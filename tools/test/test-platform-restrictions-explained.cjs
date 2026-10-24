@@ -129,7 +129,10 @@ const MANIFEST = path.join(
 // 2026-10-24: 1 → 3 on integration. The macOS user profiles moved to llm.user_profiles
 // while the two-platform count landed, so these two AI rows now restrict macOS without a
 // reason; like the AI-profile section they are wrong declarations to open to macOS.
-const BASELINE = 3;
+// 2026-10-24: 3 → 1. The AI-profile section and llm.user_profiles list macOS again, which
+// stores its active profile, prediction count and user profiles under those keys. Only
+// llm.profiles.auto_profile_for_model, which macOS does not read, is left.
+const BASELINE = 1;
 
 // 2026-10-05: the original1794 source (SHA256 below) contained136 debt rows,
 // despite its138 allowance.31 were already canonical MENU-HIDE declarations;
@@ -139,9 +142,7 @@ const BASELINE = 3;
 const PARENT_MANIFEST_SHA256 = '06b311ca65d356b405a889fb3479538b24505649a47e1d628299bf6611a5eb59';
 const PARENT_GATE_SHA256 = '872a8889a8767accdf5fdd3cd687da8726073741d9945df27d43ecd9990de290';
 const KNOWN_UNEXPLAINED = new Set([
-	'["features.llm","ahk,linux","string","user_profiles",null,null,null,null]',
-	'["features.llm.profiles","ahk,linux","boolean","auto_profile_for_model",null,null,null,null]',
-	'["sections.llm.profiles","ahk,linux",null,null,null,null,null,null]'
+	'["features.llm.profiles","ahk,linux","boolean","auto_profile_for_model",null,null,null,null]'
 ]);
 
 if (KNOWN_UNEXPLAINED.size !== BASELINE)
