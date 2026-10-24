@@ -401,6 +401,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-proxy-policy-single-source.cjs"],
 			"repro": "node tools/test/test-proxy-policy-single-source.cjs"
+		},
+		{
+			"id": "js-0476",
+			"ordinal": 484,
+			"name": "network field check parity (one step list, every label localised, no URL in the evidence)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-network-field-check-parity.cjs"],
+			"repro": "npm run test:network-field-check-parity"
 		}
 	]
 }
