@@ -24,6 +24,8 @@ local function fixture(body)
 			app = "code", title = "Ordinary editor", reads = 0, publications = 0, depth = 0, max_depth = 0 }
 		local listener, guard
 		local environment = setmetatable({ _cached_app_id = "code", keystats = logger,
+			-- Bare keys: the shared expansion delay reads the held modifiers per key.
+			keyboard_hook = { held_modifiers = function() return {} end },
 			InputEvent = require("infra.input_event"), Monotonic = { now_ms = function() return state.now end },
 			injector = { _is_injecting = function() return false end },
 			script_actions = { is_paused = function() return false end },
