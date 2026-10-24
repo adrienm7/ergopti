@@ -916,7 +916,9 @@ helpers.describe("programmable native macOS hotstrings", function()
 	helpers.it("uses physical activation timing and permits a slow owned callback", function()
 		with_native(function(f)
 			f.type_suffix()
-			f.now = f.now + 0.5
+			-- The exact deadline instant still fires, one millisecond later does not
+			-- (the whole-millisecond comparison the three drivers share).
+			f.now = f.now + 0.501
 			helpers.assert_eq(f.tap.fn(physical("★")), false)
 			drain(f.hs)
 			helpers.assert_eq(f.calls, 0)
