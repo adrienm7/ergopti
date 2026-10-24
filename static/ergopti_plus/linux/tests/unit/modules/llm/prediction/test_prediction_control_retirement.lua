@@ -590,7 +590,7 @@ do
 			  return false
 			end
 			keyboard_shortcuts.dispatch = function(detail)
-			  if action_mode == "dispatch" and detail.key == "u" then start_successor("forwarded Main dispatch"); return true end
+			  if action_mode == "dispatch" and detail.key == key then start_successor("forwarded Main dispatch"); return true end
 			  return false
 			end
 			keyboard_shortcuts.init = noop
@@ -630,13 +630,15 @@ do
 				end
 			end
 			function state.prepare()
-				if key == "k" and terminal then state.text = " world" end
-				state.type(key == "k" and terminal and "hello" or "hello world")
+				local before_suffix = terminal and (key == "k" or key == "e" or key == "f" or key == "d")
+				if before_suffix then state.text = " world" end
+				state.type(before_suffix and "hello" or "hello world")
 				if phase ~= "debounce" then scheduler.test.advance(.5); helpers.assert_eq(#state.requests, 1) end
 				if phase == "visible" then state.requests[1].done(state.response, nil); helpers.assert_true(prediction.has_suggestions()) end
 			end
 			function state.control()
-				local codes = { u = 22, h = 35, k = 37, w = 17, c = 46, s = 31, v = 47 }
+				local codes = { u = 22, h = 35, k = 37, w = 17, c = 46, s = 31, v = 47,
+					b = 48, f = 33, e = 18, d = 32, t = 20 }
 				local code, modifiers = assert(codes[key]), { 29 }
 				if modifier == "ctrl-alt" then modifiers[#modifiers + 1] = 56
 				elseif modifier == "ctrl-meta" then modifiers[#modifiers + 1] = 125
@@ -667,6 +669,14 @@ do
 								elseif terminal and key == "w" then
 									local start = state.text:sub(1, state.caret):match("^.*()%s%S*$") or 0
 									state.text = state.text:sub(1, start) .. state.text:sub(state.caret + 1); state.caret = start
+								elseif terminal and key == "b" then state.caret = state.caret - 1
+								elseif terminal and key == "f" then state.caret = state.caret + 1
+								elseif terminal and key == "e" then state.caret = #state.text
+								elseif terminal and key == "d" then state.text = state.text:sub(1, state.caret) .. state.text:sub(state.caret + 2)
+								elseif terminal and key == "t" then
+									assert(state.caret == #state.text and state.caret >= 2, "the measured transpose case starts at the line end")
+									state.text = state.text:sub(1, state.caret - 2) .. state.text:sub(state.caret, state.caret)
+										.. state.text:sub(state.caret - 1, state.caret - 1) .. state.text:sub(state.caret + 1)
 								elseif not terminal and key == "v" then state.text = state.text:sub(1, state.caret) .. "PASTED" .. state.text:sub(state.caret + 1); state.caret = state.caret + 6
 								elseif not terminal and key == "c" then state.copy_observed = true
 								elseif not terminal and key == "s" then state.saved_text = state.text end
@@ -773,6 +783,65 @@ do
 					end)
 				end
 			end
+		end
+	end)
+
+	helpers.describe("whole Main retires Readline caret and text edits", function()
+		-- The native marker receipt establishes these caret positions; X is not
+		-- typed through Main or included in the independent receiving document.
+		local receiver = { b = { text = "hello world", caret = 10 }, f = { text = "hello world", caret = 6 },
+			e = { text = "hello world", caret = 11 }, d = { text = "helloworld", caret = 5 },
+			t = { text = "hello wordl", caret = 11 } }
+		for _, key in ipairs({ "b", "f", "e", "d", "t" }) do
+			for _, phase in ipairs({ "debounce", "late", "visible" }) do
+				for _, reset in ipairs({ false, true }) do
+					helpers.it("readline-terminal-retirement " .. key .. " " .. phase .. " reset=" .. tostring(reset), function()
+						whole_main({ key = key, phase = phase, reset = reset }, function(s)
+							s.prepare(); s.control()
+							helpers.assert_eq(s.forwarded, 1); helpers.assert_eq(s.controls, 1)
+							helpers.assert_eq(s.after_control, receiver[key], "independent receiver must match native Readline movement/edit")
+							finish_old(s, phase)
+							if phase == "debounce" then helpers.assert_eq(#s.requests, 0, "the pending pre-edit prompt must not dispatch") end
+							helpers.assert_eq(s.prediction.has_suggestions(), false, "caret or text edits must retire the original offer")
+							helpers.assert_eq(s.visible, false)
+							helpers.assert_eq(s.prediction.accept(1), false)
+							helpers.assert_eq({ text = s.text, caret = s.caret }, s.after_control)
+							helpers.assert_eq(s.output, 0)
+						end)
+					end)
+				end
+			end
+		end
+
+		-- These receiving ports model no edit outside plain terminal Ctrl. They
+		-- check classification only, not native GUI or modified C0 semantics.
+		for _, specimen in ipairs({ { "b", "ctrl", "owned-gui-editor" }, { "b", "ctrl-alt", "gnome-terminal" },
+			{ "b", "ctrl-meta", "gnome-terminal" }, { "b", "ctrl-altgr", "gnome-terminal" }, { "b", "ctrl-shift", "gnome-terminal" } }) do
+			helpers.it("readline-terminal-scope " .. table.concat(specimen, " "), function()
+				whole_main({ key = specimen[1], modifier = specimen[2], app = specimen[3] }, function(s)
+					s.prepare(); s.control(); finish_old(s, "late")
+					helpers.assert_eq(s.after_control, s.before_control)
+					helpers.assert_eq(s.forwarded, 1); helpers.assert_eq(s.controls, 1)
+					helpers.assert_true(s.prediction.has_suggestions())
+					helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.output, 1)
+				end)
+			end)
+		end
+
+		for _, phase in ipairs({ "late", "visible" }) do
+			helpers.it("readline-terminal-successor dispatch " .. phase, function()
+				whole_main({ key = "b", mode = "dispatch", phase = phase, reset = false }, function(s)
+					s.prepare(); s.control()
+					helpers.assert_eq(s.after_control, receiver.b)
+					helpers.assert_eq(s.forwarded, 1); helpers.assert_eq(s.controls, 1)
+					helpers.assert_true(s.action_entry.predecessor_retired, "retire before the configured action starts its successor")
+					helpers.assert_true(s.action_started)
+					s.requests[1].done(s.response, nil); helpers.assert_eq(s.prediction.has_suggestions(), false)
+					s.scheduler.test.advance(2); helpers.assert_eq(#s.requests, 2)
+					s.requests[2].done(s.response, nil); helpers.assert_true(s.prediction.has_suggestions())
+					helpers.assert_eq(s.output, 0, "an offered successor is not an accepted insertion")
+				end)
+			end)
 		end
 	end)
 end
