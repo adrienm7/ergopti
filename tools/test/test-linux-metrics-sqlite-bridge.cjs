@@ -22,7 +22,13 @@ const html = read('static/ergopti_plus/_shared/ui/metrics_typing/index.html');
 // go through the audited builder to do it.
 assert.match(reader, /SqliteCommand\.build/);
 assert.match(reader, /flags = \{ "-readonly", "-json" \}/);
-assert.match(reader, /FROM agg_app_day/);
+// The manifest SQL is the shared catalogue's, rendered by name in the CLI
+// dialect; the aggregate table is asserted on the catalogue the reader renders.
+assert.match(reader, /Queries\.render\(name, "cli_json"/);
+assert.match(
+	read('static/ergopti_plus/_shared/data/db/queries.sql'),
+	/FROM agg_app_day\{\{where\}\}/
+);
 // The reader reaches its nine n-gram tables through a code-to-table map now,
 // so the contract is the map's coverage rather than one literal FROM clause.
 // Eight of these nine were handed to the dashboard as permanently empty maps
