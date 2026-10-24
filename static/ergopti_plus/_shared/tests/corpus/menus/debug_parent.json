@@ -22,6 +22,7 @@
 			"Open today's errors file",
 			"-",
 			"System diagnostics",
+			"Test network (PAC, proxy, download)",
 			"Show a window for every error",
 			"Report a bug",
 			"Suggest a feature"
@@ -50,6 +51,7 @@
 			"Ouvrir le fichier des erreurs du jour",
 			"-",
 			"Diagnostic système",
+			"Tester le réseau (PAC, proxy, téléchargement)",
 			"Afficher une fenêtre à chaque erreur",
 			"Signaler un bug",
 			"Proposer une fonctionnalité"
