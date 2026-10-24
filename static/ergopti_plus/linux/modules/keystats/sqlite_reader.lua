@@ -363,8 +363,9 @@ SELECT date, json_quote(app) AS app_json, json_quote(title) AS title_json, SUM(c
 FROM agg_app_day_titles%s GROUP BY date, app, title;
 ]], where))) do
 		local entry = get_entry(manifest, row.date, row.app)
-		entry.titles = entry.titles or {}
-		entry.titles[row.title] = { c = row.c or 0, ms = row.ms or 0 }
+		-- The shared page reads win_titles, as the Windows and macOS readers name it.
+		entry.win_titles = entry.win_titles or {}
+		entry.win_titles[row.title] = { c = row.c or 0, ms = row.ms or 0 }
 	end
 
 	for _, row in ipairs(query(string.format([[
