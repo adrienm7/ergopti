@@ -52,7 +52,12 @@ _HotstringsScopeRoundTrip() {
 				AssertEqual(true, Config["hotstrings.personal.words"]["enabled"], "a restore keeps a personal section on")
 				AssertEqual(4, Config["hotstrings.personal.words"]["time_activation_seconds"])
 			}
-			AssertEqual(Config["hotstrings"]["preview_ai_enabled"], true)
+			; The AI preview switch is a hotstrings key on every driver since
+			; PAR-24: a restore keeps it (restore_exclude), a clear resets it.
+			if Mode == "clear"
+				Assert(!Config["hotstrings"].Has("preview_ai_enabled"), "a clear resets the AI preview switch")
+			else
+				AssertEqual(true, Config["hotstrings"]["preview_ai_enabled"], "a restore keeps the AI preview switch")
 			AssertEqual(Config["private"]["credential"], "keep")
 			Overrides := TOML_ParseFreshFile(Fixture.overrides)
 			Assert(!Overrides["autocorrection"].Has("delay"))
