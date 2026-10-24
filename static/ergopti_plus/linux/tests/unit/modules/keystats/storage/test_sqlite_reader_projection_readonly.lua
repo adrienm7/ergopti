@@ -954,3 +954,31 @@ helpers.describe("linux-sqlite-dashboard-keys", function()
 		helpers.assert_nil(entry.titles, "no second key the page never reads")
 	end)
 end)
+
+
+helpers.describe("linux-sqlite-catalogue", function()
+	-- The manifest SQL is the shared catalogue's (_shared/data/db/queries.sql) in
+	-- the CLI dialect: the reader must issue exactly those renderings, each once,
+	-- so a statement retyped here cannot drift from macOS and Windows again.
+	local Queries = require("keystats.queries")
+	for _, case in ipairs({
+		{ label = "unfiltered", where = "" },
+		{ label = "filtered", first = "2026-10-01", last = "2026-10-02", apps = { "editor" },
+			where = " WHERE date >= '2026-10-01' AND date <= '2026-10-02' AND app IN ('editor')" },
+	}) do
+		helpers.it("linux-sqlite-catalogue: the " .. case.label .. " manifest issues the catalogue renderings", function()
+			local statements = with_stubbed_sqlite(function() return "[]" end, function(reader)
+				reader.read_manifest("/db/metrics.sqlite", case.first, case.last, case.apps)
+			end)
+			local expected = {}
+			for _, name in ipairs(Queries.names()) do
+				if name:match("^manifest%.") and name ~= "manifest.system_day" then
+					expected[#expected + 1] = Queries.render(name, "cli_json", { where = case.where })
+				end
+			end
+			table.sort(expected)
+			table.sort(statements)
+			helpers.assert_eq(statements, expected)
+		end)
+	end
+end)

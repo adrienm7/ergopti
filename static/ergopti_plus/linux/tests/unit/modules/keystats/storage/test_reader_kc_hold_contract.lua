@@ -53,7 +53,9 @@ local function assert_record(record, expected)
 end
 
 helpers.describe("linux-sqlite-kc-hold-contract", function()
-	local source = { sum_ms = 1500, count = 5, max_ms = 600, tap_count = 3, hold_count = 2 }
+	-- The native row carries the column aliases of the shared catalogue query
+	-- manifest.kc_hold (_shared/data/db/queries.sql), which the Reader renders.
+	local source = { s = 1500, c = 5, mx = 600, t = 3, h = 2 }
 	for _, item in ipairs({ { "s", 1500 }, { "n", 5 }, { "m", 600 }, { "tap", 3 }, { "hold", 2 } }) do
 		helpers.it("linux-sqlite-kc-hold-contract: projects native " .. item[1] .. " with the exact canonical value", function()
 			local record = projected(source)
@@ -67,7 +69,7 @@ helpers.describe("linux-sqlite-kc-hold-contract", function()
 	end)
 
 	helpers.it("linux-sqlite-kc-hold-contract: preserves legitimate zero values", function()
-		assert_record(projected({ sum_ms = 0, count = 0, max_ms = 0, tap_count = 0, hold_count = 0 }),
+		assert_record(projected({ s = 0, c = 0, mx = 0, t = 0, h = 0 }),
 			{ s = 0, n = 0, m = 0, tap = 0, hold = 0 })
 	end)
 
