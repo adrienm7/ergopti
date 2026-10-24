@@ -16,6 +16,7 @@ local hs          = hs
 local Logger      = require("infra.logger")
 local git_status  = require("infra.git_status")
 local reload_gate = require("reload_gate")
+local Timings     = require("infra.timings")
 local LOG         = "menu_watchers"
 
 
@@ -32,7 +33,7 @@ local LOG         = "menu_watchers"
 -- (e.g. a git commit touching several .lua files at once) so that only a
 -- single hs.reload() fires instead of one per changed file. It doubles as the
 -- settle poll interval below.
-local DEBOUNCE_SEC = 0.5
+local DEBOUNCE_SEC = Timings.sec("ui", "hs_reload_debounce_ms")
 
 -- Consecutive Git-hold re-polls before one visible warning is emitted. A live
 -- index.lock remains authoritative regardless of elapsed time: bypassing it can

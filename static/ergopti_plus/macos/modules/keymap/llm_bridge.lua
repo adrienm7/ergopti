@@ -46,6 +46,7 @@ local expander         = require("modules.keymap.expander")
 local TimerScheduler   = require("adapters.timer_scheduler")
 local ManifestReader = require("infra.manifest_reader")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
+local Timings          = require("infra.timings")
 
 local LOG    = "keymap.llm_bridge"
 local _state = nil  -- Shared CoreState, injected via M.init().
@@ -95,7 +96,7 @@ local ARROW_NAVIGATION_DELTA = {
 -- Fallback sentinel used when no row contributes a timeout. A committed
 -- infinite row itself carries duration 0, which TooltipConfig treats as the
 -- canonical "never auto-dismiss" value.
-local INFINITE_TOOLTIP_SEC       = 86400  -- 24h stand-in for "never auto-dismiss"
+local INFINITE_TOOLTIP_SEC       = Timings.sec("tooltip", "infinite_ttl_ms")  -- 24h stand-in for "never auto-dismiss"
 -- Tiny offset added on top of the tooltip timeout when chaining LLM after a hotstring,
 -- so the LLM fires just after the tooltip would normally close.
 local HOTSTRING_CHAIN_OFFSET_SEC = 0.05

@@ -89,7 +89,7 @@ local TIMEOUT_EXIT_CODE = 124
 -- Delay before auto-hiding the progress UI after a successful bootstrap.
 -- Long enough for the user to register "moteur IA prêt", short enough to
 -- not feel laggy.
-local SUCCESS_AUTO_HIDE_SEC = 1.5
+local SUCCESS_AUTO_HIDE_SEC = Timings.sec("tooltip", "success_banner_autohide_ms")
 local BOOTSTRAP_TIMEOUT_SEC = Timings.sec("llm", "dependency_bootstrap_timeout_ms")
 
 -- Keep UI hidden until the script proves a real sync is running by emitting
