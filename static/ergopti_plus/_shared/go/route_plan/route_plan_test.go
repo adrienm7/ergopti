@@ -1,13 +1,14 @@
-//go:build darwin || linux
-
 package routeplan
 
 import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 )
+
+// The route plan is pure policy: these tests run on every OS, Windows included.
 
 type routeVectors struct {
 	Plans []struct {
@@ -93,6 +94,32 @@ func TestRoutePlanReasonsNeverEchoTheirInput(t *testing.T) {
 	for _, value := range []string{reason, redirect} {
 		if value != RoutePlanInvalid && value != RoutePlanUnplannedHost {
 			t.Errorf("reason %q is outside the closed set", value)
+		}
+	}
+}
+
+// The closed refusal enum is declared once, in route_origins.json "refusals".
+func TestRoutePlanReasonsAreTheSharedClosedSet(t *testing.T) {
+	bytes, err := os.ReadFile(filepath.Join("..", "..", "modules", "network", "route_origins.json"))
+	if err != nil {
+		t.Fatalf("route origins: %v", err)
+	}
+	var inventory struct {
+		Refusals []string `json:"refusals"`
+	}
+	if err := json.Unmarshal(bytes, &inventory); err != nil {
+		t.Fatalf("route origins: %v", err)
+	}
+	got := []string{RoutePlanEmpty, RoutePlanInvalid, RoutePlanConflict, RoutePlanUnplannedHost}
+	want := append([]string(nil), inventory.Refusals...)
+	sort.Strings(got)
+	sort.Strings(want)
+	if len(got) != len(want) {
+		t.Fatalf("refusals: got %v, want %v", got, want)
+	}
+	for index := range got {
+		if got[index] != want[index] {
+			t.Fatalf("refusals: got %v, want %v", got, want)
 		}
 	}
 }
