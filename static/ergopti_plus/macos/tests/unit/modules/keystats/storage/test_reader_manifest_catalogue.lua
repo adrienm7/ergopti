@@ -48,7 +48,7 @@ helpers.describe("macOS manifest: SQL from the shared catalogue", function()
 			local statements = manifest_statements(case.first, case.last)
 			local expected = {}
 			for _, name in ipairs(Queries.names()) do
-				if name:match("^manifest%.") and name ~= "manifest.system_day" then
+				if name:match("^manifest%.") then
 					expected[#expected + 1] = Queries.render(name, "native", { where = case.where })
 				end
 			end

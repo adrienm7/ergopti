@@ -187,6 +187,14 @@ end
 -- ======================================
 -- ======================================
 
+--- Columns of the system-day row published under `manifest[date]._system`.
+--- The two battery extrema are nil when no device sampled the battery.
+local SYSTEM_DAY_FIELDS = {
+	"wifi_changes", "space_switches", "battery_sum", "battery_count", "audio_muted_ms",
+	"locked_ms", "sleep_ms", "awake_ms", "passive_count", "night_wake_count",
+	"battery_min", "battery_max",
+}
+
 --- Adds one date window of every manifest table into `manifest`.
 --- @param db userdata Open handle.
 --- @param manifest table Dict being accumulated.
@@ -425,6 +433,20 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 		end
 	end, pacer)
 
+	-- agg_system_day → manifest[date]._system, the machine's own day that both
+	-- pages read, as the Windows reader publishes it. Battery extrema stay
+	-- absent on a day no device sampled; the query already ignores the zeroes
+	-- a device without a battery stores.
+	query("agg_system_day", function()
+		for r in _rows(db, manifest_sql("manifest.system_day"), pacer) do
+			local day = manifest[r.date]
+			if not day then day = {}; manifest[r.date] = day end
+			local system = {}
+			for _, field in ipairs(SYSTEM_DAY_FIELDS) do system[field] = r[field] end
+			day._system = system
+		end
+	end, pacer)
+
 	return complete
 
 end
@@ -434,7 +456,7 @@ local MANIFEST_TABLES = {
 	"agg_app_day", "agg_app_day_buckets", "agg_app_day_burst", "agg_app_day_session",
 	"agg_app_day_chars_class", "agg_app_day_errors", "agg_app_day_ergo", "agg_app_day_layouts",
 	"agg_app_day_kc_hold", "agg_app_day_titles", "agg_app_day_hourly", "agg_app_day_hourly_min5",
-	"ngram_media_keys", "agg_app_day_media_hold", "agg_app_day_switches_to",
+	"ngram_media_keys", "agg_app_day_media_hold", "agg_app_day_switches_to", "agg_system_day",
 }
 
 --- Days per paced manifest window. The largest per-(date, app) tables return
@@ -947,6 +969,7 @@ local FINGERPRINT_SOURCES = {
 	{ "agg_app_day_hourly",      "c", "e", "es", "length(e_buckets_json)" },
 	{ "agg_app_day_hourly_min5", "c", "e", "es", "length(e_buckets_json)" },
 	{ "agg_app_day_switches_to", "count" },
+	{ "agg_system_day",          "wifi_changes", "space_switches", "locked_ms", "sleep_ms", "awake_ms", "passive_count" },
 }
 
 --- Summarizes every row the dashboards read for days up to `through_date`,
