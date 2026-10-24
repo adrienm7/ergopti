@@ -40,6 +40,8 @@ local MODULES = {
 	"table_util",
 	-- The real JSON codec and text helpers decode UTF-8 through this owner.
 	"compat.utf8",
+	-- The application identity owner normalizes names through these helpers.
+	"text_utils",
 	"modules.llm",
 	"ui.menu.menu_llm.profile_label",
 	"ui.menu.menu_llm.model_switcher",
