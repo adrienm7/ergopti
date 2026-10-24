@@ -562,6 +562,7 @@ return {
 	"tests.unit.modules.llm.prediction.test_prediction_backend",
 	"tests.unit.modules.llm.prediction.test_prediction_injection_owner",
 	"tests.unit.modules.llm.ollama.test_model_download",
+	"tests.unit.modules.llm.ollama.test_model_delete",
 	"tests.unit.modules.llm.settings.test_display_settings",
 	"tests.unit.modules.llm.settings.test_navigation_settings",
 	"tests.unit.modules.llm.prediction.test_prediction_digit_accept",

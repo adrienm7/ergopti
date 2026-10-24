@@ -3049,18 +3049,71 @@ local function _build_llm(ctx)
 		local models = ai_on and llm.get_models() or {}
 		if type(models) ~= "table" then return {} end
 		local current = llm.get_current_model and llm.get_current_model() or nil
+		local function changed()
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end
+		--- Tells the user how the removal ended: it runs after the menu closed.
+		--- @param succeeded boolean
+		--- @param tag string
+		--- @param reason string|nil
+		local function deletion_notice(succeeded, tag, reason)
+			local Notifier = require("adapters.application_notifier")
+			local delivered
+			if succeeded then
+				delivered = Notifier.send(string.format(i18n_safe("ollama.model_deleted"), tag),
+					{ title = i18n_safe("ollama.deleted_title"), level = "success" })
+			else
+				delivered = Notifier.send(string.format(i18n_safe("ollama.delete_error"), tag, tostring(reason)),
+					{ title = i18n_safe("ollama.delete_fail_title"), level = "error" })
+			end
+			if delivered ~= true then Logger.warn(LOG, "The model-deletion notice for '%s' was not delivered.", tag) end
+		end
+		--- Removes one installed model after the same confirmation Windows and macOS ask.
+		--- @param model string Ollama-native tag.
+		--- @return boolean dispatched
+		local function delete_model(model)
+			if ctx.paused == true then return false end
+			if type(llm.delete_model) ~= "function" then
+				Logger.error(LOG, "The AI engine cannot delete models — '%s' was kept.", model)
+				return false
+			end
+			local confirmed = ask_yes_no(i18n_safe("menu.llm.delete_model_title"),
+				zenity_plain(string.format(i18n_safe("menu.llm.delete_model_body"), model)),
+				i18n_safe("button.delete"), i18n_safe("button.cancel"))
+			if confirmed ~= true then return false end
+			return llm.delete_model(model, function(succeeded, tag, reason)
+				deletion_notice(succeeded, tag, reason)
+				changed()
+			end) == true
+		end
 		local rows = {}
 		for _, model in ipairs(models) do
+			-- Each installed model opens the submenu the other two drivers draw:
+			-- Select, then Delete. The parent keeps the tick of the selected one.
+			local items = ManifestMenu.template_rows("llm_model_action_rows", {
+				["model_select"] = function()
+					if llm.set_model then llm.set_model(model) end
+					changed()
+				end,
+				["model_delete"] = function() return delete_model(model) end,
+			}, {
+				["model_selected"] = function() return model == current end,
+				["model_select_ready"] = function() return ctx.paused ~= true end,
+				-- Ollama reported it, so it is installed: there is nothing to download.
+				["model_delete_present"] = function() return true end,
+				["model_download_present"] = function() return false end,
+			}, {})
+			if type(items) ~= "table" then
+				Logger.error(LOG, "The model action rows were refused — the model list cannot be drawn.")
+				return {}
+			end
 			rows[#rows + 1] = {
 				label = model,
 				-- `checked`, not a "✓" glued to the label: the tray draws its own
 				-- mark, and the glued form puts one platform's convention inside a
 				-- string twenty other languages also read.
 				checked = model == current,
-				action = function()
-					if llm.set_model then llm.set_model(model) end
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end,
+				items = items,
 			}
 		end
 		if #rows > 0 then

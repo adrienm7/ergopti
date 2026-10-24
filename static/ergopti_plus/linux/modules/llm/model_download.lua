@@ -32,10 +32,7 @@ local function translated(key)
 	return ok and type(i18n.get) == "function" and i18n.get(key) or key
 end
 
-local function valid_tag(tag)
-	return type(tag) == "string" and tag ~= ""
-		and tag:match("^[%w%._%-%/:]+$") ~= nil
-end
+local valid_tag = HttpBridge.valid_ollama_tag
 
 --- Observes actual physical retirement, never a legacy cancellation signal.
 --- @param request table

@@ -128,6 +128,12 @@ stream_watchdog_ms = 12000
 # AHK: models.ahk LLM_INSTALLED_CACHE_TTL_MS.
 installed_cache_ttl_ms = 2000
 
+# Ceiling of one Ollama DELETE /api/delete round trip (the "Delete this model
+# from cache" row); Ollama answers in well under a second once it holds no lock.
+# AHK: api_ollama/init.ahk LLM_OLLAMA_DELETE_TIMEOUT_MS.
+# LX: modules/llm/model_delete.lua.
+ollama_delete_timeout_ms = 10000
+
 # Validation chord (val_modifiers + digit N): the prediction is inserted only
 # once every modifier is released, or a held Alt/Ctrl would alter the text.
 # AHK: keymap/llm_bridge.ahk LLM_Tooltip_ScheduleSlotAcceptance.
