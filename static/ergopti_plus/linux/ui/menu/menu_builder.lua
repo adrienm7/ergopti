@@ -4932,10 +4932,12 @@ local function _build_configuration(ctx)
 		if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
 		local GlobalScope = require("infra.global_scope")
 		local committed, report = GlobalScope.apply(mode, GlobalScope.participants(ctx))
-		-- « Reverted » is only said when it is true; a pending rollback is an
-		-- ERROR the composition logs, which the error window already reports.
-		if not committed and report.reverted ~= false then
-			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+		-- The refusal names its typed failure point, as the Windows reset does:
+		-- the generic « could not be saved, it has been reverted » claimed a
+		-- revert for a pending rollback or finalization, where none took place.
+		if not committed then
+			local title, message = require("config_reset_failure").message(report, i18n_safe)
+			show_error(message, title)
 		end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed

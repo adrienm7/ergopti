@@ -116,9 +116,13 @@ helpers.describe("Linux global scope: registry and composition", function()
 			local committed, report = GlobalScope.apply("clear", { tap_holds = tap_holds, llm = stub(trace, "llm", true) })
 			helpers.assert_eq(committed, false)
 			helpers.assert_eq(report.reverted, false)
+			helpers.assert_eq({ report.point, report.kind, report.failed }, { "rollback", "rollback_pending", "llm" })
 			committed, report = GlobalScope.apply("clear", { tap_holds = stub(trace, "other") })
 			helpers.assert_eq(committed, false)
 			helpers.assert_true(report.detail:find("pending", 1, true) ~= nil, report.detail)
+			-- The refused retry is the acquire point, as on Windows: another
+			-- transaction still owns the configuration.
+			helpers.assert_eq({ report.point, report.kind, report.scope }, { "acquire", "rollback_pending", "global" })
 			stuck = false
 			committed = GlobalScope.apply("clear", { tap_holds = stub(trace, "fresh") })
 			helpers.assert_eq(committed, true)

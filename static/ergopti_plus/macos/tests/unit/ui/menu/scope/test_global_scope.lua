@@ -14,7 +14,7 @@
 local helpers = require("tests.helpers")
 
 --- A scoped owner double journaling into a shared trace.
-local function scoped_owner(trace, name, refuse)
+local function scoped_owner(trace, name, refuse, refuse_revert)
 	local owner = { committed = false }
 	function owner.apply(mode, ...)
 		-- A second argument was the retired « already asked » flag.
@@ -24,6 +24,7 @@ local function scoped_owner(trace, name, refuse)
 	end
 	function owner.revert()
 		trace[#trace + 1] = name .. ":revert"
+		if refuse_revert then return false end
 		local reverted = owner.committed
 		owner.committed = false
 		return reverted
@@ -63,7 +64,8 @@ local function build(trace, options)
 	local observed = { refreshes = {} }
 	local owners = {}
 	for _, name in ipairs({ "gestures", "shortcuts", "keyboard_layout", "llm", "metrics" }) do
-		local owner = options.missing ~= name and scoped_owner(trace, name, options.refuse == name) or nil
+		local owner = options.missing ~= name
+			and scoped_owner(trace, name, options.refuse == name, options.refuse_revert == name) or nil
 		owners[name] = function() return owner end
 	end
 	observed.deferred = {}
@@ -122,6 +124,23 @@ helpers.describe("macOS global scope", function()
 		helpers.assert_eq(observed.refreshes[1][1], false)
 		helpers.assert_eq(observed.refreshes[1][2].failed, "llm")
 		helpers.assert_eq(observed.refreshes[1][2].reverted, true)
+	end)
+
+	helpers.it("reports every refusal with its typed failure point, a pending rollback included", function()
+		local trace = {}
+		local global, observed = build(trace, { refuse = "llm", refuse_revert = "gestures" })
+		helpers.assert_eq(global.apply("recommended"), true)
+		local first = observed.refreshes[1]
+		helpers.assert_eq({ first[1], first[2].point, first[2].kind, first[2].failed },
+			{ false, "rollback", "rollback_pending", "llm" })
+		helpers.assert_eq(global.pending(), true)
+		-- The next click retries the retained rollback first; while it stays
+		-- refused the click says so instead of refusing in silence.
+		helpers.assert_eq(global.apply("clear"), false)
+		helpers.assert_eq(#observed.refreshes, 2)
+		local second = observed.refreshes[2]
+		helpers.assert_eq({ second[1], second[2].point, second[2].kind, second[2].scope },
+			{ false, "acquire", "rollback_pending", "global" })
 	end)
 
 	helpers.it("refuses a question port: neither mode asks", function()
