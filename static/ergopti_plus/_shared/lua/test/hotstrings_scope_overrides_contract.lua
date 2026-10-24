@@ -25,7 +25,7 @@ return function(helpers)
 		return assert(Codec.decode(assert(read(path), path)), path)
 	end
 	local function decode(relative) return decode_path(shared .. "/modules/hotstrings/" .. relative) end
-	local default_delay = assert(tonumber(decode("defaults.toml").delays.default_sec))
+	local default_delay = assert(tonumber(require("infra.manifest_reader").default_for("hotstrings.expansion_delay")))
 	local index = decode("_index.toml")
 
 	-- The real bundled inventory: the neutral files and every declared language

@@ -360,13 +360,13 @@ local function load_shared_defaults()
 		return s[key]
 	end
 
-	GLOBAL_DEFAULT_DELAY = tonumber(require_key("delays", "default_sec"))
+	GLOBAL_DEFAULT_DELAY = tonumber(ManifestReader.default_for("hotstrings.expansion_delay"))
 	GLOBAL_DEFAULT_COLOR = require_key("colors", "global_default")
 	NEUTRAL_COLOR        = require_key("colors", "neutral")
 	CATEGORY_DEFAULT_COLORS.personal = require_key("colors", "personal")
 
 	if type(GLOBAL_DEFAULT_DELAY) ~= "number" then
-		error("[hotstrings_config] [delays].default_sec must be a number in " .. path)
+		error("[hotstrings_config] hotstrings.expansion_delay must be a number in the feature manifest")
 	end
 end
 

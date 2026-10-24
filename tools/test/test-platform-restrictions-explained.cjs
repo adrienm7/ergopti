@@ -96,7 +96,7 @@ const MANIFEST = path.join(
 // translated strings would have frozen it in place.
 // 2026-10-20: 104 → 103. The Layout menu's macOS-only separator before the
 // active input sources is a presentation, now classified unavailable = "hide".
-const BASELINE = 91;
+const BASELINE = 90;
 
 // 2026-10-05: the original1794 source (SHA256 below) contained136 debt rows,
 // despite its138 allowance.31 were already canonical MENU-HIDE declarations;
@@ -111,7 +111,6 @@ const KNOWN_UNEXPLAINED = new Set([
 	'["features.gestures","hs","action","swipe_4_diag",null,null,null,null]',
 	'["features.gestures","hs","action","swipe_5_diag",null,null,null,null]',
 	'["features.hotstrings","hs","boolean","enabled",null,null,null,null]',
-	'["features.hotstrings","hs","number","expansion_delay",null,null,null,null]',
 	'["features.layout","ahk","boolean","ctrl_magic_save",null,null,null,null]',
 	'["features.layout","ahk","boolean","ergopti_alt_gr",null,null,null,null]',
 	'["features.layout","ahk","boolean","ergopti_base",null,null,null,null]',

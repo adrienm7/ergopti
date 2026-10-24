@@ -547,7 +547,6 @@ reason_key = "platform_reason.tap_hold_word_reset_not_on_macos"
 
 [[features.hotstrings]]
 id = "expansion_delay"
-platforms = ["hs"]
 default = 0.75
 recommended = 0.75
 input_altering = false

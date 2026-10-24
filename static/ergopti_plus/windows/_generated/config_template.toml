@@ -24,6 +24,7 @@ click_resets_word = true
 arrow_resets_word = true
 shortcut_resets_word = true
 tap_hold_resets_word = true
+expansion_delay = 0.75
 
 
 

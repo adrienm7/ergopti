@@ -50,7 +50,7 @@ HotstringsConfigLoadSharedDefaults(SharedDir := "") {
 				throw Error("_shared/modules/hotstrings/defaults.toml introuvable ou vide : " . Path)
 		}
 
-		GLOBAL_DEFAULT_DELAY := Float(_HSDefaultsRequire(c, "delays", "default_sec", Path))
+		GLOBAL_DEFAULT_DELAY := Float(ManifestDefaultFor("hotstrings.expansion_delay"))
 		DYN_HOTSTRINGS_DEFAULT_DELAY := Float(_HSDefaultsRequire(c, "delays", "dynamichotstrings_sec", Path))
 		GLOBAL_DEFAULT_COLOR := _HSDefaultsRequireHex(c, "colors", "global_default", Path)
 		HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"] := _HSDefaultsRequireHex(c, "colors", "personal", Path)
