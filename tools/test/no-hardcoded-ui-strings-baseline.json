@@ -1,0 +1,1040 @@
+[
+	{
+		"file": "_shared/ui/action_picker/script.js",
+		"sink": "textContent",
+		"text": "Cancel",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/changelog/script.js",
+		"sink": "textContent",
+		"text": "Aucune version trouvée.",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/changelog/script.js",
+		"sink": "textContent",
+		"text": "Réessayer",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/changelog/script.js",
+		"sink": "textContent",
+		"text": "Voir sur GitHub ↗",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/changelog/script.js",
+		"sink": "textContent",
+		"text": "latest",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/changelog/script.js",
+		"sink": "textContent",
+		"text": "pre-release",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/download_window/script.js",
+		"sink": "textContent",
+		"text": "Cancelling…",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/download_window/script.js",
+		"sink": "textContent",
+		"text": "Download failed",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/download_window/script.js",
+		"sink": "textContent",
+		"text": "Progression",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/download_window/script.js",
+		"sink": "textContent",
+		"text": "Unknown error.",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/download_window/script.js",
+		"sink": "textContent",
+		"text": "✅ Done",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/hotstring_editor/script.js",
+		"sink": "html title",
+		"text": "Clic pour modifier",
+		"count": 2
+	},
+	{
+		"file": "_shared/ui/hotstring_editor/script.js",
+		"sink": "textContent",
+		"text": "Compact view",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/hotstring_editor/script.js",
+		"sink": "textContent",
+		"text": "Delete",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/hotstring_editor/script.js",
+		"sink": "textContent",
+		"text": "Expanded view",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/hotstring_editor/script.js",
+		"sink": "textContent",
+		"text": "New section",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/hotstring_editor/script.js",
+		"sink": "textContent",
+		"text": "Rename section",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/hotstring_editor/script.js",
+		"sink": "textContent",
+		"text": "selected",
+		"count": 2
+	},
+	{
+		"file": "_shared/ui/metrics_apps/main.js",
+		"sink": "html title",
+		"text": "Distraction",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/metrics_apps/main.js",
+		"sink": "html title",
+		"text": "Modifier la catégorie",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/metrics_apps/main.js",
+		"sink": "html title",
+		"text": "Neutre",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/metrics_apps/main.js",
+		"sink": "html title",
+		"text": "Productif",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/metrics_apps/main.js",
+		"sink": "textContent",
+		"text": " c/min",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/metrics_apps/main.js",
+		"sink": "textContent",
+		"text": " ms",
+		"count": 2
+	},
+	{
+		"file": "_shared/ui/metrics_apps/main.js",
+		"sink": "textContent",
+		"text": "[render error] ",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/metrics_apps/script.js",
+		"sink": "html title",
+		"text": "Distraction",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/metrics_apps/script.js",
+		"sink": "html title",
+		"text": "Neutre",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/metrics_apps/script.js",
+		"sink": "html title",
+		"text": "Productif",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/metrics_apps/script.js",
+		"sink": "textContent",
+		"text": " c/min",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/metrics_apps/script.js",
+		"sink": "textContent",
+		"text": " ms",
+		"count": 2
+	},
+	{
+		"file": "_shared/ui/metrics_apps/script.js",
+		"sink": "textContent",
+		"text": "[render error] ",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/metrics_typing/modal.js",
+		"sink": "innerText",
+		"text": "Apps (",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/metrics_typing/table.js",
+		"sink": "html title",
+		"text": "Part de ce SFB parmi les SFBs de la touche",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/metrics_typing/table.js",
+		"sink": "html title",
+		"text": "Part de ce SFB parmi tous les SFBs",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/model_browser/script.js",
+		"sink": "textContent",
+		"text": "Utiliser",
+		"count": 1
+	},
+	{
+		"file": "_shared/ui/prompt_editor/script.js",
+		"sink": "alert",
+		"text": "Le nom et le prompt sont requis.",
+		"count": 1
+	},
+	{
+		"file": "linux/bin/ergopti-hotstrings",
+		"sink": "echo",
+		"text": "  Lancez : ergopti-hotstrings --install-deps",
+		"count": 1
+	},
+	{
+		"file": "linux/bin/ergopti-hotstrings",
+		"sink": "echo",
+		"text": "  Ou installez manuellement : apt-get install ${missing[*]}",
+		"count": 1
+	},
+	{
+		"file": "linux/bin/ergopti-hotstrings",
+		"sink": "echo",
+		"text": "Dépendances installées avec succès.",
+		"count": 1
+	},
+	{
+		"file": "linux/bin/ergopti-hotstrings",
+		"sink": "echo",
+		"text": "Erreur : dépendances manquantes — ${missing[*]}",
+		"count": 1
+	},
+	{
+		"file": "linux/bin/ergopti-hotstrings",
+		"sink": "echo",
+		"text": "Erreur : gestionnaire de paquets introuvable (apt, dnf ou pacman requis).",
+		"count": 1
+	},
+	{
+		"file": "linux/bin/ergopti-hotstrings",
+		"sink": "echo",
+		"text": "Erreur : répertoire du driver Linux introuvable : ${DRIVER_ROOT}",
+		"count": 1
+	},
+	{
+		"file": "linux/bin/ergopti-hotstrings",
+		"sink": "echo",
+		"text": "Installation des dépendances requises…",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "     Appartenir au groupe « input » permet de lire TOUTES les frappes",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "     Installez-la manuellement, puis relancez avec --no-deps.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "     L'unité déjà activée reste l'unique propriétaire du démarrage.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "     L'unité est installée ; XDG assurera le démarrage à la prochaine session.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "     clavier de la session, y compris les mots de passe saisis dans",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "     hotstrings, et c'est ce que font keyd et xremap.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "     l'ouverture de session.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "     n'importe quelle application. C'est ce qu'exige un moteur de",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "     prennent effet — l'appartenance à un groupe n'est lue qu'à",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  Ajoutez cette ligne à ~/.bashrc ou ~/.zshrc :",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  Lanceur  : ${BIN_DIR}/ergopti-hotstrings",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  →  ${cmd} manquant — installation de ${package_name}…",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  →  ${label} manquant — installation de ${package_name}…",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  →  ${mod} manquant — essai du paquet ${package_name}…",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  →  ${soname} manquant — installation de ${package_name}…",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  →  extension GNOME AppIndicator manquante — installation de ${package_name}…",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  → Les dépendances Lua optionnelles sont installées si disponibles.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ⚠  ${label} : aucun paquet ${pkg_mgr} connu — à installer manuellement.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ⚠  ${label} indisponible après installation de ${package_name}.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ⚠  ${mod} (${label}) : aucun paquet ${pkg_mgr} connu pour LuaJIT.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ⚠  ${mod} (${label}) indisponible pour LuaJIT — fonction dégradée.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ⚠  AVERTISSEMENT DE SÉCURITÉ",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ⚠  Déconnectez-vous et reconnectez-vous pour que les groupes",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ⚠  GNOME sans gnome-extensions — activez une extension AppIndicator pour voir l'icône.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ⚠  Impossible d'activer l'extension AppIndicator — sans elle, GNOME n'affiche pas l'icône.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ⚠  systemd absent — utilisation du démarrage automatique XDG.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ⚠  systemd présent mais aucun bus utilisateur joignable (session absente).",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✔  ${cmd} — capacité vérifiée",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✔  ${cmd} — déjà installé",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✔  ${label} — capacité vérifiée",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✔  ${label} — déjà installé",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✔  ${mod} (${label}) — capacité vérifiée",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✔  ${mod} (${label}) — déjà installé",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✔  ${soname} — capacité vérifiée",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✔  ${soname} — déjà installé",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✔  démarrage automatique XDG : ${AUTOSTART_FILE}",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✔  extension GNOME AppIndicator activée (effective à la prochaine connexion)",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✔  extension GNOME AppIndicator activée",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✔  extension GNOME AppIndicator — déjà active",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✔  lanceur : ${BIN_DIR}/ergopti-hotstrings",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✔  service ergopti-hotstrings activé et démarré",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✗  ${package_name} a été installé, mais '${cmd}' reste introuvable.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✗  ${package_name} a été installé, mais '${soname}' reste indisponible.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✗  Aucun paquet ${pkg_mgr} déclaré pour la bibliothèque '${soname}'.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "  ✗  Aucun paquet ${pkg_mgr} déclaré pour la dépendance '${cmd}'.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "=== Création des services systemd utilisateur ===",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "=== Dépendances Lua optionnelles (event loop, timers, webviews, signaux) ===",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "=== Dépendances ignorées (--no-deps) ===",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "=== Ergopti ${ERGOPTI_VERSION} — vérification des dépendances ===",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "=== Icône de la barre système et fenêtres ===",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "=== Installation des fichiers ===",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "=== Installation terminée ===",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "=== Permissions d'entrée (nécessite sudo) ===",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "Attention : ${BIN_DIR} n'est pas dans votre PATH.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "Canonical native archive build helper unavailable",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "Le daemon tourne en arrière-plan. Pour vérifier son état :",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "Native archive bin parent unavailable",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "Native archive build prerequisites unavailable; install a C compiler and libc headers, then use --no-deps",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "Native archive build refused; stage retained: $NATIVE_OUTPUT_STAGE",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "Native payload copy requires tar",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "Option inconnue : $1",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "Pour démarrer le daemon manuellement :",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "Source network build evidence retained: $NATIVE_LUV_STAGE",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "Source network build refused; stage retained: $NATIVE_LUV_STAGE",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "Target native archive backend unavailable",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "Unreviewed source native module directory",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "archive-digest-unavailable: retained-FD updates require an actual OpenSSL3 runtime; capability remains unavailable.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "proxy-backend-unavailable: installed packages did not provide the required native runtime.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "proxy-backend-unavailable: no verified ${manager} runtime provider; install the documented prerequisites.",
+		"count": 1
+	},
+	{
+		"file": "linux/install.sh",
+		"sink": "echo",
+		"text": "source-build-toolchain-unavailable",
+		"count": 1
+	},
+	{
+		"file": "linux/install/build_native_luv.sh",
+		"sink": "echo",
+		"text": "Native luv source recipe required",
+		"count": 1
+	},
+	{
+		"file": "linux/install/build_native_luv.sh",
+		"sink": "echo",
+		"text": "Native source LuaJIT networking module generated",
+		"count": 1
+	},
+	{
+		"file": "linux/install/launch.sh",
+		"sink": "echo",
+		"text": "Ergopti+ is already running in this session ($lock_root/ergopti.lock is held); this launch was refused.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/launch.sh",
+		"sink": "echo",
+		"text": "Input permission authorization was cancelled or failed.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/launch.sh",
+		"sink": "echo",
+		"text": "The session could not acquire its configured input groups.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/layout_registry.sh",
+		"sink": "echo",
+		"text": "Layout registry not found beside ${driver_source} nor at ${checkout_registry}.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/ownership.sh",
+		"sink": "echo",
+		"text": "Expected driver source, shared source, installation root, then optionally an extra source and its installed path.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/ownership.sh",
+		"sink": "echo",
+		"text": "Invalid extra ownership source.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/ownership.sh",
+		"sink": "echo",
+		"text": "Invalid ownership source or destination.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/ownership.sh",
+		"sink": "echo",
+		"text": "Payload filename cannot be represented safely.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/setup_permissions.sh",
+		"sink": "echo",
+		"text": "Account identity mismatch.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/setup_permissions.sh",
+		"sink": "echo",
+		"text": "Input setup requires administrator privileges.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/setup_permissions.sh",
+		"sink": "echo",
+		"text": "No login manager is running; user enrollment is deferred to graphical launch.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/setup_permissions.sh",
+		"sink": "echo",
+		"text": "Refusing a non-desktop account.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/setup_permissions.sh",
+		"sink": "echo",
+		"text": "Session $session could not be inspected; enrollment is deferred to graphical launch.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/setup_permissions.sh",
+		"sink": "echo",
+		"text": "The current kernel could not load uinput; its next-boot configuration is installed.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/setup_permissions.sh",
+		"sink": "echo",
+		"text": "udev is not running; the installed rule will apply when it starts.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/start_at_login.sh",
+		"sink": "echo",
+		"text": "Automatic startup requires an installed application.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/start_at_login.sh",
+		"sink": "echo",
+		"text": "Linked ownership receipt refused.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/start_at_login.sh",
+		"sink": "echo",
+		"text": "Refusing to replace a linked startup setting.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/start_at_login.sh",
+		"sink": "echo",
+		"text": "The startup entry belongs to another command.",
+		"count": 1
+	},
+	{
+		"file": "linux/install/stop_sessions.sh",
+		"sink": "echo",
+		"text": "Package session cleanup requires root.",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "Duplicate ownership path.",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "Explicit --yes confirmation is required; personal data will be retained.",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "Installation ownership manifest is missing.",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "Installation path crosses a symbolic link.",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "Installation prefix does not exist.",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "Invalid ownership digest.",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "Missing --prefix value.",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "No dialog tool (zenity, kdialog) or notify-send is available.",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "Owned file was replaced by a link or another file type.",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "Refusing to remove a source checkout.",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "Refusing to remove files inside a source checkout.",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "Startup entry belongs to a different installation: $entry",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "The application did not finish shutting down.",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "The launcher belongs to a different installation.",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "The prefix is not a complete owned standalone installation.",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "The service was modified or has no ownership record; uninstall was refused.",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "The system installation has no verified package owner.",
+		"count": 1
+	},
+	{
+		"file": "linux/uninstall.sh",
+		"sink": "echo",
+		"text": "The uninstall failure notification could not be displayed.",
+		"count": 1
+	},
+	{
+		"file": "macos/modules/llm/api_mlx.lua",
+		"sink": "Notifications.notify",
+		"text": "MLX incompatible",
+		"count": 1
+	},
+	{
+		"file": "macos/ui/download_window/script.js",
+		"sink": "textContent",
+		"text": "Cancelling…",
+		"count": 1
+	},
+	{
+		"file": "macos/ui/download_window/script.js",
+		"sink": "textContent",
+		"text": "Download failed",
+		"count": 1
+	},
+	{
+		"file": "macos/ui/download_window/script.js",
+		"sink": "textContent",
+		"text": "Progression",
+		"count": 1
+	},
+	{
+		"file": "macos/ui/download_window/script.js",
+		"sink": "textContent",
+		"text": "Unknown error.",
+		"count": 1
+	},
+	{
+		"file": "macos/ui/download_window/script.js",
+		"sink": "textContent",
+		"text": "✅ Done",
+		"count": 1
+	},
+	{
+		"file": "macos/ui/download_window/script.js",
+		"sink": "textContent",
+		"text": "🛑 Annuler",
+		"count": 1
+	},
+	{
+		"file": "macos/ui/menu/menu_hotstrings_custom.lua",
+		"sink": "text_prompt",
+		"text": "OK",
+		"count": 1
+	},
+	{
+		"file": "macos/ui/menu/menu_hotstrings_management.lua",
+		"sink": "text_prompt",
+		"text": "OK",
+		"count": 3
+	},
+	{
+		"file": "macos/ui/menu/menu_llm/api_panel.lua",
+		"sink": "text_prompt",
+		"text": "OK",
+		"count": 1
+	},
+	{
+		"file": "macos/ui/menu/menu_llm/models_manager_mlx_server.lua",
+		"sink": "notifications.notify",
+		"text": "MLX incompatible",
+		"count": 1
+	},
+	{
+		"file": "macos/ui/menu/menu_llm/models_manager_ollama.lua",
+		"sink": "notifications.notify",
+		"text": "Ollama executable unavailable",
+		"count": 1
+	},
+	{
+		"file": "macos/ui/menu/menu_llm/models_manager_ollama.lua",
+		"sink": "notifications.notify",
+		"text": "readiness failed",
+		"count": 1
+	},
+	{
+		"file": "macos/ui/menu/menu_llm/models_manager_ollama.lua",
+		"sink": "notifications.notify",
+		"text": "task creation failed",
+		"count": 1
+	},
+	{
+		"file": "macos/ui/menu/menu_llm/models_manager_ollama.lua",
+		"sink": "notifications.notify",
+		"text": "task start failed",
+		"count": 1
+	},
+	{
+		"file": "macos/ui/menu/shortcut_utils.lua",
+		"sink": "block_alert",
+		"text": "OK",
+		"count": 1
+	},
+	{
+		"file": "windows/modules/llm/ollama_webview.ahk",
+		"sink": "Gui_Create",
+		"text": "IA",
+		"count": 1
+	},
+	{
+		"file": "windows/ui/editors.ahk",
+		"sink": "AddText",
+		"text": " → Echap",
+		"count": 1
+	},
+	{
+		"file": "windows/ui/hotstrings_config_window/hcw_helpers.ahk",
+		"sink": "AddText",
+		"text": "ms",
+		"count": 1
+	},
+	{
+		"file": "windows/ui/personal_toml_editor.ahk",
+		"sink": "AddText",
+		"text": "{Enter}  {Tab}  {Left}  {Right}  {Up}  {Down}  {BackSpace}  {Delete}  {Escape}  {Home}  {End}",
+		"count": 1
+	}
+]
