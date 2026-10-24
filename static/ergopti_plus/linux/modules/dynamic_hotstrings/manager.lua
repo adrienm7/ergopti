@@ -30,6 +30,7 @@ local UserCode = require("modules.dynamic_hotstrings.user_code")
 -- Shared TOML decoder — this module owns no bespoke parser.
 local TomlCodec = require("toml_codec")
 local TomlWriter = require("toml_codec.writer")
+local KEY = require("config_keys").KEY
 
 local LOG = "modules.dynamic_hotstrings.manager"
 
@@ -72,9 +73,9 @@ local PERSONAL_SECTION = "personal_info"
 -- Active trigger character. Seeded from the shared manifest — the declaration
 -- is the only place the default lives — and overridden by init() when the user
 -- has chosen another one.
-local _trigger_char = ManifestReader.default_for("hotstrings.trigger_char")
+local _trigger_char = ManifestReader.default_for(KEY.HOTSTRINGS_TRIGGER_CHAR)
 -- The canonical master leaf; its desired value is read at init() and refresh().
-local MASTER_PATH = "hotstrings.dynamic.enabled"
+local MASTER_PATH = KEY.HOTSTRINGS_DYNAMIC_ENABLED
 local _desired_enabled = ManifestReader.default_for(MASTER_PATH)
 local _enabled      = false        -- builtin availability and desired master
 local _rules_count  = 0            -- how many rules were registered
@@ -366,10 +367,10 @@ function M.refresh(snapshot, inverse)
 		if snapshot and inverse then
 			if UserCode.scope_restore(snapshot) ~= true then return false, "programmable-refused" end
 		elseif snapshot then
-			if UserCode.scope_adopt(snapshot, Preferences.get("hotstrings.dynamic.user_code.time_activation_seconds"),
-				Preferences.get("hotstrings.dynamic.user_code.enabled")) ~= true then return false, "programmable-refused" end
-		elseif UserCode.set_time_activation(Preferences.get("hotstrings.dynamic.user_code.time_activation_seconds")) ~= true
-			or UserCode.set_enabled(Preferences.get("hotstrings.dynamic.user_code.enabled")) ~= true then
+			if UserCode.scope_adopt(snapshot, Preferences.get(KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS),
+				Preferences.get(KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED)) ~= true then return false, "programmable-refused" end
+		elseif UserCode.set_time_activation(Preferences.get(KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS)) ~= true
+			or UserCode.set_enabled(Preferences.get(KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED)) ~= true then
 			return false, "programmable-refused"
 		end
 	end
