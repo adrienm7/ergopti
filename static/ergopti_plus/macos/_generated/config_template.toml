@@ -432,7 +432,6 @@ time_activation_seconds = 0.75
 [llm]
 enabled = false
 app_profile_overrides = ""
-user_profiles = ""
 agent_system1 = ""
 agent_system2 = ""
 agent_mode = "off"
@@ -464,6 +463,12 @@ user_models = []
 selected = "mlx"
 ollama = "gemma-4-E2B-it"
 mlx = "Qwen3.5-2B"
+
+
+
+[llm.profiles]
+active = "basic"
+num_predictions = 3
 
 
 
