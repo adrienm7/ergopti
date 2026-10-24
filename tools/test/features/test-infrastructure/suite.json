@@ -491,8 +491,8 @@
 			"repro": "node tools/test/test-windows-replay-consumers.cjs"
 		},
 		{
-			"id": "js-0475",
-			"ordinal": 483,
+			"id": "js-0477",
+			"ordinal": 485,
 			"name": "local runners refuse a host whose toolchain differs from CI (pinned Node, Lua 5.4, non-root, pwsh)",
 			"cmd": "node",
 			"args": ["tools/test/test-host-toolchain.cjs"],
