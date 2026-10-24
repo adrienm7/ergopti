@@ -1020,7 +1020,7 @@ _HS_PersonalRows(Options := unset) {
 			Map("hotstring_file_ready", (*) => true, "personal_open_present", (*) => true,
 				"personal_controls_head_boundary", (*) => true, "personal_controls_tail_boundary", (*) => false,
 				"personal_preferences_present", (*) => true, "personal_controls_ready", (*) => true,
-				"personal_close_on_add", (*) => _EditorPrefGet("close_on_add", "1") == "1"),
+				"personal_close_on_add", (*) => _EditorCloseOnAddEnabled()),
 			Map("personal_editor", (*) => EditorRow is Map ? [EditorRow] : [],
 				"personal_default_parent", (*) => DefaultParent, "personal_legacy_before", (*) => [], "personal_legacy_after", (*) => []))
 		if !(Controls is Array)
