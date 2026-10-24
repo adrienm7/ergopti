@@ -1360,7 +1360,7 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 		; recurring line is de-bounced, not permanently silenced (logger-dedup-tick): a
 		; streak that outlives the window re-surfaces. When the streak ends a single
 		; "N identical lines suppressed" summary is emitted. Mirrors the macOS driver.
-		if (MsgLine == _LOGGER_DEDUP_KEY and ((Now - _LastErrTime + 0x100000000) & 0xFFFFFFFF) < LOGGER_DEDUP_WINDOW_MS) {
+		if (MsgLine == _LOGGER_DEDUP_KEY and (Now - _LastErrTime) < LOGGER_DEDUP_WINDOW_MS) {
 				_LOGGER_DEDUP_COUNT += 1
 				return
 		}
