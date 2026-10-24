@@ -561,3 +561,5 @@ for _HSCS_DefaultChoiceKind in ["missing", "kind", "caption"]
 		_HSCS_DefaultChoiceSourceReceiving.Bind(_HSCS_DefaultChoiceKind))
 
 #Include test_personal_default_preference.ahk
+
+#Include test_personal_close_on_add.ahk
