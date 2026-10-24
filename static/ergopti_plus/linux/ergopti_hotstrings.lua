@@ -1691,9 +1691,11 @@ local function main()
 			local mods = type(detail.mods) == "table" and detail.mods or {}
 			local key = keyboard_shortcuts.collision_identity(detail.key)
 			-- These standard edits change text or selection without on_char input.
+			-- Readline line edits also invalidate a terminal's old completion.
 			-- Withdraw before dispatch so a bound action can start its own request.
 			if prediction_engine and mods.ctrl and not (mods.alt or mods.meta or mods.altgr)
-				and (key == "v" or key == "z" or (not mods.shift and (key == "x" or key == "y" or key == "a"))) then
+				and (key == "v" or key == "z" or (not mods.shift and (key == "x" or key == "y" or key == "a"
+					or (WordReset.is_terminal_app(_cached_app_id) and (key == "u" or key == "h" or key == "k" or key == "w"))))) then
 				pcall(function() prediction_engine.withdraw() end)
 			end
 			secure_focus_guard.blocks_text()
