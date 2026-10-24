@@ -23,7 +23,6 @@
 		"static/ergopti_plus/linux/infra/hotstrings_scope.lua": 1,
 		"static/ergopti_plus/linux/infra/key_combinations_scope.lua": 10,
 		"static/ergopti_plus/linux/infra/legacy_hotstring_storage.lua": 1,
-		"static/ergopti_plus/linux/infra/metrics_scope.lua": 7,
 		"static/ergopti_plus/linux/infra/program_binding_transaction.lua": 1,
 		"static/ergopti_plus/linux/infra/script_scope.lua": 5,
 		"static/ergopti_plus/linux/infra/script_settings.lua": 1,

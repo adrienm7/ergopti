@@ -9,6 +9,7 @@ local Transaction = require("config_scope_transaction")
 local FencedTransaction = require("config_scope_fenced_transaction")
 local Codec = require("toml_codec")
 local Logger = require("logger.shim")
+local KEY = require("config_keys").KEY
 local LOG = "infra.metrics_scope"
 local _owner, _sequence = nil, 0
 
@@ -52,14 +53,14 @@ function M.new(options)
 				local path = "metrics." .. key
 				if touched[path] then state.collector[key] = values[path] end
 			end
-			if touched["metrics.encrypt"] then state.collector.cipher_enabled = values["metrics.encrypt"] end
-			local widget_paths = { running = "metrics.wpm_widget_visible",
-				use_source_colors = "metrics.wpm_widget_colors", graph = "metrics.wpm_widget_graph" }
+			if touched[KEY.METRICS_ENCRYPT] then state.collector.cipher_enabled = values[KEY.METRICS_ENCRYPT] end
+			local widget_paths = { running = KEY.METRICS_WPM_WIDGET_VISIBLE,
+				use_source_colors = KEY.METRICS_WPM_WIDGET_COLORS, graph = KEY.METRICS_WPM_WIDGET_GRAPH }
 			for key, path in pairs(widget_paths) do
 				if touched[path] then state.widget[key] = values[path]; state.widget.shown = false end
 			end
 			state.widget.last_draw_s = nil
-			local tray_paths = { running = "metrics.wpm_menubar_visible", use_colors = "metrics.wpm_menubar_colors" }
+			local tray_paths = { running = KEY.METRICS_WPM_MENUBAR_VISIBLE, use_colors = KEY.METRICS_WPM_MENUBAR_COLORS }
 			for key, path in pairs(tray_paths) do
 				if touched[path] then state.readout[key] = values[path]; state.readout.presentation = nil end
 			end
