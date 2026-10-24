@@ -124,7 +124,7 @@ body.mode-bootstrap .btn-row {
 /* ======================================= */
 
 #bar-bg {
-	background: #3a3a3c;
+	background: var(--theme-gray4-dark);
 	border-radius: 4px;
 	flex-shrink: 0; /* Prevent the progress bar from shrinking when logs fill up */
 	height: 12px;
@@ -133,7 +133,7 @@ body.mode-bootstrap .btn-row {
 }
 
 #bar-fill {
-	background: linear-gradient(90deg, #30d158, #34c759);
+	background: linear-gradient(90deg, var(--theme-green-dark), var(--theme-green));
 	border-radius: 4px;
 	height: 100%;
 	transition: width 0.35s ease;
@@ -141,7 +141,7 @@ body.mode-bootstrap .btn-row {
 }
 
 #bar-fill.error {
-	background: linear-gradient(90deg, #ff453a, #ff6b5f);
+	background: linear-gradient(90deg, var(--theme-red-dark), #ff6b5f);
 }
 
 #status-line {
@@ -152,7 +152,7 @@ body.mode-bootstrap .btn-row {
 }
 
 #pct {
-	color: #30d158;
+	color: var(--theme-green-dark);
 	font-size: 30px;
 	font-weight: 700;
 	letter-spacing: -1px;
@@ -223,7 +223,7 @@ body.is-error #step-line {
 }
 
 #bootstrap-bar-bg {
-	background: #3a3a3c;
+	background: var(--theme-gray4-dark);
 	border-radius: 2px;
 	height: 4px;
 	overflow: hidden;
@@ -252,7 +252,7 @@ body.kind-ollama_model #bootstrap-bar-fill {
 	background: #f2bf4d;
 }
 body.is-error #bootstrap-bar-fill {
-	background: #ff453a;
+	background: var(--theme-red-dark);
 }
 
 /* ===================================== */
@@ -279,7 +279,7 @@ button {
 #btn-cancel {
 	background: rgba(255, 59, 48, 0.12);
 	border-color: rgba(255, 59, 48, 0.45);
-	color: #ff453a;
+	color: var(--theme-red-dark);
 }
 
 #btn-cancel:hover {
@@ -305,7 +305,7 @@ button {
 #btn-retry {
 	background: rgba(48, 209, 88, 0.12);
 	border-color: rgba(48, 209, 88, 0.45);
-	color: #30d158;
+	color: var(--theme-green-dark);
 }
 
 #btn-retry:hover {
@@ -327,11 +327,11 @@ button {
 }
 
 #done-msg.ok {
-	color: #30d158;
+	color: var(--theme-green-dark);
 }
 
 #done-msg.error {
-	color: #ff453a;
+	color: var(--theme-red-dark);
 }
 
 #log-area {

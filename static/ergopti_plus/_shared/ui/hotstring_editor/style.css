@@ -28,43 +28,37 @@ body {
 }
 
 :root {
-	--bg: #f2f2f7;
-	--surface: #fff;
-	--border: #d1d1d6;
-	--text: #1d1d1f;
-	--sub: #6e6e73;
-	--hint: #8e8e93;
-	--accent: #007aff;
+	--bg: var(--theme-bg);
+	--surface: var(--theme-surface);
+	--border: var(--theme-separator);
+	--text: var(--theme-text);
+	--sub: var(--theme-sub);
+	--hint: var(--theme-gray);
+	--accent: var(--theme-accent);
 	--accent2: #5856d6;
-	--danger: #ff3b30;
-	--row-sep: #f2f2f7;
+	--danger: var(--theme-danger);
+	--row-sep: var(--theme-gray6);
 	--shadow: 0 1px 3px rgba(0, 0, 0, 0.09);
-	--tag-bg: #f2f2f7;
+	--tag-bg: var(--theme-gray6);
 	--tag-on: #ddeeff;
-	--tag-on-c: #007aff;
+	--tag-on-c: var(--theme-blue);
 	--chip-bg: #ddeeff;
 	--chip-c: #1a4bbf;
 	--cmd-hover-bg: #f1f1f1;
 	--chip-bd: rgba(26, 75, 191, 0.22);
 	--row-hover: #f5f8ff;
-	--warning: #ff9500;
+	--warning: var(--theme-orange);
 	--warning-bg: #fff8ee;
 }
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--bg: #1c1c1e;
 		--surface: #242424;
-		--border: #3a3a3c;
-		--text: #fff;
-		--sub: rgba(235, 235, 245, 0.6);
 		--hint: #a2a2a2;
-		--accent: #0a84ff;
 		--accent2: #bf5af2;
-		--danger: #ff453a;
-		--row-sep: #3a3a3c;
+		--row-sep: var(--theme-gray4-dark);
 		--shadow: none;
-		--tag-bg: #3a3a3c;
+		--tag-bg: var(--theme-gray4-dark);
 		--tag-on: #0a3a6e;
 		--tag-on-c: #64b5f6;
 		--chip-bg: #5e5f60;
@@ -72,7 +66,7 @@ body {
 		--cmd-hover-bg: #131313;
 		--chip-bd: rgba(147, 184, 248, 0.28);
 		--row-hover: #333335;
-		--warning: #ff9f0a;
+		--warning: var(--theme-orange-dark);
 		--warning-bg: #2a2000;
 	}
 }
@@ -307,7 +301,7 @@ body {
 
 @media (prefers-color-scheme: dark) {
 	.trig-lbl {
-		background: #2c2c2e;
+		background: var(--theme-gray5-dark);
 		border-color: #48484a;
 	}
 }
@@ -617,7 +611,7 @@ body {
 @media (prefers-color-scheme: dark) {
 	.fg input[type='text'],
 	.fg input[type='number'] {
-		background: #3a3a3c;
+		background: var(--theme-gray4-dark);
 		border-color: #5a5a5c;
 	}
 }
@@ -630,7 +624,7 @@ body {
 
 /* Distinct accent fill so the priority chip reads apart from the boolean flags. */
 .tag-prio {
-	background: var(--accent, #007aff);
+	background: var(--accent, var(--theme-blue));
 	color: #fff;
 }
 
@@ -789,7 +783,7 @@ body {
 
 @media (prefers-color-scheme: dark) {
 	.trig-editor {
-		background: #3a3a3c;
+		background: var(--theme-gray4-dark);
 		border-color: #5a5a5c;
 	}
 }
@@ -858,7 +852,7 @@ body {
 
 @media (prefers-color-scheme: dark) {
 	.output-editor {
-		background: #3a3a3c;
+		background: var(--theme-gray4-dark);
 		border-color: #5a5a5c;
 	}
 }
@@ -1207,7 +1201,7 @@ details.cmd-help[open] summary::before {
 }
 
 #save-toast {
-	background: #1c1c1e;
+	background: var(--theme-gray6-dark);
 	border-radius: 8px;
 	bottom: 14px;
 	color: #fff;

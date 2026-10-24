@@ -1,0 +1,146 @@
+/* _shared/ui/theme.css */
+
+/* =========================================================================== */
+/* Shared theme: the one place the shared pages write their recurring colours. */
+/* A page that uses a token links this stylesheet before its own. Windows      */
+/* serves it from the shared virtual host; macOS and Linux inline it like any  */
+/* other local stylesheet.                                                     */
+/*                                                                             */
+/* Two layers:                                                                 */
+/* 1. The palette names a colour once. Its tokens are static: a page that      */
+/*    wants the dark appearance's red writes var(--theme-red-dark) itself.     */
+/* 2. The semantic tokens flip with the appearance. They hold the three looks  */
+/*    the pages share today: the system look of the editors, the dialog look   */
+/*    of the error, diagnostics and update pages, and the metrics dashboards.  */
+/*    A page maps its own token names onto them, so its rules are unchanged.   */
+/*                                                                             */
+/* A colour that only one page uses stays in that page; the census in          */
+/* tools/lint/hex-colours.cjs counts the literals that remain.                 */
+/* =========================================================================== */
+
+/* ========================= */
+/* ========================= */
+/* ======= 1/ Palette ====== */
+/* ========================= */
+/* ========================= */
+
+:root {
+	/* Apple system colours, light and dark appearance. */
+	--theme-blue: #007aff;
+	--theme-blue-dark: #0a84ff;
+	--theme-red: #ff3b30;
+	--theme-red-dark: #ff453a;
+	--theme-green: #34c759;
+	--theme-green-dark: #30d158;
+	--theme-orange: #ff9500;
+	--theme-orange-dark: #ff9f0a;
+	--theme-gray: #8e8e93;
+
+	/* Apple system greys and label colours. */
+	--theme-label: #1d1d1f;
+	--theme-secondary-label: #6e6e73;
+	--theme-gray4: #d1d1d6;
+	--theme-gray5: #e5e5ea;
+	--theme-gray6: #f2f2f7;
+	--theme-gray4-dark: #3a3a3c;
+	--theme-gray5-dark: #2c2c2e;
+	--theme-gray6-dark: #1c1c1e;
+	--theme-page-background: #f5f5f7;
+}
+
+/* ======================================= */
+/* ======================================= */
+/* ======= 2/ System look (editors) ====== */
+/* ======================================= */
+/* ======================================= */
+
+:root {
+	--theme-bg: var(--theme-gray6);
+	--theme-surface: #fff;
+	--theme-surface-2: #f6f6f9;
+	--theme-separator: var(--theme-gray4);
+	--theme-text: var(--theme-label);
+	--theme-sub: var(--theme-secondary-label);
+	--theme-accent: var(--theme-blue);
+	--theme-accent-soft: rgba(0, 122, 255, 0.12);
+	--theme-danger: var(--theme-red);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--theme-bg: var(--theme-gray6-dark);
+		--theme-surface: var(--theme-gray5-dark);
+		--theme-surface-2: #242426;
+		--theme-separator: var(--theme-gray4-dark);
+		--theme-text: #fff;
+		--theme-sub: rgba(235, 235, 245, 0.6);
+		--theme-accent: var(--theme-blue-dark);
+		--theme-accent-soft: rgba(10, 132, 255, 0.22);
+		--theme-danger: var(--theme-red-dark);
+	}
+}
+
+/* ===================================================== */
+/* ===================================================== */
+/* ======= 3/ Dialog look (error, health, update) ====== */
+/* ===================================================== */
+/* ===================================================== */
+
+:root {
+	--theme-dialog-text: #1a1a1a;
+	--theme-dialog-muted: #666;
+	--theme-dialog-background: #fff;
+	--theme-dialog-panel: #f6f6f6;
+	--theme-dialog-border: #e0e0e0;
+	--theme-dialog-code-background: #1e1e1e;
+	--theme-dialog-code-text: #d4d4d4;
+	--theme-dialog-accent: #0a66c2;
+	--theme-dialog-accent-text: #fff;
+	--theme-dialog-ok: #1a7f37;
+	--theme-dialog-fail: #cf222e;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--theme-dialog-text: #e6e6e6;
+		--theme-dialog-muted: #9a9a9a;
+		--theme-dialog-background: #1f1f1f;
+		--theme-dialog-panel: #2a2a2a;
+		--theme-dialog-border: #3a3a3a;
+		--theme-dialog-code-background: #111;
+		--theme-dialog-ok: #3fb950;
+		--theme-dialog-fail: #ff7b72;
+	}
+}
+
+/* =========================================== */
+/* =========================================== */
+/* ======= 4/ Metrics look (dashboards) ====== */
+/* =========================================== */
+/* =========================================== */
+
+:root {
+	--theme-metrics-bg: var(--theme-page-background);
+	--theme-metrics-panel: #ffffff;
+	--theme-metrics-text: var(--theme-label);
+	--theme-metrics-text-muted: #86868b;
+	--theme-metrics-strong: var(--theme-label);
+	--theme-metrics-border: #d2d2d7;
+	--theme-metrics-th-bg: var(--theme-gray5);
+	--theme-metrics-th-hover: var(--theme-gray4);
+	--theme-metrics-td-hover: #f0f0f5;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--theme-metrics-bg: #1e1e1e;
+		--theme-metrics-panel: #2d2d2d;
+		--theme-metrics-text: #f0f0f0;
+		--theme-metrics-text-muted: #aaaaaa;
+		--theme-metrics-strong: #ffffff;
+		--theme-metrics-border: #444444;
+		--theme-metrics-th-bg: #333333;
+		--theme-metrics-th-hover: #444444;
+		--theme-metrics-td-hover: #3d3d3d;
+	}
+}
