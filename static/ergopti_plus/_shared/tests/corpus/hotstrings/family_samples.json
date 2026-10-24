@@ -1,0 +1,338 @@
+{
+	"$schema": "https://ergopti.com/schema/corpus/hotstring_family_samples.v1.json",
+	"description": "Two or three SHIPPED expansions per hotstring family of the menu manifest (hotstring_category_keys in _shared/modules/menu/menu_manifest.json). vectors.json pins the engine on hand-written entries; this file pins the shipped data. Each sample names the shipped file (relative to static/), its section and the trigger; the replay reads that entry through the shared parser _shared/lua/toml_codec/reader.lua, with its own output and flags, then types `buffer` and, for an entry that waits for one, `terminator`, through the E2E harness of each Lua driver, exactly as it replays vectors.json. `expected` has the meaning it has in vectors.json (backspace_count is the logical count of replaced codepoints). A family listed in `excluded_families` ships no file to sample, for the reason given.",
+	"version": "1.0.0",
+	"field_semantics": {
+		"family": "A key of hotstring_category_keys in the menu manifest. Every family not excluded must have at least two samples.",
+		"file": "The shipped hotstring file, relative to the repository's static/ directory.",
+		"section": "The [[section]] of that file the entry is declared in.",
+		"trigger": "The entry's trigger exactly as the file spells it."
+	},
+	"excluded_families": {
+		"dynamic_hotstrings": "Dates and personal-information prefixes are computed at expansion time (_shared/lua/dynamic_hotstrings); their replay lives in the dynamic_hotstrings corpus."
+	},
+	"samples": [
+		{
+			"id": "autocorrection.abbreviations.adn",
+			"family": "autocorrection",
+			"file": "ergopti_plus/_shared/modules/hotstrings/autocorrection.toml",
+			"section": "abbreviations",
+			"trigger": "adn",
+			"buffer": "adn",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "ADN",
+				"backspace_count": 3
+			}
+		},
+		{
+			"id": "autocorrection.names.autohotkey",
+			"family": "autocorrection",
+			"file": "ergopti_plus/_shared/modules/hotstrings/autocorrection.toml",
+			"section": "names",
+			"trigger": "autohotkey",
+			"buffer": "autohotkey",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "AutoHotkey",
+				"backspace_count": 10
+			}
+		},
+		{
+			"id": "autocorrection.technical_terms.adaboost",
+			"family": "autocorrection",
+			"file": "ergopti_plus/_shared/modules/hotstrings/autocorrection.toml",
+			"section": "technical_terms",
+			"trigger": "adaboost",
+			"buffer": "adaboost",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "AdaBoost",
+				"backspace_count": 8
+			}
+		},
+		{
+			"id": "magic_key.text_expansion_symbols.(1)★",
+			"family": "magic_key",
+			"file": "ergopti_plus/_shared/modules/hotstrings/magickey.toml",
+			"section": "text_expansion_symbols",
+			"trigger": "(1)★",
+			"buffer": "(1)★",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "➀",
+				"backspace_count": 4
+			}
+		},
+		{
+			"id": "magic_key.text_expansion_symbols_typst.$alpha$",
+			"family": "magic_key",
+			"file": "ergopti_plus/_shared/modules/hotstrings/magickey.toml",
+			"section": "text_expansion_symbols_typst",
+			"trigger": "$alpha$",
+			"buffer": "$alpha$",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "α",
+				"backspace_count": 7
+			}
+		},
+		{
+			"id": "magic_key.repeat_corrections.ccê",
+			"family": "magic_key",
+			"file": "layouts/registry/ergopti/hotstrings/repeatcorrections.toml",
+			"section": "repeat_corrections",
+			"trigger": "ccê",
+			"buffer": "ccê",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "ccu",
+				"backspace_count": 3
+			}
+		},
+		{
+			"id": "distances_reduction.qu.qa",
+			"family": "distances_reduction",
+			"file": "layouts/registry/ergopti/hotstrings/distancesreduction.toml",
+			"section": "qu",
+			"trigger": "qa",
+			"buffer": "qa",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "qua",
+				"backspace_count": 2
+			}
+		},
+		{
+			"id": "distances_reduction.comma_j.,a",
+			"family": "distances_reduction",
+			"file": "layouts/registry/ergopti/hotstrings/distancesreduction.toml",
+			"section": "comma_j",
+			"trigger": ",a",
+			"buffer": ",a",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "ja",
+				"backspace_count": 2
+			}
+		},
+		{
+			"id": "distances_reduction.comma_far_letters.,c",
+			"family": "distances_reduction",
+			"file": "layouts/registry/ergopti/hotstrings/distancesreduction.toml",
+			"section": "comma_far_letters",
+			"trigger": ",c",
+			"buffer": ",c",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "ç",
+				"backspace_count": 2
+			}
+		},
+		{
+			"id": "sfbs_reduction.comma.,d",
+			"family": "sfbs_reduction",
+			"file": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml",
+			"section": "comma",
+			"trigger": ",d",
+			"buffer": ",d",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "ds",
+				"backspace_count": 2
+			}
+		},
+		{
+			"id": "sfbs_reduction.e_circ.ê,",
+			"family": "sfbs_reduction",
+			"file": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml",
+			"section": "e_circ",
+			"trigger": "ê,",
+			"buffer": "ê,",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "u,",
+				"backspace_count": 2
+			}
+		},
+		{
+			"id": "sfbs_reduction.i_e_acute.àé",
+			"family": "sfbs_reduction",
+			"file": "layouts/registry/ergopti/hotstrings/sfbsreduction.toml",
+			"section": "i_e_acute",
+			"trigger": "àé",
+			"buffer": "àé",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "éi",
+				"backspace_count": 2
+			}
+		},
+		{
+			"id": "rolls.hc.hc",
+			"family": "rolls",
+			"file": "layouts/registry/ergopti/hotstrings/rolls.toml",
+			"section": "hc",
+			"trigger": "hc",
+			"buffer": "hc",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "wh",
+				"backspace_count": 2
+			}
+		},
+		{
+			"id": "rolls.sx.sx",
+			"family": "rolls",
+			"file": "layouts/registry/ergopti/hotstrings/rolls.toml",
+			"section": "sx",
+			"trigger": "sx",
+			"buffer": "sx",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "sk",
+				"backspace_count": 2
+			}
+		},
+		{
+			"id": "rolls.close_chevron_tag.<@",
+			"family": "rolls",
+			"file": "layouts/registry/ergopti/hotstrings/rolls.toml",
+			"section": "close_chevron_tag",
+			"trigger": "<@",
+			"buffer": "<@",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "</",
+				"backspace_count": 2
+			}
+		},
+		{
+			"id": "french_distancesreduction.suffixes_a.à'",
+			"family": "french_distancesreduction",
+			"file": "layouts/registry/ergopti/hotstrings/suffixes_a.toml",
+			"section": "suffixes_a",
+			"trigger": "à'",
+			"buffer": "à'",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "ance",
+				"backspace_count": 2
+			}
+		},
+		{
+			"id": "french_distancesreduction.suffixes_a.àa",
+			"family": "french_distancesreduction",
+			"file": "layouts/registry/ergopti/hotstrings/suffixes_a.toml",
+			"section": "suffixes_a",
+			"trigger": "àa",
+			"buffer": "àa",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "aire",
+				"backspace_count": 2
+			}
+		},
+		{
+			"id": "french_autocorrection.accents.abim",
+			"family": "french_autocorrection",
+			"file": "ergopti_plus/_shared/modules/hotstrings/french/autocorrection.toml",
+			"section": "accents",
+			"trigger": "abim",
+			"buffer": "abim",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "abîm",
+				"backspace_count": 4
+			}
+		},
+		{
+			"id": "french_autocorrection.typographic_apostrophe.c'",
+			"family": "french_autocorrection",
+			"file": "ergopti_plus/_shared/modules/hotstrings/french/autocorrection.toml",
+			"section": "typographic_apostrophe",
+			"trigger": "c'",
+			"buffer": "c'",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "c’",
+				"backspace_count": 2
+			}
+		},
+		{
+			"id": "french_autocorrection.minus.aije",
+			"family": "french_autocorrection",
+			"file": "ergopti_plus/_shared/modules/hotstrings/french/autocorrection.toml",
+			"section": "minus",
+			"trigger": "aije",
+			"buffer": "aije",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "ai-je",
+				"backspace_count": 4
+			}
+		},
+		{
+			"id": "french_magickey.text_expansion.+m★",
+			"family": "french_magickey",
+			"file": "ergopti_plus/_shared/modules/hotstrings/french/magickey.toml",
+			"section": "text_expansion",
+			"trigger": "+m★",
+			"buffer": "+m★",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "meilleur",
+				"backspace_count": 3
+			}
+		},
+		{
+			"id": "french_magickey.text_expansion.1ere★",
+			"family": "french_magickey",
+			"file": "ergopti_plus/_shared/modules/hotstrings/french/magickey.toml",
+			"section": "text_expansion",
+			"trigger": "1ere★",
+			"buffer": "1ere★",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "première",
+				"backspace_count": 5
+			}
+		},
+		{
+			"id": "french_magickey.text_expansion_auto.ya",
+			"family": "french_magickey",
+			"file": "ergopti_plus/_shared/modules/hotstrings/french/magickey.toml",
+			"section": "text_expansion_auto",
+			"trigger": "ya",
+			"buffer": "ya",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "y’a",
+				"backspace_count": 2
+			}
+		}
+	]
+}

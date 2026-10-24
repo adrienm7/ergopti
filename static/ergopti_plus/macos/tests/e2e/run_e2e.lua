@@ -219,19 +219,16 @@ local function make_vkb(trigger, replacement, opts)
 	-- Magic key sentinel — same value as the live driver.
 	local MAGIC_KEY = "\xe2\x98\x85"
 
-	-- Minimal CoreState that satisfies the Expander's require_state guard.
-	local state = {
-		buffer                     = "",
-		magic_key                  = MAGIC_KEY,
-		groups                     = {},
-		current_group              = "e2e",
-		-- Required by word_boundary_blocks: treat start-of-buffer as a word
-		-- boundary so is_word triggers fire correctly when buffer = trigger.
-		start_is_word_boundary     = true,
-		-- No-op stubs for callbacks invoked by perform_text_replacement after a
-		-- successful expansion. The E2E harness does not exercise these paths.
-		suppress_rescan            = function() end,
-	}
+	-- The production CoreState, so a final_result expansion runs its real
+	-- suppress-rescan preparation and commit. A hand-made table without
+	-- prepare_suppress_rescan made perform_text_replacement refuse every
+	-- final_result entry, which this harness then reported as "no expansion".
+	package.loaded["modules.keymap.state"] = nil
+	local state = require("modules.keymap.state").new({ trigger_char = MAGIC_KEY }, {})
+	state.current_group = "e2e"
+	-- start-of-buffer is a word boundary, so is_word triggers fire when the
+	-- buffer is the trigger alone (word_boundary_blocks).
+	state.start_is_word_boundary = true
 
 	Registry.init({
 		magic_key                  = MAGIC_KEY,
@@ -710,6 +707,22 @@ run_hardcoded_scenarios()
 print("\n--- Shared corpus vectors ---")
 for _, v in ipairs(corpus_or_err) do
 	run_corpus_vector(v)
+end
+
+-- The shipped data, which the corpus above does not pin: two or three
+-- expansions per hotstring family of the menu manifest, each read from the pack
+-- this driver ships and replayed exactly as a corpus vector.
+print("\n--- Shipped hotstring family samples ---")
+local static_root = drivers_root:match("^(.*)/[^/]+$")
+local ok_samples, samples = pcall(require("test.hotstring_family_samples").load, static_root)
+if not ok_samples then
+	fail_count = fail_count + 1
+	print("  FAIL  mandatory family samples: " .. tostring(samples))
+else
+	for _, v in ipairs(samples) do
+		run_corpus_vector(v)
+	end
+	print(string.format("Family samples processed: %d", #samples))
 end
 
 -- The REAL init.lua of an installed application copy, booted over each user

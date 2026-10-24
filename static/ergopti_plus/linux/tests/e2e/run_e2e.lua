@@ -389,6 +389,21 @@ local corpus_assertions = pass_count + fail_count - corpus_before
 assert_true("corpus vector floor", vectors ~= nil and #vectors >= Contract.MIN_VECTOR_COUNT)
 assert_true("corpus assertion floor", corpus_assertions >= Contract.MIN_CORPUS_ASSERTIONS)
 
+-- The shipped data, which the corpus above does not pin: two or three
+-- expansions per hotstring family of the menu manifest, each read from the pack
+-- this driver ships and replayed exactly as a corpus vector.
+print("\n--- Shipped hotstring family samples ---")
+local static_root = drivers_root:match("^(.*)/[^/]+$")
+local ok_samples, samples = pcall(require("test.hotstring_family_samples").load, static_root)
+if not ok_samples then
+	fail("mandatory family samples", "resolved samples", tostring(samples))
+else
+	for _, v in ipairs(samples) do
+		run_corpus_vector(v)
+	end
+	print(string.format("Family samples processed: %d", #samples))
+end
+
 -- The real daemon main(), one process per scenario (it runs once per
 -- process), against a scripted keyboard and a model of the focused field.
 -- These pin what no engine-level vector can: the injector's erase arithmetic,
