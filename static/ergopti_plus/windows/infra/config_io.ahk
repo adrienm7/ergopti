@@ -1662,6 +1662,15 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		}
 		; The exact requested intent survives a fresh source/schema refusal.
 		; Admission still precedes every runtime collection and physical write.
+		; A timer retry that finds the driver not ready yet can write nothing, so it does not
+		; pay the admission (a registry deep compare of about 21 ms): the 100 ms retry ran it
+		; 27 times per boot. A new request and every attempt once the driver is ready are
+		; still admitted before anything is collected or written.
+		if !RegisterRequest && !_DriverReady && !PublicationDebt {
+			PerfCount("config_io.save_retry_deferred_before_admission")
+			return _ConfigArmFullSaveRetry(CONFIG_FULL_SAVE_RETRY_DELAY_MS, TimerFn)
+				? CONFIG_SAVE_DEFERRED : CONFIG_SAVE_FAILED
+		}
 		if !PublicationDebt && !ConfigFullStateCanPersist() {
 			return CONFIG_SAVE_FAILED
 		}
