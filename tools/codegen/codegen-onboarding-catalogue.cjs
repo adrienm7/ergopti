@@ -757,6 +757,9 @@ function subSwitchFor(id, page, platform, master, groups, manifest, projection) 
 	) {
 		throw new Error(`[onboarding.pages.${id}] sub_switch needs a path and its sections`);
 	}
+	if (declared.independent !== undefined && typeof declared.independent !== 'boolean') {
+		throw new Error(`[onboarding.pages.${id}] sub_switch.independent must be a boolean`);
+	}
 	if (!master) {
 		throw new Error(`onboarding page ${id}: a sub-switch needs the category switch on ${platform}`);
 	}
@@ -792,7 +795,12 @@ function subSwitchFor(id, page, platform, master, groups, manifest, projection) 
 		}
 		items.push(...governed);
 	}
-	return { path: declared.path, default: values.default, items };
+	return {
+		path: declared.path,
+		default: values.default,
+		independent: declared.independent === true,
+		items
+	};
 }
 
 /**

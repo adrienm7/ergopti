@@ -1685,6 +1685,7 @@
 						"sub_switch": {
 							"path": "category_enabled.key_combinations",
 							"default": true,
+							"independent": false,
 							"items": [
 								"shortcuts.key_combination_taps.alt_gr_then_left_alt",
 								"shortcuts.key_combination_taps.alt_gr_then_caps_lock",
@@ -2846,12 +2847,12 @@
 												"args": [
 													[
 														{
-															"key": "sg_actions.alt_tab_windows"
+															"key": "sg_actions.alt_tab_monitor"
 														}
 													],
 													[
 														{
-															"text": "Fn"
+															"text": "Option"
 														}
 													]
 												]
@@ -4899,6 +4900,7 @@
 						"sub_switch": {
 							"path": "category_enabled.key_combinations",
 							"default": true,
+							"independent": true,
 							"items": [
 								"shortcuts.key_combination_taps.alt_gr_then_left_alt",
 								"shortcuts.key_combination_taps.alt_gr_then_caps_lock",
