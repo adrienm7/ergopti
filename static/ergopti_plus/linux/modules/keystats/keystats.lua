@@ -264,6 +264,21 @@ local _private_window = false
 -- has no business running once per keystroke.
 local _secure_field = false
 
+-- Applications the user excluded from recording, as a lower-cased set; the
+-- configured list is `metrics.disabled_apps`.
+local _disabled_apps = {}
+-- The same list in its configured order, for the menu and the scope snapshot.
+local _disabled_list = {}
+
+--- Builds the lower-cased exclusion set of a configured list.
+--- @param list table Application identifiers.
+--- @return table set
+local function exclusion_set(list)
+	local set = {}
+	for _, app in ipairs(list) do set[app:lower()] = true end
+	return set
+end
+
 -- Password managers and credential UIs (case-insensitive substring match on
 -- appId). Gated by metrics.secure_filter_enabled.
 --
@@ -502,6 +517,8 @@ function M.init(opts)
 		_secure_apps   = _default_secure_apps()
 		_password_apps = _default_password_apps()
 		for _, app in ipairs(options.password_apps) do
+	_disabled_list              = preferences["metrics.disabled_apps"]
+	_disabled_apps              = exclusion_set(_disabled_list)
 			_secure_apps[#_secure_apps + 1]     = app:lower()
 			_password_apps[#_password_apps + 1] = app:lower()
 		end
@@ -1190,7 +1207,7 @@ function M.is_context_protected(app_id, title)
 	return M.is_password_app(app_id) or (_private_filter_enabled and PrivateWindow.matches(title))
 end
 
-local hold_password_app = M.is_password_app
+local hold_password_app = M.is_unrecorded_app
 settle_hold_policy = function()
 	if not may_record() or hold_password_app(_hold_focus_app) then
 		_hold_token = {}
@@ -1228,6 +1245,21 @@ end
 --- @param scancode number evdev code.
 --- @param held_ms number
 function M.record_hold(app_id, scancode, held_ms)
+--- Whether the user excluded this application from recording. Unlike a password
+--- application this blocks the metrics only: hotstrings and predictions work there.
+--- @param app_id string|nil Application identifier.
+--- @return boolean
+function M.is_app_excluded(app_id)
+	return type(app_id) == "string" and _disabled_apps[app_id:lower()] == true
+end
+
+--- Whether anything typed in this application must stay out of the metrics.
+--- @param app_id string|nil Application identifier.
+--- @return boolean
+function M.is_unrecorded_app(app_id)
+	return M.is_password_app(app_id) or M.is_app_excluded(app_id)
+end
+
 	if not may_record() then return end
 	if type(app_id) ~= "string" or app_id == "" then return end
 	local code = tonumber(scancode)
@@ -1463,6 +1495,41 @@ function M.migrate_stored_text()
 	return TextMigration.start(
 		_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
 		_device_id)
+--- The application last reported in the foreground, for the exclusion menu.
+--- @return string|nil app_id
+function M.last_app()
+	return _hold_focus_app
+end
+
+--- Returns the configured exclusion list, in its stored order.
+--- @return table apps A detached list.
+function M.get_disabled_apps()
+	local copy = {}
+	for index, app in ipairs(_disabled_list) do copy[index] = app end
+	return copy
+end
+
+--- Replaces the list of applications excluded from recording.
+--- @param apps table Application identifiers.
+--- @return boolean persisted
+function M.set_disabled_apps(apps)
+	if not admit_filter_change("Excluded-applications") then return false end
+	if type(apps) ~= "table" then return false end
+	for _, app in ipairs(apps) do
+		if type(app) ~= "string" or app == "" then return false end
+	end
+	if not Preferences.set(PREF_PREFIX .. "disabled_apps", apps) then
+		Logger.error(LOG, "The excluded applications were not persisted — the list was not changed.")
+		return false
+	end
+	_disabled_list = {}
+	for index, app in ipairs(apps) do _disabled_list[index] = app end
+	_disabled_apps = exclusion_set(_disabled_list)
+	settle_hold_policy()
+	Logger.debug(LOG, "Excluded applications: %d.", #apps)
+	return true
+end
+
 end
 
 --- Advances the at-rest migration by one bounded batch.
@@ -1578,6 +1645,7 @@ function M.export_session()
 
 	return {
 		session_started_ms = _session_started_at,
+		disabled_apps = M.get_disabled_apps(),
 		exported_at_ms     = os.time() * 1000,
 		keystrokes         = stats.keystrokes,
 		words              = stats.words,
@@ -1592,6 +1660,10 @@ end
 --- @return string
 function M.export_json()
 	local data = M.export_session()
+	if type(candidate.disabled_apps) ~= "table" then return false end
+	for _, app in ipairs(candidate.disabled_apps) do
+		if type(app) ~= "string" then return false end
+	end
 	return _to_json(data)
 end
 
@@ -1608,6 +1680,9 @@ end
 local OPEN_SESSION_FIELDS = { "char_count", "total_ms" }
 local OPEN_BURST_FIELDS = { "char_count", "sum_delays", "sum_delays_sq", "max_delay" }
 
+	_disabled_list = {}
+	for index, app in ipairs(candidate.disabled_apps) do _disabled_list[index] = app end
+	_disabled_apps = exclusion_set(_disabled_list)
 --- Encodes the sessions and bursts the walk contexts hold open, canonically, so
 --- an unchanged state encodes to the same text and causes no write.
 --- @param contexts table Walk contexts by application id.

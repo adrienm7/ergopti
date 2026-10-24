@@ -40,7 +40,7 @@ helpers.describe("Main selected payload cache boundary", function()
 				{ observe_key = function() end }, { now_ms = function() return 0 end }, require("logger.shim"),
 				{ is_paused = function() return false end }, { withdraw = function() state.allowed = false; owner.cancel() end },
 				{ blocks_text = function() return false end },
-				{ is_password_app = function() return false end, suppress = function() end, unsuppress = function() end,
+				{ is_password_app = function() return false end, is_unrecorded_app = function() return false end, suppress = function() end, unsuppress = function() end,
 					record_correction = function() corrections = corrections + 1 end })
 			local token = state.read()
 			state.inserted = { first = 0, last = 1, text = "☃" }

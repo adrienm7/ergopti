@@ -3,6 +3,7 @@
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const path = require('node:path');
 const { isDeepStrictEqual } = require('node:util');
 const paths = require('../lib/paths.cjs');
 
@@ -108,6 +109,16 @@ async function main() {
 		[],
 		'the macOS-only readout spellings are retired'
 	);
+	// PAR-20: the per-application exclusion has one key on every driver; the
+	// element is the OS's own application identity, so only the key is shared.
+	const disabledApps = metricsEntries.find((entry) => entry.id === 'disabled_apps');
+	assert(disabledApps, 'metrics.disabled_apps must be declared');
+	assert.deepEqual(
+		entryPlatforms(manifest, disabledApps),
+		['ahk', 'hs', 'linux'],
+		'metrics.disabled_apps is declared for every driver'
+	);
+	assert.deepEqual(disabledApps.default, [], 'nothing is excluded until the user says so');
 	for (const [id, platforms, shipped] of [
 		['wpm_widget_visible', ['ahk', 'hs', 'linux'], false],
 		['wpm_widget_colors', ['ahk', 'hs', 'linux'], false],

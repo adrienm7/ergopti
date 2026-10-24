@@ -2560,6 +2560,26 @@ local function _build_llm(ctx)
 				["llm_trigger_ready"] = ready,
 			},
 		}
+		-- The applications the trigger never runs in: the submenu the other two drivers draw.
+		local AppRows = require("ui.menu.app_exclusion_rows")
+		local exclusion_title = i18n_safe("menu.llm.exclude_from_ai")
+		rows[#rows + 1] = {
+			label = AppRows.caption(#TriggerSettings.disabled_apps(),
+				{ none = "menu.llm.exclude_from_ai", counted = "menu.llm.disabled_in_label" }),
+			disabled = not ready() or nil,
+			items = AppRows.rows({
+				get = TriggerSettings.disabled_apps,
+				set = function(list) return ready() and TriggerSettings.set_disabled_apps(list) end,
+				current = type(llm.get_agent_last_app) == "function" and llm.get_agent_last_app or function() return nil end,
+				prompt = function(title, text, initial, hidden, choices)
+					return TextPrompt.ask(title, zenity_plain(text), initial, hidden, choices)
+				end,
+				title = exclusion_title,
+				changed = function()
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}),
+		}
 		rows = ManifestMenu.build("llm_trigger_menu", "LLM", nil, nil, trigger_ctx, {
 			["llm_trigger_leading"] = function() return leading_rows end,
 			["llm_trigger_remaining"] = function() return rows end,
@@ -3540,6 +3560,29 @@ local function metrics_dense(value, records)
 		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
 		count, maximum = count + 1, math.max(maximum, index)
 	end
+		-- The applications whose typing is never recorded: the same submenu the
+		-- other two drivers draw, over this driver's own keystats list.
+		["exclude_apps"] = function()
+			local AppRows = require("ui.menu.app_exclusion_rows")
+			local count = #k.get_disabled_apps()
+			local on = type(k.is_enabled) == "function" and k.is_enabled() == true
+			return { {
+				label = AppRows.caption(count),
+				disabled = on,
+				items = AppRows.rows({
+					get = k.get_disabled_apps,
+					set = k.set_disabled_apps,
+					current = k.last_app,
+					prompt = function(title, text, initial, hidden, choices)
+						return TextPrompt.ask(title, zenity_plain(text), initial, hidden, choices)
+					end,
+					title = i18n_safe("menu.metrics.exclude_apps"),
+					changed = function()
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end,
+				}),
+			} }
+		end,
 	return count == maximum
 end
 
