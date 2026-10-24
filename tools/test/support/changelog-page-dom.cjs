@@ -22,6 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { installHostCapabilities } = require('./host-capabilities.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const SHARED_UI = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'ui');
@@ -202,6 +203,7 @@ function runPage(globals = {}, page = 'changelog') {
 	};
 	sandbox.window = sandbox;
 	vm.createContext(sandbox);
+	installHostCapabilities(sandbox);
 	for (const src of pageScripts(page)) {
 		const file = path.resolve(SHARED_UI, page, src);
 		if (STUBBED_SCRIPTS.has(path.basename(file))) continue;

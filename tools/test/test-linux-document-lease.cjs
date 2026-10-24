@@ -24,7 +24,7 @@ function test(name, fn) {
 function page(seed, host = 'linux', cryptoAvailable = true) {
 	const messages = [];
 	const window = {
-		__ergopti_host: host,
+		__ergopti_host_capabilities: host === 'linux' ? { document_bridge: true } : undefined,
 		webkit: {
 			messageHandlers: {
 				changelog_bridge: { postMessage: (x) => messages.push(x) },
@@ -270,6 +270,24 @@ test('model browser preserves macOS and Windows wire contracts', () => {
 	win.call("makeHostBridge('model_browser_bridge')('ready')");
 	win.call("makeHostBridge('model_browser_bridge')({action:'select_model',name:'Qwen'})");
 	assert.deepEqual(win.messages, ['ready', '{"action":"select_model","name":"Qwen"}']);
+});
+test('the document protocol follows the declared capability, never a host name', () => {
+	const declared = page(1);
+	assert.equal(declared.call("hostHasCapability('document_bridge')"), true);
+	assert.equal(declared.call("hostHasCapability('undeclared')"), false);
+	const named = page(1, 'macos');
+	named.window.__ergopti_host = 'linux';
+	assert.equal(named.call("hostHasCapability('document_bridge')"), false);
+	assert.equal(named.call("getLinuxDocumentNonce('changelog_bridge')"), null);
+	for (const value of [1, 'true', {}, null]) {
+		const loose = page(1, 'macos');
+		loose.window.__ergopti_host_capabilities = { document_bridge: value };
+		assert.equal(
+			loose.call("hostHasCapability('document_bridge')"),
+			false,
+			`a capability declared as ${JSON.stringify(value)} is not declared`
+		);
+	}
 });
 console.log(
 	JSON.stringify({ passed, failed, kind: 'pure actual production JS replay; native unexecuted' })

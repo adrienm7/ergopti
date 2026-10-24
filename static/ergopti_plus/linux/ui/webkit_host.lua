@@ -389,7 +389,7 @@ function M.build_app_html(driver_root, app_name, active_locale, strings)
 	local i18n_script = M.build_i18n_boot_script(locales_dir, active_locale, strings)
 	html = M.inject_i18n_boot(html, i18n_script)
 	html = html:gsub("(<head[^>]*>)", function(tag)
-		return tag .. '<script>window.__ergopti_host="linux";</script>'
+		return tag .. '<script>window.__ergopti_host_capabilities={"document_bridge":true};</script>'
 	end, 1)
 	html = M.inject_no_remote_csp(html, app_name)
 
