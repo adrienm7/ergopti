@@ -216,7 +216,7 @@ end
 --- @return table|nil handle Exact native query owner.
 function M.revalidate_program(executable, arguments, terminal, admitted)
 	local scalar = Json.encode({ version = 1, executable = executable, arguments = Json.array(arguments) })
-	if not Parameter.parse(scalar, "hs") or not M.is_chosen_program(executable, arguments)
+	if not Parameter.parse(scalar, "posix") or not M.is_chosen_program(executable, arguments)
 		or #arguments ~= 2 or not Owner.valid_identifier(arguments[2]) then return nil end
 	local captured = identity()
 	if not captured then return nil end

@@ -197,16 +197,27 @@ check(
 // sends what the page edits with, marks the rows it edits, and forwards the
 // value it collected with the pick. A host that forgot either half would show an
 // editor whose value is thrown away, or no editor at all.
-for (const f of ['platform', 'sendVocabulary', 'parameterStrings']) {
+for (const f of ['executableSyntax', 'commandIsPrimary', 'sendVocabulary', 'parameterStrings']) {
 	check(`page reads data.${f}`, script.includes(`data.${f}`));
 	check(`Windows host emits "${f}"`, winHost.includes(`"${f}"`));
 	check(`macOS host emits ${f}`, new RegExp(`\\b${f}\\b`).test(macHost));
 	check(`Linux host emits ${f}`, new RegExp(`\\b${f}\\b`).test(linuxHost));
 }
+// The page reads capabilities, never a platform name: each host states its own.
 check(
-	'macOS host names its platform "hs" (Command is the primary modifier)',
-	/platform\s*=\s*"hs"/.test(macHost)
+	'Windows host names the windows executable syntax and Ctrl as the primary modifier',
+	winHost.includes('_ActPickWeb_Kv("executableSyntax", "windows")') &&
+		winHost.includes(`'"commandIsPrimary":false,'`)
 );
+check(
+	'macOS host names the posix executable syntax and Command as the primary modifier',
+	/executableSyntax\s*=\s*"posix"/.test(macHost) && /commandIsPrimary\s*=\s*true/.test(macHost)
+);
+check(
+	'Linux host names the posix executable syntax and Ctrl as the primary modifier',
+	/executableSyntax\s*=\s*"posix"/.test(linuxHost) && /commandIsPrimary\s*=\s*false/.test(linuxHost)
+);
+check('page sends no platform name to the parameter editor', !/data\.platform\b/.test(script));
 check(
 	'page reads item.parameter and item.parameterValue',
 	/it\.parameter\b/.test(script) && /it\.parameterValue/.test(script)

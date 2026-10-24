@@ -98,8 +98,10 @@ function M.build_init_payload(opts)
 		items             = items,
 		-- The page's own editor for send_text / send_key / send_shortcut, from
 		-- the gestures manager's get_picker_parameter_fields; without them every
-		-- action confirms at once and the zenity prompt asks.
-		platform          = "linux",
+		-- action confirms at once and the zenity prompt asks. Ctrl is the
+		-- primary modifier and a program parameter names a POSIX executable.
+		executableSyntax  = "posix",
+		commandIsPrimary  = false,
 		sendVocabulary    = o.send_vocabulary,
 		parameterStrings  = o.parameter_strings,
 		-- The llm_prompt editor's choices and the "edit the current action"

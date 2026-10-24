@@ -41,8 +41,16 @@ var ProgramParameter = (() => {
 		return true;
 	}
 
-	function parse(raw, platform) {
-		if (typeof raw !== 'string') return null;
+	// The host names its executable path syntax; the page never infers it.
+	const EXECUTABLE_SYNTAXES = {
+		windows: (executable) =>
+			(/^[A-Za-z]:[/\\]/.test(executable) || /^\\\\[^\\/]+\\[^\\/]+\\./.test(executable)) &&
+			!/^\\\\[?.]\\/.test(executable),
+		posix: (executable) => executable.startsWith('/')
+	};
+
+	function parse(raw, syntax) {
+		if (typeof raw !== 'string' || !Object.hasOwn(EXECUTABLE_SYNTAXES, syntax)) return null;
 		try {
 			if (!uniqueFields(raw)) return null;
 			const data = JSON.parse(raw);
@@ -56,16 +64,7 @@ var ProgramParameter = (() => {
 				return null;
 			if (typeof data.version !== 'number' || data.version !== 1) return null;
 			if (!cleanString(data.executable) || data.executable === '') return null;
-			if (platform === 'ahk') {
-				if (
-					!/^[A-Za-z]:[/\\]/.test(data.executable) &&
-					!/^\\\\[^\\/]+\\[^\\/]+\\./.test(data.executable)
-				)
-					return null;
-				if (/^\\\\[?.]\\/.test(data.executable)) return null;
-			} else if (platform === 'hs' || platform === 'linux') {
-				if (!data.executable.startsWith('/')) return null;
-			} else return null;
+			if (!EXECUTABLE_SYNTAXES[syntax](data.executable)) return null;
 			if (!Array.isArray(data.arguments) || !data.arguments.every(cleanString)) return null;
 			return { executable: data.executable, arguments: data.arguments.slice() };
 		} catch {
@@ -73,10 +72,10 @@ var ProgramParameter = (() => {
 		}
 	}
 
-	function encode(executable, argumentsValue, platform) {
+	function encode(executable, argumentsValue, syntax) {
 		try {
 			const raw = JSON.stringify({ version: 1, executable, arguments: argumentsValue });
-			return parse(raw, platform) === null ? null : raw;
+			return parse(raw, syntax) === null ? null : raw;
 		} catch {
 			return null;
 		}
