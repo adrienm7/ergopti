@@ -326,3 +326,31 @@ _HPLS_DispatchAttributesOneEventInEight() {
 }
 Test("hook dispatcher: one dispatch in eight attributes its time to each named subscriber (hook-subscriber-sampling)",
 	_HPLS_DispatchAttributesOneEventInEight)
+
+_HPLS_PreReadyRetryDoesNotPayAdmission() {
+	global _DriverReady, CONFIG_SAVE_DEFERRED
+	Counts := _PerfCountersOwner().Counts
+	Admissions := Counts.Get("config_io.full_state_can_persist", 0)
+	Deferred := Counts.Get("config_io.save_retry_deferred_before_admission", 0)
+	Coordinator := _ConfigFullSaveCoordinator()
+	SavedReady := IsSet(_DriverReady) ? _DriverReady : false
+	try {
+		_DriverReady := false
+		Result := SaveFullConfig(0, (*) => true, false)
+		AssertEqual(CONFIG_SAVE_DEFERRED, Result, "a pre-ready timer retry stays deferred")
+		AssertEqual(Admissions, Counts.Get("config_io.full_state_can_persist", 0),
+			"and does not pay the registry deep compare of the admission")
+		AssertEqual(Deferred + 1, Counts.Get("config_io.save_retry_deferred_before_admission", 0))
+	} finally {
+		_DriverReady := SavedReady
+		_ConfigFullSaveCoordinator(Coordinator)
+	}
+	Body := _DriverFuncBody("SaveFullConfig")
+	Early := InStr(Body, "if !RegisterRequest && !_DriverReady && !PublicationDebt {")
+	Guard := InStr(Body, "if !PublicationDebt && !ConfigFullStateCanPersist() {")
+	Assert(Early > 0 && Guard > Early,
+		"only a non-registering retry before ready skips it; a new request and every ready attempt are admitted")
+	Assert(Guard < InStr(Body, "Updates := HasMethod(CollectFn"), "admission still precedes every collection")
+}
+Test("config: a full-save retry before the driver is ready does not pay write admission (full-save-retry-admission)",
+	_HPLS_PreReadyRetryDoesNotPayAdmission)
