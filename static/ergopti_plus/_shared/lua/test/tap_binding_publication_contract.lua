@@ -177,6 +177,9 @@ function M.register(helpers, driver)
 				assert(not source:find('" is malformed")', last + 1, true), "the malformed-source branch must be unique")
 				local mutant_source = source:sub(1, first - 1) .. "local _ = nil" .. source:sub(last + 1)
 				local compile = loadstring or load
+				-- The mutant registers as the native owner; an earlier suite may have
+				-- loaded the real one, and scope() restores it afterwards.
+				package.loaded[native] = nil
 				local mutant = assert(compile(mutant_source, "@" .. file_path .. " (mutant)"))()
 				package.loaded[native] = mutant
 				local malformed, caught = 0, 0
