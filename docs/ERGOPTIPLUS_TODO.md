@@ -29,6 +29,98 @@ a sealed Windows updater source, reseal with
 `node tools/ci/seal-windows-updater-original-source.cjs --ref <commit> --write`. Procedures:
 [COORDINATOR-MEMORY](todo-agents/COORDINATOR-MEMORY.md).
 
+## Integration pass of 2026-10-24 evening: what landed and what is left
+
+A coordinator session ran a parallel pass on the parity and performance items. Its work is now on `dev` (about 495
+commits). Every `agent/*`, `wt/*`, `land/*` and `fix/*` branch was deleted, and the CI run of the push was cancelled, so
+no release was cut.
+
+**Landed.** 9 cloud worker branches:
+
+- Linux CI lanes, AppImage distribution matrix, Linux perf probe.
+- macOS Lua perf (TOML scan reuse, ASCII fold), macOS stubbed suite health, Windows AHK suite under Wine.
+- PAR-19, PAR-22/34/40, PAR-30 (first commit), PAR-59/63/64, PAR-67, PAR-71, PAR-73/77, PAR-74/84.
+
+14 local agent branches:
+
+- The health fixes, the Linux perf commits (in-process `find` replacements), PAR-21 (part).
+- PAR-44/45/52 (part), PAR-53..57 (part), PAR-60..62 (part), PAR-65 (part), PAR-68/72 (part).
+- PAR-69 and PAR-70 (one of nine), PAR-75, PAR-81 (part), PAR-12/37/48 (part), PAR-78..80 (part), PAR-82/83/85 (part).
+
+The three `fix/*` branches: fix/linux 36 commits, fix/macos 31 commits, fix/windows 269 of its 273 commits (the other
+four were already on dev).
+
+**Measured on this container (stubbed suites).**
+
+- macOS: 484 failures on the previous `dev`, 68 after integration.
+- Linux: 18 failures after integration (the agents reported 85 on the previous `dev`).
+- `npm run test:js` loads again; the duplicate ordinals and ids were renumbered.
+- `node tools/test/verify-change.cjs` is still red in this container: openbox, native Nix admission and Unicode 17 are
+  missing here.
+- Nothing native (AHK, Hammerspoon, a real desktop) was executed except the AHK suites under Wine.
+
+**Integration resolutions to review.** These are conflicts between branches that each counted from a base without the
+other:
+
+- `test-linux-e2e-shards.cjs` 180 steps, and `test-ci-full-default.cjs` 185 slots: the Go route plan twin plus the
+  split install steps.
+- The reason ratchet ledger in `test-platform-restrictions-explained.cjs` (3): `llm.user_profiles` and
+  `auto_profile_for_model` should be opened to macOS.
+- The duplicate-constant-name baseline shrank by two.
+- `windows/infra/input_probe.ahk`: the owner and admission rewrite from fix/windows, combined with dev's
+  `WMPresentWindow` and `_IP_TargetReady`. **Not executed: run it on the PC.**
+- The keystats aggregation corpus test now follows the shared walker from PAR-67.
+- Duplicate fixes for the LuaJIT 60-upvalue limit of `main()` (three agents) were dropped in favour of the first one.
+
+**Left, not committed when the agents stopped.** Their worktrees were removed; redo each item from its PAR entry:
+
+- PAR-53..57: the instrumentation inventory, Lua driver sections and the macOS boot profiler tests.
+- PAR-75: the macOS adapters migration.
+- PAR-66: the menu frames, entirely.
+- PAR-82/83/85: the Lua reader migrations of the UI-string gate.
+- PAR-44/45/52: the release-notes and update-check pages, and the notes contract.
+- PAR-65: the request plan in both prediction engines.
+- PAR-68/72: the Linux and macOS readers of the shared hotstring config.
+- PAR-78..80: the `[limits]` rules of the timing gate.
+- PAR-12/37/48: the locale and translation-audit part.
+- PAR-60..62: the sequence-corpus commit and the macOS harness edits.
+- PAR-81: the computed-style comparison.
+- fix/windows: the keylogger publication owner tests.
+- Cloud sessions stopped mid-task:
+  - PAR-73/77 (features manifest text consumers);
+  - PAR-74/84 (Lua dotted-key migration);
+  - macOS stubbed suite health (about 68 reds left);
+  - Linux perf lab (boot-stage timings);
+  - Windows AHK under Wine (triage of its reds).
+- Not started: PAR-14 (Windows), PAR-43, PAR-58, PAR-76, the Windows managed Ollama route plan consumer, the PAR-71
+  proxy-precedence ratchet to zero, and the Wave 2 and backlog remainders.
+
+**How the work was split, and what to keep.**
+
+- **Split by file ownership, not by todo item.** Each agent owned one surface (a driver area or a shared module) and
+  the items that touch it, so two agents rarely edited the same file. The coordinator alone edited this todo, integrated
+  and pushed. Each agent had its own branch and wrote a final report: commits, done and left per item, gates, what was
+  not executed.
+- **Shared registries collide.** These grow at the end in every branch: `tools/test/features/*/suite.json` (global
+  ordinals and `js-NNNN` ids), `linux/tests/test_manifest.lua`, CI step and slot counts, ratchet baselines, the sealed
+  updater inputs. Give each agent a reserved ordinal range up front, or integrate often. Regenerate generated files
+  and reseal once after integration, never by hand.
+- **Land early and often.** One branch every half hour, rebased onto `dev`, with one push and its CI cancelled, is far
+  cheaper than 30 branches at the end.
+- **Size the pass to the quota.** About 30 parallel agents (18 local, 12 cloud) used the whole five-hour allowance in
+  about 20 minutes. Stay at 4 to 6 parallel agents. Resume a stopped agent within the hour, while its prompt cache is
+  warm; after that, harvest its commits instead of reloading its context.
+- **Specialised containers worth reusing.**
+  - A Wine container that runs the Windows AHK suites on Linux (`tools/test/run-ahk-under-wine.sh`, UTF-8 locale):
+    Windows checks no longer need the PC for everything that is not input or GUI.
+  - A distribution container matrix that launches the AppImage (Ubuntu 20.04 to 26.04, Debian, Fedora, openSUSE,
+    Arch, Alpine).
+  - A Linux perf lab (startup module graph probe, boot-stage timings).
+  - A macOS pure-Lua profiling container (stubbed Hammerspoon).
+  - A Linux CI-lanes container that runs every step of the hosted Ubuntu jobs locally.
+  - One review pass with three lenses (correctness, contracts, integration), each finding checked by two skeptics,
+    before landing.
+
 ## Handover of 2026-10-24: where we stand and how to continue
 
 Written at the end of a long multi-agent session. Read this first, then the item you pick.
