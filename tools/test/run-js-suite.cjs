@@ -30,6 +30,7 @@ const { performance } = require('node:perf_hooks');
 const { loadInventory, selectFeature } = require('./lib/js-feature-inventory.cjs');
 const { spawnPlan } = require('./lib/js-suite-spawn.cjs');
 const { SKIP_PREFIX } = require('./lib/host-capabilities.cjs');
+const { requireCiEquivalentHost } = require('./lib/host-toolchain.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 let FULL = false;
@@ -62,6 +63,8 @@ if (LIST_FEATURES) {
 	);
 	process.exit(0);
 }
+
+requireCiEquivalentHost('test:js');
 
 const SLOW_CHECKS = [
 	{

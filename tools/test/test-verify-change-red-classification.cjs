@@ -52,6 +52,8 @@ function reportCli(failedScript, full = true) {
 	const commands = [];
 	let exitCode;
 	function load(name) {
+		// The planner's host guard probes the real host; these cases pin red classification only.
+		if (name === './lib/host-toolchain.cjs') return { requireCiEquivalentHost() {} };
 		if (name === 'node:fs') return { ...fs, existsSync: () => false };
 		if (name === 'node:child_process')
 			return {

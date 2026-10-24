@@ -56,6 +56,7 @@ function run(failure, options = {}) {
 								return first ? failure : { status: 0 };
 							}
 						};
+					if (name === './lib/host-toolchain.cjs') return { requireCiEquivalentHost() {} };
 					if (name === 'path') return path;
 					if (name === 'node:os') return { ...os, tmpdir: () => temporaryRoot };
 					if (name === 'node:perf_hooks') return { performance: { now: () => (clock += 7.25) } };

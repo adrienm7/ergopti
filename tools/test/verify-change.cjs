@@ -28,6 +28,7 @@ const { execFileSync, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { requireCiEquivalentHost } = require('./lib/host-toolchain.cjs');
 const { validateAhkSuiteManifest } = require('./validate-ahk-suite-manifest.cjs');
 const { validateAhkE2eManifest } = require('./validate-ahk-e2e-manifest.cjs');
 const { includeClosure } = require('./test-ahk-test-coverage.cjs');
@@ -1083,6 +1084,8 @@ function classifyGateResult(gate, result, selectedByChange) {
 function main() {
 	const args = process.argv.slice(2);
 	const planOnly = args.includes('--plan');
+	// A plan executes nothing, so only a run must match the CI toolchain.
+	if (!planOnly) requireCiEquivalentHost('verify-change');
 	const all = args.includes('--all');
 	const diagnose = args.includes('--diagnose');
 	const range = (args.find((a) => a.startsWith('--range=')) || '').replace('--range=', '') || null;

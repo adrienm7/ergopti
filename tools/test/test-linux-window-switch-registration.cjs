@@ -563,6 +563,8 @@ async function main() {
 	let exit;
 	function load(name) {
 		if (name === 'node:fs') return { ...fs, existsSync: () => false };
+		// The planner's host guard probes the real host; this case pins planning only.
+		if (name === './lib/host-toolchain.cjs') return { requireCiEquivalentHost() {} };
 		if (name === 'node:child_process')
 			return {
 				execFileSync: () => 'static/ergopti_plus/linux/adapters/window_switch.lua\0',
@@ -606,6 +608,7 @@ async function main() {
 			'package.json',
 			'.github/linux-ci-coverage.json',
 			'tools/test/verify-change.cjs',
+			'tools/test/lib/host-toolchain.cjs',
 			'tools/test/validate-ahk-suite-manifest.cjs',
 			'tools/test/validate-ahk-e2e-manifest.cjs',
 			'tools/test/test-ahk-test-coverage.cjs',
