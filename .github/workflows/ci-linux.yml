@@ -4090,26 +4090,18 @@ jobs:
 
       - name: Sign the update asset (detached signature)
         # PAR-30: the updaters verify <asset>.sig against the key in
-        # _shared/modules/updater/asset_signing.json. Until the maintainer has
-        # provisioned the key (docs/tooling/update-signing.md) the policy is "off"
-        # and a missing secret only warns; once it is "required" a release
-        # without the secret fails here.
+        # _shared/modules/updater/asset_signing.json. release-sign owns the
+        # decision (tested in tools/test/test-update-asset-signature.cjs): once
+        # the policy names a key or requires signatures, a missing or mismatched
+        # UPDATE_SIGNING_KEY fails this step; before the maintainer provisions
+        # the key (docs/tooling/update-signing.md) it only warns.
         if: ${{ inputs.release }}
         shell: bash
         env:
           UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
         run: |
           set -euo pipefail
-          enforcement=$(node -p "require('./static/ergopti_plus/_shared/modules/updater/asset_signing.json').enforcement")
-          if [ -z "$UPDATE_SIGNING_KEY" ]; then
-              if [ "$enforcement" = "required" ]; then
-                  echo "::error::the update signature policy is 'required' but the UPDATE_SIGNING_KEY secret is empty: no update would verify."
-                  exit 1
-              fi
-              echo "::warning::UPDATE_SIGNING_KEY is not set and the policy is 'off': the bundle is published without a detached signature."
-              exit 0
-          fi
-          node tools/build/update-asset-signature.cjs sign "build/linux/$LINUX_BUNDLE_ASSET"
+          node tools/build/update-asset-signature.cjs release-sign "build/linux/$LINUX_BUNDLE_ASSET"
 
       - name: Install the packaging toolchains
         # rpmbuild is not on the runner image. appimagetool runs in the AppImage
