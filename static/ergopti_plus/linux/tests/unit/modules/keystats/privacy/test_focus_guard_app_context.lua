@@ -34,6 +34,7 @@ local function fixture(body)
 				terminator_is_consumed = function() return false end },
 			engine = { on_char = function() state.engine_calls = (state.engine_calls or 0) + 1; return nil end },
 			RepeatKey = { is_enabled = function() return false end },
+			keyboard_hook = { held_modifiers = function() return {} end },
 		}, { __index = _G })
 		local function snapshot()
 			if state.unknown then return nil end
