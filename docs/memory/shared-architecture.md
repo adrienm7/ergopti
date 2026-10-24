@@ -106,6 +106,21 @@ logic that Node tests need (the layer editor's `layer_model.js`) is a classic
 script defining one top-level `var`; the tests run the page's scripts in one
 `vm` context, as the browser does, and read that global from it.
 
+### project-shared-pages-read-host-capabilities
+
+A shared page never compares a platform or driver name
+(`tools/test/test-shared-ui-no-platform-branches.cjs` keeps the count at
+zero). The host states what differs: a capability in the page's init payload
+(`capabilities.diagnostic_collection`, `capabilities.gesture_registration`,
+the action picker's `executableSyntax` and `commandIsPrimary`), a value
+(`shortcut_menu_path`), catalogue data (`sub_switch.independent`), or a
+document-level declaration read through `hostHasCapability(name)` in
+`host_bridge.js` (`window.__ergopti_host_capabilities`, which the Linux host
+injects with `document_bridge`). A page refuses an init payload that omits a
+capability it needs instead of guessing it. Page harnesses that stub
+`host_bridge.js` install the real probe with
+`tools/test/support/host-capabilities.cjs`.
+
 ### project-locale-placeholder-parity-is-not-a-defect
 
 Locale values may reorder placeholders. Validate placeholder sets and types, not
