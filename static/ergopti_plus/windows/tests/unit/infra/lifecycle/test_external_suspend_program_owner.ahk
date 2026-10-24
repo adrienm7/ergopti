@@ -22,7 +22,7 @@ _ESPO_Source() {
 	for Symbol in ["Ergopti_OnSuspendEnter", "LLM_NavEventOwner_QuiesceForLifecycle",
 		"ProgramActions_Stop", "ShellRunner_SpawnTreeOwned", "FSReadUtf8Exact",
 		"TOML_UnescapeBasicStringContents", "ProgramParameterParse", "GestureGetActionParameter",
-		"ConfigWriteLeaseBusy", "JsonStringLiteral", "LoggerInfo", "WallClockTimestamp"] {
+		"ConfigWriteLeaseBusy", "JsonStringLiteral", "LoggerInfo", "WallClockTimestamp", "PerfCount"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "" && FileExist(Owner) != "",
 			"the isolated suspension requires its genuine whole owner: " . Symbol)
