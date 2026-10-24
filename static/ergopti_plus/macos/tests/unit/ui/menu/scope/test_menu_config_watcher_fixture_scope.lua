@@ -10,6 +10,7 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.menu_config_watcher_fixture")
 local OWNERS = {
 	"ui.menu.menu_watchers", "infra.logger", "infra.git_status", "reload_gate",
+	"adapters.timer_scheduler", "error_description", "number_policy",
 }
 
 helpers.describe("Menu config watcher fixture lifetime", function()
