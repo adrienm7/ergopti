@@ -39,7 +39,7 @@ _HNRT_Source() {
 	Code .= "#Include " . _HCWT_LocaleOwner() . "`n"
 	Owners := Map()
 	for Symbol in ["_HCWWeb_TryOpen", "HotstringsLanguagePacks", "ReadTomlFile", "Gui_Create",
-		"WMPresentWindow", "RebuildHotstringsLive", "_HSE_SourcePriority"] {
+		"WMPresentWindow", "RebuildHotstringsLive", "_HSE_SourcePriority", "_PersonalTomlOverrideFields"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "" && !Owners.Has(Owner), "Each real component owner is uniquely admitted: " . Symbol)
 		Owners[Owner] := true
@@ -135,7 +135,7 @@ _HNRT_Case(Mode) {
 	AssertTrue(Retired, "The exact child tree must acknowledge retirement")
 	AssertEqual(1, AtDeadline.Calls)
 	AssertEqual("", AtDeadline.ErrorText)
-	AssertExitCode(0, AtDeadline.Code, AtDeadline.Output, "Native reset window ownership")
+	AssertEqual(0, AtDeadline.Code, "Native reset window ownership: " . AtDeadline.Output)
 	AssertContains(AtDeadline.Output, "PASS hcw-native-reset-owner " . Mode)
 }
 
