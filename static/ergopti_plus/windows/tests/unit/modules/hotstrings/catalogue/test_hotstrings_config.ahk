@@ -2,8 +2,8 @@
 
 ; ==============================================================================
 ; MODULE: Hotstrings Config Tests
-; RUN:    AutoHotkey64.exe run_hotstrings_config.ahk  (not this file directly —
-;         it has no test framework; run_all.ahk also includes this suite).
+; RUN:    AutoHotkey64.exe run_all.ahk --only "HotstringsConfig:" (not this
+;         file directly — it has no test framework of its own).
 ; DESCRIPTION:
 ; Covers the override-file parser, the resolution cascade
 ; (user.section → user.file → toml.section → toml.file → GLOBAL_DEFAULT_DELAY)
