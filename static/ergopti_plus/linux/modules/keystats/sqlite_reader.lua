@@ -514,23 +514,16 @@ local function merge_ngram(target, token, count, esrc_json, total_delay, error_c
 	target[token] = item
 end
 
---- Reads character and physical-scancode n-grams for a range. Character source
---- JSON is merged in Lua rather than selected with MIN()/MAX(): source counts
---- are additive across dates and devices, just like the token count itself.
---- Group identical source strings in SQLite to avoid transporting every day/device
---- row. Decode each distinct string in Lua, retaining the malformed-JSON fallback.
---- TOTAL uses floating accumulation like LuaJIT, avoiding SUM's integer overflow.
+--- Renders the shared catalogue's n-gram token read (_shared/data/db/queries.sql)
+--- for one family table. Source JSON is merged in Lua rather than selected with
+--- MIN()/MAX(): source counts are additive across dates and devices, just like
+--- the token count. TOTAL accumulates as a float, avoiding SUM's integer
+--- overflow, and a row whose counters are not numbers comes back raw for the
+--- merge to read as zero.
 local function grouped_ngram_sql(table_name, where, by_app)
-	local keys = by_app and "app, token" or "token"
-	local projection = by_app and "json_quote(app) AS app_json, json_quote(token) AS token_json" or "json_quote(token) AS token_json"
-	local numeric = "typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real')"
-	local conjunction = where == "" and " WHERE " or " AND "
-	-- SQLite's numeric affinity permits malformed text. Keep those rare rows raw:
-	-- TOTAL('12oops') is 12 whereas the established Lua tonumber fallback is zero.
-	return "SELECT " .. projection .. ", TOTAL(c) AS c, TOTAL(td) AS td, TOTAL(e) AS e, esrc_json, COUNT(*) AS source_rows FROM "
-		.. table_name .. where .. conjunction .. "(" .. numeric .. ") GROUP BY " .. keys .. ", esrc_json"
-		.. " UNION ALL SELECT " .. projection .. ", c, td, e, esrc_json, 1 AS source_rows FROM "
-		.. table_name .. where .. conjunction .. "NOT (" .. numeric .. ");"
+	return Queries.render(by_app and "ngram.tokens_by_app" or "ngram.tokens", "cli_json", {
+		table = table_name, where = where, conjunction = where == "" and " WHERE " or " AND ",
+	})
 end
 
 --- Reads the n-grams of an inclusive range, every family summed across apps.
