@@ -276,6 +276,7 @@ _MI_StageHotstrings() {
 		; renderer builds the item from the data this returns.
 		"magic_key_config",              (*) => _HS_MagicKeyRows(),
 		"delays_colors",                 (*) => _HS_DelaysColorsRows(),
+		"preview_bubbles",               (*) => _HS_PreviewBubbleRows(),
 		; The five category blocks. Their ROW — label, count, checkmark and
 		; position — is the renderer's now; the submenu hanging off each one is
 		; still SubMenus[Category], assembled by a different subsystem, and is
@@ -649,6 +650,7 @@ _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 		"send_probe",     InputProbe_SendComparisonCommand,
 		"hook_probe",     InputProbe_HookOrderCommand,
 		"composer_check", ComposerCheck_Command,
+		"field_check_network", NetworkCheck_Command,
 		"report_bug",      (*) => HealthCheck_ReportBug(),
 		"suggest_feature", (*) => HealthCheck_SuggestFeature(),
 		"show_error_dialog", (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled()),
