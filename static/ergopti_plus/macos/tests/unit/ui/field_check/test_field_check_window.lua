@@ -79,7 +79,7 @@ helpers.describe("field check menu rows", function()
 				helpers.assert_eq(#row.platforms, 1)
 				helpers.assert_eq(row.platforms[1], "hs")
 				helpers.assert_type(row.reason_key, "string")
-				helpers.assert_true(builder:find('["' .. id .. '"]', 1, true) ~= nil, "builder does not wire " .. id)
+				helpers.assert_true(builder:find("[COMMAND." .. id:upper() .. "]", 1, true) ~= nil, "builder does not wire " .. id)
 			end
 			for id, entry in pairs(Window.SHARED_ROWS) do
 				local row = rows[id]
@@ -87,7 +87,7 @@ helpers.describe("field check menu rows", function()
 					helpers.assert_not_nil(row, "manifest row missing: " .. id)
 					helpers.assert_eq(row.i18n, entry.title)
 					helpers.assert_nil(row.platforms, id .. " runs on every driver")
-					helpers.assert_true(builder:find('["' .. id .. '"]', 1, true) ~= nil, "builder does not wire " .. id)
+					helpers.assert_true(builder:find("[COMMAND." .. id:upper() .. "]", 1, true) ~= nil, "builder does not wire " .. id)
 				end
 			end
 			for id in pairs(rows) do

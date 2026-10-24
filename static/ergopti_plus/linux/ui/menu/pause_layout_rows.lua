@@ -19,6 +19,8 @@ local ManifestMenu = require("infra.manifest_menu")
 local Policy = require("layout.pause_switch_policy")
 
 local LOG = "ui.menu.pause_layout_rows"
+local ConfigKeys = require("config_keys")
+local COMMAND, LEAF = ConfigKeys.COMMAND, ConfigKeys.LEAF
 
 --- Builds the three switching rows.
 --- @param ctx table { paused, t, on_changed, show_error, preferences, switch }:
@@ -73,7 +75,7 @@ function M.rows(ctx)
 			}
 		end
 		return ManifestMenu.template_rows("layout_switch_picker_frame", {
-			["layout_picker_auto"] = function() persist(role, "") end,
+			[COMMAND.LAYOUT_PICKER_AUTO] = function() persist(role, "") end,
 		}, {
 			["layout_picker_auto_checked"] = function() return current == nil end,
 			["layout_picker_has_choices"] = function() return #native > 0 end,
@@ -81,15 +83,15 @@ function M.rows(ctx)
 	end
 
 	return ManifestMenu.template_rows("layout_switching_frame", {
-		["layout_switch_toggle"] = function() persist("enabled", not enabled) end,
+		[COMMAND.LAYOUT_SWITCH_TOGGLE] = function() persist("enabled", not enabled) end,
 	}, {
 		["layout_switch_checked"] = function() return enabled end,
 		["layout_switch_ready"] = function() return enabled and not ctx.paused end,
 		["layout_pause_caption"] = function() return label_for(settings.on_pause) end,
 		["layout_resume_caption"] = function() return label_for(settings.on_resume) end,
 	}, {
-		["layout_pause_picker"] = function() return picker("on_pause") end,
-		["layout_resume_picker"] = function() return picker("on_resume") end,
+		["layout_pause_picker"] = function() return picker(LEAF.ON_PAUSE) end,
+		["layout_resume_picker"] = function() return picker(LEAF.ON_RESUME) end,
 	}) or {}
 end
 

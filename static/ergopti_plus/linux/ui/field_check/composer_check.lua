@@ -22,7 +22,7 @@ local Check  = require("layouts.composer_check")
 
 return Window.new({
 	label = "Composer check",
-	log = "composer_check",
+	log = "ui.field_check.composer_check",
 	check_id = Check.CHECK_ID,
 	title_key = "menu.debug.composer_check",
 	steps = function(env, report, finish)

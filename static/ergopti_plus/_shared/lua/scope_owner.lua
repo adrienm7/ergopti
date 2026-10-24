@@ -29,8 +29,13 @@ local M = {}
 
 local TableUtil = require("table_util")
 
--- The methods install() publishes on the owning module, in protocol order.
-local METHOD_NAMES = { "scope_acquire", "scope_release", "scope_capture", "scope_apply", "scope_restore", "scope_forget" }
+-- The methods install() publishes on the owning module, in protocol order:
+-- "scope_" and the protocol verb. Built from the verbs because scope_restore is
+-- also a menu command id, which this protocol method is not.
+local METHOD_NAMES = {}
+for index, verb in ipairs({ "acquire", "release", "capture", "apply", "restore", "forget" }) do
+	METHOD_NAMES[index] = "scope_" .. verb
+end
 
 
 

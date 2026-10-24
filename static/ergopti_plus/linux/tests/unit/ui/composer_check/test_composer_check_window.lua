@@ -178,7 +178,7 @@ helpers.describe("composer check window (Linux)", function()
 		local builder = assert(io.open(helpers.driver_root() .. "/ui/menu/menu_builder.lua", "rb"))
 		local source = builder:read("*a")
 		builder:close()
-		helpers.assert_true(source:find('["composer_check"] = call_ctx("on_composer_check")', 1, true) ~= nil,
+		helpers.assert_true(source:find('[COMMAND.COMPOSER_CHECK] = call_ctx("on_composer_check")', 1, true) ~= nil,
 			"the Linux debug menu routes the row")
 		local main = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
 		local daemon = main:read("*a")
