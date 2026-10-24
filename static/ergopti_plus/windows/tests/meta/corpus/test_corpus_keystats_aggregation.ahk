@@ -408,6 +408,83 @@ _KlgAggCorpus_RunVector(Vec) {
 		; divergence (macOS-only feature, AHK walker handles modifier_hold +
 		; system_day but not focus_first_key)
 	}
+	else if (Id = "punctuation_ends_a_word") {
+		Ctx := _KlgAggCorpus_ReadCtx("PunctApp")
+		AssertTrue(Ctx != "", "context exists")
+		AssertEqual(Vec["expected"]["last_prev_word"], Ctx["prev_word"], "the comma ended the word")
+		AssertEqual(Vec["expected"]["last_cur_word"], Ctx["cur_word"], "the next word starts after the comma")
+		WordKey := "2024-06-01" . Chr(1) . "PunctApp" . Chr(1) . "hi"
+		AssertTrue(KLW.batch["ngram"]["ngram_words"].Has(WordKey), "the finished word is counted")
+		AssertEqual(1, KLW.batch["ngram"]["ngram_words"].Count, "only the finished word is counted")
+		Cc := _KlgAggCorpus_ReadCharsClass("2024-06-01", "PunctApp")
+		AssertEqual(Vec["expected"]["chars_class_punct"], Cc["punct"], "the comma is punctuation")
+	}
+	else if (Id = "synthetic_output_keeps_the_finger_streak") {
+		; The corpus names macOS virtual keycodes; this driver keys its finger map
+		; on VK codes (KLW_VK_FINGER, a deliberate third map), so the vector is
+		; replayed with its three typed keys under their VK codes: F, G and V.
+		VkOf := Map(3, 0x46, 5, 0x47, 9, 0x56)
+		KLW_ResetBatch()
+		KLW.ctx := Map()
+		for Entry in Vec["events"] {
+			Events := []
+			for Ev in Entry["events"] {
+				Meta := Map()
+				for MetaKey, MetaValue in Ev["meta"]
+					Meta[MetaKey] := (MetaKey = "kc") ? VkOf[MetaValue] : MetaValue
+				Events.Push(Map("char", Ev["char"], "delay", Ev["delay"], "meta", Meta))
+			}
+			_KlgAggCorpus_ReplayEvent(Map("type", Entry["type"], "app", Entry["app"],
+				"timestamp", Entry["timestamp"], "events", Events))
+		}
+		Eg := _KlgAggCorpus_ReadErgo("2024-06-01", "StreakApp")
+		AssertTrue(Eg != "", "ergo row exists")
+		AssertEqual(Vec["expected"]["ergo_same_finger_max"], Eg["same_finger_streak_max"],
+			"driver output neither extends nor breaks the same-finger run")
+		AssertEqual(Vec["expected"]["ergo_same_hand_max"], Eg["same_hand_streak_max"],
+			"driver output neither extends nor breaks the same-hand run")
+	}
+	else if (Id = "synthetic_correction_is_not_a_typing_error") {
+		Es := 0, E := 0, HsIn := 0, BsTotal := 0
+		for _, Row in KLW.batch["hourly"] {
+			Es += Row["es"]
+			E += Row["e"]
+		}
+		for _, Row in KLW.batch["app_buckets"]
+			HsIn += Row["hs_in_c"]
+		for _, Row in KLW.batch["errors"]
+			BsTotal += Row["bs_total"]
+		AssertEqual(Vec["expected"]["hourly_es"], Es, "each erased trigger character is a synthetic correction")
+		AssertEqual(Vec["expected"]["hourly_e"], E, "no typing error is recorded")
+		AssertEqual(Vec["expected"]["errors_bs_total"], BsTotal, "the error analysis sees no backspace")
+		AssertEqual(Vec["expected"]["trigger_buckets_hs_count"], HsIn,
+			"each erased trigger keystroke is credited to every pause bucket at or above its delay")
+		Row := _KlgAggCorpus_ReadAppDay("2024-06-01", "SynthBsApp")
+		AssertTrue(Row != "", "app_day row exists")
+		for Field, Value in Vec["expected"]["app_day"]["2024-06-01" . Chr(1) . "SynthBsApp"]
+			AssertEqual(Value, KLW_GetMap(Row, Field, 0), "app_day " . Field)
+	}
+	else if (Id = "typed_minutes_use_five_minute_slots") {
+		Cc := _KlgAggCorpus_ReadCharsClass("2024-06-01", "SlotApp")
+		AssertTrue(Cc != "", "chars_class row exists")
+		AssertEqual(Vec["expected"]["chars_class_first_typed_min"], Cc["first_typed_min"], "first slot")
+		AssertEqual(Vec["expected"]["chars_class_last_typed_min"], Cc["last_typed_min"], "last slot")
+		Hr := _KlgAggCorpus_ReadHourly("2024-06-01", "SlotApp", "10")
+		AssertTrue(Hr != "", "hourly row exists")
+		AssertEqual(Vec["expected"]["hourly_c"], Hr["c"], "both keystrokes land in the hour")
+	}
+	else if (Id = "layout_counts_one_per_typing_entry") {
+		Total := 0
+		for _, Row in KLW.batch["layouts"]
+			Total += Row["count"]
+		AssertEqual(Vec["expected"]["layouts_count_total"], Total, "one count for the typing entry")
+	}
+	else if (Id = "long_run_bounds_the_correction_history") {
+		Ctx := _KlgAggCorpus_ReadCtx("HistoryApp")
+		AssertTrue(Ctx != "", "context exists")
+		AssertEqual(Vec["expected"]["last_hist_len"], Ctx["hist"].Length, "HIST_CAP bounds the history")
+		AssertEqual(Vec["expected"]["last_p1"], Ctx["p1"], "the newest character remains the context tail")
+	}
 	else {
 		; An id with no branch used to fall straight off the end of this chain and
 		; report green having asserted nothing. That is how a vector added to the
