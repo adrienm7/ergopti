@@ -27,6 +27,8 @@
 
 local M = {}
 
+local TableUtil = require("table_util")
+
 -- The methods install() publishes on the owning module, in protocol order.
 local METHOD_NAMES = { "scope_acquire", "scope_release", "scope_capture", "scope_apply", "scope_restore", "scope_forget" }
 
@@ -54,9 +56,7 @@ local function field_list(list, label, seen)
 		assert(not seen[name], "scope owner: field declared twice: " .. name)
 		seen[name], names[index] = true, name
 	end
-	local count = 0
-	for _ in pairs(list) do count = count + 1 end
-	assert(count == #names, "scope owner: " .. label .. " must be a dense list")
+	assert(TableUtil.count(list) == #names, "scope owner: " .. label .. " must be a dense list")
 	return names
 end
 
