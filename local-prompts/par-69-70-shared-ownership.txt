@@ -1,0 +1,6 @@
+agentId: a37b12386c58a6090
+description: PAR-69/70 shared ownership
+
+Read /tmp/claude-0/-home-user-ergopti/a1289939-fd47-5b65-a929-48c61fdb6fa0/scratchpad/AGENT-BRIEF.md first and follow it.
+
+Worktree: /home/user/wt/par-ownership (branch wt/par-ownership). Task: PAR-69 then PAR-70 from docs/ERGOPTIPLUS_TODO.md (audit docs/audits/2026-10-24-cross-os-parity.md rows R5-R7, R14, R15, R28, R32). PAR-69, four small commits: `scope_owner.lua` (5 methods copied 6 times, `S`/`L` variants) into one shared protocol; `storage_owned.lua` (104 identical windows) shared; a shared `error_dialog/core.lua`; `owned_timer` for the dependency checkers. PAR-70: factory per macOS/Linux infra shim (`native_presentation`, `manifest_reader`, `manifest_menu`, `timings`, `text_cipher`, `text_migration`, `config_backup`, `locale`, `user_code`) taking `{platform}` and living in `_shared/lua` — do as many as you can safely, one commit each. Hexagonal rule: rules and ports in `_shared`, OS code only in adapters. Stateful modules keep explicit initialization ownership and reject invalid/duplicate init. Each extraction must keep behaviour identical: shared contract tests run by both runners plus the existing driver suites green (macOS lua5.4, Linux luajit). Stay off generic helpers (another agent does table/path/shell/url/trim helpers) and the menu frame builders (another agent).

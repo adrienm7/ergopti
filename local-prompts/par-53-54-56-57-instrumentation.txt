@@ -1,0 +1,12 @@
+agentId: a7f88494a79a9bef0
+description: PAR-53/54/56/57 instrumentation
+
+Read /tmp/claude-0/-home-user-ergopti/a1289939-fd47-5b65-a929-48c61fdb6fa0/scratchpad/AGENT-BRIEF.md first and follow it.
+
+Worktree: /home/user/wt/par-instrumentation (branch wt/par-instrumentation). Tasks from docs/ERGOPTIPLUS_TODO.md section "D. Instrumentation and diagnostics" (audit rows P1-P6, G5, G6, D6, R31):
+- PAR-53: HotPath-style slow-segment logging on macOS and Linux (Windows declares 31 segments, macOS 2; Linux spans exist but only time at DEBUG): always time on Linux, add the segment inventory test for both Lua drivers, then cover the typing path. Note 447da88d added macOS phase counters (`infra/phase_stats.lua`): build on it, do not duplicate.
+- PAR-54: PhaseStats and child-process timing on Linux (mirror macOS `process.*` phases); CPU in the boot profile on macOS and Linux. Windows part only if mechanical (AHK not executable here).
+- PAR-56: log-volume metrics (lines per level, dropped/collapsed lines) on all three drivers, added to the evidence record (see f298b848 LoggerEvidence/Logger.evidence). Read the `logger` skill.
+- PAR-57: Windows logger retention read from `Timings` instead of the literal 14 at `logger.ahk:112`, and extend `test-logger-scalars-single-source.cjs` (JS gate runs here).
+- PAR-55 if time remains: one crash-report content, cap and notice (macOS wins).
+Keep hot-path overhead negligible (measure). One commit per item.

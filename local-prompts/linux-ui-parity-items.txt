@@ -1,0 +1,11 @@
+agentId: a994a498c9fa2215d
+description: Linux UI parity items
+
+Read /tmp/claude-0/-home-user-ergopti/a1289939-fd47-5b65-a929-48c61fdb6fa0/scratchpad/AGENT-BRIEF.md first and follow it.
+
+Worktree: /home/user/wt/linux-ui-parity (branch wt/linux-ui-parity). Tasks from docs/ERGOPTIPLUS_TODO.md (audit docs/audits/2026-10-24-cross-os-parity.md):
+- PAR-25: Linux magic-key editor dialog (reuse the macOS/Windows editor contract; Linux dialogs go through zenity/kdialog like the other Linux dialogs), then drop the `no_magic_key_editor_on_linux` reason (manifest + locales).
+- PAR-44: the Windows-only reset error texts `dialog.reset_defaults.{rollback,commit,acquire,reload_refused}` used on macOS and Linux at the equivalent failure points of Clear/Restore.
+- PAR-45: notifications `notify_feature` and `quit_refused` fire on macOS only: align Linux (and Windows if mechanical), or document the reason; check the maintainer decisions in the handover section first ("notifications aligned on macOS").
+- PAR-52: confirm macOS and Linux open `_shared/ui/release_notes`; wire it where missing.
+One commit per item with tests (Linux luajit suite, macOS lua5.4 suite, JS gates for manifest/locales: `node tools/test/test-menu-manifest.cjs`, `test-approved-menu-labels.cjs`, `python3 tools/locale/check_locales.py`). Regenerate menu_manifest.json with `npm run build:domain` when needed.

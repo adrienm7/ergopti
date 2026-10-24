@@ -1,0 +1,9 @@
+agentId: a1b48abdfa0f16118
+description: PAR-68/72 shared parsers and registries
+
+Read /tmp/claude-0/-home-user-ergopti/a1289939-fd47-5b65-a929-48c61fdb6fa0/scratchpad/AGENT-BRIEF.md first and follow it.
+
+Worktree: /home/user/wt/par-shared-parsers (branch wt/par-shared-parsers). Tasks from docs/ERGOPTIPLUS_TODO.md (audit docs/audits/2026-10-24-cross-os-parity.md rows R4, R8, R9, R13, R20, R21):
+- PAR-68: move the hotstring override parser into `_shared` on top of the shared `toml_codec` (macOS hand-rolls 190 lines that Linux does in 25); add vectors in the shared corpus for `[__global__]` passthrough and the other cases both current parsers handle; both drivers use the shared module.
+- PAR-72: shared registries and catalogues, one commit each: `layout_registry` state machine into `_shared/lua/layouts/registry.lua`; `shortcuts/catalogue.lua`; shared gesture `direction.lua` with boundary vectors; `llm/temperature.lua` with vectors; healthcheck report core; `llm/agent_learning_store`. Start with the pure ones (direction, temperature), then the others as far as safe.
+Behaviour must stay identical (vectors replayed by both macOS lua5.4 and Linux luajit runners; Windows replay listed as left unless an AHK consumer of the corpus already exists). Stay off generic helpers (par-lua-helpers agent), ownership/infra shims (par-ownership agent), menu frames, LLM request plan.

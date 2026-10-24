@@ -1,0 +1,6 @@
+agentId: a13ef50d0b0b6e4b3
+description: PAR-21 Linux LLM parity
+
+Read /tmp/claude-0/-home-user-ergopti/a1289939-fd47-5b65-a929-48c61fdb6fa0/scratchpad/AGENT-BRIEF.md first and follow it.
+
+Worktree: /home/user/wt/linux-llm (branch wt/linux-llm). Task: PAR-21 "Linux LLM parity batch" from docs/ERGOPTIPLUS_TODO.md (audit docs/audits/2026-10-24-cross-os-parity.md rows A4-A7, H10). Already done on dev: per-app trigger disabling (5b66b7e7), AI prediction events (928aeffd), per-app profile overrides (56e8569a), think:false (1a0ce42c). Remaining, one commit per capability: model delete, hardware/RAM model ranking, warmup, min/max words, reset-on-navigation rows, and the AI-acceptance and autocompletion delay rows — each mirroring the existing Windows/macOS behaviour and config keys (same manifest keys, declare `linux` in the manifest `platforms`, reuse existing locale keys; add locale keys in all 21 locales only if truly new, via the i18n skill). Prefer moving the shared rule into `_shared/lua` when macOS already has it in Lua. Regression tests in the Linux suite. Regenerate generated menu/manifest artifacts through their generators. Another agent (par-llm-plan) extracts the LLM request plan (debounce/batching) into `_shared/lua/llm/request_plan`: do not touch debounce/batching code.

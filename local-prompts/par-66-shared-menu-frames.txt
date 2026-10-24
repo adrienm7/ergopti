@@ -1,0 +1,6 @@
+agentId: a42fe354a9866f289
+description: PAR-66 shared menu frames
+
+Read /tmp/claude-0/-home-user-ergopti/a1289939-fd47-5b65-a929-48c61fdb6fa0/scratchpad/AGENT-BRIEF.md first and follow it.
+
+Worktree: /home/user/wt/par-menu-frames (branch wt/par-menu-frames). Task: PAR-66 from docs/ERGOPTIPLUS_TODO.md (audit docs/audits/2026-10-24-cross-os-parity.md row R2): move the menu frame builders to `_shared/lua/menu/frames` — six identical bodies in the macOS `menu_*` modules and Linux `menu_builder.lua` (5648 lines); frames built from a state snapshot, replayed by the menus corpus (`_shared/tests/corpus/menus` or the existing equivalent). Proceed frame by frame (one commit per frame family), proving byte-identical menu trees before/after on both drivers (snapshot the built tree for a set of fixture states with the current code first, then refactor, then compare). Keep the menu manifest as the single source of rows; do not change rows, labels or ordering. Run the macOS (lua5.4) and Linux (luajit) suites plus `node tools/test/test-menu-manifest.cjs` and the menu census gates. Other agents add Linux menu rows (linux-llm, linux-ui-parity) concurrently: keep your refactor mechanical so their row additions rebase cleanly; if a frame you'd move is one they are likely editing (LLM rows, magic key, reset dialogs), do it last.

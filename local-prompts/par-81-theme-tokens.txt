@@ -1,0 +1,6 @@
+agentId: afe9827a9ada91200
+description: PAR-81 theme tokens
+
+Read /tmp/claude-0/-home-user-ergopti/a1289939-fd47-5b65-a929-48c61fdb6fa0/scratchpad/AGENT-BRIEF.md first and follow it.
+
+Worktree: /home/user/wt/par-theme (branch wt/par-theme). Task: PAR-81 "Theme tokens and palette codegen" from docs/ERGOPTIPLUS_TODO.md (audit docs/audits/2026-10-24-cross-os-parity.md row K5): 810 hex literals, 19 `--accent` declarations, the hotstring palette typed in three drivers, byte-identical `macos/ui/download_window/style.css` against `_shared`. Steps, one commit each: (1) census (confirm the counts); (2) `_shared/ui/theme.css` with tokens, adopted by the shared UI pages (keep rendering identical: same computed colours; check dark mode); (3) dedupe the byte-identical macOS download_window style against `_shared`; (4) a native-theme TOML for the hotstring palette and codegen into the three drivers through the repository's generator pattern (`tools/build/gen-all.cjs`), retiring `test-color-presets-parity.cjs` only once the codegen gate replaces it; (5) lint rule "hex literal outside theme" with a baseline that can only shrink, in `tools/lint/lint-conventions.js` or a sibling gate. Verify with the JS suite gates for UI and the driver suites. You can render pages with the pre-installed Playwright Chromium to compare before/after screenshots if useful.

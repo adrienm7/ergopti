@@ -1,0 +1,12 @@
+agentId: a44cb1e7b1b6758f8
+description: Manifest reasons and small PARs
+
+Read /tmp/claude-0/-home-user-ergopti/a1289939-fd47-5b65-a929-48c61fdb6fa0/scratchpad/AGENT-BRIEF.md first and follow it.
+
+Worktree: /home/user/wt/par-reasons (branch wt/par-reasons). Tasks from docs/ERGOPTIPLUS_TODO.md (audit docs/audits/2026-10-24-cross-os-parity.md), one commit each:
+- PAR-12: the token-streaming row says Windows cannot show suggestions token by token, but `ollama_streaming.ahk` and `prediction_exec.ahk:578` stream: verify in code, then enable the row on Windows (manifest platforms + the Windows reader if needed) or fix the reason in 21 locales.
+- PAR-37: check what 042ded22 ("every single-platform restriction states what the platform does differently") already did; finish the gate requiring `reason_key` on every feature entry and every non-frame menu row whose platforms are not all three, baseline lowered to zero.
+- PAR-26, PAR-32, PAR-35, PAR-36: each restricted entry gets either an implementation decision recorded or an accurate `reason_key` (no "for now" wording); do NOT implement big features, just accurate reasons and docs; list implementation work as left.
+- PAR-48: triage locale values equal to English per locale (263-385 per locale, ~30 in `fr`, e.g. `sg_actions.sticky_*`, `shortcuts.altgr*`) through the i18n skill: translate the genuinely untranslated ones in `fr` at least, leave proper nouns/technical tokens, with an allowlist gate if one fits.
+- PAR-11: Windows uninstall removes its Startup shortcut (`uninstall.ahk` never touches `A_Startup`; macOS and Linux remove their login item). Small AHK change plus a JS/meta test that fails while the shortcut is left behind (AHK not executable here: say so).
+Another agent (linux-ui-parity) handles PAR-25/44/45/52 and another (linux-llm) PAR-21: stay off those rows. Regenerate menu_manifest.json via `npm run build:domain`; run `python3 tools/locale/check_locales.py`, `node tools/test/test-menu-manifest.cjs`, `test-approved-menu-labels.cjs`.

@@ -1,0 +1,10 @@
+agentId: a5d8e47d61b48908b
+description: PAR-82/85/83 single-source gates
+
+Read /tmp/claude-0/-home-user-ergopti/a1289939-fd47-5b65-a929-48c61fdb6fa0/scratchpad/AGENT-BRIEF.md first and follow it.
+
+Worktree: /home/user/wt/par-ui-gates (branch wt/par-ui-gates). Tasks from docs/ERGOPTIPLUS_TODO.md (audit docs/audits/2026-10-24-cross-os-parity.md rows K6, I9, K2, K9, K4):
+- PAR-82: new `tools/test/test-no-hardcoded-ui-strings.cjs` (TrayTip, MsgBox, alert, window-title literals and similar visible text fail unless allowlisted; reuse `tools/lint/audit-gui-titles.cjs`), including the Linux `install.sh` echo table, with a baseline that can only shrink. Note 5430ae2e already routed several literals (PAR-46): build on it.
+- PAR-85: tooltip dequeue and ring constants: `dequeue.js` 0.2/0.05 vs `dequeue.lua` 0/0, `RING_SIZE` 64 vs 32, the "mirrored" comment at `tooltip/constants.toml:398`. Decide the correct values from the code's intent (git log -p), make one declaration, and add a single-source test in the tooltip test family.
+- PAR-83: `_shared/data/identifiers.json` (through codegen if the repo's codegen pattern fits) for ErgoptiPlus.ahk/.exe/.app names, bundle ids, service names, GitHub/Ollama/HuggingFace hosts; extend `test-repo-url-single-source.cjs` to hosts and ids; add the `ollama_install.sh` port to `test-ollama-port-single-source.cjs`. Do PAR-83 last and only as far as is safe (start with the gate plus baseline, migrate the easy readers).
+Each item its own commit(s), registered so the JS suite runs it.
