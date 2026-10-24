@@ -1550,6 +1550,7 @@
 	"menu.layout.open_prefs": "キーボード設定を開く…",
 	"menu.layout.pause_layout_enabled": "一時停止/再開時にレイアウトを切り替える",
 	"menu.layout.pause_layout_section": "一時停止/再開時のレイアウト",
+	"menu.layout.pause_layout_unsupported_desktop": "一時停止 / 再開時のレイアウト：このデスクトップでは利用できません（GNOME または X11 のみ）",
 	"menu.layout.replace": "キーを★キーに変換する",
 	"menu.layout.magic_key_source": "物理マジックキー",
 	"menu.layout.magic_key_source.auto": "自動（配列のキー）",

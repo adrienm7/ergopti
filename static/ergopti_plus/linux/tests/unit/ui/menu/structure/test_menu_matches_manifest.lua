@@ -254,7 +254,8 @@ local function build_fixture_menu(context)
 		-- Layout on pause / resume: a desktop listing no layout, so only « No change ».
 		if context.pause_layout == nil then
 			context.pause_layout = { switcher = function()
-				return { choices = function() return {} end, refresh = function() end }
+				return { backend = function() return "gnome" end, choices = function() return {} end,
+					refresh = function() end }
 			end }
 		end
 		context.gestures.is_assignable = function() return false end

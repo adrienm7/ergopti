@@ -1550,6 +1550,7 @@
 	"menu.layout.open_prefs": "Toetsenbordinstellingen openen…",
 	"menu.layout.pause_layout_enabled": "Indeling wisselen bij pauze / hervatten",
 	"menu.layout.pause_layout_section": "Indeling bij pauze / hervatten",
+	"menu.layout.pause_layout_unsupported_desktop": "Indeling bij pauze / hervatten: niet beschikbaar op deze desktop (alleen GNOME of X11)",
 	"menu.layout.replace": "Een toets omzetten naar de ★-toets",
 	"menu.layout.magic_key_source": "Fysieke magische toets",
 	"menu.layout.magic_key_source.auto": "Automatisch (de toets van de indeling)",

@@ -1550,6 +1550,7 @@
 	"menu.layout.open_prefs": "פתח הגדרות מקלדת…",
 	"menu.layout.pause_layout_enabled": "החלף פריסה בהשהיה / המשך",
 	"menu.layout.pause_layout_section": "פריסה בהשהיה / המשך",
+	"menu.layout.pause_layout_unsupported_desktop": "פריסה בהשהיה / חידוש: לא זמין בשולחן עבודה זה (GNOME או X11 בלבד)",
 	"menu.layout.replace": "להמיר מקש למקש ★",
 	"menu.layout.magic_key_source": "מקש קסם פיזי",
 	"menu.layout.magic_key_source.auto": "אוטומטי (המקש של הפריסה)",

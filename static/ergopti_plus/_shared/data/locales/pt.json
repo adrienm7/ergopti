@@ -1550,6 +1550,7 @@
 	"menu.layout.open_prefs": "Abrir Configurações de Teclado…",
 	"menu.layout.pause_layout_enabled": "Mudar layout ao pausar / retomar",
 	"menu.layout.pause_layout_section": "Layout ao pausar / retomar",
+	"menu.layout.pause_layout_unsupported_desktop": "Layout na pausa / retoma: indisponível neste ambiente de trabalho (apenas GNOME ou X11)",
 	"menu.layout.replace": "Transformar uma tecla na tecla ★",
 	"menu.layout.magic_key_source": "Tecla mágica física",
 	"menu.layout.magic_key_source.auto": "Automática (a tecla do layout)",
