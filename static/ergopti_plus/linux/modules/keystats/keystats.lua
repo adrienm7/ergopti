@@ -225,23 +225,24 @@ local _suspended = false
 -- them back on after a reboot — and the two filters they had deliberately
 -- relaxed silently tightened again, which is the harmless direction. The master
 -- switch is the other direction: off means off, and it did not stay off.
-local PREF_PREFIX = "metrics."
 local Preferences = require("infra.metrics_preferences")
+local KEY  = require("config_keys").KEY
+local LEAF = require("config_keys").LEAF
 
 --- Persists a boolean, or clears it when it matches the shipped default.
---- @param key string
+--- @param key string A config_keys.KEY value.
 --- @param value boolean
 --- @return boolean
 local function store_bool(key, value)
-	return Preferences.set(PREF_PREFIX .. key, value)
+	return Preferences.set(key, value)
 end
 
 local _DEFAULTS = {
-	enabled                    = Manifest.default_for("metrics.enabled"),
-	private_filter_enabled     = Manifest.default_for("metrics.private_filter_enabled"),
-	secure_filter_enabled      = Manifest.default_for("metrics.secure_filter_enabled"),
-	system_auth_filter_enabled = Manifest.default_for("metrics.system_auth_filter_enabled"),
-	encrypt                    = Manifest.default_for("metrics.encrypt"),
+	enabled                    = Manifest.default_for(KEY.METRICS_ENABLED),
+	private_filter_enabled     = Manifest.default_for(KEY.METRICS_PRIVATE_FILTER_ENABLED),
+	secure_filter_enabled      = Manifest.default_for(KEY.METRICS_SECURE_FILTER_ENABLED),
+	system_auth_filter_enabled = Manifest.default_for(KEY.METRICS_SYSTEM_AUTH_FILTER_ENABLED),
+	encrypt                    = Manifest.default_for(KEY.METRICS_ENCRYPT),
 }
 
 -- Seeded from the manifest at LOAD, and re-seeded from config.toml inside M.init().
@@ -495,7 +496,7 @@ function M.init(opts)
 	-- the migration this block launches depends on which posture is in force, so
 	-- reading it afterwards would resume the wrong direction on the first start
 	-- after the user changed it.
-	_encrypt_enabled = preferences["metrics.encrypt"]
+	_encrypt_enabled = preferences[KEY.METRICS_ENCRYPT]
 
 	-- Push the configured posture into the cipher. Without this the cipher stayed
 	-- off while get_privacy_state() reported the manifest's value, which is the
@@ -513,11 +514,11 @@ function M.init(opts)
 
 	-- The user's stored choices, applied over the manifest defaults. Here rather
 	-- than at module load: see the note beside the declarations.
-	_enabled                    = preferences["metrics.enabled"]
-	_private_filter_enabled     = preferences["metrics.private_filter_enabled"]
-	_secure_filter_enabled      = preferences["metrics.secure_filter_enabled"]
-	_system_auth_filter_enabled = preferences["metrics.system_auth_filter_enabled"]
-	_disabled_list              = preferences["metrics.disabled_apps"]
+	_enabled                    = preferences[KEY.METRICS_ENABLED]
+	_private_filter_enabled     = preferences[KEY.METRICS_PRIVATE_FILTER_ENABLED]
+	_secure_filter_enabled      = preferences[KEY.METRICS_SECURE_FILTER_ENABLED]
+	_system_auth_filter_enabled = preferences[KEY.METRICS_SYSTEM_AUTH_FILTER_ENABLED]
+	_disabled_list              = preferences[KEY.METRICS_DISABLED_APPS]
 	_disabled_apps              = exclusion_set(_disabled_list)
 
 	_hold_token = {}
@@ -1436,7 +1437,7 @@ end
 function M.set_enabled(enabled)
 	if not Preferences.admit() then return false end
 	local wanted = (enabled == true)
-	if not store_bool("enabled", wanted) then
+	if not store_bool(KEY.METRICS_ENABLED, wanted) then
 		Logger.error(LOG, "Metrics collection state was not persisted — it was not changed.")
 		return false
 	end
@@ -1485,7 +1486,7 @@ end
 function M.set_private_filter_enabled(enabled)
 	if not admit_filter_change("Private-browsing") then return false end
 	local wanted = (enabled == true)
-	if not store_bool("private_filter_enabled", wanted) then
+	if not store_bool(KEY.METRICS_PRIVATE_FILTER_ENABLED, wanted) then
 		Logger.error(LOG, "Private-browsing filter state was not persisted — it was not changed.")
 		return false
 	end
@@ -1518,7 +1519,7 @@ function M.set_disabled_apps(apps)
 	for _, app in ipairs(apps) do
 		if type(app) ~= "string" or app == "" then return false end
 	end
-	if not Preferences.set(PREF_PREFIX .. "disabled_apps", apps) then
+	if not Preferences.set(KEY.METRICS_DISABLED_APPS, apps) then
 		Logger.error(LOG, "The excluded applications were not persisted — the list was not changed.")
 		return false
 	end
@@ -1535,7 +1536,7 @@ end
 function M.set_secure_filter_enabled(enabled)
 	if not admit_filter_change("Secure-field") then return false end
 	local wanted = (enabled == true)
-	if not store_bool("secure_filter_enabled", wanted) then
+	if not store_bool(KEY.METRICS_SECURE_FILTER_ENABLED, wanted) then
 		Logger.error(LOG, "Secure-field filter state was not persisted — it was not changed.")
 		return false
 	end
@@ -1550,7 +1551,7 @@ end
 function M.set_system_auth_filter_enabled(enabled)
 	if not admit_filter_change("System-auth") then return false end
 	local wanted = (enabled == true)
-	if not store_bool("system_auth_filter_enabled", wanted) then
+	if not store_bool(KEY.METRICS_SYSTEM_AUTH_FILTER_ENABLED, wanted) then
 		Logger.error(LOG, "System-auth filter state was not persisted — it was not changed.")
 		return false
 	end
@@ -1573,7 +1574,7 @@ function M.set_encrypt_enabled(enabled)
 		Logger.error(LOG, "At-rest encryption requested but no key can be derived — keeping the current posture.")
 		return false
 	end
-	if not store_bool("encrypt", want) then
+	if not store_bool(KEY.METRICS_ENCRYPT, want) then
 		Logger.error(LOG, "At-rest encryption state was not persisted — it was not changed.")
 		return false
 	end
@@ -1656,8 +1657,8 @@ end
 function M.apply_configuration(candidate)
 	if M.has_flush_debt() or _flush_stopping then return false end
 	if type(candidate) ~= "table" or TextMigration.is_running() then return false end
-	for _, key in ipairs({ "enabled", "private_filter_enabled", "secure_filter_enabled",
-		"system_auth_filter_enabled", "encrypt", "cipher_enabled" }) do
+	for _, key in ipairs({ LEAF.ENABLED, LEAF.PRIVATE_FILTER_ENABLED, LEAF.SECURE_FILTER_ENABLED,
+		LEAF.SYSTEM_AUTH_FILTER_ENABLED, LEAF.ENCRYPT, "cipher_enabled" }) do
 		if type(candidate[key]) ~= "boolean" then return false end
 	end
 	if type(candidate.disabled_apps) ~= "table" then return false end
