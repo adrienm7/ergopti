@@ -1023,3 +1023,23 @@ helpers.describe("linux-sqlite-system-day", function()
 		helpers.assert_nil(system_sql:find("app IN", 1, true), "the machine's day has no application to filter")
 	end)
 end)
+
+
+helpers.describe("linux-sqlite-ngram-catalogue", function()
+	-- The token reads are the catalogue's ngram.tokens in the CLI dialect, one
+	-- per family table, so macOS and Linux sum n-grams with one statement.
+	local Queries = require("keystats.queries")
+	helpers.it("linux-sqlite-ngram-catalogue: every family read is the catalogue rendering", function()
+		local statements = with_stubbed_sqlite(function() return "[]" end, function(reader)
+			reader.read_ngrams("/db/metrics.sqlite", "2026-10-01", "2026-10-02", { "editor" })
+		end)
+		local where = " WHERE date >= '2026-10-01' AND date <= '2026-10-02' AND app IN ('editor')"
+		local issued = {}
+		for _, sql in ipairs(statements) do issued[sql] = true end
+		for _, entry in ipairs(EXPECTED) do
+			local sql = Queries.render("ngram.tokens", "cli_json",
+				{ table = entry.table_name, where = where, conjunction = " AND " })
+			helpers.assert_true(issued[sql] == true, entry.table_name .. " is read through the catalogue")
+		end
+	end)
+end)
