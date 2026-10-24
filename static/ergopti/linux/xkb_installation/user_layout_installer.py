@@ -65,6 +65,11 @@ from layout_package import (  # noqa: E402
 
 EXIT_ARGUMENTS = 2
 
+# The session type logind publishes: "x11" for a pure Xorg session.
+ENV_SESSION_TYPE = "XDG_SESSION_TYPE"
+# The kind of refusal the daemon turns into a message about the session.
+KIND_XORG_SESSION = "xorg_session"
+
 # Overrides of the user tree and home, for sandboxed tests.
 ENV_USER_ROOT = "ERGOPTI_XKB_USER_ROOT"
 ENV_USER_HOME = "ERGOPTI_XKB_USER_HOME"
@@ -116,6 +121,22 @@ def user_root(environ: Optional[Dict[str, str]] = None) -> Path:
     config_home = env.get("XDG_CONFIG_HOME")
     base = Path(config_home) if config_home else Path.home() / ".config"
     return base / "xkb"
+
+
+def is_xorg_session(environ: Optional[Dict[str, str]] = None) -> bool:
+    """True in a pure Xorg session, whose xkbcomp never reads the user tree."""
+    env = os.environ if environ is None else environ
+    return env.get(ENV_SESSION_TYPE, "").strip().lower() == "x11"
+
+
+def refuse_xorg_session(environ: Optional[Dict[str, str]] = None) -> None:
+    """Refuses before writing anything when the session could not use the tree."""
+    if is_xorg_session(environ):
+        raise InstallError(
+            EXIT_VALIDATION,
+            "this is an Xorg session, which does not read the user XKB tree; nothing was written",
+            KIND_XORG_SESSION,
+        )
 
 
 def user_home(environ: Optional[Dict[str, str]] = None) -> Path:
@@ -346,8 +367,10 @@ def install(
     languages: List[str],
     root: Path,
     home: Path,
+    environ: Optional[Dict[str, str]] = None,
 ) -> dict:
     """Installs one converted layout into the user tree."""
+    refuse_xorg_session(environ)
     symbols = (source_dir / (layout_id + ".xkb")).read_text(encoding="utf-8")
     types = (source_dir / "xkb_types.txt").read_text(encoding="utf-8")
     compose_source = source_dir / (layout_id + ".XCompose")
@@ -437,8 +460,9 @@ def uninstall(layout_id: str, root: Path, home: Path, deactivate: bool = True) -
     }
 
 
-def activate(layout_id: str, root: Path) -> dict:
+def activate(layout_id: str, root: Path, environ: Optional[Dict[str, str]] = None) -> dict:
     """Makes one installed layout the first input source of the session."""
+    refuse_xorg_session(environ)
     if layout_id not in read_manifest(root):
         raise InstallError(EXIT_VALIDATION, "the layout %s is not installed" % layout_id)
     applied = activate_layout([LayoutSpec(layout_id)])

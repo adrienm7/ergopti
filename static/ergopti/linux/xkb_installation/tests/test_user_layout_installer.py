@@ -77,8 +77,34 @@ class UserInstallerTests(unittest.TestCase):
 
     def install(self, layout_id: str, name: str) -> dict:
         return installer.install(
-            layout_id, name, self.sources[layout_id], ["fr", "en"], self.root, self.home
+            layout_id, name, self.sources[layout_id], ["fr", "en"], self.root, self.home, {}
         )
+
+    def test_a_pure_xorg_session_is_refused_before_anything_is_written(self) -> None:
+        # Xorg's xkbcomp never reads the user tree: installing there would list
+        # a layout in the pickers that the session can never type.
+        with self.assertRaises(installer.InstallError) as refusal:
+            installer.install(
+                "ergol",
+                "French (Ergo-L)",
+                self.sources["ergol"],
+                ["fr"],
+                self.root,
+                self.home,
+                {"XDG_SESSION_TYPE": "x11"},
+            )
+        self.assertEqual(refusal.exception.kind, installer.KIND_XORG_SESSION)
+        self.assertEqual(refusal.exception.code, installer.EXIT_VALIDATION)
+        self.assertFalse(self.root.exists(), "the refusal comes before any write")
+        self.assertFalse((self.home / ".XCompose").exists())
+        with self.assertRaises(installer.InstallError) as activation:
+            installer.activate("ergol", self.root, {"XDG_SESSION_TYPE": "X11"})
+        self.assertEqual(activation.exception.kind, installer.KIND_XORG_SESSION)
+
+    def test_wayland_and_unknown_sessions_still_install(self) -> None:
+        for session in ({"XDG_SESSION_TYPE": "wayland"}, {}):
+            self.assertFalse(installer.is_xorg_session(session), session)
+        self.assertTrue(installer.is_xorg_session({"XDG_SESSION_TYPE": " x11 "}))
 
     def test_a_layout_owns_its_symbols_types_and_compose_files(self) -> None:
         report = self.install("ergol", "French (Ergo-L)")
