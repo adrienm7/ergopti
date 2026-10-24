@@ -54,7 +54,7 @@ if (!fs.existsSync(ABS)) {
 	const src = fs.readFileSync(ABS, 'utf8');
 	const load = new Function(
 		'window',
-		`${src}\nreturn { SC_TO_KC, translate_win_bucket, translate_win_today };`
+		`${src}\nreturn { SC_TO_KC, translate_win_bucket, translate_win_today, is_pc_scancode_driver };`
 	);
 	const api = load({});
 
@@ -66,6 +66,19 @@ if (!fs.existsSync(ABS)) {
 		KC_LEFT !== undefined && api.SC_TO_KC[203] === KC_LEFT,
 		`${REL}: scancodes 75 and 203 must both map to the left-arrow keycode`
 	);
+
+	// The one owner of which recording OSes store PC scan codes; the key table
+	// (table.js) asks it too rather than comparing OS names itself.
+	for (const [meta, expected] of [
+		[{ os: 'win' }, true],
+		[{ os: 'linux' }, true],
+		[{ os: 'mac' }, false],
+		[undefined, false]
+	])
+		check(
+			api.is_pc_scancode_driver(meta) === expected,
+			`${REL}: driver_meta ${JSON.stringify(meta)} must ${expected ? '' : 'not '}be a PC scan-code dataset`
+		);
 
 	// ── 1. The FLAT historical aggregate must be translated ─────────────────
 	const hist = api.translate_win_today({
