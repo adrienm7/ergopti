@@ -38,6 +38,7 @@ local sqlite3 = require("hs.sqlite3")
 
 local Logger = require("infra.logger")
 local Literal = require("sqlite.literal")
+local Queries = require("keystats.queries")
 local LOG    = "keystats.sqlite_reader"
 
 
@@ -207,28 +208,15 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 		end
 		return (#clauses > 0) and (" WHERE " .. table.concat(clauses, " AND ")) or ""
 	end
+	-- The SQL is the shared catalogue's (_shared/data/db/queries.sql) in the
+	-- in-process dialect, the same statements the Windows and Linux readers run.
+	local function manifest_sql(name)
+		return Queries.render(name, "native", { where = date_filter() })
+	end
 
 	-- Core agg_app_day: sum across devices.
 	query("agg_app_day", function()
-		for r in _rows(db, string.format([[
-			SELECT date, app,
-			       SUM(chars)            AS chars,
-			       SUM(pauses)           AS pauses,
-			       SUM(time_ms)          AS time_ms,
-			       SUM(think_time_ms)    AS think_time_ms,
-			       SUM(hs_chars)         AS hs_chars,
-			       SUM(llm_chars)        AS llm_chars,
-			       SUM(hs_triggers)      AS hs_triggers,
-			       SUM(llm_triggers)     AS llm_triggers,
-			       SUM(hs_suggested)     AS hs_suggested,
-			       SUM(llm_suggested)    AS llm_suggested,
-			       SUM(hs_input_chars)   AS hs_input_chars,
-			       SUM(llm_input_chars)  AS llm_input_chars,
-			       SUM(app_time_ms)      AS app_time_ms,
-			       MAX(category)         AS category
-			FROM agg_app_day %s
-			GROUP BY date, app
-		]], date_filter()), pacer) do
+		for r in _rows(db, manifest_sql("manifest.app_day"), pacer) do
 			local a = _get(manifest, r.date, r.app)
 			a.chars            = r.chars or 0
 			a.pauses           = r.pauses or 0
@@ -249,17 +237,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 
 	-- agg_app_day_buckets → time/credited/hs_input/llm_input bucket maps.
 	query("agg_app_day_buckets", function()
-		for r in _rows(db, string.format([[
-			SELECT date, app, bucket_ms,
-			       SUM(time_sum)           AS time_sum,
-			       SUM(credited)           AS credited,
-			       SUM(hs_input_time_sum)  AS hs_in_t,
-			       SUM(hs_input_credited)  AS hs_in_c,
-			       SUM(llm_input_time_sum) AS llm_in_t,
-			       SUM(llm_input_credited) AS llm_in_c
-			FROM agg_app_day_buckets %s
-			GROUP BY date, app, bucket_ms
-		]], date_filter()), pacer) do
+		for r in _rows(db, manifest_sql("manifest.buckets"), pacer) do
 			local a = _get(manifest, r.date, r.app)
 			local k = tostring(r.bucket_ms)
 			a.time_buckets[k]               = (a.time_buckets[k]               or 0) + (r.time_sum  or 0)
@@ -277,18 +255,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 	-- when multiple devices contribute rows for the same (date, app). Retain
 	-- source multiplicity so byte-identical blobs contribute once per device.
 	query("agg_app_day_burst", function()
-		for r in _rows(db, string.format([[
-			SELECT date, app,
-			       SUM(count_total)        AS count_total,
-			       MAX(max_cpm)            AS max_cpm,
-			       MAX(max_chars)          AS max_chars,
-			       SUM(inter_delay_count)  AS inter_count,
-			       SUM(inter_delay_sum)    AS inter_sum,
-			       SUM(inter_delay_sumsq)  AS inter_sumsq,
-			       length_buckets_json, COUNT(*) AS source_rows
-			FROM agg_app_day_burst %s
-			GROUP BY date, app, length_buckets_json
-		]], date_filter()), pacer) do
+		for r in _rows(db, manifest_sql("manifest.burst"), pacer) do
 			local a = _get(manifest, r.date, r.app)
 			a.burst_count_total       = (a.burst_count_total       or 0) + (r.count_total or 0)
 			a.burst_max_cpm           = math.max(a.burst_max_cpm   or 0,   r.max_cpm   or 0)
@@ -308,10 +275,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 
 	-- agg_app_day_session.
 	query("agg_app_day_session", function()
-		for r in _rows(db, string.format([[
-			SELECT date, app, count_total, longest_ms, longest_chars, total_active_ms, durations_json
-			FROM agg_app_day_session %s
-		]], date_filter()), pacer) do
+		for r in _rows(db, manifest_sql("manifest.session"), pacer) do
 			local a = _get(manifest, r.date, r.app)
 			a.session_count_total      = (a.session_count_total      or 0) + (r.count_total or 0)
 			if (r.longest_ms or 0)    > (a.session_longest_ms or 0)    then a.session_longest_ms    = r.longest_ms end
@@ -326,14 +290,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 
 	-- agg_app_day_chars_class.
 	query("agg_app_day_chars_class", function()
-		for r in _rows(db, string.format([[
-			SELECT date, app,
-			       SUM(letter) AS letter, SUM(digit) AS digit, SUM(punct) AS punct,
-			       SUM(space)  AS space,  SUM(other) AS other,
-			       MIN(first_typed_min) AS first_min, MAX(last_typed_min) AS last_min
-			FROM agg_app_day_chars_class %s
-			GROUP BY date, app
-		]], date_filter()), pacer) do
+		for r in _rows(db, manifest_sql("manifest.chars_class"), pacer) do
 			local a = _get(manifest, r.date, r.app)
 			a.char_letter = r.letter or 0
 			a.char_digit  = r.digit  or 0
@@ -347,16 +304,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 
 	-- agg_app_day_errors.
 	query("agg_app_day_errors", function()
-		for r in _rows(db, string.format([[
-			SELECT date, app,
-			       SUM(bs_total)        AS bs_total,
-			       SUM(cascade_count)   AS cascade_count,
-			       MAX(cascade_max_len) AS cascade_max_len,
-			       SUM(recovery_sum_ms) AS recovery_sum,
-			       SUM(recovery_count)  AS recovery_count
-			FROM agg_app_day_errors %s
-			GROUP BY date, app
-		]], date_filter()), pacer) do
+		for r in _rows(db, manifest_sql("manifest.errors"), pacer) do
 			local a = _get(manifest, r.date, r.app)
 			a.bs_total              = r.bs_total or 0
 			a.cascade_count_total   = r.cascade_count or 0
@@ -368,14 +316,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 
 	-- agg_app_day_ergo.
 	query("agg_app_day_ergo", function()
-		for r in _rows(db, string.format([[
-			SELECT date, app,
-			       MAX(same_finger_streak_max) AS f_max,
-			       MAX(same_hand_streak_max)   AS h_max,
-			       SUM(auto_repeat_count)      AS ar_count
-			FROM agg_app_day_ergo %s
-			GROUP BY date, app
-		]], date_filter()), pacer) do
+		for r in _rows(db, manifest_sql("manifest.ergo"), pacer) do
 			local a = _get(manifest, r.date, r.app)
 			a.same_finger_streak_max = r.f_max or 0
 			a.same_hand_streak_max   = r.h_max or 0
@@ -385,11 +326,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 
 	-- agg_app_day_layouts.
 	query("agg_app_day_layouts", function()
-		for r in _rows(db, string.format([[
-			SELECT date, app, layout, SUM(count) AS count
-			FROM agg_app_day_layouts %s
-			GROUP BY date, app, layout
-		]], date_filter()), pacer) do
+		for r in _rows(db, manifest_sql("manifest.layouts"), pacer) do
 			local a = _get(manifest, r.date, r.app)
 			a.layouts_seen[r.layout] = (a.layouts_seen[r.layout] or 0) + (r.count or 0)
 		end
@@ -397,13 +334,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 
 	-- agg_app_day_kc_hold.
 	query("agg_app_day_kc_hold", function()
-		for r in _rows(db, string.format([[
-			SELECT date, app, keycode,
-			       SUM(sum_ms) AS s, SUM(count) AS c, MAX(max_ms) AS mx,
-			       SUM(tap_count) AS t, SUM(hold_count) AS h
-			FROM agg_app_day_kc_hold %s
-			GROUP BY date, app, keycode
-		]], date_filter()), pacer) do
+		for r in _rows(db, manifest_sql("manifest.kc_hold"), pacer) do
 			local a = _get(manifest, r.date, r.app)
 			-- The shared dashboard reads s/n/m, as the Windows and Linux readers
 			-- project them; any other key reads as a zero hold time.
@@ -416,30 +347,19 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 
 	-- Semantic keys have labelled rows, never fabricated numeric positions.
 	query("ngram_media_keys", function()
-		for r in _rows(db, string.format([[
-			SELECT date, app, media_id, SUM(c) AS c FROM ngram_media_keys %s
-			GROUP BY date, app, media_id
-		]], date_filter()), pacer) do
+		for r in _rows(db, manifest_sql("manifest.media_keys"), pacer) do
 			_get(manifest, r.date, r.app).media_keys[r.media_id] = require("keystats.media_store").project_press(r)
 		end
 	end, pacer)
 	query("agg_app_day_media_hold", function()
-		for r in _rows(db, string.format([[
-			SELECT date, app, media_id, SUM(sum_ms) AS sum_ms, SUM(count) AS count,
-			MAX(max_ms) AS max_ms, SUM(tap_count) AS tap_count, SUM(hold_count) AS hold_count
-			FROM agg_app_day_media_hold %s GROUP BY date, app, media_id
-		]], date_filter()), pacer) do
+		for r in _rows(db, manifest_sql("manifest.media_hold"), pacer) do
 			_get(manifest, r.date, r.app).media_hold[r.media_id] = require("keystats.media_store").project_hold(r)
 		end
 	end, pacer)
 
 	-- agg_app_day_titles.
 	query("agg_app_day_titles", function()
-		for r in _rows(db, string.format([[
-			SELECT date, app, title, SUM(c) AS c, SUM(ms) AS ms
-			FROM agg_app_day_titles %s
-			GROUP BY date, app, title
-		]], date_filter()), pacer) do
+		for r in _rows(db, manifest_sql("manifest.titles"), pacer) do
 			local a = _get(manifest, r.date, r.app)
 			a.win_titles[r.title] = { c = r.c or 0, ms = r.ms or 0 }
 		end
@@ -449,13 +369,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 	-- GROUP BY date, app, hour, e_buckets_json to avoid MIN(e_buckets_json) loss
 	-- on multi-device installs; accumulate scalars and merge buckets in Lua.
 	query("agg_app_day_hourly", function()
-		for r in _rows(db, string.format([[
-			SELECT date, app, hour,
-			       SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es,
-			       e_buckets_json, COUNT(*) AS source_rows
-			FROM agg_app_day_hourly %s
-			GROUP BY date, app, hour, e_buckets_json
-		]], date_filter()), pacer) do
+		for r in _rows(db, manifest_sql("manifest.hourly"), pacer) do
 			local a = _get(manifest, r.date, r.app)
 			local h = a.hourly[r.hour]
 			if not h then
@@ -478,13 +392,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 	-- agg_app_day_hourly_min5.
 	-- Same multi-device fix: GROUP BY slot, e_buckets_json; accumulate in Lua.
 	query("agg_app_day_hourly_min5", function()
-		for r in _rows(db, string.format([[
-			SELECT date, app, slot,
-			       SUM(c) AS c, SUM(e) AS e, SUM(es) AS es,
-			       e_buckets_json, COUNT(*) AS source_rows
-			FROM agg_app_day_hourly_min5 %s
-			GROUP BY date, app, slot, e_buckets_json
-		]], date_filter()), pacer) do
+		for r in _rows(db, manifest_sql("manifest.hourly_min5"), pacer) do
 			local a = _get(manifest, r.date, r.app)
 			local h = a.hourly_min5[r.slot]
 			if not h then
@@ -507,11 +415,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 	-- The shared pages read it for app-pair affinity; it stays absent for an app
 	-- without transitions, and destinations outside the selection are kept.
 	query("agg_app_day_switches_to", function()
-		for r in _rows(db, string.format([[
-			SELECT date, app_from AS app, app_to, SUM(count) AS count
-			FROM agg_app_day_switches_to %s
-			GROUP BY date, app_from, app_to
-		]], date_filter()), pacer) do
+		for r in _rows(db, manifest_sql("manifest.switches_to"), pacer) do
 			local a = _get(manifest, r.date, r.app)
 			a.switches_to = a.switches_to or {}
 			a.switches_to[r.app_to] = r.count or 0
