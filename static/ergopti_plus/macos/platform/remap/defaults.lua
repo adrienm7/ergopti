@@ -115,7 +115,10 @@ D.rollover_keys = require("tap_hold.key_catalog").load_rollover(shared_defaults_
 -- ----- Timeouts + flags ([hs_timeouts]) -----
 local timeouts = require_section(sections, "hs_timeouts")
 D.tap_hold_timeout_ms        = timeouts.tap_hold_timeout_ms        -- KE basic.to_if_alone_timeout_milliseconds
-D.sticky_timeout_ms          = timeouts.sticky_timeout_ms          -- One-shot modifier auto-cancel delay
+-- One-shot modifier auto-cancel delay: the cross-driver timing registry's value
+-- (tap_hold.one_shot_shift_timeout_ms), the one Windows and Linux read, so the
+-- three drivers cancel a one-shot Shift after the same time (PAR-15).
+D.sticky_timeout_ms          = require("infra.timings").ms("tap_hold", "one_shot_shift_timeout_ms")
 D.simultaneous_threshold_ms  = timeouts.simultaneous_threshold_ms  -- Combo activation window
 D.combo_symmetric            = timeouts.combo_symmetric            -- A+B == B+A for the chord slot
 

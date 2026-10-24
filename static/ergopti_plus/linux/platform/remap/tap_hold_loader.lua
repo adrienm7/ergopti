@@ -113,6 +113,13 @@ local function validated(key_id, fields, hold_picker, origin)
 		if type(key[field]) == "string" then
 			local canonical, err = canonical_of(key[field], hold_picker)
 			if canonical then
+				-- The left aliases (lctrl, lshift) name the left key even on the
+				-- right Ctrl / Shift key: the spelling is read before it is
+				-- canonicalised away, then rides along as `hold_left_modifiers`.
+				if field == "hold_modifier" then
+					-- A string, not a table: the manager compares keys field by field.
+					key.hold_left_modifiers = HoldOptions.left_forced(key[field], hold_picker)
+				end
 				key[field] = canonical
 			else
 				-- The hold alone goes, as the Windows loader drops it
