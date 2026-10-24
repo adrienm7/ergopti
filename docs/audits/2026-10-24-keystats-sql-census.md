@@ -51,7 +51,7 @@ all three OS unless there is a good reason) and the side that follows it.
    Right: the Windows and Linux keys; the macOS reader follows them.
 2. **Window titles field (Linux).** The dashboard reads `win_titles`; Windows and macOS project
    it, Linux projected `titles`, so the Linux window-title panel stayed empty. Right:
-   `win_titles`. Aligned in the Linux reader.
+   `win_titles`; the Linux reader follows it.
 3. **Focus-to-first-key latency (macOS, Windows).** macOS and Linux write
    `focus_to_first_key_sum_ms` and `_count` into `agg_app_day_ergo`; only Linux read them back,
    so the macOS focus-latency panel read zero. Right: read them (catalogue `manifest.ergo`).
@@ -71,7 +71,61 @@ all three OS unless there is a good reason) and the side that follows it.
 7. **N-gram token reads.** macOS sums with `SUM` and counts every source other than
    `hotstring`, `llm` and `none` as "other"; Linux sums with `TOTAL`, keeps non-numeric rows
    raw through a `typeof` split and classifies sources through the shared
-   `keystats.utils.is_other_synthetic_source`. Not yet catalogued.
+   `keystats.utils.is_other_synthetic_source` (the same rule as macOS for string labels); Windows
+   aggregates the source map in SQL through `json_each`. Not catalogued yet. Recommended: the
+   Linux form, because `TOTAL` cannot overflow and a malformed row stays visible instead of being
+   summed as the number its text happens to start with.
 8. **Semantic media keys.** Windows validates the grouped rows through temporary tables built
    from the shared `media_schema.sql`; macOS and Linux select them directly. The catalogue
    holds the direct form used by the two Lua drivers.
+
+## Parity findings in the walkers
+
+The Windows walker (`keystats_walker_events.ahk`) is the reference the corpus
+`_shared/tests/corpus/keystats/aggregation_vectors.json` pins; macOS and Linux now walk through
+`_shared/lua/keystats/walker.lua` and replay the corpus with one shared checker. Each finding is
+pinned by the vector named in brackets.
+
+1. **Correction history bound (macOS).** macOS kept every erasable entry of a run without a long
+   pause and persists that context; Windows and Linux keep eight (`HIST_CAP`, now a shared
+   constant). The outputs are the same (each backspace pops one entry and pushes one); the
+   persisted context no longer grows. [`long_run_bounds_the_correction_history`]
+2. **Word separators (Linux).** Linux ended a word on space, tab and newline only; Windows and
+   macOS also on punctuation and the no-break spaces. [`punctuation_ends_a_word`]
+3. **Driver output and streaks (Linux).** Linux broke the same-finger and same-hand runs on every
+   synthetic character and every backspace; Windows and macOS let driver output neither extend
+   nor break a run, and only a typed backspace breaks it.
+   [`synthetic_output_keeps_the_finger_streak`]
+4. **Synthetic corrections (Linux).** Linux counted a hotstring erasing its trigger neither as a
+   synthetic correction (`es`) nor in the trigger-input pause buckets, and its writer had no
+   column for those buckets. [`synthetic_correction_is_not_a_typing_error`]
+5. **Typed minutes (Linux).** Linux recorded the exact first and last minute; Windows and macOS
+   record the five-minute slot the activity histogram uses.
+   [`typed_minutes_use_five_minute_slots`]
+6. **Layout count (Linux).** Linux counted the layout once per keystroke; Windows and macOS once
+   per typing entry (on Linux, once per flushed application stream).
+   [`layout_counts_one_per_typing_entry`]
+7. **Manual marker (macOS).** macOS read `meta.s = 0` as synthetic (Lua treats 0 as true);
+   Windows reads it as typed, and so does the shared walker.
+8. **Activity rows (accepted).** Windows creates an entry's hour and five-minute rows before its
+   first keystroke; the shared walker creates them with the first keystroke of each slot, because
+   Linux places every keystroke in its own slot. The only difference is an all-zero row that no
+   page shows.
+9. **Day rollover (macOS, left).** Linux credits the open word, correction, burst and session of a
+   context when its gap has passed or the day ends (`settle`, now in the shared walker); macOS
+   resets the context at rollover and drops them. Not aligned in this change.
+10. **Finger keys (accepted).** Windows keys its finger map on virtual-key codes (the deliberate
+    third map of the cross-driver-parity skill); the corpus names macOS keycodes, so the Windows
+    replay translates the three keys of the streak vector.
+
+## Status after PAR-67
+
+- The catalogue holds the sixteen manifest queries. macOS and Linux render all of them; Windows
+  renders the eleven that were textually identical (`manifest.ergo`, the two media queries,
+  `manifest.switches_to` and `manifest.system_day` keep their Windows text: findings 3, 8, 5 and
+  4 above).
+- The census now counts the migrated statements as catalogue call sites: 11 on Windows, 16 on
+  macOS and 17 on Linux (its system-day query is rendered by the manifest and by
+  `read_system_days`). The table at the top is the census before the migration.
+- Not catalogued yet: the n-gram reads (finding 7), the walker flush upserts (identical on
+  Windows and macOS, a different column list and quoting on Linux), the event inserts.
