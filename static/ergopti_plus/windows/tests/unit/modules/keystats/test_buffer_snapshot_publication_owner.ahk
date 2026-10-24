@@ -29,7 +29,7 @@ _KBSP_ChildSource() {
 	SplitPath(StateOwner, , &StateDirectory)
 	AssertTrue(RegExMatch(StateSource, "m)^#Include ([^\r\n]+)", &ConstantsImport) > 0)
 	ConstantsPath := StateDirectory . "\" . ConstantsImport[1]
-	AssertTrue(RegExMatch(FileRead(ConstantsPath, "UTF-8"), "m)^class KeylogConst \{") > 0,
+	AssertTrue(RegExMatch(FileRead(ConstantsPath, "UTF-8"), "m)^class KeystatsConst \{") > 0,
 		"The real state owner's constants import must supply the genuine WPM limit")
 	Source .= "#Include " . ConstantsPath . "`n"
 	CategoryOwner := _DriverProductionFileForSymbol("KL_AppCat_Get", _DriverDir)
