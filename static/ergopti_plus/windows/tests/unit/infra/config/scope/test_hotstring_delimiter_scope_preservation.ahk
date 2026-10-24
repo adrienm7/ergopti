@@ -38,7 +38,11 @@ _HotstringsScopePersonalDelimiters() {
 			AssertEqual(9, Overrides["foreign"]["delay"])
 			Config := TOML_ParseFreshFile(Fixture.path)
 			AssertEqual("keep", Config["private"]["credential"])
-			AssertEqual(true, Config["hotstrings"]["preview_ai_enabled"])
+			; A restore keeps the AI preview switch (restore_exclude), a clear resets it.
+			if Mode == "clear"
+				Assert(!Config["hotstrings"].Has("preview_ai_enabled"), "a clear resets the AI preview switch")
+			else
+				AssertEqual(true, Config["hotstrings"]["preview_ai_enabled"], "a restore keeps the AI preview switch")
 			AssertContains(FSReadUtf8Exact(Fixture.personal[1]), '"abc" = "replacement"')
 			for Path in [Fixture.path, Fixture.overrides, Fixture.personal[1]]
 				Assert(!_ConfigWriteLeaseTryAcquire(Path, "concurrent-delimiter-editor"))
