@@ -191,7 +191,7 @@ function M.start(ctx)
 	-- BOOT_SUPPRESS_SEC). Captured now because M.start runs at the tail of boot,
 	-- right where the freshly-armed watchers would otherwise catch the previous
 	-- session's buffered events. This private window measures awake duration;
-	-- change receipts below keep their existing epoch domain for debounce.
+	-- change receipts below use the same awake domain for debounce.
 	local suppress_until = TimerScheduler.awake_time() + BOOT_SUPPRESS_SEC
 
 	local reload_timer = nil
@@ -322,7 +322,7 @@ function M.start(ctx)
 	-- Consecutive Git-hold re-polls with no new file activity; reset by an event or
 	-- committed reload. The threshold is diagnostic only: a live lock is never bypassed.
 	local defer_count = 0
-	-- Distinct source paths changed since the current burst began, and the epoch
+	-- Distinct source paths changed since the current burst began, and the awake
 	-- time (s) of the last change. Together they drive the adaptive settle: a lone
 	-- edit reloads after EDIT_SETTLE_SEC, but a BULK write — git pull, OneDrive /
 	-- Dropbox sync, rsync, mass save, any source that touches many files — is held
@@ -374,7 +374,7 @@ function M.start(ctx)
 	--- @param changed table|nil Absolute paths that changed in this event.
 	local function note_change(msg, changed)
 		if not lifecycle_active then return end
-		local now = hs.timer.secondsSinceEpoch()
+		local now = TimerScheduler.awake_time()
 		-- Ignore the FSEvents batch macOS replays right after an hs.reload(): during
 		-- the boot window these are the previous session's changes, not a new edit.
 		if TimerScheduler.awake_time() < suppress_until then return end
@@ -404,7 +404,7 @@ function M.start(ctx)
 		--      shows up as many distinct files; hold until BULK_SETTLE_SEC of quiet.
 		--   2. Git — a git operation holds .git/index.lock for the whole update, so
 		--      it is deferred exactly even if its file events pause partway through.
-		local elapsed = hs.timer.secondsSinceEpoch() - last_change_sec
+		local elapsed = TimerScheduler.awake_time() - last_change_sec
 		if not reload_gate.is_settled(elapsed, burst_count) then
 			Logger.debug(LOG, "Reload held (filesystem settling) on '%s'.", base_dir)
 			arm_timer(msg)
