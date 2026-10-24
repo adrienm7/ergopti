@@ -144,6 +144,9 @@ local _pending_hotstring_events = {}
 -- action that types no text — CapsWord, the selection transforms, the wrapping
 -- pairs, everything an extension registers — was absent from the metrics.
 local _pending_shortcut_events = {}
+-- LLM prediction events (generation, suggested, dismissed, accepted), buffered like their
+-- siblings and written to events_llm so the dashboard's AI tab has rows on this driver too.
+local _pending_llm_events = {}
 local _pending_app_switch_events = {}
 local _flush_state, _flush_stopping, _flush_pumping = nil, false, false
 local _flush_generation, _stop_final_dispatched, _stop_fallback_attempted = 0, false, false
@@ -849,6 +852,43 @@ function M.record_shortcut(app_id, key, timestamp_ms)  -- luacheck: ignore 212
 		app  = dashboard_app_name(type(app_id) == "string" and app_id or "unknown"),
 		key  = key,
 	}
+end
+
+-- The events_llm kinds, with the fields each may carry. The table's CHECK constraint
+-- knows only these four; anything else would be dropped silently by INSERT OR IGNORE.
+local LLM_EVENT_FIELDS = {
+	generation = { "count", "prompt_tokens", "completion_tokens", "total_tokens", "est_cost_usd" },
+	suggested = { "count" },
+	dismissed = { "all_predictions" },
+	accepted = { "prediction", "all_predictions", "chosen_index", "deletes", "deleted_text", "net_saved_chars" },
+}
+
+--- Records one LLM prediction event in the canonical events_llm shape macOS and Windows write.
+---
+--- generation: a request answered (how many predictions, and the tokens the backend
+--- reported). suggested: predictions were offered. dismissed: the offer went unused.
+--- accepted: the user took one. The dashboard's AI tab reads exactly these rows; before
+--- this existed only the per-application counters were kept, so the tab stayed empty.
+--- @param app_id string Application identifier.
+--- @param kind string "generation", "suggested", "dismissed" or "accepted".
+--- @param fields table|nil The fields of that kind (LLM_EVENT_FIELDS).
+function M.record_llm_event(app_id, kind, fields)
+	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	local allowed = LLM_EVENT_FIELDS[kind]
+	if not allowed then
+		Logger.error(LOG, "record_llm_event(): '%s' is not an events_llm kind; the event is dropped.", tostring(kind))
+		return
+	end
+	fields = type(fields) == "table" and fields or {}
+	local row = {
+		ts = os.date("!%Y-%m-%d %H:%M:%S"), date = os.date("%Y-%m-%d"),
+		app = dashboard_app_name(app_id), kind = kind,
+	}
+	for _, name in ipairs(allowed) do row[name] = fields[name] end
+	if kind == "accepted" and row.net_saved_chars == nil and type(row.prediction) == "string" then
+		row.net_saved_chars = char_count(row.prediction) - math.max(0, tonumber(row.deletes) or 0)
+	end
+	_pending_llm_events[#_pending_llm_events + 1] = row
 end
 
 --- Records successful automated output that is not a static hotstring (LLM,
@@ -1775,7 +1815,7 @@ end
 --- Composes one immutable snapshot without advancing public watermarks.
 local function capture_flush()
 	local date, now_iso = os.date("%Y-%m-%d"), os.date("!%Y-%m-%d %H:%M:%S")
-	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {} }, upserts = {} }
+	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, llm = {} }, upserts = {} }
 	local add = setmetatable({}, { __index = function(_, kind)
 		return function(_, ...)
 			payload.upserts[#payload.upserts + 1] = { kind = kind, args = copy_flush_value({ ... }) }
@@ -1784,9 +1824,11 @@ local function capture_flush()
 	local buffers = {
 		typing = _pending_typing_events, hotstrings = _pending_hotstring_events,
 		shortcuts = _pending_shortcut_events, switches = _pending_app_switch_events,
+		llm = _pending_llm_events,
 	}
 	local _pending_typing_events, _pending_hotstring_events = buffers.typing, buffers.hotstrings
 	local _pending_shortcut_events, _pending_app_switch_events = buffers.shortcuts, buffers.switches
+	local _pending_llm_events = buffers.llm
 	local _flushed_app_totals = copy_flush_value(_flushed_app_totals)
 	local _flushed_app_titles = copy_flush_value(_flushed_app_titles)
 	local _flushed_app_holds = copy_flush_value(_flushed_app_holds)
@@ -1877,6 +1919,10 @@ local function capture_flush()
 	if #_pending_shortcut_events > 0 then
 		payload.raw.shortcuts = _pending_shortcut_events
 		_pending_shortcut_events = {}
+	end
+	if #_pending_llm_events > 0 then
+		payload.raw.llm = _pending_llm_events
+		_pending_llm_events = {}
 	end
 	-- The machine's own state, which the dashboard puts beside the typing to
 	-- explain a quiet afternoon. Sampled on the daemon's tick, written here.
@@ -2123,6 +2169,7 @@ local function restore_flush_buffers(buffers)
 	end
 	_pending_hotstring_events = prepend(buffers.hotstrings, _pending_hotstring_events)
 	_pending_shortcut_events = prepend(buffers.shortcuts, _pending_shortcut_events)
+	_pending_llm_events = prepend(buffers.llm, _pending_llm_events)
 	_pending_app_switch_events = prepend(buffers.switches, _pending_app_switch_events)
 end
 
@@ -2146,7 +2193,7 @@ local function dispatch_flush()
 	end
 	local payload = snapshot.payload
 	if #payload.raw.typing == 0 and #payload.raw.hotstrings == 0 and #payload.raw.shortcuts == 0
-		and #payload.raw.switches == 0 and #payload.upserts == 0 then
+		and #payload.raw.llm == 0 and #payload.raw.switches == 0 and #payload.upserts == 0 then
 		_last_flush_committed = true
 		return true
 	end
@@ -2156,6 +2203,7 @@ local function dispatch_flush()
 	_flush_state = state -- Reserve before any reentrant external allocation.
 	_pending_typing_events, _pending_hotstring_events = {}, {}
 	_pending_shortcut_events, _pending_app_switch_events = {}, {}
+	_pending_llm_events = {}
 	local called, operation = pcall(SqliteWriter.start_flush, _device_id, payload)
 	if not called then
 		Logger.error(LOG, "SQLite dispatch raised; uncertain ownership and source remain retained.")
@@ -2196,6 +2244,7 @@ local function flush_json()
 	if not written or not closed then return false end
 	_pending_typing_events, _pending_hotstring_events = {}, {}
 	_pending_shortcut_events, _pending_app_switch_events = {}, {}
+	_pending_llm_events = {}
 
 	Logger.info(LOG, "Session flushed to JSON: %s.", path)
 	return true
@@ -2331,6 +2380,7 @@ function M.reset_session()
 	_pending_typing_events  = {}
 	_pending_hotstring_events = {}
 	_pending_shortcut_events = {}
+	_pending_llm_events = {}
 	_pending_app_switch_events = {}
 	_live = new_live_tracker()
 	_session_started_at = os.time() * 1000
@@ -2393,11 +2443,12 @@ end
 --- How many raw-event buffers are waiting for a flush (tests).
 --- @return integer
 function M._pending_buffer_count_for_test()
-	local count = #_pending_hotstring_events + #_pending_shortcut_events + #_pending_app_switch_events
+	local count = #_pending_hotstring_events + #_pending_shortcut_events + #_pending_llm_events
+		+ #_pending_app_switch_events
 	for _, pending in pairs(_pending_typing_events) do count = count + #pending.events end
 	if _flush_state then
 		local held = _flush_state.snapshot.buffers
-		count = count + #held.hotstrings + #held.shortcuts + #held.switches
+		count = count + #held.hotstrings + #held.shortcuts + #held.llm + #held.switches
 		for _, pending in pairs(held.typing) do count = count + #pending.events end
 	end
 	return count

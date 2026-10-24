@@ -671,6 +671,69 @@ function M.insert_hotstring_events(device_id, events)
 	return _exec_raw_batch(sql)
 end
 
+--- The nullable text and number literals of an events_llm row. A column the event does
+--- not carry is NULL, exactly as the other two drivers write it: the dashboard tells a
+--- generation that reported no token count from one that reported zero.
+local function _llm_text(value)
+	if type(value) ~= "string" then return "NULL" end
+	return "'" .. _sql_escape(value) .. "'"
+end
+
+local function _llm_number(value)
+	if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then return "NULL" end
+	return string.format("%.17g", value)
+end
+
+local function _llm_list(value)
+	if type(value) ~= "table" then return "NULL" end
+	return "'" .. _sql_escape(Json.encode(Json.array(value))) .. "'"
+end
+
+--- Inserts LLM prediction events in the canonical events_llm shape macOS and Windows write.
+---
+--- kind is one of the table's CHECK values (generation, suggested, dismissed, accepted);
+--- a fifth value would be dropped silently by INSERT OR IGNORE, so it is refused here.
+--- @param device_id string Device identifier.
+--- @param events table Array of { ts, date, app, kind, count?, prediction?, predictions?,
+---   all_predictions?, chosen_index?, deletes?, deleted_text?, net_saved_chars?,
+---   prompt_tokens?, completion_tokens?, total_tokens?, est_cost_usd? }.
+_raw_sql.llm = function(device_id, events, first_id)
+	local parts = {}
+	for i, ev in ipairs(events) do
+		local kind = ev.kind
+		if kind ~= "generation" and kind ~= "suggested" and kind ~= "dismissed" and kind ~= "accepted" then
+			Logger.error(LOG, "LLM event batch refused: '%s' is not an events_llm kind.", tostring(kind))
+			return nil
+		end
+		parts[#parts + 1] = string.format("('%s',%d,'%s','%s','%s','%s',%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+			_sql_escape(device_id), first_id + i - 1,
+			_sql_escape(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
+			_sql_escape(ev.date or os.date("%Y-%m-%d")),
+			_sql_escape(ev.app or "unknown"),
+			kind,
+			_llm_text(ev.context), _llm_list(ev.predictions), _llm_text(ev.prediction),
+			_llm_list(ev.all_predictions), _llm_number(ev.chosen_index), _llm_number(ev.deletes),
+			_llm_text(ev.deleted_text), _llm_number(ev.net_saved_chars), _llm_number(ev.count),
+			_llm_number(ev.prompt_tokens), _llm_number(ev.completion_tokens),
+			_llm_number(ev.total_tokens), _llm_number(ev.est_cost_usd))
+	end
+	return "INSERT OR IGNORE INTO events_llm "
+		.. "(device_id,id,ts,date,app,kind,context,predictions_json,prediction,all_predictions_json,"
+		.. "chosen_index,deletes,deleted_text,net_saved_chars,count,prompt_tokens,completion_tokens,"
+		.. "total_tokens,est_cost_usd) VALUES "
+		.. table.concat(parts, ",") .. ";"
+end
+
+--- Commits one canonical raw LLM batch and returns its native receipt.
+function M.insert_llm_events(device_id, events)
+	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
+	local sql = _raw_sql.llm(device_id, events, first_id)
+	if not sql then return false end
+	return _exec_raw_batch(sql)
+end
+
 --- Inserts shortcut firings — the actions a user triggers that type no text.
 ---
 --- macOS has written this table since its keystats existed; this driver wrote
@@ -1532,8 +1595,10 @@ function M.start_flush(device_id, payload)
 		assert(type(entry.kind) == "string" and type(_derived_sql[entry.kind]) == "function"
 			and type(entry.args) == "table", "Invalid SQLite flush intent")
 	end
+	-- A payload built before the LLM family existed carries none: that is an empty family.
+	payload.raw.llm = payload.raw.llm or {}
 	local path, count = _db_path, 0
-	local families = { "typing", "hotstrings", "shortcuts", "switches" }
+	local families = { "typing", "hotstrings", "shortcuts", "switches", "llm" }
 	for _, name in ipairs(families) do
 		array(payload.raw[name])
 		count = count + #payload.raw[name]

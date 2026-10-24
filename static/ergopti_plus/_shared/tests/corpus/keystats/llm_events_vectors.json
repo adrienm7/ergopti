@@ -1,0 +1,31 @@
+{
+	"_comment": "Vectors of the events_llm rows a driver writes for the dashboard's AI tab (schema: _shared/data/db/schema.sql). event is the logical event a driver records; row is the column to value map the table must hold, with null for a column the event does not carry (the dashboard tells a missing token count from a zero). The Linux suite replays them through the real writer; the columns are pinned against the schema by the same test.",
+	"cases": [
+		{
+			"id": "generation-with-tokens",
+			"event": { "app": "firefox", "kind": "generation", "count": 3, "prompt_tokens": 120, "completion_tokens": 30, "total_tokens": 150 },
+			"row": { "app": "firefox", "kind": "generation", "count": 3, "prompt_tokens": 120, "completion_tokens": 30, "total_tokens": 150, "context": null, "prediction": null, "all_predictions_json": null, "predictions_json": null, "chosen_index": null, "deletes": null, "deleted_text": null, "net_saved_chars": null, "est_cost_usd": null }
+		},
+		{
+			"id": "generation-without-tokens",
+			"event": { "app": "kate", "kind": "generation", "count": 0 },
+			"row": { "app": "kate", "kind": "generation", "count": 0, "prompt_tokens": null, "completion_tokens": null, "total_tokens": null, "context": null, "prediction": null, "all_predictions_json": null, "predictions_json": null, "chosen_index": null, "deletes": null, "deleted_text": null, "net_saved_chars": null, "est_cost_usd": null }
+		},
+		{
+			"id": "suggested",
+			"event": { "app": "firefox", "kind": "suggested", "count": 2 },
+			"row": { "app": "firefox", "kind": "suggested", "count": 2, "prompt_tokens": null, "completion_tokens": null, "total_tokens": null, "context": null, "prediction": null, "all_predictions_json": null, "predictions_json": null, "chosen_index": null, "deletes": null, "deleted_text": null, "net_saved_chars": null, "est_cost_usd": null }
+		},
+		{
+			"id": "dismissed",
+			"event": { "app": "firefox", "kind": "dismissed", "all_predictions": ["a", "b"] },
+			"row": { "app": "firefox", "kind": "dismissed", "all_predictions_json": "[\"a\",\"b\"]", "count": null, "prompt_tokens": null, "completion_tokens": null, "total_tokens": null, "context": null, "prediction": null, "predictions_json": null, "chosen_index": null, "deletes": null, "deleted_text": null, "net_saved_chars": null, "est_cost_usd": null }
+		},
+		{
+			"id": "accepted-with-quote",
+			"event": { "app": "code", "kind": "accepted", "prediction": "it's done", "all_predictions": ["it's done", "x"], "chosen_index": 1, "deletes": 2, "net_saved_chars": 7 },
+			"row": { "app": "code", "kind": "accepted", "prediction": "it's done", "all_predictions_json": "[\"it's done\",\"x\"]", "chosen_index": 1, "deletes": 2, "net_saved_chars": 7, "count": null, "prompt_tokens": null, "completion_tokens": null, "total_tokens": null, "context": null, "predictions_json": null, "deleted_text": null, "est_cost_usd": null }
+		}
+	],
+	"refused_kinds": ["failed", "hotstring", ""]
+}

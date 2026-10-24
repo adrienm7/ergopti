@@ -10,9 +10,10 @@ function M.attach(writer)
 	writer.start_flush = function(device, payload)
 		local ok = true
 		local raw_methods = { typing = "insert_typing_events", hotstrings = "insert_hotstring_events",
-			shortcuts = "insert_shortcut_events", switches = "insert_app_switch_events" }
+			shortcuts = "insert_shortcut_events", switches = "insert_app_switch_events",
+			llm = "insert_llm_events" }
 		for family, method in pairs(raw_methods) do
-			if #payload.raw[family] > 0 and writer[method](device, payload.raw[family]) == false then ok = false end
+			if #(payload.raw[family] or {}) > 0 and writer[method](device, payload.raw[family]) == false then ok = false end
 		end
 		for _, entry in ipairs(payload.upserts) do
 			local args = { device }
