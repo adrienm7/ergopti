@@ -209,6 +209,7 @@ return {
 	"tests.unit.infra.config.test_config_directory_target",
 	"tests.unit.infra.config.test_config_outdated",
 	"tests.unit.infra.config.test_user_model_records_contract",
+	"tests.unit.infra.config.test_config_keys",
 	"tests.unit.infra.scope.test_config_scope_composition",
 	"tests.unit.infra.scope.test_config_scope_transaction",
 	"tests.unit.infra.lifecycle.test_daemon_restart",
