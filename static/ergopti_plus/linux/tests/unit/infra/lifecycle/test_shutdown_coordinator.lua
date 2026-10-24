@@ -1527,6 +1527,8 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 			modules[name] = {}
 		end
 		modules["infra.session_lock"] = { protect = function() return true end }
+		-- Main writes a pre-sink fatal record only when startup is refused.
+		modules["infra.bootstrap_log"] = { append = function(reason) error("isolated Main must not refuse startup: " .. tostring(reason)) end }
 		modules["compat.utf8"] = { install = function() return false end }
 		modules["logger.shim"] = { info = noop, error = noop, warn = noop, debug = noop, success = noop }
 		modules["infra.logger_sink"] = { install = function() return true end }
