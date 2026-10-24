@@ -565,8 +565,9 @@ do
 			focus_module.new = function(options) state.guard = original_focus_new(options); return state.guard end
 			local engine_module = require("modules.hotstrings.engine")
 			local original_engine_new = engine_module.new
-			local main_engine = {}
-			for name, value in pairs(engine_module) do main_engine[name] = value end
+			-- The driver engine inherits the shared API through its metatable, so
+			-- the wrapper inherits it too instead of copying only its own fields.
+			local main_engine = setmetatable({}, { __index = engine_module })
 			main_engine.new = function(...)
 				state.matcher = original_engine_new(...)
 				if options.semantic_input then
