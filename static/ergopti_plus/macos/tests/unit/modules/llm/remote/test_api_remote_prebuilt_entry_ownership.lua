@@ -18,7 +18,7 @@ local function with_remote(callback)
 	helpers.with_stub_scope({
 		"modules.llm.api_remote", "modules.llm.api_token_crypto", "modules.keystats",
 		"modules.shortcuts.script_control", "adapters.http_client",
-		"modules.llm.remote_response_classifier", "modules.llm.local_servers",
+		"llm.remote_response_classifier", "modules.llm.local_servers",
 		"modules.llm.provider_uses", "modules.llm.progressive_reveal",
 		"modules.llm.api_common", "modules.llm.profiles", "modules.llm.parser",
 		"infra.logger", "adapters.timer_scheduler", "adapters.file_system",

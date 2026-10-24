@@ -39,6 +39,7 @@ local TextUtils = require("text_utils")
 local LlmBridge = require("infra.llm_bridge")
 local Monotonic = require("infra.monotonic")
 local Formats = require("llm.remote_formats")
+local Classifier = require("llm.remote_response_classifier")
 local AuthPolicy = require("llm.local_server_auth")
 local LocalCatalogue = require("modules.llm.local_server_catalogue")
 local ProviderConfig = require("llm.provider_config_policy")
@@ -146,10 +147,10 @@ end
 
 --- Parses a catalogue document. Exposed for tests over the shared corpus.
 --- @param text string|nil
---- @return table { providers, order, test_request, decisions_test }
+--- @return table { providers, order, prices, test_request, decisions_test }
 --- @return boolean admitted Nonempty projected catalogue, before native read acknowledgement.
 function M.parse_catalogue(text)
-	local catalogue = { providers = {}, order = {}, test_request = nil, decisions_test = nil }
+	local catalogue = { providers = {}, order = {}, prices = {}, test_request = nil, decisions_test = nil }
 	local root = type(text) == "string" and Json.decode(text) or nil
 	if type(root) ~= "table" or type(root.providers) ~= "table" or type(root.provider_order) ~= "table" then
 		Logger.error(LOG, "api_providers.json is missing or malformed — no remote provider is available.")
@@ -172,6 +173,11 @@ function M.parse_catalogue(text)
 		else
 			Logger.warn(LOG, "api_providers.json: provider '%s' is invalid and was skipped.", tostring(id))
 		end
+	end
+	local skipped
+	catalogue.prices, skipped = Classifier.parse_prices(root.model_prices)
+	for _, model in ipairs(skipped) do
+		Logger.warn(LOG, "api_providers.json: model_prices.%s skipped (missing in/out).", model)
 	end
 	catalogue.test_request = parse_test_request(root.test_request)
 	catalogue.decisions_test = parse_decisions_test(root.decisions_test)
@@ -458,25 +464,19 @@ end
 --- @param body string
 --- @return string|nil
 function M.extract_text(format, body)
-	local root = type(body) == "string" and Json.decode_lossless(body) or nil
-	if type(root) ~= "table" or Formats.response_has_error(root) then return nil end
-	if format == "anthropic" then
-		for _, block in ipairs(type(root.content) == "table" and root.content or {}) do
-			if type(block) == "table" and block.type == "text" and type(block.text) == "string" then return block.text end
-		end
-		return nil
-	end
-	if format == "gemini" then
-		local candidate = type(root.candidates) == "table" and root.candidates[1]
-		local parts = type(candidate) == "table" and type(candidate.content) == "table" and candidate.content.parts
-		for _, part in ipairs(type(parts) == "table" and parts or {}) do
-			if type(part) == "table" and part.thought ~= true and type(part.text) == "string" then return part.text end
-		end
-		return nil
-	end
-	local choice = type(root.choices) == "table" and root.choices[1]
-	local message = type(choice) == "table" and choice.message
-	return type(message) == "table" and type(message.content) == "string" and message.content or nil
+	local text = Classifier.classify(format, body).text
+	return text ~= "" and text or nil
+end
+
+--- Prices the token usage a response reports with the catalogue's model_prices,
+--- so events_llm carries the same cost columns as on macOS.
+--- @param usage table remote_response_classifier usage, completed in place.
+--- @param model string The model the request named.
+--- @return table usage
+local function priced(usage, model)
+	usage.est_cost_usd = Classifier.estimate_cost(catalogue().prices, model,
+		usage.prompt_tokens, usage.completion_tokens)
+	return usage
 end
 
 --- The explanation a provider gives when it refuses a request.
@@ -703,7 +703,9 @@ local function backboard_send(scope, epoch, prepared, spec, fail, on_answer, aut
 end
 
 --- Sends one completion. Same shape as api_ollama.chat, with the entry in
---- place of the base URL: on_done(full_text, err, failure_receipt?) is called exactly once.
+--- place of the base URL: on_done(full_text, nil, usage) on success, with the
+--- reported tokens priced from model_prices, or on_done("", err, failure_receipt?),
+--- exactly once.
 --- A Backboard entry sends one message (its assistant created first when
 --- needed); a decisions entry is refused, Jev being no chat model.
 --- @param entry table
@@ -730,7 +732,7 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 		if receipt == nil then done("", detail) else done("", detail, receipt) end
 	end
 	local started = Monotonic.now_ms()
-	local function deliver(text)
+	local function deliver(text, usage)
 		if authorized and not authorized() then return end
 		if not text or text == "" then
 			Logger.warn(LOG, "Remote response held no completion text.")
@@ -740,7 +742,7 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 		Logger.debug(LOG, "Remote completion received (%d chars in %d ms).", #text, Monotonic.now_ms() - started)
 		if authorized and not authorized() then return end
 		if type(on_chunk) == "function" then pcall(on_chunk, text) end
-		done(text, nil)
+		done(text, nil, usage)
 	end
 
 	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
@@ -750,7 +752,7 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 		local system, user = split_messages(messages)
 		Logger.debug(LOG, "chat() → Backboard %s (model=%s)", M.redact_url(prepared.endpoint.url), prepared.model)
 		backboard_send(scope, epoch, prepared, { system = system, text = user }, fail, function(root)
-			deliver(Formats.backboard_text(root))
+			deliver(Formats.backboard_text(root), priced(Classifier.usage("backboard", root), prepared.model))
 		end, authorized)
 		return scope.active ~= nil and scope.active.epoch == epoch
 	end
@@ -765,7 +767,8 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 			fail(failure_detail(result), failure_receipt(result))
 			return
 		end
-		deliver(M.extract_text(request.format, result.body))
+		local classified = Classifier.classify(request.format, result.body)
+		deliver(classified.text ~= "" and classified.text or nil, priced(classified.usage, request.model))
 	end, { owner = scope.owner, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000, authorized = authorized })
 	if dispatched ~= true then
 		done("", "HTTP transport unavailable")
@@ -944,8 +947,10 @@ function M.test(entry, on_done, admission)
 	return M.chat(entry, nil, {
 		{ role = "system", content = spec.system_prompt },
 		{ role = "user", content = spec.user_text },
-	}, { temperature = spec.temperature, max_tokens = spec.max_tokens, authorized = admission }, nil, function(text, err, receipt)
+	}, { temperature = spec.temperature, max_tokens = spec.max_tokens, authorized = admission }, nil, function(text, err, third)
 		local elapsed = Monotonic.now_ms() - started
+		-- The third value is the usage of a completion, a failure's receipt only beside err.
+		local receipt = err ~= nil and third or nil
 		if receipt == nil then on_done(err == nil, err or text, elapsed)
 		else on_done(err == nil, err or text, elapsed, receipt) end
 	end)
