@@ -11,6 +11,7 @@ local M = {}
 local OWNERS = {
 	"infra.file_watchers", "infra.ui_restore", "infra.git_status", "infra.fs_dir",
 	"infra.logger", "infra.i18n", "infra.notifications", "reload_gate",
+	"adapters.timer_scheduler", "error_description", "number_policy",
 }
 
 M.CONFIG_ROOT = "/fake/config/"
@@ -62,6 +63,7 @@ function M.with_watchers(body, options)
 					return { stop = function() end }
 				end,
 				secondsSinceEpoch = function() return clock end,
+				absoluteTime = function() return clock * 1e9 end,
 			}
 			host.fs.attributes = function() return nil end
 			host.reload = function()
