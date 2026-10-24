@@ -1888,10 +1888,14 @@ local function main()
 
 	-- A pointer event of a checked kind ends CapsWord: the hand has left the
 	-- keyboard. The hook reports every press of an observed pointer (a button or
-	-- a touchpad contact) and every EV_REL report (a movement or a wheel turn),
-	-- so this returns at once while CapsWord is off. The manager names the
-	-- event's pointer kind: main() is at LuaJIT's 60-upvalue limit.
-	local function on_pointer_event(kind_of_event, code)
+	-- a touchpad contact), every EV_REL report (a movement or a wheel turn) and
+	-- each report's closing frame, so this returns at once while CapsWord is off.
+	-- The metrics count clicks, wheel turns and distance from the same stream.
+	-- The manager names the event's pointer kind: main() is at LuaJIT's
+	-- 60-upvalue limit.
+	local function on_pointer_event(kind_of_event, code, value)
+		keystats.record_pointer(kind_of_event, code, value)
+		if kind_of_event == "frame" then return end
 		if not (shortcuts and shortcuts.is_caps_word_active()) then return end
 		shortcuts.caps_word_observe_pointer_event(kind_of_event, code)
 	end

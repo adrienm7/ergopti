@@ -583,11 +583,15 @@ _raw_sql.typing = function(device_id, events, first_id, derived)
 		local wpm     = tonumber(ev.wpm) or 0
 		local layout  = _sql_escape(ev.layout  or "")
 		local events_json = _sql_escape(enc_json)
+		-- The pointer activity since the application's previous row (pointer_metrics).
+		local mouse_clicks = math.floor(tonumber(ev.mouse_clicks) or 0)
+		local mouse_scrolls = math.floor(tonumber(ev.mouse_scrolls) or 0)
+		local mouse_distance = math.floor(tonumber(ev.mouse_distance_px) or 0)
 
 		parts[#parts + 1] = string.format(
-			"('%s',%d,'%s','%s','%s','%s','','','%s','',0,0,0,0,0,0,0,0.0,%.17g,'%s','','%s')",
+			"('%s',%d,'%s','%s','%s','%s','','','%s','',0,0,%d,%d,%d,0,0,0.0,%.17g,'%s','','%s')",
 			_sql_escape(device_id), event_id, ts, date, app, title,
-			layout, wpm, text, events_json
+			layout, mouse_clicks, mouse_scrolls, mouse_distance, wpm, text, events_json
 		)
 	end
 
