@@ -210,7 +210,7 @@ const customLabels = ['Mon équipe', 'Dév & outils <équipe>', 'Projet [équipe
 
 function loadedPage(host) {
 	const page = loadMetricsAppsPage(host);
-	assert.equal(page.scripts.filter((name) => name !== '#inline').length, 10);
+	assert.equal(page.scripts.filter((name) => name !== '#inline').length, 11);
 	assert.equal(
 		page.scripts.includes('script.js'),
 		false,
