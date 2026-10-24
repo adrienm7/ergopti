@@ -559,3 +559,5 @@ _HSCS_DefaultChoiceSourceReceiving(Kind) {
 for _HSCS_DefaultChoiceKind in ["missing", "kind", "caption"]
 	Test("shared-personal-default-choice: native source refusal and exact repair " . _HSCS_DefaultChoiceKind,
 		_HSCS_DefaultChoiceSourceReceiving.Bind(_HSCS_DefaultChoiceKind))
+
+#Include test_personal_default_preference.ahk
