@@ -363,6 +363,7 @@ _DG_DeclaredBuilderExpected(Id) {
 			'"layout_features_base",   (*) => _LAY_LayoutFeatureBaseRows(),',
 			'"layout_features_altgr",  (*) => _LAY_LayoutFeatureAltGrRows(),',
 			'"magic_key_source",       (*) => MagicKeySourceMenuRows(),',
+			'"layout_switching",       (*) => PauseLayoutSwitch_MenuRows(),',
 			')',
 			'LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", "", "", LayoutListProviders,',
 			'_LAY_ScopeCommands(),',
