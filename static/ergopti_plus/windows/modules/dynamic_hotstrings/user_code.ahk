@@ -485,12 +485,20 @@ class UserHotstringWorker {
 			_UserHotstringsJobs.Delete(this)
 		if !_UserHotstringsJobs.Count
 			SetTimer(_UserHotstringsPoll, 0)
+		; The bound Run timer and the task's Finish callback both hold this worker,
+		; so each is a reference cycle. Once the stage is gone nothing may call
+		; back; dropping both lets a completed worker be freed.
+		if IsObject(this.timer)
+			SetTimer(this.timer, 0)
+		this.timer := 0
+		this.task := 0
 		return true
 	}
 
 	cancel() {
 		this.cancelled := true
-		SetTimer(this.timer, 0)
+		if IsObject(this.timer)
+			SetTimer(this.timer, 0)
 		if this.event
 			UHN_SignalEvent(this.event)
 		if IsObject(this.task) && !UserCodeAcknowledged(this.task.terminate())

@@ -52,7 +52,7 @@ _UHLT_Source(Root) {
 	Owners := Map()
 	for Symbol in ["JsonStringLiteral", "CryptoSha256Bytes", "FSReadStrict", "WallClockTimestamp", "ManifestBuildFeaturesMap",
 		"IsCategoryGated", "LoggerInit", "Redact_Apply", "PLC_CreateProcessWithInheritedHandles", "ShellRunner_SpawnTreeOwned",
-		"_HSE_RunOwnedTerminalTransaction", "UserHotstringsReload"] {
+		"_HSE_RunOwnedTerminalTransaction", "UserHotstringsReload", "PerfCount", "KS_ScancodeToVk"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		AssertTrue(Owner != "", "The child must load its genuine source owner: " . Symbol)
 		if !Owners.Has(Owner) {
