@@ -434,8 +434,10 @@ MF_GetFocusSnapshot() {
 	; With events driving the cache, a foreground change that has not been delivered yet is
 	; caught here at the next read, which is exactly when the verdict matters: one cheap
 	; call instead of trusting the 2 s safety net.
+	; An invalid snapshot (hwnd 0) is already fail-closed and is not re-probed per read: a
+	; protected foreground window would otherwise cost a failing probe on every keystroke.
 	if MetricsFocusCache.event_mode && MetricsFocusCache.state.hwnd
-			!= DllCall("User32\GetForegroundWindow", "Ptr") {
+			&& MetricsFocusCache.state.hwnd != DllCall("User32\GetForegroundWindow", "Ptr") {
 		PerfCount("metrics.focus_read_refresh")
 		try MF_RefreshFocus(true)
 	}
