@@ -35,6 +35,7 @@ const fs = require('fs');
 const path = require('path');
 const {
 	generate,
+	generateShared,
 	parseRegistry,
 	OUTPUTS,
 	CHORD_GROUP_KEY,
@@ -147,13 +148,21 @@ rejects(
 	/confirm must be a boolean/
 );
 
-// 2. The committed files are exactly what the generator produces.
+// 2. The committed files are exactly what the generator produces, the shared
+//    data of the two Lua drivers included.
 const generated = generate(SOURCE);
 for (const [platform, out] of Object.entries(generated)) {
 	const onDisk = fs.readFileSync(path.join(ROOT, OUTPUTS[platform]), 'utf8');
 	check(
 		onDisk === out.text,
 		`${OUTPUTS[platform]} is stale — run npm run codegen:action-catalogue`
+	);
+}
+{
+	const shared = generateShared(SOURCE);
+	check(
+		fs.readFileSync(path.join(ROOT, shared.path), 'utf8') === shared.text,
+		`${shared.path} is stale — run npm run codegen:action-catalogue`
 	);
 }
 

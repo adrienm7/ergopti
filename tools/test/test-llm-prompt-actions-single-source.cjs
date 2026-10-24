@@ -30,9 +30,9 @@ const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const PROFILES = path.join(SP, '_shared', 'modules', 'llm', 'profiles.json');
 const ACTIONS = path.join(SP, '_shared', 'modules', 'actions', 'actions.toml');
 const LOCALES = path.join(SP, '_shared', 'data', 'locales');
+// The macOS and Linux catalogues load their actions from the shared Lua data.
 const CATALOGUES = [
-	path.join(SP, 'macos', '_generated', 'action_catalogue.lua'),
-	path.join(SP, 'linux', '_generated', 'action_catalogue.lua'),
+	path.join(SP, '_shared', 'lua', 'actions', 'catalogue_data.lua'),
 	path.join(SP, 'windows', '_generated', 'action_catalogue.ahk')
 ];
 
