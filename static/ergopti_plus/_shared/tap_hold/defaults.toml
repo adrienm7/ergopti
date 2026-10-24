@@ -7,27 +7,33 @@
 # behaviour of already-installed drivers on their next reload. Do not treat it
 # as a template that only affects fresh installs.
 #
-# The three loaders do not agree with each other, and each one's own comments
-# claim that it matches the others:
-#   - Windows  lib/tap_hold/tap_hold_loader.ahk parses [tap_hold.*] here FIRST,
-#              then merges the user file on top PER KEY. A key the user has not
-#              overridden inherits the value below.
-#   - Linux    platform/remap/manager.lua reads [tap_hold.*], but a user
-#              tap_hold.toml, when present, REPLACES these defaults wholesale —
-#              no per-key merge, so an edit here reaches only users without one.
+# The loaders read two namespaces, and Windows and Linux apply the same rules:
+#   - Windows  platform/remap/tap_hold_loader.ahk parses [tap_hold.*] here when
+#              the user tap_hold.toml sets [tap_hold] inherit_defaults = true,
+#              then merges the user file on top PER KEY and per field.
+#   - Linux    platform/remap/tap_hold_loader.lua does the same: with
+#              inherit_defaults = true the user file is laid over these keys key
+#              by key and field by field; without it the file starts from no
+#              shipped key at all (an empty file is the keyboard's own behaviour).
+#              Both drivers read a left alias (lctrl, lshift) as the left key and
+#              a plain ctrl / shift on right_ctrl / right_shift as that key's own
+#              side.
 #   - macOS    platform/remap/defaults.lua reads [hs_timeouts], [hs_tap_hold]
 #              and [hs_combos] in its module body at require time. There is no
-#              user file for those sections, so an edit here always applies.
+#              user file for those sections (Karabiner owns the key rules), so an
+#              edit here always applies.
 #
 # All three read [tap_hold.catalog] (section 2): which keys each tray lists in
 # its Tap-Hold submenu, in which order, under which hand and with which label.
 #
 # The two namespaces below describe the SAME seven physical keys under different
 # ids (left_ctrl/left_control, left_alt/left_option), with different thresholds
-# (0.2–0.35 s per key vs a flat 1000 ms global) and in places different actions
-# — caps_lock holds ctrl under [tap_hold.*] and cmd under [hs_tap_hold].
-# Unifying them is tracked as Lot 8(7); until then, a change to one namespace is
-# NOT a change to the other.
+# (0.2–0.35 s per key against one global 250 ms inside that range, with a per-key
+# override on macOS; tools/test/test-tap-hold-threshold-parity.cjs pins every
+# value) and in places different actions — caps_lock holds ctrl under
+# [tap_hold.*] and cmd under [hs_tap_hold]. The shipped actions are a maintainer
+# decision recorded in the audit entry PAR-17; until it is taken, a change to one
+# namespace is NOT a change to the other.
 #
 # Consumers of the generated per-driver file:
 #   - AHK : ``platform/remap.ahk`` arms the corresponding hotkeys.
@@ -278,8 +284,9 @@ keys = [
 # [tap_hold.keys.*] values into it is the follow-up; it needs the two id
 # vocabularies reconciled first (left_ctrl/left_control, left_alt/left_option).
 tap_hold_timeout_ms = 250
-# One-shot modifier auto-cancel delay.
-sticky_timeout_ms = 3000
+# The one-shot modifier auto-cancel delay is NOT declared here: macOS reads the
+# same registry value as the other two drivers,
+# _shared/modules/timings/constants.toml [tap_hold] one_shot_shift_timeout_ms.
 # Max delay between the two keys of a shortcut for the combo slot to fire.
 simultaneous_threshold_ms = 100
 # When true, A+B and B+A trigger the same chord (combo slot only).

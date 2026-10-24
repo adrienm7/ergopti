@@ -166,24 +166,28 @@ output is thereafter complete — "the shared file is never read again at runtim
 — and that was wrong in three separate places. The three loaders do not even
 agree with each other, and each one's own comments claim it matches the others:
 
-| Driver  | Sections read                                   | Lifecycle                                                                                                                                                                                                                                                                                                                                                                              |
-| ------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Windows | `[tap_hold.*]`                                  | Parses the shared defaults **first**, then merges the user file **on top, per key**. A key absent from the user file inherits the shared default, so editing `defaults.toml` changes existing installs on the next reload. `lib/tap_hold/tap_hold_loader.ahk` says so explicitly: "editing `defaults.toml` takes effect on every reload even when the user file exists".               |
-| Linux   | `[tap_hold.*]`                                  | `platform/remap/tap_hold_loader.lua` applies the Windows rules to the same files, with one switch: with `[tap_hold] inherit_defaults = true` the user file is laid over the shared defaults key by key and field by field; without it the user file starts from no shipped key at all (an empty file is the keyboard's own behaviour). The scope restore writes the preset explicitly. |
-| macOS   | `[hs_timeouts]`, `[hs_tap_hold]`, `[hs_combos]` | `platform/remap/defaults.lua` reads the shared file in its **module body**, at require time, unconditionally — there is no user file for these sections at all, so an edit always applies.                                                                                                                                                                                             |
+| Driver  | Sections read                                   | Lifecycle                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows | `[tap_hold.*]`                                  | With `[tap_hold] inherit_defaults = true` in the user file, parses the shared defaults **first**, then merges the user file **on top, per key and per field**: a key the user did not override inherits the shared default, so editing `defaults.toml` changes those installs on the next reload. Without it the file starts from no shipped key at all (`platform/remap/tap_hold_loader.ahk`). |
+| Linux   | `[tap_hold.*]`                                  | `platform/remap/tap_hold_loader.lua` applies the Windows rules to the same files, with one switch: with `[tap_hold] inherit_defaults = true` the user file is laid over the shared defaults key by key and field by field; without it the user file starts from no shipped key at all (an empty file is the keyboard's own behaviour). The scope restore writes the preset explicitly.          |
+| macOS   | `[hs_timeouts]`, `[hs_tap_hold]`, `[hs_combos]` | `platform/remap/defaults.lua` reads the shared file in its **module body**, at require time, unconditionally — there is no user file for these sections at all, so an edit always applies.                                                                                                                                                                                                      |
 
 The two namespaces in that one file describe the **same seven physical keys**
 under different ids (`left_ctrl`/`left_control`, `left_alt`/`left_option`), with
-different thresholds (0.2–0.35 s per key vs a flat 1000 ms global) and, in
-places, different actions — `caps_lock` holds `ctrl` under `[tap_hold.*]` and
-`cmd` under `[hs_tap_hold]`. Unifying them is Lot 8(7); this section documents
-what is true today so nobody edits the file believing it cannot reach a shipped
-install.
+different thresholds (0.2–0.35 s per key vs one global 250 ms inside that
+range, with a per-key override on macOS; `tools/test/test-tap-hold-threshold-parity.cjs`
+pins every value) and, in places, different actions — `caps_lock` holds `ctrl`
+under `[tap_hold.*]` and `cmd` under `[hs_tap_hold]`. Which shipped actions the
+three drivers should share is the maintainer decision recorded as PAR-17; this
+section documents what is true today so nobody edits the file believing it
+cannot reach a shipped install.
 
 This means:
 
-- On Windows a key missing from the per-driver file inherits the shared default; on Linux that inheritance applies only when the user file sets `[tap_hold] inherit_defaults = true`.
-- On macOS the `[hs_*]` sections are not user-editable: an edit of `defaults.toml` always applies.
+- On Windows and Linux alike, a key missing from the per-driver file inherits the shared default only when the user file sets `[tap_hold] inherit_defaults = true`; otherwise the file starts from no shipped key.
+- On Windows and Linux, a left alias (`lctrl`, `lshift`, `lalt`, `lwin`) holds the left key, and a plain `ctrl` or `shift` on `right_ctrl` / `right_shift` holds that key's own side.
+- On macOS the `[hs_*]` sections are not user-editable (Karabiner owns the key rules, so there is no per-key user file to merge): an edit of `defaults.toml` always applies.
+- The one-shot Shift timeout is the timing registry's `tap_hold.one_shot_shift_timeout_ms` (2000 ms) on all three drivers.
 - The hold thresholds differ on purpose between the namespaces (per key 0.20-0.35 s on Windows and Linux, a global value plus a per-key override on macOS).
 
 ### Semantics of a tap-hold key

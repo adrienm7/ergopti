@@ -110,6 +110,84 @@ if (perKey.length > 0 && globalMs !== null) {
 	}
 }
 
+// ===== 4) The shipped values themselves (PAR-15) =====
+//
+// The range above lets one driver drift inside it. The shipped thresholds are a
+// decision, so they are pinned exactly: changing one is a deliberate edit of this
+// table, never a side effect. macOS ships one global value inside the per-key range.
+
+const EXPECTED_PER_KEY_MS = {
+	caps_lock: 350,
+	left_shift: 350,
+	left_ctrl: 200,
+	left_alt: 200,
+	right_ctrl: 200,
+	alt_gr: 200,
+	tab: 200
+};
+const EXPECTED_MACOS_GLOBAL_MS = 250;
+
+const actualPerKey = Object.fromEntries(perKey.map((k) => [k.key, k.ms]));
+if (JSON.stringify(actualPerKey) !== JSON.stringify(EXPECTED_PER_KEY_MS)) {
+	errors.push(
+		`the per-key thresholds are ${JSON.stringify(actualPerKey)}, expected ` +
+			`${JSON.stringify(EXPECTED_PER_KEY_MS)}. Change the shipped value and this table together.`
+	);
+}
+if (globalMs !== EXPECTED_MACOS_GLOBAL_MS) {
+	errors.push(
+		`macOS's global threshold is ${globalMs} ms, expected ${EXPECTED_MACOS_GLOBAL_MS} ms. ` +
+			'Change the shipped value and this table together.'
+	);
+}
+
+// ===== 5) The one-shot timeout is ONE value =====
+//
+// Windows and Linux read tap_hold.one_shot_shift_timeout_ms from the timing
+// registry; macOS declared its own sticky_timeout_ms (3000 ms) beside the
+// registry's 2000 ms, so the same one-shot Shift lasted 50 % longer there.
+
+if (/^\s*sticky_timeout_ms\s*=/m.test(src)) {
+	errors.push(
+		"[hs_timeouts] declares sticky_timeout_ms: the one-shot timeout is the timing registry's " +
+			'tap_hold.one_shot_shift_timeout_ms on every driver, never a second declaration.'
+	);
+}
+const REGISTRY = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'modules',
+	'timings',
+	'constants.toml'
+);
+const registryOneShot = /^one_shot_shift_timeout_ms\s*=\s*(\d+)/m.exec(
+	fs.readFileSync(REGISTRY, 'utf8')
+);
+if (!registryOneShot || parseInt(registryOneShot[1], 10) !== 2000) {
+	errors.push('the timing registry must declare one_shot_shift_timeout_ms = 2000.');
+}
+const MACOS_DEFAULTS = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'macos',
+	'platform',
+	'remap',
+	'defaults.lua'
+);
+if (
+	!/D\.sticky_timeout_ms\s*=\s*require\("infra\.timings"\)\.ms\("tap_hold", "one_shot_shift_timeout_ms"\)/.test(
+		fs.readFileSync(MACOS_DEFAULTS, 'utf8')
+	)
+) {
+	errors.push(
+		'macos/platform/remap/defaults.lua must read the one-shot timeout from the timing registry ' +
+			'(tap_hold.one_shot_shift_timeout_ms).'
+	);
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] tap-hold threshold parity:\x1b[0m');
 	for (const e of errors) console.error('    - ' + e);

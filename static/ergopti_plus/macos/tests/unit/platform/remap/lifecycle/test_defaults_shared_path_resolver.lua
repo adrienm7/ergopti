@@ -70,7 +70,7 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 				-- requires must all be present, otherwise it error()s and this test
 				-- would be measuring the raise rather than the path.
 				return { sections = {
-					hs_timeouts = { tap_hold_timeout_ms = 250, sticky_timeout_ms = 3000,
+					hs_timeouts = { tap_hold_timeout_ms = 250,
 						simultaneous_threshold_ms = 100, combo_symmetric = false },
 					hs_tap_hold = {},
 					hs_combos   = {},
@@ -78,9 +78,14 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 			end,
 		}
 
+		-- The one-shot default comes from the shared timing registry, which this
+		-- probe path does not hold: the reader is a stub for the same reason the
+		-- TOML reader is.
+		package.loaded["infra.timings"] = { ms = function() return 2000 end }
 		package.loaded["platform.remap.defaults"] = nil
 		local ok, err = pcall(require, "platform.remap.defaults")
 
+		package.loaded["infra.timings"] = nil
 		package.loaded["tap_hold.key_catalog"] = saved_catalog
 		package.loaded["infra.paths"] = nil
 		package.loaded["infra.toml.reader"] = nil
@@ -112,7 +117,7 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 			parse = function(p)
 				parsed_path = p
 				return { sections = {
-					hs_timeouts = { tap_hold_timeout_ms = 250, sticky_timeout_ms = 3000,
+					hs_timeouts = { tap_hold_timeout_ms = 250,
 						simultaneous_threshold_ms = 100, combo_symmetric = false },
 					hs_tap_hold = {},
 					hs_combos   = {},

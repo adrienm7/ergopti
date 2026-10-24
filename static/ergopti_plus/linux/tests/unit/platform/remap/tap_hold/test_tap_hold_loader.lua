@@ -316,3 +316,20 @@ helpers.describe("tap-hold config: the wizard's report of a folder", function()
 	end)
 
 end)
+
+
+
+
+helpers.describe("tap-hold config: the side a hold modifier names (PAR-15)", function()
+
+	helpers.it("reads a left alias as the modifier and remembers that it forces the left key", function()
+		local loaded = load('[tap_hold.keys.right_ctrl]\nhold_modifier = "lctrl"\n'
+			.. '[tap_hold.keys.right_shift]\nhold_modifier = "shift"\n')
+		helpers.assert_eq(loaded.keys.right_ctrl.hold_modifier, "ctrl")
+		helpers.assert_eq(loaded.keys.right_ctrl.hold_left_modifiers, "ctrl")
+		helpers.assert_eq(loaded.keys.right_shift.hold_modifier, "shift")
+		helpers.assert_nil(loaded.keys.right_shift.hold_left_modifiers,
+			"a plain shift on the right Shift key holds its own side")
+	end)
+
+end)

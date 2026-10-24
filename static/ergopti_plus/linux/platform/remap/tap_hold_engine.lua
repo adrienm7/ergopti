@@ -61,6 +61,10 @@ M.KEY_CODES = {
 -- evdev codes of the holdable modifiers.
 M.MODIFIER_CODES = { ctrl = 29, shift = 42, alt = 56, alt_gr = 100, win = 125 }
 
+-- The keys whose plain "ctrl" / "shift" hold is their own side (the right
+-- Ctrl holds RCtrl, the right Shift holds RShift), as on Windows.
+local OWN_SIDE_MODIFIER_CODES = { right_ctrl = { ctrl = 97 }, right_shift = { shift = 54 } }
+
 local KEY_LEFTSHIFT = 42
 -- Every usual modifier key, left and right.
 local MODIFIER_KEYS = EvdevCodes.MODIFIER_OF
@@ -204,11 +208,22 @@ function M.new(opts)
 		local code = M.KEY_CODES[key_id]
 		if code and type(config) == "table" and config.enabled ~= false then
 			local mods = {}
+			local left_forced = {}
+			if type(config.hold_left_modifiers) == "string" then
+				for part in config.hold_left_modifiers:gmatch("[^+]+") do left_forced[part] = true end
+			end
 			if type(config.hold_modifier) == "string" and config.hold_modifier ~= "" then
 				-- The loader hands over canonical ids only: anything else here is a
 				-- bug upstream, never a hold to drop without a word.
 				for part in config.hold_modifier:gmatch("[^+]+") do
 					local modifier_code = M.MODIFIER_CODES[part]
+					-- The right Ctrl and right Shift keys hold their own side, as on
+					-- Windows (_TapHoldOwnSideModifier), unless the file spelled the
+					-- modifier with a left alias (lctrl, lshift).
+					local own_side = OWN_SIDE_MODIFIER_CODES[key_id]
+					if own_side and own_side[part] and not left_forced[part] then
+						modifier_code = own_side[part]
+					end
 					if not modifier_code then
 						error(string.format("tap-hold key '%s': '%s' is not a canonical hold modifier",
 							tostring(key_id), config.hold_modifier), 2)
