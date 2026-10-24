@@ -14,13 +14,22 @@ function M.register(helpers)
 	local Queries = require("keystats.queries")
 	local WHERE = " WHERE date >= '2026-10-01'"
 
+	--- Every parameter a query declares: the filter, and for the n-gram
+	--- queries the family table and the filter's connective.
+	local function params_for(name, where)
+		local values = { where = where, table = "ngram_chars", conjunction = where == "" and " WHERE " or " AND " }
+		local out = {}
+		for _, param in ipairs(Queries.params(name)) do out[param] = values[param] end
+		return out
+	end
+
 	helpers.describe("keystats named queries (shared contract)", function()
-		helpers.it("renders every query in both dialects with the caller's filter spliced once", function()
+		helpers.it("renders every query in both dialects with the caller's filter spliced in", function()
 			local names = Queries.names()
 			helpers.assert_true(#names > 0, "the catalogue must declare queries")
 			for _, name in ipairs(names) do
 				for _, dialect in ipairs(Queries.DIALECTS) do
-					local sql = Queries.render(name, dialect, { where = WHERE })
+					local sql = Queries.render(name, dialect, params_for(name, WHERE))
 					helpers.assert_true(sql:sub(1, 7) == "SELECT ", name .. " renders a SELECT")
 					helpers.assert_true(sql:sub(-1) == ";", name .. " renders one terminated statement")
 					local count, at = 0, 1
@@ -29,7 +38,7 @@ function M.register(helpers)
 						if not found then break end
 						count, at = count + 1, found + #WHERE
 					end
-					helpers.assert_eq(count, 1, name .. " splices the filter exactly once")
+					helpers.assert_true(count >= 1, name .. " splices the filter")
 					helpers.assert_true(not sql:find("{{", 1, true), name .. " leaves no placeholder")
 				end
 			end
@@ -37,8 +46,8 @@ function M.register(helpers)
 
 		helpers.it("projects TEXT columns raw in-process and through json_quote for the CLI", function()
 			for _, name in ipairs(Queries.names()) do
-				local native = Queries.render(name, "native", { where = "" })
-				local cli = Queries.render(name, "cli_json", { where = "" })
+				local native = Queries.render(name, "native", params_for(name, ""))
+				local cli = Queries.render(name, "cli_json", params_for(name, ""))
 				for _, column in ipairs(Queries.text_columns(name)) do
 					helpers.assert_true(cli:find(" AS " .. column .. "_json", 1, true) ~= nil,
 						name .. " CLI dialect names " .. column .. "_json")

@@ -90,6 +90,28 @@ KeystatsQuery(Name, Params := Map()) {
 			["literal", "SELECT date, COALESCE(SUM(wifi_changes), 0) AS wifi_changes, COALESCE(SUM(space_switches), 0) AS space_switches, COALESCE(SUM(battery_sum), 0) AS battery_sum, COALESCE(SUM(battery_count), 0) AS battery_count, COALESCE(SUM(audio_muted_ms), 0) AS audio_muted_ms, COALESCE(SUM(locked_ms), 0) AS locked_ms, COALESCE(SUM(sleep_ms), 0) AS sleep_ms, COALESCE(SUM(awake_ms), 0) AS awake_ms, COALESCE(SUM(passive_count), 0) AS passive_count, COALESCE(SUM(night_wake_count), 0) AS night_wake_count, MIN(CASE WHEN battery_count > 0 THEN battery_min END) AS battery_min, MAX(CASE WHEN battery_count > 0 THEN battery_max END) AS battery_max FROM agg_system_day"],
 			["param", "where"],
 			["literal", " GROUP BY date`;"]
+		],
+		"ngram.tokens", [
+			["literal", "SELECT token, TOTAL(c) AS c, TOTAL(td) AS td, TOTAL(e) AS e, esrc_json, COUNT(*) AS source_rows FROM "],
+			["param", "table"],
+			["param", "where"],
+			["param", "conjunction"],
+			["literal", "(typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real')) GROUP BY token, esrc_json UNION ALL SELECT token, c, td, e, esrc_json, 1 AS source_rows FROM "],
+			["param", "table"],
+			["param", "where"],
+			["param", "conjunction"],
+			["literal", "NOT (typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real'))`;"]
+		],
+		"ngram.tokens_by_app", [
+			["literal", "SELECT app, token, TOTAL(c) AS c, TOTAL(td) AS td, TOTAL(e) AS e, esrc_json, COUNT(*) AS source_rows FROM "],
+			["param", "table"],
+			["param", "where"],
+			["param", "conjunction"],
+			["literal", "(typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real')) GROUP BY app, token, esrc_json UNION ALL SELECT app, token, c, td, e, esrc_json, 1 AS source_rows FROM "],
+			["param", "table"],
+			["param", "where"],
+			["param", "conjunction"],
+			["literal", "NOT (typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real'))`;"]
 		]
 	)
 	if !Queries.Has(Name)
