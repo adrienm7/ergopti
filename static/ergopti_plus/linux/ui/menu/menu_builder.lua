@@ -675,6 +675,24 @@ local function _build_layouts(ctx)
 	render_ctx.commands["number_row_mode"] = function() return false end
 	render_ctx.commands["number_row_edges"] = function() return false end
 	providers["number_row_policy"] = function() return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end
+	-- Layout on pause / resume: the shared frames macOS draws, listing the
+	-- desktop's own layouts (ui/menu/pause_layout_rows.lua).
+	providers["layout_switching"] = function()
+		if type(ctx.pause_layout) ~= "table" then
+			Logger.error(LOG, "No pause layout switch in the menu context — its rows cannot be built.")
+			return {}
+		end
+		return require("ui.menu.pause_layout_rows").rows({
+			paused = ctx.paused == true,
+			t = i18n_safe,
+			show_error = show_error,
+			on_changed = function()
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end,
+			preferences = require("infra.pause_layout_preferences"),
+			switch = ctx.pause_layout,
+		})
+	end
 	local rows = ManifestMenu
 		and ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, providers)
 		or {}

@@ -242,6 +242,20 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			-- A quit switches to the pause layout first; the exit waits for it.
+			name = "pause layout switch",
+			stop = function()
+				local switch = package.loaded["modules.keymap.pause_layout_switch"]
+				return not switch or not switch.is_initialised() or switch.is_settled()
+			end,
+			when_settled = function(callback)
+				local switch = package.loaded["modules.keymap.pause_layout_switch"]
+				if not switch or not switch.is_initialised() then callback(); return true end
+				switch.when_settled(callback)
+				return true
+			end,
+		},
+		{
 			name = "cursor-display window operations",
 			stop = function()
 				return not gestures or gestures.stop_window_switches() == true
@@ -981,6 +995,15 @@ local function main()
 		},
 	})
 
+	-- The desktop layout a pause, a resume and a quit switch to (Layout menu).
+	do
+		local InputSourceSwitch = require("adapters.input_source_switch")
+		require("modules.keymap.pause_layout_switch").init({
+			switcher = InputSourceSwitch.new(InputSourceSwitch.native_port()),
+			preferences = require("infra.pause_layout_preferences"),
+		})
+	end
+
 	local script_actions = ScriptActions.new({
 		-- Runs when the script pauses: the user keeps typing text this engine
 		-- never sees, so the resumed caret is not known to start a word (macOS
@@ -992,7 +1015,10 @@ local function main()
 			engine:reset(false)
 		end,
 		reload = perform_reload,
-		quit = shutdown.request,
+		quit = function(reason)
+			if not shutdown.is_requested() then require("modules.keymap.pause_layout_switch").quit_safely() end
+			shutdown.request(reason)
+		end,
 		hide_preview = tooltip_preview and function() tooltip_preview.hide() end or nil,
 		hide_prediction = llm_overlay and function() llm_overlay.hide() end or nil,
 		cancel_prediction = prediction_engine and type(prediction_engine.cancel) == "function"
@@ -1019,6 +1045,7 @@ local function main()
 				Logger.warn("pause", "Local API discovery still owns native cleanup debt.")
 			end
 			if rebuild_tray_menu then rebuild_tray_menu() end
+			require("modules.keymap.pause_layout_switch").on_pause_change(paused)
 		end,
 	})
 
@@ -2150,6 +2177,8 @@ local function main()
 				-- The physical magic key: the keyboard-layout menu reads and
 				-- chooses it, and captures one by pressing it.
 				magic_key_source = MagicKeySource,
+				-- Layout > « Layout on pause / resume » lists and saves through it.
+				pause_layout  = require("modules.keymap.pause_layout_switch"),
 				layout        = opts.layout,
 				log_level     = ScriptSettings.current(),
 				-- Applied live rather than logged. The qwerty/azerty label describes
@@ -2197,7 +2226,10 @@ local function main()
 		webview       = webview_manager,
 			dry_run       = opts.dry_run,
 			verbose       = opts.verbose,
-			on_quit       = function() shutdown.request("tray quit") end,
+			on_quit       = function()
+				if not shutdown.is_requested() then require("modules.keymap.pause_layout_switch").quit_safely() end
+				shutdown.request("tray quit")
+			end,
 			-- Same code path the SIGHUP handler takes. The menu item used to
 			-- shell out "kill -HUP $$", which signals the /bin/sh os.execute
 			-- spawned — never this process — so Reload logged success and

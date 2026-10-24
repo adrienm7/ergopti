@@ -2471,7 +2471,8 @@
 			"type": "list",
 			"id": "layout_switching",
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.layout_bundle_and_menubar_are_macos"
 		},
@@ -6442,7 +6443,8 @@
 				"layout_switch_checked"
 			],
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"unavailable": "hide"
 		},
@@ -6455,7 +6457,8 @@
 				"layout_switch_ready"
 			],
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"unavailable": "hide"
 		},
@@ -6468,7 +6471,8 @@
 				"layout_switch_ready"
 			],
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"unavailable": "hide"
 		}
@@ -6482,7 +6486,8 @@
 				"layout_picker_auto_checked"
 			],
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"unavailable": "hide"
 		},
@@ -6500,7 +6505,8 @@
 			"type": "list",
 			"id": "layout_picker_choices",
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"unavailable": "hide"
 		}

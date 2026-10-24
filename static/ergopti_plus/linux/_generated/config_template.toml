@@ -617,6 +617,9 @@ tap_5 = "none"
 [layout]
 direct_access_digits = "native"
 number_row_reorder_edges = false
+pause_switch_enabled = false
+on_pause = ""
+on_resume = ""
 
 
 
