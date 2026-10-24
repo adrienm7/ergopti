@@ -103,9 +103,13 @@ end
 --- @param text string Independently expected caller text.
 --- @param reason string|nil Independently expected caller error.
 local function check_delivery(delivered, chunks, text, reason)
+	-- A completion carries its usage; the fixture replies report no tokens.
+	local terminal = reason == nil
+		and { n = 3, text, nil, { prompt_tokens = 0, completion_tokens = 0, total_tokens = 0, est_cost_usd = 0.0 } }
+		or { n = 2, text, reason }
 	helpers.assert_eq(delivered, {
 		chunks = chunks and { { args = { n = 1, text }, active = true } } or {},
-		terminal = { { args = { n = 2, text, reason }, active = false } },
+		terminal = { { args = terminal, active = false } },
 	})
 end
 
@@ -146,7 +150,7 @@ helpers.describe("api_remote_callbacks: safe reporting and callback ownership", 
 						calls[1].callback({ ok = true, status = 200, body = replies[format] })
 						return observed_requests[remote][1]
 					end)
-					helpers.assert_eq(delivered.terminal[1].args.n, 2)
+					helpers.assert_eq(delivered.terminal[1].args.n, 3)
 					check_delivery(delivered, true, "valid reply", nil)
 					helpers.assert_eq(formatter_calls, 0, "caught error reporting must not invoke foreign formatting")
 					helpers.assert_true(ok, "protected callback must not escape through diagnostic formatting")
