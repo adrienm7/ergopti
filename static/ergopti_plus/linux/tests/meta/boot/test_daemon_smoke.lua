@@ -117,7 +117,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
 
       helpers.assert_true(src:find("typed_at_ms         = now_ms", 1, true) ~= nil,
         "each matcher input must carry its monotonic timestamp")
-      local expiry_call = "engine_mod.within_expansion_delay(result, delay_sec, Monotonic.resolution_ms())"
+      local expiry_call = "ExpansionDelay.allows(result, delay_sec, Monotonic.resolution_ms(),"
       helpers.assert_true(src:find(expiry_call, 1, true) ~= nil,
         "expiry must evaluate the last-letter-to-expander interval against the stamping clock's resolution")
       helpers.assert_true(src:find("_last_key_ms", 1, true) == nil,
