@@ -122,7 +122,6 @@ local LOG = "ergopti_hotstrings"
 -- =========================================
 
 local engine_mod        = require("modules.hotstrings.engine")
-local ExpansionDelay     = require("modules.hotstrings.expansion_delay")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local injector          = require("modules.hotstrings.injector")
 local keyboard_layout   = require("adapters.keyboard_layout")
@@ -653,8 +652,6 @@ local function restart_daemon(reason)
 	return how ~= nil
 end
 
-local boot_catalogue_complete = false
-
 --- The Reload command, as on the other drivers: the daemon restarts, so every
 --- module reads config.toml again (infra/reload_restart.lua). The restart
 --- cannot name its successor, so the local control writes a pending record
@@ -736,6 +733,7 @@ local function main()
 	-- Keep main within older LuaJIT's 60-upvalue budget; these dependencies remain mandatory.
 	local UserHotstringRuntime = require("infra.user_hotstring_runtime")
 	local PreviewSettings = require("modules.hotstrings.preview_settings")
+	local ExpansionDelay = require("modules.hotstrings.expansion_delay")
 	-- How many candidates the preview asks the engine for. The panel itself caps
 	-- the rows it draws; this cap is about the WORK — the enumeration runs on
 	-- every keystroke, and a bucket for a common tail character holds hundreds of
@@ -754,7 +752,7 @@ local function main()
 	local lock_acquired, lock_refusal, lock_contended = require("infra.session_lock").acquire()
 	if not lock_acquired then
 		io.stderr:write("[session_lock] " .. lock_refusal .. "\n")
-		BootstrapLog.append(lock_contended and "second_instance_yielded" or "session_lock_refused")
+		require("infra.bootstrap_log").append(lock_contended and "second_instance_yielded" or "session_lock_refused")
 		os.exit(lock_contended and 75 or 78)
 	end
 
@@ -859,7 +857,7 @@ local function main()
 
 	local mapping_count, committed, _, receipt = hotstrings_config.load_all(nil, true)
 	-- What a reload request claimed by this process answers for its own boot.
-	boot_catalogue_complete = committed == true and type(receipt) == "table" and receipt.complete == true
+	local boot_catalogue_complete = committed == true and type(receipt) == "table" and receipt.complete == true
 	if committed ~= true then
 		Logger.warn(LOG, "The startup hotstring catalogue is unavailable; unrelated app features continue.")
 	elseif type(receipt) ~= "table" or receipt.complete ~= true then
