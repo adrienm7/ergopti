@@ -57,6 +57,8 @@ helpers.describe("layout manager bridge: what the page may ask", function()
 		helpers.assert_eq(state.pushes[1].name, "initData")
 		helpers.assert_eq(state.pushes[1].payload.strings["layout_manager.window_title"], "Keyboard layouts")
 		helpers.assert_eq(state.pushes[1].payload.state.platform, "macos")
+		helpers.assert_eq(state.pushes[1].payload.state.shortcut_menu_path, "shortcuts/menu.lua",
+			"the page counts the menu file this driver loads")
 		helpers.assert_eq(state.pushes[1].payload.state.index, INDEX)
 		helpers.assert_eq(state.calls[1], "refresh")
 		helpers.assert_eq(state.pushes[2].name, "updateState")
