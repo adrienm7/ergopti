@@ -203,8 +203,8 @@ assert.equal(new Set(listed).size, listed.length, 'a step is listed twice');
 assert.equal(FIXTURE.shared.length, 6);
 assert.equal(
 	listed.length,
-	180,
-	'the former E2E job had 158 steps and gained 22 install steps (two, then one per test step that installed inside itself); none may be lost'
+	181,
+	'the former E2E job had 158 steps and gained 23 install steps (two, then one per test step that installed inside itself); none may be lost'
 );
 assert.deepEqual(
 	Object.keys(FIXTURE.subjects),

@@ -1235,6 +1235,12 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install prerequisites for Qualify genuine Nix installed runtime",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Qualify genuine Nix installed runtime",
 			"protocol": 9
 		},

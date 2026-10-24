@@ -160,7 +160,27 @@ check('hosted registration is mandatory and additive', () => {
 		)
 	);
 	assert.ok(step.includes('test:linux:nix-native'));
-	assert.ok(step.includes('nix-bin'));
+	// The signed-APT Nix tool installs in its own step, just before, in the same row.
+	const installMarker =
+		'      - name: Install prerequisites for Qualify genuine Nix installed runtime\n';
+	assert.equal(ci.split(installMarker).length, 2);
+	const install = ci.split(installMarker)[1].split('\n      - name:')[0];
+	assert.ok(ci.indexOf(installMarker) < ci.indexOf(marker));
+	assert.equal(
+		ci.slice(ci.indexOf(installMarker), ci.indexOf(marker)).split('\n      - name:').length,
+		1
+	);
+	assert.ok(
+		install.includes(
+			'if: ' +
+				LinuxE2E.condition(
+					'Install prerequisites for Qualify genuine Nix installed runtime',
+					'${{ !cancelled() }}'
+				)
+		)
+	);
+	assert.ok(install.includes('ubuntu_apt.py" -y --no-install-recommends nix-bin'));
+	assert.ok(!step.includes('nix-bin'));
 	assert.ok(!step.includes('curl |'));
 	assert.ok(ci.includes('--subject "nix-installed-runtime=$nix_runtime_assertions"'));
 	const coverage = JSON.parse(
