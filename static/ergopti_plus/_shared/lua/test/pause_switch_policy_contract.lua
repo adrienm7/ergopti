@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Replays the shared pause/resume/quit layout vectors against the shared
 --- policy and checks the driver's manifest declares the three settings with the
---- types the policy reads, so macOS and Linux hold one rule.
+--- types the policy reads, so macOS and Linux hold the rule the AHK twin holds.
 --- The native switch and the picker remain adapter-owned.
 --- ==============================================================================
 

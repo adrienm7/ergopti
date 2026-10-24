@@ -10940,7 +10940,7 @@ console.log(
 	);
 }
 
-// Actual macOS and Linux layout switching own the parents and complete automatic/native picker frame.
+// Actual layout switching owns the parents and complete automatic/native picker frame on every driver.
 {
 	const assert = require('node:assert/strict');
 	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
@@ -10952,27 +10952,21 @@ console.log(
 				type: 'check',
 				id: 'layout_switch_toggle',
 				i18n: 'menu.layout.pause_layout_enabled',
-				checked_when: ['layout_switch_checked'],
-				platforms: ['hs', 'linux'],
-				unavailable: 'hide'
+				checked_when: ['layout_switch_checked']
 			},
 			{
 				type: 'group',
 				id: 'layout_pause_picker',
 				i18n: 'menu.layout.pause_picker_caption',
 				caption_getter: 'layout_pause_caption',
-				disabled_when: ['layout_switch_ready'],
-				platforms: ['hs', 'linux'],
-				unavailable: 'hide'
+				disabled_when: ['layout_switch_ready']
 			},
 			{
 				type: 'group',
 				id: 'layout_resume_picker',
 				i18n: 'menu.layout.resume_picker_caption',
 				caption_getter: 'layout_resume_caption',
-				disabled_when: ['layout_switch_ready'],
-				platforms: ['hs', 'linux'],
-				unavailable: 'hide'
+				disabled_when: ['layout_switch_ready']
 			}
 		],
 		layout_switch_picker_frame: [
@@ -10980,9 +10974,7 @@ console.log(
 				type: 'check',
 				id: 'layout_picker_auto',
 				i18n: 'menu.layout.layout_auto',
-				checked_when: ['layout_picker_auto_checked'],
-				platforms: ['hs', 'linux'],
-				unavailable: 'hide'
+				checked_when: ['layout_picker_auto_checked']
 			},
 			{
 				type: 'include',
@@ -10992,7 +10984,7 @@ console.log(
 		],
 		layout_switch_picker_choices_frame: [
 			{ type: '---' },
-			{ type: 'list', id: 'layout_picker_choices', platforms: ['hs', 'linux'], unavailable: 'hide' }
+			{ type: 'list', id: 'layout_picker_choices' }
 		]
 	};
 	for (const [section, rows] of Object.entries(expected)) {
@@ -11003,23 +10995,25 @@ console.log(
 		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua'),
 		'utf8'
 	);
-	// Linux binds the same frames from its own rows owner.
-	const linuxSource = readFileSync(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/pause_layout_rows.lua'),
-		'utf8'
-	);
-	for (const [section, key, port] of [
-		['layout_switching_frame', 'layout_switch_toggle', 1],
-		['layout_switching_frame', 'layout_pause_picker', 3],
-		['layout_switching_frame', 'layout_resume_picker', 3],
-		['layout_switch_picker_frame', 'layout_picker_auto', 1],
-		['layout_switch_picker_frame', 'layout_picker_choices', 3]
-	])
-		assert.equal(
-			nativeTemplateBinding(linuxSource, '.lua', section, key, port),
-			true,
-			'actual executable typed Linux switching owner'
-		);
+	// Linux and Windows bind the same frames from their own rows owners.
+	for (const [file, extension] of [
+		['static/ergopti_plus/linux/ui/menu/pause_layout_rows.lua', '.lua'],
+		['static/ergopti_plus/windows/modules/keymap/pause_layout_switch.ahk', '.ahk']
+	]) {
+		const native = readFileSync(resolve(REPO_ROOT, file), 'utf8');
+		for (const [section, key, port] of [
+			['layout_switching_frame', 'layout_switch_toggle', 1],
+			['layout_switching_frame', 'layout_pause_picker', 3],
+			['layout_switching_frame', 'layout_resume_picker', 3],
+			['layout_switch_picker_frame', 'layout_picker_auto', 1],
+			['layout_switch_picker_frame', 'layout_picker_choices', 3]
+		])
+			assert.equal(
+				nativeTemplateBinding(native, extension, section, key, port),
+				true,
+				'actual executable typed switching owner in ' + file
+			);
+	}
 	for (const [section, key, port] of [
 		['layout_switching_frame', 'layout_switch_toggle', 1],
 		['layout_switching_frame', 'layout_pause_picker', 3],
