@@ -197,9 +197,14 @@ _KCP_EveryDeferredPastePairsOwnership() {
 			or InStr(StartBody, "CB_TryBeginPasteTransaction") > 0,
 			Pair[1] . " must acquire shared clipboard ownership before its asynchronous mutation")
 		Assert(InStr(FinishBody, "CB_RestoreOwnedAllEventually") > 0
+			or InStr(FinishBody, "CB_RestorePlainSnapshotEventually") > 0
 			or InStr(FinishBody, "CB_HasRestoreDebtForOwner") > 0,
 			Pair[2] . " must delegate terminal ownership to the retrying restore coordinator")
 	}
+	; Plain-paste restores go through the generation-bound snapshot owner, which
+	; is a coordinator only while it hands the debt to the retrying restore.
+	Assert(InStr(_DriverFuncBody("CB_RestorePlainSnapshotEventually"), "CB_RetryRestoreDebt(") > 0,
+		"CB_RestorePlainSnapshotEventually must delegate to the retrying restore coordinator")
 }
 Test("keystats clipboard: every deferred producer pairs shared ownership", _KCP_EveryDeferredPastePairsOwnership)
 
