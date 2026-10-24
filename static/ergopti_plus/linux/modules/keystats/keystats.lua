@@ -167,6 +167,8 @@ local _pending_window_switch_events = {}
 local _pending_session_events = {}
 -- events_system rows: the machine's transitions system_metrics observed.
 local _pending_system_events = {}
+-- events_mouse rows produced by _pointer_events.
+local _pending_mouse_events = {}
 
 --- Buffers the session events the tracker produced, stamped now.
 --- @param events table { kind, duration_ms? } in order.
@@ -181,6 +183,12 @@ end
 -- The observed pointers' stream, measured into the mouse columns of the
 -- focused application's next typing row (pending.mouse), as on macOS.
 local _pointer = PointerMetrics.new()
+-- The same stream as Windows' events_mouse rows: clicks and wheel bursts.
+local PointerEvents = require("modules.keystats.pointer_events")
+local function new_pointer_events()
+	return PointerEvents.new({ burst_gap_ms = Timings.ms("keystats", "mouse_scroll_burst_gap_ms") })
+end
+local _pointer_events = new_pointer_events()
 local _flush_state, _flush_stopping, _flush_pumping = nil, false, false
 local _flush_generation, _stop_final_dispatched, _stop_fallback_attempted = 0, false, false
 local _flush_listeners = {}
@@ -454,6 +462,18 @@ end
 --- @return string Application name suitable for the shared metrics manifest.
 local function dashboard_app_name(app_id)
 	return tostring(app_id)
+end
+
+--- Buffers the events_mouse rows the pointer tracker closed, stamped now.
+--- @param app_id string The focused application.
+--- @param events table { kind, meta } in order.
+local function queue_mouse_events(app_id, events)
+	for _, event in ipairs(events) do
+		_pending_mouse_events[#_pending_mouse_events + 1] = {
+			ts = os.date("!%Y-%m-%d %H:%M:%S"), date = os.date("%Y-%m-%d"),
+			kind = event.kind, app = dashboard_app_name(app_id), meta = event.meta,
+		}
+	end
 end
 
 
@@ -901,10 +921,16 @@ end
 --- @param value integer evdev value.
 function M.record_pointer(kind, code, value)
 	local delta = _pointer.observe(kind, code, value)
-	if not delta or not may_record() then return end
-	queue_session_events(_session.input(math.floor(Monotonic.now_ms()), false))
+	-- A press or a wheel turn is an events_mouse report; a bare movement is not,
+	-- and reads no clock.
+	local discrete = kind == PointerMetrics.KIND_PRESS or (delta ~= nil and delta.scrolls > 0)
+	if not (delta or discrete) or not may_record() then return end
+	local now = math.floor(Monotonic.now_ms())
+	queue_session_events(_session.input(now, false))
 	local app_id = _focused_app_id
 	if type(app_id) ~= "string" or M.is_unrecorded_app(app_id) then return end
+	if discrete then queue_mouse_events(app_id, _pointer_events.observe(kind, code, value, now)) end
+	if not delta then return end
 	local pending = ensure_pending(app_id)
 	local mouse = pending.mouse or { clicks = 0, scrolls = 0, distance = 0 }
 	mouse.clicks = mouse.clicks + delta.clicks
@@ -1889,7 +1915,7 @@ end
 local function capture_flush()
 	local date, now_iso = os.date("%Y-%m-%d"), os.date("!%Y-%m-%d %H:%M:%S")
 	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, llm = {}, windows = {},
-		sessions = {}, system = {} }, upserts = {} }
+		sessions = {}, system = {}, mouse = {} }, upserts = {} }
 	local add = setmetatable({}, { __index = function(_, kind)
 		return function(_, ...)
 			payload.upserts[#payload.upserts + 1] = { kind = kind, args = copy_flush_value({ ... }) }
@@ -1899,7 +1925,7 @@ local function capture_flush()
 		typing = _pending_typing_events, hotstrings = _pending_hotstring_events,
 		shortcuts = _pending_shortcut_events, switches = _pending_app_switch_events,
 		llm = _pending_llm_events, windows = _pending_window_switch_events, sessions = _pending_session_events,
-		system = _pending_system_events,
+		system = _pending_system_events, mouse = _pending_mouse_events,
 	}
 	local _pending_typing_events, _pending_hotstring_events = buffers.typing, buffers.hotstrings
 	local _pending_shortcut_events, _pending_app_switch_events = buffers.shortcuts, buffers.switches
@@ -1907,6 +1933,7 @@ local function capture_flush()
 	local _pending_window_switch_events = buffers.windows
 	local _pending_session_events = buffers.sessions
 	local _pending_system_events = buffers.system
+	local _pending_mouse_events = buffers.mouse
 	local _flushed_app_totals = copy_flush_value(_flushed_app_totals)
 	local _flushed_app_titles = copy_flush_value(_flushed_app_titles)
 	local _flushed_app_holds = copy_flush_value(_flushed_app_holds)
@@ -2020,6 +2047,10 @@ local function capture_flush()
 	if #_pending_system_events > 0 then
 		payload.raw.system = _pending_system_events
 		_pending_system_events = {}
+	end
+	if #_pending_mouse_events > 0 then
+		payload.raw.mouse = _pending_mouse_events
+		_pending_mouse_events = {}
 	end
 	-- The machine's own state, which the dashboard puts beside the typing to
 	-- explain a quiet afternoon. Sampled on the daemon's tick, written here.
@@ -2275,6 +2306,7 @@ local function restore_flush_buffers(buffers)
 	_pending_window_switch_events = prepend(buffers.windows, _pending_window_switch_events)
 	_pending_session_events = prepend(buffers.sessions, _pending_session_events)
 	_pending_system_events = prepend(buffers.system, _pending_system_events)
+	_pending_mouse_events = prepend(buffers.mouse, _pending_mouse_events)
 	_pending_app_switch_events = prepend(buffers.switches, _pending_app_switch_events)
 end
 
@@ -2299,7 +2331,8 @@ local function dispatch_flush()
 	local payload = snapshot.payload
 	if #payload.raw.typing == 0 and #payload.raw.hotstrings == 0 and #payload.raw.shortcuts == 0
 		and #payload.raw.llm == 0 and #payload.raw.switches == 0 and #payload.raw.windows == 0
-		and #payload.raw.sessions == 0 and #payload.raw.system == 0 and #payload.upserts == 0 then
+		and #payload.raw.sessions == 0 and #payload.raw.system == 0 and #payload.raw.mouse == 0
+		and #payload.upserts == 0 then
 		_last_flush_committed = true
 		return true
 	end
@@ -2313,6 +2346,7 @@ local function dispatch_flush()
 	_pending_window_switch_events = {}
 	_pending_session_events = {}
 	_pending_system_events = {}
+	_pending_mouse_events = {}
 	local called, operation = pcall(SqliteWriter.start_flush, _device_id, payload)
 	if not called then
 		Logger.error(LOG, "SQLite dispatch raised; uncertain ownership and source remain retained.")
@@ -2357,6 +2391,7 @@ local function flush_json()
 	_pending_window_switch_events = {}
 	_pending_session_events = {}
 	_pending_system_events = {}
+	_pending_mouse_events = {}
 
 	Logger.info(LOG, "Session flushed to JSON: %s.", path)
 	return true
@@ -2382,8 +2417,14 @@ end
 --- @return boolean True only after durable COMMIT and native cleanup ACK.
 function M.flush()
 	if _flush_stopping then return false end
-	-- The periodic flush is the session's idle check (timings ingest_tick_ms).
-	if may_record() then queue_session_events(_session.tick(math.floor(Monotonic.now_ms()))) end
+	-- The periodic flush is the session's idle check (timings ingest_tick_ms),
+	-- and it closes a wheel burst whose silence has passed.
+	local now = math.floor(Monotonic.now_ms())
+	if may_record() then queue_session_events(_session.tick(now)) end
+	local closed = _pointer_events.tick(now)
+	if may_record() and type(_focused_app_id) == "string" and not M.is_unrecorded_app(_focused_app_id) then
+		queue_mouse_events(_focused_app_id, closed)
+	end
 	-- And it takes the machine's transitions the daemon's sampler saw, always,
 	-- so a span when recording was forbidden is dropped rather than kept.
 	if SystemMetrics then
@@ -2513,9 +2554,11 @@ function M.reset_session()
 	_pending_window_switch_events = {}
 	_pending_session_events = {}
 	_pending_system_events = {}
+	_pending_mouse_events = {}
 	_pending_app_switch_events = {}
 	_live = new_live_tracker()
 	_session = new_session_tracker()
+	_pointer_events = new_pointer_events()
 	_session_started_at = os.time() * 1000
 	return true
 end
