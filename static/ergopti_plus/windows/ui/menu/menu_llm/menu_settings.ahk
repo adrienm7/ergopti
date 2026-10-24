@@ -789,7 +789,9 @@ LLM_Menu_PromptOllamaPort() {
 	}
 	global _LLM_Menu
 	current := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_port")
-	ib := Ui_InputBox(t("menu.llm.ollama_port_prompt"), t("menu.llm.ollama_port_title"), "w400 h120", current)
+	ib := Ui_InputBox(
+		StrReplace(StrReplace(t("menu.llm.server_port_prompt"), "%s", "Ollama", , , 1), "%s", _LLM_DefaultFor("llm_ollama_port")),
+		StrReplace(t("menu.llm.server_port_title"), "%s", "Ollama"), "w400 h120", current)
 	if !_LLM_Menu_TryNormalizePortPrompt(ib.Result, ib.Value, &val)
 		return
 	return LLM_Menu_CommitMutation("the Ollama port setting",
