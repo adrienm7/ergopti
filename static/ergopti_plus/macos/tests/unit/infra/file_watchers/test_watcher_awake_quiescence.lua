@@ -73,9 +73,12 @@ local function with_watchers(kind, callback)
 				return true
 			end }
 			package.loaded["infra.fs_dir"] = {}
+			-- The registry values (constants.toml): the menu watcher's debounce
+			-- doubles as its settle poll, the UI queue polls once a second.
+			local ui_timings = { ui_restore_poll_ms = 1, hs_reload_debounce_ms = 0.5 }
 			package.loaded["infra.timings"] = { sec = function(group, key)
-				assert(group == "ui" and key == "ui_restore_poll_ms", "unexpected UI timing")
-				return 1
+				assert(group == "ui" and ui_timings[key] ~= nil, "unexpected UI timing")
+				return ui_timings[key]
 			end }
 			local stored = {}
 			package.loaded["adapters.storage"] = {
