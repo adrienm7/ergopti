@@ -1405,5 +1405,7 @@ TestLogger_CasesLeaveTheSharedLoggerAsFound() {
 Test("Logger: every case leaves the shared logger as it found it (logger-test-isolation)",
 	TestLogger_CasesLeaveTheSharedLoggerAsFound)
 
+#Include test_logger_native64_dedup_owner.ahk
+
 ; Must stay the last statement: a case registered below it would run unguarded.
 _TLOG_IsolateEveryCase()
