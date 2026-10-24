@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 local Manifest = require("infra.manifest_reader")
 local ConfigPaths = require("infra.config_paths")
 local Writer = require("toml_codec.writer")
@@ -97,12 +98,7 @@ local function publish(document)
 	_generation = _generation + 1
 end
 
-local function clone(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do copy[key] = clone(child) end
-	return copy
-end
+local clone = TableUtil.deep_copy
 
 local function segments(path)
 	local parts = {}

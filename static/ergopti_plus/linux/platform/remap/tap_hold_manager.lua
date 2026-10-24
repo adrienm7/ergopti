@@ -19,6 +19,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 local NativePath = require("native_path")
@@ -252,10 +253,7 @@ end
 -- Only this construction path records a saved/public pending configuration.
 -- SourceOwner still owns disk/state currency; it cannot enroll a caller's
 -- catalogue by merely returning a normalized options object.
-local function copy_fields(value)
- if type(value)~="table" then return value end
- local result={};for key,item in pairs(value) do result[key]=copy_fields(item) end;return result
-end
+local copy_fields = TableUtil.deep_copy
 local function fields_equal(value,captured)
  if type(value)~="table" or type(captured)~="table" then return value==captured end
  if getmetatable(value)~=nil then return false end
@@ -857,10 +855,7 @@ end
 --- @return table
 function M.tap_actions()
 	_require_init()
-	local ids = {}
-	for id in pairs(_tap_action_set()) do ids[#ids + 1] = id end
-	table.sort(ids)
-	return ids
+	return TableUtil.sorted_keys(_tap_action_set())
 end
 
 --- Whether `action` is an id a tap can be set to.

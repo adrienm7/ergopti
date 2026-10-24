@@ -3,6 +3,7 @@
 --- Canonical config-backed ordered pairs. Runtime selection and publication
 --- retain separate exact leases; unknown/future pairs are never rewritten here.
 local Shared = require("tap_hold.key_combinations")
+local TableUtil = require("table_util")
 local Codec = require("toml_codec")
 local Files = require("adapters.file_system")
 local ConfigPaths = require("infra.config_paths")
@@ -48,9 +49,7 @@ local M, instance = {}, nil
 local original_pair, original_pair_separator = Shared.pair, Shared.PAIR_SEPARATOR
 local identity_receipts = setmetatable({}, { __mode = "k" })
 local buffered_settings = setmetatable({}, {__mode="k"})
-local function clone(map)
-	local result = {}; for key, value in pairs(map) do result[key] = value end; return result
-end
+local clone = TableUtil.shallow_copy
 local function equal(left, right)
 	for key, value in pairs(left) do if right[key] ~= value then return false end end
 	for key in pairs(right) do if left[key] == nil then return false end end

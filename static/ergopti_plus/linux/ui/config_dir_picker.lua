@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 local WindowTitles = require("window_titles")
 
 --- Normalizes a configuration directory through the canonical XDG default.
@@ -20,7 +21,7 @@ function M.normalize(config_paths, value)
 	end
 	if value == nil or value == "" then return config_paths.default_config_dir() end
 	if type(value) ~= "string" then return nil end
-	local normalized = value:match("^%s*(.-)%s*$")
+	local normalized = TextUtils.trim(value)
 	if normalized:match("^/+$") then return "/" end
 	normalized = normalized:gsub("/+$", "")
 	if normalized == "" then return config_paths.default_config_dir() end

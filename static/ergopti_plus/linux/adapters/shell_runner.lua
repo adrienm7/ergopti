@@ -37,6 +37,8 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local Heredoc = require("shell.heredoc")
@@ -50,11 +52,6 @@ local ok_luv, luv = pcall(require, "luv")
 if not ok_luv then luv = nil end
 
 local LOG = "adapters.shell_runner"
-
--- POSIX close-escape-reopen sequence. A single-quoted shell word cannot contain
--- a single quote at all, so the quote is emitted by closing the word, escaping
--- a bare quote outside it, and reopening: 'it'\''s' reads back as "it's".
-local QUOTE_ESCAPE = "'\\''"
 
 -- os.execute() reports success as the exit code 0 under Lua 5.1/LuaJIT and as
 -- the boolean true from Lua 5.2 onwards. Both spellings must be accepted.
@@ -97,13 +94,14 @@ end
 --- Turns an arbitrary value into exactly one inert POSIX shell word.
 --- Everything inside the returned word is literal: $, `, $( ), ;, &, newlines
 --- and spaces all lose their meaning to the shell. This is the ONLY quoting the
---- Linux driver may use when interpolating data into a command string.
---- @param value any Value to quote; nil and non-strings become the empty word.
+--- Linux driver may use when interpolating data into a command string; the
+--- close-escape-reopen of a single quote is text_utils.shell_quote's.
+--- @param value any Value to quote; nil becomes the empty word, any other
+--- non-string its tostring() text.
 --- @return string A single-quoted shell word, always non-empty ("''" at least).
 function M.quote(value)
 	if value == nil then return "''" end
-	local s = (type(value) == "string") and value or tostring(value)
-	return "'" .. (s:gsub("'", QUOTE_ESCAPE)) .. "'"
+	return TextUtils.shell_quote(value)
 end
 
 --- Validates an argv vector destined for luv.spawn (or any execve(2) boundary).
@@ -134,9 +132,7 @@ function M.validate_spawn_args(executable, args)
 	if type(args) ~= "table" then
 		return "args must be a table, got " .. type(args)
 	end
-	local keys = 0
-	for _ in pairs(args) do keys = keys + 1 end
-	if keys ~= #args then
+	if TableUtil.count(args) ~= #args then
 		return "args must be a pure array, not a keyed or sparse table"
 	end
 	for index = 1, #args do

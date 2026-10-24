@@ -41,6 +41,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local Manifest = require("infra.manifest_reader")
@@ -376,7 +377,7 @@ end
 --- @return number|nil seconds Valid value, or nil when the text is not one.
 function M.parse_seconds(text)
 	if type(text) ~= "string" then return nil end
-	local trimmed = text:match("^%s*(.-)%s*$"):gsub(",", ".", 1)
+	local trimmed = TextUtils.trim(text):gsub(",", ".", 1)
 	if not trimmed:match("^%d+%.?%d*$") and not trimmed:match("^%.%d+$") then return nil end
 	local value = tonumber(trimmed)
 	if not Engine.valid_idle_reset_seconds(value) then return nil end

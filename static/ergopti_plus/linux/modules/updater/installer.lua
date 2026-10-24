@@ -10,6 +10,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 local Fs = require("adapters.file_system")
 local Paths = require("infra.paths")
@@ -28,9 +29,7 @@ local WORK_PREFIX = ".ergopti-update."
 -- ==========================================
 -- ==========================================
 
-local function shell_quote(value)
-	return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
-end
+local shell_quote = TextUtils.shell_quote
 
 --- Normalises the variants returned by os.execute and pipe:close across LuaJIT
 --- and Lua 5.4. A numeric non-zero status is failure even though Lua considers

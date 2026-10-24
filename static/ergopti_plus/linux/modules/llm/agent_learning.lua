@@ -179,8 +179,7 @@ function M.record(config, app, intent, accepted)
 	entry.used = _sequence
 	entry.thresholds[intent] = after
 	-- Bounded: the least recently used applications go first.
-	local count = 0
-	for _ in pairs(_apps) do count = count + 1 end
+	local count = require("table_util").count(_apps)
 	while count > M.MAX_APPS do
 		local oldest, oldest_used = nil, math.huge
 		for name, candidate in pairs(_apps) do

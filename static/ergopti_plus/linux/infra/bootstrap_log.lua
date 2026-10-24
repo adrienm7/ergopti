@@ -43,6 +43,7 @@ M.CODES = {
 }
 
 local AppDirs = require("app_dirs")
+local TextUtils = require("text_utils")
 
 
 
@@ -73,7 +74,7 @@ function M.append(code, opts)
 	end)
 	if not ok then return false, "default logs folder unresolved" end
 	local dir = path:match("^(.*)/[^/]+$")
-	os.execute("mkdir -p '" .. dir:gsub("'", "'\\''") .. "' 2>/dev/null")
+	os.execute("mkdir -p " .. TextUtils.shell_quote(dir) .. " 2>/dev/null")
 	local handle = io.open(path, "a")
 	if not handle then return false, "bootstrap log not writable" end
 	local wrote = handle:write(os.date("%Y-%m-%d %H:%M:%S"), " [ERROR] [bootstrap] ", message, "\n")

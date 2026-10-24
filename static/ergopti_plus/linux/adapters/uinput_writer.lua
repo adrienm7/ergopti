@@ -45,6 +45,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 local original_output_observer_factory, original_capture_output = nil, nil
 local kernel_backends = setmetatable({}, { __mode = "k" })
 local kernel_declared = setmetatable({}, { __mode = "k" })
@@ -861,9 +862,7 @@ end
 --- @return table|nil view
 function M.output_view(capability)
 	if not output_current(capability) then return nil end
-	local down = {}
-	for code in pairs(_output.down) do down[#down + 1] = code end
-	table.sort(down)
+	local down = TableUtil.sorted_keys(_output.down)
 	return { generation = _output.generation, write_epoch = _output.write_epoch,
 		down = down, roster_known = _output.roster_known }
 end

@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local Json = require("json")
@@ -100,7 +101,7 @@ end
 --- @return boolean ok, string|nil err
 local function write_private(path, text, expected, admit, publication)
 	local dir = path:match("^(.*)/[^/]+$")
-	if dir then os.execute("mkdir -p '" .. (dir:gsub("'", "'\\''")) .. "'") end
+	if dir then os.execute("mkdir -p " .. TextUtils.shell_quote(dir)) end
 	local tmp = path .. ".tmp"
 	os.remove(tmp)
 	_create_private = _create_private or libc_create_private()

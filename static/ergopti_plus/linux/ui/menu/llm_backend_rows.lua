@@ -25,6 +25,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local EntryNames = require("llm.api_entry_names")
@@ -142,7 +143,7 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 		or remote.token_allowed(provider.id, token, base_url) ~= true) then return end
 	local model = dialogs.prompt(heading, tr("menu.llm.api_prompt_model"), provider.default_model)
 	if not model then return end
-	model = model:match("^%s*(.-)%s*$")
+	model = TextUtils.trim(model)
 	if model == "" then model = provider.default_model end
 	if model == "" then return end
 

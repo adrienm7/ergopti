@@ -2643,7 +2643,7 @@ local function agent_pause_elapsed(generation, buffer, app)
 	local config = AgentSettings.config()
 	if not config then return end
 	-- Trimmed: a space typed after the sentence does not make it a new one.
-	local sentence = Rewrite.sentence_span(buffer):match("^%s*(.-)%s*$")
+	local sentence = require("text_utils").trim(Rewrite.sentence_span(buffer))
 	if code_points(sentence) < config.system1.min_chars or already_triaged(sentence) then return end
 	if _is_secure_context() then
 		Logger.debug(LOG, "Agent triage suppressed: secure field or excluded context.")

@@ -36,6 +36,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
@@ -485,9 +486,7 @@ local function load_assignments()
 	_assignments = loaded
 	_explicit_assignments = explicit
 	_loaded = true
-	local count = 0
-	for _ in pairs(_assignments) do count = count + 1 end
-	Logger.info(LOG, "Keyboard shortcut assignments loaded (%d bound).", count)
+	Logger.info(LOG, "Keyboard shortcut assignments loaded (%d bound).", TableUtil.count(_assignments))
 end
 
 --- Every assignment the user has made.

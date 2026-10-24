@@ -9,10 +9,11 @@
 
 local M={}
 local KEY=require("config_keys").KEY
+local TableUtil=require("table_util")
 local function same_source(a,b)
 	return type(a)=='table' and type(b)=='table' and a.status==b.status and a.content==b.content
 end
-local function copy(a)local r={};for k,v in pairs(a)do r[k]=v end;return r end
+local copy=TableUtil.shallow_copy
 function M.new(deps)
 	local backend_key=deps.backend_key
 	assert(type(backend_key)=='string' and deps.manifest.find_entry_by_path(backend_key),

@@ -151,7 +151,7 @@ local function _fill(template, placeholder, value)
 end
 
 local function shell_quote(value)
-	return "'" .. tostring(value or ""):gsub("'", "'\\''") .. "'"
+	return require("text_utils").shell_quote(value or "")
 end
 
 --- Normalises a child-process exit status across interpreters.
@@ -597,9 +597,7 @@ local function _build_layouts(ctx)
 			end
 
 			-- Ordered: `pairs` would reshuffle the list on every menu build.
-			local names = {}
-			for name in pairs(known) do names[#names + 1] = name end
-			table.sort(names)
+			local names = require("table_util").sorted_keys(known)
 
 			local rows = {}
 			for _, name in ipairs(names) do
@@ -4817,9 +4815,7 @@ local function _build_gestures(ctx)
 		local out = {}
 		-- Every known slot is configurable here. A partial quick list made
 		-- parameterized actions unreachable for the omitted gesture bindings.
-		local slots = {}
-		for slot in pairs(ge.DEFAULT_GESTURES or {}) do slots[#slots + 1] = slot end
-		table.sort(slots)
+		local slots = require("table_util").sorted_keys(ge.DEFAULT_GESTURES or {})
 
 		-- What this machine's touchpad can physically express. The kernel only
 		-- advertises BTN_TOOL_QUADTAP at four slots and QUINTTAP at five, so a pad

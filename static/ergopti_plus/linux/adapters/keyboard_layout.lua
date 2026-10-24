@@ -37,6 +37,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 local Shell = require("adapters.shell_runner")
@@ -190,8 +191,7 @@ local function typing_cohort()
 		if not retarget_is_x11() or not selection_current() then return nil end
 		local built, _, receipt = inverse_retarget(previous.receipt)
 		if not selection_current() or type(built) ~= "table" or getmetatable(built) ~= nil or not receipt then return nil end
-		local count = 0
-		for _ in pairs(built) do count = count + 1 end
+		local count = TableUtil.count(built)
 		if count < MIN_PLAUSIBLE_ENTRIES then return nil end
 		local checked, current_receipt = pcall(inverse_current, receipt)
 		if not checked or current_receipt ~= true or not selection_current() then return nil end
@@ -339,9 +339,7 @@ function M.build(text)
 		end
 	end
 
-	local count = 0
-	for _ in pairs(built) do count = count + 1 end
-	return built, count
+	return built, TableUtil.count(built)
 end
 
 
@@ -376,8 +374,7 @@ function M.publish_current_capture(override_path)
 		Logger.error(LOG, "Current capture inverse publication refused — %s.", tostring(ok and reason or built))
 		return false
 	end
-	local count = 0
-	for _ in pairs(built) do count = count + 1 end
+	local count = TableUtil.count(built)
 	if count < MIN_PLAUSIBLE_ENTRIES then _table, _cohort = nil, nil; return false end
 	local checked, current = pcall(inverse_current, receipt)
 	if not checked or current ~= true or not same_selection() then return false end
@@ -445,8 +442,7 @@ function M.refresh(override_path)
 		Logger.error(LOG, "Cannot enumerate the keymap via %s — %s.", tostring(source), tostring(inverse_err))
 		return false
 	end
-	local count = 0
-	for _ in pairs(built) do count = count + 1 end
+	local count = TableUtil.count(built)
 	if count < MIN_PLAUSIBLE_ENTRIES then
 		-- A keymap that parsed to almost nothing is a parse failure wearing the
 		-- shape of a success, and the consequence is silent: every expansion

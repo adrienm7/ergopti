@@ -31,6 +31,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 local NumberRow = require("layout.number_row_native")
 local number_row_receipts = setmetatable({}, { __mode = "k" })
 local receiving_rows = setmetatable({}, { __mode = "k" })
@@ -1091,10 +1092,7 @@ function M.number_row_view(capability, codes)
 		count = count + 1
 	end
 	if count ~= 10 then return nil end
-	local function copy(value)
-		if type(value) ~= "table" then return value end
-		local result = {}; for key, child in pairs(value) do result[key] = copy(child) end; return result
-	end
+	local copy = TableUtil.deep_copy
 	return { generation = owned.generation, group = owned.group, groups = owned.groups, keymap = owned.keymap,
 		levels = copy(owned.levels), codes = copy(owned.codes) }
 end

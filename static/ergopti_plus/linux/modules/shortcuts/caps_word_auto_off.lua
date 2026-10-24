@@ -25,6 +25,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 local Manifest = require("infra.manifest_reader")
@@ -177,9 +178,7 @@ local function resolve_terminators(value, mark)
 		ConfigOutdated.report(TERMINATORS_PATH, "a list of delimiter keys is expected", Logger)
 		return nil
 	end
-	local count = 0
-	for _ in pairs(value) do count = count + 1 end
-	if count ~= #value then
+	if TableUtil.count(value) ~= #value then
 		ConfigOutdated.report(TERMINATORS_PATH, "a list of delimiter keys is expected", Logger)
 		return nil
 	end

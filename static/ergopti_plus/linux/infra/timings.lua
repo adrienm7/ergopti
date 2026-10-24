@@ -24,6 +24,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 local Logger = require("logger.shim")
 local Paths  = require("infra.paths")
 local LOG    = "timings"
@@ -76,9 +77,7 @@ end
 
 local _sections = load_registry()
 
-local _section_count = 0
-for _ in pairs(_sections) do _section_count = _section_count + 1 end
-Logger.info(LOG, "Shared timings registry loaded (%d section(s)).", _section_count)
+Logger.info(LOG, "Shared timings registry loaded (%d section(s)).", TableUtil.count(_sections))
 
 
 -- =====================================
