@@ -182,7 +182,9 @@ helpers.describe("toolchain check", function()
 		local ports, world = make_ports()
 		healthy(world)
 		run(ports)
-		helpers.assert_true(#world.commands >= 6, "the check ran too few commands")
+		-- shortcuts list and run, brew --version and list, codesign: the timer step
+		-- is a port of its own, not a command.
+		helpers.assert_eq(#world.commands, 5, "the healthy check runs each of its five commands")
 		local forbidden = { install = true, uninstall = true, upgrade = true, update = true, ["-f"] = true, edit = true }
 		for _, command in ipairs(world.commands) do
 			helpers.assert_true(type(command.timeout) == "number" and command.timeout > 0 and command.timeout <= 20,
