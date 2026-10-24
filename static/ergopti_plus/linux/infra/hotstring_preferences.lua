@@ -30,6 +30,7 @@ local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local Terminators = require("keymap.terminators")
+local KEY = require("config_keys").KEY
 
 local LOG = "infra.hotstring_preferences"
 
@@ -37,17 +38,17 @@ local LOG = "infra.hotstring_preferences"
 --- `hotstrings.dynamic` feature rows, appended below, so a family declared there
 --- is owned here without a second list.
 local OWNED = {
-	"hotstrings.trigger_char",
-	"hotstrings.magic_key_source",
-	"hotstrings.preview_star_enabled",
-	"hotstrings.preview_autocorrect_enabled",
-	"hotstrings.preview_ai_enabled",
-	"hotstrings.preview_colored_tooltips",
-	"hotstrings.dynamic.enabled",
-	"hotstrings.dynamic.user_code.time_activation_seconds",
+	KEY.HOTSTRINGS_TRIGGER_CHAR,
+	KEY.HOTSTRINGS_MAGIC_KEY_SOURCE,
+	KEY.HOTSTRINGS_PREVIEW_STAR_ENABLED,
+	KEY.HOTSTRINGS_PREVIEW_AUTOCORRECT_ENABLED,
+	KEY.HOTSTRINGS_PREVIEW_AI_ENABLED,
+	KEY.HOTSTRINGS_PREVIEW_COLORED_TOOLTIPS,
+	KEY.HOTSTRINGS_DYNAMIC_ENABLED,
+	KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS,
 }
 for _, entry in ipairs(Manifest.features()) do
-	if entry.section == "hotstrings.dynamic" and entry.type == "feature" then
+	if entry.section == KEY.HOTSTRINGS_DYNAMIC and entry.type == "feature" then
 		OWNED[#OWNED + 1] = entry.path .. ".enabled"
 	end
 end
@@ -63,8 +64,8 @@ end
 -- (a magic key today's shared policy rejects) is outdated for the cleanup
 -- exactly as it is for the owner's reader, which warns with the same words.
 local VALUE_RULES = {
-	["hotstrings.trigger_char"] = function(value) return Terminators.validate_magic_key(value) == true end,
-	["hotstrings.dynamic.user_code.time_activation_seconds"] = function(value)
+	[KEY.HOTSTRINGS_TRIGGER_CHAR] = function(value) return Terminators.validate_magic_key(value) == true end,
+	[KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS] = function(value)
 		return type(value) == "number" and value == value and value >= 0 and value < math.huge
 	end,
 }
@@ -147,7 +148,7 @@ end
 --- @return any value
 local function lookup(document, path)
 	local value, outdated, detail = inspect(document, path)
-	if value ~= nil and path == "hotstrings.dynamic.user_code.time_activation_seconds" and not VALUE_RULES[path](value) then
+	if value ~= nil and path == KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS and not VALUE_RULES[path](value) then
 		outdated, detail, value = path, "the activation interval is not a finite non-negative number", nil
 	end
 	if outdated then ConfigOutdated.report(outdated, detail, Logger) end
@@ -284,7 +285,7 @@ function M.set_many(values)
 		for path, value in pairs(values) do
 			owned(path)
 			assert(type(value) == _owned[path], "hotstring preference has the wrong type: " .. path)
-			if path == "hotstrings.dynamic.user_code.time_activation_seconds" then
+			if path == KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS then
 				assert(VALUE_RULES[path](value), "programmable hotstring activation interval is invalid")
 			end
 			if value == Manifest.default_for(path) then
