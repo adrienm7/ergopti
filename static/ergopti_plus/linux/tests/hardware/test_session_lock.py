@@ -20,8 +20,10 @@ class SessionLockTests(unittest.TestCase):
         self.assertIsNotNone(runtime, "This native regression requires Linux LuaJIT")
         with tempfile.TemporaryDirectory() as temporary:
             bootstrap = pathlib.Path(temporary) / "bootstrap.lua"
+            # The logger shim is the first module Main loads past the lock;
+            # compat.utf8 also serves the bootstrap record of a refusal.
             bootstrap.write_text(
-                "package.preload['compat.utf8'] = function() os.exit(0) end\n",
+                "package.preload['logger.shim'] = function() os.exit(0) end\n",
                 encoding="utf-8",
             )
             for marker in (None, "invalid", "2", "9"):

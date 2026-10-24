@@ -20,8 +20,9 @@
 --- 3. Never fatal itself. The record is best effort: a folder that cannot be
 ---    created leaves the stderr line (journald under systemd) as the only
 ---    evidence, and the caller still exits with its own code.
---- 4. Dependency-free. Only infra.config_paths (already needed by the sink) is
----    loaded, so this works before any adapter can.
+--- 4. Dependency-free at load. Only app_dirs is loaded with the module, so
+---    Main can hold it before the session lock; infra.config_paths and
+---    text_utils load when a record is written.
 --- ==============================================================================
 
 local M = {}
@@ -43,7 +44,6 @@ M.CODES = {
 }
 
 local AppDirs = require("app_dirs")
-local TextUtils = require("text_utils")
 
 
 
@@ -74,7 +74,10 @@ function M.append(code, opts)
 	end)
 	if not ok then return false, "default logs folder unresolved" end
 	local dir = path:match("^(.*)/[^/]+$")
-	os.execute("mkdir -p " .. TextUtils.shell_quote(dir) .. " 2>/dev/null")
+	-- Required here, not at load: Main loads this module before the session
+	-- lock retains the launcher's lock, and text_utils pulls compat.utf8 and the
+	-- rest of the shared tree that must load after it.
+	os.execute("mkdir -p " .. require("text_utils").shell_quote(dir) .. " 2>/dev/null")
 	local handle = io.open(path, "a")
 	if not handle then return false, "bootstrap log not writable" end
 	local wrote = handle:write(os.date("%Y-%m-%d %H:%M:%S"), " [ERROR] [bootstrap] ", message, "\n")
