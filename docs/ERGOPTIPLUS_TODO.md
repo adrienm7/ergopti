@@ -82,6 +82,11 @@ expander (`★` or the end character).
    (about an hour with parallel agents idle) and the full AHK suite (about 90 minutes, single threaded, nothing else
    running: `run_all.ahk` is `#SingleInstance Force`, concurrent runs silently kill each other). Fix only reds caused by
    our changes (hosts reds: Node 22.16 vs pinned 22.22.2, Unicode 16, no pwsh, no lfs, `build:linux`, Windows file staging).
+   Known red to chase first: live check `reload-click-joins` ("second click not logged as joined") failed at the end of the
+   session after it passed at 1254dd7bd7; the joined-click log line comes from `menu_dispatcher.ahk`; suspects: the
+   driver_control pending-record work (d682fa6995) or the perf commits; run
+   `node tools/maintainer/windows-live-checks.cjs --only reload-click-joins` with no other AutoHotkey process, bisect with
+   `git archive` exports (no worktree).
 2. Hosted CI on the final source: `gh workflow run ci.yml --ref tmp/preflight-dev -f os_lanes=all` (only after every
    piece passed alone; macOS runners are expensive). Then the CI receipts section.
 3. The cross-OS parity entries `PAR-1` to `PAR-85` below: unfinished ones are those not marked done; centralisation and
