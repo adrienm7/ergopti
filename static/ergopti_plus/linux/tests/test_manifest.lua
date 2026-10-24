@@ -497,6 +497,7 @@ return {
 	"tests.unit.modules.hotstrings.injector.test_injector_destination",
 	"tests.unit.modules.hotstrings.injector.test_ordinary_injection_destination",
 	"tests.unit.modules.hotstrings.catalogue.test_loader_catalogue",
+	"tests.unit.modules.hotstrings.catalogue.test_loader_native_discovery",
 	"tests.unit.modules.hotstrings.magic_key.test_magic_key",
 	"tests.unit.modules.hotstrings.magic_key.test_magic_key_catalogue",
 	"tests.unit.modules.hotstrings.magic_key.test_magic_key_source_config_toml_leaf",

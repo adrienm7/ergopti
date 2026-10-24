@@ -44,7 +44,7 @@ local Logger = require("logger.shim")
 local Reader = require("toml_codec.reader")
 local Priority = require("hotstring_priority")
 local Paths  = require("infra.paths")
-local Shell  = require("adapters.shell_runner")
+local NativeDirectory = require("infra.native_directory")
 local CatalogueFiles = require("hotstrings.catalogue_files")
 local PersonalFiles = require("hotstrings.personal_files")
 
@@ -384,35 +384,35 @@ function M.is_pack_file(path)
 	return CatalogueFiles.is_category_file(path)
 end
 
---- Decodes native find records without treating valid filename bytes as syntax.
---- POSIX filenames can contain newlines, carriage returns and trailing spaces.
---- @param output string NUL-terminated native path records.
---- @return table paths Exact native paths.
-local function discovered_paths(output)
-	assert(output == "" or output:sub(-1) == "\0", "native discovery returned incomplete path framing")
-	local paths = {}
-	for path in output:gmatch("([^%z]+)%z") do paths[#paths + 1] = path end
-	return paths
+--- Reports a directory the discovery could not inspect or list. Absence is
+--- the ordinary case (no personal folder yet) and stays silent; any other
+--- refusal is logged, where `find ... 2>/dev/null` used to drop it.
+--- @param path string Refused path.
+--- @param message string|nil Native refusal.
+--- @param code string|nil Native error code.
+local function report_unlistable(path, message, code)
+	if code == "ENOENT" then return end
+	Logger.warn(LOG, "Hotstring discovery could not read '%s' (%s); its packs are left out.", path, tostring(message))
 end
 
 --- Scans a directory tree and returns every hotstring pack in it.
 --- Useful for pointing the loader at ~/.config/ergopti/hotstrings/.
+---
+--- The walk is `find <dir> [-maxdepth N] -type f -name '*.toml'`, kept to the
+--- byte and the order (infra/native_directory.lua), run in this process: a
+--- start used to fork find five times. Filenames keep every byte, newlines
+--- included, since no text framing sits between the kernel and the paths.
 --- @param dir string Absolute path to the root directory to scan.
+--- @param max_directory_depth number|nil Deepest level scanned (find -maxdepth).
 --- @return table  Array of absolute .toml file paths.
 function M.find_toml_files(dir, max_directory_depth)
 	if type(dir) ~= "string" or dir == "" then return {} end
 	Logger.trace(LOG, "Scanning '%s' for hotstring packs…", dir)
 
-	-- Through the shell adapter rather than a hand-quoted io.popen: this is a
-	-- path that can come from a config file, and quoting re-derived at a call
-	-- site is quoting that is eventually wrong.
 	local result = {}
-	local limit = max_directory_depth and (" -maxdepth " .. tostring(max_directory_depth)) or ""
-	local out = Shell.exec(string.format(
-		"find %s%s -type f -name '*.toml' -print0 2>/dev/null", Shell.quote(dir), limit))
-	for _, path in ipairs(discovered_paths(out)) do
-		if M.is_pack_file(path) then result[#result + 1] = path end
-	end
+	NativeDirectory.walk(dir, max_directory_depth, function(path, kind)
+		if kind == "file" and path:sub(-5) == ".toml" and M.is_pack_file(path) then result[#result + 1] = path end
+	end, report_unlistable)
 
 	Logger.done(LOG, "Found %d pack(s) under '%s'.", #result, dir)
 	return result
@@ -425,34 +425,22 @@ end
 --- @return table directories Blocked relative labels and exact paths.
 function M.unavailable_directories(dir, max_directory_depth)
 	if type(dir) ~= "string" or dir == "" or type(max_directory_depth) ~= "number" then return {} end
-	local available, native = pcall(require, "lfs")
-	local stat = available and native.symlinkattributes or nil
-	if type(stat) ~= "function" then
-		available, native = pcall(require, "luv")
-		stat = available and native.fs_lstat or nil
-	end
-	if type(stat) ~= "function" then return {} end
-	local observed, root_attributes = pcall(stat, dir)
-	local root_mode = observed and type(root_attributes) == "table" and (root_attributes.mode or root_attributes.type)
-	if root_mode == "link" then
+	if NativeDirectory.kind(dir) == "link" then
 		return { { path = dir, label = dir:gsub("/+$", ""):match("([^/]+)$"), reason = "linked-directory" } }
 	end
 	local prefix = dir:gsub("/+$", "") .. "/"
 	local rows = {}
-	local out = Shell.exec(string.format("find %s -maxdepth %d \\( -type l -o -type d \\) -print0 2>/dev/null",
-		Shell.quote(dir), max_directory_depth))
-	for _, path in ipairs(discovered_paths(out)) do
-		if path:sub(1, #prefix) == prefix then
+	-- `find <dir> -maxdepth N \( -type l -o -type d \)`, in process.
+	NativeDirectory.walk(dir, max_directory_depth, function(path, mode)
+		if (mode == "link" or mode == "directory") and path:sub(1, #prefix) == prefix then
 			local relative = path:sub(#prefix + 1)
 			local depth = 0; for _ in relative:gmatch("[^/]+") do depth = depth + 1 end
-			local called, attributes = pcall(stat, path)
-			local mode = called and type(attributes) == "table" and (attributes.mode or attributes.type)
 			if (mode == "link" and not relative:match("%.toml$")) or mode == "directory" and depth == max_directory_depth then
 				rows[#rows + 1] = { path = path, label = relative,
 					reason = mode == "link" and "linked-directory" or "scan-depth" }
 			end
 		end
-	end
+	end, report_unlistable)
 	table.sort(rows, function(left, right) return left.label < right.label end)
 	return rows
 end
@@ -460,19 +448,17 @@ end
 --- Lists the immediate subdirectories of a directory.
 ---
 --- Extensions are one directory each, so discovery is a listing at depth 1 —
---- `-maxdepth 1 -mindepth 1` rather than a recursive walk, which would descend
---- into every `hotstrings/` and `shortcuts/` folder and report those as
---- extensions too.
+--- `find <dir> -mindepth 1 -maxdepth 1 -type d`, in process — rather than a
+--- recursive walk, which would descend into every `hotstrings/` and
+--- `shortcuts/` folder and report those as extensions too.
 --- @param dir string Absolute path.
 --- @return table Array of absolute directory paths.
 function M.list_subdirs(dir)
 	if type(dir) ~= "string" or dir == "" then return {} end
 	local result = {}
-	local out = Shell.exec(string.format(
-		"find %s -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null", Shell.quote(dir)))
-	for _, path in ipairs(discovered_paths(out)) do
-		if path ~= "" then result[#result + 1] = path end
-	end
+	NativeDirectory.walk(dir, 1, function(path, kind, depth)
+		if depth == 1 and kind == "directory" then result[#result + 1] = path end
+	end, report_unlistable)
 	return result
 end
 
