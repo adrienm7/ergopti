@@ -1259,7 +1259,7 @@ recommended = ""
 input_altering = false
 type = "string"
 description_key = "menu.llm.profiles"
-platforms = ["ahk", "linux"]
+platforms = ["ahk", "hs", "linux"]
 
 [[features.llm]]
 id = "agent_system1"

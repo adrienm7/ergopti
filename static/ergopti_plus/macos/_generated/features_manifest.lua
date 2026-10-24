@@ -329,6 +329,9 @@ M.features = {
 		path = "llm.app_profile_overrides", id = "app_profile_overrides", section = "llm", default = "", type = "string", description_key = "menu.llm.app_profile_overrides", platforms = { "ahk", "hs", "linux" }, recommended = "", input_altering = false,
 	},
 	{
+		path = "llm.user_profiles", id = "user_profiles", section = "llm", default = "", type = "string", description_key = "menu.llm.profiles", platforms = { "ahk", "hs", "linux" }, recommended = "", input_altering = false,
+	},
+	{
 		path = "llm.agent_system1", id = "agent_system1", section = "llm", default = "", type = "string", description_key = "menu.agent.system1_desc", platforms = { "ahk", "hs", "linux" }, recommended = "", input_altering = false,
 	},
 	{
@@ -948,9 +951,6 @@ M.unavailable = {
 	},
 	{
 		path = "llm.onboarding_seen", section = "llm", reason_key = "platform_reason.ai_menu_bookkeeping_is_windows", platforms = { "ahk" },
-	},
-	{
-		path = "llm.user_profiles", section = "llm", reason_key = "", platforms = { "ahk", "linux" },
 	},
 	{
 		path = "llm.profiles.auto_profile_for_model", section = "llm.profiles", reason_key = "", platforms = { "ahk", "linux" },

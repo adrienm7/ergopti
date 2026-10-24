@@ -432,6 +432,7 @@ time_activation_seconds = 0.75
 [llm]
 enabled = false
 app_profile_overrides = ""
+user_profiles = ""
 agent_system1 = ""
 agent_system2 = ""
 agent_mode = "off"
