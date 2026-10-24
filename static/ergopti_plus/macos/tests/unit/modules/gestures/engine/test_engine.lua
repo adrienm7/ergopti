@@ -9,7 +9,7 @@
 --- host.
 ---
 --- FEATURES & RATIONALE:
---- 1. Time-controlled simulation: overrides hs.timer.secondsSinceEpoch so tap
+--- 1. Time-controlled simulation: controls hs.timer.absoluteTime so tap
 ---    vs swipe timing thresholds can be reproduced deterministically.
 --- 2. Isolation: fresh module instance per test (fresh_engine()) to bypass the
 ---    double-init guard and give every test a clean _state.
@@ -22,11 +22,13 @@ local helpers = require("tests.helpers")
 package.loaded["infra.logger"] = nil
 local Logger = helpers.load_with_stubs("infra.logger")
 
+package.loaded["adapters.timer_scheduler"] = nil
 local Engine = helpers.load_with_stubs("modules.gestures.engine")
 
 -- Allow tests to override the time seen by process_frame.
 local _time = 0
 _G.hs.timer.secondsSinceEpoch = function() return _time end
+_G.hs.timer.absoluteTime = function() return _time * 1e9 end
 
 -- Mock script control for pause invariant tests in engine
 -- script_control is stubbed only so a TRANSITIVE require cannot pull the real
@@ -99,8 +101,10 @@ end
 local function fresh_engine(logger)
 	package.loaded["infra.logger"] = logger or Logger
 	package.loaded["modules.gestures.engine"] = nil
+	package.loaded["adapters.timer_scheduler"] = nil
 	local E = helpers.load_with_stubs("modules.gestures.engine")
 	_G.hs.timer.secondsSinceEpoch = function() return _time end
+	_G.hs.timer.absoluteTime = function() return _time * 1e9 end
 	return E
 end
 
