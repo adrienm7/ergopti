@@ -15,6 +15,8 @@
 
 local helpers = require("tests.helpers")
 
+local SCHEDULER_OWNERS = { "adapters.timer_scheduler", "error_description", "number_policy" }
+
 
 
 
@@ -30,6 +32,8 @@ local helpers = require("tests.helpers")
 --- @param scenario function Scenario receiving the module and runtime state.
 local function with_fixture(options, scenario)
 	local saved_module = package.loaded["ui.menu.menu_watchers"]
+	local saved_scheduler_modules = {}
+	for _, name in ipairs(SCHEDULER_OWNERS) do saved_scheduler_modules[name] = package.loaded[name] end
 	local saved_pathwatcher = hs.pathwatcher
 	local saved_distributed = hs.distributednotifications
 	local runtime = {
@@ -84,11 +88,13 @@ local function with_fixture(options, scenario)
 
 	package.loaded["ui.menu.menu_watchers"] = nil
 	local ok, err = xpcall(function()
+		for _, name in ipairs(SCHEDULER_OWNERS) do package.loaded[name] = nil end
 		local MenuWatchers = require("ui.menu.menu_watchers")
 		scenario(MenuWatchers, runtime)
 	end, debug.traceback)
 
 	package.loaded["ui.menu.menu_watchers"] = saved_module
+	for _, name in ipairs(SCHEDULER_OWNERS) do package.loaded[name] = saved_scheduler_modules[name] end
 	hs.pathwatcher = saved_pathwatcher
 	hs.distributednotifications = saved_distributed
 	if not ok then error(err, 0) end
