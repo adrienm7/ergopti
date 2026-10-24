@@ -34,7 +34,9 @@ end
 --- Runs one manual check over a scripted list and returns the callback's arguments.
 local function check(list, channel, current, fetch_error, reason)
 	local M = helpers.load_module("modules.updater.manager")
-	local real_fetch, real_version = M._fetch_releases, M.current_version
+	local real_fetch, real_version, real_feed = M._fetch_releases, M.current_version, M._fetch_feed
+	-- The public feed is the check's second source when the API gave no list; this fixture has none.
+	M._fetch_feed = function(callback) callback(nil, "feed unavailable in this fixture"); return true end
 	M._fetch_releases = function(_, callback)
 		if fetch_error then callback(nil, 0, fetch_error, reason) else callback(list, 200, nil) end
 		return true
@@ -43,7 +45,7 @@ local function check(list, channel, current, fetch_error, reason)
 	M.clear_cached_release()
 	local told = nil
 	local ok, err = pcall(M.check_for_updates, channel, function(...) told = { ... } end)
-	M._fetch_releases, M.current_version = real_fetch, real_version
+	M._fetch_releases, M.current_version, M._fetch_feed = real_fetch, real_version, real_feed
 	M.clear_cached_release()
 	if not ok then error(err, 0) end
 	helpers.assert_not_nil(told, "the check answers")
@@ -93,7 +95,8 @@ helpers.describe("updater: a manual check answers the update-check window (Linux
 		local offline = check(nil, "dev", "0.0.0-dev.140", "Could not resolve host", "no_connection")[4]
 		helpers.assert_eq(offline.state, "error")
 		helpers.assert_eq(offline.reason_key, "updater.no_connection")
-		helpers.assert_eq(offline.detail, "Could not resolve host")
+		helpers.assert_eq(offline.detail, "Could not resolve host; Atom feed: feed unavailable in this fixture",
+			"a connection failure names the API and then the public feed it fell back on")
 		local garbled = check(nil, "dev", "0.0.0-dev.140", "invalid release page JSON", "parse_failed")[4]
 		helpers.assert_eq(garbled.reason_key, "updater.parse_failed")
 		local unclassified = check(nil, "dev", "0.0.0-dev.140", "empty body", nil)[4]
