@@ -765,7 +765,7 @@ console.log(
 		).join('\n');
 	// One identity the ledger still holds; the earlier sections.ui entry got its reason.
 	const knownDebt =
-		'[[features.llm.profiles]]\nid = "user_profiles"\ntype = "array"\nplatforms = ["hs"]\n';
+		'[[features.llm.profiles]]\nid = "auto_profile_for_model"\ntype = "boolean"\nplatforms = ["ahk", "linux"]\n';
 	const command =
 		'[[menu.hand_commands]]\ntype = "command"\nid = "new_hand_command"\ni18n = "menu.hand"\nplatforms = ["linux"]\n';
 	const hidden = command + 'unavailable = "hide"\n';
