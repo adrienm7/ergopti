@@ -631,7 +631,7 @@ CB_WritePlainSnapshot(Capture, Text, &OwnedSequence) {
 		throw Failure
 	} finally {
 		if !Admitted {
-			Record["phase"] := "recover"
+			Record["phase"] := "recovering"
 			_CB_PlainRetryDebt(Record)
 		}
 	}
