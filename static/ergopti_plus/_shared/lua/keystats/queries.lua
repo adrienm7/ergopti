@@ -264,6 +264,62 @@ local QUERIES = {
 			},
 		},
 	},
+	["ngram.tokens"] = {
+		params = { "table", "where", "conjunction" },
+		texts = { "token" },
+		templates = {
+			native = {
+				"SELECT token, TOTAL(c) AS c, TOTAL(td) AS td, TOTAL(e) AS e, esrc_json, COUNT(*) AS source_rows FROM ",
+				{ param = "table" },
+				{ param = "where" },
+				{ param = "conjunction" },
+				"(typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real')) GROUP BY token, esrc_json UNION ALL SELECT token, c, td, e, esrc_json, 1 AS source_rows FROM ",
+				{ param = "table" },
+				{ param = "where" },
+				{ param = "conjunction" },
+				"NOT (typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real'));",
+			},
+			cli_json = {
+				"SELECT json_quote(token) AS token_json, TOTAL(c) AS c, TOTAL(td) AS td, TOTAL(e) AS e, esrc_json, COUNT(*) AS source_rows FROM ",
+				{ param = "table" },
+				{ param = "where" },
+				{ param = "conjunction" },
+				"(typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real')) GROUP BY token, esrc_json UNION ALL SELECT json_quote(token) AS token_json, c, td, e, esrc_json, 1 AS source_rows FROM ",
+				{ param = "table" },
+				{ param = "where" },
+				{ param = "conjunction" },
+				"NOT (typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real'));",
+			},
+		},
+	},
+	["ngram.tokens_by_app"] = {
+		params = { "table", "where", "conjunction" },
+		texts = { "app", "token" },
+		templates = {
+			native = {
+				"SELECT app, token, TOTAL(c) AS c, TOTAL(td) AS td, TOTAL(e) AS e, esrc_json, COUNT(*) AS source_rows FROM ",
+				{ param = "table" },
+				{ param = "where" },
+				{ param = "conjunction" },
+				"(typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real')) GROUP BY app, token, esrc_json UNION ALL SELECT app, token, c, td, e, esrc_json, 1 AS source_rows FROM ",
+				{ param = "table" },
+				{ param = "where" },
+				{ param = "conjunction" },
+				"NOT (typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real'));",
+			},
+			cli_json = {
+				"SELECT json_quote(app) AS app_json, json_quote(token) AS token_json, TOTAL(c) AS c, TOTAL(td) AS td, TOTAL(e) AS e, esrc_json, COUNT(*) AS source_rows FROM ",
+				{ param = "table" },
+				{ param = "where" },
+				{ param = "conjunction" },
+				"(typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real')) GROUP BY app, token, esrc_json UNION ALL SELECT json_quote(app) AS app_json, json_quote(token) AS token_json, c, td, e, esrc_json, 1 AS source_rows FROM ",
+				{ param = "table" },
+				{ param = "where" },
+				{ param = "conjunction" },
+				"NOT (typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real'));",
+			},
+		},
+	},
 }
 
 --- Renders a named query. Fails on an unknown name or dialect, a missing or
@@ -312,6 +368,17 @@ function M.text_columns(name)
 	if not query then error("Unknown keystats query: " .. tostring(name), 2) end
 	local out = {}
 	for index, column in ipairs(query.texts) do out[index] = column end
+	return out
+end
+
+--- Lists the parameters a query declares, in first-use order.
+--- @param name string Catalogue name.
+--- @return table Array of parameter names.
+function M.params(name)
+	local query = QUERIES[name]
+	if not query then error("Unknown keystats query: " .. tostring(name), 2) end
+	local out = {}
+	for index, param in ipairs(query.params) do out[index] = param end
 	return out
 end
 
