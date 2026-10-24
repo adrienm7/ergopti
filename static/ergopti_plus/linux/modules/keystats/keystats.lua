@@ -165,6 +165,8 @@ local _pending_app_switch_events = {}
 local _pending_window_switch_events = {}
 -- events_session rows produced by _session.
 local _pending_session_events = {}
+-- events_system rows: the machine's transitions system_metrics observed.
+local _pending_system_events = {}
 
 --- Buffers the session events the tracker produced, stamped now.
 --- @param events table { kind, duration_ms? } in order.
@@ -1887,7 +1889,7 @@ end
 local function capture_flush()
 	local date, now_iso = os.date("%Y-%m-%d"), os.date("!%Y-%m-%d %H:%M:%S")
 	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, llm = {}, windows = {},
-		sessions = {} }, upserts = {} }
+		sessions = {}, system = {} }, upserts = {} }
 	local add = setmetatable({}, { __index = function(_, kind)
 		return function(_, ...)
 			payload.upserts[#payload.upserts + 1] = { kind = kind, args = copy_flush_value({ ... }) }
@@ -1897,12 +1899,14 @@ local function capture_flush()
 		typing = _pending_typing_events, hotstrings = _pending_hotstring_events,
 		shortcuts = _pending_shortcut_events, switches = _pending_app_switch_events,
 		llm = _pending_llm_events, windows = _pending_window_switch_events, sessions = _pending_session_events,
+		system = _pending_system_events,
 	}
 	local _pending_typing_events, _pending_hotstring_events = buffers.typing, buffers.hotstrings
 	local _pending_shortcut_events, _pending_app_switch_events = buffers.shortcuts, buffers.switches
 	local _pending_llm_events = buffers.llm
 	local _pending_window_switch_events = buffers.windows
 	local _pending_session_events = buffers.sessions
+	local _pending_system_events = buffers.system
 	local _flushed_app_totals = copy_flush_value(_flushed_app_totals)
 	local _flushed_app_titles = copy_flush_value(_flushed_app_titles)
 	local _flushed_app_holds = copy_flush_value(_flushed_app_holds)
@@ -2012,6 +2016,10 @@ local function capture_flush()
 	if #_pending_session_events > 0 then
 		payload.raw.sessions = _pending_session_events
 		_pending_session_events = {}
+	end
+	if #_pending_system_events > 0 then
+		payload.raw.system = _pending_system_events
+		_pending_system_events = {}
 	end
 	-- The machine's own state, which the dashboard puts beside the typing to
 	-- explain a quiet afternoon. Sampled on the daemon's tick, written here.
@@ -2266,6 +2274,7 @@ local function restore_flush_buffers(buffers)
 	_pending_llm_events = prepend(buffers.llm, _pending_llm_events)
 	_pending_window_switch_events = prepend(buffers.windows, _pending_window_switch_events)
 	_pending_session_events = prepend(buffers.sessions, _pending_session_events)
+	_pending_system_events = prepend(buffers.system, _pending_system_events)
 	_pending_app_switch_events = prepend(buffers.switches, _pending_app_switch_events)
 end
 
@@ -2290,7 +2299,7 @@ local function dispatch_flush()
 	local payload = snapshot.payload
 	if #payload.raw.typing == 0 and #payload.raw.hotstrings == 0 and #payload.raw.shortcuts == 0
 		and #payload.raw.llm == 0 and #payload.raw.switches == 0 and #payload.raw.windows == 0
-		and #payload.raw.sessions == 0 and #payload.upserts == 0 then
+		and #payload.raw.sessions == 0 and #payload.raw.system == 0 and #payload.upserts == 0 then
 		_last_flush_committed = true
 		return true
 	end
@@ -2303,6 +2312,7 @@ local function dispatch_flush()
 	_pending_llm_events = {}
 	_pending_window_switch_events = {}
 	_pending_session_events = {}
+	_pending_system_events = {}
 	local called, operation = pcall(SqliteWriter.start_flush, _device_id, payload)
 	if not called then
 		Logger.error(LOG, "SQLite dispatch raised; uncertain ownership and source remain retained.")
@@ -2346,6 +2356,7 @@ local function flush_json()
 	_pending_llm_events = {}
 	_pending_window_switch_events = {}
 	_pending_session_events = {}
+	_pending_system_events = {}
 
 	Logger.info(LOG, "Session flushed to JSON: %s.", path)
 	return true
@@ -2373,6 +2384,19 @@ function M.flush()
 	if _flush_stopping then return false end
 	-- The periodic flush is the session's idle check (timings ingest_tick_ms).
 	if may_record() then queue_session_events(_session.tick(math.floor(Monotonic.now_ms()))) end
+	-- And it takes the machine's transitions the daemon's sampler saw, always,
+	-- so a span when recording was forbidden is dropped rather than kept.
+	if SystemMetrics then
+		local transitions = SystemMetrics.take_events()
+		if may_record() then
+			for _, transition in ipairs(transitions) do
+				_pending_system_events[#_pending_system_events + 1] = {
+					ts = os.date("!%Y-%m-%d %H:%M:%S"), date = os.date("%Y-%m-%d"),
+					action = transition.action, metadata = transition.metadata,
+				}
+			end
+		end
+	end
 	local started = Perf.clock()
 	Perf.count("keystats.flushes")
 	local result = flush_dispatch()
@@ -2488,6 +2512,7 @@ function M.reset_session()
 	_pending_llm_events = {}
 	_pending_window_switch_events = {}
 	_pending_session_events = {}
+	_pending_system_events = {}
 	_pending_app_switch_events = {}
 	_live = new_live_tracker()
 	_session = new_session_tracker()
