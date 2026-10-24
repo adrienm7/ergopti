@@ -136,14 +136,23 @@ _LDR_AssertStability() {
 
 ; The rollover purge and the boot purge must share one retention constant. When
 ; the two drifted apart, a rotation could apply a different window than boot and
-; silently delete more than intended.
+; silently delete more than intended. That constant is the shared registry's
+; [logger] retention_days, loaded at boot: a literal of its own drifted from the
+; value macOS and Linux read.
 _LDR_RetentionIsSingleSourced() {
 	global LOGGER_RETENTION_DAYS
 
 	Assert(IsSet(LOGGER_RETENTION_DAYS),
 		"LOGGER_RETENTION_DAYS must exist as the single source of truth for the retention window")
-	Assert(LOGGER_RETENTION_DAYS > 0,
-		"LOGGER_RETENTION_DAYS must be a positive number of days")
+	Previous := LOGGER_RETENTION_DAYS
+	try {
+		TimingsLoadShared()
+		LoggerLoadTimings()
+		Assert(LOGGER_RETENTION_DAYS == TimingsGet("logger", "retention_days"),
+			"LoggerLoadTimings must assign the registry's [logger] retention_days")
+		Assert(LOGGER_RETENTION_DAYS > 0,
+			"LOGGER_RETENTION_DAYS must be a positive number of days once loaded")
+	} finally LOGGER_RETENTION_DAYS := Previous
 
 	Body := _DriverFuncBody("LoggerInit")
 	Assert(Body != "", "LoggerInit must exist in infra/logger.ahk")

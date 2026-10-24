@@ -7,7 +7,8 @@
  * Ten logger scalars are declared once per driver rather than once. This gate
  * pins every copy to _shared/modules/timings/constants.toml [logger]:
  *
- *   retention_days         14      AHK LOGGER_RETENTION_DAYS · HS max_age_days (×2)
+ *   retention_days         14      AHK reads it (LoggerLoadTimings) · Linux reads it ·
+ *                                  HS max_age_days (×2)
  *   ring_buffer_size       200     AHK LOGGER_RING_BUFFER_SIZE · HS RING_BUFFER_SIZE ·
  *                                  shared core RING_CAPACITY
  *   dedup_window_ms        5000    AHK LOGGER_DEDUP_WINDOW_MS · HS DEDUP_WINDOW_SEC
@@ -51,10 +52,12 @@
  * only go down (`--shrink` writes a lower count back).
  *
  * NOTE — duplication is still duplication:
- * These constants are not yet READ from the registry at runtime; the drivers
- * declare their own. That is tolerable only because this gate locks them to the
- * registry, exactly as test-keystats-timings-single-source.cjs does for the
- * keystats intervals. Wiring the reads is the follow-up, not the guarantee.
+ * Most of these constants are not yet READ from the registry at runtime; the
+ * drivers declare their own. That is tolerable only because this gate locks them
+ * to the registry, exactly as test-keystats-timings-single-source.cjs does for
+ * the keystats intervals. Wiring the reads is the follow-up, not the guarantee.
+ * The retention window is the first one read: Windows and Linux take it from the
+ * registry, so the gate asserts the read and forbids a literal coming back.
  * ==============================================================================
  */
 
@@ -146,12 +149,79 @@ function mustNotDeclare(file, name, pattern, why) {
 
 // ── retention_days ──────────────────────────────────────────────────────────
 
-check(
+// Windows reads the registry: LOGGER_RETENTION_DAYS starts at the sentinel 0 and
+// LoggerLoadTimings assigns it at boot. It used to be the literal 14, a third copy
+// of a number Linux already read. Every link of the read is checked, because each
+// one failing on its own leaves a driver that purges on the wrong window or not at
+// all: the literal coming back, the loader not reading the key, boot not calling
+// the loader before LoggerInit, the logger included after boot (its sentinel would
+// then zero the loaded value, exactly as test_taphold_timings_load_order.ahk guards
+// for the tap-hold constants), and a purge running on the unloaded sentinel, which
+// _LoggerPurgeOldLogs reads as "every dated file is expired".
+mustNotDeclare(
 	'windows/infra/logger.ahk',
 	'LOGGER_RETENTION_DAYS',
-	/LOGGER_RETENTION_DAYS\s*:=\s*(\d+)/g,
-	registry.logger.retention_days
+	/LOGGER_RETENTION_DAYS\s*:=\s*[1-9]\d*/g,
+	'LoggerLoadTimings assigns it from [logger] retention_days'
 );
+{
+	const ahk = read('windows/infra/logger.ahk');
+	if (!/^global LOGGER_RETENTION_DAYS := 0$/m.test(ahk)) {
+		errors.push(
+			'windows/infra/logger.ahk: LOGGER_RETENTION_DAYS is no longer declared with the sentinel 0 ' +
+				'that LoggerLoadTimings replaces.'
+		);
+	}
+	const loader = /\nLoggerLoadTimings\(\) \{([\s\S]*?)\n\}/.exec(ahk);
+	if (
+		!loader ||
+		!/LOGGER_RETENTION_DAYS := Days/.test(loader[1]) ||
+		!/Days := TimingsGet\("logger", "retention_days"\)/.test(loader[1])
+	) {
+		errors.push(
+			'windows/infra/logger.ahk: LoggerLoadTimings no longer assigns LOGGER_RETENTION_DAYS from ' +
+				'TimingsGet("logger", "retention_days").'
+		);
+	}
+	const purges = [...ahk.matchAll(/_LoggerPurgeOldLogs\(\w+, LOGGER_RETENTION_DAYS\)/g)];
+	const guarded = [
+		...ahk.matchAll(
+			/if \(LOGGER_RETENTION_DAYS > 0\)\n\t+_LoggerPurgeOldLogs\(\w+, LOGGER_RETENTION_DAYS\)/g
+		)
+	];
+	if (purges.length !== 2 || guarded.length !== purges.length) {
+		errors.push(
+			`windows/infra/logger.ahk: ${guarded.length} of ${purges.length} retention purge(s) are guarded ` +
+				'by LOGGER_RETENTION_DAYS > 0 (expected the boot and the rollover purge, both guarded). An ' +
+				'unguarded purge before LoggerLoadTimings deletes every dated log file.'
+		);
+	}
+	const boot = read('windows/infra/boot.ahk');
+	const loadAt = boot.indexOf('\nTimingsLoadShared()\n');
+	const loaderAt = boot.indexOf('\nLoggerLoadTimings()\n');
+	if (loadAt < 0 || loaderAt < 0 || loaderAt < loadAt) {
+		errors.push(
+			'windows/infra/boot.ahk: LoggerLoadTimings() must be called after TimingsLoadShared(), ' +
+				'before LoggerInit purges.'
+		);
+	}
+	const entry = read('windows/ErgoptiPlus.ahk');
+	const loggerInclude = entry.indexOf('#Include infra/logger.ahk');
+	const bootInclude = entry.indexOf('#Include infra/boot.ahk');
+	const init = entry.indexOf('\nLoggerInit()\n');
+	if (loggerInclude < 0 || bootInclude < 0 || loggerInclude > bootInclude) {
+		errors.push(
+			'windows/ErgoptiPlus.ahk: infra/logger.ahk must be included before infra/boot.ahk, or its ' +
+				'sentinel re-zeroes the retention LoggerLoadTimings just loaded.'
+		);
+	}
+	if (init < 0 || init < bootInclude) {
+		errors.push(
+			'windows/ErgoptiPlus.ahk: the boot LoggerInit() must run after infra/boot.ahk has loaded the ' +
+				'retention window.'
+		);
+	}
+}
 check(
 	'macos/infra/logger.lua',
 	'max_age_days default',
