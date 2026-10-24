@@ -32,8 +32,7 @@
 --- ==============================================================================
 
 local M = {}
-local _scope_busy = false
-local _scope_owner, _scope_generation, _scope_receipts = nil, 0, setmetatable({}, { __mode = "k" })
+local _scope = require("scope_owner").new({ name = "ui.error_dialog", module = M })
 
 local hs             = hs
 local Logger         = require("infra.logger")
@@ -106,8 +105,7 @@ end
 --- before the logger's error handler is registered.
 --- @return boolean initialised
 function M.init()
-	if _scope_owner ~= nil or _scope_busy then return false end
-	_scope_generation = _scope_generation + 1
+	if not _scope.admit_change() then return false end
 	if _policy ~= nil then
 		Logger.error(LOG, "The error window was initialised twice; the second call is refused.")
 		return false
@@ -142,8 +140,7 @@ end
 --- @param enabled boolean
 --- @return boolean saved
 function M.set_enabled(enabled)
-	if _scope_owner ~= nil or _scope_busy then return false end
-	_scope_generation = _scope_generation + 1
+	if not _scope.admit_change() then return false end
 	if type(enabled) ~= "boolean" then
 		Logger.error(LOG, "set_enabled() needs a boolean, got %s.", type(enabled))
 		return false
@@ -613,7 +610,7 @@ end
 --- @return boolean handled Always true: an error the policy keeps quiet is
 ---   still logged, which is the handler's whole contract.
 function M.on_error(module_name, template, message)
-	if _scope_owner ~= nil or _scope_busy then return false end
+	if not _scope.idle() then return false end
 	if _policy == nil then return true end
 	if module_name == RECOVERABLE_MODULE and type(template) == "string"
 		and template:sub(1, #RECOVERABLE_TEMPLATE_PREFIX) == RECOVERABLE_TEMPLATE_PREFIX then
@@ -652,10 +649,10 @@ end
 function M.report(record, complete, current)
 	assert(type(current) == "function" and type(complete) == "function",
 		"Error reporting needs its current owner and completion")
-	if _scope_owner ~= nil or _scope_busy or current() ~= true then return nil end
-	local generation = _scope_generation
+	if not _scope.idle() or current() ~= true then return nil end
+	local generation = _scope.generation()
 	local function owned()
-		return _scope_owner == nil and not _scope_busy and generation == _scope_generation and current() == true
+		return _scope.idle() and generation == _scope.generation() and current() == true
 			and package.loaded["ui.error_dialog"] == M
 	end
 	local ok_report, fields = pcall(build_report, record)
@@ -676,8 +673,7 @@ end
 
 --- Test seam: forgets the policy, the decisions and the window.
 function M._reset()
-	if _scope_owner ~= nil or _scope_busy then return false end
-	_scope_generation = _scope_generation + 1
+	if not _scope.admit_change() then return false end
 	if _session then retire(_session) end
 	_scheduled = nil
 	drop_held()
@@ -689,140 +685,19 @@ local function scope_ready()
 		and _scheduled == nil and _session == nil and _folded == 0
 end
 
---- Reads only the declared error state this module owns; no persistence occurs here.
-local function scope_state()
-	return { module = package.loaded["ui.error_dialog"], enabled = _enabled, busy = _busy, scheduled = _scheduled,
-		folded = _folded, session = _session }
-end
-
-local function scope_equal(left, right)
-	return rawequal(left.module, right.module) and left.enabled == right.enabled and left.busy == right.busy and left.scheduled == right.scheduled and left.folded == right.folded and left.session == right.session
-end
-
---- Acquires the declared runtime field for one primary transaction token.
---- @param owner table Exact token; pending() describes primary compensation only.
---- @return boolean acquired
-local function scope_acquire_impl(owner)
-	if type(owner) ~= "table" or type(owner.pending) ~= "function" or _scope_owner ~= nil
-		or not rawequal(package.loaded["ui.error_dialog"], M) then return false end
-	if not scope_ready() or not rawequal(package.loaded["ui.error_dialog"], M) then return false end
-	_scope_owner = owner
-	return true
-end
-
-function M.scope_acquire(owner)
-	if _scope_busy then return false end
-	_scope_busy = true
-	local called, acquired = pcall(scope_acquire_impl, owner)
-	_scope_busy = false
-	return called and acquired == true
-end
-
---- Releases the admission gate while retaining opaque inverse receipts.
---- @param owner table Exact token.
---- @return boolean released
-function M.scope_release(owner)
-	if _scope_busy or not rawequal(_scope_owner, owner) or owner.pending() ~= false then return false end
-	_scope_owner = nil
-	return true
-end
-
---- Captures an opaque, source-bound runtime inverse under the native claim.
---- @param owner table Exact token.
---- @return table|nil receipt
-local function scope_capture_impl(owner)
-	if not rawequal(_scope_owner, owner) or not rawequal(package.loaded["ui.error_dialog"], M) then return nil end
-	local generation = _scope_generation
-	local receipt, before = {}, scope_state()
-	if not rawequal(_scope_owner, owner) or not rawequal(package.loaded["ui.error_dialog"], M) or _scope_generation ~= generation then return nil end
-	_scope_receipts[receipt] = { owner = owner, before = before, expected = before, generation = _scope_generation }
-	return receipt
-end
-
-function M.scope_capture(owner)
-	if _scope_busy then return nil end
-	_scope_busy = true
-	local called, result = pcall(scope_capture_impl, owner)
-	_scope_busy = false
-	if not called then return nil end
-	return result
-end
-
---- Applies one canonical value after proving the captured runtime still owns it.
---- @param owner table Exact token.
---- @param receipt table Native opaque receipt.
---- @param value boolean Declared error-window preference.
---- @return boolean applied
-local function scope_apply_impl(owner, receipt, value)
-	local data = _scope_receipts[receipt]
-	if not rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or data.forgotten or data.attempted
-		or data.generation ~= _scope_generation or not scope_equal(scope_state(), data.expected)
-		or not rawequal(package.loaded["ui.error_dialog"], M) then return false end
-	if type(value) ~= "boolean" then return false end
-	local next_value = {}
-	for key, child in pairs(data.before) do next_value[key] = child end
-	next_value.enabled = value
-	_scope_generation = _scope_generation + 1
-	data.generation, data.expected, data.attempted = _scope_generation, next_value, true
-	local called = pcall(function()
-		_enabled = next_value.enabled
-	end)
-	local observed = scope_state()
-	return called and scope_equal(observed, next_value) and rawequal(_scope_owner, owner)
-		and rawequal(package.loaded["ui.error_dialog"], M) and data.generation == _scope_generation
-end
-
-function M.scope_apply(owner, receipt, value)
-	if _scope_busy then return false end
-	_scope_busy = true
-	local called, result = pcall(scope_apply_impl, owner, receipt, value)
-	_scope_busy = false
-	if not called then return false end
-	return result
-end
-
---- Restores only this receipt's acknowledged or interrupted scalar publication.
---- @param owner table Exact token.
---- @param receipt table Native opaque receipt.
---- @return boolean restored
-local function scope_restore_impl(owner, receipt)
-	local data = _scope_receipts[receipt]
-	if not rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or data.forgotten or data.generation ~= _scope_generation then return false end
-	local current = scope_state()
-	if not rawequal(current.module, M) or not rawequal(package.loaded["ui.error_dialog"], M) or not (rawequal(current.module, data.before.module) and current.busy == data.before.busy and current.scheduled == data.before.scheduled and current.folded == data.before.folded and current.session == data.before.session
-		and (current.enabled == data.before.enabled or current.enabled == data.expected.enabled)) then return false end
-	if not data.attempted or data.restored then return scope_equal(current, data.before) end
-	local called = pcall(function()
-		_enabled = data.before.enabled
-	end)
-	local observed = scope_state()
-	if not called or not scope_equal(observed, data.before) or not rawequal(_scope_owner, owner)
-		or not rawequal(package.loaded["ui.error_dialog"], M) or data.generation ~= _scope_generation then return false end
-	_scope_generation = _scope_generation + 1
-	data.generation, data.expected, data.restored = _scope_generation, data.before, true
-	return true
-end
-
-function M.scope_restore(owner, receipt)
-	if _scope_busy then return false end
-	_scope_busy = true
-	local called, result = pcall(scope_restore_impl, owner, receipt)
-	_scope_busy = false
-	if not called then return false end
-	return result
-end
-
---- Forgets only a finalized inverse, without changing live native state.
---- @param owner table Exact primary token.
---- @param receipt table Native opaque receipt.
---- @return boolean forgotten
-function M.scope_forget(owner, receipt)
-	local data = _scope_receipts[receipt]
-	if _scope_busy or rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or owner.pending() ~= false then return false end
-	if data.forgotten then return true end
-	data.before, data.expected, data.generation = nil, nil, nil
-	data.forgotten = true
-	return true
-end
+_scope.install({
+	-- Reads only the declared error state this module owns; no persistence occurs here.
+	state = function()
+		return { enabled = _enabled, busy = _busy, scheduled = _scheduled, folded = _folded, session = _session }
+	end,
+	stable = { "busy", "scheduled", "folded", "session" },
+	published = { "enabled" },
+	ready = scope_ready,
+	accept = function(value)
+		if type(value) ~= "boolean" then return nil end
+		return { enabled = value }
+	end,
+	publish = function(target) _enabled = target.enabled end,
+})
 
 return M
