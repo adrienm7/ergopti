@@ -39,6 +39,7 @@ global HSE_RepeatEnabled := true
 #Include ..\..\infra\tick_count.ahk
 #Include ..\..\infra\wall_clock.ahk
 #Include ..\..\infra\logger.ahk
+#Include ..\..\infra\hotpath_profiler.ahk
 #Include ..\..\infra\redact.ahk
 #Include ..\..\adapters\crypto.ahk
 #Include ..\..\adapters\file_system.ahk

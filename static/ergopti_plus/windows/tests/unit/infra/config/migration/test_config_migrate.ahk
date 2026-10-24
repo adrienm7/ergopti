@@ -699,3 +699,57 @@ Test("config migrate: a current semantic snapshot consumes root settings without
 	_CMG_SemanticCurrentSourceConsumesRootSettings)
 Test("config migrate: semantic readers cannot clear invalid/newer stamp write refusal (config-semantic-snapshot)",
 	_CMG_SemanticInvalidStampsStayReadOnly)
+
+
+
+
+
+; ===========================================================
+; ===========================================================
+; ======= Registry cross-check by source content hash =======
+; ===========================================================
+; ===========================================================
+
+_CMG_RegistryHashCrossCheck() {
+	Counts := _PerfCountersOwner().Counts
+	Dir := A_Temp . "\ergopti_registry_hash_" . A_TickCount
+	Path := Dir . "\migrations.toml"
+	Shipped := FSReadUtf8Exact(ConfigMigrateRegistryPath())
+	try {
+		DirCreate(Dir)
+		AssertTrue(FSWriteDurable(Path, Shipped))
+		; An authoritative load of this exact text records the pristine registry.
+		Live := ConfigRegistryCacheLoad(Path, Dir . "\cache.bin", "0123456789012345678901234567890123456789012345678901234567890123")
+		Matches := Counts.Get("config_migrate.registry_source_hash_match", 0)
+		Parsed := Counts.Get("config_migrate.registry_source_parsed", 0)
+		Fresh := ConfigMigrateLoadRegistry(Path)
+		AssertEqual(Matches + 1, Counts.Get("config_migrate.registry_source_hash_match", 0),
+			"unchanged content is matched by hash instead of parsed")
+		AssertEqual(Parsed, Counts.Get("config_migrate.registry_source_parsed", 0))
+		Assert(Fresh != Live, "the cross-check copy is independent of the live registry")
+		Assert(ConfigMigrateSameValue(Fresh, Live),
+			"and equal to it")
+		Fresh["steps"].Push(Map())
+		Assert(ConfigMigrateSameValue(ConfigMigrateLoadRegistry(Path)["steps"], Live["steps"]),
+			"mutating a returned copy cannot change the next cross-check")
+		; Live registry mutated after load: the cross-check copy still exposes the difference.
+		Live["steps"].Push(Map())
+		Assert(!ConfigMigrateSameValue(ConfigMigrateLoadRegistry(Path)["steps"], Live["steps"]),
+			"a registry mutated after load is still caught by comparing with the pristine copy")
+		Live["steps"].Pop()
+		; Changed content is parsed again, never matched.
+		AssertTrue(FSWriteDurable(Path, Shipped . "`n# trailing comment`n"))
+		Before := Counts.Get("config_migrate.registry_source_parsed", 0)
+		ConfigMigrateLoadRegistry(Path)
+		AssertEqual(Before + 1, Counts.Get("config_migrate.registry_source_parsed", 0),
+			"changed content is parsed and validated")
+		; Invalid content is refused.
+		AssertTrue(FSWriteDurable(Path, "[[steps"))
+		AssertThrows(() => ConfigMigrateLoadRegistry(Path), "invalid migrations.toml is refused")
+		; Removed content is refused although its text was validated before.
+		FileDelete(Path)
+		AssertThrows(() => ConfigMigrateLoadRegistry(Path), "a removed migrations.toml is refused")
+	} finally try DirDelete(Dir, true)
+}
+Test("config migrate: the registry cross-check matches by content hash and still refuses changed, invalid or removed sources (config-registry-hash)",
+	_CMG_RegistryHashCrossCheck)

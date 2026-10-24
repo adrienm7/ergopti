@@ -139,6 +139,13 @@ class MenuPopulation {
 			if OwnBusy
 				Entry.Busy := false
 			Critical(PreviousCritical)
+			; Per-list totals ride the interval counter record: how often each submenu was
+			; opened or prewarmed and what that cost, by manifest list id (a closed set).
+			if IsSet(Entry) {
+				PerfCount((Reason == "background" ? "menu.leaf_background_us." : "menu.leaf_open_us.") . Entry.ListId,
+					PerfElapsedUs(StartedAt))
+				PerfCount((Reason == "background" ? "menu.leaf_background_runs." : "menu.leaf_open_runs.") . Entry.ListId)
+			}
 			HotPath_LogIfSlow("Menu.populate_leaf", StartedAt,
 				Format("{1}; list={2}; rows={3}; remaining={4}",
 					Reason, IsSet(Entry) ? Entry.ListId : "unowned", Appended, Remaining))

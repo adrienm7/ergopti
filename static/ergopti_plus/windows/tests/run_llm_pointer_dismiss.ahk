@@ -20,6 +20,7 @@ SetWorkingDir(A_ScriptDir)
 ; ==============================================================================
 
 #Include test_framework.ahk
+#Include ../infra/hotpath_profiler.ahk
 
 ; --- Mutable tooltip state the stubs report ---
 global _MMP_Visible  := false

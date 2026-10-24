@@ -263,6 +263,16 @@ ConfigMigrateLoadRegistry(Path) {
 	Source := FSReadUtf8Exact(Path)
 	if !(Source is String)
 		throw Error("the registry '" . Path . "' could not be read")
+	; The shipped registry was validated from source text with a known SHA-256. The same
+	; text needs no second 38 KB parse (about 0.5 s per boot): an independent copy of that
+	; validated registry is exactly what parsing it would give. Any other content, a
+	; changed or invalid file, is parsed and validated as before; a removed file threw above.
+	Held := ConfigRegistryPristineFor(Path, CryptoSha256(Source))
+	if Held is Map {
+		PerfCount("config_migrate.registry_source_hash_match")
+		return Held
+	}
+	PerfCount("config_migrate.registry_source_parsed")
 	return ConfigMigrateValidateRegistry(_ConfigMigrateParse(Source, "the registry '" . Path . "'"))
 }
 
@@ -1347,22 +1357,32 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 		try Destinations[Key] := Row
 		finally Critical(PreviousCritical)
 		try {
-			FreshRegistry := Native.load_registry.Call(Native.registry_path.Call())
+			; The live registry loads first: that load records the pristine copy the
+			; cross-check below is matched against by source content hash.
 			Row.registry := Native.registry.Call()
+			StageTicks := PerfStage_Begin()
+			FreshRegistry := Native.load_registry.Call(Native.registry_path.Call())
+			PerfStage_End("ConfigMigrate.row_load_registry", StageTicks)
+			StageTicks := PerfStage_Begin()
 			if !SameRegistry(FreshRegistry, Row.registry)
 				throw Error("The default registry differs from its native source")
 			; Rows built from the same registry source share one private shadow,
 			; so a proof scope compares the live registry with it only once.
 			if !(SharedShadow is Map) || !SameRegistry(FreshRegistry, SharedShadow)
 				SharedShadow := Native.clone.Call(FreshRegistry)
+			PerfStage_End("ConfigMigrate.row_compare_and_shadow", StageTicks)
 			Row.registry_shadow := SharedShadow
 			if !RegistryLive(Row)
 				throw Error("The default registry does not match its native source")
+			StageTicks := PerfStage_Begin()
 			Image := ReadImage()
+			PerfStage_End("ConfigMigrate.row_read_image", StageTicks)
 			if !(Image is Object)
 				throw Error("The exact configuration source could not be classified")
 			Row.image := Image
+			StageTicks := PerfStage_Begin()
 			Row.classification := ClassifyImage(Image, Row)
+			PerfStage_End("ConfigMigrate.row_classify_image", StageTicks)
 			if Row.classification == "failed"
 				throw Error("The canonical configuration source could not be classified")
 			Row.phase := "prepared"
@@ -1618,7 +1638,11 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			&& (Present is Integer) && Present == ExpectedNoopPresent
 	}
 	if Request == "check_write"
-		return RegistryLive(Row, true) && OwnerLive() && TOML_WriteRefusal(FilePath) == ""
+		; The scope opened above holds Critical and the first check of this request already
+		; compared the live registry with its private shadow; nothing between that comparison
+		; and here runs foreign code (a native read, a parse, a lookup), so the memoised proof
+		; stands. A fresh second comparison here doubled the 21 ms cost of every admission.
+		return RegistryLive(Row) && OwnerLive() && TOML_WriteRefusal(FilePath) == ""
 	if !IsSet(Candidate)
 		return false
 	if IsSet(Candidate) {
