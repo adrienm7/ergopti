@@ -679,7 +679,8 @@ user_quit_deadline_ms = 12000
 [logger]
 
 # Days of rolled log files kept before purging.
-# AHK: logger.ahk LOGGER_RETENTION_DAYS. HS: logger.lua max_age_days default
+# AHK: read at boot by logger.ahk LoggerLoadTimings into LOGGER_RETENTION_DAYS.
+# Linux: read by logger_sink.lua. HS: logger.lua max_age_days default
 # (declared twice — purge_old_logs and the rolled-dir purge).
 retention_days = 14
 

@@ -103,12 +103,14 @@ global ConfigurationFile := _ConfigDir . _AhkSubDir . "config.toml"
 ; source shared with Hammerspoon. Must precede HotstringsConfigInit and the tray
 ; menu build (initMenu reads GLOBAL_DEFAULT_DELAY). Fail-fast on a missing key.
 HotstringsConfigLoadSharedDefaults()
-; Load the shared timing registry, then reassign the keystats-walker and
-; tap-hold timing constants from it (_shared/modules/timings/constants.toml). AHK v2 runs
+; Load the shared timing registry, then reassign the logger retention, the
+; keystats-walker and tap-hold timing constants from it
+; (_shared/modules/timings/constants.toml). AHK v2 runs
 ; static/global initializers before this auto-execute body, so these constants
-; start at a sentinel and are sourced here — well before the keystats hook or
-; any tap-hold hotkey arms. Fail-fast on a missing key.
+; start at a sentinel and are sourced here — well before LoggerInit purges, the
+; keystats hook or any tap-hold hotkey arms. Fail-fast on a missing key.
 TimingsLoadShared()
+LoggerLoadTimings()
 KeystatsWalkerLoadTimings()
 TapHoldsLoadTimings()
 ; Native scalar EndChars takes a measured ~30 ms to build cold. Warm the pure
