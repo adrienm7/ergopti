@@ -207,13 +207,28 @@ for (const retired of RETIRED_IDS) {
 
 // macOS names the encryption toggle differently in its own state, so only the
 // three filters are asserted here — they are the ones that decide whether a
-// keystroke is recorded at all.
+// keystroke is recorded at all. The driver names each key through the generated
+// constant table, so the constant must be the one that table maps to the key.
+const configKeys = fs.readFileSync(
+	path.join(ROOT, 'static/ergopti_plus/_shared/lua/config_keys.lua'),
+	'utf8'
+);
+const keyConstantsBound =
+	hsKeystats !== null &&
+	/^local ConfigKeys = require\("config_keys"\)$/m.test(hsKeystats) &&
+	/^local KEY, LEAF = ConfigKeys\.KEY, ConfigKeys\.LEAF$/m.test(hsKeystats);
 for (const id of [
 	'private_filter_enabled',
 	'secure_filter_enabled',
 	'system_auth_filter_enabled'
 ]) {
-	if (hsKeystats && !hsKeystats.includes(`Manifest.default_for("metrics.${id}")`)) {
+	const constant = 'METRICS_' + id.toUpperCase();
+	const resolvesLiteral = hsKeystats?.includes(`Manifest.default_for("metrics.${id}")`);
+	const resolvesConstant =
+		keyConstantsBound &&
+		configKeys.includes(`\t${constant} = "metrics.${id}",\n`) &&
+		hsKeystats.includes(`Manifest.default_for(KEY.${constant})`);
+	if (hsKeystats && !resolvesLiteral && !resolvesConstant) {
 		errors.push(
 			`macos/modules/keystats/init.lua does not resolve metrics.${id} from the manifest — ` +
 				'the two drivers are back to two independent privacy defaults'
