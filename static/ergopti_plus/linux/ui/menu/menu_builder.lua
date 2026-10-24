@@ -3099,7 +3099,7 @@ local function _build_llm(ctx)
 		for _, model in ipairs(models) do
 			-- Each installed model opens the submenu the other two drivers draw:
 			-- Select, then Delete. The parent keeps the tick of the selected one.
-			local items = ManifestMenu.template_rows("llm_model_action_rows", {
+			local action_rows = ManifestMenu.template_rows("llm_model_action_rows", {
 				["model_select"] = function()
 					if llm.set_model then llm.set_model(model) end
 					changed()
@@ -3112,7 +3112,7 @@ local function _build_llm(ctx)
 				["model_delete_present"] = function() return true end,
 				["model_download_present"] = function() return false end,
 			}, {})
-			if type(items) ~= "table" then
+			if type(action_rows) ~= "table" then
 				Logger.error(LOG, "The model action rows were refused — the model list cannot be drawn.")
 				return {}
 			end
@@ -3122,7 +3122,7 @@ local function _build_llm(ctx)
 				-- mark, and the glued form puts one platform's convention inside a
 				-- string twenty other languages also read.
 				checked = model == current,
-				items = items,
+				items = action_rows,
 			}
 		end
 		if #rows > 0 then
