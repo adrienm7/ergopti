@@ -276,6 +276,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-tooltip-timing-single-source.cjs"],
 			"repro": "npm run test:tooltip-timing-single-source"
+		},
+		{
+			"id": "js-0457",
+			"ordinal": 474,
+			"name": "hex colour census counts literals, not comments, issue numbers or entities",
+			"cmd": "node",
+			"args": ["tools/test/test-hex-colours.cjs"],
+			"repro": "npm run test:hex-colours"
 		}
 	]
 }
