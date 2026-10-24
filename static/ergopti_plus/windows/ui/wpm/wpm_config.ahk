@@ -107,6 +107,10 @@ WPMWidget_LoadSharedConst() {
 				Missing.Push("[neutral_sources]")
 		WPMWidgetConst.NEUTRAL := Neutral
 
+		; [position]
+		WPMWidgetConst.STORE_X := _WPMWidget_Need(wpm_c, "position", "storage_x", Missing)
+		WPMWidgetConst.STORE_Y := _WPMWidget_Need(wpm_c, "position", "storage_y", Missing)
+
 		; [transparency]
 		WPMWidgetConst.ALPHA_ACTIVE := Integer(_WPMWidget_Need(wpm_c, "transparency", "alpha_active", Missing))
 		WPMWidgetConst.ALPHA_IDLE   := Integer(_WPMWidget_Need(wpm_c, "transparency", "alpha_idle", Missing))
@@ -163,14 +167,20 @@ _WPMWidget_CurrentWorkAreas() {
 	return Areas
 }
 
-WPMWidget_LoadConfig(Cache, WorkAreas := unset) {
+; The saved position is read from the Storage port, never from config.toml:
+; it is where the user left the widget, not a preference. StoreFn(Key) is
+; injectable for tests and returns "_" for an absent key.
+_WPMWidget_StoreGet(Key) => ST_Get(Key, "_")
+
+WPMWidget_LoadConfig(Cache, WorkAreas := unset, StoreFn := 0) {
 		if !WPMWidget_LoadSharedConst() {
 				WPMWidget.visible := false
 				return
 		}
 		raw_vis    := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_VISIBLE)
-		raw_x      := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_X)
-		raw_y      := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_Y)
+		Store      := HasMethod(StoreFn, "Call") ? StoreFn : _WPMWidget_StoreGet
+		raw_x      := Store.Call(WPMWidgetConst.STORE_X)
+		raw_y      := Store.Call(WPMWidgetConst.STORE_Y)
 		raw_colors := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_COLORS)
 		raw_graph  := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_GRAPH)
 		Visible := _WPMWidget_ConfigBoolean(raw_vis, WPMWidgetConst.CFG_VISIBLE)
@@ -225,16 +235,9 @@ _WPMWidget_PublishVisibleCandidate(TargetVisible) {
 	WPMWidget.visible := TargetVisible
 }
 
-_WPMWidget_PublishPositionCandidate(TargetX, TargetY) {
-	WPMWidget.pos_x := TargetX
-	WPMWidget.pos_y := TargetY
-}
-
-_WPMWidget_PublishDisplayCandidate(TargetColors, TargetGraph, TargetX, TargetY) {
+_WPMWidget_PublishDisplayCandidate(TargetColors, TargetGraph) {
 	WPMWidget.use_colors := TargetColors
 	WPMWidget.show_graph := TargetGraph
-	WPMWidget.pos_x := TargetX
-	WPMWidget.pos_y := TargetY
 }
 
 _WPMWidget_BuildVisibleCandidate(HasVisible, Visible) {
@@ -286,37 +289,42 @@ WPMWidget_Toggle(WriterFn := 0, NotifyFn := 0, ShowFn := 0, HideFn := 0) {
 	return true
 }
 
-_WPMWidget_BuildPositionCandidate(HasX, X, HasY, Y) {
-	TargetX := HasX ? X : WPMWidget.pos_x
-	TargetY := HasY ? Y : WPMWidget.pos_y
-	PublishFn := _WPMWidget_PublishPositionCandidate.Bind(TargetX, TargetY)
-	return { updates: [
-		{ Section: "metrics", Key: WPMWidgetConst.CFG_X, Value: TargetX },
-		{ Section: "metrics", Key: WPMWidgetConst.CFG_Y, Value: TargetY },
-	], publish: PublishFn }
+_WPMWidget_StoreSet(Key, Value) => ST_Set(Key, Value)
+
+; Stores both coordinates through the Storage port and publishes them only when
+; both writes are acknowledged. A refused second write puts the first back, so
+; a half-written pair never reaches the next boot. StoreFn(Key, Value) is
+; injectable for tests.
+_WPMWidget_StorePosition(TargetX, TargetY, StoreFn := 0, NotifyFn := 0) {
+	Store := HasMethod(StoreFn, "Call") ? StoreFn : _WPMWidget_StoreSet
+	PreviousX := WPMWidget.pos_x
+	PreviousY := WPMWidget.pos_y
+	Stored := false
+	try Stored := (Store.Call(WPMWidgetConst.STORE_X, TargetX) == true)
+		&& (Store.Call(WPMWidgetConst.STORE_Y, TargetY) == true)
+	if !Stored {
+		try Store.Call(WPMWidgetConst.STORE_X, PreviousX)
+		try Store.Call(WPMWidgetConst.STORE_Y, PreviousY)
+		return ConfigReportPersistenceFailure("widget position", NotifyFn,
+			"the position store refused the write")
+	}
+	WPMWidget.pos_x := TargetX
+	WPMWidget.pos_y := TargetY
+	return true
 }
 
-WPMWidget_SavePosition(X := unset, Y := unset, WriterFn := 0, NotifyFn := 0) {
-	HasX := IsSet(X)
-	HasY := IsSet(Y)
-	XValue := 0
-	YValue := 0
-	if HasX
-		XValue := X
-	if HasY
-		YValue := Y
-	BuildFn := _WPMWidget_BuildPositionCandidate.Bind(HasX, XValue,
-		HasY, YValue)
-	return _WPMWidget_SaveBuilt(BuildFn, "widget position", WriterFn, NotifyFn)
+WPMWidget_SavePosition(X := unset, Y := unset, StoreFn := 0, NotifyFn := 0) {
+	return _WPMWidget_StorePosition(IsSet(X) ? X : WPMWidget.pos_x,
+		IsSet(Y) ? Y : WPMWidget.pos_y, StoreFn, NotifyFn)
 }
 
-; Resets the widget to its default bottom-right position and saves it to config.
-WPMWidget_ResetPosition(WriterFn := 0, NotifyFn := 0, DefaultPosFn := 0,
+; Resets the widget to its default bottom-right position and stores it.
+WPMWidget_ResetPosition(StoreFn := 0, NotifyFn := 0, DefaultPosFn := 0,
 		ShowPosFn := 0, MoveFn := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return WPMWidget_ResetPosition(WriterFn, NotifyFn, DefaultPosFn,
+		try return WPMWidget_ResetPosition(StoreFn, NotifyFn, DefaultPosFn,
 			ShowPosFn, MoveFn)
 		finally Critical(InheritedCritical)
 	}
@@ -326,7 +334,7 @@ WPMWidget_ResetPosition(WriterFn := 0, NotifyFn := 0, DefaultPosFn := 0,
 		def_y := DefaultPos.y
 	} else
 		WPMWidget_DefaultPos(&def_x, &def_y)
-	if !WPMWidget_SavePosition(def_x, def_y, WriterFn, NotifyFn)
+	if !WPMWidget_SavePosition(def_x, def_y, StoreFn, NotifyFn)
 		return false
 	if WPMWidget.visible {
 		if HasMethod(ShowPosFn, "Call") {
@@ -348,60 +356,51 @@ WPMWidget_ResetPosition(WriterFn := 0, NotifyFn := 0, DefaultPosFn := 0,
 	return true
 }
 
-_WPMWidget_BuildDisplayCandidate(HasColors, Colors, HasGraph, Graph, HasX, X,
-		HasY, Y) {
+_WPMWidget_BuildDisplayCandidate(HasColors, Colors, HasGraph, Graph) {
 	TargetColors := HasColors ? !!Colors : WPMWidget.use_colors
 	TargetGraph := HasGraph ? !!Graph : WPMWidget.show_graph
-	TargetX := HasX ? X : WPMWidget.pos_x
-	TargetY := HasY ? Y : WPMWidget.pos_y
 	PublishFn := _WPMWidget_PublishDisplayCandidate.Bind(TargetColors,
-		TargetGraph, TargetX, TargetY)
+		TargetGraph)
 	return { updates: [
 		{ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS, Value: TargetColors },
 		{ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH, Value: TargetGraph },
-		{ Section: "metrics", Key: WPMWidgetConst.CFG_X,      Value: TargetX },
-		{ Section: "metrics", Key: WPMWidgetConst.CFG_Y,      Value: TargetY },
 	], publish: PublishFn }
+}
+
+; Saves the two display preferences. A graph change also moves the saved anchor
+; (a new position, or -1 for the default), stored first and put back when the
+; configuration refuses, so the pair of stores never disagree with config.toml.
+WPMWidget_SaveConfig(Colors := unset, Graph := unset, X := unset, Y := unset,
+		WriterFn := 0, NotifyFn := 0, StoreFn := 0) {
+	HasColors := IsSet(Colors)
+	HasGraph := IsSet(Graph)
+	PreviousX := WPMWidget.pos_x
+	PreviousY := WPMWidget.pos_y
+	Moves := IsSet(X) || IsSet(Y)
+	if Moves && !_WPMWidget_StorePosition(IsSet(X) ? X : PreviousX,
+			IsSet(Y) ? Y : PreviousY, StoreFn, NotifyFn)
+		return false
+	BuildFn := _WPMWidget_BuildDisplayCandidate.Bind(
+		HasColors, HasColors ? Colors : false,
+		HasGraph, HasGraph ? Graph : false)
+	if _WPMWidget_SaveBuilt(BuildFn, "widget display settings", WriterFn, NotifyFn)
+		return true
+	if Moves
+		_WPMWidget_StorePosition(PreviousX, PreviousY, StoreFn, (*) => 0)
+	return false
 }
 
 _WPMWidget_BuildDisplayToggleCandidate(Field) {
 	switch Field {
 	case "colors":
 		return _WPMWidget_BuildDisplayCandidate(true,
-			!WPMWidget.use_colors, false, false, false, 0, false, 0)
+			!WPMWidget.use_colors, false, false)
 	case "graph":
 		return _WPMWidget_BuildDisplayCandidate(false, false,
-			true, !WPMWidget.show_graph, true, -1, true, -1)
+			true, !WPMWidget.show_graph)
 	default:
 		throw ValueError("Unknown WPM display toggle field: " . Field)
 	}
-}
-
-WPMWidget_SaveConfig(Colors := unset, Graph := unset, X := unset, Y := unset,
-		WriterFn := 0, NotifyFn := 0) {
-	HasColors := IsSet(Colors)
-	HasGraph := IsSet(Graph)
-	HasX := IsSet(X)
-	HasY := IsSet(Y)
-	ColorsValue := false
-	GraphValue := false
-	XValue := 0
-	YValue := 0
-	if HasColors
-		ColorsValue := Colors
-	if HasGraph
-		GraphValue := Graph
-	if HasX
-		XValue := X
-	if HasY
-		YValue := Y
-	BuildFn := _WPMWidget_BuildDisplayCandidate.Bind(
-		HasColors, ColorsValue,
-		HasGraph, GraphValue,
-		HasX, XValue,
-		HasY, YValue)
-	return _WPMWidget_SaveBuilt(BuildFn, "widget display settings",
-		WriterFn, NotifyFn)
 }
 
 WPMWidget_ToggleColorsConfig(WriterFn := 0, NotifyFn := 0) {
@@ -410,8 +409,17 @@ WPMWidget_ToggleColorsConfig(WriterFn := 0, NotifyFn := 0) {
 		WriterFn, NotifyFn)
 }
 
-WPMWidget_ToggleGraphConfig(WriterFn := 0, NotifyFn := 0) {
+; The graph mode has another footprint, so the saved anchor goes back to the
+; default (-1) with it. The anchor is stored first and put back when the
+; configuration refuses.
+WPMWidget_ToggleGraphConfig(WriterFn := 0, NotifyFn := 0, StoreFn := 0) {
+	PreviousX := WPMWidget.pos_x
+	PreviousY := WPMWidget.pos_y
+	if !_WPMWidget_StorePosition(-1, -1, StoreFn, NotifyFn)
+		return false
 	BuildFn := _WPMWidget_BuildDisplayToggleCandidate.Bind("graph")
-	return _WPMWidget_SaveBuilt(BuildFn, "widget display settings",
-		WriterFn, NotifyFn)
+	if _WPMWidget_SaveBuilt(BuildFn, "widget display settings", WriterFn, NotifyFn)
+		return true
+	_WPMWidget_StorePosition(PreviousX, PreviousY, StoreFn, (*) => 0)
+	return false
 }

@@ -89,10 +89,12 @@ class WPMWidgetConst {
     ; window-allocation cost is not absorbed by a tooltip render when the widget
     ; first appears (it showed up as a ~110 ms Tooltip.Present blip).
     static PREWARM_DELAY_MS := 900
+    ; Storage keys of the saved position, from the shared canon ([position]
+    ; storage_x / storage_y): the same two keys the other drivers use.
+    static STORE_X            := ""
+    static STORE_Y            := ""
     ; Config key names written to config.toml under [metrics].
     static CFG_VISIBLE        := "wpm_widget_visible"
-    static CFG_X              := "wpm_widget_x"
-    static CFG_Y              := "wpm_widget_y"
     static CFG_COLORS         := "wpm_widget_colors"
     static CFG_GRAPH          := "wpm_widget_graph"
     ; Ring buffer capacity for recent keystrokes.

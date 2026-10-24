@@ -24,12 +24,17 @@ _CTP_WidgetRoundtrip() {
 	OldPath := ConfigurationFile
 	OldWidget := [WPMWidget.visible, WPMWidget.use_colors, WPMWidget.show_graph,
 		WPMWidget.pos_x, WPMWidget.pos_y]
+	OldStore := [WPMWidgetConst.STORE_X, WPMWidgetConst.STORE_Y]
 	Path := _CTU_NewPath()
 	try {
+		WPMWidgetConst.STORE_X := "test.pos_x"
+		WPMWidgetConst.STORE_Y := "test.pos_y"
 		ConfigurationFile := Path
 		ConfigMigrateBoot(Path)
 		AssertTrue(WPMWidget_SaveVisible(true, 0, (*) => 0))
-		AssertTrue(WPMWidget_SaveConfig(true, false, 1, 0, 0, (*) => 0))
+		Stored := Map()
+		AssertTrue(WPMWidget_SaveConfig(true, false, 1, 0, 0, (*) => 0,
+			(Key, Value) => (Stored[Key] := Value) is Integer))
 		Target := ManifestBuildFeaturesMap()
 		Target["metrics"][WPMWidgetConst.CFG_VISIBLE] := false
 		Target["metrics"][WPMWidgetConst.CFG_COLORS] := false
@@ -39,12 +44,14 @@ _CTP_WidgetRoundtrip() {
 		AssertEqual(true, Target["metrics"][WPMWidgetConst.CFG_COLORS])
 		AssertEqual(false, Target["metrics"][WPMWidgetConst.CFG_GRAPH])
 		Parsed := TOML_ParseFreshFile(Path)["metrics"]
-		AssertTrue(Parsed[WPMWidgetConst.CFG_X] is Integer)
-		AssertTrue(Parsed[WPMWidgetConst.CFG_Y] is Integer)
-		AssertEqual(1, Parsed[WPMWidgetConst.CFG_X])
-		AssertEqual(0, Parsed[WPMWidgetConst.CFG_Y])
+		AssertFalse(Parsed.Has("wpm_widget_x"), "the anchor is not a configuration leaf")
+		AssertFalse(Parsed.Has("wpm_widget_y"), "the anchor is not a configuration leaf")
+		AssertEqual(1, Stored[WPMWidgetConst.STORE_X])
+		AssertEqual(0, Stored[WPMWidgetConst.STORE_Y])
 	} finally {
 		ConfigurationFile := OldPath
+		WPMWidgetConst.STORE_X := OldStore[1]
+		WPMWidgetConst.STORE_Y := OldStore[2]
 		WPMWidget.visible := OldWidget[1]
 		WPMWidget.use_colors := OldWidget[2]
 		WPMWidget.show_graph := OldWidget[3]

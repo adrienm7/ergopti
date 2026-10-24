@@ -70,6 +70,22 @@ helpers.describe("wpm readouts: the shared canon", function()
 		helpers.assert_nil((Model.validate(broken)))
 	end)
 
+	helpers.it("names the Storage keys of the saved place, the same on every driver", function()
+		local loaded = canon()
+		helpers.assert_eq(loaded.position.storage_x, "wpm_widget.pos_x")
+		helpers.assert_eq(loaded.position.storage_y, "wpm_widget.pos_y")
+		for _, key in ipairs({ "storage_x", "storage_y" }) do
+			local broken = canon()
+			broken.position[key] = nil
+			local refused, err = Model.validate(broken)
+			helpers.assert_nil(refused)
+			helpers.assert_true(err:find(key, 1, true) ~= nil, err)
+		end
+		local missing = canon()
+		missing.position = nil
+		helpers.assert_nil((Model.validate(missing)))
+	end)
+
 end)
 
 

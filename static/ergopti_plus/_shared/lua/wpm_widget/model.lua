@@ -60,6 +60,11 @@ local REQUIRED = {
 	neutral_sources = { none = "boolean", manual = "boolean" },
 }
 
+-- Strings that are names, not colours: the Storage keys of the saved position.
+local REQUIRED_NAMES = {
+	position = { storage_x = true, storage_y = true },
+}
+
 --- Checks a decoded canon.
 --- @param canon table|nil
 --- @return table|nil canon, string|nil error
@@ -75,6 +80,15 @@ function M.validate(canon)
 			-- Every string the canon holds is a colour.
 			if kind == "string" and not value:match("^#%x%x%x%x%x%x$") then
 				return nil, string.format("[%s].%s is not a #RRGGBB colour", section, key)
+			end
+		end
+	end
+	for section, keys in pairs(REQUIRED_NAMES) do
+		if type(canon[section]) ~= "table" then return nil, "missing [" .. section .. "]" end
+		for key in pairs(keys) do
+			local value = canon[section][key]
+			if type(value) ~= "string" or value == "" then
+				return nil, string.format("[%s].%s must be a non-empty string", section, key)
 			end
 		end
 	end

@@ -167,15 +167,16 @@ local _canvas_geom = { canvas_width = 0, canvas_height = 0, compact_w = 0, compa
 
 -- Saved position: top-left of the compact mode widget; nil = recalculate default.
 -- Persisted across sessions via hs.settings so drag survives a Hammerspoon reload.
-local _SETTINGS_X = "wpm_widget.pos_x"
-local _SETTINGS_Y = "wpm_widget.pos_y"
+-- The two keys come from the shared canon ([position]), the same on every driver.
+local _SETTINGS_X = CONFIG.canon and CONFIG.canon.position.storage_x
+local _SETTINGS_Y = CONFIG.canon and CONFIG.canon.position.storage_y
 -- Coerce with tonumber: a corrupt / hand-edited plist can return a STRING here,
 -- which is only guarded by `if not _pos_x` downstream (a non-empty string passes)
 -- and then flows into arithmetic (_pos_x + compact_w …) and hs.canvas geometry,
 -- raising in the timer/layout callback (swallowed to the HS Console). tonumber
 -- yields nil for a non-numeric value so the existing default-recompute fires.
-local _pos_x      = tonumber(Storage.get(_SETTINGS_X))
-local _pos_y      = tonumber(Storage.get(_SETTINGS_Y))
+local _pos_x      = _SETTINGS_X and tonumber(Storage.get(_SETTINGS_X)) or nil
+local _pos_y      = _SETTINGS_Y and tonumber(Storage.get(_SETTINGS_Y)) or nil
 
 -- Drag state.
 local _drag_start_mouse = nil
@@ -334,8 +335,10 @@ update_widget_body = function(generation)
 						_pos_x = f.x
 						_pos_y = f.y
 					end
-					Storage.set(_SETTINGS_X, _pos_x)
-					Storage.set(_SETTINGS_Y, _pos_y)
+					if _SETTINGS_X then
+						Storage.set(_SETTINGS_X, _pos_x)
+						Storage.set(_SETTINGS_Y, _pos_y)
+					end
 				elseif event == "mouseMove" and _drag_start_mouse then
 					local cur = hs.mouse.absolutePosition()
 					local dx  = cur.x - _drag_start_mouse.x
@@ -602,8 +605,10 @@ end
 function M.reset_position()
 	_pos_x = nil
 	_pos_y = nil
-	Storage.delete(_SETTINGS_X)
-	Storage.delete(_SETTINGS_Y)
+	if _SETTINGS_X then
+		Storage.delete(_SETTINGS_X)
+		Storage.delete(_SETTINGS_Y)
+	end
 	Logger.info(LOG, "Widget position reset to default.")
 end
 

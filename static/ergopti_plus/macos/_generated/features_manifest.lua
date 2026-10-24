@@ -974,12 +974,6 @@ M.unavailable = {
 		path = "llm.trigger.inline_autotype", section = "llm.trigger", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "metrics.wpm_widget_x", section = "metrics", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "metrics.wpm_widget_y", section = "metrics", reason_key = "", platforms = { "ahk" },
-	},
-	{
 		path = "shortcuts.get_hex_value", section = "shortcuts", reason_key = "", platforms = { "ahk" },
 	},
 	{

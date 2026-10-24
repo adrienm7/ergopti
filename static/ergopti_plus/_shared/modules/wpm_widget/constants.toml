@@ -160,9 +160,24 @@ text_idle = "#555577"
 fallback_accent = "#007aff"
 
 
+# =================================
+# =================================
+# ======= 5/ Saved position =======
+# =================================
+# =================================
+
+[position]
+
+# Where the user left the pill is not a preference: every driver keeps it in its
+# Storage port (registry on Windows, settings on macOS, a file on Linux) under
+# these two keys, never in config.toml.
+storage_x = "wpm_widget.pos_x"
+storage_y = "wpm_widget.pos_y"
+
+
 # ==================================
 # ==================================
-# ======= 5/ Neutral sources =======
+# ======= 6/ Neutral sources =======
 # ==================================
 # ==================================
 
@@ -180,7 +195,7 @@ rolls = true
 
 # ===============================
 # ===============================
-# ======= 6/ Transparency =======
+# ======= 7/ Transparency =======
 # ===============================
 # ===============================
 

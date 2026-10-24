@@ -692,12 +692,6 @@ M.unavailable = {
 		path = "llm.navigation.arrow_nav_enabled", section = "llm.navigation", reason_key = "", platforms = { "hs" },
 	},
 	{
-		path = "metrics.wpm_widget_x", section = "metrics", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "metrics.wpm_widget_y", section = "metrics", reason_key = "", platforms = { "ahk" },
-	},
-	{
 		path = "shortcuts.get_hex_value", section = "shortcuts", reason_key = "", platforms = { "ahk" },
 	},
 	{
