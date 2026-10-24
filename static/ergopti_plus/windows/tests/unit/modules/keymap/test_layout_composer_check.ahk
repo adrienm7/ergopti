@@ -393,8 +393,28 @@ Test("composer check: the window shows the report text (composer-check)", _LCC_W
 
 _LCC_CopyReport() {
 	Written := [], Notices := []
-	ComposerCheck_CopyReport("the`nreport", (Value) => Written.Push(Value), (Notice) => Notices.Push(Notice))
+	Copied := ComposerCheck_CopyReport("the`nreport", (Value) => (Written.Push(Value), true), (Notice) => Notices.Push(Notice))
+	AssertTrue(Copied, "a written report is reported as copied")
 	AssertEqual("the`r`nreport", _LCC_Join(Written), "the clipboard gets the text the window shows, with Windows line breaks")
 	AssertEqual(t("field_check.copied"), _LCC_Join(Notices), "and the user is told")
 }
 Test("composer check: Copy report writes the report and says so (composer-check)", _LCC_CopyReport)
+
+; A refused clipboard write must not be announced as a copy.
+_LCC_CopyReportRefused() {
+	Notices := []
+	Copied := ComposerCheck_CopyReport("the`nreport", (Value) => false, (Notice) => Notices.Push(Notice))
+	AssertFalse(Copied, "a refused write is not a copy")
+	AssertEqual(0, Notices.Length, "the user is not told the report was copied")
+}
+Test("composer check: a refused clipboard write announces no copy (composer-check)", _LCC_CopyReportRefused)
+
+; The default writer is the clipboard owner, so the metrics clipboard watcher
+; does not record the report as a copy the user made.
+_LCC_CopyReportOwnsTheClipboard() {
+	Body := _DriverFuncBody("ComposerCheck_CopyReport")
+	Code := _DriverMaskNonCode(&Body)
+	Assert(RegExMatch(Code, "WriteFn\s*:=\s*CB_Write\b"), "the default writer must be CB_Write")
+	AssertFalse(RegExMatch(Code, "A_Clipboard\s*:="), "no raw clipboard assignment")
+}
+Test("composer check: Copy report writes through the clipboard owner (composer-check)", _LCC_CopyReportOwnsTheClipboard)
