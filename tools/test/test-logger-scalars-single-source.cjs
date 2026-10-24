@@ -39,6 +39,17 @@
  * live). A driver quietly keeping 200 lines while another keeps 500 produces
  * crash reports that cannot be compared.
  *
+ * CLOSED LOG VOCABULARY:
+ * The same gate holds the logger's other shared contract, its words. Every
+ * `reason`, `phase`, `[TAG]` and evidence-record field a driver writes must be
+ * a member of the closed enums in _shared/core/ports/contracts.json (projected
+ * from _shared/modules/logger/vocabulary.json). An unknown value fails: a reason
+ * spelt `save_failure` on one driver and `save_failed` on another is two
+ * diagnoses of one event, and a log reader filtering for one never sees the
+ * other. Prose and runtime-built values cannot be enum members; their count per
+ * file is held to tools/lint/log-vocabulary-free-form-baseline.json, which may
+ * only go down (`--shrink` writes a lower count back).
+ *
  * NOTE — duplication is still duplication:
  * These constants are not yet READ from the registry at runtime; the drivers
  * declare their own. That is tolerable only because this gate locks them to the
@@ -52,6 +63,8 @@
 const fs = require('fs');
 const path = require('path');
 const toml = require('smol-toml');
+const LogVocabulary = require('../lib/log-vocabulary-scan.cjs');
+const { allOutputs } = require('../build/generators.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -61,6 +74,7 @@ const registry = toml.parse(
 );
 
 const errors = [];
+let vocabularyCount = 0;
 
 if (!registry.logger) {
 	console.error(
@@ -469,6 +483,121 @@ mustNotDeclare(
 	}
 }
 
+// ── Closed log vocabulary: reasons, phases, tags, evidence fields ───────────
+
+const FREE_FORM_BASELINE = path.join(ROOT, 'tools/lint/log-vocabulary-free-form-baseline.json');
+const FREE_FORM_KINDS = ['reason', 'phase'];
+
+/**
+ * The vocabulary violations of a scan: unknown members, and free-form counts
+ * above or below the baseline.
+ * @param {Array<{kind: string, value: string, file: string, line: number, free: boolean}>} hits
+ * @param {Object<string, string[]>} enums
+ * @param {Object<string, Object<string, number>>} baseline
+ * @returns {{unknown: string[], grown: string[], stale: string[], free: Object}}
+ */
+function vocabularyViolations(hits, enums, baseline) {
+	const unknown = [];
+	const free = {};
+	for (const kind of FREE_FORM_KINDS) free[kind] = {};
+	for (const h of hits) {
+		if (h.free) {
+			if (!FREE_FORM_KINDS.includes(h.kind))
+				unknown.push(`${h.file}:${h.line}: free-form ${h.kind} ${JSON.stringify(h.value)}`);
+			else free[h.kind][h.file] = (free[h.kind][h.file] || 0) + 1;
+			continue;
+		}
+		if (!Array.isArray(enums[h.kind]) || !enums[h.kind].includes(h.value))
+			unknown.push(
+				`${h.file}${h.line ? ':' + h.line : ''}: ${h.kind} ${JSON.stringify(h.value)} is not in the closed enum`
+			);
+	}
+	const grown = [];
+	const stale = [];
+	for (const kind of FREE_FORM_KINDS) {
+		const allowed = baseline[kind] || {};
+		for (const [file, n] of Object.entries(free[kind]))
+			if (n > (allowed[file] || 0))
+				grown.push(
+					`${file}: ${n} free-form ${kind} literal(s), baseline allows ${allowed[file] || 0}`
+				);
+		for (const [file, n] of Object.entries(allowed))
+			if ((free[kind][file] || 0) < n)
+				stale.push(
+					`${file}: ${free[kind][file] || 0} free-form ${kind} literal(s), baseline still allows ${n}`
+				);
+	}
+	return { unknown, grown, stale, free };
+}
+
+// The comparison must be able to fail before a green result means anything: a
+// probe with one unknown reason, one new free-form phase and one retired
+// free-form file must produce exactly those three findings.
+{
+	const probe = vocabularyViolations(
+		[
+			{ kind: 'reason', value: 'save_failed', file: 'a.lua', line: 1, free: false },
+			{ kind: 'reason', value: 'save_failure', file: 'a.lua', line: 2, free: false },
+			{ kind: 'phase', value: 'step ', file: 'b.lua', line: 3, free: true },
+			{ kind: 'log_tag', value: 'BOOT', file: 'c.lua', line: 4, free: false }
+		],
+		{ reason: ['save_failed'], phase: [], log_tag: ['BOOT'], evidence_field: [] },
+		{ reason: { 'gone.lua': 1 }, phase: {} }
+	);
+	if (probe.unknown.length !== 1 || probe.grown.length !== 1 || probe.stale.length !== 1)
+		errors.push(
+			'the closed-vocabulary comparison no longer reports an unknown value, a rise and headroom'
+		);
+}
+
+{
+	const contracts = JSON.parse(read('_shared/core/ports/contracts.json'));
+	const vocabulary = JSON.parse(read('_shared/modules/logger/vocabulary.json'));
+	const enums = contracts.enums || {};
+	for (const kind of LogVocabulary.KINDS) {
+		if (JSON.stringify(enums[kind]) !== JSON.stringify(vocabulary[kind]))
+			errors.push(
+				`contracts.json enums.${kind} differs from _shared/modules/logger/vocabulary.json — run npm run codegen:contracts`
+			);
+	}
+	const { hits, missingFormatters } = LogVocabulary.scanTree(ROOT, {
+		generated: new Set(allOutputs()),
+		formatters: vocabulary.evidence_record_formatters
+	});
+	for (const m of missingFormatters)
+		errors.push(`declared evidence-record formatter ${m} was not found or writes no field`);
+	if (hits.length < 500)
+		errors.push(
+			`the vocabulary scan found only ${hits.length} literal(s); the scanner stopped matching`
+		);
+	let baseline = JSON.parse(fs.readFileSync(FREE_FORM_BASELINE, 'utf8'));
+	if (process.argv.includes('--shrink')) {
+		const { free } = vocabularyViolations(hits, enums, baseline);
+		for (const kind of FREE_FORM_KINDS) {
+			const lowered = {};
+			for (const file of Object.keys(baseline[kind] || {}).sort()) {
+				const n = Math.min(free[kind][file] || 0, baseline[kind][file]);
+				if (n > 0) lowered[file] = n;
+			}
+			baseline[kind] = lowered;
+		}
+		fs.writeFileSync(FREE_FORM_BASELINE, JSON.stringify(baseline, null, '\t') + '\n', 'utf8');
+		baseline = JSON.parse(fs.readFileSync(FREE_FORM_BASELINE, 'utf8'));
+	}
+	const { unknown, grown, stale } = vocabularyViolations(hits, enums, baseline);
+	for (const u of unknown)
+		errors.push(
+			`${u} — use a listed value, or add it deliberately to _shared/modules/logger/vocabulary.json`
+		);
+	for (const g of grown)
+		errors.push(`${g} — use a closed-enum value and put the detail in the message`);
+	for (const st of stale)
+		errors.push(
+			`${st} — lower it with node tools/test/test-logger-scalars-single-source.cjs --shrink`
+		);
+	vocabularyCount = hits.length;
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] logger scalars have drifted from the shared registry:\x1b[0m');
 	for (const e of errors) console.error('    - ' + e);
@@ -480,5 +609,6 @@ if (errors.length > 0) {
 
 console.log(
 	'\x1b[32m[OK] all 12 logger scalar declaration(s) across the three drivers match ' +
-		'[logger] in the shared timing registry (dedup and repeat windows verified across the s/ms unit split).\x1b[0m'
+		'[logger] in the shared timing registry (dedup and repeat windows verified across the s/ms unit split); ' +
+		`${vocabularyCount} reason/phase/tag/evidence-field literal(s) inside the closed log vocabulary.\x1b[0m`
 );
