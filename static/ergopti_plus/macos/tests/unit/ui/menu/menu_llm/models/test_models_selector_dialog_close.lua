@@ -316,7 +316,7 @@ helpers.describe("custom model warning native signature", function()
 			local bridge = fixture.context.bridges[1]
 			helpers.assert_eq(bridge.callback({ body = { action = "add", value = "  " } }), true)
 			helpers.assert_eq(fixture.context.warnings.shown, {
-				{ "menu.llm.custom_model_title", "menu.llm.empty_model_id", "OK" },
+				{ "menu.llm.custom_model_title", "menu.llm.empty_model_id", "button.ok" },
 			}, "The empty custom-model warning must remain visible after the form closes")
 			helpers.assert_eq(fixture.context.warnings.refused, 0)
 			helpers.assert_eq(fixture.context.deletes, 1)
