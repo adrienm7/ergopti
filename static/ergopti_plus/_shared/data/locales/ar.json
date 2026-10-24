@@ -3484,7 +3484,7 @@
 	"dialog.start_at_login.failed": "تعذر تغيير التشغيل التلقائي. تحقق من إعدادات بدء التشغيل في النظام.",
 	"onboarding.error.open_failed": "تعذر فتح معالج الإعداد. تحقق من السجلات ثم حاول مجددًا من القائمة.",
 	"platform_reason.tap_hold_word_reset_not_on_macos": "غير متاح على macOS: هناك يدير Karabiner-Elements مفاتيح نقر-ضغط، وما ترسله يصل كأنه مفاتيح مكتوبة على لوحة المفاتيح، لذا يتبع الاختصار الذي يرسله مفتاح نقر-ضغط خيار الاختصارات.",
-	"platform_reason.token_streaming_transport_missing": "ليس بعد على Windows: لم يتم التحقق من العرض رمزًا برمز على Windows، لذلك يظل هذا الخيار غير نشط.",
+	"platform_reason.token_streaming_unvalidated_on_windows": "ليس بعد على Windows: لم يتم التحقق من العرض رمزًا برمز على Windows، لذلك يظل هذا الخيار غير نشط.",
 	"menu.layout.number_row": "صف الأرقام",
 	"menu.layout.number_row_native": "الترتيب الأصلي",
 	"menu.layout.number_row_digits": "الأرقام أولًا",

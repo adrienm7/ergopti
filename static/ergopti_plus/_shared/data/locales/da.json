@@ -3484,7 +3484,7 @@
 	"dialog.start_at_login.failed": "Automatisk start kunne ikke ændres. Kontrollér systemets startindstillinger.",
 	"onboarding.error.open_failed": "Opsætningsguiden kunne ikke åbnes. Se logfilerne, og prøv igen fra menuen.",
 	"platform_reason.tap_hold_word_reset_not_on_macos": "Ikke på macOS: Der styrer Karabiner-Elements tap-holds, og det, de sender, ankommer som taster skrevet på tastaturet, så en genvej sendt af en tap-hold følger indstillingen for genveje.",
-	"platform_reason.token_streaming_transport_missing": "Endnu ikke på Windows: visning token for token er ikke valideret på Windows, så denne indstilling forbliver inaktiv.",
+	"platform_reason.token_streaming_unvalidated_on_windows": "Endnu ikke på Windows: visning token for token er ikke valideret på Windows, så denne indstilling forbliver inaktiv.",
 	"menu.layout.number_row": "Talrække",
 	"menu.layout.number_row_native": "Systemets rækkefølge",
 	"menu.layout.number_row_digits": "Tal først",

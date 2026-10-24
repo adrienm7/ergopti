@@ -3484,7 +3484,7 @@
 	"dialog.start_at_login.failed": "Impossible de modifier le démarrage automatique. Vérifiez les réglages de démarrage du système.",
 	"onboarding.error.open_failed": "L’assistant de configuration n’a pas pu s’ouvrir. Consultez les journaux, puis réessayez depuis le menu.",
 	"platform_reason.tap_hold_word_reset_not_on_macos": "Pas sous macOS : Karabiner-Elements y gère les tap-holds, et ce qu’ils envoient arrive comme des touches tapées au clavier, donc un raccourci envoyé par un tap-hold suit l’option des raccourcis.",
-	"platform_reason.token_streaming_transport_missing": "Pas encore sous Windows: l'affichage jeton par jeton n'a pas été validé sous Windows, donc cette option reste inactive.",
+	"platform_reason.token_streaming_unvalidated_on_windows": "Pas encore sous Windows: l'affichage jeton par jeton n'a pas été validé sous Windows, donc cette option reste inactive.",
 	"menu.layout.number_row": "Rangée des chiffres",
 	"menu.layout.number_row_native": "Ordre natif",
 	"menu.layout.number_row_digits": "Chiffres en premier",

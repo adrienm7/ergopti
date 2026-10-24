@@ -3484,7 +3484,7 @@
 	"dialog.start_at_login.failed": "Не вдалося змінити автозапуск. Перевірте налаштування автозапуску системи.",
 	"onboarding.error.open_failed": "Не вдалося відкрити майстер налаштування. Перевірте журнали та повторіть спробу через меню.",
 	"platform_reason.tap_hold_word_reset_not_on_macos": "Не в macOS: там клавішами натискання-утримання керує Karabiner-Elements, і те, що вони надсилають, надходить як клавіші, набрані на клавіатурі, тому комбінація, надіслана такою клавішею, підпорядковується налаштуванню комбінацій клавіш.",
-	"platform_reason.token_streaming_transport_missing": "Поки не в Windows: показ токен за токеном не перевірено у Windows, тому цей параметр залишається неактивним.",
+	"platform_reason.token_streaming_unvalidated_on_windows": "Поки не в Windows: показ токен за токеном не перевірено у Windows, тому цей параметр залишається неактивним.",
 	"menu.layout.number_row": "Цифровий ряд",
 	"menu.layout.number_row_native": "Системний порядок",
 	"menu.layout.number_row_digits": "Спочатку цифри",

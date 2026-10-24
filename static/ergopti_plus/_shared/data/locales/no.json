@@ -3484,7 +3484,7 @@
 	"dialog.start_at_login.failed": "Kunne ikke endre automatisk oppstart. Kontroller systemets oppstartsinnstillinger.",
 	"onboarding.error.open_failed": "Kunne ikke åpne oppsettsveiviseren. Se loggene, og prøv igjen fra menyen.",
 	"platform_reason.tap_hold_word_reset_not_on_macos": "Ikke på macOS: Der styrer Karabiner-Elements tap-holds, og det de sender, kommer fram som taster skrevet på tastaturet, så en hurtigtast sendt av en tap-hold følger innstillingen for hurtigtaster.",
-	"platform_reason.token_streaming_transport_missing": "Ikke ennå på Windows: visning token for token er ikke validert på Windows, så dette alternativet forblir inaktivt.",
+	"platform_reason.token_streaming_unvalidated_on_windows": "Ikke ennå på Windows: visning token for token er ikke validert på Windows, så dette alternativet forblir inaktivt.",
 	"menu.layout.number_row": "Tallrekke",
 	"menu.layout.number_row_native": "Systemets rekkefølge",
 	"menu.layout.number_row_digits": "Tall først",
