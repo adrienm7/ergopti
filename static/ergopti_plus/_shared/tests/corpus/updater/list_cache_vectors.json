@@ -4,12 +4,20 @@
 	"cases": [
 		{
 			"id": "complete-copy",
-			"stored": { "url": "https://api.github.com/repos/o/r/releases?per_page=20&page=1", "etag": "W/\"abc\"", "body": "[{\"tag_name\":\"v1.0.0\"}]" },
+			"stored": {
+				"url": "https://api.github.com/repos/o/r/releases?per_page=20&page=1",
+				"etag": "W/\"abc\"",
+				"body": "[{\"tag_name\":\"v1.0.0\"}]"
+			},
 			"valid": true
 		},
 		{
 			"id": "leading-whitespace-array",
-			"stored": { "url": "https://api.github.com/x", "etag": "\"e\"", "body": "\n  [{\"tag_name\":\"v1\"}]" },
+			"stored": {
+				"url": "https://api.github.com/x",
+				"etag": "\"e\"",
+				"body": "\n  [{\"tag_name\":\"v1\"}]"
+			},
 			"valid": true
 		},
 		{
@@ -57,7 +65,11 @@
 		},
 		{
 			"id": "object-body",
-			"stored": { "url": "https://api.github.com/x", "etag": "\"e\"", "body": "{\"message\":\"rate limited\"}" },
+			"stored": {
+				"url": "https://api.github.com/x",
+				"etag": "\"e\"",
+				"body": "{\"message\":\"rate limited\"}"
+			},
 			"valid": false,
 			"reason_contains": "not a release array"
 		},
@@ -69,7 +81,11 @@
 		},
 		{
 			"id": "oversized-body",
-			"stored": { "url": "https://api.github.com/x", "etag": "\"e\"", "body_repeat": { "prefix": "[", "unit": "x", "count": 2097152 } },
+			"stored": {
+				"url": "https://api.github.com/x",
+				"etag": "\"e\"",
+				"body_repeat": { "prefix": "[", "unit": "x", "count": 2097152 }
+			},
 			"valid": false,
 			"reason_contains": "exceeds"
 		}
