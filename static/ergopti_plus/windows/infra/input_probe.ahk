@@ -295,7 +295,7 @@ _IP_Admission() {
 _IP_OpenTarget() {
 	if A_IsSuspended
 		return 0
-	Window := Gui("+AlwaysOnTop", WindowTitle(t("input_probe.title")))
+	Window := Gui("", WindowTitle(t("input_probe.title")))
 	Field := Window.AddEdit("w560 r6")
 	Owner := { Active: true, Retired: false, Gui: Window, Edit: Field, Hwnd: Window.Hwnd, CloseCallback: 0 }
 	Target := Map("gui", Window, "edit", Field, "owner", Owner)
