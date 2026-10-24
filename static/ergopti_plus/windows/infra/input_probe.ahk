@@ -468,11 +468,6 @@ _IP_RivalFire(Work := unset) {
 	}
 }
 
-; One native timer site arms and retires only the callback of this repetition.
-_IP_RepTimer(Callback, Period) {
-	SetTimer(Callback, Period)
-}
-
 ; Pure local authority is rechecked after every yielding focus observation.
 _IP_RepAuthority(Work) {
 	if IsObject(Work.Failure)
@@ -564,7 +559,7 @@ _IP_RunRep(Target, Spec, Mode, Frequency, ParentOwner := unset) {
 			return _IP_RepAbort(Reason)
 		if (Rival != "") {
 			Work.Callback := _IP_RivalFire.Bind(Work)
-			_IP_RepTimer(Work.Callback, -1)
+			SetTimer(Work.Callback, -1)
 		}
 		if (Reason := _IP_RepAdmission(Work)) != ""
 			return _IP_RepAbort(Reason)
@@ -604,7 +599,7 @@ _IP_RunRep(Target, Spec, Mode, Frequency, ParentOwner := unset) {
 		Callback := Work.Callback
 		Work.Callback := 0
 		if IsObject(Callback)
-			_IP_RepTimer(Callback, 0)
+			SetTimer(Callback, 0)
 	}
 }
 
