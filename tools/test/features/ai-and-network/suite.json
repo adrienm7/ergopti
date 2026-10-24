@@ -393,6 +393,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-go-route-plan-gate.cjs"],
 			"repro": "node tools/test/test-go-route-plan-gate.cjs"
+		},
+		{
+			"id": "js-0468",
+			"ordinal": 468,
+			"name": "proxy policy single source (every hand-typed precedence pinned to proxy_policy.json, no new copy)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-proxy-policy-single-source.cjs"],
+			"repro": "node tools/test/test-proxy-policy-single-source.cjs"
 		}
 	]
 }
