@@ -1019,6 +1019,12 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install prerequisites for The whole daemon, live — a trigger typed, a tray shown",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "The whole daemon, live — a trigger typed, a tray shown",
 			"protocol": 9
 		},
