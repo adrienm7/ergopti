@@ -445,3 +445,336 @@ helpers.describe("Main retires AI at forwarded standard editing chords", functio
 		end)
 	end)
 end)
+
+
+-- Whole-Main regression fixture: configuration/desktop/input/transport ports are
+-- controlled. Main is loaded intact and initializes the actual AI/focus owners.
+do
+	local shared_engine = require("hotstring_engine")
+	local shared_new = shared_engine.new
+
+	local function whole_main(options, body)
+		local journal, path_before = {}, package.path
+		for name, value in pairs(package.loaded) do journal[name] = value end
+		local marker = assert(os.tmpname())
+		local owned_paths = { [marker] = true }
+		local fixture_state, fixture_prediction
+		local ok, failure = xpcall(function()
+			for name in pairs(package.loaded) do
+				if name:match("^modules%.llm%.") or name:match("^modules%.keystats%.")
+					or name:match("^modules%.hotstrings%.") or name:match("^modules%.shortcuts%.") then package.loaded[name] = nil end
+			end
+			for _, name in ipairs({ "adapters.keyboard_hook", "adapters.evdev_reader", "adapters.modifier_broker",
+				"adapters.keyboard_layout", "adapters.secure_field_detector", "adapters.clipboard", "adapters.timer_scheduler",
+				"infra.hotstring_preferences", "infra.llm_preferences", "infra.metrics_preferences", "infra.monotonic",
+				"infra.config_paths", "config_migrate", "toml_codec.writer" }) do package.loaded[name] = nil end
+			local root, key, phase, modifier = helpers.driver_root(), options.key or "u", options.phase or "late", options.modifier or "ctrl"
+			local app = options.app or "gnome-terminal"
+			local action_mode = options.mode or "none"
+			local terminal = app == "gnome-terminal"
+			local role = terminal and 60 or 61
+			package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
+			require("compat.utf8").install()
+			local Json = require("json")
+			local state = { requests = {}, cancellations = 0, text = "", caret = 0, output = 0, overlays = {}, chars = 0, controls = 0, forwarded = 0 }
+			fixture_state = state
+			local function noop() end
+			local function yes() return true end
+			local function no() return false end
+			local function put(name, module) package.loaded[name] = module; return module end
+			put("infra.config_paths", { config = function(name)
+			  local file = marker .. "." .. name; owned_paths[file] = true; return file
+			end, get_config_dir = function() return marker .. ".config-dir" end })
+			put("adapters.storage", require("tests.fakes").storage())
+			local scheduler = require("tests.fakes").timer_scheduler()
+			put("adapters.timer_scheduler", scheduler)
+			put("infra.monotonic", { now_ms = function() return 1000 + scheduler.now * 1000 end, resolution_ms = function() return .001 end })
+			local logger = assert(dofile(root .. "/../_shared/lua/logger/init.lua")); logger.set_sink(function(line) state.last_log = tostring(line) end)
+			put("logger.shim", logger)
+			put("infra.logger_sink", { install = yes })
+			put("infra.session_lock", { protect = yes, acquire = yes })
+			put("infra.script_settings", { apply = yes, current = function() return "ERROR" end })
+			put("infra.boot_profiler", { begin = noop, stage = noop, stage_done = noop, complete = function() return 0 end })
+			put("infra.diagnostic_snapshot", { pid = function() return "controlled" end, prepare = function() return noop end })
+			put("modules.diagnostics.crash_reporter", { protect = function(_, body)
+			  local ok, result = xpcall(body, debug.traceback)
+			  if not ok then io.stderr:write("MAIN_SETUP_FAILURE " .. tostring(result) .. "\n") end
+			  return ok, result
+			end })
+			put("infra.input_access", { is_denied = no, report = function() error("unexpected input access") end })
+			put("infra.signal_handlers", { start = yes, stop = yes, is_settled = yes })
+			put("infra.restart_pause", { restore = yes })
+			put("infra.legacy_hotstring_storage", { import = yes })
+			local config = { init = noop, set_magic_key = yes, load_all = function() return 0, true, nil, { complete = true } end,
+			  parse_error_count = function() return 0 end, get_categories = function() return {} end }
+			put("modules.hotstrings.hotstrings_config", config)
+			put("platform.remap.tap_hold_manager", { init = noop, user_path = function() return marker .. ".tap_hold.toml" end,
+			  reload = yes, is_tap_action = no, canonical_hold = function() return "none" end, is_active = no, keys = function() return {} end, set_paused = yes })
+			put("platform.remap.tap_hold_writer", { FILE_NAME = "tap_hold.toml", init = noop })
+			-- Gesture/action sources have no configured bindings in this scope.
+			put("modules.hotstrings.magic_key_source", { init = noop, on_key = no, cancel_capture = yes })
+			put("modules.hotstrings.repeat_key", { is_enabled = no })
+			put("modules.shortcuts.wrap_on_type", { new = function() return { on_key = no, end_selection_window = yes, on_pointer_down = noop } end })
+			put("adapters.selection_transaction", { new = function() return { cancel = yes, stop = yes } end })
+			put("adapters.clipboard", { read_primary = function() error("no selection read is permitted") end })
+			put("infra.display_server", { is_x11 = yes, is_wayland = no, kind = function() return "x11" end })
+			local layout = put("adapters.keyboard_layout", require("tests.support.layout_cohort_fixture").layout(function() return 30 end))
+			layout.refresh, layout.is_ready, layout.publish_current_capture = yes, yes, yes
+			local injector = put("modules.hotstrings.injector", {
+			  _is_injecting = no, _queue_char = function() error("unexpected queued text") end,
+			  open_fast_channel = yes, close_fast_channel = yes, output_broker = function() return {} end, emit_key = yes, set_output_observer = yes,
+			  inject = function(deletes, text, _, _, publication)
+			    assert(publication.current() and publication.cached(), "real Main must admit original field")
+			    state.output = state.output + 1
+			    local start = math.max(0, state.caret - deletes)
+			    state.text = state.text:sub(1, start) .. text .. state.text:sub(state.caret + 1); state.caret = start + #text
+			    return { ok = true }
+			  end,
+			})
+			local preferences = require("tests.support.llm_preferences_fixture").new({ initial = {
+			  ["llm.models.selected"] = "api", ["llm.profiles.auto_profile_for_model"] = false, ["llm.profiles.active"] = "basic",
+			  ["llm.profiles.num_predictions"] = 1, ["llm.trigger.secure_filter_enabled"] = true,
+			  ["llm.trigger.debounce_ms"] = 500, ["llm.trigger.instant_on_word_end"] = false,
+			  ["llm.trigger.after_hotstring"] = false, ["llm.display.streaming"] = true, ["llm.display.streaming_multi"] = true,
+			} })
+			put("infra.llm_preferences", preferences)
+			put("modules.llm.profiles", { init = yes, is_enabled = yes })
+			put("modules.llm.api_entries", { active = function() return { id = "owned", provider = "openai_compat", model = "fixture-model" } end })
+			put("modules.llm.api_remote", { serves = yes, provider = function() return { default_model = "fixture-model" } end,
+			  chat = function(_, _, messages, _, stream, done) state.requests[#state.requests + 1] = { messages = messages, stream = stream, done = done }; return true end,
+			  cancel = function() state.cancellations = state.cancellations + 1; return true end })
+			local overlay = { show = function(rows, meta) state.overlays = rows; state.visible = #rows > 0; state.loading = meta and meta.loading; return true end,
+			  hide = function() state.overlays = {}; state.visible = false; return true end, is_showing = function() return state.visible == true end,
+			  move = yes, active_index = function() return 1 end }
+			local policy = require("modules.keystats.keystats")
+			-- Metrics persistence is outside this semantic audit; privacy policy methods remain real.
+			for _, name in ipairs({ "init", "record_physical_key", "record_synthetic_output", "record_suggestion", "record_shortcut", "on_keydown", "on_hotstring", "record_correction", "cancel_hold_intervals" }) do policy[name] = noop end
+			local watch = require("tests.support.focus_watch_fixture").new()
+			local original_barrier, original_snapshot = watch.barrier, watch.snapshot
+			watch.barrier = function() local receipt = original_barrier(); receipt.role = role; return receipt end
+			watch.snapshot = function() local receipt = original_snapshot(); receipt.role = role; return receipt end
+			put("adapters.atspi_focus_watch", { new = function() return watch end })
+			local window = { getFocused = function() return { appId = app, windowTitle = "owned ordinary field" } end,
+			  start_privacy_context = function(field, opts, callback)
+			    assert(field.role == role and opts.authorized())
+			    callback({ app_id = app, title = "owned ordinary field", native_identity = "owned-audit-frame" })
+			    return { cancel = yes, is_settled = yes }
+			  end }
+			local focus_module = require("modules.keystats.focus_guard")
+			local original_focus_new = focus_module.new
+			focus_module.new = function(options) state.guard = original_focus_new(options); return state.guard end
+			local engine_module = require("modules.hotstrings.engine")
+			local original_engine_new = engine_module.new
+			local main_engine = {}
+			for name, value in pairs(engine_module) do main_engine[name] = value end
+			main_engine.new = function(...) state.matcher = original_engine_new(...); return state.matcher end
+			put("modules.hotstrings.engine", main_engine)
+			local prediction = require("modules.llm.prediction_engine"); fixture_prediction = prediction
+			local hook = require("adapters.keyboard_hook")
+			hook.start = function(options) state.callbacks = options; coroutine.yield("actual Hook.start callback capture"); return true end
+			hook.isRunning, hook.get_mode = yes, function() return "intercept" end
+			local optional = { ["modules.llm.prediction_engine"] = prediction, ["ui.tooltip.llm"] = overlay,
+			  ["adapters.window_info"] = window, ["adapters.secure_field_detector"] = require("adapters.secure_field_detector") }
+			put("infra.runtime_guard", { optional_require = function(name) return optional[name] end,
+			  call = function(_, callback) return true, callback() end })
+			put("adapters.event_loop", { run = function() error("probe must remain before actual event-loop launch") end, stop = yes, defer = function(fn) state.deferred = state.deferred or {}; state.deferred[#state.deferred + 1] = fn; return true end })
+			-- Selected keyboard bindings are absent; the classifier itself is the production module.
+			local keyboard_shortcuts = require("modules.shortcuts.keyboard_shortcuts")
+			local function start_successor(port)
+			  state.action_entry = { port = port, old_offer = prediction.has_suggestions(), cancellations = state.cancellations,
+			    predecessor_retired = phase == "visible" and not prediction.has_suggestions() or phase == "late" and state.cancellations > 0 }
+			  state.action_started = prediction.trigger_now({ app_id = app })
+			end
+			keyboard_shortcuts.consume = function(detail, options)
+			  if action_mode == "consumed" and detail.key == "u" then
+			    state.bound_consumed = true; options.defer(function() start_successor("consumed deferred action") end); return true
+			  end
+			  return false
+			end
+			keyboard_shortcuts.dispatch = function(detail)
+			  if action_mode == "dispatch" and detail.key == "u" then start_successor("forwarded Main dispatch"); return true end
+			  return false
+			end
+			keyboard_shortcuts.init = noop
+			local launch_args = { "--device", marker .. ".event-placeholder", "--config", marker .. ".config.toml" }
+			local main = assert(loadfile(root .. "/ergopti_hotstrings.lua"))
+			-- Migration/persistence is an explicit inert Main boundary; canonical writer imports stay real.
+			local migration = require("config_migrate")
+			local startup_migration = { REGISTRY_PATH = migration.REGISTRY_PATH, boot = function() return {} end,
+			  read_only_notice_key = function() return nil end }
+			local environment = setmetatable({ arg = launch_args, require = function(name)
+			  if name == "config_migrate" then return startup_migration end
+			  return require(name)
+			end, os = setmetatable({ exit = function(code) error("controlled Main exit " .. tostring(code)) end }, { __index = os }) }, { __index = _G })
+			if setfenv then setfenv(main, environment) else main = assert(loadfile(root .. "/ergopti_hotstrings.lua", "t", environment)) end
+			state.thread = coroutine.create(main)
+			local resumed, detail = coroutine.resume(state.thread)
+			assert(resumed, tostring(detail))
+			assert(state.callbacks and coroutine.status(state.thread) == "suspended", tostring(detail) .. " last log=" .. tostring(state.last_log))
+			local guard = assert(state.guard)
+			guard.refresh(true); guard.refresh(true)
+			assert(guard.blocks_text() == false and guard.focused_text_identity(), "actual Main focus guard must admit this ordinary field")
+			local original_focus = guard.focused_text_identity()
+			assert(policy.is_context_protected(app, "owned ordinary field") == false)
+			local WordReset = require("modules.hotstrings.word_reset")
+			assert(WordReset.is_terminal_app(app) == terminal, "production classifier owns terminal scope")
+			local settings = WordReset.snapshot(); settings.idle_seconds = 0; settings.shortcut_resets_word = options.reset == true
+			assert(WordReset.restore_configuration(settings)); WordReset.forget_last_key()
+			local callbacks = state.callbacks
+			state.prediction, state.scheduler, state.guard = prediction, scheduler, guard
+			state.original_focus, state.response = original_focus, " ok ok ok ok ok ok"
+			function state.type(text)
+				for char in text:gmatch(".") do
+					callbacks.onPhysical(30, "a", char, 1)
+					state.text = state.text:sub(1, state.caret) .. char .. state.text:sub(state.caret + 1)
+					state.caret = state.caret + #char
+					callbacks.onChar(char, 30)
+				end
+			end
+			function state.prepare()
+				if key == "k" and terminal then state.text = " world" end
+				state.type(key == "k" and terminal and "hello" or "hello world")
+				if phase ~= "debounce" then scheduler.test.advance(.5); helpers.assert_eq(#state.requests, 1) end
+				if phase == "visible" then state.requests[1].done(state.response, nil); helpers.assert_true(prediction.has_suggestions()) end
+			end
+			function state.control()
+				local codes = { u = 22, h = 35, k = 37, w = 17, c = 46, s = 31, v = 47 }
+				local code, modifiers = assert(codes[key]), { 29 }
+				if modifier == "ctrl-alt" then modifiers[#modifiers + 1] = 56
+				elseif modifier == "ctrl-meta" then modifiers[#modifiers + 1] = 125
+				elseif modifier == "ctrl-altgr" then modifiers[#modifiers + 1] = 100
+				elseif modifier == "ctrl-shift" then modifiers[#modifiers + 1] = 42 end
+				local events, held = {}, {}
+				local function event(c, value) events[#events + 1] = { type = 1, code = c, value = value } end
+				for _, c in ipairs(modifiers) do event(c, 1) end
+				event(code, 1); event(code, 0)
+				for i = #modifiers, 1, -1 do event(modifiers[i], 0) end
+				state.before_control = { text = state.text, caret = state.caret }
+				hook._test_drive(events, {
+					onPhysical = callbacks.onPhysical, onConsume = callbacks.onConsume,
+					captureEvent = function(c, value) if c == code and value == 1 then return key, key, nil end end,
+					onChar = function() state.chars = state.chars + 1 end,
+					onKey = function(name, detail)
+						state.controls = state.controls + 1; state.semantic = { name = name, key = detail.key, mods = detail.mods }
+						callbacks.onKey(name, detail)
+					end,
+					onEmitRaw = function(c, value)
+						held[c] = value == 1 or nil
+						if c == code and value == 1 then
+							state.forwarded = state.forwarded + 1
+							if modifier == "ctrl" then
+								if terminal and key == "u" then state.text, state.caret = state.text:sub(state.caret + 1), 0
+								elseif terminal and key == "h" then state.text = state.text:sub(1, state.caret - 1) .. state.text:sub(state.caret + 1); state.caret = state.caret - 1
+								elseif terminal and key == "k" then state.text = state.text:sub(1, state.caret)
+								elseif terminal and key == "w" then
+									local start = state.text:sub(1, state.caret):match("^.*()%s%S*$") or 0
+									state.text = state.text:sub(1, start) .. state.text:sub(state.caret + 1); state.caret = start
+								elseif not terminal and key == "v" then state.text = state.text:sub(1, state.caret) .. "PASTED" .. state.text:sub(state.caret + 1); state.caret = state.caret + 6
+								elseif not terminal and key == "c" then state.copy_observed = true
+								elseif not terminal and key == "s" then state.saved_text = state.text end
+							end
+						end
+						return true
+					end,
+				}, true)
+				helpers.assert_eq(held, {}, "all controlled forwarded DOWNs have UPs")
+				helpers.assert_eq(state.chars, 0, "Ctrl-letter edits are not invented character input")
+				helpers.assert_eq(guard.focused_text_identity(), original_focus)
+				helpers.assert_eq(guard.blocks_text(), false)
+				state.after_control = { text = state.text, caret = state.caret }
+			end
+			body(state)
+			helpers.assert_eq(guard.focused_text_identity(), original_focus, "no focus change may vacuously retire this case")
+		end, debug.traceback)
+		if fixture_prediction then pcall(fixture_prediction.cancel) end
+		if fixture_state and fixture_state.guard then pcall(fixture_state.guard.stop) end
+		for name in pairs(package.loaded) do if journal[name] == nil then package.loaded[name] = nil end end
+		for name, value in pairs(journal) do package.loaded[name] = value end
+		package.path = path_before
+		local cleaned = true
+		for file in pairs(owned_paths) do
+			os.remove(file)
+			local remaining = io.open(file, "rb")
+			if remaining then remaining:close(); cleaned = false end
+		end
+		helpers.assert_true(shared_engine.new == shared_new, "a preloaded shared matcher constructor must remain unchanged")
+		helpers.assert_true(cleaned, "every temporary file owned by this fixture must be removed")
+		if not ok then error(failure, 0) end
+	end
+
+	local function finish_old(s, phase)
+		if phase == "debounce" then s.scheduler.test.advance(.5) end
+		if phase ~= "visible" and #s.requests > 0 then s.requests[1].done(s.response, nil) end
+	end
+
+	helpers.describe("whole Main retires Readline editing controls", function()
+		local receiver = { u = { text = "", caret = 0 }, h = { text = "hello worl", caret = 10 },
+			k = { text = "hello", caret = 5 }, w = { text = "hello ", caret = 6 } }
+		for _, key in ipairs({ "u", "h", "k", "w" }) do
+			for _, phase in ipairs({ "debounce", "late", "visible" }) do
+				for _, reset in ipairs({ false, true }) do
+					helpers.it("readline-control-retirement " .. key .. " " .. phase .. " reset=" .. tostring(reset), function()
+						whole_main({ key = key, phase = phase, reset = reset }, function(s)
+							s.prepare(); s.control()
+							helpers.assert_eq(s.after_control, receiver[key], "independent receiver must match native Readline receipt")
+							finish_old(s, phase)
+							if phase == "debounce" then helpers.assert_eq(#s.requests, 0, "the pending old prompt must not dispatch") end
+							helpers.assert_eq(s.prediction.has_suggestions(), false, "the edited document cannot retain its old offer")
+							helpers.assert_eq(s.visible, false)
+							helpers.assert_eq(s.prediction.accept(1), false)
+							helpers.assert_eq({ text = s.text, caret = s.caret }, s.after_control)
+							helpers.assert_eq(s.output, 0)
+						end)
+					end)
+				end
+			end
+		end
+
+		for _, specimen in ipairs({ { "c", "ctrl", "owned-gui-editor" }, { "s", "ctrl", "owned-gui-editor" },
+			{ "u", "ctrl", "owned-gui-editor" }, { "u", "ctrl-alt", "gnome-terminal" },
+			{ "u", "ctrl-meta", "gnome-terminal" }, { "u", "ctrl-altgr", "gnome-terminal" }, { "u", "ctrl-shift", "gnome-terminal" } }) do
+			helpers.it("readline-control-scope " .. table.concat(specimen, " "), function()
+				whole_main({ key = specimen[1], modifier = specimen[2], app = specimen[3] }, function(s)
+					s.prepare(); s.control(); finish_old(s, "late")
+					helpers.assert_eq(s.after_control, s.before_control)
+					if specimen[1] == "c" then helpers.assert_true(s.copy_observed) end
+					if specimen[1] == "s" then helpers.assert_eq(s.saved_text, s.before_control.text) end
+					helpers.assert_true(s.prediction.has_suggestions())
+					helpers.assert_true(s.prediction.accept(1))
+				end)
+			end)
+		end
+
+		helpers.it("readline-control whole-Main GUI paste still retires", function()
+			whole_main({ key = "v", app = "owned-gui-editor" }, function(s)
+				s.prepare(); s.control(); helpers.assert_eq(s.text, "hello worldPASTED")
+				finish_old(s, "late"); helpers.assert_eq(s.prediction.has_suggestions(), false)
+				helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.output, 0)
+			end)
+		end)
+
+		for _, mode in ipairs({ "dispatch", "consumed" }) do
+			for _, phase in ipairs({ "late", "visible" }) do
+				for _, reset in ipairs({ false, true }) do
+					helpers.it("readline-control-successor " .. mode .. " " .. phase .. " reset=" .. tostring(reset), function()
+						whole_main({ key = "u", mode = mode, phase = phase, reset = reset }, function(s)
+							s.prepare(); s.control()
+							if mode == "consumed" then
+								helpers.assert_eq(s.forwarded, 0); helpers.assert_eq(s.controls, 0)
+								helpers.assert_eq(s.after_control, s.before_control)
+								for _, fn in ipairs(s.deferred or {}) do fn() end
+							else
+								helpers.assert_eq(s.forwarded, 1); helpers.assert_eq(s.controls, 1)
+								helpers.assert_true(s.action_entry.predecessor_retired, "retire before dispatch, never erase its successor afterwards")
+							end
+							helpers.assert_true(s.action_started)
+							s.requests[1].done(s.response, nil); helpers.assert_eq(s.prediction.has_suggestions(), false)
+							s.scheduler.test.advance(2); helpers.assert_eq(#s.requests, 2)
+							s.requests[2].done(s.response, nil); helpers.assert_true(s.prediction.has_suggestions())
+						end)
+					end)
+				end
+			end
+		end
+	end)
+end
