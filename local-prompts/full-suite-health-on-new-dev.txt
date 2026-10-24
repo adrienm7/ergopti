@@ -1,0 +1,10 @@
+agentId: ad40838e5acf15270
+description: Full-suite health on new dev
+
+Read /tmp/claude-0/-home-user-ergopti/a1289939-fd47-5b65-a929-48c61fdb6fa0/scratchpad/AGENT-BRIEF.md first and follow it.
+
+Worktree: /home/user/wt/health (branch wt/health, at origin/dev d501c43d). 165 commits just landed on dev from a multi-agent session on Windows (see the "Handover of 2026-10-24" section at the top of docs/ERGOPTIPLUS_TODO.md, remaining-work step 1). Your job: run the FULL suites that can run on this Linux host once on this tree and fix the reds CAUSED by those recent commits (range 7099eb93ef..d501c43d).
+
+Run (in parallel where possible, logs to files): Linux driver full suite (luajit), macOS stubbed suite (lua5.4), `npm run format:check`, `npm run lint:conventions:strict`, and `node tools/test/verify-change.cjs --range=7099eb93ef..HEAD --diagnose` (or `--all --diagnose` if feasible). Known: `npm run format:check` was red on docs/ERGOPTIPLUS_TODO.md at 7099eb9 (a prettier wrap issue around the issue #101 paragraph) — you MAY fix formatting of docs/ERGOPTIPLUS_TODO.md by running prettier on it only (exception to the brief: formatting only, no content change). For each red: classify (caused by recent commits / pre-existing at 7099eb93ef / host-only), reproduce against the baseline (use `git show 7099eb93ef:<path>` or a temporary `git archive 7099eb93ef | tar -x -C <scratch dir>` export, not a worktree), root-cause and fix the ones caused by the recent commits, each fix its own commit with a regression test where meaningful. One known HEAD fix was a keystats.lua syntax error fixed in d501c43d; check nothing similar remains (e.g. `luajit -bl`/`luac5.4 -p` every Lua file, `node --check` JS).
+
+Other agents are concurrently working on: Linux perf, timing registry gates, UI string gate, Lua helpers, ownership protocols, shared parsers, corpora, instrumentation, Linux LLM rows, Linux UI parity, theme tokens, manifest reasons, LLM request plan, menu frames. Keep your fixes minimal and targeted to avoid conflicts. Report the full list of reds with classification.

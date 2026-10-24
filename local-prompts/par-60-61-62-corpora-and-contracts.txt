@@ -1,0 +1,10 @@
+agentId: a09d4a41239b6dab4
+description: PAR-60/61/62 corpora and contracts
+
+Read /tmp/claude-0/-home-user-ergopti/a1289939-fd47-5b65-a929-48c61fdb6fa0/scratchpad/AGENT-BRIEF.md first and follow it.
+
+Worktree: /home/user/wt/par-corpora (branch wt/par-corpora). Tasks from docs/ERGOPTIPLUS_TODO.md section "E. Tests and corpora" (audit docs/audits/2026-10-24-cross-os-parity.md rows H15, T15, R36 and section 14):
+- PAR-61: tap-versus-hold DECISION corpus (`tap_hold/vectors.json` pins accessors only): add decision vectors (tap, hold, roll, one-shot, own-side hold per 54f9c768) replayed by the macOS and Linux engines; if an AHK corpus consumer pattern exists (grep the windows tests for corpus JSON replays), add the Windows replay carefully, else list it as left.
+- PAR-60: hotstring `family_samples.json` (two or three expansions per manifest family) plus chaining, synthetic-output and erase vectors, replayed by the Lua harnesses (macOS, Linux) and the Windows one if a replay consumer already exists (note 8172483e and 290c682a pinned chaining).
+- PAR-62: contract tests for shared modules no test requires by name: `layouts.composer`, `hotstrings.personal_model`, `keystats.text_migration_runner`, `menu.click_intent`, `llm.config_guard` and the five more listed in the audit row R36; check corpus coverage first.
+Vectors must be derived from the CURRENT behaviour of the engines (generate expected outputs by running the real engine, then review them for plausibility; if two drivers disagree, that is a finding: report it, do not paper over it). Each corpus its own commit.

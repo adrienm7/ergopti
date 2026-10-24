@@ -1,0 +1,6 @@
+agentId: aae3f1d70a498aad7
+description: PAR-65 LLM request plan
+
+Read /tmp/claude-0/-home-user-ergopti/a1289939-fd47-5b65-a929-48c61fdb6fa0/scratchpad/AGENT-BRIEF.md first and follow it.
+
+Worktree: /home/user/wt/par-llm-plan (branch wt/par-llm-plan). Task: PAR-65 from docs/ERGOPTIPLUS_TODO.md (audit docs/audits/2026-10-24-cross-os-parity.md row R1): extract the LLM request plan into `_shared/lua/llm/request_plan` — prediction orchestration is 3007 / 3927 / 2108 lines in the three drivers and only prompt, parser, rewrite and tone are shared. Build a pure state machine with HttpClient, TimerScheduler and TooltipRenderer ports and a request-transcript corpus (`_shared/tests/corpus/llm/...`). Phase it: debounce and batching FIRST (note 9c322f84 unified the 500 ms debounce default), adopted by macOS and Linux with identical observable behaviour (transcript vectors generated from the current drivers' behaviour, replayed by both runners); Windows keeps its AHK implementation for now but the corpus is designed so an AHK consumer can replay it later (list as left). If both Lua drivers differ today, report the difference and pick the Windows/macOS behaviour per the maintainer's parity rule, with a vector that fails on the old behaviour. Another agent (linux-llm) adds Linux LLM menu rows: stay off menu code; coordinate only through clean module boundaries.

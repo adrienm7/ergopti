@@ -1,0 +1,6 @@
+agentId: adf691f84882dfcf9
+description: Linux driver performance
+
+Read /tmp/claude-0/-home-user-ergopti/a1289939-fd47-5b65-a929-48c61fdb6fa0/scratchpad/AGENT-BRIEF.md first and follow it.
+
+Worktree: /home/user/wt/linux-perf (branch wt/linux-perf). Task: the Linux performance items of docs/ERGOPTIPLUS_TODO.md ("Performance state per OS", Linux line): (1) 315 eagerly loaded modules at startup (about 500 ms): find which modules can be required lazily (on first use) without changing behaviour or init ownership; (2) five `find` forks in the Linux hotstring loader: replace with an in-process directory walk (lfs / luv / the existing shared helpers) that keeps the exact file set and order; (3) log rotation forks in `logger_sink.lua`: rotate without forking. Read `.agents/skills/perf-profiling/SKILL.md` and `linux-driver` skill first: MEASURE before and after (the driver has permanent counters per commit 9df1e39d and a boot profile; you can time `require` of the module graph and the loader under luajit), and put measured numbers (labelled measured) in each commit body. Each lever its own commit with a regression test (e.g. a test proving no `io.popen`/`os.execute` fork in the loader or sink, behavioural equality of the file list). Do not touch macOS/Windows code. Do not raise any timeout or budget.
