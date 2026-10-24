@@ -260,6 +260,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-composer-model.cjs"],
 			"repro": "npm run test:layout-composer-model"
+		},
+		{
+			"id": "hex-colour-scanner",
+			"ordinal": 467,
+			"name": "hex colour census counts literals, not comments, issue numbers or entities",
+			"cmd": "node",
+			"args": ["tools/test/test-hex-colours.cjs"],
+			"repro": "npm run test:hex-colours"
 		}
 	]
 }
