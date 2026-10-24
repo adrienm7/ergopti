@@ -19,7 +19,8 @@ _KCPO_ChildSource() {
 		Source .= "#Include " . Owner . "`n"
 	}
 	for Spec in [["KL_AppendLog", "Keystats"], ["KL_Hook_RefreshContext", "KLHook"],
-		["KL_Hook_RefreshContext", "KLHookConst"], ["KL_CommitPwCache", "KLPasswordCache"]] {
+		["KL_Hook_RefreshContext", "KLHookConst"], ["KL_CommitPwCache", "KLPasswordCache"],
+		["KL_CaptureHeld", "KLCollection"]] {
 		Owner := _DriverProductionFileForSymbol(Spec[1], _DriverDir)
 		AssertTrue(Owner != "", "The real state owner must resolve: " . Spec[1])
 		OwnerSource := FileRead(Owner, "UTF-8")
@@ -27,7 +28,9 @@ _KCPO_ChildSource() {
 			"State must come from its genuine class declaration: " . Spec[2])
 		Source .= StateClass[0] . "`n"
 	}
-	for Symbol in ["KL_AppendLog", "KL_AssignStableEventId", "KL_AllocEventId", "KL_RecordPrivacyHit",
+	; KL_AppendLog and KL_Hook_RefreshContext ask the capture gate (Suspend or
+	; the metrics pause) that the collection module owns.
+	for Symbol in ["KL_AppendLog", "KL_CaptureHeld", "KL_AssignStableEventId", "KL_AllocEventId", "KL_RecordPrivacyHit",
 		"KL_NowTimestamp", "KL_FlushBuffer", "KL_LogAppSwitch", "KL_LogWindowSwitch", "KL_Hook_RefreshContext",
 		"KL_Hook_AdvanceContextWatermarks", "KL_IsFocusedFieldPassword", "KL_TryGetPwCachedVerdict",
 		"KL_PasswordFocusSnapshot", "KL_CommitPwCache", "KL_JsonEncode", "KL_JsonEncodeMap",
