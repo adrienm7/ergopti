@@ -7,7 +7,7 @@ _MPG_AssertMouseParkGate() {
 	; via the framework helper instead of a pinned modules path
 	Body := _DriverFuncBody("KL_Mouse_ParkTick")
 
-	SuspendedIdx := InStr(Body, "if (!A_IsSuspended")
+	SuspendedIdx := InStr(Body, "if (!KL_CaptureHeld()")
 	Assert(SuspendedIdx > 0, "KL_Mouse_ParkTick must evaluate MF_ShouldFilter only when not suspended (mouse-park-distance-no-gate)")
 	
 	ReturnIdx := InStr(Body, "return", false, SuspendedIdx)
