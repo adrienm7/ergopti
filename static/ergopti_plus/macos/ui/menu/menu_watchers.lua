@@ -89,7 +89,7 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 	-- Consecutive Git-hold re-polls with no new file activity; reset by an event or
 	-- committed reload. The threshold is diagnostic only: a live lock is never bypassed.
 	local defer_count = 0
-	-- Distinct source paths changed since the current burst began, and the epoch
+	-- Distinct source paths changed since the current burst began, and the awake
 	-- time (s) of the last change — together they drive the adaptive settle so a
 	-- BULK write (git pull, OneDrive / Dropbox sync, rsync, mass save) is held
 	-- until activity has been quiet, while a lone edit still reloads fast
@@ -155,7 +155,7 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 		-- Two signals, shared with infra/file_watchers through reload_gate: quiescence
 		-- for a bulk write of many files, and the precise git index.lock guard. Both
 		-- watchers must hold for the same window, or the unguarded one reloads mid-op.
-		local elapsed = hs.timer.secondsSinceEpoch() - last_change_sec
+		local elapsed = TimerScheduler.awake_time() - last_change_sec
 		if not reload_gate.is_settled(elapsed, burst_count) then
 			Logger.debug(LOG, "Reload held (filesystem settling) on '%s'.", base_dir)
 			arm_reload()
@@ -292,7 +292,7 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 		end
 		if matched then
 			Logger.debug(LOG, "File change detected (%d distinct in burst) — settle armed.", burst_count)
-			last_change_sec = hs.timer.secondsSinceEpoch()
+			last_change_sec = TimerScheduler.awake_time()
 			reload_refusal_logged = false
 			-- A genuine file event resets the stuck-state counter.
 			defer_count = 0
