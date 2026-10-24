@@ -3,9 +3,11 @@
 --- ==============================================================================
 --- MODULE: Test Managed Ollama Proxy Selection
 --- DESCRIPTION:
---- Drives the managed Ollama proxy port with the real shared proxy policy and a
---- controlled system lookup: the PAC-only network that refused every pull, the
---- user-exported proxy that must stay untouched, and each refusal.
+--- Drives the managed Ollama proxy port with the real shared proxy policy, the
+--- real shared route plan and origin inventory, and a controlled system lookup:
+--- the PAC-only network that refused every pull, the blob host a PAC sends
+--- direct, two relays the daemon cannot hold, the user-exported proxy that must
+--- stay untouched, and each refusal.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -23,23 +25,31 @@ local function policy()
 	return assert(require("network.proxy_policy").new(require("json").decode(bytes)))
 end
 
---- One port over a scripted lookup; `world.receipt` is what the desktop answers.
+local ORIGINS = assert(require("infra.route_origins").client("ollama"))
+local BLOB = ORIGINS[2]
+
+--- One port over a scripted lookup. `world.receipt` is what the desktop answers
+--- for every origin; `world.receipts[url]` overrides it for one origin.
 local function world(options)
-	local w = { rows = { "PATH=/usr/bin" }, authorized = true, remaining = 5000, lookups = 0, results = {} }
+	local w = { rows = { "PATH=/usr/bin" }, authorized = true, remaining = 5000, lookups = 0, results = {},
+		urls = {}, receipts = {} }
 	for key, value in pairs(options or {}) do w[key] = value end
 	local Proxy = helpers.load_module("modules.llm.managed_ollama_proxy")
 	w.module = Proxy
 	w.port = Proxy.new({
 		policy = policy(), environment = function() return w.rows end, timeout_ms = 3000, owner = "test-owner",
+		origins = w.origins or ORIGINS,
 		lookup = function(url, lookup_options, callback)
 			w.lookups = w.lookups + 1
+			w.urls[#w.urls + 1] = url
 			w.url, w.lookup_options, w.callback = url, lookup_options, callback
 			if w.dispatch_error then return nil, w.dispatch_error end
 			w.child = { settled = false, cancelled = false }
 			function w.child.is_settled() return w.child.settled end
 			function w.child.on_settled(listener) w.child.listener = listener; return true end
 			function w.child.cancel() w.child.cancelled = true; return true end
-			if w.receipt then callback(w.receipt) end
+			local receipt = w.receipts[url] or w.receipt
+			if receipt then callback(receipt) end
 			return w.child
 		end,
 	})
@@ -51,13 +61,19 @@ local function world(options)
 	return w
 end
 
+it("the shipped inventory starts with the registry and names its blob host", function()
+	eq(ORIGINS[1], require("llm.ollama_registry").URL)
+	assert(#ORIGINS >= 2, "the blob redirect host must be looked up too")
+end)
+
 it("a PAC-only network yields the PAC proxy as HTTPS_PROXY", function()
 	local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } } })
 	local result = w:run()
 	eq(result.ok, true)
 	eq(#result.environment, 1)
 	eq(result.environment[1], "HTTPS_PROXY=http://proxy.corp.example:3128")
-	eq(w.url, w.module.REGISTRY_URL)
+	eq(w.lookups, #ORIGINS)
+	for index, origin in ipairs(ORIGINS) do eq(w.urls[index], origin) end
 	eq(w.lookup_options.owner, "test-owner")
 	eq(w.lookup_options.timeout_ms, 3000)
 	assert(#w.lookup_options.environment_exclusions > 0, "the lookup must ignore the proxy variables")
@@ -66,6 +82,63 @@ end)
 it("only the first selection is used and a socks proxy is kept as named", function()
 	local w = world({ receipt = { ok = true, proxies = { "socks5://gate.corp.example:1080", "http://other:1" } } })
 	eq(w:run().environment[1], "HTTPS_PROXY=socks5://gate.corp.example:1080")
+end)
+
+it("a blob host the PAC sends direct joins NO_PROXY after the user's own entries", function()
+	local w = world({ rows = { "PATH=/usr/bin", "no_proxy=intranet.example" },
+		receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } } })
+	w.receipts[BLOB] = { ok = true, proxies = { "direct://" } }
+	local result = w:run()
+	eq(result.ok, true)
+	eq(#result.environment, 3)
+	eq(result.environment[1], "HTTPS_PROXY=http://proxy.corp.example:3128")
+	local host = BLOB:gsub("^https://", "")
+	eq(result.environment[2], "NO_PROXY=intranet.example," .. host)
+	eq(result.environment[3], "no_proxy=intranet.example," .. host)
+end)
+
+it("a registry the PAC sends direct is bypassed while the blob host keeps the relay", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } } })
+	w.receipts[ORIGINS[1]] = { ok = true, proxies = { "direct://" } }
+	local result = w:run()
+	eq(result.environment[1], "HTTPS_PROXY=http://proxy.corp.example:3128")
+	eq(result.environment[2], "NO_PROXY=" .. ORIGINS[1]:gsub("^https://", ""))
+end)
+
+it("two different relays for the registry and the blob host refuse the start", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://relay-a.corp.example:3128" } } })
+	w.receipts[BLOB] = { ok = true, proxies = { "http://relay-b.corp.example:3128" } }
+	local result = w:run()
+	eq(result.ok, false)
+	eq(result.error, "proxy_route_plan_refused")
+end)
+
+it("a relay the daemon cannot export refuses the start instead of being passed on", function()
+	for _, proxy in ipairs({ "socks4://gate.corp.example:1080", "http://proxy.corp.example" }) do
+		local w = world({ receipt = { ok = true, proxies = { proxy } } })
+		local result = w:run()
+		eq(result.ok, false)
+		eq(result.error, "proxy_route_plan_refused")
+	end
+end)
+
+it("an authenticated desktop relay keeps its credentials", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://user:pw@proxy.corp.example:3128" } } })
+	eq(w:run().environment[1], "HTTPS_PROXY=http://user:pw@proxy.corp.example:3128")
+end)
+
+it("a failed lookup of the blob host refuses the start", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://proxy.corp.example:3128" } } })
+	w.receipts[BLOB] = { ok = false, error = "proxy-lookup-timeout" }
+	local result = w:run()
+	eq(result.ok, false)
+	eq(result.error, "proxy_lookup_failed")
+end)
+
+it("an inventory that does not start with the registry is refused at construction", function()
+	local ok = pcall(world, { origins = { BLOB, ORIGINS[1] } })
+	eq(ok, false)
+	eq(pcall(world, { origins = {} }), false)
 end)
 
 it("DIRECT adds nothing", function()
@@ -122,6 +195,16 @@ it("an exhausted budget refuses before any lookup", function()
 	eq(w.lookups, 0)
 end)
 
+it("a budget spent by the registry lookup refuses before the blob lookup", function()
+	local w = world()
+	w:run()
+	eq(w.lookups, 1)
+	w.remaining = 0
+	w.callback({ ok = true, proxies = { "direct://" } })
+	eq(w.lookups, 1)
+	eq(w.results[1].error, "proxy_timeout")
+end)
+
 it("the lookup bound is the smaller of the configured timeout and the budget", function()
 	local w = world({ remaining = 1200.4, receipt = { ok = true, proxies = { "direct://" } } })
 	w:run()
@@ -144,10 +227,35 @@ it("the operation reports the lookup child's physical state", function()
 	eq(w.operation:is_settled(), false)
 	w.child.settled = true
 	eq(w.operation:is_settled(), true)
-	eq(w.operation:on_settled(function() end), true)
-	eq(w.child.listener ~= nil, true)
+	local fired = false
+	eq(w.operation:on_settled(function() fired = true end), true)
+	w.child.settled = false
 	eq(w.operation:cancel(), true)
 	eq(w.child.cancelled, true)
+	eq(fired, false)
+	w.child.settled = true
+	w.child.listener()
+	eq(fired, true)
+end)
+
+it("the operation settles with the last lookup child, not the first", function()
+	local w = world()
+	w:run()
+	local first = w.child
+	w.callback({ ok = true, proxies = { "direct://" } })
+	local last = w.child
+	assert(first ~= last, "the blob host must be looked up by a second child")
+	first.settled = true
+	local fired = false
+	eq(w.operation:on_settled(function() fired = true end), true)
+	eq(fired, false)
+	w.callback({ ok = true, proxies = { "direct://" } })
+	eq(w.results[1].ok, true)
+	eq(w.operation:is_settled(), false)
+	last.settled = true
+	last.listener()
+	eq(fired, true)
+	eq(w.operation:is_settled(), true)
 end)
 
 it("an operation that never ran a lookup is settled at once", function()
@@ -159,7 +267,7 @@ it("an operation that never ran a lookup is settled at once", function()
 	eq(fired, true)
 end)
 
-it("the registry URL and the proxy never reach the log", function()
+it("no origin URL and no proxy ever reach the log", function()
 	local seen = {}
 	local Logger = require("logger.shim")
 	local originals = { info = Logger.info, error = Logger.error }
@@ -175,6 +283,7 @@ it("the registry URL and the proxy never reach the log", function()
 	assert(#seen >= 2, "the lifecycle must be logged")
 	for _, line in ipairs(seen) do
 		assert(not line:find("registry", 1, true) and not line:find("proxy.corp", 1, true)
-			and not line:find("secret", 1, true) and not line:find("leak", 1, true), line)
+			and not line:find("secret", 1, true) and not line:find("leak", 1, true)
+			and not line:find(BLOB:gsub("^https://", ""), 1, true), line)
 	end
 end)

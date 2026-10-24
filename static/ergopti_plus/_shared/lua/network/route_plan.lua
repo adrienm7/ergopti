@@ -20,6 +20,9 @@
 ---    URL nor a relay address ever appears in a reason.
 --- 4. The Go (go/route_plan/route_plan.go) and shell (network-retry.sh) twins
 ---    answer the same vectors (tests/corpus/network/route_plan_vectors.json).
+--- 5. Consumers: the Linux managed Ollama daemon (managed_ollama_proxy.lua) and,
+---    through the shell twin, the macOS Ollama daemon and uv. Managed HTTP
+---    downloads re-resolve each redirect hop natively and need no plan.
 --- ==============================================================================
 
 local M = {}
