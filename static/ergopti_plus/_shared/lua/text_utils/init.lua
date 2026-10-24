@@ -453,6 +453,13 @@ M.UPPER_LETTERS = {
 
 M.LOWER_LETTERS = {}
 for k, v in pairs(M.UPPER_LETTERS) do M.LOWER_LETTERS[v] = k end
+-- The ASCII fast paths of trig_lower and repl_upper are exact only while both
+-- tables hold multibyte keys alone; a new ASCII key must fail loudly here.
+local NON_ASCII_BYTE = "[\128-\255]"
+for lower, upper in pairs(M.UPPER_LETTERS) do
+	assert(upper:find(NON_ASCII_BYTE) and lower:find(NON_ASCII_BYTE),
+		"case tables must hold multibyte keys only: " .. lower)
+end
 
 M.UPPER_TRIGGERS = {}
 for k, v in pairs(M.UPPER_LETTERS) do M.UPPER_TRIGGERS[k] = v end
@@ -529,6 +536,10 @@ end
 --- @return string The lowercase string.
 function M.trig_lower(s)
 	if type(s) ~= "string" then return "" end
+	-- Every LOWER_LETTERS key is multibyte, so an ASCII-only string folds to
+	-- string.lower exactly. Most triggers and typed tails are ASCII; this skips
+	-- one Lua callback per character on the per-key path and at boot.
+	if not s:find(NON_ASCII_BYTE) then return (s:lower()) end
 	return (s:gsub("[%z\1-\127\194-\244][\128-\191]*", function(c)
 		return M.LOWER_LETTERS[c] or string.lower(c)
 	end))
@@ -688,6 +699,8 @@ end
 --- @return string The uppercase string.
 function M.repl_upper(s)
 	if type(s) ~= "string" then return "" end
+	-- Same reasoning as trig_lower: UPPER_LETTERS has no ASCII key.
+	if not s:find(NON_ASCII_BYTE) then return (s:upper()) end
 	return (s:gsub("[%z\1-\127\194-\244][\128-\191]*", function(c)
 		return M.UPPER_LETTERS[c] or string.upper(c)
 	end))
