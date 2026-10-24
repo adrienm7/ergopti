@@ -8,6 +8,12 @@
 --- angle and lift. Linux had no test for several shipped slots, among them
 --- swipe_3_down, so a direction that resolved to an undeclared slot would bind
 --- silently to nothing.
+---
+--- The boundary vectors pin the shared classifier both drivers use
+--- (_shared/lua/gestures/direction.lua) at its sector edges and its two
+--- Manhattan minimums. Linux once put the diagonal boundary at a 2:1 ratio
+--- (26.6 degrees) behind a per-axis travel gate and macOS at 25 degrees behind a
+--- Manhattan one, so the same swipe could name another slot on each.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -30,8 +36,8 @@ end
 --- @param dx integer
 --- @param dy integer
 --- @return table|nil
-local function decode(fingers, dx, dy)
-	local decoder, last = Decoder.new(), nil
+local function decode(fingers, dx, dy, threshold)
+	local decoder, last = Decoder.new({ swipe_threshold = threshold }), nil
 	local function push(t, c, v)
 		local out = decoder:feed({ type = t, code = c, value = v })
 		if out then last = out end
@@ -91,5 +97,31 @@ helpers.describe("gesture direction vectors (Linux)", function()
 				end
 			end)
 		end
+	end
+
+	local Direction = require("gestures.direction")
+	local rule = corpus.boundary_rule
+	-- Large enough for every normalised component (three decimals) to land on a
+	-- whole device unit, so the decoder sees the vector exactly.
+	local boundary_threshold = 1000
+	helpers.it("the boundary rule is the decoder's diagonal factor in normalised units", function()
+		helpers.assert_true(#corpus.boundary_vectors >= 12, "boundary vectors")
+		helpers.assert_eq(rule.minimum, 1)
+		helpers.assert_eq(rule.diagonal_minimum, Direction.DIAGONAL_MINIMUM_FACTOR)
+	end)
+
+	for _, vector in ipairs(corpus.boundary_vectors) do
+		local expected = not Json.is_null(vector.direction) and vector.direction or nil
+		helpers.it("boundary vector '" .. vector.id .. "' -> " .. tostring(expected), function()
+			helpers.assert_eq(Direction.classify(vector.dx, vector.dy, rule.minimum, rule.diagonal_minimum),
+				expected, vector.id .. ": shared classifier")
+			for _, fingers in ipairs(corpus.fingers) do
+				local out = decode(fingers, math.floor(vector.dx * boundary_threshold + 0.5),
+					math.floor(vector.dy * boundary_threshold + 0.5), boundary_threshold)
+				helpers.assert_true(out ~= nil, "the gesture completes when the last finger lifts")
+				helpers.assert_eq(out.direction, expected,
+					string.format("%s: Linux decoder with %d fingers", vector.id, fingers))
+			end
+		end)
 	end
 end)

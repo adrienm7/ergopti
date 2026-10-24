@@ -20,25 +20,32 @@ end
 helpers.describe("gestures/engine.lua: diagonal detection uses total distance (audit-v5)", function()
 
 	-- computeDir() (which owns the diagonal-distance guard) was extracted from
-	-- gestures/engine.lua into the self-contained gestures/geometry.lua. Read
-	-- both so the guard assertions survive that move (move-resilient).
+	-- gestures/engine.lua into the self-contained gestures/geometry.lua, which
+	-- now delegates the classification to the shared direction module both
+	-- drivers use. Read all three so the guard assertions survive those moves
+	-- (move-resilient); the shared corpus pins the same rule behaviourally.
 	local function read_geometry_src()
+		local handle = assert(io.open(helpers.shared("lua/gestures/direction.lua"), "r"))
+		local shared = handle:read("*a")
+		handle:close()
 		return (read_source("local function triggerLiveAxisIfNeeded") or "") ..
-			"\n" .. (read_source("function M.slotForDir") or "")
+			"\n" .. (read_source("function M.slotForDir") or "") .. "\n" .. shared
 	end
 
 	helpers.it("old `adx >= diagMin and ady >= diagMin` pattern is gone", function()
 		local src = read_geometry_src()
 		helpers.assert_true(
-			not src:find("adx >= diagMin and ady >= diagMin", 1, true),
-			"engine/geometry must not use `adx >= diagMin and ady >= diagMin` (requires 2x distance)")
+			not src:find("adx >= diagMin and ady >= diagMin", 1, true)
+				and not src:find("adx >= diagonal_minimum and ady >= diagonal_minimum", 1, true),
+			"engine/geometry must not require each axis to reach the diagonal minimum (requires 2x distance)")
 	end)
 
-	helpers.it("diagonal check uses `dist >= diagMin`", function()
+	helpers.it("diagonal check uses `dist >= diagonal_minimum`", function()
 		local src = read_geometry_src()
 		helpers.assert_true(
-			src:find("dist >= diagMin", 1, true) ~= nil,
-			"engine/geometry diagonal check must use `dist >= diagMin` (Manhattan total distance)")
+			src:find("local dist = adx + ady", 1, true) ~= nil
+				and src:find("dist >= diagonal_minimum", 1, true) ~= nil,
+			"the diagonal check must use `dist >= diagonal_minimum` on the Manhattan total distance")
 	end)
 
 end)

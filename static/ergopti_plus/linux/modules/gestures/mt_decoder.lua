@@ -41,6 +41,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Direction = require("gestures.direction")
 
 local LOG = "gestures.mt_decoder"
 
@@ -98,11 +99,6 @@ M.FINGER_COUNT_CODES = FINGER_COUNT_CODES
 -- when it has one; this value is the fallback for a device that reports none.
 M.DEFAULT_SWIPE_THRESHOLD = 120
 
--- Beyond this ratio the movement is unambiguous on one axis. Below it the
--- gesture is diagonal, and this project's slot space has explicit diagonal
--- directions, so it is a real answer rather than a rejection.
-M.DIAGONAL_RATIO = 2.0
-
 -- How long a touch may last and still be a tap, from the shared timings registry
 -- so the three drivers cannot drift on it.
 --
@@ -133,6 +129,7 @@ end
 function M.new(opts)
 	opts = opts or {}
 	local threshold = tonumber(opts.swipe_threshold) or M.DEFAULT_SWIPE_THRESHOLD
+	assert(threshold > 0, "the swipe threshold must be a positive number of device units")
 
 	-- Wall clock, injectable. Deliberately NOT os.clock(): its CPU time barely
 	-- advances in an I/O-bound daemon, so a gesture held for seconds would report
@@ -188,29 +185,22 @@ function M.new(opts)
 		return sum_x / n, sum_y / n
 	end
 
-	--- Names the direction of a displacement.
+	--- Names the direction of a displacement through the classifier the macOS
+	--- geometry uses too (_shared/lua/gestures/direction.lua), measured in this
+	--- decoder's device units. The swipe threshold is the swipe minimum, and a
+	--- diagonal needs the shared factor of it; this project's slot space has
+	--- explicit diagonal directions, so a diagonal is a real answer.
 	---
 	--- Y grows DOWNWARD in evdev, so a negative dy is "up". Getting that backwards
 	--- inverts every vertical gesture and reads as the binding being wrong rather
-	--- than the decoder.
+	--- than the decoder. The shared names put the horizontal part first
+	--- (`swipe_3_left_up`), as _shared/modules/actions/actions.toml declares
+	--- every slot: "up_right" would bind every diagonal silently to nothing.
 	--- @param dx number
 	--- @param dy number
 	--- @return string|nil
 	local function direction_of(dx, dy)
-		local ax, ay = math.abs(dx), math.abs(dy)
-		if ax < threshold and ay < threshold then return nil end
-
-		if ax >= ay * M.DIAGONAL_RATIO then return dx > 0 and "right" or "left" end
-		if ay >= ax * M.DIAGONAL_RATIO then return dy > 0 and "down" or "up" end
-
-		-- HORIZONTAL first: the declared slots are spelled `swipe_3_left_up`,
-		-- `swipe_3_right_down` and so on (_shared/modules/actions/actions.toml).
-		-- Emitting "up_right" instead produced a name no slot carries, so every
-		-- diagonal silently bound to nothing — which is the quiet half of getting
-		-- this wrong. The loud half would be binding to the WRONG slot.
-		local horizontal = dx > 0 and "right" or "left"
-		local vertical = dy > 0 and "down" or "up"
-		return horizontal .. "_" .. vertical
+		return Direction.classify(dx, dy, threshold, threshold * Direction.DIAGONAL_MINIMUM_FACTOR)
 	end
 
 	--- Feeds one decoded event.
