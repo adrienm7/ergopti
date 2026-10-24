@@ -651,3 +651,6 @@ _RunKeyboardHookContractVectors() {
 		_Result_kh_normalized_names)
 }
 _RunKeyboardHookContractVectors()
+
+
+#Include network/test_network_info_native64_cache.ahk
