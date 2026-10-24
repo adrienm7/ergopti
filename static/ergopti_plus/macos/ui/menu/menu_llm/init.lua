@@ -1034,11 +1034,13 @@ local function create_menu(deps)
 				--- @return table|nil row
 				local function config_parent(id, title, menu, disabled)
 						ConfigGuard.protect(menu, config_reason)
-						if blocked_reason == nil then return { title = title, disabled = disabled, menu = menu } end
+						-- The renderer materialises the parent in both states, so an
+						-- enabled parent is not a row this driver builds by hand.
 						local native = ManifestMenu.render_rows({ {
-								label = title, disabled = true, disabled_reason_key = blocked_reason, submenu = menu,
+								label = title, disabled = disabled or blocked_reason ~= nil or nil,
+								disabled_reason_key = blocked_reason, submenu = menu,
 						} }, id)
-						if #native ~= 1 then
+						if #native ~= 1 or not rawequal(native[1].menu, menu) then
 								Logger.error(LOG, "Greyed AI parent '%s' handoff refused.", id)
 								return nil
 						end
