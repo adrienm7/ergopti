@@ -406,6 +406,7 @@ return {
 	"tests.unit.adapters.storage.test_storage_adapter_preserves_corrupt_input",
 	"tests.unit.adapters.storage.test_storage_adapter_ordinary_native_cleanup",
 	"tests.unit.adapters.storage.test_storage_adapter_released_regular_file",
+	"tests.unit.adapters.storage.test_storage_owned",
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_writer",
 	"tests.unit.modules.hotstrings.terminators.test_terminator_no_fallback",
 	"tests.unit.adapters.runtime.test_timer_scheduler_adapter",
