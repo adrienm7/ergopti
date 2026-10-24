@@ -17,8 +17,8 @@
  *    parts of each concatenation chain and replaces every spliced expression by
  *    `?`, which is exactly the part a catalogue template parameterizes.
  * 2. Statements already moved into the catalogue are counted through the
- *    `Queries.render("name"` / `KeystatsQuery("name"` call sites, so the census
- *    keeps describing the code after migration instead of shrinking silently.
+ *    quoted catalogue names at their call sites, so the census keeps
+ *    describing the code after migration instead of shrinking silently.
  *
  * USAGE:
  *   node tools/audit/keystats-sql-census.cjs           print the report
@@ -47,6 +47,19 @@ const DRIVERS = {
 // of them (case-insensitively) opens a statement chain.
 const STATEMENT_START =
 	/^\s*(SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|PRAGMA|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE|ATTACH|DETACH|VACUUM|ANALYZE|REPLACE|WITH|REINDEX)\b/;
+
+const GENERATED_CATALOGUE = '_shared/lua/keystats/queries.lua';
+
+// Every name the shared query catalogue declares; a driver that renders one by
+// name is counted as a catalogue site rather than disappearing from the census.
+const CATALOGUE_NAMES = require('../codegen/codegen-keystats-queries.cjs')
+	.parse(
+		fs.readFileSync(
+			path.join(ROOT, require('../codegen/codegen-keystats-queries.cjs').SOURCE),
+			'utf8'
+		)
+	)
+	.map((q) => q.name);
 
 // ==========================================
 // ==========================================
@@ -378,6 +391,8 @@ function census() {
 			for (const file of walk(path.join(BASE, dir), spec.ext)) {
 				const text = fs.readFileSync(file, 'utf8');
 				const rel = path.relative(BASE, file).split(path.sep).join('/');
+				// The compiled catalogue is the source of the call sites, not one of them.
+				if (rel === GENERATED_CATALOGUE) continue;
 				for (const chain of chains(tokenize(text, spec.ext))) {
 					for (const sql of splitStatements(chain.text)) {
 						rows.push({
@@ -391,10 +406,14 @@ function census() {
 						});
 					}
 				}
-				// Catalogue call sites: one statement each, identified by name.
-				const callSite = /(?:Queries\.render|KeystatsQuery)\(\s*["']([a-z0-9_.]+)["']/g;
+				// Catalogue call sites: one statement each, identified by the quoted
+				// catalogue name, whatever helper wraps the render call.
+				const callSite = new RegExp(
+					`["'](${CATALOGUE_NAMES.map((n) => n.replace(/\./g, '\\.')).join('|')})["']`,
+					'g'
+				);
 				let match;
-				while ((match = callSite.exec(text))) {
+				while (CATALOGUE_NAMES.length > 0 && (match = callSite.exec(text))) {
 					const line = text.slice(0, match.index).split('\n').length;
 					rows.push({
 						driver,
