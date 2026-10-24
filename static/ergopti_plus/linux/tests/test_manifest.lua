@@ -524,6 +524,7 @@ return {
 	"tests.unit.modules.keymap.test_layout_selection_owner",
 	"tests.unit.ui.composer_check.test_composer_check_window",
 	"tests.unit.adapters.network.test_network_check",
+	"tests.unit.infra.updater.test_asset_signature",
 	"tests.unit.modules.keymap.test_layout_registry_channel",
 	"tests.unit.modules.llm.settings.test_llm_settings",
 	"tests.unit.modules.llm.prediction.test_prediction_messages",
