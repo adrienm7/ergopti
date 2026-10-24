@@ -1142,6 +1142,31 @@ function M.record_string_spans(raw)
 	return result
 end
 
+-- One preferences save decodes the same config.toml text 17 times across
+-- independent owners (preferences, record list, wrap pairs, inline parents,
+-- batch writer). Decoding is a pure function of the text, so the newest
+-- texts are kept and every caller receives its own deep copy. Four entries
+-- cover the source and candidate texts of one save with room to spare.
+local SHAPE_MEMO_ENTRIES = 4
+-- Newest first: { content = exact text, shapes = pristine receipts }. The
+-- pristine document and receipts are never handed out.
+local _shape_memo = {}
+
+--- Deep-copies a table graph, cloning table keys through the same map so
+--- identity-keyed receipts stay bound to the copied tables.
+--- @param value any Value to copy.
+--- @param seen table Original table -> copy.
+--- @return any copy
+local function clone_graph(value, seen)
+	if type(value) ~= "table" then return value end
+	local copy = seen[value]
+	if copy then return copy end
+	copy = {}
+	seen[value] = copy
+	for key, child in pairs(value) do copy[clone_graph(key, seen)] = clone_graph(child, seen) end
+	return copy
+end
+
 --- Decodes a document with the established untagged Lua value model.
 --- @param content string TOML source.
 --- @return table|nil document
@@ -1157,11 +1182,30 @@ end
 --- @return table|nil document
 --- @return table|nil shapes Source-bound arrays and unchanged scalar tokens.
 function M.decode_with_shapes(content)
-	local shapes = { arrays = {}, numbers = {}, strings = {} }
-	local document = decode_document(content, shapes)
-	if not document then return nil, nil end
-	shapes.document = document
-	return document, shapes
+	local memo_entry = nil
+	if type(content) == "string" then
+		for index, entry in ipairs(_shape_memo) do
+			if entry.content == content then
+				table.remove(_shape_memo, index)
+				memo_entry = entry
+				break
+			end
+		end
+	end
+	if memo_entry == nil then
+		local shapes = { arrays = {}, numbers = {}, strings = {} }
+		local document = decode_document(content, shapes)
+		if not document then return nil, nil end
+		shapes.document = document
+		if type(content) ~= "string" then return document, shapes end
+		memo_entry = { content = content, shapes = shapes }
+	end
+	table.insert(_shape_memo, 1, memo_entry)
+	_shape_memo[SHAPE_MEMO_ENTRIES + 1] = nil
+	-- One shared map clones the document and every table-keyed receipt
+	-- together, so the copy's receipts name the copy's own tables.
+	local shapes = clone_graph(memo_entry.shapes, {})
+	return shapes.document, shapes
 end
 
 return M
