@@ -389,6 +389,7 @@ return {
 	"tests.unit.infra.i18n.test_locale_reader",
 	"tests.meta.architecture.test_logger_shim_only",
 	"tests.unit.infra.logger.test_logger_sink",
+	"tests.unit.infra.logger.test_logger_sink_retention",
 	"tests.unit.ui.menu.structure.test_menu_builder_group_calls",
 	"tests.unit.ui.menu.structure.test_menu_choice_row",
 	"tests.unit.ui.menu.structure.test_custom_layout_selection",

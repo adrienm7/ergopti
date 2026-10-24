@@ -28,7 +28,9 @@
 ---    adapter, and `adapters/shell_runner.lua` itself requires the logger — so
 ---    using it here would be a load-time cycle. mkdir and mktemp quote
 ---    inline with the same POSIX idiom, and a unit test pins that quoting against
----    `shell_runner.quote()` so the two can never diverge.
+---    `shell_runner.quote()` so the two can never diverge. The retention purge
+---    lists the folder in process through infra/native_directory.lua, which
+---    needs no logger.
 --- 6. Never fatal. A directory that cannot be created degrades to stdout-only and
 ---    says so; a broken handle degrades to stdout. The daemon must not die
 ---    because logging failed.
@@ -66,6 +68,7 @@ local M = {}
 local AppDirs = require("app_dirs")
 local Redact = require("diagnostics.redact")
 local Json = require("json")
+local NativeDirectory = require("infra.native_directory")
 
 --- Topical routing table generated from _shared/modules/logger/sub_files.toml:
 --- an array of { name = "<file name>", patterns = { ... } }.
@@ -79,6 +82,9 @@ local LOG_EXT       = AppDirs.files.extension
 
 --- Variants that are additionally mirrored into the errors-only file.
 local ERROR_VARIANTS = { warn = true, error = true }
+
+--- Seconds in the whole day the retention window counts in.
+local DAY_SECONDS = 86400
 
 --- How many days of rolled files are kept. From the shared registry, which the
 --- other two drivers already read for the same purpose — this driver rolled a
@@ -300,6 +306,25 @@ local function open_handles(date)
 	_errors_handle = io.open(_dir .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT, "a")
 end
 
+--- Whether a basename matches the shell glob `<prefix>*<extension>`.
+--- @param name string Basename.
+--- @param prefix string Literal prefix (no glob character).
+--- @return boolean
+local function rolled_name(name, prefix)
+	return #name >= #prefix + #LOG_EXT and name:sub(1, #prefix) == prefix and name:sub(-#LOG_EXT) == LOG_EXT
+end
+
+--- Reports a purge refusal on stderr: the sink cannot log through itself.
+--- @param what string What was refused.
+--- @param path string The path concerned.
+--- @param message any The native refusal.
+local function report_purge_refusal(what, path, message)
+	pcall(function()
+		io.stderr:write(_redact("[logger_sink] retention purge could not " .. what .. " " .. path .. ": "
+			.. tostring(message) .. " — the file is kept.\n"))
+	end)
+end
+
 --- Deletes rolled files older than the retention window.
 ---
 --- Called at install and again on each rollover. Install is the one that
@@ -312,17 +337,38 @@ end
 --- of two constants that are free to change independently, and relying on it
 --- would make renaming one silently stop purging the other.
 ---
---- Uses `find -mtime` rather than parsing the date out of each name: the daemon
---- may have been off for a month, and a purge that only understands "yesterday"
---- leaves everything older untouched.
+--- Ages come from the modification time rather than the date in each name: the
+--- daemon may have been off for a month, and a purge that only understands
+--- "yesterday" leaves everything older untouched.
+---
+--- The sweep runs in this process. It is exactly what the two forked
+--- `find <dir> -maxdepth 1 -type f -name '<prefix>*<ext>' -mtime +N -delete`
+--- did, at every start and every rollover: a regular file directly in the
+--- folder (never a link, never a folder), named by either glob, last modified
+--- more than N + 1 whole days before the current second (-mtime +N drops the
+--- fraction of the age).
+--- A refusal the purge used to discard is now reported, and never fatal.
 local function purge_old()
 	local days = retention_days()
 	if not days or not _dir then return end
-	local quoted = M.shell_quote(_dir)
-	for _, prefix in ipairs({ MAIN_PREFIX, ERRORS_PREFIX }) do
-		os.execute(string.format(
-			"find %s -maxdepth 1 -type f -name %s -mtime +%d -delete 2>/dev/null",
-			quoted, M.shell_quote(prefix .. "*" .. LOG_EXT), math.floor(days)))
+	local entries, message, code = NativeDirectory.entries(_dir)
+	if entries == nil then
+		-- An absent folder holds nothing to purge; any other refusal is reported.
+		if code ~= "ENOENT" then report_purge_refusal("list", _dir, message) end
+		return
+	end
+	local cutoff = os.time() - (math.floor(days) + 1) * DAY_SECONDS
+	for _, entry in ipairs(entries) do
+		local name = entry.name
+		if entry.kind == "file" and (rolled_name(name, MAIN_PREFIX) or rolled_name(name, ERRORS_PREFIX)) then
+			local path = NativeDirectory.join(_dir, name)
+			local stat = NativeDirectory.stat(path)
+			-- lstat again: the entry may have been replaced since the listing.
+			if stat and stat.kind == "file" and stat.modified and stat.modified < cutoff then
+				local removed, remove_error = os.remove(path)
+				if not removed then report_purge_refusal("delete", path, remove_error) end
+			end
+		end
 	end
 end
 
