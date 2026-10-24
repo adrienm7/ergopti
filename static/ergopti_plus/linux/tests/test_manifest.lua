@@ -718,6 +718,7 @@ return {
 	"tests.meta.corpus.test_corpus_llm_parser",
 	"tests.meta.corpus.test_corpus_prompt_builder",
 	"tests.meta.corpus.test_corpus_tone",
+	"tests.meta.corpus.test_corpus_temperature",
 	"tests.meta.corpus.test_corpus_process_prediction",
 	"tests.meta.harness.test_module_groups",
 }
