@@ -24,7 +24,8 @@ _WCS_ProductionCallersUseOneSnapshot() {
 	for FunctionName in [
 		"LoggerInit",
 		"_LoggerEmitDroppedSummary",
-		"_LoggerEmit",
+		; _LoggerEmit formats the body; the line is stamped where it is written.
+		"_LoggerEmitBody",
 		"_LoggerEmitDedupSummary",
 		"KL_NowTimestamp"
 	] {
