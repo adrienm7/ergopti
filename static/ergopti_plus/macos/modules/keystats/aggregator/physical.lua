@@ -5,6 +5,7 @@
 local M = {}
 local Wire = require("modules.keystats.physical_wire")
 local Release = require("keystats.physical_release")
+local Walker = require("keystats.walker")
 
 --- Validates original physical attribution before changing aggregate state.
 ---@param entry table Original capture, exact device, keycode, app and timestamp.
@@ -36,21 +37,13 @@ function M.ergo_row(date, app, C, S)
 	})
 end
 
---- Advances streaks without coupling physical and logical event order.
----@param ergo table Aggregate maxima.
+--- Advances streaks without coupling physical and logical event order: the
+--- shared walker's rule, applied to the physical channel's own context.
+---@param ergo table|nil Aggregate maxima; nil only to break continuity.
 ---@param ctx table Context owned by the selected input channel.
 ---@param finger string|nil Mapped finger, or nil to break continuity.
 function M.advance_streak(ergo, ctx, finger)
-	if not finger then
-		ctx.last_finger, ctx.same_finger_run, ctx.same_hand_run = nil, 0, 0
-		return
-	end
-	ctx.same_finger_run = ctx.last_finger == finger and (ctx.same_finger_run or 1) + 1 or 1
-	ctx.same_hand_run = ctx.last_finger and ctx.last_finger:sub(1, 1) == finger:sub(1, 1)
-		and (ctx.same_hand_run or 1) + 1 or 1
-	ctx.last_finger = finger
-	ergo.same_finger_streak_max = math.max(ergo.same_finger_streak_max, ctx.same_finger_run)
-	ergo.same_hand_streak_max = math.max(ergo.same_hand_streak_max, ctx.same_hand_run)
+	Walker.advance_streak(ergo, ctx, finger)
 end
 
 --- Credits one physical press and advances its independent ergonomic context.

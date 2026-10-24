@@ -738,3 +738,39 @@ helpers.describe("keystats correction sequence corpus", function()
 		end)
 	end
 end)
+
+
+
+
+
+-- ===============================================
+-- ===============================================
+-- ======= 7/ Shared Expected-Key Readings ========
+-- ===============================================
+-- ===============================================
+
+-- Every expected key of every vector, read by the shared checker the Linux
+-- suite runs too, so a vector added for one driver is enforced on both. The
+-- corpus is decoded by the shared JSON codec: its keys hold \u0001
+-- separators, which the hs.json test stub leaves escaped.
+do
+	local Corpus = require("test.keystats_aggregation_corpus")
+	local function read_file(path)
+		local handle = io.open(path, "rb")
+		if not handle then return nil end
+		local content = handle:read("*a")
+		handle:close()
+		return content
+	end
+	Corpus.register(helpers, {
+		corpus = Corpus.load(read_file, require("json").decode, corpus_path),
+		label = "keystats aggregation corpus — shared readings (macOS)",
+		replay = function(vec)
+			setup_and_replay(vec)
+			local S = require("modules.keystats.aggregator.state")
+			local batch, contexts = S.agg_batch, S.ngram_ctx or {}
+			S.initialized, S.agg_batch, S.ngram_ctx, S.device_id = false, nil, nil, nil
+			return batch, function(app) return contexts[app] end
+		end,
+	})
+end
