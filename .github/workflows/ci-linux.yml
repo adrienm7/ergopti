@@ -3843,7 +3843,25 @@ jobs:
           fi
         timeout-minutes: 5
 
-      # Standard signed-APT Nix tool, one local store, existing physical phase owner.
+      # The standard signed-APT Nix tool installs in its own step, so a slow
+      # mirror fails the install and not the 35-minute qualification.
+      - name: Install prerequisites for Qualify genuine Nix installed runtime
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends nix-bin
+          else
+              exit 1
+          fi
+        timeout-minutes: 20
+
+      # One local store, existing physical phase owner.
       - name: Qualify genuine Nix installed runtime
         if: ${{ !cancelled() && matrix.shard == 'updater' }}
         env:
@@ -3857,7 +3875,6 @@ jobs:
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
           set -euo pipefail
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends nix-bin
           # This dedicated ephemeral runner may not adopt an occupied foreign store.
           if [ -L /nix ] || [ -L /nix/store ] || [ -L /nix/var ] || [ -L /nix/var/nix ] || [ -L /nix/var/log ] || [ -L /nix/var/log/nix ]; then
             echo "::error::Literal standard Nix store required."
