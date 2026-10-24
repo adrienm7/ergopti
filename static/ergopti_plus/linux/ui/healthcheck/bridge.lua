@@ -368,6 +368,22 @@ local function device_access(path, mode)
 	return "unknown"
 end
 
+--- Whether the daemon may write a device node, asked through access(2).
+--- Opening for writing from Lua means O_CREAT: with the uinput module absent, a
+--- root daemon created a regular file at /dev/uinput that the writer then took
+--- for the device. access(2) answers the same question and creates nothing.
+--- @param path string
+--- @return string "granted", "missing" or "unknown"
+local function device_writable(path)
+	local allowed, err = require("luv").fs_access(path, "W")
+	if allowed == true then return "granted" end
+	-- false: absent, or present and not writable by this user
+	if allowed == false then return "missing" end
+	Logger.warn(LOG, "Diagnostics could not check %s: %s.", path, tostring(err))
+	return "unknown"
+end
+M._device_writable_for_test = device_writable
+
 --- The devices /proc/bus/input/devices lists, one table per block.
 --- @return table
 local function input_devices()
@@ -400,7 +416,7 @@ local function collect_permissions(ids)
 	end
 	local readers = {
 		input_devices = function() return event and device_access(event, "rb") or "unknown" end,
-		uinput        = function() return device_access("/dev/uinput", "ab") end,
+		uinput        = function() return device_writable(require("adapters.uinput_writer").UINPUT_PATH) end,
 	}
 	local items = {}
 	for _, id in ipairs(ids) do

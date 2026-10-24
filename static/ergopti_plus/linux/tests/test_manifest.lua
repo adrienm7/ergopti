@@ -657,6 +657,7 @@ return {
 	"tests.unit.ui.healthcheck.test_healthcheck_last_error_wired",
 	"tests.unit.ui.menu.shortcuts.test_gesture_conflicts",
 	"tests.unit.ui.healthcheck.test_healthcheck_linux_rows",
+	"tests.unit.ui.healthcheck.test_healthcheck_device_probe",
 	"tests.unit.ui.menu.hotstrings.test_hotstring_bulk_checkboxes",
 	"tests.unit.ui.menu.hotstrings.test_hotstrings_language_scope_frame",
 	"tests.unit.ui.menu.hotstrings.test_hotstrings_master_tick",
