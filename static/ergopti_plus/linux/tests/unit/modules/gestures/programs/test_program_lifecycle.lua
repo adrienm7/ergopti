@@ -3,7 +3,9 @@
 --- Exercises literal native argv and retained physical program ownership.
 local helpers = require("tests.helpers")
 local Runner = require("adapters.program_runner")
-local Owner = require("modules.gestures.program_owner")
+-- Loaded fresh: a case patches the current logger shim, and suites that load
+-- the gestures manager under a substitute logger leave this owner bound to it.
+local Owner = helpers.load_module("modules.gestures.program_owner")
 local Native = require("luv")
 local scalar = '{"version":1,"executable":"/bin/sh","arguments":[]}'
 
