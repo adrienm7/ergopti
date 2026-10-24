@@ -260,6 +260,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-composer-model.cjs"],
 			"repro": "npm run test:layout-composer-model"
+		},
+		{
+			"id": "shared-ui-no-platform-branches",
+			"ordinal": 470,
+			"name": "shared pages read host capabilities and never compare a platform or driver name",
+			"cmd": "node",
+			"args": ["tools/test/test-shared-ui-no-platform-branches.cjs"],
+			"repro": "node tools/test/test-shared-ui-no-platform-branches.cjs"
 		}
 	]
 }
