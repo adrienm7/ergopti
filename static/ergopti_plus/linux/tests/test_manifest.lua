@@ -270,6 +270,8 @@ return {
 	"tests.unit.infra.text.test_text_case",
 	"tests.unit.infra.text.test_native_path",
 	"tests.unit.infra.text.test_native_path_sites",
+	"tests.unit.infra.text.test_table_util",
+	"tests.unit.infra.text.test_text_helpers",
 	"tests.unit.modules.keystats.aggregation.test_aggregator_helpers",
 	"tests.unit.modules.llm.ollama.test_api_ollama_payload",
 	"tests.unit.modules.llm.ollama.test_api_ollama_stream_parse",
