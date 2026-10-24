@@ -67,23 +67,23 @@ function M.rows(ctx)
 			}
 		end
 		return ManifestMenu.template_rows("layout_switch_picker_frame", {
-			layout_picker_auto = function() persist(role, "") end,
+			["layout_picker_auto"] = function() persist(role, "") end,
 		}, {
-			layout_picker_auto_checked = function() return current == nil end,
-			layout_picker_has_choices = function() return #native > 0 end,
+			["layout_picker_auto_checked"] = function() return current == nil end,
+			["layout_picker_has_choices"] = function() return #native > 0 end,
 		}, { ["layout_picker_choices"] = function() return native end }) or {}
 	end
 
 	return ManifestMenu.template_rows("layout_switching_frame", {
-		layout_switch_toggle = function() persist("enabled", not enabled) end,
+		["layout_switch_toggle"] = function() persist("enabled", not enabled) end,
 	}, {
-		layout_switch_checked = function() return enabled end,
-		layout_switch_ready = function() return enabled and not ctx.paused end,
-		layout_pause_caption = function() return label_for(settings.on_pause) end,
-		layout_resume_caption = function() return label_for(settings.on_resume) end,
+		["layout_switch_checked"] = function() return enabled end,
+		["layout_switch_ready"] = function() return enabled and not ctx.paused end,
+		["layout_pause_caption"] = function() return label_for(settings.on_pause) end,
+		["layout_resume_caption"] = function() return label_for(settings.on_resume) end,
 	}, {
-		layout_pause_picker = function() return picker("on_pause") end,
-		layout_resume_picker = function() return picker("on_resume") end,
+		["layout_pause_picker"] = function() return picker("on_pause") end,
+		["layout_resume_picker"] = function() return picker("on_resume") end,
 	}) or {}
 end
 
