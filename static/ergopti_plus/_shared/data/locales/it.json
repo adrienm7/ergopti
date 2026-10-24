@@ -3484,7 +3484,7 @@
 	"dialog.start_at_login.failed": "Impossibile modificare l’avvio automatico. Controlla le impostazioni di avvio del sistema.",
 	"onboarding.error.open_failed": "Impossibile aprire la configurazione guidata. Controlla i registri e riprova dal menu.",
 	"platform_reason.tap_hold_word_reset_not_on_macos": "Non su macOS: lì i tap-hold sono gestiti da Karabiner-Elements e ciò che inviano arriva come tasti digitati sulla tastiera, quindi una scorciatoia inviata da un tap-hold segue l’opzione delle scorciatoie.",
-	"platform_reason.token_streaming_transport_missing": "Non ancora su Windows: la visualizzazione token per token non è stata ancora convalidata su Windows, quindi questa opzione rimane inattiva.",
+	"platform_reason.token_streaming_unvalidated_on_windows": "Non ancora su Windows: la visualizzazione token per token non è stata ancora convalidata su Windows, quindi questa opzione rimane inattiva.",
 	"menu.layout.number_row": "Riga dei numeri",
 	"menu.layout.number_row_native": "Ordine nativo",
 	"menu.layout.number_row_digits": "Numeri prima",

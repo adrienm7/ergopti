@@ -3484,7 +3484,7 @@
 	"dialog.start_at_login.failed": "无法更改自动启动。请检查系统启动设置。",
 	"onboarding.error.open_failed": "无法打开设置向导。请查看日志，然后从菜单重试。",
 	"platform_reason.tap_hold_word_reset_not_on_macos": "macOS 上不可用：那里的点按/长按由 Karabiner-Elements 处理，其输出与键盘上键入的按键无异，因此点按/长按发送的快捷键遵循快捷键选项。",
-	"platform_reason.token_streaming_transport_missing": "Windows 上暂未提供: 逐个令牌显示尚未在 Windows 上验证，因此此选项保持停用。",
+	"platform_reason.token_streaming_unvalidated_on_windows": "Windows 上暂未提供: 逐个令牌显示尚未在 Windows 上验证，因此此选项保持停用。",
 	"menu.layout.number_row": "数字行",
 	"menu.layout.number_row_native": "系统顺序",
 	"menu.layout.number_row_digits": "数字优先",

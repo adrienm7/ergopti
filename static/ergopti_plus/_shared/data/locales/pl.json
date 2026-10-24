@@ -3484,7 +3484,7 @@
 	"dialog.start_at_login.failed": "Nie udało się zmienić automatycznego uruchamiania. Sprawdź ustawienia uruchamiania systemu.",
 	"onboarding.error.open_failed": "Nie udało się otworzyć kreatora konfiguracji. Sprawdź dzienniki i spróbuj ponownie z menu.",
 	"platform_reason.tap_hold_word_reset_not_on_macos": "Nie w macOS: tam klawiszami dotknięcie-przytrzymanie zarządza Karabiner-Elements, a to, co wysyłają, dociera jak klawisze wpisane na klawiaturze, więc skrót wysłany przez taki klawisz podlega opcji skrótów.",
-	"platform_reason.token_streaming_transport_missing": "Jeszcze nie w Windows: wyświetlanie token po tokenie nie zostało zweryfikowane w Windows, więc ta opcja pozostaje nieaktywna.",
+	"platform_reason.token_streaming_unvalidated_on_windows": "Jeszcze nie w Windows: wyświetlanie token po tokenie nie zostało zweryfikowane w Windows, więc ta opcja pozostaje nieaktywna.",
 	"menu.layout.number_row": "Rząd cyfr",
 	"menu.layout.number_row_native": "Kolejność systemowa",
 	"menu.layout.number_row_digits": "Najpierw cyfry",
