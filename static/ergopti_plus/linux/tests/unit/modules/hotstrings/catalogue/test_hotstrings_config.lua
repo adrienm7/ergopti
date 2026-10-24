@@ -10,6 +10,18 @@ local engine_mod = helpers.load_module("modules.hotstrings.engine")
 
 helpers.describe("hotstrings_config", function()
 
+  -- An explicit configuration directory this suite owns. The shared /tmp holds
+  -- other processes' files, any of which a personal-file scan would admit.
+  local Shell = require("adapters.shell_runner")
+  local function with_owned_dir(body)
+    local dir = assert(os.tmpname())
+    os.remove(dir)
+    assert(Shell.run("mkdir -p " .. Shell.quote(dir)))
+    local ok, err = pcall(body, dir)
+    assert(Shell.run("rm -rf -- " .. Shell.quote(dir)))
+    if not ok then error(err, 0) end
+  end
+
   -- Create a minimal engine stub for testing.
   local function make_engine()
     local e = engine_mod.new()
@@ -71,10 +83,11 @@ helpers.describe("hotstrings_config", function()
     end)
 
     helpers.it("init with an explicit config directory leaves the module usable", function()
-      local engine = make_engine()
-      config.init(engine, "/tmp")
-      helpers.assert_eq(type(config.is_group_enabled("anything")), "boolean",
-        "an explicit directory must not change whether the module answers")
+      with_owned_dir(function(dir)
+        config.init(make_engine(), dir)
+        helpers.assert_eq(type(config.is_group_enabled("anything")), "boolean",
+          "an explicit directory must not change whether the module answers")
+      end)
     end)
 
     helpers.it("init with a nil config dir falls back to XDG and still answers", function()
@@ -525,13 +538,15 @@ helpers.describe("hotstrings_config", function()
     end)
 
     helpers.it("(menu-reload-rebuilds-tray) reload asks the menu to rebuild", function()
-      local changes = 0
-      config.init(make_engine(), "/tmp", function() changes = changes + 1 end)
-      local before = changes
-      config.reload()
-      helpers.assert_eq(changes - before, 1,
-        "a reload that left the tray rows live let a click made against an old "
-          .. "checkmark toggle the reloaded state back")
+      with_owned_dir(function(dir)
+        local changes = 0
+        config.init(make_engine(), dir, function() changes = changes + 1 end)
+        local before = changes
+        config.reload()
+        helpers.assert_eq(changes - before, 1,
+          "a reload that left the tray rows live let a click made against an old "
+            .. "checkmark toggle the reloaded state back")
+      end)
     end)
   end)
 
