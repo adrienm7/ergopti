@@ -207,6 +207,30 @@ with a differential fuzz over every repository TOML file before it ships.
 `infra/perf_counters` holds the permanent closed-enum counters and spans, one
 evidence line per minute; measure with `tools/bench/linux-hot-path.lua`.
 
+### project-linux-startup-cost-is-compilation
+
+Before the first boot stage the entry's file-scope requires load about 300
+modules (4.7 MB of Lua); `tools/bench/linux-module-graph.lua` measures them.
+Most of that CPU is LuaJIT compiling source (2026-10-24: 105 of 162 ms;
+the same chunks loaded as bytecode with debug info took 12 ms). A real boot
+calls none of 128 of those modules before `BootProfiler.complete`, but they
+are only 21 ms of compile, some are used at the first key or tray draw on a
+desktop, and the largest (the HTTP engine behind `adapters/http_client`,
+`unicode_case.data`, `llm.parser`) carry identity or test-seam contracts.
+Action: measure with the probe before proposing lazy requires; the lever
+that moves the start is a precompiled-bytecode package, which needs a
+maintainer decision on its staleness contract with the shipped sources.
+
+### project-linux-directory-walks-in-process
+
+Hotstring discovery and the log retention purge walk directories through
+`infra/native_directory.lua` (libuv opendir/readdir, lstat only without
+d_type) with GNU `find -P` semantics kept exactly: pre-order, readdir order,
+links reported and never followed, `-maxdepth`, find's path spelling for a
+root with trailing slashes. It needs no logger, so the sink can use it. Action:
+a new directory walk uses this module instead of forking `find` or `ls`, and
+proves itself with a differential against the real find over a fixture.
+
 ### project-linux-sqlite-cli-invocation
 
 The Linux SQLite CLI runs with `-init /dev/null` and `-bail`, `-readonly` for
