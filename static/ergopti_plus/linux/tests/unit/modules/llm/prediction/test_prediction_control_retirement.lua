@@ -474,7 +474,7 @@ do
 			package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
 			require("compat.utf8").install()
 			local Json = require("json")
-			local state = { requests = {}, cancellations = 0, text = "", caret = 0, output = 0, overlays = {}, chars = 0, controls = 0, forwarded = 0 }
+			local state = { requests = {}, cancellations = 0, text = "", caret = 0, output = 0, overlays = {}, chars = 0, controls = 0, forwarded = 0, read_frame = 1 }
 			fixture_state = state
 			local function noop() end
 			local function yes() return true end
@@ -630,15 +630,22 @@ do
 				end
 			end
 			function state.prepare()
-				local before_suffix = terminal and (key == "k" or key == "e" or key == "f" or key == "d")
-				if before_suffix then state.text = " world" end
-				state.type(before_suffix and "hello" or "hello world")
+				if terminal and key == "n" then
+					state.text = "owned latest history "; state.caret = #state.text
+					state.history_saved_draft, state.history_selected = "hello world", true
+					state.type("typed")
+				else
+					local before_suffix = terminal and (key == "k" or key == "e" or key == "f" or key == "d")
+					if before_suffix then state.text = " world" end
+					state.type(before_suffix and "hello" or "hello world")
+				end
 				if phase ~= "debounce" then scheduler.test.advance(.5); helpers.assert_eq(#state.requests, 1) end
 				if phase == "visible" then state.requests[1].done(state.response, nil); helpers.assert_true(prediction.has_suggestions()) end
 			end
 			function state.control()
 				local codes = { u = 22, h = 35, k = 37, w = 17, c = 46, s = 31, v = 47,
-					b = 48, f = 33, e = 18, d = 32, t = 20 }
+					b = 48, f = 33, e = 18, d = 32, t = 20, p = 25, n = 49, j = 36, m = 50 }
+				local control_text = { p = string.char(16), n = string.char(14), j = "\n", m = "\r" }
 				local code, modifiers = assert(codes[key]), { 29 }
 				if modifier == "ctrl-alt" then modifiers[#modifiers + 1] = 56
 				elseif modifier == "ctrl-meta" then modifiers[#modifiers + 1] = 125
@@ -652,7 +659,7 @@ do
 				state.before_control = { text = state.text, caret = state.caret }
 				hook._test_drive(events, {
 					onPhysical = callbacks.onPhysical, onConsume = callbacks.onConsume,
-					captureEvent = function(c, value) if c == code and value == 1 then return key, key, nil end end,
+					captureEvent = function(c, value) if c == code and value == 1 then return control_text[key] or key, key, nil end end,
 					onChar = function() state.chars = state.chars + 1 end,
 					onKey = function(name, detail)
 						state.controls = state.controls + 1; state.semantic = { name = name, key = detail.key, mods = detail.mods }
@@ -677,6 +684,14 @@ do
 									assert(state.caret == #state.text and state.caret >= 2, "the measured transpose case starts at the line end")
 									state.text = state.text:sub(1, state.caret - 2) .. state.text:sub(state.caret, state.caret)
 										.. state.text:sub(state.caret - 1, state.caret - 1) .. state.text:sub(state.caret + 1)
+								elseif terminal and key == "p" then
+									state.text = "owned latest history"; state.caret = #state.text; state.history_selected = true
+								elseif terminal and key == "n" then
+									assert(state.history_selected and state.history_saved_draft == "hello world")
+									state.text = state.history_saved_draft; state.caret = #state.text; state.history_selected = false
+								elseif terminal and (key == "j" or key == "m") then
+									assert(state.read_frame == 1)
+									state.submitted_line = state.text; state.text = ""; state.caret = 0; state.read_frame = 2
 								elseif not terminal and key == "v" then state.text = state.text:sub(1, state.caret) .. "PASTED" .. state.text:sub(state.caret + 1); state.caret = state.caret + 6
 								elseif not terminal and key == "c" then state.copy_observed = true
 								elseif not terminal and key == "s" then state.saved_text = state.text end
@@ -840,6 +855,63 @@ do
 					s.scheduler.test.advance(2); helpers.assert_eq(#s.requests, 2)
 					s.requests[2].done(s.response, nil); helpers.assert_true(s.prediction.has_suggestions())
 					helpers.assert_eq(s.output, 0, "an offered successor is not an accepted insertion")
+				end)
+			end)
+		end
+	end)
+
+	helpers.describe("whole Main retires Readline history and submitted lines", function()
+		local receiver = { p = { text = "owned latest history", caret = 20 }, n = { text = "hello world", caret = 11 },
+			j = { text = "", caret = 0 }, m = { text = "", caret = 0 } }
+		for _, key in ipairs({ "p", "n", "j", "m" }) do
+			for _, phase in ipairs({ "debounce", "late", "visible" }) do
+				for _, reset in ipairs({ false, true }) do
+					helpers.it("readline-history-retirement " .. key .. " " .. phase .. " reset=" .. tostring(reset), function()
+						whole_main({ key = key, phase = phase, reset = reset }, function(s)
+							s.prepare(); s.control()
+							helpers.assert_eq(s.forwarded, 1); helpers.assert_eq(s.controls, 1)
+							helpers.assert_eq(s.after_control, receiver[key], "receiver must match the separately measured history/read transition")
+							if key == "n" then helpers.assert_eq(s.before_control.text, "owned latest history typed") end
+							if key == "j" or key == "m" then
+								helpers.assert_eq(s.submitted_line, "hello world"); helpers.assert_eq(s.read_frame, 2)
+							end
+							finish_old(s, phase)
+							if phase == "debounce" then helpers.assert_eq(#s.requests, 0, "a pre-transition pending prompt must not dispatch") end
+							helpers.assert_eq(s.prediction.has_suggestions(), false)
+							helpers.assert_eq(s.visible, false); helpers.assert_eq(s.prediction.accept(1), false)
+							helpers.assert_eq({ text = s.text, caret = s.caret }, s.after_control)
+							helpers.assert_eq(s.output, 0)
+						end)
+					end)
+				end
+			end
+		end
+
+		-- GUI printing and modified chords are controlled scope ports only;
+		-- no native GUI or modified C0 meaning is inferred from these checks.
+		for _, specimen in ipairs({ { "p", "ctrl", "owned-gui-editor" }, { "p", "ctrl-alt", "gnome-terminal" },
+			{ "p", "ctrl-meta", "gnome-terminal" }, { "p", "ctrl-altgr", "gnome-terminal" }, { "p", "ctrl-shift", "gnome-terminal" } }) do
+			helpers.it("readline-history-scope " .. table.concat(specimen, " "), function()
+				whole_main({ key = specimen[1], modifier = specimen[2], app = specimen[3] }, function(s)
+					s.prepare(); s.control(); finish_old(s, "late")
+					helpers.assert_eq(s.after_control, s.before_control)
+					helpers.assert_true(s.prediction.has_suggestions())
+					helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.output, 1)
+				end)
+			end)
+		end
+
+		for _, phase in ipairs({ "late", "visible" }) do
+			helpers.it("readline-history-successor dispatch " .. phase, function()
+				whole_main({ key = "p", mode = "dispatch", phase = phase, reset = false }, function(s)
+					s.prepare(); s.control(); helpers.assert_eq(s.after_control, receiver.p)
+					helpers.assert_eq(s.forwarded, 1); helpers.assert_eq(s.controls, 1)
+					helpers.assert_true(s.action_entry.predecessor_retired, "retire the old history context before configured dispatch")
+					helpers.assert_true(s.action_started)
+					s.requests[1].done(s.response, nil); helpers.assert_eq(s.prediction.has_suggestions(), false)
+					s.scheduler.test.advance(2); helpers.assert_eq(#s.requests, 2)
+					s.requests[2].done(s.response, nil); helpers.assert_true(s.prediction.has_suggestions())
+					helpers.assert_eq(s.output, 0)
 				end)
 			end)
 		end

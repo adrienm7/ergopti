@@ -1610,7 +1610,8 @@ local function main()
 			if prediction_engine and mods.ctrl and not (mods.alt or mods.meta or mods.altgr)
 				and (key == "v" or key == "z" or (not mods.shift and (key == "x" or key == "y" or key == "a"
 					or (WordReset.is_terminal_app(_cached_app_id) and (key == "u" or key == "h" or key == "k" or key == "w"
-						or key == "b" or key == "f" or key == "e" or key == "d" or key == "t"))))) then
+						or key == "b" or key == "f" or key == "e" or key == "d" or key == "t"
+						or key == "p" or key == "n" or key == "j" or key == "m"))))) then
 				pcall(function() prediction_engine.withdraw() end)
 			end
 			secure_focus_guard.blocks_text()
