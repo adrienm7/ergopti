@@ -19,6 +19,10 @@
  * This guard fails if the literal port value appears (outside comments) in any
  * of the deferring files, or if one of them stops referencing llm_ollama_port
  * (which would mean the default resolution was silently deleted).
+ *
+ * The Ollama install scripts (install/ollama_install.sh and its PowerShell
+ * twin) probed and announced a typed 11434 too; they now read the port from
+ * the same defaults.json and are held to the same rule.
  * ==============================================================================
  */
 
@@ -37,17 +41,25 @@ const FILES = [
 	'static/ergopti_plus/windows/modules/llm/api_ollama/init.ahk',
 	'static/ergopti_plus/windows/ui/menu/menu_llm/_index.ahk',
 	'static/ergopti_plus/windows/ui/menu/menu_llm/menu_models.ahk',
-	'static/ergopti_plus/windows/ui/menu/menu_llm/menu_settings.ahk'
+	'static/ergopti_plus/windows/ui/menu/menu_llm/menu_settings.ahk',
+	'static/ergopti_plus/_shared/modules/llm/install/ollama_install.sh',
+	'static/ergopti_plus/_shared/modules/llm/install/ollama_install.ps1'
 ];
 
 const SHARED_KEY = 'llm_ollama_port';
 
-// Strip AHK line comments (a ";" at line start or preceded by whitespace) so a
+// Line-comment marker per language: AHK uses ";", shell and PowerShell "#".
+const COMMENT_MARKERS = { '.ahk': ';', '.sh': '#', '.ps1': '#' };
+
+// Strip line comments (the marker at line start or preceded by whitespace) so a
 // documentation mention of the port in a comment is not flagged as a literal.
-function stripComments(src) {
+function stripComments(src, rel) {
+	const marker = COMMENT_MARKERS[path.extname(rel)];
+	if (!marker) throw new Error(`${rel}: no comment marker known for this file type`);
+	const comment = new RegExp(`(^|\\s)${marker}.*$`);
 	return src
 		.split(/\r?\n/)
-		.map((line) => line.replace(/(^|\s);.*$/, '$1'))
+		.map((line) => line.replace(comment, '$1'))
 		.join('\n');
 }
 
@@ -76,7 +88,7 @@ for (const rel of FILES) {
 	const abs = path.join(ROOT, rel);
 	const src = fs.readFileSync(abs, 'utf8');
 	if (!src.includes(SHARED_KEY)) missingRef.push(rel);
-	const lines = stripComments(src).split('\n');
+	const lines = stripComments(src, rel).split('\n');
 	for (let i = 0; i < lines.length; i++) {
 		if (literalRe.test(lines[i])) {
 			violations.push(`${rel}:${i + 1}  ${lines[i].trim()}`);
@@ -102,5 +114,5 @@ if (violations.length > 0 || missingRef.length > 0) {
 }
 
 console.log(
-	`\x1b[32m[OK] No hardcoded Ollama port — all ${FILES.length} AHK files defer to defaults.json llm_ollama_port (${ssot}).\x1b[0m`
+	`\x1b[32m[OK] No hardcoded Ollama port — all ${FILES.length} AHK and install-script files defer to defaults.json llm_ollama_port (${ssot}).\x1b[0m`
 );

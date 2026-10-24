@@ -28,10 +28,20 @@ param(
 
 $ErrorActionPreference = "Continue"
 
+# The default port is declared once, in _shared/modules/llm/defaults.json
+# (llm_ollama_port, pinned by tools/test/test-ollama-port-single-source.cjs).
+# The readiness probe and the server this script starts both use it.
+$LLM_DEFAULTS_FILE = Join-Path (Split-Path -Parent $PSScriptRoot) "defaults.json"
+$OLLAMA_PORT = (Get-Content -Raw -LiteralPath $LLM_DEFAULTS_FILE | ConvertFrom-Json).llm_ollama_port
+if ($null -eq $OLLAMA_PORT) {
+	[Console]::Error.WriteLine("[OLLAMA-DEPS] llm_ollama_port is missing from $LLM_DEFAULTS_FILE.")
+	exit 1
+}
+
 $OLLAMA_INSTALLER_URL = "https://ollama.com/download/OllamaSetup.exe"
 # Unique name avoids conflicts with a locked leftover from a previous run
 $INSTALLER_PATH       = "$env:TEMP\OllamaSetup_ergopti_$([System.Diagnostics.Process]::GetCurrentProcess().Id).exe"
-$OLLAMA_HEALTH_URL    = "http://localhost:11434/api/tags"
+$OLLAMA_HEALTH_URL    = "http://localhost:$OLLAMA_PORT/api/tags"
 $OLLAMA_READY_TIMEOUT = 30
 $UNIFIED_LOG          = "$env:TEMP\ergopti_ollama_serve.log"
 
@@ -157,6 +167,8 @@ if (Test-ServerAlive) {
 	Emit-Marker "OLLAMA_STARTING"
 	Log-Info "Starting Ollama server in background..."
 
+	# The started server inherits the port the probe asks.
+	$env:OLLAMA_HOST = "127.0.0.1:$OLLAMA_PORT"
 	try {
 		$serverProc = Start-Process -FilePath "ollama" -ArgumentList "serve" `
 			-WindowStyle Hidden -PassThru `
@@ -176,7 +188,7 @@ if (Test-ServerAlive) {
 	}
 
 	Emit-Marker "OLLAMA_READY"
-	Log-Info "Server ready at http://localhost:11434."
+	Log-Info "Server ready at http://localhost:$OLLAMA_PORT."
 }
 
 
