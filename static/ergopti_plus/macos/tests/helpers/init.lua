@@ -796,6 +796,9 @@ function M.make_logger_stub()
 		info    = noop, start   = noop, success = noop, evidence = noop,
 		warn    = noop, error   = noop,
 		set_level = noop, set_sink = noop, is_enabled = function() return false end,
+		-- The real thresholds: production reads Logger.LEVELS.INFO before it
+		-- asks is_enabled, so a stub without them raises on a menu rebuild.
+		LEVELS = require("logger").LEVELS,
 		ring_buffer_snapshot = function() return {} end,
 		session_issues = function() return { warn_count = 0, err_count = 0, last_error = nil } end,
 		pcall   = function(_, fn, ...) return pcall(fn, ...) end,
