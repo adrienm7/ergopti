@@ -441,19 +441,27 @@ _ComposerCheck_ShowWindow(Title, Text, TitleKey := "menu.debug.composer_check") 
 
 /**
  * Copies a report to the clipboard and says so.
+ * The write goes through the clipboard owner: a raw A_Clipboard assignment is
+ * recorded by the metrics clipboard watcher as a copy the user made. As on
+ * macOS and Linux, the notice is shown only when the copy succeeded.
  * @param {string} Text - The report text.
- * @param {Func} WriteFn - Receives the text; the clipboard by default.
+ * @param {Func} WriteFn - Receives the text and returns true once written; CB_Write by default.
  * @param {Func} NoticeFn - Receives the notice text; a tray tip by default.
  * @param {string} TitleKey - Locale key of the tray tip's title.
+ * @returns {Boolean} True when the report reached the clipboard.
  */
 ComposerCheck_CopyReport(Text, WriteFn := 0, NoticeFn := 0, TitleKey := "menu.debug.composer_check") {
 	global COMPOSER_CHECK_TAG
 	if !HasMethod(WriteFn, "Call")
-		WriteFn := (Value) => A_Clipboard := Value
+		WriteFn := CB_Write
 	if !HasMethod(NoticeFn, "Call")
 		NoticeFn := (Notice) => TrayTip(Notice, WindowTitle(t(TitleKey)))
 	; The clipboard takes Windows line breaks, as the window's own text has.
-	WriteFn.Call(StrReplace(Text, "`n", "`r`n"))
+	if WriteFn.Call(StrReplace(Text, "`n", "`r`n")) != true {
+		LoggerWarn(COMPOSER_CHECK_TAG, "Report not copied: the clipboard refused the write.")
+		return false
+	}
 	LoggerInfo(COMPOSER_CHECK_TAG, "Report copied to the clipboard.")
 	NoticeFn.Call(t("field_check.copied"))
+	return true
 }
