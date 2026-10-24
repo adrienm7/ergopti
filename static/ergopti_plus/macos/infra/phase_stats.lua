@@ -16,7 +16,7 @@
 ---    for counters and nothing else.
 --- 2. Closed names only: phase names are source constants (menu item ids, stage
 ---    names). No typed text, path or URL ever enters a phase name or a value.
---- 3. Hold attribution: a phase that lasts RING_MIN_MS or more is also written
+--- 3. Hold attribution: a phase that lasts RING_MIN_NS or more is also written
 ---    to a small ring so the slow-callback report can name the phases that ran
 ---    during the held window (recent_since).
 --- 4. One owner for the interval: start()/stop() pair the flush timer and
@@ -39,9 +39,12 @@ local LOG = "phase_stats"
 
 M.DEFAULT_INTERVAL_SEC = 300
 
--- Phases at least this long also enter the attribution ring.
-local RING_MIN_NS = 2 * 1e6
-local RING_SIZE   = 32
+-- Phases at least this long also enter the attribution ring. The ring holds
+-- the last slow phases a held callback can name, not keystrokes: it is a
+-- different buffer from infra/keystroke_integrity.lua's 64-decision RING_SIZE,
+-- and the two sizes answer different questions.
+local RING_MIN_NS           = 2 * 1e6
+local ATTRIBUTION_RING_SIZE = 32
 local NS_PER_MS   = 1e6
 -- A family line lists at most this many phases, busiest first by total time.
 local MAX_PHASES_PER_LINE = 24
@@ -108,7 +111,7 @@ function M.add(name, elapsed_ns)
 	phase.total = phase.total + elapsed_ns
 	if elapsed_ns > phase.max then phase.max = elapsed_ns end
 	if elapsed_ns >= RING_MIN_NS then
-		_ring_head = _ring_head % RING_SIZE + 1
+		_ring_head = _ring_head % ATTRIBUTION_RING_SIZE + 1
 		_ring_name[_ring_head] = name
 		_ring_end[_ring_head] = M.now()
 		_ring_dur[_ring_head] = elapsed_ns
@@ -154,7 +157,7 @@ end
 --- @return string|nil list `name=12.3 ms, name=4.1 ms`, nil when none ran.
 function M.recent_since(since_ns)
 	local found = {}
-	for slot = 1, RING_SIZE do
+	for slot = 1, ATTRIBUTION_RING_SIZE do
 		if _ring_name[slot] ~= nil and _ring_end[slot] >= since_ns then
 			found[#found + 1] = { name = _ring_name[slot], dur = _ring_dur[slot] }
 		end
