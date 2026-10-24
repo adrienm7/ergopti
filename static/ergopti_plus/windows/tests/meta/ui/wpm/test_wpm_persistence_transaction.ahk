@@ -29,7 +29,7 @@ _WPMPT_SaveHelperPropagatesFailure() {
 Test("wpm persistence: write helper reports failed TOML commits", _WPMPT_SaveHelperPropagatesFailure)
 
 _WPMPT_SaveFunctionsPublishThroughGateway() {
-    for Name in ["WPMWidget_SaveVisible", "WPMWidget_SavePosition", "WPMWidget_SaveConfig"] {
+    for Name in ["WPMWidget_SaveVisible"] {
         Body := _WPMPT_Body(Name)
         PersistPos := InStr(Body, "_WPMWidget_SaveBuilt(")
         Assert(InStr(Body, "BuildFn :=") > 0 && InStr(Body, ".Bind(") > 0,
@@ -48,6 +48,21 @@ _WPMPT_SaveFunctionsPublishThroughGateway() {
 }
 Test("wpm persistence: save functions publish detached candidates inside the gateway",
     _WPMPT_SaveFunctionsPublishThroughGateway)
+
+_WPMPT_PositionGoesToStorageNotConfig() {
+    Save := _WPMPT_Body("WPMWidget_SavePosition")
+    Assert(InStr(Save, "_WPMWidget_StorePosition(") > 0 && InStr(Save, "_WPMWidget_SaveBuilt(") = 0,
+        "the saved anchor is stored through the Storage port, never written to config.toml")
+    Store := _WPMPT_Body("_WPMWidget_StorePosition")
+    Failed := InStr(Store, "if !Stored")
+    Publish := InStr(Store, "WPMWidget.pos_x := TargetX")
+    Assert(Failed > 0 && Publish > Failed && InStr(Store, "ConfigReportPersistenceFailure(") > Failed,
+        "the anchor is published only after both coordinates are stored, and a refusal is reported")
+    Assert(InStr(_WPMPT_Body("WPMWidget_LoadConfig"), "_WPMWidget_StoreGet") > 0,
+        "the saved anchor is read from the Storage port")
+}
+Test("wpm persistence: the anchor lives in the Storage port, not in config.toml",
+    _WPMPT_PositionGoesToStorageNotConfig)
 
 _WPMPT_TogglePersistsBeforeVisibilityMutation() {
     Body := _WPMPT_Body("WPMWidget_Toggle")
@@ -69,7 +84,7 @@ _WPMPT_MenuActionsCommitBeforePublish() {
         "WPM colors toggle must submit its target through the persistence gateway")
 
     Graph := _WPMPT_Body("_ToggleWpmWidgetGraph")
-    GraphSave := InStr(Graph, "WPMWidget_ToggleGraphConfig(WriterFn, NotifyFn)")
+    GraphSave := InStr(Graph, "WPMWidget_ToggleGraphConfig(WriterFn, NotifyFn, StoreFn)")
     HidePos := InStr(Graph, "WPMWidget_Hide()")
     DestroyPos := InStr(Graph, ".Destroy()")
     Assert(GraphSave > 0 && HidePos > GraphSave && DestroyPos > GraphSave,
@@ -87,12 +102,12 @@ Test("wpm persistence: menu toggles publish only after durable commit", _WPMPT_M
 
 _WPMPT_DragUsesCandidatePosition() {
     Body := _WPMPT_Body("WPMWidget_DragEnd")
-    SavePos := InStr(Body, "WPMWidget_SavePosition(NewX, NewY, WriterFn, NotifyFn)")
+    SavePos := InStr(Body, "WPMWidget_SavePosition(NewX, NewY, StoreFn, NotifyFn)")
     RestorePos := InStr(Body, "_WPMWidget_ApplySurfaceGeometry(gui_ref)")
     Assert(SavePos > 0 && InStr(Body, "WPMWidget.pos_x :=") = 0
         && InStr(Body, "WPMWidget.pos_y :=") = 0,
         "WPM drag-end must leave candidate publication to the owned commit")
-    Assert(InStr(Body, "if !WPMWidget_SavePosition(NewX, NewY, WriterFn, NotifyFn)") > 0
+    Assert(InStr(Body, "if !WPMWidget_SavePosition(NewX, NewY, StoreFn, NotifyFn)") > 0
         && RestorePos > SavePos && InStr(Body, 'HasMethod(MoveFn, "Call")') > 0,
         "a refused dragged position must restore the live window from the retained anchor")
 }

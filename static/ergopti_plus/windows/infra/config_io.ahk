@@ -1494,8 +1494,6 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		Updates.Push({ Section: "metrics", Key: "encrypt", Value: TOML_Bool(MetricsFilters.encrypt) })
 		Updates.Push({ Section: "metrics", Key: "disabled_apps", Value: apps })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: WPMWidget.visible })
-		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_X,       Value: WPMWidget.pos_x })
-		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_Y,       Value: WPMWidget.pos_y })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS, Value: WPMWidget.use_colors })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH, Value: WPMWidget.show_graph })
 		; The flat [llm] keys below round-trip through _LLM_Menu DIRECTLY (not via

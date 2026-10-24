@@ -439,12 +439,12 @@ WPMWidget_DragStart(ctrl, info, PostFn := 0, *) {
 }
 
 WPMWidget_DragEnd(WParam := 0, LParam := 0, Message := 0, Hwnd := 0,
-		MoveFn := 0, WriterFn := 0, NotifyFn := 0, *) {
+		MoveFn := 0, StoreFn := 0, NotifyFn := 0, *) {
 		InheritedCritical := A_IsCritical
 		if InheritedCritical {
 				Critical("Off")
 				try return WPMWidget_DragEnd(WParam, LParam, Message, Hwnd,
-						MoveFn, WriterFn, NotifyFn)
+						MoveFn, StoreFn, NotifyFn)
 				finally Critical(InheritedCritical)
 		}
 		if !WPMWidget._dragging
@@ -462,7 +462,7 @@ WPMWidget_DragEnd(WParam := 0, LParam := 0, Message := 0, Hwnd := 0,
 				NewX := fx
 				NewY := fy
 		}
-		if !WPMWidget_SavePosition(NewX, NewY, WriterFn, NotifyFn) {
+		if !WPMWidget_SavePosition(NewX, NewY, StoreFn, NotifyFn) {
 				; Native dragging has already moved the window. A refused durable
 				; candidate must restore the retained anchor as well as retain RAM.
 				try {

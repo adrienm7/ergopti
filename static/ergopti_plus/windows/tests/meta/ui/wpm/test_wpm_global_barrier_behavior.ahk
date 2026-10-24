@@ -118,6 +118,19 @@ _WPMGB_Writer(Path, Updates) {
 	return _WPMGB_WriteResult
 }
 
+global _WPMGB_StoreCalls := 0
+
+; The Storage port fake: records the pair the widget stores and can refuse it.
+_WPMGB_Store(Key, Value) {
+	global _WPMGB_StoreCalls
+	_WPMGB_StoreCalls += 1
+	return true
+}
+
+_WPMGB_FailingStore(Key, Value) {
+	return false
+}
+
 _WPMGB_Notify(Message, Options) {
 	global _WPMGB_NotifyCalls, _WPMGB_NotifyCritical
 	_WPMGB_NotifyCalls += 1
@@ -217,17 +230,17 @@ _WPMGB_PublishesOnlyAfterWriter() {
 		WPMWidget.pos_y := 20
 		_WPMGB_ResetFakes()
 		AssertTrue(WPMWidget_SaveConfig(true, true, 30, 40,
-			_WPMGB_Writer, _WPMGB_Notify))
+			_WPMGB_Writer, _WPMGB_Notify, _WPMGB_Store))
 		AssertEqual(1, _WPMGB_WriteCalls,
 			"one WPM candidate must perform exactly one owned writer call")
 		AssertFalse(_WPMGB_ObservedState.colors,
 			"colors must remain unpublished while the writer runs")
 		AssertFalse(_WPMGB_ObservedState.graph,
 			"graph mode must remain unpublished while the writer runs")
-		AssertEqual(10, _WPMGB_ObservedState.x,
-			"X must remain unpublished while the writer runs")
-		AssertEqual(20, _WPMGB_ObservedState.y,
-			"Y must remain unpublished while the writer runs")
+		AssertEqual(30, _WPMGB_ObservedState.x,
+			"the anchor is stored before the configuration writer runs")
+		AssertEqual(40, _WPMGB_ObservedState.y,
+			"the anchor is stored before the configuration writer runs")
 		AssertTrue(WPMWidget.use_colors)
 		AssertTrue(WPMWidget.show_graph)
 		AssertEqual(30, WPMWidget.pos_x)
@@ -380,9 +393,8 @@ _WPMGB_RejectedDragRestoresPhysicalWindow() {
 		WPMWidget._gui := DraggedGui
 		WPMWidget._graph_gui := false
 		_WPMGB_ResetFakes()
-		Barrier := _ConfigWriteTerminalTryAcquire(ConfigurationFile)
-		Assert(Barrier is Object)
-		WPMWidget_DragEnd(0, 0, 0, 0, _WPMGB_RecordRestore)
+		WPMWidget_DragEnd(0, 0, 0, 0, _WPMGB_RecordRestore, _WPMGB_FailingStore,
+			_WPMGB_Notify)
 		AssertEqual(1, _WPMGB_RestoreCalls,
 			"a rejected native drag must restore the physical window exactly once")
 		Assert(ObjPtr(_WPMGB_RestoredGui) = ObjPtr(DraggedGui),
@@ -484,20 +496,14 @@ _WPMGB_InheritedCriticalStopsAtCompleteUserActions() {
 		WPMWidget._dragging := true
 		WPMWidget._gui := Surface
 		WPMWidget._graph_gui := false
-		Barrier := _ConfigWriteTerminalTryAcquire(ConfigurationFile)
-		AssertTrue(Barrier is Object)
-		try WPMWidget_DragEnd(0, 0, 0, 0, _WPMGB_RecordRestore,
-			_WPMGB_Writer, _WPMGB_Notify)
-		finally {
-			_ConfigWriteTerminalRelease(Barrier)
-			Barrier := false
-		}
+		WPMWidget_DragEnd(0, 0, 0, 0, _WPMGB_RecordRestore,
+			_WPMGB_FailingStore, _WPMGB_Notify)
 		AssertTrue(A_IsCritical,
 			"WPMWidget_DragEnd must restore inherited Critical")
 
 		WPMWidget.visible := true
 		WPMWidget._gui := Surface
-		AssertTrue(WPMWidget_ResetPosition(_WPMGB_Writer, _WPMGB_Notify,
+		AssertTrue(WPMWidget_ResetPosition(_WPMGB_Store, _WPMGB_Notify,
 			_WPMGB_DefaultPos, _WPMGB_ShowPos, _WPMGB_RecordMove))
 		AssertTrue(A_IsCritical,
 			"WPMWidget_ResetPosition must restore inherited Critical")
@@ -553,7 +559,7 @@ _WPMGB_InheritedCriticalStopsAtCompleteUserActions() {
 		WPMWidget._lbl_unit := false
 		Critical("On")
 		_ToggleWpmWidgetGraph(_WPMGB_Writer, _WPMGB_Notify,
-			_WPMGB_RecordHide, _WPMGB_RecordShow, _WPMGB_RebuildMenu)
+			_WPMGB_RecordHide, _WPMGB_RecordShow, _WPMGB_RebuildMenu, _WPMGB_Store)
 		AssertTrue(A_IsCritical,
 			"the WPM graph action must restore inherited Critical")
 		Critical("Off")
@@ -610,7 +616,7 @@ _WPMGB_MenuRefusalDoesNotPublish() {
 		AssertFalse(_ToggleWpmWidgetColors(_WPMGB_Writer, _WPMGB_Notify,
 			_WPMGB_RebuildMenu))
 		AssertFalse(_ToggleWpmWidgetGraph(_WPMGB_Writer, _WPMGB_Notify,
-			_WPMGB_RecordHide, _WPMGB_RecordShow, _WPMGB_RebuildMenu))
+			_WPMGB_RecordHide, _WPMGB_RecordShow, _WPMGB_RebuildMenu, _WPMGB_Store))
 		AssertFalse(_ToggleWpmWidget(() => false, _WPMGB_RebuildMenu))
 		AssertEqual(2, _WPMGB_WriteCalls)
 		AssertEqual(0, _WPMGB_RebuildCritical.Length,

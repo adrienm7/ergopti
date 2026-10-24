@@ -116,16 +116,16 @@ _ToggleWpmWidgetColors(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 }
 
 _ToggleWpmWidgetGraph(WriterFn := 0, NotifyFn := 0, HideFn := 0,
-		ShowFn := 0, RebuildFn := 0) {
+		ShowFn := 0, RebuildFn := 0, StoreFn := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
 		try return _ToggleWpmWidgetGraph(WriterFn, NotifyFn, HideFn, ShowFn,
-			RebuildFn)
+			RebuildFn, StoreFn)
 		finally Critical(InheritedCritical)
 	}
 	; Commit graph and anchor together before destroying the live surface.
-	if !WPMWidget_ToggleGraphConfig(WriterFn, NotifyFn)
+	if !WPMWidget_ToggleGraphConfig(WriterFn, NotifyFn, StoreFn)
 		return false
 	WasVisible := WPMWidget.visible
 	if WasVisible {

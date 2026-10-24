@@ -119,6 +119,36 @@ async function main() {
 		'metrics.disabled_apps is declared for every driver'
 	);
 	assert.deepEqual(disabledApps.default, [], 'nothing is excluded until the user says so');
+	// PAR-4: the saved place of the pill is state, not a preference. It lives in
+	// each driver's Storage port under the two keys of the shared canon, and no
+	// driver source restates them.
+	assert.deepEqual(
+		metricsEntries.filter((entry) => /^wpm_widget_[xy]$/.test(entry.id)).map((entry) => entry.id),
+		[],
+		'the widget position is not a configuration key'
+	);
+	const wpmCanon = parse(
+		fs.readFileSync(paths.shared('modules/wpm_widget/constants.toml'), 'utf8')
+	);
+	assert.deepEqual(wpmCanon.position, {
+		storage_x: 'wpm_widget.pos_x',
+		storage_y: 'wpm_widget.pos_y'
+	});
+	for (const driver of ['windows', 'macos', 'linux']) {
+		(function walk(dir) {
+			for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+				const full = path.join(dir, entry.name);
+				if (entry.isDirectory()) {
+					if (!['tests', '_generated', 'vendor'].includes(entry.name)) walk(full);
+				} else if (/\.(lua|ahk)$/.test(entry.name)) {
+					assert(
+						!/wpm_widget\.pos_[xy]/.test(fs.readFileSync(full, 'utf8')),
+						`${full} restates a widget position key: read it from the shared canon`
+					);
+				}
+			}
+		})(path.join(paths.shared('..'), driver));
+	}
 	for (const [id, platforms, shipped] of [
 		['wpm_widget_visible', ['ahk', 'hs', 'linux'], false],
 		['wpm_widget_colors', ['ahk', 'hs', 'linux'], false],

@@ -57,8 +57,6 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 		{ target: MetricsFilters, key: "system_auth", path: "metrics.system_auth_filter_enabled" },
 		{ target: MetricsFilters, key: "encrypt", path: "metrics.encrypt" },
 		{ target: WPMWidget, key: "visible", path: "metrics.wpm_widget_visible" },
-		{ target: WPMWidget, key: "pos_x", path: "metrics.wpm_widget_x" },
-		{ target: WPMWidget, key: "pos_y", path: "metrics.wpm_widget_y" },
 		{ target: WPMWidget, key: "use_colors", path: "metrics.wpm_widget_colors" },
 		{ target: WPMWidget, key: "show_graph", path: "metrics.wpm_widget_graph" }]
 	PriorFields := [], PriorApps := MetricsFilters.disabled_apps
@@ -372,8 +370,6 @@ _FMS_PersonalFileCaseAlias(Path, Name) {
 		{ target: MetricsFilters, key: "system_auth", path: "metrics.system_auth_filter_enabled" },
 		{ target: MetricsFilters, key: "encrypt", path: "metrics.encrypt" },
 		{ target: WPMWidget, key: "visible", path: "metrics.wpm_widget_visible" },
-		{ target: WPMWidget, key: "pos_x", path: "metrics.wpm_widget_x" },
-		{ target: WPMWidget, key: "pos_y", path: "metrics.wpm_widget_y" },
 		{ target: WPMWidget, key: "use_colors", path: "metrics.wpm_widget_colors" },
 		{ target: WPMWidget, key: "show_graph", path: "metrics.wpm_widget_graph" }]
 	PriorFields := [], PriorApps := MetricsFilters.disabled_apps

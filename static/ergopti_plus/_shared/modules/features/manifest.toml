@@ -1651,24 +1651,9 @@ input_altering = false
 type = "boolean"
 description_key = "menu.metrics.wpm_widget_visible"
 
-[[features.metrics]]
-id = "wpm_widget_x"
-platforms = ["ahk"]
-default = -1
-recommended = -1
-input_altering = false
-type = "number"
-description_key = "menu.metrics.wpm_widget_x"
-
-[[features.metrics]]
-id = "wpm_widget_y"
-platforms = ["ahk"]
-default = -1
-recommended = -1
-input_altering = false
-type = "number"
-description_key = "menu.metrics.wpm_widget_y"
-
+# The saved place of the floating pill is not declared here: it is where the
+# user left it, kept in each driver's Storage port under the keys of
+# _shared/modules/wpm_widget/constants.toml [position].
 [[features.metrics]]
 id = "wpm_widget_colors"
 # Linux used to colour the pill by keystroke origin while Windows ships it

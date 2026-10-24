@@ -38,10 +38,8 @@ local PREF_PATHS = {
 }
 
 
--- Where the choices are kept.
-local PREF_PREFIX = "wpm_widget."
-local POS_X_KEY = PREF_PREFIX .. "pos_x"
-local POS_Y_KEY = PREF_PREFIX .. "pos_y"
+-- Where the pill was left is kept in Storage under the two keys the shared
+-- canon names ([position]), the same on every driver.
 
 -- The refresh, colour hold and idle hide, from the shared timings.
 local UPDATE_S    = Timings.sec("ui", "wpm_widget_update_ms")
@@ -123,11 +121,20 @@ local function store_bool(key, value)
 	return Preferences.set(assert(PREF_PATHS[key]), value)
 end
 
+--- The two Storage keys of the saved place, from the shared canon.
+--- @return string|nil x_key, string|nil y_key Nil when the canon is unusable.
+local function position_keys()
+	local canon = Constants.load()
+	if not canon then return nil, nil end
+	return canon.position.storage_x, canon.position.storage_y
+end
+
 --- The pill's saved top-left corner, or nil for the default place.
 local function stored_anchor()
 	local Storage = storage()
-	if not Storage then return nil end
-	local x, y = tonumber(Storage.get(POS_X_KEY, nil)), tonumber(Storage.get(POS_Y_KEY, nil))
+	local x_key, y_key = position_keys()
+	if not Storage or not x_key then return nil end
+	local x, y = tonumber(Storage.get(x_key, nil)), tonumber(Storage.get(y_key, nil))
 	if not x or not y then return nil end
 	return { x = x, y = y }
 end
@@ -150,7 +157,8 @@ local function on_moved(x, y)
 	if not frame or not canon then return end
 	local ax, ay = Model.anchor_from_origin(canon, frame, x, y)
 	_state.anchor = { x = ax, y = ay }
-	if not store_position({ [POS_X_KEY] = ax, [POS_Y_KEY] = ay }) then
+	local x_key, y_key = position_keys()
+	if not store_position({ [x_key] = ax, [y_key] = ay }) then
 		Logger.error(LOG, "The widget's new place could not be saved — it returns to the last one on restart.")
 		return
 	end
@@ -375,7 +383,8 @@ end
 --- @return boolean
 function M.reset_position()
 	if _restore_debt or not Preferences.admit() then return false end
-	if not store_position({}, { POS_X_KEY, POS_Y_KEY }) then
+	local x_key, y_key = position_keys()
+	if not x_key or not store_position({}, { x_key, y_key }) then
 		Logger.error(LOG, "The widget's saved place could not be cleared.")
 		return false
 	end
