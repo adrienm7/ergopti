@@ -113,6 +113,7 @@
 		"test:is-word-flag-is-honoured-identically": "node ./tools/test/test-is-word-flag-is-honoured-identically.cjs",
 		"test:logger-scalars": "node ./tools/test/test-logger-scalars-single-source.cjs",
 		"test:config-keys-codegen": "node ./tools/test/test-config-keys-codegen.cjs",
+		"test:config-key-literals": "node ./tools/test/test-config-key-literals.cjs",
 		"test:log-file-names-single-source": "node ./tools/test/test-log-file-names-single-source.cjs",
 		"test:locale-names": "node ./tools/test/test-locale-names-single-source.cjs",
 		"test:new-driver": "node ./tools/test/test-new-driver-scaffold.cjs",
