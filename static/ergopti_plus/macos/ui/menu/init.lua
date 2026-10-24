@@ -203,7 +203,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	Logger.info(LOG, "Menubar created successfully.")
 
 	local updateMenu
-	local _suppress_watcher_until = 0
+	local _suppress_watcher_until_awake = 0
 
 	-- Menu-cache state. Builder.generate() is expensive (counts every hotstring
 	-- group, builds the layout/apps/tap-holds submenus, renders the badge), and
@@ -926,7 +926,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		pcall(core_mods.shortcuts_mod.set_extras, {
 			open_init = function()
 				return DeferredWork.after(0, function()
-					_suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8
+					_suppress_watcher_until_awake = TimerScheduler.awake_time() + 8
 					pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "init.lua"))
 				end, "menu.open_init")
 			end,
@@ -966,7 +966,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end,
 			open_config = function()
 				return DeferredWork.after(0, function()
-					_suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8
+					_suppress_watcher_until_awake = TimerScheduler.awake_time() + 8
 					pcall(hs.execute, "open " .. text_utils.shell_quote(MenuPaths.get("ConfigTomlPath")))
 				end, "menu.open_config")
 			end,
@@ -1726,7 +1726,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- file changes that occurred during the previous (possibly cascading) boot
 	-- would immediately trigger another hs.reload(), causing an infinite loop.
 	local BOOT_SUPPRESS_SEC = 5
-	_suppress_watcher_until = hs.timer.secondsSinceEpoch() + BOOT_SUPPRESS_SEC
+	_suppress_watcher_until_awake = TimerScheduler.awake_time() + BOOT_SUPPRESS_SEC
 	Logger.debug(LOG, "Pathwatcher boot suppression active for %.0f s.", BOOT_SUPPRESS_SEC)
 
 	-- The same exclusion list infra/file_watchers already receives. Two recursive
@@ -1734,7 +1734,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local configWatcher = MenuWatchers.start_config_watcher(
 		base_dir,
 		function() return do_reload("watcher") end,
-		function() return _suppress_watcher_until end,
+		function() return _suppress_watcher_until_awake end,
 		ui_restore,
 		{ (hs.configdir or ".") .. "/cache" },
 		-- Resolved from MenuPaths, exactly as infra/file_watchers resolves the same

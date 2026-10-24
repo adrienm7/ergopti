@@ -16,6 +16,7 @@ local hs          = hs
 local Logger      = require("infra.logger")
 local git_status  = require("infra.git_status")
 local reload_gate = require("reload_gate")
+local TimerScheduler = require("adapters.timer_scheduler")
 local LOG         = "menu_watchers"
 
 
@@ -72,10 +73,10 @@ end
 --- for editing from within the menu itself).
 --- @param base_dir string Directory to watch.
 --- @param on_reload function Callback invoked when a relevant file change is detected.
---- @param get_suppress_until function Returns the epoch timestamp until which events are suppressed.
+--- @param get_suppress_until_awake function Returns the TimerScheduler awake-time suppression deadline.
 --- @param ui_restore table lib.ui_restore module (provides defer_reload).
 --- @return table|nil Composite watcher/timer lifecycle owner, or nil on failure.
-function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_restore, ignored_dirs, self_written_files)
+function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, ui_restore, ignored_dirs, self_written_files)
 	-- Single debounce/poll timer shared across all pathwatcher callbacks; cancelled
 	-- and restarted on every new event so that a burst of changes produces only
 	-- one reload fired once the burst settles.
@@ -256,7 +257,7 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 		if not _lifecycle_active or not _callback_admitted then return end
 		-- HTML/CSS/JS are webview assets loaded at open-time — changing them
 		-- never requires hs.reload(); only .lua and .toml affect runtime behavior
-		if hs.timer.secondsSinceEpoch() < get_suppress_until() then return end
+		if TimerScheduler.awake_time() < get_suppress_until_awake() then return end
 		if type(files) ~= "table" then return end
 		local matched = false
 		for _, file in pairs(files) do
