@@ -49,7 +49,7 @@ _HESO_ChildSource(Owners, IndexHash) {
 	Owners["LocaleTableData"] := Map("path", LocaleOwner, "sha256", CryptoSha256Bytes(FSReadBytesStrict(LocaleOwner)))
 	for Symbol in ["JsonStringLiteral", "CryptoSha256Bytes", "TickElapsed", "KL_JsonEncode",
 		"OpenHotstringsConfigWindow", "_HCWWeb_TryOpen", "HotstringsLanguagePacks", "ReadTomlFile",
-		"TOML_StripInlineComment", "FSReadBytesStrict"] {
+		"TOML_StripInlineComment", "FSReadBytesStrict", "PerfCount"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The unique actual child path must resolve: " . Symbol)
 		Text := FSReadStrict(Owner)
@@ -61,7 +61,7 @@ _HESO_ChildSource(Owners, IndexHash) {
 			Includes .= "#Include " . Owner . "`n"
 		}
 	}
-	AssertEqual(10, Seen.Count, "The public/data/lifecycle/clock/codec owners must be genuine whole files")
+	AssertEqual(11, Seen.Count, "The public/data/lifecycle/clock/codec/counter owners must be genuine whole files")
 	Fixture := _DriverDir . "\tests\fixtures\hcw_early_show_owner_body.ahk"
 	AssertTrue(FileExist(Fixture))
 	Owners["fixture"] := Map("path", Fixture, "sha256", CryptoSha256Bytes(FSReadBytesStrict(Fixture)))
