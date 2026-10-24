@@ -1561,15 +1561,33 @@ local function main()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 				require("ui.model_browser.bridge").reproject_current()
 			end,
-			on_offer = function(context)
+			on_offer = function(context, count)
 				local output_app = type(context) == "table" and context.app_id or _cached_app_id
 				keystats.record_suggestion(output_app or "Unknown", "llm", math.floor(Monotonic.now_ms()))
+				keystats.record_llm_event(output_app or "Unknown", "suggested", { count = count })
+			end,
+			-- An offer that went unused, with what was shown
+			on_dismiss = function(context, shown)
+				local output_app = type(context) == "table" and context.app_id or _cached_app_id
+				keystats.record_llm_event(output_app or "Unknown", "dismissed", { all_predictions = shown })
+			end,
+			-- A prediction request answered: how many candidates, and the tokens the backend reported
+			on_generation = function(context, info)
+				local output_app = type(context) == "table" and context.app_id or _cached_app_id
+				keystats.record_llm_event(output_app or "Unknown", "generation", info)
 			end,
 			on_output = function(text, context)
 				local output_app = type(context) == "table" and context.app_id or _cached_app_id
 				keystats.record_synthetic_output(output_app, text, "llm",
 					math.floor(Monotonic.now_ms()), 0,
 					type(context) == "table" and context.input_chars or 0)
+				-- The row of the dashboard's AI tab: only an offer the user took has one
+				local acceptance = type(context) == "table" and context.acceptance or nil
+				if acceptance then
+					keystats.record_llm_event(output_app or "Unknown", "accepted", {
+						prediction = text, all_predictions = acceptance.all_predictions,
+						chosen_index = acceptance.chosen_index, deletes = acceptance.deletes })
+				end
 			end,
 		})
 	end

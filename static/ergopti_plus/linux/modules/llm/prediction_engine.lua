@@ -63,7 +63,9 @@ local _keyboard_hook = nil
 local _overlay = nil
 local _apply_prediction = nil
 local _on_output = nil
-local _on_offer = nil
+-- The metrics observers: offer(context, count), dismiss(context, shown), generation(context, info).
+-- One table: the main chunk is at the interpreter's limit of 200 locals.
+local _observers = {}
 local _offer_notified = false
 local _suggestions = {}
 local _suggestion_context = nil
@@ -345,6 +347,14 @@ local function hide_overlay()
 end
 
 local function clear_offer(defer_hide)
+	-- An offer that was shown and not taken is a dismissal for the metrics.
+	if _observers.dismiss and _offer_notified and #_suggestions > 0 and _suggestion_context
+		and _suggestion_context.acceptance == nil and _suggestion_context.agent == nil then
+		local shown = {}
+		for index, candidate in ipairs(_suggestions) do shown[index] = candidate.to_type end
+		local ok, err = pcall(_observers.dismiss, _suggestion_context, shown)
+		if not ok then Logger.warn(LOG, "Prediction dismissal observer failed: %s", tostring(err)) end
+	end
 	-- Revoke the old offer before a native hide callback can publish a successor.
 	-- Accepted output defers that callback until its transport has been retired.
 	_suggestions = {}
@@ -357,8 +367,8 @@ local function show_candidates(candidates, meta)
 	_suggestions = type(candidates) == "table" and candidates or {}
 	if #_suggestions > 0 and not _offer_notified then
 		_offer_notified = true
-		if _on_offer then
-			local ok, err = pcall(_on_offer, _suggestion_context)
+		if _observers.offer then
+			local ok, err = pcall(_observers.offer, _suggestion_context, #_suggestions)
 			if not ok then Logger.warn(LOG, "Prediction offer observer failed: %s", tostring(err)) end
 		end
 	end
@@ -539,7 +549,11 @@ function M.init(opts)
 			active = _overlay and rawget(_overlay, "active_index") }
 	end
 	_on_output = type(options.on_output) == "function" and options.on_output or nil
-	_on_offer = type(options.on_offer) == "function" and options.on_offer or nil
+	_observers = {
+		offer = type(options.on_offer) == "function" and options.on_offer or nil,
+		dismiss = type(options.on_dismiss) == "function" and options.on_dismiss or nil,
+		generation = type(options.on_generation) == "function" and options.on_generation or nil,
+	}
 	_is_paused = type(options.is_paused) == "function" and options.is_paused or NEVER_PAUSED
 	_notify = type(options.notify) == "function" and options.notify or nil
 	_privacy_guard, _privacy_context = options.privacy_guard, options.privacy_context
@@ -803,6 +817,8 @@ function M.predict(context, output_context, override)
 	local messages = PromptBuilder.build_messages(system_prompt, params.context, params.context_tail)
 	local candidates = {}
 	local request_index = 0
+	-- The token counts the backend reported, summed over this prediction's variants
+	local tokens = {}
 	local meta = {
 		model = model,
 		profile = profile_display_name(profile),
@@ -925,9 +941,13 @@ function M.predict(context, output_context, override)
 			if requested > 1 and DisplaySettings.get("streaming_multi") ~= true then return end
 			local partials = parse_response(streamed, is_batch, trigger_chars)
 			publish(partials[#partials])
-		end, function(full_text, err)
+		end, function(full_text, err, usage)
 			terminal_seen = true
 			if not request_current(true) then return end
+			if type(usage) == "table" then
+				tokens.prompt = (tokens.prompt or 0) + (tonumber(usage.prompt_tokens) or 0)
+				tokens.completion = (tokens.completion or 0) + (tonumber(usage.completion_tokens) or 0)
+			end
 			if err then
 				_predicting = false
 				meta.loading = false
@@ -948,6 +968,14 @@ function M.predict(context, output_context, override)
 			end
 			_predicting = false
 			meta.loading = false
+			if _observers.generation then
+				local reported = tokens.prompt ~= nil and {
+					prompt_tokens = tokens.prompt, completion_tokens = tokens.completion,
+					total_tokens = tokens.prompt + tokens.completion } or {}
+				reported.count = #candidates
+				local observed, observe_err = pcall(_observers.generation, _suggestion_context, reported)
+				if not observed then Logger.warn(LOG, "Prediction generation observer failed: %s", tostring(observe_err)) end
+			end
 			if #candidates > 0 then publish() else clear_offer() end
 		end)
 		-- A backend can refuse admission while its earlier native transport is
@@ -2857,7 +2885,10 @@ local function accept_candidate(index, complete)
 			context.selection_accepting = nil
 			completed = ack == true
 			if not completed then complete(false); return end
-			if _on_output then pcall(_on_output, candidate.to_type, context) end
+			if _on_output then
+				context.acceptance = { chosen_index = tonumber(index), all_predictions = { candidate.to_type }, deletes = 0 }
+				pcall(_on_output, candidate.to_type, context)
+			end
 			if _suggestion_context ~= context or epoch ~= _request_epoch then complete(true); return end
 			local retired_epoch = close_accepted_offer()
 			if _request_epoch == retired_epoch then
@@ -2892,6 +2923,12 @@ local function accept_candidate(index, complete)
 		return false
 	end
 	if output then
+		-- What the user took out of what was shown, for the metrics
+		if type(context) == "table" then
+			local shown = {}
+			for position, offered in ipairs(_suggestions) do shown[position] = offered.to_type end
+			context.acceptance = { chosen_index = tonumber(index), all_predictions = shown, deletes = candidate.deletes or 0 }
+		end
 		local observed, observe_err = pcall(output, candidate.to_type, context)
 		if not observed then Logger.warn(LOG, "Prediction output observer failed: %s", tostring(observe_err)) end
 	end

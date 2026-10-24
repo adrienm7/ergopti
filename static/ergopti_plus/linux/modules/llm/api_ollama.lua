@@ -156,7 +156,7 @@ local function finish_request(request, err)
 	local terminal_epoch = _request_epoch
 	local admitted = runtime_current(request)
 	if admitted and terminal_epoch == _request_epoch and type(request.on_done) == "function" then
-		local ok, callback_err = pcall(request.on_done, request.full_text, err)
+		local ok, callback_err = pcall(request.on_done, request.full_text, err, request.usage)
 		if not ok then Logger.error(LOG, "chat(): terminal callback raised — %s", tostring(callback_err)) end
 	end
 end
@@ -173,6 +173,11 @@ local function consume_line(request, line)
 	if request.done_seen then request.stream_error = "Ollama returned a record after its terminal marker"; return end
 	if type(record.done) ~= "boolean" then request.stream_error = "Invalid Ollama terminal marker"; return end
 	request.done_seen = record.done
+	if record.done == true then
+		-- The counts the server reports for this request, for the metrics
+		local prompt, completion = tonumber(record.prompt_eval_count), tonumber(record.eval_count)
+		if prompt and completion then request.usage = { prompt_tokens = prompt, completion_tokens = completion } end
+	end
 	if content and request_current(request) then
 		request.full_text = request.full_text .. content
 		if type(request.on_chunk) == "function" then pcall(request.on_chunk, content) end

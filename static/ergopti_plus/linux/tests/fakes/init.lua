@@ -673,7 +673,7 @@ function M.sqlite_writer(opts)
 	local available = opts.available ~= false
 	local system_day_paths = {}
 	local fake = {
-		typing = {}, hotstrings = {}, shortcuts = {}, app_switches = {},
+		typing = {}, hotstrings = {}, shortcuts = {}, llm = {}, app_switches = {},
 		app_days = {}, ngrams = {}, scancodes = {},
 		chars_class = {}, errors = {}, hourly = {}, hourly_min5 = {},
 		app_buckets = {}, bursts = {}, sessions = {}, switches_to = {}, ergo = {},
@@ -726,6 +726,7 @@ function M.sqlite_writer(opts)
 	end
 	fake.insert_hotstring_events = collect(fake.hotstrings)
 	fake.insert_shortcut_events = collect(fake.shortcuts)
+	fake.insert_llm_events = collect(fake.llm)
 	fake.insert_app_switch_events = collect(fake.app_switches)
 
 	function fake.upsert_app_day(device_id, date, app, fields)
