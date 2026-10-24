@@ -34,12 +34,10 @@ function tokens(source, lua) {
 			const close = ']' + long[1] + ']';
 			const end = source.indexOf(close, i + long[0].length);
 			const stop = end < 0 ? source.length : end + close.length;
-			if (!long[0].startsWith('--'))
-				out.push({
-					value: source.slice(i + long[0].length, end < 0 ? source.length : end),
-					string: true,
-					line: at
-				});
+			if (!long[0].startsWith('--')) {
+				const value = source.slice(i + long[0].length, end < 0 ? source.length : end);
+				out.push({ value, raw: value, string: true, line: at });
+			}
 			consume(stop);
 			continue;
 		}
@@ -62,9 +60,11 @@ function tokens(source, lua) {
 					i += 2;
 				} else value += source[i++];
 			}
+			const rawEnd = i;
 			i = Math.min(i + 1, source.length);
 			line += (source.slice(start, i).match(/\n/g) || []).length;
-			out.push({ value, string: true, line: at });
+			// raw keeps escape sequences such as `n or \n, which value folds into a letter.
+			out.push({ value, raw: source.slice(start + 1, rawEnd), string: true, line: at });
 			continue;
 		}
 		const word = source.slice(i).match(/^[A-Za-z_][A-Za-z_0-9]*/);
@@ -445,5 +445,5 @@ function main(root = ROOT) {
 	);
 	return violations ? 1 : 0;
 }
-module.exports = { auditSource, main };
+module.exports = { auditSource, argumentsAt, main, tokens };
 if (require.main === module) process.exitCode = main(process.argv[2] || ROOT);
