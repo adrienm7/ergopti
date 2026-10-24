@@ -214,6 +214,8 @@ local function build_init_data(state)
 	if not strings or not values then return nil end
 	return {
 		platform = CATALOGUE_DRIVER,
+		-- Gesture registration with the system is a Windows host action only.
+		capabilities = { gesture_registration = false },
 		locale = current_locale,
 		strings = strings,
 		default_config_dir = default_dir,

@@ -398,7 +398,7 @@ _OnbWeb_SessionCall(SessionEpoch, Callback, Params*) {
 ; ==============================================================
 
 ; Builds and injects window.initData(...): the platform whose catalogue pages
-; the page shows, the wizard's locale and the sorted locale list, the OS-default
+; the page shows, the host's capabilities, the wizard's locale and the sorted locale list, the OS-default
 ; and current configuration folders, the values the configuration in force
 ; holds for every wizard path, the system-layout hint, the metrics store and
 ; the strings of the current locale. A configuration that cannot be read never
@@ -428,6 +428,8 @@ _OnbWeb_InjectInitData(SessionEpoch := unset, ReadFn := OnboardingReadCurrentVal
 	ConfigDir := _OnbWeb_CustomConfigDir()
 	js := "window.initData({"
 		. "platform:" . _OnbWeb_JsStr(ONBOARDING_CATALOGUE_DRIVER)
+		; This host registers gestures with the system (registerGesturesAuto/Manual).
+		. ",capabilities:{gesture_registration:true}"
 		. ",locale:" . _OnbWeb_JsStr(_ob_locale)
 		. ",locales:" . _OnbWeb_LocalesJson()
 		. ",default_config_dir:" . _OnbWeb_JsStr(_DefaultConfigDir)
