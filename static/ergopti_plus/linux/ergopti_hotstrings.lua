@@ -70,9 +70,13 @@ package.path = SCRIPT_DIR .. "/?.lua;" ..
 
 -- Retain the launcher's lock here, while preventing any later external process
 -- from holding it after this daemon stops or crashes.
+-- The fatal outcomes that precede the logger sink leave one closed-vocabulary
+-- record in bootstrap.log (the Windows file of the same name), besides stderr.
+local BootstrapLog = require("infra.bootstrap_log")
 local lock_protected, lock_error = require("infra.session_lock").protect()
 if not lock_protected then
 	io.stderr:write("[session_lock] " .. lock_error .. "\n")
+	BootstrapLog.append("session_lock_refused")
 	os.exit(78)
 end
 
@@ -102,6 +106,7 @@ local LoggerSink = require("infra.logger_sink")
 local privacy_admitted, _, privacy_refusal = pcall(function() return LoggerSink.install(Logger) end)
 if not privacy_admitted or privacy_refusal then
 	io.stderr:write("[logger_sink] Privacy initialization refused; daemon not started.\n")
+	BootstrapLog.append("privacy_admission_refused")
 	os.exit(1)
 end
 
@@ -745,6 +750,7 @@ local function main()
 	local lock_acquired, lock_refusal, lock_contended = require("infra.session_lock").acquire()
 	if not lock_acquired then
 		io.stderr:write("[session_lock] " .. lock_refusal .. "\n")
+		BootstrapLog.append(lock_contended and "second_instance_yielded" or "session_lock_refused")
 		os.exit(lock_contended and 75 or 78)
 	end
 

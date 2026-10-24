@@ -426,7 +426,7 @@ LoggerAppendBootstrapLine(Severity, Source, Message) {
 				? _DefaultLogsDir : LoggerDefaultLogsDir()
 		if !DirExist(Dir)
 				DirCreate(Dir)
-		BootstrapLog := Dir . "bootstrap.log"
+		BootstrapLog := Dir . AppDirsLogBootstrapName()
 		FileAppend(FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") . " [" . Severity . "] ["
 				. Source . "] " . Message . "`r`n", BootstrapLog, "UTF-8")
 		return BootstrapLog
