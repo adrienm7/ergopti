@@ -188,6 +188,8 @@ const redaction = JSON.parse(
 	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'redaction.json'), 'utf8')
 );
 const context = { home: '/home/jdoe', user: 'jdoe', case_insensitive: false };
+// The host capability of every page the tests open that does not exercise collection.
+const NO_COLLECTION = { diagnostic_collection: false };
 
 /** Models the actual host's closed transfer, retaining the asserted probe observations. */
 function hostSnapshot(value, request, page) {
@@ -239,7 +241,7 @@ function snapshot(detailed) {
 function init(page, detailed) {
 	page.sandbox.window.receiveDiagnostics({
 		type: 'init',
-		config: { schema, redaction, context },
+		config: { schema, redaction, context, capabilities: NO_COLLECTION },
 		snapshot: snapshot(detailed)
 	});
 }
@@ -480,7 +482,7 @@ function init(page, detailed) {
 	const page = loadPage();
 	const message = {
 		type: 'init',
-		config: { schema, redaction, context },
+		config: { schema, redaction, context, capabilities: NO_COLLECTION },
 		snapshot: snapshot(false)
 	};
 	page.sandbox.window.__hostBridgeResponse(
@@ -545,7 +547,7 @@ function init(page, detailed) {
 		quick.probes[id] = { state: 'not_run', reason: 'opt_in_required' };
 	page.sandbox.receiveDiagnostics({
 		type: 'init',
-		config: { schema, redaction, context },
+		config: { schema, redaction, context, capabilities: NO_COLLECTION },
 		snapshot: quick
 	});
 	if (page.elements['chk-extensive'].checked || page.scheduled.size !== 0)
@@ -577,7 +579,7 @@ function init(page, detailed) {
 	current.probes.github_api = { state: 'timeout', cleanup: 'pending' };
 	page.sandbox.receiveDiagnostics({
 		type: 'init',
-		config: { schema, redaction, context },
+		config: { schema, redaction, context, capabilities: NO_COLLECTION },
 		snapshot: current
 	});
 	page.elements['btn-copy'].dispatch('click');
@@ -672,7 +674,7 @@ function init(page, detailed) {
 		else value.probes.github_api = debt;
 		page.sandbox.receiveDiagnostics({
 			type: 'init',
-			config: { schema, redaction, context },
+			config: { schema, redaction, context, capabilities: NO_COLLECTION },
 			snapshot: value
 		});
 		if (location === 'model') {
@@ -716,7 +718,7 @@ function init(page, detailed) {
 		value.probes[id] = { state: 'not_run', reason: 'opt_in_required' };
 	idle.sandbox.receiveDiagnostics({
 		type: 'init',
-		config: { schema, redaction, context },
+		config: { schema, redaction, context, capabilities: NO_COLLECTION },
 		snapshot: value
 	});
 	if (!idle.elements['btn-cancel'].disabled)
@@ -729,7 +731,7 @@ function init(page, detailed) {
 	current.extensive = true;
 	page.sandbox.receiveDiagnostics({
 		type: 'init',
-		config: { schema, redaction, context },
+		config: { schema, redaction, context, capabilities: NO_COLLECTION },
 		snapshot: current
 	});
 	while (page.scheduled.size) {
@@ -779,7 +781,7 @@ function init(page, detailed) {
 	current.extensive = true;
 	page.sandbox.receiveDiagnostics({
 		type: 'init',
-		config: { schema, redaction, context },
+		config: { schema, redaction, context, capabilities: NO_COLLECTION },
 		snapshot: current
 	});
 	page.elements['btn-copy'].dispatch('click');
@@ -848,7 +850,7 @@ for (const mutation of [
 	current.extensive = false;
 	page.sandbox.receiveDiagnostics({
 		type: 'init',
-		config: { schema, redaction, context },
+		config: { schema, redaction, context, capabilities: NO_COLLECTION },
 		snapshot: current
 	});
 	page.elements['btn-copy'].dispatch('click');
@@ -886,21 +888,45 @@ for (const mutation of [
 	} else if (copies.length !== 0) fail('An altered host observation was accepted: ' + mutation);
 }
 
+// The host states whether it collects; a page without that capability refuses
+// to guess it from the driver name.
+{
+	const page = loadPage();
+	let refused = false;
+	try {
+		page.sandbox.receiveDiagnostics({
+			type: 'init',
+			config: { schema, redaction, context },
+			snapshot: snapshot(false)
+		});
+	} catch (error) {
+		refused = /diagnostic_collection/.test(error.message);
+	}
+	if (!refused) fail('an init without the collection capability was accepted');
+}
+
 // Collection messages carry state and action names, never a browser-supplied archive path.
-for (const driver of ['linux', 'macos', 'windows']) {
+// Availability follows the host capability alone, whatever the driver is named.
+for (const [driver, collects] of [
+	['linux', false],
+	['macos', false],
+	['windows', false],
+	['linux', true],
+	['windows', true]
+]) {
 	const page = loadPage();
 	const value = snapshot(false);
 	value.driver = driver;
 	page.sandbox.receiveDiagnostics({
 		type: 'init',
-		config: { schema, redaction, context },
+		config: { schema, redaction, context, capabilities: { diagnostic_collection: collects } },
 		snapshot: value
 	});
-	if (page.elements['btn-collect-windows'].disabled !== (driver !== 'windows'))
-		fail(driver + ' collection availability is incorrect');
-	if (driver !== 'windows' && !page.elements['collection-progress'].textContent)
+	if (page.elements['btn-collect-windows'].disabled !== !collects)
+		fail(driver + ' collection availability does not follow the host capability');
+	if (!collects && !page.elements['collection-progress'].textContent)
 		fail(driver + ' collection has no unavailable reason');
-	if (driver !== 'windows') continue;
+	if (!collects) continue;
 	page.elements['btn-collect-windows'].dispatch('click');
 	if (JSON.stringify(page.posted.at(-1)) !== JSON.stringify({ action: 'collect_windows' }))
 		fail('collection did not request the closed host action');
@@ -931,7 +957,7 @@ for (const driver of ['linux', 'macos', 'windows']) {
 	};
 	page.sandbox.receiveDiagnostics({
 		type: 'init',
-		config: { schema, redaction, context },
+		config: { schema, redaction, context, capabilities: { diagnostic_collection: collects } },
 		snapshot: value,
 		collection: completed
 	});

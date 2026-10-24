@@ -54,7 +54,7 @@
 
 	/** Collection controls expose exact host state without accepting a page-supplied path. */
 	function renderCollection() {
-		var supported = state.snapshot && state.snapshot.driver === 'windows';
+		var supported = state.config !== null && state.config.capabilities.diagnostic_collection;
 		var active =
 			isTrue(collection.owner_pending) ||
 			(collection.phase !== 'idle' &&
@@ -506,6 +506,13 @@
 			sharedText = null;
 		switch (message.type) {
 			case 'init':
+				// The host states what it can do; the page never infers it from the driver name.
+				if (
+					!message.config ||
+					!message.config.capabilities ||
+					typeof message.config.capabilities.diagnostic_collection !== 'boolean'
+				)
+					throw new Error('health check host must state its diagnostic_collection capability');
 				collection = message.collection || { phase: 'idle' };
 				state.config = message.config;
 				state.snapshot = message.snapshot;
