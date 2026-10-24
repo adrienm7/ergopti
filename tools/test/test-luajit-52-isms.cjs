@@ -66,6 +66,15 @@ const FORBIDDEN = [
 		pattern: /\bstring\.pack\s*\(|\bstring\.unpack\s*\(/g,
 		name: 'string.pack / string.unpack',
 		instead: "infra/input_event.lua's byte helpers, which exist for exactly this"
+	},
+	{
+		// Not nil but worse: LuaJIT's math.atan takes one argument and drops the
+		// second without an error, so atan(y, x) returns atan(y). The shared
+		// gesture classifier read every swipe angle wrong this way on LuaJIT.
+		pattern: /\bmath\.atan\s*\([^()]*,/g,
+		name: 'a two-argument math.atan',
+		effect: 'ignores the second argument',
+		instead: 'local atan2 = math.atan2 or math.atan, at the top of the file'
 	}
 ];
 
@@ -161,7 +170,7 @@ for (const root of ROOTS) {
 				lines.push(src.slice(0, hit.index).split('\n').length);
 			}
 			errors.push(
-				`${relative}:${lines.join(',')} uses ${rule.name}, which is nil under LuaJIT — the ` +
+				`${relative}:${lines.join(',')} uses ${rule.name}, which ${rule.effect || 'is nil'} under LuaJIT — the ` +
 					`interpreter the Linux daemon and its CI suite actually run. Use ${rule.instead}.`
 			);
 		}
