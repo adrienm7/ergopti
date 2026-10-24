@@ -796,6 +796,14 @@ const STEP_CONDITIONS = [
 	],
 	[WINDOWS_BOX, 'e2e-ahk', 'Download E2E runtime', "steps.cache-ahk.outputs.cache-hit != 'true'"],
 	[WINDOWS_BOX, 'package-windows', 'Sign and verify ErgoptiPlus.exe', 'inputs.release'],
+	// The antivirus surface record is kept whenever the AV gate wrote one, failed
+	// gate included: that record is what explains the failure.
+	[
+		WINDOWS_BOX,
+		'package-windows',
+		'Keep the ErgoptiPlus.exe antivirus surface record',
+		"${{ always() && hashFiles('ergoptiplus-av-surface.json') != '' }}"
+	],
 	// The detached update-asset signatures (_shared/modules/updater/asset_signing.json)
 	// are made on release runs only, like the Authenticode signature above.
 	[
