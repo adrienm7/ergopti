@@ -7,8 +7,8 @@
 // licence and version, whether each one is installed, can be updated or is
 // available, and offers the matching install / update / uninstall / use
 // buttons. The three drivers host this page and send it the same state:
-//   { platform, index, source, error, installed, provided, builtin, active,
-//     busy, result }
+//   { platform, shortcut_menu_path, index, source, error, installed, provided,
+//     builtin, active, busy, result }
 // The page decides the rows from that state (one source for every driver)
 // and only ever posts the allowlisted actions below; each host checks them
 // again before acting.
@@ -103,18 +103,17 @@ function applyDomStrings() {
  * @param {boolean} provided - Another package already provides the layout.
  * @param {boolean} builtin - The driver ships the layout built in.
  * @param {string} active - Registry id of the active layout.
- * @param {string} platform - Host platform, selecting its shortcut menu format.
+ * @param {string} shortcutMenuPath - The extension file holding the host's shortcut menu.
  * @returns {Object}
  */
-function makeRow(entry, installed, provided, builtin, active, platform) {
+function makeRow(entry, installed, provided, builtin, active, shortcutMenuPath) {
 	const source = entry || installed;
 	const files =
 		source.extension && Array.isArray(source.extension.files) ? source.extension.files : [];
 	const hotstrings = files.filter(
 		(file) => typeof file.path === 'string' && /^hotstrings\/.+\.toml$/.test(file.path)
 	).length;
-	const shortcutPath = platform === 'windows' ? 'shortcuts/menu.ahk' : 'shortcuts/menu.lua';
-	const shortcuts = files.some((file) => file.path === shortcutPath) ? 1 : 0;
+	const shortcuts = files.some((file) => file.path === shortcutMenuPath) ? 1 : 0;
 	let status;
 	if (builtin) status = 'builtin';
 	else if (provided) status = 'provided';
@@ -167,6 +166,9 @@ function layoutRows(state) {
 	const provided = state.provided && typeof state.provided === 'object' ? state.provided : {};
 	const builtin = state.builtin && typeof state.builtin === 'object' ? state.builtin : {};
 	const active = typeof state.active === 'string' ? state.active : '';
+	// The host names the shortcut menu file it loads; the page never derives it from the platform.
+	if (typeof state.shortcut_menu_path !== 'string' || state.shortcut_menu_path === '')
+		throw new Error('layout manager host must name its shortcut_menu_path');
 	const rows = [];
 	const listed = new Set();
 	for (const entry of entries) {
@@ -182,13 +184,13 @@ function layoutRows(state) {
 				// The AutoHotkey host's JSON writer sends a boolean as 1.
 				builtin[entry.id] === true || builtin[entry.id] === 1,
 				active,
-				state.platform
+				state.shortcut_menu_path
 			)
 		);
 	}
 	for (const id of Object.keys(installed).sort()) {
 		if (!listed.has(id) && installed[id] && typeof installed[id].id === 'string') {
-			rows.push(makeRow(null, installed[id], false, false, active, state.platform));
+			rows.push(makeRow(null, installed[id], false, false, active, state.shortcut_menu_path));
 		}
 	}
 	return rows;

@@ -16,8 +16,9 @@
 ---    and select an installed one; open_homepage only opens the https homepage
 ---    the catalogue gives for that layout, never a URL the page sends.
 --- 2. One state shape for the three drivers:
----    { platform, index, source, error, installed, provided, builtin, active,
----      busy, result, record_error }, so the page decides the rows once.
+---    { platform, shortcut_menu_path, index, source, error, installed, provided,
+---      builtin, active, busy, result, record_error }, so the page decides the
+---    rows once.
 --- 3. PURE Lua: the driver injects the layout registry client, the push to the
 ---    page, the strings, the URL opener and the window close.
 --- ==============================================================================
@@ -38,6 +39,10 @@ M.ACTIONS = {
 	composer_save = true,
 	composer_remove = true,
 }
+
+-- The extension file both Lua drivers load as a layout's shortcut menu; the
+-- page counts it and never derives it from the platform.
+M.SHORTCUT_MENU_PATH = "shortcuts/menu.lua"
 
 -- A registry id: the rule of tools/build/build-layouts-index.cjs.
 local ID_PATTERN = "^[a-z][a-z0-9_]*$"
@@ -70,6 +75,7 @@ end
 function M.page_state(snapshot, result)
 	return {
 		platform = snapshot.platform,
+		shortcut_menu_path = M.SHORTCUT_MENU_PATH,
 		index = snapshot.index,
 		source = snapshot.source,
 		error = snapshot.error,
