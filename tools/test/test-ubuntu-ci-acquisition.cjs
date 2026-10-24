@@ -203,8 +203,11 @@ for (const [file, floor] of scopes) {
 			.jobsOfText(text, rel)
 			.filter((job) => job.id === 'e2e-linux')
 			.flatMap((job) => pipeline.steps(job.body))
-			.filter((step) => step.name === 'Qualify three actual XI2 property cookies');
-		assert.equal(owned.length, 1, 'the XI2 acquisition retains one genuine E2E owner');
+			.filter(
+				(step) =>
+					step.name === 'Install prerequisites for Qualify three actual XI2 property cookies'
+			);
+		assert.equal(owned.length, 1, 'the XI2 acquisition retains one genuine E2E install owner');
 		const invocation = command + ' -y --no-install-recommends gcc libx11-dev libxi-dev xvfb';
 		assert.equal(
 			(pipeline.runOf(owned[0].body) || []).filter((line) => line.trim() === invocation).length,
