@@ -7,6 +7,8 @@
 --- passes the shared policy (_shared/modules/diagnostics/error_policy.json):
 --- what went wrong, where it is logged, and the buttons to report it on
 --- GitHub, copy the report, open the errors file or close the window.
+--- The host-independent half (policy load, Debug switch, report, first
+--- message) is _shared/lua/error_dialog/core.lua, shared with the other host.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The logger hands every emitted ERROR here after its native ACK, from the
@@ -38,7 +40,7 @@ local hs             = hs
 local Logger         = require("infra.logger")
 local Paths          = require("infra.paths")
 local Policy         = require("diagnostics.error_policy")
-local ErrorReport    = require("diagnostics.error_report")
+local DialogCore     = require("error_dialog.core")
 local Redact         = require("diagnostics.redact")
 local TimerScheduler = require("adapters.timer_scheduler")
 local DeferredWork = require("infra.deferred_work")
@@ -90,50 +92,26 @@ M.clock = function() return TimerScheduler.now_ns() / 1e9 end
 -- =================================
 -- =================================
 
---- Reads and validates the shared policy.
---- @return table
-local function load_policy()
-	local path = Paths.shared("modules/diagnostics/error_policy.json")
-	local fh, err = io.open(path, "rb")
-	if not fh then error("the error policy cannot be read: " .. tostring(err)) end
-	local raw = fh:read("*a")
-	fh:close()
-	return Policy.validate(require("json").decode(raw))
-end
-
 --- Loads the policy and the Debug menu setting. Called once, from init.lua,
 --- before the logger's error handler is registered.
 --- @return boolean initialised
 function M.init()
 	if not _scope.admit_change() then return false end
-	if _policy ~= nil then
-		Logger.error(LOG, "The error window was initialised twice; the second call is refused.")
-		return false
-	end
-	Logger.start(LOG, "Initialising the error window…")
-	local ok, policy = pcall(load_policy)
-	if not ok then
-		Logger.error(LOG, "The error window cannot start: %s.", tostring(policy))
-		return false
-	end
-	_policy = policy
-	_decisions = Policy.new_state()
-	_enabled = M.is_enabled()
-	Logger.success(LOG, "Error window ready (%s).", _enabled and "enabled" or "disabled")
-	return true
+	return DialogCore.init(Logger, LOG, _policy ~= nil,
+		function() return Paths.shared("modules/diagnostics/error_policy.json") end,
+		function(policy, decisions)
+			_policy, _decisions = policy, decisions
+			_enabled = M.is_enabled()
+			return _enabled
+		end)
 end
 
 --- Whether the Debug menu's "Show a window for every error" is ticked.
 --- @return boolean
 function M.is_enabled()
 	if _enabled ~= nil then return _enabled end
-	local stored = Storage.get(SETTING, nil)
-	if type(stored) == "boolean" then return stored end
-	local default = require("infra.manifest_reader").default_for(SETTING)
-	if type(default) ~= "boolean" then
-		error("the features manifest declares no boolean default for " .. SETTING)
-	end
-	return default
+	return DialogCore.stored_enabled(Storage,
+		function(path) return require("infra.manifest_reader").default_for(path) end, SETTING)
 end
 
 --- Ticks or unticks "Show a window for every error", durably.
@@ -141,14 +119,7 @@ end
 --- @return boolean saved
 function M.set_enabled(enabled)
 	if not _scope.admit_change() then return false end
-	if type(enabled) ~= "boolean" then
-		Logger.error(LOG, "set_enabled() needs a boolean, got %s.", type(enabled))
-		return false
-	end
-	if Storage.set(SETTING, enabled) ~= true then
-		Logger.error(LOG, "The error window setting could not be saved; it is unchanged.")
-		return false
-	end
+	if not DialogCore.save_enabled(Logger, LOG, function() return Storage end, SETTING, enabled) then return false end
 	_enabled = enabled
 	if not enabled and _scheduled ~= nil then
 		_scheduled = nil
@@ -254,15 +225,7 @@ end
 local function init_message(session)
 	local redaction = session.redaction
 	local function redact(text) return Redact.apply(text, redaction.rules, redaction.context) end
-	return {
-		type     = "init",
-		kind     = session.record.kind,
-		module   = redact(session.record.module),
-		message  = redact(session.record.message),
-		log_path = redact(session.log_path),
-		text     = redact(session.report.text),
-		more     = _folded,
-	}
+	return DialogCore.init_message(session.record, session.report, session.log_path, _folded, redact)
 end
 
 --- Performs one action of the page.
@@ -336,42 +299,15 @@ local function build_report(record)
 	local HealthReport = require("ui.healthcheck.report")
 	local documents = Core.config()
 	local snapshot = Core.run()
-	local sections = snapshot.sections
-	local versions, system, issues = sections.versions or {}, sections.system or {}, sections.issues or {}
-	local generated = tostring(snapshot.generated_at)
-	local identity = {
-		version       = tostring(versions.ergopti_version or "unknown"),
-		commit        = tostring(versions.commit or ""),
-		os            = tostring(system.os or "unknown"),
-		driver        = Core.DRIVER,
-		generated_utc = generated,
-		warn_count    = tonumber(issues.warn_count) or 0,
-		err_count     = tonumber(issues.err_count) or 0,
-	}
-	-- The recent warnings and errors of today's errors file, as many as the
-	-- diagnostics window shows (_shared/modules/diagnostics/recent_issues.json)
-	local recent = {}
-	for _, entry in ipairs(issues.recent or {}) do recent[#recent + 1] = tostring(entry) end
-	local report = ErrorReport.compose({
-		kind = record.kind, module = record.module, message = record.message, time = record.time,
-		recent = recent,
-	}, identity)
-	local paths = {}
-	for id, path in pairs(sections.paths or {}) do paths[id] = path end
-	local open_id, log_path = "errors_today", paths.errors_today
-	if record.kind == "crash" then
-		open_id, log_path = "crash_report", record.log_path
-		paths.crash_report = record.log_path
-	end
-	if type(log_path) ~= "string" or log_path == "" then error("the file this error is logged in is unknown") end
+	local composed = DialogCore.compose(record, snapshot, Core.DRIVER)
 	return {
-		report    = report,
+		report    = composed.report,
 		snapshot  = snapshot,
-		paths     = paths,
+		paths     = composed.paths,
 		documents = documents,
 		redaction = { rules = documents.redaction, context = HealthReport.redaction_context() },
-		log_path  = log_path,
-		open_id   = open_id,
+		log_path  = composed.log_path,
+		open_id   = composed.open_id,
 	}
 end
 
@@ -633,8 +569,7 @@ decide_error = function(module_name, template, message)
 		if _session then send(_session, { type = "more", count = _folded }) end
 	elseif verdict == "show" then
 		_busy = true
-		schedule({ kind = "error", module = tostring(module_name), message = tostring(message),
-			time = os.date("%Y-%m-%d %H:%M:%S") })
+		schedule(DialogCore.error_record(module_name, message))
 	end
 	return true
 end
