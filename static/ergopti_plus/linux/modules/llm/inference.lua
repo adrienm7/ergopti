@@ -20,6 +20,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Json = require("json")
 local Paths = require("infra.paths")
+local Temperature = require("llm.temperature")
 
 local LOG = "modules.llm.inference"
 
@@ -58,20 +59,15 @@ function M.min_interval_ms(backend)
 	return number("rate_limit_min_interval_ms", backend)
 end
 
---- Temperature of one variant of a sequential multi-prediction. The first
---- keeps the user's setting; each next one is warmer, from a raised floor, so
---- variants differ without drifting into nonsense.
+--- Temperature of one variant of a sequential multi-prediction, through the
+--- shared algorithm (_shared/lua/llm/temperature.lua) the macOS backends use.
+--- The first keeps the user's setting; each next one is warmer, from a raised
+--- floor, so variants differ without drifting into nonsense.
 --- @param base number The user's temperature.
 --- @param index integer 1-based variant index.
 --- @return number
 function M.variant_temperature(base, index)
-	local step
-	if base <= 0.15 then step = number("diversity_temperature", "step_when_base_le_0_15")
-	elseif base <= 0.35 then step = number("diversity_temperature", "step_when_base_le_0_35")
-	else step = number("diversity_temperature", "step_default") end
-	local effective = base
-	if index > 1 then effective = math.max(base, number("diversity_temperature", "effective_base_floor")) end
-	return math.min(number("diversity_temperature", "max_temperature"), effective + (index - 1) * step)
+	return Temperature.variant(policy().diversity_temperature, base, index)
 end
 
 --- Forgets the parsed file (tests).
