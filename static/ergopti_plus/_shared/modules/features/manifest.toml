@@ -6020,12 +6020,11 @@ platforms = ["ahk"]
 reason_key = "platform_reason.lists_windows_only_settings"
 
 # Which layout to switch to when the driver pauses and when it resumes: the
-# choices are the system's input sources, which macOS and Linux list.
+# choices are the system's input sources (macOS), the desktop's layouts
+# (Linux) or the layouts installed for the user (Windows).
 [[menu.layout_menu]]
 type = "list"
 id = "layout_switching"
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
 # The physical key whose replacement choice lives in Hotstrings Ergopti
 # (hotstrings.magic_key_source), on every driver: one row naming the key in
@@ -6926,7 +6925,7 @@ platforms = ["ahk"]
 # Automatic layout switching on a pause, a resume and a quit. The two targets
 # hold the driver's own layout id ("" = no change): typed as booleans, they
 # made every chosen layout an invalid value. One policy decides the switch:
-# _shared/lua/layout/pause_switch_policy.lua.
+# _shared/lua/layout/pause_switch_policy.lua and its AHK twin.
 [[features.layout]]
 id = "pause_switch_enabled"
 default = false
@@ -6934,8 +6933,7 @@ recommended = false
 input_altering = true
 type = "boolean"
 description_key = "menu.layout"
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.layout_switch_on_pause_is_macos"
+platforms = ["ahk", "hs", "linux"]
 
 [[features.layout]]
 id = "on_pause"
@@ -6944,8 +6942,7 @@ recommended = ""
 input_altering = true
 type = "string"
 description_key = "menu.layout"
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.layout_switch_on_pause_is_macos"
+platforms = ["ahk", "hs", "linux"]
 
 [[features.layout]]
 id = "on_resume"
@@ -6954,8 +6951,7 @@ recommended = ""
 input_altering = true
 type = "string"
 description_key = "menu.layout"
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.layout_switch_on_pause_is_macos"
+platforms = ["ahk", "hs", "linux"]
 
 # `clear_exclude` lists the paths a clear leaves as they are, as
 # `restore_exclude` does for a restore. The Tap-Holds clear empties every key's
@@ -9566,14 +9562,12 @@ platforms = ["hs"]
 unavailable = "hide"
 
 # Complete automatic-switching policy frame; the input-source switch stays native
-# (macOS TIS, Linux gsettings or setxkbmap).
+# (macOS TIS, Linux gsettings or setxkbmap, Windows WM_INPUTLANGCHANGEREQUEST).
 [[menu.layout_switching_frame]]
 type = "check"
 id = "layout_switch_toggle"
 i18n = "menu.layout.pause_layout_enabled"
 checked_when = ["layout_switch_checked"]
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.layout_switching_frame]]
 type = "group"
@@ -9581,8 +9575,6 @@ id = "layout_pause_picker"
 i18n = "menu.layout.pause_picker_caption"
 caption_getter = "layout_pause_caption"
 disabled_when = ["layout_switch_ready"]
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.layout_switching_frame]]
 type = "group"
@@ -9590,16 +9582,12 @@ id = "layout_resume_picker"
 i18n = "menu.layout.resume_picker_caption"
 caption_getter = "layout_resume_caption"
 disabled_when = ["layout_switch_ready"]
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.layout_switch_picker_frame]]
 type = "check"
 id = "layout_picker_auto"
 i18n = "menu.layout.layout_auto"
 checked_when = ["layout_picker_auto_checked"]
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.layout_switch_picker_frame]]
 type = "include"
@@ -9612,8 +9600,6 @@ type = "---"
 [[menu.layout_switch_picker_choices_frame]]
 type = "list"
 id = "layout_picker_choices"
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 # Complete macOS Layout frames; native providers supply exact records and callbacks.
 # Native record captions are literal data, never placeholder translation identities.

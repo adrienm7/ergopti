@@ -394,6 +394,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/storage.ahk
 #Include adapters/process_lifecycle.ahk
 #Include adapters/key_state.ahk
+#Include adapters/keyboard_layout_switch.ahk
 #Include adapters/app_launcher.ahk
 #Include adapters/network_info.ahk
 #Include adapters/keyboard_hook.ahk
@@ -541,6 +542,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include ../_shared/modules/features/number_row_policy.ahk
 #Include ../_shared/modules/features/layout_rows_policy.ahk
 #Include ../_shared/modules/features/caps_word_auto_off_policy.ahk
+#Include ../_shared/modules/features/pause_switch_policy.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
 #Include modules/keymap/layout/digit_row_bindings.ahk
 #Include modules/keymap/layout/number_row_send.ahk
@@ -1645,6 +1647,8 @@ global _PENDING_KEYBOARD_HKL := 0
 ; registers every hotkey at load). Single source of truth — defined once there,
 ; consumed here and by tests/meta/test_layout_quiescence.ahk.
 #Include modules/keymap/layout_poll_helper.ahk
+; Layout on pause / resume: run by the lifecycle owner "keyboard-layout".
+#Include modules/keymap/pause_layout_switch.ahk
 
 ; The layout poll's seams onto the reload lifecycle (see LayoutPollTick). Its
 ; reload reports a refused stage without the "save failed" notice, and it asks

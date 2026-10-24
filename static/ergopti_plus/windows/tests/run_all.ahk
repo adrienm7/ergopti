@@ -295,6 +295,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../../_shared/modules/features/number_row_policy.ahk
 #Include ../../_shared/modules/features/layout_rows_policy.ahk
 #Include ../../_shared/modules/features/caps_word_auto_off_policy.ahk
+#Include ../../_shared/modules/features/pause_switch_policy.ahk
 #Include ../modules/keymap/layout/layout_shift_caps.ahk
 #Include ../modules/keymap/layout/number_row_send.ahk
 ; Registry layout emulation: definitions only (the hotkeys are registered by
@@ -308,6 +309,7 @@ global _DefaultLogsDir := _LogsDir
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
 ; exercised by meta/modules/keymap/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
 #Include ../modules/keymap/layout_poll_helper.ahk
+#Include ../modules/keymap/pause_layout_switch.ahk
 #Include ../ui/tooltip/init.ahk
 #Include ../adapters/tooltip_renderer.ahk
 #Include ../modules/updater.ahk
@@ -358,6 +360,7 @@ InstallHotstringHooks()
 #Include ../adapters/storage.ahk
 #Include ../adapters/process_lifecycle.ahk
 #Include ../adapters/key_state.ahk
+#Include ../adapters/keyboard_layout_switch.ahk
 #Include ../adapters/app_launcher.ahk
 #Include ../adapters/crypto.ahk
 #Include ../adapters/network_info.ahk
@@ -415,6 +418,7 @@ InstallSendNoOps()
 #Include unit/ui/windows/test_native_folder_orchestration.ahk
 #Include unit/ui/windows/test_native_file_filter_diagnostics.ahk
 #Include unit/adapters/test_console_window.ahk
+#Include unit/adapters/test_keyboard_layout_switch.ahk
 #Include unit/ui/windows/test_spotlight_ownership.ahk
 #Include unit/modules/gestures/test_take_note_async_job.ahk
 #Include unit/adapters/input/test_text_sender_modifiers.ahk
@@ -1928,6 +1932,8 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/keymap/test_layout_digit_row_probe.ahk
 #Include unit/modules/keymap/test_number_row_symbols.ahk
 #Include unit/modules/keymap/test_layout_rows_policy.ahk
+#Include unit/modules/keymap/test_pause_switch_policy.ahk
+#Include unit/modules/keymap/test_pause_layout_switch.ahk
 #Include unit/modules/keymap/test_number_row_native_hkl.ahk
 #Include meta/platform/remap/altgr/test_altgr_kana_taphold_entry.ahk
 #Include meta/platform/remap/altgr/test_altgr_prefix_arms_on_press.ahk

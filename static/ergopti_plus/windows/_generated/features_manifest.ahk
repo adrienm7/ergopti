@@ -273,7 +273,10 @@ global FEATURES_MANIFEST := Map(
         Map("path", "category_enabled.distances_reduction", "id", "distances_reduction", "section", "category_enabled", "default", false, "type", "boolean", "description_key", "category.distances_reduction", "platforms", ["ahk"], "recommended", true, "input_altering", true),
         Map("path", "category_enabled.sfbs_reduction", "id", "sfbs_reduction", "section", "category_enabled", "default", false, "type", "boolean", "description_key", "category.sfbs_reduction", "platforms", ["ahk"], "recommended", true, "input_altering", true),
         Map("path", "category_enabled.rolls", "id", "rolls", "section", "category_enabled", "default", false, "type", "boolean", "description_key", "category.rolls", "platforms", ["ahk"], "recommended", true, "input_altering", true),
-        Map("path", "category_enabled.magic_key", "id", "magic_key", "section", "category_enabled", "default", false, "type", "boolean", "description_key", "category.magic_key", "platforms", ["ahk"], "recommended", true, "input_altering", true)
+        Map("path", "category_enabled.magic_key", "id", "magic_key", "section", "category_enabled", "default", false, "type", "boolean", "description_key", "category.magic_key", "platforms", ["ahk"], "recommended", true, "input_altering", true),
+        Map("path", "layout.pause_switch_enabled", "id", "pause_switch_enabled", "section", "layout", "default", false, "type", "boolean", "description_key", "menu.layout", "platforms", ["ahk", "hs", "linux"], "recommended", false, "input_altering", true),
+        Map("path", "layout.on_pause", "id", "on_pause", "section", "layout", "default", "", "type", "string", "description_key", "menu.layout", "platforms", ["ahk", "hs", "linux"], "recommended", "", "input_altering", true),
+        Map("path", "layout.on_resume", "id", "on_resume", "section", "layout", "default", "", "type", "string", "description_key", "menu.layout", "platforms", ["ahk", "hs", "linux"], "recommended", "", "input_altering", true)
     ],
     "unavailable", [
         Map("path", "hotstrings.enabled", "section", "hotstrings", "reason_key", "platform_reason.hotstrings_master_is_macos_engine", "platforms", ["hs"]),
@@ -412,9 +415,6 @@ global FEATURES_MANIFEST := Map(
         Map("path", "shortcuts.keys.ctrl_period", "section", "shortcuts.keys", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"]),
         Map("path", "shortcuts.keys.ctrl_quote", "section", "shortcuts.keys", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"]),
         Map("path", "shortcuts.keys.cmd_shift_v", "section", "shortcuts.keys", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"]),
-        Map("path", "shortcuts.keys.cmd_star", "section", "shortcuts.keys", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"]),
-        Map("path", "layout.pause_switch_enabled", "section", "layout", "reason_key", "platform_reason.layout_switch_on_pause_is_macos", "platforms", ["hs", "linux"]),
-        Map("path", "layout.on_pause", "section", "layout", "reason_key", "platform_reason.layout_switch_on_pause_is_macos", "platforms", ["hs", "linux"]),
-        Map("path", "layout.on_resume", "section", "layout", "reason_key", "platform_reason.layout_switch_on_pause_is_macos", "platforms", ["hs", "linux"])
+        Map("path", "shortcuts.keys.cmd_star", "section", "shortcuts.keys", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"])
     ]
 )
