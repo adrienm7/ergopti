@@ -1399,7 +1399,7 @@ _LoggerEmitBody(Level, Tag, Msg, Body, Exempt) {
 		; An evidence record is accepted like any line (it ends an open dedup streak
 		; below) but is never itself withheld: it is the data a person was asked to
 		; send back, so a shared template or an immediate rerun must not fold it.
-		if (!Exempt and MsgLine == _LOGGER_DEDUP_KEY and ((Now - _LastErrTime + 0x100000000) & 0xFFFFFFFF) < LOGGER_DEDUP_WINDOW_MS) {
+		if (!Exempt and MsgLine == _LOGGER_DEDUP_KEY and (Now - _LastErrTime) < LOGGER_DEDUP_WINDOW_MS) {
 				_LOGGER_DEDUP_COUNT += 1
 				return
 		}
