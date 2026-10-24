@@ -157,6 +157,26 @@ local OWNED = {
 	"modules.shortcuts.actions.text_transform_grace",
 	"tests.support.modules.llm.selection_translation_destination",
 	"ui.tooltip",
+
+	-- Shared owners the real pipeline loads since the integrated catalogue,
+	-- key-event health, per-application profile and storage-ownership work.
+	"actions.catalogue",
+	"actions.catalogue_data",
+	"adapters.event_clock",
+	"compat.base64",
+	"gestures.direction",
+	"infra.key_event_health",
+	"infra.phase_stats",
+	"llm.app_identity",
+	"llm.app_profile_overrides",
+	"llm.temperature",
+	"scope_owner",
+	"storage_owned",
+	"table_util",
+	"toml_codec.source_memo",
+	-- The real logger and log transport probe the optional LuaSocket clock.
+	"socket",
+	"socket.core",
 }
 local OWNED_GLOBALS = {
 	"ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME", "ERGOPTI_TOUCH_DEVICES",

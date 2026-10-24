@@ -16,6 +16,10 @@ local OWNERS = {
 	"toml_codec.key_path", "toml_codec.record_scanner",
 	-- The real TOML reader opens its source through this shared owner.
 	"toml_codec.source_open",
+	-- The record scanner memoizes one text's scans through this owner.
+	"toml_codec.source_memo",
+	-- The real logger records its phase counters into this owner.
+	"infra.phase_stats",
 	-- The renderer configuration and the paths walk split paths through this pure owner.
 	"native_path",
 	"infra.vscode_bridge", "tooltip.layout", "tooltip.llm_line", "tooltip.tint", "ui.tooltip.config", "ui.tooltip.renderer",
