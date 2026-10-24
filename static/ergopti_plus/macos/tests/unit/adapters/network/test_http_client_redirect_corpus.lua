@@ -40,8 +40,6 @@ local CURL_RECEIPT_ONLY = {
 -- turns its case red until the entry is removed.
 local PENDING = {
 	["last allowed hop admitted"] = "the adapter stops after 5 hops, the shared law after 50",
-	["exact prior URL loop refused"] = "the adapter has no visited-URL guard",
-	["fragment does not bypass loop guard"] = "the adapter has no visited-URL guard",
 	["explicit https floor rejects http from http initial"] =
 		"the adapter has no HTTPS floor for an HTTP initial request",
 	["original HTTP floor stays HTTP after an intermediate HTTPS upgrade"] =
