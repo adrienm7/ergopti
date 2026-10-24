@@ -19,7 +19,7 @@ function test(name, body) {
 function fixture() {
 	const page = runPage({
 		_i18n_strings: strings,
-		__ergopti_host: 'linux',
+		__ergopti_host_capabilities: { document_bridge: true },
 		__installed_version: '1.0.0',
 		__subscribed_channel: 'dev'
 	});

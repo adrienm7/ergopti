@@ -395,10 +395,12 @@ helpers.describe("ui.webkit_host", function()
       helpers.assert_true(html:find("__i18n_base"), "has i18n base")
     end)
 
-    helpers.it("marks generated pages for the Linux host bridge", function()
+    helpers.it("declares the document bridge capability on generated pages", function()
       local html = WH.build_app_html(DRIVER_ROOT, "metrics_apps", "fr")
-      helpers.assert_true(html:find('window.__ergopti_host="linux"', 1, true) ~= nil,
-        "metrics pages must select the Linux bridge instead of a file fetch")
+      helpers.assert_true(html:find('window.__ergopti_host_capabilities={"document_bridge":true};', 1, true) ~= nil,
+        "metrics pages must select the document bridge instead of a file fetch")
+      helpers.assert_true(html:find("__ergopti_host=", 1, true) == nil,
+        "the page learns a capability, never the host's platform name")
     end)
 
     -- (page-carries-strings) WebKitGTK refuses the page's file:// locale fetch

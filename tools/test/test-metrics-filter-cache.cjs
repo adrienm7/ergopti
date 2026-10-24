@@ -13,6 +13,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { installHostCapabilities } = require('./support/host-capabilities.cjs');
 const root = path.resolve(__dirname, '../../static/ergopti_plus/_shared/ui');
 const read = (name) => fs.readFileSync(path.join(root, name), 'utf8');
 let passed = 0;
@@ -166,6 +167,7 @@ function typingFixture() {
 		}
 	});
 	context.window = context;
+	installHostCapabilities(context);
 	vm.runInContext(read('metrics_typing/data.js'), context);
 	context.get_source_mode_flags = () => modes;
 	context.get_local_date_string = () => today;

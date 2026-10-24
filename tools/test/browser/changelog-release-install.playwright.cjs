@@ -83,7 +83,7 @@ function expect(condition, message) {
 			await page.addInitScript(
 				({ strings, installed }) => {
 					window._i18n_strings = strings;
-					window.__ergopti_host = 'linux';
+					window.__ergopti_host_capabilities = { document_bridge: true };
 					window.__installed_version = installed;
 					window.__subscribed_channel = 'dev';
 					window.__posted = [];

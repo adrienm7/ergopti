@@ -1389,7 +1389,7 @@
 				// WebKitGTK cannot receive the macOS evaluateJavaScript injection and
 				// has no file-sidecar fallback. Request the shared prefetch envelope
 				// through its native bridge, then keep the dashboard live with polling.
-				if (window.__ergopti_host === 'linux') {
+				if (hostHasCapability('document_bridge')) {
 					const request_linux_refresh = () => {
 						try {
 							window.webkit.messageHandlers.metrics_typing_bridge.postMessage({

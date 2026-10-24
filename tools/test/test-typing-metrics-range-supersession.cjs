@@ -13,6 +13,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { installHostCapabilities } = require('./support/host-capabilities.cjs');
 const root = path.resolve(__dirname, '../../static/ergopti_plus/_shared/ui/metrics_typing');
 let passed = 0;
 let failed = 0;
@@ -57,10 +58,11 @@ function fixture(host = 'macos') {
 		}
 	});
 	context.window = context;
+	installHostCapabilities(context);
 	if (host === 'windows')
 		context.chrome = { webview: { postMessage: (raw) => requests.push(JSON.parse(raw)) } };
 	if (host === 'linux') {
-		context.__ergopti_host = 'linux';
+		context.__ergopti_host_capabilities = { document_bridge: true };
 		context.webkit = {
 			messageHandlers: { metrics_typing_bridge: { postMessage: (req) => requests.push(req) } }
 		};

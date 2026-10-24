@@ -70,7 +70,7 @@ end
 local function wait(code) local end_at=uv.hrtime()+15e9; repeat local v=eval(code); if v=='true' then return true end; pump() until uv.hrtime()>end_at; return false end
 assert(wait("String(document.readyState==='complete' && !!window.metrics_manifest && app_state.available_apps.includes('Editor'))"),'actual ready/native manifest deadline')
 print('ACTUAL_SOURCE_GUARD '..eval("typeof matches_typing_app_selection"))
-check('actual page and canonical selection buttons loaded',function() assert(eval("String(window.__ergopti_host==='linux' && !!document.querySelector('[onclick=\"deselect_all_apps()\"]') && !!document.querySelector('[onclick=\"select_all_apps()\"]'))")=='true') end)
+check('actual page and canonical selection buttons loaded',function() assert(eval("String(window.__ergopti_host_capabilities.document_bridge===true && !!document.querySelector('[onclick=\"deselect_all_apps()\"]') && !!document.querySelector('[onclick=\"select_all_apps()\"]'))")=='true') end)
 check('actual Unknown live inclusion in initial unfiltered native prefetch',function() assert(eval("String(app_state.data.c.u?.count===3)")=='true') end)
 eval("document.getElementById('date_start').value='1999-12-31'; document.getElementById('date_end').value=get_local_date_string(); document.querySelector('[onclick=\"open_app_modal()\"]').click(); document.querySelector('[onclick=\"select_all_apps()\"]').click(); document.querySelector('[onclick=\"close_app_modal()\"]').click(); 'clicked'")
 assert(wait("String(!app_state.loading_data && app_state.data.c.h?.count===7 && app_state.data.c.z?.count===2)"),'actual ALL range bridge deadline')

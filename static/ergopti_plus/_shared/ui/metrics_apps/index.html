@@ -1233,7 +1233,7 @@
 				// WebKitGTK loads the same inline assets as macOS but has no
 				// Hammerspoon evaluateJavaScript injection. Its bridge response is
 				// therefore the source of truth for both the first paint and refreshes.
-				if (window.__ergopti_host === 'linux') {
+				if (hostHasCapability('document_bridge')) {
 					const request_linux_refresh = () => {
 						try {
 							window.webkit.messageHandlers.metrics_apps_bridge.postMessage({ action: 'refresh' });

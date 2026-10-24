@@ -17,6 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { installHostCapabilities } = require('./support/host-capabilities.cjs');
 const assert = require('node:assert/strict');
 
 const PAGE = path.resolve(
@@ -34,7 +35,7 @@ const script = html.slice(start, end + '})();'.length);
 
 const calls = { bootstrap: 0, live: 0 };
 const window = {
-	__ergopti_host: 'linux',
+	__ergopti_host_capabilities: { document_bridge: true },
 	webkit: { messageHandlers: { metrics_apps_bridge: { postMessage() {} } } },
 	bootstrapMetricsAppsData() {
 		calls.bootstrap += 1;
@@ -49,7 +50,9 @@ const sandbox = {
 	createVisibilityPoller() {},
 	JSON
 };
-vm.runInNewContext(script, sandbox);
+vm.createContext(sandbox);
+installHostCapabilities(sandbox);
+vm.runInContext(script, sandbox);
 
 const answer = (manifest) =>
 	window.__hostBridgeResponse('metrics_apps_bridge', false, { metrics_manifest: manifest });
@@ -90,7 +93,8 @@ const actual = vm.createContext({
 	decodeHostBridgeResponse: (_base64, payload) => payload
 });
 actual.window = actual;
-actual.__ergopti_host = 'linux';
+installHostCapabilities(actual);
+actual.__ergopti_host_capabilities = { document_bridge: true };
 actual.webkit = { messageHandlers: { metrics_apps_bridge: { postMessage() {} } } };
 for (const file of ['helpers.js', 'state.js', 'main.js']) {
 	vm.runInContext(fs.readFileSync(path.join(path.dirname(PAGE), file), 'utf8'), actual, {
