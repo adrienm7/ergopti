@@ -1,0 +1,57 @@
+{
+	"expected_count": 24,
+	"filters": [
+		{
+			"contains": "healthcheck-collection-publish-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "personal-default-preference-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "spotlight-coordinate-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "shared-personal-frame: real source withdrawal disposes new native children and preserves existing dispatcher owners",
+			"expected_count": 1
+		},
+		{
+			"contains": "shared-personal-default-choice: native source refusal and exact repair ",
+			"expected_count": 3
+		},
+		{
+			"contains": "spotlight session ownership: startup failure releases exact local handles (spotlight-session-transaction)",
+			"expected_count": 1
+		},
+		{
+			"contains": "spotlight session ownership: stale ticks cannot dismiss a replacement (spotlight-session-transaction)",
+			"expected_count": 1
+		},
+		{
+			"contains": "spotlight paint ownership: refused cleanup blocks allocations until retry (spotlight-paint-resource-ownership)",
+			"expected_count": 1
+		},
+		{
+			"contains": "spotlight-upload-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "healthcheck-collection-lifetime",
+			"expected_count": 2
+		},
+		{
+			"contains": "logger-dedup-native64-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "logger: ERROR dedup TickCount delta uses wrap-safe (now - last + 0x100000000) & 0xFFFFFFFF formula (F38)",
+			"expected_count": 1
+		},
+		{
+			"contains": "logger: error deduplication uses _LastErrTime tick-time with 5000 ms window",
+			"expected_count": 1
+		}
+	]
+}
