@@ -105,9 +105,9 @@ _KLQCat_RendererRefusals() {
 		["manifest.app_day", Map()],
 		["manifest.app_day", Map("where", 1)],
 		["manifest.app_day", Map("where", "", "extra", "")]]
-	for Case in Cases {
+	for Misuse in Cases {
 		Refused := false
-		try KeystatsQuery(Case[1], Case[2])
+		try KeystatsQuery(Misuse[1], Misuse[2])
 		catch ValueError
 			Refused := true
 		AssertTrue(Refused, "KeystatsQuery must refuse case " . A_Index . " rather than render other SQL")
