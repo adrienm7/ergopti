@@ -6,6 +6,7 @@
 
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
+const { installHostCapabilities } = require('./host-capabilities.cjs');
 
 module.exports = function checkPrefetchHistory(html, data) {
 	const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
@@ -36,6 +37,7 @@ module.exports = function checkPrefetchHistory(html, data) {
 			}
 		});
 		context.window = context;
+		installHostCapabilities(context);
 		vm.runInContext(data, context);
 		context.process_manifest = () => {};
 		context.apply_local_filters = () => {};
@@ -56,7 +58,7 @@ module.exports = function checkPrefetchHistory(html, data) {
 				}
 			};
 		} else {
-			context.__ergopti_host = 'linux';
+			context.__ergopti_host_capabilities = { document_bridge: true };
 			context.webkit = { messageHandlers: { metrics_typing_bridge: { postMessage() {} } } };
 		}
 		vm.runInContext(scripts[0], context);

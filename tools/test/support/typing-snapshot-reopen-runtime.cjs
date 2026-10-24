@@ -11,6 +11,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
+const { installHostCapabilities } = require('./host-capabilities.cjs');
 const { spawnSync } = require('node:child_process');
 const { validateAhkSuiteManifest } = require('../validate-ahk-suite-manifest.cjs');
 
@@ -120,6 +121,7 @@ module.exports = async function checkSnapshotReopen(html, data) {
 				}
 			});
 			context.window = context;
+			installHostCapabilities(context);
 			context.app_state = { active_range_request_id: 0 };
 			vm.runInContext(data, context);
 			context.process_manifest = () => {};

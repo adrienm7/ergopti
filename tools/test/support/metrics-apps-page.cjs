@@ -143,7 +143,7 @@ function loadMetricsAppsPage(host = 'macos', afterScript) {
 	});
 	context.window = context;
 	context.self = context;
-	if (host === 'linux') context.__ergopti_host = 'linux';
+	if (host === 'linux') context.__ergopti_host_capabilities = { document_bridge: true };
 	if (host === 'windows')
 		context.chrome = {
 			webview: {

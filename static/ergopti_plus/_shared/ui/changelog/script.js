@@ -142,7 +142,7 @@ var _restorePath = '';
  * @return {boolean}
  */
 function _detectNativeHost() {
-	if (window.__ergopti_host === 'linux') return true;
+	if (hostHasCapability('document_bridge')) return true;
 	if (
 		window.chrome &&
 		window.chrome.webview &&
@@ -200,7 +200,7 @@ function _hostBackup(value) {
 
 var postBridgeMessage = makeHostBridge('changelog_bridge');
 
-if (window.__ergopti_host === 'linux') {
+if (hostHasCapability('document_bridge')) {
 	window.__hostBridgeResponse = function (bridge, isBase64, payload) {
 		if (bridge !== 'changelog_bridge') return;
 		var response = decodeHostBridgeResponse(isBase64, payload);

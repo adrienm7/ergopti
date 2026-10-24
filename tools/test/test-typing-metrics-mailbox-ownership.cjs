@@ -13,6 +13,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { installHostCapabilities } = require('./support/host-capabilities.cjs');
 const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '../../static/ergopti_plus');
 let passed = 0;
@@ -50,6 +51,7 @@ function frontend() {
 		console
 	});
 	context.window = context;
+	installHostCapabilities(context);
 	for (const file of ['data.js', 'filters.js']) {
 		vm.runInContext(
 			fs.readFileSync(path.join(root, '_shared/ui/metrics_typing', file), 'utf8'),
