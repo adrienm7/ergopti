@@ -243,6 +243,13 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/macos/_generated/hid_key_identity.lua']
 	},
 	{
+		script: 'codegen/codegen-keystats-queries.cjs',
+		outputs: [
+			'static/ergopti_plus/_shared/lua/keystats/queries.lua',
+			'static/ergopti_plus/windows/_generated/keystats_queries.ahk'
+		]
+	},
+	{
 		script: 'codegen/gen-architecture-diagram.cjs',
 		note: 'runs last: it describes the tree the others have just finished writing',
 		outputs: ['static/ergopti_plus/docs/architecture.md']
