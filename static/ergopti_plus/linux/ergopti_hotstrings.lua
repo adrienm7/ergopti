@@ -599,18 +599,13 @@ local function resolve_config_path(config_path)
 	return nil
 end
 
---- Reloads the hotstring config.  Reached from the SIGHUP handler and from the
---- tray menu's Reload item, so it must be self-contained and not throw.
----
---- The menu used to reach this by shelling out `kill -HUP $$`, which signalled
---- the /bin/sh that os.execute had just spawned rather than this process — the
---- item logged success and reloaded nothing. There is no reason to leave the
---- process to signal itself: the menu now calls this directly.
+--- Reloads the hotstring catalogue in this process. This is not the Reload
+--- command (see perform_reload): it serves a change that touches the catalogue
+--- alone, such as a new magic key.
 --- @param trigger string What asked for the reload, for the log line.
 --- @return boolean reloaded
---- @return string|nil why "postponed" or "failed" when not reloaded; the local
----   reload control reports it, the other callers only log.
-local function perform_reload(trigger)
+--- @return string|nil why "postponed" or "failed" when not reloaded.
+local function reload_hotstrings(trigger)
 	if gestures and gestures.stop_window_switches() ~= true then
 		Logger.warn(LOG, "Reload postponed while a window operation owns native cleanup debt.")
 		return false, "postponed"
@@ -620,7 +615,7 @@ local function perform_reload(trigger)
 		return false, "postponed"
 	end
 	if gestures then gestures.set_program_paused(false); gestures.set_window_switch_paused(false) end
-	Logger.info(LOG, "Reload requested by %s — reloading hotstring config…", trigger)
+	Logger.info(LOG, "Catalogue reload requested by %s — reloading hotstring config…", trigger)
 	local reloaded, why = require("infra.reload_outcome").run(function() return hotstrings_config.reload() end)
 	if reloaded then
 		-- A Reload click on an older tray tree now joins this reload.
@@ -657,6 +652,14 @@ local function restart_daemon(reason)
 	return how ~= nil
 end
 
+
+local boot_catalogue_complete = false
+
+--- The Reload command, as on the other drivers: the daemon restarts, so every
+--- module reads config.toml again (infra/reload_restart.lua). The restart
+--- cannot name its successor, so the local control writes a pending record
+--- that the successor claims (infra/driver_control.lua).
+local perform_reload = require("infra.reload_restart").new({ gestures = gestures, restart = restart_daemon })
 
 --- Emits facts prepared before capture only after actual driver readiness.
 ---
@@ -855,6 +858,8 @@ local function main()
 
 	local mapping_count, committed, _, receipt = hotstrings_config.load_all(nil, true)
 	if committed ~= true then
+	-- What a reload request claimed by this process answers for its own boot.
+	boot_catalogue_complete = committed == true and type(receipt) == "table" and receipt.complete == true
 		Logger.warn(LOG, "The startup hotstring catalogue is unavailable; unrelated app features continue.")
 	elseif type(receipt) ~= "table" or receipt.complete ~= true then
 		Logger.warn(LOG, "Common autocorrection is unavailable; %d unrelated hotstring mapping(s) loaded.", mapping_count)
@@ -2430,7 +2435,7 @@ local function main()
 		if dyn_hotstrings then
 			dyn_hotstrings.init({ trigger_char = new_char })
 		end
-		perform_reload("the magic key")
+		reload_hotstrings("the magic key")
 		if rebuild_tray_menu then rebuild_tray_menu() end
 	end)
 
@@ -2875,7 +2880,11 @@ local function main()
 	privacy_owners.startup.snapshot = nil
 	-- Optional: a control that cannot start is logged and the daemon runs on.
 	privacy_owners.driver_control = require("infra.driver_control").start({
-		pid = require("luv").os_getpid(), reload = perform_reload })
+		pid = require("luv").os_getpid(), reload = perform_reload,
+		boot_outcome = function()
+			if boot_catalogue_complete then return true end
+			return false, "refused"
+		end })
 	if not privacy_owners.startup_checkpoint() then return end
 	privacy_owners.finish_startup()
 	if not privacy_owners.startup_checkpoint() then return end

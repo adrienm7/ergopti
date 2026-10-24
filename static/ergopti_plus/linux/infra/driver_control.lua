@@ -12,10 +12,13 @@
 ---    signal that rings this owner, and the request must carry the token of
 ---    the session file in a 0700 folder only that user can read.
 --- 2. The tray's reload owner decides. An admitted request goes to the same
----    reload the tray item runs; nothing here starts or ends a process.
---- 3. Three separate outcomes. The reload is in-process and synchronous, so
----    this process is its own successor: it writes "requested", then
----    "completed" or "refused" with its reason.
+---    daemon restart the tray item runs; nothing here starts or ends a process.
+--- 3. A restart cannot name its successor beforehand (systemd or the relay
+---    start it), so the request is written as a pending record: successor null
+---    and a deadline. The successor claims it once ready and completes it, or
+---    refuses it with the reason of its own boot; a record past its deadline
+---    is reported as timeout, never as completed
+---    (docs/design/driver-control-pending-record.md).
 --- ==============================================================================
 
 local M = {}
@@ -87,16 +90,21 @@ end
 -- ===========================
 
 --- Creates one session; it publishes nothing until start().
---- @param opts table { spec, folder, pid, reload, ports? }; `reload(trigger)`
----   returns true once reloaded, or false and "postponed" or "failed".
+--- @param opts table { spec, folder, pid, reload, ports?, boot_outcome? };
+---   `reload(trigger)` returns true once a restart is under way (or already
+---   was), or false and "postponed" or "failed"; `boot_outcome()` answers
+---   true, or false and "refused"/"failed", for this process's own boot.
 --- @return table session
 function M.new(opts)
 	assert(type(opts) == "table" and type(opts.spec) == "table", "driver control needs its declaration")
 	assert(type(opts.folder) == "string" and opts.folder ~= "", "driver control needs its folder")
 	assert(type(opts.pid) == "number" and opts.pid > 0, "driver control needs this process id")
 	assert(type(opts.reload) == "function", "driver control needs the reload owner")
+	assert(opts.boot_outcome == nil or type(opts.boot_outcome) == "function", "boot_outcome must be a function")
+	local ports = opts.ports or native_ports()
+	ports.now = ports.now or os.time
 	return setmetatable({ spec = opts.spec, folder = opts.folder, pid = opts.pid, reload = opts.reload,
-		ports = opts.ports or native_ports(), token = nil, started = false, active = false }, Session)
+		boot_outcome = opts.boot_outcome, ports = ports, token = nil, started = false, active = false }, Session)
 end
 
 function Session:path(kind)
@@ -128,16 +136,48 @@ function Session:start()
 	if not parent or not self.ports.private_dir(parent) or not self.ports.private_dir(self.folder) then
 		error("the control folder could not be made private: " .. self.folder, 0)
 	end
-	local completed = Policy.completion(self.spec, self.ports.read(self:path("result")), self.pid, Json.decode)
-	if completed then
-		self:publish("result", completed)
-		Logger.success(LOG, "Reload request completed in successor pid %d.", self.pid)
-	end
+	self:resolve_pending()
 	local token = self.ports.random_hex(self.spec.token_hex_length)
 	if not Policy.is_token(self.spec, token) then error("the system random generator gave no token", 0) end
 	self.token = token
 	self:publish("session", Policy.session_text(self.spec, "linux", self.pid, token))
 	self.active = true
+end
+
+--- Settles the pending result this process owes, if any: claims a record that
+--- names no successor, then completes it or refuses it with the reason of this
+--- process's own boot; a record past its deadline becomes a timeout.
+function Session:resolve_pending()
+	local text = self.ports.read(self:path("result"))
+	local kind, owed = Policy.resolve(self.spec, text, self.pid, self.ports.now(), Json.decode)
+	if not kind then return end
+	self:publish("result", owed)
+	if kind == "timeout" then
+		Logger.warn(LOG, "A pending reload request passed its deadline before this process was ready; reported as timeout.")
+		return
+	end
+	if kind == "completed" then
+		Logger.success(LOG, "Reload request completed in successor pid %d.", self.pid)
+		return
+	end
+	-- Claimed: this process is the successor. Its own boot decides the answer.
+	Logger.info(LOG, "Reload request claimed by successor pid %d.", self.pid)
+	local ok, reason = true, nil
+	if self.boot_outcome then
+		local ran, answered, why = pcall(self.boot_outcome)
+		ok = ran and answered == true
+		reason = ok and nil or (ran and why or "failed")
+	end
+	local current = Json.decode(owed)
+	if ok then
+		self:publish("result", Policy.result_text(self.spec, { request_id = current.request_id, state = "completed",
+			driver_pid = self.pid, successor_pid = self.pid }))
+		Logger.success(LOG, "Reload request completed in successor pid %d.", self.pid)
+	else
+		self:publish("result", Policy.result_text(self.spec, { request_id = current.request_id, state = "refused",
+			driver_pid = self.pid, reason = self.spec.reason_set[reason] and reason or "failed" }))
+		Logger.warn(LOG, "Reload request refused by the successor's boot (%s).", tostring(reason))
+	end
 end
 
 --- Withdraws the session file this process still owns.
@@ -180,11 +220,12 @@ function Session:handle()
 		return false
 	end
 	Logger.info(LOG, "Reload request %s admitted; the reload owner decides.", id)
-	self:report({ request_id = id, state = "requested", successor_pid = self.pid })
+	-- Written before the restart: it may end this process before it returns.
+	self:report({ request_id = id, state = "requested",
+		deadline = self.ports.now() + self.spec.pending_ttl_seconds })
 	local ran, reloaded, why = pcall(self.reload, "the local reload control")
 	if ran and reloaded == true then
-		self:report({ request_id = id, state = "completed", successor_pid = self.pid })
-		Logger.success(LOG, "Reload request %s completed.", id)
+		Logger.info(LOG, "Reload request %s requested; the successor claims it once ready.", id)
 		return true
 	end
 	local cause = ran and why == "postponed" and "busy" or ran and why == "failed" and "failed"
@@ -207,7 +248,7 @@ M.Session = Session
 -- ==========================
 
 --- Starts the daemon's local reload control.
---- @param opts table { pid, reload, declaration? }
+--- @param opts table { pid, reload, boot_outcome?, declaration? }
 --- @return table|nil session, string|nil error
 function M.start(opts)
 	Logger.start(LOG, "Starting the local reload control…")
@@ -218,7 +259,8 @@ function M.start(opts)
 		local spec = Policy.validate(Json.decode(text))
 		local folder, why = Policy.folder(spec, "linux", os.getenv, require("app_dirs").folder_name, "/")
 		if not folder then error(why, 0) end
-		local session = M.new({ spec = spec, folder = folder, pid = opts.pid, reload = opts.reload })
+		local session = M.new({ spec = spec, folder = folder, pid = opts.pid, reload = opts.reload,
+			boot_outcome = opts.boot_outcome })
 		session:start()
 		return session
 	end)
