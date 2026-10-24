@@ -389,6 +389,26 @@ const w = Model.splitCaption('W ← Previous word');
 if (w.icon !== 'W ←' || w.text !== 'Previous word')
 	fail(`"W ← Previous word" splits into "${w.icon}" + "${w.text}"`);
 
+// A chord reads as each OS writes shortcuts: macOS marks every modifier with no
+// joiner, the others spell the modifier keys joined by "+", all in the data's
+// order. Pins the per-OS table that replaced a platform branch.
+{
+	const chord = [{ mods: ['primary', 'shift', 'alt', 'ctrl'], key: 'KeyZ' }];
+	const text = (os) =>
+		Model.chordText(chord, { data: DATA, os, legends: { KeyZ: 'Z' }, t: (key) => `<${key}>` });
+	const expected = {
+		macos: '⌃⌥⇧⌘Z',
+		windows: '<layer_editor.key.ctrl>+<layer_editor.key.alt>+<layer_editor.key.shift>+Z',
+		linux: '<layer_editor.key.ctrl>+<layer_editor.key.alt>+<layer_editor.key.shift>+Z'
+	};
+	for (const os of OSES)
+		if (text(os) !== expected[os])
+			fail(`${os}: a chord reads "${text(os)}", not "${expected[os]}"`);
+	const fn = (os) => Model.modifierName('fn', { data: DATA, os, legends: {}, t: (key) => key });
+	if (fn('macos') !== 'fn' || fn('windows') !== 'Fn' || fn('linux') !== 'Fn')
+		fail('the Fn modifier is not named as each OS writes it');
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] the layer editor model breaks its contract:\x1b[0m');
 	for (const e of errors.slice(0, 40)) console.error('    - ' + e);
