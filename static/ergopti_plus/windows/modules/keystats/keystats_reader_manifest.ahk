@@ -19,6 +19,7 @@
 ; ==============================================================================
 
 #Include keystats_reader_manifest_json.ahk
+#Include ../../_generated/keystats_queries.ahk
 
 
 
@@ -179,6 +180,12 @@ KLR_NewAppEntry() {
 		)
 }
 
+; Renders a named manifest query of the shared catalogue
+; (_shared/data/db/queries.sql), the statement macOS and Linux run too.
+KLR_ManifestSql(Name, Where) {
+		return KeystatsQuery(Name, Map("where", Where))
+}
+
 KLR_GetCell(manifest, date_str, app) {
 		if !manifest.Has(date_str)
 				manifest[date_str] := Map()
@@ -189,15 +196,7 @@ KLR_GetCell(manifest, date_str, app) {
 }
 
 KLR__SumAppDay(db, manifest, where) {
-		sql := "SELECT date, app,"
-				. " SUM(chars) AS chars, SUM(pauses) AS pauses,"
-				. " SUM(time_ms) AS time_ms, SUM(think_time_ms) AS think_time_ms,"
-				. " SUM(hs_chars) AS hs_chars, SUM(llm_chars) AS llm_chars,"
-				. " SUM(hs_triggers) AS hs_triggers, SUM(llm_triggers) AS llm_triggers,"
-				. " SUM(hs_suggested) AS hs_suggested, SUM(llm_suggested) AS llm_suggested,"
-				. " SUM(hs_input_chars) AS hs_input_chars, SUM(llm_input_chars) AS llm_input_chars,"
-				. " SUM(app_time_ms) AS app_time_ms, MAX(category) AS category"
-				. " FROM agg_app_day" . where . " GROUP BY date, app"
+		sql := KLR_ManifestSql("manifest.app_day", where)
 		for r in KLR_ProjectionQuery(db, sql, "manifest", "app_day") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				a["chars"] := r["chars"]
@@ -218,11 +217,7 @@ KLR__SumAppDay(db, manifest, where) {
 }
 
 KLR__SumBuckets(db, manifest, where) {
-		sql := "SELECT date, app, bucket_ms,"
-				. " SUM(time_sum) AS time_sum, SUM(credited) AS credited,"
-				. " SUM(hs_input_time_sum) AS hs_in_t, SUM(hs_input_credited) AS hs_in_c,"
-				. " SUM(llm_input_time_sum) AS llm_in_t, SUM(llm_input_credited) AS llm_in_c"
-				. " FROM agg_app_day_buckets" . where . " GROUP BY date, app, bucket_ms"
+		sql := KLR_ManifestSql("manifest.buckets", where)
 		for r in KLR_ProjectionQuery(db, sql, "manifest", "buckets") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				k := String(r["bucket_ms"])
@@ -294,12 +289,7 @@ KLR_AppendJsonNumberArray(target, raw_json, field_name) {
 }
 
 KLR__SumBurst(db, manifest, where) {
-		sql := "SELECT date, app,"
-				. " SUM(count_total) AS count_total, MAX(max_cpm) AS max_cpm, MAX(max_chars) AS max_chars,"
-				. " SUM(inter_delay_count) AS inter_count, SUM(inter_delay_sum) AS inter_sum,"
-				. " SUM(inter_delay_sumsq) AS inter_sumsq, length_buckets_json, COUNT(*) AS source_rows"
-				. " FROM agg_app_day_burst" . where
-				. " GROUP BY date, app, length_buckets_json"
+		sql := KLR_ManifestSql("manifest.burst", where)
 		for r in KLR_ProjectionQuery(db, sql, "manifest", "burst") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				a["burst_count_total"] += KLR_NumberOrZero(r["count_total"])
@@ -318,8 +308,7 @@ KLR__SumBurst(db, manifest, where) {
 }
 
 KLR__SumSession(db, manifest, where) {
-		sql := "SELECT date, app, count_total, longest_ms, longest_chars, total_active_ms, durations_json"
-				. " FROM agg_app_day_session" . where
+		sql := KLR_ManifestSql("manifest.session", where)
 		for r in KLR_ProjectionQuery(db, sql, "manifest", "session") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				a["session_count_total"] += KLR_NumberOrZero(r["count_total"])
@@ -334,11 +323,7 @@ KLR__SumSession(db, manifest, where) {
 }
 
 KLR__SumCharsClass(db, manifest, where) {
-		sql := "SELECT date, app,"
-				. " SUM(letter) AS letter, SUM(digit) AS digit, SUM(punct) AS punct,"
-				. " SUM(space) AS space, SUM(other) AS other,"
-				. " MIN(first_typed_min) AS first_min, MAX(last_typed_min) AS last_min"
-				. " FROM agg_app_day_chars_class" . where . " GROUP BY date, app"
+		sql := KLR_ManifestSql("manifest.chars_class", where)
 		for r in KLR_ProjectionQuery(db, sql, "manifest", "chars_class") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				a["char_letter"] := r["letter"]
@@ -352,11 +337,7 @@ KLR__SumCharsClass(db, manifest, where) {
 }
 
 KLR__SumErrors(db, manifest, where) {
-		sql := "SELECT date, app,"
-				. " SUM(bs_total) AS bs_total, SUM(cascade_count) AS cascade_count,"
-				. " MAX(cascade_max_len) AS cascade_max_len, SUM(recovery_sum_ms) AS recovery_sum,"
-				. " SUM(recovery_count) AS recovery_count"
-				. " FROM agg_app_day_errors" . where . " GROUP BY date, app"
+		sql := KLR_ManifestSql("manifest.errors", where)
 		for r in KLR_ProjectionQuery(db, sql, "manifest", "errors") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				a["bs_total"] := r["bs_total"]
@@ -382,8 +363,7 @@ KLR__SumErgo(db, manifest, where) {
 }
 
 KLR__SumLayouts(db, manifest, where) {
-		sql := "SELECT date, app, layout, SUM(count) AS count"
-				. " FROM agg_app_day_layouts" . where . " GROUP BY date, app, layout"
+		sql := KLR_ManifestSql("manifest.layouts", where)
 		for r in KLR_ProjectionQuery(db, sql, "manifest", "layouts") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				KLR_BumpMap(a["layouts_seen"], r["layout"], r["count"])
@@ -391,10 +371,7 @@ KLR__SumLayouts(db, manifest, where) {
 }
 
 KLR__SumKcHold(db, manifest, where) {
-		sql := "SELECT date, app, keycode,"
-				. " SUM(sum_ms) AS s, SUM(count) AS c, MAX(max_ms) AS mx,"
-				. " SUM(tap_count) AS t, SUM(hold_count) AS h"
-				. " FROM agg_app_day_kc_hold" . where . " GROUP BY date, app, keycode"
+		sql := KLR_ManifestSql("manifest.kc_hold", where)
 		for r in KLR_ProjectionQuery(db, sql, "manifest", "kc_hold") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				a["kc_hold"][String(r["keycode"])] := Map(
@@ -494,8 +471,7 @@ KLR__SumMedia(db, manifest, where) {
 }
 
 KLR__SumTitles(db, manifest, where) {
-		sql := "SELECT date, app, title, SUM(c) AS c, SUM(ms) AS ms"
-				. " FROM agg_app_day_titles" . where . " GROUP BY date, app, title"
+		sql := KLR_ManifestSql("manifest.titles", where)
 		for r in KLR_ProjectionQuery(db, sql, "manifest", "titles") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				a["win_titles"][r["title"]] := Map("c", r["c"], "ms", r["ms"])
@@ -503,11 +479,7 @@ KLR__SumTitles(db, manifest, where) {
 }
 
 KLR__SumHourly(db, manifest, where) {
-		sql := "SELECT date, app, hour,"
-				. " SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es,"
-				. " e_buckets_json, COUNT(*) AS source_rows"
-				. " FROM agg_app_day_hourly" . where
-				. " GROUP BY date, app, hour, e_buckets_json"
+		sql := KLR_ManifestSql("manifest.hourly", where)
 		for r in KLR_ProjectionQuery(db, sql, "manifest", "hourly") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				hour := r["hour"]
@@ -525,11 +497,7 @@ KLR__SumHourly(db, manifest, where) {
 }
 
 KLR__SumHourlyMin5(db, manifest, where) {
-		sql := "SELECT date, app, slot,"
-				. " SUM(c) AS c, SUM(e) AS e, SUM(es) AS es,"
-				. " e_buckets_json, COUNT(*) AS source_rows"
-				. " FROM agg_app_day_hourly_min5" . where
-				. " GROUP BY date, app, slot, e_buckets_json"
+		sql := KLR_ManifestSql("manifest.hourly_min5", where)
 		for r in KLR_ProjectionQuery(db, sql, "manifest", "hourly_min5") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				slot := r["slot"]
