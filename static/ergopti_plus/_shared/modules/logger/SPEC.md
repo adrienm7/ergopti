@@ -362,8 +362,11 @@ because its reload does not restart the daemon. Crash reports go to
 `<logs>/crash_reports/`; metrics stay in the configuration folder. What is
 written before paths.toml is read stays in the default folder whatever
 `LogsDirPath` says: the macOS boot fallback log, `launcher.log` and the fatal
-report, and on Windows `bootstrap.log` (a yielding second instance, a refused
-configuration transition).
+report, and `bootstrap.log` on Windows (a yielding second instance, a refused
+configuration transition) and on Linux (a refused session lock, a refused privacy
+admission, a second start that yielded). The file name is declared once in
+`paths/app_dirs.toml`; on Linux it only ever carries the closed messages of
+`infra/bootstrap_log.lua`, because the privacy policy is not loaded yet.
 
 ### 6.2 Fan-out sub-files
 

@@ -101,6 +101,7 @@ const data = {
 	errorsPrefix: requireString(files, 'errors_prefix', 'logs.files'),
 	topicalPrefix: requireString(files, 'topical_prefix', 'logs.files'),
 	extension: requireString(files, 'extension', 'logs.files'),
+	bootstrapLog: requireString(files, 'bootstrap_log', 'logs.files'),
 	macos: logs.macos || fail('[logs.macos] is missing.'),
 	windows: logs.windows || fail('[logs.windows] is missing.'),
 	linux: logs.linux || fail('[logs.linux] is missing.')
@@ -179,6 +180,7 @@ function emitLua() {
 		`\t\terrors_prefix = ${luaStr(data.errorsPrefix)},\n` +
 		`\t\ttopical_prefix = ${luaStr(data.topicalPrefix)},\n` +
 		`\t\textension = ${luaStr(data.extension)},\n` +
+		`\t\tbootstrap_log = ${luaStr(data.bootstrapLog)},\n` +
 		'\t},\n' +
 		'\tmacos = {\n' +
 		`\t\tbase_env = ${luaStr(macos.base)},\n` +
@@ -255,6 +257,12 @@ function emitAhk() {
 		) +
 		'\n' +
 		fn('AppDirsLogExtension', data.extension, 'Extension of every log file.') +
+		'\n' +
+		fn(
+			'AppDirsLogBootstrapName',
+			data.bootstrapLog,
+			'Pre-configuration log, always in the default logs folder.'
+		) +
 		'\n' +
 		fn(
 			'AppDirsWindowsLogsBaseEnv',

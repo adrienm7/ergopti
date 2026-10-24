@@ -393,19 +393,21 @@ helpers.describe("logger sink — production wiring", function()
 	helpers.it("linux-logger-privacy: boot refuses private admission failure without exposing its exception", function()
 		local block = entry and entry:match("(local privacy_admitted[^\n]*= pcall%b()%s*if not privacy_admitted.-\nend)")
 		helpers.assert_not_nil(block, "The actual bootstrap privacy admission block must be present")
-		local run = assert(load("return function(LoggerSink, Logger, io, os)\n" .. block .. "\nend"))()
+		local run = assert(load("return function(LoggerSink, Logger, io, os, BootstrapLog)\n" .. block .. "\nend"))()
 		for _, result in ipairs({ "true", "false", "throw", "refusal" }) do
-			local calls, exits, output = 0, {}, {}
+			local calls, exits, output, records = 0, {}, {}, {}
 			run({ install = function()
 				calls = calls + 1
 				if result == "throw" then error("PRIVATE_BOOT_CANARY /home/PrivateUser", 0) end
 				if result == "refusal" then return false, "PRIVATE_REFUSAL_CANARY /home/PrivateUser" end
 				return result == "true"
 			end }, {}, { stderr = { write = function(_, text) output[#output + 1] = text end } },
-				{ exit = function(code) exits[#exits + 1] = code end })
+				{ exit = function(code) exits[#exits + 1] = code end },
+				{ append = function(code) records[#records + 1] = code end })
 			helpers.assert_eq(calls, 1)
 			local refused = result == "throw" or result == "refusal"
 			helpers.assert_eq(exits, refused and { 1 } or {})
+			helpers.assert_eq(records, refused and { "privacy_admission_refused" } or {}, "a refusal leaves its pre-sink record")
 			helpers.assert_eq(output, refused
 				and { "[logger_sink] Privacy initialization refused; daemon not started.\n" } or {})
 		end
@@ -1002,5 +1004,57 @@ helpers.describe("linux-logger-topical-fan-out", function()
 		for _, sub in ipairs(require("_generated.logger_sub_files")) do generated[sub.name] = true end
 		helpers.assert_true(next(expected) ~= nil, "the canonical file must declare Linux topics")
 		helpers.assert_eq(generated, expected)
+	end)
+end)
+
+
+
+
+
+-- ===============================================================
+-- ===============================================================
+-- ======= 4/ The pre-sink fatal record (bootstrap.log) ==========
+-- ===============================================================
+-- ===============================================================
+
+helpers.describe("linux-bootstrap-log", function()
+	local Bootstrap = helpers.load_module("infra.bootstrap_log")
+
+	helpers.it("linux-bootstrap-log: a known code appends one closed-vocabulary line", function()
+		local dir = temp_dir() .. "/ergopti-bootstrap-" .. tostring(os.time()) .. tostring(math.random(1e6))
+		local ok, err = xpcall(function()
+			helpers.assert_true(Bootstrap.append("privacy_admission_refused", { dir = dir }))
+			helpers.assert_true(Bootstrap.append("second_instance_yielded", { dir = dir }))
+			local content = read_file(dir .. "/" .. require("app_dirs").files.bootstrap_log)
+			helpers.assert_not_nil(content, "the pre-configuration log must exist")
+			helpers.assert_contains(content, "[ERROR] [bootstrap] Privacy initialization refused; daemon not started.")
+			helpers.assert_contains(content, "this start yielded")
+			local lines = 0
+			for _ in content:gmatch("[^\n]+") do lines = lines + 1 end
+			helpers.assert_eq(lines, 2)
+		end, debug.traceback)
+		os.execute("rm -rf '" .. dir .. "'")
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("linux-bootstrap-log: free text is refused, so a path or exception never reaches the file", function()
+		local written, reason = Bootstrap.append("/home/PrivateUser exploded", { dir = temp_dir() .. "/never-created" })
+		helpers.assert_eq(written, false)
+		helpers.assert_eq(reason, "unknown bootstrap code")
+	end)
+
+	helpers.it("linux-bootstrap-log: the entry point records each fatal that precedes the sink", function()
+		local entry = strip_comment_lines(read_file(DRIVER_ROOT .. "/ergopti_hotstrings.lua"))
+		for _, code in ipairs({ "session_lock_refused", "privacy_admission_refused", "second_instance_yielded" }) do
+			helpers.assert_contains(entry, '"' .. code .. '"', "the entry point must append " .. code)
+			helpers.assert_not_nil(Bootstrap.CODES[code], code .. " must be a declared code")
+		end
+	end)
+
+	helpers.it("linux-bootstrap-log: the file name is the shared declaration the Windows driver reads too", function()
+		local name = require("app_dirs").files.bootstrap_log
+		helpers.assert_eq(name, "bootstrap.log")
+		local logger = read_file(DRIVER_ROOT .. "/../windows/infra/logger.ahk")
+		helpers.assert_contains(logger, "AppDirsLogBootstrapName()")
 	end)
 end)
