@@ -73,7 +73,8 @@ helpers.describe("manifest_reader: default_for", function()
 	helpers.it("returns the declared default for a known path", function()
 		helpers.assert_eq(Manifest.default_for("hotstrings.trigger_char"), STAR, "trigger_char default")
 		helpers.assert_eq(Manifest.default_for("hotstrings.expansion_delay"), 0.75, "expansion_delay default")
-		helpers.assert_eq(Manifest.default_for("hotstrings.preview_star_enabled"), false, "preview default")
+		-- The previews ship on on every driver (PAR-24).
+		helpers.assert_eq(Manifest.default_for("hotstrings.preview_star_enabled"), true, "preview default")
 	end)
 
 	helpers.it("fails fast on an unknown path", function()
