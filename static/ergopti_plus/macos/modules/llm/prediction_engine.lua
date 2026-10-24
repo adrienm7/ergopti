@@ -96,19 +96,6 @@ local SPINNER_FPS = 6  -- Frames per second for the streaming progress spinner
 -- prompt_builder's diversity/greedy branches meaningless.
 local MIN_NUM_PREDICTIONS = 1
 
--- ── Adaptive debounce ─────────────────────────────────────────────────────────
--- Adjust the inactivity delay based on live WPM so the timer fires sooner
--- when the user is thinking and later when they are actively typing.
-
-local FAST_TYPING_WPM    = 55   -- Above this WPM, extend debounce (user still mid-burst)
-local SLOW_TYPING_WPM    = 20   -- Below this WPM, shorten debounce (user paused to think)
-local DEBOUNCE_FAST_MULT = 1.5  -- Multiplier applied when WPM is above FAST_TYPING_WPM
-local DEBOUNCE_SLOW_MULT = 0.5  -- Multiplier applied when WPM is below SLOW_TYPING_WPM
--- Hard floor / ceiling so extreme WPM values don't produce unusable delays.
--- Sourced from the shared cross-driver registry so AHK and macOS stay in sync.
-local DEBOUNCE_MIN_SEC   = Timings.sec("llm", "prediction_debounce_min_ms")
-local DEBOUNCE_MAX_SEC   = Timings.sec("llm", "prediction_debounce_max_ms")
-
 -- ── Timing constants ──────────────────────────────────────────────────────────
 
 local CHAIN_FALLBACK_SEC  = Timings.sec("llm", "chain_fallback_ms")   -- Fire chain LLM if the F16 signal is somehow missed
@@ -203,10 +190,6 @@ end
 
 -- The last buffer+tail string sent to the LLM; prevents re-sending unchanged input
 local last_buffer_signature = nil
-
--- Length of the buffer at the time of the last LLM request; used by the adaptive
--- debounce to detect ongoing corrections (shrinking buffer = user still deleting)
-local _last_request_buffer_len = 0
 
 -- ── Timers ────────────────────────────────────────────────────────────────────
 
@@ -1109,37 +1092,20 @@ local function reset_llm_dismiss_timer()
 	return true
 end
 
---- Computes an adaptive debounce delay based on the user's current typing speed.
---- Fast typing → extend delay (prediction would be stale before it arrives).
---- Slow/paused → shorten delay (user is thinking, fire sooner).
---- If the buffer shrank since the last request, the user is still correcting —
---- keep the full configured delay to avoid sending a broken intermediate state.
+--- The debounce of the automatic trigger: the configured one, whatever the
+--- typing speed, as on Windows and Linux. It used to stretch to 1.5x (at most
+--- 600 ms) above 55 WPM and shrink to 0.5x (at least 50 ms) below 20 WPM, so
+--- the delay the menu showed was not the one macOS waited.
 --- @return number The debounce delay in seconds to use for this timer start.
-local function compute_adaptive_debounce()
+local function configured_debounce()
 	-- Live mode redraws at every keystroke: its own short, fixed debounce only
-	-- coalesces a burst, whatever the typing speed
+	-- coalesces a burst
 	if _live then return LIVE_CONFIG.debounce_sec end
-	-- Correction guard: never reduce delay while the user is still deleting
-	local active_buffer = _state and _state.llm_buffer
-	if type(active_buffer) ~= "string" and _state then active_buffer = _state.buffer end
-	local cur_len = type(active_buffer) == "string" and #active_buffer or 0
-	if cur_len < _last_request_buffer_len then
-		return inactivity_debounce_sec
-	end
-
-	local ok, stats = pcall(keystats.get_live_stats)
-	local wpm = (ok and type(stats) == "table") and (tonumber(stats.wpm_physical) or 0) or 0
-
-	if wpm > FAST_TYPING_WPM then
-		return math.min(inactivity_debounce_sec * DEBOUNCE_FAST_MULT, DEBOUNCE_MAX_SEC)
-	elseif wpm > 0 and wpm < SLOW_TYPING_WPM then
-		return math.max(inactivity_debounce_sec * DEBOUNCE_SLOW_MULT, DEBOUNCE_MIN_SEC)
-	end
 	return inactivity_debounce_sec
 end
 
 --- Arms the inactivity debounce timer to fire perform_check() after silence.
---- @param delay_override number|nil Override in seconds; uses adaptive debounce if nil.
+--- @param delay_override number|nil Override in seconds; the configured debounce if nil.
 local function start_inactivity_timer(delay_override)
 	if not runtime_available() then return false end
 	-- A negative menu debounce turns the automatic trigger off; live mode is an
@@ -1147,7 +1113,7 @@ local function start_inactivity_timer(delay_override)
 	if not is_llm_enabled or (inactivity_debounce_sec < 0 and not _live) then return false end
 	if stop_inactivity_timer() ~= true then return false end
 	local delay = delay_override
-	if delay == nil then delay = compute_adaptive_debounce() end
+	if delay == nil then delay = configured_debounce() end
 	local generation = _inactivity_generation + 1
 	_inactivity_generation = generation
 	local descriptor = {
@@ -1246,7 +1212,7 @@ local function start_inactivity_timer(delay_override)
 	if delay_override ~= nil then
 		Logger.trace(LOG, "Inactivity timer started (override: %.3fs).", delay)
 	else
-		Logger.trace(LOG, "Inactivity timer started (adaptive: %.3fs).", delay)
+		Logger.trace(LOG, "Inactivity timer started (debounce: %.3fs).", delay)
 	end
 	return true
 end
@@ -2072,7 +2038,6 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	-- Rate-limit and duplicate-suppression state describes real backend calls,
 	-- never a loading paint or failed watchdog construction.
 	last_buffer_signature    = signature
-	_last_request_buffer_len = #buffer
 	_last_request_at_s       = hs.timer.secondsSinceEpoch()
 end
 

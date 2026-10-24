@@ -73,8 +73,6 @@ local function load_fixture(loading_result, options)
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.timings"] = {
 		sec = function(_section, key)
-			if key == "prediction_debounce_min_ms" then return 0.01 end
-			if key == "prediction_debounce_max_ms" then return 2 end
 			return 0.1
 		end,
 	}

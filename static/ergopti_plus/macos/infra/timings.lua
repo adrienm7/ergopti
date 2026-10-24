@@ -24,7 +24,7 @@
 ---
 --- USAGE:
 ---   local Timings = require("infra.timings")
----   local DEBOUNCE_MAX_SEC = Timings.sec("llm", "prediction_debounce_max_ms")
+---   local CHAIN_FALLBACK_SEC = Timings.sec("llm", "chain_fallback_ms")
 ---   local IDLE_CHECK_SEC = Timings.sec("keystats", "idle_check_interval_ms")
 --- ==============================================================================
 
