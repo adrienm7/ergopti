@@ -70,8 +70,12 @@ local function gesture_with_confirmed_drop()
 	-- every confirm window unsatisfied.
 	local hs          = _G.hs
 	local saved_clock = hs.timer.secondsSinceEpoch
+	local saved_absolute_clock = hs.timer.absoluteTime
+	local saved_scheduler = package.loaded["adapters.timer_scheduler"]
 	local clock       = 1000.0
 	hs.timer.secondsSinceEpoch = function() return clock end
+	hs.timer.absoluteTime = function() return clock * 1e9 end
+	package.loaded["adapters.timer_scheduler"] = nil
 
 	local Engine = require("modules.gestures.engine")
 	local fired  = {}
@@ -115,6 +119,8 @@ local function gesture_with_confirmed_drop()
 	end
 
 	hs.timer.secondsSinceEpoch = saved_clock
+	hs.timer.absoluteTime = saved_absolute_clock
+	package.loaded["adapters.timer_scheduler"] = saved_scheduler
 	package.loaded["modules.gestures.engine"] = nil
 	return fired
 end

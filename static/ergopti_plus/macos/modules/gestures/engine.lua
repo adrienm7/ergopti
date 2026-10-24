@@ -19,6 +19,7 @@ local Timings  = require("infra.timings")
 local Geometry = require("modules.gestures.geometry")
 local AccessibilityPermission = require("adapters.accessibility_permission")
 local MouseControl = require("adapters.mouse_control")
+local TimerScheduler = require("adapters.timer_scheduler")
 local LOG      = "gestures.engine"
 
 local _state      = nil
@@ -683,7 +684,8 @@ function M.process_frame(touches)
 	end
 
 	local n   = #touches
-	local now = hs.timer.secondsSinceEpoch()
+	-- Gesture windows measure awake duration, independent of civil-clock corrections.
+	local now = TimerScheduler.awake_time()
 
 	-- A click-drag is never a gesture. Pressing the trackpad with one finger and
 	-- sliding another, or dragging after a tap to click, reports two or more
