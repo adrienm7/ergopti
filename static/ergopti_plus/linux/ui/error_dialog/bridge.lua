@@ -31,8 +31,7 @@
 --- ==============================================================================
 
 local M = {}
-local _scope_busy = false
-local _scope_owner, _scope_generation, _scope_receipts = nil, 0, setmetatable({}, { __mode = "k" })
+local _scope = require("scope_owner").new({ name = "ui.error_dialog.bridge", module = M })
 M.bridge_name = "error_dialog"
 
 local Logger      = require("logger.shim")
@@ -118,8 +117,7 @@ end
 --- before the logger's error observer is installed.
 --- @return boolean initialised
 function M.init()
-	if _scope_owner ~= nil or _scope_busy then return false end
-	_scope_generation = _scope_generation + 1
+	if not _scope.admit_change() then return false end
 	if _policy ~= nil then
 		Logger.error(LOG, "The error window was initialised twice; the second call is refused.")
 		return false
@@ -154,8 +152,7 @@ end
 --- @param enabled boolean
 --- @return boolean saved
 function M.set_enabled(enabled)
-	if _scope_owner ~= nil or _scope_busy then return false end
-	_scope_generation = _scope_generation + 1
+	if not _scope.admit_change() then return false end
 	if type(enabled) ~= "boolean" then
 		Logger.error(LOG, "set_enabled() needs a boolean, got %s.", type(enabled))
 		return false
@@ -239,9 +236,9 @@ end
 --- @return table|nil cancellable report; completion receives its actual outcome.
 function M.report(record, complete, current)
 	assert(type(complete) == "function" and type(current) == "function", "Error report needs its completion owner")
-	local generation = _scope_generation
+	local generation = _scope.generation()
 	local function owned()
-		return current() == true and generation == _scope_generation and _scope_owner == nil and not _scope_busy
+		return current() == true and generation == _scope.generation() and _scope.idle()
 			and package.loaded["ui.error_dialog.bridge"] == M
 	end
 	if not owned() then return nil end
@@ -390,12 +387,12 @@ local function perform(name, context)
 	end
 	local revision = cancel_action(session)
 	if _session ~= session or revision ~= _action_revision then return nil end
-	local token = { snapshot = session.snapshot, generation = _scope_generation }
+	local token = { snapshot = session.snapshot, generation = _scope.generation() }
 	session.action_token = token
 	local inline, answer, completed = true, nil, false
 	local function current()
 		return _session == session and session.action_token == token and session.snapshot == token.snapshot
-			and _scope_generation == token.generation and require("ui.webview_manager").current_epoch(APP) == session.epoch
+			and _scope.generation() == token.generation and require("ui.webview_manager").current_epoch(APP) == session.epoch
 	end
 	local request = require("ui.healthcheck.report").perform(action, session.paths, session.documents, session.context, nil, session.snapshot, {
 		current = current,
@@ -479,7 +476,7 @@ end
 --- @param template string The message before its arguments.
 --- @param message string The formatted message.
 function M.on_error(module_name, template, message)
-	if _scope_owner ~= nil or _scope_busy then return false end
+	if not _scope.idle() then return false end
 	if _policy == nil then return end
 	local verdict = Policy.decide(_decisions, _policy, {
 		module = module_name, template = template, at = M.clock(), enabled = M.is_enabled(), open = _busy,
@@ -533,7 +530,7 @@ end
 --- @param crash_dir string The crash reporter's folder.
 --- @return boolean shown
 function M.notify_last_crash(crash_dir)
-	if _scope_owner ~= nil or _scope_busy then return false end
+	if not _scope.idle() then return false end
 	if _policy == nil then return false end
 	-- Unticked, or a window already on its way: the dump stays unannounced and
 	-- is offered again at the next start
@@ -567,8 +564,7 @@ end
 
 --- Test seam: forgets the policy, the decisions and the window.
 function M._reset()
-	if _scope_owner ~= nil or _scope_busy then return false end
-	_scope_generation = _scope_generation + 1
+	if not _scope.admit_change() then return false end
 	_policy, _decisions, _enabled = nil, nil, nil
 	settle()
 end
@@ -578,140 +574,20 @@ local function scope_ready()
 		and _scheduled == nil and _session == nil and _folded == 0 and _pending == nil
 end
 
---- Reads only the declared error state this module owns; no persistence occurs here.
-local function scope_state()
-	return { module = package.loaded["ui.error_dialog.bridge"], enabled = _enabled, busy = _busy, scheduled = _scheduled,
-		folded = _folded, session = _session, pending = _pending }
-end
-
-local function scope_equal(left, right)
-	return rawequal(left.module, right.module) and left.enabled == right.enabled and left.busy == right.busy and left.scheduled == right.scheduled and left.folded == right.folded and left.session == right.session and left.pending == right.pending
-end
-
---- Acquires the declared runtime field for one primary transaction token.
---- @param owner table Exact token; pending() describes primary compensation only.
---- @return boolean acquired
-local function scope_acquire_impl(owner)
-	if type(owner) ~= "table" or type(owner.pending) ~= "function" or _scope_owner ~= nil
-		or not rawequal(package.loaded["ui.error_dialog.bridge"], M) then return false end
-	if not scope_ready() or not rawequal(package.loaded["ui.error_dialog.bridge"], M) then return false end
-	_scope_owner = owner
-	return true
-end
-
-function M.scope_acquire(owner)
-	if _scope_busy then return false end
-	_scope_busy = true
-	local called, acquired = pcall(scope_acquire_impl, owner)
-	_scope_busy = false
-	return called and acquired == true
-end
-
---- Releases the admission gate while retaining opaque inverse receipts.
---- @param owner table Exact token.
---- @return boolean released
-function M.scope_release(owner)
-	if _scope_busy or not rawequal(_scope_owner, owner) or owner.pending() ~= false then return false end
-	_scope_owner = nil
-	return true
-end
-
---- Captures an opaque, source-bound runtime inverse under the native claim.
---- @param owner table Exact token.
---- @return table|nil receipt
-local function scope_capture_impl(owner)
-	if not rawequal(_scope_owner, owner) or not rawequal(package.loaded["ui.error_dialog.bridge"], M) then return nil end
-	local generation = _scope_generation
-	local receipt, before = {}, scope_state()
-	if not rawequal(_scope_owner, owner) or not rawequal(package.loaded["ui.error_dialog.bridge"], M) or _scope_generation ~= generation then return nil end
-	_scope_receipts[receipt] = { owner = owner, before = before, expected = before, generation = _scope_generation }
-	return receipt
-end
-
-function M.scope_capture(owner)
-	if _scope_busy then return nil end
-	_scope_busy = true
-	local called, result = pcall(scope_capture_impl, owner)
-	_scope_busy = false
-	if not called then return nil end
-	return result
-end
-
---- Applies one canonical value after proving the captured runtime still owns it.
---- @param owner table Exact token.
---- @param receipt table Native opaque receipt.
---- @param value boolean Declared error-window preference.
---- @return boolean applied
-local function scope_apply_impl(owner, receipt, value)
-	local data = _scope_receipts[receipt]
-	if not rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or data.forgotten or data.attempted
-		or data.generation ~= _scope_generation or not scope_equal(scope_state(), data.expected)
-		or not rawequal(package.loaded["ui.error_dialog.bridge"], M) then return false end
-	if type(value) ~= "boolean" then return false end
-	local next_value = {}
-	for key, child in pairs(data.before) do next_value[key] = child end
-	next_value.enabled = value
-	_scope_generation = _scope_generation + 1
-	data.generation, data.expected, data.attempted = _scope_generation, next_value, true
-	local called = pcall(function()
-		_enabled = next_value.enabled
-	end)
-	local observed = scope_state()
-	return called and scope_equal(observed, next_value) and rawequal(_scope_owner, owner)
-		and rawequal(package.loaded["ui.error_dialog.bridge"], M) and data.generation == _scope_generation
-end
-
-function M.scope_apply(owner, receipt, value)
-	if _scope_busy then return false end
-	_scope_busy = true
-	local called, result = pcall(scope_apply_impl, owner, receipt, value)
-	_scope_busy = false
-	if not called then return false end
-	return result
-end
-
---- Restores only this receipt's acknowledged or interrupted scalar publication.
---- @param owner table Exact token.
---- @param receipt table Native opaque receipt.
---- @return boolean restored
-local function scope_restore_impl(owner, receipt)
-	local data = _scope_receipts[receipt]
-	if not rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or data.forgotten or data.generation ~= _scope_generation then return false end
-	local current = scope_state()
-	if not rawequal(current.module, M) or not rawequal(package.loaded["ui.error_dialog.bridge"], M) or not (rawequal(current.module, data.before.module) and current.busy == data.before.busy and current.scheduled == data.before.scheduled and current.folded == data.before.folded and current.session == data.before.session and current.pending == data.before.pending
-		and (current.enabled == data.before.enabled or current.enabled == data.expected.enabled)) then return false end
-	if not data.attempted or data.restored then return scope_equal(current, data.before) end
-	local called = pcall(function()
-		_enabled = data.before.enabled
-	end)
-	local observed = scope_state()
-	if not called or not scope_equal(observed, data.before) or not rawequal(_scope_owner, owner)
-		or not rawequal(package.loaded["ui.error_dialog.bridge"], M) or data.generation ~= _scope_generation then return false end
-	_scope_generation = _scope_generation + 1
-	data.generation, data.expected, data.restored = _scope_generation, data.before, true
-	return true
-end
-
-function M.scope_restore(owner, receipt)
-	if _scope_busy then return false end
-	_scope_busy = true
-	local called, result = pcall(scope_restore_impl, owner, receipt)
-	_scope_busy = false
-	if not called then return false end
-	return result
-end
-
---- Forgets only a finalized inverse, without changing live native state.
---- @param owner table Exact primary token.
---- @param receipt table Native opaque receipt.
---- @return boolean forgotten
-function M.scope_forget(owner, receipt)
-	local data = _scope_receipts[receipt]
-	if _scope_busy or rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or owner.pending() ~= false then return false end
-	if data.forgotten then return true end
-	data.before, data.expected, data.generation = nil, nil, nil
-	data.forgotten = true
-	return true
-end
+_scope.install({
+	-- Reads only the declared error state this module owns; no persistence occurs here.
+	state = function()
+		return { enabled = _enabled, busy = _busy, scheduled = _scheduled, folded = _folded, session = _session,
+			pending = _pending }
+	end,
+	stable = { "busy", "scheduled", "folded", "session", "pending" },
+	published = { "enabled" },
+	ready = scope_ready,
+	accept = function(value)
+		if type(value) ~= "boolean" then return nil end
+		return { enabled = value }
+	end,
+	publish = function(target) _enabled = target.enabled end,
+})
 
 return M
