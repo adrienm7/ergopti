@@ -140,7 +140,12 @@ manifest remains authoritative for ordering and entries.
 
 No driver parses `_shared/modules/actions/actions.toml`: run
 `npm run codegen:action-catalogue` after editing it, and each driver loads its
-platform-filtered `_generated/action_catalogue.*`. Each driver suite compares
+platform-filtered `_generated/action_catalogue.*`. The macOS and Linux files
+only call `_shared/lua/actions/catalogue.lua`, which filters the one shared
+`catalogue_data.lua` (every entry lists the Lua drivers that keep it, heading
+pruning already decided by the generator) and adds the driver's own extras;
+`tools/test/test-action-catalogue-shared-projection.cjs` loads both in Lua and
+compares them with the generator's per-driver model. Each driver suite compares
 that catalogue with its runnable registry in both directions
 (`(action-catalogue-parity)`). On Linux the runnable set is exactly the
 executor's tables, so a new Linux action is a row in one of them, never an
