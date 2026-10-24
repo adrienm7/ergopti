@@ -70,10 +70,10 @@ arrow_resets_word = true
 shortcut_resets_word = true
 tap_hold_resets_word = true
 expansion_delay = 0.75
-preview_ai_enabled = false
-preview_autocorrect_enabled = false
-preview_colored_tooltips = false
-preview_star_enabled = false
+preview_ai_enabled = true
+preview_autocorrect_enabled = true
+preview_colored_tooltips = true
+preview_star_enabled = true
 
 
 
@@ -431,6 +431,7 @@ time_activation_seconds = 0.75
 
 [llm]
 enabled = false
+app_profile_overrides = ""
 user_profiles = ""
 agent_system1 = ""
 agent_system2 = ""
@@ -472,6 +473,7 @@ auto_profile_for_model = true
 
 
 [llm.trigger]
+disabled_apps = []
 debounce_ms = 500
 instant_on_word_end = true
 after_hotstring = true

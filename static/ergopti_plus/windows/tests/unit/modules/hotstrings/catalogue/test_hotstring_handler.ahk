@@ -218,7 +218,10 @@ Test("HotstringHandler: expired time-activation produces zero sends",
     TestHH_TimeActivationExpiredSkipsAll)
 
 TestHH_TimeActivationFreshAllowsAll() {
-    global LastSentCharacterKeyTime
+    global LastSentCharacterKeyTime, _TimingsCache
+    ; The time gate reads the shared timing registry (complex-key widening), which boot loads.
+    if (Type(_TimingsCache) != "Map")
+        TimingsLoadShared()
     ResetHotstringRecorders()
     SimulateRegularApp()
     LastSentCharacterKeyTime := Map("a", A_TickCount)

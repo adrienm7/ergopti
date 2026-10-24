@@ -1120,6 +1120,26 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := fals
 }
 
 
+; Whether one character is part of a word, the rule macOS and Linux share
+; (text_utils.is_hotstring_word_char in _shared/lua/text_utils/init.lua): every
+; non-ASCII character, "@", letters, digits and "_". The shared repeat_key
+; corpus pins the three drivers to it.
+; @param Ch {String} One character (a surrogate pair counts as one).
+; @returns {Boolean}
+HSE_IsWordChar(Ch) {
+		if (Ch == "")
+				return false
+		if (Ord(Ch) > 127)
+				return true
+		return Ch == "@" or RegExMatch(Ch, "^[A-Za-z0-9_]$") > 0
+}
+
+; A word character for the repeat: the shared rule, minus any delimiter the user
+; added to the word delimiters (a custom delimiter ends a word on Windows).
+_HSE_RepeatWordChar(Ch) {
+		return HSE_IsWordChar(Ch) and InStr(_HSE_WordBoundarySet(), Ch) = 0
+}
+
 ; Attempt the magic-key repeat: when the user types <x><MagicKey> and x is
 ; preceded by at least one non-terminator letter (i.e. x is not the first
 ; letter of the word), emit <x><x> instead. This is the engine-level fallback
@@ -1160,8 +1180,9 @@ HSE_TryRepeatKey(MagicKey) {
 		RepeatCharEnd := BufLen - MkLen
 		RepeatCharPos := _TextCodepointStart(HSE_Buffer, RepeatCharEnd)
 		RepeatChar := _TextCompleteTailScalar(SubStr(HSE_Buffer, RepeatCharPos, RepeatCharEnd - RepeatCharPos + 1))
-		; Refuse to repeat whitespace or terminators.
-		if (RepeatChar == "" or InStr(_HSE_WordBoundarySet(), RepeatChar) > 0) {
+		; Only a word character repeats (HSE_IsWordChar, the shared rule), and never
+		; the magic key itself: two keys in a row are a second trigger, not a repeat.
+		if (RepeatChar == "" or RepeatChar == MagicKey or !_HSE_RepeatWordChar(RepeatChar)) {
 				return ""
 		}
 		; The char before RepeatChar must exist and be a non-terminator — this ensures
@@ -1174,10 +1195,10 @@ HSE_TryRepeatKey(MagicKey) {
 		}
 		PredStart := _TextCodepointStart(HSE_Buffer, PredPos)
 		PredChar := _TextCompleteTailScalar(SubStr(HSE_Buffer, PredStart, PredPos - PredStart + 1))
-		; Boundary set, not terminator set: after an opening quote the char is the
-		; FIRST letter of its word, so doubling it is meaningless and the real
-		; expansion must be allowed to win instead.
-		if (PredChar == "" or InStr(_HSE_WordBoundarySet(), PredChar) > 0) {
+		; Word character, not "not a terminator": after an opening quote, a
+		; parenthesis or a hyphen the char is the FIRST letter of its word, so
+		; doubling it is meaningless and the real expansion must win instead.
+		if (PredChar == "" or !_HSE_RepeatWordChar(PredChar)) {
 				return ""
 		}
 		; When PredChar starts at position 1 of the buffer (PredStart == 1) and the buffer

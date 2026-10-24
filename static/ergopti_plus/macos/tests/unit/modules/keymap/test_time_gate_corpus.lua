@@ -39,7 +39,15 @@ helpers.describe("expansion delay: the shared time-gate corpus", function()
 					"the preceding-key interval is the vector's elapsed time")
 				elapsed_s = elapsed_ms / 1000
 			end
-			local allowed = s.mapping_delay_remaining({ has_magic = vector.ends_with_magic }, elapsed_s, 1)
+			-- The keyDown tap's join: the shared rule with the registry's factor and
+			-- carry, then the delay policy with the resulting multiplier.
+			local Timings = require("infra.timings")
+			local Core = require("infra.hotstring_engine")
+			local mult = Core.complex_delay_multiplier(vector.expander.complex == true,
+				before_expander.complex == true, elapsed_s and elapsed_s * 1000 or nil,
+				Timings.ms("hotstrings", "complex_key_delay_multiplier"),
+				Timings.ms("hotstrings", "complex_key_carry_ms"), true)
+			local allowed = s.mapping_delay_remaining({ has_magic = vector.ends_with_magic }, elapsed_s, mult)
 			helpers.assert_eq(allowed, vector.fires, "the delay gate verdict")
 		end)
 	end

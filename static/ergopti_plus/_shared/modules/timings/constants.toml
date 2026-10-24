@@ -520,6 +520,30 @@ one_shot_shift_timeout_ms = 2000
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Hotstring expansion delay: complex keystrokes (PAR-7)
+# ──────────────────────────────────────────────────────────────────────
+
+[hotstrings]
+
+# A Shift, Alt or AltGr/Option keystroke takes longer finger-path time than a
+# bare letter, and the Ergopti layout is Shift/AltGr-heavy. The expansion delay
+# gate (the gap from the last letter of the input to the expander, see
+# docs/memory/text-input-and-config.md project-hotstring-expansion-delay-definition)
+# therefore widens its allowed delay by this factor on every driver when the
+# EXPANDER keystroke is complex, or when the REFERENCE keystroke (the last
+# letter) was complex and the gap is at most complex_key_carry_ms. The factor
+# applies to the allowed delay, never to the measured gap. Autocorrections are
+# never widened. A plain number, not a duration.
+# Rule: hotstring_engine.complex_delay_multiplier (_shared/lua/hotstring_engine).
+complex_key_delay_multiplier = 2
+
+# How long after a complex keystroke the widening still carries to the next one:
+# the lag between releasing Shift and pressing the next key. Beyond it the
+# bonus is dropped so it cannot stretch an expansion on an unrelated key.
+complex_key_carry_ms = 300
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Ergonomics warnings
 # ──────────────────────────────────────────────────────────────────────
 

@@ -269,12 +269,14 @@ callbacks moved, for consistency and level safety more than for speed.
 `SendInput` would remove the mouse hook around the gestures' `Click`. Its
 comment now says so.
 
-Left, decision for the maintainer: a deliberate cascade (an expansion that
-completes a trigger) would be a new feature on every driver, not a primitive
-choice. Measured blast radius on the shared data: 124 of 2786 replacements end
-with their own trigger up to case (an infinite loop without a same-spec guard)
-and 131 more end with another trigger. Do not add it without the shared corpus
-vectors and the macOS and Linux engines.
+Correction (2026-10-23): chaining exists and works. It is buffer continuity, not
+a cascade through the keyboard: the engine commits every expansion to its
+buffer, so the next typed character completes a trigger that spans the output
+and the keystroke (`ab` gives `cd`, `cde` gives `xyz`, `abe` gives `xyz`). A
+trigger wholly inside an output fires nothing alone, so no loop exists even for
+the 124 of 2786 replacements that end with their own trigger. Pinned on the real
+engine by `test_hotstring_chaining.ahk` (SendEvent and SendInput, watcher, plain
+and Space tap-hold paths, identical before and after the level-0 change).
 
 Suspected separate defect, not touched: `_SpaceTap` (`platform/remap/space.ahk`)
 emits the space with `TextPressKey("Space", "")`, which the declaration channel

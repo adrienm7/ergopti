@@ -83,7 +83,7 @@
 # (_shared/lua/tap_hold/hold_options.lua) read them here, so one file holds the
 # same keys on either. The left_ ones name the left key: Windows holds that
 # side even on right_ctrl and right_shift, where a plain "ctrl" or "shift"
-# holds the key's own side. Linux always holds the left key.
+# holds the key's own side, on Windows and on Linux alike.
 [tap_hold.hold_picker]
 modifiers = ["ctrl", "shift", "alt", "alt_gr", "win"]
 layers = ["nav"]
@@ -295,7 +295,7 @@ combo_symmetric = false
 [hs_tap_hold]
 #                              tap               hold
 escape = { tap = "none", hold = "none" }
-tab = { tap = "alt_tab_windows", hold = "fn" }
+tab = { tap = "alt_tab_monitor", hold = "alt" }
 caps_lock = { tap = "return", hold = "cmd" }
 left_shift = { tap = "copy", hold = "shift" }
 fn = { tap = "paste", hold = "cmd" }
@@ -411,7 +411,7 @@ lopt_bsp = { combo = "none", tap = "none", hold = "none" }
 # Cmd gauche
 lcmd_esc = { combo = "none", tap = "none", hold = "none" }
 lcmd_tab = { combo = "none", tap = "none", hold = "none" }
-lcmd_caps = { combo = "none", tap = "none", hold = "none" }
+lcmd_caps = { combo = "none", tap = "capsword", hold = "none" }
 lcmd_lshift = { combo = "none", tap = "none", hold = "none" }
 lcmd_fn = { combo = "none", tap = "none", hold = "none" }
 lcmd_lctrl = { combo = "none", tap = "none", hold = "none" }
@@ -424,7 +424,7 @@ lcmd_space = { combo = "none", tap = "none", hold = "none" }
 #           (Ergopti's preset: Escape on a tap, Option+Shift while held).
 #           Adding a tap here would pre-empt it.
 #   hold  : "none" — same reason; the navigation layer handles the lcmd-first hold path.
-lcmd_rcmd = { combo = "opt_backspace", tap = "none", hold = "none" }
+lcmd_rcmd = { combo = "none", tap = "none", hold = "none" }
 lcmd_ropt = { combo = "none", tap = "none", hold = "none" }
 lcmd_rshift = { combo = "none", tap = "none", hold = "none" }
 lcmd_ret = { combo = "none", tap = "none", hold = "none" }
@@ -458,13 +458,13 @@ space_bsp = { combo = "none", tap = "none", hold = "none" }
 #                 quick release; hold = option+shift modifier so the combined
 #                 hold works as a shift+option accelerator (no layer activation).
 rcmd_esc = { combo = "none", tap = "none", hold = "none" }
-rcmd_tab = { combo = "cycle_windows_in_app", tap = "cycle_windows_in_app", hold = "none" }
-rcmd_caps = { combo = "capsword", tap = "capsword", hold = "none" }
+rcmd_tab = { combo = "none", tap = "none", hold = "none" }
+rcmd_caps = { combo = "none", tap = "opt_delete_fwd", hold = "none" }
 rcmd_lshift = { combo = "none", tap = "none", hold = "none" }
-rcmd_fn = { combo = "caps_lock", tap = "caps_lock", hold = "none" }
+rcmd_fn = { combo = "none", tap = "none", hold = "none" }
 rcmd_lctrl = { combo = "none", tap = "none", hold = "none" }
-rcmd_lopt = { combo = "opt_delete_fwd", tap = "opt_delete_fwd", hold = "none" }
-rcmd_lcmd = { combo = "opt_backspace", tap = "opt_backspace", hold = "option_shift" }
+rcmd_lopt = { combo = "none", tap = "none", hold = "none" }
+rcmd_lcmd = { combo = "none", tap = "opt_backspace", hold = "none" }
 rcmd_space = { combo = "none", tap = "none", hold = "none" }
 rcmd_ropt = { combo = "none", tap = "none", hold = "none" }
 rcmd_rshift = { combo = "none", tap = "none", hold = "none" }

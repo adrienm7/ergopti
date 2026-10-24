@@ -329,7 +329,7 @@ end
 helpers.describe("magic-key repeat: the shared repeat_key_vectors.json corpus", function()
 	for _, vector in ipairs(corpus_vectors("repeat_key_vectors.json")) do
 		helpers.it(vector.id .. " (repeat-key-corpus)", function()
-			local out = RepeatKey.resolve(vector.buffer, vector.magic_key)
+			local out = RepeatKey.resolve(vector.buffer, vector.magic_key, vector.start_is_word_boundary)
 			if vector.fires then
 				helpers.assert_true(out ~= nil, vector.description)
 				helpers.assert_eq(out.replacement, vector.replacement, vector.description)

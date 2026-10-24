@@ -98,27 +98,6 @@ const KNOWN_DIVERGENCES = {
 			'the genuine cmdorctrl distinction — the same gesture is Ctrl on a PC and Cmd on a Mac, ' +
 			'which is a platform truth and not drift'
 	},
-	'tab.tap': {
-		pc: 'alt_tab_monitor',
-		mac: 'alt_tab_windows',
-		reason:
-			'a difference of DEFAULT, not of capability — settled 2026-08-03. It was drift: Windows ' +
-			'cycled only the windows on the monitor under the cursor and macOS cycled globally, so ' +
-			'the same physical key did two things and neither driver could do the other. Both ' +
-			'behaviours were wanted, so both now ship on both drivers — AltTabAll() on Windows and ' +
-			'Ctrl+F17 -> focus_previous_window_on_screen() on macOS — and each is bindable to a key ' +
-			'or a gesture anywhere. What is left is which one the tab key defaults to, and the two ' +
-			'platforms answer differently on purpose: a Windows desk is typically multi-monitor with ' +
-			'per-screen workspaces, a Mac laptop typically is not. A user who disagrees changes one ' +
-			'setting, which was not true before'
-	},
-	'tab.hold': {
-		pc: 'alt',
-		mac: 'fn',
-		reason:
-			'a Mac has an fn key where a PC bottom row does not, so tab-hold reaches a modifier here ' +
-			'that has no PC equivalent'
-	},
 	'left_ctrl.hold': {
 		pc: 'ctrl',
 		mac: 'cmd',

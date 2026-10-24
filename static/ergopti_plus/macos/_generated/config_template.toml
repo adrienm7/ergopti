@@ -23,10 +23,10 @@ click_resets_word = true
 arrow_resets_word = true
 shortcut_resets_word = true
 expansion_delay = 0.75
-preview_ai_enabled = false
-preview_autocorrect_enabled = false
-preview_colored_tooltips = false
-preview_star_enabled = false
+preview_ai_enabled = true
+preview_autocorrect_enabled = true
+preview_colored_tooltips = true
+preview_star_enabled = true
 
 
 
@@ -431,6 +431,8 @@ time_activation_seconds = 0.75
 
 [llm]
 enabled = false
+app_profile_overrides = ""
+user_profiles = ""
 agent_system1 = ""
 agent_system2 = ""
 agent_mode = "off"
@@ -467,8 +469,6 @@ mlx = "Qwen3.5-2B"
 
 [llm.profiles]
 user_profiles = []
-active = "basic"
-num_predictions = 3
 
 
 
@@ -585,24 +585,20 @@ swipe_2_left_down = "none"
 swipe_2_left_up = "none"
 swipe_2_right_down = "none"
 swipe_2_right_up = "none"
-swipe_2_diag = "none"
 swipe_3_left_down = "none"
 swipe_3_left_up = "none"
 swipe_3_right_down = "none"
 swipe_3_right_up = "none"
-swipe_3_diag = "none"
 swipe_3_horiz = "none"
 swipe_4_left_down = "none"
 swipe_4_left_up = "none"
 swipe_4_right_down = "none"
 swipe_4_right_up = "none"
-swipe_4_diag = "none"
 swipe_4_horiz = "none"
 swipe_5_left_down = "none"
 swipe_5_left_up = "none"
 swipe_5_right_down = "none"
 swipe_5_right_up = "none"
-swipe_5_diag = "none"
 swipe_5_horiz = "none"
 tap_2 = "none"
 tap_5 = "none"

@@ -1168,15 +1168,40 @@ _LSCResetFrom(Chars) {
 ; @param Character {String} The character that reached the screen.
 ; @param NowTick {Integer|unset} One observed tick shared by a physical chunk.
 AppState_TouchLastSentKey(Character, NowTick := unset) {
-		global LastSentCharacterKeyTime, LAST_SENT_KEY_TIME_MAX_AGE_MS, LAST_SENT_KEY_TIME_PRUNE_AT
+		global LastSentCharacterKeyTime, LastSentCharacterKeyComplex
+		global LAST_SENT_KEY_TIME_MAX_AGE_MS, LAST_SENT_KEY_TIME_PRUNE_AT
 		if !IsSet(NowTick)
 				NowTick := A_TickCount
 		LastSentCharacterKeyTime[Character] := NowTick
+		; Whether Shift, Alt or AltGr was held for this keystroke: the expansion
+		; delay widens for a complex reference key (HSE_ComplexDelayMultiplier).
+		LastSentCharacterKeyComplex[Character] := HSE_KeyIsComplex()
 		if LastSentCharacterKeyTime.Count > LAST_SENT_KEY_TIME_PRUNE_AT {
 				Now := NowTick
 				for k, ts in LastSentCharacterKeyTime.Clone() {
-						if TickExpired(ts, LAST_SENT_KEY_TIME_MAX_AGE_MS, Now)
+						if TickExpired(ts, LAST_SENT_KEY_TIME_MAX_AGE_MS, Now) {
 								LastSentCharacterKeyTime.Delete(k)
+								if LastSentCharacterKeyComplex.Has(k)
+										LastSentCharacterKeyComplex.Delete(k)
+						}
 				}
 		}
+}
+
+; Complexity of each character's last keystroke, keyed like LastSentCharacterKeyTime.
+global LastSentCharacterKeyComplex := Map()
+
+; Test seam: "" reads the keyboard, true / false forces the answer.
+global HSE_ComplexKeyOverride := ""
+
+; Whether the keystroke happening now is complex: Shift, Alt or AltGr is held.
+; On Windows AltGr is the right Alt (with a left Ctrl), so the physical state of
+; Shift, left Alt and right Alt covers the macOS Shift/Alt flags and the Linux
+; shift/alt/altgr roles.
+; @returns {Boolean}
+HSE_KeyIsComplex() {
+		global HSE_ComplexKeyOverride
+		if (HSE_ComplexKeyOverride != "")
+				return HSE_ComplexKeyOverride ? true : false
+		return GetKeyState("Shift", "P") or GetKeyState("LAlt", "P") or GetKeyState("RAlt", "P")
 }

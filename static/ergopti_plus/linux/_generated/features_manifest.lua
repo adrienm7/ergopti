@@ -38,7 +38,7 @@ M.sections = {
 	["llm.display"] = { description_key = "menu.llm.display", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.generation"] = { description_key = "menu.llm.generation", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.models"] = { description_key = "menu.llm.models", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
-	["llm.profiles"] = { description_key = "menu.llm.profiles", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
+	["llm.profiles"] = { description_key = "menu.llm.profiles", platforms = { "ahk", "linux" }, subsections = {  } },
 	["llm.trigger"] = { description_key = "menu.llm.trigger", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.navigation"] = { description_key = "menu.llm.navigation", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["metrics"] = { description_key = "menu.metrics", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
@@ -101,16 +101,16 @@ M.features = {
 		path = "hotstrings.expansion_delay", id = "expansion_delay", section = "hotstrings", default = 0.75, type = "number", description_key = "menu.hotstrings.expansion_delay", platforms = { "ahk", "hs", "linux" }, recommended = 0.75, input_altering = false,
 	},
 	{
-		path = "hotstrings.preview_ai_enabled", id = "preview_ai_enabled", section = "hotstrings", default = false, type = "boolean", description_key = "menu.hotstrings.preview_ai_enabled", platforms = { "hs", "linux" }, recommended = true, input_altering = true,
+		path = "hotstrings.preview_ai_enabled", id = "preview_ai_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_ai_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true,
 	},
 	{
-		path = "hotstrings.preview_autocorrect_enabled", id = "preview_autocorrect_enabled", section = "hotstrings", default = false, type = "boolean", description_key = "menu.hotstrings.preview_autocorrect_enabled", platforms = { "hs", "linux" }, recommended = true, input_altering = true,
+		path = "hotstrings.preview_autocorrect_enabled", id = "preview_autocorrect_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_autocorrect_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true,
 	},
 	{
-		path = "hotstrings.preview_colored_tooltips", id = "preview_colored_tooltips", section = "hotstrings", default = false, type = "boolean", description_key = "menu.hotstrings.preview_colored_tooltips", platforms = { "hs", "linux" }, recommended = true, input_altering = true,
+		path = "hotstrings.preview_colored_tooltips", id = "preview_colored_tooltips", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_colored_tooltips", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true,
 	},
 	{
-		path = "hotstrings.preview_star_enabled", id = "preview_star_enabled", section = "hotstrings", default = false, type = "boolean", description_key = "menu.hotstrings.preview_star_enabled", platforms = { "hs", "linux" }, recommended = true, input_altering = true,
+		path = "hotstrings.preview_star_enabled", id = "preview_star_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_star_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true,
 	},
 	{
 		path = "hotstrings.autocorrection.names", id = "names", section = "hotstrings.autocorrection", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.autocorrection.names", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, time_activation_seconds = 0.5 }, input_altering = true,
@@ -326,7 +326,10 @@ M.features = {
 		path = "llm.enabled", id = "enabled", section = "llm", default = false, type = "boolean", description_key = "menu.llm.enabled", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = true,
 	},
 	{
-		path = "llm.user_profiles", id = "user_profiles", section = "llm", default = "", type = "string", description_key = "menu.llm.profiles", platforms = { "ahk", "linux" }, recommended = "", input_altering = false,
+		path = "llm.app_profile_overrides", id = "app_profile_overrides", section = "llm", default = "", type = "string", description_key = "menu.llm.app_profile_overrides", platforms = { "ahk", "hs", "linux" }, recommended = "", input_altering = false,
+	},
+	{
+		path = "llm.user_profiles", id = "user_profiles", section = "llm", default = "", type = "string", description_key = "menu.llm.profiles", platforms = { "ahk", "hs", "linux" }, recommended = "", input_altering = false,
 	},
 	{
 		path = "llm.agent_system1", id = "agent_system1", section = "llm", default = "", type = "string", description_key = "menu.agent.system1_desc", platforms = { "ahk", "hs", "linux" }, recommended = "", input_altering = false,
@@ -380,13 +383,16 @@ M.features = {
 		path = "llm.models.ollama", id = "ollama", section = "llm.models", default = "Qwen3.5-0.8B", type = "string", description_key = "menu.llm.models.ollama", platforms = { "ahk", "hs", "linux" }, recommended = "Qwen3.5-0.8B", input_altering = false,
 	},
 	{
-		path = "llm.profiles.active", id = "active", section = "llm.profiles", default = "basic", type = "string", description_key = "menu.llm.profiles.active", platforms = { "ahk", "hs", "linux" }, recommended = "basic", input_altering = false,
+		path = "llm.profiles.active", id = "active", section = "llm.profiles", default = "basic", type = "string", description_key = "menu.llm.profiles.active", platforms = { "ahk", "linux" }, recommended = "basic", input_altering = false,
 	},
 	{
-		path = "llm.profiles.num_predictions", id = "num_predictions", section = "llm.profiles", default = 3, type = "number", description_key = "menu.llm.profiles.num_predictions", platforms = { "ahk", "hs", "linux" }, recommended = 3, input_altering = false,
+		path = "llm.profiles.num_predictions", id = "num_predictions", section = "llm.profiles", default = 3, type = "number", description_key = "menu.llm.profiles.num_predictions", platforms = { "ahk", "linux" }, recommended = 3, input_altering = false,
 	},
 	{
 		path = "llm.profiles.auto_profile_for_model", id = "auto_profile_for_model", section = "llm.profiles", default = true, type = "boolean", description_key = "menu.llm.profiles.auto_profile_for_model", platforms = { "ahk", "linux" }, recommended = true, input_altering = false,
+	},
+	{
+		path = "llm.trigger.disabled_apps", id = "disabled_apps", section = "llm.trigger", default = {  }, type = "array", description_key = "menu.llm.title", platforms = { "ahk", "hs", "linux" }, recommended = {  }, input_altering = false,
 	},
 	{
 		path = "llm.trigger.debounce_ms", id = "debounce_ms", section = "llm.trigger", default = 500, type = "number", description_key = "menu.llm.trigger.debounce_ms", platforms = { "ahk", "hs", "linux" }, recommended = 500, input_altering = false,
@@ -662,16 +668,13 @@ M.unavailable = {
 		path = "script.alt_gr_is_kana_remap", section = "script", reason_key = "platform_reason.alt_gr_is_kana_remap", platforms = { "ahk" },
 	},
 	{
-		path = "hotstrings.enabled", section = "hotstrings", reason_key = "", platforms = { "hs" },
+		path = "hotstrings.enabled", section = "hotstrings", reason_key = "platform_reason.hotstrings_master_is_macos_engine", platforms = { "hs" },
 	},
 	{
 		path = "hotstrings.magic_key_source_char", section = "hotstrings", reason_key = "platform_reason.magic_key_detection_is_windows", platforms = { "ahk" },
 	},
 	{
-		path = "llm.onboarding_seen", section = "llm", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "llm.app_profile_overrides", section = "llm", reason_key = "", platforms = { "ahk" },
+		path = "llm.onboarding_seen", section = "llm", reason_key = "platform_reason.ai_menu_bookkeeping_is_windows", platforms = { "ahk" },
 	},
 	{
 		path = "llm.models.user_models", section = "llm.models", reason_key = "platform_reason.llm_saved_user_models_are_macos", platforms = { "hs" },
@@ -683,85 +686,82 @@ M.unavailable = {
 		path = "llm.profiles.user_profiles", section = "llm.profiles", reason_key = "", platforms = { "hs" },
 	},
 	{
-		path = "llm.trigger.disabled_apps", section = "llm.trigger", reason_key = "", platforms = { "ahk", "hs" },
+		path = "llm.trigger.inline_autotype", section = "llm.trigger", reason_key = "platform_reason.inline_autotype_is_windows", platforms = { "ahk" },
 	},
 	{
-		path = "llm.trigger.inline_autotype", section = "llm.trigger", reason_key = "", platforms = { "ahk" },
+		path = "llm.navigation.arrow_nav_enabled", section = "llm.navigation", reason_key = "platform_reason.arrow_navigation_is_macos", platforms = { "hs" },
 	},
 	{
-		path = "llm.navigation.arrow_nav_enabled", section = "llm.navigation", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.get_hex_value", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.get_hex_value", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.gpt", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.gpt", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.search", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.search", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.take_note", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.take_note", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.microsoft_bold", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.microsoft_bold", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.title_case", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.title_case", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.uppercase", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.uppercase", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.paste_without_formatting", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.paste_without_formatting", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.select_line", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.select_line", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.spotlight_mouse", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.spotlight_mouse", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.surround_with_parentheses", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.surround_with_parentheses", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.teleport_mouse", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.teleport_mouse", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.open_downloads", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.open_downloads", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.move", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.move", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.screen", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.screen", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.win_caps_lock", section = "shortcuts", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.win_caps_lock", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.a_grave.enabled", section = "shortcuts.a_grave", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.a_grave.enabled", section = "shortcuts.a_grave", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.a_grave.letter", section = "shortcuts.a_grave", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.a_grave.letter", section = "shortcuts.a_grave", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.e_acute.enabled", section = "shortcuts.e_acute", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.e_acute.enabled", section = "shortcuts.e_acute", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.e_acute.letter", section = "shortcuts.e_acute", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.e_acute.letter", section = "shortcuts.e_acute", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.e_circ.enabled", section = "shortcuts.e_circ", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.e_circ.enabled", section = "shortcuts.e_circ", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.e_circ.letter", section = "shortcuts.e_circ", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.e_circ.letter", section = "shortcuts.e_circ", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.e_grave.enabled", section = "shortcuts.e_grave", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.e_grave.enabled", section = "shortcuts.e_grave", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.e_grave.letter", section = "shortcuts.e_grave", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.e_grave.letter", section = "shortcuts.e_grave", reason_key = "platform_reason.accented_shortcuts_are_windows", platforms = { "ahk" },
 	},
 	{
 		path = "shortcuts.personal.laptop_broken_key", section = "shortcuts.personal", reason_key = "", platforms = { "ahk" },
@@ -827,19 +827,7 @@ M.unavailable = {
 		path = "shortcuts.keyboard.win_space", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.keyboard.hs_ctrl_space", section = "shortcuts.keyboard", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "gestures.swipe_2_diag", section = "gestures", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "gestures.swipe_3_diag", section = "gestures", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "gestures.swipe_4_diag", section = "gestures", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "gestures.swipe_5_diag", section = "gestures", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keyboard.hs_ctrl_space", section = "shortcuts.keyboard", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
 		path = "gestures.modes.swipe_2_left", section = "gestures.modes", reason_key = "", platforms = { "hs" },
@@ -1052,13 +1040,13 @@ M.unavailable = {
 		path = "gestures.sensitivities.swipe_5_horiz", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
 	},
 	{
-		path = "layout.ergopti_base", section = "layout", reason_key = "", platforms = { "ahk" },
+		path = "layout.ergopti_base", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
 	},
 	{
 		path = "layout.virtual_keyboard", section = "layout", reason_key = "platform_reason.virtual_keyboard_is_karabiner", platforms = { "hs" },
 	},
 	{
-		path = "layout.ergopti_alt_gr", section = "layout", reason_key = "", platforms = { "ahk" },
+		path = "layout.ergopti_alt_gr", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
 	},
 	{
 		path = "layout.ergopti_variant", section = "layout", reason_key = "platform_reason.legacy_helpers_use_windows_scan_code_hotkeys", platforms = { "ahk" },
@@ -1076,10 +1064,10 @@ M.unavailable = {
 		path = "layout.emulate_bottom_row", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
 	},
 	{
-		path = "layout.ctrl_magic_save", section = "layout", reason_key = "", platforms = { "ahk" },
+		path = "layout.ctrl_magic_save", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
 	},
 	{
-		path = "layout.emulated_layout", section = "layout", reason_key = "", platforms = { "ahk" },
+		path = "layout.emulated_layout", section = "layout", reason_key = "platform_reason.layout_emulation_is_windows_only", platforms = { "ahk" },
 	},
 	{
 		path = "category_enabled.hotstrings", section = "category_enabled", reason_key = "", platforms = { "ahk" },
@@ -1097,67 +1085,67 @@ M.unavailable = {
 		path = "ui.menubar_icon", section = "ui", reason_key = "", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.wrap_text_if_selected", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.wrap_text_if_selected", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_a", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_a", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_d", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_d", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_e", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_e", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_g", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_g", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_h", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_h", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_i", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_i", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_m", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_m", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_o", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_o", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_p", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_p", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_s", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_s", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_t", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_t", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_u", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_u", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_w", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_w", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_x", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_x", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_capslock", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_capslock", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_l", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_l", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_period", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_period", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.ctrl_quote", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.ctrl_quote", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.cmd_shift_v", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.cmd_shift_v", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
-		path = "shortcuts.keys.cmd_star", section = "shortcuts.keys", reason_key = "", platforms = { "hs" },
+		path = "shortcuts.keys.cmd_star", section = "shortcuts.keys", reason_key = "platform_reason.shortcut_settings_are_stored_per_driver", platforms = { "hs" },
 	},
 	{
 		path = "category_enabled.autocorrection", section = "category_enabled", reason_key = "", platforms = { "ahk" },
@@ -1175,13 +1163,13 @@ M.unavailable = {
 		path = "category_enabled.magic_key", section = "category_enabled", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "layout.pause_switch_enabled", section = "layout", reason_key = "", platforms = { "hs" },
+		path = "layout.pause_switch_enabled", section = "layout", reason_key = "platform_reason.layout_switch_on_pause_is_macos", platforms = { "hs" },
 	},
 	{
-		path = "layout.on_pause", section = "layout", reason_key = "", platforms = { "hs" },
+		path = "layout.on_pause", section = "layout", reason_key = "platform_reason.layout_switch_on_pause_is_macos", platforms = { "hs" },
 	},
 	{
-		path = "layout.on_resume", section = "layout", reason_key = "", platforms = { "hs" },
+		path = "layout.on_resume", section = "layout", reason_key = "platform_reason.layout_switch_on_pause_is_macos", platforms = { "hs" },
 	},
 }
 

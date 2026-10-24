@@ -788,8 +788,13 @@ helpers.describe("shared hotstring engine — time-gate corpus (time-gate-corpus
 				helpers.assert_eq(result.expander_gap_ms, vector.elapsed_ms,
 					"the interval is the reference character to the expander")
 			end
-			helpers.assert_eq(engine_mod.within_expansion_delay(result, vector.delay_s, 0), vector.fires,
-				"the delay gate verdict")
+			-- The driver's own gate: the shared rule, the registry's multiplier, and
+			-- the complex flags the vector declares for the reference key and the expander.
+			local reference = vector.typed[#vector.typed]
+			helpers.assert_eq(
+				require("modules.hotstrings.expansion_delay").allows(result, vector.delay_s, 0,
+					vector.expander.complex == true, reference.complex == true, nil),
+				vector.fires, "the delay gate verdict")
 		end)
 	end
 end)

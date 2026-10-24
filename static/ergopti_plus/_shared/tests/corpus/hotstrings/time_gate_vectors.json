@@ -335,6 +335,155 @@
 			"reference_char": "r",
 			"reference_time_missing": true,
 			"fires": false
+		},
+		{
+			"id": "complex_expander_inside_widened_window",
+			"description": "A Shift/Alt/AltGr expander widens the 0.5 s delay to 1.0 s (the registry multiplier 2): 800 ms fires, where a plain expander would not.",
+			"trigger": "pr",
+			"ends_with_magic": false,
+			"delay_s": 0.5,
+			"typed": [
+				{
+					"char": "p",
+					"down_ms": 0
+				},
+				{
+					"char": "r",
+					"down_ms": 100
+				}
+			],
+			"expander": {
+				"char": " ",
+				"down_ms": 900,
+				"complex": true
+			},
+			"reference_char": "r",
+			"elapsed_ms": 800,
+			"fires": true
+		},
+		{
+			"id": "complex_expander_exact_widened_deadline",
+			"description": "The exact widened deadline (1000 ms of a 0.5 s delay) still fires.",
+			"trigger": "pr",
+			"ends_with_magic": false,
+			"delay_s": 0.5,
+			"typed": [
+				{
+					"char": "p",
+					"down_ms": 0
+				},
+				{
+					"char": "r",
+					"down_ms": 100
+				}
+			],
+			"expander": {
+				"char": " ",
+				"down_ms": 1100,
+				"complex": true
+			},
+			"reference_char": "r",
+			"elapsed_ms": 1000,
+			"fires": true
+		},
+		{
+			"id": "complex_expander_past_widened_window",
+			"description": "One millisecond past the widened window does not fire.",
+			"trigger": "pr",
+			"ends_with_magic": false,
+			"delay_s": 0.5,
+			"typed": [
+				{
+					"char": "p",
+					"down_ms": 0
+				},
+				{
+					"char": "r",
+					"down_ms": 100
+				}
+			],
+			"expander": {
+				"char": " ",
+				"down_ms": 1101,
+				"complex": true
+			},
+			"reference_char": "r",
+			"elapsed_ms": 1001,
+			"fires": false
+		},
+		{
+			"id": "plain_expander_is_not_widened",
+			"description": "The same 800 ms with no complex keystroke stays gated by the plain 0.5 s delay.",
+			"trigger": "pr",
+			"ends_with_magic": false,
+			"delay_s": 0.5,
+			"typed": [
+				{
+					"char": "p",
+					"down_ms": 0
+				},
+				{
+					"char": "r",
+					"down_ms": 100
+				}
+			],
+			"expander": {
+				"char": " ",
+				"down_ms": 900
+			},
+			"reference_char": "r",
+			"elapsed_ms": 800,
+			"fires": false
+		},
+		{
+			"id": "complex_reference_carries_inside_carry_window",
+			"description": "The last letter was typed with Shift and the expander follows within the 300 ms carry: the 0.2 s delay widens to 0.4 s, so 250 ms fires.",
+			"trigger": "pr",
+			"ends_with_magic": false,
+			"delay_s": 0.2,
+			"typed": [
+				{
+					"char": "p",
+					"down_ms": 0
+				},
+				{
+					"char": "r",
+					"down_ms": 100,
+					"complex": true
+				}
+			],
+			"expander": {
+				"char": " ",
+				"down_ms": 350
+			},
+			"reference_char": "r",
+			"elapsed_ms": 250,
+			"fires": true
+		},
+		{
+			"id": "complex_reference_carry_expired",
+			"description": "Same, but 350 ms after the Shift letter the carry is over: the plain 0.2 s delay applies and 350 ms does not fire.",
+			"trigger": "pr",
+			"ends_with_magic": false,
+			"delay_s": 0.2,
+			"typed": [
+				{
+					"char": "p",
+					"down_ms": 0
+				},
+				{
+					"char": "r",
+					"down_ms": 100,
+					"complex": true
+				}
+			],
+			"expander": {
+				"char": " ",
+				"down_ms": 450
+			},
+			"reference_char": "r",
+			"elapsed_ms": 350,
+			"fires": false
 		}
 	]
 }

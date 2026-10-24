@@ -371,18 +371,55 @@ end
 --- @param delay_sec number Maximum last-letter-to-expander pause in seconds; zero disables it.
 --- @param resolution_ms number Resolution of the clock that stamped the keys; zero when exact.
 --- @return boolean
-function M.within_expansion_delay(result, delay_sec, resolution_ms)
+function M.within_expansion_delay(result, delay_sec, resolution_ms, multiplier)
 	if type(resolution_ms) ~= "number" or resolution_ms < 0 then
 		error("within_expansion_delay(): the clock resolution must be a non-negative number, got "
 			.. tostring(resolution_ms), 2)
 	end
 	local limit = tonumber(delay_sec)
 	if not limit or limit <= 0 then return true end
+	if multiplier ~= nil and (type(multiplier) ~= "number" or multiplier < 1) then
+		error("within_expansion_delay(): the complex-key multiplier must be a number of at least 1, got "
+			.. tostring(multiplier), 2)
+	end
 	if type(result) ~= "table" then return false end
 	local gap_ms = tonumber(result.expander_gap_ms)
 	-- Whole milliseconds, as Windows (Round(seconds * 1000)) and macOS: 1.005 s is
-	-- 1005 ms, not 1004.9999999999999, so the exact deadline instant fires.
-	return gap_ms ~= nil and gap_ms - resolution_ms <= math.floor(limit * 1000 + 0.5)
+	-- 1005 ms, not 1004.9999999999999, so the exact deadline instant fires. The
+	-- multiplier widens the allowed delay (never the measured gap).
+	return gap_ms ~= nil and gap_ms - resolution_ms <= math.floor(limit * (multiplier or 1) * 1000 + 0.5)
+end
+
+--- The factor that widens the expansion delay for a complex keystroke (PAR-7).
+---
+--- A Shift, Alt or AltGr/Option keystroke is slower than a bare letter, so the
+--- allowed delay is multiplied when the EXPANDER keystroke is complex, or when
+--- the REFERENCE keystroke (the last letter of the input) was complex and the
+--- gap to the expander is at most `carry_ms` (the lag between releasing Shift
+--- and pressing the next key). The factor and the carry are the shared timing
+--- registry's `[hotstrings] complex_key_delay_multiplier` / `complex_key_carry_ms`,
+--- passed in by each driver; this function owns the rule, never the values.
+--- Autocorrections are not widened: they fire on letter combinations.
+--- @param expander_complex boolean Shift/Alt/AltGr was held on the expander keystroke.
+--- @param reference_complex boolean Shift/Alt/AltGr was held on the reference keystroke.
+--- @param gap_ms number|nil Reference-to-expander gap in milliseconds; nil when unknown.
+--- @param multiplier number The registry's complex_key_delay_multiplier (at least 1).
+--- @param carry_ms number The registry's complex_key_carry_ms (not negative).
+--- @param widenable boolean|nil False for a category that is never widened (autocorrection).
+--- @return number factor `multiplier` or 1.
+function M.complex_delay_multiplier(expander_complex, reference_complex, gap_ms, multiplier, carry_ms, widenable)
+	if type(multiplier) ~= "number" or multiplier < 1 then
+		error("complex_delay_multiplier(): the multiplier must be a number of at least 1, got "
+			.. tostring(multiplier), 2)
+	end
+	if type(carry_ms) ~= "number" or carry_ms < 0 then
+		error("complex_delay_multiplier(): the carry must be a non-negative number of milliseconds, got "
+			.. tostring(carry_ms), 2)
+	end
+	if widenable == false then return 1 end
+	if expander_complex == true then return multiplier end
+	if reference_complex == true and type(gap_ms) == "number" and gap_ms <= carry_ms then return multiplier end
+	return 1
 end
 
 --- Whether a value is a valid `hotstrings.idle_reset_seconds`: a finite

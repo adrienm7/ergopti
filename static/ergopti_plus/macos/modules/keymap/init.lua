@@ -134,15 +134,17 @@ local BUFFER_MAX_CHARS = 500
 local BUFFER_TRIM_BYTE_GATE = BUFFER_MAX_CHARS * 4
 
 -- Complex-keystroke delay multiplier. Shift- or Alt-held keystrokes take
--- longer finger-path time than a bare letter, so we widen the expansion
--- window for them by this factor.
-local COMPLEX_DELAY_MULT = 2
+-- longer finger-path time than a bare letter, so the expansion window widens
+-- for them by this factor. Declared once for the three drivers in the shared
+-- timing registry ([hotstrings] complex_key_delay_multiplier, complex_key_carry_ms);
+-- the rule is the shared engine's complex_delay_multiplier.
+local COMPLEX_DELAY_MULT = require("infra.timings").ms("hotstrings", "complex_key_delay_multiplier")
 
 -- How long after a complex keystroke the bonus multiplier still applies to
 -- the next keystroke — this covers the small lag between releasing Shift
 -- and pressing the next letter. Beyond this window the bonus is dropped so
 -- it cannot inadvertently stretch an expansion on an unrelated later key.
-local COMPLEX_CARRY_SEC = 0.3
+local COMPLEX_CARRY_MS = require("infra.timings").ms("hotstrings", "complex_key_carry_ms")
 
 -- Central memory struct passed via reference to all sub-modules. The shape,
 -- invariants, and default seeding live in modules/keymap/state.lua; keeping
@@ -1855,12 +1857,13 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- Complex keystrokes (involving Shift or Alt) allow a wider timing window
 	-- to accommodate the extra finger movement required by the modifier. The
 	-- bonus also carries over to the NEXT keystroke to cover Shift-release lag
-	-- — but only within a short window (COMPLEX_CARRY_SEC). A long pause
+	-- — but only within a short window (COMPLEX_CARRY_MS). A long pause
 	-- between a complex key and the following one means the two are unrelated,
 	-- and we must not stretch an expansion delay across that gap.
-	local is_complex       = flags.shift or flags.alt
-	local carry_from_prev  = CoreState.last_key_was_complex and dt <= COMPLEX_CARRY_SEC
-	local complex_mult     = (is_complex or carry_from_prev) and COMPLEX_DELAY_MULT or 1
+	local is_complex       = (flags.shift or flags.alt) and true or false
+	-- The shared rule (autocorrections are excluded later, by the mapping's group).
+	local complex_mult     = HotstringCore.complex_delay_multiplier(is_complex,
+		CoreState.last_key_was_complex == true, dt * 1000, COMPLEX_DELAY_MULT, COMPLEX_CARRY_MS, true)
 	CoreState.last_key_was_complex = is_complex
 
 	-- Populate module-level upvalues consumed by run_trigger_checks / mapping_fires.

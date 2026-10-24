@@ -122,6 +122,7 @@ local LOG = "ergopti_hotstrings"
 -- =========================================
 
 local engine_mod        = require("modules.hotstrings.engine")
+local ExpansionDelay     = require("modules.hotstrings.expansion_delay")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local injector          = require("modules.hotstrings.injector")
 local keyboard_layout   = require("adapters.keyboard_layout")
@@ -652,7 +653,6 @@ local function restart_daemon(reason)
 	return how ~= nil
 end
 
-
 local boot_catalogue_complete = false
 
 --- The Reload command, as on the other drivers: the daemon restarts, so every
@@ -660,6 +660,7 @@ local boot_catalogue_complete = false
 --- cannot name its successor, so the local control writes a pending record
 --- that the successor claims (infra/driver_control.lua).
 local perform_reload = require("infra.reload_restart").new({ gestures = gestures, restart = restart_daemon })
+
 
 --- Emits facts prepared before capture only after actual driver readiness.
 ---
@@ -857,9 +858,9 @@ local function main()
 	end
 
 	local mapping_count, committed, _, receipt = hotstrings_config.load_all(nil, true)
-	if committed ~= true then
 	-- What a reload request claimed by this process answers for its own boot.
 	boot_catalogue_complete = committed == true and type(receipt) == "table" and receipt.complete == true
+	if committed ~= true then
 		Logger.warn(LOG, "The startup hotstring catalogue is unavailable; unrelated app features continue.")
 	elseif type(receipt) ~= "table" or receipt.complete ~= true then
 		Logger.warn(LOG, "Common autocorrection is unavailable; %d unrelated hotstring mapping(s) loaded.", mapping_count)
@@ -919,6 +920,8 @@ local function main()
 	-- replacement by hand and retype it. Cleared by anything else, because an
 	-- undo two words later would resurrect text from nowhere.
 	local _undoable = nil
+	-- Whether the previous character keystroke carried Shift, Alt or AltGr.
+	local _previous_key_complex = false
 
 	-- The suggestion currently on offer, so the same one is counted once rather
 	-- than once per keystroke while it stays on screen. Declared here for the
@@ -1159,6 +1162,14 @@ local function main()
 		-- it would make every recorded delay meaningless.
 		local now_ms = math.floor(Monotonic.now_ms())
 
+		-- A Shift, Alt or AltGr keystroke is slower than a bare letter: the expansion
+		-- delay widens for it (modules/hotstrings/expansion_delay.lua, the shared
+		-- rule). The previous character keystroke is the delay's reference key.
+		local held_now = keyboard_hook.held_modifiers()
+		local key_is_complex = (held_now.shift or held_now.alt or held_now.altgr) and true or false
+		local previous_key_was_complex = _previous_key_complex
+		_previous_key_complex = key_is_complex
+
 		-- A pause longer than hotstrings.idle_reset_seconds ends the word: the
 		-- buffered text was typed before it and this key starts a new one, so a
 		-- word-start hotstring fires again instead of reading stale context. An
@@ -1217,7 +1228,8 @@ local function main()
 		if result and hotstrings_config and type(hotstrings_config.resolve) == "function" then
 			local ok_delay, resolved = pcall(hotstrings_config.resolve, result.group, result.section)
 			local delay_sec = ok_delay and type(resolved) == "table" and tonumber(resolved.delay) or nil
-			if delay_sec and not engine_mod.within_expansion_delay(result, delay_sec, Monotonic.resolution_ms()) then
+			if delay_sec and not ExpansionDelay.allows(result, delay_sec, Monotonic.resolution_ms(),
+				key_is_complex, previous_key_was_complex, result.group) then
 				Logger.debug(LOG,
 					"Expired: '%s' waited %.2fs for its expander, its category allows %.2fs.",
 					tostring(result.trigger),
@@ -1230,7 +1242,7 @@ local function main()
 		-- match always wins, which is why this is tested against `result` being nil
 		-- rather than run before the engine.
 		if not result and RepeatKey.is_enabled() then
-			local repeated = RepeatKey.resolve(engine:current_buffer(), MagicKey.get())
+			local repeated = RepeatKey.resolve(engine:current_buffer(), MagicKey.get(), engine:buffer_starts_at_word_boundary())
 			if repeated then
 				result = {
 					trigger         = MagicKey.get(),

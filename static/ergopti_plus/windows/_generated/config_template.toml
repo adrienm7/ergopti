@@ -25,6 +25,10 @@ arrow_resets_word = true
 shortcut_resets_word = true
 tap_hold_resets_word = true
 expansion_delay = 0.75
+preview_ai_enabled = true
+preview_autocorrect_enabled = true
+preview_colored_tooltips = true
+preview_star_enabled = true
 
 
 
