@@ -82,7 +82,7 @@ local LEASE_GUARDIAN_PROBE_TIMEOUT_SEC = 2.0
 -- at 20 s it killed a slow registration that was still inside its own budget
 -- (hardening-d-native-timeout-contract).
 local LEASE_GUARDIAN_REGISTRATION_TIMEOUT_SEC = 25.0
-local FIRST_RUN_WIZARD_DELAY_SEC = 2.0
+local FIRST_RUN_WIZARD_DELAY_SEC = Timings.sec("ui", "onboarding_startup_delay_ms")
 local FIRST_RUN_WIZARD_TIMER_MAX_ATTEMPTS = 3
 -- A retained input-source event is an ordering barrier for lease recovery: the
 -- replacement must not resolve keycodes until TIS has settled.  Transient

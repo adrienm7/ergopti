@@ -116,8 +116,12 @@ local PRESETS = {
 }
 
 -- Auto-dismiss delay applied after set_error before the window fades. Keeps
--- the failure message readable without forcing the user to dismiss it.
-local ERROR_AUTO_DISMISS_SEC = 8.0
+-- the failure message readable without forcing the user to dismiss it. Read
+-- from the shared registry when an error is shown, so loading this window
+-- (which every download path does) does not depend on the registry.
+local function error_auto_dismiss_sec()
+	return require("infra.timings").sec("tooltip", "error_dialog_autodismiss_ms")
+end
 
 --- Invokes one external window controller through the central visible boundary.
 --- @param label string Context included in the ERROR log on failure.
@@ -824,7 +828,7 @@ function M.set_progress(pct)
 end
 
 --- Switches the UI to "error" presentation: red accent, error step color,
---- and an automatic dismiss after ERROR_AUTO_DISMISS_SEC.
+--- and an automatic dismiss after the shared error auto-dismiss delay.
 --- @param msg string Short French error message (one line).
 function M.set_error(msg)
 	if _wv and not require_active_operation() then return false end
@@ -839,7 +843,7 @@ function M.set_error(msg)
     -- Same session capture as M.complete: "_wv is non-nil" only proves SOME
     -- window is open, not that it is still this operation's.
     local sid = M.session_id()
-    DeferredWork.after(ERROR_AUTO_DISMISS_SEC, function()
+    DeferredWork.after(error_auto_dismiss_sec(), function()
         if not _wv then return end
         if M.session_id() ~= sid then
             Logger.debug(LOG, "Error auto-dismiss skipped: the window now belongs to a newer operation.")

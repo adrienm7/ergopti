@@ -32,7 +32,7 @@ TapHoldsLoadTimings()
 ; ============================================================
 
 TestTimings_GetReturnsRawMs() {
-    AssertEqual(3, TimingsGet("keystats", "synth_match_delay_ms"), "keystats.synth_match_delay_ms")
+    AssertEqual(2000, TimingsGet("keystats", "think_pause_ms"), "keystats.think_pause_ms")
     AssertEqual(700, TimingsGet("gestures", "tap_max_ms"), "gestures.tap_max_ms")
     AssertEqual(500, TimingsGet("llm", "chain_fallback_ms"), "llm.chain_fallback_ms")
 }
