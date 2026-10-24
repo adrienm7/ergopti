@@ -23,12 +23,15 @@ local RETIRED_KEYS = {
 	"karabiner.enable_failed",
 }
 
--- The texts about the F2 switch itself: they must name what they switch.
+-- The texts about a Karabiner decision the user makes: they must name what
+-- they decide. The F2 switch, and the Layout row choosing the type of
+-- Karabiner's virtual keyboard (which keycodes the two ISO-only keys reach).
 local SWITCH_KEYS = {
 	["menu.global.karabiner_integration"] = true,
 	["menu.global.remove_from_karabiner"] = true,
 	["menu.tapholds.karabiner_off_hint"] = true,
 	["notify.karabiner.removed"] = true,
+	["menu.layout.virtual_keyboard"] = true,
 }
 
 -- The Debug menu's field checks exist so the maintainer can test the remap
