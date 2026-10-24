@@ -25,8 +25,7 @@
 --- ==============================================================================
 
 local M = {}
-local _scope_busy = false
-local _scope_owner, _scope_generation, _scope_receipts = nil, 0, setmetatable({}, { __mode = "k" })
+local _scope = require("scope_owner").new({ name = "infra.script_settings", module = M })
 
 local Logger = require("logger.shim")
 local Manifest = require("infra.manifest_reader")
@@ -128,8 +127,7 @@ end
 --- @param override string|nil Canonical level used only for this process.
 --- @return boolean
 function M.apply(override)
-	if _scope_owner ~= nil then return false end
-	_scope_generation = _scope_generation + 1
+	if not _scope.admit_change() then return false end
 	local level = override == nil and M.get() or canonical(override)
 	if not level then
 		Logger.error(LOG, "Cannot apply invalid log level '%s'.", tostring(override))
@@ -160,8 +158,7 @@ end
 --- @param value any
 --- @return boolean Whether persistence and application both succeeded.
 function M.set(value)
-	if _scope_owner ~= nil then return false end
-	_scope_generation = _scope_generation + 1
+	if not _scope.admit_change() then return false end
 	local level = canonical(value)
 	if not level then
 		Logger.error(LOG, "Refusing invalid log level '%s'.", tostring(value))
@@ -176,140 +173,31 @@ function M.set(value)
 	return true
 end
 
---- Reads only the logger state this module owns; no persistence occurs here.
+--- Whether the shared logger this module drives is still the loaded one.
+--- @return boolean current
 local function scope_backend_current()
 	return rawequal(package.loaded["logger.shim"], Logger) and rawequal(package.loaded["logger"], Logger)
 end
 
-local function scope_state()
-	return { module = package.loaded["infra.script_settings"], active = _active, level = Logger.get_level(), setter = Logger.set_level, getter = Logger.get_level,
-		backend_parent = package.loaded["logger.shim"], core_parent = package.loaded["logger"] }
-end
-
-local function scope_equal(left, right)
-	return rawequal(left.module, right.module) and left.active == right.active and left.level == right.level and left.setter == right.setter and left.getter == right.getter
-		and rawequal(left.backend_parent, right.backend_parent) and rawequal(left.core_parent, right.core_parent)
-end
-
---- Acquires the declared runtime field for one primary transaction token.
---- @param owner table Exact token; pending() describes primary compensation only.
---- @return boolean acquired
-function M.scope_acquire(owner)
-	if type(owner) ~= "table" or type(owner.pending) ~= "function" or _scope_owner ~= nil or _scope_busy
-		or not rawequal(package.loaded["infra.script_settings"], M) or not scope_backend_current() then return false end
-	_scope_owner = owner
-	return true
-end
-
---- Releases the admission gate while retaining opaque inverse receipts.
---- @param owner table Exact token.
---- @return boolean released
-function M.scope_release(owner)
-	if _scope_busy or not rawequal(_scope_owner, owner) or owner.pending() ~= false then return false end
-	_scope_owner = nil
-	return true
-end
-
---- Captures an opaque, source-bound runtime inverse under the native claim.
---- @param owner table Exact token.
---- @return table|nil receipt
-local function scope_capture_impl(owner)
-	if not rawequal(_scope_owner, owner) or not rawequal(package.loaded["infra.script_settings"], M) or not scope_backend_current() then return nil end
-	local generation = _scope_generation
-	local receipt, before = {}, scope_state()
-	if not rawequal(_scope_owner, owner) or not rawequal(package.loaded["infra.script_settings"], M) or _scope_generation ~= generation or not scope_backend_current() then return nil end
-	_scope_receipts[receipt] = { owner = owner, before = before, expected = before, generation = _scope_generation }
-	return receipt
-end
-
-function M.scope_capture(owner)
-	if _scope_busy then return nil end
-	_scope_busy = true
-	local called, result = pcall(scope_capture_impl, owner)
-	_scope_busy = false
-	if not called then return nil end
-	return result
-end
-
---- Applies one canonical value after proving the captured runtime still owns it.
---- @param owner table Exact token.
---- @param receipt table Native opaque receipt.
---- @param value string Canonical declared log token.
---- @return boolean applied
-local function scope_apply_impl(owner, receipt, value)
-	local data = _scope_receipts[receipt]
-	if not rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or data.forgotten or data.attempted
-		or data.generation ~= _scope_generation or not scope_backend_current() or not scope_equal(scope_state(), data.expected)
-		or not rawequal(package.loaded["infra.script_settings"], M) or not scope_backend_current() then return false end
-	local level = canonical(value)
-	if level ~= value then return false end
-	local next_value = { module = M, active = level, level = threshold(level), setter = data.before.setter, getter = data.before.getter,
-		backend_parent = data.before.backend_parent, core_parent = data.before.core_parent }
-	_scope_generation = _scope_generation + 1
-	data.generation, data.expected, data.attempted = _scope_generation, next_value, true
-	local called = pcall(function()
-		if Logger.set_level(next_value.level) == false then error("native logger setter refused") end
-		_active = next_value.active
-	end)
-	local observed = scope_state()
-	return called and scope_equal(observed, next_value) and rawequal(_scope_owner, owner)
-		and rawequal(package.loaded["infra.script_settings"], M) and scope_backend_current() and data.generation == _scope_generation
-end
-
-function M.scope_apply(owner, receipt, value)
-	if _scope_busy then return false end
-	_scope_busy = true
-	local called, result = pcall(scope_apply_impl, owner, receipt, value)
-	_scope_busy = false
-	if not called then return false end
-	return result
-end
-
---- Restores only this receipt's acknowledged or interrupted scalar publication.
---- @param owner table Exact token.
---- @param receipt table Native opaque receipt.
---- @return boolean restored
-local function scope_restore_impl(owner, receipt)
-	local data = _scope_receipts[receipt]
-	if not rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or data.forgotten or data.generation ~= _scope_generation or not scope_backend_current() then return false end
-	local current = scope_state()
-	if not rawequal(current.module, M) or not rawequal(package.loaded["infra.script_settings"], M) or not scope_backend_current() or not (rawequal(current.backend_parent, data.before.backend_parent)
-		and rawequal(current.core_parent, data.before.core_parent) and current.setter == data.before.setter and current.getter == data.before.getter
-		and (current.active == data.before.active or current.active == data.expected.active)
-		and (current.level == data.before.level or current.level == data.expected.level)) then return false end
-	if not data.attempted or data.restored then return scope_equal(current, data.before) end
-	local called = pcall(function()
-		if Logger.set_level(data.before.level) == false then error("native logger restore refused") end
-		_active = data.before.active
-	end)
-	local observed = scope_state()
-	if not called or not scope_equal(observed, data.before) or not rawequal(_scope_owner, owner)
-		or not rawequal(package.loaded["infra.script_settings"], M) or not scope_backend_current() or data.generation ~= _scope_generation then return false end
-	_scope_generation = _scope_generation + 1
-	data.generation, data.expected, data.restored = _scope_generation, data.before, true
-	return true
-end
-
-function M.scope_restore(owner, receipt)
-	if _scope_busy then return false end
-	_scope_busy = true
-	local called, result = pcall(scope_restore_impl, owner, receipt)
-	_scope_busy = false
-	if not called then return false end
-	return result
-end
-
---- Forgets only a finalized inverse, without changing live native state.
---- @param owner table Exact primary token.
---- @param receipt table Native opaque receipt.
---- @return boolean forgotten
-function M.scope_forget(owner, receipt)
-	local data = _scope_receipts[receipt]
-	if _scope_busy or rawequal(_scope_owner, owner) or not data or not rawequal(data.owner, owner) or owner.pending() ~= false then return false end
-	if data.forgotten then return true end
-	data.before, data.expected, data.generation = nil, nil, nil
-	data.forgotten = true
-	return true
-end
+_scope.install({
+	-- Reads only the logger state this module owns; no persistence occurs here.
+	state = function()
+		return { active = _active, level = Logger.get_level(), setter = Logger.set_level, getter = Logger.get_level,
+			backend_parent = package.loaded["logger.shim"], core_parent = package.loaded["logger"] }
+	end,
+	identity = { "backend_parent", "core_parent" },
+	stable = { "setter", "getter" },
+	published = { "active", "level" },
+	live = scope_backend_current,
+	accept = function(value)
+		local level = canonical(value)
+		if level ~= value then return nil end
+		return { active = level, level = threshold(level) }
+	end,
+	publish = function(target)
+		if Logger.set_level(target.level) == false then error("native logger setter refused") end
+		_active = target.active
+	end,
+})
 
 return M

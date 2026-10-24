@@ -212,6 +212,7 @@ return {
 	"tests.unit.infra.config.test_config_keys",
 	"tests.unit.infra.scope.test_config_scope_composition",
 	"tests.unit.infra.scope.test_config_scope_transaction",
+	"tests.unit.infra.scope.test_scope_owner",
 	"tests.unit.infra.lifecycle.test_daemon_restart",
 	"tests.unit.infra.scope.test_dynamic_hotstrings_scope",
 	"tests.unit.infra.scope.test_gesture_scope",
