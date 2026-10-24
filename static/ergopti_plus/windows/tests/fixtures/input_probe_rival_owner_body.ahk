@@ -40,7 +40,7 @@ _IPR_OnError(Failure, *) {
 
 ; The real reader is called and its exact result returned. Scheduling control
 ; supplies a deterministic witness at a source line already outside Critical.
-HotPath_Now() {
+_IP_Now() {
 	global _IPR
 	Value := _IPR_NativeClock()
 	_IPR.ClockCalls += 1
