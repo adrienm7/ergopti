@@ -86,7 +86,11 @@ const TESTS_DIR = path.join(DRIVER_ROOT, 'tests');
 //           34 → 33 (2026-08-02: the second-level wrappers, see the read baseline.)
 //           33 → 32 (2026-08-02: the one refusal, split by hand — see the read
 //                    baseline.)
-const BASELINE = 32;
+//           32 → 27 (2026-10-24: the measurement had fallen to 30 while the
+//                    baseline stayed at 32, and the eight new reads (five files)
+//                    became read_driver_unit(symbol) or a contract taking a source
+//                    reader; the slack is closed so the next pin cannot land.)
+const BASELINE = 27;
 
 // Second frozen baseline — individual pinned READS, not files.
 //

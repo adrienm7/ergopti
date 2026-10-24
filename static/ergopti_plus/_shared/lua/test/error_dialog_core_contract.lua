@@ -148,14 +148,16 @@ function M.register(helpers, shared_root)
 end
 
 --- Checks that one host delegates to the core instead of carrying a copy.
+--- The driver supplies the host's source, so a driver can find its host by a
+--- symbol rather than by a path a move would break.
 --- @param helpers table Driver test API.
---- @param host_path string Path of the host's Lua source.
-function M.register_host(helpers, host_path)
+--- @param host_name string Name of the host in the test title.
+--- @param read_host function Returns the host's Lua source, or fails.
+function M.register_host(helpers, host_name, read_host)
 	helpers.describe("the error window host delegates to the shared core (error-dialog-core)", function()
-		helpers.it(host_path:match("[^/]+/[^/]+$") .. " requires error_dialog.core and keeps no copy", function()
-			local file = assert(io.open(host_path, "rb"))
-			local source = assert(file:read("*a"))
-			assert(file:close())
+		helpers.it(host_name .. " requires error_dialog.core and keeps no copy", function()
+			local source = read_host()
+			helpers.assert_type(source, "string", "the host source is readable")
 			helpers.assert_true(source:find('require("error_dialog.core")', 1, true) ~= nil, "requires the core")
 			for _, copy in ipairs({ "Policy.validate(", "ErrorReport.compose(", "Policy.new_state(",
 				"the error policy cannot be read", "was initialised twice" }) do
