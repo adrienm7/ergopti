@@ -46,8 +46,8 @@
 ---    _poll_generation pattern.
 --- 8. Redirect ownership: requests carrying caller credentials, and every HTTPS
 ---    request, disable the native opaque auto-follow path. Same-origin hops
----    retain credentials; cross-origin hops strip them before dispatch, and
----    HTTPS never downgrades to HTTP.
+---    retain credentials; cross-origin hops strip them before dispatch,
+---    HTTPS never downgrades to HTTP, and a hop back to an earlier URL is refused.
 --- 9. Admission first: the URL (absolute HTTP/HTTPS, no control byte), headers
 ---    and body are validated before a replacement cancels the request in flight.
 --- ==============================================================================
@@ -757,6 +757,11 @@ local function new(options)
 		local redirects = 0
 		local current_hop = 0
 		local terminal_callback = _make_cb(callback, my_generation)
+		-- Hop identities without fragment, as the shared redirect law keys them:
+		-- a chain that returns to an exact earlier URL can never terminate.
+		local visited = {}
+		local initial = parse_http_url(url)
+		if initial then visited[initial.origin .. initial.path .. initial.query] = true end
 
 		local dispatch_hop
 		dispatch_hop = function(hop_method, hop_url, hop_headers, hop_body)
@@ -799,6 +804,14 @@ local function new(options)
 								terminal_callback(status, "", response_headers)
 								return
 							end
+
+							local identity = next_parts.origin .. next_parts.path .. next_parts.query
+							if visited[identity] then
+								Logger.error(LOG, "Redirect refused: the chain returns to an earlier URL.")
+								terminal_callback(status, "", response_headers)
+								return
+							end
+							visited[identity] = true
 
 							redirects = redirects + 1
 							local changes_to_get = hop_method ~= "get"
