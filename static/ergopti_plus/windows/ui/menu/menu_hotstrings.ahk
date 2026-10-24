@@ -939,7 +939,7 @@ _HS_PersonalRows(Options := unset) {
 		DefaultChild := MenuRenderer_TemplateChild(OwnedMenus)
 		EditorRow := _HS_PersonalEditorRow((*) => OpenPersonalEditor())
 
-		CurDefaultSec := _EditorPrefGet("DefaultSection", "")
+		CurDefaultSec := _EditorPrefGet("default_section", "")
 		DefaultRows := []
 		for _, SecName in TomlData["sections_order"] {
 			if (SecName == "-")

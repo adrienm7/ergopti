@@ -93,7 +93,7 @@ _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultChild, Disamb
 		Checked := (SecName == "") ? t("menu.hotstrings.default_none")
 				: (TomlData["sections"].Has(SecName) ? DisambiguatedLabels[SecName] : "")
 		if !MenuRenderer_RepaintTemplateChild(DefaultChild, PersonalMenu, OldCaption, NewCaption, Checked,
-			(*) => _EditorPrefSet("DefaultSection", SecName))
+			(*) => _EditorPrefSet("default_section", SecName))
 			return false
 		_PrevDefaultLabel := NewLabel
 		return true
