@@ -287,6 +287,7 @@ return {
 	"tests.meta.corpus.test_corpus_updater_release_parser",
 	"tests.meta.corpus.test_corpus_updater_list_cache",
 	"tests.meta.corpus.test_corpus_updater_check_only",
+	"tests.meta.corpus.test_corpus_tap_hold_decisions",
 	"tests.meta.corpus.test_corpus_llm_app_profile_overrides",
 	"tests.meta.corpus.test_corpus_metrics_collection_session",
 	"tests.unit.modules.diagnostics.test_crash_reporter",

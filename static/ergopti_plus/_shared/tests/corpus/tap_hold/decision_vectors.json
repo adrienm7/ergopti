@@ -1,0 +1,493 @@
+{
+	"$schema": "https://ergopti.com/schema/corpus/tap_hold_decisions.v1.json",
+	"description": "Cross-driver corpus for the tap-versus-hold DECISION: which keystrokes reach applications for a timed stream of physical presses and releases on keys bound to a tap and a hold. vectors.json pins the configuration accessors; this file pins what the engines decide. Keys are [tap_hold.catalog] ids of _shared/tap_hold/defaults.toml plus the ordinary letters a and j. A binding names a tap (a key the tap types, or one_shot_shift; none types the key itself), a hold modifier and a threshold in milliseconds. Each event is [down|up, key, at_ms]. `strokes` lists, in order, every key press of a non-modifier key that applications receive, prefixed with the modifiers down at that moment in the [tap_hold.hold_picker] order (ctrl, shift, alt, alt_gr, win), whichever side holds them. `hold_presses`, when present, lists the modifier keys, by side, that the hold of the first bound key puts down. The expectations are the Windows and Linux semantics (the Linux engine follows the Windows hotkeys). A driver that decides otherwise is listed under `divergences` with what it does and why, so the difference stays visible and a change on either side fails a consumer.",
+	"version": "1.0.0",
+	"vectors": [
+		{
+			"id": "hold_key_lone_quick_release_taps",
+			"description": "A key that holds a modifier, pressed and released alone within its threshold, types its tap.",
+			"bindings": {
+				"caps_lock": {
+					"tap": "enter",
+					"hold": "ctrl",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["up", "caps_lock", 100]
+			],
+			"expected": {
+				"strokes": ["enter"]
+			}
+		},
+		{
+			"id": "hold_key_lone_release_past_threshold_types_nothing",
+			"description": "Released alone after its threshold, the key was a hold: no tap is typed.",
+			"bindings": {
+				"caps_lock": {
+					"tap": "enter",
+					"hold": "ctrl",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["up", "caps_lock", 400]
+			],
+			"expected": {
+				"strokes": []
+			}
+		},
+		{
+			"id": "hold_key_bounce_below_tap_minimum_types_nothing",
+			"description": "A release sooner than the shared tap minimum (tap_min_duration_ms) is a bounce, not a tap.",
+			"bindings": {
+				"caps_lock": {
+					"tap": "enter",
+					"hold": "ctrl",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["up", "caps_lock", 20]
+			],
+			"expected": {
+				"strokes": []
+			},
+			"divergences": {
+				"macos": {
+					"strokes": ["enter"],
+					"reason": "Karabiner's to_if_alone has no minimum duration and the generator sets none, so a 20 ms bounce types the tap; Windows and Linux read tap_min_duration_ms. Not documented."
+				}
+			}
+		},
+		{
+			"id": "hold_key_letter_struck_under_it_is_a_chord",
+			"description": "A letter pressed and released while the key is down is typed under the hold, and the release types no tap.",
+			"bindings": {
+				"caps_lock": {
+					"tap": "enter",
+					"hold": "ctrl",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["down", "a", 30],
+				["up", "a", 60],
+				["up", "caps_lock", 100]
+			],
+			"expected": {
+				"strokes": ["ctrl+a"]
+			}
+		},
+		{
+			"id": "hold_key_hold_is_down_before_its_threshold",
+			"description": "The hold is taken at key-down: a letter struck at once, released after the key, is typed under it.",
+			"bindings": {
+				"caps_lock": {
+					"tap": "enter",
+					"hold": "ctrl",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["down", "a", 10],
+				["up", "caps_lock", 40],
+				["up", "a", 70]
+			],
+			"expected": {
+				"strokes": ["ctrl+a"]
+			}
+		},
+		{
+			"id": "hold_key_letter_struck_past_threshold_is_a_chord",
+			"description": "A letter struck after the threshold is typed under the hold.",
+			"bindings": {
+				"caps_lock": {
+					"tap": "enter",
+					"hold": "ctrl",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["down", "a", 400],
+				["up", "a", 450],
+				["up", "caps_lock", 500]
+			],
+			"expected": {
+				"strokes": ["ctrl+a"]
+			}
+		},
+		{
+			"id": "hold_key_release_of_an_earlier_key_cancels_the_tap",
+			"description": "A key pressed before and released during the press was used with it: the release types no tap (Windows A_PriorKey and activity tracker).",
+			"bindings": {
+				"caps_lock": {
+					"tap": "enter",
+					"hold": "ctrl",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "a", 0],
+				["down", "caps_lock", 10],
+				["up", "a", 40],
+				["up", "caps_lock", 100]
+			],
+			"expected": {
+				"strokes": ["a"]
+			},
+			"divergences": {
+				"macos": {
+					"strokes": ["a", "enter"],
+					"reason": "Karabiner ends a pending to_if_alone only at another key-down (basic.hpp unset_alone_if_needed), so the release of a key pressed before does not cancel the tap. Not documented."
+				}
+			}
+		},
+		{
+			"id": "hold_key_tap_keeps_a_modifier_held_before_it",
+			"description": "A modifier held by hand before the key is pressed stays on the tap.",
+			"bindings": {
+				"caps_lock": {
+					"tap": "enter",
+					"hold": "ctrl",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "left_ctrl", 0],
+				["down", "caps_lock", 20],
+				["up", "caps_lock", 100],
+				["up", "left_ctrl", 150]
+			],
+			"expected": {
+				"strokes": ["ctrl+enter"]
+			}
+		},
+		{
+			"id": "hold_key_nested_tap_under_another_hold",
+			"description": "A second tap-hold key tapped while the first is held types its tap under the first one's hold, and the first one types no tap.",
+			"bindings": {
+				"caps_lock": {
+					"tap": "enter",
+					"hold": "ctrl",
+					"threshold_ms": 300
+				},
+				"left_shift": {
+					"tap": "escape",
+					"hold": "shift",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["down", "left_shift", 30],
+				["up", "left_shift", 90],
+				["up", "caps_lock", 150]
+			],
+			"expected": {
+				"strokes": ["ctrl+escape"]
+			}
+		},
+		{
+			"id": "hold_key_two_holds_combine",
+			"description": "Two tap-hold keys held together both hold: a letter under them takes both modifiers.",
+			"bindings": {
+				"caps_lock": {
+					"tap": "enter",
+					"hold": "ctrl",
+					"threshold_ms": 300
+				},
+				"left_shift": {
+					"tap": "escape",
+					"hold": "shift",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["down", "left_shift", 30],
+				["down", "a", 60],
+				["up", "a", 90],
+				["up", "left_shift", 120],
+				["up", "caps_lock", 150]
+			],
+			"expected": {
+				"strokes": ["ctrl+shift+a"]
+			}
+		},
+		{
+			"id": "own_side_right_shift_holds_right_shift",
+			"description": "A plain shift hold on the right Shift key holds the right Shift itself, as Windows does (_TapHoldOwnSideModifier).",
+			"bindings": {
+				"right_shift": {
+					"tap": "escape",
+					"hold": "shift",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "right_shift", 0],
+				["down", "a", 30],
+				["up", "a", 60],
+				["up", "right_shift", 100]
+			],
+			"expected": {
+				"strokes": ["shift+a"],
+				"hold_presses": ["right_shift"]
+			},
+			"divergences": {
+				"macos": {
+					"strokes": ["shift+a"],
+					"hold_presses": ["left_shift"],
+					"reason": "The shift action of actions.json presses left_shift on every key; the generator has no own-side hold for right_shift. Not documented."
+				}
+			}
+		},
+		{
+			"id": "own_side_left_shift_holds_left_shift",
+			"description": "A shift hold on the left Shift key holds the left Shift.",
+			"bindings": {
+				"left_shift": {
+					"tap": "escape",
+					"hold": "shift",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "left_shift", 0],
+				["down", "a", 30],
+				["up", "a", 60],
+				["up", "left_shift", 100]
+			],
+			"expected": {
+				"strokes": ["shift+a"],
+				"hold_presses": ["left_shift"]
+			}
+		},
+		{
+			"id": "roll_key_lone_tap_types_itself",
+			"description": "A typing key that keeps its own key on a tap and has a hold types itself on a quick lone release.",
+			"bindings": {
+				"space": {
+					"hold": "shift",
+					"threshold_ms": 200
+				}
+			},
+			"events": [
+				["down", "space", 0],
+				["up", "space", 80]
+			],
+			"expected": {
+				"strokes": ["space"]
+			}
+		},
+		{
+			"id": "roll_key_short_tap_has_no_minimum",
+			"description": "A typing key's tap needs no minimum duration: a typist's 20 ms press is a space.",
+			"bindings": {
+				"space": {
+					"hold": "shift",
+					"threshold_ms": 200
+				}
+			},
+			"events": [
+				["down", "space", 0],
+				["up", "space", 20]
+			],
+			"expected": {
+				"strokes": ["space"]
+			}
+		},
+		{
+			"id": "roll_key_rolled_over_a_letter_is_a_tap",
+			"description": "Released before the letter struck under it, the typing key is a tap, typed before the letter.",
+			"bindings": {
+				"space": {
+					"hold": "shift",
+					"threshold_ms": 200
+				}
+			},
+			"events": [
+				["down", "space", 0],
+				["down", "a", 60],
+				["up", "space", 90],
+				["up", "a", 130]
+			],
+			"expected": {
+				"strokes": ["space", "a"]
+			}
+		},
+		{
+			"id": "roll_key_letter_released_first_is_a_hold",
+			"description": "When the letter struck under the typing key comes up first, the key is a hold: the letter is typed under it.",
+			"bindings": {
+				"space": {
+					"hold": "shift",
+					"threshold_ms": 200
+				}
+			},
+			"events": [
+				["down", "space", 0],
+				["down", "a", 60],
+				["up", "a", 120],
+				["up", "space", 180]
+			],
+			"expected": {
+				"strokes": ["shift+a"]
+			},
+			"divergences": {
+				"macos": {
+					"strokes": ["space", "a"],
+					"reason": "Documented in [tap_hold.rollover] of _shared/tap_hold/defaults.toml: Karabiner cannot decide from the order of the releases, so the next key-down types the typing key's own tap."
+				}
+			}
+		},
+		{
+			"id": "roll_key_two_letters_struck_is_typing",
+			"description": "A second key struck before either came up is typing: the space, then both letters in the order struck.",
+			"bindings": {
+				"space": {
+					"hold": "shift",
+					"threshold_ms": 200
+				}
+			},
+			"events": [
+				["down", "space", 0],
+				["down", "a", 40],
+				["down", "j", 70],
+				["up", "a", 90],
+				["up", "space", 100],
+				["up", "j", 130]
+			],
+			"expected": {
+				"strokes": ["space", "a", "j"]
+			}
+		},
+		{
+			"id": "roll_key_letter_past_threshold_is_a_chord",
+			"description": "Past its threshold, the typing key is its hold for the letters struck after.",
+			"bindings": {
+				"space": {
+					"hold": "shift",
+					"threshold_ms": 200
+				}
+			},
+			"events": [
+				["down", "space", 0],
+				["down", "a", 300],
+				["up", "a", 330],
+				["up", "space", 360]
+			],
+			"expected": {
+				"strokes": ["shift+a"]
+			}
+		},
+		{
+			"id": "roll_key_long_lone_press_types_nothing",
+			"description": "A typing key held alone past its threshold and released types nothing.",
+			"bindings": {
+				"space": {
+					"hold": "shift",
+					"threshold_ms": 200
+				}
+			},
+			"events": [
+				["down", "space", 0],
+				["up", "space", 500]
+			],
+			"expected": {
+				"strokes": []
+			}
+		},
+		{
+			"id": "one_shot_tap_shifts_the_next_letter",
+			"description": "A tap of the one-shot Shift arms it: the next letter is typed in capitals.",
+			"bindings": {
+				"caps_lock": {
+					"tap": "one_shot_shift",
+					"hold": "shift",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["up", "caps_lock", 100],
+				["down", "a", 300],
+				["up", "a", 350]
+			],
+			"expected": {
+				"strokes": ["shift+a"]
+			}
+		},
+		{
+			"id": "one_shot_is_spent_by_one_letter",
+			"description": "The one-shot Shift shifts one letter only.",
+			"bindings": {
+				"caps_lock": {
+					"tap": "one_shot_shift",
+					"hold": "shift",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["up", "caps_lock", 100],
+				["down", "a", 300],
+				["up", "a", 350],
+				["down", "j", 400],
+				["up", "j", 450]
+			],
+			"expected": {
+				"strokes": ["shift+a", "j"]
+			}
+		},
+		{
+			"id": "one_shot_hold_is_shift_and_arms_nothing",
+			"description": "Held over a letter, the key is its Shift hold and arms no one-shot for the letter after.",
+			"bindings": {
+				"caps_lock": {
+					"tap": "one_shot_shift",
+					"hold": "shift",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["down", "a", 30],
+				["up", "a", 60],
+				["up", "caps_lock", 100],
+				["down", "j", 200],
+				["up", "j", 250]
+			],
+			"expected": {
+				"strokes": ["shift+a", "j"]
+			}
+		},
+		{
+			"id": "one_shot_expires_after_its_timeout",
+			"description": "Past the shared one-shot timeout (one_shot_shift_timeout_ms), the next letter is typed as it is.",
+			"bindings": {
+				"caps_lock": {
+					"tap": "one_shot_shift",
+					"hold": "shift",
+					"threshold_ms": 300
+				}
+			},
+			"events": [
+				["down", "caps_lock", 0],
+				["up", "caps_lock", 100],
+				["down", "j", 2500],
+				["up", "j", 2550]
+			],
+			"expected": {
+				"strokes": ["j"]
+			}
+		}
+	]
+}
