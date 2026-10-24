@@ -294,10 +294,21 @@ class DiagnosticCollectionWindows {
 	}
 
 	Publish() {
-		global _HC_WindowEpoch, _HC_Gui
-		_HC_Send(_HC_WindowEpoch, _HC_ValueToJson(Map("type", "collection", "collection", this.Result)))
-		if IsSet(_HC_Gui) && _HC_Gui.HasProp("NativeCollection") && WMHandleExists(_HC_Gui.Hwnd)
-			_HC_NativeCollectionUpdate(_HC_Gui)
+		global _HC_Collection, _HC_WindowEpoch, _HC_Gui
+		if _HC_Collection != this
+			return
+		WindowEpoch := _HC_WindowEpoch, Window := IsSet(_HC_Gui) ? _HC_Gui : 0
+		Json := _HC_ValueToJson(Map("type", "collection", "collection", this.Result))
+		if _HC_Collection != this || _HC_WindowEpoch != WindowEpoch
+			return
+		_HC_Send(WindowEpoch, Json)
+		if _HC_Collection != this || _HC_WindowEpoch != WindowEpoch || !IsObject(Window)
+			|| !IsSet(_HC_Gui) || _HC_Gui != Window
+			return
+		if !Window.HasProp("NativeCollection") || !WMHandleExists(Window.Hwnd)
+			return
+		if _HC_Collection == this && _HC_WindowEpoch == WindowEpoch && IsSet(_HC_Gui) && _HC_Gui == Window
+			_HC_NativeCollectionUpdate(Window)
 	}
 
 	OpenFolder() {
