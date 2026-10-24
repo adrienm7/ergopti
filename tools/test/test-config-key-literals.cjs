@@ -17,7 +17,8 @@
  * `"enabled"` or `"reload"` are everyday strings in unrelated code and are not
  * counted; the `_meta` leaves (`schema_version`) name every versioned format in
  * the tree, not this configuration. Comment lines are skipped: explaining a key
- * is not reading it.
+ * is not reading it. A `require` argument is a module path, not a key, even
+ * when it is spelt like one.
  *
  * WHY A RATCHET AND NOT A BAN:
  * About 2300 literals predate the constants, in code other agents
@@ -47,6 +48,9 @@ const SCANNED_EXTENSIONS = /\.(lua|ahk|js)$/;
 const EXCLUDED = /(^|\/)(tests|test|vendor|node_modules)\//;
 const COMMENT_LINE = /^\s*(--|;|\/\/|\*|\/\*)/;
 const STRING_LITERAL = /"([^"\\\n]*)"|'([^'\\\n]*)'/g;
+// A module path is not a config key even when it is spelt like one
+// (`require("llm.app_profile_overrides")`).
+const REQUIRE_BEFORE = /\brequire\s*(?:\(\s*|,\s*)?$/;
 
 // ==========================================
 // ==========================================
@@ -81,7 +85,11 @@ function countLiterals(text, words) {
 	let count = 0;
 	for (const line of text.split('\n')) {
 		if (COMMENT_LINE.test(line)) continue;
-		for (const m of line.matchAll(STRING_LITERAL)) if (words.has(m[1] ?? m[2])) count++;
+		for (const m of line.matchAll(STRING_LITERAL)) {
+			if (!words.has(m[1] ?? m[2])) continue;
+			if (REQUIRE_BEFORE.test(line.slice(0, m.index))) continue;
+			count++;
+		}
 	}
 	return count;
 }
@@ -172,7 +180,9 @@ function selfTest(words) {
 		'Menu.on("scope_restore", restore)',
 		'-- "metrics.private_filter_enabled" is only explained here',
 		'local s = "enabled" .. "schema_version"',
-		'local m = "metrics.private_filter_enabled is the key"'
+		'local m = "metrics.private_filter_enabled is the key"',
+		'local Overrides = require("llm.app_profile_overrides")',
+		'local ok, mod = pcall(require, "llm.app_profile_overrides")'
 	].join('\n');
 	const n = countLiterals(probe, words);
 	if (n !== 3) throw new Error(`self-test: expected 3 counted literals in the probe, got ${n}`);
