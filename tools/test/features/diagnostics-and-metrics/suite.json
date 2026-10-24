@@ -213,7 +213,7 @@
 		{
 			"id": "js-0233",
 			"ordinal": 246,
-			"name": "logger scalars single-source (retention/ring/dedup/flush vs the timing registry)",
+			"name": "logger scalars single-source (retention/ring/dedup/flush vs the timing registry) and closed reason/phase/tag/evidence-field enums",
 			"cmd": "node",
 			"args": ["tools/test/test-logger-scalars-single-source.cjs"],
 			"repro": "node tools/test/test-logger-scalars-single-source.cjs"

@@ -32,7 +32,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { buildContracts, serialise } = require('../codegen/codegen-contracts-json.cjs');
+const { buildContracts, buildEnums, serialise } = require('../codegen/codegen-contracts-json.cjs');
 const { shared } = require('../lib/paths.cjs');
 
 const ROOT = path.join(__dirname, '../..');
@@ -70,7 +70,7 @@ console.log('='.repeat(50));
 // report a false "stale" on Windows checkouts.
 const normalizeEol = (s) => s.replace(/\r\n/g, '\n');
 const committed = fs.existsSync(CONTRACTS_PATH) ? fs.readFileSync(CONTRACTS_PATH, 'utf8') : null;
-const regenerated = serialise(buildContracts());
+const regenerated = serialise(buildContracts(), buildEnums());
 
 if (committed === null) {
 	fail('contracts.json exists', ['file not found — run `npm run codegen:contracts`']);
