@@ -10,7 +10,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Config = require("platform.remap.tap_hold_loader")
+-- Loaded fresh: the cases below capture the current logger shim, and a module
+-- an earlier suite loaded under a substitute logger would report elsewhere.
+local Config = helpers.load_module("platform.remap.tap_hold_loader")
 
 local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
 
