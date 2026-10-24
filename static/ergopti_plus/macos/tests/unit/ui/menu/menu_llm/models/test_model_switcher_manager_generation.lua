@@ -1026,6 +1026,8 @@ helpers.describe("model manager generation fences", function()
 		local hs_fixture = {
 			-- The pull's network prelude locates the bundled policy through test(1).
 			execute = helpers.existence_probe_execute(function() return "", true end),
+			-- The pull reads the shared route inventory through the real file adapter.
+			fs = require("tests.stubs.hs").fs,
 			http = {asyncPost = function() http_posts = http_posts + 1 end},
 			json = {encode = function() return "{}" end},
 			timer = {
