@@ -296,7 +296,9 @@ _IP_OpenTarget() {
 	Window := Gui("+AlwaysOnTop", WindowTitle(t("input_probe.title")))
 	Field := Window.AddEdit("w560 r6")
 	Window.Show("w600")
-	WinActivate("ahk_id " . Window.Hwnd)
+	; The shared present step forces the foreground past the focus lock a tray
+	; click leaves behind, and logs a refusal; a bare WinActivate does neither.
+	WMPresentWindow(Window)
 	if !WinWaitActive("ahk_id " . Window.Hwnd, , 3) {
 		Window.Destroy()
 		return 0
