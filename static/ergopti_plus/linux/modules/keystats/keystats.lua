@@ -169,6 +169,8 @@ local _pending_session_events = {}
 local _pending_system_events = {}
 -- events_mouse rows produced by _pointer_events.
 local _pending_mouse_events = {}
+-- events_av rows: the audio transitions system_metrics observed.
+local _pending_av_events = {}
 
 --- Buffers the session events the tracker produced, stamped now.
 --- @param events table { kind, duration_ms? } in order.
@@ -1915,7 +1917,7 @@ end
 local function capture_flush()
 	local date, now_iso = os.date("%Y-%m-%d"), os.date("!%Y-%m-%d %H:%M:%S")
 	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, llm = {}, windows = {},
-		sessions = {}, system = {}, mouse = {} }, upserts = {} }
+		sessions = {}, system = {}, mouse = {}, av = {} }, upserts = {} }
 	local add = setmetatable({}, { __index = function(_, kind)
 		return function(_, ...)
 			payload.upserts[#payload.upserts + 1] = { kind = kind, args = copy_flush_value({ ... }) }
@@ -1925,7 +1927,7 @@ local function capture_flush()
 		typing = _pending_typing_events, hotstrings = _pending_hotstring_events,
 		shortcuts = _pending_shortcut_events, switches = _pending_app_switch_events,
 		llm = _pending_llm_events, windows = _pending_window_switch_events, sessions = _pending_session_events,
-		system = _pending_system_events, mouse = _pending_mouse_events,
+		system = _pending_system_events, mouse = _pending_mouse_events, av = _pending_av_events,
 	}
 	local _pending_typing_events, _pending_hotstring_events = buffers.typing, buffers.hotstrings
 	local _pending_shortcut_events, _pending_app_switch_events = buffers.shortcuts, buffers.switches
@@ -1934,6 +1936,7 @@ local function capture_flush()
 	local _pending_session_events = buffers.sessions
 	local _pending_system_events = buffers.system
 	local _pending_mouse_events = buffers.mouse
+	local _pending_av_events = buffers.av
 	local _flushed_app_totals = copy_flush_value(_flushed_app_totals)
 	local _flushed_app_titles = copy_flush_value(_flushed_app_titles)
 	local _flushed_app_holds = copy_flush_value(_flushed_app_holds)
@@ -2051,6 +2054,10 @@ local function capture_flush()
 	if #_pending_mouse_events > 0 then
 		payload.raw.mouse = _pending_mouse_events
 		_pending_mouse_events = {}
+	end
+	if #_pending_av_events > 0 then
+		payload.raw.av = _pending_av_events
+		_pending_av_events = {}
 	end
 	-- The machine's own state, which the dashboard puts beside the typing to
 	-- explain a quiet afternoon. Sampled on the daemon's tick, written here.
@@ -2307,6 +2314,7 @@ local function restore_flush_buffers(buffers)
 	_pending_session_events = prepend(buffers.sessions, _pending_session_events)
 	_pending_system_events = prepend(buffers.system, _pending_system_events)
 	_pending_mouse_events = prepend(buffers.mouse, _pending_mouse_events)
+	_pending_av_events = prepend(buffers.av, _pending_av_events)
 	_pending_app_switch_events = prepend(buffers.switches, _pending_app_switch_events)
 end
 
@@ -2332,7 +2340,7 @@ local function dispatch_flush()
 	if #payload.raw.typing == 0 and #payload.raw.hotstrings == 0 and #payload.raw.shortcuts == 0
 		and #payload.raw.llm == 0 and #payload.raw.switches == 0 and #payload.raw.windows == 0
 		and #payload.raw.sessions == 0 and #payload.raw.system == 0 and #payload.raw.mouse == 0
-		and #payload.upserts == 0 then
+		and #payload.raw.av == 0 and #payload.upserts == 0 then
 		_last_flush_committed = true
 		return true
 	end
@@ -2347,6 +2355,7 @@ local function dispatch_flush()
 	_pending_session_events = {}
 	_pending_system_events = {}
 	_pending_mouse_events = {}
+	_pending_av_events = {}
 	local called, operation = pcall(SqliteWriter.start_flush, _device_id, payload)
 	if not called then
 		Logger.error(LOG, "SQLite dispatch raised; uncertain ownership and source remain retained.")
@@ -2392,6 +2401,7 @@ local function flush_json()
 	_pending_session_events = {}
 	_pending_system_events = {}
 	_pending_mouse_events = {}
+	_pending_av_events = {}
 
 	Logger.info(LOG, "Session flushed to JSON: %s.", path)
 	return true
@@ -2431,10 +2441,16 @@ function M.flush()
 		local transitions = SystemMetrics.take_events()
 		if may_record() then
 			for _, transition in ipairs(transitions) do
-				_pending_system_events[#_pending_system_events + 1] = {
-					ts = os.date("!%Y-%m-%d %H:%M:%S"), date = os.date("%Y-%m-%d"),
-					action = transition.action, metadata = transition.metadata,
-				}
+				local ts, date = os.date("!%Y-%m-%d %H:%M:%S"), os.date("%Y-%m-%d")
+				if transition.family == "av" then
+					_pending_av_events[#_pending_av_events + 1] = { ts = ts, date = date, kind = transition.action,
+						app = dashboard_app_name(_focused_app_id or "Unknown"), meta = transition.metadata }
+				else
+					assert(transition.family == "system", "unknown system transition family")
+					_pending_system_events[#_pending_system_events + 1] = {
+						ts = ts, date = date, action = transition.action, metadata = transition.metadata,
+					}
+				end
 			end
 		end
 	end
@@ -2555,6 +2571,7 @@ function M.reset_session()
 	_pending_session_events = {}
 	_pending_system_events = {}
 	_pending_mouse_events = {}
+	_pending_av_events = {}
 	_pending_app_switch_events = {}
 	_live = new_live_tracker()
 	_session = new_session_tracker()

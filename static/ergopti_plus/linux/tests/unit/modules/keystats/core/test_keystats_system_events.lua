@@ -53,7 +53,8 @@ end
 
 helpers.describe("keystats system events: the recorder", function()
 	helpers.it("writes the sampler's transitions once, with their metadata", function()
-		with_recorder({ { { action = "lock" }, { action = "wake", metadata = { asleep_ms = 90000 } } } },
+		with_recorder({ { { family = "system", action = "lock" },
+			{ family = "system", action = "wake", metadata = { asleep_ms = 90000 } } } },
 			function(keystats, writer)
 				keystats.flush()
 				keystats.flush()
@@ -64,13 +65,49 @@ helpers.describe("keystats system events: the recorder", function()
 	end)
 
 	helpers.it("drops the transitions seen while recording is forbidden", function()
-		with_recorder({ { { action = "unlock" } } }, function(keystats, writer)
+		with_recorder({ { { family = "system", action = "unlock" } } }, function(keystats, writer)
 			keystats.set_enabled(false)
 			keystats.flush()
 			keystats.set_enabled(true)
 			keystats.flush()
 			helpers.assert_eq(#writer.system_events, 0)
 		end)
+	end)
+end)
+
+helpers.describe("keystats audio events: the recorder and the writer", function()
+	helpers.it("writes the sampler's audio transitions to events_av under the focused application", function()
+		with_recorder({ { { family = "av", action = "volume_change", metadata = { muted = true, change = "muted" } } } },
+			function(keystats, writer)
+				keystats.on_app_focus("org.mozilla.firefox", 1000)
+				keystats.flush()
+				helpers.assert_eq(#writer.av_events, 1)
+				helpers.assert_eq(#writer.system_events, 0, "an audio change is no system event")
+				helpers.assert_eq(writer.av_events[1].row.kind, "volume_change")
+				helpers.assert_eq(writer.av_events[1].row.meta, { muted = true, change = "muted" })
+			end)
+	end)
+
+	helpers.it("stores the canonical events_av columns", function()
+		local has_sqlite = os.execute("command -v sqlite3 >/dev/null 2>&1")
+		local writer = helpers.load_module("modules.keystats.sqlite_writer")
+		local dir = os.tmpname()
+		os.remove(dir)
+		local ok, failure = xpcall(function()
+			local opened = writer.open_db(dir .. "/metrics.sqlite")
+			if not (has_sqlite == true or has_sqlite == 0) then
+				helpers.assert_eq(opened, false, "without sqlite3 the writer refuses, it does not pretend")
+				return
+			end
+			helpers.assert_true(opened)
+			helpers.assert_true(writer.insert_av_events("owned-device", { { ts = "2026-10-24 10:00:00",
+				date = "2026-10-24", kind = "volume_change", app = "Firefox", meta = { muted = false } } }))
+			local rows = assert(writer.query_rows("SELECT kind,app,meta_json FROM events_av;"))
+			helpers.assert_eq(rows, { 'volume_change|Firefox|{"muted":false}' })
+		end, debug.traceback)
+		writer.close_db()
+		os.execute("rm -rf '" .. dir .. "'")
+		if not ok then error(failure, 0) end
 	end)
 end)
 

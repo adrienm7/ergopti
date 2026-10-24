@@ -73,8 +73,8 @@ local _owner_database, _owner_device, _load_day = nil, nil, nil
 -- What the previous sample saw, for the transitions.
 local _last = { at_ms = nil, ssid = nil, locked = nil, muted = nil }
 
--- The transitions seen since the collector last took them, for events_system:
--- { action, metadata? } in order.
+-- The transitions seen since the collector last took them, in order:
+-- { family, action, metadata? }, family "system" (events_system) or "av" (events_av).
 local _events = {}
 
 
@@ -239,7 +239,7 @@ function M.sample(now_ms, date)
 		-- wrong: a laptop shut overnight would report eight hours of use. Only
 		-- the wake is seen, so it carries the time asleep.
 		_day.sleep_ms = _day.sleep_ms + elapsed
-		_events[#_events + 1] = { action = "wake", metadata = { asleep_ms = elapsed } }
+		_events[#_events + 1] = { family = "system", action = "wake", metadata = { asleep_ms = elapsed } }
 	elseif elapsed > 0 then
 		if _last.locked == true then
 			_day.locked_ms = _day.locked_ms + elapsed
@@ -265,19 +265,26 @@ function M.sample(now_ms, date)
 	if _last.ssid ~= nil and ssid ~= nil and ssid ~= _last.ssid then
 		_day.wifi_changes = _day.wifi_changes + 1
 		-- Without the network's name: it is a fingerprint, never stored.
-		_events[#_events + 1] = { action = "wifi_change" }
+		_events[#_events + 1] = { family = "system", action = "wifi_change" }
 	end
 
 	local locked = read_locked()
 	-- Counted only between two answers, like the network.
 	if _last.locked ~= nil and locked ~= nil and locked ~= _last.locked then
-		_events[#_events + 1] = { action = locked and "lock" or "unlock" }
+		_events[#_events + 1] = { family = "system", action = locked and "lock" or "unlock" }
+	end
+
+	-- A mute toggle is Windows' volume_change; the level is not read here.
+	local muted = read_muted()
+	if _last.muted ~= nil and muted ~= nil and muted ~= _last.muted then
+		_events[#_events + 1] = { family = "av", action = "volume_change",
+			metadata = { muted = muted, change = muted and "muted" or "unmuted" } }
 	end
 
 	_last.at_ms = now_ms
 	_last.ssid = ssid
 	_last.locked = locked
-	_last.muted = read_muted()
+	_last.muted = muted
 	return _day
 end
 
@@ -288,7 +295,7 @@ function M.current()
 end
 
 --- Hands over the transitions seen since the last call and forgets them.
---- @return table events { action, metadata? } in order.
+--- @return table events { family, action, metadata? } in order.
 function M.take_events()
 	local events = _events
 	_events = {}

@@ -204,7 +204,26 @@ helpers.describe("system metrics: awake, locked, asleep", function()
 				"counting the gap as awake would report a laptop shut overnight as "
 					.. "eight hours of use — the single most misleading number this "
 					.. "table could produce")
-			helpers.assert_eq(metrics.take_events(), { { action = "wake", metadata = { asleep_ms = step * 100 } } })
+			helpers.assert_eq(metrics.take_events(), { { family = "system", action = "wake", metadata = { asleep_ms = step * 100 } } })
+		end)
+	end)
+
+	helpers.it("reports a mute toggle as an audio change between two answers", function()
+		local muted = "Mute: no"
+		with_shell({
+			{ match = "power_supply", out = "50" },
+			{ match = "pactl get-sink-mute", out = function() return muted end },
+		}, function(metrics)
+			local step = metrics._sample_interval_ms()
+			metrics.sample(0, "2026-08-06")
+			muted = "Mute: yes"
+			metrics.sample(step, "2026-08-06")
+			muted = ""
+			metrics.sample(step * 2, "2026-08-06")
+			muted = "Mute: no"
+			metrics.sample(step * 3, "2026-08-06")
+			helpers.assert_eq(metrics.take_events(), { { family = "av", action = "volume_change",
+				metadata = { muted = true, change = "muted" } } })
 		end)
 	end)
 
@@ -224,7 +243,7 @@ helpers.describe("system metrics: awake, locked, asleep", function()
 			metrics.sample(step * 3, "2026-08-06")
 			locked = "yes"
 			metrics.sample(step * 4, "2026-08-06")
-			helpers.assert_eq(metrics.take_events(), { { action = "lock" }, { action = "unlock" } })
+			helpers.assert_eq(metrics.take_events(), { { family = "system", action = "lock" }, { family = "system", action = "unlock" } })
 		end)
 	end)
 
@@ -255,7 +274,7 @@ helpers.describe("system metrics: network changes", function()
 			end
 			metrics.sample(step, "2026-08-06")
 			helpers.assert_eq(metrics.current().wifi_changes, 1)
-			helpers.assert_eq(metrics.take_events(), { { action = "wifi_change" } },
+			helpers.assert_eq(metrics.take_events(), { { family = "system", action = "wifi_change" } },
 				"the event names no network: the name is a fingerprint, never stored")
 			helpers.assert_eq(metrics.take_events(), {}, "taken once")
 		end)
