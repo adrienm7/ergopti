@@ -41,6 +41,8 @@ local function updater(version, stored)
 	package.loaded["adapters.storage"] = Fakes.storage({ initial = stored or {} })
 	package.loaded["modules.updater.manager"] = nil
 	local M = require("modules.updater.manager")
+	-- The check's second source when the API gave no list: none here, never the network.
+	M._fetch_feed = function(callback) callback(nil, "offline"); return true end
 	local init = M.init
 	M.init = function(opts)
 		opts = opts or {}
@@ -150,7 +152,7 @@ helpers.describe("updater: a found release stays found", function()
 			check(M, function(cb) cb("[" .. release_body(M, "v0.0.0-dev.134") .. "]", 200, nil) end)
 			local offline = check(M, function(cb) cb(nil, 0, "offline") end)
 			helpers.assert_true(offline.available)
-			helpers.assert_eq(offline.err, "offline", "the failure is still reported")
+			helpers.assert_eq(offline.err, "offline; Atom feed: offline", "the failure is still reported, naming both sources")
 			helpers.assert_eq(M.get_cached_release().tag, "v0.0.0-dev.134")
 		end)
 	end)

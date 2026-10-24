@@ -60,6 +60,7 @@ local function messages_for(profile, context)
 	}
 	package.loaded["modules.llm.profile_settings"] = {
 		get = function(key) if key == "num_predictions" then return 1 end end,
+		resolve_for_app = function() return nil end,
 		resolve = function() return profile end,
 	}
 	local engine = helpers.load_module("modules.llm.prediction_engine")
