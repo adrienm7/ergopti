@@ -249,6 +249,14 @@ function check(name, fn) {
 	}
 }
 
+// The shortcut menu file each host names in its state, as
+// the host test below checks in the host sources.
+const SHORTCUT_MENU = {
+	windows: 'shortcuts/menu.ahk',
+	macos: 'shortcuts/menu.lua',
+	linux: 'shortcuts/menu.lua'
+};
+
 console.log('Layout manager page');
 
 // =======================
@@ -261,6 +269,7 @@ check('every status is decided from the host state, per platform', () => {
 	const { context } = loadPage();
 	const rows = context.layoutRows({
 		platform: 'windows',
+		shortcut_menu_path: SHORTCUT_MENU.windows,
 		index,
 		installed: {
 			ergol: { id: 'ergol', name: 'Ergo-L', version: '1.0.1', sha256: 'old' },
@@ -293,6 +302,7 @@ check('every status is decided from the host state, per platform', () => {
 
 	const mac = context.layoutRows({
 		platform: 'macos',
+		shortcut_menu_path: SHORTCUT_MENU.macos,
 		index,
 		installed: {},
 		provided: { ergopti: 'bundle' }
@@ -316,6 +326,7 @@ check('a built-in layout is recognised when the Windows host sends its flag as 1
 	const { context } = loadPage();
 	const rows = context.layoutRows({
 		platform: 'windows',
+		shortcut_menu_path: SHORTCUT_MENU.windows,
 		index,
 		installed: {},
 		builtin: { ergopti: 1 }
@@ -328,11 +339,34 @@ check('extension updates remain visible when the layout bytes did not change', (
 	const entry = { ...index.layouts[1], extension: { sha256: 'new-content', files: [] } };
 	const rows = context.layoutRows({
 		platform: 'windows',
+		shortcut_menu_path: SHORTCUT_MENU.windows,
 		index: { layouts: [entry] },
 		installed: { ergol: { ...entry, extension: { sha256: 'old-content', files: [] } } }
 	});
 	assert.equal(rows[0].status, 'update');
 	assert.ok(rows[0].actions.includes('update'));
+});
+
+check('the shortcut menu counted is the file the host names, never a platform guess', () => {
+	const { context } = loadPage();
+	const entry = {
+		...index.layouts[1],
+		extension: { sha256: 'payload', files: [{ path: 'shortcuts/menu.lua' }] }
+	};
+	const count = (shortcutMenuPath) =>
+		context.layoutRows({
+			platform: 'windows',
+			shortcut_menu_path: shortcutMenuPath,
+			index: { layouts: [entry] },
+			installed: {}
+		})[0].shortcuts;
+	assert.equal(count('shortcuts/menu.lua'), 1, 'the named file is counted');
+	assert.equal(count('shortcuts/menu.ahk'), 0, 'another host file is not');
+	assert.throws(
+		() => context.layoutRows({ platform: 'windows', index: { layouts: [entry] }, installed: {} }),
+		/shortcut_menu_path/,
+		'a host that names no shortcut menu file is refused'
+	);
 });
 
 check(
@@ -354,7 +388,15 @@ check(
 					]
 				}
 			};
-			window.initData({ strings, state: { platform, index: { layouts: [entry] }, installed: {} } });
+			window.initData({
+				strings,
+				state: {
+					platform,
+					shortcut_menu_path: SHORTCUT_MENU[platform],
+					index: { layouts: [entry] },
+					installed: {}
+				}
+			});
 			const text = textOf(byId.get('layout-list'));
 			assert.ok(
 				text.includes(
@@ -372,7 +414,15 @@ check('the page renders the rows and posts the action of each button', () => {
 	assert.deepEqual(plain(messages), [{ action: 'ready' }], 'the page announces itself');
 	window.initData({
 		strings,
-		state: { platform: 'linux', index, source: 'network', error: null, installed: {}, active: '' }
+		state: {
+			platform: 'linux',
+			shortcut_menu_path: SHORTCUT_MENU.linux,
+			index,
+			source: 'network',
+			error: null,
+			installed: {},
+			active: ''
+		}
 	});
 	const list = byId.get('layout-list');
 	assert.equal(list.children.length, 3);
@@ -405,6 +455,7 @@ check('an operation in flight disables every button and says what runs', () => {
 		strings,
 		state: {
 			platform: 'linux',
+			shortcut_menu_path: SHORTCUT_MENU.linux,
 			index,
 			source: 'cache',
 			installed: {},
@@ -432,6 +483,7 @@ for (const action of ['select', 'uninstall']) {
 			strings,
 			state: {
 				platform: 'linux',
+				shortcut_menu_path: SHORTCUT_MENU.linux,
 				index,
 				source: 'cache',
 				installed: { ergol: index.layouts.find((entry) => entry.id === 'ergol') },
@@ -466,6 +518,7 @@ check(
 			strings,
 			state: {
 				platform: 'linux',
+				shortcut_menu_path: SHORTCUT_MENU.linux,
 				index,
 				source: 'bundled',
 				error: { code: 'offline', detail: 'could not resolve host' }
@@ -477,6 +530,7 @@ check(
 		assert.ok(status.classList.contains('is-error'));
 		window.updateState({
 			platform: 'linux',
+			shortcut_menu_path: SHORTCUT_MENU.linux,
 			index: null,
 			source: 'none',
 			error: { code: 'too_large', detail: 'x' }
@@ -487,7 +541,13 @@ check(
 				.textContent.includes(strings['layout_manager.error_generic'].replace('%s', 'too_large'))
 		);
 		assert.equal(byId.get('empty').hidden, false, 'an empty list says so');
-		window.updateState({ platform: 'linux', index, source: 'network', record_error: 'damaged' });
+		window.updateState({
+			platform: 'linux',
+			shortcut_menu_path: SHORTCUT_MENU.linux,
+			index,
+			source: 'network',
+			record_error: 'damaged'
+		});
 		assert.ok(
 			byId.get('catalogue-status').textContent.includes(strings['layout_manager.error_record'])
 		);
@@ -500,6 +560,7 @@ check('the result line reports success, a translated failure and its detail', ()
 		strings,
 		state: {
 			platform: 'macos',
+			shortcut_menu_path: SHORTCUT_MENU.macos,
 			index,
 			installed: {},
 			result: { id: 'ergol', action: 'install', ok: true }
@@ -513,6 +574,7 @@ check('the result line reports success, a translated failure and its detail', ()
 	);
 	window.updateState({
 		platform: 'macos',
+		shortcut_menu_path: SHORTCUT_MENU.macos,
 		index,
 		installed: {},
 		result: { id: 'ergol', action: 'install', ok: true, warning: 'not_enabled' }
@@ -523,6 +585,7 @@ check('the result line reports success, a translated failure and its detail', ()
 	);
 	window.updateState({
 		platform: 'macos',
+		shortcut_menu_path: SHORTCUT_MENU.macos,
 		index,
 		installed: {},
 		result: {
@@ -539,6 +602,7 @@ check('the result line reports success, a translated failure and its detail', ()
 	assert.ok(failed.classList.contains('is-error'));
 	window.updateState({
 		platform: 'linux',
+		shortcut_menu_path: SHORTCUT_MENU.linux,
 		index,
 		installed: {},
 		result: { id: 'ergol', action: 'install', ok: false, code: 'python_missing' }
@@ -546,6 +610,7 @@ check('the result line reports success, a translated failure and its detail', ()
 	assert.ok(byId.get('result').textContent.includes(strings['layouts.linux_needs_python']));
 	window.updateState({
 		platform: 'linux',
+		shortcut_menu_path: SHORTCUT_MENU.linux,
 		index,
 		installed: {},
 		result: { id: 'ergol', action: 'install', ok: false, code: 'foreign_file' }
@@ -556,12 +621,18 @@ check('the result line reports success, a translated failure and its detail', ()
 	);
 	window.updateState({
 		platform: 'linux',
+		shortcut_menu_path: SHORTCUT_MENU.linux,
 		index,
 		installed: {},
 		result: { id: 'ergol', action: 'install', ok: false, code: 'record_failed' }
 	});
 	assert.ok(byId.get('result').textContent.includes(strings['layout_manager.failure_other']));
-	window.updateState({ platform: 'linux', index, installed: {} });
+	window.updateState({
+		platform: 'linux',
+		shortcut_menu_path: SHORTCUT_MENU.linux,
+		index,
+		installed: {}
+	});
 	assert.equal(byId.get('result').hidden, true);
 });
 
@@ -645,6 +716,24 @@ check('the three hosts accept exactly the actions the page sends', () => {
 	assert.ok(ahkBlock, 'the Windows host declares no LAYMGR_ACTIONS');
 	const ahkActions = [...ahkBlock[1].matchAll(/"([a-z_]+)", true/g)].map((m) => m[1]).sort();
 	assert.deepEqual(ahkActions, page, 'the Windows host accepts another list');
+});
+
+check('every host names the shortcut menu file the page counts', () => {
+	const ahk = fs.readFileSync(
+		path.resolve(SHARED, '../windows/ui/layout_manager/init.ahk'),
+		'utf8'
+	);
+	assert.ok(
+		ahk.includes(`"shortcut_menu_path", "${SHORTCUT_MENU.windows}"`),
+		'the Windows host names another shortcut menu file'
+	);
+	const lua = fs.readFileSync(path.join(SHARED, 'lua/layouts/manager_bridge.lua'), 'utf8');
+	assert.ok(
+		lua.includes(`M.SHORTCUT_MENU_PATH = "${SHORTCUT_MENU.linux}"`) &&
+			SHORTCUT_MENU.linux === SHORTCUT_MENU.macos &&
+			lua.includes('shortcut_menu_path = M.SHORTCUT_MENU_PATH'),
+		'the macOS and Linux hosts name another shortcut menu file'
+	);
 });
 
 console.log(`\n${passes} passed, ${failures} failed`);
