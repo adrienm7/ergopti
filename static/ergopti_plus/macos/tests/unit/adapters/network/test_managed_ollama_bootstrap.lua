@@ -302,7 +302,11 @@ printf bootstrap > "$FIXTURE_ROOT/bootstrap-called"
 		write(root .. "/source/native_python_bootstrap.sh", delegate)
 		local _, executable = command("chmod 755 " .. quote(root .. "/foreign-python") .. " " .. quote(root .. "/recording-python"))
 		helpers.assert_eq(executable, 0)
+		-- The copied network policy sits outside the checkout layout it locates
+		-- the shared route inventory from, so the fixture names the real file.
+		local origins = helpers.shared("modules/network/route_origins.json")
 		local bytes, status = command("env -u BASH_ENV -u ENV FIXTURE_ROOT=" .. quote(root)
+			.. " ROUTE_ORIGINS_FILE=" .. quote(origins)
 			.. " HOME=" .. quote(root .. "/home") .. " ERGOPTI_BOOTSTRAP_PYTHON=" .. quote(root .. "/foreign-python")
 			.. " ERGOPTI_BOOTSTRAP_TIMEOUT_MS=1000 OLLAMA_MODELS=relative-models /bin/bash "
 			.. quote(root .. "/source/ensure-ollama-native-deps.sh"))
