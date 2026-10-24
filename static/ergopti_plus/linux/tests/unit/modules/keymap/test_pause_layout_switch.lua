@@ -11,6 +11,15 @@
 
 local helpers = require("tests.helpers")
 
+--- Asserts fn(...) raises an error whose message names needle.
+--- @param needle string Text the refusal must contain.
+--- @param fn function
+local function assert_refused(needle, fn, ...)
+	local ok, err = pcall(fn, ...)
+	helpers.assert_eq(ok, false, "expected a refusal naming " .. needle)
+	helpers.assert_true(tostring(err):find(needle, 1, true) ~= nil, tostring(err))
+end
+
 --- A fresh orchestrator over a recording switcher and fixed settings.
 --- @param settings table { enabled, on_pause, on_resume }
 --- @return table Switch, table selected
@@ -82,7 +91,7 @@ helpers.describe("pause layout switch", function()
 			preferences = { settings = function() return { enabled = true, on_pause = "xkb:fr", on_resume = "" } end },
 		})
 		helpers.assert_eq(Switch.quit_safely(), "failed")
-		helpers.assert_eq(pcall(Switch.on_quit), false, "on_quit itself still fails fast")
+		assert_refused("native refusal", Switch.on_quit)
 		Switch._reset_for_test()
 		helpers.assert_eq(Switch.quit_safely(), "failed", "an uninitialised owner never blocks a quit")
 	end)
@@ -91,11 +100,11 @@ helpers.describe("pause layout switch", function()
 		package.loaded["modules.keymap.pause_layout_switch"] = nil
 		local Switch = require("modules.keymap.pause_layout_switch")
 		helpers.assert_eq(Switch.is_initialised(), false)
-		helpers.assert_eq(pcall(Switch.on_pause_change, true), false, "an uninitialised owner fails fast")
-		helpers.assert_eq(pcall(Switch.init, { switcher = {} }), false)
+		assert_refused("is not initialised", Switch.on_pause_change, true)
+		assert_refused("needs a switcher and a preferences reader", Switch.init, { switcher = {} })
 		local Owned = fresh({ enabled = false })
-		helpers.assert_eq(pcall(Owned.init, { switcher = {}, preferences = {} }), false, "duplicate init")
-		helpers.assert_eq(pcall(Owned.on_pause_change, "yes"), false, "the pause state is a boolean")
+		assert_refused("already initialised", Owned.init, { switcher = {}, preferences = {} })
+		assert_refused("must be a boolean", Owned.on_pause_change, "yes")
 		Owned._reset_for_test()
 	end)
 

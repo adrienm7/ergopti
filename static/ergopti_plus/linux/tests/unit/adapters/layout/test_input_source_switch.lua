@@ -11,6 +11,15 @@
 local helpers = require("tests.helpers")
 local Switch = require("adapters.input_source_switch")
 
+--- Asserts fn(...) raises an error whose message names needle.
+--- @param needle string Text the refusal must contain.
+--- @param fn function
+local function assert_refused(needle, fn, ...)
+	local ok, err = pcall(fn, ...)
+	helpers.assert_eq(ok, false, "expected a refusal naming " .. needle)
+	helpers.assert_true(tostring(err):find(needle, 1, true) ~= nil, tostring(err))
+end
+
 local GNOME_SOURCES = "[('xkb', 'fr'), ('xkb', 'fr+ergopti'), ('ibus', 'mozc-jp')]\n"
 local GNOME_MRU = "[('xkb', 'fr+ergopti'), ('xkb', 'fr')]\n"
 local X11_QUERY = "rules:      evdev\nmodel:      pc105\nlayout:     fr,us,de\nvariant:    ergopti,,neo\n"
@@ -195,10 +204,10 @@ helpers.describe("input source switch: switcher", function()
 	end)
 
 	helpers.it("rejects a port without its two functions and a switch without an id", function()
-		helpers.assert_eq(pcall(Switch.new, { backend = function() end }), false)
+		assert_refused("needs a port with backend and run", Switch.new, { backend = function() end })
 		local switcher = Switch.new(fake_port(Switch.GNOME, gnome_answers()))
-		helpers.assert_eq(pcall(switcher.select, "", function() end), false)
-		helpers.assert_eq(pcall(switcher.select, "xkb:fr"), false)
+		assert_refused("a layout id is required", switcher.select, "", function() end)
+		assert_refused("a completion callback is required", switcher.select, "xkb:fr")
 	end)
 end)
 
