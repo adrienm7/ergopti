@@ -1,0 +1,534 @@
+{
+	"_shared/lua/brightness_actions.lua": {
+		"deep_copy": 1
+	},
+	"_shared/lua/caps_word/auto_off.lua": {
+		"count": 1
+	},
+	"_shared/lua/chord/init.lua": {
+		"trim": 1
+	},
+	"_shared/lua/config_defaults.lua": {
+		"deep_copy": 1,
+		"sorted_keys": 2
+	},
+	"_shared/lua/config_migrate.lua": {
+		"count": 1,
+		"deep_copy": 1,
+		"sorted_keys": 1
+	},
+	"_shared/lua/diagnostics/issue_link.lua": {
+		"percent_encode": 1
+	},
+	"_shared/lua/diagnostics/issue_report.lua": {
+		"count": 1,
+		"sorted_keys": 1
+	},
+	"_shared/lua/diagnostics/snapshot.lua": {
+		"trim": 1
+	},
+	"_shared/lua/file_selection/init.lua": {
+		"trim": 1
+	},
+	"_shared/lua/healthcheck/actions.lua": {
+		"count": 1
+	},
+	"_shared/lua/healthcheck/share.lua": {
+		"sorted_keys": 2
+	},
+	"_shared/lua/hotstring_engine/init.lua": {
+		"count": 1
+	},
+	"_shared/lua/input/modifier_custody.lua": {
+		"sorted_keys": 1
+	},
+	"_shared/lua/keymap/layers.lua": {
+		"sorted_keys": 1
+	},
+	"_shared/lua/layouts/catalogue.lua": {
+		"sorted_keys": 1
+	},
+	"_shared/lua/layouts/composer.lua": {
+		"sorted_keys": 1
+	},
+	"_shared/lua/llm/agent.lua": {
+		"percent_encode": 1,
+		"trim": 1
+	},
+	"_shared/lua/llm/api_entry_names.lua": {
+		"trim": 1
+	},
+	"_shared/lua/llm/app_identity.lua": {
+		"trim": 1
+	},
+	"_shared/lua/llm/app_profile_overrides.lua": {
+		"count": 1
+	},
+	"_shared/lua/llm/parser.lua": {
+		"trim": 3
+	},
+	"_shared/lua/llm/tone.lua": {
+		"trim": 2
+	},
+	"_shared/lua/llm/translate.lua": {
+		"trim": 1
+	},
+	"_shared/lua/llm/vision.lua": {
+		"trim": 1
+	},
+	"_shared/lua/locale/core.lua": {
+		"count": 1
+	},
+	"_shared/lua/menu/renderer.lua": {
+		"trim": 1
+	},
+	"_shared/lua/network/http_headers.lua": {
+		"sorted_keys": 1
+	},
+	"_shared/lua/open_target/init.lua": {
+		"trim": 1
+	},
+	"_shared/lua/script_override_projection.lua": {
+		"sorted_keys": 1
+	},
+	"_shared/lua/tap_hold/hold_options.lua": {
+		"trim": 1
+	},
+	"_shared/lua/tap_hold/key_combinations.lua": {
+		"sorted_keys": 1
+	},
+	"_shared/lua/toml_codec/codec.lua": {
+		"sorted_keys": 1,
+		"trim": 1
+	},
+	"_shared/lua/toml_codec/reader.lua": {
+		"trim": 3
+	},
+	"_shared/lua/toml_codec/record_scanner.lua": {
+		"trim": 1
+	},
+	"_shared/lua/toml_codec/writer.lua": {
+		"sorted_keys": 1
+	},
+	"_shared/lua/updater/version.lua": {
+		"trim": 1
+	},
+	"_shared/lua/wrap_pair/init.lua": {
+		"trim": 1
+	},
+	"linux/adapters/curl_http_client.lua": {
+		"sorted_keys": 1
+	},
+	"linux/adapters/keyboard_hook.lua": {
+		"sorted_keys": 1
+	},
+	"linux/adapters/keyboard_layout.lua": {
+		"count": 4
+	},
+	"linux/adapters/shell_runner.lua": {
+		"count": 1,
+		"shell_quote": 1
+	},
+	"linux/adapters/storage.lua": {
+		"count": 1
+	},
+	"linux/adapters/uinput_writer.lua": {
+		"sorted_keys": 1
+	},
+	"linux/adapters/xkb_capture.lua": {
+		"deep_copy": 1
+	},
+	"linux/ergopti_hotstrings.lua": {
+		"shell_quote": 2
+	},
+	"linux/infra/boot_profiler.lua": {
+		"sorted_keys": 1
+	},
+	"linux/infra/bootstrap_log.lua": {
+		"shell_quote": 1
+	},
+	"linux/infra/diagnostic_snapshot.lua": {
+		"trim": 2
+	},
+	"linux/infra/file_watchers.lua": {
+		"count": 1,
+		"shell_quote": 3
+	},
+	"linux/infra/hotstring_preferences.lua": {
+		"deep_copy": 1
+	},
+	"linux/infra/hotstrings_scope.lua": {
+		"sorted_keys": 1
+	},
+	"linux/infra/i18n.lua": {
+		"shell_quote": 1
+	},
+	"linux/infra/logger_sink.lua": {
+		"shell_quote": 1
+	},
+	"linux/infra/personal_info_fields.lua": {
+		"count": 1
+	},
+	"linux/infra/program_binding_transaction.lua": {
+		"deep_copy": 1
+	},
+	"linux/infra/timings.lua": {
+		"count": 1
+	},
+	"linux/infra/xkb_keymap.lua": {
+		"count": 1
+	},
+	"linux/infra/xkb_rmlvo.lua": {
+		"trim": 1
+	},
+	"linux/modules/diagnostics/crash_reporter.lua": {
+		"shell_quote": 3
+	},
+	"linux/modules/dynamic_hotstrings/manager.lua": {
+		"count": 1
+	},
+	"linux/modules/gestures/manager.lua": {
+		"percent_encode": 1,
+		"shallow_copy": 1,
+		"shell_quote": 1
+	},
+	"linux/modules/hotstrings/hotstrings_config.lua": {
+		"count": 1,
+		"sorted_keys": 2
+	},
+	"linux/modules/hotstrings/loader.lua": {
+		"count": 1
+	},
+	"linux/modules/hotstrings/terminator_settings.lua": {
+		"count": 1,
+		"sorted_keys": 1
+	},
+	"linux/modules/hotstrings/word_reset.lua": {
+		"trim": 1
+	},
+	"linux/modules/keymap/layout_registry.lua": {
+		"trim": 1
+	},
+	"linux/modules/keystats/keystats.lua": {
+		"deep_copy": 1,
+		"shallow_copy": 1,
+		"shell_quote": 1
+	},
+	"linux/modules/keystats/sqlite_writer.lua": {
+		"shell_quote": 1
+	},
+	"linux/modules/llm/agent_learning.lua": {
+		"count": 1
+	},
+	"linux/modules/llm/api_entries.lua": {
+		"shell_quote": 1
+	},
+	"linux/modules/llm/api_remote.lua": {
+		"percent_encode": 1
+	},
+	"linux/modules/llm/ollama_install_resolver.lua": {
+		"shallow_copy": 1
+	},
+	"linux/modules/llm/prediction_engine.lua": {
+		"trim": 1
+	},
+	"linux/modules/llm/profile_settings.lua": {
+		"trim": 1
+	},
+	"linux/modules/llm/runtime_source.lua": {
+		"shallow_copy": 1
+	},
+	"linux/modules/shortcuts/caps_word_auto_off.lua": {
+		"count": 1
+	},
+	"linux/modules/shortcuts/key_combinations.lua": {
+		"shallow_copy": 1
+	},
+	"linux/modules/shortcuts/keyboard_shortcuts.lua": {
+		"count": 1
+	},
+	"linux/modules/shortcuts/manager.lua": {
+		"count": 1
+	},
+	"linux/modules/shortcuts/open_selection.lua": {
+		"percent_encode": 1
+	},
+	"linux/modules/updater/installer.lua": {
+		"shell_quote": 1
+	},
+	"linux/platform/remap/tap_hold_manager.lua": {
+		"deep_copy": 1,
+		"sorted_keys": 1
+	},
+	"linux/ui/config_dir_picker.lua": {
+		"trim": 1
+	},
+	"linux/ui/gesture_conflicts.lua": {
+		"sorted_keys": 1
+	},
+	"linux/ui/healthcheck/bridge.lua": {
+		"sorted_keys": 1,
+		"trim": 1
+	},
+	"linux/ui/hotstrings_config_window/bridge.lua": {
+		"sorted_keys": 1
+	},
+	"linux/ui/menu/agent_rows.lua": {
+		"trim": 2
+	},
+	"linux/ui/menu/app_exclusion_rows.lua": {
+		"trim": 1
+	},
+	"linux/ui/menu/llm_backend_rows.lua": {
+		"trim": 1
+	},
+	"linux/ui/menu/menu_builder.lua": {
+		"shell_quote": 1,
+		"sorted_keys": 2
+	},
+	"linux/ui/personal_info_editor/bridge.lua": {
+		"sorted_keys": 1
+	},
+	"linux/ui/prompt_editor/bridge.lua": {
+		"trim": 1
+	},
+	"linux/ui/text_prompt.lua": {
+		"shell_quote": 1
+	},
+	"linux/ui/webkit_host.lua": {
+		"trim": 1
+	},
+	"linux/ui/wpm/tray_readout.lua": {
+		"deep_copy": 1
+	},
+	"linux/ui/wpm/widget.lua": {
+		"deep_copy": 1
+	},
+	"macos/adapters/app_launcher.lua": {
+		"shell_quote": 1
+	},
+	"macos/adapters/clipboard.lua": {
+		"count": 1
+	},
+	"macos/adapters/hotkey_registrar.lua": {
+		"count": 1
+	},
+	"macos/adapters/http_client.lua": {
+		"percent_encode": 1
+	},
+	"macos/adapters/input_source_broker.lua": {
+		"count": 1
+	},
+	"macos/adapters/json_codec.lua": {
+		"deep_copy": 1
+	},
+	"macos/adapters/shell_runner.lua": {
+		"count": 1
+	},
+	"macos/adapters/storage.lua": {
+		"sorted_keys": 2
+	},
+	"macos/infra/capsword_auto_off.lua": {
+		"shallow_copy": 1
+	},
+	"macos/infra/config_overrides.lua": {
+		"trim": 1
+	},
+	"macos/infra/driver_control.lua": {
+		"shell_quote": 1
+	},
+	"macos/infra/field_check_checks.lua": {
+		"trim": 1
+	},
+	"macos/infra/key_event_health.lua": {
+		"sorted_keys": 1
+	},
+	"macos/infra/paced_json.lua": {
+		"count": 1
+	},
+	"macos/infra/personal_info_fields.lua": {
+		"count": 1
+	},
+	"macos/infra/timings.lua": {
+		"count": 1
+	},
+	"macos/infra/toml/record_editor.lua": {
+		"trim": 2
+	},
+	"macos/modules/dynamic_hotstrings/personal_info.lua": {
+		"shallow_copy": 1,
+		"sorted_keys": 1
+	},
+	"macos/modules/gestures/actions.lua": {
+		"percent_encode": 1
+	},
+	"macos/modules/gestures/conflicts.lua": {
+		"trim": 1
+	},
+	"macos/modules/gestures/init.lua": {
+		"count": 1,
+		"sorted_keys": 1
+	},
+	"macos/modules/gestures/sticky_modifiers.lua": {
+		"sorted_keys": 1
+	},
+	"macos/modules/hotstrings/hotstrings_config.lua": {
+		"deep_copy": 1,
+		"trim": 4
+	},
+	"macos/modules/keymap/registry_groups.lua": {
+		"deep_copy": 1,
+		"shallow_copy": 1
+	},
+	"macos/modules/keystats/init.lua": {
+		"deep_copy": 1
+	},
+	"macos/modules/keystats/kc_bridge.lua": {
+		"count": 2,
+		"trim": 1
+	},
+	"macos/modules/llm/agent_connectors.lua": {
+		"trim": 1
+	},
+	"macos/modules/llm/agent_learning.lua": {
+		"count": 1
+	},
+	"macos/modules/llm/agent_runner.lua": {
+		"trim": 1
+	},
+	"macos/modules/llm/api_mlx_discovery.lua": {
+		"trim": 1
+	},
+	"macos/modules/llm/api_remote.lua": {
+		"trim": 1
+	},
+	"macos/modules/llm/init.lua": {
+		"deep_copy": 2,
+		"sorted_keys": 1
+	},
+	"macos/modules/llm/mlx_bootstrap_diagnosis.lua": {
+		"trim": 1
+	},
+	"macos/modules/llm/mlx_deps_checker.lua": {
+		"shell_quote": 1
+	},
+	"macos/modules/llm/prediction_engine.lua": {
+		"trim": 2
+	},
+	"macos/modules/llm/streaming_handler.lua": {
+		"trim": 2
+	},
+	"macos/modules/shortcuts/actions/text.lua": {
+		"count": 1
+	},
+	"macos/modules/shortcuts/bindings.lua": {
+		"count": 1
+	},
+	"macos/modules/shortcuts/keyboard_shortcuts.lua": {
+		"count": 1
+	},
+	"macos/modules/shortcuts/script_control.lua": {
+		"count": 1
+	},
+	"macos/platform/remap/config.lua": {
+		"count": 1
+	},
+	"macos/platform/remap/generator.lua": {
+		"deep_copy": 1,
+		"shell_quote": 2
+	},
+	"macos/platform/remap/init.lua": {
+		"shell_quote": 1
+	},
+	"macos/platform/remap/legacy_release_fixtures.lua": {
+		"deep_copy": 1,
+		"shell_quote": 1
+	},
+	"macos/platform/remap/nav_layer.lua": {
+		"count": 1
+	},
+	"macos/ui/healthcheck/appleevents.lua": {
+		"count": 1
+	},
+	"macos/ui/healthcheck/core.lua": {
+		"sorted_keys": 1
+	},
+	"macos/ui/menu/global_actions_transaction.lua": {
+		"deep_copy": 1
+	},
+	"macos/ui/menu/hotstrings_scope.lua": {
+		"deep_copy": 1
+	},
+	"macos/ui/menu/menu_hotstrings_custom.lua": {
+		"sorted_keys": 1,
+		"trim": 1
+	},
+	"macos/ui/menu/menu_hotstrings_management.lua": {
+		"trim": 1
+	},
+	"macos/ui/menu/menu_llm/agent_panel.lua": {
+		"trim": 1
+	},
+	"macos/ui/menu/menu_llm/api_panel.lua": {
+		"trim": 2
+	},
+	"macos/ui/menu/menu_llm/backend_labels.lua": {
+		"trim": 1
+	},
+	"macos/ui/menu/menu_llm/local_server_panel.lua": {
+		"trim": 1
+	},
+	"macos/ui/menu/menu_llm/models_manager_mlx.lua": {
+		"count": 1
+	},
+	"macos/ui/menu/menu_llm/models_manager_mlx_hf.lua": {
+		"trim": 3
+	},
+	"macos/ui/menu/menu_llm/models_selector.lua": {
+		"count": 1,
+		"trim": 2
+	},
+	"macos/ui/menu/menu_llm/scope_runtime.lua": {
+		"deep_copy": 1
+	},
+	"macos/ui/menu/menu_llm/settings_manager.lua": {
+		"deep_copy": 1
+	},
+	"macos/ui/menu/menu_llm/startup_controller.lua": {
+		"count": 2
+	},
+	"macos/ui/menu/menu_llm/trigger_orchestrator.lua": {
+		"deep_copy": 1,
+		"sorted_keys": 1
+	},
+	"macos/ui/menu/menu_shortcuts.lua": {
+		"trim": 1
+	},
+	"macos/ui/menu/menu_state.lua": {
+		"deep_copy": 1
+	},
+	"macos/ui/menu/metrics_scope.lua": {
+		"deep_copy": 1
+	},
+	"macos/ui/menu/preferences_transaction.lua": {
+		"deep_copy": 1
+	},
+	"macos/ui/menu/program_parameter_transaction.lua": {
+		"shallow_copy": 1
+	},
+	"macos/ui/menu/session_demotions.lua": {
+		"deep_copy": 1
+	},
+	"macos/ui/menu/shortcut_utils.lua": {
+		"trim": 4
+	},
+	"macos/ui/menu/shortcuts_scope.lua": {
+		"deep_copy": 1
+	},
+	"macos/ui/metrics_typing/projection.lua": {
+		"sorted_keys": 1
+	},
+	"macos/ui/tooltip/tooltip_llm.lua": {
+		"trim": 1
+	}
+}
