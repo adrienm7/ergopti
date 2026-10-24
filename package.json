@@ -519,6 +519,7 @@
 		"test:gesture-defaults-single-source": "node ./tools/test/test-gesture-defaults-single-source.cjs",
 		"test:sqlite-event-id-single-source": "node ./tools/test/test-sqlite-event-id-single-source.cjs",
 		"test:keystats-timings-single-source": "node ./tools/test/test-keystats-timings-single-source.cjs",
+		"test:timings-registry-liveness": "node ./tools/test/test-timings-registry-liveness.cjs",
 		"test:no-plan-refs-in-source": "node ./tools/test/test-no-plan-refs-in-source.cjs",
 		"test:wpm-constants-single-source": "node ./tools/test/test-wpm-constants-single-source.cjs",
 		"test:wpm-color-normalisation-single-source": "node ./tools/test/test-wpm-color-normalisation-single-source.cjs",

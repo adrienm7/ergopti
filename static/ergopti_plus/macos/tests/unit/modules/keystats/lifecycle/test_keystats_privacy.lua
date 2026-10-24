@@ -55,7 +55,6 @@ local helpers = require("tests.helpers")
 local _TIMINGS_MS = {
 	keystats = {
 		max_keystroke_delay_ms = 5000,
-		synth_match_delay_ms   = 3,
 	},
 }
 

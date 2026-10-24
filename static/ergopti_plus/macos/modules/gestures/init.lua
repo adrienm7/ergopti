@@ -943,6 +943,7 @@ function M.is_suspended() return CoreState.suspended end
 local STARTUP_SAFETY_PROBE_SEC   = Timings.sec("gestures", "startup_safety_probe_ms")  -- One-shot retry if no frame yet
 local STARTUP_PHASE_TIMEOUT_SEC  = Timings.sec("gestures", "startup_phase_timeout_ms") -- Give up the aggressive phase after this
 local HEALTH_CHECK_INTERVAL_SEC  = Timings.sec("gestures", "health_check_interval_ms") -- Slow cadence once frames are flowing
+local STARTUP_PROBE_INTERVAL_SEC = Timings.sec("gestures", "probe_interval_ms")        -- First-frame watch during the startup phase
 -- Cooldown between primer-triggered emergency recycles, so a fast burst of
 -- gesture events at the moment of the first user contact does not retrigger
 -- the heavy recycle path several times in a row.
@@ -1045,7 +1046,7 @@ start_startup_probe_loop = function()
 
 	-- Fast poll just to detect the first-frame moment so we can hand off to
 	-- the health-check loop. The poll itself does no recycling.
-	local started = start_discovery_timer(0.5, "startup probe", function()
+	local started = start_discovery_timer(STARTUP_PROBE_INTERVAL_SEC, "startup probe", function()
 		local elapsed = hs.timer.secondsSinceEpoch() - started_at
 		if _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME then
 			Logger.success(LOG, "Startup phase EXIT — first frame received after %.2fs.", elapsed)
