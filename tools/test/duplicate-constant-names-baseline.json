@@ -30,14 +30,6 @@
 		"files": ["linux/adapters/owned_process.lua", "linux/adapters/process_runner.lua"],
 		"divergent": false
 	},
-	"DEFAULT_TIMEOUT_DECREMENT_SEC": {
-		"files": ["_shared/modules/tooltip/dequeue.js", "macos/ui/tooltip/dequeue.lua"],
-		"divergent": false
-	},
-	"DEFAULT_TIMEOUT_FLOOR_SEC": {
-		"files": ["_shared/modules/tooltip/dequeue.js", "macos/ui/tooltip/dequeue.lua"],
-		"divergent": false
-	},
 	"DEFAULT_TIMEOUT_MS": {
 		"files": [
 			"linux/adapters/curl_http_client.lua",
