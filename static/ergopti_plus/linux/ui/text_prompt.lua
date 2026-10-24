@@ -17,6 +17,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local Modal = require("ui.modal")
@@ -29,7 +30,7 @@ local LOG = "ui.text_prompt"
 --- @param value any
 --- @return string
 local function shell_quote(value)
-	return "'" .. tostring(value or ""):gsub("'", "'\\''") .. "'"
+	return TextUtils.shell_quote(value or "")
 end
 
 --- Asks the user for a line of text.

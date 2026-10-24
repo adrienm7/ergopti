@@ -226,7 +226,7 @@ function M.build_injected_html(assets_dir, html_name)
 		end
 		local href = attrs:match('href%s*=%s*"([^"]+)"')
 			or attrs:match("href%s*=%s*'([^']+)'")
-		if not href then return reject_asset("Stylesheet", attrs:match("^%s*(.-)%s*$")) end
+		if not href then return reject_asset("Stylesheet", require("text_utils").trim(attrs)) end
 		if is_remote(href) then return reject_asset("Stylesheet", href) end
 		local css = read_file(assets_dir .. "/" .. strip_asset_query(href))
 		if css == "" then return reject_asset("Stylesheet", href) end

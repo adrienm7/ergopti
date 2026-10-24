@@ -18,6 +18,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 --- A translated string, or its key when the catalogue cannot answer.
 --- @param key string
@@ -107,7 +108,7 @@ function M.rows(options)
 			local answer = options.prompt(options.title, tr("app_picker.search_placeholder"), "", false,
 				running_apps(excluded))
 			if answer == nil then return end
-			answer = answer:match("^%s*(.-)%s*$")
+			answer = TextUtils.trim(answer)
 			if answer == "" then return end
 			add(answer)
 		end,

@@ -10,6 +10,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 -- A caught callback failure is described without running its __tostring.
@@ -611,10 +612,7 @@ local function curl_args(url, headers, body, options)
 			lines[#lines + 1] = "header = " .. config_quote(wire_header)
 		end
 	else
-		local names = {}
-		for name in pairs(headers) do names[#names + 1] = name end
-		table.sort(names)
-		for _, name in ipairs(names) do
+		for _, name in ipairs(TableUtil.sorted_keys(headers)) do
 			local header_name, header_value = tostring(name), tostring(headers[name])
 			local allowed, err = HeaderPolicy.validate(header_name, header_value)
 			if not allowed then error(err) end

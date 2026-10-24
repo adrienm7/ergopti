@@ -32,6 +32,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 local Logger        = require("logger.shim")
 local SqliteCommand = require("modules.keystats.sqlite_command")
@@ -373,7 +374,7 @@ function M.open_db(db_path)
 
 	-- Ensure the parent directory exists.
 	local dir = NativePath.dirname(db_path) or "."
-	os.execute(string.format("mkdir -p '%s' 2>/dev/null", dir:gsub("'", "'\\''")))
+	os.execute(string.format("mkdir -p %s 2>/dev/null", TextUtils.shell_quote(dir)))
 
 	-- Bootstrap schema on first open.
 	if not _bootstrapped then

@@ -33,6 +33,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 local Terminators = require("keymap.terminators")
 local TerminatorScope = require("hotstrings.terminator_scope")
 local Preferences = require("infra.hotstring_preferences")
@@ -266,9 +267,8 @@ function M.load()
 		return false
 	end
 	mark_synced()
-	local count = 0
-	for _ in pairs(settings.states) do count = count + 1 end
-	Logger.info(LOG, "Loaded %d word-delimiter state(s) and %d custom delimiter(s).", count, #settings.custom)
+	Logger.info(LOG, "Loaded %d word-delimiter state(s) and %d custom delimiter(s).", TableUtil.count(settings.states),
+		#settings.custom)
 	return true
 end
 
@@ -511,10 +511,7 @@ function M.leaves(states, custom, reject)
 	if #settings.custom > 0 then
 		leaves[#leaves + 1] = { path = { CUSTOM_PATH[1], CUSTOM_PATH[2] }, value = settings.custom, custom = true }
 	end
-	local keys = {}
-	for key in pairs(settings.states) do keys[#keys + 1] = key end
-	table.sort(keys)
-	for _, key in ipairs(keys) do
+	for _, key in ipairs(TableUtil.sorted_keys(settings.states)) do
 		if settings.states[key] ~= default_for(key, shipped) then
 			leaves[#leaves + 1] = { path = { STATES_PATH[1], STATES_PATH[2], key }, value = settings.states[key],
 				custom = shipped[key] == nil }

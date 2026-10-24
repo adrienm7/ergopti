@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
@@ -79,7 +80,7 @@ local function profiles()
 end
 
 local function trimmed(value)
-	return type(value) == "string" and value:match("^%s*(.-)%s*$") or nil
+	return type(value) == "string" and TextUtils.trim(value) or nil
 end
 
 local function built_in_exists(profile_id)

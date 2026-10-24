@@ -27,6 +27,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 
 
@@ -41,7 +42,7 @@ local M = {}
 --- @param text string
 --- @return string
 local function trim(text)
-	return (tostring(text):gsub("^%s+", ""):gsub("%s+$", ""))
+	return TextUtils.trim(tostring(text))
 end
 
 --- Splits a comma list, dropping empty items.

@@ -2171,8 +2171,8 @@ local function main()
 			--- @return boolean started
 			local function xdg_open_log_target(target)
 				Logger.info(LOG, "Opening %s", target)
-				-- "'\\''" is the POSIX close-escape-reopen idiom, as in the pack opener.
-				local started = os.execute(string.format("xdg-open '%s' 2>/dev/null &", target:gsub("'", "'\\''")))
+				local started = os.execute(string.format("xdg-open %s 2>/dev/null &",
+					require("text_utils").shell_quote(target)))
 				return started == true or started == 0
 			end
 			return {
@@ -2317,12 +2317,10 @@ local function main()
 			on_open_file = function(path)
 				if type(path) ~= "string" or path == "" then return end
 				Logger.info(LOG, "Opening hotstring file: %s", path)
-				-- "'\\''" in Lua source is the four characters '\'' — the POSIX
-				-- close-escape-reopen idiom. Written "'\''" it collapses to three
-				-- apostrophes, which closes the quote and leaves the rest of the path
-				-- unquoted: a pack under "/home/me/l'ergopti" then reached xdg-open as
-				-- two broken words and silently opened nothing.
-				os.execute(string.format("xdg-open '%s' 2>/dev/null &", path:gsub("'", "'\\''")))
+				-- The shared quote closes, escapes and reopens an apostrophe: a pack
+				-- under "/home/me/l'ergopti" once reached xdg-open as two broken
+				-- words and silently opened nothing.
+				os.execute(string.format("xdg-open %s 2>/dev/null &", require("text_utils").shell_quote(path)))
 			end,
 			-- The three log rows open through ui/log_openers, shared with the
 			-- gesture actions: every path comes from the sink that writes it, and

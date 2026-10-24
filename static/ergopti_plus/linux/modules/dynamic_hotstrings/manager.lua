@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 local ManifestReader = require("infra.manifest_reader")
@@ -238,8 +239,7 @@ function M.init(opts)
 
 	-- The parsed [info] table is string-keyed, so the length operator (#) always
 	-- reports 0; count its keys explicitly to log the real field total
-	local info_field_count = 0
-	for _ in pairs(_info) do info_field_count = info_field_count + 1 end
+	local info_field_count = TableUtil.count(_info)
 
 	_desired_enabled = Preferences.get(MASTER_PATH)
 	_enabled = _desired_enabled and _rules_count > 0

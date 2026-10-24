@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger    = require("logger.shim")
 local Constants = require("infra.wpm_constants")
@@ -79,12 +80,7 @@ local _state = {
 local _surface = nil
 local _restore_debt = nil
 
-local function clone(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do copy[key] = clone(child) end
-	return copy
-end
+local clone = TableUtil.deep_copy
 
 
 

@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 M.bridge_name = "hotstrings_config_bridge"
 
 local Logger = require("logger.shim")
@@ -282,9 +283,7 @@ local function _build_initial_payload(state, bindings)
 
 	local order = type(config.get_category_order) == "function" and config.get_category_order() or nil
 	if type(order) ~= "table" or #order == 0 then
-		order = {}
-		for id in pairs(config.get_categories() or {}) do order[#order + 1] = id end
-		table.sort(order)
+		order = TableUtil.sorted_keys(config.get_categories() or {})
 	end
 
 	local categories = config.get_categories() or {}

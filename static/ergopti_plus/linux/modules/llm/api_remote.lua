@@ -325,11 +325,7 @@ function M.normalize_base_url(raw)
 end
 
 --- Percent-encodes every byte outside the unreserved set.
---- @param value string
---- @return string
-local function percent_encode(value)
-	return (value:gsub("[^%w%-%._~]", function(ch) return string.format("%%%02X", ch:byte()) end))
-end
+local percent_encode = TextUtils.percent_encode
 
 --- Replaces credential-bearing query values before a URL is logged.
 --- @param url string

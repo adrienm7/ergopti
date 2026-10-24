@@ -1,74 +1,12 @@
 {
-	"linux/adapters/curl_http_client.lua": {
-		"sorted_keys": 1
-	},
-	"linux/adapters/keyboard_hook.lua": {
-		"sorted_keys": 1
-	},
-	"linux/adapters/keyboard_layout.lua": {
-		"count": 4
-	},
-	"linux/adapters/shell_runner.lua": {
-		"count": 1,
-		"shell_quote": 1
-	},
 	"linux/adapters/storage.lua": {
 		"count": 1
-	},
-	"linux/adapters/uinput_writer.lua": {
-		"sorted_keys": 1
-	},
-	"linux/adapters/xkb_capture.lua": {
-		"deep_copy": 1
-	},
-	"linux/ergopti_hotstrings.lua": {
-		"shell_quote": 2
-	},
-	"linux/infra/boot_profiler.lua": {
-		"sorted_keys": 1
-	},
-	"linux/infra/bootstrap_log.lua": {
-		"shell_quote": 1
-	},
-	"linux/infra/diagnostic_snapshot.lua": {
-		"trim": 2
-	},
-	"linux/infra/file_watchers.lua": {
-		"count": 1,
-		"shell_quote": 3
-	},
-	"linux/infra/hotstring_preferences.lua": {
-		"deep_copy": 1
 	},
 	"linux/infra/hotstrings_scope.lua": {
 		"sorted_keys": 1
 	},
 	"linux/infra/i18n.lua": {
 		"shell_quote": 1
-	},
-	"linux/infra/logger_sink.lua": {
-		"shell_quote": 1
-	},
-	"linux/infra/personal_info_fields.lua": {
-		"count": 1
-	},
-	"linux/infra/program_binding_transaction.lua": {
-		"deep_copy": 1
-	},
-	"linux/infra/timings.lua": {
-		"count": 1
-	},
-	"linux/infra/xkb_keymap.lua": {
-		"count": 1
-	},
-	"linux/infra/xkb_rmlvo.lua": {
-		"trim": 1
-	},
-	"linux/modules/diagnostics/crash_reporter.lua": {
-		"shell_quote": 3
-	},
-	"linux/modules/dynamic_hotstrings/manager.lua": {
-		"count": 1
 	},
 	"linux/modules/gestures/manager.lua": {
 		"percent_encode": 1,
@@ -82,110 +20,11 @@
 	"linux/modules/hotstrings/loader.lua": {
 		"count": 1
 	},
-	"linux/modules/hotstrings/terminator_settings.lua": {
-		"count": 1,
-		"sorted_keys": 1
-	},
-	"linux/modules/hotstrings/word_reset.lua": {
-		"trim": 1
-	},
-	"linux/modules/keymap/layout_registry.lua": {
-		"trim": 1
-	},
 	"linux/modules/keystats/keystats.lua": {
-		"deep_copy": 1,
-		"shallow_copy": 1,
 		"shell_quote": 1
-	},
-	"linux/modules/keystats/sqlite_writer.lua": {
-		"shell_quote": 1
-	},
-	"linux/modules/llm/agent_learning.lua": {
-		"count": 1
-	},
-	"linux/modules/llm/api_entries.lua": {
-		"shell_quote": 1
-	},
-	"linux/modules/llm/api_remote.lua": {
-		"percent_encode": 1
-	},
-	"linux/modules/llm/ollama_install_resolver.lua": {
-		"shallow_copy": 1
-	},
-	"linux/modules/llm/prediction_engine.lua": {
-		"trim": 1
-	},
-	"linux/modules/llm/profile_settings.lua": {
-		"trim": 1
-	},
-	"linux/modules/llm/runtime_source.lua": {
-		"shallow_copy": 1
-	},
-	"linux/modules/shortcuts/caps_word_auto_off.lua": {
-		"count": 1
-	},
-	"linux/modules/shortcuts/key_combinations.lua": {
-		"shallow_copy": 1
-	},
-	"linux/modules/shortcuts/keyboard_shortcuts.lua": {
-		"count": 1
-	},
-	"linux/modules/shortcuts/manager.lua": {
-		"count": 1
-	},
-	"linux/modules/shortcuts/open_selection.lua": {
-		"percent_encode": 1
-	},
-	"linux/modules/updater/installer.lua": {
-		"shell_quote": 1
-	},
-	"linux/platform/remap/tap_hold_manager.lua": {
-		"deep_copy": 1,
-		"sorted_keys": 1
-	},
-	"linux/ui/config_dir_picker.lua": {
-		"trim": 1
 	},
 	"linux/ui/gesture_conflicts.lua": {
 		"sorted_keys": 1
-	},
-	"linux/ui/healthcheck/bridge.lua": {
-		"sorted_keys": 1,
-		"trim": 1
-	},
-	"linux/ui/hotstrings_config_window/bridge.lua": {
-		"sorted_keys": 1
-	},
-	"linux/ui/menu/agent_rows.lua": {
-		"trim": 2
-	},
-	"linux/ui/menu/app_exclusion_rows.lua": {
-		"trim": 1
-	},
-	"linux/ui/menu/llm_backend_rows.lua": {
-		"trim": 1
-	},
-	"linux/ui/menu/menu_builder.lua": {
-		"shell_quote": 1,
-		"sorted_keys": 2
-	},
-	"linux/ui/personal_info_editor/bridge.lua": {
-		"sorted_keys": 1
-	},
-	"linux/ui/prompt_editor/bridge.lua": {
-		"trim": 1
-	},
-	"linux/ui/text_prompt.lua": {
-		"shell_quote": 1
-	},
-	"linux/ui/webkit_host.lua": {
-		"trim": 1
-	},
-	"linux/ui/wpm/tray_readout.lua": {
-		"deep_copy": 1
-	},
-	"linux/ui/wpm/widget.lua": {
-		"deep_copy": 1
 	},
 	"macos/adapters/app_launcher.lua": {
 		"shell_quote": 1

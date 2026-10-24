@@ -29,6 +29,8 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local Monotonic = require("infra.monotonic")
@@ -169,7 +171,7 @@ local function _mtime(path)
 	-- `stat -c %Y` only has whole-second resolution, so two writes within the
 	-- same wall-clock second are indistinguishable and a real edit can be
 	-- missed entirely (file-watcher-mtime-subsecond-collision).
-	local fh = io.popen("date -r '" .. path:gsub("'", "'\\''") .. "' +%s.%N 2>/dev/null", "r")
+	local fh = io.popen("date -r " .. TextUtils.shell_quote(path) .. " +%s.%N 2>/dev/null", "r")
 	if fh then
 		local out = fh:read("*a")
 		fh:close()
@@ -198,7 +200,7 @@ local function _list_dir(dir)
 	end
 	-- Fallback: ls -1 (POSIX).
 	local entries = {}
-	local ok, fh = pcall(io.popen, "ls -1 '" .. dir:gsub("'", "'\\''") .. "' 2>/dev/null", "r")
+	local ok, fh = pcall(io.popen, "ls -1 " .. TextUtils.shell_quote(dir) .. " 2>/dev/null", "r")
 	if ok and fh then
 		for line in fh:lines() do
 			if line ~= "" then entries[#entries + 1] = line end
@@ -221,7 +223,7 @@ local function _is_dir(path)
 		end
 	end
 	-- Fallback.
-	local fh = io.popen("test -d '" .. path:gsub("'", "'\\''") .. "' && echo 1 || echo 0", "r")
+	local fh = io.popen("test -d " .. TextUtils.shell_quote(path) .. " && echo 1 || echo 0", "r")
 	if fh then
 		local out = fh:read("*l")
 		fh:close()
@@ -939,8 +941,7 @@ function M.start(opts)
 		Logger.debug(LOG, "Base dir watched for .lua: %s", base_dir)
 	end
 
-	local watcher_count = luv and #_luv_handles or #_pump_entries
-	for _ in pairs(_personal_entries) do watcher_count = watcher_count + 1 end
+	local watcher_count = (luv and #_luv_handles or #_pump_entries) + TableUtil.count(_personal_entries)
 	if _personal_anchor then watcher_count = watcher_count + 1 end
 	Logger.success(LOG, "File watchers armed: %d handle(s) (%s).", watcher_count, backend_label)
 end

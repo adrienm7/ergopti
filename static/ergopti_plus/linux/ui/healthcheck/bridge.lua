@@ -23,6 +23,8 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
 M.bridge_name = "healthcheck"
 
 local Logger = require("logger.shim")
@@ -173,7 +175,7 @@ end
 local function machine_model()
 	local vendor = read_file("/sys/class/dmi/id/sys_vendor")
 	local product = read_file("/sys/class/dmi/id/product_name")
-	local text = ((vendor or "") .. " " .. (product or "")):gsub("%s+", " "):match("^%s*(.-)%s*$")
+	local text = TextUtils.trim((((vendor or "") .. " " .. (product or "")):gsub("%s+", " ")))
 	return text ~= "" and text or nil
 end
 
@@ -560,9 +562,7 @@ function M.build_snapshot(state, detailed, extensive, complete_local)
 	local schema = M.config().schema
 	local started = now_ms()
 	local facts = collect("system facts", function() return require("infra.diagnostic_snapshot").system_facts() end)
-	local permission_ids = {}
-	for id in pairs(schema.permissions[M.DRIVER] or {}) do permission_ids[#permission_ids + 1] = id end
-	table.sort(permission_ids)
+	local permission_ids = TableUtil.sorted_keys(schema.permissions[M.DRIVER] or {})
 	local sections = {
 		paths       = collect("paths", function() return collect_paths(schema) end),
 		versions    = collect("versions", function() return collect_versions(facts) end),

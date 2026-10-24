@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local AgentSettings = require("modules.llm.agent_settings")
@@ -119,7 +120,7 @@ local function system_rows(system, dialogs, changed)
 			local answer = dialogs.prompt(tr("menu.agent.title"),
 				fill(tr("dialog.agent.model_prompt"), { current_label }), parsed.model or "")
 			if answer == nil then return end
-			answer = answer:match("^%s*(.-)%s*$")
+			answer = TextUtils.trim(answer)
 			local value = answer == "" and backend or (backend .. "|" .. answer)
 			if not AgentSettings.is_valid_spec(value) then
 				Logger.warn(LOG, "Agent %s model refused: not a model name.", system)
@@ -211,7 +212,7 @@ local function disabled_app_rows(llm, dialogs, changed)
 			local answer = dialogs.prompt(tr("menu.agent.title"), tr("app_picker.search_placeholder"), "", false,
 				running_apps(excluded))
 			if answer == nil then return end
-			answer = answer:match("^%s*(.-)%s*$")
+			answer = TextUtils.trim(answer)
 			if answer == "" then return end
 			add(answer)
 		end,

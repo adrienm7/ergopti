@@ -51,6 +51,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 
 
@@ -105,10 +106,6 @@ local function retention_days()
 	return _retention_days
 end
 
---- POSIX single-quote escape: close, insert an escaped quote, reopen.
---- Identical to `adapters/shell_runner.lua`'s QUOTE_ESCAPE; pinned by
---- `tests/unit/infra/logger/test_logger_sink.lua` so the two cannot drift.
-local QUOTE_ESCAPE = "'\\''"
 
 
 
@@ -185,13 +182,13 @@ local function admit_redaction(supplied)
 	return function(text) return Redact.apply(text, rules, captured) end
 end
 
---- Quotes a value for a POSIX shell command line.
---- @param value string Raw value.
+--- Quotes a value for a POSIX shell command line, as adapters/shell_runner's
+--- quote does (tests/unit/infra/logger/test_logger_sink.lua pins the pair).
+--- @param value string Raw value; nil becomes the empty word.
 --- @return string Single-quoted, escape-safe token.
 function M.shell_quote(value)
 	if value == nil then return "''" end
-	local s = (type(value) == "string") and value or tostring(value)
-	return "'" .. (s:gsub("'", QUOTE_ESCAPE)) .. "'"
+	return TextUtils.shell_quote(value)
 end
 
 --- Resolves the canonical log directory for this driver.

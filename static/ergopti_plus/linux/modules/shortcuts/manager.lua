@@ -32,6 +32,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 local Paths  = require("infra.paths")
@@ -227,9 +228,7 @@ local function load_wrap_pairs()
 		end
 	end
 
-	local count = 0
-	for _ in pairs(lookup) do count = count + 1 end
-	Logger.info(LOG, "Wrap-symbol catalogue loaded from shared SSoT (%d lookup key(s)).", count)
+	Logger.info(LOG, "Wrap-symbol catalogue loaded from shared SSoT (%d lookup key(s)).", TableUtil.count(lookup))
 
 	wrap_source = { path = path, content = original_content, pairs = copy_wrap_pairs(lookup) }
 	return lookup, ordered

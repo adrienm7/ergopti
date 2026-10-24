@@ -29,6 +29,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 local OpenTarget = require("open_target")
 local FileSelection = require("file_selection")
@@ -88,13 +89,7 @@ local deps = DEFAULT_DEPS
 -- ===================================
 
 --- Encodes one query component (RFC 3986 unreserved characters kept).
---- @param value string
---- @return string
-local function encode_query(value)
-	return (value:gsub("[^%w%-%._~]", function(char)
-		return string.format("%%%02X", string.byte(char))
-	end))
-end
+local encode_query = TextUtils.percent_encode
 
 --- Logs why a recognised target stayed closed and tells the user.
 --- @param reason string A REPORT_KEYS key.

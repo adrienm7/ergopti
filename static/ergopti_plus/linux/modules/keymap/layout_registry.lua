@@ -45,6 +45,7 @@ local Extension     = require("layouts.extension")
 local Composer      = require("layouts.composer")
 
 local M = {}
+local TextUtils = require("text_utils")
 
 local LOG = "layout_registry"
 local REQUEST_OWNER = "layout_registry"
@@ -317,7 +318,7 @@ local function default_deps(settings)
 					if options.etag_save then
 						local etag = FileSystem.read(etag_capture)
 						if type(etag) == "string" and etag:match("%S") then
-							response_headers.etag = etag:match("^%s*(.-)%s*$")
+							response_headers.etag = TextUtils.trim(etag)
 						end
 						FileSystem.delete(etag_capture)
 					end

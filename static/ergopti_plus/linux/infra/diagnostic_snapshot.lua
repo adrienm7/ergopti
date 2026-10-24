@@ -18,6 +18,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 local Logger        = require("logger.shim")
 local Snapshot      = require("diagnostics.snapshot")
@@ -93,12 +94,12 @@ function M.system_facts(env)
 	env = env or default_env()
 	local os_release = env.read("/etc/os-release")
 	local kernel = env.read("/proc/sys/kernel/osrelease")
-	kernel = type(kernel) == "string" and kernel:match("^%s*(.-)%s*$") or nil
+	kernel = type(kernel) == "string" and TextUtils.trim(kernel) or nil
 	if kernel == "" then kernel = nil end
 	local arch = (jit and jit.arch) or nil
 	if not arch then
 		local probed = env.read("/proc/sys/kernel/arch")
-		arch = type(probed) == "string" and probed:match("^%s*(.-)%s*$") or nil
+		arch = type(probed) == "string" and TextUtils.trim(probed) or nil
 	end
 	local cpuinfo = env.read("/proc/cpuinfo")
 	local cpu_model, cpu_cores = nil, nil

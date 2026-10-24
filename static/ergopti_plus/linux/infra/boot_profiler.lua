@@ -19,6 +19,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger    = require("logger.shim")
 local Monotonic = require("infra.monotonic")
@@ -93,9 +94,7 @@ function M.complete()
 		error("boot_profiler.complete() called twice — boot completes once.")
 	end
 	_boot_ms = M.elapsed_ms()
-	local still_open = {}
-	for name in pairs(_open) do still_open[#still_open + 1] = name end
-	table.sort(still_open)
+	local still_open = TableUtil.sorted_keys(_open)
 	if #still_open > 0 then
 		Logger.warn(LOG, "Boot completed with unclosed stage(s): %s.", table.concat(still_open, ", "))
 	end

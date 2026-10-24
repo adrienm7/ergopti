@@ -3,6 +3,7 @@
 --- Publishes an action parameter and its binding under exact runtime ownership.
 local M = {}
 local Transaction = require("config_scope_transaction")
+local TableUtil = require("table_util")
 local Writer = require("toml_codec.writer")
 local PhysicalSlots = require("shortcuts.physical_slots")
 local Logger = require("logger.shim")
@@ -10,11 +11,7 @@ local LOG = "infra.program_binding_transaction"
 local _current, _sequence = nil, 0
 local _constructing = false
 
-local function copy(value)
-	if type(value) ~= "table" then return value end
-	local out = {}; for key, child in pairs(value) do out[key] = copy(child) end
-	return out
-end
+local copy = TableUtil.deep_copy
 
 local function equal(left, right)
 	if type(left) ~= type(right) then return false end

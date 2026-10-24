@@ -11,6 +11,7 @@
 
 local M = {}
 local Policy = require("llm.ollama_install_policy")
+local TableUtil = require("table_util")
 local available, native = pcall(require, "luv")
 if not available then native = nil end
 local DIRECTORY_MODE = 448
@@ -47,11 +48,7 @@ local function ancestors(path)
 	return paths
 end
 
-local function copy(source)
-	local result = {}
-	for key, value in pairs(source) do result[key] = value end
-	return result
-end
+local copy = TableUtil.shallow_copy
 
 --- Reads only the packaged canonical asset through the installed-layout owner.
 --- @return table|nil catalogue

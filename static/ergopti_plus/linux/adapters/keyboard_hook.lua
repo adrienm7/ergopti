@@ -44,6 +44,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 local RuntimeGuard = require("infra.runtime_guard")
@@ -3260,9 +3261,7 @@ local function _acquire(paths, force_path, tx)
 		end
 		retained[path] = nil
 	end
-	local retired = {}
-	for path in pairs(retained) do retired[#retired + 1] = path end
-	table.sort(retired)
+	local retired = TableUtil.sorted_keys(retained)
 	if _source_recovery.retire_remaps(retired) ~= true then return false, "departed source remapper retirement refused" end
 	local released, release_err = _release_forwarded_sources(retired)
 	if not released then

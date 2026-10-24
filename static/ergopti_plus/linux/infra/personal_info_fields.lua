@@ -23,6 +23,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 local Reader = require("toml_codec")
@@ -110,11 +111,7 @@ local function declaration()
 	end
 
 	_declaration = { policy = parsed.policy, fields = parsed.fields or {} }
-	Logger.debug(LOG, "Field classification loaded (%d field(s) declared).", (function()
-		local n = 0
-		for _ in pairs(_declaration.fields) do n = n + 1 end
-		return n
-	end)())
+	Logger.debug(LOG, "Field classification loaded (%d field(s) declared).", TableUtil.count(_declaration.fields))
 	return _declaration
 end
 

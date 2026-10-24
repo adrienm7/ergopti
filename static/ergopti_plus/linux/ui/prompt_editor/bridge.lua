@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 M.bridge_name = "prompt_bridge"
 
 local Json = require("json")
@@ -32,7 +33,7 @@ local function translated(key)
 end
 
 local function trim(value)
-	return type(value) == "string" and value:match("^%s*(.-)%s*$") or nil
+	return type(value) == "string" and TextUtils.trim(value) or nil
 end
 
 local function next_profile_id()

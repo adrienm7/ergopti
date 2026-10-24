@@ -17,6 +17,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local LOG = "diagnostics.crash_reporter"
@@ -44,13 +45,13 @@ end
 
 --- Ensures the crash directory exists.
 local function _ensure_dir(directory)
-	return os.execute("mkdir -p '" .. directory:gsub("'", "'\\''") .. "' 2>/dev/null")
+	return os.execute("mkdir -p " .. TextUtils.shell_quote(directory) .. " 2>/dev/null")
 end
 
 --- Rotates old crash files when the directory exceeds MAX_CRASH_FILES.
 local function _rotate(directory)
 	local files = {}
-	local pipe = io.popen("ls -1t '" .. directory:gsub("'", "'\\''") .. "' 2>/dev/null")
+	local pipe = io.popen("ls -1t " .. TextUtils.shell_quote(directory) .. " 2>/dev/null")
 	if not pipe then return end
 	for line in pipe:lines() do
 		files[#files + 1] = line
@@ -214,7 +215,7 @@ end
 --- @return number
 function M.get_crash_count()
 	local count = 0
-	local pipe = io.popen("ls -1 '" .. crash_dir():gsub("'", "'\\''") .. "' 2>/dev/null | wc -l")
+	local pipe = io.popen("ls -1 " .. TextUtils.shell_quote(crash_dir()) .. " 2>/dev/null | wc -l")
 	if pipe then
 		local line = pipe:read("*l")
 		pipe:close()

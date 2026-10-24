@@ -25,6 +25,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger   = require("logger.shim")
 local Monotonic = require("infra.monotonic")
@@ -1068,9 +1069,7 @@ end
 
 --- Adds current, not-yet-flushed counters to a persisted manifest entry.
 local function shallow_copy(source)
-	local result = {}
-	for key, value in pairs(source or {}) do result[key] = value end
-	return result
+	return TableUtil.shallow_copy(source or {})
 end
 
 local function add_live_manifest_delta(manifest)
@@ -1818,12 +1817,7 @@ function M.export_json()
 end
 
 --- Copies only caller-owned RAM data; no I/O or persistence is implied.
-local function copy_flush_value(value)
-	if type(value) ~= "table" then return value end
-	local result = {}
-	for key, item in pairs(value) do result[key] = copy_flush_value(item) end
-	return result
-end
+local copy_flush_value = TableUtil.deep_copy
 
 -- The numeric cursor fields an open-walk record keeps, in their fixed order.
 -- No typed text: the open word and sequence are not persisted.

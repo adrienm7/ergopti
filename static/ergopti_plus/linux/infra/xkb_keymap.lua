@@ -41,6 +41,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
 
@@ -171,11 +172,7 @@ end
 --- Counts the pairs of a non-array table.
 --- @param t table
 --- @return integer
-local function count_pairs(t)
-	local n = 0
-	for _ in pairs(t) do n = n + 1 end
-	return n
-end
+local count_pairs = TableUtil.count
 
 --- Splits one keysym list — the text between `[` and `]` — into level order.
 --- @param list string
