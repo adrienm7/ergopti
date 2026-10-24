@@ -338,6 +338,16 @@
 					"title": "Désactiver dans les champs mot de passe",
 					"callback": true,
 					"checked": true
+				},
+				{
+					"title": "Exclure de la génération IA automatique…",
+					"callback": false,
+					"children": [
+						{
+							"title": "+ Ajouter une autre application…",
+							"callback": true
+						}
+					]
 				}
 			]
 		},
