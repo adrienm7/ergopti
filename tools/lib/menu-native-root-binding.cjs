@@ -129,8 +129,10 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 			if (token.kind !== 'identifier') continue;
 			// A closing Lua label (::continue::) does not qualify the next keyword.
 			if (
-				tokens[index - 1]?.value === '.' ||
-				(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value !== ':')
+				(tokens[index - 1]?.kind === 'symbol' && tokens[index - 1].value === '.') ||
+				(tokens[index - 1]?.kind === 'symbol' &&
+					tokens[index - 1].value === ':' &&
+					tokens[index - 2]?.value !== ':')
 			)
 				continue;
 			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {

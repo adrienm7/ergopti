@@ -18,8 +18,10 @@ function lex(source) {
 		scopes[at] = stack.length;
 		if (
 			token.kind !== 'identifier' ||
-			tokens[at - 1]?.value === '.' ||
-			(tokens[at - 1]?.value === ':' && tokens[at - 2]?.value !== ':')
+			(tokens[at - 1]?.kind === 'symbol' && tokens[at - 1].value === '.') ||
+			(tokens[at - 1]?.kind === 'symbol' &&
+				tokens[at - 1].value === ':' &&
+				tokens[at - 2]?.value !== ':')
 		)
 			continue;
 		if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
