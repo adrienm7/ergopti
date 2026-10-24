@@ -263,23 +263,23 @@
 		},
 		{
 			"id": "shared-ui-no-platform-branches",
-			"ordinal": 470,
+			"ordinal": 468,
 			"name": "shared pages read host capabilities and never compare a platform or driver name",
 			"cmd": "node",
 			"args": ["tools/test/test-shared-ui-no-platform-branches.cjs"],
 			"repro": "node tools/test/test-shared-ui-no-platform-branches.cjs"
 		},
 		{
-			"id": "js-0456",
-			"ordinal": 473,
+			"id": "js-0473",
+			"ordinal": 470,
 			"name": "tooltip duration decrement and floor have one declaration that every engine and vector uses",
 			"cmd": "node",
 			"args": ["tools/test/test-tooltip-timing-single-source.cjs"],
 			"repro": "npm run test:tooltip-timing-single-source"
 		},
 		{
-			"id": "js-0457",
-			"ordinal": 474,
+			"id": "js-0474",
+			"ordinal": 471,
 			"name": "hex colour census counts literals, not comments, issue numbers or entities",
 			"cmd": "node",
 			"args": ["tools/test/test-hex-colours.cjs"],
@@ -287,7 +287,7 @@
 		},
 		{
 			"id": "shared-ui-theme",
-			"ordinal": 468,
+			"ordinal": 482,
 			"name": "shared pages take their recurring colours from theme.css and link it",
 			"cmd": "node",
 			"args": ["tools/test/test-shared-ui-theme.cjs"],

@@ -645,7 +645,7 @@
 		},
 		{
 			"id": "action-catalogue-shared-projection",
-			"ordinal": 471,
+			"ordinal": 469,
 			"name": "the shared Lua action catalogue loads exactly each Lua driver's own catalogue",
 			"cmd": "node",
 			"args": ["tools/test/test-action-catalogue-shared-projection.cjs"],
