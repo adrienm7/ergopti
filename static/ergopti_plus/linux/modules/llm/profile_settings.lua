@@ -18,22 +18,23 @@ local RegistryCodec = require("llm.profile_registry_codec")
 local AppOverrides = require("llm.app_profile_overrides")
 local Json = require("json")
 local Codec = require("toml_codec")
+local ConfigKeys = require("config_keys")
+local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 
 local LOG = "modules.llm.profile_settings"
-local PREF_PREFIX = "llm.profiles."
-local USER_PROFILES_KEY = "llm.user_profiles"
-local APP_OVERRIDES_KEY = "llm.app_profile_overrides"
+local USER_PROFILES_KEY = KEY.LLM_USER_PROFILES
+local APP_OVERRIDES_KEY = KEY.LLM_APP_PROFILE_OVERRIDES
 
 local DEFINITIONS = {
-	active = { path = "llm.profiles.active", type = "string" },
+	active = { path = KEY.LLM_PROFILES_ACTIVE, type = "string" },
 	num_predictions = {
-		path = "llm.profiles.num_predictions",
+		path = KEY.LLM_PROFILES_NUM_PREDICTIONS,
 		type = "number",
 		min = 1,
 		max = 10,
 	},
 	auto_profile_for_model = {
-		path = "llm.profiles.auto_profile_for_model",
+		path = KEY.LLM_PROFILES_AUTO_PROFILE_FOR_MODEL,
 		type = "boolean",
 	},
 }
@@ -280,7 +281,7 @@ end
 local function valid(name, value)
 	local def = definition(name)
 	if not def or type(value) ~= def.type then return false end
-	if name == "active" then return profile_exists(value) end
+	if name == LEAF.ACTIVE then return profile_exists(value) end
 	if def.type == "number" then
 		return value == math.floor(value) and value >= def.min and value <= def.max
 	end
@@ -296,13 +297,13 @@ function M.get(name)
 	if shipped == nil then return nil end
 	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if ok and Storage then
-		local stored = Storage.get(PREF_PREFIX .. name, nil)
+		local stored = Storage.get(DEFINITIONS[name].path, nil)
 		if valid(name, stored) then
 			_values[name] = stored
 			return stored
 		elseif stored ~= nil then
 			-- Outdated configuration: named once, offered by the cleanup.
-			ConfigOutdated.report(PREF_PREFIX .. name, ConfigOutdated.REFUSED, Logger)
+			ConfigOutdated.report(DEFINITIONS[name].path, ConfigOutdated.REFUSED, Logger)
 		end
 	end
 	_values[name] = shipped
@@ -317,9 +318,9 @@ local function persist_one(name, value, admission)
 	local persisted
 	if admission ~= nil then
 		persisted = type(Storage.set_many) == "function"
-			and Storage.set_many({ [PREF_PREFIX .. name] = value }, nil, admission)
+			and Storage.set_many({ [DEFINITIONS[name].path] = value }, nil, admission)
 	else
-		persisted = Storage.set(PREF_PREFIX .. name, value)
+		persisted = Storage.set(DEFINITIONS[name].path, value)
 	end
 	if persisted ~= true then return false end
 	_values[name] = value
@@ -340,13 +341,13 @@ function M.set(name, value, current_model, admission)
 		Logger.error(LOG, "Refused invalid profile setting %s=%s.", tostring(name), tostring(value))
 		return false
 	end
-	if name == "active" and M.get("auto_profile_for_model") == true
+	if name == LEAF.ACTIVE and M.get(LEAF.AUTO_PROFILE_FOR_MODEL) == true
 			and value ~= ModelProfile.recommend(current_model) then
 		local ok, Storage = pcall(require, "infra.llm_preferences")
 		if not ok or not Storage or type(Storage.set_many) ~= "function"
 				or Storage.set_many({
-					[PREF_PREFIX .. "active"] = value,
-					[PREF_PREFIX .. "auto_profile_for_model"] = false,
+					[KEY.LLM_PROFILES_ACTIVE] = value,
+					[KEY.LLM_PROFILES_AUTO_PROFILE_FOR_MODEL] = false,
 				}, nil, admission) ~= true then
 			Logger.error(LOG, "Manual profile selection could not be persisted atomically.")
 			return false
@@ -367,11 +368,11 @@ end
 --- @param current_model string|nil
 --- @return string
 function M.effective_profile(current_model)
-	if M.get("auto_profile_for_model") == true then
+	if M.get(LEAF.AUTO_PROFILE_FOR_MODEL) == true then
 		local recommended = ModelProfile.recommend(current_model)
 		if profile_exists(recommended) then return recommended end
 	end
-	return M.get("active")
+	return M.get(LEAF.ACTIVE)
 end
 
 --- Returns a built-in profile by effective ID.
@@ -424,7 +425,7 @@ end
 --- built-ins in menu order, then the user's own, each with its menu label.
 --- @return table { { value = profile_id, label = string }, ... }
 function M.choices()
-	local count = M.get("num_predictions")
+	local count = M.get(LEAF.NUM_PREDICTIONS)
 	local choices = {}
 	for _, profile in ipairs(profiles()) do
 		choices[#choices + 1] = { value = profile.id, label = M.menu_label(profile, count) }
@@ -534,8 +535,8 @@ function M.save_user_profile(candidate, activate, expected_existing, admission)
 	if not ok or not Storage or type(Storage.set_many) ~= "function" then return false end
 	local writes = { [USER_PROFILES_KEY] = RegistryCodec.encode(stored_registry(next_profiles)) }
 	if activate == true then
-		writes[PREF_PREFIX .. "active"] = profile.id
-		writes[PREF_PREFIX .. "auto_profile_for_model"] = false
+		writes[KEY.LLM_PROFILES_ACTIVE] = profile.id
+		writes[KEY.LLM_PROFILES_AUTO_PROFILE_FOR_MODEL] = false
 	end
 	if Storage.set_many(writes, _registry_source, admission) ~= true then
 		forget_registry(true)
@@ -573,11 +574,11 @@ function M.delete_user_profile(profile_id, admission)
 	end
 	if not found then return false end
 
-	local active = M.get("active")
+	local active = M.get(LEAF.ACTIVE)
 	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if not ok or not Storage or type(Storage.set_many) ~= "function" then return false end
 	local writes = { [USER_PROFILES_KEY] = RegistryCodec.encode(stored_registry(next_profiles)) }
-	if active == profile_id then writes[PREF_PREFIX .. "active"] = "basic" end
+	if active == profile_id then writes[KEY.LLM_PROFILES_ACTIVE] = "basic" end
 	-- An application mapped to the deleted profile would name nothing: its
 	-- override goes in the same write, as on Windows.
 	local kept, dropped = {}, false

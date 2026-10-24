@@ -42,7 +42,6 @@
 		"static/ergopti_plus/linux/modules/llm/display_settings.lua": 4,
 		"static/ergopti_plus/linux/modules/llm/navigation_settings.lua": 6,
 		"static/ergopti_plus/linux/modules/llm/prediction_engine.lua": 34,
-		"static/ergopti_plus/linux/modules/llm/profile_settings.lua": 10,
 		"static/ergopti_plus/linux/modules/llm/profiles.lua": 15,
 		"static/ergopti_plus/linux/modules/llm/runtime_source.lua": 19,
 		"static/ergopti_plus/linux/modules/llm/trigger_settings.lua": 9,
