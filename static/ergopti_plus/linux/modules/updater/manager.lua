@@ -1143,7 +1143,7 @@ function M.check_for_updates(channel, callback)
 			Logger.info(LOG, "The GitHub API gave no release list (%s); reading the public Atom feed.",
 				tostring(fetch_error))
 			local feed_published = false
-			local started, admitted = pcall(_fetch_feed, function(list, feed_reason)
+			local started, admitted = pcall(M._fetch_feed, function(list, feed_reason)
 				if feed_published then return end
 				feed_published = true
 				if list then
