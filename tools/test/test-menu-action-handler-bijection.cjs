@@ -59,6 +59,24 @@ const { delegatedMenuSources } = require('../lib/menu-shared-delegation.cjs');
 const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
 
 const { nativeLayoutRowOwnership } = require('../lib/menu-native-layout-binding.cjs');
+const { namesCommandConstant } = require('../lib/menu-command-constant.cjs');
+
+assert.equal(
+	namesCommandConstant('[COMMAND.COMPOSER_CHECK] = run', 'composer_check', '.lua'),
+	true
+);
+assert.equal(
+	namesCommandConstant('[COMMAND.COMPOSER_CHECK_X] = run', 'composer_check', '.lua'),
+	false
+);
+assert.equal(
+	namesCommandConstant('Map(MenuCommand.COMPOSER_CHECK, Run)', 'composer_check', '.ahk'),
+	true
+);
+assert.equal(
+	namesCommandConstant('Map(COMMAND.COMPOSER_CHECK, Run)', 'composer_check', '.ahk'),
+	false
+);
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -1039,6 +1057,7 @@ for (const { key, driver, ext } of PLATFORMS) {
 		({ section, id }) =>
 			!corpus.includes(`"${id}"`) &&
 			!corpus.includes(`'${id}'`) &&
+			!namesCommandConstant(corpus, id, ext) &&
 			!sharedHandlers.has(id) &&
 			!nativeReferences.has(id) &&
 			!nativeSources.some((native) =>

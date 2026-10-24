@@ -92,6 +92,7 @@ const {
 const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
 
 const { nativeLayoutRowOwnership } = require('../lib/menu-native-layout-binding.cjs');
+const { namesCommandConstant } = require('../lib/menu-command-constant.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -1722,6 +1723,7 @@ for (const [key, list] of Object.entries(manifest)) {
 		const missing = needing.filter(
 			(r) =>
 				!src[p].text.includes(r.id) &&
+				!namesCommandConstant(src[p].text, r.id, EXT[p]) &&
 				!reachedInert[p].has(r) &&
 				!(p === 'ahk' && startupOwnedRows.has(r)) &&
 				!src[p].nativeSources.some((native) =>
