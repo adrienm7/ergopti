@@ -177,8 +177,10 @@ _NI_QueryWlan() {
     ; NI_GetSignalStrength() are two port methods reading two fields of the same
     ; buffer, and the keystats network tick calls them one after the other; the
     ; second WlanOpenHandle RPC was pure duplicated work on the script thread.
+    ; A_TickCount is 64-bit: a DWORD-masked age would make a result from a
+    ; whole number of 49.7-day eras ago look fresh again.
     if (NI_WLAN_CACHE_AT != 0
-        and ((A_TickCount - NI_WLAN_CACHE_AT) & 0xFFFFFFFF) < NI_WLAN_CACHE_TTL_MS)
+        and TickElapsed64(NI_WLAN_CACHE_AT, A_TickCount) < NI_WLAN_CACHE_TTL_MS)
         return NI_WLAN_CACHE
 
     result           := Map("status", NI_WIFI_STATUS_UNKNOWN)

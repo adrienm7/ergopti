@@ -69,6 +69,9 @@ _NWCT_Program(Directory) {
 	global _DriverDir
 	NetworkOwner := _DriverProductionFileForSymbol("_NI_QueryWlan", _DriverDir)
 	CryptoOwner := _DriverProductionFileForSymbol("CryptoSha256", _DriverDir)
+	; The cache predicate measures its age with the native-width tick helper.
+	TickOwner := _DriverProductionFileForSymbol("TickElapsed64", _DriverDir)
+	AssertTrue(TickOwner != "", "The adapter's clock helper must have its genuine owner")
 	NetworkSource := _NWCT_Overlay(FSReadStrict(NetworkOwner))
 	CryptoSource := FSReadStrict(CryptoOwner)
 	Fixture := _DriverDir . "\tests\fixtures\network_info_native64_cache_probe.ahk"
@@ -78,6 +81,7 @@ _NWCT_Program(Directory) {
 	return "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n"
 		. "#Include " . _NWCT_Quote(Directory . "\network_info.ahk") . "`n"
 		. "#Include " . _NWCT_Quote(Directory . "\crypto.ahk") . "`n"
+		. "#Include " . _NWCT_Quote(TickOwner) . "`n"
 		. "#Include " . _NWCT_Quote(Directory . "\probe.ahk") . "`n"
 }
 
