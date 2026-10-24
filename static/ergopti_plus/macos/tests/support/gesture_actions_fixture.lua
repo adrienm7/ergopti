@@ -25,6 +25,9 @@ local OWNERS = {
 	"program_parameter",
 	"actions.assignable",
 	"_generated.action_catalogue",
+	-- The generated catalogue filters the shared data through this owner.
+	"actions.catalogue",
+	"actions.catalogue_data",
 	-- The shared script chords' paused actions, read by the control-plane
 	-- admission of a script chord's action.
 	"infra.script_chord_catalogue",
@@ -92,8 +95,12 @@ local OWNERS = {
 	"toml_codec.key_path",
 	"toml_codec.reader",
 	"toml_codec.record_scanner",
+	-- The record scanner memoizes one text's scans through this owner.
+	"toml_codec.source_memo",
 	-- The real TOML reader opens its source through this shared owner.
 	"toml_codec.source_open",
+	-- The shared ordered-pair policy copies tables through this owner.
+	"table_util",
 	"wrap_pair",
 }
 
