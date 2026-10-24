@@ -3479,7 +3479,7 @@
 	"dialog.start_at_login.failed": "לא ניתן לשנות את ההפעלה האוטומטית. יש לבדוק את הגדרות ההפעלה של המערכת.",
 	"onboarding.error.open_failed": "לא ניתן לפתוח את אשף ההגדרה. יש לבדוק את היומנים ולנסות שוב מהתפריט.",
 	"platform_reason.tap_hold_word_reset_not_on_macos": "לא ב-macOS: שם Karabiner-Elements מפעיל את מקשי ה-Tap-hold, ומה שהם שולחים מגיע כמו מקשים שהוקלדו במקלדת, ולכן קיצור שנשלח ממקש Tap-hold פועל לפי האפשרות של הקיצורים.",
-	"platform_reason.token_streaming_transport_missing": "עדיין לא ב-Windows: התצוגה טוקן אחר טוקן לא אומתה ב-Windows, ולכן אפשרות זו נשארת לא פעילה.",
+	"platform_reason.token_streaming_unvalidated_on_windows": "עדיין לא ב-Windows: התצוגה טוקן אחר טוקן לא אומתה ב-Windows, ולכן אפשרות זו נשארת לא פעילה.",
 	"menu.layout.number_row": "שורת הספרות",
 	"menu.layout.number_row_native": "הסדר המקורי",
 	"menu.layout.number_row_digits": "ספרות תחילה",

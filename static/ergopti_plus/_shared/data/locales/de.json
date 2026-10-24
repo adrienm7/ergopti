@@ -3479,7 +3479,7 @@
 	"dialog.start_at_login.failed": "Der automatische Start konnte nicht geändert werden. Prüfen Sie die Autostart-Einstellungen des Systems.",
 	"onboarding.error.open_failed": "Der Einrichtungsassistent konnte nicht geöffnet werden. Prüfen Sie die Protokolle und versuchen Sie es erneut über das Menü.",
 	"platform_reason.tap_hold_word_reset_not_on_macos": "Nicht unter macOS: Dort steuert Karabiner-Elements die Tap-Holds, und was sie senden, kommt wie auf der Tastatur getippte Tasten an. Ein von einem Tap-Hold gesendetes Tastenkürzel folgt daher der Option für Tastenkürzel.",
-	"platform_reason.token_streaming_transport_missing": "Noch nicht unter Windows: Die Token-für-Token-Anzeige wurde unter Windows noch nicht validiert, daher bleibt diese Option inaktiv.",
+	"platform_reason.token_streaming_unvalidated_on_windows": "Noch nicht unter Windows: Die Token-für-Token-Anzeige wurde unter Windows noch nicht validiert, daher bleibt diese Option inaktiv.",
 	"menu.layout.number_row": "Ziffernreihe",
 	"menu.layout.number_row_native": "Native Reihenfolge",
 	"menu.layout.number_row_digits": "Ziffern zuerst",

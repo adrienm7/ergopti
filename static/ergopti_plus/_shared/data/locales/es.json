@@ -3479,7 +3479,7 @@
 	"dialog.start_at_login.failed": "No se pudo cambiar el inicio automático. Revise los ajustes de inicio del sistema.",
 	"onboarding.error.open_failed": "No se pudo abrir el asistente de configuración. Revise los registros e inténtelo de nuevo desde el menú.",
 	"platform_reason.tap_hold_word_reset_not_on_macos": "No en macOS: allí Karabiner-Elements gestiona los tap-holds, y lo que envían llega como teclas escritas en el teclado, así que un atajo enviado por un tap-hold sigue la opción de los atajos.",
-	"platform_reason.token_streaming_transport_missing": "Aún no en Windows: la visualización token por token no se ha validado en Windows, por lo que esta opción permanece inactiva.",
+	"platform_reason.token_streaming_unvalidated_on_windows": "Aún no en Windows: la visualización token por token no se ha validado en Windows, por lo que esta opción permanece inactiva.",
 	"menu.layout.number_row": "Fila de números",
 	"menu.layout.number_row_native": "Orden nativo",
 	"menu.layout.number_row_digits": "Números primero",

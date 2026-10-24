@@ -3479,7 +3479,7 @@
 	"dialog.start_at_login.failed": "Automatisch starten kon niet worden gewijzigd. Controleer de opstartinstellingen van het systeem.",
 	"onboarding.error.open_failed": "De configuratiewizard kon niet worden geopend. Controleer de logboeken en probeer het opnieuw via het menu.",
 	"platform_reason.tap_hold_word_reset_not_on_macos": "Niet op macOS: daar beheert Karabiner-Elements de tik-vasthoudtoetsen, en wat ze sturen komt binnen als op het toetsenbord getypte toetsen, dus een sneltoets die een tik-vasthoudtoets stuurt, volgt de optie voor sneltoetsen.",
-	"platform_reason.token_streaming_transport_missing": "Nog niet op Windows: de token-voor-token-weergave is op Windows nog niet gevalideerd, dus deze optie blijft inactief.",
+	"platform_reason.token_streaming_unvalidated_on_windows": "Nog niet op Windows: de token-voor-token-weergave is op Windows nog niet gevalideerd, dus deze optie blijft inactief.",
 	"menu.layout.number_row": "Cijferrij",
 	"menu.layout.number_row_native": "Oorspronkelijke volgorde",
 	"menu.layout.number_row_digits": "Cijfers eerst",

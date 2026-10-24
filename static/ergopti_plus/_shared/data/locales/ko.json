@@ -3479,7 +3479,7 @@
 	"dialog.start_at_login.failed": "자동 시작을 변경하지 못했습니다. 시스템 시작 설정을 확인하세요.",
 	"onboarding.error.open_failed": "설정 마법사를 열지 못했습니다. 로그를 확인한 후 메뉴에서 다시 시도하세요.",
 	"platform_reason.tap_hold_word_reset_not_on_macos": "macOS에서는 사용할 수 없음: 그곳에서는 Karabiner-Elements가 탭-홀드를 처리하고, 그 출력은 키보드로 입력한 키처럼 도착하므로 탭-홀드가 보내는 단축키는 단축키 옵션을 따릅니다.",
-	"platform_reason.token_streaming_transport_missing": "아직 Windows 제외: 토큰 단위 표시가 Windows에서 검증되지 않았으므로 이 옵션은 비활성 상태로 유지됩니다.",
+	"platform_reason.token_streaming_unvalidated_on_windows": "아직 Windows 제외: 토큰 단위 표시가 Windows에서 검증되지 않았으므로 이 옵션은 비활성 상태로 유지됩니다.",
 	"menu.layout.number_row": "숫자 행",
 	"menu.layout.number_row_native": "시스템 순서",
 	"menu.layout.number_row_digits": "숫자 우선",

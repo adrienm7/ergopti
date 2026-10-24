@@ -28,7 +28,7 @@ const SCHEDULED =
 // Texts still to rewrite (cross-OS parity audit, stale reason texts).
 const KNOWN_SCHEDULED = new Set([
 	'platform_reason.shortcuts_restore_is_composed_on_macos',
-	'platform_reason.token_streaming_transport_missing'
+	'platform_reason.token_streaming_unvalidated_on_windows'
 ]);
 
 const english = JSON.parse(fs.readFileSync(CATALOGUE, 'utf8'));
