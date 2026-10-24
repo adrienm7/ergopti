@@ -8,7 +8,10 @@
 
 local helpers = require("tests.helpers")
 local M = {}
-local OWNERS = { "ui.menu.menu_watchers", "infra.logger", "infra.git_status", "reload_gate" }
+local OWNERS = {
+	"ui.menu.menu_watchers", "infra.logger", "infra.git_status", "reload_gate",
+	"adapters.timer_scheduler", "error_description", "number_policy",
+}
 
 --- Runs a real menu watcher with deterministic events and reload decisions.
 --- @param body function Scenario receiving watcher observations.
@@ -45,6 +48,7 @@ function M.with_watcher(body, options)
 					return timer
 				end,
 				secondsSinceEpoch = function() return clock end,
+				absoluteTime = function() return clock * 1e9 end,
 			}
 			local owner = assert(Watchers.start_config_watcher(
 				options.base_dir or "/fake/base/",
@@ -53,7 +57,7 @@ function M.with_watcher(body, options)
 					if options.reload then return options.reload(reloads) end
 					return true
 				end,
-				options.suppress_until or function() return 0 end,
+				options.suppress_until_awake or function() return 0 end,
 				{ defer_reload = function(callback)
 					defer_calls = defer_calls + 1
 					if options.hold_reload then deferred = callback; return true end
