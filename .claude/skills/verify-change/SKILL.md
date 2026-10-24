@@ -34,6 +34,19 @@ unrelated full-audit check is red. If every gate selected by the edit passes,
 report the historical red separately. Multi-file campaigns, audit queues, and
 high-risk state migrations still deserve a durable plan proportional to scope.
 
+## 1b. Run on a host that matches CI, or the reds are not yours
+
+`verify-change` (except `--plan`) and `npm run test:js` (except `--list-features`) refuse to start when the host
+differs from the hosted runners (`tools/test/lib/host-toolchain.cjs`, pinned by `test-host-toolchain.cjs`):
+
+- Node exactly as pinned in `.node-version` (generator output and Unicode tables follow the Node release);
+- on Linux and macOS, `lua` must be Lua 5.4, the run must not be root, and `pwsh` must be on PATH.
+
+Fix the host instead of reading its reds: select the pinned Node (`n`, `fnm`, `nvm` or the official tarball), point
+`lua` at `lua5.4` (`update-alternatives` or a shim first in PATH), run as a normal user, install PowerShell. A cloud
+container starts as root with Lua 5.1 and an older Node: on 2026-10-24 about twenty "failing" gates were only these
+four differences.
+
 ## 2. Two silent failures it checks first
 
 Both are instant, and both describe bugs that a **passing** suite hides.

@@ -97,6 +97,16 @@ scan is appropriate only when behavior cannot be called directly.
 Use the repository verification planner and run every selected gate. A green
 subset is not a green change, and the supported Node engine floor matters.
 
+### project-host-toolchain-matches-ci
+
+Local runners refuse a host that differs from the hosted runners
+(`tools/test/lib/host-toolchain.cjs`): Node exactly as in `.node-version`, and on
+Linux and macOS `lua` as Lua 5.4, a non-root user and `pwsh` on PATH. On
+2026-10-24 a cloud container (root, Lua 5.1, Node 22.22.0, no pwsh) produced about
+twenty false reds: `table.pack` missing, uid and sudo paths, Unicode 16 generator
+output, PowerShell gates. Fix the host before triaging any red. Plans
+(`verify-change --plan`) and `--list-features` execute nothing and skip the check.
+
 ### project-js-driver-gates-share-generated-writers
 
 Do not run JS and driver suites concurrently in one checkout. The manifest
