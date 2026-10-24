@@ -429,7 +429,7 @@ ComposerCheck_ShowReport(Report, ShowFn := 0, TitleKey := "menu.debug.composer_c
 }
 
 _ComposerCheck_ShowWindow(Title, Text, TitleKey := "menu.debug.composer_check") {
-	Window := Gui("+AlwaysOnTop", WindowTitle(Title))
+	Window := Gui("", WindowTitle(Title))
 	Window.AddEdit("w560 r10 ReadOnly -Wrap", Text)
 	Copy := Window.AddButton("w140 Default", t("field_check.copy"))
 	Close := Window.AddButton("x+10 w140", t("field_check.close"))
