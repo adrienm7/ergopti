@@ -370,6 +370,7 @@ return {
 	"tests.unit.modules.keystats.core.test_keystats_session_events",
 	"tests.unit.modules.keystats.core.test_keystats_system_events",
 	"tests.unit.modules.keystats.storage.test_keystats_sqlite_reader",
+	"tests.unit.modules.keystats.storage.test_keystats_queries_contract",
 	"tests.unit.modules.keystats.storage.test_keystats_sqlite_writer_media_schema_admission",
 	"tests.unit.modules.keystats.storage.test_keystats_sqlite_writer_ngram_source_map",
 	"tests.unit.modules.keystats.aggregation.test_keystats_utils",

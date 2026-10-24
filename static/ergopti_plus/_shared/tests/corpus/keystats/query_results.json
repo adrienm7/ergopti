@@ -1,0 +1,1699 @@
+{
+	"_description": "Expected rows of every named keystats query on query_fixture.sql, per filter and per dialect. Derived from the legacy driver SQL before the catalogue replaced it: native rows from the macOS reader (the Windows reader returned the same rows), cli_json rows from the Linux reader with its json_quote columns decoded. Catalogue choices that change a legacy result: manifest.ergo adds the focus-latency sums (Linux legacy), manifest.kc_hold keeps the Windows/macOS aliases, manifest.system_day is the Windows query. In-process engines cut TEXT at NUL, so native rows hold the truncated text the json_quote dialect preserves.",
+	"filters": {
+		"all": "",
+		"day1": " WHERE date >= '2026-10-01' AND date <= '2026-10-01'"
+	},
+	"queries": {
+		"manifest.app_day": {
+			"all": {
+				"native": [
+					{
+						"app": "Code",
+						"app_time_ms": 5400000,
+						"category": "Development",
+						"chars": 2000,
+						"date": "2026-10-01",
+						"hs_chars": 50,
+						"hs_input_chars": 12,
+						"hs_suggested": 10,
+						"hs_triggers": 7,
+						"llm_chars": 12,
+						"llm_input_chars": 4,
+						"llm_suggested": 3,
+						"llm_triggers": 2,
+						"pauses": 6,
+						"think_time_ms": 13000,
+						"time_ms": 500000
+					},
+					{
+						"app": "Code",
+						"app_time_ms": 900000,
+						"category": "Development",
+						"chars": 300,
+						"date": "2026-10-02",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"pauses": 1,
+						"think_time_ms": 2500,
+						"time_ms": 80000
+					},
+					{
+						"app": "Mail",
+						"app_time_ms": 120000,
+						"category": "Communication",
+						"chars": 90,
+						"date": "2026-10-03",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"llm_chars": 5,
+						"llm_input_chars": 1,
+						"llm_suggested": 2,
+						"llm_triggers": 1,
+						"pauses": 0,
+						"think_time_ms": 0,
+						"time_ms": 21000
+					},
+					{
+						"app": "Wörd's ",
+						"app_time_ms": 60000,
+						"category": "Writing",
+						"chars": 50,
+						"date": "2026-10-01",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"pauses": 0,
+						"think_time_ms": 0,
+						"time_ms": 9000
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"app_time_ms": 5400000,
+						"category": "Development",
+						"chars": 2000,
+						"date": "2026-10-01",
+						"hs_chars": 50,
+						"hs_input_chars": 12,
+						"hs_suggested": 10,
+						"hs_triggers": 7,
+						"llm_chars": 12,
+						"llm_input_chars": 4,
+						"llm_suggested": 3,
+						"llm_triggers": 2,
+						"pauses": 6,
+						"think_time_ms": 13000,
+						"time_ms": 500000
+					},
+					{
+						"app": "Code",
+						"app_time_ms": 900000,
+						"category": "Development",
+						"chars": 300,
+						"date": "2026-10-02",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"pauses": 1,
+						"think_time_ms": 2500,
+						"time_ms": 80000
+					},
+					{
+						"app": "Mail",
+						"app_time_ms": 120000,
+						"category": "Communication",
+						"chars": 90,
+						"date": "2026-10-03",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"llm_chars": 5,
+						"llm_input_chars": 1,
+						"llm_suggested": 2,
+						"llm_triggers": 1,
+						"pauses": 0,
+						"think_time_ms": 0,
+						"time_ms": 21000
+					},
+					{
+						"app": "Wörd's \u0000x",
+						"app_time_ms": 60000,
+						"category": "Writing",
+						"chars": 50,
+						"date": "2026-10-01",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"pauses": 0,
+						"think_time_ms": 0,
+						"time_ms": 9000
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"app": "Code",
+						"app_time_ms": 5400000,
+						"category": "Development",
+						"chars": 2000,
+						"date": "2026-10-01",
+						"hs_chars": 50,
+						"hs_input_chars": 12,
+						"hs_suggested": 10,
+						"hs_triggers": 7,
+						"llm_chars": 12,
+						"llm_input_chars": 4,
+						"llm_suggested": 3,
+						"llm_triggers": 2,
+						"pauses": 6,
+						"think_time_ms": 13000,
+						"time_ms": 500000
+					},
+					{
+						"app": "Wörd's ",
+						"app_time_ms": 60000,
+						"category": "Writing",
+						"chars": 50,
+						"date": "2026-10-01",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"pauses": 0,
+						"think_time_ms": 0,
+						"time_ms": 9000
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"app_time_ms": 5400000,
+						"category": "Development",
+						"chars": 2000,
+						"date": "2026-10-01",
+						"hs_chars": 50,
+						"hs_input_chars": 12,
+						"hs_suggested": 10,
+						"hs_triggers": 7,
+						"llm_chars": 12,
+						"llm_input_chars": 4,
+						"llm_suggested": 3,
+						"llm_triggers": 2,
+						"pauses": 6,
+						"think_time_ms": 13000,
+						"time_ms": 500000
+					},
+					{
+						"app": "Wörd's \u0000x",
+						"app_time_ms": 60000,
+						"category": "Writing",
+						"chars": 50,
+						"date": "2026-10-01",
+						"hs_chars": 0,
+						"hs_input_chars": 0,
+						"hs_suggested": 0,
+						"hs_triggers": 0,
+						"llm_chars": 0,
+						"llm_input_chars": 0,
+						"llm_suggested": 0,
+						"llm_triggers": 0,
+						"pauses": 0,
+						"think_time_ms": 0,
+						"time_ms": 9000
+					}
+				]
+			}
+		},
+		"manifest.buckets": {
+			"all": {
+				"native": [
+					{
+						"app": "Code",
+						"bucket_ms": 1000,
+						"credited": 1800,
+						"date": "2026-10-01",
+						"hs_in_c": 12,
+						"hs_in_t": 1200,
+						"llm_in_c": 4,
+						"llm_in_t": 400,
+						"time_sum": 400000
+					},
+					{
+						"app": "Code",
+						"bucket_ms": 1000,
+						"credited": 280,
+						"date": "2026-10-02",
+						"hs_in_c": 0,
+						"hs_in_t": 0,
+						"llm_in_c": 0,
+						"llm_in_t": 0,
+						"time_sum": 70000
+					},
+					{
+						"app": "Code",
+						"bucket_ms": 2000,
+						"credited": 1180,
+						"date": "2026-10-01",
+						"hs_in_c": 9,
+						"hs_in_t": 900,
+						"llm_in_c": 4,
+						"llm_in_t": 400,
+						"time_sum": 290000
+					},
+					{
+						"app": "Wörd's ",
+						"bucket_ms": 1000,
+						"credited": 50,
+						"date": "2026-10-01",
+						"hs_in_c": 0,
+						"hs_in_t": 0,
+						"llm_in_c": 0,
+						"llm_in_t": 0,
+						"time_sum": 9000
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"bucket_ms": 1000,
+						"credited": 1800,
+						"date": "2026-10-01",
+						"hs_in_c": 12,
+						"hs_in_t": 1200,
+						"llm_in_c": 4,
+						"llm_in_t": 400,
+						"time_sum": 400000
+					},
+					{
+						"app": "Code",
+						"bucket_ms": 1000,
+						"credited": 280,
+						"date": "2026-10-02",
+						"hs_in_c": 0,
+						"hs_in_t": 0,
+						"llm_in_c": 0,
+						"llm_in_t": 0,
+						"time_sum": 70000
+					},
+					{
+						"app": "Code",
+						"bucket_ms": 2000,
+						"credited": 1180,
+						"date": "2026-10-01",
+						"hs_in_c": 9,
+						"hs_in_t": 900,
+						"llm_in_c": 4,
+						"llm_in_t": 400,
+						"time_sum": 290000
+					},
+					{
+						"app": "Wörd's \u0000x",
+						"bucket_ms": 1000,
+						"credited": 50,
+						"date": "2026-10-01",
+						"hs_in_c": 0,
+						"hs_in_t": 0,
+						"llm_in_c": 0,
+						"llm_in_t": 0,
+						"time_sum": 9000
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"app": "Code",
+						"bucket_ms": 1000,
+						"credited": 1800,
+						"date": "2026-10-01",
+						"hs_in_c": 12,
+						"hs_in_t": 1200,
+						"llm_in_c": 4,
+						"llm_in_t": 400,
+						"time_sum": 400000
+					},
+					{
+						"app": "Code",
+						"bucket_ms": 2000,
+						"credited": 1180,
+						"date": "2026-10-01",
+						"hs_in_c": 9,
+						"hs_in_t": 900,
+						"llm_in_c": 4,
+						"llm_in_t": 400,
+						"time_sum": 290000
+					},
+					{
+						"app": "Wörd's ",
+						"bucket_ms": 1000,
+						"credited": 50,
+						"date": "2026-10-01",
+						"hs_in_c": 0,
+						"hs_in_t": 0,
+						"llm_in_c": 0,
+						"llm_in_t": 0,
+						"time_sum": 9000
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"bucket_ms": 1000,
+						"credited": 1800,
+						"date": "2026-10-01",
+						"hs_in_c": 12,
+						"hs_in_t": 1200,
+						"llm_in_c": 4,
+						"llm_in_t": 400,
+						"time_sum": 400000
+					},
+					{
+						"app": "Code",
+						"bucket_ms": 2000,
+						"credited": 1180,
+						"date": "2026-10-01",
+						"hs_in_c": 9,
+						"hs_in_t": 900,
+						"llm_in_c": 4,
+						"llm_in_t": 400,
+						"time_sum": 290000
+					},
+					{
+						"app": "Wörd's \u0000x",
+						"bucket_ms": 1000,
+						"credited": 50,
+						"date": "2026-10-01",
+						"hs_in_c": 0,
+						"hs_in_t": 0,
+						"llm_in_c": 0,
+						"llm_in_t": 0,
+						"time_sum": 9000
+					}
+				]
+			}
+		},
+		"manifest.burst": {
+			"all": {
+				"native": [
+					{
+						"app": "Code",
+						"count_total": 4,
+						"date": "2026-10-02",
+						"inter_count": 60,
+						"inter_sum": 9000,
+						"inter_sumsq": 1500000,
+						"length_buckets_json": "{\"5\":4}",
+						"max_chars": 40,
+						"max_cpm": 300,
+						"source_rows": 1
+					},
+					{
+						"app": "Code",
+						"count_total": 42,
+						"date": "2026-10-01",
+						"inter_count": 900,
+						"inter_sum": 140000,
+						"inter_sumsq": 24000000,
+						"length_buckets_json": "{\"10\":20,\"50\":10}",
+						"max_chars": 180,
+						"max_cpm": 420.5,
+						"source_rows": 2
+					},
+					{
+						"app": "Wörd's ",
+						"count_total": 2,
+						"date": "2026-10-01",
+						"inter_count": 30,
+						"inter_sum": 4000,
+						"inter_sumsq": 600000,
+						"length_buckets_json": "{\"20\":2}",
+						"max_chars": 20,
+						"max_cpm": 200,
+						"source_rows": 1
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"count_total": 4,
+						"date": "2026-10-02",
+						"inter_count": 60,
+						"inter_sum": 9000,
+						"inter_sumsq": 1500000,
+						"length_buckets_json": "{\"5\":4}",
+						"max_chars": 40,
+						"max_cpm": 300,
+						"source_rows": 1
+					},
+					{
+						"app": "Code",
+						"count_total": 42,
+						"date": "2026-10-01",
+						"inter_count": 900,
+						"inter_sum": 140000,
+						"inter_sumsq": 24000000,
+						"length_buckets_json": "{\"10\":20,\"50\":10}",
+						"max_chars": 180,
+						"max_cpm": 420.5,
+						"source_rows": 2
+					},
+					{
+						"app": "Wörd's \u0000x",
+						"count_total": 2,
+						"date": "2026-10-01",
+						"inter_count": 30,
+						"inter_sum": 4000,
+						"inter_sumsq": 600000,
+						"length_buckets_json": "{\"20\":2}",
+						"max_chars": 20,
+						"max_cpm": 200,
+						"source_rows": 1
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"app": "Code",
+						"count_total": 42,
+						"date": "2026-10-01",
+						"inter_count": 900,
+						"inter_sum": 140000,
+						"inter_sumsq": 24000000,
+						"length_buckets_json": "{\"10\":20,\"50\":10}",
+						"max_chars": 180,
+						"max_cpm": 420.5,
+						"source_rows": 2
+					},
+					{
+						"app": "Wörd's ",
+						"count_total": 2,
+						"date": "2026-10-01",
+						"inter_count": 30,
+						"inter_sum": 4000,
+						"inter_sumsq": 600000,
+						"length_buckets_json": "{\"20\":2}",
+						"max_chars": 20,
+						"max_cpm": 200,
+						"source_rows": 1
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"count_total": 42,
+						"date": "2026-10-01",
+						"inter_count": 900,
+						"inter_sum": 140000,
+						"inter_sumsq": 24000000,
+						"length_buckets_json": "{\"10\":20,\"50\":10}",
+						"max_chars": 180,
+						"max_cpm": 420.5,
+						"source_rows": 2
+					},
+					{
+						"app": "Wörd's \u0000x",
+						"count_total": 2,
+						"date": "2026-10-01",
+						"inter_count": 30,
+						"inter_sum": 4000,
+						"inter_sumsq": 600000,
+						"length_buckets_json": "{\"20\":2}",
+						"max_chars": 20,
+						"max_cpm": 200,
+						"source_rows": 1
+					}
+				]
+			}
+		},
+		"manifest.session": {
+			"all": {
+				"native": [
+					{
+						"app": "Code",
+						"count_total": 2,
+						"date": "2026-10-01",
+						"durations_json": "[1200000,300000]",
+						"longest_chars": 700,
+						"longest_ms": 1200000,
+						"total_active_ms": 1500000
+					},
+					{
+						"app": "Code",
+						"count_total": 3,
+						"date": "2026-10-01",
+						"durations_json": "[600000,1800000,200000]",
+						"longest_chars": 900,
+						"longest_ms": 1800000,
+						"total_active_ms": 2600000
+					},
+					{
+						"app": "Mail",
+						"count_total": 1,
+						"date": "2026-10-03",
+						"durations_json": "[60000]",
+						"longest_chars": 90,
+						"longest_ms": 60000,
+						"total_active_ms": 60000
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"count_total": 2,
+						"date": "2026-10-01",
+						"durations_json": "[1200000,300000]",
+						"longest_chars": 700,
+						"longest_ms": 1200000,
+						"total_active_ms": 1500000
+					},
+					{
+						"app": "Code",
+						"count_total": 3,
+						"date": "2026-10-01",
+						"durations_json": "[600000,1800000,200000]",
+						"longest_chars": 900,
+						"longest_ms": 1800000,
+						"total_active_ms": 2600000
+					},
+					{
+						"app": "Mail",
+						"count_total": 1,
+						"date": "2026-10-03",
+						"durations_json": "[60000]",
+						"longest_chars": 90,
+						"longest_ms": 60000,
+						"total_active_ms": 60000
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"app": "Code",
+						"count_total": 2,
+						"date": "2026-10-01",
+						"durations_json": "[1200000,300000]",
+						"longest_chars": 700,
+						"longest_ms": 1200000,
+						"total_active_ms": 1500000
+					},
+					{
+						"app": "Code",
+						"count_total": 3,
+						"date": "2026-10-01",
+						"durations_json": "[600000,1800000,200000]",
+						"longest_chars": 900,
+						"longest_ms": 1800000,
+						"total_active_ms": 2600000
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"count_total": 2,
+						"date": "2026-10-01",
+						"durations_json": "[1200000,300000]",
+						"longest_chars": 700,
+						"longest_ms": 1200000,
+						"total_active_ms": 1500000
+					},
+					{
+						"app": "Code",
+						"count_total": 3,
+						"date": "2026-10-01",
+						"durations_json": "[600000,1800000,200000]",
+						"longest_chars": 900,
+						"longest_ms": 1800000,
+						"total_active_ms": 2600000
+					}
+				]
+			}
+		},
+		"manifest.chars_class": {
+			"all": {
+				"native": [
+					{
+						"app": "Code",
+						"date": "2026-10-01",
+						"digit": 200,
+						"first_min": "07:55",
+						"last_min": "18:40",
+						"letter": 1500,
+						"other": 20,
+						"punct": 160,
+						"space": 120
+					},
+					{
+						"app": "Code",
+						"date": "2026-10-02",
+						"digit": 50,
+						"first_min": null,
+						"last_min": null,
+						"letter": 200,
+						"other": 0,
+						"punct": 30,
+						"space": 20
+					},
+					{
+						"app": "Wörd's ",
+						"date": "2026-10-01",
+						"digit": 0,
+						"first_min": "12:00",
+						"last_min": "12:05",
+						"letter": 40,
+						"other": 0,
+						"punct": 5,
+						"space": 5
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"date": "2026-10-01",
+						"digit": 200,
+						"first_min": "07:55",
+						"last_min": "18:40",
+						"letter": 1500,
+						"other": 20,
+						"punct": 160,
+						"space": 120
+					},
+					{
+						"app": "Code",
+						"date": "2026-10-02",
+						"digit": 50,
+						"first_min": null,
+						"last_min": null,
+						"letter": 200,
+						"other": 0,
+						"punct": 30,
+						"space": 20
+					},
+					{
+						"app": "Wörd's \u0000x",
+						"date": "2026-10-01",
+						"digit": 0,
+						"first_min": "12:00",
+						"last_min": "12:05",
+						"letter": 40,
+						"other": 0,
+						"punct": 5,
+						"space": 5
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"app": "Code",
+						"date": "2026-10-01",
+						"digit": 200,
+						"first_min": "07:55",
+						"last_min": "18:40",
+						"letter": 1500,
+						"other": 20,
+						"punct": 160,
+						"space": 120
+					},
+					{
+						"app": "Wörd's ",
+						"date": "2026-10-01",
+						"digit": 0,
+						"first_min": "12:00",
+						"last_min": "12:05",
+						"letter": 40,
+						"other": 0,
+						"punct": 5,
+						"space": 5
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"date": "2026-10-01",
+						"digit": 200,
+						"first_min": "07:55",
+						"last_min": "18:40",
+						"letter": 1500,
+						"other": 20,
+						"punct": 160,
+						"space": 120
+					},
+					{
+						"app": "Wörd's \u0000x",
+						"date": "2026-10-01",
+						"digit": 0,
+						"first_min": "12:00",
+						"last_min": "12:05",
+						"letter": 40,
+						"other": 0,
+						"punct": 5,
+						"space": 5
+					}
+				]
+			}
+		},
+		"manifest.errors": {
+			"all": {
+				"native": [
+					{
+						"app": "Code",
+						"bs_total": 65,
+						"cascade_count": 5,
+						"cascade_max_len": 9,
+						"date": "2026-10-01",
+						"recovery_count": 50,
+						"recovery_sum": 20000
+					},
+					{
+						"app": "Mail",
+						"bs_total": 2,
+						"cascade_count": 0,
+						"cascade_max_len": 0,
+						"date": "2026-10-03",
+						"recovery_count": 2,
+						"recovery_sum": 900
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"bs_total": 65,
+						"cascade_count": 5,
+						"cascade_max_len": 9,
+						"date": "2026-10-01",
+						"recovery_count": 50,
+						"recovery_sum": 20000
+					},
+					{
+						"app": "Mail",
+						"bs_total": 2,
+						"cascade_count": 0,
+						"cascade_max_len": 0,
+						"date": "2026-10-03",
+						"recovery_count": 2,
+						"recovery_sum": 900
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"app": "Code",
+						"bs_total": 65,
+						"cascade_count": 5,
+						"cascade_max_len": 9,
+						"date": "2026-10-01",
+						"recovery_count": 50,
+						"recovery_sum": 20000
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"bs_total": 65,
+						"cascade_count": 5,
+						"cascade_max_len": 9,
+						"date": "2026-10-01",
+						"recovery_count": 50,
+						"recovery_sum": 20000
+					}
+				]
+			}
+		},
+		"manifest.ergo": {
+			"all": {
+				"native": [
+					{
+						"app": "Code",
+						"ar_count": 4,
+						"date": "2026-10-01",
+						"f_max": 7,
+						"focus_count": 6,
+						"focus_sum": 4200,
+						"h_max": 11
+					},
+					{
+						"app": "Mail",
+						"ar_count": 0,
+						"date": "2026-10-03",
+						"f_max": 2,
+						"focus_count": 1,
+						"focus_sum": 800,
+						"h_max": 4
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"ar_count": 4,
+						"date": "2026-10-01",
+						"f_max": 7,
+						"focus_count": 6,
+						"focus_sum": 4200,
+						"h_max": 11
+					},
+					{
+						"app": "Mail",
+						"ar_count": 0,
+						"date": "2026-10-03",
+						"f_max": 2,
+						"focus_count": 1,
+						"focus_sum": 800,
+						"h_max": 4
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"app": "Code",
+						"ar_count": 4,
+						"date": "2026-10-01",
+						"f_max": 7,
+						"focus_count": 6,
+						"focus_sum": 4200,
+						"h_max": 11
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"ar_count": 4,
+						"date": "2026-10-01",
+						"f_max": 7,
+						"focus_count": 6,
+						"focus_sum": 4200,
+						"h_max": 11
+					}
+				]
+			}
+		},
+		"manifest.layouts": {
+			"all": {
+				"native": [
+					{
+						"app": "Code",
+						"count": 10,
+						"date": "2026-10-01",
+						"layout": "azerty"
+					},
+					{
+						"app": "Code",
+						"count": 1890,
+						"date": "2026-10-01",
+						"layout": "ergopti"
+					},
+					{
+						"app": "Wörd's ",
+						"count": 50,
+						"date": "2026-10-01",
+						"layout": "ergopti"
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"count": 10,
+						"date": "2026-10-01",
+						"layout": "azerty"
+					},
+					{
+						"app": "Code",
+						"count": 1890,
+						"date": "2026-10-01",
+						"layout": "ergopti"
+					},
+					{
+						"app": "Wörd's \u0000x",
+						"count": 50,
+						"date": "2026-10-01",
+						"layout": "ergopti\u0000plus"
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"app": "Code",
+						"count": 10,
+						"date": "2026-10-01",
+						"layout": "azerty"
+					},
+					{
+						"app": "Code",
+						"count": 1890,
+						"date": "2026-10-01",
+						"layout": "ergopti"
+					},
+					{
+						"app": "Wörd's ",
+						"count": 50,
+						"date": "2026-10-01",
+						"layout": "ergopti"
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"count": 10,
+						"date": "2026-10-01",
+						"layout": "azerty"
+					},
+					{
+						"app": "Code",
+						"count": 1890,
+						"date": "2026-10-01",
+						"layout": "ergopti"
+					},
+					{
+						"app": "Wörd's \u0000x",
+						"count": 50,
+						"date": "2026-10-01",
+						"layout": "ergopti\u0000plus"
+					}
+				]
+			}
+		},
+		"manifest.kc_hold": {
+			"all": {
+				"native": [
+					{
+						"app": "Code",
+						"c": 60,
+						"date": "2026-10-01",
+						"h": 12,
+						"keycode": 56,
+						"mx": 1200,
+						"s": 13000,
+						"t": 48
+					},
+					{
+						"app": "Mail",
+						"c": 2,
+						"date": "2026-10-03",
+						"h": 0,
+						"keycode": 58,
+						"mx": 200,
+						"s": 300,
+						"t": 2
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"c": 60,
+						"date": "2026-10-01",
+						"h": 12,
+						"keycode": 56,
+						"mx": 1200,
+						"s": 13000,
+						"t": 48
+					},
+					{
+						"app": "Mail",
+						"c": 2,
+						"date": "2026-10-03",
+						"h": 0,
+						"keycode": 58,
+						"mx": 200,
+						"s": 300,
+						"t": 2
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"app": "Code",
+						"c": 60,
+						"date": "2026-10-01",
+						"h": 12,
+						"keycode": 56,
+						"mx": 1200,
+						"s": 13000,
+						"t": 48
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"c": 60,
+						"date": "2026-10-01",
+						"h": 12,
+						"keycode": 56,
+						"mx": 1200,
+						"s": 13000,
+						"t": 48
+					}
+				]
+			}
+		},
+		"manifest.media_keys": {
+			"all": {
+				"native": [
+					{
+						"app": "Code",
+						"c": 5,
+						"date": "2026-10-01",
+						"media_id": "media.play_pause"
+					},
+					{
+						"app": "Mail",
+						"c": 1,
+						"date": "2026-10-03",
+						"media_id": "media.next_track"
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"c": 5,
+						"date": "2026-10-01",
+						"media_id": "media.play_pause"
+					},
+					{
+						"app": "Mail",
+						"c": 1,
+						"date": "2026-10-03",
+						"media_id": "media.next_track"
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"app": "Code",
+						"c": 5,
+						"date": "2026-10-01",
+						"media_id": "media.play_pause"
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"c": 5,
+						"date": "2026-10-01",
+						"media_id": "media.play_pause"
+					}
+				]
+			}
+		},
+		"manifest.media_hold": {
+			"all": {
+				"native": [
+					{
+						"app": "Code",
+						"count": 5,
+						"date": "2026-10-01",
+						"hold_count": 2,
+						"max_ms": 700,
+						"media_id": "media.play_pause",
+						"sum_ms": 1500,
+						"tap_count": 3
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"count": 5,
+						"date": "2026-10-01",
+						"hold_count": 2,
+						"max_ms": 700,
+						"media_id": "media.play_pause",
+						"sum_ms": 1500,
+						"tap_count": 3
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"app": "Code",
+						"count": 5,
+						"date": "2026-10-01",
+						"hold_count": 2,
+						"max_ms": 700,
+						"media_id": "media.play_pause",
+						"sum_ms": 1500,
+						"tap_count": 3
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"count": 5,
+						"date": "2026-10-01",
+						"hold_count": 2,
+						"max_ms": 700,
+						"media_id": "media.play_pause",
+						"sum_ms": 1500,
+						"tap_count": 3
+					}
+				]
+			}
+		},
+		"manifest.titles": {
+			"all": {
+				"native": [
+					{
+						"app": "Code",
+						"c": 5,
+						"date": "2026-10-01",
+						"ms": 1000,
+						"title": "O'Brien"
+					},
+					{
+						"app": "Code",
+						"c": 500,
+						"date": "2026-10-01",
+						"ms": 1200000,
+						"title": "main.lua — ergopti"
+					},
+					{
+						"app": "Mail",
+						"c": 90,
+						"date": "2026-10-03",
+						"ms": 120000,
+						"title": "Inbox"
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"c": 5,
+						"date": "2026-10-01",
+						"ms": 1000,
+						"title": "O'Brien\u0000 notes"
+					},
+					{
+						"app": "Code",
+						"c": 500,
+						"date": "2026-10-01",
+						"ms": 1200000,
+						"title": "main.lua — ergopti"
+					},
+					{
+						"app": "Mail",
+						"c": 90,
+						"date": "2026-10-03",
+						"ms": 120000,
+						"title": "Inbox"
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"app": "Code",
+						"c": 5,
+						"date": "2026-10-01",
+						"ms": 1000,
+						"title": "O'Brien"
+					},
+					{
+						"app": "Code",
+						"c": 500,
+						"date": "2026-10-01",
+						"ms": 1200000,
+						"title": "main.lua — ergopti"
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"c": 5,
+						"date": "2026-10-01",
+						"ms": 1000,
+						"title": "O'Brien\u0000 notes"
+					},
+					{
+						"app": "Code",
+						"c": 500,
+						"date": "2026-10-01",
+						"ms": 1200000,
+						"title": "main.lua — ergopti"
+					}
+				]
+			}
+		},
+		"manifest.hourly": {
+			"all": {
+				"native": [
+					{
+						"app": "Code",
+						"c": 200,
+						"date": "2026-10-01",
+						"e": 4,
+						"e_buckets_json": "{\"1000\":4}",
+						"em": 4,
+						"es": 0,
+						"hour": "14",
+						"source_rows": 1
+					},
+					{
+						"app": "Code",
+						"c": 800,
+						"date": "2026-10-01",
+						"e": 24,
+						"e_buckets_json": "{\"1000\":8,\"2000\":2}",
+						"em": 20,
+						"es": 4,
+						"hour": "09",
+						"source_rows": 2
+					},
+					{
+						"app": "Mail",
+						"c": 90,
+						"date": "2026-10-03",
+						"e": 2,
+						"e_buckets_json": "{}",
+						"em": 2,
+						"es": 0,
+						"hour": "11",
+						"source_rows": 1
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"c": 200,
+						"date": "2026-10-01",
+						"e": 4,
+						"e_buckets_json": "{\"1000\":4}",
+						"em": 4,
+						"es": 0,
+						"hour": "14",
+						"source_rows": 1
+					},
+					{
+						"app": "Code",
+						"c": 800,
+						"date": "2026-10-01",
+						"e": 24,
+						"e_buckets_json": "{\"1000\":8,\"2000\":2}",
+						"em": 20,
+						"es": 4,
+						"hour": "09",
+						"source_rows": 2
+					},
+					{
+						"app": "Mail",
+						"c": 90,
+						"date": "2026-10-03",
+						"e": 2,
+						"e_buckets_json": "{}",
+						"em": 2,
+						"es": 0,
+						"hour": "11",
+						"source_rows": 1
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"app": "Code",
+						"c": 200,
+						"date": "2026-10-01",
+						"e": 4,
+						"e_buckets_json": "{\"1000\":4}",
+						"em": 4,
+						"es": 0,
+						"hour": "14",
+						"source_rows": 1
+					},
+					{
+						"app": "Code",
+						"c": 800,
+						"date": "2026-10-01",
+						"e": 24,
+						"e_buckets_json": "{\"1000\":8,\"2000\":2}",
+						"em": 20,
+						"es": 4,
+						"hour": "09",
+						"source_rows": 2
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"c": 200,
+						"date": "2026-10-01",
+						"e": 4,
+						"e_buckets_json": "{\"1000\":4}",
+						"em": 4,
+						"es": 0,
+						"hour": "14",
+						"source_rows": 1
+					},
+					{
+						"app": "Code",
+						"c": 800,
+						"date": "2026-10-01",
+						"e": 24,
+						"e_buckets_json": "{\"1000\":8,\"2000\":2}",
+						"em": 20,
+						"es": 4,
+						"hour": "09",
+						"source_rows": 2
+					}
+				]
+			}
+		},
+		"manifest.hourly_min5": {
+			"all": {
+				"native": [
+					{
+						"app": "Code",
+						"c": 200,
+						"date": "2026-10-01",
+						"e": 6,
+						"e_buckets_json": "{\"1000\":3}",
+						"es": 2,
+						"slot": "09:05",
+						"source_rows": 2
+					},
+					{
+						"app": "Code",
+						"c": 50,
+						"date": "2026-10-01",
+						"e": 1,
+						"e_buckets_json": "{\"2000\":1}",
+						"es": 0,
+						"slot": "14:30",
+						"source_rows": 1
+					},
+					{
+						"app": "Mail",
+						"c": 90,
+						"date": "2026-10-03",
+						"e": 2,
+						"e_buckets_json": "{}",
+						"es": 0,
+						"slot": "11:00",
+						"source_rows": 1
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"c": 200,
+						"date": "2026-10-01",
+						"e": 6,
+						"e_buckets_json": "{\"1000\":3}",
+						"es": 2,
+						"slot": "09:05",
+						"source_rows": 2
+					},
+					{
+						"app": "Code",
+						"c": 50,
+						"date": "2026-10-01",
+						"e": 1,
+						"e_buckets_json": "{\"2000\":1}",
+						"es": 0,
+						"slot": "14:30",
+						"source_rows": 1
+					},
+					{
+						"app": "Mail",
+						"c": 90,
+						"date": "2026-10-03",
+						"e": 2,
+						"e_buckets_json": "{}",
+						"es": 0,
+						"slot": "11:00",
+						"source_rows": 1
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"app": "Code",
+						"c": 200,
+						"date": "2026-10-01",
+						"e": 6,
+						"e_buckets_json": "{\"1000\":3}",
+						"es": 2,
+						"slot": "09:05",
+						"source_rows": 2
+					},
+					{
+						"app": "Code",
+						"c": 50,
+						"date": "2026-10-01",
+						"e": 1,
+						"e_buckets_json": "{\"2000\":1}",
+						"es": 0,
+						"slot": "14:30",
+						"source_rows": 1
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"c": 200,
+						"date": "2026-10-01",
+						"e": 6,
+						"e_buckets_json": "{\"1000\":3}",
+						"es": 2,
+						"slot": "09:05",
+						"source_rows": 2
+					},
+					{
+						"app": "Code",
+						"c": 50,
+						"date": "2026-10-01",
+						"e": 1,
+						"e_buckets_json": "{\"2000\":1}",
+						"es": 0,
+						"slot": "14:30",
+						"source_rows": 1
+					}
+				]
+			}
+		},
+		"manifest.switches_to": {
+			"all": {
+				"native": [
+					{
+						"app": "Code",
+						"app_to": "Mail",
+						"count": 15,
+						"date": "2026-10-01"
+					},
+					{
+						"app": "Code",
+						"app_to": "Wörd's ",
+						"count": 2,
+						"date": "2026-10-01"
+					},
+					{
+						"app": "Mail",
+						"app_to": "Code",
+						"count": 1,
+						"date": "2026-10-03"
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"app_to": "Mail",
+						"count": 15,
+						"date": "2026-10-01"
+					},
+					{
+						"app": "Code",
+						"app_to": "Wörd's \u0000x",
+						"count": 2,
+						"date": "2026-10-01"
+					},
+					{
+						"app": "Mail",
+						"app_to": "Code",
+						"count": 1,
+						"date": "2026-10-03"
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"app": "Code",
+						"app_to": "Mail",
+						"count": 15,
+						"date": "2026-10-01"
+					},
+					{
+						"app": "Code",
+						"app_to": "Wörd's ",
+						"count": 2,
+						"date": "2026-10-01"
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"app_to": "Mail",
+						"count": 15,
+						"date": "2026-10-01"
+					},
+					{
+						"app": "Code",
+						"app_to": "Wörd's \u0000x",
+						"count": 2,
+						"date": "2026-10-01"
+					}
+				]
+			}
+		},
+		"manifest.system_day": {
+			"all": {
+				"native": [
+					{
+						"audio_muted_ms": 0,
+						"awake_ms": 20000000,
+						"battery_count": 10,
+						"battery_max": 95,
+						"battery_min": 80,
+						"battery_sum": 900,
+						"date": "2026-10-03",
+						"locked_ms": 0,
+						"night_wake_count": 0,
+						"passive_count": 0,
+						"sleep_ms": 3600000,
+						"space_switches": 1,
+						"wifi_changes": 2
+					},
+					{
+						"audio_muted_ms": 0,
+						"awake_ms": 30000000,
+						"battery_count": 0,
+						"battery_max": null,
+						"battery_min": null,
+						"battery_sum": 0,
+						"date": "2026-10-02",
+						"locked_ms": 600000,
+						"night_wake_count": 0,
+						"passive_count": 1,
+						"sleep_ms": 0,
+						"space_switches": 2,
+						"wifi_changes": 0
+					},
+					{
+						"audio_muted_ms": 600000,
+						"awake_ms": 93600000,
+						"battery_count": 60,
+						"battery_max": 98,
+						"battery_min": 22,
+						"battery_sum": 4200,
+						"date": "2026-10-01",
+						"locked_ms": 3600000,
+						"night_wake_count": 1,
+						"passive_count": 4,
+						"sleep_ms": 28800000,
+						"space_switches": 7,
+						"wifi_changes": 4
+					}
+				],
+				"cli_json": [
+					{
+						"audio_muted_ms": 0,
+						"awake_ms": 20000000,
+						"battery_count": 10,
+						"battery_max": 95,
+						"battery_min": 80,
+						"battery_sum": 900,
+						"date": "2026-10-03",
+						"locked_ms": 0,
+						"night_wake_count": 0,
+						"passive_count": 0,
+						"sleep_ms": 3600000,
+						"space_switches": 1,
+						"wifi_changes": 2
+					},
+					{
+						"audio_muted_ms": 0,
+						"awake_ms": 30000000,
+						"battery_count": 0,
+						"battery_max": null,
+						"battery_min": null,
+						"battery_sum": 0,
+						"date": "2026-10-02",
+						"locked_ms": 600000,
+						"night_wake_count": 0,
+						"passive_count": 1,
+						"sleep_ms": 0,
+						"space_switches": 2,
+						"wifi_changes": 0
+					},
+					{
+						"audio_muted_ms": 600000,
+						"awake_ms": 93600000,
+						"battery_count": 60,
+						"battery_max": 98,
+						"battery_min": 22,
+						"battery_sum": 4200,
+						"date": "2026-10-01",
+						"locked_ms": 3600000,
+						"night_wake_count": 1,
+						"passive_count": 4,
+						"sleep_ms": 28800000,
+						"space_switches": 7,
+						"wifi_changes": 4
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"audio_muted_ms": 600000,
+						"awake_ms": 93600000,
+						"battery_count": 60,
+						"battery_max": 98,
+						"battery_min": 22,
+						"battery_sum": 4200,
+						"date": "2026-10-01",
+						"locked_ms": 3600000,
+						"night_wake_count": 1,
+						"passive_count": 4,
+						"sleep_ms": 28800000,
+						"space_switches": 7,
+						"wifi_changes": 4
+					}
+				],
+				"cli_json": [
+					{
+						"audio_muted_ms": 600000,
+						"awake_ms": 93600000,
+						"battery_count": 60,
+						"battery_max": 98,
+						"battery_min": 22,
+						"battery_sum": 4200,
+						"date": "2026-10-01",
+						"locked_ms": 3600000,
+						"night_wake_count": 1,
+						"passive_count": 4,
+						"sleep_ms": 28800000,
+						"space_switches": 7,
+						"wifi_changes": 4
+					}
+				]
+			}
+		}
+	}
+}

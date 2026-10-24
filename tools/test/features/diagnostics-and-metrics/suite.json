@@ -385,6 +385,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-sql-census.cjs"],
 			"repro": "node tools/test/test-keystats-sql-census.cjs"
+		},
+		{
+			"id": "keystats-query-catalogue",
+			"ordinal": 469,
+			"name": "keystats named-query catalogue returns the legacy rows on a realistic fixture in both dialects and its compiled outputs are current",
+			"cmd": "node",
+			"args": ["tools/test/test-keystats-query-catalogue.cjs"],
+			"repro": "node tools/test/test-keystats-query-catalogue.cjs"
 		}
 	]
 }
