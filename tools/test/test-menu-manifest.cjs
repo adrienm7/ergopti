@@ -1176,7 +1176,7 @@ function checkTokenStreamingControl() {
 		i18n: corpus.row.i18n,
 		platforms: ['hs', 'linux'],
 		unavailable: 'grey',
-		reason_key: 'platform_reason.token_streaming_transport_missing',
+		reason_key: 'platform_reason.token_streaming_unvalidated_on_windows',
 		checked_when: ['llm_token_streaming_enabled'],
 		disabled_when: ['llm_token_streaming_ready']
 	});

@@ -3479,7 +3479,7 @@
 	"dialog.start_at_login.failed": "自動起動を変更できませんでした。システムの起動設定を確認してください。",
 	"onboarding.error.open_failed": "設定ウィザードを開けませんでした。ログを確認し、メニューから再試行してください。",
 	"platform_reason.tap_hold_word_reset_not_on_macos": "macOS では使えません：そこではタップホールドを Karabiner-Elements が処理し、その出力はキーボードで入力したキーとして届くため、タップホールドが送るショートカットはショートカットの設定に従います。",
-	"platform_reason.token_streaming_transport_missing": "Windows ではまだ非対応: トークンごとの表示は Windows で検証されていないため、このオプションは無効のままです。",
+	"platform_reason.token_streaming_unvalidated_on_windows": "Windows ではまだ非対応: トークンごとの表示は Windows で検証されていないため、このオプションは無効のままです。",
 	"menu.layout.number_row": "数字列",
 	"menu.layout.number_row_native": "システムの順序",
 	"menu.layout.number_row_digits": "数字を優先",

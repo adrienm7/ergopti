@@ -3479,7 +3479,7 @@
 	"dialog.start_at_login.failed": "Не удалось изменить автозапуск. Проверьте настройки автозапуска системы.",
 	"onboarding.error.open_failed": "Не удалось открыть мастер настройки. Проверьте журналы и повторите попытку через меню.",
 	"platform_reason.tap_hold_word_reset_not_on_macos": "Не в macOS: там клавишами касание-удержание управляет Karabiner-Elements, и то, что они отправляют, приходит как клавиши, набранные на клавиатуре, поэтому сочетание, отправленное такой клавишей, подчиняется настройке сочетаний клавиш.",
-	"platform_reason.token_streaming_transport_missing": "Пока не в Windows: отображение токен за токеном не проверено в Windows, поэтому этот параметр остаётся неактивным.",
+	"platform_reason.token_streaming_unvalidated_on_windows": "Пока не в Windows: отображение токен за токеном не проверено в Windows, поэтому этот параметр остаётся неактивным.",
 	"menu.layout.number_row": "Цифровой ряд",
 	"menu.layout.number_row_native": "Системный порядок",
 	"menu.layout.number_row_digits": "Сначала цифры",

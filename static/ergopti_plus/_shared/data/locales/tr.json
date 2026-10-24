@@ -3479,7 +3479,7 @@
 	"dialog.start_at_login.failed": "Otomatik başlatma değiştirilemedi. Sistemin başlangıç ayarlarını kontrol edin.",
 	"onboarding.error.open_failed": "Kurulum sihirbazı açılamadı. Günlükleri kontrol edip menüden yeniden deneyin.",
 	"platform_reason.tap_hold_word_reset_not_on_macos": "macOS’ta yok: orada dokunma-basılı tutma tuşlarını Karabiner-Elements yönetir ve gönderdikleri klavyede yazılmış tuşlar gibi ulaşır; bu yüzden böyle bir tuşun gönderdiği kısayol, kısayollar seçeneğine uyar.",
-	"platform_reason.token_streaming_transport_missing": "Henüz Windows'ta yok: belirteç belirteç gösterim Windows'ta doğrulanmadı, bu yüzden bu seçenek devre dışı kalır.",
+	"platform_reason.token_streaming_unvalidated_on_windows": "Henüz Windows'ta yok: belirteç belirteç gösterim Windows'ta doğrulanmadı, bu yüzden bu seçenek devre dışı kalır.",
 	"menu.layout.number_row": "Sayı satırı",
 	"menu.layout.number_row_native": "Sistemin sırası",
 	"menu.layout.number_row_digits": "Önce rakamlar",
