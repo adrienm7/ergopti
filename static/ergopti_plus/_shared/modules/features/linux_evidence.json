@@ -930,6 +930,96 @@
 				"static/ergopti_plus/_shared/lua/test/number_row_policy_contract.lua",
 				"static/ergopti_plus/linux/ui/menu/menu_builder.lua"
 			]
+		},
+		"hotstrings.expansion_delay": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "no",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua",
+				"static/ergopti_plus/linux/modules/hotstrings/expansion_delay.lua",
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_expansion_delay.lua"
+			]
+		},
+		"layout.on_pause": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/infra/pause_layout_preferences.lua",
+				"static/ergopti_plus/linux/modules/keymap/pause_layout_switch.lua",
+				"static/ergopti_plus/linux/adapters/input_source_switch.lua",
+				"static/ergopti_plus/linux/ui/menu/pause_layout_rows.lua",
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/preferences/test_pause_layout_preferences.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_pause_layout_switch.lua",
+				"static/ergopti_plus/linux/tests/unit/adapters/layout/test_input_source_switch.lua",
+				"static/ergopti_plus/linux/tests/unit/ui/menu/structure/test_pause_layout_rows.lua"
+			]
+		},
+		"layout.on_resume": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/infra/pause_layout_preferences.lua",
+				"static/ergopti_plus/linux/modules/keymap/pause_layout_switch.lua",
+				"static/ergopti_plus/linux/adapters/input_source_switch.lua",
+				"static/ergopti_plus/linux/ui/menu/pause_layout_rows.lua",
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/preferences/test_pause_layout_preferences.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_pause_layout_switch.lua",
+				"static/ergopti_plus/linux/tests/unit/adapters/layout/test_input_source_switch.lua",
+				"static/ergopti_plus/linux/tests/unit/ui/menu/structure/test_pause_layout_rows.lua"
+			]
+		},
+		"layout.pause_switch_enabled": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/infra/pause_layout_preferences.lua",
+				"static/ergopti_plus/linux/modules/keymap/pause_layout_switch.lua",
+				"static/ergopti_plus/linux/adapters/input_source_switch.lua",
+				"static/ergopti_plus/linux/ui/menu/pause_layout_rows.lua",
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/preferences/test_pause_layout_preferences.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_pause_layout_switch.lua",
+				"static/ergopti_plus/linux/tests/unit/adapters/layout/test_input_source_switch.lua",
+				"static/ergopti_plus/linux/tests/unit/ui/menu/structure/test_pause_layout_rows.lua"
+			]
+		},
+		"metrics.disabled_apps": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/keystats/keystats.lua",
+				"static/ergopti_plus/linux/ui/menu/app_exclusion_rows.lua",
+				"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/preferences/test_metrics_preferences.lua"
+			]
 		}
 	}
 }
