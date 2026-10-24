@@ -221,7 +221,8 @@ function M.new(platform, raw, ports)
 			elseif not info.executable then return nil, "stale_discovery" end
 			for _, value in ipairs(arguments) do argv[#argv + 1] = value end
 			local scalar = Json.encode({ version = 1, executable = executable, arguments = Json.array(argv) })
-			if not Parameter.parse(scalar, platform) then return nil, "invalid_program" end
+			-- Both Lua drivers launch a POSIX executable.
+			if not Parameter.parse(scalar, "posix") then return nil, "invalid_program" end
 			if not guard(snapshot) then return nil, "stale_discovery" end
 			return scalar
 		end)

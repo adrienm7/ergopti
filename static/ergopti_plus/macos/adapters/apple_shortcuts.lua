@@ -236,7 +236,7 @@ function M.new(ports)
 				or data.rows[1].accepts_input ~= selected.accepts_input then finish(nil, "stale_discovery"); return end
 			local scalar = Json.encode({ version = 1, executable = selected.cli.executable,
 				arguments = Json.array({ "run", selected.id }) })
-			if not Parameter.parse(scalar, "hs") then finish(nil, "invalid_program"); return end
+			if not Parameter.parse(scalar, "posix") then finish(nil, "invalid_program"); return end
 			finish(scalar)
 		end)
 	end

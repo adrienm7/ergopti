@@ -2454,7 +2454,7 @@ function M.validate_action_parameter(action, value)
 	if spec == "llm_language" then return require("modules.llm.selection_translation").is_valid(value) end
 	-- Syntax only: whether the application is installed is checked when it opens
 	if spec == "app" then return AppParameter.is_valid(value) end
-	if spec == "program" then return ProgramParameter.parse(value, "hs") ~= nil end
+	if spec == "program" then return ProgramParameter.parse(value, "posix") ~= nil end
 	if SendInput.KINDS[spec] then return SendInput.parse(spec, value, M.send_vocabulary()) ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
@@ -2663,7 +2663,7 @@ function M.run_program(binding)
 		local Toml = require("infra.toml.codec")
 		local path = ConfigPaths.get("ConfigTomlPath")
 		local scalar = M.get_action_parameter(binding, "run_program")
-		local parsed = ProgramParameter.parse(scalar, "hs")
+		local parsed = ProgramParameter.parse(scalar, "posix")
 		if not parsed then return false end
 		local function binding_action()
 			if type(_state.ga) == "table" and _state.ga[binding] ~= nil then

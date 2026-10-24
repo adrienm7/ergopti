@@ -190,7 +190,15 @@ const IDS = [
 ];
 for (const id of IDS) check(html.includes(`id="${id}"`), `index.html must declare #${id}`);
 
-function loadPage(platform, current) {
+// Each host's capability flags, as test-action-picker-bridge.cjs pins them in
+// the host sources: the page reads these, never a platform name.
+const HOSTS = {
+	ahk: { executableSyntax: 'windows', commandIsPrimary: false },
+	hs: { executableSyntax: 'posix', commandIsPrimary: true },
+	linux: { executableSyntax: 'posix', commandIsPrimary: false }
+};
+
+function loadPage(host, current) {
 	const byId = {};
 	for (const id of IDS) byId[id] = new FakeElement('div', id);
 	const docListeners = {};
@@ -218,11 +226,13 @@ function loadPage(platform, current) {
 	for (const fn of docListeners.DOMContentLoaded || []) fn();
 	posted.length = 0;
 	context.__vocabulary = JSON.parse(fs.readFileSync(VOCABULARY, 'utf8'));
-	context.__platform = platform;
+	context.__capabilities = HOSTS[host];
 	context.__current = current || 'none';
 	vm.runInContext(
 		`init({
-			title: 'T', current: __current, noneLabel: 'Nothing', platform: __platform,
+			title: 'T', current: __current, noneLabel: 'Nothing',
+			executableSyntax: __capabilities.executableSyntax,
+			commandIsPrimary: __capabilities.commandIsPrimary,
 			sendVocabulary: __vocabulary,
 			editCurrentLabel: 'Edit current',
 			promptChoices: [{ value: 'basic', label: 'Basic' }, { value: 'rewrite', label: 'Rewrite' },
@@ -670,8 +680,8 @@ function loadPage(platform, current) {
 
 // 10. Free language entry belongs to the host's existing InputBox, on all drivers.
 // The page must not synthesize a locale or overwrite the stored binding value.
-for (const platform of ['ahk', 'hs', 'linux']) {
-	const page = loadPage(platform);
+for (const host of ['ahk', 'hs', 'linux']) {
+	const page = loadPage(host);
 	vm.runInContext("doConfirm('llm_translate_selection')", page.context);
 	check(page.posted.length === 1, 'language choice is handed off once');
 	const handoff = page.posted[0];
@@ -705,8 +715,8 @@ for (const platform of ['ahk', 'hs', 'linux']) {
 
 // 11. The editor stores an executable and literal ordered arguments, including
 // empty strings and line breaks, without interpreting shell syntax.
-for (const platform of ['ahk', 'hs', 'linux']) {
-	const page = loadPage(platform);
+for (const host of ['ahk', 'hs', 'linux']) {
+	const page = loadPage(host);
 	vm.runInContext("doConfirm('run_program')", page.context);
 	check(
 		page.posted.length === 0 && page.byId['param-program'].hidden === false,
@@ -718,7 +728,7 @@ for (const platform of ['ahk', 'hs', 'linux']) {
 		'host executable label is forwarded'
 	);
 	page.byId['param-program-executable'].value =
-		platform === 'ahk' ? 'C:\\Program Files\\été.exe' : '/private/été 日本 program';
+		host === 'ahk' ? 'C:\\Program Files\\été.exe' : '/private/été 日本 program';
 	const literal = ['', 'two words', ' padded ', '日本語', '%TOKEN%;$(literal)', 'line\nnext'];
 	for (const argument of literal) {
 		page.byId['param-program-add'].dispatch('click');
@@ -749,7 +759,7 @@ for (const platform of ['ahk', 'hs', 'linux']) {
 }
 
 // 12. Independent shared vectors reject duplicate, null, bool/version and
-// malformed argument shapes across each actual picker platform.
+// malformed argument shapes across each actual picker host's executable syntax.
 {
 	const corpus = JSON.parse(
 		fs.readFileSync(
@@ -759,23 +769,53 @@ for (const platform of ['ahk', 'hs', 'linux']) {
 	);
 	let count = 0;
 	for (const vector of corpus.cases)
-		for (const platform of vector.platforms) {
-			const page = loadPage(platform);
+		for (const host of Object.keys(HOSTS).filter((name) =>
+			vector.syntaxes.includes(HOSTS[name].executableSyntax)
+		)) {
+			const page = loadPage(host);
 			page.context.__raw = vector.value;
-			const parsed = vm.runInContext('ProgramParameter.parse(__raw, hostPlatform)', page.context);
+			const parsed = vm.runInContext(
+				'ProgramParameter.parse(__raw, executableSyntax)',
+				page.context
+			);
 			check(
 				JSON.stringify(parsed) === JSON.stringify(vector.expected),
-				`${vector.id}/${platform}: program codec disagrees with independent vector`
+				`${vector.id}/${host}: program codec disagrees with independent vector`
 			);
 			count += 1;
 		}
 	check(count >= 63, 'all independent program vectors execute');
 }
 
+// 12b. A host that enables the editor must state its capabilities: the page
+// refuses to guess a path syntax or a primary modifier.
+for (const missing of ['executableSyntax', 'commandIsPrimary']) {
+	const page = loadPage('linux');
+	page.context.__missing = missing;
+	const refused = vm.runInContext(
+		`(() => {
+			const data = { title: 'T', current: 'none', parameterStrings: { save: 'Save' },
+				executableSyntax: 'posix', commandIsPrimary: false };
+			delete data[__missing];
+			try { init(data); return false; } catch (error) { return /executableSyntax/.test(error.message); }
+		})()`,
+		page.context
+	);
+	check(refused, `init without ${missing} is refused`);
+}
+{
+	const page = loadPage('linux');
+	page.context.__raw = JSON.stringify({ version: 1, executable: '/bin/true', arguments: [] });
+	check(
+		vm.runInContext("ProgramParameter.parse(__raw, 'linux')", page.context) === null,
+		'a platform name is not an executable syntax'
+	);
+}
+
 // 13. Discovered scripts lower only in the native owner; the page cannot forge
 // executable paths and a refusal keeps literal arguments available for retry.
-for (const platform of ['hs', 'linux', 'ahk']) {
-	const page = loadPage(platform);
+for (const host of ['hs', 'linux', 'ahk']) {
+	const page = loadPage(host);
 	vm.runInContext(
 		`programProviders = {
 		choices: [{key:'1:1', label:'été 日本.py'}], truncated:false
@@ -917,7 +957,7 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 	});
 	page.context.__reason = 'Translated unavailable <script>日本</script>';
 	vm.runInContext(
-		`init({ title:'T', platform:'hs', current:'run_program',
+		`init({ title:'T', executableSyntax:'posix', commandIsPrimary:true, current:'run_program',
 		editCurrentLabel:'Edit current', parameterStrings:{save:'Save'},
 		items:[{type:'action',id:'run_program',label:'Run program',parameter:'program',
 			parameterValue:__stored,hint:__reason}] });`,

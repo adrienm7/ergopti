@@ -117,12 +117,12 @@ helpers.describe("shared private program discovery", function()
 			helpers.assert_eq(fields, 3)
 		end
 		local args = { "", "quote'\"", "$(not-run)`literal`", "%PATH%", "e\204\129\n" }
-		local parsed = assert(Parameter.parse(assert(f.owner.resolve(key, args)), "linux"))
+		local parsed = assert(Parameter.parse(assert(f.owner.resolve(key, args)), "posix"))
 		helpers.assert_eq(parsed.executable, "/native/sh")
 		helpers.assert_eq(parsed.arguments[1], ROOT .. "/écho.sh")
 		for index, value in ipairs(args) do helpers.assert_eq(parsed.arguments[index + 1], value) end
 		key = f.key("native")
-		parsed = assert(Parameter.parse(assert(f.owner.resolve(key, {})), "linux"))
+		parsed = assert(Parameter.parse(assert(f.owner.resolve(key, {})), "posix"))
 		helpers.assert_eq(parsed.executable, ROOT .. "/native")
 		helpers.assert_eq(#parsed.arguments, 0)
 	end)
@@ -238,7 +238,7 @@ helpers.describe("POSIX PowerShell provider literal contract", function()
 			helpers.assert_eq(packet.choices[1].label, f.names[1])
 			local arguments = { "", "two words", "日本", "e\204\129", "$(literal)`quote`'\"", "one\ntwo" }
 			local scalar = assert(f.owner.resolve(packet.choices[1].key, arguments))
-			local parsed = assert(Parameter.parse(scalar, platform))
+			local parsed = assert(Parameter.parse(scalar, "posix"))
 			helpers.assert_eq(parsed.executable, "/native/pwsh")
 			helpers.assert_eq(parsed.arguments, {
 				"-NoProfile", "-NonInteractive", "-File", ROOT .. "/" .. f.names[1],
