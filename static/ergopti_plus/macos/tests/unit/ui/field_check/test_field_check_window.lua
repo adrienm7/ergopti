@@ -59,7 +59,7 @@ helpers.describe("field check menu rows", function()
 		end)
 	end)
 
-	helpers.it("declares every row once for macOS only, with a reason, and wires it in the builder", function()
+	helpers.it("declares every Mac row once for macOS only, with a reason, and wires every row in the builder", function()
 		local file = assert(io.open(helpers.shared("modules/menu/menu_manifest.json"), "rb"))
 		local manifest = hs.json.decode(file:read("*a"))
 		file:close()
@@ -79,7 +79,18 @@ helpers.describe("field check menu rows", function()
 				helpers.assert_type(row.reason_key, "string")
 				helpers.assert_true(builder:find('["' .. id .. '"]', 1, true) ~= nil, "builder does not wire " .. id)
 			end
-			for id in pairs(rows) do helpers.assert_not_nil(Window.ROWS[id], "row without a check: " .. id) end
+			for id, entry in pairs(Window.SHARED_ROWS) do
+				local row = rows[id]
+				if id:find("^field_check_") then
+					helpers.assert_not_nil(row, "manifest row missing: " .. id)
+					helpers.assert_eq(row.i18n, entry.title)
+					helpers.assert_nil(row.platforms, id .. " runs on every driver")
+					helpers.assert_true(builder:find('["' .. id .. '"]', 1, true) ~= nil, "builder does not wire " .. id)
+				end
+			end
+			for id in pairs(rows) do
+				helpers.assert_true(Window.ROWS[id] ~= nil or Window.SHARED_ROWS[id] ~= nil, "row without a check: " .. id)
+			end
 		end)
 	end)
 end)
