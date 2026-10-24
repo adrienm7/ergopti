@@ -1126,7 +1126,8 @@
 			"id": "apps_installed",
 			"platforms": [
 				"hs"
-			]
+			],
+			"reason_key": "platform_reason.tray_top_level_rows_are_each_drivers"
 		}
 	],
 	"language_menu": [
@@ -1310,11 +1311,7 @@
 		{
 			"type": "command",
 			"id": "field_check_network",
-			"i18n": "menu.debug.field_check_network",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
+			"i18n": "menu.debug.field_check_network"
 		},
 		{
 			"type": "command",
@@ -2196,12 +2193,7 @@
 			"id": "exclude_apps",
 			"disabled_when": [
 				"keystats_enabled"
-			],
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.metrics_extras_are_not_on_linux"
+			]
 		},
 		{
 			"type": "---"
@@ -2218,31 +2210,20 @@
 			]
 		},
 		{
-			"type": "---",
-			"platforms": [
-				"linux"
-			]
+			"type": "---"
 		},
 		{
 			"type": "check",
 			"id": "metrics_suspend",
-			"i18n": "menu.global.suspend",
+			"i18n": "menu.metrics.suspend_collection",
 			"checked_when": [
-				"metrics_suppressed"
-			],
-			"platforms": [
-				"linux"
-			],
-			"reason_key": "platform_reason.metrics_collection_is_in_process_on_linux"
+				"metrics_suspended"
+			]
 		},
 		{
 			"type": "command",
 			"id": "metrics_reset_session",
-			"i18n": "menu.metrics.reset_session",
-			"platforms": [
-				"linux"
-			],
-			"reason_key": "platform_reason.metrics_collection_is_in_process_on_linux"
+			"i18n": "menu.metrics.reset_session"
 		},
 		{
 			"type": "list",
@@ -2513,28 +2494,32 @@
 			"id": "e_grave",
 			"platforms": [
 				"ahk"
-			]
+			],
+			"reason_key": "platform_reason.accented_shortcuts_are_windows"
 		},
 		{
 			"type": "letter_picker",
 			"id": "e_circ",
 			"platforms": [
 				"ahk"
-			]
+			],
+			"reason_key": "platform_reason.accented_shortcuts_are_windows"
 		},
 		{
 			"type": "letter_picker",
 			"id": "e_acute",
 			"platforms": [
 				"ahk"
-			]
+			],
+			"reason_key": "platform_reason.accented_shortcuts_are_windows"
 		},
 		{
 			"type": "letter_picker",
 			"id": "a_grave",
 			"platforms": [
 				"ahk"
-			]
+			],
+			"reason_key": "platform_reason.accented_shortcuts_are_windows"
 		}
 	],
 	"hotstrings_menu": [
@@ -2633,7 +2618,8 @@
 			"type": "---",
 			"platforms": [
 				"linux"
-			]
+			],
+			"unavailable": "hide"
 		},
 		{
 			"type": "command",
@@ -2724,20 +2710,11 @@
 			"id": "magic_key_config"
 		},
 		{
-			"type": "---",
-			"platforms": [
-				"hs",
-				"linux"
-			]
+			"type": "---"
 		},
 		{
 			"type": "list",
-			"id": "preview_bubbles",
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+			"id": "preview_bubbles"
 		},
 		{
 			"type": "check",
@@ -2851,13 +2828,7 @@
 			],
 			"disabled_when": [
 				"preview_colored_ready"
-			],
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+			]
 		}
 	],
 	"preview_magic_control": [
@@ -2870,13 +2841,7 @@
 			],
 			"disabled_when": [
 				"preview_magic_ready"
-			],
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+			]
 		}
 	],
 	"preview_presence_controls": [
@@ -2889,13 +2854,7 @@
 			],
 			"disabled_when": [
 				"preview_presence_ready"
-			],
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+			]
 		},
 		{
 			"type": "check",
@@ -2906,13 +2865,7 @@
 			],
 			"disabled_when": [
 				"preview_presence_ready"
-			],
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "grey",
-			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+			]
 		}
 	],
 	"gestures_menu": [
@@ -2980,7 +2933,8 @@
 			"type": "---",
 			"platforms": [
 				"hs"
-			]
+			],
+			"unavailable": "hide"
 		},
 		{
 			"type": "list",
@@ -2994,7 +2948,8 @@
 			"type": "---",
 			"platforms": [
 				"hs"
-			]
+			],
+			"unavailable": "hide"
 		},
 		{
 			"type": "list",
@@ -3008,7 +2963,8 @@
 			"type": "---",
 			"platforms": [
 				"hs"
-			]
+			],
+			"unavailable": "hide"
 		},
 		{
 			"type": "list",
@@ -3045,7 +3001,8 @@
 			"type": "---",
 			"platforms": [
 				"linux"
-			]
+			],
+			"unavailable": "hide"
 		},
 		{
 			"type": "list",
@@ -3158,7 +3115,8 @@
 			"type": "---",
 			"platforms": [
 				"hs"
-			]
+			],
+			"unavailable": "hide"
 		},
 		{
 			"type": "section_header",
@@ -4021,6 +3979,26 @@
 			"row_id": "llm_profile_create"
 		}
 	],
+	"llm_profile_lua_app_overrides": [
+		{
+			"type": "---",
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "group",
+			"id": "llm_profile_app_overrides",
+			"i18n": "menu.profiles.per_app_overrides",
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"llm_profile_windows_frame": [
 		{
 			"type": "include",
@@ -4219,38 +4197,18 @@
 	"hotstrings_preview_frame": [
 		{
 			"type": "list",
-			"id": "parameter_preview_magic",
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
+			"id": "parameter_preview_magic"
 		},
 		{
 			"type": "list",
-			"id": "parameter_preview_presence",
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
+			"id": "parameter_preview_presence"
 		},
 		{
-			"type": "---",
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
+			"type": "---"
 		},
 		{
 			"type": "list",
-			"id": "parameter_preview_colored",
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
+			"id": "parameter_preview_colored"
 		}
 	],
 	"hotstrings_delays_frame": [
@@ -4364,12 +4322,7 @@
 			"i18n": "menu.hotstrings.preview_bubbles",
 			"disabled_when": [
 				"parameter_parent_ready"
-			],
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
+			]
 		}
 	],
 	"hotstrings_delays_parent": [
@@ -5099,11 +5052,7 @@
 		{
 			"type": "command",
 			"id": "llm_profile_override_active_app",
-			"i18n": "menu.profiles.override_active_app_with_current",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "hide"
+			"i18n": "menu.profiles.override_active_app_with_current"
 		},
 		{
 			"type": "include",
@@ -5113,19 +5062,11 @@
 	],
 	"llm_profile_app_override_children": [
 		{
-			"type": "---",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "hide"
+			"type": "---"
 		},
 		{
 			"type": "list",
-			"id": "llm_profile_override_rows",
-			"platforms": [
-				"ahk"
-			],
-			"unavailable": "hide"
+			"id": "llm_profile_override_rows"
 		}
 	],
 	"llm_modifier_picker_frame": [

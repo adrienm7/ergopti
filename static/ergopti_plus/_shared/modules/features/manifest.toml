@@ -162,6 +162,7 @@ platforms = ["ahk", "hs", "linux"]
 [sections.hotstrings.order_overrides]
 description_key = "menu.hotstrings"
 platforms = ["hs"]
+reason_key = "platform_reason.hotstring_menu_order_is_macos"
 
 
 
@@ -226,6 +227,7 @@ subsections = ["caps_word", "key_combination_taps", "keyboard", "personal", "scr
 [sections.category_enabled]
 description_key = "menu.category_enabled"
 platforms = ["ahk"]
+reason_key = "platform_reason.category_gates_are_windows"
 
 [sections.layout]
 description_key = "menu.layout"
@@ -236,6 +238,7 @@ platforms = ["ahk", "hs"]
 [sections.ui]
 description_key = "menu.ui"
 platforms = ["hs"]
+reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
 # Linux native simultaneous timing and symmetry. Third slots remain neutral.
 [sections.mod_combos]
@@ -250,10 +253,12 @@ platforms = ["ahk", "linux"]
 [sections.shortcuts.keyboard]
 description_key = "menu.shortcuts.keyboard"
 platforms = ["ahk"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [sections.shortcuts.personal]
 description_key = "menu.shortcuts.personal"
 platforms = ["ahk"]
+reason_key = "platform_reason.personal_shortcut_switches_are_windows"
 
 [sections.shortcuts.script_control]
 description_key = "menu.shortcuts.script_control"
@@ -263,6 +268,7 @@ platforms = ["ahk", "hs", "linux"]
 [sections.shortcuts.wrap_symbols]
 description_key = "menu.shortcuts.wrap_symbols"
 platforms = ["hs"]
+reason_key = "platform_reason.wrap_symbols_store_is_macos"
 
 [sections.shortcuts.tap_keys]
 description_key = "menu.shortcuts.header_tap_keys"
@@ -306,10 +312,12 @@ subsections = ["modes", "sensitivities"]
 [sections.gestures.modes]
 description_key = "menu.gestures.modes"
 platforms = ["hs"]
+reason_key = "platform_reason.gesture_modes_and_steps_are_macos"
 
 [sections.gestures.sensitivities]
 description_key = "menu.gestures.sensitivities"
 platforms = ["hs"]
+reason_key = "platform_reason.gesture_modes_and_steps_are_macos"
 
 
 
@@ -393,6 +401,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.hotstrings"
 platforms = ["hs"]
+reason_key = "platform_reason.hotstrings_master_is_macos_engine"
 
 [[features.hotstrings.dynamic]]
 id = "enabled"
@@ -1231,6 +1240,7 @@ input_altering = false
 type = "boolean"
 description_key = "menu.llm.onboarding_seen"
 platforms = ["ahk"]
+reason_key = "platform_reason.ai_menu_bookkeeping_is_windows"
 
 [[features.llm]]
 id = "app_profile_overrides"
@@ -1239,7 +1249,7 @@ recommended = ""
 input_altering = false
 type = "string"
 description_key = "menu.llm.app_profile_overrides"
-platforms = ["ahk"]
+platforms = ["ahk", "hs", "linux"]
 
 [[features.llm]]
 id = "user_profiles"
@@ -1248,7 +1258,7 @@ recommended = ""
 input_altering = false
 type = "string"
 description_key = "menu.llm.profiles"
-platforms = ["ahk", "linux"]
+platforms = ["ahk", "hs", "linux"]
 
 [[features.llm]]
 id = "agent_system1"
@@ -1449,15 +1459,6 @@ reason_key = "platform_reason.llm_mlx_is_apple_silicon"
 # ==============================
 
 [[features.llm.profiles]]
-id = "user_profiles"
-default = []
-recommended = []
-input_altering = false
-type = "array"
-description_key = "menu.profiles.header_custom_profiles"
-platforms = ["hs"]
-
-[[features.llm.profiles]]
 id = "active"
 default = "basic"
 recommended = "basic"
@@ -1495,7 +1496,6 @@ recommended = []
 input_altering = false
 type = "array"
 description_key = "menu.llm.title"
-platforms = ["ahk", "hs"]
 
 [[features.llm.trigger]]
 id = "debounce_ms"
@@ -1529,6 +1529,7 @@ input_altering = false
 type = "boolean"
 description_key = "menu.llm.trigger.inline_autotype"
 platforms = ["ahk"]
+reason_key = "platform_reason.inline_autotype_is_windows"
 
 [[features.llm.trigger]]
 id = "secure_filter_enabled"
@@ -1585,6 +1586,7 @@ input_altering = false
 type = "boolean"
 description_key = "menu.llm.navigation.arrow_nav_enabled"
 platforms = ["hs"]
+reason_key = "platform_reason.arrow_navigation_is_macos"
 
 
 
@@ -1725,6 +1727,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.shortcuts.get_hex_value"
 platforms = ["ahk"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts]]
 id = "gpt"
@@ -1734,6 +1737,7 @@ input_altering = true
 type = "feature"
 description_key = "menu.shortcuts.gpt"
 platforms = ["ahk"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts]]
 id = "search"
@@ -1743,6 +1747,7 @@ input_altering = true
 type = "feature"
 description_key = "menu.shortcuts.search"
 platforms = ["ahk"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts]]
 id = "take_note"
@@ -1752,6 +1757,7 @@ input_altering = true
 type = "feature"
 description_key = "menu.shortcuts.take_note"
 platforms = ["ahk"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts]]
 id = "microsoft_bold"
@@ -1761,6 +1767,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.shortcuts.microsoft_bold"
 platforms = ["ahk"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts]]
 id = "title_case"
@@ -1770,6 +1777,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.shortcuts.title_case"
 platforms = ["ahk"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts]]
 id = "uppercase"
@@ -1779,6 +1787,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.shortcuts.uppercase"
 platforms = ["ahk"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts]]
 id = "paste_without_formatting"
@@ -1788,6 +1797,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_cmd_shift_v"
 platforms = ["ahk"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts]]
 id = "select_line"
@@ -1797,6 +1807,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.shortcuts.select_line"
 platforms = ["ahk"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts]]
 id = "spotlight_mouse"
@@ -1806,6 +1817,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.shortcuts.spotlight_mouse"
 platforms = ["ahk"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts]]
 id = "surround_with_parentheses"
@@ -1815,6 +1827,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.shortcuts.surround_with_parentheses"
 platforms = ["ahk"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts]]
 id = "teleport_mouse"
@@ -1824,6 +1837,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.shortcuts.teleport_mouse"
 platforms = ["ahk"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts]]
 id = "wrap_text_if_selected"
@@ -1839,6 +1853,7 @@ platforms = ["ahk", "linux"]
 [[features.shortcuts]]
 id = "open_downloads"
 platforms = ["ahk"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = false
 recommended = true
 input_altering = true
@@ -1848,6 +1863,7 @@ description_key = "menu.shortcuts.open_downloads"
 [[features.shortcuts]]
 id = "move"
 platforms = ["ahk"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = false
 recommended = true
 input_altering = true
@@ -1857,6 +1873,7 @@ description_key = "menu.shortcuts.move"
 [[features.shortcuts]]
 id = "screen"
 platforms = ["ahk"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = false
 recommended = true
 input_altering = true
@@ -1866,6 +1883,7 @@ description_key = "menu.shortcuts.screen"
 [[features.shortcuts]]
 id = "win_caps_lock"
 platforms = ["ahk"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = false
 recommended = true
 input_altering = true
@@ -1889,6 +1907,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.shortcuts.a_grave"
 platforms = ["ahk"]
+reason_key = "platform_reason.accented_shortcuts_are_windows"
 
 [[features.shortcuts.a_grave]]
 id = "letter"
@@ -1898,6 +1917,7 @@ input_altering = false
 type = "string"
 description_key = "menu.shortcuts.a_grave.letter"
 platforms = ["ahk"]
+reason_key = "platform_reason.accented_shortcuts_are_windows"
 
 
 
@@ -1913,6 +1933,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.shortcuts.e_acute"
 platforms = ["ahk"]
+reason_key = "platform_reason.accented_shortcuts_are_windows"
 
 [[features.shortcuts.e_acute]]
 id = "letter"
@@ -1922,6 +1943,7 @@ input_altering = false
 type = "string"
 description_key = "menu.shortcuts.e_acute.letter"
 platforms = ["ahk"]
+reason_key = "platform_reason.accented_shortcuts_are_windows"
 
 
 
@@ -1937,6 +1959,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.shortcuts.e_circ"
 platforms = ["ahk"]
+reason_key = "platform_reason.accented_shortcuts_are_windows"
 
 [[features.shortcuts.e_circ]]
 id = "letter"
@@ -1946,6 +1969,7 @@ input_altering = false
 type = "string"
 description_key = "menu.shortcuts.e_circ.letter"
 platforms = ["ahk"]
+reason_key = "platform_reason.accented_shortcuts_are_windows"
 
 
 
@@ -1961,6 +1985,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.shortcuts.e_grave"
 platforms = ["ahk"]
+reason_key = "platform_reason.accented_shortcuts_are_windows"
 
 [[features.shortcuts.e_grave]]
 id = "letter"
@@ -1970,6 +1995,7 @@ input_altering = false
 type = "string"
 description_key = "menu.shortcuts.e_grave.letter"
 platforms = ["ahk"]
+reason_key = "platform_reason.accented_shortcuts_are_windows"
 
 
 
@@ -2332,6 +2358,7 @@ description_key = "menu.shortcuts.keyboard.win_space"
 [[features.shortcuts.keyboard]]
 id = "hs_ctrl_space"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "llm_generate_prediction"
 input_altering = true
@@ -2341,6 +2368,7 @@ description_key = "menu.shortcuts.keyboard.hs_ctrl_space"
 [[features.shortcuts.keyboard]]
 id = "ctrl_g"
 platforms = ["linux"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "open_chatgpt"
 input_altering = true
@@ -2350,6 +2378,7 @@ description_key = "shortcuts.label_ctrl_g"
 [[features.shortcuts.keyboard]]
 id = "super_space"
 platforms = ["linux"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
 recommended = "llm_generate_prediction"
 input_altering = true
@@ -2630,6 +2659,7 @@ description_key = "menu.gestures.tap_4"
 [[features.gestures]]
 id = "swipe_2_left"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2639,6 +2669,7 @@ description_key = "menu.gestures.swipe_2_left"
 [[features.gestures]]
 id = "swipe_5_up"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2648,6 +2679,7 @@ description_key = "menu.gestures.swipe_5_up"
 [[features.gestures]]
 id = "swipe_5_down"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2657,6 +2689,7 @@ description_key = "menu.gestures.swipe_5_down"
 [[features.gestures]]
 id = "swipe_5_left"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2666,6 +2699,7 @@ description_key = "menu.gestures.swipe_5_left"
 [[features.gestures]]
 id = "swipe_5_right"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2675,6 +2709,7 @@ description_key = "menu.gestures.swipe_5_right"
 [[features.gestures]]
 id = "swipe_2_right"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2684,6 +2719,7 @@ description_key = "menu.gestures.swipe_2_right"
 [[features.gestures]]
 id = "swipe_2_up"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2693,6 +2729,7 @@ description_key = "menu.gestures.swipe_2_up"
 [[features.gestures]]
 id = "swipe_2_down"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2702,6 +2739,7 @@ description_key = "menu.gestures.swipe_2_down"
 [[features.gestures]]
 id = "swipe_2_left_down"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2711,6 +2749,7 @@ description_key = "menu.gestures.swipe_2_left_down"
 [[features.gestures]]
 id = "swipe_2_left_up"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2720,6 +2759,7 @@ description_key = "menu.gestures.swipe_2_left_up"
 [[features.gestures]]
 id = "swipe_2_right_down"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2729,25 +2769,19 @@ description_key = "menu.gestures.swipe_2_right_down"
 [[features.gestures]]
 id = "swipe_2_right_up"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_2_right_up"
 
-[[features.gestures]]
-id = "swipe_2_diag"
-platforms = ["hs"]
-default = "none"
-recommended = "none"
-input_altering = true
-type = "action"
-description_key = "menu.gestures.swipe_2_diag"
-
 # --- 3-finger diagonals + horiz aggregator ---
+
 [[features.gestures]]
 id = "swipe_3_left_down"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2757,6 +2791,7 @@ description_key = "menu.gestures.swipe_3_left_down"
 [[features.gestures]]
 id = "swipe_3_left_up"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2766,6 +2801,7 @@ description_key = "menu.gestures.swipe_3_left_up"
 [[features.gestures]]
 id = "swipe_3_right_down"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2775,24 +2811,18 @@ description_key = "menu.gestures.swipe_3_right_down"
 [[features.gestures]]
 id = "swipe_3_right_up"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_3_right_up"
 
-[[features.gestures]]
-id = "swipe_3_diag"
-platforms = ["hs"]
-default = "none"
-recommended = "none"
-input_altering = true
-type = "action"
-description_key = "menu.gestures.swipe_3_diag"
 
 [[features.gestures]]
 id = "swipe_3_horiz"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended_per_platform = { hs = "words", linux = "none" }
 input_altering = true
@@ -2803,6 +2833,7 @@ description_key = "menu.gestures.swipe_3_horiz"
 [[features.gestures]]
 id = "swipe_4_left_down"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2812,6 +2843,7 @@ description_key = "menu.gestures.swipe_4_left_down"
 [[features.gestures]]
 id = "swipe_4_left_up"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2821,6 +2853,7 @@ description_key = "menu.gestures.swipe_4_left_up"
 [[features.gestures]]
 id = "swipe_4_right_down"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2830,24 +2863,18 @@ description_key = "menu.gestures.swipe_4_right_down"
 [[features.gestures]]
 id = "swipe_4_right_up"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_4_right_up"
 
-[[features.gestures]]
-id = "swipe_4_diag"
-platforms = ["hs"]
-default = "none"
-recommended = "none"
-input_altering = true
-type = "action"
-description_key = "menu.gestures.swipe_4_diag"
 
 [[features.gestures]]
 id = "swipe_4_horiz"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended_per_platform = { hs = "spaces", linux = "none" }
 input_altering = true
@@ -2858,6 +2885,7 @@ description_key = "menu.gestures.swipe_4_horiz"
 [[features.gestures]]
 id = "swipe_5_left_down"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2867,6 +2895,7 @@ description_key = "menu.gestures.swipe_5_left_down"
 [[features.gestures]]
 id = "swipe_5_left_up"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2876,6 +2905,7 @@ description_key = "menu.gestures.swipe_5_left_up"
 [[features.gestures]]
 id = "swipe_5_right_down"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2885,24 +2915,18 @@ description_key = "menu.gestures.swipe_5_right_down"
 [[features.gestures]]
 id = "swipe_5_right_up"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_5_right_up"
 
-[[features.gestures]]
-id = "swipe_5_diag"
-platforms = ["hs"]
-default = "none"
-recommended = "none"
-input_altering = true
-type = "action"
-description_key = "menu.gestures.swipe_5_diag"
 
 [[features.gestures]]
 id = "swipe_5_horiz"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended_per_platform = { hs = "windows", linux = "none" }
 input_altering = true
@@ -2913,6 +2937,7 @@ description_key = "menu.gestures.swipe_5_horiz"
 [[features.gestures]]
 id = "tap_2"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -2922,6 +2947,7 @@ description_key = "menu.gestures.tap_2"
 [[features.gestures]]
 id = "tap_5"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.windows_touchpad_slots_are_three_and_four_fingers"
 default = "none"
 recommended = "none"
 input_altering = true
@@ -3632,6 +3658,7 @@ description_key = "menu.gestures.sensitivities"
 [[features.layout]]
 id = "ergopti_base"
 platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
 default = false
 recommended = true
 input_altering = true
@@ -3691,6 +3718,7 @@ description_key = "menu.layout.number_row_edges"
 [[features.layout]]
 id = "ergopti_alt_gr"
 platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
 default = false
 recommended = true
 input_altering = true
@@ -3764,6 +3792,7 @@ description_key = "menu.layout.emulate_bottom_row"
 [[features.layout]]
 id = "ctrl_magic_save"
 platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
 default = false
 recommended = false
 input_altering = true
@@ -3779,6 +3808,7 @@ description_key = "menu.layout.ctrl_magic_save"
 [[features.layout]]
 id = "emulated_layout"
 platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
 default = ""
 recommended = ""
 input_altering = true
@@ -4738,6 +4768,7 @@ disabled_when = ["agent_system_model_ready"]
 type = "list"
 id = "apps_installed"
 platforms = ["hs"]
+reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 
 # The language selector. It had no declaration of any kind: three drivers each
 # listed the same twenty-one locales from the same shared catalogue, and nothing
@@ -4906,7 +4937,9 @@ id = "healthcheck"
 i18n = "menu.debug.healthcheck"
 
 # One-click field checks of the macOS input and network chain (issue #101, item
-# 31). Each runs read-only steps, opens a result window with a Copy report
+# 31). The network check runs on all three drivers (macOS and Linux share its
+# steps in Lua, Windows runs the same steps in AutoHotkey); the others are macOS
+# only. Each runs read-only steps, opens a result window with a Copy report
 # button and writes one compact record, with no key, path or URL, to the log.
 [[menu.debug_menu]]
 type = "command"
@@ -4926,8 +4959,6 @@ reason_key = "platform_reason.debug_surface_is_each_drivers_own"
 type = "command"
 id = "field_check_network"
 i18n = "menu.debug.field_check_network"
-platforms = ["hs"]
-reason_key = "platform_reason.debug_surface_is_each_drivers_own"
 
 [[menu.debug_menu]]
 type = "command"
@@ -5734,7 +5765,6 @@ disabled_when = ["keystats_enabled"]
 
 [[menu.metrics_menu]]
 type = "---"
-platforms = ["linux"]
 
 # Three rows stood here until 2026-08-07 — "Session statistics", "Current WPM"
 # and "Per-application statistics" — and each one's entire effect was a line in
@@ -5744,23 +5774,23 @@ platforms = ["linux"]
 # widget toggle shows the live rate. They were removed rather than pointed at
 # those windows, which would have given this menu two rows opening one window.
 
-# Ticked from the keystats's own suppression state. It used to glue a " ✓" onto
-# the label, which puts one platform's convention inside a string twenty other
-# languages also read — and bypasses the tray's native check item.
+# The user's pause and session reset, on all three drivers since 2026-10-24 with
+# one meaning (docs/design/metrics-suspend-and-reset-session.md): the pause is a
+# state of its own, apart from the driver pause and the secure-field filter, and
+# the reset ends the typing session without deleting anything stored. Ticked from
+# the keystats's own pause state: it used to glue a " ✓" onto the label, which
+# puts one platform's convention inside a string twenty other languages also
+# read — and bypasses the tray's native check item.
 [[menu.metrics_menu]]
 type = "check"
 id = "metrics_suspend"
-i18n = "menu.global.suspend"
-checked_when = ["metrics_suppressed"]
-platforms = ["linux"]
-reason_key = "platform_reason.metrics_collection_is_in_process_on_linux"
+i18n = "menu.metrics.suspend_collection"
+checked_when = ["metrics_suspended"]
 
 [[menu.metrics_menu]]
 type = "command"
 id = "metrics_reset_session"
 i18n = "menu.metrics.reset_session"
-platforms = ["linux"]
-reason_key = "platform_reason.metrics_collection_is_in_process_on_linux"
 
 
 # The at-rest migration readout. Converting a year of stored rows takes minutes,
@@ -6016,21 +6046,25 @@ reason_key = "platform_reason.lists_windows_only_settings"
 type = "letter_picker"
 id = "e_grave"
 platforms = ["ahk"]
+reason_key = "platform_reason.accented_shortcuts_are_windows"
 
 [[menu.accented_letters_group]]
 type = "letter_picker"
 id = "e_circ"
 platforms = ["ahk"]
+reason_key = "platform_reason.accented_shortcuts_are_windows"
 
 [[menu.accented_letters_group]]
 type = "letter_picker"
 id = "e_acute"
 platforms = ["ahk"]
+reason_key = "platform_reason.accented_shortcuts_are_windows"
 
 [[menu.accented_letters_group]]
 type = "letter_picker"
 id = "a_grave"
 platforms = ["ahk"]
+reason_key = "platform_reason.accented_shortcuts_are_windows"
 
 [[menu.hotstrings_menu]]
 type = "toggle"
@@ -6147,6 +6181,7 @@ status_rows.none_installed = [{ type = "label", i18n = "menu.extensions.none_ins
 [[menu.hotstrings_menu]]
 type = "---"
 platforms = ["linux"]
+unavailable = "hide"
 
 [[menu.hotstrings_menu]]
 type = "command"
@@ -6428,6 +6463,7 @@ reason_key = "platform_reason.touchpad_stack_is_per_driver"
 [[menu.gestures_menu]]
 type = "---"
 platforms = ["hs"]
+unavailable = "hide"
 
 [[menu.gestures_menu]]
 type = "list"
@@ -6437,6 +6473,7 @@ reason_key = "platform_reason.touchpad_stack_is_per_driver"
 [[menu.gestures_menu]]
 type = "---"
 platforms = ["hs"]
+unavailable = "hide"
 
 [[menu.gestures_menu]]
 type = "list"
@@ -6446,6 +6483,7 @@ reason_key = "platform_reason.touchpad_stack_is_per_driver"
 [[menu.gestures_menu]]
 type = "---"
 platforms = ["hs"]
+unavailable = "hide"
 
 [[menu.gestures_menu]]
 type = "list"
@@ -6477,6 +6515,7 @@ reason_key = "platform_reason.touchpad_stack_is_per_driver"
 [[menu.gestures_menu]]
 type = "---"
 platforms = ["linux"]
+unavailable = "hide"
 
 # Linux reads gestures from libinput, which macOS gets from the OS and Windows
 # does not have at all — so the reader is startable and stoppable here and the row
@@ -6576,6 +6615,7 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 [[menu.tap_holds_menu]]
 type = "---"
 platforms = ["hs"]
+unavailable = "hide"
 
 # The keys, one row each holding its disable / tap-picker / hold-picker rows,
 # under one header per hand and with a separator between the hands, so where
@@ -6637,6 +6677,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_wrap_text"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_a"
@@ -6646,6 +6687,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_a"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_d"
@@ -6655,6 +6697,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_d"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_e"
@@ -6664,6 +6707,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_e"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_g"
@@ -6673,6 +6717,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_g"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_h"
@@ -6682,6 +6727,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_h"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_i"
@@ -6691,6 +6737,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_i"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_m"
@@ -6700,6 +6747,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_m"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_o"
@@ -6709,6 +6757,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_o"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_p"
@@ -6718,6 +6767,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_p"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_s"
@@ -6727,6 +6777,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_s"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_t"
@@ -6736,6 +6787,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_t"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_u"
@@ -6745,6 +6797,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_u"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_w"
@@ -6754,6 +6807,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_w"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_x"
@@ -6763,6 +6817,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_x"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_capslock"
@@ -6772,6 +6827,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_capslock"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_l"
@@ -6781,6 +6837,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_l"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_period"
@@ -6790,6 +6847,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_period"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "ctrl_quote"
@@ -6799,6 +6857,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_quote"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "cmd_shift_v"
@@ -6808,6 +6867,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_cmd_shift_v"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
 id = "cmd_star"
@@ -6817,6 +6877,7 @@ input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_cmd_star"
 platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.category_enabled]]
 id = "autocorrection"
@@ -6871,6 +6932,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.layout"
 platforms = ["hs"]
+reason_key = "platform_reason.layout_switch_on_pause_is_macos"
 
 [[features.layout]]
 id = "on_pause"
@@ -6880,6 +6942,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.layout"
 platforms = ["hs"]
+reason_key = "platform_reason.layout_switch_on_pause_is_macos"
 
 [[features.layout]]
 id = "on_resume"
@@ -6889,6 +6952,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.layout"
 platforms = ["hs"]
+reason_key = "platform_reason.layout_switch_on_pause_is_macos"
 
 # `clear_exclude` lists the paths a clear leaves as they are, as
 # `restore_exclude` does for a restore. The Tap-Holds clear empties every key's
@@ -7721,6 +7785,22 @@ type = "include"
 section = "llm_profile_commands"
 row_id = "llm_profile_create"
 
+# The Lua drivers (macOS and Linux) end their profile submenu with the per-application
+# overrides, as Windows does in llm_profile_windows_frame (the group's children are
+# llm_profile_app_override_frame). A template of its own keeps llm_profile_lua_frame, the
+# complete ordered frame pinned by profile_ordered_frame.json, unchanged.
+[[menu.llm_profile_lua_app_overrides]]
+type = "---"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.llm_profile_lua_app_overrides]]
+type = "group"
+id = "llm_profile_app_overrides"
+i18n = "menu.profiles.per_app_overrides"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
 [[menu.llm_profile_windows_frame]]
 type = "include"
 section = "llm_profile_builtin_heading"
@@ -8493,8 +8573,6 @@ unavailable = "hide"
 type = "command"
 id = "llm_profile_override_active_app"
 i18n = "menu.profiles.override_active_app_with_current"
-platforms = ["ahk"]
-unavailable = "hide"
 
 [[menu.llm_profile_app_override_frame]]
 type = "include"
@@ -8503,14 +8581,10 @@ present_when = "llm_profile_overrides_present"
 
 [[menu.llm_profile_app_override_children]]
 type = "---"
-platforms = ["ahk"]
-unavailable = "hide"
 
 [[menu.llm_profile_app_override_children]]
 type = "list"
 id = "llm_profile_override_rows"
-platforms = ["ahk"]
-unavailable = "hide"
 
 [[menu.llm_modifier_picker_frame]]
 type = "check"
