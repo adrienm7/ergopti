@@ -3632,5 +3632,8 @@
 	"platform_reason.arrow_navigation_is_macos": "macOS 전용: 화살표 키로 예측 사이를 이동하기 위한 macOS AI 메뉴의 설정입니다. Windows와 Linux는 탐색 보조 키 설정으로 탐색 키를 고릅니다.",
 	"platform_reason.accented_shortcuts_are_windows": "Windows 전용: 악센트 키가 단축키 글자가 아닌 레이아웃(AZERTY, BÉPO, 설치된 Ergopti 레이아웃)에서는 Ctrl+é가 아무것도 지정되지 않은 조합으로 앱에 전달됩니다. 이 기능은 해당 키의 Ctrl, Alt, Win 조합을 그 글자의 일반 단축키로 다시 매핑하여 Ctrl+é가 Ctrl+C처럼 동작하게 합니다. macOS 레이아웃 파일은 자체 Command 및 Control 층을 가지며, Linux 드라이버에는 이에 해당하는 것이 없습니다.",
 	"platform_reason.dynamic_master_is_category_switch_on_windows": "Windows에서는 별도 설정이 아닙니다. 동적 핫스트링 카테고리 체크박스가 이 마스터 스위치 역할을 합니다.",
-	"platform_reason.windows_touchpad_slots_are_three_and_four_fingers": "Windows에서는 사용할 수 없음: Windows 설정에서는 세 손가락·네 손가락 탭과 네 방향 직선 스와이프에만 단축키를 지정할 수 있고, 터치 데이터는 Ergopti에 전달되지 않습니다. 따라서 두 손가락·다섯 손가락 슬롯, 대각선, 수평 스와이프 슬롯이 없습니다."
+	"platform_reason.windows_touchpad_slots_are_three_and_four_fingers": "Windows에서는 사용할 수 없음: Windows 설정에서는 세 손가락·네 손가락 탭과 네 방향 직선 스와이프에만 단축키를 지정할 수 있고, 터치 데이터는 Ergopti에 전달되지 않습니다. 따라서 두 손가락·다섯 손가락 슬롯, 대각선, 수평 스와이프 슬롯이 없습니다.",
+	"platform_reason.category_master_is_a_gate_on_windows": "Windows에서는 이 이름이 아님: Windows는 이 마스터 스위치를 category_enabled의 카테고리 게이트로 둡니다. macOS와 Linux는 카테고리 자체 섹션에 enabled로 둡니다.",
+	"platform_reason.key_combinations_are_karabiner_settings_on_macos": "macOS에서는 이 이름이 아님: macOS에서는 Karabiner-Elements가 키 조합을 실행하므로, macOS는 키 조합과 그 스위치를 Karabiner 설정의 config_karabiner.toml 안 mod_combos로 저장합니다.",
+	"platform_reason.wrap_selection_is_a_shortcut_key_on_macos": "macOS에서는 이 이름이 아님: macOS는 이 옵션을 Ctrl 및 Cmd 단축키 사이에 두고 그것들과 함께 shortcuts.keys.wrap_text_if_selected로 저장합니다."
 }

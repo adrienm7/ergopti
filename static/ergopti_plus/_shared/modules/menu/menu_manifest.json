@@ -1888,11 +1888,7 @@
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
 		{
-			"type": "---",
-			"platforms": [
-				"ahk",
-				"hs"
-			]
+			"type": "---"
 		},
 		{
 			"type": "list",
@@ -1944,11 +1940,7 @@
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
 		{
-			"type": "---",
-			"platforms": [
-				"ahk",
-				"hs"
-			]
+			"type": "---"
 		},
 		{
 			"type": "list",
