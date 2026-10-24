@@ -1606,12 +1606,16 @@ local function main()
 			local key = keyboard_shortcuts.collision_identity(detail.key)
 			-- These standard edits change text or selection without on_char input.
 			-- Readline caret and text edits also invalidate a terminal's old completion.
+			-- Conservatively retire terminal Alt word commands too; combined chords
+			-- and AltGr text retain their existing handling.
 			-- Withdraw before dispatch so a bound action can start its own request.
-			if prediction_engine and mods.ctrl and not (mods.alt or mods.meta or mods.altgr)
+			if prediction_engine and ((mods.ctrl and not (mods.alt or mods.meta or mods.altgr)
 				and (key == "v" or key == "z" or (not mods.shift and (key == "x" or key == "y" or key == "a"
 					or (WordReset.is_terminal_app(_cached_app_id) and (key == "u" or key == "h" or key == "k" or key == "w"
 						or key == "b" or key == "f" or key == "e" or key == "d" or key == "t"
-						or key == "p" or key == "n" or key == "j" or key == "m"))))) then
+						or key == "p" or key == "n" or key == "j" or key == "m"))))))
+				or (mods.alt and not (mods.ctrl or mods.meta or mods.altgr or mods.shift)
+					and WordReset.is_terminal_app(_cached_app_id) and (key == "b" or key == "f" or key == "d"))) then
 				pcall(function() prediction_engine.withdraw() end)
 			end
 			secure_focus_guard.blocks_text()

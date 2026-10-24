@@ -620,6 +620,7 @@ do
 			assert(WordReset.restore_configuration(settings)); WordReset.forget_last_key()
 			local callbacks = state.callbacks
 			state.prediction, state.scheduler, state.guard = prediction, scheduler, guard
+			state.word_reset = WordReset.shortcut_resets_word
 			state.original_focus, state.response = original_focus, " ok ok ok ok ok ok"
 			function state.type(text)
 				for char in text:gmatch(".") do
@@ -650,7 +651,11 @@ do
 				if modifier == "ctrl-alt" then modifiers[#modifiers + 1] = 56
 				elseif modifier == "ctrl-meta" then modifiers[#modifiers + 1] = 125
 				elseif modifier == "ctrl-altgr" then modifiers[#modifiers + 1] = 100
-				elseif modifier == "ctrl-shift" then modifiers[#modifiers + 1] = 42 end
+				elseif modifier == "ctrl-shift" then modifiers[#modifiers + 1] = 42
+				elseif modifier == "alt" then modifiers = { 56 }
+				elseif modifier == "altgr" then modifiers = { 100 }
+				elseif modifier == "meta" then modifiers = { 125 }
+				elseif modifier == "alt-shift" then modifiers = { 56, 42 } end
 				local events, held = {}, {}
 				local function event(c, value) events[#events + 1] = { type = 1, code = c, value = value } end
 				for _, c in ipairs(modifiers) do event(c, 1) end
@@ -659,8 +664,16 @@ do
 				state.before_control = { text = state.text, caret = state.caret }
 				hook._test_drive(events, {
 					onPhysical = callbacks.onPhysical, onConsume = callbacks.onConsume,
-					captureEvent = function(c, value) if c == code and value == 1 then return control_text[key] or key, key, nil end end,
-					onChar = function() state.chars = state.chars + 1 end,
+					captureEvent = function(c, value)
+						if c ~= code or value ~= 1 then return nil, nil, nil end
+						if modifier == "altgr" then return "x", key, nil end
+						if modifier == "alt-shift" then return key:upper(), key:upper(), nil end
+						return control_text[key] or key, key, nil
+					end,
+					onChar = function(ch, c)
+						state.chars = state.chars + 1; state.last_char = ch
+						callbacks.onChar(ch, c)
+					end,
 					onKey = function(name, detail)
 						state.controls = state.controls + 1; state.semantic = { name = name, key = detail.key, mods = detail.mods }
 						callbacks.onKey(name, detail)
@@ -695,13 +708,32 @@ do
 								elseif not terminal and key == "v" then state.text = state.text:sub(1, state.caret) .. "PASTED" .. state.text:sub(state.caret + 1); state.caret = state.caret + 6
 								elseif not terminal and key == "c" then state.copy_observed = true
 								elseif not terminal and key == "s" then state.saved_text = state.text end
+							elseif modifier == "alt" and terminal then
+								-- This receiving profile is conditional on the measured ESC-word
+								-- bindings; physical Alt-to-terminal transport is not assumed.
+								if key == "b" then
+									local prefix = state.text:sub(1, state.caret)
+									state.caret = assert(prefix:find("%w+$")) - 1
+								elseif key == "f" or key == "d" then
+									local suffix = state.text:sub(state.caret + 1)
+									local _, last = suffix:find("%w+"); assert(last)
+									if key == "f" then state.caret = state.caret + last
+									else state.text = state.text:sub(1, state.caret) .. suffix:sub(last + 1) end
+								end
+							elseif modifier == "altgr" then
+								state.text = state.text:sub(1, state.caret) .. "x" .. state.text:sub(state.caret + 1)
+								state.caret = state.caret + 1
 							end
 						end
 						return true
 					end,
 				}, true)
 				helpers.assert_eq(held, {}, "all controlled forwarded DOWNs have UPs")
-				helpers.assert_eq(state.chars, 0, "Ctrl-letter edits are not invented character input")
+				if modifier == "altgr" then
+					helpers.assert_eq(state.chars, 1); helpers.assert_eq(state.last_char, "x")
+				else
+					helpers.assert_eq(state.chars, 0, "Ctrl-letter edits are not invented character input")
+				end
 				helpers.assert_eq(guard.focused_text_identity(), original_focus)
 				helpers.assert_eq(guard.blocks_text(), false)
 				state.after_control = { text = state.text, caret = state.caret }
@@ -912,6 +944,88 @@ do
 					s.scheduler.test.advance(2); helpers.assert_eq(#s.requests, 2)
 					s.requests[2].done(s.response, nil); helpers.assert_true(s.prediction.has_suggestions())
 					helpers.assert_eq(s.output, 0)
+				end)
+			end)
+		end
+	end)
+
+	-- These are conditional Readline receiving profiles, not a claim that every
+	-- terminal translates physical Alt into the measured ESC-word byte bindings.
+	helpers.describe("whole Main retires terminal Alt word edits", function()
+		local receiver = { b = { text = "hello world", caret = 6 }, f = { text = "hello world", caret = 11 }, d = { text = "hello", caret = 5 } }
+		for _, key in ipairs({ "b", "f", "d" }) do
+			for _, phase in ipairs({ "debounce", "late", "visible" }) do
+				for _, reset in ipairs({ false, true }) do
+					helpers.it("readline-meta-word-retirement " .. key .. " " .. phase .. " reset=" .. tostring(reset), function()
+						whole_main({ key = key, modifier = "alt", phase = phase, reset = reset }, function(s)
+							s.prepare()
+							local request, pending = s.requests[1], {}
+							local callback = request and request.done
+							for id, handle in pairs(s.scheduler.pending) do pending[id] = { handle = handle, callback = handle.fn } end
+							if phase == "debounce" then helpers.assert_eq(#s.requests, 0); helpers.assert_true(next(pending) ~= nil) end
+							s.control()
+							helpers.assert_eq(s.forwarded, 1); helpers.assert_eq(s.controls, 1); helpers.assert_eq(s.chars, 0)
+							helpers.assert_eq(s.semantic, { name = "shortcut", key = key, mods = { alt = true } })
+							helpers.assert_eq(s.after_control, receiver[key], "independent receiver must match measured ESC-word semantics")
+							helpers.assert_eq(s.word_reset(), reset, "retirement must not change the matcher preference")
+							finish_old(s, phase)
+							if phase == "debounce" then
+								helpers.assert_eq(#s.requests, 0, "the actual pending original prompt must not dispatch after the edit")
+								for id, ref in pairs(pending) do
+									helpers.assert_eq(ref.handle.fn, ref.callback)
+									helpers.assert_true(s.scheduler.pending[id] ~= ref.handle, "the old pending handle must be retired")
+								end
+							else
+								helpers.assert_eq(s.requests[1], request); helpers.assert_eq(request.done, callback)
+							end
+							helpers.assert_eq(s.prediction.has_suggestions(), false, "an edited terminal cannot retain its original offer")
+							helpers.assert_eq(s.visible, false); helpers.assert_eq(s.prediction.accept(1), false)
+							helpers.assert_eq(s.output, 0); helpers.assert_eq({ text = s.text, caret = s.caret }, s.after_control)
+						end)
+					end)
+				end
+			end
+		end
+
+		-- Ctrl+B and Ctrl+Alt+B remain covered by their original unchanged cases.
+		-- GUI/Super/combined-modifier receivers here intentionally model no edit.
+		for _, specimen in ipairs({ { "b", "alt", "owned-gui-editor" }, { "b", "altgr", "gnome-terminal" },
+			{ "b", "meta", "gnome-terminal" }, { "b", "alt-shift", "gnome-terminal" } }) do
+			helpers.it("readline-meta-word-scope " .. table.concat(specimen, " "), function()
+				whole_main({ key = specimen[1], modifier = specimen[2], app = specimen[3], phase = "visible" }, function(s)
+					s.prepare(); local request, callback = s.requests[1], s.requests[1].done
+					s.control(); helpers.assert_eq(s.forwarded, 1)
+					if specimen[2] == "altgr" then
+						helpers.assert_eq(s.controls, 0); helpers.assert_eq(s.chars, 1); helpers.assert_eq(s.last_char, "x")
+						helpers.assert_eq(s.after_control, { text = "hello worldx", caret = 12 })
+						callback(s.response, nil)
+						helpers.assert_eq(s.prediction.has_suggestions(), false); helpers.assert_eq(s.visible, false)
+						helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.output, 0)
+						helpers.assert_eq({ text = s.text, caret = s.caret }, s.after_control)
+					else
+						helpers.assert_eq(s.chars, 0); helpers.assert_eq(s.controls, 1)
+						helpers.assert_eq(s.after_control, s.before_control)
+						helpers.assert_true(s.prediction.has_suggestions()); helpers.assert_true(s.visible)
+						helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.output, 1)
+					end
+					helpers.assert_eq(s.requests[1], request); helpers.assert_eq(request.done, callback)
+				end)
+			end)
+		end
+
+		for _, phase in ipairs({ "late", "visible" }) do
+			helpers.it("readline-meta-word-successor dispatch " .. phase, function()
+				whole_main({ key = "b", modifier = "alt", mode = "dispatch", phase = phase, reset = false }, function(s)
+					s.prepare(); local request, callback = s.requests[1], s.requests[1].done
+					s.control(); helpers.assert_eq(s.after_control, receiver.b)
+					helpers.assert_eq(s.forwarded, 1); helpers.assert_eq(s.controls, 1); helpers.assert_eq(s.chars, 0)
+					helpers.assert_true(s.action_entry.predecessor_retired, "retire before the bound action starts its successor")
+					helpers.assert_true(s.action_started)
+					helpers.assert_eq(s.requests[1], request); helpers.assert_eq(request.done, callback)
+					callback(s.response, nil); helpers.assert_eq(s.prediction.has_suggestions(), false)
+					s.scheduler.test.advance(2); helpers.assert_eq(#s.requests, 2)
+					s.requests[2].done(s.response, nil); helpers.assert_true(s.prediction.has_suggestions()); helpers.assert_true(s.visible)
+					helpers.assert_eq(s.output, 0); helpers.assert_eq({ text = s.text, caret = s.caret }, s.after_control)
 				end)
 			end)
 		end
