@@ -122,7 +122,6 @@ local LOG = "ergopti_hotstrings"
 -- =========================================
 
 local engine_mod        = require("modules.hotstrings.engine")
-local ExpansionDelay     = require("modules.hotstrings.expansion_delay")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local injector          = require("modules.hotstrings.injector")
 local keyboard_layout   = require("adapters.keyboard_layout")
@@ -164,7 +163,6 @@ local ScriptActions     = require("modules.shortcuts.script_actions")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
 local FocusGuard        = require("modules.keystats.focus_guard")
 local privacy_owners = {}
-local InputCaptureGate  = require("infra.input_capture_gate")
 local BootProfiler      = require("infra.boot_profiler")
 local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
 
@@ -653,8 +651,6 @@ local function restart_daemon(reason)
 	return how ~= nil
 end
 
-local boot_catalogue_complete = false
-
 --- The Reload command, as on the other drivers: the daemon restarts, so every
 --- module reads config.toml again (infra/reload_restart.lua). The restart
 --- cannot name its successor, so the local control writes a pending record
@@ -736,6 +732,8 @@ local function main()
 	-- Keep main within older LuaJIT's 60-upvalue budget; these dependencies remain mandatory.
 	local UserHotstringRuntime = require("infra.user_hotstring_runtime")
 	local PreviewSettings = require("modules.hotstrings.preview_settings")
+	local ExpansionDelay = require("modules.hotstrings.expansion_delay")
+	local InputCaptureGate = require("infra.input_capture_gate")
 	-- How many candidates the preview asks the engine for. The panel itself caps
 	-- the rows it draws; this cap is about the WORK — the enumeration runs on
 	-- every keystroke, and a bucket for a common tail character holds hundreds of
@@ -859,7 +857,7 @@ local function main()
 
 	local mapping_count, committed, _, receipt = hotstrings_config.load_all(nil, true)
 	-- What a reload request claimed by this process answers for its own boot.
-	boot_catalogue_complete = committed == true and type(receipt) == "table" and receipt.complete == true
+	local boot_catalogue_complete = committed == true and type(receipt) == "table" and receipt.complete == true
 	if committed ~= true then
 		Logger.warn(LOG, "The startup hotstring catalogue is unavailable; unrelated app features continue.")
 	elseif type(receipt) ~= "table" or receipt.complete ~= true then
