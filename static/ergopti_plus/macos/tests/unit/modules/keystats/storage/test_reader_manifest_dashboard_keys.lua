@@ -13,6 +13,8 @@
 ---    `.n` for the modifier hold mean; macOS projected `sum` and `count`.
 --- 2. Focus latency: macOS writes focus_to_first_key_* into agg_app_day_ergo
 ---    and the page reads them, but only the Linux reader projected them.
+--- 3. System day: the page reads `manifest[day]._system`, which only the
+---    Windows reader published; macOS wrote agg_system_day and never read it.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -59,5 +61,25 @@ helpers.describe("macOS manifest: fields under the dashboard's keys", function()
 		helpers.assert_eq(entry.focus_to_first_key_sum_ms, 4200)
 		helpers.assert_eq(entry.focus_to_first_key_count, 6)
 		helpers.assert_eq(entry.same_finger_streak_max, 7)
+	end)
+
+	helpers.it("publishes the system day under _system without inventing battery extrema", function()
+		local reader = reader_answering("agg_system_day", {
+			{ date = "2026-10-01", wifi_changes = 4, space_switches = 7, battery_sum = 4200,
+				battery_count = 60, audio_muted_ms = 600000, locked_ms = 3600000, sleep_ms = 28800000,
+				awake_ms = 93600000, passive_count = 4, night_wake_count = 1, battery_min = 22, battery_max = 98 },
+			{ date = "2026-10-02", wifi_changes = 0, space_switches = 2, battery_sum = 0, battery_count = 0,
+				audio_muted_ms = 0, locked_ms = 600000, sleep_ms = 0, awake_ms = 30000000,
+				passive_count = 1, night_wake_count = 0 },
+		})
+		local manifest, complete = reader.read_manifest("/declared/db.sqlite", "2026-10-01", "2026-10-02")
+		helpers.assert_true(complete)
+		helpers.assert_eq(manifest["2026-10-01"]._system, {
+			wifi_changes = 4, space_switches = 7, battery_sum = 4200, battery_count = 60,
+			audio_muted_ms = 600000, locked_ms = 3600000, sleep_ms = 28800000, awake_ms = 93600000,
+			passive_count = 4, night_wake_count = 1, battery_min = 22, battery_max = 98,
+		})
+		helpers.assert_nil(manifest["2026-10-02"]._system.battery_min, "no sample, no minimum")
+		helpers.assert_eq(manifest["2026-10-02"]._system.awake_ms, 30000000)
 	end)
 end)
