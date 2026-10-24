@@ -23,8 +23,21 @@ HealthCheck_CollectWindows() {
 			return false
 		_HC_CollectionCreating := true
 	} finally Critical(PreviousCritical)
-	try _HC_Collection := DiagnosticCollectionWindows()
-	finally _HC_CollectionCreating := false
+	try {
+		Previous := _HC_Collection
+		if IsObject(Previous) {
+			try {
+				if !Previous.RetireCallbacks()
+					return false
+			} catch as Err {
+				try LoggerError("DiagnosticsCollection", "Callback retirement refused a new collection: {1}", Err.Message)
+				catch Any
+					throw Err
+				return false
+			}
+		}
+		_HC_Collection := DiagnosticCollectionWindows()
+	} finally _HC_CollectionCreating := false
 	return _HC_Collection.Start()
 }
 
@@ -87,7 +100,11 @@ class DiagnosticCollectionWindows {
 				"-SessionDirectory", this.Directory], ObjBindMethod(this, "Completed"), , , this.Contract["max_output_bytes"], true, true)
 			if !this.Task.start()
 				throw Error("Diagnostic worker launch refused.")
-			SetTimer(this.CollectionTimer, 100)
+			PreviousCritical := Critical("On")
+			try {
+				if !this.Terminal
+					SetTimer(this.CollectionTimer, 100)
+			} finally Critical(PreviousCritical)
 			this.Publish()
 			return true
 		} catch as Err {
@@ -95,11 +112,20 @@ class DiagnosticCollectionWindows {
 			this.Result["archive_created"] := false
 			if IsObject(this.Task) && !this.Terminal {
 				this.Cancel()
-				SetTimer(this.CollectionTimer, 100)
+				PreviousCritical := Critical("On")
+				try {
+					if !this.Terminal
+						SetTimer(this.CollectionTimer, 100)
+				} finally Critical(PreviousCritical)
 			} else if !this.Terminal {
 				this.Terminal := true
 				this.Result["owner_pending"] := false
-				this.DisarmExit()
+				try this.RetireCallbacks()
+				catch as CleanupError {
+					try LoggerError("DiagnosticsCollection", "Callback retirement after launch failure was refused: {1}", CleanupError.Message)
+					catch Any
+						throw Err
+				}
 				LoggerDone("DiagnosticsCollection", "Diagnostic collection launch failed before worker ownership.")
 			}
 			LoggerError("DiagnosticsCollection", "Diagnostic worker could not start.")
@@ -222,8 +248,7 @@ class DiagnosticCollectionWindows {
 		if this.Terminal
 			return false
 		this.Terminal := true
-		this.DisarmExit()
-		SetTimer(this.CollectionTimer, 0)
+		this.RetireCallbacks()
 		this.CloseGuided()
 		Committed := false
 		if Stdout != "" {
@@ -286,11 +311,35 @@ class DiagnosticCollectionWindows {
 		}
 	}
 
-	DisarmExit() {
-		if this.ExitArmed {
-			OnExit(this.ExitCallback, 0)
-			this.ExitArmed := false
-		}
+	/** Removes exact registrations before releasing their terminal self-references. */
+	RetireCallbacks() {
+		FirstFailure := 0, PreviousCritical := Critical("On")
+		try {
+			if !this.Terminal
+				return false
+			RetiredExit := this.ExitCallback, RetiredTimer := this.CollectionTimer
+			if IsObject(RetiredExit) {
+				try {
+					OnExit(RetiredExit, 0)
+					this.ExitArmed := false
+					this.ExitCallback := 0
+				} catch as Err {
+					FirstFailure := Err
+				}
+			}
+			if IsObject(RetiredTimer) {
+				try {
+					SetTimer(RetiredTimer, 0)
+					this.CollectionTimer := 0
+				} catch as Err {
+					if !IsObject(FirstFailure)
+						FirstFailure := Err
+				}
+			}
+		} finally Critical(PreviousCritical)
+		if IsObject(FirstFailure)
+			throw FirstFailure
+		return true
 	}
 
 	Publish() {
