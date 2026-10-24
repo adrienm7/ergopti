@@ -413,6 +413,9 @@ h.describe("initial native ledger observations", function()
     timer = {absoluteTime = function() clocks = clocks + 1; return clocks * 10 end},
     wifi = false, battery = false, spaces = false, audiodevice = false,
    })
+   -- Loading parses the timing registry, which times the TOML parse; only the
+   -- observation clock reads below are counted.
+   clocks = 0
    local state, owner = {is_enabled = true}, {}
    h.assert_eq(W.init(state, function() queries = queries + 1; return false end), true)
    local token = W.bind_physical_lifecycle_observer(owner, 8, function(r) records[#records + 1] = r; return true end, nil, true)
