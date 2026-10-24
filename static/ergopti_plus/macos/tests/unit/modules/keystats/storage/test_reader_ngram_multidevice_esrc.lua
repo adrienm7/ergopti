@@ -17,6 +17,18 @@ local helpers = require("tests.helpers")
 local src = helpers.read_driver_source("function M.read_range_split_today")
 helpers.assert_true(src ~= nil, "modules/keystats/sqlite_reader.lua source must be locatable")
 
+-- The manifest SQL is rendered from the shared catalogue (_shared/data/db/queries.sql),
+-- so its statements are checked as the reader runs them, not as source text.
+local Queries = require("keystats.queries")
+local manifest_sql = {}
+for _, name in ipairs(Queries.names()) do
+	if name:match("^manifest%.") then
+		manifest_sql[#manifest_sql + 1] = Queries.render(name, "native", { where = "" })
+	end
+end
+local catalogue = table.concat(manifest_sql, "\n")
+helpers.assert_true(catalogue ~= "", "the catalogue must render the manifest queries")
+
 -- Test 1: MIN(esrc_json) AS ... must not appear in SQL context.
 -- Matches SQL aggregation syntax "MIN(esrc_json) AS" but not inline comments.
 local min_esrc = src:find("MIN(esrc_json) AS", 1, true) ~= nil
@@ -26,14 +38,14 @@ helpers.assert_true(
 )
 
 -- Test 2: MIN(e_buckets_json) AS must not appear in SQL context.
-local min_ebuckets = src:find("MIN(e_buckets_json) AS", 1, true) ~= nil
+local min_ebuckets = (src .. catalogue):find("MIN(e_buckets_json) AS", 1, true) ~= nil
 helpers.assert_true(
 	not min_ebuckets,
 	"sqlite_reader.lua must not use `MIN(e_buckets_json) AS` in SQL — it drops multi-device data (keystats-storage-2)"
 )
 
 -- Test 3: MIN(length_buckets_json) AS must not appear in SQL context.
-local min_lbuckets = src:find("MIN(length_buckets_json) AS", 1, true) ~= nil
+local min_lbuckets = (src .. catalogue):find("MIN(length_buckets_json) AS", 1, true) ~= nil
 helpers.assert_true(
 	not min_lbuckets,
 	"sqlite_reader.lua must not use `MIN(length_buckets_json) AS` in SQL — it drops multi-device data (keystats-storage-2)"
@@ -71,10 +83,11 @@ helpers.assert_true(
 )
 
 -- Test 7: length_buckets_json is in GROUP BY for burst query.
-local group_by_lbuckets = src:find("GROUP BY date, app, length_buckets_json", 1, true) ~= nil
+local group_by_lbuckets = Queries.render("manifest.burst", "native", { where = "" })
+	:find("GROUP BY date, app, length_buckets_json", 1, true) ~= nil
 helpers.assert_true(
 	group_by_lbuckets,
-	"sqlite_reader.lua agg_app_day_burst must GROUP BY date, app, length_buckets_json (keystats-storage-2)"
+	"the catalogue's manifest.burst must GROUP BY date, app, length_buckets_json (keystats-storage-2)"
 )
 
 print("[PASS] test_reader_ngram_multidevice_esrc")
