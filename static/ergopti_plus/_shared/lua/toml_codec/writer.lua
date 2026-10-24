@@ -824,12 +824,36 @@ function M.source_inline_scalar_parents(content, updates)
 		identities[identity] = true
 		rows[#rows + 1] = { path = path, row = row }
 	end
+	-- Two rows overlap when one case-folded path is a prefix of, or equal to,
+	-- the other. A trie of folded segments finds every such pair in one walk
+	-- per row; comparing every pair lowercased segments O(rows^2) times, about
+	-- 45 000 pairs for a 300-operation save.
 	local overlapping = {}
+	local trie = { children = {}, ends = {} }
 	for index, request in ipairs(rows) do
-		for other_index = index + 1, #rows do
-			local other = rows[other_index]
-			if has_prefix(request.path, other.path, true) or has_prefix(other.path, request.path, true) then
-				overlapping[index], overlapping[other_index] = true, true
+		local node = trie
+		for _, segment in ipairs(request.path) do
+			local folded = segment:lower()
+			local child = node.children[folded]
+			if not child then
+				child = { children = {}, ends = {} }
+				node.children[folded] = child
+			end
+			node = child
+		end
+		node.ends[#node.ends + 1] = index
+	end
+	for index, request in ipairs(rows) do
+		local node = trie
+		local depth = #request.path
+		for level, segment in ipairs(request.path) do
+			node = node.children[segment:lower()]
+			local ends = node.ends
+			if level < depth and #ends > 0 then
+				overlapping[index] = true
+				for _, other in ipairs(ends) do overlapping[other] = true end
+			elseif level == depth and #ends > 1 then
+				overlapping[index] = true
 			end
 		end
 	end
