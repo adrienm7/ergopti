@@ -27,9 +27,7 @@ local FIXTURE = table.concat({
 	"# ErgoptiPlus configuration",
 	"[script]",
 	"log_level = \"debug\"",
-	"",
-	"[features]",
-	"preview_star_enabled = true",
+	"KeptKey = 1",
 	"",
 	"[hotstrings]",
 	"enabled = true",
@@ -81,7 +79,7 @@ local EXPECTED = {
 
 local SURVIVORS = {
 	{ { "script", "log_level" }, "debug" },
-	{ { "features", "preview_star_enabled" }, true },
+	{ { "script", "KeptKey" }, 1 },
 	{ { "hotstrings", "trigger_char" }, "★" },
 	{ { "hotstrings", "dynamic", "date" }, true },
 	{ { "metrics", "enabled" }, true },

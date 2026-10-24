@@ -23,7 +23,7 @@ local Overrides = helpers.load_with_stubs("infra.config_overrides", {settings = 
 
 local path = os.tmpname()
 local file = assert(io.open(path, "w"))
-assert(file:write('[features]\nkey = "DEBUG" # note with "quotes"\n'))
+assert(file:write('[script]\nkey = "DEBUG" # note with "quotes"\n'))
 assert(file:close())
 
 helpers.assert_eq(Overrides.apply(path), 1)

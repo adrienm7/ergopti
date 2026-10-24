@@ -355,11 +355,11 @@ changed leaf stays refused until its physical record has a writing owner.
 Windows document/config readers still use their flat section model; their
 inline-table reader independently supports the common dotted-key contract.
 
-Legacy `[features]` overrides project scalar semantic leaves onto their flat
-settings keys through `config_override_projection`; read marks retain the
-original segment arrays. Literal and nested paths that project onto the same
-setting refuse the entire candidate set before either owned section writes.
-`[script]` stays a flat scalar section, and arrays stay unconsumed.
+The macOS `[features]` override layer is retired: every declared feature has one
+canonical leaf, and a leftover `[features]` table is neither applied nor marked
+read, so the unused-key cleanup offers it. `[script]` projects its scalar leaves
+through `script_override_projection`; it stays a flat scalar section, tables and
+arrays stay unconsumed, and only the `log_level` spelling reaches the logger.
 
 ### project-configuration-noop-preserves-the-live-inode
 
