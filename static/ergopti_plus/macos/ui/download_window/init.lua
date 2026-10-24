@@ -29,6 +29,7 @@ local M = {}
 
 local Logger     = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
+local TimerScheduler = require("adapters.timer_scheduler")
 local Paths      = require("infra.paths")
 local ShellRunner = require("adapters.shell_runner")
 local OwnWindow  = require("adapters.own_window")
@@ -48,7 +49,7 @@ local _on_cancel = nil
 local _on_resolve = nil
 local _on_retry_start = nil
 local _on_retry  = nil
-local _start_ts  = nil
+local _start_ts  = nil -- Awake seconds private to the active presentation operation.
 local _ready     = false
 local _queued    = PendingQueue.new()
 local _log_shown = false
@@ -572,7 +573,7 @@ function M.show(opts)
 		-- Its discarded pending payload left no rendered state to reset
 		local reset_required = reusing and _ready
 
-		_start_ts          = hs.timer.secondsSinceEpoch()
+		_start_ts          = TimerScheduler.awake_time()
 		_log_shown         = false
 		M._total_files     = nil
 		M._last_file_count = nil
@@ -626,7 +627,7 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line, python_file_count)
 		if not require_active_operation() then return false end
 
 		local pct = tonumber(pct_str) or 0
-		local elapsed = hs.timer.secondsSinceEpoch() - (_start_ts or hs.timer.secondsSinceEpoch())
+		local elapsed = TimerScheduler.awake_time() - (_start_ts or TimerScheduler.awake_time())
 
 		local dl_str, speed_str, eta_str, file_count_str
 
