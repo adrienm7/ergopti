@@ -226,3 +226,5 @@ _CRDC_Run(Mode) {
 for _CRDC_Mode in ["boundary", "busy", "foreign", "borrowed"]
 	Test("clipboard restore debt: native " . _CRDC_Mode . " preserves comparison custody (clipboard-restore-debt-native-cas)",
 		_CRDC_Run.Bind(_CRDC_Mode))
+
+#Include test_clipboard_clear_receipt_owner.ahk
