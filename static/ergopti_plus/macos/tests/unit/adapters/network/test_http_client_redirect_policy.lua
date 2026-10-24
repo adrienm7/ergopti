@@ -245,12 +245,17 @@ helpers.describe("HttpClient redirect ownership", function()
 		client.get("https://api.example.test/start", {
 			Authorization = "Bearer loop-token",
 		}, function(result) terminal = result end)
-		for index = 1, 6 do
+		-- The hop limit is the shared redirect policy's, read independently here.
+		local handle = assert(io.open(assert(helpers.shared("data/http/redirect_policy.json")), "rb"))
+		local limit = require("json").decode(handle:read("*a")).buffered_get.max_hops
+		handle:close()
+		helpers.assert_true(limit > 0, "the shared policy names a positive hop limit")
+		for index = 1, limit + 1 do
 			state.callbacks[index](302, "", { Location = "/loop-" .. tostring(index) })
 		end
 
-		helpers.assert_eq(#state.requests, 6,
-			"five followed redirects plus the initial request must be the hard limit")
+		helpers.assert_eq(#state.requests, limit + 1,
+			"the shared hop limit plus the initial request must be the hard limit")
 		helpers.assert_eq(terminal.ok, false)
 		helpers.assert_eq(terminal.status, 302)
 	end)
