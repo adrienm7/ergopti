@@ -51,14 +51,22 @@ local Preferences = require("infra.hotstring_preferences")
 local ConfigOutdated = require("config_outdated")
 local Engine = require("modules.hotstrings.engine")
 local Monotonic = require("infra.monotonic")
+local ConfigKeys = require("config_keys")
+local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 
 local LOG = "hotstrings.word_reset"
 
-local IDLE_PATH = "hotstrings.idle_reset_seconds"
+local IDLE_PATH = KEY.HOTSTRINGS_IDLE_RESET_SECONDS
 
 -- The boolean leaves of [hotstrings] this module owns, each a runtime field of
--- the same name; the feature path is "hotstrings." .. key.
-local SWITCHES = { "click_resets_word", "arrow_resets_word", "shortcut_resets_word", "tap_hold_resets_word" }
+-- the same name, and the full feature path of each.
+local SWITCHES = { LEAF.CLICK_RESETS_WORD, LEAF.ARROW_RESETS_WORD, LEAF.SHORTCUT_RESETS_WORD, LEAF.TAP_HOLD_RESETS_WORD }
+local SWITCH_PATH = {
+	[LEAF.CLICK_RESETS_WORD] = KEY.HOTSTRINGS_CLICK_RESETS_WORD,
+	[LEAF.ARROW_RESETS_WORD] = KEY.HOTSTRINGS_ARROW_RESETS_WORD,
+	[LEAF.SHORTCUT_RESETS_WORD] = KEY.HOTSTRINGS_SHORTCUT_RESETS_WORD,
+	[LEAF.TAP_HOLD_RESETS_WORD] = KEY.HOTSTRINGS_TAP_HOLD_RESETS_WORD,
+}
 
 -- The caret keys arrow_resets_word governs, by the hook's control-key name.
 -- Home, End, Page Up/Down and Insert keep their unconditional reset.
@@ -122,7 +130,7 @@ end
 --- @return table settings
 local function default_settings()
 	local defaults = { idle_seconds = Manifest.default_for(IDLE_PATH) }
-	for _, key in ipairs(SWITCHES) do defaults[key] = Manifest.default_for("hotstrings." .. key) end
+	for _, key in ipairs(SWITCHES) do defaults[key] = Manifest.default_for(SWITCH_PATH[key]) end
 	return defaults
 end
 
@@ -141,12 +149,12 @@ local function resolve_settings(document, mark)
 		idle = nil
 	end
 	if idle == nil then idle = Manifest.default_for(IDLE_PATH)
-	elseif mark then mark("hotstrings", "idle_reset_seconds") end
+	elseif mark then mark(KEY.HOTSTRINGS, LEAF.IDLE_RESET_SECONDS) end
 	assert(Engine.valid_idle_reset_seconds(idle), "the manifest default of idle_reset_seconds must be valid")
 
 	local settings = { idle_seconds = idle }
 	for _, key in ipairs(SWITCHES) do
-		local path = "hotstrings." .. key
+		local path = SWITCH_PATH[key]
 		local value = section and section[key]
 		if value ~= nil and type(value) ~= "boolean" then
 			ConfigOutdated.report(path, "the value is not a boolean", Logger)
@@ -295,7 +303,7 @@ local function set_switch(key, enabled)
 		Logger.warn(LOG, "Invalid value '%s' for hotstrings.%s refused.", tostring(enabled), key)
 		return false
 	end
-	return persist("hotstrings." .. key, key, enabled)
+	return persist(SWITCH_PATH[key], key, enabled)
 end
 
 --- Sets the pause after which a key starts a new word.
@@ -313,7 +321,7 @@ end
 --- @param enabled boolean
 --- @return boolean committed
 function M.set_click_resets_word(enabled)
-	return set_switch("click_resets_word", enabled)
+	return set_switch(LEAF.CLICK_RESETS_WORD, enabled)
 end
 
 --- Flips the click setting.
@@ -326,7 +334,7 @@ end
 --- @param enabled boolean
 --- @return boolean committed
 function M.set_arrow_resets_word(enabled)
-	return set_switch("arrow_resets_word", enabled)
+	return set_switch(LEAF.ARROW_RESETS_WORD, enabled)
 end
 
 --- Flips the arrow setting.
@@ -339,7 +347,7 @@ end
 --- @param enabled boolean
 --- @return boolean committed
 function M.set_shortcut_resets_word(enabled)
-	return set_switch("shortcut_resets_word", enabled)
+	return set_switch(LEAF.SHORTCUT_RESETS_WORD, enabled)
 end
 
 --- Flips the shortcut setting.
@@ -353,7 +361,7 @@ end
 --- @param enabled boolean
 --- @return boolean committed
 function M.set_tap_hold_resets_word(enabled)
-	return set_switch("tap_hold_resets_word", enabled)
+	return set_switch(LEAF.TAP_HOLD_RESETS_WORD, enabled)
 end
 
 --- Flips the tap-hold setting.
