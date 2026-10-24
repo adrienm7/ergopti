@@ -12,31 +12,101 @@
 		{ "input": "tab\there", "expected": null }
 	],
 	"resolve": [
-		{ "id": "mapped-app", "overrides": { "slack": "formal" }, "app": "slack", "default": "basic", "expected": "formal" },
-		{ "id": "case-and-exe-insensitive", "overrides": { "slack": "formal" }, "app": "Slack.EXE", "default": "basic", "expected": "formal" },
-		{ "id": "unmapped-app", "overrides": { "slack": "formal" }, "app": "code", "default": "basic", "expected": "basic" },
-		{ "id": "no-focused-app", "overrides": { "slack": "formal" }, "app": null, "default": "basic", "expected": "basic" },
+		{
+			"id": "mapped-app",
+			"overrides": { "slack": "formal" },
+			"app": "slack",
+			"default": "basic",
+			"expected": "formal"
+		},
+		{
+			"id": "case-and-exe-insensitive",
+			"overrides": { "slack": "formal" },
+			"app": "Slack.EXE",
+			"default": "basic",
+			"expected": "formal"
+		},
+		{
+			"id": "unmapped-app",
+			"overrides": { "slack": "formal" },
+			"app": "code",
+			"default": "basic",
+			"expected": "basic"
+		},
+		{
+			"id": "no-focused-app",
+			"overrides": { "slack": "formal" },
+			"app": null,
+			"default": "basic",
+			"expected": "basic"
+		},
 		{ "id": "empty-map", "overrides": {}, "app": "slack", "default": "basic", "expected": "basic" },
-		{ "id": "dotted-identifier", "overrides": { "org.gnome.terminal": "user_x" }, "app": "org.gnome.Terminal", "default": "basic", "expected": "user_x" }
+		{
+			"id": "dotted-identifier",
+			"overrides": { "org.gnome.terminal": "user_x" },
+			"app": "org.gnome.Terminal",
+			"default": "basic",
+			"expected": "user_x"
+		}
 	],
 	"decode": [
 		{ "id": "empty-text", "payload": "", "expected": {} },
 		{ "id": "underscore-is-empty", "payload": "_", "expected": {} },
-		{ "id": "one-row", "payload": "v1:W3siYXBwIjoic2xhY2siLCJwcm9maWxlIjoiZm9ybWFsIn1d", "expected": { "slack": "formal" } },
-		{ "id": "two-rows", "payload": "v1:W3siYXBwIjoiY29kZSIsInByb2ZpbGUiOiJiYXNpYyJ9LHsiYXBwIjoic2xhY2siLCJwcm9maWxlIjoiZm9ybWFsIn1d", "expected": { "code": "basic", "slack": "formal" } },
-		{ "id": "dotted-app", "payload": "v1:W3siYXBwIjoib3JnLmdub21lLnRlcm1pbmFsIiwicHJvZmlsZSI6InVzZXJfeCJ9XQ==", "expected": { "org.gnome.terminal": "user_x" } },
-		{ "id": "unnormalised-app", "payload": "v1:W3siYXBwIjoiU2xhY2siLCJwcm9maWxlIjoiZm9ybWFsIn1d", "refused": "not stored normalised" },
-		{ "id": "duplicate-app", "payload": "v1:W3siYXBwIjoic2xhY2siLCJwcm9maWxlIjoiYSJ9LHsiYXBwIjoic2xhY2siLCJwcm9maWxlIjoiYiJ9XQ==", "refused": "twice" },
-		{ "id": "object-instead-of-array", "payload": "v1:eyJhcHAiOiJzbGFjayJ9", "refused": "JSON array" },
-		{ "id": "row-without-profile", "payload": "v1:W3siYXBwIjoic2xhY2sifV0=", "refused": "not { app, profile }" },
-		{ "id": "empty-profile", "payload": "v1:W3siYXBwIjoic2xhY2siLCJwcm9maWxlIjoiIn1d", "refused": "no usable profile" },
+		{
+			"id": "one-row",
+			"payload": "v1:W3siYXBwIjoic2xhY2siLCJwcm9maWxlIjoiZm9ybWFsIn1d",
+			"expected": { "slack": "formal" }
+		},
+		{
+			"id": "two-rows",
+			"payload": "v1:W3siYXBwIjoiY29kZSIsInByb2ZpbGUiOiJiYXNpYyJ9LHsiYXBwIjoic2xhY2siLCJwcm9maWxlIjoiZm9ybWFsIn1d",
+			"expected": { "code": "basic", "slack": "formal" }
+		},
+		{
+			"id": "dotted-app",
+			"payload": "v1:W3siYXBwIjoib3JnLmdub21lLnRlcm1pbmFsIiwicHJvZmlsZSI6InVzZXJfeCJ9XQ==",
+			"expected": { "org.gnome.terminal": "user_x" }
+		},
+		{
+			"id": "unnormalised-app",
+			"payload": "v1:W3siYXBwIjoiU2xhY2siLCJwcm9maWxlIjoiZm9ybWFsIn1d",
+			"refused": "not stored normalised"
+		},
+		{
+			"id": "duplicate-app",
+			"payload": "v1:W3siYXBwIjoic2xhY2siLCJwcm9maWxlIjoiYSJ9LHsiYXBwIjoic2xhY2siLCJwcm9maWxlIjoiYiJ9XQ==",
+			"refused": "twice"
+		},
+		{
+			"id": "object-instead-of-array",
+			"payload": "v1:eyJhcHAiOiJzbGFjayJ9",
+			"refused": "JSON array"
+		},
+		{
+			"id": "row-without-profile",
+			"payload": "v1:W3siYXBwIjoic2xhY2sifV0=",
+			"refused": "not { app, profile }"
+		},
+		{
+			"id": "empty-profile",
+			"payload": "v1:W3siYXBwIjoic2xhY2siLCJwcm9maWxlIjoiIn1d",
+			"refused": "no usable profile"
+		},
 		{ "id": "newer-version", "payload": "v2:W10=", "refused": "v1 envelope" },
 		{ "id": "legacy-pairs", "payload": "slack=formal;code=basic", "refused": "v1 envelope" },
 		{ "id": "bad-base64", "payload": "v1:***", "refused": "Base64" }
 	],
 	"encode": [
 		{ "id": "empty-map", "overrides": {}, "expected": "" },
-		{ "id": "one-row", "overrides": { "slack": "formal" }, "expected": "v1:W3siYXBwIjoic2xhY2siLCJwcm9maWxlIjoiZm9ybWFsIn1d" },
-		{ "id": "rows-sorted-by-app", "overrides": { "slack": "formal", "code": "basic" }, "expected": "v1:W3siYXBwIjoiY29kZSIsInByb2ZpbGUiOiJiYXNpYyJ9LHsiYXBwIjoic2xhY2siLCJwcm9maWxlIjoiZm9ybWFsIn1d" }
+		{
+			"id": "one-row",
+			"overrides": { "slack": "formal" },
+			"expected": "v1:W3siYXBwIjoic2xhY2siLCJwcm9maWxlIjoiZm9ybWFsIn1d"
+		},
+		{
+			"id": "rows-sorted-by-app",
+			"overrides": { "slack": "formal", "code": "basic" },
+			"expected": "v1:W3siYXBwIjoiY29kZSIsInByb2ZpbGUiOiJiYXNpYyJ9LHsiYXBwIjoic2xhY2siLCJwcm9maWxlIjoiZm9ybWFsIn1d"
+		}
 	]
 }
