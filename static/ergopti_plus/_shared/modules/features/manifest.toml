@@ -567,11 +567,16 @@ input_altering = false
 type = "number"
 description_key = "menu.hotstrings.expansion_delay"
 
+# The four preview-bubble switches start on in an empty configuration on all
+# three drivers (the coordinator's decision of 2026-10-24), so a fresh install
+# shows the bubble; a clear writes them off explicitly (cleared).
 [[features.hotstrings]]
 id = "preview_ai_enabled"
 default = true
 recommended = true
 input_altering = true
+active_by_default = true
+cleared = false
 type = "boolean"
 description_key = "menu.hotstrings.preview_ai_enabled"
 
@@ -580,6 +585,8 @@ id = "preview_autocorrect_enabled"
 default = true
 recommended = true
 input_altering = true
+active_by_default = true
+cleared = false
 type = "boolean"
 description_key = "menu.hotstrings.preview_autocorrect_enabled"
 
@@ -588,6 +595,8 @@ id = "preview_colored_tooltips"
 default = true
 recommended = true
 input_altering = true
+active_by_default = true
+cleared = false
 type = "boolean"
 description_key = "menu.hotstrings.preview_colored_tooltips"
 
@@ -596,6 +605,8 @@ id = "preview_star_enabled"
 default = true
 recommended = true
 input_altering = true
+active_by_default = true
+cleared = false
 type = "boolean"
 description_key = "menu.hotstrings.preview_star_enabled"
 

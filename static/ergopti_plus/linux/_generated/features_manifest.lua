@@ -101,16 +101,16 @@ M.features = {
 		path = "hotstrings.expansion_delay", id = "expansion_delay", section = "hotstrings", default = 0.75, type = "number", description_key = "menu.hotstrings.expansion_delay", platforms = { "ahk", "hs", "linux" }, recommended = 0.75, input_altering = false,
 	},
 	{
-		path = "hotstrings.preview_ai_enabled", id = "preview_ai_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_ai_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true,
+		path = "hotstrings.preview_ai_enabled", id = "preview_ai_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_ai_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true, cleared = false,
 	},
 	{
-		path = "hotstrings.preview_autocorrect_enabled", id = "preview_autocorrect_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_autocorrect_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true,
+		path = "hotstrings.preview_autocorrect_enabled", id = "preview_autocorrect_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_autocorrect_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true, cleared = false,
 	},
 	{
-		path = "hotstrings.preview_colored_tooltips", id = "preview_colored_tooltips", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_colored_tooltips", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true,
+		path = "hotstrings.preview_colored_tooltips", id = "preview_colored_tooltips", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_colored_tooltips", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true, cleared = false,
 	},
 	{
-		path = "hotstrings.preview_star_enabled", id = "preview_star_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_star_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true,
+		path = "hotstrings.preview_star_enabled", id = "preview_star_enabled", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.preview_star_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true, cleared = false,
 	},
 	{
 		path = "hotstrings.autocorrection.names", id = "names", section = "hotstrings.autocorrection", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.autocorrection.names", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, time_activation_seconds = 0.5 }, input_altering = true,

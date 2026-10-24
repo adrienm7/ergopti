@@ -233,6 +233,12 @@ async function main() {
 		// The maintainer also requested a conditional ordinary editor shortcut
 		// following only the actual unmodified physical magic source (2026-10-02).
 		'shortcuts.keyboard.magic_editor',
+		// The preview bubble ships on everywhere (2026-10-24), so a fresh
+		// configuration shows it and the first-run wizard no longer asks.
+		'hotstrings.preview_ai_enabled',
+		'hotstrings.preview_autocorrect_enabled',
+		'hotstrings.preview_colored_tooltips',
+		'hotstrings.preview_star_enabled',
 		'shortcuts.script_control.script_altgr_backspace',
 		'shortcuts.script_control.script_altgr_delete',
 		'shortcuts.script_control.script_altgr_enter',
