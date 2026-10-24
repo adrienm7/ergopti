@@ -166,6 +166,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 
 		local clock = { now = 1000 }
 		hs.timer.secondsSinceEpoch = function() return clock.now end
+		hs.timer.absoluteTime = function() return clock.now * 1e9 end
 
 		-- Counts either close API: these tests assert the banner went away, not which
 		-- call removed it (the normal path targets the stored id via closeSpecific).
