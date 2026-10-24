@@ -513,10 +513,10 @@ helpers.describe("tap-hold engine: RCtrl's Backspace under held keys", function(
 		local e = engine({ right_ctrl = { tap_action = "backspace", hold_modifier = "ctrl", time_activation_seconds = 0.2 } })
 		e:process(LSHIFT, DOWN, 0)
 		e:process(RCTRL, DOWN, 10)
-		helpers.assert_eq(trail((e:process(RCTRL, UP, 100))), "29↑ 42↑ 111↓ 111↑ 42↓")
+		helpers.assert_eq(trail((e:process(RCTRL, UP, 100))), "97↑ 42↑ 111↓ 111↑ 42↓")
 		e:process(LSHIFT, UP, 200)
 		e:process(RCTRL, DOWN, 300)
-		helpers.assert_eq(trail((e:process(RCTRL, UP, 400))), "29↑ 14↓ 14↑", "alone, a Backspace")
+		helpers.assert_eq(trail((e:process(RCTRL, UP, 400))), "97↑ 14↓ 14↑", "alone, a Backspace")
 	end)
 
 	helpers.it("types Right then Backspace under LAlt's one-shot Shift and spends it (rctrl-backspace-logic)", function()
