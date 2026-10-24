@@ -53,7 +53,7 @@ function M.walk_typing(entry)
 	end
 	C.walker.walk_typing(S.agg_batch, C.get_app_ctx(app), {
 		app = app,
-		date = timestamp and timestamp:sub(1, 10) or C.today(),
+		date = timestamp and timestamp:match("^(%d%d%d%d%-%d%d%-%d%d)") or C.today(),
 		events = entry.events,
 		layout = entry.layout,
 		title = entry.title,
