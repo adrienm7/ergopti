@@ -48,7 +48,8 @@ const SINGLE_DRIVER_KEYS = [
 	// tooltip now, through the same shared tint and layout maths, so they are
 	// two-driver features and this list — which is for SINGLE-driver ones —
 	// stops being where they are recorded. The manifest pins their platforms.
-	['hotstrings.expansion_delay', 'hs'],
+	// hotstrings.expansion_delay left this list when the three drivers started
+	// reading the base delay from its one manifest declaration.
 	// The Windows layout is installed by the AHK driver's own remapper.
 	['layout.ergopti_base', 'ahk'],
 	['layout.ergopti_alt_gr', 'ahk'],
