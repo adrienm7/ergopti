@@ -11,6 +11,8 @@
 --- FEATURES & RATIONALE:
 --- 1. Key holds: `_shared/ui/metrics_apps/script.js` sums `kc_hold[kc].s` and
 ---    `.n` for the modifier hold mean; macOS projected `sum` and `count`.
+--- 2. Focus latency: macOS writes focus_to_first_key_* into agg_app_day_ergo
+---    and the page reads them, but only the Linux reader projected them.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -45,5 +47,17 @@ helpers.describe("macOS manifest: fields under the dashboard's keys", function()
 		helpers.assert_true(complete)
 		helpers.assert_eq(manifest["2026-10-01"].Code.kc_hold["56"],
 			{ s = 13000, n = 60, m = 1200, tap = 48, hold = 12 })
+	end)
+
+	helpers.it("projects the focus-to-first-key latency it writes, like Linux", function()
+		local reader = reader_answering("agg_app_day_ergo", {
+			{ date = "2026-10-01", app = "Code", f_max = 7, h_max = 11, ar_count = 4,
+				focus_sum = 4200, focus_count = 6 },
+		})
+		local manifest = reader.read_manifest("/declared/db.sqlite", "2026-10-01", "2026-10-01")
+		local entry = manifest["2026-10-01"].Code
+		helpers.assert_eq(entry.focus_to_first_key_sum_ms, 4200)
+		helpers.assert_eq(entry.focus_to_first_key_count, 6)
+		helpers.assert_eq(entry.same_finger_streak_max, 7)
 	end)
 end)
