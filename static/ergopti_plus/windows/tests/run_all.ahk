@@ -1151,6 +1151,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keystats/test_keystats_app_categories.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader.ahk
 #Include unit/modules/keystats/reader/test_keystats_reader_manifest_contract.ahk
+#Include unit/modules/keystats/reader/test_keystats_query_catalogue.ahk
 #Include unit/modules/keystats/reader/test_klr_manifest_switches_to.ahk
 #Include unit/modules/keystats/test_keystats_llm_accepted_metrics.ahk
 #Include unit/modules/keystats/metrics/test_metrics_sqlite_fixture_cleanup.ahk
