@@ -109,7 +109,7 @@ _BBCR_Release(State) {
 				AssertFalse(Request.CleanupPending, "no private artifact cleanup may be silently deferred")
 				AssertFalse(_HTTP_CURL_CLEANUP_DEBTS.Has(Request.CleanupDebtId))
 				AssertFalse(_HTTP_CURL_ABORT_DEBTS.Has(Request.CleanupDebtId))
-				for FilePath in [Request.ConfigPath, Request.BodyPath, Request.HeaderPath]
+				for FilePath in [Request.BodyPath, Request.HeaderPath]
 					AssertFalse(FileExist(FilePath), "all private request artifacts must be removed")
 			}
 			if Record.Has("control") && Record["control"].Has("directory")

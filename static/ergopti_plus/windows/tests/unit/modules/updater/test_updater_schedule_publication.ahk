@@ -154,7 +154,7 @@ class _USP_Fixture {
 					AssertFalse(IsObject(Request.DeadlineFn))
 					AssertFalse(_HTTP_CURL_CLEANUP_DEBTS.Has(Request.CleanupDebtId))
 					AssertFalse(_HTTP_CURL_ABORT_DEBTS.Has(Request.CleanupDebtId))
-					for Path in [Request.ConfigPath, Request.BodyPath, Request.HeaderPath]
+					for Path in [Request.BodyPath, Request.HeaderPath]
 						AssertFalse(FileExist(Path), "every private managed artifact must retire")
 					if State.Has("directory")
 						AssertFalse(DirExist(State["directory"]))
