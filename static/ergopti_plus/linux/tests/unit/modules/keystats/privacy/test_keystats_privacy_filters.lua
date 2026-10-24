@@ -107,13 +107,16 @@ helpers.describe("keystats privacy — the posture is read, not re-typed", funct
 
 	it("does not hardcode the four defaults in the driver", function()
 		local code = code_of("modules/keystats/keystats.lua")
-		for _, path in ipairs({
-			"metrics.enabled",
-			"metrics.private_filter_enabled",
-			"metrics.secure_filter_enabled",
-			"metrics.system_auth_filter_enabled",
+		local KEY = require("config_keys").KEY
+		for _, entry in ipairs({
+			{ "METRICS_ENABLED",                    "metrics.enabled" },
+			{ "METRICS_PRIVATE_FILTER_ENABLED",     "metrics.private_filter_enabled" },
+			{ "METRICS_SECURE_FILTER_ENABLED",      "metrics.secure_filter_enabled" },
+			{ "METRICS_SYSTEM_AUTH_FILTER_ENABLED", "metrics.system_auth_filter_enabled" },
 		}) do
-			helpers.assert_contains(code, 'Manifest.default_for("' .. path .. '")',
+			-- The constant is the generated spelling of the path; the driver reads it.
+			helpers.assert_eq(KEY[entry[1]], entry[2])
+			helpers.assert_contains(code, "Manifest.default_for(KEY." .. entry[1] .. ")",
 				"the posture must be read from the shared manifest")
 		end
 	end)

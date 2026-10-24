@@ -39,7 +39,6 @@
 		"static/ergopti_plus/linux/modules/hotstrings/preview_settings.lua": 4,
 		"static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua": 2,
 		"static/ergopti_plus/linux/modules/hotstrings/word_reset.lua": 10,
-		"static/ergopti_plus/linux/modules/keystats/keystats.lua": 18,
 		"static/ergopti_plus/linux/modules/llm/agent_settings.lua": 4,
 		"static/ergopti_plus/linux/modules/llm/display_settings.lua": 4,
 		"static/ergopti_plus/linux/modules/llm/navigation_settings.lua": 6,
