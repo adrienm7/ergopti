@@ -339,6 +339,7 @@ assert.ok(
 );
 if (process.platform === 'linux') {
 	const { spawnSync } = require('node:child_process');
+	const { bashExecutable } = require('../lib/git-bash.cjs');
 	const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-libc-preflight-'));
 	try {
 		const appDir = path.join(sandbox, 'AppDir');
@@ -359,7 +360,9 @@ if (process.platform === 'linux') {
 		const bin = path.join(sandbox, 'bin');
 		fs.mkdirSync(bin);
 		for (const tool of ['sh', 'readlink', 'dirname']) {
-			const found = spawnSync('sh', ['-c', `command -v ${tool}`], { encoding: 'utf8' });
+			const found = spawnSync(bashExecutable(), ['-c', `command -v ${tool}`], {
+				encoding: 'utf8'
+			});
 			assert.equal(found.status, 0, `${tool} is on this host`);
 			fs.symlinkSync(found.stdout.trim(), path.join(bin, tool));
 		}
@@ -371,8 +374,7 @@ if (process.platform === 'linux') {
 		const launch = (libc, language, withBash) => {
 			const env = { PATH: bin, FAKE_LIBC: libc, LANG: language };
 			if (withBash) {
-				const bash = spawnSync('sh', ['-c', 'command -v bash'], { encoding: 'utf8' });
-				fs.symlinkSync(bash.stdout.trim(), path.join(bin, 'bash'));
+				fs.symlinkSync(bashExecutable(), path.join(bin, 'bash'));
 			}
 			try {
 				return spawnSync(path.join(appDir, 'AppRun'), [], { encoding: 'utf8', env });
