@@ -421,6 +421,7 @@ return {
 	"tests.unit.ui.editors.test_ui_bridge_handlers_locale_routing_i18n",
 	"tests.unit.ui.editors.test_ui_bridge_handlers_paths_editor",
 	"tests.unit.ui.editors.test_ui_bridge_handlers_personal_editor_fixture",
+	"tests.unit.ui.personal_info_editor.test_personal_info_editor_close",
 	"tests.unit.modules.updater.vectors.test_update_channels_vectors",
 	"tests.unit.modules.updater.check.test_update_check_feedback",
 	"tests.unit.modules.updater.vectors.test_update_schedule_vectors",
