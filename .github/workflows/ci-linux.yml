@@ -2643,6 +2643,16 @@ jobs:
           fi
         timeout-minutes: 3
 
+      # The XI2 cookie prerequisites install in their own step, so a slow mirror
+      # fails the install and not the five-minute native qualification.
+      - name: Install prerequisites for Qualify three actual XI2 property cookies
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gcc libx11-dev libxi-dev xvfb
+        timeout-minutes: 20
+
       # Non-input C qualification uses the original exact full-family owner.
       # This separate native receipt does not qualify the deferred E2E suite.
       - name: Qualify three actual XI2 property cookies
@@ -2651,7 +2661,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gcc libx11-dev libxi-dev xvfb
           set +e
           python3 static/ergopti_plus/linux/tests/hardware/run_xi2_property_cookies.py "$RUNNER_TEMP/linux-xi2-property-cookies" 2>&1 | tee "$RUNNER_TEMP/linux-xi2-property-cookies.log"
           xi2_pipeline_status=("${PIPESTATUS[@]}")
