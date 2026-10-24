@@ -189,7 +189,7 @@ end
 --- @return string|nil reason Existing translated native-runner availability reason.
 function M.program_assignment_reason(value)
 	local checked, reserved = pcall(function()
-		local parsed = require("program_parameter").parse(value, "hs")
+		local parsed = require("program_parameter").parse(value, "posix")
 		if not parsed then return false end
 		local Native = require("adapters.apple_shortcuts_native")
 		return Native.is_chosen_program(parsed.executable, parsed.arguments)

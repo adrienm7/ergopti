@@ -99,11 +99,17 @@ function init(data) {
 		currentId = data.allowNative ? '__native__' : 'none';
 	}
 
-	// The parameter editor needs all three; without them every action confirms
-	// at once and the host asks for the value itself.
+	// The parameter editor needs the vocabulary, the strings and the host's
+	// capabilities; without them every action confirms at once and the host
+	// asks for the value itself.
 	sendVocabulary = data.sendVocabulary || null;
-	hostPlatform = data.platform || '';
 	paramStrings = data.parameterStrings || null;
+	if (paramStrings !== null) {
+		if (typeof data.executableSyntax !== 'string' || typeof data.commandIsPrimary !== 'boolean')
+			throw new Error('action picker host must name executableSyntax and commandIsPrimary');
+		executableSyntax = data.executableSyntax;
+		commandIsPrimary = data.commandIsPrimary;
+	}
 	programProviders = data.programProviders || null;
 	automationProviders = data.automationProviders || null;
 	programProviderStrings = data.programProviderStrings || {};
@@ -476,11 +482,13 @@ const EDITABLE_KINDS = new Set([
 const SEND_INPUT_KINDS = new Set(['text', 'key', 'shortcut']);
 
 // Host-supplied: the decoded _shared/modules/actions/send_keys.json, the
-// host's platform ("hs" makes Command the primary modifier), and the localized
-// strings of the editor ({ save, back, captureKey, captureShortcut, prompts:
-// {kind: text}, errors: {kind: text} }). All three are required to edit.
+// host's capabilities (the executable path syntax of a program parameter,
+// "windows" or "posix", and whether Command is the primary modifier), and the
+// localized strings of the editor ({ save, back, captureKey, captureShortcut,
+// prompts: {kind: text}, errors: {kind: text} }). All are required to edit.
 let sendVocabulary = null;
-let hostPlatform = '';
+let executableSyntax = '';
+let commandIsPrimary = false;
 let paramStrings = null;
 let programProviders = null;
 let automationProviders = null;
@@ -617,7 +625,7 @@ function parseLlmVision(value) {
 function parseParameter(kind, value) {
 	if (typeof value !== 'string') return null;
 	if (kind === 'program')
-		return ProgramParameter.parse(value, hostPlatform) === null ? null : value;
+		return ProgramParameter.parse(value, executableSyntax) === null ? null : value;
 	if (kind === 'text') return parseSendText(value);
 	if (kind === 'key') return parseSendKey(value, false);
 	if (kind === 'shortcut') return parseSendShortcut(value);
@@ -672,7 +680,6 @@ function shortcutKeyToken(e) {
 function captureShortcut(e) {
 	if (MODIFIER_KEYS.has(e.key)) return null;
 	const mods = [];
-	const commandIsPrimary = hostPlatform === 'hs';
 	if (commandIsPrimary ? e.metaKey : e.ctrlKey) mods.push('primary');
 	if (commandIsPrimary && e.ctrlKey) mods.push('ctrl');
 	if (e.altKey) mods.push('alt');
@@ -808,7 +815,7 @@ function openParamEditor(entry) {
 	el('list').hidden = true;
 	el('search-bar').hidden = true;
 	if (program) {
-		const current = ProgramParameter.parse(entry.parameterValue || '', hostPlatform);
+		const current = ProgramParameter.parse(entry.parameterValue || '', executableSyntax);
 		el('param-program-executable').value = current === null ? '' : current.executable;
 		el('param-program-arguments').replaceChildren();
 		for (const argument of current === null ? [] : current.arguments)
@@ -969,7 +976,7 @@ function saveParameter() {
 						el('param-program-arguments').querySelectorAll('textarea'),
 						(input) => input.value
 					),
-					hostPlatform
+					executableSyntax
 				)
 			: editing.parameter === 'llm_prompt'
 				? promptChoiceValue()
