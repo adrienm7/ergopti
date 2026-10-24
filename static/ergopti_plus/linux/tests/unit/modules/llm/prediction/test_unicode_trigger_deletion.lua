@@ -46,6 +46,7 @@ local function exercise(trigger, characters, raw_bytes)
 	}
 	package.loaded["modules.llm.trigger_settings"] = {
 		get = function(key) if key == "debounce_ms" then return 0 end; return false end,
+		is_app_disabled = function() return false end,
 	}
 	package.loaded["modules.llm.display_settings"] = { get = function() return false end }
 	package.loaded["modules.llm.profile_settings"] = {
