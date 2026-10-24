@@ -386,6 +386,7 @@ helpers.describe("macOS two-finger neutral recommendations", function()
 					helpers.assert_true(scroll_tap ~= nil and scroll_tap:isEnabled(), "the real engine tap must be live")
 					local clock = 1000
 					recording.hs.timer.secondsSinceEpoch = function() return clock end
+					recording.hs.timer.absoluteTime = function() return clock * 1e9 end
 					local before = recording.synthetic.stats()
 					local function frame(x, y, lifted)
 						local touches = lifted and {} or {
