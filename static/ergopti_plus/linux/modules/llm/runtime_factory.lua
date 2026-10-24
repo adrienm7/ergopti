@@ -30,6 +30,8 @@ function M.new(engine, profiles)
 	-- The daemon cannot evaluate a PAC: the desktop proxy is resolved for it.
 	local proxy_policy, proxy_reason = require("infra.proxy_policy").load()
 	if not proxy_policy then return nil, proxy_reason end
+	local origins, origins_reason = require("infra.route_origins").client("ollama")
+	if not origins then return nil, origins_reason end
 	local source = require("modules.llm.runtime_source").new({
 		preferences = require("infra.llm_preferences"), profiles = profiles,
 		writer = require("toml_codec.writer"), manifest = require("infra.manifest_reader"),
@@ -49,7 +51,7 @@ function M.new(engine, profiles)
 		http = require("adapters.http_client"), owned_timer = timer, timings = Timings,
 		serve_environment = serve_environment,
 		network = { policy = proxy_policy, lookup = require("adapters.system_proxy").lookup_owned,
-			timeout_ms = Timings.ms("llm", "managed_proxy_lookup_timeout_ms") },
+			timeout_ms = Timings.ms("llm", "managed_proxy_lookup_timeout_ms"), origins = origins },
 		environment = function()
 			local values = native.os_environ()
 			if type(values) ~= "table" then return nil end

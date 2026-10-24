@@ -104,7 +104,7 @@ test('stale logical HTTP response does not publish callback or erase capability'
 end)
 
 local function network()return{policy={route=function()return{mode='system',environment_exclusions={}}end,environment_names=function()return{}end,
-	selection=function()return nil end},lookup=function()end,timeout_ms=7}end
+	selection=function()return nil end},lookup=function()end,timeout_ms=7,origins={'https://registry.ollama.ai'}}end
 test('without a network dependency the composition has no proxy stage',function()local w=fixture();eq(w.controller.ports.network,nil)end)
 test('a network dependency adds the proxy stage and refuses an incomplete one',function()
 	local w=fixture({network=network()});eq(type(w.controller.ports.network),'function')
@@ -125,8 +125,23 @@ test('an exported proxy reaches the daemon untouched when the stage selected non
 	for _,entry in ipairs(w.service.opts.env)do if entry=='HTTPS_PROXY=http://mine:1'then seen=true end end
 	eq(seen,true)
 end)
+test('the bypass rows of the route plan replace the inherited bypass copies',function()
+	local w=fixture({network=network()});w.env={'PATH=/usr/bin','no_proxy=intranet','NO_PROXY=intranet','http_proxy=keep'}
+	w.options.environment={'HTTPS_PROXY=http://proxy.corp.example:3128','NO_PROXY=intranet,blob.example','no_proxy=intranet,blob.example'}
+	w.controller.ports.start_service('/managed/ollama',{'serve'},w.options,function()end)
+	local bypass,kept={},false
+	for _,entry in ipairs(w.service.opts.env)do
+		if entry:lower():match('^no_proxy=')then bypass[#bypass+1]=entry end
+		if entry=='http_proxy=keep'then kept=true end
+	end
+	eq(#bypass,2);eq(bypass[1],'NO_PROXY=intranet,blob.example');eq(bypass[2],'no_proxy=intranet,blob.example');eq(kept,true)
+end)
+test('a network dependency without the origin inventory is refused',function()
+	local incomplete=network();incomplete.origins=nil
+	eq(pcall(fixture,{network=incomplete}),false)
+end)
 test('proxy rows naming another variable or carrying a newline dispatch no process',function()
-	for _,row in ipairs({'OLLAMA_HOST=0.0.0.0:1','NO_PROXY=*','HTTPS_PROXY=a\nB=c',42})do
+	for _,row in ipairs({'OLLAMA_HOST=0.0.0.0:1','ALL_PROXY=socks5://x:1','HTTPS_PROXY=a\nB=c',42})do
 		local w=fixture({network=network()});w.options.environment={row}
 		local o=w.controller.ports.start_service('/managed/ollama',{'serve'},w.options,function()end)
 		eq(w.service,nil);eq(o:is_settled(),true)

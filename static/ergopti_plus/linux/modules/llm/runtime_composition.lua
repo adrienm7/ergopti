@@ -23,8 +23,9 @@ end
 --- deps: source, resolver, installed, file_factory, admission, install_phase,
 --- process (single finite/service bridge), http, owned_timer, timings, environment,
 --- serve_environment (rows of the shared managed_ollama_environment.json),
---- optional network ({policy,lookup,timeout_ms}: the shared proxy policy, the
---- owned system proxy lookup and its bound, see managed_ollama_proxy.lua).
+--- optional network ({policy,lookup,timeout_ms,origins}: the shared proxy policy,
+--- the owned system proxy lookup, its bound and the route_origins.json "ollama"
+--- inventory, see managed_ollama_proxy.lua).
 --- `source` owns captured enable/app source proofs and existing writer ACK.
 function M.new(deps)
 	assert(type(deps)=='table', 'runtime composition unavailable')
@@ -56,8 +57,8 @@ function M.new(deps)
 	local network=d.network
 	if network~=nil then
 		assert(type(network)=='table' and type(network.policy)=='table' and type(network.lookup)=='function'
-			and type(network.timeout_ms)=='number', 'managed network port unavailable')
-		proxy_names[require('modules.llm.managed_ollama_proxy').VARIABLE]=true
+			and type(network.timeout_ms)=='number' and type(network.origins)=='table', 'managed network port unavailable')
+		for _,name in ipairs(require('modules.llm.managed_ollama_proxy').VARIABLES) do proxy_names[name]=true end
 	end
 	local p={current=s.current,publish=s.publish,app_capture=s.app_capture,app_current=s.app_current, compensate=s.compensate,
 		after=d.owned_timer.after, now_ms=d.owned_timer.now_ms}
@@ -85,12 +86,12 @@ function M.new(deps)
 		if not current(authorized) then return empty('runtime_source_changed',done) end
 		local base=environment()
 		if type(base)~='table' or not current(authorized) then return empty('runtime_environment_unavailable',done) end
-		-- Rows the proxy stage selected: only its declared variable, never a newline.
+		-- Rows the proxy stage selected: only its declared variables, never a newline.
 		-- A variable is replaced only when the stage chose a value for it, so a proxy
 		-- the user exported (which the stage leaves alone) reaches the daemon intact.
 		local selected,replaced={},{}
 		for _,row in ipairs(options.environment or {}) do
-			local name=type(row)=='string' and row:match('^([A-Z][A-Z0-9_]*)=')
+			local name=type(row)=='string' and row:match('^([%a_][%w_]*)=')
 			if not name or not proxy_names[name] or row:find('[%z\r\n]') then
 				return empty('runtime_environment_unavailable',done)
 			end
@@ -116,7 +117,7 @@ function M.new(deps)
 	end
 	if network~=nil then
 		local proxy_port=require('modules.llm.managed_ollama_proxy').new({policy=network.policy,lookup=network.lookup,
-			environment=environment,timeout_ms=network.timeout_ms,owner='ollama-runtime-proxy'})
+			environment=environment,timeout_ms=network.timeout_ms,owner='ollama-runtime-proxy',origins=network.origins})
 		function p.network(budget,authorized,done) return proxy_port(budget,authorized,done) end
 	end
 	function p.probe(url,budget,authorized,done)
