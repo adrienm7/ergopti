@@ -12,7 +12,7 @@
 
 _HCPT_ClassOwner() {
 	global _DriverDir
-	Found := ""
+	Found := "", Definitions := 0
 	loop files _DriverDir . "\*.ahk", "FR" {
 		if !_DriverIsProductionSource(A_LoopFileFullPath)
 			continue
@@ -24,12 +24,14 @@ _HCPT_ClassOwner() {
 			StrReplace(Prefix, "}", , true, &Closes)
 			Depth += Opens - Closes
 			if Depth == 0 {
+				Definitions += 1
 				AssertEqual("", Found, "The dispatcher class must have one authentic whole owner.")
 				Found := A_LoopFileFullPath
 			}
 			Through := Position, Position += Definition.Len
 		}
 	}
+	AssertEqual(1, Definitions, "The dispatcher census must observe exactly one top-level class definition.")
 	AssertTrue(Found != "", "The actual dispatcher class owner must be present.")
 	return Found
 }
