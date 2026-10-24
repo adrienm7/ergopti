@@ -50,6 +50,7 @@ local function exercise(trigger, characters, raw_bytes)
 	package.loaded["modules.llm.display_settings"] = { get = function() return false end }
 	package.loaded["modules.llm.profile_settings"] = {
 		get = function(key) if key == "num_predictions" then return 1 end end,
+		resolve_for_app = function() return nil end,
 		resolve = function() return { id = "basic", system_single = "Continue the typed text." } end,
 	}
 	package.loaded["modules.llm.api_ollama"] = {

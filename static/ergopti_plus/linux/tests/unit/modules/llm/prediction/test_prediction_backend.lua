@@ -68,6 +68,7 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 	package.loaded["modules.llm.profiles"] = profiles
 	package.loaded["modules.llm.profile_settings"] = {
 		get = function(key) if key == "num_predictions" then return 3 end end,
+		resolve_for_app = function() return nil end,
 		resolve = function()
 			if calls.on_profile then calls.on_profile() end
 			return { id = "raw", system_single = "{context}" }
