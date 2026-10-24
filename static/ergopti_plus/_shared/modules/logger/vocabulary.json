@@ -1,0 +1,21 @@
+{
+	"_comment": "Closed log vocabulary shared by every driver: the evidence-record formatters whose output an evidence line carries. tools/lib/log-vocabulary-scan.cjs reads the field names those functions write; a formatter that is renamed or loses its fields fails the census and the gate instead of silently dropping out of the count.",
+	"evidence_record_formatters": [
+		{
+			"file": "static/ergopti_plus/_shared/lua/field_check_report.lua",
+			"function": "M.format_log_line"
+		},
+		{
+			"file": "static/ergopti_plus/windows/infra/input_probe.ahk",
+			"function": "InputProbe_RowRecord"
+		},
+		{
+			"file": "static/ergopti_plus/windows/infra/input_probe.ahk",
+			"function": "InputProbe_HookRecord"
+		},
+		{
+			"file": "static/ergopti_plus/windows/ui/layout_manager/composer_check.ahk",
+			"function": "ComposerCheck_LogLine"
+		}
+	]
+}

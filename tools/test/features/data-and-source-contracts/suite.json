@@ -473,6 +473,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-config-key-literals.cjs"],
 			"repro": "npm run test:config-key-literals"
+		},
+		{
+			"id": "js-0467",
+			"ordinal": 469,
+			"name": "log vocabulary scanner matches every reason, phase, tag and evidence-field shape",
+			"cmd": "node",
+			"args": ["tools/test/test-log-vocabulary-scan.cjs"],
+			"repro": "npm run test:log-vocabulary-scan"
 		}
 	]
 }
