@@ -242,7 +242,6 @@ console.log('config schema validation (config_template.toml vs config.schema.jso
 // accepting the empty generated default cannot hide an object/list mismatch.
 for (const [section, key, valid, invalid] of [
 	['models', 'user_models', [{ backend: 'ollama', name: 'example' }], [true]],
-	['profiles', 'user_profiles', [{ id: 'custom', name: 'Custom' }], ['wrong-shape']],
 	['trigger', 'disabled_apps', ['com.example.Editor'], [17]],
 	['navigation', 'nav_modifiers', ['ctrl', 'alt'], ['unknown-modifier']]
 ]) {

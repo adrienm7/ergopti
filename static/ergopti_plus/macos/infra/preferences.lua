@@ -73,6 +73,7 @@ local PersonalFiles = require("hotstrings.personal_files")
 local PersonalAdoption = require("infra.personal_file_adoption")
 local Agent     = require("llm.agent")
 local AppProfileOverrides = require("llm.app_profile_overrides")
+local ProfileRegistry = require("llm.profile_registry_codec")
 local HotstringCore = require("infra.hotstring_engine")
 local WrapPreferences = require("menu.wrap_preferences")
 local UserModels = require("config_user_models")
@@ -172,6 +173,9 @@ local KEY_MAP = {
 	llm_agent_mode                       = { sec = "llm", key = "agent_mode"                        },
 	-- Per-application prompt profiles: the v1 text of _shared/lua/llm/app_profile_overrides.lua
 	llm_app_profile_overrides            = { sec = "llm", key = "app_profile_overrides"             },
+	-- User prompt profiles: the v1 envelope Windows and Linux store at the same key,
+	-- decoded into the profile list at the persistence boundary (scalar_units).
+	llm_user_profiles                    = { sec = "llm", key = "user_profiles", codec = ProfileRegistry },
 
 	-- ── Layout ─────────────────────────────────────────────────────────────
 	layout_number_row_mode               = { sec = "layout", key = "direct_access_digits", enum = true },
@@ -232,7 +236,6 @@ local NESTED_KEY_MAP = {
 	llm_nav_modifiers        = { sec = "llm",        key = "navigation.nav_modifiers"   },
 	llm_profile_shortcuts    = { sec = "llm",        key = "profiles.shortcuts"         },
 	llm_user_models          = { sec = "llm",        key = "models.user_models"         },
-	llm_user_profiles        = { sec = "llm",        key = "profiles.user_profiles"     },
 	llm_agent_disabled_apps  = { sec = "llm",        key = "agent_disabled_apps"        },
 	-- Shortcuts nested tables
 	shortcut_keys            = { sec = "shortcuts",  key = "keys"                       },
@@ -316,7 +319,7 @@ local function delay_fits(key, value)
 end
 
 --- The prompt profile ids a document can name: the shipped built-ins and the
---- document's own [llm.profiles] user_profiles, plus the legacy ids the active
+--- document's own llm.user_profiles, plus the legacy ids the active
 --- profile's owner still migrates silently. nil when the shipped list cannot
 --- be read: nothing can then be proved gone, and every reference is kept.
 --- @param grouped table Decoded config.toml.
@@ -332,8 +335,13 @@ local function known_profile_ids(grouped)
 	end
 	for old in pairs(Selector.load_legacy_ids()) do legacy[old] = true end
 	local llm = type(grouped.llm) == "table" and grouped.llm or {}
-	local profiles = type(llm.profiles) == "table" and llm.profiles or {}
-	for _, profile in ipairs(type(profiles.user_profiles) == "table" and profiles.user_profiles or {}) do
+	-- An unreadable registry is reported by its own reader; it names no profile.
+	local stored = llm.user_profiles
+	local readable, user_profiles = false, nil
+	if type(stored) == "string" and not ProfileRegistry.is_outdated(stored) then
+		readable, user_profiles = pcall(ProfileRegistry.decode, stored)
+	end
+	for _, profile in ipairs(readable and user_profiles or {}) do
 		if type(profile) == "table" and type(profile.id) == "string" then ids[profile.id] = true end
 	end
 	return ids, legacy
@@ -532,6 +540,10 @@ end
 --- @param reading boolean True when reading canonical disk units.
 --- @return any converted Native or persisted representation.
 local function scalar_units(spec, value, reading)
+	if spec and spec.codec then
+		if reading then return spec.codec.decode(value) end
+		return spec.codec.encode(value)
+	end
 	if not spec or not spec.units_per_state then return value end
 	assert(type(value) == "number" and value == value and value >= 0 and value < math.huge,
 		"configuration duration must be a finite non-negative number")
@@ -547,6 +559,15 @@ end
 --- @return boolean fits
 --- @return string|nil detail Why the value is outdated.
 local function persisted_units_fit(spec, value)
+	if spec and spec.codec then
+		-- An older build's list or a registry this build cannot read is outdated
+		-- as a whole: decoding it at the boundary would fail the whole file.
+		if type(value) ~= "string" or spec.codec.is_outdated(value) then
+			return false, "an older build's list is stored here"
+		end
+		if not pcall(spec.codec.decode, value) then return false, "the stored list cannot be read" end
+		return true
+	end
 	if not spec or not spec.units_per_state then return true end
 	if type(value) ~= "number" or value ~= value or value < 0 or value >= math.huge then
 		return false, "the value is not a finite non-negative number"
@@ -1256,7 +1277,8 @@ function M.current_view(prefs_file)
 		if next(outdated) ~= nil then return nil end
 		for key, value in pairs(flat) do
 			local spec = KEY_MAP[key]
-			if spec then
+			-- A codec value was checked against its stored form while it was read.
+			if spec and not spec.codec then
 				local path = spec.sec .. "." .. (spec.path and (spec.path .. ".") or "") .. (spec.key or key)
 				local entry = Manifest.find_entry_by_path(path)
 				if entry and entry.type ~= "enum" and type(value) ~= (entry.type == "array" and "table" or entry.type) then return nil end

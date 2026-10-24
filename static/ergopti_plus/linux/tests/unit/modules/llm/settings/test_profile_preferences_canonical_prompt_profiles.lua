@@ -18,7 +18,7 @@ helpers.describe("canonical Linux prompt profiles", function()
 			helpers.assert_true(Json.is_array(settings.list_user()[1].stop_sequences))
 			local added = profile(); added.id = "user_second"
 			helpers.assert_true(settings.save_user_profile(added, false, false))
-			local stored = require("modules.llm.profile_registry_codec").decode(Toml.decode(Sandbox.read_bytes(path)).llm.user_profiles)
+			local stored = require("llm.profile_registry_codec").decode(Toml.decode(Sandbox.read_bytes(path)).llm.user_profiles)
 			helpers.assert_true(Json.is_array(stored[1].stop_sequences))
 			helpers.assert_eq(Json.is_array(stored[3].stop_sequences), false)
 			helpers.assert_eq(Json.is_null(stored[3].stop_sequences), false)
@@ -70,14 +70,14 @@ helpers.describe("canonical Linux prompt profiles", function()
 			helpers.assert_eq(#settings.list_user(), 0)
 			local added = profile(); added.id = "user_valid"
 			helpers.assert_true(settings.save_user_profile(added, false, false))
-			local stored = require("modules.llm.profile_registry_codec").decode(Toml.decode(Sandbox.read_bytes(path)).llm.user_profiles)
+			local stored = require("llm.profile_registry_codec").decode(Toml.decode(Sandbox.read_bytes(path)).llm.user_profiles)
 			helpers.assert_eq(stored[2].system_multi, false)
 			helpers.assert_eq(stored[3].system_multi_template, { future = 1 })
 		end)
 	end)
 
 	helpers.it("refuses sparse registries and sparse profile stop sequences", function()
-		local codec = require("modules.llm.profile_registry_codec")
+		local codec = require("llm.profile_registry_codec")
 		local sparse = { profile(), profile(), profile() }
 		sparse[2] = nil
 		local failure = helpers.assert_throws(function() codec.encode(sparse) end)
@@ -101,7 +101,7 @@ helpers.describe("canonical Linux prompt profiles", function()
 		for _, invalid in ipairs({ "Zg", "Zg=", "Zg===", "Zg==AAAA", "Zg=Z", "Zh==", "Zm9=", " Zg==", "!!!!", "====" }) do
 			helpers.assert_nil(Base64.decode(invalid), invalid)
 		end
-		local codec = require("modules.llm.profile_registry_codec")
+		local codec = require("llm.profile_registry_codec")
 		for _, row in ipairs({
 			{ "v2:W10=", "unknown user profile registry version" },
 			{ "v1:e30=", "user profile JSON must be an array" },
@@ -169,7 +169,7 @@ helpers.describe("canonical Linux prompt profiles", function()
 				helpers.assert_contains(warnings[1], "index 2")
 				local added = profile(); added.id = "user_added"
 				helpers.assert_true(settings.save_user_profile(added, false, false))
-				local stored = require("modules.llm.profile_registry_codec").decode(Toml.decode(Sandbox.read_bytes(path)).llm.user_profiles)
+				local stored = require("llm.profile_registry_codec").decode(Toml.decode(Sandbox.read_bytes(path)).llm.user_profiles)
 				helpers.assert_eq(stored[#stored].retired_field, 1, "the outdated profile is kept on write")
 			end)
 			Logger.error, Logger.warn = real_error, real_warn
@@ -221,7 +221,7 @@ helpers.describe("canonical Linux prompt profiles", function()
 			helpers.assert_eq(#settings.list_user(), 1)
 			local another = profile(); another.id = "user_second"
 			helpers.assert_true(settings.save_user_profile(another, false, false))
-			local stored = require("modules.llm.profile_registry_codec").decode(Toml.decode(Sandbox.read_bytes(path)).llm.user_profiles)
+			local stored = require("llm.profile_registry_codec").decode(Toml.decode(Sandbox.read_bytes(path)).llm.user_profiles)
 			helpers.assert_eq(#stored, 3)
 			helpers.assert_eq(stored[3], broken)
 		end)

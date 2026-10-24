@@ -467,11 +467,6 @@ mlx = "Qwen3.5-2B"
 
 
 
-[llm.profiles]
-user_profiles = []
-
-
-
 [llm.trigger]
 disabled_apps = []
 debounce_ms = 500

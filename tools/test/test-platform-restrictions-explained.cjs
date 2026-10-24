@@ -102,7 +102,9 @@ const MANIFEST = path.join(
 // swipe_N_diag slots that no driver ever read were deleted instead of explained. The one
 // left, the macOS-only array of user profiles, goes with the unification of the stored
 // shape. Never raise it.
-const BASELINE = 1;
+// 2026-10-24: 1 → 0. macOS stores its user profiles in llm.user_profiles like Windows
+// and Linux; its own [llm.profiles] user_profiles array is gone.
+const BASELINE = 0;
 
 // 2026-10-05: the original1794 source (SHA256 below) contained136 debt rows,
 // despite its138 allowance.31 were already canonical MENU-HIDE declarations;
@@ -111,9 +113,7 @@ const BASELINE = 1;
 // separator's original ordinal. A new debt cannot replace a retired old debt.
 const PARENT_MANIFEST_SHA256 = '06b311ca65d356b405a889fb3479538b24505649a47e1d628299bf6611a5eb59';
 const PARENT_GATE_SHA256 = '872a8889a8767accdf5fdd3cd687da8726073741d9945df27d43ecd9990de290';
-const KNOWN_UNEXPLAINED = new Set([
-	'["features.llm.profiles","hs","array","user_profiles",null,null,null,null]'
-]);
+const KNOWN_UNEXPLAINED = new Set([]);
 
 if (KNOWN_UNEXPLAINED.size !== BASELINE)
 	throw new Error(

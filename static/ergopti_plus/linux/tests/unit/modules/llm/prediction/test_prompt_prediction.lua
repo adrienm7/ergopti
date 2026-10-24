@@ -343,7 +343,7 @@ helpers.describe("prompt prediction: the binding's prompt and count, for this re
 
 	helpers.it("runs a custom prompt by its id", function()
 		scenario({ buffer = "Bonjour Marc", stored = {
-			["llm.user_profiles"] = require("modules.llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
 				{ id = "user_formal", label = "Formal", system_single = "Continue formally.", batch = false },
 			}),
 		} }, function(world)

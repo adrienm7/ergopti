@@ -424,6 +424,17 @@ intent, and Finish waits for the exact read response. A category created by a
 personal-hotstring editor save is enabled; it once took the neutral-off default
 of an undeclared section and never loaded (issue #96).
 
+### project-user-llm-profiles-one-envelope
+
+The user's prompt profiles live at `llm.user_profiles` on every OS: the "v1:" +
+base64(JSON array) envelope of `_shared/lua/llm/profile_registry_codec.lua`
+(Windows writes the same bytes). macOS keeps the list decoded in its state and
+crosses the disk boundary in `scalar_units` through the KEY_MAP `codec` field,
+so its menus never see the string. Its older `[llm.profiles] user_profiles`
+array is unknown configuration that the cleanup offers; nothing migrates it,
+because the migration ops cannot re-encode a value. Action: add another
+encoded preference through a `codec` on its KEY_MAP row, never a nested map.
+
 ## Gestures and keymaps
 
 ### project-gestures-reversal-detection
