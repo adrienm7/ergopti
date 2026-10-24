@@ -399,6 +399,7 @@ _DG_DeclaredBuilderExpected(Id) {
 			'"word_expanders",                (*) => _HS_WordExpanderRows(),',
 			'"magic_key_config",              (*) => _HS_MagicKeyRows(),',
 			'"delays_colors",                 (*) => _HS_DelaysColorsRows(),',
+			'"preview_bubbles",               (*) => _HS_PreviewBubbleRows(),',
 			'"hotstring_categories_standard", (*) => _HS_CategoryRowsStandard(),',
 			'"hotstring_categories_dynamic",  (*) => _HS_CategoryRowsDynamic(),',
 			'"hotstring_languages",           (*) => _HS_LanguageRows(),',
