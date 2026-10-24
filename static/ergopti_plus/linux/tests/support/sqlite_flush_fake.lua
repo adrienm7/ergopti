@@ -12,7 +12,8 @@ function M.attach(writer)
 		local raw_methods = { typing = "insert_typing_events", hotstrings = "insert_hotstring_events",
 			shortcuts = "insert_shortcut_events", switches = "insert_app_switch_events",
 			llm = "insert_llm_events", windows = "insert_window_switch_events",
-			sessions = "insert_session_events", system = "insert_system_events" }
+			sessions = "insert_session_events", system = "insert_system_events",
+			mouse = "insert_mouse_events" }
 		for family, method in pairs(raw_methods) do
 			if #(payload.raw[family] or {}) > 0 and writer[method](device, payload.raw[family]) == false then ok = false end
 		end

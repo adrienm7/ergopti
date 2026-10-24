@@ -358,6 +358,7 @@ return {
 	"tests.meta.architecture.test_keycode_single_source",
 	"tests.unit.modules.keystats.core.test_keystats",
 	"tests.unit.modules.keystats.core.test_keystats_pointer_metrics",
+	"tests.unit.modules.keystats.core.test_keystats_pointer_events",
 	"tests.unit.modules.keystats.core.test_keystats_window_switches",
 	"tests.unit.modules.keystats.core.test_keystats_session_events",
 	"tests.unit.modules.keystats.core.test_keystats_system_events",
