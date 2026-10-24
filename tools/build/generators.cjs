@@ -229,6 +229,7 @@ const GENERATORS = [
 	{
 		script: 'codegen/codegen-action-catalogue.cjs',
 		outputs: [
+			'static/ergopti_plus/_shared/lua/actions/catalogue_data.lua',
 			'static/ergopti_plus/macos/_generated/action_catalogue.lua',
 			'static/ergopti_plus/linux/_generated/action_catalogue.lua',
 			'static/ergopti_plus/windows/_generated/action_catalogue.ahk'
