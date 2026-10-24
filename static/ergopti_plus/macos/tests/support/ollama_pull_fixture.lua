@@ -83,6 +83,7 @@ local function with_fixture(options, callback)
 	}
 	package.loaded["adapters.shell_runner"] = { spawn = function() return nil end }
 	package.loaded["adapters.timer_scheduler"] = {
+		awake_time = function() return 0 end,
 		after = function(_, fn)
 			return { callback = fn, timer = {}, observers = {} }, true
 		end,
