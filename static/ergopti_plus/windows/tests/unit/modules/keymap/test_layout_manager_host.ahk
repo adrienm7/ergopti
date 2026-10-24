@@ -153,10 +153,11 @@ _LMH_ReadyCase() {
 		AssertTrue(LayoutManager_HandleMessage(Map("action", "ready"), _LMH_Deps(Dir, Log)))
 		AssertEqual("initData", Log[1]["push"])
 		State := Log[1]["payload"]["state"]
-		for Key in ["platform", "index", "source", "error", "installed", "provided", "builtin", "active", "busy",
-				"result", "record_error"]
+		for Key in ["platform", "shortcut_menu_path", "index", "source", "error", "installed", "provided", "builtin",
+				"active", "busy", "result", "record_error"]
 			Assert(State.Has(Key), "the page state lacks " . Key)
 		AssertEqual("windows", State["platform"])
+		AssertEqual("shortcuts/menu.ahk", State["shortcut_menu_path"], "the page counts the menu file this driver loads")
 		Assert(State["builtin"].Has(ERGOPTI_LAYOUT_ID), "the built-in Ergopti emulation is listed as such")
 		Strings := Log[1]["payload"]["strings"]
 		Assert(Strings.Count >= 35, "the page receives every string it shows")

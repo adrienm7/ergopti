@@ -206,10 +206,13 @@ function hostSources() {
 	}));
 }
 
+// The smallest state the Windows host sends: no catalogue yet.
+const WINDOWS_STATE = { platform: 'windows', shortcut_menu_path: 'shortcuts/menu.ahk' };
+
 /** A page opened on the real registry, with the English strings. */
 function openPage(extra = {}) {
 	const loaded = loadPage(extra.storage);
-	loaded.window.initData({ strings: locale('en'), state: { platform: 'windows' } });
+	loaded.window.initData({ strings: locale('en'), state: WINDOWS_STATE });
 	loaded.window.composerData(
 		Object.assign(
 			{
@@ -274,7 +277,7 @@ check('the composer opens over the layout list from the host sources', () => {
 
 check('the open button asks the host for the sources', () => {
 	const loaded = loadPage();
-	loaded.window.initData({ strings: locale('en'), state: { platform: 'windows' } });
+	loaded.window.initData({ strings: locale('en'), state: WINDOWS_STATE });
 	loaded.byId.get('btn-compose').click();
 	assert.deepEqual(plain(loaded.messages.at(-1)), { action: 'composer_open' });
 });
