@@ -172,10 +172,13 @@ _LMDG_ToggleRoute(Build, Render, Getters) {
 		return false
 	if RegExMatch(SubStr(Masked, 1, Publish - 1), '\breturn\b')
 		return false
+	; The row loop sits inside the build-memo try of MenuRenderer_Build (the
+	; write-admission memo lives for one outermost build), one block deeper
+	; than the function body.
 	Branch := _LMDG_Statement(Render,
-		'm)^[ \t]*(if) ItemType == "toggle" \{[ \t]*\n[ \t]*ItemCount \+= _MR_RenderToggle\(Result, Item, ManifestKey, Commands, StateGetters\)', 2)
+		'm)^[ \t]*(if) ItemType == "toggle" \{[ \t]*\n[ \t]*ItemCount \+= _MR_RenderToggle\(Result, Item, ManifestKey, Commands, StateGetters\)', 3)
 	Call := _LMDG_Statement(Render,
-		'm)^[ \t]*(ItemCount) \+= _MR_RenderToggle\(Result, Item, ManifestKey, Commands, StateGetters\)', 3)
+		'm)^[ \t]*(ItemCount) \+= _MR_RenderToggle\(Result, Item, ManifestKey, Commands, StateGetters\)', 4)
 	return Branch && Call && Branch < Call
 }
 
