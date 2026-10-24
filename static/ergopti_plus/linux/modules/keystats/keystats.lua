@@ -149,6 +149,9 @@ local _pending_shortcut_events = {}
 -- siblings and written to events_llm so the dashboard's AI tab has rows on this driver too.
 local _pending_llm_events = {}
 local _pending_app_switch_events = {}
+-- Window title changes, written to events_window_switch as Windows and macOS do:
+-- the dashboard's per-application context shifts read them.
+local _pending_window_switch_events = {}
 -- The observed pointers' stream, measured into the mouse columns of the
 -- focused application's next typing row (pending.mouse), as on macOS.
 local _pointer = PointerMetrics.new()
@@ -169,6 +172,9 @@ local _flush_unavailable_warned = false
 -- been fixed in this driver.
 local _current_title = nil
 local _title_since = nil
+-- When _current_title came to the front. _title_since restarts at every report
+-- of the same title; a window switch lasts from the change to the next change.
+local _title_entered_at = nil
 -- Which application owned _current_title when it was reported. The title is
 -- global while applications are not: closing the interval against the
 -- incoming application credits nothing (its titles table has no such row)
@@ -1375,6 +1381,19 @@ function M.set_window_title(app_id, title, timestamp_ms)
 		return
 	end
 
+	-- The title change itself, attributed to the application that owned the
+	-- outgoing title (Windows' rule), with the time that title was in front.
+	-- Neither title is recorded for an application kept out of the metrics.
+	local owner_app = _current_title_app or app_id
+	if _current_title and type(_title_entered_at) == "number" and type(title) == "string" and title ~= ""
+		and title ~= _current_title and not M.is_unrecorded_app(owner_app) and not M.is_unrecorded_app(app_id) then
+		_pending_window_switch_events[#_pending_window_switch_events + 1] = {
+			ts = os.date("!%Y-%m-%d %H:%M:%S"), date = os.date("%Y-%m-%d"),
+			app = dashboard_app_name(owner_app), prev_title = _current_title, next_title = title,
+			duration_ms = math.max(0, now - _title_entered_at),
+		}
+	end
+
 	-- Close the previous title's interval under the application that owned
 	-- it, never the incoming one: the time already spent under it was earned
 	-- while recording was allowed, and the incoming application's titles
@@ -1395,6 +1414,7 @@ function M.set_window_title(app_id, title, timestamp_ms)
 
 	local app = ensure_app_stats(app_id, now)
 	app.titles[title] = app.titles[title] or { c = 0, ms = 0 }
+	if title ~= _current_title then _title_entered_at = now end
 	_current_title = title
 	_title_since = now
 	_current_title_app = app_id
@@ -1840,7 +1860,8 @@ end
 --- Composes one immutable snapshot without advancing public watermarks.
 local function capture_flush()
 	local date, now_iso = os.date("%Y-%m-%d"), os.date("!%Y-%m-%d %H:%M:%S")
-	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, llm = {} }, upserts = {} }
+	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, llm = {}, windows = {} },
+		upserts = {} }
 	local add = setmetatable({}, { __index = function(_, kind)
 		return function(_, ...)
 			payload.upserts[#payload.upserts + 1] = { kind = kind, args = copy_flush_value({ ... }) }
@@ -1849,11 +1870,12 @@ local function capture_flush()
 	local buffers = {
 		typing = _pending_typing_events, hotstrings = _pending_hotstring_events,
 		shortcuts = _pending_shortcut_events, switches = _pending_app_switch_events,
-		llm = _pending_llm_events,
+		llm = _pending_llm_events, windows = _pending_window_switch_events,
 	}
 	local _pending_typing_events, _pending_hotstring_events = buffers.typing, buffers.hotstrings
 	local _pending_shortcut_events, _pending_app_switch_events = buffers.shortcuts, buffers.switches
 	local _pending_llm_events = buffers.llm
+	local _pending_window_switch_events = buffers.windows
 	local _flushed_app_totals = copy_flush_value(_flushed_app_totals)
 	local _flushed_app_titles = copy_flush_value(_flushed_app_titles)
 	local _flushed_app_holds = copy_flush_value(_flushed_app_holds)
@@ -1955,6 +1977,10 @@ local function capture_flush()
 	if #_pending_llm_events > 0 then
 		payload.raw.llm = _pending_llm_events
 		_pending_llm_events = {}
+	end
+	if #_pending_window_switch_events > 0 then
+		payload.raw.windows = _pending_window_switch_events
+		_pending_window_switch_events = {}
 	end
 	-- The machine's own state, which the dashboard puts beside the typing to
 	-- explain a quiet afternoon. Sampled on the daemon's tick, written here.
@@ -2207,6 +2233,7 @@ local function restore_flush_buffers(buffers)
 	_pending_hotstring_events = prepend(buffers.hotstrings, _pending_hotstring_events)
 	_pending_shortcut_events = prepend(buffers.shortcuts, _pending_shortcut_events)
 	_pending_llm_events = prepend(buffers.llm, _pending_llm_events)
+	_pending_window_switch_events = prepend(buffers.windows, _pending_window_switch_events)
 	_pending_app_switch_events = prepend(buffers.switches, _pending_app_switch_events)
 end
 
@@ -2230,7 +2257,8 @@ local function dispatch_flush()
 	end
 	local payload = snapshot.payload
 	if #payload.raw.typing == 0 and #payload.raw.hotstrings == 0 and #payload.raw.shortcuts == 0
-		and #payload.raw.llm == 0 and #payload.raw.switches == 0 and #payload.upserts == 0 then
+		and #payload.raw.llm == 0 and #payload.raw.switches == 0 and #payload.raw.windows == 0
+		and #payload.upserts == 0 then
 		_last_flush_committed = true
 		return true
 	end
@@ -2241,6 +2269,7 @@ local function dispatch_flush()
 	_pending_typing_events, _pending_hotstring_events = {}, {}
 	_pending_shortcut_events, _pending_app_switch_events = {}, {}
 	_pending_llm_events = {}
+	_pending_window_switch_events = {}
 	local called, operation = pcall(SqliteWriter.start_flush, _device_id, payload)
 	if not called then
 		Logger.error(LOG, "SQLite dispatch raised; uncertain ownership and source remain retained.")
@@ -2282,6 +2311,7 @@ local function flush_json()
 	_pending_typing_events, _pending_hotstring_events = {}, {}
 	_pending_shortcut_events, _pending_app_switch_events = {}, {}
 	_pending_llm_events = {}
+	_pending_window_switch_events = {}
 
 	Logger.info(LOG, "Session flushed to JSON: %s.", path)
 	return true
@@ -2418,6 +2448,7 @@ function M.reset_session()
 	_pending_hotstring_events = {}
 	_pending_shortcut_events = {}
 	_pending_llm_events = {}
+	_pending_window_switch_events = {}
 	_pending_app_switch_events = {}
 	_live = new_live_tracker()
 	_session_started_at = os.time() * 1000
@@ -2481,11 +2512,11 @@ end
 --- @return integer
 function M._pending_buffer_count_for_test()
 	local count = #_pending_hotstring_events + #_pending_shortcut_events + #_pending_llm_events
-		+ #_pending_app_switch_events
+		+ #_pending_app_switch_events + #_pending_window_switch_events
 	for _, pending in pairs(_pending_typing_events) do count = count + #pending.events end
 	if _flush_state then
 		local held = _flush_state.snapshot.buffers
-		count = count + #held.hotstrings + #held.shortcuts + #held.llm + #held.switches
+		count = count + #held.hotstrings + #held.shortcuts + #held.llm + #held.switches + #held.windows
 		for _, pending in pairs(held.typing) do count = count + #pending.events end
 	end
 	return count
