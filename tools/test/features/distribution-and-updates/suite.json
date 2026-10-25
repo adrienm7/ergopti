@@ -450,6 +450,15 @@
 			"cmd": "node",
 			"args": ["tools/test/test-linux-portable-commands.cjs"],
 			"repro": "npm run test:linux-portable-commands"
+		},
+		{
+			"id": "js-0479",
+			"ordinal": 489,
+			"name": "macOS development installer emits executable Lua for literal paths and preserves original backups",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-dev-bootstrap.cjs"],
+			"repro": "node tools/test/test-macos-dev-bootstrap.cjs",
+			"platforms": ["linux", "darwin"]
 		}
 	]
 }
