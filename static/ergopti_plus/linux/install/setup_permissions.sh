@@ -8,6 +8,9 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 [ "$(id -u)" = 0 ] || { echo 'Input setup requires administrator privileges.' >&2; exit 77; }
+# Accounts and groups resolve through NSS (LDAP, sssd), so through getent;
+# without it nothing is changed (EX_UNAVAILABLE).
+command -v getent >/dev/null 2>&1 || exit 69
 MODE="${1:-}"
 case "$MODE" in
 	--active-sessions) [ "$#" -eq 1 ] || exit 64 ;;

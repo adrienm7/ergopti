@@ -12,6 +12,7 @@
 set -euo pipefail
 
 IMAGE="${1:?usage: run_in_docker.sh <image>}"
+command -v docker >/dev/null 2>&1 || { echo "ENVIRONMENT: docker is required" >&2; exit 2; }
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../../.." && pwd -P)"
 
 # shellcheck disable=SC2086

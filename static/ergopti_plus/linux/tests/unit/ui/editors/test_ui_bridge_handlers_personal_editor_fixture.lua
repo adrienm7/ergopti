@@ -65,7 +65,7 @@ helpers.describe("personal editor fixture process ABI", function()
 					if outcome == "text" then return "true" end
 					return false, "exit", 1
 				end
-				local acknowledged = Shell.run("inert-non-executed-fixture-command")
+				local acknowledged = Shell.run("/nonexistent/inert-non-executed-fixture-command")
 				os.execute = native_execute
 				helpers.assert_eq(acknowledged, false)
 				helpers.assert_eq(calls, 1, "a retained test runner must not bypass the real status boundary")

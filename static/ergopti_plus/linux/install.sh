@@ -219,6 +219,8 @@ source "${SRC_DRIVER}/install/native_source_build.sh"
 # arbitrary package. Installing a provider still requires the native re-probe.
 _available_apt_runtime_package() {
 	local package_name metadata label value rest candidate count
+	# apt-cache ships beside apt-get; without it nothing is observed or granted.
+	command -v apt-cache >/dev/null 2>&1 || return 1
 	for package_name in "$@"; do
 		if ! metadata="$(LC_ALL=C apt-cache policy -- "$package_name")"; then return 1; fi
 		candidate=""
@@ -335,6 +337,14 @@ _required_dependency_package() {
 		apk:openssl) echo "openssl" ;;
 		# Typing metrics: the keystats writes and the metrics windows read
 		# through the sqlite3 CLI; without it both fall back to nothing useful.
+		# Every link, release page and file the tray opens goes through
+		# xdg-open; without it those rows silently do nothing.
+		apt:xdg-open) echo "xdg-utils" ;;
+		dnf:xdg-open) echo "xdg-utils" ;;
+		zypper:xdg-open) echo "xdg-utils" ;;
+		pacman:xdg-open) echo "xdg-utils" ;;
+		xbps:xdg-open) echo "xdg-utils" ;;
+		apk:xdg-open) echo "xdg-utils" ;;
 		apt:sqlite3) echo "sqlite3" ;;
 		dnf:sqlite3) echo "sqlite" ;;
 		zypper:sqlite3) echo "sqlite3" ;;
@@ -562,6 +572,7 @@ _check_or_install zenity
 _check_or_install sqlite3
 _check_or_install openssl
 _check_or_install sha256sum
+_check_or_install xdg-open
 # The live keymap shared by capture and injection. The daemon now fails closed
 # without libxkbcommon state, while the injector falls back to the clipboard if
 # its inverse table cannot cover a character.
@@ -643,17 +654,19 @@ _ensure_gnome_tray_host() {
 	# which then refuses to enable it. The setting it reads at the next login is
 	# written instead, merged into the user's list rather than replacing it.
 	local enabled
-	enabled="$(gsettings get org.gnome.shell enabled-extensions 2>/dev/null || true)"
-	case "${enabled}" in
-		*"'${GNOME_TRAY_EXTENSION}'"*) ;;
-		"@as []"|"[]"|"") enabled="['${GNOME_TRAY_EXTENSION}']" ;;
-		*) enabled="${enabled%]}, '${GNOME_TRAY_EXTENSION}']" ;;
-	esac
-	if gsettings set org.gnome.shell enabled-extensions "${enabled}" 2>/dev/null; then
-		echo "  ✔  extension GNOME AppIndicator activée (effective à la prochaine connexion)"
-	else
-		echo "  ⚠  Impossible d'activer l'extension AppIndicator — sans elle, GNOME n'affiche pas l'icône." >&2
+	if command -v gsettings >/dev/null 2>&1; then
+		enabled="$(gsettings get org.gnome.shell enabled-extensions 2>/dev/null || true)"
+		case "${enabled}" in
+			*"'${GNOME_TRAY_EXTENSION}'"*) ;;
+			"@as []"|"[]"|"") enabled="['${GNOME_TRAY_EXTENSION}']" ;;
+			*) enabled="${enabled%]}, '${GNOME_TRAY_EXTENSION}']" ;;
+		esac
+		if gsettings set org.gnome.shell enabled-extensions "${enabled}" 2>/dev/null; then
+			echo "  ✔  extension GNOME AppIndicator activée (effective à la prochaine connexion)"
+			return 0
+		fi
 	fi
+	echo "  ⚠  Impossible d'activer l'extension AppIndicator — sans elle, GNOME n'affiche pas l'icône." >&2
 }
 
 echo ""

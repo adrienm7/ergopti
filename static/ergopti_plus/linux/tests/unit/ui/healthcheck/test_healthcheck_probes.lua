@@ -46,7 +46,8 @@ end
 --- Runs body with the real probes over recorded adapters.
 --- @param async boolean Whether libuv is available.
 --- @param body function(Probes, world)
-local function with_probes(async, body)
+--- @param absent table|nil Programs the probe of has_command answers absent for.
+local function with_probes(async, body, absent)
 	local names = { "ui.healthcheck.probes", "adapters.http_client", "adapters.shell_runner",
 		"adapters.timer_scheduler" }
 	local saved = {}
@@ -77,6 +78,11 @@ local function with_probes(async, body)
 	}
 	package.loaded["adapters.shell_runner"] = {
 		HAS_ASYNC = async,
+		has_command = function(binary)
+			world.probed = world.probed or {}
+			world.probed[#world.probed + 1] = binary
+			return not (absent or {})[binary]
+		end,
 		run_async = function(executable, args, options, callback)
 			world.children[#world.children + 1] = { executable = executable, args = args, options = options,
 				callback = callback }
@@ -235,6 +241,20 @@ helpers.describe("diagnostics probes (linux)", function()
 			helpers.assert_true(answers.proxy_pac.sections.network.proxy_pac:find("FindProxyForURL", 1, true) ~= nil)
 			helpers.assert_nil(tostring(answers.proxy_pac.sections.network.proxy_pac):find("example", 1, true))
 		end)
+	end)
+
+	helpers.it("asks no gsettings outside GNOME and answers that no PAC is configured", function()
+		with_probes(true, function(Probes, world)
+			local _, answers = start(Probes)
+			for _, child in ipairs(world.children) do
+				helpers.assert_true(child.executable ~= "gsettings", "an absent gsettings was spawned")
+			end
+			local probed = false
+			for _, binary in ipairs(world.probed or {}) do probed = probed or binary == "gsettings" end
+			helpers.assert_true(probed, "gsettings is probed before the desktop proxy is read")
+			helpers.assert_eq(answers.proxy_pac.result.state, "ok")
+			helpers.assert_eq(answers.proxy_pac.sections.network.proxy_pac, "No PAC configured")
+		end, { gsettings = true })
 	end)
 
 	helpers.it("names the failing PAC step and answers when no PAC is configured", function()

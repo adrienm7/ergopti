@@ -12,9 +12,10 @@
 --- 1. Polling model: Linux lacks a universal app-launch event API comparable to
 ---    hs.application.watcher; we poll xdotool getactivewindow at a 250 ms
 ---    interval and diff against the last known state to emit focus-change events.
---- 2. pgrep-based launch/quit: a background coroutine snapshots the running
----    process list every 2 s and fires registered callbacks on appearance or
----    disappearance. This is coarse but requires no root privilege or D-Bus setup.
+--- 2. /proc-based launch/quit: the caller's tick snapshots the names of the
+---    running processes from /proc/<pid>/stat every 2 s, in this process, and
+---    fires registered callbacks on appearance or disappearance. This is coarse
+---    but requires no root privilege, no D-Bus setup and no external program.
 --- 3. Idempotent start/stop: calling start() or stop() multiple times is safe.
 --- 4. Callback lists: multiple consumers can register for the same event; the
 ---    adapter fans out to all registered handlers.
@@ -32,7 +33,9 @@ local Logger = require("logger.shim")
 -- keystroke path — so teaching WindowInfo about Wayland would have changed
 -- nothing a user experiences.
 local WindowInfo = require("adapters.window_info")
-local Shell = require("adapters.shell_runner")
+-- The process table is read in this process: minimal Arch, Fedora and
+-- openSUSE images ship no `ps`, and a poll every two seconds forked one.
+local NativeDirectory = require("infra.native_directory")
 
 local LOG = "adapters.process_lifecycle"
 
@@ -107,23 +110,57 @@ local function _focus_key(app_id, title, native)
 	return native .. FOCUS_KEY_SEPARATOR .. app_id .. FOCUS_KEY_SEPARATOR .. title
 end
 
---- Returns a set (name -> true) of currently running process names via ps,
---- or nil when the snapshot could not be taken. A failed snapshot must never
---- read as an empty machine: diffing one would fire a quit event for every
---- known process, then a launch event for every one of them when ps recovers.
+--- The kernel's process table. Tests point it at a fixture tree.
+local PROC_ROOT = "/proc"
+local _proc_root = PROC_ROOT
+
+-- errno a process that exited between the listing and its read answers with.
+local ENOENT = 2
+local ESRCH = 3
+
+--- The name and scheduler state of one /proc/<pid>/stat line,
+--- "<pid> (<comm>) <state> ...". The name sits between the first "(" and the
+--- LAST ")": comm may itself hold parentheses, spaces and any byte but NUL.
+--- @param line string
+--- @return string|nil name, string|nil state
+local function _parse_stat(line)
+	local open = line:find("(", 1, true)
+	local close = line:match("^.*()%)")
+	if open == nil or close == nil or close <= open then return nil end
+	if line:sub(close + 1, close + 1) ~= " " then return nil end
+	local state = line:sub(close + 2, close + 2)
+	if not state:match("^%u$") then return nil end
+	return line:sub(open + 1, close - 1), state
+end
+
+--- Returns a set (name -> true) of the names of running processes, read from
+--- /proc/<pid>/stat in this process, or nil when the snapshot could not be
+--- taken. A failed snapshot must never read as an empty machine: diffing one
+--- would fire a quit event for every known process, then a launch event for
+--- every one of them when the table is readable again. A process that exits
+--- between the listing and its read is simply absent; any other refusal fails
+--- the whole snapshot. A zombie (Z) or dead (X) process has exited, so its
+--- application quit even before its parent reaps it.
 local function _snapshot_processes()
-	-- LuaJIT's pclose can report true for a child that exited nonzero.
-	-- The checked runner retains native status independently of partial stdout.
-	-- Request no header: COMMAND is also a legal native process name.
-	local accepted, output = Shell.exec_checked("ps -eo comm= 2>/dev/null")
-	if not accepted then return nil end
+	local entries = NativeDirectory.entries(_proc_root)
+	if entries == nil then return nil end
 	local snapshot = {}
-	for line in (output .. "\n"):gmatch("([^\n]*)\n") do
-		-- The final headerless comm column is unpadded. Spaces are native name
-		-- bytes; trimming merges distinct processes and loses whitespace names.
-		local name = line
-		if name and name ~= "" then
-			snapshot[name] = true
+	for _, entry in ipairs(entries) do
+		if entry.kind == "directory" and entry.name:match("^%d+$") then
+			local file, _, open_errno = io.open(_proc_root .. "/" .. entry.name .. "/stat", "rb")
+			if file == nil then
+				if open_errno ~= ENOENT and open_errno ~= ESRCH then return nil end
+			else
+				local line, _, read_errno = file:read("*a")
+				file:close()
+				if line == nil then
+					if read_errno ~= ESRCH then return nil end
+				elseif line ~= "" then
+					local name, state = _parse_stat(line)
+					if name == nil then return nil end
+					if name ~= "" and state ~= "Z" and state ~= "X" then snapshot[name] = true end
+				end
+			end
 		end
 	end
 	if next(snapshot) == nil then return nil end
@@ -209,6 +246,16 @@ function M.start()
 		FOCUS_POLL_S)
 end
 
+--- Points the process snapshot at a fixture tree laid out like /proc, or back
+--- at /proc with nil. Test seam only.
+--- @param path string|nil
+function M._set_proc_root_for_test(path)
+	if path ~= nil and (type(path) ~= "string" or path == "") then
+		error("process_lifecycle: the process table root must be a nonempty path", 2)
+	end
+	_proc_root = path or PROC_ROOT
+end
+
 --- Stops the polling loops and releases resources.
 --- Idempotent: has no effect when already stopped.
 function M.stop()
@@ -253,7 +300,7 @@ function M.tick(tick_count)
 			-- desktop as quit.
 			if not current then return end
 			if not _have_proc_baseline then
-				-- ps failed at start: adopt the first successful read silently.
+				-- The table was unreadable at start: adopt the first successful read silently.
 				-- Diffing it against nothing would report every running process
 				-- as launched.
 				_last_processes = current
