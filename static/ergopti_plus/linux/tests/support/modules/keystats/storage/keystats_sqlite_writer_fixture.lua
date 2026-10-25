@@ -81,8 +81,7 @@ local function with_category_commands(refusal, test, retain_startup)
 			content = "CREATE TABLE devices (os CHECK (os IN ('linux')))\n"
 		else
 			commands[#commands + 1] = command
-			if refusal == "score" and command:find("INSERT OR REPLACE INTO meta", 1, true) then status = 7 end
-			if refusal == "category" and command:find("UPDATE agg_app_day", 1, true) then status = 7 end
+			if refusal == "legacy_scores" and command:find("DELETE FROM meta", 1, true) then status = 7 end
 		end
 		return {
 			read = function() return content .. "\nERGOPTI_SQL_EXIT_STATUS=" .. status .. "\n" end,

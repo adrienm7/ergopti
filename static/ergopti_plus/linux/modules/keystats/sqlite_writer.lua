@@ -41,6 +41,7 @@ local EventIdPolicy = require("sqlite.event_id_policy")
 local Json          = require("json")
 local NativePath    = require("native_path")
 local MediaStore    = require("keystats.media_store")
+local AppCategoryStore = require("keystats.app_category_store")
 
 -- How many session durations one application-day keeps. Read from the shared
 -- accumulator rather than restated, because the walk caps the array it hands
@@ -1193,30 +1194,13 @@ function M.upsert_burst(device_id, row)
 	return _exec(sql)
 end
 
---- Sets an application's category across every day it appears on.
----
---- Applied to every row rather than today's: a category is a property of the
---- application, not of a day. Writing only today would leave the dashboard's
---- own history grouped under whatever the application was called before, and
---- the user would have to re-categorise it once per day they wanted to look at.
---- @param app_name string
---- @param category string
---- @param score number Productivity score.
-function M.set_app_category(device_id, app_name, category, score)
+--- Deletes the scores the previous category store kept in `meta`, once the
+--- shared category file holds them (keystats/app_category_file).
+--- @return boolean deleted
+function M.drop_legacy_category_scores()
 	if not M.is_available() then return false end
-	if type(app_name) ~= "string" or app_name == "" then return false end
-	if type(category) ~= "string" or category == "" then return false end
-	-- Category and score are one edit. Native -bail closes an unfinished
-	-- transaction after a statement error, undoing even an AFTER trigger FAIL.
-	local sql = string.format([[
-BEGIN;
-UPDATE agg_app_day SET category = '%s' WHERE device_id = '%s' AND app = '%s';
-INSERT OR REPLACE INTO meta (key, value) VALUES ('%s', '%s');
-COMMIT;
-]],
-		_sql_escape(category), _sql_escape(device_id), _sql_escape(app_name),
-		_sql_escape("app_score." .. app_name), _sql_escape(tostring(math.floor(tonumber(score) or 0))))
-	return _exec(sql)
+	local prefix = AppCategoryStore.LEGACY_SCORE_PREFIX
+	return _exec(string.format("DELETE FROM meta WHERE substr(key, 1, %d) = '%s';", #prefix, _sql_escape(prefix)))
 end
 
 -- How many window titles one application-day keeps. From the shared accumulator

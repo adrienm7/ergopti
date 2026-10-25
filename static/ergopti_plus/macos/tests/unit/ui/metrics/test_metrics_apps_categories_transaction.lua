@@ -10,6 +10,7 @@
 
 local helpers = require("tests.helpers")
 local WarningContract = require("tests.support.dialog_warning_contract")
+local CategoryStore = require("keystats.app_category_store")
 local CATEGORY_OWNERS = {
 	"hs",
 	"tests.stubs.hs",
@@ -338,6 +339,33 @@ helpers.describe("metrics_apps categories: failed publication exposes no candida
 				helpers.assert_eq(state.ui_pushes, 0,
 					"a rejected stale edit must publish no dashboard success")
 			end)
+	end)
+
+	helpers.it("(app-category-store) an edit upgrades the previous flat layout and keeps every other category", function()
+		local flat = '{"Example":{"score":0,"type":"Old"},"Other":{"score":2,"type":"Kept"}}'
+		with_category_store({ initial = flat }, function(metrics, state, callbacks, _logs)
+			attempt_edit(metrics, callbacks)
+			helpers.assert_eq(state.writes, 1)
+			local saved = assert(CategoryStore.decode(state.target, require("json").decode))
+			helpers.assert_eq(saved.legacy, false, "the file is rewritten in the shared versioned layout")
+			helpers.assert_eq(saved.apps, {
+				Example = { type = "New", score = 1 },
+				Other = { type = "Kept", score = 2 },
+			})
+		end)
+	end)
+
+	helpers.it("(app-category-store) a document the codec refuses is never replaced", function()
+		-- Blank category: valid JSON, invalid entry. Reading it as empty would let the next
+		-- edit overwrite every category the user has.
+		local invalid = '{"Example":{"score":0,"type":""}}'
+		with_category_store({ initial = invalid }, function(metrics, state, callbacks, logs)
+			attempt_edit(metrics, callbacks)
+			helpers.assert_eq(#callbacks, 0)
+			helpers.assert_eq(state.writes, 0)
+			helpers.assert_eq(state.target, invalid)
+			helpers.assert_true(#logs > 0)
+		end)
 	end)
 
 	helpers.it("success commits bytes before one UI refresh", function()

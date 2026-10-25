@@ -47,6 +47,8 @@ local MAX_TYPING_INTERVAL_MS = Timings.ms("keystats", "max_keystroke_delay_ms")
 -- typed, expanded or generated — and only here is it known which it was.
 local LiveWpm = require("keystats.live_wpm")
 local PointerMetrics = require("modules.keystats.pointer_metrics")
+local AppCategoryStore = require("keystats.app_category_store")
+local AppCategoryFile = require("modules.keystats.app_category_file")
 local function new_live_tracker()
 	return LiveWpm.new({
 		window_ms = Timings.ms("keystats", "wpm_window_ms"),
@@ -465,6 +467,22 @@ end
 -- =========================================
 -- =========================================
 
+--- Moves the categories the previous store kept in SQLite into the category
+--- file, then drops them from the database. Run once per start: with nothing
+--- left to move it reads one empty result.
+local function migrate_legacy_categories()
+	local legacy = SqliteReader.read_legacy_category_scores(_sqlite_path, _device_id)
+	if legacy == nil then
+		Logger.warn(LOG, "Legacy category scores could not be read; they stay in SQLite.")
+		return
+	end
+	if next(legacy) == nil then return end
+	if not AppCategoryFile.import_legacy(legacy) then return end
+	if not SqliteWriter.drop_legacy_category_scores() then
+		Logger.warn(LOG, "Legacy category scores were imported but not deleted; they are retried at the next start.")
+	end
+end
+
 --- Initialises the keystats.
 --- @param opts table { log_dir?, password_apps? }
 function M.init(opts)
@@ -502,6 +520,7 @@ function M.init(opts)
 	-- Open the SQLite database (bootstraps schema on first run).
 	if SqliteWriter and SqliteWriter.open_db(_sqlite_path) then
 		SqliteWriter.register_device(_device_id, hostname, "linux", "", hostname)
+		if SqliteReader then migrate_legacy_categories() end
 		-- A live walk owns the record; only a fresh process reads back what the
 		-- previous one left open when it stopped without its final flush.
 		if next(_walker_contexts) == nil then
@@ -1139,9 +1158,10 @@ end
 
 --- Records the category and score a user assigned to an application.
 ---
---- The category is a column on agg_app_day and the dashboard groups by it, so
---- an unhandled edit is a control that appears to work and silently discards
---- what the user typed into it.
+--- Stored in the shared category file the dashboard page reads back as
+--- `user_categories`, the same document macOS keeps. An unhandled edit is a
+--- control that appears to work and silently discards what the user typed into
+--- it, so every refusal is logged and answered false.
 --- @param app_name string
 --- @param category string
 --- @param score number|nil Productivity score, as the shared page defines it.
@@ -1156,17 +1176,20 @@ function M.set_app_category(app_name, category, score)
 		Logger.error(LOG, "set_app_category(): a category is required for '%s'.", app_name)
 		return false
 	end
-	if not (SqliteWriter and SqliteWriter.is_available()) then
-		Logger.warn(LOG, "set_app_category(): no database — '%s' stays uncategorised.", app_name)
+	local model = AppCategoryFile.load()
+	if not model then return false end
+	local stored, reason = AppCategoryStore.set(model, app_name, category, tonumber(score) or 0)
+	if not stored then
+		Logger.error(LOG, "set_app_category(): refused for '%s': %s.", app_name, tostring(reason))
 		return false
 	end
-	local ok = SqliteWriter.set_app_category(_device_id, app_name, category, tonumber(score) or 0)
-	-- The cached manifest still holds the old category, and the page re-reads
-	-- immediately after the edit. Without this the user sees their change
-	-- reverted and tries again.
-	if ok then M.clear_cache() end
+	if not AppCategoryFile.save(model) then return false end
+	-- The cached manifest was built before the edit, and the page re-reads
+	-- immediately after it. Without this the user sees their change reverted and
+	-- tries again.
+	M.clear_cache()
 	Logger.debug(LOG, "Category for '%s': %s (score %s).", app_name, category, tostring(score))
-	return ok == true
+	return true
 end
 
 local function empty_ngrams()
@@ -1240,8 +1263,9 @@ function M.get_dashboard_payload(opts)
 	local options = type(opts) == "table" and opts or {}
 	local categories = {}
 	if SqliteWriter and SqliteWriter.is_available() then
-		categories = SqliteReader.read_user_categories(_sqlite_path, _device_id)
-		if categories == nil then return nil, "SQLite projection unavailable" end
+		local model = AppCategoryFile.load()
+		if model == nil then return nil, "app category file unavailable" end
+		categories = AppCategoryStore.projection(model)
 	end
 	local persisted, manifest_complete = persisted_manifest()
 	local manifest = add_live_manifest_delta(persisted)

@@ -679,7 +679,6 @@ function M.sqlite_writer(opts)
 		chars_class = {}, errors = {}, hourly = {}, hourly_min5 = {},
 		app_buckets = {}, bursts = {}, sessions = {}, switches_to = {}, ergo = {},
 		titles = {}, layouts = {}, kc_hold = {}, system_days = {},
-		categories = {},
 		media_events = {}, media_rebuilds = {}, media_projections = {},
 		devices = {}, meta = {}, revision = 0, executed = {}, path = nil,
 	}
@@ -800,10 +799,7 @@ function M.sqlite_writer(opts)
 		return nil, true
 	end
 
-	function fake.set_app_category(device_id, app_name, category, score)
-		fake.categories[#fake.categories + 1] = {
-			device_id = device_id, app = app_name, category = category, score = score,
-		}
+	function fake.drop_legacy_category_scores()
 		return true
 	end
 
