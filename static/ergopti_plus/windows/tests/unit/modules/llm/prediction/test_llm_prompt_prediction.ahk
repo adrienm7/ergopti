@@ -844,3 +844,404 @@ for _LPP_VariantProfile in ["advanced", "rewrite", "batch_advanced"] {
 				. " (prediction-variant-admission)", _LPP_VariantStopAdmission.Bind(_LPP_VariantProfile, _LPP_VariantBoundary, _LPP_VariantCancel))
 	}
 }
+
+
+class _LPP_CustodyStartJob {
+	__New(Job, OnStarted) {
+		this.Job := Job
+		this.OnStarted := OnStarted
+	}
+	start() {
+		Started := this.Job.start()
+		this.OnStarted.Call()
+		return Started
+	}
+	terminate() {
+		return this.Job.terminate()
+	}
+}
+
+_LPP_DefaultPredictionCustody(Boundary, Mode) {
+	global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LPP_BUFFER, _LLM_Live
+	Saved := [_LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LLM_Live]
+	try {
+		_LLM_Remote_Async := Map()
+		_LLM_Live := Map("active", false, "profile_id", "", "num_predictions", 0)
+		_LPP_Run(_LPP_Menu(), LPP_BUFFER, Body)
+	} finally {
+		_LLM_Remote_Async := Saved[1]
+		_LLM_Remote_AsyncCounter := Saved[2]
+		_LLM_Live := Saved[3]
+	}
+	Body(Calls, Lines) {
+		global _LLM_Engine_RemoteTransport, _LLM_Engine, GestureActionParameters, _LLM_Bridge_Buffer, _LLM_Bridge_Active
+		global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LPP_SENTENCE
+		Gate := Boundary == "context" ? _LLMRemote_BuildRequestContext : _LLMRemoteBuildPayload
+		Constructor := CurlAsyncRequest
+		AssertFalse(Constructor.HasOwnProp("Call"))
+		AssertFalse(Gate.HasOwnProp("Call"))
+		Requests := []
+		OriginalId := 0
+		TransitionDone := false
+		try {
+			if Mode == "bridge" {
+				AssertFalse(_LLM_Bridge_Active, "the isolated fixture starts without another bridge owner")
+				LLM_Bridge_Start(_LLM_Engine.Clone())
+				AssertTrue(_LLM_Bridge_Active, "the actual bridge factory must acquire its production ownership")
+			}
+			_LLM_Engine_RemoteTransport := 0
+			Constructor.DefineProp("Call", {Call: Construct})
+			if Boundary == "context" || Boundary == "payload"
+				Gate.DefineProp("Call", {Call: ObserveGate})
+			Invoke("advanced")
+			AssertTrue(TransitionDone, "the genuine public prediction must reach the selected lower boundary")
+			Old := 0, New := 0
+			for State in Requests {
+				if State["id"] == OriginalId
+					Old := State
+				else
+					New := State
+			}
+			if Mode == "unchanged" {
+				AssertTrue(Old is Map && Old.Has("request"))
+				Complete(Old, "TAIL_CORRECTED: " . LPP_SENTENCE . "`nNEXT_WORDS: proposition actuelle")
+				Final := _LPP_LastFinalRender()
+				AssertTrue(IsObject(Final), "the admitted control must traverse actual wire decoding and render")
+				AssertEqual(1, Final.slots.Length)
+			}
+			if Mode != "unchanged" && Old is Map && Old.Has("request") {
+				Request := Old["request"]
+				if !Request.Aborted && !Request.Completed && Old["spawns"] {
+					_ManagedCurlControlAck(Old)
+					Request._PollManagedAdmission()
+				}
+				AssertFalse(Request.ManagedPayloadPublished, "a retired ordinary prediction cannot publish private transport input")
+				AssertTrue(Request.Aborted || Request.Completed, "a retired ordinary prediction cannot retain its acquired child")
+			}
+			if Mode == "newer" {
+				SavedCritical := Critical("Off")
+				Started := A_TickCount
+				try {
+					loop {
+						for State in Requests
+							if State["id"] != OriginalId
+								New := State
+						if New is Map || A_TickCount - Started > LLM_ApiCommon_GetRateLimitMs("api") + 2000
+							break
+						Sleep(1)
+					}
+				} finally Critical(SavedCritical)
+				AssertTrue(New is Map && New.Has("request"), "the real deferred newer request must acquire its own native worker")
+				AssertEqual(1, New["starts"])
+				Complete(New, "REWRITE: Nouvelle demande actuelle.")
+				Final := _LPP_LastFinalRender()
+				AssertTrue(IsObject(Final), "the actual deferred newer request must retain its accepted response")
+				AssertEqual(1, Final.slots.Length)
+			}
+
+			OldSpawns := Old is Map ? Old["spawns"] : 0
+			OldStarts := Old is Map ? Old["starts"] : 0
+			Acquired := Boundary == "after_acquire" || Boundary == "after_start"
+			AssertEqual(Mode == "unchanged" || Acquired ? 1 : 0, OldSpawns)
+			AssertEqual(Mode == "unchanged" || Boundary == "after_start" ? 1 : 0, OldStarts)
+			if Mode != "unchanged" && Acquired
+				AssertEqual(1, Old["terminates"].Length, "the exact late acquired child must physically retire")
+			AssertEqual(0, Calls.Length, "the recorder must not replace default generic generation")
+		} finally {
+			if Mode == "bridge" && _LLM_Bridge_Active
+				LLM_Bridge_Stop()
+			if Gate.HasOwnProp("Call")
+				Gate.DeleteProp("Call")
+			if Constructor.HasOwnProp("Call")
+				Constructor.DeleteProp("Call")
+			for State in Requests {
+				LLM_RemoteCancelAsync(State["id"])
+				_LLMRemote_PollRequest(State["id"])
+				if State.Has("request")
+					_ManagedCurlControlRelease(State)
+			}
+		}
+		Invoke(Profile) {
+			Binding := "keyboard__ctrl_shift_r"
+			GestureActionParameters[GestureActionParameterKey(Binding, "llm_prompt_prediction")] := Profile . "|1"
+			AssertTrue(GestureInvokeAction("llm_prompt_prediction", Binding), "the actual public gesture must admit the request")
+		}
+		ObserveGate(Self, Args*) {
+			Gate.DeleteProp("Call")
+			Result := Gate.Call(Args*)
+			OriginalId := _LLM_Remote_AsyncCounter
+			Transition()
+			return Result
+		}
+		Construct(Self, Args*) {
+			AssertEqual(0, Args.Length, "the actual default managed dispatcher must construct its production facade")
+			Constructor.DeleteProp("Call")
+			State := _ManagedCurlControlState()
+			State["id"] := _LLM_Remote_AsyncCounter
+			if !OriginalId
+				OriginalId := State["id"]
+			Requests.Push(State)
+			try Request := CurlAsyncRequest(Map("spawn", Spawn.Bind(State), "before_launch", BeforeLaunch.Bind(State)))
+			finally Constructor.DefineProp("Call", {Call: Construct})
+			State["request"] := Request
+			Request.DefineProp("SetManagedRouting", {Call: Routing})
+			return Request
+		}
+		Routing(Request, Reader := 0, CurrentFn := 0) {
+			Request.DeleteProp("SetManagedRouting")
+			return Request.SetManagedRouting((*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""), CurrentFn)
+		}
+		Spawn(State, Executable, Args, Callback, Options*) {
+			Job := _ManagedCurlControlSpawn(State, Executable, Args, Callback, Options*)
+			if State["id"] == OriginalId && Boundary == "after_acquire"
+				Transition()
+			return _LPP_CustodyStartJob(Job, AfterStart.Bind(State))
+		}
+		AfterStart(State) {
+			if State["id"] == OriginalId && Boundary == "after_start"
+				Transition()
+		}
+		BeforeLaunch(State, Request) {
+			if State["id"] == OriginalId && Boundary == "before_launch"
+				Transition()
+		}
+		Transition() {
+			if TransitionDone
+				return
+			TransitionDone := true
+			if Mode == "bridge" {
+				LLM_Bridge_Stop()
+				AssertFalse(_LLM_Bridge_Active)
+				AssertFalse(_LLM_Engine["enabled"], "the actual bridge stop must disable ordinary prediction")
+			} else if Mode == "newer" {
+				OldRequest := _LLM_Engine["request_id"]
+				_LLM_Bridge_Buffer .= " Nouveau texte pour la nouvelle demande."
+				Invoke("rewrite")
+				AssertTrue(_LLM_Engine["request_id"] > OldRequest, "the actual newer public request must replace the old generation")
+				AssertTrue(_LLM_Engine["timer_active"] && HasMethod(_LLM_Engine["pending_timer"], "Call"),
+					"the actual rate floor must retain the newer deferred request rather than inventing a new worker")
+			}
+		}
+		Complete(State, Text) {
+			Request := State["request"]
+			_ManagedCurlControlAck(State)
+			Request._PollManagedAdmission()
+			AssertTrue(Request.ManagedPayloadPublished)
+			ResponseBody := '{"choices":[{"message":{"content":' . JsonStringLiteral(Text) . '}}]}'
+			AssertTrue(FSWrite(Request.BodyPath, ResponseBody))
+			AssertTrue(FSWrite(Request.HeaderPath, "HTTP/1.1 200 OK`r`nContent-Type: application/json`r`n`r`n"))
+			State["callback"].Call(0, '{"schema_version":1,"ok":true,"status":200,"child_quiesced":true,"receipt":{}}', "")
+			AssertTrue(Request.Completed)
+			_LLMRemote_PollRequest(State["id"])
+		}
+	}
+}
+for _LPP_CustodyBoundary in ["context", "payload", "before_launch", "after_acquire", "after_start"] {
+	for _LPP_CustodyMode in ["bridge", "newer", "unchanged"]
+		Test("LLM prompt prediction: ordinary custody " . _LPP_CustodyBoundary . " " . _LPP_CustodyMode . " (ordinary-prediction-custody)",
+			_LPP_DefaultPredictionCustody.Bind(_LPP_CustodyBoundary, _LPP_CustodyMode))
+}
+
+
+_LPP_LocalQueuedCustody(Boundary, Mode) {
+	global _LLM_Ollama_Async, _LLM_Ollama_AsyncCounter, _LLM_Ollama_Pending
+	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_Epoch, _LLM_LOCAL_DEFAULTS
+	global _LLM_Ollama_IsReady, _LLM_Ollama_WarmupGeneration, _LLM_Ollama_WarmupHttp
+	global _LLM_Ollama_WarmupPendingFn, _LLM_Ollama_WarmupStartedTick, LPP_BUFFER
+	global _LLM_Ollama_WarmupRetryIntervalMs, _LLM_Ollama_WarmupRetryModel
+	Saved := [_LLM_Ollama_Async, _LLM_Ollama_AsyncCounter, _LLM_Ollama_Pending,
+		_LLM_Deps_State, _LLM_Deps_Checking, _LLM_Ollama_IsReady, _LLM_Ollama_WarmupGeneration,
+		_LLM_Ollama_WarmupHttp, _LLM_Ollama_WarmupPendingFn, _LLM_Ollama_WarmupStartedTick,
+		_LLM_Ollama_WarmupRetryIntervalMs, _LLM_Ollama_WarmupRetryModel]
+	Menu := _LPP_Menu(), Menu["backend"] := "ollama", Menu["model"] := _LLM_LOCAL_DEFAULTS["llm_model"]
+	Origin := LLM_OllamaCaptureOriginCustody, Spawn := _LLM_Ollama_DoSpawn, Constructor := CurlAsyncRequest
+	AssertFalse(Origin.HasOwnProp("Call")), AssertFalse(Spawn.HasOwnProp("Call")), AssertFalse(Constructor.HasOwnProp("Call"))
+	State := Map("runs", [], "paths", [], "closed", [], "id", 0, "seen", false)
+	Warm := _ManagedCurlControlState()
+	Port := Map("write", Write, "run", Run, "poll", (*) => 0,
+		"terminate_process", (*) => true, "wait_process", (*) => 0,
+		"close_process", (Handle) => (State["closed"].Push(Handle), true))
+	try {
+		_LLM_Ollama_Async := Map(), _LLM_Ollama_Pending := ""
+		_LLM_Ollama_WarmupHttp := 0, _LLM_Ollama_WarmupPendingFn := 0, _LLM_Ollama_IsReady := false
+		_LPP_Run(Menu, LPP_BUFFER, Body, true)
+	} finally {
+		if Origin.HasOwnProp("Call")
+			Origin.DeleteProp("Call")
+		if Spawn.HasOwnProp("Call")
+			Spawn.DeleteProp("Call")
+		if Constructor.HasOwnProp("Call")
+			Constructor.DeleteProp("Call")
+		try {
+			LLM_OllamaCancelWarmupRetry()
+			for _, Entry in _LLM_Ollama_Async.Clone() {
+				_LLM_CurlReleaseEntryProcess(Entry, true, Port)
+				_LLM_Ollama_CleanupCurlFiles(Entry)
+			}
+			if Warm.Has("request")
+				_ManagedCurlControlRelease(Warm)
+		} finally {
+			_LLM_Ollama_Async := Saved[1], _LLM_Ollama_AsyncCounter := Saved[2], _LLM_Ollama_Pending := Saved[3]
+			_LLM_Deps_State := Saved[4], _LLM_Deps_Checking := Saved[5], _LLM_Ollama_IsReady := Saved[6]
+			_LLM_Ollama_WarmupGeneration := Saved[7], _LLM_Ollama_WarmupHttp := Saved[8]
+			_LLM_Ollama_WarmupPendingFn := Saved[9], _LLM_Ollama_WarmupStartedTick := Saved[10]
+			_LLM_Ollama_WarmupRetryIntervalMs := Saved[11], _LLM_Ollama_WarmupRetryModel := Saved[12]
+		}
+	}
+	Body(Calls, Lines) {
+		global _LLM_Engine, _LLM_Bridge_Active, _LLM_Bridge_Buffer
+		Prior := Critical("Off")
+		try {
+			Options := _LLM_Engine.Clone(), Options["backend"] := "ollama", Options["model"] := Menu["model"]
+			LLM_Engine_Init(Options)
+			_LLM_Deps_DoCheck_Result(true, A_TickCount, _LLM_Deps_Epoch, Menu["model"])
+			AssertTrue(LLM_Deps_IsReady(), "controlled reachability must enter the actual dependency owner")
+			Constructor.DefineProp("Call", {Call: WarmupConstructor})
+			AssertTrue(LLM_OllamaWarmup(Menu["model"]), "the actual warmup owner must send through its real facade")
+			if Constructor.HasOwnProp("Call")
+				Constructor.DeleteProp("Call")
+			_ManagedCurlControlAck(Warm)
+			Warm["request"]._PollManagedAdmission()
+			AssertTrue(FSWrite(Warm["request"].BodyPath, '{"done":true}'))
+			AssertTrue(FSWrite(Warm["request"].HeaderPath, "HTTP/1.1 200 OK`r`nContent-Type: application/json`r`n`r`n"))
+			Warm["callback"].Call(0, '{"schema_version":1,"ok":true,"status":200,"child_quiesced":true,"receipt":{}}', "")
+			WaitUntil(LLM_OllamaIsReady, "the real warmup poll must accept its actual owned HTTP 200 response")
+			AssertTrue(LLM_OllamaAllowInference(), "no direct ready=true assignment may admit the public prediction")
+			if Mode == "bridge" {
+				AssertFalse(_LLM_Bridge_Active)
+				LLM_Bridge_Start(_LLM_Engine.Clone())
+				AssertTrue(_LLM_Bridge_Active)
+			}
+			Spawn.DefineProp("Call", {Call: ObserveSpawn})
+			if Boundary == "origin"
+				Origin.DefineProp("Call", {Call: ObserveOrigin})
+			Invoke("advanced")
+			if Boundary == "origin" {
+				WaitUntil(() => State["runs"].Length > 0 || _LLM_Ollama_Async.Count == 0,
+					"the genuine deferred origin request must either retire or reach native acquisition")
+				AssertTrue(State["seen"])
+				AssertEqual(Mode == "unchanged" ? 1 : 0, State["runs"].Length,
+					"an ordinary local prediction cannot borrow a newer generation after origin capture")
+			} else {
+				WaitUntil(() => State["runs"].Length == 1, "the actual first local prediction must own a native child")
+				Head := State["runs"][1]
+				Invoke("rewrite")
+				WaitUntil(() => _LLM_Ollama_Pending is Map, "the actual rate-floor timer must publish a real queued successor")
+				Queued := _LLM_Ollama_Pending
+				AssertTrue(_LLM_Ollama_RequesterCurrent(Queued["requester_current"]), "the real queued prediction begins with valid original authority")
+				Last := Critical("On")
+				try {
+					if Mode == "newer" {
+						Before := _LLM_Engine["request_id"]
+						_LLM_Bridge_Buffer .= " Nouveau contexte pour la demande suivante."
+						Invoke("advanced")
+						AssertTrue(_LLM_Engine["request_id"] > Before)
+						AssertTrue(_LLM_Engine["timer_active"] && HasMethod(_LLM_Engine["pending_timer"], "Call"))
+					} else if Mode == "bridge"
+						LLM_Bridge_Stop()
+					ReportedCurrent := _LLM_Ollama_RequesterCurrent(Queued["requester_current"])
+					CompleteLocal(Head, "TAIL_CORRECTED: " . LPP_SENTENCE . "`nNEXT_WORDS: première proposition")
+				} finally Critical(Last)
+				WaitUntil(() => CountRuns(Queued["req_id"]) > 0 || !_LLM_Ollama_Async.Has(Queued["req_id"]),
+					"the actual queue drain must settle its original successor")
+				FileAppend("RECEIPT local-prediction-queue mode=" . Mode . " current=" . ReportedCurrent
+					. " native_runs=" . CountRuns(Queued["req_id"]) . "`n", "*")
+				AssertEqual(Mode == "unchanged" ? 1 : 0, CountRuns(Queued["req_id"]),
+					"a retired queued prediction cannot reach native process acquisition")
+				if Mode != "bridge"
+					AssertEqual(Mode == "unchanged", ReportedCurrent, "the queued predicate must retain its actual original request identity")
+				if Mode == "unchanged" {
+					CompleteLocal(Queued["req_id"], "REWRITE: Nouvelle demande actuelle.")
+					Final := _LPP_LastFinalRender()
+					AssertTrue(IsObject(Final), "the real queued positive control must parse its actual response files")
+					AssertEqual(1, Final.slots.Length)
+				}
+			}
+			AssertEqual(0, Calls.Length, "the real local backend cannot be replaced by the fixture remote recorder")
+		} finally {
+			LLM_Engine_CancelTimer()
+			for _, Entry in _LLM_Ollama_Async.Clone() {
+				_LLM_CurlReleaseEntryProcess(Entry, true, Port)
+				_LLM_Ollama_CleanupCurlFiles(Entry)
+			}
+			if Mode == "bridge" && _LLM_Bridge_Active
+				LLM_Bridge_Stop()
+			Critical(Prior)
+		}
+	}
+	WarmupConstructor(Self, Args*) {
+		Constructor.DeleteProp("Call")
+		Request := CurlAsyncRequest(Map("spawn", _ManagedCurlControlSpawn.Bind(Warm)))
+		Warm["request"] := Request
+		Request.DefineProp("SetManagedRouting", {Call: Routing})
+		return Request
+	}
+	Routing(Request, Reader := 0, CurrentFn := 0) {
+		Request.DeleteProp("SetManagedRouting")
+		return Request.SetManagedRouting((*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""), CurrentFn)
+	}
+	Invoke(Profile) {
+		global GestureActionParameters
+		Binding := "keyboard__ctrl_shift_r"
+		GestureActionParameters[GestureActionParameterKey(Binding, "llm_prompt_prediction")] := Profile . "|1"
+		AssertTrue(GestureInvokeAction("llm_prompt_prediction", Binding), "the genuine public local action must be admitted")
+	}
+	ObserveOrigin(Self, Args*) {
+		global _LLM_Engine, _LLM_Bridge_Buffer
+		Origin.DeleteProp("Call")
+		Result := Origin.Call(Args*)
+		State["seen"] := true
+		if Mode == "newer" {
+			Before := _LLM_Engine["request_id"]
+			_LLM_Bridge_Buffer .= " Nouveau contexte pour la demande suivante."
+			Invoke("rewrite")
+			AssertTrue(_LLM_Engine["request_id"] > Before)
+			AssertTrue(_LLM_Engine["timer_active"] && HasMethod(_LLM_Engine["pending_timer"], "Call"))
+		} else if Mode == "bridge"
+			LLM_Bridge_Stop()
+		return Result
+	}
+	ObserveSpawn(Self, Id, Payload, PayloadPath, OutputPath, Job, OriginalPort := 0) {
+		Spawn.DeleteProp("Call")
+		State["id"] := Id
+		try return Spawn.Call(Id, Payload, PayloadPath, OutputPath, Job, Port)
+		finally Spawn.DefineProp("Call", {Call: ObserveSpawn})
+	}
+	Write(Path, Payload) {
+		State["paths"].Push(Path)
+		return FSWrite(Path, Payload)
+	}
+	Run(Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+		Id := State["id"]
+		State["runs"].Push(Id)
+		Pid := 990000 + Id
+		ProcessOwner := Map("pid", Pid, "handle", Pid, "released", false)
+	}
+	CountRuns(Id) {
+		Count := 0
+		for Actual in State["runs"]
+			if Actual == Id
+				Count += 1
+		return Count
+	}
+	CompleteLocal(Id, Text) {
+		if !_LLM_Ollama_Async.Has(Id)
+			return
+		Entry := _LLM_Ollama_Async[Id]
+		AssertTrue(FSWrite(Entry["tmp_stdout"], '{"message":{"content":' . JsonStringLiteral(Text) . '},"done":true}'))
+		AssertTrue(FSWrite(Entry["tmp_status"], "200`r`n"))
+		AssertTrue(FSWrite(Entry["tmp_exit"], "0`r`n"))
+		_LLM_Ollama_PollCurl(Id, Port)
+	}
+	WaitUntil(Check, Message) {
+		Started := A_TickCount
+		while !Check.Call() && TickElapsed64(Started) < LLM_ApiCommon_GetRateLimitMs("ollama") + 2000
+			Sleep(1)
+		AssertTrue(Check.Call(), Message)
+	}
+}
+for _LPP_LocalBoundary in ["origin", "queue"] {
+	for _LPP_LocalMode in ["newer", "bridge", "unchanged"]
+		Test("LLM prompt prediction: local custody " . _LPP_LocalBoundary . " " . _LPP_LocalMode . " (local-prediction-custody)",
+			_LPP_LocalQueuedCustody.Bind(_LPP_LocalBoundary, _LPP_LocalMode))
+}
