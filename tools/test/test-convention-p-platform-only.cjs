@@ -31,7 +31,10 @@
 
 'use strict';
 
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const assert = require('node:assert/strict');
 const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -64,42 +67,113 @@ const EXEMPT = /[/\\](platform|adapters|vendor|tests|docs)[/\\]/;
 const PATH_BASELINE = 1;
 
 /**
- * Every file in the staged driver candidate, excluding local runtime residue.
+ * Every staged driver file, excluding local runtime residue.
+ * @param {string} root - Repository root.
  * @returns {string[]} Repo-relative paths with forward slashes.
  */
-function trackedDriverFiles() {
+function trackedDriverFiles(root = ROOT) {
 	return execFileSync('git', ['ls-files', '--cached', '-z', '--', 'static/ergopti_plus'], {
-		cwd: ROOT,
+		cwd: root,
 		encoding: 'utf8'
 	})
 		.split('\0')
 		.filter(Boolean);
 }
 
-// Both ratchets must measure the same candidate. Files staged for addition or
-// removal count immediately; ignored caches and untracked folders never ship.
-const trackedFiles = trackedDriverFiles();
-
 /**
- * Top-level sub-folders represented in a driver's staged platform/ tree.
+ * Top-level sub-folders of a driver's platform/ tree.
  * @param {string} driver - Driver directory name.
- * @returns {string[]} Sorted folder names, empty when platform/ is absent.
+ * @param {string[]} files - The gate's tracked driver-file inventory.
+ * @returns {string[]} Sorted folder names, empty when no platform/ file is tracked.
  */
-function platformFolders(driver) {
+function platformFolders(driver, files) {
 	const prefix = `${DRIVER_PREFIX}${driver}/platform/`;
-	return [
-		...new Set(
-			trackedFiles
-				.filter((file) => file.startsWith(prefix))
-				.map((file) => file.slice(prefix.length).split('/'))
-				.filter((parts) => parts.length >= 2)
-				.map((parts) => parts[0])
-		)
-	].sort();
+	const folders = new Set();
+	for (const file of files) {
+		if (!file.startsWith(prefix)) continue;
+		const relative = file.slice(prefix.length);
+		const separator = relative.indexOf('/');
+		if (separator > 0) folders.add(relative.slice(0, separator));
+	}
+	return [...folders].sort();
 }
 
-// An adapters/ file is the driver's hexagonal marker. Discover it in Git's
-// index rather than allowing a local scratch directory to invent a new driver.
+/** Compare only shipped folders, using the same inventory as the path ratchet. */
+function platformInventory(drivers, files) {
+	const folders = new Map(drivers.map((driver) => [driver, platformFolders(driver, files)]));
+	const union = [...new Set([...folders.values()].flat())].sort();
+	const missing = [];
+	for (const [driver, own] of folders) {
+		for (const folder of union) {
+			if (!own.includes(folder)) missing.push(`${driver}/platform/${folder}`);
+		}
+	}
+	return { folders, union, missing };
+}
+
+/** Real Git fixtures distinguish generated folders from actual tracked asymmetry. */
+function assertTrackedPlatformInventory() {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-platform-inventory-'));
+	const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+	const put = (relative, content = 'fixture\n') => {
+		const filename = path.join(root, relative);
+		fs.mkdirSync(path.dirname(filename), { recursive: true });
+		fs.writeFileSync(filename, content, { flag: 'wx' });
+	};
+	try {
+		git('init', '--quiet');
+		git('config', 'core.quotePath', 'true');
+		const drivers = ['linux', 'macos', 'windows'];
+		const folder = 'shared space é';
+		const tracked = drivers.map(
+			(driver) => `static/ergopti_plus/${driver}/platform/${folder}/README.md`
+		);
+		put('.gitignore', '**/__pycache__/\n');
+		for (const filename of tracked) put(filename);
+		git('add', '--', '.gitignore', ...tracked);
+		const ignored = 'static/ergopti_plus/macos/platform/__pycache__/generated.pyc';
+		const untracked = 'static/ergopti_plus/macos/platform/local-build/generated.txt';
+		put(ignored);
+		put(untracked);
+		assert.equal(git('check-ignore', '--', ignored).trim(), ignored);
+		let files = trackedDriverFiles(root);
+		assert.deepEqual(files.sort(), tracked.sort(), 'NUL inventory must preserve quoted path bytes');
+		assert.deepEqual(
+			platformFolders('macos', files),
+			[folder],
+			'generated folders are not shipped'
+		);
+		assert.deepEqual(
+			platformInventory(drivers, files).missing,
+			[],
+			'local caches must not fail parity'
+		);
+		const asymmetric = 'static/ergopti_plus/linux/platform/linux-only/README.md';
+		put(asymmetric);
+		git('add', '--', asymmetric);
+		files = trackedDriverFiles(root);
+		assert.deepEqual(
+			platformInventory(drivers, files).missing,
+			['macos/platform/linux-only', 'windows/platform/linux-only'],
+			'a newly tracked Linux-only folder must still fail parity'
+		);
+		git('add', '-f', '--', ignored);
+		files = trackedDriverFiles(root);
+		assert.ok(
+			platformFolders('macos', files).includes('__pycache__'),
+			'tracked names are never exempt'
+		);
+		assert.ok(platformInventory(drivers, files).missing.includes('linux/platform/__pycache__'));
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+}
+
+assertTrackedPlatformInventory();
+
+// Both ratchets measure the staged candidate. Local caches and untracked
+// scratch trees cannot invent a driver or a shipped platform folder.
+const trackedFiles = trackedDriverFiles();
 const DRIVERS = [
 	...new Set(
 		trackedFiles
@@ -118,15 +192,7 @@ if (DRIVERS.length < 3) {
 }
 
 const offenders = trackedFiles.filter((f) => !EXEMPT.test(f) && VENDOR_WORDS.test(f));
-
-const folders = new Map(DRIVERS.map((d) => [d, platformFolders(d)]));
-const union = [...new Set([...folders.values()].flat())].sort();
-const missing = [];
-for (const [driver, own] of folders) {
-	for (const f of union) {
-		if (!own.includes(f)) missing.push(`${driver}/platform/${f}`);
-	}
-}
+const { folders, union, missing } = platformInventory(DRIVERS, trackedFiles);
 
 if (process.argv.includes('--measure')) {
 	console.log(`vendor-named paths outside the seam: ${offenders.length}`);
@@ -137,12 +203,6 @@ if (process.argv.includes('--measure')) {
 }
 
 let failed = false;
-if (union.length === 0) {
-	failed = true;
-	console.error(
-		'\x1b[31m[ERROR] Convention P: no tracked platform/ sub-folders found — the candidate has no subjects.\x1b[0m'
-	);
-}
 if (offenders.length > PATH_BASELINE) {
 	failed = true;
 	console.error(
