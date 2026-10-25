@@ -113,7 +113,18 @@
 			"at-spi2-core",
 			"openssl",
 			"sqlite",
-			"xdg-utils"
+			"xdg-utils",
+			"polkit",
+			"kmod",
+			"systemd",
+			"shadow",
+			"util-linux",
+			"glibc",
+			"libayatana-appindicator",
+			"zenity",
+			"lua51-lgi",
+			"webkit2gtk-4.1",
+			"python"
 		],
 		"nix_library_path": [
 			"libayatana-appindicator",

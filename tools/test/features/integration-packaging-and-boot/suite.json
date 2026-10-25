@@ -89,6 +89,15 @@
 			"cmd": "node",
 			"args": ["tools/test/test-feature-state-boot-smoke.cjs"],
 			"repro": "node tools/test/test-feature-state-boot-smoke.cjs"
+		},
+		{
+			"id": "js-linux-arch-package-runtime",
+			"ordinal": 488,
+			"name": "Arch recipe stages native runtime and executes canonical package entry points",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-arch-package.cjs"],
+			"repro": "node tools/test/test-linux-arch-package.cjs",
+			"platforms": ["linux"]
 		}
 	]
 }
