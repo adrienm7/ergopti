@@ -32,6 +32,9 @@ global KLS_LAYOUTS_KEY := "HKLM\SYSTEM\CurrentControlSet\Control\Keyboard Layout
 ; of a KLID: its low twelve bits name the registry "Layout Id" value.
 global KLS_CUSTOM_LAYOUT_MASK := 0xF000
 global KLS_LAYOUT_ID_MASK := 0x0FFF
+; Native IME handles carry their complete registry KLID in the low DWORD.
+global KLS_IME_LAYOUT_PREFIX := 0xE000
+global KLS_NATIVE_LAYOUT_MASK := 0xFFFFFFFF
 
 
 /**
@@ -42,10 +45,12 @@ global KLS_LAYOUT_ID_MASK := 0x0FFF
  * @returns {String} The KLID, "" when a custom layout id has no registry entry.
  */
 KLS_LayoutId(Hkl, LookupFn := 0) {
-	global KLS_CUSTOM_LAYOUT_MASK, KLS_LAYOUT_ID_MASK
+	global KLS_CUSTOM_LAYOUT_MASK, KLS_LAYOUT_ID_MASK, KLS_IME_LAYOUT_PREFIX, KLS_NATIVE_LAYOUT_MASK
 	if !(Hkl is Integer) || Hkl == 0
 		throw TypeError("a keyboard layout handle is required")
 	Device := (Hkl >> 16) & 0xFFFF
+	if ((Device & KLS_CUSTOM_LAYOUT_MASK) == KLS_IME_LAYOUT_PREFIX)
+		return Format("{:08X}", Hkl & KLS_NATIVE_LAYOUT_MASK)
 	if ((Device & KLS_CUSTOM_LAYOUT_MASK) == KLS_CUSTOM_LAYOUT_MASK) {
 		if !HasMethod(LookupFn, "Call")
 			LookupFn := _KLS_RegistryLookup

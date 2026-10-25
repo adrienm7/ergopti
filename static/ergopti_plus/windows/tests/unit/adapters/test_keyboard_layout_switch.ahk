@@ -77,3 +77,37 @@ Test("keyboard layout switch: KLID of standard and custom layouts", _KLST_Layout
 Test("keyboard layout switch: installed choices", _KLST_Choices)
 Test("keyboard layout switch: select posts the installed handle", _KLST_Select)
 Test("keyboard layout switch: refusals are false", _KLST_Refusals)
+
+/** IME KLIDs retain both the device word and the language word. */
+_KLST_ImeLayoutIds() {
+	AssertEqual("E020047F", KLS_LayoutId(0xE020047F, _KLST_Lookup),
+		"the KLID returned by ImmInstallIMEW is the entire native handle")
+	AssertEqual("E020047F", KLS_LayoutId(-534772609, _KLST_Lookup),
+		"a sign-extended native IME handle has the same unsigned KLID")
+}
+
+/** IMEs sharing a device word still represent distinct installed layouts. */
+_KLST_ImeChoices() {
+	Hkls := [0x040C040C, 0xE0010404, 0xE0010411, 0xE0010404]
+	Choices := KLS_Choices(() => Hkls, _KLST_Lookup, _KLST_Label)
+	AssertEqual(3, Choices.Length, "the two IMEs stay distinct and the exact duplicate is omitted")
+	AssertEqual("E0010404", Choices[2]["id"])
+	AssertEqual("label E0010404", Choices[2]["label"])
+	AssertEqual("E0010411", Choices[3]["id"])
+}
+
+/** Stored IME identities must resolve back to their exact installed handles. */
+_KLST_ImeSelect() {
+	Hkls := [0xE0010404, 0xE0010411]
+	Posted := []
+	AssertEqual(1, KLS_Select("E0010411", () => Hkls, (Hkl) => Posted.Push(Hkl), _KLST_Lookup))
+	AssertEqual(1, Posted.Length, "one input-language request is admitted")
+	AssertEqual(0xE0010411, Posted[1], "the matching IME receives the switch request")
+	AssertFalse(KLS_Select("E0020411", () => Hkls, (Hkl) => Posted.Push(Hkl), _KLST_Lookup),
+		"another IME for the same language is not an installed identity")
+	AssertEqual(1, Posted.Length, "an absent IME never posts a request")
+}
+
+Test("keyboard layout switch: native IME KLIDs (ime-layout-identity)", _KLST_ImeLayoutIds)
+Test("keyboard layout switch: distinct IME choices (ime-layout-identity)", _KLST_ImeChoices)
+Test("keyboard layout switch: exact IME selection (ime-layout-identity)", _KLST_ImeSelect)
