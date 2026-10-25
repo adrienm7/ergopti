@@ -46,6 +46,13 @@ local M = Core.new({
 		return Logger.is_enabled(Logger.LEVELS.INFO)
 	end,
 	evidence = function(format, ...) require("infra.logger").evidence(LOG, format, ...) end,
+	-- The log-volume figures ride on the memory line: both are process-wide and
+	-- one record per interval is what the CI and the diagnostics read.
+	memory_note = function(interval_sec)
+		local Logger = require("infra.logger")
+		return string.format("Log volume over %d s: %s.", math.floor(interval_sec),
+			Logger.volume_text(Logger.volume_interval()))
+	end,
 })
 
 local _handle = nil

@@ -287,6 +287,7 @@ return {
 	"tests.unit.infra.preferences.test_script_settings",
 	"tests.unit.infra.lifecycle.test_xkb_rmlvo",
 	"tests.unit.infra.logger.test_logger_contract",
+	"tests.unit.infra.logger.test_logger_volume",
 	"tests.unit.infra.text.test_text_case",
 	"tests.unit.infra.text.test_native_path",
 	"tests.unit.infra.text.test_native_path_sites",

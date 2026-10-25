@@ -308,6 +308,27 @@ early. A line swallowed by the dedup window is not counted. The Lua core
 exposes `session_issues()` → `{ warn_count, err_count, last_error }`; the AHK
 logger feeds `HealthCheck_RecordWarn()` / `HealthCheck_RecordError(Line)`.
 
+### 5.3 Log-volume counters
+
+Every driver counts, for the whole session, the lines it wrote per level and the
+lines that never were: `debug` (DEBUG, TRACE, DONE), `info` (INFO, START,
+SUCCESS and evidence records), `warn`, `error`; `dropped` (removed by the
+severity threshold), `suppressed` (swallowed by the consecutive dedup, § 4.1)
+and `collapsed` (withheld by the repeat collapser, § 4.2). A summary line
+counts as a written line of its level, so the figures describe the log a user
+can open. The Lua core exposes `volume()` (totals), `volume_interval()` (what
+was counted since the previous call, totals untouched), `volume_text(counters)`
+(`debug=N info=N warn=N error=N dropped=N suppressed=N collapsed=N`),
+`note_dropped()` (for a driver that filters before the core) and
+`reset_volume()` (tests).
+
+The figures travel in the evidence record each driver already writes once per
+interval: macOS appends `Log volume over N s: ...` to the `Memory snapshot`
+record of `phase_stats`, Linux appends `| log: ...` to the `PerfCounters`
+interval record. Windows still has to count in `_LoggerEmit` and add the same
+seven figures, in the same order, to its phase-summary evidence record.
+Contract: `_shared/lua/test/logger_volume_contract.lua`.
+
 ### 5.2 Error window hook
 
 Every emitted `ERROR` line is also handed to the driver's error window with its

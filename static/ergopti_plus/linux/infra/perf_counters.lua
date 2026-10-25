@@ -176,8 +176,9 @@ end
 --- @param now_ms number
 local function flush(now_ms)
 	local seconds = (now_ms - _interval_start_ms) / 1000
-	Logger.evidence(LOG, "Interval (counts; spans as n/total/max): %s",
-		interval_text(math.floor(collectgarbage("count")), seconds))
+	Logger.evidence(LOG, "Interval (counts; spans as n/total/max): %s | log: %s",
+		interval_text(math.floor(collectgarbage("count")), seconds),
+		Logger.volume_text(Logger.volume_interval()))
 	for _, name in ipairs(COUNTER_NAMES) do
 		_totals[name] = _totals[name] + _counts[name]
 		_counts[name] = 0

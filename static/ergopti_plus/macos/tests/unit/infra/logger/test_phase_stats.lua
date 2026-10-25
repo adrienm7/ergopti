@@ -17,6 +17,8 @@ local real_logger = package.loaded["infra.logger"]
 package.loaded["infra.logger"] = {
 	evidence = function(tag, fmt, ...) evidence[#evidence + 1] = string.format(fmt, ...) return true end,
 	is_enabled = function() return info_enabled end,
+	volume_interval = function() return { info = 3, dropped = 7 } end,
+	volume_text = function(counters) return "info=" .. counters.info .. " dropped=" .. counters.dropped end,
 	LEVELS = { DEBUG = 1, INFO = 2, WARNING = 3, ERROR = 4 },
 	error = function() end, start = function() end, done = function() end,
 }
@@ -75,6 +77,8 @@ helpers.describe("infra.phase_stats flush", function()
 		helpers.assert_true(evidence[1]:find("preview n=1", 1, true) ~= nil, "phase figures are listed")
 		helpers.assert_true(evidence[2]:find("#open_from_cache=1", 1, true) ~= nil, "counters are listed")
 		helpers.assert_true(evidence[3]:find("Memory snapshot", 1, true) ~= nil)
+		helpers.assert_true(evidence[3]:find("Log volume over 300 s: info=3 dropped=7.", 1, true) ~= nil,
+			"the memory record carries the log-volume figures: " .. evidence[3])
 	end)
 
 	helpers.it("clears the counters after a flush", function()

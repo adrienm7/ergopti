@@ -72,14 +72,17 @@ end
 --- Creates one driver's phase statistics.
 --- @param options table { now_ns = function() -> monotonic nanoseconds,
 ---   info_enabled = function() -> boolean, evidence = function(fmt, ...) that
----   writes one never-collapsed record under the driver's own module tag }.
+---   writes one never-collapsed record under the driver's own module tag,
+---   memory_note = function(interval_sec) -> string|nil appended to the memory
+---   snapshot line, nil when the driver reports nothing more there }.
 --- @return table stats The instance API.
 function M.new(options)
 	assert(type(options) == "table", "phase stats: options must be a table")
-	for _, key in ipairs({ "now_ns", "info_enabled", "evidence" }) do
+	for _, key in ipairs({ "now_ns", "info_enabled", "evidence", "memory_note" }) do
 		assert(type(options[key]) == "function", "phase stats: option " .. key .. " must be a function")
 	end
 	local default_now, info_enabled, evidence = options.now_ns, options.info_enabled, options.evidence
+	local memory_note = options.memory_note
 
 	local S = { DEFAULT_INTERVAL_SEC = M.DEFAULT_FLUSH_SECONDS }
 	-- _phases[name] = { n = count, total = ns, max = ns }
@@ -237,7 +240,12 @@ function M.new(options)
 				math.floor(interval_sec or M.DEFAULT_FLUSH_SECONDS), table.concat(parts, " | "))
 			lines = lines + 1
 		end
-		evidence("Memory snapshot: lua=%d KB.", math.floor(collectgarbage("count")))
+		local note = memory_note(interval_sec or M.DEFAULT_FLUSH_SECONDS)
+		if note == nil then
+			evidence("Memory snapshot: lua=%d KB.", math.floor(collectgarbage("count")))
+		else
+			evidence("Memory snapshot: lua=%d KB. %s", math.floor(collectgarbage("count")), note)
+		end
 		return lines + 1
 	end
 

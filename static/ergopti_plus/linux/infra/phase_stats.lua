@@ -37,6 +37,8 @@ local M = Core.new({
 		return Logger.get_level() <= Logger.LEVELS.INFO
 	end,
 	evidence = function(format, ...) Logger.evidence(LOG, format, ...) end,
+	-- Linux reports its log volume on the PerfCounters interval line instead.
+	memory_note = function() return nil end,
 })
 
 -- Monotonic milliseconds when the current interval started; nil until the first
