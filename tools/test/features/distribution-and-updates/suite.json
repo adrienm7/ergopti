@@ -442,6 +442,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-windows-exe-av-surface.cjs"],
 			"repro": "npm run test:windows-exe-av-surface"
+		},
+		{
+			"id": "js-0478",
+			"ordinal": 486,
+			"name": "Linux code launches only programs the minimal Arch, Fedora and openSUSE images ship, CI installs or a package declares",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-portable-commands.cjs"],
+			"repro": "node tools/test/test-linux-portable-commands.cjs"
 		}
 	]
 }

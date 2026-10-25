@@ -295,6 +295,27 @@ and a verified LuaJIT networking provider. Alpine's Lua 5.2 compatibility
 identities with `rawequal`). LuaJIT folds the literal `-0.0` to +0 (use
 `tonumber("-0.0")`) and allows 60 captured upvalues per function.
 
+### project-linux-minimal-images-ship-few-programs
+
+The distribution lanes run on minimal Arch, Fedora and openSUSE images that hold
+coreutils, findutils, grep, sed, bash, sudo and shadow plus what
+`.github/linux-install-matrix.json` and `tools/test/prepare-linux-distro-unit.sh`
+install (git, a compiler, cmake, curl, python3, luajit). Anything else a driver
+file, installer script or test launches passes on Debian and Ubuntu and fails
+minutes into the matrix: two tests ran `hostname`, which the driver itself
+replaced with `/proc/sys/kernel/hostname` (100e42bc65, 80802ed0dc). The
+Unit-stage gate `tools/test/test-linux-portable-commands.cjs` (lot "Distribution
+and updates") lexes the Linux tree without comments, inventories every launch
+(`io.popen`, `os.execute`, the ShellRunner, ProcessRunner, ProgramRunner,
+OwnedProcess and `uv.spawn` calls, Python `subprocess`, every shell script) and
+checks each program against one list, `PROGRAMS`, by scope (driver, test, host).
+Action: read `/proc` or `/sys` instead of running a program; when one is needed,
+add it to `PROGRAMS` with its proof (install it in the prep script, declare it in
+the package recipes and `install.sh`, or probe it with `has_command` in the same
+file); a command stored in a table field or built from a parameter is invisible
+to the scan, so keep its `has_command` probe by name. The gate has no warn-only
+state: an unbacked program fails it (`cmp` from diffutils was the first one).
+
 ### project-flatpak-sdk-build-flags
 
 The Flatpak SDK build needs explicit commands for the MIT Kerberos build,
