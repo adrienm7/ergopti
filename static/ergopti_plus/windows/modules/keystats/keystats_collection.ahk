@@ -102,7 +102,7 @@ KL_ResumeCollection() {
 
 ; Ends the current typing session and restarts the live figures from zero.
 ; Works while paused; it changes neither the pause nor any privacy filter.
-; @param FlushFn {Func} Test seam replacing KL_FlushBuffer.
+; @param FlushFn {Func} Test seam returning the Boolean KL_FlushBuffer receipt.
 ; @param CloseFn {Func} Test seam replacing the session closer; receives the
 ;        tick of the last keystroke and the current tick.
 ; @param WpmFn {Func} Test seam replacing the typing-speed reset.
@@ -115,10 +115,11 @@ KL_ResetSession(FlushFn := 0, CloseFn := 0, WpmFn := 0) {
 	}
 	try LoggerStart("Keystats", "Resetting the metrics session...")
 	try {
-		if HasMethod(FlushFn, "Call")
-			FlushFn.Call()
-		else
-			KL_FlushBuffer()
+		Flushed := HasMethod(FlushFn, "Call") ? FlushFn.Call() : KL_FlushBuffer()
+		if !Flushed {
+			try LoggerError("Keystats", "Session reset refused: pending text was not accepted.")
+			return false
+		}
 	} catch as Err {
 		try LoggerError("Keystats", "Session reset refused: pending text could not be stored: {1}.", Err.Message)
 		return false

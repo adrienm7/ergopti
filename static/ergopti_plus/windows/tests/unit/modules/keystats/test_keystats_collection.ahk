@@ -93,7 +93,7 @@ _KCT_Apply(Op, State, Label) {
 	} else if (Kind = "secure_off") {
 		State.secure := false
 	} else if (Kind = "reset") {
-		Applied := KL_ResetSession(() => 0, (*) => true, () => _KCT_ClearWpm())
+		Applied := KL_ResetSession(() => true, (*) => true, () => _KCT_ClearWpm())
 		AssertEqual(Op["reset_applied"], Applied ? true : false, Label . ": reset applied")
 	} else {
 		throw Error(Label . ": unknown operation " . Kind)
@@ -224,7 +224,7 @@ _KCT_ResetClosesAnActiveSessionAfterFlushing() {
 		try {
 			KLWatch.is_session_active := true
 			KLHook.last_tick := 1234
-			Applied := KL_ResetSession(() => Order.Push("flush"),
+			Applied := KL_ResetSession(() => (Order.Push("flush"), true),
 				(Last, Now) => (Order.Push("close"), Seen.Push(Last), true),
 				() => Order.Push("wpm"))
 		} finally {
@@ -246,7 +246,7 @@ _KCT_ResetWithoutASessionClosesNothing() {
 		Closed := []
 		try {
 			KLWatch.is_session_active := false
-			Applied := KL_ResetSession(() => 0, (*) => Closed.Push(1), () => 0)
+			Applied := KL_ResetSession(() => true, (*) => Closed.Push(1), () => 0)
 		} finally KLWatch.is_session_active := PrevActive
 		Assert(Applied, "a reset with no open session still restarts the figures")
 		AssertEqual(0, Closed.Length, "and writes no session_end for a session that never started")
@@ -261,12 +261,12 @@ _KCT_ResetRefusesRatherThanDiscards() {
 		Restarted := []
 		try {
 			KLWatch.is_session_active := true
-			Refused := !KL_ResetSession(() => 0, (*) => false, () => Restarted.Push(1))
+			Refused := !KL_ResetSession(() => true, (*) => false, () => Restarted.Push(1))
 		} finally KLWatch.is_session_active := PrevActive
 		Assert(Refused, "a refused session close refuses the reset")
 		AssertEqual(0, Restarted.Length, "and leaves the live figures alone, so nothing is lost")
 		Keystats.initialized := false
-		Assert(!KL_ResetSession(() => 0, (*) => true, () => 0), "a reset with metrics not running is refused")
+		Assert(!KL_ResetSession(() => true, (*) => true, () => 0), "a reset with metrics not running is refused")
 	}
 }
 Test("keystats collection: a reset that cannot close the session is refused, not forced", _KCT_ResetRefusesRatherThanDiscards)
@@ -277,3 +277,65 @@ _KCT_Join(Items) {
 		Out .= (Out = "" ? "" : ",") . Item
 	return Out
 }
+
+
+_KCT_ResetRefusesUnacceptedFlush(Mode) {
+	_KCT_WithKeystats(_KCT_ResetFlushCase.Bind(Mode))
+}
+
+_KCT_RefuseResetFlush(State) {
+	if State.Mode = "throw" && !State.Accepted
+		throw Error("injected pending-text flush failure")
+	return State.Accepted
+}
+
+_KCT_CommitResetClose(Closed, *) {
+	Closed.Push(1)
+	KLWatch.is_session_active := false
+	return true
+}
+
+_KCT_ResetFlushCase(Mode) {
+	global _Stub_FlushBufferDeferred, _Stub_FlushBufferCalls, _Stub_FlushBufferMutates
+	PrevActive := KLWatch.is_session_active
+	PrevDeferred := _Stub_FlushBufferDeferred
+	PrevFlushCalls := _Stub_FlushBufferCalls
+	PrevFlushMutates := _Stub_FlushBufferMutates
+	Closed := []
+	Restarted := []
+	try {
+		KLWatch.is_session_active := true
+		Keystats.buffer_events := [["a", 10, Map()]]
+		Keystats.buffer_text := "retained"
+		Events := Keystats.buffer_events
+		FlushState := {Mode: Mode, Accepted: false}
+		FlushFn := Mode = "default" ? 0 : _KCT_RefuseResetFlush.Bind(FlushState)
+		_Stub_FlushBufferDeferred := Mode = "default"
+		_Stub_FlushBufferMutates := false
+		Applied := KL_ResetSession(FlushFn,
+			_KCT_CommitResetClose.Bind(Closed), () => Restarted.Push(1))
+		AssertFalse(Applied, "a refused flush cannot report a completed session reset")
+		AssertEqual(0, Closed.Length, "the session cannot close before its text is accepted")
+		AssertEqual(0, Restarted.Length, "a refused flush leaves the live typing figures unchanged")
+		AssertTrue(KLWatch.is_session_active, "the current session remains active for retry")
+		AssertEqual("retained", Keystats.buffer_text)
+		AssertEqual(ObjPtr(Events), ObjPtr(Keystats.buffer_events),
+			"a refused flush keeps the exact unaccepted input buffer")
+		FlushState.Accepted := true
+		_Stub_FlushBufferDeferred := false
+		AssertTrue(KL_ResetSession(FlushFn,
+			_KCT_CommitResetClose.Bind(Closed), () => Restarted.Push(1)),
+			"a later accepted flush must allow the same reset to complete")
+		AssertEqual(1, Closed.Length, "the successful retry closes the session once")
+		AssertEqual(1, Restarted.Length, "the successful retry restarts the figures once")
+		AssertFalse(KLWatch.is_session_active)
+	} finally {
+		KLWatch.is_session_active := PrevActive
+		_Stub_FlushBufferDeferred := PrevDeferred
+		_Stub_FlushBufferCalls := PrevFlushCalls
+		_Stub_FlushBufferMutates := PrevFlushMutates
+	}
+}
+for _KCT_FlushMode in ["default", "false", "throw"]
+	Test("keystats collection: reset refuses unaccepted flush " . _KCT_FlushMode
+		. " (reset-flush-refusal)", _KCT_ResetRefusesUnacceptedFlush.Bind(_KCT_FlushMode))
