@@ -93,6 +93,9 @@ global LLM_AGENT_TIMEZONE_KEY := "HKLM\SYSTEM\CurrentControlSet\Control\TimeZone
 ; Generation of the newest flow; a callback carrying an older one is stale
 global _LLM_Agent_Generation := 0
 
+; A System 1 source withdrawal retires only automatic requesters.
+global _LLM_Agent_System1Revision := 0
+
 ; The automatic mode: its armed pause timer, the suggestion it showed and not
 ; settled yet, and the sentences it already triaged (Map + insertion order)
 global _LLM_Agent_Auto := Map("timer", 0, "offer", "", "triaged", Map(), "order", [])
@@ -295,11 +298,13 @@ _LLM_Agent_SetCandidate(Key, Value, Candidate) {
 ; the transaction already published.
 ; @returns {Integer} True, the transaction's success contract.
 _LLM_Agent_ApplyCommitted(Key, Previous, Candidate) {
-	global _LLM_Agent_Generation
+	global _LLM_Agent_Generation, _LLM_Agent_System1Revision
 	; Durable source/mode withdrawals retire every held requester, including ABA.
 	; A no-op or a refused transaction never revokes an accepted request.
 	if (Key == "agent_system2" || Key == "agent_mode") && Candidate[Key] != Previous
 		_LLM_Agent_Generation += 1
+	if Key == "agent_system1" && Candidate[Key] != Previous
+		_LLM_Agent_System1Revision += 1
 	LoggerDebug("LLM", "AI agent setting '{1}' committed.", Key)
 	return true
 }
@@ -453,7 +458,7 @@ _LLM_Agent_NativePrompt(Title, Text, Default) {
  * @returns {Boolean} True when the request was sent.
  */
 LLM_Agent_Ask(Flow, Text) {
-	Current := _LLM_Agent_RenderIsCurrent.Bind(Flow["generation"])
+	Current := _LLM_Agent_FlowRenderIsCurrent.Bind(Flow)
 	if !Current.Call()
 		return false
 	Config := LLM_Agent_Config()
@@ -544,7 +549,7 @@ _LLM_Agent_OnActionsFail(Flow, Failure := "") {
 		Flow["generation"], _LLM_Vision_FailureReason(Failure))
 	if LLM_LocalModelIsMissing(Failure) {
 		_LLM_Agent_HideOwnTooltip(Flow)
-		LLM_LocalModelOffer(Failure, Flow["auto"], _LLM_Agent_RenderIsCurrent.Bind(Flow["generation"]))
+		LLM_LocalModelOffer(Failure, Flow["auto"], _LLM_Agent_FlowRenderIsCurrent.Bind(Flow))
 		return
 	}
 	_LLM_Agent_Notify(Flow, "llm.agent.failed")
@@ -586,7 +591,7 @@ _LLM_Agent_Show(Flow, Actions) {
 		"accept_source", Source,
 		"app_name", _LLM_Engine_AppNameForAcceptSource(Source),
 		"is_final", true,
-		"render_guard", _LLM_Agent_RenderIsCurrent.Bind(Flow["generation"])
+		"render_guard", _LLM_Agent_FlowRenderIsCurrent.Bind(Flow)
 	)
 	; Still the same sentence, no keystroke since: the actions take the place
 	; of the automatic prediction shown meanwhile
@@ -649,7 +654,7 @@ _LLM_Agent_ShowLoading(Flow) {
 		"offer_id", _LLM_Agent_OfferId(Flow),
 		"accept_source", Source,
 		"app_name", _LLM_Engine_AppNameForAcceptSource(Source),
-		"render_guard", _LLM_Agent_RenderIsCurrent.Bind(Flow["generation"])))
+		"render_guard", _LLM_Agent_FlowRenderIsCurrent.Bind(Flow)))
 }
 
 ; Hides the flow's own tooltip, never another one.
@@ -675,8 +680,19 @@ _LLM_Agent_OfferId(Flow) {
 
 ; @returns {Boolean} True when no newer flow started.
 _LLM_Agent_IsCurrent(Flow) {
-	global _LLM_Agent_Generation
+	global _LLM_Agent_Generation, _LLM_Agent_System1Revision
 	return Flow["generation"] == _LLM_Agent_Generation
+		&& (!Flow.Has("system1_revision") || Flow["system1_revision"] == _LLM_Agent_System1Revision)
+}
+
+; Manual flows own only their generation; automatic flows also own System 1.
+_LLM_Agent_FlowRenderIsCurrent(Flow) {
+	return (_LLM_Agent_IsCurrent(Flow) && !A_IsSuspended) ? true : false
+}
+
+_LLM_Agent_TriageIsCurrent(Generation, Revision) {
+	global _LLM_Agent_System1Revision
+	return (_LLM_Agent_RenderIsCurrent(Generation) && Revision == _LLM_Agent_System1Revision) ? true : false
 }
 
 ; Render guard of the candidates: a strict Boolean the tooltip checks before
@@ -808,23 +824,23 @@ LLM_Agent_InvalidateTyping() {
  * @param {String} Sentence The sentence being typed.
  * @param {Map} Ctx Map("app", "tools").
  * @param {Func} OnTriage Called with the triage Map, or "" when there is none.
+ * @param {Func} Current Original typing and System 1 admission.
  * @returns {Boolean} False, with nothing sent, when the backend cannot be reached.
  */
-LLM_Agent_System1Request(Backend, Sentence, Ctx, OnTriage, Generation := -1) {
+LLM_Agent_System1Request(Backend, Sentence, Ctx, OnTriage, Current) {
 	global LLM_AGENT_JEV_STATE
-	Current := Generation >= 0 ? _LLM_Agent_RenderIsCurrent.Bind(Generation) : 0
 	if !_LLM_Vision_CallbackCurrent(Current)
 		return false
 	Config := LLM_Agent_Config()
 	if _LLM_Agent_IsJev(Backend)
 		return _LLM_Agent_Decide(Backend, _LLM_Agent_Fill(LLM_AGENT_JEV_STATE,
-			Map("app", Ctx.Get("app", ""), "text", Sentence)), Config, OnTriage, Generation)
+			Map("app", Ctx.Get("app", ""), "text", Sentence)), Config, OnTriage, Current)
 	Payload := Map(
 		"system", LLM_Agent_System1Prompt(Config, Ctx),
 		"user", Sentence,
 		"max_tokens", Config["system1"]["max_tokens"])
 	return _LLM_Agent_Chat(Backend, Payload, _LLM_Agent_OnSystem1Answer.Bind(Config, OnTriage),
-		_LLM_Agent_OnSystem1Fail.Bind(OnTriage, Generation), false, Current)
+		_LLM_Agent_OnSystem1Fail.Bind(OnTriage, Current), false, Current)
 }
 
 ; System 1 answered: hand its triage on.
@@ -845,8 +861,7 @@ _LLM_Agent_IsJev(Backend) {
 
 ; Asks Jev the triage question about a state: System 1's second transport.
 ; @returns {Boolean} False, with nothing sent, when the backend cannot be reached.
-_LLM_Agent_Decide(Backend, State, Config, OnTriage, Generation := -1) {
-	Current := Generation >= 0 ? _LLM_Agent_RenderIsCurrent.Bind(Generation) : 0
+_LLM_Agent_Decide(Backend, State, Config, OnTriage, Current) {
 	if !_LLM_Vision_CallbackCurrent(Current)
 		return false
 	Target := _LLM_Vision_ResolveTarget(Backend["backend"], Backend["model"], "AI agent")
@@ -857,7 +872,7 @@ _LLM_Agent_Decide(Backend, State, Config, OnTriage, Generation := -1) {
 	Questions := LLM_Agent_JevQuestions(Config)
 	if !_LLM_Vision_CallbackCurrent(Current)
 		return false
-	OnFail := _LLM_Agent_OnSystem1Fail.Bind(OnTriage, Generation)
+	OnFail := _LLM_Agent_OnSystem1Fail.Bind(OnTriage, Current)
 	if (Target["format"] == "decisions") {
 		LLM_RemoteDecisions_Async(Target["resolved"], State, Questions,
 			_LLM_Agent_OnJevAnswers.Bind(Config, OnTriage), OnFail)
@@ -890,19 +905,20 @@ _LLM_Agent_OnBackboardJev(Config, OnTriage, Response, Usage := "") {
 }
 
 ; The System 1 request failed: there is no triage.
-_LLM_Agent_OnSystem1Fail(OnTriage, Generation, Failure := "") {
-	global _LLM_Agent_Generation
-	if Generation >= 0 && (Generation != _LLM_Agent_Generation || A_IsSuspended)
+_LLM_Agent_OnSystem1Fail(OnTriage, Current, Failure := "") {
+	if !_LLM_Vision_CallbackCurrent(Current)
 		return
-	if LLM_LocalModelIsMissing(Failure) && Generation >= 0 && LLM_Agent_WatchesTyping()
-		LLM_LocalModelOffer(Failure, true, _LLM_Agent_RenderIsCurrent.Bind(Generation))
+	if LLM_LocalModelIsMissing(Failure) && LLM_Agent_WatchesTyping()
+		LLM_LocalModelOffer(Failure, true, Current)
 	LoggerWarn("LLM", "AI agent: the System 1 request failed ({1}).", _LLM_Vision_FailureReason(Failure))
 	OnTriage.Call("")
 }
 
 ; The typing paused: triage the current sentence when everything allows it.
 _LLM_Agent_OnPause(Generation, Buffer) {
-	global _LLM_Agent_Generation, _LLM_Agent_Auto, _LLM_Agent_SecureFieldFn
+	global _LLM_Agent_Generation, _LLM_Agent_Auto, _LLM_Agent_SecureFieldFn, _LLM_Agent_System1Revision
+	Revision := _LLM_Agent_System1Revision
+	Current := _LLM_Agent_TriageIsCurrent.Bind(Generation, Revision)
 	_LLM_Agent_Auto["timer"] := 0
 	if (Generation != _LLM_Agent_Generation) || A_IsSuspended
 		return false
@@ -940,14 +956,14 @@ _LLM_Agent_OnPause(Generation, Buffer) {
 	}
 	; Backend, secure-field and context reads can commit a withdrawal or
 	; admit a newer flow. Retire before caching this sentence or sending it.
-	if !_LLM_Agent_RenderIsCurrent(Generation)
+	if !Current.Call()
 		return false
 	_LLM_Agent_RememberTriaged(Sentence)
 	Flow := Map("generation", Generation, "source", "typing", "backend", System2, "auto", true,
-		"context", Ctx, "sentence", Sentence)
+		"context", Ctx, "sentence", Sentence, "system1_revision", Revision)
 	LoggerInfo("LLM", "AI agent #{1}: triage of {2} character(s) by System 1 '{3}'.", Generation,
 		StrLen(Sentence), System1["backend"])
-	if !LLM_Agent_System1Request(System1, Sentence, Ctx, _LLM_Agent_OnTriage.Bind(Flow), Generation) {
+	if !LLM_Agent_System1Request(System1, Sentence, Ctx, _LLM_Agent_OnTriage.Bind(Flow), Current) {
 		LoggerWarn("LLM", "AI agent #{1}: System 1 '{2}' has no API entry with a key.", Generation,
 			System1["backend"])
 		return false

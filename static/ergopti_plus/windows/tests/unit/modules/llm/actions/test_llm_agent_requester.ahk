@@ -346,6 +346,10 @@ _LAG_TriageCustody(Backend, Phase) {
 				switch Phase {
 					case "context-off": AssertTrue(LLM_Agent_SetMode("off"))
 					case "context-source": AssertTrue(_LLM_Agent_MenuSetBackend("agent_system2", ""))
+					case "context-source1": AssertTrue(_LLM_Agent_MenuSetBackend("agent_system1", ""))
+					case "context-source1aba":
+						AssertTrue(_LLM_Agent_MenuSetBackend("agent_system1", ""))
+						AssertTrue(_LLM_Agent_MenuSetBackend("agent_system1", Backend))
 					case "context-newer":
 						AssertTrue(_LAG_Invoke("llm_agent_selection"))
 						AssertEqual(1, Fx.Remote.Length, "the newer legitimate selection really dispatched")
@@ -371,3 +375,58 @@ for Backend in ["local", "cerebras", "backboard", "typesafe", "backboard|typesaf
 		Test("LLM agent: triage retains original requester " . Backend . " payload (agent-triage-custody)",
 			_LAG_TriageCustody.Bind(Backend, "payload"))
 }
+
+for Backend in ["local", "cerebras", "backboard", "typesafe", "backboard|typesafe/jev-latest"]
+	for Phase in ["context-source1", "context-source1aba"]
+		Test("LLM agent: System1 source withdrawal " . Backend . " " . Phase . " (agent-source1-custody)",
+			_LAG_TriageCustody.Bind(Backend, Phase))
+
+_LAG_Source1Held(Backend, Mode) {
+	_LAG_Run(_LAG_Menu("auto", Backend, "cerebras"), _LTN_Screen(""), Body)
+	Body(Fx, Lines, Sent) {
+		global _LLM_Agent_CommitFn, _LLM_Remote_BackboardExchanges
+		Owners := _LLM_Remote_BackboardExchanges.Clone()
+		try {
+			TooltipHide("AgentSource1", true)
+			AssertTrue(_LAG_Type(Fx, LAG_TYPED).Call(), "the genuine pause starts its original triage")
+			if InStr(Backend, "backboard") == 1 {
+				AssertEqual(1, Fx.Posts.Length, "the real exchange creates one assistant")
+				Fx.Posts[1]["on_success"].Call('{"assistant_id":"source1_assistant"}')
+				AssertEqual(2, Fx.Posts.Length, "the real continuation dispatches its triage message")
+				Request := Fx.Posts[2]
+			} else
+				Request := Backend == "local" ? Fx.Ollama[1] : Backend == "typesafe" ? Fx.Posts[1] : Fx.Remote[1]
+			Before := Fx.Remote.Length + Fx.Ollama.Length + Fx.Posts.Length
+			switch Mode {
+				case "off": AssertTrue(_LLM_Agent_MenuSetBackend("agent_system1", ""))
+				case "aba":
+					AssertTrue(_LLM_Agent_MenuSetBackend("agent_system1", ""))
+					AssertTrue(_LLM_Agent_MenuSetBackend("agent_system1", Backend))
+				case "same": AssertFalse(_LLM_Agent_MenuSetBackend("agent_system1", LLM_Vision_Parse(Backend)["backend"]))
+				case "refused":
+					_LLM_Agent_CommitFn := (*) => false
+					AssertFalse(_LLM_Agent_MenuSetBackend("agent_system1", ""))
+			}
+			Triage := "INTENT: calendar`nPROBABILITY: 0.9"
+			Raw := Backend == "typesafe" ? '{"answers":' . _LAG_JevAnswers("calendar") . '}'
+				: InStr(Backend, "backboard|") == 1 ? '{"system_one":{"answers":' . _LAG_JevAnswers("calendar") . '}}'
+				: Backend == "backboard" ? '{"content":' . JsonStringLiteral(Triage) . ',"status":"COMPLETED"}' : Triage
+			Request["on_success"].Call(Raw)
+			AssertEqual(Before + (Mode == "off" || Mode == "aba" ? 0 : 1),
+				Fx.Remote.Length + Fx.Ollama.Length + Fx.Posts.Length,
+				"only a still-admitted triage can wake System 2")
+			AssertEqual(0, Sent.Length)
+		} finally {
+			Retire := []
+			for Id, Owner in _LLM_Remote_BackboardExchanges
+				if !Owners.Has(Id)
+					Retire.Push(Owner)
+			for Owner in Retire
+				_LLMRemote_BackboardRetire(Owner, true)
+		}
+	}
+}
+for Backend in ["local", "cerebras", "backboard", "typesafe", "backboard|typesafe/jev-latest"]
+	for Mode in ["off", "aba", "same", "refused", "unchanged"]
+		Test("LLM agent: held System1 answer retains source " . Backend . " " . Mode . " (agent-source1-held)",
+			_LAG_Source1Held.Bind(Backend, Mode))

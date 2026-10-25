@@ -498,6 +498,7 @@ _LAG_Run(Menu, Screen, Body) {
 	global _LLM_Agent_PromptFn, _LLM_Agent_ContextProbe, _LLM_Agent_SourceProbe, _LLM_Agent_ConnectorFn
 	global _LLM_Agent_ScheduleFn, _LLM_Agent_StateReader, _LLM_Agent_StateWriter, _LLM_Agent_SecureFieldFn
 	global _LLM_Agent_CommitFn, _LLM_Agent_RebuildFn, _LLM_Agent_Generation, _LLM_Agent_Auto, _LLM_Agent_Learning
+	global _LLM_Agent_System1Revision
 	global _LLM_AgentConnector_Tools, _LLM_AgentConnector_ListFn, _LLM_AgentConnector_EnsureDirFn
 	global _Stub_LlmTooltipVisible, _Stub_LlmPresentedRecord
 	global _LLM_Remote_PostBodyFn, _LLM_Remote_BackboardAssistants
@@ -506,7 +507,7 @@ _LAG_Run(Menu, Screen, Body) {
 		Prompt: _LLM_Agent_PromptFn, Context: _LLM_Agent_ContextProbe, Source: _LLM_Agent_SourceProbe,
 		Connector: _LLM_Agent_ConnectorFn, Schedule: _LLM_Agent_ScheduleFn, Reader: _LLM_Agent_StateReader,
 		Writer: _LLM_Agent_StateWriter, Secure: _LLM_Agent_SecureFieldFn, Commit: _LLM_Agent_CommitFn,
-		Rebuild: _LLM_Agent_RebuildFn, Generation: _LLM_Agent_Generation, Auto: _LLM_Agent_Auto,
+		Rebuild: _LLM_Agent_RebuildFn, Generation: _LLM_Agent_Generation, Auto: _LLM_Agent_Auto, System1Revision: _LLM_Agent_System1Revision,
 		Learning: _LLM_Agent_Learning, Tools: _LLM_AgentConnector_Tools, List: _LLM_AgentConnector_ListFn,
 		Ensure: _LLM_AgentConnector_EnsureDirFn, Visible: _Stub_LlmTooltipVisible,
 		Presented: _Stub_LlmPresentedRecord, Post: _LLM_Remote_PostBodyFn,
@@ -556,6 +557,7 @@ _LAG_Run(Menu, Screen, Body) {
 		_LLM_Agent_CommitFn := Saved.Commit
 		_LLM_Agent_RebuildFn := Saved.Rebuild
 		_LLM_Agent_Generation := Saved.Generation
+		_LLM_Agent_System1Revision := Saved.System1Revision
 		_LLM_Agent_Auto := Saved.Auto
 		_LLM_Agent_Learning := Saved.Learning
 		_LLM_AgentConnector_Tools := Saved.Tools
