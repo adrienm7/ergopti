@@ -16,8 +16,8 @@ local function quote(value) return "'" .. tostring(value):gsub("'", "'\\''") .. 
 
 local function write(path, text)
 	local handle = assert(io.open(path, "wb"))
-	handle:write(text)
-	handle:close()
+	assert(handle:write(text))
+	assert(handle:close())
 end
 
 local function read(path)
@@ -29,8 +29,8 @@ local function read(path)
 end
 
 local function scratch()
-	local dir = os.tmpname()
-	os.remove(dir)
+	local uv = require("luv")
+	local dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-config-backup-XXXXXX"))
 	assert(os.execute("mkdir -p " .. quote(dir .. "/cfg/hotstrings") .. " " .. quote(dir .. "/state")
 		.. " " .. quote(dir .. "/cfg/metrics") .. " " .. quote(dir .. "/elsewhere")))
 	write(dir .. "/cfg/config.toml", "[script]\nlocale = \"fr\"\n")
@@ -91,5 +91,71 @@ helpers.describe("config_backup (Linux): real files", function()
 		Backup._overrides = nil
 		os.execute("rm -rf " .. quote(dir))
 		if not ok then error(err, 0) end
+	end)
+end)
+
+helpers.describe("config-backup-native-names", function()
+	for _, case in ipairs({
+		{ slug = "newline-file", relative = "personal\nnotes.toml" },
+		{ slug = "newline-directory", relative = "packs\nnested/personal.toml", folder = "packs\nnested" },
+	}) do
+		helpers.it("(config-backup-native-names) preserves " .. case.slug .. " through backup and restore", function()
+			local dir = scratch()
+			local Backup = helpers.load_module("modules.updater.config_backup")
+			Backup._overrides = { roots = { { id = "config", dir = dir .. "/cfg" } } }
+			local ok, err = pcall(function()
+				if case.folder then assert(require("luv").fs_mkdir(dir .. "/cfg/" .. case.folder, 448)) end
+				local target = dir .. "/cfg/" .. case.relative
+				local content = "[literal]\ntext = \"unchanged bytes\"\n"
+				write(target, content)
+				local owner = assert(Backup.owner())
+				local record, reason = owner.create("pre_install", { tag = "v1.2.3" })
+				helpers.assert_true(type(record) == "table", "literal native names must produce a complete backup: " .. tostring(reason))
+				helpers.assert_eq(read(record.path .. "/config/" .. case.relative), content)
+				local matches = 0
+				for _, file in ipairs(record.files) do
+					if file.root == "config" and file.path == case.relative then matches = matches + 1 end
+				end
+				helpers.assert_eq(matches, 1, "the manifest must retain the exact filename once")
+				write(target, "changed\n")
+				helpers.assert_eq(owner.restore(record.id), true)
+				helpers.assert_eq(read(target), content, "restoration must address the same native path")
+			end)
+			Backup._overrides = nil
+			os.execute("rm -rf " .. quote(dir))
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	helpers.it("(config-backup-native-names) a dangling link cannot block unrelated configuration backup", function()
+		local dir = scratch()
+		local Backup = helpers.load_module("modules.updater.config_backup")
+		Backup._overrides = { roots = { { id = "config", dir = dir .. "/cfg" } } }
+		local ok, err = pcall(function()
+			assert(require("luv").fs_symlink(dir .. "/not-here", dir .. "/cfg/dangling.toml"))
+			local owner = assert(Backup.owner())
+			local record, reason = owner.create("pre_install")
+			helpers.assert_true(type(record) == "table", "a dangling link is neither a file nor a directory: " .. tostring(reason))
+			helpers.assert_eq(read(record.path .. "/config/config.toml"), "[script]\nlocale = \"fr\"\n")
+			for _, file in ipairs(record.files) do
+				helpers.assert_true(file.path ~= "dangling.toml", "an absent target must never become a backup file")
+			end
+		end)
+		Backup._overrides = nil
+		os.execute("rm -rf " .. quote(dir))
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("(config-backup-native-names) EACCES cannot certify directory absence", function()
+		local uv = require("luv")
+		local dir = scratch()
+		local Backup = helpers.load_module("modules.updater.config_backup")
+		assert(uv.fs_chmod(dir, 0))
+		local called, entries, reason = pcall(Backup._list, dir .. "/cfg")
+		assert(uv.fs_chmod(dir, 448))
+		os.execute("rm -rf " .. quote(dir))
+		if not called then error(entries, 0) end
+		helpers.assert_eq(entries, nil)
+		helpers.assert_true(type(reason) == "string" and reason ~= "absent", "only ENOENT can mean absence")
 	end)
 end)
