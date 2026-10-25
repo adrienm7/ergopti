@@ -15,6 +15,7 @@ local Timings = require("infra.timings")
 local ShellRunner = require("adapters.shell_runner")
 local LibuvExit = require("infra.libuv_exit")
 local NativeTimer = require("infra.native_timer")
+local NumberPolicy = require("number_policy")
 local ProcessGroup = require("infra.libuv_process_group")
 local LOG = "adapters.file_digest"
 
@@ -176,11 +177,17 @@ function M.sha256(path, options, callback)
 		return false
 	end
 	local request_options = type(options) == "table" and options or {}
+	local timeout_ms = request_options.timeout_ms
+	if timeout_ms == nil then timeout_ms = DEFAULT_TIMEOUT_MS end
+	-- Admit the whole replacement before retiring an incumbent. Native timers
+	-- wrap negative delays, and coercion hid malformed caller deadlines.
+	if not NumberPolicy.within_timer_ceiling(timeout_ms) or timeout_ms <= 0 then
+		return reject("invalid digest deadline")
+	end
 	local owner = request_owner(request_options.owner)
 	if _active[owner] and not M.cancel(owner) then return reject("previous digest cancellation failed") end
 	if not luv or type(luv.spawn) ~= "function" then return reject("asynchronous digest unavailable") end
 
-	local timeout_ms = tonumber(request_options.timeout_ms) or DEFAULT_TIMEOUT_MS
 	local request = {
 		owner = owner,
 		callback = callback,
