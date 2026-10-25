@@ -83,10 +83,12 @@ local function native_backend()
 end
 
 --- Rejects rounded native inode identifiers instead of accepting false equality.
+--- Both adjacent differences must stay exact: doubles lose unit spacing at
+--- their precision boundary, while native integers retain it even across wrap.
 local function exact_identity(stat)
 	for _, value in ipairs({ stat.dev, stat.ino }) do
 		if type(value) ~= "string" and (type(value) ~= "number" or value < 0 or value % 1 ~= 0
-			or (not (math.type and math.type(value) == "integer") and value >= 2 ^ 53)) then return false end
+			or (value + 1) - value ~= 1 or value - (value - 1) ~= 1) then return false end
 	end
 	return stat.dev ~= nil and stat.ino ~= nil
 end

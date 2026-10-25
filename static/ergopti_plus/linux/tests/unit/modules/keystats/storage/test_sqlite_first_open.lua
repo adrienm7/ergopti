@@ -18,6 +18,16 @@ local HAS_SQLITE = (function()
 end)()
 
 helpers.describe("sqlite_writer: bootstrapping a new database", function()
+	helpers.it("sqlite-private-identities: preserves unit spacing across native ABI boundaries", function()
+		local quote = require("text_utils").shell_quote
+		local root = helpers.driver_root()
+		local fixture = root .. "/tests/hardware/run_sqlite_private_identities.lua"
+		for _, runtime in ipairs({ "luajit", "lua5.4" }) do
+			local status = os.execute("env -u LUA_PATH -u LUA_CPATH " .. runtime .. " " .. quote(fixture) .. " " .. quote(root))
+			helpers.assert_true(status == true or status == 0, "private inode identity precision failed in " .. runtime)
+		end
+	end)
+
 	helpers.it("sqlite-private-no-luv: preserves the genuine synchronous FFI contract", function()
 		local quote = require("text_utils").shell_quote
 		local root = helpers.driver_root()
