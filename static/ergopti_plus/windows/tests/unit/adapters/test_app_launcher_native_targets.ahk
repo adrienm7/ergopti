@@ -12,7 +12,8 @@
 
 _ALNT_Fixture() {
 	Stem := "ergopti_al_" . DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_" . A_TickCount
-	Root := A_Temp . "\" . Stem
+	; The native child reports a long image path even when Windows abbreviates A_Temp.
+	Root := FSResolveDirectoryPath(A_Temp) . "\" . Stem
 	Directory := Root . "\" . Stem . " with space"
 	try {
 		DirCreate(Directory)
