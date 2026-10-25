@@ -93,6 +93,12 @@ HTTPIsValidUtf8(Bytes, ByteCount) {
 		"Ptr", 0, "Int", 0, "Int") != 0
 }
 
+; Creates the WinHttp automation request for callers that poll one themselves.
+; @returns {ComObject} A new WinHttp.WinHttpRequest.5.1 object.
+HTTPCreateWinHttpRequest() {
+	return ComObject("WinHttp.WinHttpRequest.5.1")
+}
+
 _HTTP_CurlNextRequestId() {
 	global _HTTP_CURL_REQUEST_COUNTER
 	PreviousCritical := Critical("On")

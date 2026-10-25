@@ -306,7 +306,7 @@ HealthCheck_Config() {
 		"redaction",     JsonParse(RawRedaction),
 		"raw_redaction", RawRedaction,
 		"templates",     JsonParse(FileRead(_SharedDir . "\modules\diagnostics\issue_templates.json", "UTF-8")),
-		"day_log",       DayLog_CheckLimits(JsonParse(FileRead(_SharedDir . "\modules\diagnostics\day_log.json", "UTF-8"))),
+		"day_log",       DayLog_CheckLimits(JsonParse(FSReadStrict(_SharedDir . "\modules\diagnostics\day_log.json"))),
 		"repository",    JsonParse(FileRead(_SharedDir . "\modules\updater\defaults.json", "UTF-8"))["github"])
 	return _HC_Config
 }

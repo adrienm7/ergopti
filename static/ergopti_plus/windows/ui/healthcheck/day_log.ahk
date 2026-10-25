@@ -167,7 +167,7 @@ _DayLog_ReadToday(Cap) {
 	if (Path == "" || !FileExist(Path))
 		return Map("found", false, "size", 0, "text", "")
 	Size := FileGetSize(Path)
-	return Map("found", true, "size", Size, "text", (Size > Cap) ? "" : FileRead(Path, "UTF-8"))
+	return Map("found", true, "size", Size, "text", (Size > Cap) ? "" : FSReadStrict(Path))
 }
 
 ; The page's answer for a collection result.
