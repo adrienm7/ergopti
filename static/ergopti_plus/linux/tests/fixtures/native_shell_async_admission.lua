@@ -120,14 +120,19 @@ for _, operation in ipairs({ "timer", "stdout", "stderr", "second pipe raised", 
 		assert(ran and token == nil and type(reason) == "string" and reason ~= "",
 			"startup failure did not return the production nil/error refusal contract")
 		assert(state.callbacks == 0, "startup refusal also published a callback")
-		local expected_allocations = operation == "second pipe raised" and 1 or operation == "timer allocation nil" and 2 or 3
+		local expected_allocations = operation == "second pipe raised" and 1 or operation == "timer allocation nil" and 2 or 4
 		assert(#state.allocations == expected_allocations, "fixture did not acquire the expected real allocations")
-		for _, handle in ipairs(state.allocations) do assert(uv.is_closing(handle), "production retained a native allocation") end
 		if operation == "stdout" or operation == "stderr" then
+			local monitors = 0
+			for _, handle in ipairs(state.allocations) do
+				if not uv.is_closing(handle) then monitors = monitors + 1 end
+			end
+			assert(monitors == 1, "native group retirement must retain its exact cleanup monitor")
 			assert(state.pid, "native reader refusal must occur after actual child dispatch")
 		else assert(state.pid == nil, "pre-spawn refusal still dispatched a child") end
 		drain()
 		if state.pid then absent(state.pid) end
+		for _, handle in ipairs(state.allocations) do assert(uv.is_closing(handle), "production retained a native allocation") end
 		assert(state.callbacks == 0, "late real child exit published a refused run")
 	end)
 end

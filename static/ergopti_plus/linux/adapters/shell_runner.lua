@@ -44,11 +44,10 @@ local Logger = require("logger.shim")
 local Heredoc = require("shell.heredoc")
 local Monotonic = require("infra.monotonic")
 local RuntimeLog = require("diagnostics.runtime_log")
-local LibuvExit = require("infra.libuv_exit")
-local NativeTimer = require("infra.native_timer")
 local Perf = require("infra.perf_counters")
 local PhaseStats = require("infra.phase_stats")
 local NumberPolicy = require("number_policy")
+local OwnedProcess = require("adapters.owned_process")
 local ok_luv, luv = pcall(require, "luv")
 if not ok_luv then luv = nil end
 
@@ -483,64 +482,6 @@ M.HAS_ASYNC = luv ~= nil
 -- a version line or a df row, never a stream
 local ASYNC_MAX_OUTPUT_BYTES = require("llm.process_limits").defaults().max_output_bytes
 
---- Closes one libuv handle at most once.
---- @param handle any
-local function close_handle(handle)
-	if not handle then return end
-	local ok, closing = pcall(luv.is_closing, handle)
-	if not (ok and closing == true) then pcall(luv.close, handle) end
-end
-
---- Stops a child's whole process group.
---- @param request table
-local function stop_group(request)
-	-- A descendant can retain the pipes after libuv reaps the group leader.
-	-- The deadline and cancellation still own that group until terminal cleanup.
-	if not request.pid then return end
-	pcall(luv.kill, -request.pid, "sigterm")
-	-- A deadline must also retire children that ignore SIGTERM, or libuv keeps
-	-- their process handles alive indefinitely. The other argv runner does this too.
-	local ok, status, detail, code = pcall(luv.kill, -request.pid, "sigkill")
-	if not ok or (status == nil and code ~= "ESRCH") then
-		Logger.error(LOG, "run_async(): could not stop pid %s — %s.",
-			tostring(request.pid), tostring(detail or status))
-	end
-end
-
---- Publishes one terminal result and releases every handle.
---- @param request table
---- @param result table { ok, code, stdout, stderr, error }
-local function finish_async(request, result)
-	if request.terminal then return end
-	request.terminal = true
-	pcall(luv.timer_stop, request.timer)
-	close_handle(request.timer)
-	for _, field in ipairs({ "stdout", "stderr" }) do
-		if request[field] then
-			pcall(luv.read_stop, request[field])
-			close_handle(request[field])
-		end
-	end
-	if request.exited then close_handle(request.process) end
-	_record_exit(request.name, result.code or -1, Monotonic.now_ms() - request.started)
-	if request.silent then return end
-	local ok, err = pcall(request.callback, result)
-	if not ok then Logger.error(LOG, "run_async() callback for %s raised: %s.", request.name, tostring(err)) end
-end
-
---- Completes once the child has exited and both pipes have ended.
---- @param request table
-local function maybe_finish(request)
-	if request.terminal or not request.exited or not request.stdout_eof or not request.stderr_eof then return end
-	finish_async(request, {
-		ok     = request.code == 0,
-		code   = request.code,
-		stdout = request.stdout_text,
-		stderr = request.stderr_text,
-		error  = request.code ~= 0 and ("exit code " .. tostring(request.code)) or nil,
-	})
-end
-
 --- Runs a program without a shell and without blocking the event loop.
 --- @param executable string Program name or absolute path.
 --- @param args table Array of string arguments.
@@ -557,81 +498,48 @@ function M.run_async(executable, args, options, callback)
 	if not NumberPolicy.within_timer_ceiling(timeout_ms) or timeout_ms <= 0 then
 		return nil, "a positive timeout_ms within the timer ceiling is required"
 	end
-	local request = {
-		name = executable, callback = callback, started = Monotonic.now_ms(),
-		stdout_text = "", stderr_text = "", stdout_eof = false, stderr_eof = false,
-		exited = false, terminal = false, silent = false,
-	}
-	local function refuse(reason)
-		-- The caller reports synchronous admission failures from nil/error.
-		-- A reader can fail after spawn; retire that group without also delivering
-		-- a callback, while the late exit still closes its owned process handle.
-		request.silent = true
-		stop_group(request)
-		finish_async(request, { ok = false, error = reason })
+	local request = { name = executable, started = Monotonic.now_ms(), constructing = true, admitted = false }
+	local pending
+	local function record(result)
+		if request.recorded then return end
+		request.recorded = true
+		_record_exit(request.name, result.exit_code or -1, Monotonic.now_ms() - request.started)
+	end
+	local function publish(result)
+		if request.constructing then pending = result; return end
+		if not request.admitted then return end
+		local reason = result.error
+		local code = result.exit_code
+		if reason == "process deadline exceeded" then reason, code = "timeout", nil
+		elseif reason == "process output exceeds its bound" then
+			reason, code = "output over " .. ASYNC_MAX_OUTPUT_BYTES .. " bytes", nil
+		elseif reason == "process exited unsuccessfully" then reason = "exit code " .. tostring(code) end
+		local answer = { ok = result.ok, code = code, stdout = result.stdout, stderr = result.stderr, error = reason }
+		record(result)
+		local ok, err = pcall(callback, answer)
+		if not ok then Logger.error(LOG, "run_async() callback for %s raised: %s.", request.name, tostring(err)) end
+	end
+	local operation = OwnedProcess.start(executable, args, {
+		owner = "shell_runner:" .. tostring(request), timeout_ms = timeout_ms,
+		max_output_bytes = ASYNC_MAX_OUTPUT_BYTES,
+	}, publish)
+	request.constructing = false
+	-- Cancellation suppresses business delivery, not native exit diagnostics.
+	operation:on_settled(function() record(operation.result) end)
+	if not operation.started or operation.error ~= nil then
+		local reason = operation.error or "native process admission refused"
+		if reason == "native handle allocation failed" then reason = "handle allocation failed"
+		elseif reason == "native process deadline refused" then reason = "timeout activation failed"
+		elseif reason == "native output watch refused" then reason = "pipe activation failed"
+		elseif reason == "native process dispatch failed" then
+			reason = "spawn failed: " .. (operation.spawn_error_code or reason)
+		end
 		return nil, reason
 	end
-	local allocated, allocation_error = pcall(function()
-		-- Capture ownership before the next constructor can refuse or raise.
-		request.stdout = luv.new_pipe(false)
-		if not request.stdout then error("stdout allocation refused", 0) end
-		request.stderr = luv.new_pipe(false)
-		if not request.stderr then error("stderr allocation refused", 0) end
-		request.timer = luv.new_timer()
-		if not request.timer then error("timer allocation refused", 0) end
-	end)
-	if not allocated then return refuse("handle allocation failed: " .. tostring(allocation_error)) end
-	local timer_ok, timer_started, timer_error = pcall(NativeTimer.start, luv, request.timer, timeout_ms, 0, function()
-		stop_group(request)
-		finish_async(request, { ok = false, error = "timeout" })
-	end)
-	if not timer_ok or timer_started == nil or timer_started == false then
-		return refuse("timeout activation failed: " .. tostring(timer_ok and timer_error or timer_started))
-	end
-	local spawned, process, pid = pcall(luv.spawn, executable, {
-		args = args, stdio = { nil, request.stdout, request.stderr }, detached = true,
-	}, function(code, signal)
-		request.exited = true
-		request.code = LibuvExit.status(code, signal)
-		maybe_finish(request)
-		if request.terminal then close_handle(request.process) end
-	end)
-	if not spawned or not process then
-		-- No child was dispatched. Callers handle this synchronous refusal from
-		-- the return value; invoking their completion callback would report twice.
-		local reason = "spawn failed: " .. tostring(pid or process)
-		return refuse(reason)
-	end
-	request.process, request.pid = process, pid
-	for _, stream in ipairs({ { "stdout", "stdout_text", "stdout_eof" }, { "stderr", "stderr_text", "stderr_eof" } }) do
-		local field, text, eof = stream[1], stream[2], stream[3]
-		local read_ok, read_started, read_error = pcall(luv.read_start, request[field], function(err, chunk)
-			if request.terminal then return end
-			if err then
-				stop_group(request)
-				finish_async(request, { ok = false, error = tostring(err) })
-			elseif chunk == nil then
-				request[eof] = true
-				maybe_finish(request)
-			elseif #request[text] + #chunk > ASYNC_MAX_OUTPUT_BYTES then
-				stop_group(request)
-				finish_async(request, { ok = false, error = "output over " .. ASYNC_MAX_OUTPUT_BYTES .. " bytes" })
-			else
-				request[text] = request[text] .. chunk
-			end
-		end)
-		if not read_ok or read_started == nil or read_started == false then
-			return refuse(field .. " activation failed: " .. tostring(read_ok and read_error or read_started))
-		end
-	end
-	return {
-		cancel = function()
-			if request.terminal then return end
-			request.silent = true
-			stop_group(request)
-			finish_async(request, { ok = false, error = "cancelled" })
-		end,
-	}
+	request.admitted = true
+	if pending then publish(pending) end
+	return { cancel = function() return operation:cancel() end }
+
 end
 
 

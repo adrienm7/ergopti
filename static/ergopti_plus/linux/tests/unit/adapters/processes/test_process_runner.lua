@@ -167,15 +167,22 @@ helpers.describe("process_runner: asynchronous argv processes", function()
 				local dispatched, results = start(runner, "python3", {}, { timeout_ms = 100 })
 				helpers.assert_eq(dispatched, false)
 				helpers.assert_eq(#results, 0, "supervision refusal cannot publish before native retirement")
-				state.finish(0)
+				if operation == "timer" then
+					helpers.assert_eq(#state.spawns, 0, "deadline refusal must precede native child dispatch")
+					helpers.assert_eq(#state.kills, 0)
+					for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closing) end
+					state.drain()
+				else
+					state.finish(0)
+					helpers.assert_eq(state.kills, { { pid = -7001, signal = "sigterm" }, { pid = -7001, signal = "sigkill" } })
+					helpers.assert_true(state.options.stdio[2].closing)
+					helpers.assert_true(state.options.stdio[3].closing)
+					state.exit_callback(0, 0)
+				end
 				helpers.assert_eq(#results, 1)
 				helpers.assert_eq(results[1].exit_code, -1)
 				helpers.assert_eq(results[1].error, "process supervision could not start")
-				helpers.assert_eq(state.kills, { { pid = -7001, signal = "sigterm" }, { pid = -7001, signal = "sigkill" } })
 				helpers.assert_true(state.timer.closing)
-				helpers.assert_true(state.options.stdio[2].closing)
-				helpers.assert_true(state.options.stdio[3].closing)
-				state.exit_callback(0, 0)
 				helpers.assert_eq(#results, 1, "late exit must not publish the refusal twice")
 			end)
 		end

@@ -10,7 +10,6 @@
 
 local M = {}
 local Logger = require("logger.shim")
-local Shell = require("adapters.shell_runner")
 local Exit = require("infra.libuv_exit")
 local Group = require("infra.libuv_process_group")
 local NativeTimer = require("infra.native_timer")
@@ -292,8 +291,11 @@ end
 --- @param args table Pure string argument vector.
 --- @param options table { owner, timeout_ms?, max_output_bytes?, capture_tail?, capture_output?, authorized?, on_output?, env?, cwd? }.
 --- @param callback function Called after physical settlement unless cancelled/stale.
---- @return table operation { started, error, not_found?, cleanup_error, result, cancel, is_running, is_settled, on_settled }.
+--- @return table operation { started, error, not_found?, spawn_error_code?, cleanup_error, result, cancel, is_running, is_settled, on_settled }.
 function M.start(executable, args, options, callback)
+	-- ShellRunner uses this owner too. Resolve its pure argv validator only
+	-- after both modules have completed initialization, avoiding a require cycle.
+	local Shell = require("adapters.shell_runner")
 	options = type(options) == "table" and options or {}
 	local request = {
 		owner = options.owner, options = options, callback = callback,
@@ -411,6 +413,14 @@ function M.start(executable, args, options, callback)
 	end
 	-- The source can change while a fallible allocator invokes another owner.
 	if not authorized(request) then return refuse("process source admission refused") end
+	if request.timeout and not request.terminal then
+		request.handles[request.timeout].active = true
+		if not accepted(NativeTimer.start, native, request.timeout, options.timeout_ms, 0, function()
+			finish(request, "process deadline exceeded")
+		end) then return refuse("native process deadline refused") end
+	end
+	if request.terminal then return refuse("process deadline exceeded") end
+	if not authorized(request) then return refuse("process source admission refused") end
 	local spawned, process, pid, spawn_code = pcall(native.spawn, executable, {
 		args = args, stdio = { request.stdin, request.stdout, request.stderr },
 		detached = true, env = options.env, cwd = options.cwd,
@@ -422,6 +432,9 @@ function M.start(executable, args, options, callback)
 	end)
 	if not spawned or not process then
 		operation.not_found = spawned and spawn_code == "ENOENT"
+		if spawned and type(spawn_code) == "string" and spawn_code:match("^E[A-Z]+$") then
+			operation.spawn_error_code = spawn_code
+		end
 		return refuse("native process dispatch failed")
 	end
 	if not own_handle(request, process, "process") then return refuse("native process handle malformed") end
@@ -466,12 +479,6 @@ function M.start(executable, args, options, callback)
 			end
 		end)
 		if not started then return refuse("native output watch refused") end
-	end
-	if request.timeout and not request.terminal then
-		request.handles[request.timeout].active = true
-		if not accepted(NativeTimer.start, native, request.timeout, options.timeout_ms, 0, function()
-			finish(request, "process deadline exceeded")
-		end) then return refuse("native process deadline refused") end
 	end
 	request.dispatching = false
 	if request.stdin_owner and stdin_settled(request) then close_handle(request, request.stdin) end
