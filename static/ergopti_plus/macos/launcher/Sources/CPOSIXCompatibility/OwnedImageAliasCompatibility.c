@@ -79,19 +79,28 @@ int ergopti_image_alias_create(int source, const char *directory, const char *no
 	if (!S_ISREG(named.st_mode) || original.st_dev != named.st_dev || original.st_ino != named.st_ino) { return ESTALE; }
 	if ((fcntl(source, F_GETFL) & O_ACCMODE) != O_RDONLY || original.st_nlink != 1
 		|| (original.st_mode & 0111) == 0) { return EPERM; }
+	// Retain the expected source vnode and preflight the final descriptor slot
+	// before creating entries. The spare slot is returned for the lease open.
+	alias->image_fd = fcntl(source, F_DUPFD_CLOEXEC, 0);
+	if (alias->image_fd < 0) { return errno; }
+	int lease_capacity = fcntl(alias->directory_fd, F_DUPFD_CLOEXEC, 0);
+	if (lease_capacity < 0) { return errno; }
+	if ((error = close_local(alias, lease_capacity)) != 0) { return error; }
+	alias->device = (uint64_t)(uint32_t)original.st_dev; alias->inode = (uint64_t)original.st_ino;
 	char lease[64], image[64]; names(alias, lease, image);
 	if (mkdirat(alias->directory_fd, lease, 0700) != 0) { return errno; }
 	alias->lease_created = 1;
 	alias->lease_fd = openat(alias->directory_fd, lease, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+	if (alias->lease_fd < 0) { return errno; }
 	struct stat reserved;
 	if ((error = identity(alias->lease_fd, &reserved, 1)) != 0) { return error; }
 	alias->lease_device = (uint64_t)(uint32_t)reserved.st_dev; alias->lease_inode = (uint64_t)reserved.st_ino;
 	if (linkat(alias->directory_fd, "ollama", alias->directory_fd, image, 0) != 0) { return errno; }
 	alias->image_created = 1;
-	alias->image_fd = openat(alias->directory_fd, image, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
 	if ((error = identity(alias->image_fd, &linked, 0)) != 0) { return error; }
-	alias->device = (uint64_t)(uint32_t)linked.st_dev; alias->inode = (uint64_t)linked.st_ino;
-	if (linked.st_dev != original.st_dev || linked.st_ino != original.st_ino || linked.st_nlink != 2) { return ESTALE; }
+	if (fstatat(alias->directory_fd, image, &named, AT_SYMLINK_NOFOLLOW) != 0) { return errno; }
+	if (!S_ISREG(named.st_mode) || named.st_dev != linked.st_dev || named.st_ino != linked.st_ino
+		|| linked.st_dev != original.st_dev || linked.st_ino != original.st_ino || linked.st_nlink != 2) { return ESTALE; }
 	return 0;
 }
 int ergopti_image_alias_admit(const char *directory, const char *nonce, uint64_t directory_device,
