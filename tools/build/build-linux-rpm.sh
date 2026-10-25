@@ -198,13 +198,13 @@ hotstring engine, keystroke metrics, and AI-assisted text expansion. It runs
 as a user daemon on Linux via systemd.
 
 %prep
-# Nothing to prep — files are staged directly.
+%setup -q
 
 %install
 rm -rf %{buildroot}
 mkdir -p %{buildroot}
-# Driver files are in %{_builddir} (the BUILD directory).
-cp -r %{_builddir}/ergopti-%{version}/* %{buildroot}/
+# RPM owns the extracted source cwd; _builddir itself changes on newer RPM.
+cp -r . "%{buildroot}/"
 
 %files
 /usr/lib/ergopti/
@@ -231,6 +231,11 @@ fi
 SPEC_EOF
 
 echo "  SPEC: $RPM_ROOT/SPECS/ergopti.spec"
+
+# Source0 is the package handoff. RPM may relocate its build directory, so it
+# must extract its own complete source tree rather than reach into our staging.
+tar -czf "$RPM_ROOT/SOURCES/${PACKAGE_NAME}-${VERSION}.tar.gz" \
+  -C "$RPM_ROOT/BUILD" "${PACKAGE_NAME}-${VERSION}"
 
 # ----------------------------------------------------------------------
 # 9. Build the .rpm (Linux only)
