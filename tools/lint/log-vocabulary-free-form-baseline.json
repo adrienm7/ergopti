@@ -4,7 +4,6 @@
 		"static/ergopti_plus/linux/adapters/owned_process.lua": 1,
 		"static/ergopti_plus/linux/adapters/process_runner.lua": 11,
 		"static/ergopti_plus/linux/adapters/screen_capture.lua": 3,
-		"static/ergopti_plus/linux/adapters/shell_runner.lua": 1,
 		"static/ergopti_plus/linux/modules/gestures/touchpad_finder.lua": 3,
 		"static/ergopti_plus/linux/modules/llm/local_model_offer.lua": 1,
 		"static/ergopti_plus/linux/modules/updater/installer.lua": 5,
