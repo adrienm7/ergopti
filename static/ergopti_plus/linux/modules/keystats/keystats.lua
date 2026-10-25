@@ -209,6 +209,7 @@ local _title_entered_at = nil
 -- incoming application credits nothing (its titles table has no such row)
 -- and every later keystroke misses its count the same way. Declared here in
 -- the state section, beside the two locals it belongs with.
+local _current_title_app = nil
 
 local _flushed_app_titles = {}
 local _flushed_app_holds = {}
@@ -391,7 +392,7 @@ end
 -- Opaque producer authority: excluded time can never be reconstructed on release.
 local _hold_token = {}
 local _hold_focus_app = nil
-local settle_hold_policy
+local settle_capture_policy
 
 -- Base directory for log file persistence (JSON fallback).
 local _log_dir = nil
@@ -1359,9 +1360,14 @@ function M.is_context_protected(app_id, title)
 end
 
 local hold_password_app = M.is_unrecorded_app
-settle_hold_policy = function()
+settle_capture_policy = function()
 	if not may_record() or hold_password_app(_hold_focus_app) then
 		_hold_token = {}
+		-- Privacy can close while the same window stays focused. Retire its
+		-- open intervals now: waiting for a focus callback lets the periodic
+		-- flush credit forbidden time, and reopening backfills the old title.
+		_focused_app_id, _focused_app_started_at = nil, nil
+		_current_title, _title_since, _title_entered_at, _current_title_app = nil, nil, nil, nil
 		return false
 	end
 	return true
@@ -1371,13 +1377,13 @@ end
 --- @param app_id string|nil Current foreground application, retained only in memory.
 function M.observe_hold_focus(app_id)
 	_hold_focus_app = type(app_id) == "string" and app_id ~= "" and app_id or nil
-	settle_hold_policy()
+	settle_capture_policy()
 end
 
 --- Returns the current admission identity for physical hold measurements.
 --- @return table|nil token Opaque authority, never a duration or input payload.
 function M.hold_accounting_token()
-	if not settle_hold_policy() then return nil end
+	if not settle_capture_policy() then return nil end
 	return _hold_token
 end
 
@@ -1490,7 +1496,7 @@ end
 function M.suppress()
 	if not _suppressed then
 		_suppressed = true
-		settle_hold_policy()
+		settle_capture_policy()
 		Logger.debug(LOG, "Keystroke logging suppressed (password field detected).")
 	end
 end
@@ -1514,7 +1520,7 @@ end
 function M.suspend_collection()
 	if not _suspended then
 		_suspended = true
-		settle_hold_policy()
+		settle_capture_policy()
 		Logger.info(LOG, "Metrics collection suspended by the user.")
 	end
 end
@@ -1544,7 +1550,7 @@ function M.set_enabled(enabled)
 		return false
 	end
 	_enabled = wanted
-	settle_hold_policy()
+	settle_capture_policy()
 	Logger.debug(LOG, "Metrics collection: %s.", tostring(_enabled))
 	return true
 end
@@ -1559,7 +1565,7 @@ end
 --- @param is_private boolean
 function M.set_private_window(is_private)
 	_private_window = (is_private == true)
-	settle_hold_policy()
+	settle_capture_policy()
 	Logger.debug(LOG, "Private browsing window: %s.", tostring(_private_window))
 end
 
@@ -1568,7 +1574,7 @@ end
 --- @param is_secure boolean
 function M.set_secure_field(is_secure)
 	_secure_field = (is_secure == true)
-	settle_hold_policy()
+	settle_capture_policy()
 	Logger.debug(LOG, "Secure field focused: %s.", tostring(_secure_field))
 end
 
@@ -1593,7 +1599,7 @@ function M.set_private_filter_enabled(enabled)
 		return false
 	end
 	_private_filter_enabled = wanted
-	settle_hold_policy()
+	settle_capture_policy()
 	Logger.debug(LOG, "Private-browsing filter: %s.", tostring(_private_filter_enabled))
 	return true
 end
@@ -1628,7 +1634,7 @@ function M.set_disabled_apps(apps)
 	_disabled_list = {}
 	for index, app in ipairs(apps) do _disabled_list[index] = app end
 	_disabled_apps = exclusion_set(_disabled_list)
-	settle_hold_policy()
+	settle_capture_policy()
 	Logger.debug(LOG, "Excluded applications: %d.", #apps)
 	return true
 end
@@ -1643,7 +1649,7 @@ function M.set_secure_filter_enabled(enabled)
 		return false
 	end
 	_secure_filter_enabled = wanted
-	settle_hold_policy()
+	settle_capture_policy()
 	Logger.debug(LOG, "Secure-field filter: %s.", tostring(_secure_filter_enabled))
 	return true
 end
@@ -1658,7 +1664,7 @@ function M.set_system_auth_filter_enabled(enabled)
 		return false
 	end
 	_system_auth_filter_enabled = wanted
-	settle_hold_policy()
+	settle_capture_policy()
 	Logger.debug(LOG, "System-auth filter: %s.", tostring(_system_auth_filter_enabled))
 	return true
 end
@@ -1786,7 +1792,7 @@ function M.apply_configuration(candidate)
 	_disabled_list = {}
 	for index, app in ipairs(candidate.disabled_apps) do _disabled_list[index] = app end
 	_disabled_apps = exclusion_set(_disabled_list)
-	settle_hold_policy()
+	settle_capture_policy()
 	Logger.debug(LOG, "Collector configuration applied without historical conversion.")
 	return true
 end
