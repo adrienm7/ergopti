@@ -88,8 +88,9 @@ LLM_ToneActions() {
  */
 LLM_Tone_Trigger(Direction, Cycle) {
 	global _LLM_Tone_Generation
-	_LLM_Tone_Generation += 1
-	if !LLM_SelectionReader().Call(_LLM_Tone_OnSelection.Bind(_LLM_Tone_Generation, Direction, Cycle)) {
+	AuxGeneration := LLM_AuxGeneration()
+	Generation := ++_LLM_Tone_Generation
+	if !LLM_SelectionReader().Call(_LLM_Tone_OnSelection.Bind(Generation, AuxGeneration, Direction, Cycle)) {
 		LoggerInfo("LLM", "Tone step skipped: the selection could not be read (paused or clipboard busy).")
 		return false
 	}
@@ -118,13 +119,14 @@ LLM_SelectionReader() {
 
 ; The selection arrived: plan the step, apply the refusals, send the request.
 ; @param {Integer} Generation The step's generation.
+; @param {Integer} AuxGeneration The backend lifecycle at the original trigger.
 ; @param {Integer} Direction The ladder direction.
 ; @param {Boolean} Cycle Whether to wrap around.
 ; @param {String} Text The selected text ("" when nothing is selected).
-_LLM_Tone_OnSelection(Generation, Direction, Cycle, Text) {
+_LLM_Tone_OnSelection(Generation, AuxGeneration, Direction, Cycle, Text) {
 	global _LLM_Tone_Generation, _LLM_Tone_Memory, _LLM_Menu, LLM_TONE_MORE_FORMAL
-	if (Generation != _LLM_Tone_Generation) {
-		LoggerDebug("LLM", "Tone step dropped: a newer step superseded it before the selection arrived.")
+	if !_LLM_Tone_GenerationCurrent(Generation, AuxGeneration) {
+		LoggerDebug("LLM", "Tone step dropped: its request lifecycle ended before the selection arrived.")
 		return
 	}
 	Plan := LLM_Tone_Plan(Text, _LLM_Tone_Memory, Direction, Cycle, &Reason)
@@ -149,6 +151,7 @@ _LLM_Tone_OnSelection(Generation, Direction, Cycle, Text) {
 	; The selection would leave an app the user excluded from the AI
 	if _LLM_Engine_ShouldSuppressForDisabledApps()
 		return
+	Plan["aux_generation"] := AuxGeneration
 	_LLM_Tone_Dispatch(Generation, Plan, _LLM_Tone_CurrentFocus())
 }
 
@@ -159,6 +162,9 @@ _LLM_Tone_OnSelection(Generation, Direction, Cycle, Text) {
 ; @returns {Boolean} True when the request was sent.
 _LLM_Tone_Dispatch(Generation, Plan, Focus) {
 	global _LLM_Engine
+	AuxGeneration := Plan["aux_generation"]
+	if !_LLM_Tone_OutputCurrent(Generation, Focus, AuxGeneration)
+		return false
 	ProfileId := Plan["profile_id"]
 	Profile := LLM_FindProfile(ProfileId, _LLM_Engine.Get("user_profiles", []))
 	if !(Profile is Map) {
@@ -175,7 +181,7 @@ _LLM_Tone_Dispatch(Generation, Plan, Focus) {
 	MaxTokens := LLM_Rewrite_MaxTokens(Source)
 	Temperature := _LLM_Engine["temperature"] + 0.0
 	OnSuccess := _LLM_Tone_OnAnswer.Bind(Generation, Plan, Focus)
-	OnFail := _LLM_Tone_OnFail.Bind(Generation, ProfileId)
+	OnFail := _LLM_Tone_OnFail.Bind(Generation, AuxGeneration, ProfileId)
 	Backend := _LLM_Engine.Get("backend", "ollama")
 	Entry := ""
 	if (Backend == "api") {
@@ -192,6 +198,9 @@ _LLM_Tone_Dispatch(Generation, Plan, Focus) {
 	_LLM_Engine["last_request_tick"] := A_TickCount
 	; The size of the selection, never its content: it is the user's own text
 	LoggerInfo("LLM", "Tone step requested with '{1}' ({2} character(s)).", ProfileId, StrLen(Source))
+	; Profile/entry readers, cancellation and logging can withdraw this request.
+	if !_LLM_Tone_OutputCurrent(Generation, Focus, AuxGeneration)
+		return false
 	; PREFIX and TAIL are both the text to rewrite: a selection has no context
 	if (Backend == "api")
 		_LLM_Engine_ResolveRemoteTransport().Call(Entry, SystemPrompt, Source, Temperature,
@@ -211,12 +220,8 @@ _LLM_Tone_Dispatch(Generation, Plan, Focus) {
 ; @param {Func} SendFn Optional sender; resolved at call time.
 _LLM_Tone_OnAnswer(Generation, Plan, Focus, Raw, Meta := "", SendFn := unset) {
 	global _LLM_Tone_Generation
-	if (Generation != _LLM_Tone_Generation) {
-		LoggerInfo("LLM", "Tone answer ignored: a newer step superseded it.")
-		return
-	}
-	if A_IsSuspended {
-		LoggerInfo("LLM", "Tone answer dropped: the driver is paused.")
+	if !_LLM_Tone_RequestCurrent(Generation, Plan["aux_generation"]) {
+		LoggerInfo("LLM", "Tone answer ignored: a newer step superseded it or its backend lifecycle ended.")
 		return
 	}
 	Text := LLM_Tone_Extract(Raw)
@@ -225,7 +230,7 @@ _LLM_Tone_OnAnswer(Generation, Plan, Focus, Raw, Meta := "", SendFn := unset) {
 			(Raw is String) ? StrLen(Raw) : 0)
 		return
 	}
-	if !_LLM_Tone_OutputCurrent(Generation, Focus) {
+	if !_LLM_Tone_OutputCurrent(Generation, Focus, Plan["aux_generation"]) {
 		LoggerInfo("LLM", "Tone answer dropped: its step was superseded or the focus moved to another window.")
 		return
 	}
@@ -234,7 +239,7 @@ _LLM_Tone_OnAnswer(Generation, Plan, Focus, Raw, Meta := "", SendFn := unset) {
 		"mode", "auto",
 		"atomic_input", true,
 		; Checked again at the instant the keys are sent
-		"admission", _LLM_Tone_OutputCurrent.Bind(Generation, Focus)
+		"admission", _LLM_Tone_OutputCurrent.Bind(Generation, Focus, Plan["aux_generation"])
 	)
 	if !IsSet(SendFn)
 		SendFn := TextSend
@@ -257,7 +262,7 @@ _LLM_Tone_OnTyped(Generation, Plan, Focus, Text, Ok, ErrorMessage := "", SelectF
 		LoggerInfo("LLM", "Tone rewrite not typed: {1}.", ErrorMessage)
 		return
 	}
-	if !_LLM_Tone_OutputCurrent(Generation, Focus) or A_IsSuspended {
+	if !_LLM_Tone_OutputCurrent(Generation, Focus, Plan["aux_generation"]) or A_IsSuspended {
 		LoggerInfo("LLM", "Tone completion dropped: its step or focused control is no longer current, or the driver is paused.")
 		return
 	}
@@ -269,7 +274,7 @@ _LLM_Tone_OnTyped(Generation, Plan, Focus, Text, Ok, ErrorMessage := "", SelectF
 		LoggerWarn("LLM", "Tone rewrite typed but not selected again.")
 	; The selection sender may finish yielding effects before it returns. A
 	; newer step owns the memory even when the old selection was admitted.
-	if !_LLM_Tone_OutputCurrent(Generation, Focus) or A_IsSuspended {
+	if !_LLM_Tone_OutputCurrent(Generation, Focus, Plan["aux_generation"]) or A_IsSuspended {
 		LoggerInfo("LLM", "Tone completion memory dropped: its output owner was retired during selection.")
 		return
 	}
@@ -280,11 +285,11 @@ _LLM_Tone_OnTyped(Generation, Plan, Focus, Text, Ok, ErrorMessage := "", SelectF
 
 ; The request failed: nothing is typed.
 ; @param {Integer} Generation The step's generation.
+; @param {Integer} AuxGeneration The backend lifecycle at the original trigger.
 ; @param {String} ProfileId The ladder profile it ran.
 ; @param {Map} Failure Remote failure details, when the backend gives them.
-_LLM_Tone_OnFail(Generation, ProfileId, Failure := "") {
-	global _LLM_Tone_Generation
-	if (Generation != _LLM_Tone_Generation)
+_LLM_Tone_OnFail(Generation, AuxGeneration, ProfileId, Failure := "") {
+	if !_LLM_Tone_RequestCurrent(Generation, AuxGeneration)
 		return
 	Reason := (Failure is Map) ? Failure.Get("reason", "") : ""
 	LoggerWarn("LLM", "Tone step with '{1}' failed{2}.", ProfileId,
@@ -325,11 +330,23 @@ _LLM_Tone_FocusUnchanged(Focus) {
 ; Recheck after the focus probe: the probe can finish a newer callback.
 ; @param {Integer} Generation The step which produced the rewrite.
 ; @param {String} Focus The focused window and control captured at dispatch.
-; @returns {Integer} True only while the same step and focus remain current.
-_LLM_Tone_OutputCurrent(Generation, Focus) {
-	global _LLM_Tone_Generation
-	if Generation != _LLM_Tone_Generation
+; @param {Integer} AuxGeneration The backend lifecycle at the original trigger.
+; @returns {Integer} True only while the same step, backend and focus remain current.
+_LLM_Tone_OutputCurrent(Generation, Focus, AuxGeneration) {
+	if !_LLM_Tone_RequestCurrent(Generation, AuxGeneration)
 		return false
 	FocusCurrent := _LLM_Tone_FocusUnchanged(Focus)
-	return FocusCurrent and Generation == _LLM_Tone_Generation
+	return FocusCurrent && _LLM_Tone_RequestCurrent(Generation, AuxGeneration)
+}
+
+; A step cannot borrow authority from a backend disabled and enabled again.
+_LLM_Tone_GenerationCurrent(Generation, AuxGeneration) {
+	global _LLM_Tone_Generation
+	return Generation == _LLM_Tone_Generation && AuxGeneration == LLM_AuxGeneration()
+}
+
+_LLM_Tone_RequestCurrent(Generation, AuxGeneration) {
+	global _LLM_Menu
+	return _LLM_Tone_GenerationCurrent(Generation, AuxGeneration) && !A_IsSuspended
+		&& _LLM_Menu is Map && _LLM_Menu.Get("enabled", false) == true
 }

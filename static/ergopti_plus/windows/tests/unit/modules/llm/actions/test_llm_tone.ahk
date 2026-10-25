@@ -375,6 +375,10 @@ _LTQ_Focus(State) {
 		State.RevokeOnProbe := false
 		_LLM_Tone_Generation += 1
 	}
+	if State.WithdrawOnProbe {
+		State.WithdrawOnProbe := false
+		_LTQ_BackendWithdraw()
+	}
 	return State.Focus
 }
 
@@ -387,25 +391,39 @@ _LTQ_Select(State, Count) {
 	}
 	if State.PauseOnSelect
 		Suspend(true)
+	if State.WithdrawOnSelect
+		_LTQ_BackendWithdraw()
 	return true
+}
+
+_LTQ_BackendWithdraw() {
+	global _LLM_Menu
+	_LLM_Menu["enabled"] := false
+	LLM_AuxInvalidate("tone test disable")
+	_LLM_Menu["enabled"] := true
 }
 
 _LTQ_Case(Mode) {
 	global _LLM_Tone_Generation, _LLM_Tone_Memory
 	global _LLM_Tone_ReadSelection, _LLM_Tone_FocusProbe
+	global _LLM_Menu, _LLM_AuxGeneration, _LLM_AuxOwners
 	Saved := { Generation: _LLM_Tone_Generation, Memory: _LLM_Tone_Memory,
-		Reader: _LLM_Tone_ReadSelection, Probe: _LLM_Tone_FocusProbe, Suspended: A_IsSuspended }
+		Reader: _LLM_Tone_ReadSelection, Probe: _LLM_Tone_FocusProbe, Suspended: A_IsSuspended,
+		Menu: _LLM_Menu, Epoch: _LLM_AuxGeneration, Owners: _LLM_AuxOwners }
 	State := { Focus: "owned-control", RevokeOnProbe: false, RevokeOnSelect: false,
-		PauseOnSelect: false,
+		PauseOnSelect: false, WithdrawOnSelect: false, WithdrawOnProbe: false,
 		ReadAccepted: false, Reads: 0, Sends: 0, Selects: [],
 		NewMemory: Map("source", "new source", "output", "new output", "level", 2) }
 	InitialMemory := Map("source", "retained source", "output", "retained output", "level", 1)
 	try {
+		_LLM_Menu := Map("enabled", true)
+		_LLM_AuxOwners := Map()
 		_LLM_Tone_Generation := 41
 		_LLM_Tone_Memory := InitialMemory
 		_LLM_Tone_ReadSelection := _LTQ_SelectionReader.Bind(State)
 		_LLM_Tone_FocusProbe := _LTQ_Focus.Bind(State)
-		Plan := Map("source", "original selection", "level", 3, "profile_id", "tone_formal")
+		Plan := Map("source", "original selection", "level", 3, "profile_id", "tone_formal",
+			"aux_generation", LLM_AuxGeneration())
 		Rewrite := "Thank you " . Chr(0x1F600)
 		_LLM_Tone_OnAnswer(41, Plan, State.Focus, "REWRITE: " . Rewrite, "",
 			_LTQ_Capture.Bind(State))
@@ -461,6 +479,22 @@ _LTQ_Case(Mode) {
 				State.Callback.Call(true, "", _LTQ_Select.Bind(State))
 				AssertEqual(1, State.Selects.Length, "the selection was admitted before the pause callout")
 				AssertTrue(_LLM_Tone_Memory == InitialMemory, "memory publication must stop after a pause callout")
+			case "backend admission", "disabled admission", "backend probe":
+				if Mode == "backend admission"
+					_LTQ_BackendWithdraw()
+				else if Mode == "disabled admission"
+					_LLM_Menu["enabled"] := false
+				else
+					State.WithdrawOnProbe := true
+				AssertFalse(State.Opts["admission"].Call(), "withdrawn backend authority cannot admit queued tone output")
+			case "backend completion", "backend selection":
+				if Mode == "backend completion"
+					_LTQ_BackendWithdraw()
+				else
+					State.WithdrawOnSelect := true
+				State.Callback.Call(true, "", _LTQ_Select.Bind(State))
+				AssertEqual(Mode == "backend selection" ? 1 : 0, State.Selects.Length)
+				AssertTrue(_LLM_Tone_Memory == InitialMemory, "backend retirement prevents stale completion memory")
 			case "failed completion":
 				State.Callback.Call(false, "recorded refusal", _LTQ_Select.Bind(State))
 				AssertEqual(0, State.Selects.Length, "failed output must not select any text")
@@ -475,6 +509,9 @@ _LTQ_Case(Mode) {
 			_LLM_Tone_Memory := Saved.Memory
 			_LLM_Tone_ReadSelection := Saved.Reader
 			_LLM_Tone_FocusProbe := Saved.Probe
+			_LLM_Menu := Saved.Menu
+			_LLM_AuxGeneration := Saved.Epoch
+			_LLM_AuxOwners := Saved.Owners
 		}
 	}
 }
@@ -482,6 +519,46 @@ _LTQ_Case(Mode) {
 for _LTQ_Mode in ["current admission", "accepted supersession", "refused supersession",
 		"focus admission", "probe supersession", "current completion", "superseded completion",
 		"focus completion", "probe completion", "selection supersession", "paused completion",
-		"selection pause", "failed completion"] {
+		"selection pause", "failed completion", "backend admission", "disabled admission",
+		"backend probe", "backend completion", "backend selection"] {
 	Test("LLM tone: deferred " . _LTQ_Mode . " (tone-deferred-owner)", _LTQ_Case.Bind(_LTQ_Mode))
 }
+
+
+; The tone action replaces text automatically, so disabling its backend must
+; revoke retained selection and answer callbacks independently of another step.
+_LTN_BackendRetirement(Phase) {
+	_LTN_Run(_LPP_Menu(), _LTN_Screen("merci pour ton aide"), _Body)
+	_Body(Calls, Lines, Sent) {
+		global _LLM_Menu, _LLM_AuxGeneration, _LLM_AuxOwners, _LLM_Tone_ReadSelection
+		Epoch := _LLM_AuxGeneration, Owners := _LLM_AuxOwners
+		Pending := []
+		try {
+			_LLM_AuxOwners := Map()
+			if Phase == "selection"
+				_LLM_Tone_ReadSelection := (OnReady) => (Pending.Push(OnReady), true)
+			AssertTrue(LLM_Tone_Trigger(LLM_TONE_MORE_FORMAL, false))
+			if Phase != "selection"
+				AssertEqual(1, Calls.Length, "the original request is in flight")
+			_LLM_Menu["enabled"] := false
+			if Phase != "disabled" {
+				LLM_AuxInvalidate("tone test disable")
+				_LLM_Menu["enabled"] := true
+			}
+			if Phase == "selection" {
+				AssertEqual(1, Pending.Length, "the original selection is retained")
+				Pending[1].Call("merci pour ton aide")
+				AssertEqual(0, Calls.Length, "a retired selection cannot start a tone request")
+			} else {
+				_LPP_Answer(Calls[1], "REWRITE: Thank you for your help.")
+				AssertEqual(0, Sent.Length, "the disabled or retired tone answer cannot type into the document")
+			}
+		} finally {
+			_LLM_AuxGeneration := Epoch
+			_LLM_AuxOwners := Owners
+		}
+	}
+}
+Test("LLM tone: disabling AI rejects an automatic rewrite (tone-backend-retirement)", _LTN_BackendRetirement.Bind("disabled"))
+Test("LLM tone: backend retirement rejects a delayed answer (tone-backend-retirement)", _LTN_BackendRetirement.Bind("answer"))
+Test("LLM tone: backend retirement rejects a delayed selection (tone-backend-retirement)", _LTN_BackendRetirement.Bind("selection"))
