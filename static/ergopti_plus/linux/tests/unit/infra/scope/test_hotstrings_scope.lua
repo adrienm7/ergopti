@@ -278,7 +278,9 @@ helpers.describe("hotstrings scope: clear", function()
 				end
 			end
 			helpers.assert_nil(config.hotstrings.trigger_char)
-			helpers.assert_nil(config.hotstrings.preview_ai_enabled, "clear removes the stored AI preview choice")
+			-- An entry active by default restores its preset when its key is deleted,
+			-- so a clear writes its declared off value instead of removing it.
+			helpers.assert_eq(config.hotstrings.preview_ai_enabled, false, "clear writes the AI preview off value")
 			helpers.assert_nil(config.hotstrings.dynamic.date.enabled)
 			helpers.assert_eq(config.hotstrings.unknown, "kept")
 			local overrides = Codec.decode(read(c.override_path))
@@ -293,8 +295,8 @@ helpers.describe("hotstrings scope: clear", function()
 				helpers.assert_eq(fires(c.engine, mapping.trigger, mapping.replacement), false, "nothing fires after clear")
 			end
 			helpers.assert_eq(c.RepeatKey.is_enabled(), false)
-			-- The switch returns to its neutral default; AI itself stays behind llm.enabled.
-			helpers.assert_eq(c.preview.ai, require("infra.manifest_reader").default_for("hotstrings.preview_ai_enabled"))
+			-- The switch is cleared off; AI itself stays behind llm.enabled.
+			helpers.assert_eq(c.preview.ai, false)
 		end)
 	end)
 end)

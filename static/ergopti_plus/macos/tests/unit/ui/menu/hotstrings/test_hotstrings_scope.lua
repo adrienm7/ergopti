@@ -518,14 +518,16 @@ helpers.describe("macOS hotstrings scope", function()
 		for _, family in ipairs(COMMON_FAMILIES) do
 			helpers.assert_nil(((decoded.hotstrings.modules or {}).autocorrection or {})[family])
 		end
-		helpers.assert_nil(decoded.hotstrings.preview_ai_enabled)
+		-- An entry active by default restores its preset when deleted, so the clear
+		-- writes its declared off value.
+		helpers.assert_eq(decoded.hotstrings.preview_ai_enabled, false)
 		helpers.assert_eq(decoded.hotstrings.future, { keep = 1 })
 		helpers.assert_eq(f.engine.stops, 1)
 		helpers.assert_eq(f.state.keymap, false)
-		-- The previews ship on (PAR-24): clearing deletes the row, whose default is
-		-- the value already running, so the AI preview is neither re-applied nor revoked.
-		helpers.assert_nil(f.km.previews.ai, "an unchanged preview is not re-applied")
-		helpers.assert_eq(f.state.preview_ai_enabled, true)
+		-- The previews ship on but a clear writes their declared off value, so the
+		-- running AI preview is switched off with the stored row.
+		helpers.assert_eq(f.km.previews.ai, false, "the cleared preview is applied off")
+		helpers.assert_eq(f.state.preview_ai_enabled, false)
 		helpers.assert_eq(f.km.is_group_enabled("autocorrection"), false)
 		for _, family in ipairs(COMMON_FAMILIES) do
 			helpers.assert_eq(f.km.is_section_enabled("autocorrection", family), false)
