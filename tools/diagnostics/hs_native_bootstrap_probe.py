@@ -17,6 +17,7 @@ import secrets
 import signal
 import stat
 import subprocess
+import tempfile
 import time
 
 from hs_delayed_timer_probe import (
@@ -87,9 +88,20 @@ def read_receipt(path, limit=RECEIPT_BYTE_LIMIT):
 
 
 def publish(path, value):
-    """Publish one fresh gate-owned input without replacing an existing answer."""
-    with path.open("x", encoding="utf-8") as handle:
-        handle.write(json.dumps(value, ensure_ascii=False) + "\n")
+    """Expose complete gate-owned JSON with an atomic create-only handoff."""
+    content = json.dumps(value, ensure_ascii=False) + "\n"
+    temporary = tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=path.parent, prefix=f".{path.name}.", delete=False
+    )
+    try:
+        with temporary as handle:
+            handle.write(content)
+        # The native timer may read immediately after the final name appears.
+        # Linking the closed sibling publishes all bytes without replacing a
+        # competing input, including a dangling symlink.
+        os.link(temporary.name, path)
+    finally:
+        os.unlink(temporary.name)
 
 
 def module_roots(app):
