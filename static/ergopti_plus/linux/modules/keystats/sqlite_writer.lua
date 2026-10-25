@@ -414,21 +414,24 @@ function M.open_db(db_path)
 			end
 			Logger.success(LOG, "Schema bootstrapped successfully.")
 		end
-
-		_bootstrapped = true
 	end
 	if not _ensure_linux_device_schema() then
 		Logger.error(LOG, "Unable to upgrade device registry for Linux support.")
+		_bootstrapped = false
 		_db_path = nil
 		return false
 	end
 
 	if not _ensure_media_schema() then
 		_media_policy = nil
+		_bootstrapped = false
 		_db_path = nil
 		return false
 	end
 
+	-- This admission belongs to the successfully opened store. A failed
+	-- initializer must never let another path skip its canonical bootstrap.
+	_bootstrapped = true
 	Logger.debug(LOG, "SQLite database open: %s", _db_path)
 	return true
 end
