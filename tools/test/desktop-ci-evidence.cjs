@@ -770,5 +770,6 @@ module.exports = {
 	verifyColdBootstrapRecords,
 	recordColdMac,
 	readColdBootstrapEvidence,
-	recordWindowsUpgrade
+	recordWindowsUpgrade,
+	currentSchemaVersion
 };
