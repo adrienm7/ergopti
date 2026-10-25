@@ -5,11 +5,9 @@
  * MODULE: Tap-Hold Threshold Parity
  * DESCRIPTION:
  * The tap-vs-hold threshold decides how long a key must be held before the hold
- * action fires instead of the tap. It is declared twice in
- * _shared/tap_hold/defaults.toml — per key under `[tap_hold.keys.*]`, which
- * Windows and Linux read, and once globally under `[hs_timeouts]`, which macOS
- * reads. The two namespaces describe the same seven physical keys and neither
- * loader looks at the other's headers.
+ * action fires instead of the tap. It is declared per key under `[tap_hold.keys.*]`
+ * in _shared/tap_hold/defaults.toml, which every driver reads (macOS through the
+ * catalogue's `hs` ids), plus one fallback in the timing registry.
  *
  * WHAT THIS CAUGHT:
  * macOS sat at 1000 ms against 200-350 ms on the other two — a 3-5x divergence
@@ -19,15 +17,13 @@
  * Nothing compared the two numbers, and nothing could: they live under headers
  * the other driver ignores, and both are valid TOML.
  *
- * WHY A RANGE AND NOT AN EQUALITY:
- * macOS ships one global threshold where the others ship one value per key; a
- * per-key override exists there (the menu's per-key delay row and its
- * "use global" reset), but the shipped default is the global. The two
- * namespaces also spell the same keys differently (left_ctrl/left_control,
- * left_alt/left_option), so the shipped values cannot be compared key by key.
- * Requiring equality today would fail on arrival and be deleted. Requiring that
- * the global sits INSIDE the per-key range is true now, is what "the same
- * keyboard feels the same" actually means, and still fails on a 1000.
+ * ONE DECLARATION (PAR-15):
+ * macOS no longer ships its own global. A key takes the `time_activation_seconds`
+ * of `[tap_hold.keys.<id>]` for the catalogue id its `hs` column names, and a key
+ * with none of its own takes the timing registry's tap_hold.default_activation_ms,
+ * the fallback Linux reads and the Windows literal TAPHOLD_DEFAULT_ACTIVATION_SECONDS
+ * is pinned to below. The per-key values are pinned exactly, so changing one is a
+ * deliberate edit of this table.
  * ==============================================================================
  */
 
@@ -66,45 +62,99 @@ if (perKey.length === 0) {
 	);
 }
 
-// ===== 2) The single global macOS reads =====
+// ===== 2) The fallback is ONE value, in the timing registry =====
 
-const globalMatch = /\[hs_timeouts\][\s\S]*?tap_hold_timeout_ms\s*=\s*(\d+)/.exec(src);
-if (!globalMatch) {
-	errors.push('[hs_timeouts] declares no tap_hold_timeout_ms — macOS has no threshold to read.');
+const REGISTRY = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'modules',
+	'timings',
+	'constants.toml'
+);
+const registrySrc = fs.readFileSync(REGISTRY, 'utf8');
+const fallbackMatch = /^default_activation_ms\s*=\s*(\d+)/m.exec(registrySrc);
+if (!fallbackMatch) {
+	errors.push('the timing registry [tap_hold] declares no default_activation_ms.');
 }
-const globalMs = globalMatch ? parseInt(globalMatch[1], 10) : null;
+const fallbackMs = fallbackMatch ? parseInt(fallbackMatch[1], 10) : null;
+if (/^\s*tap_hold_timeout_ms\s*=/m.test(src)) {
+	errors.push(
+		'[hs_timeouts] declares tap_hold_timeout_ms: macOS reads the per-key [tap_hold.keys.*] ' +
+			"values and the timing registry's tap_hold.default_activation_ms, never a second declaration."
+	);
+}
 
-// ===== 3) The global must live inside the per-key range =====
+// Windows keeps the fallback as a literal that its unit tests pin; it must equal the registry.
+const AHK_LOADER = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'windows',
+	'platform',
+	'remap',
+	'tap_hold_loader.ahk'
+);
+const ahkMatch = /^global TAPHOLD_DEFAULT_ACTIVATION_SECONDS\s*:=\s*([0-9.]+)/m.exec(
+	fs.readFileSync(AHK_LOADER, 'utf8')
+);
+if (!ahkMatch || fallbackMs === null || Math.round(parseFloat(ahkMatch[1]) * 1000) !== fallbackMs) {
+	errors.push(
+		`TAPHOLD_DEFAULT_ACTIVATION_SECONDS (${ahkMatch ? ahkMatch[1] : 'missing'}) must equal ` +
+			`the registry's default_activation_ms (${fallbackMs}).`
+	);
+}
 
-if (perKey.length > 0 && globalMs !== null) {
-	const values = perKey.map((k) => k.ms);
-	const lo = Math.min(...values);
-	const hi = Math.max(...values);
+// Linux and macOS read the registry value, never a literal of their own.
+const LINUX_LOADER = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'linux',
+	'platform',
+	'remap',
+	'tap_hold_loader.lua'
+);
+if (
+	!/FALLBACK_THRESHOLD_SECONDS\s*=\s*require\("infra\.timings"\)\.ms\("tap_hold", "default_activation_ms"\)/.test(
+		fs.readFileSync(LINUX_LOADER, 'utf8')
+	)
+) {
+	errors.push(
+		'linux tap_hold_loader.lua must read FALLBACK_THRESHOLD_SECONDS from the timing registry.'
+	);
+}
+const MACOS_DEFAULTS_SRC = fs.readFileSync(
+	path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'platform', 'remap', 'defaults.lua'),
+	'utf8'
+);
+if (
+	!/D\.tap_hold_timeout_ms\s*=\s*require\("infra\.timings"\)\.ms\("tap_hold", "default_activation_ms"\)/.test(
+		MACOS_DEFAULTS_SRC
+	) ||
+	!/D\.tap_hold_key_timeouts_ms\s*=\s*require\("tap_hold\.key_catalog"\)\.load_thresholds\(/.test(
+		MACOS_DEFAULTS_SRC
+	)
+) {
+	errors.push(
+		'macos/platform/remap/defaults.lua must read the global from the registry and the per-key ' +
+			'thresholds through the shared catalogue (key_catalog.load_thresholds).'
+	);
+}
 
-	if (globalMs < lo || globalMs > hi) {
-		const near = globalMs < lo ? lo : hi;
-		errors.push(
-			`macOS's global tap-hold threshold is ${globalMs} ms while Windows and Linux use ` +
-				`${lo}-${hi} ms per key — ${Math.abs(globalMs - near)} ms outside the range, ` +
-				`${(globalMs / near).toFixed(1)}x the nearest. That is the same setting on the same ` +
-				'keyboard behaving differently by platform: a hold that registers instantly on one ' +
-				'driver takes a noticeable beat on the other, and a deliberate tap that overruns the ' +
-				'threshold silently becomes a hold. Set it inside the range, or move the per-key ' +
-				'values with it.'
-		);
-	}
+// ===== 3) Every threshold lives inside a usable band =====
 
-	// A threshold outside human tapping range is wrong on every platform, whatever
-	// the others say — this catches all three drifting together, which a pure
-	// parity check cannot.
+if (perKey.length > 0 && fallbackMs !== null) {
+	// A threshold outside human tapping range is wrong on every platform: below
+	// the band ordinary typing fires holds, above it every hold waits.
 	const SANE_LO_MS = 100;
 	const SANE_HI_MS = 500;
-	for (const { key, ms } of perKey.concat([{ key: 'hs_timeouts global', ms: globalMs }])) {
+	for (const { key, ms } of perKey.concat([{ key: 'default_activation_ms', ms: fallbackMs }])) {
 		if (ms < SANE_LO_MS || ms > SANE_HI_MS) {
 			errors.push(
 				`${key}: ${ms} ms is outside the ${SANE_LO_MS}-${SANE_HI_MS} ms band a tap-hold ` +
-					'threshold can usefully occupy. Below it, ordinary typing fires holds; above it, ' +
-					'every hold waits.'
+					'threshold can usefully occupy.'
 			);
 		}
 	}
@@ -112,9 +162,8 @@ if (perKey.length > 0 && globalMs !== null) {
 
 // ===== 4) The shipped values themselves (PAR-15) =====
 //
-// The range above lets one driver drift inside it. The shipped thresholds are a
-// decision, so they are pinned exactly: changing one is a deliberate edit of this
-// table, never a side effect. macOS ships one global value inside the per-key range.
+// The shipped thresholds are a decision, so they are pinned exactly: changing one
+// is a deliberate edit of this table, never a side effect.
 
 const EXPECTED_PER_KEY_MS = {
 	caps_lock: 350,
@@ -125,7 +174,7 @@ const EXPECTED_PER_KEY_MS = {
 	alt_gr: 200,
 	tab: 200
 };
-const EXPECTED_MACOS_GLOBAL_MS = 250;
+const EXPECTED_FALLBACK_MS = 200;
 
 const actualPerKey = Object.fromEntries(perKey.map((k) => [k.key, k.ms]));
 if (JSON.stringify(actualPerKey) !== JSON.stringify(EXPECTED_PER_KEY_MS)) {
@@ -134,9 +183,9 @@ if (JSON.stringify(actualPerKey) !== JSON.stringify(EXPECTED_PER_KEY_MS)) {
 			`${JSON.stringify(EXPECTED_PER_KEY_MS)}. Change the shipped value and this table together.`
 	);
 }
-if (globalMs !== EXPECTED_MACOS_GLOBAL_MS) {
+if (fallbackMs !== EXPECTED_FALLBACK_MS) {
 	errors.push(
-		`macOS's global threshold is ${globalMs} ms, expected ${EXPECTED_MACOS_GLOBAL_MS} ms. ` +
+		`the fallback threshold is ${fallbackMs} ms, expected ${EXPECTED_FALLBACK_MS} ms. ` +
 			'Change the shipped value and this table together.'
 	);
 }
@@ -153,18 +202,7 @@ if (/^\s*sticky_timeout_ms\s*=/m.test(src)) {
 			'tap_hold.one_shot_shift_timeout_ms on every driver, never a second declaration.'
 	);
 }
-const REGISTRY = path.join(
-	ROOT,
-	'static',
-	'ergopti_plus',
-	'_shared',
-	'modules',
-	'timings',
-	'constants.toml'
-);
-const registryOneShot = /^one_shot_shift_timeout_ms\s*=\s*(\d+)/m.exec(
-	fs.readFileSync(REGISTRY, 'utf8')
-);
+const registryOneShot = /^one_shot_shift_timeout_ms\s*=\s*(\d+)/m.exec(registrySrc);
 if (!registryOneShot || parseInt(registryOneShot[1], 10) !== 2000) {
 	errors.push('the timing registry must declare one_shot_shift_timeout_ms = 2000.');
 }
@@ -197,6 +235,5 @@ if (errors.length > 0) {
 const values = perKey.map((k) => k.ms);
 console.log(
 	`\x1b[32m[OK] tap-hold thresholds agree — ${perKey.length} per-key value(s) spanning ` +
-		`${Math.min(...values)}-${Math.max(...values)} ms, macOS global ${globalMs} ms inside that ` +
-		`range.\x1b[0m`
+		`${Math.min(...values)}-${Math.max(...values)} ms, one ${fallbackMs} ms fallback.\x1b[0m`
 );

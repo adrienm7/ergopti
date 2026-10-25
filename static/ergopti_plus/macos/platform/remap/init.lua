@@ -4893,7 +4893,7 @@ function M.set_hold_action(key_id, action_id)
 end
 
 --- Returns the per-key tap/hold threshold override in milliseconds, or nil when
---- the key inherits the global tap/hold timeout (no per-key customisation).
+--- the key keeps its default (M.get_tap_default_timeout).
 --- @param key_id string Key id.
 --- @return number|nil Per-key override in milliseconds, or nil.
 function M.get_tap_timeout(key_id)
@@ -4902,10 +4902,20 @@ function M.get_tap_timeout(key_id)
 	return cfg and tonumber(cfg.timeout_ms) or nil
 end
 
+--- Returns the threshold a key has when it carries no override of its own: the
+--- value Windows and Linux ship for it (shared [tap_hold.keys.*]), else the
+--- global tap/hold timeout. The menu shows it and "use default" returns to it.
+--- @param key_id string Key id.
+--- @return number|nil Milliseconds, nil before the state exists.
+function M.get_tap_default_timeout(key_id)
+	if not require_state("get_tap_default_timeout") then return nil end
+	return Defaults.tap_hold_key_timeouts_ms[key_id] or _state.tap_hold_timeout_ms
+end
+
 --- Sets or clears the per-key tap/hold threshold override and persists it.
---- A positive value overrides the global timeout for this key only; nil or a
---- non-positive value clears the override so the key inherits the single global
---- value again — no stale per-key literal is left behind. Does NOT regenerate.
+--- A positive value overrides the default for this key only; nil or a
+--- non-positive value clears the override so the key takes its default
+--- again — no stale per-key literal is left behind. Does NOT regenerate.
 --- @param key_id string Key id.
 --- @param ms number|nil Per-key override in milliseconds, or nil to clear.
 function M.set_tap_timeout(key_id, ms)

@@ -965,7 +965,7 @@ end
 --- @param key_def table Entry from TAP_HOLD_KEYS.
 --- @param tap_action table Resolved action definition for the tap slot.
 --- @param hold_action table Resolved action definition for the hold slot.
---- @param tap_timeout_ms number|nil Per-key tap/hold threshold override in ms; nil inherits the global.
+--- @param tap_timeout_ms number|nil Per-key tap/hold threshold in ms (the user's override, else the shared default); nil inherits the global.
 --- @param typing_priority boolean|nil False only when reconstructing historical rules.
 --- @return table Karabiner rule object.
 local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout_ms, typing_priority)
@@ -2009,10 +2009,15 @@ function M.build_karabiner_json(
 			Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
 			return nil, err
 		end
-		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, per_key_ms)
+		-- A key without an override of its own takes the threshold Windows and Linux
+		-- ship for it (the shared [tap_hold.keys.*]); a key with none of its own
+		-- inherits the global parameter.
+		local effective_ms = per_key_ms or Defaults.tap_hold_key_timeouts_ms[key_def.id]
+		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, effective_ms)
 		if rule then
 			all_rules[#all_rules + 1] = rule
-			-- Historical ownership evidence must retain the pre-timer graph.
+			-- Historical ownership evidence must retain the pre-timer graph: only
+			-- the user's own override ever existed there.
 			legacy_tap_hold_rules[rule] = build_tap_hold_rule(key_def, tap_action, hold_action, per_key_ms, false)
 			if key_def.from.key_code ~= SCRIPT_CONTROL_HOLDER_KEY then
 				tap_hold_feature_rules[rule] = true

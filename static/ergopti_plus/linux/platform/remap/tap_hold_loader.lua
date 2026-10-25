@@ -39,9 +39,10 @@ local Shapes = require("platform.remap.tap_hold_shapes")
 
 local LOG = "platform.remap.tap_hold_loader"
 
--- The Windows loader's bounds and fallback for time_activation_seconds.
+-- The Windows loader's bound for time_activation_seconds; the fallback is the
+-- timing registry's, the one declaration every driver reads or is pinned to.
 local MAX_THRESHOLD_SECONDS = 10
-M.FALLBACK_THRESHOLD_SECONDS = 0.2
+M.FALLBACK_THRESHOLD_SECONDS = require("infra.timings").ms("tap_hold", "default_activation_ms") / 1000
 
 local STRING_FIELDS = { "tap_action", "hold_modifier", "hold_layer" }
 

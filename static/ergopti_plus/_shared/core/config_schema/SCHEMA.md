@@ -174,9 +174,11 @@ agree with each other, and each one's own comments claim it matches the others:
 
 The two namespaces in that one file describe the **same seven physical keys**
 under different ids (`left_ctrl`/`left_control`, `left_alt`/`left_option`), with
-different thresholds (0.2–0.35 s per key vs one global 250 ms inside that
-range, with a per-key override on macOS; `tools/test/test-tap-hold-threshold-parity.cjs`
-pins every value) and, in places, different actions — `caps_lock` holds `ctrl`
+the **same thresholds** (the `[tap_hold.keys.*]` values, which macOS reads
+through the catalogue's `hs` ids, and the timing registry's
+`tap_hold.default_activation_ms` for a key with none;
+`tools/test/test-tap-hold-threshold-parity.cjs` pins every value) and, in
+places, different actions — `caps_lock` holds `ctrl`
 under `[tap_hold.*]` and `cmd` under `[hs_tap_hold]`. Which shipped actions the
 three drivers should share is the maintainer decision recorded as PAR-17; this
 section documents what is true today so nobody edits the file believing it

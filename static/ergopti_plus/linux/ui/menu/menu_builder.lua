@@ -4652,7 +4652,7 @@ local function _build_tap_holds(ctx)
 		local guard, setter = edit_guard("set_threshold")
 		if not guard then changed(false); return false end
 		local value = prompt_text(i18n_safe("menu.tapholds.key_tap_delay_dialog_title"),
-			string.format(i18n_safe("menu.tapholds.key_tap_delay_dialog_prompt"), current_ms),
+			string.format(i18n_safe("menu.tapholds.key_tap_delay_dialog_prompt_current"), current_ms),
 			tostring(current_ms))
 		if value == nil then return false end
 		local ms = tonumber(value)

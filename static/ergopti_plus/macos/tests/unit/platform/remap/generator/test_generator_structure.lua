@@ -508,6 +508,48 @@ helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout overr
 			"timeout_ms <= 0 must resolve to the managed default at manipulator scope")
 	end)
 
+	-- PAR-15: a macOS key takes the threshold Windows and Linux ship for it
+	-- (shared [tap_hold.keys.*], by the catalogue's `hs` id), not the global.
+	local function manipulator_of(key_def, config)
+		local state = make_state({ tap_hold_config = { [key_def.id] = config } })
+		local result = Generator.build_karabiner_json(
+			state, {NONE_ACTION, CMD_ACTION}, {key_def}, {}, nil, "/fake/data_dir/"
+		)
+		for _, rule in ipairs(result.profiles[1].complex_modifications.rules) do
+			if type(rule.description) == "string" and rule.description:find(key_def.label, 1, true) then
+				return rule.manipulators[1]
+			end
+		end
+	end
+
+	helpers.it("(par-15-per-key-default) gives a key the shared default of its own, not the global", function()
+		local caps = manipulator_of({ id = "caps_lock", label = "Caps Lock Key", from = { key_code = "caps_lock" } },
+			{ tap = "none", hold = "cmd" })
+		helpers.assert_eq(caps.parameters["basic.to_if_alone_timeout_milliseconds"], 350,
+			"Caps Lock ships 0.35 s on Windows and Linux; macOS must not read the 200 ms global")
+		local ctrl = manipulator_of({ id = "left_control", label = "Left Ctrl Key", from = { key_code = "left_control" } },
+			{ tap = "none", hold = "cmd" })
+		helpers.assert_eq(ctrl.parameters["basic.to_if_alone_timeout_milliseconds"], 200,
+			"left_control is left_ctrl of the shared catalogue: 0.2 s")
+	end)
+
+	helpers.it("(par-15-per-key-default) the user's override beats the shared default", function()
+		local caps = manipulator_of({ id = "caps_lock", label = "Caps Lock Key", from = { key_code = "caps_lock" } },
+			{ tap = "none", hold = "cmd", timeout_ms = 500 })
+		helpers.assert_eq(caps.parameters["basic.to_if_alone_timeout_milliseconds"], 500)
+	end)
+
+	helpers.it("(par-15-per-key-default) a key with no shared threshold inherits the global", function()
+		local state = make_state({
+			tap_hold_timeout_ms = 175,
+			tap_hold_config = { right_command = { tap = "none", hold = "cmd" } },
+		})
+		local result = Generator.build_karabiner_json(
+			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
+		)
+		helpers.assert_eq(rcmd_manipulator(result).parameters["basic.to_if_alone_timeout_milliseconds"], 175)
+	end)
+
 	helpers.it("does not emit a profile-global timeout beside a per-key override", function()
 		local state = make_state({
 			tap_hold_timeout_ms = 250,
