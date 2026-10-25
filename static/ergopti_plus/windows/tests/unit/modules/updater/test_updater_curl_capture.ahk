@@ -211,7 +211,9 @@ _CurlCaptureNativeCancellation(Contract) {
 			}
 			AssertTrue(First > 0 && Second > First && Second < 524288 && Run.Results.Length == 0,
 				"the exact retained curl body must actually progress while its native Job is live")
-			AssertFalse(FileExist(Run.NewExe), "incomplete authenticated bytes are never published as NewExe")
+			AssertTrue(Run.StagingOwner.Validate(), "partial body transfer preserves the exact parent-created staging identities")
+			AssertEqual(0, FileGetSize(Run.NewExe), "incomplete authenticated bytes never enter the preallocated executable")
+			AssertEqual(0, FileGetSize(Run.SwapPath), "partial transfer cannot populate the preallocated swap input")
 			AssertEqual(Run.StartedTick, _UpdaterDownloadStartedTick, "all hops and parent retirement retain the original native clock")
 			if Kind == "cancel"
 				AssertTrue(_Updater_CancelSelfUpdateTransaction("Native curl capture cancellation.", false, false, Epoch))

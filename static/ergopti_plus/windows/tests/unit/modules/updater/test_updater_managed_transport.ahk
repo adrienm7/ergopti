@@ -804,16 +804,20 @@ _UpdaterNative_ActualDeadlineAndCancellation(Contract, Fixture := unset) {
 			State := {Notices: 0}
 			Phases := []
 			; A controlled shorter budget is passed to BOTH the real parent and
-			; the real generated helper, with one original native start tick.
+			; the actual bundled helper, with one original native start tick.
 			Budget := Kind == "deadline" ? 15000 : 30000
 			UPDATER_HTTP_DOWNLOAD_DEADLINE_MS := Budget
-			Run := Fixture.NewRun("/updater/slow", Budget)
+			; Cancellation must receive the same parent-created identities as production.
+			Run := _CurlCaptureNativeDownloadRun(Fixture, Budget)
+			Fixture.DownloadRuns.Push(Run)
+			Run.Start()
 			PreviousCritical := Critical("On")
 			try {
 				_UpdaterDownloadInProgress := true
 				_UpdaterDownloadWorker := Run.Handle
 				_UpdaterDownloadRequest := 0
-				_UpdaterDownloadArtifacts := {NewExe: Run.NewExe, SwapScript: Run.SwapPath}
+				_UpdaterDownloadArtifacts := {NewExe: Run.NewExe, SwapScript: Run.SwapPath,
+					CurlCapture: Run.Capture, StagingRetirement: Run.StagingOwner}
 				_UpdaterDownloadStartedTick := Run.StartedTick
 				Epoch := ++_UpdaterSelfUpdateEpoch
 				_UpdaterSwapOwner := 0
@@ -826,16 +830,19 @@ _UpdaterNative_ActualDeadlineAndCancellation(Contract, Fixture := unset) {
 					Observer: _UpdaterInstallObserver, Epoch: _UpdaterInstallObserverEpoch}
 			} finally Critical(PreviousCritical)
 			WaitStart := A_TickCount
-			while !FileExist(Run.NewExe) && Run.Results.Length == 0 && !TickExpired64(WaitStart, 10000) {
+			while Run.Capture.ObserveBody(Run.Handle, 524288) <= 0 && Run.Results.Length == 0 && !TickExpired64(WaitStart, 10000) {
 				_SR_TreePoll()
 				Sleep(10)
 			}
-			if !FileExist(Run.NewExe) || Run.Results.Length != 0
+			if Run.Capture.ObserveBody(Run.Handle, 524288) <= 0 || Run.Results.Length != 0
 				_UpdaterNativeEmitPartialStageDiagnostic(Run, Kind)
-			AssertTrue(FileExist(Run.NewExe) && Run.Results.Length == 0,
-				"actual child must own a live partial stage before cancellation/deadline admission")
+			AssertTrue(Run.Capture.ObserveBody(Run.Handle, 524288) > 0 && Run.Results.Length == 0,
+				"actual child must own a live partial body before cancellation/deadline admission")
+			AssertTrue(Run.StagingOwner.Validate(), "the exact original parent-created stage must remain current")
+			AssertEqual(0, FileGetSize(Run.NewExe), "partial body bytes cannot enter the parent executable")
+			AssertEqual(0, FileGetSize(Run.SwapPath), "partial transfer cannot populate the parent swap input")
 			Fixture.Observe()
-			AssertTrue(Fixture.State["DownloadSlow"] >= (Kind == "cancel" ? 1 : 2),
+			AssertTrue(Fixture.State["DownloadCurlSlow"] >= (Kind == "cancel" ? 1 : 2),
 				"actual owned TLS body handler must be live before retirement")
 			AssertEqual(Run.StartedTick, _UpdaterDownloadStartedTick, "parent retains exact original worker clock")
 			if Kind == "cancel" {
