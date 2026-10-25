@@ -356,11 +356,16 @@ LLM_Agent_TriggerSelection() {
  */
 LLM_Agent_TriggerCommand() {
 	global _LLM_Agent_Generation, _LLM_Agent_PromptFn, LLM_AGENT_BLANK_PATTERN
+	Generation := _LLM_Agent_Generation
 	Backend := _LLM_Agent_ManualRefusal()
 	if !(Backend is Map)
 		return false
 	Prompt := HasMethod(_LLM_Agent_PromptFn, "Call") ? _LLM_Agent_PromptFn : _LLM_Agent_NativePrompt
 	Answer := Prompt.Call(t("dialog.agent.command_title"), t("dialog.agent.command_prompt"), "")
+	; The modal may commit a withdrawal or admit a newer selection. Its
+	; delayed answer cannot acquire a fresh requester over either event.
+	if (Generation != _LLM_Agent_Generation || A_IsSuspended)
+		return false
 	if !Answer["ok"] || RegExMatch(Answer["value"], LLM_AGENT_BLANK_PATTERN) {
 		LoggerInfo("LLM", "AI agent command cancelled: the dialog was closed or left empty.")
 		return false
