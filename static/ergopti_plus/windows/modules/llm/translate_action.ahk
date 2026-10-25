@@ -72,6 +72,7 @@ global _LLM_Translate_SourceProbe := 0
  */
 LLM_Translate_Trigger(Value) {
 	global _LLM_Menu, _LLM_Translate_Generation, LLM_TRANSLATE_REFUSAL_CONTEXT
+	global _LLM_Translate_SourceProbe
 	Enabled := _LLM_Menu.Get("enabled", false)
 	Refusal := LLM_Menu_ManualPredictionRefusal(A_IsSuspended, Enabled,
 		Enabled && _LLM_Menu_BackendIsReadyForUse(), LLM_TRANSLATE_REFUSAL_CONTEXT)
@@ -98,8 +99,13 @@ LLM_Translate_Trigger(Value) {
 		LoggerInfo("LLM", "Translation refused: the focused app is excluded from the AI.")
 		return false
 	}
+	; Selection replacement belongs to the original control, even when the user
+	; changes windows before the asynchronous capture or remote answer returns.
+	Source := HasMethod(_LLM_Translate_SourceProbe, "Call")
+		? _LLM_Translate_SourceProbe.Call() : _LLM_Engine_CaptureAcceptSource()
 	_LLM_Translate_Generation += 1
 	Flow := Map(
+		"source", _LLM_Engine_NormalizeAcceptSource(Source),
 		"generation", _LLM_Translate_Generation,
 		"locale", Locale,
 		"language", Language,
@@ -208,9 +214,7 @@ _LLM_Translate_OnFail(Flow, Failure := "") {
 ; @param {Map} Flow The translation.
 ; @param {String} Text The translation.
 _LLM_Translate_Show(Flow, Text) {
-	global _LLM_Translate_SourceProbe
-	Source := HasMethod(_LLM_Translate_SourceProbe, "Call")
-		? _LLM_Translate_SourceProbe.Call() : _LLM_Engine_CaptureAcceptSource()
+	Source := Flow["source"]
 	Meta := Map(
 		"offer_id", "translate_" . Flow["generation"],
 		"accept_source", Source,
