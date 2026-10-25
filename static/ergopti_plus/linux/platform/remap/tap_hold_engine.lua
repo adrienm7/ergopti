@@ -157,6 +157,10 @@ local SWALLOWED_ON_LAYER = { left_alt = { tap = "backspace", layer = "nav" } }
 ---   one_shot_result = function(char) -> string|nil, what the one-shot Shift
 ---     types for `char` instead of its capital (Space gives "-");
 ---   the three are required when a key taps the one-shot Shift,
+---   tap_blocked = function(action) -> boolean, whether a catalogue tap is
+---     unarmed right now (the AI actions while the AI is off): the key then
+---     does what it does with no tap action, asked at each press and release
+---     so that switching back on needs no reload; absent, none is,
 ---   held_modifiers = function() -> table, the modifiers down now, by role
 ---     ({ ctrl = true }), as the live layout names them (the keyboard hook's:
 ---     ctrl:nocaps makes CapsLock a Ctrl); without it, a caller with no layout
@@ -180,6 +184,7 @@ function M.new(opts)
 		nav_layer = options.nav_layer or {},
 		tap_min_ms = assert(tonumber(options.tap_min_ms), "tap_min_ms is required"),
 		one_shot_timeout_ms = assert(tonumber(options.one_shot_timeout_ms), "one_shot_timeout_ms is required"),
+		tap_blocked = options.tap_blocked,
 		key_text = options.key_text,
 		plan_text = options.plan_text,
 		one_shot_result = options.one_shot_result,
@@ -708,6 +713,17 @@ local function type_key_tap(self, out, config, typed, now_ms)
 	return nil
 end
 
+--- The tap a key runs now: its configured one, or no tap action (the key's
+--- own) when that is a catalogue action unarmed right now. Key taps, the
+--- one-shot Shift and "none" are the engine's own and are never unarmed.
+--- @return string tap
+local function effective_tap(self, config)
+	local tap = config.tap
+	if tap == "" or tap == "none" or tap == "one_shot_shift" or M.KEY_TAPS[tap] then return tap end
+	if self.tap_blocked and self.tap_blocked(tap) == true then return "" end
+	return tap
+end
+
 --- Fires the tap of a key that has no hold, at its key-down and at each of its
 --- repeats, as the Windows hotkey of such a key does (escape.ahk "Fire
 --- immediately on key-down"): there is no hold to tell it from, so waiting for
@@ -715,14 +731,16 @@ end
 --- Shift at key-down (NO_HOLD_BY_TAP).
 --- @return table out, string|table|nil tap As M:process returns them.
 local function fire_instant(self, out, config, now_ms)
-	if config.tap == "none" then return out, nil end
-	if config.tap == "one_shot_shift" then
+	local tap = effective_tap(self, config)
+	if tap == "none" then return out, nil end
+	if tap == "one_shot_shift" then
 		arm_one_shot(self, now_ms)
 		return out, nil
 	end
-	local typed = M.KEY_TAPS[config.tap]
+	-- An unarmed action leaves the key's own press.
+	local typed = tap == "" and M.KEY_CODES[config.id] or M.KEY_TAPS[tap]
 	if typed then return out, type_key_tap(self, out, config, typed, now_ms) end
-	return out, config.tap, "tap_hold__" .. config.id
+	return out, tap, "tap_hold__" .. config.id
 end
 
 --- Runs one event through the engine and appends what comes out, the event
@@ -766,7 +784,8 @@ local function resolve_roll(self, code, decision, now_ms, released)
 		state.tapped = true
 		-- A click or the wheel during the press made it something else than typing.
 		if not state.cancelled then
-			tap = type_key_tap(self, out, config, config.tap == "" and code or M.KEY_TAPS[config.tap], now_ms)
+			local roll_tap = effective_tap(self, config)
+			tap = type_key_tap(self, out, config, roll_tap == "" and code or M.KEY_TAPS[roll_tap], now_ms)
 		end
 	end
 	for _, queued_code in ipairs(queue) do
@@ -961,17 +980,18 @@ local function process(self, code, value, now_ms)
 		for _, needed_up in ipairs(config.tap_needs_up_at_release or {}) do
 			if self.physical_down[needed_up] then is_tap = false end
 		end
-		if state.tapped or not is_tap or config.tap == "none" then return out, nil end
-		if config.tap == "one_shot_shift" then
+		local tap = effective_tap(self, config)
+		if state.tapped or not is_tap or tap == "none" then return out, nil end
+		if tap == "one_shot_shift" then
 			arm_one_shot(self, now_ms)
 			return out, nil
 		end
 		-- The native key (as if nothing were configured on a tap) or a key tap.
-		local typed = config.tap == "" and code or M.KEY_TAPS[config.tap]
+		local typed = tap == "" and code or M.KEY_TAPS[tap]
 		if typed then
 			return out, type_key_tap(self, out, config, typed, now_ms)
 		end
-		return out, config.tap, "tap_hold__" .. config.id
+		return out, tap, "tap_hold__" .. config.id
 	end
 
 	-- A key the one-shot Shift replaced by its result: its repeats and its

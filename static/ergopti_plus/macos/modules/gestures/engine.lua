@@ -273,6 +273,11 @@ end
 --- @return boolean dispatched True only when one exact dispatcher accepted.
 local function triggerAction(action, sign, slot)
 	if not action or action == "none" then return false end
+	-- An AI action is unarmed while the AI is off, as for the keys.
+	if require("modules.shortcuts.ai_actions").blocked(action) then
+		Logger.debug(LOG, "Gesture %s -> %s held back: the AI is off.", tostring(slot), action)
+		return false
+	end
 	local single_status, single_detail = dispatchAction("execute_single", action, slot)
 	if single_status == "accepted" then
 		gs.dispatchRefusal = nil
@@ -514,7 +519,9 @@ local function commitGesture(now)
 			elseif mf >= 5 then slot = "tap_5" end
 
 			local tap_action = slot and _state.ga[slot] or nil
-			if tap_action and tap_action ~= "none" then
+			if tap_action and tap_action ~= "none" and require("modules.shortcuts.ai_actions").blocked(tap_action) then
+				Logger.debug(LOG, "commitGesture: tap %s -> %s held back: the AI is off.", tostring(slot), tap_action)
+			elseif tap_action and tap_action ~= "none" then
 				local status, detail = dispatchAction("execute_single", tap_action, slot)
 				if status == "accepted" then
 					Logger.info(LOG, "TAP FIRE slot=%s action=%s elapsed=%.3fs fingers=%d",

@@ -11,7 +11,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One predicate for every key-claiming layer (modifier chords, physical
----    slots, number-row tap keys) and for the touchpad gestures, so the layers
+---    slots, number-row tap keys, tap-hold taps) and for the touchpad gestures, so the layers
 ---    cannot disagree about which actions the AI switch covers.
 --- 2. The switch is read from the prediction engine, which owns it at runtime.
 ---    An engine that never loaded cannot run any AI action, so its bindings are
@@ -33,15 +33,21 @@ function M.is_ai_action(action_name)
 	return type(action_name) == "string" and action_name:sub(1, #AI_ACTION_PREFIX) == AI_ACTION_PREFIX
 end
 
+--- Whether the AI is switched off right now, so that every AI action is
+--- unarmed. An engine that never loaded counts as off.
+--- @return boolean
+function M.off()
+	local engine = rawget(package.loaded, ENGINE_MODULE)
+	if type(engine) ~= "table" or type(engine.is_enabled) ~= "function" then return true end
+	return engine.is_enabled() ~= true
+end
+
 --- Whether a binding to this action must be left unarmed right now: an AI
 --- action while the AI is switched off.
 --- @param action_name any
 --- @return boolean
 function M.blocked(action_name)
-	if not M.is_ai_action(action_name) then return false end
-	local engine = rawget(package.loaded, ENGINE_MODULE)
-	if type(engine) ~= "table" or type(engine.is_enabled) ~= "function" then return true end
-	return engine.is_enabled() ~= true
+	return M.is_ai_action(action_name) and M.off()
 end
 
 return M

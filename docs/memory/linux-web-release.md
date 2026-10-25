@@ -108,9 +108,13 @@ bound to one are left to the application (never claimed, then refused), and the
 switch-on re-arms them with no reload. The engine's `arm_agent` and
 `agent_blocked` also hold the agent's automatic mode back while it is off, and
 the switch-off drops its pause and request through `cancel`. Tap-hold taps and
-holds bound to an AI action are not gated by it. Action: a new key-claiming
-layer asks `AiActions.blocked` before claiming; extend
-`test_ai_off_disarms_ai_actions.lua`.
+ordered-pair taps bound to an AI action are unarmed too: the engine asks its
+`tap_blocked` port at each press and release (the key then types its own tap,
+Space types a space) and the pair engine rebuilds its policies from the next
+press with every key up, so no reload is needed. A tap-hold hold is a modifier
+or a layer, never an action, so there is no hold to gate. Action: a new
+key-claiming layer asks `AiActions.blocked` before claiming; extend
+`test_ai_off_disarms_ai_actions.lua` and `test_tap_hold_ai_off.lua`.
 
 ### project-linux-uinput-drops-a-press-of-a-held-key
 
