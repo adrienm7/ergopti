@@ -1410,6 +1410,7 @@
 	"menu.hotstrings.cascade_depth": "Verkettete Hotstrings",
 	"menu.hotstrings.cascade_depth_off": "Aus",
 	"menu.hotstrings.cascade_depth_unit": "Stufe(n)",
+	"menu.hotstrings.expansion_delay": "Verzögerung der Erweiterung",
 	"menu.hotstrings.reset_magic_key": "   ↳ Zurücksetzen (Standard: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

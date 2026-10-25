@@ -1410,6 +1410,7 @@
 	"menu.hotstrings.cascade_depth": "Gekoppelde hotstrings",
 	"menu.hotstrings.cascade_depth_off": "Uit",
 	"menu.hotstrings.cascade_depth_unit": "niveau(s)",
+	"menu.hotstrings.expansion_delay": "Uitbreidingsvertraging",
 	"menu.hotstrings.reset_magic_key": "   ↳ Herstellen (standaard: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

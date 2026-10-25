@@ -1410,6 +1410,7 @@
 	"menu.hotstrings.cascade_depth": "اختصارات نصية متسلسلة",
 	"menu.hotstrings.cascade_depth_off": "إيقاف",
 	"menu.hotstrings.cascade_depth_unit": "مستوى",
+	"menu.hotstrings.expansion_delay": "تأخير التوسيع",
 	"menu.hotstrings.reset_magic_key": "   ↳ إعادة تعيين (افتراضي: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

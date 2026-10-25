@@ -1410,6 +1410,7 @@
 	"menu.hotstrings.cascade_depth": "Połączone hotstringi",
 	"menu.hotstrings.cascade_depth_off": "Wyłączone",
 	"menu.hotstrings.cascade_depth_unit": "poz.",
+	"menu.hotstrings.expansion_delay": "Opóźnienie rozwinięcia",
 	"menu.hotstrings.reset_magic_key": "   ↳ Resetuj (domyślnie: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

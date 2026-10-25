@@ -1410,6 +1410,7 @@
 	"menu.hotstrings.cascade_depth": "ホットストリングの連鎖",
 	"menu.hotstrings.cascade_depth_off": "オフ",
 	"menu.hotstrings.cascade_depth_unit": "段",
+	"menu.hotstrings.expansion_delay": "展開の遅延",
 	"menu.hotstrings.reset_magic_key": "   ↳ リセット（デフォルト: ★）",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

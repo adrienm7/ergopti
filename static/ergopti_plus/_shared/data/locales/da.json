@@ -1410,6 +1410,7 @@
 	"menu.hotstrings.cascade_depth": "Kædede hotstrings",
 	"menu.hotstrings.cascade_depth_off": "Fra",
 	"menu.hotstrings.cascade_depth_unit": "niveau(er)",
+	"menu.hotstrings.expansion_delay": "Udvidelsesforsinkelse",
 	"menu.hotstrings.reset_magic_key": "   ↳ Nulstil (standard: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

@@ -1410,6 +1410,7 @@
 	"menu.hotstrings.cascade_depth": "הוטסטרינגים משורשרים",
 	"menu.hotstrings.cascade_depth_off": "כבוי",
 	"menu.hotstrings.cascade_depth_unit": "רמות",
+	"menu.hotstrings.expansion_delay": "השהיית ההרחבה",
 	"menu.hotstrings.reset_magic_key": "   ↳ אפס (ברירת מחדל: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",
