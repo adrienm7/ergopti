@@ -93,6 +93,8 @@ _TextSenderQueueNative(Text, Opts, Callback) {
 		Count := Options.Get("erase_before", 0)
 		if !(Text is String) || !(Deleted is String)
 			throw TypeError("native editor output requires literal Unicode text")
+		if _TextSenderContainsNul(Text) || _TextSenderContainsNul(Deleted)
+			throw ValueError("native editor text cannot contain NUL code units")
 		if Count > 0 && (!Options.Has("deleted_text")
 				|| _TextCodepointLength(Deleted) != Count)
 			throw ValueError("native editor erasure requires the exact deleted text")

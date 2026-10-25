@@ -307,3 +307,149 @@ _NEC_InvalidRecoveryHook() {
 }
 
 Test("TextSender: malformed native recovery is a typed refusal (native-editor-owner)", _NEC_InvalidRecoveryHook)
+
+
+/** Retains an embedded NUL through both literal construction and the real JSON decoder. */
+_NEC_NulPayload(Position, FromJson) {
+	Left := Position == "head" ? "" : "private_head"
+	Right := Position == "tail" ? "" : "private_tail"
+	Text := FromJson ? JsonParse('"' . Left . '\u0000' . Right . '"') : Left . Chr(0) . Right
+	AssertEqual(StrLen(Left) + 1 + StrLen(Right), StrLen(Text), "the test payload must retain its NUL and full suffix")
+	AssertEqual(StrLen(Left), DllCall("Kernel32\lstrlenW", "Ptr", StrPtr(Text), "Int"),
+		"the actual WStr ABI truncates this representable AHK string at its NUL")
+	AssertEqual(StrLen(Left) + 1 + StrLen(Right), StrLen(Text),
+		"the independent const-pointer oracle must not invalidate the payload variable's stored length")
+	return Text
+}
+
+/** Public admission must refuse before choosing or scheduling a native/clipboard owner. */
+_NEC_NulCannotAcquireOutput(Mode, Field, Position, FromJson, WithCallback := true) {
+	global _TEXT_NATIVE_OWNER, _TEXT_NATIVE_SERIAL, _LLM_NavEventOwnerModule
+	global _TEXT_CLIPBOARD_QUEUE, _TEXT_CLIPBOARD_BUSY, _TextSenderNativeTestPort
+	global _AHK_SendText, _AHK_SendInput
+	AssertFalse(IsObject(_TEXT_NATIVE_OWNER), "the NUL fixture requires an idle native owner")
+	AssertEqual(0, _TEXT_CLIPBOARD_QUEUE.Length, "the NUL fixture requires an idle clipboard queue")
+	AssertFalse(_TEXT_CLIPBOARD_BUSY, "the NUL fixture cannot borrow a live clipboard owner")
+	Saved := { Owner: _TEXT_NATIVE_OWNER, Serial: _TEXT_NATIVE_SERIAL, Module: _LLM_NavEventOwnerModule,
+		Queue: _TEXT_CLIPBOARD_QUEUE, Busy: _TEXT_CLIPBOARD_BUSY, Port: _TextSenderNativeTestPort,
+		SendText: _AHK_SendText, SendInput: _AHK_SendInput,
+		WarnCall: LoggerWarn.HasOwnProp("Call") ? LoggerWarn.GetOwnPropDesc("Call") : 0 }
+	State := _NEC_Fixture()
+	State.Logs := []
+	State.FocusCalls := 0
+	State.Primitives := 0
+	State.Opts["native_port"]["focus"] := () => (State.FocusCalls += 1, Map("hwnd", 11, "control", 12, "pid", 13))
+	try {
+		LoggerWarn.DefineProp("Call", {Call: (Self, Tag, Message, Values*) =>
+			State.Logs.Push({Tag: Tag, Message: Message, Values: Values})})
+		_TEXT_CLIPBOARD_QUEUE := []
+		; Old code may enqueue this malformed request. Keep its real one-shot
+		; wake unable to touch the clipboard until the regression can refuse it.
+		_TEXT_CLIPBOARD_BUSY := true
+		_TextSenderNativeTestPort := State.Opts["native_port"]
+		_AHK_SendText := (*) => (State.Primitives += 1)
+		_AHK_SendInput := (*) => (State.Primitives += 1)
+		Payload := _NEC_NulPayload(Position, FromJson)
+		AssertTrue(RegExMatch(Payload, "\x00") > 0, "the actual public request must still contain its embedded NUL")
+		Text := Field == "text" ? Payload : "accepted"
+		Options := Mode == "native" ? State.Opts : Map("mode", Mode)
+		if Field == "deleted_text" {
+			Options["deleted_text"] := Payload
+			Options["erase_before"] := StrLen(Payload)
+			AssertEqual(StrLen(Payload), _TextCodepointLength(Payload), "ASCII plus NUL owns its full erasure count")
+		}
+		TextSend(Text, Options, WithCallback ? State.Complete : 0)
+		AssertEqual(WithCallback ? 1 : 0, State.Callbacks,
+			"unrepresentable text must refuse immediately without inventing an optional completion consumer")
+		if WithCallback {
+			AssertFalse(State.Ok, "a NUL-terminated output ABI cannot acknowledge the full input")
+			AssertTrue(InStr(State.Message, "NUL") > 0, "the generic refusal must explain the unsupported code unit")
+			AssertEqual(0, InStr(State.Message, "private_"), "refusal must not disclose the supplied text")
+		}
+		AssertEqual(1, State.Logs.Length, "the refusal remains observable even without a completion consumer")
+		AssertEqual("TextSender", State.Logs[1].Tag)
+		AssertTrue(InStr(State.Logs[1].Message, "NUL") > 0, "the warning names the unrepresentable boundary")
+		AssertEqual(0, InStr(State.Logs[1].Message, "private_"), "the warning never embeds source text")
+		AssertEqual(0, State.Logs[1].Values.Length, "no private output or deletion text reaches logger arguments")
+		AssertEqual(WithCallback ? "callback" : "", _TSCS_Join(State.Trace),
+			"no preparation, native begin, journal or commit may run")
+		AssertEqual(0, State.FocusCalls, "refusal must precede target focus acquisition")
+		AssertEqual(0, State.Scheduled, "no native polling timer may be scheduled")
+		AssertEqual(0, State.Primitives, "no keyboard output primitive may run")
+		AssertFalse(IsObject(_TEXT_NATIVE_OWNER), "refusal cannot retain a native owner")
+		AssertEqual(Saved.Serial, _TEXT_NATIVE_SERIAL, "refusal cannot spend a native worker token")
+		AssertEqual(0, _TEXT_CLIPBOARD_QUEUE.Length, "refusal cannot enqueue a clipboard write")
+		AssertEqual(Saved.Module, _LLM_NavEventOwnerModule, "refusal cannot load or acquire the native DLL")
+	} finally {
+		SetTimer(_TextSenderStartClipboard, 0)
+		_TEXT_NATIVE_OWNER := Saved.Owner
+		_TEXT_NATIVE_SERIAL := Saved.Serial
+		_TEXT_CLIPBOARD_QUEUE := Saved.Queue
+		_TEXT_CLIPBOARD_BUSY := Saved.Busy
+		_TextSenderNativeTestPort := Saved.Port
+		_AHK_SendText := Saved.SendText
+		_AHK_SendInput := Saved.SendInput
+		if IsObject(Saved.WarnCall)
+			LoggerWarn.DefineProp("Call", Saved.WarnCall)
+		else
+			LoggerWarn.DeleteProp("Call")
+	}
+}
+for _NEC_NulMode in ["native", "direct", "clipboard", "auto"] {
+	for _NEC_NulPosition in ["head", "middle", "tail"] {
+		for _NEC_NulJson in [false, true]
+			Test("TextSender: " . _NEC_NulMode . " rejects " . _NEC_NulPosition . " NUL text from "
+				. (_NEC_NulJson ? "JSON" : "literal") . " before dispatch (text-native-nul-admission)",
+				_NEC_NulCannotAcquireOutput.Bind(_NEC_NulMode, "text", _NEC_NulPosition, _NEC_NulJson))
+	}
+}
+for _NEC_NulPosition in ["head", "middle", "tail"] {
+	for _NEC_NulJson in [false, true]
+		Test("TextSender: native rejects " . _NEC_NulPosition . " NUL deletion from "
+			. (_NEC_NulJson ? "JSON" : "literal") . " before dispatch (text-native-nul-admission)",
+			_NEC_NulCannotAcquireOutput.Bind("native", "deleted_text", _NEC_NulPosition, _NEC_NulJson))
+}
+
+
+/** Legal Unicode remains complete through admission, dispatch and terminal settlement. */
+_NEC_NulGuardPreservesLegalNativeText(Text, Deleted) {
+	global _TEXT_NATIVE_OWNER, _TEXT_NATIVE_SERIAL
+	AssertFalse(IsObject(_TEXT_NATIVE_OWNER), "the legal-text control requires an idle native owner")
+	Saved := { Owner: _TEXT_NATIVE_OWNER, Serial: _TEXT_NATIVE_SERIAL }
+	State := _NEC_Fixture()
+	try {
+		State.Opts["deleted_text"] := Deleted
+		State.Opts["erase_before"] := _TextCodepointLength(Deleted)
+		AssertEqual(StrLen(Text), DllCall("Kernel32\lstrlenW", "Ptr", StrPtr(Text), "Int"), "legal output fits the actual WStr ABI")
+		AssertEqual(StrLen(Deleted), DllCall("Kernel32\lstrlenW", "Ptr", StrPtr(Deleted), "Int"), "legal deletion fits the actual WStr ABI")
+		TextSend(Text, State.Opts, State.Complete)
+		AssertEqual(0, State.Callbacks, "legal native output must retain its asynchronous completion contract")
+		AssertTrue(IsObject(_TEXT_NATIVE_OWNER), "legal empty or Unicode output still acquires an owner")
+		AssertEqual(Text, _TEXT_NATIVE_OWNER.Text, "the complete Unicode output is retained without normalization")
+		AssertEqual(Deleted, _TEXT_NATIVE_OWNER.Opts["deleted_text"], "the exact Unicode deletion evidence survives admission")
+		State.Scheduled.Call()
+		State.Phase := 2
+		State.Scheduled.Call()
+		State.Phase := 4
+		State.Scheduled.Call()
+		AssertEqual(1, State.Callbacks)
+		AssertTrue(State.Ok, "only the usual terminal receipt settles the legal request")
+		AssertEqual("prepare|begin|decide:1|journal|commit|callback", _TSCS_Join(State.Trace))
+		AssertFalse(IsObject(_TEXT_NATIVE_OWNER))
+	} finally {
+		_TEXT_NATIVE_OWNER := Saved.Owner
+		_TEXT_NATIVE_SERIAL := Saved.Serial
+	}
+}
+for _NEC_LegalCase in [
+	{ Name: "empty", Text: "", Deleted: "" },
+	{ Name: "numeric string", Text: "0", Deleted: "" },
+	{ Name: "non-ASCII and supplementary scalar", Text: Chr(0xE9) . Chr(0x1F642), Deleted: Chr(0x1F642) . Chr(0xE9) },
+	{ Name: "legal whitespace", Text: "`t`r`n", Deleted: "`n" }
+]
+	Test("TextSender: " . _NEC_LegalCase.Name . " remains native-admissible (text-native-nul-admission)",
+		_NEC_NulGuardPreservesLegalNativeText.Bind(_NEC_LegalCase.Text, _NEC_LegalCase.Deleted))
+
+
+Test("TextSender: NUL refusal without a completion callback remains observable (text-native-nul-admission)",
+	_NEC_NulCannotAcquireOutput.Bind("native", "text", "middle", true, false))
