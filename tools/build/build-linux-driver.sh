@@ -324,8 +324,9 @@ for candidate in luajit lua5.4 lua; do
 done
 
 if [ -z "$LUA_BIN" ]; then
-	echo "WARNING: No Lua runtime found — skipping smoke test."
-	echo "  Install luajit or lua5.4 to enable this check."
+	echo "ERROR: No Lua runtime found for the required smoke test." >&2
+	echo "  Install luajit or lua5.4, or explicitly select --skip-smoke." >&2
+	exit 1
 else
 	echo "  Lua runtime: ${LUA_BIN} ($(${LUA_BIN} -v 2>&1 || true))"
 
@@ -410,9 +411,10 @@ else
 				SHARED_OK=false
 			fi
 		done
-		if [ "$SHARED_OK" = true ]; then
-			echo "    OK — all ${#SHARED_MODS[@]} shared modules load"
+		if [ "$SHARED_OK" != true ]; then
+			exit 1
 		fi
+		echo "    OK — all ${#SHARED_MODS[@]} shared modules load"
 	else
 		echo "  (skipping engine/module tests — not on Linux, uses native paths)"
 	fi

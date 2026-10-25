@@ -1,6 +1,6 @@
 // tools/test/test-linux-tracked-copy.cjs
 
-/** Exercises the real bundle copy entry point against a private tracked inventory. */
+/** Exercises the real bundle copy entry point and its smoke failure propagation. */
 'use strict';
 
 const assert = require('node:assert/strict');
@@ -118,6 +118,71 @@ try {
 		assert.equal(linked.status, 0, linked.stderr);
 		assert.equal(fs.readlinkSync(path.join(scratch, 'linked-output', 'relative-link')), names[0]);
 	}
+	// Execute the complete production smoke block. A failed shared require used
+	// to print FAIL, then report a successful assembly and return zero.
+	const smokeStart = subject.indexOf('if [ "$SKIP_SMOKE" = true ]; then');
+	assert.ok(smokeStart >= 0, 'the production smoke entry point must exist');
+	const smokeBin = path.join(scratch, 'smoke-bin');
+	fs.mkdirSync(smokeBin);
+	const runtime = path.join(smokeBin, 'luajit');
+	fs.writeFileSync(path.join(smokeBin, 'uname'), '#!/bin/sh\nprintf "Linux\\n"\n', {
+		mode: 0o755
+	});
+	fs.writeFileSync(
+		runtime,
+		'#!/bin/sh\nprintf "%s\\n" "$*" >> "$SMOKE_CALLS"\n' +
+			'case "$*" in *"\'keycodes.evdev\'"*) [ "$SMOKE_FAILURE" != shared ] ;; *) exit 0 ;; esac\n',
+		{ mode: 0o755 }
+	);
+	const smokeCalls = path.join(scratch, 'smoke-calls');
+	const bashPath = (value) =>
+		value.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`);
+	function smoke(failure, skip = false) {
+		fs.writeFileSync(smokeCalls, '');
+		return spawnSync(
+			bashExecutable(),
+			['-s', '--', String(skip), bashPath(scratch), bashPath(smokeBin)],
+			{
+				input:
+					'set -euo pipefail\nPATH="$3"\nSKIP_SMOKE="$1"\nBUILD_DIR="$2"\n' +
+					subject.slice(smokeStart),
+				encoding: 'utf8',
+				timeout: 15000,
+				env: {
+					...process.env,
+					PATH: bashPath(smokeBin),
+					SMOKE_FAILURE: failure,
+					SMOKE_CALLS: bashPath(smokeCalls)
+				}
+			}
+		);
+	}
+	const sharedFailure = smoke('shared');
+	assert.equal(
+		sharedFailure.status,
+		1,
+		'package-smoke-shared-failure: shared module refusal must fail assembly'
+	);
+	assert.match(sharedFailure.stdout, /require\('keycodes\.evdev'\) failed/);
+	assert.doesNotMatch(sharedFailure.stdout, /assembled successfully/);
+	assert.match(fs.readFileSync(smokeCalls, 'utf8'), /pcall\(require, 'keycodes\.evdev'\)/);
+	const successfulSmoke = smoke('none');
+	assert.equal(successfulSmoke.status, 0, successfulSmoke.stderr);
+	assert.match(successfulSmoke.stdout, /all [1-9][0-9]* shared modules load/);
+	assert.match(successfulSmoke.stdout, /assembled successfully/);
+	fs.unlinkSync(runtime);
+	const unavailable = smoke('none');
+	assert.equal(
+		unavailable.status,
+		1,
+		'package-smoke-runtime-absent: missing runtime must fail unless explicitly skipped'
+	);
+	assert.match(unavailable.stderr, /No Lua runtime found/);
+	assert.doesNotMatch(unavailable.stdout, /assembled successfully/);
+	const skipped = smoke('none', true);
+	assert.equal(skipped.status, 0, skipped.stderr);
+	assert.match(skipped.stdout, /Smoke test SKIPPED/);
+	assert.equal(fs.readFileSync(smokeCalls, 'utf8'), '', 'an explicit skip runs no runtime');
 } finally {
 	fs.rmSync(scratch, { recursive: true, force: true });
 }
