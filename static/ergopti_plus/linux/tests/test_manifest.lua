@@ -370,6 +370,7 @@ return {
 	"tests.unit.ui.menu.shortcuts.test_tap_hold_menu_native_per_key",
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_integration",
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_roll",
+	"tests.unit.platform.remap.tap_hold.test_tap_hold_space_end_char",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_adapter",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_intercept_passthrough_mode_re_emits",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_intercept_passthrough_acknowledged_consumed_repeats",
