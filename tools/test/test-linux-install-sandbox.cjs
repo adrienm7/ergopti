@@ -43,6 +43,8 @@
 'use strict';
 
 const fs = require('fs');
+const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
@@ -126,9 +128,8 @@ function runInstaller(scenario) {
 		`${log}\nfor p in "$@"; do case " ${absent} " in *" $p "*) exit 100 ;; esac; done\n` +
 			`for p in "$@"; do touch ${JSON.stringify(bashPath(state))}/"$p"; done\nexit 0`
 	);
-	// Every command a real system would provide.
-	for (const name of ['notify-send', 'zenity', 'sqlite3', 'xkbcli', 'sha256sum'])
-		stub(stubs, name, 'exit 0');
+	// Stub desktop capabilities; ownership hashes must come from real coreutils.
+	for (const name of ['notify-send', 'zenity', 'sqlite3', 'xkbcli']) stub(stubs, name, 'exit 0');
 	// luajit: library probes answer from the markers, so the desktop backends
 	// are "missing" until the package manager was asked for them.
 	stub(
@@ -192,6 +193,51 @@ function runInstaller(scenario) {
 		calls,
 		cleanup: () => fs.rmSync(sandbox, { recursive: true, force: true })
 	};
+}
+
+/** Verifies genuine installed bytes against every producer ownership receipt. */
+function verifyOwnership(run, contents) {
+	const library = path.join(run.home, '.local/lib/ergopti');
+	const manifest = contents ?? fs.readFileSync(path.join(library, '.ergopti-owned-files'), 'utf8');
+	assert.notEqual(manifest, '', 'an empty ownership manifest cannot certify an installation');
+	const rows = manifest.endsWith('\n') ? manifest.slice(0, -1).split('\n') : manifest.split('\n');
+	const external = {
+		'@wrapper': path.join(run.home, '.local/bin/ergopti-hotstrings'),
+		'@unit': path.join(run.configRoot, 'systemd/user/ergopti-hotstrings.service'),
+		'@autostart': path.join(run.configRoot, 'autostart/ergopti-hotstrings.desktop')
+	};
+	const observed = new Set();
+	for (const row of rows) {
+		const fields = /^([0-9a-f]{64})\t([^\t\n]+)$/.exec(row);
+		assert.ok(fields, 'each ownership row must carry a genuine SHA-256 and one path');
+		const [, digest, relative] = fields;
+		assert.ok(!observed.has(relative), 'ownership paths must be unique');
+		observed.add(relative);
+		assert.ok(
+			external[relative] ||
+				/^(?:linux|_shared)\//.test(relative) ||
+				relative === 'bin/ergopti-hotstrings',
+			'every ownership row must address the installed payload or its startup entries'
+		);
+		const file = external[relative] || path.join(library, relative);
+		assert.equal(
+			createHash('sha256').update(fs.readFileSync(file)).digest('hex'),
+			digest,
+			`receipt digest must match independently read installed bytes: ${relative}`
+		);
+	}
+	for (const required of [
+		'linux/ergopti_hotstrings.lua',
+		'_shared/data/locales/en.json',
+		'linux/bin/libergopti_archive_publication.so',
+		'bin/ergopti-hotstrings',
+		'@wrapper',
+		'@unit',
+		'@autostart'
+	]) {
+		assert.ok(observed.has(required), `the actual installation must own ${required}`);
+	}
+	return manifest;
 }
 
 const errors = [];
@@ -286,11 +332,27 @@ const errors = [];
 			'ergopti_hotstrings.lua'
 		);
 		if (!fs.existsSync(daemon)) errors.push('the driver tree was not copied');
+
+		const receipt = verifyOwnership(run);
+		const firstRow = receipt.split('\n')[0];
+		const malformed = [
+			'',
+			receipt.replace(/^[0-9a-f]{64}/, 'not-a-sha256'),
+			receipt.replace(/^[0-9a-f]{64}/, '0'.repeat(64)),
+			`${receipt}${firstRow}\n`
+		];
+		for (const candidate of malformed) {
+			assert.throws(
+				() => verifyOwnership(run, candidate),
+				'empty, malformed, false and duplicate receipts cannot certify installed bytes'
+			);
+		}
+
 		// The daemon reads the layout registry below its driver root, and the
 		// Ergopti extension inside it supplies SFB reduction, rolls and the magic
 		// key's repeat corrections; a checkout keeps it outside the copied trees.
-		// Its ownership and discovery run in test-linux-install-layout-registry.cjs,
-		// since sha256sum is a stub here.
+		// Discovery through the real Lua consumer is covered independently by
+		// test-linux-install-layout-registry.cjs; every ownership digest is verified above.
 		const extension = path.join(
 			run.home,
 			...'.local/lib/ergopti/linux/static/layouts/registry/ergopti/hotstrings/rolls.toml'.split('/')
