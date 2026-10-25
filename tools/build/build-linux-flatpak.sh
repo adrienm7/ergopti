@@ -8,7 +8,7 @@
 #                                             tree staged as its _shared child
 #   - payload/bin/ergopti                     the LUA_PATH wrapper
 #   - payload/share/applications/*.desktop    the desktop entry
-#   - payload/share/icons/.../*.svg           a placeholder icon
+#   - payload/share/icons/.../*.png           the canonical desktop logo
 #   - payload/share/metainfo/*.metainfo.xml   the AppStream metadata
 # and, when flatpak-builder and flatpak are both installed, the single-file
 # bundle build/linux/ergopti-<version>.flatpak (via `flatpak build-bundle`).
@@ -112,7 +112,7 @@ rm -rf "$FLATPAK_DIR"
 mkdir -p "$PAYLOAD_DIR/lib/ergopti"
 mkdir -p "$PAYLOAD_DIR/bin"
 mkdir -p "$PAYLOAD_DIR/share/applications"
-mkdir -p "$PAYLOAD_DIR/share/icons/hicolor/scalable/apps"
+mkdir -p "$PAYLOAD_DIR/share/icons/hicolor/512x512/apps"
 mkdir -p "$PAYLOAD_DIR/share/metainfo"
 
 # ----------------------------------------------------------------------
@@ -218,7 +218,7 @@ cat >> "$MANIFEST_FILE" << 'MANIFEST_EOF'
       - install -Dm755 bin/ergopti /app/bin/ergopti
       - install -Dm644 lib/ergopti/network-runtime-env.sh /app/lib/ergopti/network-runtime-env.sh
       - install -Dm644 share/applications/org.ergopti.Ergopti.desktop /app/share/applications/org.ergopti.Ergopti.desktop
-      - install -Dm644 share/icons/hicolor/scalable/apps/org.ergopti.Ergopti.svg /app/share/icons/hicolor/scalable/apps/org.ergopti.Ergopti.svg
+      - install -Dm644 share/icons/hicolor/512x512/apps/org.ergopti.Ergopti.png /app/share/icons/hicolor/512x512/apps/org.ergopti.Ergopti.png
       - install -Dm644 share/metainfo/org.ergopti.Ergopti.metainfo.xml /app/share/metainfo/org.ergopti.Ergopti.metainfo.xml
       # The entry point the wrapper execs must actually be in the image; a
       # payload that staged an empty tree would otherwise produce a bundle that
@@ -311,22 +311,13 @@ DESKTOP_EOF
 echo "  Desktop entry: $(basename "$DESKTOP_FILE")"
 
 # ----------------------------------------------------------------------
-# 7. Placeholder icon
+# 7. Canonical desktop icon
 # ----------------------------------------------------------------------
-# SVG rather than the 1x1 PNG the .deb ships: an icon in hicolor/scalable is
-# correct at every size, so a placeholder cannot be caught lying about its
-# dimensions by AppStream. Replace with the real artwork before publishing.
-ICON_FILE="$PAYLOAD_DIR/share/icons/hicolor/scalable/apps/${APP_ID}.svg"
-
-cat > "$ICON_FILE" << 'ICON_EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <rect width="128" height="128" rx="24" fill="#1E1E2E"/>
-  <text x="64" y="90" font-family="sans-serif" font-size="72" font-weight="bold"
-        text-anchor="middle" fill="#89B4FA">E</text>
-</svg>
-ICON_EOF
-echo "  Icon placeholder: $(basename "$ICON_FILE")"
+# Desktop and tray branding must come from the same asset; publishing a separate
+# handwritten placeholder hid the actual logo from the desktop/software centre.
+ICON_FILE="$PAYLOAD_DIR/share/icons/hicolor/512x512/apps/${APP_ID}.png"
+install -m 644 "$BUILD_DIR/_shared/assets/ergopti_tray.png" "$ICON_FILE"
+echo "  Application icon: $(basename "$ICON_FILE")"
 
 # ----------------------------------------------------------------------
 # 8. AppStream metadata
