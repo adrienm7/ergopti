@@ -18,6 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 --- Assignment head that installs or restores the shared shell_runner slot.
@@ -137,13 +138,9 @@ helpers.describe("shell_runner stub hygiene across the whole suite", function()
 
 		local offenders = {}
 		for _, path in ipairs(files) do
-			local fh = io.open(path, "r")
-			if fh then
-				local content = fh:read("*a")
-				fh:close()
-				if has_dangling_install(content) then
-					offenders[#offenders + 1] = path:match("tests/.+$") or path
-				end
+			local content = SourceFile.read(path)
+			if has_dangling_install(content) then
+				offenders[#offenders + 1] = path:match("tests/.+$") or path
 			end
 		end
 

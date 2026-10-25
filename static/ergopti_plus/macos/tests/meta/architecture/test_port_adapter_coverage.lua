@@ -20,6 +20,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 local DRIVER_ROOT = helpers.driver_root()
@@ -316,10 +317,7 @@ helpers.describe("meta: _shared/ code purity", function()
 		if file_path:match("%.spec%.js$") then goto continue end
 		scanned = scanned + 1
 
-		local fh = io.open(file_path, "r")
-		if not fh then goto continue end
-		local body = fh:read("*a")
-		fh:close()
+		local body = SourceFile.read(file_path)
 
 		local rel = file_path:sub(#shared_dir + 1)
 		local line_num = 0
@@ -386,10 +384,7 @@ local function count_lua_pattern(files, pattern, adapters_prefix)
 	local details = {}
 	for _, file_path in ipairs(files) do
 		if file_path:find(adapters_prefix, 1, true) then goto continue end
-		local fh = io.open(file_path, "r")
-		if not fh then goto continue end
-		local body = fh:read("*a")
-		fh:close()
+		local body = SourceFile.read(file_path)
 		local line_num = 0
 		for line in (body .. "\n"):gmatch("([^\n]*)\n") do
 			line_num = line_num + 1

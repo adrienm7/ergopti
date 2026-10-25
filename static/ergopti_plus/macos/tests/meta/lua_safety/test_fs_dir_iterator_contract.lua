@@ -39,6 +39,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 local DRIVER_ROOT = helpers.driver_root()  -- trailing slash, e.g. ".../macos/"
@@ -85,14 +86,11 @@ local function list_lua_files(dir)
 	return files
 end
 
---- Reads a file fully, returning "" when unreadable.
+--- Reads a mandatory source file completely or raises on a native refusal.
 --- @param path string Absolute file path.
 --- @return string Contents.
 local function read_file(path)
-	local fh = io.open(path, "r")
-	if not fh then return "" end
-	local body = fh:read("*a")
-	fh:close()
+	local body = SourceFile.read(path)
 	return body
 end
 

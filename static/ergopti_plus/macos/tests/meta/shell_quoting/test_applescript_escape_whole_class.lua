@@ -30,6 +30,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 -- Directories that ship runtime code. `tests/` is excluded by the walker.
@@ -163,10 +164,7 @@ end
 --- @param abs_path string
 --- @return string|nil
 local function read_code(abs_path)
-	local fh = io.open(abs_path, "r")
-	if not fh then return nil end
-	local src = fh:read("*a")
-	fh:close()
+	local src = SourceFile.read(abs_path)
 	-- Comments are stripped so prose about the broken shape is not mistaken for
 	-- the broken shape. This test's own header names every pattern it forbids.
 	return (src:gsub("%-%-[^\n]*", ""))

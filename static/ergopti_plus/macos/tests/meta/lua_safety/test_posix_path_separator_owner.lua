@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 -- Each tree is read except its test harness, which runs on a Windows checkout
@@ -133,9 +134,7 @@ local function tree_sources(base, tree)
 		local rel = path:sub(#base + 1)
 		assert(path:sub(1, #base) == base, "the walk left the ergopti_plus folder: " .. path)
 		if rel:sub(1, #tree.excluded) ~= tree.excluded and rel ~= OWNER then
-			local handle = assert(io.open(path, "rb"), "unreadable driver source " .. path)
-			sources[#sources + 1] = { rel = rel, text = handle:read("*a") }
-			handle:close()
+			sources[#sources + 1] = { rel = rel, text = SourceFile.read(path) }
 		end
 	end
 	return sources

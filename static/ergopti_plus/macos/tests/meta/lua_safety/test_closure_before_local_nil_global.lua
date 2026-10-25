@@ -34,6 +34,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 -- Every subtree that ships in the driver. `adapters/` holds the hs.task GC pins,
@@ -98,14 +99,11 @@ local function collect(dir, out)
 	assert(#out > source_count, "source inventory contains no matching files")
 end
 
---- Reads a whole file, returning nil when it cannot be opened.
+--- Reads a mandatory source file completely or raises on a native refusal.
 --- @param path string Absolute path.
---- @return string|nil
+--- @return string
 local function read_file(path)
-	local fh = io.open(path, "r")
-	if not fh then return nil end
-	local src = fh:read("*a")
-	fh:close()
+	local src = SourceFile.read(path)
 	return src
 end
 

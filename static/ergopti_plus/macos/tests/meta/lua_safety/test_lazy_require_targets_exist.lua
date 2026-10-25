@@ -29,6 +29,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 -- Driver subtrees to scan, matching the sibling meta guards.
@@ -42,6 +43,13 @@ local REQUIRE_ROOTS = { "", "modules/", "infra/", "platform/", "ui/", "adapters/
 -- Provided by the Hammerspoon runtime rather than this repository, so their
 -- absence from the tree is expected and must not fail the scan.
 local RUNTIME_MODULES = { socket = true, hs = true }
+
+--- Reports native modules that have no repository source or Lua M exports.
+--- @param name string Dotted runtime module name.
+--- @return boolean native
+local function is_runtime_module(name)
+	return RUNTIME_MODULES[name] == true or name:match("^hs%.") ~= nil
+end
 
 
 
@@ -85,14 +93,11 @@ local function collect(dir, out)
 	assert(#out > source_count, "source inventory contains no matching files")
 end
 
---- Reads a file whole, returning nil when it cannot be opened.
+--- Reads a mandatory source file completely or raises on a native refusal.
 --- @param path string Absolute path.
---- @return string|nil
+--- @return string
 local function read_file(path)
-	local fh = io.open(path, "r")
-	if not fh then return nil end
-	local src = fh:read("*a")
-	fh:close()
+	local src = SourceFile.read(path)
 	return src
 end
 
@@ -101,7 +106,7 @@ end
 --- @param mod string Dotted module name.
 --- @return string|nil Absolute path, or nil when the name resolves nowhere.
 local function resolve_module(root, mod)
-	if RUNTIME_MODULES[mod] or mod:match("^hs%.") then return mod end
+	if is_runtime_module(mod) then return mod end
 	local rel = mod:gsub("%.", "/")
 	for _, base in ipairs(REQUIRE_ROOTS) do
 		for _, candidate in ipairs({ root .. base .. rel .. ".lua", root .. base .. rel .. "/init.lua" }) do
@@ -210,7 +215,7 @@ helpers.describe("lazily required modules and methods exist", function()
 					if rebind and rebind - 1 < stop then stop = rebind - 1 end
 					local window = src:sub(site.pos, stop)
 					local target = resolve_module(root, site.mod)
-					if target and not RUNTIME_MODULES[site.mod] then
+					if target and not is_runtime_module(site.mod) then
 						local ex = exports_of(target)
 						-- Only assert when the module exposes an M table at all;
 						-- table-literal modules are outside this pattern's scope.

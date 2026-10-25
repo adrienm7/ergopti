@@ -34,6 +34,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 -- Driver subtrees to scan. tests/ is excluded so this file's own documentation of
@@ -137,15 +138,11 @@ helpers.describe("no driver source runs the Python TOML formatter synchronously"
 		for _, entry in ipairs(FORBIDDEN) do
 			local offenders = {}
 			for _, path in ipairs(files) do
-				local fh = io.open(path, "r")
-				if fh then
-					local src = fh:read("*a")
-					fh:close()
-					-- Normalise separators so the Windows form of the pattern is caught too.
-					local normalised = src:gsub("\\\\", "/"):gsub("%[/\\%]", "/")
-					if normalised:find(entry.needle, 1, true) then
-						offenders[#offenders + 1] = path:gsub("^.*[/\\]macos[/\\]", "")
-					end
+				local src = SourceFile.read(path)
+				-- Normalise separators so the Windows form of the pattern is caught too.
+				local normalised = src:gsub("\\\\", "/"):gsub("%[/\\%]", "/")
+				if normalised:find(entry.needle, 1, true) then
+					offenders[#offenders + 1] = path:gsub("^.*[/\\]macos[/\\]", "")
 				end
 			end
 			helpers.assert_true(#offenders == 0, string.format(

@@ -30,6 +30,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 -- Subtrees that ship in the driver.
@@ -104,31 +105,28 @@ helpers.describe("gsub replacements built from external values are escaped", fun
 
 		local offenders = {}
 		for _, path in ipairs(files) do
-			local fh = io.open(path, "r")
-			if fh then
-				local src = fh:read("*a") ; fh:close()
-				local line_no = 0
-				for line in (src .. "\n"):gmatch("([^\n]*)\n") do
-					line_no = line_no + 1
-					local stripped = line:gsub("%-%-.*$", "")
-					-- Two replacement shapes reach the same hazard:
-					--   gsub("<literal>", <bare identifier or dotted name>)
-					--   gsub("<literal>", <call(...)>)   e.g. tostring(err)
-					-- The call form was missed by an identifier-only pattern, which is how
-					-- karabiner/onboarding.lua kept an unescaped payload after this guard
-					-- first landed. Both are checked.
-					for _, pat in ipairs({
-						':gsub%(%b"",%s*([%w_%.]+)%s*%)',
-						':gsub%(%b"",%s*([%w_%.]+%b())%s*%)',
-					}) do
-						for repl in stripped:gmatch(pat) do
-							local callee = repl:match("^([%w_%.]+)%(") or repl
-							-- A numeric literal cannot carry a percent sign.
-							if not SAFE_REPLACEMENT[repl] and not SAFE_REPLACEMENT[callee]
-								and not tonumber(repl) then
-								offenders[#offenders + 1] = string.format("%s:%d (%s)",
-									path:gsub("^.*/macos/", ""), line_no, repl)
-							end
+			local src = SourceFile.read(path)
+			local line_no = 0
+			for line in (src .. "\n"):gmatch("([^\n]*)\n") do
+				line_no = line_no + 1
+				local stripped = line:gsub("%-%-.*$", "")
+				-- Two replacement shapes reach the same hazard:
+				--   gsub("<literal>", <bare identifier or dotted name>)
+				--   gsub("<literal>", <call(...)>)   e.g. tostring(err)
+				-- The call form was missed by an identifier-only pattern, which is how
+				-- karabiner/onboarding.lua kept an unescaped payload after this guard
+				-- first landed. Both are checked.
+				for _, pat in ipairs({
+					':gsub%(%b"",%s*([%w_%.]+)%s*%)',
+					':gsub%(%b"",%s*([%w_%.]+%b())%s*%)',
+				}) do
+					for repl in stripped:gmatch(pat) do
+						local callee = repl:match("^([%w_%.]+)%(") or repl
+						-- A numeric literal cannot carry a percent sign.
+						if not SAFE_REPLACEMENT[repl] and not SAFE_REPLACEMENT[callee]
+							and not tonumber(repl) then
+							offenders[#offenders + 1] = string.format("%s:%d (%s)",
+								path:gsub("^.*/macos/", ""), line_no, repl)
 						end
 					end
 				end
