@@ -302,10 +302,10 @@ _MLP_SourceRootAlias(Kind) {
 	Stem := "ergopti_logger_alias_" . DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_" . A_TickCount
 	Root := A_Temp . "\" . Stem
 	PreviousDirectory := A_WorkingDir
-	DirCreate(Root . "\adapters")
+	DirCreate(Root)
 	try {
-		FileAppend(_MLP_Source("reload"), Root . "\adapters\a_bad.ahk", "UTF-8")
-		FileAppend(_MLP_Source("balanced"), Root . "\adapters\z_good.ahk", "UTF-8")
+		FileAppend(_MLP_Source("reload"), Root . "\a_bad.ahk", "UTF-8")
+		FileAppend(_MLP_Source("balanced"), Root . "\z_good.ahk", "UTF-8")
 		if Kind == "dot"
 			Alias := Root . "\."
 		else if Kind == "parent"
@@ -318,8 +318,8 @@ _MLP_SourceRootAlias(Kind) {
 		AssertEqual(2, Census.Paths.Length, "the native census must retain both real files")
 		Sources := _MetaLoggerReadSources(Alias)
 		AssertEqual(2, Sources.Count, "an existing-directory alias cannot collapse distinct source identities")
-		AssertTrue(Sources.Has("adapters/a_bad.ahk"))
-		AssertTrue(Sources.Has("adapters/z_good.ahk"))
+		AssertTrue(Sources.Has("a_bad.ahk"))
+		AssertTrue(Sources.Has("z_good.ahk"))
 		_MLP_ExpectedRefusal(_MetaLoggerCheckPairing, Alias, "Error", "unpaired lifecycle logs")
 		_MLP_ExpectedRefusal(_MetaLoggerCheckReload, Alias, "Error", "immediately precede Reload")
 	} finally {
