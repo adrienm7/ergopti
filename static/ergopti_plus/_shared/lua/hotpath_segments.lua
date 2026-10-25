@@ -31,6 +31,11 @@ local M = {}
 -- for its COM-free hook path and carries per-segment overrides).
 M.DEFAULT_SLOW_MS = 20.0
 
+-- A segment that stays slow (a stalled disk, a busy compositor) is slow on every
+-- keystroke; one WARNING per segment per window keeps the first occurrence and
+-- the log readable. The counters keep counting every occurrence.
+M.LOG_WINDOW_MS = 10000
+
 local MACOS, LINUX = "macos", "linux"
 
 -- Order: the keystroke path first, then output, then render, because that is the
@@ -86,6 +91,26 @@ end
 function M.threshold_ms(name)
 	local segment = _by_name[name]
 	return segment and segment.slow_ms or M.DEFAULT_SLOW_MS
+end
+
+--- Creates the per-segment rate limiter of the slow-segment WARNING. Only the
+--- log line is limited: callers keep counting every slow occurrence themselves.
+--- The first slow occurrence of a segment is always admitted.
+--- @return function admit(name, now_ms) -> boolean admitted, number suppressed
+---   `suppressed` counts the occurrences withheld since the previous line of
+---   that segment (0 when not admitted).
+function M.new_slow_gate()
+	local last_logged, withheld = {}, {}
+	return function(name, now_ms)
+		local previous = last_logged[name]
+		if previous ~= nil and now_ms - previous < M.LOG_WINDOW_MS then
+			withheld[name] = (withheld[name] or 0) + 1
+			return false, 0
+		end
+		local skipped = withheld[name] or 0
+		last_logged[name], withheld[name] = now_ms, 0
+		return true, skipped
+	end
 end
 
 --- Returns whether a name is a declared segment of any driver.
