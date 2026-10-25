@@ -2,6 +2,8 @@
 """Reject foreign startup owners, incomplete native measurements and cleanup debt."""
 
 import copy
+import io
+import json
 from pathlib import Path
 import plistlib
 import subprocess
@@ -139,6 +141,88 @@ class NativeFixture:
             mock.patch.object(probe.os, "kill", side_effect=self.kill),
         ):
             return self.owner.observe(feature)
+
+
+class StartupPublicationTests(unittest.TestCase):
+    """Schedule the native reader at actual publication boundaries."""
+
+    def test_admission_is_absent_until_all_json_bytes_are_closed(self):
+        with tempfile.TemporaryDirectory() as root:
+            destination = Path(root) / "admit.json"
+            value = {"phase": "admit", "nonce": NONCE, "text": "é" * 10000}
+            observations = []
+            original_open = io.open
+
+            class ObservedWriter:
+                def __init__(self, handle):
+                    self.handle = handle
+
+                def __enter__(self):
+                    self.handle.__enter__()
+                    observations.append(destination.exists())
+                    return self
+
+                def __exit__(self, *arguments):
+                    observations.append(destination.exists())
+                    return self.handle.__exit__(*arguments)
+
+                def write(self, content):
+                    observations.append(destination.exists())
+                    written = self.handle.write(content)
+                    observations.append(destination.exists())
+                    return written
+
+                def __getattr__(self, name):
+                    return getattr(self.handle, name)
+
+            def opened(*arguments, **options):
+                handle = original_open(*arguments, **options)
+                return ObservedWriter(handle)
+
+            with mock.patch.object(io, "open", side_effect=opened):
+                probe.publish(destination, value)
+            self.assertTrue(observations, "The actual publication writer was not observed")
+            self.assertEqual(observations, [False] * len(observations))
+            self.assertEqual(json.loads(destination.read_text()), value)
+            self.assertEqual(list(Path(root).iterdir()), [destination])
+
+    def test_existing_file_and_dangling_symlink_are_never_replaced(self):
+        for alias in (False, True):
+            with self.subTest(alias=alias), tempfile.TemporaryDirectory() as root:
+                destination = Path(root) / "admit.json"
+                if alias:
+                    destination.symlink_to("foreign-missing.json")
+                else:
+                    destination.write_bytes(b"foreign admission")
+                with self.assertRaises(FileExistsError):
+                    probe.publish(destination, {"phase": "admit"})
+                if alias:
+                    self.assertTrue(destination.is_symlink())
+                    self.assertEqual(destination.readlink(), Path("foreign-missing.json"))
+                else:
+                    self.assertEqual(destination.read_bytes(), b"foreign admission")
+                self.assertEqual(list(Path(root).iterdir()), [destination])
+
+    def test_competing_publication_preserves_its_bytes_and_retires_only_temporary(self):
+        with tempfile.TemporaryDirectory() as root:
+            destination = Path(root) / "admit.json"
+            original_link = probe.os.link
+
+            def competing(source, target):
+                destination.write_bytes(b"foreign admission")
+                return original_link(source, target)
+
+            with mock.patch.object(probe.os, "link", side_effect=competing):
+                with self.assertRaises(FileExistsError):
+                    probe.publish(destination, {"phase": "admit"})
+            self.assertEqual(destination.read_bytes(), b"foreign admission")
+            self.assertEqual(list(Path(root).iterdir()), [destination])
+
+    def test_invalid_json_value_publishes_no_input_or_temporary(self):
+        with tempfile.TemporaryDirectory() as root:
+            with self.assertRaises(TypeError):
+                probe.publish(Path(root) / "admit.json", {"unsupported": object()})
+            self.assertEqual(list(Path(root).iterdir()), [])
 
 
 class StartupOwnershipTests(unittest.TestCase):
