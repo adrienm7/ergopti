@@ -206,7 +206,16 @@ while IFS=$'\t' read -r digest relative || [ -n "$digest$relative" ]; do
 done < "$MANIFEST"
 
 for entry in "$UNIT" "$AUTOSTART"; do
-	if [ -e "$entry" ] && ! grep -Fq "$WRAPPER --tray" "$entry" \
+	if [ ! -e "$entry" ] && [ ! -L "$entry" ]; then continue; fi
+	# Unlisted startup entries bypass the payload receipt loop. Admit the same
+	# regular, direct source before grep can follow an alias or wait on a FIFO.
+	if [ -L "$entry" ] || [ ! -f "$entry" ] \
+		|| [ "$(cd -- "$(dirname -- "$entry")" && pwd -P)" != "$(dirname -- "$entry")" ]; then
+		startup_refusal="[uninstall] code=invalid-source"
+		printf '%s path=%q\n' "$startup_refusal" "$entry" >&2
+		exit 1
+	fi
+	if ! grep -Fq "$WRAPPER --tray" "$entry" \
 		&& ! grep -Fxq "$(ergopti_desktop_exec "$WRAPPER")" "$entry" \
 		&& ! grep -Fxq "$(ergopti_systemd_exec "$WRAPPER")" "$entry"; then
 		echo "Startup entry belongs to a different installation: $entry" >&2

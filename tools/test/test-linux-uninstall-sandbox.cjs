@@ -529,6 +529,124 @@ try {
 			);
 		}
 		fs.writeFileSync(nativeManifest, authored);
+		// These entries deliberately have no @unit/@autostart rows. The owned
+		// payload loop must not hide the optional startup-source admission.
+		const startupAdmission = spawnSync(
+			'/usr/bin/python3',
+			[
+				'-c',
+				String.raw`
+import ctypes, json, os, pathlib, signal, subprocess, sys, tempfile
+assert ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0) == 0
+bash, script, prefix, config, manifest, wrapper = sys.argv[1:]
+config, manifest, prefix = pathlib.Path(config), pathlib.Path(manifest), pathlib.Path(prefix)
+original = manifest.read_bytes()
+wrapper_bytes = pathlib.Path(wrapper).read_bytes()
+payload = prefix / "lib/ergopti/linux/ergopti_hotstrings.lua"
+payload_bytes = payload.read_bytes()
+def identity(path):
+    fact = path.lstat()
+    return (fact.st_dev, fact.st_ino, fact.st_mode)
+assert b'\t@unit\n' not in original and b'\t@autostart\n' not in original
+results = []
+def run_worker(action):
+    worker = subprocess.Popen([bash, script, '--prefix', str(prefix), action], stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+    timed_out = False
+    try:
+        try: stdout, stderr = worker.communicate(timeout=2)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            os.killpg(worker.pid, signal.SIGKILL)
+            stdout, stderr = worker.communicate()
+    finally:
+        if worker.poll() is None:
+            os.killpg(worker.pid, signal.SIGKILL)
+            worker.communicate()
+        while True:
+            try: os.waitpid(-worker.pid, 0)
+            except ChildProcessError: break
+    return stdout, stderr, timed_out, worker.returncode
+
+for role, relative in [('unit', 'systemd/user/ergopti-hotstrings.service'), ('autostart', 'autostart/ergopti-hotstrings.desktop')]:
+    entry = config / relative
+    entry.parent.mkdir(parents=True, exist_ok=True)
+    for mode in ['absent', 'unowned-regular', 'matching-regular', 'fifo', 'directory', 'file-link', 'dangling-link', 'parent-link']:
+        foreign = pathlib.Path(tempfile.mkdtemp(prefix='uninstall-startup-', dir=str(config.parent)))
+        canary = foreign / entry.name
+        canary_bytes = ('[Service]\nExecStart=' + wrapper + ' --tray\n').encode()
+        canary.write_bytes(canary_bytes)
+        canary_identity = (canary.stat().st_dev, canary.stat().st_ino)
+        if mode == 'unowned-regular': entry.write_bytes(b'foreign user startup bytes\n')
+        elif mode == 'matching-regular': entry.write_bytes(canary_bytes)
+        elif mode == 'fifo': os.mkfifo(entry, 0o600)
+        elif mode == 'directory': entry.mkdir(); (entry / 'keep').write_bytes(b'foreign directory bytes\n')
+        elif mode == 'file-link': entry.symlink_to(canary)
+        elif mode == 'dangling-link': entry.symlink_to(foreign / 'missing')
+        elif mode == 'parent-link': entry.parent.rmdir(); entry.parent.symlink_to(foreign, target_is_directory=True)
+        source_identity = None if mode == 'absent' else identity(entry)
+        parent_identity = identity(entry.parent)
+        actions = ['--check', '--yes'] if mode in ['fifo', 'directory', 'file-link', 'dangling-link', 'parent-link'] else ['--check']
+        for action in actions:
+            stdout, stderr, timed_out, status = run_worker(action)
+            assert manifest.read_bytes() == original and pathlib.Path(wrapper).read_bytes() == wrapper_bytes and payload.read_bytes() == payload_bytes, 'refusal must preserve ownership, launcher and runtime before deletion'
+            assert identity(entry.parent) == parent_identity, 'foreign parent identity must survive'
+            if source_identity is not None: assert identity(entry) == source_identity, 'special source identity must survive'
+            results.append({'role': role, 'mode': mode, 'action': action, 'path': str(entry), 'timed_out': timed_out, 'status': status, 'stderr': stderr.decode()})
+        assert manifest.read_bytes() == original and pathlib.Path(wrapper).exists(), 'preflight must preserve ownership and launcher'
+        assert canary.read_bytes() == canary_bytes and (canary.stat().st_dev, canary.stat().st_ino) == canary_identity, 'foreign source bytes and identity must survive'
+        if mode == 'directory': assert (entry / 'keep').read_bytes() == b'foreign directory bytes\n'
+        if mode in ('unowned-regular', 'matching-regular'):
+            assert entry.read_bytes() == (b'foreign user startup bytes\n' if mode == 'unowned-regular' else canary_bytes)
+        if mode == 'directory': (entry / 'keep').unlink(); entry.rmdir()
+        elif mode == 'parent-link': entry.parent.unlink(); entry.parent.mkdir()
+        elif mode != 'absent': entry.unlink()
+        canary.unlink(); foreign.rmdir()
+print(json.dumps(results))
+`,
+				bashExecutable(),
+				script,
+				nativePrefix,
+				nativeConfig,
+				nativeManifest,
+				nativeWrapper
+			],
+			{ encoding: 'utf8', env: nativeEnv, timeout: 30000 }
+		);
+		assert.equal(startupAdmission.error, undefined, 'the native startup matrix must finish');
+		assert.equal(startupAdmission.status, 0, startupAdmission.stderr);
+		const startupCases = JSON.parse(startupAdmission.stdout);
+		assert.equal(
+			startupCases.length,
+			26,
+			'both startup roles must exercise preflight and actual removal refusal'
+		);
+		const startupFailures = [];
+		for (const result of startupCases) {
+			const special = ['fifo', 'directory', 'file-link', 'dangling-link', 'parent-link'].includes(
+				result.mode
+			);
+			const expected =
+				result.mode === 'absent' ||
+				(result.mode === 'matching-regular' && result.role === 'autostart')
+					? 0
+					: 1;
+			if (result.timed_out || result.status !== expected) startupFailures.push(result);
+			if (special) {
+				const quoted = spawnSync(
+					bashExecutable(),
+					['-c', 'printf "%q" "$1"', 'startup-path', result.path],
+					{ encoding: 'utf8' }
+				);
+				assert.equal(quoted.status, 0, quoted.stderr);
+				if (result.stderr !== `[uninstall] code=invalid-source path=${quoted.stdout}\n`)
+					startupFailures.push(result);
+			}
+		}
+		assert.deepEqual(
+			startupFailures,
+			[],
+			'(uninstall-startup-admission) special sources must refuse finitely before grep while normal ownership policy remains intact'
+		);
 		const startup = spawnSync(
 			bashExecutable(),
 			[path.join(nativeLibrary, 'linux/install/start_at_login.sh'), 'enable'],
