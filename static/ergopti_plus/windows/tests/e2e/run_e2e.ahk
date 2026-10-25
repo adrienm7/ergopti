@@ -21,6 +21,13 @@
 ;     covers native Unicode erasure and text storage. Physical InputHook and
 ;     SendInput delivery remain outside this isolated tier.
 ;
+;   Strategy C — Actual TextSender output (mandatory):
+;     Calls production TextSend and its real SendText builtin against a private
+;     foreground Edit. Literal and JSON NUL requests must refuse exactly once
+;     and preserve the receiver; a Unicode control must actually arrive. This
+;     tier runs in Windows CI or a private Wine display and starts no physical
+;     driver hotkeys or input hook.
+;
 ; CORPUS:
 ; Every shared vector is replayed through the production registration factories,
 ; matching, dispatch and intercepted native sender. A virtual document applies
@@ -28,7 +35,7 @@
 ; Explicit terminator consumption selects the end-character path, matching the
 ; macOS and Linux corpus consumers. The sender is the sole substituted boundary.
 ;
-; USAGE (headless CI):
+; USAGE (CI):
 ;   AutoHotkey64.exe run_e2e.ahk
 ; ==============================================================================
 
@@ -386,6 +393,82 @@ Test("e2e[native-edit] supplementary trigger and completion preserve native edit
 for _Sc in E2E_SCENARIOS {
     Test("e2e[native-edit] " . _Sc["id"], _E2E_RunNativeEditTest.Bind(_Sc))
 }
+
+
+
+
+
+
+/** Records completion without replacing the real TextSend or SendText boundary. */
+_E2E_TextSenderComplete(State, Ok, Message) {
+    State.Calls += 1
+    State.Ok := Ok
+    State.Message := Message
+}
+
+/** Genuine Unicode keyboard delivery into one exact private Windows Edit. */
+_E2E_TextSenderNulReceiver(Position, FromJson := false) {
+    Legal := Position == "legal-unicode"
+    Left := Position == "head" ? "" : "private_head"
+    Right := Position == "tail" ? "" : "private_tail"
+    Text := Legal ? Chr(0xE9) . Chr(0x1F642) . " accepted"
+        : FromJson ? JsonParse('"' . Left . '\u0000' . Right . '"') : Left . Chr(0) . Right
+    Before := "retained "
+    Window := Gui()
+    Control := Window.AddEdit("w400 h100 Multi", Before)
+    State := {Calls: 0, Ok: false, Message: ""}
+    PreviousCritical := Critical("Off")
+    try {
+        ; These real keyboard sends run only in Windows CI or our private Wine
+        ; display. No physical driver hotkey module or output seam is installed.
+        Window.Show()
+        Control.Focus()
+        AssertTrue(WinWaitActive("ahk_id " . Window.Hwnd, , 1), "the private receiver must become foreground")
+        AssertEqual(Window.Hwnd, DllCall("GetForegroundWindow", "Ptr"), "the exact private window must own the foreground")
+        AssertEqual(Control.Hwnd, DllCall("GetFocus", "Ptr"), "the exact private Edit must own keyboard focus")
+        AssertEqual(DllCall("GetCurrentProcessId", "UInt"), WinGetPID(Control.Hwnd), "the receiver must belong to this runner")
+        SendMessage(0x00B1, StrLen(Before), StrLen(Before), Control)
+        AssertEqual(Before, Control.Value, "setup must preserve the independent receiver text")
+        if !Legal {
+            AssertTrue(RegExMatch(Text, "\x00") > 0, "the actual public request must retain its NUL")
+            AssertEqual(StrLen(Left) + 1 + StrLen(Right), StrLen(Text), "both sides of the NUL must survive construction")
+        }
+        TextSend(Text, Map("mode", "direct"), _E2E_TextSenderComplete.Bind(State))
+        if Legal {
+            Started := A_TickCount
+            while Control.Value != Before . Text && A_TickCount - Started < 1000
+                Sleep(10)
+        } else
+            Sleep(50)
+        _TestPrint("# native-text-receiver position=" . Position . " json=" . FromJson
+            . " callback_ok=" . State.Ok . " callbacks=" . State.Calls . " unchanged=" . (Before == Control.Value))
+        AssertEqual(1, State.Calls, "the actual sender must complete exactly once")
+        if Legal {
+            AssertTrue(State.Ok, "real Unicode output must be accepted: " . State.Message)
+            AssertEqual("", State.Message, "accepted output must retain no error")
+            AssertEqual(Before . Text, Control.Value, "the real Windows receiver must retain every Unicode code unit")
+        } else {
+            AssertFalse(State.Ok, "unrepresentable NUL text must be refused by the genuine sender")
+            AssertTrue(InStr(State.Message, "NUL") > 0, "the generic refusal must explain the unsupported code unit")
+            AssertEqual(Before, Control.Value, "refused NUL output must leave the actual native receiver unchanged")
+        }
+        Sleep(30)
+        AssertEqual(1, State.Calls, "late input processing must not repeat completion")
+        AssertEqual(Legal ? Before . Text : Before, Control.Value, "no late output may alter the settled receiver")
+    } finally {
+        Window.Destroy()
+        Critical(PreviousCritical)
+    }
+}
+
+for _E2E_NulPosition in ["head", "middle", "tail"] {
+    for _E2E_NulJson in [false, true]
+        Test("e2e[native-text] " . _E2E_NulPosition . " NUL from "
+            . (_E2E_NulJson ? "JSON" : "literal") . " preserves the actual receiver (native-text-nul-receiver)",
+            _E2E_TextSenderNulReceiver.Bind(_E2E_NulPosition, _E2E_NulJson))
+}
+Test("e2e[native-text] legal Unicode reaches the actual receiver (native-text-nul-receiver)",
+    _E2E_TextSenderNulReceiver.Bind("legal-unicode"))
 
 
 
