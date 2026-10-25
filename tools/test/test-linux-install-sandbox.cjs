@@ -65,9 +65,10 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const INSTALLER = path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'install.sh');
 
 function bashPath(value) {
-	const normalized = value.replaceAll('\\', '/');
-	if (process.platform !== 'win32') return normalized;
-	return normalized.replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`);
+	if (process.platform !== 'win32') return value;
+	return value
+		.replaceAll('\\', '/')
+		.replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`);
 }
 
 /** Writes an executable stub. */
@@ -173,11 +174,16 @@ function runInstaller(scenario) {
 	fs.writeFileSync(bashEnvironment, 'export PATH="$TEST_STUBS:/usr/bin:/bin"\n');
 	env.TEST_STUBS = bashPath(stubs);
 	env.BASH_ENV = bashPath(bashEnvironment);
-	const installArgs = scenario.prefixName
-		? ['--prefix', bashPath(path.join(home, scenario.prefixName))]
-		: [];
+	const installArgs =
+		scenario.prefixArgument !== undefined
+			? ['--prefix', scenario.prefixArgument]
+			: scenario.prefixName
+				? ['--prefix', bashPath(path.join(home, scenario.prefixName))]
+				: [];
+	if (scenario.noService) installArgs.push('--no-service');
 	const result = spawnSync(bashExecutable(), [bashPath(INSTALLER), ...installArgs], {
 		env,
+		cwd: scenario.fromHome ? home : undefined,
 		encoding: 'utf8',
 		timeout: 60000
 	});
@@ -196,13 +202,13 @@ function runInstaller(scenario) {
 }
 
 /** Verifies genuine installed bytes against every producer ownership receipt. */
-function verifyOwnership(run, contents) {
-	const library = path.join(run.home, '.local/lib/ergopti');
+function verifyOwnership(run, contents, prefix = path.join(run.home, '.local'), hasStartup = true) {
+	const library = path.join(prefix, 'lib/ergopti');
 	const manifest = contents ?? fs.readFileSync(path.join(library, '.ergopti-owned-files'), 'utf8');
 	assert.notEqual(manifest, '', 'an empty ownership manifest cannot certify an installation');
 	const rows = manifest.endsWith('\n') ? manifest.slice(0, -1).split('\n') : manifest.split('\n');
 	const external = {
-		'@wrapper': path.join(run.home, '.local/bin/ergopti-hotstrings'),
+		'@wrapper': path.join(prefix, 'bin/ergopti-hotstrings'),
 		'@unit': path.join(run.configRoot, 'systemd/user/ergopti-hotstrings.service'),
 		'@autostart': path.join(run.configRoot, 'autostart/ergopti-hotstrings.desktop')
 	};
@@ -226,18 +232,112 @@ function verifyOwnership(run, contents) {
 			`receipt digest must match independently read installed bytes: ${relative}`
 		);
 	}
-	for (const required of [
+	const requiredOwners = [
 		'linux/ergopti_hotstrings.lua',
 		'_shared/data/locales/en.json',
 		'linux/bin/libergopti_archive_publication.so',
 		'bin/ergopti-hotstrings',
-		'@wrapper',
-		'@unit',
-		'@autostart'
-	]) {
+		'@wrapper'
+	];
+	if (hasStartup) requiredOwners.push('@unit', '@autostart');
+	else
+		assert.ok(
+			!observed.has('@unit') && !observed.has('@autostart'),
+			'--no-service must own no startup entries'
+		);
+	for (const required of requiredOwners) {
 		assert.ok(observed.has(required), `the actual installation must own ${required}`);
 	}
 	return manifest;
+}
+
+// A durable launcher must use the same physical prefix as removal, independent
+// of where installation and the later desktop or terminal launch happen.
+if (process.platform === 'linux') {
+	for (const candidate of [
+		{ prefix: 'staging/../relative Applications' },
+		{ prefix: 'alias\\with spaces', alias: true },
+		{ prefix: 'prefix with trailing newline\n', noService: true }
+	]) {
+		const run = runInstaller({
+			desktopProvided: true,
+			prefixArgument: candidate.prefix,
+			fromHome: true,
+			noService: candidate.noService,
+			seed(home) {
+				if (candidate.alias) {
+					const target = path.join(home, 'physical prefix');
+					fs.mkdirSync(target, { mode: 0o700 });
+					fs.symlinkSync(target, path.join(home, candidate.prefix), 'dir');
+				}
+			}
+		});
+		try {
+			assert.equal(run.status, 0, run.output.slice(-1800));
+			const selected = path.join(run.home, candidate.prefix);
+			const prefix = fs.realpathSync(selected);
+			const wrapper = path.join(prefix, 'bin/ergopti-hotstrings');
+			const fullReceipt = verifyOwnership(run, undefined, prefix, !candidate.noService);
+			// c7b743's full-content layer above validates every installed digest.
+			// This layer isolates prefix ownership with a faithful small receipt;
+			// the complete uninstaller's per-file cost is not a prefix invariant.
+			const ownerPaths = new Set([
+				'linux/ergopti_hotstrings.lua',
+				'_shared/data/locales/en.json',
+				'bin/ergopti-hotstrings',
+				'@wrapper',
+				'@unit',
+				'@autostart'
+			]);
+			const receipt = fullReceipt.split('\n').filter((row) => ownerPaths.has(row.split('\t')[1]));
+			fs.writeFileSync(
+				path.join(prefix, 'lib/ergopti/.ergopti-owned-files'),
+				receipt.join('\n') + '\n'
+			);
+			if (candidate.alias) {
+				assert.equal(
+					fs.statSync(prefix).mode & 0o777,
+					0o700,
+					'normalization preserves an existing private prefix mode'
+				);
+				fs.unlinkSync(selected);
+			}
+			const environment = {
+				HOME: bashPath(run.home),
+				XDG_CONFIG_HOME: bashPath(run.configRoot),
+				PATH: `${bashPath(run.stubs)}:/usr/bin:/bin`
+			};
+			const launched = spawnSync(bashExecutable(), [bashPath(wrapper), '--help'], {
+				cwd: run.stubs,
+				env: environment,
+				encoding: 'utf8',
+				timeout: 15000
+			});
+			assert.equal(launched.status, 0, `prefix-launch-from-other-cwd: ${launched.stderr}`);
+			const checked = spawnSync(
+				bashExecutable(),
+				[
+					bashPath(path.join(path.dirname(INSTALLER), 'uninstall.sh')),
+					'--prefix',
+					bashPath(prefix),
+					'--check'
+				],
+				{
+					cwd: run.stubs,
+					env: environment,
+					encoding: 'utf8',
+					timeout: 15000
+				}
+			);
+			assert.equal(
+				checked.status,
+				0,
+				`prefix-uninstall-owner: ${checked.stderr || checked.error?.message || checked.signal}`
+			);
+		} finally {
+			run.cleanup();
+		}
+	}
 }
 
 const errors = [];
