@@ -69,16 +69,47 @@ Test_LLM_Regression_FrameworkInitializesDryRun() {
 Test("LLM regression: test_framework defaults _AHK_DRY_RUN when unset",
 	Test_LLM_Regression_FrameworkInitializesDryRun)
 
+_LLM_Regress_AssertRunTestsGuard(Source) {
+	Body := _DriverExtractFunctionBody(&Source, "RunTests")
+	Assert(Body != "", "RunTests must have a real function definition")
+	Code := _DriverMaskNonCode(&Body)
+	GuardPos := RegExMatch(Code,
+		"m)^\s*if\s+!IsSet\(_AHK_DRY_RUN\)\s*\n\s*_AHK_DRY_RUN\s*:=\s*false\b")
+	Assert(GuardPos > 0, "RunTests must default an unset dry-run flag to false inside its own body")
+	UsePos := RegExMatch(Code, "m)^\s*if\s*\(_AHK_DRY_RUN\)")
+	Assert(UsePos > GuardPos, "the local dry-run guard must precede its execution branch")
+}
+
 Test_LLM_Regression_RunTestsGuardsDryRun() {
-	body := FileRead(_LLM_Regress_FrameworkPath(), "UTF-8")
-	AssertContains(body, "RunTests()",
-		"RunTests must exist")
-	; Second guard inside RunTests (run_llm_menu_persistence used to crash here).
-	Assert(InStr(body, "if !IsSet(_AHK_DRY_RUN)") >= 2,
-		"RunTests must re-check IsSet(_AHK_DRY_RUN) before use")
+	Source := FileRead(_LLM_Regress_FrameworkPath(), "UTF-8")
+	; Parse this closed framework snapshot, not the production driver census.
+	; An optional plan classifier must not disarm the isolated-runner guard.
+	_LLM_Regress_AssertRunTestsGuard(Source)
+	AssertEqual(0, RunTests.MinParams, "the canonical runner must still permit no-argument execution")
+	AssertTrue(_TestPlanClassifier(0) == _TestModuleOf,
+		"the Integer zero default must retain the canonical unit module classifier")
 }
 Test("LLM regression: RunTests re-guards _AHK_DRY_RUN",
 	Test_LLM_Regression_RunTestsGuardsDryRun)
+
+Test_LLM_Regression_RunTestsGuardRejectsCounterexamples() {
+	Guard := "if !IsSet(_AHK_DRY_RUN)`n_AHK_DRY_RUN := false`n"
+	Use := "if (_AHK_DRY_RUN) {`nreturn`n}`n"
+	Good := "RunTests(PlanModuleOf := 0) {`n" . Guard . Use . "}`n"
+	_LLM_Regress_AssertRunTestsGuard(Good)
+	Fixtures := Map(
+		"missing definition", Guard . "RunTests()`n",
+		"guard outside owner", Guard . "RunTests(PlanModuleOf := 0) {`n" . Use . "}`n",
+		"guard in comment", "RunTests(PlanModuleOf := 0) {`n/*`n" . Guard . "*/`n" . Use . "}`n",
+		"guard defaults true", StrReplace(Good, ":= false", ":= true"),
+		"guard after use", "RunTests(PlanModuleOf := 0) {`n" . Use . Guard . "}`n"
+	)
+	for Name, Source in Fixtures
+		AssertThrows(() => _LLM_Regress_AssertRunTestsGuard(Source),
+			"the runner guard must refuse " . Name)
+}
+Test("LLM regression: RunTests guard rejects missing and misplaced defaults (runner-guard-counterexamples)",
+	Test_LLM_Regression_RunTestsGuardRejectsCounterexamples)
 
 Test_LLM_Regression_FrameworkUsesCallbackCall() {
 	body := FileRead(_LLM_Regress_FrameworkPath(), "UTF-8")
