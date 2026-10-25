@@ -38,6 +38,16 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
       (likely the gesture greying, dbc29c5077). `test_hotstrings_scope.ahk:520` (expected 0.5, got 1.0) is
       unexplained: print `_HotstringsOverrides["autocorrection"].Sections[family]` after
       `HotstringsOverridesApplyBase()`.
+- [ ] **AI off disarms the AI keys and the agent's manual actions.** [CODE] Done on Linux and macOS
+      (bc2048765a, 6d96986979). Windows: `AiActionIsAi`/`AiActionBlocked` in `modules/gestures/config.ahk`;
+      split `TapHoldTapAction` (`platform/remap/tap_hold_loader.ahk`) so a blocked AI tap returns the native
+      tap, configured readers in `menu_taphold.ahk` and `tap_hold_writer.ahk` use the new
+      `TapHoldConfiguredTapAction`; per-press gates in `TapKeyShouldFire`, `ScriptShortcutSlotRunsAction`,
+      `KeyCombinationOwns`/`KeyCombinationFire`, `GestureDispatch`, `_MagicEditorBrokerWinner`; AI hotkeys
+      through `HotkeyRegistrarSetEnabled` from `LLM_Menu_ActivateRuntime` and `_LLM_Menu_ApplyToggleCommitted`;
+      `_LLM_Agent_ManualRefusal` passes `LLM_Menu_AiEnabled()`; `requires_ahk = ["ai:on"]` on the two agent
+      actions with the codegen token and the picker greying; tests `test_ai_action_gate.ahk`,
+      `test_llm_agent.ahk`, `test_llm_agent_requester.ahk`; reseal.
 - [ ] **Release notes in the update-check window (PAR-52).** [CODE] `windows/ui/update_check/init.ahk`:
       seed `state.notes = {body, owner, repo}` in the `available` message (from `UPDATER_LATEST_RELEASE.Body`,
       `UPDATER_GH_OWNER`, `UPDATER_GH_REPO`, as `_Updater_ReleaseNotesSeed`), serve `open_url` in the
