@@ -358,11 +358,6 @@
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO != 'xctest') }}"
 				},
 				{
-					"name": "Upload the actual managed native release asset",
-					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (inputs.release && env.MACOS_STAGE_SCENARIO != 'xctest') }}"
-				},
-				{
 					"name": "Retain actual native producer, catalogue and receiving evidence",
 					"uses": "actions/upload-artifact@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
@@ -745,6 +740,16 @@
 					"id": "managed-catalogue-toolchain",
 					"if": "${{ steps.stage-admission.outcome == 'success' }}",
 					"shell": "bash"
+				},
+				{
+					"name": "Upload the qualified managed native release asset (Apple silicon)",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && (inputs.release) }}"
+				},
+				{
+					"name": "Upload the qualified managed native release asset (Intel)",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && (inputs.release) }}"
 				},
 				{
 					"uses": "actions/setup-go@v5",

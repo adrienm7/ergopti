@@ -467,9 +467,15 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	],
 	[
 		MACOS_BOX,
-		'managed-ollama-native',
-		'Upload the actual managed native release asset',
-		"${{ inputs.release && matrix.scenario != 'xctest' }}"
+		'package-macos',
+		'Upload the qualified managed native release asset (Apple silicon)',
+		'inputs.release'
+	],
+	[
+		MACOS_BOX,
+		'package-macos',
+		'Upload the qualified managed native release asset (Intel)',
+		'inputs.release'
 	],
 	[
 		MACOS_BOX,

@@ -117,7 +117,7 @@ function admitNativeSdkSelector(mac) {
 	if (jobs.length !== 1) return null;
 	// Every original role step retains its own admission after job-level gating moved.
 	try {
-		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 35) return null;
+		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 34) return null;
 	} catch {
 		return null;
 	}
@@ -223,7 +223,7 @@ function admitNativePacSelector(mac) {
 	if (jobs.length !== 1) return null;
 	// Every original role step retains its own admission after job-level gating moved.
 	try {
-		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 35) return null;
+		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 34) return null;
 	} catch {
 		return null;
 	}
@@ -262,7 +262,7 @@ function admitNativeSourceSelector(mac) {
 	if (jobs.length !== 1) return null;
 	// Every original role step retains its own admission after job-level gating moved.
 	try {
-		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 35) return null;
+		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 34) return null;
 	} catch {
 		return null;
 	}
@@ -471,7 +471,7 @@ function admitNativeNumberRowSelector(mac) {
 	if (jobs.length !== 1) return null;
 	// Every original role step retains its own admission after job-level gating moved.
 	try {
-		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 35) return null;
+		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 34) return null;
 	} catch {
 		return null;
 	}

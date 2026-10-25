@@ -312,9 +312,11 @@ between them via `macos_launch_reset.py`) beside the cold bootstrap. Action:
 count macOS jobs per stage against the five-runner budget before splitting a
 cell, and keep the receipt chain one link per stage (`PREDECESSORS` in
 `tools/ci/macos-stage-roles.cjs`); the chain refuses a missing stage. The
-managed Ollama build and `assets-managed-ollama-*` are produced and published
-by macOS E2E on purpose, and the cold bootstrap rebuilds its own application
-at Install and launch on purpose.
+managed Ollama build and its qualification belong to macOS E2E on purpose;
+Build downloads the `managed-ollama-inputs-*` it packages and republishes the
+archives as `assets-managed-ollama-<architecture>`, so every published
+`assets-*` file comes from a Build job. The cold bootstrap rebuilds its own
+application at Install and launch on purpose.
 
 ### project-ci-run-timing-and-rerun-facts
 
