@@ -232,8 +232,8 @@ local function fake_keymap(controls)
 	function km.set_base_delay(value) km.base = value; return true end
 	function km.get_idle_reset_seconds() return km.idle_reset end
 	function km.set_idle_reset_seconds(value) km.idle_reset = value; return true end
-	function km.get_cascade_depth() return km.cascade end
-	function km.set_cascade_depth(value) km.cascade = value; return true end
+	function km.get_cascade_max_arrows() return km.cascade end
+	function km.set_cascade_max_arrows(value) km.cascade = value; return true end
 	function km.is_click_resets_word_enabled() return km.click_resets end
 	function km.set_click_resets_word(value) km.click_resets = value; return true end
 	function km.is_arrow_resets_word_enabled() return km.arrow_resets end
@@ -501,7 +501,7 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(f.editor.trigger, "★")
 		helpers.assert_eq(f.km.base, 0.75)
 		helpers.assert_eq(f.km.idle_reset, 3, "restore applies the recommended idle reset")
-		helpers.assert_eq(f.km.cascade, 0, "restore applies the recommended cascade depth (off)")
+		helpers.assert_eq(f.km.cascade, 3, "restore applies the recommended cascade arrow count (3)")
 		helpers.assert_eq(f.km.click_resets, true, "restore applies the recommended click reset")
 		helpers.assert_eq(f.km.arrow_resets, true, "restore applies the recommended arrow reset")
 		helpers.assert_eq(f.km.shortcut_resets, true, "restore applies the recommended shortcut reset")
@@ -664,7 +664,7 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(f.km.is_group_enabled("rolls"), false)
 		helpers.assert_eq(f.km.repeat_enabled, false)
 		helpers.assert_eq(f.km.idle_reset, 5, "revert restores the idle reset")
-		helpers.assert_eq(f.km.cascade, 2, "revert restores the cascade depth")
+		helpers.assert_eq(f.km.cascade, 2, "revert restores the cascade arrow count")
 		helpers.assert_eq(f.km.click_resets, false, "revert restores the click reset")
 		helpers.assert_eq(f.km.arrow_resets, false, "revert restores the arrow reset")
 		helpers.assert_eq(f.km.shortcut_resets, false, "revert restores the shortcut reset")

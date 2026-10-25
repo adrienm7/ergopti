@@ -616,12 +616,12 @@ ToggleRepeatKeyEnabled(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 
 ; The engine global each word-reset setting publishes to.
 _EditorWordResetGlobal(Key, Value) {
-	global HSE_IdleResetSeconds, HSE_ClickResetsWord, HSE_CascadeDepth
+	global HSE_IdleResetSeconds, HSE_ClickResetsWord, HSE_CascadeMaxArrows
 	global HSE_ArrowResetsWord, HSE_ShortcutResetsWord, HSE_TapHoldResetsWord
 	if (Key == "idle_reset_seconds")
 		HSE_IdleResetSeconds := Value
-	else if (Key == ConfigLeaf.CASCADE_DEPTH)
-		HSE_CascadeDepth := Value
+	else if (Key == ConfigLeaf.CASCADE_MAX_ARROWS)
+		HSE_CascadeMaxArrows := Value
 	else if (Key == "click_resets_word")
 		HSE_ClickResetsWord := Value
 	else if (Key == "arrow_resets_word")
@@ -697,16 +697,16 @@ SetHotstringsIdleResetSeconds(Seconds, WriterFn := 0, NotifyFn := 0, RebuildFn :
 }
 
 /**
- * Sets how many more hotstrings the text a hotstring produced may complete.
- * @param {Integer} Depth A whole number, 0 or more; 0 disables the cascade.
+ * Sets the longest chain of hotstrings: how many expansions (arrows) it may hold.
+ * @param {Integer} Arrows A whole number from 1 (a single expansion) to 10.
  * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
  */
-SetHotstringsCascadeDepth(Depth, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
-	if !HSE_ValidCascadeDepth(Depth) {
-		try LoggerError("Editors", "Refused cascade depth: not a whole number, 0 or more.")
+SetHotstringsCascadeMaxArrows(Arrows, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	if !HSE_ValidCascadeMaxArrows(Arrows) {
+		try LoggerError("Editors", "Refused cascade arrow count: not a whole number from 1 to 10.")
 		return false
 	}
-	return _EditorCommitWordReset(ConfigLeaf.CASCADE_DEPTH, Depth, "the cascade depth",
+	return _EditorCommitWordReset(ConfigLeaf.CASCADE_MAX_ARROWS, Arrows, "the cascade arrow count",
 		WriterFn, NotifyFn, RebuildFn)
 }
 

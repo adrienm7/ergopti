@@ -254,9 +254,9 @@ ReadScriptConfig(Cache) {
 		global HSE_IdleResetSeconds, HSE_ClickResetsWord
 		HSE_IdleResetSeconds := _FeatureStateIdleResetSeconds(
 			_FeatureStateIniGet(Cache, "hotstrings", "idle_reset_seconds"))
-		global HSE_CascadeDepth
-		HSE_CascadeDepth := _FeatureStateCascadeDepth(
-			_FeatureStateIniGet(Cache, ConfigKey.HOTSTRINGS, ConfigLeaf.CASCADE_DEPTH))
+		global HSE_CascadeMaxArrows
+		HSE_CascadeMaxArrows := _FeatureStateCascadeMaxArrows(
+			_FeatureStateIniGet(Cache, ConfigKey.HOTSTRINGS, ConfigLeaf.CASCADE_MAX_ARROWS))
 		RawClick := _FeatureStateIniGet(Cache, "hotstrings", "click_resets_word")
 		if RawClick != "_"
 				HSE_ClickResetsWord := _FeatureStateValidateBoolean(
@@ -315,20 +315,20 @@ _FeatureStateIdleResetSeconds(Raw) {
 	return Default
 }
 
-; The configured cascade depth, or the manifest default for an absent value. A
-; value that is no whole number, 0 or more, is outdated configuration: one
+; The configured cascade arrow count, or the manifest default for an absent value. A
+; value that is no whole number from 1 to 10 is outdated configuration: one
 ; WARNING, read as absent, never a boot failure.
 ; @param Raw {Any} The raw TOML value, "_" when absent.
-; @returns {Integer} 0 disables the cascade.
-_FeatureStateCascadeDepth(Raw) {
-	Default := ManifestDefaultFor(ConfigKey.HOTSTRINGS_CASCADE_DEPTH)
+; @returns {Integer} 1 is a single expansion (no cascade).
+_FeatureStateCascadeMaxArrows(Raw) {
+	Default := ManifestDefaultFor(ConfigKey.HOTSTRINGS_CASCADE_MAX_ARROWS)
 	if Raw == "_"
 		return Default
-	; HSE_ValidCascadeDepth's rule, restated because this reader also boots
+	; HSE_ValidCascadeMaxArrows's rule, restated because this reader also boots
 	; without the hotstring engine (tests/support/feature_state_boot_smoke.ahk).
-	if (Raw is Integer) and Raw >= 0
+	if (Raw is Integer) and Raw >= 1 and Raw <= 10
 		return Raw
-	try LoggerWarn("Config", "hotstrings.cascade_depth '{1}' is not a whole number, 0 or more — using {2}.",
+	try LoggerWarn("Config", "hotstrings.cascade_max_arrows '{1}' is not a whole number from 1 to 10 — using {2}.",
 		Raw is Object ? Type(Raw) : String(Raw), Default)
 	return Default
 }

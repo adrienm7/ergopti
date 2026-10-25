@@ -431,13 +431,21 @@ function M.valid_idle_reset_seconds(value)
 	return type(value) == "number" and value == value and value >= 0 and value ~= math.huge
 end
 
---- Whether a value is a valid `hotstrings.cascade_depth`: a whole number, 0 or
---- more, 0 meaning the cascade is disabled. Every driver validates the setting
---- with this rule (the Windows mirror is HSE_ValidCascadeDepth).
+--- Fewest and most arrows `hotstrings.cascade_max_arrows` accepts. One arrow is
+--- a single expansion (no cascading). The manifest presets and the config schema
+--- state the same bounds; tools/test pins the three together.
+M.CASCADE_MIN_ARROWS = 1
+M.CASCADE_MAX_ARROWS = 10
+
+--- Whether a value is a valid `hotstrings.cascade_max_arrows`: a whole number
+--- from CASCADE_MIN_ARROWS to CASCADE_MAX_ARROWS, counting the ARROWS of a chain
+--- (1 = `a` -> `b` only, 2 = `a` -> `b` -> `c`). Every driver validates the
+--- setting with this rule (the Windows mirror is HSE_ValidCascadeMaxArrows).
 --- @param value any Candidate read from config.toml or a menu.
 --- @return boolean
-function M.valid_cascade_depth(value)
-	return type(value) == "number" and value >= 0 and value % 1 == 0 and value ~= math.huge
+function M.valid_cascade_max_arrows(value)
+	return type(value) == "number" and value % 1 == 0
+		and value >= M.CASCADE_MIN_ARROWS and value <= M.CASCADE_MAX_ARROWS
 end
 
 --- Whether the pause before the current keystroke starts a new word.
@@ -827,8 +835,9 @@ function M.new()
 		return text_utils.trig_lower(mapping.trigger or "") .. "\0" .. (mapping.auto_expand and "auto" or "end")
 	end
 
-	--- Lets the text an expansion produced complete one more hotstring, up to
-	--- `depth` times, and returns ONE net edit for the whole chain.
+	--- Lets the text an expansion produced complete one more hotstring, until the
+	--- chain holds `max_arrows` expansions (arrows), and returns ONE net edit for
+	--- the whole chain.
 	---
 	--- The chain is resolved on a virtual copy of the buffer BEFORE anything is
 	--- injected, so the application receives a single burst (the atomicity the
@@ -837,21 +846,28 @@ function M.new()
 	--- than a half-way text). Each step asks `select_match` the very question a
 	--- typed character would, of the virtual buffer the previous step produced.
 	---
-	--- Stops at the first of: the depth bound, a step that is `final_result`
+	--- Stops at the first of: the arrow bound, a step that is `final_result`
 	--- (nothing may chain off it), no match, the same spec again (the guard that
 	--- makes `ab` -> `cab` terminate), or a refusal from `options.cascade_gate`
 	--- (the per-step expansion delay, which only the driver can resolve).
-	--- A replayed terminator behaves as it does for a typed one: a following end
-	--- step takes it as its own terminator, an auto step whose trigger reaches it
-	--- erases it, and what is still there at the end is replayed by the caller.
+	--- The end character that completed the first step is carried through the
+	--- whole chain, whatever its delimiter's "consumed" choice, so that a chain
+	--- gives the same text for a consumed and an unconsumed delimiter. A
+	--- following end step takes it as its own terminator; a step that would
+	--- swallow it (an auto step whose trigger reaches it) ends the chain instead,
+	--- so the end character the user typed always lands after the final text.
+	--- What is still there at the end is replayed by the caller, unless its
+	--- delimiter is consumed, in which case it is swallowed once, exactly as a
+	--- typed key's would be.
 	--- @param first table The first step's result, as built by on_char.
 	--- @param first_mapping table The mapping that produced `first`.
-	--- @param depth number Maximum number of additional steps (>= 1).
+	--- @param max_arrows number Most expansions the chain may hold, the first one included (>= 2).
 	--- @param options table on_char options (terminator_consumed, cascade_gate).
 	--- @return table result The first result when nothing cascaded, else the net edit.
-	local function cascade(first, first_mapping, depth, options)
-		if type(depth) ~= "number" or depth < 0 or depth % 1 ~= 0 then
-			Logger.error(LOG, "cascade(): depth must be a non-negative integer, got %s.", tostring(depth))
+	local function cascade(first, first_mapping, max_arrows, options)
+		if not M.valid_cascade_max_arrows(max_arrows) then
+			Logger.error(LOG, "cascade(): max_arrows must be a whole number from %d to %d, got %s.",
+				M.CASCADE_MIN_ARROWS, M.CASCADE_MAX_ARROWS, tostring(max_arrows))
 			return first
 		end
 		if first.final_result or first.is_private then return first end
@@ -891,14 +907,20 @@ function M.new()
 
 		local seen = { [spec_key(first_mapping)] = true }
 		local last_mapping = first_mapping
-		local terminator = first.end_char and not consumed and first.terminator or nil
+		-- Carried even when its delimiter is consumed: the consumption is applied
+		-- once, at the end (see the tail of this function).
+		local terminator = first.end_char and first.terminator or nil
 		local steps = 1
 		apply(first.backspace_count, first.replacement, terminator)
 
-		while steps <= depth and not last_mapping.final_result do
+		while steps < max_arrows and not last_mapping.final_result do
 			local mapping, tlen, replacement, via_end_char, nbsp_stripped =
 				select_match(vcps, terminator ~= nil)
 			if not mapping then break end
+			if terminator ~= nil and not via_end_char then
+				Logger.debug(LOG, "Cascade stopped at step %d: an auto step would swallow the end character.", steps)
+				break
+			end
 			-- A private mapping (personal information) is never composed into another
 			-- hotstring's output: its text must stay under its own redaction.
 			if mapping.is_private then
@@ -930,14 +952,9 @@ function M.new()
 				end
 			end
 			seen[spec_key(mapping)] = true
-			-- An end step keeps the terminator it consumed (replayed again unless the
-			-- driver consumes it); an auto step reaching it has erased it for good.
-			local next_terminator = nil
-			if via_end_char then
-				next_terminator = terminator
-			end
-			apply(step_bc, replacement, next_terminator)
-			terminator = next_terminator
+			-- An end step keeps the terminator it took (replayed after it); an auto
+			-- step is only reached when no terminator is carried.
+			apply(step_bc, replacement, terminator)
 			last_mapping = mapping
 			steps = steps + 1
 			Logger.debug(LOG, "Cascade step %d fired (trigger of %d char(s)).", steps - 1, tlen)
@@ -1058,9 +1075,10 @@ function M.new()
 			-- users may omit time.
 			expander_gap_ms = expander_gap_ms(via_end_char and (bc - tlen) or 1, bc),
 		}
-		local depth = options.cascade_depth
-		if depth ~= nil and depth ~= 0 then
-			return cascade(result, mapping, depth, options)
+		local max_arrows = options.cascade_max_arrows
+		-- One arrow is the first expansion alone: nothing to chain.
+		if max_arrows ~= nil and max_arrows ~= M.CASCADE_MIN_ARROWS then
+			return cascade(result, mapping, max_arrows, options)
 		end
 		return result
 	end

@@ -5,4 +5,4 @@ description = "A hotstrings.dynamic.enabled already stored keeps its value; the 
 drivers = ["ahk"]
 outcome = "migrated"
 from_version = 12
-to_version = 13
+to_version = 14

@@ -433,75 +433,75 @@ end)
 
 -- =================================================================
 -- =================================================================
--- ======= 5/ The cascade depth ====================================
+-- ======= 5/ The cascade arrows ===================================
 -- =================================================================
 -- =================================================================
 
-helpers.describe("word reset: the cascade depth", function()
-	helpers.it("cascade depth, is off by default, so no output changes unless asked", function()
+helpers.describe("word reset: the cascade arrow count", function()
+	helpers.it("cascade arrows, default to three, the manifest default", function()
 		with_settings(nil, function(subject)
-			helpers.assert_eq(subject.cascade_depth(), 0)
-			helpers.assert_eq(subject.cascade_depth(), require("infra.manifest_reader").default_for("hotstrings.cascade_depth"))
+			helpers.assert_eq(subject.cascade_max_arrows(), 3)
+			helpers.assert_eq(subject.cascade_max_arrows(), require("infra.manifest_reader").default_for("hotstrings.cascade_max_arrows"))
 		end)
 	end)
 
-	helpers.it("cascade depth, persists sparsely, reloads, and a default is an absent leaf", function()
+	helpers.it("cascade arrows, persists sparsely, reloads, and a default is an absent leaf", function()
 		with_settings('[hotstrings]\nunknown = "keep"\n', function(subject, _, path, reload, sandbox)
-			helpers.assert_true(subject.set_cascade_depth(2))
+			helpers.assert_true(subject.set_cascade_max_arrows(2))
 			local config = require("toml_codec").decode(sandbox.read_bytes(path))
-			helpers.assert_eq(config.hotstrings.cascade_depth, 2)
+			helpers.assert_eq(config.hotstrings.cascade_max_arrows, 2)
 			helpers.assert_eq(config.hotstrings.unknown, "keep")
 			local fresh = reload()
-			helpers.assert_eq(fresh.cascade_depth(), 2)
-			helpers.assert_true(fresh.set_cascade_depth(0))
-			helpers.assert_eq(require("toml_codec").decode(sandbox.read_bytes(path)).hotstrings.cascade_depth, nil,
+			helpers.assert_eq(fresh.cascade_max_arrows(), 2)
+			helpers.assert_true(fresh.set_cascade_max_arrows(3))
+			helpers.assert_eq(require("toml_codec").decode(sandbox.read_bytes(path)).hotstrings.cascade_max_arrows, nil,
 				"the default is written as an absent leaf")
 		end)
 	end)
 
-	helpers.it("cascade depth, refuses a value that is no whole number, 0 or more", function()
-		with_settings("[hotstrings]\ncascade_depth = 1\n", function(subject, controls, path, _, sandbox)
-			for _, bad in ipairs({ -1, 1.5, "2", true, math.huge }) do
-				helpers.assert_eq(subject.set_cascade_depth(bad), false, tostring(bad))
+	helpers.it("cascade arrows, refuses a value that is no whole number from 1 to 10", function()
+		with_settings("[hotstrings]\ncascade_max_arrows = 1\n", function(subject, controls, path, _, sandbox)
+			for _, bad in ipairs({ 0, 11, -1, 1.5, "2", true, math.huge }) do
+				helpers.assert_eq(subject.set_cascade_max_arrows(bad), false, tostring(bad))
 			end
 			local source = sandbox.read_bytes(path)
 			controls.refuse = true
-			helpers.assert_eq(subject.set_cascade_depth(3), false)
+			helpers.assert_eq(subject.set_cascade_max_arrows(4), false)
 			helpers.assert_eq(sandbox.read_bytes(path), source)
-			helpers.assert_eq(subject.cascade_depth(), 1, "the runtime keeps the published value")
+			helpers.assert_eq(subject.cascade_max_arrows(), 1, "the runtime keeps the published value")
 		end)
 	end)
 
-	helpers.it("cascade depth, reads an outdated value as the default with one warning", function()
-		with_settings('[hotstrings]\ncascade_depth = "deep"\n', function(subject)
+	helpers.it("cascade arrows, reads an outdated value as the default with one warning", function()
+		with_settings('[hotstrings]\ncascade_max_arrows = "deep"\n', function(subject)
 			require("config_outdated").reset_for_tests()
 			local reported = require("config_outdated").collect_reports(function()
-				helpers.assert_eq(subject.cascade_depth(), 0)
+				helpers.assert_eq(subject.cascade_max_arrows(), 3)
 			end)
-			helpers.assert_eq(reported, { ["hotstrings.cascade_depth"] = true })
+			helpers.assert_eq(reported, { ["hotstrings.cascade_max_arrows"] = true })
 		end)
 	end)
 
-	helpers.it("cascade depth, is marked as read for the cleanup and adopted with the scope", function()
-		with_settings("[hotstrings]\ncascade_depth = 2\n", function(subject, _, path)
+	helpers.it("cascade arrows, is marked as read for the cleanup and adopted with the scope", function()
+		with_settings("[hotstrings]\ncascade_max_arrows = 2\n", function(subject, _, path)
 			package.loaded["ui.menu.unused_keys_cleanup"] = nil
 			local scan = require("ui.menu.unused_keys_cleanup").find(path)
 			helpers.assert_eq(scan.status, "ok")
 			for _, key in ipairs(scan.keys) do
-				helpers.assert_true(table.concat(key.path, ".") ~= "hotstrings.cascade_depth",
+				helpers.assert_true(table.concat(key.path, ".") ~= "hotstrings.cascade_max_arrows",
 					"a consumed leaf is never offered for removal")
 			end
 			local before = subject.snapshot()
-			helpers.assert_true(subject.adopt_configuration({ hotstrings = { cascade_depth = 3 } }))
-			helpers.assert_eq(subject.cascade_depth(), 3)
+			helpers.assert_true(subject.adopt_configuration({ hotstrings = { cascade_max_arrows = 3 } }))
+			helpers.assert_eq(subject.cascade_max_arrows(), 3)
 			helpers.assert_true(subject.restore_configuration(before))
-			helpers.assert_eq(subject.cascade_depth(), 2)
-			helpers.assert_eq(subject.restore_configuration({ idle_seconds = 3, cascade_depth = -1 }), false,
-				"a snapshot with an invalid depth is refused")
+			helpers.assert_eq(subject.cascade_max_arrows(), 2)
+			helpers.assert_eq(subject.restore_configuration({ idle_seconds = 3, cascade_max_arrows = 0 }), false,
+				"a snapshot with an invalid arrow count is refused")
 		end)
 	end)
 
-	helpers.it("cascade depth, reaches the menu and the keystroke path", function()
+	helpers.it("cascade arrows, reach the menu and the keystroke path", function()
 		local function source(rel)
 			local f = assert(io.open(helpers.driver_root() .. "/" .. rel, "rb"))
 			local bytes = f:read("*a")
@@ -509,11 +509,11 @@ helpers.describe("word reset: the cascade depth", function()
 			return bytes
 		end
 		local text = source("ui/menu/menu_builder.lua")
-		helpers.assert_contains(text, "params_ctx.commands[COMMAND.CASCADE_DEPTH]")
-		helpers.assert_contains(text, "WordReset.set_cascade_depth(depth)")
-		helpers.assert_contains(text, "params_ctx.state_getters[require(\"config_keys\").KEY.HOTSTRINGS_CASCADE_DEPTH]")
+		helpers.assert_contains(text, "params_ctx.commands[COMMAND.CASCADE_MAX_ARROWS]")
+		helpers.assert_contains(text, "WordReset.set_cascade_max_arrows(arrows)")
+		helpers.assert_contains(text, "params_ctx.state_getters[require(\"config_keys\").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS]")
 		local daemon = source("ergopti_hotstrings.lua")
-		helpers.assert_contains(daemon, "cascade_depth       = WordReset.cascade_depth()")
+		helpers.assert_contains(daemon, "cascade_max_arrows  = WordReset.cascade_max_arrows()")
 		helpers.assert_contains(daemon, "cascade_gate        = within_delay")
 	end)
 end)

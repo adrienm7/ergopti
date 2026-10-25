@@ -69,7 +69,7 @@
 				"hotstrings.arrow_resets_word",
 				"hotstrings.shortcut_resets_word",
 				"hotstrings.tap_hold_resets_word",
-				"hotstrings.cascade_depth"
+				"hotstrings.cascade_max_arrows"
 			],
 			"registered": "yes",
 			"production_caller": "yes",

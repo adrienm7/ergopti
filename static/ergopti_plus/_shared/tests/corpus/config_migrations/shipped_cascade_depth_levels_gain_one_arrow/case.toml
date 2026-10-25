@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_cascade_depth_levels_gain_one_arrow/case.toml
+
+[case]
+description = "A cascade_depth of 3 (three more hotstrings) becomes 4 arrows; a sibling hotstrings key stays put."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 13
+to_version = 14

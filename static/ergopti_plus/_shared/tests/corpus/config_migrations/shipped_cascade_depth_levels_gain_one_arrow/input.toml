@@ -1,0 +1,6 @@
+[_meta]
+schema_version = 13
+
+[hotstrings]
+cascade_depth = 3
+idle_reset_seconds = 5

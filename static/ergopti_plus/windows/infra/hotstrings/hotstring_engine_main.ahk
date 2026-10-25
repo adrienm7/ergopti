@@ -277,10 +277,13 @@ global HSE_RepeatEnabled := true
 global HSE_IdleResetSeconds := ""
 global HSE_ClickResetsWord := ""
 
-; hotstrings.cascade_depth, published the same way: how many more hotstrings the
-; text a hotstring produced may complete. "" reads the manifest default
-; (HSE_CascadeDepthCurrent, in hotstring_cascade.ahk).
-global HSE_CascadeDepth := ""
+; hotstrings.cascade_max_arrows, published the same way: how many expansions
+; (arrows) a chain of hotstrings may hold, 1 = a single expansion. "" reads the
+; manifest default (HSE_CascadeMaxArrowsCurrent, in hotstring_cascade.ahk). The
+; bounds sit here so they exist before any include runs.
+global HSE_CascadeMaxArrows := ""
+global HSE_CASCADE_MIN_ARROWS := 1
+global HSE_CASCADE_MAX_ARROWS := 10
 
 ; hotstrings.arrow_resets_word, hotstrings.shortcut_resets_word and
 ; hotstrings.tap_hold_resets_word, published the same way: whether an arrow

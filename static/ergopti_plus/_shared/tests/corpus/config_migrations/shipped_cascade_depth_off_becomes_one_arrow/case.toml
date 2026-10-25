@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_cascade_depth_off_becomes_one_arrow/case.toml
+
+[case]
+description = "A cascade_depth of 0 (cascade off) becomes cascade_max_arrows 1 (a single expansion), on every driver."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 13
+to_version = 14

@@ -694,10 +694,10 @@ _CMJ_PostBootDirectPublication(Metadata, Refuse) {
 	PreviousPath := HadPath ? ConfigurationFile : ""
 	Coordinator := _ConfigFullSaveCoordinator()
 	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
-	Original := '[_meta]`nschema_version = 13`n[llm]`nmodel = "user-model"`n'
+	Original := '[_meta]`nschema_version = 14`n[llm]`nmodel = "user-model"`n'
 	Successor := Metadata . '`n[llm]`nmodel = "user-model"`n[future]`nkeep = [false, 1, "1"]`n'
 	try {
-		AssertEqual(13, ConfigMigrateCurrentVersion(), "the authored current source owns the actual v13 registry contract")
+		AssertEqual(14, ConfigMigrateCurrentVersion(), "the authored current source owns the actual v14 registry contract")
 		ConfigurationFile := Path
 		AssertTrue(FSWriteDurable(Path, Original))
 		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
@@ -718,7 +718,7 @@ _CMJ_PostBootDirectPublication(Metadata, Refuse) {
 				"exact genuine current source repair restores actual native publication")
 		}
 		Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
-		AssertEqual(13, Document["_meta"]["schema_version"], "publication must retain the independent current stamp")
+		AssertEqual(14, Document["_meta"]["schema_version"], "publication must retain the independent current stamp")
 		AssertEqual("changed-model", Document["llm"]["model"])
 		Stages := 0
 		Loop Files, Path . ".*.tmp"
@@ -730,8 +730,8 @@ _CMJ_PostBootDirectPublication(Metadata, Refuse) {
 		_CMJ_Cleanup(Dir, Path)
 	}
 }
-Test("config journal: post-boot direct current12 no-op and writer keep genuine admission",
-	_CMJ_PostBootDirectPublication.Bind('[_meta]`nschema_version = 13', false))
+Test("config journal: post-boot direct current14 no-op and writer keep genuine admission",
+	_CMJ_PostBootDirectPublication.Bind('[_meta]`nschema_version = 14', false))
 Test("config journal: post-boot direct future99 no-op and writer refuse without borrowing boot",
 	_CMJ_PostBootDirectPublication.Bind('[_meta]`nschema_version = 99', true))
 Test("config journal: post-boot direct nonversion no-op and writer refuse without borrowing boot",

@@ -958,7 +958,7 @@ local function with_replayed_hotstring(options, callback)
       script_actions = { is_paused = function() return false end },
       secure_focus_guard = { capture_text_owner = function() return destination end,
         blocks_text = function() return false end, invalidate = function() world.invalidated = true end },
-      WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end, cascade_depth = function() return 0 end },
+      WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end, cascade_max_arrows = function() return 0 end },
       RepeatKey = { is_enabled = function() return false end },
       -- Main sizes the expansion delay from the physically held modifiers.
       keyboard_hook = { held_modifiers = function() return {} end },

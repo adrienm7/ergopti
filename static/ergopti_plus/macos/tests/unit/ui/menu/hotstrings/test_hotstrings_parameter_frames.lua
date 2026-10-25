@@ -385,9 +385,9 @@ local function with_word_reset(body, idle_seconds, prompt_answer)
 		local idle, click = idle_seconds, true
 		keymap.get_idle_reset_seconds = function() return idle end
 		keymap.set_idle_reset_seconds = function(value) set[#set + 1] = { "idle", value }; idle = value; return true end
-		local cascade = 1
-		keymap.get_cascade_depth = function() return cascade end
-		keymap.set_cascade_depth = function(value) set[#set + 1] = { "cascade", value }; cascade = value; return true end
+		local cascade = 3
+		keymap.get_cascade_max_arrows = function() return cascade end
+		keymap.set_cascade_max_arrows = function(value) set[#set + 1] = { "cascade", value }; cascade = value; return true end
 		keymap.is_click_resets_word_enabled = function() return click end
 		keymap.set_click_resets_word = function(value) set[#set + 1] = { "click", value }; click = value; return true end
 		local arrow, shortcut = true, false
@@ -485,26 +485,27 @@ helpers.describe("hotstrings word-reset rows", function()
 		end, 3)
 	end)
 
-	helpers.it("draws the cascade-depth choice from the keymap, ticks the live depth and sets a preset", function()
+	helpers.it("draws the cascade arrow choice from the keymap, ticks the live count and sets a preset", function()
 		with_word_reset(function(f, set)
-			local caption = f.captions("menu.hotstrings.cascade_depth")
+			local caption = f.captions("menu.hotstrings.cascade_max_arrows")
 			local row
 			for _, candidate in ipairs(assert(f.build()).menu) do
 				if type(candidate.title) == "string" and candidate.title:sub(1, #caption) == caption then
 					row = candidate
 				end
 			end
-			assert(row, "the cascade-depth choice must be drawn")
-			local unit = f.captions("menu.hotstrings.cascade_depth_unit")
-			helpers.assert_eq(row.title, caption .. ": 1 " .. unit)
+			assert(row, "the cascade arrow choice must be drawn")
+			local unit = f.captions("menu.hotstrings.cascade_max_arrows_unit")
+			helpers.assert_eq(row.title, caption .. ": 3 " .. unit)
 			local titles = {}
 			for index, entry in ipairs(row.menu) do titles[index] = entry.title end
-			helpers.assert_eq(titles, { f.captions("menu.hotstrings.cascade_depth_off"), "1 " .. unit,
-				"2 " .. unit, "3 " .. unit })
-			helpers.assert_eq(row.menu[2].checked, true, "the live depth is ticked")
-			row.menu[3].fn()
+			local expected = { "1 " .. f.captions("menu.hotstrings.cascade_max_arrows_single") }
+			for arrows = 2, 10 do expected[arrows] = arrows .. " " .. unit end
+			helpers.assert_eq(titles, expected, "1 to 10 arrows are offered")
+			helpers.assert_eq(row.menu[3].checked, true, "the live arrow count is ticked")
+			row.menu[2].fn()
 			helpers.assert_eq(set, { { "cascade", 2 } })
-			helpers.assert_eq(f.context.state.cascade_depth, 2)
+			helpers.assert_eq(f.context.state.cascade_max_arrows, 2)
 			helpers.assert_eq(f.calls.writes, 1, "the change is saved once")
 		end, 3)
 	end)

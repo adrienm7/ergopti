@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_cascade_depth_replay_is_idempotent/case.toml
+
+[case]
+description = "A configuration already on cascade_max_arrows is left untouched, so a replay never adds a second arrow."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 13
+to_version = 14

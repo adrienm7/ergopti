@@ -1282,7 +1282,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		; reaches back over, and the last link's text as the replacement.
 		CascadeUnits := 0
 		CascadeCodepoints := 0
-		CascadePlan := _HSE_PlanCascade(Spec, Prepared, EndChar, ForceConsumeEndChar, GateTick)
+		CascadePlan := _HSE_PlanCascade(Spec, Prepared, EndChar, GateTick)
 		if IsObject(CascadePlan) {
 				Replacement := CascadePlan.Replacement
 				CascadeUnits := CascadePlan.ExtraUnits

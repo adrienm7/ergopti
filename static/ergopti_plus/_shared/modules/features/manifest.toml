@@ -555,30 +555,38 @@ type = "boolean"
 description_key = "menu.hotstrings.tap_hold_resets_word"
 reason_key = "platform_reason.tap_hold_word_reset_not_on_macos"
 
-# How many more hotstrings the text a hotstring produced may complete, in
-# chain: the cascade depth. 0 disables the cascade (a hotstring's output is
-# final, as before 2026-10); 1 lets the output complete one more hotstring; 2
-# two more, and so on. With `chatg` giving `chatgpt` and `chatgpt` giving
-# `ChatGPT`, typing `chatg` ends on `ChatGPT` from depth 1. It applies to every
-# hotstring, the shipped ones and the personal ones. The whole chain is
-# resolved before anything is typed and goes out as ONE edit (one SendInput
-# burst on Windows), so the application never shows the intermediate text and
-# an Undo (Linux) restores what was typed, not a half-way text. Guards: a hotstring never
-# fires twice in the same chain (the 124 shipped replacements that end with
-# their own trigger stop there), a `final_result` hotstring ends the chain,
-# and each further hotstring obeys its own expansion delay. A text produced
-# without a typed key never fires on its own: the chain starts from the key
-# that completed the first hotstring. The default stays 0 so that nothing the
-# shipped pack types today changes unless the user asks for it. Any whole
-# number from 0 up is accepted; the menu offers the `preset_values`.
+# The cascade: how many hotstring expansions (arrows) a chain may hold. The
+# setting counts ARROWS: 1 is a single expansion (`a` -> `b`, the text a
+# hotstring produced is final: no cascading); 2 lets that output complete one
+# more hotstring (`a` -> `b` -> `c`), and so on up to 10. With `fb` giving
+# `facebook` and `facebook` giving `Facebook`, typing `fb` and a space ends on
+# `Facebook` from 2 arrows. It applies to every hotstring, the shipped ones and
+# the personal ones. The whole chain is resolved before anything is typed and
+# goes out as ONE edit (one SendInput burst on Windows, one transaction on
+# macOS, one injection on Linux), so the application never shows the
+# intermediate text and an Undo (Linux) restores what was typed, not a half-way
+# text. Guards: a hotstring never fires twice in the same chain (the 124
+# shipped replacements that end with their own trigger stop there), a
+# `final_result` hotstring ends the chain, each further hotstring obeys the
+# word-boundary and case rules of a typed one (a word-start-only trigger never
+# fires in the middle of a word) and its own expansion delay. The end character
+# that completed the first hotstring is carried through the whole chain and
+# obeys the delimiter's "consumed" choice (hotstrings.terminator_consume) exactly
+# as a typed key does: it is swallowed once at the end of the chain when its
+# delimiter is consumed, typed once after the final text otherwise. A text
+# produced without a typed key never fires on its own: the chain starts from the
+# key that completed the first hotstring. Before 2026-10-25 the setting was
+# `cascade_depth` (0 = off, n = n more hotstrings); the migration keeps the
+# effective choice (old n becomes n + 1 arrows). The menu offers the
+# `preset_values`; the schema accepts the same whole numbers 1 to 10.
 [[features.hotstrings]]
-id = "cascade_depth"
-default = 0
-recommended = 0
+id = "cascade_max_arrows"
+default = 3
+recommended = 3
 input_altering = false
 type = "number"
-preset_values = [0, 1, 2, 3]
-description_key = "menu.hotstrings.cascade_depth"
+preset_values = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+description_key = "menu.hotstrings.cascade_max_arrows"
 
 [[features.hotstrings]]
 id = "expansion_delay"
@@ -6469,10 +6477,10 @@ type = "---"
 
 [[menu.hotstrings_params_group]]
 type = "choice"
-id = "cascade_depth"
-path = "hotstrings.cascade_depth"
-i18n = "menu.hotstrings.cascade_depth"
-choice_registry = "hotstrings.cascade_depth"
+id = "cascade_max_arrows"
+path = "hotstrings.cascade_max_arrows"
+i18n = "menu.hotstrings.cascade_max_arrows"
+choice_registry = "hotstrings.cascade_max_arrows"
 show_current_choice = true
 current_choice_suffix = ": {1}"
 

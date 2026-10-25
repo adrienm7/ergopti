@@ -260,10 +260,10 @@ function capsWordIdleTimeoutChoices(feature) {
 }
 
 /**
- * Projects the cascade-depth presets (0 = off) from their numeric feature. There
+ * Projects the cascade-arrow presets (1 = a single expansion, no cascading) from their numeric feature. There
  * is no free entry: the menu offers exactly these values.
  */
-function cascadeDepthChoices(feature) {
+function cascadeMaxArrowsChoices(feature) {
 	const values = feature?.preset_values;
 	if (
 		feature?.type !== 'number' ||
@@ -271,19 +271,19 @@ function cascadeDepthChoices(feature) {
 		values.length < 2 ||
 		values.some(
 			(value, index) =>
-				!Number.isSafeInteger(value) || value < 0 || (index > 0 && value <= values[index - 1])
+				!Number.isSafeInteger(value) || value < 1 || (index > 0 && value <= values[index - 1])
 		) ||
-		values[0] !== 0 ||
+		values[0] !== 1 ||
 		!values.includes(feature.default) ||
 		!values.includes(feature.recommended)
 	)
 		throw new Error(
-			'hotstrings.cascade_depth: presets need ascending whole numbers from 0 containing the defaults'
+			'hotstrings.cascade_max_arrows: presets need ascending whole numbers from 1 containing the defaults'
 		);
 	return values.map((value) =>
-		value === 0
-			? { value, i18n: 'menu.hotstrings.cascade_depth_off' }
-			: { value, i18n: 'menu.hotstrings.cascade_depth_unit', label_prefix: `${value} ` }
+		value === 1
+			? { value, i18n: 'menu.hotstrings.cascade_max_arrows_single', label_prefix: '1 ' }
+			: { value, i18n: 'menu.hotstrings.cascade_max_arrows_unit', label_prefix: `${value} ` }
 	);
 }
 
@@ -292,7 +292,10 @@ const CHOICE_REGISTRIES = {
 		path: 'shortcuts.caps_word.idle_timeout_seconds',
 		project: capsWordIdleTimeoutChoices
 	},
-	'hotstrings.cascade_depth': { path: 'hotstrings.cascade_depth', project: cascadeDepthChoices },
+	'hotstrings.cascade_max_arrows': {
+		path: 'hotstrings.cascade_max_arrows',
+		project: cascadeMaxArrowsChoices
+	},
 	'hotstrings.idle_reset': { path: 'hotstrings.idle_reset_seconds', project: idleResetChoices },
 	'llm.indentation': { path: 'llm.display.pred_indent', project: indentationChoices },
 	'updater.channels': { path: 'updater.channel', project: updaterChannelChoices },
