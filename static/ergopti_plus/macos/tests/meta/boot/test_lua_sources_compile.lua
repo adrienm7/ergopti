@@ -32,6 +32,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CommandLines = require("tests.support.command_lines")
+local shell_quote = require("text_utils").shell_quote
 
 -- driver_root() ends with a trailing slash (e.g. ".../macos/").
 local DRIVER_ROOT = helpers.driver_root()
@@ -79,17 +81,15 @@ local function list_lua_files(dir)
 	if package.config:sub(1, 1) == "\\" then
 		cmd = string.format('cmd /c dir /b /s /a-d "%s"', dir:gsub("/", "\\"))
 	else
-		cmd = string.format("find '%s' -type f", dir)
+		cmd = "find " .. shell_quote(dir) .. " -type f"
 	end
-	local pipe = io.popen(cmd)
-	if not pipe then return files end
-	for raw_line in pipe:lines() do
+	for _, raw_line in ipairs(CommandLines.read(cmd)) do
 		local line = raw_line:gsub("\\", "/")
 		if line:match("%.lua$") then
 			files[#files + 1] = line
 		end
 	end
-	pipe:close()
+	assert(#files > 0, "compile inventory contains no Lua sources: " .. dir)
 	return files
 end
 
