@@ -116,7 +116,7 @@ check("manifest keeps application, title, layout and destination bytes past a NU
 	assert(complete == true, "native projection must complete")
 	local entry = assert(manifest[today][nul_app], "the complete application id keys the manifest")
 	assert(entry.chars == 3 and manifest[today].owned.chars == 5, "a NUL-cut id merged two applications")
-	assert(entry.titles["doc\0title"].c == 1 and entry.titles.doc == nil, "title bytes changed")
+	assert(entry.win_titles["doc\0title"].c == 1 and entry.win_titles.doc == nil and entry.titles == nil, "title bytes changed")
 	assert(entry.layouts_seen["fr\0x"] == 2 and entry.layouts_seen.fr == nil, "layout bytes changed")
 	assert(entry.switches_to["term\0inal"] == 4 and entry.switches_to.term == nil, "destination bytes changed")
 end)
