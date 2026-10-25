@@ -819,14 +819,28 @@ HotstringsConfigPath() {
 ; STRING: the catalogue defaults, which characters the catalogue owns, and the
 ; membership tests the one-time migration of the old strings uses. No I/O here.
 
+; The keys of the generated catalogue. A row registered at runtime (addCustom)
+; is enabled by default but is never a shipped default: reset defaults must not
+; promote it.
+_HSE_TerminatorShippedKeys() {
+		static Keys := 0
+		if !(Keys is Map) {
+				Keys := Map()
+				for _, D in Terminators().all()
+						Keys[D["key"]] := true
+		}
+		return Keys
+}
+
 ; Default word-terminator string — the chars of every catalogue entry that is
 ; enabled by default. This is the single source for the AHK default set, kept in
 ; lock-step with macOS (both read the same catalogue). Separators are skipped.
 HSE_TerminatorDefaultWordDelimiters() {
 		global HSE_Terminators
+		Shipped := _HSE_TerminatorShippedKeys()
 		Out := ""
 		for _, D in HSE_Terminators.all() {
-				if (D.Has("type") and D["type"] == "separator")
+				if (D.Has("type") and D["type"] == "separator") or !Shipped.Has(D["key"])
 						continue
 				if !D["default_enabled"]
 						continue
@@ -841,9 +855,10 @@ HSE_TerminatorDefaultWordDelimiters() {
 ; rather than re-injected after an expansion, matching macOS.
 HSE_TerminatorDefaultConsumedDelimiters() {
 		global HSE_Terminators
+		Shipped := _HSE_TerminatorShippedKeys()
 		Out := ""
 		for _, D in HSE_Terminators.all() {
-				if (D.Has("type") and D["type"] == "separator")
+				if (D.Has("type") and D["type"] == "separator") or !Shipped.Has(D["key"])
 						continue
 				if !(D["default_enabled"] and D["consume"])
 						continue
