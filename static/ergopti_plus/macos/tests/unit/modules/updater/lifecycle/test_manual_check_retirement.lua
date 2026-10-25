@@ -45,6 +45,7 @@ local function with_owner(run)
 		}
 		function env.owner()
 			local ctx = { channel = "dev", pending = {}, timers = {}, notified = 0 }
+			local function get(_, _, callback) ctx.pending[#ctx.pending + 1] = callback; return true end
 			ctx.owner = AutoCheck.new({
 				state = {}, save = function() return true end,
 				channel = function() return ctx.channel end, is_paused = function() return false end,
@@ -64,7 +65,7 @@ local function with_owner(run)
 					get = function(key, default) local value = env.values[key]; if value == nil then return default end; return value end,
 					set = function(key, value) env.writes = env.writes + 1; env.values[key] = value; return true end,
 				},
-				http = { get = function(_, _, callback) ctx.pending[#ctx.pending + 1] = callback; return true end },
+				http = { get = get }, manual_http = { get = get },
 				now = function() return env.now end,
 				current_version = function() return "0.0.0-dev.140" end,
 				installed_channel = function() return "dev" end,

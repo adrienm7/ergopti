@@ -275,6 +275,11 @@ local function public_owner_retirement(mutation)
 				saved[#saved + 1] = state.update_channel; return true
 			end })
 			local AutoCheck = require("modules.updater.auto_check")
+			local get = function(url, headers, callback)
+				callback({ ok = true, status = 200, headers = {}, body =
+					'[{"tag_name":"' .. tag .. '","prerelease":true,"published_at":"2026-09-02T00:00:00Z","assets":[]}]' })
+				return true
+			end
 			local checks = AutoCheck.new({
 				state = state, save = function() return true end, channel = channel.get,
 				is_paused = function() return false end, on_available = function() return true end,
@@ -285,11 +290,7 @@ local function public_owner_retirement(mutation)
 					cancel = function() return true end },
 				storage = { get = function(key, default) return values[key] or default end,
 					set = function(key, value) values[key] = value; return true end },
-				http = { get = function(url, headers, callback)
-					callback({ ok = true, status = 200, headers = {}, body =
-						'[{"tag_name":"' .. tag .. '","prerelease":true,"published_at":"2026-09-02T00:00:00Z","assets":[]}]' })
-					return true
-				end },
+				http = { get = get }, manual_http = { get = get },
 			})
 			local answers = {}
 			local dispatched = checks.check_now("dev", function(result) answers[#answers + 1] = result end)
