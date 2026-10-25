@@ -540,8 +540,8 @@ _LAG_LocalNativeCustody(Phase, Withdraw) {
 		Origin := LLM_OllamaCaptureOriginCustody
 		Spawn := _LLM_Ollama_DoSpawn
 		AssertFalse(Origin.HasOwnProp("Call")), AssertFalse(Spawn.HasOwnProp("Call"))
-		State := Map("timer", 0, "runs", 0, "writes", 0, "closed", 0, "seen", false, "paths", [])
-		Port := Map("write", Write, "run", Run, "poll", (*) => 0,
+		State := Map("timer", 0, "runs", 0, "writes", 0, "closed", 0, "seen", false, "paths", [], "polls", [])
+		Port := Map("write", Write, "run", Run, "poll", (Id) => State["polls"].Push(Id),
 			"terminate_process", (*) => true, "wait_process", (*) => 0, "close_process", Close)
 		try {
 			_LLM_Ollama_Async := Map(), _LLM_Ollama_Pending := ""
@@ -570,7 +570,19 @@ _LAG_LocalNativeCustody(Phase, Withdraw) {
 				Tick.Call()
 			}
 			AssertTrue(State["seen"], "the actual local request reached its selected boundary")
-			AssertEqual(Withdraw && Phase != "spawn" && Phase != "origin-newer" ? 0 : 1, State["runs"],
+			if Phase == "spawn" && Withdraw {
+				AssertFalse(_LLM_Ollama_Async.Has(State["retired_id"]), "the retired predecessor must leave its exact registry slot before cleanup")
+				AssertFalse(_LLM_Ollama_Pending is Map, "the real pending successor must drain before fixture cleanup")
+				AssertTrue(_LLM_Ollama_Async.Has(State["successor_id"]), "the successor must own the actual vacated slot")
+				NextOwner := _LLM_Ollama_Async[State["successor_id"]]["process_owner"]
+				AssertTrue(NextOwner is Map && ObjPtr(NextOwner) != ObjPtr(State["old_owner"]))
+				AssertTrue(State["old_owner"]["released"])
+				AssertFalse(NextOwner["released"], "old cleanup cannot close its live successor")
+				AssertEqual(1, State["polls"].Length, "only the genuinely admitted successor may arm native polling")
+				AssertEqual(State["successor_id"], State["polls"][1])
+			}
+			ExpectedRuns := Phase == "spawn" && Withdraw ? 2 : (Withdraw && Phase != "spawn" && Phase != "origin-newer" ? 0 : 1)
+			AssertEqual(ExpectedRuns, State["runs"],
 				"only the original local requester can acquire a curl process")
 			if Phase == "spawn" && Withdraw
 				AssertEqual(1, State["closed"], "withdrawal inside native acquisition retires the exact acquired process")
@@ -612,6 +624,7 @@ _LAG_LocalNativeCustody(Phase, Withdraw) {
 		}
 		ObserveSpawn(Self, Id, Payload, PayloadPath, OutputPath, Job, OriginalPort := 0) {
 			Spawn.DeleteProp("Call")
+			State["id"] := Id
 			return Spawn.Call(Id, Payload, PayloadPath, OutputPath, Job, Port)
 		}
 		List(Callback, Owner, Strict) {
@@ -636,8 +649,18 @@ _LAG_LocalNativeCustody(Phase, Withdraw) {
 			ProcessOwner := Map("pid", Pid, "handle", 990001, "released", false)
 			if Phase == "spawn" {
 				State["seen"] := true
-				if Withdraw
+				if Withdraw && !State.Get("successor_created", false) {
+					State["successor_created"] := true
+					State["retired_id"] := State["id"], State["old_owner"] := ProcessOwner
 					AssertTrue(LLM_Agent_SetMode("off"))
+					AssertTrue(LLM_Agent_SetMode("action"))
+					AssertTrue(_LAG_Invoke("llm_agent_selection"))
+					State["successor_id"] := _LLM_Ollama_AsyncCounter
+					AssertTrue(_LLM_Ollama_Pending is Map, "a genuine successor waits behind the acquired predecessor")
+					AssertEqual(State["successor_id"], _LLM_Ollama_Pending["req_id"])
+					AssertTrue(_LLM_Ollama_Pending["requester_current"].Call())
+					Spawn.DefineProp("Call", {Call: ObserveSpawn})
+				}
 			}
 		}
 		Close(Handle) {
