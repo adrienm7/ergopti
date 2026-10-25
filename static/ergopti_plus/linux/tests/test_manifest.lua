@@ -327,6 +327,7 @@ return {
 	"tests.unit.adapters.runtime.test_event_loop_adapter",
 	"tests.unit.adapters.runtime.test_event_loop_idle_wait",
 	"tests.unit.infra.test_perf_counters",
+	"tests.unit.infra.test_hotpath_segments_declared",
 	"tests.unit.modules.keystats.test_keystats_init_spawns_nothing",
 	"tests.unit.adapters.atspi.test_x11_focus",
 	"tests.unit.infra.config.test_toml_codec_scan_cost",
