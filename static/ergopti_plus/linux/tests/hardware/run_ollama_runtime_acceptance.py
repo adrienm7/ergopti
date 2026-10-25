@@ -157,6 +157,24 @@ def acceptance_phases(text):
     return result
 
 
+def failing_assertion_line(text):
+    """Return the acceptance-script line that raised, or None.
+
+    The main phase is re-raised after cleanup, so the error message names the
+    re-raise; the first acceptance frame of the carried traceback names the
+    assertion that refused. Only the number leaves the private log.
+    """
+    if type(text) is not str:
+        return None
+    frame = re.search(
+        r"stack traceback:\n(?:\t[^\n]*\n)*?\t[^\n]*run_ollama_runtime_acceptance\.lua:(\d+): in ",
+        text,
+    )
+    message = re.search(r"run_ollama_runtime_acceptance\.lua:(\d+): ", text)
+    match = frame or message
+    return int(match.group(1)) if match else None
+
+
 def safe_failure_metadata(document):
     """Project only exact, bounded public failure values; refuse malformed input.
 
@@ -599,13 +617,12 @@ def main():
         # The private log may carry signed URLs or model text, so only the line
         # number of the child's failing assertion leaves it: enough to name the
         # check that refused without publishing what it saw.
-        assertion = re.search(r"run_ollama_runtime_acceptance\.lua:(\d+): ", text)
         document.update(
             passed=accepted,
             status="passed" if accepted else "failed",
             reason=None if accepted else "native_receipt_or_source_qualification_failed",
             child_status=result.returncode,
-            child_assertion_line=int(assertion.group(1)) if assertion else None,
+            child_assertion_line=failing_assertion_line(text),
             passed_receipts=len(receipts),
             sources_after=after,
             sources_unchanged=stable,

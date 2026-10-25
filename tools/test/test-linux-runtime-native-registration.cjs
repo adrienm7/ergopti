@@ -314,10 +314,10 @@ function validateDiagnosticProjection(root) {
 	assert.ifError(result.error);
 	assert.equal(result.status, 0, result.stderr || result.stdout);
 	const receipt = result.stderr || '';
-	assert.equal((receipt.match(/^Ran 14 tests in /gm) || []).length, 1);
+	assert.equal((receipt.match(/^Ran 15 tests in /gm) || []).length, 1);
 	assert.equal((receipt.match(/^OK$/gm) || []).length, 1);
 	assert.doesNotMatch(receipt, /(?:skipped=|\bSKIP\b)/i);
-	console.log('PASS: Controlled manual Linux diagnostics: 14 tests.');
+	console.log('PASS: Controlled manual Linux diagnostics: 15 tests.');
 }
 
 function main() {
