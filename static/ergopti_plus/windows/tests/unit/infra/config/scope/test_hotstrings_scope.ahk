@@ -52,10 +52,11 @@ _HotstringsScopeRoundTrip() {
 				AssertEqual(true, Config["hotstrings.personal.words"]["enabled"], "a restore keeps a personal section on")
 				AssertEqual(4, Config["hotstrings.personal.words"]["time_activation_seconds"])
 			}
-			; The AI preview switch is a hotstrings key on every driver since
-			; PAR-24: a restore keeps it (restore_exclude), a clear resets it.
+			; The AI preview switch is a hotstrings key on every driver: a restore
+			; keeps it (restore_exclude); it is active by default, so a clear
+			; writes its off value instead of deleting the row.
 			if Mode == "clear"
-				Assert(!Config["hotstrings"].Has("preview_ai_enabled"), "a clear resets the AI preview switch")
+				AssertEqual(false, Config["hotstrings"]["preview_ai_enabled"], "a clear turns the AI preview switch off")
 			else
 				AssertEqual(true, Config["hotstrings"]["preview_ai_enabled"], "a restore keeps the AI preview switch")
 			AssertEqual(Config["private"]["credential"], "keep")

@@ -38,9 +38,9 @@ _HotstringsScopePersonalDelimiters() {
 			AssertEqual(9, Overrides["foreign"]["delay"])
 			Config := TOML_ParseFreshFile(Fixture.path)
 			AssertEqual("keep", Config["private"]["credential"])
-			; A restore keeps the AI preview switch (restore_exclude), a clear resets it.
+			; A restore keeps the AI preview switch (restore_exclude), a clear writes its off value.
 			if Mode == "clear"
-				Assert(!Config["hotstrings"].Has("preview_ai_enabled"), "a clear resets the AI preview switch")
+				AssertEqual(false, Config["hotstrings"]["preview_ai_enabled"], "a clear turns the AI preview switch off")
 			else
 				AssertEqual(true, Config["hotstrings"]["preview_ai_enabled"], "a restore keeps the AI preview switch")
 			AssertContains(FSReadUtf8Exact(Fixture.personal[1]), '"abc" = "replacement"')
