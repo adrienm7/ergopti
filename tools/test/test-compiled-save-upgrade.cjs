@@ -125,6 +125,7 @@ function healthyUpgrade(sha = 'a'.repeat(40), digest = 'b'.repeat(64)) {
 
 /** Rejects independently authored mutations through the actual new admission API. */
 function runContractCases(verifyStartup) {
+	runFixtureSchemaCases(verifyStartup);
 	const sha = 'a'.repeat(40);
 	const digest = 'b'.repeat(64);
 	const healthy = healthyUpgrade();
@@ -284,6 +285,56 @@ function runContractCases(verifyStartup) {
 		'All authored generation, real saved-file and installation controls execute'
 	);
 	return refused;
+}
+
+/** A future canonical registry must change fixture observations, not admission. */
+function runFixtureSchemaCases(verifyStartup) {
+	const registry = path.resolve(
+		__dirname,
+		'../../static/ergopti_plus/_shared/core/config_schema/migrations.toml'
+	);
+	const current = currentSchemaVersion();
+	const future = current + 1;
+	const futureFs = {
+		...fs,
+		readFileSync(file, ...args) {
+			return typeof file === 'string' && path.resolve(file) === registry
+				? `[registry]\ncurrent_version = ${future}\n`
+				: fs.readFileSync(file, ...args);
+		}
+	};
+	const observeModule = (file, observedRequire) => {
+		const observed = { exports: {} };
+		require('node:vm').runInNewContext(fs.readFileSync(file, 'utf8'), {
+			require: observedRequire,
+			module: observed,
+			__dirname: path.dirname(file),
+			__filename: file
+		});
+		return observed.exports;
+	};
+	// Exercise the upstream reader itself: fixtures must never own another parser.
+	const evidencePath = require.resolve('./desktop-ci-evidence.cjs');
+	const evidenceRequire = require('node:module').createRequire(evidencePath);
+	const evidence = observeModule(evidencePath, (name) =>
+		name === 'node:fs' ? futureFs : evidenceRequire(name)
+	);
+	const fixture = observeModule(__filename, (name) =>
+		name === './desktop-ci-evidence.cjs' ? evidence : require(name)
+	);
+	const observation = structuredClone(fixture.healthyUpgrade());
+	for (const launch of observation.launches)
+		assert.equal(
+			launch.saved_profile.schema_version,
+			future,
+			'fixture follows a changed canonical schema'
+		);
+	verifyUpgrade(observation, 'a'.repeat(40), 'b'.repeat(64), verifyStartup, future);
+	assert.throws(
+		() => verifyUpgrade(observation, 'a'.repeat(40), 'b'.repeat(64), verifyStartup, current),
+		/Installed saved profile differs from the current canonical schema/,
+		'a fixture version must never weaken the independent current-schema check'
+	);
 }
 
 /** Literal boundary refusals complement every unchanged startup/save assertion. */
