@@ -430,3 +430,102 @@ for Backend in ["local", "cerebras", "backboard", "typesafe", "backboard|typesaf
 	for Mode in ["off", "aba", "same", "refused", "unchanged"]
 		Test("LLM agent: held System1 answer retains source " . Backend . " " . Mode . " (agent-source1-held)",
 			_LAG_Source1Held.Bind(Backend, Mode))
+
+_LAG_BackboardAssistantCustody(Source, Mode) {
+	Automatic := Source != "manual"
+	Backend := Source == "jev" ? "backboard|typesafe/jev-latest" : "backboard"
+	_LAG_Run(_LAG_Menu(Automatic ? "auto" : "action", Automatic ? Backend : "", Automatic ? "cerebras" : Backend),
+		_LTN_Screen(LAG_SELECTION), Body)
+	Body(Fx, Lines, Sent) {
+		global _LLM_Agent_CommitFn, _LLM_Remote_BackboardExchanges
+		Owners := _LLM_Remote_BackboardExchanges.Clone()
+		try {
+			TooltipHide("AgentAssistant", true)
+			AssertTrue(Automatic ? _LAG_Type(Fx, LAG_TYPED).Call() : _LAG_Invoke("llm_agent_selection"))
+			AssertEqual(1, Fx.Posts.Length, "the genuine exchange is waiting for its assistant")
+			AssertContains(Fx.Posts[1]["url"], "/assistants")
+			switch Mode {
+				case "off": AssertTrue(LLM_Agent_SetMode("off"))
+				case "aba":
+					AssertTrue(LLM_Agent_SetMode("off"))
+					AssertTrue(LLM_Agent_SetMode(Automatic ? "auto" : "action"))
+				case "source": AssertTrue(_LLM_Agent_MenuSetBackend(Automatic ? "agent_system1" : "agent_system2", ""))
+				case "refused":
+					_LLM_Agent_CommitFn := (*) => false
+					AssertFalse(LLM_Agent_SetMode("off"))
+			}
+			Fx.Posts[1]["on_success"].Call('{"assistant_id":"delayed_assistant"}')
+			AssertEqual(Mode == "unchanged" || Mode == "refused" ? 2 : 1, Fx.Posts.Length,
+				"a withdrawn requester cannot post its private text after assistant creation")
+			if Mode == "unchanged" || Mode == "refused"
+				AssertContains(Fx.Posts[2]["url"], "/threads/messages", "unchanged exchange reaches its genuine next stage")
+			AssertEqual(0, Sent.Length)
+		} finally {
+			Retire := []
+			for Id, Owner in _LLM_Remote_BackboardExchanges
+				if !Owners.Has(Id)
+					Retire.Push(Owner)
+			for Owner in Retire
+				_LLMRemote_BackboardRetire(Owner, true)
+		}
+	}
+}
+for Source in ["manual", "automatic", "jev"]
+	for Mode in ["off", "aba", "source", "refused", "unchanged"]
+		Test("LLM agent: assistant continuation retains requester " . Source . " " . Mode . " (agent-assistant-custody)",
+			_LAG_BackboardAssistantCustody.Bind(Source, Mode))
+
+_LAG_BackboardNativeCustody(Withdraw) {
+	_LAG_Run(_LAG_Menu("action", "", "backboard"), _LTN_Screen(LAG_SELECTION), Body)
+	Body(Fx, Lines, Sent) {
+		global _LLM_Remote_PostBodyFn, _LLM_Remote_BackboardExchanges
+		SavedPost := _LLM_Remote_PostBodyFn
+		Owners := _LLM_Remote_BackboardExchanges.Clone()
+		Dispatch := _LLMRemote_DispatchManagedCurl
+		AssertFalse(Dispatch.HasOwnProp("Call"), "the actual managed dispatcher starts with its original implementation")
+		State := _ManagedCurlControlState()
+		Seen := false
+		try {
+			_LLM_Remote_PostBodyFn := 0
+			Dispatch.DefineProp("Call", {Call: ObserveDispatch})
+			_LAG_Invoke("llm_agent_selection")
+			AssertTrue(Seen, "the real managed request must reach its child acquisition boundary")
+			AssertEqual(Withdraw ? 0 : 1, State["spawns"], "only an admitted original requester may acquire a native worker")
+			AssertEqual(Withdraw ? 0 : 1, State["starts"])
+			AssertEqual(0, Sent.Length)
+		} finally {
+			if Dispatch.HasOwnProp("Call")
+				Dispatch.DeleteProp("Call")
+			_LLM_Remote_PostBodyFn := SavedPost
+			Retire := []
+			for Id, Owner in _LLM_Remote_BackboardExchanges
+				if !Owners.Has(Id)
+					Retire.Push(Owner)
+			for Owner in Retire
+				_LLMRemote_BackboardRetire(Owner, true)
+			if State.Has("id")
+				_LLMRemote_PollRequest(State["id"])
+			_ManagedCurlControlRelease(State)
+		}
+		ObserveDispatch(Self, Id, Reservation, Resolved, Url, Payload, Port := 0) {
+			Dispatch.DeleteProp("Call")
+			State["id"] := Id
+			return Dispatch.Call(Id, Reservation, Resolved, Url, Payload,
+				Map("managed_settings", (*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""),
+					"create_http", Create))
+		}
+		Create() {
+			Request := CurlAsyncRequest(Map("spawn", _ManagedCurlControlSpawn.Bind(State), "before_launch", BeforeLaunch))
+			State["request"] := Request
+			return Request
+		}
+		BeforeLaunch(Request) {
+			Seen := true
+			if Withdraw
+				AssertTrue(LLM_Agent_SetMode("off"))
+		}
+	}
+}
+for Withdraw in [true, false]
+	Test("LLM agent: Backboard native launch retains original requester " . Withdraw . " (agent-assistant-native)",
+		_LAG_BackboardNativeCustody.Bind(Withdraw))

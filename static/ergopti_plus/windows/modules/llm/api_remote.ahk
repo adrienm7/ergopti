@@ -302,9 +302,10 @@ LLM_RemoteTopLevelKeys(Response) {
  * @param {Func}     on_fail    - Called with _LLMRemote_FailInfo's Map.
  * @param {String}   Kind       - Reservation kind of every request of the exchange.
  * @param {Integer}  TimeoutMs  - Override per request (0 keeps the shared one).
+ * @param {Func|Integer} CurrentFn - Original requester admission, or 0 for a standalone exchange.
  * @returns {Integer} Stable exchange id usable with LLM_RemoteCancelAsync, or 0.
  */
-LLM_RemoteBackboard_Async(Resolved, Spec, on_success, on_fail, Kind := "", TimeoutMs := 0) {
+LLM_RemoteBackboard_Async(Resolved, Spec, on_success, on_fail, Kind := "", TimeoutMs := 0, CurrentFn := 0) {
     global _LLM_Remote_BackboardAssistants
     if !(Resolved is Map) || Resolved["Format"] != "backboard"
         throw ValueError("LLM_RemoteBackboard_Async needs a resolved backboard entry.")
@@ -315,7 +316,7 @@ LLM_RemoteBackboard_Async(Resolved, Spec, on_success, on_fail, Kind := "", Timeo
         _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("invalid_model"))
         return 0
     }
-    Exchange := _LLMRemote_BackboardBegin(on_success, on_fail, Kind)
+    Exchange := _LLMRemote_BackboardBegin(on_success, on_fail, Kind, CurrentFn)
     try {
         on_success := _LLMRemote_BackboardSucceeded.Bind(Exchange)
         on_fail := _LLMRemote_BackboardFailed.Bind(Exchange)
@@ -344,12 +345,13 @@ LLM_RemoteBackboard_Async(Resolved, Spec, on_success, on_fail, Kind := "", Timeo
  * @param {Func}    on_fail    - Called with _LLMRemote_FailInfo's Map.
  * @param {String}  Kind       - Reservation kind.
  * @param {Integer} TimeoutMs  - Override per request (0 keeps the shared one).
+ * @param {Func|Integer} CurrentFn - Original requester admission, or 0 for a standalone exchange.
  * @returns {Integer} Stable exchange id usable with LLM_RemoteCancelAsync, or 0.
  */
-LLM_RemoteBackboardChat_Async(Resolved, System, Text, on_success, on_fail, Kind := "", TimeoutMs := 0) {
+LLM_RemoteBackboardChat_Async(Resolved, System, Text, on_success, on_fail, Kind := "", TimeoutMs := 0, CurrentFn := 0) {
     return LLM_RemoteBackboard_Async(Resolved,
         Map("model", Resolved["Model"], "system", System, "text", Text),
-        _LLMRemote_OnBackboardChat.Bind(on_success, on_fail), on_fail, Kind, TimeoutMs)
+        _LLMRemote_OnBackboardChat.Bind(on_success, on_fail), on_fail, Kind, TimeoutMs, CurrentFn)
 }
 
 /**
@@ -849,6 +851,16 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
     return true
 }
 
+; The exact reservation remains physically cancellable after its caller's
+; logical source has been withdrawn, including during native worker staging.
+_LLMRemote_RequestAdmitted(Id, Entry) {
+    if !_LLMRemote_RequestOwns(Id, Entry) || Entry["cancelled"] || A_IsSuspended
+        return false
+    Exchange := Entry.Get("backboard_exchange", 0)
+    Admitted := !(Exchange is Map) || _LLMRemote_BackboardAdmitted(Exchange)
+    return Admitted && _LLMRemote_RequestOwns(Id, Entry) && !Entry["cancelled"] && !A_IsSuspended
+}
+
 ; The native worker owns PAC, capability/auth and transport as one exact Job.
 ; Publish the HTTP facade before staging, Send or any native callback can reenter.
 _LLMRemote_DispatchManagedCurl(req_id, reservation, resolved, Url, Payload, Port := 0) {
@@ -861,14 +873,14 @@ _LLMRemote_DispatchManagedCurl(req_id, reservation, resolved, Url, Payload, Port
     reservation["http"] := Http
     try {
         SettingsReader := Port is Map ? Port.Get("managed_settings", 0) : 0
-        Http.SetManagedRouting(SettingsReader, () => _LLMRemote_RequestOwns(req_id, reservation) && !reservation["cancelled"])
+        Http.SetManagedRouting(SettingsReader, () => _LLMRemote_RequestAdmitted(req_id, reservation))
         Http.SetDeadline(reservation["start_tick"], reservation["timeout_ms"])
         Http.ConnectTimeoutMs := LLM_REMOTE_CONNECT_TIMEOUT_MS
         Http.RevocationBestEffort := false
         Http.Open("POST", Url, true)
         Http.SetRequestHeader("Content-Type", "application/json")
         _LLMRemoteSetAuthHeaders(Http, resolved["Format"], resolved["Token"])
-        if !_LLMRemote_RequestOwns(req_id, reservation) || reservation["cancelled"] || A_IsSuspended {
+        if !_LLMRemote_RequestAdmitted(req_id, reservation) {
             Http.Abort()
             _LLMRemote_DeleteOwned(req_id, reservation)
             return true

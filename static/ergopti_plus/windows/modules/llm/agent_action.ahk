@@ -880,7 +880,7 @@ _LLM_Agent_Decide(Backend, State, Config, OnTriage, Current) {
 	}
 	LLM_RemoteBackboard_Async(Target["resolved"],
 		Map("model", Backend["model"], "system", "", "text", State, "questions", Questions),
-		_LLM_Agent_OnBackboardJev.Bind(Config, OnTriage), OnFail)
+		_LLM_Agent_OnBackboardJev.Bind(Config, OnTriage), OnFail, "", 0, Current)
 	return true
 }
 
@@ -1127,7 +1127,7 @@ _LLM_Agent_Chat(Backend, Payload, OnSuccess, OnFail, CancelEngine := true, Curre
 			_LLM_Vision_CancelEngine()
 		if !_LLM_Vision_CallbackCurrent(CurrentFn)
 			return false
-		LLM_RemoteBackboardChat_Async(Target["resolved"], Payload["system"], Payload["user"], OnSuccess, OnFail)
+		LLM_RemoteBackboardChat_Async(Target["resolved"], Payload["system"], Payload["user"], OnSuccess, OnFail, "", 0, CurrentFn)
 		return true
 	}
 	if Target.Has("resolved") {
