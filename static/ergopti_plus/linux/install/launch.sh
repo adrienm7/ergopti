@@ -83,7 +83,16 @@ done
 if "$DAEMON_LAUNCH"; then
 	lock_root="${XDG_RUNTIME_DIR:-$HOME/.cache}/ergopti"
 	install -d -m 700 "$lock_root"
-	exec 9>"$lock_root/ergopti.lock"
+	# Read/write open never waits for a peer on a foreign FIFO. Inspect the
+	# resulting descriptor, not the path, before accepting flock ownership.
+	exec 9<>"$lock_root/ergopti.lock"
+	if [ ! -f /proc/self/fd/9 ]; then
+		# Emit pre-boot developer evidence without loading locale/config owners
+		# before the singleton exists. This is a source/code/path record.
+		lock_refusal="[session_lock] code=not_regular path=$lock_root/ergopti.lock"
+		printf '%s\n' "$lock_refusal" >&2
+		exit 78
+	fi
 	# BusyBox and util-linux share -n and report contention with status 1.
 	# BusyBox also uses 1 for native errors, which print a diagnostic. Preserve
 	# those errors instead of silently reporting an already-running instance.
