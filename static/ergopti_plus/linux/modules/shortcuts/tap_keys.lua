@@ -31,6 +31,7 @@ local BindingPublication = require("config_binding_publication")
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local Paths = require("infra.paths")
+local AiActions = require("modules.shortcuts.ai_actions")
 local Manifest = require("infra.manifest_reader")
 local TomlCodec = require("toml_codec")
 local TomlWriter = require("toml_codec.writer")
@@ -318,6 +319,8 @@ function M.on_key(detail)
 	local action = M.get_action(id)
 	local function current()
 		if _configuration_owner ~= nil or generation ~= _dispatch_generation or _is_active ~= active then return false end
+		-- Re-read at delivery: the AI may be switched off between press and run.
+		if AiActions.blocked(action) then return false end
 		local admitted = active(action)
 		return admitted == true and _configuration_owner == nil and generation == _dispatch_generation and _is_active == active
 	end

@@ -614,12 +614,12 @@ function M.on_char(ch, buffer, output_context)
 	if _runtime_closed or _scope_owner then return false end
 	if type(ch) ~= "string" or type(buffer) ~= "string" then return end
 	-- A keystroke withdraws the agent's triage in flight and restarts its pause.
-	-- The agent does not depend on the AI menu's switch: it runs with it off.
+	-- With the AI switched off nothing of it runs, the automatic agent included:
+	-- arm_agent arms no pause then, so a keystroke only withdraws what is left.
 	M.drop_agent_triage("typing")
 	if not _enabled then
 		-- Typing over an agent's offer dismisses it.
 		if _predicting or #_suggestions > 0 then M.dismiss() end
-		arm_agent(buffer, output_context)
 		return
 	end
 	-- Retain the first character's native target across debounce/manual requests.
@@ -667,7 +667,7 @@ end
 function M.on_hotstring_expired(context, output_context)
 	if _runtime_closed or _scope_owner then return false end
 	-- The automatic agent held its pause back while the preview was shown
-	-- (on_char), with the AI menu's switch on or off.
+	-- (on_char); arm_agent arms nothing while the AI is switched off.
 	arm_agent(context, output_context)
 	if not _enabled then return false end
 	-- Live mode held its request back while the preview was shown (on_char).
@@ -2172,8 +2172,9 @@ local function system2_transport(chat, payload, on_done)
 end
 
 --- Tells the user why an agent action cannot run, if it cannot: the pause,
---- then the agent's mode. The agent uses neither the AI menu's switch nor its
---- backend, so neither refuses anything here.
+--- then the agent's mode. The agent uses neither the AI menu's backend nor
+--- its switch for these manual actions, so neither refuses anything here; the
+--- switch only disarms the automatic mode and the keys bound to the actions.
 --- @param what string What the log names the action.
 --- @return boolean refused
 local function agent_refused(what)
@@ -2516,12 +2517,13 @@ end
 --- reading, a tone step, a pause, another mode, or an offer in flight or on
 --- screen that is not typing's own automatic prediction. That prediction does
 --- not block it: it comes before the agent's pause is over, and the agent's
---- actions replace it when they arrive. The AI menu's switch plays no part.
+--- actions replace it when they arrive. The AI menu's switch off disarms the
+--- automatic mode altogether, as on macOS and Windows: nothing of the AI runs.
 --- @return boolean
 local function agent_blocked()
 	local offer = _predicting or #_suggestions > 0
 	local automatic_prediction = _suggestion_context ~= nil and _suggestion_context.automatic == true
-	return _live ~= nil or (offer and not automatic_prediction) or _vision_flow ~= nil or _tone_timer ~= nil
+	return not _enabled or _live ~= nil or (offer and not automatic_prediction) or _vision_flow ~= nil or _tone_timer ~= nil
 		or _is_paused() or AgentSettings.get_mode() ~= "auto"
 end
 
@@ -2711,6 +2713,9 @@ arm_agent = function(buffer, output_context)
 	if _live or type(buffer) ~= "string" or buffer == "" then return end
 	if type(output_context) == "table" and output_context.hotstring_preview_visible == true then return end
 	if AgentSettings.get_mode() ~= "auto" then return end
+	-- The AI switched off disarms the automatic mode: no pause timer is armed,
+	-- and the switch-on re-arms it with the next keystroke.
+	if not _enabled then return end
 	local config = AgentSettings.config()
 	if not config then return end
 	if _agent_timer then _scheduler.cancel(_agent_timer) end

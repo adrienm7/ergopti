@@ -56,6 +56,7 @@ local AppParameter = require("app_parameter")
 local TomlCodec = require("toml_codec")
 local i18n = require("infra.i18n")
 local ScriptActions = require("modules.shortcuts.script_actions")
+local AiActions = require("modules.shortcuts.ai_actions")
 local ShellRunner = require("adapters.shell_runner")
 local DesktopNavigation = require("desktop_navigation")
 local SystemActions = require("modules.gestures.system_actions")
@@ -1888,6 +1889,12 @@ function M.dispatch_gesture(gesture)
 	-- user resumes; the reader keeps running so those still arrive.
 	if _is_paused() and not ScriptActions.is_script_action(action) then
 		Logger.debug(LOG, "Gesture %s → %s held back: the script is paused.", slot, action)
+		return false
+	end
+
+	-- An AI action is unarmed while the AI is off, as for the keys.
+	if AiActions.blocked(action) then
+		Logger.debug(LOG, "Gesture %s → %s held back: the AI is off.", slot, action)
 		return false
 	end
 

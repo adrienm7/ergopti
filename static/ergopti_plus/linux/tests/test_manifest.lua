@@ -621,6 +621,7 @@ return {
 	"tests.unit.modules.shortcuts.keyboard.test_chatgpt",
 	"tests.unit.modules.shortcuts.keyboard.test_chatgpt_binding",
 	"tests.unit.modules.shortcuts.keyboard.test_keyboard_slot_consumes_chord",
+	"tests.unit.modules.shortcuts.keyboard.test_ai_off_disarms_ai_actions",
 	"tests.unit.modules.shortcuts.keyboard.test_keyboard_shortcuts_which_slots_exist",
 	"tests.unit.modules.shortcuts.keyboard.test_keyboard_shortcuts_late_contextual_delivery",
 	"tests.unit.modules.shortcuts.keyboard.test_magic_editor_policy",
