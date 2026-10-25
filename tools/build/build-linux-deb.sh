@@ -15,13 +15,9 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BUILD_DIR="$PROJECT_ROOT/build/linux"
 DEB_ROOT="$BUILD_DIR/deb"
 PACKAGE_NAME="ergopti"
-# Extract version from package.json (e.g. "3.0.0") or fall back to "0.1.0"
-VERSION=$(node -e "try { process.stdout.write(require('$PROJECT_ROOT/package.json').version) } catch(e) { process.stdout.write('0.1.0') }" 2>/dev/null || echo "0.1.0")
 ARCH="amd64"
-DEB_FILE="$BUILD_DIR/${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
 
 echo "=== ergopti .deb packager ==="
-echo "Package: $PACKAGE_NAME $VERSION ($ARCH)"
 echo ""
 
 # ----------------------------------------------------------------------
@@ -67,6 +63,9 @@ cp -r "$BUILD_DIR/_shared/." "$DEB_ROOT/usr/lib/ergopti/_shared/"
 # The stamp build-linux-driver.sh wrote is how the installed daemon names its
 # commit; a package without it would report "unknown".
 bash "$SCRIPT_DIR/write_build_stamp.sh" verify "$DEB_ROOT/usr/lib/ergopti/_shared"
+VERSION=$(node "$SCRIPT_DIR/linux-package-version.cjs" deb "$DEB_ROOT/usr/lib/ergopti/_shared" "$PROJECT_ROOT/package.json")
+DEB_FILE="$BUILD_DIR/${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
+echo "Package: $PACKAGE_NAME $VERSION ($ARCH)"
 install -D -m 644 "$BUILD_DIR/linux/install/99-ergopti-uinput.rules" "$DEB_ROOT/etc/udev/rules.d/99-ergopti-uinput.rules"
 install -D -m 644 "$BUILD_DIR/linux/install/ergopti-uinput.conf" "$DEB_ROOT/etc/modules-load.d/ergopti-uinput.conf"
 
