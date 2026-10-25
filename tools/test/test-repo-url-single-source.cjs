@@ -172,24 +172,42 @@ const files = execFileSync('git', ['ls-files', '-z', '--', SP, '.github'], {
 	.split('\0')
 	.filter(Boolean);
 
-const failures = [];
-let scanned = 0;
-for (const file of files) {
-	if (
-		/\.(png|jpe?g|gif|ico|icns|woff2?|ttf|otf|dll|exe|zip|gz|sqlite|db|bin|dylib|so)$/i.test(file)
-	)
-		continue;
-	let text;
-	try {
-		text = fs.readFileSync(path.join(ROOT, file), 'utf8');
-	} catch {
-		continue;
+/**
+ * Applies both URL policies to every tracked text source. A read error is
+ * thrown, never skipped: a refused source must not vanish from the coverage.
+ * @param {string[]} list Git-listed repository-relative paths.
+ * @param {(file: string) => string} read Reads one source as UTF-8.
+ * @returns {{failures: string[], scanned: number}} Policy results and scan count.
+ */
+function scanTrackedFiles(list, read) {
+	const found = [];
+	let count = 0;
+	for (const file of list) {
+		if (
+			/\.(png|jpe?g|gif|ico|icns|woff2?|ttf|otf|dll|exe|zip|gz|sqlite|db|bin|dylib|so)$/i.test(file)
+		)
+			continue;
+		const text = read(file);
+		count++;
+		// Contract fixtures intentionally spell foreign links a parser must refuse.
+		// Production owners still retain both the repository and literal checks.
+		found.push(...violations(file, text));
 	}
-	scanned++;
-	// Contract fixtures intentionally spell foreign links a parser must refuse.
-	// Production owners still retain both the repository and literal checks.
-	failures.push(...violations(file, text));
+	return { failures: found, scanned: count };
 }
+
+// Self-test: a refused read propagates instead of shrinking the coverage.
+assert.throws(
+	() =>
+		scanTrackedFiles(['static/ergopti_plus/linux/modules/x.lua'], () => {
+			throw Object.assign(new Error('controlled read refusal'), { code: 'EACCES' });
+		}),
+	/controlled read refusal/
+);
+
+const { failures, scanned } = scanTrackedFiles(files, (file) =>
+	fs.readFileSync(path.join(ROOT, file), 'utf8')
+);
 
 // ==================================================
 // ======= 1/ Hosts, Bundle Ids and App Names =======
