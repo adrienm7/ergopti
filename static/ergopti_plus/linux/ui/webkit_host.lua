@@ -332,17 +332,19 @@ function M.build_i18n_boot_script(locales_dir, active_locale, strings)
 		end
 	end
 
-	-- Build a file:// URL for the locales directory
-	local base = locales_dir:gsub("\\", "/")
+	-- Native path bytes are URI data, then JavaScript data. Neither boundary
+	-- may reinterpret a backslash, quote, fragment marker or script terminator.
+	local base = locales_dir
 	if base ~= "" then
 		if not base:match("^/") then base = "/" .. base end
 		if not base:match("/$") then base = base .. "/" end
-		base = "file://" .. base
+		base = "file://" .. require("text_utils").percent_encode(base):gsub("%%2F", "/")
 	end
 
+	local Json = require("json")
 	return string.format(
-		'<script>window.__i18n_base="%s";window._i18n_locale="%s";%s</script>',
-		base, active_locale, seed
+		'<script>window.__i18n_base=%s;window._i18n_locale=%s;%s</script>',
+		Json.encode(base):gsub("<", "\\u003c"), Json.encode(active_locale):gsub("<", "\\u003c"), seed
 	)
 end
 

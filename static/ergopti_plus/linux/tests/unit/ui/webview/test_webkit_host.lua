@@ -291,6 +291,17 @@ helpers.describe("ui.webkit_host", function()
   -- ==========================================================================
 
   helpers.describe("build_i18n_boot_script()", function()
+		helpers.it("encodes native filenames before embedding a file URI (webview-bootstrap-path)", function()
+			local script = WH.build_i18n_boot_script('/tmp/a"b\\c #?%é</script>/locales', "en", { greeting = "Hello" })
+			local literal = script:match('window%.__i18n_base=(.-);window%._i18n_locale=')
+			helpers.assert_eq(require("json").decode(literal),
+				"file:///tmp/a%22b%5Cc%20%23%3F%25%C3%A9%3C/script%3E/locales/",
+				"the URL must preserve native path bytes without breaking the boot script")
+			local _, closes = script:gsub("</script>", "")
+			helpers.assert_eq(closes, 1, "a filename must never terminate the inline script")
+			helpers.assert_contains(script, 'window._i18n_strings={"greeting":"Hello"};')
+		end)
+
     helpers.it("builds a script tag with locale and base URL", function()
       local script = WH.build_i18n_boot_script("/path/to/locales", "fr")
       helpers.assert_true(script:find("<script>"), "is script tag")
