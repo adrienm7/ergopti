@@ -56,15 +56,19 @@ _HOF_Run(Callback) {
 }
 
 _HOF_Body(Callback) {
-	global _AHK_SendInput, _SendHook, _HotstringRegistrar, _HOF_Sends
+	global HSE_CascadeMaxArrows, _AHK_SendInput, _SendHook, _HotstringRegistrar, _HOF_Sends
 	SavedInput := _AHK_SendInput
 	SavedHook := _SendHook
 	SavedRegistrar := _HotstringRegistrar
 	SavedLevel := A_SendLevel
+	SavedArrows := HSE_CascadeMaxArrows
 	_HOF_Sends := []
 	_SendHook := 0
 	_HotstringRegistrar := 0
 	_AHK_SendInput := _HOF_SendInput
+	; One arrow is a single expansion: this contract is that no output re-enters
+	; the watcher; the in-engine cascade is pinned by test_hotstring_cascade.ahk.
+	HSE_CascadeMaxArrows := 1
 	HSE_RegistryClear()
 	HSE_HardReset()
 	HSE_FeedReset(true)
@@ -75,6 +79,7 @@ _HOF_Body(Callback) {
 		_AHK_SendInput := SavedInput
 		_SendHook := SavedHook
 		_HotstringRegistrar := SavedRegistrar
+		HSE_CascadeMaxArrows := SavedArrows
 		HSE_RegistryClear()
 		HSE_HardReset()
 	}
