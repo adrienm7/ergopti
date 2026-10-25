@@ -142,6 +142,16 @@ const OPENS_SUBMENU = {
 		kind: 'compose',
 		native_sources: { hs: 'macos/ui/menu/menu_apps.lua' }
 	},
+	gesture_recommended_notes: {
+		menu: 'gesture_recommended_notes',
+		platforms: ['ahk', 'hs', 'linux'],
+		kind: 'compose',
+		native_sources: {
+			ahk: 'windows/ui/menu/menu_gestures.ahk',
+			hs: 'macos/ui/menu/menu_gestures.lua',
+			linux: 'linux/ui/menu/menu_builder.lua'
+		}
+	},
 	system_gesture_status: [
 		{
 			menu: 'gesture_system_status_controls',
