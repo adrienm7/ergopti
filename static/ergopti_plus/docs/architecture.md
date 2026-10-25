@@ -97,6 +97,7 @@ graph TD
         MACOS_event_provenance["EventProvenance.lua"]
         MACOS_field_check_ports["FieldCheckPorts.lua"]
         MACOS_file_system["FileSystem.lua"]
+        MACOS_foreign_ledger_snapshot["ForeignLedgerSnapshot.lua"]
         MACOS_graphics_renderer["GraphicsRenderer.lua"]
         MACOS_hotkey_registrar["HotkeyRegistrar.lua"]
         MACOS_http_client["HttpClient.lua"]

@@ -8,6 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ContentDigest = require("tests.support.content_digest")
+local RunloopTimers = require("tests.support.runloop_timers")
 local BATCH = "BEGIN TRANSACTION;\nINSERT INTO events VALUES (1);\nCOMMIT;\n"
 
 --- Observe a foreign import over an independently stateful read handle.
@@ -15,6 +17,8 @@ local BATCH = "BEGIN TRANSACTION;\nINSERT INTO events VALUES (1);\nCOMMIT;\n"
 --- @param check function Assertions against the export and observed state.
 local function observe(schedule, check)
 	helpers.with_stub_scope({ "infra.logger", "infra.fs_dir", "modules.keystats.export" }, function()
+		local digest = ContentDigest.create()
+		local runloop = RunloopTimers.create()
 		local state = { reads = 0, closes = 0, applied = {}, watermark = #BATCH, position = 0, logs = {} }
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, format, ...) state.logs[#state.logs + 1] = string.format(format, ...) end
@@ -26,7 +30,11 @@ local function observe(schedule, check)
 			nrows = function()
 				local done = false
 				return function()
-					if not done then done = true; return { imported_data_sql_size = state.watermark } end
+					if not done then
+						done = true
+						return { imported_data_sql_size = state.watermark,
+							imported_data_sql_sha256 = digest.for_bytes((BATCH .. BATCH):sub(1, state.watermark)) }
+					end
 				end
 			end,
 			exec = function(_, sql)
@@ -38,9 +46,20 @@ local function observe(schedule, check)
 		}
 		local export = helpers.load_with_stubs("modules.keystats.export", {
 			fs = { attributes = function() return { size = #BATCH * 2 } end },
+			hash = digest,
+			timer = runloop.api,
 		})
 		export.init({ paths = { metrics_dir = "/foreign-read/" }, device_id = "local",
 			get_db = function() return db end })
+		-- Keep the original synchronous assertions while exercising real cooperative
+		-- continuation between the two independently scheduled ingest turns.
+		local sync = export.sync_foreign_data_sql
+		export.sync_foreign_data_sql = function(...)
+			local result, detail = sync(...)
+			if #runloop.queue == 0 then return result, detail end
+			runloop.drain()
+			return sync(...)
+		end
 		local original_open = io.open
 		io.open = function(path, ...)
 			if path:find("device.json", 1, true) then
@@ -57,19 +76,22 @@ local function observe(schedule, check)
 					helpers.assert_eq(mode, "set")
 					if schedule.phase == "seek" then
 						if schedule.failure == "throw" then error("injected seek failure") end
-						if schedule.failure == "wrong" then return state.position end
+						if schedule.failure == "wrong" then return offset + 1 end
 						return nil, "injected seek refusal"
 					end
 					state.position = offset
 					return offset
 				end,
-				read = function()
+				read = function(_, count)
 					state.reads = state.reads + 1
 					if schedule.phase == "read" then
 						if schedule.failure == "throw" then error("injected read failure") end
 						return nil, "injected read refusal"
 					end
-					return (BATCH .. BATCH):sub(state.position + 1)
+					helpers.assert_true(type(count) == "number", "verification reads must be bounded")
+					local bytes = (BATCH .. BATCH):sub(state.position + 1, state.position + count)
+					state.position = state.position + #bytes
+					return bytes
 				end,
 				close = function()
 					state.closes = state.closes + 1

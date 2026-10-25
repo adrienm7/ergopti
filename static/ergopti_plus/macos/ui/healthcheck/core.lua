@@ -468,6 +468,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.foreign_ledger_snapshot",
+		contract = { "open", "advance", "start", "poll", "close" },
+		-- Metrics foreign sync verifies source receipts before admitting SQL batches.
+		wired    = true,
+	},
+	{
 		id       = "adapters.ledger_append",
 		contract = { "cleanup", "recover", "flush" },
 		wired    = true,

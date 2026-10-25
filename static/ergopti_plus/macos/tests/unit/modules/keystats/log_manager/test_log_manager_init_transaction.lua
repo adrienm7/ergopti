@@ -103,6 +103,7 @@ helpers.describe("log_manager — initialization transaction", function()
 				read_new_entries = function() return {}, 0, "eof" end,
 			}
 			package.loaded["modules.keystats.export"] = {
+				cleanup = function() return true end,
 				init = function() end,
 				sync_foreign_data_sql = function() return {} end,
 			}

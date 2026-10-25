@@ -87,6 +87,7 @@ package.loaded["modules.keystats.aggregator"] = {
 }
 
 package.loaded["modules.keystats.export"] = {
+	cleanup = function() return true end,
 	init                    = function() end,
 	get_native_app_category = function() return "other" end,
 	get_device_short_id     = function() return "abcd" end,

@@ -79,6 +79,7 @@ function M.with_manager(scenario)
 				package.loaded["modules.keystats.aggregator"] = {}
 				local export = helpers.load_with_stubs("modules.keystats.export")
 				package.loaded["modules.keystats.export"] = {
+					cleanup = function() return true end,
 					sync_foreign_data_sql = function() return {} end,
 					_last_complete_batch_offset = export._last_complete_batch_offset,
 				}

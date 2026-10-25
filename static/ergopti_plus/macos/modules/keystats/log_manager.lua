@@ -1830,6 +1830,11 @@ end
 --- @return boolean complete True only when no initialization cleanup debt remains.
 local function _release_failed_init_resources()
 	local complete = true
+	local readers_ok, readers_closed = pcall(Export.cleanup)
+	if not readers_ok or readers_closed ~= true then
+		complete = false
+		pcall(Logger.error, LOG, "Foreign ledger verification cleanup remains pending.")
+	end
 
 	local ingest_timer = _ingest_timer
 	if ingest_timer then
@@ -2176,6 +2181,11 @@ function M.stop(opts)
 			pcall(Logger.error, LOG,
 				"Final ingest cleanup remains pending: %s.", tostring(ingest_err))
 		end
+	end
+	local readers_ok, readers_closed = pcall(Export.cleanup)
+	if not readers_ok or readers_closed ~= true then
+		complete = false
+		pcall(Logger.error, LOG, "Foreign ledger verification cleanup remains pending.")
 	end
 	if LedgerAppend.cleanup() ~= true then
 		complete = false

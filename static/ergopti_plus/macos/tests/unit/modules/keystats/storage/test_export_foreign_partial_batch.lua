@@ -17,6 +17,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ContentDigest = require("tests.support.content_digest")
+local RunloopTimers = require("tests.support.runloop_timers")
 
 package.loaded["infra.i18n"] = { get = function(k) return k end, t = function(k) return k end }
 local Export = helpers.load_with_stubs("modules.keystats.export")
@@ -121,7 +123,7 @@ helpers.describe("keystats-export-log-privacy", function()
 						end,
 					}
 					io.open = function(path, mode)
-						helpers.assert_eq(mode, "r")
+						helpers.assert_eq(mode, path == folder .. "data.sql" and "rb" or "r")
 						helpers.assert_true(path == folder .. "device.json" or path == folder .. "data.sql")
 						return {
 							read = function()
@@ -155,10 +157,17 @@ helpers.describe("keystats-export-log-privacy", function()
 						return 0
 					end
 					function db:errmsg() return "owned SQL refusal" end
+					local runloop = RunloopTimers.create()
 					local export = helpers.load_with_stubs("modules.keystats.export", {
+						hash = ContentDigest.create(),
+						timer = runloop.api,
 						fs = { attributes = function() return { size = #chunk } end },
 					})
 					export.init({ paths = { metrics_dir = "/owned-metrics/" }, device_id = "local-device", get_db = function() return db end })
+					if phase ~= "invalid" then
+						export.sync_foreign_data_sql()
+						runloop.drain()
+					end
 					local callbacks = 0
 					local result, detail = export.sync_foreign_data_sql(function(device_id)
 						callbacks = callbacks + 1

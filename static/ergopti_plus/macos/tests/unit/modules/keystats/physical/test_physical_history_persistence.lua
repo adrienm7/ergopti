@@ -108,7 +108,7 @@ local function ports()
 		return { committed = true, timer = {} }, true
 	end, cancel = function(handle) handle.timer = nil; return true end, now = os.time }
 	complete_batch_offset = complete_batch_offset or require("modules.keystats.export")._last_complete_batch_offset
-	package.loaded["modules.keystats.export"] = { _last_complete_batch_offset = complete_batch_offset, init = function() end,
+	package.loaded["modules.keystats.export"] = { cleanup = function() return true end,  _last_complete_batch_offset = complete_batch_offset, init = function() end,
 		sync_foreign_data_sql = function() return {} end, get_native_app_category = function() return "other" end }
 end
 local metrics = temporary .. "/metrics"
@@ -164,7 +164,7 @@ shell.run(function(capture, observed, native)
 	package.loaded["modules.keystats.text_cipher"]={is_enabled=function() return false end}
 	package.loaded["modules.keystats.export"]=nil
 	complete_batch_offset=require("modules.keystats.export")._last_complete_batch_offset
-	package.loaded["modules.keystats.export"]={_last_complete_batch_offset=complete_batch_offset,init=function() end,sync_foreign_data_sql=function() return {} end,get_native_app_category=function() return "other" end}
+	package.loaded["modules.keystats.export"]={ cleanup = function() return true end, _last_complete_batch_offset=complete_batch_offset,init=function() end,sync_foreign_data_sql=function() return {} end,get_native_app_category=function() return "other" end}
 	package.loaded["infra.manifest_reader"]={default_for=function() return true end}
 	package.loaded["infra.dialog_util"]={alert=function() end}
 	local kc_running=false
@@ -451,7 +451,7 @@ local function ports()
 		return { committed = true, timer = {} }, true
 	end, cancel = function(handle) handle.timer = nil; return true end, now = os.time }
 	complete_batch_offset = complete_batch_offset or require("modules.keystats.export")._last_complete_batch_offset
-	package.loaded["modules.keystats.export"] = { _last_complete_batch_offset = complete_batch_offset, init = function() end,
+	package.loaded["modules.keystats.export"] = { cleanup = function() return true end,  _last_complete_batch_offset = complete_batch_offset, init = function() end,
 		sync_foreign_data_sql = function() return {} end, get_native_app_category = function() return "other" end }
 end
 local metrics = temporary .. "/metrics"
@@ -507,7 +507,7 @@ shell.run(function(capture, observed, native)
 	package.loaded["modules.keystats.text_cipher"]={is_enabled=function() return false end}
 	package.loaded["modules.keystats.export"]=nil
 	complete_batch_offset=require("modules.keystats.export")._last_complete_batch_offset
-	package.loaded["modules.keystats.export"]={_last_complete_batch_offset=complete_batch_offset,init=function() end,sync_foreign_data_sql=function() return {} end,get_native_app_category=function() return "other" end}
+	package.loaded["modules.keystats.export"]={ cleanup = function() return true end, _last_complete_batch_offset=complete_batch_offset,init=function() end,sync_foreign_data_sql=function() return {} end,get_native_app_category=function() return "other" end}
 	package.loaded["infra.manifest_reader"]={default_for=function() return true end}
 	package.loaded["infra.dialog_util"]={alert=function() end}
 	local kc_running=false

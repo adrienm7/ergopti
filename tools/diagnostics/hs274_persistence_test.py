@@ -5,6 +5,8 @@ The live-ingest and two-rebuild proof that lived here is test_physical_history_p
 """
 
 import json
+import hashlib
+import importlib.util
 import os
 from pathlib import Path
 import shutil
@@ -31,6 +33,8 @@ def run_fixture(lua, temporary, fixture=None):
     """Answer Lua API requests with one real connection and an owned child deadline."""
     connection = None
     identity = 0
+    digests = {}
+    digest_identity = 0
     child = subprocess.Popen(
         [
             lua,
@@ -86,6 +90,12 @@ def run_fixture(lua, temporary, fixture=None):
                 elif operation == "mkdir":
                     owned_path(temporary, request["path"]).mkdir(mode=0o700)
                     value = True
+                elif operation == "replace":
+                    os.replace(
+                        owned_path(temporary, request["source"]),
+                        owned_path(temporary, request["path"]),
+                    )
+                    value = True
                 elif operation == "open":
                     if connection is not None:
                         raise ValueError("Prior SQLite connection is still owned")
@@ -95,6 +105,15 @@ def run_fixture(lua, temporary, fixture=None):
                     connection.row_factory = sqlite3.Row
                     identity += 1
                     value = identity
+                elif operation == "sha256_new":
+                    digest_identity += 1
+                    digests[digest_identity] = hashlib.sha256()
+                    value = digest_identity
+                elif operation == "sha256_append":
+                    digests[request["digest"]].update(bytes.fromhex(request["hex"]))
+                    value = True
+                elif operation == "sha256_finish":
+                    value = digests.pop(request["digest"]).hexdigest()
                 else:
                     if connection is None or request["connection"] != identity:
                         raise ValueError("SQLite request does not own the live connection")
@@ -159,6 +178,8 @@ class PhysicalReleasePersistenceTests(unittest.TestCase):
             owned.mkdir()
             outside.mkdir()
             (owned / "link").symlink_to(outside, target_is_directory=True)
+            owned_source = owned / "replace-source"
+            owned_source.write_text("controlled original", encoding="utf-8")
             targets = [
                 ("mkdir", root / "owned-sibling"),
                 ("mkdir", owned / ".." / "escaped-directory"),
@@ -166,13 +187,28 @@ class PhysicalReleasePersistenceTests(unittest.TestCase):
                 ("open", owned / "link" / "escaped.sqlite"),
                 ("mkdir", owned / "link" / "escaped-directory"),
             ]
+            requests = [{"op": operation, "path": str(path)} for operation, path in targets]
+            requests.extend(
+                [
+                    {
+                        "op": "replace",
+                        "source": str(owned_source),
+                        "path": str(root / "outside-target"),
+                    },
+                    {
+                        "op": "replace",
+                        "source": str(root / "outside-source"),
+                        "path": str(owned_source),
+                    },
+                ]
+            )
             fixture = root / "confinement.lua"
             source = [
                 'package.path = arg[1] .. "/static/ergopti_plus/_shared/lua/?.lua;" .. package.path',
                 'local json, refusals = require("json"), {}',
             ]
-            for operation, path in targets:
-                request = json.dumps({"kind": "request", "op": operation, "path": str(path)})
+            for message in requests:
+                request = json.dumps({"kind": "request", **message})
                 source.extend(
                     [
                         f'assert(io.stdout:write({json.dumps(request)} .. "\\n")); assert(io.stdout:flush())',
@@ -182,7 +218,7 @@ class PhysicalReleasePersistenceTests(unittest.TestCase):
             source.append('print(json.encode({ kind = "done", refusals = refusals }))')
             fixture.write_text("\n".join(source) + "\n")
             receipt = run_fixture(lua, str(owned), fixture)
-            self.assertEqual(len(receipt["refusals"]), 5)
+            self.assertEqual(len(receipt["refusals"]), len(requests))
             for refusal in receipt["refusals"]:
                 self.assertFalse(refusal["ok"])
                 self.assertIn("outside temporary directory", refusal["error"])
@@ -190,6 +226,145 @@ class PhysicalReleasePersistenceTests(unittest.TestCase):
             self.assertFalse((root / "escaped-directory").exists())
             self.assertFalse((root / "escaped.sqlite").exists())
             self.assertEqual(list(outside.iterdir()), [])
+            self.assertEqual(owned_source.read_text(encoding="utf-8"), "controlled original")
+            self.assertFalse((root / "outside-target").exists())
+
+
+class ForeignLedgerGenerationTests(unittest.TestCase):
+    """Real source rewrites must invalidate a durable foreign prefix receipt."""
+
+    def setUp(self):
+        self.lua = os.environ.get("ERGOPTI_DIAGNOSTIC_LUA54") or shutil.which("lua5.4")
+        self.assertTrue(self.lua, "Foreign ledger replay requires Lua 5.4")
+        self.temporary = tempfile.TemporaryDirectory(prefix="ergopti-foreign-generation-")
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        folder = self.root / "metrics/by_device/foreign"
+        folder.mkdir(parents=True)
+        (folder / "device.json").write_text(
+            json.dumps(
+                {"device_id": "foreign", "name": "Controlled foreign device", "os": "linux"}
+            ),
+            encoding="utf-8",
+        )
+        self.ledger = folder / "data.sql"
+        self.schema = ROOT / "static/ergopti_plus/_shared/data/db/schema.sql"
+        with sqlite3.connect(self.root / "cache.sqlite") as connection:
+            connection.executescript(self.schema.read_text(encoding="utf-8"))
+
+    @staticmethod
+    def batch(identifier, padding=""):
+        """Return one canonical committed event transaction."""
+        metadata = json.dumps({"padding": padding}).replace("'", "''")
+        return (
+            "BEGIN TRANSACTION;\n"
+            "INSERT OR IGNORE INTO events_system "
+            "(device_id,id,ts,date,action,metadata_json) VALUES "
+            f"('foreign',{identifier},'2026-10-25 10:00:00.000','2026-10-25','wake','{metadata}');\n"
+            "COMMIT;\n"
+        ).encode("utf-8")
+
+    def replay(self):
+        """Run the actual importer in a fresh Lua process and SQLite connection."""
+        return run_fixture(
+            self.lua,
+            self.temporary.name,
+            ROOT
+            / "static/ergopti_plus/macos/tests/fixtures/keystats/foreign_ledger_generation.lua",
+        )
+
+    def assert_committed_receipt(self, result):
+        """Independently hash exactly the source prefix committed in SQLite."""
+        watermark = result["watermark"][0]
+        offset = watermark["imported_data_sql_size"]
+        self.assertEqual(
+            watermark["imported_data_sql_sha256"],
+            hashlib.sha256(self.ledger.read_bytes()[:offset]).hexdigest(),
+        )
+
+    def test_actual_compactor_then_append_imports_new_event_after_restart(self):
+        self.ledger.write_bytes(self.batch(1) * 100)
+        before = self.replay()
+        self.assertEqual([row["id"] for row in before["rows"]], [1])
+        old_size = self.ledger.stat().st_size
+        spec = importlib.util.spec_from_file_location(
+            "foreign_compactor", ROOT / "tools/compact_data_sql.py"
+        )
+        compactor = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(compactor)
+        self.assertTrue(compactor.compact_device(self.ledger, self.schema))
+        with self.ledger.open("ab") as stream:
+            stream.write(self.batch(99))
+        self.assertLess(self.ledger.stat().st_size, old_size)
+        after = self.replay()
+        self.assertEqual([row["id"] for row in after["rows"]], [1, 99])
+        self.assert_committed_receipt(after)
+
+    def test_equal_size_rewrite_imports_complete_replacement_generation(self):
+        self.ledger.write_bytes(self.batch(1) * 4)
+        self.replay()
+        old_size = self.ledger.stat().st_size
+        replaced = self.batch(1) + self.batch(99)
+        replaced += b"--" + b" " * (old_size - len(replaced) - 3) + b"\n"
+        self.assertEqual(len(replaced), old_size)
+        self.ledger.write_bytes(replaced)
+        after = self.replay()
+        self.assertEqual([row["id"] for row in after["rows"]], [1, 99])
+        self.assert_committed_receipt(after)
+
+    def test_larger_rewrite_refuses_the_old_mid_literal_offset(self):
+        self.ledger.write_bytes(self.batch(1) * 2)
+        self.replay()
+        old_size = self.ledger.stat().st_size
+        self.ledger.write_bytes(self.batch(1) + self.batch(99, "x" * old_size))
+        self.assertGreater(self.ledger.stat().st_size, old_size)
+        after = self.replay()
+        self.assertEqual([row["id"] for row in after["rows"]], [1, 99])
+        self.assert_committed_receipt(after)
+
+    def test_legacy_watermark_without_digest_replays_before_publishing_a_receipt(self):
+        self.ledger.write_bytes(self.batch(1))
+        self.replay()
+        with sqlite3.connect(self.root / "cache.sqlite") as connection:
+            connection.execute("UPDATE devices SET imported_data_sql_sha256=NULL")
+        with self.ledger.open("ab") as stream:
+            stream.write(self.batch(99))
+        after = self.replay()
+        self.assertEqual([row["id"] for row in after["rows"]], [1, 99])
+        self.assert_committed_receipt(after)
+
+    def test_torn_append_keeps_the_digest_at_the_previous_commit(self):
+        first, second = self.batch(1), self.batch(99)
+        self.ledger.write_bytes(first + second.removesuffix(b"COMMIT;\n"))
+        partial = self.replay()
+        self.assertEqual([row["id"] for row in partial["rows"]], [1])
+        self.assertEqual(partial["watermark"][0]["imported_data_sql_size"], len(first))
+        self.assert_committed_receipt(partial)
+        with self.ledger.open("ab") as stream:
+            stream.write(b"COMMIT;\n")
+        after = self.replay()
+        self.assertEqual([row["id"] for row in after["rows"]], [1, 99])
+        self.assert_committed_receipt(after)
+
+    def test_large_prefix_yields_and_persists_a_native_digest_across_restart(self):
+        self.ledger.write_bytes(self.batch(1) * 1000)
+        initial = self.replay()
+        self.assertGreater(initial["turns"], 1)
+        self.assert_committed_receipt(initial)
+        with self.ledger.open("ab") as stream:
+            stream.write(self.batch(99, "é\nCOMMIT;\nquoted ' text"))
+        after = self.replay()
+        self.assertGreater(after["turns"], 1)
+        self.assertEqual([row["id"] for row in after["rows"]], [1, 99])
+        self.assert_committed_receipt(after)
+
+    def test_atomic_path_replacement_preserves_the_open_generation_then_imports_its_successor(self):
+        self.ledger.write_bytes(self.batch(1) * 1000)
+        (self.root / "replacement.sql").write_bytes(self.batch(1) + self.batch(99))
+        after = self.replay()
+        self.assertEqual(after["generations"], 2)
+        self.assertEqual([row["id"] for row in after["rows"]], [1, 99])
+        self.assert_committed_receipt(after)
 
 
 if __name__ == "__main__":
