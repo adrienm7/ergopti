@@ -21,7 +21,7 @@ local F_GETFD, F_SETFD, FD_CLOEXEC = 1, 2, 1
 local LOCK_FOLDER, LOCK_NAME = "ergopti", "ergopti.lock"
 local FALLBACK_ROOT = "/.cache"
 local FOLDER_MODE, FILE_MODE = 448, 384 -- 0700, 0600
-local O_WRONLY, O_CREAT, O_CLOEXEC = 1, 64, 524288
+local O_RDWR, O_CREAT, O_CLOEXEC = 2, 64, 524288
 local LOCK_EX, LOCK_NB = 2, 4
 local ERRNO_EXISTS, ERRNO_WOULD_BLOCK = 17, 11
 
@@ -94,8 +94,16 @@ function M.acquire()
 	end
 	local path = folder .. "/" .. LOCK_NAME
 	local bit = require("bit")
-	local fd = ffi.C.open(path, bit.bor(O_WRONLY, O_CREAT, O_CLOEXEC), ffi.new("int", FILE_MODE))
+	local uv = require("luv")
+	local fd = ffi.C.open(path, bit.bor(O_RDWR, O_CREAT, O_CLOEXEC, uv.constants.O_NONBLOCK), ffi.new("int", FILE_MODE))
 	if fd < 0 then return false, "The session lock file could not be opened: " .. path end
+	-- flock also accepts FIFOs: a successful lock alone does not establish a
+	-- valid singleton file. Inspect the exact open descriptor before admission.
+	local stat = uv.fs_fstat(fd)
+	if not stat or stat.type ~= "file" then
+		ffi.C.close(fd)
+		return false, "code=not_regular path=" .. path
+	end
 	if ffi.C.flock(fd, bit.bor(LOCK_EX, LOCK_NB)) ~= 0 then
 		local contended = ffi.errno() == ERRNO_WOULD_BLOCK
 		ffi.C.close(fd)

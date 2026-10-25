@@ -5,6 +5,7 @@ import pathlib
 import shlex
 import shutil
 import signal
+import socket
 import subprocess
 import tempfile
 import time
@@ -48,6 +49,77 @@ class SessionLockTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 0 if marker is None else 78, result.stderr)
                     if marker is not None:
                         self.assertIn("[session_lock]", result.stderr)
+
+    def test_nonregular_lock_never_blocks_or_admits_startup(self):
+        driver = pathlib.Path(__file__).resolve().parents[2]
+        runtime = shutil.which("luajit")
+        self.assertIsNotNone(runtime, "This native regression requires Linux LuaJIT")
+        for kind in ("fifo", "fifo-with-reader", "directory", "socket"):
+            for entry in ("launcher", "direct"):
+                with (
+                    self.subTest(kind=kind, entry=entry),
+                    tempfile.TemporaryDirectory() as temporary,
+                ):
+                    root = pathlib.Path(temporary)
+                    folder = root / "runtime" / "ergopti"
+                    folder.mkdir(parents=True)
+                    lock = folder / "ergopti.lock"
+                    reader = None
+                    node_socket = None
+                    if kind.startswith("fifo"):
+                        os.mkfifo(lock)
+                        if kind == "fifo-with-reader":
+                            reader = os.open(lock, os.O_RDONLY | os.O_NONBLOCK)
+                    elif kind == "directory":
+                        lock.mkdir()
+                    else:
+                        node_socket = socket.socket(socket.AF_UNIX)
+                        node_socket.bind(str(lock))
+                    stubs = root / "bin"
+                    stubs.mkdir()
+                    # A mistaken launcher admission is observable without booting
+                    # an actual daemon or touching any keyboard.
+                    (stubs / "luajit").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+                    (stubs / "luajit").chmod(0o755)
+                    environment = dict(os.environ)
+                    environment["XDG_RUNTIME_DIR"] = str(root / "runtime")
+                    environment["PATH"] = str(stubs) + os.pathsep + environment["PATH"]
+                    code = (
+                        "package.path = "
+                        + repr(
+                            str(driver / "?.lua") + ";" + str(driver.parent / "_shared/lua/?.lua")
+                        )
+                        + "; local lock = require('infra.session_lock'); local ok, reason = lock.acquire(); "
+                        + "if ok then lock.release() else io.stderr:write('[session_lock] ' .. reason .. '\\n') end; os.exit(ok and 0 or 78)"
+                    )
+                    command = (
+                        ["bash", str(driver / "install/launch.sh"), "--service"]
+                        if entry == "launcher"
+                        else [runtime, "-e", code]
+                    )
+                    try:
+                        result = subprocess.run(
+                            command, env=environment, capture_output=True, timeout=2
+                        )
+                        self.assertNotEqual(
+                            result.returncode,
+                            0,
+                            "A nonregular session lock must refuse daemon startup",
+                        )
+                        if kind.startswith("fifo"):
+                            self.assertEqual(result.returncode, 78)
+                            self.assertEqual(
+                                result.stderr,
+                                (
+                                    "[session_lock] code=not_regular path=" + str(lock) + "\n"
+                                ).encode(),
+                                "Both startup owners must retain the exact pre-boot refusal source, code and path",
+                            )
+                    finally:
+                        if reader is not None:
+                            os.close(reader)
+                        if node_socket is not None:
+                            node_socket.close()
 
     def test_child_outlives_daemon_without_retaining_lock(self):
         driver = pathlib.Path(__file__).resolve().parents[2]
