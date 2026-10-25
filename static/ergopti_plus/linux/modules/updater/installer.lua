@@ -17,6 +17,7 @@ local Paths = require("infra.paths")
 local Version = require("updater.version")
 local Snapshot = require("diagnostics.snapshot")
 local NativePath = require("native_path")
+local NoReplaceMove = require("infra.no_replace_move")
 
 local WORK_PREFIX = ".ergopti-update."
 
@@ -264,7 +265,9 @@ function DEFAULT_OPS.exists(path)
 end
 
 function DEFAULT_OPS.move(source, destination)
-	return run_command("mv -- " .. shell_quote(source) .. " " .. shell_quote(destination) .. " 2>/dev/null")
+	-- Every transaction step names an exact vacant destination. A concurrent
+	-- directory must never turn activation or rollback into a nested move.
+	return NoReplaceMove.move(source, destination)
 end
 
 function DEFAULT_OPS.remove_tree(path)

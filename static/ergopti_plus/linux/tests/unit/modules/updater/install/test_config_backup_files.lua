@@ -231,3 +231,140 @@ helpers.describe("config-backup-native-metadata", function()
 		end)
 	end
 end)
+
+helpers.describe("installer-native-publication", function()
+	local Fixture = require("tests.support.modules.updater.installer_native_fixture")
+	local uv = require("luv")
+	for _, mode in ipairs({ "directory", "empty-directory", "directory-link", "file", "absent" }) do
+		helpers.it("(installer-native-publication) exact directory move handles " .. mode, function()
+			local Installer = helpers.load_module("modules.updater.installer")
+			local root = Fixture.scratch()
+			local source, destination = root .. "/source", root .. "/destination"
+			local ok, err = pcall(function()
+				assert(uv.fs_mkdir(source, 448))
+				Fixture.write(source .. "/owned.marker", "owned source\n")
+				if mode == "directory" or mode == "empty-directory" then
+					assert(uv.fs_mkdir(destination, 448))
+					if mode == "directory" then Fixture.write(destination .. "/foreign.marker", "foreign destination\n") end
+				elseif mode == "directory-link" then
+					assert(uv.fs_mkdir(root .. "/foreign", 448))
+					Fixture.write(root .. "/foreign/foreign.marker", "foreign destination\n")
+					assert(uv.fs_symlink(root .. "/foreign", destination))
+				elseif mode == "file" then Fixture.write(destination, "foreign file\n") end
+				local moved = Installer.DEFAULT_OPS.move(source, destination)
+				if mode == "absent" then
+					helpers.assert_eq(moved, true)
+					helpers.assert_eq(Fixture.read(destination .. "/owned.marker"), "owned source\n")
+					helpers.assert_eq(uv.fs_stat(source), nil)
+				else
+					helpers.assert_eq(moved, false, "an occupied path must never become a container or be overwritten")
+					helpers.assert_eq(Fixture.read(source .. "/owned.marker"), "owned source\n")
+					helpers.assert_eq(uv.fs_stat(destination .. "/source"), nil, "no nested source may be published")
+					if mode == "directory" or mode == "directory-link" then
+						helpers.assert_eq(Fixture.read(destination .. "/foreign.marker"), "foreign destination\n")
+					elseif mode == "file" then helpers.assert_eq(Fixture.read(destination), "foreign file\n") end
+				end
+			end)
+			Fixture.remove(root)
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	helpers.it("(installer-native-publication) activation race retains foreign root and original backup", function()
+		local Installer = helpers.load_module("modules.updater.installer")
+		local fixture = Fixture.create(Installer)
+		local current, work_dir, candidate, foreign, injected = uv.fs_stat(fixture.installed), nil, nil, nil, false
+		local ops = {}
+		for name, operation in pairs(fixture.ops) do ops[name] = operation end
+		ops.make_work_dir = function(parent)
+			work_dir = Installer.DEFAULT_OPS.make_work_dir(parent)
+			return work_dir
+		end
+		ops.move = function(source, destination)
+			if source == work_dir .. "/candidate" then candidate = uv.fs_stat(source) end
+			local moved = Installer.DEFAULT_OPS.move(source, destination)
+			if moved and source == fixture.installed and destination == fixture.installed .. ".old" then
+				assert(uv.fs_mkdir(fixture.installed, 448))
+				Fixture.write(fixture.installed .. "/foreign.marker", "concurrent foreign owner\n")
+				foreign, injected = uv.fs_stat(fixture.installed), true
+			end
+			return moved
+		end
+		local ok, err = pcall(function()
+			local installed, reason = Installer.install({ archive_path = fixture.archive, expected_version = "1.2.3",
+				context = fixture.context, ops = ops })
+			helpers.assert_eq(injected, true, "the real transaction must reach the backup/activation boundary")
+			helpers.assert_true(type(candidate) == "table", "the exact assembled candidate must exist before publication")
+			helpers.assert_eq(installed, false)
+			helpers.assert_eq(Fixture.read(fixture.installed .. "/foreign.marker"), "concurrent foreign owner\n",
+				"rollback and staging cleanup must never remove a concurrent destination owner")
+			local retained = assert(uv.fs_stat(fixture.installed))
+			helpers.assert_eq({ retained.dev, retained.ino }, { foreign.dev, foreign.ino })
+			local backup = assert(uv.fs_stat(fixture.installed .. ".old"))
+			helpers.assert_eq({ backup.dev, backup.ino }, { current.dev, current.ino })
+			helpers.assert_eq(Fixture.read(fixture.installed .. ".old/old.marker"), "original installation\n")
+			helpers.assert_contains(reason, "backup remains at " .. fixture.installed .. ".old")
+			helpers.assert_eq(uv.fs_stat(fixture.installed .. "/candidate"), nil)
+			helpers.assert_eq(uv.fs_stat(fixture.installed .. "/ergopti.old"), nil)
+			helpers.assert_eq(uv.fs_stat(work_dir), nil, "only the private staging namespace is cleaned")
+			helpers.assert_true(uv.fs_stat(fixture.archive) ~= nil, "failure retains the authenticated archive for retry")
+		end)
+		Fixture.remove(fixture.root)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("(installer-native-publication) genuine absent destinations still install and retain the rollback root", function()
+		local Installer = helpers.load_module("modules.updater.installer")
+		local fixture = Fixture.create(Installer)
+		local old = assert(uv.fs_stat(fixture.installed))
+		local ok, err = pcall(function()
+			local installed, reason = Installer.install({ archive_path = fixture.archive, expected_version = "1.2.3", context = fixture.context, ops = fixture.ops })
+			helpers.assert_eq(installed, true, tostring(reason))
+			helpers.assert_eq(Fixture.read(fixture.installed .. "/linux/new.marker"), "selected installation\n")
+			local backup = assert(uv.fs_stat(fixture.installed .. ".old"))
+			helpers.assert_eq({ backup.dev, backup.ino }, { old.dev, old.ino })
+			helpers.assert_eq(uv.fs_stat(fixture.archive), nil)
+			helpers.assert_true(Fixture.read(fixture.installed .. "/.ergopti-owned-files") ~= nil)
+		end)
+		Fixture.remove(fixture.root)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("(installer-native-publication) native refusal cannot fall back to a shell move", function()
+		local root = Fixture.scratch()
+		local source, destination = root .. "/source", root .. "/destination"
+		assert(uv.fs_mkdir(source, 448))
+		Fixture.write(source .. "/owned.marker", "owned source\n")
+		local original = assert(uv.fs_stat(source))
+		local previous = package.loaded["modules.updater.installer"]
+		local native_owner = require("infra.no_replace_move")
+		helpers.assert_eq(type(native_owner.move), "function", "the double must mirror the real canonical port")
+		local probes, forks = 0, 0
+		local Installer = helpers.load_module_with_dependency("modules.updater.installer", "infra.no_replace_move", {
+			move = function(from, to)
+				probes = probes + 1
+				helpers.assert_eq(from, source)
+				helpers.assert_eq(to, destination)
+				return false, "native no-replace move unavailable"
+			end,
+		})
+		local execute = os.execute
+		os.execute = function(...) forks = forks + 1; return execute(...) end
+		local ok, err = pcall(function()
+			local moved, reason = Installer.DEFAULT_OPS.move(source, destination)
+			helpers.assert_eq(moved, false)
+			helpers.assert_eq(reason, "native no-replace move unavailable")
+			helpers.assert_eq(probes, 1)
+			helpers.assert_eq(forks, 0, "a refused atomic primitive must never become an unsafe mv")
+			local retained = assert(uv.fs_stat(source))
+			helpers.assert_eq({ retained.dev, retained.ino }, { original.dev, original.ino })
+			helpers.assert_eq(Fixture.read(source .. "/owned.marker"), "owned source\n")
+			helpers.assert_eq(uv.fs_stat(destination), nil)
+		end)
+		os.execute = execute
+		package.loaded["modules.updater.installer"] = previous
+		Fixture.remove(root)
+		if not ok then error(err, 0) end
+	end)
+
+end)
