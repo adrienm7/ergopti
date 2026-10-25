@@ -373,7 +373,7 @@ helpers.describe("tap-hold writer: the wizard imports only the checked keys", fu
 		helpers.assert_eq(loaded.enabled, true, "an imported key is live once the daemon restarts")
 		helpers.assert_eq(loaded.keys.caps_lock.tap_action, preset.caps_lock.tap_action)
 		helpers.assert_eq(loaded.keys.caps_lock.hold_modifier, preset.caps_lock.hold_modifier)
-		helpers.assert_eq(loaded.keys.caps_lock.time_activation_seconds, preset.caps_lock.time_activation_seconds)
+		helpers.assert_eq(loaded.keys.caps_lock.time_activation_seconds, loaded.global_seconds, "the preset ships no delay: the key follows the global one")
 		helpers.assert_eq(loaded.keys.left_alt.hold_layer, preset.left_alt.hold_layer)
 		helpers.assert_eq(loaded.keys.left_shift.tap_action, "paste", "an unchecked key keeps what it had")
 		helpers.assert_nil(loaded.keys.right_ctrl, "a key nobody checked is not written")
@@ -666,5 +666,77 @@ helpers.describe("tap-hold writer: staging write and close acknowledgement", fun
 		helpers.assert_eq(document.future.opaque[1], "left")
 		helpers.assert_eq(document.future.opaque[2], "right")
 		helpers.assert_nil(staged)
+	end)
+end)
+
+helpers.describe("tap-hold delay model: global default, sticky per-key delays, reset (PAR-15)", function()
+
+	helpers.it("ships no delay for any key", function()
+		local preset = Loader.preset_keys(DEFAULTS)
+		helpers.assert_true(next(preset) ~= nil, "the preset lists keys")
+		for key_id, fields in pairs(preset) do
+			helpers.assert_nil(fields.time_activation_seconds, key_id .. " must not ship a delay of its own")
+		end
+		local loaded = Loader.load(DEFAULTS, nil)
+		helpers.assert_eq(loaded.global_seconds, Loader.GLOBAL_DEFAULT_SECONDS, "every key follows the registry default")
+	end)
+
+	helpers.it("a global change moves a key without its own delay and never one with it; a reset follows the global again", function()
+		local writer, path = fresh_writer()
+		write_file(path, require("tests.support.tap_hold_fixture").with_preset())
+		local default = effective(path).global_seconds
+		helpers.assert_true(writer.set_threshold("caps_lock", 0.5))
+		helpers.assert_true(writer.set_global_threshold(0.3))
+		local loaded = effective(path)
+		helpers.assert_eq(loaded.global_seconds, 0.3)
+		helpers.assert_eq(loaded.keys.caps_lock.time_activation_seconds, 0.5, "a global change spares a key's own delay")
+		helpers.assert_eq(loaded.keys.tab.time_activation_seconds, 0.3, "a global change moves a key without one")
+		helpers.assert_true(writer.set_threshold("caps_lock", nil))
+		helpers.assert_eq(effective(path).keys.caps_lock.time_activation_seconds, 0.3, "a reset key follows the global again")
+		helpers.assert_true(writer.set_global_threshold(nil))
+		helpers.assert_eq(effective(path).keys.caps_lock.time_activation_seconds, default, "no global: the registry default")
+		helpers.assert_true(not writer.set_global_threshold(0), "an unusable global delay is refused")
+		helpers.assert_true(not writer.set_global_threshold(11))
+		os.remove(path)
+	end)
+
+	helpers.it("a delay an earlier build copied into the file is not the user's; a delay the user sets afterwards is", function()
+		local writer, path = fresh_writer()
+		write_file(path, require("tests.support.tap_hold_fixture").with_preset(
+			'[tap_hold.keys.caps_lock]\ntime_activation_seconds = 0.35\n'
+			.. '[tap_hold.keys.left_ctrl]\ntime_activation_seconds = 0.45\n'))
+		local loaded = effective(path)
+		helpers.assert_eq(loaded.keys.caps_lock.time_activation_seconds, loaded.global_seconds,
+			"the shipped 0.35 of Caps Lock is not a choice")
+		helpers.assert_eq(loaded.keys.left_ctrl.time_activation_seconds, 0.45, "a delay the user set stays")
+		helpers.assert_true(writer.set_tap("tab", "paste"))
+		local text = read_file(path)
+		helpers.assert_true(text:find("time_activation_seconds = 0.35", 1, true) == nil, "the write removed the copied delay")
+		helpers.assert_true(text:find("explicit_delays = true", 1, true) ~= nil, "and flagged the file")
+		helpers.assert_eq(effective(path).keys.left_ctrl.time_activation_seconds, 0.45)
+		helpers.assert_true(writer.set_threshold("caps_lock", 0.35))
+		helpers.assert_eq(effective(path).keys.caps_lock.time_activation_seconds, 0.35,
+			"once flagged, 0.35 chosen by the user is kept")
+		os.remove(path)
+	end)
+
+	helpers.it("the wizard's report ignores a copied delay and counts the user's own", function()
+		local path = os.tmpname()
+		write_file(path, '[tap_hold]\ninherit_defaults = false\n[tap_hold.keys.caps_lock]\ntap_action = "enter"\n'
+			.. 'hold_modifier = "ctrl"\ntime_activation_seconds = 0.35\n')
+		helpers.assert_eq(Loader.key_report(DEFAULTS, path).keys.caps_lock, "recommended")
+		write_file(path, '[tap_hold]\ninherit_defaults = false\nexplicit_delays = true\n[tap_hold.keys.caps_lock]\n'
+			.. 'tap_action = "enter"\nhold_modifier = "ctrl"\ntime_activation_seconds = 0.35\n')
+		helpers.assert_eq(Loader.key_report(DEFAULTS, path).keys.caps_lock, "customised")
+		os.remove(path)
+	end)
+
+	helpers.it("a scope restore drops the user's global delay with the keys' delays", function()
+		local writer, path = fresh_writer()
+		helpers.assert_true(writer.set_global_threshold(0.3))
+		local document = require("toml_codec").decode(read_file(path))
+		local text = writer.render_scope("recommended", document, {}, Loader.preset_keys(DEFAULTS))
+		helpers.assert_true(text:find("time_activation_seconds", 1, true) == nil)
+		os.remove(path)
 	end)
 end)

@@ -114,13 +114,10 @@ D.rollover_keys = require("tap_hold.key_catalog").load_rollover(shared_defaults_
 
 -- ----- Timeouts + flags ([hs_timeouts]) -----
 local timeouts = require_section(sections, "hs_timeouts")
--- Global tap/hold threshold (KE basic.to_if_alone_timeout_milliseconds) for the
--- keys with no threshold of their own: the timing registry's fallback, the one
--- Windows and Linux use for the same keys (PAR-15).
+-- Global tap/hold delay (KE basic.to_if_alone_timeout_milliseconds) of every key
+-- that has no delay of its own: the timing registry's tap_hold.default_activation_ms,
+-- the one declaration Windows and Linux read too (PAR-15). No key ships a delay.
 D.tap_hold_timeout_ms        = require("infra.timings").ms("tap_hold", "default_activation_ms")
--- The per-key thresholds Windows and Linux read from [tap_hold.keys.*], under
--- macOS's own key ids through the catalogue's `hs` column: key id -> ms.
-D.tap_hold_key_timeouts_ms   = require("tap_hold.key_catalog").load_thresholds(shared_defaults_path(), "hs")
 -- One-shot modifier auto-cancel delay: the cross-driver timing registry's value
 -- (tap_hold.one_shot_shift_timeout_ms), the one Windows and Linux read, so the
 -- three drivers cancel a one-shot Shift after the same time (PAR-15).

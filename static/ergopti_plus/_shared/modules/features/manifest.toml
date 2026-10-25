@@ -5377,12 +5377,12 @@ section = "tap_hold_key_delay_tail"
 
 [[menu.tap_hold_key_delay_tail]]
 type = "---"
-platforms = ["hs"]
-unavailable = "hide"
 
 # The row naming the key's delay opens the driver's delay prompt itself: the
 # maintainer retired the submenu whose only row did that (2026-10-22), since
-# a row that opens a submenu is never clicked.
+# a row that opens a submenu is never clicked. Its caption is « global (N ms) »
+# while the key follows the global delay and the key's own delay once it has one;
+# « Use global delay » next to it removes that override (enabled only then).
 [[menu.tap_hold_key_delay_tail]]
 type = "command"
 id = "tap_hold_key_delay"
@@ -5396,8 +5396,6 @@ i18n = "menu.tapholds.key_tap_delay_use_global"
 caption_getter = "tap_hold_key_global_delay_caption"
 checked_when = ["tap_hold_key_delay_is_global"]
 disabled_when = ["tap_hold_key_delay_has_override"]
-platforms = ["hs"]
-unavailable = "hide"
 
 [[menu.wrap_symbols_global_controls]]
 type = "command"
@@ -6723,6 +6721,23 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 [[menu.tap_holds_menu]]
 type = "---"
 platforms = ["hs"]
+unavailable = "hide"
+
+# The GLOBAL tap / hold delay on Windows and Linux (macOS draws its own among
+# the rows above): the delay of every key that has none of its own, 200 ms
+# until the user changes it. The driver supplies the one row, captioned with the
+# current value, because a provider row carries its own label. A key's own delay
+# (its delay row below) survives a change of this one; « Use global delay » on
+# that row removes it.
+[[menu.tap_holds_menu]]
+type = "list"
+id = "tap_hold_global_delay"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.tap_holds_menu]]
+type = "---"
+platforms = ["ahk", "linux"]
 unavailable = "hide"
 
 # The keys, one row each holding its disable / tap-picker / hold-picker rows,

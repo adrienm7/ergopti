@@ -190,19 +190,19 @@ This means:
 - On Windows and Linux, a left alias (`lctrl`, `lshift`, `lalt`, `lwin`) holds the left key, and a plain `ctrl` or `shift` on `right_ctrl` / `right_shift` holds that key's own side.
 - On macOS the `[hs_*]` sections are not user-editable (Karabiner owns the key rules, so there is no per-key user file to merge): an edit of `defaults.toml` always applies.
 - The one-shot Shift timeout is the timing registry's `tap_hold.one_shot_shift_timeout_ms` (2000 ms) on all three drivers.
-- The hold thresholds differ on purpose between the namespaces (per key 0.20-0.35 s on Windows and Linux, a global value plus a per-key override on macOS).
+- No key ships a hold delay, on any driver. Every key follows the global delay: the user's `[tap_hold] time_activation_seconds` on Windows and Linux (the Delay row of the menu on macOS), else the timing registry's `tap_hold.default_activation_ms` (200 ms). A key's own `time_activation_seconds` overrides it for that key and survives a change of the global delay; « Use global delay » removes it. `[tap_hold.retired_delays]` records the per-key delays earlier builds shipped so that Windows and Linux can ignore the copies a rewrite left in a user file (see `[tap_hold] explicit_delays`).
 
 ### Semantics of a tap-hold key
 
 Each `[tap_hold.keys.<name>]` entry may declare:
 
-| Field                     | Type   | Required | Description                                                              |
-| ------------------------- | ------ | -------- | ------------------------------------------------------------------------ |
-| `time_activation_seconds` | number | yes      | Tap vs hold threshold                                                    |
-| `tap_action`              | string | no       | Action emitted on short tap (ref `_shared/modules/actions/actions.toml`) |
-| `hold_layer`              | string | no       | Layer activated on hold (an id from `[tap_hold.hold_picker].layers`)     |
-| `hold_modifier`           | enum   | no       | Modifier emitted on hold (mutex with `hold_layer`)                       |
-| `enabled`                 | bool   | no       | Default `true`. Set `false` to disable this entry without deleting it    |
+| Field                     | Type   | Required | Description                                                                |
+| ------------------------- | ------ | -------- | -------------------------------------------------------------------------- |
+| `time_activation_seconds` | number | no       | This key's own tap vs hold delay; absent, the key follows the global delay |
+| `tap_action`              | string | no       | Action emitted on short tap (ref `_shared/modules/actions/actions.toml`)   |
+| `hold_layer`              | string | no       | Layer activated on hold (an id from `[tap_hold.hold_picker].layers`)       |
+| `hold_modifier`           | enum   | no       | Modifier emitted on hold (mutex with `hold_layer`)                         |
+| `enabled`                 | bool   | no       | Default `true`. Set `false` to disable this entry without deleting it      |
 
 `hold_layer` and `hold_modifier` are **mutually exclusive** (the schema enforces it).
 

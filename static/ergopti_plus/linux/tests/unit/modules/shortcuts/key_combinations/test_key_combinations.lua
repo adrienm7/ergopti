@@ -195,7 +195,7 @@ helpers.describe("ordered pairs through actual native consumers", function()
 		local loaded = Loader.load_document(defaults,{ tap_hold={enabled=false,inherit_defaults=true} },nil,"/controlled/tap_hold.toml")
 		local hook = {}; hook.set_remapper = function(engine,callback) hook.engine,hook.on_tap = engine,callback; return true end
 		for _, name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name] = function() return {} end end
-		protected_modules({ ["modules.shortcuts.key_combinations"] = false, ["platform.remap.tap_hold_manager"] = false, ["platform.remap.tap_hold_loader"]={ FALLBACK_THRESHOLD_SECONDS=Loader.FALLBACK_THRESHOLD_SECONDS, load=function() return loaded end },
+		protected_modules({ ["modules.shortcuts.key_combinations"] = false, ["platform.remap.tap_hold_manager"] = false, ["platform.remap.tap_hold_loader"]={ GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS, load=function() return loaded end },
 			["platform.remap.nav_layer"]={load=function() return {} end},
 			["adapters.file_system"]={read_with_status=function() return base_text,"ok" end},
 			["infra.config_paths"]={config=function() return path end} },function()
@@ -290,7 +290,7 @@ helpers.describe("configured pair publication lifecycle",function()
 		end
 		for _,name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name]=function() return {} end end
 		protected_modules({["modules.shortcuts.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
-			["platform.remap.tap_hold_loader"]={FALLBACK_THRESHOLD_SECONDS=Loader.FALLBACK_THRESHOLD_SECONDS,load=function() return loaded end},
+			["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end},
 			["platform.remap.nav_layer"]={load=function() return {} end},["adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
 			["infra.config_paths"]={config=function() return path end}},function()
 			local manager=require("platform.remap.tap_hold_manager")
@@ -371,7 +371,7 @@ helpers.describe("independent pair enablement across empty configuration",functi
 		end
 		for _,name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name]=function() return {} end end
 		protected_modules({["modules.shortcuts.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
-			["platform.remap.tap_hold_loader"]={FALLBACK_THRESHOLD_SECONDS=Loader.FALLBACK_THRESHOLD_SECONDS,load=function() return loaded end},
+			["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end},
 			["platform.remap.nav_layer"]={load=function() return {} end},["adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
 			["infra.config_paths"]={config=function() return path end}},function()
 			local manager=require("platform.remap.tap_hold_manager")

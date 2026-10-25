@@ -496,7 +496,7 @@ helpers.describe("declared complete per-key head", function()
 
 	helpers.it("retains actual picker and hold writer behind shared order (tap-hold-key-head)", function()
 		with_head(nil, function(rows, calls, picked, i18n)
-			helpers.assert_eq(#rows, 5, "four declared head rows and original delay tail")
+			helpers.assert_eq(#rows, 7, "four declared head rows, a separator, the delay row and its reset")
 			helpers.assert_eq(rows[1].title, i18n.get("tap_hold.action.disable"))
 			helpers.assert_eq(rows[2].title, "-")
 			helpers.assert_true(type(rows[3].fn) == "function" and rows[3].menu == nil)
@@ -538,7 +538,7 @@ helpers.describe("declared complete per-key head", function()
 
 	helpers.it("hides declared tap row without dropping hold payload (tap-hold-key-head)", function()
 		with_head(function(rows) rows[3].platforms = { "ahk" } end, function(rows, calls, picked, i18n)
-			helpers.assert_eq(#rows, 4)
+			helpers.assert_eq(#rows, 6)
 			helpers.assert_eq(rows[2].title, "-")
 			helpers.assert_eq(rows[3].title, string.format(i18n.get("tap_hold.picker.hold"), i18n.get("tap_hold.hold.shift")))
 			rows[3].fn()
@@ -670,8 +670,8 @@ helpers.describe("declared complete per-key delay tail", function()
 					helpers.assert_type(row.action, "function", "clicking the delay row opens the prompt")
 					helpers.assert_nil(row.action(), "original notification callback has no receipt")
 					helpers.assert_eq(calls, { "set" })
-					if platform == "hs" then
-						helpers.assert_true(rows[5].separator, "only macOS retains a separator before delay")
+					do
+						helpers.assert_true(rows[5].separator, "a separator precedes the delay on every platform")
 						local reset = rows[expected.delay_index + 1]
 						helpers.assert_eq(reset.label, string.format(strings["menu.tapholds.key_tap_delay_use_global"], "200 ms"))
 						helpers.assert_eq(reset.checked == true, inherited)
@@ -699,14 +699,14 @@ helpers.describe("declared complete per-key delay tail", function()
 			Manager = current
 			local i18n = require("infra.i18n")
 			local key = assert(find(key_rows(section), i18n.get("tap_hold.group.left_shift")))
-			helpers.assert_eq(key.menu[5].title, string.format(i18n.get("tap_hold.picker.hold"), i18n.get("tap_hold.hold.shift")))
-			helpers.assert_nil(key.menu[5].menu, "the delay row is a command, not a submenu")
-			helpers.assert_type(key.menu[5].fn, "function", "caption retains original dialog owner")
+			helpers.assert_eq(key.menu[6].title, string.format(i18n.get("tap_hold.picker.hold"), i18n.get("tap_hold.hold.shift")))
+			helpers.assert_nil(key.menu[6].menu, "the delay row is a command, not a submenu")
+			helpers.assert_type(key.menu[6].fn, "function", "caption retains original dialog owner")
 			restore(Manager); Manager = nil
 			group.platforms = { "hs" }
 			section, Manager = build({}, {})
 			key = assert(find(key_rows(section), i18n.get("tap_hold.group.left_shift")))
-			helpers.assert_eq(#key.menu, 4, "shared absence policy hides the delay row")
+			helpers.assert_eq(#key.menu, 6, "shared absence policy hides the delay row, not the separator and the reset")
 		end)
 		group.i18n, group.caption_getter, group.platforms = caption, getter, platforms
 		if Manager then restore(Manager) end
@@ -742,8 +742,8 @@ helpers.describe("declared complete per-key delay tail", function()
 			local i18n = require("infra.i18n")
 			local section = assert(find(items, i18n.get("menu.tapholds.title")))
 			local ctrl = assert(find(key_rows(section), i18n.get("tap_hold.group.left_ctrl")))
-			helpers.assert_nil(ctrl.menu[5].menu, "the delay row opens the prompt itself")
-			local callback = ctrl.menu[5].fn
+			helpers.assert_nil(ctrl.menu[6].menu, "the delay row opens the prompt itself")
+			local callback = ctrl.menu[6].fn
 			local malformed = "[tap_hold.keys.left_ctrl\n"
 			during_prompt = malformed
 			helpers.assert_eq(callback(), false, "refused native duration has an explicit refusal receipt")

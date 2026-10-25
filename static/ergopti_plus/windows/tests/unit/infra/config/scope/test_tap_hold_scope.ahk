@@ -9,7 +9,7 @@ _TapHoldScopeCase(Mode, RefuseBackup := false, ExternalEdit := false) {
 	Fixture := _ScopeOwnerFixture(OriginalConfigBody)
 	ConfigSource := Fixture.source
 	TapPath := Fixture.path . ".tap.toml"
-	TapSource := '[tap_hold]`ninherit_defaults = true`n[tap_hold.keys.space]`ntap_action = "open_url"`nhold_modifier = "shift"`ntime_activation_seconds = 0.9`n[private]`ncredential = "keep"`n'
+	TapSource := '[tap_hold]`ninherit_defaults = true`ntime_activation_seconds = 0.3`n[tap_hold.keys.space]`ntap_action = "open_url"`nhold_modifier = "shift"`ntime_activation_seconds = 0.9`n[private]`ncredential = "keep"`n'
 	Assert(FSWriteDurable(Fixture.path, ConfigSource))
 	Assert(FSWriteDurable(TapPath, TapSource))
 	Fixture.options["tap_hold_path"] := TapPath
@@ -41,7 +41,7 @@ _TapHoldScopeCase(Mode, RefuseBackup := false, ExternalEdit := false) {
 		Id := Mode == "clear" ? "scope_clear" : "scope_restore"
 		Rendered.Delete()
 		Rendered := MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "",
-			Map("tap_hold_keys_left", (*) => [], "tap_hold_keys_right", (*) => []),
+			Map("tap_hold_global_delay", (*) => [], "tap_hold_keys_left", (*) => [], "tap_hold_keys_right", (*) => []),
 			Commands, Map("tapholds_enabled", (*) => false))
 		ItemId := 0, Position := -1
 		Loop TrayMenuItemCount(Rendered) {
@@ -72,6 +72,9 @@ _TapHoldScopeCase(Mode, RefuseBackup := false, ExternalEdit := false) {
 			RestartPath := TapPath . ".restart"
 			Assert(FSWriteDurable(RestartPath, FSReadUtf8Exact(TapPath)))
 			Reloaded := LoadTapHoldToml(RestartPath, Fixture.options["tap_hold_defaults"])
+			; Restore and clear both drop every delay, the global one included: the
+			; recommendation sets none.
+			Assert(!Reloaded.Has("time_activation_seconds"), "the scope removes the user's global delay")
 			if Mode == "clear" {
 				; The clear once deleted the switch with the keys, so the next key
 				; the user set did nothing until the switch was found again.

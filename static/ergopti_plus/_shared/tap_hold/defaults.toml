@@ -27,10 +27,11 @@
 # its Tap-Hold submenu, in which order, under which hand and with which label.
 #
 # The two namespaces below describe the SAME seven physical keys under different
-# ids (left_ctrl/left_control, left_alt/left_option), with the SAME thresholds
-# (the [tap_hold.keys.*] time_activation_seconds below, which macOS reads through
-# the catalogue's `hs` column; tools/test/test-tap-hold-threshold-parity.cjs pins
-# every value) and in places different actions — caps_lock holds ctrl under
+# ids (left_ctrl/left_control, left_alt/left_option), with the SAME delay (none
+# of them ships a delay of its own: every key follows the one global delay, the
+# timing registry's tap_hold.default_activation_ms, until the user gives it one;
+# tools/test/test-tap-hold-threshold-parity.cjs pins the model) and in places
+# different actions — caps_lock holds ctrl under
 # [tap_hold.*] and cmd under [hs_tap_hold]. The shipped actions are a maintainer
 # decision recorded in the audit entry PAR-17; until it is taken, a change to one
 # namespace is NOT a change to the other.
@@ -50,7 +51,13 @@
 # =====================================
 
 # Each key may declare:
-#   - ``time_activation_seconds`` : tap (short) vs hold (long) threshold.
+#   - ``time_activation_seconds`` : tap (short) vs hold (long) threshold. NO key
+#                        declares one here: a key follows the global delay (the
+#                        user's [tap_hold] time_activation_seconds, else the timing
+#                        registry's tap_hold.default_activation_ms) until the user
+#                        sets its own in tap_hold.toml. A value shipped here would
+#                        be copied into the user's file by a rewrite and then
+#                        pass for the user's own choice, which is why none is.
 #   - ``tap_action``   : action emitted on tap (string or null = native key).
 #   - ``hold_layer``   : layer activated on hold, one of [tap_hold.hold_picker].layers.
 #                        Its key bindings live in _shared/keymap/layers.recommended.toml
@@ -115,12 +122,34 @@ keys = ["escape", "tab", "enter", "space", "backspace", "delete"]
 
 
 
+# ===================================
+# ===== 1.2 The retired delays =====
+# ===================================
+
+# The per-key delays this file used to ship, in seconds. They are NOT defaults
+# any more: they are kept so the loaders and the writers of Windows and Linux
+# can tell a delay a user never chose (a rewrite of tap_hold.toml copied the
+# shipped value into the file, as it did for every key) from one the user set.
+# A tap_hold.toml without `[tap_hold] explicit_delays = true` is read with these
+# exact values ignored, and the first write that file receives removes them and
+# sets the flag, so every delay left in a flagged file is the user's own. macOS
+# never stored a shipped delay and does not read this table.
+[tap_hold.retired_delays]
+caps_lock = 0.35
+left_shift = 0.35
+left_ctrl = 0.20
+left_alt = 0.20
+right_ctrl = 0.20
+alt_gr = 0.20
+tab = 0.20
+
+
+
 # =========================
 # ===== 1.1 caps_lock =====
 # =========================
 
 [tap_hold.keys.caps_lock]
-time_activation_seconds = 0.35
 tap_action = "enter"
 hold_modifier = "ctrl"
 
@@ -131,7 +160,6 @@ hold_modifier = "ctrl"
 # ==========================
 
 [tap_hold.keys.left_shift]
-time_activation_seconds = 0.35
 tap_action = "copy"
 hold_modifier = "shift"
 
@@ -142,7 +170,6 @@ hold_modifier = "shift"
 # =========================
 
 [tap_hold.keys.left_ctrl]
-time_activation_seconds = 0.20
 tap_action = "paste"
 hold_modifier = "ctrl"
 
@@ -153,7 +180,6 @@ hold_modifier = "ctrl"
 # ========================
 
 [tap_hold.keys.left_alt]
-time_activation_seconds = 0.20
 tap_action = "backspace"
 hold_layer = "nav"
 
@@ -165,7 +191,6 @@ hold_layer = "nav"
 # ==========================
 
 [tap_hold.keys.right_ctrl]
-time_activation_seconds = 0.20
 tap_action = "one_shot_shift"
 hold_modifier = "shift"
 
@@ -176,7 +201,6 @@ hold_modifier = "shift"
 # ======================
 
 [tap_hold.keys.alt_gr]
-time_activation_seconds = 0.20
 tap_action = "tab"
 hold_modifier = "alt_gr"
 
@@ -187,7 +211,6 @@ hold_modifier = "alt_gr"
 # ===================
 
 [tap_hold.keys.tab]
-time_activation_seconds = 0.20
 tap_action = "alt_tab_monitor"
 hold_modifier = "alt"
 
@@ -265,16 +288,14 @@ keys = [
 # Action ids reference macos/platform/remap/data/actions.json.
 
 [hs_timeouts]
-# There is no global tap/hold threshold declared here any more (it was 250 ms, a
-# second declaration beside the per-key ones above). A macOS key takes its
-# threshold from the same place Windows and Linux do: the
-# `time_activation_seconds` of `[tap_hold.keys.<catalog id>]` for the key the
-# catalogue maps to it (its `hs` column reconciles left_ctrl/left_control), and a
-# key with none of its own takes the timing registry's
-# tap_hold.default_activation_ms (_shared/modules/timings/constants.toml), the
-# fallback the other two drivers use. The menu's per-key delay row overrides
-# either; its global row (basic.to_if_alone_timeout_milliseconds) only applies
-# to the keys that have no value of their own.
+# There is no tap/hold threshold declared here (it was 250 ms, a second
+# declaration beside the per-key ones that used to be above). A macOS key takes
+# its threshold from the same place Windows and Linux do, the global delay: the
+# timing registry's tap_hold.default_activation_ms
+# (_shared/modules/timings/constants.toml). No key ships a delay of its own. The
+# menu's global row changes it (basic.to_if_alone_timeout_milliseconds); a key's
+# own delay row overrides it for that key only, and survives a change of the
+# global.
 # The one-shot modifier auto-cancel delay is NOT declared here: macOS reads the
 # same registry value as the other two drivers,
 # _shared/modules/timings/constants.toml [tap_hold] one_shot_shift_timeout_ms.

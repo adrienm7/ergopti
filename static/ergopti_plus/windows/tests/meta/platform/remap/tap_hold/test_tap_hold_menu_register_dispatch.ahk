@@ -176,11 +176,15 @@ _THRD_KeyRowsPolicy(Owners) {
 		. 'Map\(\s*"tap_hold_key_native"\s*,\s*_TH_MakeDisableFn\(\s*KeyId\s*\)\s*,\s*'
 		. '"tap_hold_key_tap"\s*,\s*_TH_MakeTapPickerFn\(\s*KeyId\s*,\s*KeyLabel\s*,\s*TapLbl\s*\)\s*,\s*'
 		. '"tap_hold_key_hold_action"\s*,\s*_TH_MakeHoldPickerFn\(\s*KeyId\s*,\s*KeyLabel\s*\)\s*,\s*'
-		. '"tap_hold_key_delay"\s*,\s*_TH_MakeDelayPickerFn\(\s*KeyId\s*\)\s*\)\s*,\s*'
+		. '"tap_hold_key_delay"\s*,\s*_TH_MakeDelayPickerFn\(\s*KeyId\s*\)\s*,\s*'
+		. 'MenuCommand\.TAP_HOLD_KEY_DELAY_USE_GLOBAL\s*,\s*_TH_MakeDelayResetFn\(\s*KeyId\s*\)\s*\)\s*,\s*'
 		. 'Map\(\s*"tap_hold_key_configured"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*IsConfigured\s*\)\s*,'
 		. '\s*"tap_hold_key_tap_caption"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*TapLbl\s*\)\s*,'
 		. '\s*"tap_hold_key_hold_caption"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*HoldLbl\s*\)\s*,'
-		. '\s*"tap_hold_key_delay_caption"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*DelayCaption\s*\)\s*\)\s*,'
+		. '\s*"tap_hold_key_delay_caption"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*DelayCaption\s*\)\s*,'
+		. '\s*"tap_hold_key_global_delay_caption"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*GlobalCaption\s*\)\s*,'
+		. '\s*"tap_hold_key_delay_is_global"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*!HasOwnDelay\s*\)\s*,'
+		. '\s*"tap_hold_key_delay_has_override"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*HasOwnDelay\s*\)\s*\)\s*,'
 		. '\s*Map\(\s*\)\s*\)'
 	Assert(_THRD_ExecutablePattern(Body, NativePattern, "MenuRenderer_TemplateRows"),
 		"native and tap callbacks plus configured state must reach the child template")

@@ -73,12 +73,13 @@ Test("Timings: keystats-walker constants sourced from the registry", TestTimings
 
 TestTimings_TapHoldsSourced() {
     global TAP_MIN_DURATION_MS, KEY_REPEAT_INITIAL_DELAY_MS
-    global KEY_REPEAT_INTERVAL_MS, ONE_SHOT_SHIFT_TIMEOUT_SEC
+    global KEY_REPEAT_INTERVAL_MS, ONE_SHOT_SHIFT_TIMEOUT_SEC, TAPHOLD_DEFAULT_ACTIVATION_SECONDS
     AssertEqual(50, TAP_MIN_DURATION_MS, "TAP_MIN_DURATION_MS")
     AssertEqual(50, TapMinDurationMs(), "TapMinDurationMs() accessor")
     AssertEqual(300, KEY_REPEAT_INITIAL_DELAY_MS, "KEY_REPEAT_INITIAL_DELAY_MS")
     AssertEqual(100, KEY_REPEAT_INTERVAL_MS, "KEY_REPEAT_INTERVAL_MS")
     AssertEqual(2.0, ONE_SHOT_SHIFT_TIMEOUT_SEC, "ONE_SHOT_SHIFT_TIMEOUT_SEC")
+    AssertEqual(0.2, TAPHOLD_DEFAULT_ACTIVATION_SECONDS, "TAPHOLD_DEFAULT_ACTIVATION_SECONDS is the registry global delay")
 }
 Test("Timings: tap-hold constants sourced from the registry", TestTimings_TapHoldsSourced)
 

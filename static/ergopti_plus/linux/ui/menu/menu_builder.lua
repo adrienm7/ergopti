@@ -4678,6 +4678,45 @@ local function _build_tap_holds(ctx)
 		return true
 	end
 
+	--- Asks for the GLOBAL delay, in milliseconds: the delay of every key that has
+	--- none of its own. A key with a delay of its own keeps it.
+	local function ask_global_delay(current_ms)
+		local guard, setter = edit_guard("set_global_threshold")
+		if not guard then changed(false); return false end
+		local default_ms = math.floor(require("platform.remap.tap_hold_loader").GLOBAL_DEFAULT_SECONDS * 1000 + 0.5)
+		local value = prompt_text(i18n_safe("menu.tapholds.tap_hold_dialog_title"),
+			string.format(i18n_safe("menu.tapholds.tap_hold_dialog_prompt"), default_ms),
+			tostring(current_ms))
+		if value == nil then return false end
+		local ms = tonumber(value)
+		if not ms or ms ~= ms or ms == math.huge or ms <= 0 or math.floor(ms + 0.5) <= 0 then
+			Logger.warn(LOG, "Invalid global tap-hold delay '%s' — ignored.", tostring(value))
+			show_error(tostring(value), i18n_safe("dialog.gestures.param_error_title"))
+			return false
+		end
+		if guard() ~= true then changed(false); return false end
+		local call_ok, persisted = pcall(setter, math.floor(ms + 0.5) / 1000, guard)
+		if not call_ok or persisted ~= true then
+			changed(false)
+			return false
+		end
+		changed(true)
+		return true
+	end
+
+	--- Removes a key's own delay, so it follows the global delay again.
+	local function reset_delay(key_id)
+		local guard, setter = edit_guard("set_threshold")
+		if not guard then changed(false); return false end
+		local call_ok, persisted = pcall(setter, key_id, nil, guard)
+		if not call_ok or persisted ~= true then
+			changed(false)
+			return false
+		end
+		changed(true)
+		return true
+	end
+
 	--- The rows of one hand: its keys in the shared catalogue's order, each
 	--- with its disable, tap, hold and delay rows. The manifest draws the two
 	--- hand headers and the separator between the hands around them.
@@ -4694,18 +4733,29 @@ local function _build_tap_holds(ctx)
 			local tap_label = _tap_hold_action_label(tap, ctx.gestures)
 			local hold_label = hold and HoldOptions.label(hold, i18n_safe) or i18n_safe("tap_hold.hold.none")
 			local configured = tap ~= "" or (hold ~= nil and hold.kind ~= "none")
-			local ms = math.floor((tonumber(entry.time_activation_seconds) or 0) * 1000 + 0.5)
+			-- A key follows the global delay until the user gives it one of its own;
+			-- `entry` carries the effective value either way.
+			local own_delay = th.has_own_delay(key_id)
+			local global_ms = math.floor(th.global_seconds() * 1000 + 0.5)
+			local ms = own_delay and math.floor((tonumber(entry.time_activation_seconds) or 0) * 1000 + 0.5) or global_ms
 
 			local key_rows = ManifestMenu.template_rows("tap_hold_key_rows", {
 				["tap_hold_key_native"] = function() changed(Writer.set_native(key_id)) end,
 				["tap_hold_key_tap"] = function() pick_tap(catalog_entry, tap) end,
 				["tap_hold_key_hold_action"] = function() return pick_hold(catalog_entry, hold) end,
 				["tap_hold_key_delay"] = function() return ask_delay(key_id, ms) end,
+				[require("config_keys").COMMAND.TAP_HOLD_KEY_DELAY_USE_GLOBAL] = function() return reset_delay(key_id) end,
 			}, {
 				["tap_hold_key_configured"] = function() return configured end,
 				["tap_hold_key_tap_caption"] = function() return tap_label end,
 				["tap_hold_key_hold_caption"] = function() return hold_label end,
-				["tap_hold_key_delay_caption"] = function() return ms .. " ms" end,
+				["tap_hold_key_delay_caption"] = function()
+					if own_delay then return ms .. " ms" end
+					return string.format(i18n_safe("menu.tapholds.key_tap_delay_inherited"), global_ms .. " ms")
+				end,
+				["tap_hold_key_global_delay_caption"] = function() return global_ms .. " ms" end,
+				["tap_hold_key_delay_is_global"] = function() return not own_delay end,
+				["tap_hold_key_delay_has_override"] = function() return own_delay end,
 			}, {})
 			if key_rows then
 
@@ -4721,6 +4771,13 @@ local function _build_tap_holds(ctx)
 	end
 
 	local providers = {
+		["tap_hold_global_delay"] = function()
+			local global_ms = math.floor(th.global_seconds() * 1000 + 0.5)
+			return { {
+				label = string.format(i18n_safe("menu.tapholds.tap_hold_title"), global_ms .. " ms"),
+				action = function() return ask_global_delay(global_ms) end,
+			} }
+		end,
 		["tap_hold_keys_left"] = function() return hand_rows("left") end,
 		["tap_hold_keys_right"] = function() return hand_rows("right") end,
 	}

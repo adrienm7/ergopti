@@ -1637,11 +1637,7 @@
 	],
 	"tap_hold_key_delay_tail": [
 		{
-			"type": "---",
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
+			"type": "---"
 		},
 		{
 			"type": "command",
@@ -1659,11 +1655,7 @@
 			],
 			"disabled_when": [
 				"tap_hold_key_delay_has_override"
-			],
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
+			]
 		}
 	],
 	"wrap_symbols_global_controls": [
@@ -3206,6 +3198,23 @@
 			"type": "---",
 			"platforms": [
 				"hs"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "list",
+			"id": "tap_hold_global_delay",
+			"platforms": [
+				"ahk",
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"ahk",
+				"linux"
 			],
 			"unavailable": "hide"
 		},

@@ -1839,9 +1839,9 @@ function project(menuKey, platform, visiting = new Set(), rowId) {
 {
 	const assert = require('node:assert/strict');
 	const root = manifest.tap_hold_key_rows;
-	assert.equal(project('tap_hold_key_rows', 'ahk').length, 5);
+	assert.equal(project('tap_hold_key_rows', 'ahk').length, 7);
 	assert.equal(project('tap_hold_key_rows', 'hs').length, 7);
-	assert.equal(project('tap_hold_key_rows', 'linux').length, 5);
+	assert.equal(project('tap_hold_key_rows', 'linux').length, 7);
 	const original = root.slice();
 	try {
 		root.push({ type: 'include', section: 'tap_hold_key_head' });

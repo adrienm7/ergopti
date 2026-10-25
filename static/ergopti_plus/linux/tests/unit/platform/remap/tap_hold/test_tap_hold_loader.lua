@@ -65,9 +65,9 @@ helpers.describe("tap-hold config: the user file over the shared defaults", func
 		helpers.assert_true(not load('[tap_hold]\nenabled = false\n').enabled)
 	end)
 
-	helpers.it("falls back to 0.2 s for a threshold out of range", function()
+	helpers.it("falls back to the global delay for a threshold out of range", function()
 		local loaded = load('[tap_hold.keys.left_shift]\ntime_activation_seconds = 30\n')
-		helpers.assert_eq(loaded.keys.left_shift.time_activation_seconds, Config.FALLBACK_THRESHOLD_SECONDS)
+		helpers.assert_eq(loaded.keys.left_shift.time_activation_seconds, Config.GLOBAL_DEFAULT_SECONDS)
 	end)
 
 	helpers.it("disables a key with a field of the wrong type", function()

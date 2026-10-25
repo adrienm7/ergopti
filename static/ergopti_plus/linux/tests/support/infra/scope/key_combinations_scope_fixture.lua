@@ -63,7 +63,7 @@ local function with_owner(body, managed, public_chords)
 			local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
 			local loaded=Loader.load_document(defaults,{tap_hold={enabled=false,inherit_defaults=true}},nil,"/controlled/tap_hold.toml")
 			package.loaded["platform.remap.tap_hold_manager"]=nil
-			package.loaded["platform.remap.tap_hold_loader"]={FALLBACK_THRESHOLD_SECONDS=Loader.FALLBACK_THRESHOLD_SECONDS,load=function() return loaded end}
+			package.loaded["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end}
 			package.loaded["platform.remap.nav_layer"]={load=function() return {} end}
 			package.loaded["adapters.file_system"]=files
 			package.loaded["infra.config_paths"]={config=function() return path end}

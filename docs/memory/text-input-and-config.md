@@ -384,6 +384,22 @@ id is reported as outdated. Action: before retiring more stored ids, add a
 section-wide map op to all three interpreters (with Windows runtime tests)
 rather than enumerating keys.
 
+### project-a-shipped-per-key-default-becomes-the-users-choice
+
+The Windows tap-hold writer rewrites the whole user file from the merged
+in-memory model, and the Linux scope restore writes the preset explicitly, so
+any value the shared defaults ship per key is copied into the user's
+tap_hold.toml by the first unrelated edit and then reads as the user's own
+choice, frozen against later changes of the shared value. That is why no key
+ships a tap-hold delay (`[tap_hold.keys.*]` has no `time_activation_seconds`;
+every key follows the global delay, the registry's
+`tap_hold.default_activation_ms`) and why `[tap_hold.retired_delays]` exists:
+a file without `[tap_hold] explicit_delays = true` is read with exactly the
+retired values ignored, and the first write removes them and sets the flag.
+Action: do not ship a per-key default for anything the user can also override;
+ship a global one, and when retiring a shipped per-key value, record it as
+retired and flag the files that were cleaned.
+
 ### project-outdated-config-entries-warn-never-refuse
 
 An unknown, retired or outdated config.toml entry (a removed key, a value

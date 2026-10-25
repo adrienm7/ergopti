@@ -19,20 +19,23 @@
 ; 2. Returns a hierarchical Map with the shape:
 ;        TapHold["keys"]["caps_lock"]["tap_action"]        = "enter"
 ;        TapHold["keys"]["caps_lock"]["hold_modifier"]     = "ctrl"
-;        TapHold["keys"]["caps_lock"]["time_activation_seconds"] = 0.35
+;        TapHold["keys"]["caps_lock"]["time_activation_seconds"] = 0.5   (a key's OWN delay)
+;        TapHold["time_activation_seconds"] = 0.25                        (the GLOBAL delay)
+;    A key follows the global delay until the user gives it one of its own, and
+;    the global delay is the timing registry's default until the user sets one:
+;    no key ships a delay (TapHoldDuration resolves the three levels).
 ; 3. Runtime overlay: when DefaultsFilePath is given, defaults are loaded
 ;    first and user values are merged on top. Absent user keys inherit the
-;    default so ``time_activation_seconds`` changes in defaults.toml take
-;    effect without requiring a user-file edit.
+;    default so changes in defaults.toml take effect without requiring a
+;    user-file edit.
 ; 4. Backward-compatible: callers that omit DefaultsFilePath behave exactly
 ;    as before — only the user file is parsed.
 ; ==============================================================================
 
-; Default per-key tap-hold activation threshold in seconds, used when a key has
-; no time_activation_seconds (e.g. a tap-only override under inherit_defaults =
-; false). Single source for the former 0.2 literal that TapHoldDuration used to
-; duplicate across its two return branches
-global TAPHOLD_DEFAULT_ACTIVATION_SECONDS := 0.2
+; The global default tap-hold delay (TAPHOLD_DEFAULT_ACTIVATION_SECONDS) is the
+; timing registry's tap_hold.default_activation_ms, loaded at boot by
+; TapHoldsLoadTimings() (platform/remap/constants.ahk) like every other tap-hold
+; timing; it is not a literal here.
 ; Upper sanity bound for a hold threshold read from the user-editable
 ; tap_hold.toml. A hold longer than this is certainly a typo (a stray unit, a
 ; misplaced decimal point) rather than an intent, and the value is concatenated
@@ -89,6 +92,17 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 		; re-merges every shipped default, undoing « Tout désactiver ».
 		Result["inherit_defaults"] := InheritDefaults
 	}
+	; The global delay rides in the map we RETURN for the same reason: the writer
+	; serializes the live TapHold, so a loader that dropped it would lose it on the
+	; next tray write.
+	if UserData.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+		Result[ConfigLeaf.TIME_ACTIVATION_SECONDS] := UserData[ConfigLeaf.TIME_ACTIVATION_SECONDS]
+	; A file without the flag may still hold the per-key delays this build used to
+	; ship, copied into it by an earlier rewrite: those exact values are not the
+	; user's choice and are ignored (see TapHoldRetiredDelays).
+	UserExplicit := UserData.Has("explicit_delays") && UserData["explicit_delays"]
+	Retired := (DefaultsFilePath != "" && !UserExplicit && UserData["keys"].Count > 0)
+		? TapHoldRetiredDelays(DefaultsFilePath) : Map()
 
 	try LoggerDebug("TapHoldLoader", "Parsed user tap-hold: {1} key(s), inherit_defaults={2}.",
 		UserData["keys"].Count, InheritDefaults)
@@ -130,8 +144,15 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 			Result["keys"][k].Delete("hold_layer")
 		else if v.Has("hold_layer") and Result["keys"][k].Has("hold_modifier")
 			Result["keys"][k].Delete("hold_modifier")
-		for field, val in v
+		for field, val in v {
+			if (field == ConfigLeaf.TIME_ACTIVATION_SECONDS) && Retired.Has(k) && IsNumber(val) && val == Retired[k] {
+				try LoggerInfo("TapHoldLoader",
+					"Ignoring time_activation_seconds {1} of tap-hold key '{2}': it is a delay this build no longer ships, not one you set; the key follows the global delay.",
+					val, k)
+				continue
+			}
 			Result["keys"][k][field] := val
+		}
 	}
 
 	if UserData["keys"].Has("left_ctrl") {
@@ -209,6 +230,21 @@ _TapHold_ParseFileInto(FilePath, Result) {
 			Result["inherit_defaults"] := !!Root["inherit_defaults"].Value
 		else
 			try LoggerError("TapHoldLoader", "Field '[tap_hold].inherit_defaults' must be a TOML boolean; value rejected.")
+	}
+	if Root.Has("explicit_delays") {
+		if Root["explicit_delays"] is TOML_Bool
+			Result["explicit_delays"] := !!Root["explicit_delays"].Value
+		else
+			try LoggerError("TapHoldLoader", "Field '[tap_hold].explicit_delays' must be a TOML boolean; value rejected.")
+	}
+	if Root.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS) {
+		Seconds := _ConfigTomlNativeValue(Root[ConfigLeaf.TIME_ACTIVATION_SECONDS])
+		if (_TOML_ValueKind(Root[ConfigLeaf.TIME_ACTIVATION_SECONDS]) == "number") && _TapHoldDurationValid(Seconds)
+			Result[ConfigLeaf.TIME_ACTIVATION_SECONDS] := Seconds
+		else
+			try LoggerError("TapHoldLoader",
+				"Field '[tap_hold].time_activation_seconds' must be a number above 0 and at most {1}; the global delay stays {2}.",
+				TAPHOLD_MAX_ACTIVATION_SECONDS, TAPHOLD_DEFAULT_ACTIVATION_SECONDS)
 	}
 	if !Root.Has("keys")
 		return
@@ -419,17 +455,52 @@ TapHoldTapAction(TapHold, KeyId) {
 	return Entry.Has("tap_action") ? Entry["tap_action"] : ""
 }
 
-; Return the hold-time threshold for ``KeyId`` in seconds, falling back to the
-; single-sourced TAPHOLD_DEFAULT_ACTIVATION_SECONDS when the key is unconfigured
-; or declares no ``time_activation_seconds``.
-TapHoldDuration(TapHold, KeyId) {
-	if !TapHoldIsEnabled(TapHold, KeyId) {
+; Whether a delay is a usable threshold: a number above 0 and within the runtime
+; limit. The one rule for a key's own delay and for the global one.
+_TapHoldDurationValid(Seconds) {
+	return IsNumber(Seconds) && Seconds > 0 && Seconds <= TAPHOLD_MAX_ACTIVATION_SECONDS
+}
+
+; Return the GLOBAL delay in seconds: the user's ``[tap_hold]
+; time_activation_seconds`` when the file sets a usable one, else the timing
+; registry's default. It is the delay of every key that has none of its own.
+TapHoldGlobalDuration(TapHold) {
+	if !(TapHold is Map) || !TapHold.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+		return TAPHOLD_DEFAULT_ACTIVATION_SECONDS
+	Raw := TapHold[ConfigLeaf.TIME_ACTIVATION_SECONDS]
+	; Validated again at the boundary (the parse refuses a bad file value, a
+	; test or a caller may not): the value is concatenated into a KeyWait string.
+	if !_TapHoldDurationValid(Raw) {
+		try LoggerWarn("TapHoldLoader",
+			"Invalid global time_activation_seconds '{1}' — falling back to {2}s.",
+			Raw, TAPHOLD_DEFAULT_ACTIVATION_SECONDS)
 		return TAPHOLD_DEFAULT_ACTIVATION_SECONDS
 	}
+	return Raw
+}
+
+; Whether ``KeyId`` carries a delay of its own that this build honours, as
+; opposed to following the global one. The tray names it « global (N ms) » when
+; false and offers « Use global delay » when true.
+TapHoldHasOwnDuration(TapHold, KeyId) {
+	if !TapHoldIsEnabled(TapHold, KeyId)
+		return false
 	Entry := TapHold["keys"][KeyId]
-	if !Entry.Has("time_activation_seconds")
-		return TAPHOLD_DEFAULT_ACTIVATION_SECONDS
-	Raw := Entry["time_activation_seconds"]
+	return Entry.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS) && _TapHoldDurationValid(Entry[ConfigLeaf.TIME_ACTIVATION_SECONDS])
+}
+
+; Return the hold-time threshold for ``KeyId`` in seconds: the key's own delay
+; when the user set one, else the global delay (TapHoldGlobalDuration). No key
+; ships a delay, so a change of the global moves every key without its own and
+; none that has one.
+TapHoldDuration(TapHold, KeyId) {
+	if !TapHoldIsEnabled(TapHold, KeyId) {
+		return TapHoldGlobalDuration(TapHold)
+	}
+	Entry := TapHold["keys"][KeyId]
+	if !Entry.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS)
+		return TapHoldGlobalDuration(TapHold)
+	Raw := Entry[ConfigLeaf.TIME_ACTIVATION_SECONDS]
 	; Validate at the boundary (fail fast, copilot-instructions 5.3). This value
 	; comes verbatim from the user-editable tap_hold.toml and is concatenated into
 	; a KeyWait option string ("T" . value) at ~11 call sites. A non-numeric entry
@@ -438,11 +509,12 @@ TapHoldDuration(TapHold, KeyId) {
 	; release, which is what made the modifier-latch window reachable at all. The
 	; throw was absorbed by the global error net, so the user only saw a tap-hold
 	; that intermittently did nothing, never a config error.
-	if (!IsNumber(Raw) or Raw <= 0 or Raw > TAPHOLD_MAX_ACTIVATION_SECONDS) {
+	if !_TapHoldDurationValid(Raw) {
+		GlobalSeconds := TapHoldGlobalDuration(TapHold)
 		try LoggerWarn("TapHoldLoader",
-			"Invalid time_activation_seconds '{1}' for tap-hold key '{2}' — falling back to {3}s.",
-			Raw, KeyId, TAPHOLD_DEFAULT_ACTIVATION_SECONDS)
-		return TAPHOLD_DEFAULT_ACTIVATION_SECONDS
+			"Invalid time_activation_seconds '{1}' for tap-hold key '{2}' — falling back to the global delay {3}s.",
+			Raw, KeyId, GlobalSeconds)
+		return GlobalSeconds
 	}
 	return Raw
 }
@@ -701,6 +773,37 @@ TapHoldOneShotEndKeys(MagicKey) {
 
 /** Returns the per-key fields consumed by the tap-hold loader and preset owner. */
 TapHoldFieldKinds() {
-	return Map("enabled", "boolean", "time_activation_seconds", "number",
+	return Map("enabled", "boolean", ConfigLeaf.TIME_ACTIVATION_SECONDS, "number",
 		"tap_action", "string", "hold_modifier", "string", "hold_layer", "string")
+}
+
+; The per-key delays the shared defaults used to ship, in seconds, by key id
+; (``[tap_hold.retired_delays]``). They are not defaults: they identify the delay
+; values a rewrite of an older tap_hold.toml copied into the file, which the
+; loader must not mistake for a choice of the user.
+; @param DefaultsFilePath {String} The shared tap_hold/defaults.toml.
+; @returns {Map} Key id -> seconds; empty (and logged) when the table is unusable.
+TapHoldRetiredDelays(DefaultsFilePath) {
+	Retired := Map()
+	try Document := TOML_ParseDocument(ReadTomlFile(DefaultsFilePath))
+	catch as Err {
+		try LoggerError("TapHoldLoader", "Cannot read the retired tap-hold delays of '{1}': {2}.",
+			DefaultsFilePath, Err.Message)
+		return Retired
+	}
+	Root := Document.Get("tap_hold", Map())
+	Table := (Root is Map) ? Root.Get("retired_delays", "") : ""
+	if !(Table is Map) {
+		try LoggerError("TapHoldLoader", "'{1}' declares no [tap_hold.retired_delays].", DefaultsFilePath)
+		return Retired
+	}
+	for KeyId, Typed in Table {
+		Seconds := _ConfigTomlNativeValue(Typed)
+		if (_TOML_ValueKind(Typed) != "number") || !_TapHoldDurationValid(Seconds) {
+			try LoggerError("TapHoldLoader", "[tap_hold.retired_delays] {1} must be a number of seconds above 0; ignored.", KeyId)
+			continue
+		}
+		Retired[KeyId] := Seconds
+	}
+	return Retired
 }

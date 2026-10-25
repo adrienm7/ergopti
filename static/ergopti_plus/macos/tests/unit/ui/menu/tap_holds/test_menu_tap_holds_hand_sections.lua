@@ -507,6 +507,7 @@ helpers.describe("the complete macOS per-key delay declaration", function()
 			i18n.get = function(key)
 				if key == "menu.tapholds.key_tap_delay" then return "Delay: %s" end
 				if key == "menu.tapholds.key_tap_delay_use_global" then return "Global: %s" end
+				if key == "menu.tapholds.key_tap_delay_inherited" then return "global (%s)" end
 				return original_get(key)
 			end
 			local ok, err = pcall(function()
@@ -523,7 +524,7 @@ helpers.describe("the complete macOS per-key delay declaration", function()
 				helpers.assert_eq(observed.refreshes, 1)
 				helpers.assert_eq(observed.regenerations, 1)
 				children = rows()
-				helpers.assert_eq(children[6].title, "Delay: 200 ms")
+				helpers.assert_eq(children[6].title, "Delay: global (200 ms)", "an inheriting key shows the global delay")
 				reset = children[7]
 				helpers.assert_true(reset.checked)
 				helpers.assert_true(reset.disabled)
