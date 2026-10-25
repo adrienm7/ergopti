@@ -121,3 +121,68 @@ _WVSO_NativeCode(View, Lines, Unhandled, Failure) {
 }
 Test("WebView script: native error codes survive without their sensitive messages (webview-script-outcome)",
 	_WVSO_WithFixture.Bind(_WVSO_NativeCode))
+
+
+class _WVSO_PausedHost extends WebViewHost {
+	Deliveries := 0
+	_RunScript(Js) {
+		try super._RunScript(Js)
+		finally this.Deliveries += 1
+	}
+}
+
+_WVSO_HostPause(FromQueue, View, Lines, Unhandled, Failure) {
+	Host := _WVSO_PausedHost()
+	Host.AppId := "private-pause-fixture"
+	Host.WebView := View
+	Host.Ready := !FromQueue
+	try {
+		; Admit the real timer before pause, then allow that timer to run only
+		; after suspension. Both producers share the native submission boundary.
+		PreviousCritical := Critical("On")
+		try {
+			Host.Eval("privatePausedCommand();")
+			if FromQueue
+				Host._FlushQueue()
+			Suspend(true)
+		} finally Critical(PreviousCritical)
+		Started := A_TickCount
+		while Host.Deliveries == 0 && A_TickCount - Started < 2000
+			Sleep(1)
+		AssertEqual(1, Host.Deliveries, "the admitted script timer must actually execute under pause")
+		AssertEqual(0, View.Scripts.Length, "a paused host must not submit queued browser work")
+		AssertEqual(0, Host.Queue.Length, "refused work cannot replay after resume")
+		Suspend(false)
+		Host.Eval("privateCurrentCommand();")
+		Started := A_TickCount
+		while Host.Deliveries < 2 && A_TickCount - Started < 2000
+			Sleep(1)
+		AssertEqual(2, Host.Deliveries)
+		AssertEqual(1, View.Scripts.Length, "resume admits only a fresh script")
+		AssertEqual("privateCurrentCommand();", View.Scripts[1])
+	} finally {
+		Host.Close()
+		Suspend(false)
+	}
+}
+Test("WebView script: pause fences a ready host's native timer (webview-script-pause)",
+	_WVSO_WithFixture.Bind(_WVSO_HostPause.Bind(false)))
+Test("WebView script: pause fences timers released by readiness (webview-script-pause)",
+	_WVSO_WithFixture.Bind(_WVSO_HostPause.Bind(true)))
+
+
+_WVSO_HostPauseAdmission(View, Lines, Unhandled, Failure) {
+	Host := WebViewHost()
+	Host.WebView := View
+	try {
+		Suspend(true)
+		Host.Eval("privatePausedAdmission();")
+		AssertEqual(0, Host.Queue.Length, "scripts requested under pause cannot be retained for later delivery")
+		AssertEqual(0, View.Scripts.Length)
+	} finally {
+		Host.Close()
+		Suspend(false)
+	}
+}
+Test("WebView script: paused admission cannot retain work for resume (webview-script-pause)",
+	_WVSO_WithFixture.Bind(_WVSO_HostPauseAdmission))
