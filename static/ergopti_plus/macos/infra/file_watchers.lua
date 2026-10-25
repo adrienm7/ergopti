@@ -27,6 +27,7 @@ local M = {}
 local hs            = hs
 local Logger        = require("infra.logger")
 local NativePath = require("native_path")
+local FileSystem = require("adapters.file_system")
 local i18n          = require("infra.i18n")
 local notifications = require("infra.notifications")
 local ui_restore    = require("infra.ui_restore")
@@ -72,12 +73,50 @@ local GIT_HOLD_WARN_DEFERRALS = 120   -- 120 * 0.5s = 60s before one warning
 -- =======================================
 -- =======================================
 
---- Normalises a path for comparison: lowercased, backslashes folded to slashes.
---- @param p string|nil
---- @return string
-local function canonical_path(p)
-	if type(p) ~= "string" then return "" end
-	return (p:gsub("\\", "/"):lower())
+--- Resolves native aliases without collapsing distinct POSIX names. An absent
+--- suffix is retained only after its first missing entry is proved by the file
+--- adapter; permission errors never establish an alias or watcher coverage.
+--- @param path string|nil Native absolute pathname.
+--- @param cache table|nil Identities observed during this callback batch.
+--- @return string|nil key Native spelling, or nil when identity is unproved.
+--- @return boolean|nil absent Whether a suffix is physically absent.
+local function canonical_path(path, cache)
+	if type(path) ~= "string" or path == "" then return nil end
+	path = path == "/" and path or path:gsub("/+$", "")
+	cache = cache or {}
+	if cache[path] then return cache[path].key, cache[path].absent end
+	local observed = {}
+	cache[path] = observed
+	local ok, resolved = pcall(hs.fs.pathToAbsolute, path)
+	if ok and type(resolved) == "string" and resolved ~= "" then
+		observed.key = resolved == "/" and resolved or resolved:gsub("/+$", "")
+		observed.absent = false
+		return observed.key, false
+	end
+	if not ok or resolved ~= nil or path == "/" then
+		Logger.warn(LOG, "File-watcher path identity is unproved for '%s': %s.",
+			tostring(path), tostring(ok and "native resolution refused" or resolved))
+		return nil
+	end
+	local parent = NativePath.dirname(path)
+	if parent == "" then parent = "/" end
+	if parent == nil or parent == path then
+		Logger.warn(LOG, "File-watcher path identity requires an absolute pathname: %s.", tostring(path))
+		return nil
+	end
+	local parent_key, parent_absent = canonical_path(parent, cache)
+	if parent_key == nil then return nil end
+	if not parent_absent then
+		local status, detail = FileSystem.path_status(path)
+		if status ~= "absent" then
+			Logger.warn(LOG, "File-watcher path identity is unproved for '%s': %s.",
+				tostring(path), tostring(status == "present" and "existing path did not resolve" or detail))
+			return nil
+		end
+	end
+	observed.key = (parent_key == "/" and "" or parent_key) .. "/" .. NativePath.basename(path)
+	observed.absent = true
+	return observed.key, true
 end
 
 --- Tests whether an exact path is covered by a recursive directory watcher.
@@ -85,9 +124,10 @@ end
 --- @param root string Candidate recursive root.
 --- @return boolean covered
 local function path_is_within(path, root)
-	local key = canonical_path(path):gsub("/+$", "")
-	local prefix = canonical_path(root):gsub("/+$", "")
-	if key == "" or prefix == "" then return false end
+	local identities = {}
+	local key = canonical_path(path, identities)
+	local prefix = canonical_path(root, identities)
+	if key == nil or prefix == nil then return false end
 	return key == prefix or key:sub(1, #prefix + 1) == prefix .. "/"
 end
 
@@ -119,14 +159,16 @@ function M.start(ctx)
 	local self_written = {}
 	for _, p in ipairs(ctx.self_written_files or {}) do
 		local key = canonical_path(p)
-		if key ~= "" then self_written[key] = true end
+		if key then self_written[key] = true end
 	end
 
 	--- True when a changed path is one this session wrote itself.
 	--- @param path string
 	--- @return boolean
-	local function is_self_written(path)
-		return self_written[canonical_path(path)] == true
+	local function is_self_written(path, identities)
+		if next(self_written) == nil then return false end
+		local key = canonical_path(path, identities)
+		return key ~= nil and self_written[key] == true
 	end
 
 	-- Directories inside the watched trees that hold RUNTIME artefacts rather
@@ -136,15 +178,17 @@ function M.start(ctx)
 	-- the cache, which wrote again.
 	local ignored_dirs = {}
 	for _, d in ipairs(ctx.ignored_dirs or {}) do
-		local key = canonical_path(d):gsub("/+$", "")
-		if key ~= "" then ignored_dirs[#ignored_dirs + 1] = key .. "/" end
+		local key = canonical_path(d)
+		if key then ignored_dirs[#ignored_dirs + 1] = key .. "/" end
 	end
 
 	--- True when a changed path lies inside an ignored runtime directory.
 	--- @param path string
 	--- @return boolean
-	local function is_runtime_artefact(path)
-		local key = canonical_path(path)
+	local function is_runtime_artefact(path, identities)
+		if #ignored_dirs == 0 then return false end
+		local key = canonical_path(path, identities)
+		if key == nil then return false end
 		for _, prefix in ipairs(ignored_dirs) do
 			if key:sub(1, #prefix) == prefix then return true end
 		end
@@ -502,10 +546,10 @@ function M.start(ctx)
 	-- Catches file creation, deletion, and renames in the hotstrings directory
 	local function hotstrings_changed(paths)
 		if not lifecycle_active then return end
-		local hit = {}
+		local hit, identities = {}, {}
 		for _, p in ipairs(paths) do
 			if (p:match("%.toml$") or p:match("_index%.json$") or p:match("%.local_ahk_path$"))
-				and not is_self_written(p) and not is_runtime_artefact(p) then
+				and not is_self_written(p, identities) and not is_runtime_artefact(p, identities) then
 				hit[#hit + 1] = p
 			end
 		end
@@ -530,14 +574,14 @@ function M.start(ctx)
 	local personal_root = NativePath.without_trailing_separators(personal_dir)
 	local function personal_hotstrings_changed(paths)
 		if not lifecycle_active then return end
-		local hit = {}
+		local hit, identities = {}, {}
 		for _, p in ipairs(paths) do
 			-- /tmp is excluded for the same reason the old per-directory callback
 			-- excluded it. The self-written and runtime-artefact filters are the
 			-- ones the sibling watcher already applies; the per-file watchers had
 			-- neither, so a write the driver made itself could trigger a reload.
 			if not p:match("^/tmp/")
-				and not is_self_written(p) and not is_runtime_artefact(p) then
+				and not is_self_written(p, identities) and not is_runtime_artefact(p, identities) then
 				hit[#hit + 1] = p
 			end
 		end
@@ -561,10 +605,10 @@ function M.start(ctx)
 		local personal_info_key = canonical_path(personal_info_path)
 		local function personal_info_changed(paths)
 			if not lifecycle_active then return end
-			local hit = {}
+			local hit, identities = {}, {}
 			for _, path in ipairs(paths) do
-				if canonical_path(path) == personal_info_key
-					and not is_runtime_artefact(path) then
+				if (personal_info_key == nil or canonical_path(path, identities) == personal_info_key)
+					and not is_runtime_artefact(path, identities) then
 					hit[#hit + 1] = path
 				end
 			end
@@ -581,12 +625,12 @@ function M.start(ctx)
 	Logger.debug(LOG, "Configuring file watchers for auto-reloading…")
 	local function project_changed(paths)
 		if not lifecycle_active then return end
-		local hit = {}
+		local hit, identities = {}, {}
 		for _, p in ipairs(paths) do
 			-- Ignore temporary files (tokens, etc.); a batch may still carry a real
 			-- .lua change alongside them, so skip rather than abandon the batch.
 			if not (p:find("^/tmp/") or p:find("hs_hf_token_") or p:find("hs_hf_login_"))
-				and not is_runtime_artefact(p) and p:match("%.lua$") then
+				and p:match("%.lua$") and not is_runtime_artefact(p, identities) then
 				hit[#hit + 1] = p
 			end
 		end
