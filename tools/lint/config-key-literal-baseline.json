@@ -193,7 +193,6 @@
 		"static/ergopti_plus/windows/ui/console_window.ahk": 2,
 		"static/ergopti_plus/windows/ui/editors.ahk": 30,
 		"static/ergopti_plus/windows/ui/error_dialog/init.ahk": 1,
-		"static/ergopti_plus/windows/ui/gesture_conflicts.ahk": 4,
 		"static/ergopti_plus/windows/ui/healthcheck/core.ahk": 1,
 		"static/ergopti_plus/windows/ui/layer_editor/init.ahk": 2,
 		"static/ergopti_plus/windows/ui/layout_manager/init.ahk": 13,
