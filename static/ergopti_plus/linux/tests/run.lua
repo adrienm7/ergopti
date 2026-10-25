@@ -69,6 +69,11 @@ do
 	end
 end
 
+-- Never let a suite touch the developer's own config.toml, logs or caches: a
+-- real HOME is replaced by a scratch directory for this process (see
+-- _shared/lua/test/runner_home.lua). Done before any module resolves a path.
+require("test.runner_home").isolate()
+
 -- Install the pure-Lua UTF-8 compatibility shim BEFORE any test module is
 -- loaded. LuaJIT 2.x does not bundle Lua 5.3's built-in utf8 library, and
 -- several shared modules (keystats/utils.lua, toml_codec, terminators) use

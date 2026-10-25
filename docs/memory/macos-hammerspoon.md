@@ -364,6 +364,18 @@ can hide the resulting error.
 Lua's `x and y or fallback` is not a nil-coalescing operator when `y` may be
 false. Use an explicit nil check for booleans.
 
+### project-lua-runners-redirect-a-real-home
+
+Both Lua runners call `test.runner_home` (`_shared/lua/test/runner_home.lua`)
+before any module loads: a HOME outside the temporary directories is replaced,
+for that process, by a fresh scratch directory through an `os.getenv` wrapper
+that also hides the XDG base directories, and the directory is removed on exit.
+It redirects instead of refusing because hosted CI runs with the runner's real
+HOME. A child started with `io.popen` still sees the real environment, so a test
+that spawns one must pass its own HOME. A fixture that owns a config path still
+routes it explicitly (`Config._set_config_file_for_test` with
+`tests/support/hotstring_choices.lua`): the redirect is a net, not a licence.
+
 ### project-hs-suite-order-contamination
 
 Hammerspoon modules persist in `package.loaded`. Tests must restore globals and

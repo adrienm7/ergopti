@@ -49,6 +49,7 @@ local ports = {
 	["tests.support.module_groups"] = groups,
 	["tests.support.command_lines"] = {},
 	["tests.stubs.hs"] = {},
+	["test.runner_home"] = { isolate = function() end },
 	["lfs"] = filesystem,
 }
 local cases = {
