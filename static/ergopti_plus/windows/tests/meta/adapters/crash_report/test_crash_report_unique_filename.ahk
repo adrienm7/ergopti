@@ -119,3 +119,62 @@ _CRUN_ReentrantSavePreservesBothIncidents() {
 }
 Test("crash_reporter: reentrant saves preserve both actual incident artifacts (crash-report-reentrant-save)",
 	_CRUN_ReentrantSavePreservesBothIncidents)
+
+
+; A report is a Map. Its first canonical field read happens after the caller's
+; filename probe, allowing an independent JSON writer to win that native path.
+class _CRUN_ExternalCollisionReport extends Map {
+	__New(Timestamp, Path, Bytes) {
+		super.__New("timestamp", Timestamp, "version", "collision-control", "error_msg", "competing report")
+		this.CollisionPath := Path
+		this.CollisionBytes := Bytes
+		this.Created := 0
+	}
+	__Item[Key] {
+		get {
+			if Key == "version" && !this.Created {
+				AssertFalse(FileExist(this.CollisionPath), "the competing writer must win only after the free-path probe")
+				AssertEqual(1, FSWriteCreateDurable(this.CollisionPath, this.CollisionBytes),
+					"an independent native CREATE_NEW must publish the sentinel JSON")
+				this.Created += 1
+			}
+			return super[Key]
+		}
+	}
+}
+
+_CRUN_DefaultWriterPreservesExternalCollision() {
+	global _LogsDir
+	SavedLogsDir := _LogsDir
+	Root := _SR_AcquireCaptureDirectory()
+	Timestamp := "2026-10-25T17:00:00Z"
+	Sentinel := '{"origin":"independent JSON writer"}'
+	try {
+		_LogsDir := Root
+		Baseline := CrashReport_Save(Map("timestamp", Timestamp, "error_msg", "baseline incident"))
+		AssertTrue(Baseline != "" && FileExist(Baseline), "the default writer must first acknowledge a genuine baseline artifact")
+		AssertTrue(RegExMatch(Baseline, "_([0-9]+)_([0-9]+)\.json$", &Identity),
+			"the public acknowledged filename must expose its process-local identity")
+		Prefix := LoggerCrashReportsDir() . "2026-10-25T17-00-00Z_"
+		AssertEqual(Prefix . DllCall("GetCurrentProcessId", "UInt") . "_" . Identity[2] . ".json", Baseline,
+			"prediction must qualify against the actual default-writer baseline path")
+		CollisionPath := Prefix . Identity[1] . "_" . (Integer(Identity[2]) + 1) . ".json"
+		AssertFalse(FileExist(CollisionPath), "the predicted next public filename must initially be absent")
+		Report := _CRUN_ExternalCollisionReport(Timestamp, CollisionPath, Sentinel)
+		Result := CrashReport_Save(Report)
+		AssertEqual(1, Report.Created, "the ordinary report-field read must reach the real competing file writer")
+		AssertEqual(Sentinel, FileRead(CollisionPath, "UTF-8"), "the production writer cannot replace independently created JSON bytes")
+		AssertEqual("", Result, "a collision after probing must return explicit refusal instead of acknowledging a foreign artifact")
+		Next := CrashReport_Save(Map("timestamp", Timestamp, "error_msg", "after collision"))
+		AssertTrue(Next != "" && Next != CollisionPath, "a later default save must still acknowledge its own distinct artifact")
+		AssertEqual("after collision", JsonParse(FileRead(Next, "UTF-8"))["error_msg"])
+		AssertEqual("baseline incident", JsonParse(FileRead(Baseline, "UTF-8"))["error_msg"])
+		AssertEqual(Sentinel, FileRead(CollisionPath, "UTF-8"), "the successful successor must preserve the independent sentinel too")
+	} finally {
+		_LogsDir := SavedLogsDir
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("crash_reporter: default writer refuses an external JSON collision without replacing bytes (crash-report-native-collision)",
+	_CRUN_DefaultWriterPreservesExternalCollision)
