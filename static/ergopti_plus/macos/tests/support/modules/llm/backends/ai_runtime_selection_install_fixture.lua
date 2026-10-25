@@ -228,7 +228,7 @@ end
 
 --- Loads the real Ollama checker (and resolver) over the fake filesystem.
 local function load_ollama_checker(state, daemon)
-	package.loaded["ui.download_window"] = WINDOW_STUB
+	package.loaded["ui.download_window"] = state.window or WINDOW_STUB
 	load_api(state, daemon)
 	package.loaded["modules.llm.pty_process_group"] = {
 		create = function() return "/tmp/fixture-pty.py" end,
@@ -252,7 +252,7 @@ local function load_mlx_checker(state)
 	-- policy admission bound to the preceding fake native table.
 	package.loaded["modules.llm.network_env"] = nil
 	package.loaded["adapters.file_system"] = nil
-	package.loaded["ui.download_window"] = WINDOW_STUB
+	package.loaded["ui.download_window"] = state.window or WINDOW_STUB
 	package.loaded["modules.llm.pty_process_group"] = {
 		create = function() return "/tmp/fixture-pty.py" end,
 		remove = function() return true end,

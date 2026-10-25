@@ -497,9 +497,9 @@ end
 
 local function make_streaming_handler(is_current, record_output)
 	is_current = type(is_current) == "function" and is_current or function() return true end
-	-- Per-marker dedupe: stdout is line-buffered but each marker may arrive
-	-- multiple times across chunks; we want exactly one transition each.
+	-- Each marker may repeat, but only its first complete line transitions UI.
 	local shown = {}
+	local frame_output = require("modules.llm.bootstrap_output").new()
 	-- Query the shared surface before every claim. An already visible window
 	-- may belong to a model download or the sibling backend and is never ours
 	-- merely because this task produced a progress marker.
@@ -510,11 +510,12 @@ local function make_streaming_handler(is_current, record_output)
 		return not ok or visible == true
 	end
 
-	return function(_, stdout_chunk, stderr_chunk)
+	return function(_, stdout_chunk, stderr_chunk, terminal)
 		if not is_current() then return false end
 		-- The completion receives only what this callback did not take: the
 		-- failure's cause must be kept here or it is gone.
 		if type(record_output) == "function" then record_output(stdout_chunk, stderr_chunk) end
+		stdout_chunk, stderr_chunk = frame_output(stdout_chunk, stderr_chunk, terminal)
 		-- Forward stderr (uv's verbose output) so the live log AND the
 		-- progress UI's detail line both reflect real-time progress.
 		if not forward_chunk(stderr_chunk, is_current, owns_window) then return false end
@@ -1125,12 +1126,9 @@ function M.check_and_install_deps(on_complete, replay_token)
 	local consume_stream = make_streaming_handler(owner_is_current, record_output)
 	local function process_terminal(exit_code, stdout, stderr)
 		-- Completion callback: fires when the process exits
-		record_output(stdout, stderr)
-
 		-- Final pass: forward any residual lines the streaming callback may
 		-- have missed if the task ended before its final flush.
-		if not forward_chunk(stdout or "", owner_is_current, owns_window) then return false end
-		if not forward_chunk(stderr or "", owner_is_current, owns_window) then return false end
+		if not consume_stream(nil, stdout, stderr, true) then return false end
 
 		local ran_real_sync = chunk_marked_real_sync(stdout or "")
 
