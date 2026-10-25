@@ -486,13 +486,11 @@ function M.show(app_name, active_locale, contextual_receipt)
 			local replacement = _windows[app_name]
 			if replacement then
 				if replacement.acquiring or replacement.closing or replacement.failed or replacement.debt then return false end
-				M.bring_to_front(app_name)
-				return _windows[app_name] == replacement
+				return M.bring_to_front(app_name) == true and _windows[app_name] == replacement
 			end
 		else
 			Logger.debug(LOG, "Window '%s' already open — bringing to front.", app_name)
-			M.bring_to_front(app_name)
-			return true
+			return M.bring_to_front(app_name) == true
 		end
 	end
 
@@ -617,15 +615,16 @@ end
 
 --- Brings an existing window to the front.
 --- @param app_name string The app name.
+--- @return boolean presented The exact page survived native presentation.
 function M.bring_to_front(app_name)
-	if not _windows[app_name] then return end
-	_windows[app_name].visible = true
-	-- GTK window focus is handled by _create_gtk_window on first show;
-	-- subsequent front-bringing needs GTK API (not available in pure Lua).
-	if _gtk_available then
-		M._focus_gtk_window(app_name)
-	end
+	local owned = _windows[app_name]
+	if not owned or not M.page_current(app_name, owned.epoch) then return false end
+	if M._focus_gtk_window(app_name) ~= true then return false end
+	-- GTK presentation can synchronously close the page or open a successor.
+	if _windows[app_name] ~= owned or not M.page_current(app_name, owned.epoch) then return false end
+	owned.visible = true
 	Logger.debug(LOG, "Window '%s' brought to front.", app_name)
+	return true
 end
 
 --- Returns true if a window is currently visible.
@@ -1323,19 +1322,22 @@ end
 
 --- Focuses a GTK window, bringing it to the front (Linux only).
 --- @param app_name string The app name.
+--- @return boolean presented Native presentation retained the exact window.
 function M._focus_gtk_window(app_name)
-	if not _gtk_available or not _lgi then return end
+	if not _gtk_available or not _lgi then return false end
 	local wref = _gtk_windows[app_name]
 	if not wref or not wref.window then
 		Logger.debug(LOG, "GTK window '%s' not found — cannot focus.", app_name)
-		return
+		return false
 	end
 	local ok, err = pcall(M._present_gtk_window, wref.window, true)
 	if not ok then
 		Logger.error(LOG, "GTK window '%s' could not be presented: %s.", app_name, tostring(err))
-		return
+		return false
 	end
+	if _gtk_windows[app_name] ~= wref then return false end
 	Logger.debug(LOG, "GTK window '%s' focused.", app_name)
+	return true
 end
 
 
