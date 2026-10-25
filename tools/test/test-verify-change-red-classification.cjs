@@ -42,9 +42,10 @@ console.log('verify-change red classification: ok');
  * No platform suite executes and no working tree is modified.
  * @param {string} failedScript Npm script whose child returns failure.
  * @param {boolean} full Whether to exercise full diagnostic classification.
+ * @param {string[]} files Changed paths supplied by the synthetic Git receipt.
  * @returns {object} Captured exit, commands and diagnostic output.
  */
-function reportCli(failedScript, full = true) {
+function reportCli(failedScript, full = true, files = ['docs/audits/performance/ahk/report.md']) {
 	const source = path.join(__dirname, 'verify-change.cjs');
 	const originalRequire = createRequire(source);
 	const entry = { exports: {} };
@@ -59,7 +60,7 @@ function reportCli(failedScript, full = true) {
 			return {
 				execFileSync: (command) => {
 					assert.equal(command, 'git');
-					return 'docs/audits/performance/ahk/report.md\0';
+					return files.join('\0') + '\0';
 				},
 				spawnSync: (command, args) => {
 					assert.equal(command, 'npm', 'no real driver may execute in this fixture');
@@ -117,4 +118,28 @@ assert.equal(cli.exitCode, 1, 'an actual formatting refusal must fail scoped ver
 assert.deepEqual(cli.commands, ['format:check', 'lint:conventions:strict']);
 console.log(
 	'verify-change report coverage: standalone, covering and unrelated failures classified correctly.'
+);
+
+const ahkTest =
+	'static/ergopti_plus/windows/tests/unit/modules/llm/menu/test_llm_menu_regressions.ahk';
+cli = reportCli('test:ahk-loop-capture', false, [ahkTest]);
+assert.equal(cli.exitCode, 1, 'a static loop-capture refusal must block an AHK-only change');
+assert.deepEqual(cli.commands, ['test:ahk-encoding', 'test:ahk-loop-capture']);
+assert.match(cli.output, /ahk-loop-capture CANDIDATE-REGRESSION/);
+cli = reportCli('test:js', false, [ahkTest, 'tools/test/probe.cjs']);
+assert.equal(cli.exitCode, 1, 'the covering JS refusal must still block a mixed AHK change');
+assert.equal(cli.commands.filter((script) => script === 'test:js').length, 1);
+assert(
+	!cli.commands.includes('test:ahk-loop-capture'),
+	'the covering JS gate owns the static check'
+);
+cli = reportCli('test:js', true, [ahkTest]);
+assert.equal(cli.exitCode, 1, 'a covering-suite failure remains blocking in full diagnosis');
+assert.match(cli.output, /js: candidate-regression/);
+assert(
+	!cli.commands.includes('test:ahk-loop-capture'),
+	'full audits also avoid repeating the guard'
+);
+console.log(
+	'verify-change AHK loop guard: portable refusal and covering-suite deduplication passed.'
 );

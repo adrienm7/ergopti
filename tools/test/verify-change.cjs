@@ -377,6 +377,11 @@ const RULES = [
 		match: (f) => f.endsWith('.ahk')
 	},
 	{
+		gate: 'ahk-loop-capture',
+		why: 'AHK loop closures can throw UnsetError that AssertThrows accepts, so a green native suite cannot qualify these callbacks',
+		match: (f) => f.endsWith('.ahk')
+	},
+	{
 		gate: 'ahk-suite',
 		why: 'the AHK unit + meta suite covers the Windows driver — and replays the shared corpora and port contracts',
 		match: (f) =>
@@ -947,6 +952,7 @@ function runNpm(script) {
 const GATE_COMMANDS = {
 	format: { npm: 'format:check' },
 	'ahk-encoding': { npm: 'test:ahk-encoding' },
+	'ahk-loop-capture': { npm: 'test:ahk-loop-capture', coveredBy: 'js' },
 	'report-style': { npm: 'lint:conventions:strict', coveredBy: 'js' },
 	js: { npm: 'test:js' },
 	'macos-tooltip-canvas': { npm: 'test:macos-tooltip-canvas' },

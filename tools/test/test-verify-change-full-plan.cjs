@@ -255,6 +255,46 @@ assert.equal(
 	1,
 	'the JS suite must retain the exact command that subsumes report-style'
 );
+// A green native suite cannot expose UnsetError accepted by AssertThrows.
+// Every AHK edit must retain the portable static guard even without Windows.
+for (const file of [
+	'static/ergopti_plus/windows/tests/unit/modules/llm/menu/test_llm_menu_regressions.ahk',
+	'static/ergopti_plus/windows/tests/meta/test_probe.ahk',
+	'static/ergopti_plus/windows/modules/llm/probe.ahk',
+	'probe.ahk'
+]) {
+	assert(
+		selectGates([file]).has('ahk-loop-capture'),
+		`${file}: AHK-only verification must reject false-green loop captures`
+	);
+}
+assert.equal(GATE_COMMANDS['ahk-loop-capture'].npm, 'test:ahk-loop-capture');
+assert.equal(GATE_COMMANDS['ahk-loop-capture'].coveredBy, 'js');
+for (const files of [
+	['static/ergopti_plus/_shared/modules/future/owner.ahk'],
+	[
+		'static/ergopti_plus/windows/tests/unit/modules/llm/menu/test_llm_menu_regressions.ahk',
+		'tools/test/probe.cjs'
+	]
+]) {
+	const gates = selectGates(files);
+	assert(gates.has('js'), 'the covering suite must remain selected');
+	assert(!gates.has('ahk-loop-capture'), 'JS must execute the loop guard exactly once');
+}
+assert(
+	!selectGates(['static/ergopti_plus/windows/modules/probe.lua']).has('ahk-loop-capture'),
+	'a non-AHK edit must not select the standalone Windows language guard'
+);
+assert.equal(
+	loadInventory(root).checks.filter(
+		(check) =>
+			check.cmd === 'node' &&
+			JSON.stringify(check.args) === JSON.stringify(['tools/test/test-ahk-loop-capture.cjs']) &&
+			!check.platforms
+	).length,
+	1,
+	'the covering JS suite must execute the exact portable loop guard once'
+);
 console.log(
 	'verify-change full plan: complete inventory, diagnostic mode and narrow defaults passed.'
 );
