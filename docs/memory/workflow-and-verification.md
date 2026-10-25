@@ -296,15 +296,25 @@ concurrency group, and never run Release / Publish, which stays push-only.
 ### project-macos-lane-runner-budget
 
 Hosted macOS jobs share five concurrent runners across the account; a sixth
-queues. Measured 2026-10-20, the lane was bound by that budget and by long
-cells, not by test time: Build now starts after Unit beside E2E and waits in
-`managed-ollama-handoff.cjs await-qualified` for both qualified native
-inputs, the Intel managed native role runs its XCTest cohorts in a second
-cell, and the test build runs four launch lots (scenarios in turn, a proved
-fresh runner between them via `macos_launch_reset.py`) beside the cold
-bootstrap. Action: count macOS jobs per stage against the five-runner budget
-before splitting a cell, and keep the test build admitting both E2E and Build;
-the receipt chain refuses a missing stage.
+queues. Every lane is strictly sequential (Unit, Integration, E2E, Build,
+Install and launch, Verdict): a failure skips every later stage and no stage
+runs beside another. The macOS Build used to start after Integration beside
+E2E and wait in `managed-ollama-handoff.cjs await-qualified` for both
+qualified native inputs (measured 2026-10-20: the lane was bound by the runner
+budget and by long cells, not by test time). It now needs `e2e-hs`, so the wait
+is satisfied on its first poll and is kept only as the proof that both inputs
+exist. The price is the E2E critical path added in front of Build, which the
+maintainer estimates at +2 to +6 minutes overall; the gain is one readable
+graph and no macOS minutes spent packaging a commit whose E2E is red. The Intel
+managed native role still runs its XCTest cohorts in a second cell, and the
+test build runs four launch lots (scenarios in turn, a proved fresh runner
+between them via `macos_launch_reset.py`) beside the cold bootstrap. Action:
+count macOS jobs per stage against the five-runner budget before splitting a
+cell, and keep the receipt chain one link per stage (`PREDECESSORS` in
+`tools/ci/macos-stage-roles.cjs`); the chain refuses a missing stage. The
+managed Ollama build and `assets-managed-ollama-*` are produced and published
+by macOS E2E on purpose, and the cold bootstrap rebuilds its own application
+at Install and launch on purpose.
 
 ### project-ci-run-timing-and-rerun-facts
 

@@ -10,17 +10,18 @@ const { parseClosedJson } = require('./dev-release-qualification.cjs');
 const STAGES = ['unit', 'integration', 'e2e', 'build', 'testbuild'];
 const JOBS = ['test-hs', 'integration-hs', 'e2e-hs', 'package-macos', 'launch'];
 /**
- * The stages each stage admits directly. Integration follows Unit; Build
- * packages after Integration, beside E2E, and the test build admits both, so
- * every receipt chain still names each earlier stage exactly once, in STAGES
- * order, and the verdict proof covers all five stages.
+ * The stages each stage admits directly. The lane is strictly sequential:
+ * Integration follows Unit, E2E follows Integration, Build packages only after
+ * E2E succeeded, and the test build (Install and launch) admits Build alone, so
+ * every receipt chain names each earlier stage exactly once, in STAGES order,
+ * and the verdict proof covers all five stages. No stage runs beside another.
  */
 const PREDECESSORS = Object.freeze({
 	unit: Object.freeze([]),
 	integration: Object.freeze(['unit']),
 	e2e: Object.freeze(['integration']),
-	build: Object.freeze(['integration']),
-	testbuild: Object.freeze(['e2e', 'build'])
+	build: Object.freeze(['e2e']),
+	testbuild: Object.freeze(['build'])
 });
 
 /** The stages a receipt of one stage carries before itself: its transitive predecessors, in STAGES order. */
@@ -445,7 +446,7 @@ function validateChain(chain, beforeStage, context) {
 	for (const row of chain) {
 		fields(row, ['stage', 'cells']);
 		assert.deepEqual(row.cells, validateCells(row.stage, row.cells, context));
-		// A stage runs after its own predecessors, not after a parallel sibling.
+		// A stage runs after its own predecessors.
 		const priorAttempt = Math.max(
 			0,
 			...PREDECESSORS[row.stage].map((stage) => newest.get(stage) ?? 0)

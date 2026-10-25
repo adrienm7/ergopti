@@ -663,7 +663,7 @@ function validateRaw(files) {
 		),
 		MACOS_STAGE_RESULT: '${{ job.status }}'
 	});
-	// Each job names the stage it receives; Build admits Integration beside E2E.
+	// Each job names the stage it receives; Build admits E2E and the test build admits Build.
 	for (const [id, prior] of [
 		['integration-hs', 'integration'],
 		['e2e-hs', 'e2e'],

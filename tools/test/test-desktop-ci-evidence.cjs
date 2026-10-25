@@ -35,8 +35,8 @@ function macRoleBody(body, role, expectedCount) {
 	const matrix = role === 'cold-bootstrap-native' ? 'testbuild_matrix' : 'e2e_matrix';
 	const metadata = role === 'cold-bootstrap-native' ? 'testbuild_metadata' : 'e2e_metadata';
 	const selected = `fromJSON(needs.${parent}.outputs.${metadata})[matrix.lot]`;
-	// The test build admits E2E beside the Build that supplies its lot plan.
-	const predecessors = role === 'cold-bootstrap-native' ? ['e2e-hs', parent] : [parent];
+	// Each stage waits for the one before it, which supplies its lot plan.
+	const predecessors = [parent];
 	assert.equal(pipeline.field(body, 'needs'), predecessors.map((need) => '- ' + need).join(' '));
 	assert.deepEqual(pipeline.needsOf(body), predecessors);
 	assert.equal(pipeline.field(body, 'runs-on'), '${{ ' + selected + '.runner }}');
@@ -2451,12 +2451,12 @@ function checkColdJob(body) {
 const coldJob = pipeline.job(Mac.stage['cold-bootstrap-native']);
 checkColdJob(coldJob);
 for (const [from, to] of [
-	['    needs:\n      - e2e-hs\n      - package-macos\n', ''],
-	['    needs:\n      - e2e-hs\n      - package-macos', 'needs: []'],
-	['    needs:\n      - e2e-hs\n      - package-macos', 'needs: [test-linux]'],
-	['    needs:\n      - e2e-hs\n      - package-macos', 'needs: [e2e-hs]'],
-	['    needs:\n      - e2e-hs\n      - package-macos', 'needs: [package-macos]'],
-	['    needs:\n      - e2e-hs\n      - package-macos', 'needs: [cold-bootstrap-native]'],
+	['    needs:\n      - package-macos\n', ''],
+	['    needs:\n      - package-macos', 'needs: []'],
+	['    needs:\n      - package-macos', 'needs: [test-linux]'],
+	['    needs:\n      - package-macos', 'needs: [e2e-hs]'],
+	['    needs:\n      - package-macos', 'needs: [e2e-hs, package-macos]'],
+	['    needs:\n      - package-macos', 'needs: [cold-bootstrap-native]'],
 	[
 		'runs-on: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].runner }}',
 		'runs-on: ubuntu-latest'

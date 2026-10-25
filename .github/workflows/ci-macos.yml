@@ -1,9 +1,9 @@
 # .github/workflows/ci-macos.yml
 #
-# macOS lane: Unit -> Integration -> (E2E and Build side by side) -> Test build
-# -> Verdict. Build packages after Integration; the test build admits both E2E
-# and Build, so the verdict still proves all five stages. Native roles stay parallel inside their
-# authored stage matrices.
+# macOS lane, strictly sequential: Unit -> Integration -> E2E -> Build ->
+# Install and launch -> Verdict. A failing stage skips every later one, and no
+# stage runs beside another. Native roles stay parallel inside their authored
+# stage matrices.
 # Lua unit and stubbed engine E2E tests run on Ubuntu. Every macOS cell names
 # its macOS version (tools/ci/macos-stage-roles.cjs HOSTS owns the runner
 # labels and versions, and each cell's admission refuses a runner of another
@@ -186,7 +186,7 @@ jobs:
   # outer boundaries faked, the preferences and bootstrap paths round-tripped
   # through real files, and the harness probes run as child processes. One
   # stubbed Ubuntu cell, admitted after every Unit cell; it plans the E2E cells,
-  # and E2E and Build both admit its receipt.
+  # and E2E admits its receipt.
   integration-hs:
     name: Integration tests (Lua module wiring, stubbed hs)
     runs-on: ubuntu-latest
@@ -1225,6 +1225,11 @@ jobs:
           path: |
             ${{ env.ERGOPTI_OLLAMA_ASSET }}
             ${{ env.ERGOPTI_OLLAMA_ASSET }}.provenance.json
+      # The managed Ollama build and its release asset belong to E2E on purpose:
+      # the clean source build and the Swift and XCTest qualification of its
+      # bytes are tests of the runtime, and Build packages only inputs this stage
+      # already qualified. assets-managed-ollama-<architecture> is therefore
+      # published from this E2E cell, not from Build.
       - name: Upload the actual managed native release asset
         env:
           GOTOOLCHAIN: 'local'
@@ -1789,13 +1794,13 @@ jobs:
 
   package-macos:
     name: Build (ErgoptiPlus.app, macOS 26)
-    # Reads this run's jobs and artifacts to wait for the qualified native
-    # inputs that the E2E cells running beside it upload.
+    # Runs only after every E2E cell succeeded. It reads this run's jobs and
+    # artifacts for the qualified native inputs those cells uploaded.
     permissions:
       contents: read
       actions: read
     needs:
-      - integration-hs
+      - e2e-hs
     runs-on: macos-latest
     timeout-minutes: 45
     outputs:
@@ -1813,7 +1818,7 @@ jobs:
       - name: Download exact prior stage receipts
         uses: actions/download-artifact@v4
         with:
-          pattern: macos-stage-integration-*-${{ github.run_id }}
+          pattern: macos-stage-e2e-*-${{ github.run_id }}
           path: ${{ runner.temp }}/macos-stage-inputs
       - name: Admit complete successful predecessor stage
         id: stage-admission
@@ -2327,9 +2332,10 @@ jobs:
       # grants survive an update; without it the build signs ad hoc and every
       # update costs users each permission. A release still builds without it
       # until the secrets exist, but says so with a warning on the run.
-      # Build runs beside E2E, so the qualified native inputs it packages may
-      # still be in their "Managed Ollama" cells here. Wait until both cells
-      # succeeded and uploaded them; a failed cell stops the build at once.
+      # Build runs after E2E, so both "Managed Ollama" cells already succeeded
+      # and uploaded the qualified native inputs it packages: this wait is
+      # satisfied on its first poll. It stays as the explicit proof that both
+      # source-qualified inputs of this run and attempt exist before packaging.
       - name: Await both source-qualified native producer inputs
         if: ${{ steps.stage-admission.outcome == 'success' }}
         env:
@@ -2611,7 +2617,6 @@ jobs:
   launch:
     name: Install and launch
     needs:
-      - e2e-hs
       - package-macos
     runs-on: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].runner }}
     timeout-minutes: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].timeout_minutes }}
@@ -2631,7 +2636,7 @@ jobs:
       - name: Download exact prior stage receipts
         uses: actions/download-artifact@v4
         with:
-          pattern: macos-stage-{e2e,build}-*-${{ github.run_id }}
+          pattern: macos-stage-build-*-${{ github.run_id }}
           path: ${{ runner.temp }}/macos-stage-inputs
       - name: Admit complete successful predecessor stage
         id: stage-admission
@@ -2841,7 +2846,10 @@ jobs:
           if-no-files-found: warn
 
       # Test-build acceptance follows the mandatory package gate. A fresh signed
-      # app receives the cold runtime; this job never publishes a release.
+      # app receives the cold runtime; this job never publishes a release. It
+      # builds its own application at Install and launch on purpose, instead of
+      # installing the package of Build: the cold bootstrap must start from an
+      # application no earlier launch scenario touched.
       # Retained original role: cold-bootstrap-native
       - uses: actions/checkout@v4
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}

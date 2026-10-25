@@ -19,9 +19,11 @@
  *   receive <dir>   wait for this run's build artifact of the cell's
  *                   architecture, download it into the empty <dir>, verify it
  *                   and install its files where the receiving steps read them
- *   await-qualified wait, in the application build that runs beside E2E, until
- *                   both "Managed Ollama (<architecture>)" cells succeeded and
- *                   uploaded the qualified inputs the build packages
+ *   await-qualified in the application build, which runs after E2E, require
+ *                   that both "Managed Ollama (<architecture>)" cells succeeded
+ *                   and uploaded the qualified inputs the build packages; the
+ *                   sequential stages satisfy it on the first poll, and it stays
+ *                   as the explicit proof of those inputs
  * ============================================================================
  */
 
@@ -333,7 +335,7 @@ function select(jobs, artifacts, context) {
 }
 
 /**
- * Lets the application build, which runs beside E2E, wait for the native
+ * Lets the application build, which runs after E2E, wait for the native
  * inputs it packages. An architecture is ready only once its qualifying cell
  * has completed successfully, so the build never packages an input whose
  * model receiving is still running or failed; a successful cell that left no

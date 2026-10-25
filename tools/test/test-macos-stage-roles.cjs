@@ -72,8 +72,8 @@ check('exact six visible jobs with only their declared predecessor edges', () =>
 		'test-hs': [],
 		'integration-hs': ['test-hs'],
 		'e2e-hs': ['integration-hs'],
-		'package-macos': ['integration-hs'],
-		launch: ['e2e-hs', 'package-macos'],
+		'package-macos': ['e2e-hs'],
+		launch: ['package-macos'],
 		'macos-ok': ['launch']
 	};
 	for (const [index, stage] of roles.STAGES.entries())
@@ -451,15 +451,18 @@ check('direct predecessor identity is exact', () => {
 		() => roles.aggregate({ 'package-macos': { result: 'success' } }, 'testbuild'),
 		/Closed stage/
 	);
-	// The test build's direct predecessors are both E2E and Build.
-	assert.equal(roles.aggregate(needsOf('testbuild'), ['e2e', 'build']), 'success');
-	for (const job of ['e2e-hs', 'package-macos']) {
-		const partial = needsOf('testbuild');
-		delete partial[job];
-		assert.throws(() => roles.aggregate(partial, ['e2e', 'build']), /Closed stage/);
-		const failed = { ...needsOf('testbuild'), [job]: { result: 'failure' } };
-		assert.throws(() => roles.aggregate(failed, ['e2e', 'build']), /Direct predecessor aggregate/);
-	}
+	// The test build's only direct predecessor is Build; E2E is reached through it.
+	assert.equal(roles.aggregate(needsOf('testbuild'), ['build']), 'success');
+	assert.deepEqual(Object.keys(needsOf('testbuild')), ['package-macos']);
+	const partial = needsOf('testbuild');
+	delete partial['package-macos'];
+	assert.throws(() => roles.aggregate(partial, ['build']), /Closed stage/);
+	const failed = { ...needsOf('testbuild'), 'package-macos': { result: 'failure' } };
+	assert.throws(() => roles.aggregate(failed, ['build']), /Direct predecessor aggregate/);
+	assert.throws(
+		() => roles.aggregate({ ...needsOf('testbuild'), 'e2e-hs': { result: 'success' } }, ['build']),
+		/Closed stage/
+	);
 });
 check('artifact reader refuses duplicate fields and unexpected members', () => {
 	const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-macos-stage-test-'));
@@ -1442,7 +1445,7 @@ assert.equal(
 	'all prior 200 controls and seven managed native history controls execute'
 );
 
-// The stage graph: Build admits Unit beside E2E, and the test build joins both.
+// The stage graph is a chain: Build admits E2E and the test build admits Build.
 const testbuildLot = roles.displayPlan('testbuild', context);
 const admitTestbuild = (receipts, needs = needsOf('testbuild'), ctx = context, attempt = 1) =>
 	roles.admit(
@@ -1454,13 +1457,13 @@ const admitTestbuild = (receipts, needs = needsOf('testbuild'), ctx = context, a
 		attempt,
 		() => receipts
 	);
-check('stage graph keeps every earlier stage once, in order, on every chain', () => {
+check('stage graph is one chain that keeps every earlier stage once, in order', () => {
 	assert.deepEqual(roles.PREDECESSORS, {
 		unit: [],
 		integration: ['unit'],
 		e2e: ['integration'],
-		build: ['integration'],
-		testbuild: ['e2e', 'build']
+		build: ['e2e'],
+		testbuild: ['build']
 	});
 	assert.deepEqual(
 		roles.STAGES.map((stage) => roles.priorStages(stage)),
@@ -1468,7 +1471,7 @@ check('stage graph keeps every earlier stage once, in order, on every chain', ()
 			[],
 			['unit'],
 			['unit', 'integration'],
-			['unit', 'integration'],
+			['unit', 'integration', 'e2e'],
 			['unit', 'integration', 'e2e', 'build']
 		]
 	);
@@ -1481,34 +1484,41 @@ check('stage graph keeps every earlier stage once, in order, on every chain', ()
 		['unit']
 	);
 	assert.deepEqual(
-		completed.all.build[0].prior.map((row) => row.stage),
+		completed.all.e2e[0].prior.map((row) => row.stage),
 		['unit', 'integration']
 	);
 	assert.deepEqual(
-		completed.all.e2e[0].prior.map((row) => row.stage),
-		['unit', 'integration']
+		completed.all.build[0].prior.map((row) => row.stage),
+		['unit', 'integration', 'e2e']
 	);
 	assert.throws(
 		() => roles.admit('unit', undefined, undefined, {}, context, 1, () => []),
 		/Unknown receiving stage/
 	);
 });
+check(
+	'no stage admits two direct predecessors: every stage waits for exactly the one before',
+	() => {
+		for (const [index, stage] of roles.STAGES.entries())
+			assert.deepEqual(roles.PREDECESSORS[stage], index === 0 ? [] : [roles.STAGES[index - 1]]);
+	}
+);
 for (const [name, receipts, pattern] of [
-	['missing Build', () => completed.all.e2e, /Missing or extra/],
-	['missing E2E', () => completed.all.build, /Missing or extra/],
+	['missing Build', () => [], /Missing or extra/],
+	['an E2E receipt instead of Build', () => completed.all.e2e, /Foreign stage receipt/],
 	[
-		'one missing E2E cell',
-		() => [...completed.all.e2e.slice(1), ...completed.all.build],
-		/Missing or extra/
+		'an E2E receipt beside Build',
+		() => [...completed.all.e2e, ...completed.all.build],
+		/Foreign stage receipt/
 	],
 	[
 		'a Unit receipt',
-		() => [...completed.all.e2e, ...completed.all.build, completed.all.unit[0]],
+		() => [...completed.all.build, completed.all.unit[0]],
 		/Foreign stage receipt/
 	],
 	[
 		'a test-build receipt',
-		() => [...completed.all.e2e, ...completed.all.build, completed.all.testbuild[0]],
+		() => [...completed.all.build, completed.all.testbuild[0]],
 		/Foreign stage receipt/
 	],
 	[
@@ -1516,43 +1526,34 @@ for (const [name, receipts, pattern] of [
 		() => {
 			const build = structuredClone(completed.all.build);
 			build[0].context.run_id = '4321';
-			return [...completed.all.e2e, ...build];
+			return build;
 		},
 		/Foreign source/
 	],
 	[
-		'an E2E receipt from another source',
-		() => {
-			const e2e = structuredClone(completed.all.e2e);
-			e2e[0].context.source_sha = 'b'.repeat(40);
-			return [...e2e, ...completed.all.build];
-		},
-		/Foreign source/
-	],
-	[
-		'a Build receipt over another Unit history',
+		'a Build receipt over a failed E2E history',
 		() => {
 			const build = structuredClone(completed.all.build);
-			for (const row of build) row.prior[0].cells[0].host.architecture = 'x64';
-			return [...completed.all.e2e, ...build];
+			build[0].prior[2].cells[0].result = 'failure';
+			return build;
 		},
-		/Conflicting predecessor/
+		/Stage role did not succeed/
 	],
 	[
-		'a Build receipt with no Unit predecessor',
+		'a Build receipt with no E2E predecessor',
 		() => {
 			const build = structuredClone(completed.all.build);
-			build[0].prior = [];
-			return [...completed.all.e2e, ...build];
+			build[0].prior = build[0].prior.slice(0, 2);
+			return build;
 		},
 		/prior stage/
 	],
 	[
-		'a Build receipt claiming an E2E predecessor',
+		'a Build receipt claiming a Build predecessor',
 		() => {
 			const build = structuredClone(completed.all.build);
-			build[0].prior.push(structuredClone(completed.all.testbuild[0].prior[2]));
-			return [...completed.all.e2e, ...build];
+			build[0].prior.push(structuredClone(completed.all.testbuild[0].prior[3]));
+			return build;
 		},
 		/prior stage/
 	]
@@ -1561,28 +1562,38 @@ for (const [name, receipts, pattern] of [
 		const rows = receipts();
 		assert.throws(() => admitTestbuild(rows), pattern);
 	});
-check('test-build admission refuses a missing or failed predecessor aggregate', () => {
-	const receipts = [...completed.all.e2e, ...completed.all.build];
+check('test-build admission refuses a missing, extra or failed predecessor aggregate', () => {
+	const receipts = completed.all.build;
+	assert.doesNotThrow(() => admitTestbuild(receipts, { 'package-macos': { result: 'success' } }));
 	assert.throws(() => admitTestbuild(receipts, { launch: { result: 'success' } }), /Closed stage/);
-	assert.throws(
-		() => admitTestbuild(receipts, { 'package-macos': { result: 'success' } }),
-		/Closed stage/
-	);
 	assert.throws(
 		() => admitTestbuild(receipts, { 'e2e-hs': { result: 'success' } }),
 		/Closed stage/
 	);
+	assert.throws(
+		() =>
+			admitTestbuild(receipts, {
+				'e2e-hs': { result: 'success' },
+				'package-macos': { result: 'success' }
+			}),
+		/Closed stage/
+	);
+	for (const result of ['failure', 'cancelled', 'skipped'])
+		assert.throws(
+			() => admitTestbuild(receipts, { 'package-macos': { result } }),
+			/Direct predecessor aggregate/
+		);
 });
-check('a rerun of E2E alone keeps the earlier Build and still admits', () => {
-	const e2e = completed.all.e2e.map((row) => ({ ...structuredClone(row), attempt: 2 }));
-	const proof = admitTestbuild([...e2e, ...completed.all.build], needsOf('testbuild'), context, 2);
+check('a rerun of Build alone keeps the earlier E2E history and still admits', () => {
+	const build = completed.all.build.map((row) => ({ ...structuredClone(row), attempt: 2 }));
+	const proof = admitTestbuild(build, needsOf('testbuild'), context, 2);
 	assert.deepEqual(
 		proof.chain.map((row) => [row.stage, Math.max(...row.cells.map((cell) => cell.attempt))]),
 		[
 			['unit', 1],
 			['integration', 1],
-			['e2e', 2],
-			['build', 1]
+			['e2e', 1],
+			['build', 2]
 		]
 	);
 	const receipt = roles.record(
@@ -1596,26 +1607,18 @@ check('a rerun of E2E alone keeps the earlier Build and still admits', () => {
 	);
 	assert.deepEqual(receipt.prior, proof.chain);
 });
-check('a Build older than its Integration predecessor is a backward lineage', () => {
-	const integration = completed.all.integration.map((row) => ({
+check('a Build older than its E2E predecessor is a backward lineage', () => {
+	const e2e = completed.proof.chain[2].cells.map((row) => ({
 		...structuredClone(row),
 		attempt: 2
 	}));
-	const prior = roles.admit(
-		'build',
-		undefined,
-		undefined,
-		needsOf('build'),
-		context,
-		2,
-		() => integration
-	);
 	assert.throws(
 		() =>
 			roles.validateChain(
 				[
-					...prior.chain,
-					{ stage: 'e2e', cells: structuredClone(completed.proof.chain[2].cells) },
+					structuredClone(completed.proof.chain[0]),
+					structuredClone(completed.proof.chain[1]),
+					{ stage: 'e2e', cells: e2e },
 					{ stage: 'build', cells: structuredClone(completed.proof.chain[3].cells) }
 				],
 				'testbuild',
@@ -1624,7 +1627,31 @@ check('a Build older than its Integration predecessor is a backward lineage', ()
 		/Backward predecessor attempt lineage/
 	);
 });
-assert.equal(controls, 221, 'all prior 207 controls and fourteen stage graph controls execute');
+check('an E2E older than its Integration predecessor is a backward lineage', () => {
+	const integration = completed.all.integration.map((row) => ({
+		...structuredClone(row),
+		attempt: 2
+	}));
+	const prior = roles.admit(
+		'e2e',
+		roles.displayPlan('e2e', context).matrix.lot[0],
+		roles.displayPlan('e2e', context).metadata,
+		needsOf('e2e'),
+		context,
+		2,
+		() => integration
+	);
+	assert.throws(
+		() =>
+			roles.validateChain(
+				[...prior.chain, { stage: 'e2e', cells: structuredClone(completed.proof.chain[2].cells) }],
+				'build',
+				context
+			),
+		/Backward predecessor attempt lineage/
+	);
+});
+assert.equal(controls, 222, 'all prior 207 controls and fifteen stage graph controls execute');
 
 // Launch lots: four launch jobs beside the cold bootstrap, each scenario once.
 function checkLaunchLotLoop(workflow) {
@@ -1725,7 +1752,7 @@ check(
 		}
 	}
 );
-assert.equal(controls, 222, 'all prior 221 controls and the launch lot control execute');
+assert.equal(controls, 223, 'all prior 222 controls and the launch lot control execute');
 
 // Every macOS cell, job and repeated step states its macOS version from HOSTS.
 check('macOS cells name their version from one host table and refuse another', () => {
@@ -1778,6 +1805,6 @@ check('macOS cells name their version from one host table and refuse another', (
 	])
 		assert.throws(() => roles.confirmMacosVersion(selected, version));
 });
-assert.equal(controls, 223, 'all prior 222 controls and the macOS version control execute');
+assert.equal(controls, 224, 'all prior 223 controls and the macOS version control execute');
 
 console.log('macos-stage-roles: ' + controls + ' controls passed');
