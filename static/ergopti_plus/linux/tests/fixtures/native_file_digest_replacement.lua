@@ -2,7 +2,7 @@
 --- ==============================================================================
 --- MODULE: Native File Digest Replacement Ownership Regression
 --- DESCRIPTION:
---- Invalid replacement paths cannot retire an already dispatched native digest.
+--- Invalid replacement paths or deadlines cannot retire an active native digest.
 --- Real FIFOs keep sha256sum pending until an actual writer supplies the known
 --- abc vector. Native special-file deadlines and cancellation control cleanup.
 --- No libuv call, process output, allocation or signal receipt is simulated.
@@ -79,7 +79,20 @@ local function check(name, test)
 	end
 end
 
-for _, invalid in ipairs({ "embedded NUL", "embedded NUL with a raising callback", "relative path" }) do
+local replacements = {
+	{ name = "embedded NUL" },
+	{ name = "embedded NUL with a raising callback" },
+	{ name = "relative path" },
+	{ name = "negative deadline", timeout_ms = -1 },
+	{ name = "zero deadline", timeout_ms = 0 },
+	{ name = "infinite deadline", timeout_ms = math.huge },
+	{ name = "NaN deadline", timeout_ms = 0 / 0 },
+	{ name = "over-ceiling deadline", timeout_ms = require("number_policy").MAX_TIMER_DELAY_MS + 2 },
+	{ name = "text deadline", timeout_ms = "invalid" },
+	{ name = "boolean deadline", timeout_ms = false },
+}
+for _, replacement in ipairs(replacements) do
+	local invalid = replacement.name
 	check("refused " .. invalid .. " preserves the original native FIFO digest", function()
 		local path = fifo(invalid)
 		local value, reason, callbacks = nil, nil, 0
@@ -89,12 +102,22 @@ for _, invalid in ipairs({ "embedded NUL", "embedded NUL with a raising callback
 		local pid = owned_pid()
 		assert(await(function() return process_alive(pid) and Digest.isActive() end))
 		local rejected, rejection, refusals = nil, nil, 0
-		local candidate = invalid == "relative path" and "relative" or (path .. "\0invalid")
-		assert(not Digest.sha256(candidate, {}, function(result, err)
+		local resources = {}
+		uv.walk(function(handle) resources[handle] = true end)
+		local candidate = path
+		if invalid == "relative path" then candidate = "relative"
+		elseif invalid:find("embedded NUL", 1, true) then candidate = path .. "\0invalid" end
+		assert(not Digest.sha256(candidate, { timeout_ms = replacement.timeout_ms }, function(result, err)
 			rejected, rejection, refusals = result, err, refusals + 1
 			if invalid == "embedded NUL with a raising callback" then error("intentional refusal callback exception") end
 		end), "malformed candidate was dispatched")
 		assert(refusals == 1 and rejected == nil and type(rejection) == "string")
+		if replacement.timeout_ms ~= nil then assert(rejection == "invalid digest deadline") end
+		uv.walk(function(handle)
+			assert(resources[handle], "refused candidate allocated a native resource")
+			resources[handle] = nil
+		end)
+		assert(next(resources) == nil, "refused candidate changed the incumbent native resources")
 		assert(Digest.isActive() and process_alive(pid) and callbacks == 0,
 			"refused candidate retired the original digest")
 		local writer, writer_code
@@ -111,7 +134,7 @@ for _, invalid in ipairs({ "embedded NUL", "embedded NUL with a raising callback
 	end)
 end
 
-check("accepted replacement still cancels the previous native FIFO digest", function()
+check("accepted ceiling deadline replaces the previous native FIFO digest", function()
 	local old_callbacks, callbacks, value, reason = 0, 0, nil, nil
 	assert(Digest.sha256(fifo("replaced"), { timeout_ms = 1500 }, function() old_callbacks = old_callbacks + 1 end))
 	local pid = owned_pid()
@@ -120,7 +143,8 @@ check("accepted replacement still cancels the previous native FIFO digest", func
 	assert(file:write("abc"))
 	assert(file:close())
 	paths[#paths + 1] = path
-	assert(Digest.sha256(path, {}, function(result, err) value, reason, callbacks = result, err, callbacks + 1 end))
+	assert(Digest.sha256(path, { timeout_ms = require("number_policy").MAX_TIMER_DELAY_MS },
+		function(result, err) value, reason, callbacks = result, err, callbacks + 1 end))
 	assert(await(function() return not uv.loop_alive() end))
 	assert(old_callbacks == 0 and callbacks == 1 and value == ABC_SHA256 and reason == nil)
 	assert(not Digest.isActive() and not process_alive(pid))
