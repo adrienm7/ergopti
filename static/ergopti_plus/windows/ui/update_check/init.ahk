@@ -29,7 +29,7 @@
 ; The window's size: the manifest's update_check entry
 ; (_shared/ui/apps.manifest.json), pinned by test-webview-geometry-single-source.
 global UC_WIDTH  := 480
-global UC_HEIGHT := 320
+global UC_HEIGHT := 440
 
 ; Virtual host for the shared page, mapped to _SharedDir like the error window's
 global UC_VHOST             := "ergopti.updatecheck"
