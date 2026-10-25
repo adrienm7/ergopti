@@ -27,6 +27,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 -- Directories whose code runs in direct response to a live user input event.
@@ -111,20 +112,16 @@ helpers.describe("interactive actions: no synchronous subprocess on a user-trigg
 			helpers.assert_true(#files > 0,
 				"the walker must reach " .. dir .. "; an empty list would make this vacuous")
 			for _, rel in ipairs(files) do
-				local fh = io.open(root .. rel, "r")
-				if fh then
-					local src = fh:read("*a")
-					fh:close()
-					scanned = scanned + 1
-					-- Comments stripped: a file must not satisfy — or violate — this
-					-- guard by discussing the API in prose. This very file names all
-					-- three spellings in its own header.
-					local code = src:gsub("%-%-[^\n]*", "")
-					for _, call in ipairs(BLOCKING_CALLS) do
-						local _, n = code:gsub(call.pattern, "")
-						if n > 0 then
-							table.insert(offenders, string.format("%s (%dx %s)", rel, n, call.name))
-						end
+				local src = SourceFile.read(root .. rel)
+				scanned = scanned + 1
+				-- Comments stripped: a file must not satisfy — or violate — this
+				-- guard by discussing the API in prose. This very file names all
+				-- three spellings in its own header.
+				local code = src:gsub("%-%-[^\n]*", "")
+				for _, call in ipairs(BLOCKING_CALLS) do
+					local _, n = code:gsub(call.pattern, "")
+					if n > 0 then
+						table.insert(offenders, string.format("%s (%dx %s)", rel, n, call.name))
 					end
 				end
 			end

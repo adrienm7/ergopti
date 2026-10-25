@@ -24,6 +24,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui" }
@@ -133,14 +134,11 @@ helpers.describe("shell commands are POSIX-quoted, never %q-quoted", function()
 
 		local offenders = {}
 		for _, path in ipairs(files) do
-			local fh = io.open(path, "r")
-			if fh then
-				local src = fh:read("*a") ; fh:close()
-				for _, call_at in ipairs(lua_q_shell_calls(src)) do
-					local line_no = select(2, src:sub(1, call_at):gsub("\n", "")) + 1
-					offenders[#offenders + 1] =
-						path:gsub("^.*/macos/", "") .. ":" .. line_no
-				end
+			local src = SourceFile.read(path)
+			for _, call_at in ipairs(lua_q_shell_calls(src)) do
+				local line_no = select(2, src:sub(1, call_at):gsub("\n", "")) + 1
+				offenders[#offenders + 1] =
+					path:gsub("^.*/macos/", "") .. ":" .. line_no
 			end
 		end
 

@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 local DRIVER_ROOT = helpers.driver_root()
 
@@ -195,9 +196,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 			"the UI source walk must cover the class instead of an empty allowlist")
 		local raw_sites = 0
 		for _, relative in ipairs(files) do
-			local handle = assert(io.open(DRIVER_ROOT .. relative, "rb"))
-			local code = strip_lua_comments(handle:read("*a") or "")
-			handle:close()
+			local code = strip_lua_comments(SourceFile.read(DRIVER_ROOT .. relative))
 			local count = count_pattern(code, "hs%.timer%.doAfter")
 			local contract = expected[relative]
 			if contract then
@@ -236,9 +235,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 		paths[#paths + 1] = module_source("infra.app_picker")
 		local constructions = 0
 		for _, relative in ipairs(paths) do
-			local handle = assert(io.open(DRIVER_ROOT .. relative, "rb"))
-			local code = strip_lua_comments(handle:read("*a") or "")
-			handle:close()
+			local code = strip_lua_comments(SourceFile.read(DRIVER_ROOT .. relative))
 			local count = count_pattern(code, "hs%.chooser%.new%s*%(")
 			if count > 0 then
 				local contract = chooser_contracts[relative]

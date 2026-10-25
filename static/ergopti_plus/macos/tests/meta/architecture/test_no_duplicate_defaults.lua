@@ -13,6 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 local DRIVER_ROOT = helpers.driver_root()
 
@@ -47,19 +48,17 @@ helpers.describe("meta: duplicate default values", function()
 	local seen = {}
 	for _, sub in ipairs({ "infra", "modules", "platform" }) do
 		for _, abs in ipairs(list_lua_files(DRIVER_ROOT .. sub)) do
-			local fh = io.open(abs, "r") ; if fh then
-				local body = fh:read("*a") ; fh:close()
-				-- Only scan inside DEFAULT_STATE or DEFAULTS literal tables
-				local default_block = body:match("DEFAULT_STATE%s*=%s*({.-\n})")
-					or body:match("DEFAULTS%s*=%s*({.-\n})")
-				if default_block then
-					for k, v in default_block:gmatch("(%w+)%s*=%s*([^,\n}]+)") do
-						local norm = (v:gsub("%s+$", ""))
-						if not WHITELIST_VALUES[norm] then
-							local key = k .. "=" .. norm
-							seen[key] = seen[key] or {}
-							seen[key][#seen[key] + 1] = abs:sub(#DRIVER_ROOT + 1)
-						end
+			local body = SourceFile.read(abs)
+			-- Only scan inside DEFAULT_STATE or DEFAULTS literal tables
+			local default_block = body:match("DEFAULT_STATE%s*=%s*({.-\n})")
+				or body:match("DEFAULTS%s*=%s*({.-\n})")
+			if default_block then
+				for k, v in default_block:gmatch("(%w+)%s*=%s*([^,\n}]+)") do
+					local norm = (v:gsub("%s+$", ""))
+					if not WHITELIST_VALUES[norm] then
+						local key = k .. "=" .. norm
+						seen[key] = seen[key] or {}
+						seen[key][#seen[key] + 1] = abs:sub(#DRIVER_ROOT + 1)
 					end
 				end
 			end

@@ -34,6 +34,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 -- Source subtrees that ship in the driver. tests/, vendor/ and _generated/ are
@@ -208,15 +209,11 @@ helpers.describe("keyStroke call sites: explicit delay argument", function()
 
 		local report, total = {}, 0
 		for _, path in ipairs(files) do
-			local fh = io.open(path, "r")
-			if fh then
-				local src = fh:read("*a")
-				fh:close()
-				for _, off in ipairs(find_offenders(src)) do
-					total = total + 1
-					local rel = path:gsub("^" .. root:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1") .. "[/\\]?", "")
-					report[#report + 1] = string.format("%s:%d", rel, off.line)
-				end
+			local src = SourceFile.read(path)
+			for _, off in ipairs(find_offenders(src)) do
+				total = total + 1
+				local rel = path:gsub("^" .. root:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1") .. "[/\\]?", "")
+				report[#report + 1] = string.format("%s:%d", rel, off.line)
 			end
 		end
 

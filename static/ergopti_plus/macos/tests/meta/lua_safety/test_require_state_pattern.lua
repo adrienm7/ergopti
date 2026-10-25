@@ -16,6 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 local DRIVER_ROOT = helpers.driver_root()
 
@@ -70,20 +71,18 @@ helpers.describe("meta: require_state pattern", function()
 	local known_count    = 0
 
 	for _, abs in ipairs(list_lua_files(DRIVER_ROOT .. "modules")) do
-		local fh = io.open(abs, "r") ; if fh then
-			local body = fh:read("*a") ; fh:close()
-			-- Looks stateful when it declares `local _state` or `_state = nil` at module scope
-			local stateful = body:match("\nlocal%s+_state%s*=") or body:match("^local%s+_state%s*=")
-			if stateful and not body:find("require_state", 1, true) then
-				-- Relative path used as the allowlist key (forward-slash normalised)
-				local rel = abs:sub(#DRIVER_ROOT + 1)
-				if KNOWN_VIOLATIONS[rel] then
-					known_count = known_count + 1
-					print(string.format("  KNOWN: %s — pending fix (see allowlist TODO)", rel))
-				else
-					new_violations = new_violations + 1
-					print(string.format("  FAIL: %s declares _state but defines no require_state guard", rel))
-				end
+		local body = SourceFile.read(abs)
+		-- Looks stateful when it declares `local _state` or `_state = nil` at module scope
+		local stateful = body:match("\nlocal%s+_state%s*=") or body:match("^local%s+_state%s*=")
+		if stateful and not body:find("require_state", 1, true) then
+			-- Relative path used as the allowlist key (forward-slash normalised)
+			local rel = abs:sub(#DRIVER_ROOT + 1)
+			if KNOWN_VIOLATIONS[rel] then
+				known_count = known_count + 1
+				print(string.format("  KNOWN: %s — pending fix (see allowlist TODO)", rel))
+			else
+				new_violations = new_violations + 1
+				print(string.format("  FAIL: %s declares _state but defines no require_state guard", rel))
 			end
 		end
 	end

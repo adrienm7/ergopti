@@ -18,6 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 local DRIVER_ROOT = helpers.driver_root()
 
@@ -47,10 +48,7 @@ end
 --- @param path string Absolute path.
 --- @return string code
 local function read_code(path)
-	local handle = io.open(path, "rb")
-	if not handle then return "" end
-	local source = handle:read("*a")
-	handle:close()
+	local source = SourceFile.read(path)
 	local lines = {}
 	for line in source:gmatch("[^\n]*") do lines[#lines + 1] = line:gsub("%-%-.*$", "") end
 	return table.concat(lines, "\n")

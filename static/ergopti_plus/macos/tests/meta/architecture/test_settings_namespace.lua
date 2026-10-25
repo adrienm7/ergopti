@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 local DRIVER_ROOT = helpers.driver_root()
@@ -44,12 +45,9 @@ end
 
 --- Reads a file exactly.
 --- @param path string
---- @return string|nil source
+--- @return string source
 local function read_file(path)
-	local handle = io.open(path, "rb")
-	if not handle then return nil end
-	local source = handle:read("*a")
-	handle:close()
+	local source = SourceFile.read(path)
 	return source
 end
 
