@@ -100,6 +100,7 @@ function M.new(faults)
 
 	-- In-memory files stand for mkstemp(3) outputs; host paths differ per OS.
 	local files, next_file = {}, 0
+	local removed_paths = {}
 	local native = {}
 	function native.tmpname()
 		next_file = next_file + 1
@@ -136,9 +137,19 @@ function M.new(faults)
 		}
 	end
 	function native.remove(path)
+		removed_paths[#removed_paths + 1] = path
+		if files[path] == nil then return nil, path .. ": No such file or directory", 2 end
+		if faults.cleanup_refused then return nil, path .. ": Permission denied", 13 end
 		files[path] = nil
 		return true
 	end
+	function native.classify_no_follow(path)
+		if faults.cleanup_status_error then return nil, "error", "metadata unavailable" end
+		if files[path] == nil then return nil, "absent" end
+		return { mode = "file", size = #files[path] }, "ok"
+	end
+	function native.allocation_count() return next_file end
+	function native.removal_attempts() return removed_paths end
 	--- Lists the output files still present, which must be none after a call.
 	function native.leftover_files()
 		local left = {}
