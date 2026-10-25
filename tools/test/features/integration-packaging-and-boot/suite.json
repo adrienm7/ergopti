@@ -92,7 +92,7 @@
 		},
 		{
 			"id": "js-linux-arch-package-runtime",
-			"ordinal": 488,
+			"ordinal": 489,
 			"name": "Arch recipe stages native runtime and executes canonical package entry points",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-arch-package.cjs"],
@@ -101,7 +101,7 @@
 		},
 		{
 			"id": "js-linux-deb-package-owner",
-			"ordinal": 489,
+			"ordinal": 490,
 			"name": "Rootless DEB archives preserve public ownership and modes without changing private source state",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-deb-package-owner.cjs"],
@@ -110,7 +110,7 @@
 		},
 		{
 			"id": "js-linux-package-version",
-			"ordinal": 490,
+			"ordinal": 491,
 			"name": "Linux package metadata follows copied runtime releases and native prerelease ordering",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-package-version.cjs"],
@@ -119,7 +119,7 @@
 		},
 		{
 			"id": "js-linux-flatpak-icon",
-			"ordinal": 491,
+			"ordinal": 492,
 			"name": "Flatpak exports the canonical desktop logo and refuses missing icon assets",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-flatpak-icon.cjs"],
@@ -128,7 +128,7 @@
 		},
 		{
 			"id": "js-linux-package-options",
-			"ordinal": 492,
+			"ordinal": 493,
 			"name": "System package entry points refuse unknown arguments before staging side effects",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-package-options.cjs"],
