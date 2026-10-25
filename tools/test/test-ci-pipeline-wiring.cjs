@@ -196,7 +196,6 @@ const STAGE_NAMES = Object.freeze({
 	integration: 'Integration tests',
 	e2e: 'E2E tests',
 	build: 'Build',
-	flatpak: 'Flatpak',
 	install: 'Install and launch',
 	verdict: 'Verdict'
 });
@@ -218,7 +217,6 @@ const LANE_JOB_NAMES = Object.freeze({
 	'integration-linux': ['integration', null],
 	'e2e-linux': ['e2e', null],
 	'package-linux': ['build', '.deb, .rpm, AppImage and archive'],
-	'package-flatpak': ['flatpak', 'Build, install and launch'],
 	'install-linux': ['install', null],
 	'linux-ok': ['verdict', 'All mandatory results'],
 	'test-hs': ['unit', null],
@@ -606,7 +604,7 @@ const STEP_CONDITIONS = [
 	],
 	[
 		LINUX_BOX,
-		'package-flatpak',
+		'package-linux',
 		'Save the Flatpak runtimes',
 		"steps.flatpak-cache.outputs.cache-hit != 'true'"
 	],
@@ -1030,6 +1028,97 @@ const STEP_CONDITIONS = [
 		'install-linux',
 		'Upload mandatory AppImage smoke evidence',
 		"env.INSTALL_KIND == 'appimage'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Download the archive built above (archive)',
+		"env.INSTALL_KIND == 'archive'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Install LuaJIT for the archive launcher (archive)',
+		"env.INSTALL_KIND == 'archive'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Unpack and install the tarball the way a user would (archive)',
+		"env.INSTALL_KIND == 'archive'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Launch what the tarball installed (archive)',
+		"env.INSTALL_KIND == 'archive'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'The installed shared data tree resolves and opens (archive)',
+		"env.INSTALL_KIND == 'archive'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Record mandatory archive smoke evidence (archive)',
+		"env.INSTALL_KIND == 'archive'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Upload mandatory archive smoke evidence (archive)',
+		"env.INSTALL_KIND == 'archive'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Download the Flatpak built above (flatpak)',
+		"env.INSTALL_KIND == 'flatpak'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Read the Flatpak runtime version (flatpak)',
+		"env.INSTALL_KIND == 'flatpak'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Restore the Flatpak runtimes (flatpak)',
+		"env.INSTALL_KIND == 'flatpak'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Install the Flatpak toolchain (flatpak)',
+		"env.INSTALL_KIND == 'flatpak'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Install the Flatpak the way a user would (flatpak)',
+		"env.INSTALL_KIND == 'flatpak'"
+	],
+	[LINUX_BOX, 'install-linux', 'Launch the Flatpak (flatpak)', "env.INSTALL_KIND == 'flatpak'"],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'The sandboxed shared data tree resolves and opens (flatpak)',
+		"env.INSTALL_KIND == 'flatpak'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Record mandatory Flatpak smoke evidence (flatpak)',
+		"env.INSTALL_KIND == 'flatpak'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Upload mandatory Flatpak smoke evidence (flatpak)',
+		"env.INSTALL_KIND == 'flatpak'"
 	]
 ].map(macConditionEntry);
 // e2e-linux runs each harness under !cancelled(), so a red one hides no other;
@@ -1530,7 +1619,7 @@ function lotTransport(source, rel) {
 				assert.deepEqual(receiving.steps[0], {
 					name: 'Require a declared installation lot',
 					shell: 'sh',
-					run: 'set -eu\ntest -n "$INSTALL_ID"\ncase "$INSTALL_KIND" in\n  install|first|deb|rpm|appimage) ;;\n  *) exit 1 ;;\nesac\n'
+					run: 'set -eu\ntest -n "$INSTALL_ID"\ncase "$INSTALL_KIND" in\n  install|first|deb|rpm|appimage|archive|flatpak) ;;\n  *) exit 1 ;;\nesac\n'
 				});
 				assert.equal(preceding.steps.at(-1).id, id, 'Plan only after mandatory packaging evidence');
 			}
@@ -3337,9 +3426,8 @@ if (
 /**
  * Each lane's jobs in file order, with the exact needs and the stage of each.
  * Every lane reads unit -> integration -> E2E -> build -> install and launch
- * -> verdict. Stages follow one another strictly, except for the declared
- * parallel sibling: the Linux Flatpak job builds from the package beside the
- * install cells, and the verdict waits for both.
+ * -> verdict. Stages follow one another strictly: no job runs beside the
+ * stage before the verdict, and the verdict waits for the last stage alone.
  */
 const LANE_GRAPHS = {
 	[MACOS_BOX]: [
@@ -3363,9 +3451,8 @@ const LANE_GRAPHS = {
 		['integration-linux', ['test-linux'], 'integration'],
 		['e2e-linux', ['integration-linux'], 'e2e'],
 		['package-linux', ['e2e-linux'], 'build'],
-		['package-flatpak', ['package-linux'], 'build'],
 		['install-linux', ['package-linux'], 'testbuild'],
-		['linux-ok', ['install-linux', 'package-flatpak'], 'verdict']
+		['linux-ok', ['install-linux'], 'verdict']
 	]
 };
 
@@ -3803,7 +3890,7 @@ for (const [what, rel, from, to] of [
 	[
 		'a second exit in the Linux lane',
 		LINUX_BOX,
-		'    needs: [install-linux, package-flatpak]\n    if: always()\n',
+		'    needs: [install-linux]\n    if: always()\n',
 		'    if: always()\n'
 	]
 ]) {
@@ -5064,8 +5151,8 @@ for (const [what, rel, from, to] of [
 	[
 		'a harness condition outside test-linux',
 		LINUX_BOX,
-		'      - name: Launch the Flatpak\n',
-		`      - name: Launch the Flatpak\n        if: ${NOT_CANCELLED}\n`
+		'      - name: Build the Flatpak\n',
+		`      - name: Build the Flatpak\n        if: ${NOT_CANCELLED}\n`
 	],
 	[
 		'if: false on a test-linux harness',

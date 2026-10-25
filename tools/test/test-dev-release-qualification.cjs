@@ -496,7 +496,6 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			'integration-linux',
 			'e2e-linux',
 			'package-linux',
-			'package-flatpak',
 			'install-linux',
 			'linux-ok'
 		]
@@ -585,8 +584,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			)
 		);
 	}
-	assert.equal(jobs - 1, 33);
-	assert.equal(jobs, 34);
+	assert.equal(jobs - 1, 32);
+	assert.equal(jobs, 33);
 	assert(steps > 150, 'full step inventory cannot be vacuous');
 	const rootSource = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
 	const rootJobs = pipeline.jobsOfText(rootSource, '.github/workflows/ci.yml');

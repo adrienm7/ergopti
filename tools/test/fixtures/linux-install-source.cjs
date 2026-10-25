@@ -70,7 +70,7 @@ function admit(source, plan) {
 	assert.deepEqual(admission, {
 		name: 'Require a declared installation lot',
 		shell: 'sh',
-		run: 'set -eu\ntest -n "$INSTALL_ID"\ncase "$INSTALL_KIND" in\n  install|first|deb|rpm|appimage) ;;\n  *) exit 1 ;;\nesac\n'
+		run: 'set -eu\ntest -n "$INSTALL_ID"\ncase "$INSTALL_KIND" in\n  install|first|deb|rpm|appimage|archive|flatpak) ;;\n  *) exit 1 ;;\nesac\n'
 	});
 	assert.deepEqual(step('Prepare the container'), {
 		name: 'Prepare the container',

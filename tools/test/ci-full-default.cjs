@@ -51,7 +51,6 @@ const JOBS = [
 	['.github/workflows/ci-linux.yml', 'integration-linux', null],
 	['.github/workflows/ci-linux.yml', 'e2e-linux', null],
 	['.github/workflows/ci-linux.yml', 'package-linux', null],
-	['.github/workflows/ci-linux.yml', 'package-flatpak', null],
 	['.github/workflows/ci-linux.yml', 'install-linux', null],
 	['.github/workflows/ci-linux.yml', 'linux-ok', 'always()']
 ];
@@ -449,36 +448,8 @@ const FULL_STEPS = [
 		'Verify mandatory jobs and launch scenarios',
 		null
 	],
-	[
-		'.github/workflows/ci-linux.yml',
-		'package-flatpak',
-		'Install the Flatpak the way a user would',
-		null
-	],
-	['.github/workflows/ci-linux.yml', 'package-flatpak', 'Launch the Flatpak', null],
-	[
-		'.github/workflows/ci-linux.yml',
-		'package-flatpak',
-		'The sandboxed shared data tree resolves and opens',
-		null
-	],
-	[
-		'.github/workflows/ci-linux.yml',
-		'package-linux',
-		'Unpack and install the tarball the way a user would',
-		null
-	],
-	['.github/workflows/ci-linux.yml', 'package-linux', 'Launch what the tarball installed', null],
-	[
-		'.github/workflows/ci-linux.yml',
-		'package-linux',
-		'The installed shared data tree resolves and opens',
-		null
-	],
 	['.github/workflows/ci-linux.yml', 'package-linux', 'Record mandatory package evidence', null],
 	['.github/workflows/ci-linux.yml', 'package-linux', 'Upload mandatory package evidence', null],
-	['.github/workflows/ci-linux.yml', 'package-flatpak', 'Record mandatory Flatpak evidence', null],
-	['.github/workflows/ci-linux.yml', 'package-flatpak', 'Upload mandatory Flatpak evidence', null],
 	['.github/workflows/ci-linux.yml', 'linux-ok', 'Download assertion evidence', null],
 	[
 		'.github/workflows/ci-linux.yml',

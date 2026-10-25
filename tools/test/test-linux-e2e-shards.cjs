@@ -227,7 +227,7 @@ assert.deepEqual(
 assert.deepEqual(pipeline.needsOf(pipeline.job(JOB)), ['integration-linux']);
 assert.equal(MANIFEST.jobs[JOB].classification, 'mandatory');
 assert.deepEqual(pipeline.needsOf(pipeline.job('package-linux')), [JOB]);
-assert.deepEqual(pipeline.needsOf(pipeline.job('linux-ok')), ['install-linux', 'package-flatpak']);
+assert.deepEqual(pipeline.needsOf(pipeline.job('linux-ok')), ['install-linux']);
 
 // ─────────────────────────────────────────────────
 // Each refusal fires on a mutated copy of the real workflow
