@@ -381,7 +381,7 @@ _LTR_NewTriggerSupersedes() {
 		_LPP_Answer(Calls[1], "TRANSLATION: Trop tard")
 		AssertEqual(0, _Stub_LlmTooltipCalls.Length, "the superseded answer is not shown")
 		AssertEqual(1, _LPP_LinesWith(Lines, "INFO", "newer translation superseded"), "its drop is logged")
-		AssertFalse(_LLM_Translate_RenderIsCurrent(_LLM_Translate_Generation - 1),
+		AssertFalse(_LLM_Translate_RenderIsCurrent(_LLM_Translate_Generation - 1, LLM_AuxGeneration()),
 			"an older translation can no longer paint")
 		_LPP_Answer(Calls[2], "TRANSLATION: 明日会いましょう")
 		Final := _LPP_LastFinalRender()
@@ -468,3 +468,81 @@ _LTR_RequestKeepsSelectionDestination() {
 	}
 }
 Test("LLM translate: the request retains its selection destination (translate-destination)", _LTR_RequestKeepsSelectionDestination)
+
+
+; The backend lifecycle invalidates work independently of a new translation.
+; Callbacks already queued for delivery cannot regain authority after reenable.
+_LTR_RetiredRequestScope(Phase) {
+	_LTR_Run(_LPP_Menu(), _LTN_Screen(LTR_SELECTION), "fr", _Body)
+	_Body(Calls, Lines, Sent) {
+		global _LLM_Menu, _LLM_AuxGeneration, _LLM_AuxOwners, _LLM_Tone_ReadSelection, _Stub_LlmTooltipCalls
+		Epoch := _LLM_AuxGeneration, Owners := _LLM_AuxOwners
+		Reader := _LLM_Tone_ReadSelection
+		Pending := []
+		try {
+			_LLM_AuxOwners := Map()
+			if Phase == "selection"
+				_LLM_Tone_ReadSelection := (OnReady) => (Pending.Push(OnReady), true)
+			AssertTrue(_LTR_Invoke("ui"), "the current translation starts")
+			if Phase == "render" {
+				_LPP_Answer(Calls[1], "TRANSLATION: " . LTR_TRANSLATION)
+				Final := _LPP_LastFinalRender()
+				AssertTrue(IsObject(Final), "the current request can publish")
+				AssertTrue(Final.meta["render_guard"].Call(), "its live render receipt is admitted")
+			}
+			_LLM_Menu["enabled"] := false
+			LLM_AuxInvalidate("translation test disable")
+			_LLM_Menu["enabled"] := true
+			if Phase == "selection" {
+				AssertEqual(1, Pending.Length, "the original selection callback is retained")
+				Pending[1].Call(LTR_SELECTION)
+				AssertEqual(0, Calls.Length, "the retired selection cannot send a new request")
+			} else if Phase == "answer" {
+				_LPP_Answer(Calls[1], "TRANSLATION: " . LTR_TRANSLATION)
+				AssertEqual(0, _Stub_LlmTooltipCalls.Length, "a retired answer cannot publish after reenable")
+			} else if Phase == "failure" {
+				Calls[1]["on_fail"].Call(_LLMRemote_FailInfo("timeout"))
+				AssertEqual("", _LPP_PendingNotice(), "a retired failure cannot show a new notice")
+			} else {
+				AssertFalse(Final.meta["render_guard"].Call(), "the original offer stays retired after reenable")
+			}
+			AssertEqual(0, Sent.Length, "the retired request types nothing")
+		} finally {
+			_LLM_AuxGeneration := Epoch
+			_LLM_AuxOwners := Owners
+			_LLM_Tone_ReadSelection := Reader
+		}
+	}
+}
+Test("LLM translate: backend retirement fences selection dispatch (translate-lifecycle)", _LTR_RetiredRequestScope.Bind("selection"))
+Test("LLM translate: backend retirement fences answer publication (translate-lifecycle)", _LTR_RetiredRequestScope.Bind("answer"))
+Test("LLM translate: backend retirement fences failure notices (translate-lifecycle)", _LTR_RetiredRequestScope.Bind("failure"))
+Test("LLM translate: backend retirement revokes the render receipt (translate-lifecycle)", _LTR_RetiredRequestScope.Bind("render"))
+
+
+; The selection reader owns foreground/input cancellation. Its delayed success
+; still carries the trigger's destination, never a fresh focus probe at delivery.
+_LTR_DelayedSelectionDestination() {
+	_LTR_Run(_LPP_Menu(), _LTN_Screen(LTR_SELECTION), "fr", _Body)
+	_Body(Calls, Lines, Sent) {
+		global _LLM_Tone_ReadSelection, _LLM_Translate_SourceProbe
+		Pending := []
+		Destination := Map("hwnd", 7, "control", 9)
+		_LLM_Tone_ReadSelection := (OnReady) => (Pending.Push(OnReady), true)
+		_LLM_Translate_SourceProbe := () => Destination
+		AssertTrue(_LTR_Invoke("ui"), "the selection read starts asynchronously")
+		AssertEqual(1, Pending.Length, "the callback is retained")
+		AssertEqual(0, Calls.Length, "no text leaves before capture completes")
+		Destination["hwnd"] := 70
+		Destination["control"] := 90
+		Pending[1].Call(LTR_SELECTION)
+		AssertEqual(1, Calls.Length, "the original captured text reaches the transport")
+		_LPP_Answer(Calls[1], "TRANSLATION: " . LTR_TRANSLATION)
+		Final := _LPP_LastFinalRender()
+		AssertTrue(IsObject(Final))
+		AssertEqual(7, Final.meta["accept_source"]["hwnd"], "the original window receipt is detached")
+		AssertEqual(9, Final.meta["accept_source"]["control"], "the original control receipt is detached")
+		AssertEqual(0, Sent.Length, "acceptance remains explicit")
+	}
+}
+Test("LLM translate: delayed selection keeps a detached destination (translate-destination)", _LTR_DelayedSelectionDestination)
