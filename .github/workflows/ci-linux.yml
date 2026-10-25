@@ -5144,7 +5144,7 @@ jobs:
   # evidence, instead of this job being skipped in silence. The lane's exit
   # job: no job of this file needs it.
   linux-ok:
-    name: 'Verdict (Mandatory subjects)'
+    name: 'Verdict (All mandatory results)'
     runs-on: ubuntu-latest
     needs: [install-linux, package-flatpak]
     if: always()

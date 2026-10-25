@@ -255,7 +255,7 @@ check('every scoped full body remains owned; all other product scripts remain ex
 			'common-e2e',
 			'common-build',
 			'common-testbuild',
-			'common-unit-verdict'
+			'common-verdict'
 		],
 		'Common preserves every unit and integration lot and browser E2E before production Build and Testbuild'
 	);

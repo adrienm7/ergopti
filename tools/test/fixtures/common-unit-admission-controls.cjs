@@ -83,7 +83,7 @@ async function run() {
 		run_id: 123,
 		run_attempt: 2,
 		head_sha: context.source,
-		name: 'YAML, shared code & web / ' + stage + ' (' + lot + ')',
+		name: 'Common / ' + stage + ' (' + lot + ')',
 		status: 'completed',
 		conclusion: 'success',
 		steps: [{ name: writer, status: 'completed', conclusion: 'success' }]
@@ -276,7 +276,7 @@ async function run() {
 			j[0].name = 'Common / Unit tests (Menus)';
 		},
 		(j) => {
-			j[0].name = 'YAML, shared code & web / Unit tests (foreign)';
+			j[0].name = 'Common / Unit tests (foreign)';
 		},
 		(j) => {
 			j[0].head_sha = 'c'.repeat(40);

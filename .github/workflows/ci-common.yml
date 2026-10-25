@@ -5,12 +5,12 @@
 # installers, bundles and boots), then browser E2E, then both production sites
 # built, installed and judged.
 # Every stage is a job of this workflow, so GitHub renders it in two levels,
-# "YAML, shared code & web / <Stage> (<lot>)": a matrix job keeps a static
+# "Common / <Stage> (<lot>)": a matrix job keeps a static
 # stage name and GitHub appends its lot, and a single job names its subject
 # in parentheses. Parent ci.yml owns concurrency and awaits this entire lane
 # before publication.
 
-name: 'YAML, shared code & web'
+name: 'Common'
 
 on:
   workflow_call:
@@ -385,8 +385,8 @@ jobs:
           if-no-files-found: error
           overwrite: true
 
-  common-unit-verdict:
-    name: 'Verdict (Production site receipts)'
+  common-verdict:
+    name: 'Verdict (All mandatory results)'
     needs: [common-testbuild]
     if: always()
     runs-on: ubuntu-latest

@@ -7,12 +7,12 @@ the one command — the local output is byte-identical to CI.
 The test suite spans four independent layers. CI runs them as separate jobs; you
 only need the layer whose check failed.
 
-| Layer                       | One command                   | CI job                                         | Needs         |
-| --------------------------- | ----------------------------- | ---------------------------------------------- | ------------- |
-| **JS / domain / codegen**   | `npm run test:js`             | `YAML, shared code & web / Unit tests (<lot>)` | Node 22       |
-| **Windows (AHK)**           | see [§ Windows](#windows-ahk) | `Windows / Unit tests (<category>)`            | AutoHotkey v2 |
-| **macOS (Hammerspoon/Lua)** | `npm run test:hs`             | `macOS / Unit tests (<lot>)`                   | Lua 5.4       |
-| **Linux (Lua)**             | `npm run test:linux`          | `Linux / Unit tests (<group>)`                 | LuaJIT        |
+| Layer                       | One command                   | CI job                              | Needs         |
+| --------------------------- | ----------------------------- | ----------------------------------- | ------------- |
+| **JS / domain / codegen**   | `npm run test:js`             | `Common / Unit tests (<lot>)`       | Node 22       |
+| **Windows (AHK)**           | see [§ Windows](#windows-ahk) | `Windows / Unit tests (<category>)` | AutoHotkey v2 |
+| **macOS (Hammerspoon/Lua)** | `npm run test:hs`             | `macOS / Unit tests (<lot>)`        | Lua 5.4       |
+| **Linux (Lua)**             | `npm run test:linux`          | `Linux / Unit tests (<group>)`      | LuaJIT        |
 
 `Validate and plan` is the root job of [`ci.yml`](../.github/workflows/ci.yml):
 it validates the release inputs and resolves the plan. The `Core` matrix then
@@ -43,16 +43,16 @@ row:
 - **E2E tests** drive the driver the way a user does (corpus replay, virtual
   keyboard, native sessions). They start only when Integration passed.
 
-| Row                     | Integration job                                     | What it runs                                                                                                                                                              |
-| ----------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| YAML, shared code & web | `Integration tests (Generators and parity)`         | the `integration-generators-and-parity` feature lot: the generators run and every committed `_generated/` file matches them; the drivers resolve the same manifest values |
-|                         | `Integration tests (Packaging and boot)`            | the `integration-packaging-and-boot` feature lot: the Linux installer and uninstaller in a sandbox, the bundle payloads of every OS and two isolated AHK boot smokes      |
-| Windows                 | `Integration tests (Driver startup)`                | `node tools/test/test-ahk-full-startup-smoke.cjs`: the whole driver boots                                                                                                 |
-|                         | `Integration tests (Fresh clone bootstrap)`         | `node tools/test/test-ahk-fresh-clone-startup.cjs`: a fresh Git clone bootstraps, then starts warm                                                                        |
-|                         | `Integration tests (Native cohorts and contracts)`  | the native desktop AHK cohorts, the Kana layout install, the manifest parity check and the managed Ollama file component                                                  |
-| macOS                   | `Integration tests (Lua module wiring, stubbed hs)` | `lua tests/run.lua --module=integration`: the files the `integration` group of `tests/support/module_groups.lua` names                                                    |
-| Linux                   | `Integration tests (driver)`                        | `luajit tests/run.lua --module=integration`: the files the `integration` group of `tests/support/module_groups.lua` names                                                 |
-|                         | `Integration tests (native)`                        | the metrics aggregation and histogram equivalence against Python, the XI2 LuaJIT ABI qualification and the manual managed Ollama runtime acceptance                       |
+| Row     | Integration job                                     | What it runs                                                                                                                                                              |
+| ------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Common  | `Integration tests (Generators and parity)`         | the `integration-generators-and-parity` feature lot: the generators run and every committed `_generated/` file matches them; the drivers resolve the same manifest values |
+|         | `Integration tests (Packaging and boot)`            | the `integration-packaging-and-boot` feature lot: the Linux installer and uninstaller in a sandbox, the bundle payloads of every OS and two isolated AHK boot smokes      |
+| Windows | `Integration tests (Driver startup)`                | `node tools/test/test-ahk-full-startup-smoke.cjs`: the whole driver boots                                                                                                 |
+|         | `Integration tests (Fresh clone bootstrap)`         | `node tools/test/test-ahk-fresh-clone-startup.cjs`: a fresh Git clone bootstraps, then starts warm                                                                        |
+|         | `Integration tests (Native cohorts and contracts)`  | the native desktop AHK cohorts, the Kana layout install, the manifest parity check and the managed Ollama file component                                                  |
+| macOS   | `Integration tests (Lua module wiring, stubbed hs)` | `lua tests/run.lua --module=integration`: the files the `integration` group of `tests/support/module_groups.lua` names                                                    |
+| Linux   | `Integration tests (driver)`                        | `luajit tests/run.lua --module=integration`: the files the `integration` group of `tests/support/module_groups.lua` names                                                 |
+|         | `Integration tests (native)`                        | the metrics aggregation and histogram equivalence against Python, the XI2 LuaJIT ABI qualification and the manual managed Ollama runtime acceptance                       |
 
 A test moves between Unit and Integration through its owner only: a feature
 lot's `suite.json` folder (the `integration-` prefix marks an Integration
@@ -98,13 +98,13 @@ failure means:
 
 **Slow checks**, excluded from the default run: `npm run test:js -- --full` adds
 `test:properties` (fast-check) and `test:mutation` (Stryker). CI exposes them as
-`YAML, shared code & web / Unit tests (Property tests)` and
+`Common / Unit tests (Property tests)` and
 `… (Mutation tests)`, with mutation on `main` only. These lots run independently
 of the `test:js` feature lots; the release waits for all of them.
 
 **Not bundled at all**: `python tools/format_toml.py --hotstrings --all --check`
 (hotstring TOML sorting/formatting) is its own lot,
-`YAML, shared code & web / Unit tests (Hotstring TOML formatting)`.
+`Common / Unit tests (Hotstring TOML formatting)`.
 Run it after touching any hotstring `.toml`.
 
 **Adding a feature flag?** Edit only `static/ergopti_plus/_shared/modules/features/manifest.toml`,

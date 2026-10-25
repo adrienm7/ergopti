@@ -969,7 +969,7 @@
 		{
 			"id": "macos-ok",
 			"metadata": {
-				"name": "Verdict (Mandatory jobs and launch scenarios)",
+				"name": "Verdict (All mandatory results)",
 				"needs": ["launch"],
 				"if": "always()",
 				"runs-on": "ubuntu-latest",
