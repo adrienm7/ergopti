@@ -160,9 +160,14 @@ function M.entries(path)
 	for index, entry in ipairs(names) do
 		local kind = KINDS[entry.type]
 		if kind == nil and entry.type ~= nil and entry.type ~= "unknown" then kind = "other" end
-		-- No d_type from this filesystem: lstat answers, and an entry that
-		-- vanished meanwhile is neither a file nor a directory.
-		if kind == nil then kind = M.kind(M.join(path, entry.name)) or "other" end
+		-- No d_type from this filesystem: lstat must classify the entry.
+		-- Only actual absence may disappear; an access or I/O refusal must
+		-- reject the listing rather than certify a silently incomplete tree.
+		if kind == nil then
+			local inspected, message, code = M.kind(M.join(path, entry.name))
+			if inspected == nil and code ~= "ENOENT" then return nil, message, code end
+			kind = inspected or "other"
+		end
 		entries[index] = { name = entry.name, kind = kind }
 	end
 	return entries
