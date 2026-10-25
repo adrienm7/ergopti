@@ -52,6 +52,21 @@ helpers.describe("pause layout preferences", function()
 		end)
 	end)
 
+	helpers.it("keeps a feature row stored as a table in the current view", function()
+		with_source("[hotstrings.dynamic]\ndate = { enabled = true }\n", function(preferences, path)
+			local view = preferences.current_view(path)
+			helpers.assert_type(view, "table", "a feature row table refuses the whole current view")
+		end)
+	end)
+
+	helpers.it("lets a read-only consumer see past a retired key the strict view refuses", function()
+		with_source("[layout]\nvirtual_keyboard = \"automatic\"\n[shortcuts.keys]\nlayer_scroll = true\n", function(preferences, path)
+			helpers.assert_nil(preferences.current_view(path), "the strict view refuses an outdated entry")
+			local view = preferences.current_view(path, true)
+			helpers.assert_type(view, "table", "a retired key must not hide the virtual keyboard choice")
+		end)
+	end)
+
 	for _, key in ipairs({ "on_pause", "on_resume" }) do
 		helpers.it("reports a legacy boolean " .. key .. " as outdated and reads it as absent", function()
 			with_source("[layout]\n" .. key .. " = false\n", function(preferences, path, warnings)
