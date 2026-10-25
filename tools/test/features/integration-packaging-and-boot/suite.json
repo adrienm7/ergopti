@@ -125,6 +125,15 @@
 			"args": ["tools/test/test-linux-flatpak-icon.cjs"],
 			"repro": "node tools/test/test-linux-flatpak-icon.cjs",
 			"platforms": ["linux"]
+		},
+		{
+			"id": "js-linux-package-options",
+			"ordinal": 492,
+			"name": "System package entry points refuse unknown arguments before staging side effects",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-package-options.cjs"],
+			"repro": "node tools/test/test-linux-package-options.cjs",
+			"platforms": ["linux"]
 		}
 	]
 }
