@@ -726,12 +726,29 @@ _LLM_Menu_ApiTestProgressText(Name, ElapsedMs, BudgetMs) {
 ; the state map is always set so Hide/Cancel stay consistent.
 _LLM_Menu_ApiTestProgressShow(EntryId, Name, Owner := "") {
 	global _LLM_Menu_ApiTestProgress, LLM_API_TEST_TIMEOUT_MS
-	_LLM_Menu_ApiTestProgressHide()
 	State := Map("entry", EntryId, "name", Name, "req_id", 0,
 		"owner", Owner, "start", A_TickCount, "budget", LLM_API_TEST_TIMEOUT_MS)
-	_LLM_Menu_ApiTestProgress := State
+	PreviousCritical := Critical("On")
+	try {
+		Retired := _LLM_Menu_ApiTestProgress
+		_LLM_Menu_ApiTestProgress := State
+		SetTimer(_LLM_Menu_ApiTestProgressTick, 0)
+	} finally Critical(PreviousCritical)
+	; Publish the reservation before native destruction can open a successor.
+	if Retired.Has("gui")
+		try Retired["gui"].Destroy()
+	if !_LLM_Menu_ApiTestProgressIsCurrent(State) {
+		_LLM_Menu_ApiTestProgressHide(State)
+		return false
+	}
 	try {
 		Worker := Gui_Create("", t("menu.llm.api_window_title"))
+		State["gui"] := Worker
+		if !_LLM_Menu_ApiTestProgressIsCurrent(State) {
+			try Worker.Destroy()
+			_LLM_Menu_ApiTestProgressHide(State)
+			return false
+		}
 		State["label"] := Worker.Add("Text", "w300",
 			_LLM_Menu_ApiTestProgressText(Name, 0, State["budget"]))
 		State["bar"] := Worker.Add("Progress", "w300 h16 Range0-100", 0)
@@ -742,10 +759,12 @@ _LLM_Menu_ApiTestProgressShow(EntryId, Name, Owner := "") {
 		Worker.OnEvent("Escape", CancelFn)
 		; Native Show can pump cancellation. Publish its exact window and owner
 		; first, and never rearm the pulse after that state has been retired.
-		State["gui"] := Worker
 		Worker.Show("AutoSize Center")
-		if _LLM_Menu_ApiTestProgress != State
+		if !_LLM_Menu_ApiTestProgressIsCurrent(State) {
+			try Worker.Destroy()
+			_LLM_Menu_ApiTestProgressHide(State)
 			return false
+		}
 		; Named callback (not a closure) so the fast-timer inventory can pin
 		; this 150 ms pulse by name; the tick itself reads the global state.
 		SetTimer(_LLM_Menu_ApiTestProgressTick, 150)
@@ -753,7 +772,15 @@ _LLM_Menu_ApiTestProgressShow(EntryId, Name, Owner := "") {
 		try LoggerWarn("LLM", "API test progress unavailable: {1}.",
 			Err.Message)
 	}
-	return _LLM_Menu_ApiTestProgress == State
+	return _LLM_Menu_ApiTestProgressIsCurrent(State)
+}
+
+_LLM_Menu_ApiTestProgressIsCurrent(State) {
+	global _LLM_Menu_ApiTestProgress
+	if _LLM_Menu_ApiTestProgress != State
+		return false
+	Owner := State.Get("owner", "")
+	return Owner == "" || LLM_AuxIsCurrent(Owner)
 }
 
 ; Progress tick: fills the bar with the elapsed share of the budget and
@@ -929,6 +956,7 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 		try LLM_AuxFinish(Owner)
 		return false
 	}
+	Progress := _LLM_Menu_ApiTestProgress
 	OnSucc := (Text, Usage) => _LLM_Menu_OnApiTestDone(true, Text,
 		EntryId, Name, StartedTick, Owner, NotifyFn)
 	OnFail := (Info := "") => _LLM_Menu_OnApiTestDone(false, "",
@@ -938,6 +966,13 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 	; be told apart from a handler failure. No token, no prompt content.
 	try LoggerInfo("LLM", "API test dispatched for '{1}' (model {2}).",
 		Name, snapshot["Model"])
+	if !LLM_AuxIsCurrent(Owner) || Progress.Get("owner", "") != Owner
+			|| !_LLM_Menu_ApiTestProgressIsCurrent(Progress) {
+		if Progress.Get("owner", "") == Owner
+			_LLM_Menu_ApiTestProgressHide(Progress)
+		try LLM_AuxFinish(Owner)
+		return false
+	}
 	try {
 		; Tag the reservation with the owned-probe kind so the engine's
 		; keystroke cancels (ResetPredictions, CancelInflight) spare it, and
@@ -956,11 +991,17 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 				spec["max_tokens"], LLM_REMOTE_KIND_API_TEST,
 				LLM_API_TEST_TIMEOUT_MS)
 		}
-		_LLM_Menu_ApiTestProgress["req_id"] := ReqId
+		if _LLM_Menu_ApiTestProgressIsCurrent(Progress)
+			Progress["req_id"] := ReqId
+		else if IsInteger(ReqId) && ReqId > 0
+			try LLM_RemoteCancelAsync(ReqId)
 	} catch as Err {
+		WasCurrent := _LLM_Menu_ApiTestProgressIsCurrent(Progress)
 		try LLM_AuxFinish(Owner)
+		if !WasCurrent
+			return false
 		try LoggerError("LLM", "API test dispatch failed: {1}.", Err.Message)
-		_LLM_Menu_ApiTestProgressHide()
+		_LLM_Menu_ApiTestProgressHide(Progress)
 		Tip := _LLM_Menu_ApiTestTip(false, Name, 0, "")
 		_LLM_Menu_ApiTestSurface(Tip["title"], Tip["body"], "Icon!", false, NotifyFn)
 		return false
@@ -968,7 +1009,7 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 	; A synchronously failed dispatch already ran the completion above: never
 	; leave a progress behind it.
 	if !LLM_AuxIsCurrent(Owner)
-		_LLM_Menu_ApiTestProgressHide()
+		_LLM_Menu_ApiTestProgressHide(Progress)
 	return true
 }
 
