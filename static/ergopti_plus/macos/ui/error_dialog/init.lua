@@ -46,6 +46,7 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local DeferredWork = require("infra.deferred_work")
 local NativeClose = require("ui.webview_close_owner").new(DeferredWork, Logger)
 local Storage        = require("adapters.storage")
+local WebviewResult  = require("adapters.webview_result")
 
 local LOG = "error_dialog"
 
@@ -140,6 +141,44 @@ end
 -- ==============================
 -- ==============================
 
+--- Observes native submission and completion without logging the private script.
+--- @param session table
+--- @param script string
+--- @return boolean submitted
+local function evaluate(session, script)
+	local function current()
+		return package.loaded["ui.error_dialog"] == M and _session == session and not session.closing
+	end
+	if not current() then return false end
+	local completed, failed, reported = false, false, false
+	local function report(category)
+		if not current() or reported then return end
+		reported = true
+		-- These errors reach this window's logger handler too. Bound each fixed
+		-- category per session so a failed folded-count update cannot feed itself.
+		session.javascript_failures = session.javascript_failures or {}
+		if session.javascript_failures[category] then return end
+		session.javascript_failures[category] = true
+		Logger.error(LOG, "Error-window JavaScript %s.", category)
+	end
+	local submitted, result = pcall(function()
+		return session.webview:evaluateJavaScript(script, function(_, script_error)
+			if completed then return end
+			completed = true
+			if WebviewResult.is_error(script_error) then
+				failed = true
+				report("execution failed")
+			end
+		end)
+	end)
+	if not submitted or result ~= session.webview then
+		completed = true
+		report(submitted and "submission refused" or "submission raised")
+		return false
+	end
+	return current() and not failed
+end
+
 --- Sends a message into the session's page.
 --- @param session table
 --- @param message table
@@ -148,17 +187,10 @@ local function send(session, message)
 	if _session ~= session or session.closing then return false end
 	local ok_json, json = pcall(hs.json.encode, message)
 	if not ok_json or type(json) ~= "string" then
-		Logger.error(LOG, "An error window message could not be encoded: %s.", tostring(json))
+		Logger.error(LOG, "An error window message could not be encoded.")
 		return false
 	end
-	local ok, err = pcall(function()
-		session.webview:evaluateJavaScript("if(window.receiveErrorDialog)window.receiveErrorDialog(" .. json .. ")")
-	end)
-	if not ok then
-		Logger.error(LOG, "The error window could not be reached: %s.", tostring(err))
-		return false
-	end
-	return true
+	return evaluate(session, "if(window.receiveErrorDialog)window.receiveErrorDialog(" .. json .. ")")
 end
 
 --- Invalidates action ownership before native cancellation can reenter the bridge.
@@ -413,7 +445,7 @@ local function open_window(record)
 				Logger.error(LOG, "The error window's strings could not be prepared.")
 				return
 			end
-			pcall(function() webview:evaluateJavaScript("if(window.i18n_apply){window.i18n_apply(" .. json .. ");}") end)
+			evaluate(session, "if(window.i18n_apply){window.i18n_apply(" .. json .. ");}")
 		end)
 	end)
 	local ok_html_load, html_err = xpcall(function() return webview:html(html) end, debug.traceback)
