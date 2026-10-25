@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CommandLines = require("tests.support.command_lines")
 
 -- Each tree is read except its test harness, which runs on a Windows checkout
 -- and parses its own Windows paths. Floors: a walk that reads nothing, or an
@@ -88,13 +89,14 @@ local function collect(dir, out)
 	local cmd = windows
 		and ('cmd /c dir /b /s /a-d "' .. dir:gsub("/", "\\") .. '\\*.lua" 2>nul')
 		or ("find '" .. dir .. "' -type f -name '*.lua' 2>/dev/null")
-	local pipe = io.popen(cmd)
-	if not pipe then return end
-	for line in pipe:lines() do
+	local source_count = #out
+	local inventory = CommandLines.read(cmd)
+	assert(#inventory > 0, "source inventory must not be empty")
+	for _, line in ipairs(inventory) do
 		local t = line:gsub("%s+$", ""):gsub("\\", "/")
 		if t:match("%.lua$") then out[#out + 1] = t end
 	end
-	pipe:close()
+	assert(#out > source_count, "source inventory contains no matching files")
 end
 
 --- Counts plain occurrences of needle in text.

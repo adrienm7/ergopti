@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CommandLines = require("tests.support.command_lines")
 local DRIVER_ROOT = helpers.driver_root()
 
 --- Removes Lua line and long-bracket comments before executable assertions.
@@ -75,13 +76,14 @@ local function ui_sources()
 		local command = separator == "\\"
 			and ('cmd /c dir /b /s /a-d "' .. ui_root:gsub("/", "\\") .. '*.lua"')
 			or ("find '" .. ui_root .. "' -type f -name '*.lua'")
-		local pipe = io.popen(command)
-		helpers.assert_not_nil(pipe, "the UI source fallback walk must start")
-		for line in pipe:lines() do
+		local source_count = #paths
+		local inventory = CommandLines.read(command)
+		assert(#inventory > 0, "source inventory must not be empty")
+		for _, line in ipairs(inventory) do
 			local normalized = line:gsub("\\", "/"):gsub("%s+$", "")
 			paths[#paths + 1] = normalized:gsub("^.*/macos/", "")
 		end
-		pipe:close()
+		assert(#paths > source_count, "source inventory contains no matching files")
 	end
 	table.sort(paths)
 	return paths

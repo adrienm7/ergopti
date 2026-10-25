@@ -30,6 +30,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CommandLines = require("tests.support.command_lines")
 
 -- Subtrees that ship in the driver.
 local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui" }
@@ -73,13 +74,14 @@ local function collect(dir, out)
 	local cmd = (package.config:sub(1, 1) == "\\")
 		and ('cmd /c dir /b /s /a-d "' .. dir:gsub("/", "\\") .. '\\*.lua"')
 		or ("find '" .. dir .. "' -type f -name '*.lua'")
-	local pipe = io.popen(cmd)
-	if not pipe then return end
-	for line in pipe:lines() do
+	local source_count = #out
+	local inventory = CommandLines.read(cmd)
+	assert(#inventory > 0, "source inventory must not be empty")
+	for _, line in ipairs(inventory) do
 		local t = line:gsub("%s+$", ""):gsub("\\", "/")
 		if t:match("%.lua$") then out[#out + 1] = t end
 	end
-	pipe:close()
+	assert(#out > source_count, "source inventory contains no matching files")
 end
 
 

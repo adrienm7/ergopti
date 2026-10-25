@@ -34,6 +34,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CommandLines = require("tests.support.command_lines")
 
 -- Every subtree that ships in the driver. `adapters/` holds the hs.task GC pins,
 -- `ui/` the models managers, `modules/` the API clients — the class has bitten in
@@ -84,16 +85,17 @@ local function collect(dir, out)
 	else
 		cmd = string.format("find '%s' -type f -name '*.lua'", dir)
 	end
-	local pipe = io.popen(cmd)
-	if not pipe then return end
-	for raw_line in pipe:lines() do
+	local source_count = #out
+	local inventory = CommandLines.read(cmd)
+	assert(#inventory > 0, "source inventory must not be empty")
+	for _, raw_line in ipairs(inventory) do
 		local line = raw_line:gsub("%s+$", ""):gsub("\\", "/")
 		-- Vendored code is not ours to fix, and tests/ is not shipped.
 		if line:match("%.lua$") and not line:match("/vendor/") and not line:match("/tests/") then
 			out[#out + 1] = line
 		end
 	end
-	pipe:close()
+	assert(#out > source_count, "source inventory contains no matching files")
 end
 
 --- Reads a whole file, returning nil when it cannot be opened.

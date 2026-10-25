@@ -34,6 +34,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CommandLines = require("tests.support.command_lines")
 
 -- Driver subtrees to scan. tests/ is excluded so this file's own documentation of
 -- the forbidden strings does not trip the guard.
@@ -100,13 +101,14 @@ local function collect_lua_files(dir, out)
 	else
 		cmd = string.format("find '%s' -type f -name '*.lua'", dir)
 	end
-	local pipe = io.popen(cmd)
-	if not pipe then return end
-	for line in pipe:lines() do
+	local source_count = #out
+	local inventory = CommandLines.read(cmd)
+	assert(#inventory > 0, "source inventory must not be empty")
+	for _, line in ipairs(inventory) do
 		local trimmed = line:gsub("%s+$", ""):gsub("\\", "/")
 		if trimmed:match("%.lua$") then out[#out + 1] = trimmed end
 	end
-	pipe:close()
+	assert(#out > source_count, "source inventory contains no matching files")
 end
 
 

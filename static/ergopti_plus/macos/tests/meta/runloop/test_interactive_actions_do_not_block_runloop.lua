@@ -27,6 +27,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CommandLines = require("tests.support.command_lines")
 
 -- Directories whose code runs in direct response to a live user input event.
 local INTERACTIVE_DIRS = {
@@ -87,12 +88,13 @@ local function lua_files_under(rel_dir)
 	local cmd = (sep == "\\")
 		and ('cmd /c dir /b /s /a-d "' .. abs:gsub("/", "\\") .. '\\*.lua"')
 		or ("find '" .. abs .. "' -type f -name '*.lua'")
-	local pipe = io.popen(cmd)
-	if not pipe then return out end
-	for line in pipe:lines() do
+	local source_count = #out
+	local inventory = CommandLines.read(cmd)
+	assert(#inventory > 0, "source inventory must not be empty")
+	for _, line in ipairs(inventory) do
 		out[#out + 1] = (line:gsub("\\", "/"):gsub(".*/macos/", ""))
 	end
-	pipe:close()
+	assert(#out > source_count, "source inventory contains no matching files")
 	return out
 end
 

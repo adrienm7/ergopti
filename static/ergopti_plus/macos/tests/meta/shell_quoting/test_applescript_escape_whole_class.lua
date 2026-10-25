@@ -30,6 +30,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CommandLines = require("tests.support.command_lines")
 
 -- Directories that ship runtime code. `tests/` is excluded by the walker.
 local SCANNED_DIRS = { "modules", "infra", "adapters", "platform", "ui" }
@@ -141,9 +142,10 @@ local function all_sources()
 	local cmd = (sep == "\\")
 		and ('cmd /c dir /b /s /a-d "' .. root:gsub("/", "\\") .. '*.lua"')
 		or ("find '" .. root .. "' -type f -name '*.lua'")
-	local pipe = io.popen(cmd)
-	if not pipe then return out end
-	for line in pipe:lines() do
+	local source_count = #out
+	local inventory = CommandLines.read(cmd)
+	assert(#inventory > 0, "source inventory must not be empty")
+	for _, line in ipairs(inventory) do
 		local rel = line:gsub("\\", "/"):gsub(".*/macos/", "")
 		for _, d in ipairs(SCANNED_DIRS) do
 			if rel:sub(1, #d + 1) == d .. "/" and not rel:find("/tests/", 1, true) then
@@ -152,7 +154,7 @@ local function all_sources()
 			end
 		end
 	end
-	pipe:close()
+	assert(#out > source_count, "source inventory contains no matching files")
 	return out
 end
 
