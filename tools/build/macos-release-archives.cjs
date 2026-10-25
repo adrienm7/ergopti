@@ -174,6 +174,8 @@ function createArchives(application, output, options = {}) {
 	const before = snapshot(app);
 	const requirement = signedRequirement(app, run, destination);
 	const owned = fs.mkdtempSync(path.join(destination, '.release-archives-'));
+	const published = [];
+	let committed = false;
 	return runWithOwnedCleanup(
 		() => {
 			for (const archive of archives) {
@@ -233,14 +235,38 @@ function createArchives(application, output, options = {}) {
 				throw new Error('The signed source changed during native archiving.');
 			// Link only after every archive passes. EEXIST refuses concurrent output
 			// replacement; the temporary directory belongs to this invocation alone.
-			for (const archive of archives)
-				fs.linkSync(path.join(owned, archive.name), path.join(destination, archive.name));
+			for (const archive of archives) {
+				const source = path.join(owned, archive.name);
+				const target = path.join(destination, archive.name);
+				const identity = fs.lstatSync(source);
+				fs.linkSync(source, target);
+				published.push({ target, identity });
+			}
+			committed = true;
 			return archives.map((archive) => ({
 				...archive,
 				path: path.join(destination, archive.name)
 			}));
 		},
-		() => fs.rmSync(owned, { recursive: true })
+		() =>
+			runWithOwnedCleanup(
+				() => {
+					if (committed) return;
+					// A later exclusive link can refuse after an earlier one succeeded.
+					// Retire only links that still name this invocation's own inode.
+					for (const { target, identity } of published) {
+						let current;
+						try {
+							current = fs.lstatSync(target);
+						} catch (error) {
+							if (error.code === 'ENOENT') continue;
+							throw error;
+						}
+						if (current.dev === identity.dev && current.ino === identity.ino) fs.unlinkSync(target);
+					}
+				},
+				() => fs.rmSync(owned, { recursive: true })
+			)
 	);
 }
 
