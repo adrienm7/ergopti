@@ -361,3 +361,114 @@ Test("_LLM_Ollama_NextStreamUid: returns non-empty string", _OllamaStreamUid_IsN
 #Include %A_LineFile%/../test_llm_api_ollama_stream_utf8.ahk
 
 #Include %A_LineFile%/../test_llm_api_ollama_stream_nul.ahk
+
+
+; The live poll must fence the same real-reader return boundary as final flush.
+; Only cancellation is injected: production reads/parses every JSONL byte.
+_OllamaLivePoll_ReaderCancellation(CancelAtRead, Boundary := "read", FinalOnly := false) {
+	global _LLM_Ollama_ActiveStreams, _LLM_Ollama_IsReady, _LLM_ManagedBootstrap
+	SavedStreams := _LLM_Ollama_ActiveStreams
+	SavedReady := _LLM_Ollama_IsReady
+	SavedBootstrap := _LLM_ManagedBootstrap
+	ObservedFn := Boundary == "parse" ? _LLM_Ollama_ParseStreamLine : _LLM_Ollama_ReadStreamText
+	HadReadCall := ObservedFn.HasOwnProp("Call")
+	SavedReadCall := HadReadCall ? ObservedFn.GetOwnPropDesc("Call") : 0
+	State := Map("read_calls", 0, "partials", 0, "successes", 0, "failures", 0, "text", "")
+	Path := A_Temp . "\ergopti_live_poll_cancel_" . A_TickCount . "_" . Random(1, 1000000)
+	Handle := { Pid: 0, ProcessOwner: 0, Cancelled: false,
+		TmpPayload: Path . ".json", TmpStdout: Path . ".out" }
+	try {
+		AssertFalse(HadReadCall, "the production reader starts with its genuine Call boundary")
+		_LLM_ManagedBootstrap := 0
+		_LLM_Ollama_IsReady := true
+		_LLM_Ollama_ActiveStreams := [Handle]
+		FileAppend('{"message":{"content":"live answer"},"done":true}' . (FinalOnly ? "" : "`n"),
+			Handle.TmpStdout, "UTF-8-RAW")
+		ObservedFn.DefineProp("Call", {Call: ObserveRead})
+		_LLM_Ollama_StreamPoll(Handle, Map("acc", "", "last_pos", 0),
+			(Text) => (State["partials"] += 1, State["text"] := Text),
+			(*) => State["successes"] += 1, (*) => State["failures"] += 1)
+		AssertEqual(1, State["read_calls"], "the real production owner returned once through the injected boundary")
+		AssertEqual(CancelAtRead ? 0 : 1, State["partials"], "a cancelled live read cannot deliver partial text")
+		AssertEqual(CancelAtRead ? 0 : 1, State["successes"], "only the live positive control completes")
+		AssertEqual(CancelAtRead ? 1 : 0, State["failures"], "cancellation settles exactly once")
+		if !CancelAtRead
+			AssertEqual("live answer", State["text"], "the control parses production JSONL")
+		AssertFalse(FileExist(Handle.TmpStdout), "the settled poll removes its private response")
+		AssertEqual(0, _LLM_Ollama_ActiveStreams.Length, "the poll relinquishes its exact stream handle")
+	} finally {
+		if ObservedFn.HasOwnProp("Call")
+			ObservedFn.DeleteProp("Call")
+		if HadReadCall
+			ObservedFn.DefineProp("Call", SavedReadCall)
+		if FileExist(Handle.TmpStdout)
+			FileDelete(Handle.TmpStdout)
+		_LLM_Ollama_ActiveStreams := SavedStreams
+		_LLM_Ollama_IsReady := SavedReady
+		_LLM_ManagedBootstrap := SavedBootstrap
+	}
+	ObserveRead(Self, Args*) {
+		ObservedFn.DeleteProp("Call")
+		Chunk := ObservedFn.Call(Args*)
+		State["read_calls"] += 1
+		if CancelAtRead
+			LLM_OllamaCancelStream(Handle)
+		return Chunk
+	}
+}
+Test("Ollama live poll: read cancellation rejects partial delivery (ollama-live-read-cancellation)", _OllamaLivePoll_ReaderCancellation.Bind(true))
+Test("Ollama live poll: unchanged read delivers real JSONL (ollama-live-read-cancellation)", _OllamaLivePoll_ReaderCancellation.Bind(false))
+
+
+; A partial can launch the next request while retiring this one. Its final
+; unterminated record must never publish or acquire the successor's cleanup.
+_OllamaLivePoll_PartialCancellationKeepsSuccessor() {
+	global _LLM_Ollama_ActiveStreams, _LLM_Ollama_IsReady, _LLM_ManagedBootstrap
+	SavedStreams := _LLM_Ollama_ActiveStreams
+	SavedReady := _LLM_Ollama_IsReady
+	SavedBootstrap := _LLM_ManagedBootstrap
+	Path := A_Temp . "\ergopti_live_partial_cancel_" . A_TickCount . "_" . Random(1, 1000000)
+	Handle := { Pid: 0, ProcessOwner: 0, Cancelled: false,
+		TmpPayload: Path . ".json", TmpStdout: Path . ".out" }
+	Successor := { Pid: 0, ProcessOwner: 0, Cancelled: false,
+		TmpPayload: Path . "_next.json", TmpStdout: Path . "_next.out" }
+	State := Map("partials", 0, "successes", 0, "failures", 0)
+	try {
+		_LLM_ManagedBootstrap := 0
+		_LLM_Ollama_IsReady := true
+		_LLM_Ollama_ActiveStreams := [Handle]
+		FileAppend('{"message":{"content":"first"},"done":false}' . "`n"
+			. '{"message":{"content":" stale final"},"done":true}', Handle.TmpStdout, "UTF-8-RAW")
+		FileAppend("owned next payload", Successor.TmpPayload, "UTF-8-RAW")
+		FileAppend("owned next response", Successor.TmpStdout, "UTF-8-RAW")
+		_LLM_Ollama_StreamPoll(Handle, Map("acc", "", "last_pos", 0), Partial,
+			(*) => State["successes"] += 1, (*) => State["failures"] += 1)
+		AssertEqual(1, State["partials"], "the admitted first partial cannot be followed by stale final text")
+		AssertEqual(0, State["successes"], "a partial cancellation cannot settle as successful")
+		AssertEqual(1, State["failures"], "the canceled original is settled once")
+		AssertFalse(FileExist(Handle.TmpStdout), "the old response is removed")
+		AssertEqual(1, _LLM_Ollama_ActiveStreams.Length, "the successor keeps its registration")
+		AssertTrue(_LLM_Ollama_ActiveStreams[1] == Successor, "cleanup retires the exact original handle")
+		AssertEqual("owned next payload", FileRead(Successor.TmpPayload, "UTF-8-RAW"))
+		AssertEqual("owned next response", FileRead(Successor.TmpStdout, "UTF-8-RAW"))
+		AssertFalse(Successor.Cancelled, "the new request retains its own cancellation intent")
+	} finally {
+		for FilePath in [Handle.TmpPayload, Handle.TmpStdout, Successor.TmpPayload, Successor.TmpStdout]
+			if FileExist(FilePath)
+				FileDelete(FilePath)
+		_LLM_Ollama_ActiveStreams := SavedStreams
+		_LLM_Ollama_IsReady := SavedReady
+		_LLM_ManagedBootstrap := SavedBootstrap
+	}
+	Partial(Text) {
+		global _LLM_Ollama_ActiveStreams
+		AssertEqual("first", Text, "the live poll reads only the completed first record")
+		State["partials"] += 1
+		LLM_OllamaCancelStream(Handle)
+		_LLM_Ollama_ActiveStreams.Push(Successor)
+	}
+}
+Test("Ollama live poll: partial cancellation preserves the successor (ollama-live-read-cancellation)", _OllamaLivePoll_PartialCancellationKeepsSuccessor)
+
+Test("Ollama live poll: parser cancellation rejects partial delivery (ollama-live-parse-cancellation)", _OllamaLivePoll_ReaderCancellation.Bind(true, "parse"))
+Test("Ollama final flush: parser cancellation rejects partial delivery (ollama-live-parse-cancellation)", _OllamaLivePoll_ReaderCancellation.Bind(true, "parse", true))
