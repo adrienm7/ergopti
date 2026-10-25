@@ -251,3 +251,64 @@ helpers.describe("window titles: the owner of the interval (title-owner)", funct
 	end)
 
 end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 4/ Privacy Changes End Open Intervals ====================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("window titles: privacy changes without a window change", function()
+	local policies = {
+		{ name = "disabled", close = function(k) k.set_enabled(false) end, open = function(k) k.set_enabled(true) end },
+		{ name = "paused", close = function(k) k.suspend_collection() end, open = function(k) k.resume_collection() end },
+		{ name = "suppressed", close = function(k) k.suppress() end, open = function(k) k.unsuppress() end },
+		{ name = "private", close = function(k) k.set_private_window(true) end, open = function(k) k.set_private_window(false) end },
+		{ name = "secure", close = function(k) k.set_secure_field(true) end, open = function(k) k.set_secure_field(false) end },
+		{ name = "excluded", close = function(k) k.set_disabled_apps({ "code" }) end, open = function(k) k.set_disabled_apps({}) end },
+	}
+	for _, policy in ipairs(policies) do
+		it("privacy-open-interval: " .. policy.name .. " cannot backfill a stationary window", function()
+			local clock = require("infra.monotonic")
+			local previous_now, now = clock.now_ms, 1000
+			clock.now_ms = function() return now end
+			local ok, err = pcall(function()
+				local writer = with_writer(function(keystats)
+					keystats.on_app_focus("code", now)
+					keystats.set_window_title("code", "Doc", now)
+					now = 2000
+					policy.close(keystats)
+					now = 5000
+					helpers.assert_eq(keystats.get_app_stats().code.focus_time_ms, 0,
+						"a closed privacy gate must retire the open focus interval before any new focus callback")
+					helpers.assert_true(keystats.flush())
+					now = 6000
+					policy.open(keystats)
+					keystats.set_window_title("code", "Doc", now)
+					keystats.on_app_focus("code", now)
+					now = 7000
+					keystats.set_window_title("code", "Other", now)
+					keystats.on_app_focus("shell", now)
+					helpers.assert_eq(keystats.get_app_stats().code.focus_time_ms, 1000,
+						"only the newly admitted interval may count after collection resumes")
+					helpers.assert_true(keystats.flush())
+				end)
+				helpers.assert_eq(written_titles(writer).Doc.ms, 1000,
+					"title duration cannot include the interval that crossed a privacy closure")
+				helpers.assert_eq(#writer.window_switches, 1)
+				helpers.assert_eq(writer.window_switches[1].row.duration_ms, 1000,
+					"a reopened identical title starts a new window-switch interval")
+				local focused = 0
+				for _, row in ipairs(writer.app_days) do
+					if row.app == "code" then focused = focused + (row.fields.app_time_ms or 0) end
+				end
+				helpers.assert_eq(focused, 1000, "the persisted app-day must exclude forbidden focus time too")
+			end)
+			clock.now_ms = previous_now
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
