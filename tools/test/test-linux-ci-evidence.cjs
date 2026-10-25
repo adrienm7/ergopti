@@ -1236,11 +1236,14 @@ exit "$UPDATER_TEST_STATUS"
 	fs.rmSync(updaterScratch, { recursive: true, force: true });
 }
 
-// The integration rows record their own subjects, as the Record step of
-// ci-linux.yml writes them: the Lua group in driver, the native checks in native.
+// The integration rows record their own subjects, as the Record steps of
+// ci-linux.yml write them: the Lua group in driver, the native checks in native,
+// and the integration group on each archive distribution in its own row.
+const INTEGRATION_DISTROS = ['debian', 'fedora', 'arch', 'alpine', 'opensuse'];
 const INTEGRATION_SUBJECTS = {
 	driver: ['integration-driver'],
-	native: ['native-metrics-equivalence', 'native-xi2-abi']
+	native: ['native-metrics-equivalence', 'native-xi2-abi'],
+	...Object.fromEntries(INTEGRATION_DISTROS.map((distro) => [distro, ['integration-' + distro]]))
 };
 assert.deepEqual(
 	Object.values(INTEGRATION_SUBJECTS).flat().sort(),
@@ -1309,6 +1312,32 @@ function rejects(mutate, pattern) {
 }
 
 verifyAggregate({ manifest: MANIFEST, ...fixtures(), expectedSha: SHA });
+
+// A distribution row of the Integration stage always runs: its receipt can be
+// neither missing, duplicated nor replaced by a dated suite deferral.
+for (const distro of INTEGRATION_DISTROS) {
+	rejects(
+		({ evidence }) => {
+			evidence.splice(
+				evidence.findIndex((doc) => doc.job === 'integration-linux' && doc.shard === distro),
+				1
+			);
+		},
+		new RegExp('integration-linux has no evidence from shard ' + distro)
+	);
+	rejects(({ evidence }) => {
+		evidence.push(
+			structuredClone(
+				evidence.find((doc) => doc.job === 'integration-linux' && doc.shard === distro)
+			)
+		);
+	}, /duplicate evidence document for integration-linux shard/);
+	rejects(({ evidence }) => {
+		const row = evidence.find((doc) => doc.job === 'integration-linux' && doc.shard === distro);
+		row.subjects = {};
+		row.suite_qualification = {};
+	}, /Invalid deferred Linux suite envelope/);
+}
 
 // Each Integration row records only its own subjects, as the manifest names them.
 rejects(({ evidence }) => {
@@ -1791,12 +1820,16 @@ for (const transport of [
 	assert.throws(() => installMatrix.selectLot(installationPlan, installationLots[0], transport));
 }
 
-// A distribution's Unit row runs in its archive lot's image and preparation,
-// read from the same authored map, and only for a distribution that has one.
+// A distribution's Unit and Integration rows run in its archive lot's image and
+// preparation, read from the same authored map, and only for a distribution
+// that has one.
 for (const cell of Object.values(installationMetadata).filter((row) => row.kind === 'install')) {
-	assert.strictEqual(installMatrix.selectUnit(installationPlan, cell.distro, 'image'), cell.image);
-	assert.strictEqual(installMatrix.selectUnit(installationPlan, cell.distro, 'prep'), cell.prep);
-	assert.strictEqual(cell.container, cell.image, cell.id + ' and its Unit row share one image');
+	assert.strictEqual(
+		installMatrix.selectDistro(installationPlan, cell.distro, 'image'),
+		cell.image
+	);
+	assert.strictEqual(installMatrix.selectDistro(installationPlan, cell.distro, 'prep'), cell.prep);
+	assert.strictEqual(cell.container, cell.image, cell.id + ' and its distro rows share one image');
 }
 for (const [distro, field] of [
 	['ubuntu-22.04', 'image'],
@@ -1804,7 +1837,7 @@ for (const [distro, field] of [
 	['debian', 'container'],
 	['debian', 'id']
 ])
-	assert.throws(() => installMatrix.selectUnit(installationPlan, distro, field));
+	assert.throws(() => installMatrix.selectDistro(installationPlan, distro, field));
 for (const [what, mutate] of [
 	['a distribution without its Unit row', (coverage) => coverage.jobs['test-linux'].shards.pop()],
 	[
@@ -1814,6 +1847,23 @@ for (const [what, mutate] of [
 	[
 		'a distribution row recording another subject',
 		(coverage) => (coverage.jobs['test-linux'].shard_subjects.alpine = ['unit-ui'])
+	],
+	[
+		'a distribution without its Integration row',
+		(coverage) => coverage.jobs['integration-linux'].shards.pop()
+	],
+	[
+		'reordered Integration distribution rows',
+		(coverage) => coverage.jobs['integration-linux'].shards.reverse()
+	],
+	[
+		'a deferrable Integration row',
+		(coverage) => (coverage.jobs['integration-linux'].deferrable_shards = ['debian'])
+	],
+	[
+		'an Integration distribution row recording another subject',
+		(coverage) =>
+			(coverage.jobs['integration-linux'].shard_subjects.alpine = ['integration-driver'])
 	]
 ]) {
 	const coverage = structuredClone(MANIFEST);
@@ -2873,6 +2923,118 @@ assert.deepStrictEqual(distroUnitEvidenceProblems(testLinux), []);
 	}
 }
 
+// An Integration distribution row records the count its own diagnostic read
+// from the integration group's output, under its own shard, and uploads it as
+// every Integration row does.
+/**
+ * Lists every way an Integration distribution row loses its own executed evidence.
+ * @param {string} job The actual integration-linux job.
+ * @returns {string[]}
+ */
+function distroIntegrationEvidenceProblems(job) {
+	const found = [];
+	const names = pipeline.steps(job).map((step) => step.name);
+	const order = [
+		"The integration group on this distribution's LuaJIT",
+		'Upload the native distro integration log',
+		'Record mandatory distro integration evidence',
+		'Record mandatory integration evidence',
+		'Upload mandatory integration evidence'
+	];
+	const at = names.indexOf(order[0]);
+	if (at < 0 || order.some((name, index) => names[at + index] !== name))
+		found.push('the distribution group, its raw log, its record and the upload run in order');
+	let record = '';
+	try {
+		record = pipeline.step(job, order[2]);
+	} catch {
+		return [...found, 'the distribution record step is missing'];
+	}
+	if (pipeline.stepField(record, 'if') !== 'matrix.distro')
+		found.push('only a distribution row records distribution evidence');
+	for (const line of [
+		'          DISTRO_INTEGRATION_PASSED: ${{ steps.distro_integration.outputs.passed }}\n',
+		'          DISTRO_INTEGRATION_INTERPRETER: ${{ steps.distro_integration.outputs.interpreter }}\n'
+	])
+		if (record.split(line).length !== 2)
+			found.push('the record reads the diagnostic output: ' + line.trim());
+	const run = (pipeline.runOf(record) ?? []).map((line) => line.trim().replace(/ \\$/, ''));
+	for (const line of [
+		'node tools/test/linux-ci-evidence.cjs record',
+		'--job integration-linux',
+		'--shard "$LINUX_INTEGRATION_DISTRO"',
+		'--output "$RUNNER_TEMP/linux-ci-evidence/integration-linux-$LINUX_INTEGRATION_DISTRO.json"',
+		'--sha "$GITHUB_SHA"',
+		'--distro "$LINUX_INTEGRATION_DISTRO"',
+		'--session container',
+		'--interpreter "$DISTRO_INTEGRATION_INTERPRETER"',
+		'--subject "integration-$LINUX_INTEGRATION_DISTRO=$DISTRO_INTEGRATION_PASSED"'
+	])
+		if (run.filter((value) => value === line).length !== 1)
+			found.push('the distribution record must pass exactly: ' + line);
+	// The host rows keep their own record, and no distribution row runs it.
+	if (pipeline.stepField(pipeline.step(job, order[3]), 'if') !== 'matrix.group')
+		found.push('only a host row records host integration evidence');
+	const upload = pipeline.step(job, order[4]);
+	if (pipeline.stepField(upload, 'if') !== null)
+		found.push('every Integration row uploads its evidence');
+	for (const line of [
+		'          name: linux-ci-evidence-integration-linux-${{ matrix.group || matrix.distro }}\n',
+		'          path: ${{ runner.temp }}/linux-ci-evidence/integration-linux-${{ matrix.group || matrix.distro }}.json\n',
+		'          if-no-files-found: error'
+	])
+		if (upload.split(line).length !== 2)
+			found.push('the Integration evidence upload names its row: ' + line.trim());
+	return found;
+}
+const integrationLinux = pipeline.job('integration-linux');
+assert.deepStrictEqual(distroIntegrationEvidenceProblems(integrationLinux), []);
+{
+	const record = pipeline.step(integrationLinux, 'Record mandatory distro integration evidence');
+	const host = pipeline.step(integrationLinux, 'Record mandatory integration evidence');
+	const upload = pipeline.step(integrationLinux, 'Upload mandatory integration evidence');
+	for (const [what, step, from, to] of [
+		['an every-row record', record, '        if: matrix.distro\n', ''],
+		['a host-row record', record, 'if: matrix.distro', 'if: matrix.group'],
+		['a literal count', record, '=$DISTRO_INTEGRATION_PASSED"', '=1"'],
+		[
+			'a count from another step',
+			record,
+			'steps.distro_integration.outputs.passed',
+			'steps.linux_integration.outputs.passed'
+		],
+		[
+			'a guessed interpreter',
+			record,
+			'--interpreter "$DISTRO_INTEGRATION_INTERPRETER"',
+			'--interpreter LuaJIT'
+		],
+		['a foreign shard', record, '--shard "$LINUX_INTEGRATION_DISTRO"', '--shard debian'],
+		['a host distribution', record, '--distro "$LINUX_INTEGRATION_DISTRO"', '--distro ubuntu'],
+		['a unit subject', record, '--subject "integration-$LINUX', '--subject "unit-$LINUX'],
+		['a host record on every row', host, '        if: matrix.group\n', ''],
+		[
+			'a row-less upload',
+			upload,
+			'integration-linux-${{ matrix.group || matrix.distro }}\n',
+			'integration-linux-${{ matrix.group }}\n'
+		],
+		['an empty upload', upload, 'if-no-files-found: error', 'if-no-files-found: warn']
+	]) {
+		assert.strictEqual(
+			step.split(from).length,
+			2,
+			'integration evidence mutation anchor is unique: ' + what
+		);
+		const changed = integrationLinux.replace(step, () => step.replace(from, () => to));
+		assert.notStrictEqual(changed, integrationLinux);
+		assert.ok(
+			distroIntegrationEvidenceProblems(changed).length > 0,
+			'integration evidence: ' + what
+		);
+	}
+}
+
 // The unit matrix: one row per group of the Lua runner, the same names in the
 // same order, then one row per archive distribution of the authored install
 // map, every row run to the end, and the verdict expecting each row.
@@ -2919,6 +3081,41 @@ function unitMatrixProblems(workflow, groupsSource, manifest = MANIFEST, install
 		.filter((lot) => lot.kind === 'install')
 		.map((lot) => lot.distro);
 	if (distros.length < 2) found.push('the install map must author several archive distributions');
+	// The Integration stage: its two host rows, then the integration group on
+	// every archive distribution, in lot order, none of them deferrable.
+	const integrationMatrix =
+		/^ {4}strategy:\n {6}fail-fast: false\n {6}matrix:\n {8}include:\n((?: {10}- [a-z]+: [a-z0-9_-]+\n)+) {4}env:\n/m.exec(
+			integrationJob
+		);
+	const integrationRows = integrationMatrix
+		? [...integrationMatrix[1].matchAll(/^ {10}- ([a-z]+): ([a-z0-9_-]+)$/gm)].map((match) =>
+				match.slice(1, 3).join('=')
+			)
+		: [];
+	const expectedIntegration = [
+		'group=driver',
+		'group=native',
+		...distros.map((distro) => 'distro=' + distro)
+	];
+	if (JSON.stringify(integrationRows) !== JSON.stringify(expectedIntegration))
+		found.push(
+			'the integration-linux rows must be driver, native, then the archive distributions, in order: ' +
+				expectedIntegration.join(', ')
+		);
+	for (const line of [
+		'      LINUX_INTEGRATION_GROUP: ${{ matrix.group }}\n',
+		'      LINUX_INTEGRATION_DISTRO: ${{ matrix.distro }}\n'
+	])
+		if (!integrationJob.includes(line))
+			found.push('each Integration row must name itself: ' + line.trim());
+	const integrationContract = manifest.jobs['integration-linux'];
+	if (
+		(integrationContract.shards ?? []).join(',') !==
+		expectedIntegration.map((row) => row.split('=')[1]).join(',')
+	)
+		found.push('linux-ci-coverage.json must expect evidence from every Integration row');
+	if (integrationContract.deferrable_shards !== undefined)
+		found.push('no Integration row may defer its evidence');
 	const job = /\n {2}test-linux:\n([\s\S]*?)\n {2}[a-z0-9-]+:\n/.exec(workflow)?.[1] ?? '';
 	// One include row per line, each setting exactly one of its two keys.
 	const matrix =
@@ -3010,6 +3207,55 @@ for (const [what, mutate] of [
 	const changed = mutate(WORKFLOW);
 	assert.notStrictEqual(changed, WORKFLOW, 'unit matrix mutation must alter source: ' + what);
 	assert.ok(unitMatrixProblems(changed, MODULE_GROUPS_SOURCE).length > 0, 'unit matrix: ' + what);
+}
+const INTEGRATION_ROW = (key, value) => '          - ' + key + ': ' + value + '\n';
+for (const [what, mutate] of [
+	[
+		'an Integration distribution row dropped',
+		// Anchored on the native row: the Unit matrix holds the same distro rows.
+		(text) =>
+			text.replace(
+				INTEGRATION_ROW('group', 'native') + INTEGRATION_ROW('distro', 'debian'),
+				INTEGRATION_ROW('group', 'native')
+			)
+	],
+	[
+		'Integration rows reordered',
+		(text) =>
+			text.replace(
+				INTEGRATION_ROW('group', 'driver') + INTEGRATION_ROW('group', 'native'),
+				INTEGRATION_ROW('group', 'native') + INTEGRATION_ROW('group', 'driver')
+			)
+	],
+	[
+		'an unnamed Integration distribution',
+		(text) => text.replace('      LINUX_INTEGRATION_DISTRO: ${{ matrix.distro }}\n', '')
+	]
+]) {
+	const changed = mutate(WORKFLOW);
+	assert.notStrictEqual(
+		changed,
+		WORKFLOW,
+		'integration matrix mutation must alter source: ' + what
+	);
+	// The Unit job is untouched: the refusal belongs to the Integration rows.
+	const unitJob = (text) => /\n {2}test-linux:\n[\s\S]*?\n {2}integration-linux:\n/.exec(text)[0];
+	assert.strictEqual(unitJob(changed), unitJob(WORKFLOW), 'mutation leaves the Unit job: ' + what);
+	assert.ok(
+		unitMatrixProblems(changed, MODULE_GROUPS_SOURCE).length > 0,
+		'integration matrix: ' + what
+	);
+}
+for (const [what, mutate] of [
+	['a deferrable Integration row', (contract) => (contract.deferrable_shards = ['alpine'])],
+	['an Integration row the verdict ignores', (contract) => contract.shards.pop()]
+]) {
+	const manifest = structuredClone(MANIFEST);
+	mutate(manifest.jobs['integration-linux']);
+	assert.ok(
+		unitMatrixProblems(WORKFLOW, MODULE_GROUPS_SOURCE, manifest).length > 0,
+		'integration coverage: ' + what
+	);
 }
 for (const [what, mutate] of [
 	['a deferrable distribution', (contract) => contract.deferrable_shards.push('debian')],

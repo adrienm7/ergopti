@@ -58,6 +58,7 @@ row:
 | macOS   | `Integration tests (Lua module wiring, stubbed hs)` | `lua tests/run.lua --module=integration`: the files the `integration` group of `tests/support/module_groups.lua` names                                                    |
 | Linux   | `Integration tests (driver)`                        | `luajit tests/run.lua --module=integration`: the files the `integration` group of `tests/support/module_groups.lua` names                                                 |
 |         | `Integration tests (native)`                        | the metrics aggregation and histogram equivalence against Python, the XI2 LuaJIT ABI qualification and the manual managed Ollama runtime acceptance                       |
+|         | `Integration tests (<distribution>)`                | the same `integration` group on the own LuaJIT of each archive distribution, in the container of its Unit row (`run-linux-distro-unit.sh <distribution> integration`)     |
 
 A test moves between Unit and Integration through its owner only: a feature
 lot's `suite.json` folder (the `integration-` prefix marks an Integration
@@ -182,13 +183,16 @@ luajit tests/run.lua
 luajit tests/run.lua --module=integration  # only the Integration stage's files
 ```
 
-The Unit stage also runs the whole suite on the own LuaJIT of each distribution
-that has an archive installation lot in `.github/linux-install-matrix.json`
-(`Linux / Unit tests (alpine)` and so on). One row reproduces locally, in a
+The Unit stage also runs every module group but `integration` on the own
+LuaJIT of each distribution that has an archive installation lot in
+`.github/linux-install-matrix.json` (`Linux / Unit tests (alpine)` and so on),
+and the Integration stage runs the `integration` group there
+(`Linux / Integration tests (alpine)`). One row reproduces locally, in a
 container of that lot's image and preparation, with Docker:
 
 ```bash
-tools/test/run-linux-distro-unit.sh alpine
+tools/test/run-linux-distro-unit.sh alpine unit
+tools/test/run-linux-distro-unit.sh alpine integration
 ```
 
 ---

@@ -402,8 +402,10 @@ function verifyLuaJitEnrollment(value) {
 	assert.deepStrictEqual(pipeline.needsOf(owner.body), ['test-linux']);
 	for (const at of [native, evidence])
 		assert.strictEqual(pipeline.stepField(steps[at].body, 'continue-on-error'), null);
-	// Both run once, in the native row of the Integration matrix.
-	assert.match(owner.body, /^ {8}group: \[driver, native\]$/m);
+	// Both run once, in the native row of the Integration matrix, beside the
+	// driver row and the distribution rows.
+	assert.strictEqual(owner.body.match(/^ {10}- group: native$/gm)?.length, 1);
+	assert.strictEqual(owner.body.match(/^ {10}- group: driver$/gm)?.length, 1);
 	assert.strictEqual(
 		pipeline.stepField(steps[native].body, 'if'),
 		"${{ !cancelled() && matrix.group == 'native' }}"

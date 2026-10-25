@@ -600,9 +600,14 @@ scope shows DEFERRED with `qualified: false` and never counts as a pass; expired
 exceptions are not renewed without the maintainer. A deferred suite envelope
 stands in only for the matrix rows that `deferrable_shards` of
 `.github/linux-ci-coverage.json` lists, and only for that row's own
-`shard_subjects`: the Unit stage's distribution rows (no receipt covers them,
-and their containers have no Node) always run and record their own count, so
-a missing, duplicate or deferred distribution receipt fails `linux-ok`. Unsigned stable Windows
+`shard_subjects`: the distribution rows of the Unit stage (every module group
+but `integration`) and of the Integration stage (that group alone), which share
+one container, one runner (`run-linux-distro-unit.sh <distro> unit|integration`)
+and one log diagnostic (`tools/test/linux_distro_suite_diagnostic.py`), have no
+receipt to defer them (and their containers have no Node): they always run and
+record their own count, so a missing, duplicate or deferred distribution receipt
+fails `linux-ok`. `linux-install-matrix.cjs` refuses a coverage manifest whose
+Unit or Integration rows miss an archive distribution or defer one. Unsigned stable Windows
 releases are a standing authorisation (`stable_windows_signing_exception.json`)
 until SignPath signing is integrated.
 
