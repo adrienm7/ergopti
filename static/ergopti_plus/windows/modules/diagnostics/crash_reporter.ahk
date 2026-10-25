@@ -252,7 +252,7 @@ CrashReport_Save(Report, WriterFn := 0) {
 	try DirCreate(ReportDir)
 
 	Ts   := Report.Has("timestamp") ? Report["timestamp"] : _CrashReport_IsoTimestamp()
-	Base := ReportDir . StrReplace(Ts, ":", "-")
+	Base := ReportDir . StrReplace(Ts, ":", "-") . "_" . _CrashReport_NextFileIdentity()
 	FName := Base . ".json"
 	n := 1
 	while FileExist(FName) {
@@ -261,7 +261,7 @@ CrashReport_Save(Report, WriterFn := 0) {
 	}
 
 	JsonStr := _CrashReport_ToJson(Report)
-	ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteDurable
+	ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteCreateDurable
 
 	try {
 		; A crash artifact is acknowledged only after its complete UTF-8 image has
@@ -310,6 +310,21 @@ CrashReport_PromptUser(Report) {
 ; ======= 3/ Helpers =======
 ; ==========================
 ; ==========================
+
+; A path probe is not a reservation. Allocate a process-local identity before
+; serialization or writers can pump a second crash; CREATE_NEW protects against
+; other processes racing the final native creation.
+_CrashReport_NextFileIdentity() {
+	static Serial := 0
+	PreviousCritical := Critical("On")
+	try {
+		Next := Serial + 1
+		if Next <= Serial
+			throw Error("Crash report file identities are exhausted.")
+		Serial := Next
+		return DllCall("GetCurrentProcessId", "UInt") . "_" . Serial
+	} finally Critical(PreviousCritical)
+}
 
 ; Returns a Map with full OS, CPU, RAM, screen, AHK, and git fields.
 ; @param Hardware {Map} The diagnostics snapshot's hardware section: its

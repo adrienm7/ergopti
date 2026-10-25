@@ -41,8 +41,8 @@ Test("crash_reporter: CrashReport_Save contains FileExist uniqueness loop (crash
 _CRUN_UsesCompleteDurableWrite() {
 	Body := _DriverFuncBody("CrashReport_Save")
 	Assert(Body != "", "CrashReport_Save must remain reachable")
-	Assert(InStr(Body, "FSWriteDurable") > 0,
-		"a crash report must require complete UTF-8 bytes and a stable-storage receipt (AHK-087)")
+	Assert(InStr(Body, "FSWriteCreateDurable") > 0,
+		"a crash report must require exclusive creation, complete UTF-8 bytes and a stable-storage receipt (AHK-087)")
 	Assert(InStr(Body, ".Write(JsonStr)") = 0,
 		"CrashReport_Save must not acknowledge an unchecked File.Write result")
 }
@@ -88,3 +88,34 @@ _CRUN_NoFileAppend() {
 		"crash_reporter.ahk must NOT use FileAppend for crash reports — same-second writes corrupt the JSON file")
 }
 Test("crash_reporter: CrashReport_Save does not use FileAppend (crash-report-same-second-collision)", _CRUN_NoFileAppend)
+
+
+_CRUN_ReentrantSavePreservesBothIncidents() {
+	global _LogsDir
+	SavedLogsDir := _LogsDir
+	Root := A_Temp . "\ergopti_crash_reentrant_" . A_ScriptHwnd . "_" . A_TickCount . "\"
+	InnerPath := ""
+	Timestamp := "2026-10-25T17:00:00Z"
+	_InterleaveBeforeWrite(Path, Content) {
+		; The serializer and writer can pump another deferred crash. Both writes
+		; use the actual durable filesystem adapter; no result is synthesized.
+		InnerPath := CrashReport_Save(Map("timestamp", Timestamp, "error_msg", "inner incident"))
+		return FSWriteDurable(Path, Content)
+	}
+	try {
+		_LogsDir := Root
+		OuterPath := CrashReport_Save(Map("timestamp", Timestamp, "error_msg", "outer incident"),
+			_InterleaveBeforeWrite)
+		AssertTrue(InnerPath != "" && OuterPath != "", "both actual saves must acknowledge durable bytes")
+		AssertTrue(InnerPath != OuterPath, "reentrant incidents must own distinct paths before either writer yields")
+		AssertEqual("inner incident", JsonParse(FileRead(InnerPath, "UTF-8"))["error_msg"],
+			"the outer save must not replace the already-acknowledged inner artifact")
+		AssertEqual("outer incident", JsonParse(FileRead(OuterPath, "UTF-8"))["error_msg"])
+	} finally {
+		_LogsDir := SavedLogsDir
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("crash_reporter: reentrant saves preserve both actual incident artifacts (crash-report-reentrant-save)",
+	_CRUN_ReentrantSavePreservesBothIncidents)
