@@ -20,7 +20,10 @@
 ---    the owners of the menu session that asked. Only the exact window this
 ---    module created receives pushes, so a late callback of a closed window
 ---    never writes into its successor.
---- 4. Nothing here runs on the typing path; the check is asynchronous.
+--- 4. Release notes: Sparkle's own dialog shows none, so the offered release's
+---    changelog is shown in this window by the shared page; this module only
+---    names the repository and opens the links the session approved.
+--- 5. Nothing here runs on the typing path; the check is asynchronous.
 --- ==============================================================================
 
 local M = {}
@@ -188,6 +191,9 @@ local function session_for(view, ctx)
 				time = os.date("%Y-%m-%d %H:%M:%S"),
 			}, on_complete, is_current)
 		end,
+		-- The notes pane's links: the session checked them against the repository
+		repository = function() return { owner = Updater.GH_OWNER, repo = Updater.GH_REPO } end,
+		open_url = function(url) return require("ui.ui_builder").open_http_url(url) == true end,
 		open_log = open_today_log,
 		close = function() if view == _webview then close_window() end end,
 		log_path = Logger.today_log_path,

@@ -10,8 +10,9 @@
  * as the Versions window, so both show identical notes.
  *
  * FEATURES & RATIONALE:
- * 1. One renderer: the prompt used to build its own HTML string and hand it to
- *    innerHTML, with a looser link policy than the Versions window.
+ * 1. One renderer (pane.js, shared with the update-check window): the prompt
+ *    used to build its own HTML string and hand it to innerHTML, with a looser
+ *    link policy than the Versions window.
  * 2. Changelog only: the prompt installs the update itself, so the download
  *    tables of the release body would only compete with its buttons.
  * 3. Links: repository URLs only, posted to the host with the seeded session
@@ -35,21 +36,12 @@
 
 	/** Renders the changelog section, or the empty-notes message. */
 	function render() {
-		var container = document.getElementById('release-notes');
-		var empty = document.getElementById('empty-notes');
-		var changelog = splitReleaseBody(seed.body).changelog;
-		if (changelog === '') {
-			container.replaceChildren();
-			empty.hidden = false;
-			return;
-		}
-		empty.hidden = true;
-		renderMarkdownInto(container, changelog, {
-			allow: function (url) {
-				return isRepositoryUrl(url, seed.owner, seed.repo);
-			},
-			open: openUrl
-		});
+		renderReleaseNotes(
+			document.getElementById('release-notes'),
+			document.getElementById('empty-notes'),
+			seed,
+			openUrl
+		);
 	}
 
 	if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render);

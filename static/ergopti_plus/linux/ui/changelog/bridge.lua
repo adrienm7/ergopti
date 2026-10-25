@@ -39,6 +39,7 @@ local Shell = require("adapters.shell_runner")
 local Json = require("json")
 local Base64 = require("compat.base64")
 local ReleaseSources = require("updater.release_sources")
+local RepositoryUrl = require("updater.repository_url")
 local Parser = require("updater.release_parser")
 local ReleaseInstall = require("updater.release_install")
 local VersionOrder = require("updater.version")
@@ -66,28 +67,17 @@ local _failure_contract = nil
 local _daemon_state = nil
 local _page_epoch, _page_document = nil, nil
 
---- The repository's web root, from the shared updater defaults.
---- @return string|nil url
---- @return string|nil error Why the defaults are unusable.
-local function repository_url()
-	local sources, err = load_sources()
-	if not sources then return nil, err end
-	return "https://github.com/" .. sources.owner .. "/" .. sources.repo, nil
-end
-
 --- Returns whether a URL belongs to the repository's HTTPS surface: the root
 --- itself, or a path, query or fragment below it, never a longer name.
 --- @param value any
 --- @return boolean
 local function is_allowed_repository_url(value)
-	local root, err = repository_url()
-	if not root then
+	local sources, err = load_sources()
+	if not sources then
 		Logger.error(LOG, "Repository unknown, no URL is allowed: %s.", tostring(err))
 		return false
 	end
-	if type(value) ~= "string" or value:sub(1, #root) ~= root then return false end
-	local rest = value:sub(#root + 1)
-	return rest == "" or rest:match("^[/%?#][A-Za-z0-9._~/%?=&+#-]*$") ~= nil
+	return RepositoryUrl.is_repository_url(value, sources.owner, sources.repo)
 end
 
 --- Converts the updater's cached record to the page's release schema.

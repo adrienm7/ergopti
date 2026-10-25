@@ -24,6 +24,9 @@
 --- 5. The updater refuses a check while busy: a click while the window's check
 ---    runs shows that window again, and a click while the updater is otherwise
 ---    busy starts nothing, rather than a check that could only fail.
+--- 6. Release notes: the offered release's changelog is shown in the window by
+---    the shared page, which has no other source of it; this module names the
+---    repository and opens the links the session approved with xdg-open.
 --- ==============================================================================
 
 local M = {}
@@ -288,6 +291,16 @@ local function new_session(updater)
 					tostring(result.detail)),
 				time = os.date("%Y-%m-%d %H:%M:%S"),
 			}, complete, current)
+		end,
+		-- The notes pane's links: the session checked them against the repository
+		repository = updater.repo_info,
+		open_url = function(url)
+			local Shell = require("adapters.shell_runner")
+			if not Shell.has_command("xdg-open") then
+				Logger.error(LOG, "xdg-open is unavailable: the release link cannot be opened.")
+				return false
+			end
+			return Shell.run("xdg-open " .. Shell.quote(url) .. " >/dev/null 2>&1 &") == true
 		end,
 		-- The menu's own "today's log" opener: the path comes from the sink that
 		-- writes it

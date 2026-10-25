@@ -10,6 +10,10 @@
 		<script src="../i18n.js"></script>
 		<script src="../_generated/update_channel_registry.js"></script>
 		<script src="../update_channels.js"></script>
+		<script src="../markdown.js"></script>
+		<script src="../repository_links.js"></script>
+		<script src="../changelog/release_body.js"></script>
+		<script src="../release_notes/pane.js"></script>
 	</head>
 	<body>
 		<main id="panel">
@@ -19,6 +23,10 @@
 			<p id="logged" class="logged" hidden></p>
 			<button type="button" id="btn-whats-new" class="link" hidden></button>
 			<ul id="others" class="others" hidden></ul>
+			<section id="notes" class="notes" hidden>
+				<p id="empty-notes" class="empty-notes" hidden></p>
+				<div id="release-notes"></div>
+			</section>
 			<p id="status" class="status info" role="status" aria-live="polite"></p>
 		</main>
 		<footer class="buttons">

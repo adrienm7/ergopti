@@ -31,6 +31,7 @@ local function fake_updater(subscribed)
 		INTERVAL_PRESETS = real.INTERVAL_PRESETS,
 		TIMING = real.TIMING,
 		current_version = function() return "0.0.0-dev.140" end,
+		repo_info = function() return { owner = "adrienm7", repo = "ergopti" } end,
 		get_channel = function() return subscribed end,
 		set_channel = function(id)
 			calls.set[#calls.set + 1] = id

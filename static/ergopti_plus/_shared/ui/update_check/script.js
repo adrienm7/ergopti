@@ -23,6 +23,11 @@
  *    never names a URL, a path or a release for it to use.
  * 4. Nothing installs from the page by itself: Update is a button the user
  *    clicks, shown only for a release the host offered.
+ * 5. Release notes: when the host seeds the offered release's body (state.notes:
+ *    body, owner, repo), the changelog section shows in place through the pane
+ *    renderer the Windows update prompt uses. A clicked repository link posts
+ *    open_url with the URL only; the host checks it against the repository again.
+ *    A host that seeds no notes (Windows today) shows no pane.
  * ==============================================================================
  */
 
@@ -37,6 +42,10 @@
 
 	// The host's last state message; null until it arrives
 	var state = null;
+
+	// The release body the notes pane shows now; a state that repeats it does not
+	// draw it again
+	var drawnNotes = null;
 
 	/**
 	 * True for a boolean true, or the 1 the AutoHotkey JSON writer sends for it.
@@ -148,6 +157,39 @@
 		list.hidden = list.childNodes.length === 0;
 	}
 
+	/**
+	 * The notes the host seeded for the offered release, or null.
+	 * @returns {?{body: string, owner: string, repo: string}}
+	 */
+	function seededNotes() {
+		var notes = state && state.state === 'available' ? state.notes : null;
+		if (!notes || typeof notes !== 'object') return null;
+		if (typeof notes.body !== 'string') return null;
+		return { body: notes.body, owner: text(notes.owner), repo: text(notes.repo) };
+	}
+
+	/** Shows the changelog of the offered release, or hides the pane. */
+	function renderNotes() {
+		var notes = seededNotes();
+		show('notes', notes !== null);
+		var empty = document.getElementById('empty-notes');
+		empty.textContent = t('changelog_window.no_notes');
+		if (notes === null) {
+			drawnNotes = null;
+			return;
+		}
+		if (drawnNotes === notes.body) return;
+		drawnNotes = notes.body;
+		window.renderReleaseNotes(
+			document.getElementById('release-notes'),
+			empty,
+			notes,
+			function (url) {
+				post({ action: 'open_url', url: url });
+			}
+		);
+	}
+
 	/** Renders the window from the current state, in the menu language. */
 	function render() {
 		document.getElementById('btn-close').textContent = t('common.close');
@@ -208,6 +250,7 @@
 		if (checkOnly) setStatus(t('update_check.check_only'), 'info');
 		var listsOthers = phase === 'up_to_date' || phase === 'available' || phase === 'no_release';
 		renderOthers(listsOthers ? state.others : []);
+		renderNotes();
 	}
 
 	// ===============================
@@ -229,6 +272,8 @@
 			setStatus(t('healthcheck.status.failed'), 'fail');
 			return;
 		}
+		// An opened release link leaves the answer's own status line as it is
+		if (message.action === 'open_url') return;
 		setStatus(message.action === 'report' ? t('notify.report_bug_body') : '', 'ok');
 	}
 

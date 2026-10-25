@@ -93,6 +93,19 @@ class FakeNode {
 		return child;
 	}
 
+	get childNodes() {
+		return this.children;
+	}
+
+	get firstChild() {
+		return this.children[0] || null;
+	}
+
+	removeChild(child) {
+		this.children = this.children.filter((node) => node !== child);
+		return child;
+	}
+
 	replaceChildren(...children) {
 		this.children = children;
 	}
@@ -177,6 +190,7 @@ function runPage(globals = {}, page = 'changelog') {
 	const posted = [];
 	const document = {
 		readyState: 'complete',
+		body: new FakeNode('body', 1),
 		getElementById(id) {
 			if (!byId.has(id)) {
 				const node = new FakeNode('div', 1);

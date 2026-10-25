@@ -15,7 +15,10 @@
 ---    report and the log through the menu's opener;
 --- 5. a message after the window closed is refused;
 --- 6. a click while the check runs keeps its answer, and a click while the
----    updater is busy otherwise starts no check that could only fail.
+---    updater is busy otherwise starts no check that could only fail;
+--- 7. an offered release shows its changelog in the window (the page has no
+---    other source of it), and the links of those notes open with xdg-open only
+---    on this repository.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -64,6 +67,7 @@ local function load_bridge(answer)
 	context.updater = {
 		get_channel = function() return context.channel end,
 		current_version = function() return "0.0.0-dev.144" end,
+		repo_info = function() return { owner = "adrienm7", repo = "ergopti" } end,
 		check_for_updates = function(channel, callback)
 			context.checks[#context.checks + 1] = channel
 			if context.defer then
@@ -242,6 +246,63 @@ helpers.describe("update-check window bridge (Linux)", function()
 			bridge.on_message({ action = "update" })
 			helpers.assert_eq(#context.installs, 0, "a closed window installs nothing")
 			helpers.assert_eq(#context.pushed, pushed)
+		end)
+	end)
+	local RELEASE = '{"tag_name":"v0.0.0-dev.150","body":"## Changelog\\n- **Fix: A thing**"}'
+	local function with_notes(channel)
+		local answer = available(channel)
+		answer.release = RELEASE
+		return answer
+	end
+
+	helpers.it("seeds the offered release's notes into the window", function()
+		scenario(with_notes, function(bridge, context)
+			bridge.open(context.ctx)
+			helpers.assert_eq(last(context).notes,
+				{ body = "## Changelog\n- **Fix: A thing**", owner = "adrienm7", repo = "ergopti" })
+		end)
+	end)
+
+	helpers.it("opens a repository link of the notes with xdg-open, nothing else", function()
+		scenario(with_notes, function(bridge, context)
+			local saved, commands = package.loaded["adapters.shell_runner"], {}
+			package.loaded["adapters.shell_runner"] = {
+				has_command = function(binary) return binary == "xdg-open" end,
+				quote = function(text) return "'" .. text .. "'" end,
+				run = function(command) commands[#commands + 1] = command; return true end,
+			}
+			local ok, err = pcall(function()
+				bridge.open(context.ctx)
+				local url = "https://github.com/adrienm7/ergopti/releases/tag/v0.0.0-dev.150"
+				bridge.on_message({ action = "open_url", url = url })
+				helpers.assert_eq(commands, { "xdg-open '" .. url .. "' >/dev/null 2>&1 &" })
+				helpers.assert_eq(last(context), { type = "action", action = "open_url", ok = true, missing = false })
+				bridge.on_message({ action = "open_url", url = "https://example.com/" })
+				bridge.on_message({ action = "open_url", url = "https://github.com/adrienm7/ergopti'; rm -rf ~ #" })
+				helpers.assert_eq(#commands, 1, "a link outside the repository never reaches the shell")
+				helpers.assert_eq(last(context).ok, false)
+			end)
+			package.loaded["adapters.shell_runner"] = saved
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("says so when xdg-open is missing", function()
+		scenario(with_notes, function(bridge, context)
+			local saved, ran = package.loaded["adapters.shell_runner"], 0
+			package.loaded["adapters.shell_runner"] = {
+				has_command = function() return false end,
+				quote = function(text) return text end,
+				run = function() ran = ran + 1; return true end,
+			}
+			local ok, err = pcall(function()
+				bridge.open(context.ctx)
+				bridge.on_message({ action = "open_url", url = "https://github.com/adrienm7/ergopti" })
+				helpers.assert_eq(ran, 0)
+				helpers.assert_eq(last(context).ok, false)
+			end)
+			package.loaded["adapters.shell_runner"] = saved
+			if not ok then error(err, 0) end
 		end)
 	end)
 end)
