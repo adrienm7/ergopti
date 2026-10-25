@@ -234,9 +234,9 @@ function DEFAULT_OPS.record_ownership(root, previous)
 		.. " " .. shell_quote(root .. "/linux") .. " " .. shell_quote(root .. "/_shared")
 		.. " " .. shell_quote(root)) then return false end
 	local manifest = previous .. "/" .. schema.MANIFEST
-	if not default_probe(manifest, "file") then return true end
-	local old = Fs.read(manifest)
-	if not old then return false end
+	local old, status = Ownership.read_current(manifest)
+	if status == "absent" then return true end
+	if status ~= "ok" then return false end
 	local record = Ownership.parse(old, schema)
 	if not record then return false end
 	return #record.external == 0 or Fs.append(root .. "/" .. schema.MANIFEST, table.concat(record.external))

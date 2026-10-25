@@ -462,6 +462,66 @@ helpers.describe("installer-backup-ownership native receipts", function()
 			.. " " .. Shell.quote(fixture.installed .. "/linux") .. " " .. Shell.quote(fixture.installed .. "/_shared")
 			.. " " .. Shell.quote(fixture.installed)))
 	end
+	local function external_receipt(fixture)
+		receipt(fixture)
+		local manifest = fixture.installed .. "/.ergopti-owned-files"
+		local content, rows = assert(NativeFixture.read(manifest)), {}
+		for _, role in ipairs({ "wrapper", "unit", "autostart" }) do
+			local source = role == "wrapper" and fixture.context.wrapper or fixture.root .. "/external-" .. role
+			if role ~= "wrapper" then NativeFixture.write(source, "external " .. role .. " bytes\n") end
+			rows[role] = assert(require("adapters.crypto").sha256(assert(NativeFixture.read(source)))) .. "\t@" .. role .. "\n"
+			content = content .. rows[role]
+		end
+		NativeFixture.write(manifest, content)
+		return manifest, content, rows
+	end
+
+	helpers.it("(installer-current-ownership) regular receipts retain every actual external ownership row", function()
+		local installer = helpers.load_module("modules.updater.installer")
+		local fixture = NativeFixture.create(installer)
+		local ok, failure = pcall(function()
+			local manifest, _, rows = external_receipt(fixture)
+			local installed, reason = installer.install({ archive_path = fixture.archive, expected_version = "1.2.3", context = fixture.context, ops = fixture.ops })
+			helpers.assert_eq(installed, true, tostring(reason))
+			local selected = assert(NativeFixture.read(manifest))
+			for _, row in pairs(rows) do helpers.assert_true(selected:find(row, 1, true) ~= nil, "the canonical recorder must retain the exact external SHA-256 row") end
+		end)
+		NativeFixture.remove(fixture.root)
+		if not ok then error(failure, 0) end
+	end)
+
+	for _, mode in ipairs({ "fifo", "directory", "file-link", "dangling-link" }) do
+		helpers.it("(installer-current-ownership) a " .. mode .. " receipt cannot become a missing external ownership record", function()
+			local installer = helpers.load_module("modules.updater.installer")
+			local fixture = NativeFixture.create(installer)
+			local ok, failure = pcall(function()
+				local manifest, content = external_receipt(fixture)
+				assert(uv.fs_unlink(manifest))
+				if mode == "fifo" then assert(Shell.run("mkfifo -- " .. Shell.quote(manifest)))
+				elseif mode == "directory" then assert(uv.fs_mkdir(manifest, 448))
+				elseif mode == "file-link" then
+					NativeFixture.write(fixture.root .. "/linked-receipt", content)
+					assert(uv.fs_symlink(fixture.root .. "/linked-receipt", manifest))
+				else assert(uv.fs_symlink(fixture.root .. "/missing-receipt", manifest)) end
+				local current = assert(uv.fs_stat(fixture.installed))
+				local installed = installer.install({ archive_path = fixture.archive, expected_version = "1.2.3", context = fixture.context, ops = fixture.ops })
+				if installed then
+					local selected = assert(NativeFixture.read(manifest))
+					for _, role in ipairs({ "wrapper", "unit", "autostart" }) do
+						print("CURRENT_RECEIPT_LOST role=" .. role .. " lost=" .. tostring(not selected:find("@" .. role, 1, true)))
+					end
+				end
+				helpers.assert_eq(installed, false, "an unreadable ownership receipt must abort before rotating the installed root")
+				local after = assert(uv.fs_stat(fixture.installed))
+				helpers.assert_eq({ after.dev, after.ino }, { current.dev, current.ino })
+				helpers.assert_eq(assert(uv.fs_lstat(manifest)).type, mode == "fifo" and "fifo" or mode == "directory" and "directory" or "link")
+				helpers.assert_true(uv.fs_stat(fixture.archive) ~= nil)
+			end)
+			NativeFixture.remove(fixture.root)
+			if not ok then error(failure, 0) end
+		end)
+	end
+
 	local function clone_backup(fixture)
 		assert(Shell.run("cp -a -- " .. Shell.quote(fixture.installed) .. " " .. Shell.quote(fixture.installed .. ".old")))
 	end

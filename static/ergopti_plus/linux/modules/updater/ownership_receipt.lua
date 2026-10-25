@@ -120,6 +120,22 @@ local function read_checked(native, path)
 	return bytes, before
 end
 
+--- Reads a current receipt without following links or confusing failures with absence.
+--- @param path string Current receipt namespace.
+--- @return string|nil bytes Complete bytes after stable native admission.
+--- @return string status "ok", "absent" or "error".
+function M.read_current(path)
+	local loaded, native = pcall(require, "luv")
+	if not loaded or type(native) ~= "table" or type(native.fs_lstat) ~= "function" then return nil, "error" end
+	local called, fact, _, code = pcall(native.fs_lstat, path)
+	if not called then return nil, "error" end
+	if fact == nil and code == "ENOENT" then return nil, "absent" end
+	if type(fact) ~= "table" or fact.type ~= "file" then return nil, "error" end
+	local bytes = read_checked(native, path)
+	if type(bytes) ~= "string" then return nil, "error" end
+	return bytes, "ok"
+end
+
 --- Verifies complete payload membership, bytes and stable directory identity.
 --- @param root string Rollback root, never followed through a final link.
 --- @param current string Active installation holding the canonical schema.
