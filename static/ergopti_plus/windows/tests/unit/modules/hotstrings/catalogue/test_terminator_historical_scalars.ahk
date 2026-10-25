@@ -35,8 +35,10 @@ _HTHS_With(Mode) {
 				for Character in _TextCodepoints(Label)
 					AssertTrue(HotstringsTerminatorRecordCharacter(Character), "native row labels cannot expose orphan units")
 			}
-			AssertEqual(1, Matching, "one full scalar must own its native custom row")
-			AssertEqual(1, CustomRows, "a surrogate pair must not create two partial custom commands")
+			; A record row is a parent and its own toggle, both labelled with the
+			; record: the pair is one row, a split scalar would add more.
+			AssertEqual(2, Matching, "one full scalar must own its native custom row and its toggle")
+			AssertEqual(2, CustomRows, "a surrogate pair must not create two partial custom commands")
 			if Mode == "record-shared-high" {
 				Owned := 0
 				for Label in Labels
