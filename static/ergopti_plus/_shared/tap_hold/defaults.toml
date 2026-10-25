@@ -27,10 +27,10 @@
 # its Tap-Hold submenu, in which order, under which hand and with which label.
 #
 # The two namespaces below describe the SAME seven physical keys under different
-# ids (left_ctrl/left_control, left_alt/left_option), with different thresholds
-# (0.2–0.35 s per key against one global 250 ms inside that range, with a per-key
-# override on macOS; tools/test/test-tap-hold-threshold-parity.cjs pins every
-# value) and in places different actions — caps_lock holds ctrl under
+# ids (left_ctrl/left_control, left_alt/left_option), with the SAME thresholds
+# (the [tap_hold.keys.*] time_activation_seconds below, which macOS reads through
+# the catalogue's `hs` column; tools/test/test-tap-hold-threshold-parity.cjs pins
+# every value) and in places different actions — caps_lock holds ctrl under
 # [tap_hold.*] and cmd under [hs_tap_hold]. The shipped actions are a maintainer
 # decision recorded in the audit entry PAR-17; until it is taken, a change to one
 # namespace is NOT a change to the other.
@@ -265,25 +265,16 @@ keys = [
 # Action ids reference macos/platform/remap/data/actions.json.
 
 [hs_timeouts]
-# Global tap-vs-hold threshold (KE basic.to_if_alone_timeout_milliseconds).
-#
-# 250 ms, not 1000. The old value was Karabiner-Elements' own default for
-# to_if_alone_timeout_milliseconds rather than a decision, and it made macOS
-# 3-5x slower than the other two drivers on the SAME setting: the
-# [tap_hold.keys.*] block above — which Windows and Linux read and macOS does
-# not — declares 0.20 s for five of its seven keys and 0.35 s for the other two.
-# A full second means every hold takes a second to register, and any deliberate
-# tap that overruns it silently becomes a hold.
-#
-# 250 ms sits inside the range the other two already use, so no key is more than
-# 100 ms away from its Windows/Linux twin, against 650-800 ms before.
-#
-# The remaining gap is that this is ONE global where the others are per-key. The
-# generator already supports a per-manipulator override
-# (basic.to_if_alone_timeout_milliseconds, generator.lua), so wiring the
-# [tap_hold.keys.*] values into it is the follow-up; it needs the two id
-# vocabularies reconciled first (left_ctrl/left_control, left_alt/left_option).
-tap_hold_timeout_ms = 250
+# There is no global tap/hold threshold declared here any more (it was 250 ms, a
+# second declaration beside the per-key ones above). A macOS key takes its
+# threshold from the same place Windows and Linux do: the
+# `time_activation_seconds` of `[tap_hold.keys.<catalog id>]` for the key the
+# catalogue maps to it (its `hs` column reconciles left_ctrl/left_control), and a
+# key with none of its own takes the timing registry's
+# tap_hold.default_activation_ms (_shared/modules/timings/constants.toml), the
+# fallback the other two drivers use. The menu's per-key delay row overrides
+# either; its global row (basic.to_if_alone_timeout_milliseconds) only applies
+# to the keys that have no value of their own.
 # The one-shot modifier auto-cancel delay is NOT declared here: macOS reads the
 # same registry value as the other two drivers,
 # _shared/modules/timings/constants.toml [tap_hold] one_shot_shift_timeout_ms.
