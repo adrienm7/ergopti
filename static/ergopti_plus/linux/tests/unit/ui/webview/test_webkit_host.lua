@@ -139,10 +139,25 @@ helpers.describe("ui.webkit_host", function()
       helpers.assert_true(ui_root:match("_shared/ui$") ~= nil, "ends with _shared/ui")
     end)
 
-    helpers.it("normalizes backslashes to forward slashes", function()
-      local ui_root = WH.resolve_ui_root(DRIVER_ROOT)
-      helpers.assert_true(not ui_root:find("\\"), "no backslashes in resolved path")
-    end)
+		helpers.it("preserves native path bytes after successful probes (webview-native-path)", function()
+			local driver = '/tmp/ergopti\\checkout/linux'
+			local ui = driver .. "/../_shared/ui"
+			local locales = driver .. "/../_shared/data/locales"
+			local original_open = io.open
+			io.open = function(path, mode)
+				if path == ui .. "/host_bridge.js" or path == locales .. "/fr.json" then
+					return { close = function() return true end }
+				end
+				return original_open(path, mode)
+			end
+			local ok, resolved_ui, resolved_locales = pcall(function()
+				return WH.resolve_ui_root(driver), WH.resolve_locales_dir(driver)
+			end)
+			io.open = original_open
+			if not ok then error(resolved_ui, 0) end
+			helpers.assert_eq(resolved_ui, ui, "a successful probe must return the exact admitted path")
+			helpers.assert_eq(resolved_locales, locales, "a backslash is a filename byte on Linux")
+		end)
 
     helpers.it("returns empty for nonexistent roots", function()
       helpers.assert_eq(WH.resolve_ui_root("/nonexistent/path"), "")
