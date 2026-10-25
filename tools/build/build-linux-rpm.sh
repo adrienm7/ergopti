@@ -209,10 +209,13 @@ as a user daemon on Linux via systemd.
 %setup -q
 
 %install
-rm -rf %{buildroot}
-mkdir -p %{buildroot}
+# Expand the canonical environment at execution time: macro-expanded path bytes
+# inserted into shell source could split a prefix and remove an unrelated tree.
+: "\${RPM_BUILD_ROOT:?RPM build root unavailable}"
+rm -rf -- "\$RPM_BUILD_ROOT"
+mkdir -p -- "\$RPM_BUILD_ROOT"
 # RPM owns the extracted source cwd; _builddir itself changes on newer RPM.
-cp -r . "%{buildroot}/"
+cp -r -- . "\$RPM_BUILD_ROOT/"
 
 %files
 /usr/lib/ergopti/

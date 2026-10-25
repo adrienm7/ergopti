@@ -27,6 +27,8 @@ const env = { ...process.env, DPKG_DEB_COMPRESSOR_TYPE: 'none' };
 delete env.ERGOPTI_BUILD_VERSION;
 let refused = 0;
 let archives = 0;
+let rpmInstallReplays = 0;
+let rpmRootRefusals = 0;
 
 function run(file, args, versionEnv = env) {
 	return spawnSync(file, args, {
@@ -152,6 +154,58 @@ try {
 					fs.readFileSync(path.join(shared, 'build_stamp.txt'))
 				);
 				assert.ok(fs.statSync(path.join(extracted, 'install/launch.sh')).isFile());
+				const installBody = spec.match(/^%install\n([\s\S]+?)^%files$/m)?.[1];
+				assert.ok(installBody?.trim(), 'the actual generated RPM install body must be nonempty');
+				const installRoot = path.join(scratch, `installed-${archives} root '\n$literal`);
+				const sibling = path.join(scratch, `installed-${archives}`);
+				fs.mkdirSync(sibling);
+				const canary = path.join(sibling, 'unrelated-sibling');
+				fs.writeFileSync(canary, 'must survive RPM installation');
+				const expanded = installBody.replaceAll('%{buildroot}', installRoot);
+				assert.equal(
+					expanded.includes('%{'),
+					false,
+					'unknown RPM install macros need an explicit replay owner'
+				);
+				const installed = spawnSync(bashExecutable(), ['-euc', expanded], {
+					cwd: path.join(relocated, `ergopti-${native}`),
+					env: { ...env, RPM_BUILD_ROOT: installRoot },
+					encoding: 'utf8',
+					timeout: 120000,
+					maxBuffer: 4 * 1024 * 1024
+				});
+				assert.equal(
+					fs.readFileSync(canary, 'utf8'),
+					'must survive RPM installation',
+					'a space in the owned prefix must not delete an unrelated sibling'
+				);
+				success(installed);
+				assert.deepEqual(
+					inventory(installRoot),
+					inventory(path.join(relocated, `ergopti-${native}`)),
+					'the real RPM install body must preserve every staged payload byte at a literal root'
+				);
+				rpmInstallReplays++;
+				const installedInode = fs.statSync(installRoot).ino;
+				for (const absent of [undefined, '']) {
+					const invalidEnv = { ...env };
+					delete invalidEnv.RPM_BUILD_ROOT;
+					if (absent !== undefined) invalidEnv.RPM_BUILD_ROOT = absent;
+					const missingRoot = spawnSync(bashExecutable(), ['-euc', expanded], {
+						cwd: path.join(relocated, `ergopti-${native}`),
+						env: invalidEnv,
+						encoding: 'utf8',
+						timeout: 15000
+					});
+					assert.notEqual(missingRoot.status, 0, 'an absent canonical RPM root must refuse');
+					assert.match(missingRoot.stderr, /RPM build root unavailable/);
+					assert.equal(
+						fs.statSync(installRoot).ino,
+						installedInode,
+						'missing roots must refuse before payload mutation'
+					);
+					rpmRootRefusals++;
+				}
 				assert.ok(
 					fs.existsSync(
 						path.join(BUILD, `rpm/BUILD/ergopti-${native}/usr/lib/ergopti/_shared/build_stamp.txt`)
@@ -220,7 +274,7 @@ try {
 		'source paths with apostrophes/newlines must remain literal'
 	);
 	console.log(
-		`PASS package-version-native archives=${archives} formats=4 refused=${refused} native-order-pairs=3`
+		`PASS package-version-native archives=${archives} formats=4 refused=${refused} native-order-pairs=3 rpm-install-replays=${rpmInstallReplays} rpm-root-refusals=${rpmRootRefusals}`
 	);
 } finally {
 	fs.rmSync(scratch, { recursive: true, force: true });
