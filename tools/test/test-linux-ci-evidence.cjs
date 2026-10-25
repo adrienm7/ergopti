@@ -1523,11 +1523,11 @@ const PACKAGE_SUBJECTS = ['build-appimage', 'build-deb', 'build-flatpak', 'build
 // Pin both the subjects and their execution environments: Docker first-run
 // tests need a host runner, while rpm must resolve its own LuaJIT dependency.
 const INSTALL_ROWS = [
-	['distro-debian', 'install', 'debian:stable-slim'],
-	['distro-fedora', 'install', 'fedora:latest'],
-	['distro-arch', 'install', 'archlinux:latest'],
-	['distro-alpine', 'install', 'alpine:latest'],
-	['distro-opensuse', 'install', 'opensuse/tumbleweed:latest'],
+	['archive-install-debian', 'install', 'debian:stable-slim'],
+	['archive-install-fedora', 'install', 'fedora:latest'],
+	['archive-install-arch', 'install', 'archlinux:latest'],
+	['archive-install-alpine', 'install', 'alpine:latest'],
+	['archive-install-opensuse', 'install', 'opensuse/tumbleweed:latest'],
 	['first-install-ubuntu-22.04', 'first', 'ubuntu:22.04'],
 	['first-install-ubuntu-24.04', 'first', 'ubuntu:24.04'],
 	['first-install-debian-12', 'first', 'debian:12'],
@@ -1544,15 +1544,15 @@ const INSTALL_ROWS = [
 	['smoke-flatpak-run', 'flatpak', '']
 ];
 const INSTALL_PREPARATIONS = {
-	'distro-debian':
+	'archive-install-debian':
 		'apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed sudo passwd ca-certificates git gcc libc6-dev linux-libc-dev',
-	'distro-fedora':
+	'archive-install-fedora':
 		'dnf install -y bash coreutils findutils grep sed sudo shadow-utils git gcc glibc-devel kernel-headers',
-	'distro-arch':
+	'archive-install-arch':
 		'pacman -Sy --noconfirm bash coreutils findutils grep sed sudo shadow git gcc glibc linux-api-headers',
-	'distro-alpine':
+	'archive-install-alpine':
 		'apk add --no-cache bash coreutils findutils grep sed sudo git gcc musl-dev linux-headers',
-	'distro-opensuse':
+	'archive-install-opensuse':
 		"sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed sudo shadow git gcc glibc-devel linux-glibc-devel",
 	'first-install-opensuse-tumbleweed':
 		"sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo"
@@ -1578,7 +1578,7 @@ function assertInstallRows(metadata) {
 		const row = Object.values(metadata).find((candidate) => candidate.id === id);
 		const expected = { id, kind, container: ['install', 'rpm'].includes(kind) ? image : '' };
 		if (['install', 'first'].includes(kind)) {
-			expected.distro = id.replace(/^(distro-|first-install-)/, '');
+			expected.distro = id.replace(/^(archive-install-|first-install-)/, '');
 			expected.image = image;
 		}
 		if (Object.hasOwn(INSTALL_PREPARATIONS, id)) expected.prep = INSTALL_PREPARATIONS[id];
@@ -1791,6 +1791,41 @@ for (const transport of [
 	assert.throws(() => installMatrix.selectLot(installationPlan, installationLots[0], transport));
 }
 
+// A distribution's Unit row runs in its archive lot's image and preparation,
+// read from the same authored map, and only for a distribution that has one.
+for (const cell of Object.values(installationMetadata).filter((row) => row.kind === 'install')) {
+	assert.strictEqual(installMatrix.selectUnit(installationPlan, cell.distro, 'image'), cell.image);
+	assert.strictEqual(installMatrix.selectUnit(installationPlan, cell.distro, 'prep'), cell.prep);
+	assert.strictEqual(cell.container, cell.image, cell.id + ' and its Unit row share one image');
+}
+for (const [distro, field] of [
+	['ubuntu-22.04', 'image'],
+	['gentoo', 'image'],
+	['debian', 'container'],
+	['debian', 'id']
+])
+	assert.throws(() => installMatrix.selectUnit(installationPlan, distro, field));
+for (const [what, mutate] of [
+	['a distribution without its Unit row', (coverage) => coverage.jobs['test-linux'].shards.pop()],
+	[
+		'a deferrable distribution row',
+		(coverage) => coverage.jobs['test-linux'].deferrable_shards.push('opensuse')
+	],
+	[
+		'a distribution row recording another subject',
+		(coverage) => (coverage.jobs['test-linux'].shard_subjects.alpine = ['unit-ui'])
+	]
+]) {
+	const coverage = structuredClone(MANIFEST);
+	mutate(coverage);
+	assert.throws(() => installMatrix.validateMap(installationMetadata, coverage), undefined, what);
+}
+{
+	const differentImage = structuredClone(installationMetadata);
+	Object.values(differentImage).find((row) => row.kind === 'install').container = 'debian:12';
+	assert.throws(() => installMatrix.validateMap(differentImage, MANIFEST));
+}
+
 const earlySelection = pipeline.step(installJob, 'Require a declared installation lot');
 for (const [before, after] of [
 	['runs-on: ubuntu-latest', 'runs-on: windows-latest'],
@@ -1869,11 +1904,11 @@ const prepare = pipeline.step(installJob, 'Prepare the container');
 // compiler supplied by their caller, whereas first-run provisioning belongs
 // to the real installer. Runtime packages must remain absent from preparation.
 for (const [id, buildPackages] of [
-	['distro-debian', ['gcc', 'libc6-dev']],
-	['distro-fedora', ['gcc', 'glibc-devel']],
-	['distro-arch', ['gcc', 'glibc']],
-	['distro-alpine', ['gcc', 'musl-dev', 'linux-headers']],
-	['distro-opensuse', ['gcc', 'glibc-devel']]
+	['archive-install-debian', ['gcc', 'libc6-dev']],
+	['archive-install-fedora', ['gcc', 'glibc-devel']],
+	['archive-install-arch', ['gcc', 'glibc']],
+	['archive-install-alpine', ['gcc', 'musl-dev', 'linux-headers']],
+	['archive-install-opensuse', ['gcc', 'glibc-devel']]
 ]) {
 	const entry = Object.values(installationMetadata).find((row) => row.id === id);
 	assert.ok(entry, `Missing original source-install lane: ${id}`);
@@ -2451,7 +2486,8 @@ function assertLinuxUnitFailureLog(job) {
 	assert.strictEqual(pipeline.stepField(unit, 'working-directory'), 'static/ergopti_plus/linux');
 	assert.strictEqual(pipeline.stepField(unit, 'id'), 'linux_unit');
 	assert.strictEqual(pipeline.stepField(unit, 'shell'), 'bash');
-	assert.strictEqual(pipeline.stepField(unit, 'if'), null);
+	// Only a module-group row runs the Ubuntu suite; a distribution row has its own step.
+	assert.strictEqual(pipeline.stepField(unit, 'if'), 'matrix.group');
 	assert.strictEqual(pipeline.stepField(unit, 'continue-on-error'), null);
 	const code = pipeline.runOf(unit);
 	assert.ok(Array.isArray(code) && code.length === 7, 'the original unit pipeline must be present');
@@ -2516,6 +2552,8 @@ const unitLogMutations = [
 	// A row that runs the whole suite instead of its group.
 	['-- luajit tests/run.lua --module="$LINUX_UNIT_GROUP" 2>&1', '-- luajit tests/run.lua 2>&1'],
 	['working-directory: static/ergopti_plus/linux', 'working-directory: static/ergopti_plus'],
+	['if: matrix.group\n        working-directory', 'working-directory'],
+	['if: matrix.group\n        working-directory', 'if: matrix.distro\n        working-directory'],
 	["failure() && !cancelled() && steps.linux_unit.outcome == 'failure'", 'success()'],
 	["failure() && !cancelled() && steps.linux_unit.outcome == 'failure'", 'failure()'],
 	['            ${{ runner.temp }}/linux-unit.log', '            ${{ runner.temp }}'],
@@ -2530,7 +2568,7 @@ const unitLogMutations = [
 ];
 assert.strictEqual(
 	unitLogMutations.length,
-	17,
+	19,
 	'all independent diagnostic wiring mutations are present'
 );
 for (const [from, to] of unitLogMutations) {
@@ -2635,7 +2673,10 @@ assert.ok(
 	).includes('luajit tests/e2e/run_e2e.lua | tee "$RUNNER_TEMP/linux-e2e.log"'),
 	'the stubbed E2E harness must keep the log its evidence counts'
 );
-const unitRecord = pipeline.runOf(pipeline.step(testLinux, 'Record mandatory unit evidence')) ?? [];
+const unitRecord = [
+	...(pipeline.runOf(pipeline.step(testLinux, 'Record mandatory unit evidence')) ?? []),
+	...(pipeline.runOf(pipeline.step(testLinux, 'Record mandatory distro unit evidence')) ?? [])
+];
 const e2eRecord =
 	pipeline.runOf(pipeline.step(pipeline.job('e2e-linux'), 'Record mandatory E2E evidence')) ?? [];
 const recordScript = [...unitRecord, ...e2eRecord];
@@ -2664,16 +2705,24 @@ assert.strictEqual(MANIFEST.jobs['e2e-linux'].subjects['managed-http-public'], 3
 const recorded = [
 	...recordScript
 		.join('\n')
-		.matchAll(/--subject "?([a-z0-9-]+(?:\$LINUX_UNIT_GROUP)?)=([^\s"]+)"?/g)
+		.matchAll(/--subject "?([a-z0-9-]+(?:\$LINUX_UNIT_GROUP|\$LINUX_UNIT_DISTRO)?)=([^\s"]+)"?/g)
 ];
-// Each unit row records its own group subject, unit-<group>, from one line.
+// Each unit row records its own subject, unit-<group> or unit-<distro>, from one
+// line per row kind: the module groups are the deferrable rows, the rest distributions.
 const UNIT_ROW_SUBJECT = 'unit-$LINUX_UNIT_GROUP';
+const UNIT_DISTRO_SUBJECT = 'unit-$LINUX_UNIT_DISTRO';
+const UNIT_CONTRACT = MANIFEST.jobs['test-linux'];
+const UNIT_GROUP_ROWS = UNIT_CONTRACT.deferrable_shards;
+const UNIT_DISTRO_ROWS = UNIT_CONTRACT.shards.filter((row) => !UNIT_GROUP_ROWS.includes(row));
+assert.ok(UNIT_GROUP_ROWS.length >= 2 && UNIT_DISTRO_ROWS.length >= 2);
 assert.deepStrictEqual(
 	recorded
 		.flatMap((match) =>
 			match[1] === UNIT_ROW_SUBJECT
-				? MANIFEST.jobs['test-linux'].shards.map((group) => 'unit-' + group)
-				: [match[1]]
+				? UNIT_GROUP_ROWS.map((group) => 'unit-' + group)
+				: match[1] === UNIT_DISTRO_SUBJECT
+					? UNIT_DISTRO_ROWS.map((distro) => 'unit-' + distro)
+					: [match[1]]
 		)
 		.sort(),
 	[
@@ -2686,6 +2735,7 @@ for (const [, subject, value] of recorded) {
 	const expected =
 		{
 			[UNIT_ROW_SUBJECT]: '$unit_assertions',
+			[UNIT_DISTRO_SUBJECT]: '$DISTRO_UNIT_PASSED',
 			'hotstring-e2e': '$e2e_assertions',
 			'xkb-source-qualification': '$xkb_source_assertions',
 			'http-stream-receipts': '$http_stream_assertions',
@@ -2712,11 +2762,126 @@ for (const [, subject, value] of recorded) {
 	);
 }
 
+// A distribution row records the count its own diagnostic read from the
+// suite's output, under its own shard, and uploads it as every row does.
+/**
+ * Lists every way a distribution row loses its own executed evidence.
+ * @param {string} job The actual test-linux job.
+ * @returns {string[]}
+ */
+function distroUnitEvidenceProblems(job) {
+	const found = [];
+	const names = pipeline.steps(job).map((step) => step.name);
+	const order = [
+		"The unit suite on this distribution's LuaJIT",
+		'Upload the native distro unit log',
+		'Record mandatory distro unit evidence',
+		'Upload mandatory unit evidence'
+	];
+	const at = names.indexOf(order[0]);
+	if (at < 0 || order.some((name, index) => names[at + index] !== name))
+		found.push('the distribution suite, its raw log, its record and the upload run in order');
+	let record = '';
+	try {
+		record = pipeline.step(job, order[2]);
+	} catch {
+		return [...found, 'the distribution record step is missing'];
+	}
+	if (pipeline.stepField(record, 'if') !== 'matrix.distro')
+		found.push('only a distribution row records distribution evidence');
+	for (const line of [
+		'          DISTRO_UNIT_PASSED: ${{ steps.distro_unit.outputs.passed }}\n',
+		'          DISTRO_UNIT_INTERPRETER: ${{ steps.distro_unit.outputs.interpreter }}\n'
+	])
+		if (record.split(line).length !== 2)
+			found.push('the record reads the diagnostic output: ' + line.trim());
+	const run = (pipeline.runOf(record) ?? []).map((line) => line.trim().replace(/ \\$/, ''));
+	for (const line of [
+		'node tools/test/linux-ci-evidence.cjs record',
+		'--job test-linux',
+		'--shard "$LINUX_UNIT_DISTRO"',
+		'--output "$RUNNER_TEMP/linux-ci-evidence/test-linux-$LINUX_UNIT_DISTRO.json"',
+		'--sha "$GITHUB_SHA"',
+		'--distro "$LINUX_UNIT_DISTRO"',
+		'--session container',
+		'--interpreter "$DISTRO_UNIT_INTERPRETER"',
+		'--subject "unit-$LINUX_UNIT_DISTRO=$DISTRO_UNIT_PASSED"'
+	])
+		if (run.filter((value) => value === line).length !== 1)
+			found.push('the distribution record must pass exactly: ' + line);
+	const upload = pipeline.step(job, order[3]);
+	if (pipeline.stepField(upload, 'if') !== null) found.push('every unit row uploads its evidence');
+	for (const line of [
+		'          name: linux-ci-evidence-test-linux-${{ matrix.group || matrix.distro }}\n',
+		'          path: ${{ runner.temp }}/linux-ci-evidence/test-linux-${{ matrix.group || matrix.distro }}.json\n',
+		'          if-no-files-found: error'
+	])
+		if (upload.split(line).length !== 2)
+			found.push('the unit evidence upload names its row: ' + line.trim());
+	return found;
+}
+assert.deepStrictEqual(distroUnitEvidenceProblems(testLinux), []);
+{
+	const record = pipeline.step(testLinux, 'Record mandatory distro unit evidence');
+	const upload = pipeline.step(testLinux, 'Upload mandatory unit evidence');
+	for (const [what, step, from, to] of [
+		['an every-row record', record, '        if: matrix.distro\n', ''],
+		['a host-row record', record, 'if: matrix.distro', 'if: matrix.group'],
+		['a literal count', record, '=$DISTRO_UNIT_PASSED"', '=1"'],
+		[
+			'a count from another step',
+			record,
+			'steps.distro_unit.outputs.passed',
+			'steps.linux_unit.outputs.passed'
+		],
+		[
+			'a guessed interpreter',
+			record,
+			'--interpreter "$DISTRO_UNIT_INTERPRETER"',
+			'--interpreter LuaJIT'
+		],
+		['a foreign shard', record, '--shard "$LINUX_UNIT_DISTRO"', '--shard debian'],
+		['a host distribution', record, '--distro "$LINUX_UNIT_DISTRO"', '--distro ubuntu'],
+		[
+			'a row-less upload',
+			upload,
+			'test-linux-${{ matrix.group || matrix.distro }}\n',
+			'test-linux-${{ matrix.group }}\n'
+		],
+		[
+			'a row-less file',
+			upload,
+			'test-linux-${{ matrix.group || matrix.distro }}.json',
+			'test-linux-${{ matrix.group }}.json'
+		],
+		[
+			'a conditional upload',
+			upload,
+			'        uses: actions/upload-artifact@v4',
+			'        if: matrix.group\n        uses: actions/upload-artifact@v4'
+		],
+		['an empty upload', upload, 'if-no-files-found: error', 'if-no-files-found: warn']
+	]) {
+		assert.strictEqual(
+			step.split(from).length,
+			2,
+			'distribution evidence mutation anchor is unique: ' + what
+		);
+		const changed = testLinux.replace(step, () => step.replace(from, () => to));
+		assert.notStrictEqual(changed, testLinux);
+		assert.ok(distroUnitEvidenceProblems(changed).length > 0, 'distribution evidence: ' + what);
+	}
+}
+
 // The unit matrix: one row per group of the Lua runner, the same names in the
-// same order, every row run to the end, and the verdict expecting each row.
+// same order, then one row per archive distribution of the authored install
+// map, every row run to the end, and the verdict expecting each row.
 const MODULE_GROUPS_SOURCE = fs.readFileSync(
 	path.join(ROOT, 'static/ergopti_plus/linux/tests/support/module_groups.lua'),
 	'utf8'
+);
+const INSTALL_MAP = JSON.parse(
+	fs.readFileSync(path.join(ROOT, '.github/linux-install-matrix.json'), 'utf8')
 );
 /**
  * Lists the group names of module_groups.lua, in order.
@@ -2729,12 +2894,14 @@ function moduleGroupNames(source) {
 	return [...table[1].matchAll(/^\t\{ name = "([a-z_]+)"/gm)].map((match) => match[1]);
 }
 /**
- * Lists every way the unit job breaks the module-group matrix contract.
+ * Lists every way the unit job breaks the module-group and distribution matrix contract.
  * @param {string} workflow ci-linux.yml.
  * @param {string} groupsSource module_groups.lua.
+ * @param {object} manifest linux-ci-coverage.json.
+ * @param {object} installMap linux-install-matrix.json.
  * @returns {string[]}
  */
-function unitMatrixProblems(workflow, groupsSource) {
+function unitMatrixProblems(workflow, groupsSource, manifest = MANIFEST, installMap = INSTALL_MAP) {
 	const found = [];
 	// The integration group comes first and runs in the Integration stage; every
 	// other group is one unit row.
@@ -2748,46 +2915,121 @@ function unitMatrixProblems(workflow, groupsSource) {
 		/\n {2}integration-linux:\n([\s\S]*?)\n {2}[a-z0-9-]+:\n/.exec(workflow)?.[1] ?? '';
 	if (!integrationJob.includes(' -- luajit tests/run.lua --module=' + integration + ' 2>&1 | tee '))
 		found.push('the Integration stage must run the integration group');
+	const distros = Object.values(installMap)
+		.filter((lot) => lot.kind === 'install')
+		.map((lot) => lot.distro);
+	if (distros.length < 2) found.push('the install map must author several archive distributions');
 	const job = /\n {2}test-linux:\n([\s\S]*?)\n {2}[a-z0-9-]+:\n/.exec(workflow)?.[1] ?? '';
-	const matrix = /\n {6}fail-fast: false\n {6}matrix:\n {8}group: \[([a-z_, ]+)\]\n/.exec(
-		'\n' + job
-	);
-	if (!matrix) found.push('test-linux must be a fail-fast: false matrix over group');
-	else if (matrix[1].split(/,\s*/).join(',') !== groups.join(','))
-		found.push('the test-linux matrix must list the module groups in order: ' + groups.join(', '));
-	if (!job.includes('      LINUX_UNIT_GROUP: ${{ matrix.group }}\n'))
-		found.push('each row must name its group in LINUX_UNIT_GROUP');
-	const shards = MANIFEST.jobs['test-linux'].shards ?? [];
-	if (shards.join(',') !== groups.join(','))
-		found.push('linux-ci-coverage.json must expect evidence from every module group');
+	// One include row per line, each setting exactly one of its two keys.
+	const matrix =
+		/\n {6}fail-fast: false\n {6}matrix:\n {8}include:\n((?: {10}- [a-z]+: [a-z0-9_-]+\n)+) {4}env:\n/.exec(
+			'\n' + job
+		);
+	if (!matrix) found.push('test-linux must be a fail-fast: false matrix of include rows');
+	else {
+		const rows = [...matrix[1].matchAll(/^ {10}- ([a-z]+): ([a-z0-9_-]+)$/gm)].map((match) => [
+			match[1],
+			match[2]
+		]);
+		const expected = [
+			...groups.map((group) => ['group', group]),
+			...distros.map((distro) => ['distro', distro])
+		];
+		if (JSON.stringify(rows) !== JSON.stringify(expected))
+			found.push(
+				'the test-linux rows must be the module groups, then the archive distributions, in order: ' +
+					expected.map((row) => row.join('=')).join(', ')
+			);
+	}
+	for (const line of [
+		'      LINUX_UNIT_GROUP: ${{ matrix.group }}\n',
+		'      LINUX_UNIT_DISTRO: ${{ matrix.distro }}\n'
+	])
+		if (!job.includes(line)) found.push('each row must name itself: ' + line.trim());
+	const contract = manifest.jobs['test-linux'];
+	if ((contract.shards ?? []).join(',') !== [...groups, ...distros].join(','))
+		found.push('linux-ci-coverage.json must expect evidence from every unit row');
+	// Only the module groups run the suite a dated qualification may defer.
+	if ((contract.deferrable_shards ?? []).join(',') !== groups.join(','))
+		found.push('linux-ci-coverage.json may defer exactly the module-group rows');
 	return found;
 }
 assert.deepStrictEqual(unitMatrixProblems(WORKFLOW, MODULE_GROUPS_SOURCE), []);
 assert.ok(moduleGroupNames(MODULE_GROUPS_SOURCE).length >= 2);
+const UNIT_ROW = (key, value) => '          - ' + key + ': ' + value + '\n';
 for (const [what, mutate] of [
-	['a row dropped', (text) => text.replace('[meta, core, infra,', '[meta, infra,')],
-	['rows reordered', (text) => text.replace('[meta, core, infra,', '[core, meta, infra,')],
+	['a row dropped', (text) => text.replace(UNIT_ROW('group', 'core'), '')],
+	[
+		'rows reordered',
+		(text) =>
+			text.replace(
+				UNIT_ROW('group', 'meta') + UNIT_ROW('group', 'core'),
+				UNIT_ROW('group', 'core') + UNIT_ROW('group', 'meta')
+			)
+	],
 	[
 		'fail-fast rows',
 		(text) =>
 			text.replace(
-				'      fail-fast: false\n      matrix:\n        group:',
-				'      fail-fast: true\n      matrix:\n        group:'
+				'      fail-fast: false\n      matrix:\n        include:',
+				'      fail-fast: true\n      matrix:\n        include:'
 			)
 	],
 	['unnamed group', (text) => text.replace('      LINUX_UNIT_GROUP: ${{ matrix.group }}\n', '')],
+	[
+		'unnamed distribution',
+		(text) => text.replace('      LINUX_UNIT_DISTRO: ${{ matrix.distro }}\n', '')
+	],
 	[
 		'integration group not run',
 		(text) => text.replace('tests/run.lua --module=integration', 'tests/run.lua --module=meta')
 	],
 	[
 		'integration group run as a unit row',
-		(text) => text.replace('[meta, core, infra,', '[integration, meta, core, infra,')
+		(text) =>
+			text.replace(
+				UNIT_ROW('group', 'meta'),
+				UNIT_ROW('group', 'integration') + UNIT_ROW('group', 'meta')
+			)
+	],
+	['a distribution row dropped', (text) => text.replace(UNIT_ROW('distro', 'alpine'), '')],
+	[
+		'a distribution row run as a group',
+		(text) => text.replace(UNIT_ROW('distro', 'arch'), UNIT_ROW('group', 'arch'))
+	],
+	[
+		'an unauthored distribution row',
+		(text) => text.replace(UNIT_ROW('distro', 'arch'), UNIT_ROW('distro', 'gentoo'))
+	],
+	[
+		'a row with two keys',
+		(text) =>
+			text.replace(UNIT_ROW('distro', 'arch'), '          - distro: arch\n            group: ui\n')
 	]
 ]) {
 	const changed = mutate(WORKFLOW);
 	assert.notStrictEqual(changed, WORKFLOW, 'unit matrix mutation must alter source: ' + what);
 	assert.ok(unitMatrixProblems(changed, MODULE_GROUPS_SOURCE).length > 0, 'unit matrix: ' + what);
+}
+for (const [what, mutate] of [
+	['a deferrable distribution', (contract) => contract.deferrable_shards.push('debian')],
+	['an undeferrable group', (contract) => contract.deferrable_shards.pop()],
+	['a distribution row the verdict ignores', (contract) => contract.shards.pop()]
+]) {
+	const manifest = structuredClone(MANIFEST);
+	mutate(manifest.jobs['test-linux']);
+	assert.ok(
+		unitMatrixProblems(WORKFLOW, MODULE_GROUPS_SOURCE, manifest).length > 0,
+		'unit coverage: ' + what
+	);
+}
+{
+	const installMap = structuredClone(INSTALL_MAP);
+	delete installMap['Alpine: installed archive'];
+	assert.ok(
+		unitMatrixProblems(WORKFLOW, MODULE_GROUPS_SOURCE, MANIFEST, installMap).length > 0,
+		'a Unit row without its archive lot must fail'
+	);
 }
 assert.ok(
 	unitMatrixProblems(

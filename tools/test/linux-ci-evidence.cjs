@@ -10,6 +10,12 @@
  * A job the manifest splits into matrix shards must deliver exactly one
  * document per declared shard: a successful matrix whose row recorded nothing
  * (or a row the matrix lost) is refused even when its subjects look complete.
+ * A dated suite qualification may stand in for a row only when the manifest
+ * lists that row in deferrable_shards. A job that names each row's subjects
+ * (shard_subjects) defers row by row, so the distribution rows of the unit
+ * matrix, which no receipt covers, still owe their own executed counts; a job
+ * without them defers run-wide, which the manifest admits only when every row
+ * is deferrable.
  * ============================================================================
  */
 
@@ -90,7 +96,29 @@ function validateManifest(manifest) {
 				fail(`${job} declares invalid shard subjects`);
 			}
 		}
+		// The rows a dated suite qualification may stand in for, in matrix order.
+		if (contract.deferrable_shards !== undefined) {
+			const rows = contract.deferrable_shards;
+			if (
+				!Array.isArray(rows) ||
+				rows.length === 0 ||
+				new Set(rows).size !== rows.length ||
+				JSON.stringify(rows) !==
+					JSON.stringify((contract.shards ?? []).filter((shard) => rows.includes(shard))) ||
+				(contract.shard_subjects === undefined && rows.length !== contract.shards.length)
+			) {
+				fail(`${job} declares invalid deferrable shards`);
+			}
+		}
 	}
+}
+
+/** The subjects one deferred suite envelope stands in for: its own row's, or the whole job's. */
+function deferredSubjects(document, contract) {
+	if (contract.shards === undefined) return Object.keys(contract.subjects);
+	if (!contract.deferrable_shards?.includes(document.shard))
+		fail(`${document.job} shard ${document.shard} cannot defer its suite`);
+	return contract.shard_subjects?.[document.shard] ?? Object.keys(contract.subjects);
 }
 
 function validateEvidenceDocument(document, expectedSha) {
@@ -165,10 +193,13 @@ function verifyAggregate({
 			);
 			const contract = manifest.jobs[document.job];
 			if (!contract) fail('Deferred suite names an unclassified job.');
-			for (const subject of Object.keys(contract.subjects)) {
+			for (const subject of deferredSubjects(document, contract)) {
 				const key = document.job + '/' + subject;
-				// Every shard of a deferred suite carries the same run-wide receipt.
-				const repeated = contract.shards !== undefined && suiteDeferred.has(key);
+				// Without per-row subjects, every deferrable row carries the same run-wide receipt.
+				const repeated =
+					contract.shards !== undefined &&
+					contract.shard_subjects === undefined &&
+					suiteDeferred.has(key);
 				if ((deferredEvidence.has(key) && !repeated) || indexedEvidence.has(key))
 					fail('Duplicate deferred suite evidence.');
 				deferredEvidence.set(key, document.suite_qualification);

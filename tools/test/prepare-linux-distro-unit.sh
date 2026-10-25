@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # tools/test/prepare-linux-distro-unit.sh
-# Build native test dependencies for the distribution's own LuaJIT, then run
-# the unchanged suite as its existing ordinary installation user.
+# Inside a distribution container prepared by .github/linux-install-matrix.json,
+# create the ordinary installation user, give it a private copy of the source
+# checkout, build native test dependencies for the distribution's own LuaJIT,
+# then run the unchanged suite as that user. tools/test/run-linux-distro-unit.sh
+# starts the container and calls this script as root.
 
 set -euo pipefail
 
 distro="${1:?distribution is required}"
+source_root="${2:?source checkout is required}"
+test -f "$source_root/static/ergopti_plus/linux/tests/run.lua"
 case "$distro" in
 	debian) apt-get install -y --no-install-recommends luajit python3 ca-certificates git gcc libc6-dev make cmake pkg-config libluajit-5.1-dev libuv1-dev curl ;;
 	fedora) dnf install -y luajit python3 ca-certificates git gcc make cmake pkgconf-pkg-config luajit-devel libuv-devel curl ;;
@@ -18,13 +23,32 @@ esac
 interpreter="$(command -v luajit)"
 test -x "$interpreter"
 test -x /usr/bin/python3
+
+# Root bypasses the suite's real unreadable-file permission premise, so the
+# suite runs as the same ordinary user the archive installation lot creates.
+if command -v useradd >/dev/null 2>&1; then
+	useradd -m -d /tmp/ergopti-home -s /bin/bash ergopti-ci
+else
+	adduser -D -h /tmp/ergopti-home -s /bin/bash ergopti-ci
+fi
 test "$(id -u ergopti-ci)" -ge 1000
+install -d -m 0750 /etc/sudoers.d
+printf '%s\n' 'ergopti-ci ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ergopti-ci
+chmod 0440 /etc/sudoers.d/ergopti-ci
+
+# Keep the mounted checkout untouched and give the installation user a private
+# writable source tree, including every original test and shared file.
+unit_root="$(mktemp -d /tmp/ergopti-distro-source.XXXXXXXX)"
+trap 'rm -rf -- "$unit_root"' EXIT
+cp -a "$source_root/." "$unit_root/"
+chown -R ergopti-ci:ergopti-ci "$unit_root"
+cd "$unit_root/static/ergopti_plus/linux"
 
 # Distribution packages often target Lua 5.4. Build the existing vendor versions
 # against this interpreter's headers, without replacing the interpreter itself.
 # Official release commits are immutable source pins; Git verifies their objects.
 native_root="$(mktemp -d /tmp/ergopti-distro-native.XXXXXXXX)"
-trap 'rm -rf -- "$native_root"' EXIT
+trap 'rm -rf -- "$native_root" "$unit_root"' EXIT
 chmod 0755 "$native_root"
 mkdir -m 0755 "$native_root/modules"
 
