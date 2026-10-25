@@ -50,7 +50,7 @@
 		"static/ergopti_plus/windows/infra/config_migrate.ahk": "8e98ed358f3e212fe0e5b28dad9a41271a4288fbe81f7ebf6fc13faac7a85135",
 		"static/ergopti_plus/windows/infra/config_transition_runtime.ahk": "fbf1a59708b01bc21e2dd3ba9d3084c596860431292d3e7a309b3cf6ee9e03ee",
 		"static/ergopti_plus/windows/infra/config_write_lease.ahk": "44b46dff8e60970a22d58410b0125a5495af634228a647a5d8616335845adf2a",
-		"static/ergopti_plus/windows/infra/toml/toml_document.ahk": "256e7ad6a913eae6eabca3c89ac297631a4a72b95febe7d258a1481f58841ffc",
+		"static/ergopti_plus/windows/infra/toml/toml_document.ahk": "e62826b3f9a85a392604fa93424a18f4e057183ea43dc0a1d427b6fc49157efc",
 		"static/ergopti_plus/windows/modules/updater.ahk": "0e61410a2a31e254028625461a1537b6beed763963a323de43155af602302b58",
 		"static/ergopti_plus/windows/modules/updater/changelog.ahk": "62e59046174046da6ff12288464dc42c495edb96a7465d3da935e0b675502eef",
 		"static/ergopti_plus/windows/modules/updater/channels.ahk": "d65f0823227bca1f86d102542629bd369c8a28de064036680e49c754961c8961",
@@ -59,7 +59,7 @@
 		"static/ergopti_plus/windows/modules/updater/release_install.ahk": "964dcfd4d411d94ac916434eaed44c557ba69c1b3a5c3e90b73b51acf033779e",
 		"static/ergopti_plus/windows/modules/updater/schedule.ahk": "546a68c7f6524297d2309847dba6ee43f21ae5f7aaf88c1776df56062272de40",
 		"static/ergopti_plus/windows/modules/updater/self_update.ahk": "f8345df1b566571b9a225d3347fed4adff995e2d6de4397101b197953b26f675",
-		"static/ergopti_plus/windows/tests/run_all.ahk": "53a40fdf9f86e00fa382ef72a342d35a6b911bebdc8fb4122aa0e24fa236345d",
+		"static/ergopti_plus/windows/tests/run_all.ahk": "fe697ca7b6d3715516dc4efd89c0434f77e9f7af57cb68913c519e84a503beb0",
 		"static/ergopti_plus/windows/tests/test_framework.ahk": "4659747a39e716119c0e05a1e2f88740d67a14c36db9648ec795d74941aa998c",
 		"static/ergopti_plus/windows/tests/unit/test_config_scope_manifest.ahk": "c04ff2f791d9073b05571bb01308a0442156a63217de04058de5244cbb0d886f",
 		"static/ergopti_plus/windows/tests/unit/test_updater.ahk": "01662ae4e36fbcd5981dc19363d241b068d1dbb70999e8fac03852b69fedbf4d",
@@ -70,7 +70,7 @@
 	"diagnostic_only": true,
 	"private_cost_fixture_admitted": false,
 	"role": "candidate",
-	"source_pin_base": "b13a9e632b7c664d10c9af5d5858508531afbd65",
+	"source_pin_base": "79ff786923d12bde99a269f045491c93513971c8",
 	"runtime_qualification": "UNRUN",
 	"source_authority": "Pins are data; actual HEAD/Git object/API/artifact receiving remains independently required."
 }
