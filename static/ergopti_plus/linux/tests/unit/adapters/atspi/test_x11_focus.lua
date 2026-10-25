@@ -310,3 +310,42 @@ helpers.describe("window_info and the diagnostic snapshot: the open applications
 		display._set_for_test(display.X11, "restored")
 	end)
 end)
+
+helpers.describe("window_info native process-name records", function()
+	for _, case in ipairs({ { "ordinary", "owned" }, { "embedded LF", "owned\nother" },
+		{ "leading LF", "\nowned" }, { "trailing LF", "owned\n" }, { "CR", "owned\r" },
+		{ "boundary spaces", " owned " } }) do
+		helpers.it("(window-native-comm) preserves focused and listed kernel names with " .. case[1], function()
+			local ffi = require("ffi")
+			ffi.cdef("int prctl(int option, ...);")
+			local names = { "adapters.shell_runner", "adapters.window_info", "adapters.x11_focus", "infra.display_server" }
+			local previous = {}
+			for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+			local file = assert(io.open("/proc/self/comm", "rb"))
+			local original = assert(file:read("*a")):gsub("\n$", "")
+			assert(file:close())
+			local function rename(value)
+				assert(ffi.C.prctl(15, ffi.cast("const char *", value), 0, 0, 0) == 0)
+			end
+			local called, detail = pcall(function()
+				rename(case[2])
+				local pid = require("luv").os_getpid()
+				local shell = helpers.load_module("adapters.shell_runner")
+				package.loaded["adapters.shell_runner"] = shell
+				local display = helpers.load_module("infra.display_server")
+				display._set_for_test("x11", "owned")
+				package.loaded["infra.display_server"] = display
+				package.loaded["adapters.x11_focus"] = bound({ active = 77, clients = { 77 }, windows = { [77] = { title = "Owned", pid = pid } } })
+				local window = helpers.load_module("adapters.window_info")
+				local focused = window.getFocused()
+				local listed = window.getAll()
+				helpers.assert_eq(#listed, 1, "The native X11 inventory contains the exact owned process")
+				helpers.assert_eq({ focused = focused.appId, listed = listed[1].appId },
+					{ focused = case[2], listed = case[2] }, "Both actual procfs consumers must preserve the same native name")
+			end)
+			rename(original)
+			for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+			if not called then error(detail, 0) end
+		end)
+	end
+end)

@@ -93,13 +93,20 @@ local function decode_json(raw)
 	return value
 end
 
+--- Removes only the record delimiter appended by procfs to a kernel task name.
+--- @param record string Raw /proc/<pid>/comm bytes.
+--- @return string name Exact native task-name payload.
+local function process_name_record(record)
+	return (record:gsub("\n$", ""))
+end
+
 --- Reads the process name for a PID, or "" when it cannot be read.
 --- @param pid string|number|nil
 --- @return string
 local function comm_of(pid)
 	if not pid then return "" end
-	local comm = Shell.exec_line("cat " .. Shell.quote("/proc/" .. tostring(pid) .. "/comm"))
-	return comm or ""
+	local comm = Shell.exec("cat " .. Shell.quote("/proc/" .. tostring(pid) .. "/comm"))
+	return process_name_record(comm)
 end
 
 --- Reads a process name from /proc in this process: the window list names
@@ -111,7 +118,7 @@ local function read_proc_comm(pid)
 	if not handle then return "" end
 	local comm = handle:read("*a") or ""
 	handle:close()
-	return (comm:gsub("%s+$", ""))
+	return process_name_record(comm)
 end
 _read_proc_comm = read_proc_comm
 
