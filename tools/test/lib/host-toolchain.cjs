@@ -47,14 +47,15 @@ function pinnedNodeVersion() {
 }
 
 /**
- * Run a probe command and return its combined output, or null when it is absent.
+ * Run a probe command and return its combined output, or null when it cannot be run.
  * @param {string} command
  * @param {string[]} args
  * @returns {string|null}
  */
 function probeOutput(command, args) {
 	const result = spawnSync(command, args, { encoding: 'utf8' });
-	if (result.error && result.error.code === 'ENOENT') return null;
+	// A command that is absent or present but not executable cannot run a gate either.
+	if (result.error && ['ENOENT', 'EACCES'].includes(result.error.code)) return null;
 	if (result.error) throw result.error;
 	return `${result.stdout || ''}${result.stderr || ''}`.trim();
 }
@@ -94,7 +95,9 @@ function evaluateHost(facts) {
 	if (facts.uid === 0)
 		problems.push('the run is root, the CI runners are a normal user: run as a normal user');
 	if (facts.luaVersionText === null)
-		problems.push(`no lua command, CI installs Lua ${REQUIRED_LUA_SERIES} as lua: install it`);
+		problems.push(
+			`no runnable lua command, CI installs Lua ${REQUIRED_LUA_SERIES} as lua: install it`
+		);
 	else if (
 		!new RegExp(`^Lua ${REQUIRED_LUA_SERIES.replace('.', '\\.')}\\.`).test(facts.luaVersionText)
 	)
@@ -106,7 +109,9 @@ function evaluateHost(facts) {
 			`${facts.accountVariables.join(' and ')} unset, the CI runners set both: export them (the log sinks need the account identity)`
 		);
 	if (facts.pwshVersionText === null)
-		problems.push('no pwsh on PATH, the CI images ship PowerShell: install it');
+		problems.push(
+			'no runnable pwsh on PATH, the CI images ship PowerShell: install it or make it executable'
+		);
 	return problems;
 }
 
