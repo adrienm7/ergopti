@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local M = {}
+local Publication = require("tests.support.ui.metrics.typing.publication")
 
 local LOG = "metrics_typing"
 
@@ -34,8 +35,8 @@ end
 --- @return table|nil payload First argument of window.publishTypingMetricsData.
 function M.publication(evaluations)
 	for index = #evaluations, 1, -1 do
-		local arguments = evaluations[index].code:match("^window%.publishTypingMetricsData%((.*)%)%;$")
-		if arguments then return require("json").decode("[" .. arguments .. "]")[1] end
+		local payload = Publication.decode(evaluations[index].code)
+		if payload then return payload end
 	end
 	return nil
 end

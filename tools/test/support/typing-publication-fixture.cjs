@@ -14,7 +14,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '../../../static/ergopti_plus');
 
-function actualLuaPublications(empty = false) {
+function actualLuaPublications(empty = false, applicationName) {
 	const lua = spawnSync('lua', ['-'], {
 		cwd: path.join(root, 'macos'),
 		encoding: 'utf8',
@@ -22,6 +22,7 @@ function actualLuaPublications(empty = false) {
 package.path=package.path..';../_shared/lua/?.lua;../_shared/lua/?/init.lua;./?.lua;./?/init.lua'
 local json=require('json')
 local empty=${empty ? 'true' : 'false'}
+local application_name=${applicationName === undefined ? 'nil' : JSON.stringify(applicationName)}
 local now,rev=0,1
 local timers,evaluations,publications={},{},{}
 local dashboard,context=require('tests.support.metrics_typing_fixture')({
@@ -45,13 +46,14 @@ manager.get_sqlite_path=function()return '/virtual/db'end
 package.loaded['ui.metrics_typing.projection'].session=function()
  return {
   manifest=function()
-   local manifest=empty and {} or {['2026-09-01']={[rev==1 and 'Startup' or 'Live']={chars=rev}}}
+   local manifest=empty and {} or {['2026-09-01']={[application_name or (rev==1 and 'Startup' or 'Live')]={chars=rev}}}
    return manifest,package.loaded['hs.json'].encode(manifest),true
   end,
   range=function()return '{"historical":{},"today":{}}',true end,
  }
 end
 dashboard._app_icon_cache={Startup=false,Live=false}
+if application_name then dashboard._app_icon_cache[application_name]='data:image/png;base64,owned' end
 if empty then hs.keycodes.map={} end
 io.open=function()local f={};function f:write()return self end;function f:close()return true end;return f end
 os.rename=function()return true end

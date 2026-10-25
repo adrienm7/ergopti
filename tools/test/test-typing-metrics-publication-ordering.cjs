@@ -224,11 +224,18 @@ test('actual FIFO Lua startup retry cannot roll back an applied live snapshot', 
 	assert.equal(f.context._prefetch_data, null);
 });
 
+test('actual Lua typing publications retain prototype-named application keys', () => {
+	const scripts = actualLuaPublications(false, '__proto__');
+	const f = fixture();
+	assert.equal(vm.runInContext(scripts[0], f.context), true);
+	assert.deepEqual(Array.from(f.state.available_apps), ['__proto__']);
+	assert.ok(Object.hasOwn(f.context.metrics_manifest['2026-09-01'], '__proto__'));
+	assert.equal(vm.runInContext(scripts[1], f.context), true);
+	assert.ok(Object.hasOwn(f.context.app_icons, '__proto__'));
+});
+
 test('actual Lua cold-empty payload accepts native empty-map arrays', () => {
 	const scripts = actualLuaPublications(true);
-	assert.match(scripts[0], /"manifest":\[\]/);
-	assert.match(scripts[1], /"app_icons":\[\]/);
-	assert.match(scripts[1], /"kc_layout":\[\]/);
 	const f = fixture();
 	f.state.did_apply_initial_reset = false;
 	f.state.loading_data = false;
@@ -252,6 +259,9 @@ test('actual Lua cold-empty payload accepts native empty-map arrays', () => {
 	);
 	assert.equal(vm.runInContext(scripts[1], f.context), true);
 	assert.deepEqual(Array.from(f.state.available_apps), []);
+	assert.equal(Array.isArray(f.context.metrics_manifest), true);
+	assert.equal(Array.isArray(f.context.app_icons), true);
+	assert.equal(Array.isArray(f.context.keycode_layout), true);
 	assert.equal(f.context.metrics_manifest.length, 0);
 	assert.equal(f.context.app_icons.length, 0);
 	assert.equal(f.context.keycode_layout.length, 0);

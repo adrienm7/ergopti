@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Publication = require("tests.support.ui.metrics.typing.publication")
 local with_delivery = require("tests.support.typing_delivery_fixture")
 
 --- Fires a live continuation and its real paced projection, then accepts delivery.
@@ -23,8 +24,8 @@ local function publish_live(context, timers, evaluations)
 	helpers.assert_eq(evaluations[#evaluations].code, "typeof window.publishTypingMetricsData")
 	evaluations[#evaluations].done("function")
 	helpers.assert_eq(#evaluations, before + 2, "ready page must receive the live manifest")
-	helpers.assert_true(evaluations[#evaluations].code:find(
-		'window.publishTypingMetricsData({"manifest":{}}', 1, true) == 1)
+	local payload = Publication.decode(evaluations[#evaluations].code)
+	helpers.assert_eq(payload, { manifest = {} })
 	evaluations[#evaluations].done(true)
 end
 
