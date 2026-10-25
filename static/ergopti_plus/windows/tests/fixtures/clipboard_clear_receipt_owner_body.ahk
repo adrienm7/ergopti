@@ -260,7 +260,7 @@ try {
 		_CRCO_Subject(A_Args[2], A_Args[3])
 	}
 	ExitApp(0)
-} catch Any as Failure {
-	FileAppend("FAIL clear-receipt-owner " . Failure.Message . " [" . Failure.File . ":" . Failure.Line . "]`n", "*", "UTF-8-RAW")
+} catch Any as ChildFailure {
+	FileAppend("FAIL clear-receipt-owner " . ChildFailure.Message . " [" . ChildFailure.File . ":" . ChildFailure.Line . "]`n", "*", "UTF-8-RAW")
 	ExitApp(1)
 }

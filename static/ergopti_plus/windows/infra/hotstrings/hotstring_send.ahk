@@ -748,7 +748,7 @@ GetSelectionAsync(OnReady, Ports := 0) {
 		if !(Ports is Map)
 				Ports := Map()
 		SaveFn := Ports.Get("save", CB_SaveAll)
-		ClearFn := Ports.Get("clear", CB_Write.Bind(""))
+		ClearFn := Ports.Get("clear", CB_ClearWithReceipt)
 		SendFn := Ports.Get("send", _SelectionSendCopy)
 		SequenceFn := Ports.Get("sequence", _SelectionClipboardSequence)
 		RestoreFn := Ports.Get("restore", CB_RestoreAll)
@@ -802,10 +802,13 @@ GetSelectionAsync(OnReady, Ports := 0) {
 				}
 				if !_SelectionCaptureStartCurrent(Job)
 						return false
-				if !ClearFn.Call()
+				Cleared := ClearFn.Call()
+				if !Cleared
 						throw Error("clipboard clear failed")
 				Job["mutated"] := true
-				Job["clear_sequence"] := SequenceFn.Call()
+				; The default clear authenticates its own generation; sampling it
+				; here could adopt a copy another program made right after it.
+				Job["clear_sequence"] := Cleared is Map ? Cleared["sequence"] : SequenceFn.Call()
 				Job["owned_sequence"] := Job["clear_sequence"]
 				if !_SelectionCaptureStartCurrent(Job)
 						return false
