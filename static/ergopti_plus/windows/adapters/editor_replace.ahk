@@ -84,7 +84,7 @@ _TextSenderNativeSchedule(Callback) {
 	SetTimer(Callback, -TEXT_NATIVE_POLL_MS)
 }
 
-/** Queues one immutable request, returning before any receiver messages execute. */
+/** Returns true only after one immutable request is admitted and scheduled. */
 _TextSenderQueueNative(Text, Opts, Callback) {
 	global _TEXT_NATIVE_OWNER, _TEXT_NATIVE_SERIAL
 	Options := Opts is Map ? Opts.Clone() : Map()
@@ -115,10 +115,12 @@ _TextSenderQueueNative(Text, Opts, Callback) {
 			_TEXT_NATIVE_OWNER := Owner
 		} finally Critical(PreviousCritical)
 		Port["schedule"].Call(Owner.PollFn)
+		return true
 	} catch as Err {
 		if IsSet(Owner) && _TEXT_NATIVE_OWNER == Owner
 			_TEXT_NATIVE_OWNER := 0
 		_TextSenderInvokeCallback(Callback, false, Err.Message)
+		return false
 	}
 }
 

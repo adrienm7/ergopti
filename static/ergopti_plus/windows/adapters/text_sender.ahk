@@ -860,8 +860,8 @@ TextSend(Text, Opts, Callback) {
 			: (StrLen(Text) > TEXT_CLIPBOARD_THRESHOLD ? "clipboard" : "direct")
 
 	if Mode = "native" {
-		_TextSenderQueueNative(Text, Opts, Callback)
-		_TextSenderReportOutput(Text)
+		if _TextSenderQueueNative(Text, Opts, Callback)
+			_TextSenderReportOutput(Text)
 		return
 	}
 
