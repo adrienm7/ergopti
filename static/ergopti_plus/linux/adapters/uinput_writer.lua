@@ -112,7 +112,7 @@ local UINPUT_PATH = "/dev/uinput"
 
 -- errno for "present but this user may not read it". A write-only group grant on
 -- /dev/uinput answers exactly this to a read probe.
-local EACCES = 13
+local EACCES = "EACCES"
 
 -- The node every probe and open() targets. Only the tests move it: probing the
 -- real node from a root test run is how a stray regular file came to sit there.
@@ -644,17 +644,13 @@ end
 --- True when this channel can plausibly be opened: a backend exists and
 --- /dev/uinput is present.
 ---
---- Deliberately does NOT open the device. Callers use this to choose a channel
---- during startup, and a probe with side effects would leave a half-created
---- virtual keyboard behind on every check.
+--- The temporary read probe never blocks, creates a node or issues an ioctl.
+--- Only open() creates a virtual keyboard.
 --- @return boolean
 function M.is_available()
 	if not _backend and not M.use_ffi_backend() then return false end
-	local fh, _, errno = io.open(_uinput_path, "r")
-	if fh then
-		fh:close()
-		return true
-	end
+	local readable, errno = require("infra.device_access").readable(_uinput_path)
+	if readable then return true end
 	-- Unreadable but present is normal: /dev/uinput is commonly write-only for
 	-- the owning group, so the honest write test is deferred to open(), where
 	-- opening IS the side effect. It is never probed with a write-mode io.open:

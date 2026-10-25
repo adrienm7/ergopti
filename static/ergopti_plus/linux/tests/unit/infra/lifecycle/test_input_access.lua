@@ -238,13 +238,12 @@ helpers.describe("input_access: only a denied node means re-login", function()
 
 	helpers.it("recognises EACCES and nothing else", function()
 		local Access = helpers.load_module("infra.input_access")
-		local denied = function() return nil, "Permission denied", 13 end
-		local absent = function() return nil, "No such file or directory", 2 end
+		local denied = function() return false, "EACCES" end
+		local absent = function() return false, "ENOENT" end
 		helpers.assert_eq(Access.is_denied("/dev/input/event3", denied), true)
 		helpers.assert_eq(Access.is_denied("/dev/input/event99", absent), false,
 			"a mistyped --device must not be told to log out and back in")
-		local fh = io.open(os.tmpname(), "rb")
-		local readable = function() return fh end
+		local readable = function() return true end
 		helpers.assert_eq(Access.is_denied("/tmp/x", readable), false)
 	end)
 
@@ -321,4 +320,99 @@ helpers.describe("input_access: a program the permission setup needs is missing"
 			"the daemon must report it before the device error")
 	end)
 
+end)
+
+helpers.describe("input-access-fifo-probe", function()
+	local native_ok, native = pcall(require, "luv")
+	local ffi_ok, ffi = pcall(require, "ffi")
+	if not native_ok or not ffi_ok then return end
+	ffi.cdef("int mkfifo(const char *pathname, unsigned int mode);")
+	local probes = {
+		{ name = "startup denial", body = 'require("infra.input_access").is_denied(path)' },
+		{ name = "keyboard availability", body = 'local reader = require("adapters.evdev_reader"); reader._set_backend({}); reader.is_available(path)' },
+		{ name = "uinput availability", body = 'local writer = require("adapters.uinput_writer"); writer._set_backend({}); writer._set_path_for_test(path); writer.is_available()' },
+	}
+	for _, probe in ipairs(probes) do
+		helpers.it("(input-access-fifo-probe) " .. probe.name .. " never waits for a FIFO writer", function()
+			local path = os.tmpname()
+			os.remove(path)
+			helpers.assert_eq(ffi.C.mkfifo(path, 384), 0, "the fixture must be a real FIFO with no writer")
+			local code = string.format("package.path = %q; local path = %q; %s", package.path, path, probe.body)
+			local expired, exited, exit_code, exit_signal = false, false, nil, nil
+			local timer = assert(native.new_timer())
+			local child
+			child = assert(native.spawn(assert(arg[-1]), { args = { "-e", code } }, function(status, signal)
+				exited, exit_code, exit_signal = true, status, signal
+				native.timer_stop(timer)
+				native.close(timer)
+				native.close(child)
+			end))
+			assert(require("infra.native_timer").start(native, timer, 2000, 0, function()
+				expired = true
+				child:kill("sigkill")
+			end))
+			while not exited do native.run("once") end
+			native.run("nowait")
+			os.remove(path)
+			helpers.assert_eq(expired, false, "a permission probe must never open a FIFO in blocking mode")
+			helpers.assert_eq(exit_code, 0, "the native probe must finish without an exception")
+			helpers.assert_eq(exit_signal, 0, "a killed or crashed probe must never count as success")
+		end)
+	end
+end)
+
+helpers.describe("input-access-probe-receipts", function()
+	helpers.it("(input-access-probe-receipts) rejects invalid paths before any native operation", function()
+		local probe = require("infra.device_access")
+		local calls = 0
+		local native = { fs_open = function() calls = calls + 1 end }
+		for _, path in ipairs({ "", "/dev/null\0/other", false, {} }) do
+			local readable, code = probe.readable(path, native)
+			helpers.assert_eq(readable, false)
+			helpers.assert_eq(code, "EINVAL")
+		end
+		helpers.assert_eq(calls, 0, "NUL must never reach the native path boundary")
+	end)
+
+	helpers.it("(input-access-probe-receipts) preserves native refusal and requires the exact close receipt", function()
+		local probe = require("infra.device_access")
+		local descriptor, closed = {}, nil
+		local native = {
+			constants = { O_RDONLY = 0, O_NONBLOCK = 2048 },
+			fs_open = function(path, flags, mode)
+				helpers.assert_eq(path, "/dev/input/example")
+				helpers.assert_eq(flags, 2048, "every read probe must be nonblocking")
+				helpers.assert_eq(mode, 0, "the probe must never create a device node")
+				return descriptor
+			end,
+			fs_close = function(fd)
+				helpers.assert_true(fd == descriptor, "only the exact temporary descriptor may close")
+				return closed, "controlled close refusal", "EIO"
+			end,
+		}
+		local readable, code = probe.readable("/dev/input/example", native)
+		helpers.assert_eq(readable, false, "a refused close cannot certify a successful probe")
+		helpers.assert_eq(code, "EIO")
+		closed = true
+		helpers.assert_eq(probe.readable("/dev/input/example", native), true)
+		native.fs_open = function() return nil, "permission denied", "EACCES" end
+		readable, code = probe.readable("/dev/input/example", native)
+		helpers.assert_eq(readable, false)
+		helpers.assert_eq(code, "EACCES", "permission denial must remain distinct from an absent node")
+	end)
+
+	helpers.it("(input-access-probe-receipts) real native admission distinguishes denied and absent files", function()
+		local native = require("luv")
+		local path = os.tmpname()
+		assert(native.fs_chmod(path, 0))
+		local Access = require("infra.input_access")
+		local denied = Access.is_denied(path)
+		assert(native.fs_chmod(path, 384))
+		local readable = Access.is_denied(path)
+		os.remove(path)
+		local absent = Access.is_denied(path)
+		helpers.assert_eq(denied, true, "the native EACCES must retain the repair notice")
+		helpers.assert_eq(readable, false)
+		helpers.assert_eq(absent, false, "an absent node must not suggest re-login")
+	end)
 end)
