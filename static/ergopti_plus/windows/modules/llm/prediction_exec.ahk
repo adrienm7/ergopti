@@ -584,6 +584,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; "REWRITE: …" text, which carries no erasure and would be typed as is.
 	streaming_enabled := is_rewrite ? false : LLM_EffectiveStreaming(backend,
 		_LLM_Engine.Has("streaming") and _LLM_Engine["streaming"])
+	request_current := _LLM_Engine_RenderIdentityIsCurrent.Bind(this_request_id, request_semantic_signature)
 	if (backend == "api") {
 		entry := _LLM_Engine_GetActiveApiEntry()
 		if (entry == "") {
@@ -596,7 +597,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		log_model := model_tag
 		remote_transport := _LLM_Engine_ResolveRemoteTransport()
 		dispatch_fn := (temp, on_succ, on_fail) =>
-			remote_transport.Call(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, call_tokens)
+			remote_transport.Call(entry, system_prompt, ctx, temp, on_succ, on_fail, tail, call_tokens, "", 0, request_current)
 	} else {
 		model_tag := LLM_ResolveOllamaTag(_LLM_Engine["model"])
 		log_model := model_tag
@@ -609,7 +610,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 			? profile["stop_sequences"] : ""
 		is_batch := (profile is Map and profile.Has("batch") and profile["batch"] == true)
 		dispatch_fn := (temp, on_succ, on_fail) =>
-			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail, stop_seqs, call_tokens, is_batch, tail)
+			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail, stop_seqs, call_tokens, is_batch, tail, "", request_current)
 		dispatch_stream_fn := (temp, on_partial, on_succ, on_fail) =>
 			LLM_OllamaGenerate_Streaming(model_tag, system_prompt, ctx, temp, on_partial, on_succ, on_fail, stop_seqs, call_tokens, is_batch, tail)
 	}
