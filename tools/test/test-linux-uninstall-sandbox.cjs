@@ -270,7 +270,7 @@ try {
 				`'ergopti: ${bashPath(packaged)}/uninstall.sh'`
 			)
 	);
-	for (const name of ['dirname', 'grep', 'cat']) {
+	for (const name of ['dirname', 'grep', 'cat', 'rm']) {
 		fs.symlinkSync(
 			['/usr/bin', '/bin'].map((d) => path.join(d, name)).find(fs.existsSync),
 			path.join(bare, name)
@@ -287,12 +287,24 @@ try {
 		`#!/bin/bash\nprintf '%s|' "$@" > "${bashPath(dialogLog)}"\n`,
 		{ mode: 0o755 }
 	);
+	const nativeActionLog = path.join(sandbox, 'native-package-action.log');
+	let nativePackageOwner = 'ergopti';
+	let nativeActionStatus = '0';
+	let nativeQueryStatus = '0';
 	const packagedRun = (...args) =>
 		spawnSync(bashExecutable(), [bashPath(path.join(packaged, 'uninstall.sh')), ...args], {
 			encoding: 'utf8',
 			input: '',
 			timeout: 15000,
-			env: { HOME: bashPath(home), PATH: bashPath(bare) }
+			env: {
+				HOME: bashPath(home),
+				PATH: bashPath(bare),
+				ERGOPTI_TEST_PACKAGE_OWNER: nativePackageOwner,
+				ERGOPTI_TEST_PACKAGE_STATUS: nativeActionStatus,
+				ERGOPTI_TEST_QUERY_STATUS: nativeQueryStatus,
+				ERGOPTI_TEST_PACKAGE_LOG: nativeActionLog,
+				ERGOPTI_TEST_PACKAGE_FILE: path.join(packaged, 'uninstall.sh')
+			}
 		});
 	const terminal = packagedRun('--yes');
 	assert.equal(terminal.status, 69, 'a missing package manager is EX_UNAVAILABLE');
@@ -475,6 +487,106 @@ try {
 			'native-receipt-path: producers and remover preserve absolute path bytes'
 		);
 	}
+	// A verified Arch package owns the same flat layout as DEB/RPM. Querying
+	// ownership is read-only; only the isolated privilege port records removal.
+	fs.writeFileSync(path.join(bare, 'dpkg-query'), '#!/bin/bash\nexit 1\n', { mode: 0o755 });
+	fs.writeFileSync(
+		path.join(bare, 'pacman'),
+		[
+			'#!/bin/bash',
+			'flags="${1#-}"',
+			'[ "$#" -eq 3 ] && [ "${#flags}" -eq 3 ] && [[ "$flags" != *[^Qoq]* ]] || exit 64',
+			'[[ "$flags" == *Q* && "$flags" == *o* && "$flags" == *q* ]] || exit 64',
+			'[ "$2" = -- ] && [ "$3" = "$ERGOPTI_TEST_PACKAGE_FILE" ] || exit 64',
+			'printf "%s\n" "$ERGOPTI_TEST_PACKAGE_OWNER"',
+			'exit "$ERGOPTI_TEST_QUERY_STATUS"',
+			''
+		].join('\n'),
+		{ mode: 0o755 }
+	);
+	fs.writeFileSync(
+		path.join(bare, 'pkexec'),
+		[
+			'#!/bin/bash',
+			'printf "%s\n" "$@" > "$ERGOPTI_TEST_PACKAGE_LOG"',
+			'exit "$ERGOPTI_TEST_PACKAGE_STATUS"',
+			''
+		].join('\n'),
+		{ mode: 0o755 }
+	);
+	const ownerProbe = spawnSync(
+		bashExecutable(),
+		[path.join(bare, 'pacman'), '-Qoq', '--', path.join(packaged, 'uninstall.sh')],
+		{
+			encoding: 'utf8',
+			env: {
+				ERGOPTI_TEST_PACKAGE_OWNER: nativePackageOwner,
+				ERGOPTI_TEST_QUERY_STATUS: nativeQueryStatus,
+				ERGOPTI_TEST_PACKAGE_FILE: path.join(packaged, 'uninstall.sh')
+			}
+		}
+	);
+	assert.equal(
+		ownerProbe.status,
+		0,
+		'the independent owner port must accept the actual query protocol'
+	);
+	assert.equal(ownerProbe.stdout, 'ergopti\n');
+	const archPreflight = packagedRun('--check');
+	assert.equal(archPreflight.status, 0, `verified-pacman-owner: ${archPreflight.stderr}`);
+	assert.ok(!fs.existsSync(nativeActionLog), 'owner preflight never acquires removal authority');
+	const nativeStartup = path.join(home, '.config/autostart/ergopti.desktop');
+	fs.mkdirSync(path.dirname(nativeStartup), { recursive: true });
+	const ownedStartup =
+		'[Desktop Entry]\nExec=/bin/bash "/usr/bin/ergopti" --session-start --tray\n';
+	fs.writeFileSync(nativeStartup, ownedStartup);
+	nativeQueryStatus = '23';
+	assert.notEqual(
+		packagedRun('--yes').status,
+		0,
+		'a failed query cannot claim ownership through partial stdout'
+	);
+	assert.ok(!fs.existsSync(nativeActionLog), 'unacknowledged query output cannot reach pkexec');
+	nativeQueryStatus = '0';
+
+	nativePackageOwner = 'another-package';
+	assert.notEqual(packagedRun('--yes').status, 0, 'foreign package ownership blocks removal');
+	assert.ok(!fs.existsSync(nativeActionLog), 'a foreign owner cannot reach pkexec');
+	assert.equal(
+		fs.readFileSync(nativeStartup, 'utf8'),
+		ownedStartup,
+		'foreign package ownership preserves startup'
+	);
+	nativePackageOwner = 'ergopti';
+	nativeActionStatus = '75';
+	assert.equal(packagedRun('--yes').status, 75, 'package-manager failure is preserved');
+	assert.equal(
+		fs.readFileSync(nativeStartup, 'utf8'),
+		ownedStartup,
+		'refused removal preserves startup'
+	);
+	assert.deepEqual(
+		fs.readFileSync(nativeActionLog, 'utf8').trimEnd().split('\n'),
+		['/usr/bin/pacman', '-R', '--noconfirm', 'ergopti'],
+		'only the verified package is delegated to its manager'
+	);
+	nativeActionStatus = '0';
+	assert.equal(packagedRun('--yes').status, 0, 'the verified Arch owner can finish removal');
+	assert.ok(
+		!fs.existsSync(nativeStartup),
+		'confirmed package removal retires its own user startup entry'
+	);
+	fs.writeFileSync(nativeStartup, '[Desktop Entry]\nExec=/other/application\n');
+	assert.equal(packagedRun('--yes').status, 0);
+	assert.equal(
+		fs.readFileSync(nativeStartup, 'utf8'),
+		'[Desktop Entry]\nExec=/other/application\n',
+		'package removal preserves a foreign user startup command'
+	);
+	assert.ok(
+		fs.existsSync(path.join(packaged, 'uninstall.sh')),
+		'the helper never deletes package files itself'
+	);
 	console.log('[OK] Linux uninstaller removes only the validated standalone installation.');
 } finally {
 	fs.rmSync(sandbox, { recursive: true, force: true });
