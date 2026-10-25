@@ -279,7 +279,9 @@ _LAG_DispatchCustody(Backend, Phase) {
 				switch Phase {
 					case "context-off": AssertTrue(LLM_Agent_SetMode("off"))
 					case "context-source": AssertTrue(_LLM_Agent_MenuSetBackend("agent_system2", ""))
-					case "context-newer": AssertTrue(_LAG_Invoke("llm_agent_selection"))
+					case "context-newer":
+						AssertTrue(_LAG_Invoke("llm_agent_selection"))
+						AssertEqual(1, Fx.Remote.Length, "the newer legitimate selection really dispatched")
 				}
 			} else if !Observed
 				Boundary.DefineProp("Call", {Call: Observe})
@@ -301,4 +303,71 @@ for Backend in ["local", "cerebras", "backboard"] {
 	if Backend != "backboard"
 		Test("LLM agent: dispatch retains original requester " . Backend . " payload (agent-dispatch-custody)",
 			_LAG_DispatchCustody.Bind(Backend, "payload"))
+}
+
+; Run the genuine callback armed by typing; no scheduling or delay is replaced.
+_LAG_TriageCustody(Backend, Phase) {
+	_LAG_Run(_LAG_Menu("auto", Backend, "cerebras"), _LTN_Screen(LAG_SELECTION), Body)
+	Body(Fx, Lines, Sent) {
+		global _LLM_Agent_ContextProbe, _LLM_Remote_BackboardExchanges
+		Observed := false
+		Boundary := Phase == "payload" ? (Backend == "local" ? LLM_Vision_BuildRequest : _LLMRemoteBuildPayload)
+			: _LLM_Vision_ResolveTarget
+		HadCall := Boundary.HasOwnProp("Call")
+		SavedCall := HadCall ? Boundary.GetOwnPropDesc("Call") : 0
+		Owners := _LLM_Remote_BackboardExchanges.Clone()
+		try {
+			AssertFalse(HadCall, "the real triage boundary starts with its original implementation")
+			TooltipHide("AgentCustody", true)
+			Pause := _LAG_Type(Fx, LAG_TYPED)
+			AssertTrue(HasMethod(Pause, "Call"), "actual typing arms its unchanged pause callback")
+			_LLM_Agent_ContextProbe := Context
+			Pause.Call()
+			AssertTrue(Observed, "the genuine triage callback reaches its yielding boundary")
+			AssertEqual(Phase == "unchanged" || Phase == "context-newer" ? 1 : 0,
+				Fx.Remote.Length + Fx.Ollama.Length + Fx.Posts.Length,
+				"a retired automatic requester cannot send the typed sentence")
+			AssertEqual(0, Sent.Length)
+		} finally {
+			if Boundary.HasOwnProp("Call")
+				Boundary.DeleteProp("Call")
+			if HadCall
+				Boundary.DefineProp("Call", SavedCall)
+			Retire := []
+			for Id, Owner in _LLM_Remote_BackboardExchanges
+				if !Owners.Has(Id)
+					Retire.Push(Owner)
+			for Owner in Retire
+				_LLMRemote_BackboardRetire(Owner, true)
+		}
+		Context() {
+			if !Observed && (InStr(Phase, "context") == 1 || Phase == "unchanged") {
+				Observed := true
+				switch Phase {
+					case "context-off": AssertTrue(LLM_Agent_SetMode("off"))
+					case "context-source": AssertTrue(_LLM_Agent_MenuSetBackend("agent_system2", ""))
+					case "context-newer":
+						AssertTrue(_LAG_Invoke("llm_agent_selection"))
+						AssertEqual(1, Fx.Remote.Length, "the newer legitimate selection really dispatched")
+				}
+			} else if !Observed
+				Boundary.DefineProp("Call", {Call: Observe})
+			return _LAG_Context(Fx)
+		}
+		Observe(Self, Args*) {
+			Boundary.DeleteProp("Call")
+			Result := Boundary.Call(Args*)
+			Observed := true
+			AssertTrue(LLM_Agent_SetMode("off"))
+			return Result
+		}
+	}
+}
+for Backend in ["local", "cerebras", "backboard", "typesafe", "backboard|typesafe/jev-latest"] {
+	for Phase in ["context-off", "context-source", "context-newer", "target", "unchanged"]
+		Test("LLM agent: triage retains original requester " . Backend . " " . Phase . " (agent-triage-custody)",
+			_LAG_TriageCustody.Bind(Backend, Phase))
+	if Backend == "local" || Backend == "cerebras"
+		Test("LLM agent: triage retains original requester " . Backend . " payload (agent-triage-custody)",
+			_LAG_TriageCustody.Bind(Backend, "payload"))
 }

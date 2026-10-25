@@ -812,16 +812,19 @@ LLM_Agent_InvalidateTyping() {
  */
 LLM_Agent_System1Request(Backend, Sentence, Ctx, OnTriage, Generation := -1) {
 	global LLM_AGENT_JEV_STATE
+	Current := Generation >= 0 ? _LLM_Agent_RenderIsCurrent.Bind(Generation) : 0
+	if !_LLM_Vision_CallbackCurrent(Current)
+		return false
 	Config := LLM_Agent_Config()
 	if _LLM_Agent_IsJev(Backend)
 		return _LLM_Agent_Decide(Backend, _LLM_Agent_Fill(LLM_AGENT_JEV_STATE,
-			Map("app", Ctx.Get("app", ""), "text", Sentence)), Config, OnTriage)
+			Map("app", Ctx.Get("app", ""), "text", Sentence)), Config, OnTriage, Generation)
 	Payload := Map(
 		"system", LLM_Agent_System1Prompt(Config, Ctx),
 		"user", Sentence,
 		"max_tokens", Config["system1"]["max_tokens"])
 	return _LLM_Agent_Chat(Backend, Payload, _LLM_Agent_OnSystem1Answer.Bind(Config, OnTriage),
-		_LLM_Agent_OnSystem1Fail.Bind(OnTriage, Generation), false)
+		_LLM_Agent_OnSystem1Fail.Bind(OnTriage, Generation), false, Current)
 }
 
 ; System 1 answered: hand its triage on.
@@ -842,12 +845,19 @@ _LLM_Agent_IsJev(Backend) {
 
 ; Asks Jev the triage question about a state: System 1's second transport.
 ; @returns {Boolean} False, with nothing sent, when the backend cannot be reached.
-_LLM_Agent_Decide(Backend, State, Config, OnTriage) {
+_LLM_Agent_Decide(Backend, State, Config, OnTriage, Generation := -1) {
+	Current := Generation >= 0 ? _LLM_Agent_RenderIsCurrent.Bind(Generation) : 0
+	if !_LLM_Vision_CallbackCurrent(Current)
+		return false
 	Target := _LLM_Vision_ResolveTarget(Backend["backend"], Backend["model"], "AI agent")
+	if !_LLM_Vision_CallbackCurrent(Current)
+		return false
 	if !(Target is Map)
 		return false
 	Questions := LLM_Agent_JevQuestions(Config)
-	OnFail := _LLM_Agent_OnSystem1Fail.Bind(OnTriage, -1)
+	if !_LLM_Vision_CallbackCurrent(Current)
+		return false
+	OnFail := _LLM_Agent_OnSystem1Fail.Bind(OnTriage, Generation)
 	if (Target["format"] == "decisions") {
 		LLM_RemoteDecisions_Async(Target["resolved"], State, Questions,
 			_LLM_Agent_OnJevAnswers.Bind(Config, OnTriage), OnFail)
@@ -928,6 +938,10 @@ _LLM_Agent_OnPause(Generation, Buffer) {
 		LoggerDebug("LLM", "AI agent: no triage, the application is excluded.")
 		return false
 	}
+	; Backend, secure-field and context reads can commit a withdrawal or
+	; admit a newer flow. Retire before caching this sentence or sending it.
+	if !_LLM_Agent_RenderIsCurrent(Generation)
+		return false
 	_LLM_Agent_RememberTriaged(Sentence)
 	Flow := Map("generation", Generation, "source", "typing", "backend", System2, "auto", true,
 		"context", Ctx, "sentence", Sentence)
