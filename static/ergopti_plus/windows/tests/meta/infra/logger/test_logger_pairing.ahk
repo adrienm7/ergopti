@@ -53,7 +53,7 @@ _MetaLoggerReadSources(Root := unset) {
 
 _MetaLoggerCallCount(Body, Name) {
 	Code := _DriverMaskNonCode(&Body)
-	return _MetaCountPattern(Code, "\b" . Name . "\s*\(")
+	return _MetaCountPattern(Code, "i)\b" . Name . "\s*\(")
 		- _DriverTopLevelDefinitionCount(&Code, Name)
 }
 
@@ -157,7 +157,7 @@ _MetaLoggerCheckReload(Root := unset) {
 		Starts += _MetaLoggerCallCount(Body, "LoggerStart")
 		Reloads += _MetaLoggerCallCount(Body, "Reload")
 		Code := _DriverMaskNonCode(&Body)
-		if RegExMatch(Code, "LoggerStart\([^\r\n]*\)\s*\r?\n\s*Reload")
+		if RegExMatch(Code, "i)LoggerStart\([^\r\n]*\)\s*\r?\n\s*Reload")
 			Offenders .= "`n  " . Relative
 	}
 	Assert(Starts > 0 && Reloads > 0, "the reload census must inspect actual lifecycle and reload producers")
@@ -330,3 +330,25 @@ _MLP_SourceRootAlias(Kind) {
 for _MLP_Alias in ["dot", "parent", "relative"]
 	Test("logger census: actual " . _MLP_Alias . " root retains both source identities (logger-source-root-alias)",
 		_MLP_SourceRootAlias.Bind(_MLP_Alias))
+
+
+_MLP_CallCase(Kind) {
+	Root := A_Temp . "\ergopti_logger_case_" . DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_" . A_TickCount
+	DirCreate(Root . "\adapters")
+	try {
+		; This real balanced file keeps both producer floors meaningful.
+		FileAppend(_MLP_Source("balanced"), Root . "\adapters\good.ahk", "UTF-8")
+		Text := Kind == "trace"
+			? 'Bad() {`n lOgGeRtRaCe("Audit", "Started.")`n}`n'
+			: 'Bad() {`n loggerstart("Audit", "Started.")`n rElOaD()`n}`n'
+		FileAppend(Text, Root . "\adapters\bad.ahk", "UTF-8")
+		AssertEqual(2, _MetaLoggerReadSources(Root).Count, "both real sources must reach the case guard")
+		if Kind == "trace"
+			_MLP_ExpectedRefusal(_MetaLoggerCheckPairing, Root, "Error", "unpaired lifecycle logs")
+		else
+			_MLP_ExpectedRefusal(_MetaLoggerCheckReload, Root, "Error", "immediately precede Reload")
+	} finally DirDelete(Root, true)
+}
+for _MLP_CallKind in ["trace", "reload"]
+	Test("logger census: actual " . _MLP_CallKind . " call casing retains violations (logger-call-case)",
+		_MLP_CallCase.Bind(_MLP_CallKind))
