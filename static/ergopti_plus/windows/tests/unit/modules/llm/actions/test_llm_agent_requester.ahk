@@ -531,10 +531,10 @@ for Withdraw in [true, false]
 		_LAG_BackboardNativeCustody.Bind(Withdraw))
 
 _LAG_LocalNativeCustody(Phase, Withdraw) {
-	_LAG_Run(_LAG_Menu("action", "", "local"), _LTN_Screen(LAG_SELECTION), Body)
+	_LAG_Run(_LAG_Menu("action", "", "local", Phase == "queue-independent" ? !Withdraw : true), _LTN_Screen(LAG_SELECTION), Body)
 	Body(Fx, Lines, Sent) {
 		global _LLM_Ollama_Async, _LLM_Ollama_Pending, _LLM_Ollama_PreflightPort, _LLM_Vision_OllamaTransport
-		global _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_Ollama_AsyncCounter
+		global _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_Ollama_AsyncCounter, _LLM_Engine, _LLM_Agent_Generation
 		Saved := [_LLM_Ollama_Async, _LLM_Ollama_Pending, _LLM_Ollama_PreflightPort,
 			_LLM_Vision_OllamaTransport, _LLM_AuxOwners, _LLM_AuxCleanupDebt]
 		Origin := LLM_OllamaCaptureOriginCustody
@@ -552,7 +552,16 @@ _LAG_LocalNativeCustody(Phase, Withdraw) {
 			Spawn.DefineProp("Call", {Call: ObserveSpawn})
 			if Phase == "origin" || Phase == "origin-newer"
 				Origin.DefineProp("Call", {Call: ObserveOrigin})
-			_LAG_Invoke("llm_agent_selection")
+			if Phase == "queue-independent" {
+				_LLM_Engine["enabled"] := !Withdraw
+				AssertTrue(_LAG_Invoke("llm_agent_selection"))
+				AssertTrue(_LAG_Invoke("llm_agent_selection"))
+				AssertTrue(_LLM_Ollama_Pending is Map, "the second actual independent action owns a pending local job")
+				AssertTrue(_LLM_Agent_RenderIsCurrent(_LLM_Agent_Generation))
+				AssertTrue(_LLM_Ollama_Pending["requester_current"].Call(), "the original independent requester remains genuinely admitted")
+				State["seen"] := true
+			} else
+				_LAG_Invoke("llm_agent_selection")
 			if Phase == "preflight" {
 				AssertTrue(HasMethod(State["timer"], "Call"), "the actual request reserved its deferred preflight")
 				State["seen"] := true
@@ -581,7 +590,7 @@ _LAG_LocalNativeCustody(Phase, Withdraw) {
 				AssertEqual(1, State["polls"].Length, "only the genuinely admitted successor may arm native polling")
 				AssertEqual(State["successor_id"], State["polls"][1])
 			}
-			ExpectedRuns := Phase == "spawn" && Withdraw ? 2 : (Withdraw && Phase != "spawn" && Phase != "origin-newer" ? 0 : 1)
+			ExpectedRuns := Phase == "spawn" && Withdraw ? 2 : (Withdraw && Phase != "spawn" && Phase != "origin-newer" && Phase != "queue-independent" ? 0 : 1)
 			AssertEqual(ExpectedRuns, State["runs"],
 				"only the original local requester can acquire a curl process")
 			if Phase == "spawn" && Withdraw
@@ -677,3 +686,7 @@ for Phase in ["origin", "preflight", "write", "spawn"]
 for Withdraw in [true, false]
 	Test("LLM agent: local requester preserves newer pending job withdrawal=" . Withdraw . " (agent-local-pending-requester)",
 		_LAG_LocalNativeCustody.Bind("origin-newer", Withdraw))
+
+for MainDisabled in [true, false]
+	Test("LLM agent: queued local source is independent from prediction switch disabled=" . MainDisabled . " (agent-local-independent-queue)",
+		_LAG_LocalNativeCustody.Bind("queue-independent", MainDisabled))
