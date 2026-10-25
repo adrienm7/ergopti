@@ -18,6 +18,32 @@ local HAS_SQLITE = (function()
 end)()
 
 helpers.describe("sqlite_writer: bootstrapping a new database", function()
+	helpers.it("sqlite-private-no-luv: preserves the genuine synchronous FFI contract", function()
+		local quote = require("text_utils").shell_quote
+		local root = helpers.driver_root()
+		-- The child removes lfs together with luv. Absolute loader coordinates
+		-- preserve canonical constructor admission without a native cwd module.
+		if root:sub(1, 1) ~= "/" then root = assert(require("infra.paths").current_directory()) .. "/" .. root end
+		local fixture = root .. "/tests/hardware/run_sqlite_private_no_luv.lua"
+		for _, runtime in ipairs({ "luajit", "lua5.4" }) do
+			local status = os.execute("env -u LUA_PATH -u LUA_CPATH " .. runtime .. " " .. quote(fixture) .. " " .. quote(root))
+			helpers.assert_true(status == true or status == 0, "public SQLite descriptor contract failed in " .. runtime)
+		end
+	end)
+
+	helpers.it("sqlite-private-native-files: retains private bytes under both ambient masks", function()
+		local quote = require("text_utils").shell_quote
+		local root = helpers.driver_root()
+		local fixture = root .. "/tests/hardware/run_sqlite_private_files.lua"
+		for _, mask in ipairs({ "022", "077" }) do
+			local command = "umask " .. mask .. "; exec env -u LUA_PATH -u LUA_CPATH luajit " .. quote(fixture) .. " " .. quote(root)
+			local status = os.execute(command)
+			helpers.assert_true(status == true or status == 0, "native SQLite privacy failed under umask " .. mask)
+		end
+		local status = os.execute("env -u LUA_PATH -u LUA_CPATH luajit " .. quote(fixture) .. " " .. quote(root) .. " close-refusal")
+		helpers.assert_true(status == true or status == 0, "terminal private-file close debt must retain exact native authority")
+	end)
+
 	helpers.it("system-unbound-native-recovery: retains actual samples across first successful database binding", function()
 		local quote = require("text_utils").shell_quote
 		local root = helpers.driver_root()
