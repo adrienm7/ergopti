@@ -16,11 +16,13 @@
 
 
 ; Runs a body against a fresh current-schema configuration and a fresh delimiter
-; owner, with the real configuration writer: nothing is injected.
-_HCD_WithConfig(Body) {
+; owner, with the real configuration writer: nothing is injected. Each test owns a
+; distinct path: the migration registry keeps one row per path for the whole run
+; and refuses a second boot of a path it already booted.
+_HCD_WithConfig(Name, Body) {
 	Saved := _HSDT_SaveState()
 	try {
-		_HSDT_Seed("config-delimiters")
+		_HSDT_Seed(Name)
 		return Body.Call()
 	} finally _HSDT_Restore(Saved)
 }
@@ -39,7 +41,7 @@ TestHotstringsConfig_ToggleUpdatesEngineVarLive() {
 		"the owner follows the exact bytes just written")
 }
 Test("HotstringsConfig: a delimiter toggle propagates to HSE_WORD_TERMINATORS live",
-	_HCD_WithConfig.Bind(TestHotstringsConfig_ToggleUpdatesEngineVarLive))
+	_HCD_WithConfig.Bind("config-delimiters-live", TestHotstringsConfig_ToggleUpdatesEngineVarLive))
 
 TestHotstringsConfig_ToggleGetRoundTrip() {
 	global ConfigurationFile
@@ -59,7 +61,7 @@ TestHotstringsConfig_ToggleGetRoundTrip() {
 	AssertFalse(Table.Has("colon"), "a state back on its default leaves no key")
 }
 Test("HotstringsConfig: delimiter toggles round-trip through config.toml",
-	_HCD_WithConfig.Bind(TestHotstringsConfig_ToggleGetRoundTrip))
+	_HCD_WithConfig.Bind("config-delimiters-round-trip", TestHotstringsConfig_ToggleGetRoundTrip))
 
 TestHotstringsConfig_SaveOverridesWritesNoGlobalDelimiters() {
 	global _HotstringsOverrides, _HotstringsOverridesPath
