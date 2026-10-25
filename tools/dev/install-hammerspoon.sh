@@ -71,8 +71,15 @@ backup_init_if_needed() {
 			&& grep -Fq -- "local DRIVER = ${DRIVER_LITERAL}" "${init_path}" 2>/dev/null; then
 			echo "Existing bootstrap already points at this clone — refreshing in place (${init_path})."
 		else
-			local backup_path="${init_path}.backup.$(date -u +%Y%m%dT%H%M%SZ)"
-			mv "${init_path}" "${backup_path}"
+			local backup_stamp backup_path
+			backup_stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+			# Reserve a unique sibling so another clone installed in this same
+			# second cannot overwrite the user's original configuration backup.
+			backup_path="$(mktemp "${init_path}.backup.${backup_stamp}.XXXXXX")"
+			if ! mv "${init_path}" "${backup_path}"; then
+				rm -f "${backup_path}"
+				return 1
+			fi
 			echo "Previous Hammerspoon init backed up to:"
 			echo "  ${backup_path}"
 		fi
