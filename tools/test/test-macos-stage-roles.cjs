@@ -260,10 +260,12 @@ check('release launch preserves both arches and every canonical supplied scenari
 			.map((cell) => [cell.role, cell.runner, cell.scenario, cell.timeout_minutes]),
 		[
 			// Two lots per architecture: with the cold bootstrap, five jobs at once.
-			...['macos-15', 'macos-15-intel'].flatMap((runner) => [
-				['launch', runner, 'clean__karabiner_config', 16],
-				['launch', runner, 'upgraded', 11]
-			]),
+			// The last Apple silicon lot runs on macOS 26 and then receives the
+			// cold MLX bootstrap, so its bound adds 45 minutes.
+			['launch', 'macos-15', 'clean__karabiner_config', 16],
+			['launch', 'macos-latest', 'upgraded', 56],
+			['launch', 'macos-15-intel', 'clean__karabiner_config', 16],
+			['launch', 'macos-15-intel', 'upgraded', 11],
 			['cold-bootstrap-native', 'macos-15', '', 90]
 		]
 	);
@@ -564,14 +566,14 @@ check('installed-app lots expose every exact scenario and release architecture',
 		lot: [
 			'Installed app: clean (macOS 15, Apple silicon)',
 			'Installed app: karabiner config (macOS 15, Apple silicon)',
-			'Installed app: upgraded (macOS 15, Apple silicon)',
+			'Installed app: upgraded, cold MLX bootstrap (macOS 26)',
 			'Cold native bootstrap (macOS 15, Apple silicon)'
 		]
 	});
 	assert.deepEqual(roles.displayPlan('testbuild', { ...context, release: true }).matrix, {
 		lot: [
 			'Installed app: clean, karabiner config (macOS 15, Apple silicon)',
-			'Installed app: upgraded (macOS 15, Apple silicon)',
+			'Installed app: upgraded, cold MLX bootstrap (macOS 26)',
 			'Installed app: clean, karabiner config (macOS 15, Intel)',
 			'Installed app: upgraded (macOS 15, Intel)',
 			'Cold native bootstrap (macOS 15, Apple silicon)'
@@ -1720,14 +1722,71 @@ check(
 				launches.flatMap((cell) => [cell.runner + '/' + roles.lotScenarios(cell.scenario)].flat()),
 				launches.map((cell) => cell.runner + '/' + roles.lotScenarios(cell.scenario))
 			);
-			for (const runner of release ? ['macos-15', 'macos-15-intel'] : ['macos-15'])
+			// Each processor family launches every scenario once across its lots;
+			// Apple silicon spans macOS 15 and, for its last lot only, macOS 26.
+			const families = { appleSilicon: ['macos-15', 'macos-latest'], intel: ['macos-15-intel'] };
+			for (const family of release ? ['appleSilicon', 'intel'] : ['appleSilicon'])
 				assert.deepEqual(
 					launches
-						.filter((cell) => cell.runner === runner)
+						.filter((cell) => families[family].includes(cell.runner))
 						.flatMap((cell) => roles.lotScenarios(cell.scenario)),
 					context.scenarios
 				);
+			const host = launches.filter((cell) => cell.runner === 'macos-latest');
+			assert.equal(host.length, 1, 'exactly one launch lot runs on macOS 26');
+			assert.equal(
+				host[0],
+				launches.filter((cell) => families.appleSilicon.includes(cell.runner)).at(-1),
+				'the macOS 26 lot is the last Apple silicon lot'
+			);
+			assert.ok(
+				roles
+					.lotScenarios(host[0].scenario)
+					.every((name) => !['clean', 'karabiner_config'].includes(name)),
+				'no deferrable AppleEvent scenario launches on macOS 26'
+			);
+			assert.ok(cells.length <= 5, 'Install and launch holds at most five macOS jobs');
+			assert.deepEqual(
+				cells.filter(roles.receivesColdBootstrap).map((cell) => [cell.role, cell.runner]),
+				[
+					['launch', 'macos-latest'],
+					['cold-bootstrap-native', 'macos-15']
+				],
+				'the cold bootstrap is received on macOS 26 and on macOS 15, once each'
+			);
 		}
+		// The runner budget on the real profiles: five macOS jobs at once, on
+		// macOS 15 and 26, each scenario once per processor family.
+		for (const profile of ['ci', 'release']) {
+			const scenarios = JSON.parse(
+				require('node:child_process')
+					.execFileSync(
+						'python3',
+						[
+							path.resolve(__dirname, '../diagnostics/macos_launch_gate.py'),
+							'--print-matrix',
+							profile
+						],
+						{ encoding: 'utf8' }
+					)
+					.trim()
+					.replace(/^scenarios=/, '')
+			);
+			const cells = roles.testbuildCells(scenarios, profile === 'release');
+			assert.equal(cells.length, 5, profile + ': Install and launch holds five macOS jobs');
+			assert.deepEqual(
+				[...new Set(cells.map((cell) => roles.HOSTS[cell.architecture].macos))].sort(),
+				['15', '26'],
+				profile + ': Install and launch covers macOS 15 and 26'
+			);
+		}
+		// A deferrable scenario in the macOS 26 lot, or a single Apple silicon
+		// lot that would leave macOS 15 without a launch, refuses the plan.
+		assert.throws(
+			() => roles.testbuildCells(['upgraded', 'clean'], false),
+			/cannot run on macOS 26/
+		);
+		assert.throws(() => roles.testbuildCells(['upgraded'], false), /macOS 15 and a macOS 26 lot/);
 		const workflow = YAML.parse(
 			fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'), 'utf8')
 		);
@@ -1817,10 +1876,13 @@ check('macOS cells name their version from one host table and refuse another', (
 });
 assert.equal(controls, 224, 'all prior 223 controls and the macOS version control execute');
 
-// Build builds, packages and signs; it smoke-tests the release archive and
-// receives the cold bootstrap of the application it built before signing.
-// Every test of the build host runs in the E2E launcher cell instead.
+// Build builds, packages and signs; its one test is the crash-on-launch smoke
+// test of the release archive, which gates the signature. Every test of the
+// build host runs in the E2E launcher cell, and the cold MLX bootstrap in the
+// macOS 26 lot of Install and launch, from an application that lot builds.
 const BUILD_TESTS = [
+	/\bmacos_cold(?:_ollama)?_bootstrap\.py\b/,
+	/\brecord-cold-macos\b/,
 	/\bswift test\b/,
 	/\bunittest\b/,
 	/\btools\/test\/test-[\w-]+\.(?:cjs|py)\b/,
@@ -1830,10 +1892,8 @@ const BUILD_TESTS = [
 	/\brun_native\.py\b|\brun_ci_probe\.py\b|\brun_probe\.py\b/,
 	/_native_test\.py\b|_receiving(?:_test)?\.py\b/
 ];
-const BUILD_RECEIVERS = new Set([
-	'Receive actual cold native MLX bootstrap',
-	'Smoke test built ErgoptiPlus.app (crash-on-launch guard)'
-]);
+const BUILD_RECEIVERS = new Set(['Smoke test built ErgoptiPlus.app (crash-on-launch guard)']);
+const LOT_COLD_RECEIVER = 'Receive actual isolated cold native MLX bootstrap on macOS 26';
 /**
  * Lists every Build step that runs a test instead of building, packaging or signing.
  * @param {object} workflow Parsed ci-macos.yml.
@@ -1842,10 +1902,21 @@ const BUILD_RECEIVERS = new Set([
 function buildTestProblems(workflow) {
 	const found = [];
 	for (const step of workflow.jobs['package-macos'].steps) {
-		if (BUILD_RECEIVERS.has(step.name)) continue;
+		if (BUILD_RECEIVERS.has(step.name) && !/macos_cold/.test(step.run ?? '')) continue;
 		if (BUILD_TESTS.some((pattern) => pattern.test(step.run ?? '')))
 			found.push('Build runs a test: ' + (step.name ?? step.uses));
 	}
+	// The cold MLX bootstrap of macOS 26 is received once, by the macOS 26 lot.
+	const lot = workflow.jobs.launch.steps.filter((step) => step.name === LOT_COLD_RECEIVER);
+	if (
+		lot.length !== 1 ||
+		!/python3 tools\/diagnostics\/macos_cold_bootstrap\.py/.test(lot[0].run ?? '') ||
+		!/record-cold-macos/.test(lot[0].run ?? '') ||
+		!(lot[0].if ?? '').includes(
+			"env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && "
+		)
+	)
+		found.push('the macOS 26 launch lot must receive and record the cold MLX bootstrap');
 	return found;
 }
 check('Build only builds, packages and signs; the launcher cell owns the build-host tests', () => {
@@ -1885,6 +1956,63 @@ check('Build only builds, packages and signs; the launcher cell owns the build-h
 		const step = moved.jobs['e2e-hs'].steps.find((candidate) => candidate.name === name);
 		moved.jobs['package-macos'].steps.push(step);
 		assert.ok(buildTestProblems(moved).length > 0, name + ' back in Build must refuse');
+	}
+	// The cold MLX bootstrap cannot return to Build, under its old name or any
+	// other, and the macOS 26 lot cannot drop, skip or stop recording it.
+	const coldStep = workflow.jobs.launch.steps.find((step) => step.name === LOT_COLD_RECEIVER);
+	for (const [label, mutate] of [
+		[
+			'the cold receiver back in Build',
+			(moved) => moved.jobs['package-macos'].steps.push(structuredClone(coldStep))
+		],
+		[
+			'the old Build cold step',
+			(moved) =>
+				moved.jobs['package-macos'].steps.push({
+					name: 'Receive actual cold native MLX bootstrap',
+					run: 'python3 tools/diagnostics/macos_cold_bootstrap.py --app "$PWD/build/macos/ErgoptiPlus.app" --output "$RUNNER_TEMP/native-cold-bootstrap"'
+				})
+		],
+		[
+			'the cold receiver hidden in the smoke test',
+			(moved) => {
+				const smoke = moved.jobs['package-macos'].steps.find((step) =>
+					BUILD_RECEIVERS.has(step.name)
+				);
+				smoke.run += '\npython3 tools/diagnostics/macos_cold_bootstrap.py --app x --output y\n';
+			}
+		],
+		[
+			'the macOS 26 lot without the cold receiver',
+			(moved) => {
+				moved.jobs.launch.steps = moved.jobs.launch.steps.filter(
+					(step) => step.name !== LOT_COLD_RECEIVER
+				);
+			}
+		],
+		[
+			'the cold receiver on every lot',
+			(moved) => {
+				const step = moved.jobs.launch.steps.find((each) => each.name === LOT_COLD_RECEIVER);
+				step.if = step.if.replace("env.MACOS_STAGE_ARCHITECTURE == 'host' && ", '');
+			}
+		],
+		[
+			'an unrecorded cold receipt',
+			(moved) => {
+				const step = moved.jobs.launch.steps.find((each) => each.name === LOT_COLD_RECEIVER);
+				step.run = step.run.replace(
+					/node tools\/test\/desktop-ci-evidence\.cjs record-cold-macos[^]*$/,
+					''
+				);
+			}
+		]
+	]) {
+		const moved = structuredClone(workflow);
+		const before = JSON.stringify(moved);
+		mutate(moved);
+		assert.notEqual(JSON.stringify(moved), before, label + ' must change the workflow');
+		assert.ok(buildTestProblems(moved).length > 0, label + ' must refuse');
 	}
 });
 assert.equal(controls, 225, 'all prior 224 controls and the Build purity control execute');

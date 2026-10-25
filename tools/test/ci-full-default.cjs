@@ -415,11 +415,18 @@ const FULL_STEPS = [
 		'Self-test the launch verdict',
 		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
 	],
+	// The cold MLX bootstrap of macOS 26 left Build for the macOS 26 launch lot.
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
-		'Receive actual cold native MLX bootstrap',
-		"${{ steps.stage-admission.outcome == 'success' }}"
+		'launch',
+		'Receive actual isolated cold native MLX bootstrap on macOS 26',
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled() && steps.lot-cold-app.outcome == 'success') }}"
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'launch',
+		'Retain native cold bootstrap evidence of macOS 26',
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',

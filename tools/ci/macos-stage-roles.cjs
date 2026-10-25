@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { parseClosedJson } = require('./dev-release-qualification.cjs');
+const { parseClosedJson, LAUNCH_QUALIFICATION_MATRIX } = require('./dev-release-qualification.cjs');
 const STAGES = ['unit', 'integration', 'e2e', 'build', 'testbuild'];
 const JOBS = ['test-hs', 'integration-hs', 'e2e-hs', 'package-macos', 'launch'];
 /**
@@ -191,20 +191,7 @@ function plan(stage, context) {
 	}
 	if (stage === 'build') return [cell('package-macos', 'host', 45)];
 	assert.equal(stage, 'testbuild');
-	const architectures = context.release ? ['arm64', 'amd64'] : ['arm64'];
-	return [
-		...architectures.flatMap((architecture) =>
-			launchLots(context.scenarios, architectures.length).map((lot) =>
-				cell(
-					'launch',
-					architecture,
-					LAUNCH_SETUP_MINUTES + LAUNCH_SCENARIO_MINUTES * lot.length,
-					lot.join(LOT_SEPARATOR)
-				)
-			)
-		),
-		cell('cold-bootstrap-native', 'arm64', 90)
-	];
+	return testbuildCells(context.scenarios, context.release);
 }
 
 /**
@@ -217,6 +204,60 @@ const LAUNCH_SETUP_MINUTES = 6;
 const LAUNCH_SCENARIO_MINUTES = 5;
 // A lot is its scenarios in canonical order, joined; no scenario name holds it.
 const LOT_SEPARATOR = '__';
+// The macOS 26 lot then builds its own application and receives the cold MLX
+// bootstrap (about two minutes of build and a receiver bounded at 35).
+const COLD_MLX_MINUTES = 45;
+
+/**
+ * The Install and launch cells of one profile. Each runner launches every
+ * scenario once across its lots. The last Apple silicon lot runs on the build
+ * host (macOS 26) instead of macOS 15 and, after its scenarios, receives the
+ * cold MLX bootstrap of an application it builds itself, the check Build used
+ * to run before signing: the stage covers macOS 15 and 26 and still holds five
+ * macOS jobs, the account's runner budget.
+ */
+function testbuildCells(scenarios, release) {
+	assert.equal(typeof release, 'boolean', 'Invalid release profile');
+	const architectures = release ? ['arm64', 'amd64'] : ['arm64'];
+	const launches = architectures.flatMap((architecture) => {
+		const lots = launchLots(scenarios, architectures.length);
+		if (architecture !== 'arm64') return lots.map((lot) => launchCell(architecture, lot, 0));
+		assert.ok(lots.length >= 2, 'Apple silicon needs a macOS 15 and a macOS 26 lot');
+		const host = lots[lots.length - 1];
+		assert.ok(
+			host.every((name) => !LAUNCH_QUALIFICATION_MATRIX.scenarios.includes(name)),
+			'A scenario whose deferrable launch receipt names macOS 15 cannot run on macOS 26'
+		);
+		return [
+			...lots.slice(0, -1).map((lot) => launchCell(architecture, lot, 0)),
+			launchCell('host', host, COLD_MLX_MINUTES)
+		];
+	});
+	return [...launches, cell('cold-bootstrap-native', 'arm64', 90)];
+}
+
+/** One launch lot on one host, bounded by its scenarios and any cold receiving. */
+function launchCell(architecture, lot, extraMinutes) {
+	return cell(
+		'launch',
+		architecture,
+		LAUNCH_SETUP_MINUTES + LAUNCH_SCENARIO_MINUTES * lot.length + extraMinutes,
+		lot.join(LOT_SEPARATOR)
+	);
+}
+
+/** Whether a test-build cell receives the cold MLX bootstrap of the application it builds. */
+function receivesColdBootstrap(selected) {
+	return (
+		selected.role === 'cold-bootstrap-native' ||
+		(selected.role === 'launch' && selected.architecture === 'host')
+	);
+}
+
+/** The runner of every macOS cell an Install and launch cell can be. */
+function launchRunners() {
+	return ['arm64', 'amd64', 'host'].map((architecture) => HOSTS[architecture].runner);
+}
 
 /** Splits the canonical scenarios into contiguous, balanced, non-empty lots per runner. */
 function launchLots(scenarios, runnerCount) {
@@ -270,6 +311,15 @@ function roleLot(stage, role, architecture, scenario) {
 	}
 	if (stage === 'testbuild' && role === 'launch') {
 		const names = lotScenarios(scenario).map((name) => name.replace(/_/g, ' '));
+		// The macOS 26 lot also receives the cold MLX bootstrap after its scenarios.
+		if (architecture === 'host')
+			return (
+				'Installed app: ' +
+				names.join(', ') +
+				', cold MLX bootstrap (' +
+				macosName(architecture) +
+				')'
+			);
 		return 'Installed app: ' + names.join(', ') + ' (' + native() + ')';
 	}
 	if (
@@ -761,6 +811,9 @@ module.exports = {
 	priorStages,
 	plan,
 	launchLots,
+	testbuildCells,
+	receivesColdBootstrap,
+	launchRunners,
 	lotScenarios,
 	humanLot,
 	roleLot,

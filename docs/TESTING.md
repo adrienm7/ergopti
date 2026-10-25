@@ -32,7 +32,10 @@ Swift launcher XCTest
 (`swift test --package-path static/ergopti_plus/macos/launcher`, macOS only)
 and the native probes of the build host;
 `macOS / Build (ErgoptiPlus.app, macOS 26)` then only builds, packages and
-signs.
+signs, behind the crash-on-launch smoke test of a release archive.
+`macOS / Install and launch` runs its last Apple silicon lot on macOS 26, the
+others on macOS 15; that lot then receives the cold MLX bootstrap of an
+application it builds, as the macOS 15 cold cell does.
 
 The three test stages split by what a test exercises, the same way on every
 row:

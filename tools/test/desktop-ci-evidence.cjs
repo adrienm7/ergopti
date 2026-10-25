@@ -18,6 +18,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const qualification = require('../ci/dev-release-qualification.cjs');
+const macRoles = require('../ci/macos-stage-roles.cjs');
 const timerContract = require('../diagnostics/hs_delayed_timer_contract.json');
 const karabinerContract = require('../diagnostics/hs_karabiner_config_contract.json');
 
@@ -403,30 +404,44 @@ function verifyColdBootstrap(report, sha) {
 	);
 }
 
-/** Admits exactly one actual cold bootstrap observation for this source SHA. */
-function verifyColdBootstrapRecords(records, sha) {
+/**
+ * Admits exactly one actual cold bootstrap observation for this source SHA from
+ * each runner the test-build plan gives a cold-receiving cell, and nothing else.
+ */
+function verifyColdBootstrapRecords(records, sha, runners) {
 	assert.ok(
-		Array.isArray(records) && records.length === 1,
+		Array.isArray(runners) &&
+			runners.length > 0 &&
+			new Set(runners).size === runners.length &&
+			runners.every((runner) => macRoles.launchRunners().includes(runner)),
+		'Invalid expected cold bootstrap runners'
+	);
+	assert.ok(Array.isArray(records), 'Missing cold bootstrap evidence');
+	assert.deepEqual(
+		records.map((record) => record?.runner).sort(),
+		[...runners].sort(),
 		'Missing, duplicate or unexpected cold bootstrap evidence'
 	);
-	const record = records[0];
-	assert.deepEqual(Object.keys(record).sort(), [
-		'contract',
-		'receipt',
-		'runner',
-		'schema_version',
-		'sha'
-	]);
-	assert.equal(record.schema_version, 1);
-	assert.equal(record.contract, 'macos-native-cold-bootstrap-v1');
-	assert.equal(record.runner, 'macos-15');
-	assert.equal(record.sha, sha);
-	verifyColdBootstrap(record.receipt, sha);
+	for (const record of records) {
+		assert.deepEqual(Object.keys(record).sort(), [
+			'contract',
+			'receipt',
+			'runner',
+			'schema_version',
+			'sha'
+		]);
+		assert.equal(record.schema_version, 1);
+		assert.equal(record.contract, 'macos-native-cold-bootstrap-v1');
+		assert.equal(record.sha, sha);
+		verifyColdBootstrap(record.receipt, sha);
+	}
 }
 
-/** Records only a source-admitted actual cold native receipt. */
+/** Records only a source-admitted actual cold native receipt, under the runner of its cell. */
 function recordColdMac(receiptFile, output) {
 	const sha = process.env.GITHUB_SHA;
+	const runner = process.env.MACOS_STAGE_RUNNER;
+	assert.ok(macRoles.launchRunners().includes(runner), 'Cold receipt from a foreign runner');
 	const receipt = JSON.parse(fs.readFileSync(receiptFile, 'utf8'));
 	verifyColdBootstrap(receipt, sha);
 	fs.writeFileSync(
@@ -434,7 +449,7 @@ function recordColdMac(receiptFile, output) {
 		JSON.stringify({
 			schema_version: 1,
 			contract: 'macos-native-cold-bootstrap-v1',
-			runner: 'macos-15',
+			runner,
 			sha,
 			receipt
 		}) + '\n'
@@ -481,12 +496,23 @@ function verify({
 	assert.deepEqual(Object.keys(needs).sort(), jobs.sort(), 'Mandatory jobs differ');
 	for (const job of jobs) assert.equal(needs[job].result, 'success', `${job} did not succeed`);
 	assert.match(sha, /^[a-f0-9]{40}$/, 'Invalid commit');
-	if (platform === 'macos') verifyColdBootstrapRecords(coldBootstrap, sha);
-	const runners = release ? ['macos-15', 'macos-15-intel'] : ['macos-15'];
+	// The test-build plan owns which runner launches each scenario and which
+	// cells receive the cold bootstrap; both sets must be met exactly.
+	const cells = platform === 'macos' ? macRoles.testbuildCells(scenarios, release) : [];
+	if (platform === 'macos')
+		verifyColdBootstrapRecords(
+			coldBootstrap,
+			sha,
+			cells.filter(macRoles.receivesColdBootstrap).map((cell) => cell.runner)
+		);
 	const expected =
 		platform === 'windows'
 			? ['windows-latest/startup']
-			: runners.flatMap((runner) => scenarios.map((scenario) => `${runner}/${scenario}`));
+			: cells
+					.filter((cell) => cell.role === 'launch')
+					.flatMap((cell) =>
+						macRoles.lotScenarios(cell.scenario).map((scenario) => `${cell.runner}/${scenario}`)
+					);
 	assert.ok(expected.length > 0, 'No expected launch scenarios');
 	assert.deepEqual(
 		evidence.map((record) => `${record.runner}/${record.scenario}`).sort(),

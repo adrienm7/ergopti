@@ -109,8 +109,30 @@ try {
 		count++;
 	}
 	const records = [];
-	for (const runner of runners)
-		for (const scenario of scenarios) {
+	// The release launch layout, authored independently of the stage plan:
+	// Apple silicon launches its first lot on macOS 15 and its last lot, which
+	// holds no deferrable scenario, on macOS 26; Intel launches all on macOS 15.
+	const layout = [
+		...scenarios.map((scenario, index) => [index < 7 ? runners[0] : 'macos-latest', scenario]),
+		...scenarios.map((scenario) => [runners[1], scenario])
+	];
+	// A deferrable scenario is refused on macOS 26; any other one records full there.
+	for (const scenario of ['clean', 'karabiner_config'])
+		check(() =>
+			assert.throws(
+				() => q.launchQualificationReceipt(profile, scenario, 'macos-latest', { source_sha: sha }),
+				/Invalid Mac launch qualification row/
+			)
+		);
+	for (const runner of ['ubuntu-latest', 'macos-14', ''])
+		check(() =>
+			assert.throws(
+				() => q.launchQualificationReceipt(profile, 'plain_open', runner, { source_sha: sha }),
+				/Invalid Mac launch qualification row/
+			)
+		);
+	for (const [runner, scenario] of layout) {
+		{
 			const receipt = q.launchQualificationReceipt(profile, scenario, runner, { source_sha: sha });
 			check(() => {
 				const admitted = q.validateLaunchQualificationReceipt(
@@ -214,6 +236,7 @@ try {
 				});
 			}
 		}
+	}
 	// Reuse the independently authored oracle without running its test module.
 	const coldFactory = fs
 		.readFileSync(path.join(__dirname, 'test-desktop-ci-evidence.cjs'), 'utf8')
@@ -238,7 +261,8 @@ try {
 		scenarios,
 		sha,
 		evidence: records,
-		coldBootstrap: [coldBootstrap],
+		// The macOS 15 cold cell and the macOS 26 lot each record one receipt.
+		coldBootstrap: [coldBootstrap, { ...coldBootstrap, runner: 'macos-latest' }],
 		needs: Object.fromEntries(
 			[
 				'test-hs',

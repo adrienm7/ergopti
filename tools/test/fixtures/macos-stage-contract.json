@@ -1,5 +1,5 @@
 {
-	"provenance": "Reviewed 144 original executable blocks, frozen Mac packet b09d1147; authored stage infrastructure. Never refresh from the workflow under test. Human-lot transport transposes only the reviewed metadata bindings and adds one genuine Unit map admission; never refresh from the workflow under test. The macOS 26 launcher XCTest, native probes and build-host self-tests move from package-macos to the launcher-native E2E role as reviewed entries under its role guard; Build receives and republishes their two receipts.",
+	"provenance": "Reviewed 144 original executable blocks, frozen Mac packet b09d1147; authored stage infrastructure. Never refresh from the workflow under test. Human-lot transport transposes only the reviewed metadata bindings and adds one genuine Unit map admission; never refresh from the workflow under test. The macOS 26 launcher XCTest, native probes and build-host self-tests move from package-macos to the launcher-native E2E role as reviewed entries under its role guard; Build receives and republishes their two receipts. The cold native MLX bootstrap leaves package-macos for the last Apple silicon launch lot, which runs on macOS 26 and receives it from its own build as reviewed entries under the launch role and its host guard; Build keeps only the crash-on-launch smoke test that gates signing.",
 	"jobs": [
 		{
 			"id": "test-hs",
@@ -815,11 +815,6 @@
 					"shell": "bash"
 				},
 				{
-					"name": "Receive actual cold native MLX bootstrap",
-					"if": "${{ steps.stage-admission.outcome == 'success' }}",
-					"timeout-minutes": 35
-				},
-				{
 					"name": "Smoke test built ErgoptiPlus.app (crash-on-launch guard)",
 					"if": "${{ steps.stage-admission.outcome == 'success' && (inputs.release) }}",
 					"timeout-minutes": 3,
@@ -948,6 +943,37 @@
 					"name": "Retain failed launch evidence of this attempt",
 					"uses": "actions/upload-artifact@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (failure()) }}"
+				},
+				{
+					"uses": "actions/setup-node@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled()) }}"
+				},
+				{
+					"uses": "actions/setup-python@v5",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled()) }}"
+				},
+				{
+					"name": "Require actual arm64 cold runtime prerequisites on macOS 26",
+					"id": "lot-cold-prerequisites",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled()) }}",
+					"shell": "bash"
+				},
+				{
+					"name": "Build independent signed cold application on macOS 26",
+					"id": "lot-cold-app",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled() && steps.lot-cold-prerequisites.outcome == 'success') }}",
+					"shell": "bash"
+				},
+				{
+					"name": "Receive actual isolated cold native MLX bootstrap on macOS 26",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled() && steps.lot-cold-app.outcome == 'success') }}",
+					"timeout-minutes": 35,
+					"shell": "bash"
+				},
+				{
+					"name": "Retain native cold bootstrap evidence of macOS 26",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && always()) }}"
 				},
 				{
 					"uses": "actions/checkout@v4",

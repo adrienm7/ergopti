@@ -829,7 +829,7 @@ check(
 	'(symlinked-config-dir) the plan receives the original canonical scenario profile'
 );
 for (const release of [false, true]) {
-	const scenarios = ['clean', 'upgraded', 'source_logs'];
+	const scenarios = ['clean', 'karabiner_config', 'upgraded', 'source_logs'];
 	const cells = macPlans
 		.plan('testbuild', {
 			source_sha: 'a'.repeat(40),
@@ -839,10 +839,25 @@ for (const release of [false, true]) {
 			scenarios
 		})
 		.filter((cell) => cell.role === 'launch');
-	// Each runner launches every scenario exactly once, in canonical order, across its lots.
-	const expected = (release ? ['macos-15', 'macos-15-intel'] : ['macos-15']).flatMap((runner) =>
-		scenarios.map((scenario) => [runner, scenario])
-	);
+	// Each processor family launches every scenario exactly once, in canonical
+	// order, across its lots; the last Apple silicon lot runs on macOS 26.
+	const appleSilicon = release
+		? [
+				['macos-15', 'clean'],
+				['macos-15', 'karabiner_config'],
+				['macos-latest', 'upgraded'],
+				['macos-latest', 'source_logs']
+			]
+		: [
+				['macos-15', 'clean'],
+				['macos-15', 'karabiner_config'],
+				['macos-15', 'upgraded'],
+				['macos-latest', 'source_logs']
+			];
+	const expected = [
+		...appleSilicon,
+		...(release ? scenarios.map((scenario) => ['macos-15-intel', scenario]) : [])
+	];
 	check(
 		JSON.stringify(
 			cells.flatMap((cell) =>

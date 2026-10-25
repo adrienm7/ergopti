@@ -97,7 +97,7 @@ function macRoleBody(body, role, expectedCount) {
 		run_id: '1',
 		event_name: 'push',
 		release: true,
-		scenarios: ['clean']
+		scenarios: ['clean', 'karabiner_config', 'upgraded']
 	}).filter((row) => row.role === role);
 	const expected =
 		role === 'cold-bootstrap-native'
@@ -348,46 +348,51 @@ for (const platform of ['windows', 'macos']) {
 						'managed-ollama-native',
 						'cold-bootstrap-native'
 					];
-		const runners =
-			platform === 'windows'
-				? ['windows-latest']
-				: release
-					? ['macos-15', 'macos-15-intel']
-					: ['macos-15'];
 		const scenarios =
-			platform === 'windows' ? ['startup'] : ['clean', 'upgraded', 'karabiner_config'];
+			platform === 'windows' ? ['startup'] : ['clean', 'karabiner_config', 'upgraded'];
+		// Independently authored launch layout: Apple silicon launches its last
+		// lot on macOS 26 (macos-latest), Intel every scenario on macOS 15.
+		const layout =
+			platform === 'windows'
+				? [['windows-latest', 'startup']]
+				: [
+						['macos-15', 'clean'],
+						['macos-15', 'karabiner_config'],
+						['macos-latest', 'upgraded'],
+						...(release ? scenarios.map((scenario) => ['macos-15-intel', scenario]) : [])
+					];
+		const coldOn = (runner) => ({ ...coldBootstrapRecord(), runner });
 		const state = {
 			platform,
 			release,
 			scenarios,
 			sha: 'a'.repeat(40),
-			coldBootstrap: platform === 'macos' ? [coldBootstrapRecord()] : [],
+			// The macOS 15 cold cell and the macOS 26 lot each record one receipt.
+			coldBootstrap: platform === 'macos' ? [coldOn('macos-15'), coldOn('macos-latest')] : [],
 			needs: Object.fromEntries(jobs.map((job) => [job, { result: 'success' }])),
-			evidence: runners.flatMap((runner) =>
-				scenarios.map((scenario) => ({
-					schema_version: 1,
-					platform,
-					runner,
-					scenario,
-					sha: 'a'.repeat(40),
-					package_sha256: 'b'.repeat(64),
-					failures: [],
-					marker_seen: true,
-					crashed_early: false,
-					...(platform === 'windows'
-						? {
-								native_startup: windowsStartup(),
-								compiled_upgrade: healthyUpgrade()
-							}
-						: {}),
-					...(platform === 'macos' && scenario === 'clean'
-						? { native_delayed_timer: timerSummary() }
-						: {}),
-					...(platform === 'macos' && scenario === 'karabiner_config'
-						? { native_karabiner_config: karabinerSummary() }
-						: {})
-				}))
-			)
+			evidence: layout.map(([runner, scenario]) => ({
+				schema_version: 1,
+				platform,
+				runner,
+				scenario,
+				sha: 'a'.repeat(40),
+				package_sha256: 'b'.repeat(64),
+				failures: [],
+				marker_seen: true,
+				crashed_early: false,
+				...(platform === 'windows'
+					? {
+							native_startup: windowsStartup(),
+							compiled_upgrade: healthyUpgrade()
+						}
+					: {}),
+				...(platform === 'macos' && scenario === 'clean'
+					? { native_delayed_timer: timerSummary() }
+					: {}),
+				...(platform === 'macos' && scenario === 'karabiner_config'
+					? { native_karabiner_config: karabinerSummary() }
+					: {})
+			}))
 		};
 		verify(state);
 		const rejects = (mutate) => {
@@ -407,6 +412,25 @@ for (const platform of ['windows', 'macos']) {
 		}
 		rejects((value) => value.evidence.pop());
 		rejects((value) => value.evidence.push(value.evidence[0]));
+		if (platform === 'macos') {
+			// A scenario launched on another runner than its lot, a missing,
+			// duplicate or foreign cold receipt: the plan's exact sets refuse.
+			rejects((value) => {
+				value.evidence[2].runner = 'macos-15';
+			});
+			rejects((value) => {
+				value.evidence[0].runner = 'macos-latest';
+			});
+			rejects((value) => value.coldBootstrap.pop());
+			rejects((value) => value.coldBootstrap.shift());
+			rejects((value) => value.coldBootstrap.push(structuredClone(value.coldBootstrap[0])));
+			rejects((value) => {
+				value.coldBootstrap[1].runner = 'macos-15';
+			});
+			rejects((value) => {
+				value.coldBootstrap[1].runner = 'macos-15-intel';
+			});
+		}
 		rejects((value) => {
 			value.evidence[0].sha = 'c'.repeat(40);
 		});
@@ -2242,14 +2266,31 @@ const {
 	recordColdMac,
 	readColdBootstrapEvidence
 } = require('./desktop-ci-evidence.cjs');
-verifyColdBootstrapRecords([coldBootstrapRecord()], 'a'.repeat(40));
+// The fixture receipt is the macOS 15 cold cell's; a rejection must come from
+// the mutation, so the one expected runner is always supplied.
+const COLD_RUNNERS = ['macos-15'];
+verifyColdBootstrapRecords([coldBootstrapRecord()], 'a'.repeat(40), COLD_RUNNERS);
+// Both cold-receiving cells, in either order, and nothing else.
+verifyColdBootstrapRecords(
+	[{ ...coldBootstrapRecord(), runner: 'macos-latest' }, coldBootstrapRecord()],
+	'a'.repeat(40),
+	['macos-15', 'macos-latest']
+);
+for (const runners of [[], ['macos-15', 'macos-15'], ['ubuntu-latest'], undefined])
+	assert.throws(
+		() => verifyColdBootstrapRecords([coldBootstrapRecord()], 'a'.repeat(40), runners),
+		/Invalid expected cold bootstrap runners/
+	);
 let coldRejections = 0;
 function rejectCold(mutate) {
 	const records = [coldBootstrapRecord()];
 	mutate(records);
-	assert.throws(() => verifyColdBootstrapRecords(records, 'a'.repeat(40)));
+	assert.throws(() => verifyColdBootstrapRecords(records, 'a'.repeat(40), COLD_RUNNERS));
 	coldRejections += 1;
 }
+rejectCold((records) => {
+	records[0].runner = 'macos-latest';
+});
 rejectCold((records) => records.pop());
 rejectCold((records) => records.push(structuredClone(records[0])));
 for (const field of Object.keys(coldBootstrapRecord()))
@@ -2371,7 +2412,7 @@ for (const field of ['device', 'inode']) {
 	for (const value of ['1', '9007199254740993', '1152921500312523020', '18446744073709551615']) {
 		const records = [coldBootstrapRecord()];
 		records[0].receipt.isolation.observations[0][field] = value;
-		verifyColdBootstrapRecords(records, 'a'.repeat(40));
+		verifyColdBootstrapRecords(records, 'a'.repeat(40), COLD_RUNNERS);
 	}
 	for (const value of [
 		undefined,
@@ -2497,6 +2538,96 @@ for (const [from, to] of [
 	assert.notEqual(changed, coldJob);
 	assert.throws(() => checkColdJob(changed), from);
 }
+// The macOS 26 launch lot receives the same cold MLX bootstrap after its
+// scenarios, from an application it builds, and records it under its runner.
+const LOT_COLD = "env.MACOS_STAGE_ARCHITECTURE == 'host' && ";
+/** Pins the cold receiving of the macOS 26 lot, guarded to that lot alone. */
+function checkLotColdSteps(job) {
+	const steps = pipeline.steps(job);
+	const index = (name) => {
+		const found = steps.findIndex((step) => step.name === name);
+		assert.ok(found >= 0 && steps.filter((step) => step.name === name).length === 1, name);
+		return found;
+	};
+	const after = index('Retain failed launch evidence of this attempt');
+	const at = [
+		'Require actual arm64 cold runtime prerequisites on macOS 26',
+		'Build independent signed cold application on macOS 26',
+		'Receive actual isolated cold native MLX bootstrap on macOS 26',
+		'Retain native cold bootstrap evidence of macOS 26'
+	].map(index);
+	assert.ok(
+		at.every((value, position) => value > after && (position === 0 || value > at[position - 1])),
+		'the lot receives the cold bootstrap after every scenario, in order'
+	);
+	const [prerequisites, build, receive, upload] = at.map((position) => steps[position].body);
+	assert.equal(
+		pipeline.stepField(prerequisites, 'if'),
+		Mac.condition('launch', LOT_COLD + '!cancelled()')
+	);
+	assert.equal(pipeline.stepField(prerequisites, 'id'), 'lot-cold-prerequisites');
+	assert.match(prerequisites, /test -x \/usr\/bin\/sandbox-exec/);
+	assert.match(prerequisites, /test "\$\(uname -m\)" = arm64/);
+	assert.equal(
+		pipeline.stepField(build, 'if'),
+		Mac.condition(
+			'launch',
+			LOT_COLD + "!cancelled() && steps.lot-cold-prerequisites.outcome == 'success'"
+		)
+	);
+	assert.equal(pipeline.stepField(build, 'id'), 'lot-cold-app');
+	assert.match(build, /ERGOPTI_BUILD_COMMIT: \$\{\{ github.sha \}\}/);
+	assert.match(build, /ERGOPTI_RELEASE: 'false'/);
+	assert.match(build, /HAMMERSPOON_VERSION: '1\.1\.1'/);
+	assert.match(build, /bash tools\/build\/build_macos_app.sh 2>&1 \| tee /);
+	assert.match(build, /codesign --verify --deep --strict build\/macos\/ErgoptiPlus.app/);
+	assert.equal(
+		pipeline.stepField(receive, 'if'),
+		Mac.condition('launch', LOT_COLD + "!cancelled() && steps.lot-cold-app.outcome == 'success'")
+	);
+	assert.match(receive, /python3 tools\/diagnostics\/macos_cold_bootstrap.py/);
+	assert.match(receive, /--app "\$PWD\/build\/macos\/ErgoptiPlus.app"/);
+	assert.match(receive, /node tools\/test\/desktop-ci-evidence.cjs record-cold-macos/);
+	for (const step of [prerequisites, build, receive]) {
+		assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
+		assert.equal(pipeline.stepField(step, 'shell'), 'bash');
+	}
+	assert.equal(pipeline.stepField(upload, 'if'), Mac.condition('launch', LOT_COLD + 'always()'));
+	assert.match(
+		upload,
+		/name: cold-bootstrap-native-\$\{\{ inputs.release && 'release' \|\| 'ci' \}\}-\$\{\{ env.MACOS_STAGE_RUNNER \}\}$/m
+	);
+	assert.match(upload, /if-no-files-found: error/);
+	assert.match(upload, /cold-bootstrap-evidence\.json/);
+}
+const launchJob = pipeline.job('launch');
+checkLotColdSteps(launchJob);
+for (const [from, to] of [
+	[
+		"Receive actual isolated cold native MLX bootstrap on macOS 26\n        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && ",
+		"Receive actual isolated cold native MLX bootstrap on macOS 26\n        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && ("
+	],
+	[
+		'          ERGOPTI_RELEASE: \'false\'\n          HAMMERSPOON_VERSION: \'1.1.1\'\n          GH_OWNER: ${{ github.repository_owner }}\n          GH_REPO: ${{ github.event.repository.name }}\n        run: |\n          set -euo pipefail\n          # A real ad-hoc signature suffices for native receiving. The fresh\n          # Sparkle key is used only in this unpublished test application.\n          export SPARKLE_PUBLIC_KEY="$(python3 -c \'import base64,secrets;print(base64.b64encode(secrets.token_bytes(32)).decode())\')"\n          bash tools/build/build_macos_app.sh 2>&1 | tee "$RUNNER_TEMP/cold-bootstrap-application-build.log"\n          codesign --verify --deep --strict build/macos/ErgoptiPlus.app 2>&1 | tee -a "$RUNNER_TEMP/cold-bootstrap-application-build.log"\n\n      - name: Receive actual isolated cold native MLX bootstrap on macOS 26',
+		'          ERGOPTI_RELEASE: \'true\'\n          HAMMERSPOON_VERSION: \'1.1.1\'\n          GH_OWNER: ${{ github.repository_owner }}\n          GH_REPO: ${{ github.event.repository.name }}\n        run: |\n          set -euo pipefail\n          # A real ad-hoc signature suffices for native receiving. The fresh\n          # Sparkle key is used only in this unpublished test application.\n          export SPARKLE_PUBLIC_KEY="$(python3 -c \'import base64,secrets;print(base64.b64encode(secrets.token_bytes(32)).decode())\')"\n          bash tools/build/build_macos_app.sh 2>&1 | tee "$RUNNER_TEMP/cold-bootstrap-application-build.log"\n          codesign --verify --deep --strict build/macos/ErgoptiPlus.app 2>&1 | tee -a "$RUNNER_TEMP/cold-bootstrap-application-build.log"\n\n      - name: Receive actual isolated cold native MLX bootstrap on macOS 26'
+	],
+	[
+		'          node tools/test/desktop-ci-evidence.cjs record-cold-macos \\\n            "$RUNNER_TEMP/native-cold-bootstrap/receipt.json" \\\n            "$RUNNER_TEMP/native-cold-bootstrap/cold-bootstrap-evidence.json"\n\n      - name: Retain native cold bootstrap evidence of macOS 26',
+		'\n      - name: Retain native cold bootstrap evidence of macOS 26'
+	],
+	[
+		"cold-bootstrap-native-${{ inputs.release && 'release' || 'ci' }}-${{ env.MACOS_STAGE_RUNNER }}",
+		"cold-bootstrap-native-${{ inputs.release && 'release' || 'ci' }}-macos-15"
+	],
+	["steps.lot-cold-app.outcome == 'success'", "steps.lot-cold-prerequisites.outcome == 'success'"]
+]) {
+	assert.equal(
+		launchJob.split(from).length,
+		2,
+		'unique lot cold mutation anchor: ' + from.slice(0, 60)
+	);
+	assert.throws(() => checkLotColdSteps(launchJob.replace(from, () => to)), from.slice(0, 60));
+}
 assert.ok(pipeline.needsOf(pipeline.job('macos-ok')).includes('launch'));
 assert.ok(
 	MacRoles.plan('testbuild', {
@@ -2504,7 +2635,7 @@ assert.ok(
 		run_id: '1',
 		event_name: 'push',
 		release: true,
-		scenarios: ['clean']
+		scenarios: ['clean', 'karabiner_config', 'upgraded']
 	}).some((row) => row.role === 'cold-bootstrap-native')
 );
 assert.match(
@@ -2590,10 +2721,27 @@ console.log(
 {
 	const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-cold-verdict-'));
 	const previousSha = process.env.GITHUB_SHA;
+	const previousRunner = process.env.MACOS_STAGE_RUNNER;
 	try {
 		process.env.GITHUB_SHA = 'a'.repeat(40);
 		const source = path.join(directory, 'receipt.json');
 		const output = path.join(directory, 'cold-bootstrap-evidence.json');
+		// The record names the runner of the cell that received it, never a guess.
+		fs.writeFileSync(source, JSON.stringify(coldBootstrapRecord().receipt));
+		for (const runner of [undefined, '', 'ubuntu-latest', 'macos-14'])
+			assert.throws(() => {
+				if (runner === undefined) delete process.env.MACOS_STAGE_RUNNER;
+				else process.env.MACOS_STAGE_RUNNER = runner;
+				recordColdMac(source, output);
+			}, /foreign runner/);
+		assert.equal(fs.existsSync(output), false, 'A foreign runner publishes no cold evidence');
+		process.env.MACOS_STAGE_RUNNER = 'macos-latest';
+		recordColdMac(source, output);
+		assert.deepEqual(readColdBootstrapEvidence(directory), [
+			{ ...coldBootstrapRecord(), runner: 'macos-latest' }
+		]);
+		fs.rmSync(output);
+		process.env.MACOS_STAGE_RUNNER = 'macos-15';
 		const rejected = coldBootstrapRecord().receipt;
 		rejected.caller.python_resolver = 'forced missing Python adapter';
 		fs.writeFileSync(source, JSON.stringify(rejected));
@@ -2611,11 +2759,13 @@ console.log(
 		fs.mkdirSync(duplicate);
 		fs.copyFileSync(output, path.join(duplicate, 'cold-bootstrap-evidence.json'));
 		assert.throws(() =>
-			verifyColdBootstrapRecords(readColdBootstrapEvidence(directory), 'a'.repeat(40))
+			verifyColdBootstrapRecords(readColdBootstrapEvidence(directory), 'a'.repeat(40), COLD_RUNNERS)
 		);
 	} finally {
 		if (previousSha === undefined) delete process.env.GITHUB_SHA;
 		else process.env.GITHUB_SHA = previousSha;
+		if (previousRunner === undefined) delete process.env.MACOS_STAGE_RUNNER;
+		else process.env.MACOS_STAGE_RUNNER = previousRunner;
 		fs.rmSync(directory, { recursive: true, force: true });
 	}
 }

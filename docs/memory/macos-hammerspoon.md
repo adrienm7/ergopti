@@ -27,8 +27,12 @@ so the launcher could only say "stopped unexpectedly with exit code 0".
 The `launch` job of `.github/workflows/ci-macos.yml` now runs
 `tools/diagnostics/macos_launch_gate.py` on the archive that `package-macos`
 built in the same run, installed over those user states. A run that does not
-publish uses the `ci` profile on macos-15; a release run uses the `release`
-profile on macos-15 and macos-15-intel, against the archive that ships. Either
+publish uses the `ci` profile on Apple silicon; a release run uses the `release`
+profile on Apple silicon and macos-15-intel, against the archive that ships.
+Apple silicon spans two versions: its last lot runs on macOS 26 (macos-latest),
+the others on macos-15, and `testbuildCells` in `tools/ci/macos-stage-roles.cjs`
+refuses a macOS 26 lot holding `clean` or `karabiner_config`, whose deferrable
+AppleEvent receipts name only the two macOS 15 runners. Either
 way a failed launch fails the macOS lane, and `Release` needs that lane.
 The launcher XCTest appends to the real
 `~/Library/Logs/ergopti_plus/launcher.log`, while `macos-release-launch.py`
@@ -36,8 +40,11 @@ refuses to judge a launch over an existing launcher log. It therefore runs in
 the E2E cell `Launcher XCTest and native probes (macOS 26)` (role
 `launcher-native` of `tools/ci/macos-stage-roles.cjs`) on a runner of its own,
 never on the Build runner that smoke-tests the release archive; Build only
-builds, packages and signs (`test-macos-stage-roles.cjs` refuses a test step in
-it). Any new step that runs launcher code on a runner that later launches the
+builds, packages and signs behind that crash-on-launch smoke test
+(`test-macos-stage-roles.cjs` refuses any other test step in it, the cold MLX
+bootstrap included). The macOS 26 lot receives that cold bootstrap after its
+scenarios, from an application it builds, once the runner is restored, so its
+launcher log never meets a launch verdict. Any new step that runs launcher code on a runner that later launches the
 packaged app must leave that folder absent.
 Add a scenario to `SCENARIOS` there for every new launch failure that depends
 on existing user state: `--print-matrix` derives both profiles from it, and
