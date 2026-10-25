@@ -177,4 +177,53 @@ helpers.describe("AI tap keys (ai-off-inert-macos)", function()
 	end)
 end)
 
+
+
+
+
+-- ====================================================
+-- ====================================================
+-- ======= 3/ The picker greys the manual agent =======
+-- ====================================================
+-- ====================================================
+
+helpers.describe("The action picker greys the agent's manual actions (ai-off-picker)", function()
+	helpers.it("greys them with the AI notice while the AI is off and offers them once on", function()
+		with_ai(function(state)
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["modules.shortcuts.ai_actions"] = nil
+			package.loaded["ui.menu.shortcut_utils"] = nil
+			local utils = require("ui.menu.shortcut_utils")
+			local gestures = {
+				get_action_parameter_spec = function() return nil end,
+				get_action_parameter = function() return "" end,
+				parameter_prompt = function() return "" end, parameter_error = function() return "" end,
+				send_vocabulary = function() return {} end, llm_prompt_choices = function() return {} end,
+				llm_prompt_default_count = function() return 1 end, llm_vision_choices = function() return {} end,
+				llm_language_choices = function() return {} end,
+			}
+			local function rows()
+				local items = {
+					{ type = "action", id = "llm_agent_selection" }, { type = "action", id = "llm_agent_command" },
+					{ type = "action", id = "llm_generate_prediction" }, { type = "action", id = "select_line" },
+				}
+				utils.picker_parameter_fields(gestures, items, nil)
+				return items
+			end
+			local notice = require("infra.i18n").get("llm.manual_prediction.disabled")
+			local off = rows()
+			for index = 1, 2 do
+				helpers.assert_eq(off[index].disabled, true, off[index].id .. " is greyed while the AI is off")
+				helpers.assert_eq(off[index].hint, notice, "with the reason")
+			end
+			helpers.assert_eq(off[3].disabled, nil, "an action the catalogue does not mark stays as it was")
+			helpers.assert_eq(off[4].disabled, nil)
+			state.enabled = true
+			local on = rows()
+			helpers.assert_eq(on[1].disabled, nil, "offered again with the AI on, no reload")
+			helpers.assert_eq(on[2].disabled, nil)
+		end)
+	end)
+end)
+
 return true

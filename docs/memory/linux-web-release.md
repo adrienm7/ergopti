@@ -114,7 +114,11 @@ Space types a space) and the pair engine rebuilds its policies from the next
 press with every key up, so no reload is needed. A tap-hold hold is a modifier
 or a layer, never an action, so there is no hold to gate. Action: a new
 key-claiming layer asks `AiActions.blocked` before claiming; extend
-`test_ai_off_disarms_ai_actions.lua` and `test_tap_hold_ai_off.lua`.
+`test_ai_off_disarms_ai_actions.lua` and `test_tap_hold_ai_off.lua`. The agent's
+manual actions (`llm_agent_selection`, `llm_agent_command`) refuse with the AI
+off (`agent_refused`, notice `llm.manual_prediction.disabled`), and the picker
+greys them through the `ai:on` requirement token of `actions.toml`, which all
+three drivers understand (Linux `requirement_holds`).
 
 ### project-linux-uinput-drops-a-press-of-a-held-key
 

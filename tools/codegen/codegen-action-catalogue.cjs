@@ -112,8 +112,8 @@ const AX_FIELDS = new Set(['platform', 'scalable']);
  */
 const REQUIREMENT_TOKENS = {
 	ahk: [],
-	hs: [],
-	linux: [/^tool:[A-Za-z0-9._+-]+$/, /^session:x11$/, /^session:workspaces$/]
+	hs: [/^ai:on$/],
+	linux: [/^tool:[A-Za-z0-9._+-]+$/, /^session:x11$/, /^session:workspaces$/, /^ai:on$/]
 };
 
 /**
