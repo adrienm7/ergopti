@@ -690,3 +690,201 @@ for Withdraw in [true, false]
 for MainDisabled in [true, false]
 	Test("LLM agent: queued local source is independent from prediction switch disabled=" . MainDisabled . " (agent-local-independent-queue)",
 		_LAG_LocalNativeCustody.Bind("queue-independent", MainDisabled))
+
+; Pin the real timer window at the production busy-count read. A Critical RAM
+; transaction defers this timer naturally; the fixture never invokes it there.
+class _LAG_QP_BusyCount extends Map {
+	__New(Registry, State) {
+		super.__New()
+		for Id, Entry in Registry
+			this[Id] := Entry
+		this.State := State
+		this.Armed := false
+	}
+	Count {
+		get {
+			Captured := super.Count
+			if this.Armed {
+				this.Armed := false
+				SetTimer(this.State["timer"], -1)
+				if !A_IsCritical
+					_LAG_QP_WaitForTimer(this.State)
+			}
+			return Captured
+		}
+	}
+}
+
+_LAG_QP_WaitForTimer(State) {
+	Started := A_TickCount
+	while !State["done"] && TickElapsed64(Started) < 2000
+		Sleep(10)
+	AssertTrue(State["done"], "the genuine publication-boundary timer must complete")
+	if IsObject(State["error"])
+		throw State["error"]
+}
+
+_LAG_QP_Publication(Mode) {
+	_LAG_Run(_LAG_Menu("action", "", "local"), _LTN_Screen(LAG_SELECTION), Body)
+	Body(Fx, Lines, Sent) {
+		global _LLM_Ollama_Async, _LLM_Ollama_Pending, _LLM_Ollama_PreflightPort, _LLM_Ollama_AsyncCounter
+		global _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_Agent_Generation
+		Saved := [_LLM_Ollama_Async, _LLM_Ollama_Pending, _LLM_Ollama_PreflightPort,
+			_LLM_Ollama_AsyncCounter, _LLM_AuxOwners, _LLM_AuxCleanupDebt]
+		State := Map("done", false, "error", 0, "timer", Timer, "deferred", [], "failures", Map(),
+			"successes", 0, "native_attempts", 0, "c_id", 0, "c_job", 0, "timer_critical", -1, "current_reads", 0, "pending_at_withdrawal", 0)
+		Registry := 0
+		Origin := LLM_OllamaCaptureOriginCustody
+		AssertFalse(Origin.HasOwnProp("Call"), "the production origin owner must start unmodified")
+		PreviousCritical := Critical("Off")
+		try {
+			_LLM_Ollama_Async := Map(), _LLM_Ollama_Pending := ""
+			_LLM_AuxOwners := Map(), _LLM_AuxCleanupDebt := Map()
+			_LLM_Ollama_PreflightPort := Map("schedule", Schedule, "list_models", FailModelList, "spawn", RefuseNative)
+			BusyId := Send("busy")
+			AssertTrue(_LLM_Ollama_Async.Has(BusyId), "the actual public API must reserve its real active entry")
+			AssertEqual(1, State["deferred"].Length, "the original active request owns a held preflight, not a process")
+			if Mode != "busy-idle" {
+				PriorId := Send("prior")
+				PriorJob := _LLM_Ollama_Pending
+			}
+			Registry := _LAG_QP_BusyCount(_LLM_Ollama_Async, State)
+			_LLM_Ollama_Async := Registry
+			AdmissionBoundary := Mode == "admission-newer" || Mode == "admission-withdrawn"
+			OriginBoundary := Mode == "origin-independent" || Mode == "origin-rejected"
+			Registry.Armed := !AdmissionBoundary && !OriginBoundary
+			if OriginBoundary
+				Origin.DefineProp("Call", {Call: CaptureOrigin})
+			Generation := _LLM_Agent_Generation
+			Current := AdmissionBoundary ? AdmissionCurrent
+				: (Mode == "newer-withdrawn" || Mode == "withdraw-only") ? _LLM_Agent_RenderIsCurrent.Bind(Generation) : 0
+			OlderId := Send("older", Current)
+			_LAG_QP_WaitForTimer(State)
+			AssertEqual(0, State["timer_critical"], "the actual timer must run outside the publication transaction")
+			AssertEqual(0, State["native_attempts"], "queue metadata controls cannot acquire a native transport")
+			AssertEqual(0, State["successes"])
+			AssertEqual(0, Fx.Ollama.Length, "the outer fixture recorder cannot replace the public local API")
+			AssertEqual(0, Sent.Length)
+			if Mode == "busy-idle" {
+				AssertTrue(_LLM_Ollama_Async.Has(OlderId), "the genuine busy completion must drain the admitted older job into its active slot")
+				AssertFalse(_LLM_Ollama_Pending is Map, "a stale busy snapshot cannot strand an idle pending job")
+				AssertEqual(2, State["deferred"].Length, "the actual dispatcher must schedule the admitted successor")
+				AssertEqual(1, State["failures"].Get("busy", 0))
+			} else {
+				WithdrawOnly := Mode == "withdraw-only" || Mode == "admission-withdrawn"
+				WithdrewBeforePublication := WithdrawOnly && State["pending_at_withdrawal"] == PriorJob
+				ExpectedId := Mode == "newer-independent" || Mode == "newer-withdrawn" || Mode == "callback-newer" || Mode == "admission-newer" || Mode == "origin-independent"
+					? State["c_id"] : WithdrewBeforePublication ? PriorId : OlderId
+				AssertTrue(_LLM_Ollama_Pending is Map, "the surviving accepted request owns a real pending job")
+				AssertEqual(ExpectedId, _LLM_Ollama_Pending["req_id"], "an older invocation cannot replace a newer accepted pending job")
+				AssertTrue(LLM_OllamaOriginCustodyCurrent(_LLM_Ollama_Pending["origin_custody"], _LLM_Ollama_Pending["base_url"]),
+					"all scheduling controls preserve the genuine original transport origin")
+				AssertEqual(WithdrewBeforePublication ? 0 : 1, State["failures"].Get("prior", 0),
+					"only an admitted publication can displace and settle the independent predecessor")
+				if WithdrawOnly {
+					AssertFalse(Current.Call(), "the genuine source is withdrawn while transport origin remains current")
+					if !WithdrewBeforePublication
+						AssertEqual(OlderId, State["pending_at_withdrawal"]["req_id"], "a deferred withdrawal observes the already committed older job")
+				}
+				AssertEqual(0, State["failures"].Get("newer", 0), "the retained newer pending request has no terminal failure")
+				if ExpectedId == State["c_id"]
+					AssertTrue(_LLM_Ollama_Pending == State["c_job"], "the newer public call retains its exact published job")
+				if Mode == "rejected-newer" || Mode == "origin-rejected"
+					AssertTrue(State["c_id"] > OlderId, "a refused newer call really advances the raw request counter without publishing")
+			}
+			ExpectedOlderFailures := Mode == "newer-independent" || Mode == "callback-newer" || Mode == "admission-newer" || Mode == "origin-independent" ? 1 : 0
+			AssertEqual(ExpectedOlderFailures, State["failures"].Get("older", 0),
+				"an independent dropped older job settles once; withdrawn and still-pending owners stay silent")
+		} finally {
+			if Origin.HasOwnProp("Call")
+				Origin.DeleteProp("Call")
+			SetTimer(State["timer"], 0)
+			if IsObject(Registry)
+				Registry.Armed := false
+			Owned := _LLM_Ollama_Async.Clone()
+			_LLM_Ollama_Async := Map(), _LLM_Ollama_Pending := ""
+			for _, Entry in Owned
+				_LLM_Ollama_CleanupCurlFiles(Entry)
+			for _, Owner in _LLM_AuxOwners.Clone()
+				_LLM_AuxRetireOwner(Owner, true)
+			_LLM_Ollama_Async := Saved[1], _LLM_Ollama_Pending := Saved[2], _LLM_Ollama_PreflightPort := Saved[3]
+			_LLM_Ollama_AsyncCounter := Saved[4], _LLM_AuxOwners := Saved[5], _LLM_AuxCleanupDebt := Saved[6]
+			State["deferred"] := [], State["timer"] := 0, State["c_job"] := 0, State["pending_at_withdrawal"] := 0
+			if IsObject(Registry)
+				Registry.State := 0
+			Critical(PreviousCritical)
+		}
+		Send(Label, Current := 0) {
+			Payload := '{"model":' . JsonStringLiteral(_LLM_LOCAL_DEFAULTS["llm_model"])
+				. ',"messages":[{"role":"user","content":' . JsonStringLiteral(Label) . '}],"stream":false}'
+			return LLM_OllamaChat_Async(Payload, (*) => State["successes"] += 1, Failure.Bind(Label), Current)
+		}
+		CaptureOrigin(Self, Args*) {
+			Origin.DeleteProp("Call")
+			Captured := Origin.Call(Args*)
+			AssertFalse(A_IsCritical, "genuine origin capture stays outside queue publication")
+			SetTimer(State["timer"], -1)
+			_LAG_QP_WaitForTimer(State)
+			return Captured
+		}
+		; Delay a genuine lifecycle read only to locate the scheduler window.
+		; Under Critical the timer remains deferred; there is no direct reentry.
+		AdmissionCurrent() {
+			Captured := _LLM_Agent_RenderIsCurrent(Generation)
+			State["current_reads"] += 1
+			if State["current_reads"] == 2 {
+				SetTimer(State["timer"], -1)
+				if !A_IsCritical
+					_LAG_QP_WaitForTimer(State)
+			}
+			return Captured
+		}
+		Failure(Label, *) {
+			try {
+				AssertFalse(A_IsCritical, "settlement callbacks must run outside the publication transaction")
+				State["failures"][Label] := State["failures"].Get(Label, 0) + 1
+				if Label == "prior" && Mode == "callback-newer"
+					PublishNewer()
+			} catch as Err
+				State["error"] := Err
+		}
+		PublishNewer() {
+			Current := Mode == "newer-withdrawn" ? _LLM_Agent_RenderIsCurrent.Bind(_LLM_Agent_Generation) : 0
+			State["c_id"] := Send("newer", Current)
+			State["c_job"] := _LLM_Ollama_Pending
+		}
+		Timer(*) {
+			try {
+				State["timer_critical"] := A_IsCritical
+				if Mode == "withdraw-only" || Mode == "admission-withdrawn"
+					State["pending_at_withdrawal"] := _LLM_Ollama_Pending
+				if Mode == "newer-withdrawn" || Mode == "withdraw-only" || Mode == "admission-withdrawn" {
+					AssertTrue(LLM_Agent_SetMode("off"), "a genuine committed mode withdrawal retires the older requester")
+					if Mode == "newer-withdrawn"
+						AssertTrue(LLM_Agent_SetMode("action"), "the newer requester enters the repaired same action owner")
+				}
+				if Mode == "newer-independent" || Mode == "newer-withdrawn" || Mode == "admission-newer" || Mode == "origin-independent"
+					PublishNewer()
+				else if Mode == "rejected-newer" || Mode == "origin-rejected"
+					State["c_id"] := Send("rejected", (*) => false)
+				else if Mode == "busy-idle"
+					State["deferred"][1].Call()
+			} catch as Err
+				State["error"] := Err
+			finally State["done"] := true
+		}
+		Schedule(Callback, Period) {
+			State["deferred"].Push(Callback)
+		}
+		FailModelList(Callback, Owner, Strict) {
+			LLM_AuxBindResources(Owner, Map("finalizer", Owner["on_retired"]))
+			Callback.Call(LLM_LocalModelListReceipt(Map("ok", false, "status", 503, "body", "")))
+		}
+		RefuseNative(*) {
+			State["native_attempts"] += 1
+			throw Error("A queue-publication control cannot acquire a native transport.")
+		}
+	}
+}
+for _LAG_QP_Mode in ["newer-independent", "newer-withdrawn", "noop", "rejected-newer", "callback-newer", "busy-idle", "withdraw-only", "admission-newer", "admission-withdrawn", "origin-independent", "origin-rejected"]
+	Test("Ollama pending publication: " . _LAG_QP_Mode . " (ollama-pending-publication)", _LAG_QP_Publication.Bind(_LAG_QP_Mode))
