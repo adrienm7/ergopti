@@ -1468,7 +1468,13 @@ Core.set_level(Core.LEVELS.DEBUG)
 ---   decision, so a deduped line does not produce a side effect the log suppressed.
 _log = function(variant_key, module_name, msg, ...)
 	local variant = VARIANTS[variant_key]
-	if not variant or variant.level < M.current_level then return false end
+	if not variant then return false end
+	if variant.level < M.current_level then
+		-- This dispatcher is the driver's one severity filter (the core's stays at
+		-- its floor), so the refusal is counted here for the log-volume figures.
+		Core.note_dropped()
+		return false
+	end
 
 	local core_fn = Core[CORE_VARIANT[variant_key]]
 	if not core_fn then return false end
@@ -1533,7 +1539,10 @@ function M.success(module_name, msg, ...) _log("SUCCESS", module_name, msg, ...)
 --- @param msg string Message or format string.
 --- @param ... any Optional format arguments.
 function M.evidence(module_name, msg, ...)
-	if VARIANTS.INFO.level < M.current_level then return false end
+	if VARIANTS.INFO.level < M.current_level then
+		Core.note_dropped()
+		return false
+	end
 	return Core.evidence(module_name, msg, ...) ~= nil
 end
 
@@ -1641,6 +1650,15 @@ function M.dedup_suppressed_count() return Core.dedup_suppressed_count() end
 --- and "Last recorded error" read this, not the 200-line ring.
 --- @return table { warn_count, err_count, last_error }
 function M.session_issues() return Core.session_issues() end
+
+--- Log-volume figures since the previous call (spec § 5.3); the totals are untouched.
+--- @return table Lines per level plus dropped, suppressed and collapsed.
+function M.volume_interval() return Core.volume_interval() end
+
+--- Renders log-volume figures as the text of an evidence record.
+--- @param counters table Figures from volume_interval().
+--- @return string
+function M.volume_text(counters) return Core.volume_text(counters) end
 
 --- Clock used to measure the dedup and repeat windows, in seconds.
 --- Replaceable so a test can drive the five-second window without sleeping for
