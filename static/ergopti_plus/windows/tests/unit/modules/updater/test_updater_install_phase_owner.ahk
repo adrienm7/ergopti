@@ -98,10 +98,64 @@ class _UIPO_Fixture {
 			this.Error := Failure
 		finally this.Done := true
 	}
+	OnRetirementTimer() {
+		global UPDATER_REQUEST_ORIGIN_MANUAL
+		try {
+			AssertFalse(A_IsCritical, "the termination boundary must permit actual callback interruption")
+			Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+			this.RetirementOutcome := _Updater_BeginDownloadTransaction(Request, false,
+				"v1.0.1", "https://example.invalid/successor.exe")
+			if this.RetirementOutcome.Reserved {
+				this.OwnedEpoch := this.RetirementOutcome.Epoch
+				AssertTrue(_Updater_RegisterDownloadArtifacts(this.OwnedEpoch, this.NewExe, this.SwapPath))
+				AssertTrue(FSWriteDurable(this.NewExe, "successor"))
+				AssertTrue(FSWriteDurable(this.SwapPath, "successor-swap"))
+			}
+		} catch Any as Failure
+			this.Error := Failure
+		finally this.Done := true
+	}
+	ExerciseRetirementAdmission() {
+		global _UpdaterDownloadWorker, _UpdaterDownloadArtifacts, UPDATER_REQUEST_ORIGIN_MANUAL
+		Old := this.Admit(this.OldFn, "original")
+		Worker := _UIPO_RetirementWorker(this)
+		Capture := _UpdaterCurlCaptureLedger()
+		_UpdaterDownloadArtifacts.CurlCapture := Capture
+		Capture.Acquire(this.Root)
+		Capture.Attach(Worker)
+		_UpdaterDownloadWorker := Worker
+		if this.Mode == "retire-end-admission"
+			AssertTrue(_Updater_EndDownloadTransaction(Old.Epoch))
+		else
+			AssertTrue(_Updater_CancelSelfUpdateTransaction(
+				"Install phase owner fixture: retiring original.", false, false, Old.Epoch))
+		if IsObject(this.Error)
+			throw this.Error
+		AssertTrue(this.Done, "a real timer must attempt admission while the retiring worker yields")
+		AssertTrue(Worker.Calls >= (this.Mode == "retire-end-admission" ? 1 : 2),
+			"the genuine capture owner must acknowledge tree retirement too")
+		FileAppend("RECEIPT updater-retirement-admission admitted=" . this.RetirementOutcome.Reserved
+			. " new_exists=" . !!FileExist(this.NewExe) . " swap_exists=" . !!FileExist(this.SwapPath)
+			. " terminate_calls=" . Worker.Calls . "`n", "*")
+		AssertFalse(this.RetirementOutcome.Reserved,
+			"a successor must not acquire shared staging paths before the previous worker and files retire")
+		AssertTrue(Capture.Retired, "the old private native capture must be fully released")
+		Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+		After := _Updater_BeginDownloadTransaction(Request, false, "v1.0.1", "https://example.invalid/successor.exe")
+		AssertTrue(After.Reserved, "successful retirement must reopen install admission")
+		this.OwnedEpoch := After.Epoch
+		AssertTrue(_Updater_RegisterDownloadArtifacts(After.Epoch, this.NewExe, this.SwapPath))
+		AssertTrue(FSWriteDurable(this.NewExe, "successor"))
+		AssertTrue(FSWriteDurable(this.SwapPath, "successor-swap"))
+		AssertEqual("successor", FileRead(this.NewExe, "UTF-8"))
+		AssertEqual("successor-swap", FileRead(this.SwapPath, "UTF-8"))
+	}
 	Exercise() {
 		global _UpdaterInstallObserver, _UpdaterInstallObserverEpoch
 		global _UpdaterDownloadInProgress, _UpdaterDownloadRequest, _UpdaterDownloadArtifacts
 		global _UpdaterDownloadWorker, _UpdaterSwapOwner, _UpdaterSwapTransactionCounter
+		if this.Mode == "retire-admission" || this.Mode == "retire-end-admission"
+			return this.ExerciseRetirementAdmission()
 		Old := this.Admit(this.OldFn, "original")
 		this.OldAdmission := Old.Admission, this.OldEpoch := Old.Epoch
 		LoggerSetTestSink(this.SinkFn)
@@ -180,9 +234,34 @@ class _UIPO_Fixture {
 	}
 }
 
+
+; Mirrors the tree port's synchronous termination acknowledgement while exposing
+; its yielding boundary. Native capture acquisition and retirement remain real.
+class _UIPO_RetirementWorker {
+	__New(Fixture) {
+		this.Fixture := Fixture
+		this.Calls := 0
+	}
+	terminate() {
+		this.Calls += 1
+		if this.Calls != 1
+			return true
+		F := this.Fixture
+		Timer := ObjBindMethod(F, "OnRetirementTimer")
+		try {
+			SetTimer(Timer, -1)
+			Started := A_TickCount
+			while !F.Done && TickElapsed(Started) < 2000
+				Sleep(10)
+			AssertTrue(F.Done, "the real timer must run before termination acknowledges completion")
+		} finally SetTimer(Timer, 0)
+		return true
+	}
+}
+
 _UIPO_Case(Mode) {
 	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker, _UpdaterDownloadRequest
-	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick, _UpdaterSelfUpdateEpoch
+	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick, _UpdaterSelfUpdateEpoch, _UpdaterDownloadRetirement
 	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
 	global _UpdaterInstallObserver, _UpdaterInstallObserverEpoch, _UpdaterManagedFailureOwner
 	global _UpdaterRecoveryPublishTarget, _UpdaterCurlCaptureDebt, _UpdaterSwapCleanupDebt
@@ -192,6 +271,7 @@ _UIPO_Case(Mode) {
 	global _HealthCheckWarnCount, _HealthCheckLastError, _HealthCheckErrCount, _ED_Policy, _ED_Busy, _ED_PendingRecord
 	AssertFalse(A_IsSuspended)
 	AssertFalse(_UpdaterDownloadInProgress || IsObject(_UpdaterDownloadWorker) || IsObject(_UpdaterDownloadRequest))
+	AssertFalse(IsObject(_UpdaterDownloadRetirement))
 	AssertFalse(_UpdaterSwapOwner is Map)
 	AssertFalse(_UpdaterManagedFailureOwner is Map)
 	AssertEqual(0, _UpdaterInstallObserver)
@@ -207,7 +287,7 @@ _UIPO_Case(Mode) {
 	SavedRequest := _UpdaterTest_SaveRequestState()
 	Saved := {InProgress: _UpdaterDownloadInProgress, Worker: _UpdaterDownloadWorker,
 		Request: _UpdaterDownloadRequest, Artifacts: _UpdaterDownloadArtifacts,
-		Started: _UpdaterDownloadStartedTick, Epoch: _UpdaterSelfUpdateEpoch,
+		Started: _UpdaterDownloadStartedTick, Epoch: _UpdaterSelfUpdateEpoch, Retirement: _UpdaterDownloadRetirement,
 		Swap: _UpdaterSwapOwner, Intent: _UpdaterExitIntent, Invocation: _UpdaterExitInvocation,
 		Observer: _UpdaterInstallObserver, ObserverEpoch: _UpdaterInstallObserverEpoch,
 		Failure: _UpdaterManagedFailureOwner, SwapCounter: _UpdaterSwapTransactionCounter,
@@ -244,6 +324,7 @@ _UIPO_Case(Mode) {
 			LoggerClearTestSink()
 			F.Close()
 			AssertFalse(_UpdaterDownloadInProgress || IsObject(_UpdaterDownloadWorker))
+			AssertFalse(IsObject(_UpdaterDownloadRetirement), "no terminal admission fence may leak")
 			AssertFalse(_UpdaterSwapOwner is Map)
 			DirDelete(Root, true)
 		} catch Any as Failure {
@@ -253,6 +334,7 @@ _UIPO_Case(Mode) {
 			_UpdaterDownloadInProgress := Saved.InProgress, _UpdaterDownloadWorker := Saved.Worker
 			_UpdaterDownloadRequest := Saved.Request, _UpdaterDownloadArtifacts := Saved.Artifacts
 			_UpdaterDownloadStartedTick := Saved.Started, _UpdaterSelfUpdateEpoch := Saved.Epoch
+			_UpdaterDownloadRetirement := Saved.Retirement
 			_UpdaterSwapOwner := Saved.Swap, _UpdaterExitIntent := Saved.Intent, _UpdaterExitInvocation := Saved.Invocation
 			_UpdaterInstallObserver := Saved.Observer, _UpdaterInstallObserverEpoch := Saved.ObserverEpoch
 			_UpdaterManagedFailureOwner := Saved.Failure, _UpdaterSwapTransactionCounter := Saved.SwapCounter
@@ -276,3 +358,9 @@ _UIPO_Case(Mode) {
 for _UIPO_Mode in ["cancel-distinct", "cancel-shared", "ready-distinct", "ready-shared", "cancel-current", "ready-current"]
 	Test("Updater install phase: " . _UIPO_Mode . " preserves exact transaction observation (updater-install-phase-owner)",
 		_UIPO_Case.Bind(_UIPO_Mode))
+
+Test("Updater install phase: retirement fences successor admission (updater-retirement-admission)",
+	_UIPO_Case.Bind("retire-admission"))
+
+Test("Updater install phase: completion fences successor admission (updater-retirement-admission)",
+	_UIPO_Case.Bind("retire-end-admission"))

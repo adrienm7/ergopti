@@ -805,6 +805,8 @@ global _UpdaterDownloadWorker := 0
 global _UpdaterDownloadRequest := 0
 global _UpdaterDownloadArtifacts := 0
 global _UpdaterDownloadStartedTick := 0
+; Detached state is still busy until native and shared-path retirement completes.
+global _UpdaterDownloadRetirement := 0
 global _UpdaterStagingTransportCounter := 0
 ; Bound of one inherited staging value (a URL or a path) passed through cmd.exe.
 global UPDATER_STAGING_ENV_MAX_CHARS := 7000
@@ -1951,6 +1953,7 @@ _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailu
 	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
 	global _UpdaterDownloadRequest, _UpdaterRecoveryPublishTarget
 	global _UpdaterDownloadStartedTick, _UpdaterCurlCaptureDebt, _UpdaterDownloadArtifacts
+	global _UpdaterDownloadRetirement
 	global UPDATER_REQUEST_POLICY_ALLOW
 	if !IsSet(Observation)
 		Observation := _Updater_CaptureInstallObservation()
@@ -1972,7 +1975,7 @@ _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailu
 			Outcome.ShouldDrop := true
 		} else if (_UpdaterRecoveryPublishTarget != "" || _UpdaterCurlCaptureDebt.Count != 0) {
 			Outcome.RecoveryBusy := true
-		} else if _UpdaterDownloadInProgress {
+		} else if _UpdaterDownloadInProgress || IsObject(_UpdaterDownloadRetirement) {
 			Outcome.DuplicateDownload := true
 		} else {
 			if ExpectedFailureOwner is Map
@@ -2465,20 +2468,38 @@ _Updater_QuiesceSelfUpdateForSuspend() {
 	return SwapClosed && CaptureClosed
 }
 
+; Retirement releases admission only for the exact detached terminal owner.
+; Resource cleanup stays interruptible; a successor cannot reuse its fixed paths.
+_Updater_ReleaseDownloadRetirement(Owner) {
+	global _UpdaterDownloadRetirement
+	if !IsObject(Owner)
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		if _UpdaterDownloadRetirement != Owner
+			return false
+		_UpdaterDownloadRetirement := 0
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePausedRequest := false, ExpectedEpoch := 0) {
 	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker
 	global _UpdaterDownloadRequest
 	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick
 	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
-	global _UpdaterSelfUpdateEpoch
+	global _UpdaterSelfUpdateEpoch, _UpdaterDownloadRetirement
 	Worker := 0
 	Owner := 0
 	Request := 0
 	Artifacts := 0
 	Observation := 0
 	HadTransaction := false
+	Retirement := 0
 	PreviousCritical := Critical("On")
 	try {
+		if IsObject(_UpdaterDownloadRetirement)
+			return false
 		if ExpectedEpoch && _UpdaterSelfUpdateEpoch != ExpectedEpoch
 			return false
 		HadTransaction := _UpdaterDownloadInProgress
@@ -2492,6 +2513,10 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 		if HadTransaction
 			Observation := Owner is Map ? Owner.Get("InstallObservation", 0)
 				: _Updater_ArtifactInstallObservation(Artifacts)
+		if HadTransaction {
+			Retirement := {Epoch: _UpdaterSelfUpdateEpoch}
+			_UpdaterDownloadRetirement := Retirement
+		}
 		_UpdaterDownloadWorker := 0
 		_UpdaterDownloadRequest := 0
 		_UpdaterDownloadArtifacts := 0
@@ -2505,19 +2530,21 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 	} finally {
 		Critical(PreviousCritical)
 	}
-	if IsObject(Worker)
-		try Worker.terminate()
-	if (Owner is Map)
-		_Updater_CloseSwapOwner(Owner, true)
-	CaptureClosed := _Updater_RetireCurlCaptureArtifacts(Artifacts)
-	if IsObject(Artifacts) && CaptureClosed {
-		for Name in ["NewExe", "SwapScript"] {
-			Path := Artifacts.HasOwnProp(Name) ? Artifacts.%Name% : ""
-			if (Path != "" and FSExists(Path) and !FSDelete(Path))
-				try LoggerError("Updater", "Could not delete cancelled staging artifact '{1}'.", Path)
+	try {
+		if IsObject(Worker)
+			try Worker.terminate()
+		if (Owner is Map)
+			_Updater_CloseSwapOwner(Owner, true)
+		CaptureClosed := _Updater_RetireCurlCaptureArtifacts(Artifacts)
+		if IsObject(Artifacts) && CaptureClosed {
+			for Name in ["NewExe", "SwapScript"] {
+				Path := Artifacts.HasOwnProp(Name) ? Artifacts.%Name% : ""
+				if (Path != "" and FSExists(Path) and !FSDelete(Path))
+					try LoggerError("Updater", "Could not delete cancelled staging artifact '{1}'.", Path)
+			}
 		}
-	}
-	SetTimer(_Updater_MonitorStagingWorker, 0)
+		SetTimer(_Updater_MonitorStagingWorker, 0)
+	} finally _Updater_ReleaseDownloadRetirement(Retirement)
 	; Process teardown wins before the visible terminal. RequestMayPublish queues
 	; exactly one manual notice for resume; a second cancellation has no Request.
 	if SurfacePausedRequest and IsObject(Request)
@@ -3696,12 +3723,17 @@ _Updater_TransferExitIntentAfterShutdownGates() {
 ; while both callbacks still target the same staging filenames.
 _Updater_EndDownloadTransaction(StagingEpoch := 0) {
 	global _UpdaterDownloadInProgress, _UpdaterDownloadRequest, _UpdaterSelfUpdateEpoch
-	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick
+	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick, _UpdaterDownloadRetirement
 	Artifacts := 0
+	Retirement := 0
 	PreviousCritical := Critical("On")
 	try {
+		if IsObject(_UpdaterDownloadRetirement)
+			return false
 		if (StagingEpoch and _UpdaterSelfUpdateEpoch != StagingEpoch)
 			return false
+		Retirement := {Epoch: _UpdaterSelfUpdateEpoch}
+		_UpdaterDownloadRetirement := Retirement
 		Artifacts := _UpdaterDownloadArtifacts
 		_UpdaterDownloadInProgress := false
 		_UpdaterDownloadRequest := 0
@@ -3710,7 +3742,9 @@ _Updater_EndDownloadTransaction(StagingEpoch := 0) {
 	} finally {
 		Critical(PreviousCritical)
 	}
-	_Updater_RetireCurlCaptureArtifacts(Artifacts)
-	try SetTimer((*) => _Updater_RebuildMenu(), -50)
+	try {
+		_Updater_RetireCurlCaptureArtifacts(Artifacts)
+		try SetTimer((*) => _Updater_RebuildMenu(), -50)
+	} finally _Updater_ReleaseDownloadRetirement(Retirement)
 	return true
 }
