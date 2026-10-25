@@ -449,7 +449,7 @@
 			"name": "Linux code launches only programs the minimal Arch, Fedora and openSUSE images ship, CI installs or a package declares",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-portable-commands.cjs"],
-			"repro": "node tools/test/test-linux-portable-commands.cjs"
+			"repro": "npm run test:linux-portable-commands"
 		}
 	]
 }
