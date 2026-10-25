@@ -6,6 +6,12 @@ local M = {}
 local unpack_values = table.unpack or unpack
 
 function M.attach(writer)
+	-- Logical flush ports own no native file descriptors. Do not let a broad
+	-- unknown-method metatable fabricate private cleanup debt, and preserve an
+	-- explicitly supplied debt port when a test models that refusal itself.
+	if rawget(writer, "has_private_file_debt") == nil then
+		writer.has_private_file_debt = function() return false end
+	end
 	writer.flush_transport_available = function() return true end
 	writer.start_flush = function(device, payload)
 		local ok = true
