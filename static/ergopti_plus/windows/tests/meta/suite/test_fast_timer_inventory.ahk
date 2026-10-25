@@ -200,7 +200,7 @@ _FTI_ResolvePeriod(Src, Expr) {
 	return ""
 }
 
-; Every repeating SetTimer site in the driver.
+; Every repeating SetTimer or TimerSetCallback site in the driver.
 ; One-shots (a negative period) and cancels (period 0) are excluded: neither can
 ; become a background poller.
 ; @returns {Array} { Callback, Period } — Period is "" when unresolved.
@@ -210,17 +210,24 @@ _FTI_RepeatingSites() {
 		return Sites
 	Src := _DriverSourceNoComments()
 	Sites := []
-	Pos := 1
-	while (Pos := InStr(Src, "SetTimer(", , Pos)) {
-		OpenPos := Pos + StrLen("SetTimer(") - 1
-		Args := _FTI_SplitArgs(Src, OpenPos)
-		Pos += 1
-		if (Args.Length < 2)
-			continue
-		Period := Args[2]
-		if (SubStr(Period, 1, 1) == "-" or Period == "0")
-			continue
-		Sites.Push({ Callback: Args[1], Period: _FTI_ResolvePeriod(Src, Period) })
+	; Production arms most timers through the TimerSetCallback adapter, which
+	; keeps SetTimer's period semantics; a scan of SetTimer alone would let a
+	; poller moved behind the adapter leave the inventory unseen.
+	for Needle in ["SetTimer(", "TimerSetCallback("] {
+		Pos := 1
+		while (Pos := InStr(Src, Needle, true, Pos)) {
+			OpenPos := Pos + StrLen(Needle) - 1
+			; A function definition starts at column 0; only calls arm a timer.
+			IsDefinition := (Pos = 1 || SubStr(Src, Pos - 1, 1) = "`n")
+			Args := _FTI_SplitArgs(Src, OpenPos)
+			Pos += 1
+			if (IsDefinition || Args.Length < 2)
+				continue
+			Period := Args[2]
+			if (SubStr(Period, 1, 1) == "-" or Period == "0")
+				continue
+			Sites.Push({ Callback: Args[1], Period: _FTI_ResolvePeriod(Src, Period) })
+		}
 	}
 	return Sites
 }
