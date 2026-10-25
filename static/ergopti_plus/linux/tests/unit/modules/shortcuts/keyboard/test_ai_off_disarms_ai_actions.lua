@@ -192,14 +192,16 @@ helpers.describe("AI gestures (ai-off-inert-linux)", function()
 	helpers.it("runs no AI action from a gesture while the AI is off", function()
 		with_ai(function(state)
 			local M = helpers.load_module("modules.gestures.manager")
-			M.init({ enabled = false, persist = false })
+			local fired = {}
+			M.init({ enabled = false, persist = false, action_handlers = {
+				llm_generate_prediction = function() fired[#fired + 1] = "llm_generate_prediction" end,
+			} })
 			M._test_begin_reading({})
 			helpers.assert_true(M.enable(), "the live test reader must permit enabling gestures")
 			helpers.assert_true(M.set_action("swipe_5_up", "llm_generate_prediction"))
-			local fired = {}
-			M._test_execute = function(action) fired[#fired + 1] = action end
 			local gesture = { fingers = 5, direction = "up", tap = false }
 			helpers.assert_eq(M.dispatch_gesture(gesture), false, "AI off: the gesture does nothing")
+			helpers.assert_eq(#fired, 0, "and its handler never runs")
 			state.enabled = true
 			helpers.assert_eq(M.dispatch_gesture(gesture), true, "AI on: the gesture runs again")
 			helpers.assert_eq(fired[1], "llm_generate_prediction")
