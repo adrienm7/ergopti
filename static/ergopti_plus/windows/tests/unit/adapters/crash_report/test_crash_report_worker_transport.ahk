@@ -694,3 +694,113 @@ Test("crash CIM diagnostic: observes and forwards the exact primary completion w
 	_CRWT_CimObservationForwardsExactReceipt)
 Test("crash CIM diagnostic: missing and malformed primary receipts cannot manufacture success",
 	_CRWT_CimObservationKeepsMissingAndMalformedFactsClosed)
+
+
+_CRWT_AssertCodeUnits(Expected, Actual, Context) {
+	AssertEqual(StrLen(Expected), StrLen(Actual), Context . " must preserve the stored text length")
+	Loop StrLen(Expected)
+		AssertEqual(NumGet(StrPtr(Expected), (A_Index - 1) * 2, "UShort"),
+			NumGet(StrPtr(Actual), (A_Index - 1) * 2, "UShort"),
+			Context . " differs at UTF-16 unit " . A_Index)
+}
+
+_CRWT_EncodedControlText(Encoder, Payload) {
+	Report := Map()
+	for Key in _CRWT_RequiredKeys()
+		Report[Key] := Payload
+	Report["_transport_script_dir"] := "C:\source"
+	Report["_transport_reports_dir"] := "C:\reports"
+	Encoded := Encoder.Call(Report)
+	AssertFalse(RegExMatch(Encoded, "\x00"), "encoded crash JSON must contain no raw NUL")
+	Parsed := JsonParse(Encoded)
+	for Key in _CRWT_RequiredKeys() {
+		AssertTrue(Parsed.Has(Key), "the canonical field must survive: " . Key)
+		_CRWT_AssertCodeUnits(Payload, Parsed[Key], "crash field " . Key)
+	}
+	if Encoder == _CrashReport_ToWorkerJson {
+		AssertEqual("C:\source", Parsed["_transport_script_dir"])
+		AssertEqual("C:\reports", Parsed["_transport_reports_dir"])
+	} else {
+		AssertFalse(Parsed.Has("_transport_script_dir"))
+		AssertFalse(Parsed.Has("_transport_reports_dir"))
+	}
+}
+
+for Encoder in [_CrashReport_ToJson, _CrashReport_ToWorkerJson] {
+	for Spec in [
+		["plain", "error é 😀 " . '"' . "\`r`n`t"],
+		["nul-head", Chr(0) . '"suffix\' . "`n"],
+		["nul-middle", "prefix" . Chr(0) . '"suffix\' . "`n"],
+		["nul-tail", "prefix" . Chr(0)],
+		["nul-repeated", Chr(0) . Chr(0) . "é" . Chr(0) . "😀" . Chr(0)]
+	]
+		Test("crash report JSON: " . Encoder.Name . " " . Spec[1] . " (crash-json-control-roundtrip)",
+			_CRWT_EncodedControlText.Bind(Encoder, Spec[2]))
+	Loop 32
+		Test("crash report JSON: " . Encoder.Name . " C0=" . (A_Index - 1) . " (crash-json-control-roundtrip)",
+			_CRWT_EncodedControlText.Bind(Encoder, "prefix" . Chr(A_Index - 1) . '"\suffix'))
+}
+
+
+_CRWT_ControlPayload() {
+	Payload := "error é " . Chr(0) . '"\after' . "`r`n" . Chr(0) . "😀"
+	Loop 32
+		Payload .= Chr(A_Index - 1)
+	return Payload . " final detail"
+}
+
+_CRWT_ControlTextSavedToDisk() {
+	global _LogsDir
+	SavedLogsDir := _LogsDir
+	Root := A_Temp . "\ergopti_crash_json_control_" . A_TickCount . "\"
+	try {
+		_LogsDir := Root
+		Payload := _CRWT_ControlPayload()
+		Report := Map("timestamp", "2026-10-25T16:00:00Z",
+			"error_msg", Payload, "log_tail", Payload)
+		Path := CrashReport_Save(Report)
+		AssertTrue(Path != "" && FileExist(Path), "the durable report must be published")
+		SavedJson := FileRead(Path, "UTF-8")
+		AssertFalse(RegExMatch(SavedJson, "\x00"), "the persisted report must contain no raw NUL")
+		Parsed := JsonParse(SavedJson)
+		for Key in ["error_msg", "log_tail"]
+			_CRWT_AssertCodeUnits(Payload, Parsed[Key], "persisted " . Key)
+	} finally {
+		_LogsDir := SavedLogsDir
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("crash report JSON: durable disk report preserves control text (crash-json-control-disk)",
+	_CRWT_ControlTextSavedToDisk)
+
+_CRWT_ControlTextThroughNativeWorker() {
+	global _ConfigDir
+	SavedConfigDir := _ConfigDir
+	Scope := _CRWF_Fixture("json-control-text")
+	Failure := 0
+	try {
+		_ConfigDir := Scope.Directory . "\"
+		Snapshot := _CrashReport_CheapSnapshot(Error("control-text transport"))
+		Snapshot["_transport_reports_dir"] := Scope.Directory . "\reports\"
+		Payload := _CRWT_ControlPayload()
+		for Key in ["error_msg", "error_extra", "stack_trace", "active_window_title", "log_tail"]
+			Snapshot[Key] := Payload
+		Result := _CRWT_StartAndWait(Snapshot, Scope, Map("faults", "os,cpu,git"))
+		AssertEqual(1, InStr(Result["artifact"], Scope.Directory . "\reports\"),
+			"the worker must publish inside its exact fixture directory")
+		AssertEqual("primary", Result["owner"]["phase"], "only the real primary writer qualifies this path")
+		AssertEqual(1, Scope.Tasks.Count, "the worker must not silently fall back")
+		AssertTrue(Result["owner"]["mapping"]["closed"], "completion must release the real IPC mapping")
+		for Key in ["error_msg", "error_extra", "stack_trace", "active_window_title", "log_tail"]
+			_CRWT_AssertCodeUnits(Payload, Result["report"][Key], "native worker " . Key)
+	} catch Error as Caught {
+		Failure := Caught
+		throw Caught
+	} finally {
+		_ConfigDir := SavedConfigDir
+		Scope.Finish(Failure)
+	}
+}
+Test("crash report JSON: native worker preserves control text (crash-json-control-native)",
+	_CRWT_ControlTextThroughNativeWorker)
