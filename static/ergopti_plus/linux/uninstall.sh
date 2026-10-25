@@ -123,7 +123,7 @@ fi
 # Resolve before deleting and reject system roots and link aliases. The only
 # removable standalone tree is the layout created by install.sh.
 [ -d "$PREFIX" ] || { echo 'Installation prefix does not exist.' >&2; exit 1; }
-PREFIX="$(cd -- "$PREFIX" && pwd -P)"
+IFS= read -r -d '' PREFIX < <(CDPATH= cd -Pe -- "$PREFIX" && printf '%s\0' "$PWD")
 case "$PREFIX" in
 	/|/usr|/usr/local|/app|/nix|/nix/*) echo 'Refusing a system installation prefix.' >&2; exit 1 ;;
 esac

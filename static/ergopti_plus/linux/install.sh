@@ -107,6 +107,14 @@ HELP
 	esac
 done
 
+# Publish only the physical absolute prefix, never the installer's working
+# directory or a selected directory alias. mkdir preserves existing modes;
+# NUL framing preserves trailing newlines that command substitution removes.
+if ! $SETUP_PERMS_ONLY; then
+	mkdir -p -- "$PREFIX"
+	IFS= read -r -d '' PREFIX < <(CDPATH= cd -Pe -- "$PREFIX" && printf '%s\0' "$PWD")
+fi
+
 LIB_DIR="${PREFIX}/lib/ergopti"
 BIN_DIR="${PREFIX}/bin"
 CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
