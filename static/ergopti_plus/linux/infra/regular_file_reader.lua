@@ -12,6 +12,9 @@ local O_NONBLOCK, O_CLOEXEC = 2048, 524288 -- Linux open flags, with O_RDONLY = 
 local ENOENT, EIO, EINVAL = 2, 5, 22 -- Linux errno receipts.
 local AT_EMPTY_PATH, STATX_TYPE, S_IFREG = 4096, 1, 32768 -- Linux descriptor/type query.
 
+-- Consumers must only announce absence on this reader's canonical ENOENT.
+M.ENOENT = ENOENT
+
 --- Opens a nonblocking descriptor and its owned native operations.
 --- @param path string
 --- @return number|nil descriptor

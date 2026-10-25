@@ -21,6 +21,8 @@ local M = {}
 
 local Logger     = require("logger.shim")
 local LoggerSink = require("infra.logger_sink")
+local RegularFileReader = require("infra.regular_file_reader")
+local ErrorDescription = require("error_description")
 
 local LOG = "log_openers"
 
@@ -44,11 +46,16 @@ end
 
 --- True when `path` names a readable file.
 --- @param path string Absolute path.
---- @return boolean
+--- @return boolean|nil exists False only on proven ENOENT; nil on a read refusal.
+--- @return string|nil failure
 local function file_exists(path)
-	local handle = io.open(path, "r")
-	if not handle then return false end
-	handle:close()
+	local handle, detail, code = RegularFileReader.open(path)
+	if not handle then
+		if code == RegularFileReader.ENOENT then return false end
+		return nil, detail
+	end
+	local closed, close_error = handle:close()
+	if closed ~= true then return nil, close_error end
 	return true
 end
 
@@ -95,7 +102,12 @@ function M.open_today_errors(open_fn, notify_fn)
 	notify_fn = notify_fn or notify_default
 	require_function(notify_fn, "a notification function")
 	local path = LoggerSink.errors_log_path()
-	if file_exists(path) then return open_fn(path) == true end
+	local exists, failure = file_exists(path)
+	if exists == true then return open_fn(path) == true end
+	if exists == nil then
+		Logger.error(LOG, "Errors file '%s' could not be inspected: %s.", path, ErrorDescription.describe(failure))
+		return false
+	end
 	Logger.info(LOG, "No errors file for today at '%s'; the user is told instead.", path)
 	local delivered = notify_fn("menu.debug.no_errors_today")
 	if delivered ~= true then
