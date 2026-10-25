@@ -578,7 +578,7 @@ assert.ok(
 	'the clean build never restores a cache'
 );
 controls += 5;
-// The build that packages beside E2E waits for exactly the uploaded inputs.
+// The build that packages after E2E waits for exactly the uploaded inputs.
 for (const architecture of ['arm64', 'amd64'])
 	assert.equal(
 		Handoff.qualifierJobSuffix(architecture),
@@ -596,7 +596,7 @@ assert.equal(
 	['managed-ollama-inputs', 'amd64', SHA, '42'].join('-')
 );
 const build = workflow.jobs['package-macos'];
-assert.deepEqual(build.needs, ['integration-hs'], 'the build runs beside E2E, after Integration');
+assert.deepEqual(build.needs, ['e2e-hs'], 'the build runs after E2E');
 assert.deepEqual(build.permissions, { contents: 'read', actions: 'read' });
 const names = build.steps.map((step) => step.name);
 const awaiting = names.indexOf('Await both source-qualified native producer inputs');

@@ -6,8 +6,9 @@
 # and publishes. Common exposes JS contracts/parity, properties, and (on main)
 # mutation tests independently, each on a fresh shallow checkout.
 #
-# Every OS follows the same visible sequence:
-#   unit tests -> E2E -> build/package -> install and launch -> verdict
+# Every lane follows the same strictly sequential visible stages:
+#   Unit -> Integration -> E2E -> Build -> Install and launch -> Verdict
+# A failing stage skips every later one; no stage runs beside another.
 # Installation variants stay inside one matrix. Each verdict rejects missing
 # mandatory work.
 #

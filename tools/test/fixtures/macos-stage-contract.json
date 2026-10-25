@@ -530,7 +530,7 @@
 					"contents": "read",
 					"actions": "read"
 				},
-				"needs": ["integration-hs"],
+				"needs": ["e2e-hs"],
 				"runs-on": "macos-latest",
 				"timeout-minutes": 45,
 				"outputs": {
@@ -835,7 +835,7 @@
 			"id": "launch",
 			"metadata": {
 				"name": "Install and launch",
-				"needs": ["e2e-hs", "package-macos"],
+				"needs": ["package-macos"],
 				"runs-on": "${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].runner }}",
 				"timeout-minutes": "${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].timeout_minutes }}",
 				"strategy": {

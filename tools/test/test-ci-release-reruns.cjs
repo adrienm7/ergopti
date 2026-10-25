@@ -910,11 +910,8 @@ function assertMacLotSource(job) {
 	const matrixOutput = stage + '_matrix';
 	const metadataOutput = stage + '_metadata';
 	const map = 'needs.' + predecessor + '.outputs.' + metadataOutput;
-	// The test build admits E2E beside the Build that supplies its lot plan.
-	assert.deepEqual(
-		pipeline.needsOf(job.body),
-		stage === 'testbuild' ? ['e2e-hs', predecessor] : [predecessor]
-	);
+	// Each stage waits for the one before it and reads its lot plan from it.
+	assert.deepEqual(pipeline.needsOf(job.body), [predecessor]);
 	assert.equal(
 		pipeline.field(job.body, 'runs-on'),
 		'${{ fromJSON(' + map + ')[matrix.lot].runner }}'
