@@ -363,8 +363,9 @@ check(
 	'the local dispatcher must send a caller-written chat body as it is'
 );
 check(
-	/^LLM_OllamaChat_Async\(payload, on_success, on_fail\) \{$/m.test(streaming),
-	'the local server must accept a caller-written chat body'
+	/^LLM_OllamaChat_Async\(payload, on_success, on_fail, CurrentFn := 0\) \{$/m.test(streaming) &&
+		bodyOf(streaming, 'LLM_OllamaChat_Async').includes('false, "", payload, CurrentFn)'),
+	'the local server must retain the caller-written chat body and requester admission'
 );
 const screenshots = read('modules/gestures/screenshots.ahk');
 // The GDI and GDI+ calls live at the native boundary, beside the owner.
@@ -752,8 +753,8 @@ const manualRequesterInverses = [
 	['agent', 'Candidate[Key] != Previous', 'false'],
 	[
 		'agent',
-		'_LLM_Agent_Generation += 1\n\tLoggerDebug',
-		'_LLM_Agent_Generation += 0\n\tLoggerDebug'
+		'(Key == "agent_system2" || Key == "agent_mode") && Candidate[Key] != Previous\n\t\t_LLM_Agent_Generation += 1',
+		'(Key == "agent_system2" || Key == "agent_mode") && Candidate[Key] != Previous\n\t\t_LLM_Agent_Generation += 0'
 	],
 	[
 		'agent',
