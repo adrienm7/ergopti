@@ -251,6 +251,13 @@ _ConfigBackup_Load(ConfigDir, Id, Rules) {
 			|| !Record.Has("id") || Record["id"] != Id || !Record.Has("kind") || !Rules["kinds"].Has(Record["kind"])
 			|| !Record.Has("files") || !(Record["files"] is Array)
 		return 0
+	; The picker compares timestamps and the page/restore paths consume these
+	; strings. Reject malformed metadata here so one damaged backup cannot hide
+	; every healthy restore candidate or fail only after restore has begun.
+	for _, Field in ["created_at", "tag", "from_version"] {
+		if !Record.Has(Field) || !(Record[Field] is String)
+			return 0
+	}
 	Files := []
 	for _, File in Record["files"] {
 		if !(File is Map) || !File.Has("root") || File["root"] != "config" || !File.Has("path")
@@ -259,9 +266,9 @@ _ConfigBackup_Load(ConfigDir, Id, Rules) {
 		Files.Push(File["path"])
 	}
 	return Map("id", Id, "path", BackupPath, "kind", Record["kind"],
-		"created_at", Record.Has("created_at") ? Record["created_at"] : "",
-		"tag", Record.Has("tag") ? Record["tag"] : "",
-		"from_version", Record.Has("from_version") ? Record["from_version"] : "",
+		"created_at", Record["created_at"],
+		"tag", Record["tag"],
+		"from_version", Record["from_version"],
 		"files", Files)
 }
 

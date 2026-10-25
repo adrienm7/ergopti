@@ -326,6 +326,43 @@ _RIT_BackupAndRestoreRealFiles() {
 Test("Config backup: backs up and restores the configuration's exact bytes (config-backup-real-files)",
 	_RIT_BackupAndRestoreRealFiles)
 
+
+; A damaged manifest must not make the complete backup picker throw or replace
+; a usable backup with metadata that its page/restore consumers cannot read.
+_RIT_BackupRejectsMalformedMetadata(Field, Token) {
+	Root := A_Temp . "\ergopti_rit_metadata_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "[script]`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Valid := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		Later := () => Map("stamp", "20260930-111500", "iso", "2026-09-30T11:15:00Z")
+		Damaged := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Later)
+		ManifestPath := Damaged["path"] . "\" . Rules["manifest"]
+		Raw := FileRead(ManifestPath, "UTF-8")
+		Member := JsonStringLiteral(Field) . ":" . JsonStringLiteral(Damaged[Field])
+		Changed := StrReplace(Raw, Member, JsonStringLiteral(Field) . ":" . Token, , &Count)
+		AssertEqual(1, Count, "the fixture must mutate the genuine manifest's selected metadata")
+		AssertTrue(FSWriteDurable(ManifestPath, Changed), "the malformed on-disk manifest must be published")
+		Latest := ConfigBackup_Latest(Cfg, "pre_install", Rules)
+		AssertEqual(Valid["id"], Latest["id"], "damaged metadata must leave the valid backup available")
+		AssertEqual(0, _ConfigBackup_Load(Cfg, Damaged["id"], Rules), "the malformed record has no restore authority")
+		Refused := ConfigBackup_Restore(Cfg, Damaged["id"], Rules, Later)
+		AssertFalse(Refused["ok"], "a malformed manifest is never restored")
+		AssertEqual("missing", Refused["reason"])
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+for _RIT_MetadataField in ["created_at", "tag", "from_version"] {
+	for _RIT_MetadataToken in ["[]", "{}", "null", "7"]
+		Test("Config backup: malformed " . _RIT_MetadataField . "=" . _RIT_MetadataToken
+			. " cannot hide valid backups (config-backup-manifest-metadata)",
+			_RIT_BackupRejectsMalformedMetadata.Bind(_RIT_MetadataField, _RIT_MetadataToken))
+}
+
+
 _RIT_ManifestPathsStayInside() {
 	AssertTrue(ConfigBackup_IsContained("hotstrings/personal_hotstrings.toml"))
 	for _, Bad in ["", "/etc/passwd", "..\x", "a/../b", "a//b", "C:/x", "a\b", "./a"]
