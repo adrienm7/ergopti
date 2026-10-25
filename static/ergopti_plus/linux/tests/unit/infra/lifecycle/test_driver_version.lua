@@ -192,23 +192,13 @@ end)
 
 describe("Driver version: the crash dump names the version and the app dir", function()
 	it("writes both lines although the daemon passes no context", function()
-		require("tests.support.modules.diagnostics.crash_admission").with_admission(function(redact)
+		require("tests.support.modules.diagnostics.crash_admission").with_output(function(redact, parts)
 			local Paths = require("infra.paths")
 			local Version = require("infra.version")
 			local Reporter = helpers.load_module("modules.diagnostics.crash_reporter")
-			local real_open, real_exec, real_popen = io.open, os.execute, io.popen
-			local parts = {}
-			io.open = function()
-				return {
-					write = function(_, s) parts[#parts + 1] = s; return true end,
-					close = function() return true end,
-				}
-			end
-			os.execute = function() return true end
-			io.popen = function() return nil end
 			local ok, err = pcall(Reporter.dump, "ergopti_hotstrings", "boom")
-			io.open, os.execute, io.popen = real_open, real_exec, real_popen
 			if not ok then error(err, 0) end
+			assert_true(err == true, "metadata dump must acknowledge its retained redacted output")
 			local body = table.concat(parts)
 			local report = require("json").decode(body)
 			assert_true(report ~= nil, "the dump is the shared JSON report: " .. body)
