@@ -137,17 +137,21 @@ global LLM_REMOTE_CONNECT_TIMEOUT_MS := 5000
  * @param {number}     TimeoutMs    - Override for this request only (0 keeps
  *   the shared prediction timeout). The API test passes its own longer
  *   budget: cold models need more than 30 s.
+ * @param {Func|Integer} CurrentFn - Original requester admission, or 0 for a standalone request.
  * @returns {Integer}  Request id, usable with LLM_RemoteCancelAsync.
  */
-LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success, on_fail, TailText := "", max_tokens := "", Kind := "", TimeoutMs := 0) {
+LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success, on_fail, TailText := "", max_tokens := "", Kind := "", TimeoutMs := 0, CurrentFn := 0) {
     global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LLM_REMOTE_TIMEOUT_MS
+    if !_LLMRemote_RequesterCurrent(CurrentFn)
+        return 0
 
     _LLM_Remote_AsyncCounter += 1
     req_id := _LLM_Remote_AsyncCounter
     timeout_ms := (TimeoutMs > 0) ? TimeoutMs
         : ((LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000)
     reservation := _LLMRemote_ReserveRequest(req_id, on_success, on_fail,
-        timeout_ms, A_TickCount)
+        timeout_ms, A_TickCount, 0, CurrentFn)
+    on_success := reservation["on_success"], on_fail := reservation["on_fail"]
     reservation["kind"] := Kind
 
     resolved := _LLMRemoteResolveEntry(Entry)
@@ -170,7 +174,7 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
         ; Backboard's own two-step exchange owns its requests from here
         _LLMRemote_DeleteOwned(req_id, reservation)
         return LLM_RemoteBackboardChat_Async(resolved, req["system"], req["user"],
-            on_success, on_fail, Kind, timeout_ms)
+            on_success, on_fail, Kind, timeout_ms, CurrentFn)
     }
     Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
     Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature, max_tokens,
@@ -202,19 +206,23 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
  * @param {number}   TimeoutMs  - Override for this request (0 keeps the shared one).
  * @param {string}   Kind       - Reservation kind, as LLM_RemoteGenerate_Async's.
  * @param {Map|Integer} ExchangeStage - Internal Backboard stage, or 0 for other callers.
+ * @param {Func|Integer} CurrentFn - Original requester admission, or 0 for a standalone request.
  * @returns {Integer} Request id, usable with LLM_RemoteCancelAsync.
  */
-LLM_RemotePostBody_Async(Resolved, Url, Payload, on_success, on_fail, TimeoutMs := 0, Kind := "", ExchangeStage := 0) {
+LLM_RemotePostBody_Async(Resolved, Url, Payload, on_success, on_fail, TimeoutMs := 0, Kind := "", ExchangeStage := 0, CurrentFn := 0) {
     global _LLM_Remote_AsyncCounter, LLM_REMOTE_TIMEOUT_MS
     if !(Resolved is Map)
         throw TypeError("LLM_RemotePostBody_Async needs a resolved entry.")
+    if !_LLMRemote_RequesterCurrent(CurrentFn)
+        return 0
     ExchangeOwner := ExchangeStage is Map ? ExchangeStage.Get("owner", 0) : 0
     _LLM_Remote_AsyncCounter += 1
     req_id := _LLM_Remote_AsyncCounter
     timeout_ms := (TimeoutMs > 0) ? TimeoutMs
         : ((LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000)
     reservation := _LLMRemote_ReserveRequest(req_id, on_success, on_fail,
-        timeout_ms, A_TickCount, Resolved)
+        timeout_ms, A_TickCount, Resolved, CurrentFn)
+    on_success := reservation["on_success"], on_fail := reservation["on_fail"]
     reservation["kind"] := Kind
     if ExchangeStage is Map && !_LLMRemote_BackboardBindChild(ExchangeOwner, ExchangeStage,
             req_id, reservation, on_success, on_fail) {
@@ -475,8 +483,14 @@ _LLMRemote_DecodeObject(Body) {
 }
 
 _LLMRemote_ReserveRequest(req_id, on_success, on_fail, timeout_ms, start_tick,
-        Resolved := 0) {
+        Resolved := 0, CurrentFn := 0) {
     global _LLM_Remote_Async, LLM_REMOTE_MAX_INFLIGHT
+    if !HasMethod(CurrentFn, "Call") && !(CurrentFn is Integer && CurrentFn == 0)
+        throw TypeError("Remote requester admission must be callable or 0.")
+    if HasMethod(CurrentFn, "Call") {
+        on_success := _LLMRemote_InvokeRequesterCurrent.Bind(CurrentFn, on_success, "on_success")
+        on_fail := _LLMRemote_InvokeRequesterCurrent.Bind(CurrentFn, on_fail, "on_fail")
+    }
     ResolvedFormat := Resolved is Map ? Resolved["Format"] : ""
     ResolvedModel := Resolved is Map ? Resolved["Model"] : ""
     reservation := Map(
@@ -484,7 +498,8 @@ _LLMRemote_ReserveRequest(req_id, on_success, on_fail, timeout_ms, start_tick,
         "format", ResolvedFormat,
         "model_id_at_dispatch", ResolvedModel,
         "on_success", on_success, "on_fail", on_fail,
-        "cancelled", false, "start_tick", start_tick, "timeout_ms", timeout_ms)
+        "cancelled", false, "start_tick", start_tick, "timeout_ms", timeout_ms,
+        "requester_current", CurrentFn)
     ; Publish before trim or transport work so a reentrant CancelAll always sees
     ; this invocation. Critical closes the only gap between the capacity snapshot
     ; and ownership publication; trim callbacks run after the owner is visible.
@@ -851,10 +866,24 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
     return true
 }
 
+_LLMRemote_RequesterCurrent(Current) {
+    if Current is Integer && Current == 0
+        return true
+    Valid := Current.Call()
+    return (Valid is Integer) && Valid == true
+}
+
+_LLMRemote_InvokeRequesterCurrent(Current, Callback, Kind, Args*) {
+    if _LLMRemote_RequesterCurrent(Current)
+        _LLM_InvokeCallback(Callback, Kind, Args*)
+}
+
 ; The exact reservation remains physically cancellable after its caller's
 ; logical source has been withdrawn, including during native worker staging.
 _LLMRemote_RequestAdmitted(Id, Entry) {
     if !_LLMRemote_RequestOwns(Id, Entry) || Entry["cancelled"] || A_IsSuspended
+        return false
+    if !_LLMRemote_RequesterCurrent(Entry["requester_current"])
         return false
     Exchange := Entry.Get("backboard_exchange", 0)
     Admitted := !(Exchange is Map) || _LLMRemote_BackboardAdmitted(Exchange)

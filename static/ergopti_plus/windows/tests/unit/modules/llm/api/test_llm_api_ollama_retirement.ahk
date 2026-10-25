@@ -59,7 +59,7 @@ _OllamaPollRetirement_PreservesCancellation(Outcome, Boundary, Interrupt) {
 	State["terminal"] := Map("complete", Outcome != "timeout", "exit", Outcome == "timeout" ? -1 : 0,
 		"status", Outcome == "failure" ? 500 : 200, "body_read", true,
 		"body", Outcome == "empty" ? "{}" : '{"message":{"content":"obsolete answer"}}')
-	Entry := Map("cancelled", false,
+	Entry := Map("requester_current", 0, "cancelled", false,
 		"tmp_stdout", "body", "tmp_status", "status", "tmp_exit", "exit",
 		"start_tick", A_TickCount - 1000, "timeout_ms", 1,
 		"on_success", (*) => State["successes"] += 1,

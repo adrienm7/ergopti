@@ -23,7 +23,7 @@ _OllamaDoSpawn_SkipsWhenCancelled() {
 	try FSDelete(tmp_payload)
 	failed := 0
 	job := Map("on_success", (*) => 0, "on_fail", (*) => failed += 1)
-	_LLM_Ollama_Async[fake_id] := Map("pid", 0, "tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout,
+	_LLM_Ollama_Async[fake_id] := Map("requester_current", 0, "pid", 0, "tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout,
 		"on_success", job["on_success"], "on_fail", job["on_fail"], "cancelled", true,
 		"start_tick", A_TickCount, "timeout_ms", 5000, "payload_snip", "")
 	_LLM_Ollama_DoSpawn(fake_id, '{"model":"m"}', tmp_payload, tmp_stdout, job)
@@ -47,7 +47,7 @@ _OllamaDoSpawn_SkipsWhenSuspended() {
 	try FSDelete(tmp_payload)
 	failed := 0
 	job := Map("on_success", (*) => 0, "on_fail", (*) => failed += 1)
-	_LLM_Ollama_Async[fake_id] := Map("pid", 0, "tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout,
+	_LLM_Ollama_Async[fake_id] := Map("requester_current", 0, "pid", 0, "tmp_payload", tmp_payload, "tmp_stdout", tmp_stdout,
 		"on_success", job["on_success"], "on_fail", job["on_fail"], "cancelled", false,
 		"start_tick", A_TickCount, "timeout_ms", 5000, "payload_snip", "")
 	Suspend(1)
@@ -106,7 +106,7 @@ _OllamaDoSpawn_CancelledWhileWriting() {
 	_LLM_Ollama_ActiveStreams := []
 	_LLM_Ollama_Pending := ""
 	job := Map("on_success", (*) => 0, "on_fail", (*) => State["failed"] += 1)
-	_LLM_Ollama_Async[fake_id] := Map("pid", 0, "process_owner", 0,
+	_LLM_Ollama_Async[fake_id] := Map("requester_current", 0, "pid", 0, "process_owner", 0,
 		"tmp_payload", "write-race.json", "tmp_stdout", "write-race.out",
 		"tmp_status", "write-race.status", "tmp_exit", "write-race.exit",
 		"on_success", job["on_success"], "on_fail", job["on_fail"], "cancelled", false,

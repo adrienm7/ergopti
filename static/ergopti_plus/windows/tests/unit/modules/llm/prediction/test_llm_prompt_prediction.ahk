@@ -80,10 +80,10 @@ _LPP_Engine(Base) {
 
 ; The fake network: records what the engine hands the remote transport.
 _LPP_RecordTransport(Calls, Entry, SystemPrompt, Ctx, Temperature, OnSuccess, OnFail,
-		Tail := "", MaxTokens := "") {
+		Tail := "", MaxTokens := "", Kind := "", TimeoutMs := 0, CurrentFn := 0) {
 	Calls.Push(Map("entry", Entry, "system", SystemPrompt, "ctx", Ctx,
 		"temperature", Temperature, "on_success", OnSuccess, "on_fail", OnFail,
-		"tail", Tail, "max_tokens", MaxTokens))
+		"tail", Tail, "max_tokens", MaxTokens, "requester_current", CurrentFn))
 	return Calls.Length
 }
 

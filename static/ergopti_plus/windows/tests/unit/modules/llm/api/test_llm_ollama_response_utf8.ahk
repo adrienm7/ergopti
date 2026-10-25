@@ -187,7 +187,7 @@ _OUR_Case(Mode) {
 		Custody := LLM_OllamaCaptureOriginCustody()
 		Origin := Custody.Call("origin")
 		ProcessOwner := _LLM_CurlAdoptProcess(4247, Port)
-		Entry := Map("pid", 4247, "process_owner", ProcessOwner, "cancelled", false,
+		Entry := Map("requester_current", 0, "pid", 4247, "process_owner", ProcessOwner, "cancelled", false,
 			"tmp_payload", Paths[1], "tmp_stdout", Paths[2], "tmp_status", Paths[3], "tmp_exit", Paths[4],
 			"start_tick", A_TickCount, "timeout_ms", 20000, "payload_snip", "fixture", "redact", true,
 			"base_url", Origin, "origin_custody", Custody, "origin_owned", Custody.Call("owned"),

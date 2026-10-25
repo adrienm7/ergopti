@@ -426,7 +426,7 @@ _OllamaPresenceRemovedAfterAdmission() {
 		for Body in ['{"error":"model ' . "'qwen2.5:7b'" . ' not found"}', '{"error":"endpoint not found"}'] {
 			State := Map("failures", [], "successes", 0)
 			Prefix := A_Temp . "\ergopti_todo46_absent_" . A_TickCount . "_" . Random(1, 1000000)
-			Entry := Map("pid", 0, "process_owner", 0, "cancelled", false,
+			Entry := Map("requester_current", 0, "pid", 0, "process_owner", 0, "cancelled", false,
 				"tmp_payload", Prefix . ".json", "tmp_stdout", Prefix . ".out", "tmp_status", Prefix . ".status", "tmp_exit", Prefix . ".exit",
 				"on_success", (*) => State["successes"] += 1, "on_fail", _OllamaPresenceRecordFailure.Bind(State),
 				"presence_admitted", true, "presence_generation", LLM_AuxGeneration(), "base_url", LLM_OLLAMA_BASE_URL)
