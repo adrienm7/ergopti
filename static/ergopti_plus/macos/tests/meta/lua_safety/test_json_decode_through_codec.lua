@@ -18,6 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CommandLines = require("tests.support.command_lines")
 local DRIVER_ROOT = helpers.driver_root()
 
 -- Production modules that still call hs.json.decode directly, with their
@@ -37,13 +38,14 @@ local function list_lua_files(directory)
 	else
 		command = string.format("find '%s' -type f", directory)
 	end
-	local pipe = io.popen(command)
-	if not pipe then return files end
-	for raw_line in pipe:lines() do
+	local source_count = #files
+	local inventory = CommandLines.read(command)
+	assert(#inventory > 0, "source inventory must not be empty")
+	for _, raw_line in ipairs(inventory) do
 		local path = raw_line:gsub("\\", "/")
 		if path:match("%.lua$") then files[#files + 1] = path end
 	end
-	pipe:close()
+	assert(#files > source_count, "source inventory contains no matching files")
 	return files
 end
 

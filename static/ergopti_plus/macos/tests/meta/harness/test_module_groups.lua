@@ -25,7 +25,9 @@ local function discovered_modules()
 		else
 			command = "find '" .. root .. "/" .. dir .. "' -type f -name 'test_*.lua'"
 		end
-		for _, line in ipairs(CommandLines.read(command)) do
+		local inventory = CommandLines.read(command)
+		assert(#inventory > 0, "test module inventory must not be empty: " .. dir)
+		for _, line in ipairs(inventory) do
 			local path = line:gsub("\\", "/")
 			local relative = path:sub(#root + 2):gsub("%.lua$", "")
 			modules[#modules + 1] = relative:gsub("/", ".")

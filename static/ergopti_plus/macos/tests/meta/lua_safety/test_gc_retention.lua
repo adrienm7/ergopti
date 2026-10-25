@@ -29,6 +29,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CommandLines = require("tests.support.command_lines")
 local DRIVER_ROOT = helpers.driver_root()
 
 -- Lexical window, in lines, searched around a raw hs.task spawn for its GC-root pin.
@@ -414,9 +415,10 @@ local function all_driver_sources()
 	local cmd = (sep == "\\")
 		and ('cmd /c dir /b /s /a-d "' .. DRIVER_ROOT:gsub("/", "\\") .. '*.lua"')
 		or ("find '" .. DRIVER_ROOT .. "' -type f -name '*.lua'")
-	local pipe = io.popen(cmd)
-	if not pipe then return out end
-	for line in pipe:lines() do
+	local source_count = #out
+	local inventory = CommandLines.read(cmd)
+	assert(#inventory > 0, "source inventory must not be empty")
+	for _, line in ipairs(inventory) do
 		local norm = line:gsub("\\", "/"):gsub("%s+$", "")
 		local rel  = norm:gsub("^.*/macos/", "")
 		if rel:match("%.lua$")
@@ -424,7 +426,7 @@ local function all_driver_sources()
 			out[#out + 1] = rel
 		end
 	end
-	pipe:close()
+	assert(#out > source_count, "source inventory contains no matching files")
 	return out
 end
 
