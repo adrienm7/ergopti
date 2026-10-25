@@ -26,10 +26,7 @@
 
 #Requires AutoHotkey v2.0
 
-; The window's size: the manifest's update_check entry
-; (_shared/ui/apps.manifest.json), pinned by test-webview-geometry-single-source.
-global UC_WIDTH  := 480
-global UC_HEIGHT := 440
+; Geometry is resolved at open time by the existing WebViewHost manifest owner.
 
 ; Virtual host for the shared page, mapped to _SharedDir like the error window's
 global UC_VHOST             := "ergopti.updatecheck"
@@ -419,7 +416,7 @@ _UpdateCheck_Present(State, Reopen := false) {
 ; Opens the window: the shared page in WebView2, or its native counterpart.
 ; @returns {Boolean} opened
 _UpdateCheck_Open() {
-	global _VendorDir, _SharedDir, _I18nLocale, UC_WIDTH, UC_HEIGHT, UC_VHOST, UC_HOST_ACCESS_ALLOW
+	global _VendorDir, _SharedDir, _I18nLocale, UC_VHOST, UC_HOST_ACCESS_ALLOW
 	global _UC_Gui, _UC_Controller, _UC_WebView, _UC_MsgSub, _UC_ResetDone, _UC_WindowEpoch, _UC_Native
 	LoggerStart("UpdateCheck", "Opening the update-check window…")
 	_UC_WindowEpoch += 1
@@ -434,15 +431,16 @@ _UpdateCheck_Open() {
 		return true
 	}
 	_UC_Native := false
+	Geo := WebViewHost.AppGeometry("update_check")
 	G := _UpdateCheck_NewWindow()
 	G.MarginX := 0
 	G.MarginY := 0
-	ContentCtl := G.Add("Text", "x0 y0 w" . UC_WIDTH . " h" . UC_HEIGHT, "")
+	ContentCtl := G.Add("Text", "x0 y0 w" . Geo.w . " h" . Geo.h, "")
 	G.WVC := 0
 	G.OnEvent("Close",  (*) => _UpdateCheck_CloseWindow())
 	G.OnEvent("Escape", (*) => _UpdateCheck_CloseWindow())
 	; No position: Gui.Show centers the window on the screen
-	G.Show("w" . UC_WIDTH . " h" . UC_HEIGHT)
+	G.Show("w" . Geo.w . " h" . Geo.h)
 	_UC_Gui := G
 	_UC_ResetDone := false
 	try {
@@ -500,12 +498,13 @@ _UpdateCheck_FallBackToNative(Epoch, HostGui, BuildFn := 0) {
 ; Builds (or rebuilds) the native window for the current state: every text and
 ; button centered, like the page.
 _UpdateCheck_BuildNative() {
-	global _UC_Gui, _UC_State, UC_WIDTH
+	global _UC_Gui, _UC_State
 	Owner := _UpdateCheck_CaptureActionOwner()
 	Previous := IsSet(_UC_Gui) ? _UC_Gui : 0
 	Texts := _UpdateCheck_NativeTexts(_UC_State)
 	Phase := _UC_State["state"]
-	Width := UC_WIDTH - 40
+	Geo := WebViewHost.AppGeometry("update_check")
+	Width := Geo.w - 40
 	G := _UpdateCheck_NewWindow()
 	G.MarginX := 20
 	G.MarginY := 16
@@ -520,14 +519,14 @@ _UpdateCheck_BuildNative() {
 		G.Add("Text", "xm y+10 w" . Width . " Center", Other.text)
 		SwitchButton := G.Add("Button", "xm y+4", t("update_check.switch_channel"))
 		SwitchButton.OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "switch_channel", Other.channel))
-		_UpdateCheck_CenterRow([SwitchButton])
+		_UpdateCheck_CenterRow([SwitchButton], Geo.w)
 	}
 	G.Add("Text", "xm y+10 w" . Width . " Center vStatus", "")
 	Row := []
 	if (Phase == "available") {
 		WhatsNew := G.Add("Button", "xm y+8", t("update_check.whats_new"))
 		WhatsNew.OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "whats_new", ""))
-		_UpdateCheck_CenterRow([WhatsNew])
+		_UpdateCheck_CenterRow([WhatsNew], Geo.w)
 	}
 	if (Phase == "error") {
 		Row.Push(G.Add("Button", "xm y+12", t("healthcheck.toolbar.report")))
@@ -541,11 +540,11 @@ _UpdateCheck_BuildNative() {
 		Row.Push(G.Add("Button", "x+8 yp Default", t("update_check.update")))
 		Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "update", ""))
 	}
-	_UpdateCheck_CenterRow(Row)
+	_UpdateCheck_CenterRow(Row, Geo.w)
 	G.OnEvent("Close",  (*) => _UpdateCheck_CloseWindow())
 	G.OnEvent("Escape", (*) => _UpdateCheck_CloseWindow())
 	; No position: Gui.Show centers the window on the screen; the texts span
-	; UC_WIDTH with the margins, so the window keeps the manifest's width
+	; the canonical width with the margins, so the native height fits its content
 	G.Show("AutoSize")
 	_UC_Gui := G
 	if Previous {
@@ -555,14 +554,14 @@ _UpdateCheck_BuildNative() {
 
 ; Gives a row of buttons one width and centers it in the window.
 ; @param Buttons {Array}
-_UpdateCheck_CenterRow(Buttons) {
-	global UC_WIDTH
+; @param Width {Integer} The current manifest-owned width.
+_UpdateCheck_CenterRow(Buttons, Width) {
 	if (Buttons.Length == 0)
 		return
 	Shared := Gui_HarmoniseButtonWidths(Buttons)
 	Gap := 8
 	Total := Buttons.Length * Shared + (Buttons.Length - 1) * Gap
-	X := Max(0, (UC_WIDTH - Total) // 2)
+	X := Max(0, (Width - Total) // 2)
 	for Button in Buttons {
 		Button.Move(X)
 		X += Shared + Gap

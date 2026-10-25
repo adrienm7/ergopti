@@ -20,8 +20,8 @@
  *            NOT hardcode a numeric size (no `get_centered_frame(<number>` and no
  *            `math.min(<number>, math.floor(...)` clamp). Adding a literal back
  *            fails this test.
- *   Windows — the geometry literals (WebView2 hosts still hardcode them) must
- *            equal the manifest value for that app. The expected strings are
+ *   Windows — migrated hosts consume the manifest owner at open time; the
+ *            remaining geometry literals must equal the manifest for that app. The expected strings are
  *            BUILT from the manifest at test time, so if the manifest changes the
  *            Windows literal must follow or this test fails.
  *
@@ -29,6 +29,7 @@
  *            every app id, so the check is that it keeps doing so and hardcodes
  *            no per-app size of its own.
  *
+ * The update-check hosts consume WebViewHost.AppGeometry directly. Further
  * Windows migration to the manifest-reading WebViewHost factory
  * (infra/webview_utils.ahk) is the intended end state; until then this value gate
  * keeps the hardcoded Windows sizes honest.
@@ -118,6 +119,132 @@ for (const [name, source, expected] of geometryFixtures) {
 		`geometry source fixture: ${name}`
 	);
 }
+
+/** Extracts one real top-level AHK body while treating quoted data as atomic tokens. */
+function ahkBody(source, name) {
+	const tokens = (
+		source.match(
+			/\/\*[\s\S]*?\*\/|;[^\r\n]*|"(?:`[\s\S]|[^"`])*"|'(?:`[\s\S]|[^'`])*'|[A-Za-z_]\w*|:=|[^\s]/g
+		) || []
+	).filter((token) => !token.startsWith(';') && !token.startsWith('/*'));
+	let depth = 0;
+	for (let i = 0; i < tokens.length; i += 1) {
+		if (
+			depth === 0 &&
+			tokens[i] === name &&
+			tokens[i + 1] === '(' &&
+			tokens[i + 2] === ')' &&
+			tokens[i + 3] === '{'
+		) {
+			let end = i + 4;
+			let braces = 1;
+			while (end < tokens.length && braces > 0) {
+				if (tokens[end] === '{') braces += 1;
+				if (tokens[end] === '}') braces -= 1;
+				end += 1;
+			}
+			return braces === 0 ? tokens.slice(i + 4, end - 1) : [];
+		}
+		if (tokens[i] === '{') depth += 1;
+		if (tokens[i] === '}') depth -= 1;
+	}
+	return [];
+}
+
+/** Requires both actual hosts to consume the app's canonical dimensions. */
+function resolvesUpdateGeometry(source) {
+	const contains = (tokens, sequence) =>
+		tokens.some((_, i) => sequence.every((value, j) => tokens[i + j] === value));
+	const resolve = ['Geo', ':=', 'WebViewHost', '.', 'AppGeometry', '(', '"update_check"', ')'];
+	const web = ahkBody(source, '_UpdateCheck_Open');
+	const native = ahkBody(source, '_UpdateCheck_BuildNative');
+	return (
+		contains(web, resolve) &&
+		contains(native, resolve) &&
+		contains(web, [
+			'G',
+			'.',
+			'Add',
+			'(',
+			'"Text"',
+			',',
+			'"x0 y0 w"',
+			'.',
+			'Geo',
+			'.',
+			'w',
+			'.',
+			'" h"',
+			'.',
+			'Geo',
+			'.',
+			'h',
+			',',
+			'""',
+			')'
+		]) &&
+		contains(web, [
+			'G',
+			'.',
+			'Show',
+			'(',
+			'"w"',
+			'.',
+			'Geo',
+			'.',
+			'w',
+			'.',
+			'" h"',
+			'.',
+			'Geo',
+			'.',
+			'h',
+			')'
+		]) &&
+		contains(native, ['Width', ':=', 'Geo', '.', 'w', '-'])
+	);
+}
+
+const updateGeometryFixture = `
+_UpdateCheck_Open() {
+ Geo := WebViewHost.AppGeometry("update_check")
+ G.Add("Text", "x0 y0 w" . Geo.w . " h" . Geo.h, "")
+ G.Show("w" . Geo.w . " h" . Geo.h)
+}
+_UpdateCheck_BuildNative() {
+ Geo := WebViewHost.AppGeometry("update_check")
+ Width := Geo.w - 40
+}
+`;
+assert.equal(
+	resolvesUpdateGeometry(updateGeometryFixture),
+	true,
+	'actual paired geometry consumption'
+);
+for (const [name, source] of [
+	['wrong app', updateGeometryFixture.replaceAll('"update_check"', '"another_app"')],
+	['height mirror', updateGeometryFixture.replaceAll('Geo.h', '440')],
+	['width mirror', updateGeometryFixture.replaceAll('Geo.w', '480')],
+	['missing web owner', updateGeometryFixture.replace('_UpdateCheck_Open()', 'Sibling()')],
+	[
+		'missing native owner',
+		updateGeometryFixture.replace('_UpdateCheck_BuildNative()', 'Sibling()')
+	],
+	['commented example', `/*${updateGeometryFixture}*/`],
+	['quoted example', `Example := '${updateGeometryFixture}'`],
+	[
+		'call without definition',
+		updateGeometryFixture.replace('_UpdateCheck_Open() {', '_UpdateCheck_Open()\nOther() {')
+	],
+	[
+		'foreign height at show',
+		updateGeometryFixture.replace(
+			'G.Show("w" . Geo.w . " h" . Geo.h)',
+			'G.Show("w" . Geo.w . " h" . Other.h)'
+		)
+	]
+])
+	assert.equal(resolvesUpdateGeometry(source), false, `update geometry counterexample: ${name}`);
 
 // ── macOS: each module must DEFER to the manifest, never hardcode a size ──────
 // id → module file (relative to static/ergopti_plus/macos).
@@ -249,10 +376,8 @@ const WINDOWS_APPS = {
 	},
 	update_check: {
 		file: 'ui/update_check/init.ahk',
-		checks: (m) => [
-			new RegExp(`UC_WIDTH\\s*:=\\s*${m.width}\\b`),
-			new RegExp(`UC_HEIGHT\\s*:=\\s*${m.height}\\b`)
-		]
+		checks: () => [],
+		validate: resolvesUpdateGeometry
 	},
 	download_window: {
 		file: 'modules/llm/ollama_webview.ahk',
@@ -502,6 +627,11 @@ for (const [id, spec] of Object.entries(WINDOWS_APPS)) {
 	}
 	const abs = path.join(ROOT, SP, 'windows', spec.file);
 	const src = fs.readFileSync(abs, 'utf8');
+	if (spec.validate && !spec.validate(src)) {
+		errors.push(
+			`windows/${spec.file}: both actual update-check hosts must consume canonical app geometry`
+		);
+	}
 	for (const re of spec.checks(m)) {
 		if (!re.test(src)) {
 			errors.push(
