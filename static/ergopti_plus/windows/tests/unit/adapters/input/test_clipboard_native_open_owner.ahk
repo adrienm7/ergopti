@@ -112,3 +112,101 @@ _CNOT_Case(Mode) {
 for _CNOT_Mode in ["null-to-own", "own-to-own", "foreign-holder"]
 	Test("Native clipboard open: " . _CNOT_Mode . " preserves the original caller lease (clipboard-native-open-owner)",
 		_CNOT_Case.Bind(_CNOT_Mode))
+
+
+/** A nested native BOOL is not a second lease that its caller may close. */
+_CNOT_BoundedOpenRefusesBorrowedLease() {
+	Saved := CB_SaveAll()
+	AssertFalse(Saved is String && Saved == "__CB_SAVE_ERROR__", "the fixture needs the genuine clipboard snapshot")
+	Opened := false
+	try {
+		AssertTrue(CB_OpenClipboardWithin(A_ScriptHwnd), "the original caller must acquire its real lease")
+		Opened := true
+		Refused := Map("calls", 0)
+		AssertFalse(CB_OpenClipboardWithin(A_ScriptHwnd, (*) => Refused["calls"] += 1),
+			"the bounded helper cannot grant another caller a Close right over the same HWND lease")
+		AssertEqual(1, Refused["calls"], "borrowed refusal still reaches the declared diagnostic callback exactly once")
+		AssertEqual(A_ScriptHwnd, DllCall("User32\GetOpenClipboardWindow", "Ptr"),
+			"the refused nested acquisition leaves the original caller's native lock intact")
+		AssertTrue(DllCall("User32\CloseClipboard", "Int"), "the exact original caller must close its own lease")
+		Opened := false
+		AssertTrue(CB_OpenClipboardWithin(A_ScriptHwnd), "a fresh acquisition after original release remains available")
+		Opened := true
+	} finally {
+		if Opened
+			DllCall("User32\CloseClipboard", "Int")
+		AssertTrue(CB_RestoreAll(Saved), "the genuine fixture snapshot must be restored")
+	}
+}
+Test("Native clipboard open: bounded acquisition refuses the original caller's lease (clipboard-borrowed-acquisition)",
+	_CNOT_BoundedOpenRefusesBorrowedLease)
+
+/** Bitmap publication must not consume a native lease another stack owns. */
+_CNOT_BitmapPreservesBorrowedLease() {
+	Saved := CB_SaveAll()
+	AssertFalse(Saved is String && Saved == "__CB_SAVE_ERROR__", "the fixture needs the genuine clipboard snapshot")
+	Bitmap := DllCall("Gdi32\CreateBitmap", "Int", 1, "Int", 1, "UInt", 1, "UInt", 32, "Ptr", 0, "Ptr")
+	AssertTrue(Bitmap != 0, "the fixture must own an actual native bitmap")
+	Opened := false, Receipt := 0, Failure := 0
+	try {
+		AssertTrue(CB_OpenClipboardWithin(A_ScriptHwnd), "the original caller must acquire its real lease")
+		Opened := true
+		try _CB_PublishLoadedBitmap(&Bitmap, &Receipt, 0)
+		catch as Err
+			Failure := Err
+		AssertEqual(A_ScriptHwnd, DllCall("User32\GetOpenClipboardWindow", "Ptr"),
+			"the actual bitmap publisher may not close its caller's borrowed clipboard lease")
+		AssertTrue(IsObject(Failure), "a bitmap publication without a new native lease must refuse")
+		AssertEqual(0, Receipt, "a borrowed native lease supplies no independent publication receipt")
+		AssertTrue(Bitmap != 0, "refusal keeps the original untransferred bitmap reachable")
+	} finally {
+		if Opened && DllCall("User32\GetOpenClipboardWindow", "Ptr") == A_ScriptHwnd
+			DllCall("User32\CloseClipboard", "Int")
+		if Bitmap
+			DllCall("Gdi32\DeleteObject", "Ptr", Bitmap, "Int")
+		AssertTrue(CB_RestoreAll(Saved), "the genuine fixture snapshot must be restored")
+	}
+}
+Test("Native clipboard open: bitmap publication keeps the original caller's lease (clipboard-borrowed-acquisition)",
+	_CNOT_BitmapPreservesBorrowedLease)
+
+
+/** A contention query must leave an earlier caller's native lock untouched. */
+_CNOT_BusyProbePreservesBorrowedLease(NullOwner) {
+	global CB_NATIVE_OPEN_TIMEOUT_MS, CB_NATIVE_OPEN_RETRY_MS
+	Saved := CB_SaveAll()
+	AssertFalse(Saved is String && Saved == "__CB_SAVE_ERROR__", "the fixture needs the genuine clipboard snapshot")
+	Opened := false
+	try {
+		; A prior fixture restore wakes Windows clipboard readers. Wait for those
+		; foreign readers before acquiring the original lease we are testing.
+		Started := A_TickCount
+		loop {
+			Opened := DllCall("User32\OpenClipboard", "Ptr", NullOwner ? 0 : A_ScriptHwnd, "Int") != 0
+			if Opened || TickExpired(Started, CB_NATIVE_OPEN_TIMEOUT_MS)
+				break
+			Sleep(CB_NATIVE_OPEN_RETRY_MS)
+		}
+		AssertTrue(Opened, "the original caller must acquire its actual native lease")
+		AssertTrue(CB_IsBusy(), "the real contention probe must refuse to borrow the caller's native lease")
+		AssertTrue(DllCall("User32\CloseClipboard", "Int"),
+			"the original caller must still receive its own native Close acknowledgement")
+		Opened := false
+		Started := A_TickCount
+		loop {
+			Idle := !CB_IsBusy()
+			if Idle || TickExpired(Started, CB_NATIVE_OPEN_TIMEOUT_MS)
+				break
+			Sleep(CB_NATIVE_OPEN_RETRY_MS)
+		}
+		AssertTrue(Idle, "the native contention probe still admits an idle clipboard")
+	} finally {
+		if Opened
+			DllCall("User32\CloseClipboard", "Int")
+		AssertTrue(CB_RestoreAll(Saved), "the genuine fixture snapshot must be restored")
+	}
+}
+Test("Native clipboard open: the contention probe preserves a NULL caller lease (clipboard-borrowed-acquisition)",
+	_CNOT_BusyProbePreservesBorrowedLease.Bind(true))
+Test("Native clipboard open: the contention probe preserves an HWND caller lease (clipboard-borrowed-acquisition)",
+	_CNOT_BusyProbePreservesBorrowedLease.Bind(false))

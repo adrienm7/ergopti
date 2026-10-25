@@ -4,9 +4,9 @@
 ; MODULE: Keystats Clipboard Provenance Regression Tests
 ; DESCRIPTION:
 ; Drives the real clipboard observer state machine against the shared adapter
-; ownership registry. The tests never touch the OS clipboard: they reserve the
-; same notification records which CB_Write/CB_RestoreAll reserve around a real
-; assignment, then deliver the corresponding OnClipboardChange callback.
+; ownership registry. Pure provenance cases reserve the adapter's notification
+; records and deliver OnClipboardChange directly. The native ownership case
+; also exercises the real text callback while a caller holds the clipboard.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -245,3 +245,55 @@ Test("keystats clipboard: the paste observer keeps the exact Ctrl+V and Shift+In
 #Include test_clipboard_paste_burst_owner.ahk
 
 #Include test_clipboard_source_title_owner.ahk
+
+
+/** The genuine text observer must never close an interrupted caller's NULL lease. */
+_KCP_NativeTextReadPreservesBorrowedLease() {
+	_KCP_WithCleanState(_KCP_NativeTextReadSubject)
+}
+
+_KCP_NativeTextReadSubject() {
+	global _Stub_AppendLogRows, CB_NATIVE_OPEN_TIMEOUT_MS, CB_NATIVE_OPEN_RETRY_MS
+	Saved := CB_SaveAll()
+	AssertFalse(Saved is String && Saved == "__CB_SAVE_ERROR__", "the native fixture needs its genuine clipboard snapshot")
+	ProbeText := "native clipboard observer probe"
+	Opened := false
+	try {
+		AssertTrue(CB_Write(ProbeText), "the native fixture must publish genuine Unicode clipboard data")
+		; Deliver a controlled unowned notification over the actual native data.
+		CB_DiscardOwnedNotifications()
+		Started := A_TickCount
+		loop {
+			Opened := DllCall("User32\OpenClipboard", "Ptr", 0, "Int") != 0
+			if Opened || TickExpired(Started, CB_NATIVE_OPEN_TIMEOUT_MS)
+				break
+			Sleep(CB_NATIVE_OPEN_RETRY_MS)
+		}
+		AssertTrue(Opened, "the original NULL caller must acquire its real native lock")
+		KL_Clip_OnChange(1)
+		Closed := DllCall("User32\CloseClipboard", "Int") != 0
+		Opened := false
+		AssertTrue(Closed, "the actual keystats text callback must preserve its caller's native Close right")
+		AssertEqual(1, _Stub_AppendLogRows.Length, "one public text notification reaches the recording sink exactly once")
+		AssertEqual(0, _Stub_AppendLogRows[1]["char_count"], "an unavailable native lease supplies no text-length evidence")
+		; After release, actual native reads remain possible despite transient
+		; clipboard-history readers awakened by the fixture's initial write.
+		Started := A_TickCount
+		loop {
+			_Stub_AppendLogRows := []
+			KL_Clip_OnChange(1)
+			AssertEqual(1, _Stub_AppendLogRows.Length, "every admitted notification still has one terminal row")
+			Count := _Stub_AppendLogRows[1]["char_count"]
+			if Count == StrLen(ProbeText) || TickExpired(Started, CB_NATIVE_OPEN_TIMEOUT_MS)
+				break
+			Sleep(CB_NATIVE_OPEN_RETRY_MS)
+		}
+		AssertEqual(StrLen(ProbeText), Count, "a fresh native read after release still counts the actual Unicode payload")
+	} finally {
+		if Opened
+			DllCall("User32\CloseClipboard", "Int")
+		AssertTrue(CB_RestoreAll(Saved), "the native fixture must restore its genuine clipboard snapshot")
+	}
+}
+Test("keystats clipboard: native text observer preserves a borrowed NULL lease (clipboard-borrowed-acquisition)",
+	_KCP_NativeTextReadPreservesBorrowedLease)

@@ -202,7 +202,7 @@ KL_Clip_OnChange(data_type) {
 		char_count   := 0
 		if (data_type = 1) {
 				try {
-						if DllCall("OpenClipboard", "Ptr", 0) {
+						if CB_TryOpenClipboard(A_ScriptHwnd) {
 								if hData := DllCall("GetClipboardData", "UInt", 13, "Ptr") { ; CF_UNICODETEXT
 										ptr := DllCall("GlobalLock", "Ptr", hData, "Ptr")
 										if ptr {
