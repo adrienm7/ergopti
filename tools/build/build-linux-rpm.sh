@@ -251,12 +251,16 @@ tar -czf "$RPM_ROOT/SOURCES/${PACKAGE_NAME}-${VERSION}.tar.gz" \
 # ----------------------------------------------------------------------
 # 9. Build the .rpm (Linux only)
 # ----------------------------------------------------------------------
+print_packaging_command() {
+  printf '  rpmbuild --define %q -bb %q\n' "_topdir $RPM_ROOT" "$RPM_ROOT/SPECS/ergopti.spec"
+}
+
 if [ "$SKIP_RPM" = true ]; then
   echo ""
   echo "=== Structure complete (--skip-rpm) ==="
   echo "RPM root: $RPM_ROOT"
   echo "To package on Fedora/RHEL:"
-  echo "  rpmbuild --define '_topdir $RPM_ROOT' -bb $RPM_ROOT/SPECS/ergopti.spec"
+  print_packaging_command
   exit 0
 fi
 
@@ -265,7 +269,7 @@ if ! command -v rpmbuild &>/dev/null; then
   echo "=== Structure complete (rpmbuild not available) ==="
   echo "RPM root: $RPM_ROOT"
   echo "Run on Fedora/RHEL to package:"
-  echo "  rpmbuild --define '_topdir $RPM_ROOT' -bb $RPM_ROOT/SPECS/ergopti.spec"
+  print_packaging_command
   exit 0
 fi
 

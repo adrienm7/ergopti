@@ -11,6 +11,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 
@@ -73,4 +74,64 @@ for (const format of ['deb', 'rpm']) {
 	);
 	console.log(`PASS package-argument-admission-${format}`);
 }
-console.log(`PASS package-argument-admission refused=${refusals} real-valid-staging=2`);
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-package-recipe-'));
+try {
+	const alias = path.join(scratch, "project root '\n literal");
+	fs.symlinkSync(ROOT, alias, 'dir');
+	for (const format of ['deb', 'rpm']) {
+		const staged = spawnSync(
+			bashExecutable(),
+			[path.join(alias, `tools/build/build-linux-${format}.sh`), `--skip-${format}`],
+			{
+				cwd: ROOT,
+				env,
+				encoding: 'utf8',
+				timeout: 120000,
+				maxBuffer: 4 * 1024 * 1024
+			}
+		);
+		assert.equal(staged.status, 0, staged.stderr || staged.stdout || staged.error?.message);
+		const command = staged.stdout.match(
+			format === 'deb' ? /^To package: (.+)$/m : /^  (rpmbuild .+)$/m
+		)?.[1];
+		assert.ok(command, 'the actual staging entry point must print its native producer recipe');
+		const receipt = path.join(scratch, `${format}-argv`);
+		const executable = format === 'deb' ? 'dpkg-deb' : 'rpmbuild';
+		// Record only the external producer boundary; real Bash parses the actual
+		// printed recipe, including its quoting of literal source path bytes.
+		const replay = spawnSync(
+			bashExecutable(),
+			[
+				'-euc',
+				`function ${executable} { printf '%s\\0' "$@" > "$ERGOPTI_PACKAGE_ARGV_RECEIPT"; }; ` +
+					command
+			],
+			{
+				cwd: ROOT,
+				env: { ...env, ERGOPTI_PACKAGE_ARGV_RECEIPT: receipt },
+				encoding: 'utf8',
+				timeout: 15000
+			}
+		);
+		assert.equal(replay.status, 0, replay.stderr || replay.error?.message);
+		const argv = fs.readFileSync(receipt, 'utf8').split('\0').slice(0, -1);
+		const root = path.join(alias, 'build/linux', format);
+		assert.deepEqual(
+			argv,
+			format === 'rpm'
+				? ['--define', `_topdir ${root}`, '-bb', path.join(root, 'SPECS/ergopti.spec')]
+				: [
+						'--root-owner-group',
+						'--build',
+						root,
+						path.join(alias, 'build/linux/ergopti_1.0.3_amd64.deb')
+					]
+		);
+		console.log(`PASS package-manual-recipe-literal-argv-${format}`);
+	}
+} finally {
+	fs.rmSync(scratch, { recursive: true, force: true });
+}
+console.log(
+	`PASS package-argument-admission refused=${refusals} real-valid-staging=2 manual-argv-replays=2`
+);
