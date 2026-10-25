@@ -411,11 +411,7 @@ recommended = true
 input_altering = true
 type = "boolean"
 description_key = "menu.hotstrings"
-platforms = ["hs", "linux"]
-# Windows keeps the same master as category_enabled.dynamichotstrings (the
-# per-driver file_path of the hotstring categories), so a second key there would
-# be a second master for one switch.
-reason_key = "platform_reason.dynamic_master_is_category_switch_on_windows"
+platforms = ["ahk", "hs", "linux"]
 
 [[features.hotstrings]]
 id = "trigger_char"

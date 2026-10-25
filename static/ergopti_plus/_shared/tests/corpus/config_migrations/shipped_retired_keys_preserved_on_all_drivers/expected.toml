@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_retired_keys_preserved_on_all_drivers/expected.toml
 
 [_meta]
-schema_version = 12
+schema_version = 13
 
 [gestures]
 enabled = true
@@ -18,3 +18,6 @@ debounce_ms = 200
 [shortcuts.keys]
 layer_scroll = true
 wrap_text_if_selected = true
+
+[hotstrings.dynamic]
+enabled = true

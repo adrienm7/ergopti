@@ -435,12 +435,31 @@ _HS_TryLiveToggleV2(V2Path) {
 	; A failed persist is handled here without rebuilding, then surfaced by the
 	; caller. Returning the same false used by the reload-only classifier used to
 	; trigger a second write and violate the abort-on-false transaction boundary.
-	if !WriteFeatureV2(Features, V2Path, NewEnabled) {
+	if !_HS_WriteHotstringFamily(V2Path, NewEnabled) {
 		try LoggerError("Menu", "Live-toggle (v2) for '{1}' could not be persisted; the live state and registration remain unchanged.", V2Path)
 		return {handled: true, ok: false}
 	}
 	RebuildHotstringsLive()
 	return {handled: true, ok: true}
+}
+
+; Persists one hotstring section's switch. A dynamic family switched on while
+; the dynamic master (hotstrings.dynamic.enabled) is off would stay silent, so
+; the master is written on in the same transaction; switching a family off
+; leaves the master alone.
+; @param {String} V2Path Canonical path of the section's switch.
+; @param {Integer} Enabled The new posture.
+; @returns {Integer} True once persisted and applied.
+_HS_WriteHotstringFamily(V2Path, Enabled) {
+	global Features
+	MasterPath := "hotstrings.dynamic.enabled"
+	if !Enabled || V2Path == MasterPath || SubStr(V2Path, 1, StrLen("hotstrings.dynamic.")) != "hotstrings.dynamic."
+		return WriteFeatureV2(Features, V2Path, Enabled)
+	Master := FeatureDesiredLocateV2(Features, MasterPath)
+	if (Master is Map) && Master["v2_node"].Get(Master["key"], false)
+		return WriteFeatureV2(Features, V2Path, Enabled)
+	Batch := [Map("path", V2Path, "value", true), Map("path", MasterPath, "value", true)]
+	return WriteFeatureBatchV2(Features, Batch) == Batch.Length
 }
 
 ; Cancellation must acknowledge ownership before the desired state is written.
@@ -453,7 +472,7 @@ _HS_ToggleProgrammableHotstrings(V2Path) {
 	WasEnabled := State.Has("enabled") && State["enabled"]
 	if !UserHotstringsSetEnabled(false)
 		return {handled: true, ok: false}
-	if !WriteFeatureV2(Features, V2Path, !WasEnabled) {
+	if !_HS_WriteHotstringFamily(V2Path, !WasEnabled) {
 		UserHotstringsSetEnabled(WasEnabled && IsCategoryGated("Hotstrings"))
 		return {handled: true, ok: false}
 	}

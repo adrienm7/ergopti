@@ -1,6 +1,9 @@
 [_meta]
-schema_version = 12
+schema_version = 13
 
 [layout]
 future = "kept" # independently retained
 direct_access_digits = "future"
+
+[hotstrings.dynamic]
+enabled = true

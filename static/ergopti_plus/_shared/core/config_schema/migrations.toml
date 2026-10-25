@@ -64,7 +64,7 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 12
+current_version = 13
 unstamped_version = 2
 
 
@@ -292,4 +292,20 @@ drivers = ["ahk"]
 reason = "Represent the helper-backed built-in variant without changing registry or layer intent."
 ops = [
 	{ op = "move_ergopti_variant", section = "layout", key = "ergopti_plus", to_key = "ergopti_variant", base_key = "ergopti_base", alt_gr_key = "ergopti_alt_gr", source_key = "emulated_layout", false_variant = "ergopti", true_variant = "ergopti_plus", neutral_variant = "none" },
+]
+
+# Windows reads the dynamic-hotstring master where macOS and Linux always have.
+[steps.v12_to_v13]
+from = 12
+to = 13
+drivers = ["ahk"]
+reason = "The Windows dynamic-hotstring master becomes hotstrings.dynamic.enabled, as on macOS and Linux; a stored category switch keeps its value and a configuration without one keeps its families live."
+# `category_enabled.dynamichotstrings` is the only spelling an older Windows
+# configuration can hold for this switch. An existing hotstrings.dynamic.enabled
+# keeps its value (rename never overwrites a target). Without either key the
+# families that were live under the Hotstrings master stay live: the new master
+# is written on, because its neutral default is off.
+ops = [
+	{ op = "rename", section = "category_enabled", key = "dynamichotstrings", to_section = "hotstrings.dynamic", to_key = "enabled" },
+	{ op = "set_if_absent", section = "hotstrings.dynamic", key = "enabled", value = true },
 ]

@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_dynamic_master_untouched_on_lua/case.toml
+
+[case]
+description = "macOS and Linux already own hotstrings.dynamic.enabled: the step only moves their stamp and writes nothing, so an absent master stays at its neutral off."
+drivers = ["hs", "linux"]
+outcome = "migrated"
+from_version = 12
+to_version = 13

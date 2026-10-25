@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_trigger_shortcut_removed_on_windows/expected.toml
 
 [_meta]
-schema_version = 12
+schema_version = 13
 
 [llm]
 enabled = true
@@ -10,3 +10,6 @@ ollama_port = 11434
 
 [shortcuts.keyboard]
 win_space = "llm_generate_prediction"
+
+[hotstrings.dynamic]
+enabled = true

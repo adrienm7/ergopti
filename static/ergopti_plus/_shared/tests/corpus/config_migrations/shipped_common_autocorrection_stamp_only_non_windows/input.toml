@@ -1,0 +1,5 @@
+# Missing old choices must not opt in any new section.
+[_meta]
+schema_version = 10
+[foreign]
+caps = false

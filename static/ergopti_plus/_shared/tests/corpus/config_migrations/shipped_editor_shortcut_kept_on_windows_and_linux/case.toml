@@ -1,6 +1,6 @@
 [case]
 description = "Only the macOS driver consumes its dedicated legacy shortcut source."
-drivers = ["ahk", "linux"]
+drivers = ["ahk"]
 outcome = "migrated"
 from_version = 8
-to_version = 12
+to_version = 13

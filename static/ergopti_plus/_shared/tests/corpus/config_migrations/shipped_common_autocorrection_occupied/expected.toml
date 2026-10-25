@@ -1,5 +1,5 @@
 [_meta]
-schema_version = 12
+schema_version = 13
 
 [hotstrings.autocorrection]
 names = { enabled = false, time_activation_seconds = 0.4, future = "preserved inline owner" }
@@ -25,3 +25,6 @@ technical_terms = true
 
 [hotstrings.modules.autocorrection.abbreviations]
 future = false
+
+[hotstrings.dynamic]
+enabled = true

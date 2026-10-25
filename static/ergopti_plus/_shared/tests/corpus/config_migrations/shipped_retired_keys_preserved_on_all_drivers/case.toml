@@ -2,7 +2,7 @@
 
 [case]
 description = "All shipped drivers preserve retired scalar and false settings for explicit cleanup while advancing the schema stamp."
-drivers = ["ahk", "hs", "linux"]
+drivers = ["ahk"]
 outcome = "migrated"
 from_version = 2
-to_version = 12
+to_version = 13

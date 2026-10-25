@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_dynamic_master_existing_value_wins_on_windows/case.toml
+
+[case]
+description = "A hotstrings.dynamic.enabled already stored keeps its value; the retired switch is dropped without overwriting it."
+drivers = ["ahk"]
+outcome = "migrated"
+from_version = 12
+to_version = 13

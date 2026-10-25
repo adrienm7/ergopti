@@ -686,7 +686,9 @@ function opaqueChordPaths(source, registry, where, report = fail) {
 			step.ops.filter((op) => op.op === 'move_chord_action').map((op) => op.section + '.' + op.key)
 		)
 	);
-	if (/^shipped_common_autocorrection_occupied\/(input|expected)\.toml$/.test(where))
+	if (
+		/^shipped_common_autocorrection_occupied(?:_non_windows)?\/(input|expected)\.toml$/.test(where)
+	)
 		allowed.add('hotstrings.autocorrection.names');
 	const paths = new Set();
 	let section = '';

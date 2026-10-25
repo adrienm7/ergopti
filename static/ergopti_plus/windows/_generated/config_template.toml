@@ -12,6 +12,53 @@ alt_gr_is_kana_remap = "auto"
 
 
 
+[hotstrings.dynamic]
+enabled = false
+
+
+
+[hotstrings.dynamic.date]
+enabled = false
+
+
+
+[hotstrings.dynamic.date_fr]
+enabled = false
+
+
+
+[hotstrings.dynamic.date_long_fr]
+enabled = false
+
+
+
+[hotstrings.dynamic.iban_prefixes]
+enabled = false
+
+
+
+[hotstrings.dynamic.phone_prefixes]
+enabled = false
+
+
+
+[hotstrings.dynamic.ssn_prefixes]
+enabled = false
+
+
+
+[hotstrings.dynamic.user_code]
+enabled = false
+time_activation_seconds = 0.5
+
+
+
+[hotstrings.dynamic.text_expansion_personal_information]
+enabled = false
+pattern_max_length = 1
+
+
+
 
 
 [hotstrings]
@@ -350,48 +397,6 @@ time_activation_seconds = 2
 [hotstrings.french_magickey.text_expansion_emojis]
 enabled = false
 time_activation_seconds = 2
-
-
-
-[hotstrings.dynamic.date]
-enabled = false
-
-
-
-[hotstrings.dynamic.date_fr]
-enabled = false
-
-
-
-[hotstrings.dynamic.date_long_fr]
-enabled = false
-
-
-
-[hotstrings.dynamic.iban_prefixes]
-enabled = false
-
-
-
-[hotstrings.dynamic.phone_prefixes]
-enabled = false
-
-
-
-[hotstrings.dynamic.ssn_prefixes]
-enabled = false
-
-
-
-[hotstrings.dynamic.user_code]
-enabled = false
-time_activation_seconds = 0.5
-
-
-
-[hotstrings.dynamic.text_expansion_personal_information]
-enabled = false
-pattern_max_length = 1
 
 
 

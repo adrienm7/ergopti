@@ -1,10 +1,13 @@
 # _shared/tests/corpus/config_migrations/shipped_magic_key_source_scan_becomes_a_key_code_on_windows/expected.toml
 
 [_meta]
-schema_version = 12
+schema_version = 13
 
 [hotstrings]
 trigger_char = "★"
 magic_key_source = "Semicolon"
 magic_key_source_char = ";"
 repeat_key_enabled = true
+
+[hotstrings.dynamic]
+enabled = true
