@@ -504,35 +504,47 @@ fi
 # script derived, and only when it is a real folder holding a Python
 # environment (or nothing): never a link, a file, or a foreign folder.
 venv_is_removable() {
-	if [ -L "$VENV_DIR" ]; then
-		log_error "Refusing to remove '$VENV_DIR': it is a symbolic link, not Ergopti's MLX venv."
+	local target="$1"
+	if [ -L "$target" ]; then
+		log_error "Refusing to remove '$target': it is a symbolic link, not Ergopti's MLX venv."
 		return 1
 	fi
-	if [ ! -e "$VENV_DIR" ]; then
+	if [ ! -e "$target" ]; then
 		return 0
 	fi
-	if [ ! -d "$VENV_DIR" ]; then
-		log_error "Refusing to remove '$VENV_DIR': it is not a folder."
+	if [ ! -d "$target" ]; then
+		log_error "Refusing to remove '$target': it is not a folder."
 		return 1
 	fi
-	if [ -f "$VENV_DIR/pyvenv.cfg" ] || [ -e "$VENV_DIR/bin/python" ] || [ -L "$VENV_DIR/bin/python" ]; then
+	local contents
+	# Preserve newline-only entry names across command substitution; only the
+	# sentinel by itself proves that a successfully inspected folder is empty.
+	if ! contents="$(ls -A "$target" 2>/dev/null && printf '.')"; then
+		log_error "Cannot inspect MLX repair candidate contents."
+		return 1
+	fi
+	if [ -f "$target/pyvenv.cfg" ] || [ -e "$target/bin/python" ] || [ -L "$target/bin/python" ]; then
 		return 0
 	fi
-	if [ -z "$(ls -A "$VENV_DIR" 2>/dev/null)" ]; then
+	if [ "$contents" = "." ]; then
 		return 0
 	fi
-	log_error "Refusing to remove '$VENV_DIR': it holds no Python environment."
+	log_error "Refusing to remove '$target': it holds no Python environment."
 	return 1
 }
 
 if [ "$REPAIR_MODE" = "1" ]; then
 	emit_marker "VENV_SYNC_RAN"
 	emit_marker "VENV_REMOVING"
-	if ! venv_is_removable; then
-		exit 5
-	fi
+	# A matching basename does not establish an environment. Inspect every
+	# candidate before deleting the live venv, so a refused neighbor leaves
+	# the previously installed runtime available as well as its own bytes.
+	REPAIR_CANDIDATES=("$VENV_DIR" "$VENV_DIR".bootstrap.* "$VENV_DIR".rollback.*)
+	for leftover in "${REPAIR_CANDIDATES[@]}"; do
+		if ! venv_is_removable "$leftover"; then exit 5; fi
+	done
 	if ! native_offline_bootstrap; then use_uv_route_origins; apply_system_network opaque || exit $?; fi
-	for leftover in "$VENV_DIR" "$VENV_DIR".bootstrap.* "$VENV_DIR".rollback.*; do
+	for leftover in "${REPAIR_CANDIDATES[@]}"; do
 		if [ ! -e "$leftover" ] && [ ! -L "$leftover" ]; then
 			continue
 		fi
