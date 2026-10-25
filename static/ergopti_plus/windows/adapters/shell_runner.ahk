@@ -745,7 +745,12 @@ _SR_LegacyClaimAsyncTerminate(State) {
 		local outcome := Map("Accepted", false, "Pid", 0)
 		local phase := State["Phase"]
 		if phase = SR_LEGACY_PHASE_READY {
-			outcome["Accepted"] := true
+			; The controller may retire a published handle before start reaches
+			; BeginStart. Preserve cancellation after its watchdog is removed so
+			; the interrupted start cannot resume into an untracked process.
+			State["TerminationRequested"] := true
+			State["AsyncTerminationRequested"] := true
+			outcome["Accepted"] := _SR_LegacyDetachCallbackLocked(State)
 			return outcome
 		}
 		if phase = SR_LEGACY_PHASE_STARTING {
