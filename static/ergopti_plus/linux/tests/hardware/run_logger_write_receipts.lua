@@ -3,13 +3,23 @@
 --- MODULE: Native Linux Logger Write Receipts
 --- DESCRIPTION:
 --- Routes the real shared logger through Linux's production file sink and
---- actual /dev/full failures. Failed channels must release their descriptor,
+--- actual regular-file size-limit failures. Failed channels release their descriptor,
 --- report lost durability and leave the other channel available. Private
 --- directories and symlinks belong exclusively to this fixture.
 --- No file, logger or syscall API is mocked.
 --- ==============================================================================
 
 local uv = require("luv")
+local ffi = require("ffi")
+local RLIMIT_FSIZE = 1 -- Linux resource ABI; only this fixture's soft limit changes.
+local SIG_IGN, SIG_ERR = 1, -1 -- POSIX signal handler sentinels.
+ffi.cdef([[
+ struct ergopti_logger_rlimit { unsigned long current; unsigned long maximum; };
+ int ergopti_logger_getrlimit(int resource, struct ergopti_logger_rlimit *limit) __asm__("getrlimit");
+ int ergopti_logger_setrlimit(int resource, const struct ergopti_logger_rlimit *limit) __asm__("setrlimit");
+ typedef void (*ergopti_logger_signal_handler)(int);
+ ergopti_logger_signal_handler ergopti_logger_signal(int number, ergopti_logger_signal_handler handler) __asm__("signal");
+]])
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-logger-receipts-XXXXXX"))
 local previous_config, previous_state = os.getenv("XDG_CONFIG_HOME"), os.getenv("XDG_STATE_HOME")
 assert(uv.os_setenv("XDG_CONFIG_HOME", root .. "/config"))
@@ -100,28 +110,74 @@ local function check(name, test)
 	end
 end
 
+
+--- Forces a real write/flush error on regular files without admitting a device.
+--- Console channels use a real /dev/null stream while the size limit applies,
+--- so the fixture's redirected journal cannot accidentally hit that same limit.
+--- @param limit number Maximum native regular-file size for the callback.
+--- @param body function Writes through already-acquired logger descriptors.
+local function with_file_size_limit(limit, body)
+	local previous = ffi.new("struct ergopti_logger_rlimit[1]")
+	assert(ffi.C.ergopti_logger_getrlimit(RLIMIT_FSIZE, previous) == 0)
+	local selected = ffi.new("struct ergopti_logger_rlimit[1]")
+	selected[0].current, selected[0].maximum = limit, previous[0].maximum
+	local console = assert(io.open("/dev/null", "w"))
+	local ignored = ffi.cast("ergopti_logger_signal_handler", SIG_IGN)
+	local signal = assert(uv.constants.SIGXFSZ)
+	local previous_signal = ffi.C.ergopti_logger_signal(signal, ignored)
+	assert(previous_signal ~= ffi.cast("ergopti_logger_signal_handler", SIG_ERR))
+	local stdout, stderr = io.stdout, io.stderr
+	io.stdout, io.stderr = console, console
+	local ok, detail = xpcall(function()
+		assert(ffi.C.ergopti_logger_setrlimit(RLIMIT_FSIZE, selected) == 0)
+		body()
+	end, debug.traceback)
+	local restored = ffi.C.ergopti_logger_setrlimit(RLIMIT_FSIZE, previous) == 0
+	io.stdout, io.stderr = stdout, stderr
+	assert(console:close())
+	local signal_restored = ffi.C.ergopti_logger_signal(signal, previous_signal)
+	assert(signal_restored ~= ffi.cast("ergopti_logger_signal_handler", SIG_ERR), "fixture did not restore its signal handler")
+	assert(restored, "fixture did not restore its native file-size limit")
+	assert(ok, detail)
+end
+
+--- Leaves enough room for the healthy channel's independently formatted line.
+--- @param size number Body length of the forced-failure message.
+--- @return number limit
+local function message_limit(size)
+	return #string.format("%s [%s] [%s] %s\n", Logger.default_timestamp(), Logger.label_of("warn"),
+		"native-log-error-" .. size, string.rep("y", size))
+end
+
 for _, size in ipairs({ 32, 65536 }) do
-	check("main ENOSPC retires the descriptor for " .. size .. " bytes", function()
+	check("main EFBIG retires the descriptor for " .. size .. " bytes", function()
 		local dir = directory("main-" .. size)
 		local main, errors = paths(dir)
-		assert(uv.fs_symlink("/dev/full", main))
+		local limit = message_limit(size)
+		write(main, string.rep("p", limit))
 		assert(Sink.install(Logger, { log_dir = dir }))
-		assert(full_descriptors() == baseline_full_descriptors + 1)
-		Logger.info("native-log-main-" .. size, string.rep("x", size))
+		assert(descriptors(main) == 1)
+		with_file_size_limit(limit, function()
+			Logger.info("native-log-main-" .. size, string.rep("x", size))
+		end)
 		assert(not Sink.is_file_sink_active(), "failed flush/write still reports a durable main sink")
 		assert(not Sink.install(Logger, { log_dir = dir }), "idempotent install concealed lost durability")
-		assert(full_descriptors() == baseline_full_descriptors, "failed main descriptor remained open")
+		assert(descriptors(main) == 0, "failed main descriptor remained open")
 		Logger.warn("native-log-mirror-" .. size, "Surviving error channel receipt.")
 		assert(read(errors):find("Surviving error channel receipt.", 1, true), "main failure disabled the healthy mirror")
 	end)
-	check("mirror ENOSPC preserves main durability for " .. size .. " bytes", function()
+	check("mirror EFBIG preserves main durability for " .. size .. " bytes", function()
 		local dir = directory("mirror-" .. size)
 		local main, errors = paths(dir)
-		assert(uv.fs_symlink("/dev/full", errors))
+		local limit = message_limit(size)
+		write(errors, string.rep("p", limit))
 		assert(Sink.install(Logger, { log_dir = dir }))
-		Logger.warn("native-log-error-" .. size, string.rep("y", size))
+		assert(descriptors(errors) == 1)
+		with_file_size_limit(limit, function()
+			Logger.warn("native-log-error-" .. size, string.rep("y", size))
+		end)
 		assert(Sink.is_file_sink_active(), "mirror failure disabled the healthy main channel")
-		assert(full_descriptors() == baseline_full_descriptors, "failed mirror descriptor remained open")
+		assert(descriptors(errors) == 0, "failed mirror descriptor remained open")
 		Logger.info("native-log-survivor-" .. size, "Surviving main channel receipt.")
 		assert(read(main):find("Surviving main channel receipt.", 1, true))
 	end)
@@ -134,9 +190,12 @@ check("repoint repairs a retired main channel in the same directory", function()
 	local dir = directory("repaired/ergopti_plus/logs")
 	assert(require("infra.config_paths").get_logs_dir() == dir, "repair must use the actual configured target")
 	local main = paths(dir)
-	assert(uv.fs_symlink("/dev/full", main))
+	local message = "Force a buffered native EFBIG before repair."
+	local limit = message_limit(#message)
+	write(main, string.rep("p", limit))
 	assert(Sink.install(Logger, { log_dir = dir }))
-	Logger.info("native-log-refusal", "Force a buffered native ENOSPC before repair.")
+	with_file_size_limit(limit, function() Logger.info("native-log-refusal", message) end)
+	assert(descriptors(main) == 0, "native failure must retire the old main owner before repair")
 	assert(uv.fs_unlink(main))
 	assert(Sink.repoint(), "same-directory repair was refused")
 	Logger.info("native-log-repaired", "Durable main channel restored.")

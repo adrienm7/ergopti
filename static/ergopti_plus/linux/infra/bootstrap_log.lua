@@ -79,7 +79,7 @@ function M.append(code, opts)
 	-- lock retains the launcher's lock, and text_utils pulls compat.utf8 and the
 	-- rest of the shared tree that must load after it.
 	os.execute("mkdir -p " .. require("text_utils").shell_quote(dir) .. " 2>/dev/null")
-	local handle = io.open(path, "a")
+	local handle = require("infra.regular_file_writer").open(path, "a")
 	if not handle then return false, "bootstrap log not writable" end
 	local wrote = handle:write(os.date("%Y-%m-%d %H:%M:%S"), " [ERROR] [bootstrap] ", message, "\n")
 	local closed = handle:close()

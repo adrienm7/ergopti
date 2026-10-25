@@ -161,7 +161,7 @@ local function admit_redaction(supplied)
 	local Paths = require("infra.paths")
 	local root = Paths.shared_root_from(Paths.driver_root())
 	assert(type(root) == "string" and root ~= "", "logger_sink: canonical privacy tree unavailable")
-	local file = io.open(root .. "/modules/diagnostics/redaction.json", "rb")
+	local file = require("infra.regular_file_reader").open_source(root .. "/modules/diagnostics/redaction.json")
 	assert(file, "logger_sink: canonical privacy policy unavailable")
 	local read_ok, raw = pcall(file.read, file, "*a")
 	local close_ok, closed = pcall(file.close, file)
@@ -280,7 +280,7 @@ end
 --- @param date string "YYYY-MM-DD" of the line about to be written.
 --- @return string "a" or "w".
 local function topical_mode(path, date)
-	local handle = io.open(path, "r")
+	local handle = require("infra.regular_file_reader").open_source(path)
 	if not handle then return "a" end
 	local ok, first = pcall(handle.read, handle, "*l")
 	pcall(handle.close, handle)
@@ -299,8 +299,8 @@ local function open_handles(date)
 	close_topical()
 	_date = date
 	if not _dir then return end
-	_main_handle   = io.open(_dir .. "/" .. MAIN_PREFIX   .. date .. LOG_EXT, "a")
-	_errors_handle = io.open(_dir .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT, "a")
+	_main_handle   = require("infra.regular_file_writer").open(_dir .. "/" .. MAIN_PREFIX   .. date .. LOG_EXT, "a")
+	_errors_handle = require("infra.regular_file_writer").open(_dir .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT, "a")
 end
 
 --- Whether a basename matches the shell glob `<prefix>*<extension>`.
@@ -428,7 +428,7 @@ local function fan_out(line)
 			local handle = _topical[sub.name]
 			if not handle then
 				local path = _dir .. "/" .. sub.name
-				handle = io.open(path, topical_mode(path, _date))
+				handle = require("infra.regular_file_writer").open(path, topical_mode(path, _date))
 				if not handle then
 					io.stderr:write(_redact("[logger_sink] topical file " .. sub.name
 						.. " could not be opened — retired for today; logging continues through other outputs.\n"))
@@ -557,7 +557,7 @@ function M.prepare_dir(dir)
 	if not created or not probe_path then
 		return false, "the logs folder '" .. dir .. "' is not writable"
 	end
-	local opened, probe = pcall(io.open, probe_path, "a")
+	local opened, probe = pcall(require("infra.regular_file_writer").open, probe_path, "a")
 	local wrote, accepted = false, false
 	local closed_ok, closed = false, false
 	if opened and probe then
@@ -591,8 +591,8 @@ function M.repoint()
 	-- Acquired descriptors may still work after their path becomes unwritable.
 	-- Keep them until the candidate is usable; reopening is not a rollback.
 	local date = today()
-	local main_ok, main = pcall(io.open, target .. "/" .. MAIN_PREFIX .. date .. LOG_EXT, "a")
-	local errors_ok, errors = pcall(io.open, target .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT, "a")
+	local main_ok, main = pcall(require("infra.regular_file_writer").open, target .. "/" .. MAIN_PREFIX .. date .. LOG_EXT, "a")
+	local errors_ok, errors = pcall(require("infra.regular_file_writer").open, target .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT, "a")
 	if not main_ok or not main then
 		if errors_ok and errors then pcall(function() errors:close() end) end
 		return false, "the logs folder '" .. target .. "' is not writable"
