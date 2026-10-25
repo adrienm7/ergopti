@@ -337,7 +337,10 @@
 				"static/ergopti_plus/linux/modules/llm/profiles.lua",
 				"static/ergopti_plus/linux/modules/llm/settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+				"static/ergopti_plus/linux/modules/llm/context.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/llm/prediction/test_llm_prediction_engine_integration.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/context/test_ai_typing_context.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/prediction/test_prediction_control_retirement.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_llm_settings.lua"
 			]
 		},

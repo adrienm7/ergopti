@@ -47,6 +47,7 @@ local TimerScheduler   = require("adapters.timer_scheduler")
 local ManifestReader = require("infra.manifest_reader")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 local Timings          = require("infra.timings")
+local ContextBuffer    = require("llm.context_buffer")  -- shared navigation rule of the AI context
 
 local LOG    = "keymap.llm_bridge"
 local _state = nil  -- Shared CoreState, injected via M.init().
@@ -1871,10 +1872,8 @@ end
 function M.check_escape_reset()
 	if not require_state("check_escape_reset") then return false end
 	if not M.is_runtime_available() then
-		if reset_buffer_on_navigation then
-			_state.buffer = ""
-			_state.llm_buffer = ""
-		end
+		if reset_buffer_on_navigation then _state.buffer = "" end
+		_state.llm_buffer = ContextBuffer.retained_after_navigation(_state.llm_buffer, reset_buffer_on_navigation == true)
 		if type(tooltip.is_hotstring_visible) == "function"
 			and tooltip.is_hotstring_visible() then
 			invalidate_cursor_context(reset_buffer_on_navigation)
@@ -1898,8 +1897,8 @@ function M.check_escape_reset()
 	if reset_buffer_on_navigation then
 		Logger.debug(LOG, "Escape — buffer cleared.")
 		_state.buffer = ""
-		_state.llm_buffer = ""
 	end
+	_state.llm_buffer = ContextBuffer.retained_after_navigation(_state.llm_buffer, reset_buffer_on_navigation == true)
 	M.reset_predictions()
 	return false
 end
@@ -1910,9 +1909,10 @@ end
 function M.check_nav_reset()
 	if not require_state("check_nav_reset") then return end
 
-	if reset_buffer_on_navigation and _state.llm_buffer ~= "" then
+	local retained = ContextBuffer.retained_after_navigation(_state.llm_buffer, reset_buffer_on_navigation == true)
+	if retained ~= _state.llm_buffer then
 		Logger.debug(LOG, "LLM context cleared on navigation.")
-		_state.llm_buffer = ""
+		_state.llm_buffer = retained
 	end
 	M.reset_predictions()
 end

@@ -39,6 +39,15 @@ local function main_callbacks(environment)
 	return callbacks
 end
 
+--- The text of every message the model was sent, joined.
+--- @param messages table One request's messages.
+--- @return string
+local function prompt_text(messages)
+	local parts = {}
+	for _, message in ipairs(messages) do parts[#parts + 1] = tostring(message.content) end
+	return table.concat(parts, "\n")
+end
+
 --- Gives each case a real stable native field and an independent document.
 --- @param options table Optional count and hotstring word-reset policy.
 --- @param body function Receives real engines, callbacks and observed wire state.
@@ -62,6 +71,7 @@ local function scenario(options, body)
 			["llm.trigger.secure_filter_enabled"] = true, ["llm.trigger.debounce_ms"] = 500,
 			["llm.trigger.instant_on_word_end"] = false, ["llm.trigger.after_hotstring"] = false,
 			["llm.display.streaming"] = true, ["llm.display.streaming_multi"] = true,
+			["llm.generation.reset_on_nav"] = options.reset_on_nav,
 		} })
 		package.loaded["infra.llm_preferences"] = preferences
 		package.loaded["modules.llm.profiles"] = { init = function() return true end, is_enabled = function() return true end }
@@ -124,6 +134,7 @@ local function scenario(options, body)
 		end })
 		injector._set_nanosleep_for_test(function() end)
 		local matcher = require("modules.hotstrings.engine").new()
+		matcher:attach_ai_context(require("modules.llm.context").new({ is_active = function() return prediction.is_enabled() end }))
 		local WordReset = require("modules.hotstrings.word_reset")
 		local settings = WordReset.snapshot(); settings.idle_seconds = 0
 		settings.arrow_resets_word = options.arrow_resets_word ~= false
@@ -159,7 +170,7 @@ local function scenario(options, body)
 			is_showing = function() return state.overlay_showing end,
 			move = function(delta) state.moves = state.moves + delta; return true end,
 			active_index = function() return 1 end }
-		prediction.init({ engine = matcher, scheduler = scheduler, clock_ms = function() return scheduler.now * 1000 end,
+		prediction.init({ engine = matcher, context = matcher:ai_context(), scheduler = scheduler, clock_ms = function() return scheduler.now * 1000 end,
 			is_paused = environment.script_actions.is_paused, focus_id = guard.focused_text_identity,
 			privacy_guard = guard.blocks_text, privacy_context = guard.current_context,
 			overlay = overlay, apply_prediction = callbacks.apply, on_output = function() state.outputs = state.outputs + 1 end })
@@ -252,6 +263,40 @@ local function scenario(options, body)
 end
 
 local RESPONSE = " ok ok ok ok ok ok"
+
+helpers.describe("Main feeds the AI its own typing context (llm.generation.reset_on_nav)", function()
+	for _, control in ipairs({ { "left", 105 }, { "enter", 28 }, { "escape", 1 } }) do
+		helpers.it("(ai-context) keeps the sentence across " .. control[1] .. " when navigation is not to reset it", function()
+			scenario({ reset_on_nav = false }, function(s)
+				s.type("hello"); s.control(control[1], control[2])
+				helpers.assert_eq(s.matcher:current_buffer(), "", "the hotstring word was forgotten")
+				s.type("x"); s.scheduler.test.advance(.5)
+				helpers.assert_eq(#s.requests, 1, "the typed character still triggers a prediction")
+				helpers.assert_contains(prompt_text(s.submissions[1]), "hellox")
+			end)
+		end)
+
+		helpers.it("(ai-context) starts the sentence over after " .. control[1] .. " by default", function()
+			scenario({}, function(s)
+				s.type("hello"); s.control(control[1], control[2])
+				s.type("x"); s.scheduler.test.advance(.5)
+				for _, submitted in ipairs(s.submissions) do
+					helpers.assert_eq(prompt_text(submitted):find("hello", 1, true), nil,
+						"the sentence left behind the caret must not reach the model")
+				end
+			end)
+		end)
+	end
+
+	helpers.it("(ai-context) lets a manual request see the sentence that navigation did not clear", function()
+		scenario({ reset_on_nav = false }, function(s)
+			s.type("hello"); s.control("left", 105)
+			helpers.assert_eq(s.prediction.trigger_now(), true)
+			s.scheduler.test.advance(0)
+			helpers.assert_contains(prompt_text(s.submissions[#s.submissions]), "hello")
+		end)
+	end)
+end)
 
 helpers.describe("Main retires AI at forwarded document controls", function()
 	helpers.it("does not submit the pre-Home context after debounce", function()
@@ -402,6 +447,20 @@ helpers.describe("Main retires AI at forwarded standard editing chords", functio
 			end)
 		end
 	end
+
+	helpers.it("(ai-context) a paste or undo changes the text by an unknown amount, so navigation retention does not keep it", function()
+		for _, vector in ipairs({ vectors[1], vectors[4] }) do
+			scenario({ reset_on_nav = false }, function(s)
+				s.type("hello"); s.shortcut(vector)
+				s.type("x"); s.scheduler.test.advance(.5)
+				helpers.assert_true(#s.submissions >= 1, "the control must reach a prediction request")
+				for _, submitted in ipairs(s.submissions) do
+					helpers.assert_eq(prompt_text(submitted):find("hello", 1, true), nil,
+						vector.label .. " left a context that no longer describes the field")
+				end
+			end)
+		end
+	end)
 
 	helpers.it("editing-chord-owner retires paste even when shortcut word reset is off", function()
 		scenario({ shortcut_resets_word = false }, function(s)

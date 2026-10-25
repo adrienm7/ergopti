@@ -3300,6 +3300,27 @@ local function _build_llm(ctx)
 			["llm_generation_values"] = function() return rows end,
 		})
 		for _, row in ipairs(generation_rows) do target[#target + 1] = row end
+		-- Whether a navigation or Escape clears the AI's typing context, the row
+		-- Windows and macOS show in the same submenu.
+		local function generation_ready()
+			return ctx.paused ~= true and type(llm.is_enabled) == "function" and llm.is_enabled() == true
+		end
+		local RESET_ON_NAV = require("config_keys").LEAF.RESET_ON_NAV
+		local reset_rows = ManifestMenu.build("llm_generation_reset_navigation", "LLM", nil, nil, {
+			commands = {
+				[COMMAND.LLM_RESET_ON_NAV] = function()
+					if not generation_ready() then return false end
+					if Settings.set(RESET_ON_NAV, not Settings.get(RESET_ON_NAV)) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+			},
+			state_getters = {
+				["llm_reset_on_nav_checked"] = function() return Settings.get(RESET_ON_NAV) end,
+				["llm_generation_ready"] = generation_ready,
+			},
+		}, {})
+		for _, row in ipairs(reset_rows) do target[#target + 1] = row end
 	end
 
 	-- The category switch, the submenu's first row: appindicator binds item.fn

@@ -5326,12 +5326,7 @@
 			],
 			"disabled_when": [
 				"llm_generation_ready"
-			],
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"unavailable": "hide"
+			]
 		}
 	],
 	"llm_generation_context_controls": [

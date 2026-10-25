@@ -181,9 +181,9 @@ function M.run(opts, body)
 			scheduler = scheduler,
 			clock_ms = function() return scheduler.now * 1000 end,
 			engine = {
-				current_buffer = function() return world.buffer end,
 				reset = function() world.buffer = "" end,
 			},
+			context = { text = function() return world.buffer end, replaced = function() end },
 			is_paused = function() return world.paused end,
 			notify = function(text) world.notices[#world.notices + 1] = text; return true end,
 			overlay = {

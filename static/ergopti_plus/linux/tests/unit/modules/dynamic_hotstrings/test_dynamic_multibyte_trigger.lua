@@ -201,7 +201,9 @@ helpers.describe("Linux reviewed unknown-context resets (unknown-context-resets)
 			if not first then break end
 			position = last + 1
 			local inner = argument:sub(2, -2)
-			if inner == "" then
+			-- A final_result or dynamic expansion drops the word buffer at a boundary
+			-- and tells the engine the AI context already mirrors the produced text.
+			if inner == "" or inner == 'nil, nil, "keep"' then
 				local context = source:sub(math.max(1, first - 600), first)
 				local allowed = false
 				for _, marker in ipairs(BOUNDARY_RESET_CONTEXTS) do
@@ -210,7 +212,8 @@ helpers.describe("Linux reviewed unknown-context resets (unknown-context-resets)
 				helpers.assert_true(allowed, "a plain reset outside a known word start, near byte " .. first)
 				plain = plain + 1
 			else
-				helpers.assert_true(inner == "false" or inner == "at_word_start",
+				helpers.assert_true(inner == "false" or inner == "at_word_start"
+					or inner == 'at_word_start, nil, "navigation"',
 					"a reset argument must be false or the click setting, got " .. inner)
 				explicit = explicit + 1
 			end
@@ -237,6 +240,11 @@ helpers.describe("Linux builtin dynamic word-start owners", function()
 				.. "local opts = { dry_run = false }\n"
 				.. slice .. "\nend", "@actual-dynamic-daemon-parent"))()
 			local engine = require("hotstring_engine").new()
+			-- The daemon's engine wrapper also carries the AI context; this slice only
+			-- needs it to hand the prediction callback the text just typed.
+			engine.ai_context = function() return { text = function() return engine:current_buffer() end } end
+			engine.replaced = function() end
+			engine.forget_ai_context = function() end
 			engine:reset(false)
 			for _, character in ipairs({ "d", "a", "t", "e", "★" }) do engine:on_char(character) end
 			local predicted, recorded = 0, 0

@@ -225,6 +225,7 @@ local function make_state(sentinel)
 	local state = {
 		_sentinel        = sentinel,
 		buffer           = "",
+		llm_buffer       = "",
 		mappings         = {},
 		preview_providers = {},
 		groups           = {},
