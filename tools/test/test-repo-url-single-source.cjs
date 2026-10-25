@@ -58,10 +58,24 @@ const CODE_EXTENSIONS = new Set([
 // extension users copy as a self-contained file
 const EXAMPLE_EXTENSION = /^static\/ergopti_plus\/extensions\//;
 
-/** Classifies the shared Lua contract fixtures without admitting adjacent owners. */
+// Only canonical test trees hold intentional foreign and copied URLs: a nested
+// directory named tests inside production code must not escape either policy.
+const FIXTURE_PATH =
+	/^static\/ergopti_plus\/(?:(?:windows|macos|linux|_shared)\/tests|_shared\/lua\/test)\//;
+
+/** Classifies the canonical test trees without admitting adjacent owners. */
 function isFixturePath(file) {
-	return /\/tests\//.test(file) || /^static\/ergopti_plus\/_shared\/lua\/test\//.test(file);
+	return FIXTURE_PATH.test(file);
 }
+
+// Self-test: canonical roots are fixtures; a production folder named tests is not.
+for (const [file, expected] of [
+	['static/ergopti_plus/linux/tests/unit/x.lua', true],
+	['static/ergopti_plus/_shared/lua/test/x_contract.lua', true],
+	['static/ergopti_plus/macos/modules/tests/x.lua', false],
+	['static/ergopti_plus/_shared/ui/tests/x.js', false]
+])
+	assert.equal(isFixturePath(file), expected, `fixture classification of ${file}`);
 
 // Any GitHub repository whose name is an Ergopti one; "%." is the Lua pattern
 // spelling of the dot, which the changelog allow-pattern used
