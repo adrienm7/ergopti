@@ -84,6 +84,25 @@ try {
 		);
 		assert.match(missing.stderr, /CARCH/);
 	});
+	check('arch-desktop-icon-ships-the-real-canonical-png-at-its-native-size', () => {
+		const themes = path.join(pkgdir, 'usr/share/icons/hicolor');
+		const icons = fs
+			.readdirSync(themes)
+			.map((size) => path.join(themes, size, 'apps/ergopti.png'))
+			.filter((file) => fs.existsSync(file));
+		assert.equal(icons.length, 1, 'the package must supply exactly one desktop icon');
+		const actual = fs.readFileSync(icons[0]);
+		assert.ok(actual.length > 0, 'the desktop icon must not be an empty placeholder');
+		const expected = fs.readFileSync(path.join(library, '_shared/assets/ergopti_tray.png'));
+		assert.deepEqual(actual, expected, 'desktop and tray must use the canonical logo bytes');
+		const width = expected.readUInt32BE(16),
+			height = expected.readUInt32BE(20);
+		assert.equal(
+			path.relative(themes, icons[0]),
+			`${width}x${height}/apps/ergopti.png`,
+			'hicolor size metadata must match the PNG dimensions'
+		);
+	});
 	const record = 'printf "%s %s\\n" "${0##*/}" "$*" >> "$ARCH_CALLS"';
 	const stub = (name, body) =>
 		fs.writeFileSync(path.join(stubs, name), `#!/bin/bash\n${record}\n${body}\n`, { mode: 0o755 });

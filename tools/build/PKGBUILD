@@ -87,10 +87,9 @@ DESKTOP
   install -Dm644 build/linux/linux/install/ergopti-uinput.conf \
     "$pkgdir/etc/modules-load.d/ergopti-uinput.conf"
 
-  # Icon placeholder
-  install -Dm644 /dev/stdin "$pkgdir/usr/share/icons/hicolor/128x128/apps/ergopti.png" << 'ICON'
-ICON
-  # (Empty placeholder — replace with actual icon before publishing to AUR)
+  # The desktop uses the same packaged logo as the tray, at its real size.
+  install -Dm644 build/linux/_shared/assets/ergopti_tray.png \
+    "$pkgdir/usr/share/icons/hicolor/512x512/apps/ergopti.png"
 
   # Default config
   install -d "$pkgdir/etc/ergopti"
