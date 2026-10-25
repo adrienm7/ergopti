@@ -34,6 +34,9 @@
 
 #Requires AutoHotkey v2.0
 
+#Include ../adapters/boot_clock.ahk
+#Include ../adapters/input_probe_native.ahk
+
 
 
 
@@ -282,10 +285,10 @@ _IP_Admission() {
 	if A_IsSuspended
 		return "paused"
 	for KeyName in ["Ctrl", "Alt", "Shift", "LWin", "RWin", "SC138"] {
-		if GetKeyState(KeyName, "P")
+		if KS_IsDown(KeyName)
 			return "keys_held"
 	}
-	if GetKeyState("CapsLock", "T")
+	if KS_CapsLockToggleState()
 		return "keys_held"
 	return ""
 }
@@ -313,7 +316,7 @@ _IP_OpenTarget() {
 		WMPresentWindow(Window)
 		if A_IsSuspended || !_IP_TargetOwnerCurrent(Owner)
 			return 0
-		if !WinWaitActive("ahk_id " . Window.Hwnd, , 3)
+		if !InputProbeNativeWaitActive(Window.Hwnd, 3)
 			return 0
 		if A_IsSuspended || !_IP_TargetOwnerCurrent(Owner)
 			return 0
@@ -396,8 +399,7 @@ _IP_TargetAdmission(Target) {
 ; @param Target {Map}
 ; @returns {Boolean}
 _IP_TargetReady(Target) {
-	return DllCall("GetForegroundWindow", "Ptr") == Target["gui"].Hwnd
-		&& DllCall("GetFocus", "Ptr") == Target["edit"].Hwnd
+	return InputProbeNativeOwnsKeyboard(Target["gui"].Hwnd, Target["edit"].Hwnd)
 }
 
 ; Replaces the Edit's text and puts the caret at its end.
@@ -517,9 +519,7 @@ _IP_RepAbort(Reason) {
 ; contract requires to be closed and reported, and a probe timing is neither.
 ; @returns {Integer} Raw QPC ticks.
 _IP_Now() {
-	Counter := 0
-	DllCall("QueryPerformanceCounter", "Int64*", &Counter)
-	return Counter
+	return PerfClockTicks()
 }
 
 ; Ticks to microseconds.
@@ -661,8 +661,7 @@ InputProbe_RunSendComparison(Reps := 0) {
 			try LoggerWarn(INPUT_PROBE_TAG, "Send comparison aborted: the check window could not take the focus.")
 			return Result
 		}
-		Frequency := 0
-		DllCall("QueryPerformanceFrequency", "Int64*", &Frequency)
+		Frequency := PerfClockFrequency()
 		try LoggerEvidence(INPUT_PROBE_TAG, "send_compare context ahk={1} os={2} key_delay={3} send_level={4} reps={5}",
 			A_AhkVersion, A_OSVersion, A_KeyDelay, A_SendLevel, Reps)
 		for Scenario in _IP_Scenarios() {
@@ -769,24 +768,13 @@ _IP_HookProc(Code, WParam, LParam) {
 	if (Code >= 0 && (WParam == 0x100 || WParam == 0x104)
 			&& NumGet(LParam, 0, "UInt") == INPUT_PROBE_HOOK_VK)
 		_InputProbeHookSeen += 1
-	return DllCall("CallNextHookEx", "Ptr", 0, "Int", Code, "Ptr", WParam, "Ptr", LParam, "Ptr")
+	return InputProbeNativeCallNext(Code, WParam, LParam)
 }
 
 ; The probe hotkey. It has no other effect: its job is to swallow the key.
 _IP_HookHotkey(*) {
 	global _InputProbeHookFired
 	_InputProbeHookFired += 1
-}
-
-; Installs the test hook on this thread, the newest of the chain.
-; @param Callback {Integer} CallbackCreate address.
-; @returns {Integer} The hook handle.
-_IP_HookInstall(Callback) {
-	Hook := DllCall("SetWindowsHookExW", "Int", 13, "Ptr", Callback,
-		"Ptr", DllCall("GetModuleHandleW", "Ptr", 0, "Ptr"), "UInt", 0, "Ptr")
-	if !Hook
-		throw OSError(A_LastError, "SetWindowsHookExW")
-	return Hook
 }
 
 ; Injects the probe key once and reports what each side saw.
@@ -862,8 +850,7 @@ InputProbe_RunHookOrder() {
 		; A hotkey declared with no criterion, even when the driver was last
 		; registering one under a #HotIf, so the probe key is judged by AutoHotkey's
 		; hook for every window.
-		HotIf()
-		Hotkey(INPUT_PROBE_HOOK_HOTKEY, _IP_HookHotkey, "On I0")
+		InputProbeNativeHotkeyOn(INPUT_PROBE_HOOK_HOTKEY, _IP_HookHotkey)
 		HotkeyOn := true
 		Callback := CallbackCreate(_IP_HookProc, "Fast", 3)
 		Reason := _IP_TargetAdmission(Target)
@@ -871,7 +858,7 @@ InputProbe_RunHookOrder() {
 			Result["reason"] := Reason
 			return Result
 		}
-		Hook := _IP_HookInstall(Callback)
+		Hook := InputProbeNativeHookInstall(Callback)
 		Before := _IP_HookInject(Target, "SendEvent")
 		if Before["reason"] != "" {
 			Result["reason"] := Before["reason"]
@@ -891,13 +878,13 @@ InputProbe_RunHookOrder() {
 		}
 		; Control: the test hook installed again is the newest and must run first,
 		; or the whole method (suppression seen from a newer hook) is unsound.
-		DllCall("UnhookWindowsHookEx", "Ptr", Hook)
+		InputProbeNativeHookRemove(Hook)
 		Reason := _IP_TargetAdmission(Target)
 		if Reason != "" {
 			Result["reason"] := Reason
 			return Result
 		}
-		Hook := _IP_HookInstall(Callback)
+		Hook := InputProbeNativeHookInstall(Callback)
 		Control := _IP_HookInject(Target, "SendEvent")
 		if Control["reason"] != "" {
 			Result["reason"] := Control["reason"]
@@ -924,12 +911,11 @@ InputProbe_RunHookOrder() {
 		return Result
 	} finally {
 		if Hook
-			DllCall("UnhookWindowsHookEx", "Ptr", Hook)
+			InputProbeNativeHookRemove(Hook)
 		if Callback
 			CallbackFree(Callback)
 		if HotkeyOn {
-			HotIf()
-			Hotkey(INPUT_PROBE_HOOK_HOTKEY, "Off")
+			InputProbeNativeHotkeyOff(INPUT_PROBE_HOOK_HOTKEY)
 		}
 		if IsObject(Target)
 			_IP_DestroyTarget(Target)
