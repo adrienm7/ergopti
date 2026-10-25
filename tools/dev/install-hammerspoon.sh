@@ -10,11 +10,15 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Command substitution removes trailing LF bytes, even when they belong to a
+# directory name. Capture a sentinel and remove only that final byte afterward.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && printf '%s.' "$PWD")"
+SCRIPT_DIR="${SCRIPT_DIR%.}"
 REPO_ROOT="${SCRIPT_DIR}"
 
 while [ "${REPO_ROOT}" != "/" ] && [ ! -f "${REPO_ROOT}/static/ergopti_plus/macos/init.lua" ]; do
-	REPO_ROOT="$(cd "${REPO_ROOT}/.." && pwd)"
+	REPO_ROOT="$(cd "${REPO_ROOT}/.." && printf '%s.' "$PWD")"
+	REPO_ROOT="${REPO_ROOT%.}"
 done
 
 DRIVER_DIR="${REPO_ROOT}/static/ergopti_plus/macos"

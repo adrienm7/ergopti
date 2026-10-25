@@ -31,6 +31,7 @@ const CASES = [
 	['double quotes', 'Ergopti "development"'],
 	['backslashes', 'Ergopti\\bootstrap'],
 	['newlines', 'Ergopti\nbootstrap'],
+	['trailing newlines', 'Érgopti ending.\n\n'],
 	['control bytes followed by digits', `Ergopti${String.fromCharCode(1)}23 development`],
 	['control bytes', `Ergopti${CONTROL_BYTES}bootstrap`]
 ];
