@@ -2112,7 +2112,6 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/infra/toml/test_toml_string_codec_single_source.ahk
 #Include meta/modules/hotstrings/magic_key/test_magic_key_editor_reopen_presents.ahk
 #Include meta/modules/updater/test_update_check_window_presented.ahk
-#Include meta/modules/gestures/test_gesture_notice_presented.ahk
 #Include meta/modules/hotstrings/catalogue/test_hs_delimiter_dialog_reachable.ahk
 #Include meta/ui/windows/test_ui_style_llm_tray_i18n.ahk
 #Include meta/modules/llm/servers/test_ollama_webview_msgsub_retained.ahk

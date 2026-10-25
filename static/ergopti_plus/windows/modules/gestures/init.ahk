@@ -296,8 +296,6 @@ GestureDispatch(slot) {
 
 ; Read configuration on load
 GesturesReadConfig()
-if !IsSet(_AHK_DRY_RUN)
-	SetTimer((*) => GestureSystemRefresh(true), -1)
 
 ; The onboarding wizard cannot call GestureAutoConfigureRegistry() directly —
 ; when it runs (first launch, before this module's auto-exec body executes) the

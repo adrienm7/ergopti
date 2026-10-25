@@ -6521,11 +6521,16 @@ type = "---"
 type = "list"
 id = "gesture_recommended_notes"
 
-# `command` since 2026-08-07: the handler's whole body was one row with a static
-# label, which is what a declaration already expresses.
+# The Windows driver has no status submenu since 2026-10-25: a slot whose
+# Precision Touchpad registry values do not send Ergopti's shortcut is greyed
+# out in its own row (gesture_slots_ahk) with the reason. macOS and Linux keep
+# theirs, which report a desktop gesture that would ALSO fire (a double action),
+# not a missing system assignment.
 [[menu.gestures_menu]]
 type = "list"
 id = "system_gesture_status"
+platforms = ["hs", "linux"]
+unavailable = "hide"
 
 [[menu.gestures_menu]]
 type = "command"
@@ -7674,7 +7679,7 @@ unavailable = "hide"
 type = "command"
 id = "gesture_system_refresh"
 i18n = "ui_apps.btn_refresh"
-platforms = ["ahk", "hs"]
+platforms = ["hs"]
 unavailable = "hide"
 
 # Fixed swipe child presentation only; native payloads remain actual child owners.
@@ -9381,6 +9386,18 @@ unavailable = "hide"
 type = "label"
 id = "gesture_recommended_note"
 i18n = "menu.gestures.recommended_note"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+# Windows: the driver takes the system assignment over itself, so the "remove
+# the system's assignment first" advice above does not apply; the slot is
+# usable only while the touchpad settings send Ergopti's shortcut.
+[[menu.gesture_recommended_notes]]
+type = "label"
+id = "gesture_recommended_reason_windows"
+i18n = "menu.gestures.recommended_reason_windows"
+platforms = ["ahk"]
+unavailable = "hide"
 
 [[menu.gesture_recommended_notes]]
 type = "label"
@@ -9395,21 +9412,6 @@ id = "gesture_recommended_reason_macos"
 i18n = "menu.gestures.recommended_reason_macos"
 platforms = ["hs"]
 unavailable = "hide"
-
-[[menu.gesture_system_status_windows_frame]]
-type = "include"
-section = "gesture_system_status_unknown"
-present_when = "gesture_system_is_unverified"
-
-[[menu.gesture_system_status_windows_frame]]
-type = "include"
-section = "gesture_system_status_clear"
-present_when = "gesture_system_is_clear"
-
-[[menu.gesture_system_status_windows_frame]]
-type = "include"
-section = "gesture_system_status_conflicts"
-present_when = "gesture_system_has_conflicts"
 
 # macOS has cached native conflict/pinch data; its existing parent has only clear/count states.
 [[menu.gesture_system_status_macos_frame]]
@@ -9431,7 +9433,7 @@ section = "gesture_system_status_unknown"
 type = "group"
 id = "gesture_system_unknown_children"
 i18n = "gestures.system.unknown"
-platforms = ["ahk", "linux"]
+platforms = ["linux"]
 unavailable = "hide"
 
 # Linux cannot verify the compositor's gesture policy; it retains the unknown branch.
@@ -9439,7 +9441,7 @@ unavailable = "hide"
 type = "group"
 id = "gesture_system_clear_children"
 i18n = "gestures.system.clear"
-platforms = ["ahk", "hs"]
+platforms = ["hs"]
 unavailable = "hide"
 
 [[menu.gesture_system_status_conflicts]]
@@ -9447,18 +9449,8 @@ type = "group"
 id = "gesture_system_conflict_children"
 i18n = "gestures.system.conflicts_caption"
 caption_getter = "gesture_system_conflict_count"
-platforms = ["ahk", "hs"]
+platforms = ["hs"]
 unavailable = "hide"
-
-[[menu.gesture_system_windows_children]]
-type = "list"
-id = "gesture_system_cached_slots"
-platforms = ["ahk"]
-unavailable = "hide"
-
-[[menu.gesture_system_windows_children]]
-type = "include"
-section = "gesture_system_status_controls"
 
 [[menu.gesture_system_macos_children]]
 type = "list"
@@ -9489,22 +9481,6 @@ type = "include"
 section = "gesture_system_linux_settings_unavailable"
 present_when = "gesture_system_settings_unavailable"
 
-# Only native Windows cached settings can select configured/not-configured states.
-[[menu.gesture_system_slot_windows_frame]]
-type = "include"
-section = "gesture_system_slot_unknown"
-present_when = "gesture_system_slot_unverified"
-
-[[menu.gesture_system_slot_windows_frame]]
-type = "include"
-section = "gesture_system_slot_configured"
-present_when = "gesture_system_slot_configured"
-
-[[menu.gesture_system_slot_windows_frame]]
-type = "include"
-section = "gesture_system_slot_not_configured"
-present_when = "gesture_system_slot_not_configured"
-
 [[menu.gesture_system_slot_linux_frame]]
 type = "include"
 section = "gesture_system_slot_unknown"
@@ -9514,23 +9490,7 @@ type = "command"
 id = "gesture_system_open_unknown_slot"
 i18n = "gestures.system.slot_unknown_caption"
 caption_getter = "gesture_system_slot_caption"
-platforms = ["ahk", "linux"]
-unavailable = "hide"
-
-[[menu.gesture_system_slot_configured]]
-type = "command"
-id = "gesture_system_open_configured_slot"
-i18n = "gestures.system.slot_configured_caption"
-caption_getter = "gesture_system_slot_caption"
-platforms = ["ahk"]
-unavailable = "hide"
-
-[[menu.gesture_system_slot_not_configured]]
-type = "command"
-id = "gesture_system_open_not_configured_slot"
-i18n = "gestures.system.slot_not_configured_caption"
-caption_getter = "gesture_system_slot_caption"
-platforms = ["ahk"]
+platforms = ["linux"]
 unavailable = "hide"
 
 # The native cached macOS pinch state has no Windows/Linux equivalent.

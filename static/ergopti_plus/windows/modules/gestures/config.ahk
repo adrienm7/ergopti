@@ -702,7 +702,11 @@ GestureConsumeAutoConfigureFlag(Path, WriterFn := 0, NotifyFn := 0, TimerFn := 0
 ; Returns true on success, false if the backup or any registry write failed.
 GestureAutoConfigureRegistry(OnDone := 0) {
 		LoggerStart("gestures", "Auto-configuring touchpad gestures via registry…")
-		if !TouchpadRegistryApply() {
+		Applied := TouchpadRegistryApply()
+		; Some values may have been written even when others failed: the menu
+		; greys or enables each slot from what the registry holds now.
+		GestureSystemRequestRefresh()
+		if !Applied {
 				LoggerError("gestures", "Auto-configuration failed: the touchpad values were not all written.")
 				return False
 		}
