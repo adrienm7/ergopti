@@ -448,6 +448,54 @@ try {
 					'checksum refusal preserves the previous ownership publication'
 				);
 			}
+			// The receipt wire format cannot encode these payload-relative bytes.
+			// Refusal remains a machine record: no translated UI is loaded here.
+			for (const filename of ['line\nbreak', 'carriage\rreturn', 'tab\tname', 'literal\\name']) {
+				const invalidFile = path.join(invalidSource, filename);
+				const originalBytes = Buffer.from('unrepresentable payload canary\n');
+				fs.writeFileSync(invalidFile, originalBytes);
+				const refused = spawnSync(
+					bashExecutable(),
+					[
+						path.join(nativeDriver, 'install/ownership.sh'),
+						invalidSource,
+						nativeShared,
+						nativeLibrary
+					],
+					{ encoding: 'utf8', env: nativeEnv, timeout: 15000 }
+				);
+				assert.equal(refused.error, undefined, 'the actual ownership helper must finish');
+				assert.equal(refused.signal, null, 'filename refusal must complete without a signal');
+				assert.equal(refused.status, 1, 'unrepresentable payload names must refuse publication');
+				assert.equal(refused.stdout, '', 'refusal cannot expose a success result');
+				const diagnosticPath = spawnSync(
+					bashExecutable(),
+					['-c', 'printf "%q" "$1"', 'ownership-path', invalidFile],
+					{ encoding: 'utf8' }
+				);
+				assert.equal(diagnosticPath.status, 0, diagnosticPath.stderr);
+				assert.equal(
+					refused.stderr,
+					`[ownership] code=invalid_receipt path=${diagnosticPath.stdout}\n`,
+					'filename refusal identifies its machine category and quotes native bytes into one record'
+				);
+				assert.deepEqual(
+					fs.readFileSync(nativeManifest),
+					previousReceipt,
+					'filename refusal preserves the previous publication'
+				);
+				assert.deepEqual(
+					fs.readFileSync(invalidFile),
+					originalBytes,
+					'filename refusal preserves the source payload'
+				);
+				assert.deepEqual(
+					fs.readdirSync(nativeLibrary).filter((name) => name.startsWith('.ergopti-owned-files.')),
+					[],
+					'failed receipt staging must not leave temporary publications'
+				);
+				fs.unlinkSync(invalidFile);
+			}
 		}
 
 		// Independently author the receipt so a failed producer cannot hide the

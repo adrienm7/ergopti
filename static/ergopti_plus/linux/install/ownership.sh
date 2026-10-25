@@ -68,7 +68,13 @@ for tree in "${trees[@]}"; do
 			exit 1
 		fi
 		relative="$prefix/${file#"$source/"}"
-		valid_owned_relative "$relative" || { echo 'Payload filename cannot be represented safely.' >&2; exit 1; }
+		if ! valid_owned_relative "$relative"; then
+			# The caller owns localized status; native path bytes stay in one
+			# developer record instead of becoming untranslated UI prose.
+			filename_refusal="[ownership] code=invalid_receipt"
+			printf '%s path=%q\n' "$filename_refusal" "$file" >&2
+			exit 1
+		fi
 		printf '%s\t%s\n' "$digest" "$relative" >> "$manifest"
 	done
 done
