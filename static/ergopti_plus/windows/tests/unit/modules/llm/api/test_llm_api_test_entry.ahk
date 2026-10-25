@@ -813,3 +813,84 @@ _LAT_ProgressNativeCancellation(Event) {
 for _LAT_NativeCancelEvent in ["Close", "Escape", "DuringShow"]
 	Test("llm api progress: " . _LAT_NativeCancelEvent . " cancels the live probe (api-progress-native-cancel)",
 		_LAT_ProgressNativeCancellation.Bind(_LAT_NativeCancelEvent))
+
+
+_LAT_RefuseProbeTransport(Calls, *) {
+	Calls.Push(true)
+	throw Error("Controlled probe transport refusal before network work.")
+}
+
+_LAT_ProgressShowSupersession() {
+	global _LLM_Menu_ApiTestProgress, _LLM_AuxGeneration, _LLM_AuxOwnerCounter
+	global _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter
+	global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LLM_Menu_ApiFailureEpoch
+	global LLM_REMOTE_TEST_REQUEST
+	SavedMenu := _LAT_FixtureMenu()
+	SavedProgress := _LLM_Menu_ApiTestProgress
+	SavedOwners := [_LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners,
+		_LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter]
+	SavedRemote := [_LLM_Remote_Async, _LLM_Remote_AsyncCounter, _LLM_Menu_ApiFailureEpoch]
+	HadConstructor := CurlAsyncRequest.HasOwnProp("Call")
+	SavedConstructor := HadConstructor ? CurlAsyncRequest.GetOwnPropDesc("Call") : 0
+	SavedCritical := Critical("Off")
+	DestroyProbe := 0, Window := 0
+	Calls := [], Notices := []
+	try {
+		_LAT_ResetOwners()
+		_LLM_Menu_ApiTestProgress := Map()
+		_LLM_Remote_Async := Map()
+		_LLM_Remote_AsyncCounter := 0
+		CurlAsyncRequest.DefineProp("Call", {Call: _LAT_RefuseProbeTransport.Bind(Calls)})
+		AssertTrue(LLM_REMOTE_TEST_REQUEST is Map && LLM_REMOTE_TEST_REQUEST.Count > 0,
+			"the public probe must have the genuine shared request specification")
+		Owner := _LAT_TestOwner()
+		AssertTrue(_LLM_Menu_ApiTestProgressShow("prod", "Private predecessor progress", Owner))
+		OldState := _LLM_Menu_ApiTestProgress
+		Window := OldState["gui"]
+		DestroyProbe := _LAT_ProgressReentrantDestroy(Window)
+		OldState["gui"] := DestroyProbe
+		AssertFalse(_LLM_Menu_TestActiveApiEntry((Ok, Tip) => Notices.Push(Tip)),
+			"a reentrant replacement withdraws the outer probe request")
+		AssertTrue(DestroyProbe.Fired, "the real public probe must retire its predecessor HWND")
+		AssertEqual(0, Calls.Length, "a withdrawn probe cannot construct an outgoing HTTP transport")
+		AssertEqual(0, _LLM_Remote_AsyncCounter, "withdrawal must precede even remote request reservation")
+		AssertTrue(_LLM_Menu_ApiTestProgress == DestroyProbe.NextState,
+			"the outer opening cannot overwrite progress opened by predecessor destruction")
+		AssertTrue(LLM_AuxIsCurrent(DestroyProbe.NextOwner))
+		AssertTrue(WMHandleExists(DestroyProbe.NextState["gui"].Hwnd),
+			"the latest native progress remains independently owned and visible")
+		AssertEqual(0, Notices.Length, "a withdrawn probe cannot report a transport verdict")
+	} finally {
+		RequestIds := []
+		for RequestId in _LLM_Remote_Async
+			RequestIds.Push(RequestId)
+		for RequestId in RequestIds
+			LLM_RemoteCancelAsync(RequestId)
+		_LLM_Menu_ApiTestProgressHide()
+		SetTimer(_LLM_Menu_ApiTestProgressTick, 0)
+		if IsObject(DestroyProbe) && DestroyProbe.HasOwnProp("NextState") {
+			if DestroyProbe.NextState.Has("gui")
+				try DestroyProbe.NextState["gui"].Destroy()
+			try LLM_AuxFinish(DestroyProbe.NextOwner)
+		}
+		if IsObject(Window)
+			try Window.Destroy()
+		if HadConstructor
+			CurlAsyncRequest.DefineProp("Call", SavedConstructor)
+		else
+			CurlAsyncRequest.DeleteProp("Call")
+		_LLM_Menu_ApiTestProgress := SavedProgress
+		_LLM_AuxGeneration := SavedOwners[1]
+		_LLM_AuxOwnerCounter := SavedOwners[2]
+		_LLM_AuxOwners := SavedOwners[3]
+		_LLM_AuxCleanupDebt := SavedOwners[4]
+		_LLM_AuxCleanupDebtCounter := SavedOwners[5]
+		_LLM_Remote_Async := SavedRemote[1]
+		_LLM_Remote_AsyncCounter := SavedRemote[2]
+		_LLM_Menu_ApiFailureEpoch := SavedRemote[3]
+		_LAT_RestoreMenu(SavedMenu)
+		Critical(SavedCritical)
+	}
+}
+Test("llm api progress: public probe cannot overwrite reentrant teardown ownership (api-progress-opening-supersession)",
+	_LAT_ProgressShowSupersession)
