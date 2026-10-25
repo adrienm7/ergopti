@@ -641,8 +641,19 @@ helpers.describe("session reset refusal keeps exact session ownership", function
 		it("reset-refusal-owner: retains the original session with reentrant=" .. tostring(reentrant), function()
 			local writer, admitted, launches = Fakes.sqlite_writer(), false, 0
 			local clock = require("infra.monotonic")
-			local previous_now, now = clock.now_ms, math.floor(clock.now_ms())
+			local calendar = require("modules.keystats.calendar")
+			local previous_now, previous_capture = clock.now_ms, calendar.capture
+			local now, initial = math.floor(clock.now_ms()), calendar.capture()
+			local initial_now = now
 			clock.now_ms = function() return now end
+			-- Module isolation can give Calendar a different clock table. Both
+			-- capture coordinates must advance with this fixture's elapsed time.
+			calendar.capture = function()
+				local wall = initial.wall_ms + now - initial_now
+				return { wall_ms = wall, mono_ms = now,
+					date = os.date("%Y-%m-%d", math.floor(wall / 1000)),
+					ts = os.date("!%Y-%m-%d %H:%M:%S", math.floor(wall / 1000)) }
+			end
 			local ok, err = pcall(function()
 				with_collector(function(k)
 					k.on_keydown("a", now, "owned")
@@ -673,7 +684,7 @@ helpers.describe("session reset refusal keeps exact session ownership", function
 					return writer.start_flush(device, payload)
 				end)
 			end)
-			clock.now_ms = previous_now
+			clock.now_ms, calendar.capture = previous_now, previous_capture
 			if not ok then error(err, 0) end
 			helpers.assert_eq(launches, 2, "nested reset cannot acquire another constructor")
 		end)
