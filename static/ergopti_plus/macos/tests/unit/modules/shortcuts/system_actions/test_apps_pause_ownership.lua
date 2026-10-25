@@ -50,6 +50,7 @@ local function fresh_apps()
 		centered = 0,
 		launched = {},
 		launch_result = false,
+		front_app_name = "TextEdit",
 		copies = 0,
 		clear_calls = 0,
 		read_all_calls = 0,
@@ -130,13 +131,12 @@ local function fresh_apps()
 		end,
 		frame = function() return { x = 0, y = 0, w = 200, h = 100 } end,
 		setFrame = function()
-			if type(fixture.center_hook) == "function" then fixture.center_hook() end
 			fixture.centered = fixture.centered + 1
 			return true
 		end,
 	}
 	local front_app = {
-		name = function() return "TextEdit" end,
+		name = function() return fixture.front_app_name end,
 		allWindows = function() return { window } end,
 	}
 	hs_stub.application = {
@@ -310,7 +310,7 @@ end
 
 
 helpers.describe("Apps composite owner: positive controls", function()
-	helpers.it("completes Finder probe, open and centering once while ACTIVE", function()
+	helpers.it("completes Finder probe and opens Downloads once while ACTIVE", function()
 		local f = fresh_apps()
 		helpers.assert_eq(f.subject.open_downloads(), true)
 		helpers.assert_eq(#f.shells, 1)
@@ -318,12 +318,57 @@ helpers.describe("Apps composite owner: positive controls", function()
 		f.shells[1]:deliver(false, "none")
 		helpers.assert_eq(#f.shells, 2)
 		helpers.assert_eq(f.shells[2].kind, "open")
-		helpers.assert_eq(#f.native_timers, 1)
+		helpers.assert_eq(f.shells[2].payload, os.getenv("HOME") .. "/Downloads")
 		f.shells[2]:deliver(true)
-		f.native_timers[1]:fire()
-		helpers.assert_eq(f.centered, 1)
+		for _, timer in ipairs(f.native_timers) do timer:fire() end
+		helpers.assert_eq(f.centered, 0,
+			"opening Downloads must preserve the placement of other applications")
 		helpers.assert_eq(f.subject.has_pending_apps_action(), false)
 	end)
+end)
+
+
+helpers.describe("App opening preserves window placement", function()
+	for _, variant in ipairs({
+		{ action = "open_downloads", focused = true, launched = false },
+		{ action = "open_downloads", focused = false, launched = false },
+		{ action = "open_downloads", focused = false, launched = true },
+		{ action = "open_finder", launched = false },
+		{ action = "open_finder", launched = true },
+		{ action = "open_settings", launched = true },
+	}) do
+		helpers.it("preserves placement for " .. variant.action .. " focused=" .. tostring(variant.focused)
+			.. " launched=" .. tostring(variant.launched) .. " (open-actions-preserve-placement)", function()
+			local f = fresh_apps()
+			f.front_app_name = variant.action == "open_settings" and "System Settings" or "Finder"
+			f.launch_result = variant.launched
+			helpers.assert_eq(f.subject[variant.action](), true)
+			if variant.action == "open_downloads" then
+				helpers.assert_eq(f.shells[1].kind, "applescript")
+				f.shells[1]:deliver(variant.focused, variant.focused and "ok" or "none")
+			end
+			-- A focus change after the action cannot authorize moving this new app.
+			f.front_app_name = "TextEdit"
+			for _, timer in ipairs(f.native_timers) do timer:fire() end
+			for _, shell in ipairs(f.shells) do
+				if not shell.isSettled() then shell:deliver(true) end
+			end
+			helpers.assert_eq(f.centered, 0,
+				"opening another application must never move the newly frontmost application's windows")
+			if variant.action == "open_settings" then
+				helpers.assert_eq(f.launched, { "System Settings" })
+			elseif not variant.focused then
+				local opened = f.shells[#f.shells]
+				helpers.assert_eq(opened.kind, "open")
+				local target = os.getenv("HOME") .. (variant.action == "open_downloads" and "/Downloads" or "")
+				helpers.assert_eq(opened.payload, target)
+				if variant.launched then helpers.assert_eq(f.launched, { "qspace" }) end
+			else
+				helpers.assert_eq(#f.shells, 1, "an already focused Downloads window needs no second open")
+			end
+			helpers.assert_eq(f.subject.has_pending_apps_action(), false)
+		end)
+	end
 end)
 
 
