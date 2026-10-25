@@ -1410,6 +1410,7 @@
 	"menu.hotstrings.cascade_depth": "Kedjade hotstrings",
 	"menu.hotstrings.cascade_depth_off": "Av",
 	"menu.hotstrings.cascade_depth_unit": "nivå(er)",
+	"menu.hotstrings.expansion_delay": "Expansionsfördröjning",
 	"menu.hotstrings.reset_magic_key": "   ↳ Återställ (standard: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

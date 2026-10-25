@@ -1410,6 +1410,7 @@
 	"menu.hotstrings.cascade_depth": "Hotstring a cascata",
 	"menu.hotstrings.cascade_depth_off": "Disattivato",
 	"menu.hotstrings.cascade_depth_unit": "livelli",
+	"menu.hotstrings.expansion_delay": "Ritardo di espansione",
 	"menu.hotstrings.reset_magic_key": "   ↳ Ripristina (predefinito: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",

@@ -1410,6 +1410,7 @@
 	"menu.hotstrings.cascade_depth": "Kjedede hotstrings",
 	"menu.hotstrings.cascade_depth_off": "Av",
 	"menu.hotstrings.cascade_depth_unit": "nivå",
+	"menu.hotstrings.expansion_delay": "Utvidelsesforsinkelse",
 	"menu.hotstrings.reset_magic_key": "   ↳ Tilbakestill (standard: ★)",
 	"menu.hotstrings.rolls.assign": "#! ➜ :=",
 	"menu.hotstrings.rolls.assign_arrow_equal_left": "=$ ➜ <=",
