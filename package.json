@@ -390,6 +390,7 @@
 		"test:linux-package-version": "node ./tools/test/test-linux-package-version.cjs",
 		"test:linux-flatpak-icon": "node ./tools/test/test-linux-flatpak-icon.cjs",
 		"test:linux-package-options": "node ./tools/test/test-linux-package-options.cjs",
+		"test:linux-rpm-publish": "node ./tools/test/test-linux-rpm-publish.cjs",
 		"test:linux-appimage-portability": "node ./tools/test/test-linux-appimage-portability.cjs",
 		"test:linux-install-sandbox": "node ./tools/test/test-linux-install-sandbox.cjs",
 		"test:linux-source-toolchain": "node ./tools/test/test-linux-source-toolchain.cjs",

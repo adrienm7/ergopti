@@ -96,6 +96,7 @@ try {
 		)?.[1];
 		assert.ok(command, 'the actual staging entry point must print its native producer recipe');
 		const receipt = path.join(scratch, `${format}-argv`);
+		const publicationReceipt = path.join(scratch, `${format}-publication-argv`);
 		const executable = format === 'deb' ? 'dpkg-deb' : 'rpmbuild';
 		// Record only the external producer boundary; real Bash parses the actual
 		// printed recipe, including its quoting of literal source path bytes.
@@ -103,12 +104,16 @@ try {
 			bashExecutable(),
 			[
 				'-euc',
-				`function ${executable} { printf '%s\\0' "$@" > "$ERGOPTI_PACKAGE_ARGV_RECEIPT"; }; ` +
+				`function ${executable} { printf '%s\\0' "$@" > "$ERGOPTI_PACKAGE_ARGV_RECEIPT";  }; function node { printf '%s\\0' "$@" > "$ERGOPTI_PACKAGE_PUBLICATION_RECEIPT"; }; ` +
 					command
 			],
 			{
 				cwd: ROOT,
-				env: { ...env, ERGOPTI_PACKAGE_ARGV_RECEIPT: receipt },
+				env: {
+					...env,
+					ERGOPTI_PACKAGE_ARGV_RECEIPT: receipt,
+					ERGOPTI_PACKAGE_PUBLICATION_RECEIPT: publicationReceipt
+				},
 				encoding: 'utf8',
 				timeout: 15000
 			}
@@ -119,7 +124,14 @@ try {
 		assert.deepEqual(
 			argv,
 			format === 'rpm'
-				? ['--define', `_topdir ${root}`, '-bb', path.join(root, 'SPECS/ergopti.spec')]
+				? [
+						'--define',
+						`_topdir ${root}`,
+						'--define',
+						`_rpmdir ${path.join(root, 'native-rpms')}`,
+						'-bb',
+						path.join(root, 'SPECS/ergopti.spec')
+					]
 				: [
 						'--root-owner-group',
 						'--build',
@@ -127,6 +139,16 @@ try {
 						path.join(alias, 'build/linux/ergopti_1.0.3_amd64.deb')
 					]
 		);
+		if (format === 'rpm') {
+			assert.deepEqual(fs.readFileSync(publicationReceipt, 'utf8').split('\0').slice(0, -1), [
+				path.join(root, 'publish-linux-rpm.cjs'),
+				path.join(root, 'native-rpms'),
+				path.join(root, 'RPMS'),
+				'ergopti',
+				'1.0.3',
+				'x86_64'
+			]);
+		}
 		console.log(`PASS package-manual-recipe-literal-argv-${format}`);
 	}
 } finally {
