@@ -32,9 +32,10 @@
 'use strict';
 
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
+const DRIVER_PREFIX = 'static/ergopti_plus/';
 
 // An OS or a vendor product. Anything here in a PATH says "this differs by OS"
 // in a word other than `platform`.
@@ -63,41 +64,49 @@ const EXEMPT = /[/\\](platform|adapters|vendor|tests|docs)[/\\]/;
 const PATH_BASELINE = 1;
 
 /**
- * Every tracked file under static/ergopti_plus.
+ * Every file in the staged driver candidate, excluding local runtime residue.
  * @returns {string[]} Repo-relative paths with forward slashes.
  */
 function trackedDriverFiles() {
-	return execSync('git ls-files -- static/ergopti_plus', { cwd: ROOT, encoding: 'utf8' })
-		.split('\n')
+	return execFileSync('git', ['ls-files', '--cached', '-z', '--', 'static/ergopti_plus'], {
+		cwd: ROOT,
+		encoding: 'utf8'
+	})
+		.split('\0')
 		.filter(Boolean);
 }
 
-const TRACKED_FILES = trackedDriverFiles();
+// Both ratchets must measure the same candidate. Files staged for addition or
+// removal count immediately; ignored caches and untracked folders never ship.
+const trackedFiles = trackedDriverFiles();
 
 /**
- * Top-level sub-folders of a driver's platform/ tree.
+ * Top-level sub-folders represented in a driver's staged platform/ tree.
  * @param {string} driver - Driver directory name.
  * @returns {string[]} Sorted folder names, empty when platform/ is absent.
  */
 function platformFolders(driver) {
-	const prefix = `static/ergopti_plus/${driver}/platform/`;
+	const prefix = `${DRIVER_PREFIX}${driver}/platform/`;
 	return [
 		...new Set(
-			TRACKED_FILES.filter((file) => file.startsWith(prefix))
+			trackedFiles
+				.filter((file) => file.startsWith(prefix))
 				.map((file) => file.slice(prefix.length).split('/'))
-				.filter((parts) => parts.length > 1)
+				.filter((parts) => parts.length >= 2)
 				.map((parts) => parts[0])
 		)
 	].sort();
 }
 
-// A driver is a directory with an adapters/ tree — the hexagonal marker, the
-// same discovery test-config-schema.cjs uses.
+// An adapters/ file is the driver's hexagonal marker. Discover it in Git's
+// index rather than allowing a local scratch directory to invent a new driver.
 const DRIVERS = [
 	...new Set(
-		TRACKED_FILES.map(
-			(file) => file.match(/^static\/ergopti_plus\/([^/]+)\/adapters\//)?.[1]
-		).filter(Boolean)
+		trackedFiles
+			.filter((file) => file.startsWith(DRIVER_PREFIX))
+			.map((file) => file.slice(DRIVER_PREFIX.length).split('/'))
+			.filter((parts) => parts.length >= 3 && parts[1] === 'adapters')
+			.map((parts) => parts[0])
 	)
 ].sort();
 
@@ -108,7 +117,7 @@ if (DRIVERS.length < 3) {
 	process.exit(1);
 }
 
-const offenders = TRACKED_FILES.filter((f) => !EXEMPT.test(f) && VENDOR_WORDS.test(f));
+const offenders = trackedFiles.filter((f) => !EXEMPT.test(f) && VENDOR_WORDS.test(f));
 
 const folders = new Map(DRIVERS.map((d) => [d, platformFolders(d)]));
 const union = [...new Set([...folders.values()].flat())].sort();
@@ -128,6 +137,12 @@ if (process.argv.includes('--measure')) {
 }
 
 let failed = false;
+if (union.length === 0) {
+	failed = true;
+	console.error(
+		'\x1b[31m[ERROR] Convention P: no tracked platform/ sub-folders found — the candidate has no subjects.\x1b[0m'
+	);
+}
 if (offenders.length > PATH_BASELINE) {
 	failed = true;
 	console.error(
