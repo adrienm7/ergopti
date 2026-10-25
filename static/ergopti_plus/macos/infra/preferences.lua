@@ -1257,12 +1257,19 @@ function M.load(prefs_file)
 	return values, "ok"
 end
 
+--- Lua type a stored value has for the manifest entry types whose name is not
+--- a Lua type: a feature row and an array both persist as TOML tables.
+local VALUE_LUA_TYPE = { array = "table", feature = "table" }
+
 --- Reads current canonical preferences without adopting overwrite authority.
 --- This view is admission evidence only; load/save alone own source snapshots.
 --- @param prefs_file string Canonical configuration path.
+--- @param tolerate_outdated boolean|nil True for a read-only consumer: an entry this build
+---   no longer knows is then left out of the view (already warned once) instead of refusing it.
+---   A transaction that writes the file back keeps the strict view, which would drop that entry.
 --- @return table|nil flat Current owned preferences, nil on a refused view.
 --- @return table|nil source Exact classified bytes read for this view.
-function M.current_view(prefs_file)
+function M.current_view(prefs_file, tolerate_outdated)
 	if type(prefs_file) ~= "string" or prefs_file == "" or _owned_publications[prefs_file] then return nil end
 	local called, values, source = pcall(function()
 		local current = classify_source(prefs_file)
@@ -1280,14 +1287,14 @@ function M.current_view(prefs_file)
 		end
 		local flat
 		local outdated = ConfigOutdated.collect_reports(function() flat = flatten_from_disk(decoded, nil, shapes) end)
-		if next(outdated) ~= nil then return nil end
+		if next(outdated) ~= nil and tolerate_outdated ~= true then return nil end
 		for key, value in pairs(flat) do
 			local spec = KEY_MAP[key]
 			-- A codec value was checked against its stored form while it was read.
 			if spec and not spec.codec then
 				local path = spec.sec .. "." .. (spec.path and (spec.path .. ".") or "") .. (spec.key or key)
 				local entry = Manifest.find_entry_by_path(path)
-				if entry and entry.type ~= "enum" and type(value) ~= (entry.type == "array" and "table" or entry.type) then return nil end
+				if entry and entry.type ~= "enum" and type(value) ~= (VALUE_LUA_TYPE[entry.type] or entry.type) then return nil end
 				if entry and not ConfigOutdated.manifest_value_fits(entry, value, "hs", SCALAR_VALUE_RULES[key]) then return nil end
 			end
 		end

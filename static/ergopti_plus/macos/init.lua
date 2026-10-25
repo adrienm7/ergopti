@@ -2134,7 +2134,8 @@ end
 do
 	local virtual_keyboard_default = require("infra.manifest_reader").default_for("layout.virtual_keyboard")
 	local registered = type(karabiner) == "table" and karabiner.set_virtual_keyboard_source(function()
-		local flat = Preferences.current_view(config_paths.get("ConfigTomlPath"))
+		-- Read-only: a retired key an older release left is warned and ignored, never a refusal.
+		local flat = Preferences.current_view(config_paths.get("ConfigTomlPath"), true)
 		if flat == nil then error("config.toml cannot be read, so the virtual keyboard choice is unknown") end
 		if flat.layout_virtual_keyboard == nil then return virtual_keyboard_default end
 		return flat.layout_virtual_keyboard
