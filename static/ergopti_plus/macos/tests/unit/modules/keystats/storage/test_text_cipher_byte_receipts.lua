@@ -152,3 +152,39 @@ helpers.describe("keystats.text_cipher: secrets never reach a command line (ciph
 		end)
 	end)
 end)
+
+
+helpers.describe("keystats.text_cipher refuses private cleanup debt (cipher-private-output-cleanup)", function()
+	helpers.it("does not publish a derived key whose private output file remains", function()
+		with_cipher({ cleanup_refused = true }, function(cipher, _, logs, native)
+			helpers.assert_eq(cipher.is_available(), false,
+				"a native process exit cannot publish a key before private output cleanup")
+			helpers.assert_eq(#native.leftover_files(), 1)
+			helpers.assert_true(#logs > 0)
+		end)
+	end)
+
+	helpers.it("refuses an envelope and retries exact cleanup before a later encryption", function()
+		local faults = {}
+		with_cipher(faults, function(cipher, _, logs, native)
+			helpers.assert_true(cipher.is_available(), "the independent key derivation must first commit")
+			faults.cleanup_refused = true
+			helpers.assert_nil(cipher.encrypt("mac", 7, "private failed value"),
+				"an uncleared private output must not become a stored envelope")
+			local allocations = native.allocation_count()
+			helpers.assert_nil(cipher.encrypt("mac", 8, "private later value"))
+			helpers.assert_eq(native.allocation_count(), allocations,
+				"retained cleanup must block another encryption output file")
+			helpers.assert_eq(#native.leftover_files(), 1)
+			faults.cleanup_refused = false
+			local envelope = cipher.encrypt("mac", 8, "private later value")
+			helpers.assert_true(TextCrypto.is_encrypted(envelope))
+			helpers.assert_eq(cipher.decrypt(envelope), "private later value")
+			helpers.assert_eq(#native.leftover_files(), 0)
+			for _, line in ipairs(logs) do
+				helpers.assert_true(not line:find("private failed value", 1, true))
+				helpers.assert_true(not line:find("private later value", 1, true))
+			end
+		end)
+	end)
+end)

@@ -163,50 +163,66 @@ function M.exact_stdin_pipeline(cmd, input)
 	return "set -o pipefail; printf '%b' '" .. operand .. "' | " .. cmd
 end
 
--- Native boundary of exec_private_stdin(); replaced only by tests, which cannot
--- start a real openssl. Fields: popen, tmpname, open, remove.
-local DEFAULT_PRIVATE_STDIN_NATIVE = { popen = io.popen, tmpname = os.tmpname, open = io.open, remove = os.remove }
+-- Native boundary of exec_private_stdin(); each pending cleanup retains its
+-- original provider even when a test installs another one for the next call.
+local DEFAULT_PRIVATE_STDIN_NATIVE = {
+	popen = io.popen, tmpname = os.tmpname, open = io.open, remove = os.remove,
+	classify_no_follow = function(path) return require("adapters.file_system").classify_no_follow(path) end,
+}
 local _private_stdin_native = DEFAULT_PRIVATE_STDIN_NATIVE
+local _private_stdin_cleanup = nil
+local _private_stdin_busy = false
+local PRIVATE_OUTPUT_CLEANUP_PENDING = "private output cleanup remains pending"
 
 --- Replaces the native boundary of exec_private_stdin(); nil restores it.
---- @param native table|nil Table with popen, tmpname, open and remove.
+--- @param native table|nil Table with popen, tmpname, open, remove and classify_no_follow.
 function M._set_private_stdin_native(native)
 	_private_stdin_native = type(native) == "table" and native or DEFAULT_PRIVATE_STDIN_NATIVE
 end
 
---- Runs `cmd` with `input` written to its standard input by this process, and
---- returns its stdout after a zero exit. Unlike exact_stdin_pipeline, the
---- bytes never become part of the command: an `sh -c` argument is readable by
---- every local account through the process table, so a secret (typed text, a
---- machine id) must not travel there. stdout goes to a mkstemp(3) file (mode
---- 0600) that is read back and removed, because popen(3) has one direction.
---- @param cmd string Composed consumer command without NUL.
---- @param input string Exact standard-input bytes, NUL included.
---- @return string|nil stdout Exact output after a verified zero exit.
---- @return string|nil reason Fixed refusal text; it never quotes the command or input.
-function M.exec_private_stdin(cmd, input)
-	local refusal = sync_command_refusal(cmd)
-	if refusal then return nil, refusal end
-	if type(input) ~= "string" then return nil, "input must be a string" end
+--- Settles only the private output pathname retained by the current transaction.
+--- @return boolean settled
+local function settle_private_output()
+	local receipt = _private_stdin_cleanup
+	if receipt == nil then return true end
+	local call_ok, removed = pcall(receipt.native.remove, receipt.path)
+	local absent = false
+	if not call_ok or removed ~= true then
+		local inspected, _, status = pcall(receipt.native.classify_no_follow, receipt.path)
+		absent = inspected and status == "absent"
+	end
+	if (call_ok and removed == true) or absent then
+		_private_stdin_cleanup = nil
+		if receipt.reported then Logger.debug(LOG, "Retained private output cleanup settled.") end
+		return true
+	end
+	-- Native errors may quote private paths. Keep diagnostics closed, and report
+	-- this exact debt once instead of flooding a per-keystroke cipher caller.
+	if receipt.reported ~= true then
+		receipt.reported = true
+		Logger.error(LOG, "exec_private_stdin() private output unlink refused; the pathname is retained for retry.")
+	end
+	return false
+end
+
+--- Runs one admitted private command while its caller owns the synchronous frame.
+--- @param cmd string Validated command.
+--- @param input string Exact input bytes.
+--- @return string|nil stdout
+--- @return string|nil reason
+local function run_private_stdin(cmd, input)
 	local native = _private_stdin_native
 	local made, out_path = pcall(native.tmpname)
-	-- The path is spliced unquoted into the command, so only a plain path is admitted
+	if made and type(out_path) == "string" and out_path ~= "" and not out_path:find("\0", 1, true) then
+		_private_stdin_cleanup = { path = out_path, native = native, reported = false }
+	end
+	-- The path is spliced unquoted into the command, so only a plain path is admitted.
 	if not made or type(out_path) ~= "string" or not out_path:match("^/[%w/._-]+$") then
 		return nil, "no private output file could be created"
 	end
-	local function discard()
-		local removed, remove_err = pcall(native.remove, out_path)
-		if not removed then
-			Logger.error(LOG, "exec_private_stdin() could not remove its output file: %s.",
-				tostring(remove_err))
-		end
-	end
 	local started_ms = now_ms()
 	local opened, pipe = pcall(native.popen, cmd .. " > " .. out_path, "w")
-	if not opened or not pipe then
-		discard()
-		return nil, "the native shell pipe could not be opened"
-	end
+	if not opened or not pipe then return nil, "the native shell pipe could not be opened" end
 	local written_ok, written = pcall(function() return pipe:write(input) end)
 	local closed_ok, status, exit_type, rc = pcall(function() return pipe:close() end)
 	if closed_ok then _record_exit(RuntimeLog.program_name(cmd), rc, now_ms() - started_ms) end
@@ -217,15 +233,48 @@ function M.exec_private_stdin(cmd, input)
 		handle:close()
 		return data
 	end)
-	discard()
-	-- A short write means the consumer saw a prefix: its output is not the value's
 	if not written_ok or not written then return nil, "standard input was not fully delivered" end
 	if not closed_ok or exit_type ~= "exit" or rc ~= 0 or status ~= true then
-		return nil, string.format("the shell ended by %s with status %s",
-			tostring(exit_type), tostring(rc))
+		return nil, string.format("the shell ended by %s with status %s", tostring(exit_type), tostring(rc))
 	end
 	if not read_ok or type(output) ~= "string" then return nil, "the command output could not be read" end
 	return output
+end
+
+--- Runs `cmd` with exact private standard input and publishes output only after
+--- its mkstemp(3) output file is removed. Secrets never enter command arguments.
+--- An unlink refusal retains one exact cleanup receipt; later calls retry that
+--- receipt before any new allocation. Process-exit diagnostics cannot reenter
+--- the synchronous transaction and replace its owner.
+--- @param cmd string Composed consumer command without NUL.
+--- @param input string Exact standard-input bytes, NUL included.
+--- @return string|nil stdout Exact output after zero exit and committed cleanup.
+--- @return string|nil reason Fixed refusal text; never the command, path or input.
+function M.exec_private_stdin(cmd, input)
+	local refusal = sync_command_refusal(cmd)
+	if refusal then return nil, refusal end
+	if type(input) ~= "string" then return nil, "input must be a string" end
+	if _private_stdin_busy then return nil, "a private shell operation is already active" end
+	_private_stdin_busy = true
+	local failure_trace
+	local ok, output, reason = xpcall(function()
+		if not settle_private_output() then return nil, PRIVATE_OUTPUT_CLEANUP_PENDING end
+		local candidate, failure = run_private_stdin(cmd, input)
+		if not settle_private_output() then return nil, PRIVATE_OUTPUT_CLEANUP_PENDING end
+		return candidate, failure
+	end, function()
+		failure_trace = debug.traceback("", 2)
+	end)
+	if not ok then
+		-- Keep any original cleanup owner even if an unexpected diagnostic throws.
+		pcall(settle_private_output)
+	end
+	_private_stdin_busy = false
+	if not ok then
+		Logger.error(LOG, "exec_private_stdin() failed without publishing private output.%s", failure_trace)
+		return nil, "the private shell transaction failed"
+	end
+	return output, reason
 end
 
 
