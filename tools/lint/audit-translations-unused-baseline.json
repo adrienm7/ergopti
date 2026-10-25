@@ -56,7 +56,6 @@
 	"magickey.textexpansionsymbolstypst",
 	"notify.screenshot_saved_path",
 	"notify.screenshot_title",
-	"notify.script_control",
 	"ollama.service_ready",
 	"ollama.starting_service",
 	"onboarding.btn.cancel",

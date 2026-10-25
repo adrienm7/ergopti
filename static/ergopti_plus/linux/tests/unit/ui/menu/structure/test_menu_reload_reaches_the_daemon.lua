@@ -241,6 +241,28 @@ helpers.describe("shared lifecycle commands (Linux)", function()
 		end)
 	end)
 
+	helpers.it("tells the user when the daemon refuses Quit because a shutdown already runs (quit-refused)", function()
+		with_lifecycle_declarations(function(builder)
+			local original, sent = package.loaded["adapters.notifier"], {}
+			package.loaded["adapters.notifier"] = { send = function(text, opts)
+				sent[#sent + 1] = { text = text, level = opts and opts.level }
+				return true
+			end }
+			local ok, err = pcall(function()
+				local answers, index = { false, true, nil }, 0
+				local items = builder.build({ config = make_config(),
+					on_quit = function() index = index + 1; return answers[index] end })
+				local quit = lifecycle_declared_row(items, "button.ok")
+				quit.fn()
+				helpers.assert_eq(sent, { { text = require("infra.i18n").get("notify.quit_refused"), level = "error" } })
+				quit.fn(); quit.fn()
+				helpers.assert_eq(#sent, 1, "an accepted or unanswered quit shows no refusal")
+			end)
+			package.loaded["adapters.notifier"] = original
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	helpers.it("refuses an unregistered declared readiness predicate without running native owners (shared-lifecycle)", function()
 		with_lifecycle_declarations(function(builder, owned)
 			owned.reload.i18n, owned.quit.i18n = "menu.global.reload", "menu.global.quit"

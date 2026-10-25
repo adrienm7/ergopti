@@ -188,8 +188,15 @@ helpers.describe("Runtime diagnostics: previously invisible events now log", fun
 	end)
 
 	helpers.it("menu feature toggles and menu prime failures are logged", function()
-		local src = unit_with("Feature toggled from the menu")
-		helpers.assert_true(src:find("Feature toggled from the menu", 1, true) ~= nil)
+		-- The toggle line lives in the module both menus share (PAR-45); the
+		-- macOS menu must still route its toggles through it.
+		local shared_path = assert(package.searchpath("feature_notice", package.path), "feature_notice is not on the path")
+		local shared_file = assert(io.open(shared_path, "rb"))
+		local shared_src = shared_file:read("*a")
+		shared_file:close()
+		helpers.assert_true(shared_src:find("Feature toggled from the menu", 1, true) ~= nil)
+		local src = unit_with("Menu cache prime '%s' failed")
+		helpers.assert_true(src:find("FeatureNotice.feature(notice_ports", 1, true) ~= nil)
 		helpers.assert_true(src:find("Menu cache prime '%s' failed", 1, true) ~= nil)
 		helpers.assert_eq(nil, src:find("pcall(menu_mods.apps.prime, ctx)", 1, true),
 			"the bare pcall that discarded a prime failure is gone")

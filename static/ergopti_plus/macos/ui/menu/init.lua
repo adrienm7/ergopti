@@ -15,6 +15,7 @@ local M = {}
 
 local hs               = hs
 local notifications    = require("infra.notifications")
+local FeatureNotice    = require("feature_notice")
 local hotstring_editor = require("ui.hotstring_editor")
 local Logger           = require("infra.logger")
 local PhaseStats       = require("infra.phase_stats")
@@ -405,16 +406,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end)
 	end
 
+	local notice_ports = {
+		send = function(text, level) return notifications.notify(text, nil, level) end,
+		info = function(fmt, ...) Logger.info(LOG, fmt, ...) end,
+		warn = function(fmt, ...) Logger.warn(LOG, fmt, ...) end,
+	}
 	local function notify_feature(label, is_enabled)
-		-- Every menu feature toggle funnels through here; the toast was its only
-		-- trace, so a user log could never say what had been switched and when.
-		Logger.info(LOG, "Feature toggled from the menu: '%s' → %s.", tostring(label),
-			is_enabled and "enabled" or "disabled")
-		local notified, notify_err = pcall(notifications.notify, tostring(label), nil,
-			is_enabled and "success" or "error")
-		if not notified then
-			Logger.warn(LOG, "Feature toggle notification failed: %s.", tostring(notify_err))
-		end
+		FeatureNotice.feature(notice_ports, label, is_enabled)
 	end
 
 	-- Preference callbacks mutate shared tables and runtime engines before they
@@ -1059,9 +1057,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				return request_ok and request_accepted == true
 			end)
 			if accepted ~= true then
-				-- A refusal used to reach only the log, so the user saw Quit do nothing
-				Logger.warn(LOG, "Menubar Quit was refused; the user is notified.")
-				pcall(notifications.notify, i18n.get("notify.quit_refused"), nil, "error")
+				FeatureNotice.quit_refused(notice_ports, i18n.get)
 			end
 			return accepted
 		end,
