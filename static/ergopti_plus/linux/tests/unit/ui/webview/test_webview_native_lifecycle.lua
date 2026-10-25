@@ -43,7 +43,7 @@ local run_contract = function(helpers,load_manager,load_host)
      return controls.register
     end
     function ucm:unregister_script_message_handler(name)
-     helpers.assert_eq(name=='metrics_typing_bridge' or name=='physical_shortcuts_bridge' or name=='config_cleanup_bridge',true,'Only exact owned registration retires')
+     helpers.assert_eq(name=='metrics_typing_bridge' or name=='physical_shortcuts_bridge' or name=='config_cleanup_bridge' or name=='healthcheck',true,'Only exact owned registration retires')
      controls.unregister_calls=controls.unregister_calls+1
      if controls.unregister=='throw'then error('private unregister detail')end
      if controls.unregister=='false'then return false end
@@ -52,7 +52,7 @@ local run_contract = function(helpers,load_manager,load_host)
     return ucm
    end,WebView=function()
     local view={alive=true}
-    function view:run_javascript(code)controls.replies[#controls.replies+1]={view=self,code=code}end
+    function view:run_javascript(code)controls.replies[#controls.replies+1]={view=self,code=code};if controls.javascript then controls.javascript(manager)end end
     function view:load_html()if controls.load then error('private load detail')end;if controls.child_during_load then self:destroy()end end
     function view:destroy()
      controls.view_destroy_calls=controls.view_destroy_calls+1
@@ -135,6 +135,92 @@ local run_contract = function(helpers,load_manager,load_host)
     helpers.assert_eq(m.shutdown(),true)
    end)
   end)
+  for _,mode in ipairs({'live','close_debt','renderer_debt','closing','successor'})do
+   helpers.it('(native-push-admission) asynchronous diagnostics probe cannot push into '..mode,function()
+    fixture(function(m,c)
+     local completed
+     package.loaded['ui.healthcheck.probes']={start=function(_,_,_,callback)completed=callback;return{cancel=function()end}end}
+     package.loaded['ui.healthcheck.report']={redaction_context=function()return{}end}
+     package.loaded['ui.healthcheck.bridge']=nil
+     local diagnostics=require('ui.healthcheck.bridge')
+     diagnostics.config=function()return{schema={probes={}},redaction={}}end
+     diagnostics.build_snapshot=function()return{sections={paths={}},probes={}}end
+     helpers.assert_eq(m.show('healthcheck','en'),true);local old=m.current_epoch('healthcheck')
+     m.route_message('healthcheck','healthcheck','ready',old)
+     helpers.assert_eq(type(completed),'function','The actual diagnostics bridge registers the asynchronous callback')
+     completed('probe',{state='pass'})
+     helpers.assert_eq(#c.replies,1,'The live diagnostics page receives its asynchronous probe')
+     if mode=='closing'then
+      c.on_release=function()completed('probe',{state='pass'})end
+      helpers.assert_eq(m.hide('healthcheck',old),true)
+     elseif mode=='successor'then
+      helpers.assert_eq(m.hide('healthcheck',old),true);helpers.assert_eq(m.show('healthcheck','en'),true)
+      completed('probe',{state='pass'})
+      helpers.assert_eq(c.views[2].alive,true,'A late callback never retires the successor')
+     else
+      if mode~='live'then
+       c.view_destroy='no_ack'
+       if mode=='renderer_debt'then c.views[1].on_web_process_terminated()
+       else helpers.assert_eq(m.hide('healthcheck',old),false)end
+       helpers.assert_eq(m.page_current('healthcheck',old),false)
+      end
+      completed('probe',{state='pass'})
+     end
+     helpers.assert_eq(#c.replies,mode=='live'and 2 or 1,'Retained native cleanup authority cannot receive diagnostics pushes')
+     c.view_destroy=nil;c.on_release=nil;helpers.assert_eq(m.shutdown(),true)
+    end)
+   end)
+  end
+  for _,cancelled in ipairs({false,true})do
+   helpers.it('(native-push-admission) synchronous diagnostics ready preserves only live acquisition: '..tostring(cancelled),function()
+    fixture(function(m,c)
+     local completed
+     package.loaded['ui.healthcheck.probes']={start=function(_,_,_,callback)completed=callback;return{cancel=function()end}end}
+     package.loaded['ui.healthcheck.report']={redaction_context=function()return{}end}
+     package.loaded['ui.healthcheck.bridge']=nil
+     local diagnostics=require('ui.healthcheck.bridge')
+     diagnostics.config=function()return{schema={probes={}},redaction={}}end
+     diagnostics.build_snapshot=function()return{sections={paths={}},probes={}}end
+     local observed={}
+     c.present=function(owner)
+      local epoch=owner.current_epoch('healthcheck')
+      owner.route_message('healthcheck','healthcheck','ready',epoch)
+      completed('probe',{state='pass'})
+      observed.before=#c.replies
+      if cancelled then
+       observed.closed=owner.hide('healthcheck',epoch)
+       completed('probe',{state='pass'})
+       observed.after=#c.replies
+      end
+     end
+     helpers.assert_eq(m.show('healthcheck','en'),not cancelled)
+     helpers.assert_eq(observed.before,1,'Initial ready may push before acquisition returns')
+     if cancelled then
+      helpers.assert_eq(observed.closed,false,'Acquiring cancellation defers native retirement')
+      helpers.assert_eq(observed.after,1,'A cancelled acquiring page loses write admission immediately')
+     end
+     helpers.assert_eq(m.shutdown(),true)
+    end)
+   end)
+  end
+  for _,mode in ipairs({'close','replace','retain'})do
+   helpers.it('(native-push-admission) native JavaScript dispatch acknowledges only its retained owner: '..mode,function()
+    fixture(function(m,c)
+     helpers.assert_eq(m.show('config_cleanup','en'),true);local old=m.current_epoch('config_cleanup')
+     c.javascript=function(owner)
+      c.javascript=nil
+      if mode~='retain'then helpers.assert_eq(owner.hide('config_cleanup',old),true)end
+      if mode=='replace'then helpers.assert_eq(owner.show('config_cleanup','en'),true)end
+     end
+     helpers.assert_eq(m.eval_js('config_cleanup','window.pendingEffect=true'),mode=='retain')
+     helpers.assert_eq(#c.replies,1,'The dispatched effect addresses only its exact source view')
+     if mode=='replace'then helpers.assert_true(m.current_epoch('config_cleanup')>old);helpers.assert_eq(c.views[2].alive,true)
+     elseif mode=='close'then helpers.assert_eq(m.current_epoch('config_cleanup'),nil)
+     else helpers.assert_eq(m.current_epoch('config_cleanup'),old)end
+     helpers.assert_eq(m.shutdown(),true)
+    end)
+   end)
+  end
   helpers.it('(native-window-owner) renderer termination retires an ordinary page before retry',function()
    fixture(function(m,c)
     helpers.assert_eq(m.show('metrics_typing','en'),true);local old=m.current_epoch('metrics_typing')
