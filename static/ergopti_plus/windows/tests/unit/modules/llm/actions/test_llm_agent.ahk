@@ -705,6 +705,41 @@ _LAG_CommandDialog() {
 }
 Test("LLM agent: the command dialog sends its text; cancelling does nothing", _LAG_CommandDialog)
 
+; A native modal can admit a newer flow or commit a System 2 withdrawal.
+; Its delayed answer must retain the original requester instead of replacing it.
+_LAG_CommandModalCustody(Mode) {
+	_LAG_Run(_LAG_Menu("action", "", "cerebras"), _LTN_Screen(LAG_SELECTION), Body)
+	Body(Fx, Lines, Sent) {
+		global _LLM_Agent_PromptFn, _LLM_Agent_CommitFn
+		_LLM_Agent_PromptFn := Prompt
+		Allowed := Mode == "unchanged" || Mode == "refused-write"
+		Result := _LAG_Invoke("llm_agent_command")
+		AssertEqual(Allowed || Mode == "newer-flow" ? 1 : 0, Fx.Remote.Length,
+			"a withdrawn command dialog cannot dispatch its retained request")
+		AssertEqual(Allowed, Result, "only an unchanged requester can send the typed command")
+		AssertEqual(0, Fx.Ollama.Length)
+		AssertEqual(0, Sent.Length)
+		Prompt(Title, Text, Default) {
+			switch Mode {
+				case "mode-off": AssertTrue(LLM_Agent_SetMode("off"))
+				case "mode-aba":
+					AssertTrue(LLM_Agent_SetMode("off")), AssertTrue(LLM_Agent_SetMode("action"))
+				case "source-off": AssertTrue(_LLM_Agent_MenuSetBackend("agent_system2", ""))
+				case "source-remote": AssertTrue(_LLM_Agent_MenuSetBackend("agent_system2", "local"))
+				case "newer-flow": AssertTrue(_LAG_Invoke("llm_agent_selection"))
+				case "refused-write":
+					_LLM_Agent_CommitFn := (*) => false
+					AssertFalse(LLM_Agent_SetMode("off"))
+			}
+			return Map("ok", true, "value", "create a meeting tomorrow")
+		}
+	}
+}
+
+for Mode in ["mode-off", "mode-aba", "source-off", "source-remote", "newer-flow", "unchanged", "refused-write"]
+	Test("LLM agent: command dialog retains original requester " . Mode . " (agent-command-modal)", _LAG_CommandModalCustody.Bind(Mode))
+
+
 _LAG_Refusals() {
 	Screen := _LTN_Screen(LAG_SELECTION)
 	_LAG_Run(_LAG_Menu("action", "", ""), Screen, _Body)
