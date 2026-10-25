@@ -357,9 +357,9 @@ end)
 
 
 
-helpers.describe("keystats: the JSON fallback does not hoard raw events", function()
+helpers.describe("keystats: a JSON summary cannot acknowledge raw SQLite history", function()
 
-	it("empties the raw buffers when it flushes without SQLite", function()
+	it("retains the exact raw source while native persistence is unavailable", function()
 		local writer_name = "modules.keystats.sqlite_writer"
 		local logger_name = "modules.keystats.keystats"
 		local prev_writer, prev_logger = package.loaded[writer_name], package.loaded[logger_name]
@@ -376,7 +376,7 @@ helpers.describe("keystats: the JSON fallback does not hoard raw events", functi
 			kl.on_app_focus("app.test", 1000)
 			for index, char in ipairs({ "s", "a", "l", "u", "t" }) do kl.on_keydown(char, 1000 + index * 100, "app.test") end
 			before = kl._pending_buffer_count_for_test()
-			kl.flush()
+			helpers.assert_eq(kl.flush(), false, "only a native COMMIT can acknowledge queued SQL history")
 			after = kl._pending_buffer_count_for_test()
 		end)
 		package.loaded[writer_name] = prev_writer
@@ -384,7 +384,7 @@ helpers.describe("keystats: the JSON fallback does not hoard raw events", functi
 		os.execute("rm -rf '" .. dir .. "'")
 		helpers.assert_true(ok, tostring(err))
 		helpers.assert_true(before > 0, "keys were buffered")
-		helpers.assert_eq(after, 0, "only the SQLite branch emptied them; they grew all session")
+		helpers.assert_eq(after, before, "a summary contains no raw events and cannot consume their source")
 	end)
 
 end)

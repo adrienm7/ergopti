@@ -2904,7 +2904,7 @@ local function main()
 		if system_metrics then
 			local owner = system_metrics
 			RuntimeGuard.call("system metrics sampler", function()
-				owner.sample(math.floor(Monotonic.now_ms()), os.date("%Y-%m-%d"))
+				owner.sample()
 			end, function() system_metrics = nil end)
 		end
 

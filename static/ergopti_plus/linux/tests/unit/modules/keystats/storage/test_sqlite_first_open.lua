@@ -182,6 +182,14 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		helpers.assert_true(status == true or status == 0, "native settings posture and migration acceptance must remain distinct")
 	end)
 
+	helpers.it("retains capture days through native receipts and DST (sqlite-capture-calendar)", function()
+		local quote = require("text_utils").shell_quote
+		local root = helpers.driver_root()
+		local fixture = root .. "/tests/hardware/run_keystats_calendar.lua"
+		local status = os.execute("env -u LUA_PATH -u LUA_CPATH TZ=Europe/Paris luajit " .. quote(fixture) .. " " .. quote(root))
+		helpers.assert_true(status == true or status == 0, "native calendar sources must survive delayed persistence")
+	end)
+
 	helpers.it("opens a fresh database and creates the schema", function()
 		local writer = helpers.load_module("modules.keystats.sqlite_writer")
 		local dir = os.tmpname()

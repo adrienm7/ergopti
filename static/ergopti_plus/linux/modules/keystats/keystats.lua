@@ -27,6 +27,7 @@
 local M = {}
 local TableUtil = require("table_util")
 local ErrorDescription = require("error_description")
+local Calendar = require("modules.keystats.calendar")
 
 local Logger   = require("logger.shim")
 local Monotonic = require("infra.monotonic")
@@ -175,22 +176,22 @@ local _pending_system_events = {}
 
 --- Buffers the session events the tracker produced, stamped now.
 --- @param events table { kind, duration_ms? } in order.
-local function append_session_events(target, events)
+local function append_session_events(target, events, clock)
 	for _, event in ipairs(events) do
 		target[#target + 1] = {
-			ts = os.date("!%Y-%m-%d %H:%M:%S"), date = os.date("%Y-%m-%d"),
+			ts = clock.ts, date = clock.date,
 			kind = event.kind, duration_ms = event.duration_ms,
 		}
 	end
 end
-local function queue_session_events(events)
-	append_session_events(_pending_session_events, events)
+local function queue_session_events(events, clock)
+	append_session_events(_pending_session_events, events, clock)
 end
 
 --- Advances both construction branches without keeping a per-input journal.
-local function forward_session(method, ...)
+local function forward_session(clock, method, ...)
 	local attempt = _session_reset_attempt
-	if attempt then append_session_events(attempt.rollback_events, attempt.original[method](...)) end
+	if attempt then append_session_events(attempt.rollback_events, attempt.original[method](...), clock) end
 	return _session[method](...)
 end
 -- The observed pointers' stream, measured into the mouse columns of the
@@ -435,10 +436,8 @@ end
 --- @param app_id string Focused application identifier.
 --- @param timestamp_ms number Timestamp used to seed the first-seen value.
 --- @return table Mutable per-app accumulator.
-local function ensure_app_stats(app_id, timestamp_ms)
-	local app = _app_stats[app_id]
-	if app then return app end
-	app = {
+local function new_app_stats(timestamp_ms)
+	return {
 		keystroke_count = 0,
 		wpm_ring         = {},
 		char_window      = {},
@@ -466,8 +465,109 @@ local function ensure_app_stats(app_id, timestamp_ms)
 		-- "four hours in three files"; this driver had nothing to group by.
 		titles             = {},
 	}
-	_app_stats[app_id] = app
+end
+
+local function ensure_app_stats(app_id, timestamp_ms)
+	local app = _app_stats[app_id]
+	if app == nil then app = new_app_stats(timestamp_ms); _app_stats[app_id] = app end
 	return app
+end
+
+local daily_stats = Calendar.new(new_app_stats)
+local calendar_observation, focus_prefix
+local ensure_pending, record_app_key
+
+--- Creates the canonical title counters in either live or dated accumulators.
+local function new_title_row() return { c = 0, ms = 0 } end
+
+--- Supplies the dated title that owns an interval, without retaining its payload.
+local function dated_title(date, app, title, at)
+	local owner = daily_stats.app(date, app, at)
+	owner.titles[title] = owner.titles[title] or new_title_row()
+	return owner.titles[title]
+end
+
+--- Starts the dated part of an already-owned foreground interval.
+local function focus_part(date, app, at)
+	return { date = date, app = app, started = at, accepted = 0, credited = 0 }
+end
+
+--- Closes calendar segments while retaining the logical foreground/title owner.
+local function close_calendar_part(boundary, previous_date, next_date, wall)
+	if _focused_app_id and type(_focused_app_started_at) == "number" then
+		local elapsed = math.max(0, boundary - _focused_app_started_at)
+		if elapsed > 0 then
+			local live = ensure_app_stats(_focused_app_id, _focused_app_started_at)
+			live.focus_time_ms = live.focus_time_ms + elapsed
+			local day = daily_stats.app(previous_date, _focused_app_id, _focused_app_started_at)
+			day.focus_time_ms = day.focus_time_ms + elapsed
+			_pending_app_switch_events[#_pending_app_switch_events + 1] = {
+				ts = os.date("!%Y-%m-%d %H:%M:%S", math.floor(wall / MS_PER_SECOND)), date = previous_date,
+				prev_app = _focused_app_id, duration_ms = elapsed,
+			}
+		end
+		if focus_prefix then focus_prefix.closed = true end
+		_focused_app_started_at = boundary
+		focus_prefix = focus_part(next_date, _focused_app_id, boundary)
+	end
+	if _current_title and _current_title_app and type(_title_since) == "number" then
+		local elapsed = math.max(0, boundary - _title_since)
+		if elapsed > 0 then
+			local live = ensure_app_stats(_current_title_app, _title_since)
+			live.titles[_current_title].ms = live.titles[_current_title].ms + elapsed
+			local title = dated_title(previous_date, _current_title_app, _current_title, _title_since)
+			title.ms = title.ms + elapsed
+		end
+		if type(_title_entered_at) == "number" and boundary > _title_entered_at then
+			_pending_window_switch_events[#_pending_window_switch_events + 1] = {
+				ts = os.date("!%Y-%m-%d %H:%M:%S", math.floor(wall / MS_PER_SECOND)), date = previous_date,
+				app = _current_title_app, prev_title = _current_title, duration_ms = boundary - _title_entered_at,
+			}
+		end
+		_title_since, _title_entered_at = boundary, boundary
+	end
+end
+
+--- Observes actual local midnights before any producer changes its counters.
+local function observe_calendar(clock)
+	clock = clock or Calendar.capture()
+	assert(type(clock.wall_ms) == "number" and type(clock.mono_ms) == "number" and type(clock.date) == "string",
+		"Invalid metrics calendar observation")
+	if calendar_observation then Calendar.boundaries(calendar_observation, clock, close_calendar_part) end
+	calendar_observation = clock
+	return clock
+end
+
+--- Returns matching live/session and capture-dated application accumulators.
+local function app_pair(app, at, clock)
+	clock = observe_calendar(clock)
+	return ensure_app_stats(app, at), daily_stats.app(clock.date, app, at), clock
+end
+
+--- Retains only focus prefixes already accepted by an actual native owner.
+local function retire_focus_prefix()
+	local part = focus_prefix
+	if not part then return end
+	part.dropped = true
+	if part.accepted > part.credited then
+		local day = daily_stats.app(part.date, part.app, part.started)
+		day.focus_time_ms = day.focus_time_ms + part.accepted - part.credited
+		part.credited = part.accepted
+	end
+	focus_prefix = nil
+end
+
+--- Acknowledges capture ownership before a staged native result is consumed.
+local function accept_calendar(snapshot)
+	local mark = snapshot.focus
+	if not mark then return end
+	local part = mark.owner
+	part.accepted = math.max(part.accepted, mark.duration)
+	if part.dropped and part.accepted > part.credited then
+		local day = daily_stats.app(part.date, part.app, part.started)
+		day.focus_time_ms = day.focus_time_ms + part.accepted - part.credited
+		part.credited = part.accepted
+	end
 end
 
 --- Returns a stable display name without collapsing dotted desktop identifiers.
@@ -629,13 +729,14 @@ end
 --- @param scancode     number|nil  Physical evdev code captured at keydown.
 local function ingest_keydown(ch, timestamp_ms, app_id, scancode)
 	if not may_record() then return end
+	local clock = observe_calendar()
 
 	-- A correction is an input event but types nothing, so neither speed readout
 	-- counts it: the Windows widget is pushed for characters only and macOS
 	-- leaves Backspace out of its typing rings. Counting it would make every
 	-- held Backspace read as a burst of fast typing.
 	local is_correction = ch == BACKSPACE_MARKER
-	if type(timestamp_ms) == "number" then queue_session_events(forward_session("input", timestamp_ms, true)) end
+	if type(timestamp_ms) == "number" then queue_session_events(forward_session(clock, "input", timestamp_ms, true), clock) end
 	-- Forward to the base metrics collector if available.
 	if Metrics and not is_correction then
 		Metrics.on_keydown(ch, timestamp_ms)
@@ -649,12 +750,8 @@ local function ingest_keydown(ch, timestamp_ms, app_id, scancode)
 	-- real physical character and breaking the raw-event audit trail.
 	local resolved_app = (type(app_id) == "string" and app_id ~= "") and app_id or "Unknown"
 	if type(ch) == "string" and ch ~= "" then
-		M.record_app_key(resolved_app, ch, timestamp_ms)
-		local pending = _pending_typing_events[resolved_app]
-		if not pending then
-			pending = { text = {}, events = {}, times = {} }
-			_pending_typing_events[resolved_app] = pending
-		end
+		record_app_key(resolved_app, ch, timestamp_ms, clock)
+		local pending = ensure_pending(resolved_app, clock)
 		local delay = 0
 		local previous_at = _typing_last_key_at[resolved_app]
 		if type(previous_at) == "number" and type(timestamp_ms) == "number" then
@@ -677,6 +774,7 @@ local function ingest_keydown(ch, timestamp_ms, app_id, scancode)
 		-- hour a keystroke belongs to is only derivable from an absolute stamp —
 		-- the delays are capped, so summing them drifts across every real pause.
 		pending.times[#pending.events] = timestamp_ms
+		pending.wall_times[#pending.events] = clock.wall_ms / MS_PER_SECOND
 	end
 end
 
@@ -713,35 +811,35 @@ end
 --- @param app_id       string  Application identifier.
 --- @param ch           string  Character typed.
 --- @param timestamp_ms number  Wall-clock timestamp.
-function M.record_app_key(app_id, ch, timestamp_ms)
+record_app_key = function(app_id, ch, timestamp_ms, clock)
 	if not may_record() then return end
-
-	local app = ensure_app_stats(app_id, timestamp_ms)
-	if type(app.last_key_at) == "number" then
-		local elapsed = timestamp_ms - app.last_key_at
-		if elapsed > 0 then
-			app.typing_time_ms = app.typing_time_ms + math.min(elapsed, MAX_TYPING_INTERVAL_MS)
+	local live, dated = app_pair(app_id, timestamp_ms, clock)
+	local interval = 0
+	if type(live.last_key_at) == "number" then
+		local elapsed = timestamp_ms - live.last_key_at
+		if elapsed > 0 then interval = math.min(elapsed, MAX_TYPING_INTERVAL_MS) end
+	end
+	local has_title = _current_title and live.titles[_current_title] ~= nil
+	for _, app in ipairs({ live, dated }) do
+		app.typing_time_ms = app.typing_time_ms + interval
+		app.last_key_at = timestamp_ms
+		if ch ~= BACKSPACE_MARKER then app.keystroke_count = app.keystroke_count + 1 end
+		if has_title then
+			app.titles[_current_title] = app.titles[_current_title] or new_title_row()
+			app.titles[_current_title].c = app.titles[_current_title].c + 1
 		end
+		if type(ch) == "string" and ch ~= "" then app.ngrams[ch] = (app.ngrams[ch] or 0) + 1 end
 	end
-	app.last_key_at = timestamp_ms
+	live.wpm_ring[#live.wpm_ring + 1] = timestamp_ms
+	while #live.wpm_ring > WPM_RING_CAPACITY do table.remove(live.wpm_ring, 1) end
+end
 
-	-- A correction remains an input event, but contributes no typed character.
-	if ch ~= BACKSPACE_MARKER then app.keystroke_count = app.keystroke_count + 1 end
-	-- Against the window it was typed into, not the application. Both are useful
-	-- and only one of them was recorded.
-	if _current_title then
-		local title_row = app.titles[_current_title]
-		if title_row then title_row.c = title_row.c + 1 end
-	end
-	if type(ch) == "string" and ch ~= "" then
-		app.ngrams[ch] = (app.ngrams[ch] or 0) + 1
-	end
-	app.wpm_ring[#app.wpm_ring + 1] = timestamp_ms
-
-	-- Prune ring (keep last WPM_RING_CAPACITY entries).
-	while #app.wpm_ring > WPM_RING_CAPACITY do
-		table.remove(app.wpm_ring, 1)
-	end
+--- Records one app key while retaining its capture date independently of flush.
+--- @param app_id string
+--- @param ch string
+--- @param timestamp_ms number
+function M.record_app_key(app_id, ch, timestamp_ms)
+	return record_app_key(app_id, ch, timestamp_ms, observe_calendar())
 end
 
 --- Records one physical evdev keydown for the layout-independent heatmap.
@@ -755,17 +853,23 @@ function M.record_physical_key(app_id, scancode, timestamp_ms)
 	if not may_record() then return end
 	if type(scancode) ~= "number" or scancode <= 0 then return end
 	local resolved_app = (type(app_id) == "string" and app_id ~= "") and app_id or "Unknown"
-	local app = ensure_app_stats(resolved_app, timestamp_ms)
+	local live, dated = app_pair(resolved_app, timestamp_ms)
 	local code = math.floor(scancode)
-	app.physical_scancodes[code] = (app.physical_scancodes[code] or 0) + 1
+	for _, app in ipairs({ live, dated }) do
+		app.physical_scancodes[code] = (app.physical_scancodes[code] or 0) + 1
+	end
 end
 
-local function ensure_pending(app_id)
+ensure_pending = function(app_id, clock)
+	clock = clock or observe_calendar()
 	local pending = _pending_typing_events[app_id]
-	if pending then return pending end
-	pending = { text = {}, events = {}, times = {} }
-	_pending_typing_events[app_id] = pending
-	return pending
+	if not pending then pending = { runs = {} }; _pending_typing_events[app_id] = pending end
+	local run = pending.runs[#pending.runs]
+	if not run or run.date ~= clock.date then
+		run = { date = clock.date, ts = clock.ts, text = {}, events = {}, times = {}, wall_times = {} }
+		pending.runs[#pending.runs + 1] = run
+	end
+	return run
 end
 
 local function add_synthetic_ngram(app, char, source)
@@ -796,15 +900,18 @@ local function recorded_char(char, is_private)
 end
 
 --- @param is_private boolean|nil True when `text` is PII and must be redacted.
-local function append_synthetic_events(app_id, text, source, deletes, is_private)
-	local pending = ensure_pending(app_id)
-	-- An expansion fires within a keystroke of its trigger, so it belongs in the
-	-- same minute. Taking the trigger's stamp keeps the two together without
-	-- reading a clock from a function that has never needed one.
-	local at = _typing_last_key_at[app_id]
+local function append_synthetic_events(app_id, text, source, deletes, is_private, clock)
+	clock = clock or observe_calendar()
+	local pending = ensure_pending(app_id, clock)
+	local dated = daily_stats.app(clock.date, app_id, clock.mono_ms)
+	-- Generated output owns its capture clock, including before the first manual
+	-- key or after a delayed completion crosses into another calendar day.
+	local at = clock.mono_ms
 	for _ = 1, math.max(0, math.floor(tonumber(deletes) or 0)) do
 		pending.events[#pending.events + 1] = { BACKSPACE_MARKER, 0, { s = 1, st = source } }
 		pending.times[#pending.events] = at
+		pending.wall_times[#pending.events] = clock.wall_ms / MS_PER_SECOND
+		add_synthetic_ngram(dated, BACKSPACE_MARKER, source)
 		add_synthetic_ngram(_app_stats[app_id], BACKSPACE_MARKER, source)
 	end
 	if type(text) ~= "string" or text == "" then return end
@@ -817,6 +924,8 @@ local function append_synthetic_events(app_id, text, source, deletes, is_private
 		local blob = recorded_char(text, is_private)
 		pending.events[#pending.events + 1] = { blob, 0, { s = 1, st = source } }
 		pending.times[#pending.events] = at
+		pending.wall_times[#pending.events] = clock.wall_ms / MS_PER_SECOND
+		add_synthetic_ngram(dated, blob, source)
 		add_synthetic_ngram(_app_stats[app_id], blob, source)
 		return
 	end
@@ -824,6 +933,8 @@ local function append_synthetic_events(app_id, text, source, deletes, is_private
 		local char = recorded_char(utf8.char(codepoint), is_private)
 		pending.events[#pending.events + 1] = { char, 0, { s = 1, st = source } }
 		pending.times[#pending.events] = at
+		pending.wall_times[#pending.events] = clock.wall_ms / MS_PER_SECOND
+		add_synthetic_ngram(dated, char, source)
 		add_synthetic_ngram(_app_stats[app_id], char, source)
 	end
 end
@@ -862,8 +973,8 @@ end
 function M.record_suggestion(app_id, kind, timestamp_ms)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
 	local field = (kind == "llm") and "llm_suggested" or "hs_suggested"
-	local app = ensure_app_stats(app_id, timestamp_ms)
-	app[field] = (app[field] or 0) + 1
+	local live, dated = app_pair(app_id, timestamp_ms)
+	for _, app in ipairs({ live, dated }) do app[field] = app[field] + 1 end
 	Logger.debug(LOG, "Suggestion offered (%s).", field)
 end
 
@@ -871,17 +982,19 @@ end
 function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, deletes, is_private, replay_terminator)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
 	if type(replacement) ~= "string" or replacement == "" then return end
-	local app = ensure_app_stats(app_id, timestamp_ms)
-	app.hs_chars       = app.hs_chars + char_count(replacement)
-	app.hs_triggers    = app.hs_triggers + 1
-	app.hs_input_chars = app.hs_input_chars + char_count(type(trigger) == "string" and trigger or "")
+	local live, dated, clock = app_pair(app_id, timestamp_ms)
+	for _, app in ipairs({ live, dated }) do
+		app.hs_chars = app.hs_chars + char_count(replacement)
+		app.hs_triggers = app.hs_triggers + 1
+		app.hs_input_chars = app.hs_input_chars + char_count(type(trigger) == "string" and trigger or "")
+	end
 	append_synthetic_events(app_id, replacement, "hotstring",
 		deletes ~= nil and deletes or char_count(type(trigger) == "string" and trigger or ""),
-		is_private)
+		is_private, clock)
 	-- This public delimiter already exists in the physical input journal. Keep
 	-- its replay in the ordered stream without changing the logical replacement.
 	if type(replay_terminator) == "string" and replay_terminator ~= "" then
-		append_synthetic_events(app_id, replay_terminator, "hotstring", 0, false)
+		append_synthetic_events(app_id, replay_terminator, "hotstring", 0, false, clock)
 	end
 	if type(timestamp_ms) == "number" then
 		-- The group names the colour the readouts take; a private expansion
@@ -894,8 +1007,8 @@ function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, 
 		return
 	end
 	_pending_hotstring_events[#_pending_hotstring_events + 1] = {
-		ts = os.date("!%Y-%m-%d %H:%M:%S"),
-		date = os.date("%Y-%m-%d"),
+		ts = clock.ts,
+		date = clock.date,
 		app = dashboard_app_name(app_id),
 		kind = "fired",
 		trigger = trigger or "",
@@ -927,9 +1040,10 @@ function M.record_shortcut(app_id, key, timestamp_ms)  -- luacheck: ignore 212
 			.. "something fired, so it is dropped.")
 		return
 	end
+	local clock = observe_calendar()
 	_pending_shortcut_events[#_pending_shortcut_events + 1] = {
-		ts   = os.date("!%Y-%m-%d %H:%M:%S"),
-		date = os.date("%Y-%m-%d"),
+		ts = clock.ts,
+		date = clock.date,
 		app  = dashboard_app_name(type(app_id) == "string" and app_id or "unknown"),
 		key  = key,
 	}
@@ -946,10 +1060,11 @@ end
 function M.record_pointer(kind, code, value)
 	local delta = _pointer.observe(kind, code, value)
 	if not delta or not may_record() then return end
-	queue_session_events(forward_session("input", math.floor(Monotonic.now_ms()), false))
+	local clock = observe_calendar()
+	queue_session_events(forward_session(clock, "input", clock.mono_ms, false), clock)
 	local app_id = _focused_app_id
 	if type(app_id) ~= "string" or M.is_unrecorded_app(app_id) then return end
-	local pending = ensure_pending(app_id)
+	local pending = ensure_pending(app_id, clock)
 	local mouse = pending.mouse or { clicks = 0, scrolls = 0, distance = 0 }
 	mouse.clicks = mouse.clicks + delta.clicks
 	mouse.scrolls = mouse.scrolls + delta.scrolls
@@ -983,8 +1098,9 @@ function M.record_llm_event(app_id, kind, fields)
 		return
 	end
 	fields = type(fields) == "table" and fields or {}
+	local clock = observe_calendar()
 	local row = {
-		ts = os.date("!%Y-%m-%d %H:%M:%S"), date = os.date("%Y-%m-%d"),
+		ts = clock.ts, date = clock.date,
 		app = dashboard_app_name(app_id), kind = kind,
 	}
 	for _, name in ipairs(allowed) do row[name] = fields[name] end
@@ -1002,13 +1118,15 @@ function M.record_synthetic_output(app_id, text, source, timestamp_ms, deletes, 
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
 	if type(text) ~= "string" or text == "" then return end
 	local kind = type(source) == "string" and source or "other"
-	local app = ensure_app_stats(app_id, timestamp_ms)
+	local live, dated, clock = app_pair(app_id, timestamp_ms)
 	if kind == "llm" then
-		app.llm_chars = app.llm_chars + char_count(text)
-		app.llm_triggers = app.llm_triggers + 1
-		app.llm_input_chars = app.llm_input_chars + math.max(0, math.floor(tonumber(input_chars) or 0))
+		for _, app in ipairs({ live, dated }) do
+			app.llm_chars = app.llm_chars + char_count(text)
+			app.llm_triggers = app.llm_triggers + 1
+			app.llm_input_chars = app.llm_input_chars + math.max(0, math.floor(tonumber(input_chars) or 0))
+		end
 	end
-	append_synthetic_events(app_id, text, kind, deletes)
+	append_synthetic_events(app_id, text, kind, deletes, false, clock)
 	if type(timestamp_ms) == "number" then
 		LiveWpm.record(_live, char_count(text), timestamp_ms)
 		LiveWpm.mark_source(_live, kind, kind, timestamp_ms)
@@ -1021,6 +1139,7 @@ end
 function M.on_app_focus(app_id, timestamp_ms)
 	if type(app_id) ~= "string" or app_id == "" then return end
 	M.observe_hold_focus(app_id)
+	local clock = observe_calendar()
 	-- Gated like every other recording entry point: focus time and app
 	-- switches are records too, and tracking them while recording is
 	-- forbidden would persist them on the next flush. The in-flight interval
@@ -1045,7 +1164,12 @@ function M.on_app_focus(app_id, timestamp_ms)
 		local owner = _app_stats[_current_title_app]
 		if owner then
 			local row = owner.titles[_current_title]
-			if row then row.ms = row.ms + math.max(0, now - _title_since) end
+			if row then
+				local elapsed = math.max(0, now - _title_since)
+				row.ms = row.ms + elapsed
+				local dated = dated_title(clock.date, _current_title_app, _current_title, now)
+				dated.ms = dated.ms + elapsed
+			end
 		end
 		_current_title, _title_since, _current_title_app = nil, nil, nil
 	end
@@ -1053,6 +1177,9 @@ function M.on_app_focus(app_id, timestamp_ms)
 		local elapsed = math.max(0, now - _focused_app_started_at)
 		local previous = ensure_app_stats(_focused_app_id, _focused_app_started_at)
 		previous.focus_time_ms = previous.focus_time_ms + elapsed
+		local dated = daily_stats.app(clock.date, _focused_app_id, _focused_app_started_at)
+		dated.focus_time_ms = dated.focus_time_ms + elapsed
+		if focus_prefix then focus_prefix.closed = true end
 		_pending_app_switch_events[#_pending_app_switch_events + 1] = {
 			-- The instant is UTC and the day is local, which is the convention every
 			-- other table here follows: a timestamp has to be comparable across
@@ -1060,8 +1187,8 @@ function M.on_app_focus(app_id, timestamp_ms)
 			-- 2026-08-06, so for anyone east of Greenwich an evening application
 			-- switch was filed under tomorrow while the keystrokes either side of it
 			-- were filed under today.
-			ts = os.date("!%Y-%m-%d %H:%M:%S"),
-			date = os.date("%Y-%m-%d"),
+			ts = clock.ts,
+			date = clock.date,
 			prev_app = dashboard_app_name(_focused_app_id),
 			next_app = dashboard_app_name(app_id),
 			duration_ms = elapsed,
@@ -1070,6 +1197,7 @@ function M.on_app_focus(app_id, timestamp_ms)
 	ensure_app_stats(app_id, now)
 	_focused_app_id         = app_id
 	_focused_app_started_at = now
+	focus_prefix = focus_part(clock.date, app_id, now)
 	Logger.debug(LOG, "Foreground application: %s.", app_id)
 end
 
@@ -1077,7 +1205,7 @@ end
 --- @return table { [appId] = { keystrokes, first_seen } }
 function M.get_app_stats()
 	local result = {}
-	local now = math.floor(Monotonic.now_ms())
+	local now = observe_calendar().mono_ms
 	for app_id, stats in pairs(_app_stats) do
 		local focus_time_ms = stats.focus_time_ms or 0
 		local physical_scancodes = {}
@@ -1109,36 +1237,64 @@ function M.get_app_stats()
 	return result
 end
 
---- Adds current, not-yet-flushed counters to a persisted manifest entry.
-local function shallow_copy(source)
-	return TableUtil.shallow_copy(source or {})
+--- Projects only the fields that own SQLite deltas and live n-gram overlays.
+local function project_day(stats, date, app, clock)
+	local focus = stats.focus_time_ms
+	if focus_prefix and not focus_prefix.closed and not focus_prefix.dropped
+		and focus_prefix.date == date and focus_prefix.app == app then
+		focus = focus + math.max(0, clock.mono_ms - focus_prefix.started)
+	end
+	return {
+		totals = {
+			chars = stats.keystroke_count, time_ms = stats.typing_time_ms, app_time_ms = focus,
+			hs_chars = stats.hs_chars, hs_triggers = stats.hs_triggers, hs_input_chars = stats.hs_input_chars,
+			llm_chars = stats.llm_chars, llm_triggers = stats.llm_triggers, llm_input_chars = stats.llm_input_chars,
+			hs_suggested = stats.hs_suggested, llm_suggested = stats.llm_suggested,
+		},
+		titles = stats.titles, kc_hold = stats.kc_hold, ngrams = stats.ngrams,
+		ngram_sources = stats.ngram_sources, physical_scancodes = stats.physical_scancodes,
+	}
 end
 
+--- Captures the exact dated owners without advancing their committed watermarks.
+local function snapshot_calendar(clock)
+	clock = observe_calendar(clock)
+	-- A foreground interval is data even before its first character.
+	if focus_prefix and not focus_prefix.closed and not focus_prefix.dropped then
+		daily_stats.app(focus_prefix.date, focus_prefix.app, focus_prefix.started)
+	end
+	local snapshot = daily_stats.snapshot(function(stats, date, app) return project_day(stats, date, app, clock) end)
+	if focus_prefix then
+		snapshot.focus = { owner = focus_prefix, duration = math.max(0, clock.mono_ms - focus_prefix.started) }
+	end
+	return snapshot
+end
+
+--- Retires closed-day RAM only when the exact source covered by COMMIT is unchanged.
+local function prune_calendar(snapshot)
+	local clock = calendar_observation
+	local retired = daily_stats.prune(snapshot,
+		function(stats, date, app) return project_day(stats, date, app, clock) end, clock.date)
+	for _, date in ipairs(retired) do
+		_flushed_app_totals[date], _flushed_app_titles[date], _flushed_app_holds[date] = nil, nil, nil
+		_flushed_app_ngrams[date], _flushed_app_scancodes[date], _flushed_app_sources[date] = nil, nil, nil
+	end
+end
+
+--- Adds each unflushed dated counter to its own persisted calendar day.
 local function add_live_manifest_delta(manifest)
-	local today = os.date("%Y-%m-%d")
-	local result = shallow_copy(manifest)
-	result[today] = shallow_copy(manifest[today])
-	for app_id, stats in pairs(M.get_app_stats()) do
-		local previous = _flushed_app_totals[app_id] or {}
-		local app_name = dashboard_app_name(app_id)
-		local entry = shallow_copy(result[today][app_name] or { category = "Unknown" })
-		local current = {
-			chars = stats.keystrokes or 0,
-			time = stats.typing_time_ms or 0,
-			app_time_ms = stats.focus_time_ms or 0,
-			hs_chars = stats.hs_chars or 0,
-			hs_triggers = stats.hs_triggers or 0,
-			hs_input_chars = stats.hs_input_chars or 0,
-			llm_chars = stats.llm_chars or 0,
-			llm_triggers = stats.llm_triggers or 0,
-			llm_input_chars = stats.llm_input_chars or 0,
-		}
-		for field, value in pairs(current) do
-			local persisted_field = field == "time" and "time_ms" or field
-			entry[field] = (entry[field] or 0) + math.max(0, value - (previous[persisted_field] or 0))
+	local result = TableUtil.shallow_copy(manifest)
+	for date, apps in pairs(snapshot_calendar().values) do
+		result[date] = TableUtil.shallow_copy(manifest[date] or {})
+		for app, state in pairs(apps) do
+			local previous = (_flushed_app_totals[date] or {})[app] or {}
+			local entry = TableUtil.shallow_copy(result[date][app] or { category = "Unknown" })
+			for field, value in pairs(state.totals) do
+				local output = field == "time_ms" and "time" or field
+				entry[output] = (entry[output] or 0) + math.max(0, value - (previous[field] or 0))
+			end
+			result[date][app] = entry
 		end
-		entry.category = entry.category or "Unknown"
-		result[today][app_name] = entry
 	end
 	return result
 end
@@ -1213,59 +1369,57 @@ local function empty_ngrams()
 	return { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {}, sc_kb = {} }
 end
 
---- Adds only unflushed character n-grams to the per-app today projection.
-local function add_live_ngram_delta(today_payload, apps)
-	-- Match the SQL reader: no valid application name means an unrestricted
-	-- projection. A selected range must not regain excluded apps from RAM.
-	local selected = {}
-	if type(apps) == "table" then
-		for _, app in ipairs(apps) do
-			if type(app) == "string" and app ~= "" then selected[app] = true end
+--- Adds a capture-dated character/source/physical-key delta to one destination.
+local function add_app_ngram_delta(target, stats, date, app)
+	local previous = (_flushed_app_ngrams[date] or {})[app] or {}
+	local sources = (_flushed_app_sources[date] or {})[app] or {}
+	for token, count in pairs(stats.ngrams) do
+		local delta = math.max(0, count - (previous[token] or 0))
+		if delta > 0 then
+			local item = target.c[token] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+			item.c = item.c + delta
+			local current, old = stats.ngram_sources[token] or {}, sources[token] or {}
+			item.hs = item.hs + math.max(0, (current.hotstring or 0) - (old.hotstring or 0))
+			item.llm = item.llm + math.max(0, (current.llm or 0) - (old.llm or 0))
+			for label, value in pairs(current) do
+				if Utils.is_other_synthetic_source(label) then item.o = item.o + math.max(0, value - (old[label] or 0)) end
+			end
+			target.c[token] = item
 		end
+	end
+	local physical = (_flushed_app_scancodes[date] or {})[app] or {}
+	for code, count in pairs(stats.physical_scancodes) do
+		local delta = math.max(0, count - (physical[code] or 0))
+		if delta > 0 then
+			local key = tostring(code)
+			local item = target.sc_kb[key] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+			item.c = item.c + delta
+			target.sc_kb[key] = item
+		end
+	end
+end
+
+--- Layers unflushed source into its requested historical or current-day slice.
+local function add_live_ngram_delta(payload, apps, start_date, end_date, clock)
+	local selected = {}
+	for _, app in ipairs(type(apps) == "table" and apps or {}) do
+		if type(app) == "string" and app ~= "" then selected[app] = true end
 	end
 	local unrestricted = next(selected) == nil
-	for app_id, stats in pairs(_app_stats) do
-		if unrestricted or selected[dashboard_app_name(app_id)] then
-			local previous = _flushed_app_ngrams[app_id] or {}
-			local app_name = dashboard_app_name(app_id)
-			local target = today_payload[app_name] or empty_ngrams()
-			for token, count in pairs(stats.ngrams or {}) do
-				local delta = math.max(0, count - (previous[token] or 0))
-				if delta > 0 then
-					local item = target.c[token] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
-					item.c = item.c + delta
-					local source_delta = math.max(0,
-						((stats.ngram_sources[token] or {}).hotstring or 0)
-						- (((_flushed_app_sources[app_id] or {})[token] or {}).hotstring or 0))
-					local llm_delta = math.max(0,
-						((stats.ngram_sources[token] or {}).llm or 0)
-						- (((_flushed_app_sources[app_id] or {})[token] or {}).llm or 0))
-					local other_delta = 0
-					local flushed_sources = (_flushed_app_sources[app_id] or {})[token] or {}
-					for label, source_count in pairs(stats.ngram_sources[token] or {}) do
-						if Utils.is_other_synthetic_source(label) then
-							other_delta = other_delta + math.max(0, source_count - (flushed_sources[label] or 0))
-						end
+	for date, entries in pairs(snapshot_calendar(clock).values) do
+		if date <= clock.date and SqliteReader.includes_date(date, start_date, end_date) then
+			for app, stats in pairs(entries) do
+				if unrestricted or selected[app] then
+					local target = payload.historical
+					if date == clock.date then
+						payload.today[app] = payload.today[app] or empty_ngrams()
+						target = payload.today[app]
 					end
-					item.hs = (item.hs or 0) + source_delta
-					item.llm = (item.llm or 0) + llm_delta
-					item.o = (item.o or 0) + other_delta
-					target.c[token] = item
+					add_app_ngram_delta(target, stats, date, app)
 				end
 			end
-			local flushed_scancodes = _flushed_app_scancodes[app_id] or {}
-			for scancode, count in pairs(stats.physical_scancodes or {}) do
-				local delta = math.max(0, count - (flushed_scancodes[scancode] or 0))
-				if delta > 0 then
-					local item = target.sc_kb[tostring(scancode)] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
-					item.c = item.c + delta
-					target.sc_kb[tostring(scancode)] = item
-				end
-			end
-			today_payload[app_name] = target
 		end
 	end
-	return today_payload
 end
 
 --- Builds the shared manifest/prefetch contract consumed by both metrics UIs.
@@ -1307,7 +1461,8 @@ end
 function M.get_range_payload(start_date, end_date, apps)
 	if M.is_flush_pending() then return nil, "SQLite flush pending" end
 	if not SqliteReader then return nil, "SQLite projection unavailable" end
-	local bounds = SqliteReader.split_bounds(start_date, end_date)
+	local clock = observe_calendar()
+	local bounds = SqliteReader.split_bounds(start_date, end_date, clock.date)
 	local payload, complete = { historical = empty_ngrams(), today = {} }, true
 	if SqliteWriter and SqliteWriter.is_available() then
 		payload, complete = SqliteReader.read_range_split_today(_sqlite_path, start_date, end_date, apps, bounds.today)
@@ -1316,7 +1471,7 @@ function M.get_range_payload(start_date, end_date, apps)
 	payload.incomplete = not complete or nil
 	payload.historical = payload.historical or empty_ngrams()
 	payload.today = payload.today or {}
-	if bounds.includes_today then payload.today = add_live_ngram_delta(payload.today, apps) end
+	add_live_ngram_delta(payload, apps, start_date, end_date, clock)
 	return payload
 end
 
@@ -1378,14 +1533,17 @@ end
 local hold_password_app = M.is_unrecorded_app
 settle_capture_policy = function()
 	if not may_record() or hold_password_app(_hold_focus_app) then
+		retire_focus_prefix()
 		_hold_token = {}
 		-- Privacy can close while the same window stays focused. Retire its
 		-- open intervals now: waiting for a focus callback lets the periodic
 		-- flush credit forbidden time, and reopening backfills the old title.
 		_focused_app_id, _focused_app_started_at = nil, nil
 		_current_title, _title_since, _title_entered_at, _current_title_app = nil, nil, nil, nil
+		observe_calendar()
 		return false
 	end
+	observe_calendar()
 	return true
 end
 
@@ -1424,21 +1582,23 @@ function M.record_hold(app_id, scancode, held_ms)
 	local duration = tonumber(held_ms)
 	if not code or not duration or code <= 0 or duration < 0 then return end
 
-	local app = ensure_app_stats(app_id, nil)
-	local row = app.kc_hold[code]
-	if not row then
-		row = { sum_ms = 0, count = 0, max_ms = 0, tap_count = 0, hold_count = 0 }
-		app.kc_hold[code] = row
-	end
-	row.sum_ms = row.sum_ms + duration
-	row.count = row.count + 1
-	if duration > row.max_ms then row.max_ms = duration end
-	local threshold = tap_hold_threshold_ms()
-	if threshold then
-		if duration >= threshold then
-			row.hold_count = row.hold_count + 1
-		else
-			row.tap_count = row.tap_count + 1
+	local live, dated = app_pair(app_id, nil)
+	for _, app in ipairs({ live, dated }) do
+		local row = app.kc_hold[code]
+		if not row then
+			row = { sum_ms = 0, count = 0, max_ms = 0, tap_count = 0, hold_count = 0 }
+			app.kc_hold[code] = row
+		end
+		row.sum_ms = row.sum_ms + duration
+		row.count = row.count + 1
+		if duration > row.max_ms then row.max_ms = duration end
+		local threshold = tap_hold_threshold_ms()
+		if threshold then
+			if duration >= threshold then
+				row.hold_count = row.hold_count + 1
+			else
+				row.tap_count = row.tap_count + 1
+			end
 		end
 	end
 end
@@ -1454,6 +1614,7 @@ end
 --- @param title string|nil
 --- @param timestamp_ms number|nil
 function M.set_window_title(app_id, title, timestamp_ms)
+	local clock = observe_calendar()
 	local now = type(timestamp_ms) == "number" and timestamp_ms or math.floor(Monotonic.now_ms())
 
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then
@@ -1468,7 +1629,7 @@ function M.set_window_title(app_id, title, timestamp_ms)
 	if _current_title and type(_title_entered_at) == "number" and type(title) == "string" and title ~= ""
 		and title ~= _current_title and not M.is_unrecorded_app(owner_app) and not M.is_unrecorded_app(app_id) then
 		_pending_window_switch_events[#_pending_window_switch_events + 1] = {
-			ts = os.date("!%Y-%m-%d %H:%M:%S"), date = os.date("%Y-%m-%d"),
+			ts = clock.ts, date = clock.date,
 			app = dashboard_app_name(owner_app), prev_title = _current_title, next_title = title,
 			duration_ms = math.max(0, now - _title_entered_at),
 		}
@@ -1483,7 +1644,12 @@ function M.set_window_title(app_id, title, timestamp_ms)
 		local owner = _app_stats[_current_title_app or app_id]
 		if owner then
 			local row = owner.titles[_current_title]
-			if row then row.ms = row.ms + math.max(0, now - _title_since) end
+			if row then
+				local elapsed = math.max(0, now - _title_since)
+				row.ms = row.ms + elapsed
+				local dated = dated_title(clock.date, _current_title_app or app_id, _current_title, now)
+				dated.ms = dated.ms + elapsed
+			end
 		end
 	end
 
@@ -1493,7 +1659,8 @@ function M.set_window_title(app_id, title, timestamp_ms)
 	end
 
 	local app = ensure_app_stats(app_id, now)
-	app.titles[title] = app.titles[title] or { c = 0, ms = 0 }
+	app.titles[title] = app.titles[title] or new_title_row()
+	dated_title(clock.date, app_id, title, now)
 	if title ~= _current_title then _title_entered_at = now end
 	_current_title = title
 	_title_since = now
@@ -1937,7 +2104,9 @@ end
 
 --- Composes one immutable snapshot without advancing public watermarks.
 local function capture_flush(close_session)
-	local date, now_iso = os.date("%Y-%m-%d"), os.date("!%Y-%m-%d %H:%M:%S")
+	local clock = observe_calendar()
+	local date = clock.date
+	local calendar_snapshot = snapshot_calendar(clock)
 	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, llm = {}, windows = {},
 		sessions = {}, system = {} }, upserts = {} }
 	local add = setmetatable({}, { __index = function(_, kind)
@@ -1972,42 +2141,42 @@ local function capture_flush(close_session)
 	-- because a sequence is only knowable in context — a bigram needs the
 	-- character before it, and a long pause has to be able to un-make one.
 	local ngram_batch = nil
-	-- Keystrokes are stamped on the monotonic clock, which says nothing about
-	-- the time of day; the activity histogram is entirely about the time of
-	-- day. Taking both readings at the same instant gives the offset between
-	-- them, and the offset is what makes an uptime figure into an hour.
-	local wall_offset_ms = os.time() * MS_PER_SECOND - math.floor(Monotonic.now_ms())
-	for app_id, pending in pairs(_pending_typing_events) do
-		-- Pointer activity alone is a row too, with no text, as macOS flushes it.
-		local mouse = pending.mouse
-		if #pending.events > 0 or mouse then
-			local total_time_ms = 0
-			for _, event in ipairs(pending.events) do total_time_ms = total_time_ms + (event[2] or 0) end
-			typing_batch[#typing_batch + 1] = {
-				ts = now_iso, date = date, app = dashboard_app_name(app_id),
-				text = table.concat(pending.text),
-				wpm = SharedMetrics.compute_wpm_from_events(#pending.events, total_time_ms),
-				events_json = _to_json(pending.events),
-				mouse_clicks = mouse and mouse.clicks or 0,
-				mouse_scrolls = mouse and mouse.scrolls or 0,
-				mouse_distance_px = mouse and math.floor(mouse.distance) or 0,
-			}
-		end
-		if #pending.events > 0 then
-			walker_contexts[app_id] = walker_contexts[app_id] or {}
-			local ok_walk, walked = pcall(AggregateWalker.walk,
-				pending.events, date, dashboard_app_name(app_id), ngram_batch,
-				{ times = pending.times, wall_offset_ms = wall_offset_ms }, walker_contexts[app_id])
-			if ok_walk then
-				ngram_batch = walked
-			else
-				-- Loudly, and without taking the raw events down with it: the
-				-- replayable stream is the source of truth and the aggregates are
-				-- derived from it, so losing the derivation must never lose the source.
-				return nil, "Typing aggregate derivation failed; pending source remains unacknowledged"
+	-- Producer captures retain elapsed stamps and matching wall instants. The
+	-- histogram therefore keeps the input hour even when flush is delayed or
+	-- the native wall offset changes while the stream remains buffered.
+	for app_id, stream in pairs(_pending_typing_events) do
+		for _, pending in ipairs(stream.runs) do
+			local date = pending.date
+			-- Pointer activity alone is a row too, with no text, as macOS flushes it.
+			local mouse = pending.mouse
+			if #pending.events > 0 or mouse then
+				local total_time_ms = 0
+				for _, event in ipairs(pending.events) do total_time_ms = total_time_ms + (event[2] or 0) end
+				typing_batch[#typing_batch + 1] = {
+					ts = pending.ts, date = date, app = dashboard_app_name(app_id),
+					text = table.concat(pending.text),
+					wpm = SharedMetrics.compute_wpm_from_events(#pending.events, total_time_ms),
+					events_json = _to_json(pending.events),
+					mouse_clicks = mouse and mouse.clicks or 0,
+					mouse_scrolls = mouse and mouse.scrolls or 0,
+					mouse_distance_px = mouse and math.floor(mouse.distance) or 0,
+				}
 			end
-		end
-	end
+			if #pending.events > 0 then
+				walker_contexts[app_id] = walker_contexts[app_id] or {}
+				local ok_walk, walked = pcall(AggregateWalker.walk,
+					pending.events, date, dashboard_app_name(app_id), ngram_batch,
+					{ times = pending.times, wall_times = pending.wall_times }, walker_contexts[app_id])
+				if ok_walk then
+					ngram_batch = walked
+				else
+					-- Loudly, and without taking the raw events down with it: the
+					-- replayable stream is the source of truth and the aggregates are
+					-- derived from it, so losing the derivation must never lose the source.
+					return nil, "Typing aggregate derivation failed; pending source remains unacknowledged"
+				end
+			end
+		end	end
 	-- What each context still holds is credited once its own gap has passed,
 	-- and all of it on a new day or at shutdown, so a session ends where the
 	-- user stopped rather than where a flush happened to land.
@@ -2073,9 +2242,10 @@ local function capture_flush(close_session)
 	end
 	-- The machine's own state, which the dashboard puts beside the typing to
 	-- explain a quiet afternoon. Sampled on the daemon's tick, written here.
+	local system_snapshot
 	if SystemMetrics then
-		local day = SystemMetrics.current()
-		if day then add.system_day(_device_id, day) end
+		system_snapshot = SystemMetrics.snapshot()
+		for _, day in pairs(system_snapshot.values) do add.system_day(_device_id, day) end
 	end
 
 	if #_pending_app_switch_events > 0 then
@@ -2083,13 +2253,16 @@ local function capture_flush(close_session)
 		-- source remains retained until the whole transaction is acknowledged.
 		local transitions = {}
 		for _, event in ipairs(_pending_app_switch_events) do
-			local key = event.date .. "\1" .. event.prev_app .. "\1" .. event.next_app
-			local row = transitions[key]
-			if not row then
-				row = { date = event.date, app_from = event.prev_app, app_to = event.next_app, count = 0 }
-				transitions[key] = row
+			-- A midnight interval closure has no destination and is not a switch.
+			if type(event.next_app) == "string" and event.next_app ~= "" then
+				local key = event.date .. "\1" .. event.prev_app .. "\1" .. event.next_app
+				local row = transitions[key]
+				if not row then
+					row = { date = event.date, app_from = event.prev_app, app_to = event.next_app, count = 0 }
+					transitions[key] = row
+				end
+				row.count = row.count + 1
 			end
-			row.count = row.count + 1
 		end
 		payload.raw.switches = _pending_app_switch_events
 		_pending_app_switch_events = {}
@@ -2097,122 +2270,107 @@ local function capture_flush(close_session)
 	end
 
 	-- 2. Upsert only new per-app daily aggregate values.
-	local apps = M.get_app_stats()
-	for app_id, app_stats in pairs(apps) do
-		-- The dashboard and both other drivers retain the complete desktop
-		-- identifier (for example org.mozilla.firefox). Truncating at the first
-		-- dot silently merged unrelated applications in the persisted database.
-		local app_name = dashboard_app_name(app_id)
-		local current = {
-			chars       = app_stats.keystrokes or 0,
-			time_ms     = app_stats.typing_time_ms or 0,
-			app_time_ms = app_stats.focus_time_ms or 0,
-			hs_chars    = app_stats.hs_chars or 0,
-			hs_triggers = app_stats.hs_triggers or 0,
-			hs_input_chars = app_stats.hs_input_chars or 0,
-			-- The three LLM counters, missing from this table until 2026-08-06.
-			-- record_synthetic_output has always incremented them in memory and
-			-- upsert_app_day has always accepted them — they were simply never
-			-- named here, so every accepted completion was counted for the life of
-			-- the process and forgotten at the next start. The dashboard's
-			-- LLM-gain figure read zero on a machine that had been using it all
-			-- day, which looks exactly like a feature nobody uses.
-			llm_chars       = app_stats.llm_chars or 0,
-			llm_triggers    = app_stats.llm_triggers or 0,
-			llm_input_chars = app_stats.llm_input_chars or 0,
-			-- The denominators of the acceptance rate. Recorded in memory since
-			-- record_suggestion existed and never persisted, which is the same
-			-- shape the three LLM counters above had: a number the process knew
-			-- and forgot at every restart.
-			hs_suggested    = app_stats.hs_suggested or 0,
-			llm_suggested   = app_stats.llm_suggested or 0,
-		}
-		local previous = _flushed_app_totals[app_id] or {}
-		local delta = {}
-		local changed = false
-		for field, value in pairs(current) do
-			local increment = math.max(0, value - (previous[field] or 0))
-			delta[field] = increment
-			changed = changed or increment > 0
-		end
-		if changed then add.app_day(_device_id, date, app_name, delta) end
-		_flushed_app_totals[app_id] = current
-
-		-- Hold durations, as deltas: the row sums on conflict.
-		local flushed_holds = _flushed_app_holds[app_id] or {}
-		for code, row in pairs((_app_stats[app_id] or {}).kc_hold or {}) do
-			local before = flushed_holds[code]
-				or { sum_ms = 0, count = 0, max_ms = 0, tap_count = 0, hold_count = 0 }
-			local delta_count = math.max(0, row.count - before.count)
-			if delta_count > 0 then
-				add.kc_hold(_device_id, {
-					date = date, app = app_name, keycode = code,
-					sum_ms = math.max(0, row.sum_ms - before.sum_ms),
-					count = delta_count,
-					-- The longest hold is a record, not a delta: sending the running
-					-- maximum is right because the column takes a MAX on conflict.
-					max_ms = row.max_ms,
-					tap_count = math.max(0, row.tap_count - before.tap_count),
-					hold_count = math.max(0, row.hold_count - before.hold_count),
-				})
+	for date, apps in pairs(calendar_snapshot.values) do
+		_flushed_app_totals[date] = _flushed_app_totals[date] or {}
+		_flushed_app_titles[date] = _flushed_app_titles[date] or {}
+		_flushed_app_holds[date] = _flushed_app_holds[date] or {}
+		for app_id, app_stats in pairs(apps) do
+			-- The dashboard and both other drivers retain the complete desktop
+			-- identifier (for example org.mozilla.firefox). Truncating at the first
+			-- dot silently merged unrelated applications in the persisted database.
+			local app_name = dashboard_app_name(app_id)
+			local current = app_stats.totals
+			local previous = _flushed_app_totals[date][app_id] or {}
+			local delta = {}
+			local changed = false
+			for field, value in pairs(current) do
+				local increment = math.max(0, value - (previous[field] or 0))
+				delta[field] = increment
+				changed = changed or increment > 0
 			end
-			flushed_holds[code] = {
-				sum_ms = row.sum_ms, count = row.count, max_ms = row.max_ms,
-				tap_count = row.tap_count, hold_count = row.hold_count,
-			}
-		end
-		_flushed_app_holds[app_id] = flushed_holds
+			if changed then add.app_day(_device_id, date, app_name, delta) end
+			_flushed_app_totals[date][app_id] = current
 
-		-- Window titles, as deltas like everything else on this table: the rows
-		-- add on conflict, so writing the cumulative counters again would count
-		-- every earlier keystroke once more per flush.
-		local flushed_titles = _flushed_app_titles[app_id] or {}
-		for title, row in pairs((_app_stats[app_id] or {}).titles or {}) do
-			local before = flushed_titles[title] or { c = 0, ms = 0 }
-			local delta_c = math.max(0, (row.c or 0) - before.c)
-			local delta_ms = math.max(0, (row.ms or 0) - before.ms)
-			if delta_c > 0 or delta_ms > 0 then
-				add.title(_device_id, {
-					date = date, app = app_name, title = title,
-					c = delta_c, ms = delta_ms,
-				})
+			-- Hold durations, as deltas: the row sums on conflict.
+			local flushed_holds = _flushed_app_holds[date][app_id] or {}
+			for code, row in pairs(app_stats.kc_hold or {}) do
+				local before = flushed_holds[code]
+					or { sum_ms = 0, count = 0, max_ms = 0, tap_count = 0, hold_count = 0 }
+				local delta_count = math.max(0, row.count - before.count)
+				if delta_count > 0 then
+					add.kc_hold(_device_id, {
+						date = date, app = app_name, keycode = code,
+						sum_ms = math.max(0, row.sum_ms - before.sum_ms),
+						count = delta_count,
+						-- The longest hold is a record, not a delta: sending the running
+						-- maximum is right because the column takes a MAX on conflict.
+						max_ms = row.max_ms,
+						tap_count = math.max(0, row.tap_count - before.tap_count),
+						hold_count = math.max(0, row.hold_count - before.hold_count),
+					})
+				end
+				flushed_holds[code] = {
+					sum_ms = row.sum_ms, count = row.count, max_ms = row.max_ms,
+					tap_count = row.tap_count, hold_count = row.hold_count,
+				}
 			end
-			flushed_titles[title] = { c = row.c or 0, ms = row.ms or 0 }
+			_flushed_app_holds[date][app_id] = flushed_holds
+
+			-- Window titles, as deltas like everything else on this table: the rows
+			-- add on conflict, so writing the cumulative counters again would count
+			-- every earlier keystroke once more per flush.
+			local flushed_titles = _flushed_app_titles[date][app_id] or {}
+			for title, row in pairs(app_stats.titles or {}) do
+				local before = flushed_titles[title] or { c = 0, ms = 0 }
+				local delta_c = math.max(0, (row.c or 0) - before.c)
+				local delta_ms = math.max(0, (row.ms or 0) - before.ms)
+				if delta_c > 0 or delta_ms > 0 then
+					add.title(_device_id, {
+						date = date, app = app_name, title = title,
+						c = delta_c, ms = delta_ms,
+					})
+				end
+				flushed_titles[title] = { c = row.c or 0, ms = row.ms or 0 }
+			end
+			_flushed_app_titles[date][app_id] = flushed_titles
 		end
-		_flushed_app_titles[app_id] = flushed_titles
 	end
-
 	-- 3. Record which per-app character counts are now persisted, so the
 	-- live view adds only what came after. They were also written here, as a
 	-- delta, on top of the aggregate walker's rows for the same characters:
 	-- both upserts add, so every stored character count was doubled. The
 	-- walker's rows, which carry the sources too, are the only write.
-	for app_id, app_stats in pairs(_app_stats) do
-		_flushed_app_ngrams[app_id] = {}
-		for token, count in pairs(app_stats.ngrams or {}) do _flushed_app_ngrams[app_id][token] = count end
-		_flushed_app_sources[app_id] = {}
-		for token, sources in pairs(app_stats.ngram_sources or {}) do
-			_flushed_app_sources[app_id][token] = {}
-			for source, count in pairs(sources) do _flushed_app_sources[app_id][token][source] = count end
-		end
+	for date, apps in pairs(calendar_snapshot.values) do
+		_flushed_app_ngrams[date] = _flushed_app_ngrams[date] or {}
+		_flushed_app_sources[date] = _flushed_app_sources[date] or {}
+		_flushed_app_scancodes[date] = _flushed_app_scancodes[date] or {}
+		for app_id, app_stats in pairs(apps) do
+			_flushed_app_ngrams[date][app_id] = {}
+			for token, count in pairs(app_stats.ngrams or {}) do _flushed_app_ngrams[date][app_id][token] = count end
+			_flushed_app_sources[date][app_id] = {}
+			for token, sources in pairs(app_stats.ngram_sources or {}) do
+				_flushed_app_sources[date][app_id][token] = {}
+				for source, count in pairs(sources) do _flushed_app_sources[date][app_id][token][source] = count end
+			end
 
-		local previous_scancodes = _flushed_app_scancodes[app_id] or {}
-		local scancode_delta = {}
-		for scancode, count in pairs(app_stats.physical_scancodes or {}) do
-			local increment = math.max(0, count - (previous_scancodes[scancode] or 0))
-			if increment > 0 then scancode_delta[scancode] = increment end
-		end
-		if next(scancode_delta) ~= nil then
-			add.scancodes(_device_id, date, dashboard_app_name(app_id), scancode_delta)
-		end
-		_flushed_app_scancodes[app_id] = {}
-		for scancode, count in pairs(app_stats.physical_scancodes or {}) do
-			_flushed_app_scancodes[app_id][scancode] = count
+			local previous_scancodes = _flushed_app_scancodes[date][app_id] or {}
+			local scancode_delta = {}
+			for scancode, count in pairs(app_stats.physical_scancodes or {}) do
+				local increment = math.max(0, count - (previous_scancodes[scancode] or 0))
+				if increment > 0 then scancode_delta[scancode] = increment end
+			end
+			if next(scancode_delta) ~= nil then
+				add.scancodes(_device_id, date, dashboard_app_name(app_id), scancode_delta)
+			end
+			_flushed_app_scancodes[date][app_id] = {}
+			for scancode, count in pairs(app_stats.physical_scancodes or {}) do
+				_flushed_app_scancodes[date][app_id][scancode] = count
+			end
 		end
 	end
 
 	return {
-		payload = payload, buffers = buffers,
+		payload = payload, buffers = buffers, calendar = calendar_snapshot, system = system_snapshot,
 		watermarks = {
 			totals = _flushed_app_totals, titles = _flushed_app_titles, holds = _flushed_app_holds,
 			ngrams = _flushed_app_ngrams, scancodes = _flushed_app_scancodes, sources = _flushed_app_sources,
@@ -2341,6 +2499,8 @@ function M.pump_flush()
 			if marks.recovered then _recovered_walks = nil end
 			_manifest_cache = { revision = nil, manifest = nil }
 			_last_flush_committed, _flush_state = true, nil
+			prune_calendar(state.snapshot.calendar)
+			if state.snapshot.system then SystemMetrics.acknowledge(state.snapshot.system) end
 			Logger.info(LOG, "Session flush received its SQLite COMMIT and native cleanup acknowledgement.")
 		elseif not state.failure_reported then
 			state.failure_reported = true
@@ -2363,11 +2523,19 @@ local function restore_flush_buffers(buffers)
 	for app, older in pairs(buffers.typing) do
 		local newer = _pending_typing_events[app]
 		if newer then
-			for _, field in ipairs({ "text", "events", "times" }) do older[field] = prepend(older[field], newer[field]) end
-			if newer.mouse then
-				local mouse = older.mouse or { clicks = 0, scrolls = 0, distance = 0 }
-				for _, field in ipairs({ "clicks", "scrolls", "distance" }) do mouse[field] = mouse[field] + newer.mouse[field] end
-				older.mouse = mouse
+			local tail, head = older.runs[#older.runs], newer.runs[1]
+			if tail and head and tail.date == head.date then
+				for _, field in ipairs({ "text", "events", "times", "wall_times" }) do
+					tail[field] = prepend(tail[field], head[field])
+				end
+				if head.mouse then
+					local mouse = tail.mouse or { clicks = 0, scrolls = 0, distance = 0 }
+					for _, field in ipairs({ "clicks", "scrolls", "distance" }) do mouse[field] = mouse[field] + head.mouse[field] end
+					tail.mouse = mouse
+				end
+				for index = 2, #newer.runs do older.runs[#older.runs + 1] = newer.runs[index] end
+			else
+				older.runs = prepend(older.runs, newer.runs)
 			end
 		end
 		_pending_typing_events[app] = older
@@ -2404,6 +2572,7 @@ local function dispatch_flush(close_session)
 		and #payload.raw.llm == 0 and #payload.raw.switches == 0 and #payload.raw.windows == 0
 		and #payload.raw.sessions == 0 and #payload.raw.system == 0 and #payload.upserts == 0 then
 		_last_flush_committed = true
+		prune_calendar(snapshot.calendar)
 		return true
 	end
 	_flush_generation = _flush_generation + 1
@@ -2431,14 +2600,14 @@ local function dispatch_flush(close_session)
 		return false
 	end
 	state.operation = operation
+	accept_calendar(snapshot.calendar)
 	return M.pump_flush()
 end
 
 local function flush_json()
 	local date = os.date("%Y-%m-%d")
-	-- FALLBACK: JSON log file. It holds the session summary only, so the
-	-- buffered raw events are dropped here: kept, they grew for the whole
-	-- session, since only the SQLite branch ever emptied them.
+	-- A summary is useful while SQLite is unavailable, but it contains neither
+	-- raw rows nor complete daily aggregates. Its ACK cannot consume SQL source.
 	if not _log_dir then
 		Logger.warn(LOG, "flush(): no log directory configured.")
 		return false
@@ -2459,14 +2628,7 @@ local function flush_json()
 		Logger.error(LOG, "flush(): cannot publish the summary at '%s' — %s.", path, tostring(write_err))
 		return false
 	end
-	_pending_typing_events, _pending_hotstring_events = {}, {}
-	_pending_shortcut_events, _pending_app_switch_events = {}, {}
-	_pending_llm_events = {}
-	_pending_window_switch_events = {}
-	_pending_session_events = {}
-	_pending_system_events = {}
-
-	Logger.info(LOG, "Session flushed to JSON: %s.", path)
+	Logger.info(LOG, "Session summary saved; SQLite source remains retained: %s.", path)
 	return true
 end
 
@@ -2482,7 +2644,9 @@ local function flush_dispatch(close_session)
 		return M.pump_flush()
 	end
 	if SqliteWriter and SqliteWriter.is_available() then return dispatch_flush(close_session) end
-	return flush_json()
+	_last_flush_committed = false
+	flush_json()
+	return false
 end
 
 --- Dispatches or retries one immutable flush snapshot; false never means saved.
@@ -2490,8 +2654,9 @@ end
 --- @return boolean True only after durable COMMIT and native cleanup ACK.
 function M.flush()
 	if _flush_stopping then return false end
+	local clock = observe_calendar()
 	-- The periodic flush is the session's idle check (timings ingest_tick_ms).
-	if may_record() then queue_session_events(forward_session("tick", math.floor(Monotonic.now_ms()))) end
+	if may_record() then queue_session_events(forward_session(clock, "tick", clock.mono_ms), clock) end
 	-- And it takes the machine's transitions the daemon's sampler saw, always,
 	-- so a span when recording was forbidden is dropped rather than kept.
 	if SystemMetrics then
@@ -2499,7 +2664,8 @@ function M.flush()
 		if may_record() then
 			for _, transition in ipairs(transitions) do
 				_pending_system_events[#_pending_system_events + 1] = {
-					ts = os.date("!%Y-%m-%d %H:%M:%S"), date = os.date("%Y-%m-%d"),
+					ts = assert(transition.ts, "Missing system event capture timestamp"),
+					date = assert(transition.date, "Missing system event capture date"),
 					action = transition.action, metadata = transition.metadata,
 				}
 			end
@@ -2524,8 +2690,9 @@ end
 --- @return boolean True only when no native flush work remains acquired.
 function M.stop()
 	if not _flush_stopping then
+		local clock = observe_calendar()
 		-- The open session ends with the daemon, before the final flush takes it.
-		if may_record() then queue_session_events(forward_session("stop")) end
+		if may_record() then queue_session_events(forward_session(clock, "stop"), clock) end
 		_flush_stopping = true
 		if _reset_request then finish_reset_request(_reset_request, false) end
 		_flush_generation = _flush_generation + 1
@@ -2556,7 +2723,9 @@ function M.stop()
 	end
 	if not _stop_fallback_attempted then
 		_stop_fallback_attempted = true
-		if flush_json() ~= true then Logger.error(LOG, "Final session persistence failed before shutdown.") end
+		_last_flush_committed = false
+		if flush_json() ~= true then Logger.error(LOG, "Final session summary publication failed before shutdown.") end
+		Logger.error(LOG, "Final SQLite history remains uncommitted; summary publication cannot acknowledge its source.")
 	end
 	return true
 end
@@ -2628,7 +2797,8 @@ reset_session_step = function()
 		_session_reset_attempt = attempt
 		_session, _pending_session_events = attempt.successor, candidate_events
 		local called, persisted = pcall(function()
-			queue_session_events(closing)
+			local clock = observe_calendar()
+			queue_session_events(closing, clock)
 			return flush_dispatch(true)
 		end)
 		local current = _session_reset_attempt == attempt and _session == attempt.successor
@@ -2774,11 +2944,15 @@ end
 function M._pending_buffer_count_for_test()
 	local count = #_pending_hotstring_events + #_pending_shortcut_events + #_pending_llm_events
 		+ #_pending_app_switch_events + #_pending_window_switch_events
-	for _, pending in pairs(_pending_typing_events) do count = count + #pending.events end
+	for _, stream in pairs(_pending_typing_events) do
+		for _, pending in ipairs(stream.runs) do count = count + #pending.events end
+	end
 	if _flush_state then
 		local held = _flush_state.snapshot.buffers
 		count = count + #held.hotstrings + #held.shortcuts + #held.llm + #held.switches + #held.windows
-		for _, pending in pairs(held.typing) do count = count + #pending.events end
+		for _, stream in pairs(held.typing) do
+			for _, pending in ipairs(stream.runs) do count = count + #pending.events end
+		end
 	end
 	return count
 end

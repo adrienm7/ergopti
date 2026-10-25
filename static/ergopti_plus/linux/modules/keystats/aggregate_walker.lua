@@ -148,12 +148,14 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 
 	local times = type(clock) == "table" and type(clock.times) == "table" and clock.times or nil
 	local offset = type(clock) == "table" and tonumber(clock.wall_offset_ms) or 0
+	local wall_times = type(clock) == "table" and type(clock.wall_times) == "table" and clock.wall_times or nil
 
 	--- The hour and five-minute slot of one keystroke, from its stamp.
 	local function slot_of(index)
+		local captured = wall_times and tonumber(wall_times[index])
 		local monotonic = times and tonumber(times[index])
-		if not monotonic then return nil end
-		local seconds = math.floor((monotonic + offset) / MS_PER_SECOND)
+		if not captured and not monotonic then return nil end
+		local seconds = math.floor(captured or ((monotonic + offset) / MS_PER_SECOND))
 		local hour = os.date("%H", seconds)
 		local minute = tonumber(os.date("%M", seconds)) or 0
 		return {

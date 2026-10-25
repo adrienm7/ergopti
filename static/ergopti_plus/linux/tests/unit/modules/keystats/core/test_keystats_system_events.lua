@@ -41,10 +41,20 @@ local function with_recorder(transitions, script)
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local taken = 0
+	local stamp = require("modules.keystats.calendar").capture()
+	transitions = require("table_util").deep_copy(transitions)
+	for _, batch in ipairs(transitions) do
+		for _, event in ipairs(batch) do
+			event.ts = event.ts or stamp.ts
+			event.date = event.date or stamp.date
+		end
+	end
 	package.loaded[names[1]], package.loaded[names[2]] = fake_writer, nil
 	package.loaded[names[3]] = {
 		bind = function() end,
 		current = function() return nil end,
+		snapshot = function() return { values = {}, owners = {} } end,
+		acknowledge = function() end,
 		take_events = function()
 			taken = taken + 1
 			return transitions[taken] or {}
@@ -73,8 +83,17 @@ helpers.describe("keystats system events: the recorder", function()
 			end)
 	end)
 
-	it("drops the transitions seen while recording is forbidden", function()
-		with_recorder({ { { action = "unlock" } } }, function(keystats, writer)
+	it("retains a system transition's sampled day across a delayed flush (system-transition-capture-day)", function()
+		with_recorder({ { { action = "lock", date = "2026-10-24", ts = "2026-10-24 23:59:30" } } },
+			function(keystats, writer)
+				keystats.flush()
+				helpers.assert_eq(#writer.system_events, 1)
+				helpers.assert_eq(writer.system_events[1].row.date, "2026-10-24")
+				helpers.assert_eq(writer.system_events[1].row.ts, "2026-10-24 23:59:30")
+			end)
+	end)
+
+	it("drops the transitions seen while recording is forbidden", function()		with_recorder({ { { action = "unlock" } } }, function(keystats, writer)
 			keystats.set_enabled(false)
 			keystats.flush()
 			keystats.set_enabled(true)
