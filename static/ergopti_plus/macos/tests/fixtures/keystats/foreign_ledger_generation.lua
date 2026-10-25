@@ -9,11 +9,14 @@
 
 local root, temporary = assert(arg[3]), assert(arg[2])
 local driver = root .. "/static/ergopti_plus/macos"
+-- Interpreter wrappers can inject host Lua modules before this fixture starts.
+-- Physical replay must remain runnable with only the repository's Lua sources.
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
 	.. root .. "/static/ergopti_plus/_shared/lua/?.lua;"
-	.. root .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/static/ergopti_plus/_shared/lua/?/init.lua"
+package.cpath = ""
 
-local Json, Helpers, Lfs = require("json"), require("tests.helpers"), require("lfs")
+local Json, Helpers = require("json"), require("tests.helpers")
 local RunloopTimers = require("tests.support.runloop_timers")
 
 local function rpc(message)
@@ -26,6 +29,28 @@ local function request(message)
 	local response = rpc(message)
 	assert(response.ok, response.error)
 	return response.value
+end
+
+--- Translate real stat facts to the native attributes shape without add-ons.
+local function physical_attributes(path, key)
+	local observed = request({ op = "stat", path = path })
+	if observed == false then return nil end
+	local attributes = { mode = observed.type, size = observed.size }
+	if key ~= nil then return attributes[key] end
+	return attributes
+end
+
+--- Preserve the native iterator/state contract over a real physical listing.
+local function physical_directory(path)
+	local names = { ".", ".." }
+	for _, name in ipairs(request({ op = "directory", path = path })) do names[#names + 1] = name end
+	local owner = { names = names, index = 0 }
+	local function next_name(state)
+		assert(state == owner, "physical directory iterator requires its exact native state")
+		state.index = state.index + 1
+		return state.names[state.index]
+	end
+	return next_name, owner
 end
 
 local function new_hash(algorithm)
@@ -76,14 +101,14 @@ local receipt
 Helpers.with_stub_scope({ "infra.logger", "infra.fs_dir", "modules.keystats.export" }, function()
 	local runloop = RunloopTimers.create()
 	package.loaded["infra.logger"] = Helpers.make_logger_stub()
-	package.loaded["infra.fs_dir"] = { try_entries = function() return { "foreign" }, true end }
+	package.loaded["infra.fs_dir"] = nil
 	local export = Helpers.load_with_stubs("modules.keystats.export", {
-		fs = { attributes = Lfs.attributes, dir = Lfs.dir }, hash = { new = new_hash }, timer = runloop.api,
+		fs = { attributes = physical_attributes, dir = physical_directory }, hash = { new = new_hash }, timer = runloop.api,
 	})
 	export.init({ paths = { metrics_dir = temporary .. "/metrics/" }, device_id = "local",
 		get_db = function() return db end })
 	local replacement = temporary .. "/replacement.sql"
-	local interleaved = Lfs.attributes(replacement) ~= nil
+	local interleaved = physical_attributes(replacement) ~= nil
 	local imported, turns, generations = {}, 0, 0
 	repeat
 		turns = turns + 1
@@ -97,6 +122,7 @@ Helpers.with_stub_scope({ "infra.logger", "infra.fs_dir", "modules.keystats.expo
 	until generations == (interleaved and 2 or 1) or turns == 64
 	if export.cleanup then assert(export.cleanup()) end
 	receipt = { kind = "done", imported = imported, turns = turns, generations = generations,
+		module_paths = { lua = package.path, native = package.cpath, lfs_loaded = package.loaded["lfs"] ~= nil },
 		rows = request({ op = "rows", connection = identity,
 			sql = "SELECT id,action FROM events_system ORDER BY id" }),
 		watermark = request({ op = "rows", connection = identity,

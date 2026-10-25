@@ -15,6 +15,7 @@ import sqlite3
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -281,6 +282,42 @@ class ForeignLedgerGenerationTests(unittest.TestCase):
             watermark["imported_data_sql_sha256"],
             hashlib.sha256(self.ledger.read_bytes()[:offset]).hexdigest(),
         )
+
+    def test_fixture_isolates_lua_module_paths_from_host_dependencies(self):
+        self.ledger.write_bytes(self.batch(1))
+        modules = self.root / "unbundled-modules"
+        modules.mkdir()
+        (modules / "lfs.lua").write_text("error('unbundled-lua-module')\n", encoding="utf-8")
+        lua_path, cpath = str(modules / "?.lua"), str(modules / "?.so")
+        with patch.dict(
+            os.environ,
+            {
+                "LUA_PATH": lua_path,
+                "LUA_CPATH": cpath,
+                "LUA_PATH_5_4": lua_path,
+                "LUA_CPATH_5_4": cpath,
+            },
+        ):
+            control = subprocess.run(
+                [
+                    self.lua,
+                    "-e",
+                    'local ok, reason = pcall(require, "lfs"); '
+                    'assert(not ok and tostring(reason):find("unbundled-lua-module", 1, true))',
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            self.assertEqual(control.returncode, 0, control.stdout + control.stderr)
+            result = self.replay()
+        self.assertEqual([row["id"] for row in result["rows"]], [1])
+        paths = result["module_paths"]["lua"].split(";")
+        self.assertTrue(paths)
+        self.assertTrue(all(path.startswith(str(ROOT / "static/ergopti_plus")) for path in paths))
+        self.assertEqual(result["module_paths"]["native"], "")
+        self.assertFalse(result["module_paths"]["lfs_loaded"])
+        self.assert_committed_receipt(result)
 
     def test_actual_compactor_then_append_imports_new_event_after_restart(self):
         self.ledger.write_bytes(self.batch(1) * 100)
