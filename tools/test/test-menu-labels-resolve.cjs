@@ -156,6 +156,27 @@ if (process.argv.includes('--measure')) {
 }
 
 let failed = false;
+// This numeric setting is rendered from the manifest rather than a driver's
+// bespoke label. Keep its newly introduced description translated everywhere.
+const expansionDelay = entries.filter((entry) => entry.path === 'hotstrings.expansion_delay');
+const locales = fs.readdirSync(path.dirname(EN)).filter((file) => file.endsWith('.json'));
+if (expansionDelay.length !== 1 || locales.length < 21) {
+	failed = true;
+	console.error('[ERROR] Base expansion delay must have one manifest owner and every locale.');
+} else {
+	const entry = expansionDelay[0];
+	for (const file of locales) {
+		const values = JSON.parse(fs.readFileSync(path.join(path.dirname(EN), file), 'utf8'));
+		if (
+			!candidateKeys(entry.key, entry.path).some(
+				(key) => typeof values[key] === 'string' && values[key].trim() !== ''
+			)
+		) {
+			failed = true;
+			console.error(`[ERROR] Base expansion delay has no translated label in ${file}.`);
+		}
+	}
+}
 if (namespaced.length > 0) {
 	failed = true;
 	console.error(
