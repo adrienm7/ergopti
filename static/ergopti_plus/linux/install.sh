@@ -117,7 +117,8 @@ fi
 
 LIB_DIR="${PREFIX}/lib/ergopti"
 BIN_DIR="${PREFIX}/bin"
-CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
+source "${SRC_DRIVER}/install/config_home.sh"
+ergopti_resolve_config_home CONFIG_ROOT
 CONFIG_DIR="${CONFIG_ROOT}/ergopti/hotstrings"
 SYSTEMD_DIR="${CONFIG_ROOT}/systemd/user"
 
