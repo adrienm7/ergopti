@@ -1066,4 +1066,15 @@ function M.set_clock(clock)
 	_clock = clock or os.time
 end
 
+-- Tool discovery precedes the answer surface, so a prediction reset cannot
+-- revoke that pending stage. Retire the original run on the AI off edge;
+-- enabling the gate again authorizes only a newly requested action.
+local AiActions = require("modules.shortcuts.ai_actions")
+AiActions.subscribe("agent_runner", function()
+	if AiActions.off() then
+		_generation = _generation + 1
+		M.cancel_typing("AI disabled")
+	end
+end)
+
 return M
