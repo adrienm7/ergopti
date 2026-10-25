@@ -687,3 +687,129 @@ _LAT_CompleteEditRefusal() {
 	}
 }
 Test("complete API Edit frame refuses withdrawal and repairs its actual owner", _LAT_CompleteEditRefusal)
+
+
+class _LAT_ProgressReentrantDestroy {
+	Fired := false
+	__New(Window) {
+		this.Window := Window
+	}
+	Destroy() {
+		global _LLM_Menu_ApiTestProgress
+		if this.Fired
+			return
+		this.Fired := true
+		this.Window.Destroy()
+		this.NextOwner := _LAT_TestOwner()
+		_LLM_Menu_ApiTestProgressShow("prod", "Private reentrant progress", this.NextOwner)
+		this.NextState := _LLM_Menu_ApiTestProgress
+	}
+}
+
+_LAT_ProgressNativeEvent(Receipt, *) {
+	Receipt.Delivered := true
+}
+
+_LAT_ProgressCloseDuringShow(Receipt, Showing, Param, Message, Hwnd) {
+	global _LLM_Menu_ApiTestProgress
+	if !Showing || Receipt.Delivered || !_LLM_Menu_ApiTestProgress.Has("gui")
+		return
+	Window := _LLM_Menu_ApiTestProgress["gui"]
+	if Window.Hwnd != Hwnd
+		return
+	Receipt.Delivered := true
+	Receipt.Hwnd := Hwnd
+	DllCall("PostMessageW", "Ptr", Hwnd, "UInt", 0x10, "Ptr", 0, "Ptr", 0, "Int")
+	Started := A_TickCount
+	while _LLM_Menu_ApiTestProgress.Has("entry") && A_TickCount - Started < 2000
+		Sleep(1)
+}
+
+_LAT_ProgressNativeCancellation(Event) {
+	global _LLM_Menu_ApiTestProgress, _LLM_AuxGeneration, _LLM_AuxOwnerCounter
+	global _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter
+	SavedMenu := _LAT_FixtureMenu()
+	SavedProgress := _LLM_Menu_ApiTestProgress
+	SavedOwners := [_LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners,
+		_LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter]
+	SavedCritical := Critical("Off")
+	Window := 0, DestroyProbe := 0, ShowCallback := 0
+	try {
+		_LAT_ResetOwners()
+		_LLM_Menu_ApiTestProgress := Map()
+		Owner := _LAT_TestOwner()
+		if Event == "DuringShow" {
+			Receipt := {Delivered: false, Hwnd: 0}
+			ShowCallback := _LAT_ProgressCloseDuringShow.Bind(Receipt)
+			OnMessage(0x18, ShowCallback)
+			Opened := _LLM_Menu_ApiTestProgressShow("prod", "Private opening cancellation", Owner)
+			AssertTrue(Receipt.Delivered, "real WM_SHOWWINDOW must expose the published native owner")
+			AssertFalse(Opened, "closing while Show pumps messages cannot authorize request dispatch")
+			AssertFalse(LLM_AuxIsCurrent(Owner), "early cancellation retires the owner before dispatch")
+			AssertFalse(_LLM_Menu_ApiTestProgress.Has("entry"))
+			AssertFalse(WMHandleExists(Receipt.Hwnd))
+			return
+		}
+		AssertTrue(_LLM_Menu_ApiTestProgressShow("prod", "Private progress cancellation", Owner))
+		State := _LLM_Menu_ApiTestProgress
+		AssertTrue(State.Has("gui"), "the real progress factory must create its native window")
+		Window := State["gui"], Hwnd := Window.Hwnd
+		AssertTrue(LLM_AuxIsCurrent(Owner), "the native progress must begin with a real live auxiliary owner")
+		Receipt := {Delivered: false}
+		Window.OnEvent(Event, _LAT_ProgressNativeEvent.Bind(Receipt), -1)
+		AssertTrue(DllCall("PostMessageW", "Ptr", Hwnd, "UInt", Event == "Close" ? 0x10 : 0x100,
+			"Ptr", Event == "Close" ? 0 : 0x1B, "Ptr", 0, "Int"),
+			"the private progress window must receive its cancellation message")
+		Started := A_TickCount
+		while (!Receipt.Delivered || LLM_AuxIsCurrent(Owner)) && A_TickCount - Started < 2000
+			Sleep(1)
+		AssertTrue(Receipt.Delivered, "the native cancellation event must really run")
+		AssertFalse(LLM_AuxIsCurrent(Owner), "closing progress must retire the probe instead of leaving hidden work")
+		AssertFalse(WMHandleExists(Hwnd), "native cancellation must destroy the progress window")
+		AssertFalse(_LLM_Menu_ApiTestProgress.Has("entry"), "native cancellation must clear progress state")
+		Notices := []
+		AssertFalse(_LLM_Menu_OnApiTestDone(true, "late answer", "prod", "Private progress cancellation",
+			A_TickCount, Owner, (Ok, Tip) => Notices.Push(Tip)))
+		AssertEqual(0, Notices.Length, "a closed probe cannot publish a later verdict")
+		ReplacementOwner := _LAT_TestOwner()
+		AssertTrue(_LLM_Menu_ApiTestProgressShow("prod", "Private replacement progress", ReplacementOwner))
+		Replacement := _LLM_Menu_ApiTestProgress
+		AssertFalse(_LLM_Menu_ApiTestProgressCancel(State), "a delayed old cancellation cannot claim a replacement")
+		AssertTrue(_LLM_Menu_ApiTestProgress == Replacement)
+		AssertTrue(LLM_AuxIsCurrent(ReplacementOwner), "the replacement keeps its exact owner")
+		DestroyProbe := _LAT_ProgressReentrantDestroy(Replacement["gui"])
+		Replacement["gui"] := DestroyProbe
+		AssertTrue(_LLM_Menu_ApiTestProgressCancel(Replacement))
+		AssertFalse(LLM_AuxIsCurrent(ReplacementOwner))
+		AssertTrue(DestroyProbe.Fired, "native retirement must reach the controlled reentrant boundary")
+		AssertTrue(_LLM_Menu_ApiTestProgress == DestroyProbe.NextState,
+			"retiring an old HWND cannot erase progress opened by that native callout")
+		AssertTrue(LLM_AuxIsCurrent(DestroyProbe.NextOwner), "the reentrant progress retains its own live owner")
+		AssertTrue(DestroyProbe.NextState.Has("gui"), "the replacement owns an actual native progress window")
+		AssertTrue(WMHandleExists(DestroyProbe.NextState["gui"].Hwnd))
+		AssertTrue(_LLM_Menu_ApiTestProgressCancel(DestroyProbe.NextState))
+	} finally {
+		if HasMethod(ShowCallback, "Call")
+			OnMessage(0x18, ShowCallback, 0)
+		_LLM_Menu_ApiTestProgressHide()
+		SetTimer(_LLM_Menu_ApiTestProgressTick, 0)
+		if IsObject(DestroyProbe) && DestroyProbe.HasOwnProp("NextState") {
+			if DestroyProbe.NextState.Has("gui")
+				try DestroyProbe.NextState["gui"].Destroy()
+			try LLM_AuxFinish(DestroyProbe.NextOwner)
+		}
+		if IsObject(Window)
+			try Window.Destroy()
+		_LLM_Menu_ApiTestProgress := SavedProgress
+		_LLM_AuxGeneration := SavedOwners[1]
+		_LLM_AuxOwnerCounter := SavedOwners[2]
+		_LLM_AuxOwners := SavedOwners[3]
+		_LLM_AuxCleanupDebt := SavedOwners[4]
+		_LLM_AuxCleanupDebtCounter := SavedOwners[5]
+		_LAT_RestoreMenu(SavedMenu)
+		Critical(SavedCritical)
+	}
+}
+for _LAT_NativeCancelEvent in ["Close", "Escape", "DuringShow"]
+	Test("llm api progress: " . _LAT_NativeCancelEvent . " cancels the live probe (api-progress-native-cancel)",
+		_LAT_ProgressNativeCancellation.Bind(_LAT_NativeCancelEvent))

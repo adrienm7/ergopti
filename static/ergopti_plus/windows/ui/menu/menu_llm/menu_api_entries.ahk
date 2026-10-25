@@ -724,11 +724,11 @@ _LLM_Menu_ApiTestProgressText(Name, ElapsedMs, BudgetMs) {
 ; is modeless (the request runs on timers) with a pulse bar, a live elapsed
 ; label and a Cancel button. Everything UI is try-wrapped: headless or not,
 ; the state map is always set so Hide/Cancel stay consistent.
-_LLM_Menu_ApiTestProgressShow(EntryId, Name) {
+_LLM_Menu_ApiTestProgressShow(EntryId, Name, Owner := "") {
 	global _LLM_Menu_ApiTestProgress, LLM_API_TEST_TIMEOUT_MS
 	_LLM_Menu_ApiTestProgressHide()
 	State := Map("entry", EntryId, "name", Name, "req_id", 0,
-		"owner", "", "start", A_TickCount, "budget", LLM_API_TEST_TIMEOUT_MS)
+		"owner", Owner, "start", A_TickCount, "budget", LLM_API_TEST_TIMEOUT_MS)
 	_LLM_Menu_ApiTestProgress := State
 	try {
 		Worker := Gui_Create("", t("menu.llm.api_window_title"))
@@ -736,10 +736,16 @@ _LLM_Menu_ApiTestProgressShow(EntryId, Name) {
 			_LLM_Menu_ApiTestProgressText(Name, 0, State["budget"]))
 		State["bar"] := Worker.Add("Progress", "w300 h16 Range0-100", 0)
 		CancelBtn := Worker.Add("Button", "w300", t("common.cancel"))
-		CancelBtn.OnEvent("Click",
-			(*) => _LLM_Menu_ApiTestProgressCancel())
-		Worker.Show("AutoSize Center")
+		CancelFn := _LLM_Menu_ApiTestProgressCancel.Bind(State)
+		CancelBtn.OnEvent("Click", CancelFn)
+		Worker.OnEvent("Close", CancelFn)
+		Worker.OnEvent("Escape", CancelFn)
+		; Native Show can pump cancellation. Publish its exact window and owner
+		; first, and never rearm the pulse after that state has been retired.
 		State["gui"] := Worker
+		Worker.Show("AutoSize Center")
+		if _LLM_Menu_ApiTestProgress != State
+			return false
 		; Named callback (not a closure) so the fast-timer inventory can pin
 		; this 150 ms pulse by name; the tick itself reads the global state.
 		SetTimer(_LLM_Menu_ApiTestProgressTick, 150)
@@ -747,7 +753,7 @@ _LLM_Menu_ApiTestProgressShow(EntryId, Name) {
 		try LoggerWarn("LLM", "API test progress unavailable: {1}.",
 			Err.Message)
 	}
-	return true
+	return _LLM_Menu_ApiTestProgress == State
 }
 
 ; Progress tick: fills the bar with the elapsed share of the budget and
@@ -773,16 +779,23 @@ _LLM_Menu_ApiTestProgressTick(NowTick?) {
 ; Hides the probe progress if one is showing. Silent and total: timer off,
 ; window destroyed, state cleared.
 ; @return boolean True when something was showing.
-_LLM_Menu_ApiTestProgressHide() {
+_LLM_Menu_ApiTestProgressHide(ExpectedProgress := unset) {
 	global _LLM_Menu_ApiTestProgress
-	if !(_LLM_Menu_ApiTestProgress is Map)
-		|| !_LLM_Menu_ApiTestProgress.Has("entry")
-		return false
-	State := _LLM_Menu_ApiTestProgress
-	try SetTimer(_LLM_Menu_ApiTestProgressTick, 0)
+	PreviousCritical := Critical("On")
+	try {
+		if !(_LLM_Menu_ApiTestProgress is Map)
+			|| !_LLM_Menu_ApiTestProgress.Has("entry")
+			return false
+		State := _LLM_Menu_ApiTestProgress
+		if IsSet(ExpectedProgress) && State != ExpectedProgress
+			return false
+		; Retire publication and the pulse before native destruction can pump
+		; another opening. Its replacement must keep both its state and timer.
+		_LLM_Menu_ApiTestProgress := Map()
+		SetTimer(_LLM_Menu_ApiTestProgressTick, 0)
+	} finally Critical(PreviousCritical)
 	if State.Has("gui")
 		try State["gui"].Destroy()
-	_LLM_Menu_ApiTestProgress := Map()
 	return true
 }
 
@@ -790,12 +803,14 @@ _LLM_Menu_ApiTestProgressHide() {
 ; completion stays silent, hides the progress. Closing the window IS the
 ; feedback — no popup for an action the user just chose.
 ; @return boolean True when a probe was showing.
-_LLM_Menu_ApiTestProgressCancel() {
+_LLM_Menu_ApiTestProgressCancel(ExpectedProgress := unset, *) {
 	global _LLM_Menu_ApiTestProgress
 	if !(_LLM_Menu_ApiTestProgress is Map)
 		|| !_LLM_Menu_ApiTestProgress.Has("entry")
 		return false
 	State := _LLM_Menu_ApiTestProgress
+	if IsSet(ExpectedProgress) && State != ExpectedProgress
+		return false
 	ReqId := State.Get("req_id", 0)
 	if IsInteger(ReqId) && ReqId > 0
 		try LLM_RemoteCancelAsync(ReqId)
@@ -803,7 +818,7 @@ _LLM_Menu_ApiTestProgressCancel() {
 	if Owner != ""
 		try LLM_AuxFinish(Owner)
 	Name := State.Get("name", "")
-	_LLM_Menu_ApiTestProgressHide()
+	_LLM_Menu_ApiTestProgressHide(State)
 	try LoggerInfo("LLM", "API test for '{1}' cancelled by the user.", Name)
 	return true
 }
@@ -910,8 +925,10 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 	StartedTick := A_TickCount
 	; Immediate visible feedback at click time; the Cancel button and the
 	; request id are attached below once dispatch owns them.
-	_LLM_Menu_ApiTestProgressShow(EntryId, Name)
-	_LLM_Menu_ApiTestProgress["owner"] := Owner
+	if !_LLM_Menu_ApiTestProgressShow(EntryId, Name, Owner) {
+		try LLM_AuxFinish(Owner)
+		return false
+	}
 	OnSucc := (Text, Usage) => _LLM_Menu_OnApiTestDone(true, Text,
 		EntryId, Name, StartedTick, Owner, NotifyFn)
 	OnFail := (Info := "") => _LLM_Menu_OnApiTestDone(false, "",
