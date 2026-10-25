@@ -47,7 +47,7 @@ local Logger = require("logger.shim")
 
 local LOG = "infra.hotstrings_scope"
 local REPEAT_PATH = "hotstrings.repeat_key_enabled"
-local BASE_DELAY_PATH = "hotstrings.expansion_delay"
+local BASE_DELAY_PATH = require("config_keys").KEY.HOTSTRINGS_EXPANSION_DELAY
 local _owner, _sequence = nil, 0
 
 --- Whether a category or section identity can be named by a canonical path.

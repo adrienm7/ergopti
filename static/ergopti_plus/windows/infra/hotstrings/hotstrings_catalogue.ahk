@@ -21,6 +21,10 @@
 ; Included by infra/hotstrings/hotstrings_config.ahk.
 ; ==============================================================================
 
+; The generated config-key constants; #Include skips a file the entry script
+; already loaded, so a unit harness that loads this file alone still resolves them.
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -69,8 +73,8 @@ HotstringsResolveBumpGen() {
 HotstringsBaseDelay() {
 		global Features, GLOBAL_DEFAULT_DELAY
 		if IsSet(Features) and (Features is Map) and Features.Has("hotstrings")
-				and (Features["hotstrings"] is Map) and Features["hotstrings"].Has("expansion_delay")
-				return Features["hotstrings"]["expansion_delay"]
+				and (Features["hotstrings"] is Map) and Features["hotstrings"].Has(ConfigLeaf.EXPANSION_DELAY)
+				return Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY]
 		return GLOBAL_DEFAULT_DELAY
 }
 
@@ -189,11 +193,11 @@ _HotstringsOverridesMigrateLegacyDelays(BaseWriterFn := 0) {
 		if (GlobalDelay != "") {
 				Written := HasMethod(BaseWriterFn, "Call")
 						? BaseWriterFn.Call(GlobalDelay)
-						: WriteFeatureV2(Features, "hotstrings.expansion_delay", GlobalDelay)
+						: WriteFeatureV2(Features, ConfigKey.HOTSTRINGS_EXPANSION_DELAY, GlobalDelay)
 				if !Written {
 						try LoggerError("HotstringsConfig",
 								"The default expansion delay of the override file could not be moved to config.toml (hotstrings.expansion_delay); it applies for this session and the move is retried at the next start.")
-						Features["hotstrings"]["expansion_delay"] := GlobalDelay
+						Features["hotstrings"][ConfigLeaf.EXPANSION_DELAY] := GlobalDelay
 				}
 		}
 		HotstringsOverridesApplyBase(Candidate)
@@ -228,7 +232,7 @@ HotstringsSetBaseDelay(Seconds) {
 				return false
 		}
 		Previous := HotstringsBaseDelay()
-		if !WriteFeatureV2(Features, "hotstrings.expansion_delay", Seconds)
+		if !WriteFeatureV2(Features, ConfigKey.HOTSTRINGS_EXPANSION_DELAY, Seconds)
 				return false
 		PreviousCritical := Critical("On")
 		try HotstringsOverridesRebase(Previous, Seconds)

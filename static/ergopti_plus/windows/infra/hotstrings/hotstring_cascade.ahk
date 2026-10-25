@@ -35,6 +35,10 @@
 
 #Requires AutoHotkey v2.0
 
+; The generated config-key constants; #Include skips a file the entry script
+; already loaded, so a unit harness that loads this file alone still resolves them.
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -60,7 +64,7 @@ HSE_ValidCascadeDepth(Value) {
 HSE_CascadeDepthCurrent() {
 	global HSE_CascadeDepth
 	return HSE_CascadeDepth == ""
-		? ManifestDefaultFor("hotstrings.cascade_depth")
+		? ManifestDefaultFor(ConfigKey.HOTSTRINGS_CASCADE_DEPTH)
 		: HSE_CascadeDepth
 }
 

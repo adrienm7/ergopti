@@ -11,6 +11,10 @@
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
+; The generated config-key constants; #Include skips a file the entry script
+; already loaded, so a unit harness that loads this file alone still resolves them.
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -452,7 +456,7 @@ _HS_TryLiveToggleV2(V2Path) {
 ; @returns {Integer} True once persisted and applied.
 _HS_WriteHotstringFamily(V2Path, Enabled) {
 	global Features
-	MasterPath := "hotstrings.dynamic.enabled"
+	MasterPath := ConfigKey.HOTSTRINGS_DYNAMIC_ENABLED
 	if !Enabled || V2Path == MasterPath || SubStr(V2Path, 1, StrLen("hotstrings.dynamic.")) != "hotstrings.dynamic."
 		return WriteFeatureV2(Features, V2Path, Enabled)
 	Master := FeatureDesiredLocateV2(Features, MasterPath)

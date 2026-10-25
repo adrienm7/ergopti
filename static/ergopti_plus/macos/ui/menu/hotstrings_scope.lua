@@ -49,7 +49,7 @@ local LOG = "menu.hotstrings_scope"
 --- getter is present where the native owner can read its value back.
 local OWNERS = {
 	{ key = "repeat_key_enabled", setter = "set_repeat_feature_enabled", getter = "is_repeat_feature_enabled" },
-	{ key = "expansion_delay", setter = "set_base_delay", getter = "get_base_delay" },
+	{ key = require("config_keys").LEAF.EXPANSION_DELAY, setter = "set_base_delay", getter = "get_base_delay" },
 	{ key = "idle_reset_seconds", setter = "set_idle_reset_seconds", getter = "get_idle_reset_seconds" },
 	{ key = require("config_keys").LEAF.CASCADE_DEPTH, setter = "set_cascade_depth", getter = "get_cascade_depth" },
 	{ key = "click_resets_word", setter = "set_click_resets_word", getter = "is_click_resets_word_enabled" },
@@ -221,8 +221,8 @@ function M.new(options)
 		-- The base expansion delay is one of the scope's own scalars: after it the base
 		-- is the recommended value (restore) or the default (clear), and the delays below
 		-- are offsets of THAT base, whatever the user's is today.
-		base_after = mode == "recommended" and Manifest.recommended_for("hotstrings.expansion_delay")
-			or Manifest.default_for("hotstrings.expansion_delay")
+		base_after = mode == "recommended" and Manifest.recommended_for(require("config_keys").KEY.HOTSTRINGS_EXPANSION_DELAY)
+			or Manifest.default_for(require("config_keys").KEY.HOTSTRINGS_EXPANSION_DELAY)
 		local inherit = Config.delay_projection({}, base_after)
 		local changes = Planner.plan({ mode = mode, features = Manifest.features(), groups = groups,
 			inherited = function(name, section) return inherit(name, section, registered[name].metadata) end,
