@@ -53,7 +53,8 @@ local function load_dialog(controls)
 	logger.warn = function(_, message, ...) context.warnings[#context.warnings + 1] = string.format(message, ...) end
 	package.loaded["infra.logger"] = logger
 	package.loaded["infra.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
-	package.loaded["infra.locale"] = { all = function() return { ["common.error_title"] = "Error" } end }
+	local function catalogue() return { ["common.error_title"] = "Error" } end
+	package.loaded["infra.locale"] = { all = catalogue, catalogue = catalogue }
 	package.loaded["adapters.timer_scheduler"] = {
 		after = function(delay, fn)
 			if delay == 0 then
@@ -171,7 +172,7 @@ local function load_dialog(controls)
 			local fresh = {}; for key, value in pairs(webview) do if type(value) == "function" then fresh[key] = value end end
 			webview = setmetatable(fresh, {})
 		end
-		context.windows = (context.windows or 0) + 1; return webview end
+		context.windows = (context.windows or 0) + 1; context.webview = webview; return webview end
 	hs_stub.webview.usercontent.new = function(name)
 		context.handler_name = name
 		return {
@@ -500,4 +501,118 @@ helpers.describe("error dialog asynchronous action ownership", function()
 			helpers.assert_eq(owners[1].current(), false)
 		end)
 	end
+end)
+
+
+--- Installs the native fluent submission contract and independently delivered callbacks.
+--- @param context table Existing error-window fixture.
+--- @param mode string|nil Optional native submission refusal.
+--- @return table evaluations Native requests and their completion callbacks.
+local function install_evaluator(context, mode)
+	local evaluations = {}
+	context.webview.evaluateJavaScript = function(self, script, callback)
+		context.scripts[#context.scripts + 1] = script
+		evaluations[#evaluations + 1] = { callback = callback, view = self }
+		if mode == "throw" then error("PRIVATE_NATIVE_SCRIPT_FAILURE", 0) end
+		if mode == "nil" then return nil end
+		if mode == "false" then return false end
+		return self
+	end
+	return evaluations
+end
+
+--- Opens one healthy window before injecting the JavaScript native boundary.
+--- @return table dialog
+--- @return table context
+local function open_delivery_window()
+	local dialog, context = load_dialog()
+	helpers.assert_eq(dialog.init(), true)
+	dialog.on_error("synthetic", "Initial failure", "Initial failure")
+	fire_timers(context)
+	helpers.assert_type(context.webview, "table")
+	helpers.assert_eq(#context.errors, 0)
+	return dialog, context
+end
+
+helpers.describe("error dialog native JavaScript receipts", function()
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("(error-dialog-js-receipt) reports a native submission " .. mode, function()
+			local _, context = open_delivery_window()
+			local evaluations = install_evaluator(context, mode)
+			context.page({ body = "ready" })
+			helpers.assert_eq(#evaluations, 1)
+			helpers.assert_eq(#context.errors, 1)
+			helpers.assert_eq(table.concat(context.errors):find("PRIVATE_NATIVE_SCRIPT_FAILURE", 1, true), nil,
+				"A native exception may contain the complete private page payload")
+		end)
+	end
+	for _, sentinel in ipairs({ "nil", "code_zero" }) do
+		helpers.it("(error-dialog-js-receipt) preserves a native success " .. sentinel, function()
+			local _, context = open_delivery_window()
+			local evaluations = install_evaluator(context)
+			context.page({ body = "ready" })
+			helpers.assert_eq(#evaluations, 1)
+			if evaluations[1].callback then
+				evaluations[1].callback(nil, sentinel == "code_zero" and { code = 0 } or nil)
+			end
+			helpers.assert_eq(#context.errors, 0)
+			helpers.assert_eq(page_messages(context)[1].type, "init")
+		end)
+	end
+	helpers.it("(error-dialog-js-receipt) reports an asynchronous native script error without its payload", function()
+		local _, context = open_delivery_window()
+		local evaluations = install_evaluator(context)
+		context.page({ body = "ready" })
+		helpers.assert_type(evaluations[1].callback, "function", "Observe the actual WebKit completion")
+		helpers.assert_eq(#context.errors, 0)
+		evaluations[1].callback(nil, { code = 4, domain = "WKErrorDomain", localizedDescription = "PRIVATE_PAGE_PAYLOAD" })
+		helpers.assert_eq(#context.errors, 1)
+		helpers.assert_eq(table.concat(context.errors):find("PRIVATE_PAGE_PAYLOAD", 1, true), nil)
+	end)
+	for _, replacement in ipairs({ false, true }) do
+		helpers.it("(error-dialog-js-receipt) ignores a closed page callback with successor=" .. tostring(replacement), function()
+			local dialog, context = open_delivery_window()
+			local evaluations = install_evaluator(context)
+			context.page({ body = "ready" })
+			helpers.assert_type(evaluations[1].callback, "function")
+			context.page({ body = { action = "close" } })
+			if replacement then
+				dialog.on_error("synthetic", "Successor failure", "Successor failure")
+				fire_timers(context)
+				helpers.assert_eq(context.windows, 2)
+			end
+			local errors = #context.errors
+			evaluations[1].callback(nil, { code = 4, domain = "WKErrorDomain" })
+			helpers.assert_eq(#context.errors, errors)
+		end)
+	end
+	helpers.it("(error-dialog-js-receipt) observes localization script completion too", function()
+		local _, context = open_delivery_window()
+		local evaluations = install_evaluator(context)
+		context.navigation_callback("didFinishNavigation")
+		helpers.assert_eq(#evaluations, 1)
+		helpers.assert_type(evaluations[1].callback, "function")
+		evaluations[1].callback(nil, { code = 4, domain = "WKErrorDomain", localizedDescription = "PRIVATE_LOCALE_PAYLOAD" })
+		helpers.assert_eq(#context.errors, 1)
+		helpers.assert_eq(table.concat(context.errors):find("PRIVATE_LOCALE_PAYLOAD", 1, true), nil)
+	end)
+	helpers.it("(error-dialog-js-receipt) bounds diagnostic feedback from a failed folded update", function()
+		local dialog, context = open_delivery_window()
+		local evaluations = install_evaluator(context)
+		context.page({ body = "ready" })
+		helpers.assert_type(evaluations[1].callback, "function")
+		local logger = package.loaded["infra.logger"]
+		local record_error = logger.error
+		logger.error = function(module, message, ...)
+			record_error(module, message, ...)
+			dialog.on_error(module, message, string.format(message, ...))
+		end
+		evaluations[1].callback(nil, { code = 4, domain = "WKErrorDomain" })
+		helpers.assert_eq(#context.errors, 1)
+		helpers.assert_eq(#evaluations, 2, "The recorded failure is folded into the open window")
+		helpers.assert_type(evaluations[2].callback, "function")
+		evaluations[2].callback(nil, { code = 4, domain = "WKErrorDomain" })
+		helpers.assert_eq(#context.errors, 1, "The same delivery category is already visible for this session")
+		helpers.assert_eq(#evaluations, 2, "A failed folded update must not feed another failure update")
+	end)
 end)
