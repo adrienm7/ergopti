@@ -112,6 +112,8 @@ helpers.describe("modules/updater/manager.lua", function()
 		-- The target need not ship the running updater's receipt implementation.
 		write_file(install_root .. "/linux/install/ownership.sh",
 			assert(read_file(helpers.driver_root() .. "/install/ownership.sh")))
+		write_file(install_root .. "/linux/install/ownership_schema.sh",
+			assert(read_file(helpers.driver_root() .. "/install/ownership_schema.sh")))
 		write_file(wrapper, "#!/usr/bin/env bash\nset -euo pipefail\n"
 			.. "grep -q 'version=4.0.0' " .. shell_quote(install_root .. "/_shared/build_stamp.txt") .. "\n"
 			.. "grep -q 'new-shared' " .. shell_quote(install_root .. "/_shared/lua/sentinel.lua") .. "\n"
@@ -176,7 +178,8 @@ helpers.describe("modules/updater/manager.lua", function()
 		local stages = {
 			"validate_archive", "make_work_dir", "extract", "validate_layout",
 			"validate_version", "mkdir_candidate", "move_linux", "move_shared", "move_bin",
-			"record_ownership", "remove_backup", "backup_current", "activate_candidate", "smoke",
+			"record_ownership", "verify_backup", "capture_backup", "revalidate_backup",
+			"remove_backup", "backup_current", "activate_candidate", "smoke",
 		}
 
 		for _, failed_stage in ipairs(stages) do
@@ -199,14 +202,27 @@ helpers.describe("modules/updater/manager.lua", function()
 			end
 			function ops.mkdir() return failed_stage ~= "mkdir_candidate" end
 			function ops.exists(path) return path == backup end
+			function ops.backup_is_owned(path)
+				if path == backup then return failed_stage ~= "verify_backup", "previous-owned" end
+				return failed_stage ~= "revalidate_backup" and path == state.retired_path, "previous-owned"
+			end
 			function ops.remove_tree(path)
-				if path == backup then
+				if path == state.retired_path then
 					if failed_stage == "remove_backup" then return false end
 					state.backup = nil
 				end
 				return true
 			end
 			function ops.move(source_path, destination_path)
+				if source_path == backup and destination_path ~= root then
+					if failed_stage == "capture_backup" then return false end
+					state.retired_path, state.backup = destination_path, nil
+					return true
+				end
+				if source_path == state.retired_path and destination_path == backup then
+					state.backup = "old-previous"
+					return true
+				end
 				if source_path == work .. "/linux" then return failed_stage ~= "move_linux" end
 				if source_path == work .. "/_shared" then return failed_stage ~= "move_shared" end
 				if source_path == work .. "/bin" then return failed_stage ~= "move_bin" end
@@ -411,3 +427,152 @@ helpers.describe("updater bounded pagination", function()
 	end)
 end)
 
+
+helpers.describe("installer-backup-ownership", function()
+	local NativeFixture = require("tests.support.modules.updater.installer_native_fixture")
+	local uv = require("luv")
+	helpers.it("(installer-backup-ownership) a pre-existing backup namespace is never deleted", function()
+		local installer = helpers.load_module("modules.updater.installer")
+		local fixture = NativeFixture.create(installer)
+		local foreign = fixture.installed .. ".old"
+		assert(uv.fs_mkdir(foreign, 448))
+		NativeFixture.write(foreign .. "/unrelated.marker", "unrelated user backup\n")
+		local identity = assert(uv.fs_stat(foreign))
+		local ok, failure = pcall(function()
+			installer.install({ archive_path = fixture.archive, expected_version = "1.2.3",
+				context = fixture.context, ops = fixture.ops })
+			helpers.assert_eq(NativeFixture.read(foreign .. "/unrelated.marker"), "unrelated user backup\n",
+				"the complete native updater must not retire an unowned fixed sibling")
+			local retained = assert(uv.fs_stat(foreign))
+			helpers.assert_eq({ retained.dev, retained.ino }, { identity.dev, identity.ino })
+		end)
+		NativeFixture.remove(fixture.root)
+		if not ok then error(failure, 0) end
+	end)
+end)
+
+helpers.describe("installer-backup-ownership native receipts", function()
+	local NativeFixture = require("tests.support.modules.updater.installer_native_fixture")
+	local uv = require("luv")
+	local Shell = require("adapters.shell_runner")
+	local function receipt(fixture)
+		assert(uv.fs_rename(fixture.installed .. "/old.marker", fixture.installed .. "/linux/old.marker"))
+		NativeFixture.write(fixture.installed .. "/linux/binary.marker", "\0owned binary\255\n")
+		assert(Shell.run("bash " .. Shell.quote(fixture.installed .. "/linux/install/ownership.sh")
+			.. " " .. Shell.quote(fixture.installed .. "/linux") .. " " .. Shell.quote(fixture.installed .. "/_shared")
+			.. " " .. Shell.quote(fixture.installed)))
+	end
+	local function clone_backup(fixture)
+		assert(Shell.run("cp -a -- " .. Shell.quote(fixture.installed) .. " " .. Shell.quote(fixture.installed .. ".old")))
+	end
+
+
+	helpers.it("(installer-backup-ownership) first and second native updates rotate only complete unchanged receipts", function()
+		local installer = helpers.load_module("modules.updater.installer")
+		local fixture = NativeFixture.create(installer)
+		local ok, failure = pcall(function()
+			receipt(fixture)
+			local before = assert(uv.fs_stat(fixture.installed))
+			local installed, reason = installer.install({ archive_path = fixture.archive, expected_version = "1.2.3", context = fixture.context, ops = fixture.ops })
+			helpers.assert_eq(installed, true, tostring(reason))
+			local first_backup = assert(uv.fs_stat(fixture.installed .. ".old"))
+			helpers.assert_eq({ first_backup.dev, first_backup.ino }, { before.dev, before.ino })
+			helpers.assert_eq(NativeFixture.read(fixture.installed .. ".old/linux/binary.marker"), "\0owned binary\255\n")
+			local previous = assert(uv.fs_stat(fixture.installed))
+			NativeFixture.write(fixture.archive, "validated archive collaborator\n")
+			NativeFixture.write(fixture.root .. "/payload/_shared/build_stamp.txt", "commit=" .. string.rep("b", 40) .. "\nversion=1.2.4\n")
+			installed, reason = installer.install({ archive_path = fixture.archive, expected_version = "1.2.4", context = fixture.context, ops = fixture.ops })
+			helpers.assert_eq(installed, true, tostring(reason))
+			local second_backup = assert(uv.fs_stat(fixture.installed .. ".old"))
+			helpers.assert_eq({ second_backup.dev, second_backup.ino }, { previous.dev, previous.ino })
+			helpers.assert_contains(NativeFixture.read(fixture.installed .. "/_shared/build_stamp.txt"), "version=1.2.4")
+			helpers.assert_eq(uv.fs_stat(fixture.archive), nil)
+		end)
+		NativeFixture.remove(fixture.root)
+		if not ok then error(failure, 0) end
+	end)
+
+	for _, mode in ipairs({ "modified", "extra", "duplicate", "traversal", "nul", "file-link", "manifest-link", "manifest-fifo" }) do
+		helpers.it("(installer-backup-ownership) native receipt refuses " .. mode .. " without retiring data", function()
+			local installer = helpers.load_module("modules.updater.installer")
+			local fixture = NativeFixture.create(installer)
+			local backup = fixture.installed .. ".old"
+			local ok, failure = pcall(function()
+				receipt(fixture); clone_backup(fixture)
+				local manifest = backup .. "/.ergopti-owned-files"
+				if mode == "modified" then NativeFixture.write(backup .. "/linux/old.marker", "user modification\n")
+				elseif mode == "extra" then NativeFixture.write(backup .. "/linux/private.data", "unowned private bytes\n")
+				elseif mode == "duplicate" then
+					local bytes = assert(NativeFixture.read(manifest)); NativeFixture.write(manifest, bytes .. bytes:match("([^\n]+\n)"))
+				elseif mode == "traversal" then
+					NativeFixture.write(manifest, assert(NativeFixture.read(manifest)) .. string.rep("a", 64) .. "\tlinux/../../outside\n")
+				elseif mode == "nul" then NativeFixture.write(manifest, assert(NativeFixture.read(manifest)) .. "\0")
+				elseif mode == "file-link" then
+					assert(uv.fs_unlink(backup .. "/linux/old.marker")); assert(uv.fs_symlink(fixture.installed .. "/linux/old.marker", backup .. "/linux/old.marker"))
+				elseif mode == "manifest-link" then
+					assert(uv.fs_unlink(manifest)); assert(uv.fs_symlink(fixture.installed .. "/.ergopti-owned-files", manifest))
+				elseif mode == "manifest-fifo" then
+					assert(uv.fs_unlink(manifest)); assert(Shell.run("mkfifo -- " .. Shell.quote(manifest)))
+				end
+				local current, old = assert(uv.fs_stat(fixture.installed)), assert(uv.fs_stat(backup))
+				local installed = installer.install({ archive_path = fixture.archive, expected_version = "1.2.3", context = fixture.context, ops = fixture.ops })
+				helpers.assert_eq(installed, false, "a modified/unowned backup must block mutation")
+				local kept, live = assert(uv.fs_stat(backup)), assert(uv.fs_stat(fixture.installed))
+				helpers.assert_eq({ kept.dev, kept.ino }, { old.dev, old.ino })
+				helpers.assert_eq({ live.dev, live.ino }, { current.dev, current.ino })
+				helpers.assert_eq(NativeFixture.read(backup .. "/linux/binary.marker"), "\0owned binary\255\n")
+				if mode == "modified" then helpers.assert_eq(NativeFixture.read(backup .. "/linux/old.marker"), "user modification\n") end
+				if mode == "extra" then helpers.assert_eq(NativeFixture.read(backup .. "/linux/private.data"), "unowned private bytes\n") end
+				helpers.assert_true(uv.fs_stat(fixture.archive) ~= nil)
+			end)
+			NativeFixture.remove(fixture.root)
+			if not ok then error(failure, 0) end
+		end)
+	end
+
+	for _, blocked in ipairs({ false, true }) do
+		helpers.it("(installer-backup-ownership) native capture race preserves foreign tree with restore blocked=" .. tostring(blocked), function()
+			local installer = helpers.load_module("modules.updater.installer")
+			local fixture = NativeFixture.create(installer)
+			local backup, retired, foreign = fixture.installed .. ".old", nil, nil
+			local injected, work = false, nil
+			local ops = {}; for name, operation in pairs(fixture.ops) do ops[name] = operation end
+			local make_work_dir = ops.make_work_dir or installer.DEFAULT_OPS.make_work_dir
+			ops.make_work_dir = function(...) work = make_work_dir(...); return work end
+			local ok, failure = pcall(function()
+				receipt(fixture); clone_backup(fixture)
+				local current = assert(uv.fs_stat(fixture.installed))
+				ops.move = function(source, destination)
+					if not injected and source == backup and destination ~= fixture.installed then
+						helpers.assert_true(work ~= nil and destination:sub(1, #work + 1) == work .. "/", "capture must enter the transaction-owned private staging directory")
+						assert(installer.DEFAULT_OPS.move(backup, fixture.root .. "/displaced-owned"))
+						assert(uv.fs_mkdir(backup, 448)); NativeFixture.write(backup .. "/foreign.marker", "raced foreign bytes\n")
+						foreign = assert(uv.fs_stat(backup)); retired, injected = destination, true
+						local moved = installer.DEFAULT_OPS.move(source, destination)
+						if moved and blocked then
+							assert(uv.fs_mkdir(backup, 448)); NativeFixture.write(backup .. "/blocker.marker", "concurrent old-path owner\n")
+						end
+						return moved
+					end
+					return installer.DEFAULT_OPS.move(source, destination)
+				end
+				local installed, reason = installer.install({ archive_path = fixture.archive, expected_version = "1.2.3", context = fixture.context, ops = ops })
+				helpers.assert_eq(injected, true, "the real atomic backup-capture boundary must execute")
+				helpers.assert_eq(installed, false)
+				local preserved = blocked and retired or backup
+				helpers.assert_eq(NativeFixture.read(preserved .. "/foreign.marker"), "raced foreign bytes\n")
+				local kept = assert(uv.fs_stat(preserved))
+				helpers.assert_eq({ kept.dev, kept.ino }, { foreign.dev, foreign.ino })
+				if blocked then
+					helpers.assert_contains(reason, "unverified tree retained at " .. retired)
+					helpers.assert_eq(NativeFixture.read(backup .. "/blocker.marker"), "concurrent old-path owner\n")
+				end
+				local live = assert(uv.fs_stat(fixture.installed))
+				helpers.assert_eq({ live.dev, live.ino }, { current.dev, current.ino })
+				helpers.assert_true(uv.fs_stat(fixture.archive) ~= nil)
+			end)
+			NativeFixture.remove(fixture.root)
+			if not ok then error(failure, 0) end
+		end)
+	end
+end)
