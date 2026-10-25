@@ -37,7 +37,7 @@ final class ManagedHTTPWPADWireTests: XCTestCase {
 				started: ProcessInfo.processInfo.systemUptime - (expired ? 21 : 0),
 				settingsProvider: { settings as CFDictionary },
 				discoveryMetadataProvider: { reads += 1; return metadata }, environment: anchors,
-				output: collector.append)
+				directFallback: false, output: collector.append)
 			return (status, try collector.frames(), reads)
 		}
 
