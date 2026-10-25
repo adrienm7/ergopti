@@ -1,0 +1,18 @@
+# tools/build/ergopti.install
+#
+# Pacman lifecycle hooks use the same permission and session owners as the
+# native Debian and RPM packages. Refused mutations keep their failure status.
+
+_ergopti_package_root=/usr/lib/ergopti
+
+post_install() {
+  /bin/bash "$_ergopti_package_root/install/setup_permissions.sh" --active-sessions
+}
+
+post_upgrade() {
+  post_install
+}
+
+pre_remove() {
+  /bin/bash "$_ergopti_package_root/install/stop_sessions.sh"
+}
