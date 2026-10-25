@@ -50,6 +50,29 @@ local function with_collector(body, launch)
 	if not ok then error(err, 0) end
 end
 
+helpers.describe("logical-sqlite-flush-fake-contract", function()
+	it("logical-sqlite-flush-fake-contract: inherited unknown methods cannot claim private file debt", function()
+		local unknown = function() return true end
+		local writer = setmetatable({}, { __index = function() return unknown end })
+		require("tests.support.sqlite_flush_fake").attach(writer)
+		helpers.assert_eq(type(rawget(writer, "has_private_file_debt")), "function",
+			"the logical fixture must declare its native resource capability explicitly")
+		assert_false(writer.has_private_file_debt())
+		helpers.assert_true(writer.unmodeled_operation == unknown and writer.unmodeled_operation(),
+			"declaring one capability must not neutralize other unknown-method controls")
+	end)
+
+	it("logical-sqlite-flush-fake-contract: an explicitly modeled debt callback retains its authority", function()
+		local checks = 0
+		local debt = function() checks = checks + 1; return true end
+		local writer = { has_private_file_debt = debt }
+		require("tests.support.sqlite_flush_fake").attach(writer)
+		helpers.assert_true(rawequal(writer.has_private_file_debt, debt))
+		helpers.assert_true(writer.has_private_file_debt())
+		helpers.assert_eq(checks, 1, "a modeled native refusal must remain observable")
+	end)
+end)
+
 helpers.describe("owned SQLite collector flush", function()
 	for _, phase in ipairs({ "pending", "rollback", "stopping", "healthy" }) do
 		it("rendered session reset preserves its real " .. phase .. " acknowledgement", function()
