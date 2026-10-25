@@ -98,6 +98,10 @@ _CAO_NativeInitialization() {
 		AssertTrue(FSWriteCreateDurable(Path, _CAO_Bytes("input")))
 		HotstringsConfigInit(Path)
 		Assert(StrCompare(_CAO_Bytes("expected"), _CMG_Read(Path), true) == 0)
+		; The migrated file still spells the delays as absolute values of earlier
+		; builds; the boot step, which the entry script runs once the base delay is
+		; known, adopts them as effective delays.
+		AssertTrue(HotstringsOverridesBoot(), "the delay boot step must settle")
 		for Section in ["names", "abbreviations", "technical_terms"] {
 			Actual := _HotstringsOverrides["autocorrection"].Sections[Section]
 			AssertEqual(Section == "names" ? 0.2 : 0.875, Actual.Delay)
