@@ -948,6 +948,52 @@ CB_WriteTextWithReceipt(Text, &OwnedSequence := 0) {
 	return true
 }
 
+; Empties the clipboard and authenticates that exact clear under a native read
+; lease, so a copy another program makes right after it can never be adopted as
+; the clear's own generation by a caller that samples the sequence later.
+; @return {Map|Boolean} False when the clear failed. Otherwise a Map whose
+;   "sequence" is the clear's generation, or 0 when it could not be proven
+;   (lost ownership, a lease refused or another mutation); 0 means "not owned".
+CB_ClearWithReceipt() {
+	PreviousCritical := Critical("On")
+	try BeforeMutation := CBClipboardOwner.mutation_id
+	finally Critical(PreviousCritical)
+	if !CB_Write("")
+		return false
+	Receipt := Map("sequence", 0)
+	Opened := false
+	try {
+		Opened := CB_OpenClipboardWithin(A_ScriptHwnd)
+		if !Opened || DllCall("User32\GetClipboardOwner", "Ptr") != A_ScriptHwnd
+				|| DllCall("User32\CountClipboardFormats", "Int") != 0
+			return Receipt
+		Sequence := CB_GetSequenceNumber()
+		if !Sequence || DllCall("User32\GetOpenClipboardWindow", "Ptr") != A_ScriptHwnd
+				|| DllCall("User32\GetClipboardOwner", "Ptr") != A_ScriptHwnd
+			return Receipt
+		; The still-open lease excludes external writers; an extra driver
+		; mutation would have advanced the counter and invalidates the receipt.
+		PreviousCritical := Critical("On")
+		try {
+			if CBClipboardOwner.mutation_id == BeforeMutation + 1
+				Receipt["sequence"] := Sequence
+		} finally Critical(PreviousCritical)
+	} catch {
+		Receipt["sequence"] := 0
+	} finally {
+		if Opened {
+			try {
+				if DllCall("User32\GetOpenClipboardWindow", "Ptr") != A_ScriptHwnd
+						|| !DllCall("User32\CloseClipboard", "Int")
+					Receipt["sequence"] := 0
+			} catch {
+				Receipt["sequence"] := 0
+			}
+		}
+	}
+	return Receipt
+}
+
 ; Snapshots the current clipboard and returns it for later restoration.
 ; Returns "__CB_SAVE_ERROR__" when the clipboard is locked so callers can
 ; distinguish a read failure from a legitimately empty clipboard.

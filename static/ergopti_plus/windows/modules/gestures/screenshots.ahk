@@ -881,7 +881,7 @@ GestureScreenshotRegion(Mode, OnComplete := 0, Path := "", MaxEdge := 0, Ports :
 	}
 
 	SaveFn := Ports.Get("save", CB_SaveAll)
-	ClearFn := Ports.Get("clear", CB_Write.Bind(""))
+	ClearFn := Ports.Get("clear", CB_ClearWithReceipt)
 	SequenceFn := Ports.Get("sequence", CB_GetSequenceNumber)
 	SendFn := Ports.Get("send", SendEvent.Bind("#+s"))
 	RestoreFn := Ports.Get("restore", CB_RestoreAll)
@@ -909,12 +909,15 @@ GestureScreenshotRegion(Mode, OnComplete := 0, Path := "", MaxEdge := 0, Ports :
 		SnapshotValid := true
 		if !_GestureRegionCaptureStartCurrent(Epoch)
 			return false
-		if !ClearFn.Call()
+		Cleared := ClearFn.Call()
+		if !Cleared
 			throw Error("clipboard clear failed")
 		; An empty A_Clipboard assignment fails before EmptyClipboard succeeds.
 		; Record a successful clear once; retirement must not adopt a later copy.
+		; The default clear authenticates its own generation: sampling it here
+		; could adopt a copy another program made right after the clear.
 		Mutated := true
-		OwnedSequence := SequenceFn.Call()
+		OwnedSequence := Cleared is Map ? Cleared["sequence"] : SequenceFn.Call()
 		if !_GestureRegionCaptureStartCurrent(Epoch)
 			return false
 		ExpectedChange := CB_ExpectOwnedChange()
