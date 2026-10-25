@@ -93,10 +93,15 @@ _TDC_World(Body, ReloadResult := 1, InFlight := 0) {
 	; InFlight: the pid of a successor an earlier reload already launched.
 	World := {Calls: [], Refused: 0, Stage: 0, Endpoint: 0, Started: 0, Stopped: 0, Launched: false,
 		Successor: 4242, Result: ReloadResult, Spec: Spec, Token: Corpus["token"], Folder: Folder,
-		InFlight: InFlight}
+		InFlight: InFlight, Observers: Map()}
 	Reload(SuccessFn, Bundle, RefusedFn, StageFn) {
 		World.Calls.Push([SuccessFn, Bundle])
-		World.Refused := RefusedFn, World.Stage := StageFn
+		World.Refused := Refuse, World.Stage := StageFn
+		Refuse(Reason) {
+			RefusedFn.Call(Reason)
+			for _, Observer in World.Observers.Clone()
+				Observer.Call(Reason)
+		}
 		World.Launched := World.Result == 1
 		return World.Result
 	}
@@ -107,8 +112,12 @@ _TDC_World(Body, ReloadResult := 1, InFlight := 0) {
 		World.Endpoint := Handler
 		return {Start: (*) => World.Started += 1, Stop: (*) => World.Stopped += 1}
 	}
+	Observe(Record, Owner, Callback) {
+		World.Observers[Owner] := Callback
+		return true
+	}
 	World.Session := DriverControlSession(Spec, Folder, 1000,
-		Map("token", (*) => World.Token, "endpoint", Endpoint, "reload", Reload, "pending", Pending))
+		Map("token", (*) => World.Token, "endpoint", Endpoint, "reload", Reload, "pending", Pending, "observe_refusal", Observe))
 	try Body.Call(World)
 	finally {
 		try World.Session.Stop()
@@ -233,3 +242,59 @@ _TDC_StopKeepsSuccessorSession() {
 	}
 }
 Test("driver-control: a stopping predecessor keeps its successor's session", _TDC_StopKeepsSuccessorSession)
+
+
+/** A later request joins the same native successor and takes over its report. */
+_TDC_JoinedRequestReceivesRefusal() {
+	_TDC_World(Body)
+	Body(World) {
+		World.Session.Start()
+		_TDC_Request(World, World.Token, "first")
+		AssertTrue(World.Endpoint.Call())
+		_TDC_Request(World, World.Token, "joined")
+		AssertTrue(World.Endpoint.Call())
+		AssertEqual(1, World.Calls.Length, "the second request shares the exact launched reload")
+		AssertEqual(1, World.Observers.Count, "repeated joins retain one observer per session")
+		World.Refused.Call("the successor refused the handoff")
+		AssertEqual('{"schema":1,"request_id":"joined","state":"refused","driver_pid":1000,"reason":"refused"}`n',
+			_TDC_Read(World, "result"), "the latest joined requester receives the terminal refusal")
+	}
+}
+Test("driver-control: a joined request receives its successor refusal (control-joined-refusal)",
+	_TDC_JoinedRequestReceivesRefusal)
+
+/** An old reload callback cannot overwrite the result of a later request. */
+_TDC_StaleRefusalCannotReplaceLatestResult() {
+	_TDC_World(Body)
+	Body(World) {
+		World.Session.Start()
+		_TDC_Request(World, World.Token, "first")
+		AssertTrue(World.Endpoint.Call())
+		_TDC_Request(World, StrReplace(World.Token, "0", "1"), "stale-token")
+		AssertFalse(World.Endpoint.Call())
+		Refusal := _TDC_Read(World, "result")
+		World.Refused.Call("the old successor refused the handoff")
+		AssertEqual(Refusal, _TDC_Read(World, "result"),
+			"the earlier reload no longer owns the latest request's result")
+	}
+}
+Test("driver-control: a stale reload refusal keeps the latest result (control-joined-refusal)",
+	_TDC_StaleRefusalCannotReplaceLatestResult)
+
+
+/** A control request can join a reload that originated from the tray. */
+_TDC_MenuReloadRefusalIsReported() {
+	_TDC_World(Body, 1, 7777)
+	Body(World) {
+		World.Session.Start()
+		_TDC_Request(World, World.Token, "menu-joined")
+		AssertTrue(World.Endpoint.Call())
+		AssertEqual(0, World.Calls.Length, "joining a tray reload never starts another successor")
+		AssertEqual(1, World.Observers.Count, "the admitted request subscribes to the existing owner's refusal")
+		World.Observers[World.Session].Call("the tray reload was vetoed")
+		AssertEqual('{"schema":1,"request_id":"menu-joined","state":"refused","driver_pid":1000,"reason":"refused"}`n',
+			_TDC_Read(World, "result"), "a tray-origin successor refusal settles the joined request too")
+	}
+}
+Test("driver-control: a tray-origin reload refusal settles its joined request (control-joined-refusal)",
+	_TDC_MenuReloadRefusalIsReported)

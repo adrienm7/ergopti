@@ -371,17 +371,17 @@ class DriverControlSession {
 	 * @param {Integer} Pid This process.
 	 * @param {Map} Ports "token", "endpoint" (factory taking the handler),
 	 *     "reload" (ReloadPreservingSuspend contract), "pending" (the pending
-	 *     hand-off record or false).
+	 *     hand-off record or false), "observe_refusal" (subscribes to its refusal).
 	 */
 	__New(Spec, Folder, Pid, Ports) {
-		for Name in ["token", "endpoint", "reload", "pending"]
+		for Name in ["token", "endpoint", "reload", "pending", "observe_refusal"]
 			if !(Ports is Map) || !Ports.Has(Name) || !HasMethod(Ports[Name], "Call")
 				throw TypeError("The driver control session needs its " . Name . " port.")
 		if !(Folder is String) || Folder == "" || !(Pid is Integer) || Pid <= 0
 			throw ValueError("The driver control session needs a folder and a process id.")
 		this.Spec := Spec, this.Folder := Folder, this.Pid := Pid, this.Ports := Ports
 		this.Token := "", this.Endpoint := 0, this.Started := false, this.Active := false
-		this.Handled := 0
+		this.Handled := 0, this.PendingReport := 0
 	}
 
 	Path(Kind) => this.Folder . "\" . this.Spec["files"][Kind]
@@ -416,6 +416,7 @@ class DriverControlSession {
 	/** Retires the endpoint, then withdraws the session file it still owns. */
 	Stop() {
 		this.Active := false
+		this.PendingReport := 0
 		Failure := 0
 		if IsObject(this.Endpoint) {
 			try this.Endpoint.Stop()
@@ -461,15 +462,23 @@ class DriverControlSession {
 		; A reload already in flight is joined, as on Linux and macOS for a menu
 		; click: its successor completes this request too. The result file holds
 		; one record, so the newest request takes over the report.
-		InFlight := this.InFlightSuccessor()
+		InFlight := this.InFlightSuccessor(&Pending)
 		if InFlight > 0 {
+			Request := Map("request_id", Id)
+			this.PendingReport := Request
+			if !this.ObserveRefusal(Pending, Request)
+				return false
 			try LoggerInfo("DriverControl", "Reload request {1} joined the reload in flight (successor pid {2}); no second reload.",
 				Id, InFlight)
+			if this.PendingReport != Request
+				return false
 			this.Report(Map("request_id", Id, "state", "requested", "successor_pid", InFlight))
 			return true
 		}
 		try LoggerInfo("DriverControl", "Reload request {1} admitted; the reload owner decides.", Id)
-		Started := this.Ports["reload"].Call(0, 0, ObjBindMethod(this, "Refused", Id),
+		Request := Map("request_id", Id)
+		this.PendingReport := Request
+		Started := this.Ports["reload"].Call(0, 0, ObjBindMethod(this, "Refused", Request),
 			ObjBindMethod(this, "StageRefused", Id))
 		PreviousCritical := Critical("On")
 		try {
@@ -486,6 +495,12 @@ class DriverControlSession {
 				this.Report(Map("request_id", Id, "state", "refused", "reason", "failed"))
 				return false
 			}
+			; A synchronous refusal already owns the terminal result. Never
+			; overwrite it with a requested record after the reload port returns.
+			if this.PendingReport != Request
+				return false
+			if !this.ObserveRefusal(Pending, Request)
+				return false
 			this.Report(Map("request_id", Id, "state", "requested", "successor_pid", Successor))
 			try LoggerInfo("DriverControl", "Reload request {1} requested; successor pid {2} completes it once ready.", Id, Successor)
 			return true
@@ -493,16 +508,35 @@ class DriverControlSession {
 	}
 
 	/** The pid of the successor an earlier reload already launched, 0 when none is in flight. */
-	InFlightSuccessor() {
+	InFlightSuccessor(&Pending) {
 		Pending := this.Ports["pending"].Call()
 		Successor := (Pending is Map) && (Pending.Get("successor", 0) is Map)
 			? Pending["successor"].Get("pid", 0) : 0
 		return (Successor is Integer) && Successor > 0 ? Successor : 0
 	}
 
+	/** Every admitted request observes the successor, including tray-origin reloads. */
+	ObserveRefusal(Pending, Request) {
+		Observed := false
+		try Observed := this.Ports["observe_refusal"].Call(Pending, this,
+			ObjBindMethod(this, "Refused", Request))
+		catch as Err
+			try LoggerError("DriverControl", "Reload refusal observation failed: {1}.", Err.Message)
+		if !((Observed is Integer) && Observed == 1) {
+			this.Report(Map("request_id", Request["request_id"], "state", "refused", "reason", "busy"))
+			return false
+		}
+		return true
+	}
+
 	/** The reload owner refused after launching the successor. */
-	Refused(Id, Reason := "") {
+	Refused(Request, Reason := "") {
+		if this.PendingReport != Request
+			return false
+		Id := Request["request_id"]
 		try LoggerWarn("DriverControl", "Reload request {1} refused by the reload owner: {2}.", Id, Reason)
+		if this.PendingReport != Request
+			return false
 		this.Report(Map("request_id", Id, "state", "refused", "reason", "refused"))
 	}
 
@@ -512,6 +546,10 @@ class DriverControlSession {
 	}
 
 	Report(Fields) {
+		; A newer terminal result revokes every earlier reload callback's write
+		; authority, even if that callback is already queued for delivery.
+		if Fields["state"] != "requested"
+			this.PendingReport := 0
 		Fields["driver_pid"] := this.Pid
 		try this.Publish("result", DriverControl_ResultText(this.Spec, Fields))
 		catch as Err
@@ -548,7 +586,8 @@ DriverControl_Start() {
 			A_ScriptHwnd, ProcessExist(), HealthCheck_ControlCreationTime())
 		Session := DriverControlSession(Spec, DriverControl_Folder(Spec, Base), ProcessExist(),
 			Map("token", DriverControl_RandomHex, "endpoint", Endpoint,
-				"reload", ReloadPreservingSuspend, "pending", ReloadTerminalHandoffPending))
+				"reload", ReloadPreservingSuspend, "pending", ReloadTerminalHandoffPending,
+				"observe_refusal", ReloadTerminalHandoffObserveRefusal))
 		_DriverControl := Session
 		Session.Start()
 	} catch as FirstError {
