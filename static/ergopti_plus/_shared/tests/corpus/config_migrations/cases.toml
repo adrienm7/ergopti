@@ -129,4 +129,8 @@ cases = [
 	"shipped_dynamic_master_untouched_on_lua",
     "joint_variant_unknown_without_legacy",
     "joint_variant_casealias_without_legacy",
+	"shipped_cascade_depth_off_becomes_one_arrow",
+	"shipped_cascade_depth_levels_gain_one_arrow",
+	"shipped_cascade_depth_replay_is_idempotent",
+	"shipped_cascade_depth_eleven_kept_as_outdated"
 ]

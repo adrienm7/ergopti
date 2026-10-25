@@ -1300,7 +1300,7 @@ local function main()
 			terminator_consumed = is_terminator
 				and terminators_mod.terminator_is_consumed(ch),
 			typed_at_ms         = now_ms,
-			cascade_depth       = WordReset.cascade_depth(),
+			cascade_max_arrows  = WordReset.cascade_max_arrows(),
 			cascade_gate        = within_delay,
 		})
 

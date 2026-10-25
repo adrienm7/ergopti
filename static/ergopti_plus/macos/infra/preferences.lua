@@ -105,7 +105,7 @@ local KEY_MAP = {
 	repeat_key_enabled                   = { sec = "hotstrings", key = "repeat_key_enabled"           },
 	expansion_delay                      = { sec = "hotstrings"                                        },
 	idle_reset_seconds                   = { sec = "hotstrings"                                        },
-	cascade_depth                        = { sec = "hotstrings"                                        },
+	cascade_max_arrows                   = { sec = "hotstrings"                                        },
 	click_resets_word                    = { sec = "hotstrings"                                        },
 	arrow_resets_word                    = { sec = "hotstrings"                                        },
 	shortcut_resets_word                 = { sec = "hotstrings"                                        },
@@ -609,10 +609,10 @@ local SCALAR_VALUE_RULES = {
 		if HotstringCore.valid_idle_reset_seconds(value) then return true end
 		return false, "the idle reset is not a finite non-negative number of seconds"
 	end,
-	-- The engine's own rule: a whole number, 0 or more, 0 = no cascade.
-	cascade_depth = function(value)
-		if HotstringCore.valid_cascade_depth(value) then return true end
-		return false, "the cascade depth is not a non-negative whole number"
+	-- The engine's own rule: a whole number from 1 (no cascade) to 10.
+	cascade_max_arrows = function(value)
+		if HotstringCore.valid_cascade_max_arrows(value) then return true end
+		return false, "the cascade arrow count is not a whole number from 1 to 10"
 	end,
 	click_resets_word = function(value)
 		if type(value) == "boolean" then return true end

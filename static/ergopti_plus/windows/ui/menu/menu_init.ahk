@@ -257,7 +257,7 @@ _MI_StageHotstrings() {
 		; which the seams of these commands must never receive.
 		"idle_reset", (Seconds) => SetHotstringsIdleResetSeconds(Seconds),
 		"idle_reset_custom", (*) => PromptHotstringsIdleResetSeconds(),
-		MenuCommand.CASCADE_DEPTH, (Depth) => SetHotstringsCascadeDepth(Depth),
+		MenuCommand.CASCADE_MAX_ARROWS, (Arrows) => SetHotstringsCascadeMaxArrows(Arrows),
 		"click_resets_word", (*) => ToggleHotstringsClickResetsWord(),
 		"arrow_resets_word", (*) => ToggleHotstringsWordResetFlag("arrow_resets_word"),
 		"shortcut_resets_word", (*) => ToggleHotstringsWordResetFlag("shortcut_resets_word"),
@@ -266,7 +266,7 @@ _MI_StageHotstrings() {
 	_HotParamGetters := Map(
 		"hotstrings_repeat_enabled", () => ReadFeatureStateV2("hotstrings.repeat_key_enabled").Get("enabled", false),
 		"hotstrings.idle_reset_seconds", () => HSE_IdleResetSecondsCurrent(),
-		ConfigKey.HOTSTRINGS_CASCADE_DEPTH, () => HSE_CascadeDepthCurrent(),
+		ConfigKey.HOTSTRINGS_CASCADE_MAX_ARROWS, () => HSE_CascadeMaxArrowsCurrent(),
 		"hotstrings_click_resets_word", () => HSE_ClickResetsWordCurrent(),
 		"hotstrings_arrow_resets_word", () => HSE_WordResetFlagCurrent("arrow_resets_word"),
 		"hotstrings_shortcut_resets_word", () => HSE_WordResetFlagCurrent("shortcut_resets_word"),

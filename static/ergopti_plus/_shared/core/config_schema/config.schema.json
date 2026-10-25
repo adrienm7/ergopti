@@ -113,7 +113,7 @@
 				"magic_key_source_char": { "type": "string", "minLength": 1, "maxLength": 1 },
 				"repeat_key_enabled": { "type": "boolean" },
 				"idle_reset_seconds": { "type": "number", "minimum": 0 },
-				"cascade_depth": { "type": "integer", "minimum": 0 },
+				"cascade_max_arrows": { "type": "integer", "minimum": 1, "maximum": 10 },
 				"click_resets_word": { "type": "boolean" },
 				"arrow_resets_word": { "type": "boolean" },
 				"shortcut_resets_word": { "type": "boolean" },

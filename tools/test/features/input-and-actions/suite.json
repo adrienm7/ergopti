@@ -658,6 +658,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-recommended-defaults-rule.cjs"],
 			"repro": "npm run test:recommended-defaults-rule"
+		},
+		{
+			"id": "cascade-arrow-bounds",
+			"ordinal": 488,
+			"name": "the cascade arrow count has one range across the manifest, schema, both engines and the v14 migration",
+			"cmd": "node",
+			"args": ["tools/test/test-cascade-arrow-bounds.cjs"],
+			"repro": "npm run test:cascade-arrow-bounds"
 		}
 	]
 }

@@ -1,0 +1,464 @@
+{
+	"$schema": "https://ergopti.com/schema/corpus/hotstrings.v1.json",
+	"description": "Cross-driver hotstring cascade vectors (cascade_max_arrows, end-character parity). Each vector registers the rules, types the characters of `typed` (auto rules fire on their last character), then the optional `end_char` as a word delimiter whose consumed choice is `end_char_consumed`, and expects the resulting text buffer. The whole chain is ONE expansion (`expect_expansions`): the application is erased and typed once. Replayed by the shared engine on Linux, the macOS expander and the Windows engine; every driver must reach the same buffer.",
+	"field_semantics": {
+		"rules": "Registered hotstrings. auto: fires on its own last character (the * flag); otherwise it needs an end character. word_start: only fires at the start of a word (the engine's is_word); false lets it fire inside a word. case_sensitive: the typed case must match. Without case_sensitive a rule is in conform mode (the output takes the typed casing), so an uppercase output needs case_sensitive.",
+		"max_arrows": "hotstrings.cascade_max_arrows: the number of expansions (arrows) a chain may hold; 1 is a single expansion.",
+		"end_char": "The delimiter typed after `typed`; empty for none.",
+		"end_char_consumed": "Whether that delimiter is consumed (hotstrings.terminator_consume): swallowed instead of typed after the output.",
+		"expect_buffer": "The text buffer after the expansion and the replayed end character.",
+		"expect_expansions": "How many expansions reach the application (one erase-and-type each)."
+	},
+	"vectors": [
+		{
+			"id": "fb_space_three_arrows_keeps_the_space",
+			"description": "fb then Space with the abbreviation and brand packs: fb gives facebook, facebook gives Facebook, and the typed Space lands once after the final text.",
+			"rules": [
+				{
+					"trigger": "fb",
+					"replacement": "facebook",
+					"auto": false,
+					"word_start": true
+				},
+				{
+					"trigger": "facebook",
+					"replacement": "Facebook",
+					"auto": false,
+					"word_start": true,
+					"case_sensitive": true
+				}
+			],
+			"max_arrows": 3,
+			"typed": "fb",
+			"end_char": " ",
+			"end_char_consumed": false,
+			"expect_buffer": "Facebook ",
+			"expect_expansions": 1
+		},
+		{
+			"id": "fb_space_consumed_swallows_the_space_once",
+			"description": "The same chain with Space consumed: the chain gives the same text and the Space is swallowed once at the end.",
+			"rules": [
+				{
+					"trigger": "fb",
+					"replacement": "facebook",
+					"auto": false,
+					"word_start": true
+				},
+				{
+					"trigger": "facebook",
+					"replacement": "Facebook",
+					"auto": false,
+					"word_start": true,
+					"case_sensitive": true
+				}
+			],
+			"max_arrows": 3,
+			"typed": "fb",
+			"end_char": " ",
+			"end_char_consumed": true,
+			"expect_buffer": "Facebook",
+			"expect_expansions": 1
+		},
+		{
+			"id": "fb_space_one_arrow_is_a_single_expansion",
+			"description": "One arrow is a single expansion: no cascading, the Space stays.",
+			"rules": [
+				{
+					"trigger": "fb",
+					"replacement": "facebook",
+					"auto": false,
+					"word_start": true
+				},
+				{
+					"trigger": "facebook",
+					"replacement": "Facebook",
+					"auto": false,
+					"word_start": true,
+					"case_sensitive": true
+				}
+			],
+			"max_arrows": 1,
+			"typed": "fb",
+			"end_char": " ",
+			"end_char_consumed": false,
+			"expect_buffer": "facebook ",
+			"expect_expansions": 1
+		},
+		{
+			"id": "fb_space_one_arrow_consumed",
+			"description": "One arrow with Space consumed: the single expansion, Space swallowed.",
+			"rules": [
+				{
+					"trigger": "fb",
+					"replacement": "facebook",
+					"auto": false,
+					"word_start": true
+				},
+				{
+					"trigger": "facebook",
+					"replacement": "Facebook",
+					"auto": false,
+					"word_start": true,
+					"case_sensitive": true
+				}
+			],
+			"max_arrows": 1,
+			"typed": "fb",
+			"end_char": " ",
+			"end_char_consumed": true,
+			"expect_buffer": "facebook",
+			"expect_expansions": 1
+		},
+		{
+			"id": "fb_magic_key_consumed_chains",
+			"description": "The magic key is a consumed delimiter: fb then the magic key gives Facebook with no key left behind.",
+			"rules": [
+				{
+					"trigger": "fb",
+					"replacement": "facebook",
+					"auto": false,
+					"word_start": true
+				},
+				{
+					"trigger": "facebook",
+					"replacement": "Facebook",
+					"auto": false,
+					"word_start": true,
+					"case_sensitive": true
+				}
+			],
+			"max_arrows": 2,
+			"typed": "fb",
+			"end_char": "★",
+			"end_char_consumed": true,
+			"expect_buffer": "Facebook",
+			"expect_expansions": 1
+		},
+		{
+			"id": "fb_enter_keeps_the_end_character",
+			"description": "Enter is an end character like Space: it lands after the final text.",
+			"rules": [
+				{
+					"trigger": "fb",
+					"replacement": "facebook",
+					"auto": false,
+					"word_start": true
+				},
+				{
+					"trigger": "facebook",
+					"replacement": "Facebook",
+					"auto": false,
+					"word_start": true,
+					"case_sensitive": true
+				}
+			],
+			"max_arrows": 3,
+			"typed": "fb",
+			"end_char": "\n",
+			"end_char_consumed": false,
+			"expect_buffer": "Facebook\n",
+			"expect_expansions": 1
+		},
+		{
+			"id": "two_arrows_stop_after_the_second_expansion",
+			"description": "Four rules chain a to e; two arrows stop at c.",
+			"rules": [
+				{
+					"trigger": "a",
+					"replacement": "b",
+					"auto": false,
+					"word_start": false
+				},
+				{
+					"trigger": "b",
+					"replacement": "c",
+					"auto": false,
+					"word_start": false
+				},
+				{
+					"trigger": "c",
+					"replacement": "d",
+					"auto": false,
+					"word_start": false
+				},
+				{
+					"trigger": "d",
+					"replacement": "e",
+					"auto": false,
+					"word_start": false
+				}
+			],
+			"max_arrows": 2,
+			"typed": "a",
+			"end_char": " ",
+			"end_char_consumed": false,
+			"expect_buffer": "c ",
+			"expect_expansions": 1
+		},
+		{
+			"id": "three_arrows_stop_after_the_third_expansion",
+			"description": "Three arrows stop at d.",
+			"rules": [
+				{
+					"trigger": "a",
+					"replacement": "b",
+					"auto": false,
+					"word_start": false
+				},
+				{
+					"trigger": "b",
+					"replacement": "c",
+					"auto": false,
+					"word_start": false
+				},
+				{
+					"trigger": "c",
+					"replacement": "d",
+					"auto": false,
+					"word_start": false
+				},
+				{
+					"trigger": "d",
+					"replacement": "e",
+					"auto": false,
+					"word_start": false
+				}
+			],
+			"max_arrows": 3,
+			"typed": "a",
+			"end_char": " ",
+			"end_char_consumed": false,
+			"expect_buffer": "d ",
+			"expect_expansions": 1
+		},
+		{
+			"id": "ten_arrows_run_the_whole_chain",
+			"description": "The longest setting runs a chain of four arrows to the end.",
+			"rules": [
+				{
+					"trigger": "a",
+					"replacement": "b",
+					"auto": false,
+					"word_start": false
+				},
+				{
+					"trigger": "b",
+					"replacement": "c",
+					"auto": false,
+					"word_start": false
+				},
+				{
+					"trigger": "c",
+					"replacement": "d",
+					"auto": false,
+					"word_start": false
+				},
+				{
+					"trigger": "d",
+					"replacement": "e",
+					"auto": false,
+					"word_start": false
+				}
+			],
+			"max_arrows": 10,
+			"typed": "a",
+			"end_char": " ",
+			"end_char_consumed": false,
+			"expect_buffer": "e ",
+			"expect_expansions": 1
+		},
+		{
+			"id": "auto_chain_needs_no_end_character",
+			"description": "Auto triggers chain on their own last character, with no end character at all.",
+			"rules": [
+				{
+					"trigger": "chatg",
+					"replacement": "chatgpt",
+					"auto": true,
+					"word_start": false
+				},
+				{
+					"trigger": "chatgpt",
+					"replacement": "ChatGPT",
+					"auto": true,
+					"word_start": false,
+					"case_sensitive": true
+				}
+			],
+			"max_arrows": 2,
+			"typed": "chatg",
+			"end_char": "",
+			"end_char_consumed": false,
+			"expect_buffer": "ChatGPT",
+			"expect_expansions": 1
+		},
+		{
+			"id": "auto_chain_one_arrow",
+			"description": "Auto chain at one arrow stays on the first expansion.",
+			"rules": [
+				{
+					"trigger": "chatg",
+					"replacement": "chatgpt",
+					"auto": true,
+					"word_start": false
+				},
+				{
+					"trigger": "chatgpt",
+					"replacement": "ChatGPT",
+					"auto": true,
+					"word_start": false,
+					"case_sensitive": true
+				}
+			],
+			"max_arrows": 1,
+			"typed": "chatg",
+			"end_char": "",
+			"end_char_consumed": false,
+			"expect_buffer": "chatgpt",
+			"expect_expansions": 1
+		},
+		{
+			"id": "same_rule_fires_once_per_chain",
+			"description": "A replacement that ends with its own trigger does not loop.",
+			"rules": [
+				{
+					"trigger": "ab",
+					"replacement": "xab",
+					"auto": true,
+					"word_start": false
+				}
+			],
+			"max_arrows": 10,
+			"typed": "ab",
+			"end_char": "",
+			"end_char_consumed": false,
+			"expect_buffer": "xab",
+			"expect_expansions": 1
+		},
+		{
+			"id": "link_that_would_swallow_the_end_character_ends_the_chain",
+			"description": "An auto rule whose trigger reaches the typed Space may not swallow it: the chain ends and the Space stays.",
+			"rules": [
+				{
+					"trigger": "ab",
+					"replacement": "cd",
+					"auto": false,
+					"word_start": false
+				},
+				{
+					"trigger": "cd ",
+					"replacement": "X",
+					"auto": true,
+					"word_start": false,
+					"case_sensitive": true
+				}
+			],
+			"max_arrows": 3,
+			"typed": "ab",
+			"end_char": " ",
+			"end_char_consumed": false,
+			"expect_buffer": "cd ",
+			"expect_expansions": 1
+		},
+		{
+			"id": "swallowing_link_refused_even_when_consumed",
+			"description": "The same rule with Space consumed: the chain still ends before the swallowing link, then the consumption swallows the Space once.",
+			"rules": [
+				{
+					"trigger": "ab",
+					"replacement": "cd",
+					"auto": false,
+					"word_start": false
+				},
+				{
+					"trigger": "cd ",
+					"replacement": "X",
+					"auto": true,
+					"word_start": false,
+					"case_sensitive": true
+				}
+			],
+			"max_arrows": 3,
+			"typed": "ab",
+			"end_char": " ",
+			"end_char_consumed": true,
+			"expect_buffer": "cd",
+			"expect_expansions": 1
+		},
+		{
+			"id": "word_start_rule_does_not_fire_inside_a_word",
+			"description": "facebook ends with ok, but a word-start-only auto ok rule cannot fire in the middle of a word.",
+			"rules": [
+				{
+					"trigger": "fb",
+					"replacement": "facebook",
+					"auto": true,
+					"word_start": true
+				},
+				{
+					"trigger": "ok",
+					"replacement": "OK",
+					"auto": true,
+					"word_start": true,
+					"case_sensitive": true
+				}
+			],
+			"max_arrows": 3,
+			"typed": "fb",
+			"end_char": "",
+			"end_char_consumed": false,
+			"expect_buffer": "facebook",
+			"expect_expansions": 1
+		},
+		{
+			"id": "in_word_rule_fires_inside_a_word",
+			"description": "An auto rule that is explicitly allowed mid-word does fire inside the chain's output, the contrast with the word-start-only rule.",
+			"rules": [
+				{
+					"trigger": "fb",
+					"replacement": "facebook",
+					"auto": true,
+					"word_start": true
+				},
+				{
+					"trigger": "ok",
+					"replacement": "OK",
+					"auto": true,
+					"word_start": false,
+					"case_sensitive": true
+				}
+			],
+			"max_arrows": 3,
+			"typed": "fb",
+			"end_char": "",
+			"end_char_consumed": false,
+			"expect_buffer": "faceboOK",
+			"expect_expansions": 1
+		},
+		{
+			"id": "end_character_rule_needs_the_end_character",
+			"description": "A chain whose second rule needs an end character cannot continue from an auto first rule: no end character was typed.",
+			"rules": [
+				{
+					"trigger": "ab",
+					"replacement": "cd",
+					"auto": true,
+					"word_start": false
+				},
+				{
+					"trigger": "cd",
+					"replacement": "ef",
+					"auto": false,
+					"word_start": false
+				}
+			],
+			"max_arrows": 3,
+			"typed": "ab",
+			"end_char": "",
+			"end_char_consumed": false,
+			"expect_buffer": "cd",
+			"expect_expansions": 1
+		}
+	]
+}

@@ -830,7 +830,7 @@ end
 --- @param vbuf string The buffer the previous step produced.
 --- @param tail string|nil The terminator carried at the end of `vbuf`.
 --- @param stable_bytes number Length of the untouched typed prefix.
---- @return table|nil step { mapping, start, text, consume }
+--- @return table|nil step { mapping, start, text, is_end }
 local function pick_cascade_step(vbuf, tail, stable_bytes)
 	local auto_step = nil
 	local last = last_cp_start(vbuf)
@@ -842,8 +842,7 @@ local function pick_cascade_step(vbuf, tail, stable_bytes)
 			if m.auto and is_cascade_link(m) and cascade_step_allowed(m, reference, stable_bytes) then
 				local eff_plain = M.would_fire(m, vbuf)
 				if eff_plain then
-					auto_step = { mapping = m, start = #vbuf - m.trigger_bytes + 1, text = eff_plain,
-						consume = true }
+					auto_step = { mapping = m, start = #vbuf - m.trigger_bytes + 1, text = eff_plain }
 					break
 				end
 			end
@@ -862,35 +861,46 @@ local function pick_cascade_step(vbuf, tail, stable_bytes)
 					local match = resolve_terminator_match(m, vbuf, tail, false)
 					if match and match.eff_plain then
 						end_step = { mapping = m, start = match.buf_start, text = match.eff_plain,
-							consume = match.consume_term, is_end = true }
+							is_end = true }
 						break
 					end
 				end
 			end
 		end
 	end
-	return end_step or auto_step
+	if end_step then return end_step end
+	-- A step that would swallow the end character ends the chain: the character
+	-- the user typed always lands after the final text.
+	if tail then return nil end
+	return auto_step
 end
 
---- Lets the text an expansion produced complete further hotstrings, up to the
---- configured depth, and returns ONE net edit for the whole chain.
+--- Lets the text an expansion produced complete further hotstrings, until the
+--- chain holds the configured number of arrows (expansions), and returns ONE net
+--- edit for the whole chain.
 ---
 --- The chain is resolved on a virtual copy of the buffer before anything is
 --- typed, so the application receives a single replacement transaction: no
 --- intermediate text, nothing a keystroke can land between. Each step asks the
---- same question a typed key would. It stops at the depth bound, at a
+--- same question a typed key would. It stops at the arrow bound, at a
 --- `final_result` link, at no match, at the same spec again (the guard that makes
 --- `ab` -> `cab` terminate) or at a link whose delay refuses it.
 --- @param buffer string The buffer the first step matched against.
 --- @param first table The first step's mapping.
 --- @param start_byte number Byte index where the first step's trigger starts.
 --- @param repl string The first step's effective plain replacement.
---- @param tail string|nil Terminator characters replayed after the replacement.
---- @return table|nil plan { start, text, tail, final_result, steps },
----   nil when the chain has no further step.
-local function plan_cascade(buffer, first, start_byte, repl, tail)
-	local depth = _state.CASCADE_DEPTH
-	if type(depth) ~= "number" or depth < 1 then return nil end
+--- @param tail string|nil The end character that completed the first step. It is
+---   carried through the whole chain whatever its delimiter's "consumed" choice,
+---   so a chain gives the same text either way; an end step takes it as its own
+---   terminator, a step that would swallow it ends the chain.
+--- @param consume_tail boolean|nil Whether that delimiter is consumed: the carried
+---   end character is then swallowed once, at the end, exactly as for a typed key.
+--- @return table|nil plan { start, text, tail, final_result, steps }, where
+---   `tail` is the end character still to replay (nil once its
+---   delimiter is consumed); nil when the chain has no further step.
+local function plan_cascade(buffer, first, start_byte, repl, tail, consume_tail)
+	local max_arrows = _state.CASCADE_MAX_ARROWS
+	if type(max_arrows) ~= "number" or max_arrows < 2 then return nil end
 	if first.final_result or not is_cascade_link(first) then return nil end
 
 	local vbuf = buffer:sub(1, start_byte - 1) .. repl .. (tail or "")
@@ -898,7 +908,7 @@ local function plan_cascade(buffer, first, start_byte, repl, tail)
 	local seen = { [spec_key(first)] = true }
 	local last = first
 	local steps = 1
-	while steps <= depth and not last.final_result do
+	while steps < max_arrows and not last.final_result do
 		local step = pick_cascade_step(vbuf, tail, stable)
 		if not step then break end
 		if seen[spec_key(step.mapping)] then
@@ -907,11 +917,9 @@ local function plan_cascade(buffer, first, start_byte, repl, tail)
 		end
 		seen[spec_key(step.mapping)] = true
 		if step.is_end then
-			vbuf = vbuf:sub(1, step.start - 1) .. step.text .. (step.consume and "" or tail)
-			if step.consume then tail = nil end
+			vbuf = vbuf:sub(1, step.start - 1) .. step.text .. tail
 		else
 			vbuf = vbuf:sub(1, step.start - 1) .. step.text
-			tail = nil
 		end
 		if step.start - 1 < stable then stable = step.start - 1 end
 		last = step.mapping
@@ -919,9 +927,12 @@ local function plan_cascade(buffer, first, start_byte, repl, tail)
 		Logger.debug(LOG, "Cascade step %d fired (trigger of %d char(s)).", steps - 1, step.mapping.tlen)
 	end
 	if steps == 1 then return nil end
+	local text = vbuf:sub(stable + 1, #vbuf - (tail and #tail or 0))
+	-- The consumed choice of the delimiter, applied once to the chain's end.
+	if consume_tail then tail = nil end
 	return {
 		start        = stable + 1,
-		text         = vbuf:sub(stable + 1, #vbuf - (tail and #tail or 0)),
+		text         = text,
 		tail         = tail,
 		final_result = last.final_result,
 		steps        = steps,
@@ -979,11 +990,11 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 	-- The cascade: the replacement may complete further hotstrings. The chain is
 	-- one net edit, so everything below types ONE replacement whose trigger is the
 	-- text the user really typed and whose output is the last link's. Without a
-	-- chain (depth 0, or nothing to chain) these are the first step's own values.
+	-- chain (one arrow, or nothing to chain) these are the first step's own values.
 	local trig_len     = m.tlen
 	local is_private   = m.is_private
 	local is_final     = m.final_result
-	local plan = plan_cascade(active_buffer, m, tstart_byte, repl_text, nil)
+	local plan = plan_cascade(active_buffer, m, tstart_byte, repl_text, nil, false)
 	if plan then
 		repl_text   = plan.text
 		tstart_byte = plan.start
@@ -1109,14 +1120,14 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 		local repl_text        = eff_plain
 		local deletes, to_type = trig_len, repl_text
 		local replay_spec = nil
-		-- The terminator replayed after the replacement: the typed one, unless the
-		-- driver consumes it, and after a cascade whatever the chain left at its
-		-- end (an auto link whose trigger reached the terminator swallowed it).
+		-- The terminator replayed after the replacement: the typed one, unless its
+		-- delimiter is consumed. A cascade keeps it after the final text (no link
+		-- may swallow it), and swallows it once at the end when it is consumed.
 		local replay_tail = (not consume_term) and chars or nil
 		local start_byte = buf_start
 		local is_private = m.is_private
 		local is_final = m.final_result
-		local plan = plan_cascade(_state.buffer, m, buf_start, eff_plain, replay_tail)
+		local plan = plan_cascade(_state.buffer, m, buf_start, eff_plain, chars, consume_term)
 		if plan then
 			repl_text    = plan.text
 			start_byte   = plan.start

@@ -1,0 +1,6 @@
+[_meta]
+schema_version = 14
+
+[hotstrings]
+idle_reset_seconds = 5
+cascade_max_arrows = 4

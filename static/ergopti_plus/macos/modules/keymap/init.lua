@@ -99,7 +99,7 @@ M.DEFAULT_STATE = {
 	repeat_key_enabled          = Manifest.default_for("hotstrings.repeat_key_enabled"),
 	expansion_delay             = Manifest.default_for("hotstrings.expansion_delay"),
 	idle_reset_seconds          = Manifest.default_for("hotstrings.idle_reset_seconds"),
-	cascade_depth               = Manifest.default_for(require("config_keys").KEY.HOTSTRINGS_CASCADE_DEPTH),
+	cascade_max_arrows          = Manifest.default_for(require("config_keys").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS),
 	click_resets_word           = Manifest.default_for("hotstrings.click_resets_word"),
 	arrow_resets_word           = Manifest.default_for("hotstrings.arrow_resets_word"),
 	shortcut_resets_word        = Manifest.default_for("hotstrings.shortcut_resets_word"),
@@ -509,22 +509,22 @@ function M.set_idle_reset_seconds(secs)
 	return true
 end
 
---- Returns how many more hotstrings a hotstring's output may complete.
---- @return number Depth; 0 means the cascade is off.
-function M.get_cascade_depth()
-	return CoreState.CASCADE_DEPTH
+--- Returns how many expansions (arrows) a chain of hotstrings may hold.
+--- @return number Arrows; 1 means a single expansion, no cascade.
+function M.get_cascade_max_arrows()
+	return CoreState.CASCADE_MAX_ARROWS
 end
 
---- Sets the cascade depth.
---- @param depth number hotstrings.cascade_depth; a whole number, 0 disables it.
---- @return boolean committed False for a value that is not a non-negative integer.
-function M.set_cascade_depth(depth)
-	if not HotstringCore.valid_cascade_depth(depth) then
-		Logger.error(LOG, "Cascade depth refused: '%s' is not a non-negative whole number.", tostring(depth))
+--- Sets the longest chain of hotstrings.
+--- @param arrows number hotstrings.cascade_max_arrows; a whole number from 1 (a single expansion) to 10.
+--- @return boolean committed False for a value outside that range.
+function M.set_cascade_max_arrows(arrows)
+	if not HotstringCore.valid_cascade_max_arrows(arrows) then
+		Logger.error(LOG, "Cascade arrow count refused: '%s' is not a whole number from 1 to 10.", tostring(arrows))
 		return false
 	end
-	CoreState.CASCADE_DEPTH = depth
-	Logger.debug(LOG, "Cascade depth: %d.", depth)
+	CoreState.CASCADE_MAX_ARROWS = arrows
+	Logger.debug(LOG, "Cascade arrows: %d.", arrows)
 	return true
 end
 
@@ -589,7 +589,7 @@ end
 -- it from the features manifest through its own setters, which refuse an
 -- invalid default with an ERROR and keep the neutral policy.
 M.set_idle_reset_seconds(M.DEFAULT_STATE.idle_reset_seconds)
-M.set_cascade_depth(M.DEFAULT_STATE.cascade_depth)
+M.set_cascade_max_arrows(M.DEFAULT_STATE.cascade_max_arrows)
 M.set_click_resets_word(M.DEFAULT_STATE.click_resets_word)
 M.set_arrow_resets_word(M.DEFAULT_STATE.arrow_resets_word)
 M.set_shortcut_resets_word(M.DEFAULT_STATE.shortcut_resets_word)

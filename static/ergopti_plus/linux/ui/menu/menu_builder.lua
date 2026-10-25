@@ -2231,8 +2231,8 @@ local function _manifest_hotstring_rows(ctx, config)
 				end
 				return word_reset_changed(WordReset.set_idle_seconds(seconds))
 			end
-			params_ctx.commands[COMMAND.CASCADE_DEPTH] = function(depth)
-				return word_reset_changed(WordReset.set_cascade_depth(depth))
+			params_ctx.commands[COMMAND.CASCADE_MAX_ARROWS] = function(arrows)
+				return word_reset_changed(WordReset.set_cascade_max_arrows(arrows))
 			end
 			params_ctx.commands["click_resets_word"] = function()
 				return word_reset_changed(WordReset.toggle_click_resets_word())
@@ -2249,8 +2249,8 @@ local function _manifest_hotstring_rows(ctx, config)
 			params_ctx.state_getters["hotstrings.idle_reset_seconds"] = function()
 				return WordReset.idle_seconds()
 			end
-			params_ctx.state_getters[require("config_keys").KEY.HOTSTRINGS_CASCADE_DEPTH] = function()
-				return WordReset.cascade_depth()
+			params_ctx.state_getters[require("config_keys").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS] = function()
+				return WordReset.cascade_max_arrows()
 			end
 			params_ctx.state_getters["hotstrings_click_resets_word"] = function()
 				return WordReset.click_resets_word()

@@ -107,17 +107,25 @@ terminal TUI also reads as submitting the line.
 
 ### project-hotstring-cascade
 
-`hotstrings.cascade_depth` (0 = off, the default; the menu offers 0 to 3, any
-whole number from 0 is valid) lets the text a hotstring produced complete
-further hotstrings: `chatg` > `chatgpt` > `ChatGPT`. It is resolved BEFORE
-anything is typed, on a virtual copy of the buffer, and goes out as ONE edit
-(one SendInput burst on Windows, one replacement transaction on macOS, one
-`injector.inject` on Linux). That is the in-engine re-feed the SendInput
-contract (`hotstring-output-is-final`) needs: no output ever returns through the
-watcher, no keystroke can land between two bursts, no intermediate text shows,
-and the Linux Undo restores what was typed (the net result's `trigger` is the
-erased typed text, not the first rule's). Do not turn it into a second burst
-sent after the first; that reintroduces the interleave the atomic burst removed.
+`hotstrings.cascade_max_arrows` (1 to 10, default 3) lets the text a hotstring
+produced complete further hotstrings: `chatg` > `chatgpt` > `ChatGPT`. It counts
+ARROWS: 1 is a single expansion (no cascading), 2 allows `a` > `b` > `c`. It
+replaced `cascade_depth` (0 = off, n = n more links) in config schema v14, which
+maps an old n to n + 1 and renames the leaf (`map_value` refuses overlapping
+from/to sets, so the value goes integer > text > integer). The bounds live in the
+manifest presets, the schema, the shared Lua engine and the Windows engine;
+`test-cascade-arrow-bounds.cjs` pins them together.
+
+The chain is resolved BEFORE anything is typed, on a virtual copy of the buffer,
+and goes out as ONE edit (one SendInput burst on Windows, one replacement
+transaction on macOS, one `injector.inject` on Linux). That is the in-engine
+re-feed the SendInput contract (`hotstring-output-is-final`) needs: no output
+ever returns through the watcher, no keystroke can land between two bursts, no
+intermediate text shows, and the Linux Undo restores what was typed (the net
+result's `trigger` is the erased typed text, not the first rule's). The shared
+`cascade_vectors.json` corpus pins "one expansion per chain" on the three
+drivers. Do not turn it into a second burst sent after the first; that
+reintroduces the interleave the atomic burst removed.
 
 Each link is chosen by the same matcher a typed key goes through (shared engine
 `select_match`, Windows `HSE_FindMatchAtEnd` + `_HSE_PrepareDispatchDecision`,
@@ -128,24 +136,38 @@ kind (this is what ends the 124-odd shipped replacements that end with their own
 trigger); a `final_result` link ends the chain and a `final_result` first rule
 starts none; only plain literal text is a link (a replacement with Send syntax
 or key directives, a raw callback, the repeat rule and every private
-personal-information hotstring are not); a replayed end character stays the
-first rule's (an end-character link takes it as its own terminator, a link that
-would swallow it ends the chain on Windows; macOS and Linux let an auto link
-whose trigger reaches it swallow it). A link whose reference character was
+personal-information hotstring are not). A link whose reference character was
 produced by an earlier link is inside any expansion delay; one reaching back
 into typed text keeps its delay (Windows gates it with the real time of the
 typed key, Linux and macOS with the buffer times and the keystroke pause). The
 tooltip preview still shows only the first rule's output.
 
-Measured 2026-10-25 on the shipped catalogue (2994 loaded mappings, every pack
-including the Ergopti layout's): 145 outputs end with their own trigger, case
-aside (the guard), and 147 distinct (rule, other trigger) pairs end with
-another trigger, but 141 of those triggers need an end character AND a word
-boundary before them (`Docker` ends with the word-bound trigger `r`), and the
-other 6 are identity masks (`prochaine` > `prochaine`) that never fire. So the
-cascade changes none of the 2994 outputs at depth 1, 2 or 3. What does change
-is the user's own mid-word auto trigger: with an auto `ok` > `OK` the shipped
-`fb★` > `facebook` ends as `faceboOK`. That is why the default is 0.
+End character: the character that completed the first rule (Space, Enter...) is
+carried through the whole chain whatever its delimiter's "consumed" choice
+(`[hotstrings.terminator_consume]`), so the chain gives the same text either way.
+An end-character link takes it as its own terminator; a link that would swallow
+it (an auto link whose trigger reaches it) ends the chain, so the typed
+character always lands after the final text. It is then typed once, or
+swallowed once when its delimiter is consumed (the magic key ships consumed:
+`fb` + magic key gives `Facebook` with nothing after). `fb` + Space with the
+abbreviation and brand packs gives `Facebook ` (consumed Space: `Facebook`).
+An auto first rule has no end character, so only auto links follow it. The
+Lua drivers keep the carried character in `cascade` (shared engine) and
+`plan_cascade` (macOS), Windows in `_HSE_PlanCascade`.
+
+Word boundary, measured 2026-10-25: `is_word` is a per-entry flag (the TOML
+field and the editor's "only at word start" box). A trigger with it set never
+fires after a word character, in a chain or typed; one without it (the default
+of a new personal entry) may fire mid-word, again in a chain or typed. So a
+user's own `ok` > `OK` fires inside `facebook` only when it is auto AND not
+word-start-only, exactly as when `facebook` is typed by hand; the shipped `ok`
+is `is_word = true` and end-character, so it never does. The cascade adds no
+firing a typed word would not already have. The shipped catalogue measured
+2026-10-25 (2994 loaded mappings): 145 outputs end with their own trigger, case
+aside (the guard), and 147 distinct (rule, other trigger) pairs end with another
+trigger, but 141 of those triggers need an end character AND a word boundary
+before them (`Docker` ends with the word-bound trigger `r`), and the other 6 are
+identity masks (`prochaine` > `prochaine`) that never fire.
 
 ### project-hotstring-delay-architecture
 

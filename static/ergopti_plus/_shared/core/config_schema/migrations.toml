@@ -64,7 +64,7 @@
 # tools/test/test-config-migrations.cjs.
 
 [registry]
-current_version = 13
+current_version = 14
 unstamped_version = 2
 
 
@@ -308,4 +308,27 @@ reason = "The Windows dynamic-hotstring master becomes hotstrings.dynamic.enable
 ops = [
 	{ op = "rename", section = "category_enabled", key = "dynamichotstrings", to_section = "hotstrings.dynamic", to_key = "enabled" },
 	{ op = "set_if_absent", section = "hotstrings.dynamic", key = "enabled", value = true },
+]
+
+# The cascade counts arrows, not further links.
+[steps.v13_to_v14]
+from = 13
+to = 14
+drivers = ["ahk", "hs", "linux"]
+reason = "hotstrings.cascade_depth (0 = off, n = n more hotstrings) becomes hotstrings.cascade_max_arrows (1 = a single expansion, n = n arrows): the user's effective choice is kept."
+# The old value n chained n more hotstrings after the first, that is n + 1
+# arrows, and 0 meant the first expansion only, that is 1 arrow. The old and the
+# new values overlap (an old 1 is a new 2, an old 2 a new 3), which the closed
+# map_value op refuses in one pass because a replay would map twice; the value
+# therefore goes through a text spelling the new numbers cannot collide with:
+# integer to text, then text to the new integer, then the rename. A key that is
+# absent or already moved makes the whole step a no-op, so a replay changes
+# nothing. An old value of 10 (hand-edited; the menu offered 0 to 3) keeps its
+# number, which is the new maximum; 11 or more maps to no pair, keeps its number
+# under the new name and is reported there as outdated configuration, read as
+# the default.
+ops = [
+	{ op = "map_value", section = "hotstrings", key = "cascade_depth", map = [{ from = 0, to = "1" }, { from = 1, to = "2" }, { from = 2, to = "3" }, { from = 3, to = "4" }, { from = 4, to = "5" }, { from = 5, to = "6" }, { from = 6, to = "7" }, { from = 7, to = "8" }, { from = 8, to = "9" }, { from = 9, to = "10" }] },
+	{ op = "map_value", section = "hotstrings", key = "cascade_depth", map = [{ from = "1", to = 1 }, { from = "2", to = 2 }, { from = "3", to = 3 }, { from = "4", to = 4 }, { from = "5", to = 5 }, { from = "6", to = 6 }, { from = "7", to = 7 }, { from = "8", to = 8 }, { from = "9", to = 9 }, { from = "10", to = 10 }] },
+	{ op = "rename", section = "hotstrings", key = "cascade_depth", to_key = "cascade_max_arrows" },
 ]

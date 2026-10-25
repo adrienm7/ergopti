@@ -4,9 +4,10 @@
 ; MODULE: Hotstring Cascade
 ; DESCRIPTION:
 ; Lets the text a hotstring produced complete further hotstrings, up to the
-; depth the user chose (hotstrings.cascade_depth; 0 = off, the default). With
-; ``chatg`` giving ``chatgpt`` and ``chatgpt`` giving ``ChatGPT``, typing
-; ``chatg`` ends on ``ChatGPT`` from depth 1.
+; number of arrows the user chose (hotstrings.cascade_max_arrows, default 3):
+; 1 is a single expansion (``a`` giving ``b``, no cascading), 2 allows ``a``
+; giving ``b`` giving ``c``. With ``fb`` giving ``facebook`` and ``facebook``
+; giving ``Facebook``, typing ``fb`` and a space ends on ``Facebook`` from 2.
 ;
 ; FEATURES & RATIONALE:
 ; 1. The chain is resolved BEFORE anything is sent, on a virtual copy of the
@@ -21,13 +22,17 @@
 ;    (_HSE_PrepareDispatchDecision), so a link can never fire in a case or word
 ;    context where a typed trigger would not.
 ; 3. Guards: a spec fires at most once per chain (``ab`` giving ``xab`` ends
-;    there), a FinalResult link ends the chain, and the depth bounds it.
+;    there), a FinalResult link ends the chain, and the arrow count bounds it.
 ;    Only plain literal text takes part: a replacement carrying Send syntax, a
 ;    raw callback and a private (personal information) hotstring are not links,
 ;    because the text left on screen is not known or must not be composed.
-; 4. A replayed end character stays exactly as it is: a link must replay the
-;    same end character as the first (an end-character link takes it as its own
-;    terminator), so a link that would swallow it ends the chain instead.
+; 4. The end character that completed the first hotstring is carried through
+;    the whole chain, whatever its delimiter's "consumed" choice, so a chain
+;    gives the same text either way: an end-character link takes it as its own
+;    terminator, and a link that would swallow it (a star link whose trigger
+;    reaches it) ends the chain. It is typed once after the final text, unless
+;    its delimiter is consumed, in which case it is swallowed once, exactly as
+;    for a typed key. macOS and Linux follow the same rule.
 ; 5. A link whose reference character (the one before its expander) was
 ;    produced by an earlier link is inside any expansion delay, as on macOS and
 ;    Linux; one that reaches back into typed text keeps its delay.
@@ -49,23 +54,23 @@
 ; ======================================
 ; ======================================
 
-; Whether a value is a valid hotstrings.cascade_depth: a whole number, 0 or
-; more, 0 meaning the cascade is disabled. Same rule as the shared Lua engine's
-; valid_cascade_depth.
+; Whether a value is a valid hotstrings.cascade_max_arrows: a whole number from
+; HSE_CASCADE_MIN_ARROWS to HSE_CASCADE_MAX_ARROWS (hotstring_engine_main.ahk).
+; Same rule as the shared Lua engine's valid_cascade_max_arrows.
 ; @param Value {Any} Candidate read from config.toml or the menu.
 ; @returns {Boolean}
-HSE_ValidCascadeDepth(Value) {
-	return (Value is Integer) and Value >= 0
+HSE_ValidCascadeMaxArrows(Value) {
+	return (Value is Integer) and Value >= HSE_CASCADE_MIN_ARROWS and Value <= HSE_CASCADE_MAX_ARROWS
 }
 
-; The cascade depth in force: the published value, or the manifest default
-; before the loader ran (unit harness, early boot).
+; The arrow count in force: the published value, or the manifest default before
+; the loader ran (unit harness, early boot).
 ; @returns {Integer}
-HSE_CascadeDepthCurrent() {
-	global HSE_CascadeDepth
-	return HSE_CascadeDepth == ""
-		? ManifestDefaultFor(ConfigKey.HOTSTRINGS_CASCADE_DEPTH)
-		: HSE_CascadeDepth
+HSE_CascadeMaxArrowsCurrent() {
+	global HSE_CascadeMaxArrows
+	return HSE_CascadeMaxArrows == ""
+		? ManifestDefaultFor(ConfigKey.HOTSTRINGS_CASCADE_MAX_ARROWS)
+		: HSE_CascadeMaxArrows
 }
 
 
@@ -111,15 +116,14 @@ _HSE_IsCascadeLink(Spec) {
 ; @param Spec {Object} The first (matched) spec.
 ; @param Prepared {Object} The first spec's decision (_HSE_PrepareDispatchDecision).
 ; @param EndChar {String} The end character that completed the match, "" for a star trigger.
-; @param ForceConsumeEndChar {Boolean} The caller consumes the end character.
 ; @param GateTick {Integer} The tick the expansion-delay gate is measured at.
 ; @returns {Object|String} ``{Replacement, ExtraUnits, ExtraCodepoints, Steps}``
 ;   where Replacement replaces the first trigger plus ExtraUnits more code units
 ;   of typed text, or "" when nothing chains.
-_HSE_PlanCascade(Spec, Prepared, EndChar, ForceConsumeEndChar, GateTick) {
-	global HSE_Buffer, HSE_LastEndChar, HSE_TypoNbspStripped, HSE_CONSUMED_DELIMITERS
-	Depth := HSE_CascadeDepthCurrent()
-	if (Depth < 1 or !Prepared.OnlyText or !_HSE_IsCascadeLink(Spec))
+_HSE_PlanCascade(Spec, Prepared, EndChar, GateTick) {
+	global HSE_Buffer, HSE_LastEndChar, HSE_TypoNbspStripped
+	MaxArrows := HSE_CascadeMaxArrowsCurrent()
+	if (MaxArrows < 2 or !Prepared.OnlyText or !_HSE_IsCascadeLink(Spec))
 		return ""
 	if (Spec.HasOwnProp("FinalResult") and Spec.FinalResult)
 		return ""
@@ -133,13 +137,14 @@ _HSE_PlanCascade(Spec, Prepared, EndChar, ForceConsumeEndChar, GateTick) {
 		OriginalLength := StrLen(Original)
 		StripLength := Spec.Length + StrLen(EndChar) + (HSE_TypoNbspStripped ? 1 : 0)
 		Stable := OriginalLength >= StripLength ? OriginalLength - StripLength : 0
-		Emitted := (EndChar != "" and !ForceConsumeEndChar
-			and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
+		; Carried through the chain even when its delimiter is consumed: the
+		; consumption is applied once, by the caller, after the last link.
+		Emitted := EndChar
 		Virtual := SubStr(Original, 1, Stable) . Prepared.Replacement . Emitted
 		Seen := Map(_HSE_CascadeKey(Spec), true)
 		Last := Spec
 		Steps := 1
-		while (Steps <= Depth and !(Last.HasOwnProp("FinalResult") and Last.FinalResult)) {
+		while (Steps < MaxArrows and !(Last.HasOwnProp("FinalResult") and Last.FinalResult)) {
 			HSE_Buffer := Virtual
 			Link := HSE_FindMatchAtEnd(SubStr(Virtual, -1))
 			LinkEndChar := HSE_LastEndChar
@@ -147,10 +152,10 @@ _HSE_PlanCascade(Spec, Prepared, EndChar, ForceConsumeEndChar, GateTick) {
 			HSE_Buffer := SavedBuffer
 			if (Link == "" or !_HSE_IsCascadeLink(Link) or Seen.Has(_HSE_CascadeKey(Link)))
 				break
-			LinkEmitted := (LinkEndChar != "" and !InStr(HSE_CONSUMED_DELIMITERS, LinkEndChar))
-				? LinkEndChar : ""
-			if (LinkEmitted != Emitted)
+			; A link that would swallow the carried end character ends the chain.
+			if (LinkEndChar != Emitted)
 				break
+			LinkEmitted := LinkEndChar
 			; The reference character is the one before the expander; when an
 			; earlier link produced it, the link is inside any expansion delay.
 			ExpanderUnits := LinkEndChar != ""
