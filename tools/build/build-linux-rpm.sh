@@ -23,6 +23,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BUILD_DIR="$PROJECT_ROOT/build/linux"
 RPM_ROOT="$BUILD_DIR/rpm"
+# The release-visible tree holds one runtime artifact; keep the complete native
+# package set, including debug output, outside that publication boundary.
+RPM_NATIVE_ROOT="$RPM_ROOT/native-rpms"
+RPM_PUBLISHER="$RPM_ROOT/publish-linux-rpm.cjs"
 PACKAGE_NAME="ergopti"
 ARCH="x86_64"
 RELEASE="1"
@@ -47,9 +51,12 @@ echo "[OK] Driver bundle found."
 rm -rf "$RPM_ROOT"
 mkdir -p "$RPM_ROOT/BUILD"
 mkdir -p "$RPM_ROOT/RPMS"
+mkdir -p "$RPM_NATIVE_ROOT"
 mkdir -p "$RPM_ROOT/SOURCES"
 mkdir -p "$RPM_ROOT/SPECS"
 mkdir -p "$RPM_ROOT/SRPMS"
+# Preserve the canonical publisher with the prepared native build structure.
+cp "$SCRIPT_DIR/${RPM_PUBLISHER##*/}" "$RPM_PUBLISHER"
 
 # Target install tree
 INSTALL_ROOT="$RPM_ROOT/BUILD/payload"
@@ -251,8 +258,14 @@ tar -czf "$RPM_ROOT/SOURCES/${PACKAGE_NAME}-${VERSION}.tar.gz" \
 # ----------------------------------------------------------------------
 # 9. Build the .rpm (Linux only)
 # ----------------------------------------------------------------------
+NATIVE_COMMAND=(rpmbuild --define "_topdir $RPM_ROOT" --define "_rpmdir $RPM_NATIVE_ROOT" -bb "$RPM_ROOT/SPECS/ergopti.spec")
+PUBLISH_COMMAND=(node "$RPM_PUBLISHER" "$RPM_NATIVE_ROOT" "$RPM_ROOT/RPMS" "$PACKAGE_NAME" "$VERSION" "$ARCH")
 print_packaging_command() {
-  printf '  rpmbuild --define %q -bb %q\n' "_topdir $RPM_ROOT" "$RPM_ROOT/SPECS/ergopti.spec"
+  printf '  '
+  printf '%q ' "${NATIVE_COMMAND[@]}"
+  printf '&& '
+  printf '%q ' "${PUBLISH_COMMAND[@]}"
+  printf '\n'
 }
 
 if [ "$SKIP_RPM" = true ]; then
@@ -275,16 +288,11 @@ fi
 
 echo ""
 echo "Building .rpm package..."
-rpmbuild --define "_topdir $RPM_ROOT" -bb "$RPM_ROOT/SPECS/ergopti.spec"
+"${NATIVE_COMMAND[@]}"
 
-RPM_FILE=$(find "$RPM_ROOT/RPMS" -name "*.rpm" -type f | head -1)
-if [ -n "$RPM_FILE" ]; then
-  echo ""
-  echo "=== .rpm built successfully ==="
-  echo "Package: $RPM_FILE"
-  echo ""
-  echo "Install with: sudo dnf install $RPM_FILE"
-else
-  echo "[ERR] rpmbuild did not produce a package file."
-  exit 1
-fi
+RPM_FILE=$("${PUBLISH_COMMAND[@]}")
+echo ""
+echo "=== .rpm built successfully ==="
+echo "Package: $RPM_FILE"
+echo ""
+echo "Install with: sudo dnf install $RPM_FILE"

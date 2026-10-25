@@ -134,6 +134,15 @@
 			"args": ["tools/test/test-linux-package-options.cjs"],
 			"repro": "node tools/test/test-linux-package-options.cjs",
 			"platforms": ["linux"]
+		},
+		{
+			"id": "js-linux-rpm-publish",
+			"ordinal": 494,
+			"name": "RPM publication admits one canonical runtime package and retains native debug outputs",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-rpm-publish.cjs"],
+			"repro": "node tools/test/test-linux-rpm-publish.cjs",
+			"platforms": ["linux"]
 		}
 	]
 }
