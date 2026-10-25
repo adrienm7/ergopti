@@ -145,6 +145,9 @@ local ok, failure = xpcall(function()
 			local database = own_database("failed-open")
 			k.init({ sqlite_path = database, log_dir = directory .. "/logs" })
 			assert(writer.is_available())
+			-- Recovery preserves the admitted rate clock; sensor acquisition
+			-- requires a genuinely due observation rather than another cache read.
+			elapsed = elapsed + System._sample_interval_ms()
 			assert(System.sample())
 			k.on_keydown("a", Clock.now_ms(), "privacy-probe")
 			Fixture.flush(k)
