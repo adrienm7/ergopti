@@ -27,6 +27,7 @@
 # Usage:
 #   bash tools/build/write_build_stamp.sh write  <shared tree directory>
 #   bash tools/build/write_build_stamp.sh verify <shared tree directory>
+#   bash tools/build/write_build_stamp.sh read-version <shared tree directory>
 
 set -euo pipefail
 
@@ -39,7 +40,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
 
 fail() { printf '[build-stamp] ERROR: %s\n' "$*" >&2; exit 1; }
 
-[ $# -eq 2 ] || fail "usage: write_build_stamp.sh write|verify <shared tree directory>"
+[ $# -eq 2 ] || fail "usage: write_build_stamp.sh write|verify|read-version <shared tree directory>"
 MODE="$1"
 SHARED_DIR="$2"
 [ -d "$SHARED_DIR" ] || fail "shared tree directory not found: $SHARED_DIR"
@@ -80,20 +81,26 @@ case "$MODE" in
 			echo "[build-stamp] no ${BUILD_STAMP_VERSION_KEY} entry: ERGOPTI_BUILD_VERSION is unset (not a release build)"
 		fi
 		;;
-	verify)
+	verify|read-version)
 		[ -f "$STAMP_PATH" ] || fail "no build stamp at $STAMP_PATH — the package would report an unknown commit"
 		line="$(grep -E "^${BUILD_STAMP_COMMIT_KEY}=" "$STAMP_PATH" || true)"
 		[ -n "$line" ] || fail "$STAMP_PATH has no ${BUILD_STAMP_COMMIT_KEY}= entry"
 		require_full_commit "${line#*=}" "$STAMP_PATH"
-		echo "[build-stamp] verified ${line} in ${STAMP_PATH}"
+		if [ "$MODE" = "verify" ]; then
+			echo "[build-stamp] verified ${line} in ${STAMP_PATH}"
+		fi
 		version_line="$(grep -E "^${BUILD_STAMP_VERSION_KEY}=" "$STAMP_PATH" || true)"
 		[ -z "$version_line" ] || require_release_version "${version_line#*=}" "$STAMP_PATH"
 		if [ -n "${ERGOPTI_BUILD_VERSION:-}" ] && [ "${version_line#*=}" != "$ERGOPTI_BUILD_VERSION" ]; then
 			fail "$STAMP_PATH carries '${version_line}', expected ${BUILD_STAMP_VERSION_KEY}=${ERGOPTI_BUILD_VERSION}"
 		fi
-		[ -z "$version_line" ] || echo "[build-stamp] verified ${version_line} in ${STAMP_PATH}"
+		if [ "$MODE" = "read-version" ]; then
+			printf '%s\n' "${version_line#*=}"
+		else
+			[ -z "$version_line" ] || echo "[build-stamp] verified ${version_line} in ${STAMP_PATH}"
+		fi
 		;;
 	*)
-		fail "unknown mode '$MODE' (expected write or verify)"
+		fail "unknown mode '$MODE' (expected write, verify or read-version)"
 		;;
 esac

@@ -107,6 +107,15 @@
 			"args": ["tools/test/test-linux-deb-package-owner.cjs"],
 			"repro": "node tools/test/test-linux-deb-package-owner.cjs",
 			"platforms": ["linux"]
+		},
+		{
+			"id": "js-linux-package-version",
+			"ordinal": 490,
+			"name": "Linux package metadata follows copied runtime releases and native prerelease ordering",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-package-version.cjs"],
+			"repro": "node tools/test/test-linux-package-version.cjs",
+			"platforms": ["linux"]
 		}
 	]
 }

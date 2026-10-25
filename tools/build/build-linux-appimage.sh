@@ -60,8 +60,6 @@ BUILD_DIR="$PROJECT_ROOT/build/linux"
 APPDIR="$BUILD_DIR/AppDir"
 APPDIR_LIB="$APPDIR/usr/lib/ergopti"
 PACKAGE_NAME="ergopti"
-# Extract version from package.json (e.g. "3.0.0") or fall back to "0.1.0"
-VERSION=$(node -e "try { process.stdout.write(require('$PROJECT_ROOT/package.json').version) } catch(e) { process.stdout.write('0.1.0') }" 2>/dev/null || echo "0.1.0")
 ARCH="x86_64"
 # Built under the name the release publishes: the .zsync names the file it was made
 # from, and AppImageUpdate fetches that exact asset.
@@ -71,7 +69,6 @@ UPDATE_INFORMATION="$(node "$APPIMAGE_CHECK" --print-update-information)"
 APPIMAGE_FILE="$BUILD_DIR/$APPIMAGE_ASSET"
 
 echo "=== ergopti AppImage packager ==="
-echo "Package: $PACKAGE_NAME $VERSION ($ARCH)"
 echo ""
 
 # ----------------------------------------------------------------------
@@ -111,6 +108,9 @@ cp -r "$BUILD_DIR/_shared/." "$APPDIR_LIB/_shared/"
 # The stamp build-linux-driver.sh wrote is how the mounted daemon names its
 # commit; an image without it would report "unknown".
 bash "$SCRIPT_DIR/write_build_stamp.sh" verify "$APPDIR_LIB/_shared"
+VERSION=$(node "$SCRIPT_DIR/linux-package-version.cjs" appimage "$APPDIR_LIB/_shared" "$PROJECT_ROOT/package.json")
+export VERSION
+echo "Package: $PACKAGE_NAME $VERSION ($ARCH)"
 
 # Proof the payload actually landed, rather than the assumption that it did.
 # An AppImage that packages cleanly around a missing driver is the worst

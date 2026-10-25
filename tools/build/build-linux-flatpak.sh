@@ -87,15 +87,11 @@ PAYLOAD_DIR="$FLATPAK_DIR/payload"
 REPO_DIR="$FLATPAK_DIR/repo"
 BUILDER_DIR="$FLATPAK_DIR/build"
 PACKAGE_NAME="ergopti"
-# Extract version from package.json (e.g. "3.0.0") or fall back to "0.1.0"
-VERSION=$(node -e "try { process.stdout.write(require('$PROJECT_ROOT/package.json').version) } catch(e) { process.stdout.write('0.1.0') }" 2>/dev/null || echo "0.1.0")
 # The bundle branch. Flatpak needs one to address the ref in the local repo, and
 # `stable` is what the manifest declares as its default-branch.
 BRANCH="stable"
-FLATPAK_FILE="$BUILD_DIR/${PACKAGE_NAME}-${VERSION}.flatpak"
 
 echo "=== ergopti Flatpak packager ==="
-echo "Package: $PACKAGE_NAME $VERSION (branch $BRANCH)"
 echo ""
 
 # ----------------------------------------------------------------------
@@ -268,6 +264,9 @@ cp -r "$BUILD_DIR/_shared/." "$PAYLOAD_DIR/lib/ergopti/_shared/"
 # The stamp build-linux-driver.sh wrote is how the sandboxed daemon names its
 # commit; a bundle without it would report "unknown".
 bash "$SCRIPT_DIR/write_build_stamp.sh" verify "$PAYLOAD_DIR/lib/ergopti/_shared"
+VERSION=$(node "$SCRIPT_DIR/linux-package-version.cjs" flatpak "$PAYLOAD_DIR/lib/ergopti/_shared" "$PROJECT_ROOT/package.json")
+FLATPAK_FILE="$BUILD_DIR/${PACKAGE_NAME}-${VERSION}.flatpak"
+echo "Package: $PACKAGE_NAME $VERSION (branch $BRANCH)"
 install -m644 "$SCRIPT_DIR/templates/linux-portable-runtime-env.sh" "$PAYLOAD_DIR/lib/ergopti/network-runtime-env.sh"
 
 echo "  $(find "$PAYLOAD_DIR/lib/ergopti" -type f | wc -l) files staged for /app/lib/ergopti/"
