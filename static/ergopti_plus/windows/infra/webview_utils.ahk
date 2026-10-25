@@ -669,7 +669,7 @@ class WebViewHost {
 		; ── Queue-based eval ─────────────────────────────────────────────────────
 		; Evaluates JS in the page, queuing until the page signals ready.
 		Eval(Js) {
-				if this.ResetDone || this.CloseRequested
+				if A_IsSuspended || this.ResetDone || this.CloseRequested
 						return
 				if (this.Ready && this.HasOwnProp("WebView")) {
 						SetTimer(this._RunScript.Bind(this, Js), -1)
@@ -681,7 +681,9 @@ class WebViewHost {
 		}
 
 		_RunScript(Js) {
-				if !this.HasOwnProp("WebView") || this.ResetDone || this.CloseRequested
+				; Suspend leaves native timers armed, including scripts admitted before
+				; the pause. Refuse at delivery as well as at queue admission.
+				if A_IsSuspended || !this.HasOwnProp("WebView") || this.ResetDone || this.CloseRequested
 						return
 				WebView_RunScriptAsync(this.WebView, Js, "WebViewHost." . this.AppId)
 		}
