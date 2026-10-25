@@ -180,7 +180,7 @@ local function _reject_append_handle(stage, detail)
 	return false
 end
 
---- Opens today.log in unbuffered append mode. With stdio buffering disabled,
+--- Opens today.log in unbuffered append/update mode. With stdio buffering disabled,
 --- file:write() is the only ambiguous persistence boundary: a successful return
 --- means the complete line reached the OS, while nil/throw means a possibly
 --- partial line must be isolated before retry. A later flush cannot add a second
@@ -188,7 +188,7 @@ end
 --- @return boolean opened True only when a configured handle is published.
 local function _open_append_handle()
 	local open_ok, handle_or_err, open_detail = pcall(io.open,
-		_paths.today_log_path, "a")
+		_paths.today_log_path, "a+")
 	if not open_ok or handle_or_err == nil then
 		Logger.error(LOG, "Cannot open today.log for append (%s).",
 			tostring(open_detail or handle_or_err))
@@ -204,6 +204,29 @@ local function _open_append_handle()
 		return false
 	end
 
+	-- The previous process may have stopped midway through a native write. Its
+	-- in-memory failure flag cannot establish a record boundary after restart.
+	-- Inspect the exact append stream once, before publishing it to the hot path.
+	local boundary_stage = "size query"
+	local boundary_ok, needs_boundary = pcall(function()
+		local size = handle_or_err:seek("end")
+		if type(size) ~= "number" or size < 0 then return nil end
+		if size == 0 then return false end
+		boundary_stage = "tail seek"
+		if handle_or_err:seek("set", size - 1) ~= size - 1 then return nil end
+		boundary_stage = "tail read"
+		local tail = handle_or_err:read(1)
+		if type(tail) ~= "string" or #tail ~= 1 then return nil end
+		boundary_stage = "append seek"
+		if handle_or_err:seek("end") ~= size then return nil end
+		return tail ~= "\n"
+	end)
+	if not boundary_ok or type(needs_boundary) ~= "boolean" then
+		pcall(handle_or_err.close, handle_or_err)
+		Logger.error(LOG, "Cannot inspect today.log record boundary at %s; append refused.", boundary_stage)
+		return false
+	end
+	_append_boundary_required = needs_boundary
 	_log_handle = handle_or_err
 	return true
 end

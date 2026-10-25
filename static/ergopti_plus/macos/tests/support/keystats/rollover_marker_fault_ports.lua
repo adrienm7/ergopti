@@ -86,12 +86,14 @@ function M.install(options)
 		end
 		local handle, detail, code = open(path, mode)
 		if not handle then return handle, detail, code end
-		if path == journal and mode == "a" then
+		if path == journal and mode == "a+" then
 			streams[#streams + 1] = handle
 			if case == "old_stream_close_error_after_close" and phase == "prepare" then
 				local proxy = {}
 				function proxy:write(...) local ack, err, errno = handle:write(...); return ack and self or ack, err, errno end
 				function proxy:setvbuf(...) return handle:setvbuf(...) end
+				function proxy:seek(...) return handle:seek(...) end
+				function proxy:read(...) return handle:read(...) end
 				function proxy:close()
 					state.old_stream_closes = state.old_stream_closes + 1
 					local ack, err, errno = handle:close()

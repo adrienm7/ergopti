@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ByteCursor = require("tests.support.keystats.byte_stream_cursor")
 
 
 
@@ -39,11 +40,13 @@ local STUBBED_MODULES = {
 	"infra.logger",
 }
 
-local function fake_writer(on_write, on_close)
-	return {
+local function fake_writer(on_write, on_close, initial_bytes)
+	local bytes = initial_bytes or ""
+	local handle = {
 		closed = false,
 		setvbuf = function(_, mode) return mode == "no" end,
 		write = function(self, text)
+			bytes = bytes .. text
 			if on_write then on_write(text) end
 			return self
 		end,
@@ -54,6 +57,7 @@ local function fake_writer(on_write, on_close)
 			return true
 		end,
 	}
+	return ByteCursor.attach(handle, function() return bytes end)
 end
 
 local function make_reader(failure_mode)
@@ -107,8 +111,8 @@ local function run_rollover_case(failure_mode, exercise_resume)
 	local paths, active_db, manager, scheduled, attempt
 	local journal_present, storage_refused = true, true
 	local streams, timers = {}, {}
-	local function writer(on_write, on_close)
-		local stream = fake_writer(on_write, on_close)
+	local function writer(on_write, on_close, initial_bytes)
+		local stream = fake_writer(on_write, on_close, initial_bytes)
 		streams[#streams + 1] = stream
 		return stream
 	end
@@ -206,12 +210,12 @@ local function run_rollover_case(failure_mode, exercise_resume)
 			cleanup = function() return true end,
 		}
 		io.open = function(path, mode)
-			if paths and path == paths.today_log_path and mode == "a" then
+			if paths and path == paths.today_log_path and mode == "a+" then
 				observed.journal_opens = observed.journal_opens + 1
 				journal_present = true
 				return writer(function(text)
 					observed.journal_writes[#observed.journal_writes + 1] = text
-				end, function() observed.journal_closes = observed.journal_closes + 1 end)
+				end, function() observed.journal_closes = observed.journal_closes + 1 end, ("\n"):rep(JOURNAL_SIZE))
 			end
 			if paths and path == paths.today_log_path and mode == "r" then
 				if not journal_present then return nil, "no such file", 2 end
@@ -219,7 +223,7 @@ local function run_rollover_case(failure_mode, exercise_resume)
 				return make_reader(failure_mode)
 			end
 			if paths and path == paths.data_sql_path and mode == "w" then return writer() end
-			assert(mode ~= "a" and mode ~= "w", "unexpected virtual write path")
+			assert(mode ~= "a+" and mode ~= "a" and mode ~= "w", "unexpected virtual write path")
 			return real_open(path, mode)
 		end
 		os.remove = function(path)
