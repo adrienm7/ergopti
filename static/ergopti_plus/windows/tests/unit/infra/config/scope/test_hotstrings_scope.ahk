@@ -6,7 +6,7 @@ _HotstringsScopeFixture(PersonalCount := 1, InitialSuffix := "") {
 	Source := '[category_enabled]`nhotstrings = true`n[hotstrings]`npreview_ai_enabled = true`n[hotstrings.personal.words]`nenabled = true`ntime_activation_seconds = 4`n[private]`ncredential = "keep"`n'
 	Fixture := _ScopeOwnerFixture(Source . InitialSuffix)
 	Fixture.overrides := Fixture.directory . "\hotstrings_config.toml"
-	Fixture.overrideSource := '[autocorrection]`ndelay = 3.5`nunknown = "keep"`n[autocorrection.words]`npriority = 5`n[__global__]`nword_delimiters = "!"`nunknown = "keep"`n[foreign]`ndelay = 9`n'
+	Fixture.overrideSource := '[autocorrection]`ndelay_offset = 2.75`nunknown = "keep"`n[autocorrection.words]`npriority = 5`n[__global__]`nword_delimiters = "!"`nunknown = "keep"`n[foreign]`ndelay = 9`n'
 	Fixture.personalSource := '[_meta]`ndelay = 2.5`ndescription = "Keep corpus"`nunknown = "keep"`n[_meta.sections.words]`nshow_tooltip = false`nunknown = "keep"`n[[words]]`n"abc" = "replacement"`n'
 	Fixture.catalogue := [{ Key: "autocorrection", Path: "", IsPersonal: false, IsExtension: false }]
 	Fixture.personal := []
@@ -61,6 +61,7 @@ _HotstringsScopeRoundTrip() {
 				AssertEqual(true, Config["hotstrings"]["preview_ai_enabled"], "a restore keeps the AI preview switch")
 			AssertEqual(Config["private"]["credential"], "keep")
 			Overrides := TOML_ParseFreshFile(Fixture.overrides)
+			Assert(!Overrides["autocorrection"].Has("delay_offset"), "a clear or restore drops the stored delay offset")
 			Assert(!Overrides["autocorrection"].Has("delay"))
 			Assert(!Overrides["autocorrection.words"].Has("priority"))
 			Assert(!Overrides["__global__"].Has("word_delimiters"))
@@ -192,7 +193,7 @@ _HotstringsScopeManifestRows() {
 				Assert(_MenuDispatchCallbacks.Has(ItemId))
 				Receipt := (_MenuDispatchCallbacks[ItemId])()
 				AssertEqual(Receipt["status"], "pending")
-				Assert(!TOML_ParseFreshFile(Fixture.overrides)["autocorrection"].Has("delay"))
+				Assert(!TOML_ParseFreshFile(Fixture.overrides)["autocorrection"].Has("delay_offset"))
 				Refusal.Call("native refusal")
 				AssertEqual(Receipt["status"], "refused")
 				AssertEqual(FSReadUtf8Exact(Fixture.path), Fixture.source)
@@ -506,12 +507,15 @@ _HotstringsScopeMeasuredDelayRoundTrip(SelectedFamily) {
 			AssertEqual("pending", Receipt["status"])
 			Overrides := TOML_ParseFreshFile(Fixture.overrides)
 			if Mode == "recommended"
-				AssertEqual(0.5, Overrides[OwnedSection]["delay"],
-					"the acknowledged candidate explicitly stores the recommendation")
+				AssertEqual(Round(0.5 - HotstringsBaseDelay(), 3), Overrides[OwnedSection]["delay_offset"],
+					"the acknowledged candidate explicitly stores the recommendation as an offset of the base")
 			else
-				Assert(!Overrides.Has(OwnedSection) || !Overrides[OwnedSection].Has("delay"),
+				Assert(!Overrides.Has(OwnedSection) || !Overrides[OwnedSection].Has("delay_offset"),
 					"clear removes the recommendation and returns to corpus inheritance")
+			Assert(!Overrides.Has(OwnedSection) || !Overrides[OwnedSection].Has("delay"),
+				"the absolute spelling of earlier builds is never written back")
 			_HotstringsOverrides := _ParseOverrides(Fixture.overrides)
+			HotstringsOverridesApplyBase()
 			HotstringsResolveBumpGen()
 			AssertEqual(Mode == "recommended" ? 0.5 : 1.0,
 				HotstringsResolve("autocorrection", SelectedFamily).Delay,

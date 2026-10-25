@@ -545,8 +545,8 @@ local function genuine_language_providers(damage, exercise)
 				return acknowledgement
 			end,
 			resolve = function() return { delay = 0.75, color = "#1e88e5", has_override = false } end,
-			get_global_delay = function() return 0.75 end,
-			has_global_delay_override = function() return false end,
+			get_base_delay = function() return 0.75 end,
+			has_base_delay_override = function() return false end,
 		}
 		local function contains(rows, callback)
 			if type(rows) ~= "table" or type(callback) ~= "function" then return false end

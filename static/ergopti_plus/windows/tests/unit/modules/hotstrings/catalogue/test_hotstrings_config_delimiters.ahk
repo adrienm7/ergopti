@@ -165,17 +165,20 @@ TestHotstringsConfig_ParserRejectsNumericOverflow() {
 	FloatOverflow .= ".0"
 	try {
 		try FileDelete(Path)
-		FileAppend("[rolls]`ndelay = " . FloatOverflow . "`n"
+		FileAppend("[rolls]`ndelay_offset = " . FloatOverflow . "`n"
 			. "priority = 18446744073709552116`n`n"
-			. "[rolls.too_long]`ndelay = 4294968`n", Path, "UTF-8")
+			. "[rolls.too_long]`ndelay_offset = 4294968`n"
+			. "[rolls.too_negative]`ndelay_offset = -4294968`n", Path, "UTF-8")
 		Parsed := _ParseOverrides(Path)
 		AssertTrue(Parsed.Has("rolls"))
-		AssertEqual("", Parsed["rolls"].Delay,
-			"non-finite override delay must remain unset")
+		AssertEqual("", Parsed["rolls"].PendingOffset,
+			"non-finite override delay offset must remain unset")
 		AssertEqual("", Parsed["rolls"].Priority,
 			"overflowing override priority must remain unset")
-		AssertEqual("", Parsed["rolls"].Sections["too_long"].Delay,
-			"a finite override beyond TickElapsed must remain unset")
+		AssertEqual("", Parsed["rolls"].Sections["too_long"].PendingOffset,
+			"a finite offset beyond TickElapsed must remain unset")
+		AssertEqual("", Parsed["rolls"].Sections["too_negative"].PendingOffset,
+			"a negative offset beyond TickElapsed must remain unset")
 	} finally {
 		try FileDelete(Path)
 	}
@@ -382,44 +385,44 @@ _HCOL_Read(Content) {
 }
 
 _HCOL_CategoryHeader() {
-	Read := _HCOL_Read("[rolls]`ndelay = 0.3`n`t[magickey] # own category`t`ndelay = 0.9`n")
-	AssertEqual(0.3, Read.Overrides["rolls"].Delay, "a commented category must not overwrite the previous category")
+	Read := _HCOL_Read("[rolls]`ndelay_offset = 0.3`n`t[magickey] # own category`t`ndelay_offset = 0.9`n")
+	AssertEqual(0.3, Read.Overrides["rolls"].PendingOffset, "a commented category must not overwrite the previous category")
 	AssertTrue(Read.Overrides.Has("magickey"), "the commented category must have its own identity")
-	AssertEqual(0.9, Read.Overrides["magickey"].Delay, "the value belongs to the new category")
+	AssertEqual(0.9, Read.Overrides["magickey"].PendingOffset, "the value belongs to the new category")
 }
 Test("HotstringsConfig: commented category keeps owner identity (hotstrings-override-lexical)", _HCOL_CategoryHeader)
 
 _HCOL_SectionHeader() {
-	Read := _HCOL_Read("[rolls.first]`ndelay = 0.2`n[rolls.second] # own section`ndelay = 0.8`n")
-	AssertEqual(0.2, Read.Overrides["rolls"].Sections["first"].Delay, "a commented section must not overwrite the previous section")
+	Read := _HCOL_Read("[rolls.first]`ndelay_offset = 0.2`n[rolls.second] # own section`ndelay_offset = 0.8`n")
+	AssertEqual(0.2, Read.Overrides["rolls"].Sections["first"].PendingOffset, "a commented section must not overwrite the previous section")
 	AssertTrue(Read.Overrides["rolls"].Sections.Has("second"), "the new section must exist")
-	AssertEqual(0.8, Read.Overrides["rolls"].Sections["second"].Delay, "the value belongs to the new section")
+	AssertEqual(0.8, Read.Overrides["rolls"].Sections["second"].PendingOffset, "the value belongs to the new section")
 }
 Test("HotstringsConfig: commented section keeps owner identity (hotstrings-override-lexical)", _HCOL_SectionHeader)
 
 _HCOL_ExtensionHeader() {
-	Read := _HCOL_Read("[rolls]`ndelay = 0.3`n[ext.Demo-Pack] # own extension`ndelay = 0.7`n")
-	AssertEqual(0.3, Read.Overrides["rolls"].Delay, "a commented extension must not overwrite the previous category")
+	Read := _HCOL_Read("[rolls]`ndelay_offset = 0.3`n[ext.Demo-Pack] # own extension`ndelay_offset = 0.7`n")
+	AssertEqual(0.3, Read.Overrides["rolls"].PendingOffset, "a commented extension must not overwrite the previous category")
 	AssertTrue(Read.Overrides.Has("ext.demo-pack"), "the extension retains canonical case folding")
-	AssertEqual(0.7, Read.Overrides["ext.demo-pack"].Delay, "the value belongs to the extension")
+	AssertEqual(0.7, Read.Overrides["ext.demo-pack"].PendingOffset, "the value belongs to the extension")
 }
 Test("HotstringsConfig: commented extension keeps owner identity (hotstrings-override-lexical)", _HCOL_ExtensionHeader)
 
 _HCOL_ExtensionSectionHeader() {
-	Read := _HCOL_Read("[ext.demo]`ndelay = 0.4`n[ext.demo.symbols] # own section`ndelay = 0.6`n")
-	AssertEqual(0.4, Read.Overrides["ext.demo"].Delay, "a commented extension section must not overwrite its parent")
+	Read := _HCOL_Read("[ext.demo]`ndelay_offset = 0.4`n[ext.demo.symbols] # own section`ndelay_offset = 0.6`n")
+	AssertEqual(0.4, Read.Overrides["ext.demo"].PendingOffset, "a commented extension section must not overwrite its parent")
 	AssertTrue(Read.Overrides["ext.demo"].Sections.Has("symbols"), "the extension section must exist")
-	AssertEqual(0.6, Read.Overrides["ext.demo"].Sections["symbols"].Delay, "the section receives its own value")
+	AssertEqual(0.6, Read.Overrides["ext.demo"].Sections["symbols"].PendingOffset, "the section receives its own value")
 }
 Test("HotstringsConfig: commented extension section keeps owner identity (hotstrings-override-lexical)", _HCOL_ExtensionSectionHeader)
 
 _HCOL_Fields() {
-	Content := "[rolls]`ndelay = 0.9 # timing`n"
+	Content := "[rolls]`ndelay_offset = 0.9 # timing`n"
 		. 'color = "#112233" # literal color hash' . "`n"
 		. "show_tooltip = false # tooltip`npriority = 7 # priority`n"
 	Read := _HCOL_Read(Content)
 	Entry := Read.Overrides["rolls"]
-	AssertEqual(0.9, Entry.Delay, "a trailing comment must preserve the numeric delay")
+	AssertEqual(0.9, Entry.PendingOffset, "a trailing comment must preserve the numeric delay")
 	AssertEqual("#112233", Entry.Color, "the quoted color hash is data")
 	AssertEqual(false, Entry.ShowTooltip, "a trailing comment must preserve the boolean override")
 	AssertEqual(7, Entry.Priority, "a trailing comment must preserve the integer priority")
@@ -429,11 +432,11 @@ Test("HotstringsConfig: comments preserve all override field types (hotstrings-o
 _HCOL_GlobalHeader() {
 	Content := "[__global__] # delimiter owner`n"
 		. 'word_delimiters = ".?!"' . "`n"
-		. 'consumed_delimiters = ";"' . "`n[rolls]`ndelay = 0.2`n"
+		. 'consumed_delimiters = ";"' . "`n[rolls]`ndelay_offset = 0.2`n"
 	Read := _HCOL_Read(Content)
 	AssertEqual(".?!", Read.Word, "a commented global header must expose its delimiter value")
 	AssertEqual(Chr(59), Read.Consumed, "the consumed delimiters share the global header owner")
-	AssertEqual(0.2, Read.Overrides["rolls"].Delay, "ordinary categories remain readable after global values")
+	AssertEqual(0.2, Read.Overrides["rolls"].PendingOffset, "ordinary categories remain readable after global values")
 }
 Test("HotstringsConfig: commented global header owns both delimiter keys (hotstrings-override-lexical)", _HCOL_GlobalHeader)
 
@@ -469,27 +472,27 @@ Test("HotstringsConfig: quoted escapes survive trailing comment quotes (hotstrin
 
 _HCOL_OrdinaryDefaults() {
 	Content := "[__global__]`n" . 'word_delimiters = "."' . "`n"
-		. "[rolls]`ndelay = 0.3`nshow_tooltip = true`npriority = 4`n"
-		. "[rolls.symbols]`ndelay = 0.2`n[ext.demo]`ndelay = 0.5`n"
+		. "[rolls]`ndelay_offset = 0.3`nshow_tooltip = true`npriority = 4`n"
+		. "[rolls.symbols]`ndelay_offset = 0.2`n[ext.demo]`ndelay_offset = 0.5`n"
 	Read := _HCOL_Read(Content)
 	AssertEqual(".", Read.Word, "an ordinary global key retains its value")
 	AssertEqual("", Read.Consumed, "an absent delimiter key keeps the existing absent sentinel")
-	AssertEqual(0.3, Read.Overrides["rolls"].Delay, "an ordinary category remains unchanged")
+	AssertEqual(0.3, Read.Overrides["rolls"].PendingOffset, "an ordinary category remains unchanged")
 	AssertEqual("", Read.Overrides["rolls"].Color, "an absent override retains its default sentinel")
 	AssertEqual(true, Read.Overrides["rolls"].ShowTooltip, "ordinary true remains true")
 	AssertEqual(4, Read.Overrides["rolls"].Priority, "ordinary integer priority remains intact")
-	AssertEqual(0.2, Read.Overrides["rolls"].Sections["symbols"].Delay, "ordinary sections remain separate")
-	AssertEqual(0.5, Read.Overrides["ext.demo"].Delay, "ordinary extensions remain separate")
+	AssertEqual(0.2, Read.Overrides["rolls"].Sections["symbols"].PendingOffset, "ordinary sections remain separate")
+	AssertEqual(0.5, Read.Overrides["ext.demo"].PendingOffset, "ordinary extensions remain separate")
 	AssertEqual(0, _ParseOverrides("").Count, "an absent override path retains its empty map")
 	AssertEqual("", _ParseGlobalKey("", "word_delimiters"), "an absent global path retains its empty sentinel")
 }
 Test("HotstringsConfig: ordinary values and absent defaults remain intact (hotstrings-override-lexical)", _HCOL_OrdinaryDefaults)
 
 _HCOL_FullLineComments() {
-	Content := "[rolls]`ndelay = 0.3`n# [magickey]`n# delay = 0.9`n"
+	Content := "[rolls]`ndelay_offset = 0.3`n# [magickey]`n# delay = 0.9`n"
 		. "[__global__]`n# word_delimiters = ignored`n" . 'word_delimiters = "."' . "`n"
 	Read := _HCOL_Read(Content)
-	AssertEqual(0.3, Read.Overrides["rolls"].Delay, "full-line comment assignments do not change values")
+	AssertEqual(0.3, Read.Overrides["rolls"].PendingOffset, "full-line comment assignments do not change values")
 	AssertFalse(Read.Overrides.Has("magickey"), "a full-line comment header never creates a category")
 	AssertEqual(".", Read.Word, "the actual delimiter value remains readable after comments")
 }

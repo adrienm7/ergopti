@@ -214,19 +214,28 @@ function M.run(helpers, corpus_path)
 			helpers.assert_eq(registry.current, 13, "the actual shipped registry includes the dynamic-master migration")
 			local replays = 0
 			for index = 0, 10 do
-				local directory = shared .. "tests/corpus/config_migrations/shipped_number_row_typed_" .. index .. "/"
-				local meta = Codec.decode(read(directory .. "case.toml")).case
-				local source = read(directory .. "input.toml")
-				local expected = read(directory .. "expected.toml")
-				for _, driver in ipairs(meta.drivers) do
-					local planned = Migrate.plan(source, registry, driver)
-					helpers.assert_eq(planned.outcome, "migrated", driver .. ": typed migration")
-					helpers.assert_eq(planned.candidate, expected, driver .. ": exact independent expected bytes")
-					helpers.assert_eq(planned.candidate:find('future = "kept" # independently retained', 1, true) ~= nil, true)
-					local replay = Migrate.plan(planned.candidate, registry, driver)
-					helpers.assert_eq(replay.outcome, "current", driver .. ": idempotent native plan")
-					helpers.assert_eq(replay.candidate, nil, "current sources acquire no rewrite")
-					replays = replays + 1
+				-- A case the Windows-only dynamic-master step changes is split in two: the
+				-- Windows replay and, beside it, the replay of the drivers it leaves alone.
+				for _, suffix in ipairs({ "", "_non_windows" }) do
+					local directory = shared .. "tests/corpus/config_migrations/shipped_number_row_typed_" .. index
+						.. suffix .. "/"
+					local probe = io.open(directory .. "case.toml", "rb")
+					if probe then
+						probe:close()
+						local meta = Codec.decode(read(directory .. "case.toml")).case
+						local source = read(directory .. "input.toml")
+						local expected = read(directory .. "expected.toml")
+						for _, driver in ipairs(meta.drivers) do
+							local planned = Migrate.plan(source, registry, driver)
+							helpers.assert_eq(planned.outcome, "migrated", driver .. ": typed migration")
+							helpers.assert_eq(planned.candidate, expected, driver .. ": exact independent expected bytes")
+							helpers.assert_eq(planned.candidate:find('future = "kept" # independently retained', 1, true) ~= nil, true)
+							local replay = Migrate.plan(planned.candidate, registry, driver)
+							helpers.assert_eq(replay.outcome, "current", driver .. ": idempotent native plan")
+							helpers.assert_eq(replay.candidate, nil, "current sources acquire no rewrite")
+							replays = replays + 1
+						end
+					end
 				end
 			end
 			helpers.assert_eq(replays, 21, "every declared driver vector executed")

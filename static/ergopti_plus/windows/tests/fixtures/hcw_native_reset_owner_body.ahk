@@ -134,7 +134,8 @@ _HNRC_Run() {
 	_HNRC_Require(HotstringsCommonOverrideAdmitted() == true, "The real override migration owner must admit this private source")
 	_HNRC_Require(HotstringsSetOverride("magickey", "", "delay", 0.321), "A real native writer must affirmatively seed the reset")
 	Seed := TOML_ParseDocument(FSReadUtf8Exact(_HNRC.OverridePath))
-	_HNRC_Require(Seed["magickey"]["delay"] == 0.321, "Independent native decode must confirm the durable override")
+	_HNRC_Require(Seed["magickey"]["delay_offset"] == Round(0.321 - HotstringsBaseDelay(), 3),
+		"Independent native decode must confirm the durable override, stored as an offset of the base delay")
 	_HNRC.SeedHash := CryptoSha256Bytes(FSReadBytesStrict(_HNRC.OverridePath))
 	OpenHotstringsConfigWindow()
 	_HNRC.A := _HCWGui, _HNRC.AHwnd := _HCWGui.Hwnd
@@ -162,7 +163,7 @@ _HNRC_Run() {
 		"The native event and genuine durable clear logs must be reached without contained prerequisites")
 	Final := TOML_ParseDocument(FSReadUtf8Exact(_HNRC.OverridePath))
 	FinalHash := CryptoSha256Bytes(FSReadBytesStrict(_HNRC.OverridePath))
-	Cleared := !Final.Has("magickey") || !Final["magickey"].Has("delay")
+	Cleared := !Final.Has("magickey") || !Final["magickey"].Has("delay_offset")
 	AfterB := _HNRC.Mode == "reopen" && _HCWGui == _HNRC.B && _HNRC_Visible(_HNRC.BHwnd)
 		&& IsObject(_HCWWidgets) && _HCWWidgets.Gui == _HNRC.B
 		&& DllCall("User32\IsWindow", "Ptr", _HCWWidgets.DelayEdit.Hwnd, "Int")

@@ -4,8 +4,8 @@
 --- MODULE: Hotstring Scalar Preferences (Linux)
 --- DESCRIPTION:
 --- Owns the hotstring settings that are single canonical config.toml leaves:
---- the magic key and its physical key, the four preview toggles, the dynamic
---- master and each dynamic family. Absence resolves through the manifest's
+--- the magic key and its physical key, the four preview toggles, the base
+--- expansion delay, the dynamic master and each dynamic family. Absence resolves through the manifest's
 --- neutral default, so an empty configuration switches every one of them off.
 ---
 --- FEATURES & RATIONALE:
@@ -47,6 +47,7 @@ local OWNED = {
 	KEY.HOTSTRINGS_PREVIEW_COLORED_TOOLTIPS,
 	KEY.HOTSTRINGS_DYNAMIC_ENABLED,
 	KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS,
+	KEY.HOTSTRINGS_EXPANSION_DELAY,
 }
 for _, entry in ipairs(Manifest.features()) do
 	if entry.section == KEY.HOTSTRINGS_DYNAMIC and entry.type == "feature" then
@@ -67,6 +68,10 @@ end
 local VALUE_RULES = {
 	[KEY.HOTSTRINGS_TRIGGER_CHAR] = function(value) return Terminators.validate_magic_key(value) == true end,
 	[KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS] = function(value)
+		return type(value) == "number" and value == value and value >= 0 and value < math.huge
+	end,
+	-- The base expansion delay: seconds, finite, never negative. 0 means unlimited.
+	[KEY.HOTSTRINGS_EXPANSION_DELAY] = function(value)
 		return type(value) == "number" and value == value and value >= 0 and value < math.huge
 	end,
 }

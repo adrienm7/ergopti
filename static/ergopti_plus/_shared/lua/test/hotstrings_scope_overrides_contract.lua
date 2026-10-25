@@ -278,7 +278,7 @@ return function(helpers)
 				"a malformed personal flag is refused")
 		end)
 
-		helpers.it("owns only the four override fields of listed tables and extras", function()
+		helpers.it("owns only the override fields of listed tables and extras, the delay in each of its spellings", function()
 			local changes = Planner.plan({ mode = "clear", features = Manifest.features(),
 				groups = { { id = "rolls", override = { "rolls" }, sections = { "hc" }, bundled = true } },
 				inherited = inherited, extra = { { override = { "_global" }, fields = { "delay" } } } })
@@ -289,8 +289,28 @@ return function(helpers)
 				found[#found + 1] = row.section .. "." .. row.key
 			end
 			table.sort(found)
-			helpers.assert_eq(found, { "_global.delay", "rolls.color", "rolls.delay", "rolls.hc.color", "rolls.hc.delay",
+			helpers.assert_eq(found, { "_global.delay", "_global.delay_offset", "_global.delay_unlimited",
+				"rolls.color", "rolls.delay", "rolls.delay_offset", "rolls.delay_unlimited",
+				"rolls.hc.color", "rolls.hc.delay", "rolls.hc.delay_offset", "rolls.hc.delay_unlimited",
 				"rolls.hc.priority", "rolls.hc.show_tooltip", "rolls.priority", "rolls.show_tooltip" })
+		end)
+
+		helpers.it("writes a recommended delay as an offset of the base and an unlimited one as its flag", function()
+			local rows = Planner.writer_rows({
+				{ override = { "autocorrection" }, section = "names", field = "delay", value = 0.5 },
+				{ override = { "rolls" }, section = "hc", field = "delay", value = 0 },
+				{ override = { "rolls" }, section = "ct", field = "delay", value = 2 },
+			}, 0.75)
+			local by_key = {}
+			for _, row in ipairs(rows) do by_key[row.section .. "." .. row.key] = row end
+			helpers.assert_eq(by_key["autocorrection.names.delay_offset"].value, -0.25)
+			helpers.assert_eq(by_key["autocorrection.names.delay_unlimited"].delete, true)
+			helpers.assert_eq(by_key["autocorrection.names.delay"].delete, true, "the absolute spelling never survives")
+			helpers.assert_eq(by_key["rolls.hc.delay_unlimited"].value, true)
+			helpers.assert_eq(by_key["rolls.hc.delay_offset"].delete, true)
+			helpers.assert_eq(by_key["rolls.ct.delay_offset"].value, 1.25)
+			helpers.assert_eq(pcall(Planner.writer_rows, { { override = { "rolls" }, field = "delay", value = 1 } }), false,
+				"a written delay needs the base")
 		end)
 
 		helpers.it("renders an extension identity as one quoted table segment", function()
@@ -298,7 +318,11 @@ return function(helpers)
 				groups = { { id = "ext:demo:rolls", override = { "ext:demo:rolls" }, sections = { "a.b" }, bundled = false } },
 				inherited = inherited }))
 			helpers.assert_eq(rows[1].section, '"ext:demo:rolls"')
-			helpers.assert_eq(rows[5].section, '"ext:demo:rolls"."a.b"')
+			local sectioned
+			for _, row in ipairs(rows) do
+				if row.section == '"ext:demo:rolls"."a.b"' then sectioned = row end
+			end
+			helpers.assert_true(sectioned ~= nil, "the section row carries both quoted segments")
 		end)
 
 		helpers.it("refuses an unknown mode, a malformed group and a missing inheritance", function()

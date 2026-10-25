@@ -302,7 +302,7 @@ helpers.describe("canonical hotstring override delays reach the real runtime", f
 	for _, example in ipairs({
 		{ name = "unterminated neighbor", source = "[group_a.rolls]\ndelay = 2\nfuture = [1,\n", init_admitted = false },
 		{ name = "inline ancestor", source = "[group_a]\nrolls = { delay = 2, future = true }\n" },
-		{ name = "table-valued leaf", source = "[group_a.rolls.delay]\nfuture = true\n" },
+		{ name = "table-valued leaf", source = "[group_a.rolls.delay_offset]\nfuture = true\n" },
 		{ name = "duplicate header", source = "[group_a.rolls]\ndelay = 2\n[group_a.rolls]\nfuture = true\n" },
 		{ name = "duplicate field", source = "[group_a.rolls]\ndelay = 2\ndelay = 3\n" },
 		{ name = "quoted reader-unowned header", source = '[group_a."rolls"]\ndelay = 2\n' },
@@ -371,16 +371,24 @@ helpers.describe("hotstring delay boot admission", function()
 			local last = assert(source:find("-- Wire the config window", first, true))
 			local start = assert(source:find("local keymap_started = keymap.start()", last, true))
 			helpers.assert_true(first < last and last < start)
-			local selected
+			local selected, observed
 			local transaction = function() return true end
+			local base = function() return 0.75 end
 			local env = setmetatable({
-				keymap = { with_hotstring_delays = transaction },
+				keymap = {
+					with_hotstring_delays = transaction,
+					get_base_delay = base,
+					on_base_delay_change = function(observer) observed = observer end,
+				},
 				config_paths = { get_config_dir = function() return "/virtual" end },
 				require = function(name)
 					-- The fragment joins the override path through the pure shared path owner.
 					if name == "native_path" then return require(name) end
 					helpers.assert_eq(name, "modules.hotstrings.hotstrings_config")
-					return { init = function(opts) selected = opts; return admitted end }
+					return {
+						init = function(opts) selected = opts; return admitted end,
+						refresh_delays = function() end,
+					}
 				end,
 			}, { __index = _G })
 			local chunk = assert(load(source:sub(first, last - 1), "@hotstrings-boot-fragment", "t", env))
@@ -392,6 +400,8 @@ helpers.describe("hotstring delay boot admission", function()
 			end
 			helpers.assert_eq(ok, admitted)
 			helpers.assert_true(selected.delay_transaction == transaction)
+			helpers.assert_true(selected.base_delay == base, "the overrides are offsets of the keymap's base delay")
+			helpers.assert_eq(type(observed) == "function", admitted, "a base change re-projects the delays once the owner is admitted")
 		end)
 	end
 end)

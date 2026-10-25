@@ -469,6 +469,21 @@ are never offered for cleanup: boot keeps the migration refusal, refuses session
 writes and posts `config.read_only.newer_schema` (once after boot on macOS and
 Linux, on each refused save on Windows).
 
+### project-hotstring-delays-are-offsets-of-the-base
+
+`hotstrings.expansion_delay` (config.toml, default 0.75 s declared once) is the
+base every hotstring waits. The override file stores a category or section delay
+as `delay_offset` (signed seconds added to the base) or `delay_unlimited = true`,
+never as an absolute `delay`: moving the base moves every override with it. The
+UI still reads and writes effective seconds (`delay_resolver.offset_for` and
+`effective_delay` convert). Zero cannot be an offset (it means unlimited), and an
+offset that cancels the base is clamped to 1 ms, never to 0. The absolute
+`delay` and the `[_global]` default of earlier builds are migrated once, keeping
+each user's effective delay; shipped `_meta` delays stay absolute. Windows parses
+the overrides before config.toml exists, so offsets stay pending until
+`HotstringsOverridesBoot`. Pinned by `base_delay_vectors.json`, replayed by all
+three drivers.
+
 ### project-wizard-rerun-keeps-user-keys
 
 A wizard rerun reads each folder's existing tap-hold keys: user-owned keys are

@@ -353,6 +353,21 @@ _HotstringsOverrideCandidateIdentifiersAreValid(Source, &Detail) {
 		return true
 }
 
+; One category-level override record. Delay is the EFFECTIVE delay in seconds
+; (0 = unlimited, "" = none); it is stored in the file as an offset of the base
+; expansion delay. PendingOffset holds a parsed offset until the base is known,
+; LegacyDelay an absolute delay of an earlier build until the boot migration.
+_HotstringsNewOverrideEntry() {
+		return { Delay: "", PendingOffset: "", LegacyDelay: "", Color: "", ShowTooltip: "",
+				Priority: "", Sections: Map() }
+}
+
+; One section-level override record, same fields as the category's.
+_HotstringsNewOverrideSection() {
+		return { Delay: "", PendingOffset: "", LegacyDelay: "", Color: "", ShowTooltip: "",
+				Priority: "" }
+}
+
 ; Parse the override TOML file. Returns an empty Map when the file is missing.
 ; Recognises the following header forms:
 ;   [category]                       — standard category (e.g. [magickey])
@@ -388,9 +403,9 @@ _ParseOverrides(Path) {
 								try LoggerWarn("HotstringsConfig", "Duplicate section '[{1}]' in overrides file — later values will override earlier.", SectionName)
 						SeenSections[SectionName] := true
 						if !Result.Has(CurrentCat)
-								Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
+								Result[CurrentCat] := _HotstringsNewOverrideEntry()
 						if !Result[CurrentCat].Sections.Has(CurrentSec)
-								Result[CurrentCat].Sections[CurrentSec] := { Delay: "", Color: "", ShowTooltip: "", Priority: "" }
+								Result[CurrentCat].Sections[CurrentSec] := _HotstringsNewOverrideSection()
 						continue
 				}
 
@@ -403,7 +418,7 @@ _ParseOverrides(Path) {
 								try LoggerWarn("HotstringsConfig", "Duplicate section '[{1}]' in overrides file — later values will override earlier.", SectionName)
 						SeenSections[SectionName] := true
 						if !Result.Has(CurrentCat)
-								Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
+								Result[CurrentCat] := _HotstringsNewOverrideEntry()
 						continue
 				}
 
@@ -416,9 +431,9 @@ _ParseOverrides(Path) {
 								try LoggerWarn("HotstringsConfig", "Duplicate section '[{1}]' in overrides file — later values will override earlier.", SectionName)
 						SeenSections[SectionName] := true
 						if !Result.Has(CurrentCat)
-								Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
+								Result[CurrentCat] := _HotstringsNewOverrideEntry()
 						if !Result[CurrentCat].Sections.Has(CurrentSec)
-								Result[CurrentCat].Sections[CurrentSec] := { Delay: "", Color: "", ShowTooltip: "", Priority: "" }
+								Result[CurrentCat].Sections[CurrentSec] := _HotstringsNewOverrideSection()
 						continue
 				}
 
@@ -431,7 +446,7 @@ _ParseOverrides(Path) {
 								try LoggerWarn("HotstringsConfig", "Duplicate section '[{1}]' in overrides file — later values will override earlier.", SectionName)
 						SeenSections[SectionName] := true
 						if !Result.Has(CurrentCat)
-								Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
+								Result[CurrentCat] := _HotstringsNewOverrideEntry()
 						continue
 				}
 
@@ -443,10 +458,22 @@ _ParseOverrides(Path) {
 						? Result[CurrentCat].Sections[CurrentSec]
 						: Result[CurrentCat]
 
-				if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
+				if RegExMatch(Line, "^delay_offset\s*=\s*(-?[0-9]+(?:\.[0-9]+)?)\s*$", &OffsetMatch) {
+						; The stored form of a user delay: seconds added to the base expansion
+						; delay. It stays pending until the base is known (see
+						; HotstringsOverridesApplyBase), which is not yet true at boot.
+						if TOML_TryParseNumber(OffsetMatch[1], &Offset)
+								and TickTryDurationMsFromSeconds(Abs(Offset), &OffsetMs)
+								Target.PendingOffset := Offset
+				} else if RegExMatch(Line, "^delay_unlimited\s*=\s*true\s*$") {
+						; An unlimited delay (0) is not an offset of anything.
+						Target.Delay := 0
+				} else if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
+						; The absolute spelling of earlier builds: kept for the boot migration
+						; only, which turns it into an offset of the base and rewrites the file.
 						if TOML_TryParseNumber(NumMatch[1], &Delay)
 								and TickTryDurationMsFromSeconds(Delay, &DelayMs)
-								Target.Delay := Delay
+								Target.LegacyDelay := Delay
 				} else if RegExMatch(Line, "^color\s*=\s*" . '"' . "((?:[^" . '"' . "\\]|\\.)*)" . '"' . "\s*$", &ColMatch) {
 						Target.Color := UnescapeTomlString(ColMatch[1])
 				} else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
@@ -474,6 +501,30 @@ HotstringsSerialiseDelay(Value) {
 		if !TickTryDurationMsFromSeconds(Value, &DelayMs)
 				throw ValueError("Hotstring delay must fit the elapsed-tick domain.")
 		return Format("{:." . HOTSTRINGS_DELAY_DECIMALS . "f}", Value)
+}
+
+; The signed number of seconds a delay override adds to the base expansion
+; delay, on the same millisecond grid as every other delay.
+HotstringsSerialiseDelayOffset(Offset) {
+		global HOTSTRINGS_DELAY_DECIMALS
+		if !TickTryDurationMsFromSeconds(Abs(Offset), &OffsetMs)
+				throw ValueError("Hotstring delay offset must fit the elapsed-tick domain.")
+		return Format("{:." . HOTSTRINGS_DELAY_DECIMALS . "f}", Offset)
+}
+
+; The delay line one override record contributes to the file, "" when it has
+; none: an unlimited delay (0) is its own flag, any other delay is stored as the
+; offset of the base expansion delay, and an offset not yet applied (the base
+; was unknown when the file was read) is written back unchanged.
+_HotstringsDelayLine(Record, Base) {
+		if (Record.Delay != "") {
+				if (Record.Delay == 0)
+						return "delay_unlimited = true`n"
+				return "delay_offset = " . HotstringsSerialiseDelayOffset(Record.Delay - Base) . "`n"
+		}
+		if (Record.HasOwnProp("PendingOffset") and Record.PendingOffset != "")
+				return "delay_offset = " . HotstringsSerialiseDelayOffset(Record.PendingOffset) . "`n"
+		return ""
 }
 
 ; Serialise an override candidate and atomically publish it to disk. Callers
@@ -540,6 +591,9 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 				Out .= "`n"
 		}
 
+		; Delays are stored as offsets of the base expansion delay, so the file
+		; stays valid when the base changes.
+		BaseDelay := HotstringsBaseDelay()
 		Cats := []
 		for Cat in Source {
 				Cats.Push(Cat)
@@ -556,11 +610,10 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 				IsExt := SubStr(Cat, 1, 4) == "ext."
 
 				EntryPrio := Entry.HasOwnProp("Priority") ? Entry.Priority : ""
-				if (Entry.Delay != "" or Entry.Color != "" or Entry.ShowTooltip != "" or EntryPrio != "") {
+				EntryDelay := _HotstringsDelayLine(Entry, BaseDelay)
+				if (EntryDelay != "" or Entry.Color != "" or Entry.ShowTooltip != "" or EntryPrio != "") {
 						Out .= "[" . Cat . "]`n"
-						if (Entry.Delay != "") {
-								Out .= "delay = " . HotstringsSerialiseDelay(Entry.Delay) . "`n"
-						}
+						Out .= EntryDelay
 						if (Entry.Color != "") {
 								Out .= "color = " . TOML_RenderString(Entry.Color) . "`n"
 						}
@@ -581,12 +634,11 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 				for _, Sec in Secs {
 						S := Entry.Sections[Sec]
 						SPrio := S.HasOwnProp("Priority") ? S.Priority : ""
-						if (S.Delay != "" or S.Color != "" or S.ShowTooltip != "" or SPrio != "") {
+						SecDelay := _HotstringsDelayLine(S, BaseDelay)
+						if (SecDelay != "" or S.Color != "" or S.ShowTooltip != "" or SPrio != "") {
 								; Extension: [ext.name.section] — Cat already contains the dot
 								Out .= "[" . Cat . "." . Sec . "]`n"
-								if (S.Delay != "") {
-										Out .= "delay = " . HotstringsSerialiseDelay(S.Delay) . "`n"
-								}
+								Out .= SecDelay
 								if (S.Color != "") {
 										Out .= "color = " . TOML_RenderString(S.Color) . "`n"
 								}

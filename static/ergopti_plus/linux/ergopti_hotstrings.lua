@@ -851,6 +851,9 @@ local function main()
 	hotstrings_config.init(engine, config_path, function()
 		if rebuild_tray_menu then rebuild_tray_menu() end
 	end)
+	-- The delays of earlier builds are absolute; the file now stores them as offsets
+	-- of the base expansion delay. They already apply as they were: this rewrites them.
+	hotstrings_config.migrate_legacy_delays()
 	if hotstrings_config.set_magic_key(MagicKey.get(), MagicKey.default()) ~= true then
 		error("The configured magic key cannot be applied to the hotstring catalogue.")
 	end

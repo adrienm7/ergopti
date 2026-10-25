@@ -507,7 +507,7 @@ do
 			put("infra.signal_handlers", { start = yes, stop = yes, is_settled = yes })
 			put("infra.restart_pause", { restore = yes })
 			put("infra.legacy_hotstring_storage", { import = yes })
-			local config = { init = noop, set_magic_key = yes, load_all = function() return 0, true, nil, { complete = true } end,
+			local config = { init = noop, migrate_legacy_delays = yes, set_magic_key = yes, load_all = function() return 0, true, nil, { complete = true } end,
 			  parse_error_count = function() return 0 end, get_categories = function() return {} end }
 			put("modules.hotstrings.hotstrings_config", config)
 			put("platform.remap.tap_hold_manager", { init = noop, user_path = function() return marker .. ".tap_hold.toml" end,

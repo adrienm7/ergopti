@@ -25,6 +25,7 @@
 
 local M = {}
 local Languages = require("hotstrings.languages")
+local DelayResolver = require("hotstrings.delay_resolver")
 local KeyPath = require("toml_codec.key_path")
 
 --- Override fields owned by the scope, in the order every driver writes them.
@@ -134,9 +135,16 @@ function M.plan(request)
 end
 
 --- Renders planned changes as shared TOML writer rows.
+---
+--- The planner reasons in effective seconds; the override file stores a delay as
+--- an offset of the base expansion delay (`delay_offset`, or `delay_unlimited`
+--- for 0), so a `delay` change renders as the whole set of delay leaves: the
+--- one that holds the value, and a deletion of each spelling that must not
+--- survive it, the absolute one of earlier builds included.
 --- @param changes table Result of M.plan().
+--- @param base number|nil Base expansion delay in seconds; required when a change writes a delay.
 --- @return table rows `{ section, key, delete = true }` or `{ section, key, value }`.
-function M.writer_rows(changes)
+function M.writer_rows(changes, base)
 	assert(type(changes) == "table", "override scope rows require planned changes")
 	local rows = {}
 	for index, change in ipairs(changes) do
@@ -145,10 +153,25 @@ function M.writer_rows(changes)
 		local segments = copy_segments(change.override)
 		if change.section ~= nil then segments[#segments + 1] = change.section end
 		local section = KeyPath.render(segments)
-		if change.value == nil then
-			rows[index] = { section = section, key = change.field, delete = true }
+		if change.field == "delay" then
+			local kept
+			if change.value == 0 then
+				kept = { key = "delay_unlimited", value = true }
+			elseif change.value ~= nil then
+				assert(type(base) == "number", "writing a delay needs the base expansion delay")
+				kept = { key = "delay_offset", value = DelayResolver.offset_for(change.value, base) }
+			end
+			for _, leaf in ipairs(DelayResolver.DELAY_LEAVES) do
+				if kept and kept.key == leaf then
+					rows[#rows + 1] = { section = section, key = leaf, value = kept.value }
+				else
+					rows[#rows + 1] = { section = section, key = leaf, delete = true }
+				end
+			end
+		elseif change.value == nil then
+			rows[#rows + 1] = { section = section, key = change.field, delete = true }
 		else
-			rows[index] = { section = section, key = change.field, value = change.value }
+			rows[#rows + 1] = { section = section, key = change.field, value = change.value }
 		end
 	end
 	return rows

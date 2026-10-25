@@ -1291,20 +1291,21 @@ local function _manifest_hotstring_rows(ctx, config)
 		return true
 	end
 
-	--- The row for the global default delay — the one every category inherits
-	--- when neither it nor its sections declare one.
+	--- The row for the base expansion delay (`hotstrings.expansion_delay`) — the
+	--- one every category inherits when neither it nor its sections declare one,
+	--- and that the delay overrides are offsets of.
 	--- @return table
 	local function global_delay_row()
-		local current = config.get_global_delay and config.get_global_delay() or nil
+		local current = config.get_base_delay and config.get_base_delay() or nil
 		if type(current) ~= "number" then
-			Logger.error(LOG, "hotstrings_config exposes no global delay — the row cannot show a value.")
+			Logger.error(LOG, "hotstrings_config exposes no base delay — the row cannot show a value.")
 			return {
 				label    = i18n_safe(captions.default) .. " : " .. i18n_safe("menu.hotstrings.missing_value"),
 				disabled = true,
 			}
 		end
 
-		local overridden = config.has_global_delay_override and config.has_global_delay_override() or false
+		local overridden = config.has_base_delay_override and config.has_base_delay_override() or false
 		local title = i18n_safe(captions.default)
 		return {
 			-- menu.settings.default_indicator carries its own leading space.
@@ -1313,7 +1314,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			action = function()
 				local chosen = prompt_delay(title, current)
 				if chosen == nil then return end
-				return commit_delay(config.set_global_delay, chosen)
+				return commit_delay(config.set_base_delay, chosen)
 			end,
 		}
 	end

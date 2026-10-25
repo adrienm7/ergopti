@@ -9,7 +9,8 @@
 ; infra/hotstrings/hotstrings_catalogue.ahk) against it — proving
 ; delay/color/show_tooltip/priority precedence (user_section > user_category >
 ; toml_section > toml_category) matches the macOS driver bit for bit.
-; The AHK-only "_global" menu delay tier remains outside this corpus's scope.
+; The base expansion delay and the offsets of it are covered by the second
+; corpus, base_delay_vectors.json (section 4 below).
 ;
 ; Reuses the _HCfgTestReset / _HCfgTestSeedToml fixture helpers from
 ; unit/modules/hotstrings/catalogue/test_hotstrings_config.ahk (must load before this file — see run_all.ahk).
@@ -142,3 +143,84 @@ _CorpusHCfg_ResolveMatchesCorpus() {
 	Assert(Mismatches == "", "HotstringsResolve mismatches against the corpus:" . Mismatches)
 }
 Test("hotstrings config resolve corpus — HotstringsResolve matches every vector", _CorpusHCfg_ResolveMatchesCorpus)
+
+
+
+
+
+; ============================================
+; ============================================
+; ======= 4/ Delay offsets of the base =======
+; ============================================
+; ============================================
+
+_CorpusBaseDelay_Parse() {
+	Path := A_ScriptDir . "\..\..\_shared\tests\corpus\hotstrings\base_delay_vectors.json"
+	Assert(FileExist(Path), "the base delay corpus must exist")
+	return JsonParse(FileRead(Path, "UTF-8"))
+}
+
+; Moves the base the way the setter does, without the config.toml write the
+; headless harness has no file for: the leaf in memory, then the overrides with it.
+_CorpusBaseDelay_MoveBase(Seconds) {
+	global Features
+	Previous := HotstringsBaseDelay()
+	Features["hotstrings"]["expansion_delay"] := Seconds
+	HotstringsOverridesRebase(Previous, Seconds)
+}
+
+_CorpusBaseDelay_ReplaysEveryVector() {
+	global Features, _HotstringsOverridesPath
+	Corpus := _CorpusBaseDelay_Parse()
+	AssertTrue(Corpus["vectors"].Length > 0, "the corpus must hold vectors")
+	Hotstrings := Features["hotstrings"]
+	Had := Hotstrings.Has("expansion_delay")
+	Saved := Had ? Hotstrings["expansion_delay"] : 0
+	try {
+		for Vector in Corpus["vectors"] {
+			_HCfgTestReset()
+			if Hotstrings.Has("expansion_delay")
+				Hotstrings.Delete("expansion_delay")
+			for Step in Vector["steps"] {
+				Section := Step.Has("section") ? Step["section"] : ""
+				switch Step["op"] {
+					case "set":
+						AssertTrue(HotstringsSetOverride(Step["category"], Section, "delay", Step["delay"]), Vector["id"] . ": set")
+					case "clear":
+						AssertTrue(HotstringsClearOverride(Step["category"], Section, "delay"), Vector["id"] . ": clear")
+					case "base":
+						_CorpusBaseDelay_MoveBase(Step["seconds"])
+					default:
+						Assert(false, Vector["id"] . ": unknown step " . Step["op"])
+				}
+			}
+			for Expected in Vector["expect"] {
+				Section := Expected.Has("section") ? Expected["section"] : ""
+				AssertEqual(Expected["delay"], HotstringsResolve(Expected["category"], Section).Delay,
+					Vector["id"] . ": the effective delay of " . Expected["category"] . "." . Section)
+			}
+			Stored := FileExist(_HotstringsOverridesPath) ? _ParseOverrides(_HotstringsOverridesPath) : Map()
+			for Path, Leaves in Vector["stored"] {
+				Parts := StrSplit(Path, ".")
+				AssertTrue(Stored.Has(Parts[1]), Vector["id"] . ": the file holds " . Path)
+				Record := Parts.Length > 1 ? Stored[Parts[1]].Sections[Parts[2]] : Stored[Parts[1]]
+				for Key, Value in Leaves {
+					if Key == "delay_offset"
+						AssertEqual(Value, Record.PendingOffset, Vector["id"] . ": the stored offset of " . Path)
+					else
+						AssertEqual(0, Record.Delay, Vector["id"] . ": " . Key . " of " . Path)
+				}
+			}
+			if Vector["stored"].Count == 0 && Stored.Has("rolls")
+				AssertEqual("", Stored["rolls"].PendingOffset, Vector["id"] . ": nothing stored")
+		}
+	} finally {
+		if Had
+			Hotstrings["expansion_delay"] := Saved
+		else if Hotstrings.Has("expansion_delay")
+			Hotstrings.Delete("expansion_delay")
+		HotstringsResolveBumpGen()
+	}
+}
+Test("hotstrings base delay corpus - every vector resolves and stores as the other drivers do",
+	_CorpusBaseDelay_ReplaysEveryVector)

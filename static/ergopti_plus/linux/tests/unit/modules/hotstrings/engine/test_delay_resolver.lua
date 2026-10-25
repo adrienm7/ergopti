@@ -236,8 +236,9 @@ helpers.describe("hotstrings_config: resolving through the driver", function()
 
 	helpers.it("applies an in-memory override through the shared cascade", function()
 		local config = helpers.load_module("modules.hotstrings.hotstrings_config")
+		-- The seam takes the stored form: seconds added to the base (0.75 s here).
 		config._set_overrides_for_test({
-			rolls = { delay = 2.5, sections = { hc = { delay = 0.1 } } },
+			rolls = { delay_offset = 1.75, sections = { hc = { delay_offset = -0.65 } } },
 		})
 		helpers.assert_eq(config.resolve("rolls", nil).delay, 2.5, "the category override")
 		helpers.assert_eq(config.resolve("rolls", "hc").delay, 0.1, "and the section one")

@@ -201,6 +201,7 @@ function M.new(options)
 	--- @return table|nil file The prepared override participant.
 	--- @return table|nil parsed The candidate as the engine's reader parses it.
 	local function prepare_overrides(mode)
+		local base_after
 		local committed = Config.scope_snapshot()
 		if type(committed) ~= "table" then return false, "the override file was not read cleanly" end
 		local registered, groups = keymap.hotstring_delay_inventory(), {}
@@ -217,14 +218,19 @@ function M.new(options)
 			end
 		end
 		table.sort(groups, function(left, right) return left.id < right.id end)
-		local inherit = Config.delay_projection({})
+		-- The base expansion delay is one of the scope's own scalars: after it the base
+		-- is the recommended value (restore) or the default (clear), and the delays below
+		-- are offsets of THAT base, whatever the user's is today.
+		base_after = mode == "recommended" and Manifest.recommended_for("hotstrings.expansion_delay")
+			or Manifest.default_for("hotstrings.expansion_delay")
+		local inherit = Config.delay_projection({}, base_after)
 		local changes = Planner.plan({ mode = mode, features = Manifest.features(), groups = groups,
 			inherited = function(name, section) return inherit(name, section, registered[name].metadata) end,
 			extra = { { override = { "dynamichotstrings" }, fields = Planner.FIELDS } } })
 		local path = Config.get_override_path()
 		local file = ScopeFile.new({ path = path, backup_path = options.override_backup_path(), files = options.files,
 			remove = options.remove })
-		local prepared, detail = file.prepare(Planner.writer_rows(changes))
+		local prepared, detail = file.prepare(Planner.writer_rows(changes, base_after))
 		if prepared ~= true then return false, detail end
 		local source = file.source()
 		if source.status ~= committed.source.status
@@ -238,6 +244,8 @@ function M.new(options)
 			local target = entry
 			if entry and change.section then target = (entry.sections or {})[change.section:lower()] end
 			local value = target and target[change.field]
+			-- A delay is stored as an offset of the base the scope leaves behind.
+			if change.field == "delay" then value = Config.effective_delay(target, base_after) end
 			if value ~= change.value then
 				return false, "the override file keeps a spelling the scope cannot address: " .. key
 			end

@@ -116,32 +116,60 @@ _HCfgTestSeedToml(Cat, Delay, Color, Sections := unset) {
 ; ============================================================
 ; ============================================================
 
+; The file stores a delay as an offset of the base expansion delay. The parser
+; keeps it pending (the base is unknown at boot); applying the base derives the
+; effective delay.
 TestHotstringsConfig_ParseOverridesFileLevel() {
     Path := A_Temp . "\hotstrings_config_test_filelvl.toml"
     try FileDelete(Path)
-    FileAppend("[rolls]`ndelay = 0.4`ncolor = " . '"' . "#abcdef" . '"' . "`n", Path, "UTF-8")
+    FileAppend("[rolls]`ndelay_offset = -0.35`ncolor = " . '"' . "#abcdef" . '"' . "`n", Path, "UTF-8")
     Result := _ParseOverrides(Path)
     AssertTrue(Result.Has("rolls"), "rolls override should be parsed")
-    AssertEqual(0.4, Result["rolls"].Delay, "rolls delay parsed")
+    AssertEqual("", Result["rolls"].Delay, "no effective delay before the base is applied")
+    AssertEqual(-0.35, Result["rolls"].PendingOffset, "rolls delay offset parsed")
     AssertEqual("#abcdef", Result["rolls"].Color, "rolls color parsed")
+    HotstringsOverridesApplyBase(Result)
+    AssertEqual(0.4, Result["rolls"].Delay, "the offset is added to the base expansion delay")
+    AssertEqual("", Result["rolls"].PendingOffset, "an applied offset is no longer pending")
     try FileDelete(Path)
 }
-Test("HotstringsConfig: _ParseOverrides reads file-level delay and color",
+Test("HotstringsConfig: _ParseOverrides reads a file-level delay offset and color",
     TestHotstringsConfig_ParseOverridesFileLevel)
 
 TestHotstringsConfig_ParseOverridesSection() {
     Path := A_Temp . "\hotstrings_config_test_sec.toml"
     try FileDelete(Path)
-    FileAppend("[rolls.ct]`ndelay = 0.2`ncolor = " . '"' . "#00838f" . '"' . "`n", Path, "UTF-8")
+    FileAppend("[rolls.ct]`ndelay_offset = -0.55`ncolor = " . '"' . "#00838f" . '"' . "`n", Path, "UTF-8")
     Result := _ParseOverrides(Path)
     AssertTrue(Result.Has("rolls"), "rolls bucket created")
     AssertTrue(Result["rolls"].Sections.Has("ct"), "rolls.ct subsection parsed")
-    AssertEqual(0.2, Result["rolls"].Sections["ct"].Delay, "rolls.ct delay parsed")
+    AssertEqual(-0.55, Result["rolls"].Sections["ct"].PendingOffset, "rolls.ct delay offset parsed")
     AssertEqual("#00838f", Result["rolls"].Sections["ct"].Color, "rolls.ct color parsed")
+    HotstringsOverridesApplyBase(Result)
+    AssertEqual(0.2, Result["rolls"].Sections["ct"].Delay, "the section offset is added to the base")
     try FileDelete(Path)
 }
 Test("HotstringsConfig: _ParseOverrides reads [category.section] tables",
     TestHotstringsConfig_ParseOverridesSection)
+
+; An unlimited delay (0) is not an offset of anything, so it keeps its own flag
+; and survives any base. The absolute spelling of earlier builds is only kept
+; for the boot migration.
+TestHotstringsConfig_ParseOverridesUnlimitedAndLegacy() {
+    Path := A_Temp . "\hotstrings_config_test_unlimited.toml"
+    try FileDelete(Path)
+    FileAppend("[rolls]`ndelay_unlimited = true`n[magickey]`ndelay = 0.6`n", Path, "UTF-8")
+    Result := _ParseOverrides(Path)
+    AssertEqual(0, Result["rolls"].Delay, "delay_unlimited is the effective delay 0")
+    AssertEqual("", Result["rolls"].PendingOffset, "an unlimited delay has no offset")
+    AssertEqual("", Result["magickey"].Delay, "a legacy absolute delay is not applied as such")
+    AssertEqual(0.6, Result["magickey"].LegacyDelay, "a legacy absolute delay waits for the boot migration")
+    HotstringsOverridesApplyBase(Result)
+    AssertEqual(0, Result["rolls"].Delay, "the base never changes an unlimited delay")
+    try FileDelete(Path)
+}
+Test("HotstringsConfig: _ParseOverrides keeps unlimited and legacy delays apart",
+    TestHotstringsConfig_ParseOverridesUnlimitedAndLegacy)
 
 TestHotstringsConfig_ParseOverridesMissingFile() {
     Result := _ParseOverrides("Z:\\nonexistent\\path\\does_not_exist.toml")
@@ -191,27 +219,129 @@ TestHotstringsConfig_ResolveFallsBackToGlobal() {
 Test("HotstringsConfig: resolve falls back to GLOBAL_DEFAULT_DELAY",
     TestHotstringsConfig_ResolveFallsBackToGlobal)
 
-TestHotstringsConfig_GlobalDefaultDelayTier() {
+; Runs Body with hotstrings.expansion_delay set to Seconds in the headless Features
+; map, then restores it.
+_HCfgWithBase(Seconds, Body) {
+    global Features
+    Hotstrings := Features["hotstrings"]
+    Had := Hotstrings.Has("expansion_delay")
+    Saved := Had ? Hotstrings["expansion_delay"] : unset
+    Hotstrings["expansion_delay"] := Seconds
+    try Body.Call()
+    finally {
+        if Had
+            Hotstrings["expansion_delay"] := Saved
+        else
+            Hotstrings.Delete("expansion_delay")
+        HotstringsResolveBumpGen()
+    }
+}
+
+TestHotstringsConfig_BaseDelayTier() {
     _HCfgTestReset()
-    ; Nothing set anywhere → hardcoded fallback.
+    ; Nothing set anywhere -> the shared default.
     R := HotstringsResolve("rolls", "")
     AssertEqual(GLOBAL_DEFAULT_DELAY, R.Delay,
-        "no toml + no override + no global → hardcoded GLOBAL_DEFAULT_DELAY")
-    ; The menu-set global default (key "_global") applies for any category that
-    ; has no delay of its own — below a per-category value, above the fallback.
-    HotstringsSetOverride("_global", "", "delay", 2.5)
-    R := HotstringsResolve("rolls", "")
-    AssertEqual(2.5, R.Delay,
-        "global default delay applies when the category has no delay")
-    AssertFalse(R.HasOverride,
-        "the global default is not a per-category override — HasOverride stays false")
-    ; A per-category user override still wins over the global default.
-    HotstringsSetOverride("rolls", "", "delay", 1.2)
-    R := HotstringsResolve("rolls", "")
-    AssertEqual(1.2, R.Delay, "per-category override wins over the global default")
+        "no toml + no override + no user base -> the shared default delay")
+    ; The user's base (hotstrings.expansion_delay) applies to any category that has
+    ; no delay of its own: below a per-category value, above the shared default.
+    _HCfgWithBase(2.5, () => _HCfgBaseDelayTierBody())
 }
-Test("HotstringsConfig: menu-set global default delay tier (below category, above fallback)",
-    TestHotstringsConfig_GlobalDefaultDelayTier)
+_HCfgBaseDelayTierBody() {
+    R := HotstringsResolve("rolls", "")
+    AssertEqual(2.5, R.Delay, "the base delay applies when the category has no delay")
+    AssertFalse(R.HasOverride,
+        "the base is not a per-category override - HasOverride stays false")
+    HotstringsSetOverride("rolls", "", "delay", 1.2)
+    AssertEqual(1.2, HotstringsResolve("rolls", "").Delay, "a per-category override sets its effective delay")
+}
+Test("HotstringsConfig: base expansion delay tier (below category, above the shared default)",
+    TestHotstringsConfig_BaseDelayTier)
+
+; A user delay is stored as an offset, so it follows the base: setting 1.2 s on
+; top of the 0.75 s default is +0.45 s, and a 1.0 s base makes it 1.45 s.
+TestHotstringsConfig_OverrideFollowsTheBase() {
+    global Features, _HotstringsOverridesPath
+    _HCfgTestReset()
+    AssertTrue(HotstringsSetOverride("rolls", "", "delay", 1.2), "the override is stored")
+    AssertTrue(InStr(FileRead(_HotstringsOverridesPath, "UTF-8"), "delay_offset = 0.450") > 0,
+        "the file holds the offset of the base, not the absolute delay")
+    AssertFalse(InStr(FileRead(_HotstringsOverridesPath, "UTF-8"), "delay = 1.2") > 0,
+        "the absolute spelling is gone")
+    Previous := HotstringsBaseDelay()
+    HotstringsOverridesRebase(Previous, 1.0)
+    AssertEqual(1.45, HotstringsResolve("rolls", "").Delay,
+        "after the base moves to 1.0 s the override keeps its +0.45 s")
+    HotstringsOverridesRebase(1.0, Previous)
+    AssertEqual(1.2, HotstringsResolve("rolls", "").Delay, "and returns with the base")
+}
+Test("HotstringsConfig: a delay override keeps its offset when the base moves",
+    TestHotstringsConfig_OverrideFollowsTheBase)
+
+; Unlimited is not an offset: it must stay unlimited whatever the base.
+TestHotstringsConfig_UnlimitedSurvivesTheBase() {
+    global _HotstringsOverridesPath
+    _HCfgTestReset()
+    AssertTrue(HotstringsSetOverride("rolls", "", "delay", 0), "unlimited is stored")
+    AssertTrue(InStr(FileRead(_HotstringsOverridesPath, "UTF-8"), "delay_unlimited = true") > 0,
+        "an unlimited delay has its own flag")
+    HotstringsOverridesRebase(0.75, 3)
+    AssertEqual(0, HotstringsResolve("rolls", "").Delay, "the base never changes an unlimited delay")
+    HotstringsOverridesRebase(3, 0.75)
+}
+Test("HotstringsConfig: an unlimited delay override survives a base change",
+    TestHotstringsConfig_UnlimitedSurvivesTheBase)
+
+; The override file of earlier builds held absolute delays and a menu-set default
+; delay under [_global]. The boot migration keeps every effective delay.
+TestHotstringsConfig_LegacyDelaysAreMigrated() {
+    global _HotstringsOverrides, _HotstringsOverridesPath, Features
+    _HCfgTestReset()
+    Path := _HotstringsOverridesPath
+    FileAppend("[_global]`ndelay = 1.5`n[rolls]`ndelay = 2.0`ncolor = " . '"' . "#112233" . '"' . "`n"
+        . "[rolls.ct]`ndelay = 0.4`n[magickey]`ndelay_offset = 0.25`n", Path, "UTF-8")
+    _HotstringsOverrides := _ParseOverrides(Path)
+    Hotstrings := Features["hotstrings"]
+    Had := Hotstrings.Has("expansion_delay")
+    Saved := Had ? Hotstrings["expansion_delay"] : 0
+    ; The harness has no config.toml to write: the seam stands for the live writer
+    ; and publishes the value the way a successful write does.
+    Writes := []
+    WriteBase(Seconds) {
+        Writes.Push(Seconds)
+        Hotstrings["expansion_delay"] := Seconds
+        return true
+    }
+    try {
+        AssertTrue(HotstringsOverridesBoot(WriteBase), "the migration reports success once the file is rewritten")
+        AssertEqual(1, Writes.Length, "the base is written once")
+        AssertEqual(1.5, Writes[1], "the default delay of the old file becomes the base")
+        AssertEqual(1.5, HotstringsBaseDelay(), "the new base is live")
+        AssertEqual(2.0, HotstringsResolve("rolls", "").Delay, "an absolute delay keeps its value")
+        AssertEqual(0.4, HotstringsResolve("rolls", "ct").Delay, "a section delay keeps its value")
+        AssertEqual(1.75, HotstringsResolve("magickey", "").Delay, "an offset already stored follows the migrated base")
+        AssertFalse(_HotstringsOverrides.Has("_global"), "the old default delay record is gone")
+        Text := FileRead(Path, "UTF-8")
+        AssertTrue(InStr(Text, "delay_offset = 0.500") > 0, "the file holds the offset of the migrated base")
+        AssertTrue(InStr(Text, "delay_offset = -1.100") > 0, "a section below the base gets a negative offset")
+        AssertFalse(RegExMatch(Text, "m)^delay = ") > 0, "no absolute delay remains in the file")
+        AssertFalse(InStr(Text, "[_global]") > 0, "the old default delay section is gone")
+        AssertTrue(InStr(Text, "#112233") > 0, "the colour is kept")
+        ; Idempotent: a second boot over the rewritten file changes nothing.
+        _HotstringsOverrides := _ParseOverrides(Path)
+        AssertTrue(HotstringsOverridesBoot(WriteBase), "the rewritten file needs no migration")
+        AssertEqual(1, Writes.Length, "and writes no second base")
+        AssertEqual(2.0, HotstringsResolve("rolls", "").Delay, "the migrated file resolves to the same delays")
+    } finally {
+        if Had
+            Hotstrings["expansion_delay"] := Saved
+        else if Hotstrings.Has("expansion_delay")
+            Hotstrings.Delete("expansion_delay")
+        HotstringsResolveBumpGen()
+    }
+}
+Test("HotstringsConfig: the boot migration keeps every effective delay (hotstrings-delay-offsets)",
+    TestHotstringsConfig_LegacyDelaysAreMigrated)
 
 TestHotstringsConfig_PersonalCategoryFallsBackToBaseline() {
     _HCfgTestReset()
@@ -430,13 +560,14 @@ TestHotstringsConfig_OverrideMutationRollsBackOnWriteFailure() {
 	SavedPath := _HotstringsOverridesPath
 	SavedOverrides := _HotstringsOverrides
 	Path := A_Temp . "\hotstrings_config_override_rollback.toml"
-	OriginalText := "[rolls]`ndelay = 0.400`n"
+	OriginalText := "[rolls]`ndelay_offset = -0.350`n"
 	Lock := 0
 	try {
 		try FileDelete(Path)
 		FileAppend(OriginalText, Path, "UTF-8")
 		_HotstringsOverridesPath := Path
 		_HotstringsOverrides := _ParseOverrides(Path)
+		HotstringsOverridesApplyBase()
 		HotstringsResolveBumpGen()
 
 		Lock := FileOpen(Path, "r-rwd")
@@ -550,9 +681,10 @@ TestHotstringsConfig_ReentrantWriterCannotLoseAcceptedUpdate() {
 	Path := A_Temp . "\hotstrings_config_reentrant_lease.toml"
 	try {
 		try FileDelete(Path)
-		FileAppend('[rolls]`ndelay = 0.400`ncolor = "#111111"`n', Path, "UTF-8")
+		FileAppend('[rolls]`ndelay_offset = -0.350`ncolor = "#111111"`n', Path, "UTF-8")
 		_HotstringsOverridesPath := Path
 		_HotstringsOverrides := _ParseOverrides(Path)
+		HotstringsOverridesApplyBase()
 		HotstringsResolveBumpGen()
 		_HCfgLeaseOuterWriterCalls := 0
 		_HCfgLeaseInnerWriterCalls := 0
@@ -563,6 +695,7 @@ TestHotstringsConfig_ReentrantWriterCannotLoseAcceptedUpdate() {
 		OuterResult := HotstringsSetOverride("rolls", "", "delay", 0.9,
 			_HCfgLeaseOuterWriter)
 		DiskAfter := _ParseOverrides(Path)
+		HotstringsOverridesApplyBase(DiskAfter)
 
 		AssertTrue(OuterResult, "the owning outer transaction must still publish")
 		AssertFalse(_HCfgLeaseInnerResult,

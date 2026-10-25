@@ -477,7 +477,7 @@ _HCWWeb_PushState() {
 ; Build the JSON state object consumed by the shared frontend. Shape mirrors the
 ; macOS build_state(): { categories, groups, presets, global_default_delay_ms }.
 _HCWWeb_BuildStateJson() {
-	global _HCW_CATEGORY_LIST, _HCW_GROUP_LIST, _HCW_COLOR_PRESETS, GLOBAL_DEFAULT_DELAY
+	global _HCW_CATEGORY_LIST, _HCW_GROUP_LIST, _HCW_COLOR_PRESETS
 
 	Cats := ""
 	for _, E in _HCW_CATEGORY_LIST {
@@ -504,7 +504,7 @@ _HCWWeb_BuildStateJson() {
 		Presets .= "{" . _HCWWeb_Kv("label", P["Label"]) . "," . _HCWWeb_Kv("hex", P["Hex"]) . "}"
 	}
 
-	GlobalMs := Round(GLOBAL_DEFAULT_DELAY * 1000)
+	GlobalMs := Round(HotstringsBaseDelay() * 1000)
 	return "{"
 		. '"categories":[' . Cats . "],"
 		. '"groups":[' . Groups . "],"
