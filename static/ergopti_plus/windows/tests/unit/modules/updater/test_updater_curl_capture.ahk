@@ -580,7 +580,12 @@ _CurlCaptureProductionJoinControls() {
 	AssertContains(Start, "Capture.Attach(Worker)")
 	AssertTrue(InStr(Start, "Capture.Attach(Worker)") < InStr(Start, "Worker.start()"),
 		"the exact tree owner transfers before native launch")
-	AssertContains(Cancel, "CaptureClosed := _Updater_RetireCurlCaptureArtifacts(Artifacts)")
+	AssertContains(Cancel, "_Updater_RetireCurlCaptureArtifacts(Artifacts, true)",
+		"cancellation transfers capture and staged-file debt to the terminal owner")
+	Retire := _DriverFuncBody("_Updater_RetireCurlCaptureArtifacts")
+	AssertTrue(Retire != "", "the real terminal retirement join exists")
+	AssertContains(Retire, "_Updater_RetireCurlCapture(Artifacts.StagingRetirement)",
+		"the same debt owner retains exact staged identities until capture retirement succeeds")
 	AssertContains(Complete, "_Updater_RetireCurlCaptureArtifacts(_UpdaterDownloadArtifacts)")
 	AssertContains(Reserve, "_UpdaterCurlCaptureDebt.Count != 0", "successors cannot borrow capture cleanup debt")
 	Parent := RTrim(_SR_AcquireCaptureDirectory(), "\")

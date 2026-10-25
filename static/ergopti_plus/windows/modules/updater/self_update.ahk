@@ -894,8 +894,18 @@ _Updater_RetryCurlCaptureDebt(*) {
 	return _UpdaterCurlCaptureDebt.Count == 0
 }
 
-_Updater_RetireCurlCaptureArtifacts(Artifacts) {
-	if IsObject(Artifacts) && Artifacts.HasOwnProp("CurlCapture")
+_Updater_RetireCurlCaptureArtifacts(Artifacts, DiscardStaging := false) {
+	if !IsObject(Artifacts)
+		return true
+	if DiscardStaging {
+		if !Artifacts.HasOwnProp("StagingRetirement")
+			Artifacts.StagingRetirement := _UpdaterStagedArtifactRetirement(Artifacts)
+		Closed := _Updater_RetireCurlCapture(Artifacts.StagingRetirement)
+		if !Closed
+			try LoggerWarn("Updater", "Staged update retirement retains native file or process debt.")
+		return Closed
+	}
+	if Artifacts.HasOwnProp("CurlCapture")
 		return _Updater_RetireCurlCapture(Artifacts.CurlCapture)
 	return true
 }
@@ -2017,7 +2027,7 @@ _Updater_BeginDownloadTransaction(Request, BoundarySuspended, Tag, AssetUrl, Exp
 	} else if Outcome.ShouldDrop {
 		try LoggerWarn("Updater", "Download start cancelled before reservation because request policy changed.")
 	} else if Outcome.RecoveryBusy {
-		try LoggerWarn("Updater", "Update reservation refused while rollback recovery became active.")
+		try LoggerWarn("Updater", "Update reservation refused while recovery or resource retirement is pending.")
 	} else if Outcome.DuplicateDownload {
 		try LoggerWarn("Updater", "Download reservation lost to a concurrent install request.")
 	} else {
@@ -2535,14 +2545,7 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 			try Worker.terminate()
 		if (Owner is Map)
 			_Updater_CloseSwapOwner(Owner, true)
-		CaptureClosed := _Updater_RetireCurlCaptureArtifacts(Artifacts)
-		if IsObject(Artifacts) && CaptureClosed {
-			for Name in ["NewExe", "SwapScript"] {
-				Path := Artifacts.HasOwnProp(Name) ? Artifacts.%Name% : ""
-				if (Path != "" and FSExists(Path) and !FSDelete(Path))
-					try LoggerError("Updater", "Could not delete cancelled staging artifact '{1}'.", Path)
-			}
-		}
+		_Updater_RetireCurlCaptureArtifacts(Artifacts, true)
 		SetTimer(_Updater_MonitorStagingWorker, 0)
 	} finally _Updater_ReleaseDownloadRetirement(Retirement)
 	; Process teardown wins before the visible terminal. RequestMayPublish queues
@@ -2608,6 +2611,22 @@ _Updater_AdmitStagingCompletion(StagingEpoch) {
 	}
 }
 
+; READY is a creation/verification receipt from the exact completed worker.
+; A failed CreateNew collision conveys no authority over the existing paths.
+_Updater_RetainVerifiedStagingArtifacts(StagingEpoch) {
+	global _UpdaterDownloadArtifacts
+	PreviousCritical := Critical("On")
+	try {
+		if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch) || !IsObject(_UpdaterDownloadArtifacts)
+			return 0
+		Artifacts := _UpdaterDownloadArtifacts
+		if !Artifacts.HasOwnProp("StagingRetirement")
+			Artifacts.StagingRetirement := _UpdaterStagedArtifactRetirement(Artifacts)
+		Artifacts.StagingComplete := true
+		return Artifacts.StagingRetirement
+	} finally Critical(PreviousCritical)
+}
+
 ; Complete only the still-current staging owner's notification state. No I/O,
 ; diagnostics, callbacks or native handoff belong in this short RAM transaction.
 _Updater_ClearNotifiedTagForStaging(StagingEpoch) {
@@ -2643,6 +2662,19 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 	if !_Updater_InstallObservationValid(Observation) {
 		_Updater_CancelSelfUpdateTransaction("Staging completion lacked its original install observation.", false, false, StagingEpoch)
 		return
+	}
+	if ExitCode == 0 && Stdout == "READY" {
+		StagingOwner := _Updater_RetainVerifiedStagingArtifacts(StagingEpoch)
+		if !IsObject(StagingOwner)
+			return
+		Adopted := StagingOwner.Adopt()
+		if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+			return
+		if !Adopted {
+			_Updater_ReportInstallFailure("updater.install_error_download", "changelog_window.install_error_download", "Icon!", 0, Observation)
+			_Updater_EndDownloadTransaction(StagingEpoch)
+			return
+		}
 	}
 	if !_Updater_RetireCurlCaptureArtifacts(_UpdaterDownloadArtifacts) {
 		_Updater_ReportInstallFailure("updater.install_error_download", "changelog_window.install_error_download", "Icon!", 0, Observation)
@@ -3743,7 +3775,8 @@ _Updater_EndDownloadTransaction(StagingEpoch := 0) {
 		Critical(PreviousCritical)
 	}
 	try {
-		_Updater_RetireCurlCaptureArtifacts(Artifacts)
+		DiscardStaging := IsObject(Artifacts) && Artifacts.HasOwnProp("StagingComplete") && Artifacts.StagingComplete
+		_Updater_RetireCurlCaptureArtifacts(Artifacts, DiscardStaging)
 		try SetTimer((*) => _Updater_RebuildMenu(), -50)
 	} finally _Updater_ReleaseDownloadRetirement(Retirement)
 	return true

@@ -98,6 +98,106 @@ class _UIPO_Fixture {
 			this.Error := Failure
 		finally this.Done := true
 	}
+	ExerciseStagingCleanup() {
+		global _UpdaterDownloadWorker, _UpdaterDownloadArtifacts, _UpdaterCurlCaptureDebt, _UpdaterCurlCaptureRetry
+		global _UpdaterSwapTransactionCounter, UPDATER_REQUEST_ORIGIN_MANUAL
+		Old := this.Admit(this.OldFn, "original")
+		Capture := _UpdaterCurlCaptureLedger()
+		Capture.Acquire(this.Root)
+		Worker := _UIPO_QuiescentWorker()
+		Capture.Attach(Worker)
+		_UpdaterDownloadArtifacts.CurlCapture := Capture
+		Artifacts := _UpdaterDownloadArtifacts
+		Blocker := 0
+		Moved := this.NewExe . ".original"
+		try {
+			if this.Mode != "artifact-failed-swap" {
+				BlockedPath := this.Mode == "artifact-stage-reader" ? this.NewExe : Capture.Files["artifact.bin"]["path"]
+				Blocker := Capture.Open(BlockedPath, 0x80000000, 3, false, 3)
+				AssertTrue(Blocker != 0, "a real foreign reader must deny native file deletion")
+				_UpdaterDownloadWorker := Worker
+				AssertTrue(_Updater_CancelSelfUpdateTransaction(
+					"Install phase fixture: native capture retirement was deferred.", false, false, Old.Epoch))
+				if HasMethod(_UpdaterCurlCaptureRetry, "Call")
+					SetTimer(_UpdaterCurlCaptureRetry, 0)
+				_UpdaterCurlCaptureRetry := 0
+				AssertEqual(this.Mode == "artifact-stage-reader", Capture.Retired,
+					"only a capture-file reader retains native capture handles")
+				Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+				Pending := _Updater_TryReserveDownloadTransaction(Request, false)
+				AssertFalse(Pending.Reserved, "real native refusal retains admission debt")
+				AssertTrue(Pending.RecoveryBusy, "a successor must observe the outstanding cleanup obligation")
+				AssertEqual("original", FileRead(this.NewExe, "UTF-8"), "no staging deletion precedes native quiescence")
+				if this.Mode == "artifact-replaced-after-cancel" {
+					AssertTrue(DllCall("kernel32\MoveFileW", "Str", this.NewExe, "Str", Moved, "Int"))
+					AssertTrue(FSWriteCreateDurable(this.NewExe, "foreign replacement"))
+				}
+				AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Blocker, "Int"))
+				Blocker := 0
+				if this.Mode == "artifact-replaced-after-cancel" {
+					AssertFalse(_Updater_RetryCurlCaptureDebt(), "a foreign path replacement cannot borrow retained deletion authority")
+					AssertEqual("foreign replacement", FileRead(this.NewExe, "UTF-8"))
+					AssertEqual("original", FileRead(Moved, "UTF-8"))
+					FileDelete(this.NewExe)
+					AssertTrue(DllCall("kernel32\MoveFileW", "Str", Moved, "Str", this.NewExe, "Int"))
+				}
+				AssertTrue(_Updater_RetryCurlCaptureDebt(), "closing the native reader allows exact retirement retry")
+			} else {
+				Id := ++_UpdaterSwapTransactionCounter
+				Owner := _Updater_ReserveSwapOwner(Id, Old.Epoch)
+				AssertTrue(Owner is Map && !Owner["ProcessHandle"], "the fixture must never launch a swap process")
+				; The genuine READY callback first admits the worker-created files.
+				; This occupied reservation prevents native process creation and
+				; exercises the real failed-swap terminal in the same callback.
+				_Updater_PollDownloadAsync(0, "READY", "", this.SwapPath,
+					this.NewExe, this.Root . "\current.exe", "v1.0.0", Old.Epoch)
+			}
+			AssertTrue(Capture.Retired, "the old private native capture must be completely retired")
+			Created := FSWriteCreateDurable(this.NewExe, "next-release")
+			FileAppend("RECEIPT updater-staging-cleanup mode=" . this.Mode
+				. " exclusive_create=" . Created . " swap_exists=" . !!FileExist(this.SwapPath) . "`n", "*")
+			AssertTrue(Created, "terminal cleanup must leave the next authenticated CreateNew download possible")
+			AssertFalse(FileExist(this.SwapPath), "a failed transaction cannot leave a stale swap script collision")
+		} finally {
+			SetTimer(_Updater_ShowDeferredSwapFailureNotice, 0)
+			if Blocker
+				AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Blocker, "Int"))
+			if FileExist(Moved) {
+				if FileExist(this.NewExe)
+					FileDelete(this.NewExe)
+				AssertTrue(DllCall("kernel32\MoveFileW", "Str", Moved, "Str", this.NewExe, "Int"))
+			}
+			Retirement := Artifacts.HasOwnProp("StagingRetirement") ? Artifacts.StagingRetirement : Capture
+			AssertTrue(_Updater_RetireCurlCapture(Retirement), "fixture native handles must retire even after an assertion failure")
+		}
+	}
+	ExerciseStagingCloseDebt() {
+		global _UpdaterDownloadArtifacts
+		this.Admit(this.OldFn, "original")
+		Owner := _UIPO_StagingCloseRefusal(_UpdaterDownloadArtifacts)
+		try {
+			AssertFalse(Owner.Adopt(), "a retained native lease cannot authorize staged handoff")
+			AssertEqual(1, Owner.ProbeCloseDebt.Length)
+			AssertTrue(Owner.Snapshot(Owner.ProbeCloseDebt[1]) is Map,
+				"the injected refusal must retain an actual open native directory reference")
+			AssertFalse(Owner.Adopt(), "repeated adoption cannot bypass the retained close debt")
+		} finally {
+			for Handle in Owner.ProbeCloseDebt
+				AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int"))
+			Owner.ProbeCloseDebt := []
+			AssertTrue(Owner.Retire(), "the fixture must close every exact native reference")
+		}
+	}
+	ExerciseRejectedStaging() {
+		global _UpdaterDownloadArtifacts
+		Old := this.Admit(this.OldFn, "foreign existing bytes")
+		Artifacts := _UpdaterDownloadArtifacts
+		_Updater_PollDownloadAsync(1, "refused before acquiring files", "", this.SwapPath,
+			this.NewExe, this.Root . "\current.exe", "v1.0.0", Old.Epoch)
+		AssertFalse(Artifacts.HasOwnProp("StagingComplete"), "a failure receipt conveys no creation authority")
+		AssertEqual("foreign existing bytes", FileRead(this.NewExe, "UTF-8"))
+		AssertEqual("foreign existing bytes-swap", FileRead(this.SwapPath, "UTF-8"))
+	}
 	OnRetirementTimer() {
 		global UPDATER_REQUEST_ORIGIN_MANUAL
 		try {
@@ -154,6 +254,12 @@ class _UIPO_Fixture {
 		global _UpdaterInstallObserver, _UpdaterInstallObserverEpoch
 		global _UpdaterDownloadInProgress, _UpdaterDownloadRequest, _UpdaterDownloadArtifacts
 		global _UpdaterDownloadWorker, _UpdaterSwapOwner, _UpdaterSwapTransactionCounter
+		if this.Mode == "artifact-close-debt"
+			return this.ExerciseStagingCloseDebt()
+		if this.Mode == "artifact-rejected-collision"
+			return this.ExerciseRejectedStaging()
+		if InStr(this.Mode, "artifact-") == 1
+			return this.ExerciseStagingCleanup()
 		if this.Mode == "retire-admission" || this.Mode == "retire-end-admission"
 			return this.ExerciseRetirementAdmission()
 		Old := this.Admit(this.OldFn, "original")
@@ -255,6 +361,26 @@ class _UIPO_RetirementWorker {
 				Sleep(10)
 			AssertTrue(F.Done, "the real timer must run before termination acknowledges completion")
 		} finally SetTimer(Timer, 0)
+		return true
+	}
+}
+
+
+; The child has already exited on these terminal paths; the actual file and
+; directory handles below still determine whether retirement can complete.
+class _UIPO_StagingCloseRefusal extends _UpdaterStagedArtifactRetirement {
+	CloseProbe(Handle) {
+		if !this.HasOwnProp("Refused") {
+			this.Refused := true
+			this.ProbeCloseDebt.Push(Handle)
+			return false
+		}
+		return super.CloseProbe(Handle)
+	}
+}
+
+class _UIPO_QuiescentWorker {
+	terminate() {
 		return true
 	}
 }
@@ -364,3 +490,14 @@ Test("Updater install phase: retirement fences successor admission (updater-reti
 
 Test("Updater install phase: completion fences successor admission (updater-retirement-admission)",
 	_UIPO_Case.Bind("retire-end-admission"))
+
+for _UIPO_CleanupMode in ["artifact-deferred-cleanup", "artifact-failed-swap",
+		"artifact-stage-reader", "artifact-replaced-after-cancel"]
+	Test("Updater staging: " . _UIPO_CleanupMode . " leaves the next download possible (updater-staging-terminal-cleanup)",
+		_UIPO_Case.Bind(_UIPO_CleanupMode))
+
+Test("Updater staging: a refused writer cannot delete preexisting paths (updater-staging-terminal-cleanup)",
+	_UIPO_Case.Bind("artifact-rejected-collision"))
+
+Test("Updater staging: native close debt cannot authorize handoff (updater-staging-close-debt)",
+	_UIPO_Case.Bind("artifact-close-debt"))
