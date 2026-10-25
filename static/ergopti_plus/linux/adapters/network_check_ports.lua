@@ -178,14 +178,15 @@ function M.new(deps)
 	end
 
 	local function fetch_pac(url, callback)
-		local started = deps.http_get(url, {}, {
+		-- The HTTP callback owns completion, including synchronous refusal.
+		-- Its boolean return reports dispatch only; shutdown suppresses delivery.
+		deps.http_get(url, {}, {
 			owner = M.OWNER, timeout_ms = M.PAC_TIMEOUT_MS, max_body_bytes = M.MAX_BODY_BYTES,
 			follow_redirects = true,
 		}, function(result)
 			result = type(result) == "table" and result or {}
 			callback(tonumber(result.status), result.body)
 		end)
-		if started == false then callback(nil, nil) end
 	end
 
 	local function chain(callback)
@@ -210,11 +211,10 @@ function M.new(deps)
 			callback(0, steps)
 		end
 		local function request()
-			local started = deps.http_get(url, {}, {
+			deps.http_get(url, {}, {
 				owner = M.OWNER, timeout_ms = M.REQUEST_TIMEOUT_MS, max_body_bytes = M.MAX_BODY_BYTES,
 				follow_redirects = true, https_only = true,
 			}, finish_request)
-			if started == false then finish_request(nil) end
 		end
 		local _, refusal = deps.lookup(url, { owner = M.OWNER .. ".route", timeout_ms = M.LOOKUP_TIMEOUT_MS },
 			function(receipt)

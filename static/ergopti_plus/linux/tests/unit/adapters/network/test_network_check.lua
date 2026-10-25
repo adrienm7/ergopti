@@ -100,6 +100,17 @@ helpers.describe("network field check: the shared steps", function()
 end)
 
 helpers.describe("network field check: the Linux ports", function()
+	local native_ok = pcall(require, "luv")
+	local ffi_ok = pcall(require, "ffi")
+	if native_ok and ffi_ok and package.config:sub(1, 1) == "/" then
+		helpers.it("(linux-network-check-native) preserves actual HTTP terminal callback ownership", function()
+			local Shell = require("adapters.shell_runner")
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_network_check_refusal.lua"
+			local status = os.execute(Shell.quote(assert(arg[-1])) .. " " .. Shell.quote(fixture))
+			helpers.assert_true(status == true or status == 0, "actual field-check terminal callbacks must remain singular")
+		end)
+	end
+
 	helpers.it("(linux-network-check) names the kinds from the environment, GNOME and KDE", function()
 		local settings = Ports.read_settings(deps({
 			environment = function() return { https_proxy = "http://secret.corp.example:3128", no_proxy = "" } end,
@@ -185,7 +196,10 @@ helpers.describe("network field check: the Linux ports", function()
 			helpers.assert_eq(steps.transfer.state, "fail")
 			helpers.assert_eq(steps.transfer.value, case.token)
 		end
-		local refused = run({ http_get = function() return false end })
+		local refused = run({ http_get = function(_, _, _, callback)
+			callback({ ok = false, status = 0, error = "HTTP URL protocol is unsupported" })
+			return false
+		end })
 		helpers.assert_eq(refused.transfer.value, "failed", "a request the transport refuses to start")
 	end)
 
