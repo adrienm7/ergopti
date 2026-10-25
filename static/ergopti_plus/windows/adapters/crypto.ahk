@@ -313,6 +313,57 @@ CryptoBase64Decode(b64) {
 }
 
 
+; Verifies an ECDSA P-256 / SHA-256 signature with CNG. The caller owns the
+; policy and the key encoding; the OS handles, the BCRYPT_ECCKEY_BLOB layout and
+; their release stay at this boundary.
+; @param {Buffer} Spki - DER SubjectPublicKeyInfo holding the uncompressed point.
+; @param {Integer} PointOffset - Offset of the X coordinate inside Spki.
+; @param {Integer} ComponentBytes - Size of X, Y and of each signature half.
+; @param {String} Message - Text signed, hashed as UTF-8 without a NUL.
+; @param {Buffer} Signature - IEEE P1363 r||s signature.
+; @return {String} "" when it verifies, otherwise "bad_key", "no_native" or "mismatch".
+CryptoEcdsaP256Verify(Spki, PointOffset, ComponentBytes, Message, Signature) {
+	; BCRYPT_ECCKEY_BLOB: magic 'ECS1', the component size, then X and Y
+	Blob := Buffer(8 + 2 * ComponentBytes)
+	NumPut("UInt", 0x31534345, Blob, 0)
+	NumPut("UInt", ComponentBytes, Blob, 4)
+	DllCall("RtlMoveMemory", "Ptr", Blob.Ptr + 8, "Ptr", Spki.Ptr + PointOffset,
+		"UPtr", 2 * ComponentBytes)
+	KeyAlg := 0, HashAlg := 0, Key := 0
+	Reason := "no_native"
+	try {
+		if DllCall("bcrypt\BCryptOpenAlgorithmProvider", "Ptr*", &KeyAlg, "WStr", "ECDSA_P256", "Ptr", 0, "UInt", 0, "UInt")
+			throw Error("no ECDSA provider")
+		if DllCall("bcrypt\BCryptOpenAlgorithmProvider", "Ptr*", &HashAlg, "WStr", CRYPTO_BCRYPT_SHA256_ALG, "Ptr", 0, "UInt", 0, "UInt")
+			throw Error("no SHA-256 provider")
+		Reason := "bad_key"
+		if DllCall("bcrypt\BCryptImportKeyPair", "Ptr", KeyAlg, "Ptr", 0, "WStr", "ECCPUBLICBLOB", "Ptr*", &Key,
+			"Ptr", Blob, "UInt", Blob.Size, "UInt", 0, "UInt")
+			throw Error("key refused")
+		Data := Buffer(StrPut(Message, "UTF-8") - 1)
+		StrPut(Message, Data, Data.Size, "UTF-8")
+		Hash := Buffer(32)
+		Reason := "no_native"
+		if DllCall("bcrypt\BCryptHash", "Ptr", HashAlg, "Ptr", 0, "UInt", 0, "Ptr", Data, "UInt", Data.Size,
+			"Ptr", Hash, "UInt", Hash.Size, "UInt")
+			throw Error("hash refused")
+		Status := DllCall("bcrypt\BCryptVerifySignature", "Ptr", Key, "Ptr", 0, "Ptr", Hash, "UInt", Hash.Size,
+			"Ptr", Signature, "UInt", Signature.Size, "UInt", 0, "UInt")
+		Reason := (Status == 0) ? "" : "mismatch"
+	} catch as Err {
+		; Reason keeps the stage that refused; the caller turns it into a closed refusal.
+		LoggerError("Crypto", "CryptoEcdsaP256Verify refused ({1}): {2}", Reason, Err.Message)
+	}
+	if Key
+		DllCall("bcrypt\BCryptDestroyKey", "Ptr", Key, "UInt")
+	if KeyAlg
+		DllCall("bcrypt\BCryptCloseAlgorithmProvider", "Ptr", KeyAlg, "UInt", 0, "UInt")
+	if HashAlg
+		DllCall("bcrypt\BCryptCloseAlgorithmProvider", "Ptr", HashAlg, "UInt", 0, "UInt")
+	return Reason
+}
+
+
 
 
 ; Port dispatch map (ADAPTER_CRYPTO) — the single-source-of-truth contract

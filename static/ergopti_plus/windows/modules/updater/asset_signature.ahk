@@ -82,18 +82,9 @@ AssetSignature_Record(Header, Name, Size, Sha256) {
 _AssetSignature_Base64(Text) {
 	if !(Text is String) || Text == "" || !RegExMatch(Text, "^[A-Za-z0-9+/]+=*$")
 		return 0
-	Size := 0
-	; CRYPT_STRING_BASE64 (1) | CRYPT_STRING_STRICT_BASE64 is not needed: the
-	; pattern above already refuses anything but canonical characters
-	if !DllCall("Crypt32\CryptStringToBinaryW", "WStr", Text, "UInt", 0, "UInt", 1, "Ptr", 0, "UInt*", &Size,
-		"Ptr", 0, "Ptr", 0, "Int") || Size == 0
-		return 0
-	Bytes := Buffer(Size)
-	if !DllCall("Crypt32\CryptStringToBinaryW", "WStr", Text, "UInt", 0, "UInt", 1, "Ptr", Bytes, "UInt*", &Size,
-		"Ptr", 0, "Ptr", 0, "Int")
-		return 0
-	Bytes.Size := Size
-	return Bytes
+	; The pattern above already refuses anything but canonical characters
+	Bytes := CryptoBase64Decode(Text)
+	return Bytes.Size == 0 ? 0 : Bytes
 }
 
 ; The lowercase hexadecimal text of the first Count bytes of a Buffer.
@@ -102,16 +93,6 @@ _AssetSignature_Hex(Bytes, Count) {
 	Loop Count
 		Text .= Format("{:02x}", NumGet(Bytes, A_Index - 1, "UChar"))
 	return Text
-}
-
-; Closes the CNG handles opened by a verification.
-_AssetSignature_Close(Key, KeyAlg, HashAlg) {
-	if Key
-		DllCall("bcrypt\BCryptDestroyKey", "Ptr", Key, "UInt")
-	if KeyAlg
-		DllCall("bcrypt\BCryptCloseAlgorithmProvider", "Ptr", KeyAlg, "UInt", 0, "UInt")
-	if HashAlg
-		DllCall("bcrypt\BCryptCloseAlgorithmProvider", "Ptr", HashAlg, "UInt", 0, "UInt")
 }
 
 /**
@@ -135,40 +116,8 @@ AssetSignature_Verify(SpkiBase64, Record, SignatureBase64) {
 			|| _AssetSignature_Hex(Spki, PrefixBytes) != ASSET_SIGNATURE_SPKI_PREFIX
 			|| NumGet(Spki, PrefixBytes, "UChar") != 4
 		return Map("ok", false, "reason", "bad_key")
-	; BCRYPT_ECCKEY_BLOB: magic 'ECS1', the component size, then X and Y
-	Blob := Buffer(8 + 2 * ASSET_SIGNATURE_COMPONENT_BYTES)
-	NumPut("UInt", 0x31534345, Blob, 0)
-	NumPut("UInt", ASSET_SIGNATURE_COMPONENT_BYTES, Blob, 4)
-	DllCall("RtlMoveMemory", "Ptr", Blob.Ptr + 8, "Ptr", Spki.Ptr + PrefixBytes + 1,
-		"UPtr", 2 * ASSET_SIGNATURE_COMPONENT_BYTES)
-	KeyAlg := 0, HashAlg := 0, Key := 0
-	Reason := "no_native"
-	Verified := false
-	try {
-		if DllCall("bcrypt\BCryptOpenAlgorithmProvider", "Ptr*", &KeyAlg, "WStr", "ECDSA_P256", "Ptr", 0, "UInt", 0, "UInt")
-			throw Error("no ECDSA provider")
-		if DllCall("bcrypt\BCryptOpenAlgorithmProvider", "Ptr*", &HashAlg, "WStr", "SHA256", "Ptr", 0, "UInt", 0, "UInt")
-			throw Error("no SHA-256 provider")
-		Reason := "bad_key"
-		if DllCall("bcrypt\BCryptImportKeyPair", "Ptr", KeyAlg, "Ptr", 0, "WStr", "ECCPUBLICBLOB", "Ptr*", &Key,
-			"Ptr", Blob, "UInt", Blob.Size, "UInt", 0, "UInt")
-			throw Error("key refused")
-		Message := Buffer(StrPut(Record, "UTF-8") - 1)
-		StrPut(Record, Message, Message.Size, "UTF-8")
-		Hash := Buffer(32)
-		Reason := "no_native"
-		if DllCall("bcrypt\BCryptHash", "Ptr", HashAlg, "Ptr", 0, "UInt", 0, "Ptr", Message, "UInt", Message.Size,
-			"Ptr", Hash, "UInt", Hash.Size, "UInt")
-			throw Error("hash refused")
-		Status := DllCall("bcrypt\BCryptVerifySignature", "Ptr", Key, "Ptr", 0, "Ptr", Hash, "UInt", Hash.Size,
-			"Ptr", Signature, "UInt", Signature.Size, "UInt", 0, "UInt")
-		Verified := (Status == 0)
-		Reason := Verified ? "" : "mismatch"
-	} catch {
-		Verified := false
-	}
-	_AssetSignature_Close(Key, KeyAlg, HashAlg)
-	return Map("ok", Verified, "reason", Reason)
+	Reason := CryptoEcdsaP256Verify(Spki, PrefixBytes + 1, ASSET_SIGNATURE_COMPONENT_BYTES, Record, Signature)
+	return Map("ok", Reason == "", "reason", Reason)
 }
 
 /**
