@@ -29,6 +29,22 @@ a sealed Windows updater source, reseal with
 `node tools/ci/seal-windows-updater-original-source.cjs --ref <commit> --write`. Procedures:
 [COORDINATOR-MEMORY](todo-agents/COORDINATOR-MEMORY.md).
 
+## Windows side to do on the PC (from October 25)
+
+Work done on Linux and macOS only; the AHK side is built and run live on the Windows PC.
+
+- [ ] **Hosted Windows unit failures of run 40227776226.** [CODE] `meta`, `config-scope-features`,
+      `hotstrings-shortcuts` have fixes on dev (d22c24a71d..d13ef3f19a, never run); `keymap-gestures` is new
+      (likely the gesture greying, dbc29c5077). `test_hotstrings_scope.ahk:520` (expected 0.5, got 1.0) is
+      unexplained: print `_HotstringsOverrides["autocorrection"].Sections[family]` after
+      `HotstringsOverridesApplyBase()`.
+- [ ] **Release notes in the update-check window (PAR-52).** [CODE] `windows/ui/update_check/init.ahk`:
+      seed `state.notes = {body, owner, repo}` in the `available` message (from `UPDATER_LATEST_RELEASE.Body`,
+      `UPDATER_GH_OWNER`, `UPDATER_GH_REPO`, as `_Updater_ReleaseNotesSeed`), serve `open_url` in the
+      `available` phase through the allowlist behind `_Updater_OpenManualUrl`, add `"open_url", "available"` to
+      `UC_PAGE_ACTIONS`, then drop `open_url:available` from `luaHostsOnly` in
+      `tools/test/test-update-check-dialog.cjs`.
+
 ## Integration pass of 2026-10-24 evening: what landed and what is left
 
 A coordinator session ran a parallel pass on the parity and performance items. Its work is now on `dev` (about 495
@@ -484,12 +500,10 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       dialogs (fb1aa4d934). Left: the two row captions (`ollama_port_label`, `mlx_port_label`: the caption
       machinery takes one argument) and `menu.settings.delay_prompt` against `menu.llm.debounce_prompt`
       (different accepted input).
-- [ ] **PAR-44. Reset error texts on macOS and Linux.** [CODE] Windows `ReloadWithDefaultConfig`
-      (`windows/infra/config_io.ahk`) has the typed failure points acquire, commit, reload_refused, rollback.
-      macOS has a journaled reset (`ui/menu/global_actions_transaction.lua`): surface its failures with
-      `dialog.reset_defaults.reason.*` instead of `dialog.bulk_toggle.save_failed`. Linux: find the reset
-      or restore entry points (grep `save_failed` in `linux/ui/menu/menu_builder.lua`), make them
-      transactional with the same typed points, tests. Where an OS has no reset, say so in the reason text.
+- [x] **PAR-44. Reset error texts on macOS and Linux.** [CODE] Done: shared `config_reset_failure.lua`
+      composes `dialog.reset_defaults.reason.*` for the macOS (`ui/menu/init.lua`) and Linux
+      (`ui/menu/menu_builder.lua`) restore and clear rows; `reload_refused` has no entry there because they
+      reload nothing.
 - [ ] **PAR-45. Notifications: one behaviour for toggles and refusals.** [CODE] Add `NotifyFeature(label, enabled)`
       on Windows (wrapping `NotifierSend`) and Linux (`adapters/notifier.lua`) and call it from the
       equivalents of the macOS handlers (hotstring group and section toggles, personal info, preview bubbles,
@@ -499,9 +513,9 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       around the `quit` command). The `notify.*` strings exist in 21 locales.
 - [ ] **PAR-48. Review values equal to English in each locale.** [CODE] 263-385 per locale and about 30 in
       `fr` (`sg_actions.sticky_*`, `shortcuts.altgr*`). Triage through the i18n skill. Audit I3.
-- [ ] **PAR-52. Release notes on macOS and Linux update windows.** [CODE] Only the Windows update prompt opens
-      `_shared/ui/release_notes`. Embed the shared pane in the shared `update_check` page with the host
-      seeding the release body (macOS Sparkle's prompt shows no notes; the Linux page has no notes pane).
+- [ ] **PAR-52. Release notes on macOS and Linux update windows.** [CODE] Done on macOS and Linux
+      (80a5a650a6): shared `release_notes/pane.js` in the `update_check` page, repository-only links. Left:
+      the Windows host (section "Windows side"), a visual check on a Mac and a Linux desktop.
 
 ### D. Instrumentation and diagnostics
 
