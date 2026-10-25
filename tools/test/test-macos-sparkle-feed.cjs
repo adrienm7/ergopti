@@ -2262,6 +2262,100 @@ try {
 	errors.push('Native Sparkle exact validation error guard: ' + error.message);
 }
 
+// Exercise ordinary local build inputs, which the release job normally overrides.
+try {
+	const assert = require('node:assert/strict');
+	assert.equal((buildScript.match(/^REPO_ROOT=.*$/gm) ?? []).length, 1);
+	assert.equal((buildScript.match(/^main "\$@"$/gm) ?? []).length, 1);
+	const replay = buildScript
+		.replace(/^REPO_ROOT=.*$/m, 'REPO_ROOT="$1"')
+		.replace(
+			/^main "\$@"$/m,
+			'APP_PATH="$2"\nmkdir -p "$APP_PATH/Contents"\nplutil() { :; }\ngenerate_info_plist'
+		);
+	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-build-feed-'));
+	const repository = path.join(temporary, 'repository');
+	const defaultsRelative = 'static/ergopti_plus/_shared/modules/updater/defaults.json';
+	const canonical = JSON.parse(fs.readFileSync(path.join(root, defaultsRelative), 'utf8')).github;
+	try {
+		for (const relative of [
+			'tools/build/launcher_localizations.py',
+			'static/ergopti_plus/_shared/data/locale_order.json'
+		]) {
+			const destination = path.join(repository, relative);
+			fs.mkdirSync(path.dirname(destination), { recursive: true });
+			fs.copyFileSync(path.join(root, relative), destination);
+		}
+		const defaultsPath = path.join(repository, defaultsRelative);
+		fs.mkdirSync(path.dirname(defaultsPath), { recursive: true });
+		const alternate = { owner: 'fixture-owner', repo: 'fixture-repository' };
+		const scenarios = [
+			['canonical', canonical, {}, canonical],
+			['changed-canonical', alternate, {}, alternate],
+			[
+				'owner-override',
+				alternate,
+				{ GH_OWNER: 'selected-owner' },
+				{ ...alternate, owner: 'selected-owner' }
+			],
+			[
+				'repo-override',
+				alternate,
+				{ GH_REPO: 'selected-repository' },
+				{ ...alternate, repo: 'selected-repository' }
+			],
+			[
+				'both-overrides',
+				alternate,
+				{ GH_OWNER: 'selected-owner', GH_REPO: 'selected-repository' },
+				{ owner: 'selected-owner', repo: 'selected-repository' }
+			],
+			['missing-owner', { repo: alternate.repo }, {}, null],
+			['invalid-repository', { ...alternate, repo: 'foreign/repository' }, {}, null],
+			['missing-identity', null, {}, null]
+		];
+		const toPosix = (value) => value.replace(/^([A-Za-z]):/, '/$1').replaceAll('\\', '/');
+		for (const [name, github, overrides, expected] of scenarios) {
+			fs.writeFileSync(defaultsPath, JSON.stringify({ github }));
+			const output = path.join(temporary, name);
+			const env = { ...process.env, ERGOPTI_CHANNEL: 'main' };
+			delete env.GH_OWNER;
+			delete env.GH_REPO;
+			Object.assign(env, overrides);
+			const run = spawnSync(bashExecutable(), ['-s', '--', toPosix(repository), toPosix(output)], {
+				input: replay,
+				encoding: 'utf8',
+				env,
+				timeout: 15000
+			});
+			assert.equal(run.error, undefined, name + ': the real build input declarations must execute');
+			const plist = path.join(output, 'Contents/Info.plist');
+			if (expected === null) {
+				assert.notEqual(run.status, 0, name + ': invalid canonical identity must refuse');
+				assert.equal(fs.existsSync(plist), false, name + ': refusal precedes bundle output');
+				continue;
+			}
+			assert.equal(run.status, 0, name + ': ' + run.stderr);
+			const feed = fs
+				.readFileSync(plist, 'utf8')
+				.match(/<key>SUFeedURL<\/key>\s*<string>(.*?)<\/string>/);
+			assert.ok(feed, name + ': the actual Info.plist must declare its feed');
+			assert.equal(
+				feed[1],
+				`https://raw.githubusercontent.com/${expected.owner}/${expected.repo}/sparkle-appcasts/appcast-main.xml`,
+				'(local-build-feed-defaults) ' + name + ': the bundle follows canonical repository defaults'
+			);
+		}
+	} finally {
+		fs.rmSync(temporary, { recursive: true });
+	}
+	console.log(
+		'[OK] Local build feeds follow canonical repository defaults and explicit overrides.'
+	);
+} catch (error) {
+	errors.push('Local build feed defaults guard: ' + error.message);
+}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`[FAIL] ${error}`);
 	process.exit(1);
