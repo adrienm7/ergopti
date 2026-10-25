@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Drives the real Apps owner and TimerScheduler against observable native timer
 --- identities, plus exact ShellRunner handles. PAUSE must fence Finder/open
---- continuations, centering timers and clipboard restore work before cleanup;
+--- continuations, folder-open timers and clipboard restore work before cleanup;
 --- false/nil/throw cleanup retains the same capability until terminal proof.
 --- ==============================================================================
 
@@ -48,6 +48,8 @@ local function fresh_apps()
 		next_shell_options = {},
 		urls = {},
 		centered = 0,
+		launched = {},
+		launch_result = false,
 		copies = 0,
 		clear_calls = 0,
 		read_all_calls = 0,
@@ -231,6 +233,7 @@ local function fresh_apps()
 			end
 		end
 		fixture.shells[#fixture.shells + 1] = handle
+		if kind == "open" and type(fixture.open_hook) == "function" then fixture.open_hook() end
 		if options.settled_before_return then handle:settle_without_terminal() end
 		if options.sync_terminal then handle:deliver(table.unpack(options.sync_terminal)) end
 		if options.started == false then return false, handle end
@@ -243,7 +246,12 @@ local function fresh_apps()
 			return start_shell("applescript", script, callback)
 		end,
 	}
-	package.loaded["adapters.app_launcher"] = { launch = function() return false end }
+	package.loaded["adapters.app_launcher"] = {
+		launch = function(name)
+			fixture.launched[#fixture.launched + 1] = name
+			return fixture.launch_result
+		end,
+	}
 	package.loaded["adapters.window_manager"] = { activate = function() return false end }
 	package.loaded["adapters.window_info"] = {
 		getFocused = function() return { appId = fixture.focused_app_id } end,
@@ -388,17 +396,22 @@ end)
 
 
 helpers.describe("Apps composite owner: idempotent RESUME", function()
-	helpers.it("does not cancel or revoke ACTIVE centering work", function()
+	helpers.it("does not cancel or revoke ACTIVE folder work (folder-open-handoff)", function()
 		local f = fresh_apps()
-		helpers.assert_eq(f.subject.open_settings(), true)
+		f.launch_result = true
+		helpers.assert_eq(f.subject.open_finder(), true)
 		local timer = f.native_timers[1]
 
 		helpers.assert_eq(f.subject.resume_apps_actions(), true)
 		helpers.assert_eq(timer.stop_calls, 0,
 			"duplicate RESUME must not settle an ACTIVE timer")
 		timer:fire()
-		helpers.assert_eq(f.centered, 1,
-			"duplicate RESUME must preserve the timer generation")
+		helpers.assert_eq(#f.shells, 1,
+			"a committed folder timer must hand off to the real open owner")
+		helpers.assert_eq(f.shells[1].payload, os.getenv("HOME"))
+		f.shells[1]:deliver(true)
+		for _, pending in ipairs(f.native_timers) do pending:fire() end
+		helpers.assert_eq(f.subject.has_pending_apps_action(), false)
 	end)
 end)
 
@@ -449,27 +462,54 @@ end)
 
 
 helpers.describe("Apps composite owner: exact timer fence", function()
-	helpers.it("keeps centering delivery pending until its native mutation returns", function()
+	helpers.it("keeps native folder acquisition pending through PAUSE (folder-open-handoff)", function()
 		local f = fresh_apps()
 		local nested_pause
-		helpers.assert_eq(f.subject.open_settings(), true)
-		f.center_hook = function()
-			f.center_hook = nil
+		f.launch_result = true
+		f.queue_shell({ terminate_mode = "sync" })
+		helpers.assert_eq(f.subject.open_finder(), true)
+		f.open_hook = function()
+			f.open_hook = nil
 			nested_pause = f.subject.pause_apps_actions()
 		end
 		f.native_timers[1]:fire()
 		helpers.assert_eq(nested_pause, false,
-			"PAUSE inside setFrame may not settle before the callback boundary returns")
-		helpers.assert_eq(f.centered, 1)
+			"PAUSE inside open must wait for the native acquisition callback to return")
+		helpers.assert_eq(f.shells[1].payload, os.getenv("HOME"))
+		helpers.assert_eq(f.shells[1].terminate_calls, 1)
 		helpers.assert_eq(f.subject.is_apps_actions_paused(), true)
 		helpers.assert_eq(f.subject.pause_apps_actions(), true)
 	end)
 
+	helpers.it("blocks successors until a delivered timer actually stops (folder-open-handoff)", function()
+		local f = fresh_apps()
+		f.launch_result = true
+		helpers.assert_eq(f.subject.open_finder(), true)
+		local timer = f.native_timers[1]
+		timer.stop_mode = "false"
+		timer:fire()
+		helpers.assert_eq(#f.shells, 0, "delivery cannot bypass the retained native timer")
+		helpers.assert_eq(f.subject.open_chatgpt("https://example.invalid"), false,
+			"a delivered timer's real cleanup debt must block a successor")
+		helpers.assert_eq(#f.urls, 0)
+		timer.stop_mode = "success"
+		timer:deliver()
+		helpers.assert_eq(#f.shells, 1, "the exact stop receipt admits one pending folder handoff")
+		helpers.assert_eq(f.shells[1].payload, os.getenv("HOME"))
+		f.shells[1]:deliver(true)
+		timer:deliver()
+		for _, pending in ipairs(f.native_timers) do pending:fire() end
+		helpers.assert_eq(#f.shells, 1, "retired native deliveries never repeat the open")
+		helpers.assert_eq(f.subject.has_pending_apps_action(), false)
+	end)
+
 	for _, mode in ipairs({ "false", "nil", "throw" }) do
-		helpers.it("retains and fences the centering timer after stop " .. mode, function()
+		helpers.it("retains and fences the folder-open timer after stop " .. mode, function()
 			local f = fresh_apps()
-			helpers.assert_eq(f.subject.open_settings(), true)
+			f.launch_result = true
+			helpers.assert_eq(f.subject.open_finder(), true)
 			local timer = f.native_timers[1]
+			local acquired_timers = #f.native_timers
 			timer.stop_mode = mode
 			helpers.assert_eq(f.subject.pause_apps_actions(), false)
 			helpers.assert_eq(timer.stop_calls, 1)
@@ -480,15 +520,15 @@ helpers.describe("Apps composite owner: exact timer fence", function()
 			timer.stop_mode = "success"
 			timer:fire()
 			timer:deliver()
-			helpers.assert_eq(f.centered, 0,
+			helpers.assert_eq(#f.shells, 0,
 				"a due cleanup callback must remain inert after PAUSE closed admission")
 			helpers.assert_eq(timer.stop_calls, 2)
 			helpers.assert_eq(timer.stop_identities[2] == timer, true)
 			helpers.assert_eq(f.subject.pause_apps_actions(), true)
 			helpers.assert_eq(f.subject.resume_apps_actions(), true)
-			helpers.assert_eq(#f.native_timers, 1,
+			helpers.assert_eq(#f.native_timers, acquired_timers,
 				"RESUME must not replay interrupted navigation")
-	end)
+		end)
 	end
 end)
 

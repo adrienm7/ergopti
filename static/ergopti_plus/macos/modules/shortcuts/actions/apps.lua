@@ -178,8 +178,16 @@ end
 local function apps_cleanup_debt(scope)
 	if scope.acquisitions ~= 0 then return true end
 	for _, entry in pairs(_apps_timers) do
+		local handle = entry.handle
+		-- A settled callback keeps its owner through the handoff, but that
+		-- ownership is not cleanup debt. A delivered native timer may still be.
+		local handing_off = entry.callback_active == true and entry.due == true
+			and type(handle) == "table" and handle.timer == nil
+			and apps_entry_authorized(entry)
 		if entry.scope == scope
-			and (entry.discard == true or entry.committed ~= true) then return true end
+			and (entry.discard == true
+				or (entry.committed ~= true and not handing_off)
+				or (entry.due == true and handle.timer ~= nil)) then return true end
 	end
 	for _, entry in pairs(_apps_shells) do
 		if entry.scope == scope
