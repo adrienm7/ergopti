@@ -256,9 +256,11 @@ local function make_streaming_handler(is_current)
 	is_current = type(is_current) == "function" and is_current or function() return true end
 	local shown    = {}
 	local ui_shown = false
+	local frame_output = require("modules.llm.bootstrap_output").new()
 
-	return function(_, stdout_chunk, stderr_chunk)
+	return function(_, stdout_chunk, stderr_chunk, terminal)
 		if not is_current() then return false end
+		stdout_chunk, stderr_chunk = frame_output(stdout_chunk, stderr_chunk, terminal)
 		if not forward_chunk(stderr_chunk, is_current, owns_window) then return false end
 		if not forward_chunk(stdout_chunk, is_current, owns_window) then return false end
 
@@ -728,8 +730,7 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 	local function process_terminal(exit_code, stdout, stderr)
 		diagnostic_tail.push(stdout, "stdout")
 		diagnostic_tail.push(stderr, "stderr")
-		if not forward_chunk(stdout or "", owner_is_current, owns_window) then return false end
-		if not forward_chunk(stderr or "", owner_is_current, owns_window) then return false end
+		if not forward_stream(nil, stdout, stderr, true) then return false end
 
 		local function publish_failure(message, failure_code, failure_domain)
 			if not owner_is_current() then return false end
