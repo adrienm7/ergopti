@@ -31,12 +31,10 @@
 
 'use strict';
 
-const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const DRIVERS_DIR = path.join(ROOT, 'static', 'ergopti_plus');
 
 // An OS or a vendor product. Anything here in a PATH says "this differs by OS"
 // in a word other than `platform`.
@@ -74,28 +72,34 @@ function trackedDriverFiles() {
 		.filter(Boolean);
 }
 
+const TRACKED_FILES = trackedDriverFiles();
+
 /**
  * Top-level sub-folders of a driver's platform/ tree.
  * @param {string} driver - Driver directory name.
  * @returns {string[]} Sorted folder names, empty when platform/ is absent.
  */
 function platformFolders(driver) {
-	const dir = path.join(DRIVERS_DIR, driver, 'platform');
-	if (!fs.existsSync(dir)) return [];
-	return fs
-		.readdirSync(dir, { withFileTypes: true })
-		.filter((e) => e.isDirectory())
-		.map((e) => e.name)
-		.sort();
+	const prefix = `static/ergopti_plus/${driver}/platform/`;
+	return [
+		...new Set(
+			TRACKED_FILES.filter((file) => file.startsWith(prefix))
+				.map((file) => file.slice(prefix.length).split('/'))
+				.filter((parts) => parts.length > 1)
+				.map((parts) => parts[0])
+		)
+	].sort();
 }
 
 // A driver is a directory with an adapters/ tree — the hexagonal marker, the
 // same discovery test-config-schema.cjs uses.
-const DRIVERS = fs
-	.readdirSync(DRIVERS_DIR, { withFileTypes: true })
-	.filter((e) => e.isDirectory() && fs.existsSync(path.join(DRIVERS_DIR, e.name, 'adapters')))
-	.map((e) => e.name)
-	.sort();
+const DRIVERS = [
+	...new Set(
+		TRACKED_FILES.map(
+			(file) => file.match(/^static\/ergopti_plus\/([^/]+)\/adapters\//)?.[1]
+		).filter(Boolean)
+	)
+].sort();
 
 if (DRIVERS.length < 3) {
 	console.error(
@@ -104,7 +108,7 @@ if (DRIVERS.length < 3) {
 	process.exit(1);
 }
 
-const offenders = trackedDriverFiles().filter((f) => !EXEMPT.test(f) && VENDOR_WORDS.test(f));
+const offenders = TRACKED_FILES.filter((f) => !EXEMPT.test(f) && VENDOR_WORDS.test(f));
 
 const folders = new Map(DRIVERS.map((d) => [d, platformFolders(d)]));
 const union = [...new Set([...folders.values()].flat())].sort();
