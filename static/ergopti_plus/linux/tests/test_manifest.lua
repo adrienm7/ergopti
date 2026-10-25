@@ -594,6 +594,7 @@ return {
 	"tests.unit.modules.shortcuts.test_shortcut_catalogue",
 	"tests.unit.ui.composer_check.test_composer_check_window",
 	"tests.unit.adapters.network.test_network_check",
+	"tests.unit.adapters.network.test_policy_read_admission",
 	"tests.unit.infra.updater.test_asset_signature",
 	"tests.unit.modules.keymap.test_layout_selection_owner",
 	"tests.unit.modules.keymap.test_layout_registry_channel",

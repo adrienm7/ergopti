@@ -11,6 +11,7 @@
 
 local M = {}
 local Paths = require("infra.paths")
+local Reader = require("infra.regular_file_reader")
 local Json = require("json")
 
 -- The inventory is a few hundred bytes; a larger file is not the shipped one.
@@ -24,7 +25,7 @@ local function load()
 	if initialized then return inventory, refusal end
 	initialized = true
 	local path = Paths.shared("modules/network/route_origins.json")
-	local file = path and io.open(path, "rb")
+	local file = path and Reader.open_source(path)
 	if not file then refusal = "route-origins-unavailable"; return nil, refusal end
 	local bytes = file:read(MAX_INVENTORY_BYTES + 1)
 	local closed = file:close()
