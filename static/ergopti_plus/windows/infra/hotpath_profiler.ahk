@@ -31,6 +31,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include ../adapters/boot_clock.ahk
+
 ; QueryPerformanceFrequency is constant for the life of the process; cache it on
 ; first use so the per-keystroke path never re-queries it.
 global _HOTPATH_QPC_FREQ := 0
@@ -97,9 +99,7 @@ global _HOTPATH_BREAKDOWN_CAP := 24
 ; Read the current high-resolution performance counter.
 ; @returns {Integer} Raw QPC tick value; pass to HotPath_LogIfSlow as the start.
 HotPath_Now() {
-	local counter := 0
-	DllCall("QueryPerformanceCounter", "Int64*", &counter)
-	return counter
+	return PerfClockTicks()
 }
 
 ; Sum the wall clock of the segments in ``Closed`` that opened AND closed inside
@@ -164,8 +164,8 @@ HotPath_LogIfSlow(Label, StartTicks, Detail := "") {
 	static Closed := []
 	local now := 0
 	if (_HOTPATH_QPC_FREQ == 0)
-		DllCall("QueryPerformanceFrequency", "Int64*", &_HOTPATH_QPC_FREQ)
-	DllCall("QueryPerformanceCounter", "Int64*", &now)
+		_HOTPATH_QPC_FREQ := PerfClockFrequency()
+	now := PerfClockTicks()
 	ElapsedMs := (now - StartTicks) / _HOTPATH_QPC_FREQ * 1000.0
 	; .Get, never a bracket read: an absent key THROWS in AHK v2, and this runs on
 	; the keystroke path where a throw would take the hook down.
@@ -225,8 +225,8 @@ _HotPathBreakdown(Marks, Op, Label := "", StartTicks := 0) {
 			return ""
 		local now := 0
 		if (_HOTPATH_QPC_FREQ == 0)
-			DllCall("QueryPerformanceFrequency", "Int64*", &_HOTPATH_QPC_FREQ)
-		DllCall("QueryPerformanceCounter", "Int64*", &now)
+			_HOTPATH_QPC_FREQ := PerfClockFrequency()
+		now := PerfClockTicks()
 		ElapsedMs := (_HOTPATH_QPC_FREQ > 0)
 			? ((now - StartTicks) / _HOTPATH_QPC_FREQ * 1000.0) : 0.0
 		Marks.Push({ L: Label, Ms: ElapsedMs })
@@ -422,9 +422,7 @@ PerfCount(Name, Amount := 1) {
 
 /** Opens a stage measurement; pair with PerfStage_End. Two QPC reads in total. */
 PerfStage_Begin() {
-	local counter := 0
-	DllCall("QueryPerformanceCounter", "Int64*", &counter)
-	return counter
+	return PerfClockTicks()
 }
 
 /** Microseconds since PerfStage_Begin, without recording anything; for per-name counters. */
@@ -434,8 +432,8 @@ PerfElapsedUs(StartTicks) {
 		return 0
 	local now := 0
 	if (_HOTPATH_QPC_FREQ == 0)
-		DllCall("QueryPerformanceFrequency", "Int64*", &_HOTPATH_QPC_FREQ)
-	DllCall("QueryPerformanceCounter", "Int64*", &now)
+		_HOTPATH_QPC_FREQ := PerfClockFrequency()
+	now := PerfClockTicks()
 	return Round((now - StartTicks) / _HOTPATH_QPC_FREQ * 1000000)
 }
 
@@ -446,8 +444,8 @@ PerfStage_End(Label, StartTicks, Count := -1) {
 		return 0.0
 	local now := 0
 	if (_HOTPATH_QPC_FREQ == 0)
-		DllCall("QueryPerformanceFrequency", "Int64*", &_HOTPATH_QPC_FREQ)
-	DllCall("QueryPerformanceCounter", "Int64*", &now)
+		_HOTPATH_QPC_FREQ := PerfClockFrequency()
+	now := PerfClockTicks()
 	ElapsedMs := (now - StartTicks) / _HOTPATH_QPC_FREQ * 1000.0
 	HotPath_RecordLatency(Label, ElapsedMs, _HOTPATH_SLOW_MS)
 	; Total microseconds per stage ride the interval counter record, so a stage's cost
@@ -461,20 +459,7 @@ PerfStage_End(Label, StartTicks, Count := -1) {
 /** Reads this process's memory and kernel-object counts; every field is -1 when its call fails. */
 PerfProcessState() {
 	State := { WorkingSetMb: -1, PeakWorkingSetMb: -1, PrivateMb: -1, Handles: -1, GdiObjects: -1, UserObjects: -1 }
-	Process := DllCall("GetCurrentProcess", "Ptr")
-	Counters := Buffer(80, 0)
-	NumPut("UInt", 80, Counters, 0)
-	if DllCall("psapi\GetProcessMemoryInfo", "Ptr", Process, "Ptr", Counters, "UInt", 80) {
-		State.PeakWorkingSetMb := Round(NumGet(Counters, 8, "UPtr") / 1048576, 1)
-		State.WorkingSetMb := Round(NumGet(Counters, 16, "UPtr") / 1048576, 1)
-		State.PrivateMb := Round(NumGet(Counters, 72, "UPtr") / 1048576, 1)
-	}
-	local handles := 0
-	if DllCall("GetProcessHandleCount", "Ptr", Process, "UInt*", &handles)
-		State.Handles := handles
-	; GR_GDIOBJECTS = 0, GR_USEROBJECTS = 1: leaks show here before the 10000 cap.
-	State.GdiObjects := DllCall("GetGuiResources", "Ptr", Process, "UInt", 0, "UInt")
-	State.UserObjects := DllCall("GetGuiResources", "Ptr", Process, "UInt", 1, "UInt")
+	ProcessResourceState(State)
 	return State
 }
 
