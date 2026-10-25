@@ -127,6 +127,8 @@ class _CurlCaptureNativeDownloadRun extends _UpdaterNativeDownloadRun {
 		this.SwapPath := this.Directory . "swap.ps1"
 		FileAppend(this.OldBytes, this.CurrentExe, "UTF-8-RAW")
 		this.Capture.Acquire(this.Directory)
+		this.StagingOwner := _UpdaterStagedArtifactRetirement({NewExe: this.NewExe, SwapScript: this.SwapPath, CurlCapture: this.Capture})
+		AssertTrue(this.StagingOwner.AcquireExclusive())
 		Url := "https://managed-fixture.invalid:" . this.Owner.State["tls_port"] . this.Path
 		this.StartedTick := A_TickCount
 		this.Transport := _Updater_BuildStagingTransport(_Updater_StagingWorkerPath(), _Updater_SwapWorkerPath(),
@@ -134,6 +136,7 @@ class _CurlCaptureNativeDownloadRun extends _UpdaterNativeDownloadRun {
 			_VendorDir . "\ergopti_updater_download.ps1", this.DeadlineMs, this.StartedTick,
 			_SharedDir . "\modules\network\proxy_policy.json", _SharedDir . "\modules\updater\defaults.json", 524288)
 		try {
+			_Updater_BindStagedArtifactTransport(this.Transport, this.StagingOwner)
 			_Updater_BindCurlCaptureTransport(this.Transport, this.Capture)
 			Proxy := "127.0.0.1:" . this.Owner.State["proxy_port"]
 			Admission := '$reader={param($MaxBytes)[pscustomobject]@{Ok=$true;AutoDetect=$false;Absent=$false;PacUrl="";Proxy="' . Proxy . '";Bypass="";NativeError=0;FailureOrigin=""}};$environment={param($Name)return ""};'
@@ -146,7 +149,7 @@ class _CurlCaptureNativeDownloadRun extends _UpdaterNativeDownloadRun {
 		} finally _Updater_ClearStagingTransport(this.Transport)
 	}
 	Retire() {
-		if !_Updater_RetireCurlCapture(this.Capture)
+		if !_Updater_RetireCurlCapture(this.StagingOwner)
 			return false
 		return super.Retire()
 	}
@@ -181,7 +184,7 @@ _CurlCaptureNativeCancellation(Contract) {
 			_UpdaterDownloadInProgress := true
 			_UpdaterDownloadWorker := Run.Handle
 			_UpdaterDownloadRequest := 0
-			_UpdaterDownloadArtifacts := {NewExe: Run.NewExe, SwapScript: Run.SwapPath, CurlCapture: Run.Capture}
+			_UpdaterDownloadArtifacts := {NewExe: Run.NewExe, SwapScript: Run.SwapPath, CurlCapture: Run.Capture, StagingRetirement: Run.StagingOwner}
 			_UpdaterDownloadStartedTick := Run.StartedTick
 			Epoch := ++_UpdaterSelfUpdateEpoch
 			_UpdaterSwapOwner := 0
@@ -577,6 +580,10 @@ _CurlCaptureProductionJoinControls() {
 		"all actual production lifecycle owners must be read nonvacuously")
 	AssertContains(Start, "Capture.Acquire(CaptureParent)", "the parent allocates before a worker can start")
 	AssertContains(Start, "_Updater_BindCurlCaptureTransport(Transport, Capture)")
+	AssertContains(Start, "Staged := _Updater_AcquireStagingArtifacts(StagingEpoch)")
+	AssertContains(Start, "_Updater_BindStagedArtifactTransport(Transport, Staged)")
+	AssertTrue(InStr(Start, "_Updater_AcquireStagingArtifacts(StagingEpoch)") < InStr(Start, "ShellRunner_SpawnTreeOwned("),
+		"exclusive staged custody exists before any child process")
 	AssertContains(Start, "Capture.Attach(Worker)")
 	AssertTrue(InStr(Start, "Capture.Attach(Worker)") < InStr(Start, "Worker.start()"),
 		"the exact tree owner transfers before native launch")
@@ -590,6 +597,7 @@ _CurlCaptureProductionJoinControls() {
 	AssertContains(Reserve, "_UpdaterCurlCaptureDebt.Count != 0", "successors cannot borrow capture cleanup debt")
 	Parent := RTrim(_SR_AcquireCaptureDirectory(), "\")
 	Capture := _UpdaterCurlCaptureLedger()
+	Staged := _UpdaterStagedArtifactRetirement({NewExe: Parent . "\staged.exe", SwapScript: Parent . "\swap.ps1"})
 	Transport := 0
 	Failed := false
 	Primary := 0
@@ -597,12 +605,19 @@ _CurlCaptureProductionJoinControls() {
 	Moved := ""
 	try {
 		Capture.Acquire(Parent)
+		AssertTrue(Staged.AcquireExclusive())
 		Transport := _Updater_BuildStagingTransport(_Updater_StagingWorkerPath(), _Updater_SwapWorkerPath(),
 			"https://github.com/adrienm7/ergopti/releases/download/v9.8.7/ErgoptiPlus.exe",
 			"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			Parent . "\staged.exe", Parent . "\swap.ps1", Parent . "\existing.exe", UPDATER_MIN_EXE_SIZE_BYTES,
 			5000, _VendorDir . "\ergopti_updater_download.ps1", 30000, A_TickCount,
 			_SharedDir . "\modules\network\proxy_policy.json", _SharedDir . "\modules\updater\defaults.json", 524288)
+		_Updater_BindStagedArtifactTransport(Transport, Staged)
+		for Suffix, Identity in Map("_STAGING_DIRECTORY_ID", Staged.Identity(Staged.Directory),
+			"_STAGED_EXECUTABLE_ID", Staged.Identity(Staged.Files["NewExe"]), "_SWAP_WORKER_ID", Staged.Identity(Staged.Files["SwapScript"])) {
+			AssertEqual(Identity, EnvGet(Transport.Prefix . Suffix), "the child receives the original retained native identity")
+		}
+		AssertThrows(() => _Updater_BindStagedArtifactTransport(Transport, Staged), "staged ownership cannot be transferred twice")
 		_Updater_BindCurlCaptureTransport(Transport, Capture)
 		Found := 0
 		for Pair in Transport.Environment {
@@ -627,6 +642,7 @@ _CurlCaptureProductionJoinControls() {
 		Primary := Failure
 	} finally {
 		_Updater_ClearStagingTransport(Transport)
+		AssertTrue(Staged.Retire(), "the original staged native references must close")
 		_CurlCaptureFinishNativeFixture(Capture, Parent, Failed, Primary)
 	}
 }

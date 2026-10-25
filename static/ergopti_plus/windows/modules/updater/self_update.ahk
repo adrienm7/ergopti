@@ -899,7 +899,7 @@ _Updater_RetireCurlCaptureArtifacts(Artifacts, DiscardStaging := false) {
 		return true
 	if DiscardStaging {
 		if !Artifacts.HasOwnProp("StagingRetirement")
-			Artifacts.StagingRetirement := _UpdaterStagedArtifactRetirement(Artifacts)
+			return _Updater_RetireCurlCaptureArtifacts(Artifacts)
 		Closed := _Updater_RetireCurlCapture(Artifacts.StagingRetirement)
 		if !Closed
 			try LoggerWarn("Updater", "Staged update retirement retains native file or process debt.")
@@ -1798,14 +1798,17 @@ _Updater_ParseStagingFailure(Stdout) {
 	Debt := []
 	if _Updater_ExactFailureField(Envelope, "cleanup_debt", -1) != -1 {
 		RawDebt := _Updater_ExactFailureField(Envelope, "cleanup_debt")
-		if !(RawDebt is Array) || RawDebt.Length > 6
+		Resources := Map()
+		Resources.CaseSense := "On"
+		for Name in ["request", "output", "input", "response", "staged_executable", "swap_worker", "staging_directory"]
+			Resources[Name] := true
+		if !(RawDebt is Array) || RawDebt.Length > Resources.Count
 			return Unknown
 		for Entry in RawDebt {
 			if !(Entry is Map) || Entry.Count != 2
 				return Unknown
 			Resource := _Updater_ExactFailureField(Entry, "resource")
-			if !(Resource is String) || !RegExMatch(Resource,
-				"^(?:request|output|input|response|staged_executable|swap_worker)$")
+			if !(Resource is String) || !Resources.Has(Resource)
 				return Unknown
 			CleanReceipt := _Updater_AdmitStagingReceipt(_Updater_ExactFailureField(Entry, "receipt"), Contract)
 			if !(CleanReceipt is Map)
@@ -2340,6 +2343,8 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 	StartError := ""
 	Capture := 0
 	try {
+		if !(AuthenticatedSize is Integer) || AuthenticatedSize <= 0
+			throw Error("Authenticated release byte length is required before staging allocation.")
 		if AuthenticatedSize > 0 {
 			Capture := _UpdaterCurlCaptureLedger()
 			PreviousCritical := Critical("On")
@@ -2353,6 +2358,9 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 			if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 				throw Error("Curl capture allocation crossed transaction retirement.")
 		}
+		Staged := _Updater_AcquireStagingArtifacts(StagingEpoch)
+		if !(Staged is _UpdaterStagedArtifactRetirement)
+			throw Error("Staged artifact exclusive allocation was refused.")
 		for WorkerPath in [StagingWorker, SwapWorker]
 			if !FileExist(WorkerPath)
 				throw Error("Bundled updater worker is missing: " . WorkerPath)
@@ -2363,6 +2371,7 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 			_UpdaterDownloadStartedTick,
 			_SharedDir . "\modules\network\proxy_policy.json",
 			_SharedDir . "\modules\updater\defaults.json", AuthenticatedSize)
+		_Updater_BindStagedArtifactTransport(Transport, Staged)
 		if IsObject(Capture)
 			_Updater_BindCurlCaptureTransport(Transport, Capture)
 		if _Updater_SelfUpdateEpochIsCurrent(StagingEpoch) {
@@ -2613,6 +2622,22 @@ _Updater_AdmitStagingCompletion(StagingEpoch) {
 
 ; READY is a creation/verification receipt from the exact completed worker.
 ; A failed CreateNew collision conveys no authority over the existing paths.
+_Updater_AcquireStagingArtifacts(StagingEpoch) {
+	global _UpdaterDownloadArtifacts
+	PreviousCritical := Critical("On")
+	try {
+		if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch) || !IsObject(_UpdaterDownloadArtifacts)
+			return 0
+		if _UpdaterDownloadArtifacts.HasOwnProp("StagingRetirement")
+			throw Error("Staged artifact ownership has already been published.")
+		Owner := _UpdaterStagedArtifactRetirement(_UpdaterDownloadArtifacts)
+		_UpdaterDownloadArtifacts.StagingRetirement := Owner
+	} finally Critical(PreviousCritical)
+	if !Owner.AcquireExclusive() || !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+		return 0
+	return Owner
+}
+
 _Updater_RetainVerifiedStagingArtifacts(StagingEpoch) {
 	global _UpdaterDownloadArtifacts
 	PreviousCritical := Critical("On")
@@ -2621,7 +2646,7 @@ _Updater_RetainVerifiedStagingArtifacts(StagingEpoch) {
 			return 0
 		Artifacts := _UpdaterDownloadArtifacts
 		if !Artifacts.HasOwnProp("StagingRetirement")
-			Artifacts.StagingRetirement := _UpdaterStagedArtifactRetirement(Artifacts)
+			return 0
 		Artifacts.StagingComplete := true
 		return Artifacts.StagingRetirement
 	} finally Critical(PreviousCritical)
@@ -2665,9 +2690,7 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 	}
 	if ExitCode == 0 && Stdout == "READY" {
 		StagingOwner := _Updater_RetainVerifiedStagingArtifacts(StagingEpoch)
-		if !IsObject(StagingOwner)
-			return
-		Adopted := StagingOwner.Adopt()
+		Adopted := IsObject(StagingOwner) && StagingOwner.Validate()
 		if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 			return
 		if !Adopted {
@@ -3775,7 +3798,7 @@ _Updater_EndDownloadTransaction(StagingEpoch := 0) {
 		Critical(PreviousCritical)
 	}
 	try {
-		DiscardStaging := IsObject(Artifacts) && Artifacts.HasOwnProp("StagingComplete") && Artifacts.StagingComplete
+		DiscardStaging := IsObject(Artifacts) && Artifacts.HasOwnProp("StagingRetirement")
 		_Updater_RetireCurlCaptureArtifacts(Artifacts, DiscardStaging)
 		try SetTimer((*) => _Updater_RebuildMenu(), -50)
 	} finally _Updater_ReleaseDownloadRetirement(Retirement)

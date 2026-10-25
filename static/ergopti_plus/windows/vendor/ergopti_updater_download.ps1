@@ -13,6 +13,29 @@ public static class ErgoptiUpdaterMonotonicClock
     public static extern UInt64 GetTickCount64();
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     public static extern bool CreateDirectoryW(string path, IntPtr security);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern Microsoft.Win32.SafeHandles.SafeFileHandle CreateFileW(string path, uint access,
+        uint sharing, IntPtr security, uint disposition, uint attributes, IntPtr template);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetFileInformationByHandle(Microsoft.Win32.SafeHandles.SafeFileHandle handle, IntPtr info);
+    public static Microsoft.Win32.SafeHandles.SafeFileHandle OpenStagingDirectory(string path)
+    {
+        var handle = CreateFileW(path, 0, 3, IntPtr.Zero, 3, 0x02200000, IntPtr.Zero);
+        if (handle.IsInvalid) { int error = Marshal.GetLastWin32Error(); handle.Dispose(); throw new System.ComponentModel.Win32Exception(error); }
+        return handle;
+    }
+    public static string StagingIdentity(Microsoft.Win32.SafeHandles.SafeFileHandle handle, bool directory)
+    {
+        IntPtr info = Marshal.AllocHGlobal(52);
+        try {
+            if (!GetFileInformationByHandle(handle, info)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            uint attributes = unchecked((uint)Marshal.ReadInt32(info, 0));
+            if ((attributes & 0x400) != 0 || ((attributes & 0x10) != 0) != directory)
+                throw new InvalidOperationException("Staged file kind was refused.");
+            return unchecked((uint)Marshal.ReadInt32(info, 28)).ToString("x8") + ":" +
+                unchecked((uint)Marshal.ReadInt32(info, 44)).ToString("x8") + unchecked((uint)Marshal.ReadInt32(info, 48)).ToString("x8");
+        } finally { Marshal.FreeHGlobal(info); }
+    }
 }
 '@ -ErrorAction Stop
 }
@@ -577,4 +600,26 @@ function Assert-ErgoptiOwnedArtifactOutputCurrent {
     if ($Current -isnot [bool] -or -not $Current) {
         throw [InvalidOperationException]::new('Exact artifact output authority was withdrawn.')
     }
+}
+
+# The parent retains CREATE_NEW identities before the child exists. Opening an
+# existing stream never truncates a foreign replacement; the exclusive stream
+# and the separately held directory lease prevent rename during its use.
+function Open-ErgoptiParentStagedOutput {
+    param([string]$Path, [string]$ExpectedIdentity)
+    if ($ExpectedIdentity -cnotmatch '^[0-9a-f]{8}:[0-9a-f]{16}\z') {
+        throw [ArgumentException]::new('Parent staged identity was refused.')
+    }
+    $Stream = $null
+    try {
+        $Stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        if ([ErgoptiUpdaterMonotonicClock]::StagingIdentity($Stream.SafeFileHandle, $false) -cne $ExpectedIdentity -or
+            $Stream.Position -ne 0 -or $Stream.Length -ne 0) {
+            throw [InvalidOperationException]::new('Parent staged file identity or initial bytes were refused.')
+        }
+        $Owner = @{stream=$Stream;identity=$ExpectedIdentity;is_current={param($Owner)
+            return [ErgoptiUpdaterMonotonicClock]::StagingIdentity($Owner.stream.SafeFileHandle, $false) -ceq $Owner.identity}}
+        $Stream = $null
+        return $Owner
+    } finally { if ($null -ne $Stream) { $Stream.Dispose() } }
 }

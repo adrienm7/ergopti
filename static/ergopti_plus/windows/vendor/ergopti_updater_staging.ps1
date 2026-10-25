@@ -39,15 +39,28 @@ $ProxyPolicyPath = Read-ErgoptiStagingInput "PROXY_POLICY" $false
 $UpdaterDefaultsPath = Read-ErgoptiStagingInput "UPDATER_DEFAULTS" $false
 [int64]$AuthenticatedSize = Read-ErgoptiStagingInput "AUTHENTICATED_SIZE" $false
 $OwnedCaptureDirectory = Read-ErgoptiStagingInput "CURL_CAPTURE" $false
+$ParentDirectoryIdentity = Read-ErgoptiStagingInput "STAGING_DIRECTORY_ID" ($AuthenticatedSize -gt 0)
+$ParentExecutableIdentity = Read-ErgoptiStagingInput "STAGED_EXECUTABLE_ID" ($AuthenticatedSize -gt 0)
+$ParentSwapIdentity = Read-ErgoptiStagingInput "SWAP_WORKER_ID" ($AuthenticatedSize -gt 0)
+$StagingDirectoryLease = $null
 $State=@{Stage="proxy_resolve";Reason="download";Receipt=@{};CleanupDebt=@()};if ($OwnedCaptureDirectory -ne "") {$State.OwnedCaptureDirectory=$OwnedCaptureDirectory}
 function CleanWorker($Path,$Name){try{[IO.File]::Delete($Path)}catch{if(Get-Command Add-ErgoptiUpdaterCleanupDebt -ErrorAction SilentlyContinue){Add-ErgoptiUpdaterCleanupDebt $State $Name "file_remove" $_.Exception}else{$State.CleanupDebt+=@{resource=$Name;receipt=@{backend="dotnet";stage="file_remove";failure_provenance="unknown"}}}}}
 try {
   . $DownloadModulePath
   . (Join-Path (Split-Path -Parent $DownloadModulePath) "ergopti_network_routes.ps1")
+  if ($AuthenticatedSize -gt 0) {
+    $State.Stage="file_create"
+    $ParentDirectory = [IO.Path]::GetDirectoryName($NewExe)
+    if ($ParentDirectoryIdentity -cnotmatch '^[0-9a-f]{8}:[0-9a-f]{16}\z' -or
+        $ParentDirectory -cne [IO.Path]::GetDirectoryName($SwapScriptPath)) {throw "Parent staging directory was refused"}
+    $StagingDirectoryLease = [ErgoptiUpdaterMonotonicClock]::OpenStagingDirectory($ParentDirectory)
+    if ([ErgoptiUpdaterMonotonicClock]::StagingIdentity($StagingDirectoryLease, $true) -cne $ParentDirectoryIdentity) {throw "Parent staging directory identity changed"}
+    $OpenParentDestination = {param($Path,$Size) Open-ErgoptiParentStagedOutput $Path $ParentExecutableIdentity}.GetNewClosure()
+  }
   $Resolver={param($Destination,$Budget) Resolve-ErgoptiNativeNetworkRoutes $Destination $Budget $ReadConfig $ReadEnvironment $ProxyPolicyPath $UpdaterDefaultsPath}
   $Request=[System.Net.HttpWebRequest]::Create($Url)
   $Request.ReadWriteTimeout = $TimeoutMs
-  if ($AuthenticatedSize -gt 0) {$ExpectedSize=Invoke-ErgoptiUpdaterArtifactDownload ([Uri]$Url) $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick $AuthenticatedSize $ProxyPolicyPath $UpdaterDefaultsPath $ReadEnvironment} else {$ExpectedSize=Invoke-ErgoptiUpdaterDownload $Request $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick}
+  if ($AuthenticatedSize -gt 0) {$ExpectedSize=Invoke-ErgoptiUpdaterArtifactDownload ([Uri]$Url) $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick $AuthenticatedSize $ProxyPolicyPath $UpdaterDefaultsPath $ReadEnvironment $OpenParentDestination} else {$ExpectedSize=Invoke-ErgoptiUpdaterDownload $Request $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick}
   $State.Stage="file_read"
   $ActualSize=(Get-Item -LiteralPath $NewExe).Length
   if ($ExpectedSize -gt 0 -and $ActualSize -ne $ExpectedSize) { throw "Content-Length mismatch" }
@@ -60,16 +73,18 @@ try {
   if ($AuthenticatedSize -le 0) {$State.Stage="file_remove";[IO.File]::Delete($SwapScriptPath)}
   $State.Stage="file_write"
   $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
-  if ($AuthenticatedSize -le 0) {[IO.File]::WriteAllText($SwapScriptPath,$SwapSource,[Text.UTF8Encoding]::new($false))} else {$SwapOutput=$null;try{$State.Stage="file_create";$SwapOutput=[IO.File]::Open($SwapScriptPath,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None);$State.SwapWorkerOwned=$true;$State.Stage="file_write";$SwapBytes=[Text.Encoding]::UTF8.GetBytes($SwapSource);$SwapOutput.Write($SwapBytes,0,$SwapBytes.Length);$SwapOutput.Flush($true)}finally{Close-ErgoptiUpdaterResource $SwapOutput "swap_worker" "file_write" $State}}
+  if ($AuthenticatedSize -le 0) {[IO.File]::WriteAllText($SwapScriptPath,$SwapSource,[Text.UTF8Encoding]::new($false))} else {$SwapOutput=$null;try{$State.Stage="file_create";$SwapOwner=Open-ErgoptiParentStagedOutput $SwapScriptPath $ParentSwapIdentity;$SwapOutput=$SwapOwner.stream;Assert-ErgoptiOwnedArtifactOutputCurrent $SwapOwner;$State.Stage="file_write";$SwapBytes=[Text.Encoding]::UTF8.GetBytes($SwapSource);$SwapOutput.Write($SwapBytes,0,$SwapBytes.Length);$SwapOutput.Flush($true);Assert-ErgoptiOwnedArtifactOutputCurrent $SwapOwner}finally{Close-ErgoptiUpdaterResource $SwapOutput "swap_worker" "file_write" $State}}
   $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
   if ($State.NativeCleanupDebt -or $State.CleanupDebt.Count -ne 0) {throw "Staging resources have unacknowledged retirement"}
+  if ($null -ne $StagingDirectoryLease) {$StagingDirectoryLease.Dispose();$StagingDirectoryLease=$null}
   Write-Output "READY"
   exit 0
 } catch {
+  if ($null -ne $StagingDirectoryLease) {Close-ErgoptiUpdaterResource $StagingDirectoryLease "staging_directory" "file_create" $State}
   $Receipt=@{}
   if (Get-Command Get-ErgoptiUpdaterFailureReceipt -ErrorAction SilentlyContinue) { $Receipt=Get-ErgoptiUpdaterFailureReceipt $_.Exception $State }
-  if ($AuthenticatedSize -le 0 -or $State.StagedExecutableOwned) {CleanWorker $NewExe "staged_executable"}
-  if ($AuthenticatedSize -le 0 -or $State.SwapWorkerOwned) {CleanWorker $SwapScriptPath "swap_worker"}
+  if ($AuthenticatedSize -le 0) {CleanWorker $NewExe "staged_executable"}
+  if ($AuthenticatedSize -le 0) {CleanWorker $SwapScriptPath "swap_worker"}
   @{schema_version=1;state="failed";operation="download";reason=$State.Reason;receipt=$Receipt;cleanup_debt=$State.CleanupDebt;native_cleanup_debt=[bool]$State.NativeCleanupDebt}|ConvertTo-Json -Depth 4 -Compress
   exit 1
 }
