@@ -42,6 +42,8 @@ local Json          = require("json")
 local NativePath    = require("native_path")
 local MediaStore    = require("keystats.media_store")
 local AppCategoryStore = require("keystats.app_category_store")
+local RegularFileReader = require("infra.regular_file_reader")
+local ErrorDescription = require("error_description")
 
 -- How many session durations one application-day keeps. Read from the shared
 -- accumulator rather than restated, because the walk caps the array it hands
@@ -258,13 +260,11 @@ local function _read_schema()
 		return nil
 	end
 
-	local fh = io.open(schema_path, "r")
-	if not fh then
-		Logger.error(LOG, "Cannot read schema.sql at %s.", schema_path)
+	local content, status, detail = require("adapters.file_system").read_with_status(schema_path)
+	if status ~= "ok" or type(content) ~= "string" then
+		Logger.error(LOG, "Cannot read schema.sql at %s: %s.", schema_path, ErrorDescription.describe(detail or status))
 		return nil
 	end
-	local content = fh:read("*a")
-	fh:close()
 	return content
 end
 
@@ -387,11 +387,22 @@ function M.open_db(db_path)
 		end
 
 		-- Check if the DB file already exists (has a non-zero size).
-		local fh = io.open(_db_path, "r")
+		local fh, detail, code = RegularFileReader.open(_db_path)
 		local existed = false
 		if fh then
-			existed = (fh:seek("end") or 0) > 0
-			fh:close()
+			local size, seek_error = fh:seek("end")
+			local closed, close_error = fh:close()
+			if type(size) ~= "number" or closed ~= true then
+				Logger.error(LOG, "Cannot inspect and close the existing SQLite database at %s: %s.",
+					_db_path, ErrorDescription.describe(type(size) ~= "number" and seek_error or close_error))
+				_db_path = nil
+				return false
+			end
+			existed = size > 0
+		elseif code ~= RegularFileReader.ENOENT then
+			Logger.error(LOG, "Cannot inspect the SQLite database at %s: %s.", _db_path, ErrorDescription.describe(detail))
+			_db_path = nil
+			return false
 		end
 
 		if not existed then
