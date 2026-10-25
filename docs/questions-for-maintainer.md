@@ -7,7 +7,17 @@ answer once, then move the answered line below.
 
 ## Open
 
-Nothing open.
+Batched for the next answer round (the maintainer asked for no QCM overnight, October 25). Each line names the
+default taken meanwhile.
+
+- **Slow-segment threshold:** macOS and Linux warn at 20 ms per typing-path segment, Windows at 5 ms. Default
+  meanwhile: 20 ms until a real Linux session is measured. Align on 5 ms, keep 20 ms, or give measured
+  per-segment values?
+- **Tap-hold delay migration marker:** `tap_hold.toml` has no version stamp, so the cleanup of the old shipped
+  per-key delays relies on a permanent `[tap_hold] explicit_delays = true` marker. Default meanwhile: kept.
+  Build a versioned migrator for `tap_hold.toml` on the three OS instead?
+- **AI-off hint text:** the greyed agent actions reuse `llm.manual_prediction.disabled` ("AI suggestions are
+  off: turn them on in the Artificial Intelligence menu."). Default meanwhile: reused. A dedicated string?
 
 ## Answered
 
