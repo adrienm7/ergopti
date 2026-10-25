@@ -73,6 +73,7 @@
 		"invalid-source",
 		"invalid_character",
 		"invalid_consume",
+		"invalid_consume_states",
 		"invalid_diagnostic_model",
 		"invalid_idle_timeout",
 		"invalid_key",
