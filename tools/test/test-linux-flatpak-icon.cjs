@@ -88,7 +88,12 @@ try {
 		'a missing exported icon must fail its genuine install command'
 	);
 	const asset = path.join(BUILD, '_shared/assets/ergopti_tray.png');
-	const heldAsset = path.join(scratch, 'canonical.png');
+	// Rename must stay on the asset's filesystem even when the install replay's
+	// private TMPDIR belongs to another device. Retain the original inode and
+	// metadata instead of copying a replacement over the package fixture.
+	const heldDirectory = fs.mkdtempSync(path.join(path.dirname(asset), '.ergopti-icon-'));
+	const heldAsset = path.join(heldDirectory, 'canonical.png');
+	const originalMetadata = fs.statSync(asset, { bigint: true });
 	fs.renameSync(asset, heldAsset);
 	try {
 		const absentAsset = spawnSync(
@@ -110,6 +115,16 @@ try {
 		assert.match(absentAsset.stderr, /ergopti_tray\.png/);
 	} finally {
 		fs.renameSync(heldAsset, asset);
+		fs.rmdirSync(heldDirectory);
+	}
+	assert.deepEqual(
+		fs.readFileSync(asset),
+		canonical,
+		'the original icon bytes must survive the refusal'
+	);
+	const restoredMetadata = fs.statSync(asset, { bigint: true });
+	for (const key of ['dev', 'ino', 'mode', 'uid', 'gid', 'nlink', 'size', 'mtimeNs']) {
+		assert.equal(restoredMetadata[key], originalMetadata[key], `original icon ${key} must survive`);
 	}
 	bash(path.join(ROOT, 'tools/build/build-linux-flatpak.sh'), ['--skip-flatpak']);
 	console.log(
