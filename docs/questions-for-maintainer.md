@@ -7,23 +7,29 @@ answer once, then move the answered line below.
 
 ## Open
 
-- **Linux recommended gestures doubled by the desktop (October 22):** since fa965e42f2 Linux
-  recommends the Windows three- and four-finger swipes (tab close/prev/next/new, desktop
-  prev/next). The touchpad is read without being grabbed, so GNOME, KWin, Hyprland and
-  cosmic-comp also run their own action (a double desktop switch). Default meanwhile: kept. Say
-  if Linux should recommend `none` for them, with the reason in the menu.
-- **macOS recommendations differ from Windows (October 22):** AI backend and model (Windows
-  Ollama Qwen3.5-0.8B, macOS MLX gemma-4-E2B-it), trigger debounce (500 against 200 ms),
-  three-finger swipes (tabs against tabs and word selection), four-finger swipes (windows and
-  desktops against none), four-finger tap (alt_tab_monitor against win_app_next), number row
-  (digits against native). Default meanwhile: unchanged. Say which to align.
-- **AI off on Linux (October 22):** the agent's automatic mode still runs with the AI off (pinned
-  on purpose by `test_agent_auto`) and the `llm_*` chords stay bound (they refuse the keystroke).
-  Default meanwhile: unchanged. Say if both should be disarmed with the AI off, as on macOS
-  (6dff8de6bf) and Windows.
+Nothing open.
 
 ## Answered
 
+- **Answers of 2026-10-25 (QCM), implemented the same day unless noted:**
+  - **CI design:** one lane per OS plus Common, each Unit → Integration → E2E → Build → Install and launch →
+    Verdict, strictly sequential; a failure skips the later stages. macOS Build after E2E (the XCTest and native
+    probes moved to an E2E cell); the distribution unit suites in Linux Unit and their integration group in Linux
+    Integration; the Flatpak built in the Linux Build and installed as its own lot; the cold MLX bootstrap in a
+    macOS 26 launch lot; one verdict name; the shared lane is "Common"; no diagnostic Build after a failed E2E.
+  - **Portable programs:** every program the Linux code launches needs a checked proof (declared, installed by
+    CI, probed, or replaced); `ps` became a `/proc` read, `cmp` a `sha256sum` comparison.
+  - **Hotstring cascading:** `hotstrings.cascade_max_arrows` counts arrows (1 = a single expansion, 2 = a → b →
+    c), default 3, range 1 to 10; the chain is resolved in-process and typed once. A link fires only where typing
+    the same text would fire it (each entry's word-start flag decides).
+  - **End character:** Windows behaviour on the three OS: the typed delimiter appears once after the final output;
+    the per-delimiter "consumed" choice decides, also in a chain; ★ ships consumed. No per-entry field.
+  - **Tap-hold delays:** one global delay (200 ms) for every key; no shipped per-key delay; a key the user set
+    keeps its value when the global changes; "use global" resets it.
+  - **Gestures:** Windows keeps its recommendations; each slot the system does not map to Ergopti's shortcut is
+    greyed with its reason; the status submenu is gone. macOS and Linux need no system mapping.
+  - **AI off:** disarm everything on the three OS, including tap-hold actions bound to the AI and the agent's
+    manual menu entries (greyed with the reason).
 - **Answers of 2026-10-24 evening (QCM):**
   - **PAR-6:** yes, `hotstrings.expansion_delay` becomes user-settable on all three drivers; the per-section delays
     become optional offsets from that base.

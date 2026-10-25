@@ -325,14 +325,15 @@ here); macOS and Linux behaviour that needs hardware goes through the Debug fiel
       `Click`, `MouseMove`). One real bug fixed (0c85debc93): the Space tap-hold completed a trigger
       from its level-2 thread, and with another AutoHotkey hook SendInput fell back to SendEvent, so
       the burst re-entered the watcher and cascaded (final text `foo qbar qzz` instead of
-      `foo qzy `); all engine output now goes at level 0. Deliberate cascading is built (858c9aa):
-      `hotstrings.cascade_depth`, default 0, the whole chain resolved before one send (one SendInput
-      burst on Windows), a rule fires once per chain; at depths 1-3 no shipped mapping changes (2994
-      measured), a user's own mid-word auto trigger can (`ok` > `OK` turns `facebook` into `faceboOK`).
+      `foo qzy `); all engine output now goes at level 0. Deliberate cascading is built (858c9aa, 0746b18c86):
+      `hotstrings.cascade_max_arrows` counts arrows (1 = one expansion, 2 = a > b > c), default 3,
+      range 1 to 10, the whole chain resolved before one send (one SendInput burst on Windows), a rule
+      fires once per chain, a link fires only where typing the same text would; the typed delimiter
+      lands once after the final output unless the user marked it consumed (★ ships consumed).
       Space tap completes an end-character trigger like a plain space on the three drivers (Windows
       already via `TextPressKeyFed`, Linux pinned by 504ee63, macOS emits a native space).
-      `test_hotstring_output_is_final.ahk` is already in `run_all.ahk`. Left: on the PC run
-      `run_all.ahk` (cascade tests never ran), then type `chatg` with depth 1 on each OS.
+      `test_hotstring_output_is_final.ahk` is already in `run_all.ahk`. Left: on each OS type `fb` + Space,
+      Enter and ★ with the abbreviation and brand packs, at 1, 2 and 3 arrows, consumed and not.
 - [ ] **Per-layer layout composer.** [CODE] Done on the three OS (docs/layout-composer.md): shared
       model, page, 21 locales, Windows host, macOS and Linux install paths, tests, one-click Debug
       "Test the composed layout". Left: typing the composed layout on a real keyboard on each OS.
@@ -400,6 +401,9 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       `lua_*_magic_key` group switches to `/root/.config/ergopti/config.toml` (the magic-key catalogue test
       was fixed in 76716e7; another writer remains). Find it with a scratch HOME diff and make every suite
       refuse to start when HOME is the real one.
+- [ ] **Retire the orphaned Windows gesture-notice entries.** [CODE] The gesture status submenu and notice
+      are gone (dbc29c5077); the `gesture_conflict_dismissed.*` storage entries they wrote stay in user
+      state. Remove them in a config migration.
 - [ ] **Review the machine translations of October 25.** [I18N] New keys (gesture recommendation notes,
       cascade depth, tap-hold defaults, missing-program messages) are hand-written in French and
       machine-written in the 19 other locales.
