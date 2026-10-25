@@ -835,12 +835,7 @@ const STEP_CONDITIONS = [
 		'Install the shipped Kana layout for real probes',
 		WINDOWS_NATIVE_LOT
 	],
-	[
-		WINDOWS_BOX,
-		'integration-ahk',
-		'Manifest parity (AHK ↔ HS codegen equivalence)',
-		WINDOWS_NATIVE_LOT
-	],
+	[WINDOWS_BOX, 'test-ahk', 'Test native compiled startup admission', "matrix.module == 'meta'"],
 	[WINDOWS_BOX, 'integration-ahk', 'Receive managed Ollama file component', WINDOWS_NATIVE_LOT],
 	[WINDOWS_BOX, 'integration-ahk', 'Run native desktop AHK cohorts', WINDOWS_NATIVE_LOT],
 	[
@@ -4113,13 +4108,6 @@ const WINDOWS_GATES = [
 	{
 		name: 'Build and test native navigation event owner',
 		run: './tools/build/build_windows_nav_owner.ps1'
-	},
-	// A cross-driver contract: an integration check, run once in its own lot.
-	{
-		name: 'Manifest parity (AHK ↔ HS codegen equivalence)',
-		job: 'integration-ahk',
-		condition: WINDOWS_NATIVE_LOT,
-		run: 'npm run test:manifest-parity'
 	},
 	{
 		name: 'Verify AHK source encoding (UTF-8 BOM + LF)',

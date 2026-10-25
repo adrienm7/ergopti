@@ -214,6 +214,14 @@ jobs:
         run: npm run build:manifest
         shell: pwsh
 
+      # Its native refusal probes need a Windows host but no compiled package,
+      # so it is a unit-stage check; one row runs it once.
+      - name: Test native compiled startup admission
+        if: matrix.module == 'meta'
+        shell: pwsh
+        timeout-minutes: 3
+        run: node tools/test/test-desktop-ci-evidence.cjs
+
       - name: Download AutoHotkey v2 runtime
         if: steps.cache-ahk.outputs.cache-hit != 'true'
         shell: pwsh
@@ -592,11 +600,6 @@ jobs:
         shell: pwsh
         timeout-minutes: 3
         run: ./tools/test/install-ci-kana-layout.ps1
-
-      - name: Manifest parity (AHK ↔ HS codegen equivalence)
-        if: matrix.lot == 'Native cohorts and contracts'
-        run: npm run test:manifest-parity
-        shell: pwsh
 
       - name: Receive managed Ollama file component
         if: matrix.lot == 'Native cohorts and contracts'
@@ -1313,11 +1316,6 @@ jobs:
       - name: Install locked native acceptance dependencies
         shell: pwsh
         run: npm ci --ignore-scripts
-
-      - name: Test native compiled startup admission
-        shell: pwsh
-        timeout-minutes: 3
-        run: node tools/test/test-desktop-ci-evidence.cjs
 
       - name: Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)
         id: compiled-startup

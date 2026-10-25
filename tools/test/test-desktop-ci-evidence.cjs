@@ -1109,7 +1109,7 @@ for (const [job, name] of [
 	assert.doesNotMatch(upload, /github\.run_attempt/);
 }
 const launch = pipeline.job('launch-windows');
-/** Requires native refusal probes to run on Windows before package admission. */
+/** Requires native refusal probes to run on a Windows unit row, long before package admission. */
 function checkWindowsAdmission(body) {
 	const admission = pipeline.step(body, 'Test native compiled startup admission');
 	assert.equal(
@@ -1117,11 +1117,22 @@ function checkWindowsAdmission(body) {
 		'node tools/test/test-desktop-ci-evidence.cjs'
 	);
 	assert.equal(pipeline.stepField(admission, 'shell'), 'pwsh');
-	assert.equal(pipeline.stepField(admission, 'if'), null);
+	assert.equal(pipeline.stepField(admission, 'if'), "matrix.module == 'meta'");
 	assert.equal(pipeline.stepField(admission, 'continue-on-error'), null);
-	assert.ok(body.indexOf(admission) < body.indexOf('name: Smoke test compiled ErgoptiPlus.exe'));
+	// Locked dependencies are installed by the unit row itself, before this step.
+	assert.ok(body.indexOf('- run: npm ci') < body.indexOf(admission));
+	assert.ok(
+		body.indexOf(admission) < body.indexOf('name: Run AHK test suite'),
+		'the startup admission runs before the AHK suite of its row'
+	);
 }
-checkWindowsAdmission(launch);
+checkWindowsAdmission(pipeline.job('test-ahk'));
+assert.equal(
+	pipeline.steps(launch).filter((step) => step.name === 'Test native compiled startup admission')
+		.length,
+	0,
+	'the compiled-package job no longer owns the startup admission'
+);
 
 /** The actual downloaded candidate must pass both genuine installed launches. */
 function checkCompiledUpgradeGate(body) {
@@ -1146,9 +1157,6 @@ function checkCompiledUpgradeGate(body) {
 	const dependencies = pipeline.step(body, 'Install locked native acceptance dependencies');
 	assert.equal(pipeline.stepField(dependencies, 'run'), 'npm ci --ignore-scripts');
 	assert.equal(pipeline.stepField(dependencies, 'if'), null);
-	assert.ok(
-		body.indexOf(dependencies) < body.indexOf('name: Test native compiled startup admission')
-	);
 }
 checkCompiledUpgradeGate(launch);
 for (const [from, to] of [
