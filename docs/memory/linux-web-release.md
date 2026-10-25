@@ -583,7 +583,12 @@ file in `.github/ci/` (for example
 `stable_v103_macos_native_qualification_exception.json` with
 `STABLE_V103_SCOPE_IDS` in `tools/ci/dev-release-qualification.cjs`). A deferred
 scope shows DEFERRED with `qualified: false` and never counts as a pass; expired
-exceptions are not renewed without the maintainer. Unsigned stable Windows
+exceptions are not renewed without the maintainer. A deferred suite envelope
+stands in only for the matrix rows that `deferrable_shards` of
+`.github/linux-ci-coverage.json` lists, and only for that row's own
+`shard_subjects`: the Unit stage's distribution rows (no receipt covers them,
+and their containers have no Node) always run and record their own count, so
+a missing, duplicate or deferred distribution receipt fails `linux-ok`. Unsigned stable Windows
 releases are a standing authorisation (`stable_windows_signing_exception.json`)
 until SignPath signing is integrated.
 

@@ -177,6 +177,15 @@ luajit tests/run.lua
 luajit tests/run.lua --module=integration  # only the Integration stage's files
 ```
 
+The Unit stage also runs the whole suite on the own LuaJIT of each distribution
+that has an archive installation lot in `.github/linux-install-matrix.json`
+(`Linux / Unit tests (alpine)` and so on). One row reproduces locally, in a
+container of that lot's image and preparation, with Docker:
+
+```bash
+tools/test/run-linux-distro-unit.sh alpine
+```
+
 ---
 
 ## Regression-test discipline

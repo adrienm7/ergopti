@@ -3,14 +3,45 @@
 	"jobs": {
 		"test-linux": {
 			"classification": "mandatory",
-			"shards": ["meta", "core", "infra", "input", "modules", "ui"],
+			"shards": [
+				"meta",
+				"core",
+				"infra",
+				"input",
+				"modules",
+				"ui",
+				"debian",
+				"fedora",
+				"arch",
+				"alpine",
+				"opensuse"
+			],
+			"deferrable_shards": ["meta", "core", "infra", "input", "modules", "ui"],
+			"shard_subjects": {
+				"meta": ["unit-meta"],
+				"core": ["unit-core"],
+				"infra": ["unit-infra"],
+				"input": ["unit-input"],
+				"modules": ["unit-modules"],
+				"ui": ["unit-ui"],
+				"debian": ["unit-debian"],
+				"fedora": ["unit-fedora"],
+				"arch": ["unit-arch"],
+				"alpine": ["unit-alpine"],
+				"opensuse": ["unit-opensuse"]
+			},
 			"subjects": {
 				"unit-meta": 1,
 				"unit-core": 1,
 				"unit-infra": 1,
 				"unit-input": 1,
 				"unit-modules": 1,
-				"unit-ui": 1
+				"unit-ui": 1,
+				"unit-debian": 1,
+				"unit-fedora": 1,
+				"unit-arch": 1,
+				"unit-alpine": 1,
+				"unit-opensuse": 1
 			}
 		},
 		"integration-linux": {
@@ -29,6 +60,13 @@
 		"e2e-linux": {
 			"classification": "mandatory",
 			"shards": ["input-display", "desktop-webview", "updater", "network-ai", "platform-metrics"],
+			"deferrable_shards": [
+				"input-display",
+				"desktop-webview",
+				"updater",
+				"network-ai",
+				"platform-metrics"
+			],
 			"subjects": {
 				"uinput-roundtrip": 1,
 				"grab-race": 1,
@@ -79,11 +117,11 @@
 		"install-linux": {
 			"classification": "mandatory",
 			"subjects": {
-				"distro-debian": 1,
-				"distro-fedora": 1,
-				"distro-arch": 1,
-				"distro-alpine": 1,
-				"distro-opensuse": 1,
+				"archive-install-debian": 1,
+				"archive-install-fedora": 1,
+				"archive-install-arch": 1,
+				"archive-install-alpine": 1,
+				"archive-install-opensuse": 1,
 				"first-install-ubuntu-22.04": 1,
 				"first-install-ubuntu-24.04": 1,
 				"first-install-debian-12": 1,

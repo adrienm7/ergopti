@@ -34,7 +34,7 @@ const originRewrite =
 
 function coherentInstallOrigin(source, selectedPlan) {
 	linuxInstall.admit(source, selectedPlan);
-	const row = linuxInstall.row(selectedPlan, 'distro-opensuse');
+	const row = linuxInstall.row(selectedPlan, 'archive-install-opensuse');
 	assert.strictEqual(row.kind, 'install');
 	assert.strictEqual(row.image, 'opensuse/tumbleweed:latest');
 	assert(
@@ -45,7 +45,7 @@ function coherentInstallOrigin(source, selectedPlan) {
 coherentInstallOrigin(workflow, plan);
 for (const field of ['id', 'kind', 'image', 'prep']) {
 	const changed = structuredClone(plan);
-	linuxInstall.row(changed, 'distro-opensuse')[field] = 'foreign';
+	linuxInstall.row(changed, 'archive-install-opensuse')[field] = 'foreign';
 	assert.throws(() => coherentInstallOrigin(workflow, changed), assert.AssertionError, field);
 }
 

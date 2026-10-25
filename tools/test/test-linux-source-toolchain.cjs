@@ -195,11 +195,11 @@ const { plan } = linuxInstall.read(root, workflow);
 function sourcePrerequisites(source, selectedPlan, recipe) {
 	const { job } = linuxInstall.admit(source, selectedPlan);
 	const managers = {
-		'distro-debian': 'apt',
-		'distro-fedora': 'dnf',
-		'distro-arch': 'pacman',
-		'distro-alpine': 'apk',
-		'distro-opensuse': 'zypper'
+		'archive-install-debian': 'apt',
+		'archive-install-fedora': 'dnf',
+		'archive-install-arch': 'pacman',
+		'archive-install-alpine': 'apk',
+		'archive-install-opensuse': 'zypper'
 	};
 	const rows = Object.values(selectedPlan.metadata).filter((row) => row.kind === 'install');
 	assert.equal(rows.length, 5);
@@ -318,7 +318,7 @@ ${checkoutAssertions[0]}`);
 	assert.equal(result.status, expected, label + ': actual workflow assertion must retain refusal');
 }
 console.log('Actual CI Git/SHA controls: 3 passed; process seam is a model.');
-const debianRow = rows.find((row) => row.id === 'distro-debian');
+const debianRow = rows.find((row) => row.id === 'archive-install-debian');
 assert.ok(debianRow, 'the actual Debian container preparation is present');
 const debianPrep = debianRow.prep;
 for (const [label, packageStatus, materializeCa, expected] of [

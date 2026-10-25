@@ -554,7 +554,12 @@ const WINDOWS_FILE_RETENTION = [
 ];
 
 const STEP_CONDITIONS = [
-	[LINUX_BOX, 'test-linux', 'Retain Linux Lua timing diagnostics', '${{ !cancelled() }}'],
+	[
+		LINUX_BOX,
+		'test-linux',
+		'Retain Linux Lua timing diagnostics',
+		'${{ !cancelled() && matrix.group }}'
+	],
 	[MACOS_BOX, 'test-hs', 'Retain macOS Lua timing diagnostics', '${{ !cancelled() }}'],
 	[
 		COMMON_BOX,
@@ -898,17 +903,28 @@ const STEP_CONDITIONS = [
 	[
 		LINUX_BOX,
 		'install-linux',
-		"The unit suite on this distribution's LuaJIT",
+		'Record mandatory archive installation evidence',
 		"env.INSTALL_KIND == 'install'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
-		'Upload the native distro unit log',
-		"${{ !cancelled() && env.INSTALL_KIND == 'install' }}"
+		'Upload mandatory archive installation evidence',
+		"env.INSTALL_KIND == 'install'"
 	],
-	[LINUX_BOX, 'install-linux', 'Record mandatory distro evidence', "env.INSTALL_KIND == 'install'"],
-	[LINUX_BOX, 'install-linux', 'Upload mandatory distro evidence', "env.INSTALL_KIND == 'install'"],
+	// The Unit matrix has two kinds of rows: a module group on Ubuntu's LuaJIT,
+	// or a distribution's own LuaJIT in a container. Each row runs its own kind.
+	[LINUX_BOX, 'test-linux', 'Install LuaJIT and native event dependencies', 'matrix.group'],
+	[LINUX_BOX, 'test-linux', 'Run the driver unit test suite', 'matrix.group'],
+	[LINUX_BOX, 'test-linux', 'Record mandatory unit evidence', 'matrix.group'],
+	[LINUX_BOX, 'test-linux', "The unit suite on this distribution's LuaJIT", 'matrix.distro'],
+	[
+		LINUX_BOX,
+		'test-linux',
+		'Upload the native distro unit log',
+		'${{ !cancelled() && matrix.distro }}'
+	],
+	[LINUX_BOX, 'test-linux', 'Record mandatory distro unit evidence', 'matrix.distro'],
 	[
 		LINUX_BOX,
 		'install-linux',
@@ -1141,7 +1157,7 @@ const GATE_COMMAND = new RegExp(
 		/_test\.py\b|\bmacos_launch_gate\.py\b|\bmacos-release-launch\.py\b|\bmacos_tooltip_canvas\.py\b/,
 		/\blinux-ci-evidence\.cjs (?:verify|record)\b|\bvalidate-ahk-suite-manifest\.cjs\b/,
 		/\btools\/test\/test-[\w-]+\.(?:py|cjs)\b/,
-		/\bprepare-linux-distro-unit\.sh\b/,
+		/\brun-linux-distro-unit\.sh\b/,
 		/\bnpm run (?:test|build)\b/,
 		/\bformat_toml\.py\b/,
 		/\binstall\.sh\b|\binstalled_layout_check\.lua\b/,
@@ -1447,6 +1463,8 @@ const LUA_TIMING_RETENTION = [
 		after: 'Emit Configuration assertion from failed unit log',
 		directory: 'static/ergopti_plus/linux',
 		step: 'Retain Linux Lua timing diagnostics',
+		// Only a module-group row runs the reporter; a distribution row keeps its raw log.
+		condition: '${{ !cancelled() && matrix.group }}',
 		artifact:
 			'lua-timings-linux-unit-${{ matrix.group }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
 		path: '${{ runner.temp }}/linux-lua.json',
@@ -1460,6 +1478,7 @@ const LUA_TIMING_RETENTION = [
 		after: 'Run unit + meta tests',
 		directory: 'static/ergopti_plus/macos',
 		step: 'Retain macOS Lua timing diagnostics',
+		condition: '${{ !cancelled() }}',
 		artifact:
 			'lua-timings-macos-unit-${{ fromJSON(steps.stage-selection.outputs.cell).role }}-${{ fromJSON(steps.stage-selection.outputs.cell).scenario }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
 		path: '${{ runner.temp }}/macos-lua.json',
@@ -4589,15 +4608,16 @@ for (const condition of [
 	'',
 	'false',
 	'success()',
-	"env.INSTALL_KIND == 'install'",
+	'matrix.distro',
 	'always()',
-	"always() && env.INSTALL_KIND == 'install'"
+	'always() && matrix.distro',
+	'${{ !cancelled() && matrix.group }}'
 ]) {
 	const head = '      - name: Upload the native distro unit log\n';
 	mustCatch(
 		'distro native unit raw log condition ' + condition,
 		LINUX_BOX,
-		head + "        if: ${{ !cancelled() && env.INSTALL_KIND == 'install' }}\n",
+		head + '        if: ${{ !cancelled() && matrix.distro }}\n',
 		head + (condition ? '        if: ' + condition + '\n' : ''),
 		stepProblems
 	);
@@ -5410,7 +5430,7 @@ function assertLotTransportControls() {
 		const uploader = pipeline.step(pipeline.job(owner.job), owner.step);
 		for (const changed of [
 			uploader.replace(owner.path, '${{ runner.temp }}/foreign.json'),
-			uploader.replace('if: ${{ !cancelled() }}', 'if: always()')
+			uploader.replace('if: ' + owner.condition, 'if: always()')
 		]) {
 			assert.notEqual(changed, uploader);
 			const files = pipeline
@@ -6075,7 +6095,7 @@ function luaTimingRetentionProblems(files) {
 			assert.equal(steps.indexOf(uploads[0].step), steps.indexOf(preceding[0]) + 1);
 			assert.deepEqual(uploads[0].step, {
 				name: owner.step,
-				if: '${{ !cancelled() }}',
+				if: owner.condition,
 				uses: 'actions/upload-artifact@v4',
 				with: {
 					name: owner.artifact,
@@ -6100,36 +6120,44 @@ for (const owner of LUA_TIMING_RETENTION) {
 		['missing upload', (text) => text.replace(upload, '')],
 		[
 			'cancelled-run upload',
-			(text) => text.replace(upload, upload.replace('if: ${{ !cancelled() }}', 'if: always()'))
+			(text) => text.replace(upload, upload.replace('if: ' + owner.condition, 'if: always()'))
 		],
 		[
 			'foreign predicate',
 			(text) =>
 				text.replace(
 					upload,
-					upload.replace('if: ${{ !cancelled() }}', 'if: ${{ !cancelled() && env.FOREIGN }}')
+					upload.replace('if: ' + owner.condition, 'if: ${{ !cancelled() && env.FOREIGN }}')
+				)
+		],
+		[
+			'reporterless-row upload',
+			(text) =>
+				text.replace(
+					upload,
+					upload.replace('if: ' + owner.condition, 'if: ${{ !cancelled() && matrix.distro }}')
 				)
 		],
 		['duplicate upload', (text) => text.replace(upload, upload + '\n' + upload)],
 		[
 			'success-only upload',
-			(text) => text.replace(upload, upload.replace('if: ${{ !cancelled() }}', 'if: success()'))
+			(text) => text.replace(upload, upload.replace('if: ' + owner.condition, 'if: success()'))
 		],
 		[
 			'failure-only upload',
-			(text) => text.replace(upload, upload.replace('if: ${{ !cancelled() }}', 'if: failure()'))
+			(text) => text.replace(upload, upload.replace('if: ' + owner.condition, 'if: failure()'))
 		],
 		[
 			'manual-only upload',
 			(text) =>
 				text.replace(
 					upload,
-					upload.replace('if: ${{ !cancelled() }}', "if: github.event_name == 'workflow_dispatch'")
+					upload.replace('if: ' + owner.condition, "if: github.event_name == 'workflow_dispatch'")
 				)
 		],
 		[
 			'default-success upload',
-			(text) => text.replace(upload, upload.replace('        if: ${{ !cancelled() }}\n', ''))
+			(text) => text.replace(upload, upload.replace('        if: ' + owner.condition + '\n', ''))
 		],
 		[
 			'forgiven upload',
@@ -6554,13 +6582,36 @@ assert.ok(
 	'native XCTest before Sparkle tool installation must refuse'
 );
 
-// This qualifies the shared renderer and recorded bridge, not physical input.
+// The distribution rows of the Unit stage start a container of the archive
+// lot's image and preparation (run-linux-distro-unit.sh), where the helper
+// creates the ordinary user, copies the checkout and runs the whole suite.
 const DISTRO_UNIT_COMMAND =
-	'bash "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh" "${{ env.INSTALL_DISTRO }}"';
+	'bash "$GITHUB_WORKSPACE/tools/test/run-linux-distro-unit.sh" "$LINUX_UNIT_DISTRO"';
 const DISTRO_UNIT_HELPER = fs.readFileSync(
 	path.join(__dirname, 'prepare-linux-distro-unit.sh'),
 	'utf8'
 );
+const DISTRO_UNIT_RUNNER = fs.readFileSync(
+	path.join(__dirname, 'run-linux-distro-unit.sh'),
+	'utf8'
+);
+// The runner's whole executable body: the authored map is the only source of
+// the image and preparation, the checkout is mounted read-only, and the helper
+// receives that mount as its source.
+const DISTRO_UNIT_RUNNER_CODE = [
+	'set -euo pipefail',
+	'distro="${1:?usage: run-linux-distro-unit.sh <distribution>}"',
+	'repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"',
+	'image="$(node "$repo_root/tools/ci/linux-install-matrix.cjs" unit "$distro" image)"',
+	'prep="$(node "$repo_root/tools/ci/linux-install-matrix.cjs" unit "$distro" prep)"',
+	'exec docker run --rm --network host \\',
+	'\t-v "$repo_root:/src:ro" \\',
+	'\t${ERGOPTI_UNIT_DOCKER_ARGS:-} \\',
+	'\t-e ERGOPTI_UNIT_PREP="$prep" \\',
+	'\t"$image" sh -c \'set -e',
+	'\t\teval "$ERGOPTI_UNIT_PREP"',
+	'\t\texec bash /src/tools/test/prepare-linux-distro-unit.sh "$1" /src\' distro-unit "$distro"'
+];
 // Every module group runs at once under the ordinary user, each in its own TMPDIR
 // and HOME: with a shared HOME one group's writes reached another group's fixture.
 // openSUSE's pam_env exports XDG_*_HOME from the account home, which outranks HOME.
@@ -6582,36 +6633,20 @@ const DISTRO_UNIT_GROUP_TAIL = [
 // Pin its shell ownership envelope separately from the existing direct form;
 // a comment, unreachable call or extra helper cannot satisfy this contract.
 const DISTRO_DIAGNOSTIC_COMMAND =
-	'python3 - "$unit_log" "$unit_root/static/ergopti_plus/linux/tests/run.lua" \'${{ env.INSTALL_DISTRO }}\' "$native_status" <<\'PYTHON\'';
-const DISTRO_DIAGNOSTIC_SHA256 = '2b5eacc87b0cdb4aa1f04c6ef95cc60248245cbbb2389757070db20f2ed1196d';
+	'python3 - "$unit_log" "$GITHUB_WORKSPACE/static/ergopti_plus/linux/tests/run.lua" "$LINUX_UNIT_DISTRO" "$native_status" <<\'PYTHON\'';
+const DISTRO_DIAGNOSTIC_SHA256 = 'f7d89f6387491c9cde0aa6fdb76925f0ad9e7535d95a0cb5c7b4d1a90805bc18';
 const DISTRO_LOGGED_ENVELOPE = [
 	'set -euo pipefail',
-	'case "${{ env.INSTALL_DISTRO }}" in',
-	'debian) apt-get install -y --no-install-recommends curl ;;',
-	'fedora) dnf install -y curl ;;',
-	'arch) pacman -Sy --noconfirm curl ;;',
-	'alpine) apk add --no-cache curl ;;',
-	'opensuse) zypper --non-interactive install curl ;;',
-	'*) echo "::error::unknown archive unit distribution"; exit 1 ;;',
-	'esac',
-	'command -v curl',
-	'test "$(id -u ergopti-ci)" -ge 1000',
-	'unit_root="$(mktemp -d)"',
-	'readonly unit_root',
-	'trap \'rm -rf -- "$unit_root"\' EXIT',
-	'cp -a "$GITHUB_WORKSPACE/." "$unit_root/"',
-	'chown -R ergopti-ci:ergopti-ci "$unit_root"',
 	'unit_log_dir="$RUNNER_TEMP/linux-distro-unit-logs"',
 	'mkdir -p "$unit_log_dir"',
-	'unit_log="$unit_log_dir/${{ env.INSTALL_DISTRO }}.log"',
+	'unit_log="$unit_log_dir/$LINUX_UNIT_DISTRO.log"',
 	'set +e',
-	'(cd "$unit_root/static/ergopti_plus/linux" &&',
-	'bash "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh" "${{ env.INSTALL_DISTRO }}") 2>&1 | tee "$unit_log"',
+	'bash "$GITHUB_WORKSPACE/tools/test/run-linux-distro-unit.sh" "$LINUX_UNIT_DISTRO" 2>&1 | tee "$unit_log"',
 	'unit_pipeline_status=("${PIPESTATUS[@]}")',
 	'set -e',
 	'native_status="${unit_pipeline_status[0]}"',
 	'set +e',
-	'python3 - "$unit_log" "$unit_root/static/ergopti_plus/linux/tests/run.lua" \'${{ env.INSTALL_DISTRO }}\' "$native_status" <<\'PYTHON\'',
+	'python3 - "$unit_log" "$GITHUB_WORKSPACE/static/ergopti_plus/linux/tests/run.lua" "$LINUX_UNIT_DISTRO" "$native_status" <<\'PYTHON\'',
 	'PYTHON',
 	'diagnostic_status=$?',
 	'set -e',
@@ -6625,7 +6660,7 @@ function distroUnitDiagnostic(body) {
 	const script = pipeline.runOf(body) ?? [];
 	const opening = script
 		.map((line, index) =>
-			line.trim() === "'${{ env.INSTALL_DISTRO }}' \"$native_status\" <<'PYTHON'" ? index : -1
+			line.trim() === '"$LINUX_UNIT_DISTRO" "$native_status" <<\'PYTHON\'' ? index : -1
 		)
 		.filter((index) => index >= 0);
 	const closing = script
@@ -6635,10 +6670,9 @@ function distroUnitDiagnostic(body) {
 	return script.slice(opening[0] + 1, closing[0]).join('\n') + '\n';
 }
 
-/** Admits one exact direct command or the actual source-owned logged wrapper. */
+/** Admits only the actual source-owned logged wrapper, whose diagnostic writes the evidence count. */
 function distroUnitInvocationFits(body) {
 	const lines = logicalLines(body).filter((line) => line !== '');
-	if (JSON.stringify(lines) === JSON.stringify([DISTRO_UNIT_COMMAND])) return true;
 	const normalized = lines.map((line) => line.replace(/[ \t]+/g, ' ').trim());
 	const at = normalized.indexOf(DISTRO_DIAGNOSTIC_COMMAND);
 	const close = normalized.indexOf('PYTHON');
@@ -6654,26 +6688,60 @@ function distroUnitInvocationFits(body) {
 }
 
 /** Rejects native distro suites whose wrapper omits their real prerequisites. */
-function distroUnitProblems(files, helper = DISTRO_UNIT_HELPER) {
+function distroUnitProblems(files, helper = DISTRO_UNIT_HELPER, runner = DISTRO_UNIT_RUNNER) {
 	const linux = files.find((entry) => entry.rel === LINUX_BOX);
-	const job =
-		linux && pipeline.jobsOfText(linux.text, LINUX_BOX).find((row) => row.id === 'install-linux');
-	const steps = job ? pipeline.steps(job.body) : [];
-	const units = steps.filter(
-		(step) => step.name === "The unit suite on this distribution's LuaJIT"
+	const jobs = linux ? pipeline.jobsOfText(linux.text, LINUX_BOX) : [];
+	const units = jobs.flatMap((row) =>
+		pipeline
+			.steps(row.body)
+			.filter((step) => step.name === "The unit suite on this distribution's LuaJIT")
+			.map((step) => ({ job: row.id, ...step }))
 	);
 	const problems = [];
 	if (
 		units.length !== 1 ||
+		units[0].job !== 'test-linux' ||
+		pipeline.stepField(units[0].body, 'if') !== 'matrix.distro' ||
+		pipeline.stepField(units[0].body, 'id') !== 'distro_unit' ||
 		pipeline.stepField(units[0].body, 'shell') !== 'bash' ||
+		pipeline.stepField(units[0].body, 'working-directory') !== null ||
 		!distroUnitInvocationFits(units[0].body)
 	) {
-		problems.push('the distro unit step must execute its fail-closed native prerequisite wrapper');
+		problems.push(
+			'one distribution row step of the Unit stage must execute its fail-closed native prerequisite wrapper'
+		);
+	}
+	const runnerCode = runner.split('\n').filter((line) => line.trim() !== '' && !/^\s*#/.test(line));
+	if (JSON.stringify(runnerCode) !== JSON.stringify(DISTRO_UNIT_RUNNER_CODE)) {
+		problems.push(
+			'the distro runner must start the authored image and preparation with a read-only checkout'
+		);
 	}
 	const code = helper
 		.split('\n')
 		.filter((line) => !/^\s*(?:#|--)/.test(line))
 		.join('\n');
+	// The helper owns the ordinary user and its private copy of the mounted checkout.
+	for (const line of [
+		'source_root="${2:?source checkout is required}"',
+		'useradd -m -d /tmp/ergopti-home -s /bin/bash ergopti-ci',
+		'adduser -D -h /tmp/ergopti-home -s /bin/bash ergopti-ci',
+		'test "$(id -u ergopti-ci)" -ge 1000',
+		'unit_root="$(mktemp -d /tmp/ergopti-distro-source.XXXXXXXX)"',
+		'cp -a "$source_root/." "$unit_root/"',
+		'cd "$unit_root/static/ergopti_plus/linux"'
+	]) {
+		if (code.split('\n').filter((row) => row.trim() === line).length !== 1)
+			problems.push('the distro helper must give the ordinary user a private copy: ' + line);
+	}
+	if (
+		code.indexOf('cd "$unit_root/static/ergopti_plus/linux"') >
+			code.indexOf('unit_driver="$(pwd -P)"') ||
+		code.indexOf('test "$(id -u ergopti-ci)" -ge 1000') >
+			code.indexOf('chown -R ergopti-ci:ergopti-ci "$unit_root"')
+	) {
+		problems.push('the suite must run from the private copy of the ordinary user');
+	}
 	if (
 		(code.match(/^\s*sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \\$/gm) || [])
 			.length !== 4
@@ -6719,7 +6787,12 @@ function distroUnitProblems(files, helper = DISTRO_UNIT_HELPER) {
 	if (
 		!code.includes('unit_driver="$(pwd -P)"') ||
 		!code.includes('test -f "$unit_driver/tests/run.lua"') ||
-		JSON.stringify(chowns) !== JSON.stringify(['chown ergopti-ci "$unit_tmp"', ownership]) ||
+		JSON.stringify(chowns) !==
+			JSON.stringify([
+				'chown -R ergopti-ci:ergopti-ci "$unit_root"',
+				'chown ergopti-ci "$unit_tmp"',
+				ownership
+			]) ||
 		code.indexOf(ownership) >= code.indexOf('sudo -H -u ergopti-ci env')
 	) {
 		problems.push(
@@ -6770,7 +6843,7 @@ function distroUnitProblems(files, helper = DISTRO_UNIT_HELPER) {
 }
 errors.push(...distroUnitProblems(pipeline.files()));
 const distroUnitBody = pipeline.step(
-	pipeline.job('install-linux'),
+	pipeline.job('test-linux'),
 	"The unit suite on this distribution's LuaJIT"
 );
 for (const [what, changed] of [
@@ -6814,7 +6887,17 @@ for (const [what, from, to] of [
 		'unit_status=0'
 	],
 	['missing group header', "printf 'distro-unit-group %s\\n'", "printf 'group %s\\n'"],
-	['helper exits green', 'exit "$unit_status"', 'exit 0']
+	['helper exits green', 'exit "$unit_status"', 'exit 0'],
+	['root private-copy admission', '\ntest "$(id -u ergopti-ci)" -ge 1000\n', '\n'],
+	['missing private source copy', 'cp -a "$source_root/." "$unit_root/"', 'true'],
+	[
+		'suite runs in the mounted checkout',
+		'cd "$unit_root/static/ergopti_plus/linux"',
+		'cd "$source_root/static/ergopti_plus/linux"'
+	],
+	['missing ordinary user', 'useradd -m -d /tmp/ergopti-home -s /bin/bash ergopti-ci', 'true'],
+	['missing musl ordinary user', 'adduser -D -h /tmp/ergopti-home -s /bin/bash ergopti-ci', 'true'],
+	['missing source argument', 'source_root="${2:?source checkout is required}"', 'source_root=/']
 ]) {
 	const changed = DISTRO_UNIT_HELPER.replace(from, to);
 	assert.notEqual(changed, DISTRO_UNIT_HELPER, what + ' must actually mutate the native wrapper');
@@ -6894,11 +6977,11 @@ assert.ok(
 	'disabled native directory writes must refuse'
 );
 
-// Preserve the incoming direct-command contract as a separately valid form.
+// The bare command without its diagnostic leaves the evidence count unwritten.
 const directDistroUnitStep =
 	"      - name: The unit suite on this distribution's LuaJIT\n" +
-	"        if: env.INSTALL_KIND == 'install'\n" +
-	'        working-directory: static/ergopti_plus/linux\n' +
+	'        if: matrix.distro\n' +
+	'        id: distro_unit\n' +
 	'        shell: bash\n        run: |\n          ' +
 	DISTRO_UNIT_COMMAND +
 	'\n';
@@ -6910,16 +6993,44 @@ const directDistroFiles = pipeline.files().map((entry) =>
 			}
 		: entry
 );
-assert.deepEqual(
-	distroUnitProblems(directDistroFiles),
-	[],
-	'the original exact one-command form remains admitted'
+assert.ok(
+	distroUnitProblems(directDistroFiles).length > 0,
+	'the one-command form records no executed count and is refused'
 );
 assert.equal(
 	distroUnitInvocationFits(distroUnitBody),
 	true,
 	'the actual supervised form remains admitted'
 );
+for (const [what, from, to] of [
+	['writable checkout mount', '"$repo_root:/src:ro"', '"$repo_root:/src"'],
+	['foreign image', '"$image" sh -c', 'ubuntu:latest sh -c'],
+	['unprepared container', '\t\teval "$ERGOPTI_UNIT_PREP"\n', ''],
+	['prep from another field', 'unit "$distro" prep)"', 'unit "$distro" image)"'],
+	[
+		'helper without the mount',
+		'prepare-linux-distro-unit.sh "$1" /src',
+		'prepare-linux-distro-unit.sh "$1" /tmp'
+	],
+	[
+		'helper for another distribution',
+		'"$1" /src\' distro-unit "$distro"',
+		'debian /src\' distro-unit "$distro"'
+	],
+	['kept container', 'docker run --rm --network host', 'docker run --network host'],
+	[
+		'swallowed preparation',
+		'\t\teval "$ERGOPTI_UNIT_PREP"\n',
+		'\t\teval "$ERGOPTI_UNIT_PREP" || true\n'
+	]
+]) {
+	const changed = DISTRO_UNIT_RUNNER.replace(from, to);
+	assert.notEqual(changed, DISTRO_UNIT_RUNNER, what + ' must actually mutate the distro runner');
+	assert.ok(
+		distroUnitProblems(pipeline.files(), DISTRO_UNIT_HELPER, changed).length > 0,
+		what + ' must refuse'
+	);
+}
 for (const [what, from, to] of [
 	['comment-only helper', DISTRO_UNIT_COMMAND, '# ' + DISTRO_UNIT_COMMAND],
 	['unreachable helper', DISTRO_UNIT_COMMAND, 'if false; then ' + DISTRO_UNIT_COMMAND + '; fi'],
@@ -6929,14 +7040,10 @@ for (const [what, from, to] of [
 		DISTRO_UNIT_COMMAND,
 		DISTRO_UNIT_COMMAND.replace('$GITHUB_WORKSPACE', '$unit_root')
 	],
-	['missing supervised curl', '          command -v curl\n', ''],
-	['root private-copy admission', '          test "$(id -u ergopti-ci)" -ge 1000\n', ''],
-	['missing private source copy', '          cp -a "$GITHUB_WORKSPACE/." "$unit_root/"\n', ''],
-	[
-		'suite runs in shared checkout',
-		'(cd "$unit_root/static/ergopti_plus/linux" &&',
-		'(cd "$GITHUB_WORKSPACE/static/ergopti_plus/linux" &&'
-	],
+	['host-row distro suite', '        if: matrix.distro\n', '        if: matrix.group\n'],
+	['every-row distro suite', '        if: matrix.distro\n', ''],
+	['renamed evidence source', '        id: distro_unit\n', '        id: distro_suite\n'],
+	['foreign distribution', '"$LINUX_UNIT_DISTRO" 2>&1 | tee', 'debian 2>&1 | tee'],
 	['missing raw log capture', '2>&1 | tee "$unit_log"', '2>&1'],
 	[
 		'late pipeline status capture',
@@ -6963,7 +7070,14 @@ for (const [what, from, to] of [
 	['diagnostic failure swallowed', 'exit "$diagnostic_status"', 'exit 0'],
 	['zero tests accepted', 'passed + failed <= 0', 'passed + failed < 0'],
 	['duplicate summaries accepted', 'len(frames) != 1', 'len(frames) < 1'],
-	['contradictory native summary accepted', '(native_status == "0" and failed != 0)', 'False']
+	['contradictory native summary accepted', '(native_status == "0" and failed != 0)', 'False'],
+	['ambiguous interpreter accepted', 'len(interpreters) != 1', 'len(interpreters) < 1'],
+	['evidence count without a green run', 'if native_status == "0":', 'if True:'],
+	[
+		'evidence count from one group',
+		'output.write("passed=" + str(totals[1])',
+		'output.write("passed=" + str(passed)'
+	]
 ]) {
 	const changed = distroUnitBody.replace(from, to);
 	assert.notEqual(changed, distroUnitBody, what + ' must actually mutate the supervised source');
@@ -7008,15 +7122,20 @@ try {
 			.matchAll(/\{ name = "([a-z_]+)"/g)
 	].map((match) => match[1]);
 	assert(groups.length > 1, 'the controls cover more than one module group');
-	const grouped = (last, order = groups) =>
+	// The helper prints the admitted interpreter once, before the first group header.
+	const admitted = 'LuaJIT 2.1.1761786044\n';
+	const grouped = (last, order = groups, prologue = admitted) =>
+		prologue +
 		order
 			.map(
 				(name, index) =>
 					'distro-unit-group ' + name + '\n' + (index === order.length - 1 ? last : frame(1, 7, 0))
 			)
 			.join('');
-	for (const [what, text, native, expected] of [
-		['complete successful native log', grouped(frame(1, 7, 0)), '0', 0],
+	const outputFile = path.join(distroControlRoot, 'github-output');
+	const greenOutput = 'passed=' + 7 * groups.length + '\ninterpreter=LuaJIT 2.1.1761786044\n';
+	for (const [what, text, native, expected, output = ''] of [
+		['complete successful native log', grouped(frame(1, 7, 0)), '0', 0, greenOutput],
 		['complete refused native log', grouped(frame(1, 6, 1)), '17', 0],
 		['missing native summary', 'no terminal frame\n', '0', 2],
 		['ungrouped native summary', frame(1, 7, 0), '0', 2],
@@ -7026,18 +7145,32 @@ try {
 		['zero native modules', grouped(frame(0, 7, 0)), '0', 2],
 		['zero native cases', grouped(frame(1, 0, 0)), '0', 2],
 		['green native exit with failed cases', grouped(frame(1, 6, 1)), '0', 2],
-		['partial native frame', grouped(frame(1, 7, 0).slice(0, -42)), '0', 2]
+		['partial native frame', grouped(frame(1, 7, 0).slice(0, -42)), '0', 2],
+		['unadmitted interpreter', grouped(frame(1, 7, 0), groups, ''), '0', 2],
+		['two admitted interpreters', grouped(frame(1, 7, 0), groups, admitted + admitted), '0', 2],
+		['PUC Lua interpreter', grouped(frame(1, 7, 0), groups, 'Lua 5.1\n'), '0', 2],
+		[
+			'prerelease interpreter',
+			grouped(frame(1, 7, 0), groups, 'LuaJIT 2.1.0-beta3\n'),
+			'0',
+			0,
+			'passed=' + 7 * groups.length + '\ninterpreter=LuaJIT 2.1.0-beta3\n'
+		]
 	]) {
 		fs.writeFileSync(log, text);
+		fs.writeFileSync(outputFile, '');
 		const result = spawnSync(distroControlPython, ['-', log, runner, 'debian', native], {
 			input: diagnostic,
 			encoding: 'utf8',
-			timeout: 5000
+			timeout: 5000,
+			env: { ...process.env, GITHUB_OUTPUT: outputFile }
 		});
 		assert.equal(result.error, undefined, what);
 		assert.equal(result.signal, null, what);
 		assert.equal(result.status, expected, what);
 		assert.equal(result.stderr, '', what);
+		// Only a green, complete run hands the evidence step a count and an interpreter.
+		assert.equal(fs.readFileSync(outputFile, 'utf8'), output, what + ': evidence outputs');
 		const propagated = spawnSync(
 			distroControlBash,
 			[
@@ -7095,35 +7228,50 @@ try {
 		(line, index) => index > start && line === 'native_status="${unit_pipeline_status[0]}"'
 	);
 	assert(start >= 0 && end > start, 'the actual supervised pipeline must be present');
-	const pipe = lines
-		.slice(start, end + 1)
-		.join('\n')
-		.replaceAll('${{ env.INSTALL_DISTRO }}', '__guard_unsupported__');
+	const pipe = lines.slice(start, end + 1).join('\n');
 	const quote = (value) => "'" + value.replaceAll("'", "'\"'\"'") + "'";
 	const script =
-		'set -euo pipefail\nunit_root=' +
-		quote(distroControlWorkspace) +
-		'\nunit_log=' +
+		'set -euo pipefail\nunit_log=' +
 		quote(log.replaceAll('\\', '/')) +
 		'\n' +
-		'unset BASH_XTRACEFD\nPS4="+ "\nset -x\n: "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh"\n' +
+		'unset BASH_XTRACEFD\nPS4="+ "\nset -x\n: "$GITHUB_WORKSPACE/tools/test/run-linux-distro-unit.sh"\n' +
 		pipe +
 		'\ndiagnostic_status=0\n' +
 		footer;
 	const result = spawnSync(distroControlBash, ['-c', script], {
 		encoding: 'utf8',
-		timeout: 5000,
-		env: { ...process.env, GITHUB_WORKSPACE: distroControlWorkspace },
+		timeout: 10000,
+		env: {
+			...process.env,
+			GITHUB_WORKSPACE: distroControlWorkspace,
+			LINUX_UNIT_DISTRO: '__guard_unsupported__'
+		},
 		stdio: ['pipe', 'pipe', 'pipe']
 	});
-	assert.equal(result.error, undefined, 'the genuine prerequisite helper refuses promptly');
+	assert.equal(result.error, undefined, 'the genuine distro runner refuses promptly');
 	assert.equal(result.signal, null);
 	assert.equal(
 		result.status,
 		1,
-		'the real helper refusal propagates through tee and the actual native exit tail'
+		'the real runner refusal propagates through tee and the actual native exit tail'
 	);
-	assert.match(fs.readFileSync(log, 'utf8'), /Unsupported mandatory unit distribution\./);
+	// The authored map refuses a distribution it has no archive lot for, before any container.
+	assert.match(
+		fs.readFileSync(log, 'utf8'),
+		/Unknown Linux unit distribution: __guard_unsupported__/
+	);
+	// Inside a container the helper refuses an unknown distribution before installing anything.
+	const helperRefusal = spawnSync(
+		distroControlBash,
+		[
+			path.join(__dirname, 'prepare-linux-distro-unit.sh').replaceAll('\\', '/'),
+			'__guard_unsupported__',
+			distroControlWorkspace
+		],
+		{ encoding: 'utf8', timeout: 5000 }
+	);
+	assert.equal(helperRefusal.status, 1, 'the genuine helper refuses an unknown distribution');
+	assert.match(helperRefusal.stderr, /^Unsupported mandatory unit distribution\.$/m);
 	// The real Bash renderer quotes this independently supplied exact path. Use
 	// that primitive's spelling to handle spaces and apostrophes without admitting
 	// a different helper, a guessed quote grammar, or an arbitrary helper suffix.
@@ -7143,15 +7291,10 @@ try {
 	// A controlled printf child supplies transport bytes; it is not a fake helper.
 	const refusedLog = path.join(distroControlRoot, 'refused-log');
 	fs.mkdirSync(refusedLog);
-	const teePipe = pipe.replace(
-		DISTRO_UNIT_COMMAND.replaceAll('${{ env.INSTALL_DISTRO }}', '__guard_unsupported__'),
-		'printf "%s\\n" "controlled transport"'
-	);
+	const teePipe = pipe.replace(DISTRO_UNIT_COMMAND, 'printf "%s\\n" "controlled transport"');
 	assert.notEqual(teePipe, pipe, 'the transport-only producer replacement must be exact');
 	const teeScript =
-		'set -euo pipefail\nunit_root=' +
-		quote(distroControlWorkspace) +
-		'\nunit_log=' +
+		'set -euo pipefail\nunit_log=' +
 		quote(refusedLog.replaceAll('\\', '/')) +
 		'\n' +
 		'unset BASH_XTRACEFD\nPS4="+ "\nset -x\n' +

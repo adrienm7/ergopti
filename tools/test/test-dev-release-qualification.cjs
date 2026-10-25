@@ -1051,6 +1051,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	const rows = ['first-row', 'second-row'];
 	const shardedManifest = structuredClone(manifest);
 	shardedManifest.jobs['e2e-linux'].shards = rows;
+	shardedManifest.jobs['e2e-linux'].deferrable_shards = rows;
 	const e2eDeferral = evidence.find((doc) => doc.job === 'e2e-linux');
 	const sharded = [
 		...evidence.filter((doc) => doc.job !== 'e2e-linux'),
@@ -1080,6 +1081,99 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		() => verifyAggregate({ ...args, evidence: [...evidence, structuredClone(e2eDeferral)] }),
 		/Duplicate deferred suite evidence/,
 		'an unsharded job still refuses a repeated deferral'
+	);
+	// A run-wide deferral cannot leave a row of its matrix undeferrable.
+	const partly = structuredClone(shardedManifest);
+	partly.jobs['e2e-linux'].deferrable_shards = ['first-row'];
+	assert.throws(
+		() => verifyAggregate({ ...shardedArgs, manifest: partly }),
+		/invalid deferrable shards/,
+		'a run-wide claim needs every row deferrable'
+	);
+	const undeclared = structuredClone(shardedManifest);
+	delete undeclared.jobs['e2e-linux'].deferrable_shards;
+	assert.throws(
+		() => verifyAggregate({ ...shardedArgs, manifest: undeclared }),
+		/e2e-linux shard first-row cannot defer its suite/,
+		'a sharded job defers only the rows its manifest names'
+	);
+
+	// The unit matrix defers row by row: its module-group rows may stand in a
+	// receipt for their own subject only, and its distribution rows, which no
+	// receipt covers, owe their own executed counts in the same deferred run.
+	const groupRows = ['meta', 'core'];
+	const distroRows = ['debian', 'alpine'];
+	const unitManifest = structuredClone(manifest);
+	unitManifest.jobs['test-linux'] = {
+		classification: 'mandatory',
+		shards: [...groupRows, ...distroRows],
+		deferrable_shards: groupRows,
+		shard_subjects: Object.fromEntries(
+			[...groupRows, ...distroRows].map((row) => [row, ['unit-' + row]])
+		),
+		subjects: Object.fromEntries([...groupRows, ...distroRows].map((row) => ['unit-' + row, 1]))
+	};
+	const unitDeferral = evidence.find((doc) => doc.job === 'test-linux');
+	const distroRow = (shard) => ({
+		schema_version: 1,
+		job: 'test-linux',
+		shard,
+		sha,
+		architecture: 'amd64',
+		distro: shard,
+		session: 'container',
+		interpreter: 'LuaJIT 2.1.fixture',
+		subjects: { ['unit-' + shard]: 18000 }
+	});
+	const unitEvidence = [
+		...evidence.filter((doc) => doc.job !== 'test-linux'),
+		...groupRows.map((shard) => ({ ...structuredClone(unitDeferral), shard })),
+		...distroRows.map(distroRow)
+	];
+	const unitArgs = { ...args, manifest: unitManifest, evidence: unitEvidence };
+	assert.equal(
+		verifyAggregate(unitArgs).qualified,
+		false,
+		'deferred group rows beside executed distribution rows are admitted, never qualified'
+	);
+	assert.throws(
+		() =>
+			verifyAggregate({
+				...unitArgs,
+				evidence: unitEvidence.filter((doc) => doc.shard !== 'alpine')
+			}),
+		/successful job test-linux has no evidence from shard alpine/,
+		'a deferred run still needs every distribution receipt'
+	);
+	assert.throws(
+		() => verifyAggregate({ ...unitArgs, evidence: [...unitEvidence, distroRow('debian')] }),
+		/duplicate evidence document for test-linux shard debian/,
+		'a distribution receipt counts once'
+	);
+	const deferredDistro = unitEvidence.map((doc) =>
+		doc.shard === 'debian' ? { ...structuredClone(unitDeferral), shard: 'debian' } : doc
+	);
+	assert.throws(
+		() => verifyAggregate({ ...unitArgs, evidence: deferredDistro }),
+		/test-linux shard debian cannot defer its suite/,
+		'no receipt stands in for a distribution row'
+	);
+	const emptyDistro = structuredClone(unitEvidence);
+	emptyDistro.find((doc) => doc.shard === 'alpine').subjects = {};
+	assert.throws(
+		() => verifyAggregate({ ...unitArgs, evidence: emptyDistro }),
+		/successful job test-linux has no evidence for unit-alpine/,
+		'a distribution row records its own executed count'
+	);
+	const borrowed = structuredClone(unitEvidence);
+	borrowed.find((doc) => doc.shard === 'alpine').subjects = { 'unit-meta': 1 };
+	assert.throws(
+		() => verifyAggregate({ ...unitArgs, evidence: borrowed }),
+		/Duplicate|duplicate|another row's subject/,
+		"a distribution row cannot claim a deferred group's subject"
+	);
+	console.log(
+		'Linux unit deferral: group rows defer row by row; missing, duplicate, deferred, empty and borrowed distribution receipts refuse.'
 	);
 }
 

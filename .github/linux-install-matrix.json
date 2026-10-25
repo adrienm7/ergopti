@@ -1,6 +1,6 @@
 {
 	"Debian: installed archive": {
-		"id": "distro-debian",
+		"id": "archive-install-debian",
 		"kind": "install",
 		"distro": "debian",
 		"container": "debian:stable-slim",
@@ -8,7 +8,7 @@
 		"prep": "apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed sudo passwd ca-certificates git gcc libc6-dev linux-libc-dev"
 	},
 	"Fedora: installed archive": {
-		"id": "distro-fedora",
+		"id": "archive-install-fedora",
 		"kind": "install",
 		"distro": "fedora",
 		"container": "fedora:latest",
@@ -16,7 +16,7 @@
 		"prep": "dnf install -y bash coreutils findutils grep sed sudo shadow-utils git gcc glibc-devel kernel-headers"
 	},
 	"Arch Linux: installed archive": {
-		"id": "distro-arch",
+		"id": "archive-install-arch",
 		"kind": "install",
 		"distro": "arch",
 		"container": "archlinux:latest",
@@ -24,7 +24,7 @@
 		"prep": "pacman -Sy --noconfirm bash coreutils findutils grep sed sudo shadow git gcc glibc linux-api-headers"
 	},
 	"Alpine: installed archive": {
-		"id": "distro-alpine",
+		"id": "archive-install-alpine",
 		"kind": "install",
 		"distro": "alpine",
 		"container": "alpine:latest",
@@ -32,7 +32,7 @@
 		"prep": "apk add --no-cache bash coreutils findutils grep sed sudo git gcc musl-dev linux-headers"
 	},
 	"openSUSE: installed archive": {
-		"id": "distro-opensuse",
+		"id": "archive-install-opensuse",
 		"kind": "install",
 		"distro": "opensuse",
 		"container": "opensuse/tumbleweed:latest",

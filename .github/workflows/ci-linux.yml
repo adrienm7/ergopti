@@ -7,11 +7,11 @@
 # names its subject in parentheses. One lane with one entry job and one exit
 # job:
 #
-#   unit -> integration -> E2E (5 rows) -> build -> install and launch (19 lots) -> verdict
-#   driver, native          domain rows    deb, rpm,    5 archive installs from the    (evidence
-#                                          AppImage,    checkout, 9 first installs,     gate)
-#                                          archive,     3 package runs, the built
-#                                          Flatpak      archive and the Flatpak
+#   unit (11 rows) -> integration -> E2E (5 rows) -> build -> install and launch (19 lots) -> verdict
+#   6 module groups,  driver,         domain rows    deb, rpm,  5 archive installs from the  (evidence
+#   5 distributions'  native                         AppImage,  checkout, 9 first installs,   gate)
+#   own LuaJIT                                       archive,   3 package runs, the built
+#                                                    Flatpak    archive and the Flatpak
 #
 # The stages are strictly sequential: a failure skips every later stage.
 #
@@ -83,25 +83,43 @@ jobs:
   # 1) Linux Lua driver unit and native contract tests
   # ─────────────────────────────────────────────────
   # The lane's entry job: the only one of this file that needs nothing.
-  # One row per domain group of static/ergopti_plus/linux/tests/support/
-  # module_groups.lua (run.lua --module=<group>); the groups partition the
-  # suite, so the rows together run every test module exactly once. The list
-  # below must equal those groups, in order, except the integration group,
-  # which the Integration stage runs (test-linux-ci-evidence.cjs).
+  # Two kinds of rows, told apart by the key each one sets:
+  #   group   one per domain group of static/ergopti_plus/linux/tests/support/
+  #           module_groups.lua (run.lua --module=<group>) on Ubuntu's LuaJIT;
+  #           the groups partition the suite, so these rows together run every
+  #           test module exactly once. They must equal those groups, in order,
+  #           except the integration group, which the Integration stage runs.
+  #   distro  one per archive installation lot of .github/linux-install-matrix.json,
+  #           in lot order: the whole suite on that distribution's own LuaJIT,
+  #           in a container of the lot's image (run-linux-distro-unit.sh).
+  # Every row records its own unit-<row> subject (test-linux-ci-evidence.cjs).
   test-linux:
     name: 'Unit tests'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        group: [meta, core, infra, input, modules, ui]
+        include:
+          - group: meta
+          - group: core
+          - group: infra
+          - group: input
+          - group: modules
+          - group: ui
+          - distro: debian
+          - distro: fedora
+          - distro: arch
+          - distro: alpine
+          - distro: opensuse
     env:
       LINUX_UNIT_GROUP: ${{ matrix.group }}
+      LINUX_UNIT_DISTRO: ${{ matrix.distro }}
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Install LuaJIT and native event dependencies
+        if: matrix.group
         # The test runner (tests/run.lua) uses LuaJIT. Test discovery falls
         # back to io.popen("find") when lfs is unavailable — no luarocks needed.
         run: |
@@ -109,6 +127,7 @@ jobs:
           luajit -e 'assert(require("luv"), "native luv integration is mandatory")'
 
       - name: Run the driver unit test suite
+        if: matrix.group
         working-directory: static/ergopti_plus/linux
         # Wrapped in the unified reporter: streams output unchanged, exits with the
         # runner's code (CI gating preserved), and emits GitHub annotations + a JSON
@@ -153,7 +172,7 @@ jobs:
 
       # Timing JSON is best-effort diagnostics; deferred or interrupted runs may have no file.
       - name: Retain Linux Lua timing diagnostics
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.group }}
         uses: actions/upload-artifact@v4
         with:
           name: lua-timings-linux-unit-${{ matrix.group }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -162,6 +181,7 @@ jobs:
           retention-days: 7
 
       - name: Record mandatory unit evidence
+        if: matrix.group
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-unit-suite.json"
@@ -186,13 +206,150 @@ jobs:
           else
               exit 1
           fi
+
+      # The whole unit suite, on THIS distribution's own LuaJIT, as one row per
+      # distribution with an archive installation lot.
+      #
+      # Every other row runs on Ubuntu's build, so a difference that belongs to
+      # the interpreter or the C library is invisible to it, and those are the
+      # differences that actually bite here. Alpine is musl rather than glibc;
+      # Arch ships whatever LuaJIT released last; several distributions patch
+      # it. The suite also measures actual native filesystem, timers and
+      # supervised Python/curl children. run-linux-distro-unit.sh starts a
+      # container of the lot's image and preparation from the authored map;
+      # prepare-linux-distro-unit.sh builds pinned luv/lfs against the native
+      # interpreter and runs every module group as an ordinary user on a private
+      # copy of the checkout. No dated suite qualification covers these rows:
+      # they always run, and their counts are their own evidence.
+      #
+      # LuaJIT is the production interpreter. A distribution row without it is
+      # not evidence about the driver and therefore cannot satisfy this gate.
+      - name: The unit suite on this distribution's LuaJIT
+        if: matrix.distro
+        id: distro_unit
+        shell: bash
+        run: |
+          set -euo pipefail
+          unit_log_dir="$RUNNER_TEMP/linux-distro-unit-logs"
+          mkdir -p "$unit_log_dir"
+          unit_log="$unit_log_dir/$LINUX_UNIT_DISTRO.log"
+          set +e
+          bash "$GITHUB_WORKSPACE/tools/test/run-linux-distro-unit.sh" "$LINUX_UNIT_DISTRO" 2>&1 | tee "$unit_log"
+          unit_pipeline_status=("${PIPESTATUS[@]}")
+          set -e
+          native_status="${unit_pipeline_status[0]}"
+          set +e
+          python3 - "$unit_log" "$GITHUB_WORKSPACE/static/ergopti_plus/linux/tests/run.lua" \
+            "$LINUX_UNIT_DISTRO" "$native_status" <<'PYTHON'
+          import os
+          import pathlib
+          import re
+          import sys
+
+          log_path, runner_path, distro, native_status = sys.argv[1:]
+          text = pathlib.Path(log_path).read_text(encoding="utf-8", errors="replace")
+          runner = pathlib.Path(runner_path).read_text(encoding="utf-8")
+          groups_path = pathlib.Path(runner_path).parent / "support" / "module_groups.lua"
+          groups = re.findall(r'\{ name = "([a-z_]+)"', groups_path.read_text(encoding="utf-8"))
+          separator = "=" * 40
+          template = r"\n" + separator + r"\nOVERALL RESULTS:\nTotal modules: %d\nPassed tests:  %d\nFailed tests:  %d\n" + separator
+
+          def annotation(kind, message):
+              message = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print("::" + kind + " title=Linux distro unit suite::" + message)
+
+          if native_status != "0":
+              for line in text.splitlines():
+                  if line.startswith("tests/run.lua: ") or line.startswith("luajit: "):
+                      annotation("error", distro + ": " + line)
+
+          # Couple only to the existing runner's exact format string, not a second tally.
+          if runner.count('"' + template + '"') != 1:
+              annotation("error", distro + ": native runner summary format is unavailable; inspect the raw artifact")
+              raise SystemExit(2)
+          # The helper runs every module group at once and prints each log whole
+          # under its header, in the order tests/support/module_groups.lua declares.
+          parts = re.split(r"(?m)^distro-unit-group ([a-z_]+)\n", text)
+          names = parts[1::2]
+          if not groups or names != groups:
+              annotation("error", distro + ": native exit " + native_status + "; expected the groups " + ", ".join(groups) + ", received " + ", ".join(names) + "; inspect the raw artifact")
+              raise SystemExit(2)
+          pattern = re.compile(r"(?m)^" + separator + r"\nOVERALL RESULTS:\nTotal modules: ([0-9]+)\nPassed tests:  ([0-9]+)\nFailed tests:  ([0-9]+)\n" + separator + r"(?:\n|$)")
+          totals = [0, 0, 0]
+          for name, body in zip(names, parts[2::2]):
+              frames = list(pattern.finditer(body))
+              if len(frames) != 1 or len(re.findall(r"(?m)^OVERALL RESULTS:$", body)) != 1:
+                  annotation("error", distro + " " + name + ": native exit " + native_status + "; expected one complete summary, received " + str(len(frames)) + "; inspect the raw artifact")
+                  raise SystemExit(2)
+              frame = frames[0]
+              modules, passed, failed = map(int, frame.groups())
+              if modules <= 0 or passed + failed <= 0 or (native_status == "0" and failed != 0):
+                  annotation("error", distro + " " + name + ": native exit/summary contradiction; inspect the raw artifact")
+                  raise SystemExit(2)
+              totals = [totals[0] + modules, totals[1] + passed, totals[2] + failed]
+              # Emit the actual runner's failure and module-load first lines without deriving
+              # expected results. Full traceback/replay bytes remain in the uploaded raw log.
+              if native_status != "0":
+                  for line in body[:frame.start()].splitlines():
+                      if line.startswith("  ! load error in "):
+                          annotation("error", distro + " " + name + ": " + line.strip())
+                  for line in body[frame.end():].splitlines():
+                      if line.startswith("  - ") or line.startswith("    replay: "):
+                          annotation("error", distro + " " + name + ": " + line.strip())
+          summary = distro + ": native exit " + native_status + "; groups=" + str(len(names)) + ", modules=" + str(totals[0]) + ", passed=" + str(totals[1]) + ", failed=" + str(totals[2])
+          annotation("notice" if native_status == "0" else "error", summary)
+          # The evidence names the interpreter the helper admitted, printed once before the groups.
+          interpreters = re.findall(r"(?m)^(LuaJIT [0-9][^\s]*)$", parts[0])
+          if native_status == "0":
+              if len(interpreters) != 1:
+                  annotation("error", distro + ": expected one admitted LuaJIT version, received " + str(len(interpreters)) + "; inspect the raw artifact")
+                  raise SystemExit(2)
+              with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+                  output.write("passed=" + str(totals[1]) + "\ninterpreter=" + interpreters[0] + "\n")
+          PYTHON
+          diagnostic_status=$?
+          set -e
+          # Diagnostics and tee must never turn a refused native run green.
+          if [[ "$native_status" -ne 0 ]]; then exit "$native_status"; fi
+          if [[ "${unit_pipeline_status[1]}" -ne 0 ]]; then exit "${unit_pipeline_status[1]}"; fi
+          exit "$diagnostic_status"
+        timeout-minutes: 20
+
+      - name: Upload the native distro unit log
+        if: ${{ !cancelled() && matrix.distro }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-distro-unit-log-${{ matrix.distro }}
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-distro-unit-logs/${{ matrix.distro }}.log
+          if-no-files-found: warn
+
+      - name: Record mandatory distro unit evidence
+        if: matrix.distro
+        shell: bash
+        env:
+          DISTRO_UNIT_PASSED: ${{ steps.distro_unit.outputs.passed }}
+          DISTRO_UNIT_INTERPRETER: ${{ steps.distro_unit.outputs.interpreter }}
+        run: |
+          set -euo pipefail
+          node tools/test/linux-ci-evidence.cjs record \
+              --job test-linux \
+              --shard "$LINUX_UNIT_DISTRO" \
+              --output "$RUNNER_TEMP/linux-ci-evidence/test-linux-$LINUX_UNIT_DISTRO.json" \
+              --sha "$GITHUB_SHA" \
+              --architecture "$RUNNER_ARCH" \
+              --distro "$LINUX_UNIT_DISTRO" \
+              --session container \
+              --interpreter "$DISTRO_UNIT_INTERPRETER" \
+              --subject "unit-$LINUX_UNIT_DISTRO=$DISTRO_UNIT_PASSED"
+
       - name: Upload mandatory unit evidence
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
-          name: linux-ci-evidence-test-linux-${{ matrix.group }}
+          name: linux-ci-evidence-test-linux-${{ matrix.group || matrix.distro }}
           retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/test-linux-${{ matrix.group }}.json
+          path: ${{ runner.temp }}/linux-ci-evidence/test-linux-${{ matrix.group || matrix.distro }}.json
           if-no-files-found: error
 
       - name: Retain the source-bound linux-unit-suite qualification
@@ -4528,134 +4685,7 @@ jobs:
           exit $FAIL
         timeout-minutes: 5
 
-      # The whole unit suite, on THIS distribution's own LuaJIT.
-      #
-      # Everything else in this workflow runs on Ubuntu's build, so a difference
-      # that belongs to the interpreter or the C library is invisible to it —
-      # and those are the differences that actually bite here. Alpine is musl
-      # rather than glibc; Arch ships whatever LuaJIT released last; several
-      # distributions patch it. The suite also measures actual native filesystem,
-      # timers and supervised Python/curl children. Build pinned luv/lfs against
-      # the native interpreter and retain the ordinary UID and writable source.
-      # The earlier no-dependencies installation contract remains unchanged.
-      #
-      # LuaJIT is the production interpreter. A distribution lane without it is
-      # not evidence about the driver and therefore cannot satisfy this gate.
-      - name: The unit suite on this distribution's LuaJIT
-        if: env.INSTALL_KIND == 'install'
-        working-directory: static/ergopti_plus/linux
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Retain the suite's real supervised-curl prerequisite. The incoming
-          # pinned native helper owns Python and ABI-compatible luv/lfs builds.
-          case "${{ env.INSTALL_DISTRO }}" in
-            debian)   apt-get install -y --no-install-recommends curl ;;
-            fedora)   dnf install -y curl ;;
-            arch)     pacman -Sy --noconfirm curl ;;
-            alpine)   apk add --no-cache curl ;;
-            opensuse) zypper --non-interactive install curl ;;
-            *) echo "::error::unknown archive unit distribution"; exit 1 ;;
-          esac
-          command -v curl
-
-          # Root bypasses the suite's real unreadable-file permission premise.
-          # Keep the checkout untouched and give the installation user a private
-          # writable source tree, including every original test and shared file.
-          test "$(id -u ergopti-ci)" -ge 1000
-          unit_root="$(mktemp -d)"
-          readonly unit_root
-          trap 'rm -rf -- "$unit_root"' EXIT
-          cp -a "$GITHUB_WORKSPACE/." "$unit_root/"
-          chown -R ergopti-ci:ergopti-ci "$unit_root"
-          unit_log_dir="$RUNNER_TEMP/linux-distro-unit-logs"
-          mkdir -p "$unit_log_dir"
-          unit_log="$unit_log_dir/${{ env.INSTALL_DISTRO }}.log"
-          set +e
-          (cd "$unit_root/static/ergopti_plus/linux" &&
-            bash "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh" "${{ env.INSTALL_DISTRO }}") \
-            2>&1 | tee "$unit_log"
-          unit_pipeline_status=("${PIPESTATUS[@]}")
-          set -e
-          native_status="${unit_pipeline_status[0]}"
-          set +e
-          python3 - "$unit_log" "$unit_root/static/ergopti_plus/linux/tests/run.lua" \
-            '${{ env.INSTALL_DISTRO }}' "$native_status" <<'PYTHON'
-          import pathlib
-          import re
-          import sys
-
-          log_path, runner_path, distro, native_status = sys.argv[1:]
-          text = pathlib.Path(log_path).read_text(encoding="utf-8", errors="replace")
-          runner = pathlib.Path(runner_path).read_text(encoding="utf-8")
-          groups_path = pathlib.Path(runner_path).parent / "support" / "module_groups.lua"
-          groups = re.findall(r'\{ name = "([a-z_]+)"', groups_path.read_text(encoding="utf-8"))
-          separator = "=" * 40
-          template = r"\n" + separator + r"\nOVERALL RESULTS:\nTotal modules: %d\nPassed tests:  %d\nFailed tests:  %d\n" + separator
-
-          def annotation(kind, message):
-              message = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-              print("::" + kind + " title=Linux distro unit suite::" + message)
-
-          if native_status != "0":
-              for line in text.splitlines():
-                  if line.startswith("tests/run.lua: ") or line.startswith("luajit: "):
-                      annotation("error", distro + ": " + line)
-
-          # Couple only to the existing runner's exact format string, not a second tally.
-          if runner.count('"' + template + '"') != 1:
-              annotation("error", distro + ": native runner summary format is unavailable; inspect the raw artifact")
-              raise SystemExit(2)
-          # The helper runs every module group at once and prints each log whole
-          # under its header, in the order tests/support/module_groups.lua declares.
-          parts = re.split(r"(?m)^distro-unit-group ([a-z_]+)\n", text)
-          names = parts[1::2]
-          if not groups or names != groups:
-              annotation("error", distro + ": native exit " + native_status + "; expected the groups " + ", ".join(groups) + ", received " + ", ".join(names) + "; inspect the raw artifact")
-              raise SystemExit(2)
-          pattern = re.compile(r"(?m)^" + separator + r"\nOVERALL RESULTS:\nTotal modules: ([0-9]+)\nPassed tests:  ([0-9]+)\nFailed tests:  ([0-9]+)\n" + separator + r"(?:\n|$)")
-          totals = [0, 0, 0]
-          for name, body in zip(names, parts[2::2]):
-              frames = list(pattern.finditer(body))
-              if len(frames) != 1 or len(re.findall(r"(?m)^OVERALL RESULTS:$", body)) != 1:
-                  annotation("error", distro + " " + name + ": native exit " + native_status + "; expected one complete summary, received " + str(len(frames)) + "; inspect the raw artifact")
-                  raise SystemExit(2)
-              frame = frames[0]
-              modules, passed, failed = map(int, frame.groups())
-              if modules <= 0 or passed + failed <= 0 or (native_status == "0" and failed != 0):
-                  annotation("error", distro + " " + name + ": native exit/summary contradiction; inspect the raw artifact")
-                  raise SystemExit(2)
-              totals = [totals[0] + modules, totals[1] + passed, totals[2] + failed]
-              # Emit the actual runner's failure and module-load first lines without deriving
-              # expected results. Full traceback/replay bytes remain in the uploaded raw log.
-              if native_status != "0":
-                  for line in body[:frame.start()].splitlines():
-                      if line.startswith("  ! load error in "):
-                          annotation("error", distro + " " + name + ": " + line.strip())
-                  for line in body[frame.end():].splitlines():
-                      if line.startswith("  - ") or line.startswith("    replay: "):
-                          annotation("error", distro + " " + name + ": " + line.strip())
-          summary = distro + ": native exit " + native_status + "; groups=" + str(len(names)) + ", modules=" + str(totals[0]) + ", passed=" + str(totals[1]) + ", failed=" + str(totals[2])
-          annotation("notice" if native_status == "0" else "error", summary)
-          PYTHON
-          diagnostic_status=$?
-          set -e
-          # Diagnostics and tee must never turn a refused native run green.
-          if [[ "$native_status" -ne 0 ]]; then exit "$native_status"; fi
-          if [[ "${unit_pipeline_status[1]}" -ne 0 ]]; then exit "${unit_pipeline_status[1]}"; fi
-          exit "$diagnostic_status"
-        timeout-minutes: 10
-
-      - name: Upload the native distro unit log
-        if: ${{ !cancelled() && env.INSTALL_KIND == 'install' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-distro-unit-log-${{ env.INSTALL_DISTRO }}
-          retention-days: 7
-          path: ${{ runner.temp }}/linux-distro-unit-logs/${{ env.INSTALL_DISTRO }}.log
-          if-no-files-found: warn
-
-      - name: Record mandatory distro evidence
+      - name: Record mandatory archive installation evidence
         if: env.INSTALL_KIND == 'install'
         shell: bash
         run: |
@@ -4671,17 +4701,17 @@ jobs:
             '  "distro": "${{ env.INSTALL_DISTRO }}",' \
             '  "session": "container",' \
             '  "interpreter": "LuaJIT",' \
-            '  "subjects": { "distro-${{ env.INSTALL_DISTRO }}": 1 }' \
-            '}' > "$evidence_dir/${{ env.INSTALL_DISTRO }}.json"
+            '  "subjects": { "${{ env.INSTALL_ID }}": 1 }' \
+            '}' > "$evidence_dir/${{ env.INSTALL_ID }}.json"
 
-      - name: Upload mandatory distro evidence
+      - name: Upload mandatory archive installation evidence
         if: env.INSTALL_KIND == 'install'
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
-          name: linux-ci-evidence-distro-${{ env.INSTALL_DISTRO }}
+          name: linux-ci-evidence-${{ env.INSTALL_ID }}
           retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/${{ env.INSTALL_DISTRO }}.json
+          path: ${{ runner.temp }}/linux-ci-evidence/${{ env.INSTALL_ID }}.json
           if-no-files-found: error
 
       - name: Install on ${{ env.INSTALL_IMAGE }} and verify the first run
