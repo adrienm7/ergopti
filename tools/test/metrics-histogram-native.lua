@@ -4,7 +4,8 @@
 local root, database = assert(arg[1]), assert(arg[2])
 local readers_root = assert(arg[3])
 package.path = root .. '/static/ergopti_plus/linux/?.lua;'
-	.. root .. '/static/ergopti_plus/_shared/lua/?.lua;' .. package.path
+	.. root .. '/static/ergopti_plus/_shared/lua/?.lua;'
+	.. root .. '/static/ergopti_plus/_shared/lua/?/init.lua;' .. package.path
 local json = require('json')
 local logger = {}
 for _, name in ipairs({ 'debug', 'info', 'trace', 'done', 'start', 'success' }) do
