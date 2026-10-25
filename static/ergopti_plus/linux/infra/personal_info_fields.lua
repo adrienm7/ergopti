@@ -73,6 +73,21 @@ local function resolve_path()
 	return Paths.shared("modules/personal_info/fields.toml")
 end
 
+--- Validates named field records before the shared mask reads their flags.
+--- Source receipts distinguish an empty TOML array from an empty field map.
+--- @param fields any Parsed optional field dictionary.
+--- @param shapes table Canonical source-bound array identity receipts.
+--- @return boolean valid
+local function valid_fields(fields, shapes)
+	if fields == nil then return true end
+	if type(fields) ~= "table" or shapes.arrays[fields] then return false end
+	for name, entry in pairs(fields) do
+		if type(name) ~= "string" or type(entry) ~= "table" or shapes.arrays[entry]
+			or (entry.masked ~= nil and type(entry.masked) ~= "boolean") then return false end
+	end
+	return true
+end
+
 --- Loads the declaration, once.
 --- @return table { policy = table, fields = table }
 local function declaration()
@@ -103,8 +118,9 @@ local function declaration()
 		return _declaration
 	end
 
-	local ok, parsed = pcall(Reader.decode, content)
-	if not ok or type(parsed) ~= "table" or type(parsed.policy) ~= "table" then
+	local ok, parsed, shapes = pcall(Reader.decode_with_shapes, content)
+	if not ok or type(parsed) ~= "table" or type(parsed.policy) ~= "table"
+		or type(shapes) ~= "table" or type(shapes.arrays) ~= "table" then
 		Logger.error(LOG, "Could not parse '%s' — masking everything. (%s)", path,
 			ok and "malformed" or ErrorDescription.describe(parsed))
 		_declaration = FAIL_CLOSED
@@ -114,6 +130,12 @@ local function declaration()
 	local valid, invalid = Mask.validate_policy(parsed.policy)
 	if not valid then
 		Logger.error(LOG, "The shared policy is invalid at '%s' — masking everything.", tostring(invalid))
+		_declaration = FAIL_CLOSED
+		return _declaration
+	end
+
+	if not valid_fields(parsed.fields, shapes) then
+		Logger.error(LOG, "The shared field classification is malformed — masking everything.")
 		_declaration = FAIL_CLOSED
 		return _declaration
 	end

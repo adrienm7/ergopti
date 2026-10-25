@@ -38,6 +38,27 @@ local function with_stream(stream, body)
 	if not ok then error(detail, 0) end
 end
 
+--- Loads independently authored TOML through real file and parser boundaries.
+--- @param contents string Complete declaration bytes.
+--- @param body function Receives the loader and its refusal diagnostic count.
+local function with_native_declaration(contents, body)
+	local path = os.tmpname()
+	local file = assert(io.open(path, "w"))
+	assert(file:write(contents)); assert(file:close())
+	local names = { "infra.personal_info_fields", "infra.paths", "logger.shim" }
+	local saved, errors = {}, {}
+	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+	local logger = helpers.make_logger_stub()
+	logger.error = function(_, text) errors[#errors + 1] = text end
+	package.loaded["logger.shim"] = logger
+	package.loaded["infra.paths"] = { shared = function() return path end }
+	package.loaded["infra.personal_info_fields"] = nil
+	local ok, detail = pcall(function() body(require("infra.personal_info_fields"), errors) end)
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	os.remove(path)
+	if not ok then error(detail, 0) end
+end
+
 helpers.describe("personal-info-policy-read", function()
 	helpers.it("(personal-info-policy-read) refuses a native FIFO before waiting for a writer", function()
 		local path = os.tmpname()
@@ -73,6 +94,43 @@ assert(fields.for_preview("0750399576", "phone_number") ~= "0750399576", "the pr
 	local handle = assert(io.open(require("infra.paths").shared("modules/personal_info/fields.toml"), "r"))
 	local valid_policy = assert(handle:read("*a"))
 	assert(handle:close())
+
+	local policy_only = assert(valid_policy:match("^(.-)\n%[fields%."))
+	for _, malformed in ipairs({
+		{ name = "boolean field", fields = "[fields]\nphone_number = true\n" },
+		{ name = "numeric field", fields = "[fields]\nphone_number = 42\n" },
+		{ name = "scalar fields", prefix = 'fields = "broken"\n' },
+		{ name = "empty array fields", prefix = "fields = []\n" },
+		{ name = "empty array field", fields = "[fields]\nphone_number = []\n" },
+		{ name = "array fields", fields = "[[fields]]\nmasked = false\n" },
+		{ name = "string mask flag", fields = '[fields.phone_number]\nmasked = "false"\n' },
+		{ name = "table mask flag", fields = "[fields.phone_number]\nmasked = {}\n" },
+	}) do
+		helpers.it("(personal-info-policy-shape) rejects native TOML with " .. malformed.name, function()
+			with_native_declaration((malformed.prefix or "") .. policy_only .. (malformed.fields or ""), function(fields, errors)
+				helpers.assert_eq(fields.is_masked("phone_number"), true)
+				helpers.assert_eq(fields.for_preview("1234567890123456", "phone_number"), "••••••••••••••••",
+					"a malformed field declaration must not retain the normal reveal window")
+				helpers.assert_eq(#errors, 1, "invalid field metadata is diagnosed once before publication")
+			end)
+		end)
+	end
+
+	helpers.it("(personal-info-policy-shape) preserves an explicitly public field in native TOML", function()
+		with_native_declaration(policy_only .. "[fields.phone_number]\nmasked = false\n", function(fields, errors)
+			helpers.assert_eq(fields.is_masked("phone_number"), false)
+			helpers.assert_eq(fields.for_preview("1234567890123456", "phone_number"), "1234567890123456")
+			helpers.assert_eq(#errors, 0)
+		end)
+	end)
+
+	helpers.it("(personal-info-policy-shape) keeps a missing mask flag private", function()
+		with_native_declaration(policy_only .. "[fields.phone_number]\n", function(fields, errors)
+			helpers.assert_eq(fields.is_masked("phone_number"), true)
+			helpers.assert_eq(#errors, 0)
+		end)
+	end)
+
 
 	helpers.it("(personal-info-policy-read) accepts a complete public declaration", function()
 		local closes = 0
