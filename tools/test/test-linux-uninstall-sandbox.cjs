@@ -354,6 +354,55 @@ try {
 			{ encoding: 'utf8', env: nativeEnv, timeout: 15000 }
 		);
 		if (recorded.status !== 0) nativeFailures.push(`payload receipt: ${recorded.stderr.trim()}`);
+		if (recorded.status === 0) {
+			const invalidSource = path.join(nativeRoot, 'invalid\nsource');
+			fs.cpSync(nativeDriver, invalidSource, { recursive: true });
+			const badChecksumBin = path.join(nativeRoot, 'bad-checksum-bin');
+			fs.mkdirSync(badChecksumBin);
+			fs.writeFileSync(
+				path.join(badChecksumBin, 'sha256sum'),
+				`#!/bin/bash\nprintf '%s\\n' "$ERGOPTI_TEST_CHECKSUM_RECEIPT"\n`,
+				{ mode: 0o755 }
+			);
+			const previousReceipt = fs.readFileSync(nativeManifest);
+			for (const checksum of ['', 'invalid-checksum', 'f'.repeat(63)]) {
+				const refused = spawnSync(
+					bashExecutable(),
+					[
+						path.join(nativeDriver, 'install/ownership.sh'),
+						invalidSource,
+						nativeShared,
+						nativeLibrary
+					],
+					{
+						encoding: 'utf8',
+						timeout: 15000,
+						env: {
+							...nativeEnv,
+							PATH: `${badChecksumBin}:${nativeEnv.PATH}`,
+							ERGOPTI_TEST_CHECKSUM_RECEIPT: checksum
+						}
+					}
+				);
+				assert.notEqual(refused.status, 0, 'invalid checksum receipts must refuse publication');
+				assert.match(
+					refused.stderr,
+					/^\[ownership\] code=invalid_checksum path=/,
+					'the preboot failure is a structured developer diagnostic'
+				);
+				assert.equal(
+					refused.stderr.split('\n').length,
+					2,
+					'native source path newlines cannot forge additional diagnostic records'
+				);
+				assert.deepEqual(
+					fs.readFileSync(nativeManifest),
+					previousReceipt,
+					'checksum refusal preserves the previous ownership publication'
+				);
+			}
+		}
+
 		// Independently author the receipt so a failed producer cannot hide the
 		// consumer's native-path bug, then verify every actual producer below.
 		let authored = '';

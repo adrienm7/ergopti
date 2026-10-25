@@ -48,7 +48,11 @@ for tree in "${trees[@]}"; do
 	find "$source" -type f -print0 | while IFS= read -r -d '' file; do
 		digest="$(sha256sum < "$file")"
 		digest="${digest%% *}"
-		[[ "$digest" =~ ^[0-9a-f]{64}$ ]] || { echo 'Invalid payload checksum.' >&2; exit 1; }
+		if ! [[ "$digest" =~ ^[0-9a-f]{64}$ ]]; then
+			checksum_refusal="[ownership] code=invalid_checksum"
+			printf '%s path=%q\n' "$checksum_refusal" "$file" >&2
+			exit 1
+		fi
 		relative="$prefix/${file#"$source/"}"
 		case "$relative" in
 			*$'\n'*|*$'\t'*|*\\*) echo 'Payload filename cannot be represented safely.' >&2; exit 1 ;;
