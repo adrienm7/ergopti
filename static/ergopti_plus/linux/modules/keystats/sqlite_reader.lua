@@ -56,6 +56,16 @@ local function valid_date(value)
 	return type(value) == "string" and value:match("^%d%d%d%d%-%d%d%-%d%d$") ~= nil
 end
 
+--- Tests inclusive optional bounds with the same admission as SQL filters.
+--- @param date string Captured local day.
+--- @param start_date string|nil
+--- @param end_date string|nil
+--- @return boolean
+function M.includes_date(date, start_date, end_date)
+	return valid_date(date) and (not valid_date(start_date) or start_date <= date)
+		and (not valid_date(end_date) or end_date >= date)
+end
+
 --- Executes a read-only JSON query through sqlite3.
 local function read_rows(sqlite_path, sql, media_owned)
 	if media_owned and _media_read_debt ~= nil then return {}, false end
@@ -572,8 +582,7 @@ function M.split_bounds(start_date, end_date, today)
 	}))
 	return {
 		today = today,
-		includes_today = (not valid_date(start_date) or start_date <= today)
-			and (not valid_date(end_date) or end_date >= today),
+		includes_today = M.includes_date(today, start_date, end_date),
 		historical_end = valid_date(end_date) and end_date < today and end_date or yesterday,
 	}
 end

@@ -40,6 +40,9 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Shell = require("adapters.shell_runner")
+local Calendar = require("modules.keystats.calendar")
+local TableUtil = require("table_util")
+local StorageOwned = require("storage_owned")
 
 local LOG = "modules.keystats.system_metrics"
 
@@ -63,6 +66,7 @@ local WIRELESS_PATH = "/proc/net/wireless"
 
 -- The accumulated day, or nil before the first sample.
 local _day = nil
+local _days = {}
 
 -- The wireless listing read now: WIRELESS_PATH, or a test's fixture.
 local _wireless_path = WIRELESS_PATH
@@ -71,7 +75,8 @@ local _wireless_path = WIRELESS_PATH
 local _owner_database, _owner_device, _load_day = nil, nil, nil
 
 -- What the previous sample saw, for the transitions.
-local _last = { at_ms = nil, ssid = nil, locked = nil, muted = nil }
+local function new_last() return { at_ms = nil, ssid = nil, locked = nil, muted = nil } end
+local _last = new_last()
 
 -- The transitions seen since the collector last took them, for events_system:
 -- { action, metadata? } in order.
@@ -202,54 +207,63 @@ function M.bind(database, device_id, loader)
 	assert(type(device_id) == "string" and device_id ~= "", "system metrics need a device identity")
 	assert(type(loader) == "function", "system metrics need a checked day loader")
 	if database ~= _owner_database or device_id ~= _owner_device then
-		_day = nil
-		_last = { at_ms = nil, ssid = nil, locked = nil, muted = nil }
+		_day, _days = nil, {}
+		_last = new_last()
 	end
 	_owner_database, _owner_device, _load_day = database, device_id, loader
 end
 
---- Reads the machine once and folds the result into the day.
----
---- @param now_ms number Monotonic milliseconds.
---- @param date string "YYYY-MM-DD".
---- @return table|nil The accumulated day, or nil when it is not yet due.
-function M.sample(now_ms, date)
-	if type(now_ms) ~= "number" or type(date) ~= "string" then return nil end
-	if _day and _day.date ~= date then
-		-- A new day starts a new row. The old one has already been flushed —
-		-- persistence runs far more often than midnight.
-		_day = nil
-		_last = { at_ms = nil, ssid = nil, locked = nil, muted = nil }
+--- Loads one exact device/day before its cumulative replacement can advance.
+local function retained_day(date)
+	if _days[date] then return _days[date] end
+	local day
+	if _load_day then
+		local ok, persisted, accepted = pcall(_load_day, date)
+		if not ok or accepted ~= true then return nil end
+		day = persisted
 	end
-	if _last.at_ms and (now_ms - _last.at_ms) < SAMPLE_INTERVAL_MS then return _day end
+	day = day or new_day(date)
+	_days[date] = day
+	return day
+end
 
-	if not _day then
-		if _load_day then
-			local ok, persisted, accepted = pcall(_load_day, date)
-			if not ok or accepted ~= true then return nil end
-			_day = persisted
-		end
-		_day = _day or new_day(date)
+--- Captures one producer clock and partitions elapsed time at local day cuts.
+--- @return table|nil Current cumulative day, or nil on source refusal.
+function M.sample()
+	local clock = Calendar.capture()
+	local now_ms, date = clock.mono_ms, clock.date
+	if _day and _day.date == date and _last.at_ms and (now_ms - _last.at_ms) < SAMPLE_INTERVAL_MS then return _day end
+	local current = retained_day(date)
+	if not current then return nil end
+	local elapsed = _last.at_ms and math.max(0, now_ms - _last.at_ms) or 0
+	local asleep = elapsed > SLEEP_GAP_MS
+	local segments = {}
+	local at, span_date = _last.at_ms, _last.clock and _last.clock.date
+	if at and _last.clock then
+		Calendar.boundaries(_last.clock, clock, function(boundary, previous_date, next_date)
+			if boundary > at then segments[#segments + 1] = { date = previous_date, elapsed = boundary - at } end
+			at, span_date = boundary, next_date
+		end)
+		if now_ms > at then segments[#segments + 1] = { date = span_date, elapsed = now_ms - at } end
 	end
-	local elapsed = _last.at_ms and (now_ms - _last.at_ms) or 0
-
-	if elapsed > SLEEP_GAP_MS then
-		-- The machine was not running in between. Counted as sleep rather than as
-		-- awake time, which is the one reading that would otherwise be badly
-		-- wrong: a laptop shut overnight would report eight hours of use. Only
-		-- the wake is seen, so it carries the time asleep.
-		_day.sleep_ms = _day.sleep_ms + elapsed
-		_events[#_events + 1] = { action = "wake", metadata = { asleep_ms = elapsed } }
-	elseif elapsed > 0 then
-		if _last.locked == true then
-			_day.locked_ms = _day.locked_ms + elapsed
+	-- Admit every source first: a refused historical load cannot leave half an
+	-- interval credited and then counted again on the next periodic retry.
+	for _, segment in ipairs(segments) do if not retained_day(segment.date) then return nil end end
+	for _, segment in ipairs(segments) do
+		local day = _days[segment.date]
+		if asleep then
+			day.sleep_ms = day.sleep_ms + segment.elapsed
 		else
-			_day.awake_ms = _day.awake_ms + elapsed
-		end
-		if _last.muted == true then
-			_day.audio_muted_ms = _day.audio_muted_ms + elapsed
+			local field = _last.locked == true and "locked_ms" or "awake_ms"
+			day[field] = day[field] + segment.elapsed
+			if _last.muted == true then day.audio_muted_ms = day.audio_muted_ms + segment.elapsed end
 		end
 	end
+	_day = current
+	local function transition(action, metadata)
+		_events[#_events + 1] = { action = action, metadata = metadata, date = clock.date, ts = clock.ts }
+	end
+	if asleep then transition("wake", { asleep_ms = elapsed }) end
 
 	local battery = read_battery()
 	if battery then
@@ -265,16 +279,16 @@ function M.sample(now_ms, date)
 	if _last.ssid ~= nil and ssid ~= nil and ssid ~= _last.ssid then
 		_day.wifi_changes = _day.wifi_changes + 1
 		-- Without the network's name: it is a fingerprint, never stored.
-		_events[#_events + 1] = { action = "wifi_change" }
+		transition("wifi_change")
 	end
 
 	local locked = read_locked()
 	-- Counted only between two answers, like the network.
 	if _last.locked ~= nil and locked ~= nil and locked ~= _last.locked then
-		_events[#_events + 1] = { action = locked and "lock" or "unlock" }
+		transition(locked and "lock" or "unlock")
 	end
 
-	_last.at_ms = now_ms
+	_last.at_ms, _last.clock = now_ms, clock
 	_last.ssid = ssid
 	_last.locked = locked
 	_last.muted = read_muted()
@@ -285,6 +299,21 @@ end
 --- @return table|nil
 function M.current()
 	return _day
+end
+
+--- Captures all retained days with their exact private source identities.
+--- @return table snapshot
+function M.snapshot()
+	return { values = TableUtil.deep_copy(_days), owners = TableUtil.shallow_copy(_days) }
+end
+
+--- Retires only unchanged closed days covered by an acknowledged native prefix.
+--- @param snapshot table From snapshot().
+function M.acknowledge(snapshot)
+	for date, value in pairs(snapshot.values) do
+		if (not _day or date ~= _day.date) and rawequal(_days[date], snapshot.owners[date])
+			and StorageOwned.equal(_days[date], value) then _days[date] = nil end
+	end
 end
 
 --- Hands over the transitions seen since the last call and forgets them.
@@ -298,9 +327,9 @@ end
 --- Test seam: forgets everything, the wireless listing's path included.
 function M._reset()
 	_owner_database, _owner_device, _load_day = nil, nil, nil
-	_day = nil
+	_day, _days = nil, {}
 	_events = {}
-	_last = { at_ms = nil, ssid = nil, locked = nil, muted = nil }
+	_last = new_last()
 	_wireless_path = WIRELESS_PATH
 end
 

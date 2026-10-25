@@ -340,24 +340,26 @@ helpers.describe("owned SQLite collector flush", function()
 
 
 	it("(sqlite-range-date-boundary) one captured day owns both SQL and RAM across midnight", function()
-		with_collector(function(k)
-			k.on_keydown("a", 1000, "selected")
-			local native_date, captures = os.date, 0
-			os.date = function(format, timestamp)
-				if format == "%Y-%m-%d" and timestamp == nil then
-					captures = captures + 1
-					return captures == 1 and "2026-10-18" or "2026-10-19"
-				end
-				return native_date(format, timestamp)
-			end
-			local ok, err = xpcall(function()
+		local calendar = require("modules.keystats.calendar")
+		local capture, captures, querying = calendar.capture, 0, false
+		local first = os.time({ year = 2026, month = 10, day = 18, hour = 23, min = 59, sec = 59 })
+		calendar.capture = function()
+			local wall = first
+			if querying then captures = captures + 1; if captures > 1 then wall = first + 2 end end
+			return { wall_ms = wall * 1000, mono_ms = 1000, date = os.date("%Y-%m-%d", wall),
+				ts = os.date("!%Y-%m-%d %H:%M:%S", wall) }
+		end
+		local ok, err = xpcall(function()
+			with_collector(function(k)
+				k.on_keydown("a", 1000, "selected")
+				querying = true
 				local payload = assert(k.get_range_payload("2026-10-18", "2026-10-18", { "selected" }))
 				helpers.assert_eq(payload.today.selected.c.a.c, 1)
 				helpers.assert_eq(captures, 1, "SQL and RAM must share the original local date")
-			end, debug.traceback)
-			os.date = native_date
-			if not ok then error(err, 0) end
-		end)
+			end)
+		end, debug.traceback)
+		calendar.capture = capture
+		if not ok then error(err, 0) end
 	end)
 
 	it("healthy reset returns a real ACK and retires its UI generation", function()
