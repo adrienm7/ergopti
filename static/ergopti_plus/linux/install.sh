@@ -889,7 +889,7 @@ if [ -z "$NATIVE_LUV_STAGE" ] && [ -f "${LIB_DIR}/.ergopti-owned-files" ] \
 	&& [ ! -L "${LIB_DIR}/.ergopti-owned-files" ] \
 	&& [ -f "${LIB_DIR}/linux/native_modules/luv.so" ] \
 	&& [ ! -L "${LIB_DIR}/linux/native_modules/luv.so" ]; then
-	NATIVE_LUV_EXISTING_DIGEST="$(sha256sum -- "${LIB_DIR}/linux/native_modules/luv.so")"
+	NATIVE_LUV_EXISTING_DIGEST="$(sha256sum < "${LIB_DIR}/linux/native_modules/luv.so")"
 	while IFS=$'\t' read -r prior_digest prior_relative; do
 		if [ "$prior_relative" = "linux/native_modules/luv.so" ] \
 			&& [ "$prior_digest" = "${NATIVE_LUV_EXISTING_DIGEST%% *}" ]; then
@@ -930,7 +930,7 @@ fi
 if [ -n "$NATIVE_OUTPUT_STAGE" ] || [ -n "$NATIVE_LUV_RETAINED_DIGEST" ]; then
 	# This generated checkout artifact is outside the input source tree, so its
 	# actual installed bytes need their own canonical ownership entry.
-	NATIVE_OUTPUT_DIGEST="$(sha256sum -- "${LIB_DIR}/linux/bin/libergopti_archive_publication.so")"
+	NATIVE_OUTPUT_DIGEST="$(sha256sum < "${LIB_DIR}/linux/bin/libergopti_archive_publication.so")"
 	NATIVE_OUTPUT_MANIFEST="$(mktemp "${LIB_DIR}/.ergopti-owned-native.XXXXXX")"
 	while IFS=$'\t' read -r native_digest native_relative; do
 		[ "$native_relative" = "linux/bin/libergopti_archive_publication.so" ] && continue
@@ -940,7 +940,7 @@ if [ -n "$NATIVE_OUTPUT_STAGE" ] || [ -n "$NATIVE_LUV_RETAINED_DIGEST" ]; then
 	printf '%s\tlinux/bin/libergopti_archive_publication.so\n' "${NATIVE_OUTPUT_DIGEST%% *}" \
 		>> "$NATIVE_OUTPUT_MANIFEST"
 	if [ -n "$NATIVE_LUV_STAGE" ] || [ -n "$NATIVE_LUV_RETAINED_DIGEST" ]; then
-		NATIVE_LUV_DIGEST="$(sha256sum -- "${LIB_DIR}/linux/native_modules/luv.so")"
+		NATIVE_LUV_DIGEST="$(sha256sum < "${LIB_DIR}/linux/native_modules/luv.so")"
 		printf '%s\tlinux/native_modules/luv.so\n' "${NATIVE_LUV_DIGEST%% *}" >> "$NATIVE_OUTPUT_MANIFEST"
 	fi
 	mv -- "$NATIVE_OUTPUT_MANIFEST" "${LIB_DIR}/.ergopti-owned-files"
@@ -1086,7 +1086,7 @@ for kind in wrapper unit autostart; do
 	if [ -f "$owned" ]; then
 		# The startup-choice helper may already have recorded the new desktop.
 		if grep -q $'\t@'"$kind"'$' "${LIB_DIR}/.ergopti-owned-files"; then continue; fi
-		digest="$(sha256sum -- "$owned")"
+		digest="$(sha256sum < "$owned")"
 		printf '%s\t@%s\n' "${digest%% *}" "$kind" >> "${LIB_DIR}/.ergopti-owned-files"
 	fi
 done

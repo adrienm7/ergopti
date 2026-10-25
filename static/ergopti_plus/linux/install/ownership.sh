@@ -43,10 +43,12 @@ for tree in "${trees[@]}"; do
 		_shared) source="$SHARED_SOURCE"; prefix=_shared ;;
 		extra) source="$EXTRA_SOURCE"; prefix="$EXTRA_PREFIX" ;;
 	esac
-	find "$source" -type f -exec sha256sum -- {} + | while read -r digest file; do
-		[[ "$digest" =~ ^[0-9a-f]{64}$ ]] || { echo 'Payload filename cannot be represented safely.' >&2; exit 1; }
-		# GNU checksum output marks binary inputs with '*'; it is not a path byte.
-		file="${file#\*}"
+	# Keep source paths as native bytes; checksum filename escaping must never
+	# become either a digest marker or part of the installed relative name.
+	find "$source" -type f -print0 | while IFS= read -r -d '' file; do
+		digest="$(sha256sum < "$file")"
+		digest="${digest%% *}"
+		[[ "$digest" =~ ^[0-9a-f]{64}$ ]] || { echo 'Invalid payload checksum.' >&2; exit 1; }
 		relative="$prefix/${file#"$source/"}"
 		case "$relative" in
 			*$'\n'*|*$'\t'*|*\\*) echo 'Payload filename cannot be represented safely.' >&2; exit 1 ;;
@@ -56,7 +58,7 @@ for tree in "${trees[@]}"; do
 done
 launcher="$INSTALL_ROOT/bin/ergopti-hotstrings"
 if [ -f "$launcher" ]; then
-	digest="$(sha256sum -- "$launcher")"
+	digest="$(sha256sum < "$launcher")"
 	printf '%s\tbin/ergopti-hotstrings\n' "${digest%% *}" >> "$manifest"
 fi
 mv -- "$manifest" "$INSTALL_ROOT/.ergopti-owned-files"

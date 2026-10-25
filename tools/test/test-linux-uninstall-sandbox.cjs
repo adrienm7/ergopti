@@ -302,6 +302,123 @@ try {
 		/--text=Install apt-get first\|/,
 		'the dialog shows the localized message naming the missing program'
 	);
+	if (process.platform === 'linux') {
+		// Absolute native paths are not payload-relative paths. GNU checksums
+		// escape the former when they contain a backslash, even though the
+		// receipt's relative names need no escaping at all.
+		const nativeRoot = path.join(sandbox, 'native\\path with spaces');
+		const nativeSource = path.join(nativeRoot, 'source\\checkout');
+		const nativeDriver = path.join(nativeSource, 'linux');
+		const nativeShared = path.join(nativeSource, '_shared');
+		const nativePrefix = path.join(nativeRoot, 'prefix\\installed');
+		const nativeLibrary = path.join(nativePrefix, 'lib/ergopti');
+		const nativeWrapper = path.join(nativePrefix, 'bin/ergopti-hotstrings');
+		const nativeConfig = path.join(nativeRoot, 'config\\settings');
+		const nativeDesktop = path.join(nativeConfig, 'autostart/ergopti-hotstrings.desktop');
+		const nativeManifest = path.join(nativeLibrary, '.ergopti-owned-files');
+		const nativeEnv = {
+			HOME: home,
+			XDG_CONFIG_HOME: nativeConfig,
+			PATH: `${stubs}:/usr/bin:/bin`
+		};
+		fs.mkdirSync(path.join(nativeDriver, 'install'), { recursive: true });
+		fs.mkdirSync(path.join(nativeShared, 'data/locales'), { recursive: true });
+		fs.writeFileSync(path.join(nativeDriver, 'ergopti_hotstrings.lua'), 'native-runtime');
+		fs.writeFileSync(path.join(nativeShared, 'data/locales/en.json'), '{}');
+		for (const helper of ['ownership.sh', 'start_at_login.sh', 'desktop_entry.sh']) {
+			fs.copyFileSync(
+				path.join(path.dirname(script), 'install', helper),
+				path.join(nativeDriver, 'install', helper)
+			);
+		}
+		fs.mkdirSync(nativeLibrary, { recursive: true });
+		fs.cpSync(nativeDriver, path.join(nativeLibrary, 'linux'), { recursive: true });
+		fs.cpSync(nativeShared, path.join(nativeLibrary, '_shared'), { recursive: true });
+		fs.mkdirSync(path.dirname(nativeWrapper), { recursive: true });
+		const quoteRoot = spawnSync(
+			bashExecutable(),
+			['-c', 'printf "%q" "$1"', 'native-owner', nativeLibrary],
+			{ encoding: 'utf8' }
+		);
+		assert.equal(quoteRoot.status, 0, quoteRoot.stderr);
+		fs.writeFileSync(
+			nativeWrapper,
+			`#!/bin/bash\nINSTALL_ROOT=${quoteRoot.stdout}\nexec bash "\${INSTALL_ROOT}/bin/ergopti-hotstrings" "$@"\n`
+		);
+		fs.mkdirSync(path.join(nativeLibrary, 'bin'), { recursive: true });
+		fs.writeFileSync(path.join(nativeLibrary, 'bin/ergopti-hotstrings'), '#!/bin/bash\nexit 0\n');
+		const nativeFailures = [];
+		const recorded = spawnSync(
+			bashExecutable(),
+			[path.join(nativeDriver, 'install/ownership.sh'), nativeDriver, nativeShared, nativeLibrary],
+			{ encoding: 'utf8', env: nativeEnv, timeout: 15000 }
+		);
+		if (recorded.status !== 0) nativeFailures.push(`payload receipt: ${recorded.stderr.trim()}`);
+		// Independently author the receipt so a failed producer cannot hide the
+		// consumer's native-path bug, then verify every actual producer below.
+		let authored = '';
+		function receiptFiles(directory, prefix) {
+			for (const name of fs.readdirSync(directory)) {
+				const file = path.join(directory, name);
+				if (fs.statSync(file).isDirectory()) receiptFiles(file, `${prefix}${name}/`);
+				else
+					authored += `${createHash('sha256').update(fs.readFileSync(file)).digest('hex')}\t${prefix}${name}\n`;
+			}
+		}
+		receiptFiles(nativeDriver, 'linux/');
+		receiptFiles(nativeShared, '_shared/');
+		for (const [file, relative] of [
+			[nativeWrapper, '@wrapper'],
+			[path.join(nativeLibrary, 'bin/ergopti-hotstrings'), 'bin/ergopti-hotstrings']
+		]) {
+			authored += `${createHash('sha256').update(fs.readFileSync(file)).digest('hex')}\t${relative}\n`;
+		}
+		if (recorded.status === 0) {
+			const expectedPayload = authored
+				.split('\n')
+				.filter((row) => row && !row.endsWith('\t@wrapper'))
+				.sort();
+			assert.deepEqual(
+				fs.readFileSync(nativeManifest, 'utf8').trim().split('\n').sort(),
+				expectedPayload,
+				'payload producer records exact relative names and independent content digests'
+			);
+		}
+		fs.writeFileSync(nativeManifest, authored);
+		const startup = spawnSync(
+			bashExecutable(),
+			[path.join(nativeLibrary, 'linux/install/start_at_login.sh'), 'enable'],
+			{ encoding: 'utf8', env: nativeEnv, timeout: 15000 }
+		);
+		if (startup.status !== 0) nativeFailures.push(`startup publication: ${startup.stderr.trim()}`);
+		const startupDigest = createHash('sha256').update(fs.readFileSync(nativeDesktop)).digest('hex');
+		if (
+			!fs.readFileSync(nativeManifest, 'utf8').split('\n').includes(`${startupDigest}\t@autostart`)
+		) {
+			nativeFailures.push('startup receipt has an escaped digest');
+		}
+		// Feed an independently valid startup receipt to the remover too.
+		fs.writeFileSync(nativeManifest, authored + `${startupDigest}\t@autostart\n`);
+		const nativeRemoved = spawnSync(bashExecutable(), [script, '--prefix', nativePrefix, '--yes'], {
+			encoding: 'utf8',
+			env: nativeEnv,
+			timeout: 15000
+		});
+		if (nativeRemoved.status !== 0)
+			nativeFailures.push(`uninstall: ${nativeRemoved.stderr.trim()}`);
+		if (
+			fs.existsSync(nativeWrapper) ||
+			fs.existsSync(nativeDesktop) ||
+			fs.existsSync(path.join(nativeLibrary, 'linux/ergopti_hotstrings.lua'))
+		) {
+			nativeFailures.push('uninstall retained unchanged owned files');
+		}
+		assert.deepEqual(
+			nativeFailures,
+			[],
+			'native-receipt-path: producers and remover preserve absolute path bytes'
+		);
+	}
 	console.log('[OK] Linux uninstaller removes only the validated standalone installation.');
 } finally {
 	fs.rmSync(sandbox, { recursive: true, force: true });
