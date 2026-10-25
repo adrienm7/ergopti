@@ -38,9 +38,10 @@ try {
 	fs.symlinkSync(ROOT, path.join(srcdir, 'ergopti'), 'dir');
 	const staged = spawnSync(bashExecutable(), ['-s', '--', recipe, srcdir, pkgdir, scratch], {
 		input:
-			'set -euo pipefail\nsource "$1"\nsrcdir="$2"\npkgdir="$3"\n' +
+			'set -euo pipefail\nCARCH="$(uname -m)"\nsource "$1"\nsrcdir="$2"\npkgdir="$3"\n' +
 			'printf "%s\\0" "${depends[@]}" > "$4/dependencies"\n' +
-			'printf "%s" "${install:-}" > "$4/hook-name"\npackage\n',
+			'printf "%s" "${install:-}" > "$4/hook-name"\n' +
+			'printf "%s\\0" "${arch[@]}" > "$4/architectures"\npackage\n',
 		encoding: 'utf8',
 		timeout: 120000
 	});
@@ -52,6 +53,37 @@ try {
 		Buffer.from([127, 69, 76, 70]),
 		'actual native backend must ship'
 	);
+	check('arch-package-architecture-matches-its-actual-native-payload', () => {
+		// ELF e_ident[EI_DATA] selects the byte order of e_machine.
+		assert.ok(native[5] === 1 || native[5] === 2, 'native ELF must name its byte order');
+		const machine = native[5] === 1 ? native.readUInt16LE(18) : native.readUInt16BE(18);
+		const architectures = { 62: 'x86_64', 183: 'aarch64' };
+		assert.ok(architectures[machine], `unqualified native ELF architecture: ${machine}`);
+		const declared = fs
+			.readFileSync(path.join(scratch, 'architectures'), 'utf8')
+			.split('\0')
+			.filter(Boolean);
+		assert.equal(
+			declared.includes('any'),
+			false,
+			'a compiled shared library cannot be an architecture-independent package'
+		);
+		assert.ok(
+			declared.includes(architectures[machine]),
+			'the recipe must declare the staged ELF architecture'
+		);
+		const missing = spawnSync(
+			bashExecutable(),
+			['-c', 'CARCH=; source "$1"', 'arch-metadata', recipe],
+			{ encoding: 'utf8', timeout: 15000 }
+		);
+		assert.ifError(missing.error);
+		assert.ok(
+			Number.isInteger(missing.status) && missing.status > 0,
+			'unknown build architecture must fail before package staging'
+		);
+		assert.match(missing.stderr, /CARCH/);
+	});
 	const record = 'printf "%s %s\\n" "${0##*/}" "$*" >> "$ARCH_CALLS"';
 	const stub = (name, body) =>
 		fs.writeFileSync(path.join(stubs, name), `#!/bin/bash\n${record}\n${body}\n`, { mode: 0o755 });
