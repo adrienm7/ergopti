@@ -110,6 +110,49 @@ function violations(file, text) {
 
 const canonicalUrl = `https://github.com/${owner}/${repo}`;
 const foreignUrl = `https://github.com/${owner}-other/${repo}`;
+
+// Classify complete fixture roots, never a filename that production can inherit.
+const TEST_ROOT_CASES = [
+	'static/ergopti_plus/windows/tests/',
+	'static/ergopti_plus/macos/tests/',
+	'static/ergopti_plus/linux/tests/',
+	'static/ergopti_plus/_shared/tests/',
+	'static/ergopti_plus/_shared/lua/test/'
+];
+const repeatedForeignUrl = `https://github.com/foreign-${owner}/${repo}-fork`;
+const probeText = `${canonicalUrl}\n${canonicalUrl}\n${repeatedForeignUrl} ${repeatedForeignUrl}`;
+for (const root of TEST_ROOT_CASES) {
+	for (const suffix of ['repository_url_contract.lua', 'renamed/deep/url_probe.lua']) {
+		const file = root + suffix;
+		assert.deepEqual(violations(file, probeText), [], `${file} is test data`);
+	}
+}
+for (const file of [
+	'static/ergopti_plus/_shared/lua/repository_url_contract.lua',
+	'static/ergopti_plus/_shared/lua/test_support/url_probe.lua',
+	'static/ergopti_plus/windows/modules/tests/url_probe.lua',
+	'static/ergopti_plus/linux/platform/test/url_probe.lua',
+	'.github/scripts/tests/url_probe.js'
+]) {
+	assert.deepEqual(
+		violations(file, probeText),
+		[
+			`${file}:1: a typed repository URL — derive it from ${DEFAULTS}`,
+			`${file}:2: a typed repository URL — derive it from ${DEFAULTS}`,
+			`${file}:3: github.com/foreign-${owner}/${repo}-fork is not the repository ${owner}/${repo}`,
+			`${file}:3: github.com/foreign-${owner}/${repo}-fork is not the repository ${owner}/${repo}`
+		],
+		`${file} must retain both production rules and every occurrence`
+	);
+}
+const extension = 'static/ergopti_plus/extensions/example.lua';
+assert.deepEqual(violations(extension, canonicalUrl), []);
+assert.equal(
+	violations(extension, repeatedForeignUrl).length,
+	1,
+	'standalone examples may copy the canonical URL but still reject a foreign repository'
+);
+
 for (const [name, file, text, count] of [
 	[
 		'shared contract fixture',
