@@ -42,6 +42,7 @@ local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local Paths = require("infra.paths")
 local ScriptActions = require("modules.shortcuts.script_actions")
+local AiActions = require("modules.shortcuts.ai_actions")
 local Manifest = require("infra.manifest_reader")
 local Codec = require("toml_codec")
 local Writer = require("toml_codec.writer")
@@ -680,7 +681,8 @@ local function match(detail, only_script)
 				return {
 					slot = slot,
 					action = action,
-					held_back = only_script and not ScriptActions.is_script_action(action),
+					held_back = (only_script and not ScriptActions.is_script_action(action))
+						or AiActions.blocked(action),
 				}
 			end
 		end
@@ -768,6 +770,8 @@ local function physical_match(detail, opts, epoch)
 		end
 	end
 	if explicit == "none" then return nil, slot end
+	-- An AI action is unarmed while the AI is off: the key keeps its own meaning.
+	if AiActions.blocked(explicit) then return nil end
 	if not PhysicalAvailability.ready(M.physical_delivery_available) then return nil end
 	hit.slot, hit.action, hit.physical = slot, explicit, true
 	if not guarded or not physical_current(hit) then return nil end
@@ -863,6 +867,7 @@ function M.consume(detail, opts)
 		if not called or type(admission) ~= "table" or not owner_current() then return false end
 		if type(admission.master) ~= "boolean" or type(admission.paused) ~= "boolean"
 			or admission.inhibited ~= false then return false end
+		if AiActions.blocked(hit.action) then return false end
 		return ScriptActions.is_script_action(hit.action)
 			or (admission.master == true and admission.paused == false)
 	end

@@ -106,6 +106,8 @@ function M.run(opts, body)
 		local profiles = ProfilesFixture.without_inventory({
 			init = function() return true end,
 			is_enabled = function() return ai_on end,
+			enable = function() ai_on = true; return true end,
+			disable = function() ai_on = false; return true end,
 			get_current_model = function() return "ollama-model" end,
 			get_base_url = function() return world.base_url end,
 		})

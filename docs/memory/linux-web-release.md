@@ -98,6 +98,20 @@ script-management action. The Shortcuts scope owns them; its `only =
 Action: keep any new chord in that callback, never in `on_key`, where the
 application already has the key.
 
+### project-linux-ai-off-disarms-the-ai-actions
+
+With the AI switched off nothing of it runs on Linux, as on macOS and Windows.
+`modules/shortcuts/ai_actions.lua` answers `blocked(action)` for every `llm_*`
+catalogue action from the prediction engine's switch, read at each press: a
+modifier chord, a physical slot, a number-row tap key and a touchpad gesture
+bound to one are left to the application (never claimed, then refused), and the
+switch-on re-arms them with no reload. The engine's `arm_agent` and
+`agent_blocked` also hold the agent's automatic mode back while it is off, and
+the switch-off drops its pause and request through `cancel`. Tap-hold taps and
+holds bound to an AI action are not gated by it. Action: a new key-claiming
+layer asks `AiActions.blocked` before claiming; extend
+`test_ai_off_disarms_ai_actions.lua`.
+
 ### project-linux-uinput-drops-a-press-of-a-held-key
 
 The kernel keeps one bit per key: a press of a key already down is dropped, and
