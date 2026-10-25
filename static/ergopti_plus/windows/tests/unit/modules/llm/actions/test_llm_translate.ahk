@@ -440,3 +440,31 @@ _LTR_TypedReceiptBounds() {
 	AssertTrue(LLM_PromptAction_Parse("translate") is Map, "bare profile lookup is unchanged")
 }
 Test("LLM translate: typed target admission enforces the shared bound and exact discriminator", _LTR_TypedReceiptBounds)
+
+
+; A remote answer cannot transfer a selection's replacement authority to the
+; window the user happened to focus while the request was in flight.
+_LTR_RequestKeepsSelectionDestination() {
+	_LTR_Run(_LPP_Menu(), _LTN_Screen(LTR_SELECTION), "fr", _Body)
+	_Body(Calls, Lines, Sent) {
+		global _LLM_Translate_SourceProbe
+		Destination := { Hwnd: 7, Control: 9, Reads: 0 }
+		_LLM_Translate_SourceProbe := _Probe
+		AssertTrue(_LTR_Invoke("ui"), "the original selection is translated")
+		AssertEqual(1, Calls.Length, "the request is in flight")
+		Destination.Hwnd := 70
+		Destination.Control := 90
+		_LPP_Answer(Calls[1], "TRANSLATION: " . LTR_TRANSLATION)
+		Final := _LPP_LastFinalRender()
+		AssertTrue(IsObject(Final), "the completed translation retains its original destination")
+		AssertEqual(7, Final.meta["accept_source"]["hwnd"], "the later window gains no replacement authority")
+		AssertEqual(9, Final.meta["accept_source"]["control"], "the original selection's control stays authoritative")
+		AssertEqual(1, Destination.Reads, "the destination is admitted once per translation")
+		AssertEqual(0, Sent.Length, "a changed focus never receives automatic text")
+		_Probe() {
+			Destination.Reads += 1
+			return Map("hwnd", Destination.Hwnd, "control", Destination.Control)
+		}
+	}
+}
+Test("LLM translate: the request retains its selection destination (translate-destination)", _LTR_RequestKeepsSelectionDestination)
