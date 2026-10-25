@@ -559,6 +559,31 @@ type = "boolean"
 description_key = "menu.hotstrings.tap_hold_resets_word"
 reason_key = "platform_reason.tap_hold_word_reset_not_on_macos"
 
+# How many more hotstrings the text a hotstring produced may complete, in
+# chain: the cascade depth. 0 disables the cascade (a hotstring's output is
+# final, as before 2026-10); 1 lets the output complete one more hotstring; 2
+# two more, and so on. With `chatg` giving `chatgpt` and `chatgpt` giving
+# `ChatGPT`, typing `chatg` ends on `ChatGPT` from depth 1. It applies to every
+# hotstring, the shipped ones and the personal ones. The whole chain is
+# resolved before anything is typed and goes out as ONE edit (one SendInput
+# burst on Windows), so the application never shows the intermediate text and
+# an Undo (Linux) restores what was typed, not a half-way text. Guards: a hotstring never
+# fires twice in the same chain (the 124 shipped replacements that end with
+# their own trigger stop there), a `final_result` hotstring ends the chain,
+# and each further hotstring obeys its own expansion delay. A text produced
+# without a typed key never fires on its own: the chain starts from the key
+# that completed the first hotstring. The default stays 0 so that nothing the
+# shipped pack types today changes unless the user asks for it. Any whole
+# number from 0 up is accepted; the menu offers the `preset_values`.
+[[features.hotstrings]]
+id = "cascade_depth"
+default = 0
+recommended = 0
+input_altering = false
+type = "number"
+preset_values = [0, 1, 2, 3]
+description_key = "menu.hotstrings.cascade_depth"
+
 [[features.hotstrings]]
 id = "expansion_delay"
 default = 0.75
@@ -6440,6 +6465,20 @@ platforms = ["ahk", "linux"]
 unavailable = "grey"
 reason_key = "platform_reason.tap_hold_word_reset_not_on_macos"
 checked_when = ["hotstrings_tap_hold_resets_word"]
+
+# The cascade depth: how many more hotstrings the text a hotstring produced may
+# complete. The values are the feature's `preset_values`.
+[[menu.hotstrings_params_group]]
+type = "---"
+
+[[menu.hotstrings_params_group]]
+type = "choice"
+id = "cascade_depth"
+path = "hotstrings.cascade_depth"
+i18n = "menu.hotstrings.cascade_depth"
+choice_registry = "hotstrings.cascade_depth"
+show_current_choice = true
+current_choice_suffix = ": {1}"
 
 # The "linux" values across this menu were added on 2026-08-04. Before them the
 # manifest projected exactly ONE row for Linux — a bare separator — while

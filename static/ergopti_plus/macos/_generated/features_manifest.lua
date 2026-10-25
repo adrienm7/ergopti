@@ -98,6 +98,9 @@ M.features = {
 		path = "hotstrings.shortcut_resets_word", id = "shortcut_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.shortcut_resets_word", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
 	},
 	{
+		path = "hotstrings.cascade_depth", id = "cascade_depth", section = "hotstrings", default = 0, type = "number", description_key = "menu.hotstrings.cascade_depth", platforms = { "ahk", "hs", "linux" }, recommended = 0, input_altering = false,
+	},
+	{
 		path = "hotstrings.expansion_delay", id = "expansion_delay", section = "hotstrings", default = 0.75, type = "number", description_key = "menu.hotstrings.expansion_delay", platforms = { "ahk", "hs", "linux" }, recommended = 0.75, input_altering = false,
 	},
 	{

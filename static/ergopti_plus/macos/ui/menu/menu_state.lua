@@ -330,6 +330,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		for _, item in ipairs({
 			{ fn = "set_repeat_feature_enabled",      val = state.repeat_key_enabled },
 			{ fn = "set_idle_reset_seconds",          val = state.idle_reset_seconds },
+			{ fn = "set_cascade_depth",               val = state.cascade_depth },
 			{ fn = "set_click_resets_word",           val = state.click_resets_word },
 			{ fn = "set_arrow_resets_word",           val = state.arrow_resets_word },
 			{ fn = "set_shortcut_resets_word",        val = state.shortcut_resets_word },

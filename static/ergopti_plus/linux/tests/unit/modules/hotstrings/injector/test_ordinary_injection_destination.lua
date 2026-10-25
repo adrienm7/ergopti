@@ -25,7 +25,7 @@ helpers.describe("Main retains the ordinary expansion target", function()
 					-- Bare keys: the shared expansion delay reads the held modifiers per key.
 					keyboard_hook = { held_modifiers = function() return {} end },
 					Monotonic = { now_ms = function() return state.now end }, _cached_app_id = "owned-editor",
-					WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end },
+					WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end, cascade_depth = function() return 0 end },
 					terminators_mod = { is_terminator = function() return false end },
 					RepeatKey = { is_enabled = function() return false end }, opts = { dry_run = false },
 					keyboard_hook = { held_modifiers = function() return {} end },

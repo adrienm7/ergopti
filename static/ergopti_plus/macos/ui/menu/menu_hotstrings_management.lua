@@ -697,6 +697,17 @@ function M.build_management(ctx)
 		end
 		return commit_word_reset("idle_reset_seconds", "set_idle_reset_seconds", seconds)
 	end
+	-- The cascade depth: a fixed choice, drawn by the renderer from its declaration.
+	local function current_cascade_depth()
+		if ctx.keymap and type(ctx.keymap.get_cascade_depth) == "function" then
+			return ctx.keymap.get_cascade_depth()
+		end
+		return ctx.state.cascade_depth
+	end
+	local ConfigKeys = require("config_keys")
+	params_ctx.commands[ConfigKeys.COMMAND.CASCADE_DEPTH] = function(depth)
+		return commit_word_reset(ConfigKeys.LEAF.CASCADE_DEPTH, "set_cascade_depth", depth)
+	end
 	local click_enabled = ctx.keymap and type(ctx.keymap.is_click_resets_word_enabled) == "function"
 		and ctx.keymap.is_click_resets_word_enabled()
 	params_ctx.commands["click_resets_word"] = function()
@@ -718,6 +729,7 @@ function M.build_management(ctx)
 	for key, value in pairs(ctx.state_getters or {}) do params_ctx.state_getters[key] = value end
 	params_ctx.state_getters["hotstrings_repeat_enabled"] = function() return repeat_enabled end
 	params_ctx.state_getters["hotstrings.idle_reset_seconds"] = current_idle_reset
+	params_ctx.state_getters[ConfigKeys.KEY.HOTSTRINGS_CASCADE_DEPTH] = current_cascade_depth
 	params_ctx.state_getters["hotstrings_click_resets_word"] = function() return click_enabled == true end
 	params_ctx.state_getters["hotstrings_arrow_resets_word"] = function() return arrow_enabled == true end
 	params_ctx.state_getters["hotstrings_shortcut_resets_word"] = function() return shortcut_enabled == true end

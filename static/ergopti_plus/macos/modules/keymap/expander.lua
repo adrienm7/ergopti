@@ -769,6 +769,169 @@ function M.resolve_magic_action(buffer, ordinary_auto_allowed, event_chars)
 	}
 end
 
+
+
+
+
+-- ===============================
+-- ===============================
+-- ======= 2b/ The Cascade =======
+-- ===============================
+-- ===============================
+
+--- The identity of a rule for the same-spec guard: the same trigger (case aside,
+--- so the lower, Title and UPPER registrations of one rule are one spec) and the
+--- same completion kind are one spec, whichever source registered it.
+--- @param m table Registry mapping.
+--- @return string
+local function spec_key(m)
+	return text_utils.trig_lower(m.trigger) .. "\0" .. (m.auto and "auto" or "end")
+end
+
+--- Whether a mapping can be a link of a cascade. A replacement carrying key
+--- directives ({Tab}, {Enter}...) does not leave plain text on the screen, so
+--- the text the next step would read is not known; a private mapping (personal
+--- information) is never composed into another hotstring's output.
+--- @param m table Registry mapping.
+--- @return boolean
+local function is_cascade_link(m)
+	return m.plain_repl == m.repl and not m.is_private
+end
+
+--- Byte index where the last codepoint of `s` starts.
+--- @param s string
+--- @return number|nil
+local function last_cp_start(s)
+	local ok, off = pcall(utf8.offset, s, -1)
+	if ok and off then return off end
+	return nil
+end
+
+--- Whether the expansion delay of a further step allows it. A character the
+--- earlier steps produced carries the time of the physical expander, so a step
+--- whose reference character (the one before its expander) was produced is
+--- inside any delay; one that reaches back into typed text measures the real
+--- gap before the keystroke.
+--- @param m table Registry mapping.
+--- @param reference_byte number Byte index of the reference character.
+--- @param stable_bytes number Length of the untouched typed prefix.
+--- @return boolean
+local function cascade_step_allowed(m, reference_byte, stable_bytes)
+	if not mapping_group_active(m) then return false end
+	local elapsed = reference_byte <= stable_bytes and (_state.cascade_elapsed or 0) or 0
+	local allowed = _state.mapping_delay_remaining(m, elapsed, _state.cascade_complex_mult or 1)
+	return allowed == true
+end
+
+--- Picks the mapping the virtual buffer completes, the way a typed key would: an
+--- auto mapping on the last codepoint, an end-character mapping when a
+--- terminator is still waiting to be replayed, and a STRICTLY longer end-character
+--- trigger beats an auto one (the order keymap/init.lua applies).
+--- @param vbuf string The buffer the previous step produced.
+--- @param tail string|nil The terminator carried at the end of `vbuf`.
+--- @param stable_bytes number Length of the untouched typed prefix.
+--- @return table|nil step { mapping, start, text, consume }
+local function pick_cascade_step(vbuf, tail, stable_bytes)
+	local auto_step = nil
+	local last = last_cp_start(vbuf)
+	if last then
+		-- The reference character is the one before the expander (0 = none).
+		local reference = last > 1 and last_cp_start(vbuf:sub(1, last - 1)) or 0
+		local bucket = _registry.mappings_for_tail(vbuf:sub(last))
+		for _, m in ipairs(bucket or {}) do
+			if m.auto and is_cascade_link(m) and cascade_step_allowed(m, reference, stable_bytes) then
+				local eff_plain = M.would_fire(m, vbuf)
+				if eff_plain then
+					auto_step = { mapping = m, start = #vbuf - m.trigger_bytes + 1, text = eff_plain,
+						consume = true }
+					break
+				end
+			end
+		end
+	end
+
+	local end_step = nil
+	if tail and _registry.is_terminator(tail) then
+		local body = vbuf:sub(1, #vbuf - #tail)
+		local prev = last_cp_start(body)
+		if prev then
+			local bucket = _registry.mappings_for_tail(body:sub(prev))
+			for _, m in ipairs(bucket or {}) do
+				if not m.auto and is_cascade_link(m) and (not auto_step or m.tlen > auto_step.mapping.tlen)
+					and cascade_step_allowed(m, prev, stable_bytes) then
+					local match = resolve_terminator_match(m, vbuf, tail, false)
+					if match and match.eff_plain then
+						end_step = { mapping = m, start = match.buf_start, text = match.eff_plain,
+							consume = match.consume_term, is_end = true }
+						break
+					end
+				end
+			end
+		end
+	end
+	return end_step or auto_step
+end
+
+--- Lets the text an expansion produced complete further hotstrings, up to the
+--- configured depth, and returns ONE net edit for the whole chain.
+---
+--- The chain is resolved on a virtual copy of the buffer before anything is
+--- typed, so the application receives a single replacement transaction: no
+--- intermediate text, nothing a keystroke can land between. Each step asks the
+--- same question a typed key would. It stops at the depth bound, at a
+--- `final_result` link, at no match, at the same spec again (the guard that makes
+--- `ab` -> `cab` terminate) or at a link whose delay refuses it.
+--- @param buffer string The buffer the first step matched against.
+--- @param first table The first step's mapping.
+--- @param start_byte number Byte index where the first step's trigger starts.
+--- @param repl string The first step's effective plain replacement.
+--- @param tail string|nil Terminator characters replayed after the replacement.
+--- @return table|nil plan { start, text, tail, final_result, steps },
+---   nil when the chain has no further step.
+local function plan_cascade(buffer, first, start_byte, repl, tail)
+	local depth = _state.CASCADE_DEPTH
+	if type(depth) ~= "number" or depth < 1 then return nil end
+	if first.final_result or not is_cascade_link(first) then return nil end
+
+	local vbuf = buffer:sub(1, start_byte - 1) .. repl .. (tail or "")
+	local stable = start_byte - 1
+	local seen = { [spec_key(first)] = true }
+	local last = first
+	local steps = 1
+	while steps <= depth and not last.final_result do
+		local step = pick_cascade_step(vbuf, tail, stable)
+		if not step then break end
+		if seen[spec_key(step.mapping)] then
+			Logger.debug(LOG, "Cascade stopped at step %d: the same spec would fire again.", steps)
+			break
+		end
+		seen[spec_key(step.mapping)] = true
+		if step.is_end then
+			vbuf = vbuf:sub(1, step.start - 1) .. step.text .. (step.consume and "" or tail)
+			if step.consume then tail = nil end
+		else
+			vbuf = vbuf:sub(1, step.start - 1) .. step.text
+			tail = nil
+		end
+		if step.start - 1 < stable then stable = step.start - 1 end
+		last = step.mapping
+		steps = steps + 1
+		Logger.debug(LOG, "Cascade step %d fired (trigger of %d char(s)).", steps - 1, step.mapping.tlen)
+	end
+	if steps == 1 then return nil end
+	return {
+		start        = stable + 1,
+		text         = vbuf:sub(stable + 1, #vbuf - (tail and #tail or 0)),
+		tail         = tail,
+		final_result = last.final_result,
+		steps        = steps,
+	}
+end
+
+
+
+
+
 --- Commits one automatic mapping against either the live buffer or an exact
 --- prospective buffer supplied by magic-key arbitration.
 --- @param m table Mapping entry.
@@ -813,11 +976,27 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 	-- matched on, so the two can never disagree about where the trigger began.
 	local tstart_byte = #active_buffer - m.trigger_bytes + 1
 
+	-- The cascade: the replacement may complete further hotstrings. The chain is
+	-- one net edit, so everything below types ONE replacement whose trigger is the
+	-- text the user really typed and whose output is the last link's. Without a
+	-- chain (depth 0, or nothing to chain) these are the first step's own values.
+	local trig_len     = m.tlen
+	local is_private   = m.is_private
+	local is_final     = m.final_result
+	local plan = plan_cascade(active_buffer, m, tstart_byte, repl_text, nil)
+	if plan then
+		repl_text   = plan.text
+		tstart_byte = plan.start
+		typed       = active_buffer:sub(tstart_byte)
+		eff_repl    = repl_text
+		trig_len    = text_utils.utf8_len(typed)
+		is_final    = plan.final_result
+	end
+
 	-- Compute how many backspaces and what to type, keeping common prefix chars.
 	-- In an ignored window (char_len == 0) there is no "last char" to keep, so
 	-- we must erase the full trigger length. m.tlen is the precomputed UTF-8
 	-- length of the trigger (avoids three utf8_len calls per hot-path hit).
-	local trig_len         = m.tlen
 	local char_offset      = is_ignored and 0 or char_len
 	local screen_len       = trig_len - char_offset
 	-- Clamped at zero. A trigger shorter than the typed event's codepoint count
@@ -847,11 +1026,11 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 		function()
 			_state.buffer = active_buffer:sub(1, tstart_byte - 1) .. repl_text
 		end,
-		m.final_result,
+		is_final,
 		is_ignored,
 		"hotstring",
 		m.group or nil,
-		m.is_private
+		is_private
 	)
 	if not replaced then return false end
 
@@ -862,7 +1041,7 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 	-- 14-day log because DEBUG is the driver's default level. Both sinks are
 	-- therefore skipped for private mappings — including the trigger, which is
 	-- itself a fragment of the secret. Non-private mappings are unaffected.
-	if m.is_private then
+	if is_private then
 		Logger.debug(LOG, "Auto-expand: private mapping fired (content withheld).")
 	else
 		if keystats and type(keystats.log_hotstring) == "function" then
@@ -930,7 +1109,25 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 		local repl_text        = eff_plain
 		local deletes, to_type = trig_len, repl_text
 		local replay_spec = nil
-		if not consume_term then
+		-- The terminator replayed after the replacement: the typed one, unless the
+		-- driver consumes it, and after a cascade whatever the chain left at its
+		-- end (an auto link whose trigger reached the terminator swallowed it).
+		local replay_tail = (not consume_term) and chars or nil
+		local start_byte = buf_start
+		local is_private = m.is_private
+		local is_final = m.final_result
+		local plan = plan_cascade(_state.buffer, m, buf_start, eff_plain, replay_tail)
+		if plan then
+			repl_text    = plan.text
+			start_byte   = plan.start
+			replay_tail  = plan.tail
+			typed_trigger = _state.buffer:sub(start_byte, #_state.buffer - #chars - extra_bs_bytes)
+			eff_repl     = repl_text
+			trig_len     = text_utils.utf8_len(typed_trigger)
+			deletes, to_type = trig_len, repl_text
+			is_final     = plan.final_result
+		end
+		if replay_tail then
 			if chars == "\r" or chars == "\n" then
 				replay_spec = { kind = "key", key = "return", chars = chars }
 		elseif chars == "\t" then
@@ -972,7 +1169,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 				-- once the replacement has provably landed. order_delay is carried
 				-- through as a floor for the paste path, where there is no
 				-- per-character echo to wait on.
-				if not consume_term then
+				if replay_tail then
 					-- Keep the logical replacement and keystats record aligned with
 					-- the later owned replay.
 					s = s .. chars
@@ -984,15 +1181,15 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 			function()
 				-- buf_start is a valid byte index into _state.buffer: the buffer
 				-- is only mutated by this very closure, which runs after emit.
-				_state.buffer = _state.buffer:sub(1, buf_start - 1)
+				_state.buffer = _state.buffer:sub(1, start_byte - 1)
 					.. repl_text
-					.. (consume_term and "" or chars)
+					.. (replay_tail or "")
 			end,
-			m.final_result,
+			is_final,
 			is_ignored,
 			"hotstring",
 			m.group or nil,
-			m.is_private,
+			is_private,
 			replay_spec
 		)
 		if not replacement_ok then return false end
@@ -1000,7 +1197,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 		-- Same privacy contract as try_auto_expand: a private mapping's trigger
 		-- and replacement are both secrets and must reach neither the keystats
 		-- nor the log.
-		if m.is_private then
+		if is_private then
 			Logger.debug(LOG, "Terminator-expand: private mapping fired (content withheld).")
 		else
 			if keystats and type(keystats.log_hotstring) == "function" then

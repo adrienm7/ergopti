@@ -1276,6 +1276,18 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		IsConform := Prepared.IsConform
 		Replacement := Prepared.Replacement
 		OnlyText := Prepared.OnlyText
+		; The cascade (hotstring_cascade.ahk): the text this hotstring produces may
+		; complete further hotstrings. The whole chain is resolved here and goes out
+		; as THIS burst: the same erase plus whatever typed text a later link
+		; reaches back over, and the last link's text as the replacement.
+		CascadeUnits := 0
+		CascadeCodepoints := 0
+		CascadePlan := _HSE_PlanCascade(Spec, Prepared, EndChar, ForceConsumeEndChar, GateTick)
+		if IsObject(CascadePlan) {
+				Replacement := CascadePlan.Replacement
+				CascadeUnits := CascadePlan.ExtraUnits
+				CascadeCodepoints := CascadePlan.ExtraCodepoints
+		}
 		; Sender choice and terminal ownership must share one foreground receipt.
 		; Acquire it before suppression/synthetic ownership so an ambiguous focus or
 		; title probe declines with no output-side mutation.
@@ -1327,7 +1339,9 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 				; +1 for the NNBSP/NBSP that was stripped before matching when the
 				; end-char is a typographic punctuation (``:`` / `` ; ``).
 				EraseUnits := Spec.Length + StrLen(EndChar) + (HSE_TypoNbspStripped ? 1 : 0)
+						+ CascadeUnits
 				BSCount := _TextCodepointLength(Spec.Trigger . EndChar) + (HSE_TypoNbspStripped ? 1 : 0)
+						+ CascadeCodepoints
 				BackSpaceSeq := "{BackSpace " . BSCount . "}"
 				; Replacement, casing and OnlyText were frozen by the shared decision
 				; preflight above. Never resolve a callable again here: when the tooltip
@@ -1510,7 +1524,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 					_BufferCrit := Critical("On")
 					try {
 							ExpansionEffect := HSE_ApplyExpansion(
-									Spec, Replacement, EndChar, ForceConsumeEndChar)
+									Spec, Replacement, EndChar, ForceConsumeEndChar, CascadeUnits)
 							_HSE_MirrorCanonicalEffectToLlm(ExpansionEffect)
 							CommittedEffect := ExpansionEffect
 					} finally {

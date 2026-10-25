@@ -9,7 +9,9 @@
 --- pointer click), `hotstrings.arrow_resets_word` (Left, Right, Up, Down),
 --- `hotstrings.shortcut_resets_word` (a key struck under Ctrl, Alt or Super)
 --- and `hotstrings.tap_hold_resets_word` (a tap-hold key's own command, and a
---- shortcut struck under a tap-hold or navigation-layer hold).
+--- shortcut struck under a tap-hold or navigation-layer hold). It also holds
+--- `hotstrings.cascade_depth`, the other matcher parameter that is read on every
+--- keystroke and follows the same scope (adopt, restore, cleanup ownership).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Before them the buffer kept the last word for as long as the user stayed
@@ -58,6 +60,7 @@ local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 local LOG = "hotstrings.word_reset"
 
 local IDLE_PATH = KEY.HOTSTRINGS_IDLE_RESET_SECONDS
+local CASCADE_PATH = KEY.HOTSTRINGS_CASCADE_DEPTH
 
 -- The boolean leaves of [hotstrings] this module owns, each a runtime field of
 -- the same name, and the full feature path of each.
@@ -122,7 +125,7 @@ local _last_key_ms = nil
 --- @param settings table Validated settings.
 --- @return table copy
 local function copy_settings(settings)
-	local copy = { idle_seconds = settings.idle_seconds }
+	local copy = { idle_seconds = settings.idle_seconds, cascade_depth = settings.cascade_depth }
 	for _, key in ipairs(SWITCHES) do copy[key] = settings[key] end
 	return copy
 end
@@ -130,7 +133,8 @@ end
 --- The manifest defaults of every leaf.
 --- @return table settings
 local function default_settings()
-	local defaults = { idle_seconds = Manifest.default_for(IDLE_PATH) }
+	local defaults = { idle_seconds = Manifest.default_for(IDLE_PATH),
+		cascade_depth = Manifest.default_for(CASCADE_PATH) }
 	for _, key in ipairs(SWITCHES) do defaults[key] = Manifest.default_for(SWITCH_PATH[key]) end
 	return defaults
 end
@@ -140,8 +144,8 @@ end
 --- unmarked for the cleanup.
 --- @param document table Decoded canonical configuration.
 --- @param mark function|nil Cleanup ownership visitor.
---- @return table settings `{ idle_seconds, click_resets_word, arrow_resets_word,
----   shortcut_resets_word, tap_hold_resets_word }`.
+--- @return table settings `{ idle_seconds, cascade_depth, click_resets_word,
+---   arrow_resets_word, shortcut_resets_word, tap_hold_resets_word }`.
 local function resolve_settings(document, mark)
 	local section = ConfigOutdated.settings_table(document.hotstrings, { "hotstrings" }, Logger)
 	local idle = section and section.idle_reset_seconds
@@ -153,7 +157,16 @@ local function resolve_settings(document, mark)
 	elseif mark then mark(KEY.HOTSTRINGS, LEAF.IDLE_RESET_SECONDS) end
 	assert(Engine.valid_idle_reset_seconds(idle), "the manifest default of idle_reset_seconds must be valid")
 
-	local settings = { idle_seconds = idle }
+	local depth = section and section.cascade_depth
+	if depth ~= nil and not Engine.valid_cascade_depth(depth) then
+		ConfigOutdated.report(CASCADE_PATH, "the value is not a whole number, 0 or more", Logger)
+		depth = nil
+	end
+	if depth == nil then depth = Manifest.default_for(CASCADE_PATH)
+	elseif mark then mark(KEY.HOTSTRINGS, LEAF.CASCADE_DEPTH) end
+	assert(Engine.valid_cascade_depth(depth), "the manifest default of cascade_depth must be valid")
+
+	local settings = { idle_seconds = idle, cascade_depth = depth }
 	for _, key in ipairs(SWITCHES) do
 		local path = SWITCH_PATH[key]
 		local value = section and section[key]
@@ -222,7 +235,8 @@ end
 --- @param snapshot table Value returned by snapshot().
 --- @return boolean restored
 function M.restore_configuration(snapshot)
-	if type(snapshot) ~= "table" or not Engine.valid_idle_reset_seconds(snapshot.idle_seconds) then return false end
+	if type(snapshot) ~= "table" or not Engine.valid_idle_reset_seconds(snapshot.idle_seconds)
+		or not Engine.valid_cascade_depth(snapshot.cascade_depth) then return false end
 	for _, key in ipairs(SWITCHES) do
 		if type(snapshot[key]) ~= "boolean" then return false end
 	end
@@ -245,6 +259,12 @@ end
 --- @return number seconds Pause after which a key starts a new word; 0 = never.
 function M.idle_seconds()
 	return M.current().idle_seconds
+end
+
+--- @return number depth How many more hotstrings a hotstring's output may
+---   complete in chain; 0 = the cascade is off.
+function M.cascade_depth()
+	return M.current().cascade_depth
 end
 
 --- @return boolean Whether a click starts a new word.
@@ -316,6 +336,17 @@ function M.set_idle_seconds(seconds)
 		return false
 	end
 	return persist(IDLE_PATH, "idle_seconds", seconds)
+end
+
+--- Sets the cascade depth.
+--- @param depth number Whole number, 0 or more; 0 disables the cascade.
+--- @return boolean committed
+function M.set_cascade_depth(depth)
+	if not Engine.valid_cascade_depth(depth) then
+		Logger.warn(LOG, "Invalid cascade depth '%s' refused.", tostring(depth))
+		return false
+	end
+	return persist(CASCADE_PATH, LEAF.CASCADE_DEPTH, depth)
 end
 
 --- Sets whether a click starts a new word.

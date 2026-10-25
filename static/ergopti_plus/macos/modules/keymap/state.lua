@@ -148,6 +148,14 @@ function M.new(defaults, delays_default)
 		shortcut_resets_word       = false,
 		-- The timeout the keyDown tap applies, projected from IDLE_RESET_SEC.
 		WORD_TIMEOUT_SEC           = 0,
+		-- How many more hotstrings the text a hotstring produced may complete
+		-- (hotstrings.cascade_depth, 0 = off). Neutral here; keymap/init.lua seeds
+		-- it from the features manifest and owns its setter. The two fields below
+		-- are the current keystroke's pause and complex-key factor, published by the
+		-- tap so a further cascade step is gated by the same delay rule.
+		CASCADE_DEPTH              = 0,
+		cascade_elapsed            = 0,
+		cascade_complex_mult       = 1,
 		BASE_DELAY_SEC             = defaults.expansion_delay,
 		DELAYS                     = {},
 		-- Per-section delay overrides (seconds), keyed first by owning group and

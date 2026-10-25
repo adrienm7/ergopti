@@ -277,6 +277,11 @@ global HSE_RepeatEnabled := true
 global HSE_IdleResetSeconds := ""
 global HSE_ClickResetsWord := ""
 
+; hotstrings.cascade_depth, published the same way: how many more hotstrings the
+; text a hotstring produced may complete. "" reads the manifest default
+; (HSE_CascadeDepthCurrent, in hotstring_cascade.ahk).
+global HSE_CascadeDepth := ""
+
 ; hotstrings.arrow_resets_word, hotstrings.shortcut_resets_word and
 ; hotstrings.tap_hold_resets_word, published the same way: whether an arrow
 ; key, a shortcut, or a tap-hold key's own output starts a new word. "" reads
@@ -1067,11 +1072,11 @@ HSE_WordResetFlagCurrent(Key) {
 ; sits behind » exactly, regardless of whether the end char was a word
 ; terminator (the new HSE_FeedChar keeps terminators in the buffer too,
 ; so triggers that span them — e.g. « ,a → ja » — can still match).
-HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := false) {
+HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := false, ExtraStrip := 0) {
 		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN, HSE_TypoNbspStripped
 		global HSE_CONSUMED_DELIMITERS
 
-		StripLen := Spec.Length + StrLen(EndChar) + (HSE_TypoNbspStripped ? 1 : 0)
+		StripLen := Spec.Length + StrLen(EndChar) + (HSE_TypoNbspStripped ? 1 : 0) + ExtraStrip
 		EmittedEndChar := (EndChar != "" and !ForceConsumeEndChar
 				and !InStr(HSE_CONSUMED_DELIMITERS, EndChar)) ? EndChar : ""
 		ClearAll := Spec.HasOwnProp("OnlyText") and !Spec.OnlyText
@@ -1440,3 +1445,4 @@ HSE_PreviewNextMatch(Buffer, NextChar) {
 
 #Include hotstring_match.ahk
 #Include hotstring_dispatch.ahk
+#Include hotstring_cascade.ahk
