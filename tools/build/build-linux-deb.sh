@@ -192,15 +192,24 @@ PRERM_EOF
 chmod 755 "$DEB_ROOT/DEBIAN/prerm"
 echo "  DEBIAN/prerm"
 
+# A private checkout or umask must not become the installed system payload's
+# access policy. Normalize only the owned copy, preserving executable intent;
+# source files and symlink targets outside this staging tree remain untouched.
+chmod -R u=rwX,go=rX "$DEB_ROOT"
+
 # ----------------------------------------------------------------------
 # 10. Build the .deb (Linux only)
 # ----------------------------------------------------------------------
+print_packaging_command() {
+  printf '%s dpkg-deb --root-owner-group --build %q %q\n' "$1" "$DEB_ROOT" "$DEB_FILE"
+}
+
 if [ "${1:-}" = "--skip-deb" ]; then
   echo ""
   echo "=== Structure complete (--skip-deb) ==="
   echo "DEB root: $DEB_ROOT"
   echo "Files: $(find "$DEB_ROOT" -type f | wc -l)"
-  echo "To package: dpkg-deb --build $DEB_ROOT $DEB_FILE"
+  print_packaging_command "To package:"
   exit 0
 fi
 
@@ -209,13 +218,13 @@ if ! command -v dpkg-deb &>/dev/null; then
   echo "=== Structure complete (dpkg-deb not available) ==="
   echo "DEB root: $DEB_ROOT"
   echo "Files: $(find "$DEB_ROOT" -type f | wc -l)"
-  echo "Run on Linux to package: dpkg-deb --build $DEB_ROOT $DEB_FILE"
+  print_packaging_command "Run on Linux to package:"
   exit 0
 fi
 
 echo ""
 echo "Building .deb package..."
-dpkg-deb --build "$DEB_ROOT" "$DEB_FILE"
+dpkg-deb --root-owner-group --build "$DEB_ROOT" "$DEB_FILE"
 
 if [ -f "$DEB_FILE" ]; then
   deb_size=$(du -h "$DEB_FILE" | cut -f1)

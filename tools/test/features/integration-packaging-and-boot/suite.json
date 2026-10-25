@@ -98,6 +98,15 @@
 			"args": ["tools/test/test-linux-arch-package.cjs"],
 			"repro": "node tools/test/test-linux-arch-package.cjs",
 			"platforms": ["linux"]
+		},
+		{
+			"id": "js-linux-deb-package-owner",
+			"ordinal": 489,
+			"name": "Rootless DEB archives preserve public ownership and modes without changing private source state",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-deb-package-owner.cjs"],
+			"repro": "node tools/test/test-linux-deb-package-owner.cjs",
+			"platforms": ["linux"]
 		}
 	]
 }
