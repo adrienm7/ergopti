@@ -218,6 +218,36 @@ class _UIPO_Fixture {
 			AssertTrue(_Updater_RetireCurlCapture(Owner), "the fixture closes every actual native handle even on its negative control")
 		}
 	}
+	ExerciseCaptureAllocationAdmission() {
+		global _UpdaterDownloadArtifacts, _UpdaterCurlCaptureRetry
+		Old := this.Admit(this.OldFn, "", false, false)
+		this.AllocationEpoch := Old.Epoch
+		this.AllocationTimer := ObjBindMethod(this, "OnAllocationCancel")
+		Owner := _UIPO_CaptureAllocationAdmissionBoundary(this)
+		_UpdaterDownloadArtifacts.CurlCapture := Owner
+		try {
+			Owner.Acquire(this.Root)
+			Started := A_TickCount
+			while !this.Done && TickElapsed(Started) < 2000
+				Sleep(10)
+			AssertTrue(this.Done, "a genuine cancellation timer must cross capture admission")
+			if IsObject(this.Error)
+				throw this.Error
+			if HasMethod(_UpdaterCurlCaptureRetry, "Call")
+				SetTimer(_UpdaterCurlCaptureRetry, 0)
+			_UpdaterCurlCaptureRetry := 0
+			AssertTrue(_Updater_RetryCurlCaptureDebt())
+			AssertTrue(Owner.Retired)
+			AssertFalse(DirExist(Owner.Path), "cancelled capture admission cannot orphan its actual private directory")
+			for Name, Entry in Owner.Files
+				AssertEqual(0, Entry["handle"], "every native capture creation must retire through the real cancellation")
+		} finally {
+			SetTimer(this.AllocationTimer, 0)
+			if Owner.Directory is Map && Owner.Directory["handle"]
+				Owner.Retired := false
+			AssertTrue(_Updater_RetireCurlCapture(Owner), "the fixture closes its exact native capture even on the negative control")
+		}
+	}
 	ExerciseInvalidStagingMetadata() {
 		global _UpdaterDownloadArtifacts, _UpdaterDownloadInProgress
 		Old := this.Admit(this.OldFn, "foreign initial bytes", false)
@@ -345,6 +375,8 @@ class _UIPO_Fixture {
 		global _UpdaterDownloadWorker, _UpdaterSwapOwner, _UpdaterSwapTransactionCounter
 		if this.Mode == "artifact-allocation-admission"
 			return this.ExerciseAllocationAdmission()
+		if this.Mode == "capture-allocation-admission"
+			return this.ExerciseCaptureAllocationAdmission()
 		if this.Mode == "artifact-invalid-metadata"
 			return this.ExerciseInvalidStagingMetadata()
 		if this.Mode == "artifact-create-new-collision" || this.Mode == "artifact-create-swap-collision"
@@ -472,20 +504,34 @@ class _UIPO_AllocationAdmissionBoundary extends _UpdaterStagedArtifactRetirement
 		this.Armed := true
 	}
 	Retired {
-		get {
-			Captured := this.StoredRetired
-			if this.HasOwnProp("Armed") && this.Armed {
-				this.Armed := false
-				SetTimer(this.Fixture.AllocationTimer, -1)
-				if !A_IsCritical {
-					Started := A_TickCount
-					while !this.Fixture.Done && TickElapsed(Started) < 2000
-						Sleep(10)
-					AssertTrue(this.Fixture.Done, "the unprotected guard must yield to an actual cancellation")
-				}
-			}
-			return Captured
+		get => _UIPO_AllocationAdmissionRetired(this)
+		set => this.StoredRetired := value
+	}
+}
+
+_UIPO_AllocationAdmissionRetired(Owner) {
+	Captured := Owner.StoredRetired
+	if Owner.HasOwnProp("Armed") && Owner.Armed {
+		Owner.Armed := false
+		SetTimer(Owner.Fixture.AllocationTimer, -1)
+		if !A_IsCritical {
+			Started := A_TickCount
+			while !Owner.Fixture.Done && TickElapsed(Started) < 2000
+				Sleep(10)
+			AssertTrue(Owner.Fixture.Done, "the unprotected guard must yield to an actual cancellation")
 		}
+	}
+	return Captured
+}
+
+class _UIPO_CaptureAllocationAdmissionBoundary extends _UpdaterCurlCaptureLedger {
+	__New(Fixture) {
+		super.__New()
+		this.Fixture := Fixture
+		this.Armed := true
+	}
+	Retired {
+		get => _UIPO_AllocationAdmissionRetired(this)
 		set => this.StoredRetired := value
 	}
 }
@@ -689,3 +735,6 @@ Test("Updater staging: parent directory cleanup debt retains its bounded receipt
 
 Test("Updater staging: native allocation admission retains cancellation debt (updater-staging-allocation-admission)",
 	_UIPO_Case.Bind("artifact-allocation-admission"))
+
+Test("Updater capture: native allocation admission retains cancellation debt (updater-capture-allocation-admission)",
+	_UIPO_Case.Bind("capture-allocation-admission"))
