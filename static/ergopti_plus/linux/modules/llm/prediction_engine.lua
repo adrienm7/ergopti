@@ -2171,16 +2171,21 @@ local function system2_transport(chat, payload, on_done)
 	send_system2(chat, payload, on_done)
 end
 
---- Tells the user why an agent action cannot run, if it cannot: the pause,
---- then the agent's mode. The agent uses neither the AI menu's backend nor
---- its switch for these manual actions, so neither refuses anything here; the
---- switch only disarms the automatic mode and the keys bound to the actions.
+--- Tells the user why an agent action cannot run, if it cannot: the pause, the
+--- AI switch (nothing of the AI runs while it is off, the manual agent
+--- included, and the picker greys these actions), then the agent's mode. The
+--- agent still uses no backend of the AI menu: only its switch refuses here.
 --- @param what string What the log names the action.
 --- @return boolean refused
 local function agent_refused(what)
 	if _is_paused() then
 		Logger.info(LOG, "%s refused (paused).", what)
 		show_notice(MANUAL_REFUSAL_KEYS.paused, "paused")
+		return true
+	end
+	if not _enabled then
+		Logger.info(LOG, "%s refused: the AI is off.", what)
+		show_notice(MANUAL_REFUSAL_KEYS.disabled, "disabled")
 		return true
 	end
 	if AgentSettings.get_mode() == "off" then

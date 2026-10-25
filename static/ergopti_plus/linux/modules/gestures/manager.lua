@@ -898,7 +898,7 @@ function M.get_executable_action_names()
 end
 
 --- Whether one requirement token from the catalogue holds on this machine.
---- @param token string "tool:<binary>", "session:x11" or "session:workspaces".
+--- @param token string "tool:<binary>", "session:x11", "session:workspaces" or "ai:on".
 --- @return boolean|nil True/false when proven, nil when it cannot be told —
 ---   a probe that could not read the machine must never take a binding away.
 --- @return string|nil hint Localized reason when the requirement is absent.
@@ -931,6 +931,12 @@ local function requirement_holds(token)
 		end
 		if reason == "unsupported" then return false, i18n.get("dialog.action_picker.requires_workspaces") end
 		return nil, nil
+	end
+	if token == "ai:on" then
+		-- The AI menu's switch: nothing of the AI runs while it is off, so the
+		-- row stays visible and greyed with the notice the action itself gives.
+		if AiActions.off() then return false, i18n.get("llm.manual_prediction.disabled") end
+		return true, nil
 	end
 	error("unknown action requirement token '" .. tostring(token) .. "'")
 end

@@ -116,9 +116,21 @@ helpers.describe("AI agent end to end (llm_agent_selection, llm_agent_command)",
 		helpers.assert_eq(world.notices[1], world.i18n.get("llm.agent.off_notice"))
 	end)
 
-	helpers.it("runs with the AI menu off and its prediction backend not ready", function()
+	helpers.it("refuses both manual actions with the AI notice while the AI is off (ai-off-agent)", function()
 		local world = build_world()
 		world.engine.set_llm_enabled(false)
+		trigger(world, "llm_agent_selection")
+		trigger(world, "llm_agent_command")
+		helpers.assert_eq(#world.posts + #world.dialogs, 0, "nothing is asked")
+		helpers.assert_nil(world.reads, "the selection is not read")
+		helpers.assert_eq(world.notices[1], world.i18n.get("llm.manual_prediction.disabled"))
+		helpers.assert_eq(world.notices[2], world.i18n.get("llm.manual_prediction.disabled"))
+		world.engine.set_llm_enabled(true)
+		helpers.assert_eq(trigger(world, "llm_agent_selection"), true, "armed again with the AI on")
+	end)
+
+	helpers.it("runs with the AI menu on and its prediction backend not ready", function()
+		local world = build_world()
 		-- "No Model" in the AI menu: the prediction backend cannot answer
 		local api = require("modules.llm").api_remote
 		api.set_active_entry_id("")

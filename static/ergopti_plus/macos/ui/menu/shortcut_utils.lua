@@ -395,6 +395,27 @@ function M.prompt_action_parameter(gestures, binding, action, spec, picked, muta
 	return committed == true
 end
 
+--- Greys the picker rows whose catalogue requirement is proven absent: an
+--- action that needs the AI ("ai:on" in _shared/modules/actions/actions.toml,
+--- the agent's manual actions) stays visible and greyed, with the AI-off
+--- notice as its reason, while the AI is switched off. Read at each open, so
+--- switching the AI on offers them again without a reload.
+--- @param items table Picker items, marked in place.
+local function mark_ai_requirements(items)
+	if not require("modules.shortcuts.ai_actions").off() then return end
+	local ok, Catalogue = pcall(require, "_generated.action_catalogue")
+	if not ok or type(Catalogue) ~= "table" or type(Catalogue.actions) ~= "table" then return end
+	for _, item in ipairs(items) do
+		local meta = item.type == "action" and Catalogue.actions[item.id] or nil
+		for _, token in ipairs(meta and meta.requires or {}) do
+			if token == "ai:on" then
+				item.disabled = true
+				item.hint = i18n.get("llm.manual_prediction.disabled")
+			end
+		end
+	end
+end
+
 -- What picker_parameter_fields reads from the gestures facade.
 local PICKER_EDITOR_FACADE = {
 	"get_action_parameter_spec", "get_action_parameter", "parameter_prompt", "parameter_error", "send_vocabulary",
@@ -418,6 +439,7 @@ local PICKER_EDITOR_FACADE = {
 ---   logged, when the facade lacks what the editor needs, and every value is then
 ---   asked by the native prompt.
 function M.picker_parameter_fields(gestures, items, binding)
+	mark_ai_requirements(items)
 	for _, name in ipairs(PICKER_EDITOR_FACADE) do
 		if type(gestures) ~= "table" or type(gestures[name]) ~= "function" then
 			Logger.error(LOG, "The gestures facade has no %s — the picker cannot edit a value.", name)

@@ -58,9 +58,13 @@
 #             hint, instead of offering a binding that would do nothing. Linux
 #             understands "tool:<binary>" (on PATH), "session:x11" and
 #             "session:workspaces" (a session whose workspaces another process
-#             can read and pick: X11, KDE Plasma, sway or Hyprland); macOS
-#             and Windows declare no probe yet, so the generator refuses a
-#             token for them rather than emitting one nothing checks.
+#             can read and pick: X11, KDE Plasma, sway or Hyprland). The Lua
+#             drivers understand "ai:on" (the AI menu's switch is on: the
+#             picker greys the row with the AI-off notice while it is off, and
+#             the action refuses itself then). The other
+#             tokens have no macOS probe, and Windows has none yet, so the
+#             generator refuses them for those drivers rather than emitting one
+#             nothing checks.
 #   scalable  (axis only) whether the axis repeats with the swipe distance.
 #
 # [sg_order] / [ax_order] give the picker order. "#name" is a level-1 heading,
@@ -1222,14 +1226,19 @@ parameter = "llm_language"
 # _shared/modules/llm/agent.json (calendar event, reminder, mail draft, one of
 # the user's shortcuts) as tooltip candidates; accepting one hands it to the
 # driver's connector. Nothing runs without that acceptance. Nothing selected:
-# a notice. It refuses like llm_generate_prediction, and with a notice when
-# no System 2 is chosen.
+# a notice. It refuses like llm_generate_prediction (paused, AI off), and with
+# a notice when no System 2 is chosen. With the AI off the picker greys it.
 platform = "all"
+requires_linux = ["ai:on"]
+requires_hs = ["ai:on"]
 
 [sg_actions.llm_agent_command]
 # llm_agent_selection on a command the user types in a dialog ("meeting
-# tomorrow 9am with the product team") instead of the selection.
+# tomorrow 9am with the product team") instead of the selection. It refuses and
+# is greyed like llm_agent_selection while the AI is off.
 platform = "all"
+requires_linux = ["ai:on"]
+requires_hs = ["ai:on"]
 
 [sg_actions.llm_agent_auto_toggle]
 # Switches the agent between its automatic mode and "on action"

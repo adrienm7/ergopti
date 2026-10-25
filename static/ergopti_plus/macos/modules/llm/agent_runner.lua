@@ -19,11 +19,12 @@
 ---    llm.agent_disabled_apps lists the applications the automatic mode ignores.
 ---    The keymap bridge sets them; the AI menu reads and resets them like its
 ---    other native settings.
---- 3. Refusals first: a paused script refuses with the notice of
----    llm_generate_prediction, then the agent's own (mode off, no usable System
+--- 3. Refusals first: a paused script and the AI switched off refuse with the
+---    notices of llm_generate_prediction (the picker greys the manual actions
+---    while the AI is off), then the agent's own (mode off, no usable System
 ---    2), before anything is read. The agent never uses the AI menu's
----    prediction backend: the AI switched off or that backend not ready refuses
----    nothing. A secure field refuses like the tone actions.
+---    prediction backend: that backend not ready refuses nothing. A secure
+---    field refuses like the tone actions.
 --- 4. One transport per system, each behind one function taking the backend and
 ---    its payload, so a new request format plugs in there. A chat backend gets
 ---    a plain chat body built by llm/vision.lua (the local server, a chat
@@ -68,8 +69,10 @@ local LABEL = "AI agent"
 -- The Backboard model prefix of Jev: such a System 1 asks Jev's questions
 local JEV_BACKBOARD_PREFIX = "typesafe/"
 
--- The notice of a paused script, shared with llm_generate_prediction
+-- The notices of a paused script and of the AI switched off, shared with
+-- llm_generate_prediction
 local PAUSED_KEY = "llm.manual_prediction.paused"
+local DISABLED_KEY = "llm.manual_prediction.disabled"
 
 M.MODE_OFF    = "off"
 M.MODE_ACTION = "action"
@@ -646,9 +649,11 @@ local function run_agent(generation, source, text, focus, backend, learning)
 	end)
 end
 
---- The refusals every action shares, before anything is read. The agent never
---- uses the AI menu's prediction backend: that menu off, or its backend not
---- ready, refuses nothing here.
+--- The refusals every action shares, before anything is read: a pause, the AI
+--- switch (nothing of the AI runs while it is off, the manual agent included;
+--- the action picker greys these actions then), then the agent's own. The agent
+--- still never uses the AI menu's prediction backend: its backend not being
+--- ready refuses nothing here.
 --- @return table|nil backend System 2's backend, nil after the refusal was shown.
 local function admit()
 	local engine = dependency("modules.llm.prediction_engine", "is_focus_blocked")
@@ -656,6 +661,11 @@ local function admit()
 	if is_paused() then
 		Logger.info(LOG, "Agent refused: the script is paused.")
 		show_notice(PAUSED_KEY)
+		return nil
+	end
+	if require("modules.shortcuts.ai_actions").off() then
+		Logger.info(LOG, "Agent refused: the AI is off.")
+		show_notice(DISABLED_KEY)
 		return nil
 	end
 	if settings().llm_agent_mode == M.MODE_OFF then
