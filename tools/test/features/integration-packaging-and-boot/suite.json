@@ -116,6 +116,15 @@
 			"args": ["tools/test/test-linux-package-version.cjs"],
 			"repro": "node tools/test/test-linux-package-version.cjs",
 			"platforms": ["linux"]
+		},
+		{
+			"id": "js-linux-flatpak-icon",
+			"ordinal": 491,
+			"name": "Flatpak exports the canonical desktop logo and refuses missing icon assets",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-flatpak-icon.cjs"],
+			"repro": "node tools/test/test-linux-flatpak-icon.cjs",
+			"platforms": ["linux"]
 		}
 	]
 }
