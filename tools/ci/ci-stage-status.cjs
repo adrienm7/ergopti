@@ -23,10 +23,6 @@ const E2E = Object.freeze({ windows: 'e2e-ahk', linux: 'e2e-linux' });
 const EXTRA_OUTPUTS = Object.freeze({
 	'package-linux': ['install_matrix', 'install_metadata']
 });
-// A job that runs beside the last chain job and is needed by the same verdict:
-// the Linux Flatpak is built from the package job's bundle while the install
-// cells run, so it is a sibling of the install job, not a link of the chain.
-const SIBLINGS = Object.freeze({ linux: 'package-flatpak' });
 const OUTPUTS = ['ci_attempt', 'ci_predecessors', 'ci_run_id', 'ci_source_sha'];
 const RESULTS = ['success', 'failure', 'cancelled', 'skipped'];
 
@@ -162,33 +158,11 @@ function complete(platform, raw, current) {
 	assert.ok(names, 'Unknown OS status lane');
 	const last = names.length - 1;
 	const direct = record(raw);
-	const sibling = SIBLINGS[platform];
-	keys(direct, sibling ? [names[last], sibling] : [names[last]]);
+	keys(direct, [names[last]]);
 	assert.equal(direct[names[last]].result, 'success', 'Aggregate Testbuild did not succeed');
 	const chain = JSON.stringify({ [names[last]]: direct[names[last]] });
 	const result = collect(platform, chain, current, last);
 	for (const name of names) assert.equal(result[name].result, 'success', `${name} did not succeed`);
-	if (sibling) {
-		const job = direct[sibling];
-		keys(job, ['result', 'outputs']);
-		assert.equal(job.result, 'success', `${sibling} did not succeed`);
-		keys(job.outputs, OUTPUTS);
-		assert.equal(job.outputs.ci_source_sha, context(current).sourceSha, 'Foreign sibling source');
-		assert.equal(job.outputs.ci_run_id, current.runId, 'Foreign sibling run');
-		assert.match(job.outputs.ci_attempt, /^[1-9][0-9]*$/, 'Invalid sibling attempt');
-		assert.ok(
-			Number.isSafeInteger(Number(job.outputs.ci_attempt)) &&
-				Number(job.outputs.ci_attempt) <= Number(current.attempt),
-			'Future or invalid sibling attempt'
-		);
-		// The sibling must have consumed the very package job the install job did.
-		assert.deepEqual(
-			record(job.outputs.ci_predecessors),
-			record(direct[names[last]].outputs.ci_predecessors),
-			'Sibling was built from a different predecessor than the install job'
-		);
-		result[sibling] = { result: job.result };
-	}
 	return result;
 }
 

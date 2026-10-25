@@ -116,8 +116,8 @@ function verify(subject) {
 	assert.strictEqual(pipeline.field(gate.body, 'if'), 'always()');
 	assert.deepStrictEqual(
 		pipeline.needsOf(gate.body),
-		['install-linux', 'package-flatpak'],
-		'the verdict waits for the latest aggregate testbuild and the parallel Flatpak'
+		['install-linux'],
+		'the verdict waits for the latest aggregate testbuild alone'
 	);
 	for (const [id, prior] of [
 		['integration-linux', 'test-linux'],

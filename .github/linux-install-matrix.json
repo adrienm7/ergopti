@@ -119,5 +119,15 @@
 		"id": "smoke-appimage-run",
 		"kind": "appimage",
 		"container": ""
+	},
+	"Archive tarball": {
+		"id": "smoke-tarball-install",
+		"kind": "archive",
+		"container": ""
+	},
+	"Flatpak package": {
+		"id": "smoke-flatpak-run",
+		"kind": "flatpak",
+		"container": ""
 	}
 }

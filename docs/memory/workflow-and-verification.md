@@ -324,7 +324,7 @@ application at Install and launch on purpose.
 (with queue time) and steps; the report reporter prints the ten slowest AHK and
 Lua tests. Measured 2026-10-23: the Flatpak runtime download from Flathub took
 34 to 45 minutes in three of five runs and under two otherwise, so the
-`package-flatpak` job ended the Linux lane; the runtimes are now cached before
+Flatpak build (now a step of `package-linux`, installed by the `flatpak` install lot) ended the Linux lane; the runtimes are now cached before
 the application is installed and the install step is bounded at 20 minutes.
 `gh run rerun --failed` lists every job it did not execute again as a copy under
 the new attempt with the original start and completion times, so the receipt of

@@ -39,9 +39,11 @@
  * 6. The version reaches the lanes only through ci.yml: each OS caller must
  *    pass the version output of validate's plan, or a lane would stamp an empty
  *    version on a release.
- * 7. A packager job may instead unpack the verified tarball another job built
- *    (the parallel Flatpak job): the step that unpacks it into build/linux must
- *    verify the stamp of the unpacked tree before any packager runs.
+ * 7. A packager job may instead unpack a verified tarball another job built:
+ *    the step that unpacks it into build/linux must verify the stamp of the
+ *    unpacked tree before any packager runs. No job does today, since the
+ *    Flatpak is built by the package job itself; the rule and its self-check
+ *    stay armed for any future carrier.
  * ==============================================================================
  */
 
@@ -447,13 +449,11 @@ for (const box of VERSIONED_BOXES) {
 
 // The unpack-and-verify path must be able to fail too: dropping the verify
 // from every step that unpacks a bundle has to be reported.
-let unpackCarriers = 0;
 for (const { rel, text } of workflows) {
 	// The verify that follows an unpack (past its `test -f` checks), and no other.
 	const verifyAfterUnpack =
 		/(\btar\s+-xzf\b[^\n]*\s-C\s+build\/linux\b[^\n]*\n(?:[ \t]*test\s[^\n]*\n)*)[ \t]*bash tools\/build\/write_build_stamp\.sh verify build\/linux\/_shared[^\n]*\n/g;
 	if (!parseJobs(text).some((job) => job.steps.some((step) => UNPACK_TAR.test(step.run)))) continue;
-	unpackCarriers++;
 	const mutated = text.replace(verifyAfterUnpack, '$1');
 	if (mutated === text || checkWorkflow(mutated, rel).errors.length === 0) {
 		errors.push(
@@ -461,9 +461,8 @@ for (const { rel, text } of workflows) {
 		);
 	}
 }
-if (unpackCarriers < 1) {
-	errors.push('no pipeline workflow unpacks a stamped bundle any more — the Flatpak job moved');
-}
+// With no carrier the self-check above has nothing to mutate; a new carrier is
+// checked by the same rule as soon as a workflow unpacks into build/linux.
 
 // Each build entry point writes the stamp; each packager verifies its copy.
 for (const script of Object.keys(STAMPING_BUILDS)) {
