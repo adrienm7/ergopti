@@ -264,12 +264,61 @@ helpers.describe("input_access: the service does not loop on it", function()
 		local src = read("ergopti_hotstrings.lua")
 		local _, sites = src:gsub('input_access"%)%.report%(', "")
 		local _, named = src:gsub("InputAccess%.report%(", "")
-		helpers.assert_eq(sites + named, 3,
-			"the absent keyboard, the unreadable keyboard and the unwritable /dev/uinput must all report through input_access")
+		helpers.assert_eq(sites + named, 4,
+			"the absent keyboard, the unreadable keyboard, the unwritable /dev/uinput and the missing setup program must all report through input_access")
 		local _, held = src:gsub("tray = opts%.tray and tray_menu or nil", "")
-		helpers.assert_eq(held, 2, "both access exits must keep the tray icon up when --tray is set")
+		helpers.assert_eq(held, 3, "every access exit must keep the tray icon up when --tray is set")
 		helpers.assert_true(src:find("InputAccess.is_denied(device)", 1, true) ~= nil,
 			"the keyboard check must distinguish a denied node from an absent one")
+	end)
+
+end)
+
+helpers.describe("input_access: a program the permission setup needs is missing", function()
+
+	helpers.it("reads the program the launcher reported, and nothing else", function()
+		local Access = helpers.load_module("infra.input_access")
+		local function with(value) return function(name) return name == Access.MISSING_PROGRAM_ENV and value or nil end end
+		helpers.assert_eq(Access.missing_program(with("getent")), "getent")
+		helpers.assert_eq(Access.missing_program(with(nil)), nil)
+		helpers.assert_eq(Access.missing_program(with("")), nil)
+		helpers.assert_eq(pcall(Access.missing_program, with("a b; rm")), false, "a name is never trusted as a command")
+	end)
+
+	helpers.it("tells the user which program is missing, in their language (missing-program-localized)", function()
+		local Access = helpers.load_module("infra.input_access")
+		local sent, lines = {}, {}
+		local status = Access.report({
+			i18n = { init = function() end, get = function(key)
+				return key == Access.MISSING_PROGRAM_BODY_KEY and "Install “{1}”." or "T"
+			end },
+			notifier = { send = function(body) sent[#sent + 1] = body end },
+			print = function(line) lines[#lines + 1] = line end,
+			program = "getent",
+			body_key = Access.MISSING_PROGRAM_BODY_KEY,
+		}, "missing program getent")
+		helpers.assert_eq(sent[1], "Install “getent”.", "the notification names the program")
+		helpers.assert_eq(status, Access.EXIT_ACCESS)
+	end)
+
+	helpers.it("has a message naming the program in every locale (missing-program-locales)", function()
+		for _, locale in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl",
+			"no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
+			local json = read("../_shared/data/locales/" .. locale .. ".json")
+			for _, key in ipairs({ "startup.linux_input_access_missing_program_body", "dialog.uninstall.missing_program" }) do
+				local text = json:match('"' .. key:gsub("%.", "%%.") .. '": "([^\n]-)",?\n')
+				helpers.assert_true(text ~= nil and text:find("{1}", 1, true) ~= nil, locale .. " " .. key .. " names {1}")
+			end
+		end
+	end)
+
+	helpers.it("is wired from the launcher token to the daemon (missing-program-wiring)", function()
+		local launcher = read("install/launch.sh")
+		helpers.assert_true(launcher:find("missing-program", 1, true) ~= nil and launcher:find("ERGOPTI_MISSING_PROGRAM", 1, true) ~= nil,
+			"the launcher must hand the token to the daemon")
+		local daemon = read("ergopti_hotstrings.lua")
+		helpers.assert_true(daemon:find("InputAccess.missing_program()", 1, true) ~= nil,
+			"the daemon must report it before the device error")
 	end)
 
 end)

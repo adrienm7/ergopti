@@ -69,7 +69,7 @@ try {
 		`#!/bin/bash\nprintf '%s|' "$@" > "${bashPath(kdialogLog)}"\n`,
 		{ mode: 0o755 }
 	);
-	assert.notEqual(run('--yes', '--gui', 'Title', 'Body').status, 0);
+	assert.notEqual(run('--yes', '--gui', 'Title', 'Body', 'Missing {1}').status, 0);
 	assert.match(
 		fs.readFileSync(kdialogLog, 'utf8'),
 		/--error\|Body\|/,
@@ -81,7 +81,7 @@ try {
 		`#!/bin/bash\nprintf '%s|' "$@" > "${bashPath(notifyLog)}"\n`,
 		{ mode: 0o755 }
 	);
-	const bareRun = run('--yes', '--gui', 'Title', 'Body');
+	const bareRun = run('--yes', '--gui', 'Title', 'Body', 'Missing {1}');
 	assert.match(bareRun.stderr, /Title: Body/, 'stderr must carry the failure text');
 	assert.match(
 		fs.readFileSync(notifyLog, 'utf8'),
@@ -247,6 +247,61 @@ try {
 	assert.equal(customRemoval.status, 0, customRemoval.stderr);
 	assert.ok(!fs.existsSync(customUnit), 'XDG config service must be removed with its launcher');
 	assert.equal(fs.readFileSync(customPersonal, 'utf8'), 'custom-personal');
+	// A system installation owned by dpkg on a host without apt-get exits 69
+	// after a machine-readable `missing-program apt-get` line, and the menu's
+	// localized template reaches the dialog with the program filled in.
+	const packaged = path.join(sandbox, 'packaged');
+	const bare = path.join(sandbox, 'bare');
+	fs.mkdirSync(path.join(packaged, 'install'), { recursive: true });
+	fs.mkdirSync(bare);
+	fs.copyFileSync(
+		path.join(path.dirname(script), 'install/desktop_entry.sh'),
+		path.join(packaged, 'install/desktop_entry.sh')
+	);
+	fs.writeFileSync(
+		path.join(packaged, 'uninstall.sh'),
+		fs
+			.readFileSync(script, 'utf8')
+			.replace('[ "$SCRIPT_DIR" = /usr/lib/ergopti ]', `[ "$SCRIPT_DIR" = ${bashPath(packaged)} ]`)
+			.replace(
+				"'ergopti: /usr/lib/ergopti/uninstall.sh'",
+				`'ergopti: ${bashPath(packaged)}/uninstall.sh'`
+			)
+	);
+	for (const name of ['dirname', 'grep', 'cat']) {
+		fs.symlinkSync(
+			['/usr/bin', '/bin'].map((d) => path.join(d, name)).find(fs.existsSync),
+			path.join(bare, name)
+		);
+	}
+	fs.writeFileSync(
+		path.join(bare, 'dpkg-query'),
+		`#!/bin/bash\necho 'ergopti: ${bashPath(packaged)}/uninstall.sh'\n`,
+		{ mode: 0o755 }
+	);
+	const dialogLog = path.join(sandbox, 'missing-dialog.log');
+	fs.writeFileSync(
+		path.join(bare, 'zenity'),
+		`#!/bin/bash\nprintf '%s|' "$@" > "${bashPath(dialogLog)}"\n`,
+		{ mode: 0o755 }
+	);
+	const packagedRun = (...args) =>
+		spawnSync(bashExecutable(), [bashPath(path.join(packaged, 'uninstall.sh')), ...args], {
+			encoding: 'utf8',
+			input: '',
+			timeout: 15000,
+			env: { HOME: bashPath(home), PATH: bashPath(bare) }
+		});
+	const terminal = packagedRun('--yes');
+	assert.equal(terminal.status, 69, 'a missing package manager is EX_UNAVAILABLE');
+	assert.equal(terminal.stderr.trim(), 'missing-program apt-get', 'the program is named on stderr');
+	const menu = packagedRun('--yes', '--gui', 'Title', 'Body', 'Install {1} first');
+	assert.equal(menu.status, 69);
+	assert.match(
+		fs.readFileSync(dialogLog, 'utf8'),
+		/--text=Install apt-get first\|/,
+		'the dialog shows the localized message naming the missing program'
+	);
 	console.log('[OK] Linux uninstaller removes only the validated standalone installation.');
 } finally {
 	fs.rmSync(sandbox, { recursive: true, force: true });

@@ -32,7 +32,18 @@ for arg in "$@"; do
 		uid="$(id -u)"
 		groups=" $(id -nG "$uid") "
 		if [[ "$groups" != *' input '* || "$groups" != *' uinput '* ]]; then
-			if ! pkexec /bin/bash "$DRIVER_ROOT/install/setup_permissions.sh" --user "$uid"; then
+			status=0
+			diagnostic="$(pkexec /bin/bash "$DRIVER_ROOT/install/setup_permissions.sh" --user "$uid" 2>&1 >/dev/null)" || status=$?
+			if [ -n "$diagnostic" ]; then printf '%s\n' "$diagnostic" >&2; fi
+			if [ "$status" -ne 0 ]; then
+				# EX_UNAVAILABLE plus a `missing-program NAME` line: no window exists
+				# yet, so the daemon (infra/input_access.lua) tells the user, in
+				# their language, which program to install.
+				last_line="${diagnostic##*$'\n'}"
+				if [ "$status" -eq 69 ] && [[ "$last_line" =~ ^missing-program\ ([A-Za-z0-9._+-]+)$ ]]; then
+					export ERGOPTI_MISSING_PROGRAM="${BASH_REMATCH[1]}"
+					break
+				fi
 				echo 'Input permission authorization was cancelled or failed.' >&2
 				exit 78
 			fi

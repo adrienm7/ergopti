@@ -16,6 +16,8 @@ CHECK_ONLY=false
 WAIT_OWNER=
 GUI_TITLE=
 GUI_ERROR=
+GUI_MISSING=
+MISSING_PROGRAM=
 
 while [ "$#" -gt 0 ]; do
 	case "$1" in
@@ -25,8 +27,8 @@ while [ "$#" -gt 0 ]; do
 			[ "$#" -ge 2 ] || exit 64
 			WAIT_OWNER="$2"; shift 2 ;;
 		--gui)
-			[ "$#" -ge 3 ] || exit 64
-			GUI_TITLE="$2"; GUI_ERROR="$3"; shift 3 ;;
+			[ "$#" -ge 4 ] || exit 64
+			GUI_TITLE="$2"; GUI_ERROR="$3"; GUI_MISSING="$4"; shift 4 ;;
 		--prefix)
 			[ "$#" -ge 2 ] || { echo 'Missing --prefix value.' >&2; exit 64; }
 			PREFIX="$2"; shift 2 ;;
@@ -56,8 +58,13 @@ show_failure_dialog() {
 	fi
 }
 
+# EX_UNAVAILABLE names a missing program: the menu passes a localized message
+# whose {1} is that program, so the dialog says what to install.
 report_exit() {
 	local status=$?
+	if [ "$status" -eq 69 ] && [ -n "$MISSING_PROGRAM" ] && [ -n "$GUI_MISSING" ]; then
+		GUI_ERROR="${GUI_MISSING//\{1\}/$MISSING_PROGRAM}"
+	fi
 	if [ "$status" -ne 0 ] && [ -n "$GUI_TITLE" ]; then
 		show_failure_dialog
 	fi
@@ -98,7 +105,8 @@ if [ "$SCRIPT_DIR" = /usr/lib/ergopti ]; then
 	if command -v dpkg-query >/dev/null 2>&1 && dpkg-query -S "$SCRIPT_DIR/uninstall.sh" | grep -qx 'ergopti: /usr/lib/ergopti/uninstall.sh'; then
 		if "$CHECK_ONLY"; then exit 0; fi
 		# EX_UNAVAILABLE: the package manager that owns the package is missing.
-		command -v apt-get >/dev/null 2>&1 || exit 69
+		# The stderr line is a machine-readable token, not a sentence.
+		command -v apt-get >/dev/null 2>&1 || { MISSING_PROGRAM=apt-get; printf '%s %s\n' missing-program apt-get >&2; exit 69; }
 		pkexec /usr/bin/apt-get remove -y ergopti
 		remove_native_startup
 		exit 0
