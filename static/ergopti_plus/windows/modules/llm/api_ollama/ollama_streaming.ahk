@@ -952,14 +952,8 @@ _LLM_Ollama_ReadStreamText(Path, State, Final := false, MaxReadBytes := 0) {
  */
 _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 	global LLM_OLLAMA_POLL_MS
-	if handle.Cancelled || !_LLM_Ollama_StreamOriginCurrent(handle) {
-		_LLM_CurlReleaseProcess(handle.ProcessOwner, true)
-		_LLM_Ollama_CleanupStreamFiles(handle)
-		_LLM_Ollama_RemoveStreamHandle(handle)
-		try LoggerInfo("LLM.ollama", "Streaming cancelled (newer prediction).")
-		_LLM_InvokeCallback(on_fail, "on_fail")
+	if _LLM_Ollama_StopStaleStream(handle, on_fail)
 		return
-	}
 	if (state.Has("start_tick") and state.Has("timeout_ms") and _LLM_DeadlineExpired(state["start_tick"], state["timeout_ms"])) {
 		_LLM_CurlReleaseProcess(handle.ProcessOwner, true)
 		_LLM_Ollama_CleanupStreamFiles(handle)
@@ -972,12 +966,19 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 	; Read whatever new bytes appeared.
 	try {
 		chunk := _LLM_Ollama_ReadStreamText(handle.TmpStdout, state)
+		; The filesystem read can pump cancellation before its bytes are admitted.
+		if _LLM_Ollama_StopStaleStream(handle, on_fail)
+			return
 		if chunk != ""
-			_LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial)
+			_LLM_Ollama_ConsumeStreamChunk(chunk, state,
+				_LLM_Ollama_StreamPartial.Bind(handle, on_partial))
 	} catch as Err {
 		state["failed"] := true
 		state["stream_error"] := "Stream output read failed: " . Err.Message
 	}
+	; A partial callback may itself retire the stream before this tick resumes.
+	if _LLM_Ollama_StopStaleStream(handle, on_fail)
+		return
 	if state.Get("failed", false) {
 		_LLM_CurlReleaseProcess(handle.ProcessOwner, true)
 		try LoggerError("LLM.ollama", "{1}", state.Get("stream_error", "Streaming failed."))
@@ -1006,7 +1007,7 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 ; message pump keeps pumping. Bounded by _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES.
 _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail, ReadFn := 0) {
 	global _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES, _LLM_OLLAMA_STREAM_FLUSH_RETRY_MS
-	if _LLM_Ollama_StopStaleStreamFlush(handle, on_fail)
+	if _LLM_Ollama_StopStaleStream(handle, on_fail)
 		return
 	if !IsObject(ReadFn)
 		ReadFn := _LLM_Ollama_ReadStreamText
@@ -1016,16 +1017,17 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail, Rea
 		state["stream_error"] := "Final stream output read failed: " . Err.Message
 	}
 	; File I/O can pump cancellation before any returned bytes are admitted.
-	if _LLM_Ollama_StopStaleStreamFlush(handle, on_fail)
+	if _LLM_Ollama_StopStaleStream(handle, on_fail)
 		return
 	try {
 		if !state.Get("failed", false) && chunk != ""
-			_LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial)
+			_LLM_Ollama_ConsumeStreamChunk(chunk, state,
+				_LLM_Ollama_StreamPartial.Bind(handle, on_partial))
 	} catch as Err {
 		state["failed"] := true
 		state["stream_error"] := "Final stream output read failed: " . Err.Message
 	}
-	if _LLM_Ollama_StopStaleStreamFlush(handle, on_fail)
+	if _LLM_Ollama_StopStaleStream(handle, on_fail)
 		return
 	; The process has stopped, but a response can still contain many bounded
 	; JSONL records. Yield between slices instead of collapsing the final tail
@@ -1046,7 +1048,7 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail, Rea
 		state["failed"] := true
 		state["stream_error"] := "Final stream size check failed: " . Err.Message
 	}
-	if _LLM_Ollama_StopStaleStreamFlush(handle, on_fail)
+	if _LLM_Ollama_StopStaleStream(handle, on_fail)
 		return
 	if (!state.Get("failed", false) and state["acc"] == "" and more_to_read
 			and retries < _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES) {
@@ -1064,9 +1066,10 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail, Rea
 			and state["leftover"] != "") {
 		_resid := state["leftover"]
 		state["leftover"] := ""
-		_LLM_Ollama_ConsumeStreamChunk(_resid . "`n", state, on_partial)
+		_LLM_Ollama_ConsumeStreamChunk(_resid . "`n", state,
+			_LLM_Ollama_StreamPartial.Bind(handle, on_partial))
 	}
-	if _LLM_Ollama_StopStaleStreamFlush(handle, on_fail)
+	if _LLM_Ollama_StopStaleStream(handle, on_fail)
 		return
 	Result := _LLM_Ollama_StreamTerminalResult(state)
 	hint := ""
@@ -1094,15 +1097,32 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail, Rea
 }
 
 
-; Cancellation can land after curl exits, while its timer drains final bytes or
-; invokes a partial callback. Origin currency alone does not carry that intent.
-_LLM_Ollama_StopStaleStreamFlush(handle, on_fail) {
-	if !handle.Cancelled && _LLM_Ollama_StreamOriginCurrent(handle)
+; Both live reads and final drains can yield to cancellation or origin changes.
+; Retire the exact child before removing artifacts; origin currency alone does
+; not carry an explicit cancellation, and final flush may reuse a released owner.
+_LLM_Ollama_StopStaleStream(handle, on_fail) {
+	if _LLM_Ollama_StreamDeliveryCurrent(handle)
 		return false
+	_LLM_CurlReleaseProcess(handle.ProcessOwner, true)
 	_LLM_Ollama_CleanupStreamFiles(handle)
 	_LLM_Ollama_RemoveStreamHandle(handle)
+	try LoggerInfo("LLM.ollama", "Streaming retired after cancellation or origin withdrawal.")
 	if handle.Cancelled
 		_LLM_InvokeCallback(on_fail, "on_fail")
+	return true
+}
+
+; The JSONL parser can pump messages too. Authorize its one partial handoff at
+; the actual sink, after parsing and after any yielding origin reader.
+_LLM_Ollama_StreamDeliveryCurrent(handle) {
+	OriginCurrent := _LLM_Ollama_StreamOriginCurrent(handle)
+	return OriginCurrent && !handle.Cancelled
+}
+
+_LLM_Ollama_StreamPartial(handle, OnPartial, Text) {
+	if !_LLM_Ollama_StreamDeliveryCurrent(handle)
+		return false
+	_LLM_InvokeCallback(OnPartial, "on_partial", Text)
 	return true
 }
 
