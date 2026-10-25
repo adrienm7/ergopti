@@ -595,6 +595,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	local accumulated   = ""
 	local line_buf      = ""
 	local event_data_lines = {}
+	local stream_complete = false
 	local in_reasoning  = false  -- Currently accumulating delta.reasoning(_content) tokens — close </think> on transition or end
 	local t0_req        = TimerScheduler.now()
 	local task = nil
@@ -626,7 +627,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	-- Framing is handled separately so multi-line data fields reach the JSON
 	-- boundary as one value instead of being mistaken for split TCP chunks.
 	local function process_sse_payload(json_str)
-		if json_str == "[DONE]" then return end
+		if json_str == "[DONE]" then stream_complete = true; return end
 		if json_str == "" then return end
 		local ok_json, obj, decode_err = pcall(JsonCodec.decode, json_str)
 		if not ok_json or decode_err ~= nil then
@@ -900,6 +901,14 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		if remaining and remaining ~= "" then
 			line_buf = line_buf .. remaining
 			flush_lines()
+		end
+		-- HTTP/1.0 closes a streamed body at EOF even when the model generator
+		-- raised. curl exit zero proves transport closure, not provider completion.
+		if not stream_complete then
+			Logger.warn(LOG, "[%s] #%d STREAM ended without its completion marker — discarding partial output.",
+				tostring(model_name), req_id)
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+			return
 		end
 
 		-- Close any unterminated reasoning segment so Parser.strip_thinking

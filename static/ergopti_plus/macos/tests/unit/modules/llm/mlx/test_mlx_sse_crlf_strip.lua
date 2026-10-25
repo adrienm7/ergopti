@@ -12,6 +12,7 @@
 local helpers = require("tests.helpers")
 
 local JSON_SINGLE = '{"choices":[{"delta":{"content":"hello"}}]}'
+local SSE_DONE = "data:[DONE]\n\n"
 
 local function get_upvalue(fn, target)
 	for index = 1, 64 do
@@ -65,6 +66,8 @@ local function run_stream_case(case)
 	local partial_count_before_blank = nil
 	local starts = 0
 	local stream_on_done, stream_on_chunk
+	local context = new_ctx()
+	local successor, successor_timeout
 
 	shell_runner.spawn = function(_, _, on_done, on_chunk)
 		stream_on_done = on_done
@@ -98,7 +101,7 @@ local function run_stream_case(case)
 	end
 
 	local ok, err = xpcall(function()
-		inference.init(new_ctx())
+		inference.init(context)
 		inference.post_and_parse_streaming(
 			"fixture-model", "", "typed context", "", 0.2, 8, 1, false,
 			function(results) successes[#successes + 1] = results end,
@@ -117,7 +120,12 @@ local function run_stream_case(case)
 				partial_count_before_blank = #partials
 			end
 		end
-		stream_on_done(0, "", "")
+		if case.superseded then
+			successor, successor_timeout = {}, { active = true }
+			context.stream.generation = context.stream.generation + 1
+			context.stream.task, context.stream.timeout = successor, successor_timeout
+		end
+		stream_on_done(case.exit_code or 0, case.remaining or "", "")
 	end, debug.traceback)
 
 	shell_runner.spawn = original_spawn
@@ -129,6 +137,20 @@ local function run_stream_case(case)
 	if not ok then error(err) end
 
 	helpers.assert_eq(starts, 1, "the case must traverse one real streaming request")
+	if case.superseded or case.exit_code == 15 then
+		helpers.assert_eq(#partials, 1, "the retired stream must have delivered a real token before retirement")
+		helpers.assert_eq(#successes, 0, "retirement must not publish a final prediction")
+		helpers.assert_eq(failures, 0, "a retired stream must not report a new provider failure")
+		if case.superseded then
+			helpers.assert_true(rawequal(context.stream.task, successor), "stale EOF must preserve the successor task")
+			helpers.assert_true(rawequal(context.stream.timeout, successor_timeout) and successor_timeout.active,
+				"stale EOF must preserve the successor watchdog")
+		else
+			helpers.assert_nil(context.stream.task, "the cancelled stream must release its exact task")
+			helpers.assert_nil(context.stream.timeout, "the cancelled stream must release its exact watchdog")
+		end
+		return
+	end
 	if case.expect_incomplete then
 		helpers.assert_eq(#decoded_payloads, 0,
 			"an event without a blank-line delimiter must never reach JSON decoding")
@@ -159,6 +181,13 @@ local function run_stream_case(case)
 			"a nil decode error is authoritative even for a false value")
 		return
 	end
+	if case.expect_transport_incomplete then
+		helpers.assert_eq(#decoded_payloads, 1, "the truncated stream must contain a valid decoded token")
+		helpers.assert_eq(#partials, 1, "the provider must have started a real partial prediction")
+		helpers.assert_eq(#successes, 0, "curl EOF cannot commit a prediction without the provider's terminal receipt")
+		helpers.assert_eq(failures, 1, "a truncated stream must report exactly one failure")
+		return
+	end
 	helpers.assert_eq(#decoded_payloads, 1,
 		"only the completed data event may reach the JSON boundary; DONE and field lines must not")
 	helpers.assert_eq(decoded_payloads[1], case.expected_payload or JSON_SINGLE,
@@ -179,12 +208,41 @@ end
 helpers.describe("MLX SSE event parser", function()
 	for _, case in ipairs({
 		{
+			name = "ignores superseded EOF without clearing its successor (mlx-stream-terminal-receipt)",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n" },
+			superseded = true,
+		},
+		{
+			name = "keeps explicit cancellation silent without a completion marker (mlx-stream-terminal-receipt)",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n" },
+			exit_code = 15,
+		},
+		{
+			name = "rejects clean curl EOF before the completion marker (mlx-stream-terminal-receipt)",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n" },
+			expect_transport_incomplete = true,
+		},
+		{
+			name = "rejects an unterminated completion marker at EOF (mlx-stream-terminal-receipt)",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n", "data:[DONE]\n" },
+			expect_transport_incomplete = true,
+		},
+		{
+			name = "accepts a completion marker split across TCP chunks (mlx-stream-terminal-receipt)",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n", "data: [DO", "NE]\n", "\n" },
+		},
+		{
+			name = "accepts a completion marker in the native completion remainder (mlx-stream-terminal-receipt)",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n" },
+			remaining = "data:[DONE]\n\n",
+		},
+		{
 			name = "accepts a CRLF event with the conventional space",
-			chunks = { "data: " .. JSON_SINGLE .. "\r\n\r\n" },
+			chunks = { "data: " .. JSON_SINGLE .. "\r\n\r\n", SSE_DONE },
 		},
 		{
 			name = "accepts a space-less field fragmented inside the data prefix",
-			chunks = { "da", "ta:" .. JSON_SINGLE .. "\n", "\n" },
+			chunks = { "da", "ta:" .. JSON_SINGLE .. "\n", "\n", SSE_DONE },
 			observe_before_blank_at = 2,
 		},
 		{
@@ -192,6 +250,7 @@ helpers.describe("MLX SSE event parser", function()
 			chunks = {
 				'data: {"choices":[\n',
 				'data: {"delta":{"content":"hello"}}]}\n\n',
+				SSE_DONE,
 			},
 			expected_payload = '{"choices":[\n{"delta":{"content":"hello"}}]}',
 		},
@@ -200,6 +259,7 @@ helpers.describe("MLX SSE event parser", function()
 			chunks = {
 				": keepalive\r\nid: 7\r\nevent: token\r\n",
 				"data:" .. JSON_SINGLE .. "\r\nretry: 1000\r\n\r\n",
+				SSE_DONE,
 			},
 		},
 		{
@@ -217,7 +277,7 @@ helpers.describe("MLX SSE event parser", function()
 		},
 		{
 			name = "routes a decoded false value through schema validation",
-			chunks = { "data:" .. JSON_SINGLE .. "\n\n" },
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n", SSE_DONE },
 			has_decoded_value = true,
 			decoded_value = false,
 			expect_schema_rejection = true,
