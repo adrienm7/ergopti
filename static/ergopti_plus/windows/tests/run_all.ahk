@@ -418,6 +418,7 @@ InstallSendNoOps()
 #Include unit/ui/windows/test_native_file_filter_diagnostics.ahk
 #Include unit/adapters/test_console_window.ahk
 #Include unit/adapters/test_keyboard_layout_switch.ahk
+#Include unit/adapters/test_app_launcher_native_targets.ahk
 #Include unit/ui/windows/test_spotlight_ownership.ahk
 #Include unit/modules/gestures/test_take_note_async_job.ahk
 #Include unit/adapters/input/test_text_sender_modifiers.ahk
