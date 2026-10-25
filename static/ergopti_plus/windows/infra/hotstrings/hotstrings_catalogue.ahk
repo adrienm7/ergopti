@@ -191,9 +191,10 @@ _HotstringsOverridesMigrateLegacyDelays(BaseWriterFn := 0) {
 				Candidate[Cat] := Clone
 		}
 		if (GlobalDelay != "") {
-				Written := HasMethod(BaseWriterFn, "Call")
-						? BaseWriterFn.Call(GlobalDelay)
-						: WriteFeatureV2(Features, ConfigKey.HOTSTRINGS_EXPANSION_DELAY, GlobalDelay)
+				if HasMethod(BaseWriterFn, "Call")
+						Written := BaseWriterFn.Call(GlobalDelay)
+				else
+						Written := WriteFeatureV2(Features, ConfigKey.HOTSTRINGS_EXPANSION_DELAY, GlobalDelay)
 				if !Written {
 						try LoggerError("HotstringsConfig",
 								"The default expansion delay of the override file could not be moved to config.toml (hotstrings.expansion_delay); it applies for this session and the move is retried at the next start.")
