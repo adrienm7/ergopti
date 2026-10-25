@@ -133,14 +133,17 @@ helpers.describe("modules/gestures/manager.lua", function()
     helpers.assert_true(all.tap_4 ~= nil)
   end)
 
-  helpers.it("reset_defaults restores the Windows recommendation, not the neutral default", function()
+  helpers.it("reset_defaults restores the recommendation, not the neutral default", function()
     -- A fresh install still binds nothing (the touchpad is read without a
-    -- grab, so the desktop sees every gesture), but an explicit restore gives
-    -- the Windows recommendation since the decision of 2026-10-22.
+    -- grab, so the desktop sees every gesture). An explicit restore gives the
+    -- recommendation, which is "none" for the swipes the desktop also handles
+    -- (decision of 2026-10-24) and the Windows binding for the taps.
+    M.set_action("tap_3", "vol_up")
     M.set_action("swipe_3_left", "vol_up")
     M.reset_defaults()
-    helpers.assert_eq(M.get_action("swipe_3_left"), "tab_prev")
-    helpers.assert_eq(M.DEFAULT_GESTURES.swipe_3_left, "none", "the neutral default stays unbound")
+    helpers.assert_eq(M.get_action("tap_3"), "left_click_toggle")
+    helpers.assert_eq(M.DEFAULT_GESTURES.tap_3, "none", "the neutral default stays unbound")
+    helpers.assert_eq(M.get_action("swipe_3_left"), "none", "the desktop also acts on a swipe")
   end)
 
   helpers.it("keeps parameterized action values isolated per gesture binding", function()
