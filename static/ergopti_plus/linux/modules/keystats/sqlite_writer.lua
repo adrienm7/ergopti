@@ -44,6 +44,7 @@ local MediaStore    = require("keystats.media_store")
 local AppCategoryStore = require("keystats.app_category_store")
 local RegularFileReader = require("infra.regular_file_reader")
 local ErrorDescription = require("error_description")
+local PrivateSqlite = nil
 
 -- How many session durations one application-day keeps. Read from the shared
 -- accumulator rather than restated, because the walk caps the array it hands
@@ -337,8 +338,12 @@ end
 --- Returns true when the SQLite backend is available (binary found + db opened).
 --- @return boolean
 function M.is_available()
-	return _available == true and _db_path ~= nil
+	return _available == true and _db_path ~= nil and not M.has_private_file_debt()
 end
+
+--- Reports retained file admission debt independently of logical SQL availability.
+--- @return boolean pending
+function M.has_private_file_debt() return PrivateSqlite ~= nil and PrivateSqlite.is_settled() ~= true end
 
 --- Reports the separate capability required for owned asynchronous flushes.
 --- A minimal daemon without luv may still read the last committed database.
@@ -352,6 +357,10 @@ end
 --- @param db_path string Absolute path to the .sqlite file (e.g. ~/.local/share/ergopti/metrics.sqlite).
 --- @return boolean True on success.
 function M.open_db(db_path)
+	if M.has_private_file_debt() then
+		Logger.error(LOG, "Private SQLite file cleanup remains unresolved; reopening is refused.")
+		return false
+	end
 	if _flush_owner and not _flush_owner:is_settled() then return false end
 	if _media_terminal_debt ~= nil then
 		Logger.error(LOG, "Cannot reopen SQLite while semantic media terminal ownership is unresolved.")
@@ -376,6 +385,15 @@ function M.open_db(db_path)
 	-- Ensure the parent directory exists.
 	local dir = NativePath.dirname(db_path) or "."
 	os.execute(string.format("mkdir -p %s 2>/dev/null", TextUtils.shell_quote(dir)))
+
+	-- Typed records stay private even when the selected parent is shared.
+	PrivateSqlite = PrivateSqlite or require("infra.private_sqlite_file")
+	local private, privacy_error = PrivateSqlite.admit(_db_path)
+	if not private then
+		Logger.error(LOG, "SQLite permissions admission refused: %s.", privacy_error)
+		_db_path = nil
+		return false
+	end
 
 	-- Bootstrap schema on first open.
 	if not _bootstrapped then
@@ -438,6 +456,10 @@ end
 
 --- Closes the database connection (no-op for CLI-based backend, but cleans up state).
 function M.close_db()
+	if M.has_private_file_debt() then
+		Logger.error(LOG, "Private SQLite file cleanup remains unresolved; close cannot acknowledge it.")
+		return false
+	end
 	if _flush_owner and not _flush_owner:is_settled() then return false end
 	if _media_terminal_debt ~= nil then
 		Logger.error(LOG, "Semantic media terminal cleanup remains unresolved; ambiguous pipe close is not retried.")

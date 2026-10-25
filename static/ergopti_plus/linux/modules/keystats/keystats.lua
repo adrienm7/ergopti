@@ -2701,6 +2701,7 @@ function M.stop()
 		_flush_listeners = {}
 	end
 	M.pump_flush()
+	if SqliteWriter and SqliteWriter.has_private_file_debt() then return false end
 	if _flush_state then
 		local operation = _flush_state.operation
 		if not operation then return false end

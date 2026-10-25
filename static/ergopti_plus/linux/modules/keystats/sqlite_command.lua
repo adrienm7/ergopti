@@ -41,6 +41,7 @@
 --- ==============================================================================
 
 local M = {}
+local PrivacyPolicy = require("infra.sqlite_privacy_policy")
 
 local Shell = require("adapters.shell_runner")
 local SqliteLiteral = require("sqlite.literal")
@@ -141,7 +142,7 @@ function M.build(db_path, sql, opts)
 	words[#words + 1] = Shell.quote(filename)
 	words[#words + 1] = opts.capture_stderr and STDERR_TO_STDOUT or STDERR_DISCARDED
 
-	local command = Shell.with_stdin(table.concat(words, " "), sql, HEREDOC_BASE_TOKEN)
+	local command = string.format("umask %03o\n", PrivacyPolicy.creation_mask) .. Shell.with_stdin(table.concat(words, " "), sql, HEREDOC_BASE_TOKEN)
 	if opts.capture_exit then
 		-- Append to the existing command, without quoting the SQL a second time.
 		-- Reusing exec_checked here amplified quote-heavy SQL beyond ARG_MAX and

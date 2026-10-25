@@ -266,7 +266,7 @@ helpers.describe("sqlite_command — stop-on-error ownership", function()
 			local flags = mode == "json" and { "-readonly", "-json" } or mode == "scalar" and { "-noheader" } or {}
 			local command = assert(Cmd.build("/db/metrics.sqlite", "BEGIN;\nSELECT 42;\nCOMMIT;", { flags = flags, capture_exit = true }))
 			helpers.assert_contains(command, "'-bail'", "receipt refusal alone cannot undo a later COMMIT")
-			helpers.assert_true(command:find("sqlite3 '-init' '/dev/null'", 1, true) == 1)
+			helpers.assert_true(command:find("umask 077\nsqlite3 '-init' '/dev/null'", 1, true) == 1)
 			for _, flag in ipairs(flags) do helpers.assert_contains(command, "'" .. flag .. "'") end
 			helpers.assert_contains(command, "BEGIN;\nSELECT 42;\nCOMMIT;")
 			helpers.assert_contains(command, "ERGOPTI_SQL_EXIT_STATUS=")
@@ -280,7 +280,7 @@ helpers.describe("sqlite_command — native initialization isolation", function(
 		helpers.it("linux-sqlite-init: " .. mode .. " uses an explicit empty native init before its owned flags", function()
 			local flags = mode == "json" and { "-readonly", "-json" } or mode == "scalar" and { "-noheader" } or {}
 			local command = assert(Cmd.build("/db/metrics.sqlite", "SELECT 42;", { flags = flags, capture_exit = true }))
-			helpers.assert_true(command:find("sqlite3 '-init' '/dev/null'", 1, true) == 1,
+			helpers.assert_true(command:find("umask 077\nsqlite3 '-init' '/dev/null'", 1, true) == 1,
 				"native application CLI must not inherit a personal .sqliterc program")
 			for _, flag in ipairs(flags) do helpers.assert_contains(command, "'" .. flag .. "'") end
 			helpers.assert_contains(command, "'/db/metrics.sqlite'")
