@@ -53,16 +53,6 @@ local KDE_PAC = " --file kioslaverc --group 'Proxy Settings' --key 'Proxy Config
 --- KDE ProxyType values.
 local KDE_KINDS = { ["1"] = "manual", ["2"] = "pac", ["3"] = "discovery", ["4"] = "env" }
 
---- Strips the quotes of a GVariant string and refuses anything that is not one.
---- @param text any
---- @return string|nil
-local function unquote(text)
-	if type(text) ~= "string" then return nil end
-	local value = text:match("^%s*'(.*)'%s*$")
-	if value == nil or value == "" then return nil end
-	return value
-end
-
 --- The real collaborators.
 --- @return table
 local function native()
@@ -72,6 +62,11 @@ local function native()
 			local Shell = require("adapters.shell_runner")
 			local ok, output = Shell.exec_checked("timeout " .. M.SETTINGS_TIMEOUT_SECONDS .. " " .. command)
 			if not ok then return nil end
+			if command == GNOME_MODE or command == GNOME_PAC then
+				local value, refusal = require("infra.gvariant_string").decode(output)
+				if value == nil then error(refusal, 0) end
+				return value
+			end
 			return ((output or ""):gsub("%s+$", ""))
 		end,
 		has_command = function(name) return require("adapters.shell_runner").has_command(name) end,
@@ -114,10 +109,11 @@ function M.read_settings(deps)
 		end
 	end
 	if deps.has_command("gsettings") then
-		local mode = unquote(deps.exec(GNOME_MODE))
+		local mode = deps.exec(GNOME_MODE)
 		if mode == "auto" then
 			add("gnome_pac")
-			pac_url = pac_url or unquote(deps.exec(GNOME_PAC))
+			local address = deps.exec(GNOME_PAC)
+			if type(address) == "string" and address ~= "" then pac_url = pac_url or address end
 		elseif mode == "manual" then
 			add("gnome_manual")
 		end

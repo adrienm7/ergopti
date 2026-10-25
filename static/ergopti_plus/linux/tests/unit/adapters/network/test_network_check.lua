@@ -78,8 +78,8 @@ helpers.describe("network field check: the shared steps", function()
 		local _, result = run({
 			has_command = function(name) return name == "gsettings" end,
 			exec = function(command)
-				if command:find("autoconfig-url", 1, true) then return "'" .. PAC_URL .. "'" end
-				if command:find(" mode", 1, true) then return "'auto'" end
+				if command:find("autoconfig-url", 1, true) then return PAC_URL end
+				if command:find(" mode", 1, true) then return "auto" end
 			end,
 		})
 		local order = {}
@@ -103,6 +103,12 @@ helpers.describe("network field check: the Linux ports", function()
 	local native_ok = pcall(require, "luv")
 	local ffi_ok = pcall(require, "ffi")
 	if native_ok and ffi_ok and package.config:sub(1, 1) == "/" then
+		helpers.it("(linux-network-check-native) preserves actual GLib proxy setting bytes", function()
+			local Shell = require("adapters.shell_runner")
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_gvariant_proxy_settings.lua"
+			local status = os.execute(Shell.quote(assert(arg[-1])) .. " " .. Shell.quote(fixture))
+			helpers.assert_true(status == true or status == 0, "actual GLib strings must reach the PAC check unchanged")
+		end)
 		helpers.it("(linux-network-check-native) preserves actual HTTP terminal callback ownership", function()
 			local Shell = require("adapters.shell_runner")
 			local fixture = helpers.driver_root() .. "/tests/fixtures/native_network_check_refusal.lua"
@@ -116,7 +122,7 @@ helpers.describe("network field check: the Linux ports", function()
 			environment = function() return { https_proxy = "http://secret.corp.example:3128", no_proxy = "" } end,
 			has_command = function(name) return name == "gsettings" or name == "kreadconfig6" end,
 			exec = function(command)
-				if command:find("org.gnome.system.proxy mode", 1, true) then return "'manual'" end
+				if command:find("org.gnome.system.proxy mode", 1, true) then return "manual" end
 				if command:find("ProxyType", 1, true) then return "2" end
 				if command:find("Proxy Config Script", 1, true) then return "http://kde.example/p.pac" end
 			end,
@@ -139,8 +145,8 @@ helpers.describe("network field check: the Linux ports", function()
 		local gnome = {
 			has_command = function(name) return name == "gsettings" end,
 			exec = function(command)
-				if command:find("autoconfig-url", 1, true) then return "'" .. PAC_URL .. "'" end
-				if command:find(" mode", 1, true) then return "'auto'" end
+				if command:find("autoconfig-url", 1, true) then return PAC_URL end
+				if command:find(" mode", 1, true) then return "auto" end
 			end,
 		}
 		local down = {}
@@ -217,8 +223,8 @@ helpers.describe("network field check: the Linux ports", function()
 			environment = function() return { https_proxy = "http://secret.corp.example:3128" } end,
 			has_command = function(name) return name == "gsettings" end,
 			exec = function(command)
-				if command:find("autoconfig-url", 1, true) then return "'" .. PAC_URL .. "'" end
-				if command:find(" mode", 1, true) then return "'auto'" end
+				if command:find("autoconfig-url", 1, true) then return PAC_URL end
+				if command:find(" mode", 1, true) then return "auto" end
 			end,
 			http_get = function(url, _, _, callback)
 				callback(url == PAC_URL
