@@ -101,7 +101,9 @@ function M.pick(shell, title)
 	if completed ~= true or type(output) ~= "string" then
 		return nil, "application selection was cancelled or refused"
 	end
-	local chosen = output:match("^([^\r\n]*)")
+	-- Remove the chooser's single LF delimiter before validating the full id.
+	-- A line break in a selected filename must never select another desktop file.
+	local chosen = output:gsub("\n$", "")
 	if not chosen or chosen == "" then return nil, "application selection was cancelled" end
 	local id = M.desktop_id(chosen)
 	if not id then return nil, "the chosen file is not a desktop entry" end
