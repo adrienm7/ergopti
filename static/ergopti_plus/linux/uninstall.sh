@@ -182,7 +182,7 @@ while IFS=$'\t' read -r digest relative; do
 		[ ! -L "$owned" ] && [ -f "$owned" ] \
 			&& [ "$(cd -- "$(dirname -- "$owned")" && pwd -P)" = "$(dirname -- "$owned")" ] \
 			|| { echo 'Owned file was replaced by a link or another file type.' >&2; exit 1; }
-		actual="$(sha256sum -- "$owned")"
+		actual="$(sha256sum < "$owned")"
 		# A modified shipped file might contain personal data. Keep it, just as
 		# we keep files absent from the installer's payload manifest.
 		if [ "${actual%% *}" = "$digest" ]; then

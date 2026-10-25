@@ -98,7 +98,7 @@ if [ -f "$manifest" ]; then
 	while IFS=$'\t' read -r digest relative; do
 		if [ "$relative" != @autostart ]; then printf '%s\t%s\n' "$digest" "$relative"; fi
 	done < "$manifest" > "$receipt_tmp"
-	digest="$(sha256sum -- "$DESKTOP_FILE")"
+	digest="$(sha256sum < "$DESKTOP_FILE")"
 	printf '%s\t@autostart\n' "${digest%% *}" >> "$receipt_tmp"
 	mv -f -- "$receipt_tmp" "$manifest"
 fi
