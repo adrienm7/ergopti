@@ -31,6 +31,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const vm = require('node:vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const STATIC = path.join(ROOT, 'static', 'ergopti_plus');
@@ -231,6 +234,98 @@ function read(rel) {
 	return fs.readFileSync(file, 'utf8');
 }
 
+const LINUX_BOOT_CATALOGUE = {
+	'fixture.heading': 'Delivered "heading" </script>',
+	'fixture.detail': 'Delivered \\ detail é'
+};
+const LINUX_BOOT_CASES = [
+	{ locales: '/tmp/locales', locale: 'fr', base: 'file:///tmp/locales/' },
+	{
+		locales: '/tmp/a"b\\c #?%é</script>/locales',
+		locale: 'en',
+		base: 'file:///tmp/a%22b%5Cc%20%23%3F%25%C3%A9%3C/script%3E/locales/'
+	}
+];
+
+/** Executes one actual boot script and checks the page's received locale data. */
+function assertLinuxBootDelivery(html, fixture) {
+	assert.equal(typeof html, 'string', 'Linux boot HTML must be a string');
+	const script = /^<script>([\s\S]*)<\/script>$/.exec(html);
+	assert.ok(script, 'Linux boot HTML must contain its executable script');
+	assert.equal((html.match(/<\/script>/gi) || []).length, 1, 'data must not end the script');
+	const window = {};
+	vm.runInNewContext(script[1], { window }, { timeout: 1000 });
+	assert.equal(window._i18n_locale, fixture.locale, 'Linux boot locale must reach the page');
+	assert.equal(window.__i18n_base, fixture.base, 'Linux boot base URL must preserve the path');
+	assert.equal(typeof window._i18n_strings, 'object', 'Linux boot catalogue must reach the page');
+	assert.notEqual(window._i18n_strings, null, 'Linux boot catalogue must be an object');
+	assert.deepEqual(
+		JSON.parse(JSON.stringify(window._i18n_strings)),
+		LINUX_BOOT_CATALOGUE,
+		'Linux boot catalogue must retain every sentinel string'
+	);
+}
+
+/** Tests the Lua producer and the JavaScript receiver, independent of source spelling. */
+function linuxBootDeliversCatalogue() {
+	try {
+		const fixtures = JSON.stringify({ cases: LINUX_BOOT_CASES, catalogue: LINUX_BOOT_CATALOGUE });
+		const source = `
+package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+require("compat.utf8").install()
+local Json = require("json")
+local Host = require("ui.webkit_host")
+local fixtures = assert(Json.decode([==[${fixtures}]==]))
+local scripts = {}
+for index, case in ipairs(fixtures.cases) do
+	scripts[index] = Host.build_i18n_boot_script(case.locales, case.locale, fixtures.catalogue)
+end
+io.write(Json.encode(scripts))
+`;
+		const lua = process.env.LUA || 'lua';
+		const produced = spawnSync(lua, ['-'], {
+			cwd: path.join(STATIC, 'linux'),
+			input: source,
+			encoding: 'utf8',
+			timeout: 20000
+		});
+		assert.ifError(produced.error);
+		assert.equal(produced.status, 0, `${lua} boot producer failed: ${produced.stderr}`);
+		const scripts = JSON.parse(produced.stdout);
+		assert.ok(Array.isArray(scripts), 'Linux boot producer must return an array');
+		assert.ok(LINUX_BOOT_CASES.length >= 2, 'Linux boot cases must include native path data');
+		assert.equal(scripts.length, LINUX_BOOT_CASES.length, 'every Linux boot case must execute');
+		for (const [index, html] of scripts.entries()) {
+			const fixture = LINUX_BOOT_CASES[index];
+			assertLinuxBootDelivery(html, fixture);
+			const corrupt = (code) => html.replace(/<\/script>$/, `;${code}</script>`);
+			assert.throws(
+				() => assertLinuxBootDelivery(corrupt('delete window._i18n_strings;'), fixture),
+				/catalogue must reach/,
+				'a missing catalogue must fail the behavioral guard'
+			);
+			assert.throws(
+				() =>
+					assertLinuxBootDelivery(
+						corrupt('window._i18n_strings["fixture.heading"]="Incorrect heading";'),
+						fixture
+					),
+				/catalogue must retain/,
+				'an incorrect catalogue must fail the behavioral guard'
+			);
+			assert.throws(
+				() => assertLinuxBootDelivery(corrupt('const = ;'), fixture),
+				(error) => error.name === 'SyntaxError',
+				'a malformed boot script must fail the behavioral guard'
+			);
+		}
+		return true;
+	} catch (error) {
+		fail(`Linux boot delivery behavior failed: ${error.message}`);
+		return false;
+	}
+}
+
 // The inline-page builders: the boot script they prepend carries the strings
 const BUILDERS = [
 	{
@@ -241,12 +336,12 @@ const BUILDERS = [
 	{
 		driver: 'Linux',
 		rel: 'static/ergopti_plus/linux/ui/webkit_host.lua',
-		seed: /window\._i18n_locale="%s";%s<\/script>'[\s\S]{0,80}base, active_locale, seed/
+		delivers: linuxBootDeliversCatalogue
 	}
 ];
 for (const builder of BUILDERS) {
 	const source = read(builder.rel);
-	if (source && !builder.seed.test(source))
+	if (source && !(builder.delivers ? builder.delivers() : builder.seed.test(source)))
 		fail(
 			`${builder.driver}: ${builder.rel} no longer seeds window._i18n_strings in the page's ` +
 				`boot script. Its pages are inline and cannot fetch file:// locales, so they would ` +
