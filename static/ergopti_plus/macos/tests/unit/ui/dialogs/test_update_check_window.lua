@@ -443,3 +443,34 @@ helpers.describe("update-check JavaScript delivery (update-check-js-receipt)", f
 		end)
 	end)
 end)
+
+
+helpers.describe("update-check changelog admission", function()
+	for _, mode in ipairs({ "accepted", "refused", "missing" }) do
+		helpers.it("preserves the changelog opening receipt: " .. mode .. " (update-changelog-receipt)", function()
+			scenario(function(ctx)
+				local owners = fake_owners(available)
+				local view = fake_view()
+				local session = ctx.Host._session_for(view, owners)
+				ctx.Host._set_window(view, session)
+				session.start()
+				local calls = 0
+				package.loaded["ui.changelog"].open = function(options)
+					calls = calls + 1
+					helpers.assert_eq(options.channel, "dev")
+					helpers.assert_true(rawequal(options.channel_owner, owners.channel_owner))
+					if mode == "accepted" then return true end
+					if mode == "refused" then return false end
+					return nil
+				end
+				session.on_message({ action = "whats_new" })
+				local acknowledgement = view.messages[#view.messages]
+				helpers.assert_eq(calls, 1)
+				helpers.assert_eq(acknowledgement.type, "action")
+				helpers.assert_eq(acknowledgement.action, "whats_new")
+				helpers.assert_eq(acknowledgement.ok, mode == "accepted",
+					"the page must receive the actual changelog admission outcome")
+			end)
+		end)
+	end
+end)

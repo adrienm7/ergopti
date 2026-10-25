@@ -199,8 +199,7 @@ local function session_for(view, ctx)
 		-- Sparkle reads the same channel's feed and shows its own install dialog.
 		install = function(result) return UpdateLauncher.request_check(result.channel) end,
 		open_changelog = function(channel)
-			require("ui.changelog").open({ channel = channel, channel_owner = ctx.channel_owner })
-			return true
+			return require("ui.changelog").open({ channel = channel, channel_owner = ctx.channel_owner }) == true
 		end,
 		report = function(result, on_complete, is_current)
 			if not is_current() then return end
