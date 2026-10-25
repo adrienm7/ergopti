@@ -106,12 +106,12 @@ function verify(subject) {
 	assert.deepStrictEqual(
 		pipeline.needsOf(build.body),
 		['e2e-linux'],
-		'the package directly waits for E2E with genuine carried integration admission'
+		'the package directly waits for E2E, the only link before it'
 	);
 	assert.strictEqual(
 		pipeline.field(build.body, 'if'),
-		"${{ !cancelled() && needs.e2e-linux.outputs.ci_integration_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
-		'integration success stays mandatory; failed E2E admits package diagnostics only on manual dispatch'
+		null,
+		'a failed E2E admits no package on any event, manual dispatch included'
 	);
 	assert.strictEqual(pipeline.field(gate.body, 'if'), 'always()');
 	assert.deepStrictEqual(
@@ -139,10 +139,9 @@ function verify(subject) {
 				'genuine source-bound custody ' + id + ':' + key
 			);
 	}
-	assert.strictEqual(
-		owner.body.split('      ci_integration_result: ${{ needs.integration-linux.result }}\n').length,
-		2,
-		'integration predicate is the real scheduler result'
+	assert.ok(
+		!owner.body.includes('ci_integration_result'),
+		'E2E forwards no integration predicate: the chain is strictly sequential'
 	);
 	assert.strictEqual(
 		pipeline
@@ -168,7 +167,7 @@ function verify(subject) {
 	assert.strictEqual(
 		pipeline.runOf(verdict).slice(0, 7).join('\n'),
 		'set -euo pipefail\nNEEDS="$(node tools/ci/ci-stage-status.cjs complete linux)"\nnode tools/test/linux-ci-evidence.cjs verify \\\n    --manifest .github/linux-ci-coverage.json \\\n    --needs "$NEEDS" \\\n    --evidence-dir "$RUNNER_TEMP/linux-ci-evidence" \\\n    --sha "$GITHUB_SHA"',
-		'same strict source-bound verdict rejects failed manual diagnostics'
+		'same strict source-bound verdict rejects every failed mandatory job'
 	);
 	assert(owner.body.includes(BLOCK), 'owned block must remain inside the E2E job');
 	const steps = pipeline.steps(owner.body);
@@ -631,25 +630,19 @@ console.log(
 	'PASS additive LuaJIT XI2 enrollment: portable15/source refusals22/placement refusals5; ABI29/cookies3 native UNRUN'
 );
 
-// The ordered suites converge before packaging; a manual diagnostic never qualifies release.
+// The ordered suites converge before packaging; no event admits a package after a failed E2E.
 for (const [name, before, replacement] of [
-	[
-		'package omits integration',
-		'      ci_integration_result: ${{ needs.integration-linux.result }}',
-		'      ci_integration_result: success'
-	],
 	['package omits E2E', '    needs: [e2e-linux]', '    needs: []'],
 	[
-		'integration success omitted',
-		"needs.e2e-linux.outputs.ci_integration_result == 'success' && ",
-		''
+		'manual dispatch admits a failed E2E',
+		'    needs: [e2e-linux]\n',
+		"    needs: [e2e-linux]\n    if: ${{ !cancelled() && (needs.e2e-linux.result == 'success' || github.event_name == 'workflow_dispatch') }}\n"
 	],
 	[
-		'automatic failed E2E admitted',
-		"(github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')",
-		"(needs.e2e-linux.result == 'failure')"
+		'package runs whatever the E2E result',
+		'    needs: [e2e-linux]\n',
+		'    needs: [e2e-linux]\n    if: always()\n'
 	],
-	['E2E success omitted', "needs.e2e-linux.result == 'success' || ", ''],
 	['unit prerequisite omitted', '    needs: [test-linux]\n', ''],
 	['integration prerequisite omitted', '    needs: [integration-linux]\n', ''],
 	[
@@ -687,5 +680,5 @@ for (const [name, before, replacement] of [
 	assert.throws(() => verify({ ...subject, workflow }), undefined, name);
 }
 console.log(
-	'PASS ordered XI2 prerequisites: 10 causal graph/status/consumer refusals; existing Linux-evidence truth tables remain authoritative; native UNRUN'
+	'PASS ordered XI2 prerequisites: 8 causal graph/status/consumer refusals; existing Linux-evidence truth tables remain authoritative; native UNRUN'
 );

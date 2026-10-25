@@ -1577,23 +1577,6 @@ function planReferenceProblems(files) {
 				? consumerStart + strategy.index + matrixField.index + '      matrix: '.length
 				: -1;
 		for (const match of file.text.matchAll(/needs\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+)/g)) {
-			if (
-				file.rel === LINUX_BOX &&
-				match[1] === 'e2e-linux' &&
-				match[2] === 'ci_integration_result'
-			) {
-				const build = pipeline
-					.jobsOfText(file.text, file.rel)
-					.find((job) => job.id === 'package-linux');
-				const condition = build && /^ {4}if: ([^\n]+)$/m.exec(build.body);
-				const start = condition ? file.text.indexOf(build.body) + condition.index : -1;
-				if (
-					start >= 0 &&
-					match.index >= start &&
-					match.index + match[0].length <= start + condition[0].length
-				)
-					continue;
-			}
 			const owner = pipeline.jobsOfText(file.text, file.rel).find((job) => {
 				const start = file.text.indexOf(job.body);
 				return match.index >= start && match.index < start + job.body.length;
@@ -3484,10 +3467,7 @@ function graphProblems(files) {
 					'      ci_predecessors: ${{ toJSON(needs) }}',
 					'      ci_source_sha: ${{ github.sha }}',
 					'      ci_run_id: ${{ github.run_id }}',
-					'      ci_attempt: ${{ github.run_attempt }}',
-					...(id === 'e2e-linux'
-						? ['      ci_integration_result: ${{ needs.integration-linux.result }}']
-						: [])
+					'      ci_attempt: ${{ github.run_attempt }}'
 				].join('\n');
 				const blocks = [...job.body.matchAll(/^ {4}outputs:\n((?: {6}[^\n]*(?:\n|$)|\n)*)/gm)];
 				if (blocks.length !== 1 || blocks[0][0].trimEnd() !== expectedOutputs)
@@ -3496,16 +3476,11 @@ function graphProblems(files) {
 			if (job && pipeline.field(job.body, 'continue-on-error') !== null) {
 				problems.push(`${rel} ${id} must remain a mandatory phase`);
 			}
-			const expectedCondition =
-				stage === 'verdict'
-					? 'always()'
-					: rel === LINUX_BOX && id === 'package-linux'
-						? "${{ !cancelled() && needs.e2e-linux.outputs.ci_integration_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
-						: null;
+			// Every stage but the verdict carries the default admission of its lane: the
+			// success of the stage before it, on a manual dispatch as well.
+			const expectedCondition = stage === 'verdict' ? 'always()' : null;
 			if (job && pipeline.field(job.body, 'if') !== expectedCondition) {
-				problems.push(
-					`${rel} ${id} must retain its exact mandatory or manual diagnostic admission`
-				);
+				problems.push(`${rel} ${id} must retain its exact mandatory admission`);
 			}
 		}
 		if (rel === MACOS_BOX) problems.push(...macStageProblems(entry.text));
@@ -3624,26 +3599,21 @@ for (const [what, from, to] of [
 		"  integration-linux:\n    name: 'Integration tests'\n    needs: [test-linux]\n",
 		"  integration-linux:\n    name: 'Integration tests'\n"
 	],
-	[
-		'Linux package omits integration tests',
-		'      ci_integration_result: ${{ needs.integration-linux.result }}\n',
-		'      ci_integration_result: success\n'
-	],
 	['Linux package omits E2E', '    needs: [e2e-linux]\n', '    needs: []\n'],
 	[
-		'Linux package forgives failed integration tests',
-		"needs.e2e-linux.outputs.ci_integration_result == 'success' && ",
-		''
+		'Linux package admits a failed E2E on manual dispatch',
+		'    needs: [e2e-linux]\n',
+		"    needs: [e2e-linux]\n    if: ${{ !cancelled() && (needs.e2e-linux.result == 'success' || github.event_name == 'workflow_dispatch') }}\n"
 	],
 	[
-		'Linux package drops manual failed-E2E diagnostics',
-		" || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')",
-		''
+		'Linux package runs whatever the E2E result',
+		'    needs: [e2e-linux]\n',
+		'    needs: [e2e-linux]\n    if: always()\n'
 	],
 	[
-		'Linux package admits failed E2E automatically',
-		"(github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')",
-		"(needs.e2e-linux.result == 'failure')"
+		'Linux E2E forwards an integration predicate for a diagnostic build',
+		'      ci_attempt: ${{ github.run_attempt }}\n\n    steps:\n      - uses: actions/checkout@v4\n\n      - name: Install LuaJIT\n        # Bound',
+		'      ci_attempt: ${{ github.run_attempt }}\n      ci_integration_result: ${{ needs.integration-linux.result }}\n\n    steps:\n      - uses: actions/checkout@v4\n\n      - name: Install LuaJIT\n        # Bound'
 	]
 ]) {
 	mustCatch(what, LINUX_BOX, from, to, graphProblems);

@@ -32,8 +32,6 @@ function run(platform, results = {}) {
 			ci_attempt: '1',
 			ci_predecessors: JSON.stringify(prior)
 		};
-		if (platform === 'linux' && index === I.e2e)
-			outputs.ci_integration_result = prior[names[platform][I.integration]].result;
 		if (platform === 'linux' && index === I.build) {
 			outputs.install_matrix = JSON.stringify(installPlan.matrix);
 			outputs.install_metadata = JSON.stringify(installPlan.metadata);
@@ -159,34 +157,30 @@ check(() => {
 	value['package-flatpak'].outputs.ci_predecessors = JSON.stringify(foreign);
 	refuse(value, 'linux');
 });
-check(() => {
-	const value = run('linux', { [I.e2e]: 'failure' });
-	const packageJob = JSON.parse(value['install-linux'].outputs.ci_predecessors)['package-linux'];
-	const beforeBuild = packageJob.outputs.ci_predecessors;
-	assert.throws(() => admitBuild('linux', beforeBuild, current));
-	assert.equal(
-		admitBuild('linux', beforeBuild, { ...current, event: 'workflow_dispatch' })['e2e-linux']
-			.result,
-		'failure'
-	);
-	refuse(value, 'linux', { ...current, event: 'workflow_dispatch' });
-});
-check(() => {
-	const value = run('linux', { [I.unit]: 'failure', [I.e2e]: 'failure' });
-	const beforeBuild = JSON.parse(value['install-linux'].outputs.ci_predecessors)['package-linux']
-		.outputs.ci_predecessors;
-	assert.throws(() => admitBuild('linux', beforeBuild, { ...current, event: 'workflow_dispatch' }));
-});
-// A failed Integration stage admits no build, not even the manual diagnostic one.
-check(() => {
-	const value = run('linux', { [I.integration]: 'failure', [I.e2e]: 'failure' });
-	const beforeBuild = JSON.parse(value['install-linux'].outputs.ci_predecessors)['package-linux']
-		.outputs.ci_predecessors;
-	assert.throws(
-		() => admitBuild('linux', beforeBuild, { ...current, event: 'workflow_dispatch' }),
-		/integration-linux did not succeed/
-	);
-});
+// A failed E2E admits no build on any lane or event: a manual dispatch is not special.
+for (const platform of Object.keys(names))
+	for (const event of ['push', 'pull_request', 'workflow_dispatch'])
+		check(() => {
+			const value = run(platform, { [I.e2e]: 'failure' });
+			const beforeBuild = JSON.parse(value[names[platform][LAST]].outputs.ci_predecessors)[
+				names[platform][I.build]
+			].outputs.ci_predecessors;
+			assert.throws(
+				() => admitBuild(platform, beforeBuild, { ...current, event }),
+				/E2E does not admit this build/
+			);
+			refuse(value, platform, { ...current, event });
+		});
+for (const stage of ['unit', 'integration'])
+	check(() => {
+		const value = run('linux', { [I[stage]]: 'failure', [I.e2e]: 'failure' });
+		const beforeBuild = JSON.parse(value['install-linux'].outputs.ci_predecessors)['package-linux']
+			.outputs.ci_predecessors;
+		assert.throws(
+			() => admitBuild('linux', beforeBuild, { ...current, event: 'workflow_dispatch' }),
+			/did not succeed/
+		);
+	});
 check(() => {
 	const value = run('windows');
 	value['launch-windows'].outputs.ci_attempt = '1';
@@ -208,11 +202,12 @@ check(() => {
 	value['launch-windows'].outputs.ci_predecessors = '{"package-windows":{},"package-windows":{}}';
 	refuse(value);
 });
+// The Linux E2E link forwards the custody outputs alone: an extra integration predicate is refused.
 check(() => {
 	const value = run('linux');
 	const packageJob = JSON.parse(value['install-linux'].outputs.ci_predecessors);
 	const e2e = JSON.parse(packageJob['package-linux'].outputs.ci_predecessors);
-	e2e['e2e-linux'].outputs.ci_integration_result = 'failure';
+	e2e['e2e-linux'].outputs.ci_integration_result = 'success';
 	packageJob['package-linux'].outputs.ci_predecessors = JSON.stringify(e2e);
 	value['install-linux'].outputs.ci_predecessors = JSON.stringify(packageJob);
 	refuse(value, 'linux');
@@ -569,7 +564,6 @@ function validateWorkflow(platform, workflow) {
 			Object.keys(job.outputs).sort(),
 			[
 				...['ci_attempt', 'ci_predecessors', 'ci_run_id', 'ci_source_sha'],
-				...(platform === 'linux' && index === I.e2e ? ['ci_integration_result'] : []),
 				...(platform === 'linux' && index === I.build ? ['install_matrix', 'install_metadata'] : [])
 			].sort()
 		);
@@ -624,15 +618,9 @@ function validateWorkflow(platform, workflow) {
 			'${{ steps.install-plan.outputs.metadata }}',
 			'Linux Build must forward the actual complete install metadata'
 		);
-		assert.equal(
-			workflow.jobs['e2e-linux'].outputs.ci_integration_result,
-			'${{ needs.integration-linux.result }}'
-		);
-		assert.equal(
-			build.if,
-			"${{ !cancelled() && needs.e2e-linux.outputs.ci_integration_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
-		);
 	}
+	// Build carries the default admission of every lane: success of E2E alone.
+	assert.equal(build.if, undefined, 'Build must not carry a manual-dispatch exception');
 }
 for (const platform of Object.keys(names)) {
 	const workflow = yaml.parse(
@@ -655,6 +643,12 @@ for (const platform of Object.keys(names)) {
 		},
 		(value) => {
 			value.jobs[platform + '-ok'].if = 'success()';
+		},
+		(value) => {
+			value.jobs[names[platform][I.build]].if =
+				"${{ !cancelled() && (needs['" +
+				names[platform][I.e2e] +
+				"'].result == 'success' || github.event_name == 'workflow_dispatch') }}";
 		},
 		(value) => {
 			value.jobs[names[platform][I.build]].steps = value.jobs[
@@ -690,7 +684,8 @@ for (const platform of Object.keys(names)) {
 	if (platform === 'linux')
 		check(() => {
 			const changed = structuredClone(workflow);
-			changed.jobs['e2e-linux'].outputs.ci_integration_result = 'success';
+			changed.jobs['e2e-linux'].outputs.ci_integration_result =
+				'${{ needs.integration-linux.result }}';
 			assert.throws(() => validateWorkflow(platform, changed));
 		});
 	if (platform === 'linux') {

@@ -191,8 +191,10 @@ function problems(text, manifest = MANIFEST) {
 	// Downstream: the build, the verdict and the release wait for every row.
 	if (JSON.stringify(workflow.jobs['package-linux']?.needs) !== JSON.stringify([JOB]))
 		found.push('package-linux must need ' + JOB + ' (the whole matrix)');
-	if (!String(workflow.jobs['package-linux']?.if).includes("needs.e2e-linux.result == 'success'"))
-		found.push('package-linux must require the aggregate matrix result');
+	// No job-level if: the default admission requires the aggregate matrix result
+	// to be a success, on a manual dispatch as well.
+	if (workflow.jobs['package-linux']?.if !== undefined)
+		found.push('package-linux must require the aggregate matrix result alone');
 	return found;
 }
 
@@ -254,6 +256,13 @@ function replaced(before, after) {
 	return WORKFLOW.replace(before, after);
 }
 const mutations = [
+	[
+		'a build admitted after a failed matrix on manual dispatch',
+		replaced(
+			"  package-linux:\n    name: 'Build (.deb, .rpm, AppImage and archive)'\n    runs-on: ubuntu-latest\n    needs: [e2e-linux]\n",
+			"  package-linux:\n    name: 'Build (.deb, .rpm, AppImage and archive)'\n    runs-on: ubuntu-latest\n    needs: [e2e-linux]\n    if: ${{ !cancelled() && (needs.e2e-linux.result == 'success' || github.event_name == 'workflow_dispatch') }}\n"
+		)
+	],
 	[
 		'a harness moved to another row',
 		withIf(

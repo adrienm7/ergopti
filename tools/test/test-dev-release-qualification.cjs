@@ -510,8 +510,6 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		'common-verdict': 'always()',
 		'windows-ok': 'always()',
 		'macos-ok': 'always()',
-		'package-linux':
-			"${{ !cancelled() && needs.e2e-linux.outputs.ci_integration_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
 		'linux-ok': 'always()'
 	};
 	let jobs = 0,
