@@ -931,12 +931,21 @@ ProcessUserInput(gui, edits, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 	return true
 }
 
+; Every opening creates a fresh native dialog. Default Close only hides it,
+; retaining its edit control and the button callback that captures this Gui.
+_GPTLinkEditorClose(Window, *) {
+	Window.Destroy()
+	return true
+}
+
 GPTLinkEditor(*) {
 		global Features
 		CurrentLink := ""
 		if IsSet(Features) and Features.Has("shortcuts") and Features["shortcuts"].Has("gpt") and Features["shortcuts"]["gpt"].Has("link")
 				CurrentLink := Features["shortcuts"]["gpt"]["link"]
 		GuiToShow := Gui_Create(, t("dialog.gpt_link.title"))
+		GuiToShow.OnEvent("Close", _GPTLinkEditorClose)
+		GuiToShow.OnEvent("Escape", _GPTLinkEditorClose)
 		NewValue := GuiToShow.Add("Edit", "w300", CurrentLink)
 		GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click", (*) => ModifyLink(GuiToShow, NewValue.Text))
 		GuiToShow.Show("Center")

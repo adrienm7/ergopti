@@ -438,3 +438,57 @@ _EGB20260813_InheritedCriticalStopsAtEditorBoundary() {
 Test("editor-global-barrier-20260813: user actions defuse inherited Critical "
 	. "through post-commit UI (editor-postcommit-inherited-critical)",
 	_EGB20260813_InheritedCriticalStopsAtEditorBoundary)
+
+
+_EGB_LinkCloseDelivered(Receipt, *) {
+	Receipt.Delivered := true
+}
+
+_EGB_LinkEditorCancellation(Event) {
+	SavedHidden := A_DetectHiddenWindows
+	SavedMatch := A_TitleMatchMode
+	SavedCritical := Critical("Off")
+	Window := 0
+	try {
+		DetectHiddenWindows(true)
+		SetTitleMatchMode(3)
+		Spec := WindowTitle(t("dialog.gpt_link.title")) . " ahk_pid " . ProcessExist()
+		Before := Map()
+		for Hwnd in WinGetList(Spec)
+			Before[Hwnd] := true
+		GPTLinkEditor()
+		Opened := []
+		for Hwnd in WinGetList(Spec)
+			if !Before.Has(Hwnd)
+				Opened.Push(Hwnd)
+		AssertEqual(1, Opened.Length, "the real ChatGPT-link factory must create one private editor")
+		Hwnd := Opened[1]
+		Window := GuiFromHwnd(Hwnd)
+		AssertTrue(IsObject(Window), "the native HWND must belong to the genuine editor Gui")
+		Receipt := {Delivered: false}
+		Window.OnEvent(Event, _EGB_LinkCloseDelivered.Bind(Receipt), -1)
+		Target := Hwnd
+		if Event == "Escape" {
+			for Control in Window
+				if Control.Type == "Edit"
+					Target := Control.Hwnd
+		}
+		AssertTrue(DllCall("PostMessageW", "Ptr", Target, "UInt", Event == "Close" ? 0x10 : 0x100,
+			"Ptr", Event == "Close" ? 0 : 0x1B, "Ptr", 0, "Int"),
+			"the private editor must receive its native cancellation message")
+		Started := A_TickCount
+		while (!Receipt.Delivered || WMHandleExists(Hwnd)) && A_TickCount - Started < 2000
+			Sleep(1)
+		AssertTrue(Receipt.Delivered, "the native cancellation event must really run")
+		AssertFalse(WMHandleExists(Hwnd), "cancelling the fresh editor must destroy its HWND and controls")
+	} finally {
+		if IsObject(Window)
+			try Window.Destroy()
+		DetectHiddenWindows(SavedHidden)
+		SetTitleMatchMode(SavedMatch)
+		Critical(SavedCritical)
+	}
+}
+for _EGB_LinkCloseEvent in ["Close", "Escape"]
+	Test("ChatGPT-link editor: " . _EGB_LinkCloseEvent . " retires its native window (gpt-link-close-retirement)",
+		_EGB_LinkEditorCancellation.Bind(_EGB_LinkCloseEvent))
