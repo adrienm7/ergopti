@@ -213,14 +213,14 @@ _IPT_MenuRowsAreDeclaredForWindowsOnly() {
 			Id . " names a translated reason for the other drivers")
 		Assert(English.Has(Row["i18n"]) && English[Row["i18n"]] != "", Id . " has an English label")
 		Body := _DriverFuncBody("_MI_BuildDebuggingMenu")
-		Assert(InStr(Body, '"' . Id . '",'), "the Windows Debug menu supplies a command for '" . Id . "'")
+		Assert(InStr(Body, "MenuCommand." . StrUpper(Id) . ","), "the Windows Debug menu supplies a command for '" . Id . "' through the generated constant")
 	}
 	Assert(InStr(_DriverFuncBody("_MI_BuildDebuggingMenu"), "InputProbe_SendComparisonCommand"),
 		"the send row runs the send comparison")
 	Assert(InStr(_DriverFuncBody("_MI_BuildDebuggingMenu"), "InputProbe_HookOrderCommand"),
 		"the hook row runs the hook check")
 	Fallback := _DriverFuncBody("_MM_DebugFallback")
-	Assert(InStr(Fallback, '"send_probe"') && InStr(Fallback, '"hook_probe"'),
+	Assert(InStr(Fallback, "MenuCommand.SEND_PROBE") && InStr(Fallback, "MenuCommand.HOOK_PROBE"),
 		"the hard-coded fallback order lists both rows")
 }
 Test("input probe: both Debug rows are declared once for Windows with a reason", _IPT_MenuRowsAreDeclaredForWindowsOnly)
