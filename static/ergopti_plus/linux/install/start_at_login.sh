@@ -7,7 +7,8 @@
 set -euo pipefail
 DRIVER_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "$DRIVER_ROOT/install/desktop_entry.sh"
-CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
+source "$DRIVER_ROOT/install/config_home.sh"
+ergopti_resolve_config_home CONFIG_ROOT
 ACTION="${1:-status}"
 case "$ACTION" in status|enable|disable) ;; *) exit 64 ;; esac
 

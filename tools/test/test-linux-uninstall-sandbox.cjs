@@ -254,10 +254,12 @@ try {
 	const bare = path.join(sandbox, 'bare');
 	fs.mkdirSync(path.join(packaged, 'install'), { recursive: true });
 	fs.mkdirSync(bare);
-	fs.copyFileSync(
-		path.join(path.dirname(script), 'install/desktop_entry.sh'),
-		path.join(packaged, 'install/desktop_entry.sh')
-	);
+	for (const helper of ['desktop_entry.sh', 'config_home.sh']) {
+		fs.copyFileSync(
+			path.join(path.dirname(script), 'install', helper),
+			path.join(packaged, 'install', helper)
+		);
+	}
 	fs.writeFileSync(
 		path.join(packaged, 'uninstall.sh'),
 		fs
@@ -325,7 +327,12 @@ try {
 		fs.mkdirSync(path.join(nativeShared, 'data/locales'), { recursive: true });
 		fs.writeFileSync(path.join(nativeDriver, 'ergopti_hotstrings.lua'), 'native-runtime');
 		fs.writeFileSync(path.join(nativeShared, 'data/locales/en.json'), '{}');
-		for (const helper of ['ownership.sh', 'start_at_login.sh', 'desktop_entry.sh']) {
+		for (const helper of [
+			'ownership.sh',
+			'start_at_login.sh',
+			'desktop_entry.sh',
+			'config_home.sh'
+		]) {
 			fs.copyFileSync(
 				path.join(path.dirname(script), 'install', helper),
 				path.join(nativeDriver, 'install', helper)

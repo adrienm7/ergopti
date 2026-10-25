@@ -10,7 +10,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/install/desktop_entry.sh"
 PREFIX="${HOME}/.local"
-CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
+source "$SCRIPT_DIR/install/config_home.sh"
+ergopti_resolve_config_home CONFIG_ROOT
 CONFIRMED=false
 CHECK_ONLY=false
 WAIT_OWNER=
