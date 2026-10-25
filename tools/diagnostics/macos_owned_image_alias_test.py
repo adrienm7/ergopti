@@ -5,6 +5,8 @@ import ctypes
 import errno
 import os
 from pathlib import Path
+import json
+import shutil
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -37,6 +39,7 @@ FAULT_SOURCE = r"""#include "OwnedImageAliasCompatibility.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 static int unlink_fault;
@@ -45,11 +48,42 @@ static int foreign_source = -1;
 static int foreign_duplicate = -1;
 static int original_close_attempts;
 static int original_descriptor = -1;
+static int source_link_race;
 size_t test_alias_size(void) { return sizeof(ergopti_owned_image_alias); }
 void test_faults(int unlink_image, int uncertain_close, int foreign_fd) {
     unlink_fault = unlink_image; close_fault = uncertain_close;
     foreign_source = foreign_fd; foreign_duplicate = -1;
     original_descriptor = -1; original_close_attempts = 0;
+    source_link_race = 0;
+}
+void test_link_race(void) { source_link_race = 1; }
+void test_alias_race(void) { source_link_race = 2; }
+int controlled_linkat(int oldfd, const char *oldname, int newfd, const char *newname, int flags) {
+    int race = source_link_race;
+    source_link_race = 0;
+    if (race == 1) {
+        if (renameat(oldfd, oldname, oldfd, "retained-original") != 0) { return -1; }
+        int source = openat(oldfd, oldname, O_WRONLY | O_CREAT | O_EXCL, 0755);
+        if (source < 0) { return -1; }
+        const char *bytes = "foreign atomic replacement";
+        ssize_t count = write(source, bytes, strlen(bytes));
+        int closed = close(source);
+        if (count != (ssize_t)strlen(bytes) || closed != 0) { errno = EIO; return -1; }
+    }
+    int result = linkat(oldfd, oldname, newfd, newname, flags);
+    if (result == 0 && race == 2) {
+        char retained[96];
+        int size = snprintf(retained, sizeof(retained), "%s.retained", newname);
+        if (size < 0 || (size_t)size >= sizeof(retained)) { errno = ENAMETOOLONG; return -1; }
+        if (renameat(newfd, newname, newfd, retained) != 0) { return -1; }
+        int foreign = openat(newfd, newname, O_WRONLY | O_CREAT | O_EXCL, 0755);
+        if (foreign < 0) { return -1; }
+        const char *bytes = "foreign alias replacement";
+        ssize_t count = write(foreign, bytes, strlen(bytes));
+        int closed = close(foreign);
+        if (count != (ssize_t)strlen(bytes) || closed != 0) { errno = EIO; return -1; }
+    }
+    return result;
 }
 int test_foreign_duplicate(void) { return foreign_duplicate; }
 int test_original_close_attempts(void) { return original_close_attempts; }
@@ -107,6 +141,7 @@ class ActualAliasControls(unittest.TestCase):
             + [
                 "-Dclose=controlled_close",
                 "-Dunlinkat=controlled_unlinkat",
+                "-Dlinkat=controlled_linkat",
                 "-c",
                 str(source),
                 "-o",
@@ -123,6 +158,7 @@ class ActualAliasControls(unittest.TestCase):
             capture_output=True,
         )
         cls.native = ctypes.CDLL(str(binary), use_errno=True)
+        cls.binary = binary
         cls.native.test_alias_size.restype = ctypes.c_size_t
         if cls.native.test_alias_size() != ctypes.sizeof(Alias):
             raise RuntimeError(
@@ -131,6 +167,8 @@ class ActualAliasControls(unittest.TestCase):
         cls.native.test_faults.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
         cls.native.test_foreign_duplicate.restype = ctypes.c_int
         cls.native.test_original_close_attempts.restype = ctypes.c_int
+        cls.native.test_link_race.argtypes = []
+        cls.native.test_alias_race.argtypes = []
         cls.native.ergopti_image_alias_create.argtypes = [
             ctypes.c_int,
             ctypes.c_char_p,
@@ -451,6 +489,132 @@ class ActualAliasControls(unittest.TestCase):
                 result, owner = self.acquire(nonce=nonce)
                 self.assertEqual(result, errno.EINVAL)
                 self.assertEqual(owner.directory_fd, -1)
+
+    def test_source_replaced_during_link_retains_unproved_alias_debt(self):
+        self.native.test_link_race()
+        result, owner = self.acquire()
+        self.assertEqual(result, errno.ESTALE)
+        self.assertEqual(self.native.ergopti_image_alias_retire(ctypes.byref(owner)), errno.ESTALE)
+        self.assertEqual(self.source.read_bytes(), b"foreign atomic replacement")
+        self.assertEqual(os.pread(self.descriptor, 64, 0), b"independent original executable bytes")
+        self.assertEqual(
+            Path(os.fsdecode(owner.executable)).read_bytes(), b"foreign atomic replacement"
+        )
+
+    def test_alias_replaced_immediately_after_link_never_becomes_cleanup_authority(self):
+        self.native.test_alias_race()
+        result, owner = self.acquire()
+        self.assertEqual(result, errno.ESTALE)
+        self.assertEqual(self.native.ergopti_image_alias_retire(ctypes.byref(owner)), errno.ESTALE)
+        self.assertEqual(
+            Path(os.fsdecode(owner.executable)).read_bytes(), b"foreign alias replacement"
+        )
+        self.assertEqual(os.pread(self.descriptor, 64, 0), b"independent original executable bytes")
+
+    def test_replaced_lease_directory_survives_cleanup_and_keeps_exact_original_debt(self):
+        result, owner = self.acquire()
+        self.assertEqual(result, 0)
+        lease = self.root / (".ergopti-lease-" + self.nonce.decode())
+        retained = self.root / "retained-original-lease"
+        lease.rename(retained)
+        lease.mkdir(mode=0o700)
+        (lease / "foreign").write_bytes(b"unrelated user state")
+        self.assertEqual(self.native.ergopti_image_alias_retire(ctypes.byref(owner)), errno.ESTALE)
+        self.assertEqual((lease / "foreign").read_bytes(), b"unrelated user state")
+        (lease / "foreign").unlink()
+        lease.rmdir()
+        retained.rename(lease)
+        self.assertEqual(self.native.ergopti_image_alias_retire(ctypes.byref(owner)), 0)
+
+    def pressure(self, slots, mode="recover"):
+        """Exhaust only an isolated child's real descriptor table, never this runner's."""
+        script = r"""
+import ctypes, json, os, resource, runpy, sys
+Alias = runpy.run_path(sys.argv[1])["Alias"]
+native = ctypes.CDLL(sys.argv[2], use_errno=True)
+native.ergopti_image_alias_create.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_char_p, ctypes.POINTER(Alias)]
+for name in ("retire", "close"):
+    getattr(native, "ergopti_image_alias_" + name).argtypes = [ctypes.POINTER(Alias)]
+root, slots, mode = sys.argv[3], int(sys.argv[4]), sys.argv[5]
+source = os.open(root + "/ollama", os.O_RDONLY | os.O_CLOEXEC)
+available = os.open(os.devnull, os.O_RDONLY | os.O_CLOEXEC)
+os.close(available)
+original = resource.getrlimit(resource.RLIMIT_NOFILE)
+alias = Alias()
+nonce = b"0123456789abcdef0123456789abcdef"
+facts = {}
+try:
+    resource.setrlimit(resource.RLIMIT_NOFILE, (available + slots, original[1]))
+    facts["primary"] = native.ergopti_image_alias_create(source, os.fsencode(root), nonce, ctypes.byref(alias))
+    facts["created"] = [bool(alias.lease_created), bool(alias.image_created)]
+    if mode == "pending":
+        facts["limited_retire"] = native.ergopti_image_alias_retire(ctypes.byref(alias))
+        facts["retained_lease"] = bool(alias.lease_created)
+finally:
+    resource.setrlimit(resource.RLIMIT_NOFILE, original)
+try:
+    facts["retire"] = native.ergopti_image_alias_retire(ctypes.byref(alias))
+    facts["repeat"] = native.ergopti_image_alias_retire(ctypes.byref(alias))
+    facts["remaining"] = sorted(name for name in os.listdir(root) if name.startswith(".ergopti-"))
+    facts["source"] = os.pread(source, 128, 0).decode()
+finally:
+    native.ergopti_image_alias_close(ctypes.byref(alias))
+    os.close(source)
+print(json.dumps(facts))
+"""
+        with TemporaryDirectory(prefix="native-pressure-", dir=self.root) as probe:
+            source = Path(probe) / "ollama"
+            shutil.copyfile(self.source, source)
+            source.chmod(0o755)
+            result = subprocess.run(
+                [sys.executable, "-c", script, __file__, str(self.binary), probe, str(slots), mode],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        return json.loads(result.stdout)
+
+    def test_native_descriptor_pressure_preserves_primary_creation_error(self):
+        for slots in (2, 3):
+            with self.subTest(slots=slots):
+                facts = self.pressure(slots)
+                self.assertEqual(facts["primary"], errno.EMFILE)
+
+    def test_native_descriptor_pressure_cleanup_recovers_after_capacity_returns(self):
+        for slots in (2, 3):
+            with self.subTest(slots=slots):
+                facts = self.pressure(slots)
+                self.assertNotEqual(facts["primary"], 0)
+                self.assertEqual(facts["created"], [False, False])
+                self.assertEqual(facts["retire"], 0)
+                self.assertEqual(facts["repeat"], 0)
+                self.assertEqual(facts["remaining"], [])
+                self.assertEqual(facts["source"], "independent original executable bytes")
+
+    def test_native_pressure_refusal_already_settles_without_namespace_debt(self):
+        facts = self.pressure(2, "pending")
+        self.assertEqual(facts["primary"], errno.EMFILE)
+        self.assertEqual(facts["limited_retire"], 0)
+        self.assertFalse(facts["retained_lease"])
+        self.assertEqual(facts["retire"], 0)
+        self.assertEqual(facts["repeat"], 0)
+        self.assertEqual(facts["remaining"], [])
+
+    def test_native_capacity_boundary_accepts_exact_required_slots(self):
+        facts = self.pressure(4)
+        self.assertEqual(facts["primary"], 0)
+        self.assertEqual(facts["created"], [True, True])
+        self.assertEqual(facts["retire"], 0)
+        self.assertEqual(facts["repeat"], 0)
+        self.assertEqual(facts["remaining"], [])
+
+    def test_native_precreation_pressure_has_no_namespace_debt(self):
+        facts = self.pressure(1)
+        self.assertEqual(facts["primary"], errno.EMFILE)
+        self.assertEqual(facts["retire"], 0)
+        self.assertEqual(facts["repeat"], 0)
+        self.assertEqual(facts["remaining"], [])
 
 
 if __name__ == "__main__":
