@@ -403,15 +403,28 @@ _HCA_SetterPersistsAndPublishes() {
 	}
 }
 
-; The loader reads a stored depth, falls back to the manifest default for an
-; absent leaf and for an outdated one.
+; The loader (infra/feature_state.ahk) is not part of the headless suite, so its
+; reader _FeatureStateCascadeDepth cannot be called here. Its rule is the engine's
+; HSE_ValidCascadeDepth, checked on the cases the reader must accept or fall back
+; from, while the source pins that the loader restates the same rule and reads the
+; depth leaf through the generated constants.
 _HCA_LoaderReadsTheDepth() {
-	AssertEqual(0, _FeatureStateCascadeDepth("_"), "an absent leaf reads the manifest default")
-	AssertEqual(3, _FeatureStateCascadeDepth(3), "a stored whole number is kept")
-	AssertEqual(0, _FeatureStateCascadeDepth(0), "0 stays 0")
-	AssertEqual(0, _FeatureStateCascadeDepth(-2), "a negative depth is outdated configuration")
-	AssertEqual(0, _FeatureStateCascadeDepth("deep"), "a string is outdated configuration")
-	AssertEqual(0, _FeatureStateCascadeDepth(1.5), "a fraction is outdated configuration")
+	global HSE_CascadeDepth
+	AssertTrue(HSE_ValidCascadeDepth(3), "a stored whole number is kept")
+	AssertTrue(HSE_ValidCascadeDepth(0), "0 stays 0")
+	AssertFalse(HSE_ValidCascadeDepth(-2), "a negative depth is outdated configuration")
+	AssertFalse(HSE_ValidCascadeDepth("deep"), "a string is outdated configuration")
+	AssertFalse(HSE_ValidCascadeDepth(1.5), "a fraction is outdated configuration")
+	Saved := HSE_CascadeDepth
+	try {
+		HSE_CascadeDepth := ""
+		AssertEqual(0, HSE_CascadeDepthCurrent(), "before the loader ran the engine reads the manifest default")
+	} finally HSE_CascadeDepth := Saved
+	Source := FileRead(A_ScriptDir . "\..\infra\feature_state.ahk", "UTF-8")
+	AssertTrue(InStr(Source, "_FeatureStateCascadeDepth(") > 0
+		&& InStr(Source, "ConfigLeaf.CASCADE_DEPTH") > 0
+		&& InStr(Source, "(Raw is Integer) and Raw >= 0") > 0,
+		"the loader reads the depth leaf and restates the engine's validity rule")
 }
 
 ; The Space tap-hold completes a trigger from its level-2 hotkey thread (see
