@@ -118,7 +118,13 @@ function M.with_world(options, scenario)
 							if not deadline or timer.due < deadline then index, deadline = i, timer.due end
 						end
 					end
-					if not index or deadline > until_time then return end
+					if not index or deadline > until_time then
+						-- An idle run loop still spends the requested native time interval.
+						w.now = until_time
+						f.options.absolute_time = math.floor(w.now * 1e9)
+						f.options.epoch = 1900000000 + w.now
+						return
+					end
 					local timer = table.remove(f.timers, index)
 					w.now = deadline
 					f.options.absolute_time = math.floor(w.now * 1e9)

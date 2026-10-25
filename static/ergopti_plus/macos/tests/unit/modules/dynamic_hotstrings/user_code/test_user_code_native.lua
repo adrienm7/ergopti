@@ -42,7 +42,12 @@ local function drain(hs_stub)
 			if timer.running and (timer.delay == 0 or publishing) then pending[#pending + 1] = timer end
 		end
 		if #pending == 0 then return end
-		for _, timer in ipairs(pending) do if timer.running then timer:fire() end end
+		local selected, deadline
+		for _, timer in ipairs(pending) do
+			local due = fixture.clock.next_deadline(timer)
+			if selected == nil or due < deadline then selected, deadline = timer, due end
+		end
+		selected:fire()
 	end
 	error("programmable callback fixture did not settle")
 end
@@ -71,6 +76,7 @@ local function with_native(body)
 		}, { __index = function() return function() end end })
 		package.loaded["tests.stubs.hs"] = nil
 		local native_stub = require("tests.stubs.hs")
+		fixture.clock = SyntheticStack.install_timer_clock(native_stub)
 		local application_port = {}
 		for key, value in pairs(native_stub.application) do application_port[key] = value end
 		application_port.get = function(pid) return pid == 9001 and fixture.app or nil end
@@ -92,7 +98,7 @@ local function with_native(body)
 		end
 		eventtap_port.event = event_port
 		local Keymap, Synthetic = SyntheticStack.load("modules.keymap", {
-			application = application_port, eventtap = eventtap_port })
+			application = application_port, eventtap = eventtap_port, timer = native_stub.timer })
 		fixture.outputs, fixture.deletes = {}, 0
 		local emit_text, emit_key = Synthetic.emit_key_strokes, Synthetic.emit_key_stroke
 		Synthetic.emit_key_strokes = function(text, ...)
@@ -287,6 +293,18 @@ helpers.describe("programmable native macOS hotstrings", function()
 				end
 			end
 		end
+		local restore_delay = require("infra.timings").sec("debounce", "clipboard_restore_ms")
+		local restore_timers = {}
+		for _, timer in ipairs(f.hs.timer.__timers) do
+			if timer.running and timer.delay == restore_delay then restore_timers[#restore_timers + 1] = timer end
+		end
+		helpers.assert_eq(#restore_timers, 1, "the exact handed-off paste must own its restoration timer")
+		helpers.assert_eq(f.hs.pasteboard.getContents(), f.result,
+			"finishing the native producer must not restore before its host interval")
+		local deadline = f.clock.next_deadline(restore_timers[1])
+		helpers.assert_true(deadline > f.clock.now(), "restoration still owns an unelapsed native deadline")
+		restore_timers[1]:fire()
+		helpers.assert_eq(f.clock.now(), deadline, "the restoration turn must spend its actual native interval")
 	end
 	for _, phase in ipairs({ "before mutation", "after original restoration" }) do
 		helpers.it("retains exact clipboard release refusal " .. phase, function()

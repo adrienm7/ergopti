@@ -76,6 +76,164 @@ helpers.describe("multi-paste follows actual FIFO handoff", function()
 		end)
 	end)
 
+	for _, terminal in ipairs({ "cancel", "fail" }) do
+		helpers.it("keeps dispatched clipboard data through " .. terminal .. " grace (multi-fifo-cancel-grace)", function()
+			Fixture.with_world({ terminal = true }, function(w)
+				local tx = w.start(A .. "{Enter}" .. B)
+				w.advance(0.30)
+				helpers.assert_eq(#w.pastes, 1)
+				helpers.assert_true(w.synthetic[terminal](tx, "unit clipboard handoff revoked"))
+				w.advance(0.31)
+				helpers.assert_eq(w.restores, 0,
+					"retirement must not replace a payload the receiving application can still read")
+				helpers.assert_eq(w.board["public.utf8-plain-text"], A)
+				w.advance(3)
+				helpers.assert_eq(#w.pastes, 1, "the waiting second segment must not escape retirement")
+				helpers.assert_eq(tx.completion_status, terminal == "cancel" and "cancelled" or "failed")
+				w.assert_retired()
+			end)
+		end)
+	end
+
+	helpers.it("adopts a handoff before reentrant terminal rollback (multi-fifo-inline-cancel-grace)", function()
+		Fixture.with_world({}, function(w)
+			local tx = w.synthetic.begin("unit.inline-paste-retirement", "action")
+			w.synthetic.retain(tx)
+			w.synthetic.seal(tx)
+			local retired = false
+			w.synthetic.on_dispatched(tx, function(_, _, status)
+				if status == "dispatched" then retired = w.synthetic.cancel(tx) end
+			end)
+			local emit = w.synthetic.emit_key_stroke
+			w.synthetic.emit_key_stroke = function(...)
+				local accepted, batch = emit(...)
+				w.advance(0.01)
+				return accepted, batch
+			end
+			w.synthetic.with_transaction(tx, function()
+				require("modules.keymap.utils").emit_text(A)
+			end)
+			helpers.assert_true(retired and tx.completed)
+			helpers.assert_eq(tx.completion_status, "cancelled")
+			helpers.assert_eq(#w.pastes, 1)
+			helpers.assert_eq(w.restores, 0,
+				"terminal delivery before the emitter receipt must preserve the dispatched payload")
+			helpers.assert_eq(w.board["public.utf8-plain-text"], A)
+			w.advance(3)
+			w.assert_retired()
+		end)
+	end)
+
+	helpers.it("preserves cancellation grace after restore timer refusal (multi-fifo-cancel-timer-grace)", function()
+		Fixture.with_world({ terminal = true }, function(w)
+			local tx = w.start(A .. "{Enter}" .. B)
+			w.advance(0.30)
+			helpers.assert_eq(#w.pastes, 1)
+			w.native.fail_next_timer_new = true
+			helpers.assert_true(w.synthetic.cancel(tx))
+			w.advance(0.31)
+			helpers.assert_eq(w.restores, 0)
+			helpers.assert_eq(w.board["public.utf8-plain-text"], A,
+				"a refused restoration timer must not shorten the dispatched paste interval")
+			helpers.assert_true(table.concat(w.native.logs, "\n"):find(
+				"Clipboard restore could not be armed after Cmd+V handoff", 1, true) ~= nil,
+				"the injected allocation refusal must reach the restore timer")
+			w.advance(3)
+			w.assert_retired()
+		end)
+	end)
+
+	helpers.it("bounds persistent restore refusals until a later retry (multi-fifo-persistent-timer-grace)", function()
+		Fixture.with_world({ terminal = true }, function(w)
+			local tx = w.start(A .. "{Enter}" .. B)
+			w.advance(0.30)
+			helpers.assert_eq(#w.pastes, 1)
+			local native_new = hs.timer.new
+			local restore_delay = require("infra.timings").sec("debounce", "clipboard_restore_ms")
+			local attempts, refusing = 0, true
+			hs.timer.new = function(delay, ...)
+				if refusing and delay == restore_delay then
+					attempts = attempts + 1
+					-- Bound the broken implementation too: it burns this entire budget
+					-- in one lifecycle drain instead of retaining honest cleanup debt.
+					if attempts <= 8 then return nil end
+				end
+				return native_new(delay, ...)
+			end
+			helpers.assert_true(w.synthetic.cancel(tx))
+			w.advance(0.31)
+			helpers.assert_eq(w.restores, 0)
+			helpers.assert_eq(w.board["public.utf8-plain-text"], A)
+			helpers.assert_true(attempts > 0 and attempts <= 2,
+				"a pending host interval must not spin in immediate recovery: " .. tostring(attempts))
+			w.advance(3)
+			helpers.assert_true(w.synthetic.stats().active_transactions > 0,
+				"unarmed restoration must retain its exact original snapshot and drain debt")
+			refusing = false
+			w.standalone(B)
+			w.advance(6)
+			helpers.assert_eq(#w.pastes, 2)
+			helpers.assert_eq(w.pastes[2].value, B)
+			helpers.assert_eq(w.restores, 2,
+				"the later producer must settle the retained original before its own fresh borrow")
+			helpers.assert_true(helpers.deep_equal(w.board, w.original))
+			helpers.assert_eq(w.synthetic.stats().active_transactions, 0)
+			helpers.assert_eq(w.synthetic.stats().pending, 0)
+			helpers.assert_eq(require("adapters.timer_scheduler").activeCount(), 0)
+		end)
+	end)
+
+	for _, refuse_timer in ipairs({ false, true }) do
+		helpers.it("retains reentrant cancellation recovery before a successor, timer refusal="
+			.. tostring(refuse_timer) .. " (multi-fifo-inline-recovery-grace)", function()
+			Fixture.with_world({}, function(w)
+				local tx = w.synthetic.begin("unit.inline-paste-recovery", "action")
+				w.synthetic.retain(tx)
+				w.synthetic.seal(tx)
+				w.synthetic.on_dispatched(tx, function(_, _, status)
+					if status == "dispatched" then helpers.assert_true(w.synthetic.cancel(tx)) end
+				end)
+				local native_new = hs.timer.new
+				local restore_delay = require("infra.timings").sec("debounce", "clipboard_restore_ms")
+				local refusing, attempts = refuse_timer, 0
+				hs.timer.new = function(delay, ...)
+					if refusing and delay == restore_delay then
+						attempts = attempts + 1
+						if attempts <= 8 then return nil end
+					end
+					return native_new(delay, ...)
+				end
+				local emit = w.synthetic.emit_key_stroke
+				w.synthetic.emit_key_stroke = function(...)
+					local accepted, batch = emit(...)
+					w.advance(0.01)
+					return accepted, batch
+				end
+				w.synthetic.with_transaction(tx, function()
+					require("modules.keymap.utils").emit_text(A)
+				end)
+				helpers.assert_true(tx.completed and tx.completion_status == "cancelled")
+				local successor_ok = pcall(w.standalone, B)
+				helpers.assert_true(not successor_ok,
+					"a reentrant terminal's retained recovery must refuse a successor during host grace")
+				helpers.assert_eq(#w.writes, 1)
+				helpers.assert_eq(#w.pastes, 1)
+				helpers.assert_eq(w.board["public.utf8-plain-text"], A)
+				w.advance(3)
+				refusing = false
+				w.synthetic.emit_key_stroke = emit
+				w.standalone(B)
+				w.advance(6)
+				helpers.assert_eq(#w.pastes, 2)
+				helpers.assert_eq(w.pastes[2].value, B)
+				helpers.assert_eq(w.restores, 2)
+				helpers.assert_true(helpers.deep_equal(w.board, w.original))
+				helpers.assert_eq(w.synthetic.stats().active_transactions, 0)
+				helpers.assert_eq(require("adapters.timer_scheduler").activeCount(), 0)
+			end)
+		end)
+	end
+
 	helpers.it("preserves committed Terminal output when cancellation is refused (multi-fifo-cancel-refused)", function()
 		Fixture.with_world({ terminal = true }, function(w)
 			local tx = w.start(A .. "{Enter}" .. B)

@@ -42,6 +42,8 @@ function M.run(options)
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
+	local elapsed = 0
+	hs_stub.timer.absoluteTime = function() return math.floor(elapsed * 1e9) end
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 
@@ -307,6 +309,8 @@ function M.run(options)
 			end
 		end
 		if selected == nil then return nil end
+		-- A fired native timer spends its interval even when the test uses no CPU.
+		elapsed = elapsed + selected.delay
 		selected:fire()
 		return selected.delay
 	end

@@ -350,6 +350,13 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 
 		fixture.synthetic.enter_callback()
 		local transaction = fixture.synthetic.begin("test.timer_refusal", "replacement")
+		local payload_before_host_grace
+		fixture.synthetic.on_complete(transaction, function()
+			payload_before_host_grace = current
+			-- Exercise the independent fallback after the host has actually settled.
+			fixture.hs.timer.__elapsed = fixture.hs.timer.__elapsed
+				+ require("infra.timings").sec("debounce", "clipboard_restore_ms")
+		end)
 		local ok = pcall(function()
 			fixture.synthetic.with_transaction(transaction, function()
 				fixture.utils.emit_text(("T"):rep(60))
@@ -365,6 +372,8 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		helpers.assert_eq(current, ("T"):rep(60),
 			"the payload must remain available until Cmd+V is handed off")
 		settle_callback_transaction(fixture.hs)
+		helpers.assert_eq(payload_before_host_grace, ("T"):rep(60),
+			"native handoff alone must not authorize early clipboard restoration")
 		for _ = 1, 4 do
 			if current == original then break end
 			fire_existing_delay(fixture.hs, 0)
@@ -410,6 +419,12 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 
 		fixture.synthetic.enter_callback()
 		local transaction = fixture.synthetic.begin("test.sync_restore", "replacement")
+		local payload_before_host_grace
+		fixture.synthetic.on_complete(transaction, function()
+			payload_before_host_grace = current
+			fixture.hs.timer.__elapsed = fixture.hs.timer.__elapsed
+				+ require("infra.timings").sec("debounce", "clipboard_restore_ms")
+		end)
 		local ok = pcall(function()
 			fixture.synthetic.with_transaction(transaction, function()
 				fixture.utils.emit_text(("S"):rep(60))
@@ -423,6 +438,8 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		helpers.assert_true(consume)
 		helpers.assert_eq(#events, 2)
 		settle_callback_transaction(fixture.hs)
+		helpers.assert_eq(payload_before_host_grace, ("S"):rep(60),
+			"the synchronous-dispatcher control starts with the handed-off payload intact")
 		helpers.assert_eq(timer_calls, 2,
 			"one post-handoff arm and one bounded retry are allowed; recursion is not")
 		helpers.assert_eq(defer_calls, 1,

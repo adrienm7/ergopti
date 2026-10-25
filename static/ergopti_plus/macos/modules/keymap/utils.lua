@@ -108,6 +108,7 @@ local _publication_clipboards = setmetatable({}, { __mode = "k" })
 local _paste_publication_lease = nil
 local _paste_recovery_only = false
 local _paste_generation = 0
+local _paste_restore_after = nil
 -- A sealed retained synthetic transaction makes clipboard restoration part of
 -- the same process-wide drain used by pause/reload/quit. It owns no Quartz
 -- events; its sole terminal condition is restoration of the exact all-type
@@ -229,6 +230,7 @@ local function release_paste_ownership()
 	_paste_owns_clipboard = false
 	_paste_builtin_count = nil
 	_paste_recovery_only = false
+	_paste_restore_after = nil
 	_paste_generation = _paste_generation + 1
 	release_paste_debt()
 	if lease then clear_settled_publication_lease(lease) end
@@ -270,6 +272,9 @@ end
 --- @return any error_detail
 local function restore_owned_clipboard()
 	if not _paste_owns_clipboard then return true, nil end
+	if _paste_restore_after ~= nil and TimerScheduler.awake_time() < _paste_restore_after then
+		return false, "native paste is still settling"
+	end
 	local lease = _paste_publication_lease
 	if lease and (lease.count == nil or clipboard_change_count() ~= lease.count) then
 		return false, "guarded clipboard ownership changed"
@@ -355,7 +360,10 @@ queue_paste_restore_retry = function(reason)
 	if not _paste_owns_clipboard then return true end
 	local scheduled, timer_error = schedule_paste_restore(CLIPBOARD_RESTORE_SEC)
 	if scheduled then return true end
-	if type(SyntheticInput.defer_after_callback) == "function" then
+	-- Immediate lifecycle work cannot replace an unelapsed native host interval.
+	-- Retain the exact snapshot for a later retry instead of spinning in its drain.
+	local settling = _paste_restore_after ~= nil and TimerScheduler.awake_time() < _paste_restore_after
+	if not settling and type(SyntheticInput.defer_after_callback) == "function" then
 		local generation = _paste_generation
 		local callback_ran = false
 		local installing = true
@@ -403,6 +411,7 @@ end
 --- @param handoff table|nil Receives the exact paste batch handoff and settle deadline.
 --- @return boolean True only after the payload and Cmd+V were both accepted.
 local function perform_paste(value, handoff)
+	handoff = handoff or {}
 	local transaction = SyntheticInput.current_transaction()
 	if _paste_publication_lease and _paste_publication_lease.producer ~= transaction then
 		Logger.error(LOG, "Clipboard paste refused while another programmable producer retains ownership.")
@@ -547,30 +556,35 @@ local function perform_paste(value, handoff)
 
 	local ownership_generation = _paste_generation
 	local restore_armed = false
+	local receipt_pending = true
+	local terminal_status = nil
+	local function settle_paste(status)
+		if ownership_generation ~= _paste_generation or not _paste_owns_clipboard then return end
+		-- Native delivery can reenter lifecycle callbacks before emission returns
+		-- its exact batch. Adopt that receipt before deciding whether rollback is safe.
+		if receipt_pending then terminal_status = status; return end
+		if status ~= "complete" then _paste_recovery_only = true end
+		if status ~= "complete" and handoff.status ~= "dispatched" then
+			local restored, restore_error = restore_owned_clipboard()
+			if not restored then queue_paste_restore_retry("cancelled paste transaction") end
+			if not restored then
+				Logger.error(LOG, "Clipboard rollback after %s transaction failed: %s.",
+					tostring(status), tostring(restore_error))
+			end
+			return
+		end
+		local scheduled, timer_error = schedule_paste_restore(CLIPBOARD_RESTORE_SEC)
+		if not scheduled then
+			_paste_recovery_only = true
+			queue_paste_restore_retry("post-handoff restore timer refusal")
+			Logger.error(LOG, "Clipboard restore could not be armed after Cmd+V handoff: %s.",
+				tostring(timer_error))
+		end
+	end
 	if transaction then
-		-- Cmd+V may sit behind many Terminal delete turns. Starting a wall-clock
-		-- restore now lets 8 × 20 ms restore the old clipboard before Cmd+V posts.
-		-- Completion is the exact handoff boundary for both callback and paced FIFO.
+		-- Completion also preserves host grace when cancellation follows Cmd+V.
 		local registered, registration_error = pcall(SyntheticInput.on_complete,
-			transaction, function(_transaction, status)
-				if ownership_generation ~= _paste_generation or not _paste_owns_clipboard then return end
-				if status ~= "complete" then
-					local restored, restore_error = restore_owned_clipboard()
-					if not restored then queue_paste_restore_retry("cancelled paste transaction") end
-					if not restored then
-						Logger.error(LOG, "Clipboard rollback after %s transaction failed: %s.",
-							tostring(status), tostring(restore_error))
-					end
-					return
-				end
-				local scheduled, timer_error = schedule_paste_restore(CLIPBOARD_RESTORE_SEC)
-				if not scheduled then
-					_paste_recovery_only = true
-					queue_paste_restore_retry("post-handoff restore timer refusal")
-					Logger.error(LOG, "Clipboard restore could not be armed after Cmd+V handoff: %s.",
-						tostring(timer_error))
-				end
-			end)
+			transaction, function(_, status) settle_paste(status) end)
 		if not registered then
 			local restored, restore_error = restore_owned_clipboard()
 			if not restored then queue_paste_restore_retry("completion registration refusal") end
@@ -598,16 +612,21 @@ local function perform_paste(value, handoff)
 	-- delivered before the emitter returns. Admission alone is not a paste.
 	local observed = {}
 	local function record_handoff(batch, status)
+		if ownership_generation ~= _paste_generation then return end
 		if handoff.batch ~= nil and handoff.batch ~= batch then return end
-		local result = { status = status,
-			ready_at = TimerScheduler.awake_time() + CLIPBOARD_PASTE_GAP_SEC }
+		local now = TimerScheduler.awake_time()
+		local result = { status = status, ready_at = now + CLIPBOARD_PASTE_GAP_SEC,
+			restore_after = now + CLIPBOARD_PASTE_GAP_SEC }
 		if handoff.batch == batch then
 			handoff.status, handoff.ready_at = result.status, result.ready_at
+			if status == "dispatched" then
+				_paste_restore_after = result.restore_after
+			end
 		else
 			observed[batch] = result
 		end
 	end
-	if handoff and transaction then
+	if transaction then
 		local registered, registration_error = pcall(SyntheticInput.on_dispatched,
 			transaction, function(_, batch, status) record_handoff(batch, status) end)
 		if not registered then
@@ -621,16 +640,27 @@ local function perform_paste(value, handoff)
 	local ok_emit, emitted_or_error, batch = pcall(function()
 		return SyntheticInput.emit_key_stroke({ "cmd" }, "v", 0)
 	end)
-	if handoff and transaction and ok_emit and emitted_or_error == true then
+	if transaction and ok_emit and emitted_or_error == true then
 		if type(batch) ~= "table" then
 			ok_emit, emitted_or_error = false, "clipboard paste emitter returned no batch receipt"
 		else
 			handoff.batch = batch
 			local result = observed[batch]
-			if result then handoff.status, handoff.ready_at = result.status, result.ready_at end
+			if result and ownership_generation == _paste_generation and _paste_owns_clipboard then
+				handoff.status, handoff.ready_at = result.status, result.ready_at
+				if result.status == "dispatched" then
+					_paste_restore_after = result.restore_after
+				end
+			end
 		end
 
 	end
+	if ok_emit and emitted_or_error == true and ownership_generation == _paste_generation then
+		-- A reentrant terminal callback owns any recovery posture it publishes.
+		_paste_recovery_only = false
+	end
+	receipt_pending = false
+	if terminal_status ~= nil then settle_paste(terminal_status) end
 	if not ok_emit or emitted_or_error ~= true then
 		if restore_armed then stop_paste_restore_timer() end
 		local restored, restore_error = restore_owned_clipboard()
@@ -639,7 +669,6 @@ local function perform_paste(value, handoff)
 			tostring(emitted_or_error), tostring(restore_error))
 		return false
 	end
-	_paste_recovery_only = false
 	return true
 end
 
