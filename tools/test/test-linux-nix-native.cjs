@@ -12,7 +12,8 @@ const {
 	lockReceipt,
 	outputReceipt,
 	helpReceipt,
-	SUMMARY
+	SUMMARY,
+	nativeExecutableHash
 } = require('./run-linux-nix-native.cjs');
 const root = path.resolve(__dirname, '../..');
 const head = '0123456789abcdef0123456789abcdef01234567';
@@ -22,6 +23,129 @@ function check(name, run) {
 	run();
 	checks++;
 }
+check('large genuine ELF does not inherit the source input budget (nix-large-elf)', () => {
+	const executable = fs.realpathSync(process.execPath);
+	assert.ok(
+		fs.statSync(executable).size > 8 * 1024 * 1024,
+		'pinned Node must reproduce the large ELF boundary'
+	);
+	const expected = require('node:crypto')
+		.createHash('sha256')
+		.update(fs.readFileSync(executable))
+		.digest('hex');
+	assert.equal(nativeExecutableHash(executable), expected);
+});
+/** Model read races on real owned files, retaining actual descriptor cleanup. */
+function executableControl(mode) {
+	const directory = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'ergopti-nix-elf-'));
+	const file = path.join(directory, 'image'),
+		previous = path.join(directory, 'previous');
+	const content = Buffer.concat([Buffer.from([127, 69, 76, 70]), Buffer.alloc(131072, 42)]);
+	fs.writeFileSync(file, content);
+	const original = Object.fromEntries(
+		['openSync', 'readSync', 'fstatSync', 'closeSync'].map((name) => [name, fs[name]])
+	);
+	let owned,
+		reads = 0,
+		closes = 0,
+		stats = 0;
+	fs.openSync = (...args) => {
+		if (mode === 'open-error') throw new Error('controlled open refusal');
+		owned = original.openSync(...args);
+		return owned;
+	};
+	fs.readSync = (fd, buffer, offset, length, position) => {
+		assert.equal(fd, owned);
+		assert.ok(length <= 64 * 1024, 'native hashing must use bounded chunks');
+		reads++;
+		if (mode === 'read-error') throw new Error('controlled read refusal');
+		if (mode === 'premature-eof') return 0;
+		const count = original.readSync(
+			fd,
+			buffer,
+			offset,
+			mode === 'partial' ? Math.min(length, 3) : length,
+			position
+		);
+		if (reads === 1 && mode === 'truncate') fs.writeFileSync(file, content.subarray(0, 16));
+		if (reads === 1 && mode === 'mutation') {
+			const changed = Buffer.from(content);
+			changed[changed.length - 1] = 43;
+			fs.writeFileSync(file, changed);
+		}
+		if (reads === 1 && (mode === 'replacement' || mode === 'symlink-race')) {
+			fs.renameSync(file, previous);
+			if (mode === 'replacement') fs.writeFileSync(file, content);
+			else fs.symlinkSync(previous, file);
+		}
+		return count;
+	};
+	fs.fstatSync = (...args) => {
+		stats++;
+		if (mode === 'stat-error' && stats === 2) throw new Error('controlled stat refusal');
+		return original.fstatSync(...args);
+	};
+	fs.closeSync = (fd) => {
+		assert.equal(fd, owned);
+		closes++;
+		original.closeSync(fd);
+		if (mode === 'close-error') throw new Error('controlled close refusal');
+	};
+	try {
+		if (mode === 'symlink') {
+			fs.renameSync(file, previous);
+			fs.symlinkSync(previous, file);
+		}
+		if (mode === 'not-elf') fs.writeFileSync(file, 'ordinary text');
+		if (mode === 'partial') {
+			const expected = require('node:crypto').createHash('sha256').update(content).digest('hex');
+			assert.equal(nativeExecutableHash(file), expected);
+			assert.ok(reads > 2, 'positive short reads must finish the entire image');
+		} else assert.throws(() => nativeExecutableHash(file));
+		assert.equal(
+			closes,
+			owned === undefined ? 0 : 1,
+			'every admitted descriptor must close exactly once'
+		);
+		if (owned !== undefined) assert.throws(() => original.fstatSync(owned), { code: 'EBADF' });
+	} finally {
+		Object.assign(fs, original);
+		fs.rmSync(directory, { recursive: true });
+	}
+}
+for (const mode of [
+	'partial',
+	'premature-eof',
+	'read-error',
+	'open-error',
+	'stat-error',
+	'close-error',
+	'mutation',
+	'truncate',
+	'replacement',
+	'symlink',
+	'symlink-race',
+	'not-elf'
+]) {
+	check('pinned ELF read and cleanup: ' + mode, () => executableControl(mode));
+}
+check('native hashing leaves bounded source inputs unchanged', () => {
+	const directory = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'ergopti-nix-source-'));
+	const file = path.join(directory, 'oversized-source');
+	const descriptor = fs.openSync(file, 'wx');
+	try {
+		fs.ftruncateSync(descriptor, 8 * 1024 * 1024 + 1);
+	} finally {
+		fs.closeSync(descriptor);
+	}
+	try {
+		assert.throws(() =>
+			cleanEnvironment({ SSL_CERT_FILE: file }, '/owned/home', '/owned/config', '/owned/tmp')
+		);
+	} finally {
+		fs.rmSync(directory, { recursive: true });
+	}
+});
 check('exact actual source-bound native receipt', () => assert.equal(receipt(passed, head), true));
 for (const [name, text, sha] of [
 	['missing summary', `Nix native source: ${head}\n`, head],
