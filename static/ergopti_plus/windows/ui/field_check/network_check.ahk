@@ -114,16 +114,14 @@ NetworkCheck_ProxyKinds(Config, EnvFn := EnvGet) {
 
 /**
  * Whether the bytes are strictly valid UTF-8 (no overlong form, no surrogate).
- * @param {Buffer} Bytes
+ * @param {Buffer|Integer} Bytes - A buffer or the address of the span.
  * @param {Integer} Size
  * @returns {boolean}
  */
 _NetworkCheck_IsStrictUtf8(Bytes, Size) {
 	if Size == 0
 		return true
-	; MB_ERR_INVALID_CHARS makes the conversion fail on any invalid sequence
-	return DllCall("Kernel32\MultiByteToWideChar", "UInt", 65001, "UInt", 0x8, "Ptr", Bytes, "Int", Size,
-		"Ptr", 0, "Int", 0, "Int") > 0
+	return HTTPIsValidUtf8(Bytes, Size)
 }
 
 /**
@@ -141,11 +139,11 @@ NetworkCheck_JudgePac(Status, Bytes) {
 	if (First == 0xFF && Second == 0xFE) || (First == 0xFE && Second == 0xFF)
 		return "ok"
 	Offset := (Bytes.Size >= 3 && First == 0xEF && Second == 0xBB && NumGet(Bytes, 2, "UChar") == 0xBF) ? 3 : 0
-	Body := Buffer(Bytes.Size - Offset)
-	DllCall("RtlMoveMemory", "Ptr", Body, "Ptr", Bytes.Ptr + Offset, "UPtr", Body.Size)
-	if !_NetworkCheck_IsStrictUtf8(Body, Body.Size)
+	BodyPtr := Bytes.Ptr + Offset
+	BodySize := Bytes.Size - Offset
+	if !_NetworkCheck_IsStrictUtf8(BodyPtr, BodySize)
 		return "error"
-	return InStr(StrGet(Body, Body.Size, "UTF-8"), "FindProxyForURL") ? "ok" : "error"
+	return InStr(StrGet(BodyPtr, BodySize, "UTF-8"), "FindProxyForURL") ? "ok" : "error"
 }
 
 /**
@@ -342,7 +340,7 @@ _NetworkCheck_FetchPac(Url, Callback) {
 	global NETWORK_CHECK_PAC_TIMEOUT_MS, NETWORK_CHECK_POLL_MS, NETWORK_CHECK_PAC_MAX_BYTES
 	Whr := ""
 	try {
-		Whr := ComObject("WinHttp.WinHttpRequest.5.1")
+		Whr := HTTPCreateWinHttpRequest()
 		Whr.SetTimeouts(5000, 5000, NETWORK_CHECK_PAC_TIMEOUT_MS, NETWORK_CHECK_PAC_TIMEOUT_MS)
 		Whr.Open("GET", Url, true)
 		Whr.Send()
