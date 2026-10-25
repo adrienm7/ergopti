@@ -254,27 +254,24 @@ _HS_PreviewBubbleRows(Toggle := ToggleHotstringsPreviewSwitch) {
 	return Rows is Array ? Rows : []
 }
 
-; Label for the "default expansion delay" item: "Default : <ms>[ (default)]". The
-; "(default)" marker shows when no global override is set — the effective value
-; is then the built-in GLOBAL_DEFAULT_DELAY fallback.
+; Label for the "default expansion delay" item: "Default : <ms>[ (default)]". It
+; shows the base expansion delay (hotstrings.expansion_delay); the "(default)"
+; marker shows while that is still the shared default.
 _HS_DefaultDelayLabel(CaptionKey := "menu.hotstrings.tooltip_default") {
-	global _HotstringsOverrides, GLOBAL_DEFAULT_DELAY
-	HasGlobal := _HotstringsOverrides.Has("_global") and _HotstringsOverrides["_global"].Delay != ""
-	Seconds   := HasGlobal ? _HotstringsOverrides["_global"].Delay : GLOBAL_DEFAULT_DELAY
+	global GLOBAL_DEFAULT_DELAY
+	Seconds   := HotstringsBaseDelay()
 	Ms        := Round(Seconds * 1000)
 	Display   := (Ms == 0) ? t("menu.hotstrings.infinite") : (Ms . " ms")
 	; menu.settings.default_indicator already carries a leading space.
-	return t(CaptionKey) . " : " . Display . (HasGlobal ? "" : t("menu.settings.default_indicator"))
+	return t(CaptionKey) . " : " . Display . (Seconds == GLOBAL_DEFAULT_DELAY ? t("menu.settings.default_indicator") : "")
 }
 
-; Prompt for and persist the global default expansion delay (entered in ms),
-; mirroring the Hammerspoon make_delay_item prompt. Reuses HotstringsSetOverride
-; with the reserved "_global" key, which HotstringsResolve consults as the
-; lowest-priority user value, just above the hardcoded GLOBAL_DEFAULT_DELAY.
+; Prompt for and persist the base expansion delay (entered in ms), mirroring the
+; Hammerspoon make_delay_item prompt. It is the hotstrings.expansion_delay leaf of
+; config.toml, which every category and section without a delay of its own
+; waits, and which the delay overrides are offsets of.
 _HS_PromptDefaultDelay() {
-	global _HotstringsOverrides, GLOBAL_DEFAULT_DELAY
-	HasGlobal := _HotstringsOverrides.Has("_global") and _HotstringsOverrides["_global"].Delay != ""
-	CurMs     := Round((HasGlobal ? _HotstringsOverrides["_global"].Delay : GLOBAL_DEFAULT_DELAY) * 1000)
+	CurMs     := Round(HotstringsBaseDelay() * 1000)
 	IB := Ui_InputBox(t("menu.hotstrings.delay_prompt"), t("menu.hotstrings.tooltip_default"), "w340 h140", CurMs)
 	if (IB.Result != "OK") {
 		return
@@ -284,7 +281,7 @@ _HS_PromptDefaultDelay() {
 		Ui_MsgBox(t("menu.hotstrings.delay_invalid_body"), t("menu.hotstrings.delay_invalid_title"))
 		return
 	}
-	return _HS_CommitDelayOverride("_global", (Val + 0) / 1000)
+	return _HS_CommitBaseDelay((Val + 0) / 1000)
 }
 
 ; Label for a per-category default-delay item ("<name> : <ms>[ (default)]").
@@ -322,6 +319,29 @@ _HS_PromptCategoryDelay(Cat, I18nKey, DefaultSec := "") {
 	return _HS_CommitDelayOverride(Cat, (Val + 0) / 1000)
 }
 
+; Persist the base expansion delay, then re-register the hotstrings live: their
+; delays are baked into specs at registration. Same ordering and seams as
+; _HS_CommitDelayOverride.
+_HS_CommitBaseDelay(Value, SetterFn := 0, RebuildFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _HS_CommitBaseDelay(Value, SetterFn, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	try Committed := HasMethod(SetterFn, "Call")
+		? SetterFn.Call(Value)
+		: HotstringsSetBaseDelay(Value)
+	catch as Err {
+		try LoggerError("HotstringsMenu",
+			"Failed to persist the base expansion delay: {1}.", Err.Message)
+		return false
+	}
+	if !(Committed is Integer) || Committed != 1
+		return false
+	return _HS_RebuildAfterDelayChange("the base expansion delay", RebuildFn)
+}
+
 ; Persist first and rebuild only after a strict successful result. The injected
 ; seams keep the menu's failure ordering behaviour-testable without opening an
 ; InputBox or registering real hotstrings.
@@ -347,6 +367,13 @@ _HS_CommitDelayOverride(Cat, Value, SetterFn := 0, RebuildFn := 0) {
 
 	; Delays are baked into specs at registration time, so the durable value must
 	; be re-registered live. A refused writer must never rebuild from stale RAM.
+	return _HS_RebuildAfterDelayChange("the '" . Cat . "' delay override", RebuildFn)
+}
+
+; Re-registers the hotstrings after a persisted delay change.
+; @param {String} What Names the change in the log.
+; @param RebuildFn Optional seam standing for RebuildHotstringsLive.
+_HS_RebuildAfterDelayChange(What, RebuildFn := 0) {
 	try {
 		if HasMethod(RebuildFn, "Call")
 			Rebuilt := RebuildFn.Call()
@@ -354,14 +381,14 @@ _HS_CommitDelayOverride(Cat, Value, SetterFn := 0, RebuildFn := 0) {
 			Rebuilt := RebuildHotstringsLive()
 	} catch as Err {
 		try LoggerError("HotstringsMenu",
-			"Delay override for '{1}' was persisted but live rebuild failed: {2}.",
-			Cat, Err.Message)
+			"Delay change of {1} was persisted but live rebuild failed: {2}.",
+			What, Err.Message)
 		return false
 	}
 	if !(Rebuilt is Integer) || Rebuilt != 1 {
 		try LoggerError("HotstringsMenu",
-			"Delay override for '{1}' was persisted but live rebuild was refused.",
-			Cat)
+			"Delay change of {1} was persisted but live rebuild was refused.",
+			What)
 		return false
 	}
 	return true

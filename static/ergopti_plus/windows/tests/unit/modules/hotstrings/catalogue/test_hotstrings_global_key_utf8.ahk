@@ -33,7 +33,7 @@ _HGKU_Case(Mode) {
 				. 'word_delimiters = "§😀#\"\\\t" # ignored comment "quote"' . "`r`n"
 				. 'consumed_delimiters = "§😀" # ignored comment' . "`r`n"
 				. '[rolls] # ordinary sibling' . "`r`n"
-				. 'delay = 0.2' . "`r`n" . 'color = "#112233"' . "`r`n"
+				. 'delay_offset = -0.55' . "`r`n" . 'color = "#112233"' . "`r`n"
 			if Mode == "bom"
 				Source := Chr(0xFEFF) . Source
 			AssertTrue(FSWriteCreateDurable(Path, Source) == 1,
@@ -49,7 +49,7 @@ _HGKU_Case(Mode) {
 			"both global delimiter keys must use the file's UTF-8 contract")
 		AssertEqual("", _ParseGlobalKey(Path, "missing_key"), "absent keys retain their existing sentinel")
 		Sibling := _ParseOverrides(Path)
-		AssertEqual(0.2, Sibling["rolls"].Delay, "the explicit UTF-8 sibling reader remains consistent")
+		AssertEqual(-0.55, Sibling["rolls"].PendingOffset, "the explicit UTF-8 sibling reader remains consistent")
 		AssertEqual("#112233", Sibling["rolls"].Color)
 		AssertEqual(Ambient, A_FileEncoding, "reading the file must not change the ambient thread encoding")
 		After := FSReadBytesStrict(Path)

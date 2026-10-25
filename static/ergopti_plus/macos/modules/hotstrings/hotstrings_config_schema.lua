@@ -73,6 +73,16 @@ function M.is_delay(value)
 		and value < math.huge
 end
 
+--- Validates the stored offset of a delay override: the signed seconds it adds
+--- to the base expansion delay.
+--- @param value any Candidate offset in seconds.
+--- @return boolean valid
+function M.is_delay_offset(value)
+	return type(value) == "number"
+		and value == value
+		and math.abs(value) < math.huge
+end
+
 --- Encodes a string as one TOML basic-string literal.
 --- @param value any Candidate string.
 --- @return string|nil encoded

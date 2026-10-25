@@ -47,6 +47,7 @@ local Logger = require("logger.shim")
 
 local LOG = "infra.hotstrings_scope"
 local REPEAT_PATH = "hotstrings.repeat_key_enabled"
+local BASE_DELAY_PATH = "hotstrings.expansion_delay"
 local _owner, _sequence = nil, 0
 
 --- Whether a category or section identity can be named by a canonical path.
@@ -118,13 +119,17 @@ function M.new(options)
 				personal = personal }
 		end
 		table.sort(groups, function(left, right) return left.id < right.id end)
+		-- The base expansion delay is one of the scope's own preferences: after it the
+		-- base is the recommended value (restore) or the default (clear), and the
+		-- delays below are offsets of THAT base, whatever the user's is today.
+		local base_after = mode == "recommended" and Manifest.recommended_for(BASE_DELAY_PATH)
+			or Manifest.default_for(BASE_DELAY_PATH)
 		local changes = Planner.plan({ mode = mode, features = Manifest.features(), groups = groups,
-			inherited = Config.inherited_delay,
-			extra = { { override = { "_global" }, fields = { "delay" } },
-				{ override = { "dynamichotstrings" }, fields = Planner.FIELDS } } })
+			inherited = function(group, section) return Config.inherited_delay(group, section, base_after) end,
+			extra = { { override = { "dynamichotstrings" }, fields = Planner.FIELDS } } })
 		secondary = ScopeFile.new({ path = Config.override_path(),
 			backup_path = Config.override_path() .. options.backup_suffix, remove = remove })
-		return secondary.prepare(Planner.writer_rows(changes))
+		return secondary.prepare(Planner.writer_rows(changes, base_after))
 	end
 
 	local function capture()

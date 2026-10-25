@@ -319,7 +319,7 @@ helpers.describe("wizard genuine canonical admitted native Finish with private p
 			local content, status = f.files.read_with_status(f.path)
 			helpers.assert_eq(status, "ok")
 			local decoded = require("toml_codec").decode(content)
-			helpers.assert_eq(decoded._meta.schema_version, 12)
+			helpers.assert_eq(decoded._meta.schema_version, 13)
 			helpers.assert_eq(decoded.llm.enabled, true)
 			helpers.assert_eq(decoded.hotstrings.trigger_char, "ù")
 			helpers.assert_eq(decoded.future.keep, "owned by another feature")

@@ -51,6 +51,31 @@ end
 
 local corpus, corpus_error = read_corpus()
 
+-- The override file stores a delay as an offset of the base expansion delay, and
+-- the test seam takes that stored form. The corpus states effective seconds, so
+-- they are turned into offsets of the shared default base (0.75 s) here.
+local DEFAULT_BASE = 0.75
+
+--- Copies one corpus override record into the stored form.
+--- @param source table Corpus record with effective seconds.
+--- @param fields table Field names to copy.
+--- @param into table Destination record.
+local function store_fields(source, fields, into)
+	for _, field in ipairs(fields) do
+		if source[field] ~= nil then
+			if field == "delay" then
+				if source.delay == 0 then
+					into.delay_unlimited = true
+				else
+					into.delay_offset = math.floor((source.delay - DEFAULT_BASE) * 1000 + 0.5) / 1000
+				end
+			else
+				into[field] = source[field]
+			end
+		end
+	end
+end
+
 
 --- Loads a fresh config module positioned on one vector.
 ---
@@ -90,18 +115,12 @@ local function module_for(vector)
 	local overrides = {}
 	if vector.user_category or vector.user_section then
 		local entry = { sections = {} }
-		for _, field in ipairs({ "delay", "color", "show_tooltip", "priority" }) do
-			if vector.user_category and vector.user_category[field] ~= nil then
-				entry[field] = vector.user_category[field]
-			end
+		if vector.user_category then
+			store_fields(vector.user_category, { "delay", "color", "show_tooltip", "priority" }, entry)
 		end
 		if vector.section and vector.user_section then
 			local section_entry = {}
-			for _, field in ipairs({ "delay", "color", "show_tooltip", "priority" }) do
-				if vector.user_section[field] ~= nil then
-					section_entry[field] = vector.user_section[field]
-				end
-			end
+			store_fields(vector.user_section, { "delay", "color", "show_tooltip", "priority" }, section_entry)
 			entry.sections[vector.section] = section_entry
 		end
 		overrides[vector.category] = entry

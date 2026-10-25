@@ -456,8 +456,8 @@ helpers.describe("hotstrings_config", function()
       local dir = (os.getenv("TMPDIR") or "/tmp"):gsub("/+$", "") .. "/ergopti_overrides_probe"
       os.execute("mkdir -p '" .. dir .. "'")
       local fh = assert(io.open(dir .. "/hotstrings_overrides.toml", "w"))
-      fh:write("[_global]\ndelay = 0.3\n[probe]\ndelay = 0.2\n[probe.main]\ndelay = 0.1\n"
-        .. "[probe.gone_section]\ndelay = 0.1\n[retired_category]\ndelay = 0.5\n")
+      fh:write("[probe]\ndelay_offset = -0.55\n[probe.main]\ndelay_offset = -0.65\n"
+        .. "[probe.gone_section]\ndelay_offset = -0.65\n[retired_category]\ndelay_offset = -0.25\n")
       fh:close()
       local saved_loader, saved_logger = package.loaded["modules.hotstrings.loader"], package.loaded["logger.shim"]
       local warnings = {}

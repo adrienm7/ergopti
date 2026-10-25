@@ -247,7 +247,7 @@ helpers.describe("hotstring priority overrides", function()
 				fail_rename = false
 				helpers.assert_eq(restarted.clear_override("second", section, field), true, scope)
 				helpers.assert_nil(restarted.get_user_override("second", section).delay)
-				helpers.assert_eq(restarted.resolve("second", section).delay, restarted.get_global_delay())
+				helpers.assert_eq(restarted.resolve("second", section).delay, restarted.get_base_delay())
 				helpers.assert_true(persisted ~= durable, "successful clears must change durable TOML")
 				local remaining_color = scope ~= "category" and "#123456" or nil
 				local remaining_sibling = scope ~= "category" and 2.5 or nil
@@ -255,7 +255,7 @@ helpers.describe("hotstring priority overrides", function()
 				helpers.assert_eq(restarted.get_user_override("second", "other").delay, remaining_sibling)
 				helpers.assert_eq(restarted.get_user_override("first").delay, 3.5)
 				if remaining_sibling then
-					helpers.assert_contains(persisted, "[second.other]\ndelay = 2.5",
+					helpers.assert_contains(persisted, "[second.other]\ndelay_offset = 1.75",
 						"clearing another scope must preserve the serialized sibling")
 				end
 
@@ -267,7 +267,7 @@ helpers.describe("hotstring priority overrides", function()
 				restarted.load_all()
 				helpers.assert_nil(restarted.get_user_override("second", section).delay,
 					"cleared delay must stay cleared after restart")
-				helpers.assert_eq(restarted.resolve("second", section).delay, restarted.get_global_delay())
+				helpers.assert_eq(restarted.resolve("second", section).delay, restarted.get_base_delay())
 				helpers.assert_eq(restarted.get_user_override("second").color, remaining_color)
 				helpers.assert_eq(restarted.get_user_override("second", "other").delay, remaining_sibling,
 					"surviving sibling override must remain after clear and restart")
@@ -342,21 +342,21 @@ helpers.describe("hotstring override leaf ownership", function()
 		"# Keep this user's introduction.",
 		'["ext:future:pack"."literal.section"]',
 		'future = { enabled = false, note = "keep me" }',
-		"delay = 1.25",
+		"delay_offset = 0.5",
 		'color = "#abcdef"',
 		"show_tooltip = false",
 		"priority = 90",
 		"# Keep this section comment.",
 		"[unrelated]",
 		'future = ["one", "two"]',
-		"delay = 2.5",
+		"delay_offset = 1.75",
 		"",
 	}, "\n")
 
 	helpers.it("preserves unknown records and comments through public set and field clear", function()
 		with_owner(source, function(config, _, read)
 			helpers.assert_true(config.set_override("ext:future:pack", "literal.section", "delay", 3.5))
-			local changed = source:gsub("delay = 1.25", "delay = 3.5")
+			local changed = source:gsub("delay_offset = 0.5", "delay_offset = 2.75")
 			helpers.assert_eq(read(), changed)
 			helpers.assert_true(config.clear_override("ext:future:pack", "literal.section", "color"))
 			helpers.assert_eq(read(), changed:gsub('color = "#abcdef"\n', ""))
@@ -369,7 +369,7 @@ helpers.describe("hotstring override leaf ownership", function()
 		for _, section in ipairs({ "literal.section", false }) do
 			with_owner(source, function(config, _, read)
 				helpers.assert_true(config.clear_override("ext:future:pack", section or nil))
-				local expected = source:gsub("delay = 1.25\n", ""):gsub('color = "#abcdef"\n', "")
+				local expected = source:gsub("delay_offset = 0.5\n", ""):gsub('color = "#abcdef"\n', "")
 					:gsub("show_tooltip = false\n", ""):gsub("priority = 90\n", "")
 				helpers.assert_eq(read(), expected)
 				helpers.assert_nil(config.get_user_override("ext:future:pack", "literal.section").delay)
@@ -469,8 +469,8 @@ helpers.describe("hotstring override leaf ownership", function()
 			helpers.assert_eq(renames, 0, "an unchanged file must retain its inode")
 			helpers.assert_eq(changes(), 1)
 		end)
-		with_owner('second = { delay = 2.5, future = "keep" }\n', function(config, path, read, _, changes)
-			local expected = 'second = { delay = 4, future = "keep" }\n'
+		with_owner('second = { delay_offset = 1.75, future = "keep" }\n', function(config, path, read, _, changes)
+			local expected = 'second = { delay_offset = 3.25, future = "keep" }\n'
 			helpers.assert_eq(config.set_override("second", nil, "delay", 4), true)
 			helpers.assert_eq(read(), expected)
 			helpers.assert_eq(config.get_user_override("second").delay, 4)
@@ -533,7 +533,7 @@ helpers.describe("hotstring override leaf ownership", function()
 				helpers.assert_eq(changes(), 0, fault)
 				helpers.assert_true(config.set_override("ext:future:pack", "literal.section", "delay", 4),
 					"the same owner can retry once the refusal is removed: " .. fault)
-				helpers.assert_eq(read(), source:gsub("delay = 1.25", "delay = 4"), fault)
+				helpers.assert_eq(read(), source:gsub("delay_offset = 0.5", "delay_offset = 3.25"), fault)
 				helpers.assert_eq(changes(), 1, fault)
 			end)
 		end
@@ -544,7 +544,7 @@ helpers.describe("hotstring override leaf ownership", function()
 			local writer = require("toml_codec.writer")
 			local original = config.configuration_snapshot()
 			local owner = {}
-			local candidate = source:gsub("delay = 1.25", "delay = 8.5")
+			local candidate = source:gsub("delay_offset = 0.5", "delay_offset = 7.75")
 			-- The scope's runtime catalogue port is controlled; both file boundaries
 			-- and all public leaf operations still use the actual writer.
 			config.load_all = function() return {}, true end
@@ -554,14 +554,14 @@ helpers.describe("hotstring override leaf ownership", function()
 			helpers.assert_true(writer.publish_if_unchanged(path, candidate, nil, original.override_source))
 			helpers.assert_true(config.release(owner))
 			helpers.assert_true(config.set_override("ext:future:pack", "literal.section", "delay", 9.5))
-			helpers.assert_eq(read(), source:gsub("delay = 1.25", "delay = 9.5"))
+			helpers.assert_eq(read(), source:gsub("delay_offset = 0.5", "delay_offset = 8.75"))
 			local applied = config.configuration_snapshot()
 			helpers.assert_true(config.acquire(owner))
 			helpers.assert_true(writer.publish_if_unchanged(path, source, nil, applied.override_source))
 			helpers.assert_true(config.restore_configuration(owner, original))
 			helpers.assert_true(config.release(owner))
 			helpers.assert_true(config.set_override("ext:future:pack", "literal.section", "delay", 2.5))
-			helpers.assert_eq(read(), source:gsub("delay = 1.25", "delay = 2.5"))
+			helpers.assert_eq(read(), source:gsub("delay_offset = 0.5", "delay_offset = 1.75"))
 		end)
 	end)
 
@@ -583,7 +583,7 @@ helpers.describe("hotstring override leaf ownership", function()
 				helpers.assert_true(config.release(owner))
 				helpers.assert_eq(config.configuration_snapshot().override_source.status, target.status)
 				helpers.assert_true(config.set_override("fresh", nil, "delay", 2.5))
-				helpers.assert_contains(read(), "delay = 2.5")
+				helpers.assert_contains(read(), "delay_offset = 1.75")
 			end)
 		end
 	end)

@@ -1,0 +1,144 @@
+{
+	"$schema": "",
+	"description": "Delay overrides are stored as offsets of the base expansion delay (hotstrings.expansion_delay). Each vector starts from the shared default base (0.75 s), applies its steps through the driver's public API (effective seconds in, effective seconds out) and states what a reader must then resolve and what the override file must hold. Windows, macOS and Linux replay the same vectors.",
+	"version": 1,
+	"decimals": 3,
+	"vectors": [
+		{
+			"id": "offset_follows_the_base",
+			"description": "A category delay set to 1.2 s over the 0.75 s base is stored as +0.45 s; moving the base to 1.0 s moves the delay to 1.45 s and leaves the file alone.",
+			"steps": [
+				{
+					"op": "set",
+					"category": "rolls",
+					"delay": 1.2
+				},
+				{
+					"op": "base",
+					"seconds": 1.0
+				}
+			],
+			"expect": [
+				{
+					"category": "rolls",
+					"delay": 1.45
+				}
+			],
+			"stored": {
+				"rolls": {
+					"delay_offset": 0.45
+				}
+			}
+		},
+		{
+			"id": "section_offset_is_independent",
+			"description": "A section delay is its own offset; the category without a delay of its own waits the base.",
+			"steps": [
+				{
+					"op": "set",
+					"category": "rolls",
+					"section": "ct",
+					"delay": 0.5
+				},
+				{
+					"op": "base",
+					"seconds": 2.0
+				}
+			],
+			"expect": [
+				{
+					"category": "rolls",
+					"section": "ct",
+					"delay": 1.75
+				},
+				{
+					"category": "rolls",
+					"delay": 2.0
+				}
+			],
+			"stored": {
+				"rolls.ct": {
+					"delay_offset": -0.25
+				}
+			}
+		},
+		{
+			"id": "unlimited_is_not_an_offset",
+			"description": "0 means unlimited: it has its own flag and survives any base.",
+			"steps": [
+				{
+					"op": "set",
+					"category": "rolls",
+					"delay": 0
+				},
+				{
+					"op": "base",
+					"seconds": 3.0
+				}
+			],
+			"expect": [
+				{
+					"category": "rolls",
+					"delay": 0
+				}
+			],
+			"stored": {
+				"rolls": {
+					"delay_unlimited": true
+				}
+			}
+		},
+		{
+			"id": "a_cancelling_offset_never_becomes_unlimited",
+			"description": "A -0.65 s offset on a 0.5 s base would be negative: the delay is clamped to one millisecond, never to 0.",
+			"steps": [
+				{
+					"op": "set",
+					"category": "rolls",
+					"delay": 0.1
+				},
+				{
+					"op": "base",
+					"seconds": 0.5
+				}
+			],
+			"expect": [
+				{
+					"category": "rolls",
+					"delay": 0.001
+				}
+			],
+			"stored": {
+				"rolls": {
+					"delay_offset": -0.65
+				}
+			}
+		},
+		{
+			"id": "clear_returns_to_the_base",
+			"description": "Clearing a delay override leaves the category on the base, wherever it moved.",
+			"steps": [
+				{
+					"op": "set",
+					"category": "rolls",
+					"delay": 1.2
+				},
+				{
+					"op": "clear",
+					"category": "rolls"
+				},
+				{
+					"op": "base",
+					"seconds": 1.1
+				}
+			],
+			"expect": [
+				{
+					"category": "rolls",
+					"delay": 1.1
+				}
+			],
+			"stored": {}
+		}
+	]
+}

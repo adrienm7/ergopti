@@ -164,8 +164,8 @@ local function menu_controls(Settings, paused, reordered)
 			get_categories = function() return {} end,
 			language_packs = function() return {} end,
 			resolve = function() return { delay = 0.75, color = "#1e88e5", has_override = false } end,
-			get_global_delay = function() return 0.75 end,
-			has_global_delay_override = function() return false end,
+			get_base_delay = function() return 0.75 end,
+			has_base_delay_override = function() return false end,
 		},
 		on_persist_terminators = function()
 			observations.writes = observations.writes + 1

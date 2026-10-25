@@ -432,7 +432,7 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(f.owner.apply("recommended"), true)
 		local overrides = f.config.parse_override_content(f.files.overrides)
 		for _, family in ipairs(COMMON_FAMILIES) do
-			helpers.assert_eq(overrides.autocorrection.sections[family].delay, 0.5)
+			helpers.assert_eq(overrides.autocorrection.sections[family].delay_offset, -0.25, "stored as an offset of the 0.75 s base")
 			helpers.assert_eq(overrides.autocorrection.sections[family].color, nil)
 		end
 		assert_family_delays(f, 0.5)
@@ -457,7 +457,7 @@ helpers.describe("macOS hotstrings scope", function()
 			local f = fixture()
 			helpers.assert_eq(f.owner.apply(mode), true)
 			local overrides = f.config.parse_override_content(f.files.overrides)
-			helpers.assert_eq(overrides.futurepack.sections.section.delay, 3.0)
+			helpers.assert_eq(overrides.futurepack.sections.section.legacy_delay, 3.0, "an earlier build's absolute delay stays as written")
 			helpers.assert_true(f.files.overrides:find("# kept comment", 1, true) ~= nil, "comment kept")
 			helpers.assert_true(f.files.overrides:find('consumed_delimiters = "x"', 1, true) ~= nil,
 				"a sibling driver's global kept")
@@ -616,7 +616,7 @@ helpers.describe("macOS hotstrings scope", function()
 			local parse = f.config.parse_override_content
 			f.config.parse_override_content = function(content)
 				local parsed = parse(content)
-				parsed.autocorrection = { sections = { [family] = { delay = 2.0 } } }
+				parsed.autocorrection = { sections = { [family] = { delay_offset = 1.25 } } }
 				return parsed
 			end
 			helpers.assert_eq(f.owner.apply("clear"), false)
@@ -725,7 +725,7 @@ helpers.describe("macOS hotstrings scope", function()
 		for _, family in ipairs(COMMON_FAMILIES) do
 			f.config.parse_override_content = function(content)
 				local parsed = parse(content)
-				parsed.autocorrection = { sections = { [family] = { delay = 2.0 } } }
+				parsed.autocorrection = { sections = { [family] = { delay_offset = 1.25 } } }
 				return parsed
 			end
 			local reason = f.owner.unavailable()
@@ -761,7 +761,7 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(f.owner.apply("recommended"), true)
 		local overrides = f.config.parse_override_content(f.files.overrides)
 		for _, family in ipairs(COMMON_FAMILIES) do
-			helpers.assert_eq(overrides.autocorrection.sections[family].delay, 0.5)
+			helpers.assert_eq(overrides.autocorrection.sections[family].delay_offset, -0.25, "stored as an offset of the 0.75 s base")
 		end
 		assert_family_delays(f, 0.5)
 	end)

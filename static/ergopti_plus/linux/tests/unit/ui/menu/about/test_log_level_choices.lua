@@ -30,8 +30,8 @@ local function build(selected, setter)
 		get_categories = function() return {} end,
 		language_packs = function() return {} end,
 		resolve = function() return { delay = 0.75, color = "#1e88e5", has_override = false } end,
-		get_global_delay = function() return 0.75 end,
-		has_global_delay_override = function() return false end,
+		get_base_delay = function() return 0.75 end,
+		has_base_delay_override = function() return false end,
 	}
 	local rows = helpers.load_module("ui.menu.menu_builder").build({
 		config = config, log_level = selected, on_set_log_level = setter,
@@ -179,7 +179,7 @@ local function debug_parent_fixture(body)
 		on_toggle_pause = function() end, on_quit = function() end,
 		config = { get_groups = function() return {} end, get_categories = function() return {} end,
 			language_packs = function() return {} end, resolve = function() return { delay = 0.75, color = "#1e88e5", has_override = false } end,
-			get_global_delay = function() return 0.75 end, has_global_delay_override = function() return false end } }
+			get_base_delay = function() return 0.75 end, has_base_delay_override = function() return false end } }
 	local function build(paused) context.paused = paused; return native.build(context) end
 	local ok, detail = xpcall(function() body(renderer, build, callbacks, locale) end, debug.traceback)
 	locale.set_locale(language)

@@ -50,7 +50,7 @@ helpers.describe("hotstrings_config: a save preserves the shared [__global__] bl
 			cfg.init({ override_path = path, toml_resolver = function() return nil end })
 
 			-- A category-level change is what the window writes on every edit.
-			helpers.assert_eq(cfg.set_override("rolls", nil, "delay", 0.75), true)
+			helpers.assert_eq(cfg.set_override("rolls", nil, "delay", 1.25), true)
 
 			local reread = io.open(path, "r")
 			local content = reread and reread:read("*a") or ""
@@ -58,7 +58,7 @@ helpers.describe("hotstrings_config: a save preserves the shared [__global__] bl
 
 			-- Prove the save actually ran. Without this the assertions below pass
 			-- against an init that failed and a setter that wrote nothing at all.
-			helpers.assert_true(content:find("0.75", 1, true) ~= nil,
+			helpers.assert_true(content:find("delay_offset = 0.5", 1, true) ~= nil,
 				"the category change must have been persisted, or this test asserts nothing "
 				.. "about what a save preserves")
 
@@ -171,13 +171,13 @@ helpers.describe("hotstrings_config: a save preserves the shared [__global__] bl
 					override_path = path,
 					toml_resolver = function() return nil end,
 				}), true)
-				helpers.assert_eq(cfg.set_override("rolls", nil, "delay", 0.75), true,
+				helpers.assert_eq(cfg.set_override("rolls", nil, "delay", 1.25), true,
 					"the unrelated category mutation must commit")
 
 				local reread = assert(io.open(path, "r"))
 				local content = assert(reread:read("*a"))
 				assert(reread:close())
-				helpers.assert_contains(content, "delay = 0.75",
+				helpers.assert_contains(content, "delay_offset = 0.5",
 					"the preservation check must observe a real category save")
 				helpers.assert_contains(content, record,
 					"unsupported owned record " .. tostring(index)

@@ -453,6 +453,19 @@ function M.get_base_delay()
 	return CoreState.BASE_DELAY_SEC
 end
 
+--- Observers of the baseline delay. The override file stores each delay as an
+--- offset of it, so whoever projects delays (the hotstring config) must project
+--- them again when it changes.
+local _base_delay_observers = {}
+
+--- Registers a function called after every change of the baseline delay.
+--- A false answer refuses the change: the previous baseline is put back.
+--- @param observer function Called with no argument, returns true when it applied the change.
+function M.on_base_delay_change(observer)
+	assert(type(observer) == "function", "a base-delay observer is a function")
+	_base_delay_observers[#_base_delay_observers + 1] = observer
+end
+
 --- Sets the baseline inter-key delay threshold used for all unmapped groups.
 --- @param secs number The new threshold in seconds (clamped to ≥ 0).
 function M.set_base_delay(secs)
@@ -461,7 +474,16 @@ function M.set_base_delay(secs)
 		Logger.error(LOG, "Base-delay change refused because the active hotstring preview could not be revoked.")
 		return false
 	end
+	local previous = CoreState.BASE_DELAY_SEC
 	CoreState.BASE_DELAY_SEC = v
+	for _, observer in ipairs(_base_delay_observers) do
+		local called, applied = pcall(observer)
+		if not called or applied ~= true then
+			CoreState.BASE_DELAY_SEC = previous
+			Logger.error(LOG, "Base-delay change refused because a delay owner could not apply it.")
+			return false
+		end
+	end
 	Logger.debug(LOG, "Base delay: %.3fs.", v)
 	return true
 end

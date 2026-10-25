@@ -268,13 +268,29 @@ _HotstringsScopeSourceKey(Path) {
 }
 
 
-/** Resolves only source metadata and the shared fallback, excluding user overrides. */
+/** Resolves only source metadata and the base expansion delay, excluding user overrides. */
 _HotstringsScopeInheritedDelay(Category, Section) {
-	global GLOBAL_DEFAULT_DELAY
 	Config := ParseTomlGroupConfig(Category)
 	if Config.Sections.Has(Section) && Config.Sections[Section].Delay != ""
 		return Config.Sections[Section].Delay
-	return Config.Delay != "" ? Config.Delay : GLOBAL_DEFAULT_DELAY
+	return Config.Delay != "" ? Config.Delay : HotstringsBaseDelay()
+}
+
+/**
+ * The leaves of the override file one category or section can hold: the personal
+ * fields, with the delay in its three spellings (current offset, unlimited flag
+ * and the absolute one of earlier builds).
+ */
+_HotstringsScopeOverrideLeaves() {
+	Leaves := []
+	for Field in _PersonalTomlOverrideFields() {
+		if Field == "delay" {
+			Leaves.Push("delay", "delay_offset", "delay_unlimited")
+			continue
+		}
+		Leaves.Push(Field)
+	}
+	return Leaves
 }
 
 /**
@@ -346,7 +362,7 @@ class HotstringsScopeFiles {
 				RowsByPath[Item.Path].Push({ Section: Section, Key: Item.Field, Delete: 1 })
 			} else {
 				Section := Item.Category . (Item.Sec == "" ? "" : "." . Item.Sec)
-				for Field in _PersonalTomlOverrideFields()
+				for Field in _HotstringsScopeOverrideLeaves()
 					RowsByPath[this.overrides].Push({ Section: Section, Key: Field, Delete: 1 })
 			}
 		}
@@ -366,9 +382,10 @@ class HotstringsScopeFiles {
 			; discard the measured recommendation during transaction preparation.
 			Found := false
 			for Index, Row in RowsByPath[this.overrides] {
-				if Row.Section == Section && Row.Key == "delay" {
-					RowsByPath[this.overrides][Index] := { Section: Section, Key: "delay",
-						Value: Recommendation["seconds"] }
+				if Row.Section == Section && Row.Key == "delay_offset" {
+					; The file stores delays as offsets of the base expansion delay.
+					RowsByPath[this.overrides][Index] := { Section: Section, Key: "delay_offset",
+						Value: Round(Recommendation["seconds"] - HotstringsBaseDelay(), HOTSTRINGS_DELAY_DECIMALS) }
 					Found := true
 					break
 				}
@@ -377,7 +394,7 @@ class HotstringsScopeFiles {
 				throw Error("A recommended hotstring delay has no owned reset row.")
 		}
 		for Category in ["_global", "dynamichotstrings"] {
-			for Field in _PersonalTomlOverrideFields()
+			for Field in _HotstringsScopeOverrideLeaves()
 				RowsByPath[this.overrides].Push({ Section: Category, Key: Field, Delete: 1 })
 		}
 		; Read after admission, independently of the live engine and UI caches.

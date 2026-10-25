@@ -54,8 +54,8 @@ local function fake_config(gates_on, sections_on)
 		enable_all = function() end,
 		disable_all = function() end,
 		resolve = function() return { delay = 0.75, color = "#1e88e5", has_override = false } end,
-		get_global_delay = function() return 0.75 end,
-		has_global_delay_override = function() return false end,
+		get_base_delay = function() return 0.75 end,
+		has_base_delay_override = function() return false end,
 	}, log
 end
 

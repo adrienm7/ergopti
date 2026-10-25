@@ -39,7 +39,7 @@
 ;   2. user_override.file
 ;   3. toml.section
 ;   4. toml.file
-;   5. GLOBAL_DEFAULT_DELAY (delay only); color stays empty.
+;   5. the base expansion delay (delay only); color stays empty.
 HotstringsResolve(CategoryName, SectionName := "") {
 		if IsSet(PersonalFileControls) && PersonalFileControls.owners.Has(CategoryName)
 				return PersonalFileControls.owners[CategoryName].Resolve(SectionName)
@@ -62,9 +62,184 @@ HotstringsResolveBumpGen() {
 		_HSResolveGen += 1
 }
 
+; The base expansion delay in seconds: the user's hotstrings.expansion_delay,
+; else the shared default (the manifest's, loaded as GLOBAL_DEFAULT_DELAY). It is
+; what a hotstring waits when nothing more specific says otherwise, and what a
+; user override of a category or section is an offset of.
+HotstringsBaseDelay() {
+		global Features, GLOBAL_DEFAULT_DELAY
+		if IsSet(Features) and (Features is Map) and Features.Has("hotstrings")
+				and (Features["hotstrings"] is Map) and Features["hotstrings"].Has("expansion_delay")
+				return Features["hotstrings"]["expansion_delay"]
+		return GLOBAL_DEFAULT_DELAY
+}
+
+; The effective delay of an override that adds Offset seconds to Base, on the
+; millisecond grid and never below one grid step: 0 means "unlimited" everywhere,
+; so an offset that cancels the base must not turn into it.
+HotstringsDelayFromOffset(Base, Offset) {
+		global HOTSTRINGS_DELAY_DECIMALS
+		return Max(Round(Base + Offset, HOTSTRINGS_DELAY_DECIMALS), 10 ** -HOTSTRINGS_DELAY_DECIMALS)
+}
+
+; Derives the effective delay of every override read from a file, now that the
+; base is known: the file stores offsets, the engine reads seconds. Memory only.
+; @param Overrides Optional Map to derive; the live one by default.
+HotstringsOverridesApplyBase(Overrides := unset) {
+		global _HotstringsOverrides
+		Source := IsSet(Overrides) ? Overrides : _HotstringsOverrides
+		Base := HotstringsBaseDelay()
+		for _, Entry in Source {
+				_HotstringsRecordApplyBase(Entry, Base)
+				for _, SectionRecord in Entry.Sections
+						_HotstringsRecordApplyBase(SectionRecord, Base)
+		}
+}
+
+_HotstringsRecordApplyBase(Record, Base) {
+		if !Record.HasOwnProp("PendingOffset") or Record.PendingOffset == ""
+				return
+		Record.Delay := HotstringsDelayFromOffset(Base, Record.PendingOffset)
+		Record.PendingOffset := ""
+}
+
+; Moves every override with it when the base changes: the delays are offsets, so
+; each keeps its distance from the base. Unlimited delays stay unlimited.
+; Memory only; the file holds offsets and does not change.
+HotstringsOverridesRebase(PreviousBase, NewBase) {
+		global _HotstringsOverrides
+		for _, Entry in _HotstringsOverrides {
+				_HotstringsRecordRebase(Entry, PreviousBase, NewBase)
+				for _, SectionRecord in Entry.Sections
+						_HotstringsRecordRebase(SectionRecord, PreviousBase, NewBase)
+		}
+		HotstringsResolveBumpGen()
+}
+
+_HotstringsRecordRebase(Record, PreviousBase, NewBase) {
+		if Record.Delay == "" or Record.Delay == 0
+				return
+		Record.Delay := HotstringsDelayFromOffset(NewBase, Record.Delay - PreviousBase)
+}
+
+; Boot step, run once the configuration (and so the base expansion delay) is
+; known: turns the absolute delays and the menu-set default delay of earlier
+; builds into offsets of the base, keeping every effective delay, and derives
+; the effective delay of every override read from the file.
+; @param BaseWriterFn Optional seam standing for the config.toml write of the base.
+; @returns {Integer} True when the file needed no migration or was rewritten.
+HotstringsOverridesBoot(BaseWriterFn := 0) {
+		global _HotstringsOverrides
+		Legacy := false
+		for _, Entry in _HotstringsOverrides {
+				if _HotstringsRecordIsLegacy(Entry)
+						Legacy := true
+				for _, SectionRecord in Entry.Sections {
+						if _HotstringsRecordIsLegacy(SectionRecord)
+								Legacy := true
+				}
+		}
+		if !Legacy {
+				HotstringsOverridesApplyBase()
+				HotstringsResolveBumpGen()
+				return true
+		}
+		return _HotstringsOverridesMigrateLegacyDelays(BaseWriterFn)
+}
+
+_HotstringsRecordIsLegacy(Record) {
+		return Record.HasOwnProp("LegacyDelay") and Record.LegacyDelay != ""
+}
+
+; Adopts an absolute delay of an earlier build as the record's effective delay.
+; A delay already stored in the current form wins.
+_HotstringsRecordAdoptLegacy(Record) {
+		if !_HotstringsRecordIsLegacy(Record)
+				return
+		if Record.Delay == "" and Record.PendingOffset == ""
+				Record.Delay := Record.LegacyDelay
+		Record.LegacyDelay := ""
+}
+
+; The migration itself. The menu-set default delay (the "_global" record) becomes
+; hotstrings.expansion_delay, the absolute delays become offsets of that base on
+; the next write, and the file is rewritten at once so no later build reads the
+; old spelling. Each step is idempotent: a failed write leaves the old file in
+; place and the next boot starts again, while this session already runs on the
+; migrated values.
+_HotstringsOverridesMigrateLegacyDelays(BaseWriterFn := 0) {
+		global _HotstringsOverrides, _HotstringsOverridesPath, Features
+		Candidate := Map()
+		GlobalDelay := ""
+		for Cat, Entry in _HotstringsOverrides {
+				if (Cat == "_global") {
+						GlobalDelay := Entry.LegacyDelay
+						continue
+				}
+				Clone := _HotstringsCloneOverrideCategory(Entry)
+				Clone.Sections := Map()
+				_HotstringsRecordAdoptLegacy(Clone)
+				for Sec, SectionRecord in Entry.Sections {
+						SectionClone := _HotstringsCloneOverrideSection(SectionRecord)
+						_HotstringsRecordAdoptLegacy(SectionClone)
+						Clone.Sections[Sec] := SectionClone
+				}
+				Candidate[Cat] := Clone
+		}
+		if (GlobalDelay != "") {
+				Written := HasMethod(BaseWriterFn, "Call")
+						? BaseWriterFn.Call(GlobalDelay)
+						: WriteFeatureV2(Features, "hotstrings.expansion_delay", GlobalDelay)
+				if !Written {
+						try LoggerError("HotstringsConfig",
+								"The default expansion delay of the override file could not be moved to config.toml (hotstrings.expansion_delay); it applies for this session and the move is retried at the next start.")
+						Features["hotstrings"]["expansion_delay"] := GlobalDelay
+				}
+		}
+		HotstringsOverridesApplyBase(Candidate)
+		OwnerToken := _HotstringsOverrideLeaseAcquire("migrate delay overrides")
+		Persisted := false
+		if (OwnerToken is Object) {
+				try Persisted := _HotstringsPersistOverrideCandidate(Candidate, OwnerToken,
+						_HotstringsOverridesPath, 0, 0)
+				finally _HotstringsOverrideLeaseRelease(OwnerToken)
+		}
+		if !Persisted {
+				try LoggerError("HotstringsConfig",
+						"The delay overrides could not be rewritten as offsets of the base expansion delay; they apply for this session and the rewrite is retried at the next start.")
+				PreviousCritical := Critical("On")
+				try _HotstringsPublishOverrideCandidate(Candidate)
+				finally Critical(PreviousCritical)
+				return false
+		}
+		try LoggerInfo("HotstringsConfig", "Delay overrides migrated to offsets of the base expansion delay.")
+		return true
+}
+
+; Persists the base expansion delay and moves the overrides with it. The setting
+; is a config.toml leaf, so it goes through the live writer: no reload.
+; @param Seconds New base, a non-negative number of seconds.
+; @returns {Integer} True once the leaf is durable and the overrides are rebased.
+HotstringsSetBaseDelay(Seconds) {
+		global Features
+		if !(Seconds is Number) or !TickTryDurationMsFromSeconds(Seconds, &DelayMs) {
+				try LoggerError("HotstringsConfig",
+						"SetBaseDelay: the base delay must fit the elapsed-tick domain, got '{1}'.", Seconds)
+				return false
+		}
+		Previous := HotstringsBaseDelay()
+		if !WriteFeatureV2(Features, "hotstrings.expansion_delay", Seconds)
+				return false
+		PreviousCritical := Critical("On")
+		try HotstringsOverridesRebase(Previous, Seconds)
+		finally Critical(PreviousCritical)
+		try LoggerInfo("HotstringsConfig", "Base expansion delay set to {1} s.", Seconds)
+		return true
+}
+
 ; Internal resolution logic (uncached); HotstringsResolve above memoises it.
 _HotstringsResolveUncached(CategoryName, SectionName := "") {
-		global _HotstringsOverrides, GLOBAL_DEFAULT_DELAY
+		global _HotstringsOverrides
 		global GLOBAL_DEFAULT_COLOR, HOTSTRINGS_CATEGORY_DEFAULT_COLORS
 		Cat := StrLower(CategoryName)
 		; Section names in features_config use PascalCase that may contain French
@@ -92,14 +267,11 @@ _HotstringsResolveUncached(CategoryName, SectionName := "") {
 				Delay := TomlSec.Delay
 		} else if (TomlCfg.Delay != "") {
 				Delay := TomlCfg.Delay
-		} else if (_HotstringsOverrides.Has("_global") and _HotstringsOverrides["_global"].Delay != "") {
-				; Menu-set global default expansion delay — applied only when no user or
-				; TOML delay is defined for this category/section. It is the "default
-				; expansion delay" the user edits from the tray menu; the hardcoded
-				; GLOBAL_DEFAULT_DELAY below is the final fallback when even that is unset.
-				Delay := _HotstringsOverrides["_global"].Delay
 		} else {
-				Delay := GLOBAL_DEFAULT_DELAY
+				; The base expansion delay (hotstrings.expansion_delay): the user's
+				; value, else the shared default. A user delay above is stored as an
+				; offset of it.
+				Delay := HotstringsBaseDelay()
 		}
 
 		Color := ""
@@ -176,9 +348,9 @@ _HotstringsResolveUncached(CategoryName, SectionName := "") {
 ;   2. [ext.extid]         in hotstrings_config.toml (user override, file level)
 ;   3. [_meta.sections.*] in the extension TOML     (extension default, section)
 ;   4. [_meta]             in the extension TOML     (extension default, file)
-;   5. GLOBAL_DEFAULT_DELAY / GLOBAL_DEFAULT_COLOR   (hard fallback)
+;   5. the base expansion delay / GLOBAL_DEFAULT_COLOR  (hard fallback)
 HotstringsResolveExt(ExtId, TomlPath, SectionName := "") {
-		global _HotstringsOverrides, GLOBAL_DEFAULT_DELAY, GLOBAL_DEFAULT_COLOR
+		global _HotstringsOverrides, GLOBAL_DEFAULT_COLOR
 		OverrideKey := "ext." . StrLower(ExtId)
 		Sec := SectionName != "" ? StrLower(SectionName) : ""
 
@@ -201,14 +373,11 @@ HotstringsResolveExt(ExtId, TomlPath, SectionName := "") {
 				Delay := TomlSec.Delay
 		} else if (TomlCfg.Delay != "") {
 				Delay := TomlCfg.Delay
-		} else if (_HotstringsOverrides.Has("_global") and _HotstringsOverrides["_global"].Delay != "") {
-				; Menu-set global default expansion delay — applied only when no user or
-				; TOML delay is defined for this category/section. It is the "default
-				; expansion delay" the user edits from the tray menu; the hardcoded
-				; GLOBAL_DEFAULT_DELAY below is the final fallback when even that is unset.
-				Delay := _HotstringsOverrides["_global"].Delay
 		} else {
-				Delay := GLOBAL_DEFAULT_DELAY
+				; The base expansion delay (hotstrings.expansion_delay): the user's
+				; value, else the shared default. A user delay above is stored as an
+				; offset of it.
+				Delay := HotstringsBaseDelay()
 		}
 
 		Color := ""
@@ -264,6 +433,8 @@ HotstringsResolveExt(ExtId, TomlPath, SectionName := "") {
 _HotstringsCloneOverrideCategory(Source) {
 		return {
 				Delay: Source.Delay,
+				PendingOffset: Source.HasOwnProp("PendingOffset") ? Source.PendingOffset : "",
+				LegacyDelay: Source.HasOwnProp("LegacyDelay") ? Source.LegacyDelay : "",
 				Color: Source.Color,
 				ShowTooltip: Source.ShowTooltip,
 				Priority: Source.HasOwnProp("Priority") ? Source.Priority : "",
@@ -275,6 +446,8 @@ _HotstringsCloneOverrideCategory(Source) {
 _HotstringsCloneOverrideSection(Source) {
 		return {
 				Delay: Source.Delay,
+				PendingOffset: Source.HasOwnProp("PendingOffset") ? Source.PendingOffset : "",
+				LegacyDelay: Source.HasOwnProp("LegacyDelay") ? Source.LegacyDelay : "",
 				Color: Source.Color,
 				ShowTooltip: Source.ShowTooltip,
 				Priority: Source.HasOwnProp("Priority") ? Source.Priority : ""
@@ -327,6 +500,7 @@ _HotstringsAuthorizeOverrideCommit(OwnerToken, BoundPath) {
 ; one memory-only Critical callback supplied to _SaveOverrides.
 _HotstringsPublishOverrideCandidate(Candidate) {
 		global _HotstringsOverrides
+		HotstringsOverridesApplyBase(Candidate)
 		_HotstringsOverrides := Candidate
 		HotstringsResolveBumpGen()
 		return 1
@@ -439,7 +613,7 @@ _HotstringsSetOverrideOwned(Cat, Sec, Field, Value, WriterFn, ReplaceFn,
 		if Candidate.Has(Cat) {
 				Entry := _HotstringsCloneOverrideCategory(Candidate[Cat])
 		} else {
-				Entry := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
+				Entry := _HotstringsNewOverrideEntry()
 		}
 		Candidate[Cat] := Entry
 
@@ -447,7 +621,7 @@ _HotstringsSetOverrideOwned(Cat, Sec, Field, Value, WriterFn, ReplaceFn,
 				if Entry.Sections.Has(Sec) {
 						Target := _HotstringsCloneOverrideSection(Entry.Sections[Sec])
 				} else {
-						Target := { Delay: "", Color: "", ShowTooltip: "", Priority: "" }
+						Target := _HotstringsNewOverrideSection()
 				}
 				Entry.Sections[Sec] := Target
 		} else {
@@ -456,6 +630,7 @@ _HotstringsSetOverrideOwned(Cat, Sec, Field, Value, WriterFn, ReplaceFn,
 
 		if (Field == "delay") {
 				Target.Delay := Value
+				Target.PendingOffset := ""
 		} else if (Field == "color") {
 				Target.Color := Value
 		} else if (Field == "priority") {
@@ -536,6 +711,7 @@ _HotstringsClearOverrideOwned(Cat, Sec, Field, WriterFn, ReplaceFn,
 
 		if (Field == "" or Field == "delay") {
 				Target.Delay := ""
+				Target.PendingOffset := ""
 		}
 		if (Field == "" or Field == "color") {
 				Target.Color := ""

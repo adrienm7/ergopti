@@ -941,6 +941,9 @@ _HotstringExtensionPacks := HotstringExtensions_Prepare(Features,
 	HotstringExtensions_Roots(_ConfigDir, _ExtensionsDir))
 _BootConfigApplied := ApplyBootConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml", &_BootConfigSnapshot)
 HotstringsTerminatorRecordsInitBoot(_BootConfigSnapshot)
+; The override file stores delays as offsets of hotstrings.expansion_delay, which
+; is only known now; this also migrates the absolute delays of earlier builds.
+HotstringsOverridesBoot()
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 	_SharedDir . "\tap_hold\defaults.toml")
 BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, {2} tap-hold key(s)",

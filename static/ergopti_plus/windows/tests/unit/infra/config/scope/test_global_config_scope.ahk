@@ -135,7 +135,7 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 				Assert(!Parsed["layout"].Has("ergopti_base"))
 			else
 				AssertEqual(ManifestRecommendedFor("layout.ergopti_base"), Parsed["layout"]["ergopti_base"])
-			Assert(!TOML_ParseFreshFile(Fixture.overrides)["autocorrection"].Has("delay"))
+			Assert(!TOML_ParseFreshFile(Fixture.overrides)["autocorrection"].Has("delay_offset"))
 			for PersonalPath in Fixture.personal {
 				if Mode == "clear"
 					Assert(!TOML_ParseFreshFile(PersonalPath)["_meta"].Has("delay"))

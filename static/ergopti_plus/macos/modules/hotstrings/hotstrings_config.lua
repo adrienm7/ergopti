@@ -78,6 +78,13 @@ local CATEGORY_DEFAULT_COLORS = {}
 -- =================================
 -- =================================
 
+-- The fields of an override rung as held in memory, and the leaf each is stored
+-- as. `legacy_delay` is the absolute `delay` of earlier builds: read until the
+-- boot migration, never written, removed from the file by it.
+local OVERRIDE_FIELDS = { "delay_offset", "delay_unlimited", "legacy_delay", "color", "show_tooltip", "priority" }
+local OVERRIDE_KEYS = { delay_offset = "delay_offset", delay_unlimited = "delay_unlimited", legacy_delay = "delay",
+	color = "color", show_tooltip = "show_tooltip", priority = "priority" }
+
 -- Built-in word-delimiter set — mirrors HOTSTRINGS_DEFAULT_WORD_DELIMITERS in AHK.
 -- CR and LF are always included; the rest are user-configurable.
 local DEFAULT_WORD_DELIMITERS = " \t\r\n.,;:?!'’-=()[]/\\+*"
@@ -328,10 +335,25 @@ local function parse_override_content(content)
 				and result[current_cat].sections[current_sec]
 				or result[current_cat]
 
+			-- The stored form of a delay override: an offset of the base expansion
+			-- delay, or the flag of an unlimited one (0 is not an offset of anything).
+			local offset = line:match("^delay_offset%s*=%s*([%-%d%.]+)%s*$")
+			if offset then
+				local n = tonumber(offset)
+				if ConfigSchema.is_delay_offset(n) then target.delay_offset = n end
+				goto continue
+			end
+			if line:match("^delay_unlimited%s*=%s*true%s*$") then
+				target.delay_unlimited = true
+				goto continue
+			end
+
+			-- The absolute spelling of earlier builds, kept until the boot migration
+			-- turns it into an offset of the base and rewrites the file.
 			local num = line:match("^delay%s*=%s*([%-%d%.]+)%s*$")
 			if num then
 				local n = tonumber(num)
-				if ConfigSchema.is_delay(n) then target.delay = n end
+				if ConfigSchema.is_delay(n) then target.legacy_delay = n end
 				goto continue
 			end
 
@@ -465,6 +487,26 @@ local function parse_overrides(path)
 	return result, word_delimiters, "committed", { status = "ok", content = content }, global_passthrough, migrated.common_admitted ~= false
 end
 
+--- The delay lines of one override rung: an offset of the base expansion delay,
+--- or the flag of an unlimited delay.
+--- @param rung table Override rung.
+--- @return table lines Zero, one or two lines.
+--- @return string|nil error_detail Validation failure.
+local function delay_lines(rung)
+	local lines = {}
+	if rung.delay_offset ~= nil then
+		if not ConfigSchema.is_delay_offset(rung.delay_offset) then
+			return lines, "override delay offset must be a finite number"
+		end
+		lines[#lines + 1] = string.format("delay_offset = %." .. DelayResolver.DELAY_DECIMALS .. "f", rung.delay_offset)
+	end
+	if rung.delay_unlimited ~= nil then
+		if rung.delay_unlimited ~= true then return lines, "override unlimited delay must be true when present" end
+		lines[#lines + 1] = "delay_unlimited = true"
+	end
+	return lines
+end
+
 --- Serializes the in-memory override table back to TOML.
 --- @param overrides table The override table (same shape as parse_overrides).
 --- @param word_delimiters string|nil The [__global__] word_delimiters value, if set.
@@ -517,16 +559,13 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 
 	for _, cat in ipairs(cats) do
 		local entry = overrides[cat]
-		local has_file_level = entry.delay ~= nil or entry.color ~= nil or entry.show_tooltip ~= nil
-			or entry.priority ~= nil
+		local has_file_level = entry.delay_offset ~= nil or entry.delay_unlimited ~= nil or entry.color ~= nil
+			or entry.show_tooltip ~= nil or entry.priority ~= nil
 		if has_file_level then
 			table.insert(out, string.format("[%s]", cat))
-			if entry.delay ~= nil then
-				if not ConfigSchema.is_delay(entry.delay) then
-					return nil, "override delay must be a finite non-negative number"
-				end
-				table.insert(out, string.format("delay = %s", tostring(entry.delay)))
-			end
+			local delay_line, delay_error = delay_lines(entry)
+			if delay_error then return nil, delay_error end
+			for _, line in ipairs(delay_line) do table.insert(out, line) end
 			if entry.color ~= nil then
 				local encoded = ConfigSchema.encode_basic_string(entry.color)
 				if not encoded then return nil, "override color must be a string" end
@@ -558,15 +597,12 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 			table.sort(secs)
 			for _, sec in ipairs(secs) do
 				local s_entry = entry.sections[sec]
-				if s_entry.delay ~= nil or s_entry.color ~= nil or s_entry.show_tooltip ~= nil
-					or s_entry.priority ~= nil then
+				if s_entry.delay_offset ~= nil or s_entry.delay_unlimited ~= nil or s_entry.color ~= nil
+					or s_entry.show_tooltip ~= nil or s_entry.priority ~= nil then
 					table.insert(out, string.format("[%s.%s]", cat, sec))
-					if s_entry.delay ~= nil then
-						if not ConfigSchema.is_delay(s_entry.delay) then
-							return nil, "override section delay must be a finite non-negative number"
-						end
-						table.insert(out, string.format("delay = %s", tostring(s_entry.delay)))
-					end
+					local delay_line, delay_error = delay_lines(s_entry)
+					if delay_error then return nil, delay_error end
+					for _, line in ipairs(delay_line) do table.insert(out, line) end
 					if s_entry.color ~= nil then
 						local encoded = ConfigSchema.encode_basic_string(s_entry.color)
 						if not encoded then return nil, "override color must be a string" end
@@ -643,6 +679,18 @@ local function refresh_after_failed_publication()
 	Logger.warn(LOG, "Override publication lost a source race; newer external bytes were adopted.")
 end
 
+--- Removes one override field from a rung. A delay is stored as an offset, an
+--- unlimited flag or the absolute spelling of earlier builds: all three go.
+--- @param rung table Override rung.
+--- @param field string "delay", "color", "show_tooltip" or "priority".
+local function clear_override_field(rung, field)
+	if field == "delay" then
+		rung.delay_offset, rung.delay_unlimited, rung.legacy_delay = nil, nil, nil
+	else
+		rung[field] = nil
+	end
+end
+
 --- Preserves every unowned record while publishing only changed override leaves.
 --- @param overrides table Candidate known overrides.
 --- @param word_delimiters string|nil Candidate global delimiter choice.
@@ -653,11 +701,11 @@ local function prepare_override_content(overrides, word_delimiters)
 	local function leaves(source)
 		local rows = {}
 		for category, entry in pairs(source) do
-			for _, field in ipairs({ "delay", "color", "show_tooltip", "priority" }) do
+			for _, field in ipairs(OVERRIDE_FIELDS) do
 				if entry[field] ~= nil then rows[category .. "\0" .. field] = { category, field, entry[field] } end
 			end
 			for section, values in pairs(entry.sections or {}) do
-				for _, field in ipairs({ "delay", "color", "show_tooltip", "priority" }) do
+				for _, field in ipairs(OVERRIDE_FIELDS) do
 					if values[field] ~= nil then
 						local path = category .. "." .. section
 						rows[path .. "\0" .. field] = { path, field, values[field] }
@@ -670,11 +718,13 @@ local function prepare_override_content(overrides, word_delimiters)
 	local previous, candidate = leaves(_state.overrides), leaves(overrides)
 	for id, row in pairs(candidate) do
 		if previous[id] == nil or previous[id][3] ~= row[3] then
-			updates[#updates + 1] = { section = row[1], key = row[2], value = row[3] }
+			updates[#updates + 1] = { section = row[1], key = OVERRIDE_KEYS[row[2]], value = row[3] }
 		end
 	end
 	for id, row in pairs(previous) do
-		if candidate[id] == nil then updates[#updates + 1] = { section = row[1], key = row[2], delete = true } end
+		if candidate[id] == nil then
+			updates[#updates + 1] = { section = row[1], key = OVERRIDE_KEYS[row[2]], delete = true }
+		end
 	end
 	if word_delimiters ~= nil or word_delimiters ~= _state.word_delimiters then
 		updates[#updates + 1] = { section = "__global__", key = "word_delimiters",
@@ -725,6 +775,7 @@ local function prepare_override_content(overrides, word_delimiters)
 		if not row.delete then
 			if type(row.value) == "string" then encoded = ConfigSchema.encode_basic_string(row.value)
 			elseif row.key == "priority" then encoded = tostring(math.floor(row.value))
+			elseif row.key == "delay_offset" then encoded = string.format("%." .. DelayResolver.DELAY_DECIMALS .. "f", row.value)
 			else encoded = tostring(row.value) end
 		end
 		local detail
@@ -879,6 +930,7 @@ function M.init(opts)
 		or (opts.delay_transaction ~= nil and type(opts.delay_transaction) ~= "function")
 		or (opts.section_sources_resolver ~= nil and type(opts.section_sources_resolver) ~= "function")
 		or (opts.current_override_path ~= nil and type(opts.current_override_path) ~= "function")
+		or (opts.base_delay ~= nil and type(opts.base_delay) ~= "function")
 	then
 		Logger.error(LOG, "M.init(): opts.override_path and opts.toml_resolver are required.")
 		return
@@ -894,6 +946,7 @@ function M.init(opts)
 		toml_resolver   = opts.toml_resolver,
 		section_sources_resolver = opts.section_sources_resolver,
 		delay_transaction = opts.delay_transaction,
+		base_delay      = opts.base_delay,
 		overrides       = {},
 		global_passthrough = {},
 		common_admitted = false,
@@ -941,17 +994,15 @@ end
 --- @param category string The TOML file name without extension (e.g. "rolls").
 --- @param section string|nil Optional section name within the category.
 
---- Returns the shared global default expansion delay, in milliseconds.
----
---- Published so consumers read the canon instead of mirroring it. The hotstrings
---- config window carried its own `GLOBAL_DEFAULT_DELAY_MS = 750` with a comment
---- saying the two "must stay in sync" — which is the definition of two sources,
---- and the shared TOML is the one the AutoHotkey driver reads.
+--- Returns the base expansion delay, in milliseconds: what a section that
+--- declares no delay waits, shown by the settings window as the placeholder of an
+--- empty field. It is the user's `hotstrings.expansion_delay`, so the window reads
+--- the canon instead of mirroring it (it once carried its own 750).
 --- @return number|nil Milliseconds, or nil before init() has loaded the canon.
 function M.get_global_default_delay_ms()
 	if type(GLOBAL_DEFAULT_DELAY) ~= "number" then return nil end
-	-- GLOBAL_DEFAULT_DELAY is held in seconds; the window speaks milliseconds.
-	return math.floor(GLOBAL_DEFAULT_DELAY * 1000 + 0.5)
+	-- The base is held in seconds; the window speaks milliseconds.
+	return math.floor(base_delay() * 1000 + 0.5)
 end
 
 --- Copies one cascade rung while dropping an invalid activation delay.
@@ -968,12 +1019,38 @@ local function sanitized_resolution_entry(entry)
 	}
 end
 
+--- The base expansion delay in seconds: what a hotstring waits when no rung of
+--- the cascade says otherwise, and what a delay override is an offset of. It is
+--- the user's `hotstrings.expansion_delay`, which the keymap owns at runtime;
+--- before that owner is wired it is the shared default.
+--- @return number
+local function base_delay()
+	if _state and _state.base_delay then
+		local value = _state.base_delay()
+		if type(value) == "number" and value == value and value >= 0 and value < math.huge then return value end
+	end
+	return GLOBAL_DEFAULT_DELAY
+end
+
+--- A user override rung as the cascade reads it: its stored delay turned into
+--- effective seconds, every other field as `sanitized_resolution_entry` leaves it.
+--- @param entry table|nil Stored rung.
+--- @param base number|nil Base expansion delay to measure against; the live one by default.
+--- @return table|nil resolved
+local function user_resolution_entry(entry, base)
+	local resolved = sanitized_resolution_entry(entry)
+	if resolved == nil then return nil end
+	resolved.delay = DelayResolver.effective_delay(entry, base or base_delay())
+	return resolved
+end
+
 --- Builds a pure runtime projection from one unpublished override candidate.
 --- Corpus metadata comes from the registry's already committed parse, never I/O
 --- on the input path. The shared cascade remains the sole precedence owner.
 --- @param overrides table Candidate override tree.
+--- @param base number|nil Base expansion delay to project against; the live one by default.
 --- @return function resolve Group/section/corpus resolver in seconds.
-delay_projection = function(overrides)
+delay_projection = function(overrides, base)
 	return function(category, section, meta)
 		local extension_id = Extensions.parse_category_key(category)
 		local source_category = category
@@ -993,12 +1070,12 @@ delay_projection = function(overrides)
 			meta_section = { delay = meta.section_delays[section] }
 		end
 		return DelayResolver.resolve({
-			user_category = sanitized_resolution_entry(user),
-			user_section = sanitized_resolution_entry(user_section),
+			user_category = user_resolution_entry(user, base),
+			user_section = user_resolution_entry(user_section, base),
 			meta_category = sanitized_resolution_entry(meta),
 			meta_section = sanitized_resolution_entry(meta_section),
 			default_delay = PersonalFiles.components(category) and PersonalFiles.additional_default_delay_seconds
-				or GLOBAL_DEFAULT_DELAY,
+				or base or base_delay(),
 		}).delay
 	end
 end
@@ -1064,11 +1141,11 @@ function M.resolve(category, section)
 	-- category that ships `show_tooltip = false` is the common case and a rung
 	-- testing truthiness turns its preview back on.
 	local resolved = DelayResolver.resolve({
-		user_category  = sanitized_resolution_entry(user),
-		user_section   = sanitized_resolution_entry(user_sec),
+		user_category  = user_resolution_entry(user),
+		user_section   = user_resolution_entry(user_sec),
 		meta_category  = sanitized_resolution_entry(meta),
 		meta_section   = sanitized_resolution_entry(meta_sec),
-		default_delay  = personal and PersonalFiles.additional_default_delay_seconds or GLOBAL_DEFAULT_DELAY,
+		default_delay  = personal and PersonalFiles.additional_default_delay_seconds or base_delay(),
 		default_color  = GLOBAL_DEFAULT_COLOR,
 		category_color = CATEGORY_DEFAULT_COLORS[category],
 		default_priority = HotstringPriority.source_priority(category),
@@ -1126,14 +1203,63 @@ function M.resolve_ext(ext_id, toml_path, section)
 	local meta_sec = requested_section and meta.sections[requested_section] or nil
 
 	return DelayResolver.resolve({
-		user_category = sanitized_resolution_entry(user),
-		user_section = sanitized_resolution_entry(user_sec),
+		user_category = user_resolution_entry(user),
+		user_section = user_resolution_entry(user_sec),
 		meta_category = sanitized_resolution_entry(meta),
 		meta_section = sanitized_resolution_entry(meta_sec),
-		default_delay = GLOBAL_DEFAULT_DELAY,
+		default_delay = base_delay(),
 		default_color = GLOBAL_DEFAULT_COLOR,
 		default_priority = HotstringPriority.source_priority(override_key),
 	})
+end
+
+--- Moves the delays of earlier builds to the stored form, once the base expansion
+--- delay is known: every absolute `delay` becomes an offset of the base, so no
+--- effective delay changes, and the file is rewritten at once. Until then the
+--- absolute delay applies as it stands. A `[_global]` record is the Windows
+--- spelling of the base: this driver keeps its base in config.toml, so the
+--- record is dropped with a warning rather than guessed.
+--- @return boolean ok False when the rewrite was refused; the next start retries.
+local function migrate_legacy_delays()
+	local candidate = clone_value(_state.overrides)
+	local global = DelayResolver.take_legacy_global(candidate)
+	local changed = DelayResolver.adopt_legacy_delays(candidate, base_delay())
+	if global == nil and not changed then return true end
+	if global ~= nil then
+		Logger.warn(LOG, "The override file holds a Windows default delay (%.3f s); the base expansion delay of this "
+			.. "driver is hotstrings.expansion_delay in config.toml, so the record is dropped.", global)
+	end
+	local committed, content = save_to_disk(candidate, _state.word_delimiters)
+	if not committed then
+		Logger.error(LOG, "The delay overrides could not be rewritten as offsets of the base expansion delay; "
+			.. "they apply as they were and the rewrite is retried at the next start.")
+		return false
+	end
+	_state.overrides = candidate
+	_state.source_snapshot = { status = "ok", content = content }
+	_state.epoch = _state.epoch + 1
+	_state.resolve_cache = {}
+	Logger.info(LOG, "Delay overrides migrated to offsets of the base expansion delay.")
+	return true
+end
+
+--- Applies a change of the base expansion delay: the delays of every registered
+--- group are projected again (they are offsets of it), and the delays of earlier
+--- builds are migrated the first time the base is known.
+--- @return boolean ok False when the registry refused the new delays.
+function M.refresh_delays()
+	if not _state or _terminal_owner ~= nil then return true end
+	_state.resolve_cache = {}
+	if _state.delay_transaction
+		and _state.delay_transaction(delay_projection(_state.overrides), function() return true end) ~= true then
+		Logger.error(LOG, "The registry refused the delays projected from the new base expansion delay.")
+		return false
+	end
+	if not _state.writes_blocked and not _state.operation_active and _state.scope_owner == nil
+		and not _state.recovery.has_pending() then
+		migrate_legacy_delays()
+	end
+	return true
 end
 
 --- Sets a user override for a single field. Pass section=nil for file-level.
@@ -1168,11 +1294,21 @@ function M.set_override(category, section, field, value)
 	local entry = candidate[category]
 	entry.sections = entry.sections or {}
 
+	local target = entry
 	if section then
 		entry.sections[section] = entry.sections[section] or {}
-		entry.sections[section][field] = value
+		target = entry.sections[section]
+	end
+	if field == "delay" then
+		-- The caller speaks effective seconds; the file stores an offset of the base.
+		clear_override_field(target, "delay")
+		if value == 0 then
+			target.delay_unlimited = true
+		else
+			target.delay_offset = DelayResolver.offset_for(value, base_delay())
+		end
 	else
-		entry[field] = value
+		target[field] = value
 	end
 
 	local committed, content = save_to_disk(candidate, _state.word_delimiters)
@@ -1211,9 +1347,9 @@ function M.clear_override(category, section, field)
 	if not target then return true end
 
 	if field then
-		target[field] = nil
+		clear_override_field(target, field)
 	else
-		target.delay        = nil
+		clear_override_field(target, "delay")
 		target.color        = nil
 		target.show_tooltip = nil
 		target.priority     = nil
@@ -1287,10 +1423,20 @@ end
 
 --- The delay resolver of one override tree, as the registry projection runs it.
 --- @param overrides table Reader override tree.
+--- @param base number|nil Base expansion delay to project against; the live one by default.
 --- @return function resolve (group, section, corpus metadata) -> seconds.
-function M.delay_projection(overrides)
+function M.delay_projection(overrides, base)
 	assert(type(overrides) == "table", "delay projection needs an override tree")
-	return delay_projection(overrides)
+	return delay_projection(overrides, base)
+end
+
+--- The effective delay a stored override rung describes, for the scope's proof
+--- that the reader agrees with what it planned.
+--- @param rung table|nil Reader override rung.
+--- @param base number Base expansion delay in seconds.
+--- @return number|nil seconds
+function M.effective_delay(rung, base)
+	return DelayResolver.effective_delay(rung, base)
 end
 
 --- Holds the override file for one scope transaction; ordinary mutations and
@@ -1336,6 +1482,19 @@ end
 
 --- Prepares one admitted source edit together with only its masking legacy leaves.
 --- The caller holds this override owner until publication or a verified inverse.
+--- The effective-seconds view of an override rung, the form the shared
+--- personal-metadata planner reads: the stored offsets become seconds.
+--- @param rung table|nil Stored override category or section record.
+--- @return table view Record with `delay`, the other fields and `sections`.
+local function effective_view(rung)
+	local view = { sections = {} }
+	if type(rung) ~= "table" then return view end
+	view.delay = DelayResolver.effective_delay(rung, base_delay())
+	view.color, view.show_tooltip, view.priority = rung.color, rung.show_tooltip, rung.priority
+	for name, nested in pairs(rung.sections or {}) do view.sections[name] = effective_view(nested) end
+	return view
+end
+
 function M.prepare_personal_metadata(owner, record, section, field, value)
 	if not require_state("prepare_personal_metadata") or _state.scope_owner ~= owner or _state.writes_blocked
 		or type(record) ~= "table" or record.admitted ~= true or not PersonalFiles.components(record.owner) then return nil end
@@ -1343,12 +1502,13 @@ function M.prepare_personal_metadata(owner, record, section, field, value)
 	if loader.adoption_current(record) ~= true then return nil end
 	local overrides = clone_value(_state.overrides)
 	local legacy_name = personal_override_owner(record.owner, overrides)
-	local legacy = overrides[legacy_name] or {}
+	local stored = overrides[legacy_name] or {}
+	local legacy = effective_view(stored)
 	local plan = require("hotstrings.personal_metadata").prepare(record.content, section, field, value, legacy)
 	if not plan then return nil end
-	if legacy_name and legacy then
-		if plan.remove_file then legacy[field] = nil end
-		if plan.remove_section then legacy.sections[section][field] = nil end
+	if legacy_name and stored then
+		if plan.remove_file then clear_override_field(stored, field) end
+		if plan.remove_section then clear_override_field(stored.sections[section], field) end
 	end
 	local override_content = prepare_override_content(overrides, _state.word_delimiters)
 	if not override_content then return nil end
@@ -1380,8 +1540,8 @@ function M.personal_catalogue_effective(record, section)
 	local overrides = candidate and candidate.owner == _state.scope_owner and candidate.overrides or _state.overrides
 	local user = overrides[personal_override_owner(record.owner, overrides)] or {}
 	return DelayResolver.resolve({
-		user_category = sanitized_resolution_entry(user),
-		user_section = sanitized_resolution_entry(section and (user.sections or {})[section] or nil),
+		user_category = user_resolution_entry(user),
+		user_section = user_resolution_entry(section and (user.sections or {})[section] or nil),
 		meta_category = sanitized_resolution_entry(registered.metadata),
 		meta_section = sanitized_resolution_entry(section and personal_section_metadata(registered.metadata, section) or nil),
 		default_delay = PersonalFiles.additional_default_delay_seconds,
@@ -1499,7 +1659,7 @@ function M.get_toml_defaults(category, section)
 	local meta_sec = requested_section and meta.sections[requested_section] or nil
 	return {
 		delay = (meta_sec and meta_sec.delay) or meta.delay
-			or (personal and PersonalFiles.additional_default_delay_seconds or GLOBAL_DEFAULT_DELAY),
+			or (personal and PersonalFiles.additional_default_delay_seconds or base_delay()),
 		color = (meta_sec and meta_sec.color) or meta.color,
 		priority = (meta_sec and meta_sec.priority) or meta.priority,
 	}
@@ -1568,9 +1728,10 @@ function M.get_user_override(category, section)
 	if not cat then return nil end
 	local target = section and (cat.sections or {})[section] or cat
 	if not target then return nil end
-	if target.delay == nil and target.color == nil and target.show_tooltip == nil
+	local delay = DelayResolver.effective_delay(target, base_delay())
+	if delay == nil and target.color == nil and target.show_tooltip == nil
 		and target.priority == nil then return nil end
-	return { delay = target.delay, color = target.color, show_tooltip = target.show_tooltip,
+	return { delay = delay, color = target.color, show_tooltip = target.show_tooltip,
 		priority = target.priority }
 end
 

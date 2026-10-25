@@ -45,6 +45,8 @@ local ChoiceCatalogue = require("hotstrings.choice_catalogue")
 local PersonalFiles = require("hotstrings.personal_files")
 local PersonalAdoption = require("infra.personal_file_adoption")
 local ManifestReader = require("infra.manifest_reader")
+local Preferences = require("infra.hotstring_preferences")
+local KEY = require("config_keys").KEY
 
 local LOG = "modules.hotstrings.hotstrings_config"
 local _personal_sources = {}
@@ -65,16 +67,11 @@ end
 -- open: the same one the config window edits and the same shape macOS writes.
 local OVERRIDES_FILE = "hotstrings_overrides.toml"
 
--- The reserved override key holding the user's GLOBAL default delay, as opposed
--- to any one category's. Spelled exactly as AHK spells it
--- (infra/hotstrings/hotstrings_catalogue.ahk consults `_HotstringsOverrides["_global"]`
--- as the lowest-priority user value) so the two override files stay readable by
--- the same rules — where the file LIVES differs per driver by design, but what a
--- key means inside it must not.
---
--- The leading underscore is what keeps it out of the catalogue: category ids are
--- TOML file stems, and no pack is named "_global".
-local GLOBAL_CATEGORY = "_global"
+-- The base expansion delay is the canonical config.toml leaf
+-- `hotstrings.expansion_delay`, shared by the three drivers. A delay override in
+-- the file above is stored as an offset of it (`delay_offset`, or
+-- `delay_unlimited` for 0), so it keeps its distance from the base.
+local BASE_DELAY_PATH = KEY.HOTSTRINGS_EXPANSION_DELAY
 
 
 -- =========================================
@@ -372,6 +369,18 @@ end
 
 load_shared_defaults()
 
+--- The base expansion delay in seconds: what a hotstring waits when no rung
+--- of the cascade says otherwise, and what a delay override is an offset of.
+--- It is the user's `hotstrings.expansion_delay`, else the shared default. A
+--- stored value the owner refuses is read as absent (and reported by the
+--- configuration cleanup), never guessed.
+--- @return number
+local function base_delay()
+	local value = Preferences.get(BASE_DELAY_PATH)
+	if type(value) == "number" and value == value and value >= 0 and value < math.huge then return value end
+	return GLOBAL_DEFAULT_DELAY
+end
+
 
 
 
@@ -394,6 +403,11 @@ local _common_override_admitted = false
 --- otherwise be walked several times per key on the input path.
 local _resolve_cache = {}
 
+--- The hotstring-preference generation the memo was built under: the base
+--- expansion delay is one of those preferences, and a scope can replace it
+--- without going through the setter below.
+local _resolve_generation = nil
+
 --- The override file's path.
 --- @return string
 local function override_config_dir()
@@ -412,9 +426,9 @@ end
 local function report_retired_overrides()
 	if type(_config_dir) == "string" and _config_dir:match("%.toml$") then return end
 	for id, entry in pairs(_overrides) do
-		if id ~= GLOBAL_CATEGORY and choice_is_retired(id) then
+		if choice_is_retired(id) then
 			ConfigOutdated.report_in_file(overrides_path(), { id }, "no loaded hotstring category has this id")
-		elseif id ~= GLOBAL_CATEGORY then
+		else
 			for name in pairs(entry.sections or {}) do
 				if choice_is_retired(id, name) then
 					ConfigOutdated.report_in_file(overrides_path(), { id, name },
@@ -427,13 +441,19 @@ end
 
 --- Interprets override file bytes, raising when they are not valid TOML.
 --- @param content string Exact file bytes.
---- @return table overrides { [category] = { delay, color, show_tooltip, priority, sections } }
+--- @return table overrides { [category] = { delay_offset, delay_unlimited, legacy_delay, color,
+---   show_tooltip, priority, sections } }
 local function parse_override_content(content)
 	local parsed = TomlCodec.decode(content)
 	assert(type(parsed) == "table", "the override file is not valid TOML")
 	local function override_fields(values)
+		local offset = tonumber(values.delay_offset)
 		return {
-			delay = tonumber(values.delay),
+			-- Seconds added to the base expansion delay; the finite check refuses nan and inf.
+			delay_offset = offset ~= nil and offset == offset and math.abs(offset) < math.huge and offset or nil,
+			delay_unlimited = values.delay_unlimited == true or nil,
+			-- The absolute delay of earlier builds, held only until load_overrides migrates it.
+			legacy_delay = tonumber(values.delay),
 			color = values.color,
 			show_tooltip = values.show_tooltip,
 			priority = tonumber(values.priority),
@@ -488,7 +508,9 @@ local function copy_overrides(source)
 	local copy = {}
 	for category, entry in pairs(source) do
 		local cloned = {
-			delay = entry.delay,
+			delay_offset = entry.delay_offset,
+			delay_unlimited = entry.delay_unlimited,
+			legacy_delay = entry.legacy_delay,
 			color = entry.color,
 			show_tooltip = entry.show_tooltip,
 			priority = entry.priority,
@@ -496,7 +518,9 @@ local function copy_overrides(source)
 		}
 		for section, values in pairs(entry.sections or {}) do
 			cloned.sections[section] = {
-				delay = values.delay,
+				delay_offset = values.delay_offset,
+				delay_unlimited = values.delay_unlimited,
+				legacy_delay = values.legacy_delay,
 				color = values.color,
 				show_tooltip = values.show_tooltip,
 				priority = values.priority,
@@ -517,14 +541,19 @@ end
 local function save_overrides(overrides, previous, current)
 	previous = previous or _overrides
 	if _override_source.status ~= "ok" and _override_source.status ~= "absent" then return false end
-	local fields = { "delay", "color", "show_tooltip", "priority" }
+	-- Field name in memory, then the leaf it is stored as. `legacy_delay` is the
+	-- absolute spelling of earlier builds: only ever removed.
+	local fields = { { "delay_offset", "delay_offset" }, { "delay_unlimited", "delay_unlimited" },
+		{ "legacy_delay", "delay" }, { "color", "color" }, { "show_tooltip", "show_tooltip" },
+		{ "priority", "priority" } }
 	local rows = {}
 	local function update(segments, previous, candidate)
 		previous, candidate = previous or {}, candidate or {}
 		for _, field in ipairs(fields) do
-			if previous[field] ~= candidate[field] then
-				rows[#rows + 1] = { section = KeyPath.render(segments), key = field,
-					value = candidate[field], delete = candidate[field] == nil and true or nil }
+			local name, key = field[1], field[2]
+			if previous[name] ~= candidate[name] then
+				rows[#rows + 1] = { section = KeyPath.render(segments), key = key,
+					value = candidate[name], delete = candidate[name] == nil and true or nil }
 			end
 		end
 	end
@@ -563,6 +592,64 @@ local function save_overrides(overrides, previous, current)
 	end
 	_override_source = { status = "ok", content = content }
 	return true
+end
+
+--- Removes the header of a table that holds nothing, with the blank lines after it.
+--- @param content string Exact file bytes.
+--- @param name string Bare table name.
+--- @return string|nil trimmed The bytes without the header, nil when the table is absent or not empty.
+local function without_empty_header(content, name)
+	local lines, header = {}, nil
+	for line in (content .. "\n"):gmatch("([^\n]*)\n") do lines[#lines + 1] = line end
+	if lines[#lines] == "" then lines[#lines] = nil end
+	for index, line in ipairs(lines) do
+		if line:match("^%s*%[" .. name .. "%]%s*$") then header = index; break end
+	end
+	if not header then return nil end
+	local last = header
+	while lines[last + 1] ~= nil and lines[last + 1]:match("^%s*$") do last = last + 1 end
+	if lines[last + 1] ~= nil and not lines[last + 1]:match("^%s*%[") then return nil end
+	for _ = header, last do table.remove(lines, header) end
+	return table.concat(lines, "\n") .. "\n"
+end
+
+--- Moves the delays of earlier builds to the stored form, once, right after the
+--- daemon has initialised the owner. Until then an absolute delay applies as it
+--- was (the cascade reads it), so nothing depends on this step's timing. The
+--- menu-set default delay (`[_global]`) becomes the
+--- base expansion delay in config.toml, and every absolute `delay` becomes an
+--- offset of the base, so no effective delay changes. Memory takes the migrated
+--- values even when a write is refused: the old spellings stay in their files
+--- and the next start repeats the step.
+function M.migrate_legacy_delays()
+	if _override_source.status ~= "ok" then return end
+	local previous = _overrides
+	local candidate = copy_overrides(previous)
+	local global = DelayResolver.take_legacy_global(candidate)
+	if global ~= nil then
+		local stored, reason = Preferences.set(BASE_DELAY_PATH, global)
+		if stored ~= true then
+			Logger.error(LOG, "The default delay of the override file could not move to config.toml (%s); it stays "
+				.. "in the override file and the move is retried at the next start.", tostring(reason))
+			candidate[DelayResolver.LEGACY_GLOBAL_CATEGORY] = previous[DelayResolver.LEGACY_GLOBAL_CATEGORY]
+			global = nil
+		end
+	end
+	local changed = DelayResolver.adopt_legacy_delays(candidate, base_delay())
+	if global == nil and not changed then return end
+	if not save_overrides(candidate, previous) then
+		Logger.error(LOG, "The delay overrides could not be rewritten as offsets of the base expansion delay; "
+			.. "they apply for this session and the rewrite is retried at the next start.")
+	elseif global ~= nil then
+		-- The leaf writer removes leaves only: take the emptied record's header away too.
+		local trimmed = without_empty_header(_override_source.content, DelayResolver.LEGACY_GLOBAL_CATEGORY)
+		if trimmed ~= nil then
+			local published = Writer.publish_if_unchanged(overrides_path(), trimmed, nil, _override_source)
+			if published == true then _override_source = { status = "ok", content = trimmed } end
+		end
+	end
+	_overrides, _resolve_cache = candidate, {}
+	Logger.info(LOG, "Delay overrides migrated to offsets of the base expansion delay.")
 end
 
 local function engine_generation(engine)
@@ -691,6 +778,8 @@ end
 --- @param section string|nil
 --- @return table { delay, color, show_tooltip, priority, has_override }
 function M.resolve(category, section)
+	local generation = Preferences.generation()
+	if generation ~= _resolve_generation then _resolve_cache, _resolve_generation = {}, generation end
 	local key = tostring(category) .. "\1" .. tostring(section or "")
 	local cached = _resolve_cache[key]
 	if cached then return cached end
@@ -702,13 +791,14 @@ function M.resolve(category, section)
 	end
 	local meta = _categories[category] or {}
 
+	local base = base_delay()
 	local resolved = DelayResolver.resolve({
-		user_category  = user,
-		user_section   = section and (user.sections or {})[section] or nil,
+		user_category  = DelayResolver.with_effective_delay(user, base),
+		user_section   = section and DelayResolver.with_effective_delay((user.sections or {})[section], base) or nil,
 		meta_category  = meta,
 		meta_section   = section and (meta.sections or {})[section] or nil,
 		default_delay  = PersonalFiles.components(category) and PersonalFiles.additional_default_delay_seconds
-			or M.get_global_delay(),
+			or base,
 		default_color  = GLOBAL_DEFAULT_COLOR,
 		category_color = CATEGORY_DEFAULT_COLORS[category],
 		default_priority = Priority.source_priority(category),
@@ -717,41 +807,38 @@ function M.resolve(category, section)
 	return resolved
 end
 
---- The delay used by every category that declares none: the user's global
---- choice, or the shipped default.
----
---- Occupies the same rung as AHK's reserved "_global" override key — the lowest
---- USER value, sitting just above the hardcoded shared default and below
---- anything a category or section says. It is spelled as a normal override entry
---- rather than as a field of its own so that one writer, one file and one
---- clear-override path serve it like all the others; GLOBAL_CATEGORY is not a
---- real category, and nothing enumerates it, because the catalogue is what
---- lists categories and this key never appears there.
+--- The base expansion delay: what every category that declares none waits, and
+--- what a delay override is an offset of. The user's `hotstrings.expansion_delay`
+--- (config.toml, the leaf macOS and Windows read too), else the shared default.
 --- @return number Seconds.
-function M.get_global_delay()
-	local entry = _overrides[GLOBAL_CATEGORY]
-	local delay = entry and tonumber(entry.delay) or nil
-	if delay then return delay end
-	return GLOBAL_DEFAULT_DELAY
+function M.get_base_delay()
+	return base_delay()
 end
 
---- Whether the user has set a global delay of their own.
+--- Whether the user has set a base expansion delay of their own.
 --- @return boolean
-function M.has_global_delay_override()
-	local entry = _overrides[GLOBAL_CATEGORY]
-	return entry ~= nil and tonumber(entry.delay) ~= nil
+function M.has_base_delay_override()
+	return Preferences.is_explicit(BASE_DELAY_PATH)
 end
 
---- Sets the global default delay.
---- @param seconds number|nil nil clears it, restoring the shipped default.
+--- Sets the base expansion delay. Delay overrides follow it: they are stored as
+--- offsets of the base.
+--- @param seconds number|nil nil restores the shared default.
 --- @return boolean
-function M.set_global_delay(seconds)
-	if seconds == nil then return M.clear_override(GLOBAL_CATEGORY, nil) end
-	if type(seconds) ~= "number" or seconds < 0 then
-		Logger.error(LOG, "set_global_delay(): %s is not a non-negative number.", tostring(seconds))
+function M.set_base_delay(seconds)
+	if seconds == nil then seconds = GLOBAL_DEFAULT_DELAY end
+	if type(seconds) ~= "number" or seconds ~= seconds or seconds < 0 or seconds == math.huge then
+		Logger.error(LOG, "set_base_delay(): %s is not a non-negative number.", tostring(seconds))
 		return false
 	end
-	return M.set_override(GLOBAL_CATEGORY, nil, "delay", seconds)
+	local stored, reason = Preferences.set(BASE_DELAY_PATH, seconds)
+	if stored ~= true then
+		Logger.error(LOG, "set_base_delay(): not persisted: %s.", tostring(reason))
+		return false
+	end
+	_resolve_cache = {}
+	notify_change()
+	return true
 end
 
 --- Sets one override field, persisting it.
@@ -787,7 +874,21 @@ function M.set_override(category, section, field, value)
 		entry.sections[section] = entry.sections[section] or {}
 		target = entry.sections[section]
 	end
-	target[field] = value
+	if field == "delay" then
+		-- The caller speaks effective seconds; the file stores an offset of the base.
+		if value ~= nil and (type(value) ~= "number" or value ~= value or value < 0 or value == math.huge) then
+			Logger.error(LOG, "set_override(): a delay is a non-negative number of seconds.")
+			return false
+		end
+		target.delay_offset, target.delay_unlimited = nil, nil
+		if value == 0 then
+			target.delay_unlimited = true
+		elseif value ~= nil then
+			target.delay_offset = DelayResolver.offset_for(value, base_delay())
+		end
+	else
+		target[field] = value
+	end
 	candidate[category] = entry
 
 	if not commit_override_candidate(candidate, field == "priority") then return false end
@@ -839,7 +940,7 @@ function M.get_user_override(category, section)
 	if section then source = (entry.sections or {})[section] end
 	if type(source) ~= "table" then return {} end
 	return {
-		delay        = source.delay,
+		delay        = DelayResolver.effective_delay(source, base_delay()),
 		color        = source.color,
 		show_tooltip = source.show_tooltip,
 		priority     = source.priority,
@@ -877,7 +978,13 @@ function M.clear_override(category, section, field)
 		end
 		local target = entry
 		if section then target = (entry.sections or {})[section] end
-		if type(target) == "table" then target[field] = nil end
+		if type(target) == "table" then
+			if field == "delay" then
+				target.delay_offset, target.delay_unlimited = nil, nil
+			else
+				target[field] = nil
+			end
+		end
 	elseif section then
 		if entry.sections then entry.sections[section] = nil end
 	else
@@ -889,14 +996,13 @@ function M.clear_override(category, section, field)
 	return true
 end
 
---- The shared global default delay, in milliseconds.
----
---- Published so the config window reads the canon instead of mirroring it: the
---- macOS window carried its own 750 with a comment saying the two "must stay in
---- sync", which is the definition of two sources.
+--- The base expansion delay, in milliseconds: what a section that declares no
+--- delay waits, shown by the settings window as the placeholder of an empty
+--- field. It follows the user's `hotstrings.expansion_delay`, so the window
+--- reads the canon instead of mirroring it.
 --- @return integer
 function M.get_global_default_delay_ms()
-	return math.floor(GLOBAL_DEFAULT_DELAY * 1000 + 0.5)
+	return math.floor(base_delay() * 1000 + 0.5)
 end
 
 --- The neutral shade the settings window's "make everything grey" button applies.
@@ -2338,14 +2444,15 @@ end
 --- manifest recommendation instead of assuming deletion restores it.
 --- @param category string Loaded category.
 --- @param section string Section name.
+--- @param base number|nil Base expansion delay to measure against; the user's by default.
 --- @return number seconds
-function M.inherited_delay(category, section)
+function M.inherited_delay(category, section, base)
 	local meta = _categories[category]
 	assert(type(meta) == "table", "unknown hotstring category: " .. tostring(category))
 	return DelayResolver.resolve({
 		meta_category = meta,
 		meta_section = (meta.sections or {})[section],
-		default_delay = GLOBAL_DEFAULT_DELAY,
+		default_delay = base or base_delay(),
 	}).delay
 end
 

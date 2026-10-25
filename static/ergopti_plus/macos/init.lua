@@ -1725,6 +1725,9 @@ do
 			return require("native_path").without_trailing_separators(config_paths.get_config_dir()) .. "/hotstrings_config.toml"
 		end,
 		delay_transaction = keymap.with_hotstring_delays,
+		-- The base expansion delay the overrides are offsets of is the keymap's,
+		-- which the preferences set from hotstrings.expansion_delay.
+		base_delay = keymap.get_base_delay,
 		toml_resolver = function(category)
 			-- A namespaced extension pack names its own discovered file, and a
 			-- category an extension binds whole reads its metadata from it,
@@ -1770,6 +1773,9 @@ do
 	})
 
 	if hotstring_config_ready ~= true then error("hotstring override owner did not initialize") end
+	-- The delays it projects onto the registry are offsets of the base: project
+	-- them again whenever the base changes, and migrate the old file once it is known.
+	keymap.on_base_delay_change(hotstrings_config.refresh_delays)
 
 	-- Wire the config window so it can discover personal + extension files.
 	local ok_cw, cw = pcall(require, "ui.hotstrings_config_window")
