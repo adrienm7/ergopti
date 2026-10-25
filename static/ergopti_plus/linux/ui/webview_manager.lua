@@ -723,11 +723,23 @@ function M.eval_js(app_name, js_code)
 		Logger.debug(LOG, "eval_js: no live webview for '%s' — nothing to push to.", app_name)
 		return false
 	end
+	local owned = _windows[app_name]
+	local function current()
+		return owned ~= nil and _windows[app_name] == owned and _gtk_windows[app_name] == wref
+			and owned.epoch == wref.epoch and not owned.debt and not owned.failed
+			and not owned.closing and not owned.cancelled and not wref.cancelled
+			and not wref.retiring and not wref.settled and not wref.view_settled
+			and wref.registration == true and wref.signal_id ~= nil
+	end
+	-- A failed close retains native resources for retry, never page admission.
+	-- A live acquiring page still needs its synchronous ready response.
+	if not current() then return false end
 	local ok, err = pcall(function() wref.webview:run_javascript(js_code, nil, nil, nil) end)
 	if not ok then
 		Logger.error(LOG, "eval_js: run_javascript failed for '%s': %s", app_name, tostring(err))
 		return false
 	end
+	if not current() then return false end
 	Logger.debug(LOG, "eval_js: pushed %d char(s) to '%s'.", #js_code, app_name)
 	return true
 end
