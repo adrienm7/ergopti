@@ -555,3 +555,39 @@ _RIT_PublicFailureJsonNeverSerializesNativeReceipt() {
 	AssertEqual("C:\cfg\backup", Decoded["backup_path"], "the original user-visible backup is preserved")
 }
 Test("Release install: page JSON contains only canonical safe failure fields", _RIT_PublicFailureJsonNeverSerializesNativeReceipt)
+
+
+_RIT_BackupAllocationPreservesOrdinaryFile(Mode) {
+	Root := A_Temp . "\ergopti_rit_occupied_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "generation = 1`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Folder := Cfg . "\" . Rules["folder"]
+		Base := Rules["kinds"]["pre_install"] . "-20260930-101500"
+		if Mode != "base" {
+			First := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+			AssertEqual(Base, First["id"])
+		}
+		Suffix := Mode == "base" ? "" : Mode == "next" ? "-2" : "-12"
+		Expected := Base . (Mode == "base" ? "-2" : Mode == "next" ? "-3" : "-13")
+		Occupied := Folder . "\" . Base . Suffix
+		DirCreate(Folder)
+		Sentinel := "foreign ordinary file " . Mode . "`n"
+		AssertTrue(FSWriteCreateDurable(Occupied, Sentinel), "the collision must be an actual ordinary file")
+		AssertFalse(DirExist(Occupied), "the collision must not be a backup directory")
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 2`n"))
+		Created := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		AssertEqual(Expected, Created["id"], "allocation must advance above every retained matching file or directory")
+		AssertEqual(Sentinel, FSReadUtf8Exact(Occupied), "allocation cannot replace or delete the foreign file")
+		AssertEqual(Created["id"], ConfigBackup_Latest(Cfg, "pre_install", Rules)["id"],
+			"the new complete backup must retain numeric chronology")
+		AssertEqual("generation = 2`n", FSReadUtf8Exact(Created["path"] . "\config\config.toml"))
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+for _RIT_OccupiedMode in ["base", "next", "gap"]
+	Test("Config backup: ordinary file at " . _RIT_OccupiedMode . " preserves bytes and allocation order (config-backup-ordinary-collision)",
+		_RIT_BackupAllocationPreservesOrdinaryFile.Bind(_RIT_OccupiedMode))
