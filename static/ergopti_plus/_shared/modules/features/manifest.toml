@@ -2568,10 +2568,23 @@ description_key = "menu.caps_word.pointer.other_buttons"
 # Windows (GESTURE_FACTORY_DEFAULTS) build what « Restaurer les valeurs
 # conseillées » writes from them rather than from a copy of their own;
 # test-gesture-defaults-single-source.cjs holds both drivers to this list.
-# Linux recommends the Windows binding of every slot both drivers have
-# (maintainer decision, 2026-10-22), except the four-finger vertical swipes:
-# their Windows actions, win_app_prev and win_app_next, do not exist in the
-# Linux catalogue, so those two stay unassigned there.
+# Recommendation rule (maintainer decision, 2026-10-24): recommend nothing the
+# system already does with that gesture, unless the driver takes the system's
+# own assignment over itself. Every slot stays reassignable on every OS, and the
+# Gestures menu says to remove the system assignment first to avoid a double
+# action (menu.gestures.recommended_note).
+# - Linux: the touchpad is read without being grabbed, so GNOME, KWin, Hyprland
+#   and cosmic-comp also act on a three- or four-finger swipe; those eight slots
+#   are recommended "none" (menu.gestures.recommended_reason_linux). The taps
+#   have no desktop default and keep their binding.
+# - macOS: the three-finger tap is the system's « Look up & data detectors »
+#   (on by default), so it is recommended "none"
+#   (menu.gestures.recommended_reason_macos). The three-finger swipes are off in
+#   a default macOS install, and the four-finger swipes already recommend "none".
+# - Windows: every slot is a system gesture, but the driver writes the touchpad
+#   registry itself (modules/gestures/touchpad_registry.ahk, backed up first),
+#   so Windows runs only Ergopti's action: no double action, the recommendation
+#   stays.
 [[features.gestures]]
 id = "enabled"
 platforms = ["ahk", "hs", "linux"]
@@ -2585,7 +2598,7 @@ description_key = "menu.gestures.enabled"
 id = "swipe_3_down"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "tab_close", hs = "tab_next", linux = "tab_close" }
+recommended_per_platform = { ahk = "tab_close", hs = "tab_next", linux = "none" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_3_down"
@@ -2594,7 +2607,7 @@ description_key = "menu.gestures.swipe_3_down"
 id = "swipe_3_left"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "tab_prev", hs = "sel_word_prev", linux = "tab_prev" }
+recommended_per_platform = { ahk = "tab_prev", hs = "sel_word_prev", linux = "none" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_3_left"
@@ -2603,7 +2616,7 @@ description_key = "menu.gestures.swipe_3_left"
 id = "swipe_3_right"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "tab_next", hs = "sel_word_next", linux = "tab_next" }
+recommended_per_platform = { ahk = "tab_next", hs = "sel_word_next", linux = "none" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_3_right"
@@ -2612,7 +2625,7 @@ description_key = "menu.gestures.swipe_3_right"
 id = "swipe_3_up"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "tab_new", hs = "tab_prev", linux = "tab_new" }
+recommended_per_platform = { ahk = "tab_new", hs = "tab_prev", linux = "none" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_3_up"
@@ -2630,7 +2643,7 @@ description_key = "menu.gestures.swipe_4_down"
 id = "swipe_4_left"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "desktop_prev", hs = "none", linux = "desktop_prev" }
+recommended_per_platform = { ahk = "desktop_prev", hs = "none", linux = "none" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_4_left"
@@ -2639,7 +2652,7 @@ description_key = "menu.gestures.swipe_4_left"
 id = "swipe_4_right"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "desktop_next", hs = "none", linux = "desktop_next" }
+recommended_per_platform = { ahk = "desktop_next", hs = "none", linux = "none" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_4_right"
@@ -2657,7 +2670,7 @@ description_key = "menu.gestures.swipe_4_up"
 id = "tap_3"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended = "left_click_toggle"
+recommended_per_platform = { ahk = "left_click_toggle", hs = "none", linux = "left_click_toggle" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.tap_3"
@@ -6463,6 +6476,16 @@ i18n = "common.clear_to_system"
 [[menu.gestures_menu]]
 type = "---"
 
+# The recommended-defaults rule of 2026-10-24 (see section 3.6): the preset
+# avoids what the system already does, every slot stays reassignable, and the
+# user removes the system's own assignment first to avoid a double action.
+# A `list` whose provider publishes the `gesture_recommended_notes` template
+# below on every driver (labels are inert: the coverage gate credits them only
+# through a published template).
+[[menu.gestures_menu]]
+type = "list"
+id = "gesture_recommended_notes"
+
 # `command` since 2026-08-07: the handler's whole body was one row with a static
 # label, which is what a declaration already expresses.
 [[menu.gestures_menu]]
@@ -9319,6 +9342,25 @@ platforms = ["hs"]
 unavailable = "hide"
 
 # Cached system status presentation; native inventories and settings/probes stay native.
+[[menu.gesture_recommended_notes]]
+type = "label"
+id = "gesture_recommended_note"
+i18n = "menu.gestures.recommended_note"
+
+[[menu.gesture_recommended_notes]]
+type = "label"
+id = "gesture_recommended_reason_linux"
+i18n = "menu.gestures.recommended_reason_linux"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.gesture_recommended_notes]]
+type = "label"
+id = "gesture_recommended_reason_macos"
+i18n = "menu.gestures.recommended_reason_macos"
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.gesture_system_status_windows_frame]]
 type = "include"
 section = "gesture_system_status_unknown"

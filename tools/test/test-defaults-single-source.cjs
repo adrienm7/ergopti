@@ -8,12 +8,25 @@ const { isDeepStrictEqual } = require('node:util');
 const paths = require('../lib/paths.cjs');
 
 // Linux recommends exactly what Windows recommends (maintainer decision,
-// 2026-10-22). Each exception names a Windows value Linux cannot run; the
-// gate proves that reason still holds, so a stale exception fails too.
+// 2026-10-22). Each exception names a Windows value Linux cannot run, or must
+// not recommend; the gate proves that reason still holds, so a stale exception
+// fails too. Decision of 2026-10-24: the touchpad is read without being
+// grabbed, so a three- or four-finger swipe is also handled by the desktop and
+// is recommended "none" ("desktop-also-acts").
 const LINUX_RECOMMENDATION_EXCEPTIONS = {
 	// win_app_prev and win_app_next are absent from the Linux catalogue.
 	'gestures.swipe_4_down': { linux: 'none', reason: 'windows-action-absent-on-linux' },
 	'gestures.swipe_4_up': { linux: 'none', reason: 'windows-action-absent-on-linux' },
+	...Object.fromEntries(
+		[
+			'swipe_3_up',
+			'swipe_3_down',
+			'swipe_3_left',
+			'swipe_3_right',
+			'swipe_4_left',
+			'swipe_4_right'
+		].map((slot) => [`gestures.${slot}`, { linux: 'none', reason: 'desktop-also-acts' }])
+	),
 	// Linux only reports the layout's own number row (number_row_policy).
 	'layout.direct_access_digits': { linux: 'native', reason: 'native-number-row-only' }
 };
@@ -62,7 +75,9 @@ function linuxRecommendationDrift(manifest, linuxActions) {
 		const reasonHolds =
 			exception.reason === 'windows-action-absent-on-linux'
 				? entry.type === 'action' && !linuxActions.has(windows)
-				: exception.reason === 'native-number-row-only' && windows !== 'native';
+				: exception.reason === 'desktop-also-acts'
+					? entry.type === 'action' && windows !== 'none'
+					: exception.reason === 'native-number-row-only' && windows !== 'native';
 		if (linux !== exception.linux || !reasonHolds)
 			drift.push(`${name}: the declared Linux exception (${exception.reason}) no longer holds`);
 	}

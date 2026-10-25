@@ -650,6 +650,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-action-catalogue-shared-projection.cjs"],
 			"repro": "node tools/test/test-action-catalogue-shared-projection.cjs"
+		},
+		{
+			"id": "recommended-defaults-rule",
+			"ordinal": 487,
+			"name": "recommended defaults avoid system conflicts (Linux swipes, macOS tap), one trigger debounce, MLX reason shown",
+			"cmd": "node",
+			"args": ["tools/test/test-recommended-defaults-rule.cjs"],
+			"repro": "npm run test:recommended-defaults-rule"
 		}
 	]
 }
