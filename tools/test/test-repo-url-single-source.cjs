@@ -33,6 +33,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 const assert = require('node:assert/strict');
 const { execFileSync } = require('child_process');
 
@@ -248,9 +249,12 @@ assert.throws(
 	/controlled read refusal/
 );
 
-const { failures, scanned } = scanTrackedFiles(files, (file) =>
-	fs.readFileSync(path.join(ROOT, file), 'utf8')
-);
+/** Reads an indexed text source without hiding filesystem failures. */
+function readTrackedSource(file) {
+	return fs.readFileSync(path.join(ROOT, file), 'utf8');
+}
+
+const { failures, scanned } = scanTrackedFiles(files, readTrackedSource);
 
 // ==================================================
 // ======= 1/ Hosts, Bundle Ids and App Names =======
@@ -357,6 +361,50 @@ if (process.argv.includes('--shrink')) {
 				'node tools/test/test-repo-url-single-source.cjs --shrink'
 		);
 }
+
+// Execute the genuine scanner body with real filesystem reads, then replace
+// only that native read boundary with an exact refusal. A skipped source can
+// never count as a completed repository check.
+const readProbe = files.find(
+	(file) =>
+		CODE_EXTENSIONS.has(path.extname(file)) &&
+		!FIXTURE_PATH.test(file) &&
+		!EXAMPLE_EXTENSION.test(file)
+);
+assert.ok(readProbe, 'the tracked census must contain production code for the read regression');
+const readProbePath = path.join(ROOT, readProbe);
+const scanSource = `${readTrackedSource.toString()}; (${scanTrackedFiles.toString()})(probeFiles, readTrackedSource)`;
+const scanWorld = { ROOT, path, violations, probeFiles: [readProbe] };
+const normalRead = vm.runInNewContext(scanSource, { ...scanWorld, fs });
+assert.equal(normalRead.scanned, 1, 'a real readable tracked source must be counted');
+assert.equal(normalRead.failures.length, 0, 'the actual production control must be valid');
+const readDenied = Object.assign(new Error('Controlled tracked production read refusal.'), {
+	code: 'EACCES',
+	path: readProbePath
+});
+let refusedReads = 0;
+assert.throws(
+	() =>
+		vm.runInNewContext(scanSource, {
+			...scanWorld,
+			fs: {
+				...fs,
+				readFileSync(file, encoding) {
+					assert.equal(
+						file,
+						readProbePath,
+						'the refusal targets the exact tracked production source'
+					);
+					assert.equal(encoding, 'utf8', 'the read retains its original text decoding');
+					refusedReads++;
+					throw readDenied;
+				}
+			}
+		}),
+	(error) => error === readDenied,
+	'a tracked read refusal must escape instead of certifying partial coverage'
+);
+assert.equal(refusedReads, 1, 'the scanner must actually reach the refused filesystem boundary');
 
 if (scanned < 500)
 	failures.push(`only ${scanned} file(s) scanned — the tracked-file listing is broken`);
