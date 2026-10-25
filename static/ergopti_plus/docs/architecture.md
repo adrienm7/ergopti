@@ -176,6 +176,7 @@ graph TD
         WINDOWS_graphics_renderer["GraphicsRenderer.ahk"]
         WINDOWS_hotkey_registrar["HotkeyRegistrar.ahk"]
         WINDOWS_http_client["HttpClient.ahk"]
+        WINDOWS_input_probe_native["InputProbeNative.ahk"]
         WINDOWS_key_state["KeyState.ahk"]
         WINDOWS_keyboard_hook["KeyboardHook.ahk"]
         WINDOWS_keyboard_layout_switch["KeyboardLayoutSwitch.ahk"]
