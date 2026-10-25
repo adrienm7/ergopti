@@ -3,6 +3,7 @@
 'use strict';
 const { scriptTokens } = require('./script-source.cjs');
 const { publishesMenuTemplate } = require('./menu-shared-delegation.cjs');
+const { commandConstantId } = require('./menu-command-constant.cjs');
 
 /** Necessary typed command/list port evidence, never live publication authority. */
 function nativeTemplateBinding(
@@ -166,9 +167,16 @@ function nativeTemplateBinding(
 			if (!list || list.length % 2) return null;
 			for (let i = 0; i < list.length; i += 2) {
 				const [a, z] = list[i];
-				if (z !== a + 1 || !literal(a) || keys.has(tokens[a].value.toLowerCase())) return null;
-				keys.add(tokens[a].value.toLowerCase());
-				fields.push({ key: tokens[a].value, value: list[i + 1] });
+				// A generated MenuCommand.X names the id exactly as its spelling does.
+				const named = z === a + 3 && id(a) && sym(a + 1, '.') && id(a + 2);
+				const text = named
+					? commandConstantId('.ahk', tokens[a].value, tokens[a + 2].value)
+					: z === a + 1 && literal(a)
+						? tokens[a].value
+						: undefined;
+				if (text === undefined || keys.has(text.toLowerCase())) return null;
+				keys.add(text.toLowerCase());
+				fields.push({ key: text, value: list[i + 1] });
 			}
 		} else {
 			if (!sym(start, '{') || close(start) !== end - 1) return null;
@@ -182,6 +190,17 @@ function nativeTemplateBinding(
 				} else if (sym(a, '[') && literal(a + 1) && sym(a + 2, ']') && sym(a + 3, '=')) {
 					key = tokens[a + 1].value;
 					value = a + 4;
+				} else if (
+					sym(a, '[') &&
+					id(a + 1) &&
+					sym(a + 2, '.') &&
+					id(a + 3) &&
+					sym(a + 4, ']') &&
+					sym(a + 5, '=') &&
+					commandConstantId('.lua', tokens[a + 1].value, tokens[a + 3].value) !== undefined
+				) {
+					key = commandConstantId('.lua', tokens[a + 1].value, tokens[a + 3].value);
+					value = a + 6;
 				} else return null;
 				if (keys.has(key) || value >= z) return null;
 				keys.add(key);
