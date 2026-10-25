@@ -41,7 +41,7 @@ _MEOT_Source() {
 	Adapter := _MEOT_AdapterOwner()
 	Owner := _DriverProductionFileForSymbol("GestureSysMicMuteToggle", _DriverDir)
 	Text := FSReadStrict(Owner)
-	Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n"
+	Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 		. "#Include " . Adapter . "`n"
 	for Name in ["_GestureSys", "GestureSysMicMuteToggle"] {
 		Definition := _DriverExtractFunctionBody(&Text, Name)
