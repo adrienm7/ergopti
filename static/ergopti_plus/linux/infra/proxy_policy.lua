@@ -9,6 +9,7 @@
 
 local M = {}
 local Paths = require("infra.paths")
+local Reader = require("infra.regular_file_reader")
 local Json = require("json")
 local SharedPolicy = require("network.proxy_policy")
 local initialized, policy, refusal = false, nil, nil
@@ -20,7 +21,7 @@ function M.load()
 	if initialized then return policy, refusal end
 	initialized = true
 	local path = Paths.shared("modules/network/proxy_policy.json")
-	local file = path and io.open(path, "rb")
+	local file = path and Reader.open_source(path)
 	if not file then refusal = "proxy-policy-unavailable"; return nil, refusal end
 	local bytes = file:read(32769)
 	local closed = file:close()

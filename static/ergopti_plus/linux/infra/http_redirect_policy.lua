@@ -13,6 +13,7 @@ local M = {}
 
 local Json = require("json")
 local Paths = require("infra.paths")
+local Reader = require("infra.regular_file_reader")
 
 local _headers = nil
 
@@ -28,7 +29,7 @@ local _headers = nil
 local function load_headers()
 	if _headers then return _headers end
 	local path = Paths.shared("data/http/redirect_policy.json")
-	local file = path and io.open(path, "rb")
+	local file = path and Reader.open_source(path)
 	if not file then return nil, "HTTP redirect policy is unavailable" end
 	local bytes = file:read("*a")
 	local closed = file:close()
