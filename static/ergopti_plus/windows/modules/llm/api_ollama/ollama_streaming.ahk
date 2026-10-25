@@ -434,16 +434,8 @@ _LLM_Ollama_DrainPending() {
 	; SetTimer poll ticks bypass native Suspend, so this guard is the chokepoint.
 	if A_IsSuspended
 		return
-	; Engine disabled at runtime (user toggled off) — do not re-dispatch pending
-	; jobs; on_fail already fired when the job was displaced from the pending slot.
-	; IsSet proves the Map exists, not that this key does. Reading an absent key
-	; RAISES in AHK v2, and this runs from a SetTimer tick: the throw escapes into
-	; the timer thread, where it is a fatal startup error rather than a failed
-	; prediction. The engine Map is populated during boot, so any tick that lands
-	; before that — or against a harness stub — crashes the whole driver
-	; (llm-engine-enabled-read-unguarded-in-timer).
-	if (IsSet(_LLM_Engine) and _LLM_Engine is Map and !_LLM_Engine.Get("enabled", false))
-		return
+	; The original requester and captured origin own this job. The agent
+	; remains usable while the unrelated prediction engine is switched off.
 	if (_LLM_Ollama_Async.Count > 0)
 		return
 	if !(_LLM_Ollama_Pending is Map)

@@ -19,10 +19,10 @@
 ;   ollama_streaming.ahk (241) : If (IsSet(_LLM_Engine) and !_LLM_Engine["enabled"])
 ;   > Timer
 ;
-; ROOT CAUSE ENCODED: a tick cannot assume the boot that fills a Map has already
-; happened. The read must default, and it must default to "disabled" — this
-; guard exists to stop a network POST and a PII temp-file write, so the state it
-; cannot prove must be the one that does nothing.
+; ROOT CAUSE ENCODED: a timer cannot assume a client's Map has already been
+; initialized. Each queued request retains its own admission and origin; the
+; transport must not read an unrelated prediction engine's switch. The agent
+; remains independent while a retired prediction is still denied by its owner.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -82,30 +82,16 @@ _LERG_DrainSurvivesANonMapEngine() {
 Test("llm timer: draining with a non-Map engine does not throw (llm-engine-enabled-read-unguarded-in-timer)",
 	_LERG_DrainSurvivesANonMapEngine)
 
-_LERG_AnUnprovableEngineIsTreatedAsDisabled() {
-	; The guard exists to stop a network POST and a PII temp-file write. When the
-	; engine state cannot be proven, the safe answer is the one that does
-	; nothing, so the drain must return BEFORE it looks at the pending slot.
+_LERG_QueueUsesItsOriginalRequester() {
 	Body := _DriverFuncBody("_LLM_Ollama_DrainPending")
-	Assert(Body != "",
-		"_LLM_Ollama_DrainPending must exist -- a renamed drain would make every "
-		. "assertion here pass vacuously")
+	Assert(Body != "", "the actual transport queue must exist before any absence assertion")
 	Stripped := _StripFullLineComments(Body)
-	GuardPos := InStr(Stripped, "_LLM_Engine")
-	PendingPos := InStr(Stripped, "_LLM_Ollama_Pending is Map")
-	Assert(GuardPos > 0 && PendingPos > 0,
-		"the drain must still read the engine state and the pending slot")
-	Assert(GuardPos < PendingPos,
-		"the engine guard must run before the pending job is claimed, or a "
-		. "disabled engine still dispatches one last request")
-	AssertContains(Stripped, 'Get("enabled", false)',
-		"the default must be FALSE: an engine whose state cannot be read must be "
-		. "treated as disabled, never as enabled "
-		. "(llm-engine-enabled-read-unguarded-in-timer)")
+	Assert(InStr(Stripped, "_LLM_Engine") == 0,
+		"an independent request cannot inherit a prediction engine's disabled or incomplete state")
 }
 
-Test("llm timer: an unprovable engine state is treated as disabled (llm-engine-enabled-read-unguarded-in-timer)",
-	_LERG_AnUnprovableEngineIsTreatedAsDisabled)
+Test("llm timer: pending jobs retain their original requester (llm-engine-enabled-read-unguarded-in-timer)",
+	_LERG_QueueUsesItsOriginalRequester)
 
 
 
@@ -125,8 +111,8 @@ _LERG_NoOllamaFunctionSubscriptsTheEngine() {
 	Assert(Src != "",
 		"the api_ollama sources must be readable -- an empty scan would make "
 		. "this guard pass vacuously")
-	Assert(InStr(Src, "_LLM_Engine") > 0,
-		"the scan must actually see the engine reads it is policing")
+	Assert(InStr(Src, "_LLM_Ollama_DrainPending() {") > 0,
+		"the scan must include the actual queue owner before any absence assertion")
 	Assert(InStr(Src, '_LLM_Engine["') = 0,
 		'a bare _LLM_Engine["key"] subscript raises when the key is absent, and '
 		. "every function here can be reached from a poll tick where a throw is "
