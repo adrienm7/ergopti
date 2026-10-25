@@ -486,9 +486,19 @@ Test("e2e[native-text] legal Unicode reaches the actual receiver (native-text-nu
 ; process persistent on some CI runners).
 SetTimer(_E2E_Watchdog, -30000)
 
+; E2E owns its two registering files without joining the unit shard inventory.
+_E2E_PlanModuleOf(File) {
+    Normalized := StrLower(StrReplace(File, "/", "\"))
+    for Name in ["run_e2e.ahk", "test_e2e_number_row.ahk"] {
+        if Normalized == StrLower(A_ScriptDir . "\" . Name)
+            return "e2e"
+    }
+    throw Error("The E2E plan does not own the registering file: " . File)
+}
+
 _E2E_Watchdog() {
     try FileAppend("WATCHDOG: forced exit after 30 s`r`n", "*")
     ExitApp(2)
 }
 
-RunTests()
+RunTests(_E2E_PlanModuleOf)
