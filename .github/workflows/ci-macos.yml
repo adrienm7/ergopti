@@ -1225,27 +1225,9 @@ jobs:
           path: |
             ${{ env.ERGOPTI_OLLAMA_ASSET }}
             ${{ env.ERGOPTI_OLLAMA_ASSET }}.provenance.json
-      # The managed Ollama build and its release asset belong to E2E on purpose:
-      # the clean source build and the Swift and XCTest qualification of its
-      # bytes are tests of the runtime, and Build packages only inputs this stage
-      # already qualified. assets-managed-ollama-<architecture> is therefore
-      # published from this E2E cell, not from Build.
-      - name: Upload the actual managed native release asset
-        env:
-          GOTOOLCHAIN: 'local'
-          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
-          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
-          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
-          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (inputs.release && env.MACOS_STAGE_SCENARIO != 'xctest') }}
-        uses: actions/upload-artifact@v4
-        with:
-          overwrite: true
-          name: assets-managed-ollama-${{ env.MACOS_STAGE_ARCHITECTURE }}
-          if-no-files-found: error
-          retention-days: 7
-          path: ${{ env.ERGOPTI_OLLAMA_ASSET }}
+      # The qualified asset travels to Build as managed-ollama-inputs-*, which
+      # Build packages and republishes as assets-managed-ollama-<architecture>:
+      # every published assets-* file comes from a Build job, never from E2E.
 
       - name: Retain actual native producer, catalogue and receiving evidence
         env:
@@ -2379,11 +2361,34 @@ jobs:
           }
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as stream:
               stream.write('version=' + contract['go_version'][2:] + '\n')
+              for architecture in ('arm64', 'amd64'):
+                  stream.write(architecture + '_asset=' + contract['assets']['macos-' + architecture]['filename'] + '\n')
           with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as stream:
               for key, value in values.items():
                   assert '\n' not in value and '\r' not in value
                   stream.write(key + '=' + value + '\n')
           PYINPUTS
+      # The qualified runtime archives are release assets. They were built and
+      # qualified by the E2E "Managed Ollama" cells; Build only republishes the
+      # exact bytes it received, so every assets-* artifact has a Build owner.
+      - name: Upload the qualified managed native release asset (Apple silicon)
+        if: ${{ steps.stage-admission.outcome == 'success' && (inputs.release) }}
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: assets-managed-ollama-arm64
+          if-no-files-found: error
+          retention-days: 7
+          path: ${{ runner.temp }}/managed-ollama-package/inputs/${{ steps.managed-catalogue-toolchain.outputs.arm64_asset }}
+      - name: Upload the qualified managed native release asset (Intel)
+        if: ${{ steps.stage-admission.outcome == 'success' && (inputs.release) }}
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: assets-managed-ollama-amd64
+          if-no-files-found: error
+          retention-days: 7
+          path: ${{ runner.temp }}/managed-ollama-package/inputs/${{ steps.managed-catalogue-toolchain.outputs.amd64_asset }}
       - uses: actions/setup-go@v5
         if: ${{ steps.stage-admission.outcome == 'success' }}
         with:

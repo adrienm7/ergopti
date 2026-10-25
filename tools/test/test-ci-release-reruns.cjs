@@ -74,6 +74,21 @@ const LINUX_BUNDLE = JSON.parse(
 	)
 ).release_assets.linux_bundle;
 
+const managedRuntime = JSON.parse(
+	fs.readFileSync(
+		path.join(
+			ROOT,
+			'static',
+			'ergopti_plus',
+			'_shared',
+			'modules',
+			'llm',
+			'managed_ollama_runtime.json'
+		),
+		'utf8'
+	)
+);
+
 const MANAGED_PUBLICATION_ASSETS = [
 	'ollama-ergopti-native-http-darwin-arm64.tgz',
 	'ollama-ergopti-native-http-darwin-amd64.tgz',
@@ -1040,31 +1055,7 @@ function uploadedLayout(channel) {
 				if (!/uses:\s*actions\/upload-artifact/.test(candidate.body)) continue;
 				if (!/^ {10}name:\s*assets-/m.test(candidate.body)) continue;
 				const listed = uploadPaths(candidate.body).flatMap((listedPath) => {
-					if (listedPath !== '${{ env.ERGOPTI_OLLAMA_ASSET }}')
-						return uploadMatrixPaths(listedPath, entry, job, candidate);
-					assert.equal(
-						job.id,
-						MacStage.stage['managed-ollama-native'],
-						'the runtime asset has one native producer owner'
-					);
-					assertMacLotSource(job);
-					assert.equal(candidate.name, 'Upload the actual managed native release asset');
-					assert.equal(
-						pipeline.stepField(candidate.body, 'if'),
-						// The Intel XCTest cell never uploads the runtime asset.
-						MacStage.condition(
-							'managed-ollama-native',
-							"${{ inputs.release && matrix.scenario != 'xctest' }}"
-						)
-					);
-					assert(
-						job.body.includes(
-							'      matrix: ${{ fromJSON(needs.integration-hs.outputs.e2e_matrix) }}'
-						)
-					);
-					// The real matrix uploads each archive alone: both artifact roots are
-					// its filename. Independent filenames model these two actual legs.
-					return MANAGED_PUBLICATION_ASSETS.slice(0, 2);
+					return uploadMatrixPaths(listedPath, entry, job, candidate);
 				});
 				const dirs = listed.map((listedPath) => listedPath.split('/').slice(0, -1));
 				const common = [];
@@ -1083,6 +1074,14 @@ function uploadedLayout(channel) {
 							if (expression === 'inputs.linux_bundle' || expression === 'env.LINUX_BUNDLE_ASSET')
 								return LINUX_BUNDLE;
 							if (expression === 'inputs.channel') return channel;
+							const managed =
+								/^steps\.managed-catalogue-toolchain\.outputs\.(arm64|amd64)_asset$/.exec(
+									expression
+								);
+							if (managed) {
+								assert.equal(job.id, 'package-macos', 'Build owns the managed runtime asset');
+								return managedRuntime.assets['macos-' + managed[1]].filename;
+							}
 							throw new Error(
 								`an assets-* upload path uses ${whole}, which this test cannot resolve`
 							);

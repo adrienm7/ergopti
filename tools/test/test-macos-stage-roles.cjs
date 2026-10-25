@@ -178,8 +178,7 @@ function checkManagedNativeSplit(workflow) {
 		'Receive and admit the clean native source asset from its build cell',
 		'Receive actual native model create, pull, inference and retirement',
 		'Receive actual independent managed HTTP native clients',
-		'Upload qualified native inputs for the application catalogue',
-		'Upload the actual managed native release asset'
+		'Upload qualified native inputs for the application catalogue'
 	]) {
 		const step = steps.find((candidate) => candidate.name === name);
 		assert.ok(step && runs(step, 'runtime') && !runs(step, 'xctest'), name + ' is runtime only');
