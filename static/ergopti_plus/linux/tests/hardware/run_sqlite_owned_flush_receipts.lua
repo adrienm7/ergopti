@@ -160,7 +160,13 @@ assert(K.reset_session() == false)
 assert(Drain.control(W, "DROP TRIGGER refusal;"))
 assert(Drain.flush(K))
 assert(total("rollback") == 2 and scalar("SELECT SUM(c) FROM ngram_chars WHERE app='rollback';") == 2)
-assert(tonumber(W.get_meta("linux_next_event_id")) == tonumber(cursor) + 1)
+-- The retry commits the typing row and the session start/end rows the same
+-- flush carries; each took one ID from the reserved range and none was skipped
+-- or reissued, so the cursor moved by exactly the rows committed past it.
+local committed = scalar("SELECT (SELECT COUNT(*) FROM events_typing WHERE id>=" .. cursor
+	.. ")+(SELECT COUNT(*) FROM events_session WHERE id>=" .. cursor .. ");")
+assert(committed >= 1 and tonumber(W.get_meta("linux_next_event_id")) == tonumber(cursor) + committed)
+assert(scalar("SELECT COUNT(DISTINCT id)=COUNT(*) FROM (SELECT id FROM events_typing UNION ALL SELECT id FROM events_session);") == 1)
 pass("conclusive ABORT exposes complete old+new RAM and retries its acknowledged IDs exactly once")
 
 -- A payload larger than Linux's per-argument ceiling must travel only on the
