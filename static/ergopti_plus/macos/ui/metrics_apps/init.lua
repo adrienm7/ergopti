@@ -36,6 +36,7 @@ local i18n       = require("infra.i18n")
 local FileSystem = require("adapters.file_system")
 local ConfigPaths = require("infra.config_paths")
 local TimerScheduler = require("adapters.timer_scheduler")
+local CategoryStore = require("keystats.app_category_store")
 
 local LOG = "metrics_apps"
 
@@ -438,7 +439,7 @@ local MAX_ICON_LOOKUPS_PER_OPEN = 30
 --- error, so the dashboard refused to render and showed nothing.
 --- @return string Absolute path of the category overrides file.
 local function categories_file()
-	return ConfigPaths.get_config_dir() .. "app_categories.json"
+	return ConfigPaths.get_config_dir() .. CategoryStore.FILE_NAME
 end
 --- Fallback category assigned to an uncategorised app on first edit.
 ---
@@ -505,19 +506,22 @@ local function load_categories()
 			tostring(read_ok and read_detail or content))
 		return nil, "failed"
 	end
-	if read_status == "absent" then return {}, "absent", { status = "absent" } end
+	if read_status == "absent" then return CategoryStore.empty(), "absent", { status = "absent" } end
 	if read_status ~= "ok" or type(content) ~= "string" then
 		Logger.error(LOG, "App categories returned an invalid read status; edit refused — %s.",
 			tostring(read_status))
 		return nil, "failed"
 	end
 
-	local decode_ok, data = pcall(json.decode, content)
-	if not decode_ok or type(data) ~= "table" then
-		Logger.error(LOG, "App categories contain invalid JSON; edit refused.")
+	local model, reason = CategoryStore.decode(content, json.decode)
+	if not model then
+		Logger.error(LOG, "App categories are invalid (%s); edit refused.", tostring(reason))
 		return nil, "failed"
 	end
-	return data, "ok", { status = "ok", content = content }
+	-- A store in the previous flat layout is rewritten in the shared one by the
+	-- next save: the categories it holds are kept.
+	if model.legacy then Logger.info(LOG, "App categories read from the previous layout; the next save upgrades it.") end
+	return model, "ok", { status = "ok", content = content }
 end
 
 local function save_categories(data, source_snapshot)
@@ -525,7 +529,7 @@ local function save_categories(data, source_snapshot)
 		Logger.error(LOG, "App categories save refused without an exact source snapshot.")
 		return false
 	end
-	local encode_ok, encoded = pcall(json.encode, data)
+	local encode_ok, encoded = pcall(CategoryStore.encode, data, json.encode)
 	if not encode_ok or type(encoded) ~= "string" then
 		Logger.error(LOG, "App categories encode failed; changes were not saved.")
 		return false
@@ -549,10 +553,10 @@ local function push_categories_to_ui(generation, webview)
 	generation = generation or _generation
 	if not is_current_window(generation, webview) then return false end
 	local revision = next_publication_revision(_focus_owner, "categories_revision")
-	local categories = load_categories()
-	if not categories then return false end
+	local model = load_categories()
+	if not model then return false end
 	if not is_current_window(generation, webview) then return false end
-	local encoded_ok, encoded = pcall(json.encode, categories)
+	local encoded_ok, encoded = pcall(json.encode, CategoryStore.projection(model))
 	if not encoded_ok or type(encoded) ~= "string" then
 		Logger.error(LOG, "Apps dashboard category serialization failed.")
 		return false
@@ -570,9 +574,9 @@ local function list_existing_categories()
 	local general = i18n.get("metrics_apps.general_category")
 	local seen = { [general] = true }
 	local result = { general }
-	for _, entry in pairs(cats) do
-		local t = type(entry) == "table" and entry.type or nil
-		if type(t) == "string" and t ~= "" and not seen[t] then
+	for _, entry in pairs(cats.apps) do
+		local t = entry.type
+		if not seen[t] then
 			seen[t] = true
 			table.insert(result, t)
 		end
@@ -590,13 +594,17 @@ local function prompt_score_then_save(app_name, chosen_cat, default_score, gener
 	if not owner_is_current(generation, webview) then return false end
 	if btn ~= i18n.get("button.ok") then return end
 	local score = tonumber(score_str)
-	if not score or score < -2 or score > 2 then
+	if not score or not CategoryStore.score_valid(score) then
 		dialog.block_alert(i18n.get("common.warning"), i18n.get("metrics_apps.score_error"), i18n.get("button.ok"))
 		return
 	end
 	local cats, _, source_snapshot = load_categories()
 	if not cats then return false end
-	cats[app_name] = { type = chosen_cat, score = score }
+	local stored, reason = CategoryStore.set(cats, app_name, chosen_cat, score)
+	if not stored then
+		Logger.error(LOG, "App category refused: %s.", tostring(reason))
+		return false
+	end
 	if not save_categories(cats, source_snapshot) then return false end
 	if generation ~= nil then
 		push_categories_to_ui(generation, webview)
@@ -647,10 +655,10 @@ function M.prompt_category(app_name, default_cat, default_score, generation, web
 				if btn == i18n.get("button.ok") and new_name and new_name ~= "" and new_name ~= c2.text then
 					local cats, _, source_snapshot = load_categories()
 					if not cats then return end
-					for _, entry in pairs(cats) do
-						if type(entry) == "table" and entry.type == c2.text then
-							entry.type = new_name
-						end
+					local renamed, reason = CategoryStore.rename_category(cats, c2.text, new_name)
+					if not renamed then
+						Logger.error(LOG, "Category rename refused: %s.", tostring(reason))
+						return
 					end
 					if save_categories(cats, source_snapshot) then
 						if generation ~= nil then
@@ -697,7 +705,7 @@ local function prompt_pick_app(generation, webview)
 			if not choice then return end
 			local cats    = load_categories()
 			if not cats then return end
-			local current = cats[choice.text] or { type = default_app_category(), score = 0 }
+			local current = cats.apps[choice.text] or { type = default_app_category(), score = 0 }
 			M.prompt_category(choice.text, current.type, current.score, generation, webview)
 		end, function(chooser)
 			chooser:placeholderText(i18n.get("metrics_apps.pick_app_placeholder"))
@@ -953,11 +961,12 @@ local function load_and_inject(generation, webview)
 	end
 	if not is_current_window(generation, webview) then return false end
 
-	local user_cats = load_categories()
-	if not user_cats then
+	local category_model = load_categories()
+	if not category_model then
 		Logger.warn(LOG, "Apps dashboard refresh refused because categories are unreadable.")
 		return false
 	end
+	local user_cats = CategoryStore.projection(category_model)
 	if not is_current_window(generation, webview) then return false end
 
 	-- The rest is cut into bounded slices, one main-loop turn each: the icon

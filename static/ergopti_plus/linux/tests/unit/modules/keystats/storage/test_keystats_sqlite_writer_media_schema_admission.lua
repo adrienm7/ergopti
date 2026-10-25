@@ -47,58 +47,25 @@ end)
 
 
 helpers.describe("linux-sqlite-category-transaction", function()
-	it("linux-sqlite-category-transaction: score receipt refusal cannot acknowledge an edit", function()
-		with_category_commands("score", function(writer)
-			helpers.assert_eq(writer.set_app_category("owned", "owned-app", "Updated", 1), false)
-		end)
-	end)
-
-	it("linux-sqlite-category-transaction: category and score use one checked native transaction", function()
+	-- The shared category file owns the edits; the database only sheds the scores
+	-- the previous store kept in `meta`, after they were imported.
+	it("linux-sqlite-category-transaction: dropping the legacy scores is one checked native command", function()
 		with_category_commands(nil, function(writer, commands)
-			helpers.assert_eq(writer.set_app_category("owned", "owned-app", "Updated", 1), true)
+			helpers.assert_eq(writer.drop_legacy_category_scores(), true)
 			helpers.assert_eq(#commands, 1)
-			helpers.assert_contains(commands[1], "BEGIN;")
-			helpers.assert_contains(commands[1], "UPDATE agg_app_day")
-			helpers.assert_contains(commands[1], "INSERT OR REPLACE INTO meta")
-			helpers.assert_contains(commands[1], "COMMIT;")
-			helpers.assert_contains(commands[1], "'-bail'")
+			helpers.assert_contains(commands[1], "DELETE FROM meta WHERE substr(key, 1, 10) = 'app_score.';")
 			helpers.assert_contains(commands[1], "ERGOPTI_SQL_EXIT_STATUS=")
 		end)
 	end)
 
-	it("linux-sqlite-category-transaction: UTF-8 and quote bytes retain canonical SQL escaping", function()
-		with_category_commands(nil, function(writer, commands)
-			helpers.assert_eq(writer.set_app_category("owned '", "été ' app", "Updated ' été", 1), true)
-			local all = table.concat(commands, "\n")
-			helpers.assert_contains(all, "device_id = 'owned '''")
-			helpers.assert_contains(all, "app = 'été '' app'")
-			helpers.assert_contains(all, "category = 'Updated '' été'")
-			helpers.assert_contains(all, "'app_score.été '' app'")
+	it("linux-sqlite-category-transaction: a refused receipt is not acknowledged as dropped", function()
+		with_category_commands("legacy_scores", function(writer)
+			helpers.assert_eq(writer.drop_legacy_category_scores(), false)
 		end)
 	end)
 
-	it("linux-sqlite-category-transaction: absent and fractional scores preserve their existing defaults and floors", function()
-		for _, case in ipairs({ { false, "0" }, { -0.25, "-1" }, { "1.9", "1" } }) do
-			with_category_commands(nil, function(writer, commands)
-				local score = case[1] ~= false and case[1] or nil
-				helpers.assert_eq(writer.set_app_category("owned", "owned-app", "Updated", score), true)
-				helpers.assert_contains(table.concat(commands, "\n"), "'app_score.owned-app', '" .. case[2] .. "'")
-			end)
-		end
-	end)
-
-	it("linux-sqlite-category-transaction: category receipt refusal remains a failed edit", function()
-		with_category_commands("category", function(writer)
-			helpers.assert_eq(writer.set_app_category("owned", "owned-app", "Updated", 1), false)
-		end)
-	end)
-
-	it("linux-sqlite-category-transaction: invalid labels refuse before any native command", function()
-		with_category_commands(nil, function(writer, commands)
-			helpers.assert_eq(writer.set_app_category("owned", "", "Updated", 1), false)
-			helpers.assert_eq(writer.set_app_category("owned", "owned-app", "", 1), false)
-			helpers.assert_eq(#commands, 0)
-		end)
+	it("linux-sqlite-category-transaction: the writer no longer edits categories", function()
+		helpers.assert_nil(sw.set_app_category, "an edit belongs to the shared category file")
 	end)
 end)
 

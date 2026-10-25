@@ -15,6 +15,7 @@ local Utils = require("keystats.utils")
 local MediaStore = require("keystats.media_store")
 local SqliteCommand = require("modules.keystats.sqlite_command")
 local Queries = require("keystats.queries")
+local AppCategoryStore = require("keystats.app_category_store")
 local ok_json, Json = pcall(require, "json")
 local LOG = "modules.keystats.sqlite_reader"
 
@@ -178,15 +179,17 @@ local function merge_error_buckets(target, row)
 	end
 end
 
---- Projects local saved category/score overrides for the shared Apps dashboard.
---- One read-only query joins every score to this device's category history;
---- foreign synced categories must not replace the user's own assignment.
+--- Reads the category edits the previous Linux store kept in SQLite (a score
+--- in `meta` and the category on the day rows), for their import into the shared
+--- category file. One read-only query joins every score to this device's
+--- category history; foreign synced categories must not replace the user's own
+--- assignment. An application with a score and no category keeps the default.
 --- @param sqlite_path string Database path.
 --- @param device_id string Local device owning the category edit.
---- @return table|nil categories Shared { app = { type, score } } map; nil on refusal.
-function M.read_user_categories(sqlite_path, device_id)
+--- @return table|nil categories { app = { type, score } } map; nil on refusal.
+function M.read_legacy_category_scores(sqlite_path, device_id)
 	if type(device_id) ~= "string" or device_id == "" then return nil end
-	local prefix = sql_quote("app_score.")
+	local prefix = sql_quote(AppCategoryStore.LEGACY_SCORE_PREFIX)
 	-- TEXT substr stops at NUL. The namespace is ASCII, so slice its bytes first.
 	local app = "CAST(substr(CAST(scores.key AS BLOB), length(" .. prefix .. ") + 1) AS TEXT)"
 	local rows, accepted = read_rows(sqlite_path,
@@ -211,7 +214,7 @@ function M.read_user_categories(sqlite_path, device_id)
 			Logger.warn(LOG, "SQLite category metadata is invalid; dashboard projection refused.")
 			return nil
 		end
-		categories[name] = { type = category or new_entry().category, score = score }
+		categories[name] = { type = category or AppCategoryStore.DEFAULT_CATEGORY, score = score }
 	end
 	return categories
 end
@@ -255,7 +258,7 @@ function M.read_manifest(sqlite_path, start_date, end_date, apps)
 	end
 	local rows = manifest_query("manifest.app_day")
 	for _, row in ipairs(rows) do
-		-- Quoted in SQL as read_user_categories quotes it: the CLI's JSON mode
+		-- Quoted in SQL as read_legacy_category_scores quotes it: the CLI's JSON mode
 		-- cuts raw TEXT at NUL, so a saved category came back shortened.
 		local valid, category = decode_optional_text(row.category_json)
 		if not valid then
