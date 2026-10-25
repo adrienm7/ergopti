@@ -92,22 +92,35 @@ Test_LLM_Regression_RunTestsGuardsDryRun() {
 Test("LLM regression: RunTests re-guards _AHK_DRY_RUN",
 	Test_LLM_Regression_RunTestsGuardsDryRun)
 
+_LLM_Regress_AssertRunTestsRejection(Source, ExpectedMessage) {
+	Caught := false
+	try _LLM_Regress_AssertRunTestsGuard(Source)
+	catch as Err {
+		Caught := true
+		AssertEqual("Error", Type(Err), "a malformed guard must fail its intended assertion, never an unset variable")
+		AssertEqual(ExpectedMessage, Err.Message, "the guard must refuse the exact missing safeguard")
+	}
+	AssertTrue(Caught, "a malformed guard must be rejected")
+}
+
 Test_LLM_Regression_RunTestsGuardRejectsCounterexamples() {
 	Guard := "if !IsSet(_AHK_DRY_RUN)`n_AHK_DRY_RUN := false`n"
 	Use := "if (_AHK_DRY_RUN) {`nreturn`n}`n"
 	Good := "RunTests(PlanModuleOf := 0) {`n" . Guard . Use . "}`n"
 	_LLM_Regress_AssertRunTestsGuard(Good)
-	Fixtures := Map(
-		"missing definition", Guard . "RunTests()`n",
-		"guard outside owner", Guard . "RunTests(PlanModuleOf := 0) {`n" . Use . "}`n",
-		"guard in comment", "RunTests(PlanModuleOf := 0) {`n/*`n" . Guard . "*/`n" . Use . "}`n",
-		"guard defaults true", StrReplace(Good, ":= false", ":= true"),
-		"guard after use", "RunTests(PlanModuleOf := 0) {`n" . Use . Guard . "}`n"
-	)
-	for Name, Source in Fixtures
-		AssertThrows(() => _LLM_Regress_AssertRunTestsGuard(Source),
-			"the runner guard must refuse " . Name)
+	MissingGuard := "RunTests must default an unset dry-run flag to false inside its own body"
+	Fixtures := [
+		[Guard . "RunTests()`n", "RunTests must have a real function definition"],
+		[Guard . "RunTests(PlanModuleOf := 0) {`n" . Use . "}`n", MissingGuard],
+		["RunTests(PlanModuleOf := 0) {`n/*`n" . Guard . "*/`n" . Use . "}`n", MissingGuard],
+		[StrReplace(Good, ":= false", ":= true"), MissingGuard],
+		["RunTests(PlanModuleOf := 0) {`n" . Use . Guard . "}`n",
+			"the local dry-run guard must precede its execution branch"]
+	]
+	for Fixture in Fixtures
+		_LLM_Regress_AssertRunTestsRejection(Fixture[1], Fixture[2])
 }
+
 Test("LLM regression: RunTests guard rejects missing and misplaced defaults (runner-guard-counterexamples)",
 	Test_LLM_Regression_RunTestsGuardRejectsCounterexamples)
 
