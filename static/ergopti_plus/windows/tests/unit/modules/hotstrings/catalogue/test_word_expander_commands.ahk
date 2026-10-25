@@ -169,7 +169,7 @@ _HSDT_DeclaredCustomDeleteReceipts() {
 		Expected := Corpus["rows"][1]
 		; The typed record owner is exercised by the record suite; here the shared
 		; declaration is proven to reach the owner, and only when it is ready.
-		Command := (*) => (Seen["calls"] += 1, Mode == "ack" ? 1 : 0)
+		Command := ((Outcome, *) => (Seen["calls"] += 1, Outcome == "ack" ? 1 : 0)).Bind(Mode)
 		Row := MenuRenderer_CommandRow(Corpus["section"], Expected["id"],
 			Map(Expected["id"], Command), Map(Expected["ready"], (*) => Seen["ready"]))
 		Assert(Row is Map, "the declared provider supplies the actual native row")
@@ -207,7 +207,7 @@ _HSDT_DeclaredCustomAddReceipts() {
 	Corpus := _HSDT_CustomAddCorpus()
 	for Mode in ["ack", "refused", "paused"] {
 		Ready := Map("value", true, "calls", 0)
-		Command := (*) => (Ready["calls"] += 1, Mode == "ack" ? 1 : 0)
+		Command := ((Outcome, *) => (Ready["calls"] += 1, Outcome == "ack" ? 1 : 0)).Bind(Mode)
 		Row := MenuRenderer_CommandRow(Corpus["section"], Corpus["id"],
 			Map(Corpus["id"], Command), Map(Corpus["ready"], (*) => Ready["value"]))
 		Assert(Row is Map, "the Add declaration supplies an actual native command row")
