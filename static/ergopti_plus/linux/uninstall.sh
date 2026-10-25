@@ -89,6 +89,8 @@ if [ -n "$WAIT_OWNER" ]; then
 		if ! stat="$(cat "/proc/$owner_pid/stat")"; then continue; fi
 		read -ra fields <<< "${stat##*) }"
 		if [ "${fields[19]:-}" != "$owner_start" ]; then break; fi
+		# A zombie has finished cleanup; only its parent can reap the proc entry.
+		if [ "${fields[0]:-}" = Z ]; then break; fi
 		sleep 0.1
 	done
 	[ "$attempt" -lt 300 ] || { echo 'The application did not finish shutting down.' >&2; exit 1; }
