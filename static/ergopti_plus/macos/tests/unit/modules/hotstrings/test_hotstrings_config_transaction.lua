@@ -308,35 +308,22 @@ helpers.describe("hotstrings config: setters publish only after atomic commit", 
 		os.remove(path)
 	end)
 
-	helpers.it("set_word_delimiters rolls back when publication fails", function()
-		local path = fixture_path("delimiters")
-		local original_open = io.open
-		local fh = assert(original_open(path, "w"))
-		assert(fh:write('[__global__]\nword_delimiters = " ,"\n\n' .. SENTINEL))
+	helpers.it("an old [__global__] delimiter table is no longer owned and survives a delay save byte for byte", function()
+		local path = fixture_path("global_passthrough")
+		local record = '[__global__]\nword_delimiters = " \\t,"\nconsumed_delimiters = "x"\n'
+		local fh = assert(io.open(path, "w"))
+		assert(fh:write(record .. "\n[rolls]\ndelay = 0.5\n"))
 		assert(fh:close())
-		local original_content = read_fixture(path)
-		local mod = fresh_module(path, false)
-
-		helpers.assert_eq(mod.set_word_delimiters(" ;"), false)
-		helpers.assert_eq(mod.get_word_delimiters(), " ,",
-			"the runtime delimiter set must change only after durable publication")
-		helpers.assert_eq(read_fixture(path), original_content)
-		os.remove(path)
-	end)
-
-	helpers.it("word delimiters with control characters commit and round-trip", function()
-		local path = fixture_path("delimiter_roundtrip")
 		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
 		package.loaded["modules.hotstrings.hotstrings_config"] = nil
 		local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
-		mod.init({ override_path = path, toml_resolver = function() return nil end })
-		local delimiters = " \t\r\n,"
-
-		helpers.assert_eq(mod.set_word_delimiters(delimiters), true)
-		helpers.assert_contains(read_fixture(path), 'word_delimiters = " \\t\\r\\n,"',
-			"control bytes must stay escaped inside one TOML basic string")
-		helpers.assert_eq(mod.reload(), true)
-		helpers.assert_eq(mod.get_word_delimiters(), delimiters)
+		helpers.assert_eq(mod.init({ override_path = path, toml_resolver = function() return nil end }), true)
+		helpers.assert_nil(mod.get_word_delimiters, "the delimiter strings are config.toml leaves now")
+		helpers.assert_nil(mod.set_word_delimiters)
+		helpers.assert_eq(mod.set_override("rolls", nil, "delay", 1.25), true)
+		local content = read_fixture(path)
+		helpers.assert_contains(content, record)
+		helpers.assert_contains(content, "delay_offset = 0.5")
 		os.remove(path)
 	end)
 end)

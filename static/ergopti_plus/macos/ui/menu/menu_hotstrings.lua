@@ -75,6 +75,7 @@ M.DEFAULT_STATE = {
 	custom_editor_shortcut        = nil,
 	sections_order_overrides      = {},
 	terminator_states             = {},
+	terminator_consume            = {},
 	custom_terminators            = {},
 	custom_delimiters             = {},
 	hotstrings                    = {},

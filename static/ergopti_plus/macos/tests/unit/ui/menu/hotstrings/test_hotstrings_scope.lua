@@ -150,6 +150,9 @@ local function fake_keymap(controls)
 	km.is_terminator_enabled = Terminators.is_terminator_enabled
 	km.add_custom_terminator = Terminators.add_custom_terminator
 	km.is_terminator = Terminators.is_terminator
+	km.is_terminator_consume = Terminators.is_terminator_consume
+	km.set_terminators_consume = Terminators.set_terminators_consume
+	km.terminator_is_consumed = Terminators.terminator_is_consumed
 	function km.set_terminators_enabled(changes)
 		km.terminator_calls = (km.terminator_calls or 0) + 1
 		if controls.refuse_terminators or controls.refuse_terminator_call == km.terminator_calls then
@@ -337,6 +340,14 @@ local function fixture(options)
 		end
 	end
 	assert(km.set_terminators_enabled(known))
+	state.terminator_consume = hotstrings.terminator_consume or {}
+	local consumed = {}
+	for _, entry in ipairs(km.get_terminator_defs()) do
+		if entry.key and entry.custom ~= true and type(state.terminator_consume[entry.key]) == "boolean" then
+			consumed[entry.key] = state.terminator_consume[entry.key]
+		end
+	end
+	assert(km.set_terminators_consume(consumed))
 	local hotfiles = { "autocorrection", "rolls", "personal", "dynamichotstrings" }
 	local core = { keymap = km }
 	local PT = require("ui.menu.preferences_transaction")
@@ -460,8 +471,9 @@ helpers.describe("macOS hotstrings scope", function()
 			helpers.assert_eq(overrides.futurepack.sections.section.legacy_delay, 3.0, "an earlier build's absolute delay stays as written")
 			helpers.assert_true(f.files.overrides:find("# kept comment", 1, true) ~= nil, "comment kept")
 			helpers.assert_true(f.files.overrides:find('consumed_delimiters = "x"', 1, true) ~= nil,
-				"a sibling driver's global kept")
-			helpers.assert_eq(f.config.get_word_delimiters(), " .,")
+				"an old delimiter table is foreign bytes and is kept")
+			helpers.assert_true(f.files.overrides:find('word_delimiters = " .,"', 1, true) ~= nil,
+				"an old delimiter table is foreign bytes and is kept")
 			helpers.assert_eq(backup(f.files, "overrides-backup-"), ORIGINAL_OVERRIDES)
 			helpers.assert_eq(backup(f.files, "config-backup-"), ORIGINAL_CONFIG)
 		end
@@ -790,6 +802,26 @@ helpers.describe("hotstrings scope: delimiter parity (hotstrings-delimiter-scope
 			helpers.assert_nil((saved.terminator_states or {}).space)
 			helpers.assert_eq(saved.terminators,
 				{ { key = "custom_¤", char = "¤", label = "¤", consume = true } })
+		end)
+	end
+
+	for _, mode in ipairs({ "recommended", "clear" }) do
+		helpers.it("resets the consumed choice of shipped delimiters and keeps a personal entry's on " .. mode, function()
+			local source = DELIMITER_CONFIG .. '\n[hotstrings.terminator_consume]\nstar = false\ncomma = true\n'
+				.. '"custom_¤" = true\nretired = true\n'
+			local f = fixture({ config = source })
+			helpers.assert_eq(f.km.terminator_is_consumed(","), true, "the configured comma is consumed")
+			helpers.assert_eq(f.km.is_terminator_consume("star"), false, "the configured star is not consumed")
+			helpers.assert_eq(f.owner.apply(mode), true)
+			local consume = Codec.decode(f.files.config).hotstrings.terminator_consume or {}
+			helpers.assert_nil(consume.star, "the file inherits the shipped star consumption")
+			helpers.assert_nil(consume.comma, "the file inherits the shipped comma consumption")
+			helpers.assert_eq(consume["custom_¤"], true, "a personal entry is user data")
+			helpers.assert_eq(consume.retired, true, "cleanup still owns the outdated entry")
+			helpers.assert_eq(f.km.terminator_is_consumed(","), false)
+			helpers.assert_eq(f.km.is_terminator_consume("star"), true)
+			helpers.assert_nil(f.state.terminator_consume.star, "the next save must not resurrect the override")
+			helpers.assert_nil(f.state.terminator_consume.comma)
 		end)
 	end
 

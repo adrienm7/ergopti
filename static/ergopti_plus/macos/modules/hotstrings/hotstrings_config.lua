@@ -38,7 +38,6 @@ local TomlRecordEditor = require("infra.toml.record_editor")
 local FileSystem = require("adapters.file_system")
 local ConfigSchema = require("modules.hotstrings.hotstrings_config_schema")
 local PersonalFiles = require("hotstrings.personal_files")
-local BasicString = require("toml_codec.basic_string")
 local TomlCodec = require("toml_codec.codec")
 local PublicationRecovery = require("hotstrings.publication_recovery")
 -- The five-rung precedence, shared with Linux. It was written once here and
@@ -84,10 +83,6 @@ local CATEGORY_DEFAULT_COLORS = {}
 local OVERRIDE_FIELDS = { "delay_offset", "delay_unlimited", "legacy_delay", "color", "show_tooltip", "priority" }
 local OVERRIDE_KEYS = { delay_offset = "delay_offset", delay_unlimited = "delay_unlimited", legacy_delay = "delay",
 	color = "color", show_tooltip = "show_tooltip", priority = "priority" }
-
--- Built-in word-delimiter set — mirrors HOTSTRINGS_DEFAULT_WORD_DELIMITERS in AHK.
--- CR and LF are always included; the rest are user-configurable.
-local DEFAULT_WORD_DELIMITERS = " \t\r\n.,;:?!'’-=()[]/\\+*"
 
 local _state = nil
 local _terminal_owner = nil
@@ -174,24 +169,22 @@ end
 --- @return number depth Updated nesting depth.
 --- @return string|nil multiline_quote Updated triple-quote delimiter.
 --- Parses the user override TOML file into two structures:
---- - overrides: { [category] = { delay = n, color = s, sections = { [name] = { delay, color } } } }
---- - global_word_delimiters: string|nil (from [__global__] word_delimiters key)
---- Unknown category keys are ignored. Unowned or unsupported [__global__]
---- records are preserved byte-for-byte because sibling drivers share the file.
+--- - overrides: { [category] = { delay_offset = n, color = s, sections = { [name] = { ... } } } }
+--- - global_passthrough: the raw records of a [__global__] table.
+--- Unknown category keys are ignored. No [__global__] key is owned any more (the
+--- word and consumed delimiter strings moved to config.toml leaves), so a table
+--- an earlier build or another tool wrote is preserved byte-for-byte.
 --- @param content string Exact override source bytes.
 --- @return table overrides The parsed overrides.
---- @return string|nil word_delimiters The optional word-delimiter override.
---- @return string[] global_passthrough Exact raw records for unowned [__global__] keys.
+--- @return string[] global_passthrough Exact raw records of the [__global__] table.
 local function parse_override_content(content)
 	local result = {}
-	local word_delimiters = nil
 	local global_passthrough = {}
 	local current_cat = nil
 	local current_sec = nil
 	local in_global   = false
 	local global_depth = 0
 	local global_multiline_quote = nil
-	local global_owned_record = false
 	local record_depth, record_quote = 0, nil
 
 	for raw in (content .. "\n"):gmatch("([^\n]*)\n") do
@@ -209,68 +202,38 @@ local function parse_override_content(content)
 		local global_record_open = in_global
 			and (global_depth > 0 or global_multiline_quote ~= nil)
 		if global_record_open then
-			if not global_owned_record then
-				global_passthrough[#global_passthrough + 1] = raw
-			end
+			global_passthrough[#global_passthrough + 1] = raw
 			global_depth, global_multiline_quote = TomlRecordEditor.advance_continuation(
 				raw,
 				global_depth,
 				global_multiline_quote
 			)
-			if global_depth == 0 and global_multiline_quote == nil then
-				global_owned_record = false
-			end
 			goto continue
 		end
 
-		-- [__global__] — script-wide settings (word_delimiters, etc.)
+		-- [__global__] — no key of it is interpreted.
 		if line == "[__global__]" then
 			in_global = true
 			current_cat, current_sec = nil, nil
 			global_depth = 0
 			global_multiline_quote = nil
-			global_owned_record = false
 			goto continue
 		end
 
-		-- This file is shared with the Windows driver. This module owns
-		-- word_delimiters, but sibling drivers may add other global assignments
-		-- such as consumed_delimiters. Retain their complete raw records, including
-		-- multiline values, comments, and blank lines, instead of silently deleting
-		-- fields this parser does not interpret. A '[' only starts a new section
-		-- when no value is open; inside an array it is continuation data.
+		-- Retain the complete raw records, including multiline values, comments
+		-- and blank lines, instead of silently deleting fields this parser does
+		-- not interpret. A '[' only starts a new section when no value is open;
+		-- inside an array it is continuation data.
 		if in_global then
 			if line:sub(1, 1) == "[" then
 				in_global = false
-				global_owned_record = false
 			else
-				local global_key = line:match("^([%w_%-]+)%s*=")
-				local wd = global_key == "word_delimiters"
-					and line:match("^word_delimiters%s*=%s*\"(.-)\"%s*$")
-					or nil
-				-- Ownership starts only after the value shape is understood. A
-				-- hand-edited literal string or trailing comment is valid shared TOML,
-				-- but this deliberately narrow parser cannot interpret it. Preserve
-				-- that complete record as passthrough instead of claiming and dropping
-				-- bytes during an unrelated category save.
-				local decoded = wd and BasicString.unescape_body(wd) or nil
-				global_owned_record = decoded ~= nil
-				if global_owned_record then
-					word_delimiters = decoded
-				elseif global_key == "word_delimiters" then
-					Logger.warn(LOG, "Unsupported word_delimiters representation preserved without applying it.")
-				end
-				if not global_owned_record then
-					global_passthrough[#global_passthrough + 1] = raw
-				end
+				global_passthrough[#global_passthrough + 1] = raw
 				global_depth, global_multiline_quote = TomlRecordEditor.advance_continuation(
 					raw,
 					global_depth,
 					global_multiline_quote
 				)
-				if global_depth == 0 and global_multiline_quote == nil then
-					global_owned_record = false
-				end
 				goto continue
 			end
 		end
@@ -382,7 +345,7 @@ local function parse_override_content(content)
 		::continue::
 	end
 
-	return result, word_delimiters, global_passthrough
+	return result, global_passthrough
 end
 
 --- Checks every captured logical field without entering a path callback.
@@ -391,8 +354,9 @@ local function same_publication_owner(captured)
 	local state = _state
 	if state.path ~= captured.path or state.epoch ~= captured.epoch
 		or state.owner_epoch ~= captured.owner_epoch or state.scope_owner ~= captured.scope_owner
-		or state.source_snapshot ~= captured.source_object or state.overrides ~= captured.overrides
-		or state.word_delimiters ~= captured.word_delimiters then return false end
+		or state.source_snapshot ~= captured.source_object or state.overrides ~= captured.overrides then
+		return false
+	end
 	local source = state.source_snapshot
 	return (source and source.status) == captured.source_status
 		and (source and source.content) == captured.source_content
@@ -404,8 +368,7 @@ local function capture_publication_owner(state)
 	local captured = { state = state, path = state.path, epoch = state.epoch,
 		owner_epoch = state.owner_epoch, scope_owner = state.scope_owner,
 		source_object = source, source_status = source and source.status,
-		source_content = source and source.content, overrides = state.overrides,
-		word_delimiters = state.word_delimiters }
+		source_content = source and source.content, overrides = state.overrides }
 	if state.current_override_path then
 		local called, current = pcall(state.current_override_path)
 		if not called or current ~= captured.path then return nil end
@@ -455,36 +418,35 @@ end
 --- Reads and parses the user override file.
 --- @param path string Absolute path to the override file.
 --- @return table overrides The parsed overrides.
---- @return string|nil word_delimiters The optional word-delimiter override.
 --- @return string status `committed`, `absent`, or `error`.
 --- @return table|nil source_snapshot Exact classified bytes used to build the result.
 --- @return string[] global_passthrough Exact raw records for unowned [__global__] keys.
 --- @return boolean|nil common_admitted Exact common activation admission after migration.
 local function parse_overrides(path)
-	if not begin_publication_attempt() then return {}, nil, "error", nil, {} end
+	if not begin_publication_attempt() then return {}, "error", nil, {} end
 	local Migration = require("hotstrings.common_autocorrection_migration")
 	local read_ok, migrated = pcall(Migration.run, path, Paths.shared(Migration.POLICY_PATH), FileSystem,
 		_state.on_publication_error, _state.recovery.publish)
 	local accepted = read_ok and type(migrated) == "table"
 		and (migrated.status == "absent" or migrated.status == "current" or migrated.status == "migrated")
-	if not finish_publication_attempt(accepted) then return {}, nil, "error", nil, {} end
+	if not finish_publication_attempt(accepted) then return {}, "error", nil, {} end
 	local content = read_ok and migrated.content or nil
 	local read_status = read_ok and migrated.status or "error"
 	local read_detail = read_ok and migrated.detail or tostring(migrated)
 	if not read_ok or read_status == "error" then
 		Logger.error(LOG, "Override source read did not commit: %s.",
 			tostring(read_ok and read_detail or content))
-		return {}, nil, "error", nil, {}
+		return {}, "error", nil, {}
 	end
 	if read_status == "absent" then
-		return {}, nil, "absent", { status = "absent" }, {}, true
+		return {}, "absent", { status = "absent" }, {}, true
 	end
 	if (read_status ~= "current" and read_status ~= "migrated") or type(content) ~= "string" then
 		Logger.error(LOG, "Override source returned an invalid read status: %s.", tostring(read_status))
-		return {}, nil, "error", nil, {}
+		return {}, "error", nil, {}
 	end
-	local result, word_delimiters, global_passthrough = parse_override_content(content)
-	return result, word_delimiters, "committed", { status = "ok", content = content }, global_passthrough, migrated.common_admitted ~= false
+	local result, global_passthrough = parse_override_content(content)
+	return result, "committed", { status = "ok", content = content }, global_passthrough, migrated.common_admitted ~= false
 end
 
 --- The delay lines of one override rung: an offset of the base expansion delay,
@@ -509,11 +471,10 @@ end
 
 --- Serializes the in-memory override table back to TOML.
 --- @param overrides table The override table (same shape as parse_overrides).
---- @param word_delimiters string|nil The [__global__] word_delimiters value, if set.
---- @param global_passthrough string[] Exact raw records for unowned [__global__] keys.
+--- @param global_passthrough string[] Exact raw records of the [__global__] table.
 --- @return string|nil content The serialized TOML content.
 --- @return string|nil error_detail Validation failure without untrusted bytes.
-local function serialize_overrides(overrides, word_delimiters, global_passthrough)
+local function serialize_overrides(overrides, global_passthrough)
 	if type(overrides) ~= "table" then return nil, "override root must be a table" end
 	local out = {
 		"# Hotstrings — overrides utilisateur",
@@ -524,22 +485,12 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 	}
 
 	-- [__global__] is re-emitted FIRST. parse_overrides returns it as a separate
-	-- value from the category table, and this function only ever received the
-	-- second — so every save from the delays-and-colours window rewrote the file
-	-- without it, silently discarding the word_delimiters the AutoHotkey driver
-	-- writes into the very same shared file. A round trip that reads more than it
-	-- writes destroys whatever it did not read.
-	local has_word_delimiters = type(word_delimiters) == "string" and word_delimiters ~= ""
+	-- value from the category table, so a save that only wrote the categories
+	-- would silently discard whatever the table holds. A round trip that reads
+	-- more than it writes destroys whatever it did not read.
 	local has_passthrough = type(global_passthrough) == "table" and #global_passthrough > 0
-	if has_word_delimiters or has_passthrough then
+	if has_passthrough then
 		table.insert(out, "[__global__]")
-		-- Written in the shape the PARSER reads: a plain double-quoted string with
-		-- only the quote and the backslash escaped. string.format("%q") emits LUA
-		-- escapes — a tab becomes \9 — which round-trips through Lua and not
-		-- through `word_delimiters%s*=%s*"(.-)"`.
-		if has_word_delimiters then
-			table.insert(out, "word_delimiters = " .. ConfigSchema.encode_basic_string(word_delimiters))
-		end
 		for _, assignment in ipairs(global_passthrough or {}) do
 			table.insert(out, assignment)
 		end
@@ -652,7 +603,7 @@ local function refresh_after_failed_publication()
 		_state.writes_blocked = true
 		return false
 	end
-	local overrides, word_delimiters, read_status, source_snapshot, global_passthrough, common_admitted =
+	local overrides, read_status, source_snapshot, global_passthrough, common_admitted =
 		parse_overrides(_state.path)
 	if read_status == "error" then
 		_state.common_admitted = false
@@ -669,7 +620,6 @@ local function refresh_after_failed_publication()
 		return false
 	end
 	_state.overrides       = overrides
-	_state.word_delimiters = word_delimiters
 	_state.global_passthrough = global_passthrough
 	_state.source_snapshot = source_snapshot
 	_state.epoch = _state.epoch + 1
@@ -693,10 +643,9 @@ end
 
 --- Preserves every unowned record while publishing only changed override leaves.
 --- @param overrides table Candidate known overrides.
---- @param word_delimiters string|nil Candidate global delimiter choice.
 --- @return string|nil content Prepared source bytes.
 --- @return string|nil detail Refusal reason.
-local function prepare_override_content(overrides, word_delimiters)
+local function prepare_override_content(overrides)
 	local updates = {}
 	local function leaves(source)
 		local rows = {}
@@ -725,10 +674,6 @@ local function prepare_override_content(overrides, word_delimiters)
 		if candidate[id] == nil then
 			updates[#updates + 1] = { section = row[1], key = OVERRIDE_KEYS[row[2]], delete = true }
 		end
-	end
-	if word_delimiters ~= nil or word_delimiters ~= _state.word_delimiters then
-		updates[#updates + 1] = { section = "__global__", key = "word_delimiters",
-			value = word_delimiters, delete = word_delimiters == nil }
 	end
 	local snapshot = _state.source_snapshot
 	local content = snapshot.status == "ok" and snapshot.content or ""
@@ -789,21 +734,20 @@ end
 
 --- Persists a candidate override state through the atomic file-system adapter.
 --- @param overrides table Candidate overrides.
---- @param word_delimiters string|nil Candidate delimiter override.
 --- @return boolean True on success, false on I/O failure.
-local function save_to_disk(overrides, word_delimiters)
+local function save_to_disk(overrides)
 	if not _state then return false end
 	if _state.writes_blocked then
 		Logger.error(LOG, "Override save refused because the source read did not commit.")
 		return false
 	end
-	local content, serialize_err = serialize_overrides(overrides, word_delimiters, _state.global_passthrough)
+	local content, serialize_err = serialize_overrides(overrides, _state.global_passthrough)
 	if not content then
 		Logger.error(LOG, "Override save refused because the candidate schema is invalid: %s.",
 			tostring(serialize_err))
 		return false
 	end
-	local prepared, prepare_error = prepare_override_content(overrides, word_delimiters)
+	local prepared, prepare_error = prepare_override_content(overrides)
 	if not prepared then
 		Logger.error(LOG, "Override source preparation refused: %s.", tostring(prepare_error))
 		refresh_after_failed_publication()
@@ -967,7 +911,7 @@ function M.init(opts)
 	state.recovery = PublicationRecovery.new({ files = FileSystem,
 		capture = function() return capture_publication_owner(state) end,
 		current = publication_owner_current })
-	local overrides, word_delimiters, read_status, source_snapshot, global_passthrough, common_admitted =
+	local overrides, read_status, source_snapshot, global_passthrough, common_admitted =
 		parse_overrides(opts.override_path)
 	if read_status == "error" then
 		Logger.error(LOG, "Initialization degraded: override source is unreadable and writes are blocked.")
@@ -980,7 +924,6 @@ function M.init(opts)
 		return false
 	end
 	_state.overrides = overrides
-	_state.word_delimiters = word_delimiters
 	_state.global_passthrough = global_passthrough
 	_state.source_snapshot = source_snapshot
 	_state.epoch = _state.epoch + 1
@@ -1229,7 +1172,7 @@ local function migrate_legacy_delays()
 		Logger.warn(LOG, "The override file holds a Windows default delay (%.3f s); the base expansion delay of this "
 			.. "driver is hotstrings.expansion_delay in config.toml, so the record is dropped.", global)
 	end
-	local committed, content = save_to_disk(candidate, _state.word_delimiters)
+	local committed, content = save_to_disk(candidate)
 	if not committed then
 		Logger.error(LOG, "The delay overrides could not be rewritten as offsets of the base expansion delay; "
 			.. "they apply as they were and the rewrite is retried at the next start.")
@@ -1311,7 +1254,7 @@ function M.set_override(category, section, field, value)
 		target[field] = value
 	end
 
-	local committed, content = save_to_disk(candidate, _state.word_delimiters)
+	local committed, content = save_to_disk(candidate)
 	if not committed then return false end
 	_state.overrides = candidate
 	_state.source_snapshot = { status = "ok", content = content }
@@ -1355,7 +1298,7 @@ function M.clear_override(category, section, field)
 		target.priority     = nil
 	end
 
-	local committed, content = save_to_disk(candidate, _state.word_delimiters)
+	local committed, content = save_to_disk(candidate)
 	if not committed then return false end
 	_state.overrides = candidate
 	_state.source_snapshot = { status = "ok", content = content }
@@ -1386,7 +1329,7 @@ end
 --- @return boolean
 function M.reload()
 	if not require_state("reload") or not scope_admits("reload") then return false end
-	local overrides, word_delimiters, read_status, source_snapshot, global_passthrough, common_admitted =
+	local overrides, read_status, source_snapshot, global_passthrough, common_admitted =
 		parse_overrides(_state.path)
 	if read_status == "error" then
 		_state.common_admitted = false
@@ -1402,7 +1345,6 @@ function M.reload()
 		return false
 	end
 	_state.overrides       = overrides
-	_state.word_delimiters = word_delimiters
 	_state.global_passthrough = global_passthrough
 	_state.source_snapshot = source_snapshot
 	_state.epoch = _state.epoch + 1
@@ -1510,7 +1452,7 @@ function M.prepare_personal_metadata(owner, record, section, field, value)
 		if plan.remove_file then clear_override_field(stored, field) end
 		if plan.remove_section then clear_override_field(stored.sections[section], field) end
 	end
-	local override_content = prepare_override_content(overrides, _state.word_delimiters)
+	local override_content = prepare_override_content(overrides)
 	if not override_content then return nil end
 	plan.override_path = _state.path
 	plan.override_source = clone_value(_state.source_snapshot)
@@ -1567,7 +1509,7 @@ function M.adopt_scope_source(owner, source, publish)
 	assert(type(source) == "table" and (source.status == "absent"
 		or (source.status == "ok" and type(source.content) == "string")), "scope override source is not classified")
 	assert(type(publish) == "function", "scope override adoption needs its publication")
-	local overrides, word_delimiters, global_passthrough = parse_override_content(source.content or "")
+	local overrides, global_passthrough = parse_override_content(source.content or "")
 	local candidate = { owner = owner, overrides = overrides }
 	_state.scope_candidate = candidate
 	local ok, committed = pcall(function()
@@ -1582,7 +1524,6 @@ function M.adopt_scope_source(owner, source, publish)
 		return false
 	end
 	_state.overrides          = overrides
-	_state.word_delimiters    = word_delimiters
 	_state.global_passthrough = global_passthrough
 	_state.source_snapshot    = source.status == "ok" and { status = "ok", content = source.content }
 		or { status = "absent" }
@@ -1735,98 +1676,13 @@ function M.get_user_override(category, section)
 		priority = target.priority }
 end
 
--- =================================================
--- =================================================
--- ======= 7/ Word-delimiter API ===================
--- =================================================
--- =================================================
-
---- Returns the effective word-delimiter string: user override when stored,
---- otherwise the built-in DEFAULT_WORD_DELIMITERS constant (mirrors AHK default).
---- @return string
-function M.get_word_delimiters()
-	if not require_state("get_word_delimiters") then return DEFAULT_WORD_DELIMITERS end
-	return _state.word_delimiters or DEFAULT_WORD_DELIMITERS
-end
-
---- Returns the built-in default word-delimiter string.
---- @return string
-function M.get_default_word_delimiters()
-	return DEFAULT_WORD_DELIMITERS
-end
-
---- Patches only the shared global delimiter key while preserving other bytes.
---- @param existing string Complete committed source content.
---- @param delimiters string|nil Candidate delimiter value.
---- @return string content Candidate file content.
-local function patch_word_delimiters(existing, delimiters)
-	local encoded = delimiters and ConfigSchema.encode_basic_string(delimiters) or nil
-	return TomlRecordEditor.patch_table_field(
-		existing,
-		"[__global__]",
-		"word_delimiters",
-		encoded,
-		{ remove_empty_section = true }
-	)
-end
-
---- Persists a new word-delimiter string to the [__global__] section of the
---- override file and updates the in-memory value.
---- Pass nil or the default string to clear the override (removes the key).
---- @param delimiters string|nil The new delimiter string, or nil to reset.
---- @return boolean True on success.
-function M.set_word_delimiters(delimiters)
-	if not require_state("set_word_delimiters") or not scope_admits("set_word_delimiters") then return false end
-
-	local candidate
-	if delimiters == nil or delimiters == DEFAULT_WORD_DELIMITERS then
-		candidate = nil
-	else
-		candidate = delimiters
-	end
-
-	if _state.writes_blocked then
-		Logger.error(LOG, "Delimiter save refused because the source read did not commit.")
-		return false
-	end
-	-- Synchronize the complete shared file before patching one key. This keeps
-	-- both the in-memory overrides and the publication precondition on the same
-	-- exact cross-driver source version.
-	if not M.reload() then return false end
-	local snapshot = _state.source_snapshot
-	local existing = snapshot.status == "ok" and snapshot.content or ""
-	local content, patch_err = patch_word_delimiters(existing, candidate)
-	if not content then
-		Logger.error(LOG, "Failed to patch word_delimiters: %s.", tostring(patch_err))
-		return false
-	end
-	local previous_common_admission = _state.common_admitted
-	if not begin_publication_attempt() then return false end
-	local write_ok, committed = pcall(_state.recovery.publish,
-		_state.path, content, FileSystem, snapshot, _state.on_publication_error, publish_native_override)
-	local accepted = finish_publication_attempt(write_ok and committed == true)
-	if not accepted then
-		Logger.error(LOG, "Failed to commit word_delimiters against its loaded source snapshot.")
-		refresh_after_failed_publication()
-		return false
-	end
-	_state.common_admitted = previous_common_admission
-	_state.writes_blocked = false
-	_state.word_delimiters = candidate
-	_state.source_snapshot = { status = "ok", content = content }
-	_state.epoch = _state.epoch + 1
-	Logger.debug(LOG, "word_delimiters persisted: %s.", candidate and
-		('"' .. tostring(candidate) .. '"') or "(default — key removed)")
-	return true
-end
-
 
 
 
 
 -- ==========================================================
 -- ==========================================================
--- ======= 8/ Bootstrap: shared cross-driver defaults =======
+-- ======= 7/ Bootstrap: shared cross-driver defaults =======
 -- ==========================================================
 -- ==========================================================
 

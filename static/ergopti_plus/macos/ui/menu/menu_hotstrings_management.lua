@@ -209,14 +209,34 @@ function M.build_management(ctx)
 	-- expose the same set: enable all / disable all / reset the built-in
 	-- terminators to their catalogue defaults. Custom terminators are managed
 	-- individually below and are left untouched here.
-	local function commit_terminator_changes(changes, reason)
+	local function commit_terminator_changes(changes, reason, consumption)
 		local keymap = ctx.keymap
 		local committed = KeymapLifecycle.commit_mutation(ctx, reason, function()
 			if not keymap or type(keymap.set_terminators_enabled) ~= "function" then return false end
-			return keymap.set_terminators_enabled(changes)
+			if consumption == nil then return keymap.set_terminators_enabled(changes) end
+			-- The enabled states and the consumed choices change together or not at all.
+			if type(keymap.set_terminators_consume) ~= "function"
+				or type(keymap.is_terminator_consume) ~= "function" then
+				return false
+			end
+			local previous = {}
+			for key in pairs(consumption) do previous[key] = keymap.is_terminator_consume(key) end
+			if keymap.set_terminators_consume(consumption) ~= true then return false end
+			local called, applied = pcall(keymap.set_terminators_enabled, changes)
+			if not called or applied ~= true then
+				keymap.set_terminators_consume(previous)
+				if not called then error(applied, 0) end
+				return applied
+			end
+			return true
 		end)
 		if not committed then return false end
 		for key, enabled in pairs(changes) do state.terminator_states[key] = enabled end
+		if consumption ~= nil then
+			-- Back on the catalogue choice, the stored consume table holds no key.
+			if type(state.terminator_consume) ~= "table" then state.terminator_consume = {} end
+			for key in pairs(consumption) do state.terminator_consume[key] = nil end
+		end
 		if ctx.save_prefs() ~= true then return false end
 		ctx.updateMenu()
 		return true
@@ -243,7 +263,12 @@ function M.build_management(ctx)
 				changes[d.key] = (d.default_enabled ~= false)
 			end
 		end
-		return commit_terminator_changes(changes, "reset word expanders")
+		-- The consumed choice of every built-in goes back to the catalogue too.
+		local consumption = {}
+		for _, d in ipairs(defs) do
+			if type(d) == "table" and not d.custom and d.key then consumption[d.key] = (d.consume == true) end
+		end
+		return commit_terminator_changes(changes, "reset word expanders", consumption)
 	end
 
 	-- Built-in terminators (non-custom), with consume indicator. The shared
@@ -260,7 +285,9 @@ function M.build_management(ctx)
 				-- The catalogue carries a locale key, never display text: resolving
 				-- it here follows the active language on every menu rebuild.
 				local lbl = i18n.get(def.label_key)
-				if def.consume then lbl = lbl .. " " .. i18n.get("menu.hotstrings.consumed_suffix") end
+				local consumed_t = ctx.keymap and type(ctx.keymap.is_terminator_consume) == "function"
+					and ctx.keymap.is_terminator_consume(def.key) or def.consume
+				if consumed_t then lbl = lbl .. " " .. i18n.get("menu.hotstrings.consumed_suffix") end
 
 				exp_sub[#exp_sub + 1] = {
 					label    = ctx.applyTriggerChar(lbl),
