@@ -229,7 +229,7 @@ function assertModelOfferAffinity(source, managedSource) {
 	);
 	assert.match(
 		source,
-		/TimerSetCallback\(_LLM_LocalModelOfferPublished\.Bind\(Receipt, Callback\), Delay\)/
+		/TimerArmOneShotMs\(_LLM_LocalModelOfferPublished\.Bind\(Receipt, Callback\), Delay\)/
 	);
 	assert.match(
 		source,
@@ -284,13 +284,13 @@ const offerControls = [
 	],
 	[
 		'platform timer owner',
-		'TimerSetCallback(_LLM_LocalModelOfferPublished.Bind(Receipt, Callback), Delay)',
+		'TimerArmOneShotMs(_LLM_LocalModelOfferPublished.Bind(Receipt, Callback), Delay)',
 		'SetTimer(_LLM_LocalModelOfferPublished.Bind(Receipt, Callback), Delay)'
 	],
 	[
 		'delayed origin scope',
-		'TimerSetCallback(_LLM_LocalModelOfferPublished.Bind(Receipt, Callback), Delay)',
-		'TimerSetCallback(Callback, Delay)'
+		'TimerArmOneShotMs(_LLM_LocalModelOfferPublished.Bind(Receipt, Callback), Delay)',
+		'TimerArmOneShotMs(Callback, Delay)'
 	]
 ];
 for (const [name, before, after] of offerControls) {
