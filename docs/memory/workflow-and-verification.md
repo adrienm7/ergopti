@@ -78,6 +78,14 @@ another live process, never download runtimes or models without authorization,
 and keep large artifacts on owned D: storage (C: ran out of space during site
 and runtime checks).
 
+## Communication
+
+### feedback-times-in-paris
+
+State every time told to the maintainer in Paris time (Europe/Paris, with the
+CET/CEST offset applied), never in UTC. Tools, CI and schedulers report UTC;
+convert before writing it, for example with `TZ=Europe/Paris date`.
+
 ## Verification
 
 ### feedback-regression-tests
