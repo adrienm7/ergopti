@@ -591,3 +591,43 @@ _RIT_BackupAllocationPreservesOrdinaryFile(Mode) {
 for _RIT_OccupiedMode in ["base", "next", "gap"]
 	Test("Config backup: ordinary file at " . _RIT_OccupiedMode . " preserves bytes and allocation order (config-backup-ordinary-collision)",
 		_RIT_BackupAllocationPreservesOrdinaryFile.Bind(_RIT_OccupiedMode))
+
+
+_RIT_BackupAllocationPreservesCaseVariant(Kind, Position) {
+	Root := A_Temp . "\ergopti_rit_case_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "generation = 1`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Folder := Cfg . "\" . Rules["folder"]
+		Base := Rules["kinds"]["pre_install"] . "-20260930-101500"
+		if Position == "next"
+			ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		DirCreate(Folder)
+		Foreign := Folder . "\" . StrUpper(Base . (Position == "next" ? "-2" : ""))
+		SentinelPath := Kind == "directory" ? Foreign . "\foreign.txt" : Foreign
+		if Kind == "directory"
+			DirCreate(Foreign)
+		Sentinel := "foreign case variant " . Kind . " " . Position . "`n"
+		AssertTrue(FSWriteCreateDurable(SentinelPath, Sentinel))
+		AssertTrue(FileExist(Folder . "\" . Base . (Position == "next" ? "-2" : "")),
+			"the native filesystem must resolve the existing case variant as the same occupied path")
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 2`n"))
+		Created := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		AssertEqual(Base . (Position == "next" ? "-3" : "-2"), Created["id"],
+			"allocation must honor Windows case-insensitive pathname collisions")
+		AssertEqual(Sentinel, FSReadUtf8Exact(SentinelPath), "the existing case variant must preserve its exact bytes")
+		AssertFalse(FileExist(Foreign . "\" . Rules["manifest"]),
+			"an existing directory cannot acquire this transaction's backup manifest")
+		AssertEqual(Created["id"], ConfigBackup_Latest(Cfg, "pre_install", Rules)["id"])
+		AssertEqual("generation = 2`n", FSReadUtf8Exact(Created["path"] . "\config\config.toml"))
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+for _RIT_CaseKind in ["file", "directory"] {
+	for _RIT_CasePosition in ["base", "next"]
+		Test("Config backup: case-variant " . _RIT_CaseKind . " at " . _RIT_CasePosition . " preserves foreign ownership (config-backup-case-collision)",
+			_RIT_BackupAllocationPreservesCaseVariant.Bind(_RIT_CaseKind, _RIT_CasePosition))
+}
