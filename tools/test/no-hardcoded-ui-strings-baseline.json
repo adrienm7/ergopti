@@ -732,12 +732,6 @@
 		"count": 1
 	},
 	{
-		"file": "linux/install/ownership.sh",
-		"sink": "echo",
-		"text": "Payload filename cannot be represented safely.",
-		"count": 1
-	},
-	{
 		"file": "linux/install/setup_permissions.sh",
 		"sink": "echo",
 		"text": "Account identity mismatch.",
