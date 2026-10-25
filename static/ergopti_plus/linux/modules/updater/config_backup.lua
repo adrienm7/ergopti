@@ -131,10 +131,9 @@ end
 --- @return string|nil error
 local function read_defaults()
 	local path = Paths.shared("modules/updater/defaults.json")
-	local handle = path and io.open(path, "rb") or nil
-	if not handle then return nil, "the shared updater defaults are unreadable" end
-	local raw = handle:read("*a")
-	handle:close()
+	local raw, status
+	if path then raw, status = Writer.read_classified(path) end
+	if status ~= "ok" then return nil, "the shared updater defaults are unreadable" end
 	local ok, decoded = pcall(Json.decode, raw)
 	if not ok then return nil, "the shared updater defaults are not JSON" end
 	return decoded

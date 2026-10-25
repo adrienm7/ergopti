@@ -368,3 +368,82 @@ helpers.describe("installer-native-publication", function()
 	end)
 
 end)
+
+helpers.describe("config-backup-rule-source", function()
+	local uv = require("luv")
+	local Paths = require("infra.paths")
+	local rules = assert(read(Paths.shared("modules/updater/defaults.json")))
+	for _, kind in ipairs({ "fifo", "fifo-link", "denied", "file", "file-link" }) do
+		helpers.it("(config-backup-rule-source) classifies " .. kind .. " before building a backup owner", function()
+			local dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-backup-rules-XXXXXX"))
+			local source, target = dir .. "/rules\\source\n", dir .. "/target\\source\n"
+			assert(uv.fs_mkdir(dir .. "/config", 448))
+			if kind == "fifo" or kind == "fifo-link" then
+				assert(require("adapters.shell_runner").run("mkfifo -- " .. quote(kind == "fifo" and source or target)))
+			else write(kind == "file-link" and target or source, rules) end
+			if kind == "fifo-link" or kind == "file-link" then assert(uv.fs_symlink(target, source)) end
+			if kind == "denied" then assert(uv.fs_chmod(source, 0)) end
+			local admitted = kind == "file" or kind == "file-link"
+			local code = string.format([[package.path = %q
+local original = require("infra.paths")
+package.loaded["infra.paths"] = setmetatable({ shared = function(relative)
+ if relative == "modules/updater/defaults.json" then return %q end
+ return original.shared(relative)
+end }, { __index = original })
+local backup = require("modules.updater.config_backup")
+backup._overrides = { roots = { { id = "config", dir = %q } } }
+local owner, detail = backup.owner()
+assert((owner ~= nil) == %s, "backup rules admission disagrees with actual source type: " .. tostring(detail))
+]], package.path, source, dir .. "/config", tostring(admitted))
+			local expired, exited, status, signal = false, false, nil, nil
+			local timer, child = assert(uv.new_timer()), nil
+			child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code } }, function(result, killed)
+				exited, status, signal = true, result, killed
+				uv.timer_stop(timer); uv.close(timer); uv.close(child)
+			end))
+			assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+				expired = true; child:kill("sigkill")
+			end))
+			while not exited do uv.run("once") end
+			uv.run("nowait")
+			uv.fs_chmod(source, 384)
+			assert(require("adapters.shell_runner").run("rm -r -- " .. quote(dir)))
+			helpers.assert_eq(expired, false, "configuration backup must not wait for a FIFO writer")
+			helpers.assert_eq(status, 0, "only complete regular rule sources can construct a backup owner")
+			helpers.assert_eq(signal, 0, "a killed backup constructor never counts as admission")
+		end)
+	end
+
+	helpers.it("(config-backup-rule-source) refuses valid bytes when the stream close is unacknowledged", function()
+		local previous_paths = package.loaded["infra.paths"]
+		local previous_backup = package.loaded["modules.updater.config_backup"]
+		local path = os.tmpname()
+		write(path, rules)
+		package.loaded["infra.paths"] = setmetatable({ shared = function(relative)
+			if relative == "modules/updater/defaults.json" then return path end
+			return Paths.shared(relative)
+		end }, { __index = Paths })
+		local Backup = helpers.load_module("modules.updater.config_backup")
+		Backup._overrides = { roots = { { id = "config", dir = path .. "-unused" } } }
+		local open, closes = io.open, 0
+		io.open = function(file, mode)
+			local handle, detail, code = open(file, mode)
+			if not handle then return nil, detail, code end
+			if file ~= path and not file:match("^/proc/self/fd/%d+$") then return handle end
+			return { read = function(_, ...) return handle:read(...) end, close = function()
+				closes = closes + 1
+				assert(handle:close())
+				return nil, "unacknowledged close"
+			end }
+		end
+		local called, owner, detail = pcall(Backup.owner)
+		io.open = open
+		package.loaded["infra.paths"] = previous_paths
+		package.loaded["modules.updater.config_backup"] = previous_backup
+		os.remove(path)
+		helpers.assert_eq(called, true, "the public owner must report a refusal without throwing")
+		helpers.assert_eq(closes, 1, "the actual rules stream is closed exactly once")
+		helpers.assert_nil(owner, "valid JSON cannot override an incomplete read receipt")
+		helpers.assert_true(type(detail) == "string")
+	end)
+end)
