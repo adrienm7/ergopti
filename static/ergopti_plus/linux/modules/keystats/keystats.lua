@@ -610,6 +610,7 @@ function M.init(opts)
 	local options = type(opts) == "table" and opts or {}
 	-- Validate canonical consent before initializing collectors or persistent data.
 	local preferences = Preferences.snapshot()
+	if SystemMetrics then SystemMetrics.bind_event_capture(may_record) end
 
 	-- Initialise the underlying metrics collector if available.
 	if Metrics then Metrics.init({}) end
@@ -2657,8 +2658,9 @@ function M.flush()
 	local clock = observe_calendar()
 	-- The periodic flush is the session's idle check (timings ingest_tick_ms).
 	if may_record() then queue_session_events(forward_session(clock, "tick", clock.mono_ms), clock) end
-	-- And it takes the machine's transitions the daemon's sampler saw, always,
-	-- so a span when recording was forbidden is dropped rather than kept.
+	-- The sampler admits raw transitions at capture, independently of machine
+	-- aggregates. Retain the existing conservative drain gate as well: reopening
+	-- recording cannot authorize a forbidden sample, and closing it drops queues.
 	if SystemMetrics then
 		local transitions = SystemMetrics.take_events()
 		if may_record() then

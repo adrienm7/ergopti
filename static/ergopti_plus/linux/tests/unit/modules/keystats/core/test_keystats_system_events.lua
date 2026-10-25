@@ -52,6 +52,7 @@ local function with_recorder(transitions, script)
 	package.loaded[names[1]], package.loaded[names[2]] = fake_writer, nil
 	package.loaded[names[3]] = {
 		bind = function() end,
+		bind_event_capture = function() end,
 		current = function() return nil end,
 		snapshot = function() return { values = {}, owners = {} } end,
 		acknowledge = function() end,

@@ -73,6 +73,7 @@ local _wireless_path = WIRELESS_PATH
 
 -- Persistence is bound by the collector after its own database is opened.
 local _owner_database, _owner_device, _load_day = nil, nil, nil
+local _event_admit = nil
 
 -- What the previous sample saw, for the transitions.
 local function new_last() return { at_ms = nil, ssid = nil, locked = nil, muted = nil } end
@@ -197,6 +198,14 @@ local function new_day(date)
 	}
 end
 
+--- Binds the collector's one live recording-policy authority for raw transitions.
+--- Machine aggregates remain independent of the boolean capture decision.
+--- @param admit function Returns an exact boolean for the current producer span.
+function M.bind_event_capture(admit)
+	assert(type(admit) == "function", "System transitions require a recording-policy authority")
+	_event_admit = admit
+end
+
 --- Binds the collector's exact persistence identity and checked day loader.
 --- Reopening the same database preserves the live cumulative day.
 --- @param database string Database identity.
@@ -233,6 +242,9 @@ function M.sample()
 	local clock = Calendar.capture()
 	local now_ms, date = clock.mono_ms, clock.date
 	if _day and _day.date == date and _last.at_ms and (now_ms - _last.at_ms) < SAMPLE_INTERVAL_MS then return _day end
+	assert(type(_event_admit) == "function", "System transition capture has no recording-policy authority")
+	local capture_events = _event_admit()
+	assert(type(capture_events) == "boolean", "System transition recording policy must return a boolean")
 	local current = retained_day(date)
 	if not current then return nil end
 	local elapsed = _last.at_ms and math.max(0, now_ms - _last.at_ms) or 0
@@ -261,6 +273,7 @@ function M.sample()
 	end
 	_day = current
 	local function transition(action, metadata)
+		if not capture_events then return end
 		_events[#_events + 1] = { action = action, metadata = metadata, date = clock.date, ts = clock.ts }
 	end
 	if asleep then transition("wake", { asleep_ms = elapsed }) end
@@ -326,6 +339,7 @@ end
 
 --- Test seam: forgets everything, the wireless listing's path included.
 function M._reset()
+	_event_admit = nil
 	_owner_database, _owner_device, _load_day = nil, nil, nil
 	_day, _days = nil, {}
 	_events = {}

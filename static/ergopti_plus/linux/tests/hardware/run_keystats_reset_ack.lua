@@ -32,7 +32,7 @@ for _, successor in ipairs({ false, true }) do
 				k.init({ sqlite_path = path })
 				require("tests.support.metrics_consent_fixture").enable(k)
 				local system = require("modules.keystats.system_metrics")
-				assert(system.sample(math.floor(Clock.now_ms()), os.date("%Y-%m-%d")))
+				assert(system.sample())
 				local writer = require("modules.keystats.sqlite_writer")
 				local start, operations, released = writer.start_flush, {}, false
 				writer.start_flush = function(...)
