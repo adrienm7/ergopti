@@ -44,8 +44,8 @@ const cases = [
 		/lua is "Lua 5\.1\.5/
 	],
 	[{ luaVersionText: 'Lua 5.40.0' }, /lua is "Lua 5\.40\.0"/],
-	[{ luaVersionText: null }, /no lua command/],
-	[{ pwshVersionText: null }, /no pwsh on PATH/],
+	[{ luaVersionText: null }, /no runnable lua command/],
+	[{ pwshVersionText: null }, /no runnable pwsh on PATH/],
 	[{ accountVariables: ['USER', 'LOGNAME'] }, /USER and LOGNAME unset/]
 ];
 for (const [override, expected] of cases) {
