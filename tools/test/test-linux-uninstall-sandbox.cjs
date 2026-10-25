@@ -108,6 +108,8 @@ try {
 	);
 	const ownershipPath = path.join(library, '.ergopti-owned-files');
 	const validOwnership = fs.readFileSync(ownershipPath, 'utf8');
+	fs.writeFileSync(ownershipPath, validOwnership.slice(0, -1));
+	assert.equal(run('--check').status, 0, 'a complete final record is valid without a newline');
 	fs.writeFileSync(ownershipPath, '');
 	const emptyPreflight = run('--check');
 	const emptyRemoval = run('--yes');
@@ -125,9 +127,18 @@ try {
 	assert.ok(fs.existsSync(wrapper), 'empty receipt refusal preserves the launcher');
 	fs.writeFileSync(ownershipPath, validOwnership);
 	for (const invalidPath of ['linux/../../another-app/keep', 'linux//file', '@unknown']) {
-		fs.writeFileSync(ownershipPath, validOwnership + `${wrapperHash}\t${invalidPath}\n`);
-		assert.notEqual(run('--yes').status, 0, `unsafe receipt must be refused: ${invalidPath}`);
-		assert.ok(fs.existsSync(wrapper), 'receipt refusal must happen before any deletion');
+		for (const terminator of ['\n', '']) {
+			fs.writeFileSync(
+				ownershipPath,
+				validOwnership + `${wrapperHash}\t${invalidPath}${terminator}`
+			);
+			assert.notEqual(
+				run('--yes').status,
+				0,
+				`unsafe receipt must be refused with terminator=${JSON.stringify(terminator)}: ${invalidPath}`
+			);
+			assert.ok(fs.existsSync(wrapper), 'receipt refusal must happen before any deletion');
+		}
 	}
 	fs.writeFileSync(ownershipPath, validOwnership);
 	const gitMarker = path.join(prefix, '.git');

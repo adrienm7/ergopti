@@ -177,7 +177,7 @@ AUTOSTART="$CONFIG_ROOT/autostart/ergopti-hotstrings.desktop"
 OWNED=()
 REMOVE_UNIT=false
 declare -A SEEN=()
-while IFS=$'\t' read -r digest relative; do
+while IFS=$'\t' read -r digest relative || [ -n "$digest$relative" ]; do
 	[[ "$digest" =~ ^[0-9a-f]{64}$ ]] || { echo 'Invalid ownership digest.' >&2; exit 1; }
 	case "$relative" in
 		linux/*|_shared/*|bin/ergopti-hotstrings) owned="$LIBRARY/$relative" ;;
