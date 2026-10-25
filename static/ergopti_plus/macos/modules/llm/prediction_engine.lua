@@ -674,6 +674,10 @@ function M.set_llm_enabled(enabled)
 
 	settle("runtime gate", core_llm.set_runtime_llm_enabled, is_llm_enabled)
 	Logger.info(LOG, "LLM %s.", is_llm_enabled and "enabled" or "disabled")
+	-- The keys bound to an AI action follow the switch. Only a gate that is
+	-- loaded has layers to tell, so this never loads it (and its listeners).
+	local ai_actions = rawget(package.loaded, "modules.shortcuts.ai_actions")
+	if ai_actions ~= nil then ai_actions.notify() end
 	if not is_llm_enabled then
 		-- Turning the AI off ends live mode too: turning it back on must not
 		-- resume a translation the user no longer sees announced

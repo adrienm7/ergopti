@@ -26,6 +26,7 @@ local NativePath = require("native_path")
 local Config = require("platform.remap.tap_hold_loader")
 local Engine = require("platform.remap.tap_hold_engine")
 local Combinations = require("modules.shortcuts.key_combinations")
+local AiActions = require("modules.shortcuts.ai_actions")
 local original_combination_constructor = Combinations.new
 local original_combination_instance_current = Combinations.instance_is_current
 local BindingIdentity = require("config_binding_identity")
@@ -197,6 +198,11 @@ local function _run_tap(action, binding)
 				and rawequal(_installed_engine, engine) and _generation == generation and _execute_action == execute
 		end
 		if not tap_current() then return end
+	end
+	-- Re-read at delivery: the AI may be switched off between the key and its run.
+	if AiActions.blocked(action) then
+		Logger.debug(LOG, "Tap action '%s' held back: the AI is off.", action)
+		return
 	end
 	Logger.debug(LOG, "Tap action '%s'.", action)
 	if pair_current and not pair_current() then return end
@@ -512,6 +518,8 @@ local function _build(loaded, boot)
 		key_text = function(code) return _hook.key_text(code) end,
 		plan_text = function(text) return (require("adapters.keyboard_layout").plan(text)) end,
 		one_shot_result = _one_shot_result,
+		-- An AI action is unarmed while the AI is off: the key keeps its own tap.
+		tap_blocked = AiActions.blocked,
 		held_modifiers = function() return _hook.held_modifiers() end,
 		held_text_modifier_codes = function() return _hook.held_text_modifier_codes() end,
 		held_shortcut_modifier_codes = function() return _hook.held_shortcut_modifier_codes() end,

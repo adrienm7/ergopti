@@ -14,7 +14,7 @@ local function make(text, keys, changed)
 	state.owner = Owner.new({ keys = catalog, hold_picker = { modifiers = { "ctrl", "shift", "alt" }, layers = { "nav" } },
 		files = { read_with_status = function() if state.on_read then state.on_read() end; return state.bytes, "ok" end }, route = function() return state.route end,
 		is_paused = function() return state.paused end, changed = changed or function() return true end,
-		actions = { is_assignable = function(action) return action == "run_program" or action == "copy" end } })
+		actions = { is_assignable = function(action) return action == "run_program" or action == "copy" or action == "llm_generate_prediction" end } })
 	local base = Engine.new({ keys = keys or { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 } },
 		tap_min_ms = 0, one_shot_timeout_ms = 1000 })
 	local thresholds = {}; for _, row in ipairs(catalog) do thresholds[row.id] = 300 end
@@ -114,6 +114,30 @@ helpers.describe("configured Linux ordered pair ownership", function()
 			helpers.assert_true(frame.ack(true)); frame.run(function() end,origin()); local restored, ack = frame.restore(origin()); if ack then helpers.assert_true(ack.ack(true)) end
 		end
 		local _,action,_,frame = process(state,15,0,100); helpers.assert_eq(action,nil); helpers.assert_true(frame.ack(true))
+	end)
+	helpers.it("leaves a tap-only AI pair to the keys while the AI is off and takes it once on (ai-off-pair)", function()
+		local previous = package.loaded["modules.llm.prediction_engine"]
+		local switch = { enabled = false }
+		package.loaded["modules.llm.prediction_engine"] = { is_enabled = function() return switch.enabled end }
+		local ok, err = pcall(function()
+			local text = base_text:gsub('caps_lock_then_tab = "shift"', 'caps_lock_then_tab = "none"')
+				:gsub('caps_lock_then_tab = "run_program"', 'caps_lock_then_tab = "llm_generate_prediction"')
+				:gsub('\n%[gesture_parameters%].*', "\n")
+			local state = make(text)
+			local out, action = process(state, 58, 1, 0)
+			out, action = process(state, 15, 1, 10)
+			helpers.assert_eq(action, nil, "the AI is off: the pair runs nothing")
+			helpers.assert_eq(rows(out), "", "and takes neither key: the second key is left to the application")
+			process(state, 15, 0, 20); process(state, 58, 0, 30)
+			switch.enabled = true
+			process(state, 58, 1, 100)
+			local _, armed, slot, frame = process(state, 15, 1, 110)
+			helpers.assert_eq(armed, "llm_generate_prediction", "the AI back on: the pair is taken again with no reload")
+			helpers.assert_eq(slot, binding)
+			helpers.assert_true(frame.ack(true))
+		end)
+		package.loaded["modules.llm.prediction_engine"] = previous
+		if not ok then error(err, 0) end
 	end)
 	helpers.it("refuses a cross-keyboard pair and a duplicate-code source collision", function()
 		local state = make(); process(state,58,1,0)

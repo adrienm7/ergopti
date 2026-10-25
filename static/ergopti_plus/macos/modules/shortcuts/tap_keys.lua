@@ -310,6 +310,8 @@ function M.decide(keycode, keyboard_type)
 	if not id or not _assignments then return nil, nil end
 	local action = _assignments[id] or "none"
 	if action == "none" then return nil, nil end
+	-- An AI action is unarmed while the AI is off: the key types as usual.
+	if require("modules.shortcuts.ai_actions").blocked(action) then return nil, nil end
 	return action, M.binding_id(id)
 end
 

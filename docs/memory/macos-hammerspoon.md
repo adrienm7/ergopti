@@ -258,6 +258,16 @@ disarms them; a startup that turns the AI off releases the hotkeys through
 switch and joins that pair; extend `test_ai_off_runtime_inert.lua`, whose
 fakes count bindings, tasks and timers.
 
+The keys bound to an `llm_*` catalogue action follow the switch too:
+`modules/shortcuts/ai_actions.lua` answers `blocked(action)` from the
+prediction engine, the number-row tap keys (`decide`), the physical shortcut
+slots (their `action` lookup) and the gestures ask it at each press, and the
+`hs.hotkey` slots, which cannot ask, subscribe to `notify()` (sent by
+`set_llm_enabled`) and release or re-arm their registrar handle. No Karabiner
+tap-hold or combination can name an `llm_*` action, so there is nothing to
+disarm there. Action: a new key-claiming layer asks `AiActions.blocked`; extend
+`test_ai_off_disarms_ai_actions.lua`.
+
 ### project-macos-local-openai-servers-are-keyless-api-entries
 
 Servers the user runs (oMLX, LM Studio, llama-server/LocalAI, Jan) come from

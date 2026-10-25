@@ -5,6 +5,7 @@
 local Policy = require("tap_hold.key_combinations")
 local Engine = require("platform.remap.tap_hold_engine")
 local ConfigOwner = require("modules.shortcuts.key_combinations")
+local AiActions = require("modules.shortcuts.ai_actions")
 local settings_current = ConfigOwner.buffered_settings_current
 local M = {}
 local input_issuers = setmetatable({}, { __mode = "k" })
@@ -69,6 +70,19 @@ local function participating_codes(options, taps, chords)
 	return codes
 end
 
+--- Copies an action map with the unarmed actions withdrawn (AI actions while
+--- the AI is off), so the pair is not a pair at all and its keys keep their own
+--- behaviour, instead of being claimed and refused.
+--- @param map table|nil Pair -> action.
+--- @param off boolean Whether the AI is off.
+--- @return table|nil
+local function armed_map(map, off)
+	if map == nil or not off then return map end
+	local copy = {}
+	for pair, action in pairs(map) do copy[pair] = AiActions.is_ai_action(action) and Policy.NONE or action end
+	return copy
+end
+
 function M.new(base, options, buffered_ports, projection)
 	assert(type(base) == "table" and type(options.capture) == "function" and type(options.capture_action) == "function")
 	local runtime_taps, runtime_chords = projected_maps(options, projection)
@@ -77,6 +91,7 @@ function M.new(base, options, buffered_ports, projection)
 	local presses, blocked, holds, serial = {}, {}, {}, 0
 	local native_presses = {}
 	local waiting, chords, chord_policy = nil, {}, nil
+	local policy_ai_off = false -- the AI state the policy and chord policy were built for
 	local processing, buffer_request = nil, nil
 	local original_by_code, acknowledged, runtime_guard = base.by_code, false, nil
 	-- Retain this producer's dispatch and inverse functions before any callback.
@@ -193,6 +208,13 @@ local function revoke_event(code, source)
 		if acting or delivery or pending then return owner:release_all(), nil, nil, retired_frame() end
 		if retirement then return {} end
 		if disabled then return base_ports.process(base, code, value, at_ms, receipt) end
+		-- The AI switch changed: build the policies again from the first press
+		-- with every key up, so the pairs follow the switch with no reload.
+		if policy_ai_off ~= AiActions.off() and not next(presses) and not next(native_presses) and not waiting
+			and not next(chords) and not next(base.held) then
+			policy, generation, runtime_guard, chord_policy = nil, nil, nil, nil
+			policy_ai_off = AiActions.off()
+		end
 		if not physical(receipt) then return base_ports.process(base, code, value, at_ms, receipt) end
 		if generation ~= nil and generation ~= receipt.generation then return revoke_event(code, receipt.source) end
 		local source = receipt.source
@@ -233,7 +255,8 @@ local function revoke_event(code, source)
 		if not policy then
 			generation, runtime_guard = receipt.generation, guard
 			local configured = {}; for key, setting in pairs(options) do configured[key] = setting end
-			configured.taps = runtime_taps
+			policy_ai_off = AiActions.off()
+			configured.taps = armed_map(runtime_taps, policy_ai_off)
 			configured.generation = generation
 			policy = Policy.new(configured)
 		end
@@ -294,7 +317,8 @@ local function revoke_event(code, source)
 			for _,a in ipairs(options.keys) do for _,b in ipairs(options.keys) do
 				if a~=b then pairs[#pairs+1]={id=Policy.pair(a,b),first=a,second=b} end
 			end end
-			chord_policy = Policy.chord_policy({pairs=pairs,chords=runtime_chords,settings=options.chord_settings})
+			policy_ai_off = AiActions.off()
+			chord_policy = Policy.chord_policy({pairs=pairs,chords=armed_map(runtime_chords,policy_ai_off),settings=options.chord_settings})
 		end
 		return chord_policy and chord_policy.choose(first,second,elapsed) or nil
 	end

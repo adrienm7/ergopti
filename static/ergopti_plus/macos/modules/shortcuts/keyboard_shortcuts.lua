@@ -44,6 +44,7 @@ local PhysicalSlots = require("shortcuts.physical_slots")
 local PhysicalSlotConstructor = PhysicalSlots.new
 local PhysicalAvailability = require("shortcuts.physical_availability")
 local i18n = require("infra.i18n")
+local AiActions = require("modules.shortcuts.ai_actions")
 
 local LOG = "shortcuts.keyboard_shortcuts"
 
@@ -618,7 +619,13 @@ local function start_physical(assignments)
 	local called, started = xpcall(_physical_owner.start, debug.traceback, {
 		assignments = rows,
 		admitted = physical_admission,
-		action = function(slot) return _explicit_actions[slot] end,
+		-- Asked at each press: an AI action is unarmed while the AI is off, so
+		-- the key goes to the application and the switch-on needs no rebind.
+		action = function(slot)
+			local action = _explicit_actions[slot]
+			if AiActions.blocked(action) then return nil end
+			return action
+		end,
 		conflicts = physical_conflict,
 		execute = function(slot, action, receipt)
 			local admitted = physical_admission(receipt)
@@ -696,8 +703,9 @@ local function bind_slot(slot_id, action_id)
 		local retained_handle = _hotkeys[slot_id]
 		local acquisition_epoch = _lifecycle_epoch
 		_native_acquisition_depth = _native_acquisition_depth + 1
+		-- An AI action is unarmed while the AI is off: the key keeps its meaning.
 		local ok_enable, enabled = xpcall(Registrar.setEnabled, debug.traceback,
-			retained_handle, true)
+			retained_handle, not AiActions.blocked(action_id))
 		_native_acquisition_depth = _native_acquisition_depth - 1
 		if ok_enable and enabled == true
 			and _lifecycle_paused ~= true
@@ -743,6 +751,15 @@ local function bind_slot(slot_id, action_id)
 	_native_acquisition_depth = _native_acquisition_depth - 1
 	if ok_bind and handle then
 		_hotkeys[slot_id] = handle
+		-- Bound while the AI is off: the exact handle stays released until the
+		-- switch-on (refresh_ai_arming), so the key reaches the application.
+		if AiActions.blocked(action_id) then
+			local ok_off, off = xpcall(Registrar.setEnabled, debug.traceback, handle, false)
+			if not ok_off or off ~= true then
+				Logger.error(LOG, "Slot '%s' could not be left unarmed while the AI is off: %s.",
+					slot_id, tostring(off))
+			end
+		end
 		if _lifecycle_paused == true or _lifecycle_epoch ~= acquisition_epoch then
 			local ok_release, released = xpcall(
 				Registrar.unbind, debug.traceback, handle)
@@ -768,6 +785,8 @@ end
 local function set_slot_enabled(slot_id, enabled)
 	local handle = _hotkeys[slot_id]
 	if not handle then return false end
+	-- Never arm a binding to an AI action while the AI is off.
+	if enabled and AiActions.blocked(_actions[slot_id]) then enabled = false end
 	local ok, result = xpcall(Registrar.setEnabled, debug.traceback, handle, enabled)
 	if ok and result == true then return true end
 	Logger.error(LOG, "Failed to set slot '%s' enabled=%s: %s — exact handle retained.",
@@ -1211,5 +1230,23 @@ function M.published_binding_catalogue()
 end
 
 KeyboardPublication.register(M, M.published_binding_catalogue)
+
+--- Follows the AI switch: the hotkeys bound to an AI action are released while
+--- the AI is off and armed again by the switch-on, with no reload. Nothing is
+--- touched outside a started, unpaused module (its own start/stop owns those).
+--- @return boolean settled
+function M.refresh_ai_arming()
+	if _started ~= true or _delivery_enabled ~= true or _lifecycle_paused == true or _editing then return true end
+	local settled = true
+	for slot_id in pairs(_hotkeys) do
+		local action = _actions[slot_id]
+		if AiActions.is_ai_action(action) then
+			if set_slot_enabled(slot_id, not AiActions.blocked(action)) ~= true then settled = false end
+		end
+	end
+	return settled
+end
+
+AiActions.subscribe("keyboard_shortcuts", M.refresh_ai_arming)
 
 return M
