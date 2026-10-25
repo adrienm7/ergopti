@@ -42,8 +42,11 @@ local Engine = require("platform.remap.tap_hold_engine")
 local Manifest = require("infra.manifest_reader")
 local LayerPreset = require("keymap.layer_preset")
 local Shapes = require("platform.remap.tap_hold_shapes")
+local KeyCatalog = require("tap_hold.key_catalog")
+local Paths = require("infra.paths")
 
 local LOG = "platform.remap.tap_hold_writer"
+local TIME_FIELD = require("config_keys").LEAF.TIME_ACTIVATION_SECONDS
 
 --- The user file's name in the configuration folder.
 M.FILE_NAME = "tap_hold.toml"
@@ -51,7 +54,8 @@ M.FILE_NAME = "tap_hold.toml"
 -- The Windows loader's bound for time_activation_seconds.
 local MAX_THRESHOLD_SECONDS = 10
 
--- The per-key fields whose runtime meaning belongs to this writer.
+-- The per-key fields whose runtime meaning belongs to this writer. A delay is
+-- only ever written when the user sets it: no key ships one.
 local OWNED_KEY_FIELDS = { "tap_action", "hold_modifier", "hold_layer", "enabled", "time_activation_seconds" }
 
 local HEADER = {
@@ -74,6 +78,7 @@ local _is_tap_action = nil
 local _canonical_hold = nil
 local _layers = nil          -- { shared_root, config_dir, file_adapter } a layer hold imports into, or nil.
 local _backup_sequence = 0    -- Keeps the wizard import's backups unique.
+local _retired = nil          -- The delays earlier builds shipped, read once by init().
 
 
 -- =========================================
@@ -244,6 +249,9 @@ local function write_document(path, document, shapes, expected_source, guard)
 	return true
 end
 
+-- Defined with the document helpers below: every write migrates before it applies.
+local migrate_retired_delays
+
 --- Reads, changes, writes and reloads: one tray change.
 --- @param what string For the logs.
 --- @param mutate function(document, shapes) Changes the decoded document in place.
@@ -264,7 +272,10 @@ local function save_and_reload(what, mutate, prepare, guard)
 		return false, false
 	end
 	if guard ~= nil and not current() then return false, false end
-	local changed, detail = pcall(mutate, document, shapes)
+	local changed, detail = pcall(function()
+		migrate_retired_delays(document, shapes)
+		mutate(document, shapes)
+	end)
 	if not changed then
 		Logger.error(LOG, "Tap-hold change '%s' refused: %s.", what, tostring(detail))
 		return false, false
@@ -342,6 +353,43 @@ local function key_entry(document, key_id, shapes)
 	return tap_hold.keys[key_id]
 end
 
+--- The per-key delays earlier builds shipped, by key id: see
+--- `[tap_hold.retired_delays]` in the shared defaults. Read once by init(), so a
+--- write opens no file but its own.
+--- @return table key id -> seconds
+local function retired_delays()
+	-- init() reads it; the wizard import runs without an init, so it reads on demand.
+	if _retired == nil then
+		_retired = KeyCatalog.load_retired_delays(Paths.shared("tap_hold/defaults.toml"), "linux")
+	end
+	return _retired
+end
+
+--- Finishes the migration of a file written before no key shipped a delay: each
+--- delay equal to a retired shipped one was copied in by a rewrite, not chosen,
+--- so it goes, and the file is flagged `[tap_hold] explicit_delays = true` so
+--- every delay it keeps from now on is the user's own. A flagged file is
+--- untouched. Every write goes through here before it applies its change, so a
+--- delay the user sets afterwards, whatever its value, is kept.
+--- @param document table Decoded user document, edited in place.
+--- @param shapes table|nil Canonical shape receipt of the document.
+migrate_retired_delays = function(document, shapes)
+	local tap_hold = section(document, shapes)
+	if tap_hold.explicit_delays == true then return end
+	Shapes.require_table(tap_hold.keys, shapes, "tap_hold.keys")
+	if tap_hold.keys ~= nil then
+		for key_id, retired in pairs(retired_delays()) do
+			local entry = tap_hold.keys[key_id]
+			if Shapes.is_table(entry, shapes) and entry.time_activation_seconds == retired then
+				entry.time_activation_seconds = nil
+				if next(entry) == nil then tap_hold.keys[key_id] = nil end
+			end
+		end
+		if next(tap_hold.keys) == nil then tap_hold.keys = nil end
+	end
+	tap_hold.explicit_delays = true
+end
+
 --- Removes only fields whose runtime meaning belongs to this writer, on every
 --- key this engine knows and every key of the shipped preset.
 --- @param tap_hold table
@@ -399,6 +447,7 @@ function M.init(opts)
 		_layers = { shared_root = opts.layers.shared_root, config_dir = opts.layers.config_dir,
 			file_adapter = opts.layers.file_adapter }
 	end
+	retired_delays()
 	_path = opts.path
 	_reload = opts.reload
 	_is_tap_action = opts.is_tap_action
@@ -488,8 +537,30 @@ function M.set_threshold(key_id, seconds, guard)
 			tostring(seconds), MAX_THRESHOLD_SECONDS)
 		return false
 	end
-	return commit(key_id .. " threshold = " .. tostring(seconds or "<default>"), function(document, shapes)
-		key_entry(document, key_id, shapes).time_activation_seconds = seconds
+	return commit(key_id .. " threshold = " .. tostring(seconds or "<global>"), function(document, shapes)
+		local entry = key_entry(document, key_id, shapes)
+		entry.time_activation_seconds = seconds
+		-- A key that follows the global delay and holds nothing else is not listed.
+		if next(entry) == nil then document.tap_hold.keys[key_id] = nil end
+		if next(document.tap_hold.keys) == nil then document.tap_hold.keys = nil end
+	end, guard)
+end
+
+--- Sets the GLOBAL delay, in seconds: the delay of every key that has none of
+--- its own. A key with a delay of its own keeps it. nil removes the setting, so
+--- the timing registry's default applies again.
+--- @param seconds number|nil
+--- @param guard function|nil Original deferred editor, strict true required.
+--- @return boolean
+function M.set_global_threshold(seconds, guard)
+	if seconds ~= nil and (type(seconds) ~= "number" or seconds ~= seconds or seconds <= 0
+		or seconds > MAX_THRESHOLD_SECONDS) then
+		Logger.error(LOG, "set_global_threshold: %s s is outside 0..%d s — nothing written.",
+			tostring(seconds), MAX_THRESHOLD_SECONDS)
+		return false
+	end
+	return commit("global threshold = " .. tostring(seconds or "<default>"), function(document, shapes)
+		section(document, shapes).time_activation_seconds = seconds
 	end, guard)
 end
 
@@ -529,6 +600,8 @@ function M.render_scope(mode, document, rows, preset, shapes)
 		end
 	end
 	tap_hold.inherit_defaults = nil
+	-- The recommendation sets no delay: the user's global one goes with the keys'.
+	tap_hold.time_activation_seconds = nil
 	clear_owned_keys(tap_hold, preset, shapes)
 	for _, row in ipairs(rows) do
 		if row.section ~= "tap_holds" or row.key ~= "enabled" then
@@ -552,16 +625,23 @@ end
 --- the preset depends on inheritance, and the wizard never guesses.
 --- @param entry any The key's table in the user's document.
 --- @param fields table The key's preset fields.
+--- @param retired number|nil The delay an earlier build shipped for the key, when
+---   the file is not yet flagged as holding only the user's own: not a setting.
 --- @return boolean
-local function customised(entry, fields)
+local function customised(entry, fields, retired)
 	if type(entry) ~= "table" then return false end
+	local function owned_value(field)
+		local value = entry[field]
+		if field == TIME_FIELD and retired ~= nil and value == retired then return nil end
+		return value
+	end
 	local owned = false
 	for _, field in ipairs(OWNED_KEY_FIELDS) do
-		if entry[field] ~= nil then owned = true end
+		if owned_value(field) ~= nil then owned = true end
 	end
 	if not owned then return false end
 	for _, field in ipairs(OWNED_KEY_FIELDS) do
-		local value, recommended = entry[field], fields[field]
+		local value, recommended = owned_value(field), fields[field]
 		if field == "enabled" then value, recommended = value ~= false, recommended ~= false end
 		if value ~= recommended then return true end
 	end
@@ -617,8 +697,9 @@ function M.import_recommended(path, key_ids, preset)
 		return false, tostring(admission_error)
 	end
 	local keys = type(tap_hold) == "table" and tap_hold.keys or {}
+	local retired = (type(tap_hold) == "table" and tap_hold.explicit_delays == true) and {} or retired_delays()
 	for _, key_id in ipairs(key_ids) do
-		if customised(keys[key_id], preset[key_id]) then
+		if customised(keys[key_id], preset[key_id], retired[key_id]) then
 			Logger.error(LOG, "Tap-hold key '%s' of '%s' holds the user's own setting — the import is refused.",
 				key_id, path)
 			return false, "'" .. key_id .. "' holds the user's own setting"
@@ -632,6 +713,7 @@ function M.import_recommended(path, key_ids, preset)
 			return false, "'" .. path .. "' could not be backed up"
 		end
 	end
+	migrate_retired_delays(document, shapes)
 	section(document, shapes).enabled = true
 	for _, key_id in ipairs(key_ids) do
 		local entry = key_entry(document, key_id, shapes)
@@ -658,7 +740,7 @@ end
 
 --- Test seam: forgets the initialisation.
 function M._reset_for_test()
-	_path, _reload, _is_tap_action, _canonical_hold = nil, nil, nil, nil
+	_path, _reload, _is_tap_action, _canonical_hold, _retired = nil, nil, nil, nil, nil
 end
 
 return M

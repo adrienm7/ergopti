@@ -508,8 +508,8 @@ helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout overr
 			"timeout_ms <= 0 must resolve to the managed default at manipulator scope")
 	end)
 
-	-- PAR-15: a macOS key takes the threshold Windows and Linux ship for it
-	-- (shared [tap_hold.keys.*], by the catalogue's `hs` id), not the global.
+	-- PAR-15: no key ships a delay of its own. A key without an override follows the
+	-- global parameter; one with an override keeps it whatever the global is.
 	local function manipulator_of(key_def, config)
 		local state = make_state({ tap_hold_config = { [key_def.id] = config } })
 		local result = Generator.build_karabiner_json(
@@ -522,24 +522,59 @@ helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout overr
 		end
 	end
 
-	helpers.it("(par-15-per-key-default) gives a key the shared default of its own, not the global", function()
-		local caps = manipulator_of({ id = "caps_lock", label = "Caps Lock Key", from = { key_code = "caps_lock" } },
-			{ tap = "none", hold = "cmd" })
-		helpers.assert_eq(caps.parameters["basic.to_if_alone_timeout_milliseconds"], 350,
-			"Caps Lock ships 0.35 s on Windows and Linux; macOS must not read the 200 ms global")
-		local ctrl = manipulator_of({ id = "left_control", label = "Left Ctrl Key", from = { key_code = "left_control" } },
-			{ tap = "none", hold = "cmd" })
-		helpers.assert_eq(ctrl.parameters["basic.to_if_alone_timeout_milliseconds"], 200,
-			"left_control is left_ctrl of the shared catalogue: 0.2 s")
+	helpers.it("(par-15-no-shipped-delay) a key that shipped a delay before follows the global one", function()
+		for _, def in ipairs({
+			{ id = "caps_lock", label = "Caps Lock Key", from = { key_code = "caps_lock" } },
+			{ id = "left_control", label = "Left Ctrl Key", from = { key_code = "left_control" } },
+		}) do
+			local state = make_state({ tap_hold_timeout_ms = 160, tap_hold_config = { [def.id] = { tap = "none", hold = "cmd" } } })
+			local result = Generator.build_karabiner_json(state, {NONE_ACTION, CMD_ACTION}, {def}, {}, nil, "/fake/data_dir/")
+			local found
+			for _, rule in ipairs(result.profiles[1].complex_modifications.rules) do
+				if type(rule.description) == "string" and rule.description:find(def.label, 1, true) then
+					found = rule.manipulators[1]
+				end
+			end
+			helpers.assert_eq(found.parameters["basic.to_if_alone_timeout_milliseconds"], 160,
+				def.id .. " must follow the global delay, not a 350 ms or 200 ms of its own")
+		end
 	end)
 
-	helpers.it("(par-15-per-key-default) the user's override beats the shared default", function()
+	helpers.it("(par-15-no-shipped-delay) a change of the global moves a key without an override and never one with it", function()
+		local caps_def = { id = "caps_lock", label = "Caps Lock Key", from = { key_code = "caps_lock" } }
+		local function build(global_ms)
+			local state = make_state({
+				tap_hold_timeout_ms = global_ms,
+				tap_hold_config = {
+					caps_lock = { tap = "none", hold = "cmd", timeout_ms = 500 },
+					right_command = { tap = "none", hold = "cmd" },
+				},
+			})
+			return Generator.build_karabiner_json(state, {NONE_ACTION, CMD_ACTION}, {caps_def, RCMD_KEY_DEF}, {}, nil,
+				"/fake/data_dir/")
+		end
+		for _, global_ms in ipairs({ 175, 320 }) do
+			local result = build(global_ms)
+			helpers.assert_eq(rcmd_manipulator(result).parameters["basic.to_if_alone_timeout_milliseconds"], global_ms,
+				"a key without an override follows the global at " .. global_ms)
+			local own
+			for _, rule in ipairs(result.profiles[1].complex_modifications.rules) do
+				if type(rule.description) == "string" and rule.description:find(caps_def.label, 1, true) then
+					own = rule.manipulators[1]
+				end
+			end
+			helpers.assert_eq(own.parameters["basic.to_if_alone_timeout_milliseconds"], 500,
+				"a key with its own delay is not moved by the global at " .. global_ms)
+		end
+	end)
+
+	helpers.it("(par-15-per-key-default) the user's override beats the global", function()
 		local caps = manipulator_of({ id = "caps_lock", label = "Caps Lock Key", from = { key_code = "caps_lock" } },
 			{ tap = "none", hold = "cmd", timeout_ms = 500 })
 		helpers.assert_eq(caps.parameters["basic.to_if_alone_timeout_milliseconds"], 500)
 	end)
 
-	helpers.it("(par-15-per-key-default) a key with no shared threshold inherits the global", function()
+	helpers.it("(par-15-per-key-default) a key with no override inherits the global", function()
 		local state = make_state({
 			tap_hold_timeout_ms = 175,
 			tap_hold_config = { right_command = { tap = "none", hold = "cmd" } },

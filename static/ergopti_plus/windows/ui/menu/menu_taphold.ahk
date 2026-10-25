@@ -51,9 +51,19 @@ _BuildTapHoldsSubmenu() {
 	Commands := _TH_ScopeCommands()
 	Getters := Map("tapholds_enabled", () => IsCategoryGated("TapHolds"))
 	ListProviders := Map(
+		"tap_hold_global_delay", (*) => _TH_GlobalDelayRows(),
 		"tap_hold_keys_left", (*) => _TH_KeyRows("left"),
 		"tap_hold_keys_right", (*) => _TH_KeyRows("right"))
 	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", ListProviders, Commands, Getters)
+}
+
+; The GLOBAL delay row: the delay of every key that has none of its own. The label
+; carries the current value; the click asks for a new one in milliseconds.
+_TH_GlobalDelayRows() {
+	global TapHold
+	GlobalMs := Round(TapHoldGlobalDuration(MasterGateDesiredTapHold(TapHold)) * 1000)
+	Label := StrReplace(t("menu.tapholds.tap_hold_title"), "%s", GlobalMs . " ms")
+	return [Map("label", Label, "action", _TH_MakeGlobalDelayFn())]
 }
 
 ; List provider: one row per configurable key of one hand.
@@ -81,16 +91,27 @@ _TH_KeyRows(Hand) {
 			: (TapLbl . "  /  " . HoldLbl)
 		ParentLabel := KeyLabel . "  :  " . ComboLabel
 
-		DelayCaption := Round(TapHoldDuration(MasterGateDesiredTapHold(TapHold), KeyId) * 1000) . " ms"
+		; « global (200 ms) » while the key follows the global delay, its own delay
+		; once it has one; « Use global delay (200 ms) » removes that override.
+		Desired := MasterGateDesiredTapHold(TapHold)
+		GlobalCaption := Round(TapHoldGlobalDuration(Desired) * 1000) . " ms"
+		HasOwnDelay := TapHoldHasOwnDuration(Desired, KeyId)
+		DelayCaption := HasOwnDelay
+			? Round(TapHoldDuration(Desired, KeyId) * 1000) . " ms"
+			: StrReplace(t("menu.tapholds.key_tap_delay_inherited"), "%s", GlobalCaption)
 		KeyRows := MenuRenderer_TemplateRows("tap_hold_key_rows",
 			Map("tap_hold_key_native", _TH_MakeDisableFn(KeyId),
 				"tap_hold_key_tap", _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl),
 				"tap_hold_key_hold_action", _TH_MakeHoldPickerFn(KeyId, KeyLabel),
-				"tap_hold_key_delay", _TH_MakeDelayPickerFn(KeyId)),
+				"tap_hold_key_delay", _TH_MakeDelayPickerFn(KeyId),
+				MenuCommand.TAP_HOLD_KEY_DELAY_USE_GLOBAL, _TH_MakeDelayResetFn(KeyId)),
 			Map("tap_hold_key_configured", ((Value) => Value).Bind(IsConfigured),
 				"tap_hold_key_tap_caption", ((Value) => Value).Bind(TapLbl),
 				"tap_hold_key_hold_caption", ((Value) => Value).Bind(HoldLbl),
-				"tap_hold_key_delay_caption", ((Value) => Value).Bind(DelayCaption)),
+				"tap_hold_key_delay_caption", ((Value) => Value).Bind(DelayCaption),
+				"tap_hold_key_global_delay_caption", ((Value) => Value).Bind(GlobalCaption),
+				"tap_hold_key_delay_is_global", ((Value) => Value).Bind(!HasOwnDelay),
+				"tap_hold_key_delay_has_override", ((Value) => Value).Bind(HasOwnDelay)),
 			Map())
 		if !(KeyRows is Array)
 			continue
@@ -305,6 +326,24 @@ class _TH_DelayPickerFnObj {
 	}
 }
 
+class _TH_GlobalDelayFnObj {
+	PromptFn := 0
+	SetterFn := 0
+	ReloadFn := 0
+	Call(*) {
+		return _TH_PromptGlobalDelay(this.PromptFn, this.SetterFn, this.ReloadFn)
+	}
+}
+
+class _TH_DelayResetFnObj {
+	KeyId := ""
+	SetterFn := 0
+	ReloadFn := 0
+	Call(*) {
+		return _TH_ResetKeyDelay(this.KeyId, this.SetterFn, this.ReloadFn)
+	}
+}
+
 class _TH_HoldPickerFnObj {
 	KeyId    := ""
 	KeyLabel := ""
@@ -401,6 +440,114 @@ _TH_MakeDelayPickerFn(KeyId, PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
 	obj.SetterFn := SetterFn
 	obj.ReloadFn := ReloadFn
 	return ObjBindMethod(obj, "Call")
+}
+
+; Build a bound callback that asks for the global delay.
+_TH_MakeGlobalDelayFn(PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
+	obj := _TH_GlobalDelayFnObj()
+	obj.PromptFn := PromptFn
+	obj.SetterFn := SetterFn
+	obj.ReloadFn := ReloadFn
+	return ObjBindMethod(obj, "Call")
+}
+
+; Build a bound callback that returns a key to the global delay.
+_TH_MakeDelayResetFn(KeyId, SetterFn := 0, ReloadFn := 0) {
+	obj := _TH_DelayResetFnObj()
+	obj.KeyId := KeyId
+	obj.SetterFn := SetterFn
+	obj.ReloadFn := ReloadFn
+	return ObjBindMethod(obj, "Call")
+}
+
+/**
+ * Asks for the GLOBAL delay in milliseconds, publishes it, then reloads once. A key
+ * with a delay of its own is untouched; every other key follows the new value.
+ * @returns {Integer|Boolean} Strict1 after publication and reload, otherwise false.
+ */
+_TH_PromptGlobalDelay(PromptFn := 0, SetterFn := 0, ReloadFn := 0) {
+	global TapHold, TAPHOLD_DEFAULT_ACTIVATION_SECONDS
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _TH_PromptGlobalDelay(PromptFn, SetterFn, ReloadFn)
+		finally Critical(InheritedCritical)
+	}
+	for Adapter in [PromptFn, SetterFn, ReloadFn] {
+		if !((Adapter is Integer) && Adapter == 0) && !HasMethod(Adapter, "Call")
+			return false
+	}
+	if !(TapHold is Map)
+		return false
+	CurrentMs := Round(TapHoldGlobalDuration(MasterGateDesiredTapHold(TapHold)) * 1000)
+	DefaultMs := Round(TAPHOLD_DEFAULT_ACTIVATION_SECONDS * 1000)
+	Prompt := StrReplace(t("menu.tapholds.tap_hold_dialog_prompt"), "%d", DefaultMs)
+	Title := t("menu.tapholds.tap_hold_dialog_title")
+	try {
+		Answer := HasMethod(PromptFn, "Call") ? PromptFn.Call(Prompt, Title, "w340 h160", CurrentMs)
+			: Ui_InputBox(Prompt, Title, "w340 h160", CurrentMs)
+		if !(Answer is Object) || Answer.Result != "OK" || !(Answer.Value is String)
+			return false
+		Raw := Trim(Answer.Value, " `t")
+		if !IsNumber(Raw)
+			return false
+		Ms := Round(Raw + 0)
+		if Ms <= 0 || !_TH_DurationValueValid(Ms / 1000)
+			return false
+	} catch as Err {
+		try LoggerError("TapHoldMenu", "The global delay prompt was refused: {1}.", Err.Message)
+		return false
+	}
+	try Published := HasMethod(SetterFn, "Call") ? SetterFn.Call(Ms / 1000)
+		: WriteTapHoldGlobalDuration(Ms / 1000)
+	catch as Err {
+		try LoggerError("TapHoldMenu", "The global delay could not be saved: {1}.", Err.Message)
+		return false
+	}
+	if !(Published is Integer) || Published != 1
+		return false
+	try Reloaded := HasMethod(ReloadFn, "Call") ? ReloadFn.Call("global_delay_set", "")
+		: _TH_ReloadTapHoldMenu("global_delay_set", "")
+	catch as Err {
+		try LoggerError("TapHoldMenu", "Reload after the global delay failed: {1}.", Err.Message)
+		return false
+	}
+	return (Reloaded is Integer) && Reloaded == 1 ? 1 : false
+}
+
+/**
+ * Removes a key's own delay so it follows the global delay again, then reloads once.
+ * @param {String} KeyId Shared physical-key identifier.
+ * @returns {Integer|Boolean} Strict1 after publication and reload, otherwise false.
+ */
+_TH_ResetKeyDelay(KeyId, SetterFn := 0, ReloadFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _TH_ResetKeyDelay(KeyId, SetterFn, ReloadFn)
+		finally Critical(InheritedCritical)
+	}
+	for Adapter in [SetterFn, ReloadFn] {
+		if !((Adapter is Integer) && Adapter == 0) && !HasMethod(Adapter, "Call")
+			return false
+	}
+	if !(KeyId is String) || !_TH_DurationKeyKnown(KeyId)
+		return false
+	try Published := HasMethod(SetterFn, "Call") ? SetterFn.Call(KeyId)
+		: WriteTapHoldDurationReset(KeyId)
+	catch as Err {
+		try LoggerError("TapHoldMenu", "The per-key delay could not be reset: {1}.", Err.Message)
+		return false
+	}
+	if !(Published is Integer) || Published != 1
+		return false
+	try Reloaded := HasMethod(ReloadFn, "Call") ? ReloadFn.Call("delay_reset", KeyId)
+		: _TH_ReloadTapHoldMenu("delay_reset", KeyId)
+	catch as Err {
+		try LoggerError("TapHoldMenu", "Reload after the per-key delay reset failed: {1}.", Err.Message)
+		return false
+	}
+	return (Reloaded is Integer) && Reloaded == 1 ? 1 : false
 }
 
 /**

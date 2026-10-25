@@ -45,9 +45,9 @@ local TAP_HOLDS_ON_PINS = {
 	default     = { rules = 24, digest = "cff39a3f5e11da3e" },
 	-- Re-pinned for PAR-17: the recommended pairs became the three tap slots
 	-- Windows and Linux ship, with no chord and no hold slot.
-	-- Re-pinned for PAR-15: the keys with a shared per-key threshold (Caps Lock,
-	-- Shift, Ctrl, Tab) carry it as their own to_if_alone timeout.
-	recommended = { rules = 27, digest = "d9d713127ce661d1" },
+	-- Re-pinned for PAR-15: the global delay is the registry's 200 ms (it was 250 ms)
+	-- and no key carries a threshold of its own.
+	recommended = { rules = 27, digest = "5b370a4cac965f05" },
 }
 
 --- Returns the key codes an engine posted at key_down, in order, with the

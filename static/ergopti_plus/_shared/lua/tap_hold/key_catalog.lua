@@ -180,45 +180,40 @@ function M.load_rollover(path, platform)
 	return M.rollover_for_platform(read_defaults(path), platform)
 end
 
---- Resolves the shared per-key thresholds to one driver's catalogue ids. The
---- thresholds are the `time_activation_seconds` of `[tap_hold.keys.<id>]`, one
---- declaration for every driver; a driver whose key has none falls back to the
---- timing registry's tap_hold.default_activation_ms.
+--- The per-key delays the shared defaults used to ship, resolved to one
+--- driver's key ids. They are not defaults any more: the loaders and writers of
+--- Windows and Linux use them to tell a delay nobody chose (copied into a user
+--- file by a rewrite) from one the user set; see `[tap_hold.retired_delays]`.
 --- @param defaults table Decoded shared tap-hold defaults.
 --- @param platform string Driver column.
---- @return table thresholds Driver key id -> positive integer milliseconds;
----   keys the driver does not have, and keys with no threshold, are omitted.
-function M.thresholds_for_platform(defaults, platform)
+--- @return table retired Driver key id -> seconds; keys the driver does not
+---   have are omitted.
+function M.retired_delays_for_platform(defaults, platform)
 	local catalog = M.for_platform(defaults, platform)
-	local declared = defaults.tap_hold.keys
-	if type(declared) ~= "table" then error("the shared tap-hold defaults declare no [tap_hold.keys]", 0) end
+	local declared = defaults.tap_hold.retired_delays
+	if type(declared) ~= "table" then error("the shared tap-hold defaults declare no [tap_hold.retired_delays]", 0) end
 	local known = {}
 	for _, entry in ipairs(defaults.tap_hold.catalog.keys) do known[entry.id] = true end
-	for id in pairs(declared) do
-		if not known[id] then error("[tap_hold.keys." .. tostring(id) .. "] is not in [tap_hold.catalog]", 0) end
+	for id, seconds in pairs(declared) do
+		if not known[id] then error("[tap_hold.retired_delays] " .. tostring(id) .. " is not in [tap_hold.catalog]", 0) end
+		if type(seconds) ~= "number" or seconds <= 0 then
+			error(string.format("[tap_hold.retired_delays] %s must be a number of seconds above zero, got %s",
+				tostring(id), tostring(seconds)), 0)
+		end
 	end
 	local result = {}
 	for _, entry in ipairs(catalog) do
-		local key = declared[entry.key]
-		local seconds = type(key) == "table" and key.time_activation_seconds or nil
-		if seconds ~= nil then
-			local ms = type(seconds) == "number" and seconds * 1000 or nil
-			if not ms or ms <= 0 or math.abs(ms - math.floor(ms + 0.5)) > 1e-6 then
-				error(string.format("[tap_hold.keys.%s] time_activation_seconds must be a whole number of "
-					.. "milliseconds above zero, got %s", entry.key, tostring(seconds)), 0)
-			end
-			result[entry.id] = math.floor(ms + 0.5)
-		end
+		if declared[entry.key] ~= nil then result[entry.id] = declared[entry.key] end
 	end
 	return result
 end
 
---- Reads one driver's per-key thresholds from the shared defaults.
+--- Reads one driver's retired per-key delays from the shared defaults.
 --- @param path string Absolute defaults path.
 --- @param platform string Driver column.
---- @return table thresholds See M.thresholds_for_platform.
-function M.load_thresholds(path, platform)
-	return M.thresholds_for_platform(read_defaults(path), platform)
+--- @return table retired See M.retired_delays_for_platform.
+function M.load_retired_delays(path, platform)
+	return M.retired_delays_for_platform(read_defaults(path), platform)
 end
 
 --- The keys of one hand, in order.

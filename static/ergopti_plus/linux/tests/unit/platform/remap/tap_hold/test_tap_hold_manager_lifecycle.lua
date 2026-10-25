@@ -343,9 +343,14 @@ helpers.describe("tap-hold manager", function()
 
 	helpers.it("reports one threshold only when every key agrees", function()
 		local Manager, _, _, user_path = manager()
-		helpers.assert_nil(Manager.threshold_ms(), "the defaults mix 0.35 s and 0.2 s")
+		helpers.assert_eq(Manager.threshold_ms(), 200, "no key ships a delay: the shipped keys all follow the global one")
 		Manager._reset_for_test()
 		os.remove(user_path)
+		local Mixed, _, _, mixed_path = manager('[tap_hold]\ninherit_defaults = true\n'
+			.. '[tap_hold.keys.caps_lock]\ntime_activation_seconds = 0.5\n')
+		helpers.assert_nil(Mixed.threshold_ms(), "a key with a delay of its own disagrees with the rest")
+		Mixed._reset_for_test()
+		os.remove(mixed_path)
 		local Same, _, _, same_path = manager('[tap_hold]\ninherit_defaults = false\n'
 			.. '[tap_hold.keys.caps_lock]\ntap_action = "enter"\nhold_modifier = "ctrl"\ntime_activation_seconds = 0.25\n')
 		helpers.assert_eq(Same.threshold_ms(), 250)

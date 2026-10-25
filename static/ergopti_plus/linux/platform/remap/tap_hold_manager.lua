@@ -244,7 +244,7 @@ local function _pair_thresholds(loaded)
 	local thresholds = {}
 	for _, row in ipairs(loaded.catalog) do
 		local key = loaded.keys[row.id]
-		thresholds[row.id] = math.floor((key and key.time_activation_seconds or Config.FALLBACK_THRESHOLD_SECONDS) * MS_PER_SECOND + 0.5)
+		thresholds[row.id] = math.floor((key and key.time_activation_seconds or loaded.global_seconds) * MS_PER_SECOND + 0.5)
 	end
 	return thresholds
 end
@@ -725,6 +725,25 @@ end
 function M.keys()
 	_require_init()
 	return _loaded.keys
+end
+
+--- The GLOBAL delay in seconds: what a key with no delay of its own waits before
+--- its hold fires. The user's `[tap_hold] time_activation_seconds`, else the
+--- timing registry's default.
+--- @return number
+function M.global_seconds()
+	_require_init()
+	return _loaded.global_seconds
+end
+
+--- Whether the user gave a key a delay of its own, as opposed to it following the
+--- global delay. The tray names the delay « global (N ms) » when this is false.
+--- @param key_id string Canonical shared tap-hold key id.
+--- @return boolean
+function M.has_own_delay(key_id)
+	_require_init()
+	local own = _loaded.user_fields[key_id]
+	return type(own) == "table" and own.time_activation_seconds == true
 end
 
 --- Resolves only an actual enabled key of the currently active engine.

@@ -12,6 +12,24 @@
 			"type": "object",
 			"additionalProperties": false,
 			"properties": {
+				"enabled": {
+					"type": "boolean",
+					"description": "Switches the feature on or off (Linux file switch)."
+				},
+				"inherit_defaults": {
+					"type": "boolean",
+					"description": "Lays the file over the shipped recommendation key by key."
+				},
+				"time_activation_seconds": {
+					"type": "number",
+					"exclusiveMinimum": 0,
+					"maximum": 10,
+					"description": "The GLOBAL delay in seconds: what every key without a delay of its own waits before its hold fires. Absent: the timing registry's tap_hold.default_activation_ms."
+				},
+				"explicit_delays": {
+					"type": "boolean",
+					"description": "Written by the Windows and Linux writers: true means every per-key time_activation_seconds in the file is the user's own. Without it, a per-key delay equal to one an earlier build shipped ([tap_hold.retired_delays] in the shared defaults) is ignored."
+				},
 				"keys": { "$ref": "#/$defs/keys_map" }
 			}
 		}
@@ -27,7 +45,6 @@
 		"key_definition": {
 			"type": "object",
 			"additionalProperties": false,
-			"required": ["time_activation_seconds"],
 			"properties": {
 				"enabled": {
 					"type": "boolean",
@@ -36,8 +53,8 @@
 				"time_activation_seconds": {
 					"type": "number",
 					"minimum": 0,
-					"maximum": 5,
-					"description": "Hold threshold in seconds. Below = tap_action; above = hold_*."
+					"maximum": 10,
+					"description": "This key's OWN hold delay in seconds, set by the user. Absent: the key follows the global delay. Below = tap_action; above = hold_*."
 				},
 				"tap_action": {
 					"type": "string",

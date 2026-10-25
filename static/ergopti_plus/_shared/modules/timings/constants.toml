@@ -496,11 +496,13 @@ key_repeat_initial_delay_ms = 300
 # AHK: tap_holds/constants.ahk KEY_REPEAT_INTERVAL_MS.
 key_repeat_interval_ms = 100
 
-# Tap-vs-hold threshold of a key that declares none of its own in
-# _shared/tap_hold/defaults.toml ([tap_hold.keys.<id>] time_activation_seconds).
-# The ONE declaration of that fallback: Linux and macOS read it here, and the
-# Windows literal TAPHOLD_DEFAULT_ACTIVATION_SECONDS is pinned to it by
-# tools/test/test-tap-hold-threshold-parity.cjs.
+# The GLOBAL tap-vs-hold delay: what every tap-hold key waits before its hold
+# fires, until the user changes the global delay or gives a key its own. No key
+# ships a delay of its own (_shared/tap_hold/defaults.toml declares none).
+# The ONE declaration of it: Linux and macOS read it here and Windows loads it at
+# boot into TAPHOLD_DEFAULT_ACTIVATION_SECONDS (TapHoldsLoadTimings). 200 ms was
+# already the fallback and the delay of five of the seven keys that shipped one;
+# Caps Lock and Left Shift used to ship 350 ms.
 default_activation_ms = 200
 
 # One-shot shift: auto-cancel timeout if no subsequent key is pressed.

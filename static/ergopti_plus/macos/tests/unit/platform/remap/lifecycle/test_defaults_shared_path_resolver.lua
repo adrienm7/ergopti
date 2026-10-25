@@ -53,18 +53,13 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 			end,
 			shared_root = function() return "/probe/_shared" end,
 		}
-		local rollover_path, thresholds_path = nil, nil
+		local rollover_path = nil
 		local saved_catalog = package.loaded["tap_hold.key_catalog"]
 		package.loaded["tap_hold.key_catalog"] = {
 			load_rollover = function(path, platform)
 				rollover_path = path
 				helpers.assert_eq(platform, "hs")
 				return { spacebar = true }
-			end,
-			load_thresholds = function(path, platform)
-				thresholds_path = path
-				helpers.assert_eq(platform, "hs")
-				return {}
 			end,
 		}
 		local parsed_path = nil
@@ -101,7 +96,6 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 		-- error text attached, which says more than "it crashed".
 		helpers.assert_eq(ok, true, "the resolved reader fixture must complete defaults initialization")
 		helpers.assert_eq(rollover_path, parsed_path, "both readers must use the same resolved defaults path")
-		helpers.assert_eq(thresholds_path, parsed_path, "the per-key thresholds must use the same resolved path")
 		local ctx = ok and "" or (" — load raised: " .. tostring(err))
 		helpers.assert_eq("tap_hold/defaults.toml", asked_for,
 			"defaults.lua must ask infra.paths for the shared-relative path, not walk up itself" .. ctx)

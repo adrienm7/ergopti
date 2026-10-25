@@ -622,13 +622,84 @@ _TH_DurationDefaultWhenAbsent() {
 }
 Test("TapHoldDuration: returns the single-sourced default when time_activation_seconds absent", _TH_DurationDefaultWhenAbsent)
 
-; Pin the canonical default value in exactly one place. This is the regression
-; for sourcing TapHoldDuration's fallback from a single named constant instead of
-; the 0.2 literal it used to duplicate across both return branches.
+; The global default is the timing registry's, loaded at boot: no literal of its
+; own survives here. (The cross-driver gate pins the registry value itself.)
 _TH_DefaultActivationConstantValue() {
-	AssertEqual(0.2, TAPHOLD_DEFAULT_ACTIVATION_SECONDS)
+	AssertEqual(TimingsGetSec("tap_hold", "default_activation_ms"), TAPHOLD_DEFAULT_ACTIVATION_SECONDS)
+	Assert(TAPHOLD_DEFAULT_ACTIVATION_SECONDS > 0, "the registry value was loaded (the sentinel is 0)")
 }
-Test("tap_hold: TAPHOLD_DEFAULT_ACTIVATION_SECONDS is the single 0.2 source", _TH_DefaultActivationConstantValue)
+Test("tap_hold: TAPHOLD_DEFAULT_ACTIVATION_SECONDS is the registry's tap_hold.default_activation_ms", _TH_DefaultActivationConstantValue)
+
+; ---- The delay model: global default, sticky per-key overrides, reset ----
+
+; No key ships a delay: the shared catalogue loaded as a user file declares none.
+_TH_ShippedCatalogueDeclaresNoKeyDelay() {
+	global _SharedDir
+	Shipped := LoadTapHoldToml(_SharedDir . "\tap_hold\defaults.toml")
+	Assert(Shipped["keys"].Count > 0, "the shipped catalogue has keys")
+	for KeyId, Entry in Shipped["keys"]
+		Assert(!Entry.Has("time_activation_seconds"), KeyId . " must not ship a delay of its own")
+}
+Test("tap_hold delay: no per-key delay remains in the shipped catalogue", _TH_ShippedCatalogueDeclaresNoKeyDelay)
+
+_TH_GlobalChangeMovesOnlyKeysWithoutOwnDelay() {
+	TH := Map("keys", Map(
+		"caps_lock", Map("tap_action", "enter", "hold_modifier", "ctrl", "time_activation_seconds", 0.5),
+		"tab", Map("tap_action", "tab", "hold_modifier", "alt")), "layers", Map())
+	AssertEqual(TAPHOLD_DEFAULT_ACTIVATION_SECONDS, TapHoldDuration(TH, "tab"), "no global set: the registry default")
+	TH["time_activation_seconds"] := 0.3
+	AssertEqual(0.3, TapHoldDuration(TH, "tab"), "a global change moves a key without its own delay")
+	AssertEqual(0.5, TapHoldDuration(TH, "caps_lock"), "a global change never moves a key with its own delay")
+	AssertTrue(TapHoldHasOwnDuration(TH, "caps_lock"))
+	AssertFalse(TapHoldHasOwnDuration(TH, "tab"))
+	TH["keys"]["caps_lock"].Delete("time_activation_seconds")
+	AssertEqual(0.3, TapHoldDuration(TH, "caps_lock"), "a reset key follows the global delay again")
+	AssertFalse(TapHoldHasOwnDuration(TH, "caps_lock"))
+}
+Test("tap_hold delay: a global change moves a key without its own delay and never one with it; a reset follows the global again",
+	_TH_GlobalChangeMovesOnlyKeysWithoutOwnDelay)
+
+_TH_InvalidGlobalDelayFallsBackToRegistry() {
+	for Bad in [0, -1, 10.5, "abc"] {
+		TH := Map("keys", Map(), "time_activation_seconds", Bad)
+		AssertEqual(TAPHOLD_DEFAULT_ACTIVATION_SECONDS, TapHoldGlobalDuration(TH), "refused: " . Bad)
+	}
+}
+Test("tap_hold delay: an unusable global delay falls back to the registry default", _TH_InvalidGlobalDelayFallsBackToRegistry)
+
+_TH_LoaderReadsTheGlobalDelayFromTheFile() {
+	Path := _TH_Write("[tap_hold]`r`nexplicit_delays = true`r`ntime_activation_seconds = 0.31`r`n"
+		. '[tap_hold.keys.caps_lock]`r`ntap_action = "enter"`r`n')
+	TH := LoadTapHoldToml(Path)
+	_TH_Clean()
+	AssertEqual(0.31, TapHoldGlobalDuration(TH))
+	AssertEqual(0.31, TapHoldDuration(TH, "caps_lock"))
+}
+Test("LoadTapHoldToml: reads [tap_hold] time_activation_seconds as the global delay", _TH_LoaderReadsTheGlobalDelayFromTheFile)
+
+; A file written by an earlier build holds the delays that build shipped, copied in by a
+; rewrite: not the user's choice, so the keys follow the global delay. A user's own value
+; (any other number) stays, and a flagged file's every value is the user's.
+_TH_RetiredShippedDelaysAreMigrated() {
+	global _SharedDir
+	Defaults := _SharedDir . "\tap_hold\defaults.toml"
+	Source := '[tap_hold.keys.caps_lock]`r`ntap_action = "enter"`r`ntime_activation_seconds = 0.35`r`n'
+		. '[tap_hold.keys.tab]`r`ntap_action = "tab"`r`ntime_activation_seconds = 0.2`r`n'
+		. '[tap_hold.keys.left_ctrl]`r`ntap_action = "paste"`r`ntime_activation_seconds = 0.45`r`n'
+	TH := LoadTapHoldToml(_TH_Write("[tap_hold]`r`ninherit_defaults = false`r`n" . Source), Defaults)
+	_TH_Clean()
+	AssertFalse(TapHoldHasOwnDuration(TH, "caps_lock"), "the shipped 0.35 of Caps Lock was not the user's")
+	AssertFalse(TapHoldHasOwnDuration(TH, "tab"), "the shipped 0.2 of Tab was not the user's")
+	AssertEqual(TAPHOLD_DEFAULT_ACTIVATION_SECONDS, TapHoldDuration(TH, "caps_lock"))
+	AssertEqual(0.45, TapHoldDuration(TH, "left_ctrl"), "a delay the user set stays")
+	AssertTrue(TapHoldHasOwnDuration(TH, "left_ctrl"))
+	Flagged := LoadTapHoldToml(_TH_Write("[tap_hold]`r`ninherit_defaults = false`r`nexplicit_delays = true`r`n" . Source), Defaults)
+	_TH_Clean()
+	AssertEqual(0.35, TapHoldDuration(Flagged, "caps_lock"), "in a flagged file 0.35 is the user's own choice")
+	AssertTrue(TapHoldHasOwnDuration(Flagged, "caps_lock"))
+}
+Test("LoadTapHoldToml: delays an earlier build shipped are not the user's own; a flagged file keeps every value",
+	_TH_RetiredShippedDelaysAreMigrated)
 
 _TH_DurationReturnsConfiguredValue() {
 	TH := Map("keys", Map("caps_lock", Map("time_activation_seconds", 0.35)), "layers", Map())

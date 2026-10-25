@@ -49,6 +49,13 @@ global KEY_REPEAT_INTERVAL_MS := 0
 ; character before giving up and leaving the shift state active.
 global ONE_SHOT_SHIFT_TIMEOUT_SEC := 0
 
+; The GLOBAL tap-hold delay (s): what every key waits before its hold fires until
+; the user sets the global delay or the key's own (TapHoldDuration). No key ships a
+; delay. The one declaration is the registry's tap_hold.default_activation_ms,
+; which Linux and macOS read too; tools/test/test-tap-hold-threshold-parity.cjs
+; pins this loader to it.
+global TAPHOLD_DEFAULT_ACTIVATION_SECONDS := 0
+
 ; Failsafe ceiling (s) on any KeyWait that holds a SYNTHETIC modifier Down while
 ; waiting for the physical tap-hold key to be released. The arm/release pair is
 ; guarded by try/finally, but an unbounded wait could still latch the modifier
@@ -68,11 +75,12 @@ global TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS := 3
 ; tap-hold hotkey arms). Fail-fast: a missing key throws via TimingsGet.
 TapHoldsLoadTimings() {
 	global TAP_MIN_DURATION_MS, KEY_REPEAT_INITIAL_DELAY_MS
-	global KEY_REPEAT_INTERVAL_MS, ONE_SHOT_SHIFT_TIMEOUT_SEC
+	global KEY_REPEAT_INTERVAL_MS, ONE_SHOT_SHIFT_TIMEOUT_SEC, TAPHOLD_DEFAULT_ACTIVATION_SECONDS
 	TAP_MIN_DURATION_MS         := TimingsGet("tap_hold", "tap_min_duration_ms")
 	KEY_REPEAT_INITIAL_DELAY_MS := TimingsGet("tap_hold", "key_repeat_initial_delay_ms")
 	KEY_REPEAT_INTERVAL_MS      := TimingsGet("tap_hold", "key_repeat_interval_ms")
 	ONE_SHOT_SHIFT_TIMEOUT_SEC  := TimingsGetSec("tap_hold", "one_shot_shift_timeout_ms")
+	TAPHOLD_DEFAULT_ACTIVATION_SECONDS := TimingsGetSec("tap_hold", "default_activation_ms")
 }
 
 

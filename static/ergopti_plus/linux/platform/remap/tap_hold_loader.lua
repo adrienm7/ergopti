@@ -22,9 +22,15 @@
 ---     shipped keys; otherwise it starts from no keys at all (an empty file is
 ---     the keyboard's own behaviour), and enabled = false switches the feature
 ---     off. The scope restore writes the preset explicitly instead;
----   - a threshold outside 0..10 s falls back to 0.2 s, a field of the wrong
----     type disables its key, and a malformed user file is reported and never
----     half-applied.
+---   - a key's delay is its own `time_activation_seconds` when the user set one,
+---     else the global delay: `[tap_hold] time_activation_seconds` when the user
+---     set it, else the timing registry's default. No shipped key carries a
+---     delay. The per-key delays this build used to ship, copied into a file by
+---     a rewrite, are ignored in a file that lacks `[tap_hold] explicit_delays =
+---     true` (the writer flags the file when it removes them);
+---   - a threshold outside 0..10 s falls back to the global delay, a field of
+---     the wrong type disables its key, and a malformed user file is reported and
+---     never half-applied.
 --- ==============================================================================
 
 local M = {}
@@ -38,16 +44,18 @@ local Outdated = require("config_outdated")
 local Shapes = require("platform.remap.tap_hold_shapes")
 
 local LOG = "platform.remap.tap_hold_loader"
+local TIME_FIELD = require("config_keys").LEAF.TIME_ACTIVATION_SECONDS
 
--- The Windows loader's bound for time_activation_seconds; the fallback is the
--- timing registry's, the one declaration every driver reads or is pinned to.
+-- The Windows loader's bound for time_activation_seconds; the global default is
+-- the timing registry's, the one declaration every driver reads or is pinned to.
 local MAX_THRESHOLD_SECONDS = 10
-M.FALLBACK_THRESHOLD_SECONDS = require("infra.timings").ms("tap_hold", "default_activation_ms") / 1000
+M.GLOBAL_DEFAULT_SECONDS = require("infra.timings").ms("tap_hold", "default_activation_ms") / 1000
 
 local STRING_FIELDS = { "tap_action", "hold_modifier", "hold_layer" }
 
--- The per-key fields that decide what a key does, compared by key_report().
-local BEHAVIOUR_FIELDS = { "tap_action", "hold_modifier", "hold_layer", "time_activation_seconds" }
+-- The per-key fields that decide what a key does, compared by key_report(). A
+-- delay of the key's own is checked apart: the global delay is no key's setting.
+local BEHAVIOUR_FIELDS = { "tap_action", "hold_modifier", "hold_layer" }
 
 -- Every field a tap-hold key has (the writer's OWNED_KEY_FIELDS).
 local KEY_FIELDS = {
@@ -92,8 +100,9 @@ local HOLD_FIELDS = {
 --- @param hold_picker table|nil The shared `[tap_hold.hold_picker]` catalogue.
 --- @param origin function origin(field) -> the file the field's value came
 ---   from, and whether that file is the user's.
+--- @param global_seconds number The delay of a key that has none of its own.
 --- @return table
-local function validated(key_id, fields, hold_picker, origin)
+local function validated(key_id, fields, hold_picker, origin, global_seconds)
 	local key = {}
 	for field, value in pairs(fields) do key[field] = value end
 	local function outdated(field, detail)
@@ -135,13 +144,14 @@ local function validated(key_id, fields, hold_picker, origin)
 		outdated("enabled", "it must be true or false; the key is disabled")
 		key.enabled = false
 	end
+	-- The key's own delay when it has a usable one, else the global delay.
 	local seconds = tonumber(key.time_activation_seconds)
 	if not seconds or seconds <= 0 or seconds > MAX_THRESHOLD_SECONDS then
 		if key.time_activation_seconds ~= nil then
-			outdated("time_activation_seconds", string.format("%s is outside 0..%d s; %.1f s is used",
-				tostring(key.time_activation_seconds), MAX_THRESHOLD_SECONDS, M.FALLBACK_THRESHOLD_SECONDS))
+			outdated(TIME_FIELD, string.format("%s is outside 0..%d s; the global delay %.3f s is used",
+				tostring(key.time_activation_seconds), MAX_THRESHOLD_SECONDS, global_seconds))
 		end
-		key.time_activation_seconds = M.FALLBACK_THRESHOLD_SECONDS
+		key.time_activation_seconds = global_seconds
 	end
 	return key
 end
@@ -219,7 +229,7 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 	local section = table_or_absent(user and user.tap_hold, { "tap_hold" })
 	local overrides = table_or_absent(section.keys, { "tap_hold", "keys" })
 	local global = {}
-	for _, field in ipairs({ "enabled", "inherit_defaults" }) do
+	for _, field in ipairs({ "enabled", "inherit_defaults", "explicit_delays" }) do
 		local value = section[field]
 		if value ~= nil and type(value) ~= "boolean" then
 			Outdated.report_in_file(user_file, { "tap_hold", field }, "it must be true or false; the stored value is ignored")
@@ -227,6 +237,24 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 			global[field] = value
 		end
 	end
+	-- The global delay: the user's when the file sets a usable one, else the
+	-- registry's. A key with none of its own takes it.
+	local global_seconds = M.GLOBAL_DEFAULT_SECONDS
+	local global_user_set = false
+	if section.time_activation_seconds ~= nil then
+		local seconds = section.time_activation_seconds
+		if type(seconds) == "number" and seconds > 0 and seconds <= MAX_THRESHOLD_SECONDS then
+			global_seconds, global_user_set = seconds, true
+		else
+			Outdated.report_in_file(user_file, { "tap_hold", TIME_FIELD },
+				string.format("%s is not a number of seconds in 0..%d; the global delay stays %.3f s",
+					tostring(seconds), MAX_THRESHOLD_SECONDS, M.GLOBAL_DEFAULT_SECONDS))
+		end
+	end
+	-- Delays this build used to ship, copied into the file by a rewrite: not the
+	-- user's choice unless the file is flagged as holding only the user's own.
+	local retired = global.explicit_delays == true and {}
+		or KeyCatalog.retired_delays_for_platform(defaults, "linux")
 	-- Shipped data like the hold picker: a user file cannot move a key.
 	local catalog = KeyCatalog.for_platform(defaults, "linux")
 	local remappable = {}
@@ -253,7 +281,10 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 			if override.hold_modifier ~= nil then merged.hold_layer = nil end
 			if override.hold_layer ~= nil then merged.hold_modifier = nil end
 			for field, value in pairs(override) do
-				if KEY_FIELDS[field] then
+				if field == TIME_FIELD and retired[key_id] ~= nil and value == retired[key_id] then
+					Logger.info(LOG, "Ignoring time_activation_seconds %s of '%s' in '%s': an earlier build shipped it, "
+						.. "you did not set it; the key follows the global delay.", tostring(value), key_id, user_file)
+				elseif KEY_FIELDS[field] then
 					merged[field] = value
 					user_fields[key_id][field] = true
 				else
@@ -261,7 +292,8 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 						"no tap-hold key has this field")
 				end
 			end
-			keys[key_id] = merged
+			-- An entry whose only field was a retired delay holds nothing at all.
+			if keys[key_id] ~= nil or next(merged) ~= nil then keys[key_id] = merged end
 		else
 			Outdated.report_in_file(user_file, { "tap_hold", "keys", key_id },
 				"it must be a table, not a scalar or array; repair the stored entry by hand")
@@ -282,12 +314,15 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 		keys[key_id] = validated(key_id, fields, hold_picker, function(field)
 			if set_by_user[field] then return user_file, true end
 			return defaults_path, false
-		end)
+		end, global_seconds)
 	end
 
 	return {
 		enabled = global.enabled == true or (global.enabled == nil and Manifest.default_for("tap_holds.enabled")),
 		keys = keys,
+		global_seconds = global_seconds,
+		global_user_set = global_user_set,
+		explicit_delays = global.explicit_delays == true,
 		user_error = user_err,
 		user_path = user_file,
 		user_fields = user_fields,
@@ -300,9 +335,11 @@ end
 --- Whether a loaded key does exactly what the recommendation does.
 --- @param fields table Validated fields of the key.
 --- @param recommended table|nil Validated fields of its recommendation.
+--- @param own_delay boolean Whether the user gave the key a delay of its own: the
+---   recommendation ships none.
 --- @return boolean
-local function behaves_as(fields, recommended)
-	if type(recommended) ~= "table" or (fields.enabled ~= false) ~= (recommended.enabled ~= false) then
+local function behaves_as(fields, recommended, own_delay)
+	if own_delay or type(recommended) ~= "table" or (fields.enabled ~= false) ~= (recommended.enabled ~= false) then
 		return false
 	end
 	for _, field in ipairs(BEHAVIOUR_FIELDS) do
@@ -329,7 +366,9 @@ function M.key_report(defaults_path, user_path)
 		{ tap_hold = { keys = M.preset_keys(defaults_path) } }, nil).keys
 	local keys = {}
 	for key_id, fields in pairs(loaded.keys) do
-		keys[key_id] = behaves_as(fields, recommended[key_id]) and "recommended" or "customised"
+		local own = loaded.user_fields[key_id]
+		local own_delay = type(own) == "table" and own.time_activation_seconds == true
+		keys[key_id] = behaves_as(fields, recommended[key_id], own_delay) and "recommended" or "customised"
 	end
 	return { enabled = loaded.enabled, keys = keys }
 end

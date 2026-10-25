@@ -190,12 +190,12 @@ _THHS_KeyChildren(KeyId) {
 
 _THHS_KeyHeadRows(KeyId) {
 	Rows := _THHS_KeyChildren(KeyId)
-	Assert(Rows.Length > 1 && !Rows[Rows.Length].Has("items")
-		&& HasMethod(Rows[Rows.Length].Get("action", 0), "Call"),
-		"the existing head must be followed by the genuine Windows delay command row")
+	Assert(Rows.Length == 7 && !Rows[6].Has("items")
+		&& HasMethod(Rows[6].Get("action", 0), "Call"),
+		"the existing head must be followed by the separator, the genuine Windows delay command row and its reset")
 	Head := []
 	for Index, Row in Rows {
-		if Index < Rows.Length
+		if Index <= 4
 			Head.Push(Row)
 	}
 	return Head
@@ -378,19 +378,22 @@ _THHS_KeyDelayVisible(TargetPath) {
 	global TapHold
 	TapHold["keys"]["caps_lock"]["time_activation_seconds"] := 0.35
 	Rows := _THHS_KeyChildren("caps_lock")
-	AssertEqual(5, Rows.Length, "Windows exposes the complete head and genuine per-key delay")
+	AssertEqual(7, Rows.Length, "Windows exposes the complete head, the genuine per-key delay and its reset")
 	AssertEqual(StrReplace(t("menu.tapholds.key_tap_delay"), "%s", "350 ms"),
-		Rows[5]["label"], "caption reads the authoritative inherited/effective per-key duration")
+		Rows[6]["label"], "caption reads the key's own duration once it has one")
 	; The delay row opens the prompt itself: the one-row submenu is retired (2026-10-22).
-	Assert(!Rows[5].Has("items") && !Rows[5].Has("submenu"), "the delay row is a command, not a submenu")
-	Assert(HasMethod(Rows[5]["action"], "Call"), "clicking the delay row runs the native prompt owner")
+	Assert(!Rows[6].Has("items") && !Rows[6].Has("submenu"), "the delay row is a command, not a submenu")
+	Assert(HasMethod(Rows[6]["action"], "Call"), "clicking the delay row runs the native prompt owner")
+	Assert(HasMethod(Rows[7]["action"], "Call") && !_MR_Get(Rows[7], "disabled", false),
+		"a key with its own delay offers the reset to the global delay")
 	Rendered := Menu()
 	try {
-		AssertEqual(4, _MR_RenderRows(Rendered, Rows, "tap_hold_key_delay_test", 1),
-			"the complete receipt counts four labelled rows and excludes its separator")
-		AssertEqual(5, DllCall("GetMenuItemCount", "ptr", Rendered.Handle, "int"),
-			"the actual native menu retains all five physical positions")
-		AssertEqual(Rows[5]["label"], _THHS_LabelAt(Rendered, 4), "the genuine delay is last")
+		AssertEqual(6, _MR_RenderRows(Rendered, Rows, "tap_hold_key_delay_test", 1),
+			"the complete receipt counts six labelled rows and excludes its two separators")
+		AssertEqual(7, DllCall("GetMenuItemCount", "ptr", Rendered.Handle, "int"),
+			"the actual native menu retains all seven physical positions")
+		AssertEqual(Rows[7]["label"], _THHS_LabelAt(Rendered, 6), "the reset to the global delay is last")
+		AssertEqual(Rows[6]["label"], _THHS_LabelAt(Rendered, 5), "the genuine delay precedes it")
 		Assert(TrayMenuIsSeparatorAt(Rendered, 1), "the original separator remains second")
 	} finally {
 		_CTC_ReleaseMenu(Rendered)
@@ -412,9 +415,9 @@ _THHS_KeyDelayProviderContract(TargetPath) {
 		Definition["i18n"] := "menu.tapholds.simultaneous_title"
 		Rows := _THHS_KeyChildren("caps_lock")
 		Prefix := StrSplit(t("menu.tapholds.simultaneous_title"), "%s")[1]
-		AssertEqual(Prefix, SubStr(Rows[5]["label"], 1, StrLen(Prefix)),
+		AssertEqual(Prefix, SubStr(Rows[6]["label"], 1, StrLen(Prefix)),
 			"the real delay row consumes its shared command caption")
-		Assert(HasMethod(Rows[5]["action"], "Call"),
+		Assert(HasMethod(Rows[6]["action"], "Call"),
 			"caption mutation retains the actual native delay owner")
 		Definition["id"] := "unowned_delay_command"
 		AssertEqual(0, _TH_KeyRows("left").Length,
@@ -431,7 +434,7 @@ Test("tap-holds: actual delay provider constructs both hands and refuses unowned
 _THHS_KeyDelayRetainedOwnerRefusal(TargetPath) {
 	global TapHold
 	Rows := _THHS_KeyChildren("caps_lock")
-	DelayCommand := Rows[5]
+	DelayCommand := Rows[6]
 	Previous := TapHold
 	try {
 		TapHold := 0

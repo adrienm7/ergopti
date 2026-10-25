@@ -531,6 +531,14 @@ _TOAN_TapHoldReportTellsImportedFromCustomised() {
 		Json := OnboardingValuesJson(Values)
 		AssertContains(Json, '"tap_holds.keys.caps_lock":true', "an imported key shows checked")
 		AssertContains(Json, '"tap_holds.keys.left_alt":"customised"', "a customised key shows as kept")
+		; The 0.35 above is the delay an earlier build shipped for Caps Lock, copied into the
+		; file by a rewrite: it is not the user's. Flagged, the same number is theirs.
+		FileDelete(Path)
+		AssertTrue(FSWriteDurable(Path, '[tap_hold]`ninherit_defaults = false`nexplicit_delays = true`n'
+			. '[tap_hold.keys.caps_lock]`ntime_activation_seconds = 0.35`ntap_action = "enter"`n'
+			. 'hold_modifier = "ctrl"`n'))
+		AssertEqual("customised", TapHoldKeyReport(Path, Defaults).Get("caps_lock", ""),
+			"a flagged file's delay is the user's own setting")
 		FileDelete(Path)
 		AssertTrue(FSWriteDurable(Path, '[tap_hold]`ninherit_defaults = true`n'
 			. '[tap_hold.keys.tab]`ntap_action = "enter"`n'))

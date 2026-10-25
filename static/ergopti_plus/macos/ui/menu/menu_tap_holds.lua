@@ -467,14 +467,13 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 	local hold_slbl = short_action_label(action_index, current_hold)
 	local is_active = (current_tap ~= "none" or current_hold ~= "none")
 
-	-- Per-key tap/hold threshold: the effective value is the per-key override when
-	-- set, otherwise the key's default (the value Windows and Linux ship for it,
-	-- else the global timeout), so no literal is duplicated here.
-	local ok_default, default_ms = pcall(karabiner.get_tap_default_timeout, kid)
-	if not ok_default or default_ms == nil then default_ms = karabiner.DEFAULT_TAP_HOLD_TIMEOUT_MS end
+	-- Per-key tap/hold threshold: the key's own override when it has one, otherwise
+	-- the global delay (no key ships a delay of its own), so no literal is
+	-- duplicated here and a change of the global never moves an overridden key.
+	local global_ms = karabiner.get_tap_hold_timeout() or karabiner.DEFAULT_TAP_HOLD_TIMEOUT_MS
 	local ok_to, per_key_ms = pcall(karabiner.get_tap_timeout, kid)
 	if not ok_to then per_key_ms = nil end
-	local effective_ms = per_key_ms or default_ms
+	local effective_ms = per_key_ms or global_ms
 
 	-- Show "—" when nothing is configured on this key
 	local combo_label = (current_tap == "none" and current_hold == "none")
@@ -494,7 +493,7 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 		["tap_hold_key_delay"] = function()
 			hs.focus()
 			local prompt = string.format(
-				i18n.get("menu.tapholds.key_tap_delay_dialog_prompt"), default_ms)
+				i18n.get("menu.tapholds.key_tap_delay_dialog_prompt"), global_ms)
 			local title_d    = i18n.get("menu.tapholds.key_tap_delay_dialog_title")
 			local btn_ok     = i18n.get("button.ok")
 			local btn_cancel = i18n.get("button.cancel")
@@ -531,8 +530,12 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 		["tap_hold_key_configured"] = function() return is_active end,
 		["tap_hold_key_tap_caption"] = function() return tap_slbl end,
 		["tap_hold_key_hold_caption"] = function() return hold_slbl end,
-		["tap_hold_key_delay_caption"] = function() return fmt_delay(effective_ms) end,
-		["tap_hold_key_global_delay_caption"] = function() return fmt_delay(default_ms) end,
+		-- « global (200 ms) » while the key follows the global delay, else its own.
+		["tap_hold_key_delay_caption"] = function()
+			if per_key_ms ~= nil then return fmt_delay(per_key_ms) end
+			return string.format(i18n.get("menu.tapholds.key_tap_delay_inherited"), fmt_delay(global_ms))
+		end,
+		["tap_hold_key_global_delay_caption"] = function() return fmt_delay(global_ms) end,
 		["tap_hold_key_delay_is_global"] = function() return per_key_ms == nil end,
 		["tap_hold_key_delay_has_override"] = function() return per_key_ms ~= nil end,
 	})

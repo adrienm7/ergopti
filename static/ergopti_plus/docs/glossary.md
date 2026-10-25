@@ -253,8 +253,9 @@ below the activation threshold. Declared as `tap_action` in
 
 **Tap-Hold**
 A key-behaviour mode where a short press (tap) and a long press (hold) on the
-same physical key emit different actions. The threshold is configurable via
-`time_activation_seconds` in `_shared/tap_hold/defaults.toml`. Test vectors:
+same physical key emit different actions. No key ships a threshold: all follow
+the global delay (the timing registry's `tap_hold.default_activation_ms`) until
+the user changes it or gives a key its own `time_activation_seconds`. Test vectors:
 `_shared/tests/corpus/tap_hold/vectors.json` for the configuration and
 `_shared/tests/corpus/tap_hold/decision_vectors.json` for the decision itself.
 
