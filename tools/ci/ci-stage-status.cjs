@@ -18,11 +18,9 @@ const JOBS = Object.freeze({
 });
 // The E2E link of each chain: Build admits the chain up to and including it.
 const E2E = Object.freeze({ windows: 'e2e-ahk', linux: 'e2e-linux' });
-// What a chain job forwards beyond the custody outputs. Linux E2E reports the
-// result of the integration stage it follows, which gates the manual
-// diagnostic build; Linux Build hands the install cells their authored plan.
+// What a chain job forwards beyond the custody outputs: Linux Build hands the
+// install cells their authored plan.
 const EXTRA_OUTPUTS = Object.freeze({
-	'e2e-linux': ['ci_integration_result'],
 	'package-linux': ['install_matrix', 'install_metadata']
 });
 // A job that runs beside the last chain job and is needed by the same verdict:
@@ -142,19 +140,11 @@ function collect(platform, raw, current, highest) {
 		const attempt = Number(job.outputs.ci_attempt);
 		assert.ok(attempt <= downstreamAttempt, 'Producer lineage runs backward');
 		downstreamAttempt = attempt;
-		if (names[index] === 'e2e-linux') {
-			keys(direct, [names[index - 1]]);
-			assert.equal(
-				job.outputs.ci_integration_result,
-				direct[names[index - 1]].result,
-				'Integration predicate differs from genuine Integration result'
-			);
-		}
 	}
 	return Object.fromEntries(names.slice(0, highest + 1).map((name) => [name, result[name]]));
 }
 
-/** Preserve the existing Linux manual diagnostic build after failed E2E. */
+/** Admit Build only when every stage through E2E succeeded, on every lane and event. */
 function admitBuild(platform, raw, current) {
 	assert.ok(Object.hasOwn(JOBS, platform), 'Unknown OS status lane');
 	const names = JOBS[platform];
@@ -162,13 +152,7 @@ function admitBuild(platform, raw, current) {
 	const result = collect(platform, raw, current, names.indexOf(e2e));
 	for (const name of names.slice(0, names.indexOf(e2e)))
 		assert.equal(result[name].result, 'success', `${name} did not succeed`);
-	assert.ok(
-		result[e2e].result === 'success' ||
-			(platform === 'linux' &&
-				current.event === 'workflow_dispatch' &&
-				result[e2e].result === 'failure'),
-		'E2E does not admit this build'
-	);
+	assert.equal(result[e2e].result, 'success', 'E2E does not admit this build');
 	return result;
 }
 

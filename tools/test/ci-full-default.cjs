@@ -50,11 +50,7 @@ const JOBS = [
 	['.github/workflows/ci-linux.yml', 'test-linux', null],
 	['.github/workflows/ci-linux.yml', 'integration-linux', null],
 	['.github/workflows/ci-linux.yml', 'e2e-linux', null],
-	[
-		'.github/workflows/ci-linux.yml',
-		'package-linux',
-		"${{ !cancelled() && needs.e2e-linux.outputs.ci_integration_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
-	],
+	['.github/workflows/ci-linux.yml', 'package-linux', null],
 	['.github/workflows/ci-linux.yml', 'package-flatpak', null],
 	['.github/workflows/ci-linux.yml', 'install-linux', null],
 	['.github/workflows/ci-linux.yml', 'linux-ok', 'always()']

@@ -361,7 +361,6 @@ jobs:
       ci_source_sha: ${{ github.sha }}
       ci_run_id: ${{ github.run_id }}
       ci_attempt: ${{ github.run_attempt }}
-      ci_integration_result: ${{ needs.integration-linux.result }}
 
     steps:
       - uses: actions/checkout@v4
@@ -4041,10 +4040,10 @@ jobs:
       # renamed below to a name that carries no version at all, so no asset can be
       # misnamed and the website's exact-name lookup keeps working.
       #
-      # After e2e-linux: automatic runs require successful unit and E2E receiving.
-      # Manual diagnostics can still receive packages after an E2E failure, with
-      # successful unit admission retained through the E2E dependency. linux-ok
-      # continues to reject every failed mandatory job and missing native subject.
+      # After e2e-linux: like every other lane, packaging requires every earlier
+      # stage to have succeeded, on a manual dispatch as well; a failed E2E skips
+      # this job instead of building a package nobody can ship. linux-ok rejects
+      # every failed mandatory job and missing native subject.
       #
       # The tarball smoke runs here, on the build host, because it needs no
       # pristine machine: the tarball installs under $HOME. The Flatpak is built
@@ -4072,7 +4071,6 @@ jobs:
     name: 'Build (.deb, .rpm, AppImage and archive)'
     runs-on: ubuntu-latest
     needs: [e2e-linux]
-    if: ${{ !cancelled() && needs.e2e-linux.outputs.ci_integration_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}
     env:
       ERGOPTI_BUILD_VERSION: ${{ inputs.version }}
       LINUX_BUNDLE_ASSET: ${{ inputs.linux_bundle }}

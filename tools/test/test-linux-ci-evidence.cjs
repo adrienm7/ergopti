@@ -1963,16 +1963,14 @@ assert.strictEqual(
 	null,
 	'a failed or skipped package job must skip the Flatpak'
 );
-// Manual diagnostics can qualify packages after failed E2E receiving, while
-// both the mandatory verdict and automatic release admission remain strict.
+// Packaging has the admission of every other lane: a successful E2E and nothing
+// else, on a manual dispatch as well. A failed E2E skips the build.
 const manualPackageJob = pipeline.job('package-linux');
 assert.deepStrictEqual(pipeline.needsOf(manualPackageJob), ['e2e-linux']);
 assert.match(manualPackageJob, /node tools\/ci\/ci-stage-status\.cjs admit-build linux/);
 assert.ok(
-	pipeline
-		.job('e2e-linux')
-		.includes('ci_integration_result: ${{ needs.integration-linux.result }}'),
-	'Package Integration admission must come from the genuine E2E predecessor output'
+	!pipeline.job('e2e-linux').includes('ci_integration_result'),
+	'E2E forwards no integration predicate: only a successful chain admits packaging'
 );
 assert.deepStrictEqual(pipeline.needsOf(pipeline.job('e2e-linux')), ['integration-linux']);
 assert.deepStrictEqual(pipeline.needsOf(pipeline.job('integration-linux')), ['test-linux']);
@@ -1980,55 +1978,9 @@ assert.strictEqual(pipeline.field(pipeline.job('integration-linux'), 'if'), null
 assert.strictEqual(pipeline.field(pipeline.job('e2e-linux'), 'if'), null);
 assert.strictEqual(
 	pipeline.field(manualPackageJob, 'if'),
-	"${{ !cancelled() && needs.e2e-linux.outputs.ci_integration_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
-	'manual packaging must retain integration admission, cancellation and automatic E2E admission'
+	null,
+	'packaging must not carry a manual-dispatch exception after a failed E2E'
 );
-// The frozen acceptance table is independent of the workflow expression.
-// Evaluate only after the exact source guard above admits this closed predicate.
-const diagnosticEvents = ['push', 'pull_request', 'workflow_dispatch', 'schedule', 'unknown'];
-const diagnosticResults = ['success', 'failure', 'cancelled', 'skipped', null, 'unknown'];
-const admittedPackageCases = new Set([
-	'push:success:success:false',
-	'pull_request:success:success:false',
-	'workflow_dispatch:success:success:false',
-	'workflow_dispatch:success:failure:false',
-	'schedule:success:success:false',
-	'unknown:success:success:false'
-]);
-const diagnosticExpression = pipeline
-	.field(manualPackageJob, 'if')
-	.slice(3, -2)
-	.replaceAll(
-		'needs.e2e-linux.outputs.ci_integration_result',
-		"needs['e2e-linux'].outputs.ci_integration_result"
-	)
-	.replaceAll('needs.e2e-linux.result', "needs['e2e-linux'].result");
-let diagnosticCaseCount = 0;
-for (const event of diagnosticEvents) {
-	for (const integrationResult of diagnosticResults) {
-		for (const result of diagnosticResults) {
-			for (const cancelled of [false, true]) {
-				const actual = require('node:vm').runInNewContext(
-					diagnosticExpression,
-					{
-						cancelled: () => cancelled,
-						needs: {
-							'e2e-linux': { result, outputs: { ci_integration_result: integrationResult } }
-						},
-						github: { event_name: event }
-					},
-					{ timeout: 100 }
-				);
-				assert.strictEqual(
-					actual,
-					admittedPackageCases.has(`${event}:${integrationResult}:${result}:${cancelled}`)
-				);
-				diagnosticCaseCount++;
-			}
-		}
-	}
-}
-assert.strictEqual(diagnosticCaseCount, 360);
 
 assert.strictEqual(
 	pipeline.field(pipeline.job('release'), 'if'),
