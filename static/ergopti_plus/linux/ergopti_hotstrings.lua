@@ -910,6 +910,16 @@ local function main()
 		device = dev_finder.find_keyboard()
 	end
 	local InputAccess = require("infra.input_access")
+	-- The launcher could not set up the input groups because a program is
+	-- missing: say which one before the device error that follows from it.
+	local missing_program = InputAccess.missing_program()
+	if missing_program then
+		Logger.error(LOG, "Input permission setup needs %s, which is not installed.", missing_program)
+		os.exit(InputAccess.report({ i18n = RuntimeGuard.optional_require("infra.i18n"),
+			notifier = notifier, tray = opts.tray and tray_menu or nil, program = missing_program,
+			body_key = InputAccess.MISSING_PROGRAM_BODY_KEY },
+			"missing program " .. missing_program))
+	end
 	if not device then
 		Logger.error(LOG, "No keyboard device found. Specify one with --device.")
 		print("Error: no keyboard device detected. Specify one with --device.")

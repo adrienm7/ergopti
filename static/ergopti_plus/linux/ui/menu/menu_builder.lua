@@ -5335,10 +5335,13 @@ local function _uninstall_command(ctx)
 		if not uninstall_caption_facade_current() or not current() then return false end
 		local failure = i18n_safe("dialog.uninstall.failed")
 		if not uninstall_caption_facade_current() or not current() then return false end
+		local missing_program = i18n_safe("dialog.uninstall.missing_program")
+		if not uninstall_caption_facade_current() or not current() then return false end
 		local options = {
 			title = title,
 			confirmation = confirmation,
 			failure = failure,
+			missing_program = missing_program,
 			confirm = function(title, text)
 				return ask_yes_no(title, zenity_plain(text),
 					i18n_safe("button.remove"), i18n_safe("button.cancel"))

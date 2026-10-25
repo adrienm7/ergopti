@@ -339,6 +339,64 @@ fi`
 			);
 		}
 	}
+	// A host without getent: the helpers refuse with EX_UNAVAILABLE and a
+	// machine-readable `missing-program getent` line, never in silence, and the
+	// launcher hands the program's name to the daemon, which localizes it.
+	const bare = path.join(sandbox, 'bare');
+	fs.mkdirSync(bare);
+	for (const name of ['dirname', 'install', 'flock', 'cat']) {
+		fs.symlinkSync(
+			['/usr/bin', '/bin'].map((d) => path.join(d, name)).find(fs.existsSync),
+			path.join(bare, name)
+		);
+	}
+	const bareStub = (name, body) =>
+		fs.writeFileSync(path.join(bare, name), `#!/bin/bash\n${body}\n`, { mode: 0o755 });
+	bareStub('id', 'case "$1" in -u) echo 0 ;; -nG) echo users ;; *) exit 1 ;; esac');
+	const linuxRoot = path.join(ROOT, 'static/ergopti_plus/linux');
+	const bareEnv = {
+		HOME: bashPath(sandbox),
+		PATH: bashPath(bare),
+		XDG_RUNTIME_DIR: bashPath(sandbox)
+	};
+	const withoutGetent = (relative, ...args) =>
+		spawnSync(bashExecutable(), [bashPath(path.join(linuxRoot, relative)), ...args], {
+			encoding: 'utf8',
+			timeout: 15000,
+			env: bareEnv
+		});
+	for (const [relative, args] of [
+		['install/setup_permissions.sh', ['--active-sessions']],
+		['install/stop_sessions.sh', []]
+	]) {
+		const refused = withoutGetent(relative, ...args);
+		assert.equal(refused.status, 69, `${relative} must refuse without getent`);
+		assert.equal(
+			refused.stderr.trim(),
+			'missing-program getent',
+			`${relative} must name the missing program, not exit 69 in silence`
+		);
+	}
+	const daemonReceipt = path.join(sandbox, 'daemon-receipt');
+	bareStub(
+		'luajit',
+		`printf '%s\\n' "\${ERGOPTI_MISSING_PROGRAM-unset}" > "${bashPath(daemonReceipt)}"`
+	);
+	bareStub('systemctl', 'exit 1');
+	bareStub('pkexec', 'exec "$@"');
+	const launched = withoutGetent('install/launch.sh', '--tray');
+	assert.equal(launched.status, 0, launched.stderr);
+	assert.equal(
+		fs.readFileSync(daemonReceipt, 'utf8').trim(),
+		'getent',
+		'the launcher passes the missing program to the daemon that tells the user'
+	);
+	assert.match(launched.stderr, /missing-program getent/);
+	fs.unlinkSync(daemonReceipt);
+	bareStub('pkexec', 'exit 126');
+	const cancelled = withoutGetent('install/launch.sh', '--tray');
+	assert.equal(cancelled.status, 78, 'a cancelled authorization still stops the launch');
+	assert.equal(fs.existsSync(daemonReceipt), false);
 	console.log('[OK] Package setup provisions input access only for local graphical users.');
 } finally {
 	fs.rmSync(sandbox, { recursive: true, force: true });

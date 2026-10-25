@@ -7,8 +7,9 @@
 set -euo pipefail
 [ "$(id -u)" = 0 ] || { echo 'Package session cleanup requires root.' >&2; exit 77; }
 # Accounts resolve through NSS (LDAP, sssd), so through getent; without it
-# no session is touched (EX_UNAVAILABLE).
-command -v getent >/dev/null 2>&1 || exit 69
+# no session is touched (EX_UNAVAILABLE). The stderr line is a machine-readable
+# token, not a sentence: the package manager prints it in its own output.
+command -v getent >/dev/null 2>&1 || { printf '%s %s\n' missing-program getent >&2; exit 69; }
 for runtime in /run/user/[0-9]*; do
 	[ -S "$runtime/bus" ] || continue
 	uid="${runtime##*/}"
