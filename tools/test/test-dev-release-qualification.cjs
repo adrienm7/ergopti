@@ -480,7 +480,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			'common-e2e',
 			'common-build',
 			'common-testbuild',
-			'common-unit-verdict'
+			'common-verdict'
 		],
 		'ci-windows.yml': [
 			'test-ahk',
@@ -507,7 +507,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		linux: "needs.validate.outputs.lane_linux == 'true'",
 		publication: 'always() && !cancelled()',
 		release: "github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'",
-		'common-unit-verdict': 'always()',
+		'common-verdict': 'always()',
 		'windows-ok': 'always()',
 		'macos-ok': 'always()',
 		'package-linux':

@@ -25,8 +25,8 @@ function fixture(target = 'main') {
 	const workflow = { id: 77, path: '.github/workflows/ci.yml', name: 'CI' };
 	const jobs = [target, target === 'main' ? 'dev' : 'main'].flatMap((cellTarget, cellIndex) =>
 		[
-			['YAML, shared code & web / Build', 'Build and seal production site'],
-			['YAML, shared code & web / Install and launch', 'Test received production site']
+			['Common / Build', 'Build and seal production site'],
+			['Common / Install and launch', 'Test received production site']
 		].map(([name, writer], i) => ({
 			id: 201 + i + cellIndex * 10,
 			name: name + ' (' + siteLot(cellTarget) + ')',
@@ -311,7 +311,7 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 		[
 			'unknown caller prefix',
 			(m) => {
-				m.jobs[0].name = m.jobs[0].name.replace('YAML, shared code & web / ', 'Foreign / ');
+				m.jobs[0].name = m.jobs[0].name.replace('Common / ', 'Foreign / ');
 			},
 			/stage job name/
 		],
@@ -588,7 +588,7 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 					...m.jobs[0],
 					id: 204,
 					run_attempt: 2,
-					name: m.jobs[0].name.replace('YAML, shared code & web / ', 'Foreign / ')
+					name: m.jobs[0].name.replace('Common / ', 'Foreign / ')
 				}),
 			/stage job name/
 		]

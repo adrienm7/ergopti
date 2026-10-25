@@ -1800,7 +1800,7 @@ jobs:
           if-no-files-found: error
 
   windows-ok:
-    name: 'Verdict (Mandatory jobs and launch evidence)'
+    name: 'Verdict (All mandatory results)'
     needs: [launch-windows]
     if: always()
     runs-on: ubuntu-latest

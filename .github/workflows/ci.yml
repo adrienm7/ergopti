@@ -486,7 +486,7 @@ jobs:
   # 2.4) Common — shared JavaScript, property, mutation and site suites
   # ─────────────────────────────────────────────────
   core:
-    name: 'YAML, shared code & web'
+    name: 'Common'
     needs: [validate, prepare-common]
     uses: ./.github/workflows/ci-common.yml
     permissions:

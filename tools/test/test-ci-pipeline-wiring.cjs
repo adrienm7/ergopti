@@ -207,20 +207,20 @@ const LANE_JOB_NAMES = Object.freeze({
 	'common-e2e': ['e2e', 'Shared UI rendering'],
 	'common-build': ['build', null],
 	'common-testbuild': ['install', null],
-	'common-unit-verdict': ['verdict', 'Production site receipts'],
+	'common-verdict': ['verdict', 'All mandatory results'],
 	'test-ahk': ['unit', null],
 	'integration-ahk': ['integration', null],
 	'e2e-ahk': ['e2e', 'Engine E2E corpus'],
 	'package-windows': ['build', 'ErgoptiPlus.exe and layout installer'],
 	'launch-windows': ['install', 'Compiled ErgoptiPlus.exe'],
-	'windows-ok': ['verdict', 'Mandatory jobs and launch evidence'],
+	'windows-ok': ['verdict', 'All mandatory results'],
 	'test-linux': ['unit', null],
 	'integration-linux': ['integration', null],
 	'e2e-linux': ['e2e', null],
 	'package-linux': ['build', '.deb, .rpm, AppImage and archive'],
 	'package-flatpak': ['flatpak', 'Build, install and launch'],
 	'install-linux': ['install', null],
-	'linux-ok': ['verdict', 'Mandatory subjects'],
+	'linux-ok': ['verdict', 'All mandatory results'],
 	'test-hs': ['unit', null],
 	// One stubbed cell, so no matrix: the job names its subject.
 	'integration-hs': ['integration', 'Lua module wiring, stubbed hs'],
@@ -231,7 +231,7 @@ const LANE_JOB_NAMES = Object.freeze({
 		`ErgoptiPlus.app, ${require('../ci/macos-stage-roles.cjs').macosName('host')}`
 	],
 	launch: ['install', null],
-	'macos-ok': ['verdict', 'Mandatory jobs and launch scenarios']
+	'macos-ok': ['verdict', 'All mandatory results']
 });
 
 // Release verifies every lane against the persisted plan, then publishes.
@@ -2143,9 +2143,9 @@ const COMMON_DISPATCH = [
 function commonVerdictProblems(source) {
 	const problems = [];
 	try {
-		const job = YAML.parse(source, { uniqueKeys: true }).jobs['common-unit-verdict'];
+		const job = YAML.parse(source, { uniqueKeys: true }).jobs['common-verdict'];
 		assert.deepEqual(job, {
-			name: 'Verdict (Production site receipts)',
+			name: 'Verdict (All mandatory results)',
 			needs: ['common-testbuild'],
 			if: 'always()',
 			'runs-on': 'ubuntu-latest',
@@ -2621,7 +2621,7 @@ function siteDeploymentProblems(source) {
 const SITE_BUILD_REFUSALS = [
 	['missing production build', '  common-build:\n', '  foreign-build:\n'],
 	['missing production testbuild', '  common-testbuild:\n', '  foreign-testbuild:\n'],
-	['crossed Build dependency', '    needs: [common-e2e]\n', '    needs: [common-unit-verdict]\n'],
+	['crossed Build dependency', '    needs: [common-e2e]\n', '    needs: [common-verdict]\n'],
 	['crossed Testbuild dependency', '    needs: [common-build]\n', '    needs: [common-e2e]\n'],
 	[
 		'forgiven production build',
@@ -2772,7 +2772,7 @@ function commonProblems(files) {
 	const byId = new Map(children.map((job) => [job.id, job]));
 	const child = byId.get('shared-validation');
 	const prepare = callers.find((job) => job.id === 'prepare-common');
-	const verdict = byId.get('common-unit-verdict');
+	const verdict = byId.get('common-verdict');
 	const integration = byId.get('common-integration');
 	const browser = byId.get('common-e2e');
 	if (!call || pipeline.field(call.body, 'uses') !== './.github/workflows/ci-common.yml')
@@ -2799,7 +2799,7 @@ function commonProblems(files) {
 		problems.push('Common caller must forward exactly the five canonical plan inputs');
 	const dependencies = {
 		'shared-validation': [],
-		'common-unit-verdict': ['common-testbuild'],
+		'common-verdict': ['common-testbuild'],
 		'common-integration': ['shared-validation'],
 		'common-e2e': ['common-integration'],
 		'common-build': ['common-e2e'],
@@ -2820,7 +2820,7 @@ function commonProblems(files) {
 			if (
 				job &&
 				pipeline.field(job.body, key) !==
-					(id === 'common-unit-verdict' && key === 'if' ? 'always()' : null)
+					(id === 'common-verdict' && key === 'if' ? 'always()' : null)
 			)
 				problems.push(id + ' must set no ' + key);
 		if (!job || pipeline.field(job.body, 'runs-on') !== 'ubuntu-latest')
@@ -2988,7 +2988,7 @@ function commonProblems(files) {
 errors.push(...commonProblems(pipeline.files()));
 
 for (const [label, from, to] of [
-	['missing site Verdict', '  common-unit-verdict:\n', '  missing-verdict:\n'],
+	['missing site Verdict', '  common-verdict:\n', '  missing-verdict:\n'],
 	['Verdict wrong predecessor', '    needs: [common-testbuild]\n', '    needs: [common-build]\n'],
 	[
 		'Verdict forged aggregate',
@@ -3096,8 +3096,8 @@ for (const [what, file, from, to] of [
 	[
 		'Common caller skips',
 		ENTRY,
-		"    name: 'YAML, shared code & web'\n",
-		"    name: 'YAML, shared code & web'\n    if: false\n"
+		"    name: 'Common'\n",
+		"    name: 'Common'\n    if: false\n"
 	],
 	[
 		'Common claims caller concurrency',
@@ -3924,7 +3924,7 @@ function permissionProblems(files) {
 	const evidenceReaders = new Set([
 		`${ENTRY}:core`,
 		`${COMMON_BOX}:common-e2e`,
-		`${COMMON_BOX}:common-unit-verdict`,
+		`${COMMON_BOX}:common-verdict`,
 		`${ENTRY}:macos`,
 		`${MACOS_BOX}:e2e-hs`,
 		`${MACOS_BOX}:package-macos`
@@ -4097,7 +4097,7 @@ assert.deepEqual(
 for (const [rel, id] of [
 	[ENTRY, 'core'],
 	[COMMON_BOX, 'common-e2e'],
-	[COMMON_BOX, 'common-unit-verdict']
+	[COMMON_BOX, 'common-verdict']
 ]) {
 	const matches = pipeline.jobsOfText(pipeline.file(rel), rel).filter((job) => job.id === id);
 	assert.equal(matches.length, 1, id + ' has one actual permission owner');
@@ -5420,7 +5420,7 @@ function namingProblems(files) {
 				entry.rel === ENTRY
 					? caller
 						? {
-								core: 'YAML, shared code & web',
+								core: 'Common',
 								macos: 'macOS',
 								windows: 'Windows',
 								linux: 'Linux',
@@ -5499,7 +5499,7 @@ for (const [before, after] of [
 	mustCatch('qualification owner ' + before, ENTRY, before, after, rootProblems);
 errors.push(...namingProblems(pipeline.files()));
 for (const [what, rel, from, to] of [
-	['an incorrect Common caller name', ENTRY, "name: 'YAML, shared code & web'", "name: 'Linux'"],
+	['an incorrect Common caller name', ENTRY, "name: 'Common'", "name: 'Linux'"],
 	[
 		'an incorrect Common matrix name',
 		COMMON_BOX,
@@ -5543,8 +5543,8 @@ for (const [what, rel, from, to] of [
 	[
 		'a single job with a third name level',
 		LINUX_BOX,
-		"    name: 'Verdict (Mandatory subjects)'\n",
-		"    name: 'Verdict / Mandatory subjects'\n"
+		"    name: 'Verdict (All mandatory results)'\n",
+		"    name: 'Verdict / All mandatory results'\n"
 	],
 	[
 		'a matrix job that names a subject GitHub would repeat',

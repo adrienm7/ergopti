@@ -3036,7 +3036,7 @@ jobs:
           overwrite: true
 
   macos-ok:
-    name: Verdict (Mandatory jobs and launch scenarios)
+    name: Verdict (All mandatory results)
     needs:
       - launch
     if: always()

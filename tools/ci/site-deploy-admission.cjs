@@ -193,9 +193,9 @@ async function selectSiteJobs(identity, readApi) {
 	const prefix = '/repos/' + REPOSITORY + '/actions';
 	const targets = Object.values(siteLots()).map((row) => row.target);
 	const stages = [
-		{ name: 'YAML, shared code & web / Build', writer: 'Build and seal production site' },
+		{ name: 'Common / Build', writer: 'Build and seal production site' },
 		{
-			name: 'YAML, shared code & web / Install and launch',
+			name: 'Common / Install and launch',
 			writer: 'Test received production site'
 		}
 	];

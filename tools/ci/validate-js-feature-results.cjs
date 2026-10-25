@@ -11,9 +11,9 @@ const { stageOf } = require('./js-feature-matrix.cjs');
 // The rendered name of each Common stage's matrix job and the step that writes
 // its feature journal: a lot runs in exactly one of them.
 const STAGE_JOBS = Object.freeze({
-	unit: { prefix: 'YAML, shared code & web / Unit tests', writer: 'Run shared validation suite' },
+	unit: { prefix: 'Common / Unit tests', writer: 'Run shared validation suite' },
 	integration: {
-		prefix: 'YAML, shared code & web / Integration tests',
+		prefix: 'Common / Integration tests',
 		writer: 'Run shared integration suite'
 	}
 });

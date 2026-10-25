@@ -21,7 +21,7 @@ const JOBS = [
 	['.github/workflows/ci.yml', 'prepare-common', null],
 	['.github/workflows/ci-common.yml', 'shared-validation', null],
 	['.github/workflows/ci-common.yml', 'common-integration', null],
-	['.github/workflows/ci-common.yml', 'common-unit-verdict', 'always()'],
+	['.github/workflows/ci-common.yml', 'common-verdict', 'always()'],
 	['.github/workflows/ci-common.yml', 'common-e2e', null],
 	['.github/workflows/ci-common.yml', 'common-build', null],
 	['.github/workflows/ci-common.yml', 'common-testbuild', null],

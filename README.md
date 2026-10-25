@@ -401,7 +401,7 @@ every pull request into them, and on manual dispatch:
    which tag, version and update channel. The repository-wide gates (hotstring
    TOML formatting, the property tests, the mutation tests and
    `npm run test:js`, one runner per feature lot) run in the
-   `YAML, shared code & web / Unit tests` stage; the lots that run real
+   `Common / Unit tests` stage; the lots that run real
    generators, packaging or boot code run next, in its `Integration tests`
    stage.
 2. Once it passes, four lanes run in parallel, one reusable workflow each:
@@ -434,7 +434,7 @@ every pull request into them, and on manual dispatch:
 Validate and plan ─┬─ macOS ─────────────────────┬─ Release
                    ├─ Windows ───────────────────┤
                    ├─ Linux ─────────────────────┤
-                   └─ YAML, shared code & web ───┘
+                   └─ Common ───┘
 each lane: Unit tests ─ Integration tests ─ E2E tests ─ Build ─ Install and launch ─ Verdict
 ```
 

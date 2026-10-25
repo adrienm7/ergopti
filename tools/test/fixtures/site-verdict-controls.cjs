@@ -389,9 +389,9 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 			/source\/run/
 		],
 		[
-			'old Common API alias',
+			'old YAML, shared code & web API name',
 			(v) => {
-				v.model.jobs[0].name = v.model.jobs[0].name.replace('YAML, shared code & web', 'Common');
+				v.model.jobs[0].name = v.model.jobs[0].name.replace('Common', 'YAML, shared code & web');
 			},
 			/foreign stage job name/
 		],
