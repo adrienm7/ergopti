@@ -111,7 +111,9 @@ return function(helpers)
 		helpers.it("writes every declared off value in the scopes that own it", function()
 			for _, entry in ipairs(manifest.features) do
 				if entry.cleared ~= nil then
-					for _, scope in ipairs({ "shortcuts", "global" }) do
+					-- The owning scope is the one whose prefix leads the path.
+					local owner = entry.path:match("^(%w+)%.")
+					for _, scope in ipairs({ owner, "global" }) do
 						local operation = rows(scope, "clear")[entry.path]
 						helpers.assert_not_nil(operation, scope .. " " .. entry.path)
 						helpers.assert_eq(operation.value, entry.cleared, scope .. " " .. entry.path)
