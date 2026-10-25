@@ -861,13 +861,13 @@ function M.consume(detail, opts)
 				and opts.admission == admission_reader
 		end
 		if not owner_current() then return false end
+		if AiActions.blocked(hit.action) then return false end
 		if admission_reader == nil then return true end
 		if type(admission_reader) ~= "function" then return false end
 		local called, admission = pcall(admission_reader)
 		if not called or type(admission) ~= "table" or not owner_current() then return false end
 		if type(admission.master) ~= "boolean" or type(admission.paused) ~= "boolean"
 			or admission.inhibited ~= false then return false end
-		if AiActions.blocked(hit.action) then return false end
 		return ScriptActions.is_script_action(hit.action)
 			or (admission.master == true and admission.paused == false)
 	end
