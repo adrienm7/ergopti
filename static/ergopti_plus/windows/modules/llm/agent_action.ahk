@@ -303,7 +303,7 @@ _LLM_Agent_ApplyCommitted(Key, Previous, Candidate) {
 	; A no-op or a refused transaction never revokes an accepted request.
 	if (Key == "agent_system2" || Key == "agent_mode") && Candidate[Key] != Previous
 		_LLM_Agent_Generation += 1
-	if Key == "agent_system1" && Candidate[Key] != Previous
+	if Key == ConfigLeaf.AGENT_SYSTEM1 && Candidate[Key] != Previous
 		_LLM_Agent_System1Revision += 1
 	LoggerDebug("LLM", "AI agent setting '{1}' committed.", Key)
 	return true
