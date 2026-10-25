@@ -55,12 +55,27 @@ local function fake_luv(config)
 	end
 	function luv.read_stop(pipe) pipe.stopped = true; return true end
 	function luv.is_closing(value) return value.closing end
-	function luv.close(value) value.closing = true end
-	function luv.kill(pid, signal) state.kills[#state.kills + 1] = { pid = pid, signal = signal }; return true end
+	function luv.close(value, callback)
+		value.closing = true
+		if callback then callback() end
+	end
+	function luv.kill(pid, signal)
+		if signal == 0 then
+			if state.absent then return nil, "ESRCH", "ESRCH" end
+			return 0
+		end
+		state.kills[#state.kills + 1] = { pid = pid, signal = signal }
+		if signal == "sigkill" then state.absent = true end
+		return 0
+	end
 	function luv.spawn(command, spawn_options, on_exit)
 		state.spawns = state.spawns + 1
-		state.command, state.options, state.on_exit = command, spawn_options, on_exit
-		if options.spawn_error then return nil, options.spawn_error end
+		state.command, state.options = command, spawn_options
+		state.on_exit = function(...)
+			if not options.descendant then state.absent = true end
+			on_exit(...)
+		end
+		if options.spawn_error then return nil, options.spawn_error, "ENOENT" end
 		state.process = handle("process")
 		return state.process, 4321
 	end
@@ -79,12 +94,15 @@ end
 local function fresh_runner(luv)
 	local previous_luv, previous_preload = package.loaded["luv"], package.preload["luv"]
 	local previous_runner = package.loaded["adapters.shell_runner"]
+	local previous_owned = package.loaded["adapters.owned_process"]
+	package.loaded["adapters.owned_process"] = nil
 	package.loaded["luv"] = luv
 	if not luv then package.preload["luv"] = function() error("no libuv here") end end
 	package.loaded["adapters.shell_runner"] = nil
 	local runner = require("adapters.shell_runner")
 	package.loaded["luv"], package.preload["luv"] = previous_luv, previous_preload
 	package.loaded["adapters.shell_runner"] = previous_runner
+	package.loaded["adapters.owned_process"] = previous_owned
 	return runner
 end
 
@@ -110,7 +128,7 @@ helpers.describe("shell_runner.run_async (linux)", function()
 	end
 
 	for _, receipt in ipairs({ "nil", "false", "raised" }) do
-		for allocation = 1, 3 do
+		for allocation = 1, 4 do
 			helpers.it("linux-shell-async-admission: allocation " .. allocation .. " " .. receipt .. " refuses without losing earlier handles", function()
 				local luv, state = fake_luv({ allocation_at = allocation, refusal = receipt })
 				local runner, callbacks = fresh_runner(luv), 0
@@ -138,11 +156,11 @@ helpers.describe("shell_runner.run_async (linux)", function()
 				helpers.assert_true(state.timer.stopped)
 				if operation == "timer" then
 					helpers.assert_eq(state.spawns, 0)
-					helpers.assert_eq(#state.handles, 3)
+					helpers.assert_eq(#state.handles, 4)
 					helpers.assert_eq(#state.kills, 0)
 				else
 					helpers.assert_eq(state.spawns, 1)
-					helpers.assert_eq(#state.handles, 4)
+					helpers.assert_eq(#state.handles, 5)
 					helpers.assert_eq(state.reads, operation == "stdout" and 1 or 2, "stop admission at the failed reader")
 					helpers.assert_eq(state.kills, {
 						{ pid = -4321, signal = "sigterm" }, { pid = -4321, signal = "sigkill" },
@@ -159,6 +177,12 @@ helpers.describe("shell_runner.run_async (linux)", function()
 	end
 
 	if pcall(require, "luv") and package.config:sub(1, 1) == "/" then
+		helpers.it("linux-shell-family-retirement: actual leaders and pipe-independent descendants retire before publication", function()
+			local Shell = require("adapters.shell_runner")
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_shell_group_retirement.lua"
+			local result = os.execute(Shell.quote(assert(arg[-1])) .. " " .. Shell.quote(fixture))
+			helpers.assert_true(result == true or result == 0, "actual process families must retire before shell callbacks")
+		end)
 		helpers.it("linux-shell-async-admission: actual children and handles retire on five explicit native refusal seams", function()
 			local fixture = helpers.driver_root() .. "/tests/fixtures/native_shell_async_admission.lua"
 			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
@@ -222,9 +246,9 @@ helpers.describe("shell_runner.run_async (linux)", function()
 			{ pid = -4321, signal = "sigterm" },
 			{ pid = -4321, signal = "sigkill" },
 		})
-		helpers.assert_eq(#answers, 1)
-		helpers.assert_eq(answers[1].error, "timeout")
+		helpers.assert_eq(#answers, 0, "deadline publication waits for physical child exit")
 		state.finish(143)
+		helpers.assert_eq(answers[1].error, "timeout")
 		helpers.assert_eq(#answers, 1, "a late exit must not answer a second time")
 	end)
 
@@ -266,7 +290,7 @@ helpers.describe("shell_runner.run_async (linux)", function()
 	end)
 
 	helpers.it("stops descendants after their leader exits (linux-orphaned-process-group)", function()
-		local luv, state = fake_luv()
+		local luv, state = fake_luv({ descendant = true })
 		local runner = fresh_runner(luv)
 		local answers = {}
 		runner.run_async("sh", { "-c", "sleep 30 &" }, { timeout_ms = 10 },
@@ -277,13 +301,13 @@ helpers.describe("shell_runner.run_async (linux)", function()
 		helpers.assert_eq(state.kills[1], { pid = -4321, signal = "sigterm" },
 			"a reaped leader does not mean the process group is empty")
 		helpers.assert_eq(#answers, 1)
-		helpers.assert_eq(answers[1].error, "timeout")
+		helpers.assert_eq(answers[1].error, "native process group outlived leader")
 		state.finish(0)
 		helpers.assert_eq(#answers, 1, "late EOF must not publish twice")
 	end)
 
 	helpers.it("cancels descendants after their leader exits (linux-orphaned-process-group)", function()
-		local luv, state = fake_luv()
+		local luv, state = fake_luv({ descendant = true })
 		local runner = fresh_runner(luv)
 		local answers = 0
 		local handle = runner.run_async("sh", { "-c", "sleep 30 &" }, { timeout_ms = 1000 },
