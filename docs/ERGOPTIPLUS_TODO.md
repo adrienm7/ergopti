@@ -544,18 +544,18 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       run on macOS and Linux, none on Windows. Convert the highest-value ones (`config_scope_*`,
       `toml_*`, `menu_*`) to JSON vectors and replay from one AHK consumer per family. Audit test
       item 11, section 14.
-- [ ] **PAR-59. Corpus replay gaps.** [CODE] `http/get_redirect_vectors.json` (Windows, macOS),
-      `native_presentations/original_captions.json` (Windows), `config_outdated/file_warning_vectors.json`
-      (macOS, Linux), `route_plan_vectors.json` (Linux, Windows), `document_lease_contract` and
-      `download_document_contract` (macOS). Audit R35, C21, section 14.
+- [ ] **PAR-59. Corpus replay gaps.** [CODE] Done on macOS and Linux (file warnings, route plan, GET
+      redirects, document lease; the download-document contract is Linux-only by design). Left: Windows
+      consumers of `http/get_redirect_vectors.json`, `native_presentations/original_captions.json`,
+      `route_plan_vectors.json`.
 - [ ] **PAR-60. Hotstring `family_samples.json` plus chaining, synthetic-output and erase vectors.** [CODE]
-      Two or three expansions per manifest family, replayed by the three E2E harnesses. Audit H15,
-      test item 13.
-- [ ] **PAR-61. Tap-versus-hold decision corpus.** [CODE] `tap_hold/vectors.json` pins accessors only; add
-      decision vectors (tap, hold, roll, one-shot) replayed by the three engines. Audit T15.
-- [ ] **PAR-62. Contract tests for shared modules no test requires by name.** [CODE] `layouts.composer`,
-      `hotstrings.personal_model`, `keystats.text_migration_runner`, `menu.click_intent`,
-      `llm.config_guard` and five more. Check corpus coverage first. Audit R36.
+      Done on macOS and Linux (`family_samples.json`, `sequence_vectors.json`, `cascade_vectors.json` in both
+      E2E harnesses). Left: a Windows `family_samples` consumer.
+- [ ] **PAR-61. Tap-versus-hold decision corpus.** [CODE] Done on macOS and Linux (`decision_vectors.json`,
+      23 vectors, shared contract). Left: a Windows consumer through its tap-hold engine.
+- [x] **PAR-62. Contract tests for shared modules no test requires by name.** [CODE] Done (ab086f5020):
+      direct contracts for nine shared modules, each proved red by a mutation; personal_model's
+      `unowned-personal-section` stays covered by the writer corpus only.
 - [ ] **PAR-63. Remaining 2026-10-18 test items.** [CODE] Windows dynamic hotstrings, Linux personal-info
       editor, Linux model records and downloads, keystats corpus on Linux, toggle-level gaps
       (`preview_autocorrect_enabled`, `direct_access_digits`, `reset_on_nav`, `rolls.left_arrow`,
