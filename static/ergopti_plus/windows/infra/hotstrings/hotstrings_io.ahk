@@ -316,6 +316,15 @@ _ParseOverrides(Path) {
 						continue
 				}
 
+				; The reserved table of earlier builds holds the delimiter strings, read
+				; once by _ParseGlobalKey. It is no override category: keeping it in the
+				; catalogue would make every later write refuse the reserved identifier.
+				if (Line == "[__global__]") {
+						CurrentCat := ""
+						CurrentSec := ""
+						continue
+				}
+
 				; Standard category header: [category]
 				if RegExMatch(Line, "^\[([A-Za-z0-9_\-]+)\]$", &CatMatch) {
 						CurrentCat := StrLower(CatMatch[1])

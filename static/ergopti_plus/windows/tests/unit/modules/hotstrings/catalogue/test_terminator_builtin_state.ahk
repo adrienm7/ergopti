@@ -94,6 +94,8 @@ _HTBS_BootStepRetiresTheStrings() {
 			. '[rolls]`ndelay_offset = 0.25`n'))
 		HotstringsConfigInit(Path)
 		AssertEqual("!.", _HotstringsLegacyDelimiters.Word)
+		AssertFalse(_HotstringsOverrides.Has("__global__"),
+			"the reserved delimiter table is no override category, or the rewrite would refuse it")
 		Seen := []
 		Refusing(Word, Consumed) {
 			Seen.Push([Word, Consumed])
