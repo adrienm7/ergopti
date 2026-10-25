@@ -631,7 +631,7 @@ local function publish_data(generation, webview, site, payload, revision, with_a
 	local metadata = string.format('{"manifest_revision":%d%s%s}', revision,
 		with_assets and string.format(',"assets_revision":%d', revision) or "",
 		freshness and (',"freshness":' .. freshness) or "")
-	local code = "window.publishTypingMetricsData(" .. payload .. "," .. metadata .. ");"
+	local code = "window.publishTypingMetricsData(JSON.parse(" .. Json.quote(payload) .. ")," .. metadata .. ");"
 	local publication = { code = code, generation = generation, revision = revision }
 	if site == "live manifest" then
 		if _pending_live_publication and _pending_live_publication.generation == generation then

@@ -292,6 +292,97 @@ end)
 	assert.deepEqual(reordered.state()[0], { '2026-01-01': { Editor: { app_time_ms: 20 } } });
 });
 
+test('actual Lua application dictionaries retain prototype-named keys in the loaded page', () => {
+	const lua = spawnSync('lua', ['-'], {
+		cwd: path.resolve(__dirname, '../../static/ergopti_plus/macos'),
+		encoding: 'utf8',
+		input: `package.path='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;'..package.path
+local json=require('json')
+require('tests.support.metrics_delivery_fixture')(true,function(dashboard,state,evaluations,errors,successes,pending)
+ local names={'Editor','constructor','toString','__proto__'}
+ package.loaded['hs.json'].encode=json.encode
+ package.loaded['hs.json'].decode=json.decode
+ local day,categories={},{}
+ for index,name in ipairs(names) do
+  day[name]={app_time_ms=index*60000,chars=index,category='Productivity'}
+  categories[name]={type='Original',score=1}
+  dashboard._app_icon_cache[name]='data:image/png;base64,'..name
+ end
+ local saved=json.encode(categories)
+ local files=package.loaded['adapters.file_system']
+ files.read_with_status=function() return saved,'ok' end
+ files.write_if_unchanged=function(_,content) saved=content; return true end
+ package.loaded['modules.keystats.sqlite_reader'].read_manifest=function()
+  return {['2026-10-20']=day},true
+ end
+ assert(dashboard.push_live_update())
+ pending[#pending]()
+ evaluations[#evaluations].done('function')
+ local publication=evaluations[#evaluations].code
+ local choose
+ hs.chooser={new=function(callback)
+  choose=callback
+  local chooser={}
+  for _,method in ipairs({'placeholderText','choices','searchSubText','show','delete'}) do
+   chooser[method]=function(self) return self end
+  end
+  return chooser
+ end}
+ package.loaded['infra.dialog_util'].text_prompt=function() return 'button.ok','2' end
+ assert(dashboard.prompt_category('__proto__','Original',1))
+ choose({_kind='pick',_value='Edited'})
+ print('PUBLICATIONS='..json.encode({publication,evaluations[#evaluations].code}))
+end)
+`
+	});
+	assert.equal(lua.status, 0, lua.stderr + lua.stdout);
+	const line = lua.stdout.split(/\r?\n/).find((value) => value.startsWith('PUBLICATIONS='));
+	assert.ok(line, 'the real Lua host must emit its actual native scripts');
+	const [publication, edit] = JSON.parse(line.slice('PUBLICATIONS='.length));
+	const page = loadMetricsAppsPage('macos');
+	// These deliberately inert image URLs fail asynchronously at the browser port.
+	page.context.Image = class {
+		set src(_value) {
+			queueMicrotask(() => this.onerror());
+		}
+	};
+	vm.runInContext(
+		"currentPeriod='all'; currentWeekdayFilter=new Set([0,1,2,3,4,5,6]); currentCategoryFilter=null;",
+		page.context
+	);
+	assert.equal(vm.runInContext(publication, page.context), true);
+	const received = JSON.parse(
+		vm.runInContext('JSON.stringify([manifestData,userCategories,appIcons])', page.context)
+	);
+	for (const name of ['Editor', 'constructor', 'toString', '__proto__']) {
+		assert.ok(
+			Object.hasOwn(received[0]['2026-10-20'], name),
+			`native manifest retains own application key ${name}`
+		);
+		assert.ok(
+			Object.hasOwn(received[1], name),
+			`native categories retain own application key ${name}`
+		);
+		assert.ok(Object.hasOwn(received[2], name), `native icons retain own application key ${name}`);
+	}
+	assert.equal(
+		page.elements.get('apps-tbody').children.length,
+		4,
+		'the real renderer shows every application'
+	);
+	assert.equal(vm.runInContext(edit, page.context), true);
+	assert.deepEqual(
+		{ ...page.context.getAppCategory('__proto__', 'Productivity') },
+		{ type: 'Edited', score: 2 }
+	);
+	assert.ok(
+		Object.hasOwn(
+			JSON.parse(vm.runInContext('JSON.stringify(userCategories)', page.context)),
+			'__proto__'
+		)
+	);
+});
+
 test('loaded HTML admits the exact Lua readiness query and paints normal native publications', () => {
 	const f = loadMetricsAppsPage();
 	assert.equal(

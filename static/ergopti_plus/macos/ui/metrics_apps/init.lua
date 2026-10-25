@@ -28,6 +28,7 @@ local OwnWindow = require("adapters.own_window")
 local hs         = hs
 local fs         = require("hs.fs")
 local json       = require("hs.json")
+local Json       = require("json")
 local ui_builder = require("ui.ui_builder")
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
@@ -562,7 +563,7 @@ local function push_categories_to_ui(generation, webview)
 		return false
 	end
 	return submit_javascript(generation, webview, string.format(
-		"window.publishMetricsAppsCategories(%s,%d);", encoded, revision), "categories", function(applied)
+		"window.publishMetricsAppsCategories(JSON.parse(%s),%d);", Json.quote(encoded), revision), "categories", function(applied)
 		Logger.debug(LOG, "Apps dashboard categories publication %s (generation=%d).",
 			applied and "applied" or "obsolete", generation)
 	end, true)
@@ -906,8 +907,10 @@ local function inject_payload(generation, webview, manifest, categories, icons, 
 		end
 	end
 	local function publish()
-		local code = string.format("window.publishMetricsAppsData(%s,%s,%s,{manifest_revision:%d,categories_revision:%d});",
-			manifest, categories, icons, manifest_revision, categories_revision)
+		-- Application names are data keys: JavaScript object literals treat
+		-- __proto__ specially, while JSON.parse preserves the exact own key.
+		local code = string.format("window.publishMetricsAppsData(JSON.parse(%s),JSON.parse(%s),JSON.parse(%s),{manifest_revision:%d,categories_revision:%d});",
+			Json.quote(manifest), Json.quote(categories), Json.quote(icons), manifest_revision, categories_revision)
 		return submit_javascript(generation, webview, code, label .. " publication", function(applied)
 			if applied then
 				Logger.success(LOG, "Apps dashboard %s injected.", label)

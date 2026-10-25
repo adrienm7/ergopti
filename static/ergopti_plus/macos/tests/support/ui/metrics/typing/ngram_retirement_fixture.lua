@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Publication = require("tests.support.ui.metrics.typing.publication")
 local Json = require("json")
 local FakeSqlite = require("tests.support.fake_ngram_sqlite")
 local with_delivery = require("tests.support.typing_delivery_fixture")
@@ -166,10 +167,10 @@ function M.run(callback)
 						local call = evaluations[index]
 						if not call.received then
 							call.received = true
-							local full = call.code:match("^window%.publishTypingMetricsData%((.*)%)%;$")
+							local full = Publication.decode(call.code)
 							local range = call.code:match("^window%.receive_range_data%((.*)%)$")
 							if full then
-								state.last_delivery = Json.decode("[" .. full .. "]")[1].initial_data
+								state.last_delivery = full.initial_data
 							elseif range then
 								state.last_delivery = Json.decode("[" .. range .. "]")[1]
 							end

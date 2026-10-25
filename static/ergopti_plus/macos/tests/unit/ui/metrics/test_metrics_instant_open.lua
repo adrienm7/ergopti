@@ -19,6 +19,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Publication = require("tests.support.ui.metrics.typing.publication")
 local with_delivery = require("tests.support.typing_delivery_fixture")
 local FakeSqlite = require("tests.support.fake_ngram_sqlite")
 
@@ -68,10 +69,11 @@ helpers.describe("metrics-instant-open: dashboard", function()
 			helpers.assert_eq(t.evaluations[1].code, "typeof window.publishTypingMetricsData")
 			t.evaluations[1].done("function", nil)
 			local painted = t.evaluations[2].code
-			helpers.assert_true(painted:find("window.publishTypingMetricsData(" .. PAYLOAD .. ",", 1, true) ~= nil,
-				"the snapshot payload is painted verbatim")
-			helpers.assert_true(painted:find('"manifest_revision":0', 1, true) ~= nil)
-			helpers.assert_true(painted:find('"freshness":{"state":"stale","generated_at":' .. GENERATED_AT .. "000}", 1, true) ~= nil,
+			local _, painted_metadata, painted_payload = Publication.decode(painted)
+			helpers.assert_eq(painted_payload, PAYLOAD, "the snapshot payload is painted verbatim")
+			helpers.assert_eq(painted_metadata.manifest_revision, 0)
+			helpers.assert_eq(painted_metadata.freshness.state, "stale")
+			helpers.assert_eq(painted_metadata.freshness.generated_at, GENERATED_AT * 1000,
 				"the painted snapshot is labelled with its age")
 			helpers.assert_eq(t.statements(), 0, "no aggregation has run when the snapshot is painted")
 
@@ -80,11 +82,12 @@ helpers.describe("metrics-instant-open: dashboard", function()
 			helpers.assert_eq(t.evaluations[3].code, "typeof window.publishTypingMetricsData")
 			t.evaluations[3].done("function", nil)
 			local fresh = t.evaluations[4].code
-			helpers.assert_true(fresh:find('"manifest_revision":1', 1, true) ~= nil,
+			local _, fresh_metadata, fresh_payload = Publication.decode(fresh)
+			helpers.assert_eq(fresh_metadata.manifest_revision, 1,
 				"the refresh outranks the snapshot revision, so the page replaces it in place")
-			helpers.assert_true(fresh:find('"freshness":{"state":"fresh"}', 1, true) ~= nil)
+			helpers.assert_eq(fresh_metadata.freshness.state, "fresh")
 			helpers.assert_true(saved ~= nil and saved.path:sub(-8) == ".partial", "the refresh becomes the next snapshot")
-			helpers.assert_true(fresh:find(saved.payload, 1, true) ~= nil, "the saved snapshot is what was published")
+			helpers.assert_eq(fresh_payload, saved.payload, "the saved snapshot is what was published")
 			helpers.assert_eq(#t.errors, 0, table.concat(t.errors, " | "))
 		end)
 	end)
@@ -158,4 +161,51 @@ helpers.describe("metrics-instant-open: dashboard", function()
 			helpers.assert_true(answered, "the queued range request is answered with its request id")
 		end)
 	end)
+end)
+
+helpers.describe("Typing publication decoder protocol vectors", function()
+	helpers.it("preserves escaped bytes and prototype keys (typing-publication-protocol)", function()
+		local code = [=[window.publishTypingMetricsData(JSON.parse("{\"manifest\":{\"__proto__\":{\"title\":\"quote \\\" slash \\\\ punctuation ), and Unicode é € 😀\"}},\"initial_data\":null}"),{"manifest_revision":7,"freshness":{"state":"fresh"}});]=]
+		local expected = [=[{"manifest":{"__proto__":{"title":"quote \" slash \\ punctuation ), and Unicode é € 😀"}},"initial_data":null}]=]
+		local payload, metadata, encoded_payload = Publication.decode(code)
+		helpers.assert_eq(encoded_payload, expected, "decoding must retain the exact inner JSON bytes")
+		helpers.assert_eq(payload.manifest.__proto__.title, [=[quote " slash \ punctuation ), and Unicode é € 😀]=])
+		helpers.assert_eq(metadata, { manifest_revision = 7, freshness = { state = "fresh" } })
+	end)
+
+	local refusals = {
+		{
+			name = "an unquoted payload",
+			code = 'window.publishTypingMetricsData(JSON.parse(42),{});',
+			receipt = "requires a quoted JSON payload",
+		},
+		{
+			name = "unterminated quoting",
+			code = [=[window.publishTypingMetricsData(JSON.parse("unterminated),{});]=],
+			receipt = "requires complete JSON.parse arguments",
+		},
+		{
+			name = "an escaped terminal quote",
+			code = [=[window.publishTypingMetricsData(JSON.parse("unterminated\"),{});]=],
+			receipt = "requires complete JSON.parse arguments",
+		},
+		{
+			name = "a missing argument delimiter",
+			code = [=[window.publishTypingMetricsData(JSON.parse("{}"){});]=],
+			receipt = "requires complete JSON.parse arguments",
+		},
+		{
+			name = "obsolete object-literal transport",
+			code = 'window.publishTypingMetricsData({"manifest":{}},{});',
+			receipt = "requires the JSON.parse boundary",
+		},
+	}
+	for _, vector in ipairs(refusals) do
+		helpers.it("refuses " .. vector.name .. " (typing-publication-protocol)", function()
+			local ok, err = pcall(Publication.decode, vector.code)
+			helpers.assert_eq(ok, false, "malformed transport must never produce a publication")
+			helpers.assert_not_nil(tostring(err):find(vector.receipt, 1, true),
+				"the refusal must identify the broken publication boundary")
+		end)
+	end
 end)
