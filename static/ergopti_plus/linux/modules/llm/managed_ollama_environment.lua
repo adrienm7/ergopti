@@ -59,11 +59,11 @@ end
 function M.load()
 	local path = require("infra.paths").shared(SOURCE)
 	if not path then return nil, "managed_environment_unreadable" end
-	local file = io.open(path, "rb")
-	if not file then return nil, "managed_environment_unreadable" end
-	local data = file:read(MAXIMUM_BYTES + 1)
-	local closed = file:close()
-	if not closed or type(data) ~= "string" then return nil, "managed_environment_unreadable" end
+	local acquired, file = pcall(require("infra.regular_file_reader").open_source, path)
+	if not acquired or not file then return nil, "managed_environment_unreadable" end
+	local read, data = pcall(file.read, file, MAXIMUM_BYTES + 1)
+	local closed, acknowledged = pcall(file.close, file)
+	if not read or type(data) ~= "string" or not closed or acknowledged ~= true then return nil, "managed_environment_unreadable" end
 	return M.decode(data)
 end
 
