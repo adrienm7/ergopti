@@ -6,15 +6,17 @@ local HOME = "/home/crashprivateowner"
 local USER = "crashprivateowner"
 local PAYLOAD = "CRASH_SENTINEL api_key=" .. TOKEN .. " file=" .. HOME .. "/private.lua user=" .. USER
 local DIRECTORY = "/owned-crash-privacy-fixture"
+local ENOENT, EACCES = 2, 13 -- Canonical Linux missing-source and permission receipts.
 
 -- Actual policy admission and redactor, with explicit portable filesystem ports.
 -- Real file output is independently exercised by the native causal receipt.
 local function with_fixture(body, cold)
 	local names = { "infra.logger_sink", "modules.diagnostics.crash_reporter", "logger.shim", "infra.diagnostic_snapshot",
-		"infra.version", "infra.paths", "adapters.file_system" }
+		"infra.version", "infra.paths", "adapters.file_system", "infra.regular_file_reader", "infra.regular_file_writer" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local open, popen, execute, remove, stderr = io.open, io.popen, os.execute, os.remove, io.stderr
-	local state = { files = {}, notices = {}, stderr = {}, opened = 0, closed = 0 }
+	local state = { files = {}, notices = {}, stderr = {}, opened = 0, closed = 0, logger_opened = 0 }
+	local function owned(path) return type(path) == "string" and path:sub(1, #DIRECTORY + 1) == DIRECTORY .. "/" end
 	local Logger = helpers.make_logger_stub()
 	Logger.set_sink = function(fn) state.sink = fn end
 	Logger.enable_repeat_collapsing = function() end
@@ -27,11 +29,11 @@ local function with_fixture(body, cold)
 		os.execute = function() return 0 end
 		io.popen = function() return nil end
 		os.remove = function(path)
-			if path:sub(1, #DIRECTORY) == DIRECTORY then state.files[path] = nil; return true end
+			if owned(path) then state.files[path] = nil; return true end
 			return remove(path)
 		end
 		io.open = function(path, mode)
-			if path:sub(1, #DIRECTORY) ~= DIRECTORY then return open(path, mode) end
+			if not owned(path) then return open(path, mode) end
 			local crash = path:find("/crash_", 1, true) ~= nil
 			if crash then state.opened = state.opened + 1 end
 			if crash and state.refuse_open then return nil, PAYLOAD end
@@ -53,10 +55,36 @@ local function with_fixture(body, cold)
 			if crash and state.on_open then state.on_open() end
 			return file
 		end
-		Sink = require("infra.logger_sink")
-		state.install = function(context)
-			assert(Sink.install(Logger, { log_dir = DIRECTORY, redaction_context = context or { home = HOME, user = USER } }))
+		-- Model the canonical logger acquisitions at their actual public ports.
+		-- Policy and other sources outside this owned root keep native read admission.
+		local Reader, Writer = require("infra.regular_file_reader"), require("infra.regular_file_writer")
+		local reader_ports, writer_ports = {}, {}
+		for name, value in pairs(Reader) do reader_ports[name] = value end
+		for name, value in pairs(Writer) do writer_ports[name] = value end
+		for _, name in ipairs({ "open", "open_source" }) do
+			local original = Reader[name]
+			reader_ports[name] = function(path)
+				if not owned(path) then return original(path) end
+				local text = state.files[path]
+				if text == nil then return nil, "fixture source is absent", ENOENT end
+				return { read = function(_, format)
+					assert(format == "*l" or format == "*a", "fixture source requires a canonical text read")
+					return format == "*l" and text:match("^([^\n]*)") or text
+				end, close = function() return true end }
+			end
 		end
+		writer_ports.open = function(path, mode)
+			if not owned(path) then return Writer.open(path, mode) end
+			state.logger_opened = state.logger_opened + 1
+			if state.refuse_logger_open then return nil, PAYLOAD, EACCES end
+			return io.open(path, mode)
+		end
+		package.loaded["infra.regular_file_reader"], package.loaded["infra.regular_file_writer"] = reader_ports, writer_ports
+		Sink = require("infra.logger_sink")
+		state.try_install = function(context)
+			return Sink.install(Logger, { log_dir = DIRECTORY, redaction_context = context or { home = HOME, user = USER } })
+		end
+		state.install = function(context) assert(state.try_install(context)) end
 		if not cold then state.install() end
 		package.loaded["infra.diagnostic_snapshot"] = { resolve_commit = function()
 			if state.on_facts then state.on_facts() end
@@ -81,6 +109,18 @@ local function no_private(text)
 end
 
 helpers.describe("crash privacy admission", function()
+	helpers.it("keeps file-sink admission false when canonical logger acquisition is refused", function()
+		with_fixture(function(s)
+			s.refuse_logger_open = true
+			helpers.assert_eq(s.try_install(), false)
+			helpers.assert_true(s.logger_opened > 0, "The real logger must attempt the canonical writer port")
+			helpers.assert_eq(s.Sink.is_file_sink_active(), false)
+			helpers.assert_true(#s.stderr > 0, "Native file refusal must be reported")
+			helpers.assert_eq(s.opened, 0); helpers.assert_eq(#s.dumps(), 0); helpers.assert_eq(#s.notices, 0)
+			no_private(table.concat(s.stderr))
+		end, true)
+	end)
+
 	helpers.it("redacts protected errors and stack while preserving technical diagnostics", function()
 		with_fixture(function(s)
 			local ok, original = s.Reporter.protect("engine", function() error(PAYLOAD) end)
