@@ -264,3 +264,117 @@ class _UpdaterCurlCaptureLedger {
 	}
 }
 
+
+; A terminal download also owns the staged executable and swap script. Keep
+; their exact identities in the existing retirement queue when a native reader
+; delays deletion; the shared updates directory itself is never removed.
+class _UpdaterStagedArtifactRetirement extends _UpdaterCurlCaptureLedger {
+	__New(Artifacts) {
+		super.__New()
+		this.Capture := Artifacts.HasOwnProp("CurlCapture") ? Artifacts.CurlCapture : 0
+		this.Paths := Map()
+		for Name in ["NewExe", "SwapScript"]
+			if Artifacts.HasOwnProp(Name) && Artifacts.%Name% != ""
+				this.Paths[Name] := Artifacts.%Name%
+		this.Adopted := false
+	}
+	Adopt() {
+		if this.Retired || this.Acquiring || this.ProbeCloseDebt.Length
+			return false
+		if this.Adopted
+			return true
+		this.Acquiring := true
+		try {
+			Adopted := this.AdoptPrivate()
+			return Adopted && !this.ProbeCloseDebt.Length
+		}
+		finally this.Acquiring := false
+	}
+	AdoptPrivate() {
+		Parent := ""
+		for Name, Path in this.Paths {
+			if !FSPathIsAdmissible(Path)
+				return false
+			SplitPath(Path, , &Directory)
+			if Directory == "" || (Parent != "" && StrCompare(Parent, Directory, false) != 0)
+				return false
+			Parent := Directory
+		}
+		if Parent == "" {
+			this.Adopted := true
+			return true
+		}
+		if !(this.Directory is Map) {
+			Handle := this.Open(Parent, 0, 3, true)
+			NativeError := A_LastError
+			if !Handle {
+				if NativeError != 2 && NativeError != 3
+					return false
+				this.Adopted := true
+				return true
+			}
+			this.Directory := Map("path", Parent, "handle", Handle, "directory", true)
+		}
+		Lease := this.AcquireDirectoryLease()
+		if !Lease
+			return false
+		try {
+			for Name, Path in this.Paths {
+				if this.Files.Has(Name)
+					continue
+				Handle := this.Open(Path, 0, 3, false)
+				NativeError := A_LastError
+				if !Handle {
+					if NativeError == 2 || NativeError == 3
+						continue
+					return false
+				}
+				this.Files[Name] := Map("path", Path, "handle", Handle, "directory", false)
+			}
+			this.Adopted := true
+			return true
+		} finally this.CloseProbe(Lease)
+	}
+	Retire() {
+		if this.Retired
+			return true
+		if this.Running || this.Acquiring || this.ProbeCloseDebt.Length
+			return false
+		this.Running := true
+		try {
+			; Snapshot staged identities as soon as the exact producer has
+			; quiesced, before an unrelated capture reader can defer deletion.
+			; Otherwise a later retry could adopt a replacement at the old path.
+			if this.Capture is _UpdaterCurlCaptureLedger {
+				if this.Capture.Running || this.Capture.Acquiring
+					return false
+				if IsObject(this.Capture.Worker) && !this.Capture.Worker.terminate()
+					return false
+			}
+			if !this.Adopted && !this.Adopt()
+				return false
+			if this.Capture is _UpdaterCurlCaptureLedger && !this.Capture.Retire()
+				return false
+			if this.ProbeCloseDebt.Length
+				return false
+			if this.Directory is Map {
+				Lease := this.AcquireDirectoryLease()
+				if !Lease
+					return false
+				try {
+					for Name, Entry in this.Files
+						if !this.RetireEntry(Entry)
+							return false
+				} finally this.CloseProbe(Lease)
+				if this.ProbeCloseDebt.Length
+					return false
+				if !DllCall("kernel32\CloseHandle", "Ptr", this.Directory["handle"], "Int")
+					return false
+				this.Directory["handle"] := 0
+			}
+			this.Capture := 0
+			this.Retired := true
+			return true
+		} finally this.Running := false
+	}
+}
