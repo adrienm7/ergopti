@@ -6,9 +6,21 @@
 
 local helpers   = require("tests.helpers")
 local Home = require("tests.support.keystats_home_fixture")
-local it = Home.it
 local Fakes     = helpers.load_module("tests.fakes")
-local keystats = helpers.load_module("modules.keystats.keystats")
+local keystats
+
+local NativeFixture = require("tests.support.keystats_native_fixture")
+
+-- A business session reset preserves daily history. Each functional scenario
+-- therefore owns fresh collectors rather than using reset as destructive cleanup.
+local function it(name, body)
+  Home.it(name, function()
+    NativeFixture.with(function(collector)
+      keystats = collector
+      body()
+    end)
+  end)
+end
 
 -- Every case runs in a home of its own (keystats_home_fixture), and each init
 -- names its database and its log directory inside it. Once flushes started
@@ -365,8 +377,13 @@ helpers.describe("keystats", function()
       keystats.init({ sqlite_path = fresh_db() })
       require("tests.support.metrics_consent_fixture").enable(keystats)
       keystats.on_keydown("r", 100, "test")
-      keystats.reset_session()
+      NativeFixture.reset(keystats)
       helpers.assert_eq(keystats.get_session_stats().keystrokes, 0)
+      local writer = require("modules.keystats.sqlite_writer")
+      helpers.assert_eq(writer.query_rows("SELECT COUNT(*) FROM events_typing;"), { "1" },
+        "resetting live figures must retain the typed row in the real database")
+      helpers.assert_eq(writer.query_rows("SELECT kind FROM events_session ORDER BY id;"),
+        { "session_start", "session_end" }, "the native reset transaction must close its session")
     end)
     it("full lifecycle does not crash", function()
       keystats.init({ sqlite_path = fresh_db(), log_dir = Home.path("logs") })
@@ -693,6 +710,7 @@ helpers.describe("physical-backspace-corrections", function()
   end)
   it("physical-backspace-corrections: corrections leave the live speed unchanged", function()
     local function live_wpm(stream)
+      keystats = helpers.load_module("modules.keystats.keystats")
       keystats.init({ sqlite_path = fresh_db() })
       require("tests.support.metrics_consent_fixture").enable(keystats)
       keystats.reset_session()
@@ -832,6 +850,7 @@ end)
 
 helpers.describe("live-source-projection", function()
 	local function fresh_live()
+		keystats = helpers.load_module("modules.keystats.keystats")
 		keystats.init({ sqlite_path = fresh_db() })
 		require("tests.support.metrics_consent_fixture").enable(keystats)
 		keystats.reset_session()
@@ -884,7 +903,7 @@ helpers.describe("live-source-projection", function()
 	it("live-source-projection: flushed other snapshot is not included in the pending source delta", function()
 		fresh_live()
 		keystats.record_synthetic_output("owned-live", "aa", "other", 1000)
-		keystats.flush()
+		NativeFixture.flush(keystats)
 		assert_tuple(keystats.get_range_payload(), "owned-live", 2, 0, 0, 2)
 		keystats.record_synthetic_output("owned-live", "aa", "other", 1100)
 		keystats.record_synthetic_output("owned-live", "aaa", "action", 1200)

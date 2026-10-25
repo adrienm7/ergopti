@@ -16,6 +16,22 @@ function M.synchronous(keystats)
 			return accepted
 		end
 	end
+	local receipts = setmetatable({}, { __mode = "k" })
+	keystats.request_session_reset = function(complete)
+		if type(complete) ~= "function" or type(keystats.reset_session) ~= "function" then return false end
+		local origin = generation
+		local success = keystats.reset_session()
+		local receipt = {}
+		receipts[receipt] = { origin = origin, generation = generation, success = success == true }
+		complete(success == true, receipt)
+		return true
+	end
+	keystats.reset_receipt_generation = function(receipt, origin)
+		local record = receipts[receipt]
+		if not record or record.origin ~= origin or record.generation ~= generation then return nil end
+		return record.generation, record.success
+	end
+
 	keystats.get_flush_status = function()
 		return { phase = "idle", pending = false, has_debt = false, read_safe = true,
 			committed = true, stopping = false, generation = generation }

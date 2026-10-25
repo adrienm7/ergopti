@@ -92,16 +92,11 @@ local function handle(payload, state, request)
 	-- silent nil. The guard read as defensive while making the branch
 	-- permanently unreachable and wrong.
 	if action == "reset" then
-		local reset = false
-		if state.keystats and type(state.keystats.reset_session) == "function" then
-			local ok, accepted = pcall(state.keystats.reset_session)
-			reset = ok and accepted == true
-			if reset and not request.accept_reset() then return nil end
-		end
-		if not request.valid() then return nil end
-		local reply = _build_initial_payload(state, true)
-		if reply then reply.reset = reset end
-		return reply
+		return request.reset_session(function(success)
+			local reply = _build_initial_payload(state, true)
+			if reply then reply.reset = success end
+			return reply
+		end)
 	end
 
 	if action == "export" then

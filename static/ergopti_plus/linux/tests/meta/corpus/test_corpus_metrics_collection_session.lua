@@ -11,7 +11,8 @@
 local helpers = require("tests.helpers")
 local Json = require("json")
 local it = require("tests.support.metrics_preferences_fixture").it
-local keystats = helpers.load_module("modules.keystats.keystats")
+local NativeFixture = require("tests.support.keystats_native_fixture")
+local keystats
 
 local path = helpers.driver_root() .. "/../_shared/tests/corpus/metrics/collection_session_vectors.json"
 local handle = assert(io.open(path, "rb"), "cannot open " .. path)
@@ -40,7 +41,7 @@ local function apply(op, clock, label)
 	elseif op.op == "secure_off" then
 		keystats.set_secure_field(false)
 	elseif op.op == "reset" then
-		local applied = keystats.reset_session()
+		local applied = NativeFixture.reset(keystats)
 		helpers.assert_eq(applied ~= false, op.reset_applied, label .. ": reset applied")
 	else
 		error(label .. ": unknown operation " .. tostring(op.op))
@@ -60,13 +61,16 @@ helpers.describe("metrics suspend and session reset corpus: the shared contract 
 
 	for _, vector in ipairs(corpus.vectors) do
 		it("vector " .. vector.id, function()
-			os.remove(SQLITE_PATH)
-			keystats.init({ sqlite_path = SQLITE_PATH })
-			require("tests.support.metrics_consent_fixture").enable(keystats)
-			local clock = { now = 1000 }
-			for _, op in ipairs(vector.ops) do apply(op, clock, vector.id) end
-			keystats.resume_collection()
-			keystats.set_secure_field(false)
+			NativeFixture.with(function(collector)
+				keystats = collector
+				os.remove(SQLITE_PATH)
+				keystats.init({ sqlite_path = SQLITE_PATH })
+				require("tests.support.metrics_consent_fixture").enable(keystats)
+				local clock = { now = 1000 }
+				for _, op in ipairs(vector.ops) do apply(op, clock, vector.id) end
+				keystats.resume_collection()
+				keystats.set_secure_field(false)
+			end)
 		end)
 	end
 end)

@@ -26,6 +26,7 @@
 
 local M = {}
 local TableUtil = require("table_util")
+local ErrorDescription = require("error_description")
 
 local Logger   = require("logger.shim")
 local Monotonic = require("infra.monotonic")
@@ -168,23 +169,38 @@ local _pending_app_switch_events = {}
 local _pending_window_switch_events = {}
 -- events_session rows produced by _session.
 local _pending_session_events = {}
+local _session_reset_attempt = nil
 -- events_system rows: the machine's transitions system_metrics observed.
 local _pending_system_events = {}
 
 --- Buffers the session events the tracker produced, stamped now.
 --- @param events table { kind, duration_ms? } in order.
-local function queue_session_events(events)
+local function append_session_events(target, events)
 	for _, event in ipairs(events) do
-		_pending_session_events[#_pending_session_events + 1] = {
+		target[#target + 1] = {
 			ts = os.date("!%Y-%m-%d %H:%M:%S"), date = os.date("%Y-%m-%d"),
 			kind = event.kind, duration_ms = event.duration_ms,
 		}
 	end
 end
+local function queue_session_events(events)
+	append_session_events(_pending_session_events, events)
+end
+
+--- Advances both construction branches without keeping a per-input journal.
+local function forward_session(method, ...)
+	local attempt = _session_reset_attempt
+	if attempt then append_session_events(attempt.rollback_events, attempt.original[method](...)) end
+	return _session[method](...)
+end
 -- The observed pointers' stream, measured into the mouse columns of the
 -- focused application's next typing row (pending.mouse), as on macOS.
 local _pointer = PointerMetrics.new()
 local _flush_state, _flush_stopping, _flush_pumping = nil, false, false
+local _session_reset_flush = nil
+local _reset_request, _reset_request_running = nil, false
+local _reset_receipts = setmetatable({}, { __mode = "k" })
+local reset_session_step, has_reset_input
 local _flush_generation, _stop_final_dispatched, _stop_fallback_attempted = 0, false, false
 local _flush_listeners = {}
 local _last_flush_committed = false
@@ -487,7 +503,7 @@ end
 --- Initialises the keystats.
 --- @param opts table { log_dir?, password_apps? }
 function M.init(opts)
-	if _flush_state or _flush_stopping then return false end
+	if _flush_state or _flush_stopping or _reset_request then return false end
 	if not Preferences.admit() then return false end
 	_flush_generation = _flush_generation + 1
 	_flush_listeners = {}
@@ -619,7 +635,7 @@ local function ingest_keydown(ch, timestamp_ms, app_id, scancode)
 	-- leaves Backspace out of its typing rings. Counting it would make every
 	-- held Backspace read as a burst of fast typing.
 	local is_correction = ch == BACKSPACE_MARKER
-	if type(timestamp_ms) == "number" then queue_session_events(_session.input(timestamp_ms, true)) end
+	if type(timestamp_ms) == "number" then queue_session_events(forward_session("input", timestamp_ms, true)) end
 	-- Forward to the base metrics collector if available.
 	if Metrics and not is_correction then
 		Metrics.on_keydown(ch, timestamp_ms)
@@ -930,7 +946,7 @@ end
 function M.record_pointer(kind, code, value)
 	local delta = _pointer.observe(kind, code, value)
 	if not delta or not may_record() then return end
-	queue_session_events(_session.input(math.floor(Monotonic.now_ms()), false))
+	queue_session_events(forward_session("input", math.floor(Monotonic.now_ms()), false))
 	local app_id = _focused_app_id
 	if type(app_id) ~= "string" or M.is_unrecorded_app(app_id) then return end
 	local pending = ensure_pending(app_id)
@@ -1920,7 +1936,7 @@ decode_open_walk = function(encoded)
 end
 
 --- Composes one immutable snapshot without advancing public watermarks.
-local function capture_flush()
+local function capture_flush(close_session)
 	local date, now_iso = os.date("%Y-%m-%d"), os.date("!%Y-%m-%d %H:%M:%S")
 	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, llm = {}, windows = {},
 		sessions = {}, system = {} }, upserts = {} }
@@ -1998,7 +2014,7 @@ local function capture_flush()
 	local now_ms = math.floor(Monotonic.now_ms())
 	for _, context in pairs(walker_contexts) do
 		local ok_settle, settled = pcall(AggregateWalker.settle, context, now_ms, ngram_batch,
-			_flush_stopping or (context.date ~= nil and context.date ~= date))
+			_flush_stopping or close_session == true or (context.date ~= nil and context.date ~= date))
 		if not ok_settle then
 			return nil, "Typing aggregate settlement failed; pending source remains unacknowledged"
 		end
@@ -2248,12 +2264,62 @@ local function publish_flush_observation()
 	for _, callback in ipairs(listeners) do pcall(callback, status) end
 end
 
+--- Completes one accepted user request with an opaque source-bound receipt.
+local function finish_reset_request(request, success)
+	if _reset_request ~= request then return end
+	_reset_request = nil
+	local receipt = {}
+	_reset_receipts[receipt] = { origin = request.origin, generation = _flush_generation, success = success }
+	local called, err = pcall(request.complete, success, receipt)
+	if not called then
+		Logger.error(LOG, "Metrics session reset completion callback raised: %s.", ErrorDescription.describe(err))
+	end
+end
+
+--- Drives only the reset request that owns the current closing transaction.
+local function advance_reset_request(allow_dispatch)
+	local request = _reset_request
+	if not request or _reset_request_running then return end
+	if _flush_stopping then finish_reset_request(request, false); return end
+	if _flush_state then
+		if request.native and request.native ~= _flush_state then
+			Logger.error(LOG, "Metrics session reset lost its native transaction owner.")
+			finish_reset_request(request, false)
+		end
+		return
+	end
+	-- Idle pumping only consumes receipts. Fresh successor capture belongs to
+	-- the periodic dispatcher, and a waiting request needs no repeated fork.
+	if request.native and allow_dispatch ~= true then
+		if request.awaiting_dispatch then return end
+		if has_reset_input() or #_session.fork().stop() > 0 then
+			request.awaiting_dispatch = true
+			return
+		end
+	end
+	request.awaiting_dispatch = nil
+	_reset_request_running = true
+	local called, complete = pcall(reset_session_step)
+	_reset_request_running = false
+	if _reset_request ~= request then return end
+	if not called then
+		Logger.error(LOG, "Metrics session reset request raised: %s.", ErrorDescription.describe(complete))
+	end
+	if called and complete == true then
+		finish_reset_request(request, true)
+	elseif _flush_state and _session_reset_flush == _flush_state then
+		request.native = _flush_state
+	else
+		finish_reset_request(request, false)
+	end
+end
+
 --- Consumes staged native receipts off the input callback, without running luv.
 --- @return boolean Whether no captured snapshot remains.
 function M.pump_flush()
 	if _flush_pumping then return _flush_state == nil end
 	local state = _flush_state
-	if not state then publish_flush_observation(); return true end
+	if not state then advance_reset_request(); publish_flush_observation(); return _flush_state == nil end
 	if not state.operation then return false end
 	_flush_pumping = true
 	local called, settled = pcall(state.operation.pump, state.operation)
@@ -2280,6 +2346,7 @@ function M.pump_flush()
 		end
 	end
 	_flush_pumping = false
+	advance_reset_request()
 	publish_flush_observation()
 	return _flush_state == nil
 end
@@ -2319,13 +2386,13 @@ local function warn_flush_unavailable()
 	end
 end
 
-local function dispatch_flush()
+local function dispatch_flush(close_session)
 	if SqliteWriter.flush_transport_available() ~= true then
 		_last_flush_committed = false
 		warn_flush_unavailable()
 		return false
 	end
-	local captured, snapshot, reason = pcall(capture_flush)
+	local captured, snapshot, reason = pcall(capture_flush, close_session)
 	if not captured or not snapshot then
 		Logger.error(LOG, "SQLite flush preparation refused; pending source remains retained.")
 		return false
@@ -2340,6 +2407,7 @@ local function dispatch_flush()
 	_flush_generation = _flush_generation + 1
 	_last_flush_committed = false
 	local state = { snapshot = snapshot }
+	if close_session == true then _session_reset_flush = state end
 	_flush_state = state -- Reserve before any reentrant external allocation.
 	_pending_typing_events, _pending_hotstring_events = {}, {}
 	_pending_shortcut_events, _pending_app_switch_events = {}, {}
@@ -2356,6 +2424,7 @@ local function dispatch_flush()
 		-- Refusal acquires nothing, but a port may have synchronously admitted
 		-- another input callback. Restore the old prefix without losing arrivals.
 		restore_flush_buffers(snapshot.buffers)
+		if state == _session_reset_flush then _session_reset_flush = nil end
 		_flush_state = nil
 		return false
 	end
@@ -2401,7 +2470,7 @@ end
 
 --- The flush body: retries a retained snapshot, else dispatches a new one.
 --- @return boolean
-local function flush_dispatch()
+local function flush_dispatch(close_session)
 	if _flush_state then
 		local operation = _flush_state.operation
 		if operation and operation:is_retryable() then
@@ -2410,7 +2479,7 @@ local function flush_dispatch()
 		end
 		return M.pump_flush()
 	end
-	if SqliteWriter and SqliteWriter.is_available() then return dispatch_flush() end
+	if SqliteWriter and SqliteWriter.is_available() then return dispatch_flush(close_session) end
 	return flush_json()
 end
 
@@ -2420,7 +2489,7 @@ end
 function M.flush()
 	if _flush_stopping then return false end
 	-- The periodic flush is the session's idle check (timings ingest_tick_ms).
-	if may_record() then queue_session_events(_session.tick(math.floor(Monotonic.now_ms()))) end
+	if may_record() then queue_session_events(forward_session("tick", math.floor(Monotonic.now_ms()))) end
 	-- And it takes the machine's transitions the daemon's sampler saw, always,
 	-- so a span when recording was forbidden is dropped rather than kept.
 	if SystemMetrics then
@@ -2436,7 +2505,13 @@ function M.flush()
 	end
 	local started = Perf.clock()
 	Perf.count("keystats.flushes")
-	local result = flush_dispatch()
+	local result
+	if _reset_request and not _flush_state then
+		advance_reset_request(true)
+		result = _reset_request == nil and _flush_state == nil
+	else
+		result = flush_dispatch()
+	end
 	Perf.span("keystats.flush", started)
 	return result
 end
@@ -2448,8 +2523,9 @@ end
 function M.stop()
 	if not _flush_stopping then
 		-- The open session ends with the daemon, before the final flush takes it.
-		if may_record() then queue_session_events(_session.stop()) end
+		if may_record() then queue_session_events(forward_session("stop")) end
 		_flush_stopping = true
+		if _reset_request then finish_reset_request(_reset_request, false) end
 		_flush_generation = _flush_generation + 1
 		_flush_listeners = {}
 	end
@@ -2522,40 +2598,120 @@ function M.get_ngrams(n)
 	return Metrics.get_ngrams(n)
 end
 
---- Resets all session data.
-function M.reset_session()
-	if M.has_flush_debt() or _flush_stopping then return false end
-	_flush_generation = _flush_generation + 1
+--- Whether fresh capture still needs a durable reset boundary.
+has_reset_input = function()
+	return next(_pending_typing_events) ~= nil or #_pending_hotstring_events > 0
+		or #_pending_shortcut_events > 0 or #_pending_llm_events > 0
+		or #_pending_window_switch_events > 0 or #_pending_session_events > 0
+		or #_pending_system_events > 0 or #_pending_app_switch_events > 0
+end
+
+--- Ends the typing session after its source and closing rows are committed.
+--- Daily history and input arriving during an outstanding reset remain owned.
+--- @return boolean acknowledged False while persistence is refused or pending.
+reset_session_step = function()
+	if _session_reset_attempt or M.has_flush_debt() or _flush_stopping then return false end
+	if not (SqliteWriter and SqliteWriter.is_available()) then
+		Logger.error(LOG, "Metrics session reset refused: durable SQLite persistence is unavailable.")
+		return false
+	end
+	local generation = _flush_generation
+	local closing = _session.fork().stop()
+	local committed = _session_reset_flush and _session_reset_flush.committed == true
+	if not committed or has_reset_input() or #closing > 0 then
+		local attempt = { original = _session, successor = new_session_tracker(),
+			rollback_events = copy_flush_value(_pending_session_events) }
+		local candidate_events = copy_flush_value(_pending_session_events)
+		local previous_receipt = _session_reset_flush
+		_session_reset_attempt = attempt
+		_session, _pending_session_events = attempt.successor, candidate_events
+		local called, persisted = pcall(function()
+			queue_session_events(closing)
+			return flush_dispatch(true)
+		end)
+		local current = _session_reset_attempt == attempt and _session == attempt.successor
+		local receipt = _session_reset_flush
+		local acquired = _flush_state ~= nil or (called and persisted == true)
+			or (receipt ~= previous_receipt and receipt ~= nil and receipt.committed == true)
+		-- Only an actual native owner or its completed receipt admits the close.
+		-- On refusal the original branch already includes reentrant input/ticks,
+		-- so restoring it removes the provisional close without replaying keys.
+		if current and not acquired then
+			_session, _pending_session_events = attempt.original, attempt.rollback_events
+		end
+		if _session_reset_attempt == attempt then _session_reset_attempt = nil end
+		assert(current, "Metrics session reset lost its original construction owner")
+		if not called then
+			Logger.error(LOG, "Metrics session reset construction raised after capture ownership settled: %s.",
+				ErrorDescription.describe(persisted))
+			error(persisted, 0)
+		end
+		if persisted ~= true then
+			if _flush_state then
+				Logger.info(LOG, "Metrics session reset awaits its SQLite COMMIT and native cleanup acknowledgement.")
+			else
+				Logger.error(LOG, "Metrics session reset persistence was refused; source and live figures remain retained.")
+			end
+			return false
+		end
+	end
+	if has_reset_input() then
+		Logger.info(LOG, "Metrics session reset awaits input admitted during its persistence boundary.")
+		return false
+	end
+	-- A synchronous flush already advances the UI generation. An acknowledged
+	-- asynchronous request instead retires its generation on this final retry.
+	if _flush_generation == generation then _flush_generation = generation + 1 end
+	_session_reset_flush = nil
 	_hold_token = {}
 	if Metrics then Metrics.reset_session() end
-	_app_stats = {}
-	_focused_app_id         = nil
-	_focused_app_started_at = nil
-	_current_title      = nil
-	_title_since        = nil
-	_current_title_app  = nil
-	_flushed_app_totals     = {}
-	_flushed_app_titles     = {}
-	_flushed_app_holds      = {}
-	_flushed_app_ngrams     = {}
-	_flushed_app_scancodes  = {}
-	_flushed_app_sources    = {}
-	_walker_contexts        = {}
-	_typing_last_key_at     = {}
-	_manifest_cache         = { revision = nil, manifest = nil }
-	_pending_typing_events  = {}
-	_pending_hotstring_events = {}
-	_pending_shortcut_events = {}
-	_pending_llm_events = {}
-	_pending_window_switch_events = {}
-	_pending_session_events = {}
-	_pending_system_events = {}
-	_pending_app_switch_events = {}
+	-- App/day accumulators and their COMMIT watermarks are historical data,
+	-- not live session figures. Clearing them also erased pending input and
+	-- made a later flush lose or duplicate what the user had already typed.
+	for _, app in pairs(_app_stats) do
+		app.last_key_at, app.wpm_ring, app.char_window = nil, {}, {}
+	end
+	_typing_last_key_at = {}
 	_live = new_live_tracker()
 	_session = new_session_tracker()
 	_session_started_at = os.time() * 1000
 	return true
 end
+
+--- Performs a synchronous reset step without borrowing another user's request.
+--- @return boolean acknowledged
+function M.reset_session()
+	if _reset_request then return false end
+	return reset_session_step()
+end
+
+--- Owns one user reset through native completion without blocking the loop.
+--- @param complete function Receives success and an opaque completion receipt.
+--- @return boolean accepted Whether this request owns its continuation.
+function M.request_session_reset(complete)
+	if type(complete) ~= "function" then
+		Logger.error(LOG, "Metrics session reset requires a completion callback.")
+		return false
+	end
+	if _reset_request or _session_reset_attempt or _flush_state or _flush_stopping then return false end
+	_reset_request = { complete = complete, origin = _flush_generation }
+	advance_reset_request(true)
+	return true
+end
+
+--- Resolves only this collector's exact completed reset and source generation.
+--- @param receipt table Opaque completion identity, never caller-owned fields.
+--- @param origin_generation number Generation at request admission.
+--- @return number|nil generation Current generation authorized by that receipt.
+--- @return boolean|nil success The acknowledged business outcome.
+function M.reset_receipt_generation(receipt, origin_generation)
+	if type(receipt) ~= "table" or type(origin_generation) ~= "number" then return nil end
+	local record = _reset_receipts[receipt]
+	if not record or record.origin ~= origin_generation or record.generation ~= _flush_generation
+		or _flush_state or _flush_stopping then return nil end
+	return record.generation, record.success
+end
+
 
 
 -- =========================================
