@@ -33,9 +33,9 @@ a sealed Windows updater source, reseal with
 
 Work done on Linux and macOS only; the AHK side is built and run live on the Windows PC.
 
-- [ ] **Hosted Windows unit failures of run 40227776226.** [CODE] `meta`, `config-scope-features`,
-      `hotstrings-shortcuts` have fixes on dev (d22c24a71d..d13ef3f19a, never run); `keymap-gestures` is new
-      (likely the gesture greying, dbc29c5077). `test_hotstrings_scope.ahk:520` (expected 0.5, got 1.0) is
+- [ ] **Hosted Windows unit failures.** [CODE] Run 40235626114 (e2aa642f8c) still fails `meta`,
+      `config-scope-features`, `core` and `keymap-gestures` (likely the gesture greying, dbc29c5077);
+      `hotstrings-shortcuts` passes since the second round of fixes. `test_hotstrings_scope.ahk:520` (expected 0.5, got 1.0) is
       unexplained: print `_HotstringsOverrides["autocorrection"].Sections[family]` after
       `HotstringsOverridesApplyBase()`.
 - [ ] **AI off disarms the AI keys and the agent's manual actions.** [CODE] Done on Linux and macOS
@@ -427,10 +427,10 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 
 ### A. Behaviour that differs without a good reason (fix first)
 
-- [ ] **Tests write the real user config.** [CODE] A Linux or macOS Lua test run as root keeps adding
-      `lua_*_magic_key` group switches to `/root/.config/ergopti/config.toml` (the magic-key catalogue test
-      was fixed in 76716e7; another writer remains). Find it with a scratch HOME diff and make every suite
-      refuse to start when HOME is the real one.
+- [ ] **Tests write the real user config.** [CODE] Fixed (the magic-key catalogue test, and both Lua
+      runners now move a real HOME to a scratch dir, `_shared/lua/test/runner_home.lua`). Left: route
+      `test_keystats.lua` and `test_keystats_system_events.lua` through their own fixtures instead of the
+      runner net; on Lua 5.4 an `io.popen` child still sees the real HOME.
 - [ ] **Retire the orphaned Windows gesture-notice entries.** [CODE] The gesture status submenu and notice
       are gone (dbc29c5077); the `gesture_conflict_dismissed.*` storage entries they wrote stay in user
       state. Remove them in a config migration.
@@ -457,16 +457,9 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       (macOS read 3000 against 2000 ms), Linux holds the key's own side. macOS reads the shared per-key
       thresholds too (8cb8f04); one fallback `default_activation_ms = 200` (macOS was 250). Left: Windows
       still holds a 0.2 literal pinned to it by a gate; check the Karabiner JSON on a Mac.
-- [ ] **PAR-19. Pause and resume of the layout, implement on Windows and Linux (decided).** [CODE]
-      Plan: move the three `layout.*` rows (`pause_switch_enabled`, `on_pause`, `on_resume`) and the two
-      menu frames from hs to all platforms; correct the `on_pause`/`on_resume` type (macOS stores layout id
-      strings, the manifest says boolean); one shared target policy (enabled and a non-empty string; macOS
-      `switch_target` in `menu_keyboard_layout.lua`); Windows: hook a layout step into
-      `Ergopti_OnSuspendEnter`, the resume path and quit in `windows/infra/lifecycle.ahk` through
-      `_LifecycleRunRequiredStep`, switching with `WM_INPUTLANGCHANGEREQUEST` and a picker listing the
-      installed layouts; Linux: an adapter with a fakeable port (gsettings `current` on GNOME, `setxkbmap`
-      on X11) driven from `script_actions.on_pause_change` and quit; shared policy vectors replayed by the
-      three drivers. Strings already exist in 21 locales.
+- [x] **PAR-19. Pause and resume of the layout, implement on Windows and Linux (decided).** [CODE] Done on
+      the three OS (shared `pause_switch_policy.lua` and contract; Linux gsettings and `setxkbmap` adapter;
+      Windows `pause_layout_switch.ahk`). Left: a live check on GNOME, X11 and Windows.
 
 ### B. Missing features on one OS
 
