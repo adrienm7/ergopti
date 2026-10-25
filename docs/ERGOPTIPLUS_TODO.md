@@ -48,6 +48,10 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
       `_LLM_Agent_ManualRefusal` passes `LLM_Menu_AiEnabled()`; `requires_ahk = ["ai:on"]` on the two agent
       actions with the codegen token and the picker greying; tests `test_ai_action_gate.ahk`,
       `test_llm_agent.ahk`, `test_llm_agent_requester.ahk`; reseal.
+- [ ] **One app-category file on the three OS (PAR-34).** [CODE] Windows keeps `app_categories.json` in the
+      metrics dir and accepts legacy flat string values the Lua codec refuses, and it preserves unknown
+      members the codec drops. Align the location (decision pending), the record shape and the score range,
+      and replay `_shared/tests/corpus/metrics/app_category_store_vectors.json` in AHK.
 - [ ] **Release notes in the update-check window (PAR-52).** [CODE] `windows/ui/update_check/init.ahk`:
       seed `state.notes = {body, owner, repo}` in the `available` message (from `UPDATER_LATEST_RELEASE.Body`,
       `UPDATER_GH_OWNER`, `UPDATER_GH_REPO`, as `_Updater_ReleaseNotesSeed`), serve `open_url` in the
@@ -483,10 +487,10 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       manager's transfer flow and the Windows `release_install`/`self_update` path (enforcement `"off"` until
       the maintainer provisions the key: five steps in `docs/tooling/update-signing.md`), then flip it to
       `"required"`.
-- [ ] **PAR-34. Mouse metrics, event families and app-category store on Linux and macOS.** [CODE] Linux
-      writes 4 event tables of 15; the `mouse` column exists with no capture; app categories live in
-      three stores. Capture mouse, write window/system/session tables, one category store. Audit S2,
-      S4, S8.
+- [x] **PAR-34. Mouse metrics, event families and app-category store on Linux and macOS.** [CODE] Done:
+      Linux pointer counters and the window, session and system families (4947f7a445); one
+      `{schema, version, apps}` category file shared by macOS and Linux through
+      `_shared/lua/keystats/app_category_store.lua`, Linux importing its old SQLite rows once (94e7ed0b4a).
 
 ### C. UI-only gaps, reasons and docs
 
