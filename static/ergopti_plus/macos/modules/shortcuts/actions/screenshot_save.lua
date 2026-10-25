@@ -116,7 +116,8 @@ end
 local function screenshot_cleanup_debt(parent)
 	local scope_id = action_parent(parent)
 	for _, operation in pairs(_operations) do
-		if operation.parent == scope_id and operation.authorized ~= true then return true end
+		if operation.parent == scope_id
+			and (operation.authorized ~= true or operation.cleanup_pending == true) then return true end
 	end
 	return false
 end
@@ -126,27 +127,44 @@ local function screenshot_admission_open(parent)
 	return _pause_claims[scope_id] ~= true and not screenshot_cleanup_debt(scope_id)
 end
 
---- Removes the temporary capture file owned by a finished clipboard operation.
+--- Removes the exact temporary pathname without losing a refused cleanup receipt.
 --- @param operation table Screenshot operation.
+--- @return boolean settled
 local function release_capture_file(operation)
 	local path = operation.temp_path
-	if path == nil then return end
-	operation.temp_path = nil
+	if path == nil then return true end
+	operation.cleanup_pending = true
 	local removed_ok, removed, detail = pcall(FileSystem.remove_exact, path)
-	if removed_ok and removed == true then return end
+	if removed_ok and removed == true then
+		operation.temp_path = nil
+		operation.cleanup_pending = false
+		return true
+	end
 	local classify_ok, _, status = pcall(FileSystem.classify_no_follow, path)
-	if classify_ok and status == "absent" then return end
+	if classify_ok and status == "absent" then
+		operation.temp_path = nil
+		operation.cleanup_pending = false
+		return true
+	end
+	operation.authorized = false
 	Logger.error(LOG, "Screenshot capture file '%s' could not be removed: %s.",
 		path, tostring(removed_ok and detail or removed))
+	return false
 end
 
 local function finish_operation(operation)
-	if operation_is_current(operation) and operation.phase == nil
-		and operation.acquisitions == 0 then
-		_operations[operation.id] = nil
-		operation.finished = true
-		release_capture_file(operation)
-	end
+	if not operation_is_current(operation) then return operation.finished == true end
+	if operation.phase ~= nil or operation.acquisitions ~= 0 then return false end
+	-- Cleanup diagnostics can reenter PAUSE. Keep this exact operation and its
+	-- native frame owned until unlink or independent absence has committed.
+	operation.acquisitions = operation.acquisitions + 1
+	local cleanup_ok, settled = xpcall(release_capture_file, debug.traceback, operation)
+	operation.acquisitions = operation.acquisitions - 1
+	if not cleanup_ok then error(settled, 0) end
+	if settled ~= true then return false end
+	_operations[operation.id] = nil
+	operation.finished = true
+	return true
 end
 
 local function create_operation(label, parent)
@@ -162,6 +180,7 @@ local function create_operation(label, parent)
 		acquisitions = 0,
 		phase = nil,
 		finished = false,
+		cleanup_pending = false,
 	}
 	_operations[operation.id] = operation
 	return operation
