@@ -1244,8 +1244,8 @@ _CB_CloseBitmapPublication(&ClipboardOpened, ClipboardMutated, TransferredBitmap
 	}
 }
 
-; True when another process currently holds the clipboard open, i.e. reading or
-; writing it now would contend with that process.
+; True when an earlier caller holds the clipboard open, i.e. reading or
+; writing it now would contend with that native lock.
 ;
 ; OpenClipboard is the only honest test for this: it returns 0 immediately when
 ; someone else owns the handle, it does NOT wait. GetClipboardSequenceNumber
@@ -1256,34 +1256,63 @@ _CB_CloseBitmapPublication(&ClipboardOpened, ClipboardMutated, TransferredBitmap
 ; open would make THIS process the blocker, which is the exact failure the probe
 ; exists to avoid.
 CB_IsBusy() {
-	Opened := 0
-	try Opened := DllCall("User32\OpenClipboard", "Ptr", 0, "Int")
-	catch
+	PreviousCritical := Critical("On")
+	try {
+		; A distinct nonzero HWND refuses a NULL caller's borrowed lock. Keep
+		; the probe's genuine Open/Close pair on the same noninterruptible stack.
+		Opened := CB_TryOpenClipboard(A_ScriptHwnd)
+		if !Opened
+			return true
+		try DllCall("User32\CloseClipboard")
+		return false
+	} catch {
 		return true
-	if !Opened
-		return true
-	try DllCall("User32\CloseClipboard")
-	return false
+	} finally Critical(PreviousCritical)
+}
+
+/**
+ * Try one independent native acquisition without waiting or borrowing a lock.
+ * @param {Integer} Hwnd Nonzero window handle that will own the new lock.
+ * @param {VarRef} Borrowed Receives true when this HWND already owns the lock.
+ * @returns {Boolean} True grants one new Close right; false grants none.
+ */
+CB_TryOpenClipboard(Hwnd, &Borrowed := false) {
+	if !(Hwnd is Integer) || !Hwnd
+		throw ValueError("An independent clipboard lock requires a nonzero HWND.")
+	Borrowed := false
+	PreviousCritical := Critical("On")
+	try {
+		; Windows accepts a same-HWND reopen without nesting the native lock.
+		; Granting another Close right would release the interrupted caller's
+		; lease. That caller cannot finish while this stack waits, so refuse now.
+		if DllCall("User32\GetOpenClipboardWindow", "Ptr") == Hwnd {
+			Borrowed := true
+			return false
+		}
+		return DllCall("User32\OpenClipboard", "Ptr", Hwnd, "Int") != 0
+	} finally Critical(PreviousCritical)
 }
 
 ; Opens the native clipboard lock for Hwnd, waiting up to CB_NATIVE_OPEN_TIMEOUT_MS
 ; while another process holds it. A single attempt loses to the readers that open
 ; the clipboard just after every change, which is exactly when callers need it.
-; @param {Integer} Hwnd The window that will own the lock.
+; @param {Integer} Hwnd Nonzero window handle that will own the new lock.
 ; @param {Func} OnRefused Optional; called once, at the first refused attempt.
-; @returns {Boolean} True once the lock is held; false when the bound expired.
+; @returns {Boolean} True for a new lock; false for a borrowed lock or expired bound.
 CB_OpenClipboardWithin(Hwnd, OnRefused := 0) {
 	global CB_NATIVE_OPEN_TIMEOUT_MS, CB_NATIVE_OPEN_RETRY_MS
 	Started := A_TickCount
 	Refused := false
 	Loop {
-		if DllCall("User32\OpenClipboard", "Ptr", Hwnd, "Int")
+		if CB_TryOpenClipboard(Hwnd, &Borrowed)
 			return true
 		if !Refused {
 			Refused := true
 			if HasMethod(OnRefused, "Call")
 				OnRefused.Call()
 		}
+		if Borrowed
+			return false
 		if TickElapsed(Started) >= CB_NATIVE_OPEN_TIMEOUT_MS
 			return false
 		Sleep(CB_NATIVE_OPEN_RETRY_MS)
