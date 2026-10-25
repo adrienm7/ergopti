@@ -179,7 +179,7 @@ jobs:
 
       - name: Install native integration tools
         run: |
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y lua5.4 lua-luv libxml2-utils
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y lua5.4 lua-luv libxml2-utils luajit sqlite3
 
       - name: Run shared integration suite
         env:
@@ -189,6 +189,14 @@ jobs:
           set -euo pipefail
           test "$SUITE" = js
           npm run test:js -- --feature "$FEATURE"
+
+      # Spans the macOS and the Linux Lua readers against one real SQLite
+      # database, so it belongs to the shared Integration stage rather than to
+      # either driver's lane. It runs once, in the lot that checks the
+      # generators and the cross-driver parity.
+      - name: Verify native cross-driver histogram multiplicity
+        if: steps.common-lot.outputs.feature == 'integration-generators-and-parity'
+        run: python3 tools/test/test-metrics-histogram-native.py
 
       - name: Retain shared integration timings, including interrupted runs
         if: always()

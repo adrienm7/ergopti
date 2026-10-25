@@ -35,8 +35,6 @@ const LinuxE2E = require('./fixtures/linux-e2e-shards.cjs');
 const UNIT_META_ROW = new Set(['Retain the source-bound linux-unit-suite qualification']);
 /** The native integration checks run in the native row of the Integration matrix only. */
 const INTEGRATION_NATIVE_ROW = new Set([
-	'Run manual official runtime and model acceptance',
-	'Upload manual runtime acceptance evidence',
 	'Qualify actual LuaJIT XI2 ABI and property cookies',
 	'Retain actual LuaJIT XI2 diagnostic evidence'
 ]);
@@ -1242,7 +1240,7 @@ exit "$UPDATER_TEST_STATUS"
 // ci-linux.yml writes them: the Lua group in driver, the native checks in native.
 const INTEGRATION_SUBJECTS = {
 	driver: ['integration-driver'],
-	native: ['native-metrics-equivalence', 'native-histogram-multiplicity', 'native-xi2-abi']
+	native: ['native-metrics-equivalence', 'native-xi2-abi']
 };
 assert.deepEqual(
 	Object.values(INTEGRATION_SUBJECTS).flat().sort(),
@@ -2480,7 +2478,10 @@ for (const harness of testLinuxSteps.slice(unitAt + 1, recordAt)) {
 	if (assertRetainedQualification(harness)) continue;
 	assert.strictEqual(
 		pipeline.stepField(harness.body, 'if'),
-		rowCondition(harness.name, '${{ !cancelled() }}'),
+		rowCondition(
+			harness.name,
+			LINUX_E2E_SHARDS.predicates?.[harness.name] ?? '${{ !cancelled() }}'
+		),
 		`e2e-linux step "${harness.name}" must run under !cancelled() in its own matrix row`
 	);
 }

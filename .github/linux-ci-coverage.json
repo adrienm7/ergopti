@@ -18,12 +18,11 @@
 			"shards": ["driver", "native"],
 			"shard_subjects": {
 				"driver": ["integration-driver"],
-				"native": ["native-metrics-equivalence", "native-histogram-multiplicity", "native-xi2-abi"]
+				"native": ["native-metrics-equivalence", "native-xi2-abi"]
 			},
 			"subjects": {
 				"integration-driver": 1,
 				"native-metrics-equivalence": 1,
-				"native-histogram-multiplicity": 1,
 				"native-xi2-abi": 1
 			}
 		},

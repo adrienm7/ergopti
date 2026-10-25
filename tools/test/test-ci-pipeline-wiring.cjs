@@ -245,18 +245,20 @@ const RELEASE_INPUT = `\${{ needs.${ROOT}.outputs.release == 'true' }}`;
 const RELEASE_IF =
 	"github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'";
 const NOT_CANCELLED = '${{ !cancelled() }}';
-// The native checks outside the Lua suite are integration tests: they run once,
-// in the native row of the Linux Integration matrix.
+// The native checks outside the Lua suite that stay in Linux Integration run
+// once, in the native row of its matrix.
 const LINUX_INTEGRATION_NATIVE_ROW = "matrix.group == 'native'";
 const LINUX_INTEGRATION_DRIVER_ROW = "matrix.group == 'driver'";
 // The Windows Integration lot that owns the native cohorts and real install files.
 const WINDOWS_NATIVE_LOT = "matrix.lot == 'Native cohorts and contracts'";
 const SIGNPATH_STABLE_RELEASE =
 	"inputs.release && inputs.prerelease != 'true' && vars.SIGNPATH_PROJECT_SLUG != ''";
+// The manual official runtime acceptance is an E2E step of the network-ai row.
 const MANUAL_RUNTIME_IF =
-	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && " +
-	LINUX_INTEGRATION_NATIVE_ROW +
-	' }}';
+	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && matrix.shard == 'network-ai' }}";
+// The cross-driver histogram check runs once, in one Common Integration lot.
+const COMMON_HISTOGRAM_LOT =
+	"steps.common-lot.outputs.feature == 'integration-generators-and-parity'";
 const MANUAL_RUNTIME_EVIDENCE_IF = MANUAL_RUNTIME_IF;
 const MANUAL_VERDICT_IF = 'always() && !cancelled()';
 const LANE_IF = (os) => `needs.${ROOT}.outputs.lane_${os} == 'true'`;
@@ -642,23 +644,13 @@ const STEP_CONDITIONS = [
 		LINUX_INTEGRATION_NATIVE_ROW
 	],
 	[
-		LINUX_BOX,
-		'integration-linux',
+		COMMON_BOX,
+		'common-integration',
 		'Verify native cross-driver histogram multiplicity',
-		LINUX_INTEGRATION_NATIVE_ROW
+		COMMON_HISTOGRAM_LOT
 	],
-	[
-		LINUX_BOX,
-		'integration-linux',
-		'Run manual official runtime and model acceptance',
-		MANUAL_RUNTIME_IF
-	],
-	[
-		LINUX_BOX,
-		'integration-linux',
-		'Upload manual runtime acceptance evidence',
-		MANUAL_RUNTIME_EVIDENCE_IF
-	],
+	[LINUX_BOX, 'e2e-linux', 'Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
+	[LINUX_BOX, 'e2e-linux', 'Upload manual runtime acceptance evidence', MANUAL_RUNTIME_EVIDENCE_IF],
 	[
 		LINUX_BOX,
 		'integration-linux',
@@ -3093,12 +3085,7 @@ for (const [what, file, from, to] of [
 		pipeline.job('core'),
 		pipeline.job('core').replace('      tag: ${{ needs.validate.outputs.tag }}\n', '')
 	],
-	[
-		'Common caller skips',
-		ENTRY,
-		"    name: 'Common'\n",
-		"    name: 'Common'\n    if: false\n"
-	],
+	['Common caller skips', ENTRY, "    name: 'Common'\n", "    name: 'Common'\n    if: false\n"],
 	[
 		'Common claims caller concurrency',
 		COMMON_BOX,

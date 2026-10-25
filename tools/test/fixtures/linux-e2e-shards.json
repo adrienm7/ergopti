@@ -31,9 +31,7 @@
 			"Install prerequisites for Detect and read the keymap on a real X11 and a real Wayland",
 			"Detect and read the keymap on a real X11 and a real Wayland",
 			"A virtual touchpad, described by the kernel and read back",
-			"A gesture written to uinput comes back as a gesture",
-			"Install prerequisites for AI predictions against a real Ollama",
-			"AI predictions against a real Ollama"
+			"A gesture written to uinput comes back as a gesture"
 		],
 		"desktop-webview": [
 			"Install prerequisites for Launch option-looking application ids through actual GTK desktop entries",
@@ -122,6 +120,10 @@
 			"Qualify native managed HTTP public and retained output",
 			"Qualify native updater archive pipeline",
 			"Qualify archive crypto and bin parent source controls",
+			"Install prerequisites for AI predictions against a real Ollama",
+			"AI predictions against a real Ollama",
+			"Run manual official runtime and model acceptance",
+			"Upload manual runtime acceptance evidence",
 			"Install the model pull window prerequisites",
 			"Successful native model pulls retire stale retries"
 		],
@@ -208,8 +210,7 @@
 			"wayland-display",
 			"touchpad-capability",
 			"gesture-roundtrip",
-			"hotstring-e2e",
-			"ollama-live"
+			"hotstring-e2e"
 		],
 		"desktop-webview": [
 			"tray-symbols",
@@ -237,9 +238,14 @@
 			"archive-source-crypto",
 			"archive-source-bin-parent",
 			"archive-private-snapshot",
-			"connect-terminal-protocol-model"
+			"connect-terminal-protocol-model",
+			"ollama-live"
 		],
 		"platform-metrics": ["native-platform-metrics"]
+	},
+	"predicates": {
+		"Run manual official runtime and model acceptance": "${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}",
+		"Upload manual runtime acceptance evidence": "${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}"
 	},
 	"prerequisites": {
 		"Round-trip real events through the kernel": ["Load the uinput module"],
@@ -253,6 +259,9 @@
 			"Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options"
 		],
 		"Upload live updater diagnostic evidence": ["Update to the newest release and restart"],
+		"Upload manual runtime acceptance evidence": [
+			"Run manual official runtime and model acceptance"
+		],
 		"Qualify native managed HTTP public and retained output": [
 			"Prepare authenticated managed HTTP validation tools"
 		],
