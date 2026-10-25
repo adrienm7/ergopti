@@ -250,17 +250,30 @@ _DriverIsProductionSource(Path) {
 	return !RegExMatch(StrReplace(Path, "\", "/"), "i)/(tests|vendor|build|_generated)/")
 }
 
+; One native census owns the production scope for source consumers. Enumeration
+; failure cannot be represented by a successful empty scan.
+_DriverProductionSourceCensus(Root := unset) {
+	if !IsSet(Root)
+		SplitPath(A_ScriptDir, , &Root)
+	if !(Root is String) || Root == "" || !DirExist(Root)
+		throw ValueError("The production source census requires an existing directory.")
+	Paths := []
+	Loop Files, Root . "\*.ahk", "FR" {
+		if _DriverIsProductionSource(A_LoopFileFullPath)
+			Paths.Push(A_LoopFileFullPath)
+	}
+	if !Paths.Length
+		throw ValueError("The production source census found no authored AHK files.")
+	return { Root: Root, Paths: Paths }
+}
+
 _DriverSourceConcat() {
 	static cache := ""
 	if (cache != "")
 		return cache
-	SplitPath(A_ScriptDir, , &Root)   ; A_ScriptDir = windows/tests  ->  Root = windows
 	Combined := ""
-	Loop Files, Root . "\*.ahk", "FR" {
-		if !_DriverIsProductionSource(A_LoopFileFullPath)
-			continue
-		Combined .= "`n" . FileRead(A_LoopFileFullPath, "UTF-8")
-	}
+	for Path in _DriverProductionSourceCensus().Paths
+		Combined .= "`n" . FileRead(Path, "UTF-8")
 	cache := Combined
 	return cache
 }
