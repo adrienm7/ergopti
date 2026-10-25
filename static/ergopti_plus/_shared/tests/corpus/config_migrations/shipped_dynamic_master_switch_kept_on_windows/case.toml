@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_dynamic_master_switch_kept_on_windows/case.toml
+
+[case]
+description = "A stored category_enabled.dynamichotstrings switch becomes hotstrings.dynamic.enabled with its value; sibling category gates and the families stay put."
+drivers = ["ahk"]
+outcome = "migrated"
+from_version = 12
+to_version = 13

@@ -1,9 +1,12 @@
 # _shared/tests/corpus/config_migrations/shipped_script_chords_kept_on_windows_and_linux/expected.toml
 
 [_meta]
-schema_version = 12
+schema_version = 13
 
 [shortcuts.script_control]
 chords_enabled = false
 return_key = "script_reload"
 script_altgr_delete = "none"
+
+[hotstrings.dynamic]
+enabled = true

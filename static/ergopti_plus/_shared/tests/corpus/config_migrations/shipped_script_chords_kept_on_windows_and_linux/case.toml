@@ -2,7 +2,7 @@
 
 [case]
 description = "The v6 to v7 step renames macOS keys only: Windows and Linux already name the script chords script_altgr_*, and a stray return_key is left for the configuration cleanup."
-drivers = ["ahk", "linux"]
+drivers = ["ahk"]
 outcome = "migrated"
 from_version = 6
-to_version = 12
+to_version = 13

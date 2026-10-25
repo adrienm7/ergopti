@@ -1,0 +1,30 @@
+# Independently authored complete typed destination model.
+owner = "foreign root"
+[_meta]
+schema_version = 13
+
+[hotstrings.autocorrection.caps]
+enabled = true
+time_activation_seconds = 0.875
+future = "retain the legacy unknown leaf"
+
+[hotstrings.autocorrection.names]
+enabled = false
+time_activation_seconds = 0.875
+
+[hotstrings.autocorrection.abbreviations]
+enabled = true
+time_activation_seconds = 0.2
+
+[hotstrings.autocorrection.technical_terms]
+enabled = true
+time_activation_seconds = 0.875
+
+[hotstrings.modules.autocorrection]
+caps = false
+names = true
+abbreviations = false
+technical_terms = false
+
+[[foreign.records]]
+name = "never owned"

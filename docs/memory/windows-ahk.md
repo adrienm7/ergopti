@@ -1053,6 +1053,21 @@ with user intent, count them as migrated (never as rejected), and let the next
 typed save canonicalize them. The 2026-09 legacy 0/1 boolean migration in
 ApplyConfigToml is the reference case.
 
+### project-ahk-a-features-group-can-hold-its-own-switch
+
+`Features["hotstrings"]["dynamic"]` holds the dynamic families as Maps and, since
+the shared master `hotstrings.dynamic.enabled` reached Windows, a scalar
+`enabled` beside them. Three readers treated "a Map carrying `enabled`" as a
+leaf feature: `_FeatureLocateParts` (it located `hotstrings.dynamic.date` as the
+group itself), `_MG_DisableFeatureNode` (it zeroed the switch and returned, so
+the Hotstrings master left every family on) and the dynamic gate in
+`ApplyMasterGatesToFeatures`. They now walk on into a member when the next path
+segment is a nested Map. Action: a new group switch beside nested features
+needs the same rule in any reader that stops at `enabled`. Windows has no
+`category_enabled.dynamichotstrings`: the retired spelling is renamed by the
+v12 to v13 config step, which also writes the master on for a configuration
+without one so live families stay live (its neutral default is off).
+
 ### project-windows-at-rest-store-is-data-sql
 
 Windows persists metrics in `data.sql`; `db.sqlite` is a rebuilt cache, not the

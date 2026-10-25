@@ -76,7 +76,10 @@ MasterGateDesiredTapHold(TapHoldSource) {
 _MG_DisableFeatureNode(Node, Prefix) {
 	if InStr(Prefix, ".") && Node.Has("enabled") {
 		Node["enabled"] := false
-		return
+		; A group switch (hotstrings.dynamic.enabled) sits beside its members and
+		; must not hide them from the walk; a feature's own parameters end it.
+		if !_MG_HasNestedFeature(Node)
+			return
 	}
 	for Key, Value in Node {
 		Path := Prefix . "." . Key
@@ -92,6 +95,15 @@ _MG_DisableFeatureNode(Node, Prefix) {
 		else if Prefix == "shortcuts.personal" && (Value is Integer) && (Value == 0 || Value == 1)
 			Node[Key] := false
 	}
+}
+
+; Whether a Features node holds other features beneath it, not only parameters.
+_MG_HasNestedFeature(Node) {
+	for _, Value in Node {
+		if Value is Map
+			return true
+	}
+	return false
 }
 
 ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDebugFn := 0) {
@@ -125,6 +137,19 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 		; Hotstrings master (includes Personal sub-category).
 		if !CategoryGateFn.Call("Hotstrings") and FeaturesTarget.Has("hotstrings") {
 				_MG_DisableFeatureNode(FeaturesTarget["hotstrings"], "hotstrings")
+		}
+
+		; Dynamic hotstrings master (hotstrings.dynamic.enabled, the one switch the
+		; three drivers share): off, no dynamic family or programmable hotstring
+		; runs, whatever its own switch says. The choices stay on disk.
+		if FeaturesTarget.Has("hotstrings") and FeaturesTarget["hotstrings"].Has("dynamic") {
+				DynamicNode := FeaturesTarget["hotstrings"]["dynamic"]
+				if DynamicNode.Has("enabled") and !DynamicNode["enabled"] {
+						for _DynamicId, DynamicValue in DynamicNode {
+								if (Type(DynamicValue) == "Map" and DynamicValue.Has("enabled"))
+										DynamicValue["enabled"] := false
+						}
+				}
 		}
 
 		; Per-TOML-file hotstring sub-category gates. Independent of the top

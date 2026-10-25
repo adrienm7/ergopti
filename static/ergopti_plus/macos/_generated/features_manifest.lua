@@ -74,7 +74,7 @@ M.features = {
 		path = "hotstrings.enabled", id = "enabled", section = "hotstrings", default = false, type = "boolean", description_key = "menu.hotstrings", platforms = { "hs" }, recommended = true, input_altering = true,
 	},
 	{
-		path = "hotstrings.dynamic.enabled", id = "enabled", section = "hotstrings.dynamic", default = false, type = "boolean", description_key = "menu.hotstrings", platforms = { "hs", "linux" }, recommended = true, input_altering = true,
+		path = "hotstrings.dynamic.enabled", id = "enabled", section = "hotstrings.dynamic", default = false, type = "boolean", description_key = "menu.hotstrings", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true,
 	},
 	{
 		path = "hotstrings.trigger_char", id = "trigger_char", section = "hotstrings", default = "★", type = "string", description_key = "menu.hotstrings.trigger_char", platforms = { "ahk", "hs", "linux" }, recommended = "★", input_altering = false,

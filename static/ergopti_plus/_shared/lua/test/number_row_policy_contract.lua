@@ -211,7 +211,7 @@ function M.run(helpers, corpus_path)
 				return bytes
 			end
 			local registry = assert(Migrate.load_registry(shared .. Migrate.REGISTRY_PATH))
-			helpers.assert_eq(registry.current, 12, "the actual shipped registry includes the common-family migration")
+			helpers.assert_eq(registry.current, 13, "the actual shipped registry includes the dynamic-master migration")
 			local replays = 0
 			for index = 0, 10 do
 				local directory = shared .. "tests/corpus/config_migrations/shipped_number_row_typed_" .. index .. "/"

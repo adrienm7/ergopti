@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_switch_actions_kept_on_windows_and_linux/expected.toml
 
 [_meta]
-schema_version = 12
+schema_version = 13
 
 [gestures]
 enabled = true
@@ -11,3 +11,6 @@ tap_3 = "app_switcher"
 
 [shortcuts.tap_keys]
 number_row_left = "app_switcher"
+
+[hotstrings.dynamic]
+enabled = true

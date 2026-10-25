@@ -74,7 +74,8 @@ _HSCS_WithDynamicBootState(Body) {
 	}
 }
 
-; Dynamic scopes have eight canonical features and no separate category gate.
+; Dynamic scopes have eight canonical families and their master,
+; hotstrings.dynamic.enabled, which the whole-family selection writes with them.
 ; The native submenu applies in-process while the master or pause is off. The
 ; programmable hotstrings keep their own row: a bulk click once switched them on
 ; (2026-10-17, « [hotstrings.dynamic.user_code] enabled = true »).
@@ -111,8 +112,8 @@ _HSCS_DynamicMenuLive(Enabled, Paused := false) {
 		AssertEqual(0, Calls.reload)
 		AssertFalse(CategoryEnabled["Hotstrings"], "the native engine master stays off")
 		AssertTrue(CategoryEnabled["Rolls"], "another category keeps its native gate")
-		AssertEqual(Names.Length, ManifestFeaturesForSection("hotstrings.dynamic").Length,
-			"every current dynamic family belongs to the canonical inventory")
+		AssertEqual(Names.Length + 1, ManifestFeaturesForSection("hotstrings.dynamic").Length,
+			"every current dynamic family and the master belong to the canonical inventory")
 		Parsed := TOML_ParseFreshFile(Fixture.path)
 		for Name in Names {
 			if Name == "user_code"
@@ -124,7 +125,7 @@ _HSCS_DynamicMenuLive(Enabled, Paused := false) {
 		AssertFalse(Parsed["category_enabled"]["hotstrings"])
 		AssertTrue(Parsed["category_enabled"]["rolls"])
 		AssertFalse(Parsed["category_enabled"].Has("dynamichotstrings"), "no additional category gate is written")
-		AssertFalse(Parsed["hotstrings.dynamic"]["enabled"], "an unrelated scalar keeps its stored value")
+		AssertEqual(Enabled, _HSCS_Stored(Parsed, "hotstrings.dynamic"), "the master follows the whole-family selection")
 		AssertTrue(Parsed["hotstrings.dynamic.future_family"]["enabled"], "unrecognized future families stay untouched")
 		AssertEqual(0.75, Parsed["hotstrings.dynamic.date"]["time_activation_seconds"])
 		AssertEqual("retain-dynamic-fixture", Parsed["private"]["credential"])
@@ -239,3 +240,49 @@ Test("hotstring dynamic shared metadata: independent and detached", _HSCS_Dynami
 for _HSCS_MenuVector in JsonParse(FileRead(_SharedDir . "\tests\corpus\dynamic_hotstrings\menu_vectors.json", "UTF-8"))["vectors"]
 	Test("hotstring dynamic shared order: " . _HSCS_MenuVector["id"],
 		_HSCS_DynamicSharedOrder.Bind(JsonParse(FileRead(_SharedDir . "\tests\corpus\dynamic_hotstrings\menu_vectors.json", "UTF-8")), _HSCS_MenuVector))
+
+
+; A family switched on while the dynamic master is off would stay silent: the
+; one write carries the master with it, and switching it off leaves the master.
+_HSCS_DynamicFamilyCarriesMaster(Enable) {
+	Source := '[category_enabled]`nhotstrings = true`n[hotstrings.dynamic]`nenabled = ' . (Enable ? "false" : "true") . '`n'
+		. '[hotstrings.dynamic.date]`nenabled = ' . (Enable ? "false" : "true") . '`n'
+	_HSCS_WithLiveConfig(Source, Map("Hotstrings", true), Check)
+	Check(Fixture, Options, Calls) {
+		global Features
+		AssertTrue(_HS_WriteHotstringFamily("hotstrings.dynamic.date", Enable), "the section's switch is persisted")
+		Parsed := TOML_ParseFreshFile(Fixture.path)
+		AssertEqual(Enable, _HSCS_Stored(Parsed, "hotstrings.dynamic.date"), "the family follows the request")
+		AssertEqual(true, _HSCS_Stored(Parsed, "hotstrings.dynamic"),
+			Enable ? "enabling a family writes the master with it" : "disabling a family leaves the master on")
+		Desired := MasterGateDesiredFeatures(Features)
+		AssertEqual(Enable, Desired["hotstrings"]["dynamic"]["date"]["enabled"] ? true : false, "the desired state follows")
+		AssertEqual(Enable, Features["hotstrings"]["dynamic"]["date"]["enabled"] ? true : false,
+			"the runtime projection follows once the master is on")
+	}
+}
+Test("hotstring dynamic master: enabling a family writes the master (hotstrings-dynamic-master)",
+	_HSCS_WithDynamicBootState.Bind(_HSCS_DynamicFamilyCarriesMaster.Bind(true)))
+Test("hotstring dynamic master: disabling a family keeps the master (hotstrings-dynamic-master)",
+	_HSCS_WithDynamicBootState.Bind(_HSCS_DynamicFamilyCarriesMaster.Bind(false)))
+
+; The master gates the families in the runtime projection and nowhere else: the
+; choices stay in the retained state for when the master returns.
+_HSCS_DynamicMasterGatesProjection() {
+	Candidate := ManifestBuildFeaturesMap()
+	Candidate["hotstrings"]["dynamic"]["enabled"] := false
+	Candidate["hotstrings"]["dynamic"]["date"]["enabled"] := true
+	Candidate["hotstrings"]["dynamic"]["user_code"]["enabled"] := true
+	ApplyMasterGatesToFeatures(Candidate, Map("keys", Map()), (*) => true)
+	AssertFalse(Candidate["hotstrings"]["dynamic"]["date"]["enabled"], "a family is off while the master is off")
+	AssertFalse(Candidate["hotstrings"]["dynamic"]["user_code"]["enabled"], "the programmable hotstrings follow the master")
+	Candidate["hotstrings"]["dynamic"]["enabled"] := true
+	Candidate["hotstrings"]["dynamic"]["date"]["enabled"] := true
+	ApplyMasterGatesToFeatures(Candidate, Map("keys", Map()), (*) => true)
+	AssertTrue(Candidate["hotstrings"]["dynamic"]["date"]["enabled"], "the master on leaves a family as chosen")
+	ApplyMasterGatesToFeatures(Candidate, Map("keys", Map()), (Category) => Category != "Hotstrings")
+	AssertFalse(Candidate["hotstrings"]["dynamic"]["date"]["enabled"], "the Hotstrings master still zeroes every family")
+	AssertFalse(Candidate["hotstrings"]["dynamic"]["enabled"], "and the dynamic master with them")
+}
+Test("hotstring dynamic master: gates the families in the projection (hotstrings-dynamic-master)",
+	_HSCS_DynamicMasterGatesProjection)

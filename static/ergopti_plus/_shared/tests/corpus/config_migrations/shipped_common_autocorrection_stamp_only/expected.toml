@@ -1,5 +1,8 @@
 # Missing old choices must not opt in any new section.
 [_meta]
-schema_version = 12
+schema_version = 13
 [foreign]
 caps = false
+
+[hotstrings.dynamic]
+enabled = true

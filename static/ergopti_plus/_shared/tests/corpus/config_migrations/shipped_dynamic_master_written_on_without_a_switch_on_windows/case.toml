@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_dynamic_master_written_on_without_a_switch_on_windows/case.toml
+
+[case]
+description = "A Windows configuration without any dynamic switch keeps its families live: the new master is written on, because its neutral default is off."
+drivers = ["ahk"]
+outcome = "migrated"
+from_version = 12
+to_version = 13

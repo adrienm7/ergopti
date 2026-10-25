@@ -1,8 +1,11 @@
 [_meta]
-schema_version = 12
+schema_version = 13
 [layout]
 ergopti_variant = "ergopti_plus"
 ergopti_base = false
 ergopti_alt_gr = false
 emulated_layout = ""
 future_owner = "retain"
+
+[hotstrings.dynamic]
+enabled = true

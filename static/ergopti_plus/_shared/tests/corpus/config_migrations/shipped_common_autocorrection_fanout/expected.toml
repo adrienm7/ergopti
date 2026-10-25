@@ -1,7 +1,7 @@
 # Independently authored complete typed destination model.
 owner = "foreign root"
 [_meta]
-schema_version = 12
+schema_version = 13
 
 [hotstrings.autocorrection.caps]
 enabled = true
@@ -28,3 +28,6 @@ technical_terms = false
 
 [[foreign.records]]
 name = "never owned"
+
+[hotstrings.dynamic]
+enabled = true
