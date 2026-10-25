@@ -453,3 +453,87 @@ for _NEC_LegalCase in [
 
 Test("TextSender: NUL refusal without a completion callback remains observable (text-native-nul-admission)",
 	_NEC_NulCannotAcquireOutput.Bind("native", "text", "middle", true, false))
+
+_NEC_CapsWordAdmission(Mode) {
+	global CapsWordEnabled, _TEXT_NATIVE_OWNER, _TEXT_NATIVE_SERIAL
+	AssertFalse(CapsWordAutoOff.Armed is Map, "The output fixture must own an idle CapsWord activation")
+	AssertFalse(IsObject(_TEXT_NATIVE_OWNER), "The output fixture must own an idle native sender")
+	Saved := {Enabled: CapsWordEnabled, Configured: CapsWordAutoOff.Configured,
+		Subscribers: HookDispatcher._subscribers, Critical: A_IsCritical, Suspended: A_IsSuspended,
+		Owner: _TEXT_NATIVE_OWNER, Serial: _TEXT_NATIVE_SERIAL}
+	State := _NEC_Fixture()
+	State.Ends := []
+	Accepted := Mode == "accepted-delimiter" || Mode == "accepted-word"
+	Text := Mode == "accepted-word" ? "word" : "word "
+	try {
+		Critical("Off"), Suspend(false)
+		HookDispatcher._subscribers := Map()
+		Pointer := Map()
+		for Kind in CapsWordAutoOffPointerKinds()
+			Pointer[Kind] := 0
+		Policy := CapsWordAutoOffCompile(Map("idle_timeout_seconds", 0,
+			"terminators", ["space"], "pointer", Pointer), CapsWordAutoOffPointerKinds(), &Reason)
+		AssertTrue(Policy is Map, "The actual CapsWord policy must compile: " . Reason)
+		CapsWordAutoOff.Configured := Policy
+		CapsWordEnabled := true
+		AssertTrue(CapsWordAutoOffArm(_CWAOO_End.Bind(State, "output")))
+		if Mode == "missing-evidence"
+			State.Opts.Delete("deleted_text")
+		else if Mode == "mismatched-evidence"
+			State.Opts["deleted_text"] := "x"
+		else if Mode == "unowned-evidence"
+			State.Opts["erase_before"] := 0
+		else if Mode == "busy"
+			_TEXT_NATIVE_OWNER := {Token: "existing"}
+		else if Mode == "focus-refused"
+			State.Opts["native_port"]["focus"] := _Refuse
+		else if Mode == "schedule-refused"
+			State.Opts["native_port"]["schedule"] := _Refuse
+		else
+			AssertTrue(Accepted, "The fixture mode must be explicit")
+		TextSend(Text, State.Opts, State.Complete)
+		if !Accepted {
+			AssertEqual(1, State.Callbacks, "The actual native admission must refuse synchronously")
+			AssertFalse(State.Ok, "A refused native request must report failure")
+			AssertTrue(State.Message != "", "A refused request must retain a concrete failure")
+			AssertEqual("callback", _TSCS_Join(State.Trace), "Refusal must perform no preparation, native begin, journal or commit")
+			_TestPrint("# native-refusal-capsword mode=" . Mode . " callback_ok=" . State.Ok
+				. " native_effects=" . _TSCS_Join(State.Trace) . " capsword=" . CapsWordEnabled . " ends=" . State.Ends.Length)
+			AssertTrue(CapsWordEnabled, "A request that never queued output must leave CapsWord active")
+			AssertEqual(0, State.Ends.Length, "A native refusal must not report an output delimiter")
+			AssertTrue(CapsWordAutoOff.Armed == Policy, "The actual armed policy remains owned")
+			if Mode == "busy"
+				AssertEqual("existing", _TEXT_NATIVE_OWNER.Token, "Refusal must retain the prior output owner")
+			else
+				AssertFalse(IsObject(_TEXT_NATIVE_OWNER), "Refused admission must leave no output owner")
+		} else {
+			AssertEqual(0, State.Callbacks, "A real queued request is still pending")
+			AssertTrue(IsObject(_TEXT_NATIVE_OWNER), "The accepted request must acquire its actual native owner")
+			AssertEqual(Mode == "accepted-word", CapsWordEnabled, "Queued output keeps the existing delimiter policy")
+			AssertEqual(Mode == "accepted-word" ? 0 : 1, State.Ends.Length)
+			State.Scheduled.Call()
+			State.Phase := 2
+			State.Scheduled.Call()
+			State.Phase := 4
+			State.Scheduled.Call()
+			AssertEqual(1, State.Callbacks)
+			AssertTrue(State.Ok, "The accepted control must settle successfully")
+			AssertFalse(IsObject(_TEXT_NATIVE_OWNER), "The accepted control must retire its native owner")
+			AssertEqual(Mode == "accepted-word" ? 0 : 1, State.Ends.Length, "Completion must not duplicate the output delimiter")
+		}
+	} finally {
+		CapsWordAutoOffDisarm()
+		HookDispatcher._subscribers := Saved.Subscribers
+		CapsWordEnabled := Saved.Enabled, CapsWordAutoOff.Configured := Saved.Configured
+		_TEXT_NATIVE_OWNER := Saved.Owner, _TEXT_NATIVE_SERIAL := Saved.Serial
+		Suspend(Saved.Suspended), Critical(Saved.Critical)
+	}
+	_Refuse(*) {
+		throw Error("Recorded native admission refusal")
+	}
+}
+
+for _NEC_CapsWordMode in ["missing-evidence", "mismatched-evidence", "unowned-evidence", "busy",
+	"focus-refused", "schedule-refused", "accepted-delimiter", "accepted-word"]
+	Test("TextSend native CapsWord: " . _NEC_CapsWordMode . " respects queue admission (native-refusal-capsword)",
+		_NEC_CapsWordAdmission.Bind(_NEC_CapsWordMode))
