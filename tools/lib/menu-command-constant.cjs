@@ -19,6 +19,7 @@ const ConfigKeysCodegen = require('../codegen/codegen-config-keys.cjs');
 const COMMAND_CONSTANTS = new Map(
 	ConfigKeysCodegen.collect().COMMAND.map(([name, id]) => [id, name])
 );
+const COMMAND_IDS = new Map(ConfigKeysCodegen.collect().COMMAND);
 const COMMAND_TABLE = { '.lua': 'COMMAND', '.ahk': 'MenuCommand' };
 
 /**
@@ -34,4 +35,16 @@ function namesCommandConstant(source, id, extension) {
 	return new RegExp(`\\b${COMMAND_TABLE[extension]}\\.${name}\\b`).test(source);
 }
 
-module.exports = { namesCommandConstant };
+/**
+ * Menu command id behind a `COMMAND.X` / `MenuCommand.X` reference, or undefined.
+ * @param {string} extension Driver source extension (".lua" or ".ahk").
+ * @param {string} table Identifier written before the dot.
+ * @param {string} name Constant name written after the dot.
+ * @returns {string|undefined}
+ */
+function commandConstantId(extension, table, name) {
+	if (COMMAND_TABLE[extension] !== table) return undefined;
+	return COMMAND_IDS.get(name);
+}
+
+module.exports = { namesCommandConstant, commandConstantId };
