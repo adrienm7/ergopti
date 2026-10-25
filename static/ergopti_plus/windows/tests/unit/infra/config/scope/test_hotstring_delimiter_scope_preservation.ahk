@@ -30,7 +30,7 @@ _HotstringsScopeShippedDelimiters() {
 			Fixture.options["stamp"] := "shipped-delimiters-" . Mode
 			Receipt := HotstringsScopeApply(Mode, Fixture.options)
 			AssertEqual("pending", Receipt["status"])
-			Config := TOML_ParseFreshFile(Fixture.path)
+			Config := TOML_ParseFreshFileTyped(Fixture.path)
 			AssertFalse(_HSDP_Has(Config, "hotstrings.terminator_states", "space"), "a shipped state is deleted")
 			AssertFalse(_HSDP_Has(Config, "hotstrings.terminator_states", "slash"), "a shipped state is deleted")
 			AssertFalse(_HSDP_Has(Config, "hotstrings.terminator_consume", "comma"), "a shipped consumption is deleted")
@@ -68,8 +68,9 @@ _HotstringsScopeDelimiterRowsList() {
 			AssertEqual(1, Row.Delete, "every row deletes")
 			Seen.Push(Row.Section . "/" . Row.Key)
 		}
-		AssertEqual(["hotstrings.terminator_states/slash", "hotstrings.terminator_states/space",
-			"hotstrings.terminator_consume/star"], Seen,
+		; AssertEqual compares by identity, which two distinct Arrays never share.
+		AssertEqual("hotstrings.terminator_states/slash,hotstrings.terminator_states/space,"
+			. "hotstrings.terminator_consume/star", ArrayJoin(Seen, ","),
 			"only the shipped keys, states first, each table in key order")
 		AssertEqual(0, _HotstringsScopeDelimiterRows(Fixture.directory . "\absent.toml").Length,
 			"no configuration holds no leaf")
