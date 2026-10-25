@@ -40,7 +40,7 @@ class _UIPO_Fixture {
 			}
 		}
 	}
-	Admit(Observer, Image) {
+	Admit(Observer, Image, Acquire := true, WriteImage := true) {
 		global UPDATER_REQUEST_ORIGIN_MANUAL, _UpdaterDownloadRequest, _UpdaterDownloadInProgress
 		global _UpdaterInstallObserver, _UpdaterInstallObserverEpoch
 		Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
@@ -55,6 +55,11 @@ class _UIPO_Fixture {
 		AssertTrue(_UpdaterDownloadInProgress && _UpdaterDownloadRequest == Request)
 		AssertTrue(_Updater_SelfUpdateEpochIsCurrent(Outcome.Epoch))
 		AssertTrue(_Updater_RegisterDownloadArtifacts(Outcome.Epoch, this.NewExe, this.SwapPath))
+		if Acquire
+			AssertTrue(_Updater_AcquireStagingArtifacts(Outcome.Epoch) is _UpdaterStagedArtifactRetirement,
+				"the real parent owns exclusive staged files before any worker can exist")
+		if !WriteImage
+			return {Admission: Admission, Request: Request, Epoch: Outcome.Epoch}
 		AssertEqual(1, FSWriteDurable(this.NewExe, Image))
 		AssertEqual(1, FSWriteDurable(this.SwapPath, Image . "-swap"))
 		return {Admission: Admission, Request: Request, Epoch: Outcome.Epoch}
@@ -107,6 +112,7 @@ class _UIPO_Fixture {
 		Worker := _UIPO_QuiescentWorker()
 		Capture.Attach(Worker)
 		_UpdaterDownloadArtifacts.CurlCapture := Capture
+		_UpdaterDownloadArtifacts.StagingRetirement.Capture := Capture
 		Artifacts := _UpdaterDownloadArtifacts
 		Blocker := 0
 		Moved := this.NewExe . ".original"
@@ -171,16 +177,98 @@ class _UIPO_Fixture {
 			AssertTrue(_Updater_RetireCurlCapture(Retirement), "fixture native handles must retire even after an assertion failure")
 		}
 	}
+	OnAllocationCancel(*) {
+		try AssertTrue(_Updater_CancelSelfUpdateTransaction(
+			"Install phase fixture: cancelled at native allocation admission.", false, false, this.AllocationEpoch))
+		catch Any as Failure
+			this.Error := Failure
+		finally this.Done := true
+	}
+	ExerciseAllocationAdmission() {
+		global _UpdaterDownloadArtifacts, _UpdaterCurlCaptureRetry
+		Old := this.Admit(this.OldFn, "", false, false)
+		this.AllocationEpoch := Old.Epoch
+		this.AllocationTimer := ObjBindMethod(this, "OnAllocationCancel")
+		Owner := _UIPO_AllocationAdmissionBoundary(_UpdaterDownloadArtifacts, this)
+		_UpdaterDownloadArtifacts.StagingRetirement := Owner
+		try {
+			Owner.AcquireExclusive()
+			Started := A_TickCount
+			while !this.Done && TickElapsed(Started) < 2000
+				Sleep(10)
+			AssertTrue(this.Done, "a genuine cancellation timer must cross allocation admission")
+			if IsObject(this.Error)
+				throw this.Error
+			if HasMethod(_UpdaterCurlCaptureRetry, "Call")
+				SetTimer(_UpdaterCurlCaptureRetry, 0)
+			_UpdaterCurlCaptureRetry := 0
+			AssertTrue(_Updater_RetryCurlCaptureDebt())
+			AssertTrue(Owner.Retired)
+			AssertFalse(FileExist(this.NewExe) || FileExist(this.SwapPath), "cancelled allocation cannot orphan actual staged files")
+			for Name, Entry in Owner.Files
+				AssertEqual(0, Entry["handle"], "every native creation remains owned through the real cancellation")
+		} finally {
+			SetTimer(this.AllocationTimer, 0)
+			; The broken admission can retire an empty owner, then allocate new
+			; real handles. Reopen only this fixture's exact ledger for cleanup;
+			; the physical orphan assertions above remain the verdict.
+			for Name, Entry in Owner.Files
+				if Entry["handle"]
+					Owner.Retired := false
+			AssertTrue(_Updater_RetireCurlCapture(Owner), "the fixture closes every actual native handle even on its negative control")
+		}
+	}
+	ExerciseInvalidStagingMetadata() {
+		global _UpdaterDownloadArtifacts, _UpdaterDownloadInProgress
+		Old := this.Admit(this.OldFn, "foreign initial bytes", false)
+		Artifacts := _UpdaterDownloadArtifacts
+		_Updater_StartStagingWorker("https://example.invalid/refused.exe", "", this.NewExe, this.SwapPath,
+			this.Root . "\current.exe", "v1.0.0", Old.Epoch, 0, Old.Request, , 0)
+		AssertFalse(_UpdaterDownloadInProgress, "invalid authenticated metadata must settle the real reservation")
+		AssertFalse(Artifacts.HasOwnProp("StagingRetirement"), "invalid metadata refuses before any native file acquisition")
+		AssertEqual("foreign initial bytes", FileRead(this.NewExe, "UTF-8"))
+		AssertEqual("foreign initial bytes-swap", FileRead(this.SwapPath, "UTF-8"))
+	}
+	ExerciseExclusiveCollision() {
+		global _UpdaterDownloadArtifacts, UPDATER_REQUEST_ORIGIN_MANUAL
+		ForeignPath := this.Mode == "artifact-create-new-collision" ? this.NewExe : this.SwapPath
+		AssertTrue(FSWriteCreateDurable(ForeignPath, "independent collision bytes"))
+		Old := this.Admit(this.OldFn, "", false, false)
+		AssertFalse(IsObject(_Updater_AcquireStagingArtifacts(Old.Epoch)), "CREATE_NEW must refuse preexisting native identity")
+		Owner := _UpdaterDownloadArtifacts.StagingRetirement
+		AssertTrue(Owner.ExclusiveAllocated, "the failed allocation retains its own partial custody")
+		AssertEqual(this.Mode == "artifact-create-new-collision" ? 0 : 1, Owner.Files.Count,
+			"only successful native creations enter the exact cleanup ledger")
+		AssertTrue(_Updater_EndDownloadTransaction(Old.Epoch))
+		AssertTrue(Owner.Retired, "failed parent allocation must acknowledge all partial native cleanup")
+		AssertEqual("independent collision bytes", FileRead(ForeignPath, "UTF-8"))
+		if ForeignPath != this.NewExe
+			AssertFalse(FileExist(this.NewExe), "the genuinely created partial executable must retire")
+		Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+		After := _Updater_TryReserveDownloadTransaction(Request, false)
+		AssertTrue(After.Reserved, "a closed partial allocation cannot strand successor admission")
+		this.OwnedEpoch := After.Epoch
+	}
+	ExerciseUnacquiredCancellation() {
+		AssertTrue(FSWriteCreateDurable(this.NewExe, "preexisting foreign bytes"))
+		AssertTrue(FSWriteCreateDurable(this.SwapPath, "preexisting foreign bytes-swap"))
+		Old := this.Admit(this.OldFn, "", false, false)
+		AssertTrue(_Updater_CancelSelfUpdateTransaction(
+			"Install phase fixture: cancelled before worker acquisition.", false, false, Old.Epoch))
+		AssertEqual("preexisting foreign bytes", FileRead(this.NewExe, "UTF-8"),
+			"registration alone cannot authorize deletion of an existing executable")
+		AssertEqual("preexisting foreign bytes-swap", FileRead(this.SwapPath, "UTF-8"))
+	}
 	ExerciseStagingCloseDebt() {
 		global _UpdaterDownloadArtifacts
-		this.Admit(this.OldFn, "original")
+		this.Admit(this.OldFn, "", false, false)
 		Owner := _UIPO_StagingCloseRefusal(_UpdaterDownloadArtifacts)
 		try {
-			AssertFalse(Owner.Adopt(), "a retained native lease cannot authorize staged handoff")
+			AssertFalse(Owner.AcquireExclusive(), "a retained native lease cannot authorize staged handoff")
 			AssertEqual(1, Owner.ProbeCloseDebt.Length)
 			AssertTrue(Owner.Snapshot(Owner.ProbeCloseDebt[1]) is Map,
 				"the injected refusal must retain an actual open native directory reference")
-			AssertFalse(Owner.Adopt(), "repeated adoption cannot bypass the retained close debt")
+			AssertFalse(Owner.Validate(), "validation cannot bypass the retained close debt")
 		} finally {
 			for Handle in Owner.ProbeCloseDebt
 				AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int"))
@@ -190,7 +278,7 @@ class _UIPO_Fixture {
 	}
 	ExerciseRejectedStaging() {
 		global _UpdaterDownloadArtifacts
-		Old := this.Admit(this.OldFn, "foreign existing bytes")
+		Old := this.Admit(this.OldFn, "foreign existing bytes", false)
 		Artifacts := _UpdaterDownloadArtifacts
 		_Updater_PollDownloadAsync(1, "refused before acquiring files", "", this.SwapPath,
 			this.NewExe, this.Root . "\current.exe", "v1.0.0", Old.Epoch)
@@ -221,6 +309,7 @@ class _UIPO_Fixture {
 		Worker := _UIPO_RetirementWorker(this)
 		Capture := _UpdaterCurlCaptureLedger()
 		_UpdaterDownloadArtifacts.CurlCapture := Capture
+		_UpdaterDownloadArtifacts.StagingRetirement.Capture := Capture
 		Capture.Acquire(this.Root)
 		Capture.Attach(Worker)
 		_UpdaterDownloadWorker := Worker
@@ -254,6 +343,14 @@ class _UIPO_Fixture {
 		global _UpdaterInstallObserver, _UpdaterInstallObserverEpoch
 		global _UpdaterDownloadInProgress, _UpdaterDownloadRequest, _UpdaterDownloadArtifacts
 		global _UpdaterDownloadWorker, _UpdaterSwapOwner, _UpdaterSwapTransactionCounter
+		if this.Mode == "artifact-allocation-admission"
+			return this.ExerciseAllocationAdmission()
+		if this.Mode == "artifact-invalid-metadata"
+			return this.ExerciseInvalidStagingMetadata()
+		if this.Mode == "artifact-create-new-collision" || this.Mode == "artifact-create-swap-collision"
+			return this.ExerciseExclusiveCollision()
+		if this.Mode == "artifact-unacquired-cancel"
+			return this.ExerciseUnacquiredCancellation()
 		if this.Mode == "artifact-close-debt"
 			return this.ExerciseStagingCloseDebt()
 		if this.Mode == "artifact-rejected-collision"
@@ -368,6 +465,31 @@ class _UIPO_RetirementWorker {
 
 ; The child has already exited on these terminal paths; the actual file and
 ; directory handles below still determine whether retirement can complete.
+class _UIPO_AllocationAdmissionBoundary extends _UpdaterStagedArtifactRetirement {
+	__New(Artifacts, Fixture) {
+		super.__New(Artifacts)
+		this.Fixture := Fixture
+		this.Armed := true
+	}
+	Retired {
+		get {
+			Captured := this.StoredRetired
+			if this.HasOwnProp("Armed") && this.Armed {
+				this.Armed := false
+				SetTimer(this.Fixture.AllocationTimer, -1)
+				if !A_IsCritical {
+					Started := A_TickCount
+					while !this.Fixture.Done && TickElapsed(Started) < 2000
+						Sleep(10)
+					AssertTrue(this.Fixture.Done, "the unprotected guard must yield to an actual cancellation")
+				}
+			}
+			return Captured
+		}
+		set => this.StoredRetired := value
+	}
+}
+
 class _UIPO_StagingCloseRefusal extends _UpdaterStagedArtifactRetirement {
 	CloseProbe(Handle) {
 		if !this.HasOwnProp("Refused") {
@@ -501,3 +623,69 @@ Test("Updater staging: a refused writer cannot delete preexisting paths (updater
 
 Test("Updater staging: native close debt cannot authorize handoff (updater-staging-close-debt)",
 	_UIPO_Case.Bind("artifact-close-debt"))
+
+Test("Updater staging: cancellation cannot delete unacquired paths (updater-staging-cancel-custody)",
+	_UIPO_Case.Bind("artifact-unacquired-cancel"))
+
+for _UIPO_CollisionMode in ["artifact-create-new-collision", "artifact-create-swap-collision"]
+	Test("Updater staging: " . _UIPO_CollisionMode . " preserves foreign native custody (updater-staging-cancel-custody)",
+		_UIPO_Case.Bind(_UIPO_CollisionMode))
+
+_UIPO_RunNativeStreamControl(Owner, Mode) {
+	global _VendorDir
+	Args := [_Updater_PowerShellPath(), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+		"-File", A_ScriptDir . "\fixtures\updater_staged_custody.ps1", "-Module", _VendorDir . "\ergopti_updater_download.ps1",
+		"-Path", Owner.Files["NewExe"]["path"], "-ExpectedIdentity", Owner.Identity(Owner.Files["NewExe"]),
+		"-ExpectedDirectoryIdentity", Owner.Identity(Owner.Directory), "-Mode", Mode]
+	Command := ""
+	for Arg in Args
+		Command .= (Command == "" ? "" : " ") . _Updater_QuoteCreateProcessArg(Arg)
+	AssertEqual(0, RunWait(Command, , "Hide"), "the actual Windows PowerShell child must prove " . Mode . " custody")
+}
+
+_UIPO_NativeStreamCustody() {
+	Root := RTrim(_SR_AcquireCaptureDirectory(), "\")
+	Artifacts := {NewExe: Root . "\new.exe", SwapScript: Root . "\swap.ps1"}
+	Owner := _UpdaterStagedArtifactRetirement(Artifacts)
+	Moved := Artifacts.NewExe . ".original"
+	try {
+		AssertTrue(Owner.AcquireExclusive())
+		_UIPO_RunNativeStreamControl(Owner, "accept")
+		_UIPO_RunNativeStreamControl(Owner, "nonempty")
+		AssertTrue(DllCall("kernel32\MoveFileW", "Str", Artifacts.NewExe, "Str", Moved, "Int"))
+		AssertTrue(FSWriteCreateDurable(Artifacts.NewExe, ""))
+		_UIPO_RunNativeStreamControl(Owner, "foreign")
+		AssertEqual("abc", FileRead(Moved, "UTF-8"))
+		AssertEqual("", FileRead(Artifacts.NewExe, "UTF-8"), "an independently created empty replacement must remain untouched")
+	} finally {
+		if FileExist(Moved) {
+			if FileExist(Artifacts.NewExe)
+				FileDelete(Artifacts.NewExe)
+			AssertTrue(DllCall("kernel32\MoveFileW", "Str", Moved, "Str", Artifacts.NewExe, "Int"))
+		}
+		AssertTrue(Owner.Retire(), "actual parent references must close after every child control")
+		DirDelete(Root, false)
+	}
+}
+
+Test("Updater staging: actual child streams enforce parent identities and preserve refused bytes (updater-staging-native-custody)",
+	_UIPO_NativeStreamCustody)
+
+Test("Updater staging: invalid authenticated metadata refuses before file allocation (updater-staging-invalid-custody)",
+	_UIPO_Case.Bind("artifact-invalid-metadata"))
+
+_UIPO_StagedDirectoryDebtReceipt() {
+	Envelope := '{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{},'
+		. '"cleanup_debt":[{"resource":"staging_directory","receipt":{"backend":"dotnet","stage":"file_create","failure_provenance":"unknown"}}]}'
+	Debt := _Updater_ParseStagingFailure(Envelope)
+	AssertTrue(Debt["valid"], "the new physical directory lease must retain its cleanup receipt")
+	AssertEqual(1, Debt["cleanup_debt"].Length)
+	AssertEqual("staging_directory", Debt["cleanup_debt"][1]["resource"])
+	Refused := _Updater_ParseStagingFailure(StrReplace(Envelope, '"staging_directory"', '"STAGING_DIRECTORY"'))
+	AssertFalse(Refused["valid"], "the resource admission remains closed and case-sensitive")
+}
+Test("Updater staging: parent directory cleanup debt retains its bounded receipt (updater-staging-directory-debt)",
+	_UIPO_StagedDirectoryDebtReceipt)
+
+Test("Updater staging: native allocation admission retains cancellation debt (updater-staging-allocation-admission)",
+	_UIPO_Case.Bind("artifact-allocation-admission"))

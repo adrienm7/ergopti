@@ -276,21 +276,46 @@ class _UpdaterStagedArtifactRetirement extends _UpdaterCurlCaptureLedger {
 		for Name in ["NewExe", "SwapScript"]
 			if Artifacts.HasOwnProp(Name) && Artifacts.%Name% != ""
 				this.Paths[Name] := Artifacts.%Name%
-		this.Adopted := false
+		this.ExclusiveAllocated := false
 	}
-	Adopt() {
-		if this.Retired || this.Acquiring || this.ProbeCloseDebt.Length
-			return false
-		if this.Adopted
-			return true
-		this.Acquiring := true
+	AcquireExclusive() {
+		PreviousCritical := Critical("On")
 		try {
-			Adopted := this.AdoptPrivate()
-			return Adopted && !this.ProbeCloseDebt.Length
+			if this.Retired || this.Acquiring || this.ExclusiveAllocated || this.ProbeCloseDebt.Length
+				return false
+			; This admission must precede retirement as one RAM transaction.
+			; Native allocation below remains interruptible and retains debt.
+			this.Acquiring := true
+			this.ExclusiveAllocated := true
+		} finally Critical(PreviousCritical)
+		try {
+			Acquired := this.AllocatePrivate()
+			return Acquired && !this.ProbeCloseDebt.Length
+		} finally {
+			this.Acquiring := false
 		}
-		finally this.Acquiring := false
 	}
-	AdoptPrivate() {
+	Identity(Entry) {
+		Native := this.Snapshot(Entry["handle"])
+		if !Native.Get("ok", false) || Native["delete_pending"]
+			throw Error("Staged native identity was refused.")
+		return Format("{:08x}:{:08x}{:08x}", Native["volume"], Native["index_high"], Native["index_low"])
+	}
+	Validate() {
+		if this.Retired || this.Acquiring || !this.ExclusiveAllocated || this.ProbeCloseDebt.Length
+			return false
+		try return this.ValidatePaths()
+		catch {
+			; The inherited native close records its exact live reference before
+			; throwing. That debt refuses READY without losing the terminal owner.
+			if !this.ProbeCloseDebt.Length
+				throw
+			return false
+		}
+	}
+	AllocatePrivate() {
+		if this.Paths.Count != 2
+			return false
 		Parent := ""
 		for Name, Path in this.Paths {
 			if !FSPathIsAdmissible(Path)
@@ -300,19 +325,12 @@ class _UpdaterStagedArtifactRetirement extends _UpdaterCurlCaptureLedger {
 				return false
 			Parent := Directory
 		}
-		if Parent == "" {
-			this.Adopted := true
-			return true
-		}
+		if Parent == ""
+			return false
 		if !(this.Directory is Map) {
 			Handle := this.Open(Parent, 0, 3, true)
-			NativeError := A_LastError
-			if !Handle {
-				if NativeError != 2 && NativeError != 3
-					return false
-				this.Adopted := true
-				return true
-			}
+			if !Handle
+				return false
 			this.Directory := Map("path", Parent, "handle", Handle, "directory", true)
 		}
 		Lease := this.AcquireDirectoryLease()
@@ -320,18 +338,11 @@ class _UpdaterStagedArtifactRetirement extends _UpdaterCurlCaptureLedger {
 			return false
 		try {
 			for Name, Path in this.Paths {
-				if this.Files.Has(Name)
-					continue
-				Handle := this.Open(Path, 0, 3, false)
-				NativeError := A_LastError
-				if !Handle {
-					if NativeError == 2 || NativeError == 3
-						continue
+				Handle := this.Open(Path, 0, 1, false)
+				if !Handle
 					return false
-				}
 				this.Files[Name] := Map("path", Path, "handle", Handle, "directory", false)
 			}
-			this.Adopted := true
 			return true
 		} finally this.CloseProbe(Lease)
 	}
@@ -342,17 +353,15 @@ class _UpdaterStagedArtifactRetirement extends _UpdaterCurlCaptureLedger {
 			return false
 		this.Running := true
 		try {
-			; Snapshot staged identities as soon as the exact producer has
-			; quiesced, before an unrelated capture reader can defer deletion.
-			; Otherwise a later retry could adopt a replacement at the old path.
+			; Staged identities were exclusively created by this parent.
+			; Retirement waits for the producer before touching those files;
+			; a delayed retry never acquires authority over a replacement.
 			if this.Capture is _UpdaterCurlCaptureLedger {
 				if this.Capture.Running || this.Capture.Acquiring
 					return false
 				if IsObject(this.Capture.Worker) && !this.Capture.Worker.terminate()
 					return false
 			}
-			if !this.Adopted && !this.Adopt()
-				return false
 			if this.Capture is _UpdaterCurlCaptureLedger && !this.Capture.Retire()
 				return false
 			if this.ProbeCloseDebt.Length
@@ -376,5 +385,25 @@ class _UpdaterStagedArtifactRetirement extends _UpdaterCurlCaptureLedger {
 			this.Retired := true
 			return true
 		} finally this.Running := false
+	}
+}
+
+_Updater_BindStagedArtifactTransport(Transport, Owner) {
+	if !(Owner is _UpdaterStagedArtifactRetirement) || !Owner.ExclusiveAllocated || !Owner.ValidatePaths()
+		|| Type(Transport) != "Object" || !Transport.HasOwnProp("Environment")
+		|| !(Transport.Environment is Array) || Transport.Environment.Length == 0
+		|| !Transport.HasOwnProp("Prefix") || Transport.Environment[1].Name != Transport.Prefix . "_URL"
+		throw Error("Parent-owned staged artifact transport was refused.")
+	for Pair in Transport.Environment
+		if Pair.Name == Transport.Prefix . "_STAGING_DIRECTORY_ID"
+			throw Error("Staged artifact transport has already been initialized.")
+	Pairs := [
+		{Name: Transport.Prefix . "_STAGING_DIRECTORY_ID", Value: Owner.Identity(Owner.Directory)},
+		{Name: Transport.Prefix . "_STAGED_EXECUTABLE_ID", Value: Owner.Identity(Owner.Files["NewExe"])},
+		{Name: Transport.Prefix . "_SWAP_WORKER_ID", Value: Owner.Identity(Owner.Files["SwapScript"])}
+	]
+	for Pair in Pairs {
+		Transport.Environment.Push(Pair)
+		EnvSet(Pair.Name, Pair.Value)
 	}
 }
