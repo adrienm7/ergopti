@@ -919,6 +919,23 @@ const STEP_CONDITIONS = [
 		'${{ !cancelled() && matrix.distro }}'
 	],
 	[LINUX_BOX, 'test-linux', 'Record mandatory distro unit evidence', 'matrix.distro'],
+	// The Integration matrix has the same two kinds: the host rows (driver,
+	// native) on Ubuntu, and the integration group on each distribution.
+	[LINUX_BOX, 'integration-linux', 'Install LuaJIT and native event dependencies', 'matrix.group'],
+	[
+		LINUX_BOX,
+		'integration-linux',
+		"The integration group on this distribution's LuaJIT",
+		'matrix.distro'
+	],
+	[
+		LINUX_BOX,
+		'integration-linux',
+		'Upload the native distro integration log',
+		'${{ !cancelled() && matrix.distro }}'
+	],
+	[LINUX_BOX, 'integration-linux', 'Record mandatory distro integration evidence', 'matrix.distro'],
+	[LINUX_BOX, 'integration-linux', 'Record mandatory integration evidence', 'matrix.group'],
 	[
 		LINUX_BOX,
 		'install-linux',
@@ -6631,11 +6648,35 @@ assert.ok(
 	'native XCTest before Sparkle tool installation must refuse'
 );
 
-// The distribution rows of the Unit stage start a container of the archive
-// lot's image and preparation (run-linux-distro-unit.sh), where the helper
-// creates the ordinary user, copies the checkout and runs the whole suite.
-const DISTRO_UNIT_COMMAND =
-	'bash "$GITHUB_WORKSPACE/tools/test/run-linux-distro-unit.sh" "$LINUX_UNIT_DISTRO"';
+// The distribution rows of the Unit and Integration stages start a container
+// of the archive lot's image and preparation (run-linux-distro-unit.sh), where
+// the helper creates the ordinary user, copies the checkout and runs one suite
+// of module groups: every group but integration in the Unit stage, the
+// integration group alone in the Integration stage. One diagnostic,
+// linux_distro_suite_diagnostic.py, reads both rows' logs.
+const DISTRO_SUITE_ROWS = Object.freeze([
+	Object.freeze({
+		job: 'test-linux',
+		step: "The unit suite on this distribution's LuaJIT",
+		id: 'distro_unit',
+		distro: '$LINUX_UNIT_DISTRO',
+		suite: 'unit',
+		logs: 'linux-distro-unit-logs'
+	}),
+	Object.freeze({
+		job: 'integration-linux',
+		step: "The integration group on this distribution's LuaJIT",
+		id: 'distro_integration',
+		distro: '$LINUX_INTEGRATION_DISTRO',
+		suite: 'integration',
+		logs: 'linux-distro-integration-logs'
+	})
+]);
+/** The one runner call of a distribution row. */
+const distroSuiteCommand = (row) =>
+	'bash "$GITHUB_WORKSPACE/tools/test/run-linux-distro-unit.sh" "' + row.distro + '" ' + row.suite;
+const DISTRO_UNIT_COMMAND = distroSuiteCommand(DISTRO_SUITE_ROWS[0]);
+const DISTRO_INTEGRATION_COMMAND = distroSuiteCommand(DISTRO_SUITE_ROWS[1]);
 const DISTRO_UNIT_HELPER = fs.readFileSync(
 	path.join(__dirname, 'prepare-linux-distro-unit.sh'),
 	'utf8'
@@ -6644,26 +6685,37 @@ const DISTRO_UNIT_RUNNER = fs.readFileSync(
 	path.join(__dirname, 'run-linux-distro-unit.sh'),
 	'utf8'
 );
+const DISTRO_DIAGNOSTIC_PATH = path.join(__dirname, 'linux_distro_suite_diagnostic.py');
+const DISTRO_DIAGNOSTIC = fs.readFileSync(DISTRO_DIAGNOSTIC_PATH, 'utf8');
+// The reviewed diagnostic bytes. Its behavior is executed below against
+// handwritten logs; any edit must be reviewed against those controls.
+const DISTRO_DIAGNOSTIC_SHA256 = '5c028ced76cccfdb5785c667f2609b6523c71f3bc100e95235687a5bd14b01c5';
 // The runner's whole executable body: the authored map is the only source of
-// the image and preparation, the checkout is mounted read-only, and the helper
-// receives that mount as its source.
+// the image and preparation, the suite is checked before any container, the
+// checkout is mounted read-only, and the helper receives that mount and suite.
 const DISTRO_UNIT_RUNNER_CODE = [
 	'set -euo pipefail',
-	'distro="${1:?usage: run-linux-distro-unit.sh <distribution>}"',
+	'distro="${1:?usage: run-linux-distro-unit.sh <distribution> <unit|integration>}"',
+	'suite="${2:?usage: run-linux-distro-unit.sh <distribution> <unit|integration>}"',
+	'case "$suite" in',
+	'\tunit|integration) ;;',
+	"\t*) echo 'Unknown distribution suite: unit or integration.' >&2; exit 64 ;;",
+	'esac',
 	'repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"',
-	'image="$(node "$repo_root/tools/ci/linux-install-matrix.cjs" unit "$distro" image)"',
-	'prep="$(node "$repo_root/tools/ci/linux-install-matrix.cjs" unit "$distro" prep)"',
+	'image="$(node "$repo_root/tools/ci/linux-install-matrix.cjs" distro "$distro" image)"',
+	'prep="$(node "$repo_root/tools/ci/linux-install-matrix.cjs" distro "$distro" prep)"',
 	'exec docker run --rm --network host \\',
 	'\t-v "$repo_root:/src:ro" \\',
 	'\t${ERGOPTI_UNIT_DOCKER_ARGS:-} \\',
 	'\t-e ERGOPTI_UNIT_PREP="$prep" \\',
 	'\t"$image" sh -c \'set -e',
 	'\t\teval "$ERGOPTI_UNIT_PREP"',
-	'\t\texec bash /src/tools/test/prepare-linux-distro-unit.sh "$1" /src\' distro-unit "$distro"'
+	'\t\texec bash /src/tools/test/prepare-linux-distro-unit.sh "$1" /src "$2"\' distro-unit "$distro" "$suite"'
 ];
-// Every module group runs at once under the ordinary user, each in its own TMPDIR
-// and HOME: with a shared HOME one group's writes reached another group's fixture.
-// openSUSE's pam_env exports XDG_*_HOME from the account home, which outranks HOME.
+// Every module group of the suite runs at once under the ordinary user, each in
+// its own TMPDIR and HOME: with a shared HOME one group's writes reached another
+// group's fixture. openSUSE's pam_env exports XDG_*_HOME from the account home,
+// which outranks HOME.
 const DISTRO_UNIT_SUITE =
 	'\tsudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \\\n' +
 	'\t\t-u XDG_CONFIG_HOME -u XDG_DATA_HOME -u XDG_CACHE_HOME -u XDG_STATE_HOME \\\n' +
@@ -6677,88 +6729,100 @@ const DISTRO_UNIT_GROUP_TAIL = [
 	'cat "$unit_logs/${unit_groups[$index]}.log"',
 	'exit "$unit_status"'
 ];
+// The helper refuses an unknown suite before installing anything, then keeps
+// the integration group out of the unit suite and alone in the integration one.
+const DISTRO_SUITE_SELECTION = [
+	'suite="${3:?suite is required: unit or integration}"',
+	'case "$suite" in',
+	'unit|integration) ;;',
+	"*) echo 'Unsupported distribution suite.' >&2; exit 1 ;;",
+	'esac',
+	'unit_groups=()',
+	'for unit_group in "${all_groups[@]}"; do',
+	'case "$suite/$unit_group" in',
+	'unit/integration) ;;',
+	'unit/*|integration/integration) unit_groups+=("$unit_group") ;;',
+	'esac',
+	'done',
+	'test "${#unit_groups[@]}" -gt 0'
+];
 
-// The supervised form adds diagnostics around the same one actual helper call.
-// Pin its shell ownership envelope separately from the existing direct form;
-// a comment, unreachable call or extra helper cannot satisfy this contract.
-const DISTRO_DIAGNOSTIC_COMMAND =
-	'python3 - "$unit_log" "$GITHUB_WORKSPACE/static/ergopti_plus/linux/tests/run.lua" "$LINUX_UNIT_DISTRO" "$native_status" <<\'PYTHON\'';
-const DISTRO_DIAGNOSTIC_SHA256 = 'f7d89f6387491c9cde0aa6fdb76925f0ad9e7535d95a0cb5c7b4d1a90805bc18';
-const DISTRO_LOGGED_ENVELOPE = [
+// The supervised form adds the diagnostic around the same one actual helper
+// call. Pin its shell ownership envelope per row; a comment, unreachable call
+// or extra helper cannot satisfy this contract.
+const distroDiagnosticCommand = (row) =>
+	'python3 "$GITHUB_WORKSPACE/tools/test/linux_distro_suite_diagnostic.py" "$suite_log" "$GITHUB_WORKSPACE/static/ergopti_plus/linux/tests/run.lua" "' +
+	row.distro +
+	'" "$native_status" ' +
+	row.suite;
+const distroLoggedEnvelope = (row) => [
 	'set -euo pipefail',
-	'unit_log_dir="$RUNNER_TEMP/linux-distro-unit-logs"',
-	'mkdir -p "$unit_log_dir"',
-	'unit_log="$unit_log_dir/$LINUX_UNIT_DISTRO.log"',
+	'suite_log_dir="$RUNNER_TEMP/' + row.logs + '"',
+	'mkdir -p "$suite_log_dir"',
+	'suite_log="$suite_log_dir/' + row.distro + '.log"',
 	'set +e',
-	'bash "$GITHUB_WORKSPACE/tools/test/run-linux-distro-unit.sh" "$LINUX_UNIT_DISTRO" 2>&1 | tee "$unit_log"',
-	'unit_pipeline_status=("${PIPESTATUS[@]}")',
+	distroSuiteCommand(row) + ' 2>&1 | tee "$suite_log"',
+	'suite_pipeline_status=("${PIPESTATUS[@]}")',
 	'set -e',
-	'native_status="${unit_pipeline_status[0]}"',
+	'native_status="${suite_pipeline_status[0]}"',
 	'set +e',
-	'python3 - "$unit_log" "$GITHUB_WORKSPACE/static/ergopti_plus/linux/tests/run.lua" "$LINUX_UNIT_DISTRO" "$native_status" <<\'PYTHON\'',
-	'PYTHON',
+	distroDiagnosticCommand(row),
 	'diagnostic_status=$?',
 	'set -e',
 	'if [[ "$native_status" -ne 0 ]]; then exit "$native_status"; fi',
-	'if [[ "${unit_pipeline_status[1]}" -ne 0 ]]; then exit "${unit_pipeline_status[1]}"; fi',
+	'if [[ "${suite_pipeline_status[1]}" -ne 0 ]]; then exit "${suite_pipeline_status[1]}"; fi',
 	'exit "$diagnostic_status"'
 ];
+const DISTRO_LOGGED_ENVELOPE = distroLoggedEnvelope(DISTRO_SUITE_ROWS[0]);
 
-/** Reads only the existing supervised diagnostic's single quoted heredoc. */
-function distroUnitDiagnostic(body) {
-	const script = pipeline.runOf(body) ?? [];
-	const opening = script
-		.map((line, index) =>
-			line.trim() === '"$LINUX_UNIT_DISTRO" "$native_status" <<\'PYTHON\'' ? index : -1
-		)
-		.filter((index) => index >= 0);
-	const closing = script
-		.map((line, index) => (line === 'PYTHON' ? index : -1))
-		.filter((index) => index >= 0);
-	if (opening.length !== 1 || closing.length !== 1 || closing[0] <= opening[0]) return null;
-	return script.slice(opening[0] + 1, closing[0]).join('\n') + '\n';
-}
-
-/** Admits only the actual source-owned logged wrapper, whose diagnostic writes the evidence count. */
-function distroUnitInvocationFits(body) {
-	const lines = logicalLines(body).filter((line) => line !== '');
-	const normalized = lines.map((line) => line.replace(/[ \t]+/g, ' ').trim());
-	const at = normalized.indexOf(DISTRO_DIAGNOSTIC_COMMAND);
-	const close = normalized.indexOf('PYTHON');
-	if (at < 0 || close <= at) return false;
-	const envelope = [...normalized.slice(0, at + 1), ...normalized.slice(close)];
-	const diagnostic = distroUnitDiagnostic(body);
-	return (
-		JSON.stringify(envelope) === JSON.stringify(DISTRO_LOGGED_ENVELOPE) &&
-		diagnostic !== null &&
-		require('node:crypto').createHash('sha256').update(diagnostic).digest('hex') ===
-			DISTRO_DIAGNOSTIC_SHA256
-	);
+/** Admits only the actual source-owned logged wrapper of one row, whose diagnostic writes the evidence count. */
+function distroUnitInvocationFits(body, row = DISTRO_SUITE_ROWS[0]) {
+	const normalized = logicalLines(body)
+		.filter((line) => line !== '')
+		.map((line) => line.replace(/[ \t]+/g, ' ').trim());
+	return JSON.stringify(normalized) === JSON.stringify(distroLoggedEnvelope(row));
 }
 
 /** Rejects native distro suites whose wrapper omits their real prerequisites. */
-function distroUnitProblems(files, helper = DISTRO_UNIT_HELPER, runner = DISTRO_UNIT_RUNNER) {
+function distroUnitProblems(
+	files,
+	helper = DISTRO_UNIT_HELPER,
+	runner = DISTRO_UNIT_RUNNER,
+	diagnostic = DISTRO_DIAGNOSTIC
+) {
 	const linux = files.find((entry) => entry.rel === LINUX_BOX);
 	const jobs = linux ? pipeline.jobsOfText(linux.text, LINUX_BOX) : [];
-	const units = jobs.flatMap((row) =>
-		pipeline
-			.steps(row.body)
-			.filter((step) => step.name === "The unit suite on this distribution's LuaJIT")
-			.map((step) => ({ job: row.id, ...step }))
-	);
 	const problems = [];
-	if (
-		units.length !== 1 ||
-		units[0].job !== 'test-linux' ||
-		pipeline.stepField(units[0].body, 'if') !== 'matrix.distro' ||
-		pipeline.stepField(units[0].body, 'id') !== 'distro_unit' ||
-		pipeline.stepField(units[0].body, 'shell') !== 'bash' ||
-		pipeline.stepField(units[0].body, 'working-directory') !== null ||
-		!distroUnitInvocationFits(units[0].body)
-	) {
-		problems.push(
-			'one distribution row step of the Unit stage must execute its fail-closed native prerequisite wrapper'
+	for (const row of DISTRO_SUITE_ROWS) {
+		const found = jobs.flatMap((job) =>
+			pipeline
+				.steps(job.body)
+				.filter((step) => step.name === row.step)
+				.map((step) => ({ job: job.id, ...step }))
 		);
+		if (
+			found.length !== 1 ||
+			found[0].job !== row.job ||
+			pipeline.stepField(found[0].body, 'if') !== 'matrix.distro' ||
+			pipeline.stepField(found[0].body, 'id') !== row.id ||
+			pipeline.stepField(found[0].body, 'shell') !== 'bash' ||
+			pipeline.stepField(found[0].body, 'working-directory') !== null ||
+			!distroUnitInvocationFits(found[0].body, row)
+		) {
+			problems.push(
+				'one distribution row step of ' +
+					row.job +
+					' must execute its fail-closed native prerequisite wrapper for the ' +
+					row.suite +
+					' suite'
+			);
+		}
+	}
+	if (
+		require('node:crypto').createHash('sha256').update(diagnostic).digest('hex') !==
+		DISTRO_DIAGNOSTIC_SHA256
+	) {
+		problems.push('the distribution suite diagnostic must keep its reviewed bytes');
 	}
 	const runnerCode = runner.split('\n').filter((line) => line.trim() !== '' && !/^\s*#/.test(line));
 	if (JSON.stringify(runnerCode) !== JSON.stringify(DISTRO_UNIT_RUNNER_CODE)) {
@@ -6806,6 +6870,10 @@ function distroUnitProblems(files, helper = DISTRO_UNIT_HELPER, runner = DISTRO_
 		if (!code.split('\n').some((row) => row.trim() === line))
 			problems.push('every parallel distro group must keep its exit, order and header: ' + line);
 	}
+	const trimmed = code.split('\n').map((row) => row.trim());
+	for (const line of DISTRO_SUITE_SELECTION)
+		if (!trimmed.includes(line))
+			problems.push('the helper must select exactly its suite of module groups: ' + line);
 	const lua = code.match(/"\$interpreter" -e '\n([\s\S]*?)\n'/)?.[1] || '';
 	for (const statement of [
 		'assert(ffi.C.getuid() ~= 0)',
@@ -6894,6 +6962,10 @@ errors.push(...distroUnitProblems(pipeline.files()));
 const distroUnitBody = pipeline.step(
 	pipeline.job('test-linux'),
 	"The unit suite on this distribution's LuaJIT"
+);
+const distroIntegrationBody = pipeline.step(
+	pipeline.job('integration-linux'),
+	"The integration group on this distribution's LuaJIT"
 );
 for (const [what, changed] of [
 	['missing native distro wrapper', ''],
@@ -7051,11 +7123,19 @@ assert.equal(
 	true,
 	'the actual supervised form remains admitted'
 );
+assert.equal(
+	distroUnitInvocationFits(distroIntegrationBody, DISTRO_SUITE_ROWS[1]),
+	true,
+	'the actual supervised Integration form remains admitted'
+);
+// A row fits only its own suite and distribution variable.
+assert.equal(distroUnitInvocationFits(distroIntegrationBody, DISTRO_SUITE_ROWS[0]), false);
+assert.equal(distroUnitInvocationFits(distroUnitBody, DISTRO_SUITE_ROWS[1]), false);
 for (const [what, from, to] of [
 	['writable checkout mount', '"$repo_root:/src:ro"', '"$repo_root:/src"'],
 	['foreign image', '"$image" sh -c', 'ubuntu:latest sh -c'],
 	['unprepared container', '\t\teval "$ERGOPTI_UNIT_PREP"\n', ''],
-	['prep from another field', 'unit "$distro" prep)"', 'unit "$distro" image)"'],
+	['prep from another field', 'distro "$distro" prep)"', 'distro "$distro" image)"'],
 	[
 		'helper without the mount',
 		'prepare-linux-distro-unit.sh "$1" /src',
@@ -7063,9 +7143,13 @@ for (const [what, from, to] of [
 	],
 	[
 		'helper for another distribution',
-		'"$1" /src\' distro-unit "$distro"',
-		'debian /src\' distro-unit "$distro"'
+		'"$1" /src "$2"\' distro-unit "$distro"',
+		'debian /src "$2"\' distro-unit "$distro"'
 	],
+	['helper for another suite', '/src "$2"\'', "/src unit'"],
+	['suite never handed over', ' distro-unit "$distro" "$suite"', ' distro-unit "$distro"'],
+	['suite accepted unchecked', '\tunit|integration) ;;\n', '\tunit|integration|*) ;;\n'],
+	['unknown suite tolerated', 'exit 64 ;;', 'exit 0 ;;'],
 	['kept container', 'docker run --rm --network host', 'docker run --network host'],
 	[
 		'swallowed preparation',
@@ -7092,19 +7176,31 @@ for (const [what, from, to] of [
 	['host-row distro suite', '        if: matrix.distro\n', '        if: matrix.group\n'],
 	['every-row distro suite', '        if: matrix.distro\n', ''],
 	['renamed evidence source', '        id: distro_unit\n', '        id: distro_suite\n'],
-	['foreign distribution', '"$LINUX_UNIT_DISTRO" 2>&1 | tee', 'debian 2>&1 | tee'],
-	['missing raw log capture', '2>&1 | tee "$unit_log"', '2>&1'],
+	['foreign distribution', '"$LINUX_UNIT_DISTRO" unit 2>&1 | tee', 'debian unit 2>&1 | tee'],
+	[
+		'unit row running integration',
+		'"$LINUX_UNIT_DISTRO" unit 2>&1',
+		'"$LINUX_UNIT_DISTRO" integration 2>&1'
+	],
+	['unit row without its suite', '"$LINUX_UNIT_DISTRO" unit 2>&1', '"$LINUX_UNIT_DISTRO" 2>&1'],
+	['diagnostic of another suite', '"$native_status" unit\n', '"$native_status" integration\n'],
+	['diagnostic of another row', '"$LINUX_UNIT_DISTRO" "$native_status"', 'debian "$native_status"'],
+	['missing raw log capture', '2>&1 | tee "$suite_log"', '2>&1'],
 	[
 		'late pipeline status capture',
-		'unit_pipeline_status=("${PIPESTATUS[@]}")',
-		'echo ignored\n          unit_pipeline_status=("${PIPESTATUS[@]}")'
+		'suite_pipeline_status=("${PIPESTATUS[@]}")',
+		'echo ignored\n          suite_pipeline_status=("${PIPESTATUS[@]}")'
 	],
 	[
 		'tee mistaken for native exit',
-		'native_status="${unit_pipeline_status[0]}"',
-		'native_status="${unit_pipeline_status[1]}"'
+		'native_status="${suite_pipeline_status[0]}"',
+		'native_status="${suite_pipeline_status[1]}"'
 	],
-	['native exit fabricated green', 'native_status="${unit_pipeline_status[0]}"', 'native_status=0'],
+	[
+		'native exit fabricated green',
+		'native_status="${suite_pipeline_status[0]}"',
+		'native_status=0'
+	],
 	['diagnostic exit fabricated green', 'diagnostic_status=$?', 'diagnostic_status=0'],
 	[
 		'native failure swallowed',
@@ -7113,10 +7209,65 @@ for (const [what, from, to] of [
 	],
 	[
 		'tee failure swallowed',
-		'if [[ "${unit_pipeline_status[1]}" -ne 0 ]]; then exit "${unit_pipeline_status[1]}"; fi',
+		'if [[ "${suite_pipeline_status[1]}" -ne 0 ]]; then exit "${suite_pipeline_status[1]}"; fi',
 		'true'
 	],
-	['diagnostic failure swallowed', 'exit "$diagnostic_status"', 'exit 0'],
+	['diagnostic failure swallowed', 'exit "$diagnostic_status"', 'exit 0']
+]) {
+	const changed = distroUnitBody.replace(from, to);
+	assert.notEqual(changed, distroUnitBody, what + ' must actually mutate the supervised source');
+	mustCatch(what, LINUX_BOX, distroUnitBody, changed, distroUnitProblems);
+}
+// The Integration row keeps the same supervised form for its own suite and row.
+for (const [what, from, to] of [
+	['missing native Integration wrapper', DISTRO_INTEGRATION_COMMAND, 'luajit tests/run.lua'],
+	[
+		'Integration row running the unit suite',
+		'"$LINUX_INTEGRATION_DISTRO" integration 2>&1',
+		'"$LINUX_INTEGRATION_DISTRO" unit 2>&1'
+	],
+	[
+		'foreign Integration distribution',
+		'"$LINUX_INTEGRATION_DISTRO" integration 2>&1',
+		'alpine integration 2>&1'
+	],
+	[
+		'Integration diagnostic of the unit suite',
+		'"$native_status" integration\n',
+		'"$native_status" unit\n'
+	],
+	[
+		'host-row Integration distro suite',
+		'        if: matrix.distro\n',
+		'        if: matrix.group\n'
+	],
+	[
+		'renamed Integration evidence source',
+		'        id: distro_integration\n',
+		'        id: distro_unit\n'
+	],
+	['Integration tee failure swallowed', 'exit "$diagnostic_status"', 'exit 0']
+]) {
+	const changed = distroIntegrationBody.replace(from, to);
+	assert.notEqual(
+		changed,
+		distroIntegrationBody,
+		what + ' must actually mutate the Integration source'
+	);
+	mustCatch(what, LINUX_BOX, distroIntegrationBody, changed, distroUnitProblems);
+}
+mustCatch(
+	'swallowed native Integration wrapper',
+	LINUX_BOX,
+	distroIntegrationBody,
+	distroIntegrationBody.replace(
+		DISTRO_INTEGRATION_COMMAND,
+		DISTRO_INTEGRATION_COMMAND + ' || true'
+	),
+	stepProblems
+);
+// The diagnostic both rows share keeps its reviewed bytes.
+for (const [what, from, to] of [
 	['zero tests accepted', 'passed + failed <= 0', 'passed + failed < 0'],
 	['duplicate summaries accepted', 'len(frames) != 1', 'len(frames) < 1'],
 	['contradictory native summary accepted', '(native_status == "0" and failed != 0)', 'False'],
@@ -7126,11 +7277,62 @@ for (const [what, from, to] of [
 		'evidence count from one group',
 		'output.write("passed=" + str(totals[1])',
 		'output.write("passed=" + str(passed)'
-	]
+	],
+	[
+		'integration group back in the unit suite',
+		'return groups[1:] if suite',
+		'return groups if suite'
+	],
+	['unknown suite admitted', 'if suite not in SUITES:', 'if False:']
 ]) {
-	const changed = distroUnitBody.replace(from, to);
-	assert.notEqual(changed, distroUnitBody, what + ' must actually mutate the supervised source');
-	mustCatch(what, LINUX_BOX, distroUnitBody, changed, distroUnitProblems);
+	const changed = DISTRO_DIAGNOSTIC.replace(from, to);
+	assert.notEqual(changed, DISTRO_DIAGNOSTIC, what + ' must actually mutate the diagnostic');
+	assert.ok(
+		distroUnitProblems(pipeline.files(), DISTRO_UNIT_HELPER, DISTRO_UNIT_RUNNER, changed).length >
+			0,
+		what + ' must refuse'
+	);
+}
+// The suite selection of the helper, executed: unit keeps every group but
+// integration, integration keeps that group alone, each in declared order.
+{
+	const lines = DISTRO_UNIT_HELPER.split('\n');
+	const start = lines.indexOf('unit_groups=()');
+	const end = lines.indexOf('test "${#unit_groups[@]}" -gt 0');
+	assert.ok(start > 0 && end > start, 'the helper selects the suite groups in one block');
+	const select = (helper, suite) => {
+		const body = helper.split('\n');
+		const from = body.indexOf('unit_groups=()');
+		const to = body.indexOf('test "${#unit_groups[@]}" -gt 0');
+		const result = spawnSync(
+			bashExecutable(),
+			[
+				'-c',
+				'set -euo pipefail\nsuite="$1"\nall_groups=(integration meta core ui)\n' +
+					body.slice(from, to + 1).join('\n') +
+					'\nprintf "%s\\n" "${unit_groups[@]}"',
+				'distro-suite-selection',
+				suite
+			],
+			{ encoding: 'utf8', timeout: 5000 }
+		);
+		return result.status === 0 ? result.stdout : 'refused ' + result.status;
+	};
+	assert.equal(select(DISTRO_UNIT_HELPER, 'unit'), 'meta\ncore\nui\n');
+	assert.equal(select(DISTRO_UNIT_HELPER, 'integration'), 'integration\n');
+	for (const [what, from, to] of [
+		['integration kept in the unit suite', '\t\tunit/integration) ;;\n', ''],
+		['unit groups in the integration suite', 'integration/integration)', 'integration/*)']
+	]) {
+		const changed = DISTRO_UNIT_HELPER.replace(from, to);
+		assert.notEqual(changed, DISTRO_UNIT_HELPER, what + ' must actually mutate the helper');
+		assert.ok(
+			select(changed, 'unit') !== 'meta\ncore\nui\n' ||
+				select(changed, 'integration') !== 'integration\n',
+			what + ' must change the executed selection'
+		);
+		assert.ok(distroUnitProblems(pipeline.files(), changed).length > 0, what + ' must refuse');
+	}
 }
 
 // Execute the actual diagnostic and Bash exit tail with handwritten status/log
@@ -7144,8 +7346,6 @@ const distroControlRoot = fs.mkdtempSync(
 try {
 	const log = path.join(distroControlRoot, 'unit.log');
 	const runner = path.resolve(__dirname, '../../static/ergopti_plus/linux/tests/run.lua');
-	const diagnostic = distroUnitDiagnostic(distroUnitBody);
-	assert.notEqual(diagnostic, null, 'the current supervised diagnostic must be present');
 	const footer = (pipeline.runOf(distroUnitBody) ?? []).slice(-3).join('\n');
 	assert.equal(
 		footer,
@@ -7164,12 +7364,16 @@ try {
 		'\n' +
 		'='.repeat(40) +
 		'\n';
-	// One log per module group, under the header the parallel helper prints.
-	const groups = [
+	// One log per module group of the suite, under the header the parallel
+	// helper prints: the unit suite is every declared group but the first,
+	// integration, which the integration suite runs alone.
+	const declared = [
 		...fs
 			.readFileSync(path.join(path.dirname(runner), 'support', 'module_groups.lua'), 'utf8')
 			.matchAll(/\{ name = "([a-z_]+)"/g)
 	].map((match) => match[1]);
+	assert.equal(declared[0], 'integration', 'the integration group is declared first');
+	const groups = declared.slice(1);
 	assert(groups.length > 1, 'the controls cover more than one module group');
 	// The helper prints the admitted interpreter once, before the first group header.
 	const admitted = 'LuaJIT 2.1.1761786044\n';
@@ -7183,7 +7387,7 @@ try {
 			.join('');
 	const outputFile = path.join(distroControlRoot, 'github-output');
 	const greenOutput = 'passed=' + 7 * groups.length + '\ninterpreter=LuaJIT 2.1.1761786044\n';
-	for (const [what, text, native, expected, output = ''] of [
+	for (const [what, text, native, expected, output = '', suite = 'unit'] of [
 		['complete successful native log', grouped(frame(1, 7, 0)), '0', 0, greenOutput],
 		['complete refused native log', grouped(frame(1, 6, 1)), '17', 0],
 		['missing native summary', 'no terminal frame\n', '0', 2],
@@ -7204,16 +7408,39 @@ try {
 			'0',
 			0,
 			'passed=' + 7 * groups.length + '\ninterpreter=LuaJIT 2.1.0-beta3\n'
-		]
+		],
+		// The unit rows never run the integration group; the Integration rows run it alone.
+		['integration group in a unit log', grouped(frame(1, 7, 0), declared), '0', 2],
+		[
+			'integration suite log',
+			grouped(frame(1, 9, 0), ['integration']),
+			'0',
+			0,
+			'passed=9\ninterpreter=LuaJIT 2.1.1761786044\n',
+			'integration'
+		],
+		[
+			'unit group in an integration log',
+			grouped(frame(1, 9, 0), ['integration', groups[0]]),
+			'0',
+			2,
+			'',
+			'integration'
+		],
+		['unit log for the integration suite', grouped(frame(1, 7, 0)), '0', 2, '', 'integration'],
+		['unknown suite', grouped(frame(1, 7, 0)), '0', 2, '', 'e2e']
 	]) {
 		fs.writeFileSync(log, text);
 		fs.writeFileSync(outputFile, '');
-		const result = spawnSync(distroControlPython, ['-', log, runner, 'debian', native], {
-			input: diagnostic,
-			encoding: 'utf8',
-			timeout: 5000,
-			env: { ...process.env, GITHUB_OUTPUT: outputFile }
-		});
+		const result = spawnSync(
+			distroControlPython,
+			[DISTRO_DIAGNOSTIC_PATH, log, runner, 'debian', native, suite],
+			{
+				encoding: 'utf8',
+				timeout: 5000,
+				env: { ...process.env, GITHUB_OUTPUT: outputFile }
+			}
+		);
 		assert.equal(result.error, undefined, what);
 		assert.equal(result.signal, null, what);
 		assert.equal(result.status, expected, what);
@@ -7224,7 +7451,7 @@ try {
 			distroControlBash,
 			[
 				'-c',
-				'set -euo pipefail\nnative_status="$1"\nunit_pipeline_status=("$1" 0)\ndiagnostic_status="$2"\n' +
+				'set -euo pipefail\nnative_status="$1"\nsuite_pipeline_status=("$1" 0)\ndiagnostic_status="$2"\n' +
 					footer,
 				'distro-diagnostic-transport',
 				native,
@@ -7251,7 +7478,7 @@ try {
 			distroControlBash,
 			[
 				'-c',
-				'set -euo pipefail\nnative_status="$1"\nunit_pipeline_status=("$1" "$2")\ndiagnostic_status="$3"\n' +
+				'set -euo pipefail\nnative_status="$1"\nsuite_pipeline_status=("$1" "$2")\ndiagnostic_status="$3"\n' +
 					footer,
 				'distro-transport',
 				String(native),
@@ -7274,13 +7501,13 @@ try {
 	const lines = pipeline.runOf(distroUnitBody) ?? [];
 	const start = lines.findIndex((line) => line === 'set +e');
 	const end = lines.findIndex(
-		(line, index) => index > start && line === 'native_status="${unit_pipeline_status[0]}"'
+		(line, index) => index > start && line === 'native_status="${suite_pipeline_status[0]}"'
 	);
 	assert(start >= 0 && end > start, 'the actual supervised pipeline must be present');
 	const pipe = lines.slice(start, end + 1).join('\n');
 	const quote = (value) => "'" + value.replaceAll("'", "'\"'\"'") + "'";
 	const script =
-		'set -euo pipefail\nunit_log=' +
+		'set -euo pipefail\nsuite_log=' +
 		quote(log.replaceAll('\\', '/')) +
 		'\n' +
 		'unset BASH_XTRACEFD\nPS4="+ "\nset -x\n: "$GITHUB_WORKSPACE/tools/test/run-linux-distro-unit.sh"\n' +
@@ -7307,7 +7534,7 @@ try {
 	// The authored map refuses a distribution it has no archive lot for, before any container.
 	assert.match(
 		fs.readFileSync(log, 'utf8'),
-		/Unknown Linux unit distribution: __guard_unsupported__/
+		/Unknown Linux archive distribution: __guard_unsupported__/
 	);
 	// Inside a container the helper refuses an unknown distribution before installing anything.
 	const helperRefusal = spawnSync(
@@ -7315,12 +7542,38 @@ try {
 		[
 			path.join(__dirname, 'prepare-linux-distro-unit.sh').replaceAll('\\', '/'),
 			'__guard_unsupported__',
-			distroControlWorkspace
+			distroControlWorkspace,
+			'unit'
 		],
 		{ encoding: 'utf8', timeout: 5000 }
 	);
 	assert.equal(helperRefusal.status, 1, 'the genuine helper refuses an unknown distribution');
 	assert.match(helperRefusal.stderr, /^Unsupported mandatory unit distribution\.$/m);
+	// An unknown suite is refused by the helper before any installation and by
+	// the runner before any container; a missing one cannot default.
+	for (const args of [
+		['debian', distroControlWorkspace, 'e2e'],
+		['debian', distroControlWorkspace]
+	]) {
+		const refusal = spawnSync(
+			distroControlBash,
+			[path.join(__dirname, 'prepare-linux-distro-unit.sh').replaceAll('\\', '/'), ...args],
+			{ encoding: 'utf8', timeout: 5000 }
+		);
+		assert.equal(refusal.status, 1, 'the genuine helper refuses suite ' + args[2]);
+		assert.match(refusal.stderr, /Unsupported distribution suite\.|suite is required/);
+	}
+	const runnerRefusal = spawnSync(
+		distroControlBash,
+		[path.join(__dirname, 'run-linux-distro-unit.sh').replaceAll('\\', '/'), 'debian', 'e2e'],
+		{ encoding: 'utf8', timeout: 5000, env: { ...process.env, PATH: '/nonexistent' } }
+	);
+	assert.equal(
+		runnerRefusal.status,
+		64,
+		'the runner refuses an unknown suite before node or docker'
+	);
+	assert.match(runnerRefusal.stderr, /^Unknown distribution suite: unit or integration\.$/m);
 	// The real Bash renderer quotes this independently supplied exact path. Use
 	// that primitive's spelling to handle spaces and apostrophes without admitting
 	// a different helper, a guessed quote grammar, or an arbitrary helper suffix.
@@ -7332,7 +7585,8 @@ try {
 	assert.equal(helperPathRenderings.length, 1, 'the exact helper path has one Bash rendering');
 	const helperPathRendering = helperPathRenderings[0].slice('+ : '.length);
 	const calls = traceLines.filter(
-		(line) => line.replace(/^\++ /, '') === 'bash ' + helperPathRendering + ' __guard_unsupported__'
+		(line) =>
+			line.replace(/^\++ /, '') === 'bash ' + helperPathRendering + ' __guard_unsupported__ unit'
 	);
 	assert.equal(calls.length, 1, 'the actual wrapped prerequisite helper executes exactly once');
 
@@ -7343,7 +7597,7 @@ try {
 	const teePipe = pipe.replace(DISTRO_UNIT_COMMAND, 'printf "%s\\n" "controlled transport"');
 	assert.notEqual(teePipe, pipe, 'the transport-only producer replacement must be exact');
 	const teeScript =
-		'set -euo pipefail\nunit_log=' +
+		'set -euo pipefail\nsuite_log=' +
 		quote(refusedLog.replaceAll('\\', '/')) +
 		'\n' +
 		'unset BASH_XTRACEFD\nPS4="+ "\nset -x\n' +

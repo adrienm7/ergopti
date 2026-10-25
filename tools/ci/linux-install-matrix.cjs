@@ -42,9 +42,11 @@ function validateMap(metadata, coverage) {
 		Object.keys(subjects),
 		'Linux lot order must retain every mandatory subject exactly once'
 	);
-	// The Unit stage runs the suite once per archive distribution, in that lot's
-	// image and preparation: those rows are the unit shards no dated suite
-	// qualification may stand in for, each recording its own unit-<distro>.
+	// The Unit stage runs the suite but its integration group once per archive
+	// distribution, in that lot's image and preparation, and the Integration
+	// stage runs the integration group in the same containers: those rows are
+	// the shards no dated suite qualification may stand in for, each recording
+	// its own unit-<distro> or integration-<distro>.
 	const unit = coverage.jobs['test-linux'];
 	const distros = Object.values(metadata)
 		.filter((cell) => cell.kind === 'install')
@@ -55,16 +57,28 @@ function validateMap(metadata, coverage) {
 		'Every archive distribution must have exactly one Unit row, in lot order'
 	);
 	for (const distro of distros) assert.deepEqual(unit.shard_subjects[distro], ['unit-' + distro]);
+	const integration = coverage.jobs['integration-linux'];
+	assert.equal(integration.deferrable_shards, undefined, 'No Integration row may defer');
+	assert.deepEqual(
+		integration.shards.slice(-distros.length),
+		distros,
+		'Every archive distribution must have exactly one Integration row, last and in lot order'
+	);
+	for (const distro of distros)
+		assert.deepEqual(integration.shard_subjects[distro], ['integration-' + distro]);
 	return { matrix: { lot: Object.keys(metadata) }, metadata };
 }
 
-/** The image and preparation of one distribution's Unit row, from its archive lot. */
-function selectUnit(plan, distro, field) {
+/**
+ * The image and preparation of one archive distribution, from its lot: the
+ * container of its Unit and Integration distribution rows.
+ */
+function selectDistro(plan, distro, field) {
 	const cells = Object.values(plan.metadata).filter(
 		(cell) => cell.kind === 'install' && cell.distro === distro
 	);
-	assert.equal(cells.length, 1, 'Unknown Linux unit distribution: ' + distro);
-	assert.ok(['image', 'prep'].includes(field), 'Unknown Linux unit field: ' + field);
+	assert.equal(cells.length, 1, 'Unknown Linux archive distribution: ' + distro);
+	assert.ok(['image', 'prep'].includes(field), 'Unknown Linux distribution field: ' + field);
 	return cells[0][field];
 }
 
@@ -96,8 +110,8 @@ function loadPlan(root) {
 if (require.main === module) {
 	const args = process.argv.slice(2);
 	const plan = loadPlan(path.resolve(__dirname, '../..'));
-	if (args.length === 3 && args[0] === 'unit') {
-		process.stdout.write(selectUnit(plan, args[1], args[2]) + '\n');
+	if (args.length === 3 && args[0] === 'distro') {
+		process.stdout.write(selectDistro(plan, args[1], args[2]) + '\n');
 	} else if (args.length === 0 && process.env.GITHUB_OUTPUT) {
 		fs.appendFileSync(
 			process.env.GITHUB_OUTPUT,
@@ -105,9 +119,9 @@ if (require.main === module) {
 		);
 	} else {
 		throw new Error(
-			'Usage: node tools/ci/linux-install-matrix.cjs (with GITHUB_OUTPUT) | unit <distro> <image|prep>'
+			'Usage: node tools/ci/linux-install-matrix.cjs (with GITHUB_OUTPUT) | distro <distro> <image|prep>'
 		);
 	}
 }
 
-module.exports = { validateMap, selectLot, selectUnit, loadPlan };
+module.exports = { validateMap, selectLot, selectDistro, loadPlan };

@@ -46,15 +46,25 @@
 		},
 		"integration-linux": {
 			"classification": "mandatory",
-			"shards": ["driver", "native"],
+			"shards": ["driver", "native", "debian", "fedora", "arch", "alpine", "opensuse"],
 			"shard_subjects": {
 				"driver": ["integration-driver"],
-				"native": ["native-metrics-equivalence", "native-xi2-abi"]
+				"native": ["native-metrics-equivalence", "native-xi2-abi"],
+				"debian": ["integration-debian"],
+				"fedora": ["integration-fedora"],
+				"arch": ["integration-arch"],
+				"alpine": ["integration-alpine"],
+				"opensuse": ["integration-opensuse"]
 			},
 			"subjects": {
 				"integration-driver": 1,
 				"native-metrics-equivalence": 1,
-				"native-xi2-abi": 1
+				"native-xi2-abi": 1,
+				"integration-debian": 1,
+				"integration-fedora": 1,
+				"integration-arch": 1,
+				"integration-alpine": 1,
+				"integration-opensuse": 1
 			}
 		},
 		"e2e-linux": {

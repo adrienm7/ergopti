@@ -3,14 +3,22 @@
 # Inside a distribution container prepared by .github/linux-install-matrix.json,
 # create the ordinary installation user, give it a private copy of the source
 # checkout, build native test dependencies for the distribution's own LuaJIT,
-# then run the unchanged suite as that user. tools/test/run-linux-distro-unit.sh
-# starts the container and calls this script as root.
+# then run one suite of the unchanged module groups as that user: "unit" is
+# every group of tests/support/module_groups.lua but the integration group (the
+# Unit stage's distribution rows), "integration" that group alone (the
+# Integration stage's). tools/test/run-linux-distro-unit.sh starts the
+# container and calls this script as root.
 
 set -euo pipefail
 
 distro="${1:?distribution is required}"
 source_root="${2:?source checkout is required}"
+suite="${3:?suite is required: unit or integration}"
 test -f "$source_root/static/ergopti_plus/linux/tests/run.lua"
+case "$suite" in
+	unit|integration) ;;
+	*) echo 'Unsupported distribution suite.' >&2; exit 1 ;;
+esac
 case "$distro" in
 	debian) apt-get install -y --no-install-recommends luajit python3 ca-certificates git gcc libc6-dev make cmake pkg-config libluajit-5.1-dev libuv1-dev curl ;;
 	fedora) dnf install -y luajit python3 ca-certificates git gcc make cmake pkgconf-pkg-config luajit-devel libuv-devel curl ;;
@@ -119,7 +127,7 @@ for directory in (working, working / "tests"):
 assert(Path.cwd() == working)
 print("Native ordinary-user fixture writes: 2 directories admitted")
 '
-# The module groups of tests/support/module_groups.lua run at once, each with
+# The suite's module groups of tests/support/module_groups.lua run at once, each with
 # a private TMPDIR and HOME: the whole suite in one process held every archive
 # cell for about four minutes. A shared HOME let one group's writes to the
 # user's ~/.config/ergopti_plus reach another group's fixture that proves its
@@ -128,7 +136,14 @@ print("Native ordinary-user fixture writes: 2 directories admitted")
 # HOME, so they are removed too or every group shares one ~/.config again.
 # Logs print whole, in group order, under one header each, so the workflow
 # diagnostic still reads one runner summary per group.
-mapfile -t unit_groups < <("$interpreter" -e 'for _, group in ipairs(dofile("tests/support/module_groups.lua").GROUPS) do print(group.name) end')
+mapfile -t all_groups < <("$interpreter" -e 'for _, group in ipairs(dofile("tests/support/module_groups.lua").GROUPS) do print(group.name) end')
+unit_groups=()
+for unit_group in "${all_groups[@]}"; do
+	case "$suite/$unit_group" in
+		unit/integration) ;;
+		unit/*|integration/integration) unit_groups+=("$unit_group") ;;
+	esac
+done
 test "${#unit_groups[@]}" -gt 0
 unit_logs="$(mktemp -d "$native_root/logs.XXXXXXXX")"
 unit_pids=()
