@@ -424,12 +424,36 @@ for (const site of luaSites) {
 const used = new Set();
 let redactedCount = 0;
 
+/**
+ * Resolves the same reviewed allowance for census entries and mutation controls.
+ * @param {{file: string, callNorm: string}} site Candidate log sink.
+ * @returns {number} Matching judgment index, or -1 when the sink is unreviewed.
+ */
+function judgmentIndex(site) {
+	return JUDGED.findIndex(
+		(judgment) => judgment.file === site.file && site.callNorm.includes(judgment.match)
+	);
+}
+
+// A retired message prefix must not approve a later call carrying private data.
+// The old delimiter judgment accepted this sink even though its Trigger is raw.
+const retiredPrivateSink = {
+	file: 'infra/hotstrings/hotstrings_io.ahk',
+	callNorm:
+		'("privacy_probe", "Global delimiter sets published after durable override replacement. Trigger: {1}", Trigger)'
+};
+if (judgmentIndex(retiredPrivateSink) !== -1) {
+	errors.push(
+		'(retired-judgment-private-sink) a retired delimiter judgment authorizes a raw Trigger.'
+	);
+}
+
 for (const site of sites) {
 	if (REDACTORS.some((r) => site.call.includes(r))) {
 		redactedCount++;
 		continue;
 	}
-	const idx = JUDGED.findIndex((j) => j.file === site.file && site.callNorm.includes(j.match));
+	const idx = judgmentIndex(site);
 	if (idx === -1) {
 		errors.push(
 			`${site.file}:${site.line} — ${site.sink} interpolates a hotstring trigger or replacement ` +
