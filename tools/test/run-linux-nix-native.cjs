@@ -25,6 +25,63 @@ function bytes(filename, limit = 8 * 1024 * 1024) {
 	if (!fact.isFile() || fact.isSymbolicLink() || fact.size > limit) refuse();
 	return fs.readFileSync(filename);
 }
+/** Hash a pinned regular ELF in fixed chunks without inheriting source budgets. */
+function nativeExecutableHash(filename) {
+	const before = fs.lstatSync(filename, { bigint: true });
+	const identity = (fact) => [
+		fact.dev,
+		fact.ino,
+		fact.size,
+		fact.mode,
+		fact.nlink,
+		fact.mtimeNs,
+		fact.ctimeNs
+	];
+	const same = (fact) =>
+		fact.isFile() &&
+		!fact.isSymbolicLink() &&
+		identity(fact).every((value, index) => value === identity(before)[index]);
+	if (!same(before) || before.size < 4n || before.size > BigInt(Number.MAX_SAFE_INTEGER)) refuse();
+	const descriptor = fs.openSync(
+		filename,
+		fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK
+	);
+	try {
+		if (!same(fs.fstatSync(descriptor, { bigint: true }))) refuse();
+		const hash = crypto.createHash('sha256');
+		const chunk = Buffer.alloc(64 * 1024),
+			magic = Buffer.alloc(4);
+		let offset = 0;
+		while (offset < Number(before.size)) {
+			const count = fs.readSync(
+				descriptor,
+				chunk,
+				0,
+				Math.min(chunk.length, Number(before.size) - offset),
+				offset
+			);
+			if (
+				!Number.isSafeInteger(count) ||
+				count <= 0 ||
+				count > Math.min(chunk.length, Number(before.size) - offset)
+			)
+				refuse();
+			if (offset < magic.length)
+				chunk.copy(magic, offset, 0, Math.min(count, magic.length - offset));
+			hash.update(chunk.subarray(0, count));
+			offset += count;
+		}
+		if (
+			!magic.equals(Buffer.from([127, 69, 76, 70])) ||
+			!same(fs.fstatSync(descriptor, { bigint: true })) ||
+			!same(fs.lstatSync(filename, { bigint: true }))
+		)
+			refuse();
+		return hash.digest('hex');
+	} finally {
+		fs.closeSync(descriptor);
+	}
+}
 const NODE_OWNER = 'tools/test/run-linux-managed-http-native.cjs';
 const capturedNodeOwner = sha(bytes(path.join(ROOT, NODE_OWNER)));
 const {
@@ -310,9 +367,8 @@ async function run({
 		}
 		checkpoint = 'native-cli';
 		const nix = fs.realpathSync('/usr/bin/nix'),
-			nixBytes = bytes(nix);
+			nixHash = nativeExecutableHash(nix);
 		fs.accessSync(nix, fs.constants.X_OK);
-		if (!nixBytes.subarray(0, 4).equals(Buffer.from([127, 69, 76, 70]))) refuse();
 		if (
 			path.resolve(root) !== ROOT ||
 			sha(bytes(path.join(root, NODE_OWNER))) !== capturedNodeOwner
@@ -355,7 +411,7 @@ async function run({
 			}
 		}
 		const identities = {
-			nix: sha(nixBytes),
+			nix: nixHash,
 			worker: inputHashes[inputs[0]],
 			owner: inputHashes[inputs[1]],
 			probe: inputHashes[PROBE]
@@ -386,7 +442,7 @@ async function run({
 			if (!success(result) || hasRetainedPhases()) refuse();
 			phaseObservation.boundary = 'native_identity_fence';
 			if (
-				sha(bytes(nix)) !== identities.nix ||
+				nativeExecutableHash(nix) !== identities.nix ||
 				sha(bytes(path.join(root, 'tools/test/run-linux-managed-http-phase.py'))) !==
 					identities.worker ||
 				sha(bytes(path.join(root, 'tools/build/stage-linux-network-runtime.py'))) !==
@@ -575,6 +631,7 @@ if (require.main === module) {
 		});
 }
 module.exports = {
+	nativeExecutableHash,
 	run,
 	receipt,
 	runtimeReceipt,
