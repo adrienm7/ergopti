@@ -39,14 +39,23 @@
  * @param {string}   payload       - A complete /api/chat body the caller wrote
  *                                   (LLM_OllamaChat_Async); "" builds it from
  *                                   the other parameters.
+ * @param {Func|Integer} CurrentFn - Original requester admission, or 0 for a standalone request.
  * @returns {Integer} The request id, for correlating log lines. Aborting is
  *                    always all-or-nothing via LLM_OllamaCancelAllAsync — the
  *                    registry holds at most one in-flight slot by design.
  */
-LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_success, on_fail, stop_sequences := "", max_tokens := "", is_batch := false, tail_text := "", payload := "") {
+LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_success, on_fail, stop_sequences := "", max_tokens := "", is_batch := false, tail_text := "", payload := "", CurrentFn := 0) {
 	global _LLM_Ollama_AsyncCounter, _LLM_Ollama_Pending, LLM_OLLAMA_BASE_URL
+	if !HasMethod(CurrentFn, "Call") && !(CurrentFn is Integer && CurrentFn == 0)
+		throw TypeError("Ollama requester admission must be callable or 0.")
+	if HasMethod(CurrentFn, "Call") {
+		on_success := _LLM_Ollama_InvokeRequesterCurrent.Bind(CurrentFn, on_success, "on_success")
+		on_fail := _LLM_Ollama_InvokeRequesterCurrent.Bind(CurrentFn, on_fail, "on_fail")
+	}
 	_LLM_Ollama_AsyncCounter += 1
 	req_id := _LLM_Ollama_AsyncCounter
+	if !_LLM_Ollama_RequesterCurrent(CurrentFn)
+		return req_id
 	job := Map(
 		"req_id", req_id,
 		"model", model,
@@ -59,7 +68,8 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
 		"max_tokens", max_tokens,
 		"is_batch", is_batch,
 		"tail_text", tail_text,
-		"payload", payload
+		"payload", payload,
+		"requester_current", CurrentFn
 	)
 	try {
 		job["origin_custody"] := LLM_OllamaCaptureOriginCustody()
@@ -72,6 +82,10 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
 		_LLM_InvokeCallback(on_fail, "on_fail")
 		return req_id
 	}
+	; Origin capture can admit a newer request. A retired caller must not
+	; displace that request's pending job before the deferred dispatch guard.
+	if !_LLM_Ollama_RequesterCurrent(CurrentFn)
+		return req_id
 	global _LLM_Ollama_Async
 	if (_LLM_Ollama_Async.Count > 0) {
 		; Latest-only coalescing keeps a single pending slot. If a previous job
@@ -103,12 +117,13 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
  * @param {string}   payload    - The complete JSON body.
  * @param {function} on_success - Callback receiving the generated text.
  * @param {function} on_fail    - Failure callback while the captured origin is current.
+ * @param {Func|Integer} CurrentFn - Original requester admission retained through origin capture and dispatch.
  * @returns {Integer} The request id.
  */
-LLM_OllamaChat_Async(payload, on_success, on_fail) {
+LLM_OllamaChat_Async(payload, on_success, on_fail, CurrentFn := 0) {
 	if !(payload is String) || payload == ""
 		throw ValueError("LLM_OllamaChat_Async needs a JSON body.")
-	return LLM_OllamaGenerate_Async("", "", "", 0, on_success, on_fail, "", "", false, "", payload)
+	return LLM_OllamaGenerate_Async("", "", "", 0, on_success, on_fail, "", "", false, "", payload, CurrentFn)
 }
 
 ; Starts one /api/chat request via curl (UTF-8 file body). WinHTTP async ``Send()``
@@ -152,7 +167,8 @@ _LLM_Ollama_DispatchAsync(job) {
 		"base_url", job.Get("base_url", ""),
 		"origin_custody", job.Get("origin_custody", 0),
 		"origin_owned", job.Get("origin_owned", false),
-		"presence_generation", job.Get("presence_generation", LLM_AuxGeneration()))
+		"presence_generation", job.Get("presence_generation", LLM_AuxGeneration()),
+		"requester_current", job["requester_current"])
 	if job.Get("payload", "") != "" {
 		Port := _LLM_Ollama_PreflightPort
 		ScheduleFn := _LLM_CurlArtifactPortFn(Port, "schedule", _LLM_Ollama_SchedulePreflight)
@@ -257,16 +273,33 @@ _LLM_Ollama_OnPresence(req_id, Entry, payload, job, Model, Owner, Port, Receipt)
 	SpawnFn.Call(req_id, payload, Entry["tmp_payload"], Entry["tmp_stdout"], job)
 }
 
-_LLM_Ollama_PresenceStillCurrent(Entry) {
-	if Entry.Has("origin_custody")
-		return Entry.Get("presence_generation", 0) == LLM_AuxGeneration()
-			&& LLM_OllamaOriginCustodyCurrent(Entry["origin_custody"], Entry.Get("base_url", ""))
-	if Entry.Get("origin_owned", false) || LLM_OllamaManagedOriginRequired()
-		return false
-	if !Entry.Get("presence_admitted", false)
+_LLM_Ollama_RequesterCurrent(Current) {
+	if Current is Integer && Current == 0
 		return true
-	return Entry.Get("presence_generation", 0) == LLM_AuxGeneration()
-		&& LLM_OllamaOriginMatches(Entry.Get("base_url", ""))
+	Valid := Current.Call()
+	return (Valid is Integer) && Valid == true
+}
+
+_LLM_Ollama_InvokeRequesterCurrent(Current, Callback, Kind, Args*) {
+	if _LLM_Ollama_RequesterCurrent(Current)
+		_LLM_InvokeCallback(Callback, Kind, Args*)
+}
+
+_LLM_Ollama_PresenceStillCurrent(Entry) {
+	Current := Entry["requester_current"]
+	if !_LLM_Ollama_RequesterCurrent(Current)
+		return false
+	if Entry.Has("origin_custody")
+		Admitted := Entry.Get("presence_generation", 0) == LLM_AuxGeneration()
+			&& LLM_OllamaOriginCustodyCurrent(Entry["origin_custody"], Entry.Get("base_url", ""))
+	else if Entry.Get("origin_owned", false) || LLM_OllamaManagedOriginRequired()
+		return false
+	else if !Entry.Get("presence_admitted", false)
+		Admitted := true
+	else
+		Admitted := Entry.Get("presence_generation", 0) == LLM_AuxGeneration()
+			&& LLM_OllamaOriginMatches(Entry.Get("base_url", ""))
+	return Admitted && _LLM_Ollama_RequesterCurrent(Current)
 }
 
 ; Deferred spawn: writes the payload file and launches curl outside the
@@ -373,6 +406,14 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job, Port := 0) {
 			req_id, A_IsSuspended ? "suspended" : "cancelled before launch")
 		_LLM_Ollama_Async.Delete(req_id)
 		_LLM_InvokeCallback(job.Has("on_fail") ? job["on_fail"] : "", "on_fail")
+		_LLM_Ollama_DrainPending()
+		return
+	}
+	if entry is Map && !_LLM_Ollama_PresenceStillCurrent(entry) {
+		_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
+		_LLM_Ollama_CleanupCurlFiles(entry)
+		if _LLM_Ollama_Async.Has(req_id) && _LLM_Ollama_Async[req_id] == entry
+			_LLM_Ollama_Async.Delete(req_id)
 		_LLM_Ollama_DrainPending()
 		return
 	}

@@ -529,3 +529,128 @@ _LAG_BackboardNativeCustody(Withdraw) {
 for Withdraw in [true, false]
 	Test("LLM agent: Backboard native launch retains original requester " . Withdraw . " (agent-assistant-native)",
 		_LAG_BackboardNativeCustody.Bind(Withdraw))
+
+_LAG_LocalNativeCustody(Phase, Withdraw) {
+	_LAG_Run(_LAG_Menu("action", "", "local"), _LTN_Screen(LAG_SELECTION), Body)
+	Body(Fx, Lines, Sent) {
+		global _LLM_Ollama_Async, _LLM_Ollama_Pending, _LLM_Ollama_PreflightPort, _LLM_Vision_OllamaTransport
+		global _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_Ollama_AsyncCounter
+		Saved := [_LLM_Ollama_Async, _LLM_Ollama_Pending, _LLM_Ollama_PreflightPort,
+			_LLM_Vision_OllamaTransport, _LLM_AuxOwners, _LLM_AuxCleanupDebt]
+		Origin := LLM_OllamaCaptureOriginCustody
+		Spawn := _LLM_Ollama_DoSpawn
+		AssertFalse(Origin.HasOwnProp("Call")), AssertFalse(Spawn.HasOwnProp("Call"))
+		State := Map("timer", 0, "runs", 0, "writes", 0, "closed", 0, "seen", false, "paths", [])
+		Port := Map("write", Write, "run", Run, "poll", (*) => 0,
+			"terminate_process", (*) => true, "wait_process", (*) => 0, "close_process", Close)
+		try {
+			_LLM_Ollama_Async := Map(), _LLM_Ollama_Pending := ""
+			_LLM_AuxOwners := Map(), _LLM_AuxCleanupDebt := Map()
+			_LLM_Vision_OllamaTransport := 0
+			_LLM_Ollama_PreflightPort := Map("schedule", (Callback, Period) => State["timer"] := Callback,
+				"list_models", List)
+			Spawn.DefineProp("Call", {Call: ObserveSpawn})
+			if Phase == "origin" || Phase == "origin-newer"
+				Origin.DefineProp("Call", {Call: ObserveOrigin})
+			_LAG_Invoke("llm_agent_selection")
+			if Phase == "preflight" {
+				AssertTrue(HasMethod(State["timer"], "Call"), "the actual request reserved its deferred preflight")
+				State["seen"] := true
+				if Withdraw
+					AssertTrue(LLM_Agent_SetMode("off"))
+			}
+			if Phase == "origin-newer" && Withdraw {
+				AssertTrue(_LLM_Ollama_Pending is Map, "the newer legitimate request really occupies the pending slot")
+				AssertEqual(State["newest"], _LLM_Ollama_Pending["req_id"], "the stale origin capture cannot replace its newer pending successor")
+			}
+			Loop 3 {
+				if !HasMethod(State["timer"], "Call")
+					break
+				Tick := State["timer"], State["timer"] := 0
+				Tick.Call()
+			}
+			AssertTrue(State["seen"], "the actual local request reached its selected boundary")
+			AssertEqual(Withdraw && Phase != "spawn" && Phase != "origin-newer" ? 0 : 1, State["runs"],
+				"only the original local requester can acquire a curl process")
+			if Phase == "spawn" && Withdraw
+				AssertEqual(1, State["closed"], "withdrawal inside native acquisition retires the exact acquired process")
+			AssertEqual(0, Sent.Length)
+		} finally {
+			if Origin.HasOwnProp("Call")
+				Origin.DeleteProp("Call")
+			if Spawn.HasOwnProp("Call")
+				Spawn.DeleteProp("Call")
+			try {
+			for _, Entry in _LLM_Ollama_Async.Clone() {
+				_LLM_CurlReleaseEntryProcess(Entry, true, Port)
+				_LLM_Ollama_CleanupCurlFiles(Entry)
+			}
+			for _, Owner in _LLM_AuxOwners.Clone()
+				_LLM_AuxRetireOwner(Owner, true)
+			for Path in State["paths"]
+				AssertFalse(FileExist(Path), "exact local payload custody must leave no private file")
+			} finally {
+			_LLM_Ollama_Async := Saved[1], _LLM_Ollama_Pending := Saved[2], _LLM_Ollama_PreflightPort := Saved[3]
+			_LLM_Vision_OllamaTransport := Saved[4], _LLM_AuxOwners := Saved[5], _LLM_AuxCleanupDebt := Saved[6]
+			}
+		}
+		ObserveOrigin(Self, Args*) {
+			Origin.DeleteProp("Call")
+			Result := Origin.Call(Args*)
+			State["seen"] := true
+			if Withdraw {
+				if Phase == "origin-newer" {
+					AssertTrue(_LAG_Invoke("llm_agent_selection"))
+					AssertTrue(_LAG_Invoke("llm_agent_selection"))
+					State["newest"] := _LLM_Ollama_AsyncCounter
+					AssertTrue(_LLM_Ollama_Pending is Map, "the new request has a real reserved pending job")
+					AssertEqual(State["newest"], _LLM_Ollama_Pending["req_id"])
+				} else
+					AssertTrue(LLM_Agent_SetMode("off"))
+			}
+			return Result
+		}
+		ObserveSpawn(Self, Id, Payload, PayloadPath, OutputPath, Job, OriginalPort := 0) {
+			Spawn.DeleteProp("Call")
+			return Spawn.Call(Id, Payload, PayloadPath, OutputPath, Job, Port)
+		}
+		List(Callback, Owner, Strict) {
+			LLM_AuxBindResources(Owner, Map("finalizer", Owner["on_retired"]))
+			Callback.Call(LLM_LocalModelListReceipt(Map("ok", true, "status", 200,
+				"body", '{"models":[{"name":' . JsonStringLiteral(Owner["identity"]) . '}]}')))
+		}
+		Write(Path, Payload) {
+			State["writes"] += 1
+			State["paths"].Push(Path)
+			Result := FSWrite(Path, Payload)
+			if Phase == "write" {
+				State["seen"] := true
+				if Withdraw
+					AssertTrue(LLM_Agent_SetMode("off"))
+			}
+			return Result
+		}
+		Run(Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+			State["runs"] += 1
+			Pid := 990001
+			ProcessOwner := Map("pid", Pid, "handle", 990001, "released", false)
+			if Phase == "spawn" {
+				State["seen"] := true
+				if Withdraw
+					AssertTrue(LLM_Agent_SetMode("off"))
+			}
+		}
+		Close(Handle) {
+			AssertEqual(990001, Handle, "retirement receives the exact controlled native capability")
+			State["closed"] += 1
+			return true
+		}
+	}
+}
+for Phase in ["origin", "preflight", "write", "spawn"]
+	for Withdraw in [true, false]
+		Test("LLM agent: local requester native custody " . Phase . " withdrawal=" . Withdraw . " (agent-local-requester)",
+			_LAG_LocalNativeCustody.Bind(Phase, Withdraw))
+for Withdraw in [true, false]
+	Test("LLM agent: local requester preserves newer pending job withdrawal=" . Withdraw . " (agent-local-pending-requester)",
+		_LAG_LocalNativeCustody.Bind("origin-newer", Withdraw))

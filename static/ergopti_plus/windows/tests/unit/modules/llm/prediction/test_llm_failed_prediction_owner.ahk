@@ -12,11 +12,11 @@
 #Requires AutoHotkey v2.0
 
 _LFO_Transport(State, Entry, SystemPrompt, Context, Temperature, OnSuccess, OnFail,
-		Tail := "", MaxTokens := "") {
+		Tail := "", MaxTokens := "", Kind := "", TimeoutMs := 0, CurrentFn := 0) {
 	global _LLM_Engine
 	State.Calls.Push(Map("entry", Entry, "system", SystemPrompt, "ctx", Context,
 		"temperature", Temperature, "on_success", OnSuccess, "on_fail", OnFail,
-		"tail", Tail, "max_tokens", MaxTokens, "request_id", _LLM_Engine["request_id"]))
+		"tail", Tail, "max_tokens", MaxTokens, "requester_current", CurrentFn, "request_id", _LLM_Engine["request_id"]))
 	return State.Calls.Length
 }
 

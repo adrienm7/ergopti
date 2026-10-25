@@ -518,10 +518,10 @@ _LAG_Run(Menu, Screen, Body) {
 		App: "Mail", Secure: false }
 	try {
 		_I18nLocale := "fr"
-		_LLM_Vision_RemoteTransport := (Resolved, Url, Payload, OnSuccess, OnFail) => Fx.Remote.Push(Map(
-			"resolved", Resolved, "url", Url, "body", Payload, "on_success", OnSuccess, "on_fail", OnFail))
-		_LLM_Vision_OllamaTransport := (Payload, OnSuccess, OnFail) => Fx.Ollama.Push(Map(
-			"body", Payload, "on_success", OnSuccess, "on_fail", OnFail))
+		_LLM_Vision_RemoteTransport := (Resolved, Url, Payload, OnSuccess, OnFail, CurrentFn) => Fx.Remote.Push(Map(
+			"resolved", Resolved, "url", Url, "body", Payload, "on_success", OnSuccess, "on_fail", OnFail, "requester_current", CurrentFn))
+		_LLM_Vision_OllamaTransport := (Payload, OnSuccess, OnFail, CurrentFn) => Fx.Ollama.Push(Map(
+			"body", Payload, "on_success", OnSuccess, "on_fail", OnFail, "requester_current", CurrentFn))
 		_LLM_Agent_PromptFn := _LAG_FakePrompt.Bind(Fx)
 		_LLM_Agent_ContextProbe := () => _LAG_Context(Fx)
 		_LLM_Agent_SourceProbe := () => Map("hwnd", 7, "control", 9)
