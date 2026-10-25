@@ -363,6 +363,125 @@ for _RIT_MetadataField in ["created_at", "tag", "from_version"] {
 }
 
 
+_RIT_LatestBackupUsesCollisionOrder(Kind, Tag) {
+	Root := A_Temp . "\ergopti_rit_order_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "[script]`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		loop 11 {
+			AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = " . A_Index . "`n"),
+				"each collision must back up a distinct generation")
+			Created := ConfigBackup_Create(Cfg, Kind, Tag, "", Rules, Clock)
+			Latest := ConfigBackup_Latest(Cfg, Kind, Rules)
+			AssertEqual(Created["id"], Latest["id"],
+				"every collision must select the newest complete backup, including collision " . A_Index)
+		}
+		AssertEqual(Created["id"], ConfigBackup_Latest(Cfg, Kind, Rules)["id"])
+		FileDelete(Created["path"] . "\" . Rules["manifest"])
+		AssertEqual(SubStr(Created["id"], 1, -2) . "10", ConfigBackup_Latest(Cfg, Kind, Rules)["id"],
+			"an interrupted newest backup must expose the previous complete collision")
+		LaterClock := () => Map("stamp", "20260930-101501", "iso", "2026-09-30T10:15:01Z")
+		Later := ConfigBackup_Create(Cfg, Kind, Tag, "", Rules, LaterClock)
+		AssertEqual(Later["id"], ConfigBackup_Latest(Cfg, Kind, Rules)["id"],
+			"a later timestamp must outrank every earlier collision counter")
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "changed = true`n"))
+		Selected := ConfigBackup_Latest(Cfg, Kind, Rules)
+		Restored := ConfigBackup_Restore(Cfg, Selected["id"], Rules, LaterClock)
+		AssertTrue(Restored["ok"], "the selected newest backup must remain restorable")
+		AssertEqual("generation = 11`n", FSReadStrict(Cfg . "\config.toml"),
+			"restoring the latest record must recover its exact configuration generation")
+		AssertEqual("changed = true`n", FSReadStrict(Restored["pre"]["path"] . "\config\config.toml"),
+			"the integrated restore must retain the replaced configuration first")
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+for _RIT_OrderKind in ["pre_install", "pre_restore"] {
+	for _RIT_OrderTag in ["", "v1.2.3", "2026-9"]
+		Test("Config backup: latest follows numeric collision order for " . _RIT_OrderKind . " tag=" . _RIT_OrderTag
+			. " (config-backup-collision-order)", _RIT_LatestBackupUsesCollisionOrder.Bind(_RIT_OrderKind, _RIT_OrderTag))
+}
+
+
+_RIT_BackupOrderKeepsDistinctTagIdentity() {
+	Root := A_Temp . "\ergopti_rit_tags_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "[script]`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		First := ConfigBackup_Create(Cfg, "pre_install", "v1-9", "", Rules, Clock)
+		Second := ConfigBackup_Create(Cfg, "pre_install", "v1-10", "", Rules, Clock)
+		AssertEqual(First["id"], ConfigBackup_Latest(Cfg, "pre_install", Rules)["id"],
+			"different numeric release tags retain the existing deterministic tie order")
+		LaterClock := () => Map("stamp", "20260930-101501", "iso", "2026-09-30T10:15:01Z")
+		Later := ConfigBackup_Create(Cfg, "pre_install", "v1-1", "", Rules, LaterClock)
+		AssertEqual(Later["id"], ConfigBackup_Latest(Cfg, "pre_install", Rules)["id"],
+			"the exact creation timestamp remains primary across different release tags")
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+Test("Config backup: collision ordering preserves release tag identity (config-backup-collision-order)",
+	_RIT_BackupOrderKeepsDistinctTagIdentity)
+
+
+_RIT_BackupCounterNeverReusesRemovedNames(RemovedIndex, Tag) {
+	Root := A_Temp . "\ergopti_rit_gap_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "[script]`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Created := []
+		loop 3
+			Created.Push(ConfigBackup_Create(Cfg, "pre_install", Tag, "", Rules, Clock))
+		DirDelete(Created[RemovedIndex]["path"], true)
+		Newest := ConfigBackup_Create(Cfg, "pre_install", Tag, "", Rules, Clock)
+		AssertEqual(Newest["id"], ConfigBackup_Latest(Cfg, "pre_install", Rules)["id"],
+			"removing an older backup must not make a new generation sort before retained backups")
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+for _RIT_RemovedIndex in [1, 2] {
+	for _RIT_GapTag in ["", "v1.2.3", "2026-9"]
+		Test("Config backup: removing collision " . _RIT_RemovedIndex . " preserves newest selection for tag=" . _RIT_GapTag
+			. " (config-backup-collision-gap)", _RIT_BackupCounterNeverReusesRemovedNames.Bind(_RIT_RemovedIndex, _RIT_GapTag))
+}
+
+
+_RIT_BackupCounterOverflowRefusesBeforePublication(Counter) {
+	Root := A_Temp . "\ergopti_rit_counter_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "[script]`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Folder := Cfg . "\" . Rules["folder"]
+		DirCreate(Folder . "\" . Rules["kinds"]["pre_install"] . "-20260930-101500-" . Counter)
+		Failure := ""
+		try ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		catch as Err
+			Failure := Err.Message
+		AssertTrue(InStr(Failure, "collision counter") > 0,
+			"an exhausted or unrepresentable counter must refuse instead of wrapping or reusing a name")
+		AssertEqual("[script]`n", FSReadStrict(Cfg . "\config.toml"))
+		Manifests := 0
+		loop files Folder . "\" . Rules["manifest"], "FR"
+			Manifests += 1
+		AssertEqual(0, Manifests, "a refused allocation cannot publish a complete backup")
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+for _RIT_Counter in ["9223372036854775807", "9223372036854775808"]
+	Test("Config backup: counter " . _RIT_Counter . " refuses before publication (config-backup-counter-overflow)",
+		_RIT_BackupCounterOverflowRefusesBeforePublication.Bind(_RIT_Counter))
+
+
 _RIT_ManifestPathsStayInside() {
 	AssertTrue(ConfigBackup_IsContained("hotstrings/personal_hotstrings.toml"))
 	for _, Bad in ["", "/etc/passwd", "..\x", "a/../b", "a//b", "C:/x", "a\b", "./a"]
