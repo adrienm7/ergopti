@@ -223,6 +223,54 @@ helpers.describe("infra.boot_profiler stages (boot-stage-trail)", function()
 	end)
 end)
 
+helpers.describe("infra.boot_profiler CPU time beside wall time", function()
+	helpers.it("reports each stage's CPU milliseconds after its wall time", function()
+		configure_journal()
+		reset_capture()
+		local cpu = 500
+		boot.use_cpu_clock(function() return cpu end)
+		CLOCK_NS = 40e9
+		boot.begin()
+		boot.stage("Compute")
+		CLOCK_NS = CLOCK_NS + 100e6   -- 100 ms of wall time ...
+		cpu = cpu + 90                -- ... of which 90 ms were CPU: the stage computes.
+		boot.mark("Compute")
+		boot.stage("Wait")
+		CLOCK_NS = CLOCK_NS + 200e6   -- 200 ms of wall time ...
+		cpu = cpu + 5                 -- ... with 5 ms of CPU: the stage waits.
+		boot.mark("Wait")
+		local compute, wait
+		for _, record in ipairs(captured) do
+			if record.lvl == "success" and record.args[1] == "Compute" then compute = record end
+			if record.lvl == "success" and record.args[1] == "Wait" then wait = record end
+		end
+		helpers.assert_true(math.abs(compute.args[5] - 90) < 1e-6, "Compute CPU is 90 ms")
+		helpers.assert_true(math.abs(wait.args[5] - 5) < 1e-6, "Wait CPU is 5 ms")
+		helpers.assert_contains(table.concat(journal_lines("/journal/fallback.log")), "cpu 90.0 ms)")
+		helpers.assert_true(math.abs(boot.cpu_ms() - 95) < 1e-6, "boot CPU total spans begin() to now")
+		boot.use_cpu_clock(nil)
+	end)
+
+	helpers.it("writes the boot CPU total as one never-collapsed evidence line", function()
+		configure_journal()
+		local lines = {}
+		package.loaded["infra.logger"].evidence = function(_, fmt, ...)
+			lines[#lines + 1] = string.format(fmt, ...)
+			return true
+		end
+		local cpu = 10
+		boot.use_cpu_clock(function() return cpu end)
+		CLOCK_NS = 60e9
+		boot.begin()
+		CLOCK_NS = CLOCK_NS + 300e6
+		cpu = cpu + 120
+		boot.complete()
+		helpers.assert_eq(lines[#lines], "Boot CPU: 120 ms of process CPU over 300 ms of boot.")
+		boot.use_cpu_clock(nil)
+		package.loaded["infra.logger"].evidence = nil
+	end)
+end)
+
 helpers.describe("infra.boot_profiler sub-stages and require trace", function()
 	helpers.it("names the slowest first-time requires of a stage with their own time", function()
 		configure_journal()

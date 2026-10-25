@@ -56,3 +56,38 @@ helpers.describe("boot profiler: one summary line at completion", function()
 		error("no boot summary line")
 	end)
 end)
+
+helpers.describe("boot profiler: CPU time beside wall time", function()
+	helpers.it("reports each stage's CPU milliseconds and the boot CPU total", function()
+		local profiler, lines = fixture()
+		local cpu = 100
+		profiler._use_cpu_clock(function() return cpu end)
+		profiler.begin()
+		profiler.stage("config")
+		cpu = cpu + 30
+		profiler.stage_done("config")
+		profiler.stage("input hooks")
+		cpu = cpu + 12
+		profiler.stage_done("input hooks")
+		profiler.complete()
+		helpers.assert_eq(profiler.cpu_ms(), 42, "the boot CPU total spans begin() to now")
+		local joined = table.concat(lines, "\n")
+		helpers.assert_contains(joined, "Boot stage 'config' done in ")
+		helpers.assert_contains(joined, "(cpu 30 ms)")
+		helpers.assert_contains(joined, "(cpu 12 ms)")
+		helpers.assert_contains(joined, "Boot complete in ")
+		helpers.assert_contains(joined, "(cpu 42 ms).")
+		helpers.assert_contains(joined, "(cpu 42ms) heap=")
+		helpers.assert_contains(joined, "config=")
+		helpers.assert_contains(joined, "(cpu 30ms)")
+	end)
+
+	helpers.it("measures the real process clock when no test clock is installed", function()
+		local profiler = fixture()
+		profiler.begin()
+		local sink = 0
+		for index = 1, 2000000 do sink = sink + index % 7 end
+		helpers.assert_true(sink > 0)
+		helpers.assert_true(profiler.cpu_ms() > 0, "a busy loop must consume CPU time")
+	end)
+end)

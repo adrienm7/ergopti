@@ -22,10 +22,6 @@
 		],
 		"divergent": false
 	},
-	"DEFAULT_INTERVAL_SEC": {
-		"files": ["linux/modules/updater/manager.lua", "macos/infra/phase_stats.lua"],
-		"divergent": false
-	},
 	"DEFAULT_MAX_OUTPUT_BYTES": {
 		"files": ["linux/adapters/owned_process.lua", "linux/adapters/process_runner.lua"],
 		"divergent": false
@@ -108,8 +104,7 @@
 			"macos/infra/boot_profiler.lua",
 			"macos/infra/hotpath_profiler.lua",
 			"macos/infra/key_event_health.lua",
-			"macos/infra/keystroke_integrity.lua",
-			"macos/infra/phase_stats.lua"
+			"macos/infra/keystroke_integrity.lua"
 		],
 		"divergent": false
 	},

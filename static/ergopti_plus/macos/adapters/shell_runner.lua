@@ -51,7 +51,19 @@ end
 -- Every exit is reported by program name, status and duration through one
 -- throttled recorder; the command line is never logged because it can carry
 -- user text. Successful spawns and their exit codes used to leave no trace.
-local _record_exit = RuntimeLog.new_process_log(Logger, LOG, now_ms)
+local _log_exit = RuntimeLog.new_process_log(Logger, LOG, now_ms)
+
+--- Times the child as the phase process.<program> (the Linux driver records the
+--- same phase on every spawn path), then reports its exit as above. The
+--- synchronous run/capture paths used to leave no phase: only the task path did.
+--- @param program string Sanitised program basename from RuntimeLog.program_name.
+--- @param status any Exit status.
+--- @param duration_ms number Wall milliseconds.
+--- @return boolean logged Whether the throttled recorder wrote a line.
+local function _record_exit(program, status, duration_ms)
+	PhaseStats.add_ms("process." .. tostring(program), duration_ms)
+	return _log_exit(program, status, duration_ms)
+end
 local CAPTURED_OUTPUT_MAX_BYTES = 4 * 1024 * 1024
 local CAPTURED_OUTPUT_LIMIT_EXIT_CODE = -1
 local CAPTURED_OUTPUT_LIMIT_DETAIL = "ShellRunner output limit exceeded."
@@ -613,7 +625,6 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 			local program = RuntimeLog.program_name(executable)
 			local duration_ms = _started_ms and (now_ms() - _started_ms) or 0
 			_record_exit(program, exit_code, duration_ms)
-			PhaseStats.add("process." .. tostring(program), duration_ms * 1e6)
 		end
 		if _start_dispatching then
 			if _pending_completion == nil then

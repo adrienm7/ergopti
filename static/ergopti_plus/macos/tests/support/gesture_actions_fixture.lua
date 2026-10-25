@@ -16,6 +16,8 @@ local OWNERS = {
 	-- The real logger's shared core and the phase counters it records into.
 	"logger",
 	"infra.phase_stats",
+	-- The phase counters' bookkeeping, shared with the Linux driver.
+	"phase_stats_core",
 	-- The real paths, logger and configuration owners split paths through this pure owner,
 	-- and the timer scheduler admits delays through the number policy.
 	"native_path",
