@@ -171,9 +171,13 @@ helpers.describe("application chooser requires native confirmation", function()
 					"refused|modal:1")
 			end)
 		end
-		helpers.it("(linux-app-chooser-status) " .. tool .. " successful choice preserves the first-line id", function()
-			helpers.assert_eq(native_dialog_receipt(tool, 0, "/usr/share/applications/org.gnome.Nautilus.desktop\nignored\n"),
+		helpers.it("(linux-app-chooser-status) " .. tool .. " successful choice preserves the exact native id", function()
+			helpers.assert_eq(native_dialog_receipt(tool, 0, "/usr/share/applications/org.gnome.Nautilus.desktop\n"),
 				"accepted|org.gnome.Nautilus|modal:1")
+		end)
+		helpers.it("(linux-app-chooser-status) " .. tool .. " refuses a line break inside the full record", function()
+			helpers.assert_eq(native_dialog_receipt(tool, 0, "/usr/share/applications/org.gnome.Nautilus.desktop\nignored\n"),
+				"refused|modal:1")
 		end)
 		helpers.it("(linux-app-chooser-status) " .. tool .. " confirmed empty output is not an application", function()
 			helpers.assert_eq(native_dialog_receipt(tool, 0, ""), "refused|modal:1")

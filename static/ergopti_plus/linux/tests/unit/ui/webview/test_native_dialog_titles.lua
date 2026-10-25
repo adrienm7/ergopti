@@ -315,8 +315,9 @@ end)
 --- @param backend string Native chooser name.
 --- @param status number Independent child exit code.
 --- @param output string Independent child stdout.
+--- @param application_root string|nil Real XDG data root for the application chooser.
 --- @return string receipt
-local function picker_exit_receipt(backend, status, output)
+local function picker_exit_receipt(backend, status, output, application_root)
 	local created, directory = Shell.exec_checked("mktemp -d")
 	assert(created)
 	directory = directory:gsub("[\r\n]+$", "")
@@ -335,10 +336,12 @@ local function picker_exit_receipt(backend, status, output)
 			.. "local modals = 0\n"
 			.. "package.loaded['ui.modal'] = { run = function(fn) modals = modals + 1; return fn() end }\n"
 			.. "local paths = { default_config_dir = function() return '/owned/default' end }\n"
-			.. "local value = require('ui.config_dir_picker').pick(shell, paths, nil, '/owned/current')\n"
+			.. (application_root and "local value = require('ui.app_chooser').pick(shell, 'Choose application')\n"
+				or "local value = require('ui.config_dir_picker').pick(shell, paths, nil, '/owned/current')\n")
 			.. "io.write(value == nil and 'refused' or 'accepted|' .. value)\n"
 			.. "io.write('|modal:' .. modals)\n")
 		local command = "env PATH=" .. Shell.quote(directory .. ":" .. (os.getenv("PATH") or ""))
+			.. (application_root and " XDG_DATA_HOME=" .. Shell.quote(application_root) or "")
 			.. " " .. Shell.quote(arg[-1] or "luajit") .. " " .. Shell.quote(worker)
 		local executed, result, reason = Shell.exec_checked(command)
 		assert(executed, tostring(reason))
@@ -387,6 +390,34 @@ h.describe("native configuration picker exit receipts", function()
 		end)
 	end
 end)
+
+h.describe("native application picker record admission", function()
+	for _, backend in ipairs({ "zenity", "kdialog" }) do
+		h.it("picker-native-record: " .. backend .. " never replaces a selected desktop file with its first line", function()
+			local created, directory = Shell.exec_checked("mktemp -d")
+			assert(created)
+			directory = directory:gsub("[\r\n]+$", "")
+			local applications = directory .. "/applications"
+			local prefix = applications .. "/owned.desktop"
+			local selected = prefix .. "\nother.desktop"
+			local ok, receipt = xpcall(function()
+				assert(Shell.run("mkdir -- " .. Shell.quote(applications)))
+				for _, filename in ipairs({ prefix, selected }) do
+					local file = assert(io.open(filename, "wb"))
+					assert(file:write("[Desktop Entry]\nType=Application\nName=Owned\nExec=true\n"))
+					assert(file:close())
+				end
+				return picker_exit_receipt(backend, 0, selected .. "\n", directory)
+			end, debug.traceback)
+			os.remove(prefix); os.remove(selected)
+			assert(Shell.run("rmdir -- " .. Shell.quote(applications) .. " " .. Shell.quote(directory)))
+			if not ok then error(receipt, 0) end
+			h.assert_eq(receipt, "refused|modal:1",
+				"an unsupported desktop-file id must be refused, never turned into another installed app")
+		end)
+	end
+end)
+
 
 h.describe("configuration filesystem root", function()
 	for _, backend in ipairs({ "zenity", "kdialog" }) do
