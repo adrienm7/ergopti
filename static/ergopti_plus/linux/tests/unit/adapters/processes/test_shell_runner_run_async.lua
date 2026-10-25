@@ -103,6 +103,23 @@ local function fresh_runner(luv)
 	package.loaded["luv"], package.preload["luv"] = previous_luv, previous_preload
 	package.loaded["adapters.shell_runner"] = previous_runner
 	package.loaded["adapters.owned_process"] = previous_owned
+	local run_async, captured_owner = runner.run_async, nil
+	local function pack(...) return { n = select("#", ...), ... } end
+	-- The real owner loads on first async admission. Keep that acquisition
+	-- inside the explicit native dependency scope instead of loading it early.
+	runner.run_async = function(...)
+		local saved_native, saved_preload = package.loaded["luv"], package.preload["luv"]
+		local saved_shell, saved_owner = package.loaded["adapters.shell_runner"], package.loaded["adapters.owned_process"]
+		package.loaded["luv"], package.loaded["adapters.shell_runner"] = luv, runner
+		package.loaded["adapters.owned_process"] = captured_owner
+		if not luv then package.preload["luv"] = function() error("no libuv here") end end
+		local result = pack(pcall(run_async, ...))
+		captured_owner = package.loaded["adapters.owned_process"]
+		package.loaded["luv"], package.preload["luv"] = saved_native, saved_preload
+		package.loaded["adapters.shell_runner"], package.loaded["adapters.owned_process"] = saved_shell, saved_owner
+		if not result[1] then error(result[2], 0) end
+		return (table.unpack or unpack)(result, 2, result.n)
+	end
 	return runner
 end
 

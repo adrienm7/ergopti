@@ -47,7 +47,7 @@ local RuntimeLog = require("diagnostics.runtime_log")
 local Perf = require("infra.perf_counters")
 local PhaseStats = require("infra.phase_stats")
 local NumberPolicy = require("number_policy")
-local OwnedProcess = require("adapters.owned_process")
+local OwnedProcess = nil
 local ok_luv, luv = pcall(require, "luv")
 if not ok_luv then luv = nil end
 
@@ -498,6 +498,9 @@ function M.run_async(executable, args, options, callback)
 	if not NumberPolicy.within_timer_ceiling(timeout_ms) or timeout_ms <= 0 then
 		return nil, "a positive timeout_ms within the timer ceiling is required"
 	end
+	-- Synchronous shell consumers and cold connector shutdown own no native
+	-- process ledger. Capture it once only after an async request is admitted.
+	if not OwnedProcess then OwnedProcess = require("adapters.owned_process") end
 	local request = { name = executable, started = Monotonic.now_ms(), constructing = true, admitted = false }
 	local pending
 	local function record(result)
