@@ -103,7 +103,7 @@ local function load_rotation_fixture(options)
 		function handle:write(line)
 			if write_failures > 0 then
 				write_failures = write_failures - 1
-				written_bytes = written_bytes .. "{partial"
+				written_bytes = written_bytes .. line:sub(1, 8)
 				return nil, "ENOSPC", 28
 			end
 			written_bytes = written_bytes .. line
@@ -158,12 +158,13 @@ local function load_log_manager_fixture(sink_failures, initialize)
 	end
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 
-	local appended = {}
+	local appended, attempts = {}, {}
 	local controls = {}
 	package.loaded["modules.keystats.rotation"] = {
 		init = function() end,
 		is_initialized = function() return true end,
 		append_log = function(entry)
+			attempts[#attempts + 1] = entry
 			if sink_failures > 0 then
 				sink_failures = sink_failures - 1
 				return false
@@ -297,6 +298,7 @@ local function load_log_manager_fixture(sink_failures, initialize)
 		controls = controls,
 		state = state,
 		appended = appended,
+		attempts = attempts,
 		fire_next = function()
 			for _, handle in ipairs(delayed) do
 				if handle.running then return handle:fire() end
@@ -323,17 +325,18 @@ helpers.describe("rotation exact append transaction", function()
 			return load_rotation_fixture({ write_failures = 1 })
 		end, function(fixture)
 			fixture.rotation.init({ paths = { today_log_path = "/tmp/today.log" }, state = {} })
-			local first = fixture.rotation.append_log({ type = "typing", text = "owned" })
-			local second = fixture.rotation.append_log({ type = "typing", text = "owned" })
+			local entry = { type = "typing", text = "owned" }
+			local first = fixture.rotation.append_log(entry)
+			local second = fixture.rotation.append_log(entry)
 
 			helpers.assert_eq(first, false, "nil, ENOSPC from write must be an explicit refusal")
 			helpers.assert_true(second, "the exact retry must commit after storage recovers")
 			helpers.assert_eq(#fixture.durable_lines, 1,
 				"one refused write followed by one retry must yield one complete logical line")
-			helpers.assert_true(fixture.written_bytes():find("{partial\n", 1, true) ~= nil,
-				"retry must isolate a possibly partial failed write behind a line boundary")
-			helpers.assert_true(fixture.closed_handles() >= 1,
-				"the ambiguous failed handle must be invalidated before retry")
+			helpers.assert_eq(fixture.written_bytes(), hs.json.encode(entry) .. "\n",
+				"retry must resume the exact serialized prefix without duplicating the event")
+			helpers.assert_eq(fixture.closed_handles(), 0,
+				"the refused append must retain its original stream until the exact receipt settles")
 		end)
 	end)
 
@@ -648,6 +651,11 @@ helpers.describe("log_manager append transaction ownership", function()
 			helpers.assert_eq(fixture.appended[1].text, "old",
 				"retry must serialize the detached snapshot, not the replacement live buffer")
 			helpers.assert_eq(fixture.appended[1].events[1][1], "old")
+			helpers.assert_true(#fixture.attempts >= 3, "the fixture must exercise repeated refused attempts")
+			for _, attempted in ipairs(fixture.attempts) do
+				helpers.assert_true(rawequal(attempted, fixture.appended[1]),
+					"every retry must retain the exact prepared typing entry, not reconstruct an equal table")
+			end
 		end)
 	end)
 

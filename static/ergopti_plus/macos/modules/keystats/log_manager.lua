@@ -607,9 +607,13 @@ _drain_deferred_logs = function()
 			operation.prepared = true
 			operation.build = nil
 		end
-		local entry = (operation.kind == "entry" or operation.kind == "entry_builder")
-			and operation.value
-			or _typing_entry_from_snapshot(operation.value)
+		-- Rotation retains the first serialized receipt after a refused write.
+		-- Reuse this exact prepared entry, including detached typing snapshots.
+		if operation.entry == nil then
+			operation.entry = (operation.kind == "entry" or operation.kind == "entry_builder")
+				and operation.value or _typing_entry_from_snapshot(operation.value)
+		end
+		local entry = operation.entry
 		local ok, accepted_or_err = xpcall(function()
 			return Rotation.append_log(entry)
 		end, debug.traceback)
