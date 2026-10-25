@@ -39,16 +39,19 @@ _IPET_ChildSource() {
 	Seen := Map()
 	; The probe presents its target through the shared window presenter and
 	; arms its rival through the timer adapter.
-	for Symbol in ["LoggerSetTestSink", "WallClockTimestamp", "TickElapsed", "WMPresentWindow", "TimerSetCallback"] {
+	for Symbol in ["LoggerSetTestSink", "WallClockTimestamp", "TickElapsed", "WMPresentWindow", "TimerSetCallback",
+		"PerfClockTicks", "InputProbeNativeCallNext", "KS_IsDown"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The real probe requires its genuine whole support owner: " . Symbol)
 		AssertFalse(Seen.Has(Owner), "The native support owners must be distinct")
 		Seen[Owner] := true
 		Code .= "#Include " . Owner . "`n"
 	}
-	AssertEqual(5, Seen.Count, "The real logger, native clocks, window presenter and timer adapter must be present")
+	AssertEqual(8, Seen.Count, "The real logger, native clocks, window presenter, timer, clock, hook and key-state adapters must be present")
 	Owner := _DriverProductionFileForSymbol("InputProbe_RunHookOrder")
 	Source := FSReadStrict(Owner)
+	; The copy lives elsewhere; its relative adapter includes are the owners above.
+	Source := RegExReplace(Source, "m)^#Include\s+\.\./adapters/\S+\R", "")
 	for Symbol in ["InputProbe_RunHookOrder", "_IP_Admission", "_IP_OpenTarget", "_IP_HookInject", "_IP_HookProc"]
 		AssertTrue(IsObject(_DriverFindFunctionDefinition(&Source, Symbol)), "The complete native probe route must exist: " . Symbol)
 	Observed := _IPET_Overlay(Source, &Count)
