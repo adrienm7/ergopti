@@ -46,7 +46,29 @@ const EXCLUDED = Object.freeze({
 });
 const PORTABLE_CPP = Object.freeze(['hs274-raw-capture-test.cpp', 'hs274-stream-session-test.cpp']);
 
+// Each child has Node's ordinary synchronous capture ceiling. A verbose child
+// remains a failed check on ENOBUFS, rather than silently dropping its status.
+const CHILD_CAPTURE_BYTES = 1024 * 1024;
+// Final receipts retain bounded UTF-8 edges per stream, independently of later
+// healthy suite output. This is a console-receipt budget, not a suite log limit.
+const FAILURE_EXCERPT_BYTES = 4096;
 const failures = [];
+
+/** Retains valid UTF-8 edges and accounts explicitly for omitted source bytes. */
+function excerpt(text) {
+	const bytes = Buffer.from(text || '', 'utf8');
+	if (bytes.length <= FAILURE_EXCERPT_BYTES)
+		return { head: bytes.toString('utf8'), tail: '', omitted_bytes: 0 };
+	let headEnd = FAILURE_EXCERPT_BYTES / 2;
+	let tailStart = bytes.length - headEnd;
+	while ((bytes[headEnd] & 0xc0) === 0x80) headEnd--;
+	while ((bytes[tailStart] & 0xc0) === 0x80) tailStart++;
+	return {
+		head: bytes.subarray(0, headEnd).toString('utf8'),
+		tail: bytes.subarray(tailStart).toString('utf8'),
+		omitted_bytes: tailStart - headEnd
+	};
+}
 
 /**
  * Runs one command from the repository root and records a failure with its reason.
@@ -57,14 +79,31 @@ const failures = [];
  */
 function run(label, command, args) {
 	console.log(`\n=== ${label} ===`);
-	const result = spawnSync(command, args, {
-		cwd: ROOT,
-		stdio: 'inherit',
-		env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
-	});
-	if (result.error || result.status !== 0) {
-		const reason = result.error ? result.error.message : `exit status ${result.status}`;
-		failures.push(`${label}: ${reason}`);
+	let result;
+	try {
+		result = spawnSync(command, args, {
+			cwd: ROOT,
+			stdio: ['inherit', 'pipe', 'pipe'],
+			encoding: 'utf8',
+			maxBuffer: CHILD_CAPTURE_BYTES,
+			env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+		});
+	} catch (error) {
+		result = { error, status: null, signal: null };
+	}
+	if (result.stdout) process.stdout.write(result.stdout);
+	if (result.stderr) process.stderr.write(result.stderr);
+	if (result.error || result.status !== 0 || result.signal) {
+		failures.push({
+			kind: 'child',
+			label,
+			exit_code: result.status ?? null,
+			signal: result.signal ?? null,
+			error_code: result.error?.code ?? null,
+			error: excerpt(result.error?.message),
+			stdout: excerpt(result.stdout),
+			stderr: excerpt(result.stderr)
+		});
 		return false;
 	}
 	return true;
@@ -72,10 +111,18 @@ function run(label, command, args) {
 
 const entries = fs.readdirSync(DIAGNOSTICS);
 for (const name of Object.keys(EXCLUDED)) {
-	if (!entries.includes(name)) failures.push(`stale exclusion ${name}: the file no longer exists`);
+	if (!entries.includes(name))
+		failures.push({
+			kind: 'inventory',
+			label: `stale exclusion ${name}: the file no longer exists`
+		});
 }
 const suites = entries.filter((name) => /^hs274_.+_test\.py$/.test(name) && !EXCLUDED[name]).sort();
-if (suites.length === 0) failures.push('no hs274_*_test.py suite found in tools/diagnostics');
+if (suites.length === 0)
+	failures.push({
+		kind: 'inventory',
+		label: 'no hs274_*_test.py suite found in tools/diagnostics'
+	});
 for (const suite of suites) {
 	run(`${PYTHON} -m unittest ${suite}`, PYTHON, [
 		'-m',
@@ -110,9 +157,22 @@ try {
 
 if (failures.length > 0) {
 	console.error(`\n${failures.length} HS-274 diagnostics check(s) failed:`);
-	for (const failure of failures) console.error(`  - ${failure}`);
-	process.exit(1);
+	for (const failure of failures) console.error(`  - ${failure.label}`);
+	// One compact line keeps every failed child's bounded diagnosis in the
+	// aggregate tail when the outer JS runner clips each stream's middle.
+	console.error(
+		'HS274_FAILURE_RECEIPT ' +
+			JSON.stringify({
+				schema: 1,
+				capture_limit_bytes: CHILD_CAPTURE_BYTES,
+				excerpt_limit_bytes: FAILURE_EXCERPT_BYTES,
+				failures
+			})
+	);
+	// Let piped output drain: an immediate exit can cut off the final receipt.
+	process.exitCode = 1;
+} else {
+	console.log(
+		`\nAll ${suites.length} HS-274 Python suites and ${PORTABLE_CPP.length} C++ tests passed.`
+	);
 }
-console.log(
-	`\nAll ${suites.length} HS-274 Python suites and ${PORTABLE_CPP.length} C++ tests passed.`
-);
