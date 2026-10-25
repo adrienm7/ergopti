@@ -468,7 +468,12 @@ helpers.describe("linux-open-session-crash-recovery", function()
 	it("linux-open-session-crash-recovery: a malformed record credits nothing and is replaced", function()
 		for _, text in ipairs({ "not json", '[{"date":"2026-10-21","app":"owned","session":[1]}]', '{"app":"x"}' }) do
 			local writer = Fakes.sqlite_writer()
-			writer.meta["open_walk:" .. "linux-" .. (io.popen("hostname"):read("*l") or "linux"):gsub("%s+", "")] = text
+			-- The driver names its device after the kernel nodename, not the hostname
+			-- program, which minimal Arch, Fedora and openSUSE images lack.
+			local nodename = assert(io.open("/proc/sys/kernel/hostname", "rb"))
+			local host = (nodename:read("*l") or "linux"):gsub("%s+", "")
+			nodename:close()
+			writer.meta["open_walk:linux-" .. host] = text
 			process(writer, function(k)
 				for index, char in ipairs({ "a", "b" }) do k.on_keydown(char, recent_stamp(index), "fresh") end
 				helpers.assert_true(k.flush())
