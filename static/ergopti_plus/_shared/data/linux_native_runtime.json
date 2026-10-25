@@ -82,7 +82,8 @@
 			"gsettings-desktop-schemas",
 			"lua-luv",
 			"openssl",
-			"sqlite3"
+			"sqlite3",
+			"xdg-utils"
 		],
 		"rpm": [
 			"luajit >= 2.1",
@@ -100,7 +101,8 @@
 			"shadow-utils",
 			"util-linux",
 			"openssl",
-			"sqlite"
+			"sqlite",
+			"xdg-utils"
 		],
 		"arch": [
 			"luajit",
@@ -110,7 +112,8 @@
 			"libxkbcommon",
 			"at-spi2-core",
 			"openssl",
-			"sqlite"
+			"sqlite",
+			"xdg-utils"
 		],
 		"nix_library_path": [
 			"libayatana-appindicator",

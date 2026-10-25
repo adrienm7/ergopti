@@ -290,8 +290,10 @@ after a completed-response receipt.
 ### project-linux-process-and-locale-traps
 
 Query `pactl` under the C locale (a translated "oui" or "ja" broke mute
-detection). GNU `ps` comm output is headerless and keeps spaces, so parse it as
-bytes. `notify-send` and `gtk-launch` get an option terminator before caller
+detection). A process name in `/proc/<pid>/stat` sits between the first `(` and
+the last `)` and keeps spaces and parentheses, so parse it as bytes; a zombie
+(state Z) has exited, and a stat that vanished between listing and read
+(ENOENT, ESRCH) is an absent process, never a failed snapshot. `notify-send` and `gtk-launch` get an option terminator before caller
 text. On POSIX a backslash is filename data, the working directory comes from
 native `getcwd` rather than `$PWD`, and the at-rest key falls back to
 `/var/lib/dbus/machine-id`.
@@ -323,12 +325,20 @@ and updates") lexes the Linux tree without comments, inventories every launch
 (`io.popen`, `os.execute`, the ShellRunner, ProcessRunner, ProgramRunner,
 OwnedProcess and `uv.spawn` calls, Python `subprocess`, every shell script) and
 checks each program against one list, `PROGRAMS`, by scope (driver, test, host).
-Action: read `/proc` or `/sys` instead of running a program; when one is needed,
-add it to `PROGRAMS` with its proof (install it in the prep script, declare it in
-the package recipes and `install.sh`, or probe it with `has_command` in the same
-file); a command stored in a table field or built from a parameter is invisible
-to the scan, so keep its `has_command` probe by name. The gate has no warn-only
-state: an unbacked program fails it (`cmp` from diffutils was the first one).
+Action: read `/proc` or `/sys` instead of running a program (the process
+snapshot of `adapters/process_lifecycle.lua` reads `/proc/<pid>/stat` rather
+than forking `ps`); when one is needed, add it to `PROGRAMS` with a proof the
+gate checks for every scope it is used in: a file token (installed by the prep
+script or a CI job, declared in the package recipes and `install.sh`, or `sh`,
+which both container entry points run in every bare image), each bound to the
+scopes it covers, or a `command -v`/`has_command` probe in every launching file
+of the probed scopes, host scripts included. No entry may rest on its
+justification alone, and none is "tolerated". A test's refusal fixture names a
+path under a root no system creates (`/nonexistent/...`), which the gate
+recognises structurally and refuses in a driver file. A command stored in a table
+field, built from a parameter or probed through a loop variable is invisible to
+the scan, so probe it by literal name. The gate has no warn-only state: an
+unbacked program fails it (`cmp` from diffutils was the first one).
 
 ### project-flatpak-sdk-build-flags
 

@@ -97,6 +97,8 @@ if [ "$SCRIPT_DIR" = /usr/lib/ergopti ]; then
 	# Never remove package files ourselves, even if authorization is refused.
 	if command -v dpkg-query >/dev/null 2>&1 && dpkg-query -S "$SCRIPT_DIR/uninstall.sh" | grep -qx 'ergopti: /usr/lib/ergopti/uninstall.sh'; then
 		if "$CHECK_ONLY"; then exit 0; fi
+		# EX_UNAVAILABLE: the package manager that owns the package is missing.
+		command -v apt-get >/dev/null 2>&1 || exit 69
 		pkexec /usr/bin/apt-get remove -y ergopti
 		remove_native_startup
 		exit 0

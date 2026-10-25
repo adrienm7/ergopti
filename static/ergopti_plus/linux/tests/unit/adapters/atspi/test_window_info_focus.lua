@@ -433,6 +433,24 @@ helpers.describe("window_info: Wayland", function()
 		restore()
 	end)
 
+	helpers.it("runs no compositor query whose client binary is absent", function()
+		-- Each query probes its own client by name: swaymsg, hyprctl and niri are
+		-- absent from most desktops, and a spawn of a missing one is wasted work.
+		local wi, log = under("wayland", "sway", {})
+		wi.getFocused()
+		local probes = {}
+		for _, command in ipairs(log) do
+			for _, query in ipairs({ "swaymsg -t", "hyprctl activewindow", "niri msg" }) do
+				helpers.assert_true(not command:find(query, 1, true), "an absent client was queried: " .. command)
+			end
+			local binary = command:match("^command %-v '([%w]+)'")
+			if binary then probes[binary] = true end
+		end
+		helpers.assert_eq(probes, { swaymsg = true, hyprctl = true, niri = true },
+			"every Wayland client is probed before its query")
+		restore()
+	end)
+
 	helpers.it("answers empty on a compositor with no query interface", function()
 		local wi = under("wayland", "GNOME", {})
 		local info = wi.getFocused()

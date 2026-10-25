@@ -60,8 +60,17 @@
  * driver, installer, launcher), "test" (the distribution containers, which hold
  * only the CI image preparation) or "host" (tests/hardware and the other files that
  * only the Ubuntu runners execute). An entry lists the scopes it is valid for, and
- * one of three things must back it: a file proof, a probe of the program in the
- * launching file, or the tolerance of its caller.
+ * a machine-checked proof must back each of them: a file proof this gate reads
+ * (an install by CI, a declared dependency, the container entry point of every
+ * image), bound to the scopes it covers, or a probe of the program in every file
+ * of the probed scopes that launches it, host scripts included. No program
+ * rests on its justification alone, and an entry with a scope neither proven
+ * nor probed is refused.
+ *
+ * FIXTURES. A launch of an absolute path under no top-level directory a Linux
+ * system creates (anything outside FHS_ROOTS, such as /nonexistent) cannot run
+ * any installed program: it is a refusal fixture of a test, recognised by that
+ * structure and never listed. The same path in a driver file is refused.
  *
  * The scan is floored (FLOORS) so a broken scanner cannot pass by finding nothing,
  * and a self-test proves the scanner reports io.popen("hostname") and ignores the
@@ -174,6 +183,8 @@ const DISTRO_PREP = 'tools/test/prepare-linux-distro-unit.sh';
 const CI_LINUX = '.github/workflows/ci-linux.yml';
 const INSTALLER = `${LINUX_DIR}/install.sh`;
 const DEB_RECIPE = 'tools/build/build-linux-deb.sh';
+const RPM_RECIPE = 'tools/build/build-linux-rpm.sh';
+const DISTRO_RUNNER = 'tools/test/run-linux-distro-unit.sh';
 
 // Where a program may be launched. "driver" is a user's machine (the driver, the
 // installer and the launcher), "test" the distribution containers that run the
@@ -186,14 +197,21 @@ const TEST = ['test'];
 const HOST = ['host'];
 
 /**
- * One justification. `proof` names a file and a pattern this gate reads, so the
- * claim cannot outlive its evidence. `probed` demands a `command -v` (or
- * has_command) of the same program in the launching file. `tolerated` marks a
- * program accepted on its justification alone: the caller turns a missing
- * program into a nil or a fallback.
+ * One justification and its machine-checked evidence, per scope. Each of
+ * `proofs` (or the single `proof`) names a file and a pattern this gate reads,
+ * so the claim cannot outlive its evidence; it covers its own `scopes`, or all
+ * of the entry's. `probed` (true for every scope of the entry, or a list of
+ * scopes) demands a `command -v` (or has_command) of the program in every file
+ * of those scopes that launches it, proof or not. Every scope of an entry is
+ * probed or covered by a proof, or the entry is refused: no program rests on
+ * its justification alone.
  */
-function why(text, scopes, { proof = null, probed = false, tolerated = false } = {}) {
-	return { why: text, scopes, proof, probed, tolerated };
+function why(text, scopes, { proof = null, proofs = null, probed = false } = {}) {
+	const cited = (proofs ?? (proof ? [proof] : [])).map((item) => ({
+		...item,
+		scopes: item.scopes ?? scopes
+	}));
+	return { why: text, scopes, proofs: cited, probed: probed === true ? scopes : probed || [] };
 }
 
 const inMatrix = (token, text) =>
@@ -222,15 +240,50 @@ const optionalTool = (text, scopes = DRIVER) =>
 	why(`${text}; optional tool, absent means the feature is off, probed before use`, scopes, {
 		probed: true
 	});
-const tolerantTool = (text) =>
-	why(`${text}; the caller turns a missing program into nil or a fallback`, DRIVER, {
-		tolerated: true
-	});
+const packageManager = (text, scopes) =>
+	why(`${text}; detected with command -v in every file that runs it`, scopes, { probed: true });
 const coreutils = why(`coreutils; installed by CI: ${MATRIX_JSON} prep`, ALL, {
 	proof: { file: MATRIX_JSON, token: 'coreutils' }
 });
-const fixtureName = (text, scopes = TEST) =>
-	why(`${text}; a name no program carries, a fake spawn or an expected ENOENT, never run`, scopes);
+
+/**
+ * Top-level directories a Linux system creates: the FHS ones, plus the stores
+ * of Nix, Guix, Snap and Flatpak. A program under any other root cannot be
+ * installed, so launching it can only be a test's refusal fixture.
+ */
+const FHS_ROOTS = new Set([
+	'app',
+	'bin',
+	'boot',
+	'dev',
+	'etc',
+	'gnu',
+	'home',
+	'lib',
+	'lib32',
+	'lib64',
+	'libx32',
+	'media',
+	'mnt',
+	'nix',
+	'opt',
+	'proc',
+	'root',
+	'run',
+	'sbin',
+	'snap',
+	'srv',
+	'sys',
+	'tmp',
+	'usr',
+	'var'
+]);
+
+/** Whether a program name is an absolute path no Linux system can hold. */
+function isUnrunnablePath(name) {
+	const top = /^\/([^/]+)\//.exec(name)?.[1];
+	return top !== undefined && !FHS_ROOTS.has(top);
+}
 
 /** Files outside the scan, with the reason. */
 const EXCLUDED_FILES = new Map([
@@ -289,7 +342,14 @@ const PROGRAMS = {
 	uname: coreutils,
 	wc: coreutils,
 	bash: inMatrix('\\bbash\\b', 'the shell the scripts name'),
-	sh: why('the POSIX shell every image links at /bin/sh', ALL),
+	// Both container entry points start every distribution image of the matrix
+	// through sh before anything is installed: an image without it fails at once.
+	sh: why('the POSIX shell, run by the entry point of every distribution image', ALL, {
+		proofs: [
+			{ file: DISTRO_RUNNER, token: '"\\$image" sh -c ' },
+			{ file: `${LINUX_DIR}/tests/distro/run_in_docker.sh`, token: '"\\$\\{IMAGE\\}" sh -c ' }
+		]
+	}),
 	find: inMatrix('findutils', 'findutils'),
 	grep: inMatrix('\\bgrep\\b', 'grep'),
 	sed: inMatrix('\\bsed\\b', 'sed'),
@@ -310,10 +370,19 @@ const PROGRAMS = {
 			token: 'useradd -m .*\\|\\| adduser'
 		}
 	}),
-	getent: why('the C library package (glibc, musl-utils) ships it on every image', DRIVER_TEST),
+	getent: why(
+		'the C library package (glibc, musl-utils); every launching script refuses without it',
+		DRIVER_TEST,
+		{
+			probed: true
+		}
+	),
 	su: why(
-		'util-linux (BusyBox on Alpine), a base package of every image of the first-install lane',
-		TEST
+		'util-linux (BusyBox on Alpine); the first-install lane refuses an image without it',
+		TEST,
+		{
+			probed: true
+		}
 	),
 	// Installed by the CI image preparation of the distribution lanes.
 	git: inPrep('\\bgit\\b', 'git'),
@@ -327,11 +396,14 @@ const PROGRAMS = {
 	'notify-send': declaredByInstaller('notify-send', 'desktop notifications'),
 	zenity: declaredByInstaller('zenity', 'dialogs'),
 	sqlite3: why(
-		'declared dependency: install.sh _check_or_install sqlite3, and every launch probes it first',
+		'declared dependency: install.sh _check_or_install sqlite3, and every driver and test launch probes it first; the Ubuntu jobs install it',
 		ALL,
 		{
-			proof: { file: INSTALLER, token: '_check_or_install sqlite3\\b' },
-			probed: true
+			proofs: [
+				{ file: INSTALLER, token: '_check_or_install sqlite3\\b', scopes: DRIVER },
+				{ file: CI_LINUX, token: 'ubuntu_apt\\.py.* sqlite3\\b', scopes: HOST }
+			],
+			probed: DRIVER_TEST
 		}
 	),
 	openssl: declaredByInstaller('openssl', 'hashing and the TLS helper', DRIVER_HOST),
@@ -358,11 +430,15 @@ const PROGRAMS = {
 			probed: true
 		}
 	),
-	// Optional desktop and system tools: probed before use, or tolerated when absent.
+	// Optional desktop and system tools: probed before use in every launching file.
 	xsel: optionalTool('clipboard fallback on X11', DRIVER_HOST),
 	gdbus: optionalTool('GNOME tooltip preview', DRIVER_HOST),
 	systemctl: optionalTool('systemd user service', DRIVER_HOST),
-	pactl: optionalTool('PulseAudio volume metric', DRIVER_HOST),
+	pactl: why(
+		'PulseAudio volume metric; probed before use, and the audio lane of the Ubuntu runner installs it',
+		DRIVER_HOST,
+		{ proof: { file: CI_LINUX, token: 'pulseaudio-utils', scopes: HOST }, probed: DRIVER }
+	),
 	kdialog: optionalTool('KDE dialogs'),
 	amixer: optionalTool('ALSA volume metric'),
 	nmcli: optionalTool('network metric'),
@@ -372,8 +448,8 @@ const PROGRAMS = {
 	tar: why('the installer probes it and refuses clearly when absent', DRIVER_HOST, {
 		probed: true
 	}),
-	localectl: tolerantTool('system keyboard layout, nil when absent'),
-	gsettings: tolerantTool('GNOME settings, `|| true` or a nil result when absent'),
+	localectl: optionalTool('system keyboard layout of systemd-localed'),
+	gsettings: optionalTool('GNOME settings'),
 	xrandr: optionalTool(
 		'action picker window switching, the menu row is disabled with a reason when absent'
 	),
@@ -405,36 +481,37 @@ const PROGRAMS = {
 	'qdbus-qt5': optionalTool('KDE workspace switching, the first present of several binaries'),
 	'qdbus-qt6': optionalTool('KDE workspace switching, the first present of several binaries'),
 	qdbus6: optionalTool('KDE workspace switching, the first present of several binaries'),
-	hyprctl: tolerantTool('Hyprland window identity, nil outside Hyprland'),
-	swaymsg: why(
-		'Sway window identity; nil outside Sway, and the Sway lane of the Ubuntu runner installs it',
-		DRIVER_HOST,
-		{ tolerated: true }
-	),
-	niri: tolerantTool('Niri window identity, nil outside Niri'),
-	'xdg-open': tolerantTool('opens a link, the spawn error is reported to the caller'),
-	ps: why(
-		'process snapshot; nil when it fails, never read as an empty machine (procps is in the Ubuntu runner image)',
-		DRIVER_HOST,
+	hyprctl: optionalTool('Hyprland window identity'),
+	swaymsg: optionalTool('Sway window identity', DRIVER_HOST),
+	niri: optionalTool('Niri window identity'),
+	'xdg-open': why(
+		`opens links and files; declared dependency: install.sh _check_or_install, ${DEB_RECIPE} Depends and ${RPM_RECIPE} Requires`,
+		DRIVER,
 		{
-			tolerated: true
+			proofs: [
+				{ file: INSTALLER, token: '_check_or_install xdg-open\\b' },
+				{ file: DEB_RECIPE, token: 'Depends:.*\\bxdg-utils\\b' },
+				{ file: RPM_RECIPE, token: 'Requires: +xdg-utils\\b' }
+			]
 		}
 	),
+	// The driver reads /proc instead; the hardware lanes probe procps first.
+	ps: optionalTool('procps process listing of the hardware lanes', HOST),
 	node: why('reads the version for install.sh and falls back to "dev"', DRIVER_HOST, {
 		proof: { file: INSTALLER, token: '\\|\\| echo "dev"' }
 	}),
 	// Package managers: each distribution's own, reached through the detection of install.sh.
-	'apt-get': why('the Debian package manager, reached only on Debian-family images', DRIVER_TEST),
-	'apt-cache': why('the Debian package manager, reached only on Debian-family images', DRIVER_TEST),
+	'apt-get': packageManager('the Debian package manager', DRIVER_TEST),
+	'apt-cache': packageManager('the Debian package database', DRIVER_TEST),
 	'dpkg-query': why('the Debian package database, probed by uninstall.sh', DRIVER, {
 		probed: true
 	}),
-	dnf: why('the Fedora package manager, reached only on Fedora-family images', DRIVER_TEST),
+	dnf: packageManager('the Fedora package manager', DRIVER_TEST),
 	rpm: why('the RPM database, probed by uninstall.sh', DRIVER, { probed: true }),
-	pacman: why('the Arch package manager, reached only on Arch images', DRIVER_TEST),
-	zypper: why('the openSUSE package manager, reached only on openSUSE images', DRIVER_TEST),
-	apk: why('the Alpine package manager, reached only on Alpine images', DRIVER_TEST),
-	'xbps-install': why('the Void package manager, reached only on Void images', DRIVER),
+	pacman: packageManager('the Arch package manager', DRIVER_TEST),
+	zypper: packageManager('the openSUSE package manager', DRIVER_TEST),
+	apk: packageManager('the Alpine package manager', DRIVER_TEST),
+	'xbps-install': packageManager('the Void package manager', DRIVER),
 	'update-ca-certificates': why(
 		'Debian CA tool of the first-install lane, probed before use',
 		TEST,
@@ -459,11 +536,6 @@ const PROGRAMS = {
 			token: 'package\\.config:sub\\(1, 1\\) == "\\\\\\\\"'
 		}
 	}),
-	'missing-program': fixtureName('refusal of a failed spawn'),
-	kanata: fixtureName('argv of a fake luv.spawn'),
-	'inert-non-executed-fixture-command': fixtureName('command of a replaced os.execute'),
-	'/not/a/real/program106': fixtureName('refusal of a missing executable'),
-	'/nonexistent/ergopti-owned-process-fixture': fixtureName('expected ENOENT', HOST),
 	// The Ubuntu runners of the hardware and desktop lanes.
 	Xvfb: inUbuntuJob('xvfb', 'X server'),
 	'xvfb-run': inUbuntuJob('xvfb', 'X server wrapper'),
@@ -488,8 +560,8 @@ const PROGRAMS = {
 	umount: inUbuntuJob('util-linux', 'util-linux'),
 	findmnt: inUbuntuJob('util-linux', 'util-linux'),
 	setpriv: inUbuntuJob('util-linux', 'util-linux'),
-	pkill: why('procps, in the Ubuntu runner image', HOST),
-	docker: why('the container engine this script drives from the developer host', HOST)
+	pkill: optionalTool('procps, in the Ubuntu runner image', HOST),
+	docker: optionalTool('the container engine this script drives from the developer host', HOST)
 };
 
 // ======================================
@@ -2011,13 +2083,22 @@ function evaluateSites(sites) {
 	const probedIn = new Set(
 		sites.filter((site) => site.probe && site.name).map((site) => `${site.file}\0${site.name}`)
 	);
+	const fixtures = [];
 	for (const site of sites) {
 		if (!site.name) continue;
-		used.set(site.name, (used.get(site.name) || 0) + 1);
-		const entry = PROGRAMS[site.name];
 		const scope = scopeOf(site.file);
 		const where = `${site.file}:${site.line}`;
 		const how = site.probe ? `${site.via}, probe` : site.via;
+		if (isUnrunnablePath(site.name)) {
+			if (scope === 'driver')
+				problems.push(
+					`${where}: "${site.name}" (${how}) names a root no system creates; a driver file cannot launch a fixture path`
+				);
+			else fixtures.push(site);
+			continue;
+		}
+		used.set(site.name, (used.get(site.name) || 0) + 1);
+		const entry = PROGRAMS[site.name];
 		if (!entry) {
 			problems.push(
 				`${where}: "${site.name}" (${how}) is not in every minimal Arch, Fedora and openSUSE image, ` +
@@ -2029,33 +2110,49 @@ function evaluateSites(sites) {
 				`${where}: "${site.name}" (${how}) is justified for ${entry.scopes.join(' and ')} only (${entry.why}), ` +
 					`but this ${scope} file runs where it is absent`
 			);
-		} else if (
-			entry.probed &&
-			!site.probe &&
-			scope !== 'host' &&
-			!probedIn.has(`${site.file}\0${site.name}`)
-		) {
+		} else if (entry.probed.includes(scope)) {
+			if (!site.probe && !probedIn.has(`${site.file}\0${site.name}`))
+				problems.push(
+					`${where}: "${site.name}" (${how}) is an optional tool but this file never probes for it (command -v, has_command)`
+				);
+		} else if (!entry.proofs.some((item) => item.scopes.includes(scope))) {
 			problems.push(
-				`${where}: "${site.name}" (${how}) is an optional tool but this file never probes for it (command -v, has_command)`
+				`${where}: "${site.name}" (${how}) has no proof for this ${scope} file: no cited file covers the scope and none probes it`
 			);
 		}
 	}
-	return { problems, used };
+	return { problems, used, fixtures };
 }
 
-/** Reads the proof file of every entry that claims one. */
-function verifyProofs() {
+/**
+ * Reads every proof file an entry cites, and refuses an entry with a scope
+ * that no cited file covers and no probe guards: its justification alone is no
+ * evidence.
+ * @param {object} programs The reference, PROGRAMS or a self-test copy.
+ * @returns {string[]}
+ */
+function verifyProofs(programs = PROGRAMS) {
 	const problems = [];
-	for (const [name, entry] of Object.entries(PROGRAMS)) {
-		const proofOf = entry.proof;
-		if (!proofOf) continue;
-		const abs = path.join(ROOT, proofOf.file);
-		if (!fs.existsSync(abs)) {
-			problems.push(`PROGRAMS["${name}"] cites ${proofOf.file}, which does not exist`);
-		} else if (!new RegExp(proofOf.token).test(fs.readFileSync(abs, 'utf8'))) {
+	for (const [name, entry] of Object.entries(programs)) {
+		if (entry.proofs.length === 0 && entry.probed.length === 0)
 			problems.push(
-				`PROGRAMS["${name}"] cites ${proofOf.file} for /${proofOf.token}/, which it no longer contains`
+				`PROGRAMS["${name}"] rests on its justification alone: cite a file proof or probe it where it is launched`
 			);
+		for (const scope of entry.scopes)
+			if (
+				!entry.probed.includes(scope) &&
+				!entry.proofs.some((item) => item.scopes.includes(scope))
+			)
+				problems.push(`PROGRAMS["${name}"] has no proof for its ${scope} scope`);
+		for (const proofOf of entry.proofs) {
+			const abs = path.join(ROOT, proofOf.file);
+			if (!fs.existsSync(abs)) {
+				problems.push(`PROGRAMS["${name}"] cites ${proofOf.file}, which does not exist`);
+			} else if (!new RegExp(proofOf.token).test(fs.readFileSync(abs, 'utf8'))) {
+				problems.push(
+					`PROGRAMS["${name}"] cites ${proofOf.file} for /${proofOf.token}/, which it no longer contains`
+				);
+			}
 		}
 	}
 	return problems;
@@ -2149,6 +2246,46 @@ function selfTest() {
 	]);
 	if (evaluateSites(hostOnly.sites).problems.length !== 1)
 		problems.push('self-test: a host-only program was accepted in a unit test');
+	// A probed tool must be probed in a host file too: no scope is exempt.
+	const unprobedHost = scanSources([
+		{ rel: `${LINUX_DIR}/tests/hardware/fixture.sh`, src: '#!/bin/sh\ndocker info\n' }
+	]);
+	if (evaluateSites(unprobedHost.sites).problems.length !== 1)
+		problems.push('self-test: an unprobed host launch of a probed tool was accepted');
+	const probedHost = scanSources([
+		{
+			rel: `${LINUX_DIR}/tests/hardware/fixture.sh`,
+			src: '#!/bin/sh\ncommand -v docker >/dev/null || exit 2\ndocker info\n'
+		}
+	]);
+	if (evaluateSites(probedHost.sites).problems.length !== 0)
+		problems.push('self-test: a probed host launch of a probed tool was refused');
+	// A fixture path is recognised by its root in a test, refused in the driver.
+	const fixturePath = (rel) =>
+		evaluateSites(
+			scanSources([{ rel, src: 'local p = io.popen("/nonexistent/ergopti-fixture")\n' }]).sites
+		);
+	const testFixture = fixturePath(`${LINUX_DIR}/tests/unit/fixture.lua`);
+	if (testFixture.problems.length !== 0 || testFixture.fixtures.length !== 1)
+		problems.push('self-test: a test fixture path was not recognised structurally');
+	if (fixturePath(`${LINUX_DIR}/adapters/fixture.lua`).problems.length !== 1)
+		problems.push('self-test: a fixture path was accepted in a driver file');
+	if (!isUnrunnablePath('/not/a/real/program') || isUnrunnablePath('/usr/local/bin/x'))
+		problems.push('self-test: the filesystem-root rule misjudged a path');
+	if (isUnrunnablePath('/opt/vendor/bin/x') || isUnrunnablePath('fixture-name'))
+		problems.push('self-test: an installable or bare name was taken for a fixture path');
+	// An entry with neither a proof nor a probe is refused, whatever it says.
+	const unbacked = { bare: why('a reason and nothing else', ALL) };
+	if (verifyProofs(unbacked).length === 0)
+		problems.push('self-test: an entry resting on its justification alone was accepted');
+	// A proof bound to one scope cannot stand in for another.
+	const hostOnlyProof = {
+		bound: why('installed on the Ubuntu runners only', DRIVER_HOST, {
+			proof: { file: CI_LINUX, token: 'ubuntu_apt', scopes: HOST }
+		})
+	};
+	if (verifyProofs(hostOnlyProof).length !== 1)
+		problems.push('self-test: a host-bound proof was accepted for the driver scope');
 	return problems;
 }
 
@@ -2232,18 +2369,17 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
-const byKind = { proof: 0, probed: 0, justified: 0 };
-for (const name of new Set(resolved.map((site) => site.name))) {
-	const entry = PROGRAMS[name];
-	if (entry.proof) byKind.proof++;
-	else if (entry.probed) byKind.probed++;
-	else byKind.justified++;
+const byKind = { proof: 0, probed: 0 };
+for (const name of evaluation.used.keys()) {
+	if (PROGRAMS[name].probed.length === 0) byKind.proof++;
+	else byKind.probed++;
 }
 console.log(
 	`\x1b[32m[OK] ${measured.total} Linux call sites in ${scan.files} files (floor ${FLOORS.total}; ` +
 		`${measured.lua} Lua, ${measured.shell} shell, ${measured.python} Python): ` +
-		`${new Set(resolved.map((site) => site.name)).size} programs justified in PROGRAMS ` +
-		`(${byKind.proof} with a file proof, ${byKind.probed} probed before use, ${byKind.justified} on their justification alone); ` +
+		`${evaluation.used.size} programs proven in PROGRAMS ` +
+		`(${byKind.proof} with file proofs alone, ${byKind.probed} probed where launched in some scope, none on its justification alone); ` +
+		`${evaluation.fixtures.length} test launches of fixture paths no system holds; ` +
 		`${dynamic.length} dynamic and ${skipped.length} repository-path launches skipped by design, ` +
 		`${builtins.length} shell builtins not counted; the scanner reports io.popen("hostname") and ignores it in comments.\x1b[0m`
 );

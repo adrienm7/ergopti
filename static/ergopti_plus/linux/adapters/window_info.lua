@@ -283,6 +283,7 @@ end
 --- Queries sway (and any wlroots compositor speaking the sway IPC).
 --- @return table|nil
 local function focused_sway()
+	if not Shell.has_command("swaymsg") then return nil end
 	local tree = decode_json(Shell.exec("swaymsg -t get_tree 2>/dev/null"))
 	if not tree then return nil end
 	local node = sway_focused_node(tree)
@@ -303,6 +304,7 @@ end
 --- Queries Hyprland.
 --- @return table|nil
 local function focused_hyprland()
+	if not Shell.has_command("hyprctl") then return nil end
 	local win = decode_json(Shell.exec("hyprctl activewindow -j 2>/dev/null"))
 	if not win then return nil end
 	local info = empty_info()
@@ -315,6 +317,7 @@ end
 --- Queries niri.
 --- @return table|nil
 local function focused_niri()
+	if not Shell.has_command("niri") then return nil end
 	local win = decode_json(Shell.exec("niri msg --json focused-window 2>/dev/null"))
 	if not win then return nil end
 	local info = empty_info()
@@ -324,21 +327,19 @@ local function focused_niri()
 	return info, native_identity("niri", win.id, win.pid), tonumber(win.pid)
 end
 
+-- Each query probes its own client binary first and answers nil without it.
 local WAYLAND_QUERIES = {
-	sway     = { binary = "swaymsg", query = focused_sway },
-	hyprland = { binary = "hyprctl", query = focused_hyprland },
-	niri     = { binary = "niri",    query = focused_niri },
+	sway     = focused_sway,
+	hyprland = focused_hyprland,
+	niri     = focused_niri,
 }
 
 --- Tries every Wayland backend this session might speak.
 --- @return table|nil
 local function focused_wayland()
 	for _, name in ipairs(WAYLAND_BACKENDS) do
-		local backend = WAYLAND_QUERIES[name]
-		if Shell.has_command(backend.binary) then
-			local info, identity, pid = backend.query()
-			if info then return info, identity, pid end
-		end
+		local info, identity, pid = WAYLAND_QUERIES[name]()
+		if info then return info, identity, pid end
 	end
 
 	if not _reported_unsupported then

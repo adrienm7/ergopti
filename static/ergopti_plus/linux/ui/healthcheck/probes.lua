@@ -179,6 +179,8 @@ local function proxy_pac(config, run)
 				end)
 		end
 		local function ask(key, on_output)
+			-- Only GNOME stores a proxy setting there; elsewhere there is none to read.
+			if not Shell.has_command("gsettings") then on_output(nil) return end
 			local handle = Shell.run_async("gsettings", { "get", "org.gnome.system.proxy", key },
 				{ timeout_ms = config.timeout_ms }, function(result)
 					on_output(result.ok and result.stdout or nil)

@@ -171,7 +171,7 @@ helpers.describe("shell_runner.run_async (linux)", function()
 		local luv, state = fake_luv("ENOENT: no such file or directory")
 		local runner = fresh_runner(luv)
 		local answers = 0
-		local handle, err = runner.run_async("missing-program", {}, { timeout_ms = 1000 },
+		local handle, err = runner.run_async("/nonexistent/missing-program", {}, { timeout_ms = 1000 },
 			function() answers = answers + 1 end)
 		helpers.assert_nil(handle)
 		helpers.assert_eq(answers, 0, "the caller handles a refused dispatch through the return value")
@@ -197,10 +197,11 @@ helpers.describe("shell_runner.run_async (linux)", function()
 		local luv, state = fake_luv()
 		local runner = fresh_runner(luv)
 		local answers = {}
-		local handle = runner.run_async("kanata", { "--version" }, { timeout_ms = 4000 },
+		-- A program under a root no system creates: the fake libuv never runs it.
+		local handle = runner.run_async("/nonexistent/kanata", { "--version" }, { timeout_ms = 4000 },
 			function(result) answers[#answers + 1] = result end)
 		helpers.assert_true(handle ~= nil)
-		helpers.assert_eq(state.command, "kanata")
+		helpers.assert_eq(state.command, "/nonexistent/kanata")
 		helpers.assert_eq(state.options.args, { "--version" })
 		helpers.assert_eq(state.timer.timeout_ms, 4000)
 		state.stdout("kanata 1.7.0\n")

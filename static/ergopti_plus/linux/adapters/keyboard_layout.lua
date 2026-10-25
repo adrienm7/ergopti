@@ -238,8 +238,12 @@ local function session_layout_names()
 
 	local desc = XkbRmlvo.parse_kxkbrc(read_file(ConfigPaths.config_home() .. "/kxkbrc"))
 		or XkbRmlvo.from_env()
-		or XkbRmlvo.parse_localectl(Shell.exec(LOCALECTL))
 	if desc then return desc end
+	-- systemd-localed is absent from minimal and non-systemd systems.
+	if Shell.has_command("localectl") then
+		desc = XkbRmlvo.parse_localectl(Shell.exec(LOCALECTL))
+		if desc then return desc end
+	end
 
 	for _, path in ipairs(KEYBOARD_DEFAULTS) do
 		desc = XkbRmlvo.parse_keyboard_defaults(read_file(path))

@@ -159,11 +159,30 @@ helpers.describe("keyboard_layout: keymap sources on X11", function()
 		local layout, _, Shell = load_with("x11", {
 			{ "localectl status", "      X11 Layout: fr\n     X11 Variant: bepo\n" },
 			{ "compile-keymap --layout fr --variant bepo", plausible_keymap() },
-		})
+		}, { ["has:localectl"] = true })
 		with_env({ DISPLAY = ":0", HOME = "/nonexistent-home" }, function()
 			helpers.assert_true(layout.refresh(nil), "localectl's layout must be compiled as a last resort")
 		end)
 		helpers.assert_contains(layout.source(), "localectl")
+		cleanup(Shell)
+	end)
+
+	helpers.it("never runs localectl where systemd-localed is absent", function()
+		-- Minimal and non-systemd systems ship no localectl: the probe answers
+		-- first, and the system defaults are read as files instead.
+		local layout, commands, Shell = load_with("x11", {
+			{ "localectl status", "      X11 Layout: fr\n     X11 Variant: bepo\n" },
+			{ "compile-keymap --layout fr --variant bepo", plausible_keymap() },
+		})
+		with_env({ DISPLAY = ":0", HOME = "/nonexistent-home" }, function() layout.refresh(nil) end)
+		local probed = false
+		for _, command in ipairs(commands) do
+			helpers.assert_true(not command:find("localectl status", 1, true), "localectl ran without its probe: " .. command)
+			if command:find("command -v 'localectl'", 1, true) or command:find("command -v localectl", 1, true) then
+				probed = true
+			end
+		end
+		helpers.assert_true(probed, "the absent localectl must be probed, not assumed")
 		cleanup(Shell)
 	end)
 
