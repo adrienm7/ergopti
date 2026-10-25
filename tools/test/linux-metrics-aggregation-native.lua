@@ -5,7 +5,8 @@ local control = arg[3]
 assert(control == nil or control == 'legacy-global-column' or control == 'legacy-app-column',
 	'unknown raw projection contract control')
 package.path = root .. '/static/ergopti_plus/linux/?.lua;'
-	.. root .. '/static/ergopti_plus/_shared/lua/?.lua;' .. package.path
+	.. root .. '/static/ergopti_plus/_shared/lua/?.lua;'
+	.. root .. '/static/ergopti_plus/_shared/lua/?/init.lua;' .. package.path
 package.loaded['logger.shim'] = {
 	debug = function() end, info = function() end,
 	warn = function(_, message) error(message) end,
