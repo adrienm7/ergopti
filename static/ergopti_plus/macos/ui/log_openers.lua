@@ -26,6 +26,7 @@ local Logger        = require("infra.logger")
 local ConfigPaths   = require("infra.config_paths")
 local i18n          = require("infra.i18n")
 local notifications = require("infra.notifications")
+local FileSystem    = require("adapters.file_system")
 
 local LOG = "log_openers"
 
@@ -48,12 +49,19 @@ local function require_opener(open_fn)
 	end
 end
 
---- True when `path` names an existing file.
+--- Distinguishes a missing errors file from an inspection failure.
 --- @param path string Absolute path.
---- @return boolean
-local function file_exists(path)
-	local ok, attributes = pcall(hs.fs.attributes, path)
-	return ok and type(attributes) == "table" and attributes.mode == "file"
+--- @return string status `present`, `absent`, or `error`.
+local function errors_file_status(path)
+	local status, attributes = FileSystem.path_status(path)
+	if status ~= "present" then return status end
+	if type(attributes) ~= "table" then return "error" end
+	if attributes.mode == "link" then
+		local followed, target = pcall(hs.fs.attributes, path)
+		if not followed or type(target) ~= "table" then return "error" end
+		attributes = target
+	end
+	return attributes.mode == "file" and "present" or "error"
 end
 
 
@@ -94,7 +102,12 @@ end
 function M.open_today_errors(open_fn)
 	require_opener(open_fn)
 	local path = Logger.today_errors_path()
-	if file_exists(path) then return open_fn(path) == true end
+	local status = errors_file_status(path)
+	if status == "present" then return open_fn(path) == true end
+	if status ~= "absent" then
+		Logger.error(LOG, "Today's errors file could not be inspected; nothing opened.")
+		return false
+	end
 	Logger.info(LOG, "No errors file for today at '%s'; the user is told instead.", path)
 	local notified, notify_err = notifications.notify(i18n.get("menu.debug.no_errors_today"))
 	if notified ~= true then
