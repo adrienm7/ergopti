@@ -7,15 +7,18 @@
 # Lua unit and stubbed engine E2E tests run on Ubuntu. Every macOS cell names
 # its macOS version (tools/ci/macos-stage-roles.cjs HOSTS owns the runner
 # labels and versions, and each cell's admission refuses a runner of another
-# version): the E2E, launch and cold cells run on macOS 15 (Apple silicon
-# macos-15, Intel macos-15-intel), the E2E launcher cell and Build on macOS 26
-# (macos-latest). The Swift launcher XCTest classes the Managed Ollama cells run
-# on macOS 15 run again in the launcher cell on macOS 26: that repetition is
+# version): the E2E cells, the cold cell and most launch lots run on macOS 15
+# (Apple silicon macos-15, Intel macos-15-intel); the E2E launcher cell, Build
+# and the last Apple silicon launch lot on macOS 26 (macos-latest). The Swift
+# launcher XCTest classes the Managed Ollama cells run on macOS 15 run again
+# in the launcher cell on macOS 26: that repetition is
 # deliberate cross-version coverage, not duplicated work; do not deduplicate
-# it. Build only builds, packages and signs, then smoke-tests the release
-# archive and receives the cold bootstrap of the application it built. The
-# launch matrix installs the exact uploaded archive over the canonical
-# user-state profile on Apple silicon and, for a release, Intel. The verdict checks every expected runner/scenario and commit.
+# it. Build only builds, packages and signs, after the crash-on-launch smoke
+# test of the release archive that gates the signature. The launch matrix
+# installs the exact uploaded archive over the canonical user-state profile on
+# Apple silicon (macOS 15 and 26) and, for a release, Intel; the macOS 26 lot
+# and the cold cell each receive the cold MLX bootstrap of an application they
+# build. The verdict checks every expected runner/scenario, cold receipt and commit.
 # Every stage is a job of this workflow, so GitHub renders it in two levels,
 # "macOS / <Stage> (<lot>)": a matrix job keeps a static stage name and GitHub
 # appends its lot, and a single job names its subject in parentheses.
@@ -2279,8 +2282,7 @@ jobs:
           node-version-file: '.node-version'
 
       # The catalogue and upstream input checks use hashlib.file_digest
-      # (Python 3.11), and the cold bootstrap receiver the same interpreter as
-      # its Install and launch cell.
+      # (Python 3.11).
       - name: Prepare Python for the build and receiving scripts
         if: ${{ steps.stage-admission.outcome == 'success' }}
         uses: actions/setup-python@v5
@@ -2561,18 +2563,9 @@ jobs:
           node tools/build/macos-release-archives.cjs --ci-receipt
           "$PWD/build/macos/ErgoptiPlus.app" "$PWD/build/macos"
 
-      # Like the release smoke test below, this receives the application this
-      # job just built, on the build host, before anything is signed. The
-      # Install and launch cold cell repeats it on macOS 15 from its own build.
-      - name: Receive actual cold native MLX bootstrap
-        if: ${{ steps.stage-admission.outcome == 'success' }}
-        run: |
-          set -euo pipefail
-          python3 tools/diagnostics/macos_cold_bootstrap.py --app "$PWD/build/macos/ErgoptiPlus.app" --output "$RUNNER_TEMP/native-cold-bootstrap"
-        timeout-minutes: 35
-
-      # The only launch on macos-latest (macOS 26): every launch leg runs on
-      # macos-15 or macos-15-intel.
+      # The one test Build keeps: a release archive that crashes on launch is
+      # never signed. The cold MLX bootstrap of the build host runs in the
+      # macOS 26 lot of Install and launch, from an application that lot builds.
       - name: Smoke test built ErgoptiPlus.app (crash-on-launch guard)
         # Test the extracted release archive through the same Launch Services
         # path as an installation. Early log creation is not startup readiness.
@@ -2937,6 +2930,85 @@ jobs:
           path: ${{ runner.temp }}/launch-gate
           if-no-files-found: warn
 
+      # The macOS 26 lot then receives the cold MLX bootstrap Build used to run
+      # on its build host: the stage covers macOS 15 and 26 with five jobs. It
+      # runs after every scenario of the lot, on a runner restored to its fresh
+      # state, so no launcher log it writes can reach a launch verdict, and it
+      # builds its own application like the cold cell: the receiver checks the
+      # build tree's pinned Hammerspoon archive, and no scenario touched that
+      # application. A failed scenario does not hide this receipt.
+      - uses: actions/setup-node@v4
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled()) }}
+        with:
+          node-version-file: '.node-version'
+
+      - uses: actions/setup-python@v5
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled()) }}
+        with:
+          python-version: '3.13'
+
+      - name: Require actual arm64 cold runtime prerequisites on macOS 26
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled()) }}
+        id: lot-cold-prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -s)" = Darwin
+          test "$(uname -m)" = arm64
+          test -x /usr/bin/sandbox-exec
+          xcode-select -p
+          swift --version
+          node --version
+
+      - name: Build independent signed cold application on macOS 26
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled() && steps.lot-cold-prerequisites.outcome == 'success') }}
+        id: lot-cold-app
+        shell: bash
+        env:
+          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
+          ERGOPTI_VERSION: ${{ inputs.version }}
+          ERGOPTI_CHANNEL: ${{ inputs.channel }}
+          ERGOPTI_RELEASE: 'false'
+          HAMMERSPOON_VERSION: '1.1.1'
+          GH_OWNER: ${{ github.repository_owner }}
+          GH_REPO: ${{ github.event.repository.name }}
+        run: |
+          set -euo pipefail
+          # A real ad-hoc signature suffices for native receiving. The fresh
+          # Sparkle key is used only in this unpublished test application.
+          export SPARKLE_PUBLIC_KEY="$(python3 -c 'import base64,secrets;print(base64.b64encode(secrets.token_bytes(32)).decode())')"
+          bash tools/build/build_macos_app.sh 2>&1 | tee "$RUNNER_TEMP/cold-bootstrap-application-build.log"
+          codesign --verify --deep --strict build/macos/ErgoptiPlus.app 2>&1 | tee -a "$RUNNER_TEMP/cold-bootstrap-application-build.log"
+
+      - name: Receive actual isolated cold native MLX bootstrap on macOS 26
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && !cancelled() && steps.lot-cold-app.outcome == 'success') }}
+        shell: bash
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          python3 tools/diagnostics/macos_cold_bootstrap.py \
+            --app "$PWD/build/macos/ErgoptiPlus.app" \
+            --output "$RUNNER_TEMP/native-cold-bootstrap"
+          node tools/test/desktop-ci-evidence.cjs record-cold-macos \
+            "$RUNNER_TEMP/native-cold-bootstrap/receipt.json" \
+            "$RUNNER_TEMP/native-cold-bootstrap/cold-bootstrap-evidence.json"
+
+      - name: Retain native cold bootstrap evidence of macOS 26
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_ARCHITECTURE == 'host' && always()) }}
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: cold-bootstrap-native-${{ inputs.release && 'release' || 'ci' }}-${{ env.MACOS_STAGE_RUNNER }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/cold-bootstrap-application-build.log
+            ${{ runner.temp }}/native-cold-bootstrap/receipt.json
+            ${{ runner.temp }}/native-cold-bootstrap/result.json
+            ${{ runner.temp }}/native-cold-bootstrap/launch.log
+            ${{ runner.temp }}/native-cold-bootstrap/cold-runtime.sb
+            ${{ runner.temp }}/native-cold-bootstrap/cold-bootstrap-evidence.json
+
       # Test-build acceptance follows the mandatory package gate. A fresh signed
       # app receives the cold runtime; this job never publishes a release. It
       # builds its own application at Install and launch on purpose, instead of
@@ -3157,10 +3229,12 @@ jobs:
           pattern: launch-gate-${{ inputs.release && 'release' || 'ci' }}-*
           path: ${{ runner.temp }}/launch-evidence
 
+      # One artifact per cold-receiving cell (the macOS 15 cold cell and the
+      # macOS 26 launch lot); the verifier requires exactly the plan's runners.
       - name: Download native cold bootstrap evidence
         uses: actions/download-artifact@v4
         with:
-          name: cold-bootstrap-native-${{ inputs.release && 'release' || 'ci' }}-macos-15
+          pattern: cold-bootstrap-native-${{ inputs.release && 'release' || 'ci' }}-*
           path: ${{ runner.temp }}/launch-evidence/cold-bootstrap-native
 
       - name: Verify mandatory jobs and launch scenarios

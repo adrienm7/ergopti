@@ -29,9 +29,10 @@ function state(needs) {
 		platform: 'macos',
 		release: false,
 		sha: 'a'.repeat(40),
-		scenarios: ['clean', 'upgraded', 'karabiner_config'],
+		scenarios: ['clean', 'karabiner_config', 'upgraded'],
 		evidence: [],
-		coldBootstrap: [coldBootstrapRecord()],
+		// Both cold-receiving cells (macOS 15 and the macOS 26 lot) recorded.
+		coldBootstrap: [coldBootstrapRecord(), { ...coldBootstrapRecord(), runner: 'macos-latest' }],
 		needs
 	};
 }

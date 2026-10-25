@@ -1023,15 +1023,17 @@ function uploadMatrixPaths(listedPath, entry, job, candidate) {
 		run_id: '1',
 		event_name: 'push',
 		release: true,
-		scenarios: ['clean', 'karabiner_config']
+		scenarios: ['clean', 'karabiner_config', 'upgraded']
 	}).filter((row) => row.role === 'launch');
+	// The AppleEvent scenarios stay on the macOS 15 runners their receipts name;
+	// the last Apple silicon lot, which holds neither, runs on macOS 26.
 	assert.deepEqual(
 		rows.map((row) => [row.runner, row.scenario]),
 		[
-			['macos-15', 'clean'],
-			['macos-15', 'karabiner_config'],
-			['macos-15-intel', 'clean'],
-			['macos-15-intel', 'karabiner_config']
+			['macos-15', 'clean__karabiner_config'],
+			['macos-latest', 'upgraded'],
+			['macos-15-intel', 'clean__karabiner_config'],
+			['macos-15-intel', 'upgraded']
 		]
 	);
 

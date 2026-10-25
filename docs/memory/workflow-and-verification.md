@@ -317,7 +317,16 @@ run (a second job's setup) for a critical path about 7 to 10 minutes shorter.
 On a push E2E now holds seven macOS cells for five runners. The Intel
 managed native role still runs its XCTest cohorts in a second cell, and the
 test build runs four launch lots (scenarios in turn, a proved fresh runner
-between them via `macos_launch_reset.py`) beside the cold bootstrap. Action:
+between them via `macos_launch_reset.py`) beside the cold cell: five macOS
+jobs. The last Apple silicon lot runs on macOS 26 instead of macOS 15 and, after
+its scenarios, receives the cold MLX bootstrap Build used to run before signing,
+from an application it builds itself (the receiver needs the build tree's pinned
+Hammerspoon archive): Install and launch covers macOS 15 and 26 without a sixth
+job, and Build keeps only the crash-on-launch smoke test that gates signing
+(measured in run 40192411091: the cold step took 17 s of Build, the cold cell
+3.5 minutes with its build). The verdict requires exactly one cold receipt per
+cold-receiving cell of the plan (`receivesColdBootstrap`), so two, from
+macos-15 and macos-latest. Action:
 count macOS jobs per stage against the five-runner budget before splitting a
 cell, and keep the receipt chain one link per stage (`PREDECESSORS` in
 `tools/ci/macos-stage-roles.cjs`); the chain refuses a missing stage. The

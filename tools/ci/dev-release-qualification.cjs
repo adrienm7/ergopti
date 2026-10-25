@@ -163,6 +163,16 @@ const SCOPE_IDS = Object.freeze([
 	'macos-shortcuts-discovery',
 	'macos-launch-appleevents'
 ]);
+/**
+ * The closed AppleEvent launch matrix every policy defers: the two scenarios
+ * whose consent boundary hosted runners cannot answer, on the two macOS 15
+ * runners. Any other scenario records a full receipt on whatever launch runner
+ * the test-build plan gives it (tools/ci/macos-stage-roles.cjs).
+ */
+const LAUNCH_QUALIFICATION_MATRIX = Object.freeze({
+	scenarios: Object.freeze(['clean', 'karabiner_config']),
+	runners: Object.freeze(['macos-15', 'macos-15-intel'])
+});
 const STABLE_EXTRA_SCOPES = Object.freeze({
 	'core-js-suite': {
 		path: '.github/workflows/ci-common.yml',
@@ -473,8 +483,8 @@ function validatePolicy(value) {
 			refuse('Invalid closed stable command scope.');
 		if (
 			i === 4 &&
-			(JSON.stringify(row.scenarios) !== '["clean","karabiner_config"]' ||
-				JSON.stringify(row.runners) !== '["macos-15","macos-15-intel"]')
+			(JSON.stringify(row.scenarios) !== JSON.stringify(LAUNCH_QUALIFICATION_MATRIX.scenarios) ||
+				JSON.stringify(row.runners) !== JSON.stringify(LAUNCH_QUALIFICATION_MATRIX.runners))
 		)
 			refuse('Invalid closed Mac launch qualification matrix.');
 		if (
@@ -610,11 +620,17 @@ function launchQualificationReceipt(profile, scenario, runner, details) {
 	const scope = 'macos-launch-appleevents';
 	const row = (profile || POLICY).scopes[scope];
 	keys(details, ['source_sha']);
+	// A deferrable scenario runs only on the runners its receipts name; any
+	// other one may run on every launch runner of the test-build plan. Required
+	// lazily: the stage roles read this module's closed JSON parser at load.
+	const runners = row.scenarios.includes(scenario)
+		? row.runners
+		: require('./macos-stage-roles.cjs').launchRunners();
 	if (
 		typeof scenario !== 'string' ||
 		!scenario ||
 		/[\r\n]/.test(scenario) ||
-		!row.runners.includes(runner)
+		!runners.includes(runner)
 	)
 		refuse('Invalid Mac launch qualification row.');
 	if (profile !== null) deferredScopes(profile);
@@ -1016,6 +1032,7 @@ function main(argv) {
 	}
 }
 module.exports = {
+	LAUNCH_QUALIFICATION_MATRIX,
 	STABLE_V102_POLICY_PATH,
 	STABLE_V102_PROFILE_ID,
 	STABLE_V102_PAC_METHODS,
