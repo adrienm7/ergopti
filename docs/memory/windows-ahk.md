@@ -161,6 +161,17 @@ escaping should still use native `StrReplace` passes (a per-code-unit script
 loop took 3 s on a 2 MB release list), but split the text on NUL with
 `RegExMatch(text, "\x00")` first, as `JsonStringLiteral` does.
 
+### project-ahk-wstr-invalidates-embedded-nul-length
+
+`DllCall(..., "WStr", Variable)` invalidates the variable's cached string length
+because the native callee may write through that pointer. On AutoHotkey 2.0.26,
+even the read-only `lstrlenW` changed a 13-unit `prefix` + NUL + `suffix` variable
+into a six-unit value for later script reads. A NUL rejection test that calls
+that oracle first therefore submits a valid prefix instead of its malformed
+fixture. Use `"Ptr", StrPtr(Value)` for an independent const-pointer oracle and
+assert that the full stored length and NUL survive immediately before dispatch.
+Reject unrepresentable text before passing it through the native string ABI.
+
 ## Startup and callbacks
 
 ### project-ahk-entry-smoke-is-the-startup-proof

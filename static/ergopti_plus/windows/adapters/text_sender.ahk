@@ -812,6 +812,13 @@ _TextSenderReportOutput(Text) {
 		CapsWordAutoOffObserveOutput(Text)
 }
 
+; Windows string output boundaries terminate at NUL even though an AHK String
+; can retain a suffix after it. Refuse the whole request instead of committing
+; the full source text after the receiver obtained only its prefix.
+_TextSenderContainsNul(Text) {
+	return Text is String && RegExMatch(Text, "\x00") > 0
+}
+
 ; Inserts text at the current insertion point.
 ; Uses the Clipboard port (CB_SaveAll / CB_Write / CB_RestoreAll) for the clipboard
 ; path so the interaction is mockable and the driver has one canonical clipboard
@@ -823,6 +830,13 @@ _TextSenderReportOutput(Text) {
 ; @param Callback {Func|0}   Called with the completion Boolean and error message.
 TextSend(Text, Opts, Callback) {
 	global TEXT_CLIPBOARD_THRESHOLD, _TEXT_CLIPBOARD_QUEUE
+	if _TextSenderContainsNul(Text)
+			|| ((Opts is Map) && Opts.Has("deleted_text") && _TextSenderContainsNul(Opts["deleted_text"])) {
+		try LoggerWarn("TextSender", "Text output refused: NUL code units cannot cross a Windows string boundary.")
+		finally _TextSenderInvokeCallback(Callback, false,
+			"text output and deletion evidence cannot contain NUL code units")
+		return
+	}
 	Mode := "auto"
 	if (Opts is Map) and Opts.Has("mode") and Opts["mode"] != ""
 		Mode := Opts["mode"]
