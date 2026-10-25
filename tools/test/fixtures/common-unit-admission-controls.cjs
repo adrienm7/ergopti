@@ -273,7 +273,7 @@ async function run() {
 			j.pop();
 		},
 		(j) => {
-			j[0].name = 'Common / Unit tests (Menus)';
+			j[0].name = 'YAML, shared code & web / Unit tests (Menus)';
 		},
 		(j) => {
 			j[0].name = 'Common / Unit tests (foreign)';
