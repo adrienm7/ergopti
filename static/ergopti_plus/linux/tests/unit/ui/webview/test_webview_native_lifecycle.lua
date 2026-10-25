@@ -43,7 +43,7 @@ local run_contract = function(helpers,load_manager,load_host)
      return controls.register
     end
     function ucm:unregister_script_message_handler(name)
-     helpers.assert_eq(name=='metrics_typing_bridge' or name=='physical_shortcuts_bridge',true,'Only exact owned registration retires')
+     helpers.assert_eq(name=='metrics_typing_bridge' or name=='physical_shortcuts_bridge' or name=='config_cleanup_bridge',true,'Only exact owned registration retires')
      controls.unregister_calls=controls.unregister_calls+1
      if controls.unregister=='throw'then error('private unregister detail')end
      if controls.unregister=='false'then return false end
@@ -104,6 +104,37 @@ local run_contract = function(helpers,load_manager,load_host)
   if not called then error(detail,0)end
  end
  helpers.describe('Actual native WebView acquisition and retirement debt',function()
+  for _,mode in ipairs({'close','replace','retain','refused','debt'})do
+   helpers.it('(native-refocus-owner) repeated show acknowledges only its retained native owner: '..mode,function()
+    fixture(function(m,c)
+     helpers.assert_eq(m.show('metrics_typing','en'),true);local old=m.current_epoch('metrics_typing')
+     c.present=function(owner)
+      c.present=nil
+      if mode=='refused'then error('presentation refused')end
+      if mode=='debt'then c.view_destroy='no_ack'end
+      if mode~='retain'then helpers.assert_eq(owner.hide('metrics_typing',old),mode~='debt')end
+      if mode=='replace'then helpers.assert_eq(owner.show('metrics_typing','en'),true)end
+     end
+     helpers.assert_eq(m.show('metrics_typing','en'),mode=='retain','Native focus callbacks cannot acknowledge a closed or replaced page')
+     if mode=='replace'then helpers.assert_true(m.current_epoch('metrics_typing')>old);helpers.assert_eq(c.windows[2].alive,true)
+     elseif mode=='close'then helpers.assert_eq(m.current_epoch('metrics_typing'),nil)
+     else helpers.assert_eq(m.current_epoch('metrics_typing'),old)end
+     c.view_destroy=nil;helpers.assert_eq(m.shutdown(),true)
+    end)
+   end)
+  end
+  helpers.it('(native-refocus-owner) configuration cleanup reopen refuses a synchronously closed page',function()
+   fixture(function(m,c)
+    package.loaded['ui.config_cleanup.bridge']=nil
+    local cleanup=require('ui.config_cleanup.bridge')
+    helpers.assert_eq(cleanup.open({path='/owned/config.toml'}),true)
+    local old=m.current_epoch('config_cleanup')
+    c.present=function(owner)helpers.assert_eq(owner.hide('config_cleanup',old),true)end
+    helpers.assert_eq(cleanup.open({path='/owned/config.toml'}),false,'The actual caller must not announce a closed cleanup page as opened')
+    helpers.assert_eq(m.current_epoch('config_cleanup'),nil)
+    helpers.assert_eq(m.shutdown(),true)
+   end)
+  end)
   helpers.it('(native-window-owner) renderer termination retires an ordinary page before retry',function()
    fixture(function(m,c)
     helpers.assert_eq(m.show('metrics_typing','en'),true);local old=m.current_epoch('metrics_typing')
