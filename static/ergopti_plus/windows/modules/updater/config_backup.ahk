@@ -173,7 +173,7 @@ _ConfigBackup_NextId(Folder, Base) {
 		Entries.Push(FilePath)
 	for _, Path in Entries {
 		SplitPath(Path, &Name)
-		if Name == Base {
+		if StrCompare(Name, Base, false) == 0 {
 			Highest := Max(Highest, 1)
 			continue
 		}
