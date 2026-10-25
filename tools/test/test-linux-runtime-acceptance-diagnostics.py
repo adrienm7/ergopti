@@ -72,6 +72,22 @@ class FailureMetadataTests(unittest.TestCase):
         )
         self.assertIsNone(MODULE.acceptance_phases({"text": PRIVATE}))
 
+    def test_failing_assertion_names_the_traceback_frame_not_the_reraise(self):
+        log = (
+            "lua: tests/hardware/run_ollama_runtime_acceptance.lua:347: "
+            "tests/hardware/run_ollama_runtime_acceptance.lua:240: inference receipt\n"
+            "stack traceback:\n"
+            "\t[C]: in function 'assert'\n"
+            "\ttests/hardware/run_ollama_runtime_acceptance.lua:240: in function <x>\n"
+            "\t[C]: in function 'xpcall'\n"
+        )
+        self.assertEqual(MODULE.failing_assertion_line(log), 240)
+        self.assertEqual(
+            MODULE.failing_assertion_line("run_ollama_runtime_acceptance.lua:12: refused"), 12
+        )
+        self.assertIsNone(MODULE.failing_assertion_line(PRIVATE))
+        self.assertIsNone(MODULE.failing_assertion_line(None))
+
     def test_annotation_exact_closed_projection(self):
         self.assertEqual(
             MODULE.failure_annotation(failed_document()),
