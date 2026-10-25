@@ -64,12 +64,22 @@ def verify_snapshots(result):
         "statement refusal has zero durable raw rows",
         lambda: same(refused.execute("SELECT COUNT(*) FROM events_typing").fetchone()[0], 0),
     )
+
+    # Each stream reserves IDs for its two typing batches and for the session
+    # rows written with it; the accepted retry holds those same session rows.
+    def session_rows(db):
+        return db.execute("SELECT COUNT(*) FROM events_session").fetchone()[0]
+
     check(
         "separate refused ID reservation stays acknowledged",
         lambda: same(
             refused.execute("SELECT value FROM meta WHERE key='linux_next_event_id'").fetchone()[0],
-            "3",
+            str(3 + session_rows(accepted)),
         ),
+    )
+    check(
+        "statement refusal has zero durable session rows",
+        lambda: same(session_rows(refused), 0),
     )
     check("healthy public retry clears pending keys", lambda: same(result["pending_accepted"], 0))
     check("retry accepts exactly two per-app raw batches", lambda: same(len(raw), 2))
@@ -164,7 +174,7 @@ def main():
             raise RuntimeError("producer returned a database outside its owned root")
         print("Actual calendar days:", result["local_day"], "local;", result["utc_day"], "UTC")
         checks, failures = verify_snapshots(result)
-    assert checks == 12, "native raw coherence must execute all twelve checks"
+    assert checks == 13, "native raw coherence must execute all thirteen checks"
     print("Native raw WPM/day coherence oracle:", checks, "checks,", failures, "failures")
     return 1 if failures else 0
 
