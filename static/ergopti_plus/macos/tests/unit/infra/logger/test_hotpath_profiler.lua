@@ -73,12 +73,43 @@ helpers.describe("infra.hotpath_profiler.log_if_slow", function()
 	helpers.it("honours a runtime threshold override", function()
 		reset_capture()
 		hot.set_threshold_ms(0.5)          -- tighten the tripwire
-		NS = 3000 * NS_PER_MS
+		NS = 30000 * NS_PER_MS          -- past the log window of the first test
 		local t0 = hot.now()
 		NS = t0 + 1 * NS_PER_MS            -- 1 ms now trips the 0.5 ms threshold
 		hot.log_if_slow("keydown", t0, "char=c")
 		helpers.assert_eq(#captured, 1, "1 ms must trip a 0.5 ms threshold")
 		hot.set_threshold_ms(20.0)         -- restore default for any later use
+	end)
+
+	helpers.it("logs a repeating slow segment once per window and reports what it withheld", function()
+		reset_capture()
+		local Segments = require("hotpath_segments")
+		local function slow_at(at_ms, detail)
+			NS = at_ms * NS_PER_MS
+			local t0 = hot.now()
+			NS = t0 + 25 * NS_PER_MS
+			hot.log_if_slow("hotstring.match", t0, detail)
+		end
+		slow_at(100000, "first")
+		slow_at(100100, "second")
+		slow_at(100200, "third")
+		helpers.assert_eq(#captured, 1, "only the first occurrence of a window is logged")
+		slow_at(100000 + Segments.LOG_WINDOW_MS + 1000, "next window")
+		helpers.assert_eq(#captured, 2, "the next window logs again")
+		helpers.assert_eq(captured[2].args[4], 2, "the line says how many repeats it replaces")
+	end)
+
+	helpers.it("throttles each segment on its own", function()
+		reset_capture()
+		local function slow(label, at_ms)
+			NS = at_ms * NS_PER_MS
+			local t0 = hot.now()
+			NS = t0 + 25 * NS_PER_MS
+			hot.log_if_slow(label, t0, "")
+		end
+		slow("hotstring.match", 200000)
+		slow("hotstring.expand", 200010)
+		helpers.assert_eq(#captured, 2, "a second segment is not hidden by the first")
 	end)
 end)
 

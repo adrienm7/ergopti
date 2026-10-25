@@ -45,6 +45,10 @@ for name in pairs(Segments.for_driver("macos")) do
 	end
 end
 
+-- Rate limiter of the WARNING (window shared with Linux); PhaseStats keeps
+-- counting every slow occurrence.
+local _admit_slow = Segments.new_slow_gate()
+
 -- Nanoseconds per millisecond — the conversion applied once per slow keystroke.
 local NS_PER_MS = 1e6
 
@@ -103,8 +107,11 @@ function M.log_if_slow(label, start_ns, detail)
 	end
 	PhaseStats.add(phase, elapsed_ns)
 	if elapsed_ms > (_segment_slow_ms[label] or _slow_ms) then
-		pcall(Logger.warn, LOG, "Slow %s: %.2f ms (%s).",
-			tostring(label), elapsed_ms, tostring(detail or ""))
+		local admitted, skipped = _admit_slow(label, M.now() / NS_PER_MS)
+		if admitted then
+			pcall(Logger.warn, LOG, "Slow %s: %.2f ms (%s) (%d similar since the last line).",
+				tostring(label), elapsed_ms, tostring(detail or ""), skipped)
+		end
 	end
 	return elapsed_ms
 end

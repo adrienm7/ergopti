@@ -78,12 +78,15 @@ local _interval_start_ms = nil
 -- an idle wait is long by design. Built once, so the hot path is one table read.
 local _slow_ms = {}
 for name in pairs(Segments.for_driver("linux")) do _slow_ms[name] = Segments.threshold_ms(name) end
+-- Rate limiter of the WARNING (window shared with macOS); the slow counts stay exact.
+local _admit_slow = Segments.new_slow_gate()
 
 local function reset_state()
 	_counts, _totals = {}, {}
 	_span_n, _span_sum, _span_max = {}, {}, {}
 	_life_n, _life_sum, _life_max = {}, {}, {}
 	_span_slow, _life_slow = {}, {}
+	_admit_slow = Segments.new_slow_gate()
 	for _, name in ipairs(COUNTER_NAMES) do _counts[name] = 0; _totals[name] = 0 end
 	for _, name in ipairs(SPAN_NAMES) do
 		_span_n[name], _span_sum[name], _span_max[name] = 0, 0, 0
@@ -118,14 +121,18 @@ function M.span(name, started)
 	local n = _span_n[name]
 	if n == nil then error("unknown perf span '" .. tostring(name) .. "'", 2) end
 	if type(started) ~= "number" then error("perf span '" .. name .. "' closed without a clock() stamp", 2) end
-	local elapsed = Monotonic.now_ms() - started
+	local now = Monotonic.now_ms()
+	local elapsed = now - started
 	_span_n[name] = n + 1
 	_span_sum[name] = _span_sum[name] + elapsed
 	if elapsed > _span_max[name] then _span_max[name] = elapsed end
 	local limit = _slow_ms[name]
 	if limit ~= nil and elapsed > limit then
 		_span_slow[name] = _span_slow[name] + 1
-		Logger.warn(HOTPATH_LOG, "Slow %s: %.2f ms.", name, elapsed)
+		local admitted, skipped = _admit_slow(name, now)
+		if admitted then
+			Logger.warn(HOTPATH_LOG, "Slow %s: %.2f ms (%d similar since the last line).", name, elapsed, skipped)
+		end
 	end
 	return elapsed
 end

@@ -135,6 +135,22 @@ function M.register(helpers, options)
 				helpers.assert_true(#segment.why > 0, name .. " needs a reason")
 			end
 		end)
+
+		helpers.it("rate-limits the slow-segment line per segment, first occurrence always admitted", function()
+			local window = Inventory.LOG_WINDOW_MS
+			helpers.assert_true(window > 0, "the log window needs a positive length")
+			local admit = Inventory.new_slow_gate()
+			local ok, skipped = admit("a", 1000)
+			helpers.assert_true(ok and skipped == 0, "the first occurrence is logged")
+			helpers.assert_eq((admit("a", 1000 + window - 1)), false, "inside the window")
+			helpers.assert_eq((admit("a", 1000 + window - 1)), false, "inside the window, again")
+			helpers.assert_true((admit("b", 1001)), "another segment has its own window")
+			ok, skipped = admit("a", 1000 + window)
+			helpers.assert_true(ok, "logged again once the window has passed")
+			helpers.assert_eq(skipped, 2, "the line reports the repeats it stands for")
+			ok, skipped = admit("a", 1000 + 2 * window)
+			helpers.assert_true(ok and skipped == 0, "nothing withheld, nothing reported")
+		end)
 	end)
 end
 

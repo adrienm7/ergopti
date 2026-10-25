@@ -98,6 +98,15 @@ helpers.describe("perf counters: slow segments", function()
 		helpers.assert_eq(perf.snapshot().spans["loop.idle"].n, 1, "it is still timed")
 	end)
 
+	helpers.it("logs a repeating slow segment once per window yet counts every occurrence", function()
+		local perf, lines = fixture(30)
+		for _ = 1, 5 do perf.span("input.dispatch", perf.clock() - (Segments.DEFAULT_SLOW_MS + 5)) end
+		helpers.assert_eq(#lines, 1, "the repeats inside the window are not logged")
+		helpers.assert_eq(perf.snapshot().spans["input.dispatch"].slow, 5, "the count stays exact")
+		perf.span("hotstring.match", perf.clock() - (Segments.DEFAULT_SLOW_MS + 5))
+		helpers.assert_eq(#lines, 2, "another segment has its own window")
+	end)
+
 	helpers.it("reports the slow count in the interval summary", function()
 		local perf, lines = fixture(20)
 		perf.maybe_flush(0)
