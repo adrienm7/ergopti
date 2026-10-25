@@ -70,7 +70,13 @@ for _, item in ipairs(invalid) do
 	check("native " .. item[1] .. " cursor recovery retains pending typing once", function()
 		local rows = assert(Writer.query_rows("SELECT id,text FROM events_typing ORDER BY id;"))
 		assert(#rows == 1 and rows[1] == "41|a", "refusal consumed pending typing or acknowledged an unusable ID")
-		assert(Writer.get_meta("linux_next_event_id") == "42")
+		-- The retained stream also carries the typing session's start and end
+		-- rows, which take the next IDs of the same reserved range: the typing
+		-- row keeps 41 and no ID is skipped or reissued.
+		local sessions = number("SELECT count(*) FROM events_session;")
+		assert(sessions >= 1 and number("SELECT min(id) FROM events_session;") == 42)
+		assert(number("SELECT max(id) FROM events_session;") == 41 + sessions)
+		assert(Writer.get_meta("linux_next_event_id") == tostring(42 + sessions))
 		assert(number("SELECT c FROM ngram_chars WHERE token='a';") == 1)
 	end)
 end
