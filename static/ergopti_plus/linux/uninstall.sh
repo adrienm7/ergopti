@@ -173,7 +173,7 @@ done
 MANIFEST="$LIBRARY/.ergopti-owned-files"
 UNIT="$CONFIG_ROOT/systemd/user/ergopti-hotstrings.service"
 AUTOSTART="$CONFIG_ROOT/autostart/ergopti-hotstrings.desktop"
-[ -f "$MANIFEST" ] && [ ! -L "$MANIFEST" ] || { echo 'Installation ownership manifest is missing.' >&2; exit 1; }
+[ -f "$MANIFEST" ] && [ ! -L "$MANIFEST" ] && [ -s "$MANIFEST" ] || { echo 'Installation ownership manifest is missing.' >&2; exit 1; }
 OWNED=()
 REMOVE_UNIT=false
 declare -A SEEN=()

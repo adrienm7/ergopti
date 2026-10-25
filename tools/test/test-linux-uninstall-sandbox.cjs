@@ -108,6 +108,22 @@ try {
 	);
 	const ownershipPath = path.join(library, '.ergopti-owned-files');
 	const validOwnership = fs.readFileSync(ownershipPath, 'utf8');
+	fs.writeFileSync(ownershipPath, '');
+	const emptyPreflight = run('--check');
+	const emptyRemoval = run('--yes');
+	assert.notEqual(
+		emptyPreflight.status,
+		0,
+		`empty-owner-receipt: ${JSON.stringify({ preflight: emptyPreflight.status, removal: emptyRemoval.status, receiptRetained: fs.existsSync(ownershipPath), wrapperRetained: fs.existsSync(wrapper) })}`
+	);
+	assert.notEqual(emptyRemoval.status, 0, 'empty ownership cannot claim successful removal');
+	assert.equal(
+		fs.readFileSync(ownershipPath, 'utf8'),
+		'',
+		'refusal preserves the ownership evidence'
+	);
+	assert.ok(fs.existsSync(wrapper), 'empty receipt refusal preserves the launcher');
+	fs.writeFileSync(ownershipPath, validOwnership);
 	for (const invalidPath of ['linux/../../another-app/keep', 'linux//file', '@unknown']) {
 		fs.writeFileSync(ownershipPath, validOwnership + `${wrapperHash}\t${invalidPath}\n`);
 		assert.notEqual(run('--yes').status, 0, `unsafe receipt must be refused: ${invalidPath}`);
