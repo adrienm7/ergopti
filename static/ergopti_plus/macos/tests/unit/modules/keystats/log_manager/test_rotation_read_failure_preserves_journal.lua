@@ -241,6 +241,7 @@ local function run_rollover_case(failure_mode, exercise_resume)
 			reset_ngram_ctx = function() observed.reset_calls = observed.reset_calls + 1 end,
 		}
 		package.loaded["modules.keystats.export"] = {
+			cleanup = function() return true end,
 			init = function() end,
 			get_native_app_category = function() return "other" end,
 			get_device_short_id = function() return "abcd" end,

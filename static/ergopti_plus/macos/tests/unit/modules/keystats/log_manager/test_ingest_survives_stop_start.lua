@@ -88,6 +88,7 @@ local function load_log_manager()
 	}
 
 	package.loaded["modules.keystats.export"] = {
+		cleanup = function() return true end,
 		init = function() end, get_native_app_category = function() return "other" end,
 		get_device_short_id = function() return "abcd" end,
 		get_sqlite_path = function() return "/tmp/test.sqlite" end,

@@ -11,9 +11,9 @@
 --- 1. App category lookup via macOS LSApplicationCategoryType.
 --- 2. Device short-id helper for UI display labels.
 --- 3. SQLite path and db-revision accessors used as UI cache-invalidation keys.
---- 4. Foreign-device data.sql sync: reads bytes past the stored watermark from
----    each sibling device folder and applies them to the local db.sqlite so
----    cross-device SUM queries reflect all devices.
+--- 4. Foreign-device data.sql sync: verifies durable source-prefix receipts from
+---    sibling device folders before applying their committed bytes, so source
+---    rewrites and compaction cannot strand cross-device metrics.
 ---
 --- DEPENDENCIES:
 --- - infra.logger, infra.i18n, infra.fs_dir (project-wide).
@@ -32,6 +32,7 @@ local Logger = require("infra.logger")
 local i18n   = require("infra.i18n")
 local FsDir  = require("infra.fs_dir")
 local RunningApplication = require("adapters.running_application")
+local ForeignLedgerSnapshot = require("adapters.foreign_ledger_snapshot")
 local LOG    = "keystats.export"
 
 
@@ -83,6 +84,9 @@ local _get_db = nil
 
 --- Whether M.init has been called.
 local _initialized = false
+
+--- Bounded verification readers retained across ingest turns by exact source path.
+local _foreign_readers = {}
 
 
 
@@ -256,10 +260,10 @@ end
 --- db.sqlite has not yet ingested. KEYSTATS_SPEC §16.
 ---
 --- For each foreign device folder:
----  1. Reads `devices.imported_data_sql_size` (watermark; defaults to 0).
----  2. Reads everything from data.sql past that watermark.
----  3. Applies it inside a transaction (INSERT OR IGNORE — replay is safe).
----  4. Bumps the watermark in the `devices` row.
+---  1. Reads the device's committed byte offset and exact prefix SHA-256.
+---  2. Verifies that prefix in cooperative slices through one owned reader.
+---  3. Applies a proved append, or replays the complete replacement generation.
+---  4. Publishes offset and digest together after the derived rebuild commits.
 ---
 --- Locate the one canonical typing tuple without interpreting arbitrary values.
 --- Mac/Windows writers and the standalone compactor retain device_id,id first.
@@ -412,38 +416,69 @@ function M._typing_rollover_boundaries(chunk, device_sql, collect_ids, is_rollov
 	return facts
 end
 
---- Read a ledger suffix only after the committed offset and file close agree.
---- A refused seek leaves the cursor unchanged, so reading anyway would replay
---- the prefix and advance the watermark beyond the actual imported suffix.
+--- Verify one source generation between ingest turns before admitting its SQL.
+--- A durable prefix receipt is the only authority for retaining an old offset.
 --- @param path string Foreign ledger path.
 --- @param watermark integer Committed byte offset.
---- @return string|nil chunk Validated unread bytes, or nil on a native refusal.
-local function _read_foreign_sql_tail(path, watermark)
-	local opened, handle = pcall(io.open, path, "r")
-	if not opened or handle == nil then
-		Logger.warn(LOG, "Foreign sync: ledger open failed; watermark preserved.")
+--- @param digest string|nil Digest of exactly the previously committed prefix.
+--- @param size integer Captured source EOF.
+--- @return table|nil receipt Verified SQL and new prefix receipt, or nil while deferred.
+local function _read_foreign_sql_tail(path, watermark, digest, size)
+	local reader = _foreign_readers[path]
+	if reader and (reader.failed or reader.expected_offset ~= watermark or reader.expected_digest ~= digest) then
+		if not ForeignLedgerSnapshot.close(reader) then return nil end
+		_foreign_readers[path] = nil
+		reader = nil
+	end
+	if not reader then
+		local failure
+		reader, failure = ForeignLedgerSnapshot.open(path, size, watermark, digest)
+		if reader then _foreign_readers[path] = reader end
+		if failure then
+			if reader then reader.failed = true end
+			Logger.warn(LOG, "Foreign sync: ledger %s failed; watermark preserved.", failure)
+			return nil
+		end
+		if not ForeignLedgerSnapshot.start(reader) then
+			reader.failed = true
+			Logger.warn(LOG, "Foreign sync: verification scheduling failed; watermark preserved.")
+			return nil
+		end
+	end
+	local status, receipt = ForeignLedgerSnapshot.poll(reader)
+	if status == "pending" then return nil end
+	if not reader.handle and not reader.job then _foreign_readers[path] = nil end
+	if status == "failed" then
+		reader.failed = true
+		Logger.warn(LOG, "Foreign sync: ledger %s failed; watermark preserved.", receipt)
 		return nil
 	end
-	local stage = "seek"
-	local read_ok, chunk = pcall(function()
-		if handle:seek("set", watermark) ~= watermark then return nil end
-		stage = "read"
-		return handle:read("*a")
-	end)
-	local close_ok, closed = pcall(handle.close, handle)
-	if not read_ok or type(chunk) ~= "string" then
-		Logger.warn(LOG, "Foreign sync: ledger %s failed; watermark preserved.", stage)
-	end
-	if not close_ok or closed ~= true then
-		Logger.warn(LOG, "Foreign sync: ledger close failed; watermark preserved.")
-		return nil
-	end
-	if not read_ok or type(chunk) ~= "string" then return nil end
-	return chunk
+	return receipt
 end
 
---- Runs from the ingest tick. Cheap when no foreign growth has occurred since
---- the last call (just one fs.attributes() check per device folder).
+--- Retire source capabilities missing from the current enumeration snapshot.
+--- @param eligible table Set of source paths still admitted by this ingest.
+--- @return boolean complete True only when every retired reader settled.
+local function _retire_foreign_readers(eligible)
+	local complete = true
+	for path, reader in pairs(_foreign_readers) do
+		if not eligible[path] then
+			if ForeignLedgerSnapshot.close(reader) then _foreign_readers[path] = nil
+			else complete = false end
+		end
+	end
+	return complete
+end
+
+--- Close verification jobs and streams before exit, reload, or feature stop.
+--- @return boolean complete True only when every owned source capability settled.
+function M.cleanup()
+	return _retire_foreign_readers({})
+end
+
+--- Schedule foreign verification and apply completed receipts during ingest.
+--- Even equal-size files require byte continuity proof because a compaction or
+--- source replacement can invalidate an offset without changing its file size.
 ---@param on_applied fun(device_id:string):boolean|nil|nil Optional callback that
 --- rebuilds derived rows for a successfully imported device before its watermark
 --- advances. Returning false leaves the safe raw replay retryable next tick.
@@ -452,15 +487,26 @@ end
 function M.sync_foreign_data_sql(on_applied)
 	if not _require_init("sync_foreign_data_sql") then return {} end
 	local db = _get_db and _get_db()
-	if not db then return {} end
+	if not db then
+		if not M.cleanup() then return nil, "foreign verification reader cleanup refused" end
+		return {}
+	end
 	local synced_devices = {}
+	local eligible = {}
 
 	local md = _paths.metrics_dir
-	if not md or not fs.attributes(md) then return synced_devices end
+	if not md or not fs.attributes(md) then
+		if not M.cleanup() then return nil, "foreign verification reader cleanup refused" end
+		return synced_devices
+	end
 	local by_root = md .. "by_device/"
-	if not fs.attributes(by_root) then return synced_devices end
+	if not fs.attributes(by_root) then
+		if not M.cleanup() then return nil, "foreign verification reader cleanup refused" end
+		return synced_devices
+	end
 	local entries, listed, list_err = FsDir.try_entries(by_root)
 	if listed ~= true then
+		M.cleanup()
 		return nil, string.format("cannot enumerate '%s': %s", by_root, tostring(list_err))
 	end
 
@@ -497,20 +543,32 @@ function M.sync_foreign_data_sql(on_applied)
 				-- Look up the watermark for this device.  A malformed/missing
 				-- device.json leaves no devices row; applying its ledger anyway would
 				-- rebuild it every tick because the watermark UPDATE affects zero rows.
-				local watermark, has_device_row = 0, false
+				local watermark, digest, has_device_row = 0, nil, false
 				for r in db:nrows(string.format(
-					"SELECT imported_data_sql_size FROM devices WHERE device_id='%s'",
+					"SELECT imported_data_sql_size, imported_data_sql_sha256 FROM devices WHERE device_id='%s'",
 					entry:gsub("'", "''"))) do
 					has_device_row = true
-					watermark = tonumber(r.imported_data_sql_size) or 0
+					watermark = tonumber(r.imported_data_sql_size)
+					digest = r.imported_data_sql_sha256
 				end
 
 				local sz = sql_attrs.size or 0
 				if not has_device_row then
 					Logger.warn(LOG, "Foreign sync: skipping invalid device.json.")
-				elseif sz > watermark then
-					local chunk = _read_foreign_sql_tail(data_sql, watermark)
+				elseif not watermark or watermark < 0 or watermark >= math.huge or watermark % 1 ~= 0 then
+					Logger.warn(LOG, "Foreign sync: invalid committed source offset; import refused.")
+				elseif sz > 0 then
+					eligible[data_sql] = true
+					local receipt = _read_foreign_sql_tail(data_sql, watermark, digest, sz)
+					local chunk = receipt and receipt.chunk
+					if receipt and receipt.uncommitted then
+						Logger.debug(LOG, "Foreign sync: no complete batch yet — deferring.")
+					end
 					if chunk and #chunk > 0 then
+						if watermark > 0 and receipt.offset == 0 then
+							Logger.info(LOG, "Foreign sync: prior source prefix is unproved; replaying committed batches.")
+						end
+						watermark = receipt.offset
 						-- Apply ONLY through the last complete batch boundary. A
 						-- cross-device sync can copy the file mid-append, so the chunk
 						-- may end with an orphan "BEGIN TRANSACTION;" + inserts and NO
@@ -521,8 +579,8 @@ function M.sync_foreign_data_sql(on_applied)
 						-- last "COMMIT;" and defer any trailing partial batch to the next
 						-- tick; advance the watermark only to that boundary (F-M3).
 						local last_commit = M._last_complete_batch_offset(chunk)
-						if last_commit == 0 then
-							Logger.debug(LOG, "Foreign sync: no complete batch yet — deferring.")
+						if last_commit ~= #chunk or watermark + last_commit ~= receipt.applied_to then
+							Logger.warn(LOG, "Foreign sync: verified batch boundary changed; watermark preserved.")
 						else
 							local applicable = chunk:sub(1, last_commit)
 							local applied_to = watermark + last_commit
@@ -543,8 +601,8 @@ function M.sync_foreign_data_sql(on_applied)
 							end
 							if derived_ok then
 								local watermark_rc = db:exec(string.format(
-									"UPDATE devices SET imported_data_sql_size=%d, updated_at='%s' WHERE device_id='%s'",
-									applied_to, _now_ts():gsub("'", "''"), entry:gsub("'", "''")))
+									"UPDATE devices SET imported_data_sql_size=%d, imported_data_sql_sha256='%s', updated_at='%s' WHERE device_id='%s'",
+									applied_to, receipt.digest, _now_ts():gsub("'", "''"), entry:gsub("'", "''")))
 								if watermark_rc == sqlite3.OK then
 									table.insert(synced_devices, entry)
 									Logger.debug(LOG, "Foreign sync: applied %d byte(s).", applied_to - watermark)
@@ -563,6 +621,9 @@ function M.sync_foreign_data_sql(on_applied)
 				end
 			end
 		end
+	end
+	if not _retire_foreign_readers(eligible) then
+		return nil, "foreign verification reader cleanup refused"
 	end
 	return synced_devices
 end

@@ -83,6 +83,7 @@ local function run_refused_transaction(failure)
 			walk_system_event = function() end,
 		}
 		package.loaded["modules.keystats.export"] = {
+			cleanup = function() return true end,
 			sync_foreign_data_sql = function() return {} end,
 		}
 		package.loaded["modules.keystats.rotation"] = {

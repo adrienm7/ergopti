@@ -45,11 +45,43 @@ helpers.describe("keystats: foreign sync rebuilds UI aggregate partitions", func
 	end)
 
 	helpers.it("skips an unidentifiable foreign folder instead of rebuilding it forever", function()
-		local source = read_source("function M._last_complete_batch_offset") -- modules/keystats/export.lua
-		helpers.assert_true(source:find("local watermark, has_device_row = 0, false", 1, true) ~= nil,
-			"sync must distinguish a zero watermark from a missing devices row")
-		helpers.assert_true(source:find("not has_device_row", 1, true) ~= nil,
-			"an invalid device folder must be skipped before raw replay")
+		helpers.with_stub_scope({ "infra.logger", "infra.fs_dir", "modules.keystats.export" }, function()
+			local ledger_opens, sql_calls, rebuilds, device_rows = 0, 0, 0, 0
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["infra.fs_dir"] = { try_entries = function() return { "foreign" }, true end }
+			local export = helpers.load_with_stubs("modules.keystats.export", {
+				fs = { attributes = function() return { size = 100 } end },
+			})
+			export.init({ paths = { metrics_dir = "/unidentifiable/" }, device_id = "local", get_db = function()
+				return {
+					prepare = function() device_rows = device_rows + 1; return nil end,
+					nrows = function() return function() return nil end end,
+					exec = function() sql_calls = sql_calls + 1; return 0 end,
+				}
+			end })
+			local original_open = io.open
+			io.open = function(path, mode)
+				if path == "/unidentifiable/by_device/foreign/device.json" then
+					return { read = function() return '{"device_id":"a-different-device"}' end,
+						close = function() return true end }
+				elseif path == "/unidentifiable/by_device/foreign/data.sql" then
+					ledger_opens = ledger_opens + 1
+					return nil
+				end
+				return original_open(path, mode)
+			end
+			local ok, err = xpcall(function()
+				for _ = 1, 2 do
+					helpers.assert_eq(export.sync_foreign_data_sql(function() rebuilds = rebuilds + 1 end), {})
+				end
+				helpers.assert_eq(device_rows, 0, "mismatched metadata cannot publish a device row")
+				helpers.assert_eq(ledger_opens, 0, "an unidentified folder cannot authorize any raw ledger read")
+				helpers.assert_eq(sql_calls, 0)
+				helpers.assert_eq(rebuilds, 0)
+			end, debug.traceback)
+			io.open = original_open
+			if not ok then error(err, 0) end
+		end)
 	end)
 
 	helpers.it("rebuilds only the imported device before invalidating UI snapshots", function()

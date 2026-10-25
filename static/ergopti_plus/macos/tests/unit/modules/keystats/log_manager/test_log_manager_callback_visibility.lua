@@ -56,6 +56,7 @@ local function fresh_manager()
 		read_new_entries = function() return {}, 0 end,
 	}
 	package.loaded["modules.keystats.export"] = {
+		cleanup = function() return true end,
 		sync_foreign_data_sql = function()
 			return { "peer-device" }
 		end,

@@ -57,6 +57,7 @@ local function load_fixture(options)
 		reset_ngram_ctx = function() end,
 	}
 	package.loaded["modules.keystats.export"] = {
+		cleanup = function() return true end,
 		init = function() end,
 		sync_foreign_data_sql = function() end,
 		get_native_app_category = function() return "other" end,

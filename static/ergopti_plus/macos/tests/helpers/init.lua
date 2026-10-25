@@ -279,6 +279,12 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- was first required, and no later call here can reach it. A test that needs
 	-- such a submodule re-read must clear it itself.
 	loaded[module_name] = nil
+	-- Foreign ledger readers retain the native hash API across ingest turns.
+	loaded["adapters.foreign_ledger_snapshot"] = nil
+	if module_name == "modules.keystats.export" or module_name == "adapters.foreign_ledger_snapshot" then
+		loaded["infra.paced_job"] = nil
+		loaded["adapters.timer_scheduler"] = nil
+	end
 	-- The keystats and its process-lifetime physical-source settlement port
 	-- form one ownership unit. A fresh fixture parent cannot inherit a child
 	-- bound to the preceding CoreState; the scoped proxy restores both caches.
