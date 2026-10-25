@@ -39,6 +39,17 @@ local function world(coordinator, files)
 		end,
 		write = function(path, text) files[path] = text; return true end,
 		remove = function(path) files[path] = nil; return true end,
+		remove_session = function(path, expected)
+			if files[path] ~= expected.content then return false end
+			files[path] = nil
+			if state.release_pending then
+				return false, "native release refused", {}, function()
+					state.release_attempts = (state.release_attempts or 0) + 1
+					return not state.release_pending
+				end
+			end
+			return true
+		end,
 		exists = function(path) return files[path] ~= nil end,
 		private_dir = function() return true end,
 		random_hex = function() return TOKEN end,
@@ -159,6 +170,11 @@ local function with_native_world(options, callback)
 					if options.write_false then return false end
 				end
 				state.files[path] = text
+				return true
+			end,
+			remove_if_unchanged = function(path, expected)
+				if options.remove_false or state.files[path] ~= expected.content then return false end
+				state.files[path] = nil
 				return true
 			end,
 			delete = function(path)
@@ -477,6 +493,38 @@ helpers.describe("macOS local driver control", function()
 				helpers.assert_eq(state.created, 1, "stop retries the original watcher")
 			end)
 		end
+	end)
+
+	helpers.it("preserves a successor written after the marker ownership read (control-marker-replacement-race)", function()
+		local state = world(function() return true end)
+		state.session:start()
+		local session_path = state.session:path("session")
+		local successor = Policy.session_text(SPEC, "macos", 888, (TOKEN:sub(1, 1) == "0" and "1" or "0") .. TOKEN:sub(2))
+		local previous_read = state.session.ports.read
+		state.session.ports.read = function(path)
+			local content, status = previous_read(path)
+			if path == session_path then state.files[path] = successor end
+			return content, status
+		end
+		helpers.assert_eq(state.session:stop(), false, "changed source refuses conditional withdrawal")
+		helpers.assert_eq(state.files[session_path], successor, "a successor published after the read must survive")
+		helpers.assert_eq(state.session:stop(), true, "retry observes that the successor owns the marker")
+	end)
+
+	helpers.it("retains release-only marker cleanup after unlink (control-marker-release-debt)", function()
+		local state = world(function() return true end)
+		state.session:start()
+		state.release_pending = true
+		helpers.assert_eq(state.session:stop(), false, "unlink alone is not a completed native transaction")
+		local session_path = state.session:path("session")
+		helpers.assert_nil(state.files[session_path], "the original marker was physically removed")
+		helpers.assert_eq(state.session:stop(), false, "absence cannot discard the retained mutex cleanup")
+		local successor = Policy.session_text(SPEC, "macos", 888, (TOKEN:sub(1, 1) == "0" and "1" or "0") .. TOKEN:sub(2))
+		state.files[session_path] = successor
+		state.release_pending = false
+		helpers.assert_eq(state.session:stop(), true)
+		helpers.assert_eq(state.files[session_path], successor, "release-only retry never unlinks a recreated marker")
+		helpers.assert_eq(state.release_attempts, 2, "the exact cleanup capability is retried until release commits")
 	end)
 
 	helpers.it("reserves singleton startup before diagnostic reentry (control-native-start-reservation)", function()
