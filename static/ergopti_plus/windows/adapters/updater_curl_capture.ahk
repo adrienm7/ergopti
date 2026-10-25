@@ -17,11 +17,14 @@ class _UpdaterCurlCaptureLedger {
 		this.Retired := false
 	}
 	Acquire(Parent) {
-		if this.Path != "" || this.Retired || this.Acquiring
-			throw Error("Curl capture has already been initialized.")
-		; Cancellation may interrupt any native allocation. Publish the latch
-		; first; the immutable object key retains debt before a path exists.
-		this.Acquiring := true
+		PreviousCritical := Critical("On")
+		try {
+			if this.Path != "" || this.Retired || this.Acquiring
+				throw Error("Curl capture has already been initialized.")
+			; Retirement cannot cross the guard before this latch is published.
+			; Native allocation below stays interruptible with retained custody.
+			this.Acquiring := true
+		} finally Critical(PreviousCritical)
 		try {
 			Parent := RTrim(Parent, "\")
 			DirCreate(Parent)
