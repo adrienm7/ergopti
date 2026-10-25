@@ -133,6 +133,19 @@ function runContractCases(verifyStartup) {
 		verifyUpgrade(subject, sha, digest, verifyStartup, currentSchemaVersion());
 	validate(healthy);
 	let refused = 0;
+	const schemaVersion = currentSchemaVersion();
+	for (const index of [0, 1]) {
+		for (const observed of [schemaVersion - 1, schemaVersion + 1]) {
+			const changed = structuredClone(healthy);
+			changed.launches[index].saved_profile.schema_version = observed;
+			assert.throws(
+				() => validate(changed),
+				/Installed saved profile differs from the current canonical schema/,
+				'both compiled launches must reject stale and future saved-profile schemas'
+			);
+			refused++;
+		}
+	}
 	for (const mutate of [
 		(s) => {
 			delete s.prior_install;
@@ -281,7 +294,7 @@ function runContractCases(verifyStartup) {
 	}
 	assert.equal(
 		refused,
-		61,
+		65,
 		'All authored generation, real saved-file and installation controls execute'
 	);
 	return refused;
