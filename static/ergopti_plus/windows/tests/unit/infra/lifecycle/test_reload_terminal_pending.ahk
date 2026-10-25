@@ -172,6 +172,9 @@ _RTP_LaunchReturnIsPendingSuccess() {
 		Record := _RTP_Pending(Bundle, Port, _RTP_Record.Bind("success"),
 			_RTP_Record.Bind("commit"), _RTP_Record.Bind("abort"),
 			_RTP_Record.Bind("refused"), _RTP_Record.Bind("release"))
+		Observed := []
+		AssertTrue(ReloadTerminalHandoffObserveRefusal(Record, Observed,
+			(Reason) => Observed.Push(Reason)))
 		AssertEqual("launch", _RTP_Join(_RTP_Events),
 			"nothing but the launch may run before OnExit")
 		AssertEqual(1, Port["probe"]["armed"].Length,
@@ -188,6 +191,8 @@ _RTP_LaunchReturnIsPendingSuccess() {
 			"the terminal commit must run from OnExit")
 		AssertTrue(ReloadTerminalHandoffFinish(Claimed),
 			"the accepted reload must report success from OnExit")
+		AssertEqual(0, Observed.Length, "a successful successor is never reported as refused")
+		AssertEqual(0, Record["refusal_observers"].Count, "accepted hand-off retires observer closures")
 		AssertEqual("launch,commit,success", _RTP_Join(_RTP_Events),
 			"a successful reload commits then succeeds, never aborts or refuses")
 		AssertEqual(0, Port["probe"]["terminated"],
@@ -333,10 +338,17 @@ _RTP_ExitSupersedesThePendingReload() {
 		Record := _RTP_Pending(Bundle, Port, _RTP_Record.Bind("success"),
 			_RTP_Record.Bind("commit"), _RTP_Record.Bind("abort"),
 			_RTP_Record.Bind("refused"), _RTP_Record.Bind("release"))
+		Observed := []
+		AssertTrue(ReloadTerminalHandoffObserveRefusal(Record, Observed,
+			(Reason) => Observed.Push(Reason)))
 		AssertFalse(ReloadTerminalHandoffAbandon(Record, "Exit"), "A request cannot acknowledge a still-live process.")
+		AssertEqual(0, Observed.Length, "observers wait for the exact successor's physical retirement")
 		Port["probe"]["alive"] := false
 		_RTP_RunArmed(Port)
 		AssertTrue(ReloadTerminalHandoffAbandon(Record, "Exit"))
+		AssertEqual(1, Observed.Length, "a superseding quit also settles joined clients")
+		AssertEqual("reload superseded by exit: Exit", Observed[1])
+		AssertEqual(0, Record["refusal_observers"].Count)
 		AssertEqual(1, Port["probe"]["terminated"],
 			"an accepted exit must stop the successor it supersedes")
 		AssertEqual("launch,abort", _RTP_Join(_RTP_Events),
@@ -447,3 +459,42 @@ _RTP_RefusalNoticeOnlyWithoutACallerCallback() {
 }
 Test("reload terminal: the generic refusal notice is only for callers without "
 	. "their own (reload-refusal-notice-owner)", _RTP_RefusalNoticeOnlyWithoutACallerCallback)
+
+
+/** Joined observers preserve the owner's repair callback and settle once. */
+_RTP_RefusalObserversFollowExactOwner() {
+	global _RTP_Events
+	_RTP_Events := []
+	Bundle := _RTP_Acquire("control-observers")
+	Port := _RTP_NewPort()
+	Observed := []
+	try {
+		Record := _RTP_Pending(Bundle, Port, , , , _RTP_Record.Bind("caller"), _RTP_Record.Bind("release"))
+		AssertTrue(ReloadTerminalHandoffObserveRefusal(Record, Map(), _RTP_ObserverThrows))
+		AssertTrue(ReloadTerminalHandoffObserveRefusal(Record, Observed,
+			(Reason) => Observed.Push(Reason)), "the exact pending owner admits joined clients")
+		AssertFalse(ReloadTerminalHandoffObserveRefusal(Map(), Map(), (*) => 0),
+			"a foreign record never acquires notification authority")
+		AssertThrows(() => ReloadTerminalHandoffObserveRefusal(Record, Map(), 0),
+			"observer admission requires a callable")
+		Port["probe"]["alive"] := false
+		AssertTrue(ReloadTerminalHandoffRefuse(Record, "joined reload was vetoed"))
+		_RTP_RunArmed(Port)
+		_RTP_RunArmed(Port)
+		AssertEqual("launch,caller,release", _RTP_Join(_RTP_Events),
+			"observer failure cannot drop the caller's repair or bundle release")
+		AssertEqual(1, Observed.Length, "another observer's exception cannot drop terminal delivery")
+		AssertEqual("joined reload was vetoed", Observed[1])
+		AssertEqual(0, Record["refusal_observers"].Count, "terminal delivery releases observer closures")
+		AssertFalse(ReloadTerminalHandoffObserveRefusal(Record, Map(), (*) => 0),
+			"a retired owner refuses new notification authority")
+		_ReloadTerminalHandoffDeliverRefusal(Record, "duplicate")
+		AssertEqual(1, Observed.Length, "a duplicate delivery cannot repeat terminal notification")
+	} finally _RTP_Cleanup(Bundle)
+}
+
+_RTP_ObserverThrows(Reason) {
+	throw Error("Injected reload observer failure.")
+}
+Test("reload terminal: refusal observers settle on their exact owner once (control-joined-refusal)",
+	_RTP_RefusalObserversFollowExactOwner)

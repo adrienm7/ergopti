@@ -57,7 +57,7 @@ ReloadTerminalHandoffPrepare(Bundle, SuccessFn := 0, CommitFn := 0,
 		_ReloadTerminalHandoffNextId += 1
 		Record := Map("id", _ReloadTerminalHandoffNextId, "bundle", Bundle,
 			"success", SuccessFn, "commit", CommitFn, "abort", AbortFn,
-			"refused", RefusedFn, "release", ReleaseFn, "retract", RetractFn,
+			"refused", RefusedFn, "refusal_observers", Map(), "release", ReleaseFn, "retract", RetractFn,
 			"port", 0, "successor", 0, "launch_tick", 0,
 			"stall_reported", false, "probe_failure_reported", false,
 			"state", "authorized", "stop_mode", "", "stop_origin", "",
@@ -92,6 +92,28 @@ ReloadTerminalHandoffClaim(ExitReason) {
 			return false
 		Record["state"] := "claimed"
 		return Record
+	} finally Critical(PreviousCritical)
+}
+
+/**
+ * Subscribes to the exact pending successor's terminal refusal. Joined clients
+ * observe the owner instead of replacing its configuration-repair callback.
+ * @param {Map} Record The pending hand-off returned by the lifecycle owner.
+ * @param {Object} Owner Stable client identity; a new request replaces its callback.
+ * @param {Func} Callback Receives the refusal reason after native retirement.
+ * @returns {Boolean} Whether the exact pending owner admitted the observer.
+ */
+ReloadTerminalHandoffObserveRefusal(Record, Owner, Callback) {
+	if !(Owner is Object)
+		throw TypeError("A reload refusal observer needs an owner identity.")
+	if !HasMethod(Callback, "Call")
+		throw TypeError("A reload refusal observer must be callable.")
+	PreviousCritical := Critical("On")
+	try {
+		if !_ReloadTerminalHandoffOwns(Record) || Record["state"] != "pending"
+			return false
+		Record["refusal_observers"][Owner] := Callback
+		return true
 	} finally Critical(PreviousCritical)
 }
 
@@ -181,6 +203,7 @@ _ReloadTerminalHandoffFinishNonCritical(Record, BeforeSuccessFn) {
 		; All validation that may refuse happens before the teardown callback.
 		; Clearing the global makes the accepted record terminal and single-use.
 		Record["state"] := "finishing"
+		Record["refusal_observers"] := Map()
 		_ReloadTerminalHandoff := false
 	} finally Critical(PreviousCritical)
 	try {
@@ -492,6 +515,7 @@ _ReloadTerminalHandoffDeliverRefusal(Record, Reason, *) {
 		catch as Err
 			try LoggerError("Lifecycle", "Reload refusal callback failed: {1}.", Err.Message)
 	}
+	_ReloadTerminalHandoffNotifyObservers(Record, Reason)
 	ReleaseFn := Record["release"]
 	if HasMethod(ReleaseFn, "Call") {
 		try ReleaseFn.Call()
@@ -501,6 +525,17 @@ _ReloadTerminalHandoffDeliverRefusal(Record, Reason, *) {
 	if !_ReloadTerminalHandoffCloseSuccessor(Record)
 		_ReloadTerminalHandoffRetainCloseDebt(Record)
 	return true
+}
+
+/** Retires each exact client's terminal subscription before invoking it. */
+_ReloadTerminalHandoffNotifyObservers(Record, Reason) {
+	Observers := Record["refusal_observers"]
+	Record["refusal_observers"] := Map()
+	for _, Observer in Observers {
+		try Observer.Call(Reason)
+		catch as Err
+			try LoggerError("Lifecycle", "Reload refusal observer failed: {1}.", Err.Message)
+	}
 }
 
 ; An ordinary exit accepted while the successor is still loading supersedes the
@@ -521,6 +556,7 @@ ReloadTerminalHandoffAbandon(Record, ExitReason) {
 			Record["state"] := "abandoned"
 			_ReloadTerminalHandoffReleaseOwner(Record)
 		} finally Critical(PreviousOwnershipCritical)
+		_ReloadTerminalHandoffNotifyObservers(Record, "reload superseded by exit: " . ExitReason)
 		Closed := _ReloadTerminalHandoffCloseSuccessor(Record)
 		if !Closed
 			_ReloadTerminalHandoffRetainCloseDebt(Record)
