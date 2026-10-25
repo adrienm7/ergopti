@@ -33,10 +33,12 @@
 
 const fs = require('fs');
 const path = require('path');
+const assert = require('node:assert/strict');
 const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const DEFAULTS = 'static/ergopti_plus/_shared/modules/updater/defaults.json';
+const SP = 'static/ergopti_plus';
+const DEFAULTS = `${SP}/_shared/modules/updater/defaults.json`;
 const { owner, repo } = JSON.parse(fs.readFileSync(path.join(ROOT, DEFAULTS), 'utf8')).github;
 
 // Source files whose URLs are executable logic rather than documentation
@@ -54,7 +56,12 @@ const CODE_EXTENSIONS = new Set([
 
 // Paths allowed to spell the canonical URL: fixtures, tests and the example
 // extension users copy as a self-contained file
-const LITERAL_ALLOWED = [/\/tests\//, /^static\/ergopti_plus\/extensions\//];
+const EXAMPLE_EXTENSION = /^static\/ergopti_plus\/extensions\//;
+
+/** Classifies the shared Lua contract fixtures without admitting adjacent owners. */
+function isFixturePath(file) {
+	return /\/tests\//.test(file) || /^static\/ergopti_plus\/_shared\/lua\/test\//.test(file);
+}
 
 // Any GitHub repository whose name is an Ergopti one; "%." is the Lua pattern
 // spelling of the dot, which the changelog allow-pattern used
@@ -66,7 +73,64 @@ const CANONICAL = new RegExp(
 	'i'
 );
 
-const files = execFileSync('git', ['ls-files', '-z', '--', 'static/ergopti_plus', '.github'], {
+/** Applies the same URL policy to indexed source and its adversarial controls. */
+function violations(file, text) {
+	const errors = [];
+	const fixture = isFixturePath(file);
+	const literalAllowed = fixture || EXAMPLE_EXTENSION.test(file);
+	text.split('\n').forEach((line, index) => {
+		for (const match of fixture ? [] : line.matchAll(ERGOPTI_REPO)) {
+			if (
+				match[1].toLowerCase() !== owner.toLowerCase() ||
+				match[2].toLowerCase() !== repo.toLowerCase()
+			) {
+				errors.push(`${file}:${index + 1}: ${match[0]} is not the repository ${owner}/${repo}`);
+			}
+		}
+		if (CODE_EXTENSIONS.has(path.extname(file)) && !literalAllowed && CANONICAL.test(line)) {
+			errors.push(`${file}:${index + 1}: a typed repository URL — derive it from ${DEFAULTS}`);
+		}
+	});
+	return errors;
+}
+
+const canonicalUrl = `https://github.com/${owner}/${repo}`;
+const foreignUrl = `https://github.com/${owner}-other/${repo}`;
+for (const [name, file, text, count] of [
+	[
+		'shared contract fixture',
+		`${SP}/_shared/lua/test/repository_url_contract.lua`,
+		canonicalUrl + '\n' + foreignUrl,
+		0
+	],
+	[
+		'driver fixture',
+		`${SP}/macos/tests/unit/test_repository.lua`,
+		canonicalUrl + '\n' + foreignUrl,
+		0
+	],
+	[
+		'adjacent shared owner literal',
+		`${SP}/_shared/lua/updater/repository_url.lua`,
+		canonicalUrl,
+		1
+	],
+	[
+		'adjacent shared owner foreign URL',
+		`${SP}/_shared/lua/updater/repository_url.lua`,
+		foreignUrl,
+		1
+	],
+	['test-like directory', `${SP}/_shared/lua/test_owner/repository_url.lua`, canonicalUrl, 1],
+	['test-like filename', `${SP}/_shared/lua/test.lua`, foreignUrl, 1],
+	['other Lua test directory', `${SP}/macos/test/repository_url.lua`, canonicalUrl, 1],
+	['standalone example', `${SP}/extensions/example.lua`, canonicalUrl, 0],
+	['standalone example foreign URL', `${SP}/extensions/example.lua`, foreignUrl, 1]
+]) {
+	assert.equal(violations(file, text).length, count, `repository source role: ${name}`);
+}
+
+const files = execFileSync('git', ['ls-files', '-z', '--', SP, '.github'], {
 	cwd: ROOT,
 	encoding: 'utf8',
 	maxBuffer: 64 * 1024 * 1024
@@ -88,24 +152,9 @@ for (const file of files) {
 		continue;
 	}
 	scanned++;
-	// Tests and corpora spell other repositories on purpose (a foreign link a
-	// parser must refuse); every shipped file must name the real one
-	const isFixture = /\/tests\//.test(file);
-	const literalAllowed = LITERAL_ALLOWED.some((re) => re.test(file));
-	const lines = text.split('\n');
-	lines.forEach((line, index) => {
-		for (const match of isFixture ? [] : line.matchAll(ERGOPTI_REPO)) {
-			if (
-				match[1].toLowerCase() !== owner.toLowerCase() ||
-				match[2].toLowerCase() !== repo.toLowerCase()
-			) {
-				failures.push(`${file}:${index + 1}: ${match[0]} is not the repository ${owner}/${repo}`);
-			}
-		}
-		if (CODE_EXTENSIONS.has(path.extname(file)) && !literalAllowed && CANONICAL.test(line)) {
-			failures.push(`${file}:${index + 1}: a typed repository URL — derive it from ${DEFAULTS}`);
-		}
-	});
+	// Contract fixtures intentionally spell foreign links a parser must refuse.
+	// Production owners still retain both the repository and literal checks.
+	failures.push(...violations(file, text));
 }
 
 // ==================================================
