@@ -221,13 +221,15 @@ _MetaRunDomainCoverageTests()
 ; ===============================================
 ; ===============================================
 
-_MetaRunSharedPurityTests() {
-	RepoRoot := StrReplace(A_ScriptDir, "\", "/")
-	; A_ScriptDir is always the main script's dir (tests/) regardless of which
-	; #Include'd file is executing — strip everything from /static/... onward.
-	RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests(/meta)?$", "")
-
-	SharedDir := RepoRoot . "/static/ergopti_plus/_shared"
+_MetaCheckSharedPurity(SharedDir := unset) {
+	if !IsSet(SharedDir) {
+		RepoRoot := StrReplace(A_ScriptDir, "\", "/")
+		; A_ScriptDir remains the main runner directory through includes.
+		RepoRoot := RegExReplace(RepoRoot, "/static/ergopti_plus/windows/tests(/meta)?$", "")
+		SharedDir := RepoRoot . "/static/ergopti_plus/_shared"
+	}
+	if !(SharedDir is String) || SharedDir == "" || !DirExist(SharedDir)
+		throw ValueError("The shared purity census requires an existing directory.")
 	; ``\bhs\.`` (word boundary) so the Hammerspoon global is matched but not the
 	; "hs." inside ordinary words like "months." — the looser ``hs\.`` produced
 	; false positives that forced this gate to stay warn-only.
@@ -242,12 +244,8 @@ _MetaRunSharedPurityTests() {
 		if FilePath ~= "i)\.spec\.js$" {
 			continue
 		}
+		Body := FileRead(StrReplace(FilePath, "/", "\"), "UTF-8")
 		ScannedFiles++
-		try {
-			Body := FileRead(StrReplace(FilePath, "/", "\"))
-		} catch {
-			continue
-		}
 		Rel := SubStr(FilePath, InStr(FilePath, "/_shared/") + 1)
 		InBlockComment := false
 		LineNum := 0
@@ -286,13 +284,86 @@ _MetaRunSharedPurityTests() {
 	; comments + a "months." false positive — both handled above — so the real
 	; violation count is zero and this can fail the build on any new OS call. The
 	; macOS twin (hs.* baseline) already hard-fails; this brings the AHK side level.
-	_ResultSharedPurity() {
-		Assert(ScannedFiles > 0, "shared purity scanner found no JS files  --  check RepoRoot")
-		Assert(Violations = 0, "meta: " . Violations . " direct OS-API call(s) in _shared/ JS  --  route OS access through a port adapter (see WARNs)")
-	}
-	Test("meta shared purity: no direct OS API in _shared/ JS (" . ScannedFiles . " files)", _ResultSharedPurity)
+	Assert(ScannedFiles > 0, "shared purity scanner found no implementation JS files")
+	Assert(Violations == 0, "shared purity scanner found forbidden OS API calls")
+	return Map("files", ScannedFiles, "violations", Violations)
+}
+
+_MetaRunSharedPurityTests() {
+	; Count only successful reads at execution time, not a captured partial scan.
+	Test("meta shared purity: no direct OS API in _shared/ JS", _MetaCheckSharedPurity)
 }
 _MetaRunSharedPurityTests()
 
 ; Encore plus (diagnostic + keystats/llm/gestures/keymap/karabiner/adapters/timer/active_app/features): these modules + healthcheck collectors must be explicitly pause-guarded and diagnostic-visible (always-readable for paused users troubleshooting). Extend coverage lists and require_state notes accordingly.
 ; Would have caught: diagnostic missing keystats aggregator counts or LLM profile under pause, or gesture conflicts corrupting after suspend, or timer stats wrong in healthcheck.
+
+
+_MSP_RequireRefusal(Check, Root, ErrorType, Fragment := "") {
+	Observed := false
+	try Check.Call(Root)
+	catch as Err {
+		Observed := true
+		AssertEqual(ErrorType, Type(Err), "the actual purity scanner must refuse at its intended boundary")
+		if Fragment != ""
+			AssertTrue(InStr(Err.Message, Fragment) > 0)
+	}
+	AssertTrue(Observed, "an unread or absent source cannot certify shared purity")
+}
+
+_MSP_ReadCase(Kind) {
+	Check := _MetaCheckSharedPurity
+	Root := A_Temp . "\ergopti_shared_census_" . DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_" . A_TickCount
+	DirCreate(Root)
+	Handle := 0
+	try {
+		if Kind == "empty" {
+			_MSP_RequireRefusal(Check, Root, "Error", "no implementation JS files")
+			return
+		}
+		if Kind == "missing" {
+			_MSP_RequireRefusal(Check, Root . "\missing", "ValueError", "existing directory")
+			return
+		}
+		; Source fixtures are read as text; none of this JavaScript is executed.
+		Pure := 'export const value = 1;`n'
+		Impure := 'FileRead("source-only-not-executed");`n'
+		Path := Root . "\ordinary.js"
+		if Kind == "spec-only" {
+			FileAppend(Impure, Root . "\ignored.spec.js", "UTF-8")
+			_MSP_RequireRefusal(Check, Root, "Error", "no implementation JS files")
+			return
+		}
+		FileAppend(Kind == "pure" ? Pure : Impure, Path, "UTF-8")
+		if Kind == "read-error" || Kind == "mixed-read-error" {
+			if Kind == "mixed-read-error"
+				FileAppend(Pure, Root . "\peer.js", "UTF-8")
+			Handle := DllCall("Kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000, "UInt", 0,
+				"Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+			AssertTrue(Handle != -1, "the fixture must establish actual native read refusal")
+			_MSP_RequireRefusal(Check, Root, "OSError")
+			AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Handle))
+			Handle := 0
+			_MSP_RequireRefusal(Check, Root, "Error", "forbidden OS API")
+			FileDelete(Path)
+			FileAppend(Pure, Path, "UTF-8")
+			AssertEqual(Kind == "mixed-read-error" ? 2 : 1, Check.Call(Root)["files"],
+				"the same native files must succeed after unlocking and removing the forbidden call")
+			return
+		}
+		if Kind == "impure" {
+			_MSP_RequireRefusal(Check, Root, "Error", "forbidden OS API")
+			return
+		}
+		FileAppend(Impure, Root . "\ignored.spec.js", "UTF-8")
+		Receipt := Check.Call(Root)
+		AssertEqual(1, Receipt["files"], "the count must represent inspected implementation files")
+		AssertEqual(0, Receipt["violations"])
+	} finally {
+		if Handle && Handle != -1
+			DllCall("Kernel32\CloseHandle", "Ptr", Handle)
+		DirDelete(Root, true)
+	}
+}
+for _MSP_Kind in ["empty", "missing", "read-error", "mixed-read-error", "impure", "pure", "spec-only"]
+	Test("shared purity: actual " . _MSP_Kind . " source behavior (shared-purity-read-failure)", _MSP_ReadCase.Bind(_MSP_Kind))
