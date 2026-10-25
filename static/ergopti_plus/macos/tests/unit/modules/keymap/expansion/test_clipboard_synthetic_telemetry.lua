@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SyntheticStack = require("tests.support.synthetic_input_stack")
 
 
 local function load_fixture(keystats)
@@ -26,6 +27,7 @@ local function load_fixture(keystats)
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
+	local clock = SyntheticStack.install_timer_clock(hs_stub)
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -38,6 +40,7 @@ local function load_fixture(keystats)
 
 	return {
 		hs = hs_stub,
+		clock = clock,
 		synthetic = require("adapters.synthetic_input"),
 		utils = require("modules.keymap.utils"),
 	}
@@ -59,6 +62,31 @@ end
 
 
 helpers.describe("clipboard output reaches synthetic telemetry", function()
+	helpers.it("shares native time across parallel restore timers and rearms (clipboard-native-fixture-clock)", function()
+		local fixture = load_fixture()
+		local interval = require("infra.timings").sec("debounce", "clipboard_restore_ms")
+		local observed = {}
+		local function delivered() observed[#observed + 1] = fixture.clock.now() end
+		local first = fixture.hs.timer.new(interval, delivered)
+		local second = fixture.hs.timer.new(interval, delivered)
+		first:start(); second:start()
+		first:fire(); second:fire()
+		helpers.assert_eq(observed, { interval, interval },
+			"concurrently armed native timers spend one shared interval, not two")
+		helpers.assert_eq(fixture.clock.now(), interval)
+		first:start(); first:fire()
+		helpers.assert_eq(fixture.clock.now(), interval * 2, "a native rearm owns a fresh deadline")
+		local delivered_count = #observed
+		first:stop(); first:fire()
+		helpers.assert_eq(#observed, delivered_count, "stopped native timers deliver no callback")
+		helpers.assert_eq(fixture.clock.now(), interval * 2, "a stopped timer spends no native time")
+		local delayed = fixture.hs.timer.delayed.new(interval, delivered)
+		local entry = fixture.hs.timer.__timers[#fixture.hs.timer.__timers]
+		delayed:start(); delayed:start(interval * 2); entry:fire()
+		helpers.assert_eq(fixture.clock.now(), interval * 4, "delayed rearming replaces the pending deadline")
+		helpers.assert_true(not delayed:running())
+	end)
+
 	helpers.it("keeps paste echoes event-only while returning the full logical output", function()
 		local fixture = load_fixture()
 		local logical = ("p"):rep(60)
@@ -108,6 +136,8 @@ helpers.describe("clipboard output reaches synthetic telemetry", function()
 		helpers.assert_eq(handoff.status, "complete")
 		helpers.assert_eq(handoff.text, logical,
 			"restoration must wait until after Cmd+V has been handed off")
+		helpers.assert_eq(fixture.clock.now(), 0,
+			"zero-delay handoff turns must not spend the receiving host interval")
 		local restores = 0
 		for _, timer in ipairs(fixture.hs.timer.__timers) do
 			if timer.running and timer.delay == 0.15 then
@@ -116,6 +146,8 @@ helpers.describe("clipboard output reaches synthetic telemetry", function()
 			end
 		end
 		helpers.assert_eq(restores, 1, "one exact completion must own one clipboard restoration")
+		helpers.assert_true(fixture.clock.now() >= require("infra.timings").sec("debounce", "clipboard_paste_settle_ms"),
+			"delivering the restoration timer must spend the native host interval")
 		helpers.assert_eq(fixture.hs.pasteboard.readAllData(), original,
 			"the production restore must retain every original type and binary byte")
 	end)
