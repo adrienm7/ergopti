@@ -169,6 +169,24 @@ module.exports = function (sources, manifest) {
 			'withdrawn current removal caption receiver'
 		]
 	);
+	// Missing-program diagnostics remain inside the same admitted command lease.
+	cases.push(
+		[
+			'local missing_program = i18n_safe("dialog.uninstall.missing_program")',
+			'local missing_program = i18n_safe("dialog.uninstall.failed")',
+			'withdrawn missing-program diagnostic caption'
+		],
+		[
+			'\t\t\tmissing_program = missing_program,',
+			'\t\t\tmissing_program = failure,',
+			'foreign missing-program diagnostic receipt'
+		],
+		[
+			'local missing_program = i18n_safe("dialog.uninstall.missing_program")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end',
+			'local missing_program = i18n_safe("dialog.uninstall.missing_program")',
+			'missing-program localization must revalidate its command lease'
+		]
+	);
 	// Genuine About container, context and finished subtree must transport the command.
 	cases.push(
 		[
