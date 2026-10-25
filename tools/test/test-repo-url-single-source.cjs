@@ -130,6 +130,27 @@ for (const [name, file, text, count] of [
 	assert.equal(violations(file, text).length, count, `repository source role: ${name}`);
 }
 
+// Exercise classification through the same policy used by the tracked scan.
+// A nearby product directory must keep both canonical and foreign checks.
+const controlSource = `local canonical = "https://github.com/${owner}/${repo}"
+local foreign = "https://github.com/foreign-owner/${repo}"`;
+for (const fixture of [
+	'static/ergopti_plus/linux/tests/unit/repository_contract.lua',
+	'static/ergopti_plus/_shared/lua/test/repository_contract.lua'
+]) {
+	assert.deepEqual(violations(fixture, controlSource), [], fixture);
+}
+for (const product of [
+	'static/ergopti_plus/_shared/lua/updater/repository_url.lua',
+	'static/ergopti_plus/_shared/lua/test_support/repository_url.lua'
+]) {
+	const found = violations(product, controlSource);
+	assert.equal(found.length, 2, product);
+	assert.match(found[0], /a typed repository URL/);
+	assert.match(found[1], /is not the repository/);
+}
+
+
 const files = execFileSync('git', ['ls-files', '-z', '--', SP, '.github'], {
 	cwd: ROOT,
 	encoding: 'utf8',
