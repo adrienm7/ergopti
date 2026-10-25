@@ -116,7 +116,11 @@ function problems(text, manifest = MANIFEST) {
 		}
 		if (rows.length !== 1 || rows[0] !== shard)
 			found.push('step "' + key + '" must run in row ' + shard + ' alone');
-		const base = String(step.if).includes('always()') ? 'always()' : NOT_CANCELLED;
+		// A step with a reviewed extra clause (the manual dispatch acceptance) is
+		// pinned to the exact predicate its fixture entry declares.
+		const base =
+			FIXTURE.predicates?.[key] ??
+			(String(step.if).includes('always()') ? 'always()' : NOT_CANCELLED);
 		if (step.if !== LinuxE2E.condition(key, base))
 			found.push('step "' + key + '" must keep its original predicate within its row');
 	}
@@ -203,8 +207,8 @@ assert.equal(new Set(listed).size, listed.length, 'a step is listed twice');
 assert.equal(FIXTURE.shared.length, 6);
 assert.equal(
 	listed.length,
-	182,
-	'the former E2E job had 158 steps, gained 23 install steps (two, then one per test step that installed inside itself) and the Go route plan twin; none may be lost'
+	184,
+	'the former E2E job had 158 steps, gained 23 install steps (two, then one per test step that installed inside itself) and the Go route plan twin, and gained the two manual acceptance steps; none may be lost'
 );
 assert.deepEqual(
 	Object.keys(FIXTURE.subjects),

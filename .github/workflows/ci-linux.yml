@@ -208,10 +208,11 @@ jobs:
   # --module=integration), which no unit row runs: the daemon entry point as a
   # child process, the real tap-hold stack on the shipped defaults, the real
   # sqlite3, real files, real signals and timers. native runs the equivalence
-  # of the native metrics aggregation and histograms, the actual LuaJIT XI2 ABI
-  # against a real libXi under Xvfb and, on a manual dispatch, the official
-  # runtime and model acceptance. Each row records its evidence; linux-ok
-  # requires both rows.
+  # of the native metrics aggregation and the actual LuaJIT XI2 ABI against a
+  # real libXi under Xvfb. The cross-driver histogram multiplicity check runs in
+  # the Common Integration stage because it spans both Lua drivers, and the
+  # manual official runtime and model acceptance is an E2E step of the
+  # network-ai row. Each row records its evidence; linux-ok requires both rows.
   integration-linux:
     name: 'Integration tests'
     needs: [test-linux]
@@ -239,10 +240,6 @@ jobs:
       - name: Verify native metrics aggregation equivalence
         if: matrix.group == 'native'
         run: python3 tools/test/test-linux-metrics-aggregation-native.py
-
-      - name: Verify native cross-driver histogram multiplicity
-        if: matrix.group == 'native'
-        run: python3 tools/test/test-metrics-histogram-native.py
 
       - name: Run the driver integration tests
         if: matrix.group == 'driver'
@@ -308,28 +305,6 @@ jobs:
             ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stderr
           if-no-files-found: error
 
-      # This external acceptance is deliberate manual validation, separate from
-      # the frozen prerequisite gate and every package/installed-driver subject.
-      - name: Run manual official runtime and model acceptance
-        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && matrix.group == 'native' }}
-        run: |
-          set -euo pipefail
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl zstd
-          python3 static/ergopti_plus/linux/tests/hardware/run_ollama_runtime_acceptance.py \
-            --repository "$GITHUB_WORKSPACE" \
-            --evidence "$RUNNER_TEMP/ollama-runtime-acceptance" \
-            --lua luajit
-        timeout-minutes: 18
-
-      - name: Upload manual runtime acceptance evidence
-        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && matrix.group == 'native' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: ollama-runtime-acceptance-linux
-          retention-days: 7
-          path: ${{ runner.temp }}/ollama-runtime-acceptance/ollama-runtime-acceptance.json
-          if-no-files-found: error
-
       - name: Record mandatory integration evidence
         run: |
           set -euo pipefail
@@ -337,7 +312,7 @@ jobs:
               integration_assertions=$(jq -r '.passed' "$RUNNER_TEMP/linux-lua.json")
               subjects=(--subject "integration-driver=$integration_assertions")
           else
-              subjects=(--subject native-metrics-equivalence=1 --subject native-histogram-multiplicity=1 --subject native-xi2-abi=1)
+              subjects=(--subject native-metrics-equivalence=1 --subject native-xi2-abi=1)
           fi
           node tools/test/linux-ci-evidence.cjs record \
               --job integration-linux \
@@ -3330,7 +3305,7 @@ jobs:
         timeout-minutes: 5
 
       - name: Install prerequisites for AI predictions against a real Ollama
-        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -3351,7 +3326,7 @@ jobs:
       # OpenAI-compatible endpoint, the dialect Cerebras speaks — the remote
       # backend and its connectivity probe.
       - name: AI predictions against a real Ollama
-        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -3373,6 +3348,30 @@ jobs:
               exit 1
           fi
         timeout-minutes: 12
+
+      # This external acceptance is deliberate manual validation, separate from
+      # the frozen prerequisite gate and every package/installed-driver subject.
+      # It runs the official runtime and a model for real, so it is an E2E step
+      # and belongs with the other real-Ollama step of this row.
+      - name: Run manual official runtime and model acceptance
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && matrix.shard == 'network-ai' }}
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl zstd
+          python3 static/ergopti_plus/linux/tests/hardware/run_ollama_runtime_acceptance.py \
+            --repository "$GITHUB_WORKSPACE" \
+            --evidence "$RUNNER_TEMP/ollama-runtime-acceptance" \
+            --lua luajit
+        timeout-minutes: 18
+
+      - name: Upload manual runtime acceptance evidence
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && matrix.shard == 'network-ai' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ollama-runtime-acceptance-linux
+          retention-days: 7
+          path: ${{ runner.temp }}/ollama-runtime-acceptance/ollama-runtime-acceptance.json
+          if-no-files-found: error
 
       # touchpad_finder reads capability bits out of a printed bitmap, and that
       # rests on one thing the text cannot confirm: that the words are 64 bits
@@ -3952,8 +3951,7 @@ jobs:
               --subject wayland-display=1 \
               --subject touchpad-capability=1 \
               --subject gesture-roundtrip=1 \
-              --subject "hotstring-e2e=$e2e_assertions" \
-              --subject ollama-live=1
+              --subject "hotstring-e2e=$e2e_assertions"
           ;;
           desktop-webview)
           "${record[@]}" \
@@ -3998,7 +3996,8 @@ jobs:
               --subject "archive-source-crypto=$archive_crypto_assertions" \
               --subject "archive-source-bin-parent=$archive_bin_parent_assertions" \
               --subject "archive-private-snapshot=$archive_snapshot_assertions" \
-              --subject "connect-terminal-protocol-model=$connect_protocol_assertions"
+              --subject "connect-terminal-protocol-model=$connect_protocol_assertions" \
+              --subject ollama-live=1
           ;;
           platform-metrics)
           "${record[@]}" \
