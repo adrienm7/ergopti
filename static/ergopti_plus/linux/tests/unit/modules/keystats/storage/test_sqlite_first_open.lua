@@ -234,6 +234,16 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		helpers.assert_true(status == true or status == 0, "capture admission must preserve permitted raw events and independent machine aggregates")
 	end)
 
+	helpers.it("retains the actual physical family at input capture (layout-capture-context)", function()
+		local quote = require("text_utils").shell_quote
+		local root = helpers.driver_root()
+		local fixture = root .. "/tests/hardware/run_keystats_layout_capture.lua"
+		local receipt = os.tmpname()
+		local status = os.execute("env -u LUA_PATH -u LUA_CPATH luajit " .. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
+		os.remove(receipt)
+		helpers.assert_true(status == true or status == 0, "captured layout and finger context must survive later provider publication")
+	end)
+
 	helpers.it("opens a fresh database and creates the schema", function()
 		local writer = helpers.load_module("modules.keystats.sqlite_writer")
 		local dir = os.tmpname()

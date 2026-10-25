@@ -26,7 +26,7 @@ helpers.describe("linux-unicode-character-classes", function()
 			for _, codepoint in utf8.codes(case[2]) do
 				events[#events + 1] = { utf8.char(codepoint), 100, {} }
 			end
-			local batch = Walker.walk(events, "2026-10-05", "owned-unicode")
+			local batch = Walker.walk(events, "2026-10-05", "owned-unicode", nil, { layout = "qwerty", physical_layout = "qwerty" })
 			local row = batch.chars_class["2026-10-05\1owned-unicode"]
 			local total = 0
 			for index, field in ipairs({ "letter", "digit", "punct", "space", "other" }) do
@@ -47,7 +47,7 @@ helpers.describe("linux-unicode-character-classes", function()
 			for _, codepoint in utf8.codes("é中🙂\194\160\n") do
 				events[#events + 1] = { utf8.char(codepoint), 0, { s = 1, st = source } }
 			end
-			local batch = Walker.walk(events, "2026-10-05", "owned-synthetic")
+			local batch = Walker.walk(events, "2026-10-05", "owned-synthetic", nil, { layout = "qwerty", physical_layout = "qwerty" })
 			local row = batch.chars_class["2026-10-05\1owned-synthetic"]
 			for _, field in ipairs({ "letter", "digit", "punct", "space", "other" }) do
 				helpers.assert_eq(row[field], 0)
@@ -68,7 +68,7 @@ helpers.describe("linux-unicode-character-controls", function()
 			{ "\t", 100, {} },
 			{ "\n", 100, {} },
 		}
-		local batch = Walker.walk(events, "2026-10-05", "owned-controls")
+		local batch = Walker.walk(events, "2026-10-05", "owned-controls", nil, { layout = "qwerty", physical_layout = "qwerty" })
 		local row = batch.chars_class["2026-10-05\1owned-controls"]
 		helpers.assert_eq(row.letter, 0)
 		helpers.assert_eq(row.digit, 0)

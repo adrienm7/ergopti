@@ -945,7 +945,8 @@ local function with_replayed_hotstring(options, callback)
     assert(collector.init({ sqlite_path = "/controlled/replayed-hotstring.sqlite" }) ~= false)
     require("tests.support.metrics_consent_fixture").enable(collector)
     collector.reset_session()
-    package.loaded["adapters.keyboard_hook"] = { held_text_modifier_codes = function() return {} end,
+    package.loaded["adapters.keyboard_hook"] = { get_layout = function() return "qwerty" end,
+      held_text_modifier_codes = function() return {} end,
       held_shortcut_modifier_codes = function() return {} end, held_forwarded_keys = function() return {} end,
       emergency_stop = function() world.stopped = true end }
     package.loaded["adapters.xkb_capture"] = { caps_locked = function() return false end }
