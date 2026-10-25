@@ -28,7 +28,7 @@ local STUBS = { "adapters.update_launcher", "ui.changelog", "ui.error_dialog", "
 --- Loads the host with recording doubles of the launcher, the Versions window,
 --- the error window and the log opener. ctx: Host, requests, reports, changelogs.
 local function load_host()
-	local ctx = { requests = {}, reports = {}, changelogs = {}, saved = {} }
+	local ctx = { requests = {}, reports = {}, changelogs = {}, saved = {}, errors = {} }
 	for _, name in ipairs(STUBS) do ctx.saved[name] = package.loaded[name] end
 	package.loaded["adapters.update_launcher"] = {
 		request_check = function(channel) ctx.requests[#ctx.requests + 1] = channel; return true end,
@@ -46,10 +46,14 @@ local function load_host()
 		open_http_url = function(url) ctx.urls[#ctx.urls + 1] = url; return true end,
 	}
 	ctx.Host = helpers.load_with_stubs("ui.update_check")
+	ctx.logger = require("infra.logger")
+	ctx.previous_error = ctx.logger.error
+	ctx.logger.error = function(_, message, ...) ctx.errors[#ctx.errors + 1] = string.format(message, ...) end
 	return ctx
 end
 
 local function restore(ctx)
+	ctx.logger.error = ctx.previous_error
 	for _, name in ipairs(STUBS) do package.loaded[name] = ctx.saved[name] end
 	package.loaded["ui.update_check"] = nil
 end
@@ -60,6 +64,7 @@ local function fake_view()
 	function view.evaluateJavaScript(_, js)
 		local payload = js:match("receiveUpdateCheck%((.*)%)$")
 		view.messages[#view.messages + 1] = payload and Json.decode(payload) or js
+		return view
 	end
 	function view.delete() view.deleted = true end
 	return view
@@ -379,6 +384,62 @@ helpers.describe("update host report cancellation reentry", function()
 			ctx.Host.open(owners)
 			helpers.assert_true(replacement ~= nil and replacement ~= session)
 			helpers.assert_true(ctx.Host._session() == replacement, "outer retirement cannot overwrite the reentrant session")
+		end)
+	end)
+end)
+
+
+helpers.describe("update-check JavaScript delivery (update-check-js-receipt)", function()
+	for _, mode in ipairs({ "nil", "false", "throw" }) do
+		helpers.it("rejects native submission " .. mode .. " (update-check-js-receipt)", function()
+			scenario(function(ctx)
+				local view = fake_view()
+				function view:evaluateJavaScript()
+					if mode == "throw" then error("native submission failed") end
+					if mode == "false" then return false end
+					return nil
+				end
+				ctx.Host._set_window(view, nil)
+				helpers.assert_eq(ctx.Host._push_to(view, { state = "checking" }), false)
+				helpers.assert_eq(#ctx.errors, 1, "the failed submission must be diagnosed")
+			end)
+		end)
+	end
+
+	helpers.it("observes native execution errors and accepts the native success sentinel (update-check-js-receipt)", function()
+		scenario(function(ctx)
+			local view = fake_view()
+			local complete
+			function view:evaluateJavaScript(_, callback) complete = callback; return self end
+			ctx.Host._set_window(view, nil)
+			helpers.assert_true(ctx.Host._push_to(view, { state = "checking" }))
+			helpers.assert_type(complete, "function", "execution must have an observed completion")
+			complete(nil, { code = 0 })
+			helpers.assert_eq(#ctx.errors, 0, "Hammerspoon's nil NSError sentinel is successful")
+			helpers.assert_true(ctx.Host._push_to(view, { state = "available" }))
+			complete(nil, { code = 4, domain = "WKErrorDomain", message = "private release payload" })
+			helpers.assert_eq(#ctx.errors, 1, "an asynchronous page exception must be diagnosed")
+			helpers.assert_nil(ctx.errors[1]:find("private release payload", 1, true),
+				"native diagnostics must not echo evaluated payloads")
+		end)
+	end)
+
+	helpers.it("rejects inline execution failure and ignores completion of a retired window (update-check-js-receipt)", function()
+		scenario(function(ctx)
+			local view = fake_view()
+			function view:evaluateJavaScript(_, callback)
+				callback(nil, { code = 4, domain = "WKErrorDomain" })
+				return self
+			end
+			ctx.Host._set_window(view, nil)
+			helpers.assert_eq(ctx.Host._push_to(view, { state = "checking" }), false)
+			helpers.assert_eq(#ctx.errors, 1)
+			local complete
+			function view:evaluateJavaScript(_, callback) complete = callback; return self end
+			helpers.assert_true(ctx.Host._push_to(view, { state = "checking" }))
+			ctx.Host._set_window(fake_view(), nil)
+			complete(nil, { code = 4, domain = "WKErrorDomain" })
+			helpers.assert_eq(#ctx.errors, 1, "a retired window cannot report into its successor")
 		end)
 	end)
 end)
