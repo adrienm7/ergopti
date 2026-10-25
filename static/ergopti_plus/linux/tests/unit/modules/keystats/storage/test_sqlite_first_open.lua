@@ -116,6 +116,72 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		end)
 	end
 
+	for _, mode in ipairs({ "encrypt", "decrypt" }) do
+		helpers.it("resumes accepted " .. mode .. " migration before its first slice (migration-before-first-slice)", function()
+			local previous_writer = package.loaded["modules.keystats.sqlite_writer"]
+			local previous_migration = package.loaded["modules.keystats.text_migration"]
+			local writer = helpers.load_module("modules.keystats.sqlite_writer")
+			local migration = helpers.load_module("modules.keystats.text_migration")
+			local path = os.tmpname()
+			local ok, failure = xpcall(function()
+				helpers.assert_true(writer.open_db(path))
+				helpers.assert_true(writer.exec_sql("INSERT INTO events_typing "
+					.. "(device_id,id,ts,date,app,is_fullscreen,in_meeting,mouse_clicks,mouse_scrolls,mouse_distance_px,text,events_json) "
+					.. "VALUES ('owned-device',1,'2026-10-25 12:00:00','2026-10-25','owned-app',0,0,0,0,0,'not-converted','[]');"))
+				helpers.assert_true(migration.start(mode, "owned-device"))
+				-- Rebuild the actual runner before any periodic pump, as a daemon
+				-- restart does. The same native database is its only durable state.
+				migration._set_backend(nil)
+				helpers.assert_true(migration.resume(mode, "owned-device"), "an acknowledged pass must survive a restart before its first slice")
+				helpers.assert_eq(migration.get_progress().cursor, 0)
+				helpers.assert_eq(writer.query_rows("SELECT text FROM events_typing;")[1], "not-converted")
+			end, debug.traceback)
+			migration.cancel()
+			writer.close_db()
+			package.loaded["modules.keystats.sqlite_writer"] = previous_writer
+			package.loaded["modules.keystats.text_migration"] = previous_migration
+			os.remove(path)
+			if not ok then error(failure, 0) end
+		end)
+	end
+
+	for _, mode in ipairs({ "encrypt", "decrypt" }) do
+		helpers.it("refuses accepted " .. mode .. " migration without its first cursor receipt (migration-start-write-refusal)", function()
+			local previous_writer = package.loaded["modules.keystats.sqlite_writer"]
+			local previous_migration = package.loaded["modules.keystats.text_migration"]
+			local writer = helpers.load_module("modules.keystats.sqlite_writer")
+			local migration = helpers.load_module("modules.keystats.text_migration")
+			local key = require("keystats.text_migration_runner").CURSOR_META_KEY
+			local path = os.tmpname()
+			local ok, failure = xpcall(function()
+				helpers.assert_true(writer.open_db(path))
+				helpers.assert_true(writer.exec_sql("CREATE TRIGGER owned_cursor_refusal BEFORE INSERT ON meta "
+					.. "WHEN NEW.key='" .. key .. "' BEGIN SELECT RAISE(FAIL,'owned refusal'); END;"))
+				helpers.assert_eq(migration.start(mode, "owned-device"), false, "native cursor refusal must reject acceptance")
+				helpers.assert_eq(migration.is_running(), false)
+				helpers.assert_nil(writer.get_meta(key))
+				helpers.assert_true(writer.exec_sql("DROP TRIGGER owned_cursor_refusal;"))
+				helpers.assert_true(migration.start(mode, "owned-device"))
+				helpers.assert_eq(writer.get_meta(key), mode .. ":0", "a healthy retry must durably own its first slice")
+			end, debug.traceback)
+			migration.cancel()
+			writer.close_db()
+			package.loaded["modules.keystats.sqlite_writer"] = previous_writer
+			package.loaded["modules.keystats.text_migration"] = previous_migration
+			os.remove(path)
+			if not ok then error(failure, 0) end
+		end)
+	end
+
+	helpers.it("keeps published encryption posture while refusing historical work (migration-public-consumer)", function()
+		local quote = require("text_utils").shell_quote
+		local root = helpers.driver_root()
+		local fixture = root .. "/tests/hardware/run_text_migration_consumer.lua"
+		-- A Lua 5.4 parent must not export its native module ABI into LuaJIT.
+		local status = os.execute("env -u LUA_PATH -u LUA_CPATH luajit " .. quote(fixture) .. " " .. quote(root))
+		helpers.assert_true(status == true or status == 0, "native settings posture and migration acceptance must remain distinct")
+	end)
+
 	helpers.it("opens a fresh database and creates the schema", function()
 		local writer = helpers.load_module("modules.keystats.sqlite_writer")
 		local dir = os.tmpname()

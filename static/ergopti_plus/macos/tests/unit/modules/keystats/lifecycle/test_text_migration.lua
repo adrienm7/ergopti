@@ -37,6 +37,10 @@ local CipherDouble = require("tests.support.keystats.cipher_shell_double")
 
 local DEVICE = "mac-testhost"
 
+-- The real migration module loads native hs.* dependencies before the store
+-- override is installed. Register their faithful aliases even in a focused run.
+helpers.load_with_stubs("modules.keystats.text_migration")
+
 
 
 
@@ -534,3 +538,11 @@ helpers.describe("Migration fixture native identity ownership", function()
 		assert_scope_restoration(true)
 	end)
 end)
+
+require("test.text_migration_durability").register(helpers, {
+	make_store = make_store, load = load_runner, install = install_shell,
+	restore = restore_shell, drain = drain,
+	logger = function() return require("infra.logger") end,
+	log_tag = "keystats.text_migration", device = DEVICE,
+	resume = function(migration, mode) return migration.resume_for_posture(mode == Plan.MODE_ENCRYPT, DEVICE) end,
+})

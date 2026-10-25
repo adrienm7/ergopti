@@ -114,10 +114,11 @@ function M.new(deps)
 		return tonumber(stored_cursor) or 0
 	end
 
-	--- Persists the resume point. Called only after the batch it covers was
-	--- written, so a crash between the two costs a re-scan and never a skipped row.
+	--- Persists the resume point. Advances cover only committed rows; the initial
+	--- publication also owns a pass stopped before its first periodic slice.
+	--- @return boolean acknowledged Only an explicit committed receipt succeeds.
 	local function write_cursor()
-		backend.set_cursor(mode .. CURSOR_SEPARATOR .. tostring(math.floor(cursor)))
+		return backend.set_cursor(mode .. CURSOR_SEPARATOR .. tostring(math.floor(cursor))) == true
 	end
 
 	--- Stops the pass, leaving every already-converted row converted.
@@ -130,7 +131,7 @@ function M.new(deps)
 
 	--- Marks the pass finished.
 	local function finish()
-		write_cursor()
+		if not write_cursor() then return abort("the final resume point could not be written") end
 		Logger.success(LOG, "At-rest migration finished: %d row(s) converted, %d scanned.",
 			converted, scanned)
 		mode = nil
@@ -198,6 +199,9 @@ function M.new(deps)
 		last_logged = 0
 		total       = backend.count(owner)
 
+		-- Boot resumes only durable intent. The daemon may stop before its first
+		-- periodic slice, so accepting a RAM-only pass would strand old rows.
+		if not write_cursor() then return abort("the initial resume point could not be written") end
 		Logger.start(LOG, "At-rest migration (%s) over %d row(s), resuming after id %d…",
 			wanted_mode, total, cursor)
 		return true
@@ -247,7 +251,7 @@ function M.new(deps)
 
 		-- Only now: the cursor must never claim ground the write did not cover.
 		cursor = batch_cursor
-		write_cursor()
+		if not write_cursor() then return abort("the batch resume point could not be written") end
 
 		if converted - last_logged >= PROGRESS_LOG_INTERVAL_ROWS then
 			last_logged = converted

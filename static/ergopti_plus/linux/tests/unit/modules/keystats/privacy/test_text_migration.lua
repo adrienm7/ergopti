@@ -615,8 +615,16 @@ helpers.describe("text_migration — failure never leaves data behind", function
 		Shell()._reset_runner()
 
 		helpers.assert_eq(migration.is_running(), false)
-		helpers.assert_nil(store.cursor,
-			"a cursor that claims ground the write never covered would skip those rows forever")
+		helpers.assert_eq(store.cursor, Plan.MODE_ENCRYPT .. ":0",
+			"the initial durable intent must not advance past a batch whose write failed")
 		helpers.assert_eq(store.rows[1].values.text, "one")
 	end)
 end)
+
+require("test.text_migration_durability").register(helpers, {
+	make_store = make_store, load = load_runner, install = install_shell,
+	restore = function() Shell()._reset_runner() end, drain = drain,
+	logger = function() return require("logger.shim") end,
+	log_tag = "modules.keystats.text_migration", device = DEVICE,
+	resume = function(migration, mode) return migration.resume(mode, DEVICE) end,
+})
