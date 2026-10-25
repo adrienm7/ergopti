@@ -257,8 +257,25 @@ _DriverProductionSourceCensus(Root := unset) {
 		SplitPath(A_ScriptDir, , &Root)
 	if !(Root is String) || Root == "" || !DirExist(Root)
 		throw ValueError("The production source census requires an existing directory.")
+	; Match the filesystem's full/long path before deriving relative identities.
+	; Standalone framework consumers cannot depend on a loaded filesystem adapter.
+	Size := DllCall("Kernel32\GetFullPathNameW", "Str", Root, "UInt", 0, "Ptr", 0, "Ptr", 0, "UInt")
+	if !Size
+		throw OSError()
+	Full := Buffer(Size * 2)
+	Written := DllCall("Kernel32\GetFullPathNameW", "Str", Root, "UInt", Size, "Ptr", Full, "Ptr", 0, "UInt")
+	if !Written || Written >= Size
+		throw Error("The production source root did not resolve completely.")
+	Size := DllCall("Kernel32\GetLongPathNameW", "Ptr", Full, "Ptr", 0, "UInt", 0, "UInt")
+	if !Size
+		throw OSError()
+	Long := Buffer(Size * 2)
+	Written := DllCall("Kernel32\GetLongPathNameW", "Ptr", Full, "Ptr", Long, "UInt", Size, "UInt")
+	if !Written || Written >= Size
+		throw Error("The production source long root did not resolve completely.")
+	Root := StrGet(Long)
 	Paths := []
-	Loop Files, Root . "\*.ahk", "FR" {
+	Loop Files, RTrim(Root, "\") . "\*.ahk", "FR" {
 		if _DriverIsProductionSource(A_LoopFileFullPath)
 			Paths.Push(A_LoopFileFullPath)
 	}

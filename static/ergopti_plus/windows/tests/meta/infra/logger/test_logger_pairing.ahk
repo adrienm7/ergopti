@@ -43,6 +43,8 @@ _MetaLoggerReadSources(Root := unset) {
 	Sources := Map()
 	for Path in Census.Paths {
 		Relative := SubStr(StrReplace(Path, "\", "/"), StrLen(Prefix) + 1)
+		if Relative == "" || Sources.Has(Relative)
+			throw Error("The logger census must retain distinct relative source identities.")
 		; A listed source is part of the subject: failed reads must fail the test.
 		Sources[Relative] := FileRead(Path, "UTF-8")
 	}
@@ -294,3 +296,37 @@ _MLP_CensusCase(Kind) {
 }
 for _MLP_Kind in ["empty", "missing", "read-error", "unbalanced", "adapter", "no-producer", "reload", "no-reload", "balanced"]
 	Test("logger census: actual " . _MLP_Kind . " source behavior (logger-census-failure)", _MLP_CensusCase.Bind(_MLP_Kind))
+
+
+_MLP_SourceRootAlias(Kind) {
+	Stem := "ergopti_logger_alias_" . DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_" . A_TickCount
+	Root := A_Temp . "\" . Stem
+	PreviousDirectory := A_WorkingDir
+	DirCreate(Root . "\adapters")
+	try {
+		FileAppend(_MLP_Source("reload"), Root . "\adapters\a_bad.ahk", "UTF-8")
+		FileAppend(_MLP_Source("balanced"), Root . "\adapters\z_good.ahk", "UTF-8")
+		if Kind == "dot"
+			Alias := Root . "\."
+		else if Kind == "parent"
+			Alias := Root . "\..\" . Stem
+		else {
+			SetWorkingDir(A_Temp)
+			Alias := Stem
+		}
+		Census := _DriverProductionSourceCensus(Alias)
+		AssertEqual(2, Census.Paths.Length, "the native census must retain both real files")
+		Sources := _MetaLoggerReadSources(Alias)
+		AssertEqual(2, Sources.Count, "an existing-directory alias cannot collapse distinct source identities")
+		AssertTrue(Sources.Has("adapters/a_bad.ahk"))
+		AssertTrue(Sources.Has("adapters/z_good.ahk"))
+		_MLP_ExpectedRefusal(_MetaLoggerCheckPairing, Alias, "Error", "unpaired lifecycle logs")
+		_MLP_ExpectedRefusal(_MetaLoggerCheckReload, Alias, "Error", "immediately precede Reload")
+	} finally {
+		SetWorkingDir(PreviousDirectory)
+		DirDelete(Root, true)
+	}
+}
+for _MLP_Alias in ["dot", "parent", "relative"]
+	Test("logger census: actual " . _MLP_Alias . " root retains both source identities (logger-source-root-alias)",
+		_MLP_SourceRootAlias.Bind(_MLP_Alias))
