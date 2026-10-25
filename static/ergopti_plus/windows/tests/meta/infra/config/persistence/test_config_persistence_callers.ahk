@@ -216,7 +216,10 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	; ConfigCommitUpdates and returns false when that commit refuses.
 	; 42: the profile opening-image publisher retains its original content,
 	; presence and current-owner callback, independently audited above.
-	AssertEqual(42, Calls,
+	; 43-44: the built-in delimiter commit (HotstringsTerminatorBuiltinCommit)
+	; and the legacy delimiter migration (HotstringsTerminatorMigrateStrings)
+	; commit through ConfigCommitUpdates and return false when it refuses.
+	AssertEqual(44, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
