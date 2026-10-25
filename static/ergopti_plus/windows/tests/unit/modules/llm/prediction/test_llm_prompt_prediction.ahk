@@ -645,3 +645,202 @@ Test("LLM prompt prediction: only an atomic output may erase before its text",
 	_LPP_EraseRequiresAtomicOutput)
 
 #Include test_llm_failed_prediction_owner.ahk
+
+
+_LPP_PublicPredictionAdmission(ProfileId, Boundary, Cancel) {
+	global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LPP_BUFFER
+	Saved := [_LLM_Remote_Async, _LLM_Remote_AsyncCounter]
+	try {
+		_LLM_Remote_Async := Map()
+		_LPP_Run(_LPP_Menu(), LPP_BUFFER, Body)
+	} finally {
+		_LLM_Remote_Async := Saved[1]
+		_LLM_Remote_AsyncCounter := Saved[2]
+	}
+	Body(Calls, Lines) {
+		global _LLM_Engine_RemoteTransport, _LLM_Engine, GestureActionParameters
+		Gate := Boundary == "target" ? _LLM_Engine_GetActiveApiEntry : _LLMRemote_BuildRequestContext
+		Dispatch := _LLMRemote_DispatchManagedCurl
+		AssertFalse(Dispatch.HasOwnProp("Call"))
+		AssertFalse(Gate.HasOwnProp("Call"))
+		State := _ManagedCurlControlState()
+		Seen := false
+		try {
+			_LLM_Engine_RemoteTransport := 0
+			Dispatch.DefineProp("Call", {Call: ObserveDispatch})
+			if Boundary != "before_launch"
+				Gate.DefineProp("Call", {Call: ObserveGate})
+			Binding := "keyboard__ctrl_shift_r"
+			GestureActionParameters[GestureActionParameterKey(Binding, "llm_prompt_prediction")] := ProfileId . "|2"
+			AssertTrue(GestureInvokeAction("llm_prompt_prediction", Binding))
+			AssertTrue(Seen, "the actual public prediction must reach its selected request boundary")
+			AssertEqual(Cancel ? 0 : 1, State["spawns"], "an explicitly stopped prediction cannot acquire an HTTP worker")
+			AssertEqual(Cancel ? 0 : 1, State["starts"])
+			AssertEqual(0, Calls.Length, "the recorder must not replace generic generation")
+		} finally {
+			if Gate.HasOwnProp("Call")
+				Gate.DeleteProp("Call")
+			if Dispatch.HasOwnProp("Call")
+				Dispatch.DeleteProp("Call")
+			if State.Has("id") {
+				LLM_RemoteCancelAsync(State["id"])
+				_LLMRemote_PollRequest(State["id"])
+			}
+			if State.Has("request")
+				_ManagedCurlControlRelease(State)
+		}
+		ObserveGate(Self, Args*) {
+			Gate.DeleteProp("Call")
+			Result := Gate.Call(Args*)
+			Seen := true
+			StopOriginal()
+			return Result
+		}
+		ObserveDispatch(Self, Id, Reservation, Resolved, Url, Payload, Port := 0) {
+			Dispatch.DeleteProp("Call")
+			State["id"] := Id
+			return Dispatch.Call(Id, Reservation, Resolved, Url, Payload,
+				Map("managed_settings", (*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""),
+					"create_http", Create))
+		}
+		Create() {
+			Request := CurlAsyncRequest(Map("spawn", _ManagedCurlControlSpawn.Bind(State), "before_launch", BeforeLaunch))
+			State["request"] := Request
+			return Request
+		}
+		BeforeLaunch(Request) {
+			if Boundary == "before_launch" {
+				Seen := true
+				StopOriginal()
+			}
+		}
+		StopOriginal() {
+			if !Cancel
+				return
+			Original := _LLM_Engine["request_id"]
+			LLM_Engine_StopGeneration()
+			AssertTrue(_LLM_Engine["request_id"] > Original, "the actual stop must revoke this request identity")
+			AssertEqual("", _LLM_Engine["active_request_signature"], "the real stop must retire semantic authority")
+		}
+	}
+}
+for _LPP_AdmissionProfile in ["advanced", "rewrite", "batch_advanced"] {
+	for _LPP_AdmissionBoundary in ["target", "context", "before_launch"] {
+		for _LPP_AdmissionCancel in [true, false]
+			Test("LLM prompt prediction: public " . _LPP_AdmissionProfile . ": " . _LPP_AdmissionBoundary . " stop=" . _LPP_AdmissionCancel . " (public-prediction-requester-admission)",
+				_LPP_PublicPredictionAdmission.Bind(_LPP_AdmissionProfile, _LPP_AdmissionBoundary, _LPP_AdmissionCancel))
+	}
+}
+
+
+_LPP_VariantStopAdmission(ProfileId, Boundary, Cancel) {
+	global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LPP_BUFFER
+	Saved := [_LLM_Remote_Async, _LLM_Remote_AsyncCounter]
+	try {
+		_LLM_Remote_Async := Map()
+		_LPP_Run(_LPP_Menu(), LPP_BUFFER, Body)
+	} finally {
+		_LLM_Remote_Async := Saved[1]
+		_LLM_Remote_AsyncCounter := Saved[2]
+	}
+	Body(Calls, Lines) {
+		global _LLM_Engine_RemoteTransport, _LLM_Engine, GestureActionParameters, LPP_SENTENCE
+		Gate := Boundary == "context" ? _LLMRemote_BuildRequestContext : _LLMRemoteBuildPayload
+		Dispatch := _LLMRemote_DispatchManagedCurl
+		AssertFalse(Dispatch.HasOwnProp("Call"))
+		AssertFalse(Gate.HasOwnProp("Call"))
+		Requests := []
+		Seen := false
+		try {
+			_LLM_Engine_RemoteTransport := 0
+			Dispatch.DefineProp("Call", {Call: ObserveDispatch})
+			if Boundary != "before_launch"
+				Gate.DefineProp("Call", {Call: ObserveGate})
+			Binding := "keyboard__ctrl_shift_r"
+			GestureActionParameters[GestureActionParameterKey(Binding, "llm_prompt_prediction")] := ProfileId . "|2"
+			AssertTrue(GestureInvokeAction("llm_prompt_prediction", Binding))
+			AssertTrue(Seen, "the first actual variant must reach its selected admission boundary")
+			if !Cancel {
+				First := ProfileId == "rewrite" ? "REWRITE: Ok pour jeudi 14 h."
+					: "TAIL_CORRECTED: " . LPP_SENTENCE . "`nNEXT_WORDS: première proposition"
+				Second := ProfileId == "rewrite" ? "REWRITE: OK pour jeudi à 14 h."
+					: "TAIL_CORRECTED: " . LPP_SENTENCE . "`nNEXT_WORDS: deuxième proposition"
+				Complete(Requests[1], ProfileId == "batch_advanced" ? First . "`n===`n" . Second : First)
+				if ProfileId != "batch_advanced" {
+					AssertEqual(2, Requests.Length, "the real first completion must dispatch a second distinct HTTP variant")
+					Complete(Requests[2], Second)
+				}
+				Final := _LPP_LastFinalRender()
+				AssertTrue(IsObject(Final), "actual wire responses must reach the final prediction renderer")
+				AssertEqual(2, Final.slots.Length, "both actual logical variants must survive real parsing")
+			}
+			Spawns := 0
+			for State in Requests
+				Spawns += State["spawns"]
+			Expected := Cancel ? 0 : ProfileId == "batch_advanced" ? 1 : 2
+			AssertEqual(Expected, Spawns, "stopping the first variant cannot leave a late first or second HTTP request")
+			AssertTrue(Requests.Length <= (ProfileId == "batch_advanced" ? 1 : 2), "no hidden retry may escape the counted native boundaries")
+			AssertEqual(0, Calls.Length)
+		} finally {
+			if Gate.HasOwnProp("Call")
+				Gate.DeleteProp("Call")
+			if Dispatch.HasOwnProp("Call")
+				Dispatch.DeleteProp("Call")
+			for State in Requests {
+				LLM_RemoteCancelAsync(State["id"])
+				_LLMRemote_PollRequest(State["id"])
+				if State.Has("request")
+					_ManagedCurlControlRelease(State)
+			}
+		}
+		ObserveGate(Self, Args*) {
+			Gate.DeleteProp("Call")
+			Result := Gate.Call(Args*)
+			Seen := true
+			if Cancel
+				LLM_Engine_StopGeneration()
+			return Result
+		}
+		ObserveDispatch(Self, Id, Reservation, Resolved, Url, Payload, Port := 0) {
+			Dispatch.DeleteProp("Call")
+			State := _ManagedCurlControlState()
+			State["id"] := Id
+			Requests.Push(State)
+			try return Dispatch.Call(Id, Reservation, Resolved, Url, Payload,
+				Map("managed_settings", (*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""),
+					"create_http", Create.Bind(State)))
+			finally Dispatch.DefineProp("Call", {Call: ObserveDispatch})
+		}
+		Create(State) {
+			Request := CurlAsyncRequest(Map("spawn", _ManagedCurlControlSpawn.Bind(State), "before_launch", BeforeLaunch))
+			State["request"] := Request
+			return Request
+		}
+		BeforeLaunch(Request) {
+			if Boundary == "before_launch" && Requests.Length == 1 {
+				Seen := true
+				if Cancel
+					LLM_Engine_StopGeneration()
+			}
+		}
+		Complete(State, Text) {
+			Request := State["request"]
+			_ManagedCurlControlAck(State)
+			Request._PollManagedAdmission()
+			AssertTrue(Request.ManagedPayloadPublished, "the current control must admit its actual transport payload")
+			ResponseBody := '{"choices":[{"message":{"content":' . JsonStringLiteral(Text) . '}}]}'
+			AssertTrue(FSWrite(Request.BodyPath, ResponseBody))
+			AssertTrue(FSWrite(Request.HeaderPath, "HTTP/1.1 200 OK`r`nContent-Type: application/json`r`n`r`n"))
+			State["callback"].Call(0, '{"schema_version":1,"ok":true,"status":200,"child_quiesced":true,"receipt":{}}', "")
+			AssertTrue(Request.Completed, "the genuine HTTP facade must consume its native terminal receipt")
+			_LLMRemote_PollRequest(State["id"])
+		}
+	}
+}
+for _LPP_VariantProfile in ["advanced", "rewrite", "batch_advanced"] {
+	for _LPP_VariantBoundary in ["context", "payload", "before_launch"] {
+		for _LPP_VariantCancel in [true, false]
+			Test("LLM prompt prediction: actual two variants " . _LPP_VariantProfile . " " . _LPP_VariantBoundary . " stop=" . _LPP_VariantCancel
+				. " (prediction-variant-admission)", _LPP_VariantStopAdmission.Bind(_LPP_VariantProfile, _LPP_VariantBoundary, _LPP_VariantCancel))
+	}
+}
