@@ -503,7 +503,7 @@ do
 			  if not ok then io.stderr:write("MAIN_SETUP_FAILURE " .. tostring(result) .. "\n") end
 			  return ok, result
 			end })
-			put("infra.input_access", { is_denied = no, report = function() error("unexpected input access") end })
+			put("infra.input_access", { is_denied = no, missing_program = function() return nil end, report = function() error("unexpected input access") end })
 			put("infra.signal_handlers", { start = yes, stop = yes, is_settled = yes })
 			put("infra.restart_pause", { restore = yes })
 			put("infra.legacy_hotstring_storage", { import = yes })
