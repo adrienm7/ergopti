@@ -11,6 +11,14 @@
 
 set -euo pipefail
 
+SKIP_RPM=false
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --skip-rpm) SKIP_RPM=true; shift ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BUILD_DIR="$PROJECT_ROOT/build/linux"
@@ -240,7 +248,7 @@ tar -czf "$RPM_ROOT/SOURCES/${PACKAGE_NAME}-${VERSION}.tar.gz" \
 # ----------------------------------------------------------------------
 # 9. Build the .rpm (Linux only)
 # ----------------------------------------------------------------------
-if [ "${1:-}" = "--skip-rpm" ]; then
+if [ "$SKIP_RPM" = true ]; then
   echo ""
   echo "=== Structure complete (--skip-rpm) ==="
   echo "RPM root: $RPM_ROOT"

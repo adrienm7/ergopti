@@ -10,6 +10,14 @@
 
 set -euo pipefail
 
+SKIP_DEB=false
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --skip-deb) SKIP_DEB=true; shift ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BUILD_DIR="$PROJECT_ROOT/build/linux"
@@ -203,7 +211,7 @@ print_packaging_command() {
   printf '%s dpkg-deb --root-owner-group --build %q %q\n' "$1" "$DEB_ROOT" "$DEB_FILE"
 }
 
-if [ "${1:-}" = "--skip-deb" ]; then
+if [ "$SKIP_DEB" = true ]; then
   echo ""
   echo "=== Structure complete (--skip-deb) ==="
   echo "DEB root: $DEB_ROOT"
