@@ -169,22 +169,39 @@ module.exports = function (sources, manifest) {
 			'withdrawn current removal caption receiver'
 		]
 	);
-	// Missing-program diagnostics remain inside the same admitted command lease.
+	// The native missing-program explanation belongs to its own translated field.
+	const missingProgramLocal =
+		'local missing_program = i18n_safe("dialog.uninstall.missing_program")';
+	const missingProgramField = 'missing_program = missing_program,';
 	cases.push(
+		[missingProgramLocal, '', 'withdrawn missing-program value owner'],
 		[
-			'local missing_program = i18n_safe("dialog.uninstall.missing_program")',
+			missingProgramLocal,
+			'local missing_program = Foreign.message',
+			'foreign missing-program value owner'
+		],
+		[
+			missingProgramLocal,
 			'local missing_program = i18n_safe("dialog.uninstall.failed")',
-			'withdrawn missing-program diagnostic caption'
+			'swapped missing-program translation role'
+		],
+		[missingProgramField, '', 'withdrawn missing-program option delivery'],
+		[
+			missingProgramField,
+			'missing_program = Foreign.message,',
+			'foreign missing-program option value'
+		],
+		[missingProgramField, 'missing_program = failure,', 'swapped missing-program option value'],
+		[
+			'failure = failure,\n\t\t\tmissing_program = missing_program,',
+			'failure = missing_program,\n\t\t\tmissing_program = failure,',
+			'swapped failure and missing-program option owners'
 		],
 		[
-			'\t\t\tmissing_program = missing_program,',
-			'\t\t\tmissing_program = failure,',
-			'foreign missing-program diagnostic receipt'
-		],
-		[
-			'local missing_program = i18n_safe("dialog.uninstall.missing_program")\n\t\tif not uninstall_caption_facade_current() or not current() then return false end',
-			'local missing_program = i18n_safe("dialog.uninstall.missing_program")',
-			'missing-program localization must revalidate its command lease'
+			missingProgramLocal +
+				'\n\t\tif not uninstall_caption_facade_current() or not current() then return false end',
+			missingProgramLocal,
+			'withdrawn post-translation caption ownership check'
 		]
 	);
 	// Genuine About container, context and finished subtree must transport the command.
