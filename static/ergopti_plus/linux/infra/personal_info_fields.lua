@@ -29,6 +29,8 @@ local Logger = require("logger.shim")
 local Reader = require("toml_codec")
 local Mask   = require("personal_info.mask")
 local Paths  = require("infra.paths")
+local FileReader = require("infra.regular_file_reader")
+local ErrorDescription = require("error_description")
 
 local LOG = "infra.personal_info_fields"
 
@@ -86,19 +88,25 @@ local function declaration()
 	-- Read then decode: toml_codec exposes `decode(string)`, not `parse(path)` —
 	-- the timings reader's `Reader.parse` is a different module, and calling the
 	-- wrong one here fails closed, which is safe and completely silent about why.
-	local fh = io.open(path, "r")
+	local fh = FileReader.open_source(path)
 	if not fh then
 		Logger.error(LOG, "Cannot open '%s' — masking everything.", path)
 		_declaration = FAIL_CLOSED
 		return _declaration
 	end
-	local content = fh:read("*a")
-	fh:close()
+	local read_ok, content, read_error = pcall(fh.read, fh, "*a")
+	local close_ok, closed, close_error = pcall(fh.close, fh)
+	if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true then
+		local detail = not read_ok and content or (not close_ok and closed) or read_error or close_error
+		Logger.error(LOG, "Cannot read and close '%s' — masking everything. (%s)", path, ErrorDescription.describe(detail))
+		_declaration = FAIL_CLOSED
+		return _declaration
+	end
 
 	local ok, parsed = pcall(Reader.decode, content)
 	if not ok or type(parsed) ~= "table" or type(parsed.policy) ~= "table" then
 		Logger.error(LOG, "Could not parse '%s' — masking everything. (%s)", path,
-			ok and "malformed" or tostring(parsed))
+			ok and "malformed" or ErrorDescription.describe(parsed))
 		_declaration = FAIL_CLOSED
 		return _declaration
 	end
