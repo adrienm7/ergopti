@@ -131,11 +131,14 @@ local function with_sandbox(opts, fn)
 		local real_open, real_exec, real_popen = io.open, os.execute, io.popen
 		local Writer = require("infra.regular_file_writer")
 		local real_write = Writer.open
+		local cap = { path = nil, mode = nil, parts = {} }
 		Writer.open = function(path, mode)
-			if path:sub(1, #EXPECTED_DIR + 1) == EXPECTED_DIR .. "/" then return io.open(path, mode) end
+			if path:sub(1, #EXPECTED_DIR + 1) == EXPECTED_DIR .. "/" then
+				local file = io.open(path, mode)
+				return file, nil, nil, nil, function(expected) return table.concat(cap.parts, "") == expected end
+			end
 			return real_write(path, mode)
 		end
-		local cap = { path = nil, mode = nil, parts = {} }
 
 		io.open = function(path, mode)
 			-- Only the crash folder is virtual: the notice reads the locale catalogue.
