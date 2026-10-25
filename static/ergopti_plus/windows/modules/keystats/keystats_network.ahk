@@ -361,17 +361,34 @@ KL_Net_Start(TimerFn := SetTimer) {
 KL_Net_WifiStarter() {
 		fn := KLNet.wifi_fn
 		fn()
-		SetTimer(KLNet.wifi_fn, KLNetConst.NETWORK_TICK_MS)
+		_KL_Net_ArmOwnedRecurring("wifi_fn", fn, KLNetConst.NETWORK_TICK_MS)
 }
 KL_Net_ReachStarter() {
 		fn := KLNet.reach_fn
 		fn()
-		SetTimer(KLNet.reach_fn, KLNetConst.REACH_TICK_MS)
+		_KL_Net_ArmOwnedRecurring("reach_fn", fn, KLNetConst.REACH_TICK_MS)
 }
 KL_Net_VpnStarter() {
 		fn := KLNet.vpn_fn
 		fn()
-		SetTimer(KLNet.vpn_fn, KLNetConst.VPN_TICK_MS)
+		_KL_Net_ArmOwnedRecurring("vpn_fn", fn, KLNetConst.VPN_TICK_MS)
+}
+
+
+; Native probes may pump a shutdown or restart before their starter resumes.
+; Publish the recurring timer only while the exact pre-probe identity still
+; owns this slot; checking and arming share one short native transaction.
+_KL_Net_ArmOwnedRecurring(PropertyName, Callback, Period, TimerFn := SetTimer) {
+		PreviousCritical := Critical("On")
+		try {
+				if !KLNet.HasOwnProp(PropertyName)
+						|| ObjPtr(KLNet.%PropertyName%) != ObjPtr(Callback)
+						return false
+				TimerFn.Call(Callback, Period)
+				return true
+		} finally {
+				Critical(PreviousCritical)
+		}
 }
 
 KL_Net_Stop(TimerFn := SetTimer) {
