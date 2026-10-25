@@ -49,7 +49,7 @@ M.MISSING_PROGRAM_BODY_KEY = "startup.linux_input_access_missing_program_body"
 M.MISSING_PROGRAM_ENV = "ERGOPTI_MISSING_PROGRAM"
 
 -- errno for a node that exists but this user may not open.
-local EACCES = 13
+local EACCES = "EACCES"
 
 --- Whether a node exists but this session is denied access to it.
 ---
@@ -57,15 +57,11 @@ local EACCES = 13
 --- --device, an unplugged keyboard) is a different problem with a different
 --- message, and telling that user to re-login would send them the wrong way.
 --- @param path string
---- @param open function|nil io.open by default; a seam for the tests.
+--- @param probe function|nil Nonblocking read-admission probe; a seam for tests.
 --- @return boolean
-function M.is_denied(path, open)
-	local handle, _, errno = (open or io.open)(path, "rb")
-	if handle then
-		handle:close()
-		return false
-	end
-	return errno == EACCES
+function M.is_denied(path, probe)
+	local readable, code = (probe or require("infra.device_access").readable)(path)
+	return not readable and code == EACCES
 end
 
 --- The program the launcher found missing, when it reported one.

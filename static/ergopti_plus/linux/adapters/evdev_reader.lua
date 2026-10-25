@@ -348,8 +348,8 @@ end
 -- ===========================================
 
 --- True when this reader could plausibly open a device: a backend exists and the
---- node is readable. Deliberately opens nothing — a probe with side effects on
---- an input device is a grab nobody asked for.
+--- node is readable. The temporary read probe never blocks, grabs or retains
+--- a descriptor; only open() below owns a live device stream.
 --- @param path string Device path, e.g. "/dev/input/event3".
 --- @return boolean available, string|nil reason
 function M.is_available(path)
@@ -359,11 +359,10 @@ function M.is_available(path)
 	if type(path) ~= "string" or path == "" then
 		return false, "no device path"
 	end
-	local fh = io.open(path, "rb")
-	if not fh then
+	local readable = require("infra.device_access").readable(path)
+	if not readable then
 		return false, path .. " is not readable (is this user in the input group?)"
 	end
-	fh:close()
 	return true
 end
 
