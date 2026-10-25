@@ -26,16 +26,24 @@ local M = {}
 local Logger = require("infra.logger")
 local Timer  = require("adapters.timer_scheduler")
 local PhaseStats = require("infra.phase_stats")
+local Segments = require("hotpath_segments")
 local LOG    = "HotPath"
 
 -- Phase name of each label, built once so a keystroke never concatenates.
 local _phase_names = {}
 
--- Keystrokes whose hot-path processing exceeds this many milliseconds are logged
--- at WARNING. A 20 ms budget filters harmless one-off scheduler jitter while
--- preserving a visible typing hitch as an actionable diagnostic.
-local DEFAULT_SLOW_MS = 20.0
-local _slow_ms        = DEFAULT_SLOW_MS
+-- Segments whose processing exceeds this many milliseconds are logged at
+-- WARNING. The budget and the declared segments live in the shared inventory
+-- (_shared/lua/hotpath_segments.lua), so macOS and Linux share one policy.
+local _slow_ms = Segments.DEFAULT_SLOW_MS
+-- A declared segment with its own measured threshold keeps it whatever the
+-- runtime default is; built once so the hot path is one table read.
+local _segment_slow_ms = {}
+for name in pairs(Segments.for_driver("macos")) do
+	if Segments.threshold_ms(name) ~= Segments.DEFAULT_SLOW_MS then
+		_segment_slow_ms[name] = Segments.threshold_ms(name)
+	end
+end
 
 -- Nanoseconds per millisecond — the conversion applied once per slow keystroke.
 local NS_PER_MS = 1e6
@@ -68,8 +76,9 @@ function M.elapsed_ms(start_ns)
 	return (M.now() - (start_ns or 0)) / NS_PER_MS
 end
 
---- Sets the slow-keystroke threshold in milliseconds. Lets a developer tighten or
---- loosen the tripwire without editing the constant. Logs the new value at DEBUG.
+--- Sets the default slow threshold in milliseconds. Lets a developer tighten or
+--- loosen the tripwire without editing the constant; a segment with its own
+--- measured threshold keeps it. Logs the new value at DEBUG.
 --- @param ms number New threshold in milliseconds.
 function M.set_threshold_ms(ms)
 	if type(ms) == "number" and ms > 0 then
@@ -80,7 +89,7 @@ end
 
 --- Logs a WARNING when the elapsed time since `start_ns` exceeds the threshold.
 --- Silent (and nearly free) for fast keystrokes so the hot path stays clean.
---- @param label string Hot-path segment name (e.g. "keydown").
+--- @param label string Declared hot-path segment name (e.g. "keydown").
 --- @param start_ns number Nanosecond timestamp captured by M.now() at entry.
 --- @param detail string|nil Context shown when slow (typed char, buffer, …).
 --- @return number elapsed_ms The measured duration in milliseconds.
@@ -93,7 +102,7 @@ function M.log_if_slow(label, start_ns, detail)
 		_phase_names[label] = phase
 	end
 	PhaseStats.add(phase, elapsed_ns)
-	if elapsed_ms > _slow_ms then
+	if elapsed_ms > (_segment_slow_ms[label] or _slow_ms) then
 		pcall(Logger.warn, LOG, "Slow %s: %.2f ms (%s).",
 			tostring(label), elapsed_ms, tostring(detail or ""))
 	end

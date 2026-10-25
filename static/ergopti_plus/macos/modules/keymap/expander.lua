@@ -27,6 +27,7 @@ local text_utils = require("infra.text_utils")
 local HotstringCore = require("infra.hotstring_engine")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("infra.logger")
+local HotPath    = require("infra.hotpath_profiler")
 local Timings    = require("infra.timings")
 local CoreStateM = require("modules.keymap.state")
 local TextSender = require("adapters.text_sender")
@@ -177,6 +178,9 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		end
 	end
 
+	-- The erase + replacement output of every expansion is built here, inside the
+	-- key-down callback, so a slow one is a typing hitch.
+	local inject_started = HotPath.now()
 	local ok, emit_count, emitted_str, logical_text, order_delay = pcall(function()
 		return SyntheticInput.with_transaction(transaction, function()
 			assert(TextSender.eraseChars(deletes, 0) ~= false,
@@ -184,6 +188,8 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 			return emit_action()
 		end)
 	end)
+	HotPath.log_if_slow("hotstring.expand", inject_started,
+		string.format("deletes=%d", deletes))
 	if not ok then
 		-- Nothing in the callback collector has reached Quartz yet. Cancel removes
 		-- every already-built prefix, so a producer that emits one token and then

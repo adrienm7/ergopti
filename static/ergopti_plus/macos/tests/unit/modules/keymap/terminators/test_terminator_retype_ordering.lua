@@ -138,6 +138,8 @@ local function load_fixture(options)
 	local awake_time = 0
 	package.loaded["adapters.timer_scheduler"] = {
 		awake_time = function() return awake_time end,
+		-- The expansion's hot-path segment reads the scheduler's monotonic clock.
+		now_ns = function() return awake_time * 1e9 end,
 		after = function(delay, callback)
 			local handle = {
 				delay = delay,

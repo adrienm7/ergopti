@@ -1547,6 +1547,21 @@ local function main()
 
 	end
 	on_char = input_capture_gate.guard(handle_char)
+	-- The character callback is the segment between the key event and the
+	-- hotstring/injection work, so a slow keystroke is attributed to it rather
+	-- than to the whole input.dispatch span that also contains the tap-hold path.
+	do
+		-- Required here, not at file level: main() sits at LuaJIT's 60-upvalue limit.
+		local Perf = require("infra.perf_counters")
+		local guarded_char = on_char
+		on_char = function(ch, scancode)
+			local started = Perf.clock()
+			-- A blocked gate answers (nil, reason); both values go back unchanged.
+			local result, reason = guarded_char(ch, scancode)
+			Perf.span("input.char", started)
+			return result, reason
+		end
+	end
 
 	-- All physical keydowns, including modifiers and navigation keys, feed the
 	-- separate hardware heatmap. Character handling above records only printable
