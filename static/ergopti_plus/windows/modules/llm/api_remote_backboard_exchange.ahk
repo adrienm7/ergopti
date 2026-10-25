@@ -10,12 +10,15 @@
 
 #Requires AutoHotkey v2.0
 
-_LLMRemote_BackboardBegin(OnSuccess, OnFail, Kind) {
+_LLMRemote_BackboardBegin(OnSuccess, OnFail, Kind, CurrentFn := 0) {
+	if !HasMethod(CurrentFn, "Call") && !(CurrentFn is Integer && CurrentFn == 0)
+		throw TypeError("Backboard requester admission must be callable or 0.")
 	global _LLM_Remote_BackboardExchanges, _LLM_Remote_AsyncCounter
 	PreviousCritical := Critical("On")
 	try {
 		Id := ++_LLM_Remote_AsyncCounter
-		Owner := Map("id", Id, "kind", Kind, "stage", 0, "success", OnSuccess, "failure", OnFail)
+		Owner := Map("id", Id, "kind", Kind, "stage", 0, "success", OnSuccess, "failure", OnFail,
+			"requester_current", CurrentFn)
 		_LLM_Remote_BackboardExchanges[Id] := Owner
 		return Owner
 	} finally Critical(PreviousCritical)
@@ -25,6 +28,30 @@ _LLMRemote_BackboardCurrent(Owner) {
 	global _LLM_Remote_BackboardExchanges
 	return Owner is Map && _LLM_Remote_BackboardExchanges.Has(Owner["id"])
 		&& _LLM_Remote_BackboardExchanges[Owner["id"]] == Owner
+}
+
+; Logical source admission is separate from physical ownership so withdrawal
+; never removes the authority required to cancel the exact child and artifacts.
+_LLMRemote_BackboardAdmitted(Owner) {
+	if !_LLMRemote_BackboardCurrent(Owner)
+		return false
+	Current := Owner["requester_current"]
+	if Current is Integer && Current == 0
+		return true
+	Valid := Current.Call()
+	return (Valid is Integer) && Valid == true && _LLMRemote_BackboardCurrent(Owner)
+}
+
+_LLMRemote_BackboardRequireAdmission(Owner) {
+	try {
+		if _LLMRemote_BackboardAdmitted(Owner)
+			return true
+	} catch {
+		_LLMRemote_BackboardRetire(Owner, true)
+		throw
+	}
+	_LLMRemote_BackboardRetire(Owner, true)
+	return false
 }
 
 _LLMRemote_BackboardStageCurrent(Owner, Stage) {
@@ -63,7 +90,7 @@ _LLMRemote_BackboardRetire(Owner, CancelChild := false) {
 		_LLM_Remote_BackboardExchanges.Delete(Owner["id"])
 		Stage := Owner["stage"]
 		Owner["stage"] := 0
-		Owner["success"] := 0, Owner["failure"] := 0
+		Owner["success"] := 0, Owner["failure"] := 0, Owner["requester_current"] := 0
 		if Stage is Map {
 			Child := Stage.Get("child", 0), ChildId := Stage.Get("child_id", 0)
 			_LLMRemote_BackboardDetachChild(Stage)
@@ -76,12 +103,16 @@ _LLMRemote_BackboardRetire(Owner, CancelChild := false) {
 }
 
 _LLMRemote_BackboardSucceeded(Owner, Body, Usage := "") {
+	if !_LLMRemote_BackboardRequireAdmission(Owner)
+		return
 	Callback := Owner["success"]
 	if _LLMRemote_BackboardRetire(Owner)
 		_LLM_InvokeCallback(Callback, "on_success", Body, Usage)
 }
 
 _LLMRemote_BackboardFailed(Owner, Info := "") {
+	if !_LLMRemote_BackboardRequireAdmission(Owner)
+		return
 	Callback := Owner["failure"]
 	if _LLMRemote_BackboardRetire(Owner, true)
 		_LLM_InvokeCallback(Callback, "on_fail", Info)
@@ -89,6 +120,8 @@ _LLMRemote_BackboardFailed(Owner, Info := "") {
 
 _LLMRemote_BackboardStageSucceeded(Owner, Stage, Continuation, Body, Usage := "") {
 	if !_LLMRemote_BackboardStageCurrent(Owner, Stage)
+		return
+	if !_LLMRemote_BackboardRequireAdmission(Owner) || !_LLMRemote_BackboardStageCurrent(Owner, Stage)
 		return
 	_LLMRemote_BackboardDetachChild(Stage)
 	try Continuation.Call(Body, Usage)
@@ -101,6 +134,8 @@ _LLMRemote_BackboardStageSucceeded(Owner, Stage, Continuation, Body, Usage := ""
 
 _LLMRemote_BackboardStageFailed(Owner, Stage, Continuation, Info := "") {
 	if !_LLMRemote_BackboardStageCurrent(Owner, Stage)
+		return
+	if !_LLMRemote_BackboardRequireAdmission(Owner) || !_LLMRemote_BackboardStageCurrent(Owner, Stage)
 		return
 	_LLMRemote_BackboardDetachChild(Stage)
 	try Continuation.Call(Info)
@@ -116,6 +151,10 @@ _LLMRemote_BackboardStageFailed(Owner, Stage, Continuation, Info := "") {
 _LLMRemote_BackboardBindChild(Owner, Stage, Id, Entry, OnSuccess, OnFail) {
 	if !(Entry is Map) || Entry.Get("on_success", 0) != OnSuccess || Entry.Get("on_fail", 0) != OnFail
 		return false
+	if !_LLMRemote_BackboardRequireAdmission(Owner) {
+		_LLMRemote_BackboardCancelChild(Id, Entry)
+		return false
+	}
 	Bound := false
 	PreviousCritical := Critical("On")
 	try {
@@ -133,6 +172,8 @@ _LLMRemote_BackboardBindChild(Owner, Stage, Id, Entry, OnSuccess, OnFail) {
 
 _LLMRemote_BackboardPost(Owner, Resolved, Url, Payload, OnSuccess, OnFail, TimeoutMs, Kind) {
 	global _LLM_Remote_PostBodyFn, _LLM_Remote_Async
+	if !_LLMRemote_BackboardRequireAdmission(Owner)
+		return Owner["id"]
 	Stage := Map("owner", Owner, "child", 0, "child_id", 0)
 	Success := _LLMRemote_BackboardStageSucceeded.Bind(Owner, Stage, OnSuccess)
 	Failure := _LLMRemote_BackboardStageFailed.Bind(Owner, Stage, OnFail)
