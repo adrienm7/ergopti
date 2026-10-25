@@ -13,7 +13,121 @@ const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
 const { bashExecutable } = require('../lib/git-bash.cjs');
-const evidence = require('../ci/native_http_clock_evidence.cjs');
+// Cache only committed Git objects in this portable fixture, never mutable files.
+// The real receiver still checks HEAD, tracked cleanliness, metadata and hashes.
+const childProcess = require('node:child_process');
+const nativeExec = childProcess.execFileSync;
+const committedSources = new Map();
+let useCommittedSources = true;
+function sourceGit(command, args, options) {
+	if (useCommittedSources && command === 'git' && Array.isArray(args)) {
+		const repository = options?.cwd && fs.realpathSync(options.cwd);
+		if (args.length === 2 && args[0] === 'rev-parse' && args[1] === 'HEAD') {
+			const result = nativeExec(command, args, options);
+			const head = String(result).trim();
+			const fixture = committedSources.get(repository)?.get(head);
+			if (fixture) {
+				// Both genuine source-acquisition fences receive fresh object bytes.
+				// A failed batch must never leave a prior snapshot available.
+				fixture.bytes = null;
+				fixture.bytes = receiveCommittedSources(repository, head, fixture.paths);
+			}
+			return result;
+		}
+		if (args.length === 2 && args[0] === 'show') {
+			const object = /^([0-9a-f]{40}):(.+)$/s.exec(args[1]);
+			const bytes =
+				object && committedSources.get(repository)?.get(object[1])?.bytes?.get(object[2]);
+			if (bytes && options.encoding === undefined && bytes.length <= options.maxBuffer)
+				return Buffer.from(bytes);
+		}
+	}
+	return nativeExec(command, args, options);
+}
+let evidence;
+childProcess.execFileSync = sourceGit;
+try {
+	evidence = require('../ci/native_http_clock_evidence.cjs');
+} finally {
+	childProcess.execFileSync = nativeExec;
+}
+
+/** Receives exact Git blob bytes at each genuine source-acquisition fence. */
+function receiveCommittedSources(root, candidate, paths) {
+	const listing = nativeExec('git', ['ls-tree', '-r', '-z', candidate], { cwd: root });
+	const entries = listing
+		.toString('utf8')
+		.split('\0')
+		.filter(Boolean)
+		.flatMap((line) => {
+			const entry = /^([0-7]{6}) ([a-z]+) ([0-9a-f]{40})\t(.+)$/s.exec(line);
+			assert.ok(entry, 'Fixture Git tree must contain complete object records.');
+			if (!paths.has(entry[4])) return [];
+			assert.equal(entry[2], 'blob');
+			assert.ok(entry[1] === '100644' || entry[1] === '100755');
+			return [{ oid: entry[3], path: entry[4] }];
+		});
+	assert.ok(entries.length > 0);
+	const objects = [...new Set(entries.map((entry) => entry.oid))];
+	const input = objects.join('\n') + '\n';
+	const checked = nativeExec('git', ['cat-file', '--batch-check'], { cwd: root, input })
+		.toString('ascii')
+		.split('\n');
+	assert.equal(checked.pop(), '');
+	assert.equal(checked.length, objects.length);
+	const sizes = checked.map((line, index) => {
+		const header = /^([0-9a-f]{40}) blob (0|[1-9][0-9]*)$/.exec(line);
+		assert.ok(header, 'Every requested source object must remain available as a Git blob.');
+		assert.equal(header[1], objects[index]);
+		const size = Number(header[2]);
+		assert.ok(Number.isSafeInteger(size) && size >= 0);
+		return size;
+	});
+	const maximum = objects.reduce(
+		(total, oid, index) =>
+			total + Buffer.byteLength(`${oid} blob ${sizes[index]}\n`) + sizes[index] + 1,
+		0
+	);
+	assert.ok(Number.isSafeInteger(maximum) && maximum > 0);
+	const output = nativeExec('git', ['cat-file', '--batch'], {
+		cwd: root,
+		input,
+		maxBuffer: maximum
+	});
+	const blobs = new Map();
+	let offset = 0;
+	for (const [index, oid] of objects.entries()) {
+		const size = sizes[index],
+			header = Buffer.from(`${oid} blob ${size}\n`);
+		assert.deepEqual(output.subarray(offset, offset + header.length), header);
+		offset += header.length;
+		const bytes = output.subarray(offset, offset + size);
+		assert.equal(bytes.length, size);
+		assert.equal(
+			crypto.createHash('sha1').update(`blob ${size}\0`).update(bytes).digest('hex'),
+			oid
+		);
+		offset += size;
+		assert.equal(
+			output[offset++],
+			10,
+			'Every immutable Git blob must retain its frame terminator.'
+		);
+		blobs.set(oid, Buffer.from(bytes));
+	}
+	assert.equal(offset, output.length, 'Unrequested Git output cannot acquire source authority.');
+	return new Map(entries.map((entry) => [entry.path, blobs.get(entry.oid)]));
+}
+/** Exercises the same receiver once with its original native Git transport. */
+function withNativeGit(body) {
+	const previous = useCommittedSources;
+	useCommittedSources = false;
+	try {
+		return body();
+	} finally {
+		useCommittedSources = previous;
+	}
+}
 const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 const SWIFT = [
 	'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift',
@@ -224,6 +338,10 @@ function sourceFixture(change = () => {}) {
 	git(root, ['add', '--all']);
 	git(root, ['commit', '-qm', 'Independent clock source control']);
 	const candidate = git(root, ['rev-parse', 'HEAD']).toString().trim();
+	const fixtureRepository = fs.realpathSync(root);
+	const commits = committedSources.get(fixtureRepository) || new Map();
+	commits.set(candidate, { paths: new Set(files), bytes: null });
+	committedSources.set(fixtureRepository, commits);
 	return {
 		root,
 		epoch: {
@@ -852,6 +970,12 @@ try {
 	control('actual fresh Git HEAD clean closure receives fixed nineteen inputs', () => {
 		const fixture = sourceFixture(),
 			receipt = evidence.sourceReceipt(fixture.root, fixture.epoch);
+		const originalSource = structuredClone(receipt);
+		assert.deepEqual(
+			withNativeGit(() => evidence.sourceReceipt(fixture.root, fixture.epoch)),
+			receipt,
+			'Batched immutable bytes must produce the exact original native receiver DTO.'
+		);
 		assert.deepEqual(Object.keys(receipt.sources).sort(), [...INPUTS].sort());
 		assert.equal(receipt.original_source.candidate, fixture.epoch.candidate);
 		assert.equal(receipt.original_source.scope, 'native-pac-source-only');
@@ -864,6 +988,78 @@ try {
 			0
 		);
 		assert.deepEqual(JSON.parse(fs.readFileSync(output)), receipt);
+		const source = path.join(fixture.root, SWIFT[0]);
+		const original = fs.readFileSync(source);
+		try {
+			fs.appendFileSync(source, '\n// actual mutable source refusal control\n');
+			assert.throws(() => evidence.sourceReceipt(fixture.root, fixture.epoch));
+			assert.throws(() => withNativeGit(() => evidence.sourceReceipt(fixture.root, fixture.epoch)));
+		} finally {
+			fs.writeFileSync(source, original);
+		}
+		const held = path.join(temporary, 'held-original-source.swift');
+		fs.renameSync(source, held);
+		try {
+			fs.symlinkSync(held, source);
+			assert.throws(() => evidence.sourceReceipt(fixture.root, fixture.epoch));
+			assert.throws(() => withNativeGit(() => evidence.sourceReceipt(fixture.root, fixture.epoch)));
+		} finally {
+			fs.unlinkSync(source);
+			fs.renameSync(held, source);
+		}
+		const oid = git(fixture.root, ['rev-parse', `${fixture.epoch.candidate}:${SWIFT[0]}`])
+			.toString()
+			.trim();
+		const loose = path.join(fixture.root, '.git/objects', oid.slice(0, 2), oid.slice(2));
+		const objectBytes = fs.readFileSync(loose),
+			objectMode = fs.statSync(loose).mode;
+		const heldObject = path.join(temporary, 'held-committed-source-object');
+		fs.renameSync(loose, heldObject);
+		try {
+			assert.throws(() => withNativeGit(() => evidence.sourceReceipt(fixture.root, fixture.epoch)));
+			assert.throws(
+				() => evidence.sourceReceipt(fixture.root, fixture.epoch),
+				'A missing actual object cannot reuse an earlier source snapshot.'
+			);
+		} finally {
+			fs.renameSync(heldObject, loose);
+		}
+		assert.deepEqual(evidence.sourceReceipt(fixture.root, fixture.epoch), originalSource);
+		const changed = Buffer.from(original);
+		changed[0] ^= 1;
+		try {
+			fs.chmodSync(loose, 0o600);
+			fs.writeFileSync(
+				loose,
+				require('node:zlib').deflateSync(
+					Buffer.concat([Buffer.from(`blob ${changed.length}\0`), changed])
+				)
+			);
+			assert.throws(() => withNativeGit(() => evidence.sourceReceipt(fixture.root, fixture.epoch)));
+			assert.throws(
+				() => evidence.sourceReceipt(fixture.root, fixture.epoch),
+				'A same-size zlib object with the wrong Git hash cannot retain source authority.'
+			);
+		} finally {
+			fs.writeFileSync(loose, objectBytes);
+			fs.chmodSync(loose, objectMode);
+		}
+		git(fixture.root, ['commit', '--allow-empty', '-qm', 'Independent changed HEAD control']);
+		try {
+			assert.notEqual(
+				git(fixture.root, ['rev-parse', 'HEAD']).toString().trim(),
+				fixture.epoch.candidate
+			);
+			assert.throws(() => evidence.sourceReceipt(fixture.root, fixture.epoch));
+			assert.throws(() => withNativeGit(() => evidence.sourceReceipt(fixture.root, fixture.epoch)));
+		} finally {
+			git(fixture.root, ['update-ref', 'HEAD', fixture.epoch.candidate]);
+		}
+		assert.deepEqual(
+			evidence.sourceReceipt(fixture.root, fixture.epoch),
+			originalSource,
+			'Restored mutable admission must still yield the original exact immutable-source DTO.'
+		);
 	});
 	control('missing tracked builder cannot enroll new role', () => {
 		const fixture = sourceFixture((root) =>
