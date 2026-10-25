@@ -149,7 +149,7 @@ local function list_bundles(dir)
 		-- Windows (used during Lua test runs)
 		cmd = string.format('cmd /c dir /b /a:d "%s"', dir:gsub("/", "\\"))
 	else
-		cmd = string.format("ls -1 '%s'", dir)
+		cmd = string.format("ls -1 %s", text_utils.shell_quote(dir))
 	end
 	local p = io.popen(cmd)
 	if not p then return out end
