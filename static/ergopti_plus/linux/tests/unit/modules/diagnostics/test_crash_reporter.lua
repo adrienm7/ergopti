@@ -129,6 +129,12 @@ local function with_sandbox(opts, fn)
 	return require("tests.support.modules.diagnostics.crash_admission").with_admission(function()
 		opts = opts or {}
 		local real_open, real_exec, real_popen = io.open, os.execute, io.popen
+		local Writer = require("infra.regular_file_writer")
+		local real_write = Writer.open
+		Writer.open = function(path, mode)
+			if path:sub(1, #EXPECTED_DIR + 1) == EXPECTED_DIR .. "/" then return io.open(path, mode) end
+			return real_write(path, mode)
+		end
 		local cap = { path = nil, mode = nil, parts = {} }
 
 		io.open = function(path, mode)
@@ -155,6 +161,7 @@ local function with_sandbox(opts, fn)
 
 		-- Restore globals unconditionally so a failing assertion cannot leak stubs.
 		io.open, os.execute, io.popen = real_open, real_exec, real_popen
+		Writer.open = real_write
 		if not ok then error(err, 0) end
 
 		cap.content = table.concat(cap.parts, "")
@@ -213,7 +220,7 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 			})
 		end)
 		helpers.assert_not_nil(cap.path, "dump opened a file")
-		helpers.assert_eq(cap.mode, "w", "opened for writing")
+		helpers.assert_eq(cap.mode, "wx", "report acquisition must refuse to replace an earlier incident")
 		helpers.assert_true(cap.path:sub(1, #EXPECTED_DIR) == EXPECTED_DIR, "file under the crash dir")
 		local report = require("json").decode(cap.content)
 		helpers.assert_not_nil(report, "the file is a JSON document")

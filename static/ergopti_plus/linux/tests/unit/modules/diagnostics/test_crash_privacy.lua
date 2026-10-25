@@ -36,7 +36,8 @@ local function with_fixture(body, cold)
 			if not owned(path) then return open(path, mode) end
 			local crash = path:find("/crash_", 1, true) ~= nil
 			if crash then state.opened = state.opened + 1 end
-			if crash and state.refuse_open then return nil, PAYLOAD end
+			if crash and state.refuse_open then return nil, PAYLOAD, state.refuse_errno end
+			if mode == "wx" and state.files[path] ~= nil then return nil, "fixture candidate exists", "EEXIST" end
 			state.files[path] = mode == "a" and (state.files[path] or "") or ""
 			local file = {}
 			function file:write(text)
@@ -216,6 +217,18 @@ helpers.describe("crash privacy admission", function()
 			helpers.assert_eq(#s.notices, 1)
 		end)
 	end)
+	for _, receipt in ipairs({ 13, "EACCES", "EINVAL" }) do
+		helpers.it("does not retry exclusive acquisition refusal " .. tostring(receipt), function()
+			with_fixture(function(s)
+				s.refuse_open, s.refuse_errno = true, receipt
+				helpers.assert_eq(s.Reporter.dump("engine", PAYLOAD), false)
+				helpers.assert_eq(s.opened, 1, "only a proven EEXIST may select another candidate")
+				helpers.assert_eq(s.closed, 0); helpers.assert_eq(#s.notices, 0)
+				no_private(table.concat(s.stderr))
+			end)
+		end)
+	end
+
 	helpers.it("redacts module filenames and optional context as well as the error", function()
 		with_fixture(function(s)
 			helpers.assert_eq(s.Reporter.dump(TOKEN, PAYLOAD, { stack_trace = PAYLOAD, layout = PAYLOAD, locale = PAYLOAD }), true)
@@ -223,3 +236,81 @@ helpers.describe("crash privacy admission", function()
 		end)
 	end)
 end)
+
+
+if package.config:sub(1, 1) == "/" then
+	helpers.describe("native crash history", function()
+		helpers.it("preserves same-second reports across reporter reloads (crash-exclusive-history)", function()
+			local uv = require("luv")
+			local directory = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-crash-history-XXXXXX"))
+			local names = { "infra.logger_sink", "modules.diagnostics.crash_reporter", "logger.shim" }
+			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+			local date, Sink, Logger = os.date
+			local Writer = require("infra.regular_file_writer")
+			local native_write = Writer.open
+			local timestamp = "2026-10-25T12-00-00"
+			local ok, err = xpcall(function()
+				Logger, Sink = require("logger.shim"), require("infra.logger_sink")
+				assert(Sink.install(Logger, { log_dir = directory, redaction_context = { home = HOME, user = USER } }))
+				os.date = function(format, ...)
+					if format == "!%Y-%m-%dT%H-%M-%S" then return timestamp end
+					return date(format, ...)
+				end
+				local Reporter = require("modules.diagnostics.crash_reporter")
+				for _, marker in ipairs({ "FIRST_HISTORY_MARKER", "SECOND_HISTORY_MARKER" }) do
+					helpers.assert_eq(Reporter.dump("engine", marker .. " " .. PAYLOAD), true)
+				end
+				helpers.assert_eq(Reporter.dump("other", "OTHER_MODULE_MARKER " .. PAYLOAD), true)
+				timestamp = "2026-10-25T12-00-01"
+				helpers.assert_eq(Reporter.dump("engine", "OTHER_SECOND_MARKER " .. PAYLOAD), true)
+				timestamp = "2026-10-25T12-00-00"
+				package.loaded["modules.diagnostics.crash_reporter"] = nil
+				Reporter = require("modules.diagnostics.crash_reporter")
+				helpers.assert_eq(Reporter.dump("engine", "RELOADED_HISTORY_MARKER " .. PAYLOAD), true)
+				local raced = false
+				Writer.open = function(path, mode)
+					if path:find("_racing", 1, true) and not raced then
+						raced = true
+						local descriptor = assert(uv.fs_open(path, "wx", 384))
+						assert(uv.fs_write(descriptor, "RACE_OWNER_MARKER", 0))
+						assert(uv.fs_close(descriptor))
+					end
+					return native_write(path, mode)
+				end
+				helpers.assert_eq(Reporter.dump("racing", "RACE_REPORT_MARKER " .. PAYLOAD), true)
+				Writer.open = native_write
+				helpers.assert_eq(raced, true, "a real competing inode must occupy the candidate at acquisition")
+				local files, texts = {}, {}
+				local reports = assert(uv.fs_scandir(directory .. "/crash_reports"))
+				while true do
+					local name = uv.fs_scandir_next(reports); if not name then break end
+					local file = assert(io.open(directory .. "/crash_reports/" .. name, "rb"))
+					local text = assert(file:read("*a")); assert(file:close())
+					no_private(name); no_private(text)
+					files[#files + 1], texts[#texts + 1] = name, text
+				end
+				helpers.assert_eq(#files, 7, "every acknowledged report must survive same-second collisions and reloads")
+				local document = table.concat(texts)
+				for _, marker in ipairs({ "FIRST_HISTORY_MARKER", "SECOND_HISTORY_MARKER", "OTHER_MODULE_MARKER",
+					"OTHER_SECOND_MARKER", "RELOADED_HISTORY_MARKER", "RACE_OWNER_MARKER", "RACE_REPORT_MARKER" }) do
+					local _, count = document:gsub(marker, "")
+					helpers.assert_eq(count, 1, "each error must survive exactly once")
+				end
+			end, debug.traceback)
+			os.date = date
+			Writer.open = native_write
+			if Sink then Sink.uninstall(Logger) end
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			for _, folder in ipairs({ directory .. "/crash_reports", directory }) do
+				local scanner = uv.fs_scandir(folder)
+				if scanner then
+					while true do local name, kind = uv.fs_scandir_next(scanner); if not name then break end
+						if kind == "file" then assert(uv.fs_unlink(folder .. "/" .. name)) end
+					end
+					assert(uv.fs_rmdir(folder))
+				end
+			end
+			if not ok then error(err, 0) end
+		end)
+	end)
+end
