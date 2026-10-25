@@ -109,6 +109,7 @@ local _idle_wait = nil      -- Optional input wait supplied by run(); see _yield
 
 local Monotonic = require("infra.monotonic")
 local Perf = require("infra.perf_counters")
+local PhaseStats = require("infra.phase_stats")
 
 
 -- =========================================
@@ -198,6 +199,10 @@ local function _safe_periodic(onPeriodic)
 	local flushed, flush_error = pcall(Perf.maybe_flush)
 	if not flushed then
 		Logger.error(LOG, "Counter summary raised: %s", ErrorDescription.describe(flush_error))
+	end
+	local phases_flushed, phases_error = pcall(PhaseStats.maybe_flush)
+	if not phases_flushed then
+		Logger.error(LOG, "Phase summary raised: %s", ErrorDescription.describe(phases_error))
 	end
 end
 

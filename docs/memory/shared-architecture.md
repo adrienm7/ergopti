@@ -40,6 +40,20 @@ runtime-built reasons and phases are held to a shrinking per-file baseline in
 `tools/lint/log-vocabulary-free-form-baseline.json`. Reuse an existing value
 and put detail in the message; adding a value is a deliberate vocabulary edit.
 
+### project-lua-slow-segments-are-one-inventory
+
+The macOS and Linux slow-segment logging (`[HotPath] Slow <segment>`) declares
+what it measures once, in `_shared/lua/hotpath_segments.lua`: name, drivers,
+reason, and a `slow_ms` only together with the measurement that justifies it.
+The shared contract `_shared/lua/test/hotpath_segments_contract.lua` (run by
+each driver's `test_hotpath_segments_declared.lua`) fails when a driver emits an
+undeclared segment or drops a declared one; the Windows list stays in
+`test-hotpath-segments-declared.cjs`. Linux spans in `infra/perf_counters.lua`
+are always timed (two `luv.hrtime` reads, no string unless slow); a span that is
+not an inventory segment (idle wait, tray, keystats flush) is timed but never
+warns. `PhaseStats` bookkeeping is `_shared/lua/phase_stats_core.lua` on both
+Lua drivers. A new typing-path span joins the inventory, never a private list.
+
 ### project-fixed-field-lists-drop-flags
 
 When a record schema grows, fixed allowlists silently discard new fields. Prefer

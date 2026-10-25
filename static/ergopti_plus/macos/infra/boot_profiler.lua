@@ -40,6 +40,20 @@ local LOG         = "BootProfile"
 local _last_ns  = nil
 local _start_ns = nil
 
+-- Process CPU milliseconds (user + system, os.clock) at the same instants. The
+-- duration of a stage is wall time; its CPU time beside it tells a stage that
+-- computes from one that waits (a child process, a file, the network), which
+-- the Windows driver also reports per stage.
+local MILLISECONDS_PER_SECOND = 1000
+local function process_cpu_ms()
+	return os.clock() * MILLISECONDS_PER_SECOND
+end
+-- Replaceable in tests, which cannot make a process burn a known amount of CPU.
+local _cpu_ms        = process_cpu_ms
+local _last_cpu_ms   = nil
+local _start_cpu_ms  = nil
+local _stage_cpu_ms  = nil
+
 -- Open stage name and its start, the last completed stage, and completion.
 local _open_stage     = nil
 local _stage_start_ns = nil
@@ -163,6 +177,9 @@ end
 function M.begin()
 	_start_ns = now_ns()
 	_last_ns  = _start_ns
+	_start_cpu_ms = _cpu_ms()
+	_last_cpu_ms  = _start_cpu_ms
+	_stage_cpu_ms = nil
 	_open_stage, _stage_start_ns, _last_completed, _complete = nil, nil, nil, false
 	_boot_complete_ms = nil
 	pcall(Logger.info, LOG, "Boot timing started.")
@@ -179,6 +196,7 @@ function M.stage(stage_name)
 	end
 	_open_stage = name
 	_stage_start_ns = now_ns()
+	_stage_cpu_ms = _cpu_ms()
 	_sub_last_ns = _stage_start_ns
 	pcall(Logger.start, LOG, "Boot stage started: %s.", name)
 	pcall(BootJournal.append, "START", "Boot stage started: " .. name .. ".")
@@ -205,6 +223,10 @@ function M.complete()
 	local total = _start_ns and (now_ns() - _start_ns) / NS_PER_MS or 0
 	pcall(Logger.success, LOG, "Boot complete in %.0f ms.", total)
 	pcall(BootJournal.append, "SUCCESS", string.format("Boot complete in %.0f ms.", total))
+	-- Never collapsed: the CPU total is the figure a slow-boot report compares
+	-- with the wall total above.
+	pcall(Logger.evidence, LOG, "Boot CPU: %.0f ms of process CPU over %.0f ms of boot.",
+		M.cpu_ms(), total)
 end
 
 --- Logs the time since the previous mark and since M.begin().
@@ -217,6 +239,11 @@ function M.mark(phase_name)
 		_start_ns = n
 		_last_ns  = n
 	end
+	local cpu_now = _cpu_ms()
+	if _start_cpu_ms == nil then
+		_start_cpu_ms = cpu_now
+		_last_cpu_ms  = cpu_now
+	end
 	local delta = (n - _last_ns) / NS_PER_MS
 	local total = (n - _start_ns) / NS_PER_MS
 	_last_ns = n
@@ -226,11 +253,15 @@ function M.mark(phase_name)
 			name, tostring(_open_stage))
 	end
 	local stage_ms = (_open_stage == name and _stage_start_ns) and (n - _stage_start_ns) / NS_PER_MS or delta
-	_open_stage, _stage_start_ns, _last_completed = nil, nil, name
-	local format = "Boot stage completed: %s in %.1f ms (+%.1f ms, total %.1f ms)."
-	pcall(Logger.success, LOG, format, name, stage_ms, delta, total)
-	pcall(BootJournal.append, "SUCCESS", string.format(format, name, stage_ms, delta, total))
+	local stage_cpu_ms = (_open_stage == name and _stage_cpu_ms) and (cpu_now - _stage_cpu_ms)
+		or (cpu_now - _last_cpu_ms)
+	_last_cpu_ms = cpu_now
+	_open_stage, _stage_start_ns, _stage_cpu_ms, _last_completed = nil, nil, nil, name
+	local format = "Boot stage completed: %s in %.1f ms (+%.1f ms, total %.1f ms, cpu %.1f ms)."
+	pcall(Logger.success, LOG, format, name, stage_ms, delta, total, stage_cpu_ms)
+	pcall(BootJournal.append, "SUCCESS", string.format(format, name, stage_ms, delta, total, stage_cpu_ms))
 	PhaseStats.add("boot.stage", stage_ms * NS_PER_MS)
+	PhaseStats.add("boot.stage_cpu", stage_cpu_ms * NS_PER_MS)
 	report_stage_requires(name)
 	-- The boot sequence closes with a mark whose label starts with BOOT_COMPLETE_LABEL.
 	-- Freezing the total there lets the post-boot diagnostic snapshot report the
@@ -245,6 +276,19 @@ end
 --- @return number|nil
 function M.boot_complete_ms()
 	return _boot_complete_ms
+end
+
+--- Returns the process CPU milliseconds consumed since M.begin().
+--- @return number CPU milliseconds (0 when begin() was never called).
+function M.cpu_ms()
+	if _start_cpu_ms == nil then return 0 end
+	return _cpu_ms() - _start_cpu_ms
+end
+
+--- Replaces the CPU clock (tests only). Pass nil to restore the process clock.
+--- @param fn function|nil Zero-argument function returning CPU milliseconds.
+function M.use_cpu_clock(fn)
+	_cpu_ms = fn or process_cpu_ms
 end
 
 --- Returns the milliseconds elapsed since M.begin() without emitting a log.

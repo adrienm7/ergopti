@@ -47,6 +47,7 @@ local RuntimeLog = require("diagnostics.runtime_log")
 local LibuvExit = require("infra.libuv_exit")
 local NativeTimer = require("infra.native_timer")
 local Perf = require("infra.perf_counters")
+local PhaseStats = require("infra.phase_stats")
 local NumberPolicy = require("number_policy")
 local ok_luv, luv = pcall(require, "luv")
 if not ok_luv then luv = nil end
@@ -75,9 +76,13 @@ local _test_runner = nil
 local _log_exit = RuntimeLog.new_process_log(Logger, LOG, Monotonic.now_ms)
 
 --- Counts the child (the forks per key and per startup are the figure that
---- matters), then reports its exit as above.
+--- matters), times it as the phase process.<program> exactly as the macOS
+--- driver does, then reports its exit as above. The phase name is the program
+--- basename that RuntimeLog.program_name sanitised, never the command line.
 local function _record_exit(name, status, duration_ms)
 	Perf.count("shell.spawns")
+	local program = (type(name) == "string" and name ~= "") and name or "unknown"
+	PhaseStats.add_ms("process." .. program, duration_ms)
 	return _log_exit(name, status, duration_ms)
 end
 

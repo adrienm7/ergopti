@@ -167,6 +167,8 @@ local OWNED = {
 	"gestures.direction",
 	"infra.key_event_health",
 	"infra.phase_stats",
+	-- The phase counters' bookkeeping, shared with the Linux driver.
+	"phase_stats_core",
 	"llm.app_identity",
 	"llm.app_profile_overrides",
 	"llm.temperature",

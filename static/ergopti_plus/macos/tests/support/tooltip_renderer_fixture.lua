@@ -20,6 +20,8 @@ local OWNERS = {
 	"toml_codec.source_memo",
 	-- The real logger records its phase counters into this owner.
 	"infra.phase_stats",
+	-- The phase counters' bookkeeping, shared with the Linux driver.
+	"phase_stats_core",
 	-- The renderer configuration and the paths walk split paths through this pure owner.
 	"native_path",
 	"infra.vscode_bridge", "tooltip.layout", "tooltip.llm_line", "tooltip.tint", "ui.tooltip.config", "ui.tooltip.renderer",
