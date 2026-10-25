@@ -63,6 +63,59 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		end)
 	end
 
+	for _, phase in ipairs({ "initial", "reopen", "registry" }) do
+		helpers.it("releases failed " .. phase .. " bootstrap admission before a new store (sqlite-failed-open-state)", function()
+			local writer = helpers.load_module("modules.keystats.sqlite_writer")
+			local control = helpers.load_module("modules.keystats.sqlite_writer")
+			local paths = require("infra.paths")
+			local shared = paths.shared
+			local root = os.tmpname()
+			os.remove(root)
+			local quote = require("text_utils").shell_quote
+			local made = os.execute("mkdir -p " .. quote(root))
+			helpers.assert_true(made == true or made == 0)
+			local original, replacement = root .. "/original.sqlite", root .. "/replacement.sqlite"
+			local bad_catalogue = root .. "/invalid.json"
+			local file = assert(io.open(bad_catalogue, "w"))
+			assert(file:write("{}") and file:close())
+			local ok, failure = xpcall(function()
+				if phase == "reopen" then
+					helpers.assert_true(writer.open_db(original))
+					helpers.assert_true(writer.exec_sql("CREATE TABLE owned_original (value TEXT); INSERT INTO owned_original VALUES ('preserved');"))
+				elseif phase == "registry" then
+					helpers.assert_true(control.open_db(original))
+					helpers.assert_true(control.exec_sql("DROP TABLE devices; CREATE TABLE devices (device_id TEXT PRIMARY KEY);"))
+					control.close_db()
+				end
+				if phase ~= "registry" then
+					paths.shared = function(relative)
+						if relative == "data/keycodes/metrics_media_keys.json" then return bad_catalogue end
+						return shared(relative)
+					end
+				end
+				helpers.assert_eq(writer.open_db(original), false, "the real native startup must reject its invalid resource")
+				helpers.assert_nil(writer.get_db_path())
+				helpers.assert_eq(writer.is_available(), false)
+				paths.shared = shared
+				if phase == "reopen" then
+					helpers.assert_true(control.open_db(original))
+					helpers.assert_eq(control.query_rows("SELECT value FROM owned_original;")[1], "preserved")
+					control.close_db()
+				end
+				helpers.assert_true(control.open_db(root .. "/healthy-control.sqlite"), "native prerequisites must remain healthy")
+				control.close_db()
+				helpers.assert_true(writer.open_db(replacement), "a refused open must not reuse another store's bootstrap admission")
+				helpers.assert_true(writer.exec_sql("CREATE TABLE owned_retry (value TEXT); INSERT INTO owned_retry VALUES ('retained');"))
+				helpers.assert_eq(writer.query_rows("SELECT value FROM owned_retry;")[1], "retained")
+			end, debug.traceback)
+			paths.shared = shared
+			writer.close_db()
+			control.close_db()
+			os.execute("rm -rf " .. quote(root))
+			if not ok then error(failure, 0) end
+		end)
+	end
+
 	helpers.it("opens a fresh database and creates the schema", function()
 		local writer = helpers.load_module("modules.keystats.sqlite_writer")
 		local dir = os.tmpname()
