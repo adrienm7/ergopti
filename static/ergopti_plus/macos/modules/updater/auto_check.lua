@@ -189,7 +189,8 @@ end
 ---   config table|nil load_config() result (tests pass one).
 ---   timer table { after(sec, fn) -> handle, committed; cancel(handle) -> boolean }
 ---   storage table { get(key, default), set(key, value) -> boolean }
----   http table { get(url, headers, callback(result)) -> boolean }
+---   http table Background transport { get(url, headers, callback(result)) -> boolean }.
+---   manual_http table Distinct manual transport with the same contract.
 ---   now function(): number Wall clock in epoch seconds.
 ---   current_version function(): string|nil, installed_channel function(): string|nil
 --- @return table owner
@@ -197,8 +198,9 @@ function M.new(opts)
 	if type(opts) ~= "table" or type(opts.state) ~= "table" or type(opts.save) ~= "function"
 		or type(opts.channel) ~= "function" or type(opts.is_paused) ~= "function"
 		or type(opts.on_available) ~= "function" or type(opts.timer) ~= "table"
-		or type(opts.storage) ~= "table" or type(opts.http) ~= "table" or type(opts.now) ~= "function" then
-		error("the automatic update-check owner needs its state, save, channel, pause, callback and ports", 2)
+		or type(opts.storage) ~= "table" or type(opts.http) ~= "table"
+		or type(opts.manual_http) ~= "table" or opts.manual_http == opts.http or type(opts.now) ~= "function" then
+		error("the automatic update-check owner needs its state, save, channel, pause, callback and distinct transport ports", 2)
 	end
 	local config = opts.config or M.load_config()
 	if type(config.feed_url) ~= "string" or config.feed_url == "" then
@@ -429,9 +431,10 @@ function M.new(opts)
 
 	--- Reads the public releases Atom feed after the API gave no list, and
 	--- answers once with its tags as a release list, or with both causes.
+	--- @param http table Transport owned by this check kind.
 	--- @param api_detail string Why the API list failed.
 	--- @param done function(body|nil, detail|nil)
-	local function read_feed(api_detail, done)
+	local function read_feed(http, api_detail, done)
 		local settled = false
 		local function settle(body, detail)
 			if settled then return end
@@ -439,7 +442,7 @@ function M.new(opts)
 			done(body, detail)
 		end
 		local headers = { Accept = "application/atom+xml", ["User-Agent"] = USER_AGENT }
-		local ok_dispatch, sent = pcall(opts.http.get, config.feed_url, headers, function(result)
+		local ok_dispatch, sent = pcall(http.get, config.feed_url, headers, function(result)
 			local status = type(result) == "table" and result.status or 0
 			local body = type(result) == "table" and result.body or nil
 			local ok, reason = ReleaseSources.classify_feed(status, body, type(result) == "table" and result.error or nil)
@@ -469,7 +472,7 @@ function M.new(opts)
 			local body, reason, detail = read_response(result)
 			if not body and reason == "no_connection" then
 				Logger.info(LOG, "Background check: the GitHub API gave no list (%s); reading the Atom feed.", detail)
-				read_feed(detail, function(feed_body, feed_detail)
+				read_feed(opts.http, detail, function(feed_body, feed_detail)
 					if not active or request_generation ~= generation then return end
 					if channel ~= opts.channel() then
 						in_flight = false
@@ -589,14 +592,14 @@ function M.new(opts)
 				result.state, channel, tostring(result.latest), #result.others)
 			answer(result)
 		end
-		local ok_dispatch, sent = pcall(opts.http.get, config.releases_url, list_headers(), function(response)
+		local ok_dispatch, sent = pcall(opts.manual_http.get, config.releases_url, list_headers(), function(response)
 			if answered or request_generation ~= manual_generation then return end
 			local body, reason, detail = read_response(response)
 			if body then return answer_from(body) end
 			if reason ~= "no_connection" then return fail(reason, detail) end
 			Logger.info(LOG, "Manual update check on channel '%s': the GitHub API gave no list (%s); reading the Atom feed.",
 				tostring(channel), detail)
-			read_feed(detail, function(feed_body, feed_detail)
+			read_feed(opts.manual_http, detail, function(feed_body, feed_detail)
 				if answered or request_generation ~= manual_generation then return end
 				if not feed_body then return fail("no_connection", feed_detail) end
 				answer_from(feed_body)
@@ -736,6 +739,7 @@ function M.start_session(opts)
 		timer = require("adapters.timer_scheduler"),
 		storage = require("adapters.storage"),
 		http = require("adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
+		manual_http = require("adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
 		now = os.time,
 	})
 	local watcher = require("adapters.wake_watcher").new(owner.on_wake)

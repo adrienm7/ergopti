@@ -217,6 +217,7 @@ local function actual_checks(refusal, interval)
 		},
 		storage = {get = function(_, default) return default end, set = function() return true end},
 		http = {get = function() obs.requests = obs.requests + 1; return false end},
+		manual_http = {get = function() obs.requests = obs.requests + 1; return false end},
 		now = function() return 1700000000 end,
 		current_version = function() return "0.0.0-dev.140" end,
 		installed_channel = function() return "dev" end,
