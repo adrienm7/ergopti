@@ -2343,9 +2343,10 @@ local function main()
 		webview       = webview_manager,
 			dry_run       = opts.dry_run,
 			verbose       = opts.verbose,
+			-- False when a shutdown already owns the daemon: the tray tells the user.
 			on_quit       = function()
 				if not shutdown.is_requested() then require("modules.keymap.pause_layout_switch").quit_safely() end
-				shutdown.request("tray quit")
+				return shutdown.request("tray quit")
 			end,
 			-- Same code path the SIGHUP handler takes. The menu item used to
 			-- shell out "kill -HUP $$", which signals the /bin/sh os.execute

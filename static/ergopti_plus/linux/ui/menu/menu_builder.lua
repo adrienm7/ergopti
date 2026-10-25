@@ -1092,7 +1092,11 @@ local function _manifest_hotstring_rows(ctx, config)
 							if type(config.toggle_section) ~= "function" then return false end
 							return config.toggle_section(id, name)
 						end)
-						if called and committed == true then return true end
+						if called and committed == true then
+							require("ui.menu.feature_notice").feature(name, config.is_section_checked and config.is_section_checked(id, name)
+								or (config.is_section_enabled and config.is_section_enabled(id, name)) or false)
+							return true
+						end
 						Logger.error(LOG, "Hotstring section toggle refused for '%s.%s' (%s).", id, name,
 							called and "owner-not-committed" or "owner-error")
 						show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
@@ -1108,7 +1112,10 @@ local function _manifest_hotstring_rows(ctx, config)
 				if not current_source() then return false end
 				return config.set_category_scope_enabled({ id }, enabled)
 			end)
-			if called and committed == true then return true end
+			if called and committed == true then
+				require("ui.menu.feature_notice").feature(category_label(id, category), enabled)
+				return true
+			end
 			Logger.error(LOG, "Hotstring category scope refused for '%s' (%s).", id,
 				called and "owner-not-committed" or "owner-error")
 			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
@@ -1140,7 +1147,9 @@ local function _manifest_hotstring_rows(ctx, config)
 				enabled = function() return type(config.is_group_enabled) == "function" and config.is_group_enabled(id) == true end,
 				available = function(field) return controls ~= nil and controls.file[field] ~= true end,
 				enable = function(enabled)
-					return (enabled and config.enable_group or config.disable_group)(id) == true
+					local committed = (enabled and config.enable_group or config.disable_group)(id) == true
+					if committed then require("ui.menu.feature_notice").feature(category_label(id, category), enabled) end
+					return committed
 				end,
 				tooltip_enabled = function() return type(config.resolve) == "function" and config.resolve(id, nil).show_tooltip == true end,
 				tooltip = function(value) return config.set_personal_metadata(id, nil, "show_tooltip", value) == true end,
@@ -1493,7 +1502,10 @@ local function _manifest_hotstring_rows(ctx, config)
 						action      = function()
 							local saved = snapshot()
 							if Terminators.set_terminator_enabled(key,
-								not Terminators.is_terminator_enabled(key)) then commit(saved) end
+								not Terminators.is_terminator_enabled(key)) and commit(saved) then
+								require("ui.menu.feature_notice").feature(string.format(i18n_safe("notify.word_expander_prefix"), label),
+									Terminators.is_terminator_enabled(key))
+							end
 						end,
 					}
 					if def.custom then
@@ -2082,7 +2094,11 @@ local function _manifest_hotstring_rows(ctx, config)
 								if type(config.toggle_section) ~= "function" then return false end
 								return config.toggle_section(bound.category, bound.section)
 							end)
-							if called and committed == true then return true end
+							if called and committed == true then
+								require("ui.menu.feature_notice").feature(description, config.is_section_checked
+									and config.is_section_checked(bound.category, bound.section) or false)
+								return true
+							end
 							Logger.error(LOG, "Extension hotstring section toggle refused for '%s.%s' (%s).", bound.category, bound.section,
 								called and "owner-not-committed" or "owner-error")
 							show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
@@ -2131,6 +2147,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			local row = ManifestMenu.check_row("preview_magic_control", "preview_star_enabled", {
 				["preview_star_enabled"] = function()
 					if PreviewSettings.toggle("star") ~= true then return false end
+					require("ui.menu.feature_notice").feature(i18n_safe("menu.hotstrings.notify_bubble_star"), PreviewSettings.get("star") == true)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
@@ -2143,9 +2160,14 @@ local function _manifest_hotstring_rows(ctx, config)
 			local magic_rows = choices
 			choices = {}
 			local presence_commands, presence_getters = {}, { preview_presence_ready = function() return true end }
+			local bubble_notice_keys = {
+				autocorrect = "menu.hotstrings.notify_bubble_autocorrect",
+				ai = "menu.hotstrings.notify_bubble_ai",
+			}
 			for key, name in pairs({ preview_autocorrect_enabled = "autocorrect", preview_ai_enabled = "ai" }) do
 				presence_commands[key] = function()
 					if PreviewSettings.toggle(name) ~= true then return false end
+					require("ui.menu.feature_notice").feature(i18n_safe(bubble_notice_keys[name]), PreviewSettings.get(name) == true)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end
@@ -2160,6 +2182,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			local row = ManifestMenu.check_row("preview_colored_control", "preview_colored_tooltips", {
 				["preview_colored_tooltips"] = function()
 					if PreviewSettings.toggle("colored") ~= true then return false end
+					require("ui.menu.feature_notice").feature(i18n_safe("menu.hotstrings.notify_bubble_colored"), PreviewSettings.get("colored") == true)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
@@ -2292,6 +2315,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- ends in a full load_all(), which re-parses every pack — magickey.toml
 			-- alone is 305 KB — once per category, inside a menu callback.
 			local changed
+			local enabling = not hotstrings_on()
 			if hotstrings_on() then
 				-- Off stops every expansion: each gate closes, keeping its section
 				-- choices, and the dynamic hotstrings stop with them.
@@ -2304,6 +2328,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			else
 				changed = config.enable_all()
 			end
+			if changed ~= false then require("ui.menu.feature_notice").feature(i18n_safe("notify.hotstrings"), enabling) end
 			if changed ~= false and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end,
 		-- Reloading the catalogue from disk: this driver's own affordance, because
@@ -4286,6 +4311,7 @@ local function _build_shortcuts(ctx)
 				show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
 				return false
 			end
+			require("ui.menu.feature_notice").feature(i18n_safe("notify.script_control"), not current)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end
@@ -4424,6 +4450,7 @@ local function _build_shortcuts(ctx)
 			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
 			return false
 		end
+		require("ui.menu.feature_notice").feature(i18n_safe("menu.shortcuts.title"), not current)
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return true
 	end
@@ -4488,6 +4515,7 @@ local function _build_shortcuts(ctx)
 					local current = sc.is_wrap_on_type_enabled()
 					if type(current) ~= "boolean" or not wrap_on_type_ready() then return false end
 					if sc.set_wrap_on_type_enabled(not current) ~= true then return false end
+					require("ui.menu.feature_notice").feature(i18n_safe("shortcuts.label_wrap_text"), not current)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
@@ -4887,7 +4915,9 @@ local function _build_gestures(ctx)
 	-- label, a mark that belonged to the tray rather than to the string.
 	local gestures_on = enabled
 	local function master_toggle_action()
-		ge.toggle()
+		local before = ge.is_enabled()
+		local after = ge.toggle()
+		if after ~= before then require("ui.menu.feature_notice").feature(i18n_safe("menu.gestures.notify_title"), after == true) end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
 
@@ -5608,7 +5638,12 @@ local function _build_quit(ctx)
 	return ManifestMenu.command_row("top_level", "quit", {
 		quit = function()
 			Logger.info(LOG, "Quit requested via tray menu.")
-			if ctx.on_quit then ctx.on_quit() end
+			if not ctx.on_quit then return end
+			-- Only an explicit false is a refusal: the owner answers false while a
+			-- shutdown already runs. Before, the second click did nothing visible.
+			if ctx.on_quit() == false then
+				require("ui.menu.feature_notice").quit_refused(i18n_safe)
+			end
 		end,
 	})
 end

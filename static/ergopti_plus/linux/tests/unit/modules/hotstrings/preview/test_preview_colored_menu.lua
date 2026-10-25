@@ -153,6 +153,38 @@ helpers.describe("declared coloured preview native row", function()
 end)
 
 
+--- Runs a body with the desktop notifier replaced by a recorder.
+--- @param body function Receives the list of { text, level } sent.
+local function with_recording_notifier(body)
+	local original, sent = package.loaded["adapters.notifier"], {}
+	package.loaded["adapters.notifier"] = { send = function(text, opts)
+		sent[#sent + 1] = { text = text, level = opts and opts.level }
+		return true
+	end }
+	local ok, err = pcall(body, sent)
+	package.loaded["adapters.notifier"] = original
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("preview bubble toggles notify like the macOS menu", function()
+	helpers.it("announces the new state of the coloured bubble and nothing when the write is refused", function()
+		with_preferences(function(Preferences, _, _, _)
+			with_recording_notifier(function(sent)
+				local i18n = require("infra.i18n")
+				local lease = {}; assert(Preferences.acquire(lease))
+				local refused_rows = menu_controls(false)
+				helpers.assert_eq(refused_rows[5].fn(), false)
+				assert(Preferences.release(lease))
+				helpers.assert_eq(#sent, 0, "a refused toggle must not claim a new state")
+				local rows = menu_controls(false)
+				helpers.assert_eq(rows[5].fn(), true)
+				helpers.assert_eq(sent, { { text = i18n.get("menu.hotstrings.notify_bubble_colored"), level = "error" } })
+			end)
+		end)
+	end)
+end)
+
+
 helpers.describe("coloured provider locale contract", function()
 	helpers.it("uses all twenty-one actual catalogues without disturbing provider order", function()
 		with_preferences(function(_, _, _, _)
