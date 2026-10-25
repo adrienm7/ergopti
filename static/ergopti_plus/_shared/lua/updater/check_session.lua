@@ -7,7 +7,8 @@
 --- macOS and Linux hosts: it starts a check of the subscribed channel, shows
 --- "checking" and then the answer, and serves the page's actions (install the
 --- offered release, open the release notes, switch to another channel that has
---- a newer release, report or open the log of a failed check, close).
+--- a newer release, open a link of its notes, report or open the log of a failed
+--- check, close).
 ---
 --- FEATURES & RATIONALE:
 --- 1. One controller for both Lua hosts: the host only creates the window,
@@ -19,10 +20,17 @@
 ---    the answer of an older one inert, so a late result never replaces the
 ---    window's current phase; a retired session (its window closed, or
 ---    replaced by a new one) shows and does nothing more.
---- 4. PURE Lua (LuaJIT and 5.4): no driver imports, no io, no OS calls.
+--- 4. Release notes: an offered release carries its body, with the repository
+---    identity the page's link policy needs. The window shows the changelog
+---    section in place (the Windows prompt does the same with its own pane), and
+---    the one link action the notes add is checked here against the repository
+---    again before the host opens anything.
+--- 5. PURE Lua (LuaJIT and 5.4): no driver imports, no io, no OS calls.
 --- ==============================================================================
 
 local CheckResult = require("updater.check_result")
+local Parser = require("updater.release_parser")
+local RepositoryUrl = require("updater.repository_url")
 
 local M = {}
 
@@ -31,6 +39,7 @@ local ACTIONS = {
 	close          = true,
 	update         = "available",
 	whats_new      = "available",
+	open_url       = "available",
 	switch_channel = true,
 	report         = "error",
 	open_log       = "error",
@@ -41,7 +50,7 @@ local PORTS = {
 	push = "function", check = "function", channel = "function", current = "function",
 	set_channel = "function", install = "function", open_changelog = "function",
 	report = "function", open_log = "function", close = "function", log_path = "function",
-	log = "function",
+	log = "function", repository = "function", open_url = "function",
 }
 
 --- Creates the session of one window.
@@ -58,6 +67,10 @@ local PORTS = {
 ---     Complete(ok, missing) receives the report outcome; nil is valid after
 ---     inline completion. A return value never acknowledges the action.
 ---   open_log function(): boolean, boolean|nil Opens today's log (ok, missing).
+---   repository function(): table The repository identity { owner, repo } the
+---     notes' link policy needs.
+---   open_url function(url): boolean Opens one URL this session already
+---     checked against the repository.
 ---   close function() Closes the window.
 ---   log_path function(): string Today's log file.
 ---   log function(level, message, ...) The driver's logger.
@@ -124,6 +137,16 @@ function M.new(opts)
 		}
 		-- An offer read from the Atom feed: the page shows no Update button for it
 		if answer.state == "available" and answer.check_only == true then page.check_only = true end
+		if answer.state == "available" and type(answer.release) == "string" then
+			local ok, repository = pcall(opts.repository)
+			if ok and type(repository) == "table" and type(repository.owner) == "string"
+				and type(repository.repo) == "string" then
+				page.notes = { body = Parser.parse_notes(answer.release), owner = repository.owner, repo = repository.repo }
+			else
+				-- The page then shows no notes pane; the log says why
+				opts.log("error", "The repository identity is unavailable for the release notes: %s.", tostring(repository))
+			end
+		end
 		if answer.state == "error" then
 			page.reason_key = answer.reason_key
 			local ok, path = pcall(opts.log_path)
@@ -204,6 +227,15 @@ function M.new(opts)
 			end
 		elseif name == "whats_new" then
 			acknowledge(name, opts.open_changelog(result.channel) == true)
+		elseif name == "open_url" then
+			local notes = message and message.notes
+			if type(notes) ~= "table"
+				or not RepositoryUrl.is_repository_url(body.url, notes.owner, notes.repo) then
+				opts.log("warn", "Refused a release-notes link outside the repository.")
+				acknowledge(name, false)
+			else
+				acknowledge(name, opts.open_url(body.url) == true)
+			end
 		elseif name == "switch_channel" then
 			local id = body.channel
 			if not listed(id) then

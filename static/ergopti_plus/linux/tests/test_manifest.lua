@@ -296,6 +296,7 @@ return {
 	"tests.unit.modules.llm.ollama.test_api_ollama_terminal_receipt",
 	"tests.unit.infra.config.test_bridge_persistence",
 	"tests.unit.modules.updater.check.test_changelog_release_sources",
+	"tests.unit.modules.updater.check.test_repository_url",
 	"tests.unit.infra.config.test_config_window_overrides",
 	"tests.meta.corpus.test_corpus_cross_driver",
 	"tests.meta.corpus.test_corpus_diagnostics",

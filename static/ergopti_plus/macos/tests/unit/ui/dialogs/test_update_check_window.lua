@@ -14,7 +14,10 @@
 ---    refreshed;
 --- 4. a failure's Report goes through the error window's report, naming the
 ---    updater and the cause;
---- 5. without an automatic-check owner the window shows a failure, not nothing.
+--- 5. without an automatic-check owner the window shows a failure, not nothing;
+--- 6. Sparkle's dialog shows no notes, so the offered release's changelog is
+---    seeded into this window, and its repository links open through the
+---    system handler only on this repository.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -37,7 +40,11 @@ local function load_host()
 		report = function(record, complete) ctx.reports[#ctx.reports + 1] = record; complete(true); return { cancel = function() end } end,
 	}
 	package.loaded["ui.log_openers"] = { open_today_log = function() return true end }
-	package.loaded["ui.ui_builder"] = { force_focus = function() ctx.focused = (ctx.focused or 0) + 1 end }
+	ctx.urls = {}
+	package.loaded["ui.ui_builder"] = {
+		force_focus = function() ctx.focused = (ctx.focused or 0) + 1 end,
+		open_http_url = function(url) ctx.urls[#ctx.urls + 1] = url; return true end,
+	}
 	ctx.Host = helpers.load_with_stubs("ui.update_check")
 	return ctx
 end
@@ -182,6 +189,29 @@ helpers.describe("update-check window (macOS host)", function()
 			helpers.assert_eq(#view.messages, shown, "the replaced session's late answer is not shown")
 			helpers.assert_true(ctx.Host._session() ~= session, "the window has a new session")
 			ctx.Host._set_window(nil, nil)
+		end)
+	end)
+
+	helpers.it("seeds the offered release's notes and opens only repository links", function()
+		scenario(function(ctx)
+			local owners = fake_owners(function(channel)
+				local answer = available(channel)
+				answer.release = '{"tag_name":"v0.0.0-dev.150","body":"## Changelog\\n- **Fix: A thing**"}'
+				return answer
+			end)
+			local view = fake_view()
+			local session = ctx.Host._session_for(view, owners)
+			ctx.Host._set_window(view, session)
+			session.start()
+			local notes = view.messages[#view.messages].notes
+			helpers.assert_eq(notes.body, "## Changelog\n- **Fix: A thing**")
+			helpers.assert_eq(notes.owner, require("modules.updater").GH_OWNER)
+			helpers.assert_eq(notes.repo, require("modules.updater").GH_REPO)
+			local url = "https://github.com/" .. notes.owner .. "/" .. notes.repo .. "/releases/tag/v0.0.0-dev.150"
+			session.on_message({ action = "open_url", url = url })
+			helpers.assert_eq(ctx.urls, { url })
+			session.on_message({ action = "open_url", url = "https://example.com/" })
+			helpers.assert_eq(#ctx.urls, 1, "a link outside the repository never reaches the system handler")
 		end)
 	end)
 

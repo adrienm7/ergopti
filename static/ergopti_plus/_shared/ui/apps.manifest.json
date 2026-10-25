@@ -230,9 +230,9 @@
 		"update_check": {
 			"title_key": "update_check.window_title",
 			"width": 480,
-			"height": 320,
+			"height": 440,
 			"min_width": 400,
-			"min_height": 260,
+			"min_height": 340,
 			"vhost": "ergopti.updatecheck"
 		},
 		"physical_shortcuts": {
