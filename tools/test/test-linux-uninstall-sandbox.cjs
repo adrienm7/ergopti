@@ -270,7 +270,7 @@ try {
 				`'ergopti: ${bashPath(packaged)}/uninstall.sh'`
 			)
 	);
-	for (const name of ['dirname', 'grep', 'cat', 'rm']) {
+	for (const name of ['dirname', 'grep', 'cat', 'rm', 'sleep']) {
 		fs.symlinkSync(
 			['/usr/bin', '/bin'].map((d) => path.join(d, name)).find(fs.existsSync),
 			path.join(bare, name)
@@ -535,6 +535,78 @@ try {
 	const archPreflight = packagedRun('--check');
 	assert.equal(archPreflight.status, 0, `verified-pacman-owner: ${archPreflight.stderr}`);
 	assert.ok(!fs.existsSync(nativeActionLog), 'owner preflight never acquires removal authority');
+	if (process.platform === 'linux') {
+		// Keep the real kernel child unreaped, rather than simulating /proc.
+		// Each helper group and owner is retired even when a regression times out.
+		const ownerWait = spawnSync(
+			'/usr/bin/python3',
+			[
+				'-c',
+				String.raw`
+import json, os, signal, subprocess, sys
+results = []
+for mode in ('zombie', 'live', 'reused'):
+    ready_read, ready_write = os.pipe()
+    owner = os.fork()
+    if owner == 0:
+        os.close(ready_read)
+        os.write(ready_write, b'1')
+        os.close(ready_write)
+        if mode == 'zombie':
+            os._exit(0)
+        signal.pause()
+        os._exit(0)
+    os.close(ready_write)
+    os.read(ready_read, 1)
+    os.close(ready_read)
+    worker = None
+    try:
+        if mode == 'zombie':
+            os.waitid(os.P_PID, owner, os.WEXITED | os.WNOWAIT)
+        with open('/proc/%d/stat' % owner) as stat:
+            fields = stat.read().rsplit(') ', 1)[1].split()
+        if mode == 'zombie':
+            assert fields[0] == 'Z', fields
+        identity = int(fields[19]) + (1 if mode == 'reused' else 0)
+        worker = subprocess.Popen(
+            [sys.argv[1], sys.argv[2], '--wait-owner', '%d:%d' % (owner, identity), '--check'],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+        try:
+            stdout, stderr = worker.communicate(timeout=2)
+            results.append({'mode': mode, 'status': worker.returncode, 'stderr': stderr.decode()})
+        except subprocess.TimeoutExpired:
+            results.append({'mode': mode, 'timed_out': True})
+    finally:
+        if worker is not None:
+            if worker.poll() is None:
+                os.killpg(worker.pid, signal.SIGKILL)
+            worker.communicate()
+        if mode != 'zombie':
+            os.kill(owner, signal.SIGKILL)
+        os.waitpid(owner, 0)
+print(json.dumps(results))
+assert results[0].get('status') == 0, 'an exited zombie cannot retain uninstall ownership'
+assert results[1].get('timed_out'), 'a live exact owner must retain uninstall ownership'
+assert results[2].get('status') == 0, 'a reused PID cannot retain a previous owner identity'
+`,
+				bashExecutable(),
+				path.join(packaged, 'uninstall.sh')
+			],
+			{
+				encoding: 'utf8',
+				timeout: 12000,
+				env: {
+					...process.env,
+					HOME: home,
+					PATH: bare,
+					ERGOPTI_TEST_PACKAGE_OWNER: nativePackageOwner,
+					ERGOPTI_TEST_QUERY_STATUS: nativeQueryStatus,
+					ERGOPTI_TEST_PACKAGE_FILE: path.join(packaged, 'uninstall.sh')
+				}
+			}
+		);
+		assert.equal(ownerWait.status, 0, `native-owner-wait: ${ownerWait.stdout}${ownerWait.stderr}`);
+	}
 	const nativeStartup = path.join(home, '.config/autostart/ergopti.desktop');
 	fs.mkdirSync(path.dirname(nativeStartup), { recursive: true });
 	const ownedStartup =
