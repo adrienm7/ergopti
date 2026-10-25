@@ -146,13 +146,17 @@ fire = function(generation, interval_ms)
 		arm(generation, interval_ms, interval_ms)
 		return
 	end
+	local completed = false
 	local called, operation = pcall(_ports.request, target, function(loaded, failure)
+		completed = true
 		on_result(generation, key, next_interval, loaded == true, failure)
 	end)
 	if not called or type(operation) ~= "table" or operation.started ~= true then
 		Logger.warn(LOG, "The warmup request was refused before it was sent: %s.",
 			tostring(called and operation or "request raised"))
-		arm(generation, next_interval, next_interval)
+		-- Preflight refusals can deliver their failure before returning the
+		-- rejected operation. That completion already owns the retry timer.
+		if not completed then arm(generation, next_interval, next_interval) end
 		return
 	end
 	_request = operation

@@ -35,6 +35,10 @@ local function run(scenario)
 				function operation:is_settled() return self.closed end
 				function operation:cancel() self.cancelled = true; self.closed = not world.hold_cancel; return self.closed end
 				world.requests[#world.requests + 1] = { target = target, on_done = on_done, operation = operation }
+				if world.refuse_synchronously or world.refuse_without_callback then
+					operation.started, operation.closed = false, true
+					if world.refuse_synchronously then on_done(false, "HTTP preflight refused") end
+				end
 				return operation
 			end,
 		}))
@@ -56,6 +60,31 @@ local function answer(world, loaded, failure)
 end
 
 helpers.describe("Ollama model warmup chain", function()
+	helpers.it("linux-warmup-sync-refusal: owns exactly one retry and cancels it on stop", function()
+		run(function(Warmup, world)
+			world.refuse_synchronously = true
+			helpers.assert_true(Warmup.schedule("enable"))
+			world.scheduler.test.advance(INITIAL_SEC)
+			helpers.assert_eq(#world.requests, 1)
+			helpers.assert_eq(world.scheduler.activeCount(), 1, "a synchronous HTTP refusal must schedule only one retry")
+			helpers.assert_true(Warmup.stop())
+			helpers.assert_eq(world.scheduler.activeCount(), 0, "stop must retire every retry timer")
+		end)
+	end)
+
+	helpers.it("linux-warmup-sync-refusal: still retries a refusal without a callback", function()
+		run(function(Warmup, world)
+			world.refuse_without_callback = true
+			helpers.assert_true(Warmup.schedule("enable"))
+			world.scheduler.test.advance(INITIAL_SEC)
+			helpers.assert_eq(world.scheduler.activeCount(), 1)
+			world.scheduler.test.advance(BASE_SEC * 2)
+			helpers.assert_eq(#world.requests, 2, "a transport refusing without delivery still needs a retry")
+			helpers.assert_true(Warmup.stop())
+			helpers.assert_eq(world.scheduler.activeCount(), 0)
+		end)
+	end)
+
 	helpers.it("linux-model-warmup: loads the model once after the shared initial delay", function()
 		run(function(Warmup, world)
 			helpers.assert_true(Warmup.schedule("enable"))
