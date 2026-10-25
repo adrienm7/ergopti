@@ -42,6 +42,7 @@ ICON_PATH="${6:-}"        # only used when ICON_MODE=custom
 PWA_MODE="${7:-0}"        # 1 = clone is a WKWebView PWA pointing at OPEN_ARG (URL)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 QUOTE_HELPER="$SCRIPT_DIR/quote_launcher_values.py"
+source "$SCRIPT_DIR/reserve_bundle.sh"
 
 [[ -f "$QUOTE_HELPER" ]] || { echo "Error: launcher literal helper missing"; exit 1; }
 
@@ -69,8 +70,7 @@ safe_name="$(printf '%s' "$CLONE_NAME" | tr ':/' '-' | sed -e 's/^[[:space:]]*//
 
 APPS_DIR="$HOME/Applications"
 mkdir -p "$APPS_DIR"
-DEST="$APPS_DIR/${safe_name}.app"
-[[ -e "$DEST" ]] && DEST="$APPS_DIR/${safe_name}_$(date +%s).app"
+DEST="$(reserve_bundle_directory "$APPS_DIR/${safe_name}.app")"
 
 CONTENTS="$DEST/Contents"
 MACOS="$CONTENTS/MacOS"

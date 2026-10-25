@@ -341,6 +341,134 @@ printf icns > "$out"
 			JSON.stringify(captured) === JSON.stringify(['-n', maliciousTarget]),
 		JSON.stringify({ status: generatedRun.status, captured, stderr: generatedRun.stderr })
 	);
+	writeExecutable(path.join(fakeBin, 'date'), "#!/usr/bin/env bash\nprintf '%s\\n' 1700000000\n");
+	const setupEnd = cloneSource.indexOf('TMPDIR_WORK=');
+	if (setupEnd < 0) throw new Error('clone setup boundary is missing');
+	const cloneSetup = cloneSource.slice(0, setupEnd);
+	const nativeFixturePath = (value) =>
+		path.join(fixtureRoot, path.posix.relative(toBashPath(fixtureRoot), value));
+	const cloneDestinations = [];
+	for (let index = 0; index < 3; index += 1) {
+		const run = spawnSync(
+			bash,
+			[
+				'-c',
+				`${cloneSetup}\nprintf '%s\\0' "$DEST"\n`,
+				toBashPath(CLONE_SCRIPT),
+				toBashPath(fixtureRoot),
+				'Clone collision'
+			],
+			{
+				encoding: null,
+				env: {
+					...process.env,
+					HOME: toBashPath(home),
+					PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
+				}
+			}
+		);
+		if (run.status !== 0) throw new Error(`clone setup failed: ${run.stderr}`);
+		const [reported] = decodeNulFields(run.stdout);
+		const destination = nativeFixturePath(reported);
+		cloneDestinations.push(destination);
+		fs.writeFileSync(path.join(destination, 'owned-marker'), String(index));
+	}
+	test(
+		'the actual clone setup reserves distinct bundles and preserves previous contents',
+		new Set(cloneDestinations).size === 3 &&
+			cloneDestinations.every(
+				(destination, index) =>
+					fs.readFileSync(path.join(destination, 'owned-marker'), 'utf8') === String(index)
+			),
+		JSON.stringify(cloneDestinations)
+	);
+	const collisionRuns = [];
+	for (const target of ['first-target', 'second-target', 'third-target']) {
+		const run = spawnSync(
+			bash,
+			[
+				toBashPath(SHORTCUT_SCRIPT),
+				'Collision',
+				target,
+				'/Applications/Editor.app',
+				'#123456',
+				'C'
+			],
+			{
+				encoding: 'utf8',
+				env: {
+					...process.env,
+					HOME: toBashPath(home),
+					PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
+				}
+			}
+		);
+		const destination = nativeFixturePath((run.stdout || '').trim());
+		collisionRuns.push({
+			run,
+			destination,
+			launcher: fs.readFileSync(path.join(destination, 'Contents', 'MacOS', 'open_target'), 'utf8')
+		});
+	}
+	test(
+		'same-second shortcut creation reserves three separate bundles without overwriting earlier launchers',
+		collisionRuns.every(({ run }) => run.status === 0) &&
+			new Set(collisionRuns.map(({ destination }) => destination)).size === 3 &&
+			collisionRuns.every(
+				({ destination, launcher }) =>
+					fs.readFileSync(path.join(destination, 'Contents', 'MacOS', 'open_target'), 'utf8') ===
+					launcher
+			),
+		JSON.stringify(
+			collisionRuns.map(({ destination, run }) => ({ destination, status: run.status }))
+		)
+	);
+	const reserveHelper = toBashPath(path.join(RESOURCES, 'reserve_bundle.sh'));
+	const occupied = path.join(fixtureRoot, 'Occupied.app');
+	fs.writeFileSync(occupied, 'unrelated original file');
+	fs.symlinkSync(
+		path.join(fixtureRoot, 'missing-target'),
+		path.join(fixtureRoot, 'Occupied_1.app'),
+		'junction'
+	);
+	const reservation = spawnSync(
+		bash,
+		[
+			'-c',
+			'set -eu; source "$1"; reserve_bundle_directory "$2"',
+			'reservation',
+			reserveHelper,
+			toBashPath(occupied)
+		],
+		{ encoding: 'utf8' }
+	);
+	test(
+		'bundle reservation preserves occupied files and dangling symbolic links',
+		reservation.status === 0 &&
+			reservation.stdout.trim() === toBashPath(path.join(fixtureRoot, 'Occupied_2.app')) &&
+			fs.readFileSync(occupied, 'utf8') === 'unrelated original file' &&
+			fs.lstatSync(path.join(fixtureRoot, 'Occupied_1.app')).isSymbolicLink(),
+		reservation.stderr || reservation.stdout
+	);
+	const refused = spawnSync(
+		bash,
+		[
+			'-c',
+			'set -eu; source "$1"; reserve_bundle_directory "$2"; printf unexpected-success',
+			'reservation',
+			reserveHelper,
+			`${toBashPath(occupied)}/Forbidden.app`
+		],
+		{ encoding: 'utf8' }
+	);
+	test(
+		'a real ENOTDIR reservation refusal is fatal and never reports a destination',
+		refused.status !== 0 &&
+			refused.stdout === '' &&
+			refused.stderr.includes('cannot reserve bundle directory') &&
+			fs.readFileSync(occupied, 'utf8') === 'unrelated original file',
+		JSON.stringify({ status: refused.status, stdout: refused.stdout, stderr: refused.stderr })
+	);
 } finally {
 	fs.rmSync(fixtureRoot, { recursive: true, force: true });
 }
