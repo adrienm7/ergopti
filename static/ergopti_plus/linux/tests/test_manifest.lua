@@ -160,6 +160,7 @@ return {
 	"tests.unit.infra.config.test_personal_file_adoption_native",
 	"tests.unit.infra.config.test_personal_info_policy_read",
 	"tests.unit.infra.logger.test_logger_native_files",
+	"tests.unit.infra.config.test_shared_probe_native",
 	"tests.unit.modules.dynamic_hotstrings.test_user_code_contract",
 	"tests.unit.modules.llm.remote.test_local_server_discovery",
 	"tests.unit.modules.llm.remote.test_local_server_startup",
