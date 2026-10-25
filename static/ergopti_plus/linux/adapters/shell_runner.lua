@@ -508,13 +508,13 @@ function M.run_async(executable, args, options, callback)
 	local function publish(result)
 		if request.constructing then pending = result; return end
 		if not request.admitted then return end
-		local reason = result.error
+		local error_message = result.error
 		local code = result.exit_code
-		if reason == "process deadline exceeded" then reason, code = "timeout", nil
-		elseif reason == "process output exceeds its bound" then
-			reason, code = "output over " .. ASYNC_MAX_OUTPUT_BYTES .. " bytes", nil
-		elseif reason == "process exited unsuccessfully" then reason = "exit code " .. tostring(code) end
-		local answer = { ok = result.ok, code = code, stdout = result.stdout, stderr = result.stderr, error = reason }
+		if error_message == "process deadline exceeded" then error_message, code = "timeout", nil
+		elseif error_message == "process output exceeds its bound" then
+			error_message, code = "output over " .. ASYNC_MAX_OUTPUT_BYTES .. " bytes", nil
+		elseif error_message == "process exited unsuccessfully" then error_message = "exit code " .. tostring(code) end
+		local answer = { ok = result.ok, code = code, stdout = result.stdout, stderr = result.stderr, error = error_message }
 		record(result)
 		local ok, err = pcall(callback, answer)
 		if not ok then Logger.error(LOG, "run_async() callback for %s raised: %s.", request.name, tostring(err)) end
@@ -527,14 +527,14 @@ function M.run_async(executable, args, options, callback)
 	-- Cancellation suppresses business delivery, not native exit diagnostics.
 	operation:on_settled(function() record(operation.result) end)
 	if not operation.started or operation.error ~= nil then
-		local reason = operation.error or "native process admission refused"
-		if reason == "native handle allocation failed" then reason = "handle allocation failed"
-		elseif reason == "native process deadline refused" then reason = "timeout activation failed"
-		elseif reason == "native output watch refused" then reason = "pipe activation failed"
-		elseif reason == "native process dispatch failed" then
-			reason = "spawn failed: " .. (operation.spawn_error_code or reason)
+		local error_message = operation.error or "native process admission refused"
+		if error_message == "native handle allocation failed" then error_message = "handle allocation failed"
+		elseif error_message == "native process deadline refused" then error_message = "timeout activation failed"
+		elseif error_message == "native output watch refused" then error_message = "pipe activation failed"
+		elseif error_message == "native process dispatch failed" then
+			error_message = "spawn failed: " .. (operation.spawn_error_code or error_message)
 		end
-		return nil, reason
+		return nil, error_message
 	end
 	request.admitted = true
 	if pending then publish(pending) end

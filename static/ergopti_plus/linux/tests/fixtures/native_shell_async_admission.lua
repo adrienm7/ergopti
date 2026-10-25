@@ -38,7 +38,8 @@ local function check(name, test)
 	local state = { allocations = {}, callbacks = 0 }
 	uv.spawn = function(...)
 		local process, pid, code = originals.spawn(...)
-		state.pid, state.process = pid, process
+		state.process, state.spawn_code = process, code
+		state.pid = type(pid) == "number" and pid or nil
 		return process, pid, code
 	end
 	local ok, err = xpcall(function() test(state) end, debug.traceback)
@@ -136,6 +137,25 @@ for _, operation in ipairs({ "timer", "stdout", "stderr", "second pipe raised", 
 		assert(state.callbacks == 0, "late real child exit published a refused run")
 	end)
 end
+
+check("actual oversized argv retains safe E2BIG without exposing caller bytes", function(state)
+	local private_marker = "PRIVATE_OVERSIZED_ARGUMENT_NEVER_LOG"
+	-- Exceed the native single-argument bound on both 4 KiB and 64 KiB pages
+	local oversized_bytes = 4 * 1024 * 1024
+	local logger = require("logger.shim")
+	local token, error_message = Shell.run_async("/usr/bin/printf", { string.rep(private_marker, math.ceil(oversized_bytes / #private_marker)) },
+		{ timeout_ms = 1000 }, function() state.callbacks = state.callbacks + 1 end)
+	assert(token == nil and state.pid == nil and state.process == nil and state.spawn_code == "E2BIG",
+		"oversized actual argv did not produce the expected typed native refusal")
+	assert(error_message == "spawn failed: E2BIG", "safe native E2BIG diagnostic was lost")
+	assert(not error_message:find(private_marker, 1, true), "refusal exposed caller argv")
+	drain()
+	assert(state.callbacks == 0, "synchronous native refusal also delivered a callback")
+	assert(type(logger.ring_buffer_snapshot) == "function", "actual logger ring is required")
+	for _, line in ipairs(logger.ring_buffer_snapshot()) do
+		assert(not line:find(private_marker, 1, true), "native spawn diagnostics logged caller argv")
+	end
+end)
 
 check("native zero-valued receipts preserve exact successful streams once", function(state)
 	local results, receipts = {}, {}

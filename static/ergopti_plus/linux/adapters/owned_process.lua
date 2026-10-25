@@ -432,7 +432,7 @@ function M.start(executable, args, options, callback)
 	end)
 	if not spawned or not process then
 		operation.not_found = spawned and spawn_code == "ENOENT"
-		if spawned and type(spawn_code) == "string" and spawn_code:match("^E[A-Z]+$") then
+		if spawned and type(spawn_code) == "string" and spawn_code:match("^E[A-Z0-9_]+$") then
 			operation.spawn_error_code = spawn_code
 		end
 		return refuse("native process dispatch failed")
