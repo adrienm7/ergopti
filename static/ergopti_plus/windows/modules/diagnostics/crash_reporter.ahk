@@ -423,29 +423,12 @@ _CrashReport_ToWorkerJson(Report) {
 
 _CrashReport_EncodeFields(Report, Fields) {
 	Parts := []
-	Q     := Chr(34)
-
 	for _, Key in Fields {
 		Val := Report.Has(Key) ? String(Report[Key]) : ""
-		Val := StrReplace(Val, "\",  "\\")
-		Val := StrReplace(Val, Q,   "\" . Q)
-		Val := StrReplace(Val, "`r", "\r")
-		Val := StrReplace(Val, "`n", "\n")
-		Val := StrReplace(Val, "`t", "\t")
-		; Every OTHER C0 control character must be escaped too, or the report is
-		; a file no JSON parser will read — and this is the one artifact that
-		; exists to be read after a crash. error_msg, stack_trace and log_tail
-		; all carry text the driver did not author, so a stray 0x00-0x1F is not
-		; hypothetical enough to leave unhandled.
-		Loop 32 {
-			Code := A_Index - 1
-			if (Code = 9 or Code = 10 or Code = 13)
-				continue  ; already handled above
-			Val := StrReplace(Val, Chr(Code), Format("\u{:04x}", Code))
-		}
-		Parts.Push("  " . Q . Key . Q . ": " . Q . Val . Q)
+		; Native string replacement stops at embedded NUL. The canonical encoder
+		; preserves the complete stored text for both local artifacts and IPC.
+		Parts.Push("  " . JsonStringLiteral(Key) . ": " . JsonStringLiteral(Val))
 	}
-
 	return "{`r`n" . _CrashReport_JoinParts(Parts) . "`r`n}"
 }
 
