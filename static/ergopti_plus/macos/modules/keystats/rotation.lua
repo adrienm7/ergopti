@@ -43,6 +43,9 @@ local LOG    = "keystats.rotation"
 --- Maximum JSONL lines consumed per ingest tick.
 local INGEST_BATCH_LINES = 5000
 
+--- Maximum refused-write bytes verified in one deferred retry turn.
+local APPEND_RECOVERY_BYTES_PER_TURN = 64 * 1024
+
 --- Tail-read outcomes. Only READ_STATUS_EOF authorizes destructive rollover;
 --- an empty entry list alone is never proof that the journal was fully read.
 M.READ_STATUS_BATCH  = "batch"
@@ -73,10 +76,18 @@ local _initialized = false
 --- across every M.append_log() call so the hot path never pays open()/close().
 local _log_handle = nil
 
---- A failed unbuffered write may have left a partial unterminated record. The
---- next retry starts on a fresh line so that its complete JSON object remains
---- independently ingestible after storage recovers.
+--- Startup framing for bytes left by a previous process.
 local _append_boundary_required = false
+
+--- Exact end established by startup inspection and acknowledged writes only.
+local _append_end = nil
+
+--- Original FILE, serialized bytes and entry retained until one append settles.
+--- The cooperating writer and rollover owner cannot replace this pending stream.
+local _pending_append = nil
+
+--- Diagnostic callbacks cannot reenter and settle one append twice.
+local _append_active = false
 
 --- Fences the exact old stream until durable rollover and native cleanup settle.
 local _pending_rollover = nil
@@ -160,30 +171,18 @@ end
 -- ==================================================================
 -- ==================================================================
 
---- Invalidates an append handle after an ambiguous unbuffered write result.
---- The exact handle is closed best-effort and never reused: stdio buffer state
---- after ENOSPC is undefined, so a retry must acquire a fresh stream.
---- @param stage string Failed operation name for diagnostics.
---- @param detail any Non-sensitive failure detail returned by the file API.
---- @return boolean Always false so callers propagate the refused transaction.
-local function _reject_append_handle(stage, detail)
-	local failed_handle = _log_handle
-	_log_handle = nil
-	if failed_handle then
-		local close_ok, close_result = pcall(failed_handle.close, failed_handle)
-		if not close_ok or close_result ~= true then
-			Logger.warn(LOG, "today.log handle close after %s failure was not confirmed.", stage)
-		end
-	end
-	Logger.error(LOG, "Cannot append to today.log: %s failed (%s).",
-		stage, tostring(detail))
+--- Refuse an append without surrendering its original stream or exact receipt.
+--- @param stage string Fixed operation name for diagnostics.
+--- @return boolean Always false; the FIFO must retain its current operation.
+local function _refuse_append(stage)
+	Logger.error(LOG, "Cannot append to today.log: %s failed; original append remains pending.", stage)
 	return false
 end
 
 --- Opens today.log in unbuffered append/update mode. With stdio buffering disabled,
 --- file:write() is the only ambiguous persistence boundary: a successful return
---- means the complete line reached the OS, while nil/throw means a possibly
---- partial line must be isolated before retry. A later flush cannot add a second
+--- means the complete line reached the OS, while nil/throw retains a possibly
+--- partial line for exact prefix verification before retry. A later flush cannot add a second
 --- uncertainty window because there is no userspace buffer left to flush.
 --- @return boolean opened True only when a configured handle is published.
 local function _open_append_handle()
@@ -208,10 +207,10 @@ local function _open_append_handle()
 	-- in-memory failure flag cannot establish a record boundary after restart.
 	-- Inspect the exact append stream once, before publishing it to the hot path.
 	local boundary_stage = "size query"
-	local boundary_ok, needs_boundary = pcall(function()
+	local boundary_ok, needs_boundary, append_end = pcall(function()
 		local size = handle_or_err:seek("end")
 		if type(size) ~= "number" or size < 0 then return nil end
-		if size == 0 then return false end
+		if size == 0 then return false, size end
 		boundary_stage = "tail seek"
 		if handle_or_err:seek("set", size - 1) ~= size - 1 then return nil end
 		boundary_stage = "tail read"
@@ -219,7 +218,7 @@ local function _open_append_handle()
 		if type(tail) ~= "string" or #tail ~= 1 then return nil end
 		boundary_stage = "append seek"
 		if handle_or_err:seek("end") ~= size then return nil end
-		return tail ~= "\n"
+		return tail ~= "\n", size
 	end)
 	if not boundary_ok or type(needs_boundary) ~= "boolean" then
 		pcall(handle_or_err.close, handle_or_err)
@@ -227,44 +226,109 @@ local function _open_append_handle()
 		return false
 	end
 	_append_boundary_required = needs_boundary
+	_append_end = append_end
 	_log_handle = handle_or_err
 	return true
 end
 
---- Append a single event entry to today.log as a JSONL line.
---- Hot path: every keystroke ends up here. Never touches SQLite.
---- @param entry table The event entry. Must contain a `type` field.
---- @return boolean True only after one unbuffered write accepted the complete line.
+--- Verify a refused write against the exact retained FILE, then finish its suffix.
+--- Each retry bounds reads; already verified bytes remain immutable under the
+--- sole writer/rollover custody. Any subsequent refused write restarts the proof.
+--- @return boolean accepted True only when the complete owned row is acknowledged.
+local function _resume_append()
+	local pending = _pending_append
+	local handle = pending.handle
+	local function refused(stage)
+		pending.verified, pending.observed_end = 0, nil
+		return _refuse_append(stage)
+	end
+	if pending.failed then
+		local end_ok, observed_end = pcall(handle.seek, handle, "end")
+		if not end_ok or type(observed_end) ~= "number"
+			or observed_end < pending.anchor or observed_end > pending.anchor + #pending.bytes
+			or (pending.observed_end ~= nil and observed_end ~= pending.observed_end) then
+			return refused("recovery end validation")
+		end
+		pending.observed_end = observed_end
+		local count = observed_end - pending.anchor
+		local seek_ok, position = pcall(handle.seek, handle, "set", pending.anchor + pending.verified)
+		if not seek_ok or position ~= pending.anchor + pending.verified then
+			return refused("recovery prefix seek")
+		end
+		local remaining = count - pending.verified
+		local amount = math.min(remaining, APPEND_RECOVERY_BYTES_PER_TURN - 1)
+		-- read(0) at a verified empty prefix returns clean EOF and clears the
+		-- stdio write-error indicator, just as a positive read does.
+		local read_ok, bytes, detail, code = pcall(handle.read, handle, amount)
+		if not read_ok or detail ~= nil or code ~= nil
+			or (amount == 0 and bytes ~= nil and bytes ~= "")
+			or (amount > 0 and (type(bytes) ~= "string" or #bytes ~= amount)) then
+			return refused("recovery prefix read")
+		end
+		if amount > 0 and bytes ~= pending.bytes:sub(pending.verified + 1, pending.verified + amount) then
+			return refused("recovery prefix comparison")
+		end
+		pending.verified = pending.verified + amount
+		if pending.verified < count then return false end
+		local eof_ok, extra, eof_detail, eof_code = pcall(handle.read, handle, 1)
+		if not eof_ok or extra ~= nil or eof_detail ~= nil or eof_code ~= nil then
+			return refused("recovery EOF validation")
+		end
+		local restore_ok, restored_end = pcall(handle.seek, handle, "end")
+		if not restore_ok or restored_end ~= observed_end then
+			return refused("recovery append seek")
+		end
+	end
+	if pending.verified < #pending.bytes then
+		local suffix = pending.verified == 0 and pending.bytes or pending.bytes:sub(pending.verified + 1)
+		local written, result = pcall(handle.write, handle, suffix)
+		if not written or result == nil or result == false then
+			pending.failed = true
+			return refused("write")
+		end
+	end
+	_append_end = pending.anchor + #pending.bytes
+	_append_boundary_required = false
+	_pending_append = nil
+	return true
+end
+
+--- Append one event, retaining its exact serialized receipt after any refusal.
+--- Hot-path success performs one write and no position query or body read.
+--- @param entry table The exact event retained by the deferred FIFO operation.
+--- @return boolean True only after the complete row is acknowledged.
 function M.append_log(entry)
-	if not _require_init("append_log") or _pending_rollover then return false end
+	if not _require_init("append_log") or _pending_rollover or _append_active then return false end
 	if type(entry) ~= "table" or type(entry.type) ~= "string" then
 		Logger.warn(LOG, "append_log: invalid entry — skipping")
 		return false
 	end
-	entry.timestamp = entry.timestamp or _now_ts()
-
-	local ok, str = pcall(json.encode, entry)
-	if not ok then
-		Logger.error(LOG, "JSON encode failed for type '%s': %s.",
-			tostring(entry.type), tostring(str))
+	if _pending_append and _pending_append.entry ~= entry then
+		Logger.error(LOG, "Cannot append another entry while the original journal append remains pending.")
 		return false
 	end
-	-- Collapse any embedded newlines so the file stays valid JSONL
-	str = str:gsub("\n", "")
-
-	-- Reopen if the handle was lost (e.g. external rotation deleted the file).
-	if not _log_handle and not _open_append_handle() then return false end
-
-	local prefix = _append_boundary_required and "\n" or ""
-	local write_ok, write_result, write_detail = pcall(_log_handle.write,
-		_log_handle, prefix .. str .. "\n")
-	if not write_ok or write_result == nil or write_result == false then
-		_append_boundary_required = true
-		return _reject_append_handle("write", write_detail or write_result)
+	_append_active = true
+	local attempted, accepted = pcall(function()
+		if not _pending_append then
+			entry.timestamp = entry.timestamp or _now_ts()
+			local encoded, str = pcall(json.encode, entry)
+			if not encoded or type(str) ~= "string" then
+				Logger.error(LOG, "JSON encode failed for journal entry type '%s'.", tostring(entry.type))
+				return false
+			end
+			if not _log_handle and not _open_append_handle() then return false end
+			_pending_append = { handle = _log_handle, entry = entry, anchor = _append_end,
+				bytes = (_append_boundary_required and "\n" or "") .. str:gsub("\n", "") .. "\n",
+				verified = 0, failed = false }
+		end
+		return _resume_append()
+	end)
+	_append_active = false
+	if not attempted then
+		Logger.error(LOG, "Journal append attempt failed; original ownership preserved.")
+		return false
 	end
-
-	_append_boundary_required = false
-	return true
+	return accepted
 end
 
 
@@ -285,7 +349,7 @@ end
 --- @return integer offset New byte offset, or the previous committed offset on failure.
 --- @return string status One of READ_STATUS_BATCH, READ_STATUS_EOF, READ_STATUS_FAILED.
 function M.read_new_entries()
-	if not _require_init("read_new_entries") or _pending_rollover then
+	if not _require_init("read_new_entries") or _pending_rollover or _pending_append or _append_active then
 		return {}, _today_log_offset, M.READ_STATUS_FAILED
 	end
 
@@ -378,6 +442,7 @@ local function _close_rollover_stream()
 	local closed, ack = pcall(_log_handle.close, _log_handle)
 	if (closed and ack == true) or io.type(_log_handle) == "closed file" then
 		_log_handle = nil
+		_append_end = nil
 		return true
 	end
 	Logger.error(LOG, "Rollover journal stream close remains pending; writer fenced.")
@@ -394,7 +459,7 @@ end
 --- @param origin function Existing complete-ledger admission predicate.
 --- @return boolean committed True only after durable intent and native cleanup settle.
 function M.rollover(data_sql_path, read_status, reset, origin)
-	if not _require_init("rollover") then return false end
+	if not _require_init("rollover") or _pending_append or _append_active then return false end
 	if not _pending_rollover then
 		if read_status ~= M.READ_STATUS_EOF then
 			Logger.warn(LOG, "rollover refused without a committed EOF status; today.log preserved.")

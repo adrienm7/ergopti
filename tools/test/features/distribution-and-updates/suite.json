@@ -468,6 +468,15 @@
 			"args": ["tools/test/test-hs274-diagnostic-receipts.cjs"],
 			"repro": "node tools/test/test-hs274-diagnostic-receipts.cjs",
 			"platforms": ["linux", "darwin"]
+		},
+		{
+			"id": "js-0481",
+			"ordinal": 491,
+			"name": "macOS journal retries preserve one public event and duration after an actual Common Linux short write",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-journal-native-receipt.cjs"],
+			"repro": "npm run test:macos-journal-native-receipt",
+			"platforms": ["linux"]
 		}
 	]
 }
