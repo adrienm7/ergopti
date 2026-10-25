@@ -22,10 +22,11 @@ _UCNO_GeneratedOwner(Symbol) {
 	return Owners[1]
 }
 
-_UCNO_ChildSource() {
-	global _DriverDir
+_UCNO_ChildSource(Fixture) {
+	global _DriverDir, _SharedDir
 	Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
-	for Symbol in ["LoggerInfo", "WallClockTimestamp", "TickElapsed", "UpdateCheck_Begin", "UpdateChannels_Field", "WMPresentWindow"] {
+	Source .= 'global _SharedDir := "' . _SharedDir . '"`n'
+	for Symbol in ["JsonParse", "WebView_AvailRamMb", "LoggerInfo", "WallClockTimestamp", "TickElapsed", "UpdateCheck_Begin", "UpdateChannels_Field", "WMPresentWindow"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		AssertTrue(Owner != "", "The consent child needs the unique whole owner of " . Symbol)
 		Source .= "#Include " . Owner . "`n"
@@ -55,7 +56,7 @@ _UCNO_ChildSource() {
 			Source .= Declaration[0] . "`n"
 		}
 	}
-	return Source . "#Include " . _DriverDir . "\tests\fixtures\update_check_native_consent_body.ahk`n"
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\" . Fixture . "`n"
 }
 
 _UCNO_Complete(State, Code, Output, ErrorText) {
@@ -70,14 +71,15 @@ _UCNO_Case(Mode) {
 	Directory := A_Temp . "\ergopti_update_consent_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
 	FSCreateDirectoryExclusiveStrict(Directory)
 	Script := Directory . "\subject.ahk"
+	Fixture := Mode == "geometry" ? "update_check_geometry_body.ahk" : "update_check_native_consent_body.ahk"
 	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
 	AtDeadline := 0, ExportFailure := 0
 	PreviousCritical := Critical("Off")
 	try {
-		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _UCNO_ChildSource()) != 0)
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _UCNO_ChildSource(Fixture)) != 0)
 		_TestPrint("# update-check-native-consent-source script=" . CryptoSha256Bytes(FSReadBytesStrict(Script))
 			. " runtime=" . CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
-			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\update_check_native_consent_body.ahk")))
+			. " fixture=" . CryptoSha256Bytes(FSReadBytesStrict(_DriverDir . "\tests\fixtures\" . Fixture)))
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _UCNO_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The real private child must start")
@@ -132,3 +134,6 @@ _UCNO_Case(Mode) {
 Test("Update consent: native current and closed actions keep their owner (update-check-native-consent)", _UCNO_Case.Bind("current-close"))
 Test("Update consent: old native action cannot install its successor (update-check-native-consent)", _UCNO_Case.Bind("replaced"))
 Test("Update consent: fresh successor native button remains usable (update-check-native-consent)", _UCNO_Case.Bind("successor-current"))
+
+Test("Update geometry: canonical owner sizes native fallback and refuses invalid entries (update-check-geometry-source)",
+	_UCNO_Case.Bind("geometry"))

@@ -335,6 +335,27 @@ class WebViewHost {
 				}
 		}
 
+		/**
+		 * Resolves required app dimensions through the existing lazy manifest owner.
+		 * @param {String} AppId Exact shared app identifier.
+		 * @returns {Object} Positive integer dimensions, without a fallback geometry.
+		 */
+		static AppGeometry(AppId) {
+				if !(AppId is String) || AppId == ""
+						throw ValueError("An app geometry identifier is required.")
+				if WebViewHost._ManifestCache == ""
+						WebViewHost._LoadManifest()
+				Apps := WebViewHost._ManifestCache
+				if !(Apps is Map) || !Apps.Has(AppId) || !(Apps[AppId] is Map)
+						throw ValueError("Missing app geometry: " . AppId . ".")
+				Entry := Apps[AppId]
+				for Name in ["width", "height"] {
+						if !Entry.Has(Name) || !(Entry[Name] is Integer) || Entry[Name] <= 0
+								throw ValueError("Invalid app geometry " . AppId . "." . Name . ".")
+				}
+				return {w: Entry["width"], h: Entry["height"]}
+		}
+
 		; --------------------------------------------------------------------------
 		; Returns the manifest entry for this app, or an empty Map on miss.
 		; --------------------------------------------------------------------------
