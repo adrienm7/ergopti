@@ -155,6 +155,8 @@ REQUIRED_FILES=(
 	"linux/adapters/tray_menu.lua"
 	"linux/infra/locale.lua"
 	"linux/install/config_home.sh"
+	"linux/install/ownership_schema.sh"
+	"linux/modules/updater/ownership_receipt.lua"
 	"linux/infra/i18n.lua"
 	"linux/infra/timings.lua"
 	"linux/ui/webkit_host.lua"

@@ -57,10 +57,13 @@ function M.create(installer)
 	local installed = prefix .. "/lib/ergopti"
 	for _, path in ipairs({ installed .. "/linux/install", installed .. "/_shared/lua",
 		installed .. "/_shared/data/locales", installed .. "/bin", prefix .. "/bin",
-		payload .. "/linux/infra", payload .. "/_shared/data/locales", payload .. "/_shared/lua", payload .. "/bin" }) do
+		payload .. "/linux/infra", payload .. "/linux/install", payload .. "/_shared/data/locales", payload .. "/_shared/lua", payload .. "/bin" }) do
 		assert(Shell.run("mkdir -p -- " .. Shell.quote(path)))
 	end
-	assert(Native.fs_copyfile(Helpers.driver_root() .. "/install/ownership.sh", installed .. "/linux/install/ownership.sh"))
+	for _, name in ipairs({ "ownership.sh", "ownership_schema.sh" }) do
+		assert(Native.fs_copyfile(Helpers.driver_root() .. "/install/" .. name, installed .. "/linux/install/" .. name))
+		assert(Native.fs_copyfile(Helpers.driver_root() .. "/install/" .. name, payload .. "/linux/install/" .. name))
+	end
 	M.write(installed .. "/old.marker", "original installation\n")
 	M.write(installed .. "/linux/ergopti_hotstrings.lua", "-- Previous driver fixture.\n")
 	M.write(installed .. "/_shared/data/locales/en.json", "{}\n")
@@ -90,10 +93,10 @@ function M.create(installer)
 	end
 	ops.extract = function(path, work_dir)
 		if path ~= archive or M.read(path) ~= archive_receipt then return false end
-		for _, relative in ipairs({ "linux", "linux/infra", "_shared", "_shared/data", "_shared/data/locales", "_shared/lua", "bin" }) do
+		for _, relative in ipairs({ "linux", "linux/infra", "linux/install", "_shared", "_shared/data", "_shared/data/locales", "_shared/lua", "bin" }) do
 			if Native.fs_mkdir(work_dir .. "/" .. relative, 448) ~= true then return false end
 		end
-		for _, relative in ipairs({ "linux/ergopti_hotstrings.lua", "linux/infra/version.lua", "linux/new.marker",
+		for _, relative in ipairs({ "linux/ergopti_hotstrings.lua", "linux/infra/version.lua", "linux/new.marker", "linux/install/ownership.sh", "linux/install/ownership_schema.sh",
 			"_shared/data/locales/en.json", "_shared/lua/init.lua", "_shared/build_stamp.txt", "bin/ergopti-hotstrings", "install.sh" }) do
 			if Native.fs_copyfile(payload .. "/" .. relative, work_dir .. "/" .. relative) ~= true then return false end
 		end

@@ -368,6 +368,7 @@ try {
 		fs.writeFileSync(path.join(nativeShared, 'data/locales/en.json'), '{}');
 		for (const helper of [
 			'ownership.sh',
+			'ownership_schema.sh',
 			'start_at_login.sh',
 			'desktop_entry.sh',
 			'config_home.sh'

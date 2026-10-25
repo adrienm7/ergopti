@@ -18,6 +18,7 @@ local Version = require("updater.version")
 local Snapshot = require("diagnostics.snapshot")
 local NativePath = require("native_path")
 local NoReplaceMove = require("infra.no_replace_move")
+local Ownership = require("modules.updater.ownership_receipt")
 
 local WORK_PREFIX = ".ergopti-update."
 
@@ -227,21 +228,28 @@ end
 --- @return boolean success
 function DEFAULT_OPS.record_ownership(root, previous)
 	-- The running updater owns the receipt format, not the selected release.
+	local schema = Ownership.read_schema(previous)
+	if not schema then return false end
 	if not run_command("bash " .. shell_quote(previous .. "/linux/install/ownership.sh")
 		.. " " .. shell_quote(root .. "/linux") .. " " .. shell_quote(root .. "/_shared")
 		.. " " .. shell_quote(root)) then return false end
-	local manifest = previous .. "/.ergopti-owned-files"
+	local manifest = previous .. "/" .. schema.MANIFEST
 	if not default_probe(manifest, "file") then return true end
 	local old = Fs.read(manifest)
 	if not old then return false end
-	local retained = {}
-	for line in old:gmatch("[^\r\n]+") do
-		local digest, kind = line:match("^(%x+)\t@(%a+)$")
-		if digest and #digest == 64 and (kind == "wrapper" or kind == "unit" or kind == "autostart") then
-			retained[#retained + 1] = line .. "\n"
-		end
-	end
-	return #retained == 0 or Fs.append(root .. "/.ergopti-owned-files", table.concat(retained))
+	local record = Ownership.parse(old, schema)
+	if not record then return false end
+	return #record.external == 0 or Fs.append(root .. "/" .. schema.MANIFEST, table.concat(record.external))
+end
+
+--- Validates a disposable rollback tree through its canonical receipt owner.
+--- @param path string Previous backup path.
+--- @param current string Active installation whose ownership helper is trusted.
+--- @return boolean owned
+--- @return string|nil identity Device/inode receipt, unchanged by namespace moves.
+function DEFAULT_OPS.backup_is_owned(path, current)
+	local identity, detail = Ownership.verify(path, current)
+	return identity ~= nil, identity, detail
 end
 
 function DEFAULT_OPS.mkdir(path)
@@ -368,8 +376,9 @@ local function install_transaction(options, owned_current)
 	local work_dir = ops.make_work_dir(context.parent)
 	if not work_dir then return false, "could not allocate same-filesystem staging" end
 
+	local retained_work = false
 	local function fail(detail)
-		cleanup_work(work_dir, context.parent, ops)
+		if not retained_work then cleanup_work(work_dir, context.parent, ops) end
 		return false, detail
 	end
 
@@ -396,8 +405,26 @@ local function install_transaction(options, owned_current)
 		return fail("backup path escaped the installation parent")
 	end
 	if not forward_current() then return fail("local install deadline expired") end
-	if ops.exists(backup) and not ops.remove_tree(backup) then
-		return fail("previous backup could not be retired")
+	if ops.exists(backup) then
+		local owned, identity = ops.backup_is_owned(backup, context.install_root)
+		if owned ~= true or type(identity) ~= "string" then
+			return fail("previous backup could not be retired")
+		end
+		local retired = work_dir .. "/retired-backup"
+		if not forward_current() or not ops.move(backup, retired) then
+			return fail("previous backup could not be retired")
+		end
+		local captured, captured_identity = ops.backup_is_owned(retired, context.install_root)
+		if captured ~= true or captured_identity ~= identity or not forward_current() then
+			if not ops.move(retired, backup) then
+				-- A raced foreign tree is not staging debris: retain its namespace
+				-- when a concurrent owner prevents the no-replace restoration.
+				retained_work = true
+				return fail("previous backup ownership changed; unverified tree retained at " .. retired)
+			end
+			return fail("previous backup could not be retired")
+		end
+		if not ops.remove_tree(retired) then return fail("previous backup could not be retired") end
 	end
 	if not forward_current() or not ops.move(context.install_root, backup) then
 		return fail("current installation could not be moved to backup")
