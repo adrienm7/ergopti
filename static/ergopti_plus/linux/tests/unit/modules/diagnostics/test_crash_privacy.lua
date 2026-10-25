@@ -78,7 +78,17 @@ local function with_fixture(body, cold)
 			if not owned(path) then return Writer.open(path, mode) end
 			state.logger_opened = state.logger_opened + 1
 			if state.refuse_logger_open then return nil, PAYLOAD, EACCES end
-			return io.open(path, mode)
+			if state.before_writer_open then state.before_writer_open(path, mode) end
+			local file, detail, errno = io.open(path, mode)
+			if not file or mode ~= "wx" or state.image_failure == "missing" then return file, detail, errno end
+			return file, detail, errno, nil, function(expected)
+				if state.on_image then state.on_image() end
+				if state.image_failure == "throw" then error(PAYLOAD) end
+				if state.image_failure == "truthy" then return {} end
+				if state.image_failure == "false" then return false end
+				if state.image_failure == "nil" then return nil end
+				return state.files[path] == expected
+			end
 		end
 		package.loaded["infra.regular_file_reader"], package.loaded["infra.regular_file_writer"] = reader_ports, writer_ports
 		Sink = require("infra.logger_sink")
@@ -159,7 +169,7 @@ helpers.describe("crash privacy admission", function()
 			helpers.assert_true(not dump[1].text:find("successorowner", 1, true))
 		end)
 	end)
-	for _, phase in ipairs({ "open", "write", "close" }) do
+	for _, phase in ipairs({ "open", "write", "close", "image" }) do
 		helpers.it("retires a dump revoked during " .. phase, function()
 			with_fixture(function(s)
 				s["on_" .. phase] = function() s.Sink.uninstall(s.Logger) end
@@ -229,6 +239,33 @@ helpers.describe("crash privacy admission", function()
 		end)
 	end
 
+	helpers.it("does not reacquire after sink revocation during an EEXIST receipt", function()
+		with_fixture(function(s)
+			s.before_writer_open = function(path)
+				if path:find("/crash_", 1, true) then
+					s.Sink.uninstall(s.Logger)
+					s.refuse_open, s.refuse_errno = true, "EEXIST"
+				end
+			end
+			helpers.assert_eq(s.Reporter.dump("engine", PAYLOAD), false)
+			helpers.assert_eq(s.opened, 1); helpers.assert_eq(s.closed, 0)
+			helpers.assert_eq(#s.dumps(), 0); helpers.assert_eq(#s.notices, 0)
+			no_private(table.concat(s.stderr))
+		end)
+	end)
+
+	for _, failure in ipairs({ "throw", "truthy", "false", "nil", "missing" }) do
+		helpers.it("refuses failed publication image " .. failure, function()
+			with_fixture(function(s)
+				s.image_failure = failure
+				helpers.assert_eq(s.Reporter.dump("engine", PAYLOAD), false)
+				helpers.assert_eq(s.closed, 1); helpers.assert_eq(#s.notices, 0)
+				for _, dump in ipairs(s.dumps()) do no_private(dump.text) end
+				no_private(table.concat(s.stderr))
+			end)
+		end)
+	end
+
 	helpers.it("redacts module filenames and optional context as well as the error", function()
 		with_fixture(function(s)
 			helpers.assert_eq(s.Reporter.dump(TOKEN, PAYLOAD, { stack_trace = PAYLOAD, layout = PAYLOAD, locale = PAYLOAD }), true)
@@ -240,6 +277,68 @@ end)
 
 if package.config:sub(1, 1) == "/" then
 	helpers.describe("native crash history", function()
+		helpers.it("acknowledges only a retained redacted report image (crash-published-image)", function()
+			local uv = require("luv")
+			local directory = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-crash-image-XXXXXX"))
+			local names = { "infra.logger_sink", "modules.diagnostics.crash_reporter", "logger.shim" }
+			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+			local Writer = require("infra.regular_file_writer")
+			local native_write, Sink, Logger = Writer.open
+			local ok, err = xpcall(function()
+				Logger, Sink = require("logger.shim"), require("infra.logger_sink")
+				assert(Sink.install(Logger, { log_dir = directory, redaction_context = { home = HOME, user = USER } }))
+				local Reporter = require("modules.diagnostics.crash_reporter")
+				for _, mode in ipairs({ "intact", "replaced", "removed" }) do
+					local candidate, injected
+					Writer.open = function(path, access)
+						local file, detail, errno, cleanup, image = native_write(path, access)
+						if file and path:find("/crash_", 1, true) then
+							candidate, injected = path, true
+							if mode ~= "intact" then
+								assert(uv.fs_unlink(path))
+								if mode == "replaced" then
+									local descriptor = assert(uv.fs_open(path, "wx", 384))
+									assert(uv.fs_write(descriptor, "FOREIGN_IMAGE_MARKER", 0))
+									assert(uv.fs_close(descriptor))
+								end
+							end
+						end
+						return file, detail, errno, cleanup, image
+					end
+					local acknowledged = Reporter.dump("image_" .. mode, "PUBLISHED_IMAGE_MARKER " .. PAYLOAD)
+					Writer.open = native_write
+					helpers.assert_eq(injected, true, "the native writer must first acquire a real inode")
+					local file = io.open(candidate, "rb")
+					local text = file and file:read("*a") or nil
+					if file then assert(file:close()) end
+					if text then no_private(text) end
+					if mode == "intact" then
+						helpers.assert_eq(acknowledged, true)
+						helpers.assert_contains(text, "PUBLISHED_IMAGE_MARKER")
+					elseif mode == "replaced" then
+						helpers.assert_eq(text, "FOREIGN_IMAGE_MARKER", "verification cannot overwrite or unlink the successor")
+						helpers.assert_eq(acknowledged, false, "a report written to an unlinked inode is not published")
+					else
+						helpers.assert_nil(text)
+						helpers.assert_eq(acknowledged, false, "an absent publication cannot be acknowledged")
+					end
+				end
+			end, debug.traceback)
+			Writer.open = native_write
+			if Sink then Sink.uninstall(Logger) end
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			for _, folder in ipairs({ directory .. "/crash_reports", directory }) do
+				local scanner = uv.fs_scandir(folder)
+				if scanner then
+					while true do local name, kind = uv.fs_scandir_next(scanner); if not name then break end
+						if kind == "file" then assert(uv.fs_unlink(folder .. "/" .. name)) end
+					end
+					assert(uv.fs_rmdir(folder))
+				end
+			end
+			if not ok then error(err, 0) end
+		end)
+
 		helpers.it("preserves same-second reports across reporter reloads (crash-exclusive-history)", function()
 			local uv = require("luv")
 			local directory = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-crash-history-XXXXXX"))

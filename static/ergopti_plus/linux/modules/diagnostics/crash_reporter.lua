@@ -213,15 +213,17 @@ end
 --- @param live function Checks the original sink admission.
 --- @return file*|nil file
 --- @return string|nil path
+--- @return function|nil current_image Exact regular-path byte verification.
 local function open_report(directory, stem, live)
 	local available, Writer = pcall(require, "infra.regular_file_writer")
 	if not available or type(Writer) ~= "table" or type(Writer.open) ~= "function" then return nil end
 	for attempt = 1, MAX_REPORT_FILENAME_ATTEMPTS do
 		if not live() then return nil end
 		local path = directory .. "/" .. CrashReport.file_name(stem, attempt)
-		local opened, file, _, errno = pcall(Writer.open, path, "wx")
-		if opened and file then return file, path end
-		if not opened or (errno ~= EEXIST and errno ~= "EEXIST") then return nil end	end
+		local opened, file, _, errno, _, current_image = pcall(Writer.open, path, "wx")
+		if opened and file then return file, path, current_image end
+		if not opened or (errno ~= EEXIST and errno ~= "EEXIST") then return nil end
+	end
 	return nil
 end
 
@@ -230,7 +232,7 @@ end
 --- @param module_name string Name of the module where the error occurred.
 --- @param error_msg string Error message (tostring(err) from pcall).
 --- @param context table|nil Optional { stack_trace?, locale? }.
---- @return boolean True after the redacted file's write and close acknowledge.
+--- @return boolean True after write, close and the retained redacted path image acknowledge.
 function M.dump(module_name, error_msg, context)
 	if type(module_name) ~= "string" or type(error_msg) ~= "string" or error_msg == "" then return false end
 	local available, Sink = pcall(require, "infra.logger_sink")
@@ -264,7 +266,7 @@ function M.dump(module_name, error_msg, context)
 	if not prepared or type(document) ~= "string" or not live() then return refused() end
 	local made, status = pcall(_ensure_dir, directory)
 	if not made or (status ~= true and status ~= 0) or not live() then return refused() end
-	local file, path = open_report(directory, CrashReport.stem(timestamp), live)
+	local file, path, current_image = open_report(directory, CrashReport.stem(timestamp), live)
 	if not file then return refused() end
 	local written, ack
 	if live() then written, ack = pcall(file.write, file, document) end
@@ -274,6 +276,11 @@ function M.dump(module_name, error_msg, context)
 		-- a reentrant close may already have published a successor at that name.
 		return refused()
 	end
+	-- A pinned stream can finish after its pathname was unlinked or replaced.
+	-- The canonical writer verifies the published bytes; never remove a successor.
+	local checked, retained
+	if type(current_image) == "function" then checked, retained = pcall(current_image, document) end
+	if not checked or retained ~= true or not live() then return refused() end
 	pcall(Logger.error, LOG, "Crash report written: %s", path)
 	_notify(true, path)
 	if live() then pcall(_rotate, directory) end
