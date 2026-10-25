@@ -491,3 +491,75 @@ _UIWH_CloseDuringBuild(Phase) {
 for _UIWH_BuildPhase in ["show", "create", "core", "navigate", "fill", "create-error", "live"]
 	Test("WebView host: native parent survives close during " . _UIWH_BuildPhase
 		. " acquisition (webview-build-close-ownership)", _UIWH_CloseDuringBuild.Bind(_UIWH_BuildPhase))
+
+
+_UIWH_ReopenBuildShow(State, Host, Window, Options) {
+	State["hosts"].Push(Host)
+	Window.Show("Hide w220 h140")
+	State["hwnd"] := Window.Hwnd
+}
+
+_UIWH_ReopenBuildCreate(State, Host, PlaceholderHwnd, Loader) {
+	State["creates"] += 1
+	if State["creates"] == 1 {
+		State["reopened"] := WebViewHost.TryOpen(Host.AppId, Host.Opts)
+		if State["fail_first"]
+			throw Error("Private singleton acquisition failure.")
+	}
+	return _UIWH_BuildController(State)
+}
+
+_UIWH_ReopenDuringBuild(FirstFails) {
+	global WebView2
+	HadWebView2 := IsSet(WebView2)
+	SavedShow := WebViewHost.Prototype.GetOwnPropDesc("_ShowWindow")
+	SavedCreate := WebViewHost.Prototype.GetOwnPropDesc("_CreateController")
+	SavedInstances := WebViewHost._Instances
+	SavedManifest := WebViewHost._ManifestCache
+	SavedSuspended := A_IsSuspended
+	State := Map("phase", "singleton", "creates", 0, "core_reads", 0,
+		"closes", 0, "fills", 0, "navigates", 0, "hosts", [], "reopened", 0,
+		"fail_first", FirstFails)
+	WebViewHost.Prototype.DefineProp("_ShowWindow", {Call: _UIWH_ReopenBuildShow.Bind(State)})
+	WebViewHost.Prototype.DefineProp("_CreateController", {Call: _UIWH_ReopenBuildCreate.Bind(State)})
+	WebViewHost._Instances := Map()
+	WebViewHost._ManifestCache := Map()
+	try {
+		if !HadWebView2
+			WebView2 := {}
+		Suspend(false)
+		Host := WebViewHost.TryOpen("private-build-reopen", Map("Title", "Private singleton fixture",
+			"SkipI18nSeed", true, "OnMessage", _UIWH_BuildCallback.Bind(State)))
+		AssertEqual(1, State["creates"], "a reentrant open cannot acquire a second browser controller")
+		AssertEqual(1, State["hosts"].Length, "the build owns one native parent before acquisition yields")
+		if FirstFails {
+			AssertEqual("", Host, "native acquisition failure still requests the caller's fallback")
+			AssertTrue(State["reopened"].ResetDone, "the failed reserved owner is retired")
+			AssertEqual(0, WebViewHost._Instances.Count, "failure releases the singleton reservation")
+			AssertEqual(0, State["hosts"][1].Gui, "the failed native parent is destroyed")
+			Host := WebViewHost.TryOpen("private-build-reopen", State["reopened"].Opts)
+			AssertEqual(2, State["creates"], "a fresh request can acquire after rollback")
+			AssertTrue(Host != State["reopened"], "retry owns a distinct current host")
+			State["reopened"].Close()
+		} else
+			AssertTrue(State["reopened"] == Host, "the repeated request receives the in-flight singleton")
+		AssertTrue(WebViewHost._Instances[Host.AppId] == Host, "stale close retains the current reservation")
+		Host.Close()
+		AssertEqual(1, State["closes"], "the sole controller is retired exactly once")
+		AssertEqual(0, WebViewHost._Instances.Count)
+	} finally {
+		for BuiltHost in State["hosts"]
+			BuiltHost.Close()
+		WebViewHost.Prototype.DefineProp("_ShowWindow", SavedShow)
+		WebViewHost.Prototype.DefineProp("_CreateController", SavedCreate)
+		if !HadWebView2
+			WebView2 := unset
+		WebViewHost._Instances := SavedInstances
+		WebViewHost._ManifestCache := SavedManifest
+		Suspend(SavedSuspended)
+	}
+}
+Test("WebView host: reopening during acquisition reuses its native owner (webview-build-singleton)",
+	_UIWH_ReopenDuringBuild.Bind(false))
+Test("WebView host: failed acquisition releases its singleton for retry (webview-build-singleton)",
+	_UIWH_ReopenDuringBuild.Bind(true))

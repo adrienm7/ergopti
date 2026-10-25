@@ -278,37 +278,39 @@ class WebViewHost {
 						WebViewHost._LoadManifest()
 				}
 
-				; ── Singleton: reuse existing window ─────────────────────────────────
-				if !(Opts.Has("AllowMultiple") && Opts["AllowMultiple"]) {
-						if WebViewHost._Instances.Has(AppId) {
-								Existing := WebViewHost._Instances[AppId]
-								if (Existing.Gui != 0) {
-										WMPresentWindow(Existing.Gui)
-										return Existing
-								}
-								; Stale entry — remove and fall through to create a new one
-								WebViewHost._Instances.Delete(AppId)
-						}
-				}
-
-				; ── Create the host instance ─────────────────────────────────────────
-				Host := WebViewHost()
-				Host.AppId := AppId
-				Host.Opts  := Opts
-
-				; ── Build the window ─────────────────────────────────────────────────
-				if !Host._Build() {
-						return Host.CloseRequested ? Host : ""
-				}
-
-				; Publication and Close cannot interleave after the yielding build.
+				; Reserve the singleton before Show or controller creation can pump a
+				; second opening. Lookup and publication share one RAM-only section;
+				; native presentation stays outside it.
+				AllowMultiple := Opts.Get("AllowMultiple", false)
+				Reused := false
 				PreviousCritical := Critical("On")
 				try {
-						if !Host.ResetDone && !Host.CloseRequested
-								&& !(Opts.Has("AllowMultiple") && Opts["AllowMultiple"])
-								WebViewHost._Instances[AppId] := Host
-						return Host
+						if !AllowMultiple && WebViewHost._Instances.Has(AppId) {
+								Existing := WebViewHost._Instances[AppId]
+								if Existing.BuildActive || (!Existing.ResetDone && !Existing.CloseRequested) {
+										Host := Existing
+										Reused := true
+								}
+						}
+						if !Reused {
+								Host := WebViewHost()
+								Host.AppId := AppId
+								Host.Opts := Opts
+								if !AllowMultiple
+										WebViewHost._Instances[AppId] := Host
+						}
 				} finally Critical(PreviousCritical)
+				if Reused {
+						if Existing.Gui != 0 && !Existing.CloseRequested
+								WMPresentWindow(Existing.Gui)
+						return Existing
+				}
+
+				; _Build retires this exact reservation on fallback, cancellation or
+				; failure. A late return cannot overwrite a replacement's ownership.
+				if !Host._Build()
+						return Host.CloseRequested ? Host : ""
+				return Host
 		}
 
 		; --------------------------------------------------------------------------
