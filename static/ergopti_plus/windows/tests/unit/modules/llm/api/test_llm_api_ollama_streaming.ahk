@@ -472,3 +472,107 @@ Test("Ollama live poll: partial cancellation preserves the successor (ollama-liv
 
 Test("Ollama live poll: parser cancellation rejects partial delivery (ollama-live-parse-cancellation)", _OllamaLivePoll_ReaderCancellation.Bind(true, "parse"))
 Test("Ollama final flush: parser cancellation rejects partial delivery (ollama-live-parse-cancellation)", _OllamaLivePoll_ReaderCancellation.Bind(true, "parse", true))
+
+
+; Capability inspection reads a real executable before private-directory setup.
+; Its yielding boundary must already own the cancellation handle for this request.
+_OllamaStreaming_EarlyReservation(CancelAtGate, Boundary := "capability") {
+	global _LLM_Ollama_ActiveStreams, _LLM_Ollama_IsReady, _LLM_ManagedBootstrap
+	SavedStreams := _LLM_Ollama_ActiveStreams
+	SavedReady := _LLM_Ollama_IsReady
+	SavedBootstrap := _LLM_ManagedBootstrap
+	GateFn := Boundary == "origin" ? LLM_OllamaCaptureOriginCustody : _HTTP_CurlRuntimeLimitSupported
+	HadGateCall := GateFn.HasOwnProp("Call")
+	SavedGateCall := HadGateCall ? GateFn.GetOwnPropDesc("Call") : 0
+	Directory := A_Temp . "\ergopti_early_stream_" . A_TickCount . "_" . Random(1, 1000000)
+	State := Map("gates", 0, "writes", 0, "runs", 0, "failures", 0, "bytes", 0)
+	try {
+		AssertFalse(HadGateCall, "the capability owner starts without a foreign observer")
+		DirCreate(Directory)
+		_LLM_ManagedBootstrap := 0
+		_LLM_Ollama_IsReady := true
+		_LLM_Ollama_ActiveStreams := []
+		GateFn.DefineProp("Call", {Call: ObserveGate})
+		Port := Map("temp_dir", (*) => Directory, "write", WritePayload,
+			"run", _OllamaStreaming_RecordUnexpectedRun.Bind(State))
+		Handle := LLM_OllamaGenerate_Streaming("fixture-model", "system", "private context", 0.2,
+			(*) => 0, (*) => 0, (*) => State["failures"] += 1, "", "", false, "", Port)
+		AssertEqual(1, State["gates"], "the genuine executable capability read must complete")
+		AssertEqual(CancelAtGate ? 0 : 1, State["writes"], "early cancellation must fence sensitive payload staging")
+		AssertEqual(0, State["runs"], "the fixture never starts a network child")
+		AssertEqual(1, State["failures"], "the canceled or write-refused request settles once")
+		AssertEqual(0, _LLM_Ollama_ActiveStreams.Length, "failed dispatch relinquishes its reservation")
+		AssertEqual(CancelAtGate, Handle.Cancelled, "the returned handle retains the cancellation intent")
+		if !CancelAtGate
+			AssertTrue(State["bytes"] > 0, "the positive control exercised an actual UTF-8 payload file")
+		Files := 0
+		Loop Files Directory . "\*", "F"
+			Files += 1
+		AssertEqual(0, Files, "a refused dispatch leaves no private payload behind")
+	} finally {
+		if GateFn.HasOwnProp("Call")
+			GateFn.DeleteProp("Call")
+		if HadGateCall
+			GateFn.DefineProp("Call", SavedGateCall)
+		if DirExist(Directory)
+			DirDelete(Directory, true)
+		_LLM_Ollama_ActiveStreams := SavedStreams
+		_LLM_Ollama_IsReady := SavedReady
+		_LLM_ManagedBootstrap := SavedBootstrap
+	}
+	ObserveGate(Self, Args*) {
+		GateFn.DeleteProp("Call")
+		Supported := GateFn.Call(Args*)
+		if Boundary == "capability"
+			AssertTrue(Supported, "the fixture requires a genuinely supported Windows curl executable")
+		else
+			AssertTrue(HasMethod(Supported, "Call"), "the original origin admission produced its genuine custody receipt")
+		State["gates"] += 1
+		if CancelAtGate
+			LLM_OllamaCancelStreams()
+		return Supported
+	}
+	WritePayload(Path, Payload) {
+		State["writes"] += 1
+		AssertTrue(FSWrite(Path, Payload), "the control must write through the actual filesystem owner")
+		State["bytes"] := FileGetSize(Path)
+		; Refuse after the real write so the production refusal owner must clean
+		; the actual payload; this probe must never send a request to a server.
+		return false
+	}
+}
+Test("Ollama stream: capability-read cancellation owns its reservation (ollama-stream-early-reservation)", _OllamaStreaming_EarlyReservation.Bind(true))
+Test("Ollama stream: unchanged capability read reaches payload staging (ollama-stream-early-reservation)", _OllamaStreaming_EarlyReservation.Bind(false))
+Test("Ollama stream: origin-read cancellation owns its reservation (ollama-stream-early-reservation)", _OllamaStreaming_EarlyReservation.Bind(true, "origin"))
+
+
+; Moving reservation ahead of payload preparation must retain fail-fast errors
+; without leaking this handle or replacing another stream's ownership.
+_OllamaStreaming_PreparationFailureRetiresReservation() {
+	global _LLM_Ollama_ActiveStreams, _LLM_Ollama_IsReady, _LLM_ManagedBootstrap
+	SavedStreams := _LLM_Ollama_ActiveStreams
+	SavedReady := _LLM_Ollama_IsReady
+	SavedBootstrap := _LLM_ManagedBootstrap
+	Other := { Pid: 0, ProcessOwner: 0, Cancelled: false, TmpPayload: "", TmpStdout: "" }
+	Failure := 0
+	Callbacks := 0
+	try {
+		_LLM_ManagedBootstrap := 0
+		_LLM_Ollama_IsReady := true
+		_LLM_Ollama_ActiveStreams := [Other]
+		try LLM_OllamaGenerate_Streaming("fixture-model", "system", "context", Map(),
+			(*) => 0, (*) => 0, (*) => Callbacks += 1)
+		catch as Err
+			Failure := Err
+		AssertTrue(Failure is TypeError, "actual numeric payload formatting must retain its TypeError")
+		AssertEqual(0, Callbacks, "a preparation exception remains fail-fast rather than a network verdict")
+		AssertEqual(1, _LLM_Ollama_ActiveStreams.Length, "preparation failure retires only its new reservation")
+		AssertTrue(_LLM_Ollama_ActiveStreams[1] == Other, "the existing stream keeps its original identity")
+		AssertFalse(Other.Cancelled, "the existing stream's cancellation state is unchanged")
+	} finally {
+		_LLM_Ollama_ActiveStreams := SavedStreams
+		_LLM_Ollama_IsReady := SavedReady
+		_LLM_ManagedBootstrap := SavedBootstrap
+	}
+}
+Test("Ollama stream: preparation failure retires its exact reservation (ollama-stream-early-reservation)", _OllamaStreaming_PreparationFailureRetiresReservation)

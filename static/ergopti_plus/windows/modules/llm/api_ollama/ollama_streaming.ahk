@@ -748,41 +748,56 @@ _LLM_Ollama_TrimAsyncRegistry() {
  *                   to LLM_OllamaCancelStream to terminate the curl process.
  */
 LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_partial, on_success, on_fail, stop_sequences := "", max_tokens := "", is_batch := false, tail_text := "", Port := 0) {
-	try Custody := LLM_OllamaCaptureOriginCustody()
-	catch {
-		_LLM_InvokeCallback(on_fail, "on_fail")
-		return { Pid: 0, ProcessOwner: 0, Cancelled: true }
-	}
-	Origin := Custody.Call("origin")
-	on_partial := LLM_OllamaInvokeOriginCurrent.Bind(Custody, Origin, on_partial, "on_partial")
-	on_success := LLM_OllamaInvokeOriginCurrent.Bind(Custody, Origin, on_success, "on_success")
-	on_fail := LLM_OllamaInvokeOriginCurrent.Bind(Custody, Origin, on_fail, "on_fail")
-	; Build the streaming payload — ``stream:true`` flips Ollama to JSONL (/api/chat).
-	payload := LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, true, stop_sequences, max_tokens, is_batch, tail_text)
-	curl_exe := A_WinDir . "\System32\curl.exe"
-	if !_HTTP_CurlRuntimeLimitSupported(curl_exe) {
-		try LoggerWarn("LLM.ollama", "curl cannot enforce the live response-size limit.")
-		_LLM_InvokeCallback(on_fail, "on_fail")
-		return { Pid: 0, ProcessOwner: 0, Cancelled: false }
-	}
-	if A_IsSuspended {
-		_LLM_InvokeCallback(on_fail, "on_fail")
-		return { Pid: 0, ProcessOwner: 0, Cancelled: true }
-	}
-	TempDirFn := _LLM_CurlArtifactPortFn(Port, "temp_dir", _LLM_Ollama_TempDir)
-	WriteFn := _LLM_CurlArtifactPortFn(Port, "write", FSWrite)
-	RunFn := _LLM_CurlArtifactPortFn(Port, "run", _LLM_CurlArtifactRun)
-
-	; A stream must be cancellable before its first filesystem operation. Both
-	; the private-directory creation and payload write can pump messages; without
-	; this reservation a later keystroke can cancel the current generation, then
-	; this stack resumes and launches its stale POST after the cancellation.
-
-	handle := { Pid: 0, ProcessOwner: 0, Cancelled: false,
-		TmpPayload: "", TmpStdout: "", Origin: Origin, OriginCustody: Custody,
-		OriginGeneration: LLM_AuxGeneration(), OriginOwned: Custody.Call("owned") }
 	global _LLM_Ollama_ActiveStreams
-	_LLM_Ollama_ActiveStreams.Push(handle)
+	; Origin admission, payload configuration and executable inspection may all
+	; pump cancellation. Reserve one identity before any of those yielding calls.
+	PreviousCritical := Critical("On")
+	try {
+		handle := { Pid: 0, ProcessOwner: 0, Cancelled: false,
+			TmpPayload: "", TmpStdout: "", OriginGeneration: LLM_AuxGeneration() }
+		_LLM_Ollama_ActiveStreams.Push(handle)
+	} finally Critical(PreviousCritical)
+	try {
+		try Custody := LLM_OllamaCaptureOriginCustody()
+		catch {
+			handle.Cancelled := true
+			_LLM_Ollama_RemoveStreamHandle(handle)
+			_LLM_InvokeCallback(on_fail, "on_fail")
+			return handle
+		}
+		Origin := Custody.Call("origin")
+		handle.Origin := Origin
+		handle.OriginCustody := Custody
+		handle.OriginOwned := Custody.Call("owned")
+		on_partial := LLM_OllamaInvokeOriginCurrent.Bind(Custody, Origin, on_partial, "on_partial")
+		on_success := LLM_OllamaInvokeOriginCurrent.Bind(Custody, Origin, on_success, "on_success")
+		on_fail := LLM_OllamaInvokeOriginCurrent.Bind(Custody, Origin, on_fail, "on_fail")
+		if A_IsSuspended
+			handle.Cancelled := true
+		if _LLM_Ollama_StopStaleStream(handle, on_fail)
+			return handle
+		; Build the streaming payload — ``stream:true`` selects JSONL (/api/chat).
+		payload := LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, true, stop_sequences, max_tokens, is_batch, tail_text)
+		curl_exe := A_WinDir . "\System32\curl.exe"
+		if !_HTTP_CurlRuntimeLimitSupported(curl_exe) {
+			try LoggerWarn("LLM.ollama", "curl cannot enforce the live response-size limit.")
+			_LLM_Ollama_RemoveStreamHandle(handle)
+			_LLM_InvokeCallback(on_fail, "on_fail")
+			return handle
+		}
+		if A_IsSuspended
+			handle.Cancelled := true
+		if _LLM_Ollama_StopStaleStream(handle, on_fail)
+			return handle
+		TempDirFn := _LLM_CurlArtifactPortFn(Port, "temp_dir", _LLM_Ollama_TempDir)
+		WriteFn := _LLM_CurlArtifactPortFn(Port, "write", FSWrite)
+		RunFn := _LLM_CurlArtifactPortFn(Port, "run", _LLM_CurlArtifactRun)
+	} catch as Err {
+		; Earlier reservation also owns synchronous preparation failures. Preserve
+		; the original exception without leaving an unlaunchable active stream.
+		_LLM_Ollama_RemoveStreamHandle(handle)
+		throw Err
+	}
 
 	; Write the payload to a temp file (curl --data-binary @file). Avoids
 	; command-line length limits and shell escaping headaches with the JSON
