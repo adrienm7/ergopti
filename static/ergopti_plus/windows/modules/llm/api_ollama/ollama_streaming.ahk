@@ -39,7 +39,9 @@
  * @param {string}   payload       - A complete /api/chat body the caller wrote
  *                                   (LLM_OllamaChat_Async); "" builds it from
  *                                   the other parameters.
- * @param {Func|Integer} CurrentFn - Original requester admission, or 0 for a standalone request.
+ * @param {Func|Integer} CurrentFn - Bounded, non-blocking requester admission, or 0.
+ *   May run in the short publication Critical: no file/network/menu I/O or
+ *   synchronous callback dispatch. A native focus peek must remain non-blocking.
  * @returns {Integer} The request id, for correlating log lines. Aborting is
  *                    always all-or-nothing via LLM_OllamaCancelAllAsync — the
  *                    registry holds at most one in-flight slot by design.
@@ -82,27 +84,38 @@ LLM_OllamaGenerate_Async(model, system_prompt, full_text, temperature, on_succes
 		_LLM_InvokeCallback(on_fail, "on_fail")
 		return req_id
 	}
-	; Origin capture can admit a newer request. A retired caller must not
-	; displace that request's pending job before the deferred dispatch guard.
-	if !_LLM_Ollama_RequesterCurrent(CurrentFn)
-		return req_id
+	; Origin capture may admit a newer request. The final bounded lifecycle /
+	; focus predicate and RAM publication share one transaction; origin capture,
+	; terminal callbacks and diagnostics remain outside it.
 	global _LLM_Ollama_Async
-	if (_LLM_Ollama_Async.Count > 0) {
-		; Latest-only coalescing keeps a single pending slot. If a previous job
-		; is already waiting there, it is being superseded and will never run —
-		; settle the displaced job only while its captured origin is current.
-		; Origin supersession remains silent. Without current-origin settlement a
-		; future consumer that advances a state machine on the callback would
-		; stall forever on the dropped job.
-		displaced := ""
-		if (_LLM_Ollama_Pending is Map and _LLM_Ollama_Pending.Has("on_fail"))
-			displaced := _LLM_Ollama_Pending["on_fail"]
-		; Overwrite the slot BEFORE firing the displaced callback: on_fail re-enters
-		; the engine, and a re-entrant dispatch that still found the displaced job
-		; parked here would fail it a second time, breaking the exactly-once contract.
-		_LLM_Ollama_Pending := job
+	Busy := false, Queued := false, displaced := ""
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_Ollama_RequesterCurrent(CurrentFn)
+			return req_id
+		if (_LLM_Ollama_Async.Count > 0) {
+			Busy := true
+			if _LLM_Ollama_Pending is Map && _LLM_Ollama_Pending["req_id"] > req_id {
+				; Only a published newer job supersedes this invocation. A refused
+				; newer call may advance the counter without acquiring this slot.
+				displaced := job["on_fail"]
+			} else {
+				if (_LLM_Ollama_Pending is Map and _LLM_Ollama_Pending.Has("on_fail"))
+					displaced := _LLM_Ollama_Pending["on_fail"]
+				; Publish before settling: a displaced callback can admit a newer
+				; job and must never find its old owner still parked here.
+				_LLM_Ollama_Pending := job
+				Queued := true
+			}
+		}
+	} finally Critical(PreviousCritical)
+	if Busy {
+		; A still-current independent older job also receives one failure when
+		; a newer published owner wins; requester/origin wrappers suppress stale
+		; delivery. No callback or logger runs inside queue publication.
 		_LLM_InvokeCallback(displaced, "on_fail")
-		try LoggerInfo("LLM.ollama", "Ollama busy — coalescing request #{1} until slot free.", req_id)
+		if Queued
+			try LoggerInfo("LLM.ollama", "Ollama busy — coalescing request #{1} until slot free.", req_id)
 		return req_id
 	}
 	_LLM_Ollama_DispatchAsync(job)
