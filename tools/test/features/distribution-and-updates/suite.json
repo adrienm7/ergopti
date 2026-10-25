@@ -459,6 +459,15 @@
 			"args": ["tools/test/test-macos-dev-bootstrap.cjs"],
 			"repro": "node tools/test/test-macos-dev-bootstrap.cjs",
 			"platforms": ["linux", "darwin"]
+		},
+		{
+			"id": "js-0480",
+			"ordinal": 490,
+			"name": "HS-274 aggregate failure receipts preserve failed child diagnostics after later healthy suites",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-hs274-diagnostic-receipts.cjs"],
+			"repro": "node tools/test/test-hs274-diagnostic-receipts.cjs",
+			"platforms": ["linux", "darwin"]
 		}
 	]
 }
