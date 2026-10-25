@@ -227,6 +227,9 @@ _HCfgWithBase(Seconds, Body) {
     Had := Hotstrings.Has("expansion_delay")
     Saved := Had ? Hotstrings["expansion_delay"] : unset
     Hotstrings["expansion_delay"] := Seconds
+    ; HotstringsResolve memoises per generation: the resolution made before the
+    ; base moved would otherwise be served again.
+    HotstringsResolveBumpGen()
     try Body.Call()
     finally {
         if Had
