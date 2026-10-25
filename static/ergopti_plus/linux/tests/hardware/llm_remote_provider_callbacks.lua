@@ -39,9 +39,13 @@ local function check_observed_tuple(owner, format, case, phase, role)
     local tuples = observed_tuples[tuple_key(owner, format, case, phase, role)]
     assert(tuples and #tuples == 1, 'outside callback: exact observed callback count')
     local tuple, args = tuples[1], tuples[1].args
-    assert(args.n == (role == 'chunk' and 1 or 2), 'outside callback: exact callback arity')
+    -- A remote completion carries the priced usage in its third slot (text, nil, usage);
+    -- a chunk and a vision completion keep the shorter tuples.
+    local usage_slot = owner == 'remote' and role == 'done'
+    assert(args.n == (role == 'chunk' and 1 or usage_slot and 3 or 2), 'outside callback: exact callback arity')
     assert(args[1] == 'valid reply' and (role == 'chunk' or args[2] == nil),
         'outside callback: exact completion/chunk tuple')
+    assert(not usage_slot or type(args[3]) == 'table', 'outside callback: remote completion usage')
     if owner == 'remote' then
         assert(tuple.remote_active == (role == 'chunk'), 'outside callback: captured remote ownership')
     end
