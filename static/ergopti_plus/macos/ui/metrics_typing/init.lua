@@ -101,7 +101,7 @@ local _continuation_timers = {}
 local _closing_webview = nil
 local _delivery_errors = {}
 local _delivery_generation = nil
---- Running paced projection, if any; one job at a time per window.
+--- Running projection or cleanup-only job retaining exact native timers.
 M._job = nil
 --- Work waiting for the running job: a full refresh, a live manifest refresh,
 --- and the latest range request (older ones are superseded by the frontend).
@@ -177,16 +177,25 @@ local function encode_delivery(generation, webview, site, value)
 	return encoded
 end
 
+--- Settles the exact projection's timers before releasing its owner.
+--- @return boolean settled True once every acquired timer acknowledged cleanup.
+local function settle_job()
+	local job = M._job
+	if not job then return true end
+	local settled = job.cancel()
+	if settled ~= true then
+		Logger.error(LOG, "Typing metrics projection job retained timer cleanup debt.")
+		return false
+	end
+	if M._job == job then M._job = nil end
+	return true
+end
+
 --- Cancels the running projection job and forgets queued work.
 --- @return boolean settled True once no job timer remains owned.
 local function cancel_job()
 	_pending_work = { full = false, live = false, range = nil }
-	local job = M._job
-	if not job then return true end
-	M._job = nil
-	local settled = job.cancel()
-	if not settled then Logger.error(LOG, "Typing metrics projection job retained timer cleanup debt.") end
-	return settled
+	return settle_job()
 end
 
 local _cache_reset_failure_generation = nil
@@ -194,16 +203,16 @@ local _cache_reset_failure_generation = nil
 local request_work
 
 --- Forgets every cached projection, on disk and in memory, once the disk
---- snapshot is gone. The running job is cancelled in the same turn, so it can
---- neither republish nor re-save what was cleared, and a full projection is
+--- snapshot is gone. The running job must settle before any cache mutation,
+--- so it can neither republish nor re-save what was cleared. A full projection is
 --- queued again so the page leaves its refreshing state.
 --- @return boolean removed True only when the disk snapshot is gone.
 local function reset_caches(generation, webview)
 	if not delivery_is_current(generation, webview) then return false end
+	if not cancel_job() or not delivery_is_current(generation, webview) then return false end
 	local removed = Snapshot.remove()
 	if not delivery_is_current(generation, webview) then return false end
 	if removed then
-		cancel_job()
 		Projection.reset()
 		request_work(generation, webview, "full")
 		return true
@@ -724,7 +733,12 @@ end
 --- @return boolean accepted
 local function run_next_work(generation, webview)
 	if not delivery_is_current(generation, webview) then return false end
-	if M._job then return true end
+	if M._job then
+		local state = M._job.state
+		if state ~= "done" and state ~= "failed" and state ~= "cancelled" then return true end
+		if not settle_job() or not delivery_is_current(generation, webview) then return false end
+		if M._job then return true end
+	end
 	local work
 	if _pending_work.full then
 		_pending_work.full = false
@@ -750,9 +764,9 @@ local function run_next_work(generation, webview)
 		end,
 		on_done = function(ok, result)
 			if M._job ~= job then return end
-			M._job = nil
+			local settled = settle_job()
 			deliver_work(generation, webview, work, ok, result)
-			run_next_work(generation, webview)
+			if settled then run_next_work(generation, webview) end
 		end,
 	})
 	if not job then
@@ -848,6 +862,10 @@ function M.show()
 		return submit_javascript(generation, webview, "reopen", "window.apply_date_app_filters();")
 	end
 
+	if not cancel_job() then
+		Logger.error(LOG, "Typing metrics dashboard startup refused: prior projection cleanup remains pending.")
+		return false
+	end
 	Logger.start(LOG, "Opening typing metrics dashboard…")
 
 	local sf    = hs.screen.mainScreen():frame()
