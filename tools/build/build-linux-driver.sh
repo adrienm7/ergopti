@@ -337,12 +337,12 @@ else
 	BUILD_DIR_FWD="${BUILD_DIR}"  # already forward-slash from bash on Windows
 
 	# Helper: runs a Lua one-liner with the build directory on package.path.
-	# Passes the build root as the first argument so Lua can resolve paths
-	# portably regardless of OS path separator conventions.
+	# Keep the path outside Lua source: quotes, backslashes and newlines are
+	# valid Linux filename bytes, not Lua lexical syntax.
 	_lua_with_path() {
 		local lua_code="$1"
-		${LUA_BIN} -e "
-			local build_dir = '${BUILD_DIR_FWD}'
+		ERGOPTI_LINUX_BUILD_ROOT="$BUILD_DIR_FWD" "$LUA_BIN" -e "
+			local build_dir = assert(os.getenv('ERGOPTI_LINUX_BUILD_ROOT'))
 			-- Normalize to the OS path separator (Lua package.config).
 			local sep = package.config:sub(1,1)
 			if sep == '\\\\' then build_dir = build_dir:gsub('/', '\\\\') end

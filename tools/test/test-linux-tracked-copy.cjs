@@ -183,6 +183,33 @@ try {
 	assert.equal(skipped.status, 0, skipped.stderr);
 	assert.match(skipped.stdout, /Smoke test SKIPPED/);
 	assert.equal(fs.readFileSync(smokeCalls, 'utf8'), '', 'an explicit skip runs no runtime');
+	// The builder executes native module probes only on Linux. Pass paths with
+	// Lua lexical delimiters through its real helper and require a staged file.
+	if (process.platform === 'linux') {
+		const helperStart = subject.indexOf('\t_lua_with_path() {');
+		const helperEnd = subject.indexOf('\n\t# Test 1:', helperStart);
+		assert.ok(helperStart >= 0 && helperEnd > helperStart, 'the production Lua probe must exist');
+		for (const name of ["bundle's source", 'bundle\\source', 'bundle\nsource']) {
+			const buildRoot = path.join(scratch, name);
+			const moduleFile = path.join(buildRoot, '_shared/lua/packaging_path_probe.lua');
+			fs.mkdirSync(path.dirname(moduleFile), { recursive: true });
+			fs.writeFileSync(moduleFile, 'return "exact staged bytes"\n');
+			const checked = spawnSync(bashExecutable(), ['-s', '--', buildRoot], {
+				input:
+					'set -euo pipefail\nLUA_BIN=lua\nBUILD_DIR_FWD="$1"\n' +
+					subject.slice(helperStart, helperEnd) +
+					"\n_lua_with_path \"assert(require('packaging_path_probe') == 'exact staged bytes'); print('staged module loaded')\"\n",
+				encoding: 'utf8',
+				timeout: 15000
+			});
+			assert.equal(
+				checked.status,
+				0,
+				`package-smoke-literal-path ${JSON.stringify(name)}: ${checked.stderr || checked.stdout}`
+			);
+			assert.equal(checked.stdout.trim(), 'staged module loaded');
+		}
+	}
 } finally {
 	fs.rmSync(scratch, { recursive: true, force: true });
 }
