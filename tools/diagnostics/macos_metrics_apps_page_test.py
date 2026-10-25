@@ -222,6 +222,7 @@ class MetricsAppsPageControls(unittest.TestCase):
             "../dom_utils.js",
             "../i18n.js",
             "../metrics_rebuild_banner.js",
+            "../metrics_freshness.js",
             "helpers.js",
             "state.js",
             "main.js",
