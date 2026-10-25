@@ -37,6 +37,31 @@ return function(helpers, select_leaves)
 			helpers.assert_eq(document.hotstrings.unknown, "kept")
 		end)
 
+		helpers.it("restores the shipped consumption: only the magic key slot ships consumed", function()
+			local consume = Scope.consume_defaults()
+			helpers.assert_eq(consume.star, true)
+			helpers.assert_eq(consume.comma, false)
+			helpers.assert_nil(consume.custom_personal)
+			consume.star = false
+			helpers.assert_eq(Scope.consume_defaults().star, true, "callers cannot mutate the source defaults")
+		end)
+
+		helpers.it("selects the shipped consume leaves after the state leaves and keeps personal ones", function()
+			local document = { hotstrings = {
+				terminator_states = { space = false },
+				terminator_consume = { star = false, comma = true, ["custom_¤"] = true, retired = true },
+				terminators = { { key = "custom_¤", char = "¤", label = "¤", consume = true } },
+			} }
+			helpers.assert_eq(select_leaves(document), {
+				{ "hotstrings", "terminator_states", "space" },
+				{ "hotstrings", "terminator_consume", "comma" },
+				{ "hotstrings", "terminator_consume", "star" },
+			})
+			helpers.assert_eq(document.hotstrings.terminator_consume,
+				{ star = false, comma = true, ["custom_¤"] = true, retired = true },
+				"the input is never rewritten")
+		end)
+
 		helpers.it("replays independent personal preservation vectors without taking ownership", function()
 			local shared = debug.getinfo(1, "S").source:gsub("^@", ""):gsub("\\", "/")
 				:match("^(.*)/lua/test/[^/]+$")

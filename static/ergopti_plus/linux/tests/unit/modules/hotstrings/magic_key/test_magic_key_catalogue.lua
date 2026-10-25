@@ -62,6 +62,11 @@ helpers.describe("magic key: static catalogue ownership", function()
 ]=])
 		file:close()
 
+		-- The group switches below are preferences: keep them out of the real config.toml.
+		local preferences = require("infra.hotstring_preferences")
+		local preferences_path = temporary .. "_preferences.toml"
+		assert(preferences._set_file_for_test(preferences_path))
+
 		local ok, err = pcall(function()
 			local loaded = nil
 			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
@@ -95,6 +100,8 @@ helpers.describe("magic key: static catalogue ownership", function()
 				"a fresh process must reconstruct the same configured catalogue")
 		end)
 
+		preferences._set_file_for_test(nil)
+		os.remove(preferences_path)
 		os.remove(path)
 		if not ok then error(err, 0) end
 	end)

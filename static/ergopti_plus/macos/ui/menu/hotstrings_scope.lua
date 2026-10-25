@@ -411,14 +411,17 @@ function M.new(options)
 			end
 			local values = { [ENGINE_KEY] = state[ENGINE_KEY] }
 			for _, owner in ipairs(OWNERS) do values[owner.key] = clone(current(owner.key)) end
-			local terminators = {}
+			local terminators, consumption = {}, {}
 			for _, def in ipairs(keymap.get_terminator_defs()) do
-				if def.key then terminators[def.key] = keymap.is_terminator_enabled(def.key) end
+				if def.key then
+					terminators[def.key] = keymap.is_terminator_enabled(def.key)
+					if def.custom ~= true then consumption[def.key] = keymap.is_terminator_consume(def.key) end
+				end
 			end
 			local snapshot = { config = config, programmable = programmable, groups = groups, sections = sections, values = values,
 				hotstrings = clone(state.hotstrings), delays = clone(state.delays), reloaded = {},
-				candidate = active.overrides, terminators = terminators,
-				terminator_states = clone(state.terminator_states) }
+				candidate = active.overrides, terminators = terminators, consumption = consumption,
+				terminator_states = clone(state.terminator_states), terminator_consume = clone(state.terminator_consume) }
 			active = snapshot
 			return snapshot
 		end,
@@ -459,6 +462,10 @@ function M.new(options)
 			local retained = clone(state.terminator_states or {})
 			for key in pairs(defaults) do retained[key] = nil end
 			state.terminator_states = retained
+			if keymap.set_terminators_consume(TerminatorScope.consume_defaults()) ~= true then return false end
+			local kept_consume = clone(state.terminator_consume or {})
+			for key in pairs(TerminatorScope.consume_defaults()) do kept_consume[key] = nil end
+			state.terminator_consume = kept_consume
 			return apply_values(values, active.programmable)
 		end,
 		restore = function(snapshot)
@@ -473,6 +480,8 @@ function M.new(options)
 			if not reload_groups(snapshot.reloaded) then return false end
 			if keymap.set_terminators_enabled(snapshot.terminators) ~= true then return false end
 			state.terminator_states = clone(snapshot.terminator_states)
+			if keymap.set_terminators_consume(snapshot.consumption) ~= true then return false end
+			state.terminator_consume = clone(snapshot.terminator_consume)
 			if apply_values(snapshot.values) ~= true then return false end
 			state.hotstrings = clone(snapshot.hotstrings)
 			return true

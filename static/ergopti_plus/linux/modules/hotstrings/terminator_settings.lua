@@ -7,6 +7,10 @@
 --- as canonical config.toml leaves read into the shared terminator catalogue:
 ---   [hotstrings.terminator_states]  key = true|false, only where a delimiter
 ---                                   differs from its catalogue default;
+---   [hotstrings.terminator_consume] key = true|false, only where a shipped
+---                                   delimiter is consumed (swallowed by the
+---                                   expansion) differently from its catalogue
+---                                   default;
 ---   hotstrings.terminators          the user's own delimiters, as
 ---                                   { key, char, label, consume } records.
 --- These are the paths and record fields macOS reads, so one configuration
@@ -49,6 +53,7 @@ local LOG = "hotstrings.terminator_settings"
 
 -- The two canonical paths, as segments.
 local STATES_PATH = { "hotstrings", "terminator_states" }
+local CONSUME_PATH = { "hotstrings", "terminator_consume" }
 local CUSTOM_PATH = { "hotstrings", "terminators" }
 
 -- A delimiter the user adds is on when created (add_custom_terminator).
@@ -76,7 +81,8 @@ local function builtins()
 	local out = {}
 	for _, def in ipairs(Terminators.get_terminator_defs()) do
 		if def.key and def.custom ~= true then
-			out[def.key] = { default = def.default_enabled ~= false, chars = def.chars or {} }
+			out[def.key] = { default = def.default_enabled ~= false, chars = def.chars or {},
+				consume = def.consume == true }
 		end
 	end
 	return out
@@ -110,11 +116,12 @@ end
 --- @param custom table|nil Array of { key, char, label, consume } records.
 --- @param reject function reject(path_segments, detail) for each unusable entry.
 --- @param mark function|nil Cleanup mark(...segments) for each kept entry.
---- @return table settings { states = key -> boolean, custom = records }
+--- @param consume table|nil Shipped key -> consumed.
+--- @return table settings { states = key -> boolean, consume = key -> boolean, custom = records }
 --- @return table admitted_indices Stored list positions owned by usable custom records.
-local function keep_usable(states, custom, reject, mark)
+local function keep_usable(states, custom, reject, mark, consume)
 	local shipped = builtins()
-	local settings, keys, chars, admitted = { states = {}, custom = {} }, {}, {}, {}
+	local settings, keys, chars, admitted = { states = {}, consume = {}, custom = {} }, {}, {}, {}
 	for index, record in ipairs(custom or {}) do
 		local detail = custom_refusal(record, shipped, keys, chars)
 		if detail then
@@ -136,6 +143,18 @@ local function keep_usable(states, custom, reject, mark)
 			reject(path, "the value is not a boolean")
 		else
 			settings.states[key] = enabled
+			if mark then mark(path[1], path[2], path[3]) end
+		end
+	end
+	for key, consumed in pairs(consume or {}) do
+		local path = { CONSUME_PATH[1], CONSUME_PATH[2], tostring(key) }
+		if type(key) ~= "string" or not shipped[key] then
+			-- A user's own delimiter carries its choice in its record.
+			reject(path, "no built-in delimiter has this key")
+		elseif type(consumed) ~= "boolean" then
+			reject(path, "the value is not a boolean")
+		else
+			settings.consume[key] = consumed
 			if mark then mark(path[1], path[2], path[3]) end
 		end
 	end
@@ -171,12 +190,14 @@ local function resolve(document, mark)
 	assert(type(document) == "table", "word-delimiter settings need a decoded configuration")
 	local hotstrings = ConfigOutdated.settings_table(document.hotstrings, { "hotstrings" }, Logger) or {}
 	local states = ConfigOutdated.settings_table(hotstrings.terminator_states, STATES_PATH, Logger)
+	local consume = ConfigOutdated.settings_table(hotstrings.terminator_consume, CONSUME_PATH, Logger)
 	local custom = hotstrings.terminators
 	if custom ~= nil and (type(custom) ~= "table" or (next(custom) ~= nil and #custom == 0)) then
 		ConfigOutdated.report(CUSTOM_PATH, "a list of delimiters is expected here", Logger)
 		custom = nil
 	end
-	return keep_usable(states, custom, function(path, detail) ConfigOutdated.report(path, detail, Logger) end, mark)
+	return keep_usable(states, custom, function(path, detail) ConfigOutdated.report(path, detail, Logger) end, mark,
+		consume)
 end
 
 --- Reads config.toml as it is now.
@@ -224,7 +245,14 @@ local function apply(settings)
 			changes[def.key] = enabled
 		end
 	end
-	return Terminators.set_terminators_enabled(changes) == true
+	if Terminators.set_terminators_enabled(changes) ~= true then return false end
+	local consumption = {}
+	for key, entry in pairs(shipped) do
+		local consumed = (settings.consume or {})[key]
+		if consumed == nil then consumed = entry.consume end
+		consumption[key] = consumed
+	end
+	return Terminators.set_terminators_consume(consumption) == true
 end
 
 --- Records the catalogue as config.toml now holds it, for the next save.
@@ -235,10 +263,11 @@ end
 --- The catalogue's current settings, every delimiter's state included.
 --- @return table snapshot { states = key -> boolean, custom = records }
 function M.snapshot()
-	local snapshot = { states = {}, custom = {} }
+	local snapshot = { states = {}, consume = {}, custom = {} }
 	for _, def in ipairs(Terminators.get_terminator_defs()) do
 		if def.key then
 			snapshot.states[def.key] = Terminators.is_terminator_enabled(def.key)
+			if def.custom ~= true then snapshot.consume[def.key] = Terminators.is_terminator_consume(def.key) end
 			if def.custom == true then
 				snapshot.custom[#snapshot.custom + 1] = { key = def.key, char = (def.chars or {})[1],
 					label = def.label, consume = def.consume == true }
@@ -293,7 +322,8 @@ end
 --- @param snapshot table Result of M.snapshot().
 --- @return boolean restored
 function M.restore_configuration(snapshot)
-	if type(snapshot) ~= "table" or type(snapshot.states) ~= "table" or type(snapshot.custom) ~= "table" then
+	if type(snapshot) ~= "table" or type(snapshot.states) ~= "table" or type(snapshot.custom) ~= "table"
+		or type(snapshot.consume) ~= "table" then
 		return false
 	end
 	if not apply(snapshot) then return false end
@@ -386,6 +416,24 @@ local function plan(document, current, synced)
 		if wanted == default_for(key, shipped) then wanted = nil end
 		if stored_states[key] ~= wanted then
 			local path = { STATES_PATH[1], STATES_PATH[2], key }
+			if wanted == nil then
+				operations[#operations + 1] = { path = path, delete = true }
+			else
+				operations[#operations + 1] = { path = path, value = wanted }
+			end
+		end
+	end
+	local stored_consume = type(hotstrings.terminator_consume) == "table" and hotstrings.terminator_consume or {}
+	local consume_keys = {}
+	for key in pairs(current.consume) do
+		if current.consume[key] ~= synced.consume[key] then consume_keys[#consume_keys + 1] = key end
+	end
+	table.sort(consume_keys)
+	for _, key in ipairs(consume_keys) do
+		local wanted = current.consume[key]
+		if shipped[key] and wanted == shipped[key].consume then wanted = nil end
+		if stored_consume[key] ~= wanted then
+			local path = { CONSUME_PATH[1], CONSUME_PATH[2], key }
 			if wanted == nil then
 				operations[#operations + 1] = { path = path, delete = true }
 			else

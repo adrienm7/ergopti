@@ -228,6 +228,7 @@ local NESTED_KEY_MAP = {
 	hotstrings               = { sec = "hotstrings", key = "groups"                    },
 	section_states           = { sec = "hotstrings", key = "modules"                   },
 	terminator_states        = { sec = "hotstrings", key = "terminator_states"          },
+	terminator_consume       = { sec = "hotstrings", key = "terminator_consume"         },
 	sections_order_overrides = { sec = "hotstrings", key = "order_overrides"            },
 	custom_editor_shortcut   = { sec = "hotstrings", key = "editor.shortcut"            },
 	custom_terminators       = { sec = "hotstrings", key = "terminators"                },
@@ -401,6 +402,20 @@ local function terminator_state_owner(document)
 			return false, "no built-in or custom delimiter has this key"
 		end
 		if type(enabled) ~= "boolean" then return false, "the value is not a boolean" end
+		return true
+	end
+end
+
+--- Builds the owner check of [hotstrings.terminator_consume]: a consume choice
+--- belongs to a built-in terminator only; a custom one carries its choice in its
+--- own record.
+--- @return function is_known `is_known(key, consumed)`.
+local function terminator_consume_owner()
+	return function(key, consumed)
+		if not BUILTIN_TERMINATORS[key] then
+			return false, "no built-in delimiter has this key"
+		end
+		if type(consumed) ~= "boolean" then return false, "the value is not a boolean" end
 		return true
 	end
 end
@@ -922,6 +937,9 @@ local function flatten_from_disk(grouped, mark, shapes)
 						elseif nested_fk == "terminator_states" then
 							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
 								terminator_state_owner(grouped), mark)
+						elseif nested_fk == "terminator_consume" then
+							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
+								terminator_consume_owner(), mark)
 						elseif nested_fk == "hotstrings" then
 							-- The hotstring projection asserts booleans: an old-shape
 							-- choice reaching it failed the boot hotstrings sync.
@@ -1060,6 +1078,7 @@ function M.build_initial_state(hotfiles, menu_mods, core_mods)
 		hotstrings               = {},
 		sections_order_overrides = {},
 		terminator_states        = {},
+		terminator_consume       = {},
 		delays                   = {},
 	}
 
@@ -2199,6 +2218,9 @@ function M.merge_saved_data(state, saved)
 
 	if type(saved.terminator_states) == "table" then
 		state.terminator_states = saved.terminator_states
+	end
+	if type(saved.terminator_consume) == "table" then
+		state.terminator_consume = saved.terminator_consume
 	end
 
 	-- A stored pointer kind overlays its default; an absent one keeps it.

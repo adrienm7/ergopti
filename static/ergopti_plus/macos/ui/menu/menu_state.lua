@@ -188,6 +188,24 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		end
 	end
 
+	-- The consumed choice of the built-in terminators (hotstrings.terminator_consume).
+	-- A user's own terminator carries its choice in its record.
+	if type(saved.terminator_consume) == "table" and keymap
+		and type(keymap.set_terminators_consume) == "function"
+		and type(keymap.get_terminator_defs) == "function" then
+		local builtin = {}
+		for _, def in ipairs(keymap.get_terminator_defs()) do
+			if type(def) == "table" and type(def.key) == "string" and def.custom ~= true then
+				builtin[def.key] = true
+			end
+		end
+		local chosen = {}
+		for key, consumed in pairs(saved.terminator_consume) do
+			if builtin[key] then chosen[key] = consumed end
+		end
+		try("hotstrings", "keymap.set_terminators_consume", keymap.set_terminators_consume, chosen)
+	end
+
 	-- Re-register custom terminators created by the user (persisted in state)
 	if keymap and type(keymap.add_custom_terminator) == "function" then
 		local custom_runtime_failed = false
