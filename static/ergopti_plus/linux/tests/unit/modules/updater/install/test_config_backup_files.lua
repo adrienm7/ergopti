@@ -159,3 +159,75 @@ helpers.describe("config-backup-native-names", function()
 		helpers.assert_true(type(reason) == "string" and reason ~= "absent", "only ENOENT can mean absence")
 	end)
 end)
+
+helpers.describe("config-backup-native-metadata", function()
+	for _, mode in ipairs({ "denied", "gone", "file" }) do
+		helpers.it("(config-backup-native-metadata) unknown d_type requires actual " .. mode .. " metadata", function()
+			local uv = require("luv")
+			local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-backup-metadata-XXXXXX"))
+			local target = root .. "/config.toml"
+			write(target, "[native]\nvalue = 1\n")
+			write(root .. "/kept.toml", "[kept]\nvalue = 2\n")
+			local previous_directory = package.loaded["infra.native_directory"]
+			local previous_backup = package.loaded["modules.updater.config_backup"]
+			local closed, probed, native_code = 0, 0, nil
+			local backend = {
+				fs_opendir = uv.fs_opendir,
+				fs_readdir = function(handle)
+					local entries, message, code = uv.fs_readdir(handle)
+					for _, entry in ipairs(entries or {}) do
+						-- DT_UNKNOWN is a supported native filesystem receipt. Keep
+						-- the real names/directory owner and defer only their types.
+						if entry.name == "config.toml" then entry.type = "unknown" end
+					end
+					return entries, message, code
+				end,
+				fs_closedir = function(handle)
+					local result, message, code = uv.fs_closedir(handle)
+					if result == true then closed = closed + 1 end
+					return result, message, code
+				end,
+				fs_lstat = function(path)
+					if path ~= target then return uv.fs_lstat(path) end
+					probed = probed + 1
+					if mode == "denied" then assert(uv.fs_chmod(root, 0))
+					elseif mode == "gone" then assert(uv.fs_unlink(target)) end
+					local attributes, message, code = uv.fs_lstat(path)
+					native_code = code
+					if mode == "denied" then assert(uv.fs_chmod(root, 448)) end
+					return attributes, message, code
+				end,
+			}
+			local ok, err = pcall(function()
+				local Directory = helpers.load_module_with_dependency("infra.native_directory", "luv", backend)
+				package.loaded["infra.native_directory"] = Directory
+				local Backup = helpers.load_module("modules.updater.config_backup")
+				Backup._overrides = { roots = { { id = "config", dir = root } } }
+				local owner = assert(Backup.owner())
+				local record, reason = owner.create("pre_install")
+				helpers.assert_eq(probed, 1, "unknown native types must be classified exactly once")
+				helpers.assert_eq(closed, 1, "the actual directory descriptor must retire before any metadata outcome")
+				if mode == "denied" then
+					helpers.assert_eq(native_code, "EACCES", "the refusal must come from the real kernel")
+					helpers.assert_eq(record, nil, "unreadable metadata must never certify a backup that omits configuration")
+					helpers.assert_contains(reason, "EACCES")
+					helpers.assert_eq(read(target), "[native]\nvalue = 1\n", "the source still exists after the refused observation")
+				elseif mode == "gone" then
+					helpers.assert_eq(native_code, "ENOENT")
+					helpers.assert_true(type(record) == "table", tostring(reason))
+					helpers.assert_eq(#record.files, 1, "only actual absence may omit the vanished source")
+					helpers.assert_eq(read(record.path .. "/config/kept.toml"), "[kept]\nvalue = 2\n")
+				else
+					helpers.assert_eq(native_code, nil)
+					helpers.assert_true(type(record) == "table", tostring(reason))
+					helpers.assert_eq(read(record.path .. "/config/config.toml"), "[native]\nvalue = 1\n")
+				end
+			end)
+			package.loaded["infra.native_directory"] = previous_directory
+			package.loaded["modules.updater.config_backup"] = previous_backup
+			uv.fs_chmod(root, 448)
+			os.execute("rm -rf " .. quote(root))
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
