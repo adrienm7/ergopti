@@ -11,7 +11,7 @@ local M = {}
 local OWNERS = {
 	"infra.file_watchers", "infra.ui_restore", "infra.git_status", "infra.fs_dir",
 	"infra.logger", "infra.i18n", "infra.notifications", "reload_gate",
-	"adapters.timer_scheduler", "error_description", "number_policy",
+	"adapters.timer_scheduler", "error_description", "number_policy", "adapters.file_system",
 }
 
 M.CONFIG_ROOT = "/fake/config/"
@@ -28,12 +28,13 @@ function M.with_watchers(body, options)
 	local host = hs
 	local previous_pathwatcher, previous_timer = host.pathwatcher, host.timer
 	local previous_attributes, previous_reload = host.fs.attributes, host.reload
+	local previous_absolute = host.fs.pathToAbsolute
 	local previous_roots = rawget(_G, "script_watchers")
 	local outcome = table.pack(xpcall(function()
 		return helpers.with_fresh_modules(OWNERS, function()
 			local defer_calls = 0
 			for _, name in ipairs(OWNERS) do package.loaded[name] = nil end
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["infra.logger"] = options.logger or helpers.make_logger_stub()
 			package.loaded["infra.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.notifications"] = { notify = function() return true end }
 			package.loaded["infra.ui_restore"] = {
@@ -51,8 +52,9 @@ function M.with_watchers(body, options)
 			package.loaded["infra.file_watchers"] = nil
 			local watchers = require("infra.file_watchers")
 			local clock, reloads, scheduled_count = 0, 0, 0
-			local callbacks, pending = {}, nil
-			host.pathwatcher = { new = function(_, callback)
+			local callbacks, watcher_paths, pending = {}, {}, nil
+			host.pathwatcher = { new = function(path, callback)
+				watcher_paths[#watcher_paths + 1] = path
 				callbacks[#callbacks + 1] = callback
 				return { start = function(self) return self end, stop = function() end }
 			end }
@@ -65,7 +67,8 @@ function M.with_watchers(body, options)
 				secondsSinceEpoch = function() return clock end,
 				absoluteTime = function() return clock * 1e9 end,
 			}
-			host.fs.attributes = function() return nil end
+			host.fs.attributes = options.attributes or function() return nil end
+			if options.resolve_path then host.fs.pathToAbsolute = options.resolve_path end
 			host.reload = function()
 				reloads = reloads + 1
 				if options.reload then return options.reload() end
@@ -80,6 +83,7 @@ function M.with_watchers(body, options)
 			}), "watcher fixture startup did not commit")
 			clock = 30
 			return body({
+				watcher_paths = watcher_paths,
 				set_clock = function(value) clock = value end,
 				fire = function(path)
 					pending = nil
@@ -106,6 +110,7 @@ function M.with_watchers(body, options)
 	end, debug.traceback))
 	host.pathwatcher, host.timer = previous_pathwatcher, previous_timer
 	host.fs.attributes, host.reload = previous_attributes, previous_reload
+	host.fs.pathToAbsolute = previous_absolute
 	_G.script_watchers = previous_roots
 	if not outcome[1] then error(outcome[2], 0) end
 	return table.unpack(outcome, 2, outcome.n)
