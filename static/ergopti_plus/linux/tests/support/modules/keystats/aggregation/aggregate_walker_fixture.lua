@@ -22,6 +22,16 @@ local PAUSE_MS = Timings.ms("keystats", "max_keystroke_delay_ms")
 
 local SESSION_GAP_MS = Timings.ms("keystats", "session_gap_ms")
 
+--- Declares the qwerty physical fixture, independently of the live driver.
+--- @param timing table|nil Explicit time observation ports for this case.
+--- @return table Captured input context.
+local function qwerty_clock(timing)
+	local clock = {}
+	for key, value in pairs(timing or {}) do clock[key] = value end
+	clock.layout, clock.physical_layout = "qwerty", "qwerty"
+	return clock
+end
+
 --- One buffered keystroke.
 --- @param char string
 --- @param delay number|nil
@@ -62,6 +72,7 @@ return {
 	it = it,
 	Fakes = Fakes,
 	Walker = Walker,
+	qwerty_clock = qwerty_clock,
 	Timings = Timings,
 	PAUSE_MS = PAUSE_MS,
 	SESSION_GAP_MS = SESSION_GAP_MS,

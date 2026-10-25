@@ -53,12 +53,11 @@ end
 --- @return table batch, function ctx_of
 local function replay(vector)
 	local contexts, batch = {}, nil
-	local previous_hook = package.loaded["adapters.keyboard_hook"]
 	local ok, err = pcall(function()
 		for _, entry in ipairs(vector.events) do
 			assert(entry.type == "typing", vector.id .. " replays a " .. tostring(entry.type) .. " event")
-			-- The layout of an entry is the hook's on Linux.
-			package.loaded["adapters.keyboard_hook"] = { get_layout = function() return entry.layout end }
+			-- The corpus uses the qwerty finger fixture; its optional reported
+			-- logical layout label is a separate captured port.
 			local events, times = {}, {}
 			local stamp = stamp_of(entry.timestamp)
 			for index, ev in ipairs(entry.events) do
@@ -67,10 +66,9 @@ local function replay(vector)
 			end
 			contexts[entry.app] = contexts[entry.app] or {}
 			batch = Walker.walk(events, entry.timestamp:sub(1, 10), entry.app, batch,
-				{ times = times, wall_offset_ms = 0 }, contexts[entry.app])
+				{ times = times, wall_offset_ms = 0, layout = entry.layout, physical_layout = "qwerty" }, contexts[entry.app])
 		end
 	end)
-	package.loaded["adapters.keyboard_hook"] = previous_hook
 	if not ok then error(err, 0) end
 	return batch, function(app) return contexts[app] end
 end

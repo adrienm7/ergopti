@@ -45,7 +45,7 @@ local helpers, it, Fakes, Walker, Timings, PAUSE_MS, SESSION_GAP_MS, key, typed,
 helpers.describe("ngram walker: the nine families", function()
 
 	it("produces tokens of every length from one to seven", function()
-		local batch = Walker.walk(typed("abcdefgh"), "2026-08-06", "app")
+		local batch = Walker.walk(typed("abcdefgh"), "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(count_of(batch, "ngram_chars", "a"), 1)
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "ab"), 1)
 		helpers.assert_eq(count_of(batch, "ngram_trigrams", "abc"), 1)
@@ -59,7 +59,7 @@ helpers.describe("ngram walker: the nine families", function()
 	end)
 
 	it("records words and word pairs", function()
-		local batch = Walker.walk(typed("le chat noir "), "2026-08-06", "app")
+		local batch = Walker.walk(typed("le chat noir "), "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(count_of(batch, "ngram_words", "chat"), 1)
 		helpers.assert_eq(count_of(batch, "ngram_word_bigrams", "le chat"), 1,
 			"the word lists and the pair lists are two different panels, and both "
@@ -67,7 +67,7 @@ helpers.describe("ngram walker: the nine families", function()
 	end)
 
 	it("keeps the last word even though the stream ends mid-sentence", function()
-		local batch = Walker.walk(typed("bonjour"), "2026-08-06", "app")
+		local batch = Walker.walk(typed("bonjour"), "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(count_of(batch, "ngram_words", "bonjour"), 1,
 			"a flush lands between keystrokes, not between sentences, so discarding "
 				.. "the tail would lose a word every time the daemon persists")
@@ -92,7 +92,7 @@ helpers.describe("ngram walker: what must not become a sequence", function()
 			key("c", 200),
 			key("d", SESSION_GAP_MS + 1000),
 			key("e", 200),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local rows = batch.ngram.ngram_chars
 		local total_delay, delay_count = 0, 0
 		for _, item in pairs(rows) do
@@ -117,7 +117,7 @@ helpers.describe("ngram walker: what must not become a sequence", function()
 			key("a", 100), key("b", 100),
 			key("c", PAUSE_MS + 5000),
 			key("d", 100),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "ab"), 1, "a normal pair still counts")
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "bc"), 0,
@@ -133,7 +133,7 @@ helpers.describe("ngram walker: what must not become a sequence", function()
 			key("a", 100), key("b", 100),
 			key("[BS]", 100),
 			key("c", 100),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "bc"), 0,
 			"after a backspace the next character continues from a different one "
@@ -146,7 +146,7 @@ helpers.describe("ngram walker: what must not become a sequence", function()
 		local batch = Walker.walk({
 			key("b", 100), key("t", 100), key("w", 100),
 			key("b", 0, "hotstring"), key("y", 0, "hotstring"),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 
 		-- Windows and macOS chain generated text like typed text; the rows carry
 		-- the source, so a view of typing effort alone filters on it.
@@ -168,7 +168,7 @@ helpers.describe("ngram walker: what must not become a sequence", function()
 			key("c", 100), key("h", 100), key("a", 100),
 			key("[BS]", 100),
 			key("t", 100), key(" ", 100),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(count_of(batch, "ngram_words", "chat"), 0,
 			"the user typed 'cha', deleted, then 't' — 'chat' is a word the walk "
 				.. "would have invented")
@@ -183,7 +183,7 @@ helpers.describe("ngram walker: what must not become a sequence", function()
 	it("flags the n-grams of the character a Backspace erases", function()
 		local batch = Walker.walk({
 			key("a", 100), key("b", 100), key("c", 100), key("[BS]", 100),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local prefix = "2026-08-06\1app\1"
 		for family, token in pairs({ ngram_chars = "c", ngram_bigrams = "bc", ngram_trigrams = "abc" }) do
 			local row = batch.ngram[family][prefix .. token]
@@ -194,7 +194,7 @@ helpers.describe("ngram walker: what must not become a sequence", function()
 	end)
 
 	it("erases nothing typed before a long pause", function()
-		local batch = Walker.walk({ key("a", 100), key("b", 100), key("[BS]", PAUSE_MS) }, "2026-08-06", "app")
+		local batch = Walker.walk({ key("a", 100), key("b", 100), key("[BS]", PAUSE_MS) }, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(batch.ngram.ngram_chars["2026-08-06\1app\1b"].e, 0)
 	end)
 
@@ -212,8 +212,8 @@ end)
 helpers.describe("ngram walker: what the writer receives", function()
 
 	it("splits the batch by table and by application-day", function()
-		local batch = Walker.walk(typed("ab"), "2026-08-06", "firefox")
-		Walker.walk(typed("cd"), "2026-08-06", "code", batch)
+		local batch = Walker.walk(typed("ab"), "2026-08-06", "firefox", nil, Fixture.qwerty_clock())
+		Walker.walk(typed("cd"), "2026-08-06", "code", batch, Fixture.qwerty_clock())
 
 		local groups = Walker.batches_for_writer(batch)
 		helpers.assert_true(#groups > 0, "the writer must receive something at all")
@@ -234,7 +234,7 @@ helpers.describe("ngram walker: what the writer receives", function()
 	end)
 
 	it("emits nothing for a family with no rows", function()
-		local batch = Walker.walk({}, "2026-08-06", "app")
+		local batch = Walker.walk({}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(#Walker.batches_for_writer(batch), 0,
 			"an empty group would cost a sqlite3 spawn to write nothing, on a path "
 				.. "that already runs several times a second")
@@ -401,7 +401,7 @@ end)
 helpers.describe("aggregate walker: what the day was made of", function()
 
 	it("sorts characters into the five classes", function()
-		local batch = Walker.walk(typed("ab 12 ,."), "2026-08-06", "app")
+		local batch = Walker.walk(typed("ab 12 ,."), "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local row = batch.chars_class["2026-08-06\1app"]
 		helpers.assert_not_nil(row, "the breakdown row must exist")
 		helpers.assert_eq(row.letter, 2)
@@ -411,7 +411,7 @@ helpers.describe("aggregate walker: what the day was made of", function()
 	end)
 
 	it("counts an accented letter as a letter", function()
-		local batch = Walker.walk(typed("éàü"), "2026-08-06", "app")
+		local batch = Walker.walk(typed("éàü"), "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local row = batch.chars_class["2026-08-06\1app"]
 		helpers.assert_eq(row.letter, 3,
 			"these arrive as multi-byte sequences that the ASCII class pattern does "
@@ -424,7 +424,7 @@ helpers.describe("aggregate walker: what the day was made of", function()
 		local batch = Walker.walk({
 			key("a", 100),
 			key("b", 0, "hotstring"), key("c", 0, "hotstring"),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local row = batch.chars_class["2026-08-06\1app"]
 		helpers.assert_eq(row.letter, 1,
 			"the composition breakdown answers what the USER typed. Counting the "
@@ -448,7 +448,7 @@ helpers.describe("aggregate walker: corrections", function()
 	it("counts manual backspaces", function()
 		local batch = Walker.walk({
 			key("a", 100), key("[BS]", 100), key("[BS]", 100), key("b", 100),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(batch.errors["2026-08-06\1app"].bs_total, 2)
 	end)
 
@@ -457,7 +457,7 @@ helpers.describe("aggregate walker: corrections", function()
 			key("b", 100), key("t", 100), key("w", 100),
 			key("[BS]", 0, "hotstring"), key("[BS]", 0, "hotstring"), key("[BS]", 0, "hotstring"),
 			key("b", 0, "hotstring"),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(batch.errors["2026-08-06\1app"].bs_total, 0,
 			"those deletions are the driver erasing its own trigger. Counting them "
 				.. "would make the measured error rate rise with every expansion — the "
@@ -469,7 +469,7 @@ helpers.describe("aggregate walker: corrections", function()
 			key("a", 100),
 			key("[BS]", 100), key("[BS]", 100), key("[BS]", 100), key("[BS]", 100),
 			key("b", 100),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local row = batch.errors["2026-08-06\1app"]
 		helpers.assert_eq(row.cascade_count, 1,
 			"four deletions in a row are one correction, not four")
@@ -479,7 +479,7 @@ helpers.describe("aggregate walker: corrections", function()
 	it("does not call a single backspace a cascade", function()
 		local batch = Walker.walk({
 			key("a", 100), key("[BS]", 100), key("b", 100),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(batch.errors["2026-08-06\1app"].cascade_count, 0,
 			"fixing one character is ordinary typing; if that counted, the cascade "
 				.. "figure would just be the backspace count again")
@@ -488,7 +488,7 @@ helpers.describe("aggregate walker: corrections", function()
 	it("closes a cascade that is still open when the stream ends", function()
 		local batch = Walker.walk({
 			key("a", 100), key("[BS]", 100), key("[BS]", 100), key("[BS]", 100),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(batch.errors["2026-08-06\1app"].cascade_count, 1,
 			"a flush lands between keystrokes, so a correction still in progress at "
 				.. "the boundary is the normal case rather than an edge one")
@@ -497,7 +497,7 @@ helpers.describe("aggregate walker: corrections", function()
 	it("measures how quickly the user resumed", function()
 		local batch = Walker.walk({
 			key("a", 100), key("[BS]", 100), key("b", 250),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local row = batch.errors["2026-08-06\1app"]
 		helpers.assert_eq(row.recovery_count, 1)
 		helpers.assert_eq(row.recovery_sum_ms, 250)
@@ -506,7 +506,7 @@ helpers.describe("aggregate walker: corrections", function()
 	it("does not call a coffee break recovery time", function()
 		local batch = Walker.walk({
 			key("a", 100), key("[BS]", 100), key("b", PAUSE_MS + 60000),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(batch.errors["2026-08-06\1app"].recovery_count, 0,
 			"past the pause threshold the user stopped typing rather than thought "
 				.. "about the fix, and folding that in would report a lunch break as "
@@ -545,7 +545,7 @@ helpers.describe("aggregate walker: when the typing happened", function()
 		-- Read back through the same os.date the walk uses, so a machine in any
 		-- time zone agrees with itself.
 		local at = os.time({ year = 2026, month = 8, day = 6, hour = 10, min = 7, sec = 0 })
-		local batch = Walker.walk(events, "2026-08-06", "app", nil, clock_at(#events, at))
+		local batch = Walker.walk(events, "2026-08-06", "app", nil, Fixture.qwerty_clock(clock_at(#events, at)))
 
 		local hour = os.date("%H", at)
 		local minute = tonumber(os.date("%M", at))
@@ -565,7 +565,7 @@ helpers.describe("aggregate walker: when the typing happened", function()
 	it("records the first and last five-minute slot the user typed in", function()
 		local events = typed("ab")
 		local at = os.time({ year = 2026, month = 8, day = 6, hour = 14, min = 32, sec = 0 })
-		local batch = Walker.walk(events, "2026-08-06", "app", nil, clock_at(#events, at))
+		local batch = Walker.walk(events, "2026-08-06", "app", nil, Fixture.qwerty_clock(clock_at(#events, at)))
 		local row = batch.chars_class["2026-08-06\1app"]
 		-- The slot the activity histogram bins the keystroke in, as on Windows and
 		-- macOS (corpus vector typed_minutes_use_five_minute_slots): 14:32 is 14:30.
@@ -576,7 +576,7 @@ helpers.describe("aggregate walker: when the typing happened", function()
 	end)
 
 	it("skips the time-of-day tables rather than guessing when it has no clock", function()
-		local batch = Walker.walk(typed("abc"), "2026-08-06", "app")
+		local batch = Walker.walk(typed("abc"), "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_true(next(batch.hourly) == nil,
 			"a keystroke with no timestamp has no hour. Defaulting to the flush time "
 				.. "would pile a whole session onto whichever minute the daemon "
@@ -602,7 +602,7 @@ helpers.describe("aggregate walker: runs of typing", function()
 	local SESSION_GAP_MS = Timings.ms("keystats", "session_gap_ms")
 
 	it("counts an uninterrupted run as one burst", function()
-		local batch = Walker.walk(typed("bonjour tout le monde", 90), "2026-08-06", "app")
+		local batch = Walker.walk(typed("bonjour tout le monde", 90), "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local row = batch.bursts["2026-08-06\1app"]
 		helpers.assert_not_nil(row, "the burst panel had no rows at all before this")
 		helpers.assert_eq(row.count_total, 1)
@@ -614,14 +614,14 @@ helpers.describe("aggregate walker: runs of typing", function()
 			key("a", 80), key("b", 80),
 			key("c", BURST_GAP_MS + 500),
 			key("d", 80),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(batch.bursts["2026-08-06\1app"].count_total, 2,
 			"a burst is a run with no real gap in it; merging across one would "
 				.. "report a single long fluent stretch the user never had")
 	end)
 
 	it("credits a burst still open when the stream ends", function()
-		local batch = Walker.walk(typed("abc", 80), "2026-08-06", "app")
+		local batch = Walker.walk(typed("abc", 80), "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(batch.bursts["2026-08-06\1app"].count_total, 1,
 			"persisting runs every few seconds, so a burst in progress at the "
 				.. "boundary is the common case — dropping it would lose nearly every "
@@ -630,7 +630,7 @@ helpers.describe("aggregate walker: runs of typing", function()
 
 	it("keeps the squared delays so rhythm is recoverable", function()
 		local batch = Walker.walk({ key("a", 0), key("b", 100), key("c", 200) },
-			"2026-08-06", "app")
+			"2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local row = batch.bursts["2026-08-06\1app"]
 		helpers.assert_eq(row.inter_sum, 300)
 		helpers.assert_eq(row.inter_sumsq, 100 * 100 + 200 * 200,
@@ -640,7 +640,7 @@ helpers.describe("aggregate walker: runs of typing", function()
 	end)
 
 	it("records one session for a continuous stretch", function()
-		local batch = Walker.walk(typed("bonjour", 90), "2026-08-06", "app")
+		local batch = Walker.walk(typed("bonjour", 90), "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local row = batch.sessions["2026-08-06\1app"]
 		helpers.assert_not_nil(row, "the session panel was empty too")
 		helpers.assert_eq(row.count_total, 1)
@@ -652,7 +652,7 @@ helpers.describe("aggregate walker: runs of typing", function()
 			key("a", 80), key("b", 80),
 			key("c", BURST_GAP_MS + 500),
 			key("d", 80),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(batch.sessions["2026-08-06\1app"].count_total, 1,
 			"a pause long enough to break a burst is a pause within one session — "
 				.. "the two thresholds measure different things, and using one for "
@@ -661,7 +661,7 @@ helpers.describe("aggregate walker: runs of typing", function()
 		local long = Walker.walk({
 			key("a", 80),
 			key("b", SESSION_GAP_MS + 1000),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(long.sessions["2026-08-06\1app"].count_total, 2)
 	end)
 
@@ -679,7 +679,7 @@ helpers.describe("aggregate walker: the pause buckets", function()
 	end
 
 	it("credits a delay to every threshold at or above it", function()
-		local batch = Walker.walk({ key("a", 0), key("b", 1500) }, "2026-08-06", "app")
+		local batch = Walker.walk({ key("a", 0), key("b", 1500) }, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_not_nil(bucket(batch, 2000), "the dropdown behind this had nothing to read")
 		helpers.assert_eq(bucket(batch, 1000).time_sum, 0,
 			"a 1500 ms gap is longer than the 1 s threshold, so that bucket excludes it")
@@ -692,7 +692,7 @@ helpers.describe("aggregate walker: the pause buckets", function()
 
 	it("counts the keystrokes each bucket credits", function()
 		local batch = Walker.walk({ key("a", 0), key("b", 200), key("c", 300) },
-			"2026-08-06", "app")
+			"2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(bucket(batch, 1000).credited, 3,
 			"the dashboard divides the bucket's time by this to get a mean delay. "
 				.. "Dividing by a keystroke count that includes the pauses the bucket "
@@ -701,7 +701,7 @@ helpers.describe("aggregate walker: the pause buckets", function()
 	end)
 
 	it("unrolls one row per threshold for the writer", function()
-		local batch = Walker.walk(typed("ab", 100), "2026-08-06", "app")
+		local batch = Walker.walk(typed("ab", 100), "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local rows = Walker.daily_rows(batch).app_buckets
 		helpers.assert_true(#rows > 1,
 			"the schema keys these by (device, date, app, bucket_ms), so a single "

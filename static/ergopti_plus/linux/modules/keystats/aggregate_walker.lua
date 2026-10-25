@@ -57,49 +57,65 @@ local function read_file(path)
 	return content
 end
 
---- The layout the keyboard hook resolves keystrokes through, or nil. It is a
---- property of the hook that changes only from the menu, so it is read once
---- per walk rather than per keystroke.
---- @return string|nil
-local function active_layout()
-	local ok_hook, Hook = pcall(require, "adapters.keyboard_hook")
-	if ok_hook and type(Hook.get_layout) == "function" then
-		local ok_get, name = pcall(Hook.get_layout)
-		if ok_get and type(name) == "string" and name ~= "" then return name end
-	end
-	return nil
+--- Validates the physical family against its actual provider registry.
+local function physical_family(family)
+	local known = require("modules.hotstrings.input_reader").get_layouts()
+	assert(type(family) == "string" and type(known) == "table" and known[family],
+		"Metrics require a captured supported physical keyboard family")
+	return family
+end
+
+--- Captures the provider's family at input, before any mutable metric counters.
+--- @return string Physical keyboard family.
+function M.capture_layout()
+	local Hook = require("adapters.keyboard_hook")
+	assert(type(Hook.get_layout) == "function", "Metrics capture has no physical family provider")
+	return physical_family(Hook.get_layout())
 end
 
 --- The finger lookup for the physical base the hook reads through. Not the
 --- user's typing layout: the question is which key on the board produced the
 --- character, and that is what the hook resolved it against.
 --- @return table|nil
-local function finger_lookup()
+local function finger_lookup(family)
 	local ok_paths, Paths = pcall(require, "infra.paths")
 	if not ok_paths then return nil end
 	local path = Paths.shared("data/keycodes/azerty.json")
 	if not path then return nil end
 	local ok_json, Json = pcall(require, "json")
 	if not ok_json then return nil end
-	return FingerMap.load(active_layout() or "qwerty", read_file, Json.decode, path)
+	return FingerMap.load(family, read_file, Json.decode, path)
 end
 
--- The shared walk, with the Linux finger port. The lookup is resolved per
--- keystroke through FingerMap's own per-layout cache.
-local Walk = SharedWalker.new({
-	timings = {
-		max_keystroke_delay_ms = Timings.ms("keystats", "max_keystroke_delay_ms"),
-		think_pause_ms = Timings.ms("keystats", "think_pause_ms"),
-		burst_gap_ms = Timings.ms("keystats", "burst_gap_ms"),
-		session_gap_ms = Timings.ms("keystats", "session_gap_ms"),
-		auto_repeat_max_delay_ms = Timings.ms("keystats", "auto_repeat_max_delay_ms"),
-	},
-	finger_of = function(char)
-		local finger = FingerMap.finger_of(finger_lookup(), char)
+local WALK_TIMINGS = {
+	max_keystroke_delay_ms = Timings.ms("keystats", "max_keystroke_delay_ms"),
+	think_pause_ms = Timings.ms("keystats", "think_pause_ms"),
+	burst_gap_ms = Timings.ms("keystats", "burst_gap_ms"),
+	session_gap_ms = Timings.ms("keystats", "session_gap_ms"),
+	auto_repeat_max_delay_ms = Timings.ms("keystats", "auto_repeat_max_delay_ms"),
+}
+
+--- Closes the finger port over one immutable family, never the live provider.
+local function new_walk(family)
+	local lookup
+	if family then lookup = assert(finger_lookup(family), "Metrics physical finger catalogue is unavailable") end
+	return SharedWalker.new({ timings = WALK_TIMINGS, finger_of = function(char)
+		if not lookup then return nil end -- Settlement has no typing entry or finger.
+		local finger = FingerMap.finger_of(lookup, char)
 		if finger == FingerMap.UNKNOWN then return nil end
 		return finger
-	end,
-})
+	end })
+end
+
+local Walk = new_walk()
+local walks_by_family = {}
+
+--- Retains one finger port per registered physical family.
+local function captured_walk(family)
+	family = physical_family(family)
+	if not walks_by_family[family] then walks_by_family[family] = new_walk(family) end
+	return walks_by_family[family]
+end
 
 --- Fills the fields of a shared walk context a fresh or recovered one lacks.
 --- @param ctx table
@@ -131,9 +147,8 @@ end
 --- @param date_str string "YYYY-MM-DD".
 --- @param app string Application identifier.
 --- @param batch table|nil An existing batch to add to; a fresh one when absent.
---- @param clock table|nil { times = {monotonic_ms…}, wall_offset_ms = n } to place
----        keystrokes on the wall clock. Absent means the time-of-day tables are
----        skipped rather than filled with a guess.
+--- @param clock table Captured physical_layout and optional reported layout,
+---        times, wall_times or wall_offset_ms. Missing time ports skip histograms.
 --- @param ctx table|nil The application's walk context (see M.settle), carried
 ---        from the previous flush and updated in place. Without it, everything
 ---        still open is credited when the stream ends.
@@ -141,6 +156,9 @@ end
 function M.walk(events, date_str, app, batch, clock, ctx)
 	batch = batch or Helpers.new_batch()
 	if type(events) ~= "table" then return batch end
+	assert(type(clock) == "table", "Metrics walk requires captured input context")
+	assert(clock.layout == nil or type(clock.layout) == "string", "Invalid captured metrics layout label")
+	local typing_walk = captured_walk(clock.physical_layout)
 	-- Nothing continues across midnight: what the context still holds belongs
 	-- to the day it was typed on.
 	if ctx and ctx.date and ctx.date ~= date_str then M.settle(ctx, nil, batch, true) end
@@ -176,7 +194,7 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 		end
 	end
 
-	Walk.walk_typing(batch, walk_ctx, { app = app, date = date_str, events = events, layout = active_layout() },
+	typing_walk.walk_typing(batch, walk_ctx, { app = app, date = date_str, events = events, layout = clock.layout },
 		slot_of, function(index, delay) return gaps[index] or delay end)
 
 	if ctx then

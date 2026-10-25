@@ -538,6 +538,14 @@ local function observe_calendar(clock)
 	return clock
 end
 
+--- Captures physical metadata before counters or raw input can be admitted.
+local function capture_input_clock()
+	local family = AggregateWalker.capture_layout()
+	local clock = observe_calendar()
+	clock.layout = family
+	return clock
+end
+
 --- Returns matching live/session and capture-dated application accumulators.
 local function app_pair(app, at, clock)
 	clock = observe_calendar(clock)
@@ -730,7 +738,7 @@ end
 --- @param scancode     number|nil  Physical evdev code captured at keydown.
 local function ingest_keydown(ch, timestamp_ms, app_id, scancode)
 	if not may_record() then return end
-	local clock = observe_calendar()
+	local clock = capture_input_clock()
 
 	-- A correction is an input event but types nothing, so neither speed readout
 	-- counts it: the Windows widget is pushed for characters only and macOS
@@ -862,12 +870,13 @@ function M.record_physical_key(app_id, scancode, timestamp_ms)
 end
 
 ensure_pending = function(app_id, clock)
-	clock = clock or observe_calendar()
+	assert(type(clock) == "table" and type(clock.layout) == "string", "Raw metrics require captured physical context")
 	local pending = _pending_typing_events[app_id]
 	if not pending then pending = { runs = {} }; _pending_typing_events[app_id] = pending end
 	local run = pending.runs[#pending.runs]
-	if not run or run.date ~= clock.date then
-		run = { date = clock.date, ts = clock.ts, text = {}, events = {}, times = {}, wall_times = {} }
+	if not run or run.date ~= clock.date or run.layout ~= clock.layout then
+		run = { date = clock.date, ts = clock.ts, layout = clock.layout,
+			text = {}, events = {}, times = {}, wall_times = {} }
 		pending.runs[#pending.runs + 1] = run
 	end
 	return run
@@ -902,7 +911,7 @@ end
 
 --- @param is_private boolean|nil True when `text` is PII and must be redacted.
 local function append_synthetic_events(app_id, text, source, deletes, is_private, clock)
-	clock = clock or observe_calendar()
+	assert(type(clock) == "table", "Synthetic metrics require captured input context")
 	local pending = ensure_pending(app_id, clock)
 	local dated = daily_stats.app(clock.date, app_id, clock.mono_ms)
 	-- Generated output owns its capture clock, including before the first manual
@@ -983,7 +992,7 @@ end
 function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, deletes, is_private, replay_terminator)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
 	if type(replacement) ~= "string" or replacement == "" then return end
-	local live, dated, clock = app_pair(app_id, timestamp_ms)
+	local live, dated, clock = app_pair(app_id, timestamp_ms, capture_input_clock())
 	for _, app in ipairs({ live, dated }) do
 		app.hs_chars = app.hs_chars + char_count(replacement)
 		app.hs_triggers = app.hs_triggers + 1
@@ -1061,7 +1070,7 @@ end
 function M.record_pointer(kind, code, value)
 	local delta = _pointer.observe(kind, code, value)
 	if not delta or not may_record() then return end
-	local clock = observe_calendar()
+	local clock = capture_input_clock()
 	queue_session_events(forward_session(clock, "input", clock.mono_ms, false), clock)
 	local app_id = _focused_app_id
 	if type(app_id) ~= "string" or M.is_unrecorded_app(app_id) then return end
@@ -1119,7 +1128,7 @@ function M.record_synthetic_output(app_id, text, source, timestamp_ms, deletes, 
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
 	if type(text) ~= "string" or text == "" then return end
 	local kind = type(source) == "string" and source or "other"
-	local live, dated, clock = app_pair(app_id, timestamp_ms)
+	local live, dated, clock = app_pair(app_id, timestamp_ms, capture_input_clock())
 	if kind == "llm" then
 		for _, app in ipairs({ live, dated }) do
 			app.llm_chars = app.llm_chars + char_count(text)
@@ -2155,6 +2164,7 @@ local function capture_flush(close_session)
 				for _, event in ipairs(pending.events) do total_time_ms = total_time_ms + (event[2] or 0) end
 				typing_batch[#typing_batch + 1] = {
 					ts = pending.ts, date = date, app = dashboard_app_name(app_id),
+					layout = pending.layout,
 					text = table.concat(pending.text),
 					wpm = SharedMetrics.compute_wpm_from_events(#pending.events, total_time_ms),
 					events_json = _to_json(pending.events),
@@ -2167,7 +2177,8 @@ local function capture_flush(close_session)
 				walker_contexts[app_id] = walker_contexts[app_id] or {}
 				local ok_walk, walked = pcall(AggregateWalker.walk,
 					pending.events, date, dashboard_app_name(app_id), ngram_batch,
-					{ times = pending.times, wall_times = pending.wall_times }, walker_contexts[app_id])
+					{ times = pending.times, wall_times = pending.wall_times,
+						layout = pending.layout, physical_layout = pending.layout }, walker_contexts[app_id])
 				if ok_walk then
 					ngram_batch = walked
 				else
@@ -2525,7 +2536,7 @@ local function restore_flush_buffers(buffers)
 		local newer = _pending_typing_events[app]
 		if newer then
 			local tail, head = older.runs[#older.runs], newer.runs[1]
-			if tail and head and tail.date == head.date then
+			if tail and head and tail.date == head.date and tail.layout == head.layout then
 				for _, field in ipairs({ "text", "events", "times", "wall_times" }) do
 					tail[field] = prepend(tail[field], head[field])
 				end

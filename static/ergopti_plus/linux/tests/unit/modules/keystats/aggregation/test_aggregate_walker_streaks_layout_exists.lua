@@ -101,7 +101,7 @@ helpers.describe("aggregate walker: the streaks the layout exists to reduce", fu
 			"the catalogue must describe at least one finger with two keys, or "
 				.. "there is nothing here to measure")
 
-		local batch = Walker.walk(typed(first .. second, 90), "2026-08-06", "app")
+		local batch = Walker.walk(typed(first .. second, 90), "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local row = batch.ergo["2026-08-06\1app"]
 		helpers.assert_not_nil(row, "the ergonomics panel had no rows at all before this")
 		helpers.assert_true(row.same_finger_streak_max >= 2,
@@ -114,7 +114,7 @@ helpers.describe("aggregate walker: the streaks the layout exists to reduce", fu
 	it("does not call two different fingers a run", function()
 		local lookup = require_catalogue()
 		local first, _, other = pick_pair(lookup)
-		local batch = Walker.walk(typed(first .. other, 90), "2026-08-06", "app")
+		local batch = Walker.walk(typed(first .. other, 90), "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(batch.ergo["2026-08-06\1app"].same_finger_streak_max, 1,
 			"a maximum of one means no run happened; seeding the counter at two "
 				.. "would report every isolated keystroke as a same-finger event")
@@ -125,7 +125,7 @@ helpers.describe("aggregate walker: the streaks the layout exists to reduce", fu
 		local first, second = pick_pair(lookup)
 		local batch = Walker.walk({
 			key(first, 90), key("[BS]", 90), key(second, 90),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(batch.ergo["2026-08-06\1app"].same_finger_streak_max, 1,
 			"what follows a backspace continues from a different character than it "
 				.. "appears to, so those two keystrokes were never consecutive under "
@@ -137,14 +137,14 @@ helpers.describe("aggregate walker: the streaks the layout exists to reduce", fu
 		local first, second = pick_pair(lookup)
 		local batch = Walker.walk({
 			key(first, 90), key(second, 0, "hotstring"),
-		}, "2026-08-06", "app")
+		}, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(batch.ergo["2026-08-06\1app"].same_finger_streak_max, 1,
 			"counting the driver's own output would make the layout look worse the "
 				.. "more it types for the user, which is backwards")
 	end)
 
 	it("breaks the run on a character the catalogue does not describe", function()
-		local batch = Walker.walk(typed("\194\1691\194\1692", 90), "2026-08-06", "app")
+		local batch = Walker.walk(typed("\194\1691\194\1692", 90), "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local row = batch.ergo["2026-08-06\1app"]
 		helpers.assert_true(row.same_finger_streak_max <= 1,
 			"guessing a finger for a character the layout data does not cover would "
@@ -152,7 +152,7 @@ helpers.describe("aggregate walker: the streaks the layout exists to reduce", fu
 	end)
 
 	it("hands the row to the writer", function()
-		local batch = Walker.walk(typed("abc", 90), "2026-08-06", "app")
+		local batch = Walker.walk(typed("abc", 90), "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local rows = Walker.daily_rows(batch).ergo
 		helpers.assert_eq(#rows, 1,
 			"a table computed and never emitted is the same blank panel as one "
@@ -168,7 +168,7 @@ end)
 helpers.describe("linux-hourly-manual-errors", function()
 	local function walk(events, times)
 		return Walker.daily_rows(Walker.walk(events, "2000-01-01", "owned", nil,
-			{ times = times, wall_offset_ms = 0 }))
+			Fixture.qwerty_clock({ times = times, wall_offset_ms = 0 })))
 	end
 	it("linux-hourly-manual-errors: manual correction bins are cumulative without changing typed counts", function()
 		local at = os.time({ year = 2000, month = 1, day = 1, hour = 10, min = 0, sec = 0 }) * 1000
@@ -223,7 +223,7 @@ end)
 helpers.describe("aggregate walker: backspace unigram retention", function()
 	it("linux-backspace-unigrams: manual correction keeps its count and native delay", function()
 		local batch = Walker.walk({ key("a", 100), key("[BS]", 110), key("b", 120) },
-			"2026-08-06", "app")
+			"2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local item = batch.ngram.ngram_chars["2026-08-06\1app\1[BS]"]
 		helpers.assert_true(item ~= nil, "the supported Backspace row survives persistence")
 		helpers.assert_eq(item.c, 1)
@@ -243,7 +243,7 @@ helpers.describe("aggregate walker: backspace unigram retention", function()
 	it("linux-backspace-unigrams: synthetic deletions keep HS and LLM source counts", function()
 		local batch = Walker.walk({ key("a", 100), key("[BS]", 0, "hotstring"),
 			key("[BS]", 0, "hotstring"), key("[BS]", 0, "llm"), key("b", 100) },
-			"2026-08-06", "app")
+			"2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local item = batch.ngram.ngram_chars["2026-08-06\1app\1[BS]"]
 		helpers.assert_true(item ~= nil)
 		helpers.assert_eq(item.c, 3)
@@ -259,7 +259,7 @@ helpers.describe("aggregate walker: backspace unigram retention", function()
 	end)
 	it("linux-backspace-unigrams: cascade and recovery contexts stay independent", function()
 		local batch = Walker.walk({ key("a", 100), key("[BS]", 100), key("[BS]", 100),
-			key("[BS]", 100), key("b", 140) }, "2026-08-06", "app")
+			key("[BS]", 100), key("b", 140) }, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local item = batch.ngram.ngram_chars["2026-08-06\1app\1[BS]"]
 		helpers.assert_true(item ~= nil)
 		helpers.assert_eq(item.c, 3)
@@ -280,7 +280,7 @@ helpers.describe("aggregate walker: backspace unigram retention", function()
 	end)
 	it("linux-backspace-unigrams: literal software spelling stays four codepoints", function()
 		local batch = Walker.walk({ key("[", 0, "other"), key("B", 0, "other"),
-			key("S", 0, "other"), key("]", 0, "other") }, "2026-08-06", "app")
+			key("S", 0, "other"), key("]", 0, "other") }, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(count_of(batch, "ngram_chars", "[BS]"), 0)
 		for _, char in ipairs({ "[", "B", "S", "]" }) do
 			local item = batch.ngram.ngram_chars["2026-08-06\1app\1" .. char]
@@ -309,7 +309,7 @@ helpers.describe("aggregate walker: backspace sequences", function()
 	end
 	it("linux-backspace-sequences: a manual correction ends a bigram and a trigram", function()
 		local batch = Walker.walk({ key("t", 100), key("h", 100), key("e", 100), key("[BS]", 110) },
-			"2026-08-06", "app")
+			"2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local bigram, trigram = item(batch, "ngram_bigrams", "e[BS]"), item(batch, "ngram_trigrams", "he[BS]")
 		helpers.assert_true(bigram ~= nil and trigram ~= nil, "both sequences are counted")
 		helpers.assert_eq(bigram.c, 1)
@@ -324,7 +324,7 @@ helpers.describe("aggregate walker: backspace sequences", function()
 	end)
 	it("linux-backspace-sequences: consecutive corrections chain with each other", function()
 		local batch = Walker.walk({ key("a", 100), key("b", 100), key("[BS]", 90), key("[BS]", 80),
-			key("[BS]", 70) }, "2026-08-06", "app")
+			key("[BS]", 70) }, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "b[BS]"), 1)
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "[BS][BS]"), 2)
 		helpers.assert_eq(item(batch, "ngram_bigrams", "[BS][BS]").td, 150)
@@ -335,7 +335,7 @@ helpers.describe("aggregate walker: backspace sequences", function()
 	end)
 	it("linux-backspace-sequences: the characters after a correction chain with it", function()
 		local batch = Walker.walk({ key("a", 100), key("[BS]", 100), key("b", 100), key("c", 100),
-			key("[BS]", 100) }, "2026-08-06", "app")
+			key("[BS]", 100) }, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "[BS]b"), 1)
 		helpers.assert_eq(item(batch, "ngram_bigrams", "[BS]b").td, 100, "the next keystroke times the pair")
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "bc"), 1)
@@ -349,20 +349,20 @@ helpers.describe("aggregate walker: backspace sequences", function()
 	end)
 	it("linux-backspace-sequences: a pause after the correction breaks the sequence", function()
 		local batch = Walker.walk({ key("a", 100), key("[BS]", 100), key("b", PAUSE_MS) },
-			"2026-08-06", "app")
+			"2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "a[BS]"), 1)
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "[BS]b"), 0)
 	end)
 	it("linux-backspace-sequences: a pause before the correction breaks the sequence", function()
 		local batch = Walker.walk({ key("a", 100), key("b", 100), key("[BS]", PAUSE_MS) },
-			"2026-08-06", "app")
+			"2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(count_of(batch, "ngram_chars", "[BS]"), 1, "the correction itself still counts")
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "b[BS]"), 0)
 		helpers.assert_eq(count_of(batch, "ngram_trigrams", "ab[BS]"), 0)
 	end)
 	it("linux-backspace-sequences: a pause before the character breaks the sequence", function()
 		local batch = Walker.walk({ key("a", 100), key("b", PAUSE_MS), key("[BS]", 100) },
-			"2026-08-06", "app")
+			"2026-08-06", "app", nil, Fixture.qwerty_clock())
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "b[BS]"), 1)
 		helpers.assert_eq(count_of(batch, "ngram_trigrams", "ab[BS]"), 0,
 			"two characters either side of a pause are not one sequence")
@@ -370,7 +370,7 @@ helpers.describe("aggregate walker: backspace sequences", function()
 	it("linux-backspace-sequences: synthetic deletions keep their source and chain through the output", function()
 		local batch = Walker.walk({ key("b", 100), key("t", 100), key("w", 100),
 			key("[BS]", 0, "hotstring"), key("[BS]", 0, "hotstring"),
-			key("x", 0, "hotstring"), key("[BS]", 0, "llm") }, "2026-08-06", "app")
+			key("x", 0, "hotstring"), key("[BS]", 0, "llm") }, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local erase = item(batch, "ngram_bigrams", "w[BS]")
 		helpers.assert_true(erase ~= nil, "the trigger the expansion erased is counted")
 		helpers.assert_eq(erase.esrc.hotstring, 1)
@@ -381,7 +381,7 @@ helpers.describe("aggregate walker: backspace sequences", function()
 		helpers.assert_eq(batch.errors["2026-08-06\1app"].bs_total, 0)
 	end)
 	it("linux-backspace-sequences: the writer receives the correction sequences", function()
-		local batch = Walker.walk({ key("a", 100), key("b", 100), key("[BS]", 100) }, "2026-08-06", "app")
+		local batch = Walker.walk({ key("a", 100), key("b", 100), key("[BS]", 100) }, "2026-08-06", "app", nil, Fixture.qwerty_clock())
 		local found = {}
 		for _, group in ipairs(Walker.batches_for_writer(batch)) do
 			for token in pairs(group.ngrams) do found[group.table_name .. ":" .. token] = true end
@@ -409,7 +409,7 @@ helpers.describe("aggregate walker: cross-flush context", function()
 	local function walk_typed(ctx, text, start, batch, day)
 		local events, times = typed(text, 100), {}
 		for index = 1, #events do times[index] = start + (index - 1) * 100 end
-		return Walker.walk(events, day or "2026-08-06", "app", batch, { times = times, wall_offset_ms = 0 }, ctx),
+		return Walker.walk(events, day or "2026-08-06", "app", batch, Fixture.qwerty_clock({ times = times, wall_offset_ms = 0 }), ctx),
 			start + (#events - 1) * 100
 	end
 	it("linux-cross-flush-walk: a session cut by two flushes is one session", function()
@@ -440,10 +440,10 @@ helpers.describe("aggregate walker: cross-flush context", function()
 		local ctx = {}
 		local _, last = walk_typed(ctx, "ab", 1000)
 		local bs = Walker.walk({ key("[BS]", 100), key("[BS]", 100) }, "2026-08-06", "app", nil,
-			{ times = { last + 100, last + 200 }, wall_offset_ms = 0 }, ctx)
+			Fixture.qwerty_clock({ times = { last + 100, last + 200 }, wall_offset_ms = 0 }), ctx)
 		helpers.assert_eq(count_of(bs, "ngram_bigrams", "b[BS]"), 1)
 		local more = Walker.walk({ key("[BS]", 100), key("c", 100) }, "2026-08-06", "app", nil,
-			{ times = { last + 300, last + 400 }, wall_offset_ms = 0 }, ctx)
+			Fixture.qwerty_clock({ times = { last + 300, last + 400 }, wall_offset_ms = 0 }), ctx)
 		helpers.assert_eq(count_of(more, "ngram_trigrams", "[BS][BS][BS]"), 1)
 		helpers.assert_eq(more.errors[DAY].cascade_count, 1, "three corrections across two flushes are one cascade")
 		helpers.assert_eq(more.errors[DAY].recovery_count, 1)
@@ -451,7 +451,7 @@ helpers.describe("aggregate walker: cross-flush context", function()
 	it("linux-cross-flush-walk: the stamps cut a session the capped delays cannot", function()
 		local events = { key("a", 100), key("b", Fixture.PAUSE_MS) }
 		local batch = Walker.walk(events, "2026-08-06", "app", nil,
-			{ times = { 1000, 1000 + SESSION_GAP_MS + 1 }, wall_offset_ms = 0 })
+			Fixture.qwerty_clock({ times = { 1000, 1000 + SESSION_GAP_MS + 1 }, wall_offset_ms = 0 }))
 		helpers.assert_eq(batch.sessions[DAY].count_total, 2,
 			"a buffered delay never exceeds the pause cap, so only the stamps see the gap")
 	end)
@@ -506,7 +506,7 @@ helpers.describe("aggregate walker: shared correction sequence corpus", function
 			for _, flush in ipairs(vec.flushes) do
 				local events = {}
 				for _, ev in ipairs(flush) do events[#events + 1] = key(ev.char, ev.delay) end
-				batch = Walker.walk(events, data.date, data.app, batch, nil, ctx)
+				batch = Walker.walk(events, data.date, data.app, batch, Fixture.qwerty_clock(nil), ctx)
 			end
 			local prefix = data.date .. "\1" .. data.app .. "\1"
 			for family, expected in pairs(vec.expected) do
@@ -523,4 +523,25 @@ helpers.describe("aggregate walker: shared correction sequence corpus", function
 			end
 		end)
 	end
+end)
+
+helpers.describe("layout-capture-context", function()
+	it("refuses absent or unsupported captured family before advancing context", function()
+		local contexts = { date = "2026-08-05", app = "app" }
+		for _, clock in ipairs({ false, {}, { physical_layout = "unsupported" } }) do
+			helpers.assert_eq(pcall(Walker.walk, typed("mn"), "2026-08-06", "app", nil, clock, contexts), false)
+			helpers.assert_eq(contexts, { date = "2026-08-05", app = "app" })
+		end
+	end)
+
+	it("settles recovered history without a physical input capture", function()
+		local context = { date = "2026-08-06", app = "app",
+			current_session = { char_count = 2, total_ms = 100 },
+			current_burst = { char_count = 2, sum_delays = 100, sum_delays_sq = 10000, max_delay = 100 } }
+		local batch = assert(Walker.settle(context, nil, nil, true))
+		helpers.assert_eq(batch.sessions["2026-08-06\1app"].longest_chars, 2)
+		helpers.assert_eq(batch.bursts["2026-08-06\1app"].max_chars, 2)
+		helpers.assert_nil(next(batch.layouts))
+		helpers.assert_eq(context, {})
+	end)
 end)
