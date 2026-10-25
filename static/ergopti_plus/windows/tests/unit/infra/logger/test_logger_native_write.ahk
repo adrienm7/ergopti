@@ -645,3 +645,61 @@ _LNWPrivacyMultilineRecord() {
 	}
 }
 Test("Logger privacy: multiline bodies cannot impersonate separate source records", _LNWPrivacyMultilineRecord)
+
+
+_LNWPrivacyBounded(User, Mode) {
+	global _SharedDir, _LOGGER_DEBUG_ENABLED, _LOGGER_APPEND_OWNERS
+	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
+	AssertEqual(0, _LOGGER_APPEND_OWNERS.Count, "the private sink requires no foreign writer")
+	AssertEqual(0, _LOGGER_APPEND_DEBTS.Count, "the private sink requires no foreign append debt")
+	AssertEqual(0, _LOGGER_APPEND_DEBT_REPAIRS.Count, "the private sink requires no foreign repair")
+	Policy := _LoggerPrivacyState()
+	Saved := [Policy["config"], Policy["root"], _LOGGER_DEBUG_ENABLED]
+	Path := _FSWL_Path()
+	try {
+		Policy["root"] := _SharedDir
+		Policy["config"] := _LNWPrivacyContext(User)
+		_LOGGER_DEBUG_ENABLED := true
+		Expected := Policy["config"]["rules"]["account_placeholder"] . "`r`n"
+		Capacity := StrPut(Expected, "UTF-8") + 2
+		if Mode = "oversize" {
+			RawCapacity := StrPut(User . "`r`n", "UTF-8") + 2
+			AssertTrue(RawCapacity < Capacity,
+				"the canonical redactor must genuinely expand this account name")
+			AssertFalse(LoggerAppendBoundedDebug(Path, User, RawCapacity))
+			AssertFalse(FileExist(Path),
+				"an oversized redacted record must be refused before creating a log")
+			AssertFalse(FileExist(Path . ".1"), "an oversized record cannot rotate an archive")
+			return
+		}
+		if Mode = "rotate"
+			FileAppend("prior", Path, "UTF-8-RAW")
+		AssertTrue(LoggerAppendBoundedDebug(Path, User, Capacity),
+			"the exact sanitized payload must fit after any required rotation")
+		AssertEqual(Expected, FileRead(Path, "UTF-8"),
+			"the written record must be redacted exactly once")
+		AssertEqual(Capacity, FileGetSize(Path), "the native file must respect the sanitized byte cap")
+		if Mode = "rotate"
+			AssertEqual("prior", FileRead(Path . ".1", "UTF-8"),
+				"rotation must retain the original bounded file")
+		else
+			AssertFalse(FileExist(Path . ".1"), "an exact first record needs no archive")
+	} finally {
+		Policy["config"] := Saved[1]
+		Policy["root"] := Saved[2]
+		_LOGGER_DEBUG_ENABLED := Saved[3]
+		for OwnedPath in [Path, Path . ".1"] {
+			_LNW_ReleaseOwnedDebt(OwnedPath)
+			if FileExist(OwnedPath)
+				FileDelete(OwnedPath)
+		}
+	}
+}
+for _LNW_BoundedUser in ["sam", "user"] {
+	for _LNW_BoundedMode in ["oversize", "rotate", "exact"]
+		Test("Logger privacy: bounded sink user=" . _LNW_BoundedUser . " mode=" . _LNW_BoundedMode
+			. " (logger-redacted-byte-cap)", _LNWPrivacyBounded.Bind(_LNW_BoundedUser, _LNW_BoundedMode))
+}
+
+Test("Logger privacy: a shrinking record is sized after redaction (logger-redacted-byte-cap)",
+	_LNWPrivacyBounded.Bind("long-account-name", "exact"))
