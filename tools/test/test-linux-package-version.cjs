@@ -13,6 +13,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { createHash } = require('node:crypto');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -45,6 +46,26 @@ function bash(file, args = [], versionEnv = env) {
 }
 function projected(format, directory, json = sourcePackage, versionEnv = env) {
 	return run(process.execPath, [projector, format, directory, json], versionEnv);
+}
+function inventory(directory, relative = '') {
+	const entries = [];
+	for (const item of fs
+		.readdirSync(path.join(directory, relative), { withFileTypes: true })
+		.sort((left, right) => left.name.localeCompare(right.name))) {
+		const name = relative ? `${relative}/${item.name}` : item.name;
+		const filename = path.join(directory, name);
+		if (item.isDirectory()) entries.push(['directory', name], ...inventory(directory, name));
+		else if (item.isSymbolicLink()) entries.push(['symlink', name, fs.readlinkSync(filename)]);
+		else {
+			assert.ok(item.isFile(), `unexpected payload node: ${name}`);
+			entries.push([
+				'file',
+				name,
+				createHash('sha256').update(fs.readFileSync(filename)).digest('hex')
+			]);
+		}
+	}
+	return entries;
 }
 function refusal(label, directory, json = sourcePackage, versionEnv = env) {
 	const result = projected('deb', directory, json, versionEnv);
@@ -107,6 +128,30 @@ try {
 			if (format === 'rpm') {
 				const spec = fs.readFileSync(path.join(BUILD, 'rpm/SPECS/ergopti.spec'), 'utf8');
 				assert.equal(spec.match(/^Version:\s+(\S+)$/m)?.[1], native);
+				const source = spec.match(/^Source0:\s+(\S+)$/m)?.[1];
+				assert.ok(source, 'the actual recipe must declare its owned source archive');
+				const archiveName = source
+					.replaceAll('%{name}', 'ergopti')
+					.replaceAll('%{version}', native);
+				const sourceArchive = path.join(BUILD, 'rpm/SOURCES', archiveName);
+				const relocated = path.join(scratch, `rpm-${archives}/BUILD/ergopti-${native}-build`);
+				fs.mkdirSync(relocated, { recursive: true });
+				success(run('tar', ['-xzf', sourceArchive, '-C', relocated]));
+				const extracted = path.join(relocated, `ergopti-${native}/usr/lib/ergopti`);
+				assert.deepEqual(
+					inventory(path.join(relocated, `ergopti-${native}`)),
+					inventory(path.join(BUILD, `rpm/BUILD/ergopti-${native}`)),
+					'the declared RPM source archive must preserve the entire staged tree without checkout fallback'
+				);
+				assert.deepEqual(
+					fs.readFileSync(path.join(extracted, 'bin/libergopti_archive_publication.so')),
+					fs.readFileSync(path.join(BUILD, 'linux/bin/libergopti_archive_publication.so'))
+				);
+				assert.deepEqual(
+					fs.readFileSync(path.join(extracted, '_shared/build_stamp.txt')),
+					fs.readFileSync(path.join(shared, 'build_stamp.txt'))
+				);
+				assert.ok(fs.statSync(path.join(extracted, 'install/launch.sh')).isFile());
 				assert.ok(
 					fs.existsSync(
 						path.join(BUILD, `rpm/BUILD/ergopti-${native}/usr/lib/ergopti/_shared/build_stamp.txt`)
