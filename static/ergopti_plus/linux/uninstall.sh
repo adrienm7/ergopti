@@ -114,7 +114,9 @@ if [ "$SCRIPT_DIR" = /usr/lib/ergopti ]; then
 		pkexec /usr/bin/apt-get remove -y "$PACKAGE_NAME"
 		remove_native_startup
 		exit 0
-	elif command -v rpm >/dev/null 2>&1 && [ "$(rpm -qf --qf '%{NAME}' "$SCRIPT_DIR/uninstall.sh")" = "$PACKAGE_NAME" ]; then
+	elif command -v rpm >/dev/null 2>&1 \
+		&& rpm_owner="$(rpm -qf --qf '%{NAME}' "$SCRIPT_DIR/uninstall.sh")" \
+		&& [ "$rpm_owner" = "$PACKAGE_NAME" ]; then
 		if "$CHECK_ONLY"; then exit 0; fi
 		pkexec /usr/bin/rpm -e "$PACKAGE_NAME"
 		remove_native_startup

@@ -659,6 +659,49 @@ assert results[2].get('status') == 0, 'a reused PID cannot retain a previous own
 		fs.existsSync(path.join(packaged, 'uninstall.sh')),
 		'the helper never deletes package files itself'
 	);
+	// A partial RPM owner name is not an acknowledged ownership query.
+	fs.writeFileSync(path.join(bare, 'pacman'), '#!/bin/bash\nexit 1\n', { mode: 0o755 });
+	fs.writeFileSync(
+		path.join(bare, 'rpm'),
+		[
+			'#!/bin/bash',
+			'[ "$#" -eq 4 ] && [ "$1" = -qf ] && [ "$2" = --qf ] && [ "$3" = "%{NAME}" ] && [ "$4" = "$ERGOPTI_TEST_PACKAGE_FILE" ] || exit 64',
+			'printf "%s" "$ERGOPTI_TEST_PACKAGE_OWNER"',
+			'exit "$ERGOPTI_TEST_QUERY_STATUS"',
+			''
+		].join('\n'),
+		{ mode: 0o755 }
+	);
+	fs.unlinkSync(nativeActionLog);
+	fs.writeFileSync(nativeStartup, ownedStartup);
+	nativeQueryStatus = '23';
+	assert.notEqual(
+		packagedRun('--check').status,
+		0,
+		'failed-rpm-owner-query: partial package-name stdout is not ownership'
+	);
+	assert.notEqual(packagedRun('--yes').status, 0);
+	assert.ok(!fs.existsSync(nativeActionLog), 'a failed RPM query cannot acquire removal authority');
+	assert.equal(fs.readFileSync(nativeStartup, 'utf8'), ownedStartup);
+	nativeQueryStatus = '0';
+	nativePackageOwner = 'another-package';
+	assert.notEqual(packagedRun('--yes').status, 0, 'foreign RPM ownership blocks removal');
+	assert.ok(!fs.existsSync(nativeActionLog));
+	nativePackageOwner = 'ergopti';
+	assert.equal(packagedRun('--check').status, 0, 'a successful exact RPM owner is admitted');
+	assert.ok(!fs.existsSync(nativeActionLog), 'RPM preflight is read-only');
+	nativeActionStatus = '75';
+	assert.equal(packagedRun('--yes').status, 75, 'RPM removal failure is preserved');
+	assert.equal(fs.readFileSync(nativeStartup, 'utf8'), ownedStartup);
+	assert.deepEqual(fs.readFileSync(nativeActionLog, 'utf8').trimEnd().split('\n'), [
+		'/usr/bin/rpm',
+		'-e',
+		'ergopti'
+	]);
+	nativeActionStatus = '0';
+	assert.equal(packagedRun('--yes').status, 0);
+	assert.ok(!fs.existsSync(nativeStartup), 'confirmed RPM removal retires its own startup entry');
+	assert.ok(fs.existsSync(path.join(packaged, 'uninstall.sh')), 'RPM alone owns its package files');
 	console.log('[OK] Linux uninstaller removes only the validated standalone installation.');
 } finally {
 	fs.rmSync(sandbox, { recursive: true, force: true });
