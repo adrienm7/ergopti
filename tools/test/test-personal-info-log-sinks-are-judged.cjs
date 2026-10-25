@@ -130,12 +130,6 @@ const LUA_REDACTORS = [
  */
 const JUDGED = [
 	{
-		file: 'infra/hotstrings/hotstrings_io.ahk',
-		match: 'Global delimiter sets published after durable override replacement.',
-		verdict: 'not-personal',
-		why: 'replacement describes the completed atomic file operation; the constant diagnostic carries no mapping value.'
-	},
-	{
 		file: 'infra/hotstrings/hotstring_dispatch.ahk',
 		match: 'Resolving a dynamic replacement failed; exception detail withheld.',
 		verdict: 'not-personal',
