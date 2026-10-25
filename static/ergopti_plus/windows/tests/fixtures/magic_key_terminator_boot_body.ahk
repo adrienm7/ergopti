@@ -69,8 +69,7 @@ _MKTB_Match(Text, Star := false) {
 }
 
 _MKTB_Boot() {
-	global _MKTB, ConfigurationFile, Features, ScriptInformation
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global _MKTB, ConfigurationFile, Features, ScriptInformation, _HotstringsLegacyDelimiters
 	Mode := _MKTB.Mode, Star := Chr(0x2605), Section := Chr(0xA7), Face := Chr(0x1F600)
 	Magic := (Mode == "default-star" || InStr(Mode, "native-") == 1) ? Star
 		: (Mode == "default-astral" ? Face : Section)
@@ -118,36 +117,24 @@ _MKTB_Boot() {
 	HistoricalWord := "", HistoricalConsumed := ""
 	if Mode == "historical-controls"
 		HistoricalWord := Star . Section . "¤¤", HistoricalConsumed := Section . "¤"
-	else if Mode == "custom-controls"
-		HistoricalWord := "¤" . Star, HistoricalConsumed := "¤" . Star
 	OverrideSource := HistoricalWord == "" ? "" : '[__global__]`nword_delimiters = '
 		. TOML_RenderString(HistoricalWord) . '`nconsumed_delimiters = ' . TOML_RenderString(HistoricalConsumed) . "`n"
 	_UNC_Require(FSWriteDurable(OverridePath, OverrideSource), "The private historical preference file must be durable.")
 	HotstringsConfigInit(OverridePath)
 	AdmittedOverrideSource := FSReadStrict(OverridePath)
-	if _HotstringsWordDelimiters != HistoricalWord || _HotstringsConsumedDelimiters != HistoricalConsumed {
-		; Observe the actual reader's encoding and results without changing its
-		; admission, the stored bytes, or the independent preference goldens.
-		FileAppend("OVERRIDE_FAILURE encoding=" . A_FileEncoding . " acp=" . DllCall("GetACP", "UInt")
-			. " source_unchanged=" . (AdmittedOverrideSource == OverrideSource) . "`n", "**")
-		for Name, Text in Map("expected_word", HistoricalWord, "actual_word", _HotstringsWordDelimiters,
-			"expected_consumed", HistoricalConsumed, "actual_consumed", _HotstringsConsumedDelimiters,
-			"source_utf16", AdmittedOverrideSource)
-			FileAppend("OVERRIDE_HEX " . Name . "=" . _UNC_Hex(_UNC_Units(Text)) . "`n", "**")
-		Raw := FileRead(OverridePath, "RAW"), Bytes := ""
-		loop Raw.Size
-			Bytes .= (A_Index == 1 ? "" : ",") . Format("{:02X}", NumGet(Raw, A_Index - 1, "UChar"))
-		FileAppend("OVERRIDE_BYTES " . Bytes . "`n", "**")
-	}
-	_UNC_Require(_HotstringsWordDelimiters == HistoricalWord && _HotstringsConsumedDelimiters == HistoricalConsumed,
-		"The actual override loader must admit the exact independent preference strings.")
+	_UNC_Require(_HotstringsLegacyDelimiters.Word == HistoricalWord && _HotstringsLegacyDelimiters.Consumed == HistoricalConsumed,
+		"The actual override loader must read the exact independent preference strings for the one-time move.")
 	; Reset only the runtime leaf, then execute the actual entry's current window.
 	ScriptInformation["MagicKey"] := ManifestDefaultFor("hotstrings.trigger_char")
 	_MKTB_ReadBoot(Snapshot)
 	_UNC_Require(ScriptInformation["MagicKey"] == Magic, "The genuine reader must restore the exact persisted scalar.")
 	_UNC_Require(HotstringsTerminatorRecordsInitBoot(Snapshot), "The actual boot record owner refused its admitted snapshot.")
-	_UNC_Require(_HotstringsWordDelimiters == HistoricalWord && _HotstringsConsumedDelimiters == HistoricalConsumed
-		&& FSReadStrict(OverridePath) == AdmittedOverrideSource, "Boot must neither mutate nor rewrite independent historical preferences.")
+	if HistoricalWord != "" {
+		_UNC_Require(FSReadStrict(OverridePath) == AdmittedOverrideSource, "Reading the owner must not touch the historical strings.")
+		_UNC_Require(HotstringsDelimitersBoot(), "The actual boot step must move the historical strings to config.toml.")
+		_UNC_Require(!InStr(FSReadStrict(OverridePath), "word_delimiters") && !InStr(FSReadStrict(OverridePath), "consumed_delimiters"),
+			"The override file must no longer hold the historical strings once they are durable in config.toml.")
+	}
 	return { Magic: Magic, Star: Star, Face: Face, Snapshot: Snapshot }
 }
 
@@ -155,13 +142,17 @@ _MKTB_CheckProjection(Data) {
 	global _MKTB, HSE_Terminators, HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS, _HotstringsTerminatorRecords
 	Mode := _MKTB.Mode
 	if Mode == "historical-controls" {
-		_MKTB_Check(HSE_WORD_TERMINATORS == "★§¤¤" && HSE_CONSUMED_DELIMITERS == "§¤",
-			"Independent historical strings must retain exact order, duplicates and old-star intent.")
+		; The old word string held the configured slot (§), the former star and the
+		; currency sign: every other shipped delimiter was off, the former star and
+		; the currency became records, the currency stayed consumed.
+		_MKTB_Check(HSE_WORD_TERMINATORS == "§★¤" && HSE_CONSUMED_DELIMITERS == "§¤",
+			"The moved historical strings must keep exactly their delimiters and their consumption.")
 		_MKTB_Check(_MKTB_Match("§").Found && _MKTB_Match("★").Found, "Both independently admitted historical markers must terminate.")
 		return
 	}
 	if Mode == "custom-controls" {
-		_MKTB_Check(HSE_WORD_TERMINATORS == "★😀" && HSE_CONSUMED_DELIMITERS == "★",
+		_MKTB_Check(HSE_WORD_TERMINATORS == HSE_TerminatorDefaultWordDelimiters() . "😀"
+			&& HSE_CONSUMED_DELIMITERS == HSE_TerminatorDefaultConsumedDelimiters(),
 			"Disabled currency must withdraw its exact scalar while the enabled nonconsumed face remains independent.")
 		_MKTB_Check(_HotstringsTerminatorRecords.Records.Length == 2 && _HotstringsTerminatorRecords.Rejected.Length == 0,
 			"Both independent custom records must be admitted by the actual boot owner.")
@@ -177,13 +168,12 @@ _MKTB_CheckProjection(Data) {
 	}
 	if Mode == "restore-section" {
 		_UNC_Require(HSE_Terminators.addCustom("runtime_only", ["¤"], "Runtime only", true), "The runtime-only token must be genuinely registered.")
-		Restored := HSE_TerminatorRestoreDefaults("★¤", "★¤")
-		_MKTB_Check(_MKTB_ContainsScalar(Restored.DefaultWord, Data.Magic)
-			&& Restored.DefaultConsumed == Data.Magic && !_MKTB_ContainsScalar(Restored.DefaultWord, Data.Star),
+		DefaultWord := HSE_TerminatorDefaultWordDelimiters(), DefaultConsumed := HSE_TerminatorDefaultConsumedDelimiters()
+		_MKTB_Check(_MKTB_ContainsScalar(DefaultWord, Data.Magic)
+			&& DefaultConsumed == Data.Magic && !_MKTB_ContainsScalar(DefaultWord, Data.Star),
 			"Reset defaults must honor the configured magic scalar without resetting that setting.")
-		_MKTB_Check(!_MKTB_ContainsScalar(Restored.DefaultWord, "¤") && !_MKTB_ContainsScalar(Restored.DefaultConsumed, "¤")
-			&& _MKTB_ContainsScalar(Restored.Word, "¤") && _MKTB_ContainsScalar(Restored.Consumed, "¤"),
-			"Runtime-only tokens are personal strings, never silently promoted to shipped reset defaults.")
+		_MKTB_Check(!_MKTB_ContainsScalar(DefaultWord, "¤") && !_MKTB_ContainsScalar(DefaultConsumed, "¤"),
+			"Runtime-only tokens are never silently promoted to shipped reset defaults.")
 		return
 	}
 	if InStr(Mode, "native-") == 1

@@ -519,7 +519,6 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include infra/i18n.ahk
 #Include ui/onboarding/init.ahk
 BootProfile_Stamp("Manifest, updater and locale state initialised")
-#Include ../_shared/modules/hotstrings/terminator_scope.ahk
 #Include infra/hotstrings/hotstrings_config.ahk
 #Include ui/hotstrings_config_window/init.ahk
 #Include ui/hotstrings_config_window/webview.ahk
@@ -944,6 +943,10 @@ HotstringsTerminatorRecordsInitBoot(_BootConfigSnapshot)
 ; The override file stores delays as offsets of hotstrings.expansion_delay, which
 ; is only known now; this also migrates the absolute delays of earlier builds.
 HotstringsOverridesBoot()
+; The delimiter strings of earlier builds sit in the same file; they move to
+; config.toml leaves and records once the owner exists. After the delays: the
+; file is rewritten from memory, which must hold the migrated delays by then.
+HotstringsDelimitersBoot()
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 	_SharedDir . "\tap_hold\defaults.toml")
 BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, {2} tap-hold key(s)",

@@ -238,15 +238,6 @@ Test("Terminators: custom character identity is case-sensitive", TestTerminators
 ; ============================================================
 ; ============================================================
 
-TestTerminators_BuiltinCharsExcludesSeparators() {
-    Chars := HSE_TerminatorBuiltinChars()
-    AssertTrue(InStr(Chars, " ") > 0, "built-in chars include space")
-    AssertTrue(InStr(Chars, ",") > 0, "built-in chars include comma")
-    AssertTrue(InStr(Chars, "-") > 0, "built-in chars include the dash slot")
-    AssertTrue(InStr(Chars, Chr(0x2026)) > 0, "built-in chars include the ellipsis")
-}
-Test("Terminators: HSE_TerminatorBuiltinChars covers catalogue chars", TestTerminators_BuiltinCharsExcludesSeparators)
-
 TestTerminators_EntryEnabledHelper() {
     AssertTrue(HSE_TerminatorEntryEnabled([","], ".,;"), "single-char entry present -> enabled")
     AssertFalse(HSE_TerminatorEntryEnabled(["!"], ".,;"), "single-char entry absent -> disabled")
@@ -256,33 +247,6 @@ TestTerminators_EntryEnabledHelper() {
     AssertFalse(HSE_TerminatorEntryEnabled([], "abc"), "empty chars -> never enabled")
 }
 Test("Terminators: HSE_TerminatorEntryEnabled multi-char semantics", TestTerminators_EntryEnabledHelper)
-
-TestTerminators_ToggleStringHelper() {
-    ; Absent -> added.
-    R1 := HSE_TerminatorToggleString(" .", [","])
-    AssertTrue(InStr(R1, ",") > 0, "toggling an absent entry adds its char")
-    ; Present -> removed.
-    R2 := HSE_TerminatorToggleString(" .,", [","])
-    AssertFalse(InStr(R2, ",") > 0, "toggling a present entry removes its char")
-    ; Multi-char entry adds/removes as a unit.
-    R3 := HSE_TerminatorToggleString(" .", ["`r", "`n"])
-    AssertTrue((InStr(R3, "`r") > 0) and (InStr(R3, "`n") > 0), "toggling enter adds both CR and LF")
-}
-Test("Terminators: HSE_TerminatorToggleString add/remove", TestTerminators_ToggleStringHelper)
-
-TestTerminators_SetAllStringHelper() {
-    ; Disable-all keeps only custom chars (here "@") and drops every built-in.
-    Off := HSE_TerminatorSetAllString(" .,@", false)
-    AssertTrue(InStr(Off, "@") > 0, "set-all(false) preserves custom chars")
-    AssertFalse(InStr(Off, " ") > 0, "set-all(false) drops built-in space")
-    AssertFalse(InStr(Off, ",") > 0, "set-all(false) drops built-in comma")
-    ; Enable-all turns every built-in on while still preserving the custom char.
-    On := HSE_TerminatorSetAllString("@", true)
-    AssertTrue(InStr(On, " ") > 0, "set-all(true) enables space")
-    AssertTrue(InStr(On, ",") > 0, "set-all(true) enables comma")
-    AssertTrue(InStr(On, "@") > 0, "set-all(true) still preserves the custom char")
-}
-Test("Terminators: HSE_TerminatorSetAllString enable/disable", TestTerminators_SetAllStringHelper)
 
 TestTerminators_GlobalInstance() {
     ; The shared instance the menus render must exist and carry the catalogue.
@@ -325,15 +289,21 @@ TestTerminators_DefaultConsumedIsMagicKeyOnly() {
 }
 Test("Terminators: default consumed set is the magic key only", TestTerminators_DefaultConsumedIsMagicKeyOnly)
 
-TestTerminators_GlobalDefaultsMatchCatalogue() {
-    ; The boot-time globals must equal the catalogue-derived defaults so AHK and
-    ; macOS start from the same set (no hardcoded drift).
-    AssertEqual(HSE_TerminatorDefaultWordDelimiters(), HOTSTRINGS_DEFAULT_WORD_DELIMITERS,
-        "HOTSTRINGS_DEFAULT_WORD_DELIMITERS is catalogue-derived")
-    AssertEqual(HSE_TerminatorDefaultConsumedDelimiters(), HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS,
-        "HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS is catalogue-derived")
+TestTerminators_StringsWithoutOwnerAreCatalogueDefaults() {
+    ; Before the configuration owner exists the engine strings are the catalogue
+    ; defaults, so AHK and macOS start from the same set (no hardcoded drift).
+    global _HotstringsTerminatorRecords
+    Saved := _HotstringsTerminatorRecords
+    try {
+        _HotstringsTerminatorRecords := 0
+        Strings := HotstringsTerminatorStrings()
+        AssertEqual(HSE_TerminatorDefaultWordDelimiters(), Strings.Word,
+            "the derived word string is catalogue-derived")
+        AssertEqual(HSE_TerminatorDefaultConsumedDelimiters(), Strings.Consumed,
+            "the derived consumed string is catalogue-derived")
+    } finally _HotstringsTerminatorRecords := Saved
 }
-Test("Terminators: boot-time default globals are catalogue-derived", TestTerminators_GlobalDefaultsMatchCatalogue)
+Test("Terminators: without a configuration owner the derived strings are the catalogue defaults", TestTerminators_StringsWithoutOwnerAreCatalogueDefaults)
 
 
 
@@ -530,8 +500,8 @@ _MKTB_ChildSource() {
 		}
 		AssertEqual(1, Found, "the actual suite must name one complete data owner: " . Basename)
 	}
-	for Symbol in ["HotPath_Now", "UnescapeTomlString", "_FeatureBuildSinglePlan", "MasterGateState", "_TextCodepointLength", "HSE_Register", "ModifyMagicKey", "SIHO_StartOwned", "HotstringsTerminatorRestore"] {
-		Owner := _DriverProductionFileForSymbol(Symbol, Symbol == "HotstringsTerminatorRestore" ? _SharedDir : _DriverDir)
+	for Symbol in ["HotPath_Now", "UnescapeTomlString", "_FeatureBuildSinglePlan", "MasterGateState", "_TextCodepointLength", "HSE_Register", "ModifyMagicKey", "SIHO_StartOwned"] {
+		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		AssertTrue(Owner != "", "the real round-trip dependency requires its unique owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}

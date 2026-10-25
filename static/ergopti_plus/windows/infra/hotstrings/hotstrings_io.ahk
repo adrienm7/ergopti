@@ -15,6 +15,9 @@
 ;    the AHK and macOS fallback values can never drift behind a re-typed literal.
 ; 3. Stable on-disk serialisation via _SaveOverrides: alphabetical category and
 ;    section order, HOTSTRINGS_DELAY_DECIMALS decimal places for delay values.
+; 4. No [__global__] key is written: the delimiter state is config.toml leaves.
+;    The strings an earlier build left here are read once and moved by
+;    HotstringsDelimitersBoot.
 ;
 ; Included by infra/hotstrings/hotstrings_config.ahk.
 ; ==============================================================================
@@ -99,8 +102,7 @@ _HSDefaultsRequireHex(c, Section, Key, Path) {
 ; The path is shared with Hammerspoon so both drivers can read each other's
 ; edits after a reload.
 HotstringsConfigInit(OverridePath) {
-		global _HotstringsOverridesPath, _HotstringsOverrides
-		global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+		global _HotstringsOverridesPath, _HotstringsOverrides, _HotstringsLegacyDelimiters
 		if !HotstringsCommonOverrideMigrate(OverridePath) {
 				_HotstringsOverridesPath := OverridePath
 				try LoggerError("HotstringsConfig", "Common autocorrection override migration was refused; prior proven overrides and delimiters remain in memory, and common families and writes are blocked.")
@@ -108,8 +110,10 @@ HotstringsConfigInit(OverridePath) {
 		}
 		_HotstringsOverridesPath    := OverridePath
 		_HotstringsOverrides        := _ParseOverrides(OverridePath)
-		_HotstringsWordDelimiters   := _ParseGlobalKey(OverridePath, "word_delimiters")
-		_HotstringsConsumedDelimiters := _ParseGlobalKey(OverridePath, "consumed_delimiters")
+		; The word and consumed delimiter strings of earlier builds: read once so
+		; HotstringsDelimitersBoot can move them to config.toml, never used as a state.
+		_HotstringsLegacyDelimiters := { Word: _ParseGlobalKey(OverridePath, "word_delimiters"),
+				Consumed: _ParseGlobalKey(OverridePath, "consumed_delimiters") }
 		HotstringsResolveBumpGen()
 		try LoggerInfo("HotstringsConfig", "Initialized (override file: '{1}').", OverridePath)
 }
@@ -140,178 +144,53 @@ _ParseGlobalKey(Path, KeyName) {
 		return ""
 }
 
-; Return the effective word-delimiter string: user override when present,
-; otherwise the engine default ``HOTSTRINGS_DEFAULT_WORD_DELIMITERS``.
+; Return the effective word-delimiter string the engine matches, derived from the
+; delimiter settings in config.toml (see terminator_records.ahk).
 HotstringsGetWordDelimiters() {
-		global _HotstringsWordDelimiters, HOTSTRINGS_DEFAULT_WORD_DELIMITERS
-		return HotstringsTerminatorRecordString((_HotstringsWordDelimiters != "")
-				? _HotstringsWordDelimiters : HOTSTRINGS_DEFAULT_WORD_DELIMITERS)
+		return HotstringsTerminatorStrings().Word
 }
 
-; Persist a new word-delimiter string and publish it to the live engine only
-; after the complete override candidate is durable. The builder preserves the
-; consumed set from the snapshot taken after write admission.
-HotstringsSetWordDelimiters(Delimiters, WriterFn := 0, ReplaceFn := 0) {
-		return HotstringsCommitDelimiterUpdate(
-				(CurrentWord, CurrentConsumed) => {
-						Word: Delimiters,
-						Consumed: CurrentConsumed
-				}, WriterFn, ReplaceFn)
-}
-
-; Return the effective consumed-delimiter string: user override when present,
-; otherwise the catalogue-derived default (the magic key is consumed out of the
-; box, matching macOS).
+; Return the effective consumed-delimiter string: the characters of the enabled
+; delimiters that are swallowed by the expansion rather than typed after it.
 HotstringsGetConsumedDelimiters() {
-		global _HotstringsConsumedDelimiters, HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS
-		return HotstringsTerminatorRecordString((_HotstringsConsumedDelimiters != "")
-				? _HotstringsConsumedDelimiters : HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS, true)
+		return HotstringsTerminatorStrings().Consumed
 }
 
-; Persist a new consumed-delimiter string and publish the effective catalogue
-; default when the stored candidate is empty.
-HotstringsSetConsumedDelimiters(Consumed, WriterFn := 0, ReplaceFn := 0) {
-		return HotstringsCommitDelimiterUpdate(
-				(CurrentWord, CurrentConsumed) => {
-						Word: CurrentWord,
-						Consumed: Consumed
-				}, WriterFn, ReplaceFn)
-}
-
-; Change both delimiter sets in one whole-file transaction. This is the only
-; safe primitive for menu actions such as adding/removing a consumed custom
-; delimiter: two independent writes expose a half-applied state and let the
-; second writer erase a concurrent sibling update.
-HotstringsSetBothDelimiters(Delimiters, Consumed, WriterFn := 0, ReplaceFn := 0) {
-		return HotstringsCommitDelimiterUpdate(
-				(CurrentWord, CurrentConsumed) => {
-						Word: Delimiters,
-						Consumed: Consumed
-				}, WriterFn, ReplaceFn)
-}
-
-; Claim the exact override store before reading any live delimiter state, ask
-; BuildFn for one detached {Word, Consumed} candidate, atomically replace the
-; whole file, then publish both caches and both engine variables while the same
-; owner is still held. A process-wide terminal transition therefore refuses
-; before even invoking BuildFn.
-HotstringsCommitDelimiterUpdate(BuildFn, WriterFn := 0, ReplaceFn := 0) {
-		InheritedCritical := A_IsCritical
-		if InheritedCritical {
-				; Candidate construction, durable staging, atomic replacement and
-				; logging must remain interruptible. The override-path lease supplies
-				; serialization; only the final live projection becomes Critical.
-				Critical("Off")
-				try return HotstringsCommitDelimiterUpdate(BuildFn, WriterFn,
-						ReplaceFn)
-				finally Critical(InheritedCritical)
-		}
-		global _HotstringsOverridesPath, _HotstringsOverrides
-		global _HotstringsWordDelimiters
-		global _HotstringsConsumedDelimiters
-		global HOTSTRINGS_DEFAULT_WORD_DELIMITERS
-		global HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS
-
-		OwnerToken := _HotstringsOverrideLeaseAcquire("change delimiters")
-		if !(OwnerToken is Object)
-				return false
-		try {
-				BoundPath := _HotstringsOverridesPath
-				if !_ConfigWriteLeaseOwns(OwnerToken, BoundPath) {
-						try LoggerError("HotstringsConfig",
-								"Cannot change delimiters: the admitted owner no longer owns the override path. The change is NOT persisted.")
-						return false
-				}
-				if !HasMethod(BuildFn, "Call") {
-						try LoggerError("HotstringsConfig",
-								"Cannot change delimiters: the candidate builder is not callable. The change is NOT persisted.")
-						return false
-				}
-
-				CurrentWord := (_HotstringsWordDelimiters != "")
-						? _HotstringsWordDelimiters : HOTSTRINGS_DEFAULT_WORD_DELIMITERS
-				CurrentConsumed := (_HotstringsConsumedDelimiters != "")
-						? _HotstringsConsumedDelimiters : HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS
-				Candidate := 0
-				try Candidate := BuildFn.Call(CurrentWord, CurrentConsumed)
-				catch as Err {
-						try LoggerError("HotstringsConfig",
-								"Cannot change delimiters: candidate construction failed: {1}. The change is NOT persisted.",
-								Err.Message)
-						return false
-				}
-				if !(Candidate is Object)
-						|| !Candidate.HasOwnProp("Word")
-						|| !Candidate.HasOwnProp("Consumed")
-						|| !(Candidate.Word is String)
-						|| !(Candidate.Consumed is String) {
-						try LoggerError("HotstringsConfig",
-								"Cannot change delimiters: candidate must contain String Word and Consumed fields. The change is NOT persisted.")
-						return false
-				}
-
-				; Store catalogue defaults canonically as an absent override. The live
-				; engine still receives the effective strings after durable publication.
-				WordCandidate := (Candidate.Word == HOTSTRINGS_DEFAULT_WORD_DELIMITERS)
-						? "" : Candidate.Word
-				ConsumedCandidate := (Candidate.Consumed == HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS)
-						? "" : Candidate.Consumed
-
-				if !_SaveOverrides(_HotstringsOverrides, WriterFn, ReplaceFn,
-						WordCandidate, ConsumedCandidate, BoundPath,
-						_HotstringsAuthorizeOverrideCommit.Bind(
-								OwnerToken, BoundPath),
-						_HotstringsPublishDelimiterCandidate.Bind(
-								WordCandidate, ConsumedCandidate))
-						return false
-
-				; The in-memory publisher advanced the canonical runtime-decision
-				; epoch in the same Critical span as both delimiter sets. Remove any
-				; pre-commit pixels only now, after the persistence helper restored
-				; interruptibility; TooltipHide performs Win32 work.
-				if IsSet(HSE_InvalidateRuntimeDecisionProjection)
-						HSE_InvalidateRuntimeDecisionProjection()
-
-				try LoggerDebug("HotstringsConfig",
-						"Global delimiter sets published after durable override replacement.")
+; Boot step, once the configuration and the delimiter owner exist: moves the word
+; and consumed strings of the override file (earlier builds) to config.toml
+; leaves and records, then rewrites the override file without them. Idempotent:
+; a failed step leaves the strings in place and the next boot retries.
+; @param MigrateFn Optional seam standing for HotstringsTerminatorMigrateStrings.
+; @returns {Integer} True when there was nothing to move or the move is durable.
+HotstringsDelimitersBoot(MigrateFn := 0) {
+		global _HotstringsLegacyDelimiters, _HotstringsOverrides, _HotstringsOverridesPath
+		if !(_HotstringsLegacyDelimiters is Object)
 				return true
-		} finally _HotstringsOverrideLeaseRelease(OwnerToken)
-}
-
-; This memory-only projection runs in the same tiny Critical span as the durable
-; catalogue publication. It cannot expose one live delimiter cache without the
-; matching engine variable to an interrupting callback.
-_HotstringsPublishDelimiterCandidate(WordCandidate, ConsumedCandidate) {
-		global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
-		global HOTSTRINGS_DEFAULT_WORD_DELIMITERS
-		global HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS
-		global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
-		_HotstringsWordDelimiters := WordCandidate
-		_HotstringsConsumedDelimiters := ConsumedCandidate
-		HSE_WORD_TERMINATORS := HotstringsGetWordDelimiters()
-		HSE_CONSUMED_DELIMITERS := HotstringsGetConsumedDelimiters()
-		if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
-				HSE_AdvanceRuntimeDecisionGeneration()
-		return 1
-}
-
-; Write (or clear) the ``word_delimiters`` key in ``[__global__]``.
-_SaveGlobalWordDelimiters(Delimiters) {
-		return HotstringsSetWordDelimiters(Delimiters)
-}
-
-; Compatibility entrypoint for the two historical [__global__] keys. It no
-; longer owns a second truncating writer; every call joins the same atomic
-; whole-file delimiter transaction as the public setters.
-_SaveGlobalKey(KeyName, Value, _Unused := "", WriterFn := 0, ReplaceFn := 0) {
-		if (KeyName == "word_delimiters")
-				return HotstringsSetWordDelimiters(Value, WriterFn, ReplaceFn)
-		if (KeyName == "consumed_delimiters")
-				return HotstringsSetConsumedDelimiters(Value, WriterFn, ReplaceFn)
-		try LoggerError("HotstringsConfig",
-				"Cannot write unknown [__global__] key '{1}'. The change is NOT persisted.",
-				KeyName)
-		return false
+		Legacy := _HotstringsLegacyDelimiters
+		if Legacy.Word == "" and Legacy.Consumed == ""
+				return true
+		Moved := HasMethod(MigrateFn, "Call")
+				? MigrateFn.Call(Legacy.Word, Legacy.Consumed)
+				: HotstringsTerminatorMigrateStrings(Legacy.Word, Legacy.Consumed)
+		if !Moved {
+				try LoggerError("HotstringsConfig",
+						"The delimiter strings of the override file could not be moved to config.toml; the delimiters keep their catalogue state for this session and the move is retried at the next start.")
+				return false
+		}
+		OwnerToken := _HotstringsOverrideLeaseAcquire("retire delimiter strings")
+		Persisted := false
+		if (OwnerToken is Object) {
+				try Persisted := _HotstringsPersistOverrideCandidate(_HotstringsOverrides, OwnerToken,
+						_HotstringsOverridesPath, 0, 0)
+				finally _HotstringsOverrideLeaseRelease(OwnerToken)
+		}
+		if !Persisted {
+				try LoggerError("HotstringsConfig",
+						"The override file could not be rewritten without its delimiter strings; the move is retried at the next start.")
+				return false
+		}
+		_HotstringsLegacyDelimiters := { Word: "", Consumed: "" }
+		return true
 }
 
 _EscapeTomlString(S) {
@@ -532,10 +411,8 @@ _HotstringsDelayLine(Record, Base) {
 ; swap; omitting it retains compatibility for internal full-state saves.
 ; Stable ordering: alphabetical category, alphabetical section.
 _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
-		WordDelimiters := unset, ConsumedDelimiters := unset,
 		TargetPath := unset, AuthorizeFn := 0, PublishFn := 0) {
 		global _HotstringsOverrides, _HotstringsOverridesPath
-		global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
 		InheritedCritical := A_IsCritical
 		if InheritedCritical
 				Critical("Off")
@@ -557,14 +434,6 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 				try LoggerError("HotstringsConfig", "Cannot write overrides: the candidate state is not a Map. The change is NOT persisted.")
 				return false
 		}
-		WordSource := IsSet(WordDelimiters)
-				? WordDelimiters : _HotstringsWordDelimiters
-		ConsumedSource := IsSet(ConsumedDelimiters)
-				? ConsumedDelimiters : _HotstringsConsumedDelimiters
-		if !(WordSource is String) || !(ConsumedSource is String) {
-				try LoggerError("HotstringsConfig", "Cannot write overrides: delimiter candidates must be strings. The change is NOT persisted.")
-				return false
-		}
 		if !_HotstringsOverrideCandidateIdentifiersAreValid(
 				Source, &IdentifierDetail) {
 				try LoggerError("HotstringsConfig",
@@ -578,19 +447,6 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 				. "# Ne pas mélanger les sections : chaque [category] et [category.section]`n"
 				. "# ne doit apparaître qu'une seule fois.`n`n"
 
-		; Re-emit [__global__] so a category/section edit never erases the
-		; cross-driver word/consumed delimiter customisation.
-		if (WordSource != "" or ConsumedSource != "") {
-				Out .= "[__global__]`n"
-				; Both keys share this one serializer and escape path. The explicit
-				; candidates keep an uncommitted delimiter set detached from live RAM.
-				if (WordSource != "")
-						Out .= 'word_delimiters = "' . _EscapeTomlString(WordSource) . '"`n'
-				if (ConsumedSource != "")
-						Out .= 'consumed_delimiters = "' . _EscapeTomlString(ConsumedSource) . '"`n'
-				Out .= "`n"
-		}
-
 		; Delays are stored as offsets of the base expansion delay, so the file
 		; stays valid when the base changes.
 		BaseDelay := HotstringsBaseDelay()
@@ -601,7 +457,7 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 		_SortStringsInPlace(Cats)
 
 		for _, Cat in Cats {
-				if (Cat == "__global__")   ; reserved — handled above
+				if (Cat == "__global__")   ; reserved: no key of it is written any more
 						continue
 				Entry := Source[Cat]
 				; Extension keys are stored as "ext.name" — the header must be written

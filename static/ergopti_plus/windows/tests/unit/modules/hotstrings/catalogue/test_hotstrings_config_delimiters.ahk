@@ -3,8 +3,10 @@
 ; ==============================================================================
 ; MODULE: Hotstrings Config Word Delimiters
 ; DESCRIPTION:
-; SetWordDelimiters propagates live to the engine and round-trips, and
-; _SaveOverrides preserves the [__global__] delimiters (F06).
+; A built-in delimiter change is a config.toml leaf written through the live
+; writer: it reaches the engine strings immediately and round-trips through the
+; file. The override file holds no delimiter string any more: _SaveOverrides
+; writes none, and what an earlier build left there is read once for the move.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -13,149 +15,101 @@
 
 
 
-TestHotstringsConfig_SetWordDelimitersUpdatesEngineVarLive() {
-	global _HotstringsOverridesPath, _HotstringsOverrides
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
-	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
-	SavedPath := _HotstringsOverridesPath
-	SavedOverrides := _HotstringsOverrides
-	SavedCache  := _HotstringsWordDelimiters
-	SavedEngine := HSE_WORD_TERMINATORS
-	SavedConsumedCache := _HotstringsConsumedDelimiters
-	SavedConsumedEngine := HSE_CONSUMED_DELIMITERS
-	Path := A_Temp . "\ergopti_set_word_live_" . A_ScriptHwnd
-		. "_" . A_TickCount . ".toml"
+; Runs a body against a fresh current-schema configuration and a fresh delimiter
+; owner, with the real configuration writer: nothing is injected.
+_HCD_WithConfig(Body) {
+	Saved := _HSDT_SaveState()
 	try {
-		try FileDelete(Path)
-		_HotstringsOverridesPath := Path
-		_HotstringsOverrides := Map()
-		_HotstringsWordDelimiters := ""
-		_HotstringsConsumedDelimiters := ""
-		Committed := HotstringsSetWordDelimiters("AB")
-		EngineAfter := HSE_WORD_TERMINATORS
-		AssertTrue(Committed,
-			"the fixture must complete the durable transaction before asserting its live projection")
-	} finally {
-		try FileDelete(Path)
-		_HotstringsOverridesPath := SavedPath
-		_HotstringsOverrides := SavedOverrides
-		_HotstringsWordDelimiters := SavedCache
-		HSE_WORD_TERMINATORS := SavedEngine
-		_HotstringsConsumedDelimiters := SavedConsumedCache
-		HSE_CONSUMED_DELIMITERS := SavedConsumedEngine
-	}
-	AssertEqual("AB", EngineAfter,
-		"HotstringsSetWordDelimiters must propagate to HSE_WORD_TERMINATORS immediately (no Reload needed)")
+		_HSDT_Seed("config-delimiters")
+		return Body.Call()
+	} finally _HSDT_Restore(Saved)
 }
-Test("HotstringsConfig: SetWordDelimiters propagates to HSE_WORD_TERMINATORS live",
-	TestHotstringsConfig_SetWordDelimitersUpdatesEngineVarLive)
 
-TestHotstringsConfig_SetWordDelimitersGetRoundTrip() {
-	global _HotstringsOverridesPath, _HotstringsOverrides
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
-	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
-	SavedPath := _HotstringsOverridesPath
-	SavedOverrides := _HotstringsOverrides
-	SavedCache  := _HotstringsWordDelimiters
-	SavedEngine := HSE_WORD_TERMINATORS
-	SavedConsumedCache := _HotstringsConsumedDelimiters
-	SavedConsumedEngine := HSE_CONSUMED_DELIMITERS
-	Path := A_Temp . "\ergopti_set_word_roundtrip_" . A_ScriptHwnd
-		. "_" . A_TickCount . ".toml"
-	try {
-		try FileDelete(Path)
-		_HotstringsOverridesPath := Path
-		_HotstringsOverrides := Map()
-		_HotstringsWordDelimiters := ""
-		_HotstringsConsumedDelimiters := ""
-		Committed := HotstringsSetWordDelimiters("XY")
-		Got := HotstringsGetWordDelimiters()
-		AssertTrue(Committed,
-			"the fixture must complete the durable transaction before asserting its getter")
-	} finally {
-		try FileDelete(Path)
-		_HotstringsOverridesPath := SavedPath
-		_HotstringsOverrides := SavedOverrides
-		_HotstringsWordDelimiters := SavedCache
-		HSE_WORD_TERMINATORS := SavedEngine
-		_HotstringsConsumedDelimiters := SavedConsumedCache
-		HSE_CONSUMED_DELIMITERS := SavedConsumedEngine
-	}
-	AssertEqual("XY", Got,
-		"HotstringsGetWordDelimiters must return the value just set by HotstringsSetWordDelimiters")
+TestHotstringsConfig_ToggleUpdatesEngineVarLive() {
+	global ConfigurationFile, HSE_WORD_TERMINATORS
+	Before := HSE_WORD_TERMINATORS
+	AssertEqual(1, HotstringsTerminatorToggle("colon"),
+		"the live configuration writer must complete the durable write")
+	AssertEqual(StrReplace(Before, ":", ""), HSE_WORD_TERMINATORS,
+		"a toggle must propagate to HSE_WORD_TERMINATORS immediately (no Reload needed)")
+	Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+	AssertEqual(false, Document["hotstrings"]["terminator_states"]["colon"].Value,
+		"the state is a leaf of config.toml")
+	AssertEqual(FSReadUtf8Exact(ConfigurationFile), _HotstringsTerminatorRecords.Source,
+		"the owner follows the exact bytes just written")
 }
-Test("HotstringsConfig: SetWordDelimiters / GetWordDelimiters round-trip",
-	TestHotstringsConfig_SetWordDelimitersGetRoundTrip)
+Test("HotstringsConfig: a delimiter toggle propagates to HSE_WORD_TERMINATORS live",
+	_HCD_WithConfig.Bind(TestHotstringsConfig_ToggleUpdatesEngineVarLive))
 
-TestHotstringsConfig_SaveOverridesPreservesGlobalDelimiters() {
+TestHotstringsConfig_ToggleGetRoundTrip() {
+	global ConfigurationFile
+	AssertEqual(1, HotstringsTerminatorToggle("slash"))
+	AssertEqual(1, HotstringsTerminatorToggle("colon"))
+	Got := HotstringsGetWordDelimiters()
+	AssertTrue(InStr(Got, "/") > 0 and InStr(Got, ":") == 0)
+	; A restart reads the same state back from the file.
+	Reread := HotstringsTerminatorRecordsResolve(TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile)))
+	AssertEqual(true, Reread.Builtin["slash"].Enabled)
+	AssertEqual(false, Reread.Builtin["colon"].Enabled)
+	AssertEqual(0, Reread.Rejected.Length)
+	; Toggling back deletes the leaf instead of storing a default.
+	AssertEqual(1, HotstringsTerminatorToggle("colon"))
+	Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+	Table := Document["hotstrings"].Get("terminator_states", Map())
+	AssertFalse(Table.Has("colon"), "a state back on its default leaves no key")
+}
+Test("HotstringsConfig: delimiter toggles round-trip through config.toml",
+	_HCD_WithConfig.Bind(TestHotstringsConfig_ToggleGetRoundTrip))
+
+TestHotstringsConfig_SaveOverridesWritesNoGlobalDelimiters() {
 	global _HotstringsOverrides, _HotstringsOverridesPath
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
-
-	SavedPath     := _HotstringsOverridesPath
-	SavedOv       := _HotstringsOverrides
-	SavedWordDel  := _HotstringsWordDelimiters
-	SavedConsumed := _HotstringsConsumedDelimiters
-
-	Path := A_Temp . "\hotstrings_config_f06_global.toml"
+	SavedPath := _HotstringsOverridesPath
+	SavedOv := _HotstringsOverrides
+	Path := A_Temp . "\hotstrings_config_no_global.toml"
 	try FileDelete(Path)
-
-	; Wire up a real file so _SaveOverrides actually writes to disk
-	_HotstringsOverrides     := Map()
+	_HotstringsOverrides := Map()
 	_HotstringsOverridesPath := Path
-
-	; 1. Seed custom delimiter candidates in the live fixture.
-	_HotstringsWordDelimiters   := "AB"
-	_HotstringsConsumedDelimiters := "A"
-
-	; 2. Trigger _SaveOverrides via a category edit (full-file rebuild)
-	HotstringsSetOverride("rolls", "", "delay", 1.2)
-
-	; 3. Read the delimiter back from disk directly — _SaveOverrides must have
-	;    re-emitted [__global__] during the rebuild, not clobbered it
-	WordDelOnDisk     := _ParseGlobalKey(Path, "word_delimiters")
-	ConsumedDelOnDisk := _ParseGlobalKey(Path, "consumed_delimiters")
-
-	try FileDelete(Path)
-	_HotstringsOverridesPath      := SavedPath
-	_HotstringsOverrides          := SavedOv
-	_HotstringsWordDelimiters     := SavedWordDel
-	_HotstringsConsumedDelimiters := SavedConsumed
-	HotstringsResolveBumpGen()
-
-	; 4. Assert the custom delimiters survived the rebuild
-	AssertEqual("AB", WordDelOnDisk,
-		"[__global__] word_delimiters must survive a subsequent _SaveOverrides")
-	AssertEqual("A", ConsumedDelOnDisk,
-		"[__global__] consumed_delimiters must survive a subsequent _SaveOverrides")
-}
-Test("hotstrings_config: _SaveOverrides preserves [__global__] delimiters", TestHotstringsConfig_SaveOverridesPreservesGlobalDelimiters)
-
-; F37 (audit 2026-07-20): a delimiter containing a quote or backslash once
-; produced malformed TOML and silently reverted at the next read. Both global
-; keys now share one whole-file serializer, including detached candidates.
-TestHotstringsConfig_SaveOverridesEscapesGlobalDelimiters() {
-	Path := A_Temp . "\ergopti_delimiter_roundtrip_" . A_ScriptHwnd
-		. "_" . A_TickCount . ".toml"
-	AssertFalse(FileExist(Path), "the roundtrip fixture must own a fresh path")
-	Word := 'W"\literal`n[injected_word]`ncolor = "bad'
-	Consumed := 'C"\literal`n[injected_consumed]`ncolor = "bad'
 	try {
-		AssertTrue(_SaveOverrides(Map(), 0, 0, Word, Consumed, Path),
-			"detached delimiter candidates must reach the real file writer")
+		AssertTrue(HotstringsSetOverride("rolls", "", "delay", 1.2))
+		Content := FSReadUtf8Exact(Path)
+		AssertFalse(InStr(Content, "__global__"), "no delimiter table is written")
+		AssertFalse(InStr(Content, "word_delimiters"))
+		AssertContains(Content, "delay_offset = 0.45")
+	} finally {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOv
+		HotstringsResolveBumpGen()
+	}
+}
+Test("hotstrings_config: _SaveOverrides writes no [__global__] delimiter table",
+	TestHotstringsConfig_SaveOverridesWritesNoGlobalDelimiters)
+
+; The strings of an earlier build are read exactly once, to move them. A quote or
+; a backslash in them once produced malformed TOML; the reader must still decode
+; every escape.
+TestHotstringsConfig_LegacyGlobalDelimitersAreReadExactly() {
+	Path := A_Temp . "\ergopti_delimiter_legacy_" . A_ScriptHwnd
+		. "_" . A_TickCount . ".toml"
+	AssertFalse(FileExist(Path), "the fixture must own a fresh path")
+	Word := 'W"\literal'
+	Consumed := 'C"\literal'
+	try {
+		AssertTrue(FSWriteDurable(Path, "[__global__]`nword_delimiters = " . TOML_RenderString(Word)
+			. "`nconsumed_delimiters = " . TOML_RenderString(Consumed) . '`n[rolls]`ncolor = "#112233"`n'))
 		AssertEqual(Word, _ParseGlobalKey(Path, "word_delimiters"),
-			"word delimiters must survive actual serialization and parsing")
+			"word delimiters must survive actual parsing")
 		AssertEqual(Consumed, _ParseGlobalKey(Path, "consumed_delimiters"),
-			"consumed delimiters must survive actual serialization and parsing")
+			"consumed delimiters must survive actual parsing")
 		Parsed := _ParseOverrides(Path)
-		AssertFalse(Parsed.Has("injected_word"), "word delimiters cannot inject a section")
-		AssertFalse(Parsed.Has("injected_consumed"), "consumed delimiters cannot inject a section")
+		AssertEqual("#112233", Parsed["rolls"].Color)
 	} finally {
 		if FileExist(Path)
 			FileDelete(Path)
 	}
 }
-Test("hotstrings_config: _SaveOverrides escapes detached [__global__] delimiter candidates",
-	TestHotstringsConfig_SaveOverridesEscapesGlobalDelimiters)
+Test("hotstrings_config: legacy [__global__] delimiter strings are read exactly",
+	TestHotstringsConfig_LegacyGlobalDelimitersAreReadExactly)
 
 TestHotstringsConfig_ParserRejectsNumericOverflow() {
 	Path := A_Temp . "\hotstrings_override_numeric_overflow.toml"

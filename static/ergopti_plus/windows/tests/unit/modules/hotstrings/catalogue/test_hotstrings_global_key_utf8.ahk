@@ -3,8 +3,10 @@
 ; ==============================================================================
 ; MODULE: Global Delimiter UTF-8 Reader Regressions
 ; DESCRIPTION:
-; Real BOM-less UTF-8 override files must round-trip independently of the thread's
-; ambient code page. Native BOM handling, comments and string escapes stay intact.
+; The delimiter strings an earlier build left in [__global__] are read once, to
+; move them to config.toml. That read must work on real BOM-less UTF-8 files
+; independently of the thread's ambient code page; native BOM handling, comments
+; and string escapes stay intact. The writer no longer emits the strings.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -26,7 +28,7 @@ _HGKU_Case(Mode) {
 		if Mode == "writer" {
 			Overrides := Map("rolls", { Delay: 0.2, Color: "#112233", ShowTooltip: "",
 				Priority: "", Sections: Map() })
-			AssertTrue(_SaveOverrides(Overrides, 0, 0, Word, Consumed, Path),
+			AssertTrue(_SaveOverrides(Overrides, 0, 0, Path),
 				"the genuine override writer must publish its real BOM-less UTF-8 image")
 		} else {
 			Source := "[__global__] # delimiter owner`r`n"
@@ -43,9 +45,10 @@ _HGKU_Case(Mode) {
 		HasBom := Before.Size >= 3 && NumGet(Before, 0, "UChar") == 0xEF
 			&& NumGet(Before, 1, "UChar") == 0xBB && NumGet(Before, 2, "UChar") == 0xBF
 		AssertEqual(Mode == "bom", HasBom, "the intended physical BOM contract must be observed")
-		AssertEqual(Word, _ParseGlobalKey(Path, "word_delimiters"),
+		; The writer owns no [__global__] key any more: a file it publishes holds none.
+		AssertEqual(Mode == "writer" ? "" : Word, _ParseGlobalKey(Path, "word_delimiters"),
 			"Unicode, literal hashes, quotes, backslashes and tabs must survive the actual global reader")
-		AssertEqual(Consumed, _ParseGlobalKey(Path, "consumed_delimiters"),
+		AssertEqual(Mode == "writer" ? "" : Consumed, _ParseGlobalKey(Path, "consumed_delimiters"),
 			"both global delimiter keys must use the file's UTF-8 contract")
 		AssertEqual("", _ParseGlobalKey(Path, "missing_key"), "absent keys retain their existing sentinel")
 		Sibling := _ParseOverrides(Path)

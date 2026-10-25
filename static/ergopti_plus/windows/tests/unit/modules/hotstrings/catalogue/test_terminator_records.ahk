@@ -21,37 +21,38 @@ _HTR_Source() {
 		. '[[foreign.rows]]`nvalue = "never alter" # foreign comment`n'
 }
 
+; The strings the catalogue ships with, spelled out independently of the code that
+; derives them: space, tab, CR, LF, the magic key, then the sentence punctuation.
+global _HTR_DEFAULT_WORD := " `t`r`n★,;.!?:"
+global _HTR_DEFAULT_CONSUMED := "★"
+
 _HTR_WithRuntime(Body) {
-	global _HotstringsTerminatorRecords, _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global _HotstringsTerminatorRecords
 	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
-	Saved := { Owner: _HotstringsTerminatorRecords, Word: _HotstringsWordDelimiters,
-		Consumed: _HotstringsConsumedDelimiters, EngineWord: HSE_WORD_TERMINATORS,
+	Saved := { Owner: _HotstringsTerminatorRecords, EngineWord: HSE_WORD_TERMINATORS,
 		EngineConsumed: HSE_CONSUMED_DELIMITERS }
 	try {
 		_HotstringsTerminatorRecords := 0
-		_HotstringsWordDelimiters := "!", _HotstringsConsumedDelimiters := "!"
 		return Body.Call()
 	} finally {
 		_HotstringsTerminatorRecords := Saved.Owner
-		_HotstringsWordDelimiters := Saved.Word
-		_HotstringsConsumedDelimiters := Saved.Consumed
 		HSE_WORD_TERMINATORS := Saved.EngineWord
 		HSE_CONSUMED_DELIMITERS := Saved.EngineConsumed
 	}
 }
 
 _HTR_BootProjectionBody() {
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global _HTR_DEFAULT_WORD, _HTR_DEFAULT_CONSUMED
 	AssertEqual(true, HotstringsTerminatorRecordsInit(_HTR_Source()))
-	AssertEqual("!¤😀", HotstringsGetWordDelimiters(), "the actual consumer must publish both admitted scalars")
-	AssertEqual("!¤", HotstringsGetConsumedDelimiters(), "only the independently consumed record joins the consumed set")
-	AssertEqual("!", _HotstringsWordDelimiters, "record loading must preserve the historical word preference")
-	AssertEqual("!", _HotstringsConsumedDelimiters, "record loading must preserve the historical consumed preference")
+	AssertEqual(_HTR_DEFAULT_WORD . "¤😀", HotstringsGetWordDelimiters(),
+		"the actual consumer must publish both admitted scalars after the catalogue defaults")
+	AssertEqual(_HTR_DEFAULT_CONSUMED . "¤", HotstringsGetConsumedDelimiters(),
+		"only the independently consumed record joins the consumed set")
 }
 _HTR_BootProjection() {
 	_HTR_WithRuntime(_HTR_BootProjectionBody)
 }
-Test("terminator-records: actual boot consumer projects AOT and Unicode without changing string controls", _HTR_BootProjection)
+Test("terminator-records: actual boot consumer projects AOT and Unicode on top of the catalogue defaults", _HTR_BootProjection)
 
 _HTR_InlineRecords() {
 	InlineRecordSource := 'hotstrings.terminators = [{ key = "upper", char = "A", label = "Upper", consume = false }, { key = "lower", char = "a", label = "Lower", consume = true }]`n'
@@ -90,8 +91,9 @@ Test("terminator-records: one exact scalar rejects truncated surrogate and malfo
 
 _HTR_DuplicateInitBody() {
 	HotstringsTerminatorRecordsInit(_HTR_Source())
+	global _HTR_DEFAULT_WORD
 	AssertThrows(HotstringsTerminatorRecordsInit.Bind(""), "a second initializer cannot replace a live boot owner")
-	AssertEqual("!¤😀", HotstringsGetWordDelimiters())
+	AssertEqual(_HTR_DEFAULT_WORD . "¤😀", HotstringsGetWordDelimiters())
 }
 _HTR_DuplicateInit() {
 	_HTR_WithRuntime(_HTR_DuplicateInitBody)
@@ -131,20 +133,18 @@ _HTR_Remove() {
 Test("terminator-records: removing one admitted record retains quarantined rows and foreign tables", _HTR_Remove)
 
 _HTR_StateBody() {
-	global _HotstringsTerminatorRecords, _HotstringsWordDelimiters
+	global _HotstringsTerminatorRecords, _HTR_DEFAULT_WORD, _HTR_DEFAULT_CONSUMED
 	Plan := HotstringsTerminatorRecordPlan(_HTR_Source(), Map("mode", "state", "key", "currency", "enabled", false))
 	_HotstringsTerminatorRecords := Plan.Settings
-	_HotstringsWordDelimiters := "!¤"
-	AssertEqual("!😀", HotstringsGetWordDelimiters(), "a disabled record owns its scalar even in the older string")
-	AssertEqual("!", HotstringsGetConsumedDelimiters())
-	AssertEqual("!¤", _HotstringsWordDelimiters, "effective record projection must not rewrite historical preferences")
+	AssertEqual(_HTR_DEFAULT_WORD . "😀", HotstringsGetWordDelimiters(), "a disabled record leaves only its scalar out")
+	AssertEqual(_HTR_DEFAULT_CONSUMED, HotstringsGetConsumedDelimiters())
 	AssertThrows(HotstringsTerminatorRecordPlan.Bind(_HTR_Source(),
 		Map("mode", "state", "key", "currency", "enabled", "false")))
 }
 _HTR_State() {
 	_HTR_WithRuntime(_HTR_StateBody)
 }
-Test("terminator-records: exact record state projection and typed edit preserve legacy strings", _HTR_State)
+Test("terminator-records: exact record state projection and typed edit leave the other delimiters alone", _HTR_State)
 
 _HTR_ParentInlineEdit() {
 	ParentFixtureSource := 'hotstrings = { terminators = [{ key = "one", char = "¤", label = "One", consume = false }], unknown = "keep" }`n'
@@ -482,34 +482,59 @@ _HTRA_MalformedStatesRefuse() {
 Test("terminator-add: an unaddressable existing state owner refuses the new Add intent",
 	_HTRA_MalformedStatesRefuse)
 
-_HTRP_CanonicalPrecedence(LegacyWord, LegacyConsumed, RecordSource, ExpectedWord, ExpectedConsumed) {
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+_HTRP_CanonicalPrecedence(RecordSource, ExpectedWord, ExpectedConsumed) {
 	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
-	_HotstringsWordDelimiters := LegacyWord
-	_HotstringsConsumedDelimiters := LegacyConsumed
 	AssertEqual(true, HotstringsTerminatorRecordsInit(RecordSource))
-	AssertEqual(ExpectedWord, HotstringsGetWordDelimiters(), "the canonical record owns only its exact scalar")
-	AssertEqual(ExpectedConsumed, HotstringsGetConsumedDelimiters(), "canonical consumption is independent of legacy string membership")
+	AssertEqual(ExpectedWord, HotstringsGetWordDelimiters(), "the derived word string follows the leaves and records")
+	AssertEqual(ExpectedConsumed, HotstringsGetConsumedDelimiters(), "the derived consumed string follows the leaves and records")
 	AssertEqual(ExpectedWord, HSE_WORD_TERMINATORS, "the real boot consumer must publish the independently expected word string")
 	AssertEqual(ExpectedConsumed, HSE_CONSUMED_DELIMITERS, "the real boot consumer must publish the independently expected consumed string")
-	AssertEqual(LegacyWord, _HotstringsWordDelimiters, "canonical activation must not migrate saved legacy word bytes")
-	AssertEqual(LegacyConsumed, _HotstringsConsumedDelimiters, "canonical activation must not migrate saved legacy consumed bytes")
 }
 
-_HTRP_WithPrecedence(LegacyWord, LegacyConsumed, RecordSource, ExpectedWord, ExpectedConsumed) {
-	return _HTR_WithRuntime(_HTRP_CanonicalPrecedence.Bind(LegacyWord, LegacyConsumed,
-		RecordSource, ExpectedWord, ExpectedConsumed))
+_HTRP_WithPrecedence(RecordSource, ExpectedWord, ExpectedConsumed) {
+	return _HTR_WithRuntime(_HTRP_CanonicalPrecedence.Bind(RecordSource, ExpectedWord, ExpectedConsumed))
 }
 
-Test("terminator-precedence: explicit disabled record removes only its scalar from both legacy sets",
-	_HTRP_WithPrecedence.Bind("!¤", "!¤",
-		'[[hotstrings.terminators]]`nkey = "currency"`nchar = "¤"`nlabel = "Currency"`nconsume = true`n[hotstrings.terminator_states]`ncurrency = false`n', "!", "!"))
-Test("terminator-precedence: admitted active consumed record joins both sets absent from legacy strings",
-	_HTRP_WithPrecedence.Bind("!", "!",
-		'[[hotstrings.terminators]]`nkey = "currency"`nchar = "¤"`nlabel = "Currency"`nconsume = true`n', "!¤", "!¤"))
-Test("terminator-precedence: explicit consume false removes legacy consumption without disabling the record",
-	_HTRP_WithPrecedence.Bind("!¤", "!¤",
-		'[[hotstrings.terminators]]`nkey = "currency"`nchar = "¤"`nlabel = "Currency"`nconsume = false`n', "!¤", "!"))
-Test("terminator-precedence: a complete disabled emoji scalar preserves unrelated legacy punctuation",
-	_HTRP_WithPrecedence.Bind("!?😀", "!😀",
-		'[[hotstrings.terminators]]`nkey = "smile"`nchar = "😀"`nlabel = "Smile"`nconsume = false`n[hotstrings.terminator_states]`nsmile = false`n', "!?", "!"))
+Test("terminator-precedence: explicit disabled record leaves out only its scalar",
+	_HTRP_WithPrecedence.Bind(
+		'[[hotstrings.terminators]]`nkey = "currency"`nchar = "¤"`nlabel = "Currency"`nconsume = true`n[hotstrings.terminator_states]`ncurrency = false`n',
+		_HTR_DEFAULT_WORD, _HTR_DEFAULT_CONSUMED))
+Test("terminator-precedence: admitted active consumed record joins both sets",
+	_HTRP_WithPrecedence.Bind(
+		'[[hotstrings.terminators]]`nkey = "currency"`nchar = "¤"`nlabel = "Currency"`nconsume = true`n',
+		_HTR_DEFAULT_WORD . "¤", _HTR_DEFAULT_CONSUMED . "¤"))
+Test("terminator-precedence: a record that is not consumed joins the word set only",
+	_HTRP_WithPrecedence.Bind(
+		'[[hotstrings.terminators]]`nkey = "currency"`nchar = "¤"`nlabel = "Currency"`nconsume = false`n',
+		_HTR_DEFAULT_WORD . "¤", _HTR_DEFAULT_CONSUMED))
+Test("terminator-precedence: a complete disabled emoji scalar leaves the shipped punctuation intact",
+	_HTRP_WithPrecedence.Bind(
+		'[[hotstrings.terminators]]`nkey = "smile"`nchar = "😀"`nlabel = "Smile"`nconsume = false`n[hotstrings.terminator_states]`nsmile = false`n',
+		_HTR_DEFAULT_WORD, _HTR_DEFAULT_CONSUMED))
+Test("terminator-leaves: a disabled shipped delimiter leaves both strings",
+	_HTRP_WithPrecedence.Bind('[hotstrings.terminator_states]`nstar = false`nquestion = false`n',
+		" `t`r`n,;.!:", ""))
+Test("terminator-leaves: an enabled optional delimiter joins the word string in catalogue order",
+	_HTRP_WithPrecedence.Bind('[hotstrings.terminator_states]`nslash = true`nminus = true`n',
+		" -`t`r`n★,;.!?:/", _HTR_DEFAULT_CONSUMED))
+Test("terminator-leaves: the consume leaf of a shipped delimiter changes only the consumed string",
+	_HTRP_WithPrecedence.Bind('[hotstrings.terminator_consume]`ncomma = true`nstar = false`n',
+		_HTR_DEFAULT_WORD, ","))
+Test("terminator-leaves: a consumed delimiter that is disabled consumes nothing",
+	_HTRP_WithPrecedence.Bind('[hotstrings.terminator_consume]`nslash = true`n',
+		_HTR_DEFAULT_WORD, _HTR_DEFAULT_CONSUMED))
+
+_HTRP_RejectedLeaves() {
+	Resolved := HotstringsTerminatorRecordsResolve(TOML_ParseDocument(
+		'[hotstrings.terminator_states]`nspace = "no"`nunknown_key = false`n[hotstrings.terminator_consume]`ncomma = 1`nperiod = true`n'))
+	AssertEqual(2, Resolved.Rejected.Length, "a non-boolean leaf is quarantined, an unknown key is not a delimiter at all")
+	AssertEqual("invalid_state", Resolved.Rejected[1]["reason"])
+	AssertEqual("space", Resolved.Rejected[1]["key"])
+	AssertEqual("invalid_consume", Resolved.Rejected[2]["reason"])
+	AssertEqual(true, Resolved.Builtin["space"].Enabled, "a refused leaf is read as absent")
+	AssertEqual(false, Resolved.Builtin["comma"].Consume)
+	AssertEqual(true, Resolved.Builtin["period"].Consume)
+	AssertEqual(false, Resolved.Stored["enabled"].Has("space"))
+	AssertEqual(true, Resolved.Stored["consume"].Has("period"))
+}
+Test("terminator-leaves: refused leaves are quarantined and read as the catalogue default", _HTRP_RejectedLeaves)

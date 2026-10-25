@@ -323,7 +323,8 @@ TomlConfigStaticForeignOwnershipRegistry() {
 			"sfbs_reduction", "FeatureState"),
 		"hotstrings", Map(
 			"terminators", "TerminatorRecords",
-			"terminator_states", "TerminatorRecords"),
+			"terminator_states", "TerminatorRecords",
+			"terminator_consume", "TerminatorRecords"),
 		"gestures", Map(
 			"auto_configure_on_next_start", "Gestures"),
 		"personal_editor", Map(

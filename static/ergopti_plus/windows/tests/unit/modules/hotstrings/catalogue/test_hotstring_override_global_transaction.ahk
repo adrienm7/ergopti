@@ -32,24 +32,18 @@ global _HSOT_ParseCritical := []
 
 _HSOT_SaveState() {
 	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
 	return {
 		Path: _HotstringsOverridesPath,
 		Overrides: _HotstringsOverrides,
-		Generation: _HSResolveGen,
-		Word: _HotstringsWordDelimiters,
-		Consumed: _HotstringsConsumedDelimiters
+		Generation: _HSResolveGen
 	}
 }
 
 _HSOT_RestoreState(Saved) {
 	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
 	_HotstringsOverridesPath := Saved.Path
 	_HotstringsOverrides := Saved.Overrides
 	_HSResolveGen := Saved.Generation
-	_HotstringsWordDelimiters := Saved.Word
-	_HotstringsConsumedDelimiters := Saved.Consumed
 	_HSOT_ResetFakes()
 }
 
@@ -70,7 +64,6 @@ _HSOT_ResetFakes() {
 
 _HSOT_Seed(Name) {
 	global _HotstringsOverridesPath, _HotstringsOverrides, _HSResolveGen
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
 	_HotstringsOverridesPath := A_Temp . "\ergopti_hotstring_override_"
 		. Name . "_" . A_TickCount . ".toml"
 	_HotstringsOverrides := Map("rolls", {
@@ -81,8 +74,6 @@ _HSOT_Seed(Name) {
 		Sections: Map()
 	})
 	_HSResolveGen := 100
-	_HotstringsWordDelimiters := "word-old"
-	_HotstringsConsumedDelimiters := "consumed-old"
 	_HSOT_ResetFakes()
 }
 

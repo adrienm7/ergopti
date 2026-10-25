@@ -252,16 +252,30 @@ section it declares, so route with the source's origin, never by stem alone.
 
 ### project-word-delimiters-are-config-leaves
 
-Both Lua drivers keep word delimiters in config.toml:
+All three drivers keep word delimiters in config.toml:
 `[hotstrings.terminator_states]` maps a delimiter key to its state (an absent
-key is the shared catalogue default; Linux writes only differences) and
-`hotstrings.terminators` is an inline list of `{ key, char, label, consume }`
-records. Linux reads and writes them through
+key is the shared catalogue default; only differences are written),
+`[hotstrings.terminator_consume]` does the same for whether a shipped delimiter
+is consumed (swallowed by the expansion; only the magic-key slot ships
+consumed), and `hotstrings.terminators` is an inline list of
+`{ key, char, label, consume }` records for the user's own delimiters, which
+carry their consume choice in the record. A consume leaf for a user's own key is
+outdated configuration. Linux reads and writes them through
 `modules/hotstrings/terminator_settings` (storage.json is imported once): a
 save writes only what differs from the catalogue at the last sync, so hand
 edits and outdated entries survive, and the Hotstrings scope resets only the
-shipped delimiters' states, keeping the user's own. Windows keeps its
-delimiter string in the override file. The shared writer cannot address one
+shipped delimiters' leaves (state and consume), keeping the user's own.
+Windows derives its two engine strings (`HSE_WORD_TERMINATORS`,
+`HSE_CONSUMED_DELIMITERS`) from those leaves and records
+(`HotstringsTerminatorStrings`, terminator_records.ahk); a built-in click writes
+its leaf through the live configuration writer (`ConfigCommitUpdates`, no
+reload) and the strings follow only from the writer's publication callback,
+while record edits keep their conditional WAL and reload. The word and consumed
+strings an earlier Windows build kept in `[__global__]` of the override file are
+moved once at boot (`HotstringsDelimitersBoot`): leaves where a shipped
+delimiter differed, records for every other character, then the override file is
+rewritten without them; a leaf already stored wins. No driver writes a
+`[__global__]` key any more. The shared writer cannot address one
 `[[array-of-tables]]` element; both Lua drivers can replace the whole custom
 delimiter list through the shared writer, including quoted table-array headers.
 
