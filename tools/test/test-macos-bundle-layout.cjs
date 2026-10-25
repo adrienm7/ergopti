@@ -531,6 +531,65 @@ function verifyArchiveProducerContracts(fs, Archives) {
 			fs.readFileSync(path.join(racedOutput, 'ErgoptiPlus.app.zip'), 'utf8'),
 			'foreign publication'
 		);
+		assert.deepEqual(
+			fs.readdirSync(racedOutput),
+			['ErgoptiPlus.app.zip'],
+			'(archive-publication-rollback) A failed publication retires its earlier archive links'
+		);
+		for (const replaced of [false, true]) {
+			const target = path.join(scratch, 'rollback-' + (replaced ? 'replacement' : 'refusal'));
+			fs.mkdirSync(target);
+			const preferred = path.join(target, 'ErgoptiPlus.app.tar.xz');
+			const historical = path.join(target, 'ErgoptiPlus.app.zip');
+			const originalLink = fs.linkSync;
+			const originalUnlink = fs.unlinkSync;
+			const seen = [];
+			const run = native(seen, { output: target });
+			fs.linkSync = (source, destination) => {
+				const result = originalLink.call(fs, source, destination);
+				if (replaced && destination === preferred) {
+					originalUnlink.call(fs, destination);
+					fs.writeFileSync(destination, 'foreign replacement');
+				}
+				return result;
+			};
+			fs.unlinkSync = (filename) => {
+				if (!replaced && filename === preferred) throw new Error('owned rollback refusal');
+				return originalUnlink.call(fs, filename);
+			};
+			try {
+				assert.throws(
+					() =>
+						Archives.createArchives(app, target, {
+							defaults,
+							execute: (...args) => {
+								const result = run(...args);
+								if (seen.filter((event) => event === 'verify-restored').length === 2)
+									fs.writeFileSync(historical, 'foreign publication');
+								return result;
+							}
+						}),
+					(error) =>
+						replaced
+							? error.code === 'EEXIST'
+							: error instanceof AggregateError &&
+								error.errors[0].code === 'EEXIST' &&
+								error.errors[1].message === 'owned rollback refusal',
+					'(archive-publication-rollback) Preserve foreign replacements and cleanup refusals'
+				);
+			} finally {
+				fs.linkSync = originalLink;
+				fs.unlinkSync = originalUnlink;
+			}
+			assert.equal(
+				fs.readFileSync(preferred, 'utf8'),
+				replaced ? 'foreign replacement' : 'owned XZ bytes'
+			);
+			assert.deepEqual(fs.readdirSync(target).sort(), [
+				'ErgoptiPlus.app.tar.xz',
+				'ErgoptiPlus.app.zip'
+			]);
+		}
 		const preexisting = path.join(output, 'ErgoptiPlus.app.zip');
 		const held = fs.readFileSync(preexisting);
 		assert.throws(

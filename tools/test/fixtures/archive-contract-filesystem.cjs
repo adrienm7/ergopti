@@ -31,6 +31,7 @@ class ArchiveContractFilesystem {
 		this.root = path.resolve(namespace);
 		this.entries = new Map([[this.root, { kind: 'directory', mode: 0o755 }]]);
 		this.sequence = 0;
+		this.inodes = new WeakMap();
 		this.descriptors = new Map();
 		this.constants = Object.freeze({ O_RDONLY: 0, O_NOFOLLOW: 0x20000 });
 	}
@@ -101,7 +102,10 @@ class ArchiveContractFilesystem {
 	}
 
 	statRecord(node) {
+		if (!this.inodes.has(node)) this.inodes.set(node, ++this.sequence);
 		return {
+			dev: 1,
+			ino: this.inodes.get(node),
 			mode:
 				node.mode |
 				(node.kind === 'directory' ? 0o040000 : node.kind === 'symlink' ? 0o120000 : 0o100000),
