@@ -487,9 +487,8 @@ class UserHotstringWorker {
 			SetTimer(_UserHotstringsPoll, 0)
 		; The bound Run timer and the task's Finish callback both hold this worker,
 		; so each is a reference cycle. Once the stage is gone nothing may call
-		; back; dropping both lets a completed worker be freed.
-		if IsObject(this.timer)
-			SetTimer(this.timer, 0)
+		; back (Run has fired or cancel stopped it); dropping both lets a completed
+		; worker be freed.
 		this.timer := 0
 		this.task := 0
 		return true
