@@ -42,6 +42,8 @@ local MAX_REPORT_FILENAME_ATTEMPTS = 1000
 -- dialog no longer see these, so they would otherwise stay forever.
 local LEGACY_DUMP_PATTERN = "^crash_%d%d%d%d%-%d%d%-%d%dT%d%d%-%d%d%-%d%d_[%w_.-]+%.txt$"
 
+local EEXIST = 17 -- Linux exclusive-create collision receipt.
+
 -- Crash reports live in the logs folder, next to the daily log that explains
 -- them, and follow a LogsDirPath override: resolved per call.
 --- @return string Absolute folder, no trailing slash.
@@ -204,16 +206,22 @@ local function refused()
 	return false
 end
 
---- Reserves the first free report name in the folder.
+--- Reserves a distinct report without truncating a prior incident or following a link.
+--- Other native refusals are not collisions and must never select another path.
 --- @param directory string Crash folder, no trailing slash.
 --- @param stem string From CrashReport.stem.
+--- @param live function Checks the original sink admission.
+--- @return file*|nil file
 --- @return string|nil path
-local function _free_path(directory, stem)
-	local FileSystem = require("adapters.file_system")
+local function open_report(directory, stem, live)
+	local available, Writer = pcall(require, "infra.regular_file_writer")
+	if not available or type(Writer) ~= "table" or type(Writer.open) ~= "function" then return nil end
 	for attempt = 1, MAX_REPORT_FILENAME_ATTEMPTS do
+		if not live() then return nil end
 		local path = directory .. "/" .. CrashReport.file_name(stem, attempt)
-		if not FileSystem.exists(path) then return path end
-	end
+		local opened, file, _, errno = pcall(Writer.open, path, "wx")
+		if opened and file then return file, path end
+		if not opened or (errno ~= EEXIST and errno ~= "EEXIST") then return nil end	end
 	return nil
 end
 
@@ -256,10 +264,8 @@ function M.dump(module_name, error_msg, context)
 	if not prepared or type(document) ~= "string" or not live() then return refused() end
 	local made, status = pcall(_ensure_dir, directory)
 	if not made or (status ~= true and status ~= 0) or not live() then return refused() end
-	local reserved, path = pcall(_free_path, directory, CrashReport.stem(timestamp))
-	if not reserved or type(path) ~= "string" then return refused() end
-	local opened, file = pcall(io.open, path, "w")
-	if not opened or not file then return refused() end
+	local file, path = open_report(directory, CrashReport.stem(timestamp), live)
+	if not file then return refused() end
 	local written, ack
 	if live() then written, ack = pcall(file.write, file, document) end
 	local closed, close_ack = pcall(file.close, file)
