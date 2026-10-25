@@ -91,6 +91,9 @@ local fire
 --- @return boolean armed
 local function arm(generation, delay_ms, interval_ms)
 	if generation ~= _generation then return false end
+	-- A refused transport may publish only after its native cleanup. Its
+	-- completion shares the retry already reserved when dispatch returned.
+	if _timer then return true end
 	local handle = _ports.scheduler.after(delay_ms / 1000, function()
 		fire(generation, interval_ms)
 	end)
@@ -120,6 +123,11 @@ local function on_result(generation, key, next_interval, loaded, failure)
 		Logger.info(LOG, "Warmup ended: Ollama does not have the selected model.")
 		return
 	end
+	if _timer then
+		Logger.info(LOG, "Warmup attempt failed (%s) — the pending retry timer is retained.",
+			type(failure) == "string" and failure or "unclassified failure")
+		return
+	end
 	Logger.info(LOG, "Warmup attempt failed (%s) — next attempt in %d ms.",
 		type(failure) == "string" and failure or "unclassified failure", next_interval)
 	arm(generation, next_interval, next_interval)
@@ -146,17 +154,17 @@ fire = function(generation, interval_ms)
 		arm(generation, interval_ms, interval_ms)
 		return
 	end
-	local completed = false
 	local called, operation = pcall(_ports.request, target, function(loaded, failure)
-		completed = true
 		on_result(generation, key, next_interval, loaded == true, failure)
 	end)
+	-- Start refusal is not physical retirement: an owned deadline can still
+	-- be closing. Keep that operation reachable by stop() until its ACK.
+	if called and type(operation) == "table" and type(operation.cancel) == "function"
+		and type(operation.is_settled) == "function" then _request = operation end
 	if not called or type(operation) ~= "table" or operation.started ~= true then
 		Logger.warn(LOG, "The warmup request was refused before it was sent: %s.",
 			tostring(called and operation or "request raised"))
-		-- Preflight refusals can deliver their failure before returning the
-		-- rejected operation. That completion already owns the retry timer.
-		if not completed then arm(generation, next_interval, next_interval) end
+		arm(generation, next_interval, next_interval)
 		return
 	end
 	_request = operation

@@ -31,14 +31,20 @@ local function run(scenario)
 			target = function() return world.target end,
 			busy = function() return world.busy end,
 			request = function(target, on_done)
+				if world.native_request then
+					local operation = world.native_request()
+					world.requests[#world.requests + 1] = { target = target, on_done = on_done, operation = operation }
+					return operation
+				end
 				local operation = { started = true, closed = false }
 				function operation:is_settled() return self.closed end
-				function operation:cancel() self.cancelled = true; self.closed = not world.hold_cancel; return self.closed end
+				function operation:cancel() self.cancelled = true; self.closed = self.closed or not world.hold_cancel; return self.closed end
 				world.requests[#world.requests + 1] = { target = target, on_done = on_done, operation = operation }
 				if world.refuse_synchronously or world.refuse_without_callback then
 					operation.started, operation.closed = false, true
 					if world.refuse_synchronously then on_done(false, "HTTP preflight refused") end
 				end
+				if world.refuse_pending then operation.started = false end
 				return operation
 			end,
 		}))
@@ -60,6 +66,58 @@ local function answer(world, loaded, failure)
 end
 
 helpers.describe("Ollama model warmup chain", function()
+	helpers.it("linux-warmup-refusal-debt: retains a real rejected native deadline until its close callback", function()
+		local native = require("luv")
+		local Deadline = require("infra.managed_http_deadline")
+		local Monotonic = require("infra.monotonic")
+		local NumberPolicy = require("number_policy")
+		local ok, err = xpcall(function()
+			run(function(Warmup, world)
+				world.native_request = function()
+					return Deadline.start(Monotonic.now_ms() + NumberPolicy.MAX_TIMER_DELAY_MS * 2, function() end)
+				end
+				helpers.assert_true(Warmup.schedule("enable"))
+				world.scheduler.test.advance(INITIAL_SEC)
+				local operation = world.requests[1].operation
+				helpers.assert_eq(operation.started, false, "the genuine native timer refuses an excessive deadline")
+				helpers.assert_eq(operation:is_settled(), false, "scheduled close is not physical retirement")
+				helpers.assert_eq(Warmup.stop(), false, "stop must retain the actual closing libuv timer")
+				native.run("nowait")
+				helpers.assert_true(operation:is_settled())
+				helpers.assert_true(Warmup.stop())
+			end)
+		end, debug.traceback)
+		native.run("nowait")
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("linux-warmup-refusal-debt: stop waits for a refused transport's native retirement", function()
+		run(function(Warmup, world)
+			world.refuse_pending, world.hold_cancel = true, true
+			helpers.assert_true(Warmup.schedule("enable"))
+			world.scheduler.test.advance(INITIAL_SEC)
+			helpers.assert_eq(Warmup.stop(), false, "a refused start can still own a native deadline handle")
+			helpers.assert_true(world.requests[1].operation.cancelled)
+			helpers.assert_true(Warmup.pending())
+			world.requests[1].operation.closed = true
+			helpers.assert_true(Warmup.stop())
+			helpers.assert_eq(Warmup.pending(), false)
+		end)
+	end)
+
+	helpers.it("linux-warmup-refusal-debt: deferred refusal completion keeps one retry timer", function()
+		run(function(Warmup, world)
+			world.refuse_pending = true
+			helpers.assert_true(Warmup.schedule("enable"))
+			world.scheduler.test.advance(INITIAL_SEC)
+			helpers.assert_eq(world.scheduler.activeCount(), 1)
+			answer(world, false, "native deadline start refused")
+			helpers.assert_eq(world.scheduler.activeCount(), 1, "physical completion must not orphan the existing retry")
+			helpers.assert_true(Warmup.stop())
+			helpers.assert_eq(world.scheduler.activeCount(), 0)
+		end)
+	end)
+
 	helpers.it("linux-warmup-sync-refusal: owns exactly one retry and cancels it on stop", function()
 		run(function(Warmup, world)
 			world.refuse_synchronously = true
