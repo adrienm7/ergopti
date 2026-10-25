@@ -79,7 +79,7 @@ _CWND_TraySubmenuStillOwnsDelimiters() {
 	; The rows it returns are what proves it still MANAGES them rather than
 	; merely listing them: without these the feature could have been deleted and
 	; the symbol kept.
-	for _, Needle in ["_HS_DelimSetAll", "_HS_DelimReset", "_HS_DelimAddCustom", "_HS_DelimRemoveCustom"] {
+	for _, Needle in ["_HS_DelimSetAll", "_HS_DelimReset", "_HS_DelimAddCustom", "_HS_DelimRemoveRecord"] {
 		Assert(InStr(Body, Needle) > 0,
 			"_HS_WordExpanderRows must still offer '" . Needle . "' — delimiter management moved to the renderer's row shape, it was not removed")
 	}
