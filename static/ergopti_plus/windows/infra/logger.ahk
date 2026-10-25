@@ -623,7 +623,7 @@ _LoggerRepairAppendDebt(Path, FlushFn, TruncateFn) {
 ; Injectable seams make short writes and failed stable flushes deterministic in
 ; regression tests without weakening the production filesystem boundary.
 _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
-		FlushFn := 0, TruncateFn := 0, WriteFn := 0, SourceRecords := 0) {
+		FlushFn := 0, TruncateFn := 0, WriteFn := 0, SourceRecords := 0, MaxBytes := 0) {
 	global _LOGGER_APPEND_OWNERS
 	if !(Path is String) or Path = "" or !(Blob is String)
 		return false
@@ -652,7 +652,10 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 		Stage := "redaction"
 		Blob := _LoggerPrivacyBlob(Blob, Config, SourceRecords)
 		Stage := "debt_repair"
-		if !_LoggerRepairAppendDebt(Path, ResolvedFlush, ResolvedTruncate)
+		if MaxBytes {
+			if !_LoggerPrepareBoundedAppend(Path, Blob, MaxBytes, ResolvedFlush, ResolvedTruncate)
+				return _LoggerRefuseAppend(Stage)
+		} else if !_LoggerRepairAppendDebt(Path, ResolvedFlush, ResolvedTruncate)
 			return _LoggerRefuseAppend(Stage)
 		; Another writer must not commit bytes that this owner's rollback can erase
 		Stage := "open"
@@ -671,7 +674,7 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 			throw Error("logger stable flush failed")
 		FileObject.Close()
 		FileObject := 0
-		return true
+		return !MaxBytes || FileGetSize(Path) <= MaxBytes
 	} catch {
 		_LoggerRefuseAppend(Stage)
 		if IsObject(FileObject)
@@ -1185,40 +1188,40 @@ LoggerAppendBoundedDebug(Path, Line, MaxBytes := 0) {
 		MaxBytes := LOGGER_AUXILIARY_LOG_MAX_BYTES
 	if Type(MaxBytes) != "Integer" || MaxBytes < 4
 		return false
-	Payload := Line . "`r`n"
-	PayloadBytes := StrPut(Payload, "UTF-8") - 1
-	; AHK writes a three-byte UTF-8 BOM when creating a new text file.
-	if PayloadBytes + 3 > MaxBytes
+	; Admission and rotation consume the exact redacted bytes inside the append
+	; owner. Measuring the raw line can undercount expansions or reject a secret
+	; whose redacted replacement would fit; redacting here would run it twice.
+	return _LoggerAppendComplete(Path, Line . "`r`n", false,
+		0, 0, 0, 0, 0, MaxBytes)
+}
+
+; Called only after the sink has admitted its privacy policy and reserved Path.
+; Repair precedes every size decision so rotation never moves an unpaid native
+; rollback boundary to a different owner. The byte cap includes a new-file BOM.
+_LoggerPrepareBoundedAppend(Path, Blob, MaxBytes, FlushFn, TruncateFn) {
+	PayloadBytes := StrPut(Blob, "UTF-8") - 1
+	BomBytes := StrPut(Chr(0xFEFF), "UTF-8") - 1
+	if PayloadBytes + BomBytes > MaxBytes
 		return false
 	ArchivePath := Path . ".1"
-	try {
-		; A size decision must use repaired bytes, and rotation must never move
-		; an outstanding rollback boundary onto a different file owner
-		for RepairPath in [Path, ArchivePath] {
-			if !_LoggerRepairAppendDebt(RepairPath,
-					FSFlushFileBuffers, _LoggerTruncateAppend)
-				return false
-		}
-		if FileExist(ArchivePath) && FileGetSize(ArchivePath) > MaxBytes
-			FileDelete(ArchivePath)
-		CurrentBytes := FileExist(Path) ? FileGetSize(Path) : 0
-		NextBytes := CurrentBytes + PayloadBytes + (CurrentBytes == 0 ? 3 : 0)
-		if NextBytes > MaxBytes {
-			if FileExist(ArchivePath)
-				FileDelete(ArchivePath)
-			; A legacy file may already exceed the newly enforced cap. Rotating that
-			; debt would merely preserve an oversized owner, so discard it once.
-			if CurrentBytes > MaxBytes
-				FileDelete(Path)
-			else if FileExist(Path)
-				FileMove(Path, ArchivePath, true)
-		}
-		if !_LoggerAppendComplete(Path, Payload)
+	for RepairPath in [Path, ArchivePath] {
+		if !_LoggerRepairAppendDebt(RepairPath, FlushFn, TruncateFn)
 			return false
-		return FileGetSize(Path) <= MaxBytes
-	} catch {
-		return false
 	}
+	if FileExist(ArchivePath) && FileGetSize(ArchivePath) > MaxBytes
+		FileDelete(ArchivePath)
+	CurrentBytes := FileExist(Path) ? FileGetSize(Path) : 0
+	NextBytes := CurrentBytes + PayloadBytes + (CurrentBytes == 0 ? BomBytes : 0)
+	if NextBytes > MaxBytes {
+		if FileExist(ArchivePath)
+			FileDelete(ArchivePath)
+		; A legacy file above the cap cannot become a bounded archive.
+		if CurrentBytes > MaxBytes
+			FileDelete(Path)
+		else if FileExist(Path)
+			FileMove(Path, ArchivePath, true)
+	}
+	return true
 }
 
 ; Start of a routine internal operation (debug granularity). Pair with Done.
