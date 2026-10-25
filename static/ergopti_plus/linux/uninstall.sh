@@ -12,6 +12,7 @@ source "$SCRIPT_DIR/install/desktop_entry.sh"
 PREFIX="${HOME}/.local"
 source "$SCRIPT_DIR/install/config_home.sh"
 ergopti_resolve_config_home CONFIG_ROOT
+PACKAGE_NAME=ergopti
 CONFIRMED=false
 CHECK_ONLY=false
 WAIT_OWNER=
@@ -103,17 +104,24 @@ remove_native_startup() {
 
 if [ "$SCRIPT_DIR" = /usr/lib/ergopti ]; then
 	# Never remove package files ourselves, even if authorization is refused.
-	if command -v dpkg-query >/dev/null 2>&1 && dpkg-query -S "$SCRIPT_DIR/uninstall.sh" | grep -qx 'ergopti: /usr/lib/ergopti/uninstall.sh'; then
+	if command -v dpkg-query >/dev/null 2>&1 && dpkg-query -S "$SCRIPT_DIR/uninstall.sh" | grep -Fxq "${PACKAGE_NAME}: $SCRIPT_DIR/uninstall.sh"; then
 		if "$CHECK_ONLY"; then exit 0; fi
 		# EX_UNAVAILABLE: the package manager that owns the package is missing.
 		# The stderr line is a machine-readable token, not a sentence.
 		command -v apt-get >/dev/null 2>&1 || { MISSING_PROGRAM=apt-get; printf '%s %s\n' missing-program apt-get >&2; exit 69; }
-		pkexec /usr/bin/apt-get remove -y ergopti
+		pkexec /usr/bin/apt-get remove -y "$PACKAGE_NAME"
 		remove_native_startup
 		exit 0
-	elif command -v rpm >/dev/null 2>&1 && [ "$(rpm -qf --qf '%{NAME}' "$SCRIPT_DIR/uninstall.sh")" = ergopti ]; then
+	elif command -v rpm >/dev/null 2>&1 && [ "$(rpm -qf --qf '%{NAME}' "$SCRIPT_DIR/uninstall.sh")" = "$PACKAGE_NAME" ]; then
 		if "$CHECK_ONLY"; then exit 0; fi
-		pkexec /usr/bin/rpm -e ergopti
+		pkexec /usr/bin/rpm -e "$PACKAGE_NAME"
+		remove_native_startup
+		exit 0
+	elif command -v pacman >/dev/null 2>&1 \
+		&& pacman_owner="$(pacman -Qoq -- "$SCRIPT_DIR/uninstall.sh")" \
+		&& [ "$pacman_owner" = "$PACKAGE_NAME" ]; then
+		if "$CHECK_ONLY"; then exit 0; fi
+		pkexec /usr/bin/pacman -R --noconfirm "$PACKAGE_NAME"
 		remove_native_startup
 		exit 0
 	fi
