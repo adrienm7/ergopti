@@ -38,22 +38,9 @@ M.IDLE_END      = "idle_end"
 -- ===============================
 -- ===============================
 
---- A fresh tracker.
---- @param opts table { micro_idle_ms, session_timeout_ms } from the shared timings.
---- @return table tracker { input(now_ms, is_keystroke), tick(now_ms), stop(now_ms) }
-function M.new(opts)
-	if type(opts) ~= "table" then error("session_events.new requires its timings", 2) end
-	for _, key in ipairs({ "micro_idle_ms", "session_timeout_ms" }) do
-		if type(opts[key]) ~= "number" or opts[key] <= 0 then
-			error("session_events.new: " .. key .. " must be a positive number", 2)
-		end
-	end
-	if opts.session_timeout_ms <= opts.micro_idle_ms then
-		error("session_events.new: the session timeout must exceed the idle timeout", 2)
-	end
-	local micro_idle_ms, session_timeout_ms = opts.micro_idle_ms, opts.session_timeout_ms
+--- Builds an independent closure over one exact session state.
+local function new_tracker(micro_idle_ms, session_timeout_ms, started_at, last_active, idle)
 	local tracker = {}
-	local started_at, last_active, idle = nil, nil, false
 
 	local function ended_session(events)
 		events[#events + 1] = { kind = M.SESSION_END, duration_ms = math.max(0, last_active - started_at) }
@@ -106,7 +93,29 @@ function M.new(opts)
 		return ended_session({})
 	end
 
+	--- Forks the current state without exposing mutable checkpoint authority.
+	--- @return table tracker Independent owner with the same validated timings.
+	function tracker.fork()
+		return new_tracker(micro_idle_ms, session_timeout_ms, started_at, last_active, idle)
+	end
+
 	return tracker
+end
+
+--- A fresh tracker.
+--- @param opts table { micro_idle_ms, session_timeout_ms } from the shared timings.
+--- @return table tracker { input(now_ms, is_keystroke), tick(now_ms), stop(), fork() }
+function M.new(opts)
+	if type(opts) ~= "table" then error("session_events.new requires its timings", 2) end
+	for _, key in ipairs({ "micro_idle_ms", "session_timeout_ms" }) do
+		if type(opts[key]) ~= "number" or opts[key] <= 0 then
+			error("session_events.new: " .. key .. " must be a positive number", 2)
+		end
+	end
+	if opts.session_timeout_ms <= opts.micro_idle_ms then
+		error("session_events.new: the session timeout must exceed the idle timeout", 2)
+	end
+	return new_tracker(opts.micro_idle_ms, opts.session_timeout_ms, nil, nil, false)
 end
 
 return M

@@ -42,6 +42,22 @@ local function fixture(app)
 		generation = generation + 1
 		return true
 	end
+	local reset_receipts = {}
+	K.request_session_reset = function(complete)
+		if debt or pending or stopping then return false end
+		local origin = generation
+		local success = K.reset_session()
+		local receipt = {}
+		reset_receipts[receipt] = { origin = origin, generation = generation, success = success }
+		complete(success, receipt)
+		return true
+	end
+	K.reset_receipt_generation = function(receipt, origin)
+		local record = reset_receipts[receipt]
+		if not record or record.origin ~= origin or record.generation ~= generation then return nil end
+		return record.generation, record.success
+	end
+
 	local state = { keystats = K, webview_manager = {
 		page_current = function(name, owner) return name == app and owner == epoch end,
 		eval_js = function(_, js) pushed[#pushed + 1] = js return true end,

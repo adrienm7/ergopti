@@ -3681,16 +3681,24 @@ local function _manifest_metrics_rows(ctx, k)
 			if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end,
 		["metrics_reset_session"] = function()
-			if type(k.reset_session) ~= "function" then
-				Logger.error(LOG, "Keystats exposes no reset_session — the row does nothing.")
+			if type(k.request_session_reset) ~= "function" then
+				Logger.error(LOG, "Keystats exposes no request_session_reset — the row does nothing.")
 				return false
 			end
-			if k.reset_session() ~= true then
+			local completed = nil
+			local accepted = k.request_session_reset(function(success)
+				completed = success
+				if success == true then
+					Logger.info(LOG, "Metrics session reset.")
+				else
+					Logger.error(LOG, "Metrics session reset was refused; the session is unchanged.")
+				end
+			end)
+			if accepted ~= true then
 				Logger.error(LOG, "Metrics session reset was refused; the session is unchanged.")
 				return false
 			end
-			Logger.info(LOG, "Metrics session reset.")
-			return true
+			return completed ~= false
 		end,
 	}
 
