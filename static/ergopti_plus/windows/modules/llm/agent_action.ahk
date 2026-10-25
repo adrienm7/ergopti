@@ -453,9 +453,14 @@ _LLM_Agent_NativePrompt(Title, Text, Default) {
  * @returns {Boolean} True when the request was sent.
  */
 LLM_Agent_Ask(Flow, Text) {
+	Current := _LLM_Agent_RenderIsCurrent.Bind(Flow["generation"])
+	if !Current.Call()
+		return false
 	Config := LLM_Agent_Config()
 	if !Flow.Has("context")
 		Flow["context"] := _LLM_Agent_Context(Config)
+	if !Current.Call()
+		return false
 	Ctx := Flow["context"].Clone()
 	Ctx["source"] := Flow["source"]
 	Flow["config"] := Config
@@ -472,7 +477,9 @@ LLM_Agent_Ask(Flow, Text) {
 	if !Flow["auto"]
 		_LLM_Agent_ShowLoading(Flow)
 	if !LLM_Agent_System2Request(Flow["backend"], Payload, _LLM_Agent_OnActions.Bind(Flow),
-			_LLM_Agent_OnActionsFail.Bind(Flow), !Flow["auto"]) {
+			_LLM_Agent_OnActionsFail.Bind(Flow), !Flow["auto"], Current) {
+		if !Current.Call()
+			return false
 		LoggerWarn("LLM", "AI agent #{1} failed: System 2 '{2}' has no API entry with a key.",
 			Flow["generation"], Flow["backend"]["backend"])
 		_LLM_Agent_Notify(Flow, "llm.agent.failed")
@@ -489,10 +496,11 @@ LLM_Agent_Ask(Flow, Text) {
  * @param {Func} OnFail Called on failure.
  * @param {Boolean} CancelEngine Whether a pending or in-flight prediction gives
  *     way (a flow the user asked for).
- * @returns {Boolean} False, with nothing sent, when the backend cannot be reached.
+ * @param {Func|Integer} CurrentFn Original requester admission, or 0 for an unscoped call.
+ * @returns {Boolean} False when the backend or original requester is unavailable.
  */
-LLM_Agent_System2Request(Backend, Payload, OnSuccess, OnFail, CancelEngine := true) {
-	return _LLM_Agent_Chat(Backend, Payload, OnSuccess, OnFail, CancelEngine)
+LLM_Agent_System2Request(Backend, Payload, OnSuccess, OnFail, CancelEngine := true, CurrentFn := 0) {
+	return _LLM_Agent_Chat(Backend, Payload, OnSuccess, OnFail, CancelEngine, CurrentFn)
 }
 
 ; System 2 answered: validate its actions and offer them.
@@ -1070,10 +1078,15 @@ _LLM_Agent_Schedule(Callback, Period) {
 ; api_providers.json (a reasoning model told not to reason over a triage).
 ; @param {Boolean} CancelEngine Whether a pending or in-flight prediction must
 ;     give way (a manual flow); the automatic mode leaves it running.
-; @returns {Boolean} False, with nothing sent, when the backend cannot be reached.
-_LLM_Agent_Chat(Backend, Payload, OnSuccess, OnFail, CancelEngine := true) {
+; @param {Func|Integer} CurrentFn Original requester admission across yielding work.
+; @returns {Boolean} False when the backend or original requester is unavailable.
+_LLM_Agent_Chat(Backend, Payload, OnSuccess, OnFail, CancelEngine := true, CurrentFn := 0) {
 	global _LLM_Engine
+	if !_LLM_Vision_CallbackCurrent(CurrentFn)
+		return false
 	Target := _LLM_Vision_ResolveTarget(Backend["backend"], Backend["model"], "AI agent")
+	if !_LLM_Vision_CallbackCurrent(CurrentFn)
+		return false
 	if !(Target is Map)
 		return false
 	if Target.Has("resolved") && !LLM_RemoteFormatServes(Target["format"], "chat")
@@ -1082,6 +1095,8 @@ _LLM_Agent_Chat(Backend, Payload, OnSuccess, OnFail, CancelEngine := true) {
 	if (Target["format"] == "backboard") {
 		if CancelEngine
 			_LLM_Vision_CancelEngine()
+		if !_LLM_Vision_CallbackCurrent(CurrentFn)
+			return false
 		LLM_RemoteBackboardChat_Async(Target["resolved"], Payload["system"], Payload["user"], OnSuccess, OnFail)
 		return true
 	}
@@ -1096,8 +1111,8 @@ _LLM_Agent_Chat(Backend, Payload, OnSuccess, OnFail, CancelEngine := true) {
 			"text", Payload["user"],
 			"max_tokens", Payload["max_tokens"]))
 	}
-	_LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine)
-	return true
+	Result := _LLM_Vision_Send(Target, Body, OnSuccess, OnFail, CancelEngine, CurrentFn)
+	return !(Result is Integer && Result == false)
 }
 
 

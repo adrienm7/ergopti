@@ -237,3 +237,68 @@ _LAG_AppPickerLiveTail(Mode) {
 for _LAG_AppPickerMode in ["accepted", "same", "refused", "stale", "float", "string"]
 	Test("LLM agent app picker: actual live tail " . _LAG_AppPickerMode . " (agent-app-picker-tail)",
 		_LAG_AppPickerLiveTail.Bind(_LAG_AppPickerMode))
+
+; Context, endpoint, body and prediction retirement all yield before dispatch.
+; Observe the actual function, delegate its original result, then withdraw the
+; requester through the genuine durable settings transaction.
+_LAG_DispatchCustody(Backend, Phase) {
+	_LAG_Run(_LAG_Menu("action", "", Backend), _LTN_Screen(LAG_SELECTION), Body)
+	Body(Fx, Lines, Sent) {
+		global _LLM_Agent_ContextProbe, _LLM_Remote_BackboardExchanges
+		Observed := false
+		Boundary := Phase == "cancel" ? _LLM_Vision_CancelEngine
+			: Phase == "payload" ? (Backend == "local" ? LLM_Vision_BuildRequest : _LLMRemoteBuildPayload)
+			: _LLM_Vision_ResolveTarget
+		HadCall := Boundary.HasOwnProp("Call")
+		SavedCall := HadCall ? Boundary.GetOwnPropDesc("Call") : 0
+		Owners := _LLM_Remote_BackboardExchanges.Clone()
+		try {
+			AssertFalse(HadCall, "the observed production function retains its genuine Call boundary")
+			_LLM_Agent_ContextProbe := Context
+			_LAG_Invoke("llm_agent_selection")
+			AssertTrue(Observed, "the actual dispatch boundary was reached")
+			Expected := Phase == "unchanged" || Phase == "context-newer" ? 1 : 0
+			AssertEqual(Expected, Fx.Remote.Length + Fx.Ollama.Length + Fx.Posts.Length,
+				"only the unchanged or newer legitimate requester can send private text")
+			AssertEqual(0, Sent.Length)
+		} finally {
+			if Boundary.HasOwnProp("Call")
+				Boundary.DeleteProp("Call")
+			if HadCall
+				Boundary.DefineProp("Call", SavedCall)
+			Retire := []
+			for Id, Owner in _LLM_Remote_BackboardExchanges
+				if !Owners.Has(Id)
+					Retire.Push(Owner)
+			for Owner in Retire
+				_LLMRemote_BackboardRetire(Owner, true)
+		}
+		Context() {
+			if !Observed && (InStr(Phase, "context") == 1 || Phase == "unchanged") {
+				Observed := true
+				switch Phase {
+					case "context-off": AssertTrue(LLM_Agent_SetMode("off"))
+					case "context-source": AssertTrue(_LLM_Agent_MenuSetBackend("agent_system2", ""))
+					case "context-newer": AssertTrue(_LAG_Invoke("llm_agent_selection"))
+				}
+			} else if !Observed
+				Boundary.DefineProp("Call", {Call: Observe})
+			return _LAG_Context(Fx)
+		}
+		Observe(Self, Args*) {
+			Boundary.DeleteProp("Call")
+			Result := Boundary.Call(Args*)
+			Observed := true
+			AssertTrue(LLM_Agent_SetMode("off"))
+			return Result
+		}
+	}
+}
+for Backend in ["local", "cerebras", "backboard"] {
+	for Phase in ["context-off", "context-source", "context-newer", "target", "cancel", "unchanged"]
+		Test("LLM agent: dispatch retains original requester " . Backend . " " . Phase . " (agent-dispatch-custody)",
+			_LAG_DispatchCustody.Bind(Backend, Phase))
+	if Backend != "backboard"
+		Test("LLM agent: dispatch retains original requester " . Backend . " payload (agent-dispatch-custody)",
+			_LAG_DispatchCustody.Bind(Backend, "payload"))
+}
