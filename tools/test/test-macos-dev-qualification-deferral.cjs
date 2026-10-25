@@ -406,16 +406,19 @@ function admitItem36Selector(mac) {
 		'        timeout-minutes: 20'
 	])
 		if (step.split('\n').filter((actual) => actual === line).length !== 1) return null;
-	const packages = [
-		...mac.matchAll(/^  package-macos:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)
-	];
-	if (
-		packages.length !== 1 ||
-		!packages[0][0].includes(
-			'          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci" 2>&1 | tee "$xctest_log"\n'
-		)
-	)
+	// The unfiltered full launcher run belongs to the macOS 26 launcher cell.
+	let launcher = '';
+	try {
+		launcher = stageSource
+			.selected(job, 'launcher-native')
+			.map((entry) => entry.body)
+			.join('\n');
+	} catch {
 		return null;
+	}
+	const fullRun =
+		'          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci" 2>&1 | tee "$xctest_log"\n';
+	if (launcher.split(fullRun).length !== 2 || mac.split(fullRun).length !== 2) return null;
 	const position = jobs[0].index + steps[0].index + step.indexOf(ITEM36_FILTER);
 	return admitPermissionObservationSelector(
 		mac.slice(0, position) + mac.slice(position + ITEM36_FILTER.length)
@@ -756,6 +759,19 @@ function run({ includeLeafControls = true } = {}) {
 		assert.ok(admitNativeSdkSelector(workflow));
 		assert.ok(!/--skip|--filter|XCTSkip/.test(admitNativeSdkSelector(workflow)));
 		assert.ok(workflow.includes('script -q /dev/null swift test --package-path'));
+	});
+	check('full-launcher-run-stays-in-the-launcher-cell', () => {
+		const guard = "env.MACOS_STAGE_ROLE == 'launcher-native'";
+		const heading = '      - name: Run Swift launcher tests on macOS 26\n        if: ${{ ';
+		const at = workflow.indexOf(heading);
+		assert.ok(at >= 0 && workflow.split(heading).length === 2);
+		const line = workflow.slice(at, workflow.indexOf('\n', at + heading.length));
+		assert.ok(line.includes(guard));
+		const moved = workflow.replace(line, () =>
+			line.replace(guard, "env.MACOS_STAGE_ROLE == 'e2e-hs'")
+		);
+		assert.notEqual(moved, workflow);
+		assert.equal(admitNativeSdkSelector(moved), null);
 	});
 	for (const [name, token, replacement] of [
 		['sdk-wrong-selector-is-red', SDK_FILTER, "--filter 'ManagedOllamaAPIWorkerTests'"],
@@ -1234,7 +1250,7 @@ function run({ includeLeafControls = true } = {}) {
 			assert.equal(admitRawNativeSdkSelector(changed), null);
 		});
 
-	assert.equal(passed, 76);
+	assert.equal(passed, 77);
 	runInputSourceControls({ workflow, admitNativeSdkSelector });
 	let publicationControls = 0;
 	for (const lane of ['core', 'macos', 'windows', 'linux']) {
@@ -1279,7 +1295,7 @@ function run({ includeLeafControls = true } = {}) {
 	assert.equal(publicationControls, 11);
 	console.log('PASS: publication lane membership controls=11; no release or native execution.');
 	console.log(
-		'PASS: Mac qualification deferral source/typed-receipt controls=76; Swift/native execution unqualified.'
+		'PASS: Mac qualification deferral source/typed-receipt controls=77; Swift/native execution unqualified.'
 	);
 
 	// Keep the original source/receipt census separate from public emission controls.

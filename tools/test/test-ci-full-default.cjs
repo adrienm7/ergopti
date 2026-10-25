@@ -28,6 +28,78 @@ function changed(rel, before, after) {
 		return { ...entry, text: entry.text.replace(before, () => after) };
 	});
 }
+// The macOS 26 launcher cell decides the Brew and Shortcuts deferrals where
+// its tests run and hands those two receipts to Build, which admits exactly
+// them for this source and republishes them byte for byte as release assets.
+const NATIVE_HANDOFF = 'macos-native-qualification-${{ github.sha }}-${{ github.run_id }}';
+const NATIVE_RECEIPTS = ['stable-macos-brew-archive.json', 'stable-macos-shortcuts-discovery.json'];
+/**
+ * Lists every way the launcher-to-Build receipt handoff breaks.
+ * @param {string} text ci-macos.yml.
+ * @returns {string[]}
+ */
+function nativeReceiptHandoffProblems(text) {
+	const problems = [];
+	const jobs = require('yaml').parse(text).jobs;
+	const named = (id, name) => (jobs[id]?.steps ?? []).filter((step) => step.name === name);
+	const e2e = jobs['e2e-hs']?.steps ?? [];
+	const build = jobs['package-macos']?.steps ?? [];
+	const hand = named('e2e-hs', 'Hand the source-bound native qualification receipts to Build');
+	if (
+		hand.length !== 1 ||
+		JSON.stringify(hand[0]) !==
+			JSON.stringify({
+				name: 'Hand the source-bound native qualification receipts to Build',
+				if: macRole.condition('launcher-native'),
+				uses: 'actions/upload-artifact@v4',
+				with: {
+					overwrite: true,
+					name: NATIVE_HANDOFF,
+					'retention-days': 7,
+					'if-no-files-found': 'error',
+					path: NATIVE_RECEIPTS.map((file) => '${{ runner.temp }}/' + file).join('\n') + '\n'
+				}
+			})
+	)
+		problems.push('the launcher cell hands exactly its two receipts to Build');
+	const issued = [
+		'Prepare scoped native qualification profile',
+		'Observe native Apple Shortcuts discovery'
+	].map((name) => e2e.indexOf(named('e2e-hs', name)[0]));
+	if (issued.some((at) => at < 0 || at >= e2e.indexOf(hand[0])))
+		problems.push('the receipts are handed over after the steps that issue them');
+	const receive = named('package-macos', 'Receive the source-bound native qualification receipts');
+	if (
+		receive.length !== 1 ||
+		JSON.stringify(receive[0]) !==
+			JSON.stringify({
+				name: 'Receive the source-bound native qualification receipts',
+				if: macRole.condition('package-macos'),
+				uses: 'actions/download-artifact@v4',
+				with: { name: NATIVE_HANDOFF, path: '${{ runner.temp }}/native-qualification' }
+			})
+	)
+		problems.push('Build receives the exact handoff of this run');
+	const admit = named('package-macos', 'Admit the received native qualification receipts');
+	const order = [
+		receive[0],
+		admit[0],
+		...[
+			'Retain source-bound package native qualification receipt',
+			'Retain source-bound Shortcuts native qualification receipt'
+		].map((name) => named('package-macos', name)[0])
+	].map((step) => build.indexOf(step));
+	if (admit.length !== 1 || order.some((at, index) => at < 0 || (index && at <= order[index - 1])))
+		problems.push('Build admits the receipts before it republishes them');
+	for (const [id, steps] of Object.entries(jobs))
+		for (const step of steps.steps ?? [])
+			if (
+				/^assets-qualification-(?:package|shortcuts)-macos$/.test(step.with?.name ?? '') &&
+				id !== 'package-macos'
+			)
+				problems.push('only Build publishes the native qualification assets: ' + id);
+	return problems;
+}
 function assertNativeHTTPClockWorkflow(workflow, expected) {
 	const job = workflow.jobs['e2e-hs'];
 	assert.ok(job && Array.isArray(job.steps), 'Actual managed native clock owner must exist.');
@@ -68,7 +140,7 @@ function assertNativeHTTPClockWorkflow(workflow, expected) {
 		1,
 		'Clock output authority must have one unique step ID.'
 	);
-	const packages = workflow.jobs['package-macos'].steps.filter(
+	const packages = workflow.jobs['e2e-hs'].steps.filter(
 		(step) => step.name === 'Receive actual managed HTTP native clients'
 	);
 	assert.deepEqual(
@@ -76,7 +148,7 @@ function assertNativeHTTPClockWorkflow(workflow, expected) {
 		[
 			{
 				name: 'Receive actual managed HTTP native clients',
-				if: macRole.condition('package-macos'),
+				if: macRole.condition('launcher-native'),
 				run: 'set -euo pipefail\nstatus=0\n"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\nreceipt="$RUNNER_TEMP/stable-macos-native-http-package.json"\nmkdir -p "$(dirname "$receipt")"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"\nmode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"\nif [ "$mode" = deferred ]; then\n    echo "[DEFERRED] macos-native-http: qualified=false; duplicate native wire receiving not executed; owned-process and client-only controls remain mandatory."\nelif [ "$mode" = full ]; then\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1\nelse\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\nexit "$status"\n',
 				'timeout-minutes': 5
 			}
@@ -140,8 +212,8 @@ for (const [name, before, after] of [
 	],
 	[
 		'Package first-two commands remain outside duplicate wire deferral',
-		'      - name: Receive actual managed HTTP native clients\n        if: ${{ steps.stage-admission.outcome == \'success\' }}\n        run: |\n          set -euo pipefail\n          status=0\n          "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n',
-		"      - name: Receive actual managed HTTP native clients\n        if: ${{ steps.stage-admission.outcome == 'success' }}\n        run: |\n          set -euo pipefail\n          status=0\n          true omitted_package_owned_process\n"
+		"      - name: Receive actual managed HTTP native clients\n        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}\n        run: |\n          set -euo pipefail\n          status=0\n          \"$ERGOPTI_NATIVE_HTTP_PYTHON\" tools/diagnostics/macos_owned_process_native_test.py || status=1\n",
+		"      - name: Receive actual managed HTTP native clients\n        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}\n        run: |\n          set -euo pipefail\n          status=0\n          true omitted_package_owned_process\n"
 	]
 ]) {
 	check(name + ' is refused by actual live equality', () => {
@@ -746,9 +818,9 @@ check('full Linux package has the default admission and no manual receiving allo
 			condition
 		);
 });
-check('package duplicate HTTP receiving scopes only the native wire command', () => {
+check('launcher duplicate HTTP receiving scopes only the native wire command', () => {
 	const job = Raw.jobsOfText(source.find((entry) => entry.rel === MAC).text, MAC).find(
-		(entry) => entry.id === 'package-macos'
+		(entry) => entry.id === 'e2e-hs'
 	);
 	const code = Raw.runOf(Raw.step(job.body, 'Receive actual managed HTTP native clients')).join(
 		'\n'
@@ -764,15 +836,15 @@ check('package duplicate HTTP receiving scopes only the native wire command', ()
 	assert.ok(code.includes('elif [ "$mode" = full ]; then\n    ' + wire));
 	assert.ok(code.includes('stable-macos-native-http-package.json'));
 	assert.equal(
-		Full.runOf(
-			Full.step(Full.job('package-macos'), 'Receive actual managed HTTP native clients')
-		).join('\n'),
+		Full.runOf(Full.step(Full.job('e2e-hs'), 'Receive actual managed HTTP native clients')).join(
+			'\n'
+		),
 		['set -euo pipefail', 'status=0', first, second, wire, 'exit "$status"'].join('\n')
 	);
 });
-check('package duplicate keeps both mandatory failure acknowledgments', () => {
+check('launcher duplicate keeps both mandatory failure acknowledgments', () => {
 	const original = source.find((entry) => entry.rel === MAC);
-	const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'package-macos');
+	const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'e2e-hs');
 	const step = Raw.step(job.body, 'Receive actual managed HTTP native clients');
 	for (const command of [
 		'macos_owned_process_native_test.py',
@@ -790,7 +862,7 @@ check('package duplicate keeps both mandatory failure acknowledgments', () => {
 	assert.ok(uploader.includes('${{ runner.temp }}/stable-macos-native-http-package.json'));
 	assert.equal(
 		Raw.stepField(uploader, 'if'),
-		macRole.condition('package-macos', '${{ always() }}')
+		macRole.condition('launcher-native', '${{ always() }}')
 	);
 	assert.match(uploader, /^ {10}if-no-files-found: error$/m);
 });
@@ -841,10 +913,10 @@ check(
 	}
 );
 check(
-	'package Swift duplicate scopes only the existing PAC classes and preserves the full body',
+	'launcher Swift duplicate scopes only the existing PAC classes and preserves the full body',
 	() => {
 		const original = source.find((entry) => entry.rel === MAC);
-		const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'package-macos');
+		const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'e2e-hs');
 		const code = Raw.runOf(Raw.step(job.body, 'Run Swift launcher tests on macOS 26')).join('\n');
 		assert.ok(
 			code.includes(
@@ -855,7 +927,7 @@ check(
 		assert.ok(code.includes('--pac-skip-pattern "$pac_receipt"'));
 		assert.equal(code.split(' --pac-qualification-receipt "$pac_receipt"').length, 3);
 		const full = Full.runOf(
-			Full.step(Full.job('package-macos'), 'Run Swift launcher tests on macOS 26')
+			Full.step(Full.job('e2e-hs'), 'Run Swift launcher tests on macOS 26')
 		).join('\n');
 		assert.ok(
 			full.includes(
@@ -884,13 +956,13 @@ check(
 		);
 		assert.equal(
 			Raw.stepField(retained, 'if'),
-			macRole.condition('package-macos', '${{ always() }}')
+			macRole.condition('launcher-native', '${{ always() }}')
 		);
 	}
 );
 check('embedded Swift admission refuses omitted collector binding or changed source gate', () => {
 	const original = source.find((entry) => entry.rel === MAC);
-	const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'package-macos');
+	const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'e2e-hs');
 	const step = Raw.step(job.body, 'Run Swift launcher tests on macOS 26');
 	const receiptOption = ' --pac-qualification-receipt "$pac_receipt"';
 	const missing = step.replace(receiptOption, '');
@@ -902,7 +974,7 @@ check('embedded Swift admission refuses omitted collector binding or changed sou
 });
 check('Swift PAC arguments preserve empty and selected arrays under nounset', () => {
 	const original = source.find((entry) => entry.rel === MAC);
-	const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'package-macos');
+	const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'e2e-hs');
 	const code = Raw.runOf(Raw.step(job.body, 'Run Swift launcher tests on macOS 26')).join('\n');
 	const safe = '${pac_skip_args[@]+"${pac_skip_args[@]}"}';
 	assert.ok(code.includes(' ' + safe + ' 2>&1 | tee "$xctest_log"'));
@@ -1088,7 +1160,7 @@ check('v101 retains the full dispatch-only Item36 cohort and public Brew receipt
 		itemCode.includes("SparkleArchiveUpdateAcceptanceTests|HomebrewArchiveAcceptanceTests'")
 	);
 	assert.equal(itemCode.includes('HomebrewAutomationConsent'), false);
-	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'package-macos');
+	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'e2e-hs');
 	const prepare = Raw.runOf(Raw.step(job.body, 'Prepare scoped native qualification profile')).join(
 		'\n'
 	);
@@ -1098,10 +1170,45 @@ check('v101 retains the full dispatch-only Item36 cohort and public Brew receipt
 			'cp "$RUNNER_TEMP/dev-release-qualification/macos-brew-archive.json" "$RUNNER_TEMP/stable-macos-brew-archive.json"'
 		)
 	);
-	const retain = Raw.step(job.body, 'Retain source-bound package native qualification receipt');
-	assert.equal(Raw.stepField(retain, 'if'), macRole.condition('package-macos', 'always()'));
+	// The launcher cell hands its receipt to Build, which admits and republishes it.
+	assert.deepEqual(nativeReceiptHandoffProblems(entry.text), []);
+	for (const [what, from, to] of [
+		[
+			'a foreign handoff',
+			'name: macos-native-qualification-${{ github.sha }}-${{ github.run_id }}\n          retention-days',
+			'name: macos-native-qualification-${{ github.run_id }}\n          retention-days'
+		],
+		[
+			'a received foreign handoff',
+			'name: macos-native-qualification-${{ github.sha }}-${{ github.run_id }}\n          path',
+			'name: macos-native-qualification-${{ github.run_id }}\n          path'
+		],
+		[
+			'a missing Brew receipt',
+			'            ${{ runner.temp }}/stable-macos-brew-archive.json\n            ${{ runner.temp }}/stable-macos-shortcuts',
+			'            ${{ runner.temp }}/stable-macos-shortcuts'
+		],
+		[
+			'an unadmitted republication',
+			'      - name: Admit the received native qualification receipts\n',
+			'      - name: Skip the received native qualification receipts\n'
+		],
+		[
+			'an E2E publication',
+			'name: macos-native-qualification-${{ github.sha }}-${{ github.run_id }}\n          retention-days',
+			'name: assets-qualification-package-macos\n          retention-days'
+		]
+	]) {
+		assert.equal(entry.text.split(from).length, 2, 'one handoff mutation seam: ' + what);
+		assert.ok(nativeReceiptHandoffProblems(entry.text.replace(from, to)).length > 0, what);
+	}
+	const build = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'package-macos');
+	const retain = Raw.step(build.body, 'Retain source-bound package native qualification receipt');
+	assert.equal(Raw.stepField(retain, 'if'), macRole.condition('package-macos'));
 	assert.ok(retain.includes('name: assets-qualification-package-macos'));
-	assert.ok(retain.includes('path: ${{ runner.temp }}/stable-macos-brew-archive.json'));
+	assert.ok(
+		retain.includes('path: ${{ runner.temp }}/native-qualification/stable-macos-brew-archive.json')
+	);
 	assert.match(retain, /^ {10}if-no-files-found: error$/m);
 });
 check('v101 managed PAC admission retains Worker filter and exact collector authority', () => {
@@ -1172,7 +1279,7 @@ check('v101 HTTP receiver defers only wire and preserves both mandatory statuses
 	const entry = source.find((file) => file.rel === MAC);
 	for (const [id, name] of [
 		['e2e-hs', 'Receive actual independent managed HTTP native clients'],
-		['package-macos', 'Receive actual managed HTTP native clients']
+		['e2e-hs', 'Receive actual managed HTTP native clients']
 	]) {
 		const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === id);
 		const step = Raw.step(job.body, name);
@@ -1199,7 +1306,11 @@ check('v101 HTTP receiver defers only wire and preserves both mandatory statuses
 			['full', '', false, 'client-capture', 1],
 			['full', '', false, 'wire-capture', 1]
 		]) {
-			if (id === 'package-macos' && failedCommand.endsWith('-capture')) continue;
+			if (
+				name === 'Receive actual managed HTTP native clients' &&
+				failedCommand.endsWith('-capture')
+			)
+				continue;
 			const shell =
 				`
 set -euo pipefail
@@ -1270,7 +1381,11 @@ owned_python() {
 				if (result.status === expected) {
 					const clockRoot = owned + '/native-http-clock-arm64-123-2';
 					const expectedRequests = ['-p', owned];
-					if (id === 'e2e-hs' && mode === 'full' && !refused) {
+					if (
+						name === 'Receive actual independent managed HTTP native clients' &&
+						mode === 'full' &&
+						!refused
+					) {
 						expectedRequests.push('-m', '700', clockRoot, clockRoot + '/private-cache');
 						for (const [file, text] of [
 							['owned-process.log', 'owned\n'],
@@ -1299,11 +1414,11 @@ owned_python() {
 			const lines = result.stdout.split('\n');
 			assert.equal(
 				lines.filter((line) => line === 'owned').length,
-				refused && id === 'e2e-hs' ? 0 : 1
+				refused && name === 'Receive actual independent managed HTTP native clients' ? 0 : 1
 			);
 			assert.equal(
 				lines.filter((line) => line === 'client').length,
-				refused && id === 'e2e-hs' ? 0 : 1
+				refused && name === 'Receive actual independent managed HTTP native clients' ? 0 : 1
 			);
 			assert.equal(
 				lines.filter((line) => line === 'wire').length,
@@ -1320,9 +1435,9 @@ owned_python() {
 		}
 	}
 });
-check('v101 package joins only validated PAC and Brew identities', () => {
+check('v101 launcher cell joins only validated PAC and Brew identities', () => {
 	const entry = source.find((file) => file.rel === MAC);
-	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'package-macos');
+	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'e2e-hs');
 	const step = Raw.step(job.body, 'Run Swift launcher tests on macOS 26');
 	const code = Raw.runOf(step).join('\n');
 	for (const token of [
@@ -1340,14 +1455,14 @@ check('v101 package joins only validated PAC and Brew identities', () => {
 		code.includes('--pac-skip-pattern "$pac_receipt" --brew-qualification-receipt "$brew_receipt"')
 	);
 	const full = Full.runOf(
-		Full.step(Full.job('package-macos'), 'Run Swift launcher tests on macOS 26')
+		Full.step(Full.job('e2e-hs'), 'Run Swift launcher tests on macOS 26')
 	).join('\n');
 	assert.equal(full.includes('brew_evidence_args'), false);
 	assert.equal(full.includes('--brew-qualification-receipt'), false);
 });
-check('v103 package defers Brew and owned-runtime only while PAC stays mandatory', () => {
+check('v103 launcher cell defers Brew and owned-runtime only while PAC stays mandatory', () => {
 	const entry = source.find((file) => file.rel === MAC);
-	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'package-macos');
+	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'e2e-hs');
 	const code = Raw.runOf(Raw.step(job.body, 'Run Swift launcher tests on macOS 26')).join('\n');
 	const start = code.indexOf('pac_receipt=');
 	const end = code.indexOf('set +e\nscript -q');
@@ -1403,7 +1518,7 @@ node() {
 
 check('v101 Shortcuts keeps portable/full work and publishes its validated exact receipt', () => {
 	const entry = source.find((file) => file.rel === MAC);
-	const job = Raw.jobsOfText(entry.text, MAC).find((candidate) => candidate.id === 'package-macos');
+	const job = Raw.jobsOfText(entry.text, MAC).find((candidate) => candidate.id === 'e2e-hs');
 	const probe = Raw.step(job.body, 'Observe native Apple Shortcuts discovery');
 	const code = Raw.runOf(probe).join('\n');
 	const portable = code.indexOf(
@@ -1420,10 +1535,17 @@ check('v101 Shortcuts keeps portable/full work and publishes its validated exact
 	);
 	assert(code.includes("{ flag: 'wx' }"));
 	assert(code.includes('python3 tools/diagnostics/apple_shortcuts_probe/run_probe.py'));
-	const upload = Raw.step(job.body, 'Retain source-bound Shortcuts native qualification receipt');
+	const build = Raw.jobsOfText(entry.text, MAC).find(
+		(candidate) => candidate.id === 'package-macos'
+	);
+	const upload = Raw.step(build.body, 'Retain source-bound Shortcuts native qualification receipt');
 	assert.equal(Raw.stepField(upload, 'if'), macRole.condition('package-macos'));
 	assert(upload.includes('name: assets-qualification-shortcuts-macos'));
-	assert(upload.includes('path: ${{ runner.temp }}/stable-macos-shortcuts-discovery.json'));
+	assert(
+		upload.includes(
+			'path: ${{ runner.temp }}/native-qualification/stable-macos-shortcuts-discovery.json'
+		)
+	);
 	assert(upload.includes('if-no-files-found: error'));
 });
 

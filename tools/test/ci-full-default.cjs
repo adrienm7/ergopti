@@ -273,141 +273,147 @@ const FULL_STEPS = [
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Run reporter lifecycle self-tests',
-		"${{ steps.stage-admission.outcome == 'success' }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Run owned program XCTest notice constructed-policy controls',
-		"${{ steps.stage-admission.outcome == 'success' }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Admit native nonreaping Python prerequisites',
-		"${{ steps.stage-admission.outcome == 'success' }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Prepare locked managed HTTP native clients',
-		"${{ steps.stage-admission.outcome == 'success' }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Prepare scoped native qualification profile',
-		"${{ steps.stage-admission.outcome == 'success' }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Run portable Brew ownership and refusal controls',
-		"${{ steps.stage-admission.outcome == 'success' }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Verify scoped Swift test target exclusion',
-		"${{ steps.stage-admission.outcome == 'success' }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Receive actual managed HTTP native clients',
-		"${{ steps.stage-admission.outcome == 'success' }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Run Swift launcher tests on macOS 26',
-		"${{ steps.stage-admission.outcome == 'success' }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Retain scoped native Brew qualification receipt',
-		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Upload Swift launcher failure transcript',
-		"${{ steps.stage-admission.outcome == 'success' && (failure() && steps.swift-launcher-tests.outcome == 'failure') }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (failure() && steps.swift-launcher-tests.outcome == 'failure') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Retain archive diagnostic session',
-		"${{ steps.stage-admission.outcome == 'success' && (always() && steps.swift-launcher-tests.outputs.archive_session_dir != '') }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always() && steps.swift-launcher-tests.outputs.archive_session_dir != '') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Retain closed TIS diagnostic session',
-		"${{ steps.stage-admission.outcome == 'success' && (always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '') }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Run signed Hammerspoon program provider inventory',
-		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Retain native Hammerspoon provider inventory',
-		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Observe native notification constructors',
-		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Retain native notification constructor observations',
-		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Observe native global application switcher',
-		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Retain native global application switcher observations',
-		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Observe native Apple Shortcuts discovery',
-		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
-		'package-macos',
+		'e2e-hs',
 		'Retain native Apple Shortcuts observation',
-		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
-		'Remove the launcher log the Swift tests wrote',
+		'Admit the received native qualification receipts',
 		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
+		'Install Sparkle signing tool',
+		"${{ steps.stage-admission.outcome == 'success' && (inputs.release) }}"
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'e2e-hs',
 		'Self-test the launch verdict',
-		"${{ steps.stage-admission.outcome == 'success' }}"
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',

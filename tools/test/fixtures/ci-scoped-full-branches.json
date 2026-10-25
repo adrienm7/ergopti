@@ -1258,7 +1258,7 @@
 		},
 		{
 			"file": ".github/workflows/ci-macos.yml",
-			"job": "package-macos",
+			"job": "e2e-hs",
 			"step": "Receive actual managed HTTP native clients",
 			"protocol": 12,
 			"owner_job": "e2e-hs",
@@ -1266,7 +1266,7 @@
 		},
 		{
 			"file": ".github/workflows/ci-macos.yml",
-			"job": "package-macos",
+			"job": "e2e-hs",
 			"step": "Run Swift launcher tests on macOS 26",
 			"protocol": 13,
 			"owner_job": "e2e-hs",
@@ -1352,6 +1352,16 @@
 			"issuer_step": "Run shared validation suite",
 			"body": "set -euo pipefail\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope core-js-suite --validate-scope-receipt qualification/stable-core-js-suite.json)\"\nif [ \"$mode\" = full ]; then\n    node tools/ci/validate-js-feature-results.cjs feature-timings\nelif [ \"$mode\" = deferred ]; then\n    node tools/ci/validate-js-feature-results.cjs --admit-jobs\n    echo '[DEFERRED] core-js-suite: qualified=false; no complete unit qualification claimed.'\nelse\n    exit 1\nfi",
 			"issuer_command": "npm run test:js"
+		}
+	],
+	"receipt_republishers": [
+		{
+			"file": ".github/workflows/ci-macos.yml",
+			"job": "package-macos",
+			"step": "Admit the received native qualification receipts",
+			"scopes": ["macos-brew-archive", "macos-shortcuts-discovery"],
+			"issuer_job": "e2e-hs",
+			"body": "set -euo pipefail\nreceived=\"$RUNNER_TEMP/native-qualification\"\ntest \"$(find \"$received\" -type f | sort)\" = \"$(printf '%s\\n' \"$received/stable-macos-brew-archive.json\" \"$received/stable-macos-shortcuts-discovery.json\")\"\nfor scope in macos-brew-archive macos-shortcuts-discovery; do\n    mode=\"$(node tools/ci/dev-release-qualification.cjs --scope \"$scope\" --validate-scope-receipt \"$received/stable-$scope.json\")\"\n    echo \"$scope: $mode\"\ndone"
 		}
 	]
 }

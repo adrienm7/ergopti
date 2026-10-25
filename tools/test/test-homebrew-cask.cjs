@@ -751,7 +751,7 @@ check('native XCTest invokes actual Brew acceptance and requires its complete re
 
 check('native macOS CI admits the pinned Python nonreaping prerequisites', () => {
 	const pipeline = require('./ci-full-default.cjs');
-	const job = pipeline.job('package-macos');
+	const job = pipeline.job('e2e-hs');
 	const setupName = 'Prepare Python for native nonreaping waits';
 	const admissionName = 'Admit native nonreaping Python prerequisites';
 	const setup = pipeline.step(job, setupName);
@@ -759,7 +759,7 @@ check('native macOS CI admits the pinned Python nonreaping prerequisites', () =>
 	assert.equal(pipeline.stepField(setup, 'uses'), 'actions/setup-python@v5');
 	assert.match(setup, /python-version: '3\.13'/);
 	for (const step of [setup, admission]) {
-		assert.equal(pipeline.stepField(step, 'if'), macRole.condition('package-macos'));
+		assert.equal(pipeline.stepField(step, 'if'), macRole.condition('launcher-native'));
 		assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
 	}
 	const order = pipeline.steps(job).map((step) => step.name);
@@ -802,7 +802,7 @@ check('native macOS CI admits the pinned Python nonreaping prerequisites', () =>
 
 check('archive artifacts bind only this step session independently of TIS', () => {
 	const pipeline = require('./ci-full-default.cjs');
-	const job = pipeline.job('package-macos');
+	const job = pipeline.job('e2e-hs');
 	const step = pipeline.step(job, 'Run Swift launcher tests on macOS 26');
 	const lines = pipeline.runOf(step).join('\n');
 	assert.match(
@@ -821,7 +821,7 @@ check('archive artifacts bind only this step session independently of TIS', () =
 	assert.equal(
 		pipeline.stepField(upload, 'if'),
 		macRole.condition(
-			'package-macos',
+			'launcher-native',
 			"always() && steps.swift-launcher-tests.outputs.archive_session_dir != ''"
 		)
 	);
@@ -964,7 +964,7 @@ function nativeHttpClockPipeline(workflow, expected) {
 		1,
 		'Clock output authority must have one unique step ID.'
 	);
-	const packages = workflow.jobs['package-macos'].steps.filter(
+	const packages = workflow.jobs['e2e-hs'].steps.filter(
 		(step) => step.name === 'Receive actual managed HTTP native clients'
 	);
 	assert.deepStrictEqual(
@@ -972,7 +972,7 @@ function nativeHttpClockPipeline(workflow, expected) {
 		[
 			{
 				name: 'Receive actual managed HTTP native clients',
-				if: macRole.condition('package-macos'),
+				if: macRole.condition('launcher-native'),
 				run: 'set -euo pipefail\nstatus=0\n"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\nreceipt="$RUNNER_TEMP/stable-macos-native-http-package.json"\nmkdir -p "$(dirname "$receipt")"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"\nmode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"\nif [ "$mode" = deferred ]; then\n    echo "[DEFERRED] macos-native-http: qualified=false; duplicate native wire receiving not executed; owned-process and client-only controls remain mandatory."\nelif [ "$mode" = full ]; then\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1\nelse\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\nexit "$status"\n',
 				'timeout-minutes': 5
 			}
@@ -1040,7 +1040,7 @@ check('shared native process ownership controls remain registered and mandatory'
 		'"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py';
 	for (const [job, name] of [
 		['managed-ollama-native', 'Receive actual independent managed HTTP native clients'],
-		['package-macos', 'Receive actual managed HTTP native clients']
+		['launcher-native', 'Receive actual managed HTTP native clients']
 	]) {
 		const steps = workflow.jobs[macRole.stage[job]].steps.filter((step) => step.name === name);
 		assert.strictEqual(steps.length, 1, `${job} needs one actual native receiving owner`);
@@ -1179,7 +1179,7 @@ check('shared native process ownership controls remain registered and mandatory'
 		);
 	}
 	const packageCorruption = clone(workflow);
-	const packageOwner = packageCorruption.jobs['package-macos'].steps.find(
+	const packageOwner = packageCorruption.jobs['e2e-hs'].steps.find(
 		(step) => step.name === 'Receive actual managed HTTP native clients'
 	);
 	assert.ok(packageOwner.run.includes(`${command} || status=1\n`));

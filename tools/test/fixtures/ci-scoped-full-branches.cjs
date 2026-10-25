@@ -66,6 +66,7 @@ function projectScopedSteps(text, rel) {
 	let result = text;
 	const seen = new Set();
 	const seenConsumers = new Set();
+	const seenRepublishers = new Set();
 	for (const job of raw.jobsOfText(text, rel))
 		for (const step of raw.steps(job.body)) {
 			const matches = contract.slots.filter(
@@ -74,16 +75,35 @@ function projectScopedSteps(text, rel) {
 			const consumers = contract.receipt_consumers.filter(
 				(owner) => owner.file === rel && owner.job === job.id && owner.step === step.name
 			);
+			const republishers = contract.receipt_republishers.filter(
+				(owner) => owner.file === rel && owner.job === job.id && owner.step === step.name
+			);
 			const lines = raw.runOf(step.body);
 			if (!lines) {
 				assert.equal(
-					matches.length + consumers.length,
+					matches.length + consumers.length + republishers.length,
 					0,
 					'the reviewed scoped command must retain its run body'
 				);
 				continue;
 			}
 			const code = lines.join('\n');
+			// A republisher admits receipts another job issued and branches on no
+			// disposition: its exact body validates them and leaves no full route.
+			if (republishers.length) {
+				assert.equal(republishers.length, 1, 'duplicate receipt republisher');
+				assert.equal(matches.length + consumers.length, 0, 'a republisher issues nothing');
+				const owner = republishers[0];
+				assert.notEqual(owner.issuer_job, job.id, 'a republisher receives from another job');
+				assert.ok(owner.scopes.length > 0, 'a republisher names the scopes it admits');
+				for (const scope of owner.scopes)
+					assert.ok(Object.hasOwn(policy.scopes, scope), 'unknown republished scope ' + scope);
+				assert.equal(code, owner.body, 'unknown or weakened receipt republisher');
+				const identity = job.id + '/' + step.name;
+				assert.ok(!seenRepublishers.has(identity), 'duplicate receipt republisher');
+				seenRepublishers.add(identity);
+				continue;
+			}
 			if (consumers.length) {
 				assert.equal(consumers.length, 1, 'duplicate receipt consumer');
 				assert.equal(matches.length, 0, 'a receipt consumer cannot become an issuer');
@@ -141,7 +161,8 @@ function projectScopedSteps(text, rel) {
 						'Qualify actual native PAC and WPAD XCTest controls'
 					]
 				};
-				assert.equal(job.id, 'package-macos', 'reviewed duplicate job must remain');
+				// The macOS 26 launcher cell repeats these scopes of the macOS 15 cells.
+				assert.equal(job.id, 'e2e-hs', 'reviewed duplicate job must remain');
 				assert.ok(Object.hasOwn(siblings, step.name), 'unknown duplicate scoped owner');
 				assert.equal(protocol.scope, siblings[step.name][0], 'duplicate scope family must remain');
 				assert.equal(slot.owner_job, 'e2e-hs', 'original scope owner must remain');
@@ -204,6 +225,14 @@ function projectScopedSteps(text, rel) {
 		[...seenConsumers].sort(),
 		expectedConsumers.sort(),
 		'every readonly receipt consumer must remain'
+	);
+	assert.deepEqual(
+		[...seenRepublishers].sort(),
+		contract.receipt_republishers
+			.filter((owner) => owner.file === rel)
+			.map((owner) => owner.job + '/' + owner.step)
+			.sort(),
+		'every receipt republisher must remain'
 	);
 	return result;
 }

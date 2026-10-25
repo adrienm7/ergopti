@@ -8,12 +8,14 @@
 # its macOS version (tools/ci/macos-stage-roles.cjs HOSTS owns the runner
 # labels and versions, and each cell's admission refuses a runner of another
 # version): the E2E, launch and cold cells run on macOS 15 (Apple silicon
-# macos-15, Intel macos-15-intel), Build on macOS 26 (macos-latest). The Swift
-# launcher XCTest classes the E2E cells run on macOS 15 run again in Build on
-# macOS 26: that repetition is deliberate cross-version coverage, not
-# duplicated work; do not deduplicate it. The launch matrix installs the exact uploaded
-# archive over the canonical user-state profile on Apple silicon and, for a
-# release, Intel. The verdict checks every expected runner/scenario and commit.
+# macos-15, Intel macos-15-intel), the E2E launcher cell and Build on macOS 26
+# (macos-latest). The Swift launcher XCTest classes the Managed Ollama cells run
+# on macOS 15 run again in the launcher cell on macOS 26: that repetition is
+# deliberate cross-version coverage, not duplicated work; do not deduplicate
+# it. Build only builds, packages and signs, then smoke-tests the release
+# archive and receives the cold bootstrap of the application it built. The
+# launch matrix installs the exact uploaded archive over the canonical
+# user-state profile on Apple silicon and, for a release, Intel. The verdict checks every expected runner/scenario and commit.
 # Every stage is a job of this workflow, so GitHub renders it in two levels,
 # "macOS / <Stage> (<lot>)": a matrix job keeps a static stage name and GitHub
 # appends its lot, and a single job names its subject in parentheses.
@@ -649,7 +651,7 @@ jobs:
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/numeric-tls-controls.log
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/api-wire-controls.log
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/serve-lifecycle-controls.log
-      # Runs on macOS 15; Build runs these classes again on macOS 26 on purpose.
+      # Runs on macOS 15; the launcher cell runs these classes again on macOS 26 on purpose.
       - name: Qualify actual SDK accepted-owner and deadline XCTest controls
         env:
           GOTOOLCHAIN: 'local'
@@ -1756,84 +1758,35 @@ jobs:
             ${{ runner.temp }}/lease-silence-native/script-status.txt
             ${{ runner.temp }}/lease-silence-native/capture-status.txt
 
-      # Native producer and receiving run independently of the Brew/package branch.
-      # Both advertised architectures are mandatory even for unpublished manual CI.
-      - name: Record actual stage role outcome — ${{ matrix.lot }}
-        if: always()
-        env:
-          MACOS_STAGE_CELL: ${{ env.MACOS_STAGE_CELL }}
-          MACOS_STAGE_RESULT: ${{ job.status }}
-        run: node tools/ci/macos-stage-roles.cjs record e2e "$RUNNER_TEMP/macos-stage-prior.json" "$RUNNER_TEMP/macos-stage-output/receipt.json"
-      - name: Retain exact stage role outcome
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-stage-e2e-${{ env.MACOS_STAGE_ROLE }}-${{ env.MACOS_STAGE_RUNNER }}-${{ env.MACOS_STAGE_SCENARIO || 'default' }}-${{ github.run_id }}
-          path: ${{ runner.temp }}/macos-stage-output/receipt.json
-          if-no-files-found: error
-          retention-days: 7
-          overwrite: true
-
-  package-macos:
-    name: Build (ErgoptiPlus.app, macOS 26)
-    # Runs only after every E2E cell succeeded. It reads this run's jobs and
-    # artifacts for the qualified native inputs those cells uploaded.
-    permissions:
-      contents: read
-      actions: read
-    needs:
-      - e2e-hs
-    runs-on: macos-latest
-    timeout-minutes: 45
-    outputs:
-      scenarios: ${{ steps.profile.outputs.scenarios }}
-      testbuild_matrix: ${{ steps.stage-plan.outputs.testbuild_matrix }}
-      testbuild_metadata: ${{ steps.stage-plan.outputs.testbuild_metadata }}
-    env:
-      ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
-      ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
-      ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
-      ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
-      ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
-    steps:
+      # Retained original role: launcher-native
+      # The launcher XCTest and the native probes of the build host (macOS 26),
+      # out of Build: Build packages the application only after this cell passed.
       - uses: actions/checkout@v4
-      - name: Download exact prior stage receipts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: macos-stage-e2e-*-${{ github.run_id }}
-          path: ${{ runner.temp }}/macos-stage-inputs
-      - name: Admit complete successful predecessor stage
-        id: stage-admission
-        env:
-          MACOS_STAGE_NEEDS: ${{ toJSON(needs) }}
-        run: node tools/ci/macos-stage-roles.cjs admit build "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"
-      # A depth-1 clone: the build reads tracked files and HEAD, never history.
-      - uses: actions/checkout@v4
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
 
       - name: Prepare Node for native policy fixtures and XCTest evidence
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         uses: actions/setup-node@v4
         with:
           node-version-file: '.node-version'
 
       - name: Run reporter lifecycle self-tests
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         run: node tools/test/test-report.cjs
 
       - name: Run owned program XCTest notice constructed-policy controls
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         run: node tools/test/test-owned-program-xctest-notice.cjs
 
       # CPython intentionally omitted Darwin os.waitid until Python 3.13.
       - name: Prepare Python for native nonreaping waits
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
 
       - name: Admit native nonreaping Python prerequisites
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         run: |
           python3 - <<'PY'
           import json
@@ -1849,7 +1802,7 @@ jobs:
           PY
 
       - name: Prepare locked managed HTTP native clients
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         run: |
           set -euo pipefail
           python3 -m venv "$RUNNER_TEMP/managed-http-native-clients"
@@ -1858,7 +1811,7 @@ jobs:
           echo "ERGOPTI_NATIVE_HTTP_PYTHON=$RUNNER_TEMP/managed-http-native-clients/bin/python" >> "$GITHUB_ENV"
 
       - name: Cache SwiftPM dependencies
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         uses: actions/cache@v4
         with:
           path: |
@@ -1870,16 +1823,16 @@ jobs:
             swiftpm-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Report Swift toolchain
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         run: swift --version
 
       - name: Lint remap guardian LaunchAgent
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         run: plutil -lint static/ergopti_plus/macos/launcher/com.ergoptiplus.remap-guardian.plist
 
       # The helper refuses foreign contexts; inactive policy retains full tests.
       - name: Prepare scoped native qualification profile
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -1890,12 +1843,12 @@ jobs:
           cp "$RUNNER_TEMP/dev-release-qualification/macos-brew-archive.json" "$RUNNER_TEMP/stable-macos-brew-archive.json"
 
       - name: Run portable Brew ownership and refusal controls
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         run: python3 -m unittest discover -s tools/diagnostics -p macos_brew_archive_acceptance_test.py -v
 
       # Verify the real manifest output before any test source can be excluded.
       - name: Verify scoped Swift test target exclusion
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -1906,27 +1859,9 @@ jobs:
           node tools/test/test-macos-dev-qualification-deferral.cjs \
             --package-dump "$RUNNER_TEMP/dev-release-qualification/swift-package.json"
 
-      - name: Build release launcher
-        if: ${{ steps.stage-admission.outcome == 'success' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          swift build -c release --product ErgoptiPlus --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci" 2>&1 | tee "$RUNNER_TEMP/macos-release-launcher-build.log"
-        timeout-minutes: 10
-
-      - name: Retain launcher build diagnostics
-        if: ${{ steps.stage-admission.outcome == 'success' && (always()) }}
-        uses: actions/upload-artifact@v4
-        with:
-          overwrite: true
-          name: macos-release-launcher-build-${{ github.run_id }}
-          if-no-files-found: warn
-          retention-days: 7
-          path: ${{ runner.temp }}/macos-release-launcher-build.log
-
       # The native archive fixture uses disposable file keys on every run.
-      - name: Install Sparkle signing tool
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+      - name: Install the Sparkle tool for the native archive fixture
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         shell: bash
         env:
           SPARKLE_VERSION: '2.9.2'
@@ -1943,7 +1878,7 @@ jobs:
       # This duplicate wire receiver belongs to the existing macos-native-http scope.
       # The owned-process and client-only controls remain mandatory here.
       - name: Receive actual managed HTTP native clients
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         run: |
           set -euo pipefail
           status=0
@@ -1964,11 +1899,11 @@ jobs:
           exit "$status"
         timeout-minutes: 5
 
-      # The full launcher XCTest run on macOS 26. The E2E cells run many of the
-      # same classes on macOS 15; keep both: they are deliberate cross-version
-      # coverage of one launcher, not duplicates to skip here.
+      # The full launcher XCTest run on macOS 26. The Managed Ollama cells run
+      # many of the same classes on macOS 15; keep both: they are deliberate
+      # cross-version coverage of one launcher, not duplicates to skip here.
       - name: Run Swift launcher tests on macOS 26
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         id: swift-launcher-tests
         env:
           SWIFT_BACKTRACE: enable=yes
@@ -2063,7 +1998,7 @@ jobs:
         timeout-minutes: 10
 
       - name: Retain scoped native Brew qualification receipt
-        if: ${{ steps.stage-admission.outcome == 'success' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
           name: native-brew-qualification-${{ github.run_id }}-${{ github.run_attempt }}
@@ -2073,16 +2008,8 @@ jobs:
             ${{ runner.temp }}/swift-launcher-evidence/native-pac-package-qualification.json
           if-no-files-found: error
 
-      - name: Retain source-bound package native qualification receipt
-        if: ${{ steps.stage-admission.outcome == 'success' && (always()) }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: assets-qualification-package-macos
-          path: ${{ runner.temp }}/stable-macos-brew-archive.json
-          if-no-files-found: error
-
       - name: Upload Swift launcher failure transcript
-        if: ${{ steps.stage-admission.outcome == 'success' && (failure() && steps.swift-launcher-tests.outcome == 'failure') }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (failure() && steps.swift-launcher-tests.outcome == 'failure') }}
         uses: actions/upload-artifact@v4
         with:
           name: swift-launcher-failure-${{ github.run_id }}-${{ github.run_attempt }}
@@ -2092,7 +2019,7 @@ jobs:
       # Export only constructed bounded JSON from this step's owned archive session.
       # Its availability is independent of TIS setup and native ownership closure.
       - name: Retain archive diagnostic session
-        if: ${{ steps.stage-admission.outcome == 'success' && (always() && steps.swift-launcher-tests.outputs.archive_session_dir != '') }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always() && steps.swift-launcher-tests.outputs.archive_session_dir != '') }}
         uses: actions/upload-artifact@v4
         with:
           name: swift-archive-session-${{ github.run_id }}-${{ github.run_attempt }}
@@ -2103,7 +2030,7 @@ jobs:
 
       # Preserve only the fresh session acquired by this exact Swift step.
       - name: Retain closed TIS diagnostic session
-        if: ${{ steps.stage-admission.outcome == 'success' && (always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '') }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '') }}
         uses: actions/upload-artifact@v4
         with:
           name: swift-tis-session-${{ github.run_id }}-${{ github.run_attempt }}
@@ -2116,7 +2043,7 @@ jobs:
 
       # Native inventory remains observable even when the separate XCTest suite fails.
       - name: Run signed Hammerspoon program provider inventory
-        if: ${{ steps.stage-admission.outcome == 'success' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}
         env:
           ERGOPTI_NATIVE_HS_METADATA_TOKEN: ${{ github.token }}
         run: |
@@ -2129,7 +2056,7 @@ jobs:
         timeout-minutes: 5
 
       - name: Retain native Hammerspoon provider inventory
-        if: ${{ steps.stage-admission.outcome == 'success' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
           name: native-hs-program-providers-${{ github.run_id }}-${{ github.run_attempt }}
@@ -2143,7 +2070,7 @@ jobs:
 
       # Observe genuine constructor userdata without delivering notifications.
       - name: Observe native notification constructors
-        if: ${{ steps.stage-admission.outcome == 'success' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}
         env:
           ERGOPTI_NATIVE_HS_METADATA_TOKEN: ${{ github.token }}
         run: |
@@ -2156,7 +2083,7 @@ jobs:
         timeout-minutes: 5
 
       - name: Retain native notification constructor observations
-        if: ${{ steps.stage-admission.outcome == 'success' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
           name: native-notification-constructors-${{ github.run_id }}-${{ github.run_attempt }}
@@ -2170,7 +2097,7 @@ jobs:
 
       # Qualify the isolated OS switcher; prerequisite refusal remains a failure.
       - name: Observe native global application switcher
-        if: ${{ steps.stage-admission.outcome == 'success' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}
         env:
           ERGOPTI_NATIVE_HS_METADATA_TOKEN: ${{ github.token }}
         shell: bash
@@ -2188,7 +2115,7 @@ jobs:
         timeout-minutes: 5
 
       - name: Retain native global application switcher observations
-        if: ${{ steps.stage-admission.outcome == 'success' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
           name: native-global-switcher-${{ github.run_id }}-${{ github.run_attempt }}
@@ -2200,7 +2127,7 @@ jobs:
 
       # Observe the native structured API without invoking or importing automations.
       - name: Observe native Apple Shortcuts discovery
-        if: ${{ steps.stage-admission.outcome == 'success' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tools/diagnostics/apple_shortcuts_probe -p test_probe.py -v
@@ -2241,7 +2168,7 @@ jobs:
         timeout-minutes: 2
 
       - name: Retain native Apple Shortcuts observation
-        if: ${{ steps.stage-admission.outcome == 'success' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
           name: native-apple-shortcuts-${{ github.run_id }}-${{ github.run_attempt }}
@@ -2250,27 +2177,25 @@ jobs:
             ${{ runner.temp }}/dev-release-qualification/macos-shortcuts-discovery.json
           if-no-files-found: error
 
-      - name: Retain source-bound Shortcuts native qualification receipt
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+      # Build republishes these two receipts as release assets, byte for byte,
+      # after admitting them: they record the deferral this cell actually
+      # applied, so Build never derives a second disposition of its own.
+      - name: Hand the source-bound native qualification receipts to Build
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         uses: actions/upload-artifact@v4
         with:
-          name: assets-qualification-shortcuts-macos
-          path: ${{ runner.temp }}/stable-macos-shortcuts-discovery.json
+          overwrite: true
+          name: macos-native-qualification-${{ github.sha }}-${{ github.run_id }}
+          retention-days: 7
           if-no-files-found: error
-
-      # LauncherLogTests append to the real launcher log,
-      # ~/Library/Logs/ergopti_plus/launcher.log, and the release smoke below
-      # refuses to judge a launch over a launcher log it did not start fresh.
-      # On a runner of its own that log never existed; here the tests leave it
-      # behind, so it goes before the app is built.
-      - name: Remove the launcher log the Swift tests wrote
-        if: ${{ steps.stage-admission.outcome == 'success' }}
-        run: rm -rf -- "$HOME/Library/Logs/ergopti_plus"
+          path: |
+            ${{ runner.temp }}/stable-macos-brew-archive.json
+            ${{ runner.temp }}/stable-macos-shortcuts-discovery.json
 
       # Once per run instead of once per launch leg: the verdict and the
       # scenario profiles are plain Python, identical on every runner.
       - name: Self-test the launch verdict
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         env:
           HOMEBREW_NO_AUTO_UPDATE: '1'
         run: |
@@ -2286,8 +2211,167 @@ jobs:
       # pinned DMG on a user's first run. Validating the pin here makes a bad
       # bump fail CI instead of that first install.
       - name: Validate the Karabiner-Elements pin onboarding downloads
-        if: ${{ steps.stage-admission.outcome == 'success' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
         run: python3 -m unittest discover -s tools/build -p 'karabiner_manifest_test.py'
+
+      # Native producer and receiving run independently of the Brew/package branch.
+      # Both advertised architectures are mandatory even for unpublished manual CI.
+      - name: Record actual stage role outcome — ${{ matrix.lot }}
+        if: always()
+        env:
+          MACOS_STAGE_CELL: ${{ env.MACOS_STAGE_CELL }}
+          MACOS_STAGE_RESULT: ${{ job.status }}
+        run: node tools/ci/macos-stage-roles.cjs record e2e "$RUNNER_TEMP/macos-stage-prior.json" "$RUNNER_TEMP/macos-stage-output/receipt.json"
+      - name: Retain exact stage role outcome
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-stage-e2e-${{ env.MACOS_STAGE_ROLE }}-${{ env.MACOS_STAGE_RUNNER }}-${{ env.MACOS_STAGE_SCENARIO || 'default' }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/macos-stage-output/receipt.json
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+
+  package-macos:
+    name: Build (ErgoptiPlus.app, macOS 26)
+    # Runs only after every E2E cell succeeded. It reads this run's jobs and
+    # artifacts for the qualified native inputs and the native qualification
+    # receipts those cells uploaded. It builds, packages and signs; the
+    # launcher XCTest and the native probes of macOS 26 are the E2E cell
+    # "Launcher XCTest and native probes (macOS 26)".
+    permissions:
+      contents: read
+      actions: read
+    needs:
+      - e2e-hs
+    runs-on: macos-latest
+    timeout-minutes: 45
+    outputs:
+      scenarios: ${{ steps.profile.outputs.scenarios }}
+      testbuild_matrix: ${{ steps.stage-plan.outputs.testbuild_matrix }}
+      testbuild_metadata: ${{ steps.stage-plan.outputs.testbuild_metadata }}
+    env:
+      ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+      ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+      ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+      ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+      ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact prior stage receipts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: macos-stage-e2e-*-${{ github.run_id }}
+          path: ${{ runner.temp }}/macos-stage-inputs
+      - name: Admit complete successful predecessor stage
+        id: stage-admission
+        env:
+          MACOS_STAGE_NEEDS: ${{ toJSON(needs) }}
+        run: node tools/ci/macos-stage-roles.cjs admit build "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"
+      # A depth-1 clone: the build reads tracked files and HEAD, never history.
+      - uses: actions/checkout@v4
+        if: ${{ steps.stage-admission.outcome == 'success' }}
+
+      - name: Prepare Node for the build, archive and qualification tools
+        if: ${{ steps.stage-admission.outcome == 'success' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      # The catalogue and upstream input checks use hashlib.file_digest
+      # (Python 3.11), and the cold bootstrap receiver the same interpreter as
+      # its Install and launch cell.
+      - name: Prepare Python for the build and receiving scripts
+        if: ${{ steps.stage-admission.outcome == 'success' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # The E2E launcher cell decided each deferral where its tests ran; Build
+      # admits exactly its two receipts for this source and republishes them,
+      # unchanged, as release assets.
+      - name: Receive the source-bound native qualification receipts
+        if: ${{ steps.stage-admission.outcome == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-native-qualification-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/native-qualification
+
+      - name: Admit the received native qualification receipts
+        if: ${{ steps.stage-admission.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          received="$RUNNER_TEMP/native-qualification"
+          test "$(find "$received" -type f | sort)" = "$(printf '%s\n' "$received/stable-macos-brew-archive.json" "$received/stable-macos-shortcuts-discovery.json")"
+          for scope in macos-brew-archive macos-shortcuts-discovery; do
+              mode="$(node tools/ci/dev-release-qualification.cjs --scope "$scope" --validate-scope-receipt "$received/stable-$scope.json")"
+              echo "$scope: $mode"
+          done
+
+      - name: Retain source-bound package native qualification receipt
+        if: ${{ steps.stage-admission.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-package-macos
+          path: ${{ runner.temp }}/native-qualification/stable-macos-brew-archive.json
+          if-no-files-found: error
+
+      - name: Retain source-bound Shortcuts native qualification receipt
+        if: ${{ steps.stage-admission.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-shortcuts-macos
+          path: ${{ runner.temp }}/native-qualification/stable-macos-shortcuts-discovery.json
+          if-no-files-found: error
+
+      - name: Cache SwiftPM dependencies
+        if: ${{ steps.stage-admission.outcome == 'success' }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/swift-launcher-ci/artifacts
+            ${{ runner.temp }}/swift-launcher-ci/checkouts
+            ${{ runner.temp }}/swift-launcher-ci/repositories
+          key: swiftpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('static/ergopti_plus/macos/launcher/Package.swift') }}
+          restore-keys: |
+            swiftpm-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Report Swift toolchain
+        if: ${{ steps.stage-admission.outcome == 'success' }}
+        run: swift --version
+
+      - name: Build release launcher
+        if: ${{ steps.stage-admission.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift build -c release --product ErgoptiPlus --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci" 2>&1 | tee "$RUNNER_TEMP/macos-release-launcher-build.log"
+        timeout-minutes: 10
+
+      - name: Retain launcher build diagnostics
+        if: ${{ steps.stage-admission.outcome == 'success' && (always()) }}
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: macos-release-launcher-build-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 7
+          path: ${{ runner.temp }}/macos-release-launcher-build.log
+
+      # Only a release signs its archives (Sign declared archives below).
+      - name: Install Sparkle signing tool
+        if: ${{ steps.stage-admission.outcome == 'success' && (inputs.release) }}
+        shell: bash
+        env:
+          SPARKLE_VERSION: '2.9.2'
+        run: |
+          set -euo pipefail
+          curl -fsSLo /tmp/Sparkle.tar.xz \
+              "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
+          mkdir -p /tmp/sparkle-dist
+          tar -xJf /tmp/Sparkle.tar.xz -C /tmp/sparkle-dist
+          echo "SIGN_UPDATE=/tmp/sparkle-dist/bin/sign_update" >> "$GITHUB_ENV"
 
       # The only list of launch scenarios lives in macos_launch_gate.py; the
       # launch matrix below reads it from this output.
@@ -2477,6 +2561,9 @@ jobs:
           node tools/build/macos-release-archives.cjs --ci-receipt
           "$PWD/build/macos/ErgoptiPlus.app" "$PWD/build/macos"
 
+      # Like the release smoke test below, this receives the application this
+      # job just built, on the build host, before anything is signed. The
+      # Install and launch cold cell repeats it on macOS 15 from its own build.
       - name: Receive actual cold native MLX bootstrap
         if: ${{ steps.stage-admission.outcome == 'success' }}
         run: |

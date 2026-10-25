@@ -405,7 +405,7 @@ try {
 	assert.match(result.stdout, /Swift XCTest evidence could not be judged/);
 
 	// stepField folds scalars for structural checks; execute the actual literal.
-	const step = pipeline.step(pipeline.job('package-macos'), 'Run Swift launcher tests on macOS 26');
+	const step = pipeline.step(pipeline.job('e2e-hs'), 'Run Swift launcher tests on macOS 26');
 	const header = /^([ ]+)run: \|[ \t]*$/m.exec(step);
 	assert.notEqual(header, null, 'the native command owner is a YAML literal block');
 	const indentation = header[1].length + 2;
@@ -686,15 +686,12 @@ try {
 			'foreign symlink cannot supply evidence'
 		);
 	}
-	const uploaded = pipeline.step(
-		pipeline.job('package-macos'),
-		'Retain closed TIS diagnostic session'
-	);
+	const uploaded = pipeline.step(pipeline.job('e2e-hs'), 'Retain closed TIS diagnostic session');
 	function assertTisRetention(step) {
 		assert.equal(
 			pipeline.stepField(step, 'if'),
 			macRole.condition(
-				'package-macos',
+				'launcher-native',
 				"always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != ''"
 			)
 		);
@@ -705,6 +702,7 @@ try {
 	assertTisRetention(uploaded);
 	for (const [before, after] of [
 		["steps.stage-admission.outcome == 'success'", 'true'],
+		["env.MACOS_STAGE_ROLE == 'launcher-native'", "env.MACOS_STAGE_ROLE == 'e2e-hs'"],
 		['always()', 'success()'],
 		["steps.swift-launcher-tests.outcome != 'skipped'", 'true'],
 		["steps.swift-launcher-tests.outputs.tis_session_dir != ''", 'true']
@@ -714,7 +712,7 @@ try {
 		assert.throws(() => assertTisRetention(changed), assert.AssertionError, before);
 	}
 	const commands = pipeline
-		.runOf(pipeline.step(pipeline.job('package-macos'), 'Run Swift launcher tests on macOS 26'))
+		.runOf(pipeline.step(pipeline.job('e2e-hs'), 'Run Swift launcher tests on macOS 26'))
 		.join('\n');
 	assert.match(commands, /mktemp -d .*tis-session\.XXXXXX/);
 	assert.match(commands, /randomBytes\(32\)/);

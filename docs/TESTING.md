@@ -27,10 +27,12 @@ with one job per stage. A matrix stage keeps its static name and GitHub appends 
 its rows read `Linux / Unit tests (core)` and its graph group
 `Matrix: Linux / Unit tests`; a single job names its subject in parentheses.
 Variants are grouped into one installation matrix per OS.
-`macOS / Build (ErgoptiPlus.app, macOS 26)` also builds the Swift launcher
-and runs its XCTest
+`macOS / E2E tests (Launcher XCTest and native probes (macOS 26))` runs the
+Swift launcher XCTest
 (`swift test --package-path static/ergopti_plus/macos/launcher`, macOS only)
-before it builds the app.
+and the native probes of the build host;
+`macOS / Build (ErgoptiPlus.app, macOS 26)` then only builds, packages and
+signs.
 
 The three test stages split by what a test exercises, the same way on every
 row:
