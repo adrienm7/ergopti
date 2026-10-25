@@ -87,9 +87,19 @@ SPARKLE_PUBLIC_KEY="${SPARKLE_PUBLIC_KEY:-}"
 MACOS_SIGNING_CERTIFICATE_BASE64="${MACOS_SIGNING_CERTIFICATE_BASE64:-}"
 MACOS_SIGNING_CERTIFICATE_PASSWORD="${MACOS_SIGNING_CERTIFICATE_PASSWORD:-}"
 
-# GitHub repo coordinates so the appcast URL can be derived. Override via env.
-GH_OWNER="${GH_OWNER:-Ergopti}"
-GH_REPO="${GH_REPO:-Ergopti}"
+# Local builds must follow the same repository as the runtime updater. Explicit
+# environment overrides still support builds published from another repository.
+UPDATER_REPOSITORY="$(node - "$REPO_ROOT/static/ergopti_plus/_shared/modules/updater/defaults.json" <<'NODE'
+const { github } = require(process.argv[2]);
+if (!github || ![github.owner, github.repo].every((value) =>
+	typeof value === 'string' && /^[A-Za-z0-9._-]+$/.test(value))) {
+	throw new Error('The canonical update repository is invalid.');
+}
+process.stdout.write(`${github.owner}/${github.repo}`);
+NODE
+)"
+GH_OWNER="${GH_OWNER:-${UPDATER_REPOSITORY%/*}}"
+GH_REPO="${GH_REPO:-${UPDATER_REPOSITORY#*/}}"
 
 # The outer app prohibits duplicate instances. Give the embedded GUI runtime a
 # dedicated Ergopti-owned identity while keeping it isolated from stock HS.
