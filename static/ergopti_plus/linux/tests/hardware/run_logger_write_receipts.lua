@@ -297,6 +297,65 @@ check("refused optional mirror keeps successful native main repoint usable", fun
 	assert(descriptors(new_errors) == 0, "refused mirror acquired a native descriptor")
 end)
 
+--- Observes production diagnostics through a genuine temporary stdio stream.
+--- @param body function Native logger operation being observed.
+--- @return string diagnostics
+local function capture_diagnostics(body)
+	local previous = io.stderr
+	local output = assert(io.tmpfile())
+	io.stderr = output
+	local ok, detail = xpcall(body, debug.traceback)
+	io.stderr = previous
+	assert(output:seek("set", 0))
+	local diagnostics = assert(output:read("*a"))
+	assert(output:close())
+	assert(ok, detail)
+	return diagnostics
+end
+
+for _, operation in ipairs({ "install", "repoint" }) do
+	for _, refusal in ipairs({ "directory", "EACCES" }) do
+		check(operation .. " reports a refused optional mirror: " .. refusal, function()
+			local old_main, old_errors
+			if operation == "repoint" then
+				local old = directory("mirror-refusal-old-" .. refusal)
+				assert(Sink.install(Logger, { log_dir = old }))
+				old_main, old_errors = restrict_channels(old)
+			end
+			local name = "mirror-refusal-" .. operation .. "-" .. refusal
+			local target = configured_directory(name)
+			local main, errors = paths(target)
+			local expected = "Unrelated refused mirror bytes.\n"
+			if refusal == "directory" then
+				directory(name .. "/ergopti_plus/logs/" .. errors:match("([^/]+)$"))
+			else
+				write(errors, expected)
+				assert(uv.fs_chmod(errors, 256))
+			end
+			local refused, _, code = require("infra.regular_file_writer").open(errors, "a")
+			assert(refused == nil and code == (refusal == "directory" and "EISDIR" or "EACCES"),
+				"fixture did not establish the actual native open refusal")
+			local diagnostics = capture_diagnostics(function()
+				if operation == "install" then assert(Sink.install(Logger, { log_dir = target }))
+				else assert(Sink.repoint()) end
+			end)
+			assert(diagnostics:find("errors channel could not be opened", 1, true),
+				"optional mirror failure was silent")
+			assert(diagnostics:find(errors, 1, true), "refusal diagnostic omitted the affected mirror path")
+			local _, reports = diagnostics:gsub("errors channel could not be opened", "")
+			assert(reports == 1, "one native admission must produce exactly one refusal diagnostic")
+			assert(Sink.is_file_sink_active() and descriptors(main) == 1 and descriptors(errors) == 0)
+			if old_main then
+				assert(descriptors(old_main) == 0 and descriptors(old_errors) == 0,
+					"accepted optional-mirror transition retained the previous pair")
+			end
+			Logger.warn("native-mirror-refusal-" .. operation .. refusal, "Main durability survives refused mirror admission.")
+			assert(read(main):find("Main durability survives refused mirror admission.", 1, true))
+			if refusal == "EACCES" then assert(read(errors) == expected) end
+		end)
+	end
+end
+
 for _, operation in ipairs({ "install", "prepare", "repoint" }) do
 	check(operation .. " preserves a pre-existing native probe file", function()
 		local dir

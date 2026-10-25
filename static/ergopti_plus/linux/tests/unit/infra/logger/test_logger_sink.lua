@@ -285,7 +285,7 @@ local function with_repoint_receipts(case, body)
 	local Sink = helpers.load_module("infra.logger_sink")
 	local saved_writer = package.loaded["infra.regular_file_writer"]
 	local old, target = "/owned-repoint-old", "/owned-repoint-candidate"
-	local state = { phase = "initial", target = old, old = {}, candidates = {}, console = {} }
+	local state = { phase = "initial", target = old, old = {}, candidates = {}, console = {}, diagnostics = {} }
 	local original_open, original_execute = io.open, os.execute
 	local original_stdout, original_stderr = io.stdout, io.stderr
 	local previous_paths = package.loaded["infra.config_paths"]
@@ -298,7 +298,11 @@ local function with_repoint_receipts(case, body)
 	end
 	io.stdout = { write = function(_, line) state.console[#state.console + 1] = line; return true end,
 		flush = function() return true end }
-	io.stderr = { write = function() return true end }
+	io.stderr = { write = function(_, line)
+		if case.stderr_throws then error("diagnostic output is unavailable") end
+		state.diagnostics[#state.diagnostics + 1] = line
+		return true
+	end }
 	local open_file = function(path, mode)
 		local is_old = path:sub(1, #old + 1) == old .. "/"
 		if not is_old and path:sub(1, #target + 1) ~= target .. "/" then return original_open(path, mode) end
@@ -311,8 +315,8 @@ local function with_repoint_receipts(case, body)
 			helpers.assert_eq(state.old.errors.closes, 0)
 		end
 		if not is_old and kind == case.channel then
-			if case.throws then error("simulated native open raised") end
-			return case.value, "simulated native open refused"
+			if case.throws then error(case.failure or "simulated native open raised") end
+			return case.value, case.failure or "simulated native open refused"
 		end
 		local file = { lines = {}, closes = 0 }
 		function file:write(line)
@@ -345,6 +349,7 @@ local function with_repoint_receipts(case, body)
 end
 
 helpers.describe("linux-logger-repoint-owner", function()
+	local failure = setmetatable({}, { __tostring = function() error("foreign error formatting must not execute") end })
 	for _, case in ipairs({
 		{ name = "nil main", channel = "main" },
 		{ name = "false main", channel = "main", value = false },
@@ -352,6 +357,10 @@ helpers.describe("linux-logger-repoint-owner", function()
 		{ name = "nil optional mirror", channel = "errors", success = true },
 		{ name = "false optional mirror", channel = "errors", value = false, success = true },
 		{ name = "throwing optional mirror", channel = "errors", throws = true, success = true },
+		{ name = "foreign mirror refusal", channel = "errors", failure = failure, success = true },
+		{ name = "foreign mirror throw", channel = "errors", failure = failure, throws = true, success = true },
+		{ name = "private mirror refusal", channel = "errors", failure = "refused /home/fixture-user/private", private = true, success = true },
+		{ name = "unavailable mirror diagnostic", channel = "errors", stderr_throws = true, success = true },
 		{ name = "successful staged pair", observe = true, success = true },
 		{ name = "repeated main refusal", channel = "main", mode = "repeat" },
 		{ name = "mkdir refusal", mode = "mkdir" },
@@ -383,7 +392,20 @@ helpers.describe("linux-logger-repoint-owner", function()
 				if case.channel == "main" then
 					helpers.assert_eq(#state.candidates, attempts, "each failed main must retire its acquired partial mirror")
 				end
+				if case.channel == "errors" and not case.stderr_throws then
+					helpers.assert_eq(#state.diagnostics, 1, "one attempted mirror open must produce one diagnostic")
+					helpers.assert_contains(state.diagnostics[1], "errors channel could not be opened")
+					helpers.assert_contains(state.diagnostics[1], target .. "/ErgoptiPlus_errors_")
+					if type(case.failure) == "table" then helpers.assert_contains(state.diagnostics[1], "error object (table)") end
+					if case.private then
+						helpers.assert_true(not state.diagnostics[1]:find("/home/fixture-user", 1, true),
+							"native refusal details must pass the admitted privacy boundary")
+					end
+				end
 				state.emit("line after transition", "warn")
+				if case.channel == "errors" and not case.stderr_throws then
+					helpers.assert_eq(#state.diagnostics, 1, "emitted records must not repeat the failed open or diagnostic")
+				end
 				if not switched and case.mode ~= "stdout" then
 					helpers.assert_eq(#state.old.main.lines, 1)
 					helpers.assert_eq(#state.old.errors.lines, 1)

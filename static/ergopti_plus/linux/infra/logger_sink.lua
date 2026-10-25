@@ -290,6 +290,18 @@ local function topical_mode(path, date)
 	return "a"
 end
 
+--- Reports lost optional mirroring without recursively invoking the logger sink.
+--- The main channel remains the durable owner; stderr failure cannot retire it.
+--- @param path string Refused mirror path.
+--- @param failure any Native or protected open refusal.
+local function report_mirror_refusal(path, failure)
+	local description = require("error_description").describe(failure)
+	pcall(function()
+		io.stderr:write(_redact("[logger_sink] errors channel could not be opened: " .. path
+			.. " (" .. description .. ") — mirror disabled; logging continues through main and stdout.\n"))
+	end)
+end
+
 --- Opens (or reopens) both handles for the given date.
 --- Both are repointed together: repointing only the main file leaves WARNING and
 --- ERROR lines appended to yesterday's errors file forever.
@@ -299,8 +311,11 @@ local function open_handles(date)
 	close_topical()
 	_date = date
 	if not _dir then return end
-	_main_handle   = require("infra.regular_file_writer").open(_dir .. "/" .. MAIN_PREFIX   .. date .. LOG_EXT, "a")
-	_errors_handle = require("infra.regular_file_writer").open(_dir .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT, "a")
+	_main_handle = require("infra.regular_file_writer").open(_dir .. "/" .. MAIN_PREFIX .. date .. LOG_EXT, "a")
+	local errors_path = _dir .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT
+	local failure
+	_errors_handle, failure = require("infra.regular_file_writer").open(errors_path, "a")
+	if _main_handle and not _errors_handle then report_mirror_refusal(errors_path, failure) end
 end
 
 --- Whether a basename matches the shell glob `<prefix>*<extension>`.
@@ -592,7 +607,8 @@ function M.repoint()
 	-- Keep them until the candidate is usable; reopening is not a rollback.
 	local date = today()
 	local main_ok, main = pcall(require("infra.regular_file_writer").open, target .. "/" .. MAIN_PREFIX .. date .. LOG_EXT, "a")
-	local errors_ok, errors = pcall(require("infra.regular_file_writer").open, target .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT, "a")
+	local errors_path = target .. "/" .. ERRORS_PREFIX .. date .. LOG_EXT
+	local errors_ok, errors, errors_failure = pcall(require("infra.regular_file_writer").open, errors_path, "a")
 	if not main_ok or not main then
 		if errors_ok and errors then pcall(function() errors:close() end) end
 		return false, "the logs folder '" .. target .. "' is not writable"
@@ -602,6 +618,7 @@ function M.repoint()
 	_dir, _date = target, date
 	_main_handle, _errors_handle = main, errors_ok and errors or nil
 	_stdout_only = false
+	if not _errors_handle then report_mirror_refusal(errors_path, errors_ok and errors_failure or errors) end
 	if previous_main then pcall(function() previous_main:close() end) end
 	if previous_errors then pcall(function() previous_errors:close() end) end
 	purge_old()
