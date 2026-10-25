@@ -127,6 +127,7 @@ local function load_fixture(options, lifetime)
 	lifetime.bridge = Bridge
 	local state = {
 		buffer = "agé",
+		llm_buffer = "agé",
 		start_is_word_boundary = true,
 		mappings = {},
 		preview_providers = {},

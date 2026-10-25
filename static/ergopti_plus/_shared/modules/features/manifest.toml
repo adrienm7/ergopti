@@ -8808,8 +8808,6 @@ id = "llm_reset_on_nav"
 i18n = "menu.llm.reset_on_nav"
 checked_when = ["llm_reset_on_nav_checked"]
 disabled_when = ["llm_generation_ready"]
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.llm_generation_context_controls]]
 type = "include"

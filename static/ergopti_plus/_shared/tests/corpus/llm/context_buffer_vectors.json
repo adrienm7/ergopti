@@ -1,0 +1,231 @@
+{
+	"_comment": "Shared oracle for _shared/lua/llm/context_buffer.lua, replayed by the Linux and macOS suites. Each case applies ops in order to a fresh buffer and checks the final text and codepoint length; 'cleared' lists the result of each navigated op.",
+	"capacity": 2048,
+	"cases": [
+		{
+			"id": "append-accumulates",
+			"ops": [
+				{
+					"op": "append",
+					"text": "Bonjour"
+				},
+				{
+					"op": "append",
+					"text": " tout"
+				}
+			],
+			"expect": {
+				"text": "Bonjour tout",
+				"length": 12
+			}
+		},
+		{
+			"id": "backspace-drops-one-codepoint",
+			"ops": [
+				{
+					"op": "append",
+					"text": "café"
+				},
+				{
+					"op": "backspace"
+				}
+			],
+			"expect": {
+				"text": "caf",
+				"length": 3
+			}
+		},
+		{
+			"id": "backspace-on-empty-is-noop",
+			"ops": [
+				{
+					"op": "backspace"
+				}
+			],
+			"expect": {
+				"text": "",
+				"length": 0
+			}
+		},
+		{
+			"id": "expansion-replaces-trigger",
+			"ops": [
+				{
+					"op": "append",
+					"text": "Il dit btw"
+				},
+				{
+					"op": "replace_tail",
+					"deletes": 3,
+					"text": "by the way"
+				}
+			],
+			"expect": {
+				"text": "Il dit by the way",
+				"length": 17
+			}
+		},
+		{
+			"id": "expansion-keeps-replayed-terminator",
+			"ops": [
+				{
+					"op": "append",
+					"text": "adn "
+				},
+				{
+					"op": "replace_tail",
+					"deletes": 4,
+					"text": "ADN "
+				}
+			],
+			"expect": {
+				"text": "ADN ",
+				"length": 4
+			}
+		},
+		{
+			"id": "expansion-deleting-more-than-known-empties-first",
+			"ops": [
+				{
+					"op": "append",
+					"text": "ab"
+				},
+				{
+					"op": "replace_tail",
+					"deletes": 5,
+					"text": "Z"
+				}
+			],
+			"expect": {
+				"text": "Z",
+				"length": 1
+			}
+		},
+		{
+			"id": "expansion-multibyte-tail",
+			"ops": [
+				{
+					"op": "append",
+					"text": "à é"
+				},
+				{
+					"op": "replace_tail",
+					"deletes": 1,
+					"text": "ê"
+				}
+			],
+			"expect": {
+				"text": "à ê",
+				"length": 3
+			}
+		},
+		{
+			"id": "set-replaces-everything",
+			"ops": [
+				{
+					"op": "append",
+					"text": "old"
+				},
+				{
+					"op": "set",
+					"text": "new"
+				}
+			],
+			"expect": {
+				"text": "new",
+				"length": 3
+			}
+		},
+		{
+			"id": "clear-forgets",
+			"ops": [
+				{
+					"op": "append",
+					"text": "secret"
+				},
+				{
+					"op": "clear"
+				}
+			],
+			"expect": {
+				"text": "",
+				"length": 0
+			}
+		},
+		{
+			"id": "navigation-clears-when-preferred",
+			"ops": [
+				{
+					"op": "append",
+					"text": "phrase"
+				},
+				{
+					"op": "navigated",
+					"reset_on_nav": true
+				}
+			],
+			"expect": {
+				"text": "",
+				"length": 0
+			},
+			"cleared": [true]
+		},
+		{
+			"id": "navigation-keeps-when-not-preferred",
+			"ops": [
+				{
+					"op": "append",
+					"text": "phrase"
+				},
+				{
+					"op": "navigated",
+					"reset_on_nav": false
+				}
+			],
+			"expect": {
+				"text": "phrase",
+				"length": 6
+			},
+			"cleared": [false]
+		},
+		{
+			"id": "navigation-keeps-typing-after",
+			"ops": [
+				{
+					"op": "append",
+					"text": "one "
+				},
+				{
+					"op": "navigated",
+					"reset_on_nav": false
+				},
+				{
+					"op": "append",
+					"text": "two"
+				}
+			],
+			"expect": {
+				"text": "one two",
+				"length": 7
+			}
+		},
+		{
+			"id": "window-keeps-newest-codepoints",
+			"ops": [
+				{
+					"op": "append",
+					"text": "é",
+					"repeat": 2050
+				},
+				{
+					"op": "append",
+					"text": "z"
+				}
+			],
+			"expect": {
+				"text": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééz",
+				"length": 2048
+			}
+		}
+	]
+}

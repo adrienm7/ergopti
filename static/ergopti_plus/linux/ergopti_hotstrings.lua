@@ -837,6 +837,11 @@ local function main()
 
 	-- 8.1) Initialise the hotstring engine.
 	local engine = engine_mod.new()
+	-- The AI's own typing context, fed by this engine's edits and read by the
+	-- prediction engine; it outlives the word buffer's resets (modules/llm/context.lua).
+	engine:attach_ai_context(require("modules.llm.context").new({
+		is_active = function() return prediction_engine ~= nil and prediction_engine.is_enabled() end,
+	}))
 
 	-- 8.2) Initialise hotstrings_config and load all mappings.
 	local config_path = resolve_config_path(opts.config)
@@ -1407,7 +1412,10 @@ local function main()
 			-- final_result unobservable here.
 			if expansion_committed then
 				if result.final_result then
-					engine:reset()
+					-- The field holds the replacement whether or not the matcher may chain
+					-- off it: the AI context mirrors it, then only the word buffer is dropped.
+					engine:apply_expansion(result)
+					engine:reset(nil, nil, "keep")
 				else
 					engine:apply_expansion(result)
 				end
@@ -1487,7 +1495,8 @@ local function main()
 			local start_is_boundary = engine:buffer_starts_at_word_boundary()
 			if prediction_engine then
 				pcall(function()
-					prediction_engine.on_char(ch, buf, {
+					-- The AI completes its own typing context, not the word buffer.
+					prediction_engine.on_char(ch, engine:ai_context():text(), {
 						app_id = app_id,
 						hotstring_preview_visible = tooltip_preview
 							and tooltip_preview.is_visible() or false,
@@ -1519,7 +1528,18 @@ local function main()
 					end
 					-- Dynamic expansion consumed the trigger — reset the engine
 					-- buffer so the expansion text doesn't trigger further matches.
-					if not dynamic_event or not dynamic_event.pending_user then engine:reset() end
+					-- The AI context mirrors what the application received instead
+					-- (forgotten when it is private or has no logical text).
+					if not dynamic_event or not dynamic_event.pending_user then
+						engine:reset(nil, nil, "keep")
+						if dynamic_event and type(dynamic_event.replacement) == "string"
+							and type(dynamic_event.backspace_count) == "number" then
+							engine:replaced(dynamic_event.backspace_count, dynamic_event.replacement,
+								dynamic_event.is_private)
+						else
+							engine:forget_ai_context()
+						end
+					end
 				end
 			end
 		end
@@ -1564,7 +1584,7 @@ local function main()
 		})
 		prediction_engine.init({
 			engine        = engine,
-			keyboard_hook = keyboard_hook,
+			context       = engine:ai_context(),
 			is_paused     = script_actions.is_paused,
 			privacy_guard = secure_focus_guard.blocks_text,
 			privacy_context = secure_focus_guard.current_context,
@@ -1712,6 +1732,7 @@ local function main()
 		if key_name == "shortcut" and type(detail) == "table" then
 			local mods = type(detail.mods) == "table" and detail.mods or {}
 			local key = keyboard_shortcuts.collision_identity(detail.key)
+			local edits_text = false
 			-- These standard edits change text or selection without on_char input.
 			-- Readline caret and text edits also invalidate a terminal's old completion.
 			-- Conservatively retire terminal Alt word commands too; combined chords
@@ -1725,6 +1746,7 @@ local function main()
 				or (mods.alt and not (mods.ctrl or mods.meta or mods.altgr or mods.shift)
 					and WordReset.is_terminal_app(_cached_app_id) and (key == "b" or key == "f" or key == "d"))) then
 				pcall(function() prediction_engine.withdraw() end)
+				edits_text = true
 			end
 			secure_focus_guard.blocks_text()
 			local chord = keyboard_shortcuts.chord_name(detail)
@@ -1742,6 +1764,10 @@ local function main()
 			pcall(keyboard_shortcuts.dispatch, detail, {
 				only_script = opts.dry_run or script_actions.is_paused() or not shortcuts_on,
 			})
+			-- Paste, cut, undo and the terminal's line edits change the text by an
+			-- amount nothing here knows: the AI context no longer describes the field.
+			-- Forgotten after the dispatch, so a bound action's own request has read it.
+			if edits_text then engine:forget_ai_context() end
 		end
 		if script_actions.is_paused() then return end
 		-- A modified Tab or Enter reaches here, not the text callback: it ends
@@ -1756,6 +1782,7 @@ local function main()
 		-- than on_char. It can cross a privacy boundary just as bare/Shift+Tab can.
 		if key_name == "tab" then
 			secure_focus_guard.invalidate()
+			engine:navigated()
 			return
 		end
 
@@ -1978,7 +2005,8 @@ local function main()
 		-- hotstrings.click_resets_word the clicked caret starts a word instead,
 		-- so a word-start hotstring fires on the first word typed there.
 		local at_word_start = WordReset.click_resets_word()
-		engine:reset(at_word_start)
+		-- A click is a navigation for the AI context, whatever the word option says.
+		engine:reset(at_word_start, nil, "navigation")
 		Logger.debug(LOG, "Pointer click — text privacy state invalidated, buffer reset (word start: %s).",
 			tostring(at_word_start))
 	end
@@ -2488,7 +2516,7 @@ local function main()
 				config = hotstrings_config,
 				on_expire = function()
 					if prediction_engine and type(prediction_engine.on_hotstring_expired) == "function" then
-						prediction_engine.on_hotstring_expired(engine:current_buffer(), {
+						prediction_engine.on_hotstring_expired(engine:ai_context():text(), {
 							app_id = _cached_app_id,
 						})
 					end

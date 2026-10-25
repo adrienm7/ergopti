@@ -487,7 +487,8 @@ end
 --- @return boolean applied
 function M.apply_typed_newline(engine, ch, app_id)
 	if ch ~= "\n" or not M.is_terminal_app(app_id) then return false end
-	engine:reset(true, true)
+	-- A submitted line is a navigation for the AI context, as an Enter is.
+	engine:reset(true, true, "navigation")
 	return true
 end
 
@@ -529,14 +530,24 @@ end
 --- @param app_id string|nil Focused application id.
 --- @return string effect "word_start", "unknown" or "kept".
 function M.apply_control(engine, key_name, detail, app_id)
+	-- A Backspace under a modifier removes text by an unknown amount: the AI
+	-- context no longer describes the field and is forgotten by the reset. Every
+	-- other control key is a navigation, which the AI context treats by its own
+	-- preference whatever the word-reset options decide for the hotstring buffer.
+	local ai_effect = key_name ~= "backspace" and "navigation" or nil
 	if key_name == "backspace" and M.deletes_previous_word(detail) then
 		engine:reset(true)
 		return "word_start"
 	end
 	local owner = M.control_owner(key_name, detail)
-	if owner ~= nil and not M.current()[owner .. "_resets_word"] then return "kept" end
+	if owner ~= nil and not M.current()[owner .. "_resets_word"] then
+		-- The word is kept, the caret still moved.
+		if ai_effect then engine:navigated() end
+		return "kept"
+	end
 	local at_word_start = owner ~= nil or key_name == "escape"
-	engine:reset(at_word_start, owner ~= nil and key_name == "shortcut" and selects_whole_field(detail, app_id))
+	engine:reset(at_word_start, owner ~= nil and key_name == "shortcut" and selects_whole_field(detail, app_id),
+		ai_effect)
 	return at_word_start and "word_start" or "unknown"
 end
 
@@ -553,8 +564,13 @@ function M.apply_tap_action(engine, binding)
 	if binding ~= "tap_hold" and not (type(binding) == "string" and binding:match("^tap_hold__")) then
 		return "not_tap_hold"
 	end
-	if not M.tap_hold_resets_word() then return "kept" end
-	engine:reset(true)
+	-- The command's keys may move the caret or change text: a navigation for the
+	-- AI context, whatever the hotstring option decides.
+	if not M.tap_hold_resets_word() then
+		engine:navigated()
+		return "kept"
+	end
+	engine:reset(true, nil, "navigation")
 	return "word_start"
 end
 

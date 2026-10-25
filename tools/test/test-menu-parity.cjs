@@ -6314,7 +6314,9 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // The three Word Expander controls now share one declared child menu.
 // The common AI Info Bar check delegates to a shared display child menu.
 // Linux 19 → 20: navigation and validation now use their declared list providers.
-const RENDERED_THROUGH_SHARED = { hs: 23, linux: 21 };
+// Linux 21 → 22: « Vider le contexte sur clic/navigation » (llm_generation_reset_navigation)
+// is a row of the Linux AI submenu now that the AI context is its own buffer.
+const RENDERED_THROUGH_SHARED = { hs: 23, linux: 22 };
 
 const DRIVER_ROOTS = {
 	hs: path.join(SP, 'macos'),

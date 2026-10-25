@@ -100,7 +100,8 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 		end,
 		privacy_guard = privacy and privacy.guard,
 		privacy_context = privacy and privacy.context,
-		engine = { current_buffer = function() return calls.buffer or "Bonjour à tous" end, reset = function() calls.resets = calls.resets + 1 end },
+		engine = { reset = function() calls.resets = calls.resets + 1 end },
+		context = { text = function() return calls.buffer or "Bonjour à tous" end, replaced = function() end },
 		apply_prediction = function(candidate, context)
 			calls.applied = calls.applied + 1
 			if calls.on_apply then return calls.on_apply(candidate, context) end

@@ -139,7 +139,8 @@ local function scenario(action, phase, body)
 		end
 		local scheduler = require("tests.fakes").timer_scheduler()
 		engine.init({ scheduler = scheduler, clock_ms = function() return scheduler.now * 1000 end,
-			engine = { current_buffer = function() return "btw" end, reset = function() state.resets = state.resets + 1 end },
+			engine = { reset = function() state.resets = state.resets + 1 end },
+			context = { text = function() return "btw" end, replaced = function() end },
 			is_paused = function() return state.paused end,
 			focus_id = function() local target = guard.focused_text_identity(); transition("focus"); return target end,
 			privacy_guard = function() local blocked = guard.blocks_text(); transition("privacy"); return blocked end,

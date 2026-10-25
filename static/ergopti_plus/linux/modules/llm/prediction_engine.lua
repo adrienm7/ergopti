@@ -59,7 +59,9 @@ local LOG = "modules.llm.prediction_engine"
 local _enabled = true
 local _predicting = false
 local _engine = nil
-local _keyboard_hook = nil
+-- The AI typing context (modules/llm/context.lua): the text every prediction
+-- completes. Nil on a driver without one, which then offers no typing completion.
+local _context = nil
 local _overlay = nil
 local _apply_prediction = nil
 local _on_output = nil
@@ -539,7 +541,7 @@ function M.init(opts)
 	local options = type(opts) == "table" and opts or {}
 	local on_models_changed = type(options.on_models_changed) == "function" and options.on_models_changed or nil
 	_engine = options.engine
-	_keyboard_hook = options.keyboard_hook
+	_context = type(options.context) == "table" and options.context or nil
 	_overlay = type(options.overlay) == "table" and options.overlay or nil
 	_apply_prediction = type(options.apply_prediction) == "function" and options.apply_prediction or nil
 	-- Capture actual capabilities before later constructor collaborators run.
@@ -1003,7 +1005,7 @@ local function manual_refusal()
 	if not M.get_prediction_model() then
 		return "backend_not_ready", ""
 	end
-	local buffer = _engine and type(_engine.current_buffer) == "function" and _engine:current_buffer() or ""
+	local buffer = _context and _context:text() or ""
 	if type(buffer) ~= "string" or buffer == "" then return "empty_context", "" end
 	return nil, buffer
 end
@@ -2749,7 +2751,7 @@ function M.withdraw(resync_owner)
 	M.dismiss(resync_owner)
 	-- An empty matcher retires the typing context as well as its offer. Retained
 	-- text must keep its original target even if a fresh focus query now succeeds.
-	if _engine and type(_engine.current_buffer) == "function" and _engine:current_buffer() == "" then
+	if _context and _context:text() == "" then
 		_buffer_focus = nil
 	end
 end
@@ -2950,7 +2952,10 @@ local function accept_candidate(index, complete)
 	-- The accepted text is not asked about again until the user types.
 	if _request_epoch == retired_epoch then
 		_buffer_focus = nil
-		if _engine and type(_engine.reset) == "function" then _engine:reset() end
+		-- The field now holds the accepted words, which the typing context keeps
+		-- (macOS appends them too); only the hotstring word buffer is dropped.
+		if _context then _context:replaced(candidate.deletes or 0, candidate.to_type) end
+		if _engine and type(_engine.reset) == "function" then _engine:reset(nil, nil, "keep") end
 	end
 	complete(true)
 	return true

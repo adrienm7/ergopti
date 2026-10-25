@@ -56,7 +56,8 @@ local function fixture(state)
 	local engine = require("modules.llm.prediction_engine")
 	engine.init({ focus_id = function() return "owned-prediction-window" end,
 		scheduler = Fakes.timer_scheduler(),
-		engine = { current_buffer = function() return state.buffer or "" end, reset = function() end },
+		engine = { reset = function() end },
+		context = { text = function() return state.buffer or "" end, replaced = function() end },
 		is_paused = function() return state.paused == true end,
 		notify = function(text) seen.notices[#seen.notices + 1] = text return true end,
 	})

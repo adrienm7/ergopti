@@ -120,6 +120,26 @@ off (`agent_refused`, notice `llm.manual_prediction.disabled`), and the picker
 greys them through the `ai:on` requirement token of `actions.toml`, which all
 three drivers understand (Linux `requirement_holds`).
 
+### project-linux-the-ai-completes-its-own-typing-context
+
+The prediction engine does not read the hotstring word buffer on Linux. The
+Linux `modules/hotstrings/engine.lua` wrapper reports each edit the shared
+engine applies (typed text, Backspace, `apply_expansion`, `reset`, a
+navigation) to the AI context of `modules/llm/context.lua`, a rolling window
+from `_shared/lua/llm/context_buffer.lua`, which macOS shares for its
+navigation rule and pins with `context_buffer_vectors.json`. A navigation key,
+Escape, Enter, a click, a shortcut and a tap-hold command clear it only while
+`llm.generation.reset_on_nav` is on, whatever the `hotstrings.*_resets_word`
+options do to the word buffer; any other `engine:reset` (focus, pause, failed
+output, undo, a word deletion) clears it, and `engine:reset(nil, nil, true)`
+is the one reset that keeps it (a mirrored expansion, a click, an accepted
+prediction). Paste, cut and undo chords clear it in `handle_control`, a private
+expansion clears it, and the AI off keeps nothing. Action: a new site that
+resets the word buffer chooses between the default (forget) and the keep flag
+with an `engine:navigated()` call; the prediction engine's `main` chunk is at
+LuaJIT's 200-local limit, so it keeps the context in the reused `_context`
+slot.
+
 ### project-linux-uinput-drops-a-press-of-a-held-key
 
 The kernel keeps one bit per key: a press of a key already down is dropped, and
