@@ -133,3 +133,90 @@ _KLST_ProductionTimerModulesUseOwnedGroups() {
 }
 Test("keystats timer groups: every auxiliary module uses owned transactions",
 	_KLST_ProductionTimerModulesUseOwnedGroups)
+
+
+; A one-shot starter can be interrupted by shutdown while its probe pumps native
+; messages. Stopping the owned callback during the probe must make the resumed
+; starter inert, rather than reading the now-unset owner or arming a timer again.
+_KLST_StopDuringProbe(State, PropertyName) {
+	State["probes"] += 1
+	State["stopped"] := KL_TimerGroupStop(KLNet, [PropertyName],
+		_KLST_TimerPort.Bind(State["timer"]), "network")
+}
+
+_KLST_StarterSurvivesRetiredProbe(Starter, PropertyName) {
+	HadOwner := KLNet.HasOwnProp(PropertyName)
+	if HadOwner
+		SavedOwner := KLNet.%PropertyName%
+	State := Map("probes", 0, "stopped", false, "timer", _KLST_TimerState())
+	Callback := _KLST_StopDuringProbe.Bind(State, PropertyName)
+	KLNet.%PropertyName% := Callback
+	Failure := 0
+	try {
+		try Starter.Call()
+		catch Error as Err
+			Failure := Err
+		AssertEqual(1, State["probes"], "the starter must execute the owned initial probe")
+		AssertTrue(State["stopped"], "the probe interruption must stop the actual timer owner")
+		AssertFalse(KLNet.HasOwnProp(PropertyName), "stop must retire the recurring callback")
+		AssertEqual(1, State["timer"]["calls"].Length,
+			"the interruption must acknowledge the callback's cancellation")
+		AssertEqual(ObjPtr(Callback), ObjPtr(State["timer"]["calls"][1]["callback"]))
+		AssertEqual(0, State["timer"]["calls"][1]["period"])
+		AssertFalse(IsObject(Failure),
+			"a stopped network probe cannot dereference its retired timer owner")
+	} finally {
+		SetTimer(Callback, 0)
+		if HadOwner
+			KLNet.%PropertyName% := SavedOwner
+		else if KLNet.HasOwnProp(PropertyName)
+			KLNet.%PropertyName% := unset
+	}
+}
+
+for _KLST_StarterCase in [
+	[KL_Net_WifiStarter, "wifi_fn"],
+	[KL_Net_ReachStarter, "reach_fn"],
+	[KL_Net_VpnStarter, "vpn_fn"]]
+	Test("keystats timer groups: stopped initial probe stays retired " . _KLST_StarterCase[2]
+		. " (network-starter-stop-race)", _KLST_StarterSurvivesRetiredProbe.Bind(_KLST_StarterCase*))
+
+
+_KLST_RecurringIdentityFence() {
+	HadOwner := KLNet.HasOwnProp("wifi_fn")
+	if HadOwner
+		SavedOwner := KLNet.wifi_fn
+	Original := _KLST_NoopTimer.Bind()
+	Replacement := _KLST_NoopTimer.Bind()
+	State := _KLST_TimerState()
+	TimerPort := _KLST_TimerPort.Bind(State)
+	PreviousCritical := A_IsCritical
+	try {
+		KLNet.wifi_fn := Original
+		AssertTrue(_KL_Net_ArmOwnedRecurring("wifi_fn", Original,
+			KLNetConst.NETWORK_TICK_MS, TimerPort))
+		AssertEqual(1, State["calls"].Length, "the current owner must arm exactly once")
+		AssertEqual(ObjPtr(Original), ObjPtr(State["calls"][1]["callback"]))
+		AssertEqual(KLNetConst.NETWORK_TICK_MS, State["calls"][1]["period"])
+
+		KLNet.wifi_fn := Replacement
+		AssertFalse(_KL_Net_ArmOwnedRecurring("wifi_fn", Original,
+			KLNetConst.NETWORK_TICK_MS, TimerPort),
+			"an old starter cannot arm the replacement generation's callback")
+		KLNet.wifi_fn := unset
+		AssertFalse(_KL_Net_ArmOwnedRecurring("wifi_fn", Original,
+			KLNetConst.NETWORK_TICK_MS, TimerPort),
+			"a stopped slot cannot arm the retired callback")
+		AssertEqual(1, State["calls"].Length,
+			"retired and replaced owners must cause zero native timer admissions")
+		AssertEqual(PreviousCritical, A_IsCritical,
+			"every arm decision must restore its caller's Critical setting")
+	} finally {
+		if HadOwner
+			KLNet.wifi_fn := SavedOwner
+		else if KLNet.HasOwnProp("wifi_fn")
+			KLNet.wifi_fn := unset
+	}
+}
+Test("keystats timer groups: recurring admission belongs to the exact probe (network-starter-stop-race)",
+	_KLST_RecurringIdentityFence)
