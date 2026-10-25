@@ -44,6 +44,7 @@
 const fs = require('fs');
 const assert = require('node:assert/strict');
 const path = require('path');
+const os = require('node:os');
 const { parse: parseToml } = require('smol-toml');
 const { normalizeScopes } = require('../lib/configuration-scopes.cjs');
 const { stripComments, scriptTokens } = require('../lib/script-source.cjs');
@@ -477,15 +478,217 @@ function isCanonicalParameterWrite(
 // and this gate exempted that one row. The delimiter strings moved to config.toml
 // leaves and macOS now keeps any `[__global__]` table as foreign bytes, so no
 // exemption exists: a macOS source that writes the row again must be declared.
-const retiredSecondaryOwner = fs.readFileSync(
+const secondarySource = fs.readFileSync(
 	path.join(DRIVERS_DIR, 'macos', 'modules/hotstrings/hotstrings_config.lua'),
 	'utf8'
 );
 assert.equal(
-	/section\s*=\s*"__global__"\s*,\s*key\s*=\s*"word_delimiters"/.test(retiredSecondaryOwner),
+	/section\s*=\s*"__global__"\s*,\s*key\s*=\s*"word_delimiters"/.test(secondarySource),
 	false,
 	'macOS must not write the shared [__global__] delimiter row any more'
 );
+
+/**
+ * Pins the real shared recovery transport used by the secondary publisher.
+ * @param {string} sourceRoot Driver source root; mutation fixtures own their copy.
+ * @returns {boolean} Whether exact path and snapshot arguments reach the writer.
+ */
+function hasSecondaryRecoveryTransport(sourceRoot) {
+	const helperPath = path.join(sourceRoot, '_shared/lua/hotstrings/publication_recovery.lua');
+	if (!fs.existsSync(helperPath)) return false;
+	const helper = fs.readFileSync(helperPath, 'utf8');
+	const constructor = /^function M\.new\(options\)\r?\n[\s\S]*?^end\b/m.exec(helper);
+	if (!constructor) return false;
+	const body = constructor[0];
+	const publish =
+		/^\tlocal function publish\(path, candidate, adapter, expected, on_error, publisher\)\r?\n[\s\S]*?^\tend\b/m.exec(
+			body
+		);
+	const inverse = /^\tlocal function settle_pending\(\)\r?\n[\s\S]*?^\tend\b/m.exec(body);
+	if (!publish || !inverse) return false;
+	return (
+		/^local function copy_source\(source\)\r?\n\s*return \{ status = source\.status, content = source\.content \}\s*\r?\nend\b/m.test(
+			helper
+		) &&
+		/^\tlocal files = options\.files\s*$/m.test(body) &&
+		/^\tlocal writer = options\.writer or require\("toml_codec\.writer"\)\s*$/m.test(body) &&
+		/adapter ~= files/.test(publish[0]) &&
+		/local record = \{ path = path, candidate = candidate, expected = copy_source\(expected\),\s+on_error = on_error, attempt = attempt, publisher = publisher or writer\.publish_if_unchanged \}/.test(
+			publish[0]
+		) &&
+		/^\t\tlocal called, acknowledged, detail, native = pcall\(record\.publisher,\s+path, candidate, files, record\.expected, on_error\)/m.test(
+			publish[0]
+		) &&
+		/inverse = \{ path = record\.path, expected = copy_source\(view\.source\),\s+candidate = record\.expected\.content, on_error = record\.on_error, attempt = record\.attempt \}/.test(
+			inverse[0]
+		) &&
+		/^\t\tlocal called, acknowledged, detail, native = pcall\(record\.publisher,\s+inverse\.path, inverse\.candidate, files, inverse\.expected, inverse\.on_error\)/m.test(
+			inverse[0]
+		) &&
+		/return \{ begin = begin, finish = finish, publish = publish, retry = retry,/.test(body)
+	);
+}
+
+/**
+ * Validates the current runtime-keyed secondary writer independently of row names.
+ * A caller's secondary-file option grants no authority if initialization or
+ * conditional publication later switches its destination or loaded snapshot.
+ * @param {string} source Current secondary owner source.
+ * @param {string} sourceRoot Source root containing the real recovery transport.
+ * @returns {boolean} Whether the loaded source owns the conditional publication.
+ */
+function hasSecondaryPublicationOwner(source, sourceRoot = DRIVERS_DIR) {
+	const prepare = /^local function prepare_override_content\(overrides\)\r?\n[\s\S]*?^end\b/m.exec(
+		source
+	);
+	const save = /^local function save_to_disk\(overrides\)\r?\n[\s\S]*?^end\b/m.exec(source);
+	const init = /^function M\.init\(opts\)\r?\n[\s\S]*?^end\b/m.exec(source);
+	if (!prepare || !save || !init) return false;
+	return (
+		/local snapshot = _state\.source_snapshot/.test(prepare[0]) &&
+		/TomlRecordEditor\.patch_table_field\(content,/.test(prepare[0]) &&
+		/local prepared, prepare_error = prepare_override_content\(overrides\)/.test(save[0]) &&
+		/content = prepared/.test(save[0]) &&
+		/^local FileSystem\s*= require\("adapters\.file_system"\)\s*$/m.test(source) &&
+		/^local PublicationRecovery = require\("hotstrings\.publication_recovery"\)\s*$/m.test(
+			source
+		) &&
+		/^local function publish_native_override\(path, content, files, expected, on_error\)\r?\n\s*return files\.write_if_unchanged\(path, content, expected, on_error\)\s*\r?\nend\b/m.test(
+			source
+		) &&
+		/^\tlocal function publish\(\)\r?\n\s*return _state\.recovery\.publish\(_state\.path, content, FileSystem,\s*_state\.source_snapshot, _state\.on_publication_error, publish_native_override\)\s*\r?\n\tend\b/m.test(
+			save[0]
+		) &&
+		/^\tlocal state = _state\s*$/m.test(init[0]) &&
+		/state\.recovery = PublicationRecovery\.new\(\{ files = FileSystem,\s*capture = function\(\) return capture_publication_owner\(state\) end,\s*current = publication_owner_current \}\)/.test(
+			init[0]
+		) &&
+		/_state\.source_snapshot = source_snapshot/.test(init[0]) &&
+		/parse_overrides\(opts\.override_path\)/.test(init[0]) &&
+		/\bpath\s*= opts\.override_path/.test(init[0]) &&
+		hasSecondaryRecoveryTransport(sourceRoot)
+	);
+}
+
+/**
+ * Enumerates every literal write descriptor without granting path-based exclusions.
+ * Secondary override leaves are runtime-keyed; their retired literal delimiter
+ * row must not leave an exemption available to future undeclared config writes.
+ * @param {string} source Driver source text.
+ * @returns {Set<string>} Literal section/key pairs.
+ */
+function literalWriteSurfaces(source) {
+	return new Set(
+		[
+			...source.matchAll(/section\s*=\s*"([A-Za-z0-9_.]+)"\s*,\s*key\s*=\s*"([A-Za-z0-9_.]+)"/g)
+		].map((match) => `${match[1]}.${match[2]}`)
+	);
+}
+
+// The production bootstrap binds this owner to its secondary TOML file.
+// Redirecting that owner to config.toml must fail the gate too.
+const secondaryBootstrap = fs.readFileSync(path.join(DRIVERS_DIR, 'macos', 'init.lua'), 'utf8');
+const secondaryDestination =
+	/override_path = require\("native_path"\)\.with_trailing_separator\(override_path\) \.\. "hotstrings_config\.toml"\s+local hotstring_config_ready = hotstrings_config\.init\(\{\s+override_path = override_path,/;
+assert.equal(
+	secondaryDestination.test(secondaryBootstrap),
+	true,
+	'override owner must target its secondary file'
+);
+assert.equal(
+	secondaryDestination.test(
+		secondaryBootstrap.replace('"hotstrings_config.toml"', '"config.toml"')
+	),
+	false
+);
+
+// A formerly exempt secondary owner now emits runtime-keyed override leaves.
+// Reintroducing a literal legacy or neighbouring key must follow the same
+// declaration check as any other writer, while an ordinary declared row passes.
+assert.equal(
+	hasSecondaryPublicationOwner(secondarySource),
+	true,
+	'the live secondary owner retains its loaded destination and publication snapshot'
+);
+for (const [pattern, replacement] of [
+	[/_state\.recovery\.publish\(_state\.path,/, '_state.recovery.publish(config_path,'],
+	[
+		/_state\.source_snapshot, _state\.on_publication_error, publish_native_override/,
+		'other_snapshot, _state.on_publication_error, publish_native_override'
+	],
+	[/\bpath\s*= opts\.override_path/, 'path = config_path'],
+	[/_state\.source_snapshot = source_snapshot/g, '_state.source_snapshot = other_snapshot'],
+	[/local snapshot = _state\.source_snapshot/, 'local snapshot = other_snapshot'],
+	[/parse_overrides\(opts\.override_path\)/, 'parse_overrides(config_path)'],
+	[
+		/files\.write_if_unchanged\(path, content, expected, on_error\)/,
+		'files.write_if_unchanged(path, content, nil, on_error)'
+	]
+]) {
+	const changed = secondarySource.replace(pattern, replacement);
+	assert.notEqual(
+		changed,
+		secondarySource,
+		'each secondary publication mutation must change actual source'
+	);
+	assert.equal(
+		hasSecondaryPublicationOwner(changed),
+		false,
+		`a changed destination, read source or conditional writer argument grants no publication owner: ${pattern}`
+	);
+}
+const recoveryFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-secondary-transport-'));
+try {
+	assert.equal(
+		hasSecondaryPublicationOwner(secondarySource, recoveryFixture),
+		false,
+		'an absent recovery helper grants no transport'
+	);
+	const helperPath = '_shared/lua/hotstrings/publication_recovery.lua';
+	const target = path.join(recoveryFixture, helperPath);
+	fs.mkdirSync(path.dirname(target), { recursive: true });
+	const helperSource = fs.readFileSync(path.join(DRIVERS_DIR, helperPath), 'utf8');
+	fs.writeFileSync(target, helperSource);
+	assert.equal(
+		hasSecondaryPublicationOwner(secondarySource, recoveryFixture),
+		true,
+		'the unmodified actual recovery transport satisfies the control'
+	);
+	const changed = helperSource.replace('expected = copy_source(expected)', 'expected = {}');
+	assert.notEqual(
+		changed,
+		helperSource,
+		'the snapshot-loss mutation must change the actual helper'
+	);
+	fs.writeFileSync(target, changed);
+	assert.equal(
+		hasSecondaryPublicationOwner(secondarySource, recoveryFixture),
+		false,
+		'a recovery helper that loses the loaded snapshot grants no transport'
+	);
+} finally {
+	fs.rmSync(recoveryFixture, { recursive: true, force: true });
+}
+
+for (const [section, key, expected] of [
+	['__global__', 'word_delimiters', false],
+	['__global__', 'unknown', false],
+	['script', 'locale', true]
+]) {
+	const source = `${secondarySource}\nlocal probe = { section = "${section}", key = "${key}" }\n`;
+	const surface = `${section}.${key}`;
+	assert.notEqual(source, secondarySource, 'a mutation must add a real literal descriptor');
+	assert.equal(
+		literalWriteSurfaces(source).has(surface),
+		true,
+		'every literal descriptor remains visible, including the retired secondary row'
+	);
+	assert.equal(
+		isDeclaredSurface(surface, parseManifest().get('hs')),
+		expected,
+		'the actual manifest alone grants literal config ownership'
+	);
+}
 
 /**
  * Every "section.key" (or bare section) a driver's own source reads or writes.
@@ -507,13 +710,7 @@ function surfaceOf(driver) {
 			if (!/\.(lua|ahk)$/.test(e.name)) continue;
 			const src = fs.readFileSync(p, 'utf8');
 			// batch_write rows: { section = "x", key = "y" }
-			for (const m of src.matchAll(
-				/section\s*=\s*"([A-Za-z0-9_.]+)"\s*,\s*key\s*=\s*"([A-Za-z0-9_.]+)"/g
-			)) {
-				const surface = `${m[1]}.${m[2]}`;
-				const relative = path.relative(root, p).split(path.sep).join('/');
-				out.add(surface);
-			}
+			for (const surface of literalWriteSurfaces(src)) out.add(surface);
 			// A row whose key is a runtime value still names its section.
 			for (const m of src.matchAll(/section\s*=\s*"([A-Za-z0-9_.]+)"\s*,\s*key\s*=\s*[A-Za-z_]/g)) {
 				const relative = path.relative(root, p).split(path.sep).join('/');
