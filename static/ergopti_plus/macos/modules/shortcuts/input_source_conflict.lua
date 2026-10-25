@@ -24,6 +24,7 @@ local M = {}
 local Logger      = require("infra.logger")
 local ShellRunner = require("adapters.shell_runner")
 local JsonCodec   = require("adapters.json_codec")
+local FileSystem  = require("adapters.file_system")
 
 local LOG = "shortcuts.input_source_conflict"
 
@@ -98,8 +99,8 @@ end
 -- =====================================
 
 --- Reads the input-source shortcuts and reports which of them own a chord.
---- A non-zero plutil exit means the file or its dictionary is absent, which is
---- every shortcut at its macOS default; that reading is logged, not hidden.
+--- Defaults apply only to a proven absent file or a decoded document without
+--- the shortcut dictionary. A process or decoding failure proves neither.
 --- @param mods table Canonical modifier names.
 --- @param key string Canonical key name.
 --- @param on_result function fn(ids) with the conflicting ids; not called when
@@ -119,20 +120,34 @@ function M.check(mods, key, on_result)
 		Logger.error(LOG, "check(): HOME is not set — the input-source shortcuts cannot be read.")
 		return false
 	end
+	local path = home .. PREFERENCES_REL_PATH
+	local status, detail = FileSystem.path_status(path)
+	if status == "absent" then
+		Logger.info(LOG, "No input-source shortcut preference file — macOS defaults apply.")
+		on_result(M.conflicting_ids(nil, mods, key))
+		return true
+	end
+	if status ~= "present" then
+		Logger.error(LOG, "Input-source shortcut preferences cannot be inspected: %s.", tostring(detail))
+		return false
+	end
 	local handle = ShellRunner.spawn(PLUTIL,
-		{ "-extract", "AppleSymbolicHotKeys", "json", "-o", "-", home .. PREFERENCES_REL_PATH },
+		{ "-convert", "json", "-o", "-", path },
 		function(exit_code, stdout, stderr)
-			local hotkeys = nil
-			if exit_code == 0 then
-				local ok, decoded = pcall(JsonCodec.decode, stdout)
-				if not ok or type(decoded) ~= "table" then
-					Logger.warn(LOG, "Input-source shortcuts unreadable: %s.", tostring(decoded))
-					return
-				end
-				hotkeys = decoded
-			else
-				Logger.info(LOG, "No customised input-source shortcut (plutil exit %s: %s) — macOS defaults apply.",
+			if exit_code ~= 0 then
+				Logger.error(LOG, "Input-source shortcut preference read failed (plutil exit %s: %s).",
 					tostring(exit_code), tostring(stderr))
+				return
+			end
+			local ok, decoded = pcall(JsonCodec.decode, stdout)
+			if not ok or type(decoded) ~= "table" then
+				Logger.error(LOG, "Input-source shortcut preferences could not be decoded: %s.", tostring(decoded))
+				return
+			end
+			local hotkeys = decoded.AppleSymbolicHotKeys
+			if hotkeys ~= nil and type(hotkeys) ~= "table" then
+				Logger.error(LOG, "Input-source shortcut dictionary is invalid: %s.", type(hotkeys))
+				return
 			end
 			on_result(M.conflicting_ids(hotkeys, mods, key))
 		end)
