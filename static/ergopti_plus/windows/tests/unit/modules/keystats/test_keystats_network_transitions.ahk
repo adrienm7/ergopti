@@ -301,3 +301,107 @@ Test("keystats network: unknown internet and VPN samples preserve both baselines
 	_KLNet_UnknownInternetAndVpnSamplesAreIgnored)
 Test("keystats AV: unknown capture samples preserve both baselines (probe-unknown-preserves-state)",
 	_KLAV_UnknownCaptureSamplesAreIgnored)
+
+
+; A later durability failure leaves KL_Stop retryable. Auxiliary Stop calls
+; therefore cannot append the same accepted closing row on every retry.
+_KLNet_StopClosesOnce(StopFn, Owner, ActiveProperty, NameProperty, EventType) {
+	global _Stub_AppendLogRows, _Stub_AppendLogAccept
+	global _Stub_AppendLogRejectSuspend, _Stub_AppendLogHook
+	SavedRows := _Stub_AppendLogRows
+	SavedAccept := _Stub_AppendLogAccept
+	SavedReject := _Stub_AppendLogRejectSuspend
+	SavedHook := _Stub_AppendLogHook
+	SavedActive := Owner.%ActiveProperty%
+	SavedName := Owner.%NameProperty%
+	TimerProperties := ["wifi_start_fn", "reach_start_fn", "vpn_start_fn",
+		"wifi_fn", "reach_fn", "vpn_fn", "warmup_fn", "fast_fn", "slow_fn"]
+	SavedTimers := Map()
+	for PropertyName in TimerProperties
+		if Owner.HasOwnProp(PropertyName)
+			SavedTimers[PropertyName] := Owner.%PropertyName%
+	try {
+		_Stub_AppendLogRows := []
+		_Stub_AppendLogAccept := true
+		_Stub_AppendLogRejectSuspend := false
+		_Stub_AppendLogHook := 0
+		Owner.%ActiveProperty% := true
+		Owner.%NameProperty% := "closing-test"
+		AssertTrue(StopFn.Call((*) => 0))
+		AssertTrue(StopFn.Call((*) => 0))
+		AssertEqual(1, _Stub_AppendLogRows.Length,
+			"a repeated shutdown must emit the accepted close exactly once")
+		AssertEqual(EventType, _Stub_AppendLogRows[1]["type"])
+		AssertFalse(Owner.%ActiveProperty%, "the accepted interval must be retired")
+		AssertEqual("", Owner.%NameProperty%, "retired metadata cannot seed another close")
+	} finally {
+		_Stub_AppendLogRows := SavedRows
+		_Stub_AppendLogAccept := SavedAccept
+		_Stub_AppendLogRejectSuspend := SavedReject
+		_Stub_AppendLogHook := SavedHook
+		Owner.%ActiveProperty% := SavedActive
+		Owner.%NameProperty% := SavedName
+		for PropertyName in TimerProperties {
+			if SavedTimers.Has(PropertyName)
+				Owner.%PropertyName% := SavedTimers[PropertyName]
+			else if Owner.HasOwnProp(PropertyName)
+				Owner.%PropertyName% := unset
+		}
+	}
+}
+Test("keystats network: a shutdown retry closes VPN once (sensor-close-once)",
+	_KLNet_StopClosesOnce.Bind(KL_Net_Stop, KLNet, "vpn_active", "vpn_adapter_name", "vpn_disconnected"))
+Test("keystats AV: a shutdown retry closes capture once (sensor-close-once)",
+	_KLNet_StopClosesOnce.Bind(KL_AV_Stop, KLAVState, "capture_active", "capture_exe", "screen_recording_end"))
+
+
+_KLNet_CloseAppendHook(Mode, Owner, Entry) {
+	if Mode = "reenter" {
+		AssertTrue(_KL_StopObservedInterval(Owner, "active", "name", "vpn_disconnected", "adapter"),
+			"a committed close must already be retired before a reentrant stop")
+		return
+	}
+	throw Error("injected closing-row failure")
+}
+
+_KLNet_CloseOutcome(Mode) {
+	global _Stub_AppendLogRows, _Stub_AppendLogAccept
+	global _Stub_AppendLogRejectSuspend, _Stub_AppendLogHook
+	SavedRows := _Stub_AppendLogRows
+	SavedAccept := _Stub_AppendLogAccept
+	SavedReject := _Stub_AppendLogRejectSuspend
+	SavedHook := _Stub_AppendLogHook
+	Owner := {active: true, name: "closing-test"}
+	try {
+		_Stub_AppendLogRows := []
+		_Stub_AppendLogAccept := Mode != "privacy" && Mode != "throw-before"
+		_Stub_AppendLogRejectSuspend := Mode = "suspend"
+		_Stub_AppendLogHook := Mode = "throw-before" || Mode = "throw-after" || Mode = "reenter"
+			? _KLNet_CloseAppendHook.Bind(Mode, Owner) : 0
+		Completed := _KL_StopObservedInterval(Owner, "active", "name", "vpn_disconnected", "adapter")
+		AssertEqual(Mode = "privacy" || Mode = "reenter", Completed,
+			"privacy is terminal; suspension and technical failures remain retryable")
+		AssertEqual(Mode = "suspend" || Mode = "throw-before", Owner.active,
+			"an accepted or privacy-dropped close must retire its interval")
+		AssertEqual(Mode = "throw-after" || Mode = "reenter" ? 1 : 0, _Stub_AppendLogRows.Length,
+			"only an acknowledged append may publish a closing row")
+
+		_Stub_AppendLogAccept := true
+		_Stub_AppendLogRejectSuspend := false
+		_Stub_AppendLogHook := 0
+		AssertTrue(_KL_StopObservedInterval(Owner, "active", "name", "vpn_disconnected", "adapter"))
+		AssertTrue(_KL_StopObservedInterval(Owner, "active", "name", "vpn_disconnected", "adapter"))
+		AssertEqual(Mode = "privacy" ? 0 : 1, _Stub_AppendLogRows.Length,
+			"retry must publish pending technical debt once and never replay a privacy drop")
+		AssertFalse(Owner.active)
+		AssertEqual("", Owner.name)
+	} finally {
+		_Stub_AppendLogRows := SavedRows
+		_Stub_AppendLogAccept := SavedAccept
+		_Stub_AppendLogRejectSuspend := SavedReject
+		_Stub_AppendLogHook := SavedHook
+	}
+}
+for _KLNet_CloseMode in ["privacy", "suspend", "throw-before", "throw-after", "reenter"]
+	Test("keystats shutdown: closing outcome " . _KLNet_CloseMode . " (sensor-close-once)",
+		_KLNet_CloseOutcome.Bind(_KLNet_CloseMode))

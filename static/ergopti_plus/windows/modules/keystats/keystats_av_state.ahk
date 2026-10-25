@@ -361,13 +361,7 @@ KL_AV_Stop(TimerFn := SetTimer) {
 		TimersStopped := KL_TimerGroupStop(KLAVState,
 				["warmup_fn", "fast_fn", "slow_fn"], TimerFn,
 				"audio-video state")
-		; Close any open screen_recording_start with a matching end
-		if KLAVState.capture_active {
-				try KL_AppendLog(Map(
-						"type", "screen_recording_end",
-						"app",  Keystats.session_app,
-						"exe",  KLAVState.capture_exe
-				))
-		}
-		return TimersStopped
+		IntervalClosed := _KL_StopObservedInterval(KLAVState, "capture_active",
+				"capture_exe", "screen_recording_end", "exe")
+		return TimersStopped && IntervalClosed
 }

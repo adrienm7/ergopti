@@ -158,3 +158,52 @@ KL_TimerGroupStop(Owner, PropertyNames, TimerFn := SetTimer,
 			"Cannot stop {1} timer group ({2}).", GroupName, Message)
 	return CleanupErrors.Length = 0
 }
+
+
+; Auxiliary intervals must close once even when a later shutdown owner refuses.
+; The publication commit retires accepted state in the same transaction as its
+; row. A privacy drop is terminal too; a lifecycle refusal or native exception
+; keeps uncommitted state available to the next shutdown attempt.
+_KL_StopObservedInterval(Owner, ActiveProperty, NameProperty, EventType, MetadataKey) {
+	PreviousCritical := Critical("On")
+	try {
+		if !Owner.%ActiveProperty%
+			return true
+		Name := Owner.%NameProperty%
+		Entry := Map("type", EventType, "app", Keystats.session_app, MetadataKey, Name)
+	} finally {
+		Critical(PreviousCritical)
+	}
+	Guard := _KL_ObservedIntervalCloseCurrent.Bind(Owner, ActiveProperty, NameProperty, Name)
+	Commit := _KL_CommitObservedIntervalClose.Bind(Owner, ActiveProperty, NameProperty, Name)
+	RejectedBySuspend := false
+	try {
+		if KL_AppendLog(Entry, &RejectedBySuspend, Guard, Commit)
+			return true
+		if RejectedBySuspend
+			return false
+		Commit.Call()
+		return true
+	} catch as Failure {
+		try LoggerError("Keystats", "Cannot close {1} interval during shutdown: {2}.",
+			EventType, Failure.Message)
+		return false
+	}
+}
+
+_KL_ObservedIntervalCloseCurrent(Owner, ActiveProperty, NameProperty, Name) {
+	return Owner.%ActiveProperty% && Owner.%NameProperty% == Name
+}
+
+_KL_CommitObservedIntervalClose(Owner, ActiveProperty, NameProperty, Name) {
+	PreviousCritical := Critical("On")
+	try {
+		if !_KL_ObservedIntervalCloseCurrent(Owner, ActiveProperty, NameProperty, Name)
+			return false
+		Owner.%ActiveProperty% := false
+		Owner.%NameProperty% := ""
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}

@@ -395,13 +395,7 @@ KL_Net_Stop(TimerFn := SetTimer) {
 		TimersStopped := KL_TimerGroupStop(KLNet,
 				["wifi_start_fn", "reach_start_fn", "vpn_start_fn",
 						"wifi_fn", "reach_fn", "vpn_fn"], TimerFn, "network")
-		; Emit vpn_disconnected on clean shutdown so the log is consistent
-		if KLNet.vpn_active {
-				try KL_AppendLog(Map(
-						"type",    "vpn_disconnected",
-						"app",     Keystats.session_app,
-						"adapter", KLNet.vpn_adapter_name
-				))
-		}
-		return TimersStopped
+		IntervalClosed := _KL_StopObservedInterval(KLNet, "vpn_active",
+				"vpn_adapter_name", "vpn_disconnected", "adapter")
+		return TimersStopped && IntervalClosed
 }
