@@ -165,7 +165,7 @@ review). libXi dependency declined (Xi packet retired). Items 46/47/48 retired e
 check, no removal. No token-reuse rearm (ADR 012). Expansion delay with end char: from the last typed letter to the
 expander (`★` or the end character).
 
-**Decisions still pending for the maintainer.** `docs/questions-for-maintainer.md` (check it for anything new). Open at the end of the session: delimiters as config leaves on Windows (PAR-8), user-settable base delay (PAR-6), the Linux autocompletion delay row (PAR-21), `hotstrings.dynamic.enabled` on Windows (PAR-24: the master exists there as `category_enabled.dynamichotstrings`, a reason key says so), the content-Gui pool of the Windows prediction tooltip.
+**Decisions still pending for the maintainer.** `docs/questions-for-maintainer.md` (check it for anything new). The 2026-10-24 QCM answers are implemented (October 25): PAR-6, PAR-8, PAR-15, PAR-21, PAR-24, hotstring cascading, Space tap completion, the recommended-defaults rule and AI off on Linux. Still open: the content-Gui pool of the Windows prediction tooltip, PAR-12 on the PC.
 
 **Remaining work, in the order to take it.**
 
@@ -325,13 +325,14 @@ here); macOS and Linux behaviour that needs hardware goes through the Debug fiel
       `Click`, `MouseMove`). One real bug fixed (0c85debc93): the Space tap-hold completed a trigger
       from its level-2 thread, and with another AutoHotkey hook SendInput fell back to SendEvent, so
       the burst re-entered the watcher and cascaded (final text `foo qbar qzz` instead of
-      `foo qzy `); all engine output now goes at level 0. Open question (docs/questions-for-maintainer.md):
-      deliberate hotstring-to-hotstring cascading would be a new feature on all drivers (124 of 2786
-      shared replacements end with their own trigger, 131 with another trigger). Suspected separate
-      defect: `_SpaceTap` emits its space with `TextPressKey("Space", "")`, which the buffer treats as
-      an edit and resets both buffers, so an end-character trigger cannot complete from the Space
-      tap-hold; check on the PC with the Space tap-hold on. Left: wire
-      `test_hotstring_output_is_final.ahk` into `run_all.ahk`.
+      `foo qzy `); all engine output now goes at level 0. Deliberate cascading is built (858c9aa):
+      `hotstrings.cascade_depth`, default 0, the whole chain resolved before one send (one SendInput
+      burst on Windows), a rule fires once per chain; at depths 1-3 no shipped mapping changes (2994
+      measured), a user's own mid-word auto trigger can (`ok` > `OK` turns `facebook` into `faceboOK`).
+      Space tap completes an end-character trigger like a plain space on the three drivers (Windows
+      already via `TextPressKeyFed`, Linux pinned by 504ee63, macOS emits a native space).
+      `test_hotstring_output_is_final.ahk` is already in `run_all.ahk`. Left: on the PC run
+      `run_all.ahk` (cascade tests never ran), then type `chatg` with depth 1 on each OS.
 - [ ] **Per-layer layout composer.** [CODE] Done on the three OS (docs/layout-composer.md): shared
       model, page, 21 locales, Windows host, macOS and Linux install paths, tests, one-click Debug
       "Test the composed layout". Left: typing the composed layout on a real keyboard on each OS.
@@ -395,15 +396,22 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 
 ### A. Behaviour that differs without a good reason (fix first)
 
-- [ ] **PAR-6. Make the base expansion delay user-settable on all three.** [CODE] One declaration now
-      (manifest default of `hotstrings.expansion_delay`, 31372616f5) but only macOS reads a user-set value;
-      Windows and Linux ignore one written in `config.toml` (their delay is per section in the « Délais &
-      couleurs » window). Question in `questions-for-maintainer.md`.
-- [ ] **PAR-8. Word delimiters in config leaves on Windows.** [CODE] Blocked on a design answer
-      (`questions-for-maintainer.md`): write the built-in states through the live config writer (no
-      reload per click), drop the override-file strings and the per-character consume opt-in on built-ins,
-      keep custom delimiters as records. About 230 references in 17 files and 40 AHK tests. Also: macOS and
-      Linux ignore the delimiters a user adds when deciding a repeat; only Windows honours them.
+- [ ] **Tests write the real user config.** [CODE] A Linux or macOS Lua test run as root keeps adding
+      `lua_*_magic_key` group switches to `/root/.config/ergopti/config.toml` (the magic-key catalogue test
+      was fixed in 76716e7; another writer remains). Find it with a scratch HOME diff and make every suite
+      refuse to start when HOME is the real one.
+- [ ] **Review the machine translations of October 25.** [I18N] New keys (gesture recommendation notes,
+      cascade depth, tap-hold defaults, missing-program messages) are hand-written in French and
+      machine-written in the 19 other locales.
+- [ ] **PAR-6. Make the base expansion delay user-settable on all three.** [CODE] Done (a737049): the
+      base is user-settable everywhere, section delays are stored as `delay_offset` or `delay_unlimited`,
+      old absolute values migrate keeping the effective delay, shared vectors `base_delay_vectors.json`.
+      Left: run the Windows corpus test on the PC.
+- [ ] **PAR-8. Word delimiters in config leaves on Windows.** [CODE] Done: the consume choice is the
+      leaf `[hotstrings.terminator_consume]` on macOS and Linux (76716e7); Windows writes built-in states
+      through the live config writer and moves the old override strings at boot (2d734b6). Left: run the
+      rewritten AHK tests on the PC (never executed); no menu toggle for built-in consumption on any
+      driver; macOS and Linux still ignore user delimiters when deciding a repeat.
 - [ ] **PAR-12. Token streaming reason.** [CODE] Reason text rewritten in 21 locales (the display exists on
       Windows but is not validated there). Left: rename the key `token_streaming_transport_missing` (it is
       misleading) in manifest and locales, or enable the row on Windows after a live Ollama check.
@@ -412,8 +420,9 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       needs the Atom fallback in `core.ahk` plus an AHK feed parser, then a reseal of the sealed updater
       sources (only when `run_all.ahk` has no foreign hunk).
 - [ ] **PAR-15. Tap-hold thresholds.** [CODE] Done: exact per-key thresholds pinned, one one-shot timeout
-      (macOS read 3000 against 2000 ms), Linux holds the key's own side. Left: decide whether macOS keeps one
-      global 250 ms or gets per-key values (the id vocabularies must be reconciled first).
+      (macOS read 3000 against 2000 ms), Linux holds the key's own side. macOS reads the shared per-key
+      thresholds too (8cb8f04); one fallback `default_activation_ms = 200` (macOS was 250). Left: Windows
+      still holds a 0.2 literal pinned to it by a gate; check the Karabiner JSON on a Mac.
 - [ ] **PAR-19. Pause and resume of the layout, implement on Windows and Linux (decided).** [CODE]
       Plan: move the three `layout.*` rows (`pause_switch_enabled`, `on_pause`, `on_resume`) and the two
       menu frames from hs to all platforms; correct the `on_pause`/`on_resume` type (macOS stores layout id
@@ -430,8 +439,9 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 - [ ] **PAR-21. Linux LLM parity batch.** [CODE] Done: per-app trigger disabling (5b66b7e761), min/max
       words rows already existed. Left: model delete (the Linux HTTP transport has no DELETE), warmup (needs
       the engine's runtime-owner lifecycle), reset on navigation (needs an LLM context buffer: design
-      decision), the AI-acceptance and autocompletion delay rows (the meaning of the autocompletion delay
-      needs a decision).
+      decision). The AI-acceptance and autocompletion delay rows stay Windows/macOS only; Linux has
+      `llm.trigger.debounce_ms` as its only AI delay, like the others. AI off disarms the automatic agent
+      mode and the `llm_*` chords, tap keys and gestures (7735e6b, 47ca337).
 - [ ] **PAR-22. LLM telemetry on Linux.** [CODE] Done: generation, suggested, dismissed, accepted rows in
       `events_llm` and Ollama token counts (928aeffd43). Left: remote-provider tokens and cost (port the
       macOS response classifier and `model_prices`).
