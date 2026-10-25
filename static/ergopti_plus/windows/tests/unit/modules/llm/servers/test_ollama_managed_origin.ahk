@@ -58,9 +58,9 @@ _G4B_RequestOrigin(State) {
 		Owner := _LLM_OllamaAuxOwner(0, "g4_managed_consumer")
 		AssertEqual(Owner["endpoint"], "http://127.0.0.1:23456", "Post-enable auxiliary consumers capture the admitted listener.")
 		Custody := LLM_OllamaCaptureOriginCustody()
-		AssertTrue(_LLM_Ollama_PresenceStillCurrent(Map("origin_custody", Custody, "presence_admitted", true,
+		AssertTrue(_LLM_Ollama_PresenceStillCurrent(Map("requester_current", 0, "origin_custody", Custody, "presence_admitted", true,
 			"presence_generation", LLM_AuxGeneration(), "base_url", "http://127.0.0.1:23456")))
-		AssertFalse(_LLM_Ollama_PresenceStillCurrent(Map("origin_custody", Custody, "presence_admitted", true,
+		AssertFalse(_LLM_Ollama_PresenceStillCurrent(Map("requester_current", 0, "origin_custody", Custody, "presence_admitted", true,
 			"presence_generation", LLM_AuxGeneration(), "base_url", LLM_OLLAMA_BASE_URL)))
 		Handle := { Origin: "http://127.0.0.1:23456", OriginCustody: Custody, OriginGeneration: LLM_AuxGeneration(), OriginOwned: true }
 		AssertTrue(_LLM_Ollama_StreamOriginCurrent(Handle), "Actual streaming dispatch retains its admitted listener.")
