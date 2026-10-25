@@ -441,14 +441,15 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 ### B. Missing features on one OS
 
 - [ ] **PAR-21. Linux LLM parity batch.** [CODE] Done: per-app trigger disabling (5b66b7e761), min/max
-      words rows already existed. Left: model delete (the Linux HTTP transport has no DELETE), warmup (needs
-      the engine's runtime-owner lifecycle), reset on navigation (needs an LLM context buffer: design
-      decision). The AI-acceptance and autocompletion delay rows stay Windows/macOS only; Linux has
+      words rows, model delete (`http_client.delete_owned`, `model_delete.lua`), warmup (`warmup.lua`, explicit
+      lifecycle). Left: reset on navigation (Linux has no LLM context buffer apart from the hotstring word
+      buffer, which already resets on navigation: decision pending). The AI-acceptance and autocompletion delay rows stay Windows/macOS only; Linux has
       `llm.trigger.debounce_ms` as its only AI delay, like the others. AI off disarms the automatic agent
       mode and the `llm_*` chords, tap keys and gestures (7735e6b, 47ca337).
-- [ ] **PAR-22. LLM telemetry on Linux.** [CODE] Done: generation, suggested, dismissed, accepted rows in
-      `events_llm` and Ollama token counts (928aeffd43). Left: remote-provider tokens and cost (port the
-      macOS response classifier and `model_prices`).
+- [x] **PAR-22. LLM telemetry on Linux.** [CODE] Done: generation, suggested, dismissed, accepted rows in
+      `events_llm`, Ollama token counts (928aeffd43), remote-provider tokens and cost through the shared
+      `remote_response_classifier.lua` and `remote_usage_vectors.json`. Left: check the dashboard cost with a
+      real provider.
 - [ ] **PAR-30. Sign the Windows and Linux update assets.** [CODE] [CI] Done: ECDSA P-256 detached signatures
       over a record of asset name, size and SHA-256, signer and reference verifier
       (`tools/build/update-asset-signature.cjs`), Linux verifies with OpenSSL, Windows with CNG, shared
