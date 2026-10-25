@@ -23,6 +23,8 @@ package.loaded['modules.llm.profiles'] = {
 package.loaded['modules.llm.profile_settings'] = {
 	get = function(key) if key == 'num_predictions' then return 1 end end,
 	resolve = function() return {id = 'raw', system_single = '{context}'} end,
+	-- No application is mapped to a profile: the engine falls back to the menu's.
+	resolve_for_app = function() return nil end,
 }
 local engine = require('modules.llm.prediction_engine')
 local applied, resets, accepted, timeout = 0, 0, false, false
