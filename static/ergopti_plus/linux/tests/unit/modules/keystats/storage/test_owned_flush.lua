@@ -1029,3 +1029,13 @@ helpers.describe("owned reset admission and shutdown", function()
 		end)
 	end)
 end)
+
+helpers.describe("native sampled reset acknowledgement", function()
+	it("reset-sampled-native-ack: consumes the exact committed reset source once", function()
+		local quote = require("text_utils").shell_quote
+		local root = helpers.driver_root()
+		local fixture = root .. "/tests/hardware/run_keystats_reset_ack.lua"
+		local status = os.execute("env -u LUA_PATH -u LUA_CPATH luajit " .. quote(fixture) .. " " .. quote(root))
+		helpers.assert_true(status == true or status == 0, "actual sampled reset must finish once after COMMIT and cleanup")
+	end)
+end)

@@ -2331,6 +2331,8 @@ function M.pump_flush()
 	if settled == true then
 		local result = state.operation.result
 		if type(result) == "table" and result.committed == true then
+			-- The reset owner observes this exact source after native cleanup ACK.
+			state.committed = true
 			local marks = state.snapshot.watermarks
 			_flushed_app_totals, _flushed_app_titles, _flushed_app_holds = marks.totals, marks.titles, marks.holds
 			_flushed_app_ngrams, _flushed_app_scancodes, _flushed_app_sources = marks.ngrams, marks.scancodes, marks.sources
