@@ -216,8 +216,34 @@ function M.bind(database, device_id, loader)
 	assert(type(device_id) == "string" and device_id ~= "", "system metrics need a device identity")
 	assert(type(loader) == "function", "system metrics need a checked day loader")
 	if database ~= _owner_database or device_id ~= _owner_device then
-		_day, _days = nil, {}
-		_last = new_last()
+		if _owner_database == nil and next(_days) ~= nil then
+			-- Samples accepted while SQLite was unavailable are deltas, not a
+			-- replacement baseline. Admit every date before publishing any merge.
+			local merged = {}
+			for date, captured in pairs(_days) do
+				local ok, persisted, accepted = pcall(loader, date)
+				if not ok or accepted ~= true then
+					Logger.error(LOG, "Cannot bind sampled system history: baseline read refused for %s.", date)
+					error("System baseline refused before initial binding", 2)
+				end
+				local value = TableUtil.deep_copy(persisted or new_day(date))
+				for field, count in pairs(captured) do
+					if type(count) == "number" then
+						if field == "battery_min" then
+							value[field] = value[field] and math.min(value[field], count) or count
+						elseif field == "battery_max" then
+							value[field] = value[field] and math.max(value[field], count) or count
+						else value[field] = (value[field] or 0) + count end
+					end
+				end
+				merged[date] = value
+			end
+			local current_date = _day and _day.date
+			_days, _day = merged, current_date and merged[current_date] or nil
+		else
+			_day, _days = nil, {}
+			_last = new_last()
+		end
 	end
 	_owner_database, _owner_device, _load_day = database, device_id, loader
 end

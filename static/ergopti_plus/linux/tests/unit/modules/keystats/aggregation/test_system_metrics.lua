@@ -374,6 +374,45 @@ helpers.describe("system metrics: owned restart hydration", function()
 		}
 	end
 
+	helpers.it("unbound-recovery: merges first binding without losing clocks or queued transitions", function()
+		local network = "first"
+		with_shell({ { match = "power_supply", out = "50" }, { match = "nmcli", out = function() return network end } },
+			function(metrics, sample, set_clock)
+				local base = os.time({ year = 2026, month = 10, day = 5, hour = 23, min = 59, sec = 45 })
+				set_clock(function(now, date)
+					return { wall_ms = base * 1000 + now, mono_ms = now, date = date,
+						ts = os.date("!%Y-%m-%d %H:%M:%S", base + now / 1000) }
+				end)
+				sample(0, "2026-10-05")
+				network = "second"
+				sample(30000, "2026-10-06")
+				local pending = metrics.snapshot()
+				local attempts = 0
+				local called = pcall(metrics.bind, "recovered", "device", function(date)
+					attempts = attempts + 1
+					return persisted(date, 4000), attempts ~= 2
+				end)
+				helpers.assert_eq(called, false, "partial date admission must fail explicitly")
+				helpers.assert_eq(metrics.snapshot().values, pending.values, "a later refusal cannot mutate earlier retained dates")
+				local loads = 0
+				local function load(date) loads = loads + 1; return persisted(date, 4000), true end
+				metrics.bind("recovered", "device", load)
+				helpers.assert_eq(metrics.current().awake_ms, 19000, "current day must point at its merged owner")
+				helpers.assert_eq(metrics.snapshot().values["2026-10-05"].awake_ms, 19000)
+				helpers.assert_eq(metrics.current().battery_sum, 200)
+				helpers.assert_eq(metrics.current().battery_count, 3)
+				helpers.assert_eq(metrics.current().battery_min, 50)
+				helpers.assert_eq(metrics.current().battery_max, 80)
+				helpers.assert_eq(sample(60000, "2026-10-06").awake_ms, 49000, "binding must preserve the previous elapsed-time cursor")
+				helpers.assert_eq(#metrics.take_events(), 1, "binding must preserve already-captured transitions")
+				metrics.bind("recovered", "device", load)
+				helpers.assert_eq(metrics.current().awake_ms, 49000)
+				helpers.assert_eq(loads, 2, "same-owner binding must not merge the baseline twice")
+				metrics._reset()
+				helpers.assert_eq(metrics.snapshot().values, {}, "explicit reset must still purge all source")
+			end)
+	end)
+
 	helpers.it("hydrates the owned cumulative row before its first sample", function()
 		with_shell({}, function(metrics, sample)
 			metrics.bind("owned-a", "device-a", function(date) return persisted(date, 4000), true end)

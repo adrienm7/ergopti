@@ -18,6 +18,14 @@ local HAS_SQLITE = (function()
 end)()
 
 helpers.describe("sqlite_writer: bootstrapping a new database", function()
+	helpers.it("system-unbound-native-recovery: retains actual samples across first successful database binding", function()
+		local quote = require("text_utils").shell_quote
+		local root = helpers.driver_root()
+		local fixture = root .. "/tests/hardware/run_system_bind_recovery.lua"
+		local status = os.execute("env -u LUA_PATH -u LUA_CPATH luajit " .. quote(fixture) .. " " .. quote(root))
+		helpers.assert_true(status == true or status == 0, "same-path native recovery must preserve captured system history")
+	end)
+
 
 	helpers.it("refuses special native startup sources without blocking (sqlite-native-file-admission)", function()
 		local fixture = helpers.driver_root() .. "/tests/hardware/test_sqlite_file_admission.py"
