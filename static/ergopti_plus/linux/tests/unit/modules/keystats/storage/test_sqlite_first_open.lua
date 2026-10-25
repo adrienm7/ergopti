@@ -19,6 +19,50 @@ end)()
 
 helpers.describe("sqlite_writer: bootstrapping a new database", function()
 
+	helpers.it("refuses special native startup sources without blocking (sqlite-native-file-admission)", function()
+		local fixture = helpers.driver_root() .. "/tests/hardware/test_sqlite_file_admission.py"
+		local status = os.execute("python3 " .. require("text_utils").shell_quote(fixture))
+		helpers.assert_true(status == 0 or status == true, "Native SQLite file admission must refuse without hanging")
+	end)
+
+	for _, fault in ipairs({ "seek", "close" }) do
+		helpers.it("refuses an unacknowledged database probe " .. fault .. " (sqlite-native-file-admission)", function()
+			local writer = helpers.load_module("modules.keystats.sqlite_writer")
+			local reader = require("infra.regular_file_reader")
+			local original = reader.open
+			local path = os.tmpname()
+			local seeks, closes = 0, 0
+			reader.open = function(candidate)
+				if candidate ~= path then return original(candidate) end
+				return {
+					seek = function()
+						seeks = seeks + 1
+						if fault == "seek" then return nil, "seek refused" end
+						return 0
+					end,
+					close = function()
+						closes = closes + 1
+						if fault == "close" then return nil, "close refused" end
+						return true
+					end,
+				}
+			end
+			local ok, failure = xpcall(function()
+				helpers.assert_eq(writer.open_db(path), false, "a failed probe must not authorize bootstrap")
+				helpers.assert_eq(seeks, 1)
+				helpers.assert_eq(closes, 1, "a failed seek must still close its exact stream")
+				helpers.assert_nil(writer.get_db_path())
+				helpers.assert_eq(writer.is_available(), false)
+				reader.open = original
+				helpers.assert_true(writer.open_db(path), "the same empty file must admit a healthy retry")
+			end, debug.traceback)
+			reader.open = original
+			writer.close_db()
+			os.remove(path)
+			if not ok then error(failure, 0) end
+		end)
+	end
+
 	helpers.it("opens a fresh database and creates the schema", function()
 		local writer = helpers.load_module("modules.keystats.sqlite_writer")
 		local dir = os.tmpname()
