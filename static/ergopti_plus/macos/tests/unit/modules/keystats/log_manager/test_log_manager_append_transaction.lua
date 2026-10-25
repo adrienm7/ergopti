@@ -17,6 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ByteCursor = require("tests.support.keystats.byte_stream_cursor")
 
 local MUTATED_PACKAGE_SLOTS = {
 	"adapters.file_system", "adapters.timer_scheduler",
@@ -113,11 +114,13 @@ local function load_rotation_fixture(options)
 			closed_handles = closed_handles + 1
 			return true
 		end
-		return handle
+		return ByteCursor.attach(handle, function() return written_bytes end)
 	end
 
 	local hs_stub = _G.hs or require("tests.stubs.hs")
-	package.loaded["hs.json"] = hs_stub.json
+	for _, name in ipairs({ "fs", "json", "sqlite3", "timer" }) do
+		package.loaded["hs." .. name] = hs_stub[name]
+	end
 	local rotation = require("modules.keystats.rotation")
 
 	return {

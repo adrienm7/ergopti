@@ -16,6 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ByteCursor = require("tests.support.keystats.byte_stream_cursor")
 
 
 
@@ -315,9 +316,10 @@ local function with_rollover_owner(callback)
 			local r = helpers.load_with_stubs("modules.keystats.rotation")
 			io.open = function(path, mode)
 				helpers.assert_eq(path, "/tmp/today.log")
-				helpers.assert_eq(mode, "a", "pending reads must return before opening the journal")
+				helpers.assert_eq(mode, "a+", "pending reads must return before opening the journal")
 				controls.opens = controls.opens + 1
 				local handle = {}
+				local bytes = ""
 				handle.setvbuf = function(self, buffering)
 					helpers.assert_true(rawequal(self, handle))
 					helpers.assert_eq(buffering, "no")
@@ -327,6 +329,7 @@ local function with_rollover_owner(callback)
 					helpers.assert_true(rawequal(self, handle))
 					helpers.assert_eq(type(content), "string")
 					controls.writes = controls.writes + 1
+					bytes = bytes .. content
 					return handle
 				end
 				handle.close = function(self)
@@ -334,7 +337,7 @@ local function with_rollover_owner(callback)
 					controls.closes = controls.closes + 1
 					return true
 				end
-				return handle
+				return ByteCursor.attach(handle, function() return bytes end)
 			end
 			os.date = function(format, ...)
 				if format == "%Y-%m-%d" then return controls.date end

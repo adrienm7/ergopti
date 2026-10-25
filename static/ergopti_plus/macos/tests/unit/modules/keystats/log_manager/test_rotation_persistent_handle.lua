@@ -18,18 +18,23 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ByteCursor = require("tests.support.keystats.byte_stream_cursor")
 
 local TODAY   = "/tmp/ergopti_rotation_persistent_today.log"
 local DATASQL = "/tmp/ergopti_rotation_persistent_data.sql"
 
 --- A no-op file handle so the spy touches no real disk.
-local function fake_handle(on_close)
+local function fake_handle(on_close, on_inspect)
 	local handle = {}
+	local bytes = ""
 	function handle:setvbuf(mode) return mode == "no" end
-	function handle:write() return self end
+	function handle:write(text) bytes = bytes .. text; return self end
 	function handle:close() on_close(); return true end
-	function handle:read() return nil end
 	function handle:lines() return function() return nil end end
+	ByteCursor.attach(handle, function() return bytes end)
+	local read, seek = handle.read, handle.seek
+	function handle:read(...) on_inspect("read"); return read(self, ...) end
+	function handle:seek(...) on_inspect("seek"); return seek(self, ...) end
 	return handle
 end
 
@@ -43,6 +48,7 @@ helpers.describe("rotation — persistent today.log handle (no per-append open/c
 		}, function()
 			local real_open, real_remove, real_date = io.open, os.remove, os.date
 			local today_opens, today_closes, owner_calls, reset_calls, removes = 0, 0, 0, 0, 0
+			local inspections = { read = 0, seek = 0 }
 			local function reset(next_date)
 				helpers.assert_eq(next_date, "2024-06-02", "reset must acknowledge the captured rollover date")
 				reset_calls = reset_calls + 1
@@ -78,9 +84,10 @@ helpers.describe("rotation — persistent today.log handle (no per-append open/c
 				-- Every native path is virtual and remains inside this fixture.
 				io.open = function(path, mode)
 					helpers.assert_eq(path, TODAY, "only the owned today.log append stream may open")
-					helpers.assert_eq(mode, "a", "the persistent stream must use native append mode")
+					helpers.assert_eq(mode, "a+", "the persistent stream must use native append/update mode")
 					today_opens = today_opens + 1
-					return fake_handle(function() today_closes = today_closes + 1 end)
+					return fake_handle(function() today_closes = today_closes + 1 end,
+						function(operation) inspections[operation] = inspections[operation] + 1 end)
 				end
 				os.remove = function(path)
 					helpers.assert_eq(path, TODAY, "only the consumed virtual journal may retire")
@@ -93,6 +100,7 @@ helpers.describe("rotation — persistent today.log handle (no per-append open/c
 				end
 
 				r.init({ paths = { today_log_path = TODAY }, state = {}, today_log_date = "2024-06-01" })
+				local initial_reads, initial_seeks = inspections.read, inspections.seek
 
 				-- N appends must NOT reopen the file — the init handle is reused.
 				local N = 25
@@ -101,6 +109,8 @@ helpers.describe("rotation — persistent today.log handle (no per-append open/c
 						"every hot-path append must report literal true while reusing the single stream")
 				end
 				opens_after_appends = today_opens
+				helpers.assert_eq(inspections.read, initial_reads, "ordinary appends must not inspect the journal again")
+				helpers.assert_eq(inspections.seek, initial_seeks, "ordinary appends must not repeat startup position queries")
 
 				-- Reopen only after the durable owner and reset both acknowledge.
 				helpers.assert_eq(r.rollover(DATASQL, r.READ_STATUS_EOF, reset, origin), true,
