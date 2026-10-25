@@ -120,18 +120,31 @@ class SystemControl {
 		RegWrite(Value, "REG_DWORD", Key, Name)
 	}
 
+	; The capture endpoint CaptureMuted read, held until SetCaptureMuted writes
+	; it: the default device can change between the two calls, and a toggle
+	; that reads one microphone and writes another would mute the wrong one.
+	_Capture := 0
+
+	; Reads the default microphone's mute flag and pins that endpoint for the
+	; SetCaptureMuted call that follows.
 	; @returns {Boolean} Whether the default microphone is muted.
 	; @throws {Error} When no capture device is present.
 	CaptureMuted() {
 		Muted := 0
-		ComCall(15, this._CaptureVolume(), "Int*", &Muted)
+		this._Capture := 0
+		Volume := this._CaptureVolume()
+		ComCall(15, Volume, "Int*", &Muted)
+		this._Capture := Volume
 		return Muted != 0
 	}
 
-	; Mutes or unmutes the default microphone.
+	; Mutes or unmutes the microphone CaptureMuted read, or the current default
+	; when none was read first. The pinned endpoint is released either way.
 	; @throws {Error} When no capture device is present.
 	SetCaptureMuted(Muted) {
-		ComCall(14, this._CaptureVolume(), "Int", Muted ? 1 : 0, "Ptr", 0)
+		Volume := this._Capture ? this._Capture : this._CaptureVolume()
+		this._Capture := 0
+		ComCall(14, Volume, "Int", Muted ? 1 : 0, "Ptr", 0)
 	}
 
 	; The IAudioEndpointVolume of the default capture endpoint.
@@ -140,9 +153,9 @@ class SystemControl {
 		static CLSID_MMDeviceEnumerator := "{BCDE0395-E52F-467C-8E3D-C4579291692E}"
 		static IID_IMMDeviceEnumerator := "{A95664D2-9614-4F35-A746-DE8DB63617E6}"
 		static IID_IAudioEndpointVolume := "{5CDF2C82-841E-4546-9722-0CF74078229A}"
-		Enumerator := ComObject(CLSID_MMDeviceEnumerator, IID_IMMDeviceEnumerator)
+		DeviceEnumerator := ComObject(CLSID_MMDeviceEnumerator, IID_IMMDeviceEnumerator)
 		DevicePtr := 0
-		ComCall(4, Enumerator, "Int", SYSTEM_CONTROL_E_CAPTURE, "Int", SYSTEM_CONTROL_E_CONSOLE, "Ptr*", &DevicePtr)
+		ComCall(4, DeviceEnumerator, "Int", SYSTEM_CONTROL_E_CAPTURE, "Int", SYSTEM_CONTROL_E_CONSOLE, "Ptr*", &DevicePtr)
 		Device := ComValue(13, DevicePtr)
 		Iid := Buffer(16)
 		DllCall("ole32\CLSIDFromString", "Str", IID_IAudioEndpointVolume, "Ptr", Iid, "HRESULT")
