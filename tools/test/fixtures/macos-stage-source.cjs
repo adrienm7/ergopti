@@ -12,6 +12,7 @@ const stage = Object.freeze({
 	'managed-ollama-native': 'e2e-hs',
 	'managed-ollama-build': 'e2e-hs',
 	'item36-native': 'e2e-hs',
+	'launcher-native': 'e2e-hs',
 	'lease-silence-native': 'e2e-hs',
 	'package-macos': 'package-macos',
 	launch: 'launch',

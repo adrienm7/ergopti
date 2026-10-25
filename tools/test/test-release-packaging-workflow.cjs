@@ -1097,10 +1097,12 @@ if (macosSmokeStep !== null) {
 }
 
 // NATIVE_SPARKLE_FIXTURE_BEGIN
+// The launcher cell of E2E installs the keyless tool its archive fixture signs with.
+const NATIVE_SPARKLE_TOOL = 'Install the Sparkle tool for the native archive fixture';
 /** The real keyless CI tool owner must be available before native XCTest. */
 function nativeSparkleFixtureProblems(steps, fixture) {
 	const problems = [];
-	const install = steps.filter((step) => step.name === 'Install Sparkle signing tool');
+	const install = steps.filter((step) => step.name === NATIVE_SPARKLE_TOOL);
 	const tests = steps.filter((step) => step.name === 'Run Swift launcher tests on macOS 26');
 	if (
 		install.length !== 1 ||
@@ -1110,7 +1112,7 @@ function nativeSparkleFixtureProblems(steps, fixture) {
 		problems.push('The native Sparkle fixture needs exactly one installer before XCTest.');
 	if (install.length === 1) {
 		if (
-			pipeline.stepField(install[0].body, 'if') !== Mac.condition('package-macos') ||
+			pipeline.stepField(install[0].body, 'if') !== Mac.condition('launcher-native') ||
 			pipeline.stepField(install[0].body, 'continue-on-error') !== null
 		)
 			problems.push(
@@ -1160,7 +1162,13 @@ const nativeSparkleFixturePath = path.join(
 	'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ReleaseArchiveStagingTests.swift'
 );
 const nativeSparkleFixture = fs.readFileSync(nativeSparkleFixturePath, 'utf8');
-const nativeSparkleSteps = pipeline.steps(pipeline.job(PACKAGE_JOB[MACOS_BOX]));
+const nativeSparkleSteps = pipeline
+	.steps(pipeline.job('e2e-hs'))
+	.filter((step) =>
+		(pipeline.stepField(step.body, 'if') ?? '').includes(
+			"env.MACOS_STAGE_ROLE == 'launcher-native'"
+		)
+	);
 errors.push(...nativeSparkleFixtureProblems(nativeSparkleSteps, nativeSparkleFixture));
 // Portable controls prove the actual CI prerequisite and control guards only;
 // actual Sparkle cryptography and child retirement remain macOS XCTest work.
@@ -1169,7 +1177,7 @@ const nativeSparkleControls = [
 	[
 		'release-only installer',
 		nativeSparkleSteps.map((step) =>
-			step.name === 'Install Sparkle signing tool'
+			step.name === NATIVE_SPARKLE_TOOL
 				? {
 						...step,
 						body: step.body.replace(/^ {8}if:.*\n/gm, '') + '\n        if: inputs.release\n'
@@ -1181,15 +1189,15 @@ const nativeSparkleControls = [
 	],
 	[
 		'missing installer',
-		nativeSparkleSteps.filter((step) => step.name !== 'Install Sparkle signing tool'),
+		nativeSparkleSteps.filter((step) => step.name !== NATIVE_SPARKLE_TOOL),
 		nativeSparkleFixture,
 		true
 	],
 	[
 		'late installer',
 		[
-			...nativeSparkleSteps.filter((step) => step.name !== 'Install Sparkle signing tool'),
-			...nativeSparkleSteps.filter((step) => step.name === 'Install Sparkle signing tool')
+			...nativeSparkleSteps.filter((step) => step.name !== NATIVE_SPARKLE_TOOL),
+			...nativeSparkleSteps.filter((step) => step.name === NATIVE_SPARKLE_TOOL)
 		],
 		nativeSparkleFixture,
 		true
@@ -1198,7 +1206,7 @@ const nativeSparkleControls = [
 		'duplicate installer',
 		[
 			...nativeSparkleSteps,
-			...nativeSparkleSteps.filter((step) => step.name === 'Install Sparkle signing tool')
+			...nativeSparkleSteps.filter((step) => step.name === NATIVE_SPARKLE_TOOL)
 		],
 		nativeSparkleFixture,
 		true
@@ -1261,7 +1269,6 @@ for (const [name, steps, fixture, refuses] of nativeSparkleControls) {
 // stops the whole release after every box has run.
 const MACOS_ORDER = [
 	'Install Sparkle signing tool',
-	'Run Swift launcher tests on macOS 26',
 	'Build ErgoptiPlus.app',
 	'Record signed CI archive source',
 	'Smoke test built ErgoptiPlus.app (crash-on-launch guard)',
@@ -1298,7 +1305,7 @@ if (
 const MACOS_RELEASE_CONDITIONS = [
 	['Smoke test built ErgoptiPlus.app (crash-on-launch guard)', 'inputs.release'],
 	['Retain packaged application startup evidence', 'always() && inputs.release'],
-	['Install Sparkle signing tool', null],
+	['Install Sparkle signing tool', 'inputs.release'],
 	['Sign declared archives with Sparkle EdDSA key', 'inputs.release'],
 	['Generate Sparkle appcast', 'inputs.release'],
 	['Package latest keylayout bundle', 'inputs.release']

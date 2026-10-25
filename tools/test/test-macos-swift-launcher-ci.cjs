@@ -21,19 +21,19 @@
  * The workflow needs an independent verdict and tests need explicit termination.
  * Since the pipeline became one reusable workflow per OS, the macOS lane's own
  * result replaces that aggregate job: it fails as soon as any of its jobs fails,
- * and Release runs only when every lane succeeded. The launcher build and its
- * XCTest then moved into the package job, before the app build, so the lane
- * uses one macOS runner before its launch legs; the tests append to the real
+ * and Release runs only when every lane succeeded. The launcher XCTest on
+ * macOS 26 then moved out of the package job into its own E2E cell on the
+ * build host (role launcher-native), so Build only builds, packages and signs
+ * and packages nothing until it passed. The tests append to the real
  * ~/Library/Logs/ergopti_plus/launcher.log, which the release smoke refuses to
- * launch over, and the app that ships must not build in their cached tree.
+ * launch over: on a runner of their own that log never reaches the build host.
  *
  * FEATURES & RATIONALE:
- * 1. Requires release compilation and XCTest execution on `macos-*`, in the
- *    package job after the Hammerspoon suites and before the app build; an
- *    Ubuntu source grep cannot substitute for Darwin process and signal
- *    semantics. The launcher log the tests leave is removed before the app is
- *    built, and the tests build in a scratch path of their own, the only
- *    SwiftPM tree the cache restores.
+ * 1. Requires release compilation in the package job and XCTest execution on
+ *    `macos-*` in the launcher cell of E2E, before Build; an Ubuntu source grep
+ *    cannot substitute for Darwin process and signal semantics. The package
+ *    job runs no XCTest, and both build in a scratch path of their own, the
+ *    only SwiftPM tree the cache restores.
  * 2. Requires every job of an OS lane to gate its lane: only exact pinned
  *    verdict/diagnostic conditions and no `continue-on-error`, the release
  *    job waiting on the three lanes through its implicit `success()` (no status
@@ -121,21 +121,56 @@ check(
 	PIPELINE.length > 10000,
 	'the CI pipeline is missing or truncated; refusing to inspect an empty workflow'
 );
-// locate() throws unless exactly one `package-macos` job exists.
+// locate() throws unless exactly one job of each name exists.
 check(
 	pipeline.locate('package-macos').file === MACOS_BOX,
-	`the \`package-macos\` job, which builds and tests the launcher, must live in the macOS lane, ${MACOS_BOX}`
+	`the \`package-macos\` job, which builds the launcher, must live in the macOS lane, ${MACOS_BOX}`
+);
+check(
+	pipeline.locate('e2e-hs').file === MACOS_BOX,
+	`the E2E job, whose launcher cell runs the XCTest, must live in the macOS lane, ${MACOS_BOX}`
 );
 check(
 	!/^ {2}test-swift-launcher:/m.test(pipeline.file(MACOS_BOX)),
-	'the launcher build and XCTest live in package-macos; a second macOS job for them would add a second lane entry'
+	'the launcher XCTest is a cell of the E2E matrix; a separate macOS job for it would add a second lane entry'
 );
 
 const swiftJob = withoutFullLineComments(pipeline.job('package-macos'));
 check(swiftJob.length > 100, '`package-macos` is absent or empty');
 check(
 	/^\s+runs-on:\s*macos-[A-Za-z0-9._-]+\s*$/m.test(swiftJob),
-	'`package-macos` must run the launcher build and XCTest on a real macOS runner'
+	'`package-macos` must build the launcher on a real macOS runner'
+);
+// The launcher cell is one E2E cell on the build host: the same macOS 26.
+const LAUNCHER_CELLS = macPlans
+	.plan('e2e', {
+		source_sha: 'a'.repeat(40),
+		run_id: '1',
+		event_name: 'push',
+		release: false,
+		scenarios: ['clean']
+	})
+	.filter((cell) => cell.role === 'launcher-native');
+check(
+	LAUNCHER_CELLS.length === 1 &&
+		/^macos-/.test(LAUNCHER_CELLS[0].runner) &&
+		LAUNCHER_CELLS[0].runner ===
+			macPlans.plan('build', {
+				source_sha: 'a'.repeat(40),
+				run_id: '1',
+				event_name: 'push',
+				release: false,
+				scenarios: ['clean']
+			})[0].runner,
+	'the launcher XCTest must run in exactly one E2E cell, on the real macOS host Build uses'
+);
+const launcherJob = withoutFullLineComments(
+	macRole.body(pipeline.file(MACOS_BOX), 'launcher-native')
+);
+const launcherStepNames = pipeline.steps(launcherJob).map((candidate) => candidate.name);
+check(
+	!/\bswift test\b/.test(swiftJob),
+	'the package job builds, packages and signs; the launcher XCTest belongs to its E2E cell'
 );
 check(
 	!/^\s+continue-on-error:\s*true\s*$/m.test(swiftJob),
@@ -149,13 +184,12 @@ check(
 	`package-macos must need exactly the E2E suite it admits, got [${pipeline.needsOf(pipeline.job('package-macos')).join(', ')}]`
 );
 
-// The launcher build and XCTest precede the app build. LauncherLogTests append
-// to the real ~/Library/Logs/ergopti_plus/launcher.log, and the release smoke
-// refuses a launcher log it did not start fresh, so the log goes in between.
+// The launcher build precedes the app build, which precedes its smoke test.
+// LauncherLogTests append to the real ~/Library/Logs/ergopti_plus/launcher.log,
+// and the release smoke refuses a launcher log it did not start fresh: the
+// tests run on the launcher cell's own runner, so the build host never has one.
 const PACKAGE_ORDER = [
 	'Build release launcher',
-	'Run Swift launcher tests on macOS 26',
-	'Remove the launcher log the Swift tests wrote',
 	'Build ErgoptiPlus.app',
 	'Smoke test built ErgoptiPlus.app (crash-on-launch guard)'
 ];
@@ -167,49 +201,47 @@ check(
 	!packageOrder.some((at, index) => at < 0 || (index > 0 && at <= packageOrder[index - 1])),
 	`package-macos must run ${PACKAGE_ORDER.join(' < ')}; got: ${packageStepNames.join(' | ')}`
 );
-const logCleanup = pipeline.step(
-	pipeline.job('package-macos'),
-	'Remove the launcher log the Swift tests wrote'
-);
 check(
-	pipeline.stepField(logCleanup, 'run') === 'rm -rf -- "$HOME/Library/Logs/ergopti_plus"' &&
-		pipeline.stepField(logCleanup, 'if') === macRole.condition('package-macos'),
-	'package-macos must always remove ~/Library/Logs/ergopti_plus, the log the launcher tests write, before the app build'
+	!/Library\/Logs\/ergopti_plus/.test(swiftJob) &&
+		/Library\/Logs\/ergopti_plus|LauncherLog/.test(readSwiftTree(path.join(SWIFT_ROOT, 'Tests'))),
+	'no package step may touch the launcher log; the launcher cell writes it on a runner of its own'
 );
 check(
 	/if launcher_log\.exists\(\):\s*\n\s*raise RuntimeError\("Release launch requires a fresh launcher log"\)/.test(
 		fs.readFileSync(path.join(ROOT, 'tools', 'diagnostics', 'macos-release-launch.py'), 'utf8')
 	),
-	'the release smoke no longer refuses a stale launcher log; re-derive why package-macos removes it'
+	'the release smoke no longer refuses a stale launcher log; re-derive why the launcher XCTest leaves the build host'
 );
 
 // The tests build in a scratch path of their own, the only SwiftPM tree the
 // cache restores, so the app build resolves its dependencies into a clean
 // .build as it did on a runner of its own: no cached tree reaches a shipped app.
 const SWIFT_SCRATCH = '--scratch-path "$RUNNER_TEMP/swift-launcher-ci"';
-const swiftCache = pipeline.step(pipeline.job('package-macos'), 'Cache SwiftPM dependencies');
-const cacheLines = swiftCache.split('\n');
-const pathAt = cacheLines.indexOf('          path: |');
-const pathEnd = cacheLines.findIndex((line, index) => index > pathAt && !/^ {12}\S/.test(line));
-const cachedPaths =
-	pathAt < 0
-		? []
-		: cacheLines.slice(pathAt + 1, pathEnd < 0 ? undefined : pathEnd).map((line) => line.trim());
-check(
-	cachedPaths.length === 3 &&
-		cachedPaths.every((line) =>
-			/^\$\{\{ runner\.temp \}\}\/swift-launcher-ci\/(?:artifacts|checkouts|repositories)$/.test(
-				line
-			)
-		),
-	`the SwiftPM cache must restore only the launcher tests' scratch path, got: ${cachedPaths.join(', ')}`
-);
+for (const owner of [pipeline.job('package-macos'), launcherJob]) {
+	const swiftCache = pipeline.step(owner, 'Cache SwiftPM dependencies');
+	const cacheLines = swiftCache.split('\n');
+	const pathAt = cacheLines.indexOf('          path: |');
+	const pathEnd = cacheLines.findIndex((line, index) => index > pathAt && !/^ {12}\S/.test(line));
+	const cachedPaths =
+		pathAt < 0
+			? []
+			: cacheLines.slice(pathAt + 1, pathEnd < 0 ? undefined : pathEnd).map((line) => line.trim());
+	check(
+		cachedPaths.length === 3 &&
+			cachedPaths.every((line) =>
+				/^\$\{\{ runner\.temp \}\}\/swift-launcher-ci\/(?:artifacts|checkouts|repositories)$/.test(
+					line
+				)
+			),
+		`the SwiftPM cache must restore only the launcher scratch path, got: ${cachedPaths.join(', ')}`
+	);
+}
 
 const plistLintLine =
-	swiftJob.split(/\r?\n/).find((line) => /\brun:\s*plutil\s+-lint\b/.test(line)) || '';
+	launcherJob.split(/\r?\n/).find((line) => /\brun:\s*plutil\s+-lint\b/.test(line)) || '';
 check(
 	plistLintLine.includes('static/ergopti_plus/macos/launcher/com.ergoptiplus.remap-guardian.plist'),
-	'the macOS job must plutil-lint the exact bundled guardian LaunchAgent'
+	'the launcher cell must plutil-lint the exact bundled guardian LaunchAgent'
 );
 check(
 	!plistLintLine.includes('|| true'),
@@ -295,7 +327,7 @@ check(
 	'a preceding independent native build must not replace the exact package launcher build'
 );
 
-const testStep = pipeline.step(swiftJob, 'Run Swift launcher tests on macOS 26');
+const testStep = pipeline.step(launcherJob, 'Run Swift launcher tests on macOS 26');
 check(
 	testStep.length > 100,
 	'`Run Swift launcher tests on macOS 26` is absent or too small to enforce a trustworthy XCTest verdict'
@@ -344,14 +376,14 @@ check(
 	'(macos-xctest-summary-required-2026-08-27) a missing XCTest summary must fail the job explicitly'
 );
 const nodeSetup = pipeline.step(
-	swiftJob,
+	launcherJob,
 	'Prepare Node for native policy fixtures and XCTest evidence'
 );
 check(
 	/uses:\s*actions\/setup-node@v4/.test(nodeSetup) &&
 		/node-version-file:\s*'\.node-version'/.test(nodeSetup) &&
-		packageStepNames.indexOf('Prepare Node for native policy fixtures and XCTest evidence') <
-			packageStepNames.indexOf('Run Swift launcher tests on macOS 26'),
+		launcherStepNames.indexOf('Prepare Node for native policy fixtures and XCTest evidence') <
+			launcherStepNames.indexOf('Run Swift launcher tests on macOS 26'),
 	'native generated-policy probes and XCTest evidence require the repository-owned Node version before XCTest'
 );
 check(
@@ -383,32 +415,32 @@ check(
 	'the XCTest evidence owner receives both real pipeline statuses before errexit, and retains the transcript on failure'
 );
 const ownedPolicyStep = pipeline.step(
-	swiftJob,
+	launcherJob,
 	'Run owned program XCTest notice constructed-policy controls'
 );
 check(
 	pipeline.stepField(ownedPolicyStep, 'run') ===
 		'node tools/test/test-owned-program-xctest-notice.cjs' &&
-		pipeline.stepField(ownedPolicyStep, 'if') === macRole.condition('package-macos') &&
+		pipeline.stepField(ownedPolicyStep, 'if') === macRole.condition('launcher-native') &&
 		pipeline.stepField(ownedPolicyStep, 'continue-on-error') === null &&
-		packageStepNames.indexOf('Run owned program XCTest notice constructed-policy controls') >
-			packageStepNames.indexOf('Prepare Node for native policy fixtures and XCTest evidence') &&
-		packageStepNames.indexOf('Run owned program XCTest notice constructed-policy controls') <
-			packageStepNames.indexOf('Run Swift launcher tests on macOS 26'),
+		launcherStepNames.indexOf('Run owned program XCTest notice constructed-policy controls') >
+			launcherStepNames.indexOf('Prepare Node for native policy fixtures and XCTest evidence') &&
+		launcherStepNames.indexOf('Run owned program XCTest notice constructed-policy controls') <
+			launcherStepNames.indexOf('Run Swift launcher tests on macOS 26'),
 	'the independently authored owned-program policy corpus runs unconditionally before native XCTest'
 );
-const transcriptUpload = pipeline.step(swiftJob, 'Upload Swift launcher failure transcript');
+const transcriptUpload = pipeline.step(launcherJob, 'Upload Swift launcher failure transcript');
 check(
 	/uses:\s*actions\/upload-artifact@v4/.test(transcriptUpload) &&
 		pipeline.stepField(transcriptUpload, 'if') ===
 			macRole.condition(
-				'package-macos',
+				'launcher-native',
 				"${{ failure() && steps.swift-launcher-tests.outcome == 'failure' }}"
 			) &&
 		/path:\s*\$\{\{ runner\.temp \}\}\/swift-launcher-evidence/.test(transcriptUpload) &&
 		/if-no-files-found:\s*error/.test(transcriptUpload) &&
-		packageStepNames.indexOf('Upload Swift launcher failure transcript') >
-			packageStepNames.indexOf('Run Swift launcher tests on macOS 26'),
+		launcherStepNames.indexOf('Upload Swift launcher failure transcript') >
+			launcherStepNames.indexOf('Run Swift launcher tests on macOS 26'),
 	'a failed native XCTest step must upload the retained transcript and exact verdict'
 );
 check(

@@ -71,8 +71,9 @@ function validateContext(value) {
 /**
  * The one owner of each cell host: its runner label and, on macOS, the
  * version every job, lot and step name states. The Swift launcher classes
- * run on macOS 15 in E2E and again on macOS 26 in Build; that repetition is
- * deliberate cross-version coverage, not duplicated work to remove.
+ * run on macOS 15 in the Managed Ollama cells and again on macOS 26 in the
+ * launcher-native cell; that repetition is deliberate cross-version coverage,
+ * not duplicated work to remove.
  */
 const HOSTS = Object.freeze({
 	stubbed: Object.freeze({ runner: 'ubuntu-latest', macos: null }),
@@ -166,6 +167,9 @@ function plan(stage, context) {
 	// The Intel managed-ollama-native role runs as two cells: its XCTest cohorts
 	// ("xctest") beside the runtime receiving ("runtime"), which waits for the
 	// clean build anyway. Apple silicon keeps one cell that runs both.
+	// launcher-native runs the full launcher XCTest and the native probes on the
+	// build host, so Build only builds, packages and signs. It comes last: the
+	// build cells the native cells wait for keep the earlier runners.
 	if (stage === 'e2e') {
 		const rows = [
 			cell('e2e-hs', 'stubbed', 360),
@@ -174,7 +178,8 @@ function plan(stage, context) {
 			cell('managed-ollama-native', 'amd64', 60, 'runtime'),
 			cell('managed-ollama-native', 'amd64', 45, 'xctest'),
 			cell('managed-ollama-build', 'arm64', 60),
-			cell('managed-ollama-build', 'amd64', 60)
+			cell('managed-ollama-build', 'amd64', 60),
+			cell('launcher-native', 'host', 30)
 		];
 		if (context.event_name === 'workflow_dispatch' && !context.release)
 			rows.push(
@@ -291,6 +296,9 @@ function roleLot(stage, role, architecture, scenario) {
 		case 'e2e/item36-native':
 			assert.equal(architecture, 'host');
 			return 'Archive update controls (' + macosName(architecture) + ')';
+		case 'e2e/launcher-native':
+			assert.equal(architecture, 'host');
+			return 'Launcher XCTest and native probes (' + macosName(architecture) + ')';
 		case 'e2e/lease-silence-native':
 			return 'Lease silence (' + native() + ')';
 		case 'testbuild/cold-bootstrap-native':

@@ -305,7 +305,16 @@ budget and by long cells, not by test time). It now needs `e2e-hs`, so the wait
 is satisfied on its first poll and is kept only as the proof that both inputs
 exist. The price is the E2E critical path added in front of Build, which the
 maintainer estimates at +2 to +6 minutes overall; the gain is one readable
-graph and no macOS minutes spent packaging a commit whose E2E is red. The Intel
+graph and no macOS minutes spent packaging a commit whose E2E is red. The
+macOS 26 launcher XCTest and the native probes of the build host left Build for
+the E2E cell `launcher-native` (measured in run 40176334355: about ten minutes
+of the 16 Build spent outside its input wait), so Build only builds, packages
+and signs, in about six minutes on a non-release run. The cell is listed last
+in the E2E plan, so the build cells the native cells wait for get the first
+runners, and it ends well inside the stage's longest chain (Intel build, then
+Intel native receiving); the trade is about one more macOS runner-minute per
+run (a second job's setup) for a critical path about 7 to 10 minutes shorter.
+On a push E2E now holds seven macOS cells for five runners. The Intel
 managed native role still runs its XCTest cohorts in a second cell, and the
 test build runs four launch lots (scenarios in turn, a proved fresh runner
 between them via `macos_launch_reset.py`) beside the cold bootstrap. Action:

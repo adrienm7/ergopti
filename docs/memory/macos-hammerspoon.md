@@ -30,12 +30,15 @@ built in the same run, installed over those user states. A run that does not
 publish uses the `ci` profile on macos-15; a release run uses the `release`
 profile on macos-15 and macos-15-intel, against the archive that ships. Either
 way a failed launch fails the macOS lane, and `Release` needs that lane.
-The launcher XCTest runs in `package-macos` before the app build and appends to
-the real `~/Library/Logs/ErgoptiPlus/launcher.log`, while
-`macos-release-launch.py` refuses to judge a launch over an existing launcher
-log; that job therefore removes `~/Library/Logs/ErgoptiPlus` before building.
-Any new step that runs launcher code on a runner that later launches the
-packaged app must leave that folder absent as well.
+The launcher XCTest appends to the real
+`~/Library/Logs/ergopti_plus/launcher.log`, while `macos-release-launch.py`
+refuses to judge a launch over an existing launcher log. It therefore runs in
+the E2E cell `Launcher XCTest and native probes (macOS 26)` (role
+`launcher-native` of `tools/ci/macos-stage-roles.cjs`) on a runner of its own,
+never on the Build runner that smoke-tests the release archive; Build only
+builds, packages and signs (`test-macos-stage-roles.cjs` refuses a test step in
+it). Any new step that runs launcher code on a runner that later launches the
+packaged app must leave that folder absent.
 Add a scenario to `SCENARIOS` there for every new launch failure that depends
 on existing user state: `--print-matrix` derives both profiles from it, and
 only `RELEASE_ONLY_SCENARIOS` stay out of the `ci` profile. Hosted runners

@@ -128,7 +128,9 @@ check('push E2E includes every mandatory role and both managed architectures', (
 			['managed-ollama-native', 'macos-15-intel', 'runtime', 60],
 			['managed-ollama-native', 'macos-15-intel', 'xctest', 45],
 			['managed-ollama-build', 'macos-15', '', 60],
-			['managed-ollama-build', 'macos-15-intel', '', 60]
+			['managed-ollama-build', 'macos-15-intel', '', 60],
+			// The launcher XCTest and native probes of the build host, out of Build.
+			['launcher-native', 'macos-latest', '', 30]
 		]
 	);
 	assert.deepEqual(roles.displayPlan('e2e', context).matrix.lot.slice(2, 5), [
@@ -239,7 +241,7 @@ check('manual nonrelease retains Item36 and both lease cells', () => {
 	assert.deepEqual(
 		roles
 			.plan('e2e', ctx)
-			.slice(7)
+			.slice(8)
 			.map((cell) => [cell.role, cell.runner, cell.timeout_minutes]),
 		[
 			['item36-native', 'macos-latest', 25],
@@ -247,11 +249,11 @@ check('manual nonrelease retains Item36 and both lease cells', () => {
 			['lease-silence-native', 'macos-15-intel', 20]
 		]
 	);
-	assert.equal(complete(ctx).proof.chain[2].cells.length, 10);
+	assert.equal(complete(ctx).proof.chain[2].cells.length, 11);
 });
 check('release launch preserves both arches and every canonical supplied scenario', () => {
 	const ctx = { ...context, release: true, event_name: 'workflow_dispatch' };
-	assert.equal(roles.plan('e2e', ctx).length, 7);
+	assert.equal(roles.plan('e2e', ctx).length, 8);
 	assert.deepEqual(
 		roles
 			.plan('testbuild', ctx)
@@ -537,7 +539,8 @@ check('E2E human lots retain native architectures and scoped manual roles', () =
 		'Managed Ollama (macOS 15, Intel)',
 		'Native XCTest (macOS 15, Intel)',
 		'Managed Ollama build (macOS 15, Apple silicon)',
-		'Managed Ollama build (macOS 15, Intel)'
+		'Managed Ollama build (macOS 15, Intel)',
+		'Launcher XCTest and native probes (macOS 26)'
 	];
 	assert.deepEqual(roles.displayPlan('e2e', context).matrix, { lot: push });
 	assert.deepEqual(
@@ -855,6 +858,7 @@ check('role labels retain the independent authored human names without runtime m
 		['e2e', 'managed-ollama-build', 'arm64', '', 'Managed Ollama build (macOS 15, Apple silicon)'],
 		['e2e', 'managed-ollama-build', 'amd64', '', 'Managed Ollama build (macOS 15, Intel)'],
 		['e2e', 'item36-native', 'host', '', 'Archive update controls (macOS 26)'],
+		['e2e', 'launcher-native', 'host', '', 'Launcher XCTest and native probes (macOS 26)'],
 		['e2e', 'lease-silence-native', 'arm64', '', 'Lease silence (macOS 15, Apple silicon)'],
 		['e2e', 'lease-silence-native', 'amd64', '', 'Lease silence (macOS 15, Intel)'],
 		[
@@ -900,6 +904,8 @@ check(
 			['unit', 'lua-unit-meta', 'arm64', 'meta'],
 			['e2e', 'foreign', 'arm64', ''],
 			['e2e', 'managed-ollama-native', 'host', ''],
+			['e2e', 'launcher-native', 'arm64', ''],
+			['e2e', 'launcher-native', 'host', 'xctest'],
 			['e2e', 'managed-ollama-native', 'arm64', 'clean'],
 			['testbuild', 'launch', 'arm64', ''],
 			['testbuild', 'launch', 'arm64', 'clean forged']
@@ -1779,9 +1785,14 @@ check('macOS cells name their version from one host table and refuse another', (
 		packaging.name,
 		'Build (ErgoptiPlus.app, ' + roles.macosName(build.architecture) + ')'
 	);
+	const launcher = roles.plan('e2e', context).filter((cell) => cell.role === 'launcher-native');
+	assert.equal(launcher.length, 1);
+	assert.equal(launcher[0].runner, build.runner, 'the launcher cell runs on the build host');
 	assert.ok(
-		packaging.steps.some(
-			(step) => step.name === 'Run Swift launcher tests on ' + roles.macosName(build.architecture)
+		workflow.jobs['e2e-hs'].steps.some(
+			(step) =>
+				step.name === 'Run Swift launcher tests on ' + roles.macosName(launcher[0].architecture) &&
+				step.if.includes("env.MACOS_STAGE_ROLE == 'launcher-native'")
 		),
 		'the repeated Swift run names its macOS'
 	);
@@ -1791,7 +1802,7 @@ check('macOS cells name their version from one host table and refuse another', (
 	);
 	assert.match(
 		source,
-		/deliberate cross-version coverage, not\n# duplicated work; do not deduplicate it\./
+		/deliberate cross-version coverage, not duplicated work; do not deduplicate\n# it\./
 	);
 	roles.confirmMacosVersion(build, '26.0.1');
 	roles.confirmMacosVersion({ runner: 'macos-15-intel' }, '15.7');
@@ -1805,5 +1816,77 @@ check('macOS cells name their version from one host table and refuse another', (
 		assert.throws(() => roles.confirmMacosVersion(selected, version));
 });
 assert.equal(controls, 224, 'all prior 223 controls and the macOS version control execute');
+
+// Build builds, packages and signs; it smoke-tests the release archive and
+// receives the cold bootstrap of the application it built before signing.
+// Every test of the build host runs in the E2E launcher cell instead.
+const BUILD_TESTS = [
+	/\bswift test\b/,
+	/\bunittest\b/,
+	/\btools\/test\/test-[\w-]+\.(?:cjs|py)\b/,
+	/_test\.py\b/,
+	/\btest_[\w]+\.(?:py|cjs)\b/,
+	/\bplutil -lint\b/,
+	/\brun_native\.py\b|\brun_ci_probe\.py\b|\brun_probe\.py\b/,
+	/_native_test\.py\b|_receiving(?:_test)?\.py\b/
+];
+const BUILD_RECEIVERS = new Set([
+	'Receive actual cold native MLX bootstrap',
+	'Smoke test built ErgoptiPlus.app (crash-on-launch guard)'
+]);
+/**
+ * Lists every Build step that runs a test instead of building, packaging or signing.
+ * @param {object} workflow Parsed ci-macos.yml.
+ * @returns {string[]}
+ */
+function buildTestProblems(workflow) {
+	const found = [];
+	for (const step of workflow.jobs['package-macos'].steps) {
+		if (BUILD_RECEIVERS.has(step.name)) continue;
+		if (BUILD_TESTS.some((pattern) => pattern.test(step.run ?? '')))
+			found.push('Build runs a test: ' + (step.name ?? step.uses));
+	}
+	return found;
+}
+check('Build only builds, packages and signs; the launcher cell owns the build-host tests', () => {
+	const text = fs.readFileSync(
+		path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'),
+		'utf8'
+	);
+	const workflow = YAML.parse(text);
+	assert.deepEqual(buildTestProblems(workflow), []);
+	const launcher = workflow.jobs['e2e-hs'].steps.filter((step) =>
+		(step.if ?? '').includes("env.MACOS_STAGE_ROLE == 'launcher-native'")
+	);
+	for (const name of [
+		'Run reporter lifecycle self-tests',
+		'Run Swift launcher tests on macOS 26',
+		'Run signed Hammerspoon program provider inventory',
+		'Observe native notification constructors',
+		'Observe native global application switcher',
+		'Observe native Apple Shortcuts discovery',
+		'Self-test the launch verdict'
+	])
+		assert.equal(launcher.filter((step) => step.name === name).length, 1, name);
+	// The released launcher log is never left behind on the runner that builds it.
+	assert.equal(
+		workflow.jobs['package-macos'].steps.some((step) =>
+			/Library\/Logs\/ergopti_plus/.test(step.run ?? '')
+		),
+		false
+	);
+	for (const name of [
+		'Run Swift launcher tests on macOS 26',
+		'Self-test the launch verdict',
+		'Lint remap guardian LaunchAgent',
+		'Observe native Apple Shortcuts discovery'
+	]) {
+		const moved = structuredClone(workflow);
+		const step = moved.jobs['e2e-hs'].steps.find((candidate) => candidate.name === name);
+		moved.jobs['package-macos'].steps.push(step);
+		assert.ok(buildTestProblems(moved).length > 0, name + ' back in Build must refuse');
+	}
+});
+assert.equal(controls, 225, 'all prior 224 controls and the Build purity control execute');
 
 console.log('macos-stage-roles: ' + controls + ' controls passed');

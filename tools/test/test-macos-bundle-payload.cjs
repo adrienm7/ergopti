@@ -866,17 +866,18 @@ const manifest = payload.loadManifest(ROOT);
 errors.push(...buildScriptProblems(BUILD, manifest.external));
 
 // The build validated the Karabiner pin on every package run; with the
-// installer gone, the macOS package job must still run that validation, or a
-// bad pin first fails on a new user's onboarding
-const packageJob =
+// installer gone, the launcher cell of macOS E2E, which every package waits
+// for, must still run that validation, or a bad pin first fails on a new
+// user's onboarding.
+const e2eJob =
 	(fs
 		.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8')
-		.match(/^ {2}package-macos:\n[\s\S]*?(?=^ {2}[a-z][a-z-]*:\n|(?![\s\S]))/m) || [])[0] || '';
+		.match(/^ {2}e2e-hs:\n[\s\S]*?(?=^ {2}[a-z][a-z-]*:\n|(?![\s\S]))/m) || [])[0] || '';
 check(
-	/^ {8}run: python3 -m unittest discover -s tools\/build -p 'karabiner_manifest_test\.py'$/m.test(
-		packageJob
+	/^ {6}- name: Validate the Karabiner-Elements pin onboarding downloads\n {8}if: \$\{\{ steps\.stage-admission\.outcome == 'success' && env\.MACOS_STAGE_ROLE == 'launcher-native' \}\}\n {8}run: python3 -m unittest discover -s tools\/build -p 'karabiner_manifest_test\.py'$/m.test(
+		e2eJob
 	),
-	'ci-macos.yml: the package-macos job no longer validates the Karabiner-Elements pin (tools/build/karabiner_manifest_test.py)'
+	'ci-macos.yml: the macOS launcher cell no longer validates the Karabiner-Elements pin (tools/build/karabiner_manifest_test.py)'
 );
 
 // Self-check: each way of bypassing the manifest must be reported

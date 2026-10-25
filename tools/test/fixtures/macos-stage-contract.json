@@ -1,5 +1,5 @@
 {
-	"provenance": "Reviewed 144 original executable blocks, frozen Mac packet b09d1147; authored stage infrastructure. Never refresh from the workflow under test. Human-lot transport transposes only the reviewed metadata bindings and adds one genuine Unit map admission; never refresh from the workflow under test.",
+	"provenance": "Reviewed 144 original executable blocks, frozen Mac packet b09d1147; authored stage infrastructure. Never refresh from the workflow under test. Human-lot transport transposes only the reviewed metadata bindings and adds one genuine Unit map admission; never refresh from the workflow under test. The macOS 26 launcher XCTest, native probes and build-host self-tests move from package-macos to the launcher-native E2E role as reviewed entries under its role guard; Build receives and republishes their two receipts.",
 	"jobs": [
 		{
 			"id": "test-hs",
@@ -507,6 +507,153 @@
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (always()) }}"
 				},
 				{
+					"uses": "actions/checkout@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
+				},
+				{
+					"name": "Prepare Node for native policy fixtures and XCTest evidence",
+					"uses": "actions/setup-node@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
+				},
+				{
+					"name": "Run reporter lifecycle self-tests",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
+				},
+				{
+					"name": "Run owned program XCTest notice constructed-policy controls",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
+				},
+				{
+					"name": "Prepare Python for native nonreaping waits",
+					"uses": "actions/setup-python@v5",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
+				},
+				{
+					"name": "Admit native nonreaping Python prerequisites",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
+				},
+				{
+					"name": "Prepare locked managed HTTP native clients",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
+				},
+				{
+					"name": "Cache SwiftPM dependencies",
+					"uses": "actions/cache@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
+				},
+				{
+					"name": "Report Swift toolchain",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
+				},
+				{
+					"name": "Lint remap guardian LaunchAgent",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
+				},
+				{
+					"name": "Prepare scoped native qualification profile",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}",
+					"shell": "bash"
+				},
+				{
+					"name": "Run portable Brew ownership and refusal controls",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
+				},
+				{
+					"name": "Verify scoped Swift test target exclusion",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}",
+					"shell": "bash"
+				},
+				{
+					"name": "Install the Sparkle tool for the native archive fixture",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}",
+					"shell": "bash"
+				},
+				{
+					"name": "Receive actual managed HTTP native clients",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}",
+					"timeout-minutes": 5
+				},
+				{
+					"name": "Run Swift launcher tests on macOS 26",
+					"id": "swift-launcher-tests",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}",
+					"timeout-minutes": 10
+				},
+				{
+					"name": "Retain scoped native Brew qualification receipt",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}"
+				},
+				{
+					"name": "Upload Swift launcher failure transcript",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (failure() && steps.swift-launcher-tests.outcome == 'failure') }}"
+				},
+				{
+					"name": "Retain archive diagnostic session",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always() && steps.swift-launcher-tests.outputs.archive_session_dir != '') }}"
+				},
+				{
+					"name": "Retain closed TIS diagnostic session",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '') }}"
+				},
+				{
+					"name": "Run signed Hammerspoon program provider inventory",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}",
+					"timeout-minutes": 5
+				},
+				{
+					"name": "Retain native Hammerspoon provider inventory",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}"
+				},
+				{
+					"name": "Observe native notification constructors",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}",
+					"timeout-minutes": 5
+				},
+				{
+					"name": "Retain native notification constructor observations",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}"
+				},
+				{
+					"name": "Observe native global application switcher",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}",
+					"timeout-minutes": 5,
+					"shell": "bash"
+				},
+				{
+					"name": "Retain native global application switcher observations",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}"
+				},
+				{
+					"name": "Observe native Apple Shortcuts discovery",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}",
+					"timeout-minutes": 2
+				},
+				{
+					"name": "Retain native Apple Shortcuts observation",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' && (always()) }}"
+				},
+				{
+					"name": "Hand the source-bound native qualification receipts to Build",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
+				},
+				{
+					"name": "Self-test the launch verdict",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
+				},
+				{
+					"name": "Validate the Karabiner-Elements pin onboarding downloads",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
+				},
+				{
 					"name": "Record actual stage role outcome — ${{ matrix.lot }}",
 					"if": "always()"
 				},
@@ -558,29 +705,33 @@
 					"if": "${{ steps.stage-admission.outcome == 'success' }}"
 				},
 				{
-					"name": "Prepare Node for native policy fixtures and XCTest evidence",
+					"name": "Prepare Node for the build, archive and qualification tools",
 					"uses": "actions/setup-node@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' }}"
 				},
 				{
-					"name": "Run reporter lifecycle self-tests",
-					"if": "${{ steps.stage-admission.outcome == 'success' }}"
-				},
-				{
-					"name": "Run owned program XCTest notice constructed-policy controls",
-					"if": "${{ steps.stage-admission.outcome == 'success' }}"
-				},
-				{
-					"name": "Prepare Python for native nonreaping waits",
+					"name": "Prepare Python for the build and receiving scripts",
 					"uses": "actions/setup-python@v5",
 					"if": "${{ steps.stage-admission.outcome == 'success' }}"
 				},
 				{
-					"name": "Admit native nonreaping Python prerequisites",
+					"name": "Receive the source-bound native qualification receipts",
+					"uses": "actions/download-artifact@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' }}"
 				},
 				{
-					"name": "Prepare locked managed HTTP native clients",
+					"name": "Admit the received native qualification receipts",
+					"if": "${{ steps.stage-admission.outcome == 'success' }}",
+					"shell": "bash"
+				},
+				{
+					"name": "Retain source-bound package native qualification receipt",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' }}"
+				},
+				{
+					"name": "Retain source-bound Shortcuts native qualification receipt",
+					"uses": "actions/upload-artifact@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' }}"
 				},
 				{
@@ -591,24 +742,6 @@
 				{
 					"name": "Report Swift toolchain",
 					"if": "${{ steps.stage-admission.outcome == 'success' }}"
-				},
-				{
-					"name": "Lint remap guardian LaunchAgent",
-					"if": "${{ steps.stage-admission.outcome == 'success' }}"
-				},
-				{
-					"name": "Prepare scoped native qualification profile",
-					"if": "${{ steps.stage-admission.outcome == 'success' }}",
-					"shell": "bash"
-				},
-				{
-					"name": "Run portable Brew ownership and refusal controls",
-					"if": "${{ steps.stage-admission.outcome == 'success' }}"
-				},
-				{
-					"name": "Verify scoped Swift test target exclusion",
-					"if": "${{ steps.stage-admission.outcome == 'success' }}",
-					"shell": "bash"
 				},
 				{
 					"name": "Build release launcher",
@@ -623,102 +756,8 @@
 				},
 				{
 					"name": "Install Sparkle signing tool",
-					"if": "${{ steps.stage-admission.outcome == 'success' }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && (inputs.release) }}",
 					"shell": "bash"
-				},
-				{
-					"name": "Receive actual managed HTTP native clients",
-					"if": "${{ steps.stage-admission.outcome == 'success' }}",
-					"timeout-minutes": 5
-				},
-				{
-					"name": "Run Swift launcher tests on macOS 26",
-					"id": "swift-launcher-tests",
-					"if": "${{ steps.stage-admission.outcome == 'success' }}",
-					"timeout-minutes": 10
-				},
-				{
-					"name": "Retain scoped native Brew qualification receipt",
-					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && (always()) }}"
-				},
-				{
-					"name": "Retain source-bound package native qualification receipt",
-					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && (always()) }}"
-				},
-				{
-					"name": "Upload Swift launcher failure transcript",
-					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && (failure() && steps.swift-launcher-tests.outcome == 'failure') }}"
-				},
-				{
-					"name": "Retain archive diagnostic session",
-					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && (always() && steps.swift-launcher-tests.outputs.archive_session_dir != '') }}"
-				},
-				{
-					"name": "Retain closed TIS diagnostic session",
-					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && (always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '') }}"
-				},
-				{
-					"name": "Run signed Hammerspoon program provider inventory",
-					"if": "${{ steps.stage-admission.outcome == 'success' && (always()) }}",
-					"timeout-minutes": 5
-				},
-				{
-					"name": "Retain native Hammerspoon provider inventory",
-					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && (always()) }}"
-				},
-				{
-					"name": "Observe native notification constructors",
-					"if": "${{ steps.stage-admission.outcome == 'success' && (always()) }}",
-					"timeout-minutes": 5
-				},
-				{
-					"name": "Retain native notification constructor observations",
-					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && (always()) }}"
-				},
-				{
-					"name": "Observe native global application switcher",
-					"if": "${{ steps.stage-admission.outcome == 'success' && (always()) }}",
-					"timeout-minutes": 5,
-					"shell": "bash"
-				},
-				{
-					"name": "Retain native global application switcher observations",
-					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && (always()) }}"
-				},
-				{
-					"name": "Observe native Apple Shortcuts discovery",
-					"if": "${{ steps.stage-admission.outcome == 'success' && (always()) }}",
-					"timeout-minutes": 2
-				},
-				{
-					"name": "Retain native Apple Shortcuts observation",
-					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && (always()) }}"
-				},
-				{
-					"name": "Retain source-bound Shortcuts native qualification receipt",
-					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' }}"
-				},
-				{
-					"name": "Remove the launcher log the Swift tests wrote",
-					"if": "${{ steps.stage-admission.outcome == 'success' }}"
-				},
-				{
-					"name": "Self-test the launch verdict",
-					"if": "${{ steps.stage-admission.outcome == 'success' }}"
-				},
-				{
-					"name": "Validate the Karabiner-Elements pin onboarding downloads",
-					"if": "${{ steps.stage-admission.outcome == 'success' }}"
 				},
 				{
 					"name": "Resolve the launch-gate scenario profile",

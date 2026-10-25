@@ -517,12 +517,6 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	[MACOS_BOX, 'package-macos', 'Retain application build diagnostics', 'always()'],
 	[
 		MACOS_BOX,
-		'package-macos',
-		'Retain source-bound package native qualification receipt',
-		'always()'
-	],
-	[
-		MACOS_BOX,
 		'cold-bootstrap-native',
 		'Receive actual official cold Ollama without stock Python',
 		"${{ !cancelled() && steps.cold-app.outcome == 'success' }}"
@@ -722,51 +716,51 @@ const STEP_CONDITIONS = [
 	],
 	[
 		MACOS_BOX,
-		'package-macos',
+		'launcher-native',
 		'Retain scoped native Brew qualification receipt',
 		'${{ always() }}'
 	],
 	[
 		MACOS_BOX,
-		'package-macos',
+		'launcher-native',
 		'Retain archive diagnostic session',
 		"${{ always() && steps.swift-launcher-tests.outputs.archive_session_dir != '' }}"
 	],
 	[
 		MACOS_BOX,
-		'package-macos',
+		'launcher-native',
 		'Retain closed TIS diagnostic session',
 		"${{ always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '' }}"
 	],
 	[
 		MACOS_BOX,
-		'package-macos',
+		'launcher-native',
 		'Upload Swift launcher failure transcript',
 		"${{ failure() && steps.swift-launcher-tests.outcome == 'failure' }}"
 	],
 	[
 		MACOS_BOX,
-		'package-macos',
+		'launcher-native',
 		'Run signed Hammerspoon program provider inventory',
 		'${{ always() }}'
 	],
-	[MACOS_BOX, 'package-macos', 'Retain native Hammerspoon provider inventory', '${{ always() }}'],
-	[MACOS_BOX, 'package-macos', 'Observe native notification constructors', '${{ always() }}'],
+	[MACOS_BOX, 'launcher-native', 'Retain native Hammerspoon provider inventory', '${{ always() }}'],
+	[MACOS_BOX, 'launcher-native', 'Observe native notification constructors', '${{ always() }}'],
 	[
 		MACOS_BOX,
-		'package-macos',
+		'launcher-native',
 		'Retain native notification constructor observations',
 		'${{ always() }}'
 	],
-	[MACOS_BOX, 'package-macos', 'Observe native Apple Shortcuts discovery', '${{ always() }}'],
-	[MACOS_BOX, 'package-macos', 'Observe native global application switcher', '${{ always() }}'],
+	[MACOS_BOX, 'launcher-native', 'Observe native Apple Shortcuts discovery', '${{ always() }}'],
+	[MACOS_BOX, 'launcher-native', 'Observe native global application switcher', '${{ always() }}'],
 	[
 		MACOS_BOX,
-		'package-macos',
+		'launcher-native',
 		'Retain native global application switcher observations',
 		'${{ always() }}'
 	],
-	[MACOS_BOX, 'package-macos', 'Retain native Apple Shortcuts observation', '${{ always() }}'],
+	[MACOS_BOX, 'launcher-native', 'Retain native Apple Shortcuts observation', '${{ always() }}'],
 	[MACOS_BOX, 'package-macos', 'Sign declared archives with Sparkle EdDSA key', 'inputs.release'],
 	[MACOS_BOX, 'package-macos', 'Generate Sparkle appcast', 'inputs.release'],
 	[MACOS_BOX, 'package-macos', 'Package latest keylayout bundle', 'inputs.release'],
@@ -4822,7 +4816,7 @@ function nativeInventoryArtifactProblems(files) {
 	const found = files
 		.filter((entry) => entry.rel === MACOS_BOX)
 		.flatMap((entry) => pipeline.jobsOfText(entry.text, entry.rel))
-		.filter((job) => job.id === 'package-macos')
+		.filter((job) => job.id === 'e2e-hs')
 		.flatMap((job) => pipeline.steps(job.body))
 		.filter((step) => step.name === NATIVE_INVENTORY_ARTIFACT);
 	if (found.length !== 1) return ['native inventory artifact step must exist exactly once'];
@@ -4843,7 +4837,7 @@ function nativeInventoryArtifactProblems(files) {
 			'native inventory artifact must whitelist only summary and per-scenario closed receipts'
 		);
 	if (
-		pipeline.stepField(body, 'if') !== macRole.condition('package-macos', '${{ always() }}') ||
+		pipeline.stepField(body, 'if') !== macRole.condition('launcher-native', '${{ always() }}') ||
 		pipeline.stepField(body, 'uses') !== 'actions/upload-artifact@v4' ||
 		!/^ {10}if-no-files-found: error$/m.test(body)
 	)
@@ -4928,7 +4922,7 @@ function nativeActionProbeProblems(files) {
 	const steps = files
 		.filter((entry) => entry.rel === MACOS_BOX)
 		.flatMap((entry) => pipeline.jobsOfText(entry.text, entry.rel))
-		.filter((job) => job.id === 'package-macos')
+		.filter((job) => job.id === 'e2e-hs')
 		.flatMap((job) => pipeline.steps(job.body));
 	const problems = [];
 	for (const spec of NATIVE_ACTION_PROBES) {
@@ -4940,7 +4934,7 @@ function nativeActionProbeProblems(files) {
 		}
 		const body = runs[0].body;
 		if (
-			pipeline.stepField(body, 'if') !== macRole.condition('package-macos', '${{ always() }}') ||
+			pipeline.stepField(body, 'if') !== macRole.condition('launcher-native', '${{ always() }}') ||
 			pipeline.stepField(body, 'timeout-minutes') !== '5' ||
 			!spec.commands.every((command) => (pipeline.runOf(body) ?? []).join('\n').includes(command))
 		)
@@ -4961,7 +4955,7 @@ function nativeActionProbeProblems(files) {
 		if (
 			JSON.stringify(paths) !== JSON.stringify(expected) ||
 			pipeline.stepField(artifact, 'if') !==
-				macRole.condition('package-macos', '${{ always() }}') ||
+				macRole.condition('launcher-native', '${{ always() }}') ||
 			pipeline.stepField(artifact, 'uses') !== 'actions/upload-artifact@v4' ||
 			!/^ {10}if-no-files-found: error$/m.test(artifact)
 		)
@@ -4974,7 +4968,7 @@ errors.push(...nativeActionProbeProblems(pipeline.files()));
 for (const spec of NATIVE_ACTION_PROBES) {
 	const steps = pipeline
 		.jobsOfText(pipeline.file(MACOS_BOX), MACOS_BOX)
-		.filter((job) => job.id === 'package-macos')
+		.filter((job) => job.id === 'e2e-hs')
 		.flatMap((job) => pipeline.steps(job.body));
 	const run = steps.find((step) => step.name === spec.run);
 	const artifact = steps.find((step) => step.name === spec.retain);
@@ -5778,16 +5772,29 @@ function reporterLifecycleProblems(files) {
 	const problems = [];
 	for (const [rel, id, host, product, shell] of [
 		[WINDOWS_BOX, 'test-ahk', 'windows-', 'Run AHK test suite', 'pwsh'],
-		[MACOS_BOX, 'package-macos', 'macos-', 'Build release launcher', null]
+		[MACOS_BOX, 'e2e-hs', 'macos-', 'Run Swift launcher tests on macOS 26', null]
 	]) {
 		const entry = files.find((candidate) => candidate.rel === rel);
 		const job =
 			entry && pipeline.jobsOfText(entry.text, rel).find((candidate) => candidate.id === id);
-		if (!job || !(pipeline.field(job.body, 'runs-on') ?? '').startsWith(host)) {
+		// The Mac reporter runs in the launcher cell, whose host the stage plan owns.
+		const runner =
+			rel === MACOS_BOX
+				? MAC_REPORTER_CELLS.length === 1 && MAC_REPORTER_CELLS[0].runner
+				: job && pipeline.field(job.body, 'runs-on');
+		if (!job || !(runner || '').startsWith(host)) {
 			problems.push(`${rel} ${id} must qualify the reporter on its actual native host`);
 			continue;
 		}
-		const steps = pipeline.steps(job.body);
+		// The shared admission and the launcher role; every other E2E role keeps its own steps.
+		const steps = pipeline.steps(job.body).filter((step) => {
+			const predicate = pipeline.stepField(step.body, 'if') ?? '';
+			return (
+				rel !== MACOS_BOX ||
+				!predicate.includes('env.MACOS_STAGE_ROLE ==') ||
+				predicate.includes(MAC_REPORTER_ROLE)
+			);
+		});
 		const matches = steps.filter((candidate) => candidate.name === REPORTER_STEP);
 		const nodes = steps.filter(
 			(candidate) => pipeline.stepField(candidate.body, 'uses') === 'actions/setup-node@v4'
@@ -5807,8 +5814,7 @@ function reporterLifecycleProblems(files) {
 			);
 			continue;
 		}
-		const condition =
-			rel === MACOS_BOX ? "${{ steps.stage-admission.outcome == 'success' }}" : null;
+		const condition = rel === MACOS_BOX ? macRole.condition('launcher-native') : null;
 		if (rel === MACOS_BOX) {
 			const admissions = steps.filter(
 				(step) => pipeline.stepField(step.body, 'id') === 'stage-admission'
@@ -5819,7 +5825,7 @@ function reporterLifecycleProblems(files) {
 			const admissionAt = steps.indexOf(admission),
 				downloadAt = steps.indexOf(download);
 			if (
-				JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(['e2e-hs']) ||
+				JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(['integration-hs']) ||
 				pipeline.field(job.body, 'if') !== null ||
 				pipeline.field(job.body, 'continue-on-error') !== null ||
 				admissions.length !== 1 ||
@@ -5839,7 +5845,7 @@ function reporterLifecycleProblems(files) {
 			if (
 				admission.name !== 'Admit complete successful predecessor stage' ||
 				(pipeline.runOf(admission.body) ?? []).join('\n').trim() !==
-					'node tools/ci/macos-stage-roles.cjs admit build "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"' ||
+					'node tools/ci/macos-stage-roles.cjs admit e2e "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"' ||
 				!/^        env:\n          MACOS_STAGE_NEEDS: \$\{\{ toJSON\(needs\) \}\}\n        run:/m.test(
 					admission.body
 				) ||
@@ -5850,7 +5856,7 @@ function reporterLifecycleProblems(files) {
 				['if', 'continue-on-error'].some(
 					(key) => pipeline.stepField(download.body, key) !== null
 				) ||
-				!/^          pattern: macos-stage-e2e-\*-\$\{\{ github\.run_id \}\}$/m.test(
+				!/^          pattern: macos-stage-integration-\*-\$\{\{ github\.run_id \}\}$/m.test(
 					download.body
 				) ||
 				!/^          path: \$\{\{ runner\.temp \}\}\/macos-stage-inputs$/m.test(download.body) ||
@@ -5891,13 +5897,24 @@ function reporterLifecycleProblems(files) {
 
 const REPORTER_STEP = 'Run reporter lifecycle self-tests';
 const REPORTER_COMMAND = 'node tools/test/test-report.cjs';
+// The macOS reporter self-test belongs to the launcher cell on the build host.
+const MAC_REPORTER_ROLE = "env.MACOS_STAGE_ROLE == 'launcher-native'";
+const MAC_REPORTER_CELLS = require('../ci/macos-stage-roles.cjs')
+	.plan('e2e', {
+		source_sha: 'a'.repeat(40),
+		run_id: '1',
+		event_name: 'push',
+		release: false,
+		scenarios: ['clean']
+	})
+	.filter((cell) => cell.role === 'launcher-native');
 errors.push(...reporterLifecycleProblems(pipeline.files()));
 for (const [rel, shell] of [
 	[WINDOWS_BOX, '        shell: pwsh\n'],
 	[MACOS_BOX, '']
 ]) {
 	const condition =
-		rel === MACOS_BOX ? "        if: ${{ steps.stage-admission.outcome == 'success' }}\n" : '';
+		rel === MACOS_BOX ? '        if: ' + macRole.condition('launcher-native') + '\n' : '';
 	const block = `      - name: ${REPORTER_STEP}\n${shell}${condition}        run: ${REPORTER_COMMAND}\n`;
 	for (const [what, replacement] of [
 		['missing native reporter self-test', ''],
@@ -5927,11 +5944,13 @@ for (const [rel, shell] of [
 	const steps = pipeline.steps(
 		pipeline
 			.jobsOfText(pipeline.files().find((candidate) => candidate.rel === rel).text, rel)
-			.find((candidate) => candidate.id === (rel === WINDOWS_BOX ? 'test-ahk' : 'package-macos'))
-			.body
+			.find((candidate) => candidate.id === (rel === WINDOWS_BOX ? 'test-ahk' : 'e2e-hs')).body
 	);
 	const node = steps.find(
-		(candidate) => pipeline.stepField(candidate.body, 'uses') === 'actions/setup-node@v4'
+		(candidate) =>
+			pipeline.stepField(candidate.body, 'uses') === 'actions/setup-node@v4' &&
+			(rel === WINDOWS_BOX ||
+				(pipeline.stepField(candidate.body, 'if') ?? '').includes(MAC_REPORTER_ROLE))
 	).body;
 	mustCatch(
 		'reporter before Node setup',
@@ -5946,15 +5965,15 @@ for (const [rel, shell] of [
 {
 	const job = pipeline
 		.jobsOfText(pipeline.file(MACOS_BOX), MACOS_BOX)
-		.find((entry) => entry.id === 'package-macos');
+		.find((entry) => entry.id === 'e2e-hs');
 	const admission = pipeline.step(job.body, 'Admit complete successful predecessor stage');
 	const download = pipeline.step(job.body, 'Download exact prior stage receipts');
 	const node = pipeline.step(
 		job.body,
 		'Prepare Node for native policy fixtures and XCTest evidence'
 	);
-	const product = pipeline.step(job.body, 'Build release launcher');
-	const condition = "        if: ${{ steps.stage-admission.outcome == 'success' }}\n";
+	const product = pipeline.step(job.body, 'Run Swift launcher tests on macOS 26');
+	const condition = '        if: ' + macRole.condition('launcher-native') + '\n';
 	for (const [what, mutate] of [
 		['missing reporter admission', (body) => body.replace(admission, '')],
 		[
@@ -5971,7 +5990,7 @@ for (const [rel, shell] of [
 		],
 		[
 			'unknown reporter admission command',
-			(body) => body.replace(admission, admission.replace(' admit build ', ' admit e2e '))
+			(body) => body.replace(admission, admission.replace(' admit e2e ', ' admit build '))
 		],
 		[
 			'manual-only reporter admission',
@@ -5999,14 +6018,14 @@ for (const [rel, shell] of [
 		],
 		[
 			'wrong reporter predecessor',
-			(body) => body.replace('    needs:\n      - e2e-hs', '    needs:\n      - integration-hs')
+			(body) => body.replace('    needs:\n      - integration-hs', '    needs:\n      - test-hs')
 		],
 		[
 			'transitive reporter predecessor',
 			(body) =>
 				body.replace(
-					'    needs:\n      - e2e-hs',
-					'    needs:\n      - integration-hs\n      - e2e-hs'
+					'    needs:\n      - integration-hs',
+					'    needs:\n      - test-hs\n      - integration-hs'
 				)
 		],
 		[
@@ -6017,7 +6036,7 @@ for (const [rel, shell] of [
 		[
 			'foreign reporter receipt download',
 			(body) =>
-				body.replace(download, download.replace('macos-stage-e2e-*', 'macos-stage-integration-*'))
+				body.replace(download, download.replace('macos-stage-integration-*', 'macos-stage-unit-*'))
 		],
 		[
 			'forgiven reporter receipt download',
@@ -6045,7 +6064,7 @@ for (const [rel, shell] of [
 			(body) =>
 				body.replace(
 					product,
-					product.replace('        shell:', '        continue-on-error: true\n        shell:')
+					product.replace(condition, condition + '        continue-on-error: true\n')
 				)
 		],
 		[
@@ -6505,20 +6524,21 @@ for (const input of ['{', 'null', '[]', '{}']) {
 	assert.equal(result.stdout, '');
 }
 
+const SPARKLE_FIXTURE_TOOL = 'Install the Sparkle tool for the native archive fixture';
 /** Requires native signing tools before XCTest without release-key access. */
 function sparkleToolProblems(files) {
 	const problems = [];
 	const mac = files.find((entry) => entry.rel === MACOS_BOX);
 	const job =
-		mac && pipeline.jobsOfText(mac.text, MACOS_BOX).find((entry) => entry.id === 'package-macos');
+		mac && pipeline.jobsOfText(mac.text, MACOS_BOX).find((entry) => entry.id === 'e2e-hs');
 	const steps = job ? pipeline.steps(job.body) : [];
-	const tools = steps.filter((step) => step.name === 'Install Sparkle signing tool');
-	const toolAt = steps.findIndex((step) => step.name === 'Install Sparkle signing tool');
+	const tools = steps.filter((step) => step.name === SPARKLE_FIXTURE_TOOL);
+	const toolAt = steps.findIndex((step) => step.name === SPARKLE_FIXTURE_TOOL);
 	const nativeAt = steps.findIndex((step) => step.name === 'Run Swift launcher tests on macOS 26');
 	if (tools.length !== 1 || toolAt < 0 || nativeAt <= toolAt) {
 		problems.push('the actual pinned Sparkle tool installer must precede native XCTest');
 	} else if (
-		pipeline.stepField(tools[0].body, 'if') !== macRole.condition('package-macos') ||
+		pipeline.stepField(tools[0].body, 'if') !== macRole.condition('launcher-native') ||
 		pipeline.stepField(tools[0].body, 'continue-on-error') !== null ||
 		/\bsecrets\.|SPARKLE_ED_PRIVATE_KEY/.test(codeOf(tools[0].body))
 	) {
@@ -6526,16 +6546,31 @@ function sparkleToolProblems(files) {
 			'native fixture tool installation must be unconditional and cannot receive release secrets'
 		);
 	}
+	// Build signs only a release, so it installs the signer only for a release.
+	const build =
+		mac && pipeline.jobsOfText(mac.text, MACOS_BOX).find((entry) => entry.id === 'package-macos');
+	const signers = build
+		? pipeline.steps(build.body).filter((step) => step.name === 'Install Sparkle signing tool')
+		: [];
+	if (
+		signers.length !== 1 ||
+		pipeline.stepField(signers[0].body, 'if') !==
+			macRole.condition('package-macos', 'inputs.release') ||
+		pipeline.stepField(signers[0].body, 'continue-on-error') !== null ||
+		/\bsecrets\.|SPARKLE_ED_PRIVATE_KEY/.test(codeOf(signers[0].body))
+	)
+		problems.push('Build installs the Sparkle signer for a release only, without release secrets');
 	return problems;
 }
 errors.push(...sparkleToolProblems(pipeline.files()));
-const sparkleToolBody = pipeline.step(
+const sparkleToolBody = pipeline.step(pipeline.job('e2e-hs'), SPARKLE_FIXTURE_TOOL);
+const sparkleNativeBody = pipeline.step(
+	pipeline.job('e2e-hs'),
+	'Run Swift launcher tests on macOS 26'
+);
+const sparkleBuildBody = pipeline.step(
 	pipeline.job('package-macos'),
 	'Install Sparkle signing tool'
-);
-const sparkleNativeBody = pipeline.step(
-	pipeline.job('package-macos'),
-	'Run Swift launcher tests on macOS 26'
 );
 for (const [what, from, to] of [
 	['missing native Sparkle tools', sparkleToolBody, ''],
@@ -6559,6 +6594,20 @@ for (const [what, from, to] of [
 		'release secret handed to native Sparkle tools',
 		sparkleToolBody,
 		sparkleToolBody.replace(
+			"          SPARKLE_VERSION: '2.9.2'",
+			"          SPARKLE_VERSION: '2.9.2'\n          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}"
+		)
+	],
+	[
+		'Build signer outside a release',
+		sparkleBuildBody,
+		sparkleBuildBody.replace(' && (inputs.release) }}', ' }}')
+	],
+	['missing Build signer', sparkleBuildBody, ''],
+	[
+		'release secret handed to the Build signer',
+		sparkleBuildBody,
+		sparkleBuildBody.replace(
 			"          SPARKLE_VERSION: '2.9.2'",
 			"          SPARKLE_VERSION: '2.9.2'\n          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}"
 		)
@@ -8782,7 +8831,8 @@ const shortcutsIndependentGuardian = pipeline.step(
 	shortcutsIndependentGuardJob,
 	'Receive selected-release shell corpus and native guardian cancellation'
 );
-const shortcutsIndependentPackage = '      - name: Observe native Apple Shortcuts discovery\n';
+// Build depends on every E2E cell; the observer may not move into it.
+const shortcutsIndependentPackage = '      - name: Resolve the launch-gate scenario profile\n';
 const shortcutsIndependentFixtureCondition =
 	'        if: ' + macRole.condition('managed-ollama-native') + '\n';
 const shortcutsIndependentLaterFixture =
