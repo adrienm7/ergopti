@@ -427,6 +427,8 @@ function M.build(ctx)
 	}
 
 	local providers = {
+		-- The recommended-defaults note and why macOS recommends no three-finger tap.
+		["gesture_recommended_notes"] = function() return ManifestMenu.template_rows("gesture_recommended_notes", {}) end,
 		["system_gesture_status"] = function()
 			local conflicts = gestures.system_gesture_conflicts()
 			local rows = {}

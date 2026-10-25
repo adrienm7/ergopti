@@ -46,7 +46,10 @@ BuildGesturesMenu(Options := unset) {
 		"manual_tutorial",  (*) => GestureShowManualTutorialDialog(),
 	)
 	Getters := Map("gestures_enabled", _GES_IsEnabled)
+	; The recommended-defaults note: the preset avoids what Windows already does
+	; with a gesture, and the driver takes the system assignment over itself.
 	ListProviders := Map("gesture_slots_ahk", (*) => _GES_SlotRows(),
+		"gesture_recommended_notes", (*) => MenuRenderer_TemplateRows("gesture_recommended_notes", Map(), Map(), Map()),
 		"system_gesture_status", (*) => GestureSystemRows())
 	return MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers, "", ListProviders, Commands, Getters)
 }

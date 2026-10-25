@@ -4828,6 +4828,8 @@ local function _build_gestures(ctx)
 	-- count, so grouping would mean parsing the names apart only to regroup them.
 	local providers = {}
 	providers["system_gesture_status"] = function() return require("ui.gesture_conflicts").rows(ge) end
+	-- The recommended-defaults note and why Linux recommends no swipe.
+	providers["gesture_recommended_notes"] = function() return ManifestMenu.template_rows("gesture_recommended_notes", {}) end
 	gesture_commands["system_gesture_settings"] = function() return require("ui.gesture_conflicts").open_settings() end
 	providers["gesture_slots_linux"] = function()
 		local out = {}

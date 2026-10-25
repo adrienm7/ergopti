@@ -220,14 +220,15 @@ if (
 	);
 }
 // Linux recommends the Windows binding of every slot both drivers have
-// (decision of 2026-10-22). Fresh configurations still start neutral: only an
-// explicit restore applies these. The four-finger vertical swipes stay
-// unassigned because win_app_prev and win_app_next do not exist on Linux.
+// (decision of 2026-10-22), except what the desktop also does: the touchpad is
+// read without being grabbed, so the three- and four-finger swipes recommend
+// "none" (decision of 2026-10-24, test-recommended-defaults-rule.cjs). Fresh
+// configurations still start neutral: only an explicit restore applies these.
 const windowsRecommendations = manifestDefaults('ahk');
-const LINUX_UNASSIGNED = new Set(['swipe_4_down', 'swipe_4_up']);
+const LINUX_UNASSIGNED = (slot) => /^swipe_[34]_/.test(slot);
 for (const [slot, action] of manifestDefaults('linux')) {
 	if (!windowsRecommendations.has(slot)) continue;
-	const expected = LINUX_UNASSIGNED.has(slot) ? 'none' : windowsRecommendations.get(slot);
+	const expected = LINUX_UNASSIGNED(slot) ? 'none' : windowsRecommendations.get(slot);
 	if (action !== expected)
 		errors.push(
 			`Linux gesture recommendation gestures.${slot} must be ${expected}, found ${action}.`

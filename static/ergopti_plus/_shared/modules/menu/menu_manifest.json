@@ -2912,6 +2912,10 @@
 		},
 		{
 			"type": "list",
+			"id": "gesture_recommended_notes"
+		},
+		{
+			"type": "list",
 			"id": "system_gesture_status"
 		},
 		{
@@ -6058,6 +6062,31 @@
 			"disabled_when": [
 				"keyboard_group_ready"
 			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"gesture_recommended_notes": [
+		{
+			"type": "label",
+			"id": "gesture_recommended_note",
+			"i18n": "menu.gestures.recommended_note"
+		},
+		{
+			"type": "label",
+			"id": "gesture_recommended_reason_linux",
+			"i18n": "menu.gestures.recommended_reason_linux",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "label",
+			"id": "gesture_recommended_reason_macos",
+			"i18n": "menu.gestures.recommended_reason_macos",
 			"platforms": [
 				"hs"
 			],

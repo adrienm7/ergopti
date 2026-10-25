@@ -548,7 +548,7 @@ M.features = {
 		path = "gestures.swipe_4_up", id = "swipe_4_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_up", platforms = { "ahk", "hs", "linux" }, recommended = "none", input_altering = true,
 	},
 	{
-		path = "gestures.tap_3", id = "tap_3", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_3", platforms = { "ahk", "hs", "linux" }, recommended = "left_click_toggle", input_altering = true,
+		path = "gestures.tap_3", id = "tap_3", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_3", platforms = { "ahk", "hs", "linux" }, recommended = "none", input_altering = true,
 	},
 	{
 		path = "gestures.tap_4", id = "tap_4", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_4", platforms = { "ahk", "hs", "linux" }, recommended = "win_app_next", input_altering = true,
