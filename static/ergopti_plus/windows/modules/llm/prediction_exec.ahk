@@ -765,6 +765,8 @@ _LLM_Engine_ShowLoadingTooltip() {
 ; predictions separated by ``===`` (the convention HS's Parser.split_blocks
 ; also expects), and we split / dedup the response into slots.
 _LLM_Engine_DispatchBatch(state) {
+	if !_LLM_Engine_IsCurrent(state)
+		return
 	; Keep the compact violet loading tooltip until the batch response lands.
 	; macOS does not paint placeholder rows here — show_loading stays up.
 
