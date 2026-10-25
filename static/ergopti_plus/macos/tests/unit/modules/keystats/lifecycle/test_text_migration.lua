@@ -76,8 +76,45 @@ local function restore_shell()
 	if _real_hs_execute ~= nil then hs.execute = _real_hs_execute end
 	hs.hash = _real_hs_hash
 	_private_stdin_native = nil
-	local runner = package.loaded["adapters.shell_runner"]
-	if type(runner) == "table" and runner._set_private_stdin_native then runner._set_private_stdin_native(nil) end
+end
+
+-- Native requires must match the current hs identity even when this file runs
+-- first. Own the writer too: it captures the cipher reloaded by each scenario.
+local OWNED_MODULES = {
+	"hs.fs", "hs.json", "hs.sqlite3",
+	"adapters.crypto", "adapters.shell_runner",
+	"modules.keystats.text_cipher", "modules.keystats.text_migration",
+	"modules.keystats.sqlite_writer",
+}
+
+--- Runs one migration scenario without borrowing another test's native aliases.
+--- @param callback function Complete setup, assertions and callback delivery.
+local function with_migration_scope(callback)
+	return helpers.with_fresh_modules(OWNED_MODULES, function()
+		local native = hs
+		local execute, hash = native.execute, native.hash
+		local previous_execute, previous_hash = _real_hs_execute, _real_hs_hash
+		local previous_private = _private_stdin_native
+		local batch_size = Plan.DEFAULT_BATCH_SIZE
+		package.loaded["hs.fs"] = native.fs
+		package.loaded["hs.json"] = native.json
+		package.loaded["hs.sqlite3"] = native.sqlite3
+		_real_hs_execute, _real_hs_hash = nil, nil
+		local outcome = table.pack(xpcall(callback, debug.traceback))
+		native.execute, native.hash = execute, hash
+		_real_hs_execute, _real_hs_hash = previous_execute, previous_hash
+		_private_stdin_native = previous_private
+		Plan.DEFAULT_BATCH_SIZE = batch_size
+		if not outcome[1] then error(outcome[2], 0) end
+		return table.unpack(outcome, 2, outcome.n)
+	end)
+end
+
+--- Wraps a case body without registering or executing another test.
+--- @param callback function Original case body.
+--- @return function Scoped case body.
+local function migration_case(callback)
+	return function() return with_migration_scope(callback) end
 end
 
 --- Builds an in-memory stand-in for events_typing.
@@ -169,7 +206,7 @@ end
 -- =========================================
 
 helpers.describe("keystats.text_migration: enabling encrypts the rows already stored", function()
-	helpers.it("wraps every pre-existing row and round-trips it byte for byte", function()
+	helpers.it("wraps every pre-existing row and round-trips it byte for byte", migration_case(function()
 		local originals = {
 			{ id = 1, text = "hello world",            events_json = "[1,2]" },
 			{ id = 2, text = "h\195\169llo \226\130\172 monde", events_json = "[]" },
@@ -193,9 +230,9 @@ helpers.describe("keystats.text_migration: enabling encrypts the rows already st
 			helpers.assert_eq(cipher.decrypt(row.values.events_json), originals[index].events_json)
 		end
 		restore_shell()
-	end)
+	end))
 
-	helpers.it("gives each row and each column its own IV", function()
+	helpers.it("gives each row and each column its own IV", migration_case(function()
 		local store = make_store({
 			{ id = 1, text = "same text", events_json = "same text" },
 			{ id = 2, text = "same text", events_json = "same text" },
@@ -215,9 +252,9 @@ helpers.describe("keystats.text_migration: enabling encrypts the rows already st
 				seen[row.values[column]] = true
 			end
 		end
-	end)
+	end))
 
-	helpers.it("derives the key once for the whole migration", function()
+	helpers.it("derives the key once for the whole migration", migration_case(function()
 		local rows = {}
 		for id = 1, 12 do rows[id] = { id = id, text = "value " .. id, events_json = "[]" } end
 		local store = make_store(rows)
@@ -234,9 +271,9 @@ helpers.describe("keystats.text_migration: enabling encrypts the rows already st
 		end
 		helpers.assert_eq(derivations, 1,
 			"24 values must cost ONE derivation — per-value derivation is half a second each")
-	end)
+	end))
 
-	helpers.it("never asks the store to write anything but the two text columns", function()
+	helpers.it("never asks the store to write anything but the two text columns", migration_case(function()
 		local store = make_store({ { id = 1, text = "a", events_json = "[]" } })
 		install_shell()
 		local cipher, migration = load_runner(store)
@@ -249,7 +286,7 @@ helpers.describe("keystats.text_migration: enabling encrypts the rows already st
 			helpers.assert_true(Plan.is_migratable_column(column),
 				"the migration wrote the non-text column " .. column)
 		end
-	end)
+	end))
 end)
 
 
@@ -263,7 +300,7 @@ end)
 -- =========================================
 
 helpers.describe("keystats.text_migration: disabling decrypts the rows in place", function()
-	helpers.it("returns every row to the exact bytes it started from", function()
+	helpers.it("returns every row to the exact bytes it started from", migration_case(function()
 		local originals = {
 			{ id = 1, text = "secret sentence",       events_json = "[1]" },
 			{ id = 2, text = "accentu\195\169 \226\128\148 ok", events_json = "[2]" },
@@ -288,7 +325,7 @@ helpers.describe("keystats.text_migration: disabling decrypts the rows in place"
 			helpers.assert_eq(row.values.events_json, originals[index].events_json)
 			helpers.assert_true(not TextCrypto.is_encrypted(row.values.text))
 		end
-	end)
+	end))
 end)
 
 
@@ -302,7 +339,7 @@ end)
 -- ==========================================
 
 helpers.describe("keystats.text_migration: an interrupted pass converges", function()
-	helpers.it("finishes a half-migrated table without double-wrapping", function()
+	helpers.it("finishes a half-migrated table without double-wrapping", migration_case(function()
 		local store = make_store({
 			{ id = 1, text = "one",   events_json = "[1]" },
 			{ id = 2, text = "two",   events_json = "[2]" },
@@ -341,9 +378,9 @@ helpers.describe("keystats.text_migration: an interrupted pass converges", funct
 		-- cipher pointed back at the real shell answers "" to everything, which
 		-- would make every one of them pass without proving anything.
 		restore_shell()
-	end)
+	end))
 
-	helpers.it("re-running a finished pass converts nothing and loses nothing", function()
+	helpers.it("re-running a finished pass converts nothing and loses nothing", migration_case(function()
 		local originals = { { id = 1, text = "already done", events_json = "[1]" } }
 		local store = make_store(originals)
 		install_shell()
@@ -362,18 +399,18 @@ helpers.describe("keystats.text_migration: an interrupted pass converges", funct
 		helpers.assert_eq(migration.get_progress().converted, 0)
 		helpers.assert_eq(cipher.decrypt(store.rows[1].values.text), originals[1].text)
 		restore_shell()
-	end)
+	end))
 
-	helpers.it("resumes nothing when no pass was ever started in that direction", function()
+	helpers.it("resumes nothing when no pass was ever started in that direction", migration_case(function()
 		local store = make_store({ { id = 1, text = "a", events_json = "[]" } })
 		install_shell()
 		local _, migration = load_runner(store)
 		helpers.assert_true(not migration.resume_for_posture(true, DEVICE),
 			"a full re-scan at every boot would read a year of history for nothing")
 		restore_shell()
-	end)
+	end))
 
-	helpers.it("reads in bounded batches rather than the whole table", function()
+	helpers.it("reads in bounded batches rather than the whole table", migration_case(function()
 		local rows = {}
 		for id = 1, 7 do rows[id] = { id = id, text = "row " .. id, events_json = "[]" } end
 		local store = make_store(rows)
@@ -392,7 +429,7 @@ helpers.describe("keystats.text_migration: an interrupted pass converges", funct
 			"a batch must never exceed the configured size — memory is the whole point")
 		helpers.assert_true(pumps >= 3,
 			"7 rows in batches of 3 cannot be done in fewer than 3 slices")
-	end)
+	end))
 end)
 
 
@@ -406,7 +443,7 @@ end)
 -- =========================================
 
 helpers.describe("keystats.text_migration: the pass is sliced, not looped", function()
-	helpers.it("schedules the next batch instead of converting the table in one go", function()
+	helpers.it("schedules the next batch instead of converting the table in one go", migration_case(function()
 		local rows = {}
 		for id = 1, 6 do rows[id] = { id = id, text = "row " .. id, events_json = "[]" } end
 		local store = make_store(rows)
@@ -429,5 +466,71 @@ helpers.describe("keystats.text_migration: the pass is sliced, not looped", func
 
 		migration.cancel()
 		restore_shell()
+	end))
+end)
+
+
+--- Exercises the real migration after removing cold and conflicting native caches.
+--- @param should_throw boolean Inject a failure after the cipher has run.
+local function assert_scope_restoration(should_throw)
+	helpers.with_fresh_modules(OWNED_MODULES, function()
+		local borrowed_resets = 0
+		local borrowed_runner = {
+			_set_private_stdin_native = function() borrowed_resets = borrowed_resets + 1 end,
+		}
+		local prior = {
+			["hs.json"] = false,
+			["hs.sqlite3"] = { foreign_native = true },
+			["adapters.shell_runner"] = borrowed_runner,
+			["modules.keystats.text_cipher"] = false,
+			["modules.keystats.sqlite_writer"] = { foreign_writer = true },
+		}
+		for _, name in ipairs(OWNED_MODULES) do package.loaded[name] = prior[name] end
+		local execute, hash = hs.execute, hs.hash
+		local original_batch = Plan.DEFAULT_BATCH_SIZE
+		local ok, result = pcall(function()
+			return with_migration_scope(function()
+				for _, name in ipairs({ "fs", "json", "sqlite3" }) do
+					helpers.assert_true(rawequal(require("hs." .. name), hs[name]),
+						"native requires must resolve to the current hs identity")
+				end
+				local store = make_store({ { id = 1, text = "isolated fixture", events_json = "[]" } })
+				install_shell()
+				local cipher, migration = load_runner(store)
+				cipher.set_enabled(true)
+				helpers.assert_true(migration.start(Plan.MODE_ENCRYPT, DEVICE))
+				drain(migration)
+				helpers.assert_true(TextCrypto.is_encrypted(store.rows[1].values.text))
+				helpers.assert_eq(cipher.decrypt(store.rows[1].values.text), "isolated fixture")
+				Plan.DEFAULT_BATCH_SIZE = original_batch + 1
+				if should_throw then error("migration fixture failure receipt", 0) end
+				return "migration fixture completed"
+			end)
+		end)
+		helpers.assert_eq(ok, not should_throw)
+		if should_throw then
+			helpers.assert_not_nil(result:find("migration fixture failure receipt", 1, true))
+		else
+			helpers.assert_eq(result, "migration fixture completed")
+		end
+		for _, name in ipairs(OWNED_MODULES) do
+			helpers.assert_true(rawequal(package.loaded[name], prior[name]),
+				"scope must restore the exact prior nil/false/table identity for " .. name)
+		end
+		helpers.assert_true(rawequal(hs.execute, execute))
+		helpers.assert_true(rawequal(hs.hash, hash))
+		helpers.assert_eq(Plan.DEFAULT_BATCH_SIZE, original_batch)
+		helpers.assert_eq(borrowed_resets, 0,
+			"a borrowed ShellRunner keeps its private native provider")
+	end)
+end
+
+helpers.describe("Migration fixture native identity ownership", function()
+	helpers.it("restores cold and conflicting native identities after success (migration-fixture-isolation)", function()
+		assert_scope_restoration(false)
+	end)
+
+	helpers.it("restores cold and conflicting native identities after failure (migration-fixture-isolation)", function()
+		assert_scope_restoration(true)
 	end)
 end)
