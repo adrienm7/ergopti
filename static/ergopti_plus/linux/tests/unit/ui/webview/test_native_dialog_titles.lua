@@ -356,6 +356,27 @@ h.describe("native configuration picker exit receipts", function()
 		h.it("linux-config-picker-exit: " .. backend .. " accepts successful normalized selection", function()
 			h.assert_eq(picker_exit_receipt(backend, 0, "/owned/chosen/\n"), "accepted|/owned/chosen|modal:1")
 		end)
+		for _, case in ipairs({
+			{ "spaces", "/  configuration  " },
+			{ "carriage return", "/configuration\r" },
+			{ "trailing line feed", "/configuration\n" },
+			{ "embedded line feed", "/config\nuration" },
+		}) do
+			h.it("picker-native-path-bytes: " .. backend .. " preserves a real folder's " .. case[1], function()
+				local created, directory = Shell.exec_checked("mktemp -d")
+				assert(created)
+				directory = directory:gsub("[\r\n]+$", "")
+				local selected = directory .. case[2]
+				local ok, receipt = xpcall(function()
+					assert(Shell.run("mkdir -- " .. Shell.quote(selected)))
+					return picker_exit_receipt(backend, 0, selected .. "\n")
+				end, debug.traceback)
+				assert(Shell.run("rmdir -- " .. Shell.quote(selected) .. " " .. Shell.quote(directory)))
+				if not ok then error(receipt, 0) end
+				h.assert_eq(receipt, "accepted|" .. selected .. "|modal:1",
+					"only the CLI's final LF is framing; filename bytes must survive")
+			end)
+		end
 		for _, status in ipairs({ 1, 7 }) do
 			h.it("linux-config-picker-exit: " .. backend .. " refuses absolute stdout after exit " .. status, function()
 				h.assert_eq(picker_exit_receipt(backend, status, "/untrusted/selection\n"), "refused|modal:1")
@@ -366,7 +387,6 @@ h.describe("native configuration picker exit receipts", function()
 		end)
 	end
 end)
-
 
 h.describe("configuration filesystem root", function()
 	for _, backend in ipairs({ "zenity", "kdialog" }) do

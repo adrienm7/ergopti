@@ -8,7 +8,6 @@
 --- ==============================================================================
 
 local M = {}
-local TextUtils = require("text_utils")
 local WindowTitles = require("window_titles")
 
 --- Normalizes a configuration directory through the canonical XDG default.
@@ -21,7 +20,8 @@ function M.normalize(config_paths, value)
 	end
 	if value == nil or value == "" then return config_paths.default_config_dir() end
 	if type(value) ~= "string" then return nil end
-	local normalized = TextUtils.trim(value)
+	-- A native chooser already returns a filename; whitespace belongs to it.
+	local normalized = value
 	if normalized:match("^/+$") then return "/" end
 	normalized = normalized:gsub("/+$", "")
 	if normalized == "" then return config_paths.default_config_dir() end
@@ -63,7 +63,9 @@ function M.pick(shell, config_paths, i18n, current)
 	local completed, output = require("ui.modal").run(function() return shell.exec_checked(command) end)
 	-- Partial stdout cannot turn native cancellation or command failure into a selection.
 	if completed ~= true or type(output) ~= "string" then return nil, "folder selection was cancelled or refused" end
-	local chosen = output:match("^([^\r\n]*)")
+	-- Both chooser CLIs append one LF to the raw filename. A CR or another LF
+	-- before that delimiter belongs to the selected directory itself.
+	local chosen = output:gsub("\n$", "")
 	local normalized = chosen ~= "" and M.normalize(config_paths, chosen) or nil
 	if not normalized then return nil, "folder selection was cancelled" end
 	return normalized
