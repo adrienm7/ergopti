@@ -26,7 +26,7 @@ local function read(path)
 end
 local bin, logs = folder .. "/bin", folder .. "/logs"
 assert(uv.fs_mkdir(bin, 448)); assert(uv.fs_mkdir(logs, 448))
-for _, program in ipairs({ "mkdir", "hostname" }) do
+for _, program in ipairs({ "mkdir" }) do
 	local found, path = Shell.exec_checked("command -v " .. program)
 	assert(found and path:sub(1, 1) == "/"); assert(uv.fs_symlink(path:gsub("\n$", ""), bin .. "/" .. program))
 end
