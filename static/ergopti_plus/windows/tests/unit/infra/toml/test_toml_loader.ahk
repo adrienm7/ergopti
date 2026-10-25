@@ -856,10 +856,13 @@ TestTL_SelectedExtensionKeepsResolvedOwner() {
 	SavedOverrides := _HotstringsOverrides
 	SavedGroupConfig := HotstringGroupConfig
 	try {
-		FileAppend('[rolls.ct]`ndelay = 0.25`npriority = 67`n', Root . "\overrides.toml", "UTF-8")
+		FileAppend('[rolls.ct]`ndelay_offset = 0.25`npriority = 67`n', Root . "\overrides.toml", "UTF-8")
 		FileAppend('[[ct]]`n"slx" = { output = "literal", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true, priority = 81 }`n'
 			. 'simple = "value"`n[[foreign]]`nforeign = "untouched"`n', Root . "\source.toml", "UTF-8")
 		_HotstringsOverrides := _ParseOverrides(Root . "\overrides.toml")
+		; The file stores the delay as an offset of the base expansion delay.
+		HotstringsOverridesApplyBase()
+		ExpectedDelay := HotstringsDelayFromOffset(HotstringsBaseDelay(), 0.25)
 		HotstringGroupConfig := Map()
 		HotstringsResolveBumpGen()
 		_HotstringRegistrar := 0
@@ -873,7 +876,7 @@ TestTL_SelectedExtensionKeepsResolvedOwner() {
 			AssertEqual("rolls", OwnedSpec.Category)
 			AssertEqual("ct", OwnedSpec.Section)
 			AssertEqual("rolls.ct", OwnedSpec.Group)
-			AssertEqual(0.25, OwnedSpec.TimeActivationSeconds)
+			AssertEqual(ExpectedDelay, OwnedSpec.TimeActivationSeconds)
 			AssertEqual(Position == 1 ? 81 : 67, OwnedSpec.Priority)
 			AssertEqual(Position, OwnedSpec.Seq)
 		}
