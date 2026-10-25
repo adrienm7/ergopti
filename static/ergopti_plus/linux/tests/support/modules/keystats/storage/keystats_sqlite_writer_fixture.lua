@@ -184,7 +184,16 @@ end
 -- Date formatting and writer receipts below are declared unit doubles; the
 -- separate native fixture uses real libc and SQLite for the same public APIs.
 local function with_local_day_clock(body)
-	local previous_date = os.date
+	local calendar = require("modules.keystats.calendar")
+	local previous_date, previous_capture = os.date, calendar.capture
+	-- One fixed UTC+01 observation: neither initialization nor producers may
+	-- combine these civil dates with the process's actual native wall clock.
+	local wall_seconds = 1767311999 -- 2026-01-01T23:59:59Z.
+	assert(previous_date("!%Y-%m-%d %H:%M:%S", wall_seconds) == "2026-01-01 23:59:59")
+	calendar.capture = function()
+		return { wall_ms = wall_seconds * 1000, mono_ms = 1000,
+			date = os.date("%Y-%m-%d", wall_seconds), ts = os.date("!%Y-%m-%d %H:%M:%S", wall_seconds) }
+	end
 	os.date = function(format, epoch)
 		if format == "%Y-%m-%d" then return "2026-01-02" end
 		if format == "!%Y-%m-%d" then return "2026-01-01" end
@@ -192,7 +201,7 @@ local function with_local_day_clock(body)
 		return previous_date(format, epoch)
 	end
 	local ok, err = xpcall(body, debug.traceback)
-	os.date = previous_date
+	os.date, calendar.capture = previous_date, previous_capture
 	if not ok then error(err, 0) end
 end
 
