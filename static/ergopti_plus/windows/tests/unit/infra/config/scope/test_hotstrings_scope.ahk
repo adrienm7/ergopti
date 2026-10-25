@@ -497,6 +497,10 @@ _HotstringsScopeMeasuredDelayRoundTrip(SelectedFamily) {
 		; Other resolver fixtures deliberately seed empty metadata. This real-corpus
 		; round trip owns a fresh cache so the actual TOML parser supplies inheritance.
 		HotstringGroupConfig := Map()
+		; The resolver memoises per generation, and other suites restore the
+		; generation counter after bumping it, so a stale entry of an earlier suite
+		; can carry the very generation this round trip reaches. Own a fresh memo.
+		_HSResolveCache := Map()
 		AssertEqual(1.0, _HotstringsScopeInheritedDelay("autocorrection", SelectedFamily),
 			"the real corpus makes deletion inherit 1.0 seconds")
 		AssertEqual(0.5, ManifestValueFor("hotstrings." . OwnedSection . ".time_activation_seconds", "recommended"),
