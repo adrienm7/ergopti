@@ -559,7 +559,7 @@ _IP_RunRep(Target, Spec, Mode, Frequency, ParentOwner := unset) {
 			return _IP_RepAbort(Reason)
 		if (Rival != "") {
 			Work.Callback := _IP_RivalFire.Bind(Work)
-			SetTimer(Work.Callback, -1)
+			TimerSetCallback(Work.Callback, -1)
 		}
 		if (Reason := _IP_RepAdmission(Work)) != ""
 			return _IP_RepAbort(Reason)
@@ -599,7 +599,7 @@ _IP_RunRep(Target, Spec, Mode, Frequency, ParentOwner := unset) {
 		Callback := Work.Callback
 		Work.Callback := 0
 		if IsObject(Callback)
-			SetTimer(Callback, 0)
+			TimerSetCallback(Callback, 0)
 	}
 }
 

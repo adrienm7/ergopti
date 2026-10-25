@@ -27,11 +27,14 @@ _IPR_ChildSource() {
 	AssertEqual(1, ClockNames, "The real probe stopwatch must be defined once")
 	TickOwner := _DriverProductionFileForSymbol("TickElapsed64", _DriverDir)
 	AssertTrue(TickOwner != "")
-	; The probe presents its target through the shared window presenter.
+	; The probe presents its target through the shared window presenter and
+	; arms its rival through the timer adapter.
 	PresenterOwner := _DriverProductionFileForSymbol("WMPresentWindow", _DriverDir)
 	AssertTrue(PresenterOwner != "" && PresenterOwner != TickOwner)
+	TimerOwner := _DriverProductionFileForSymbol("TimerSetCallback", _DriverDir)
+	AssertTrue(TimerOwner != "" && TimerOwner != TickOwner && TimerOwner != PresenterOwner)
 	return "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
-		. "#Include " . TickOwner . "`n#Include " . PresenterOwner . "`n" . Body . "`n"
+		. "#Include " . TickOwner . "`n#Include " . PresenterOwner . "`n#Include " . TimerOwner . "`n" . Body . "`n"
 		. "#Include " . _DriverDir . "\tests\fixtures\input_probe_rival_owner_body.ahk`n"
 }
 

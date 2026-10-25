@@ -37,15 +37,16 @@ _IPET_ChildSource() {
 	global _DriverDir
 	Code := '#Requires AutoHotkey v2.0' . "`n#SingleInstance Off`n#NoTrayIcon`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 	Seen := Map()
-	; The probe presents its target through the shared window presenter.
-	for Symbol in ["LoggerSetTestSink", "WallClockTimestamp", "TickElapsed", "WMPresentWindow"] {
+	; The probe presents its target through the shared window presenter and
+	; arms its rival through the timer adapter.
+	for Symbol in ["LoggerSetTestSink", "WallClockTimestamp", "TickElapsed", "WMPresentWindow", "TimerSetCallback"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The real probe requires its genuine whole support owner: " . Symbol)
 		AssertFalse(Seen.Has(Owner), "The native support owners must be distinct")
 		Seen[Owner] := true
 		Code .= "#Include " . Owner . "`n"
 	}
-	AssertEqual(4, Seen.Count, "The real logger, native clocks and window presenter must be present")
+	AssertEqual(5, Seen.Count, "The real logger, native clocks, window presenter and timer adapter must be present")
 	Owner := _DriverProductionFileForSymbol("InputProbe_RunHookOrder")
 	Source := FSReadStrict(Owner)
 	for Symbol in ["InputProbe_RunHookOrder", "_IP_Admission", "_IP_OpenTarget", "_IP_HookInject", "_IP_HookProc"]
