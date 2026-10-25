@@ -167,7 +167,11 @@ _ConfigBackup_Walk(ConfigDir, Rules) {
 _ConfigBackup_NextId(Folder, Base) {
 	Highest := 0
 	Prefix := Base . "-"
-	for _, Path in FSListDirectoryStrict(Folder, true) {
+	; Every retained pathname occupies its identity, including foreign files.
+	Entries := FSListDirectoryStrict(Folder, true)
+	for _, FilePath in FSListDirectoryStrict(Folder, false)
+		Entries.Push(FilePath)
+	for _, Path in Entries {
 		SplitPath(Path, &Name)
 		if Name == Base {
 			Highest := Max(Highest, 1)
