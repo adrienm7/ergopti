@@ -352,7 +352,8 @@ TomlConfigSectionSkipKind(Header) {
 	; The record consumer owns its exact namespaces, including unknown row
 	; metadata. Neither the Features loader nor cleanup may acquire those rows.
 	if Parts is Array && Parts.Length >= 2 && Parts[1] == "hotstrings"
-			&& (Parts[2] == "terminators" || Parts[2] == "terminator_states")
+			&& (Parts[2] == "terminators" || Parts[2] == "terminator_states"
+				|| Parts[2] == "terminator_consume")
 		return "foreign"
 	if (Header == "ahk" or InStr(Header, "ahk.") == 1)
 		return "obsolete"

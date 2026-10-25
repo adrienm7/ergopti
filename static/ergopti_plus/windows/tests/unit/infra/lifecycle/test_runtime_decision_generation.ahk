@@ -31,7 +31,6 @@
 
 global _RDGE_RepeatWriterSnapshots := []
 global _RDGE_DelimiterWriterSnapshots := []
-global _RDGE_DelimiterReplaceSnapshots := []
 
 _RDGE_SaveState() {
 	global ConfigurationFile, Features, ScriptInformation
@@ -41,8 +40,7 @@ _RDGE_SaveState() {
 	global _PrefixBuffer, _PrefixContentGeneration
 	global _PrefixInputContextGeneration, _PrefixInputHook
 	global _PrefixVisibleFireDecisions
-	global _HotstringsOverridesPath, _HotstringsOverrides
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HotstringsTerminatorRecords
 	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
 	Hotstrings := Features["hotstrings"]
 	return {
@@ -65,8 +63,7 @@ _RDGE_SaveState() {
 		VisibleDecisions: _PrefixVisibleFireDecisions,
 		OverridesPath: _HotstringsOverridesPath,
 		Overrides: _HotstringsOverrides,
-		WordCache: _HotstringsWordDelimiters,
-		ConsumedCache: _HotstringsConsumedDelimiters,
+		DelimiterOwner: _HotstringsTerminatorRecords,
 		WordLive: HSE_WORD_TERMINATORS,
 		ConsumedLive: HSE_CONSUMED_DELIMITERS
 	}
@@ -75,15 +72,13 @@ _RDGE_SaveState() {
 _RDGE_RestoreState(Saved) {
 	global ConfigurationFile, Features, ScriptInformation
 	global _RDGE_RepeatWriterSnapshots, _RDGE_DelimiterWriterSnapshots
-	global _RDGE_DelimiterReplaceSnapshots
 	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed
 	global HSE_RebuildInProgress, HSE_RegistryTransitionDepth
 	global HSE_RepeatEnabled, HSE_RuntimeDecisionGeneration
 	global _PrefixBuffer, _PrefixContentGeneration
 	global _PrefixInputContextGeneration, _PrefixInputHook
 	global _PrefixVisibleFireDecisions
-	global _HotstringsOverridesPath, _HotstringsOverrides
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HotstringsTerminatorRecords
 	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
 	ConfigurationFile := Saved.ConfigurationFile
 	ScriptInformation["MagicKey"] := Saved.MagicKey
@@ -106,13 +101,11 @@ _RDGE_RestoreState(Saved) {
 	_PrefixVisibleFireDecisions := Saved.VisibleDecisions
 	_HotstringsOverridesPath := Saved.OverridesPath
 	_HotstringsOverrides := Saved.Overrides
-	_HotstringsWordDelimiters := Saved.WordCache
-	_HotstringsConsumedDelimiters := Saved.ConsumedCache
+	_HotstringsTerminatorRecords := Saved.DelimiterOwner
 	HSE_WORD_TERMINATORS := Saved.WordLive
 	HSE_CONSUMED_DELIMITERS := Saved.ConsumedLive
 	_RDGE_RepeatWriterSnapshots := []
 	_RDGE_DelimiterWriterSnapshots := []
-	_RDGE_DelimiterReplaceSnapshots := []
 	if Saved.fixture is Object
 		_ScopeOwnerCleanup(Saved.fixture)
 }
@@ -120,13 +113,11 @@ _RDGE_RestoreState(Saved) {
 _RDGE_SeedDecisionState(Name, Saved) {
 	global ConfigurationFile, Features, ScriptInformation
 	global _RDGE_RepeatWriterSnapshots, _RDGE_DelimiterWriterSnapshots
-	global _RDGE_DelimiterReplaceSnapshots
 	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed
 	global HSE_RebuildInProgress, HSE_RegistryTransitionDepth
 	global HSE_RepeatEnabled, _PrefixInputHook
 	global _PrefixVisibleFireDecisions
-	global _HotstringsOverridesPath, _HotstringsOverrides
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HotstringsTerminatorRecords
 	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
 	Saved.fixture := _ScopeOwnerFixture()
 	ConfigurationFile := Saved.fixture.path
@@ -142,14 +133,15 @@ _RDGE_SeedDecisionState(Name, Saved) {
 	HSE_StartIsWordBoundary := true
 	_PrefixInputHook := false
 	_PrefixVisibleFireDecisions := []
-	_HotstringsWordDelimiters := " "
-	_HotstringsConsumedDelimiters := "!"
+	; A fresh delimiter owner admitted from the fixture configuration, then the
+	; two strings the decision scenarios were authored against.
+	_HotstringsTerminatorRecords := 0
+	HotstringsTerminatorRecordsInit(FSReadUtf8Exact(ConfigurationFile))
 	HSE_WORD_TERMINATORS := " "
 	HSE_CONSUMED_DELIMITERS := "!"
 	HSE_Buffer := ""
 	_RDGE_RepeatWriterSnapshots := []
 	_RDGE_DelimiterWriterSnapshots := []
-	_RDGE_DelimiterReplaceSnapshots := []
 }
 
 _RDGE_RepeatWriter(Path, Updates) {
@@ -165,30 +157,11 @@ _RDGE_RepeatWriter(Path, Updates) {
 	return 1
 }
 
-_RDGE_DelimiterWriter(StagePath, Content) {
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+_RDGE_DelimiterWriter(Path, Updates) {
 	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
 	global HSE_RuntimeDecisionGeneration
 	global _RDGE_DelimiterWriterSnapshots
 	_RDGE_DelimiterWriterSnapshots.Push({
-		WordCache: _HotstringsWordDelimiters,
-		ConsumedCache: _HotstringsConsumedDelimiters,
-		WordLive: HSE_WORD_TERMINATORS,
-		ConsumedLive: HSE_CONSUMED_DELIMITERS,
-		RuntimeGeneration: HSE_RuntimeDecisionGeneration,
-		Critical: A_IsCritical
-	})
-	return 1
-}
-
-_RDGE_DelimiterReplace(StagePath, TargetPath) {
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
-	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
-	global HSE_RuntimeDecisionGeneration
-	global _RDGE_DelimiterReplaceSnapshots
-	_RDGE_DelimiterReplaceSnapshots.Push({
-		WordCache: _HotstringsWordDelimiters,
-		ConsumedCache: _HotstringsConsumedDelimiters,
 		WordLive: HSE_WORD_TERMINATORS,
 		ConsumedLive: HSE_CONSUMED_DELIMITERS,
 		RuntimeGeneration: HSE_RuntimeDecisionGeneration,
@@ -301,12 +274,10 @@ Test("hotstrings runtime epoch: repeat publication retires its canonical preview
 ; =======================================================
 
 _RDGE_DelimiterPublishersInvalidateCanonicalDecision() {
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
 	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
 	global HSE_RuntimeDecisionGeneration, HSE_RegistryGeneration
 	global _PrefixContentGeneration, _PrefixInputContextGeneration
 	global _RDGE_DelimiterWriterSnapshots
-	global _RDGE_DelimiterReplaceSnapshots
 	Saved := _RDGE_SaveState()
 	try {
 		_RDGE_SeedDecisionState("delimiters", Saved)
@@ -316,28 +287,19 @@ _RDGE_DelimiterPublishersInvalidateCanonicalDecision() {
 		BeforeContent := _PrefixContentGeneration
 		BeforeContext := _PrefixInputContextGeneration
 
-		AssertTrue(HotstringsSetWordDelimiters(" x",
-			_RDGE_DelimiterWriter, _RDGE_DelimiterReplace))
+		AssertEqual(1, HotstringsTerminatorToggle("comma", _RDGE_DelimiterWriter))
 		AssertEqual(1, _RDGE_DelimiterWriterSnapshots.Length)
-		AssertEqual(1, _RDGE_DelimiterReplaceSnapshots.Length)
-		for Snapshot in [_RDGE_DelimiterWriterSnapshots[1],
-			_RDGE_DelimiterReplaceSnapshots[1]] {
-			AssertEqual(" ", Snapshot.WordCache,
-				"word publication must remain detached through durable I/O")
-			AssertEqual("!", Snapshot.ConsumedCache)
-			AssertEqual(" ", Snapshot.WordLive)
-			AssertEqual("!", Snapshot.ConsumedLive)
-			AssertEqual(BeforeWordRuntime, Snapshot.RuntimeGeneration,
-				"the epoch must remain old through atomic disk replacement")
-			AssertEqual(0, Snapshot.Critical,
-				"filesystem adapters must remain outside Critical")
-		}
-		AssertEqual(" x", _HotstringsWordDelimiters)
-		AssertEqual("!", _HotstringsConsumedDelimiters,
-			"a word-only update must preserve the consumed cache")
-		AssertEqual(" x", HSE_WORD_TERMINATORS)
-		AssertEqual("!", HSE_CONSUMED_DELIMITERS,
-			"a word-only update must preserve the consumed engine value")
+		Snapshot := _RDGE_DelimiterWriterSnapshots[1]
+		AssertEqual(" ", Snapshot.WordLive,
+			"word publication must remain detached through the durable write")
+		AssertEqual("!", Snapshot.ConsumedLive)
+		AssertEqual(BeforeWordRuntime, Snapshot.RuntimeGeneration,
+			"the epoch must remain old through the durable write")
+		AssertEqual(0, Snapshot.Critical,
+			"the configuration write must remain outside Critical")
+		AssertEqual(" `t`r`n★;.!?:", HSE_WORD_TERMINATORS,
+			"a word-set mutation publishes the strings derived from the leaves")
+		AssertEqual("★", HSE_CONSUMED_DELIMITERS)
 		AssertEqual(BeforeWordRuntime + 1,
 			HSE_RuntimeDecisionGeneration,
 			"word publication must advance the shared runtime epoch once")
@@ -347,25 +309,18 @@ _RDGE_DelimiterPublishersInvalidateCanonicalDecision() {
 		AssertFalse(HotstringPrefixWatcherDecisionItemsStillCurrent(
 			[WordCandidate]),
 			"a word-set mutation must reject a visible pre-mutation decision")
-		AssertFalse(HSE_PreviewNextDecision("runtimeepochx", "★") is Object,
-			"adding the repeated letter to the word boundary set must change the live answer")
 
-		AssertTrue(HotstringsSetWordDelimiters(" ",
-			_RDGE_DelimiterWriter, _RDGE_DelimiterReplace))
 		ConsumedCandidate := _RDGE_CreateRepeatCandidate("runtimeepochx")
 		BeforeConsumedRuntime := HSE_RuntimeDecisionGeneration
 		BeforeRegistry := HSE_RegistryGeneration
 		BeforeContent := _PrefixContentGeneration
 		BeforeContext := _PrefixInputContextGeneration
 
-		AssertTrue(HotstringsSetConsumedDelimiters("★?",
-			_RDGE_DelimiterWriter, _RDGE_DelimiterReplace))
-		AssertEqual(" ", _HotstringsWordDelimiters,
-			"a consumed-only update must preserve the word cache")
-		AssertEqual("★?", _HotstringsConsumedDelimiters)
-		AssertEqual(" ", HSE_WORD_TERMINATORS,
+		AssertEqual(1, HotstringsTerminatorBuiltinCommit(
+			Map("semicolon", Map("consume", 1)), _RDGE_DelimiterWriter))
+		AssertEqual(" `t`r`n★;.!?:", HSE_WORD_TERMINATORS,
 			"a consumed-only update must preserve the word engine value")
-		AssertEqual("★?", HSE_CONSUMED_DELIMITERS)
+		AssertEqual("★;", HSE_CONSUMED_DELIMITERS)
 		AssertEqual(BeforeConsumedRuntime + 1,
 			HSE_RuntimeDecisionGeneration,
 			"consumed publication must advance the same runtime epoch once")
@@ -375,11 +330,8 @@ _RDGE_DelimiterPublishersInvalidateCanonicalDecision() {
 		AssertFalse(HotstringPrefixWatcherDecisionItemsStillCurrent(
 			[ConsumedCandidate]),
 			"a consumed-set mutation must reject a visible pre-mutation decision")
-		AssertTrue(HSE_PreviewNextDecision("runtimeepochx", "★") is Object,
-			"consumed publication must retain the live repeat match while changing its output consumption")
-		AssertEqual(3, _RDGE_DelimiterWriterSnapshots.Length,
-			"word mutation, reset and consumed mutation must each write once")
-		AssertEqual(3, _RDGE_DelimiterReplaceSnapshots.Length)
+		AssertEqual(2, _RDGE_DelimiterWriterSnapshots.Length,
+			"the word mutation and the consumed mutation must each write once")
 	} finally _RDGE_RestoreState(Saved)
 }
 Test("hotstrings runtime epoch: word and consumed publishers reject old rows",

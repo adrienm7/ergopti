@@ -20,11 +20,11 @@ _HSDT_ControlCorpus() {
 }
 
 _HSDT_ControlSetAll(Enable, Writer, *) {
-	return _HS_DelimSetAll(Enable, Writer, _HSDT_AcceptReplace, _HSDT_Notify)
+	return _HS_DelimSetAll(Enable, Writer, _HSDT_Notify)
 }
 
 _HSDT_ControlRestore(Writer, *) {
-	return _HS_DelimReset(Writer, _HSDT_AcceptReplace, _HSDT_Notify)
+	return _HS_DelimReset(Writer, _HSDT_Notify)
 }
 
 _HSDT_ControlCommands(Writer) {
@@ -45,8 +45,15 @@ _HSDT_NativeControlCallback(Built, Position) {
 	return _MenuDispatchCallbacks[Id]
 }
 
+; The corpus states space, slash and a personal delimiter x; this seed starts them
+; as the corpus's "initial" row and adds a personal, consumed currency sign.
+_HSDT_ControlSeed(Name) {
+	_HSDT_Seed(Name, '[hotstrings.terminator_states]`nspace = false`nslash = true`ncustom_x = false`n'
+		. '[[hotstrings.terminators]]`nkey = "custom_x"`nchar = "x"`nlabel = "x"`nconsume = false`n'
+		. '[[hotstrings.terminators]]`nkey = "keep"`nchar = "¤"`nlabel = "Keep"`nconsume = true`n')
+}
+
 _HSDT_SharedControlMatrix() {
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
 	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
 	Corpus := _HSDT_ControlCorpus()
 	AssertEqual(3, Corpus["rows"].Length, "every independent control must execute")
@@ -54,7 +61,7 @@ _HSDT_SharedControlMatrix() {
 	Saved := _HSDT_SaveState()
 	try {
 		for Index, Expected in Corpus["rows"] {
-			_HSDT_Seed("shared-control-" . Index, "/¤😀", "¤🔒")
+			_HSDT_ControlSeed("shared-control-" . Index)
 			Built := _HSDT_NativeControlMenu(_HSDT_AcceptWriter)
 			try {
 				for Position, Row in Corpus["rows"] {
@@ -64,13 +71,14 @@ _HSDT_SharedControlMatrix() {
 				Callback := _HSDT_NativeControlCallback(Built, Index - 1)
 				AssertTrue(Callback.Call(), "the actual owned delimiter transaction must acknowledge")
 				State := Corpus["delimiter_states"][Modes[Index]]
-				AssertEqual(State["space"], InStr(_HotstringsWordDelimiters, " ") > 0)
-				AssertEqual(State["slash"], InStr(_HotstringsWordDelimiters, "/") > 0)
-				AssertEqual(State["custom_x"], InStr(_HotstringsWordDelimiters, "x") > 0)
-				AssertTrue(InStr(_HotstringsWordDelimiters, "¤😀") > 0, "personal delimiters survive")
-				AssertTrue(InStr(_HotstringsConsumedDelimiters, "¤🔒") > 0, "personal consumption survives")
-				AssertEqual(_HotstringsWordDelimiters, HSE_WORD_TERMINATORS)
-				AssertEqual(_HotstringsConsumedDelimiters, HSE_CONSUMED_DELIMITERS)
+				Word := HotstringsGetWordDelimiters()
+				AssertEqual(State["space"], InStr(Word, " ") > 0)
+				AssertEqual(State["slash"], InStr(Word, "/") > 0)
+				AssertEqual(State["custom_x"], InStr(Word, "x") > 0)
+				AssertTrue(InStr(Word, "¤") > 0, "personal delimiters survive")
+				AssertTrue(InStr(HotstringsGetConsumedDelimiters(), "¤") > 0, "personal consumption survives")
+				AssertEqual(Word, HSE_WORD_TERMINATORS)
+				AssertEqual(HotstringsGetConsumedDelimiters(), HSE_CONSUMED_DELIMITERS)
 			} finally _CTC_ReleaseMenu(Built)
 		}
 	} finally _HSDT_Restore(Saved)
@@ -78,8 +86,8 @@ _HSDT_SharedControlMatrix() {
 Test("word expanders: shared native controls replay the independent state corpus", _HSDT_SharedControlMatrix)
 
 _HSDT_SharedControlOrderAndRefusal() {
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
-	global _HSDT_WriteCalls, _HSDT_ReplaceCalls, _HSDT_NotifyCalls
+	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+	global _HSDT_WriteCalls, _HSDT_NotifyCalls
 	Definitions := _MR_GetManifestRoot()["word_expanders_menu"]
 	SavedDefinitions := Definitions.Clone()
 	Corpus := _HSDT_ControlCorpus()
@@ -87,7 +95,8 @@ _HSDT_SharedControlOrderAndRefusal() {
 	try {
 		Definitions[1] := SavedDefinitions[3]
 		Definitions[3] := SavedDefinitions[1]
-		_HSDT_Seed("shared-control-refusal", "/¤😀", "¤🔒")
+		_HSDT_ControlSeed("shared-control-refusal")
+		SeededWord := HSE_WORD_TERMINATORS, SeededConsumed := HSE_CONSUMED_DELIMITERS
 		Built := _HSDT_NativeControlMenu(_HSDT_FalseWriter)
 		try {
 			AssertEqual(t(Corpus["rows"][3]["i18n"]), _CTC_LabelAt(Built, 0))
@@ -95,10 +104,9 @@ _HSDT_SharedControlOrderAndRefusal() {
 			AssertEqual(t(Corpus["rows"][1]["i18n"]), _CTC_LabelAt(Built, 2))
 			Callback := _HSDT_NativeControlCallback(Built, 0)
 			AssertFalse(Callback.Call(), "the reordered restore must retain the real writer refusal")
-			AssertEqual("/¤😀", _HotstringsWordDelimiters)
-			AssertEqual("¤🔒", _HotstringsConsumedDelimiters)
+			AssertEqual(SeededWord, HSE_WORD_TERMINATORS)
+			AssertEqual(SeededConsumed, HSE_CONSUMED_DELIMITERS)
 			AssertEqual(1, _HSDT_WriteCalls)
-			AssertEqual(0, _HSDT_ReplaceCalls)
 			AssertEqual(0, _HSDT_NotifyCalls)
 		} finally _CTC_ReleaseMenu(Built)
 	} finally {
@@ -111,14 +119,15 @@ Test("word expanders: shared ordering retains the actual native owner refusal", 
 
 
 _HSDT_SharedControlRefusesDelayedPause() {
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
-	global _HSDT_WriteCalls, _HSDT_ReplaceCalls, _HSDT_NotifyCalls
+	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+	global _HSDT_WriteCalls, _HSDT_NotifyCalls
 	Saved := _HSDT_SaveState()
 	WasSuspended := A_IsSuspended
 	Built := 0
 	try {
 		Suspend(false)
-		_HSDT_Seed("shared-control-delayed-pause", "/¤😀", "¤🔒")
+		_HSDT_ControlSeed("shared-control-delayed-pause")
+		SeededWord := HSE_WORD_TERMINATORS, SeededConsumed := HSE_CONSUMED_DELIMITERS
 		Built := _HSDT_NativeControlMenu(_HSDT_AcceptWriter)
 		Callbacks := []
 		loop 3
@@ -129,10 +138,9 @@ _HSDT_SharedControlRefusesDelayedPause() {
 			Receipts.Push(Callback.Call())
 		AssertEqual(3, Receipts.Length, "every captured control must refuse actual suspended delivery")
 		AssertEqual(0, _HSDT_WriteCalls)
-		AssertEqual(0, _HSDT_ReplaceCalls)
 		AssertEqual(0, _HSDT_NotifyCalls)
-		AssertEqual("/¤😀", _HotstringsWordDelimiters)
-		AssertEqual("¤🔒", _HotstringsConsumedDelimiters)
+		AssertEqual(SeededWord, HSE_WORD_TERMINATORS)
+		AssertEqual(SeededConsumed, HSE_CONSUMED_DELIMITERS)
 		for Receipt in Receipts
 			AssertFalse(Receipt, "the current readiness owner refuses before the durable owner")
 	} finally {
@@ -155,37 +163,23 @@ _HSDT_CustomDeleteCorpus() {
 }
 
 _HSDT_DeclaredCustomDeleteReceipts() {
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
-	global _HSDT_WriteCalls, _HSDT_ReplaceCalls, _HSDT_NotifyCalls
 	Corpus := _HSDT_CustomDeleteCorpus()
-	Saved := _HSDT_SaveState()
-	try {
-		for Mode in ["ack", "refused", "paused"] {
-			_HSDT_Seed("declared-custom-delete-" . Mode,
-				Corpus["native_membership"]["before"], Corpus["native_membership"]["before"])
-			Seen := Map("ready", true)
-			Expected := Corpus["rows"][1]
-			Writer := Mode == "refused" ? _HSDT_FalseWriter : _HSDT_AcceptWriter
-			Command := _HS_DelimRemoveCustomCommit.Bind(Corpus["target"]["char"], Writer,
-				_HSDT_AcceptReplace, _HSDT_Notify)
-			Row := MenuRenderer_CommandRow(Corpus["section"], Expected["id"],
-				Map(Expected["id"], Command), Map(Expected["ready"], (*) => Seen["ready"]))
-			Assert(Row is Map, "the declared provider supplies the actual native row")
-			AssertEqual(t(Expected["i18n"]), Row["label"])
-			if Mode == "paused"
-				Seen["ready"] := false
-			; Native callbacks collect through the real delimiter transaction;
-			; assertions follow delivery and any production-caught refusal.
-			Committed := Row["action"].Call()
-			AssertEqual(Mode == "ack", Committed)
-			AssertEqual(Mode == "ack" ? Corpus["native_membership"]["ack"]
-				: Corpus["native_membership"]["refused"], _HotstringsWordDelimiters)
-			AssertEqual(_HotstringsWordDelimiters, _HotstringsConsumedDelimiters)
-			AssertEqual(Mode == "paused" ? 0 : 1, _HSDT_WriteCalls)
-			AssertEqual(Mode == "ack" ? 1 : 0, _HSDT_ReplaceCalls)
-			AssertEqual(Mode == "ack" ? 1 : 0, _HSDT_NotifyCalls)
-		}
-	} finally _HSDT_Restore(Saved)
+	for Mode in ["ack", "refused", "paused"] {
+		Seen := Map("ready", true, "calls", 0)
+		Expected := Corpus["rows"][1]
+		; The typed record owner is exercised by the record suite; here the shared
+		; declaration is proven to reach the owner, and only when it is ready.
+		Command := (*) => (Seen["calls"] += 1, Mode == "ack" ? 1 : 0)
+		Row := MenuRenderer_CommandRow(Corpus["section"], Expected["id"],
+			Map(Expected["id"], Command), Map(Expected["ready"], (*) => Seen["ready"]))
+		Assert(Row is Map, "the declared provider supplies the actual native row")
+		AssertEqual(t(Expected["i18n"]), Row["label"])
+		if Mode == "paused"
+			Seen["ready"] := false
+		Committed := Row["action"].Call()
+		AssertEqual(Mode == "ack", Committed)
+		AssertEqual(Mode == "paused" ? 0 : 1, Seen["calls"])
+	}
 }
 Test("custom word expanders: declared Delete retains native ACK, refusal and delayed pause",
 	_HSDT_DeclaredCustomDeleteReceipts)
@@ -194,7 +188,7 @@ _HSDT_CustomProviderOwnsDeclaredDelete() {
 	Body := _DriverFuncBody("_HS_WordExpanderRows")
 	Assert(Body != "", "the actual custom-delimiter provider must exist")
 	Assert(InStr(Body, 'MenuRenderer_CommandRow("word_expander_custom_menu", "word_expander_delete"'))
-	Assert(InStr(Body, "_HS_DelimRemoveCustom(C)"), "the shared row retains its captured native target owner")
+	Assert(InStr(Body, "_HS_DelimRemoveRecord(Captured)"), "the shared row retains its captured native target owner")
 	AssertFalse(InStr(Body, 't("menu.hotstrings.delete_delimiter")'),
 		"a native fixed label cannot override the canonical command declaration")
 }
@@ -210,38 +204,26 @@ _HSDT_CustomAddCorpus() {
 }
 
 _HSDT_DeclaredCustomAddReceipts() {
-	global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
-	global _HSDT_WriteCalls, _HSDT_ReplaceCalls, _HSDT_NotifyCalls
 	Corpus := _HSDT_CustomAddCorpus()
-	Saved := _HSDT_SaveState()
-	try {
-		for Mode in ["ack", "refused", "paused"] {
-			_HSDT_Seed("declared-custom-add-" . Mode)
-			Ready := Map("value", true)
-			Writer := Mode == "refused" ? _HSDT_FalseWriter : _HSDT_AcceptWriter
-			Command := _HS_DelimAddCustomCommit.Bind(Corpus["target"]["char"], true,
-				Writer, _HSDT_AcceptReplace, _HSDT_Notify)
-			Row := MenuRenderer_CommandRow(Corpus["section"], Corpus["id"],
-				Map(Corpus["id"], Command), Map(Corpus["ready"], (*) => Ready["value"]))
-			Assert(Row is Map, "the Add declaration supplies an actual native command row")
-			AssertEqual(t(Corpus["i18n"]), Row["label"])
-			if Mode == "paused"
-				Ready["value"] := false
-			Committed := Row["action"].Call()
-			AssertEqual(Mode == "ack", Committed)
-			AssertEqual(Mode == "ack" ? "A" . Corpus["target"]["char"] : "A", _HotstringsWordDelimiters)
-			AssertEqual(_HotstringsWordDelimiters, _HotstringsConsumedDelimiters)
-			AssertEqual(Mode == "paused" ? 0 : 1, _HSDT_WriteCalls)
-			AssertEqual(Mode == "ack" ? 1 : 0, _HSDT_ReplaceCalls)
-			AssertEqual(Mode == "ack" ? 1 : 0, _HSDT_NotifyCalls)
-		}
-	} finally _HSDT_Restore(Saved)
+	for Mode in ["ack", "refused", "paused"] {
+		Ready := Map("value", true, "calls", 0)
+		Command := (*) => (Ready["calls"] += 1, Mode == "ack" ? 1 : 0)
+		Row := MenuRenderer_CommandRow(Corpus["section"], Corpus["id"],
+			Map(Corpus["id"], Command), Map(Corpus["ready"], (*) => Ready["value"]))
+		Assert(Row is Map, "the Add declaration supplies an actual native command row")
+		AssertEqual(t(Corpus["i18n"]), Row["label"])
+		if Mode == "paused"
+			Ready["value"] := false
+		Committed := Row["action"].Call()
+		AssertEqual(Mode == "ack", Committed)
+		AssertEqual(Mode == "paused" ? 0 : 1, Ready["calls"])
+	}
 }
 Test("custom word expanders: declared Add retains native ACK, refusal and held pause",
 	_HSDT_DeclaredCustomAddReceipts)
 
 _HSDT_PausedNativeAddOpensNoDialog() {
-	global _HS_DelimAddGui, _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global _HS_DelimAddGui, HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
 	Entry := _DriverFuncBody("_HS_DelimAddCustom")
 	Assert(Entry != "", "the actual modal owner must exist before native delivery")
 	PauseGatePosition := RegExMatch(Entry, "m)^\s*if A_IsSuspended\s*$")
@@ -258,15 +240,15 @@ _HSDT_PausedNativeAddOpensNoDialog() {
 		Suspend(true)
 		Result := _HS_DelimAddCustom()
 		Observed := Map("result", Result, "gui", _HS_DelimAddGui,
-			"word", _HotstringsWordDelimiters, "consumed", _HotstringsConsumedDelimiters)
+			"word", HSE_WORD_TERMINATORS, "consumed", HSE_CONSUMED_DELIMITERS)
 	} finally {
 		Suspend(WasSuspended)
 		_HSDT_Restore(Saved)
 	}
 	AssertFalse(Observed["result"])
 	AssertEqual(PreviousGui, Observed["gui"], "the paused native owner must not create, present or retire a dialog")
-	AssertEqual("A", Observed["word"])
-	AssertEqual("A", Observed["consumed"])
+	AssertEqual(_HSDT_DefaultWord(), Observed["word"])
+	AssertEqual("★", Observed["consumed"])
 	AssertEqual(WasSuspended, A_IsSuspended, "the actual native suspension owner is restored exactly")
 }
 Test("custom word expanders: actual suspended Add entry keeps its native dialog owner inert",
@@ -276,9 +258,8 @@ _HSDT_CustomAddProviderKeepsPostModalAdmission() {
 	Provider := _DriverFuncBody("_HS_WordExpanderRows")
 	Owner := _DriverFuncBody("_HS_DelimAddCustom")
 	RecordCommit := _DriverFuncBody("_HS_DelimAddRecordCommit")
-	StringCommit := _DriverFuncBody("_HS_DelimAddCustomCommit")
-	Assert(Provider != "" && Owner != "" && RecordCommit != "" && StringCommit != "",
-		"the provider, modal owner and both distinct commit owners must exist")
+	Assert(Provider != "" && Owner != "" && RecordCommit != "",
+		"the provider, modal owner and typed commit owner must exist")
 	Assert(InStr(Provider, 'MenuRenderer_CommandRow("word_expander_custom_menu", "word_expander_add"'))
 	AssertFalse(InStr(Provider, 'Map("label", t("menu.hotstrings.add_delimiter")'),
 		"the native provider must not replace the canonical Add label")
@@ -289,9 +270,6 @@ _HSDT_CustomAddProviderKeepsPostModalAdmission() {
 		"the typed commit must retain scalar, consume-type and suspension admission")
 	AssertEqual(1, _HSDT_PostModalCodeCount(RecordCode, "\bHotstringsTerminatorRecordsEdit\("),
 		"the typed commit must acquire exactly one actual record transaction")
-	StringCode := _DriverMaskNonCode(&StringCommit)
-	AssertEqual(1, _HSDT_PostModalCodeCount(StringCode, "\b_HS_DelimCommit\("),
-		"historical anonymous strings must retain their distinct transaction owner")
 	ClosePosition := InStr(Owner, 'finally _HS_DelimAddGui := ""')
 	Assert(ClosePosition > 0, "the real close receipt must exist before deriving mutations")
 	ModalPrefix := SubStr(Owner, 1, ClosePosition - 1)
@@ -306,7 +284,7 @@ _HSDT_CustomAddProviderKeepsPostModalAdmission() {
 	AssertEqual(1, CancelReplacements, "the mutant removes only the actual cancelled-result gate")
 	_HSDT_ExpectPostModalRefusal(NoCancel, "cancelled and empty native results must remain unpublished")
 	TypedCall := "return _HS_DelimAddRecordCommit(Result.Char, Result.Consume)"
-	LegacyCall := "return _HS_DelimAddCustomCommit(Result.Char, Result.Consume)"
+	LegacyCall := "return _HS_DelimToggleEntry(Result.Char)"
 	WrongOwner := StrReplace(Owner, TypedCall, LegacyCall, true, &CommitReplacements, 1)
 	AssertEqual(1, CommitReplacements, "the mutant redirects the actual typed transaction once")
 	_HSDT_ExpectPostModalRefusal(WrongOwner, "the modal result must acquire exactly one typed record owner")

@@ -402,10 +402,8 @@ _HS_RebuildAfterDelayChange(What, RebuildFn := 0) {
 ; the same {label, action, checked, items} shape.
 _HS_WordExpanderRows(Commands := unset) {
 	global HSE_Terminators, _HotstringsTerminatorRecords
-	Current      := HotstringsGetWordDelimiters()
-	Consumed     := HotstringsGetConsumedDelimiters()
-	Defs         := HSE_Terminators.all()
-	BuiltinChars := HSE_TerminatorBuiltinChars()
+	Defs := HSE_Terminators.all()
+	Owner := _HotstringsTerminatorRecords
 
 	Rows := []
 
@@ -419,31 +417,30 @@ _HS_WordExpanderRows(Commands := unset) {
 				Rows.Push(Row)
 			continue
 		}
-		Chars := D["chars"]
+		Key := D["key"]
+		; The state of the entry: its config.toml leaves over the catalogue default.
+		State := (Owner is Object && Owner.Builtin.Has(Key)) ? Owner.Builtin[Key]
+			: { Enabled: !!D["default_enabled"], Consume: !!D["consume"] }
 		; The catalogue carries a locale key, never display text: resolving it
 		; here, at render time, follows a language switch without a restart.
 		Lbl   := t(D["label_key"])
 		; A consumed delimiter is swallowed by the expansion, an unconsumed one is
 		; typed after it. The difference shows only in the output, so the row has
-		; to say which it is. On Windows consumption is opt-in via
-		; consumed_delimiters rather than the catalogue flag.
-		if HSE_TerminatorAnyCharIn(Chars, Consumed)
+		; to say which it is.
+		if State.Consume
 			Lbl .= " " . t("menu.hotstrings.consumed_suffix")
 		Rows.Push(Map(
 			"label",   Lbl,
-			"action",  ((CharsArr) => (*) => _HS_DelimToggleEntry(CharsArr))(Chars),
-			"checked", HSE_TerminatorEntryEnabled(Chars, Current) ? true : false))
+			"action",  ((EntryKey) => (*) => _HS_DelimToggleEntry(EntryKey))(Key),
+			"checked", State.Enabled ? true : false))
 	}
 	CatalogueRows := Rows
 	Rows := []
 
-	; ── Custom delimiters: chars in the active string that no catalogue entry
-	;    owns. Structural CR/LF belong to the "enter" entry. ──
-	RecordChars := ""
+	; ── Custom delimiters: the user's own, kept as records in config.toml. ──
 	if _HotstringsTerminatorRecords is Object {
 		for Record in _HotstringsTerminatorRecords.Records {
 			Admission := HotstringsTerminatorRecordCapture(Record)
-			RecordChars .= Record.Char
 			Rows.Push(Map("label", Record.Label
 				. (Record.Consume ? " " . t("menu.hotstrings.consumed_suffix") : ""),
 				"checked", Record.Enabled,
@@ -453,19 +450,6 @@ _HS_WordExpanderRows(Commands := unset) {
 					Map("word_expander_delete", ((Captured) => (*) => _HS_DelimRemoveRecord(Captured))(Admission)),
 					Map("word_expanders_ready", (*) => !A_IsSuspended))]))
 		}
-	}
-	for Ch in _TextCodepoints(Current) {
-		if (Ch == "`r" or Ch == "`n" or InStr(BuiltinChars, Ch) or InStr(RecordChars, Ch))
-			continue
-		ConsumedSfx := (InStr(Consumed, Ch) > 0) ? (" " . t("menu.hotstrings.consumed_suffix")) : ""
-		Rows.Push(Map(
-			"label", Ch . " : " . t("menu.hotstrings.custom_label") . ConsumedSfx,
-			; Always ticked: a custom delimiter exists only while it is in the
-			; active string, so its presence IS its enabled state.
-			"checked", true,
-			"items", [MenuRenderer_CommandRow("word_expander_custom_menu", "word_expander_delete",
-				Map("word_expander_delete", ((C) => (*) => _HS_DelimRemoveCustom(C))(Ch)),
-				Map("word_expanders_ready", (*) => !A_IsSuspended))]))
 	}
 
 	Rows.Push(MenuRenderer_CommandRow("word_expander_custom_menu", "word_expander_add",
@@ -511,45 +495,35 @@ _HS_WordExpanderCommand(Command, Ready, *) {
 	return Command.Call()
 }
 
-; Toggle a whole catalogue entry (all of its chars) on/off and persist. The
-; toggle logic lives in HSE_TerminatorToggleString (infra/hotstrings_config.ahk)
-; so it is shared with the config window and unit-tested.
-_HS_DelimToggleEntry(CharsArr, WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
-	BuildFn := (CurrentWord, CurrentConsumed) => {
-		Word: HSE_TerminatorToggleString(CurrentWord, CharsArr),
-		Consumed: CurrentConsumed
-	}
-	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
+; Toggle a whole catalogue entry (all of its chars) on/off and persist. The state
+; is a config.toml leaf written through the live writer: no reload.
+_HS_DelimToggleEntry(Key, WriterFn := 0, NotifyFn := 0) {
+	return _HS_DelimCommit(() => HotstringsTerminatorToggle(Key, WriterFn), NotifyFn)
 }
 
-; Set every built-in catalogue entry on (true) or off (false), preserving any
-; user-defined custom chars. Delegates to the shared, tested pure function.
-_HS_DelimSetAll(Enable, WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
-	BuildFn := (CurrentWord, CurrentConsumed) => {
-		Word: HSE_TerminatorSetAllString(CurrentWord, Enable),
-		Consumed: CurrentConsumed
-	}
-	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
+; Set every built-in catalogue entry on (true) or off (false), preserving the
+; user's own delimiters (records).
+_HS_DelimSetAll(Enable, WriterFn := 0, NotifyFn := 0) {
+	return _HS_DelimCommit(() => HotstringsTerminatorSetAll(Enable, WriterFn), NotifyFn)
 }
 
-; Restore shipped defaults without deleting personal word or consumed markers.
-_HS_DelimReset(WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
-	BuildFn := (CurrentWord, CurrentConsumed) =>
-		HSE_TerminatorRestoreDefaults(CurrentWord, CurrentConsumed)
-	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
+; Restore the shipped state and consumption of every built-in delimiter without
+; deleting the user's own records.
+_HS_DelimReset(WriterFn := 0, NotifyFn := 0) {
+	return _HS_DelimCommit(() => HotstringsTerminatorRestoreBuiltin(WriterFn), NotifyFn)
 }
 
-; Execute one delimiter candidate transaction and show the success notice only
-; after strict durable success. A terminal transition or refused writer leaves
-; both engine variables untouched and produces no misleading notification.
-_HS_DelimCommit(BuildFn, WriterFn := 0, ReplaceFn := 0, NotifyFn := 0) {
+; Execute one delimiter transaction and show the success notice only after
+; strict durable success. A refused writer leaves the engine strings untouched
+; and produces no misleading notification.
+_HS_DelimCommit(CommitFn, NotifyFn := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
+		try return _HS_DelimCommit(CommitFn, NotifyFn)
 		finally Critical(InheritedCritical)
 	}
-	try Committed := HotstringsCommitDelimiterUpdate(BuildFn, WriterFn, ReplaceFn)
+	try Committed := CommitFn.Call()
 	catch as Err {
 		try LoggerError("HotstringsMenu",
 			"Delimiter transaction raised before publication: {1}.", Err.Message)
@@ -621,19 +595,6 @@ _HS_DelimAddCustom() {
 	return _HS_DelimAddRecordCommit(Result.Char, Result.Consume)
 }
 
-; Add the word and optional consumed membership in ONE transaction. The previous
-; two-setter sequence could publish the word key while the consumed-key write
-; failed, and each setter rebuilt the same whole file from a different snapshot.
-_HS_DelimAddCustomCommit(Char, Consume, WriterFn := 0, ReplaceFn := 0,
-	NotifyFn := 0) {
-	BuildFn := (CurrentWord, CurrentConsumed) => {
-		Word: InStr(CurrentWord, Char) ? CurrentWord : CurrentWord . Char,
-		Consumed: (Consume && !InStr(CurrentConsumed, Char))
-			? CurrentConsumed . Char : CurrentConsumed
-	}
-	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
-}
-
 ; Called by the OK button of the add-delimiter GUI.
 _HS_DelimGuiSubmit(G, EditCtrl, ChkCtrl, Result) {
 	Ch := EditCtrl.Value
@@ -645,26 +606,6 @@ _HS_DelimGuiSubmit(G, EditCtrl, ChkCtrl, Result) {
 	Result.Consume := (ChkCtrl.Value == 1)
 	Result.OK      := true
 	G.Destroy()
-}
-
-; Confirm then remove a custom delimiter character (and its consume flag if set).
-_HS_DelimRemoveCustom(Char) {
-	Res := Ui_MsgBox(t("dialog.hotstrings.delete_delimiter_body"), t("dialog.hotstrings.delete_delimiter_title"), "YesNo")
-	if (Res != "Yes") {
-		return
-	}
-	return _HS_DelimRemoveCustomCommit(Char)
-}
-
-; Remove both memberships from the same admitted snapshot and publish them as a
-; single durable candidate.
-_HS_DelimRemoveCustomCommit(Char, WriterFn := 0, ReplaceFn := 0,
-	NotifyFn := 0) {
-	BuildFn := (CurrentWord, CurrentConsumed) => {
-		Word: StrReplace(CurrentWord, Char, ""),
-		Consumed: StrReplace(CurrentConsumed, Char, "")
-	}
-	return _HS_DelimCommit(BuildFn, WriterFn, ReplaceFn, NotifyFn)
 }
 
 ; Dynamic handler: standard hotstring categories.
@@ -1616,8 +1557,7 @@ _HS_ExtensionToggle(Path, Options, *) {
 	return HotstringExtensions_SetEnabled(Path, !ReadFeatureStateV2(Path)["enabled"], Options)
 }
 
-; New records join the conditional config.toml/reload owner; legacy string
-; controls remain separate and cannot silently substitute for refused records.
+; New records join the conditional config.toml/reload owner.
 _HS_DelimAddRecordCommit(Char, Consume, Options := unset) {
 	if !HotstringsTerminatorRecordCharacter(Char) || !(Consume is Integer)
 			|| (Consume != 0 && Consume != 1) || A_IsSuspended

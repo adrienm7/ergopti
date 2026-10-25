@@ -21,10 +21,55 @@ HotstringsScopeApply(Mode, Options := unset) {
 		return Map("status", "refused", "scope", "hotstrings", "mode", Mode, "detail", "pending_numeric_write")
 	Owner := HotstringsScopeFiles(Options, Mode)
 	Operations() {
+		global ConfigurationFile
 		Inventory := ManifestScopeInventory("hotstrings", Map("catalogue", Owner.Inventory.Bind(Owner)))
-		return ManifestScopePlan("hotstrings", Mode, Inventory).operations
+		Rows := ManifestScopePlan("hotstrings", Mode, Inventory).operations
+		; The shipped delimiters go back to the catalogue; the user's own do not.
+		for Row in _HotstringsScopeDelimiterRows(Options.Has("path") ? Options["path"] : ConfigurationFile)
+			Rows.Push(Row)
+		return Rows
 	}
 	return ConfigScopeCommitOperations("hotstrings", Mode, Operations, Options, Owner)
+}
+
+/**
+ * Deletion rows for every built-in delimiter leaf (state and consumption) a
+ * configuration holds, read from the source as it is now. Records, their states
+ * and unknown entries are user data and are never listed.
+ * @param {String} Path The configuration file the scope rewrites.
+ * @returns {Array} Delete rows, ordered by leaf table then key.
+ */
+_HotstringsScopeDelimiterRows(Path) {
+	global HSE_Terminators
+	Rows := []
+	if !FSStrictExists(Path)
+		return Rows
+	Source := FSReadUtf8Exact(Path)
+	if !(Source is String)
+		throw Error("The admitted configuration source is unreadable.")
+	Document := TOML_ParseDocument(Source)
+	Hotstrings := Document.Get("hotstrings", 0)
+	if !(Hotstrings is Map)
+		return Rows
+	Builtin := Map()
+	Builtin.CaseSense := "On"
+	for Definition in HSE_Terminators.all() {
+		if Definition.Get("type", "") != "separator" && Definition.Has("key")
+			Builtin[Definition["key"]] := true
+	}
+	for Leaf in ["terminator_states", "terminator_consume"] {
+		Stored := Hotstrings.Get(Leaf, 0)
+		if !(Stored is Map)
+			continue
+		Keys := []
+		for Key in Stored
+			if Builtin.Has(Key)
+				Keys.Push(Key)
+		_SortStringsInPlace(Keys)
+		for Key in Keys
+			Rows.Push({ Section: "hotstrings." . Leaf, Key: Key, Delete: 1 })
+	}
+	return Rows
 }
 
 /**
@@ -401,20 +446,7 @@ class HotstringsScopeFiles {
 		DelimiterSourcePresent := FSStrictExists(this.overrides)
 		DelimiterSource := DelimiterSourcePresent ? FSReadUtf8Exact(this.overrides) : ""
 		if !(DelimiterSource is String)
-			throw Error("The admitted hotstring delimiter source is unreadable.")
-		Stored := _ParseTomlFileImpl(this.overrides, false, false, DelimiterSource)
-		GlobalSettings := Stored.Get("__global__", Map())
-		Delimiters := HSE_TerminatorRestoreDefaults(
-			GlobalSettings.Get("word_delimiters", ""), GlobalSettings.Get("consumed_delimiters", ""))
-		for Field, Pair in Map("word_delimiters", [Delimiters.Word, Delimiters.DefaultWord],
-				"consumed_delimiters", [Delimiters.Consumed, Delimiters.DefaultConsumed]) {
-			Row := { Section: "__global__", Key: Field }
-			if Pair[1] == Pair[2]
-				Row.Delete := 1
-			else
-				Row.Value := Pair[1]
-			RowsByPath[this.overrides].Push(Row)
-		}
+			throw Error("The admitted hotstring override source is unreadable.")
 		Candidates := []
 		for Path, Rows in RowsByPath {
 			; Several TOML sources may share an extension override category.
@@ -431,7 +463,7 @@ class HotstringsScopeFiles {
 				if Image.Get("status", "") == "ok"
 						&& (Image["source_present"] != DelimiterSourcePresent
 						|| !(Image["source_content"] == DelimiterSource))
-					throw Error("The admitted hotstring delimiter source changed during planning.")
+					throw Error("The admitted hotstring override source changed during planning.")
 			} else {
 				Present := FSStrictExists(Path)
 				Original := Present ? FSReadUtf8Exact(Path) : ""

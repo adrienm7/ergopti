@@ -1308,7 +1308,8 @@ _TOML_InlineTableRewriteRecord(RecordText, Changes) {
 ; assignments and literal dotted root names still lack native write authority.
 _TOML_InlineTerminatorParent(Physical, Document) {
 	ParentTable := Document.Get("hotstrings", 0)
-	if !(ParentTable is Map) || (!ParentTable.Has("terminators") && !ParentTable.Has("terminator_states"))
+	if !(ParentTable is Map) || (!ParentTable.Has("terminators") && !ParentTable.Has("terminator_states")
+			&& !ParentTable.Has("terminator_consume"))
 		return false
 	for ParentRow in Physical {
 		if ParentRow.Kind != "assignment" || ParentRow.Section != ""
@@ -1354,6 +1355,7 @@ _TOML_AdmitInlineTerminatorParent(Source, Document, Physical, Before, After, Can
 		if UpdateParts.Length != 2 || StrCompare(UpdateParts[1], "hotstrings", true) != 0
 				|| StrCompare(ParentUpdate.Key, "terminators", false) == 0
 				|| StrCompare(ParentUpdate.Key, "terminator_states", false) == 0
+				|| StrCompare(ParentUpdate.Key, "terminator_consume", false) == 0
 			throw ValueError("The record owner requires its dedicated typed editor")
 		ParentDelete := ParentUpdate.HasOwnProp("Delete") && ParentUpdate.Delete == 1
 		ParentChanges[ParentUpdate.Key] := Map("delete", ParentDelete)

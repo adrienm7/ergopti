@@ -3,9 +3,16 @@
 ; ==============================================================================
 ; MODULE: Custom Hotstring Terminator Records
 ; DESCRIPTION:
-; Admits config.toml records through the typed document owner. Record edits retain
-; foreign source spans and join the conditional journal and reload acknowledgement.
-; The historical delimiter strings remain independent preference owners.
+; Admits config.toml delimiter state through the typed document owner:
+;   hotstrings.terminators          the user's own delimiters, as records;
+;   hotstrings.terminator_states    key = enabled, only where it differs from the
+;                                   catalogue default (built-in and custom keys);
+;   hotstrings.terminator_consume   key = consumed, only where it differs from the
+;                                   catalogue default (built-in keys).
+; The word and consumed strings the engine matches are DERIVED from these leaves;
+; no override-file string remains. A built-in delimiter click writes its leaf
+; through the live configuration writer (no reload); record edits keep their
+; conditional journal and reload acknowledgement.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -34,16 +41,22 @@ HotstringsTerminatorRecordsResolve(Document) {
 		throw TypeError("Terminator records require a typed configuration document.")
 	Hotstrings := Document.Get("hotstrings", _TOML_DocumentTable())
 	if !(Hotstrings is Map)
-		return { Records: [], Rejected: [Map("index", 0, "reason", "invalid_namespace")] }
+		return _HotstringsTerminatorRecordsRefused("invalid_namespace")
 	Stored := Hotstrings.Get("terminators", [])
 	if !_HotstringsTerminatorRecordDenseArray(Stored)
-		return { Records: [], Rejected: [Map("index", 0, "reason", "invalid_list")] }
+		return _HotstringsTerminatorRecordsRefused("invalid_list")
 	Records := [], Rejected := []
 	States := Hotstrings.Get("terminator_states", _TOML_DocumentTable())
 	if !(States is Map) {
 		Rejected.Push(Map("index", 0, "reason", "invalid_states"))
 		States := _TOML_DocumentTable()
 	}
+	Consumption := Hotstrings.Get("terminator_consume", _TOML_DocumentTable())
+	if !(Consumption is Map) {
+		Rejected.Push(Map("index", 0, "reason", "invalid_consume_states"))
+		Consumption := _TOML_DocumentTable()
+	}
+	Builtin := _HotstringsTerminatorBuiltinResolve(States, Consumption, Rejected)
 	Keys := Map(), Characters := Map()
 	Keys.CaseSense := "On", Characters.CaseSense := "On"
 	for Definition in HSE_Terminators.all() {
@@ -83,7 +96,47 @@ HotstringsTerminatorRecordsResolve(Document) {
 		Records.Push({ Index: RecordOrdinal, Key: Record["key"], Char: Record["char"],
 			Label: Record["label"], Consume: !!Record["consume"].Value, Enabled: Enabled })
 	}
-	return { Records: Records, Rejected: Rejected }
+	return { Records: Records, Rejected: Rejected, Builtin: Builtin.State, Stored: Builtin.Stored }
+}
+
+/** The settings of a configuration whose delimiter namespace cannot be read: the catalogue alone. */
+_HotstringsTerminatorRecordsRefused(Reason) {
+	Rejected := [Map("index", 0, "reason", Reason)]
+	Builtin := _HotstringsTerminatorBuiltinResolve(_TOML_DocumentTable(), _TOML_DocumentTable(), [])
+	return { Records: [], Rejected: Rejected, Builtin: Builtin.State, Stored: Builtin.Stored }
+}
+
+/**
+ * Resolves each built-in delimiter: a stored boolean leaf, else the catalogue default.
+ * Stored keeps only the leaves actually present, so a write can delete a leaf that
+ * returns to its default instead of leaving a redundant key.
+ */
+_HotstringsTerminatorBuiltinResolve(States, Consumption, Rejected) {
+	global HSE_Terminators
+	State := Map(), Stored := Map("enabled", Map(), "consume", Map())
+	State.CaseSense := "On", Stored["enabled"].CaseSense := "On", Stored["consume"].CaseSense := "On"
+	for Definition in HSE_Terminators.all() {
+		if Definition.Get("type", "") == "separator" || !Definition.Has("key")
+			continue
+		Key := Definition["key"]
+		Enabled := !!Definition["default_enabled"], Consumed := !!Definition["consume"]
+		if States.Has(Key) {
+			if States[Key] is TOML_Bool {
+				Enabled := !!States[Key].Value
+				Stored["enabled"][Key] := Enabled
+			} else
+				Rejected.Push(Map("index", 0, "key", Key, "reason", "invalid_state"))
+		}
+		if Consumption.Has(Key) {
+			if Consumption[Key] is TOML_Bool {
+				Consumed := !!Consumption[Key].Value
+				Stored["consume"][Key] := Consumed
+			} else
+				Rejected.Push(Map("index", 0, "key", Key, "reason", "invalid_consume"))
+		}
+		State[Key] := { Enabled: Enabled, Consume: Consumed }
+	}
+	return { State: State, Stored: Stored }
 }
 
 /** Consumes only the boot loader's admitted image; refusal publishes no record owner. */
@@ -106,27 +159,47 @@ HotstringsTerminatorRecordsInit(Source) {
 	HSE_WORD_TERMINATORS := HotstringsGetWordDelimiters()
 	HSE_CONSUMED_DELIMITERS := HotstringsGetConsumedDelimiters()
 	for Rejection in Candidate.Rejected
-		LoggerWarn("HotstringsConfig", Format("Custom terminator record {1} ignored: {2}; source retained.",
-			Rejection["index"], Rejection["reason"]))
+		LoggerWarn("HotstringsConfig", Format("Terminator setting {1} ignored: {2}; source retained.",
+			Rejection.Has("key") ? Rejection["key"] : Rejection["index"], Rejection["reason"]))
 	return true
 }
 
 /**
- * Projects admitted canonical records over only their exact historical scalar.
- * Explicit disabled and consume=false win for that scalar. Other characters and
- * the saved historical preferences remain unchanged; no migration is performed.
+ * Derives the two strings the engine matches from the delimiter settings: every
+ * enabled built-in delimiter by catalogue order, then every enabled record. The
+ * consumed string holds the characters of the enabled delimiters that are consumed.
+ * Without an initialized owner the catalogue defaults apply.
+ * @returns {Object} Word and Consumed strings.
  */
-HotstringsTerminatorRecordString(Base, Consumed := false) {
-	global _HotstringsTerminatorRecords
-	if !(_HotstringsTerminatorRecords is Object)
-		return Base
-	for Record in _HotstringsTerminatorRecords.Records {
-		; The record owns its exact scalar, even when an older string contains it.
-		Base := StrReplace(Base, Record.Char, "", true)
-		if Record.Enabled && (!Consumed || Record.Consume)
-			Base .= Record.Char
+HotstringsTerminatorStrings() {
+	global HSE_Terminators, _HotstringsTerminatorRecords
+	Owner := _HotstringsTerminatorRecords
+	Word := "", Consumed := ""
+	for Definition in HSE_Terminators.all() {
+		if Definition.Get("type", "") == "separator" || !Definition.Has("key")
+			continue
+		if Owner is Object && Owner.Builtin.Has(Definition["key"])
+			State := Owner.Builtin[Definition["key"]]
+		else
+			State := { Enabled: !!Definition["default_enabled"], Consume: !!Definition["consume"] }
+		if !State.Enabled
+			continue
+		for Character in Definition["chars"] {
+			Word .= Character
+			if State.Consume
+				Consumed .= Character
+		}
 	}
-	return Base
+	if Owner is Object {
+		for Record in Owner.Records {
+			if !Record.Enabled
+				continue
+			Word .= Record.Char
+			if Record.Consume
+				Consumed .= Record.Char
+		}
+	}
+	return { Word: Word, Consumed: Consumed }
 }
 
 /** Captures the exact boot owner and displayed record without borrowing a fresh read. */
@@ -457,6 +530,242 @@ HotstringsTerminatorRecordsEdit(Operation, Options := unset) {
 				_ConfigWriteTerminalRelease(Bundle)
 		}
 	} finally Critical(PreviousCritical)
+}
+
+/**
+ * The catalogue defaults of every built-in delimiter, by key.
+ * @returns {Map} Key -> { Enabled, Consume }.
+ */
+_HotstringsTerminatorDefaults() {
+	global HSE_Terminators
+	Defaults := Map()
+	Defaults.CaseSense := "On"
+	for Definition in HSE_Terminators.all() {
+		if Definition.Get("type", "") == "separator" || !Definition.Has("key")
+			continue
+		Defaults[Definition["key"]] := { Enabled: !!Definition["default_enabled"], Consume: !!Definition["consume"] }
+	}
+	return Defaults
+}
+
+/**
+ * Plans the sparse leaf updates of a set of built-in delimiter changes: a value
+ * equal to the catalogue default deletes its leaf, any other value writes it, and
+ * a value already stored is not rewritten.
+ * @param {Object} Owner The initialized record owner.
+ * @param {Map} Changes Key -> Map("enabled", Boolean?, "consume", Boolean?).
+ * @returns {Object} Updates (Array), State and Stored (the owner's next maps).
+ */
+_HotstringsTerminatorBuiltinPlan(Owner, Changes) {
+	if !(Changes is Map)
+		throw TypeError("Built-in delimiter changes require a Map.")
+	Defaults := _HotstringsTerminatorDefaults()
+	State := Map(), Stored := Map("enabled", Owner.Stored["enabled"].Clone(), "consume", Owner.Stored["consume"].Clone())
+	State.CaseSense := "On"
+	for Key, Current in Owner.Builtin
+		State[Key] := { Enabled: Current.Enabled, Consume: Current.Consume }
+	Updates := []
+	for Key, Change in Changes {
+		if !(Key is String) || !State.Has(Key)
+			throw ValueError("'" . String(Key) . "' is not a built-in delimiter.")
+		if !(Change is Map)
+			throw TypeError("A built-in delimiter change requires a Map.")
+		for Field, Leaf in Map("enabled", "terminator_states", "consume", "terminator_consume") {
+			if !Change.Has(Field)
+				continue
+			Wanted := Change[Field]
+			if !(Wanted is Integer) || (Wanted != 0 && Wanted != 1)
+				throw TypeError("A delimiter " . Field . " state is a strict Boolean.")
+			Wanted := !!Wanted
+			DefaultValue := Field == "enabled" ? Defaults[Key].Enabled : Defaults[Key].Consume
+			Section := "hotstrings." . Leaf
+			if Wanted == DefaultValue {
+				if Stored[Field].Has(Key) {
+					Updates.Push({ Section: Section, Key: Key, Delete: 1 })
+					Stored[Field].Delete(Key)
+				}
+			} else if !Stored[Field].Has(Key) || Stored[Field][Key] != Wanted {
+				Updates.Push({ Section: Section, Key: Key, Value: TOML_Bool(Wanted ? 1 : 0) })
+				Stored[Field][Key] := Wanted
+			}
+			if Field == "enabled"
+				State[Key].Enabled := Wanted
+			else
+				State[Key].Consume := Wanted
+		}
+	}
+	return { Updates: Updates, State: State, Stored: Stored }
+}
+
+/**
+ * Publishes the next built-in settings and the engine strings derived from them.
+ * Runs inside the writer's short Critical window: memory swaps only.
+ */
+_HotstringsTerminatorPublishBuiltin(Owner, State, Stored) {
+	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+	Owner.Builtin := State
+	Owner.Stored := Stored
+	Strings := HotstringsTerminatorStrings()
+	HSE_WORD_TERMINATORS := Strings.Word
+	HSE_CONSUMED_DELIMITERS := Strings.Consumed
+	if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
+		HSE_AdvanceRuntimeDecisionGeneration()
+	return 1
+}
+
+/**
+ * Writes built-in delimiter states through the live configuration writer: sparse
+ * against the catalogue defaults, no reload, and the engine strings follow only
+ * once the write is durable.
+ * @param {Map} Changes Key -> Map("enabled", Boolean?, "consume", Boolean?).
+ * @param {Func} WriterFn Optional writer seam.
+ * @param {Func} NotifyFn Optional failure notifier seam.
+ * @returns {Integer} 1 when persisted or already stored, otherwise 0.
+ */
+HotstringsTerminatorBuiltinCommit(Changes, WriterFn := 0, NotifyFn := 0) {
+	global ConfigurationFile, _HotstringsTerminatorRecords
+	Owner := _HotstringsTerminatorRecords
+	if !(Owner is Object) {
+		LoggerError("HotstringsConfig", "Delimiter settings refused: the terminator owner is not initialized.")
+		return 0
+	}
+	Plan := _HotstringsTerminatorBuiltinPlan(Owner, Changes)
+	if Plan.Updates.Length == 0
+		return 1
+	if !ConfigCommitUpdates(ConfigurationFile, Plan.Updates, "the word expander settings", WriterFn, NotifyFn,
+			_HotstringsTerminatorPublishBuiltin.Bind(Owner, Plan.State, Plan.Stored))
+		return 0
+	; The file changed: record edits compare against its exact source.
+	try Owner.Source := FSReadUtf8Exact(ConfigurationFile)
+	catch as Err
+		LoggerError("HotstringsConfig", Format("The delimiter source could not be re-read after the write: {1}.", Err.Message))
+	if IsSet(HSE_InvalidateRuntimeDecisionProjection)
+		HSE_InvalidateRuntimeDecisionProjection()
+	return 1
+}
+
+/** Toggles one built-in delimiter entry by key. */
+HotstringsTerminatorToggle(Key, WriterFn := 0, NotifyFn := 0) {
+	global _HotstringsTerminatorRecords
+	Owner := _HotstringsTerminatorRecords
+	if !(Owner is Object) || !Owner.Builtin.Has(Key)
+		return 0
+	return HotstringsTerminatorBuiltinCommit(Map(Key, Map("enabled", !Owner.Builtin[Key].Enabled)), WriterFn, NotifyFn)
+}
+
+/** Enables or disables every built-in delimiter; the user's own records are untouched. */
+HotstringsTerminatorSetAll(Enable, WriterFn := 0, NotifyFn := 0) {
+	global _HotstringsTerminatorRecords
+	Owner := _HotstringsTerminatorRecords
+	if !(Owner is Object)
+		return 0
+	Changes := Map()
+	for Key in Owner.Builtin
+		Changes[Key] := Map("enabled", Enable ? 1 : 0)
+	return HotstringsTerminatorBuiltinCommit(Changes, WriterFn, NotifyFn)
+}
+
+/** Returns every built-in delimiter to its catalogue state and consumption. */
+HotstringsTerminatorRestoreBuiltin(WriterFn := 0, NotifyFn := 0) {
+	global _HotstringsTerminatorRecords
+	Owner := _HotstringsTerminatorRecords
+	if !(Owner is Object)
+		return 0
+	Defaults := _HotstringsTerminatorDefaults()
+	Changes := Map()
+	for Key, Default in Defaults
+		Changes[Key] := Map("enabled", Default.Enabled ? 1 : 0, "consume", Default.Consume ? 1 : 0)
+	return HotstringsTerminatorBuiltinCommit(Changes, WriterFn, NotifyFn)
+}
+
+/**
+ * Moves the word and consumed strings of earlier builds into the delimiter leaves,
+ * keeping every effective choice: a built-in whose state or consumption differs
+ * from the catalogue becomes a leaf (a leaf already stored wins), and every other
+ * character becomes a record. Idempotent: a second run finds nothing to add.
+ * @param {String} LegacyWord Stored word_delimiters, "" when absent.
+ * @param {String} LegacyConsumed Stored consumed_delimiters, "" when absent.
+ * @returns {Integer} 1 when the leaves hold the choices, otherwise 0.
+ */
+HotstringsTerminatorMigrateStrings(LegacyWord, LegacyConsumed, WriterFn := 0, NotifyFn := 0) {
+	global ConfigurationFile, _HotstringsTerminatorRecords, HSE_Terminators
+	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+	Owner := _HotstringsTerminatorRecords
+	if !(Owner is Object) {
+		LoggerError("HotstringsConfig", "Delimiter migration refused: the terminator owner is not initialized.")
+		return 0
+	}
+	Defaults := _HotstringsTerminatorDefaults()
+	Word := LegacyWord != "" ? LegacyWord : HSE_TerminatorDefaultWordDelimiters()
+	Consumed := LegacyConsumed != "" ? LegacyConsumed : HSE_TerminatorDefaultConsumedDelimiters()
+	Changes := Map(), Owned := ""
+	for Definition in HSE_Terminators.all() {
+		if Definition.Get("type", "") == "separator" || !Definition.Has("key")
+			continue
+		Key := Definition["key"]
+		for Character in Definition["chars"]
+			Owned .= Character
+		Change := Map()
+		if !Owner.Stored["enabled"].Has(Key)
+			Change["enabled"] := HSE_TerminatorEntryEnabled(Definition["chars"], Word) ? 1 : 0
+		if !Owner.Stored["consume"].Has(Key)
+			Change["consume"] := HSE_TerminatorAnyCharIn(Definition["chars"], Consumed) ? 1 : 0
+		if Change.Count
+			Changes[Key] := Change
+	}
+	Plan := _HotstringsTerminatorBuiltinPlan(Owner, Changes)
+	Updates := Plan.Updates
+	; Every other character of the old string is a delimiter of the user's own.
+	RecordChars := Map()
+	RecordChars.CaseSense := "On"
+	for Record in Owner.Records
+		RecordChars[Record.Char] := true
+	Added := []
+	for Character in _TextCodepoints(Word) {
+		if Character == "`r" || Character == "`n" || InStr(Owned, Character) || RecordChars.Has(Character)
+			continue
+		if !HotstringsTerminatorRecordCharacter(Character) {
+			LoggerWarn("HotstringsConfig", "A delimiter of the old word_delimiters string is not a single character and is dropped.")
+			continue
+		}
+		RecordChars[Character] := true
+		Added.Push(Map("key", "custom_" . Format("{:X}", Ord(Character)), "char", Character,
+			"label", Character, "consume", TOML_Bool(InStr(Consumed, Character) ? 1 : 0)))
+	}
+	if Added.Length {
+		Document := TOML_ParseDocument(Owner.Source)
+		Stored := Document.Has("hotstrings") && Document["hotstrings"] is Map
+			? Document["hotstrings"].Get("terminators", []) : []
+		if !_HotstringsTerminatorRecordDenseArray(Stored) {
+			LoggerError("HotstringsConfig", "Delimiter migration refused: the custom terminator list is not an array.")
+			return 0
+		}
+		Next := ManifestCloneValue(Stored)
+		for Record in Added
+			Next.Push(Record)
+		Updates.Push({ Section: "hotstrings", Key: "terminators", Value: Next })
+	}
+	if Updates.Length == 0
+		return 1
+	if !ConfigCommitUpdates(ConfigurationFile, Updates, "the word expander migration", WriterFn, NotifyFn)
+		return 0
+	try {
+		Source := FSReadUtf8Exact(ConfigurationFile)
+		Candidate := HotstringsTerminatorRecordsResolve(TOML_ParseDocument(Source))
+		Candidate.Source := Source
+	} catch as Err {
+		LoggerError("HotstringsConfig", Format("The migrated delimiter source could not be re-read: {1}.", Err.Message))
+		return 0
+	}
+	PreviousCritical := Critical("On")
+	try {
+		_HotstringsTerminatorRecords := Candidate
+		Strings := HotstringsTerminatorStrings()
+		HSE_WORD_TERMINATORS := Strings.Word
+		HSE_CONSUMED_DELIMITERS := Strings.Consumed
+	} finally Critical(PreviousCritical)
+	LoggerInfo("HotstringsConfig", "Delimiter strings of the override file migrated to config.toml leaves.")
+	return 1
 }
 
 /** Rejects sparse record arrays before indexing an owned row. */

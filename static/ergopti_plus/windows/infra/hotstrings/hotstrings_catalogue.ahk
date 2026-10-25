@@ -15,8 +15,8 @@
 ; 2. Extension overrides — HotstringsResolveExt resolves [ext.extid] keys from
 ;    the shared override file, keeping bundled-extension delays editable from
 ;    the UI without touching per-extension TOML.
-; 3. Terminator catalogue helpers are pure (no I/O); callers persist the
-;    returned string via HotstringsSetWordDelimiters (in hotstrings_io.ahk).
+; 3. Terminator catalogue helpers are pure (no I/O); the delimiter state is a
+;    set of config.toml leaves owned by terminator_records.ahk.
 ;
 ; Included by infra/hotstrings/hotstrings_config.ahk.
 ; ==============================================================================
@@ -507,13 +507,10 @@ _HotstringsPublishOverrideCandidate(Candidate) {
 }
 
 ; Persist one detached catalogue while retaining the exact owner and path that
-; admitted its snapshot. Delimiter state is captured explicitly so serialization
-; never consults mutable globals after the candidate has begun staging.
+; admitted its snapshot.
 _HotstringsPersistOverrideCandidate(Candidate, OwnerToken, BoundPath,
 		WriterFn, ReplaceFn) {
-		global _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
 		return _SaveOverrides(Candidate, WriterFn, ReplaceFn,
-				_HotstringsWordDelimiters, _HotstringsConsumedDelimiters,
 				BoundPath,
 				_HotstringsAuthorizeOverrideCommit.Bind(OwnerToken, BoundPath),
 				_HotstringsPublishOverrideCandidate.Bind(Candidate))
@@ -814,30 +811,9 @@ HotstringsConfigPath() {
 ; ============================================================
 ; ============================================================
 
-; Pure helpers shared by the tray word-expander submenu and the config-window
-; checkbox grid so the per-entry enable/toggle logic lives in exactly one place
-; (and is unit-tested via test_terminators.ahk). They operate on the active
-; word-delimiter STRING — the persisted serialization of the catalogue's
-; enabled state — and the generated HSE_Terminators catalogue. No I/O here;
-; callers persist the returned string via HotstringsSetWordDelimiters.
-
-/** Restores only generated shipped definitions, excluding runtime custom rows. */
-HSE_TerminatorRestoreDefaults(CurrentWord, CurrentConsumed) {
-	global HSE_Terminators
-	Catalogue := Terminators()
-	for Definition in HSE_Terminators.all() {
-		if Definition.Get("key", "") != "star"
-			continue
-		MagicChars := Definition["chars"]
-		if !(MagicChars is Array) || MagicChars.Length != 1
-			throw Error("The active magic terminator must own exactly one scalar.")
-		; Fresh shipped defaults exclude runtime custom definitions, while their
-		; magic slot follows the catalogue actually admitted by this boot.
-		Catalogue.updateMagicKey(MagicChars[1])
-		return HotstringsTerminatorRestore(Catalogue.all(), CurrentWord, CurrentConsumed)
-	}
-	throw Error("The active terminator catalogue has no magic slot.")
-}
+; Pure helpers over the generated HSE_Terminators catalogue and a word-delimiter
+; STRING: the catalogue defaults, which characters the catalogue owns, and the
+; membership tests the one-time migration of the old strings uses. No I/O here.
 
 ; Default word-terminator string — the chars of every catalogue entry that is
 ; enabled by default. This is the single source for the AHK default set, kept in
@@ -873,20 +849,6 @@ HSE_TerminatorDefaultConsumedDelimiters() {
 		return Out
 }
 
-; Concatenated chars of every built-in (non-separator) catalogue entry. Used to
-; tell user-defined custom delimiters apart from catalogue ones.
-HSE_TerminatorBuiltinChars() {
-		global HSE_Terminators
-		Out := ""
-		for _, D in HSE_Terminators.all() {
-				if (D.Has("type") and D["type"] == "separator")
-						continue
-				for _, Ch in D["chars"]
-						Out .= Ch
-		}
-		return Out
-}
-
 ; True when EVERY char of a catalogue entry is present in the delimiter string
 ; (an entry such as "enter" owns both CR and LF and toggles as one unit).
 HSE_TerminatorEntryEnabled(CharsArr, WordStr) {
@@ -907,43 +869,4 @@ HSE_TerminatorAnyCharIn(CharsArr, Hay) {
 						return true
 		}
 		return false
-}
-
-; Pure: return WordStr with the entry's chars toggled — all removed when the
-; entry is currently enabled, all added otherwise.
-HSE_TerminatorToggleString(WordStr, CharsArr) {
-		if HSE_TerminatorEntryEnabled(CharsArr, WordStr) {
-				for _, Ch in CharsArr
-						WordStr := StrReplace(WordStr, Ch, "")
-		} else {
-				for _, Ch in CharsArr {
-						if !InStr(WordStr, Ch)
-								WordStr .= Ch
-				}
-		}
-		return WordStr
-}
-
-; Pure: return WordStr with every built-in catalogue char enabled (Enable=true)
-; or removed (Enable=false), always preserving user-defined custom chars (those
-; owned by no catalogue entry). CR/LF belong to the "enter" entry and follow it.
-HSE_TerminatorSetAllString(WordStr, Enable) {
-		global HSE_Terminators
-		BuiltinChars := HSE_TerminatorBuiltinChars()
-		Kept := ""
-		for Ch in _TextCodepoints(WordStr) {
-				if (Ch != "`r" and Ch != "`n" and !InStr(BuiltinChars, Ch))
-						Kept .= Ch
-		}
-		if Enable {
-				for _, D in HSE_Terminators.all() {
-						if (D.Has("type") and D["type"] == "separator")
-								continue
-						for _, Ch in D["chars"] {
-								if !InStr(Kept, Ch)
-										Kept .= Ch
-						}
-				}
-		}
-		return Kept
 }

@@ -89,10 +89,10 @@ Test("common override migration: actual absent and acknowledged native publicati
 	_CAO_NativePublication)
 
 _CAO_NativeInitialization() {
-	global _HotstringsOverridesPath, _HotstringsOverrides, _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HotstringsLegacyDelimiters
 	global _HotstringsCommonOverrideAdmitted
 	SavedAdmission := HotstringsCommonOverrideAdmitted()
-	Saved := [_HotstringsOverridesPath, _HotstringsOverrides, _HotstringsWordDelimiters, _HotstringsConsumedDelimiters]
+	Saved := [_HotstringsOverridesPath, _HotstringsOverrides, _HotstringsLegacyDelimiters]
 	Directory := _CMG_NewDir(), Path := Directory . "\overrides.toml"
 	try {
 		AssertTrue(FSWriteCreateDurable(Path, _CAO_Bytes("input")))
@@ -110,7 +110,7 @@ _CAO_NativeInitialization() {
 		}
 	} finally {
 		_HotstringsOverridesPath := Saved[1], _HotstringsOverrides := Saved[2]
-		_HotstringsWordDelimiters := Saved[3], _HotstringsConsumedDelimiters := Saved[4]
+		_HotstringsLegacyDelimiters := Saved[3]
 		_HotstringsCommonOverrideAdmitted := SavedAdmission
 		HotstringsResolveBumpGen()
 		for RefusedName in ["overrides.toml", "foreign.toml", "legacy-invalid.toml"] {
@@ -128,8 +128,8 @@ Test("common override migration: native initialization consumes acknowledged new
 _CAO_NativeAdmission() {
 	global _HotstringsCommonOverrideAdmitted, HSE_RegistryByGroup, Features
 	SavedFeatures := Features
-	global _HotstringsOverridesPath, _HotstringsOverrides, _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
-	Saved := [_HotstringsOverridesPath, _HotstringsOverrides, _HotstringsWordDelimiters, _HotstringsConsumedDelimiters,
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HotstringsLegacyDelimiters
+	Saved := [_HotstringsOverridesPath, _HotstringsOverrides, _HotstringsLegacyDelimiters,
 		HotstringsCommonOverrideAdmitted()]
 	Directory := _CMG_NewDir(), Path := Directory . "\foreign.toml"
 	Source := '[__global__]`nfuture = "bad\uD800" # retain unrelated unsupported scalar bytes`n'
@@ -159,10 +159,10 @@ _CAO_NativeAdmission() {
 		Legacy := '[autocorrection.caps]`ncolor = "bad\q"`n[__global__]`nword_delimiters = "bad\uD800"`n'
 		AssertTrue(FSWriteCreateDurable(LegacyPath, Legacy))
 		AssertFalse(HotstringsCommonOverrideMigrate(LegacyPath), "a malformed known owned source cannot become a successful passthrough")
-		CommittedOverrides := _HotstringsOverrides, CommittedDelimiters := _HotstringsWordDelimiters
+		CommittedOverrides := _HotstringsOverrides, CommittedDelimiters := _HotstringsLegacyDelimiters
 		AssertEqual(false, HotstringsConfigInit(LegacyPath), "unsafe source bytes never reach the native color or delimiter decoder")
 		AssertTrue(_HotstringsOverrides == CommittedOverrides, "failed migration retains the exact prior proven override object")
-		AssertEqual(CommittedDelimiters, _HotstringsWordDelimiters)
+		AssertTrue(CommittedDelimiters == _HotstringsLegacyDelimiters, "and the exact prior legacy delimiter strings")
 		AssertEqual(false, HotstringsCommonOverrideAdmitted(), "the actual retained-source boot owner never acknowledges failed migration")
 		Assert(TOML_WriteRefusal(LegacyPath) != "", "failed owned migration blocks later override publication")
 		AssertEqual(false, RegisterAllHotstrings())
@@ -172,8 +172,8 @@ _CAO_NativeAdmission() {
 		Assert(StrCompare(Legacy, _CMG_Read(LegacyPath), true) == 0)
 	} finally {
 		_HotstringsOverridesPath := Saved[1], _HotstringsOverrides := Saved[2]
-		_HotstringsWordDelimiters := Saved[3], _HotstringsConsumedDelimiters := Saved[4]
-		_HotstringsCommonOverrideAdmitted := Saved[5]
+		_HotstringsLegacyDelimiters := Saved[3]
+		_HotstringsCommonOverrideAdmitted := Saved[4]
 		Features := SavedFeatures
 		HotstringsResolveBumpGen()
 		HSE_TestReset()
@@ -224,11 +224,11 @@ _CAO_RestoreOptionalOwners(Saved) {
 ; successful receipt from the migration helper. All selections are explicit.
 _CAO_NativeColdBoot() {
 	global Features, ScriptInformation, ConfigurationFile, HSE_RegistryByGroup
-	global _HotstringsOverridesPath, _HotstringsOverrides, _HotstringsWordDelimiters, _HotstringsConsumedDelimiters
+	global _HotstringsOverridesPath, _HotstringsOverrides, _HotstringsLegacyDelimiters
 	global _HotstringsCommonOverrideAdmitted, _HS_CACHE_LOADED, _HS_CACHE_ROWS, _GENERATED_HOTSTRINGS
 	global HotstringGroupConfig, _HotstringBoundSources, _HotstringExtensionPacks
 	SavedFeatures := Features, SavedInformation := ScriptInformation, SavedConfiguration := ConfigurationFile
-	Saved := [_HotstringsOverridesPath, _HotstringsOverrides, _HotstringsWordDelimiters, _HotstringsConsumedDelimiters,
+	Saved := [_HotstringsOverridesPath, _HotstringsOverrides, _HotstringsLegacyDelimiters,
 		HotstringsCommonOverrideAdmitted(), _HS_CACHE_LOADED, _HS_CACHE_ROWS, _GENERATED_HOTSTRINGS,
 		HotstringGroupConfig, _HotstringBoundSources, _HotstringExtensionPacks]
 	OptionalOwners := _CAO_IsolateOptionalOwners()
@@ -313,10 +313,10 @@ _CAO_NativeColdBoot() {
 		PersonalInformation := HadPersonalInformation ? SavedPersonalInformation : unset
 		Features := SavedFeatures, ScriptInformation := SavedInformation, ConfigurationFile := SavedConfiguration
 		_HotstringsOverridesPath := Saved[1], _HotstringsOverrides := Saved[2]
-		_HotstringsWordDelimiters := Saved[3], _HotstringsConsumedDelimiters := Saved[4]
-		_HotstringsCommonOverrideAdmitted := Saved[5], _HS_CACHE_LOADED := Saved[6], _HS_CACHE_ROWS := Saved[7]
-		_GENERATED_HOTSTRINGS := Saved[8], HotstringGroupConfig := Saved[9], _HotstringBoundSources := Saved[10]
-		_HotstringExtensionPacks := Saved[11]
+		_HotstringsLegacyDelimiters := Saved[3]
+		_HotstringsCommonOverrideAdmitted := Saved[4], _HS_CACHE_LOADED := Saved[5], _HS_CACHE_ROWS := Saved[6]
+		_GENERATED_HOTSTRINGS := Saved[7], HotstringGroupConfig := Saved[8], _HotstringBoundSources := Saved[9]
+		_HotstringExtensionPacks := Saved[10]
 		HotstringsResolveBumpGen(), HSE_TestReset()
 		if SavedPersonalControls is Array
 			PersonalFileControls.owners := SavedPersonalControls[1], PersonalFileControls.inventory := SavedPersonalControls[2]

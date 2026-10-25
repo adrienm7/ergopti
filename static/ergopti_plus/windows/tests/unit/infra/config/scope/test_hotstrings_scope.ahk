@@ -6,7 +6,7 @@ _HotstringsScopeFixture(PersonalCount := 1, InitialSuffix := "") {
 	Source := '[category_enabled]`nhotstrings = true`n[hotstrings]`npreview_ai_enabled = true`n[hotstrings.personal.words]`nenabled = true`ntime_activation_seconds = 4`n[private]`ncredential = "keep"`n'
 	Fixture := _ScopeOwnerFixture(Source . InitialSuffix)
 	Fixture.overrides := Fixture.directory . "\hotstrings_config.toml"
-	Fixture.overrideSource := '[autocorrection]`ndelay_offset = 2.75`nunknown = "keep"`n[autocorrection.words]`npriority = 5`n[__global__]`nword_delimiters = "!"`nunknown = "keep"`n[foreign]`ndelay = 9`n'
+	Fixture.overrideSource := '[autocorrection]`ndelay_offset = 2.75`nunknown = "keep"`n[autocorrection.words]`npriority = 5`n[foreign]`ndelay = 9`n'
 	Fixture.personalSource := '[_meta]`ndelay = 2.5`ndescription = "Keep corpus"`nunknown = "keep"`n[_meta.sections.words]`nshow_tooltip = false`nunknown = "keep"`n[[words]]`n"abc" = "replacement"`n'
 	Fixture.catalogue := [{ Key: "autocorrection", Path: "", IsPersonal: false, IsExtension: false }]
 	Fixture.personal := []
@@ -64,7 +64,7 @@ _HotstringsScopeRoundTrip() {
 			Assert(!Overrides["autocorrection"].Has("delay_offset"), "a clear or restore drops the stored delay offset")
 			Assert(!Overrides["autocorrection"].Has("delay"))
 			Assert(!Overrides["autocorrection.words"].Has("priority"))
-			Assert(!Overrides["__global__"].Has("word_delimiters"))
+			Assert(!Overrides.Has("__global__"), "no delimiter string is owned by the override file")
 			AssertEqual(Overrides["autocorrection"]["unknown"], "keep")
 			AssertEqual(Overrides["foreign"]["delay"], 9)
 			Personal := TOML_ParseFreshFile(Fixture.personal[1])
