@@ -66,6 +66,13 @@ helpers.describe("magic key: static catalogue ownership", function()
 		local preferences = require("infra.hotstring_preferences")
 		local preferences_path = temporary .. "_preferences.toml"
 		assert(preferences._set_file_for_test(preferences_path))
+		-- Category and section switches go through the configuration owner's own
+		-- choices file: without this route they landed in the real config.toml.
+		local choices_path = temporary .. "_choices.toml"
+		local user_config = require("infra.config_paths").config("config.toml")
+		local before = io.open(user_config, "rb")
+		local before_bytes = before and before:read("*a")
+		if before then before:close() end
 
 		local ok, err = pcall(function()
 			local loaded = nil
@@ -73,6 +80,7 @@ helpers.describe("magic key: static catalogue ownership", function()
 			local engine = require("hotstring_engine").new()
 			local load = engine.load_mappings
 			engine.load_mappings = function(self, mappings) loaded = mappings; return load(self, mappings) end
+			helpers.assert_true(Config._set_config_file_for_test(choices_path))
 			Config.init(engine, path, nil)
 			helpers.assert_true(Config.set_magic_key("§", "★"))
 			Config.load_all()
@@ -93,6 +101,7 @@ helpers.describe("magic key: static catalogue ownership", function()
 			local engine = require("hotstring_engine").new()
 			local load = engine.load_mappings
 			engine.load_mappings = function(self, mappings) loaded = mappings; return load(self, mappings) end
+			helpers.assert_true(Config._set_config_file_for_test(choices_path))
 			Config.init(engine, path, nil)
 			helpers.assert_true(Config.set_magic_key("§", "★"))
 			Config.load_all()
@@ -100,9 +109,17 @@ helpers.describe("magic key: static catalogue ownership", function()
 				"a fresh process must reconstruct the same configured catalogue")
 		end)
 
+		local owner = package.loaded["modules.hotstrings.hotstrings_config"]
+		if owner then owner._set_config_file_for_test(nil) end
 		preferences._set_file_for_test(nil)
 		os.remove(preferences_path)
+		os.remove(choices_path)
+		os.remove(choices_path .. ".tmp")
 		os.remove(path)
+		local after = io.open(user_config, "rb")
+		local after_bytes = after and after:read("*a")
+		if after then after:close() end
+		helpers.assert_eq(after_bytes, before_bytes, "the scenario must not write the user's config.toml")
 		if not ok then error(err, 0) end
 	end)
 

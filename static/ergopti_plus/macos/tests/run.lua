@@ -65,6 +65,11 @@ package.path = table.concat({
 	package.path,
 }, ";")
 
+-- Never let a suite touch the developer's own config.toml, logs or caches: a
+-- real HOME is replaced by a scratch directory for this process (see
+-- _shared/lua/test/runner_home.lua). Done before any module resolves a path.
+require("test.runner_home").isolate()
+
 local helpers = require("tests.helpers")
 local shell_quote = require("text_utils").shell_quote
 helpers.initialize_timing()
