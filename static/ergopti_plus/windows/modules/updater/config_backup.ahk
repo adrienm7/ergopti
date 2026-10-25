@@ -162,6 +162,35 @@ _ConfigBackup_Walk(ConfigDir, Rules) {
 	return Files
 }
 
+; Preserve chronology when an older backup directory has been removed. The
+; first free suffix is unique but can sort before a retained newer backup.
+_ConfigBackup_NextId(Folder, Base) {
+	Highest := 0
+	Prefix := Base . "-"
+	for _, Path in FSListDirectoryStrict(Folder, true) {
+		SplitPath(Path, &Name)
+		if Name == Base {
+			Highest := Max(Highest, 1)
+			continue
+		}
+		if SubStr(Name, 1, StrLen(Prefix)) != Prefix
+			continue
+		Tail := SubStr(Name, StrLen(Prefix) + 1)
+		if !RegExMatch(Tail, "^[1-9][0-9]*$")
+			continue
+		Counter := Integer(Tail)
+		if String(Counter) != Tail
+			throw Error("Configuration backup collision counter exceeds the supported Integer range.")
+		Highest := Max(Highest, Counter)
+	}
+	if !Highest
+		return Base
+	Next := Highest + 1
+	if Next <= Highest
+		throw Error("Configuration backup collision counter cannot be incremented.")
+	return Base . "-" . Next
+}
+
 ; Makes one backup of the whole configuration.
 ; @param ConfigDir {String} The configuration folder.
 ; @param Kind {String} "pre_install" or "pre_restore".
@@ -185,13 +214,8 @@ ConfigBackup_Create(ConfigDir, Kind, Tag := "", FromVersion := "", Rules := 0, C
 	SafeTag := RegExReplace(Tag, "[^A-Za-z0-9._-]")
 	if (SafeTag != "")
 		Id .= "-" . SafeTag
-	; Two backups within one second get distinct folders.
-	Base := Id
-	Suffix := 1
-	while FSExists(Folder . "\" . Id) {
-		Suffix += 1
-		Id := Base . "-" . Suffix
-	}
+	; Collision numbers retain creation order even after older copies are removed.
+	Id := _ConfigBackup_NextId(Folder, Id)
 	BackupPath := Folder . "\" . Id
 	FSEnsureDirectoryStrict(BackupPath)
 	FilesJson := []
@@ -272,6 +296,23 @@ _ConfigBackup_Load(ConfigDir, Id, Rules) {
 		"files", Files)
 }
 
+; Collision suffixes are decimal counters, not lexicographic names: the
+; tenth backup in one second must sort after the ninth. Compare digits by
+; length first so an imported long counter cannot overflow an AHK Integer.
+_ConfigBackup_CompareOrder(Left, Right) {
+	TimeDifference := StrCompare(Left["created_at"], Right["created_at"])
+	if TimeDifference
+		return TimeDifference
+	if Left["tag"] == Right["tag"]
+			&& RegExMatch(Left["id"], "^(.*)-([1-9][0-9]*)$", &LeftParts)
+			&& RegExMatch(Right["id"], "^(.*)-([1-9][0-9]*)$", &RightParts)
+			&& LeftParts[1] == RightParts[1] {
+		LengthDifference := StrLen(LeftParts[2]) - StrLen(RightParts[2])
+		return LengthDifference ? LengthDifference : StrCompare(LeftParts[2], RightParts[2])
+	}
+	return StrCompare(Left["id"], Right["id"])
+}
+
 ; The newest complete backup of one kind.
 ; @returns {Map|Integer} The record, or 0 when there is none.
 ConfigBackup_Latest(ConfigDir, Kind, Rules := 0) {
@@ -287,8 +328,7 @@ ConfigBackup_Latest(ConfigDir, Kind, Rules := 0) {
 		Record := _ConfigBackup_Load(ConfigDir, Name, Rules)
 		if !IsObject(Record) || Record["kind"] != Kind
 			continue
-		if !IsObject(Best) || StrCompare(Record["created_at"], Best["created_at"]) > 0
-				|| (Record["created_at"] == Best["created_at"] && StrCompare(Record["id"], Best["id"]) > 0)
+		if !IsObject(Best) || _ConfigBackup_CompareOrder(Record, Best) > 0
 			Best := Record
 	}
 	return Best
