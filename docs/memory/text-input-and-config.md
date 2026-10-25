@@ -105,6 +105,48 @@ a typed letter, so the buffer runs one character ahead (no driver reads the
 field's text); Linux sees no modifiers on a typed newline, so Shift+Enter in a
 terminal TUI also reads as submitting the line.
 
+### project-hotstring-cascade
+
+`hotstrings.cascade_depth` (0 = off, the default; the menu offers 0 to 3, any
+whole number from 0 is valid) lets the text a hotstring produced complete
+further hotstrings: `chatg` > `chatgpt` > `ChatGPT`. It is resolved BEFORE
+anything is typed, on a virtual copy of the buffer, and goes out as ONE edit
+(one SendInput burst on Windows, one replacement transaction on macOS, one
+`injector.inject` on Linux). That is the in-engine re-feed the SendInput
+contract (`hotstring-output-is-final`) needs: no output ever returns through the
+watcher, no keystroke can land between two bursts, no intermediate text shows,
+and the Linux Undo restores what was typed (the net result's `trigger` is the
+erased typed text, not the first rule's). Do not turn it into a second burst
+sent after the first; that reintroduces the interleave the atomic burst removed.
+
+Each link is chosen by the same matcher a typed key goes through (shared engine
+`select_match`, Windows `HSE_FindMatchAtEnd` + `_HSE_PrepareDispatchDecision`,
+macOS `would_fire`/`resolve_terminator_match`), so word boundary, case mode and
+no-op rules apply unchanged. Rules, identical on the three drivers: a rule fires
+at most once per chain, keyed on its trigger case-folded plus its completion
+kind (this is what ends the 124-odd shipped replacements that end with their own
+trigger); a `final_result` link ends the chain and a `final_result` first rule
+starts none; only plain literal text is a link (a replacement with Send syntax
+or key directives, a raw callback, the repeat rule and every private
+personal-information hotstring are not); a replayed end character stays the
+first rule's (an end-character link takes it as its own terminator, a link that
+would swallow it ends the chain on Windows; macOS and Linux let an auto link
+whose trigger reaches it swallow it). A link whose reference character was
+produced by an earlier link is inside any expansion delay; one reaching back
+into typed text keeps its delay (Windows gates it with the real time of the
+typed key, Linux and macOS with the buffer times and the keystroke pause). The
+tooltip preview still shows only the first rule's output.
+
+Measured 2026-10-25 on the shipped catalogue (2994 loaded mappings, every pack
+including the Ergopti layout's): 145 outputs end with their own trigger, case
+aside (the guard), and 147 distinct (rule, other trigger) pairs end with
+another trigger, but 141 of those triggers need an end character AND a word
+boundary before them (`Docker` ends with the word-bound trigger `r`), and the
+other 6 are identity masks (`prochaine` > `prochaine`) that never fire. So the
+cascade changes none of the 2994 outputs at depth 1, 2 or 3. What does change
+is the user's own mid-word auto trigger: with an auto `ok` > `OK` the shipped
+`fb★` > `facebook` ends as `faceboOK`. That is why the default is 0.
+
 ### project-hotstring-delay-architecture
 
 Typing delays live in shared timing constants with explicit per-driver

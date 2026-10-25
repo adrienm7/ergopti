@@ -76,6 +76,33 @@ helpers.describe("word-reset preferences", function()
 		end)
 	end)
 
+	helpers.it("reads, saves and reloads the cascade depth, the default stored as absent", function()
+		with_source("[hotstrings]\ncascade_depth = 2\n", function(preferences, path)
+			local state, status = preferences.load(path)
+			helpers.assert_eq(status, "ok")
+			helpers.assert_eq(state.cascade_depth, 2)
+			helpers.assert_eq(preferences.save(path, { cascade_depth = 3 }, {}, {}), true)
+			package.loaded["infra.preferences"] = nil
+			local again = helpers.load_with_stubs("infra.preferences").load(path)
+			helpers.assert_eq(again.cascade_depth, 3)
+			helpers.assert_eq(preferences.save(path, { cascade_depth = 0 }, {}, {}), true)
+			package.loaded["infra.preferences"] = nil
+			local restarted = helpers.load_with_stubs("infra.preferences").load(path)
+			helpers.assert_nil(restarted.cascade_depth, "the default depth is stored as absent")
+		end)
+	end)
+
+	for _, bad in ipairs({ "-1", "1.5", '"deep"', "true" }) do
+		helpers.it("reads the outdated cascade depth " .. bad .. " as absent with a warning", function()
+			with_source("[hotstrings]\ncascade_depth = " .. bad .. "\n", function(preferences, path, warnings)
+				local state, status = preferences.load(path)
+				helpers.assert_eq(status, "ok", "an outdated value is never a refused file")
+				helpers.assert_nil(state.cascade_depth)
+				helpers.assert_true(#warnings >= 1, "one warning names the outdated leaf")
+			end)
+		end)
+	end
+
 	for _, vector in ipairs({
 		{ name = "a negative idle delay", source = "[hotstrings]\nidle_reset_seconds = -2\n", key = "idle_reset_seconds" },
 		{ name = "a text idle delay", source = '[hotstrings]\nidle_reset_seconds = "3"\n', key = "idle_reset_seconds" },

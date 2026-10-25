@@ -99,6 +99,7 @@ M.DEFAULT_STATE = {
 	repeat_key_enabled          = Manifest.default_for("hotstrings.repeat_key_enabled"),
 	expansion_delay             = Manifest.default_for("hotstrings.expansion_delay"),
 	idle_reset_seconds          = Manifest.default_for("hotstrings.idle_reset_seconds"),
+	cascade_depth               = Manifest.default_for(require("config_keys").KEY.HOTSTRINGS_CASCADE_DEPTH),
 	click_resets_word           = Manifest.default_for("hotstrings.click_resets_word"),
 	arrow_resets_word           = Manifest.default_for("hotstrings.arrow_resets_word"),
 	shortcut_resets_word        = Manifest.default_for("hotstrings.shortcut_resets_word"),
@@ -486,6 +487,25 @@ function M.set_idle_reset_seconds(secs)
 	return true
 end
 
+--- Returns how many more hotstrings a hotstring's output may complete.
+--- @return number Depth; 0 means the cascade is off.
+function M.get_cascade_depth()
+	return CoreState.CASCADE_DEPTH
+end
+
+--- Sets the cascade depth.
+--- @param depth number hotstrings.cascade_depth; a whole number, 0 disables it.
+--- @return boolean committed False for a value that is not a non-negative integer.
+function M.set_cascade_depth(depth)
+	if not HotstringCore.valid_cascade_depth(depth) then
+		Logger.error(LOG, "Cascade depth refused: '%s' is not a non-negative whole number.", tostring(depth))
+		return false
+	end
+	CoreState.CASCADE_DEPTH = depth
+	Logger.debug(LOG, "Cascade depth: %d.", depth)
+	return true
+end
+
 --- Returns whether a mouse click starts a new word.
 --- @return boolean
 function M.is_click_resets_word_enabled()
@@ -547,6 +567,7 @@ end
 -- it from the features manifest through its own setters, which refuse an
 -- invalid default with an ERROR and keep the neutral policy.
 M.set_idle_reset_seconds(M.DEFAULT_STATE.idle_reset_seconds)
+M.set_cascade_depth(M.DEFAULT_STATE.cascade_depth)
 M.set_click_resets_word(M.DEFAULT_STATE.click_resets_word)
 M.set_arrow_resets_word(M.DEFAULT_STATE.arrow_resets_word)
 M.set_shortcut_resets_word(M.DEFAULT_STATE.shortcut_resets_word)
@@ -1883,6 +1904,9 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	_tc_char_len     = (chars_bytes <= 2) and 1 or (text_utils.utf8_len(chars))
 	_tc_dt           = dt
 	_tc_complex_mult = complex_mult
+	-- The same two values for the cascade's further steps (expander.lua).
+	CoreState.cascade_elapsed      = dt
+	CoreState.cascade_complex_mult = complex_mult
 
 	-- Sub-segment timing, always on: it feeds the phase counters summarised
 	-- every interval and attributes a slow keystroke to trigger matching vs.

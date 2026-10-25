@@ -1251,18 +1251,14 @@ local function main()
 		-- reach the trigger, but only catalogue entries with consume=true stay
 		-- erased. The others are replayed after the replacement.
 		local is_terminator = terminators_mod.is_terminator(ch)
-		local result = engine:on_char(ch, {
-			is_terminator       = is_terminator,
-			terminator_consumed = is_terminator
-				and terminators_mod.terminator_is_consumed(ch),
-			typed_at_ms         = now_ms,
-		})
 
-		-- The per-category expansion delay, which nothing consumed until 2026-08-05.
-		-- hotstrings_config.resolve() had no production caller at all: the whole
+		-- The per-category expansion delay of one match, or of one further step of
+		-- a cascade (the first step's gap is the typed pause, a later step's gap is
+		-- measured over the produced text). Nothing consumed it until 2026-08-05:
+		-- hotstrings_config.resolve() had no production caller at all, so the whole
 		-- five-rung cascade, the shared DelayResolver and every override the
-		-- settings window persisted resolved into nothing, so setting a delay saved
-		-- it to disk and changed no behaviour.
+		-- settings window persisted resolved into nothing, and setting a delay
+		-- saved it to disk and changed no behaviour.
 		--
 		-- The semantics are macOS's and Windows's: the delay is the time between the
 		-- LAST LETTER OF THE INPUT and the EXPANDER (the magic key when the trigger
@@ -1271,7 +1267,8 @@ local function main()
 		-- chained expansions, and reports that one interval.
 		-- The clock's resolution goes with the stamps: without luv it counts whole
 		-- seconds, and a trigger typed across a second boundary read as a pause.
-		if result and hotstrings_config and type(hotstrings_config.resolve) == "function" then
+		local function within_delay(result)
+			if not (hotstrings_config and type(hotstrings_config.resolve) == "function") then return true end
 			local ok_delay, resolved = pcall(hotstrings_config.resolve, result.group, result.section)
 			local delay_sec = ok_delay and type(resolved) == "table" and tonumber(resolved.delay) or nil
 			if delay_sec and not ExpansionDelay.allows(result, delay_sec, Monotonic.resolution_ms(),
@@ -1280,9 +1277,21 @@ local function main()
 					"Expired: '%s' waited %.2fs for its expander, its category allows %.2fs.",
 					tostring(result.trigger),
 					(tonumber(result.expander_gap_ms) or math.huge) / 1000, delay_sec)
-				result = nil
+				return false
 			end
+			return true
 		end
+
+		local result = engine:on_char(ch, {
+			is_terminator       = is_terminator,
+			terminator_consumed = is_terminator
+				and terminators_mod.terminator_is_consumed(ch),
+			typed_at_ms         = now_ms,
+			cascade_depth       = WordReset.cascade_depth(),
+			cascade_gate        = within_delay,
+		})
+
+		if result and not within_delay(result) then result = nil end
 
 		-- The magic-key repeat, when nothing else matched: `po★` gives `poo`. A real
 		-- match always wins, which is why this is tested against `result` being nil

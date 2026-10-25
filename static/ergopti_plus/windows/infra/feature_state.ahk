@@ -19,6 +19,8 @@
 ; The preview-switch readers the loader publishes to. The engine includes the same
 ; file; an already included file is skipped.
 #Include hotstrings/preview_switches.ahk
+; The generated key vocabulary (a dedupe-safe include: menu_manifest.ahk names it too).
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
 
 global _FeatureStateConfigDir := IsSet(_ConfigDir) ? _ConfigDir : ""
 global _FeatureStateAhkSubDir := IsSet(_AhkSubDir) ? _AhkSubDir : ""
@@ -252,6 +254,9 @@ ReadScriptConfig(Cache) {
 		global HSE_IdleResetSeconds, HSE_ClickResetsWord
 		HSE_IdleResetSeconds := _FeatureStateIdleResetSeconds(
 			_FeatureStateIniGet(Cache, "hotstrings", "idle_reset_seconds"))
+		global HSE_CascadeDepth
+		HSE_CascadeDepth := _FeatureStateCascadeDepth(
+			_FeatureStateIniGet(Cache, ConfigKey.HOTSTRINGS, ConfigLeaf.CASCADE_DEPTH))
 		RawClick := _FeatureStateIniGet(Cache, "hotstrings", "click_resets_word")
 		if RawClick != "_"
 				HSE_ClickResetsWord := _FeatureStateValidateBoolean(
@@ -306,6 +311,24 @@ _FeatureStateIdleResetSeconds(Raw) {
 	if ((Raw is Integer) or (Raw is Float)) and Raw == Raw and Raw >= 0 and (Raw - Raw) == 0
 		return Raw
 	try LoggerWarn("Config", "hotstrings.idle_reset_seconds '{1}' is not a number of seconds, 0 or more — using {2} s.",
+		Raw is Object ? Type(Raw) : String(Raw), Default)
+	return Default
+}
+
+; The configured cascade depth, or the manifest default for an absent value. A
+; value that is no whole number, 0 or more, is outdated configuration: one
+; WARNING, read as absent, never a boot failure.
+; @param Raw {Any} The raw TOML value, "_" when absent.
+; @returns {Integer} 0 disables the cascade.
+_FeatureStateCascadeDepth(Raw) {
+	Default := ManifestDefaultFor(ConfigKey.HOTSTRINGS_CASCADE_DEPTH)
+	if Raw == "_"
+		return Default
+	; HSE_ValidCascadeDepth's rule, restated because this reader also boots
+	; without the hotstring engine (tests/support/feature_state_boot_smoke.ahk).
+	if (Raw is Integer) and Raw >= 0
+		return Raw
+	try LoggerWarn("Config", "hotstrings.cascade_depth '{1}' is not a whole number, 0 or more — using {2}.",
 		Raw is Object ? Type(Raw) : String(Raw), Default)
 	return Default
 }

@@ -22,6 +22,7 @@ idle_reset_seconds = 3
 click_resets_word = true
 arrow_resets_word = true
 shortcut_resets_word = true
+cascade_depth = 0
 expansion_delay = 0.75
 preview_ai_enabled = true
 preview_autocorrect_enabled = true

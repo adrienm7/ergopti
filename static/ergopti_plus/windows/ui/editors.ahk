@@ -10,6 +10,10 @@
 ; their menu/hotkey call sites elsewhere are unaffected.
 ; ==============================================================================
 
+; The generated key vocabulary the word-reset and cascade settings are named by
+; (a dedupe-safe include: menu_init.ahk and menu_manifest.ahk name it too).
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
+
 global _MagicKeyEditorInputHook := ""
 global _MagicKeyEditorStopDebt := false
 ; The window of the live capture, published with its hook.
@@ -612,10 +616,12 @@ ToggleRepeatKeyEnabled(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 
 ; The engine global each word-reset setting publishes to.
 _EditorWordResetGlobal(Key, Value) {
-	global HSE_IdleResetSeconds, HSE_ClickResetsWord
+	global HSE_IdleResetSeconds, HSE_ClickResetsWord, HSE_CascadeDepth
 	global HSE_ArrowResetsWord, HSE_ShortcutResetsWord, HSE_TapHoldResetsWord
 	if (Key == "idle_reset_seconds")
 		HSE_IdleResetSeconds := Value
+	else if (Key == ConfigLeaf.CASCADE_DEPTH)
+		HSE_CascadeDepth := Value
 	else if (Key == "click_resets_word")
 		HSE_ClickResetsWord := Value
 	else if (Key == "arrow_resets_word")
@@ -687,6 +693,20 @@ SetHotstringsIdleResetSeconds(Seconds, WriterFn := 0, NotifyFn := 0, RebuildFn :
 		return false
 	}
 	return _EditorCommitWordReset("idle_reset_seconds", Seconds, "the idle-reset delay",
+		WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Sets how many more hotstrings the text a hotstring produced may complete.
+ * @param {Integer} Depth A whole number, 0 or more; 0 disables the cascade.
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+SetHotstringsCascadeDepth(Depth, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	if !HSE_ValidCascadeDepth(Depth) {
+		try LoggerError("Editors", "Refused cascade depth: not a whole number, 0 or more.")
+		return false
+	}
+	return _EditorCommitWordReset(ConfigLeaf.CASCADE_DEPTH, Depth, "the cascade depth",
 		WriterFn, NotifyFn, RebuildFn)
 }
 

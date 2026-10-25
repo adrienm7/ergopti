@@ -1863,6 +1863,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/hotstrings/engine/test_hse_send_failure_transaction.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_output_is_final.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_chaining.ahk
+#Include unit/modules/hotstrings/engine/test_hotstring_cascade.ahk
 #Include meta/modules/hotstrings/catalogue/test_hotstrings_combo_auto_escaping.ahk
 #Include meta/modules/keystats/ergonomics/test_ergo_flow_gap_end.ahk
 #Include meta/infra/config/persistence/test_config_window_patch_toml_meta_error.ahk

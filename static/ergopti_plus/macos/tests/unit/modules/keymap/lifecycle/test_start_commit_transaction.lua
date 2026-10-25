@@ -262,6 +262,7 @@ local function load_fixture(prepare_input)
 			if key == "hotstrings.trigger_char" then return "★" end
 			-- The word-reset policy stays neutral: these scenarios are not about pauses.
 			if key == "hotstrings.idle_reset_seconds" then return 0 end
+			if key == "hotstrings.cascade_depth" then return 0 end
 			return false
 		end,
 	}

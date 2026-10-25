@@ -51,6 +51,7 @@ local OWNERS = {
 	{ key = "repeat_key_enabled", setter = "set_repeat_feature_enabled", getter = "is_repeat_feature_enabled" },
 	{ key = "expansion_delay", setter = "set_base_delay", getter = "get_base_delay" },
 	{ key = "idle_reset_seconds", setter = "set_idle_reset_seconds", getter = "get_idle_reset_seconds" },
+	{ key = require("config_keys").LEAF.CASCADE_DEPTH, setter = "set_cascade_depth", getter = "get_cascade_depth" },
 	{ key = "click_resets_word", setter = "set_click_resets_word", getter = "is_click_resets_word_enabled" },
 	{ key = "arrow_resets_word", setter = "set_arrow_resets_word", getter = "is_arrow_resets_word_enabled" },
 	{ key = "shortcut_resets_word", setter = "set_shortcut_resets_word",
