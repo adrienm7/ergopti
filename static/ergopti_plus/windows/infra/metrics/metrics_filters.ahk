@@ -437,7 +437,7 @@ MF_GetFocusSnapshot() {
 	; An invalid snapshot (hwnd 0) is already fail-closed and is not re-probed per read: a
 	; protected foreground window would otherwise cost a failing probe on every keystroke.
 	if MetricsFocusCache.event_mode && MetricsFocusCache.state.hwnd
-			&& MetricsFocusCache.state.hwnd != DllCall("User32\GetForegroundWindow", "Ptr") {
+			&& MetricsFocusCache.state.hwnd != WIGetForegroundHwnd() {
 		PerfCount("metrics.focus_read_refresh")
 		try MF_RefreshFocus(true)
 	}
@@ -540,7 +540,7 @@ _MF_FocusTimerTick(OwnerGeneration) {
 }
 
 _MF_CancelFocusTimerNative(FocusTimerFn) {
-	SetTimer(FocusTimerFn, 0)
+	TimerSetCallback(FocusTimerFn, 0)
 }
 
 
@@ -612,7 +612,7 @@ MF_StartFocusRefresh() {
 	; Timer mutation stays outside Critical. The BoundFunc identity lets failure
 	; cleanup cancel only this start attempt, never a newer owner’s timer.
 	EventsLive := _MF_StartFocusWinEvents()
-	try SetTimer(FocusTimerFn, EventsLive ? MF_FOCUS_FALLBACK_POLL_MS : MF_FOCUS_TTL_MS)
+	try TimerSetCallback(FocusTimerFn, EventsLive ? MF_FOCUS_FALLBACK_POLL_MS : MF_FOCUS_TTL_MS)
 	catch as Err {
 		_MF_StopFocusWinEvents()
 		PreviousCritical := Critical("On")
@@ -639,7 +639,7 @@ MF_StartFocusRefresh() {
 		&& ObjPtr(MetricsFocusCache.timer_fn) = ObjPtr(FocusTimerFn))
 	finally Critical(PreviousCritical)
 	if !StillOwned {
-		try SetTimer(FocusTimerFn, 0)
+		try TimerSetCallback(FocusTimerFn, 0)
 		return false
 	}
 
@@ -679,14 +679,13 @@ _MF_StartFocusWinEvents(AllowUnderHarness := false) {
 	Hooks := []
 	for Event in [MF_EVENT_SYSTEM_FOREGROUND, MF_EVENT_OBJECT_NAMECHANGE] {
 		Hook := 0
-		try Hook := DllCall("SetWinEventHook", "UInt", Event, "UInt", Event, "Ptr", 0,
-			"Ptr", Callback, "UInt", 0, "UInt", 0, "UInt", 0, "Ptr")
+		try Hook := WIInstallEventHook(Event, Callback)
 		catch as Err
 			try LoggerError("MetricsFilters", "SetWinEventHook raised for event 0x{1:X}: {2}.", Event, Err.Message)
 		if !Hook {
 			try LoggerError("MetricsFilters", "Focus event 0x{1:X} could not be hooked; polling instead.", Event)
 			for Done in Hooks
-				try DllCall("UnhookWinEvent", "Ptr", Done)
+				try WIRemoveEventHook(Done)
 			try CallbackFree(Callback)
 			return false
 		}
@@ -720,7 +719,7 @@ _MF_StopFocusWinEvents() {
 	AllRemoved := true
 	for Hook in Hooks {
 		Removed := false
-		try Removed := !!DllCall("UnhookWinEvent", "Ptr", Hook)
+		try Removed := WIRemoveEventHook(Hook)
 		catch as Err
 			try LoggerWarn("MetricsFilters", "Focus event hook teardown failed: {1}.", Err.Message)
 		AllRemoved := AllRemoved && Removed
@@ -738,14 +737,14 @@ _MF_FocusWinEvent(WinEventHook, Event, Hwnd, ObjectId, ChildId, EventThread, Eve
 	if Event == MF_EVENT_OBJECT_NAMECHANGE {
 		; Only the title of the foreground top-level window matters; child controls rename
 		; themselves constantly.
-		if ObjectId != 0 || Hwnd != DllCall("User32\GetForegroundWindow", "Ptr")
+		if ObjectId != 0 || Hwnd != WIGetForegroundHwnd()
 			return
 	}
 	PerfCount("metrics.focus_event")
 	if MetricsFocusCache.event_refresh_pending
 		return
 	MetricsFocusCache.event_refresh_pending := true
-	SetTimer(_MF_FocusEventRefresh, -MF_FOCUS_EVENT_COALESCE_MS)
+	TimerArmOneShotMs(_MF_FocusEventRefresh, MF_FOCUS_EVENT_COALESCE_MS)
 }
 
 _MF_FocusEventRefresh() {

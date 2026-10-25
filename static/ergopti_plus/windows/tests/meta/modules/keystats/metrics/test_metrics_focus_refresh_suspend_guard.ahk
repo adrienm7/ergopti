@@ -85,7 +85,7 @@ _MFS_PollIsCancellable() {
 	Bind := InStr(Start, "_MF_FocusTimerTick.Bind(StartGeneration)")
 	Store := InStr(Start, "MetricsFocusCache.timer_fn := FocusTimerFn")
 	; The interval is the fast poll, or the slow safety net while system focus events drive the cache.
-	Arm := InStr(Start, "SetTimer(FocusTimerFn, EventsLive ? MF_FOCUS_FALLBACK_POLL_MS : MF_FOCUS_TTL_MS)")
+	Arm := InStr(Start, "TimerSetCallback(FocusTimerFn, EventsLive ? MF_FOCUS_FALLBACK_POLL_MS : MF_FOCUS_TTL_MS)")
 	Assert(Pending > 0 && PendingPublish > Pending && Bind > PendingPublish
 		&& Store > Bind && Arm > Store,
 		"each start must publish a fail-closed pending barrier, bind its lifecycle generation, publish that exact callback identity, then arm it — a shared timer callback lets stale stop/start work target the wrong owner")
@@ -308,9 +308,9 @@ _MFS_StopAlwaysRemovesTheHooks() {
 		&& InStr(Stop, "_MF_StopFocusWinEvents()") < InStr(Stop, "NativeCancelFn.Call(FocusTimerFn)"),
 		"stop removes the focus hooks before it cancels the timer, so no event outlives the lifecycle")
 	Assert(InStr(Start, "_MF_StartFocusWinEvents()") > 0
-		&& InStr(Start, "_MF_StartFocusWinEvents()") < InStr(Start, "SetTimer(FocusTimerFn, EventsLive"),
+		&& InStr(Start, "_MF_StartFocusWinEvents()") < InStr(Start, "TimerSetCallback(FocusTimerFn, EventsLive"),
 		"the interval is chosen after the hooks are known to be live")
-	Assert(InStr(Start, "_MF_StopFocusWinEvents()") > InStr(Start, "SetTimer(FocusTimerFn, EventsLive"),
+	Assert(InStr(Start, "_MF_StopFocusWinEvents()") > InStr(Start, "TimerSetCallback(FocusTimerFn, EventsLive"),
 		"a failed arm releases the hooks it installed")
 }
 Test("metrics: the lifecycle installs the hooks before choosing the interval and removes them on stop (metrics-focus-events)",

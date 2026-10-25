@@ -541,6 +541,22 @@ WIGetForegroundHwnd() {
 	return 0
 }
 
+; Installs an out-of-context WinEvent hook for one event, delivered on this thread.
+; @param {Integer} Event - EVENT_* constant.
+; @param {Integer} Callback - CallbackCreate address with the WinEventProc signature.
+; @return {Integer} The hook handle, 0 when Windows refuses.
+WIInstallEventHook(Event, Callback) {
+	return DllCall("SetWinEventHook", "UInt", Event, "UInt", Event, "Ptr", 0,
+		"Ptr", Callback, "UInt", 0, "UInt", 0, "UInt", 0, "Ptr")
+}
+
+; Removes a hook installed by WIInstallEventHook.
+; @param {Integer} Hook - The hook handle.
+; @return {Boolean} Whether Windows removed it.
+WIRemoveEventHook(Hook) {
+	return !!DllCall("UnhookWinEvent", "Ptr", Hook)
+}
+
 ; Returns a stable identity for the focused Win32 control. GUI-thread focus is
 ; more precise than the foreground top-level HWND (an editor, Find box and
 ; address bar can all live in one window). Windowless/restricted controls may
