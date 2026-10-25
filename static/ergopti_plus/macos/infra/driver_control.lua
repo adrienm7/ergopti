@@ -59,6 +59,7 @@ local function native_ports()
 		read = FileSystem.read_with_status,
 		write = function(path, text) return FileSystem.write(path, text) == true end,
 		remove = FileSystem.delete,
+		remove_session = FileSystem.remove_if_unchanged,
 		exists = FileSystem.exists,
 		private_dir = function(path)
 			-- Once at start: mkdir -m sets the mode on the last component only, so
@@ -246,11 +247,20 @@ function Session:stop()
 	end
 	if self.token ~= nil then
 		local ok, result = pcall(function()
+			-- Conditional unlink can finish before its writer lock releases. That
+			-- release-only capability must settle even if a successor now owns
+			-- the pathname; repeating unlink would delete the wrong generation.
+			if self.marker_cleanup ~= nil then
+				if self.marker_cleanup() ~= true then return false end
+				self.marker_cleanup = nil
+			end
 			local current, status = self.ports.read(self:path("session"))
 			if status == "absent" then return true end
 			if status ~= "ok" or type(current) ~= "string" then return false end
 			if current:find('"token":"' .. self.token .. '"', 1, true) then
-				return self.ports.remove(self:path("session")) == true
+				local removed, _, _, cleanup = self.ports.remove_session(self:path("session"), { status = status, content = current })
+				if removed ~= true and type(cleanup) == "function" then self.marker_cleanup = cleanup end
+				return removed == true
 			end
 			return true
 		end)
