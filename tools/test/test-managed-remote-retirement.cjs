@@ -139,6 +139,33 @@ console.log(
 
 stagingCleanupControls();
 
+// Execute only the parsed output-factory assignments, with an inert local helper.
+// PowerShell closure scope is shared by both runtimes; no updater worker runs.
+const closureRuntime =
+	process.platform === 'win32'
+		? path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe')
+		: 'pwsh';
+const closureResult = spawnSync(
+	closureRuntime,
+	[
+		'-NoProfile',
+		'-NonInteractive',
+		'-File',
+		path.join(__dirname, 'test_updater_staging_closure.ps1'),
+		'-WorkerSourcePath',
+		path.join(__dirname, '../../static/ergopti_plus/windows/vendor/ergopti_updater_staging.ps1')
+	],
+	{ encoding: 'utf8', windowsHide: true, maxBuffer: 65536 }
+);
+assert.ifError(closureResult.error);
+assert.equal(closureResult.status, 0, closureResult.stdout + closureResult.stderr);
+assert.equal(closureResult.stderr, '');
+assert.equal(
+	closureResult.stdout.trim(),
+	'PASS: actual staging closure checks=6 native=0 network=0 output_io=0'
+);
+console.log(closureResult.stdout.trim());
+
 if (process.platform !== 'win32') {
 	console.log('SKIP: managed fixture retirement requires Windows PowerShell and owned loopback.');
 	process.exit(0);

@@ -55,7 +55,9 @@ try {
         $ParentDirectory -cne [IO.Path]::GetDirectoryName($SwapScriptPath)) {throw "Parent staging directory was refused"}
     $StagingDirectoryLease = [ErgoptiUpdaterMonotonicClock]::OpenStagingDirectory($ParentDirectory)
     if ([ErgoptiUpdaterMonotonicClock]::StagingIdentity($StagingDirectoryLease, $true) -cne $ParentDirectoryIdentity) {throw "Parent staging directory identity changed"}
-    $OpenParentDestination = {param($Path,$Size) Open-ErgoptiParentStagedOutput $Path $ParentExecutableIdentity}.GetNewClosure()
+    # The dynamic closure retains values, but cannot resolve script-local helpers.
+    $OpenParentOutput = ${function:Open-ErgoptiParentStagedOutput}
+    $OpenParentDestination = {param($Path,$Size) & $OpenParentOutput $Path $ParentExecutableIdentity}.GetNewClosure()
   }
   $Resolver={param($Destination,$Budget) Resolve-ErgoptiNativeNetworkRoutes $Destination $Budget $ReadConfig $ReadEnvironment $ProxyPolicyPath $UpdaterDefaultsPath}
   $Request=[System.Net.HttpWebRequest]::Create($Url)
