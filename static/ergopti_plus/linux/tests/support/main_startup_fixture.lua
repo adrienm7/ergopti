@@ -191,7 +191,7 @@ function M.run(options)
 		elseif name == "luv" then
 			return { os_getpid = function() return 4242 end }
 		elseif name == "infra.input_access" then
-			return { report = function() observed.access_reported = true; return 1 end }
+			return { missing_program = function() return nil end, report = function() observed.access_reported = true; return 1 end }
 		elseif name == "infra.i18n" then
 			return { init = noop, set_trigger_provider = noop, get = function(key) return key end }
 		elseif name == "infra.config_paths" then
