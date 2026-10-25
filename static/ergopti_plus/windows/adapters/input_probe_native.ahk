@@ -46,15 +46,15 @@ InputProbeNativeWaitActive(Hwnd, Seconds) {
 }
 
 /**
- * Declares the probe hotkey with no criterion, even when the driver was last
- * registering one under a #HotIf, so AutoHotkey's hook judges the key for every
- * window.
+ * Registers only the probe-owned variant. Its stable always-true criterion
+ * is eligible in every window without replacing a global user callback.
  * @param {String} Key - Hotkey name.
  * @param {Func} Callback - Called when the key fires.
  */
 InputProbeNativeHotkeyOn(Key, Callback) {
-	HotIf()
-	Hotkey(Key, Callback, "On I0")
+	HotIf(_InputProbeNativeHotkeyCriterion)
+	try Hotkey(Key, Callback, "On I0")
+	finally HotIf()
 }
 
 /**
@@ -62,8 +62,14 @@ InputProbeNativeHotkeyOn(Key, Callback) {
  * @param {String} Key - Hotkey name.
  */
 InputProbeNativeHotkeyOff(Key) {
-	HotIf()
-	Hotkey(Key, "Off")
+	HotIf(_InputProbeNativeHotkeyCriterion)
+	try Hotkey(Key, "Off")
+	finally HotIf()
+}
+
+; Function identity separates the diagnostic owner from every driver variant.
+_InputProbeNativeHotkeyCriterion(*) {
+	return true
 }
 
 

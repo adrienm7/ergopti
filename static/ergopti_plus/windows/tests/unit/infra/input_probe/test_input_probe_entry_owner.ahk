@@ -59,7 +59,7 @@ _IPET_ChildSource() {
 		. "`n#Include " . _DriverDir . "\tests\fixtures\input_probe_entry_owner_body.ahk`n"
 }
 
-_IPET_Case(Mode) {
+_IPET_Case(Mode, Source := 0) {
 	global _SharedDir
 	static RetirementDebt := 0
 	AssertFalse(IsObject(RetirementDebt), "An unsettled earlier input probe child must retire first")
@@ -70,7 +70,7 @@ _IPET_Case(Mode) {
 	AtDeadline := 0, ExportFailure := 0
 	PreviousCritical := Critical("Off")
 	try {
-		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _IPET_ChildSource()) != 0)
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . (Source is String ? Source : _IPET_ChildSource())) != 0)
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Mode, Directory, _SharedDir], _IPET_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The genuine public input probe child must start")
@@ -139,3 +139,17 @@ _IPET_Case(Mode) {
 for _IPET_Mode in ["current", "pause", "close"]
 	Test("Input probe entry: " . _IPET_Mode . " keeps native sends owned (input-probe-entry-owner)",
 		_IPET_Case.Bind(_IPET_Mode))
+
+_IPHT_Case(Mode) {
+	global _DriverDir
+	Owner := _DriverProductionFileForSymbol("InputProbeNativeHotkeyOn")
+	AssertTrue(Owner != "", "The native hotkey test requires the genuine complete adapter")
+	Source := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn All, StdOut`n"
+		. "#Include " . Owner . "`n#Include " . _DriverDir
+		. "\tests\fixtures\input_probe_hotkey_owner_body.ahk`n"
+	_IPET_Case(Mode, Source)
+}
+
+for _IPHT_Mode in ["global-enabled", "global-disabled", "conditional", "virtual-key"]
+	Test("Input probe hotkey: " . _IPHT_Mode . " retains the prior owner (input-probe-hotkey-owner)",
+		_IPHT_Case.Bind(_IPHT_Mode))

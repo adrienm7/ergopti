@@ -847,9 +847,8 @@ InputProbe_RunHookOrder() {
 			try LoggerWarn(INPUT_PROBE_TAG, "Hook order check aborted: the check window could not take the focus.")
 			return Result
 		}
-		; A hotkey declared with no criterion, even when the driver was last
-		; registering one under a #HotIf, so the probe key is judged by AutoHotkey's
-		; hook for every window.
+		; The adapter owns an always-true variant, so probing never replaces
+		; an existing callback or changes its enabled state.
 		InputProbeNativeHotkeyOn(INPUT_PROBE_HOOK_HOTKEY, _IP_HookHotkey)
 		HotkeyOn := true
 		Callback := CallbackCreate(_IP_HookProc, "Fast", 3)
