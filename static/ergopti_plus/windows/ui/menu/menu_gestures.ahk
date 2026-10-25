@@ -46,12 +46,15 @@ BuildGesturesMenu(Options := unset) {
 		"manual_tutorial",  (*) => GestureShowManualTutorialDialog(),
 	)
 	Getters := Map("gestures_enabled", _GES_IsEnabled)
-	; The recommended-defaults note: the preset avoids what Windows already does
-	; with a gesture, and the driver takes the system assignment over itself.
+	; The recommended-defaults note: a gesture is offered only while the system
+	; sends Ergopti's shortcut for it. There is no status provider: the slot rows
+	; below carry the availability themselves.
 	ListProviders := Map("gesture_slots_ahk", (*) => _GES_SlotRows(),
-		"gesture_recommended_notes", (*) => MenuRenderer_TemplateRows("gesture_recommended_notes", Map(), Map(), Map()),
-		"system_gesture_status", (*) => GestureSystemRows())
-	return MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers, "", ListProviders, Commands, Getters)
+		"gesture_recommended_notes", (*) => MenuRenderer_TemplateRows("gesture_recommended_notes", Map(), Map(), Map()))
+	Built := MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers, "", ListProviders, Commands, Getters)
+	if Built is Menu
+		GestureSystemWatchMenu(Built)
+	return Built
 }
 
 ; True when the gestures feature is switched on in the loaded configuration.
@@ -77,8 +80,12 @@ _GES_ApplyScope(Mode, Options := unset) {
 ; Iterates GESTURE_SLOTS in order, inserting a separator before tap_4 as before.
 ; Row DATA since 2026-08-07, as on Linux: each label is the slot plus the action
 ; currently bound to it, which no static declaration can carry.
-_GES_SlotRows() {
+; A slot the system does not map to Ergopti's shortcut is greyed out and its
+; label ends with the reason; the availability is re-read at every build.
+; @param ReadFn {Func|0} Injectable registry reader (tests); the real one when omitted.
+_GES_SlotRows(ReadFn := 0) {
 	global GestureAssignments, GESTURE_ACTIONS, GESTURE_SLOTS, Features
+	GestureSystemRefresh(ReadFn)
 	GestEnabled := Features.Has("gestures") and Features["gestures"].Has("enabled")
 		and Features["gestures"]["enabled"] = true
 	Rows := []
@@ -95,9 +102,10 @@ _GES_SlotRows() {
 		CurrentLabel  := GESTURE_ACTIONS.Has(CurrentAction)
 			? GestureActionDisplayLabel(CurrentAction, GestureBindingId("gesture", Slot))
 			: t("dialog.action_picker.disabled")
+		Reason := GestureSystemUnavailableReason(Slot)
 		Rows.Push(Map(
-			"label",    SlotLabel . " : " . CurrentLabel,
-			"disabled", !GestEnabled,
+			"label",    SlotLabel . " : " . CurrentLabel . (Reason != "" ? " — " . Reason : ""),
+			"disabled", !GestEnabled || Reason != "",
 			"action",   ((_s, _l) => (*) => ShowActionPicker(_l,
 				GestureAssignments.Has(_s) ? GestureAssignments[_s] : "none",
 				(Id) => SetGestureSlotAction(_s, Id), false, GestureBindingId("gesture", _s)))(Slot, SlotLabel)))
@@ -125,9 +133,7 @@ SetGestureSlotAction(Slot, ActionName) {
 	if !GestureAssignConfiguredAction(&GestureAssignments,
 			"gesture", "gestures", Slot, ActionName)
 		return false
-	if ActionName == "none"
-		return ReloadPreservingSuspend()
-	return GestureSystemAfterAssignment(Slot)
+	return ReloadPreservingSuspend()
 }
 
 ; Toggles the Gestures enabled state and reloads.

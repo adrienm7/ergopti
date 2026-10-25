@@ -75,7 +75,8 @@ const templateRows = (doc.menu && doc.menu.gesture_recommended_notes) || [];
 for (const [id, key] of [
 	['gesture_recommended_note', 'menu.gestures.recommended_note'],
 	['gesture_recommended_reason_linux', 'menu.gestures.recommended_reason_linux'],
-	['gesture_recommended_reason_macos', 'menu.gestures.recommended_reason_macos']
+	['gesture_recommended_reason_macos', 'menu.gestures.recommended_reason_macos'],
+	['gesture_recommended_reason_windows', 'menu.gestures.recommended_reason_windows']
 ]) {
 	const row = templateRows.find((r) => r.id === id);
 	assert.ok(row, `the notes template declares ${id}`);
@@ -91,6 +92,13 @@ for (const file of [
 ])
 	assert.match(read(file), /"gesture_recommended_notes"/, `${file} publishes the notes`);
 assert.match(en['menu.gestures.recommended_note'], /remove the system/i);
+// Windows replaces the system's own assignment, so the "remove it first" advice
+// is not shown there; its own note explains the greying instead.
+const platformsOf = (id) => templateRows.find((r) => r.id === id).platforms;
+assert.deepEqual(platformsOf('gesture_recommended_note'), ['hs', 'linux']);
+assert.deepEqual(platformsOf('gesture_recommended_reason_windows'), ['ahk']);
+assert.match(en['menu.gestures.recommended_reason_windows'], /greyed out/i);
+assert.match(en['menu.gestures.recommended_reason_windows'], /no double action/i);
 
 // 4. One debounce.
 const defaults = JSON.parse(read('_shared/modules/llm/defaults.json'));

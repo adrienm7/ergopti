@@ -1,12 +1,13 @@
 ﻿; tests/unit/modules/gestures/test_gesture_menu_status.ahk
 
 ; ==============================================================================
-; MODULE: Gesture Menu Boundary and Status
+; MODULE: Gesture Menu Boundary and Availability
 ; DESCRIPTION:
 ; The gestures menu materializes its shared tap boundary, consumes the
-; current declared order and refuses an effect-bearing boundary, and the
-; cached status frames keep their localized captions and strict
-; predicates.
+; current declared order and refuses an effect-bearing boundary. Each slot row
+; is greyed out, with its reason in the label, unless the Windows touchpad
+; settings send Ergopti's shortcut for it (assigned / not assigned / key
+; missing / unreadable). The retired status submenu stays absent.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -14,6 +15,26 @@
 
 
 
+
+; A registry reader answering what a fully assigned touchpad holds: every value
+; of every slot, taken from the generated table the writer itself uses.
+; @return {Func} fn(Name) returning the assigned value or "".
+_GSS_FullReader() {
+	global GESTURE_REG_ACTIONS, GESTURE_REG_KEY_PARAMS_NAMES, GESTURE_REG_KEY_PARAMS
+	global GESTURE_REG_ENABLE_NAMES, GESTURE_REG_CUSTOM_TAP_NAMES, GESTURE_REG_FAMILY_ENABLES
+	global GESTURE_REG_CUSTOM_VALUE, GESTURE_REG_CUSTOM_TAP_VALUE
+	Values := Map()
+	for Slot in GESTURE_REG_ACTIONS {
+		Values[GESTURE_REG_FAMILY_ENABLES[Slot]] := GESTURE_REG_CUSTOM_VALUE
+		Values[GESTURE_REG_ACTIONS[Slot]] := GESTURE_REG_CUSTOM_VALUE
+		Values[GESTURE_REG_KEY_PARAMS_NAMES[Slot]] := GESTURE_REG_KEY_PARAMS[Slot]
+		if GESTURE_REG_ENABLE_NAMES.Has(Slot)
+			Values[GESTURE_REG_ENABLE_NAMES[Slot]] := GESTURE_REG_CUSTOM_VALUE
+		if GESTURE_REG_CUSTOM_TAP_NAMES.Has(Slot)
+			Values[GESTURE_REG_CUSTOM_TAP_NAMES[Slot]] := GESTURE_REG_CUSTOM_TAP_VALUE
+	}
+	return (Name) => Values.Get(Name, "")
+}
 
 ; The independent three-slot vector crosses the original tap_4 boundary once.
 _GTB_WithSlots(Callback) {
@@ -57,7 +78,7 @@ _GTB_DeclaredBoundaryInner() {
 	AssertEqual(1, Boundary.Length)
 	AssertEqual(1, Boundary[1].Count)
 	AssertEqual("---", Boundary[1]["type"])
-	Rows := _GES_SlotRows()
+	Rows := _GES_SlotRows(_GSS_FullReader())
 	_GTB_AssertSlotRows(Rows, 4, 3)
 	AssertTrue(Rows[2]["separator"])
 	AssertFalse(Rows[2].Has("action"), "a fixed separator has no click owner")
@@ -81,7 +102,7 @@ _GTB_PublishedBoundaryInner() {
 	try {
 		Owner["status_rows"] := Map("tap_group_boundary", [
 			Map("type", "label", "i18n", "common.restore_recommended"), Map("type", "---")])
-		Rows := _GES_SlotRows()
+		Rows := _GES_SlotRows(_GSS_FullReader())
 		_GTB_AssertSlotRows(Rows, 5, 4)
 		AssertEqual(t("common.restore_recommended"), Rows[2]["label"])
 		AssertTrue(Rows[2]["disabled"])
@@ -90,9 +111,9 @@ _GTB_PublishedBoundaryInner() {
 		AssertFalse(Rows[3].Has("action"))
 		Owner["status_rows"]["tap_group_boundary"][1]["i18n"] := "common.clear_to_system"
 		AssertEqual(t("common.restore_recommended"), Rows[2]["label"], "held materialized data is detached from later source mutation")
-		AssertEqual(t("common.clear_to_system"), _GES_SlotRows()[2]["label"], "a fresh native provider consumes current shared source")
+		AssertEqual(t("common.clear_to_system"), _GES_SlotRows(_GSS_FullReader())[2]["label"], "a fresh native provider consumes current shared source")
 		Owner.Delete("status_rows")
-		AssertEqual(0, _GES_SlotRows().Length, "a missing required boundary refuses a rebuilt provider")
+		AssertEqual(0, _GES_SlotRows(_GSS_FullReader()).Length, "a missing required boundary refuses a rebuilt provider")
 		Native := Menu()
 		try {
 			AssertEqual(4, _MR_RenderRows(Native, Rows, "gesture_slots_ahk", 1), "the renderer receipt counts the inert label and slots")
@@ -124,7 +145,7 @@ _GTB_RefusedBoundaryInner() {
 			Map("tap_group_boundary", [Map("type", "---", "action", (*) => true)]),
 			Map("tap_group_boundary", [Map("type", "label", "i18n", "common.restore_recommended", "checked_when", ["foreign_state"])])] {
 			Owner["status_rows"] := Invalid
-			AssertEqual(0, _GES_SlotRows().Length, "missing, empty or effect-bearing status cannot publish a partial slot list")
+			AssertEqual(0, _GES_SlotRows(_GSS_FullReader()).Length, "missing, empty or effect-bearing status cannot publish a partial slot list")
 			AssertTrue(GestureAssignments == Assignments)
 			AssertEqual("none", GestureAssignments["tap_4"])
 			AssertTrue(Features == FeatureOwner)
@@ -132,7 +153,7 @@ _GTB_RefusedBoundaryInner() {
 		}
 		Owner.Delete("status_rows")
 		GESTURE_SLOTS := ["swipe_3_up", "tap_3"]
-		Rows := _GES_SlotRows()
+		Rows := _GES_SlotRows(_GSS_FullReader())
 		AssertEqual(2, Rows.Length, "an absent tap_4 needs no boundary or invented separator")
 		AssertFalse(Rows[1].Get("separator", false))
 		AssertFalse(Rows[2].Get("separator", false))
@@ -145,107 +166,161 @@ _GTB_RefusedBoundaryInner() {
 }
 Test("Gestures menu: missing or effect-bearing boundary refuses atomically without changing native assignment owners", _GTB_RefusedBoundary)
 
-; Keeps complete cached-system status assertions on the actual native provider.
-_GSS_WithSnapshot(Callback) {
-	global GESTURE_SLOTS, GestureAssignments, Features, _I18nCache, _I18nCacheLoaded
+
+
+
+
+; =============================================
+; =============================================
+; ======= 1/ Availability of the Slots ========
+; =============================================
+; =============================================
+
+; Runs a callback with the cached availability state restored afterwards.
+_GSS_WithState(Callback) {
 	State := GestureSystemState()
-	PreviousSlots := GESTURE_SLOTS, PreviousAssignments := GestureAssignments, PreviousFeatures := Features
-	PreviousReady := State["ready"], PreviousCached := State["slots"]
-	PreviousCache := _I18nCache, PreviousLoaded := _I18nCacheLoaded
-	try {
-		GESTURE_SLOTS := ["swipe_3_up", "tap_4", "tap_3"]
-		GestureAssignments := Map("swipe_3_up", "lookup", "tap_4", "lookup", "tap_3", "lookup")
-		Features := Map("gestures", Map("enabled", true))
-		State["slots"] := Map("swipe_3_up", true, "tap_4", false, "tap_3", false)
-		State["ready"] := false
-		return Callback.Call(State)
-	} finally {
-		GESTURE_SLOTS := PreviousSlots, GestureAssignments := PreviousAssignments, Features := PreviousFeatures
-		State["ready"] := PreviousReady, State["slots"] := PreviousCached
-		_I18nCache := PreviousCache, _I18nCacheLoaded := PreviousLoaded
+	PreviousSlots := State["slots"], PreviousReady := State["ready"], PreviousMenu := State["menu"]
+	try return Callback.Call(State)
+	finally {
+		State["slots"] := PreviousSlots, State["ready"] := PreviousReady, State["menu"] := PreviousMenu
 	}
 }
 
-_GSS_PriorCaptions() {
-	_GSS_WithSnapshot(_GSS_PriorCaptionsInner)
+; Three outcomes of the one predicate: every value assigned, a registry key that
+; does not exist at all, and one slot's value missing (the others stay assigned).
+_GSS_PredicateOutcomes() {
+	global GESTURE_SLOTS, GESTURE_REG_ACTIONS
+	Full := _GSS_FullReader()
+	for Slot in GESTURE_SLOTS
+		AssertTrue(GestureSystemSlotConfigured(Slot, Full), Slot . " is available when every value is assigned")
+	; The key is missing: RegRead falls back to "" and nothing is assigned.
+	Missing := GestureSystemRegistryReader("HKEY_CURRENT_USER\Software\ErgoptiPlusTests\NoSuchPrecisionTouchPad")
+	Snapshot := GestureSystemReadSnapshot(Missing)
+	AssertEqual(GESTURE_SLOTS.Length, Snapshot.Count, "a missing key still yields a complete snapshot")
+	for Slot, Available in Snapshot
+		AssertFalse(Available, Slot . " is unavailable when the registry key does not exist")
+	; One slot loses its own action value: only that slot becomes unavailable.
+	Lost := GESTURE_REG_ACTIONS["tap_3"]
+	Partial := (Name) => Name == Lost ? "" : Full.Call(Name)
+	Mixed := GestureSystemReadSnapshot(Partial)
+	AssertFalse(Mixed["tap_3"], "tap_3 is unavailable without its action value")
+	for Slot, Available in Mixed {
+		if (Slot != "tap_3")
+			AssertTrue(Available, Slot . " stays available")
+	}
 }
-_GSS_PriorCaptionsInner(State) {
-	global _SharedDir, GESTURE_SLOTS, GestureAssignments, _I18nCache, _I18nCacheLoaded
-	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\gesture_system_status_captions.json", "UTF-8"))
-	Locales := JsonParse(FileRead(_SharedDir . "\data\locale_order.json", "UTF-8"))["order"]
-	AssertEqual(21, Locales.Length)
-	for Locale in Locales {
-		Prior := Corpus["captions"][Locale]
-		_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Locale . ".json", "UTF-8"))
-		_I18nCacheLoaded := true
-		for Slot in GESTURE_SLOTS
-			_I18nCache["gesture.slots." . Slot] := "Independent Slot"
-		State["ready"] := false
-		Rows := GestureSystemRows()
-		AssertEqual(1, Rows.Length)
-		AssertEqual(Prior["unknown"], Rows[1]["label"], Locale . ": cached unknown parent")
-		AssertFalse(State["ready"], "building never starts a registry probe")
-		AssertEqual(4, Rows[1]["items"].Length)
-		for Index in [1, 2, 3] {
-			AssertEqual(Prior["slot_unknown"], Rows[1]["items"][Index]["label"])
-			Assert(Rows[1]["items"][Index]["action"] is Func, "real cached Settings callback retained")
+Test("Gestures availability: assigned, not assigned and registry key missing", _GSS_PredicateOutcomes)
+
+; A refused read is never "available": the state is unverified and says so.
+_GSS_UnreadableIsNotAvailable() {
+	_GSS_WithState(_GSS_UnreadableIsNotAvailableInner)
+}
+_GSS_UnreadableIsNotAvailableInner(State) {
+	AssertTrue(GestureSystemRefresh(_GSS_FullReader()))
+	AssertTrue(GestureSystemSlotAvailable("tap_3"))
+	AssertEqual("", GestureSystemUnavailableReason("tap_3"), "an available slot has no reason")
+	AssertFalse(GestureSystemRefresh(TestGestures_RefuseSystemRead))
+	AssertFalse(GestureSystemSlotAvailable("tap_3"), "a stale good value cannot survive a refused read")
+	AssertEqual(t("gestures.system.slot_unverified"), GestureSystemUnavailableReason("tap_3"))
+	AssertTrue(GestureSystemRefresh((Name) => ""))
+	AssertEqual(t("gestures.system.slot_unavailable"), GestureSystemUnavailableReason("tap_3"))
+}
+Test("Gestures availability: an unreadable registry leaves every slot unavailable with its own reason", _GSS_UnreadableIsNotAvailable)
+
+; The menu rows: available stays clickable, the others are disabled with the reason.
+_GSS_RowsFollowAvailability() {
+	_GTB_WithSlots(() => _GSS_RowsFollowAvailabilityInner())
+}
+_GSS_RowsFollowAvailabilityInner() {
+	global GESTURE_REG_ACTIONS
+	Full := _GSS_FullReader()
+	Lost := GESTURE_REG_ACTIONS["tap_4"]
+	Rows := _GES_SlotRows((Name) => Name == Lost ? "" : Full.Call(Name))
+	Reason := t("gestures.system.slot_unavailable")
+	AssertEqual(4, Rows.Length)
+	AssertFalse(Rows[1]["disabled"], "swipe_3_up is assigned")
+	AssertFalse(InStr(Rows[1]["label"], Reason), "an available row carries no reason")
+	AssertTrue(Rows[3]["disabled"], "tap_4 is not assigned")
+	AssertTrue(SubStr(Rows[3]["label"], -StrLen(Reason)) == Reason, "the reason ends the greyed label")
+	AssertTrue(InStr(Rows[3]["label"], t("gesture.slots.tap_4") . " : ") == 1, "the slot name still leads")
+	AssertFalse(Rows[4]["disabled"], "tap_3 is assigned")
+	; Nothing assigned and an unreadable registry grey every row.
+	for Reader in [(Name) => "", TestGestures_RefuseSystemRead] {
+		Greyed := _GES_SlotRows(Reader)
+		for Row in Greyed {
+			if !Row.Get("separator", false)
+				AssertTrue(Row["disabled"], "no slot is usable without an assignment: " . Row["label"])
 		}
-		State["ready"] := true
-		Rows := GestureSystemRows()
-		AssertEqual(Prior["conflicts_two"], Rows[1]["label"])
-		AssertEqual(Prior["slot_configured"], Rows[1]["items"][1]["label"])
-		AssertEqual(Prior["slot_not_configured"], Rows[1]["items"][2]["label"])
-		AssertEqual(Prior["slot_not_configured"], Rows[1]["items"][3]["label"])
-		AssertEqual(t("ui_apps.btn_refresh"), Rows[1]["items"][4]["label"])
-		for Slot in GESTURE_SLOTS
-			GestureAssignments[Slot] := "none"
-		AssertEqual(Prior["clear"], GestureSystemRows()[1]["label"])
-		for Slot in GESTURE_SLOTS
-			GestureAssignments[Slot] := "lookup"
-		for Slot in GESTURE_SLOTS
-			_I18nCache["gesture.slots." . Slot] := "Independent " . Slot
-		State["ready"] := false
-		Rows := GestureSystemRows()
-		for Index, Slot in GESTURE_SLOTS
-			AssertEqual(StrReplace(Prior["slot_unknown"], "Independent Slot", "Independent " . Slot),
-				Rows[1]["items"][Index]["label"], "each real native slot retains its own independently chosen caption")
-
 	}
+	AssertTrue(InStr(_GES_SlotRows(TestGestures_RefuseSystemRead)[1]["label"], t("gestures.system.slot_unverified")),
+		"an unreadable registry says so in the row")
 }
-Test("Gestures status: actual cached slot and parent frames preserve all prior localized captions", _GSS_PriorCaptions)
+Test("Gestures availability: slot rows are greyed with their reason and re-read at every build", _GSS_RowsFollowAvailability)
 
-_GSS_WithdrawnFrames() {
-	_GSS_WithSnapshot(_GSS_WithdrawnFramesInner)
+; Snapshots are compared as a whole, an unverified state differs from a verified one.
+_GSS_SnapshotComparison() {
+	A := Map("tap_3", true, "tap_4", false)
+	AssertTrue(_GestureSystemSameSnapshot(A, Map("tap_4", false, "tap_3", true)))
+	AssertFalse(_GestureSystemSameSnapshot(A, Map("tap_3", true, "tap_4", true)), "one slot changed")
+	AssertFalse(_GestureSystemSameSnapshot(A, Map("tap_3", true)), "a slot is missing")
+	AssertFalse(_GestureSystemSameSnapshot(A, 0), "unverified differs from verified")
+	AssertTrue(_GestureSystemSameSnapshot(0, 0), "two unverified states agree")
 }
-_GSS_WithdrawnFramesInner(State) {
-	Root := _MR_GetManifestRoot()
-	for Section in ["gesture_system_status_windows_frame", "gesture_system_status_unknown", "gesture_system_windows_children",
-		"gesture_system_slot_windows_frame", "gesture_system_slot_unknown"] {
-		Original := Root[Section]
-		try {
-			Root[Section] := []
-			AssertEqual(0, GestureSystemRows().Length, "withdrawn complete declaration refuses publication: " . Section)
-			AssertFalse(State["ready"], "refusal cannot start a registry probe")
-		} finally Root[Section] := Original
-	}
-}
-Test("Gestures status: actual cached provider refuses every withdrawn active frame", _GSS_WithdrawnFrames)
+Test("Gestures availability: snapshot comparison decides whether the menu is stale", _GSS_SnapshotComparison)
 
-_GSS_StrictPredicates() {
-	_GSS_WithSnapshot(_GSS_StrictPredicatesInner)
+; The open-time check only acts for the published Gestures submenu.
+_GSS_OpenOnlyForTheGesturesMenu() {
+	_GSS_WithState(_GSS_OpenOnlyForTheGesturesMenuInner)
 }
-_GSS_StrictPredicatesInner(State) {
+_GSS_OpenOnlyForTheGesturesMenuInner(State) {
+	State["menu"] := 0
+	; With no published menu, or another menu, nothing is read or rebuilt.
+	GestureSystemOnInitPopup(12345)
+	State["menu"] := 777
+	GestureSystemOnInitPopup(12345)
+	AssertEqual(777, State["menu"], "a foreign popup leaves the watched handle alone")
+}
+Test("Gestures availability: the open-time check ignores every other menu", _GSS_OpenOnlyForTheGesturesMenu)
+
+
+
+
+
+; =============================================
+; =============================================
+; ======= 2/ The Status Submenu Is Gone =======
+; =============================================
+; =============================================
+
+; Windows has no verification submenu: no declaration, no provider, no functions.
+_GSS_StatusSubmenuAbsent() {
 	Root := _MR_GetManifestRoot()
-	Section := "gesture_system_status_windows_frame"
-	Original := Root[Section]
-	try {
-		for Getter in ["missing_native_status_predicate", "gesture_system_conflict_count"] {
-			Changed := Original[1].Clone()
-			Changed["present_when"] := Getter
-			Root[Section] := [Changed, Original[2], Original[3]]
-			AssertEqual(0, GestureSystemRows().Length, "missing and non-boolean actual source getters refuse status")
-			AssertFalse(State["ready"])
-		}
-	} finally Root[Section] := Original
+	for Section in ["gesture_system_status_windows_frame", "gesture_system_windows_children",
+		"gesture_system_slot_windows_frame", "gesture_system_slot_configured", "gesture_system_slot_not_configured"]
+		AssertFalse(Root.Has(Section), "retired Windows status declaration: " . Section)
+	Status := _MR_FindItemById("gestures_menu", "system_gesture_status")
+	Assert(Status is Map, "macOS and Linux keep the row, so the declaration exists")
+	for Platform in Status["platforms"]
+		AssertTrue(Platform != "ahk", "the status row is not declared for the Windows driver")
+	for Name in ["GestureSystemRows", "GestureSystemNotice", "GestureSystemFinishNotice",
+		"GestureSystemAfterAssignment", "GestureSystemAssignmentNeedsWarning", "GestureSystemGroup"]
+		AssertEqual("", _DriverFuncBodyOrEmpty(Name), Name . " is retired with the status submenu")
+	Builder := _DriverFuncBody("BuildGesturesMenu")
+	AssertFalse(InStr(Builder, "system_gesture_status"), "the Windows menu registers no status provider")
+	Notes := _MR_FindItemById("gesture_recommended_notes", "gesture_recommended_reason_windows")
+	Assert(Notes is Map, "the Windows note explains the greying")
+	AssertEqual("ahk", Notes["platforms"][1])
 }
-Test("Gestures status: actual cached status frame refuses missing and non-boolean predicates", _GSS_StrictPredicates)
+Test("Gestures availability: the status submenu is absent from the Windows menu", _GSS_StatusSubmenuAbsent)
+
+; Whoever rewrites the registry asks for a re-read, so the greying follows it.
+_GSS_RegistryWritersRequestRefresh() {
+	for Name in ["GestureAutoConfigureRegistry", "TouchpadRegistryRestoreFromMenu"]
+		AssertContains(_DriverFuncBody(Name), "GestureSystemRequestRefresh(",
+			Name . " must refresh the availability after changing the registry")
+	AssertContains(_DriverFuncBody("GestureSystemWatchMenu"), "OnMessage(0x117",
+		"the Gestures submenu is re-checked when it opens")
+	AssertContains(_DriverFuncBody("BuildGesturesMenu"), "GestureSystemWatchMenu(",
+		"the built Gestures submenu is the one watched")
+}
+Test("Gestures availability: registry rewrites and the menu open both re-evaluate it", _GSS_RegistryWritersRequestRefresh)

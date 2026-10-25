@@ -155,18 +155,9 @@ const OPENS_SUBMENU = {
 	system_gesture_status: [
 		{
 			menu: 'gesture_system_status_controls',
-			platforms: ['ahk', 'hs'],
+			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: {
-				ahk: 'windows/ui/gesture_conflicts.ahk',
-				hs: 'macos/ui/menu/menu_gestures.lua'
-			}
-		},
-		{
-			menu: 'gesture_system_status_windows_frame',
-			platforms: ['ahk'],
-			kind: 'compose',
-			native_sources: { ahk: 'windows/ui/gesture_conflicts.ahk' }
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
 		},
 		{
 			menu: 'gesture_system_status_macos_frame',
@@ -183,12 +174,6 @@ const OPENS_SUBMENU = {
 	],
 	gesture_system_unknown_children: [
 		{
-			menu: 'gesture_system_windows_children',
-			platforms: ['ahk'],
-			kind: 'submenu',
-			native_sources: { ahk: 'windows/ui/gesture_conflicts.ahk' }
-		},
-		{
 			menu: 'gesture_system_linux_children',
 			platforms: ['linux'],
 			kind: 'submenu',
@@ -196,12 +181,6 @@ const OPENS_SUBMENU = {
 		}
 	],
 	gesture_system_clear_children: [
-		{
-			menu: 'gesture_system_windows_children',
-			platforms: ['ahk'],
-			kind: 'submenu',
-			native_sources: { ahk: 'windows/ui/gesture_conflicts.ahk' }
-		},
 		{
 			menu: 'gesture_system_macos_children',
 			platforms: ['hs'],
@@ -211,24 +190,12 @@ const OPENS_SUBMENU = {
 	],
 	gesture_system_conflict_children: [
 		{
-			menu: 'gesture_system_windows_children',
-			platforms: ['ahk'],
-			kind: 'submenu',
-			native_sources: { ahk: 'windows/ui/gesture_conflicts.ahk' }
-		},
-		{
 			menu: 'gesture_system_macos_children',
 			platforms: ['hs'],
 			kind: 'submenu',
 			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
 		}
 	],
-	gesture_system_cached_slots: {
-		menu: 'gesture_system_slot_windows_frame',
-		platforms: ['ahk'],
-		kind: 'compose',
-		native_sources: { ahk: 'windows/ui/gesture_conflicts.ahk' }
-	},
 	gesture_system_cached_overlap: {
 		menu: 'gesture_system_slot_linux_frame',
 		platforms: ['linux'],
@@ -3424,72 +3391,13 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 		OPENS_SUBMENU.system_gesture_status[0],
 		{
 			menu: 'gesture_system_status_controls',
-			platforms: ['ahk', 'hs'],
+			platforms: ['hs'],
 			kind: 'compose',
-			native_sources: {
-				ahk: 'windows/ui/gesture_conflicts.ahk',
-				hs: 'macos/ui/menu/menu_gestures.lua'
-			}
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
 		},
-		'the original independently published controls edge is retained'
+		'the controls edge is macOS only: the Windows driver has no status submenu'
 	);
 	const owners = [
-		{
-			file: 'windows/ui/gesture_conflicts.ahk',
-			platform: 'ahk',
-			section: 'gesture_system_status_unknown',
-			key: 'gesture_system_unknown_children',
-			port: 3
-		},
-		{
-			file: 'windows/ui/gesture_conflicts.ahk',
-			platform: 'ahk',
-			section: 'gesture_system_status_clear',
-			key: 'gesture_system_clear_children',
-			port: 3
-		},
-		{
-			file: 'windows/ui/gesture_conflicts.ahk',
-			platform: 'ahk',
-			section: 'gesture_system_status_conflicts',
-			key: 'gesture_system_conflict_children',
-			port: 3
-		},
-		{
-			file: 'windows/ui/gesture_conflicts.ahk',
-			platform: 'ahk',
-			section: 'gesture_system_windows_children',
-			key: 'gesture_system_cached_slots',
-			port: 3
-		},
-		{
-			file: 'windows/ui/gesture_conflicts.ahk',
-			platform: 'ahk',
-			section: 'gesture_system_status_controls',
-			key: 'gesture_system_refresh',
-			port: 1
-		},
-		{
-			file: 'windows/ui/gesture_conflicts.ahk',
-			platform: 'ahk',
-			section: 'gesture_system_slot_unknown',
-			key: 'gesture_system_open_unknown_slot',
-			port: 1
-		},
-		{
-			file: 'windows/ui/gesture_conflicts.ahk',
-			platform: 'ahk',
-			section: 'gesture_system_slot_configured',
-			key: 'gesture_system_open_configured_slot',
-			port: 1
-		},
-		{
-			file: 'windows/ui/gesture_conflicts.ahk',
-			platform: 'ahk',
-			section: 'gesture_system_slot_not_configured',
-			key: 'gesture_system_open_not_configured_slot',
-			port: 1
-		},
 		{
 			file: 'macos/ui/menu/menu_gestures.lua',
 			platform: 'hs',
@@ -3626,7 +3534,6 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 {
 	const assert = require('node:assert/strict');
 	for (const [platform, file, child] of [
-		['ahk', 'windows/ui/gesture_conflicts.ahk', 'gesture_system_windows_children'],
 		['hs', 'macos/ui/menu/menu_gestures.lua', 'gesture_system_macos_children']
 	]) {
 		const native = fs.readFileSync(path.join(SP, file), 'utf8');

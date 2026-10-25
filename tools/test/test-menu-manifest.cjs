@@ -3607,7 +3607,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	assert.deepEqual(source[corpus.section], corpus.rows, 'independent refresh source declaration');
 	assert.deepEqual(generated[corpus.section], corpus.rows, 'actual generated refresh declaration');
 	assert.deepEqual(corpus.platform_rows, {
-		ahk: ['gesture_system_refresh'],
+		ahk: [],
 		hs: ['gesture_system_refresh'],
 		linux: []
 	});
@@ -3627,13 +3627,12 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			sequence.every((value, offset) => tokens[index + offset]?.value === value)
 		);
 	}
+	// The Windows driver has no status submenu (its gesture rows are greyed out
+	// individually), so the refresh control belongs to the macOS menu alone.
 	function assertRefreshWiring(owner, extension, declaration = source) {
 		const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
-		const mac = extension === '.lua';
-		const child = mac ? 'gesture_system_macos_children' : 'gesture_system_windows_children';
-		const parent = mac
-			? 'gesture_system_status_macos_frame'
-			: 'gesture_system_status_windows_frame';
+		const child = 'gesture_system_macos_children';
+		const parent = 'gesture_system_status_macos_frame';
 		const tokens = scriptTokens(owner, extension);
 		assert.deepEqual(
 			declaration[child].filter((row) => row.type === 'include' && row.section === corpus.section),
@@ -3645,9 +3644,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			true,
 			'the executable refresh owner is bound in the actual typed command port'
 		);
-		const cached = mac ? 'gesture_system_cached_conflicts' : 'gesture_system_cached_slots';
 		assert.equal(
-			nativeTemplateBinding(owner, extension, child, cached, 3),
+			nativeTemplateBinding(owner, extension, child, 'gesture_system_cached_conflicts', 3),
 			true,
 			'the actual cached native inventory feeds the consumed child frame'
 		);
@@ -3657,80 +3655,45 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				true,
 				'the genuinely published status frame owns its cached child data'
 			);
-		if (mac) {
-			assert.ok(
-				hasSequence(tokens, ['[', 'gesture_system_refresh', ']', '=', 'function', '(', ')'])
-			);
-			assert.ok(
-				hasSequence(tokens, [
-					'return',
-					'gestures',
-					'.',
-					'refresh_system_gestures',
-					'(',
-					'ctx',
-					'.',
-					'updateMenu',
-					')'
-				])
-			);
-			assert.ok(
-				hasSequence(tokens, ['return', 'status']),
-				'the complete actual status frame is published'
-			);
-		} else {
-			assert.ok(
-				hasSequence(tokens, ['gesture_system_refresh', ',', 'GestureSystemRequestRefresh', ')'])
-			);
-			assert.ok(
-				hasSequence(tokens, ['SetTimer', '(', 'GestureSystemRefresh', ',', '-', '1', ')']),
-				'Windows retains the original deferred complete-snapshot refresh'
-			);
-			assert.ok(
-				hasSequence(tokens, [
-					'return',
-					'Rows',
-					'is',
-					'Array',
-					'&',
-					'&',
-					'Rows',
-					'.',
-					'Length',
-					'=',
-					'=',
-					'1',
-					'?',
-					'Rows'
-				]),
-				'the complete actual status frame is published'
-			);
-		}
+		assert.ok(hasSequence(tokens, ['[', 'gesture_system_refresh', ']', '=', 'function', '(', ')']));
+		assert.ok(
+			hasSequence(tokens, [
+				'return',
+				'gestures',
+				'.',
+				'refresh_system_gestures',
+				'(',
+				'ctx',
+				'.',
+				'updateMenu',
+				')'
+			])
+		);
+		assert.ok(
+			hasSequence(tokens, ['return', 'status']),
+			'the complete actual status frame is published'
+		);
 	}
-	for (const [extension, nativePath] of [
-		['.lua', 'macos/ui/menu/menu_gestures.lua'],
-		['.ahk', 'windows/ui/gesture_conflicts.ahk']
-	]) {
-		const owner = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', nativePath), 'utf8');
+	{
+		const extension = '.lua';
+		const owner = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_gestures.lua'),
+			'utf8'
+		);
 		assertRefreshWiring(owner, extension);
-		const child =
-			extension === '.lua' ? 'gesture_system_macos_children' : 'gesture_system_windows_children';
+		const child = 'gesture_system_macos_children';
 		for (const id of [child, 'gesture_system_refresh'])
 			assert.throws(() =>
 				assertRefreshWiring(owner.replaceAll('"' + id + '"', '"unowned_refresh"'), extension)
 			);
-		const changed =
-			extension === '.lua'
-				? owner.replaceAll('gestures.refresh_system_gestures', 'gestures.unowned_refresh')
-				: owner.replaceAll('GestureSystemRequestRefresh)', 'UnownedRefresh)');
+		const changed = owner.replaceAll(
+			'gestures.refresh_system_gestures',
+			'gestures.unowned_refresh'
+		);
 		assert.throws(() => assertRefreshWiring(changed, extension));
-		const comment = extension === '.lua' ? '-- ' : '; ';
 		const erased = owner.replaceAll('"' + child + '"', '"unowned_refresh"');
-		const call =
-			extension === '.lua'
-				? `ManifestMenu.template_rows("${child}", {})`
-				: `MenuRenderer_TemplateRows("${child}", Map(), Map(), Map())`;
-		assert.throws(() => assertRefreshWiring(erased + '\n' + comment + call, extension));
+		const call = `ManifestMenu.template_rows("${child}", {})`;
+		assert.throws(() => assertRefreshWiring(erased + '\n-- ' + call, extension));
 		assert.throws(() => assertRefreshWiring(erased + '\n' + JSON.stringify(call), extension));
 		for (const mutate of [
 			(rows) => rows.filter((row) => row.type !== 'include' || row.section !== corpus.section),
@@ -3754,6 +3717,42 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			() => assertRefreshWiring(wrongPort, extension),
 			'a quoted refresh ID outside its actual command port has no authority'
 		);
+	}
+	// The Windows slot rows carry their own availability: no status provider, no
+	// status template and no verification submenu may come back for that driver.
+	{
+		const windowsTemplates = [
+			'gesture_system_status_windows_frame',
+			'gesture_system_windows_children',
+			'gesture_system_slot_windows_frame',
+			'gesture_system_slot_configured',
+			'gesture_system_slot_not_configured'
+		];
+		for (const name of windowsTemplates) {
+			assert.equal(source[name], undefined, 'retired Windows status declaration: ' + name);
+			assert.equal(generated[name], undefined, 'retired Windows status output: ' + name);
+		}
+		const statusRow = source.gestures_menu.find((row) => row.id === 'system_gesture_status');
+		assert.deepEqual(
+			{ platforms: statusRow.platforms, unavailable: statusRow.unavailable },
+			{ platforms: ['hs', 'linux'], unavailable: 'hide' },
+			'the status submenu is not declared for the Windows driver'
+		);
+		const windowsSource = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/windows/ui/menu/menu_gestures.ahk'),
+			'utf8'
+		);
+		assert.ok(
+			!windowsSource.includes('system_gesture_status'),
+			'the Windows gestures menu publishes no status provider'
+		);
+		const manifestJson = readFileSync(MENU_PATH, 'utf8');
+		for (const id of [
+			'gesture_system_cached_slots',
+			'gesture_system_open_configured_slot',
+			'gesture_system_open_not_configured_slot'
+		])
+			assert.ok(!manifestJson.includes(id), 'retired Windows status row: ' + id);
 	}
 }
 
@@ -10364,23 +10363,6 @@ console.log(
 	const declaration = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
 	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
 	const expected = {
-		gesture_system_status_windows_frame: [
-			{
-				type: 'include',
-				section: 'gesture_system_status_unknown',
-				present_when: 'gesture_system_is_unverified'
-			},
-			{
-				type: 'include',
-				section: 'gesture_system_status_clear',
-				present_when: 'gesture_system_is_clear'
-			},
-			{
-				type: 'include',
-				section: 'gesture_system_status_conflicts',
-				present_when: 'gesture_system_has_conflicts'
-			}
-		],
 		gesture_system_status_macos_frame: [
 			{
 				type: 'include',
@@ -10401,7 +10383,7 @@ console.log(
 				type: 'group',
 				id: 'gesture_system_unknown_children',
 				i18n: 'gestures.system.unknown',
-				platforms: ['ahk', 'linux'],
+				platforms: ['linux'],
 				unavailable: 'hide'
 			}
 		],
@@ -10410,7 +10392,7 @@ console.log(
 				type: 'group',
 				id: 'gesture_system_clear_children',
 				i18n: 'gestures.system.clear',
-				platforms: ['ahk', 'hs'],
+				platforms: ['hs'],
 				unavailable: 'hide'
 			}
 		],
@@ -10420,13 +10402,9 @@ console.log(
 				id: 'gesture_system_conflict_children',
 				i18n: 'gestures.system.conflicts_caption',
 				caption_getter: 'gesture_system_conflict_count',
-				platforms: ['ahk', 'hs'],
+				platforms: ['hs'],
 				unavailable: 'hide'
 			}
-		],
-		gesture_system_windows_children: [
-			{ type: 'list', id: 'gesture_system_cached_slots', platforms: ['ahk'], unavailable: 'hide' },
-			{ type: 'include', section: 'gesture_system_status_controls' }
 		],
 		gesture_system_macos_children: [
 			{
@@ -10469,27 +10447,13 @@ console.log(
 		);
 		for (const state of ['enabled', 'disabled', 'unknown'])
 			assert.equal(strings['gestures.system.pinch_' + state], prior['pinch_' + state]);
-		for (const state of ['unknown', 'configured', 'not_configured'])
+		for (const state of ['unknown'])
 			assert.equal(
 				strings['gestures.system.slot_' + state + '_caption'].split('%s').join('Independent Slot'),
 				prior['slot_' + state]
 			);
 	}
 	for (const [file, extension, section, key, port] of [
-		[
-			'windows/ui/gesture_conflicts.ahk',
-			'.ahk',
-			'gesture_system_slot_windows_frame',
-			'gesture_system_open_unknown_slot',
-			1
-		],
-		[
-			'windows/ui/gesture_conflicts.ahk',
-			'.ahk',
-			'gesture_system_windows_children',
-			'gesture_system_cached_slots',
-			3
-		],
 		[
 			'macos/ui/menu/menu_gestures.lua',
 			'.lua',
