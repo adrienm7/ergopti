@@ -923,16 +923,41 @@ _TestPrint(Line) {
 	try FileAppend(Line . "`r`n", "*")
 }
 
+; Resolve only the declared Integer zero default; a string zero is not an owner.
+_TestPlanClassifier(ModuleOf) {
+	if (ModuleOf is Integer) && ModuleOf == 0
+		return _TestModuleOf
+	if !HasMethod(ModuleOf, "Call")
+		throw TypeError("The test plan classifier must be callable.")
+	return ModuleOf
+}
+
+; Build all metadata before writing a plan so a refused owner leaves no partial file.
+_TestBuildPlan(Entries, ModuleOf := 0) {
+	Classifier := _TestPlanClassifier(ModuleOf)
+	Plan := ""
+	for Entry in Entries {
+		Group := Classifier.Call(Entry.file)
+		if !(Group is String) || Trim(Group) == "" || RegExMatch(Group, "[\t\r\n]")
+			throw TypeError("The test plan classifier must return one nonempty field.")
+		Plan .= Group . "`t" . Entry.file . "`t" . Entry.name . "`n"
+	}
+	return Plan
+}
+
 ; Execute every registered test, print TAP-style results and exit with
 ; code 0 (all green) or 1 (any failure). Designed to be called from the
 ; bottom of ``run_all.ahk`` after every test file has been #Included.
 ; When --dry-run is passed on the command line, exits immediately after
 ; printing the plan line so the CI warning-check step stays fast.
-RunTests() {
+; The optional callable classifies plan metadata only; Integer zero retains
+; the canonical unit shard owner, independent of any other runner profile.
+RunTests(PlanModuleOf := 0) {
 	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN, _AHK_ONLY_FILTER
 	global TEST_NOT_EXECUTED_COUNT, TEST_NOT_EXECUTED_MARKER
 	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
 	global _AHK_INTERACTIVE, _AHK_MODULE, _AHK_LIST_FILE, _AHK_DUMP_PLAN, _AHK_REVERSE
+	PlanClassifier := _TestPlanClassifier(PlanModuleOf)
     if (A_IsCritical != 0) {
         throw Error("RunTests started with A_IsCritical=" . A_IsCritical)
     }
@@ -949,9 +974,7 @@ RunTests() {
 	ActiveTests := _SelectReversed(_SelectListed(_SelectModule(ActiveTests, _AHK_MODULE), _AHK_LIST_FILE),
 		_AHK_REVERSE)
 	if _AHK_DUMP_PLAN != "" {
-		Plan := ""
-		for Entry in ActiveTests
-			Plan .= _TestModuleOf(Entry.file) . "`t" . Entry.file . "`t" . Entry.name . "`n"
+		Plan := _TestBuildPlan(ActiveTests, PlanClassifier)
 		FileAppend(Plan, _AHK_DUMP_PLAN, "UTF-8")
 	}
 	DeferredName := _TestDevQualificationName()

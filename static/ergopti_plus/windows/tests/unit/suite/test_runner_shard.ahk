@@ -99,3 +99,50 @@ _RSH_Reverse() {
 	AssertEqual(0, _SelectReversed([], true).Length)
 }
 Test("runner module: --reverse runs the selection backwards (runner-module)", _RSH_Reverse)
+
+
+_RSH_DefaultPlanOwner() {
+	global TEST_MODULE_GROUPS
+	File := "C:\repo\static\ergopti_plus\windows\tests\unit\infra\test_text_utils.ahk"
+	Rows := [{file: File, name: "first"}, {file: File, name: "second"}]
+	Expected := "core`t" . File . "`tfirst`ncore`t" . File . "`tsecond`n"
+	AssertEqual(Expected, _TestBuildPlan(Rows), "the default plan preserves canonical unit classification and order")
+	AssertEqual(Expected, _TestBuildPlan(Rows, 0), "only the declared Integer zero chooses the same canonical owner")
+	AssertEqual(14, TEST_MODULE_GROUPS.Length, "the E2E owner must not create an empty unit shard")
+	for Unowned in ["unit\new_area\test_x.ahk", "e2e\run_e2e.ahk"] {
+		AssertThrows(_TestModuleOf.Bind("C:\repo\static\ergopti_plus\windows\tests\" . Unowned))
+		AssertThrows(_TestBuildPlan.Bind([{file: "C:\repo\static\ergopti_plus\windows\tests\" . Unowned, name: "unknown"}]))
+	}
+	AssertThrows(_SelectModule.Bind([], "e2e"), "E2E must remain outside the unit module vocabulary")
+}
+Test("runner plan: default ownership keeps all unit classification strict (runner-plan-owner)", _RSH_DefaultPlanOwner)
+
+_RSH_ExplicitPlanOwner() {
+	Files := []
+	Rows := [{file: "owned-entry.ahk", name: "first"}, {file: "owned-include.ahk", name: "second"}]
+	Plan := _TestBuildPlan(Rows, (File) => (Files.Push(File), "owned-suite"))
+	AssertEqual("owned-suite`towned-entry.ahk`tfirst`nowned-suite`towned-include.ahk`tsecond`n", Plan)
+	AssertEqual(2, Files.Length, "the owner must classify every actual registering file")
+	AssertEqual(Rows[1].file, Files[1])
+	AssertEqual(Rows[2].file, Files[2])
+}
+Test("runner plan: an explicit owner classifies exact ordered registrations (runner-plan-owner)", _RSH_ExplicitPlanOwner)
+
+_RSH_InvalidPlanOwners() {
+	for Invalid in ["0", 0.0, 1, "", "classifier", {}, [], Map()]
+		AssertThrows(_TestBuildPlan.Bind([], Invalid), "invalid ownership must refuse even an empty registry")
+}
+Test("runner plan: invalid classifier values never select the default (runner-plan-owner)", _RSH_InvalidPlanOwners)
+
+_RSH_InvalidPlanLabel(Label) {
+	Rows := [{file: "owned.ahk", name: "one"}]
+	Owner := (File) => Label
+	AssertThrows(_TestBuildPlan.Bind(Rows, Owner), "a classifier must not corrupt the plan's three fields")
+}
+for _RSH_BadPlanLabel in [
+	{Name: "empty", Value: ""}, {Name: "whitespace", Value: " "}, {Name: "integer", Value: 0},
+	{Name: "tab", Value: "bad`tfield"}, {Name: "newline", Value: "bad`nfield"},
+	{Name: "carriage return", Value: "bad`rfield"}, {Name: "object", Value: {}}
+]
+	Test("runner plan: " . _RSH_BadPlanLabel.Name . " classifier output is refused (runner-plan-owner)",
+		_RSH_InvalidPlanLabel.Bind(_RSH_BadPlanLabel.Value))
