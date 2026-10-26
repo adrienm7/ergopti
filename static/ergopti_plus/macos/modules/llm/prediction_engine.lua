@@ -223,7 +223,12 @@ local chain_pending = false
 -- bursts and caps energy on local backends. Sourced from _shared/modules/llm/inference.json
 -- so the AHK twin (modules/llm/api_common.ahk) reads the same floor.
 local ApiCommon = require("modules.llm.api_common")
-local _last_request_at_s = 0
+-- The debounce and rate-floor decisions (_shared/lua/llm/request_plan): this
+-- engine feeds the plan events and the clock, and owns the native timers and
+-- the backend calls. The plan also holds when the last request went out.
+local _plan = require("modules.llm.request_plan_policy").new(function(backend_id)
+	return ApiCommon.get_rate_limit_min_interval_s(backend_id) * 1000
+end)
 
 -- ── LLM engine configuration ─────────────────────────────────────────────────
 -- Stub values that prevent crashes during the brief startup window before the
@@ -1100,28 +1105,51 @@ local function reset_llm_dismiss_timer()
 	return true
 end
 
---- The debounce of the automatic trigger: the configured one, whatever the
---- typing speed, as on Windows and Linux. It used to stretch to 1.5x (at most
---- 600 ms) above 55 WPM and shrink to 0.5x (at least 50 ms) below 20 WPM, so
---- the delay the menu showed was not the one macOS waited.
---- @return number The debounce delay in seconds to use for this timer start.
-local function configured_debounce()
-	-- Live mode redraws at every keystroke: its own short, fixed debounce only
-	-- coalesces a burst
-	if _live then return LIVE_CONFIG.debounce_sec end
-	return inactivity_debounce_sec
+--- Asks the plan what the keystroke does to the debounce timer. A negative menu
+--- debounce turns the automatic trigger off (a skip); live mode is an explicit
+--- request for it, so it keeps its own debounce. A skip leaves the pending
+--- timer alone, an arm has already withdrawn the plan's previous token. The
+--- delay is the configured one whatever the typing speed, as on Windows and
+--- Linux; it used to stretch to 1.5x above 55 WPM and shrink to 0.5x below 20,
+--- so the delay the menu showed was not the one macOS waited.
+--- @param delay_override number|nil Override in seconds; the configured debounce if nil.
+--- @param ends_word boolean|nil True when the buffer just ended a word.
+--- @return table|nil arm The arm decision, nil when nothing is to be armed.
+local function plan_arm(delay_override, ends_word)
+	local ok, decisions = pcall(function()
+		_plan:configure({
+			enabled = is_llm_enabled,
+			debounce_ms = inactivity_debounce_sec * 1000,
+			instant_on_word_end = instant_on_word_end,
+			live_debounce_ms = _live and LIVE_CONFIG.debounce_sec * 1000 or false,
+		})
+		if delay_override ~= nil then
+			return _plan:on_input({ cause = "override", delay_ms = delay_override * 1000 })
+		end
+		return _plan:on_input({ cause = "typing", ends_word = ends_word == true })
+	end)
+	if not ok then
+		Logger.error(LOG, "Debounce plan refused the keystroke: %s", tostring(decisions))
+		return nil
+	end
+	for _, decision in ipairs(decisions) do
+		if decision.action == "arm" then return decision end
+	end
+	return nil
 end
 
 --- Arms the inactivity debounce timer to fire perform_check() after silence.
 --- @param delay_override number|nil Override in seconds; the configured debounce if nil.
-local function start_inactivity_timer(delay_override)
+--- @param ends_word boolean|nil True when the buffer just ended a word.
+local function start_inactivity_timer(delay_override, ends_word)
 	if not runtime_available() then return false end
-	-- A negative menu debounce turns the automatic trigger off; live mode is an
-	-- explicit request for it, so it keeps its own
-	if not is_llm_enabled or (inactivity_debounce_sec < 0 and not _live) then return false end
-	if stop_inactivity_timer() ~= true then return false end
-	local delay = delay_override
-	if delay == nil then delay = configured_debounce() end
+	local arm = plan_arm(delay_override, ends_word)
+	if arm == nil then return false end
+	if stop_inactivity_timer(true) ~= true then
+		_plan:on_cancel()
+		return false
+	end
+	local delay = arm.delay_ms / 1000
 	local generation = _inactivity_generation + 1
 	_inactivity_generation = generation
 	local descriptor = {
@@ -1132,6 +1160,7 @@ local function start_inactivity_timer(delay_override)
 		generation = generation,
 		handle = nil,
 		settled = false,
+		token = arm.token,
 	}
 	_inactivity_timer = descriptor
 
@@ -1161,6 +1190,13 @@ local function start_inactivity_timer(delay_override)
 	local handle, committed = TimerScheduler.after(delay, function()
 		if descriptor.authorized ~= true or descriptor.delivered == true
 			or descriptor.generation ~= _inactivity_generation then
+			descriptor.authorized = false
+			release_descriptor()
+			return false
+		end
+		-- The plan agrees this is its current timer; one it withdrew sends nothing.
+		if _plan:on_timer(descriptor.token)[1].action ~= "fire" then
+			Logger.debug(LOG, "Inactivity timer superseded in the plan — nothing sent.")
 			descriptor.authorized = false
 			release_descriptor()
 			return false
@@ -1217,7 +1253,8 @@ local function start_inactivity_timer(delay_override)
 		return false
 	end
 	descriptor.authorized = true
-	if delay_override ~= nil then
+	local labels = require("llm.request_plan.debounce").REASON
+	if arm.why == labels.override or arm.why == labels.word_end then
 		Logger.trace(LOG, "Inactivity timer started (override: %.3fs).", delay)
 	else
 		Logger.trace(LOG, "Inactivity timer started (debounce: %.3fs).", delay)
@@ -1247,9 +1284,15 @@ end
 --- Cancels the exact inactivity timer without firing the LLM check.
 --- A failed native stop remains retryable through the same descriptor.
 --- @return boolean stopped True only when no native capability remains.
-stop_inactivity_timer = function()
+stop_inactivity_timer = function(plan_superseded)
+	-- A start has already replaced the plan's pending token; every other stop
+	-- withdraws it once the native timer is gone.
+	local function withdrawn()
+		if plan_superseded ~= true then _plan:on_cancel() end
+		return true
+	end
 	local descriptor = _inactivity_timer
-	if not descriptor then return true end
+	if not descriptor then return withdrawn() end
 	descriptor.authorized = false
 	_inactivity_generation = _inactivity_generation + 1
 	if descriptor.callback_running == true then
@@ -1263,7 +1306,7 @@ stop_inactivity_timer = function()
 	local handle = descriptor.handle
 	if type(handle) ~= "table" or handle.timer == nil then
 		if _inactivity_timer == descriptor then _inactivity_timer = nil end
-		return true
+		return withdrawn()
 	end
 	local stop_ok, stop_result = xpcall(function()
 		return TimerScheduler.cancel(handle)
@@ -1279,7 +1322,7 @@ stop_inactivity_timer = function()
 	end
 	if _inactivity_timer == descriptor then _inactivity_timer = nil end
 	Logger.done(LOG, "Inactivity timer stopped.")
-	return true
+	return withdrawn()
 end
 
 
@@ -1770,24 +1813,22 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	end
 
 	-- Backend-aware request floor — re-arm the debounce timer for the
-	-- remaining gap instead of firing immediately. force_trigger (the
-	-- manual hotkey path) bypasses the floor because it is an explicit user
-	-- request, not a per-keystroke burst.
-	if not force_trigger then
-		local now_s        = hs.timer.secondsSinceEpoch()
-		local backend_id   = core_llm.get_backend and core_llm.get_backend() or "ollama"
+	-- remaining gap instead of firing immediately. The plan lets force_trigger
+	-- (the manual hotkey path) through: it is an explicit user request, not a
+	-- per-keystroke burst.
+	local backend_id = core_llm.get_backend and core_llm.get_backend() or "ollama"
+	local floor_verdict = _plan:on_dispatch({ backend = backend_id, explicit = force_trigger },
+		hs.timer.secondsSinceEpoch() * 1000)[1]
+	if not predispatch_is_current() then return end
+	if floor_verdict.action == "defer" then
 		local min_interval = ApiCommon.get_rate_limit_min_interval_s(backend_id)
-		local elapsed      = now_s - _last_request_at_s
-		if not predispatch_is_current() then return end
-		if _last_request_at_s > 0 and elapsed < min_interval then
-			local remaining = min_interval - elapsed
-			Logger.debug(LOG, "Backend '%s' floor (%dms) — deferring %dms.",
-				backend_id, math.floor(min_interval * 1000), math.floor(remaining * 1000))
-			-- Reuse the single canonical timer instead of creating an orphan;
-			-- store profile_name so the callback can forward it when it fires
-			defer_check(remaining, "Rate-limit deferral")
-			return
-		end
+		local remaining = floor_verdict.delay_ms / 1000
+		Logger.debug(LOG, "Backend '%s' floor (%dms) — deferring %dms.",
+			backend_id, math.floor(min_interval * 1000), math.floor(remaining * 1000))
+		-- Reuse the single canonical timer instead of creating an orphan;
+		-- store profile_name so the callback can forward it when it fires
+		defer_check(remaining, "Rate-limit deferral")
+		return
 	end
 
 	-- Pre-build the info bar for streaming frames; on_success replaces it with the latency-aware version
@@ -2046,7 +2087,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	-- Rate-limit and duplicate-suppression state describes real backend calls,
 	-- never a loading paint or failed watchdog construction.
 	last_buffer_signature    = signature
-	_last_request_at_s       = hs.timer.secondsSinceEpoch()
+	_plan:on_sent(backend_id, hs.timer.secondsSinceEpoch() * 1000)
 end
 
 -- The reasons a manual request is refused, each with the locale key of the
@@ -2880,11 +2921,7 @@ end
 --- so the prediction fires as soon as the word boundary is detected.
 function M.start_timer_word_end()
 	if not runtime_available() then return false end
-	if instant_on_word_end then
-		return start_inactivity_timer(0) == true
-	else
-		return start_inactivity_timer() == true
-	end
+	return start_inactivity_timer(nil, true) == true
 end
 
 --- Cancels the inactivity timer without firing the LLM check.

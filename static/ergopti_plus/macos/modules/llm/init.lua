@@ -2107,7 +2107,12 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
 	local profile = profile_override or M.get_active_profile()
 	local api = get_api()
 
-	if type(profile) == "table" and (not profile.batch) then
+	-- A batch profile asks once for every variant, but only above one prediction:
+	-- the rule of the shared plan and of the prompt selector, as on Windows and
+	-- Linux. A single prediction of a batch profile used to take the batch path.
+	local batching = require("llm.request_plan.batching").plan(
+		type(profile) == "table" and (profile.batch and true or false), num_predictions)
+	if type(profile) == "table" and batching.mode == "sequential" then
 		if num_predictions > 1 and not sequential_mode then
 			api.fetch_parallel(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider, _streaming_enabled, on_partial)
 		else
