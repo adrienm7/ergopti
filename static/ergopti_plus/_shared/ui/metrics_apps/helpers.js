@@ -1,6 +1,6 @@
 // _shared/ui/metrics_apps/helpers.js
 /**
- * _shared/ui/metrics_apps/script.js
+ * _shared/ui/metrics_apps/helpers.js
  * ==============================================================================
  * MODULE: Apps Time UI Logic
  * DESCRIPTION:

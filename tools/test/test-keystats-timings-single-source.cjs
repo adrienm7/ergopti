@@ -175,7 +175,7 @@ const SOURCE_PINS = [
 		file: 'macos/adapters/http_client.lua',
 		pattern: /^local HTTP_CLIENT_DEFAULT_TIMEOUT_MS\s*=\s*(\d+)\s*$/gm
 	},
-	...['metrics_apps/script.js', 'metrics_apps/state.js', 'metrics_typing/data.js'].map((page) => ({
+	...['metrics_apps/state.js', 'metrics_typing/data.js'].map((page) => ({
 		section: 'keystats',
 		key: 'long_session_threshold_ms',
 		file: '_shared/ui/' + page,

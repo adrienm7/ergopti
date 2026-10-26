@@ -3454,8 +3454,6 @@
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Not on Windows: that driver draws a flag icon on each locale row, and a shared menu row carries a label, a tick, an action and a submenu — not an icon. Declaring this row there would trade the flags away for a shared description.",
 	"platform_reason.base_layout_is_the_linux_decode_table": "Linux only: this driver reads raw keycodes from the kernel and needs to know which physical layout produced them, so it picks the table it decodes with. macOS asks the system for its input sources and Windows installs a keyboard layout; neither has a decode table to choose.",
 	"platform_reason.shortcuts_restore_is_composed_on_macos": "Not on macOS yet: its key combinations are kept in the Karabiner settings, and only the Configuration menu's restore brings them back together with the other shortcut settings.",
-	"metrics_apps.chart_time_series": "Time",
-	"metrics_apps.edit_category_hint": "Edit category",
 	"menu.llm.generation.temperature": "Temperature",
 	"menu.llm.generation.context_length": "Context length",
 	"numeric_prompt.window_title": "Value",

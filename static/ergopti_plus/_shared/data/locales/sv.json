@@ -3454,8 +3454,6 @@
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Inte på Windows: den drivrutinen ritar en flaggikon på varje språkrad, och en delad menyrad bär en etikett, en bock, en åtgärd och en undermeny — inte en ikon. Att deklarera raden där vore att byta bort flaggorna mot en delad beskrivning.",
 	"platform_reason.base_layout_is_the_linux_decode_table": "Endast Linux: den här drivrutinen läser råa tangentkoder från kärnan och måste veta vilken fysisk layout som skapade dem, så den väljer tabellen den avkodar med. macOS frågar systemet om sina inmatningskällor och Windows installerar en tangentbordslayout; ingen av dem har en avkodningstabell att välja.",
 	"platform_reason.shortcuts_restore_is_composed_on_macos": "Ännu inte på macOS: där sparas tangentkombinationerna i Karabiners inställningar, och bara återställningen i menyn Konfiguration återställer dem tillsammans med övriga genvägsinställningar.",
-	"metrics_apps.chart_time_series": "Tid",
-	"metrics_apps.edit_category_hint": "Redigera kategori",
 	"menu.llm.generation.temperature": "Temperatur",
 	"menu.llm.generation.context_length": "Kontextlängd",
 	"numeric_prompt.window_title": "Värde",

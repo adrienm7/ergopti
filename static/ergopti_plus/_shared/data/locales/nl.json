@@ -3454,8 +3454,6 @@
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Niet op Windows: die driver tekent een vlagpictogram op elke taalrij, en een gedeelde menurij draagt een label, een vinkje, een actie en een submenu — geen pictogram. De rij daar declareren zou de vlaggen inruilen voor een gedeelde beschrijving.",
 	"platform_reason.base_layout_is_the_linux_decode_table": "Alleen Linux: deze driver leest ruwe toetscodes van de kernel en moet weten welke fysieke indeling ze voortbracht, dus kiest hij de tabel waarmee hij decodeert. macOS vraagt het systeem om zijn invoerbronnen en Windows installeert een toetsenbordindeling; geen van beide heeft een decodeertabel te kiezen.",
 	"platform_reason.shortcuts_restore_is_composed_on_macos": "Nog niet op macOS: daar staan de toetscombinaties in de Karabiner-instellingen, en alleen het herstel in het menu Configuratie zet ze terug samen met de andere sneltoetsinstellingen.",
-	"metrics_apps.chart_time_series": "Tijd",
-	"metrics_apps.edit_category_hint": "Categorie bewerken",
 	"menu.llm.generation.temperature": "Temperatuur",
 	"menu.llm.generation.context_length": "Contextlengte",
 	"numeric_prompt.window_title": "Waarde",

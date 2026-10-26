@@ -31,11 +31,7 @@
 		"divergent": false
 	},
 	"LONG_SESSION_THRESHOLD_MS": {
-		"files": [
-			"_shared/ui/metrics_apps/script.js",
-			"_shared/ui/metrics_apps/state.js",
-			"_shared/ui/metrics_typing/data.js"
-		],
+		"files": ["_shared/ui/metrics_apps/state.js", "_shared/ui/metrics_typing/data.js"],
 		"divergent": false
 	},
 	"MAX_BODY_BYTES": {

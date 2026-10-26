@@ -3454,8 +3454,6 @@
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "ليس على Windows: يرسم هذا المشغّل أيقونة عَلَم على كل صف لغة، بينما يحمل صف القائمة المشترك تسمية وعلامة وإجراءً وقائمة فرعية — لا أيقونة. فإعلان هذا الصف هناك يعني التخلّي عن الأعلام مقابل وصف مشترك.",
 	"platform_reason.base_layout_is_the_linux_decode_table": "Linux فقط: يقرأ هذا المشغّل رموز المفاتيح الخام من النواة ويحتاج إلى معرفة التخطيط الفعلي الذي أنتجها، لذا يختار الجدول الذي يفك به الترميز. أما macOS فيسأل النظام عن مصادر الإدخال وWindows يثبّت تخطيط لوحة مفاتيح؛ ولا يملك أيٌّ منهما جدول فك ترميز ليختاره.",
 	"platform_reason.shortcuts_restore_is_composed_on_macos": "ليس على macOS بعد: هناك تُحفظ تركيبات المفاتيح في إعدادات Karabiner، ولا يعيدها مع بقية إعدادات الاختصارات إلا الاستعادة من قائمة «الإعدادات».",
-	"metrics_apps.chart_time_series": "الوقت",
-	"metrics_apps.edit_category_hint": "تعديل الفئة",
 	"menu.llm.generation.temperature": "درجة الحرارة",
 	"menu.llm.generation.context_length": "طول السياق",
 	"numeric_prompt.window_title": "قيمة",
