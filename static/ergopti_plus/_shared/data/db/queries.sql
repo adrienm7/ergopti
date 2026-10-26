@@ -405,3 +405,42 @@ ON CONFLICT(device_id, date, app, title) DO UPDATE SET c = c + excluded.c, ms = 
 -- doc: window the user glanced at loses to one they worked in.
 DELETE FROM agg_app_day_titles WHERE device_id = {{s device_id}} AND date = {{s date}} AND app = {{s app}}
 AND title NOT IN (SELECT title FROM agg_app_day_titles WHERE device_id = {{s device_id}} AND date = {{s date}} AND app = {{s app}} ORDER BY (c + ms) DESC LIMIT {{i cap}});
+
+
+-- ============================================================================
+-- 6. EVENT INSERTS (one row per event, per device)
+-- ============================================================================
+-- INSERT OR IGNORE: a replayed event keeps the row it already has. A column the
+-- schema declares NOT NULL takes a text slot, a nullable one the `?` form, so
+-- a missing value is NULL where the schema allows it and an error where it
+-- would make the database drop the whole event.
+
+-- name: events.app_switch
+-- doc: A change of the foreground application.
+INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s? prev_app}}, {{s? next_app}}, {{i duration_ms}});
+
+-- name: events.window_switch
+-- doc: A change of the focused window title inside an application.
+INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s? prev_title}}, {{s? next_title}}, {{i duration_ms}});
+
+-- name: events.shortcut
+-- doc: A shortcut or action that typed no text.
+INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s key}});
+
+-- name: events.system
+-- doc: A transition of the machine: sleep, lock, network, power.
+INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s action}}, {{s? metadata_json}});
+
+-- name: events.hotstring
+-- doc: A hotstring that fired, was suggested, dismissed or nearly typed.
+INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s app}}, {{s kind}}, {{s trigger}}, {{s replacement}}, {{s? h_type}}, {{i? net_saved_chars}});
+
+-- name: events.session
+-- doc: The start or end of a typing session or an idle period.
+INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms)
+VALUES ({{s device_id}}, {{i id}}, {{s ts}}, {{s date}}, {{s kind}}, {{i? duration_ms}});

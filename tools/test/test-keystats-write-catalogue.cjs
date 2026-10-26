@@ -925,6 +925,204 @@ check('maps: a key with a dot or a quote no longer merges into a nested path', (
 	db.close();
 });
 
+// ---------------------------------------------------------------------------
+// Family: event inserts
+// ---------------------------------------------------------------------------
+
+const EVENT_TABLES = [
+	'events_app_switch',
+	'events_window_switch',
+	'events_shortcut',
+	'events_system',
+	'events_hotstring',
+	'events_session'
+];
+/** macOS _sql_str / _sql_num: a missing value is NULL, a number its Lua text. */
+const msStr = (v) => (v === undefined || v === null ? 'NULL' : legacyQuote(v));
+const msNum = (v) => (v === undefined || v === null ? 'NULL' : String(v));
+const STAMP = { ts: '2026-10-01 10:00:00', date: '2026-10-01' };
+
+const EVENTS = {
+	app_switch: [
+		{ id: 1, prev_app: 'Mail', next_app: "Code's", duration_ms: 1500 },
+		{ id: 2, prev_app: null, next_app: null, duration_ms: 0 }
+	],
+	window_switch: [
+		{ id: 3, app: 'Code', prev_title: 'a\r\n', next_title: null, duration_ms: 40 },
+		{ id: 4, app: 'Unknown', prev_title: null, next_title: 'b', duration_ms: 7 }
+	],
+	shortcut: [
+		{ id: 5, app: 'Unknown', key: 'Cmd+K' },
+		{ id: 6, app: 'Code', key: '' }
+	],
+	system: [
+		{ id: 7, action: 'sleep', metadata_json: '{"asleep_ms":5}' },
+		{ id: 8, action: 'unknown', metadata_json: null }
+	],
+	hotstring: [
+		{
+			id: 9,
+			app: 'Code',
+			kind: 'fired',
+			trigger: 'btw',
+			replacement: 'by the way',
+			h_type: 'text',
+			net_saved_chars: 7
+		},
+		{
+			id: 10,
+			app: 'Code',
+			kind: 'suggested',
+			trigger: '',
+			replacement: '',
+			h_type: null,
+			net_saved_chars: null
+		}
+	],
+	session: [
+		{ id: 11, kind: 'session_start', duration_ms: null },
+		{ id: 12, kind: 'session_end', duration_ms: 90000 }
+	]
+};
+
+/** Legacy macOS builders (sqlite_writer.lua section 6). */
+const legacyEventMac = {
+	app_switch: (e) =>
+		`INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms) VALUES (${legacyQuote('dev')}, ${e.id}, ${msStr(STAMP.ts)}, ${msStr(STAMP.date)}, ${msStr(e.prev_app)}, ${msStr(e.next_app)}, ${msNum(e.duration_ms)});`,
+	window_switch: (e) =>
+		`INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms) VALUES (${legacyQuote('dev')}, ${e.id}, ${msStr(STAMP.ts)}, ${msStr(STAMP.date)}, ${msStr(e.app)}, ${msStr(e.prev_title)}, ${msStr(e.next_title)}, ${msNum(e.duration_ms)});`,
+	shortcut: (e) =>
+		`INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key) VALUES (${legacyQuote('dev')}, ${e.id}, ${msStr(STAMP.ts)}, ${msStr(STAMP.date)}, ${msStr(e.app)}, ${msStr(e.key)});`,
+	system: (e) =>
+		`INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES (${legacyQuote('dev')}, ${e.id}, ${msStr(STAMP.ts)}, ${msStr(STAMP.date)}, ${msStr(e.action)}, ${msStr(e.metadata_json ?? '{}')});`,
+	hotstring: (e) =>
+		`INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars) VALUES (${legacyQuote('dev')}, ${e.id}, ${msStr(STAMP.ts)}, ${msStr(STAMP.date)}, ${msStr(e.app)}, ${msStr(e.kind)}, ${msStr(e.trigger)}, ${msStr(e.replacement)}, ${msStr(e.h_type)}, ${msNum(e.net_saved_chars)});`,
+	session: (e) =>
+		`INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms) VALUES (${legacyQuote('dev')}, ${e.id}, ${msStr(STAMP.ts)}, ${msStr(STAMP.date)}, ${msStr(e.kind)}, ${msNum(e.duration_ms)});`
+};
+
+/** Legacy Linux builders: one multi-row INSERT per kind, defaults applied. */
+const linuxRows = {
+	app_switch: (e) =>
+		`('dev',${e.id},'${STAMP.ts}','${STAMP.date}',${legacyQuote(e.prev_app ?? '')},${legacyQuote(e.next_app ?? '')},${e.duration_ms})`,
+	window_switch: (e) =>
+		`('dev',${e.id},'${STAMP.ts}','${STAMP.date}',${legacyQuote(e.app)},${legacyQuote(e.prev_title ?? '')},${legacyQuote(e.next_title ?? '')},${e.duration_ms})`,
+	shortcut: (e) =>
+		`('dev',${e.id},'${STAMP.ts}','${STAMP.date}',${legacyQuote(e.app)},${legacyQuote(e.key)})`,
+	system: (e) =>
+		`('dev',${e.id},'${STAMP.ts}','${STAMP.date}',${legacyQuote(e.action)},${e.metadata_json ? legacyQuote(e.metadata_json) : 'NULL'})`,
+	hotstring: (e) =>
+		`('dev',${e.id},'${STAMP.ts}','${STAMP.date}',${legacyQuote(e.app)},${legacyQuote(e.kind)},${legacyQuote(e.trigger)},${legacyQuote(e.replacement)},${legacyQuote(e.h_type ?? 'unknown')},${e.net_saved_chars ?? 0})`,
+	session: (e) =>
+		`('dev',${e.id},'${STAMP.ts}','${STAMP.date}','${e.kind}',${e.duration_ms === null ? 'NULL' : e.duration_ms})`
+};
+const LINUX_COLUMNS = {
+	app_switch: ['events_app_switch', 'device_id,id,ts,date,prev_app,next_app,duration_ms'],
+	window_switch: [
+		'events_window_switch',
+		'device_id,id,ts,date,app,prev_title,next_title,duration_ms'
+	],
+	shortcut: ['events_shortcut', 'device_id,id,ts,date,app,key'],
+	system: ['events_system', 'device_id,id,ts,date,action,metadata_json'],
+	hotstring: [
+		'events_hotstring',
+		'device_id,id,ts,date,app,kind,trigger,replacement,h_type,net_saved_chars'
+	],
+	session: ['events_session', 'device_id,id,ts,date,kind,duration_ms']
+};
+
+/** The catalogue call of an event: the stamp and device added, missing values left out. */
+const eventValues = (event) =>
+	withoutUndefined(
+		Object.fromEntries(
+			Object.entries({ device_id: 'dev', ...STAMP, ...event }).map(([k, v]) => [
+				k,
+				v === null ? undefined : v
+			])
+		)
+	);
+
+check('events: the catalogue stores the rows of the macOS builders', () => {
+	const rows = equivalent(
+		EVENT_TABLES,
+		(db) => {
+			for (const [kind, events] of Object.entries(EVENTS))
+				for (const event of events) db.exec(legacyEventMac[kind](event));
+		},
+		(db) => {
+			for (const [kind, events] of Object.entries(EVENTS))
+				for (const event of events) {
+					const values = eventValues(event);
+					// macOS stores a system event without metadata as '{}'.
+					if (kind === 'system' && values.metadata_json === undefined) values.metadata_json = '{}';
+					db.exec(catalogue(`events.${kind}`, values));
+				}
+		}
+	);
+	assert.equal(
+		rows.events_app_switch.find((r) => r.id === 2).prev_app,
+		null,
+		'a missing app is NULL'
+	);
+	assert.equal(rows.events_session.find((r) => r.id === 11).duration_ms, null);
+});
+
+check('events: the catalogue stores the rows of the Linux batches, one statement per event', () => {
+	equivalent(
+		EVENT_TABLES,
+		(db) => {
+			for (const [kind, events] of Object.entries(EVENTS)) {
+				const [table, columns] = LINUX_COLUMNS[kind];
+				db.exec(
+					`INSERT OR IGNORE INTO ${table} (${columns}) VALUES ${events.map(linuxRows[kind]).join(',')};`
+				);
+			}
+		},
+		(db) => {
+			for (const [kind, events] of Object.entries(EVENTS))
+				for (const event of events) {
+					// Linux applies its defaults before the statement: '' for a missing app or
+					// title, 'unknown' for a missing hotstring type, 0 for missing counts.
+					const values = eventValues(event);
+					for (const [key, fallback] of Object.entries({
+						prev_app: '',
+						next_app: '',
+						prev_title: '',
+						next_title: '',
+						h_type: 'unknown'
+					}))
+						if (key in event && values[key] === undefined) values[key] = fallback;
+					if (kind === 'hotstring' && values.net_saved_chars === undefined)
+						values.net_saved_chars = 0;
+					db.exec(catalogue(`events.${kind}`, values));
+				}
+		}
+	);
+});
+
+check('events: a replayed event keeps the row it already has', () => {
+	const db = freshDb();
+	db.exec(
+		catalogue('events.shortcut', { device_id: 'dev', id: 1, ...STAMP, app: 'A', key: 'one' })
+	);
+	db.exec(
+		catalogue('events.shortcut', { device_id: 'dev', id: 1, ...STAMP, app: 'B', key: 'two' })
+	);
+	assert.equal(db.prepare('SELECT key FROM events_shortcut').get().key, 'one');
+	db.close();
+});
+
+check('events: a NOT NULL column refuses a missing value instead of losing the whole event', () => {
+	assert.throws(
+		() => catalogue('events.shortcut', { device_id: 'dev', id: 1, ...STAMP, app: 'A' }),
+		TypeError
+	);
+	assert.throws(
+		() => catalogue('events.window_switch', { device_id: 'dev', id: 1, ...STAMP, duration_ms: 1 }),
+		TypeError
+	);
+});
+
 if (failures > 0) {
 	console.error(`\n${failures} keystats write catalogue check(s) failed.`);
 	process.exit(1);
