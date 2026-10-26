@@ -30,6 +30,7 @@
 
 local M = {}
 
+local Identifiers = require("identifiers")
 local Logger      = require("infra.logger")
 local Paths       = require("infra.paths")
 local FileSystem  = require("adapters.file_system")
@@ -42,7 +43,7 @@ local LOG = "updater.release_installer"
 -- The executable inside the app bundle the launcher runs from.
 local EXECUTABLE_SUFFIX = "/Contents/MacOS/ErgoptiPlus"
 -- The app folder name inside the release archive.
-local APP_NAME = "ErgoptiPlus.app"
+local APP_NAME = Identifiers.app.bundle
 
 -- Test seams.
 M._run = function(...) return ShellRunner.run(...) end

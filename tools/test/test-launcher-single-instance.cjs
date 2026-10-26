@@ -124,10 +124,17 @@ if (!/candidate\.bundleIdentifier == embeddedBundleId/.test(ownership)) {
 	);
 }
 const admission = read('static/ergopti_plus/macos/infra/instance_admission.lua');
-const luaLauncherId = admission.match(/^M.LAUNCHER_BUNDLE_ID = "([^"]+)"$/m)?.[1];
-const updaterEmbeddedId = read('static/ergopti_plus/macos/modules/updater/init.lua').match(
-	/^local BUNDLED_ID = "([^"]+)"$/m
-)?.[1];
+// Both Lua sites read the ids from identifiers.json (generated into identifiers.lua);
+// the ids below are what that file declares, compared with the build script's.
+const identifiers = JSON.parse(read('static/ergopti_plus/_shared/data/identifiers.json'));
+const luaLauncherId = /^M.LAUNCHER_BUNDLE_ID = Identifiers\.bundle_ids\.launcher$/m.test(admission)
+	? identifiers.bundle_ids.launcher
+	: undefined;
+const updaterEmbeddedId = /^local BUNDLED_ID = Identifiers\.bundle_ids\.hammerspoon$/m.test(
+	read('static/ergopti_plus/macos/modules/updater/init.lua')
+)
+	? identifiers.bundle_ids.hammerspoon
+	: undefined;
 if (updaterEmbeddedId !== embeddedId) {
 	errors.push("modules/updater/init.lua must name the build script's HAMMERSPOON_BUNDLE_ID.");
 }

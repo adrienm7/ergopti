@@ -22,6 +22,7 @@
 ---    so the resolver starts with the official application bundle.
 --- ==============================================================================
 
+local Identifiers = require("identifiers")
 local M = {}
 
 local hs = hs
@@ -42,7 +43,7 @@ local HOMEBREW_CANDIDATES = {
 local MANAGED_RELATIVE_DIR = "Library/Application Support/Ergopti/ollama"
 
 -- Official download page offered when the user prefers a manual install.
-M.DOWNLOAD_PAGE_URL = "https://ollama.com/download"
+M.DOWNLOAD_PAGE_URL = "https://" .. Identifiers.hosts.ollama .. "/download"
 
 M.SOURCE_APP = "app"
 M.SOURCE_USER_APP = "user_app"

@@ -47,6 +47,7 @@
 
 local M = {}
 
+local Identifiers = require("identifiers")
 local Logger    = require("logger.shim")
 local Paths     = require("infra.paths")
 local NoReplaceMove = require("infra.no_replace_move")
@@ -538,7 +539,7 @@ end
 
 --- Returns the public releases page URL shown to the user.
 function M.releases_page_url()
-	return "https://github.com/" .. GH_OWNER .. "/" .. GH_REPO .. "/releases"
+	return "https://" .. Identifiers.hosts.github .. "/" .. GH_OWNER .. "/" .. GH_REPO .. "/releases"
 end
 
 --- Builds one shell-free conditional GitHub Releases request.

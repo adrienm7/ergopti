@@ -27,11 +27,12 @@
 ---    in, so every branch is tested without a live Hammerspoon.
 --- ==============================================================================
 
+local Identifiers = require("identifiers")
 local M = {}
 
 -- The launcher's bundle identifier, written by tools/build/build_macos_app.sh
 -- and pinned to it by tools/test/test-launcher-single-instance.cjs.
-M.LAUNCHER_BUNDLE_ID = "com.ergoptiplus.app"
+M.LAUNCHER_BUNDLE_ID = Identifiers.bundle_ids.launcher
 
 M.ADMIT = "admit"
 M.STRAY_RUNTIME = "stray_runtime"

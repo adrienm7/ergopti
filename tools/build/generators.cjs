@@ -204,6 +204,10 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/_shared/core/ports/contracts.json']
 	},
 	{
+		script: 'codegen/codegen-identifiers.cjs',
+		outputs: ['static/ergopti_plus/_shared/lua/identifiers.lua']
+	},
+	{
 		script: 'codegen/codegen-app-dirs.cjs',
 		outputs: [
 			'static/ergopti_plus/_shared/lua/app_dirs.lua',

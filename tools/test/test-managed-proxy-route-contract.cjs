@@ -395,9 +395,14 @@ try {
 	});
 
 	check('the Ollama inventory names the registry the daemon pulls from', () => {
-		const registry = /M\.URL = "([^"]+)"/.exec(
-			read(path.join(shared, 'lua', 'llm', 'ollama_registry.lua'))
-		)[1];
+		// The registry module derives its URL from the shared identifiers file.
+		assert.match(
+			read(path.join(shared, 'lua', 'llm', 'ollama_registry.lua')),
+			/^M\.URL = "https:\/\/" \.\. Identifiers\.hosts\.ollama_registry$/m
+		);
+		const registry =
+			'https://' +
+			JSON.parse(read(path.join(shared, 'data', 'identifiers.json'))).hosts.ollama_registry;
 		assert.ok(origins.clients.ollama.includes(registry));
 	});
 

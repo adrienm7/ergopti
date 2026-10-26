@@ -184,6 +184,8 @@ REQUIRED_FILES=(
 	"_shared/lua/keymap/terminators_catalogue.lua"
 	# The logs folder and log names: the logger sink cannot start without it.
 	"_shared/lua/app_dirs.lua"
+	# Application and bundle names, service labels and external hosts.
+	"_shared/lua/identifiers.lua"
 	"_shared/lua/keycodes/evdev.lua"
 	"_shared/lua/updater/version.lua"
 	"_shared/lua/updater/release_sources.lua"
