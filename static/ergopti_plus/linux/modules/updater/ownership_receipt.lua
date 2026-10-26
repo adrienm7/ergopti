@@ -163,6 +163,8 @@ function M.verify(root, current)
 			if name == "." or name == ".." or name:find("/", 1, true) then return nil end
 			entries[#entries + 1] = name
 		end
+		local tree = relative:match("^[^/]+")
+		local payload_tree = tree == schema.DRIVER_TREE or tree == schema.SHARED_TREE
 		for _, name in ipairs(entries) do
 			local child = relative == "" and name or relative .. "/" .. name
 			local full = path .. "/" .. name
@@ -173,6 +175,11 @@ function M.verify(root, current)
 				if content == nil or Crypto.sha256(content) ~= record.files[child] then return nil end
 				seen[child] = true
 			elseif record.directories[child] then
+				if not walk(full, child) then return nil end
+			elseif payload_tree and snapshot(native, full, "directory") then
+				-- Receipts enumerate files, not empty archive directories. Recurse
+				-- only inside owned payload trees: any unlisted data or link still
+				-- refuses, including a file nested below otherwise empty folders.
 				if not walk(full, child) then return nil end
 			else return nil end
 		end
