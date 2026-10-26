@@ -36,6 +36,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const TOML = require('smol-toml');
+const { luaManifestSource } = require('../lib/lua-manifest-view.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SP = path.join(ROOT, 'static/ergopti_plus');
@@ -74,10 +75,12 @@ const DRIVER_MANIFESTS = {
 	},
 	macos: {
 		file: 'macos/_generated/features_manifest.lua',
+		source: () => luaManifestSource('macos'),
 		row: /path = "([^"]+)"[^\n]*?type = "([^"]+)"/g
 	},
 	linux: {
 		file: 'linux/_generated/features_manifest.lua',
+		source: () => luaManifestSource('linux'),
 		row: /path = "([^"]+)"[^\n]*?type = "([^"]+)"/g
 	}
 };
@@ -125,7 +128,7 @@ const manifestToml = TOML.parse(
  */
 function declaredPaths(driver) {
 	const spec = DRIVER_MANIFESTS[driver];
-	const text = fs.readFileSync(path.join(SP, spec.file), 'utf8');
+	const text = spec.source ? spec.source() : fs.readFileSync(path.join(SP, spec.file), 'utf8');
 	const features = new Map();
 	for (const match of text.matchAll(spec.row)) features.set(match[1], match[2]);
 	assert.ok(features.size > 100, `${driver}: the generated manifest yields its features`);

@@ -29,6 +29,7 @@
 const fs = require('fs');
 const path = require('path');
 const { shared } = require('../lib/paths.cjs');
+const { luaManifestSource } = require('../lib/lua-manifest-view.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
@@ -598,7 +599,7 @@ if (!ahkExists || !luaExists || !fixtureExists) {
 }
 
 const ahkSrc = fs.readFileSync(AHK_MANIFEST, 'utf8');
-const luaSrc = fs.readFileSync(HS_MANIFEST, 'utf8');
+const luaSrc = luaManifestSource('macos');
 const fixtureSrc = fs.readFileSync(FIXTURE_CONFIG, 'utf8');
 const manifestSrc = fs.readFileSync(shared('modules/features/manifest.toml'), 'utf8');
 
@@ -662,7 +663,7 @@ const luaFeatures = parseLuaCrossFeatures(luaSrc);
 // a third driver, rather than failing for a missing file it does not otherwise
 // need.
 const linuxFeatures = fs.existsSync(LINUX_MANIFEST)
-	? parseLuaCrossFeatures(fs.readFileSync(LINUX_MANIFEST, 'utf8'))
+	? parseLuaCrossFeatures(luaManifestSource('linux'))
 	: new Map();
 const fixtureToml = parseTomlFixture(fixtureSrc);
 

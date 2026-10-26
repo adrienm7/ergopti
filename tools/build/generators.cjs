@@ -104,6 +104,7 @@ const GENERATORS = [
 	{
 		script: 'build/build-features-manifest.js',
 		outputs: [
+			'static/ergopti_plus/_shared/lua/features/manifest_data.lua',
 			'static/ergopti_plus/linux/_generated/config_template.toml',
 			'static/ergopti_plus/linux/_generated/features_manifest.lua',
 			'static/ergopti_plus/macos/_generated/config_template.toml',

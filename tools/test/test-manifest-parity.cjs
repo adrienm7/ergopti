@@ -29,6 +29,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { luaManifestSource } = require('../lib/lua-manifest-view.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
@@ -341,8 +342,8 @@ if (!ahkExists || !luaExists || !linuxExists) {
 }
 
 const ahkSrc = fs.readFileSync(AHK_MANIFEST, 'utf8');
-const luaSrc = fs.readFileSync(HS_MANIFEST, 'utf8');
-const linuxSrc = fs.readFileSync(LINUX_MANIFEST, 'utf8');
+const luaSrc = luaManifestSource('macos');
+const linuxSrc = luaManifestSource('linux');
 
 // =====================================================
 // =====================================================

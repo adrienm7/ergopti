@@ -31,6 +31,9 @@ local OWNED = {
 	"diagnostics.runtime_log",
 	-- The real logger and timer scheduler describe failures through this pure owner.
 	"error_description",
+	-- The real manifest reader loads the shared features manifest through these owners.
+	"features.manifest",
+	"features.manifest_data",
 	-- Path splitting and timer delay admission go through these pure owners.
 	"native_path",
 	"number_policy",

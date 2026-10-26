@@ -163,6 +163,8 @@ REQUIRED_FILES=(
 	# the manifest, and degrades without the other three, so their absence must
 	# fail the build rather than the user's first launch.
 	"linux/_generated/features_manifest.lua"
+	"_shared/lua/features/manifest.lua"
+	"_shared/lua/features/manifest_data.lua"
 	"linux/_generated/gesture_emit_actions.lua"
 	"linux/_generated/locale_table.lua"
 	"linux/_generated/config_template.toml"

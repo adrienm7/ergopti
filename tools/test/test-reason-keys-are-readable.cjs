@@ -36,6 +36,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { luaManifestSource } = require('../lib/lua-manifest-view.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -47,12 +48,14 @@ const GENERATED = [
 	{
 		label: 'macOS',
 		file: path.join(SP, 'macos', '_generated', 'features_manifest.lua'),
+		source: () => luaManifestSource('macos'),
 		re: /M\.unavailable = \{([\s\S]*?)\n\}/,
 		entry: /path = /g
 	},
 	{
 		label: 'Linux',
 		file: path.join(SP, 'linux', '_generated', 'features_manifest.lua'),
+		source: () => luaManifestSource('linux'),
 		re: /M\.unavailable = \{([\s\S]*?)\n\}/,
 		entry: /path = /g
 	},
@@ -87,7 +90,7 @@ for (const g of GENERATED) {
 		errors.push(`${g.label}: ${path.relative(ROOT, g.file)} is missing`);
 		continue;
 	}
-	const src = fs.readFileSync(g.file, 'utf8');
+	const src = g.source ? g.source() : fs.readFileSync(g.file, 'utf8');
 	const block = src.match(g.re);
 	if (!block) {
 		errors.push(
