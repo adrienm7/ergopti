@@ -44,6 +44,36 @@ end
 require("test.config_backup_binding_contract").register(helpers, { defaults = defaults, listing = real_listing })
 require("test.release_install_contract").register(helpers)
 
+helpers.describe("configuration backup listing of special files (config-backup-special-nodes)", function()
+	helpers.it("(config-backup-special-nodes) reports a FIFO, a socket and a link to a FIFO as other and never opens them", function()
+		local uv = require("luv")
+		local root = os.tmpname()
+		os.remove(root)
+		assert(os.execute("mkdir -p '" .. root .. "'"))
+		assert(os.execute("mkfifo '" .. root .. "/pipe.toml'"))
+		assert(os.execute("ln -s '" .. root .. "/pipe.toml' '" .. root .. "/linked_pipe.toml'"))
+		assert(os.execute("ln -s '" .. root .. "/missing.toml' '" .. root .. "/dangling.toml'"))
+		assert(os.execute(": > '" .. root .. "/plain.toml'"))
+		local server = uv.new_pipe(false)
+		assert(server:bind(root .. "/socket.toml"))
+		local kinds
+		local ok, err = pcall(function()
+			-- The listing must classify by stat alone: opening the FIFO would block forever.
+			local list = helpers.load_module("modules.updater.config_backup")._list
+			kinds = {}
+			for _, entry in ipairs(assert(list(root))) do kinds[entry.name] = entry.kind end
+		end)
+		server:close()
+		os.execute("rm -rf '" .. root .. "'")
+		if not ok then error(err, 0) end
+		helpers.assert_eq(kinds["pipe.toml"], "other")
+		helpers.assert_eq(kinds["socket.toml"], "other")
+		helpers.assert_eq(kinds["linked_pipe.toml"], "other")
+		helpers.assert_eq(kinds["dangling.toml"], "file")
+		helpers.assert_eq(kinds["plain.toml"], "file")
+	end)
+end)
+
 local policy_handle = assert(io.open(helpers.driver_root() .. "/../_shared/modules/network/managed_network.json", "rb"))
 local policy = assert(Json.decode(policy_handle:read("*a")), "managed network policy must decode")
 policy_handle:close()
