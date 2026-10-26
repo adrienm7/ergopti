@@ -49,27 +49,48 @@ def create_log_path():
         run_dir = tempfile.mkdtemp(prefix="ergopti-appcloner-")
         os.chmod(run_dir, 0o700)
         return run_dir, os.path.join(run_dir, "appcloner.log")
-    except OSError:
+    except OSError as error:
+        # The standalone bundle has no Lua logger; stderr owns sink refusals.
+        print(f"[AppCloner] diagnostic log allocation failed: {error}", file=sys.stderr)
         if run_dir:
             shutil.rmtree(run_dir, ignore_errors=True)
         return "", ""
 
-def open_log(log_path):
-    """Open the owned log without following links, falling back to /dev/null."""
-    if log_path:
+def append_log(log_path, message):
+    """Persist one diagnostic transaction and return its usable path, or empty."""
+    if not log_path:
+        return ""
+    fd = None
+    stream = None
+    errors = []
+    try:
+        flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        fd = os.open(log_path, flags, 0o600)
+        stream = os.fdopen(fd, "a", encoding="utf-8")
         fd = None
+        stream.write(message)
+        stream.flush()
+    except OSError as error:
+        errors.append(error)
+    finally:
         try:
-            flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
-            if hasattr(os, "O_NOFOLLOW"):
-                flags |= os.O_NOFOLLOW
-            fd = os.open(log_path, flags, 0o600)
-            return os.fdopen(fd, "a", encoding="utf-8")
-        except OSError:
-            if fd is not None:
+            if stream is not None:
+                stream.close()
+            elif fd is not None:
                 os.close(fd)
-    return open(os.devnull, "a", encoding="utf-8")
+        except OSError as error:
+            errors.append(error)
+    if errors:
+        # Report through bootstrap stderr because this independent app has no
+        # Hammerspoon logger and the selected file sink could not persist text.
+        for error in errors:
+            print(f"[AppCloner] diagnostic log persistence failed: {error}", file=sys.stderr)
+        return ""
+    return log_path
 
-def ensure_icon(resources_dir, log):
+def ensure_icon(resources_dir, record_log):
     """Build AppIcon.icns from AppIcon.svg if missing or stale.
 
     Self-contained icon generation — App Cloner no longer depends on
@@ -86,7 +107,7 @@ def ensure_icon(resources_dir, log):
         or os.path.getmtime(svg) > os.path.getmtime(icns)
     )
     if needs_build:
-        log.write(f"[AppCloner] regenerating icon from {svg}\n")
+        record_log(f"[AppCloner] regenerating icon from {svg}\n")
         subprocess.run(["zsh", script], capture_output=True)
 
 def resolve_locale() -> str:
@@ -141,11 +162,17 @@ def main():
     env["ERGOPTI_LOCALES_DIR"] = locales_dir
     env["ERGOPTI_APPCLONER_LOG"] = log_path or ""
 
+    def record_log(message):
+        nonlocal log_path
+        log_path = append_log(log_path, message)
+        env["ERGOPTI_APPCLONER_LOG"] = log_path
+
     try:
         ui = load_error_ui(locale_code, locales_dir)
     except ValueError as error:
         # Fatal pre-i18n exception: an invalid selected catalogue cannot supply
         # translated text. These English strings report refusal before UI boot.
+        record_log(f"[AppCloner] startup locale refusal={error}\n")
         fatal_text = (
             "App Cloner cannot start because the selected locale catalogue is unavailable or invalid."
             + "\n\n" + str(error)
@@ -153,21 +180,20 @@ def main():
         if log_path:
             fatal_text += "\n\nDiagnostic log: " + log_path
         try:
-            # Notify before another diagnostic write can fail and hide refusal.
+            # The guarded transaction cannot hide this mandatory notification.
             subprocess.run([
                 "osascript", "-e", ERROR_DIALOG_SCRIPT, "--", fatal_text,
                 "App Cloner — Locale error", "OK",
             ], capture_output=True, env=env)
-            with open_log(log_path) as log:
-                log.write(f"[AppCloner] startup locale refusal={error}\n")
         finally:
             raise error
 
-    with open_log(log_path) as log:
-        log.write(f"[AppCloner] app_root={app_root}\n")
-        log.write(f"[AppCloner] applescript={applescript}\n")
-        log.write(f"[AppCloner] locale={locale_code} locales_dir={locales_dir}\n")
-        ensure_icon(resources, log)
+    record_log(
+        f"[AppCloner] app_root={app_root}\n"
+        f"[AppCloner] applescript={applescript}\n"
+        f"[AppCloner] locale={locale_code} locales_dir={locales_dir}\n"
+    )
+    ensure_icon(resources, record_log)
 
     result = subprocess.run(
         ["osascript", applescript, app_root],
@@ -176,12 +202,11 @@ def main():
         env=env,
     )
 
-    with open_log(log_path) as log:
-        log.write(f"[AppCloner] exit={result.returncode}\n")
-        if result.stdout:
-            log.write(f"[AppCloner] stdout={result.stdout}\n")
-        if result.stderr:
-            log.write(f"[AppCloner] stderr={result.stderr}\n")
+    record_log(
+        f"[AppCloner] exit={result.returncode}\n"
+        + (f"[AppCloner] stdout={result.stdout}\n" if result.stdout else "")
+        + (f"[AppCloner] stderr={result.stderr}\n" if result.stderr else "")
+    )
 
     if result.returncode not in (0, -128):
         err_text = result.stderr.strip() or result.stdout.strip() or ui["apps.cloner.error_unknown"]
