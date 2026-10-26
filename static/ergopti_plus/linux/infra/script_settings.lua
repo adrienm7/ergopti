@@ -30,9 +30,10 @@ local _scope = require("scope_owner").new({ name = "infra.script_settings", modu
 local Logger = require("logger.shim")
 local Manifest = require("infra.manifest_reader")
 local Storage = require("adapters.storage")
+local ConfigKeys = require("config_keys")
 
 local LOG = "infra.script_settings"
-local FEATURE_PATH = "script.log_level"
+local FEATURE_PATH = ConfigKeys.KEY.SCRIPT_LOG_LEVEL
 
 local VARIANT_BY_LEVEL = {
 	DEBUG = "debug",
