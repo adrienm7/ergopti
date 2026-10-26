@@ -54,7 +54,7 @@ local load_sources
 local APP_NAME = "changelog"
 local HTTP_OWNER = "changelog"
 -- Feeds carry the rendered notes of ten releases (about 0.5 MB today).
-local MAX_SOURCE_BYTES = 4 * 1024 * 1024
+local MAX_CHANGELOG_BYTES = require("infra.timings").count("limits", "changelog_source_bytes")
 
 local _fetch_generation = 0
 local _sources = nil
@@ -203,7 +203,7 @@ local function default_http_get(url, headers, timeout_ms, callback)
 	HttpClient.get(url, headers, {
 		owner = HTTP_OWNER,
 		timeout_ms = timeout_ms,
-		max_body_bytes = MAX_SOURCE_BYTES,
+		max_body_bytes = MAX_CHANGELOG_BYTES,
 		follow_redirects = true,
 		https_only = true,
 	}, function(result)

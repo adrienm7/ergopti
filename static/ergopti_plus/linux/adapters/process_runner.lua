@@ -19,7 +19,7 @@ if not available then Native = nil end
 
 local LOG = "adapters.process_runner"
 local DEFAULT_TIMEOUT_MS = Timings.ms("adapters", "default_timeout_ms")
-local DEFAULT_MAX_OUTPUT_BYTES = 65536
+local DEFAULT_MAX_OUTPUT_BYTES = require("llm.process_limits").defaults().max_output_bytes
 local claims = {}
 local stopping = false
 

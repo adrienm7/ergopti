@@ -769,3 +769,29 @@ native_slow_batch_ms = 500
 # names none. HS: http_client.lua. LX: curl_http_client.lua, file_digest.lua,
 # process_runner.lua.
 default_timeout_ms = 30000
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Byte limits
+# ──────────────────────────────────────────────────────────────────────
+#
+# Caps on what a driver accepts from a child process, a file or a feed before it
+# refuses. Values are bytes, every key ends in _bytes, and
+# tools/test/test-timings-registry-liveness.cjs fails on a *_BYTES constant that
+# retypes one of these numbers instead of reading it.
+
+[limits]
+
+# What a child process may print before it is stopped: a version line, a df row,
+# a probe reply, never a stream. Lua canon: _shared/lua/llm/process_limits.lua
+# (every Linux process owner takes it from there; pinned to this key).
+process_output_bytes = 65536
+
+# Largest managed-Ollama environment declaration file the Linux driver reads.
+# LX: modules/llm/managed_ollama_environment.lua.
+declaration_file_bytes = 65536
+
+# Largest changelog feed the Linux changelog window downloads (ten releases'
+# rendered notes, about 0.5 MB today).
+# LX: ui/changelog/bridge.lua.
+changelog_source_bytes = 4194304

@@ -12,7 +12,7 @@
 local M = {}
 
 local SOURCE = "modules/llm/managed_ollama_environment.json"
-local MAXIMUM_BYTES = 65536
+local MAXIMUM_BYTES = require("infra.timings").count("limits", "declaration_file_bytes")
 
 --- Validates the decoded declaration; the launch owner keeps host and models.
 --- @param decoded any Decoded JSON document.

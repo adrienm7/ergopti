@@ -17,7 +17,7 @@ local Paths = require("infra.paths")
 local AtspiFocus = require("adapters.atspi_focus")
 local Logger = require("logger.shim")
 local LOG = "adapters.atspi_focus_watch"
-local MAX_BYTES = 65536
+local MAX_FOCUS_OUTPUT_BYTES = require("llm.process_limits").defaults().max_output_bytes
 local MAX_FRAMES = 128
 
 --- Allocates only daemon-owned FIFO endpoints with close-on-exec descriptors.
@@ -171,7 +171,7 @@ function M.new(options)
 		local ended = false
 		local spawned, child = pcall(start_process, executable, arguments, {
 			owner = "accessibility-focus-watch", capture_tail = true,
-			max_output_bytes = MAX_BYTES, cwd = Paths.driver_root(),
+			max_output_bytes = MAX_FOCUS_OUTPUT_BYTES, cwd = Paths.driver_root(),
 		}, function()
 			ended = true
 			if operation then fail("worker exited") end
@@ -247,7 +247,7 @@ function M.new(options)
 			received = true
 			bytes = bytes + #chunk
 			pending = pending .. chunk
-			if bytes > MAX_BYTES or #pending > MAX_BYTES then fail("output exceeded bound"); break end
+			if bytes > MAX_FOCUS_OUTPUT_BYTES or #pending > MAX_FOCUS_OUTPUT_BYTES then fail("output exceeded bound"); break end
 			if read == MAX_FRAMES then exhausted = true end
 		end
 		if exhausted and not failed then
