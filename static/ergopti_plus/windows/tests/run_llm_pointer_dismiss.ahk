@@ -41,6 +41,17 @@ LLM_Tooltip_IsLoading()        => _MMP_Loading
 LLM_Tooltip_InGracePeriod()    => _MMP_InGrace
 LLM_Engine_IsBusy()            => false
 LLM_Tooltip_GetPresentedToken() => _MMP_PresentedToken
+; The bridge revokes the presented offer before it queues the deferred hide
+; (LLM_Bridge_DeferTooltipHide). Like the production owner, only the record
+; still presented is withdrawn; any other record is refused with 0.
+LLM_Tooltip_WithdrawExact(ExpectedRecord, accepted := false) {
+	global _MMP_PresentedToken
+	if !IsObject(ExpectedRecord) || !IsObject(_MMP_PresentedToken)
+			|| ObjPtr(ExpectedRecord) != ObjPtr(_MMP_PresentedToken)
+		return 0
+	ExpectedRecord.WithdrawalPending := true
+	return ExpectedRecord
+}
 LLM_Tooltip_HideExact(Token, accepted := false) {
 	global _MMP_PresentedToken, _MMP_ExactHits
 	_MMP_ExactHits += 1
