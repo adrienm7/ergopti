@@ -27,10 +27,11 @@ local LOG = "infra.reload_restart"
 --- Builds the reload owner.
 --- @param opts table { gestures = table|nil, restart = function(reason) -> boolean }
 --- @return function perform `perform(trigger)` -> started, why
+--- @return function in_flight `in_flight()` -> whether a restart was requested and owns the process
 function M.new(opts)
 	assert(type(opts) == "table" and type(opts.restart) == "function", "the reload owner needs its restart")
 	local in_flight = false
-	return function(trigger)
+	local function perform(trigger)
 		if in_flight then
 			Logger.info(LOG, "Reload requested by %s joins the restart already in flight.", trigger)
 			return true
@@ -54,6 +55,7 @@ function M.new(opts)
 		in_flight = true
 		return true
 	end
+	return perform, function() return in_flight end
 end
 
 return M

@@ -680,7 +680,7 @@ end
 --- that the successor claims (infra/driver_control.lua). The successor also
 --- inherits the live pause (infra/restart_pause.lua): main() installs its
 --- script controller before any Reload trigger can fire.
-local perform_reload = require("infra.reload_restart").new({ gestures = gestures,
+local perform_reload, reload_in_flight = require("infra.reload_restart").new({ gestures = gestures,
 	restart = function(reason) return restart_daemon(reason, privacy_owners.script_actions.is_paused()) end })
 
 
@@ -713,6 +713,17 @@ local function emit_diagnostic_snapshot(boot_ms, opts, i18n_mod, prepared)
 		Logger.error(LOG, "Diagnostic snapshot could not be collected: %s.", tostring(err))
 	end
 end
+
+
+--- The tray's Quit: refused for the same causes as on macOS (infra/quit_request.lua).
+--- Held in privacy_owners: main() already sits at LuaJIT's 60-upvalue limit.
+privacy_owners.tray_quit = require("infra.quit_request").new({
+	shutdown = shutdown,
+	reload_in_flight = reload_in_flight,
+	writer_active = function() return require("infra.global_scope").pending() end,
+	publication_pending = function() return hotstrings_config.publication_pending() end,
+	apply_pause_layout = function() require("modules.keymap.pause_layout_switch").quit_safely() end,
+})
 
 
 -- =========================================
@@ -2343,11 +2354,9 @@ local function main()
 		webview       = webview_manager,
 			dry_run       = opts.dry_run,
 			verbose       = opts.verbose,
-			-- False when a shutdown already owns the daemon: the tray tells the user.
-			on_quit       = function()
-				if not shutdown.is_requested() then require("modules.keymap.pause_layout_switch").quit_safely() end
-				return shutdown.request("tray quit")
-			end,
+			-- False when Quit is refused (a shutdown or reload owns the daemon, a global
+			-- writer or a hotstring publication is pending): the tray tells the user.
+			on_quit       = privacy_owners.tray_quit,
 			-- Same code path the SIGHUP handler takes. The menu item used to
 			-- shell out "kill -HUP $$", which signals the /bin/sh os.execute
 			-- spawned — never this process — so Reload logged success and

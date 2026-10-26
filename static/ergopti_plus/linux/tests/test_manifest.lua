@@ -232,6 +232,7 @@ return {
 	"tests.unit.infra.scope.test_config_scope_composition",
 	"tests.unit.infra.scope.test_config_reset_failure",
 	"tests.unit.ui.menu.test_feature_notice",
+	"tests.unit.infra.lifecycle.test_quit_request",
 	"tests.unit.infra.scope.test_config_scope_transaction",
 	"tests.unit.infra.scope.test_scope_owner",
 	"tests.unit.infra.lifecycle.test_daemon_restart",

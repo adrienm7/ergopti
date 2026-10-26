@@ -1653,6 +1653,14 @@ end
 
 
 
+--- Whether a hotstring publication still owns configuration: a scope transaction,
+--- or a refused personal-file publication whose inverse is not settled. The tray's
+--- Quit reads it, as the macOS menu reads its terminal admission.
+--- @return boolean pending
+function M.publication_pending()
+	return _scope_owner ~= nil or _personal_gate_debt ~= nil or _personal_debt ~= nil
+end
+
 --- Settles only the exact candidate engine image owned by a refused choice edit.
 --- Foreign runtime generations keep the lease closed rather than being replaced.
 --- @return boolean restored

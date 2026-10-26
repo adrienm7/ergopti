@@ -116,7 +116,19 @@ helpers.describe("pause layout switch", function()
 			"a pause transition reaches the layout switch")
 		local _, quits = source:gsub('require%("modules%.keymap%.pause_layout_switch"%)%.quit_safely%(%)', "")
 		helpers.assert_eq(quits, 2, "the shortcut quit and the tray quit switch first")
-		helpers.assert_true(source:find('shutdown.request("tray quit")', 1, true) ~= nil)
+		-- The tray quit runs through infra/quit_request.lua, which applies the pause
+		-- layout only once the shared admission accepted the quit.
+		helpers.assert_true(source:find("on_quit       = privacy_owners.tray_quit,", 1, true) ~= nil)
+		helpers.assert_true(source:find("apply_pause_layout = function() require", 1, true) ~= nil,
+			"the tray quit switches the layout")
+		local request = io.open(helpers.driver_root() .. "/infra/quit_request.lua", "rb")
+		helpers.assert_true(request ~= nil, "the tray quit handler is found")
+		local handler = request:read("*a")
+		request:close()
+		local switched = handler:find("ports.apply_pause_layout()", 1, true)
+		local requested = handler:find('ports.shutdown.request("tray quit")', 1, true)
+		helpers.assert_true(switched ~= nil and requested ~= nil and switched < requested,
+			"the layout switches before the shutdown starts, and only after the admission")
 		local owner = source:match('name = "pause layout switch",(.-)\n\t\t},')
 		helpers.assert_true(owner ~= nil, "the shutdown waits for the quit switch")
 		helpers.assert_true(owner:find("switch.is_settled()", 1, true) ~= nil)

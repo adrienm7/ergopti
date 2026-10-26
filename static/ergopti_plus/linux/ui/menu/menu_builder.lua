@@ -5592,8 +5592,9 @@ local function _build_quit(ctx)
 		quit = function()
 			Logger.info(LOG, "Quit requested via tray menu.")
 			if not ctx.on_quit then return end
-			-- Only an explicit false is a refusal: the owner answers false while a
-			-- shutdown already runs. Before, the second click did nothing visible.
+			-- Only an explicit false is a refusal: the owner answers false for the
+			-- causes of the shared quit admission (infra/quit_request.lua), as the
+			-- macOS menu does, and the user is told with the one notice.
 			if ctx.on_quit() == false then
 				require("ui.menu.feature_notice").quit_refused(i18n_safe)
 			end
