@@ -626,7 +626,8 @@ _LLM_Ollama_CleanupCurlFiles(entry) {
 _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry := "") {
 	if entry is Map && !_LLM_Ollama_PresenceStillCurrent(entry)
 		return
-	text := LLM_ParseOllamaChatResponse(body)
+	Redact := (entry is Map) && entry.Get("redact", false)
+	text := LLM_ParseOllamaChatResponse(body, Redact)
 	; LLM_ParseOllamaChatResponse returns a structured Map("error", true, ...)
 	; on a JSON parse failure (malformed body) instead of an empty string, so
 	; that case must be checked before the empty-string "parse miss" branch —
@@ -637,17 +638,20 @@ _LLM_OllamaParseAsyncBody(body, on_success, on_fail, entry := "") {
 		return
 	}
 	if (text == "") {
-		snip := StrLen(body) > 120 ? SubStr(body, 1, 120) . "…" : body
-		payload_hint := ""
-		if (entry is Map) and entry.Has("payload_snip")
-			payload_hint := " Payload: «" . entry["payload_snip"] . "»."
-		try LoggerWarn("LLM.ollama", "Ollama returned an empty prediction (parse miss). Body: «{1}».{2}", snip, payload_hint)
+		if Redact {
+			try LoggerWarn("LLM.ollama", "Ollama returned an empty prediction (parse miss; body_chars={1}).", StrLen(body))
+		} else {
+			snip := StrLen(body) > 120 ? SubStr(body, 1, 120) . "…" : body
+			payload_hint := ""
+			if (entry is Map) and entry.Has("payload_snip")
+				payload_hint := " Payload: «" . entry["payload_snip"] . "»."
+			try LoggerWarn("LLM.ollama", "Ollama returned an empty prediction (parse miss). Body: «{1}».{2}", snip, payload_hint)
+		}
 		_LLM_InvokeCallback(on_fail, "on_fail", Map("error", true, "message", "empty prediction"))
 		return
 	}
 	; A caller-written body (the screen reading) answers with what is on the
 	; user's screen: its size is logged, never its text
-	Redact := (entry is Map) && entry.Get("redact", false)
 	snip := Redact ? "…" : (StrLen(text) > 60 ? SubStr(text, 1, 60) . "…" : text)
 	try LoggerInfo("LLM.ollama", "Prediction received ({1} chars): «{2}».", StrLen(text), snip)
 	if entry is Map && !_LLM_Ollama_PresenceStillCurrent(entry)
