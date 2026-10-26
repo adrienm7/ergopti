@@ -425,7 +425,15 @@ helpers.describe("AT-SPI focus watcher: native lifecycle", function()
 		-- actual driver runtime instead of fabricating a stock-Lua native backend.
 		-- Default Linux sessions need not export TMPDIR; the native temp owner
 		-- must still allocate private, uniquely owned fixture directories.
-		local status = os.execute("env -u TMPDIR -u LUA_PATH -u LUA_CPATH luajit "
+		local runtime, native_environment = "luajit", ""
+		if rawget(_G, "jit") then
+			-- Reuse the actual JIT interpreter and its admitted provider paths.
+			-- Minimal distributions build luv outside the interpreter defaults.
+			runtime = assert(require("process.interpreter").from_arguments(arg))
+			native_environment = " LUA_CPATH=" .. quote(package.cpath)
+		end
+		-- A stock-Lua parent cannot lend its foreign native-module ABI to JIT.
+		local status = os.execute("env -u TMPDIR -u LUA_PATH -u LUA_CPATH" .. native_environment .. " " .. quote(runtime) .. " "
 			.. quote(root .. "/tests/hardware/run_focus_listener_retirement.lua") .. " " .. quote(root))
 		helpers.assert_true(status == true or status == 0, "native focus listener retirement must remain truthful")
 	end)
