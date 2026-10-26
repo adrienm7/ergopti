@@ -853,3 +853,46 @@ _CPC_NativeTernaryRequiresTestedStatus() {
 Test("AHK-15-persistence: adjacent native ternary branches retain tested result ownership", _CPC_NativeTernaryRequiresTestedStatus)
 
 #Include test_config_indent_source_witness.ahk
+
+
+; The boot handoff is structural: an otherwise correct widget reader will still
+; fail on outdated source if its caller supplies the physical cache. Masking all
+; non-code and excluding brace-owned bodies keeps comments or unused functions
+; from supplying a fake producer; renamed cache variables remain equivalent.
+_CPC_MetricsBootCacheHandoff(Source, &CacheName := "") {
+	Code := _DriverMaskNonCode(&Source)
+	Top := "", Depth := 0
+	loop parse Code, "`n", "`r" {
+		Line := A_LoopField
+		if Depth == 0
+			Top .= Line . "`n"
+		loop parse Line {
+			if A_LoopField == "{"
+				Depth += 1
+			else if A_LoopField == "}"
+				Depth -= 1
+		}
+	}
+	if !RegExMatch(Top,
+		"m)^[\t ]*(?:global[\t ]+)?([A-Za-z_][A-Za-z0-9_]*)[\t ]*:=[\t ]*CS_Load\([\t ]*\)[\t ]*$", &Producer)
+		return false
+	CacheName := Producer[1]
+	return !!RegExMatch(Top,
+		"m)^[\t ]*WPMWidget_LoadConfig\([\t ]*" . CacheName . "[\t ]*\)[\t ]*$")
+}
+
+_CPC_MetricsBootUsesAdmittedCache() {
+	Source := _DriverSourceConcat()
+	Assert(Source != "", "the production driver source must be readable")
+	AssertTrue(_CPC_MetricsBootCacheHandoff(Source, &CacheName),
+		"the actual boot widget must consume the effective cache returned by metrics admission")
+	Raw := RegExReplace(Source, "WPMWidget_LoadConfig\([\t ]*" . CacheName . "[\t ]*\)",
+		"WPMWidget_LoadConfig(_IniCache)", &Changed)
+	AssertEqual(1, Changed, "the negative control must alter the genuine boot handoff")
+	AssertFalse(_CPC_MetricsBootCacheHandoff(Raw),
+		"restoring the physical-cache caller must fail even though the readers remain correct")
+	Renamed := StrReplace(Source, CacheName, "AdmittedMetricsRenamed")
+	AssertTrue(_CPC_MetricsBootCacheHandoff(Renamed), "the guard must preserve a harmless variable rename")
+}
+Test("metrics boot: widget consumes the admitted metrics cache (metrics-secondary-handoff)",
+	_CPC_MetricsBootUsesAdmittedCache)

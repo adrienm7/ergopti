@@ -68,9 +68,11 @@ global CS_SECTION := "metrics"
 ; Returns a Map of { section_name => Map(key => value) }. Values are
 ; strings, integers, booleans (1/0), or Arrays of strings.
 ; Comments (lines starting with #) and blank lines are skipped.
-CS_Read() {
+CS_Read(&Snapshot := 0, &SourcePath := "") {
+		Snapshot := 0
 		out := Map()
 		path := CS_GetTomlPath()
+		SourcePath := path
 		if !FileExist(path)
 				return out
 		content := ""
@@ -99,7 +101,8 @@ CS_Read() {
 		; Dotted assignments, inline namespaces and quoted headers can all name
 		; the metrics section; a flat parse silently loses those consent choices.
 		; Project the bytes already read without publishing another boot snapshot.
-		return ConfigTomlDecodeSnapshotShared(content).Cache
+		Snapshot := ConfigTomlDecodeSnapshotShared(content)
+		return Snapshot.Cache
 }
 
 ; Truncate a value at the first '#' that sits OUTSIDE a quoted string, so an
@@ -177,9 +180,50 @@ CS_Unescape(s) {
 ; =========================================
 ; =========================================
 
-; Populate MetricsShortcuts + MetricsFilters from disk. Safe to call once
-; at boot — missing file or missing keys leave the in-memory defaults
-; untouched.
+; The primary boot loader already reports this exact source generation. A
+; later metrics read must not report the same entry again, while a different
+; file or a changed source still owns its own diagnostic.
+_CS_OutdatedAlreadyReported(Snapshot, Path, Key) {
+	global CS_SECTION, ConfigurationFile, _BootConfigSnapshot, _ConfigBootOutdatedEntries
+	if !IsSet(ConfigurationFile) || ConfigurationFile == ""
+			|| !IsSet(_BootConfigSnapshot) || !IsObject(_BootConfigSnapshot)
+			|| !_BootConfigSnapshot.HasOwnProp("Source")
+			|| !IsSet(_ConfigBootOutdatedEntries) || !(_ConfigBootOutdatedEntries is Map)
+		return false
+	return _ConfigWriteLeaseKey(Path) == _ConfigWriteLeaseKey(ConfigurationFile)
+		&& Snapshot.Source == _BootConfigSnapshot.Source
+		&& _ConfigBootOutdatedEntries.Has(CS_SECTION . "`n" . Key)
+}
+
+; Keep the complete semantic snapshot intact for cleanup and source admission.
+; Only the metrics consumers receive the canonical effective values; re-decoding
+; an outdated signed zero or quoted Boolean must never grant collection consent.
+_CS_AdmitMetricsCache(Cache, Snapshot, Path) {
+	global CS_SECTION
+	if !Cache.Has(CS_SECTION)
+		return Cache
+	Effective := Cache.Clone()
+	Effective[CS_SECTION] := Cache[CS_SECTION].Clone()
+	for Row in Snapshot.Rows {
+		if Row.Section != CS_SECTION
+			continue
+		if TomlConfigValueMatchesManifest(Row.Section, Row.Key, Row.Value,
+				&ExpectedType, TOML_StripInlineComment(Row.Raw))
+			continue
+		TomlConfigExpectedType(Row.Section, Row.Key, &Entry)
+		if !(Entry is Map) || !Entry.Has("path") || !Entry.Has("default")
+			throw Error("An outdated metrics setting has no manifest default")
+		Effective[CS_SECTION][Row.Key] := _ConfigTomlNativeValue(ManifestDefaultFor(Entry["path"]))
+		if !_CS_OutdatedAlreadyReported(Snapshot, Path, Row.Key)
+			LoggerWarn("ConfigShortcuts",
+				"Ignoring outdated [{1}].{2} in '{3}'; keeping the manifest value for this {4} setting. Source bytes are unchanged.",
+				CS_SECTION, Row.Key, Path, ExpectedType)
+	}
+	return Effective
+}
+
+; Populate MetricsShortcuts + MetricsFilters from disk and return their admitted
+; cache to the widget reader. Missing settings keep their in-memory defaults.
 _CS_RequireBoolean(Value, Key) {
 		if !(Value is Integer) || (Value != 0 && Value != 1)
 				throw TypeError("metrics." . Key . " must be a TOML boolean")
@@ -227,9 +271,11 @@ CS_Load() {
 		; unspecified point relative to the manifest include, and a privacy default
 		; that depends on include order is one refactor away from flipping.
 		MetricsFiltersApplyManifestDefaults()
-		data := CS_Read()
+		data := CS_Read(&Snapshot, &SourcePath)
+		if IsObject(Snapshot)
+				data := _CS_AdmitMetricsCache(data, Snapshot, SourcePath)
 		if !data.Has(CS_SECTION) {
-				return
+				return data
 		}
 		s := data[CS_SECTION]
 		Validated := _CS_ValidateMetricsSection(s)
@@ -255,6 +301,7 @@ CS_Load() {
 
 		if Validated.Has("disabled_apps")
 				MetricsFilters.disabled_apps := Validated["disabled_apps"]
+		return data
 }
 
 ; Commit an explicit metrics candidate through the one atomic config.toml
