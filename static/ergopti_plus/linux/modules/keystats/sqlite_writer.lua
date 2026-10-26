@@ -44,6 +44,7 @@ local MediaStore    = require("keystats.media_store")
 local AppCategoryStore = require("keystats.app_category_store")
 local RegularFileReader = require("infra.regular_file_reader")
 local ErrorDescription = require("error_description")
+local Queries = require("keystats.queries")
 local PrivateSqlite = nil
 
 -- How many session durations one application-day keeps. Read from the shared
@@ -480,7 +481,7 @@ end
 --- Returns the dashboard cache revision, or nil when no database is open.
 function M.get_revision()
 	if not M.is_available() then return nil end
-	return tonumber(_query_scalar("SELECT value FROM meta WHERE key = 'rev';"))
+	return tonumber(_query_scalar(Queries.render("meta.rev", "cli_json")))
 end
 
 --- Registers (or updates) the current device in the devices table.

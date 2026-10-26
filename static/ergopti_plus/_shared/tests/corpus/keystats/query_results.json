@@ -1695,6 +1695,10 @@
 				]
 			}
 		},
+		"meta.rev": {
+			"all": { "native": [{ "value": "0" }], "cli_json": [{ "value": "0" }] },
+			"day1": { "native": [{ "value": "0" }], "cli_json": [{ "value": "0" }] }
+		},
 		"ngram.tokens": {
 			"all": {
 				"native": [

@@ -322,6 +322,18 @@ local QUERIES = {
 			},
 		},
 	},
+	["meta.rev"] = {
+		params = {  },
+		texts = {  },
+		templates = {
+			native = {
+				"SELECT value FROM meta WHERE key='rev';",
+			},
+			cli_json = {
+				"SELECT value FROM meta WHERE key='rev';",
+			},
+		},
+	},
 }
 
 --- Renders a named query. Fails on an unknown name or dialect, a missing or
