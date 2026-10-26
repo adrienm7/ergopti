@@ -41,6 +41,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { SYSTEM_BASH, bashExecutable, gitForWindowsRoot } = require('../lib/git-bash.cjs');
+const { findRuntime } = require('./run-linux-lua.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const TOOLS = path.join(ROOT, 'tools');
@@ -285,6 +286,27 @@ console.log(
 if (process.platform === 'linux') {
 	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-runner-path-'));
 	try {
+		// The runner's own interpreter, given a C path that holds luv alone.
+		const runtime = findRuntime();
+		assert.ok(runtime, 'a Linux Lua runtime is required');
+		const luv = spawnSync(
+			runtime,
+			['-e', 'io.write(assert(package.searchpath("luv", package.cpath)))'],
+			{
+				encoding: 'utf8'
+			}
+		);
+		assert.equal(luv.status, 0, `luv must be installed for ${runtime}: ${luv.stderr}`);
+		const onlyLuv = path.join(temporary, 'only-luv');
+		fs.mkdirSync(onlyLuv);
+		fs.symlinkSync(luv.stdout, path.join(onlyLuv, 'luv.so'));
+		const cpath = path.join(onlyLuv, '?.so');
+		const withoutLfs = { LUA_CPATH: cpath, LUA_CPATH_5_4: cpath };
+		const lfsProbe = spawnSync(runtime, ['-e', 'assert(not pcall(require, "lfs"))'], {
+			encoding: 'utf8',
+			env: { ...process.env, ...withoutLfs }
+		});
+		assert.equal(lfsProbe.status, 0, 'the listing control must actually hide lfs');
 		for (const prefix of ['ordinary', 'literal\\backslash', 'literal\nnewline']) {
 			const checkout = path.join(temporary, prefix);
 			const driver = path.join(checkout, 'static/ergopti_plus/linux');
@@ -310,33 +332,42 @@ if (process.platform === 'linux') {
 			fs.symlinkSync(path.join(TOOLS, 'control'), path.join(tools, 'control'));
 			const home = path.join(checkout, 'home');
 			fs.mkdirSync(home);
-			const launched = spawnSync(
-				process.execPath,
-				[
-					path.join(tools, 'test/run-linux-lua.cjs'),
-					'tests/run.lua',
-					'--module=infra',
-					'--only=keeps the POSIX request tool'
-				],
-				{
-					cwd: checkout,
-					encoding: 'utf8',
-					timeout: 30000,
-					maxBuffer: 8 * 1024 * 1024,
-					env: { ...process.env, HOME: home }
-				}
-			);
-			assert.ifError(launched.error);
-			assert.equal(
-				launched.status,
-				0,
-				`${JSON.stringify(prefix)}: ${launched.stdout}\n${launched.stderr}`
-			);
-			assert.match(launched.stdout, /ok   keeps the POSIX request tool/);
-			assert.match(launched.stdout, /Passed tests:\s+1\nFailed tests:\s+0/);
-			console.log(
-				`[OK] Linux native prefix ${JSON.stringify(prefix)} executes one existing case without loader errors.`
-			);
+			// Both discovery paths run: lfs when the interpreter has it, and the
+			// find listing a runner without lfs uses (the Test infrastructure lot's
+			// lua5.4). The listing once turned the prefix's backslash into a
+			// separator and discovered no manifest module.
+			for (const [mode, overrides] of [
+				['lfs', {}],
+				['listing', withoutLfs]
+			]) {
+				const launched = spawnSync(
+					process.execPath,
+					[
+						path.join(tools, 'test/run-linux-lua.cjs'),
+						'tests/run.lua',
+						'--module=infra',
+						'--only=keeps the POSIX request tool'
+					],
+					{
+						cwd: checkout,
+						encoding: 'utf8',
+						timeout: 30000,
+						maxBuffer: 8 * 1024 * 1024,
+						env: { ...process.env, HOME: home, ...overrides }
+					}
+				);
+				assert.ifError(launched.error);
+				assert.equal(
+					launched.status,
+					0,
+					`${JSON.stringify(prefix)} (${mode}): ${launched.stdout}\n${launched.stderr}`
+				);
+				assert.match(launched.stdout, /ok   keeps the POSIX request tool/);
+				assert.match(launched.stdout, /Passed tests:\s+1\nFailed tests:\s+0/);
+				console.log(
+					`[OK] Linux native prefix ${JSON.stringify(prefix)} executes one existing case without loader errors (${mode} discovery).`
+				);
+			}
 		}
 	} finally {
 		fs.rmSync(temporary, { recursive: true, force: true });
