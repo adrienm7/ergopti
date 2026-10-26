@@ -24,6 +24,7 @@ require("test.hotpath_segments_contract").register(helpers, {
 	root = helpers.driver_root(),
 	call_pattern = 'Perf%.span%(%s*"([^"]+)"',
 	timed_only = TIMED_ONLY,
+	default_slow_ms = require("infra.timings").ms("logger", "hotpath_slow_ms"),
 })
 
 helpers.describe("hot-path segment inventory: linux spans", function()

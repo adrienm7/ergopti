@@ -100,6 +100,7 @@ end
 function M.register(helpers, options)
 	local declared = Inventory.for_driver(options.driver)
 	local timed_only = options.timed_only or {}
+	assert(type(options.default_slow_ms) == "number", "the contract needs the registry's hotpath_slow_ms")
 	local emitted, sites = emitted_segments(options.root, options.call_pattern)
 
 	helpers.describe("hot-path segment inventory: " .. options.driver, function()
@@ -131,9 +132,17 @@ function M.register(helpers, options)
 
 		helpers.it("gives every declared segment a threshold and a reason", function()
 			for name, segment in pairs(declared) do
-				helpers.assert_true(Inventory.threshold_ms(name) > 0, name .. " needs a positive threshold")
+				helpers.assert_true(Inventory.threshold_ms(name, options.default_slow_ms) > 0, name .. " needs a positive threshold")
 				helpers.assert_true(#segment.why > 0, name .. " needs a reason")
 			end
+		end)
+
+		helpers.it("slows a segment from the 5 ms the three drivers share", function()
+			for name in pairs(declared) do
+				helpers.assert_true(Inventory.threshold_ms(name, options.default_slow_ms) <= 5,
+					name .. " must be reported slow from 5 ms at the latest, as on Windows")
+			end
+			helpers.assert_eq(options.default_slow_ms, 5, "the registry's [logger] hotpath_slow_ms")
 		end)
 
 		helpers.it("rate-limits the slow-segment line per segment, first occurrence always admitted", function()

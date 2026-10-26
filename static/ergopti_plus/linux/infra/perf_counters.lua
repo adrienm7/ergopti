@@ -35,6 +35,7 @@ local M = {}
 local Logger    = require("logger.shim")
 local Monotonic = require("infra.monotonic")
 local Segments  = require("hotpath_segments")
+local Timings   = require("infra.timings")
 
 local LOG = "PerfCounters"
 -- Tag of the slow-segment WARNING, shared with the Windows and macOS drivers so
@@ -77,7 +78,8 @@ local _interval_start_ms = nil
 -- A span absent here (an idle wait, a tray build) is timed but never a warning:
 -- an idle wait is long by design. Built once, so the hot path is one table read.
 local _slow_ms = {}
-for name in pairs(Segments.for_driver("linux")) do _slow_ms[name] = Segments.threshold_ms(name) end
+local DEFAULT_SLOW_MS = Timings.ms("logger", "hotpath_slow_ms")
+for name in pairs(Segments.for_driver("linux")) do _slow_ms[name] = Segments.threshold_ms(name, DEFAULT_SLOW_MS) end
 -- Rate limiter of the WARNING (window shared with macOS); the slow counts stay exact.
 local _admit_slow = Segments.new_slow_gate()
 

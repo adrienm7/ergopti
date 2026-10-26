@@ -758,6 +758,16 @@ stall_fatal_ms = 30000
 # Swift: LoggerDatagramWorker.swift kLoggerSlowBatchThresholdMilliseconds.
 native_slow_batch_ms = 500
 
+# A hot-path segment (one keystroke's processing, a hotstring expansion, ...)
+# slower than this is logged at WARNING as "Slow <segment>". One value for the
+# three drivers: 5 ms is below the threshold of perceptible single-keystroke lag
+# yet far above the sub-millisecond cost of a healthy keystroke.
+# HS: infra/hotpath_profiler.lua. Linux: infra/perf_counters.lua (both through
+# _shared/lua/hotpath_segments.lua threshold_ms).
+# AHK: infra/hotpath_profiler.ahk _HOTPATH_SLOW_MS is still a literal 5.0; it
+# must read this key (TimingsGet("logger", "hotpath_slow_ms")).
+hotpath_slow_ms = 5
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Adapters shared by the Linux and macOS drivers

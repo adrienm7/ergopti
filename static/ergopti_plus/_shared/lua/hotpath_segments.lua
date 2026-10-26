@@ -16,7 +16,9 @@
 ---    says why it exists, and tests/unit/.../test_hotpath_segments_declared.lua
 ---    (shared contract test/hotpath_segments_contract.lua) fails when the
 ---    driver emits a segment that is not listed or no longer emits one that is.
---- 2. One threshold policy. DEFAULT_SLOW_MS applies to every segment; an entry
+--- 2. One threshold policy. The registry value [logger] hotpath_slow_ms (5 ms,
+---    the same on the three drivers) applies to every segment; the caller reads
+---    it and passes it in, so this module holds no copy of the number. An entry
 ---    may carry slow_ms only together with the measurement that justifies it, as
 ---    on Windows, because an override without evidence hides a regression.
 --- 3. Names and numbers only. A segment name is a source constant; typed text,
@@ -24,12 +26,6 @@
 --- ==============================================================================
 
 local M = {}
-
--- Segments slower than this many milliseconds are logged at WARNING. 20 ms
--- filters one-off scheduler jitter while keeping a typing hitch a person can
--- feel (the macOS tripwire's long-standing budget; the Windows driver uses 5 ms
--- for its COM-free hook path and carries per-segment overrides).
-M.DEFAULT_SLOW_MS = 20.0
 
 -- A segment that stays slow (a stalled disk, a busy compositor) is slow on every
 -- keystroke; one WARNING per segment per window keeps the first occurrence and
@@ -87,10 +83,12 @@ end
 
 --- Returns the slow threshold of a segment in milliseconds.
 --- @param name string Segment name.
---- @return number threshold_ms The segment's own override, else DEFAULT_SLOW_MS.
-function M.threshold_ms(name)
+--- @param default_ms number The registry's [logger] hotpath_slow_ms.
+--- @return number threshold_ms The segment's own override, else default_ms.
+function M.threshold_ms(name, default_ms)
+	assert(type(default_ms) == "number" and default_ms > 0, "threshold_ms needs the registry default in milliseconds")
 	local segment = _by_name[name]
-	return segment and segment.slow_ms or M.DEFAULT_SLOW_MS
+	return segment and segment.slow_ms or default_ms
 end
 
 --- Creates the per-segment rate limiter of the slow-segment WARNING. Only the
