@@ -23,6 +23,8 @@
  *    op semantics (after _shared/lua/tap_hold/migrate.lua). It decides each
  *    case's outcome, compares the migrated document with expected.toml and
  *    replays the steps on their own output, which must change nothing.
+ * 4. Marker retired. No Lua driver file writes or reads the explicit_delays
+ *    flag any more; only the registry names it, to remove it.
  * ==============================================================================
  */
 
@@ -221,5 +223,16 @@ for (const name of index) {
 }
 for (const outcome of OUTCOMES)
 	assert(seen.has(outcome), `the corpus covers the outcome ${outcome}`);
+
+// -- 5. The marker is retired on Linux --------------------------------------------
+
+const linuxRoot = path.join(path.dirname(shared('')), 'linux');
+for (const file of ['platform/remap/tap_hold_loader.lua', 'platform/remap/tap_hold_writer.lua']) {
+	const source = fs.readFileSync(path.join(linuxRoot, file), 'utf8');
+	assert(
+		!/explicit_delays\s*=\s*true|\.explicit_delays/.test(source),
+		`${file} still reads or writes explicit_delays`
+	);
+}
 
 console.log(`tap-hold migrations: ${index.length} corpus cases, ${steps.length} step(s) replayed`);

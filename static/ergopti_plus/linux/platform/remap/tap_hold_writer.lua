@@ -43,10 +43,10 @@ local Manifest = require("infra.manifest_reader")
 local LayerPreset = require("keymap.layer_preset")
 local Shapes = require("platform.remap.tap_hold_shapes")
 local KeyCatalog = require("tap_hold.key_catalog")
+local Migration = require("platform.remap.tap_hold_migration")
 local Paths = require("infra.paths")
 
 local LOG = "platform.remap.tap_hold_writer"
-local TIME_FIELD = require("config_keys").LEAF.TIME_ACTIVATION_SECONDS
 
 --- The user file's name in the configuration folder.
 M.FILE_NAME = "tap_hold.toml"
@@ -250,7 +250,7 @@ local function write_document(path, document, shapes, expected_source, guard)
 end
 
 -- Defined with the document helpers below: every write migrates before it applies.
-local migrate_retired_delays
+local migrate_document
 
 --- Reads, changes, writes and reloads: one tray change.
 --- @param what string For the logs.
@@ -273,7 +273,7 @@ local function save_and_reload(what, mutate, prepare, guard)
 	end
 	if guard ~= nil and not current() then return false, false end
 	local changed, detail = pcall(function()
-		migrate_retired_delays(document, shapes)
+		migrate_document(document, shapes)
 		mutate(document, shapes)
 	end)
 	if not changed then
@@ -365,29 +365,23 @@ local function retired_delays()
 	return _retired
 end
 
---- Finishes the migration of a file written before no key shipped a delay: each
---- delay equal to a retired shipped one was copied in by a rewrite, not chosen,
---- so it goes, and the file is flagged `[tap_hold] explicit_delays = true` so
---- every delay it keeps from now on is the user's own. A flagged file is
---- untouched. Every write goes through here before it applies its change, so a
---- delay the user sets afterwards, whatever its value, is kept.
+--- Brings a decoded document to the current file version in place (see
+--- _shared/tap_hold/migrations.toml): the per-key delays earlier builds shipped
+--- are removed once and the stamp is set, so every write publishes a stamped
+--- file and every delay it keeps is the user's own. A current document is
+--- untouched. A file saved by a newer build, or with an unreadable stamp, is
+--- refused: this build never rewrites what it cannot version.
 --- @param document table Decoded user document, edited in place.
 --- @param shapes table|nil Canonical shape receipt of the document.
-migrate_retired_delays = function(document, shapes)
-	local tap_hold = section(document, shapes)
-	if tap_hold.explicit_delays == true then return end
-	Shapes.require_table(tap_hold.keys, shapes, "tap_hold.keys")
-	if tap_hold.keys ~= nil then
-		for key_id, retired in pairs(retired_delays()) do
-			local entry = tap_hold.keys[key_id]
-			if Shapes.is_table(entry, shapes) and entry.time_activation_seconds == retired then
-				entry.time_activation_seconds = nil
-				if next(entry) == nil then tap_hold.keys[key_id] = nil end
-			end
-		end
-		if next(tap_hold.keys) == nil then tap_hold.keys = nil end
+--- @return string outcome "migrated" or "current".
+--- @return number from The version the document carried.
+migrate_document = function(document, shapes)
+	local outcome, detail = Migration.read_as_current(document, shapes, retired_delays())
+	if outcome == "newer" then
+		error("the file was saved by a newer build (schema v" .. tostring(detail) .. "); update before changing it", 0)
 	end
-	tap_hold.explicit_delays = true
+	if outcome == "invalid" then error(tostring(detail), 0) end
+	return outcome, detail
 end
 
 --- Removes only fields whose runtime meaning belongs to this writer, on every
@@ -592,6 +586,7 @@ function M.render_scope(mode, document, rows, preset, shapes)
 	if type(document) ~= "table" or type(rows) ~= "table" or type(preset) ~= "table" then
 		error("tap-hold scope rendering requires a document, rows and the preset", 0)
 	end
+	migrate_document(document, shapes)
 	local tap_hold = section(document, shapes)
 	Shapes.require_table(tap_hold.keys, shapes, "tap_hold.keys")
 	if mode == "recommended" then
@@ -625,23 +620,16 @@ end
 --- the preset depends on inheritance, and the wizard never guesses.
 --- @param entry any The key's table in the user's document.
 --- @param fields table The key's preset fields.
---- @param retired number|nil The delay an earlier build shipped for the key, when
----   the file is not yet flagged as holding only the user's own: not a setting.
 --- @return boolean
-local function customised(entry, fields, retired)
+local function customised(entry, fields)
 	if type(entry) ~= "table" then return false end
-	local function owned_value(field)
-		local value = entry[field]
-		if field == TIME_FIELD and retired ~= nil and value == retired then return nil end
-		return value
-	end
 	local owned = false
 	for _, field in ipairs(OWNED_KEY_FIELDS) do
-		if owned_value(field) ~= nil then owned = true end
+		if entry[field] ~= nil then owned = true end
 	end
 	if not owned then return false end
 	for _, field in ipairs(OWNED_KEY_FIELDS) do
-		local value, recommended = owned_value(field), fields[field]
+		local value, recommended = entry[field], fields[field]
 		if field == "enabled" then value, recommended = value ~= false, recommended ~= false end
 		if value ~= recommended then return true end
 	end
@@ -696,10 +684,15 @@ function M.import_recommended(path, key_ids, preset)
 		Logger.error(LOG, "Tap-hold import into '%s' refused: %s.", path, tostring(admission_error))
 		return false, tostring(admission_error)
 	end
+	local migrated, migration_error = pcall(migrate_document, document, shapes)
+	if not migrated then
+		Logger.error(LOG, "Tap-hold import into '%s' refused: %s.", path, tostring(migration_error))
+		return false, tostring(migration_error)
+	end
+	tap_hold = document.tap_hold
 	local keys = type(tap_hold) == "table" and tap_hold.keys or {}
-	local retired = (type(tap_hold) == "table" and tap_hold.explicit_delays == true) and {} or retired_delays()
 	for _, key_id in ipairs(key_ids) do
-		if customised(keys[key_id], preset[key_id], retired[key_id]) then
+		if customised(keys[key_id], preset[key_id]) then
 			Logger.error(LOG, "Tap-hold key '%s' of '%s' holds the user's own setting — the import is refused.",
 				key_id, path)
 			return false, "'" .. key_id .. "' holds the user's own setting"
@@ -713,7 +706,6 @@ function M.import_recommended(path, key_ids, preset)
 			return false, "'" .. path .. "' could not be backed up"
 		end
 	end
-	migrate_retired_delays(document, shapes)
 	section(document, shapes).enabled = true
 	for _, key_id in ipairs(key_ids) do
 		local entry = key_entry(document, key_id, shapes)
@@ -726,6 +718,49 @@ function M.import_recommended(path, key_ids, preset)
 	Logger.success(LOG, "Imported %d recommended tap-hold key(s) into '%s' (backup: %s).",
 		#key_ids, path, tostring(backup or "none, the file is new"))
 	return true, nil, backup
+end
+
+--- Migrates the user's file on disk to the current version, once, at boot: a
+--- byte-exact backup first, then one atomic publication of the migrated
+--- document. A current or absent file is not written. A file this build cannot
+--- version (newer, unreadable stamp, malformed) is left untouched and ERROR
+--- logged; every later change to it is refused by the writers.
+--- @param path string The user's tap_hold.toml.
+--- @return string status "absent", "current", "migrated", "newer", "invalid" or "failed".
+--- @return string|nil detail The backup of a migrated file, or why it was refused.
+function M.migrate_file(path)
+	if type(path) ~= "string" or path == "" then error("tap-hold migration requires a path", 2) end
+	Logger.start(LOG, "Checking the tap-hold file version of '%s'…", path)
+	local document, err, text, shapes = read_document(path)
+	if not document then
+		Logger.error(LOG, "'%s' is %s — left untouched, not migrated.", path, tostring(err))
+		return "failed", tostring(err)
+	end
+	if text == nil then
+		Logger.success(LOG, "No tap-hold file at '%s' yet; nothing to migrate.", path)
+		return "absent"
+	end
+	local outcome, detail = Migration.read_as_current(document, shapes, retired_delays())
+	if outcome == "current" then
+		Logger.success(LOG, "'%s' is at schema v%s; nothing to migrate.", path, tostring(detail))
+		return "current"
+	end
+	if outcome ~= "migrated" then
+		Logger.error(LOG, "'%s' cannot be migrated (%s: %s) — left untouched and never written.",
+			path, outcome, tostring(detail))
+		return outcome, tostring(detail)
+	end
+	local backup = back_up(path, text)
+	if not backup then
+		Logger.error(LOG, "'%s' could not be backed up — not migrated.", path)
+		return "failed", "'" .. path .. "' could not be backed up"
+	end
+	if not write_document(path, document, shapes, { status = "ok", content = text }) then
+		return "failed", "'" .. path .. "' could not be written"
+	end
+	Logger.success(LOG, "Migrated '%s' from schema v%s to v%s; backup at '%s'.", path, tostring(detail),
+		tostring(Migration.registry().current), backup)
+	return "migrated", backup
 end
 
 --- Whether the user's file names this key.

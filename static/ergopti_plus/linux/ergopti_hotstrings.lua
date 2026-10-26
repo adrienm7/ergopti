@@ -985,6 +985,9 @@ local function main()
 	-- keyboard hook. Required here rather than at file scope because main() is at
 	-- LuaJIT's 60-upvalue limit. Declared before the pause controller below,
 	-- whose closure reads it.
+	-- tap_hold.toml is versioned like config.toml: migrated before the engine reads it.
+	require("platform.remap.tap_hold_writer").migrate_file(
+		require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME))
 	local TapHold = require("platform.remap.tap_hold_manager")
 	-- When the buffer forgets the current word: after a pause and on a click.
 	-- Required here for the same upvalue budget as TapHold.

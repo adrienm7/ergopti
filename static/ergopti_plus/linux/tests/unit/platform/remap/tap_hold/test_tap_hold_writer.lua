@@ -712,11 +712,12 @@ helpers.describe("tap-hold delay model: global default, sticky per-key delays, r
 		helpers.assert_true(writer.set_tap("tab", "paste"))
 		local text = read_file(path)
 		helpers.assert_true(text:find("time_activation_seconds = 0.35", 1, true) == nil, "the write removed the copied delay")
-		helpers.assert_true(text:find("explicit_delays = true", 1, true) ~= nil, "and flagged the file")
+		helpers.assert_true(text:find("schema_version = 1", 1, true) ~= nil, "and stamped the file as migrated")
+		helpers.assert_true(text:find("explicit_delays", 1, true) == nil, "without writing the retired marker")
 		helpers.assert_eq(effective(path).keys.left_ctrl.time_activation_seconds, 0.45)
 		helpers.assert_true(writer.set_threshold("caps_lock", 0.35))
 		helpers.assert_eq(effective(path).keys.caps_lock.time_activation_seconds, 0.35,
-			"once flagged, 0.35 chosen by the user is kept")
+			"once migrated, 0.35 chosen by the user is kept")
 		os.remove(path)
 	end)
 
