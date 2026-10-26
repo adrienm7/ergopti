@@ -7,6 +7,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+-- Stateless generated constants every owner now reads; loaded before any snapshot so they are
+-- not mistaken for residue of the fixture under test.
+require("config_keys")
 local Fixture = require("tests.support.gesture_actions_fixture")
 
 local function snapshot()
