@@ -115,6 +115,15 @@ local function _sql_escape(s)
 	return SqliteCommand.escape_literal(s)
 end
 
+--- A value as the text a catalogue slot takes: a string stays, anything else is empty,
+--- which is what the hand-built statements wrote for it.
+--- @param value any
+--- @return string
+local function _text(value)
+	if type(value) ~= "string" then return "" end
+	return value
+end
+
 --- Runs a SQL statement against the database via the sqlite3 CLI.
 --- @param sql string Complete SQL statement(s) to execute.
 --- @return boolean True on success.
@@ -670,24 +679,21 @@ end
 --- @param device_id string Device identifier.
 --- @param events table Array of {ts,date,app,kind,trigger,replacement,h_type,net_saved_chars}.
 _raw_sql.hotstrings = function(device_id, events, first_id)
-	local parts = {}
+	local statements = {}
 	for i, ev in ipairs(events) do
-		parts[#parts + 1] = string.format(
-			"('%s',%d,'%s','%s','%s','%s','%s','%s','%s',%d)",
-			_sql_escape(device_id), first_id + i - 1,
-			_sql_escape(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
-			_sql_escape(ev.date or os.date("%Y-%m-%d")),
-			_sql_escape(ev.app or "unknown"),
-			_sql_escape(ev.kind or "fired"),
-			_sql_escape(ev.trigger or ""),
-			_sql_escape(ev.replacement or ""),
-			_sql_escape(ev.h_type or "unknown"),
-			tonumber(ev.net_saved_chars) or 0
-		)
+		statements[#statements + 1] = Queries.render("events.hotstring", "cli_json", {
+			device_id = device_id, id = first_id + i - 1,
+			ts = _text(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
+			date = _text(ev.date or os.date("%Y-%m-%d")),
+			app = _text(ev.app or "unknown"),
+			kind = _text(ev.kind or "fired"),
+			trigger = _text(ev.trigger or ""),
+			replacement = _text(ev.replacement or ""),
+			h_type = _text(ev.h_type or "unknown"),
+			net_saved_chars = math.floor(tonumber(ev.net_saved_chars) or 0),
+		})
 	end
-	return "INSERT OR IGNORE INTO events_hotstring "
-		.. "(device_id,id,ts,date,app,kind,trigger,replacement,h_type,net_saved_chars) VALUES "
-		.. table.concat(parts, ",") .. ";"
+	return table.concat(statements, "\n")
 end
 
 --- Commits one canonical raw hotstrings batch and returns its native receipt.
@@ -777,20 +783,17 @@ end
 --- @param events table Array of { ts, date, app, key }.
 --- @return boolean|nil
 _raw_sql.shortcuts = function(device_id, events, first_id)
-	local parts = {}
+	local statements = {}
 	for i, ev in ipairs(events) do
-		parts[#parts + 1] = string.format(
-			"('%s',%d,'%s','%s','%s','%s')",
-			_sql_escape(device_id), first_id + i - 1,
-			_sql_escape(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
-			_sql_escape(ev.date or os.date("%Y-%m-%d")),
-			_sql_escape(ev.app or "unknown"),
-			_sql_escape(ev.key or "")
-		)
+		statements[#statements + 1] = Queries.render("events.shortcut", "cli_json", {
+			device_id = device_id, id = first_id + i - 1,
+			ts = _text(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
+			date = _text(ev.date or os.date("%Y-%m-%d")),
+			app = _text(ev.app or "unknown"),
+			key = _text(ev.key or ""),
+		})
 	end
-	return "INSERT OR IGNORE INTO events_shortcut "
-		.. "(device_id,id,ts,date,app,key) VALUES "
-		.. table.concat(parts, ",") .. ";"
+	return table.concat(statements, "\n")
 end
 
 --- Commits one canonical raw shortcuts batch and returns its native receipt.
@@ -807,40 +810,34 @@ end
 --- @param device_id string Device identifier.
 --- @param events table Array of {ts,date,prev_app,next_app,duration_ms}.
 _raw_sql.switches = function(device_id, events, first_id)
-	local parts = {}
+	local statements = {}
 	for i, ev in ipairs(events) do
-		parts[#parts + 1] = string.format(
-			"('%s',%d,'%s','%s','%s','%s',%d)",
-			_sql_escape(device_id), first_id + i - 1,
-			_sql_escape(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
-			_sql_escape(ev.date or os.date("%Y-%m-%d")),
-			_sql_escape(ev.prev_app or ""),
-			_sql_escape(ev.next_app or ""),
-			tonumber(ev.duration_ms) or 0
-		)
+		statements[#statements + 1] = Queries.render("events.app_switch", "cli_json", {
+			device_id = device_id, id = first_id + i - 1,
+			ts = _text(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
+			date = _text(ev.date or os.date("%Y-%m-%d")),
+			prev_app = _text(ev.prev_app or ""),
+			next_app = _text(ev.next_app or ""),
+			duration_ms = math.floor(tonumber(ev.duration_ms) or 0),
+		})
 	end
-	return "INSERT OR IGNORE INTO events_app_switch "
-		.. "(device_id,id,ts,date,prev_app,next_app,duration_ms) VALUES "
-		.. table.concat(parts, ",") .. ";"
+	return table.concat(statements, "\n")
 end
 
 --- Inserts window title changes in the shared events_window_switch format.
 --- @param device_id string Device identifier.
 --- @param events table Array of {ts,date,app,prev_title,next_title,duration_ms}.
 _raw_sql.windows = function(device_id, events, first_id)
-	local parts = {}
+	local statements = {}
 	for i, ev in ipairs(events) do
-		parts[#parts + 1] = string.format(
-			"('%s',%d,'%s','%s','%s','%s','%s',%d)",
-			_sql_escape(device_id), first_id + i - 1,
-			_sql_escape(ev.ts), _sql_escape(ev.date), _sql_escape(ev.app),
-			_sql_escape(ev.prev_title), _sql_escape(ev.next_title),
-			math.floor(ev.duration_ms)
-		)
+		statements[#statements + 1] = Queries.render("events.window_switch", "cli_json", {
+			device_id = device_id, id = first_id + i - 1,
+			ts = _text(ev.ts), date = _text(ev.date), app = _text(ev.app),
+			prev_title = _text(ev.prev_title), next_title = _text(ev.next_title),
+			duration_ms = math.floor(ev.duration_ms),
+		})
 	end
-	return "INSERT OR IGNORE INTO events_window_switch "
-		.. "(device_id,id,ts,date,app,prev_title,next_title,duration_ms) VALUES "
-		.. table.concat(parts, ",") .. ";"
+	return table.concat(statements, "\n")
 end
 
 --- Inserts typing session events in the shared events_session format.
@@ -850,41 +847,35 @@ end
 --- @param events table Array of {ts,date,kind,duration_ms?}.
 _raw_sql.sessions = function(device_id, events, first_id)
 	local kinds = { session_start = true, session_end = true, idle_start = true, idle_end = true }
-	local parts = {}
+	local statements = {}
 	for i, ev in ipairs(events) do
 		if not kinds[ev.kind] then
 			Logger.error(LOG, "Session event batch refused: '%s' is not an events_session kind.", tostring(ev.kind))
 			return nil
 		end
-		parts[#parts + 1] = string.format(
-			"('%s',%d,'%s','%s','%s',%s)",
-			_sql_escape(device_id), first_id + i - 1,
-			_sql_escape(ev.ts), _sql_escape(ev.date), ev.kind,
-			type(ev.duration_ms) == "number" and string.format("%d", math.floor(ev.duration_ms)) or "NULL"
-		)
+		statements[#statements + 1] = Queries.render("events.session", "cli_json", {
+			device_id = device_id, id = first_id + i - 1,
+			ts = _text(ev.ts), date = _text(ev.date), kind = ev.kind,
+			duration_ms = type(ev.duration_ms) == "number" and math.floor(ev.duration_ms) or nil,
+		})
 	end
-	return "INSERT OR IGNORE INTO events_session "
-		.. "(device_id,id,ts,date,kind,duration_ms) VALUES "
-		.. table.concat(parts, ",") .. ";"
+	return table.concat(statements, "\n")
 end
 
 --- Inserts machine transitions in the shared events_system format.
 --- @param device_id string Device identifier.
 --- @param events table Array of {ts,date,action,metadata?}.
 _raw_sql.system = function(device_id, events, first_id)
-	local parts = {}
+	local statements = {}
 	for i, ev in ipairs(events) do
 		assert(type(ev.action) == "string" and ev.action ~= "", "a system event needs its action")
-		parts[#parts + 1] = string.format(
-			"('%s',%d,'%s','%s','%s',%s)",
-			_sql_escape(device_id), first_id + i - 1,
-			_sql_escape(ev.ts), _sql_escape(ev.date), _sql_escape(ev.action),
-			type(ev.metadata) == "table" and ("'" .. _sql_escape(Json.encode(ev.metadata)) .. "'") or "NULL"
-		)
+		statements[#statements + 1] = Queries.render("events.system", "cli_json", {
+			device_id = device_id, id = first_id + i - 1,
+			ts = _text(ev.ts), date = _text(ev.date), action = ev.action,
+			metadata_json = type(ev.metadata) == "table" and Json.encode(ev.metadata) or nil,
+		})
 	end
-	return "INSERT OR IGNORE INTO events_system "
-		.. "(device_id,id,ts,date,action,metadata_json) VALUES "
-		.. table.concat(parts, ",") .. ";"
+	return table.concat(statements, "\n")
 end
 
 --- Commits one canonical raw system-event batch and returns its native receipt.

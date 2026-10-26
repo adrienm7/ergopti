@@ -638,7 +638,11 @@ helpers.describe("linux-sqlite-local-event-days", function()
 							helpers.assert_true(writer[method]("owned", { event }))
 							local ts = explicit and event.ts or "2026-01-01 23:59:59"
 							local date = explicit and event.date or "2026-01-02"
-							helpers.assert_contains(commands[#commands], "'" .. ts .. "','" .. date .. "'")
+							-- The typing batch writes its values list compact, the catalogue events with a space.
+                            local statement = commands[#commands]
+                            helpers.assert_true(statement:find("'" .. ts .. "','" .. date .. "'", 1, true) ~= nil
+                                or statement:find("'" .. ts .. "', '" .. date .. "'", 1, true) ~= nil,
+                                "the event carries its own timestamp and local day")
 							helpers.assert_eq(require("json").encode(event), original)
 						end, debug.traceback)
 						io.popen = previous_popen
