@@ -26,6 +26,15 @@ local function fixture(level)
 end
 
 helpers.describe("perf counters: closed names and aggregation", function()
+	helpers.it("loads without reading the timings registry, as shell_runner workers require it", function()
+		-- Child workers load shell_runner with a minimal logger shim: a registry
+		-- parse at require time made every one of them exit on the missing logger level.
+		-- A refused infra.timings raises here, failing the case, if require reads it.
+		local perf = helpers.load_module_with_dependency("infra.perf_counters", "infra.timings", false)
+		package.loaded["infra.perf_counters"] = nil
+		helpers.assert_eq(type(perf.span), "function")
+	end)
+
 	helpers.it("rejects an unknown counter or span instead of opening a bucket", function()
 		local perf = fixture(10)
 		helpers.assert_throws(function() perf.count("typed.text") end)
