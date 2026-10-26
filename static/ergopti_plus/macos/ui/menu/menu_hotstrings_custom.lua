@@ -23,6 +23,7 @@ local dialog = require("infra.dialog_util")
 local Chord = require("chord")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local ManifestMenu = require("infra.manifest_menu")
+local TableUtil = require("table_util")
 
 
 
@@ -712,10 +713,7 @@ function M.build_custom(ctx, counts)
 		})
 	end
 	local function sorted_keys(tbl)
-		local keys = {}
-		for key in pairs(type(tbl) == "table" and tbl or {}) do keys[#keys + 1] = key end
-		table.sort(keys)
-		return keys
+		return TableUtil.sorted_keys(type(tbl) == "table" and tbl or {})
 	end
 	-- Sum all hotstring counts inside a node and its sub-nodes recursively.
 	local function node_total(node)

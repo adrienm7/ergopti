@@ -8,6 +8,13 @@
 
 local helpers = require("tests.helpers")
 
+-- Stateless shared helpers that the typing metrics modules load on first use.
+-- The leak check below compares package.loaded around each scenario, so the
+-- snapshot must already hold them: they are not scenario state.
+require("table_util")
+require("native_path")
+require("text_utils")
+
 --- Collects actual scoped callbacks without publishing replacement registrations.
 --- @return table scenarios Registered names and callbacks.
 local function collect_scenarios()

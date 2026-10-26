@@ -1821,21 +1821,15 @@ end
 --- The categories the current catalogue offers, in a stable order.
 --- @return table Array of category ids.
 local function known_categories()
-	local ids = {}
-	for id in pairs(_categories) do ids[#ids + 1] = id end
-	table.sort(ids)
-	return ids
+	return TableUtil.sorted_keys(_categories)
 end
 
 --- The sections one category declares, in a stable order.
 --- @param id string
 --- @return table Array of section names.
 local function known_sections(id)
-	local names = {}
 	local category = _categories[id]
-	for name in pairs(category and category.sections or {}) do names[#names + 1] = name end
-	table.sort(names)
-	return names
+	return TableUtil.sorted_keys(category and category.sections or {})
 end
 
 --- The sections one category's own submenu draws: an extension's bound section
