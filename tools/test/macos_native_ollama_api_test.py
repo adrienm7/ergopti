@@ -103,6 +103,16 @@ class WireReceiving(unittest.TestCase):
         patch.dict(
             os.environ, ERGOPTI_PEER_RECEIPT=str(self.receipt), ERGOPTI_PEER_MODE="good"
         ).start()
+        self.stderr_files = []
+        original_temporary_file = tempfile.TemporaryFile
+
+        def temporary_file(*args, **kwargs):
+            handle = original_temporary_file(*args, **kwargs)
+            self.stderr_files.append(handle)
+            self.addCleanup(handle.close)
+            return handle
+
+        patch.object(self.api.ENGINE.tempfile, "TemporaryFile", side_effect=temporary_file).start()
 
     def tearDown(self):
         for process in self.children:
@@ -112,6 +122,8 @@ class WireReceiving(unittest.TestCase):
                 self.fail("native role fixture child survived caller completion")
             self.assertTrue(process.stdin.closed)
             self.assertTrue(process.stdout.closed)
+        for handle in self.stderr_files:
+            self.assertTrue(handle.closed, "fixture-owned stderr must retire before the test ends")
 
     def discover(self):
         return self.api.discover("/private/verified/ollama", "123", "456", 11434, 2, 1)
@@ -498,27 +510,34 @@ class WireReceiving(unittest.TestCase):
                 allocated.append(self)
                 raise primary
 
-        with patch.object(self.api.ENGINE, "_ROLE_POPEN", IncompletePopen):
-            with self.assertRaises(RuntimeError) as raised:
-                self.api.discover(
-                    "/private/verified/ollama",
-                    "123",
-                    "456",
-                    11434,
-                    2,
-                    1,
-                    register=lambda response: retained.append(response) is None,
-                )
-        self.assertIs(raised.exception, primary)
-        self.assertEqual(len(allocated), 1)
-        self.assertIs(retained[0]._process, allocated[0])
-        self.assertFalse(getattr(allocated[0], "_child_created", False))
-        self.assertFalse(retained[0]._closed)
-        self.assertIsNone(retained[0]._selector.get_map())
-        self.assertEqual(self.children, [])
-        with self.assertRaises(self.api.ENGINE.NativeHTTPError) as refused:
-            retained[0].close()
-        self.assertEqual(refused.exception.reason, "unavailable")
+        try:
+            with patch.object(self.api.ENGINE, "_ROLE_POPEN", IncompletePopen):
+                with self.assertRaises(RuntimeError) as raised:
+                    self.api.discover(
+                        "/private/verified/ollama",
+                        "123",
+                        "456",
+                        11434,
+                        2,
+                        1,
+                        register=lambda response: retained.append(response) is None,
+                    )
+            self.assertIs(raised.exception, primary)
+            self.assertEqual(len(allocated), 1)
+            self.assertIs(retained[0]._process, allocated[0])
+            self.assertFalse(getattr(allocated[0], "_child_created", False))
+            self.assertFalse(retained[0]._closed)
+            self.assertIsNone(retained[0]._selector.get_map())
+            self.assertEqual(self.children, [])
+            with self.assertRaises(self.api.ENGINE.NativeHTTPError) as refused:
+                retained[0].close()
+            self.assertEqual(refused.exception.reason, "unavailable")
+        finally:
+            # This fixture never enters Popen, so it alone can release its file
+            # without inventing an exact native child retirement receipt.
+            for response in retained:
+                if response._stderr_file is not None:
+                    response._stderr_file.close()
         self.assertFalse(retained[0]._closed)
 
     def test_pre_acquire_close_return_refuses_without_successor_child(self):
