@@ -46,7 +46,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		-- preserve canonical constructor admission without a native cwd module.
 		if root:sub(1, 1) ~= "/" then root = assert(require("infra.paths").current_directory()) .. "/" .. root end
 		local fixture = root .. "/tests/hardware/run_sqlite_private_no_luv.lua"
-		local status = os.execute("env -u LUA_PATH -u LUA_CPATH " .. quote(runtime) .. " " .. quote(fixture) .. " " .. quote(root))
+		local status = os.execute("env -u LUA_PATH " .. quote(runtime) .. " " .. quote(fixture) .. " " .. quote(root))
 		helpers.assert_true(status == true or status == 0, "public SQLite descriptor contract failed in " .. runtime)
 	end)
 
@@ -234,7 +234,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_text_migration_consumer.lua"
 		-- A Lua 5.4 parent must not export its native module ABI into LuaJIT.
-		local status = os.execute("env -u LUA_PATH -u LUA_CPATH luajit " .. quote(fixture) .. " " .. quote(root))
+		local status = os.execute("env -u LUA_PATH luajit " .. quote(fixture) .. " " .. quote(root))
 		helpers.assert_true(status == true or status == 0, "native settings posture and migration acceptance must remain distinct")
 	end)
 
@@ -242,7 +242,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		local quote = require("text_utils").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_keystats_calendar.lua"
-		local status = os.execute("env -u LUA_PATH -u LUA_CPATH TZ=Europe/Paris luajit " .. quote(fixture) .. " " .. quote(root))
+		local status = os.execute("env -u LUA_PATH TZ=Europe/Paris luajit " .. quote(fixture) .. " " .. quote(root))
 		helpers.assert_true(status == true or status == 0, "native calendar sources must survive delayed persistence")
 	end)
 
@@ -251,7 +251,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_system_event_capture.lua"
 		local receipt = os.tmpname()
-		local status = os.execute("env -u LUA_PATH -u LUA_CPATH luajit " .. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
+		local status = os.execute("env -u LUA_PATH luajit " .. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
 		os.remove(receipt)
 		helpers.assert_true(status == true or status == 0, "capture admission must preserve permitted raw events and independent machine aggregates")
 	end)
@@ -261,7 +261,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_keystats_layout_capture.lua"
 		local receipt = os.tmpname()
-		local status = os.execute("env -u LUA_PATH -u LUA_CPATH luajit " .. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
+		local status = os.execute("env -u LUA_PATH luajit " .. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
 		os.remove(receipt)
 		helpers.assert_true(status == true or status == 0, "captured layout and finger context must survive later provider publication")
 	end)

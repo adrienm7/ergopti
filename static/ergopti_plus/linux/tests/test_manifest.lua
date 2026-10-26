@@ -780,4 +780,5 @@ return {
 	"tests.meta.corpus.test_corpus_temperature",
 	"tests.meta.corpus.test_corpus_process_prediction",
 	"tests.meta.harness.test_module_groups",
+	"tests.meta.harness.test_native_child_cpath",
 }
