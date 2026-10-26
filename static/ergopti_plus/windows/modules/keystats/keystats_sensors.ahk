@@ -95,7 +95,8 @@ class KLSensors {
 KL_Sensors_Tick() {
 	if !Keystats.initialized
 		return
-	if A_IsSuspended
+	; A periodic sample is not a lifecycle closer exempted by the append gate.
+	if KL_CaptureHeld()
 		return
 	filtered := false
 	try filtered := MF_ShouldFilter()
