@@ -78,11 +78,16 @@ Test("boot: every shared-constant sentinel file loads before boot.ahk (F-18)",
 _A0720B4_TapHoldDurationIsValidated() {
 	Body := _DriverFuncBody("TapHoldDuration")
 	Assert(Body != "", "TapHoldDuration must exist in platform/remap/tap_hold_loader.ahk")
-	Assert(InStr(Body, "IsNumber(") > 0,
-		"TapHoldDuration must type-check the TOML value: it is concatenated into a KeyWait option string, so a non-numeric entry produces an invalid timeout and KeyWait THROWS on the hook thread with a synthetic modifier already armed")
-	Assert(InStr(Body, "TAPHOLD_MAX_ACTIVATION_SECONDS") > 0,
-		"TapHoldDuration must range-check against a named upper bound, not just reject non-numbers")
-	Assert(InStr(Body, "LoggerWarn") > 0,
+	Code := _DriverMaskNonCode(&Body)
+	Assert(RegExMatch(Code, "m)^\s*if\s+!_TapHoldDurationValid\(Raw\)\s*\{") > 0,
+		"TapHoldDuration must reject an invalid raw TOML value through the shared duration validator before it reaches a KeyWait option string")
+	ValidationBody := _DriverFuncBody("_TapHoldDurationValid")
+	Assert(ValidationBody != "", "the shared tap-hold duration validator must exist")
+	ValidationCode := _DriverMaskNonCode(&ValidationBody)
+	Assert(RegExMatch(ValidationCode,
+		"m)^\s*return\s+IsNumber\(Seconds\)\s*&&\s*Seconds\s*>\s*0\s*&&\s*Seconds\s*<=\s*TAPHOLD_MAX_ACTIVATION_SECONDS\s*$") > 0,
+		"the shared duration validator must require a number above zero within the named runtime upper bound")
+	Assert(RegExMatch(Code, "\bLoggerWarn\s*\(") > 0,
 		"an invalid tap-hold duration must be logged, not silently coerced — the failure was invisible precisely because the throw was absorbed by the global error net")
 }
 Test("tap-holds: the activation time is validated at the loader boundary (F-31)",
