@@ -336,6 +336,9 @@ function sourceFixture(change = () => {}) {
 	git(root, ['init', '-q']);
 	git(root, ['config', 'user.name', 'Portable receiving']);
 	git(root, ['config', 'user.email', 'portable@example.invalid']);
+	// Missing/corrupt-object controls own loose blobs; background packing would
+	// remove them or leave a packed copy that defeats their refusal assertions.
+	git(root, ['config', 'maintenance.auto', 'false']);
 	git(root, ['add', '--all']);
 	git(root, ['commit', '-qm', 'Independent clock source control']);
 	const candidate = git(root, ['rev-parse', 'HEAD']).toString().trim();
@@ -991,8 +994,22 @@ try {
 		}
 	});
 	control('actual fresh Git HEAD clean closure receives fixed nineteen inputs', () => {
-		const fixture = sourceFixture(),
-			receipt = evidence.sourceReceipt(fixture.root, fixture.epoch);
+		const maintenanceConfig = path.join(temporary, 'automatic-maintenance.gitconfig');
+		fs.writeFileSync(
+			maintenanceConfig,
+			'[maintenance]\n\tauto = true\n\tstrategy = gc\n[gc]\n\tauto = 1\n\tautoDetach = false\n'
+		);
+		const previousGlobalConfig = process.env.GIT_CONFIG_GLOBAL;
+		let fixture;
+		try {
+			// A host's automatic maintenance must not acquire this fixture's objects.
+			process.env.GIT_CONFIG_GLOBAL = maintenanceConfig;
+			fixture = sourceFixture();
+		} finally {
+			if (previousGlobalConfig === undefined) delete process.env.GIT_CONFIG_GLOBAL;
+			else process.env.GIT_CONFIG_GLOBAL = previousGlobalConfig;
+		}
+		const receipt = evidence.sourceReceipt(fixture.root, fixture.epoch);
 		const originalSource = structuredClone(receipt);
 		assert.deepEqual(
 			withNativeGit(() => evidence.sourceReceipt(fixture.root, fixture.epoch)),
@@ -1089,6 +1106,26 @@ try {
 			evidence.sourceReceipt(fixture.root, fixture.epoch),
 			originalSource,
 			'Restored mutable admission must still yield the original exact immutable-source DTO.'
+		);
+		// Production source acquisition must also accept the same immutable bytes
+		// once this fixture's deliberate loose-object mutations have finished.
+		git(fixture.root, ['repack', '-ad']);
+		git(fixture.root, ['prune-packed']);
+		assert.equal(
+			fs.existsSync(loose),
+			false,
+			'The positive packed control must remove its loose copy.'
+		);
+		assert.equal(git(fixture.root, ['cat-file', '-t', oid]).toString().trim(), 'blob');
+		assert.deepEqual(
+			withNativeGit(() => evidence.sourceReceipt(fixture.root, fixture.epoch)),
+			originalSource,
+			'Native Git must retain source authority after explicit packing.'
+		);
+		assert.deepEqual(
+			evidence.sourceReceipt(fixture.root, fixture.epoch),
+			originalSource,
+			'Batched Git must retain the same authority from actual packed objects.'
 		);
 	});
 	control('missing tracked builder cannot enroll new role', () => {
