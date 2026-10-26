@@ -43,6 +43,7 @@ end
 local function run_step(plan, step)
 	return pcall(function()
 		if step.call == "on_dispatch" then return plan:on_dispatch(step.args, step.now_ms) end
+		if step.call == "on_explicit" then return plan:on_explicit(step.args) end
 		if step.call == "on_sent" then return plan:on_sent(step.now_ms) or {} end
 		if step.call == "configure" then return plan:configure(step.args) or {} end
 		if step.call == "reset" then return plan:reset() or {} end

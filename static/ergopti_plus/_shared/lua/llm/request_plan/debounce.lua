@@ -258,6 +258,24 @@ function M:on_dispatch(request, now_ms)
 	return { { action = "send" } }
 end
 
+--- Decides what pressing an explicit shortcut does while the request its previous
+--- press started may still be in flight (a mashed shortcut). The new request is
+--- never delayed; the one in flight under the same shortcut is superseded, so
+--- two requests of one shortcut are never concurrent. The engine owns the
+--- request and tells whether it is in flight; this only decides.
+--- @param request table { key = string (the shortcut's identity), in_flight = boolean }.
+--- @return table decisions A `supersede` of the key when in flight, then one `send`.
+function M:on_explicit(request)
+	if type(request) ~= "table" or type(request.key) ~= "string" or request.key == "" then
+		error("an explicit request needs a shortcut key", 2)
+	end
+	if type(request.in_flight) ~= "boolean" then error("an explicit request needs in_flight", 2) end
+	if request.in_flight then
+		return { { action = "supersede", key = request.key }, { action = "send" } }
+	end
+	return { { action = "send" } }
+end
+
 --- Records that a request went to its backend.
 --- @param now_ms number The caller's monotonic clock in milliseconds.
 function M:on_sent(now_ms)

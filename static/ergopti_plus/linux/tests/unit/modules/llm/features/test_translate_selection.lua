@@ -76,7 +76,7 @@ local function scenario(opts, body)
 		local previous_locale = I18n.get_locale
 		local locale = opts.locale or "fr"
 		I18n.get_locale = function() return locale end
-		local world = { posts = {}, notices = {}, reads = 0, replaced = {}, typed = {}, shown = nil,
+		local world = { wire = {}, posts = {}, notices = {}, reads = 0, replaced = {}, typed = {}, shown = nil,
 			focus = "editor\1Draft", selection = opts.selection }
 		package.loaded["adapters.secure_field_detector"] = {
 			isSecureField = function() return opts.secure == true end,
@@ -86,9 +86,10 @@ local function scenario(opts, body)
 		package.loaded["adapters.http_client"] = {
 			post = function(url, _, request_body, callback)
 				world.posts[#world.posts + 1] = { url = url, body = Json.decode(request_body), callback = callback }
+				world.wire[#world.wire + 1] = "post"
 				return true
 			end,
-			cancel = function() return true end,
+			cancel = function() world.wire[#world.wire + 1] = "cancel"; return true end,
 		}
 		package.loaded["modules.llm.api_entries"] = {
 			active = function() return ENTRY end,
@@ -396,6 +397,15 @@ helpers.describe("selected translations require a known stable native focus", fu
 			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"))
 		end)
 	end)
+	helpers.it("a mashed translation shortcut cancels its request in flight before the next one leaves (mashed-shortcut)", function()
+		scenario({ selection = SELECTION }, function(world)
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
+			helpers.assert_eq(table.concat(world.wire, ","), "post,cancel,post",
+				"the first request is cancelled, then the second leaves at once")
+		end)
+	end)
+
 	helpers.it("sends a second translation at once, without waiting for the request interval (explicit-never-held)", function()
 		scenario({ selection = SELECTION }, function(world)
 			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))

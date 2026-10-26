@@ -231,6 +231,32 @@ local _plan = require("llm.request_plan.debounce").new(function()
 	return request_floor_sec * 1000
 end)
 
+-- The explicit requests with no fetch counter of their own (the tone step).
+local _explicit = { tone_in_flight = false }
+
+--- Asks the plan what pressing an explicit shortcut does while its previous
+--- request may be in flight (a mashed shortcut): the new request is never
+--- delayed, and the one in flight is cancelled at the backend. The caller has
+--- already retired the old request's callbacks (fetch counter or generation),
+--- so a cancellation that answers synchronously reaches nothing current.
+--- @param key string The shortcut's identity, for the plan and the log.
+--- @param in_flight boolean Whether a request of that shortcut may still run.
+--- @return boolean superseded True when the request in flight was cancelled.
+local function explicit_supersedes(key, in_flight)
+	local ok, decisions = pcall(_plan.on_explicit, _plan, { key = key, in_flight = in_flight })
+	if not ok then
+		Logger.error(LOG, "Explicit request decision refused: %s", tostring(decisions))
+		return false
+	end
+	if decisions[1].action ~= "supersede" then return false end
+	Logger.info(LOG, "%s requested again: the request in flight is superseded.", key)
+	local cancel_ok, cancel_err = xpcall(core_llm.cancel_streaming, debug.traceback)
+	if not cancel_ok then
+		Logger.error(LOG, "The superseded request could not be cancelled: %s", tostring(cancel_err))
+	end
+	return true
+end
+
 -- ── LLM engine configuration ─────────────────────────────────────────────────
 -- Stub values that prevent crashes during the brief startup window before the
 -- menu loads and calls the set_* setters. NOT the user-configured values.
@@ -1861,6 +1887,8 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	local my_fetch_id     = fetch_request_counter
 	_activity = { kind = (force_trigger or live) and "explicit" or "automatic", fetch = my_fetch_id }
 	local superseded_log_id = retire_request_log(_request_log_id)
+	-- A mashed hotkey: the previous press's request is cancelled, not left running.
+	if force_trigger then explicit_supersedes("Prediction", superseded_log_id ~= nil) end
 
 	-- The initiating timer owns this check only while its callback runs: its
 	-- guard reads false as soon as the callback returns, so an answer arriving
@@ -2301,9 +2329,19 @@ function M.request_selection_rewrite(profile_id, source, on_raw, on_fail, contin
 			return false
 		end
 	end
+	-- A mashed tone shortcut: the previous step's request is cancelled first.
+	explicit_supersedes("Tone rewrite", _explicit.tone_in_flight ~= false)
+	local inflight = {}
+	_explicit.tone_in_flight = inflight
+	local function settle()
+		if _explicit.tone_in_flight == inflight then _explicit.tone_in_flight = false end
+	end
+	local function settled_raw(...) settle(); return on_raw(...) end
+	local function settled_fail(...) settle(); if on_fail ~= nil then return on_fail(...) end end
 	local dispatch_ok, dispatch_err = xpcall(core_llm.fetch_raw_completion, debug.traceback,
-		profile, source, source, model, temperature, max_tokens, on_raw, on_fail, continuation_check)
+		profile, source, source, model, temperature, max_tokens, settled_raw, settled_fail, continuation_check)
 	if not dispatch_ok then
+		settle()
 		Logger.error(LOG, "Tone rewrite dispatch raised: %s.", tostring(dispatch_err))
 		return false
 	end
@@ -2398,10 +2436,15 @@ function M.open_answer_surface(label)
 	predictions_visible = false
 	last_buffer_signature = nil
 	llm_request_counter = llm_request_counter + 1
+	local previous_activity = _activity
 	fetch_request_counter = fetch_request_counter + 1
 	local session = fetch_request_counter
 	_activity = { kind = "explicit", fetch = session }
-	log_request_cancellation(retire_request_log(_request_log_id), "supersede")
+	local retired_log_id = retire_request_log(_request_log_id)
+	log_request_cancellation(retired_log_id, "supersede")
+	-- A mashed answer shortcut: the previous answers' request is cancelled.
+	explicit_supersedes(label, retired_log_id ~= nil or (previous_activity ~= nil
+		and previous_activity.kind == "explicit" and previous_activity.fetch == session - 1))
 	local dismiss_delay = (_state.DELAYS and _state.DELAYS.llm_prediction) or 0
 	local shown_ok, shown = xpcall(function()
 		tooltip.set_llm_timeout(dismiss_delay)
@@ -2616,6 +2659,7 @@ function M.reset(options)
 	fetch_request_counter = fetch_request_counter + 1
 	local reset_generation = fetch_request_counter
 	local cancelled_log_id = retire_request_log(_request_log_id)
+	_explicit.tone_in_flight = false
 	_deferred_profile_name = nil
 	chain_pending = false
 	_chain_generation = _chain_generation + 1

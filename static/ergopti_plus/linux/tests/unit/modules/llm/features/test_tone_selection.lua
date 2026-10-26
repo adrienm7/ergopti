@@ -95,7 +95,7 @@ local function scenario(opts, body)
 		local previous = {}
 		for _, name in ipairs(RELOADED) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		for _, name in ipairs(FAKED) do previous[name] = package.loaded[name] end
-		local world = { posts = {}, ollama = {}, notices = {}, reads = 0, focus = "editor\1Draft",
+		local world = { wire = {}, posts = {}, ollama = {}, notices = {}, reads = 0, focus = "editor\1Draft",
 			selection = opts.selection, preferences = preferences, emitted = {} }
 		world.active_entry = ENTRY
 		world.alternate_entry = { id = "cerebras-2", provider = "cerebras", label = "Cerebras",
@@ -108,9 +108,10 @@ local function scenario(opts, body)
 		package.loaded["adapters.http_client"] = {
 			post = function(url, _, request_body, callback)
 				world.posts[#world.posts + 1] = { url = url, body = Json.decode(request_body), callback = callback }
+				world.wire[#world.wire + 1] = "post"
 				return true
 			end,
-			cancel = function() return true end,
+			cancel = function() world.wire[#world.wire + 1] = "cancel"; return true end,
 		}
 		package.loaded["modules.llm.api_entries"] = {
 			active = function() return world.active_entry end,
@@ -486,6 +487,18 @@ helpers.describe("tone actions: refusals and dropped answers", function()
 			world.respond(1, "REWRITE: Merci pour votre aide.")
 			helpers.assert_eq(#world.emitted, 0, "the retired provider cannot replace the selection")
 			helpers.assert_eq(world.selection, "merci pour ton aide", "the user's selection remains unchanged")
+		end)
+	end)
+
+	helpers.it("a mashed tone shortcut cancels its request in flight before the next one leaves (mashed-shortcut)", function()
+		scenario({ selection = "merci pour ton aide" }, function(world)
+			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), true)
+			helpers.assert_eq(table.concat(world.wire, ","), "post")
+			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), true)
+			helpers.assert_eq(table.concat(world.wire, ","), "post,cancel,post",
+				"the first request is cancelled, then the second leaves at once")
+			world.respond(2, "REWRITE: Merci pour votre aide.")
+			assert_replaced(world, "Merci pour votre aide.")
 		end)
 	end)
 
