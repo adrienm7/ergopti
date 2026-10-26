@@ -92,7 +92,7 @@
 		},
 		{
 			"id": "js-linux-arch-package-runtime",
-			"ordinal": 490,
+			"ordinal": 493,
 			"name": "Arch recipe stages native runtime and executes canonical package entry points",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-arch-package.cjs"],
@@ -101,7 +101,7 @@
 		},
 		{
 			"id": "js-linux-deb-package-owner",
-			"ordinal": 491,
+			"ordinal": 494,
 			"name": "Rootless DEB archives preserve public ownership and modes without changing private source state",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-deb-package-owner.cjs"],
@@ -110,7 +110,7 @@
 		},
 		{
 			"id": "js-linux-package-version",
-			"ordinal": 492,
+			"ordinal": 495,
 			"name": "Linux package metadata follows copied runtime releases and native prerelease ordering",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-package-version.cjs"],
@@ -119,7 +119,7 @@
 		},
 		{
 			"id": "js-linux-flatpak-icon",
-			"ordinal": 493,
+			"ordinal": 496,
 			"name": "Flatpak exports the canonical desktop logo and refuses missing icon assets",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-flatpak-icon.cjs"],
@@ -128,7 +128,7 @@
 		},
 		{
 			"id": "js-linux-package-options",
-			"ordinal": 494,
+			"ordinal": 497,
 			"name": "System package entry points refuse unknown arguments before staging side effects",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-package-options.cjs"],
@@ -137,7 +137,7 @@
 		},
 		{
 			"id": "js-linux-rpm-publish",
-			"ordinal": 495,
+			"ordinal": 498,
 			"name": "RPM publication admits one canonical runtime package and retains native debug outputs",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-rpm-publish.cjs"],
@@ -146,7 +146,7 @@
 		},
 		{
 			"id": "js-linux-distro-native-prerequisites",
-			"ordinal": 496,
+			"ordinal": 499,
 			"name": "Distribution unit preparation installs native GLib and SQLite before executing unchanged groups",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-distro-native-prerequisites.cjs"],
