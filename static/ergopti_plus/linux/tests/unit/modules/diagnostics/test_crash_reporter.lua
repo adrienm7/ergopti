@@ -319,6 +319,56 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 		if not ok then error(err, 0) end
 	end)
 
+	-- The dumps of the pre-JSON reporter (crash_<stamp>_<module>.txt) are invisible
+	-- to the retention and to the next-start dialog, so the startup removes them.
+	helpers.it("removes exactly the legacy text dumps and nothing else (legacy-crash-cleanup)", function()
+		local listing = {
+			{ name = "crash_2026-09-01T10-00-00_ergopti_hotstrings.txt", kind = "file" },
+			{ name = "crash_2026-09-02T11-30-05_engine.v2.txt", kind = "file" },
+			{ name = "2026-10-24T10-00-01Z.json", kind = "file" },
+			{ name = "2026-10-24T10-00-01Z-2.json", kind = "file" },
+			{ name = ".last_crash_notice", kind = "file" },
+			{ name = "crash_notes.txt", kind = "file" },
+			{ name = "crash_2026-09-01T10-00-00_x.txt.bak", kind = "file" },
+			{ name = "my_crash_2026-09-01T10-00-00_x.txt", kind = "file" },
+			{ name = "crash_2026-09-01T10-00-00_dir.txt", kind = "directory" },
+		}
+		local deleted = {}
+		local FileSystem = require("adapters.file_system")
+		local saved_directory, saved_delete = package.loaded["infra.native_directory"], FileSystem.delete
+		package.loaded["infra.native_directory"] = { entries = function() return listing end }
+		FileSystem.delete = function(path) deleted[#deleted + 1] = path; return true end
+		local ok, err = pcall(function()
+			helpers.assert_eq(cr.remove_legacy_dumps("/crash"), 2)
+			helpers.assert_eq(#deleted, 2)
+			helpers.assert_eq(deleted[1], "/crash/crash_2026-09-01T10-00-00_ergopti_hotstrings.txt")
+			helpers.assert_eq(deleted[2], "/crash/crash_2026-09-02T11-30-05_engine.v2.txt")
+		end)
+		package.loaded["infra.native_directory"], FileSystem.delete = saved_directory, saved_delete
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("a refused legacy delete is a warning, and a missing folder is not an error (legacy-crash-cleanup)", function()
+		local FileSystem = require("adapters.file_system")
+		local saved_directory, saved_delete = package.loaded["infra.native_directory"], FileSystem.delete
+		local attempts = 0
+		package.loaded["infra.native_directory"] = { entries = function()
+			return { { name = "crash_2026-09-01T10-00-00_a.txt", kind = "file" },
+				{ name = "crash_2026-09-01T10-00-01_b.txt", kind = "file" } }
+		end }
+		FileSystem.delete = function() attempts = attempts + 1; return attempts ~= 1 end
+		local ok, err = pcall(function()
+			helpers.assert_eq(cr.remove_legacy_dumps("/crash"), 1)
+			helpers.assert_eq(attempts, 2, "a refusal must not stop the remaining deletions")
+			package.loaded["infra.native_directory"] = { entries = function() return nil, "no such folder" end }
+			helpers.assert_eq(cr.remove_legacy_dumps("/crash"), 0)
+			package.loaded["infra.native_directory"] = { entries = function() error("listing raised") end }
+			helpers.assert_eq(cr.remove_legacy_dumps("/crash"), 0)
+		end)
+		package.loaded["infra.native_directory"], FileSystem.delete = saved_directory, saved_delete
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("captures the stack where the error was RAISED", function()
 		-- protect() used pcall and then took debug.traceback afterwards. By then
 		-- the throwing stack has been unwound, so every crash report in the driver

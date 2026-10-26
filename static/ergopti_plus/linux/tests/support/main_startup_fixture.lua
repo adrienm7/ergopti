@@ -205,7 +205,8 @@ function M.run(options)
 		error("Unexpected startup dependency: " .. tostring(name), 0)
 	end
 	env.os = setmetatable({ exit = function(code) error("controlled process exit " .. tostring(code), 0) end }, { __index = os })
-	env.CrashReporter = { protect = function(_, callback)
+	env.CrashReporter = { remove_legacy_dumps = function() observed.legacy_dump_cleanups = (observed.legacy_dump_cleanups or 0) + 1; return 0 end,
+		protect = function(_, callback)
 		local ok, failure = pcall(callback)
 		observed.protected_error = failure
 		-- The protected Main frame, including its native constructor, has unwound.

@@ -57,4 +57,14 @@ helpers.describe("daemon wiring: the error window observes logged errors (error-
 		helpers.assert_true(run_pos ~= nil, "the event loop must still be findable, or this test compares nothing")
 		helpers.assert_true(defer_pos < run_pos, "the notice is queued before the loop starts, so it runs on its first tick")
 	end)
+
+	helpers.it("removes the legacy text dumps once, before the crash notice reads the folder (legacy-crash-cleanup)", function()
+		local src = daemon_code()
+		local call = "CrashReporter.remove_legacy_dumps()"
+		local first = src:find(call, 1, true)
+		helpers.assert_true(first ~= nil, "the daemon must clean the legacy crash dumps at startup")
+		helpers.assert_eq(src:find(call, first + 1, true), nil, "the cleanup runs once per start")
+		local defer_pos = src:find("event_loop.defer(function() ErrorDialog.notify_last_crash", 1, true)
+		helpers.assert_true(defer_pos ~= nil and first < defer_pos, "the cleanup precedes the next-start crash notice")
+	end)
 end)

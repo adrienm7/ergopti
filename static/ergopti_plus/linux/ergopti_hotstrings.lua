@@ -2935,6 +2935,7 @@ local function main()
 	end
 
 	if not privacy_owners.startup_checkpoint() then return end
+	CrashReporter.remove_legacy_dumps()
 	-- systemd restarts a crashed daemon, and the crash left no window behind: the
 	-- first tick of the new loop announces the newest crash dump, once
 	if ErrorDialog then
