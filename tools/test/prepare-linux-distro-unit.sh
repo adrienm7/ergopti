@@ -20,17 +20,21 @@ case "$suite" in
 	*) echo 'Unsupported distribution suite.' >&2; exit 1 ;;
 esac
 case "$distro" in
-	debian) apt-get install -y --no-install-recommends luajit python3 ca-certificates git gcc libc6-dev make cmake pkg-config libluajit-5.1-dev libuv1-dev curl ;;
-	fedora) dnf install -y luajit python3 ca-certificates git gcc make cmake pkgconf-pkg-config luajit-devel libuv-devel curl ;;
-	arch) pacman -Sy --noconfirm luajit python ca-certificates git gcc make cmake pkgconf libuv curl ;;
-	alpine) apk add --no-cache luajit python3 ca-certificates git build-base cmake pkgconf luajit-dev libuv-dev curl ;;
-	opensuse) zypper --non-interactive install luajit python3 ca-certificates git gcc make cmake pkg-config luajit-devel libuv-devel curl ;;
+	debian) apt-get install -y --no-install-recommends luajit python3 ca-certificates git gcc libc6-dev make cmake pkg-config libluajit-5.1-dev libuv1-dev libglib2.0-0t64 sqlite3 curl ;;
+	fedora) dnf install -y luajit python3 ca-certificates git gcc make cmake pkgconf-pkg-config luajit-devel libuv-devel glib2 sqlite curl ;;
+	arch) pacman -Sy --noconfirm luajit python ca-certificates git gcc make cmake pkgconf libuv glib2 sqlite curl ;;
+	alpine) apk add --no-cache luajit python3 ca-certificates git build-base cmake pkgconf luajit-dev libuv-dev glib sqlite curl ;;
+	opensuse) zypper --non-interactive install luajit python3 ca-certificates git gcc make cmake pkg-config luajit-devel libuv-devel libglib-2_0-0 sqlite3 curl ;;
 	*) echo 'Unsupported mandatory unit distribution.' >&2; exit 1 ;;
 esac
 
 interpreter="$(command -v luajit)"
 test -x "$interpreter"
 test -x /usr/bin/python3
+# Native reset fixtures use the real CLI; refuse before starting any group.
+sqlite="$(command -v sqlite3)"
+test -x "$sqlite"
+"$sqlite" --version
 
 # Root bypasses the suite's real unreadable-file permission premise, so the
 # suite runs as the same ordinary user the archive installation lot creates.
@@ -107,6 +111,12 @@ assert(debug.getinfo(uv.fs_stat, "S").what == "C")
 assert(debug.getinfo(lfs.attributes, "S").what == "C")
 assert(uv.fs_stat(".").type == "directory")
 assert(lfs.attributes(".", "mode") == "directory")
+-- Native GVariant fixtures require the base GLib ABI, not a desktop session.
+local glib = ffi.load(require("_generated.native_runtime").network_runtime.libraries.glib)
+ffi.cdef("void *g_variant_new_string(const char *string); void g_variant_unref(void *value);")
+local variant = glib.g_variant_new_string("native-unit-admission")
+assert(variant ~= nil)
+glib.g_variant_unref(variant)
 print(jit.version)
 '
 sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \
