@@ -55,6 +55,10 @@ helpers.describe("Core.DEFAULT_STATE", function()
 		end)
 	end
 
+	helpers.it("ships the 300 ms minimum request interval, in seconds (request-floor-setting)", function()
+		helpers.assert_eq(Core.DEFAULT_STATE.llm_min_request_interval, 0.3)
+	end)
+
 	helpers.it("llm_temperature is in [0, 1.5]", function()
 		local t = Core.DEFAULT_STATE.llm_temperature
 		helpers.assert_true(type(t) == "number" and t >= 0 and t <= 1.5)

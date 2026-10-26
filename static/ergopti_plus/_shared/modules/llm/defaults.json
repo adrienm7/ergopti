@@ -7,7 +7,7 @@
 	"llm_temperature": 0.1,
 	"llm_num_predictions": 3,
 	"llm_debounce_ms": 500,
-	"llm_min_request_interval_ms": 500,
+	"llm_min_request_interval_ms": 300,
 	"llm_context_length": 500,
 	"llm_min_words": 3,
 	"llm_max_words": 15,

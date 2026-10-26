@@ -477,7 +477,7 @@ num_predictions = 3
 [llm.trigger]
 disabled_apps = []
 debounce_ms = 500
-min_request_interval_ms = 500
+min_request_interval_ms = 300
 instant_on_word_end = true
 after_hotstring = true
 secure_filter_enabled = true

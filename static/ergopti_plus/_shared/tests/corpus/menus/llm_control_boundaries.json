@@ -49,7 +49,7 @@
 	"marker_english": "Cancel",
 	"trigger_delay": 500,
 	"trigger_debounce_english": "Idle time before suggestion: 500 ms",
-	"trigger_min_interval_english": "Minimum time between two automatic AI requests: 500 ms",
+	"trigger_min_interval_english": "Minimum time between two automatic AI requests: 300 ms",
 	"display_inline_key": "menu.llm.inline_autotype",
 	"live_off_key": "menu.llm.live_mode_off",
 	"native_counts_before": [59, 92, 67],

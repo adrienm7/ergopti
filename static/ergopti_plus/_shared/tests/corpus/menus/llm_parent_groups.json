@@ -321,7 +321,7 @@
 					]
 				},
 				{
-					"title": "Délai minimum entre deux requêtes IA automatiques : 500 ms",
+					"title": "Délai minimum entre deux requêtes IA automatiques : 300 ms",
 					"callback": false,
 					"children": [
 						{
@@ -342,12 +342,12 @@
 						{
 							"title": "300 ms",
 							"callback": true,
-							"checked": false
+							"checked": true
 						},
 						{
 							"title": "500 ms",
 							"callback": true,
-							"checked": true
+							"checked": false
 						},
 						{
 							"title": "750 ms",
