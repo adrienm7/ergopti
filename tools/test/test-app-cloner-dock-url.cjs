@@ -4,8 +4,10 @@
  * ============================================================================
  * MODULE: App Cloner Dock URL - Behavioral Guard
  * DESCRIPTION:
- * Executes the real Dock-plist Python body on a hostile application path and
- * verifies byte-exact RFC 3986 encoding plus idempotent tile replacement.
+ * Executes the actual pure URL/deduplication/append source operations on a
+ * hostile path. POSIX transaction reachability and kernel locks are exercised
+ * by the Hammerspoon/native Dock writer campaign; this portable guard does not
+ * claim to execute native locking or the entire Dock writer.
  * ============================================================================
  */
 
@@ -87,43 +89,71 @@ try {
 		{ encoding: 'utf8' }
 	);
 
+	const bodyFile = path.join(fixtureRoot, 'actual_dock_body.py');
+	fs.writeFileSync(bodyFile, dockBody ? dockBody[1] : '', 'utf8');
+	const runner = path.join(fixtureRoot, 'dock_pure_operations.py');
 	fs.writeFileSync(
-		path.join(fixtureRoot, 'subprocess.py'),
-		`
-class Result:
-    returncode = 1
-    stdout = ""
-    stderr = ""
+		runner,
+		String.raw`import ast,json,os,plistlib,sys
+from urllib.parse import quote
 
-def run(*args, **kwargs):
-    return Result()
+body_path,app_path,bundle_id,plist_path = sys.argv[1:]
+with open(body_path, encoding="utf-8") as stream:
+    tree = ast.parse(stream.read(), filename=body_path)
+
+def exactly_one(nodes, description):
+    if len(nodes) != 1:
+        raise ValueError("Expected exactly one actual " + description)
+    return nodes[0]
+
+def is_name(node, name):
+    return isinstance(node, ast.Name) and node.id == name
+
+def is_dedupe(node):
+    return (isinstance(node, ast.Assign) and len(node.targets) == 1
+            and is_name(node.targets[0], "apps") and isinstance(node.value, ast.ListComp))
+
+def is_append(node):
+    return (isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Attribute)
+            and is_name(node.value.func.value, "apps") and node.value.func.attr == "append")
+
+# Walking identifies ambiguity only. Admission requires direct placement in
+# the actual top-level transaction, so dead/conditional branches cannot pass.
+url_function = exactly_one([node for node in ast.walk(tree)
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "dock_file_url"], "URL function")
+if url_function not in tree.body or not isinstance(url_function, ast.FunctionDef):
+    raise ValueError("The pure URL function must have direct module placement")
+transaction = exactly_one([node for node in tree.body if isinstance(node, ast.With)
+    and len(node.items) == 1 and isinstance(node.items[0].context_expr, ast.Call)
+    and is_name(node.items[0].context_expr.func, "dock_update_lock")
+    and not node.items[0].context_expr.args and not node.items[0].context_expr.keywords], "Dock transaction")
+dedupe = exactly_one([node for node in ast.walk(tree) if is_dedupe(node)], "deduplication operation")
+append = exactly_one([node for node in ast.walk(tree) if is_append(node)], "append operation")
+if dedupe not in transaction.body or append not in transaction.body or transaction.body.index(dedupe) >= transaction.body.index(append):
+    raise ValueError("Pure tile operations must have ordered direct transaction placement")
+
+# Execute original source nodes, without importing or mocking the platform
+# lock module. The fixture supplies only ordinary in-memory tile state.
+exec(compile(ast.Module(body=[url_function], type_ignores=[]), body_path, "exec"))
+url = dock_file_url(app_path)
+with open(plist_path, "rb") as stream:
+    dock = plistlib.load(stream)
+apps = dock["persistent-apps"]
+tile_data = {"bundle-identifier": bundle_id, "file-data": {"_CFURLString": url}}
+exec(compile(ast.Module(body=[dedupe, append], type_ignores=[]), body_path, "exec"))
+dock["persistent-apps"] = apps
+print(json.dumps(dock, ensure_ascii=False))
 `,
 		'utf8'
 	);
-	const runner = path.join(fixtureRoot, 'dock_body.py');
-	fs.writeFileSync(
-		runner,
-		'import time\ntime.sleep = lambda _seconds: None\n' + (dockBody ? dockBody[1] : ''),
-		'utf8'
-	);
-	const executed = spawnSync(python, [runner, appPath, bundleId, '/Applications/Source.app', ''], {
+	const executed = spawnSync(python, [runner, bodyFile, appPath, bundleId, dockPlist], {
 		cwd: fixtureRoot,
-		encoding: 'utf8',
-		env: { ...process.env, HOME: home, USERPROFILE: home, PYTHONPATH: fixtureRoot }
+		encoding: 'utf8'
 	});
-	const inspected = spawnSync(
-		python,
-		[
-			'-c',
-			'import json,plistlib,sys; ' +
-				'print(json.dumps(plistlib.load(open(sys.argv[1], "rb")), ensure_ascii=False))',
-			dockPlist
-		],
-		{ encoding: 'utf8' }
-	);
 	let dock = {};
 	try {
-		dock = JSON.parse(inspected.stdout || '{}');
+		dock = JSON.parse(executed.stdout || '{}');
 	} catch {
 		/* reported below */
 	}
@@ -132,17 +162,12 @@ def run(*args, **kwargs):
 	const actualUrl = newTile?.['tile-data']?.['file-data']?._CFURLString;
 
 	test(
-		'the production Dock body is extracted and executes successfully',
-		dockBody !== null &&
-			oracle.status === 0 &&
-			seed.status === 0 &&
-			executed.status === 0 &&
-			inspected.status === 0,
+		'the actual pure Dock URL and tile operations are extracted and execute successfully',
+		dockBody !== null && oracle.status === 0 && seed.status === 0 && executed.status === 0,
 		JSON.stringify({
 			oracle: oracle.stderr,
 			seed: seed.stderr,
-			executed: executed.stderr,
-			inspected: inspected.stderr
+			executed: executed.stderr
 		})
 	);
 	test(
