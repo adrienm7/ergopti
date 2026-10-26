@@ -103,7 +103,7 @@ _LAG_AutoWithAiOff() {
 			_LAG_AssertNoPrediction(Fx, Before)
 			; An expansion the hotstring engine mirrors reaches the agent's context only
 			PreviousCritical := Critical("On")
-			try _HSE_MirrorCanonicalEffectToLlm({ DeleteFromEnd: 5, InsertedText: "contrat" })
+			try _HSE_MirrorCanonicalEffectToLlm({ IsPrivate: false, DeleteFromEnd: 5, InsertedText: "contrat" })
 			finally Critical(PreviousCritical)
 			AssertEqual("Bonjour. On se voit jeudi 14h avec Paul pour le contrat", _LLM_Bridge_AgentBuffer,
 				"the expansion reached the agent's context")

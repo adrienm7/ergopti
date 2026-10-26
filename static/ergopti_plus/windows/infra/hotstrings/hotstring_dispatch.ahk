@@ -198,6 +198,7 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 	InsertedText := Owner["OnlyText"] ? Owner["PlainInsertedText"] : ""
 	ClearAll := !Owner["OnlyText"]
 	Effect := {
+		IsPrivate: Owner["IsPrivate"],
 		ClearAll: ClearAll,
 		DeleteFromEnd: DeleteCount,
 		InsertedText: InsertedText,
@@ -273,6 +274,7 @@ _HSE_CommitTerminalRawOwner(Owner, TrailingText := "") {
 				. InsertedText
 			_HSE_TrimBufferToCapacity()
 			Effect := {
+				IsPrivate: Owner["IsPrivate"],
 				ClearAll: false,
 				DeleteFromEnd: Backspaces,
 				InsertedText: InsertedText,
@@ -697,7 +699,7 @@ _HSE_CommitNotepadOwner(Owner) {
 			|| _PrefixDeferredGeneration != Owner["LifecycleGeneration"]
 		throw Error("The Notepad canonical commit lost its original input context.")
 	InsertedText := Owner["PlainInsertedText"]
-	Effect := { ClearAll: false, DeleteFromEnd: Owner["EraseUnits"],
+	Effect := { IsPrivate: Owner["IsPrivate"], ClearAll: false, DeleteFromEnd: Owner["EraseUnits"],
 		InsertedText: InsertedText, EndCharEmitted: Owner["EndCharPart"] != "",
 		KnownBoundaryAfter: InsertedText != ""
 			&& InStr(_HSE_WordBoundarySet(), SubStr(InsertedText, -_TextTailCodeUnits(InsertedText, 1))) > 0 }
@@ -900,16 +902,20 @@ _HSE_MirrorCanonicalEffectToLlm(Effect) {
 		if !A_IsCritical
 				throw Error("_HSE_MirrorCanonicalEffectToLlm requires a Critical buffer transaction.")
 		if !(IsObject(Effect) and Effect.HasOwnProp("DeleteFromEnd")
-				and Effect.HasOwnProp("InsertedText"))
-				throw Error("Canonical hotstring effect is missing DeleteFromEnd or InsertedText.")
+				and Effect.HasOwnProp("InsertedText") and Effect.HasOwnProp("IsPrivate")
+				and Effect.IsPrivate is Integer and (Effect.IsPrivate == true or Effect.IsPrivate == false))
+				throw Error("Canonical hotstring effect requires DeleteFromEnd, InsertedText and Boolean IsPrivate.")
 		; Every canonical hotstring edit passes here with its exact inserted text,
 		; which the auto-off InputHook never sees (SendLevel 0, SendInput, paste):
 		; a checked delimiter in an expansion ends CapsWord as if typed.
 		if IsSet(CapsWordAutoOffObserveOutput)
 				CapsWordAutoOffObserveOutput(Effect.InsertedText)
+		; The screen/matcher keeps the committed replacement. AI contexts restart
+		; after private output, so no later prompt can inherit that expansion.
+		ClearContext := Effect.IsPrivate or (Effect.HasOwnProp("ClearAll") and Effect.ClearAll)
 		if (IsSet(_LLM_Bridge_Active) and _LLM_Bridge_Active
 				and IsSet(_LLM_Bridge_ApplyBufferEdit)) {
-				if (Effect.HasOwnProp("ClearAll") and Effect.ClearAll)
+				if ClearContext
 						_LLM_Bridge_ApplyBufferEdit()
 				else
 						_LLM_Bridge_ApplyBufferEdit(Effect.DeleteFromEnd, Effect.InsertedText)
@@ -919,7 +925,7 @@ _HSE_MirrorCanonicalEffectToLlm(Effect) {
 		} else if IsSet(LLM_Bridge_MirrorAgentEdit) {
 				; Predictions are off: only the AI agent's own context follows it
 				LLM_Bridge_MirrorAgentEdit(Effect.DeleteFromEnd, Effect.InsertedText,
-						Effect.HasOwnProp("ClearAll") and Effect.ClearAll)
+						ClearContext)
 		}
 }
 
@@ -1040,6 +1046,7 @@ _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 										; Ins can never grow the buffer unbounded or drift the boundary flag.
 										_HSE_TrimBufferToCapacity()
 										CanonicalEffect := {
+												IsPrivate: Spec.HasOwnProp("IsPrivate") && Spec.IsPrivate,
 												ClearAll: false,
 												DeleteFromEnd: EraseUnits,
 												InsertedText: Ins,
