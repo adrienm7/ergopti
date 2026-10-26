@@ -398,7 +398,9 @@ Linux's tap_hold.toml carries `[_meta] schema_version`, and step `v0_to_v1` of
 `_shared/tap_hold/migrations.toml` (its own registry: the config.toml one
 cannot express a delete-if-equal and Windows validates it at every boot)
 removes exactly the retired values, once, from a file that was never stamped
-and does not carry the old `explicit_delays = true` flag, then stamps it.
+and does not carry the old `explicit_delays = true` flag, then stamps it. The
+boot edit is line-preserving (explicit `delete`/`set_if_absent` ops through
+`config_migrate.plan_operations`), so the user's comments and formatting stay.
 Windows still uses that flag until it replays the step. Action: do not ship a
 per-key default for anything the user can also override; ship a global one, and
 when retiring a shipped per-key value, record it as retired and add a migration
