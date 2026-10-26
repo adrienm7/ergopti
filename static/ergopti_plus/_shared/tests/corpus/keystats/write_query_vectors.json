@@ -726,6 +726,168 @@
 				"inter_delay_sumsq": 7
 			},
 			"sql": "INSERT INTO agg_app_day_burst (device_id, date, app, count_total, max_cpm, max_chars, length_buckets_json, inter_delay_count, inter_delay_sum, inter_delay_sumsq) VALUES ('v_device_id','v_date','Code''s',7,1.2345678901234568e+18,7,'v_length_buckets_json',7,7,7) ON CONFLICT(device_id, date, app) DO UPDATE SET count_total = count_total + excluded.count_total, max_cpm = MAX(max_cpm, excluded.max_cpm), max_chars = MAX(max_chars, excluded.max_chars), length_buckets_json = (SELECT COALESCE('{' || group_concat(json_quote(k) || ':' || v, ',') || '}', '{}') FROM (SELECT key AS k, SUM(value) AS v FROM (SELECT key, value FROM json_each(COALESCE(length_buckets_json, '{}')) UNION ALL SELECT key, value FROM json_each(COALESCE(excluded.length_buckets_json, '{}'))) GROUP BY key)), inter_delay_count = inter_delay_count + excluded.inter_delay_count, inter_delay_sum = inter_delay_sum + excluded.inter_delay_sum, inter_delay_sumsq = inter_delay_sumsq + excluded.inter_delay_sumsq;"
+		},
+		{
+			"name": "events.app_switch",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"prev_app": "v_prev_app",
+				"next_app": "v_next_app",
+				"duration_ms": 7
+			},
+			"sql": "INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_prev_app', 'v_next_app', 7);"
+		},
+		{
+			"name": "events.app_switch",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"duration_ms": 7
+			},
+			"sql": "INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms) VALUES ('v_device_id', 7, 'v_ts', 'v_date', NULL, NULL, 7);"
+		},
+		{
+			"name": "events.window_switch",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"app": "Code's",
+				"prev_title": "v_prev_title",
+				"next_title": "v_next_title",
+				"duration_ms": 7
+			},
+			"sql": "INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', 'v_prev_title', 'v_next_title', 7);"
+		},
+		{
+			"name": "events.window_switch",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"app": "Code's",
+				"duration_ms": 7
+			},
+			"sql": "INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', NULL, NULL, 7);"
+		},
+		{
+			"name": "events.shortcut",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"app": "Code's",
+				"key": "v_key"
+			},
+			"sql": "INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', 'v_key');"
+		},
+		{
+			"name": "events.shortcut",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"app": "Code's",
+				"key": "v_key"
+			},
+			"sql": "INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', 'v_key');"
+		},
+		{
+			"name": "events.system",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"action": "v_action",
+				"metadata_json": "v_metadata_json"
+			},
+			"sql": "INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_action', 'v_metadata_json');"
+		},
+		{
+			"name": "events.system",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"action": "v_action"
+			},
+			"sql": "INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_action', NULL);"
+		},
+		{
+			"name": "events.hotstring",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"app": "Code's",
+				"kind": "v_kind",
+				"trigger": "v_trigger",
+				"replacement": "v_replacement",
+				"h_type": "v_h_type",
+				"net_saved_chars": 7
+			},
+			"sql": "INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', 'v_kind', 'v_trigger', 'v_replacement', 'v_h_type', 7);"
+		},
+		{
+			"name": "events.hotstring",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"app": "Code's",
+				"kind": "v_kind",
+				"trigger": "v_trigger",
+				"replacement": "v_replacement"
+			},
+			"sql": "INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'Code''s', 'v_kind', 'v_trigger', 'v_replacement', NULL, NULL);"
+		},
+		{
+			"name": "events.session",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"kind": "v_kind",
+				"duration_ms": 7
+			},
+			"sql": "INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_kind', 7);"
+		},
+		{
+			"name": "events.session",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"id": 7,
+				"ts": "v_ts",
+				"date": "v_date",
+				"kind": "v_kind"
+			},
+			"sql": "INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms) VALUES ('v_device_id', 7, 'v_ts', 'v_date', 'v_kind', NULL);"
 		}
 	]
 }
