@@ -110,6 +110,259 @@
 				"updated_at": "2026-10-02T00:00:00Z"
 			},
 			"sql": "INSERT INTO devices (device_id, name, os, os_version, host_signature, created_at, updated_at) VALUES ('dev''1', 'Mac'||char(13)||'', 'darwin', '', 'sig', '2026-10-01T00:00:00Z', '2026-10-02T00:00:00Z') ON CONFLICT(device_id) DO UPDATE SET name = excluded.name, os = excluded.os, os_version = excluded.os_version, host_signature = excluded.host_signature, updated_at = excluded.updated_at;"
+		},
+		{
+			"name": "agg.app_day",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"date": "v_date",
+				"app": "Code's",
+				"chars": 7,
+				"pauses": 7,
+				"time_ms": 7,
+				"think_time_ms": 7,
+				"hs_chars": 7,
+				"llm_chars": 7,
+				"hs_triggers": 7,
+				"llm_triggers": 7,
+				"hs_suggested": 7,
+				"llm_suggested": 7,
+				"hs_input_chars": 7,
+				"llm_input_chars": 7,
+				"app_time_ms": 7,
+				"category": "v_category"
+			},
+			"sql": "INSERT INTO agg_app_day (device_id, date, app, chars, pauses, time_ms, think_time_ms, hs_chars, llm_chars, hs_triggers, llm_triggers, hs_suggested, llm_suggested, hs_input_chars, llm_input_chars, app_time_ms, category) VALUES ('v_device_id', 'v_date', 'Code''s', 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 'v_category') ON CONFLICT(device_id, date, app) DO UPDATE SET chars = chars + excluded.chars, pauses = pauses + excluded.pauses, time_ms = time_ms + excluded.time_ms, think_time_ms = think_time_ms + excluded.think_time_ms, hs_chars = hs_chars + excluded.hs_chars, llm_chars = llm_chars + excluded.llm_chars, hs_triggers = hs_triggers + excluded.hs_triggers, llm_triggers = llm_triggers + excluded.llm_triggers, hs_suggested = hs_suggested + excluded.hs_suggested, llm_suggested = llm_suggested + excluded.llm_suggested, hs_input_chars = hs_input_chars + excluded.hs_input_chars, llm_input_chars = llm_input_chars + excluded.llm_input_chars, app_time_ms = app_time_ms + excluded.app_time_ms, category = COALESCE(agg_app_day.category, excluded.category);"
+		},
+		{
+			"name": "agg.app_day",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"date": "v_date",
+				"app": "Code's",
+				"chars": 7,
+				"pauses": 7,
+				"time_ms": 7,
+				"think_time_ms": 7,
+				"hs_chars": 7,
+				"llm_chars": 7,
+				"hs_triggers": 7,
+				"llm_triggers": 7,
+				"hs_suggested": 7,
+				"llm_suggested": 7,
+				"hs_input_chars": 7,
+				"llm_input_chars": 7,
+				"app_time_ms": 7
+			},
+			"sql": "INSERT INTO agg_app_day (device_id, date, app, chars, pauses, time_ms, think_time_ms, hs_chars, llm_chars, hs_triggers, llm_triggers, hs_suggested, llm_suggested, hs_input_chars, llm_input_chars, app_time_ms, category) VALUES ('v_device_id', 'v_date', 'Code''s', 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, NULL) ON CONFLICT(device_id, date, app) DO UPDATE SET chars = chars + excluded.chars, pauses = pauses + excluded.pauses, time_ms = time_ms + excluded.time_ms, think_time_ms = think_time_ms + excluded.think_time_ms, hs_chars = hs_chars + excluded.hs_chars, llm_chars = llm_chars + excluded.llm_chars, hs_triggers = hs_triggers + excluded.hs_triggers, llm_triggers = llm_triggers + excluded.llm_triggers, hs_suggested = hs_suggested + excluded.hs_suggested, llm_suggested = llm_suggested + excluded.llm_suggested, hs_input_chars = hs_input_chars + excluded.hs_input_chars, llm_input_chars = llm_input_chars + excluded.llm_input_chars, app_time_ms = app_time_ms + excluded.app_time_ms, category = COALESCE(agg_app_day.category, excluded.category);"
+		},
+		{
+			"name": "agg.buckets",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"date": "v_date",
+				"app": "Code's",
+				"bucket_ms": 7,
+				"time_sum": 7,
+				"credited": 7,
+				"hs_input_time_sum": 7,
+				"hs_input_credited": 7,
+				"llm_input_time_sum": 7,
+				"llm_input_credited": 7
+			},
+			"sql": "INSERT INTO agg_app_day_buckets (device_id, date, app, bucket_ms, time_sum, credited, hs_input_time_sum, hs_input_credited, llm_input_time_sum, llm_input_credited) VALUES ('v_device_id', 'v_date', 'Code''s', 7, 7, 7, 7, 7, 7, 7) ON CONFLICT(device_id, date, app, bucket_ms) DO UPDATE SET time_sum = time_sum + excluded.time_sum, credited = credited + excluded.credited, hs_input_time_sum = hs_input_time_sum + excluded.hs_input_time_sum, hs_input_credited = hs_input_credited + excluded.hs_input_credited, llm_input_time_sum = llm_input_time_sum + excluded.llm_input_time_sum, llm_input_credited = llm_input_credited + excluded.llm_input_credited;"
+		},
+		{
+			"name": "agg.buckets",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"date": "v_date",
+				"app": "Code's",
+				"bucket_ms": 7,
+				"time_sum": 7,
+				"credited": 7,
+				"hs_input_time_sum": 7,
+				"hs_input_credited": 7,
+				"llm_input_time_sum": 7,
+				"llm_input_credited": 7
+			},
+			"sql": "INSERT INTO agg_app_day_buckets (device_id, date, app, bucket_ms, time_sum, credited, hs_input_time_sum, hs_input_credited, llm_input_time_sum, llm_input_credited) VALUES ('v_device_id', 'v_date', 'Code''s', 7, 7, 7, 7, 7, 7, 7) ON CONFLICT(device_id, date, app, bucket_ms) DO UPDATE SET time_sum = time_sum + excluded.time_sum, credited = credited + excluded.credited, hs_input_time_sum = hs_input_time_sum + excluded.hs_input_time_sum, hs_input_credited = hs_input_credited + excluded.hs_input_credited, llm_input_time_sum = llm_input_time_sum + excluded.llm_input_time_sum, llm_input_credited = llm_input_credited + excluded.llm_input_credited;"
+		},
+		{
+			"name": "agg.kc_hold",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"date": "v_date",
+				"app": "Code's",
+				"keycode": 7,
+				"sum_ms": 7,
+				"count": 7.9,
+				"max_ms": 7,
+				"tap_count": 7,
+				"hold_count": 7
+			},
+			"sql": "INSERT INTO agg_app_day_kc_hold (device_id, date, app, keycode, sum_ms, count, max_ms, tap_count, hold_count) VALUES ('v_device_id', 'v_date', 'Code''s', 7, 7, 7, 7, 7, 7) ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET sum_ms = sum_ms + excluded.sum_ms, count = count + excluded.count, max_ms = MAX(max_ms, excluded.max_ms), tap_count = tap_count + excluded.tap_count, hold_count = hold_count + excluded.hold_count;"
+		},
+		{
+			"name": "agg.kc_hold",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"date": "v_date",
+				"app": "Code's",
+				"keycode": 7,
+				"sum_ms": 7,
+				"count": 7.9,
+				"max_ms": 7,
+				"tap_count": 7,
+				"hold_count": 7
+			},
+			"sql": "INSERT INTO agg_app_day_kc_hold (device_id, date, app, keycode, sum_ms, count, max_ms, tap_count, hold_count) VALUES ('v_device_id', 'v_date', 'Code''s', 7, 7, 7, 7, 7, 7) ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET sum_ms = sum_ms + excluded.sum_ms, count = count + excluded.count, max_ms = MAX(max_ms, excluded.max_ms), tap_count = tap_count + excluded.tap_count, hold_count = hold_count + excluded.hold_count;"
+		},
+		{
+			"name": "agg.layouts",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"date": "v_date",
+				"app": "Code's",
+				"layout": "v_layout",
+				"count": 7.9
+			},
+			"sql": "INSERT INTO agg_app_day_layouts (device_id, date, app, layout, count) VALUES ('v_device_id', 'v_date', 'Code''s', 'v_layout', 7) ON CONFLICT(device_id, date, app, layout) DO UPDATE SET count = count + excluded.count;"
+		},
+		{
+			"name": "agg.layouts",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"date": "v_date",
+				"app": "Code's",
+				"layout": "v_layout",
+				"count": 7.9
+			},
+			"sql": "INSERT INTO agg_app_day_layouts (device_id, date, app, layout, count) VALUES ('v_device_id', 'v_date', 'Code''s', 'v_layout', 7) ON CONFLICT(device_id, date, app, layout) DO UPDATE SET count = count + excluded.count;"
+		},
+		{
+			"name": "agg.switches_to",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"date": "v_date",
+				"app_from": "v_app_from",
+				"app_to": "v_app_to",
+				"count": 7.9
+			},
+			"sql": "INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count) VALUES ('v_device_id', 'v_date', 'v_app_from', 'v_app_to', 7) ON CONFLICT(device_id, date, app_from, app_to) DO UPDATE SET count = count + excluded.count;"
+		},
+		{
+			"name": "agg.switches_to",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"date": "v_date",
+				"app_from": "v_app_from",
+				"app_to": "v_app_to",
+				"count": 7.9
+			},
+			"sql": "INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count) VALUES ('v_device_id', 'v_date', 'v_app_from', 'v_app_to', 7) ON CONFLICT(device_id, date, app_from, app_to) DO UPDATE SET count = count + excluded.count;"
+		},
+		{
+			"name": "agg.errors",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"date": "v_date",
+				"app": "Code's",
+				"bs_total": 7,
+				"cascade_count": 7,
+				"cascade_max_len": 7,
+				"recovery_sum_ms": 7,
+				"recovery_count": 7
+			},
+			"sql": "INSERT INTO agg_app_day_errors (device_id, date, app, bs_total, cascade_count, cascade_max_len, recovery_sum_ms, recovery_count) VALUES ('v_device_id', 'v_date', 'Code''s', 7, 7, 7, 7, 7) ON CONFLICT(device_id, date, app) DO UPDATE SET bs_total = bs_total + excluded.bs_total, cascade_count = cascade_count + excluded.cascade_count, cascade_max_len = MAX(cascade_max_len, excluded.cascade_max_len), recovery_sum_ms = recovery_sum_ms + excluded.recovery_sum_ms, recovery_count = recovery_count + excluded.recovery_count;"
+		},
+		{
+			"name": "agg.errors",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"date": "v_date",
+				"app": "Code's",
+				"bs_total": 7,
+				"cascade_count": 7,
+				"cascade_max_len": 7,
+				"recovery_sum_ms": 7,
+				"recovery_count": 7
+			},
+			"sql": "INSERT INTO agg_app_day_errors (device_id, date, app, bs_total, cascade_count, cascade_max_len, recovery_sum_ms, recovery_count) VALUES ('v_device_id', 'v_date', 'Code''s', 7, 7, 7, 7, 7) ON CONFLICT(device_id, date, app) DO UPDATE SET bs_total = bs_total + excluded.bs_total, cascade_count = cascade_count + excluded.cascade_count, cascade_max_len = MAX(cascade_max_len, excluded.cascade_max_len), recovery_sum_ms = recovery_sum_ms + excluded.recovery_sum_ms, recovery_count = recovery_count + excluded.recovery_count;"
+		},
+		{
+			"name": "agg.ergo",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"date": "v_date",
+				"app": "Code's",
+				"same_finger_streak_max": 7,
+				"same_hand_streak_max": 7,
+				"auto_repeat_count": 7,
+				"focus_to_first_key_sum_ms": 7,
+				"focus_to_first_key_count": 7
+			},
+			"sql": "INSERT INTO agg_app_day_ergo (device_id, date, app, same_finger_streak_max, same_hand_streak_max, auto_repeat_count, focus_to_first_key_sum_ms, focus_to_first_key_count) VALUES ('v_device_id', 'v_date', 'Code''s', 7, 7, 7, 7, 7) ON CONFLICT(device_id, date, app) DO UPDATE SET same_finger_streak_max = MAX(same_finger_streak_max, excluded.same_finger_streak_max), same_hand_streak_max = MAX(same_hand_streak_max, excluded.same_hand_streak_max), auto_repeat_count = auto_repeat_count + excluded.auto_repeat_count, focus_to_first_key_sum_ms = focus_to_first_key_sum_ms + excluded.focus_to_first_key_sum_ms, focus_to_first_key_count = focus_to_first_key_count + excluded.focus_to_first_key_count;"
+		},
+		{
+			"name": "agg.ergo",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"date": "v_date",
+				"app": "Code's",
+				"same_finger_streak_max": 7,
+				"same_hand_streak_max": 7,
+				"auto_repeat_count": 7,
+				"focus_to_first_key_sum_ms": 7,
+				"focus_to_first_key_count": 7
+			},
+			"sql": "INSERT INTO agg_app_day_ergo (device_id, date, app, same_finger_streak_max, same_hand_streak_max, auto_repeat_count, focus_to_first_key_sum_ms, focus_to_first_key_count) VALUES ('v_device_id', 'v_date', 'Code''s', 7, 7, 7, 7, 7) ON CONFLICT(device_id, date, app) DO UPDATE SET same_finger_streak_max = MAX(same_finger_streak_max, excluded.same_finger_streak_max), same_hand_streak_max = MAX(same_hand_streak_max, excluded.same_hand_streak_max), auto_repeat_count = auto_repeat_count + excluded.auto_repeat_count, focus_to_first_key_sum_ms = focus_to_first_key_sum_ms + excluded.focus_to_first_key_sum_ms, focus_to_first_key_count = focus_to_first_key_count + excluded.focus_to_first_key_count;"
+		},
+		{
+			"name": "agg.chars_class",
+			"dialect": "native",
+			"values": {
+				"device_id": "v_device_id",
+				"date": "v_date",
+				"app": "Code's",
+				"letter": 7,
+				"digit": 7,
+				"punct": 7,
+				"space": 7,
+				"other": 7,
+				"first_typed_min": "v_first_typed_min",
+				"last_typed_min": "v_last_typed_min"
+			},
+			"sql": "INSERT INTO agg_app_day_chars_class (device_id, date, app, letter, digit, punct, space, other, first_typed_min, last_typed_min) VALUES ('v_device_id', 'v_date', 'Code''s', 7, 7, 7, 7, 7, 'v_first_typed_min', 'v_last_typed_min') ON CONFLICT(device_id, date, app) DO UPDATE SET letter = letter + excluded.letter, digit = digit + excluded.digit, punct = punct + excluded.punct, space = space + excluded.space, other = other + excluded.other, first_typed_min = MIN(COALESCE(first_typed_min, excluded.first_typed_min), COALESCE(excluded.first_typed_min, first_typed_min)), last_typed_min = MAX(COALESCE(last_typed_min, excluded.last_typed_min), COALESCE(excluded.last_typed_min, last_typed_min));"
+		},
+		{
+			"name": "agg.chars_class",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "v_device_id",
+				"date": "v_date",
+				"app": "Code's",
+				"letter": 7,
+				"digit": 7,
+				"punct": 7,
+				"space": 7,
+				"other": 7
+			},
+			"sql": "INSERT INTO agg_app_day_chars_class (device_id, date, app, letter, digit, punct, space, other, first_typed_min, last_typed_min) VALUES ('v_device_id', 'v_date', 'Code''s', 7, 7, 7, 7, 7, NULL, NULL) ON CONFLICT(device_id, date, app) DO UPDATE SET letter = letter + excluded.letter, digit = digit + excluded.digit, punct = punct + excluded.punct, space = space + excluded.space, other = other + excluded.other, first_typed_min = MIN(COALESCE(first_typed_min, excluded.first_typed_min), COALESCE(excluded.first_typed_min, first_typed_min)), last_typed_min = MAX(COALESCE(last_typed_min, excluded.last_typed_min), COALESCE(excluded.last_typed_min, last_typed_min));"
 		}
 	]
 }

@@ -24,6 +24,7 @@ local SqliteWriter = require("modules.keystats.sqlite_writer")
 local Export       = require("modules.keystats.export")
 local AggHelper    = require("keystats.aggregator_helpers")
 local Literal      = require("sqlite.literal")
+local Queries      = require("keystats.queries")
 
 local S = require("modules.keystats.aggregator.state")
 local C = require("modules.keystats.aggregator.core")
@@ -174,50 +175,36 @@ function M.flush()
 
 	for key, row in pairs(S.agg_batch.app_day) do
 		local cat = Export.get_native_app_category(row.app)
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day (device_id, date, app, chars, pauses, time_ms, think_time_ms, hs_chars, llm_chars, hs_triggers, llm_triggers, hs_suggested, llm_suggested, hs_input_chars, llm_input_chars, category) "
-			.. "VALUES (%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s) "
-			.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
-			.. "chars=chars+excluded.chars,pauses=pauses+excluded.pauses,"
-			.. "time_ms=time_ms+excluded.time_ms,think_time_ms=think_time_ms+excluded.think_time_ms,"
-			.. "hs_chars=hs_chars+excluded.hs_chars,llm_chars=llm_chars+excluded.llm_chars,"
-			.. "hs_triggers=hs_triggers+excluded.hs_triggers,llm_triggers=llm_triggers+excluded.llm_triggers,"
-			.. "hs_suggested=hs_suggested+excluded.hs_suggested,llm_suggested=llm_suggested+excluded.llm_suggested,"
-			.. "hs_input_chars=hs_input_chars+excluded.hs_input_chars,"
-			.. "llm_input_chars=llm_input_chars+excluded.llm_input_chars,"
-			.. "category=COALESCE(agg_app_day.category, excluded.category)",
-			d, sq(row.date), sq(row.app),
-			i(row.chars), i(row.pauses), i(row.time_ms), i(row.think_time_ms),
-			i(row.hs_chars), i(row.llm_chars),
-			i(row.hs_triggers), i(row.llm_triggers),
-			i(row.hs_suggested), i(row.llm_suggested),
-			i(row.hs_input_chars), i(row.llm_input_chars), sq(cat)))
+		local ok = exec(Queries.render("agg.app_day", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			chars = i(row.chars), pauses = i(row.pauses), time_ms = i(row.time_ms),
+			think_time_ms = i(row.think_time_ms), hs_chars = i(row.hs_chars), llm_chars = i(row.llm_chars),
+			hs_triggers = i(row.hs_triggers), llm_triggers = i(row.llm_triggers),
+			hs_suggested = i(row.hs_suggested), llm_suggested = i(row.llm_suggested),
+			hs_input_chars = i(row.hs_input_chars), llm_input_chars = i(row.llm_input_chars),
+			app_time_ms = 0, category = cat,
+		}))
 		if ok then S.agg_batch.app_day[key] = nil end
 	end
 
 	for key, row in pairs(S.agg_batch.app_time) do
 		local cat = Export.get_native_app_category(row.app)
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day (device_id, date, app, app_time_ms, category) VALUES (%s,%s,%s,%d,%s) "
-			.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
-			.. "app_time_ms=app_time_ms+excluded.app_time_ms,"
-			.. "category=COALESCE(agg_app_day.category, excluded.category)",
-			d, sq(row.date), sq(row.app), i(row.ms), sq(cat)))
+		local ok = exec(Queries.render("agg.app_day", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			chars = 0, pauses = 0, time_ms = 0, think_time_ms = 0, hs_chars = 0, llm_chars = 0,
+			hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0,
+			hs_input_chars = 0, llm_input_chars = 0, app_time_ms = i(row.ms), category = cat,
+		}))
 		if ok then S.agg_batch.app_time[key] = nil end
 	end
 
 	for key, row in pairs(S.agg_batch.app_buckets) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_buckets (device_id, date, app, bucket_ms, time_sum, credited, hs_input_time_sum, hs_input_credited, llm_input_time_sum, llm_input_credited) VALUES (%s,%s,%s,%d,%d,%d,%d,%d,%d,%d) "
-			.. "ON CONFLICT(device_id, date, app, bucket_ms) DO UPDATE SET "
-			.. "time_sum=time_sum+excluded.time_sum,credited=credited+excluded.credited,"
-			.. "hs_input_time_sum=hs_input_time_sum+excluded.hs_input_time_sum,"
-			.. "hs_input_credited=hs_input_credited+excluded.hs_input_credited,"
-			.. "llm_input_time_sum=llm_input_time_sum+excluded.llm_input_time_sum,"
-			.. "llm_input_credited=llm_input_credited+excluded.llm_input_credited",
-			d, sq(row.date), sq(row.app), i(row.bucket_ms),
-			i(row.time_sum), i(row.credited),
-			i(row.hs_in_t), i(row.hs_in_c), i(row.llm_in_t), i(row.llm_in_c)))
+		local ok = exec(Queries.render("agg.buckets", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			bucket_ms = i(row.bucket_ms), time_sum = i(row.time_sum), credited = i(row.credited),
+			hs_input_time_sum = i(row.hs_in_t), hs_input_credited = i(row.hs_in_c),
+			llm_input_time_sum = i(row.llm_in_t), llm_input_credited = i(row.llm_in_c),
+		}))
 		if ok then S.agg_batch.app_buckets[key] = nil end
 	end
 
@@ -263,14 +250,11 @@ function M.flush()
 	end
 
 	for key, row in pairs(S.agg_batch.kc_hold) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_kc_hold (device_id, date, app, keycode, sum_ms, count, max_ms, tap_count, hold_count) VALUES (%s,%s,%s,%d,%d,%d,%d,%d,%d) "
-			.. "ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET "
-			.. "sum_ms=sum_ms+excluded.sum_ms,count=count+excluded.count,"
-			.. "max_ms=MAX(max_ms, excluded.max_ms),"
-			.. "tap_count=tap_count+excluded.tap_count,hold_count=hold_count+excluded.hold_count",
-			d, sq(row.date), sq(row.app), i(row.keycode),
-			i(row.sum_ms), i(row.count), i(row.max_ms), i(row.tap_count), i(row.hold_count)))
+		local ok = exec(Queries.render("agg.kc_hold", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			keycode = i(row.keycode), sum_ms = i(row.sum_ms), count = i(row.count), max_ms = i(row.max_ms),
+			tap_count = i(row.tap_count), hold_count = i(row.hold_count),
+		}))
 		if ok then S.agg_batch.kc_hold[key] = nil end
 	end
 
@@ -332,54 +316,42 @@ function M.flush()
 	end
 
 	for key, row in pairs(S.agg_batch.layouts) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_layouts (device_id, date, app, layout, count) VALUES (%s,%s,%s,%s,%d) "
-			.. "ON CONFLICT(device_id, date, app, layout) DO UPDATE SET count=count+excluded.count",
-			d, sq(row.date), sq(row.app), sq(row.layout), i(row.count)))
+		local ok = exec(Queries.render("agg.layouts", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			layout = tostring(row.layout), count = i(row.count),
+		}))
 		if ok then S.agg_batch.layouts[key] = nil end
 	end
 
 	for key, row in pairs(S.agg_batch.chars_class) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_chars_class (device_id, date, app, letter, digit, punct, space, other, first_typed_min, last_typed_min) VALUES (%s,%s,%s,%d,%d,%d,%d,%d,%s,%s) "
-			.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
-			.. "letter=letter+excluded.letter,digit=digit+excluded.digit,"
-			.. "punct=punct+excluded.punct,space=space+excluded.space,other=other+excluded.other,"
-			.. "first_typed_min=COALESCE(agg_app_day_chars_class.first_typed_min, excluded.first_typed_min),"
-			.. "last_typed_min=COALESCE(excluded.last_typed_min, agg_app_day_chars_class.last_typed_min)",
-			d, sq(row.date), sq(row.app),
-			i(row.letter), i(row.digit), i(row.punct), i(row.space), i(row.other),
-			row.first_typed_min and sq(row.first_typed_min) or "NULL",
-			row.last_typed_min  and sq(row.last_typed_min)  or "NULL"))
+		local ok = exec(Queries.render("agg.chars_class", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			letter = i(row.letter), digit = i(row.digit), punct = i(row.punct), space = i(row.space),
+			other = i(row.other),
+			first_typed_min = row.first_typed_min and tostring(row.first_typed_min) or nil,
+			last_typed_min = row.last_typed_min and tostring(row.last_typed_min) or nil,
+		}))
 		if ok then S.agg_batch.chars_class[key] = nil end
 	end
 
 	for key, row in pairs(S.agg_batch.errors) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_errors (device_id, date, app, bs_total, cascade_count, cascade_max_len, recovery_sum_ms, recovery_count) VALUES (%s,%s,%s,%d,%d,%d,%d,%d) "
-			.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
-			.. "bs_total=bs_total+excluded.bs_total,cascade_count=cascade_count+excluded.cascade_count,"
-			.. "cascade_max_len=MAX(cascade_max_len, excluded.cascade_max_len),"
-			.. "recovery_sum_ms=recovery_sum_ms+excluded.recovery_sum_ms,"
-			.. "recovery_count=recovery_count+excluded.recovery_count",
-			d, sq(row.date), sq(row.app),
-			i(row.bs_total), i(row.cascade_count), i(row.cascade_max_len),
-			i(row.recovery_sum_ms), i(row.recovery_count)))
+		local ok = exec(Queries.render("agg.errors", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			bs_total = i(row.bs_total), cascade_count = i(row.cascade_count),
+			cascade_max_len = i(row.cascade_max_len), recovery_sum_ms = i(row.recovery_sum_ms),
+			recovery_count = i(row.recovery_count),
+		}))
 		if ok then S.agg_batch.errors[key] = nil end
 	end
 
 	for key, row in pairs(S.agg_batch.ergo) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_ergo (device_id, date, app, same_finger_streak_max, same_hand_streak_max, auto_repeat_count, focus_to_first_key_sum_ms, focus_to_first_key_count) VALUES (%s,%s,%s,%d,%d,%d,%d,%d) "
-			.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
-			.. "same_finger_streak_max=MAX(same_finger_streak_max, excluded.same_finger_streak_max),"
-			.. "same_hand_streak_max=MAX(same_hand_streak_max, excluded.same_hand_streak_max),"
-			.. "auto_repeat_count=auto_repeat_count+excluded.auto_repeat_count,"
-			.. "focus_to_first_key_sum_ms=focus_to_first_key_sum_ms+excluded.focus_to_first_key_sum_ms,"
-			.. "focus_to_first_key_count=focus_to_first_key_count+excluded.focus_to_first_key_count",
-			d, sq(row.date), sq(row.app),
-			i(row.same_finger_streak_max), i(row.same_hand_streak_max), i(row.auto_repeat_count),
-			i(row.focus_to_first_key_sum_ms), i(row.focus_to_first_key_count)))
+		local ok = exec(Queries.render("agg.ergo", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date), app = tostring(row.app),
+			same_finger_streak_max = i(row.same_finger_streak_max),
+			same_hand_streak_max = i(row.same_hand_streak_max), auto_repeat_count = i(row.auto_repeat_count),
+			focus_to_first_key_sum_ms = i(row.focus_to_first_key_sum_ms),
+			focus_to_first_key_count = i(row.focus_to_first_key_count),
+		}))
 		if ok then S.agg_batch.ergo[key] = nil end
 	end
 
@@ -416,10 +388,10 @@ function M.flush()
 	end
 
 	for key, row in pairs(S.agg_batch.switches_to) do
-		local ok = exec(string.format(
-			"INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count) VALUES (%s,%s,%s,%s,%d) "
-			.. "ON CONFLICT(device_id, date, app_from, app_to) DO UPDATE SET count=count+excluded.count",
-			d, sq(row.date), sq(row.app_from), sq(row.app_to), i(row.count)))
+		local ok = exec(Queries.render("agg.switches_to", "native", {
+			device_id = tostring(S.device_id), date = tostring(row.date),
+			app_from = tostring(row.app_from), app_to = tostring(row.app_to), count = i(row.count),
+		}))
 		if ok then S.agg_batch.switches_to[key] = nil end
 	end
 
