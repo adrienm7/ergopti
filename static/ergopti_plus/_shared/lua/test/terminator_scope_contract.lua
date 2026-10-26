@@ -63,8 +63,9 @@ return function(helpers, select_leaves)
 		end)
 
 		helpers.it("replays independent personal preservation vectors without taking ownership", function()
-			local shared = debug.getinfo(1, "S").source:gsub("^@", ""):gsub("\\", "/")
-				:match("^(.*)/lua/test/[^/]+$")
+			local NativePath = require("native_path")
+			local source = debug.getinfo(1, "S").source:gsub("^@", "")
+			local shared = NativePath.dirname(assert(NativePath.dirname(assert(NativePath.dirname(source)))))
 			local path = assert(shared, "the shared tree encloses this contract")
 				.. "/tests/corpus/hotstrings/terminator_restoration_vectors.json"
 			local handle = assert(io.open(path, "rb"))

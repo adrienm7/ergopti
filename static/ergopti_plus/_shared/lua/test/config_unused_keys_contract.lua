@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local NativePath = require("native_path")
 
 local Engine    = require("config_unused_keys")
 local TomlCodec = require("toml_codec")
@@ -45,7 +46,7 @@ local _sequence = 0
 --- @return string
 local function new_config_path()
 	local base = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or "/tmp"
-	base = base:gsub("\\", "/"):gsub("/+$", "")
+	base = NativePath.without_trailing_separators(base)
 	_sequence = _sequence + 1
 	return string.format("%s/ergopti_unused_keys_%d_%d_%d.toml", base, os.time(),
 		math.random(100000, 999999), _sequence)
