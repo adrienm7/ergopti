@@ -5,12 +5,18 @@
 return {
 	hotstring_palette = {
 		{ name = "red", i18n = "hs_config.color_red", hex = "#e53935" },
-		{ name = "green", i18n = "hs_config.color_green", hex = "#43a047" },
-		{ name = "orange", i18n = "hs_config.color_orange", hex = "#fb8c00" },
-		{ name = "blue", i18n = "hs_config.color_blue", hex = "#1e88e5" },
+		{ name = "pink", i18n = "hs_config.color_pink", hex = "#e91e63" },
 		{ name = "purple", i18n = "hs_config.color_purple", hex = "#8e44ad" },
+		{ name = "ai", i18n = "menu.hotstrings.tooltip_ai", hex = "#ad61ff" },
+		{ name = "indigo", i18n = "hs_config.color_indigo", hex = "#3f51b5" },
+		{ name = "blue", i18n = "hs_config.color_blue", hex = "#1e88e5" },
 		{ name = "cyan", i18n = "hs_config.color_cyan", hex = "#00838f" },
+		{ name = "turquoise", i18n = "hs_config.color_turquoise", hex = "#009688" },
+		{ name = "green", i18n = "hs_config.color_green", hex = "#43a047" },
+		{ name = "lime", i18n = "hs_config.color_lime", hex = "#9e9d24" },
 		{ name = "yellow", i18n = "hs_config.color_yellow", hex = "#fdd835" },
+		{ name = "orange", i18n = "hs_config.color_orange", hex = "#fb8c00" },
+		{ name = "brown", i18n = "hs_config.color_brown", hex = "#8d6e63" },
 		{ name = "gray", i18n = "hs_config.color_gray", hex = "#6e6e73" },
 	},
 	download_accent = {

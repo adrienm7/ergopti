@@ -28,7 +28,8 @@ const { shared } = require('../lib/paths.cjs');
 const SOURCE = shared('data', 'native_theme.toml');
 const TARGET = shared('lua', 'native_theme_data.lua');
 const LOCALE_SOURCE = shared('data', 'locales', 'en.json');
-const HEX = /^#[0-9a-f]{6}$/;
+const TOOLTIP_SOURCE = shared('modules', 'tooltip', 'constants.toml');
+const HEX = /^#[0-9a-f]{6}$/i;
 
 // ==========================================
 // ==========================================
@@ -37,19 +38,37 @@ const HEX = /^#[0-9a-f]{6}$/;
 // ==========================================
 
 /**
+ * The hex of one palette row: typed in the row, or read from the tooltip
+ * constants' [accent_colors] when the row names its source with `hex_from`.
+ * @param {object} row One [[hotstring_palette]] row.
+ * @param {object} accents The tooltip constants' [accent_colors] table.
+ * @returns {string} The lowercase #rrggbb colour.
+ */
+function resolveHex(row, accents) {
+	if ((row.hex === undefined) === (row.hex_from === undefined)) {
+		throw new Error(`native_theme.toml: "${row.name}" needs exactly one of hex and hex_from`);
+	}
+	const hex = row.hex !== undefined ? row.hex : accents[row.hex_from];
+	if (typeof hex !== 'string' || !HEX.test(hex)) {
+		throw new Error(`native_theme.toml: "${row.name}" has hex "${hex}"`);
+	}
+	return hex.toLowerCase();
+}
+
+/**
  * Validates the theme source; a malformed colour must not reach a driver.
  * @param {object} theme The parsed TOML.
  * @param {object} locale The English locale table.
+ * @param {object} tooltipAccents The tooltip constants' [accent_colors] table.
  */
-function validate(theme, locale) {
+function validate(theme, locale, tooltipAccents) {
 	const palette = theme.hotstring_palette;
 	if (!Array.isArray(palette) || palette.length === 0) {
 		throw new Error('native_theme.toml: [[hotstring_palette]] must list at least one colour');
 	}
 	const names = new Set();
 	for (const row of palette) {
-		if (!HEX.test(row.hex))
-			throw new Error(`native_theme.toml: "${row.name}" has hex "${row.hex}"`);
+		resolveHex(row, tooltipAccents);
 		if (names.has(row.name)) throw new Error(`native_theme.toml: duplicate colour "${row.name}"`);
 		names.add(row.name);
 		if (!Object.hasOwn(locale, row.i18n)) {
@@ -75,11 +94,13 @@ function validate(theme, locale) {
 /**
  * Renders the Lua module.
  * @param {object} theme The validated theme.
+ * @param {object} accentColors The tooltip constants' [accent_colors] table.
  * @returns {string} The module text.
  */
-function emit(theme) {
+function emit(theme, accentColors) {
 	const rows = theme.hotstring_palette.map(
-		(row) => `\t\t{ name = "${row.name}", i18n = "${row.i18n}", hex = "${row.hex}" },`
+		(row) =>
+			`\t\t{ name = "${row.name}", i18n = "${row.i18n}", hex = "${resolveHex(row, accentColors)}" },`
 	);
 	const accents = Object.entries(theme.download_accent).map(
 		([kind, hex]) => `\t\t${kind} = "${hex}",`
@@ -102,6 +123,7 @@ function emit(theme) {
 }
 
 const theme = toml.parse(fs.readFileSync(SOURCE, 'utf8'));
-validate(theme, JSON.parse(fs.readFileSync(LOCALE_SOURCE, 'utf8')));
-fs.writeFileSync(TARGET, emit(theme), 'utf8');
+const accentColors = toml.parse(fs.readFileSync(TOOLTIP_SOURCE, 'utf8')).accent_colors;
+validate(theme, JSON.parse(fs.readFileSync(LOCALE_SOURCE, 'utf8')), accentColors);
+fs.writeFileSync(TARGET, emit(theme, accentColors), 'utf8');
 console.log('[OK] Generated the shared native theme data.');
