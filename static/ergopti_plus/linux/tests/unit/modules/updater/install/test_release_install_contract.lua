@@ -16,6 +16,32 @@ local defaults = assert(Json.decode(handle:read("*a")), "defaults.json must deco
 handle:close()
 
 require("test.config_backup_contract").register(helpers, { defaults = defaults })
+
+--- Lists a real temporary folder through the Linux listing port.
+--- @param entries table { { name, kind } } with kind file, dir, link_file or link_dir
+--- @param body function fn(list, root)
+local function real_listing(entries, body)
+	local function quote(value) return "'" .. tostring(value):gsub("'", "'\\''") .. "'" end
+	local root = os.tmpname()
+	os.remove(root)
+	assert(os.execute("mkdir -p " .. quote(root .. "/cfg") .. " " .. quote(root .. "/elsewhere")))
+	assert(os.execute("mkdir -p " .. quote(root .. "/elsewhere/folder") .. " && : > " .. quote(root .. "/elsewhere/file.toml")))
+	for _, entry in ipairs(entries) do
+		local path = quote(root .. "/cfg/" .. entry.name)
+		local command = ({
+			file = ": > " .. path,
+			dir = "mkdir " .. path,
+			link_file = "ln -s " .. quote(root .. "/elsewhere/file.toml") .. " " .. path,
+			link_dir = "ln -s " .. quote(root .. "/elsewhere/folder") .. " " .. path,
+		})[entry.kind]
+		assert(os.execute(command))
+	end
+	local ok, err = pcall(body, helpers.load_module("modules.updater.config_backup")._list, root .. "/cfg")
+	os.execute("rm -rf " .. quote(root))
+	if not ok then error(err, 0) end
+end
+
+require("test.config_backup_binding_contract").register(helpers, { defaults = defaults, listing = real_listing })
 require("test.release_install_contract").register(helpers)
 
 local policy_handle = assert(io.open(helpers.driver_root() .. "/../_shared/modules/network/managed_network.json", "rb"))

@@ -4,7 +4,7 @@
 --- MODULE: Configuration Backup (macOS)
 --- DESCRIPTION:
 --- Binds the shared configuration backup owner (_shared/lua/updater/
---- config_backup.lua) to this driver: the configuration folder of
+--- config_backup.lua, assembled by config_backup_binding.lua) to this driver: the configuration folder of
 --- infra/config_paths.lua and file ports over the FileSystem adapter's
 --- classified reads, create-only writes and compare-and-publish. The Versions
 --- window backs the configuration up through it before installing a release,
@@ -25,7 +25,7 @@ local ConfigPaths = require("infra.config_paths")
 local FsDir       = require("infra.fs_dir")
 local FileSystem  = require("adapters.file_system")
 local JsonCodec   = require("adapters.json_codec")
-local Shared      = require("updater.config_backup")
+local Binding     = require("updater.config_backup_binding")
 
 local LOG = "updater.config_backup"
 
@@ -120,35 +120,48 @@ end
 -- ==============================
 -- ==============================
 
+--- Reads the shared updater defaults the backup rules come from.
+--- @return table|nil defaults
+--- @return string|nil error
+local function read_defaults()
+	local path = Paths.shared("modules/updater/defaults.json")
+	local raw = type(path) == "string" and FileSystem.read(path) or nil
+	if type(raw) ~= "string" then return nil, "the shared updater defaults are unreadable" end
+	local decoded, decode_err = JsonCodec.decode(raw)
+	if decoded == nil then return nil, tostring(decode_err or "the shared updater defaults are not JSON") end
+	return decoded
+end
+
+--- The roots of this driver: the configuration folder only. The settings of
+--- this driver live in hs.settings, not in a file a backup could copy.
+--- @return table|nil roots
+--- @return string|nil reason
+--- @return string|nil log_text
+local function default_roots()
+	local config_dir = ConfigPaths.get_config_dir()
+	if type(config_dir) ~= "string" or config_dir:sub(1, 1) ~= "/" then
+		return nil, "configuration folder unknown",
+			"Configuration backup refused: the configuration folder is unknown."
+	end
+	return { { id = "config", dir = config_dir } }
+end
+
+local _binding = Binding.new({
+	logger = Logger,
+	log = LOG,
+	defaults = read_defaults,
+	json = { encode = JsonCodec.encode, decode = JsonCodec.decode },
+	file_ports = file_ports,
+	clock = clock,
+	default_roots = default_roots,
+	overrides = function() return M._overrides end,
+})
+
 --- Builds the owner over the current configuration folder. It is built per
 --- use: the folder can move while the driver runs (the paths editor).
 --- @return table|nil owner
 --- @return string|nil error
-function M.owner()
-	local path = Paths.shared("modules/updater/defaults.json")
-	local raw = type(path) == "string" and FileSystem.read(path) or nil
-	local decoded = type(raw) == "string" and JsonCodec.decode(raw) or nil
-	local rules, err = Shared.rules(decoded)
-	if not rules then
-		Logger.error(LOG, "Configuration backup unavailable: %s.", tostring(err))
-		return nil, err
-	end
-	local overrides = M._overrides or {}
-	local config_dir = ConfigPaths.get_config_dir()
-	if not overrides.roots and (type(config_dir) ~= "string" or config_dir:sub(1, 1) ~= "/") then
-		Logger.error(LOG, "Configuration backup refused: the configuration folder is unknown.")
-		return nil, "configuration folder unknown"
-	end
-	return Shared.new({
-		rules = rules,
-		roots = overrides.roots or { { id = "config", dir = config_dir } },
-		io = overrides.io or file_ports(),
-		json = { encode = JsonCodec.encode, decode = JsonCodec.decode },
-		clock = overrides.clock or clock,
-		logger = Logger,
-		log = LOG,
-	}), nil
-end
+function M.owner() return _binding.owner() end
 
 M._list = list
 

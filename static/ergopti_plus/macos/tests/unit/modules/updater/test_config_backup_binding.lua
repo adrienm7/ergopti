@@ -4,13 +4,16 @@
 --- MODULE: Configuration Backup Binding (macOS)
 --- DESCRIPTION:
 --- The shared backup owner is proven over an in-memory tree by its contract;
---- this pins the macOS binding (modules/updater/config_backup.lua): how a
---- folder entry is classified through the FileSystem adapter (a link to a
---- folder is reported and never walked) and that the owner reads its rules
---- from the shared updater defaults and backs up the configuration folder.
+--- this pins the macOS binding (modules/updater/config_backup.lua): the shared
+--- binding contract replayed over the FileSystem adapter's classified entries
+--- (a link to a folder is reported and never walked) and that the owner reads
+--- its rules from the shared updater defaults and backs up the configuration
+--- folder.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+
+local Json = require("json")
 
 local DEFAULTS = helpers.shared("modules/updater/defaults.json")
 
@@ -73,26 +76,6 @@ local function with_binding(tree, body)
 end
 
 helpers.describe("config_backup binding (macOS)", function()
-	helpers.it("classifies entries and never walks a link to a folder", function()
-		with_binding({
-			["/cfg"] = "dir",
-			["/cfg/config.toml"] = "file",
-			["/cfg/hotstrings"] = "dir",
-			["/cfg/linked.toml"] = "link_file",
-			["/cfg/loop"] = "link_dir",
-		}, function(Binding)
-			local kinds = {}
-			for _, entry in ipairs(assert(Binding._list("/cfg"))) do kinds[entry.name] = entry.kind end
-			helpers.assert_eq(kinds["config.toml"], "file")
-			helpers.assert_eq(kinds["hotstrings"], "dir")
-			helpers.assert_eq(kinds["linked.toml"], "file")
-			helpers.assert_eq(kinds["loop"], "other")
-			local absent, reason = Binding._list("/nothing")
-			helpers.assert_nil(absent)
-			helpers.assert_eq(reason, "absent")
-		end)
-	end)
-
 	helpers.it("backs up the configuration folder under the shared rules", function()
 		with_binding({}, function(Binding)
 			local owner = assert(Binding.owner())
@@ -100,3 +83,19 @@ helpers.describe("config_backup binding (macOS)", function()
 		end)
 	end)
 end)
+
+--- Lists a stubbed tree through the macOS listing port (the FileSystem adapter).
+--- @param entries table { { name, kind } } with kind file, dir, link_file or link_dir
+--- @param body function fn(list, root)
+local function stub_listing(entries, body)
+	local root = "/cfg"
+	local tree = { [root] = "dir" }
+	for _, entry in ipairs(entries) do tree[root .. "/" .. entry.name] = entry.kind end
+	with_binding(tree, function(Binding) body(Binding._list, root) end)
+end
+
+local handle = assert(io.open(DEFAULTS, "rb"))
+local defaults = assert(Json.decode(handle:read("*a")), "defaults.json must decode")
+handle:close()
+
+require("test.config_backup_binding_contract").register(helpers, { defaults = defaults, listing = stub_listing })
