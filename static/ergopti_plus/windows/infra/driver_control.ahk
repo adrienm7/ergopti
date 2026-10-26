@@ -381,6 +381,7 @@ class DriverControlSession {
 			throw ValueError("The driver control session needs a folder and a process id.")
 		this.Spec := Spec, this.Folder := Folder, this.Pid := Pid, this.Ports := Ports
 		this.Token := "", this.Endpoint := 0, this.Started := false, this.Active := false
+		this.Closed := false
 		this.Handled := 0, this.PendingReport := 0
 	}
 
@@ -388,34 +389,60 @@ class DriverControlSession {
 
 	/** Completes a pending request naming this process, then publishes the session. */
 	Start() {
-		if this.Started
-			throw Error("The driver control session cannot be started twice.")
+		if this.Started || this.Closed
+			throw Error("The driver control session cannot start twice or after retirement.")
 		this.Started := true
-		FSEnsureDirectoryStrict(this.Folder)
-		Owed := DriverControl_Resolve(this.Spec,
-			FSReadUtf8ExactBounded(this.Path("result"), this.Spec["max_request_bytes"]), this.Pid,
-			DriverControl_Now(), &Kind)
-		if Owed != "" {
-			this.Publish("result", Owed)
-			if Kind == "timeout" {
-				try LoggerWarn("DriverControl", "A pending reload request passed its deadline before this driver was ready; reported as timeout.")
-			} else if Kind == "completed" {
-				try LoggerSuccess("DriverControl", "Reload request completed in successor pid {1}.", this.Pid)
+		try {
+			FSEnsureDirectoryStrict(this.Folder)
+			this._RequireStarting()
+			Owed := DriverControl_Resolve(this.Spec,
+				FSReadUtf8ExactBounded(this.Path("result"), this.Spec["max_request_bytes"]), this.Pid,
+				DriverControl_Now(), &Kind)
+			this._RequireStarting()
+			if Owed != "" {
+				this.Publish("result", Owed)
+				if Kind == "timeout" {
+					try LoggerWarn("DriverControl", "A pending reload request passed its deadline before this driver was ready; reported as timeout.")
+				} else if Kind == "completed" {
+					try LoggerSuccess("DriverControl", "Reload request completed in successor pid {1}.", this.Pid)
+				}
 			}
+			this._RequireStarting()
+			Token := this.Ports["token"].Call(this.Spec["token_hex_length"])
+			this._RequireStarting()
+			if !DriverControl_IsToken(this.Spec, Token)
+				throw Error("The driver control token source returned a malformed token.")
+			this.Token := Token
+			this.Publish("session", DriverControl_SessionText(this.Spec, this.Pid, Token))
+			this._RequireStarting()
+			this.Endpoint := this.Ports["endpoint"].Call(ObjBindMethod(this, "Handle"))
+			this._RequireStarting()
+			this.Endpoint.Start()
+			PreviousCritical := Critical("On")
+			try {
+				; Retirement is monotonic even when an OnExit continuation resumes.
+				this.Active := !this.Closed
+				this._RequireStarting()
+			} finally Critical(PreviousCritical)
+		} catch as FirstError {
+			; A reentrant global Stop may already have withdrawn this session.
+			; The exact Start continuation still owes cleanup of any late return.
+			try this.Stop()
+			catch as CleanupError
+				FirstError.ControlRetirementError := CleanupError
+			throw FirstError
 		}
-		Token := this.Ports["token"].Call(this.Spec["token_hex_length"])
-		if !DriverControl_IsToken(this.Spec, Token)
-			throw Error("The driver control token source returned a malformed token.")
-		this.Token := Token
-		this.Publish("session", DriverControl_SessionText(this.Spec, this.Pid, Token))
-		this.Endpoint := this.Ports["endpoint"].Call(ObjBindMethod(this, "Handle"))
-		this.Endpoint.Start()
-		this.Active := true
+	}
+
+	/** Rejects late startup publication after this exact session was retired. */
+	_RequireStarting() {
+		if this.Closed
+			throw Error("The driver control session was retired during startup.")
 	}
 
 	/** Retires the endpoint, then withdraws the session file it still owns. */
 	Stop() {
-		this.Active := false
+		this.Active := false, this.Closed := true
 		this.PendingReport := 0
 		Failure := 0
 		if IsObject(this.Endpoint) {
@@ -434,7 +461,7 @@ class DriverControlSession {
 
 	/** Runs one rung request outside SendMessage; reports its outcome in the result file. */
 	Handle() {
-		if !this.Active
+		if !this.Active || this.Closed
 			return false
 		this.Handled += 1
 		RequestPath := this.Path("request")

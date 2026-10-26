@@ -298,3 +298,62 @@ _TDC_MenuReloadRefusalIsReported() {
 }
 Test("driver-control: a tray-origin reload refusal settles its joined request (control-joined-refusal)",
 	_TDC_MenuReloadRefusalIsReported)
+
+
+_TDCR_RetireDuringStart(Phase) {
+	_TDC_World(_TDCR_RetireDuringStartBody.Bind(Phase))
+}
+
+_TDCR_RetireDuringStartBody(Phase, World) {
+	State := {Phase: Phase, World: World, FactoryCalls: 0, StartCalls: 0,
+		StopCalls: 0, RetiredInPort: false}
+	World.Session.Ports["token"] := _TDCR_Token.Bind(State)
+	World.Session.Ports["endpoint"] := _TDCR_Endpoint.Bind(State)
+	Failure := 0
+	try World.Session.Start()
+	catch Any as Err
+		Failure := Err
+	AssertTrue(State.RetiredInPort, "the genuine session must be stopped while its startup collaborator is running")
+	AssertFalse(World.Session.Active, "startup cannot publish an active session after its exact owner retired")
+	AssertFalse(FileExist(World.Session.Path("session")),
+		"startup cannot republish its withdrawn session token after retirement")
+	AssertEqual(Phase == "token" ? 0 : 1, State.FactoryCalls,
+		"retirement fences later startup phases")
+	AssertEqual(Phase == "start" ? 1 : 0, State.StartCalls,
+		"a late endpoint factory cannot start its native listener after retirement")
+	AssertTrue(IsObject(Failure), "retired startup must fail fast instead of reporting a completed start")
+}
+
+_TDCR_Stop(State) {
+	State.World.Session.Stop()
+	State.RetiredInPort := true
+}
+
+_TDCR_Token(State, Length) {
+	AssertEqual(StrLen(State.World.Token), Length)
+	if State.Phase == "token"
+		_TDCR_Stop(State)
+	return State.World.Token
+}
+
+_TDCR_Endpoint(State, Handler) {
+	State.FactoryCalls += 1
+	AssertTrue(HasMethod(Handler, "Call"), "the actual session owns its native endpoint callback")
+	if State.Phase == "factory"
+		_TDCR_Stop(State)
+	return {Start: _TDCR_EndpointStart.Bind(State), Stop: _TDCR_EndpointStop.Bind(State)}
+}
+
+_TDCR_EndpointStart(State, *) {
+	State.StartCalls += 1
+	if State.Phase == "start"
+		_TDCR_Stop(State)
+}
+
+_TDCR_EndpointStop(State, *) {
+	State.StopCalls += 1
+}
+
+for _TDCR_Phase in ["token", "factory", "start"]
+	Test("driver-control: retirement during " . _TDCR_Phase . " startup cannot resurrect the session (driver-control-start-retirement)",
+		_TDCR_RetireDuringStart.Bind(_TDCR_Phase))
