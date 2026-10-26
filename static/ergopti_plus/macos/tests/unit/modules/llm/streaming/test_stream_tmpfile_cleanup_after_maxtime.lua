@@ -146,7 +146,7 @@ do
 	-- exact same Lua lexical-scoping gotcha the Ollama twin's comment warns
 	-- about: a local declared AFTER a closure is defined resolves to the nil
 	-- global inside that closure, so os.remove(tmp_path) would throw.
-	local tmp_path_decl_pos = src:find("local tmp_path =", 1, true)
+	local tmp_path_decl_pos = src:find("local tmp_path[%s,=]")
 	local on_done_pos       = src:find("local function on_done(", 1, true)
 	helpers.assert_true(tmp_path_decl_pos ~= nil, "api_mlx_inference.lua must declare local tmp_path (F-MED-3)")
 	helpers.assert_true(on_done_pos ~= nil, "api_mlx_inference.lua must define on_done (F-MED-3)")
