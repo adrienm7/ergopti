@@ -19,6 +19,11 @@ default taken meanwhile.
 - **Duplicate keys in the macOS hotstring override file:** the shared parser reads a duplicate field or
   header as invalid TOML (the file is then treated as unreadable, as Linux already did); macOS used to keep
   the last value. Default meanwhile: strict. Keep it, or add a lenient mode?
+- **Linux crash notice:** a Linux crash now shows the same immediate notification as macOS, and the
+  next-start crash dialog is kept too, so a crash can show a toast then a dialog. Default meanwhile: both.
+  Drop the next-start dialog ("one notice")?
+- **Linux Quit refusal:** the only refusal on Linux is "a shutdown already owns the daemon". Default
+  meanwhile: that case only. Enough?
 - **AI-off hint text:** the greyed agent actions reuse `llm.manual_prediction.disabled` ("AI suggestions are
   off: turn them on in the Artificial Intelligence menu."). Default meanwhile: reused. A dedicated string?
 
