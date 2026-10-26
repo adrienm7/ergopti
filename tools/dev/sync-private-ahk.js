@@ -28,10 +28,19 @@ if (!fs.existsSync(privatePath)) {
 
 const publicPath = path.join('static', 'ergopti_plus', 'windows', 'ErgoptiPlus.ahk');
 
-// Helper to strip date line and section 2/ perso (découpage étape-par-étape comme remove_ahk_personal_configuration.js)
+// Normalize text before inspecting its first line so the private BOM cannot
+// move behind the generated date, and Windows saves cannot introduce CRLF.
+function normalizeAhkText(content) {
+	return content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+}
+
+// One format owner for every public write, including unchanged-body repairs.
+function canonicalAhkContent(content) {
+	return '\uFEFF' + normalizeAhkText(content);
+}
+
 function stripForComparison(content) {
-	// Remove BOM if present
-	content = content.replace(/^\uFEFF/, '');
+	content = normalizeAhkText(content);
 	// Remove date line if present
 	content = content.replace(/^; (Created|Last modified) on .*(\r?\n)/, '');
 
@@ -64,16 +73,23 @@ function stripForComparison(content) {
 	return (before + start2Block + extra2 + endBlock + after).trim();
 }
 
-const privateContent = fs.readFileSync(privatePath, 'utf8');
+const privateContent = normalizeAhkText(fs.readFileSync(privatePath, 'utf8'));
 let privateForCompare = stripForComparison(privateContent);
 
 let publicForCompare = '';
-if (fs.existsSync(publicPath)) {
-	const publicContent = fs.readFileSync(publicPath, 'utf8');
+let publicContent = '';
+const publicExists = fs.existsSync(publicPath);
+if (publicExists) {
+	publicContent = fs.readFileSync(publicPath, 'utf8');
 	publicForCompare = stripForComparison(publicContent);
 }
 
-if (privateForCompare === publicForCompare) {
+if (publicExists && privateForCompare === publicForCompare) {
+	const canonicalPublic = canonicalAhkContent(publicContent);
+	if (publicContent !== canonicalPublic) {
+		fs.writeFileSync(publicPath, canonicalPublic, 'utf8');
+		console.log('Normalized public AHK encoding without changing its date or source.');
+	}
 	console.log('ℹ️  No changes outside personal section — skipping sync and date update.');
 	process.exit(0);
 }
@@ -95,5 +111,5 @@ const hasDateLine = !!firstLine.match(/^; (Created|Last modified) on /);
 const rest = hasDateLine ? lines.slice(1).join('\n') : privateContent;
 const updated = dateLine + '\n' + rest;
 
-fs.writeFileSync(publicPath, updated, 'utf8');
+fs.writeFileSync(publicPath, canonicalAhkContent(updated), 'utf8');
 console.log(`✅ Synced private AHK → ${publicPath} (date line added)`);
