@@ -653,6 +653,7 @@ return {
 	"tests.unit.modules.llm.features.test_translate_selection",
 	"tests.unit.modules.llm.prediction.test_prediction_triggers",
 	"tests.unit.modules.llm.prediction.test_request_plan_contract",
+	"tests.unit.modules.llm.prediction.test_engine_transcripts",
 	"tests.unit.modules.llm.prediction.test_unicode_trigger_deletion",
 	"tests.unit.modules.llm.settings.test_profile_settings",
 	"tests.unit.modules.llm.settings.test_profile_preferences_canonical_prompt_profiles",

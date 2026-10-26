@@ -1,0 +1,177 @@
+{
+	"_comment": "End-to-end prediction transcripts replayed by _shared/lua/test/llm_engine_transcript.lua against the real macOS and Linux engines on recording fakes of the three ports. A scenario gives a config (the menu's debounce in ms, prediction count and prompt, an optional user prompt, and watch_timers_ms: the only timer delays recorded, so the engines' own watchdogs and spinners stay out), steps (keystroke: the whole typed buffer after one keystroke; elapse_ms: time passing, which runs the timers that fall due; answer: the provider answers request N; toggle_live: the live binding with its parameter; delete_prompt: the user deletes a prompt), and expect: the port calls in order. Calls: timer.after with delay_ms; http.post with max_tokens (the symbols base, batch:N and rewrite are resolved from the shared token budget); tooltip.show with the number of candidates and the info pieces ($model is the model the shared Cerebras entry defaults to; $profile:ID is the prompt's name as the driver's menu spells it, short-label rule applied). Only a render that is not a loading placeholder is recorded.",
+	"drivers": {
+		"macos": "Replays every scenario (macos/tests/unit/modules/llm/features/test_engine_transcripts.lua).",
+		"linux": "Replays every scenario (linux/tests/unit/modules/llm/prediction/test_engine_transcripts.lua).",
+		"windows": "Not ported yet: the AutoHotkey engine would have to expose the same three ports (a timer, an HTTP client and a tooltip renderer it can be given fakes of) and replay every scenario; today its timers and requests are called directly."
+	},
+	"differences": {
+		"seams": "Linux hands the engine its scheduler and its overlay through init and its HTTP client through the module the remote backend requires; macOS has no init injection for them, so its world replaces adapters.timer_scheduler.after, the remote backend's inference client and ui.tooltip in place. The ports are the same three; only the way a fake is put in differs.",
+		"repaint": "macOS paints the final answer a second time after its success callback commits; the screen does not change, so the macOS world records one tooltip call for two identical consecutive paints. Linux paints once.",
+		"batch_reveal": "macOS reveals a batch prediction by prediction on zero-delay timers; its world runs the timers an answer arms. Linux shows the batch at once.",
+		"info_bar_join": "The pieces are compared, not the joined text: macOS joins with an em dash and Linux with a middle dot and adds i/n (see request_plan_info_bar_vectors.json)."
+	},
+	"scenarios": [
+		{
+			"id": "typing-arms-the-menu-debounce-then-asks-once",
+			"config": {
+				"debounce_ms": 400,
+				"count": 1,
+				"profile": "basic",
+				"watch_timers_ms": [400, 80]
+			},
+			"steps": [
+				{
+					"keystroke": "Bonjour Marc, je voulais te dire"
+				},
+				{
+					"elapse_ms": 400
+				},
+				{
+					"answer": {
+						"request": 1,
+						"text": "que tout est prêt."
+					}
+				}
+			],
+			"expect": [
+				{
+					"port": "timer",
+					"call": "after",
+					"delay_ms": 400
+				},
+				{
+					"port": "http",
+					"call": "post",
+					"max_tokens": "base"
+				},
+				{
+					"port": "tooltip",
+					"call": "show",
+					"candidates": 1,
+					"info": ["$model", "$profile:basic"]
+				}
+			]
+		},
+		{
+			"id": "a-batch-prompt-asks-once-with-the-batch-budget",
+			"config": {
+				"debounce_ms": 400,
+				"count": 2,
+				"profile": "batch_advanced",
+				"watch_timers_ms": [400, 80]
+			},
+			"steps": [
+				{
+					"keystroke": "Je vous envoie ce mail pour"
+				},
+				{
+					"elapse_ms": 400
+				},
+				{
+					"answer": {
+						"request": 1,
+						"text": "TAIL_CORRECTED: pour\nNEXT_WORDS: vous dire\n===\nTAIL_CORRECTED: pour\nNEXT_WORDS: te dire"
+					}
+				}
+			],
+			"expect": [
+				{
+					"port": "timer",
+					"call": "after",
+					"delay_ms": 400
+				},
+				{
+					"port": "http",
+					"call": "post",
+					"max_tokens": "batch:2"
+				},
+				{
+					"port": "tooltip",
+					"call": "show",
+					"candidates": 2,
+					"info": ["$model", "$profile:batch_advanced"]
+				}
+			]
+		},
+		{
+			"id": "live-mode-arms-its-own-debounce-and-rewrites",
+			"config": {
+				"debounce_ms": 400,
+				"count": 3,
+				"profile": "basic",
+				"watch_timers_ms": [400, 80]
+			},
+			"steps": [
+				{
+					"toggle_live": "translate_en|1"
+				},
+				{
+					"keystroke": "on se voit demain"
+				},
+				{
+					"elapse_ms": 80
+				},
+				{
+					"answer": {
+						"request": 1,
+						"text": "REWRITE: See you tomorrow"
+					}
+				}
+			],
+			"expect": [
+				{
+					"port": "timer",
+					"call": "after",
+					"delay_ms": 80
+				},
+				{
+					"port": "http",
+					"call": "post",
+					"max_tokens": "rewrite"
+				},
+				{
+					"port": "tooltip",
+					"call": "show",
+					"candidates": 1,
+					"info": ["$model", "$profile:translate_en"]
+				}
+			]
+		},
+		{
+			"id": "a-deleted-live-prompt-stops-live-mode-and-asks-for-nothing",
+			"config": {
+				"debounce_ms": 400,
+				"count": 3,
+				"profile": "basic",
+				"watch_timers_ms": [400, 80],
+				"user_prompt": {
+					"id": "user_pirate",
+					"label": "Pirate",
+					"system_single": "Rewrite as a pirate.\nREWRITE: <text>"
+				}
+			},
+			"steps": [
+				{
+					"toggle_live": "user_pirate|1"
+				},
+				{
+					"delete_prompt": "user_pirate"
+				},
+				{
+					"keystroke": "on se voit demain"
+				},
+				{
+					"elapse_ms": 80
+				}
+			],
+			"expect": [
+				{
+					"port": "timer",
+					"call": "after",
+					"delay_ms": 80
+				}
+			]
+		}
+	]
+}
