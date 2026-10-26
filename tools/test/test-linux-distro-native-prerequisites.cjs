@@ -17,11 +17,11 @@ const bashPath = (value) =>
 // These are runtime ABI/CLI package providers, not desktop networking backends.
 // Genuine distro qualification separately executes GVariant and SQLite fixtures.
 const providers = [
-	['debian', 'apt-get', 'libglib2.0-0t64', 'sqlite3', 'tzdata'],
-	['fedora', 'dnf', 'glib2', 'sqlite', 'tzdata'],
-	['arch', 'pacman', 'glib2', 'sqlite', 'tzdata'],
-	['alpine', 'apk', 'glib', 'sqlite', 'tzdata'],
-	['opensuse', 'zypper', 'libglib-2_0-0', 'sqlite3', 'timezone']
+	['debian', 'apt-get', 'libglib2.0-0t64', 'sqlite3', 'tzdata', 'libxkbcommon0'],
+	['fedora', 'dnf', 'glib2', 'sqlite', 'tzdata', 'libxkbcommon'],
+	['arch', 'pacman', 'glib2', 'sqlite', 'tzdata', 'libxkbcommon'],
+	['alpine', 'apk', 'glib', 'sqlite', 'tzdata', 'libxkbcommon'],
+	['opensuse', 'zypper', 'libglib-2_0-0', 'sqlite3', 'timezone', 'libxkbcommon0']
 ];
 /** Execute every package, pin and destination guard in one physical scratch tree. */
 function runControls(scratch) {
@@ -51,7 +51,7 @@ function runControls(scratch) {
 				}
 			});
 		let checks = 0;
-		for (const [distro, manager, glib, sqlite, timezone] of providers) {
+		for (const [distro, manager, glib, sqlite, timezone, xkb] of providers) {
 			for (const suite of ['unit', 'integration']) {
 				fs.rmSync(recorded, { force: true });
 				const result = invoke(distro, suite);
@@ -76,6 +76,10 @@ function runControls(scratch) {
 					`${distro}: native local-calendar fixtures require declared timezone data`
 				);
 				assert.ok(args.includes(glib), `${distro}: native GVariant requires declared ${glib}`);
+				assert.ok(
+					args.includes(xkb),
+					`${distro}: native keymap publication requires declared ${xkb}`
+				);
 				assert.ok(
 					args.includes(sqlite),
 					`${distro}: native metric reset requires declared ${sqlite}`
