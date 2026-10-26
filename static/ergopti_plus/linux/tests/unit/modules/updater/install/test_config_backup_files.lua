@@ -134,12 +134,23 @@ helpers.describe("config-backup-native-names", function()
 		local ok, err = pcall(function()
 			assert(require("luv").fs_symlink(dir .. "/not-here", dir .. "/cfg/dangling.toml"))
 			local owner = assert(Backup.owner())
-			local record, reason = owner.create("pre_install")
-			helpers.assert_true(type(record) == "table", "a dangling link holds no configuration: " .. tostring(reason))
+			local Writer = require("toml_codec.writer")
+			local native_read, attempts = Writer.read_classified, 0
+			Writer.read_classified = function(path, ...)
+				if path == dir .. "/cfg/dangling.toml" then attempts = attempts + 1 end
+				return native_read(path, ...)
+			end
+			local called, record, reason = pcall(owner.create, "pre_install")
+			Writer.read_classified = native_read
+			if not called then error(record, 0) end
+			helpers.assert_true(type(record) == "table", "a proven dangling link holds no configuration: " .. tostring(reason))
+			helpers.assert_eq(attempts, 0, "a proven dangling target must never enter the file read set")
 			helpers.assert_eq(read(record.path .. "/config/config.toml"), "[script]\nlocale = \"fr\"\n")
 			for _, file in ipairs(record.files) do
 				helpers.assert_true(file.path ~= "dangling.toml", "an absent target must never become a backup file")
 			end
+			helpers.assert_eq(read(dir .. "/cfg/config.toml"), "[script]\nlocale = \"fr\"\n")
+			helpers.assert_eq(assert(owner.latest("pre_install")).id, record.id, "the complete snapshot must remain discoverable")
 		end)
 		Backup._overrides = nil
 		os.execute("rm -rf " .. quote(dir))
