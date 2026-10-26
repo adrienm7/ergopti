@@ -43,8 +43,6 @@ local LOG    = "keystats.rotation"
 --- Maximum JSONL lines consumed per ingest tick.
 local INGEST_BATCH_LINES = 5000
 
---- Maximum refused-write bytes verified in one deferred retry turn.
-local APPEND_RECOVERY_BYTES_PER_TURN = 64 * 1024
 
 --- Tail-read outcomes. Only READ_STATUS_EOF authorizes destructive rollover;
 --- an empty entry list alone is never proof that the journal was fully read.
@@ -71,6 +69,7 @@ local _today_log_date = nil
 
 --- Whether M.init has been called.
 local _initialized = false
+local _recovery_turn_bytes = nil  -- Refused-write bytes re-verified per deferred retry turn; set by init().
 
 --- Persistent append handle for today.log — opened once in M.init() and reused
 --- across every M.append_log() call so the hot path never pays open()/close().
@@ -256,7 +255,7 @@ local function _resume_append()
 			return refused("recovery prefix seek")
 		end
 		local remaining = count - pending.verified
-		local amount = math.min(remaining, APPEND_RECOVERY_BYTES_PER_TURN - 1)
+		local amount = math.min(remaining, _recovery_turn_bytes - 1)
 		-- read(0) at a verified empty prefix returns clean EOF and clears the
 		-- stdio write-error indicator, just as a positive read does.
 		local read_ok, bytes, detail, code = pcall(handle.read, handle, amount)
@@ -502,13 +501,16 @@ end
 -- ==============================
 
 --- Initialize the rotation module with resolved paths and shared state.
---- @param deps table Must contain: paths (table), state (table).
+--- @param deps table Must contain: paths (table), state (table), recovery_turn_bytes
+---                   (integer > 1, the [limits] journal_recovery_turn_bytes budget).
 ---                   May also carry: today_log_offset (integer), today_log_date (string).
 function M.init(deps)
 	Logger.start(LOG, "Initializing…")
 	if type(deps) ~= "table"
 		or type(deps.paths) ~= "table"
-		or type(deps.state) ~= "table" then
+		or type(deps.state) ~= "table"
+		or math.type(deps.recovery_turn_bytes) ~= "integer"
+		or deps.recovery_turn_bytes < 2 then
 		Logger.error(LOG, "M.init(): invalid deps — rotation module non-functional.")
 		return
 	end
@@ -518,6 +520,7 @@ function M.init(deps)
 	end
 	_paths = deps.paths
 	_state = deps.state
+	_recovery_turn_bytes = deps.recovery_turn_bytes
 	_today_log_offset = deps.today_log_offset or 0
 	_today_log_date   = deps.today_log_date   or nil
 	_append_boundary_required = false

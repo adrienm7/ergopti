@@ -795,3 +795,8 @@ declaration_file_bytes = 65536
 # rendered notes, about 0.5 MB today).
 # LX: ui/changelog/bridge.lua.
 changelog_source_bytes = 4194304
+
+# Refused metrics-journal bytes the macOS driver re-verifies in one deferred
+# retry turn, so a large backlog never blocks the event loop.
+# HS: modules/keystats/rotation.lua.
+journal_recovery_turn_bytes = 65536

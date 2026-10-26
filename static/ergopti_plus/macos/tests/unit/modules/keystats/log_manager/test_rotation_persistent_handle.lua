@@ -99,7 +99,7 @@ helpers.describe("rotation — persistent today.log handle (no per-append open/c
 					return real_date(format, timestamp)
 				end
 
-				r.init({ paths = { today_log_path = TODAY }, state = {}, today_log_date = "2024-06-01" })
+				r.init({ recovery_turn_bytes = 65536, paths = { today_log_path = TODAY }, state = {}, today_log_date = "2024-06-01" })
 				local initial_reads, initial_seeks = inspections.read, inspections.seek
 
 				-- N appends must NOT reopen the file — the init handle is reused.
