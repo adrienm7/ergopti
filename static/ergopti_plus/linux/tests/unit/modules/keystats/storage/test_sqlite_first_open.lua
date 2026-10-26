@@ -77,7 +77,10 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 
 	helpers.it("refuses special native startup sources without blocking (sqlite-native-file-admission)", function()
 		local fixture = helpers.driver_root() .. "/tests/hardware/test_sqlite_file_admission.py"
-		local status = os.execute("python3 " .. require("text_utils").shell_quote(fixture))
+		local quote = require("text_utils").shell_quote
+		-- Lend this provider only to the exact interpreter that admitted it.
+		local status = os.execute("python3 " .. quote(fixture) .. " " .. quote("--runtime=" .. runtime)
+			.. " " .. quote("--cpath=" .. package.cpath))
 		helpers.assert_true(status == 0 or status == true, "Native SQLite file admission must refuse without hanging")
 	end)
 
@@ -233,8 +236,8 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		local quote = require("text_utils").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_text_migration_consumer.lua"
-		-- A Lua 5.4 parent must not export its native module ABI into LuaJIT.
-		local status = os.execute("env -u LUA_PATH luajit " .. quote(fixture) .. " " .. quote(root))
+		-- Reuse admitted JIT providers; a stock-Lua parent cannot export its ABI.
+		local status = os.execute(native_fixture_command(rawget(_G, "jit") and runtime or "luajit", rawget(_G, "jit") ~= nil) .. quote(fixture) .. " " .. quote(root))
 		helpers.assert_true(status == true or status == 0, "native settings posture and migration acceptance must remain distinct")
 	end)
 
@@ -242,7 +245,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		local quote = require("text_utils").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_keystats_calendar.lua"
-		local status = os.execute("env -u LUA_PATH TZ=Europe/Paris luajit " .. quote(fixture) .. " " .. quote(root))
+		local status = os.execute("TZ=Europe/Paris " .. native_fixture_command(rawget(_G, "jit") and runtime or "luajit", rawget(_G, "jit") ~= nil) .. quote(fixture) .. " " .. quote(root))
 		helpers.assert_true(status == true or status == 0, "native calendar sources must survive delayed persistence")
 	end)
 
@@ -251,7 +254,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_system_event_capture.lua"
 		local receipt = os.tmpname()
-		local status = os.execute("env -u LUA_PATH luajit " .. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
+		local status = os.execute(native_fixture_command(rawget(_G, "jit") and runtime or "luajit", rawget(_G, "jit") ~= nil) .. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
 		os.remove(receipt)
 		helpers.assert_true(status == true or status == 0, "capture admission must preserve permitted raw events and independent machine aggregates")
 	end)
@@ -261,7 +264,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_keystats_layout_capture.lua"
 		local receipt = os.tmpname()
-		local status = os.execute("env -u LUA_PATH luajit " .. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
+		local status = os.execute(native_fixture_command(rawget(_G, "jit") and runtime or "luajit", rawget(_G, "jit") ~= nil) .. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
 		os.remove(receipt)
 		helpers.assert_true(status == true or status == 0, "captured layout and finger context must survive later provider publication")
 	end)
