@@ -223,6 +223,7 @@ class MetricsAppsPageControls(unittest.TestCase):
             "../i18n.js",
             "../metrics_rebuild_banner.js",
             "../metrics_freshness.js",
+            "../_generated/metrics_general_category_aliases.js",
             "helpers.js",
             "state.js",
             "main.js",
@@ -412,6 +413,13 @@ class MetricsAppsPageControls(unittest.TestCase):
                 probe.validate_retirement(result)
 
     def test_source_manifest_uses_actual_declared_scripts_and_caller_query(self):
+        actual_repo = Path(__file__).resolve().parents[2]
+        actual_sources, _ = probe.source_identity(actual_repo)
+        alias = "static/ergopti_plus/_shared/ui/_generated/metrics_general_category_aliases.js"
+        self.assertEqual(
+            actual_sources[alias],
+            probe.hashlib.sha256((actual_repo / alias).read_bytes()).hexdigest(),
+        )
         repo = self.source_fixture()
         sources, digest = probe.source_identity(repo)
         self.assertEqual(len(digest), 64)
@@ -427,6 +435,21 @@ class MetricsAppsPageControls(unittest.TestCase):
         self.assertEqual(probe.source_identity(aliased_repo), (sources, digest))
         self.assertEqual(probe.source_identity(repo.resolve()), (sources, digest))
         self.assertTrue(all(not Path(name).is_absolute() for name in sources))
+        page = repo / probe.PAGE
+        declared = page.read_text()
+        for changed in (
+            declared.replace('<script src="state.js"></script>', ""),
+            declared.replace('src="state.js"', 'src="main.js"'),
+            declared.replace('src="state.js"', 'src="unexpected.js"'),
+            declared.replace('src="state.js"', 'src="charts.js"').replace(
+                '<script src="charts.js"></script><script src="modal.js">',
+                '<script src="state.js"></script><script src="modal.js">',
+            ),
+        ):
+            page.write_text(changed)
+            with self.subTest(page=changed), self.assertRaises(ValueError):
+                probe.source_identity(repo)
+        page.write_text(declared)
 
     def test_missing_or_remote_asset_cannot_be_accepted(self):
         repo = self.source_fixture()
