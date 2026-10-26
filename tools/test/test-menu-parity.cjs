@@ -5321,7 +5321,11 @@ function personalInfoProviderComposition(source, declarations, platform) {
 		for (const candidate of ['', JSON.stringify(source), '--[=[\n' + source + '\n]=]'])
 			assert.equal(admits(candidate), false, 'missing, quoted or comment-only producer');
 		for (const [before, after, reason] of [
-			['local renderer = ManifestMenu', 'local renderer = Foreign', 'foreign native facade'],
+			[
+				'return PersonalInfoSource.read(ManifestMenu)',
+				'return PersonalInfoSource.read(Foreign)',
+				'foreign native facade'
+			],
 			[
 				'local root, source = root_owner(), array_owner("personal_info_editor_frame")',
 				'local root, source = root_owner(), array_owner("foreign_frame")',
@@ -5343,15 +5347,35 @@ function personalInfoProviderComposition(source, declarations, platform) {
 				'withdrawn lexical namespace'
 			],
 			[
+				'local function read_source(renderer)',
+				'local _ENV = Foreign\nlocal function read_source(renderer)',
+				'withdrawn lexical namespace in the shared module'
+			],
+			[
 				platform === 'hs' ? 'items[#items + 1] = row' : 'if valid then sub[1] = row end',
 				platform === 'hs' ? 'items[#items + 1] = {}' : 'if valid then sub[1] = {} end',
 				'actual returned command discarded'
 			]
 		]) {
-			assert.equal(source.split(before).length - 1, 1, reason + ': exact genuine coordinate');
-			const candidate = source.replace(before, after);
-			assert.notEqual(candidate, source, reason + ': actual source changes');
-			assert.equal(admits(candidate), false, reason);
+			// The admission body lives once in the shared module: a control whose
+			// preimage is there mutates that text, every other control the driver's.
+			const proof = require('../lib/menu-native-personal-info-binding.cjs');
+			const shared = proof.sharedSource();
+			const inDriver = source.split(before).length - 1;
+			const inShared = shared.split(before).length - 1;
+			assert.equal(inDriver + inShared, 1, reason + ': exact genuine coordinate');
+			const candidate = inDriver === 1 ? source.replace(before, after) : source;
+			const candidateShared = inShared === 1 ? shared.replace(before, after) : shared;
+			assert.notEqual(
+				candidate + candidateShared,
+				source + shared,
+				reason + ': actual source changes'
+			);
+			assert.equal(
+				proof.withSharedSource(candidateShared, () => admits(candidate)),
+				false,
+				reason
+			);
 			assert.equal(admits(), true, reason + ': genuine inverse');
 		}
 		for (const alter of [
