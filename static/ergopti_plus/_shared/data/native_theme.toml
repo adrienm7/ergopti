@@ -1,0 +1,61 @@
+# _shared/data/native_theme.toml
+#
+# The colours the native (Lua) drivers type themselves: the ordered palette of
+# the hotstrings settings window and the accent of each download-window kind.
+# The web pages take their colours from _shared/ui/theme.css instead; this file
+# exists because a Lua driver has no stylesheet to read.
+#
+# Generated into _shared/lua/native_theme_data.lua by
+# tools/codegen/codegen-native-theme.cjs. Edit this file, then run
+# `npm run gen`; never edit the generated Lua by hand.
+#
+# The Windows driver still types its own palette (a superset of the one below).
+# tools/test/test-color-presets-parity.cjs holds that copy to this one.
+
+# The ordered palette. `i18n` is the locale key of the colour's name.
+[[hotstring_palette]]
+name = "red"
+i18n = "hs_config.color_red"
+hex = "#e53935"
+
+[[hotstring_palette]]
+name = "green"
+i18n = "hs_config.color_green"
+hex = "#43a047"
+
+[[hotstring_palette]]
+name = "orange"
+i18n = "hs_config.color_orange"
+hex = "#fb8c00"
+
+[[hotstring_palette]]
+name = "blue"
+i18n = "hs_config.color_blue"
+hex = "#1e88e5"
+
+[[hotstring_palette]]
+name = "purple"
+i18n = "hs_config.color_purple"
+hex = "#8e44ad"
+
+[[hotstring_palette]]
+name = "cyan"
+i18n = "hs_config.color_cyan"
+hex = "#00838f"
+
+[[hotstring_palette]]
+name = "yellow"
+i18n = "hs_config.color_yellow"
+hex = "#fdd835"
+
+[[hotstring_palette]]
+name = "gray"
+i18n = "hs_config.color_gray"
+hex = "#6e6e73"
+
+# The accent of each download-window kind (the macOS window pushes it to the page).
+[download_accent]
+mlx_install = "#4da6ff"
+ollama_install = "#73d98c"
+mlx_model = "#9973f2"
+ollama_model = "#f2bf4d"
