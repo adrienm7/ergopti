@@ -44,7 +44,8 @@ M._overrides = nil
 
 --- Classifies one folder entry.
 --- @param path string
---- @return string kind "file", "dir" or "other"
+--- @return string|nil kind "file", "dir" or "other"; nil when the link target is unknowable
+--- @return string|nil error Why the link target cannot be classified
 local function classify(path)
 	local status, attributes = FileSystem.path_status(path)
 	if status ~= "present" or type(attributes) ~= "table" then return "other" end
@@ -54,10 +55,12 @@ local function classify(path)
 		-- A link to a folder could lead back up the tree: it is reported, never walked.
 		-- Only a regular file is read: opening a FIFO, a socket or a device node can
 		-- block forever, so those targets are "other". A dangling link holds no
-		-- configuration and is "other" too, so it never fails the snapshot.
-		local target_status, target_mode = FileSystem.followed_mode(path)
-		if target_status == "present" and target_mode == "file" then return "file" end
-		return "other"
+		-- configuration and is "other" too, so it never fails the snapshot; a denied
+		-- or looping target may hide configuration, so it refuses the listing.
+		local target_status, target = FileSystem.followed_mode(path)
+		if target_status == "present" then return target == "file" and "file" or "other" end
+		if target_status == "absent" then return "other" end
+		return nil, string.format("cannot classify %s: %s", path, tostring(target or target_status))
 	end
 	return "other"
 end
@@ -75,7 +78,9 @@ local function list(dir)
 	local entries = {}
 	for _, name in ipairs(names) do
 		if name ~= "." and name ~= ".." then
-			entries[#entries + 1] = { name = name, kind = classify((dir:gsub("/+$", "")) .. "/" .. name) }
+			local kind, refusal = classify((dir:gsub("/+$", "")) .. "/" .. name)
+			if kind == nil then return nil, refusal end
+			entries[#entries + 1] = { name = name, kind = kind }
 		end
 	end
 	return entries

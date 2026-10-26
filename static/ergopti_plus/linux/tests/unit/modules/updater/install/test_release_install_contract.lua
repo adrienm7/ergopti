@@ -36,6 +36,7 @@ local function real_listing(entries, body)
 			fifo = "mkfifo " .. path,
 			link_fifo = "mkfifo " .. quote(root .. "/elsewhere/pipe") .. " && ln -s " .. quote(root .. "/elsewhere/pipe") .. " " .. path,
 			link_dangling = "ln -s " .. quote(root .. "/elsewhere/missing.toml") .. " " .. path,
+			link_loop = "ln -s " .. path .. " " .. path,
 		})[entry.kind]
 		assert(os.execute(command))
 	end

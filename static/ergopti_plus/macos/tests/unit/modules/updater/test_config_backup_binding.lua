@@ -38,6 +38,7 @@ local function with_binding(tree, body)
 			followed_mode = function(path)
 				local kind = tree[path]
 				if kind == "link_dangling" then return "absent" end
+				if kind == "link_loop" then return "error", "Too many levels of symbolic links" end
 				if kind == "link_dir" then return "present", "directory" end
 				if kind == "link_fifo" then return "present", "named pipe" end
 				return "present", "file"
