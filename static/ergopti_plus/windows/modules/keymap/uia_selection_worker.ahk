@@ -43,6 +43,8 @@ global UIASW_TERMINATION_RETRY_MS := 250
 
 class UIASWState {
 	static worker_generation := 0
+	; Construction is owned before a shell handle exists, so Stop can cancel it.
+	static starting_generation := 0
 	static request_generation := 0
 	static handle := 0
 	static worker_hwnd := 0
@@ -387,50 +389,92 @@ UIASW_Start() {
 	if (!UIASW_DrainTerminationDebt()
 			|| !UIASW_DrainProcessCleanupDebt())
 		return false
-	if IsObject(UIASWState.handle)
-		return true
-	if UIASWState.start_failure_tick {
-		if !TickExpired(UIASWState.start_failure_tick, UIASW_START_BACKOFF_MS)
+	PreviousCritical := Critical("On")
+	try {
+		; Admission and its reservation form one RAM transaction. Constructors,
+		; process startup and callbacks below remain interruptible.
+		if A_IsSuspended || ReloadTerminalHandoffActive()
 			return false
-		UIASWState.start_failure_tick := 0
+		if IsObject(UIASWState.handle)
+			return true
+		if UIASWState.starting_generation
+			return false
+		if UIASWState.start_failure_tick {
+			if !TickExpired(UIASWState.start_failure_tick, UIASW_START_BACKOFF_MS)
+				return false
+			UIASWState.start_failure_tick := 0
+		}
+		WorkerGeneration := ++UIASWState.worker_generation
+		UIASWState.starting_generation := WorkerGeneration
+		UIASWState.start_diagnostic := "ready message not received"
+	} finally Critical(PreviousCritical)
+
+	Handle := 0
+	ConstructionFailure := 0
+	try {
+		Executable := A_IsCompiled ? A_ScriptFullPath : A_AhkPath
+		Args := A_IsCompiled
+			? ["/force", "--uia-selection-worker", A_ScriptHwnd, WorkerGeneration]
+			: ["/force", "/ErrorStdOut", UIASW_WorkerEntryPath(), "--uia-selection-worker", A_ScriptHwnd, WorkerGeneration]
+		Done := UIASW_OnWorkerExit.Bind(WorkerGeneration)
+		Spawn := IsObject(UIASWState.spawn_fn) ? UIASWState.spawn_fn : ShellRunner_Spawn
+		Handle := Spawn.Call(Executable, Args, Done)
+	} catch as Err {
+		ConstructionFailure := Err
 	}
-
-	WorkerGeneration := ++UIASWState.worker_generation
-	UIASWState.start_diagnostic := "ready message not received"
-	Executable := A_IsCompiled ? A_ScriptFullPath : A_AhkPath
-	Args := A_IsCompiled
-		? ["/force", "--uia-selection-worker", A_ScriptHwnd, WorkerGeneration]
-		: ["/force", "/ErrorStdOut", UIASW_WorkerEntryPath(), "--uia-selection-worker", A_ScriptHwnd, WorkerGeneration]
-	Done := UIASW_OnWorkerExit.Bind(WorkerGeneration)
-	Spawn := IsObject(UIASWState.spawn_fn) ? UIASWState.spawn_fn : ShellRunner_Spawn
-
-	try Handle := Spawn.Call(Executable, Args, Done)
-	catch as Err {
-		UIASWState.start_failure_tick := A_TickCount
-		try LoggerError("Layout", "Could not create the UIA probe worker: {1}", Err.Message)
+	if IsObject(ConstructionFailure) || !IsObject(Handle) {
+		PreviousCritical := Critical("On")
+		try {
+			; A late refusal belongs only to its still-current reservation.
+			if UIASWState.starting_generation == WorkerGeneration
+					&& UIASWState.worker_generation == WorkerGeneration {
+				UIASWState.starting_generation := 0
+				UIASWState.start_failure_tick := A_TickCount
+			}
+		} finally Critical(PreviousCritical)
+		if IsObject(ConstructionFailure) {
+			try LoggerError("Layout", "Could not create the UIA probe worker: {1}", ConstructionFailure.Message)
+		} else {
+			try LoggerError("Layout", "Could not create the UIA probe worker handle.")
+		}
 		return false
 	}
-	if !IsObject(Handle) {
-		UIASWState.start_failure_tick := A_TickCount
-		try LoggerError("Layout", "Could not create the UIA probe worker handle.")
-		return false
-	}
 
-	; Publish before start(): a fake or failed handle may complete synchronously.
-	UIASWState.handle := Handle
-	UIASWState.worker_hwnd := 0
-	UIASWState.worker_process_handle := 0
-	StartDeadlineFn := UIASW_OnStartDeadline.Bind(WorkerGeneration)
-	UIASWState.start_deadline_fn := StartDeadlineFn
-	try SetTimer(StartDeadlineFn, -UIASW_START_DEADLINE_MS)
-	catch as Err {
-		UIASW_QueueTerminationDebt(Handle, false)
-		UIASWState.start_deadline_fn := 0
-		UIASWState.handle := 0
-		UIASWState.start_failure_tick := A_TickCount
-		UIASWState.worker_generation += 1
+	Published := false
+	ArmFailure := 0
+	PreviousCritical := Critical("On")
+	try {
+		if UIASWState.starting_generation == WorkerGeneration
+				&& UIASWState.worker_generation == WorkerGeneration {
+			UIASWState.starting_generation := 0
+			if !A_IsSuspended && !ReloadTerminalHandoffActive() {
+				; Publish before start(): completion may be synchronous. The
+				; native timer admission cannot race a stop or a newer owner.
+				UIASWState.handle := Handle
+				UIASWState.worker_hwnd := 0
+				UIASWState.worker_process_handle := 0
+				StartDeadlineFn := UIASW_OnStartDeadline.Bind(WorkerGeneration)
+				UIASWState.start_deadline_fn := StartDeadlineFn
+				try {
+					SetTimer(StartDeadlineFn, -UIASW_START_DEADLINE_MS)
+					Published := true
+				} catch as Err {
+					UIASW_QueueTerminationDebt(Handle, false)
+					UIASWState.start_deadline_fn := 0
+					UIASWState.handle := 0
+					UIASWState.start_failure_tick := A_TickCount
+					UIASWState.worker_generation += 1
+					ArmFailure := Err
+				}
+			}
+		}
+	} finally Critical(PreviousCritical)
+	if !Published {
+		; Stop may have admitted a replacement while this constructor yielded.
+		; Retire only the late capability; never publish it over that successor.
 		UIASW_TerminateWorker(Handle)
-		try LoggerError("Layout", "Could not arm the UIA probe worker startup deadline: {1}", Err.Message)
+		if IsObject(ArmFailure)
+			try LoggerError("Layout", "Could not arm the UIA probe worker startup deadline: {1}", ArmFailure.Message)
 		return false
 	}
 	try Started := Handle.start()
@@ -626,14 +670,16 @@ UIASW_Stop(Status := "canceled") {
 	ProcessHandle := UIASWState.worker_process_handle
 	StartDeadlineFn := UIASWState.start_deadline_fn
 	HadBackoff := UIASWState.start_failure_tick != 0
+	HadConstruction := UIASWState.starting_generation != 0
 	HadDebt := UIASWState.cleanup_debt.Length != 0
 		|| UIASWState.process_cleanup_debt.Length != 0
 	if !IsObject(Pending) && !IsObject(Handle) && !IsObject(StartDeadlineFn)
-			&& !HadBackoff && !HadDebt {
+			&& !HadBackoff && !HadDebt && !HadConstruction {
 		Critical(PreviousCritical ? PreviousCritical : "Off")
 		return false
 	}
 	UIASW_QueueTerminationDebt(Handle, false)
+	UIASWState.starting_generation := 0
 	UIASWState.pending := 0
 	UIASWState.handle := 0
 	UIASWState.worker_hwnd := 0
@@ -657,7 +703,7 @@ UIASW_Stop(Status := "canceled") {
 	TerminationDebtReleased := UIASW_DrainTerminationDebt()
 	ProcessDebtReleased := UIASW_DrainProcessCleanupDebt()
 	HadOwnership := IsObject(Pending) || IsObject(Handle)
-		|| IsObject(StartDeadlineFn) || HadBackoff || HadDebt
+		|| IsObject(StartDeadlineFn) || HadBackoff || HadDebt || HadConstruction
 	return HadOwnership && TerminationAccepted
 		&& TerminationDebtReleased && ProcessDebtReleased
 }
@@ -675,6 +721,7 @@ UIASW_OnWorkerExit(WorkerGeneration, ExitCode, Stdout, Stderr) {
 	ProcessHandle := UIASWState.worker_process_handle
 	; Retire admission before any terminal callback can retry. Cleanup below
 	; owns only these captured resources and must never erase a successor.
+	UIASWState.starting_generation := 0
 	UIASWState.handle := 0
 	UIASWState.worker_hwnd := 0
 	UIASWState.worker_process_handle := 0
