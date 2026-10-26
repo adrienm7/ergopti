@@ -20,6 +20,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { luaManifestSource } = require('../lib/lua-manifest-view.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static/ergopti_plus');
@@ -120,7 +121,7 @@ try {
 			errors.push('macos must project both complete slot lists through the manifest');
 		}
 		for (const driver of ['macos', 'linux']) {
-			const manifest = read(`${driver}/_generated/features_manifest.lua`);
+			const manifest = luaManifestSource(driver);
 			for (const slot of union) {
 				if (!manifest.includes(`path = "gestures.${slot}"`)) {
 					errors.push(`${driver} manifest has no owned default for ${slot}`);

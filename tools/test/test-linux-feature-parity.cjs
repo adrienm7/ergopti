@@ -15,17 +15,10 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const { luaManifestSource } = require('../lib/lua-manifest-view.cjs');
 const { buildParityRows, summarize } = require('./linux-feature-parity.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const MANIFEST_PATH = path.join(
-	ROOT,
-	'static',
-	'ergopti_plus',
-	'linux',
-	'_generated',
-	'features_manifest.lua'
-);
 const EVIDENCE_PATH = path.join(
 	ROOT,
 	'static',
@@ -35,7 +28,7 @@ const EVIDENCE_PATH = path.join(
 	'features',
 	'linux_evidence.json'
 );
-const manifest = fs.readFileSync(MANIFEST_PATH, 'utf8');
+const manifest = luaManifestSource('linux');
 const evidenceConfig = JSON.parse(fs.readFileSync(EVIDENCE_PATH, 'utf8'));
 
 function build(config = evidenceConfig) {

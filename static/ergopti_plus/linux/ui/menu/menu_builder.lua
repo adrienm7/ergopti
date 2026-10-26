@@ -2164,7 +2164,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				autocorrect = "menu.hotstrings.notify_bubble_autocorrect",
 				ai = "menu.hotstrings.notify_bubble_ai",
 			}
-			for key, name in pairs({ preview_autocorrect_enabled = "autocorrect", preview_ai_enabled = "ai" }) do
+			for key, name in pairs({ ["preview_autocorrect_enabled"] = "autocorrect", ["preview_ai_enabled"] = "ai" }) do
 				presence_commands[key] = function()
 					if PreviewSettings.toggle(name) ~= true then return false end
 					require("ui.menu.feature_notice").feature(i18n_safe(bubble_notice_keys[name]), PreviewSettings.get(name) == true)

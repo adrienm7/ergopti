@@ -666,6 +666,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-cascade-arrow-bounds.cjs"],
 			"repro": "npm run test:cascade-arrow-bounds"
+		},
+		{
+			"id": "lua-features-manifest-projection",
+			"ordinal": 489,
+			"name": "the shared Lua features manifest loads exactly each Lua driver's own manifest",
+			"cmd": "node",
+			"args": ["tools/test/test-lua-features-manifest-projection.cjs"],
+			"repro": "node tools/test/test-lua-features-manifest-projection.cjs"
 		}
 	]
 }

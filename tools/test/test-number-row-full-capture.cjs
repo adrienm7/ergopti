@@ -20,6 +20,7 @@ const fs = require('fs');
 const path = require('path');
 const toml = require('smol-toml');
 const { stripComments } = require('../lib/script-source.cjs');
+const { luaManifestSource } = require('../lib/lua-manifest-view.cjs');
 
 const SP = path.resolve(__dirname, '../../static/ergopti_plus');
 const PATH = 'shortcuts.tap_keys.number_row_left';
@@ -123,8 +124,8 @@ const input = {
 	),
 	actionPlatform: (catalogue.sg_actions[ACTION] || {}).platform,
 	generated: {
-		hs: read('macos/_generated/features_manifest.lua'),
-		linux: read('linux/_generated/features_manifest.lua'),
+		hs: luaManifestSource('macos'),
+		linux: luaManifestSource('linux'),
 		ahk: read('windows/_generated/features_manifest.ahk')
 	},
 	hs: read('macos/modules/gestures/actions.lua'),

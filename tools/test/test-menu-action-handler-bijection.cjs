@@ -1000,13 +1000,16 @@ for (const { key, driver, ext } of PLATFORMS) {
 	// The driver's production source, as one corpus. A handler is "named" when
 	// the row id appears as a quoted string: every driver dispatches by id, and
 	// the id has to be written down somewhere to be dispatched on.
+	// `_generated/` is left out: its tables declare the same ids (the features
+	// manifest names every row), so counting them would let a row pass without
+	// any handler in the driver.
 	const chunks = [],
 		nativeSources = [];
 	(function walk(dir) {
 		for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
 			const p = path.join(dir, e.name);
 			if (e.isDirectory()) {
-				if (e.name !== 'tests' && e.name !== 'vendor' && e.name !== 'node_modules') walk(p);
+				if (!['tests', 'vendor', 'node_modules', '_generated'].includes(e.name)) walk(p);
 			} else if (path.extname(e.name) === ext) {
 				const src = fs.readFileSync(p, 'utf8');
 				chunks.push(src);

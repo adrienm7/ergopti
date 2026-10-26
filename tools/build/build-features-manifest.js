@@ -12,8 +12,11 @@
 // Outputs:
 //   static/ergopti_plus/windows/_generated/features_manifest.ahk
 //   static/ergopti_plus/windows/_generated/config_template.toml
-//   static/ergopti_plus/macos/_generated/features_manifest.lua
+//   static/ergopti_plus/_shared/lua/features/manifest_data.lua  (macOS + Linux, once)
+//   static/ergopti_plus/macos/_generated/features_manifest.lua  (projection call)
 //   static/ergopti_plus/macos/_generated/config_template.toml
+//   static/ergopti_plus/linux/_generated/features_manifest.lua  (projection call)
+//   static/ergopti_plus/linux/_generated/config_template.toml
 //
 // Usage:
 //   npm run build:manifest
@@ -35,6 +38,15 @@ const MANIFEST_PATH = shared('modules/features/manifest.toml');
 const OUT_AHK_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/windows/_generated');
 const OUT_HS_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/macos/_generated');
 const OUT_LINUX_DIR = resolve(REPO_ROOT, 'static/ergopti_plus/linux/_generated');
+const OUT_SHARED_LUA_DATA = resolve(
+	REPO_ROOT,
+	'static/ergopti_plus/_shared/lua/features/manifest_data.lua'
+);
+
+// The two Lua drivers share one generated manifest table
+// (_shared/lua/features/manifest_data.lua); each driver's own file only asks
+// _shared/lua/features/manifest.lua for its projection.
+const LUA_PLATFORMS = ['hs', 'linux'];
 
 // Ultimate fallback default: a feature that declares no 'platforms' at any
 // ancestor level inherits this list. When adding a new driver, this list must
@@ -497,7 +509,63 @@ function luaLiteral(value) {
 	throw new Error(`cannot represent ${typeof value} in Lua literal`);
 }
 
+/**
+ * The manifest row one Lua driver sees for a feature.
+ * @param {object} f Flattened feature.
+ * @param {string} platform Driver key ("hs" or "linux").
+ * @returns {object}
+ */
+function luaFeatureEntry(f, platform) {
+	const entry = {
+		path: f.path,
+		id: f.id,
+		section: f.section,
+		default: resolveDefault(f, platform),
+		type: f.type || '',
+		description_key: f.description_key || '',
+		platforms: f.platforms,
+		recommended: resolveRecommended(f, platform),
+		input_altering: f.input_altering
+	};
+	if (f.enum_values) entry.enum_values = f.enum_values;
+	if (f.choice_values) entry.choice_values = f.choice_values;
+	if (f.cleared !== undefined) entry.cleared = f.cleared;
+	return entry;
+}
+
+/**
+ * The table one Lua driver loads from its features_manifest.lua. The shared
+ * generated data and its projection (_shared/lua/features/manifest.lua) must
+ * produce exactly this; test-lua-features-manifest-projection.cjs loads the
+ * real Lua files and compares.
+ * @returns {object} { version, section_order, scopes, sections, features, unavailable }
+ */
+function luaManifestModel(manifest, sections, features, platform) {
+	return {
+		version: manifest.manifest.version,
+		section_order: (manifest.sections && manifest.sections.order) || [],
+		scopes: manifest.scopes,
+		sections: sections.map((s) => ({
+			path: s.path,
+			description_key: s.description_key,
+			platforms: s.platforms,
+			subsections: s.subsections
+		})),
+		features: features
+			.filter((f) => f.platforms.includes(platform))
+			.map((f) => luaFeatureEntry(f, platform)),
+		unavailable: unavailableFor(features, platform)
+	};
+}
+
+/**
+ * The full text a Lua driver's manifest had when each driver carried its own
+ * copy. Nothing is written from it any more: the parity tests that read the
+ * manifest as text (tools/lib/lua-manifest-view.cjs) still parse this layout,
+ * and the projection test proves it equals what the real Lua files produce.
+ */
 function renderLuaManifest(manifest, sections, features, platform) {
+	const model = luaManifestModel(manifest, sections, features, platform);
 	const lines = [];
 	lines.push('--- _generated/features_manifest.lua');
 	lines.push('--- AUTO-GENERATED from _shared/modules/features/manifest.toml.');
@@ -516,10 +584,105 @@ function renderLuaManifest(manifest, sections, features, platform) {
 	lines.push('');
 	lines.push('local M = {}');
 	lines.push('');
+	lines.push(`M.version = ${luaLiteral(model.version)}`);
+	lines.push('');
+	lines.push(`M.section_order = ${luaLiteral(model.section_order)}`);
+	lines.push(`M.scopes = ${luaLiteral(model.scopes)}`);
+	lines.push('');
+	lines.push('M.sections = {');
+	for (const s of model.sections) {
+		const { path, ...meta } = s;
+		lines.push(`\t["${luaEscapeString(path)}"] = ${luaLiteral(meta)},`);
+	}
+	lines.push('}');
+	lines.push('');
+	lines.push('M.features = {');
+	for (const entry of model.features) pushLuaRow(lines, entry);
+	lines.push('}');
+	lines.push('');
+
+	// What this driver does NOT have. See unavailableFor(): M.features above is
+	// filtered to this platform, so without this table the driver cannot know a
+	// feature exists at all, and `reason_key` would stay a field nothing could
+	// ever read.
+	lines.push('M.unavailable = {');
+	for (const u of model.unavailable) pushLuaRow(lines, u);
+	lines.push('}');
+	lines.push('');
+	lines.push('return M');
+	lines.push('');
+	return lines.join('\n');
+}
+
+// Emits one row compactly: opening brace, all fields on one line, then the
+// closing brace. ~3 lines/row instead of ~9, while keeping the row's opening
+// "{" on its own line so the regex manifest parsers (parseLuaFeatures,
+// depth-based) still walk each block correctly.
+function pushLuaRow(lines, row) {
+	const fields = Object.entries(row)
+		.map(([k, v]) => `${k} = ${luaLiteral(v)}`)
+		.join(', ');
+	lines.push('\t{');
+	lines.push(`\t\t${fields},`);
+	lines.push('\t},');
+}
+
+/**
+ * One row of the data the two Lua drivers share. A feature a Lua driver has
+ * carries every field once; where the drivers disagree the default or the
+ * recommendation moves into `default_by` / `recommended_by`. A feature neither
+ * Lua driver has stays as the short row each driver lists as unavailable.
+ * `reason_key` rides on the row so a driver that lacks the feature can name why.
+ */
+function sharedLuaRow(f) {
+	const have = LUA_PLATFORMS.filter((p) => f.platforms.includes(p));
+	if (have.length === 0) {
+		const row = { path: f.path, section: f.section };
+		if (f.reason_key) row.reason_key = f.reason_key;
+		row.platforms = f.platforms;
+		return row;
+	}
+	const perPlatform = new Map(have.map((p) => [p, luaFeatureEntry(f, p)]));
+	const first = perPlatform.get(have[0]);
+	const differs = (field) =>
+		have.some((p) => JSON.stringify(perPlatform.get(p)[field]) !== JSON.stringify(first[field]));
+	const by = (field) => Object.fromEntries(have.map((p) => [p, perPlatform.get(p)[field]]));
+	const row = {};
+	for (const [field, value] of Object.entries(first)) {
+		if ((field === 'default' || field === 'recommended') && differs(field)) {
+			row[`${field}_by`] = by(field);
+		} else {
+			row[field] = value;
+		}
+	}
+	if (f.reason_key) row.reason_key = f.reason_key;
+	return row;
+}
+
+function renderSharedLuaData(manifest, sections, features) {
+	const lines = [];
+	lines.push('--- _shared/lua/features/manifest_data.lua');
+	lines.push('--- AUTO-GENERATED from _shared/modules/features/manifest.toml.');
+	lines.push('--- DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.');
+	lines.push('---');
+	lines.push('--- The features manifest both Lua drivers load, written once. A driver does');
+	lines.push('--- not read this table: its _generated/features_manifest.lua asks');
+	lines.push('--- features.manifest for the projection that names it. The two drivers');
+	lines.push('--- shared two thirds of their former copies line for line, so only what');
+	lines.push('--- differs (a feature one driver lacks, a default or recommendation that');
+	lines.push('--- differs) is marked per driver, in `default_by` and `recommended_by`.');
+	lines.push('---');
+	lines.push('--- `features` lists every manifest feature in manifest order: the full row for');
+	lines.push('--- one a Lua driver has, the short row (no `id`) for one only Windows has.');
+	lines.push('--- `reason_key` is the reason a driver without the feature gives.');
+	lines.push('');
+	lines.push('local M = {}');
+	lines.push('');
 	lines.push(`M.version = ${luaLiteral(manifest.manifest.version)}`);
 	lines.push('');
-	const topOrder = (manifest.sections && manifest.sections.order) || [];
-	lines.push(`M.section_order = ${luaLiteral(topOrder)}`);
+	lines.push(
+		`M.section_order = ${luaLiteral((manifest.sections && manifest.sections.order) || [])}`
+	);
 	lines.push(`M.scopes = ${luaLiteral(manifest.scopes)}`);
 	lines.push('');
 	lines.push('M.sections = {');
@@ -529,60 +692,32 @@ function renderLuaManifest(manifest, sections, features, platform) {
 			platforms: s.platforms,
 			subsections: s.subsections
 		};
-		const keyLit = `["${luaEscapeString(s.path)}"]`;
-		lines.push(`\t${keyLit} = ${luaLiteral(meta)},`);
+		lines.push(`\t["${luaEscapeString(s.path)}"] = ${luaLiteral(meta)},`);
 	}
 	lines.push('}');
 	lines.push('');
 	lines.push('M.features = {');
-	const platformFeatures = features.filter((f) => f.platforms.includes(platform));
-	for (const f of platformFeatures) {
-		const entry = {
-			path: f.path,
-			id: f.id,
-			section: f.section,
-			default: resolveDefault(f, platform),
-			type: f.type || '',
-			description_key: f.description_key || '',
-			platforms: f.platforms,
-			recommended: resolveRecommended(f, platform),
-			input_altering: f.input_altering
-		};
-		if (f.enum_values) entry.enum_values = f.enum_values;
-		if (f.choice_values) entry.choice_values = f.choice_values;
-		if (f.cleared !== undefined) entry.cleared = f.cleared;
-		// Emit each feature compactly: opening brace, all fields on one line, then
-		// the closing brace. ~3 lines/feature instead of ~9, while keeping the
-		// entry's opening "{" on its own line so the regex manifest parsers
-		// (parseLuaFeatures, depth-based) still walk each block correctly.
-		const fields = Object.entries(entry)
-			.map(([k, v]) => `${k} = ${luaLiteral(v)}`)
-			.join(', ');
-		lines.push('\t{');
-		lines.push(`\t\t${fields},`);
-		lines.push('\t},');
-	}
-	lines.push('}');
-	lines.push('');
-
-	// What this driver does NOT have. See unavailableFor(): M.features above is
-	// filtered to this platform, so without this table the driver cannot know a
-	// feature exists at all, and `reason_key` would stay a field nothing could
-	// ever read.
-	lines.push('M.unavailable = {');
-	for (const u of unavailableFor(features, platform)) {
-		const fields = Object.entries(u)
-			.map(([k, v]) => `${k} = ${luaLiteral(v)}`)
-			.join(', ');
-		lines.push('\t{');
-		lines.push(`\t\t${fields},`);
-		lines.push('\t},');
-	}
+	for (const f of features) pushLuaRow(lines, sharedLuaRow(f));
 	lines.push('}');
 	lines.push('');
 	lines.push('return M');
 	lines.push('');
 	return lines.join('\n');
+}
+
+function renderLuaDriverManifest(platform) {
+	return [
+		'--- _generated/features_manifest.lua',
+		'--- AUTO-GENERATED from _shared/modules/features/manifest.toml.',
+		'--- DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.',
+		'---',
+		"--- This driver's features manifest: the table the macOS and Linux drivers share",
+		'--- (_shared/lua/features/manifest_data.lua), projected for this driver when it',
+		'--- loads. Nothing else is declared here.',
+		'',
+		`return require("features.manifest").for_platform("${platform}")`,
+		''
+	].join('\n');
 }
 
 // ======================================================
@@ -718,14 +853,36 @@ function writeOutput(absPath, content) {
 	console.log(`Wrote ${absPath} (${content.length} chars)`);
 }
 
-function main() {
-	console.log('Loading manifest…');
+/**
+ * Loads, flattens and validates the shared manifest.
+ * @returns {{manifest: object, sections: object[], features: object[]}}
+ */
+export function loadFeatureModel() {
 	const manifest = loadManifest();
-
 	const sections = flattenSections(manifest.sections);
 	const features = flattenFeatures(manifest.entries);
 	resolvePlatforms(features, sections);
 	validate(features);
+	return { manifest, sections, features };
+}
+
+/**
+ * What a Lua driver must load from its features_manifest.lua, and the layout
+ * of the full text that file had before the drivers shared one table.
+ * @param {string} platform "hs" or "linux".
+ * @returns {{model: object, source: string}}
+ */
+export function luaDriverManifest(platform) {
+	const { manifest, sections, features } = loadFeatureModel();
+	return {
+		model: luaManifestModel(manifest, sections, features, platform),
+		source: renderLuaManifest(manifest, sections, features, platform)
+	};
+}
+
+function main() {
+	console.log('Loading manifest…');
+	const { manifest, sections, features } = loadFeatureModel();
 	console.log(`Parsed ${sections.length} section(s), ${features.length} feature(s).`);
 
 	// AHK outputs
@@ -738,10 +895,8 @@ function main() {
 		renderConfigTemplate(manifest, sections, features, 'ahk')
 	);
 	// HS outputs
-	writeOutput(
-		resolve(OUT_HS_DIR, 'features_manifest.lua'),
-		renderLuaManifest(manifest, sections, features, 'hs')
-	);
+	writeOutput(OUT_SHARED_LUA_DATA, renderSharedLuaData(manifest, sections, features));
+	writeOutput(resolve(OUT_HS_DIR, 'features_manifest.lua'), renderLuaDriverManifest('hs'));
 	writeOutput(
 		resolve(OUT_HS_DIR, 'config_template.toml'),
 		renderConfigTemplate(manifest, sections, features, 'hs')
@@ -749,10 +904,7 @@ function main() {
 	// Linux outputs. The driver went without a features manifest for a long
 	// time, which is why its keystats had none of the privacy toggles the
 	// other two read from the shared source — it had nowhere to read them from.
-	writeOutput(
-		resolve(OUT_LINUX_DIR, 'features_manifest.lua'),
-		renderLuaManifest(manifest, sections, features, 'linux')
-	);
+	writeOutput(resolve(OUT_LINUX_DIR, 'features_manifest.lua'), renderLuaDriverManifest('linux'));
 	writeOutput(
 		resolve(OUT_LINUX_DIR, 'config_template.toml'),
 		renderConfigTemplate(manifest, sections, features, 'linux')
@@ -760,4 +912,5 @@ function main() {
 	console.log('Done.');
 }
 
-main();
+// Importing this file (the tests do) must not rewrite the generated outputs.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

@@ -38,6 +38,7 @@
 const fs = require('fs');
 const path = require('path');
 const { parse } = require('smol-toml');
+const { luaManifestSource } = require('../lib/lua-manifest-view.cjs');
 
 const rootArg = process.argv.indexOf('--root');
 const ROOT =
@@ -132,11 +133,11 @@ const luaEntry = (source, id) => {
 	const match = source.match(new RegExp(`path = "${SECTION}\\.${id}", id = "${id}",[^\\n]*`, 'u'));
 	return match ? match[0] : '';
 };
-for (const [driver, file] of [
-	['hs', ['macos', '_generated', 'features_manifest.lua']],
-	['linux', ['linux', '_generated', 'features_manifest.lua']]
+for (const [driver, directory] of [
+	['hs', 'macos'],
+	['linux', 'linux']
 ]) {
-	const source = read(...file);
+	const source = luaManifestSource(directory);
 	for (const [id, preset] of PRESETS) {
 		const line = luaEntry(source, id);
 		check(

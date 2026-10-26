@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Single source of truth for every feature toggle and its default value across both drivers. `manifest.toml` is processed by `npm run codegen` to generate `windows/_generated/features_manifest.ahk` and `macos/_generated/features_manifest.lua`. Neither driver edits the generated files by hand. Feature state is read at runtime via `Features["section"]["id"]` (AHK) or `Manifest.feat_enabled("section.id")` (macOS).
+Single source of truth for every feature toggle and its default value across both drivers. `manifest.toml` is processed by `npm run codegen` to generate `windows/_generated/features_manifest.ahk` and, for macOS and Linux together, `_shared/lua/features/manifest_data.lua` (each driver's `_generated/features_manifest.lua` projects it). Neither driver edits the generated files by hand. Feature state is read at runtime via `Features["section"]["id"]` (AHK) or `Manifest.feat_enabled("section.id")` (macOS).
 
 ## Editing rules
 

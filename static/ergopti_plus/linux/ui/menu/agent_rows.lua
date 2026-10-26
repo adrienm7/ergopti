@@ -286,7 +286,7 @@ function M.build(ctx, dialogs)
 	end
 	local menu_ctx = {
 		commands = {
-			agent_mode = function(id)
+			["agent_mode"] = function(id)
 				if not llm or type(llm.set_agent_mode) ~= "function" then return false end
 				local committed = llm.set_agent_mode(id) == true
 				if committed then changed() end
