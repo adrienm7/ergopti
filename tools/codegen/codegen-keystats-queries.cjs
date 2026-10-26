@@ -21,6 +21,15 @@
  * 3. Fail fast: an unknown placeholder, a duplicate name, an unterminated
  *    query or a body comment aborts generation instead of shipping a template
  *    that renders something else.
+ * 4. Typed value slots for write statements. `{{s name}}` renders a TEXT
+ *    literal and `{{i name}}` an integer; a trailing `?` on
+ *    the kind (`{{s? name}}`) renders NULL for a missing value and every other
+ *    slot refuses one. The driver passes the raw Lua value and the generated
+ *    renderer quotes it through the one shared literal encoder
+ *    (sqlite.literal), so no driver formats a value into SQL by hand.
+ *    `{{merge column}}` expands at generation time into the expression that
+ *    sums a stored JSON number map with the incoming one key by key, the one
+ *    accumulation every driver shares.
  * ==============================================================================
  */
 
@@ -41,6 +50,26 @@ const DIALECTS = ['native', 'cli_json'];
 const NAME = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
 const PARAM = /^[a-z][a-z0-9_]*$/;
 const IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
+const SLOT = /^([si])(\?)?\s+([a-z][a-z0-9_]*)$/;
+
+// The JSON number-map columns a `{{merge column}}` may name.
+const MERGE_COLUMNS = new Set(['esrc_json', 'e_buckets_json', 'length_buckets_json']);
+
+/**
+ * The expression that adds an incoming JSON number map to the stored one, key
+ * by key. Both maps are read with json_each, so a key present in only one of
+ * them survives, a NULL stored map counts as empty, and a key is quoted by
+ * json_quote so punctuation in it cannot alter the merged document.
+ * @param {string} column - One of MERGE_COLUMNS.
+ * @returns {string} SQL expression.
+ */
+function mergeExpression(column) {
+	return (
+		"(SELECT COALESCE('{' || group_concat(json_quote(k) || ':' || v, ',') || '}', '{}') FROM (" +
+		`SELECT key AS k, SUM(value) AS v FROM (SELECT key, value FROM json_each(COALESCE(${column}, '{}')) ` +
+		`UNION ALL SELECT key, value FROM json_each(COALESCE(excluded.${column}, '{}'))) GROUP BY key))`
+	);
+}
 
 // ===================================
 // ===================================
@@ -104,6 +133,14 @@ function segments(name, body) {
 			if (!IDENTIFIER.test(alias))
 				throw new SyntaxError(`${name}: a text column needs a column name or "EXPR AS name".`);
 			out.push({ text: { expr, alias } });
+		} else if (SLOT.test(inner)) {
+			const [, kind, nullable, slot] = inner.match(SLOT);
+			out.push({ slot: { name: slot, kind, nullable: nullable === '?' } });
+		} else if (/^merge\s+/.test(inner)) {
+			const column = inner.replace(/^merge\s+/, '');
+			if (!MERGE_COLUMNS.has(column))
+				throw new SyntaxError(`${name}: {{merge ${column}}} names no JSON number-map column.`);
+			out.push({ literal: mergeExpression(column) });
 		} else if (PARAM.test(inner)) {
 			out.push({ param: inner });
 		} else {
@@ -117,7 +154,7 @@ function segments(name, body) {
 /**
  * Parses the catalogue into ordered query records.
  * @param {string} text - Catalogue content.
- * @returns {{name: string, doc: string[], params: string[], texts: string[], segments: object[]}[]}
+ * @returns {{name: string, doc: string[], params: string[], slots: Map<string, {kind: string, nullable: boolean}>, texts: string[], segments: object[]}[]}
  */
 function parse(text) {
 	const queries = [];
@@ -152,7 +189,27 @@ function parse(text) {
 			if (body.indexOf(';') !== body.length - 1)
 				throw new SyntaxError(`${where}: ${current.name} must hold exactly one statement.`);
 			const segs = segments(current.name, body);
-			const params = [...new Set(segs.filter((s) => s.param).map((s) => s.param))];
+			const params = [];
+			const slots = new Map();
+			for (const seg of segs) {
+				const name = seg.param ?? seg.slot?.name;
+				if (name === undefined) continue;
+				if (seg.slot) {
+					const known = slots.get(name);
+					if (known && (known.kind !== seg.slot.kind || known.nullable !== seg.slot.nullable))
+						throw new SyntaxError(`${where}: ${current.name} gives the slot ${name} two kinds.`);
+					if (!known && params.includes(name))
+						throw new SyntaxError(
+							`${where}: ${current.name} uses ${name} as a slot and a parameter.`
+						);
+					slots.set(name, { name, ...seg.slot });
+				} else if (slots.has(name)) {
+					throw new SyntaxError(
+						`${where}: ${current.name} uses ${name} as a slot and a parameter.`
+					);
+				}
+				if (!params.includes(name)) params.push(name);
+			}
 			// A UNION repeats its projection: the same column may recur, but one
 			// name for two expressions would decode one as the other.
 			const exprOf = new Map();
@@ -164,7 +221,7 @@ function parse(text) {
 				exprOf.set(seg.text.alias, seg.text.expr);
 			}
 			const texts = [...exprOf.keys()];
-			queries.push({ name: current.name, doc: current.doc, params, texts, segments: segs });
+			queries.push({ name: current.name, doc: current.doc, params, slots, texts, segments: segs });
 			current = null;
 		}
 	});
@@ -178,7 +235,7 @@ function parse(text) {
  * literals, so each template is an alternation of literals and parameters.
  * @param {ReturnType<typeof parse>[number]} query - Parsed query.
  * @param {string} dialect - One of DIALECTS.
- * @returns {({literal: string}|{param: string})[]} Dialect template.
+ * @returns {({literal: string}|{param: string}|{slot: object})[]} Dialect template.
  */
 function template(query, dialect) {
 	if (!DIALECTS.includes(dialect)) throw new RangeError(`Unknown dialect ${dialect}.`);
@@ -191,6 +248,7 @@ function template(query, dialect) {
 	for (const seg of query.segments) {
 		if (seg.literal !== undefined) pushLiteral(seg.literal);
 		else if (seg.param !== undefined) out.push({ param: seg.param });
+		else if (seg.slot !== undefined) out.push({ slot: seg.slot });
 		else if (dialect === 'cli_json')
 			pushLiteral(`json_quote(${seg.text.expr}) AS ${seg.text.alias}_json`);
 		else
@@ -218,12 +276,49 @@ function render(queries, name, dialect, params = {}) {
 	return template(query, dialect)
 		.map((seg) => {
 			if (seg.literal !== undefined) return seg.literal;
+			if (seg.slot !== undefined) return renderSlot(name, seg.slot, params[seg.slot.name]);
 			const value = params[seg.param];
 			if (typeof value !== 'string')
 				throw new TypeError(`${name} requires the string parameter ${seg.param}.`);
 			return value;
 		})
 		.join('');
+}
+
+/**
+ * Encodes content for a single-quoted SQLite value exactly as
+ * _shared/lua/sqlite/literal.lua does: quotes doubled, CR and NUL spelled as
+ * SQL char() expressions so no native boundary can cut them.
+ * @param {string} value - Raw content.
+ * @returns {string} Escaped content.
+ */
+function escapeLiteral(value) {
+	return value
+		.replaceAll("'", "''")
+		.replaceAll('\r', "'||char(13)||'")
+		.replaceAll('\0', "'||char(0)||'");
+}
+
+/**
+ * Renders one typed slot. An absent value is NULL for a nullable slot and an
+ * error for any other; an integer slot floors its number.
+ * @param {string} name - Query name, for errors.
+ * @param {{name: string, kind: string, nullable: boolean}} slot - Slot.
+ * @param {unknown} value - Raw value.
+ * @returns {string} SQL text.
+ */
+function renderSlot(name, slot, value) {
+	if (value === undefined || value === null) {
+		if (slot.nullable) return 'NULL';
+		throw new TypeError(`${name} requires the value ${slot.name}.`);
+	}
+	if (slot.kind === 's') {
+		if (typeof value !== 'string') throw new TypeError(`${name}: ${slot.name} must be a string.`);
+		return `'${escapeLiteral(value)}'`;
+	}
+	if (typeof value !== 'number' || !Number.isFinite(value))
+		throw new TypeError(`${name}: ${slot.name} must be a finite number.`);
+	return String(Math.floor(value));
 }
 
 // ===================================
@@ -251,14 +346,18 @@ function renderLua(queries) {
 	const entries = queries
 		.map((query) => {
 			const dialects = DIALECTS.map((dialect) => {
-				const parts = template(query, dialect).map((seg) =>
-					seg.literal !== undefined ? luaString(seg.literal) : `{ param = ${luaString(seg.param)} }`
-				);
+				const parts = template(query, dialect).map((seg) => {
+					if (seg.literal !== undefined) return luaString(seg.literal);
+					if (seg.slot !== undefined)
+						return `{ slot = ${luaString(seg.slot.name)}, kind = ${luaString(seg.slot.kind)}, nullable = ${seg.slot.nullable} }`;
+					return `{ param = ${luaString(seg.param)} }`;
+				});
 				return `\t\t\t${dialect} = {\n${parts.map((p) => `\t\t\t\t${p},`).join('\n')}\n\t\t\t},`;
 			});
 			return [
 				`\t[${luaString(query.name)}] = {`,
 				`\t\tparams = { ${query.params.map(luaString).join(', ')} },`,
+				`\t\tslots = { ${[...query.slots.values()].map((slot) => `{ ${luaString(slot.name)}, ${luaString(slot.kind)}, ${slot.nullable} }`).join(', ')} },`,
 				`\t\ttexts = { ${query.texts.map(luaString).join(', ')} },`,
 				'\t\ttemplates = {',
 				...dialects,
@@ -274,6 +373,7 @@ function renderLua(queries) {
 local M = {}
 
 local TableUtil = require("table_util")
+local Literal = require("sqlite.literal")
 
 --- In-process engines (Hammerspoon, AHK) and the Linux sqlite3 -json CLI.
 M.DIALECTS = { ${DIALECTS.map(luaString).join(', ')} }
@@ -282,11 +382,34 @@ local QUERIES = {
 ${entries}
 }
 
+--- Renders one typed slot. An absent value is NULL for a nullable slot and an
+--- error for any other; a text slot is quoted through sqlite.literal; an
+--- integer slot floors its number.
+--- @param name string Query name, for errors.
+--- @param part table Slot part { slot, kind, nullable }.
+--- @param value any Raw value.
+--- @return string SQL text.
+local function render_slot(name, part, value)
+	if value == nil then
+		if part.nullable then return "NULL" end
+		error(name .. " requires the value " .. part.slot, 3)
+	end
+	if part.kind == "s" then
+		if type(value) ~= "string" then error(name .. ": " .. part.slot .. " must be a string", 3) end
+		return "'" .. Literal.escape(value) .. "'"
+	end
+	if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then
+		error(name .. ": " .. part.slot .. " must be a finite number", 3)
+	end
+	return string.format("%d", math.floor(value))
+end
+
 --- Renders a named query. Fails on an unknown name or dialect, a missing or
---- non-string parameter, and a parameter the query does not declare.
+--- non-string parameter, a missing or mistyped slot value, and a parameter the
+--- query does not declare.
 --- @param name string Catalogue name, such as "manifest.app_day".
 --- @param dialect string "native" or "cli_json".
---- @param params table|nil Value of every declared parameter.
+--- @param params table|nil Raw string of every declared parameter, raw value of every slot.
 --- @return string The SQL text.
 function M.render(name, dialect, params)
 	local query = QUERIES[name]
@@ -308,6 +431,8 @@ function M.render(name, dialect, params)
 	for index, part in ipairs(parts) do
 		if type(part) == "string" then
 			out[index] = part
+		elseif part.slot then
+			out[index] = render_slot(name, part, params[part.slot])
 		else
 			local value = params[part.param]
 			if type(value) ~= "string" then
@@ -342,6 +467,19 @@ function M.params(name)
 	return out
 end
 
+--- Lists the typed value slots a query declares, in first-use order.
+--- @param name string Catalogue name.
+--- @return table Array of { name, kind ("s" or "i"), nullable }.
+function M.slots(name)
+	local query = QUERIES[name]
+	if not query then error("Unknown keystats query: " .. tostring(name), 2) end
+	local out = {}
+	for index, slot in ipairs(query.slots) do
+		out[index] = { name = slot[1], kind = slot[2], nullable = slot[3] }
+	end
+	return out
+end
+
 --- Lists every catalogue name, sorted.
 --- @return table Array of names.
 function M.names()
@@ -360,11 +498,12 @@ return M
 function renderAhk(queries) {
 	const entries = queries
 		.map((query) => {
-			const parts = template(query, 'native').map((seg) =>
-				seg.literal !== undefined
-					? `"literal", ${ahkString(seg.literal)}`
-					: `"param", ${ahkString(seg.param)}`
-			);
+			const parts = template(query, 'native').map((seg) => {
+				if (seg.literal !== undefined) return `"literal", ${ahkString(seg.literal)}`;
+				if (seg.slot !== undefined)
+					return `"slot", ${ahkString(seg.slot.name)}, ${ahkString(seg.slot.kind + (seg.slot.nullable ? '?' : ''))}`;
+				return `"param", ${ahkString(seg.param)}`;
+			});
 			return `\t\t${ahkString(query.name)}, [\n${parts.map((p) => `\t\t\t[${p}]`).join(',\n')}\n\t\t]`;
 		})
 		.join(',\n');
@@ -374,7 +513,8 @@ function renderAhk(queries) {
 ; Source: _shared/data/db/queries.sql (the named keystats queries).
 
 /**
- * Renders a named keystats query for the in-process SQLite engine.
+ * Renders a named keystats query for the in-process SQLite engine. Queries with
+ * typed value slots (the write statements) are refused until Windows adopts them.
  * @param {string} Name - Catalogue name, such as "manifest.app_day".
  * @param {Map} Params - Value of every parameter the query declares.
  * @returns {string} The SQL text.

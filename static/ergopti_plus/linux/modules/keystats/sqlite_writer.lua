@@ -564,7 +564,7 @@ function M.insert_media_events(device_id, events, threshold_ms)
 		statements[#statements + 1] = MediaStore.raw_sql(device_id, first_id + index - 1, event, Json.encode)
 	end
 	for _, sql in ipairs(plan.derived) do statements[#statements + 1] = sql end
-	statements[#statements + 1] = "UPDATE meta SET value=CAST(value AS INTEGER)+1 WHERE key='rev';"
+	statements[#statements + 1] = Queries.render("meta.rev_bump", "cli_json")
 	return _exec("BEGIN IMMEDIATE;\n" .. table.concat(statements, "\n") .. "\nCOMMIT;", true)
 end
 
@@ -577,7 +577,7 @@ function M.rebuild_media(device_id, threshold_ms)
 	local ok, sql = pcall(MediaStore.rebuild_sql, device_id, threshold_ms)
 	if not ok then return false end
 	return _exec("BEGIN IMMEDIATE;\n" .. sql
-		.. "\nUPDATE meta SET value=CAST(value AS INTEGER)+1 WHERE key='rev';\nCOMMIT;", true)
+		.. "\n" .. Queries.render("meta.rev_bump", "cli_json") .. "\nCOMMIT;", true)
 end
 
 --- Inserts a batch of keystroke events into the events_typing table.
@@ -1674,8 +1674,7 @@ end
 --- @param encoded string JSON array produced by the collector (no raw NUL).
 _derived_sql.open_walk = function(device_id, encoded)
 	assert(type(encoded) == "string" and not encoded:find("[%z\n]"), "Invalid open-walk record")
-	return "INSERT INTO meta(key,value) VALUES ('" .. _sql_escape(open_walk_key(device_id)) .. "','"
-		.. _sql_escape(encoded) .. "') ON CONFLICT(key) DO UPDATE SET value = excluded.value;"
+	return Queries.render("meta.upsert", "cli_json", { key = open_walk_key(device_id), value = encoded })
 end
 
 --- Commits one open-walk record outside a flush and returns its native receipt.
@@ -1776,7 +1775,7 @@ function M.start_flush(device_id, payload)
 			assert(type(statement) == "string", "Invalid SQLite flush statement")
 			if statement ~= "" then statements[#statements + 1] = statement end
 		end
-		statements[#statements + 1] = "UPDATE meta SET value = CAST(value AS INTEGER) + 1 WHERE key = 'rev';"
+		statements[#statements + 1] = Queries.render("meta.rev_bump", "cli_json")
 		statements[#statements + 1] = "INSERT INTO meta(key,value) VALUES ('" .. token .. "','committed');"
 		return ".output /dev/null\nBEGIN IMMEDIATE;\n" .. table.concat(statements, "\n")
 			.. "\nCOMMIT;\n.output stdout\nSELECT 1;\n"
@@ -1911,7 +1910,7 @@ function M.get_meta(key)
 	-- Native raw TEXT output stops at NUL and scalar line framing stops at LF.
 	-- Quote just this value so the existing checked scalar path carries one line
 	-- while the shared decoder restores every byte, including an empty string.
-	local encoded = _query_scalar(string.format("SELECT json_quote(value) FROM meta WHERE key = '%s';", _sql_escape(key)))
+	local encoded = _query_scalar(Queries.render("meta.get", "cli_json", { key = key }))
 	if encoded == nil then return nil end
 	local ok, value = pcall(Json.decode, encoded)
 	if not ok or type(value) ~= "string" then
@@ -1927,14 +1926,13 @@ end
 --- @return boolean True on success.
 function M.set_meta(key, value)
 	if not M.is_available() or type(key) ~= "string" or key == "" then return false end
-	return _exec(string.format("INSERT OR REPLACE INTO meta (key, value) VALUES ('%s', '%s');",
-		_sql_escape(key), _sql_escape(tostring(value))))
+	return _exec(Queries.render("meta.set", "cli_json", { key = key, value = tostring(value) }))
 end
 
 --- Bumps the meta.rev counter so the view cache knows new data is available.
 function M.bump_rev()
 	if not M.is_available() then return end
-	return _exec("UPDATE meta SET value = CAST(value AS INTEGER) + 1 WHERE key = 'rev';")
+	return _exec(Queries.render("meta.rev_bump", "cli_json"))
 end
 
 return M
