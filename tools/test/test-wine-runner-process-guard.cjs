@@ -9,10 +9,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-if (process.platform !== 'linux') {
-	console.log('[SKIP] the /proc Wine admission guard requires Linux');
-	process.exit(0);
-}
+assert.equal(process.platform, 'linux', 'The /proc Wine admission guard requires Linux.');
 const source = fs.readFileSync(path.join(__dirname, 'run-ahk-under-wine.sh'), 'utf8');
 const start = source.indexOf('for proc in /proc/[0-9]*; do');
 const end = source.indexOf('\nif [ -z "$results" ]; then', start);
