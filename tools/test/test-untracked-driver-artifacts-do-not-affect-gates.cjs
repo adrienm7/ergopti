@@ -53,12 +53,19 @@ function verifyPlatformCandidate() {
 		return relative;
 	};
 	const check = (status, message, missing = []) => {
+		const before = git(['ls-files', '--stage', '-z']);
+		assert.ok(before.length > 0, 'the candidate must contain actual staged entries');
 		const result = spawnSync(process.execPath, [path.join(fixture, PLATFORM_GATE)], {
 			cwd: fixture,
 			env,
 			encoding: 'utf8'
 		});
 		if (result.error) throw result.error;
+		assert.equal(
+			git(['ls-files', '--stage', '-z']),
+			before,
+			'the gate must preserve the enclosing candidate staged entries'
+		);
 		const output = `${result.stdout}${result.stderr}`;
 		assert.equal(result.status, status, `${message}\n${output}`);
 		for (const entry of missing)
