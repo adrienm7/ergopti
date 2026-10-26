@@ -32,6 +32,7 @@ local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local Terminators = require("keymap.terminators")
 local KEY = require("config_keys").KEY
+local NativePath = require("native_path")
 
 local LOG = "infra.hotstring_preferences"
 
@@ -296,7 +297,7 @@ function M.set_many(values)
 			end
 		end
 		local rows = LeafRows.prepare(source.content or "", operations)
-		local directory = file():match("^(.*)/[^/]+$")
+		local directory = NativePath.dirname(file())
 		if source.status == "absent" and not Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") then
 			return false, "the configuration folder cannot be created"
 		end

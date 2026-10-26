@@ -6321,7 +6321,7 @@ function M.regenerate(
 
 	-- Ensure the parent directory of the KC physical log exists before Karabiner
 	-- starts writing to it via shell_command echo redirects
-	local kc_parent = Generator.KE_PHYSICAL_KC_LOG and Generator.KE_PHYSICAL_KC_LOG:match("^(.*)/[^/]+$")
+	local kc_parent = Generator.KE_PHYSICAL_KC_LOG and require("native_path").dirname(Generator.KE_PHYSICAL_KC_LOG)
 	if kc_parent and not _kc_parent_ensured then
 		-- POSIX single-quoting, not Lua's %q. %q escapes for a LUA literal — it leaves
 		-- $, backticks and ! untouched — so a config dir containing any of them was

@@ -29,6 +29,7 @@
 --- ==============================================================================
 
 local M = {}
+local NativePath = require("native_path")
 
 M.SCHEMA_VERSION = 1
 
@@ -106,7 +107,7 @@ end
 --- @param path string
 --- @return string
 local function parent(path)
-	return path:match("^(.*)/[^/]+$") or path
+	return NativePath.dirname(path) or path
 end
 
 --- Whether a relative path stays inside its root: no absolute path, no empty,

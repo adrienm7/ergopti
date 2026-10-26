@@ -10,6 +10,7 @@
 --- ==============================================================================
 
 local M = {}
+local NativePath = require("native_path")
 local available, native = pcall(require, "luv")
 if not available then native = nil end
 
@@ -92,7 +93,7 @@ function M.new(directory, backend)
 	end
 	local ok_uid, uid = pcall(fs.getuid)
 	if not ok_uid or type(uid) ~= "number" or uid < 0 or uid % 1 ~= 0 then return nil, "native_user_identity_unavailable" end
-	local parent = assert(directory:match("^(.*)/[^/]+$"))
+	local parent = assert(NativePath.dirname(directory))
 	if parent == "" then return nil, "install_parent_invalid" end
 	local owner = { directory = directory, published = false }
 	local directories, descriptors = {}, {}
@@ -113,7 +114,7 @@ function M.new(directory, backend)
 		local value, reason = stat(path)
 		if not value then
 			if reason ~= "absent" then return false, reason end
-			local ancestor = path:match("^(.*)/[^/]+$")
+			local ancestor = NativePath.dirname(path)
 			if ancestor == "" then ancestor = "/" end
 			if not ancestor then return false, "install_parent_invalid" end
 			local accepted, failure = ensure_directory(ancestor, false)

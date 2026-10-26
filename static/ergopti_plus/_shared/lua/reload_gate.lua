@@ -127,7 +127,7 @@ end
 --- @param dir string
 --- @return string|nil Parent path, or nil at the root.
 local function parent_of(dir)
-	local parent = dir:match("^(.*)/[^/]+$")
+	local parent = NativePath.dirname(dir)
 	if not parent or parent == "" then return nil end
 	return parent
 end

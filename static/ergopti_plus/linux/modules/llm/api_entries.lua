@@ -32,6 +32,7 @@ local AuthPolicy = require("llm.local_server_auth")
 local SourceWriter = require("toml_codec.writer")
 local ProviderConfig = require("llm.provider_config_policy")
 local EntryIdentity = require("llm.api_entry_identity")
+local NativePath = require("native_path")
 
 local LOG = "modules.llm.api_entries"
 local VERSION = 1
@@ -100,7 +101,7 @@ end
 --- @param publication table|nil Private native rename acknowledgement.
 --- @return boolean ok, string|nil err
 local function write_private(path, text, expected, admit, publication)
-	local dir = path:match("^(.*)/[^/]+$")
+	local dir = NativePath.dirname(path)
 	if dir then os.execute("mkdir -p " .. TextUtils.shell_quote(dir)) end
 	local tmp = path .. ".tmp"
 	os.remove(tmp)

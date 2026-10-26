@@ -2,6 +2,9 @@
 	"linux/adapters/storage.lua": {
 		"count": 1
 	},
+	"linux/ergopti_hotstrings.lua": {
+		"dirname": 1
+	},
 	"linux/infra/hotstrings_scope.lua": {
 		"sorted_keys": 1
 	},
@@ -77,6 +80,9 @@
 	"macos/infra/toml/record_editor.lua": {
 		"trim": 2
 	},
+	"macos/init.lua": {
+		"dirname": 2
+	},
 	"macos/modules/dynamic_hotstrings/personal_info.lua": {
 		"shallow_copy": 1,
 		"sorted_keys": 1
@@ -96,7 +102,7 @@
 	},
 	"macos/modules/hotstrings/hotstrings_config.lua": {
 		"deep_copy": 1,
-		"trim": 4
+		"trim": 3
 	},
 	"macos/modules/keymap/registry_groups.lua": {
 		"deep_copy": 1,

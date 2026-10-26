@@ -22,6 +22,7 @@ local Logger        = require("infra.logger")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local CaptureFlow   = require("modules.shortcuts.actions.screen_capture_flow")
+local NativePath = require("native_path")
 
 local LOG = "shortcuts.actions.screenshot_save"
 
@@ -429,7 +430,7 @@ function M.save(flags, prefix, parent)
 		report_failure("target allocation", target_error)
 		return false
 	end
-	local directory = target:match("^(.*)/[^/]+$")
+	local directory = NativePath.dirname(target)
 	if not directory then
 		report_failure("target allocation", "target directory is invalid")
 		return false

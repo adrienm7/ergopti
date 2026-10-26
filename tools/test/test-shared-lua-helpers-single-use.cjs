@@ -6,7 +6,8 @@
  * DESCRIPTION:
  * The macOS driver, the Linux driver and the shared Lua they both load copy,
  * count, trim, shell-quote and percent-encode only through the shared owners:
- * _shared/lua/table_util.lua and _shared/lua/text_utils/init.lua.
+ * _shared/lua/table_util.lua, _shared/lua/text_utils/init.lua and, for the parent
+ * directory of a path, _shared/lua/native_path.lua.
  *
  * ROOT CAUSE ENCODED:
  * The cross-OS parity audit (R16, K10) counted 26 deep-copy definitions, the
@@ -47,6 +48,7 @@ const TREES = [
 
 const TABLE_OWNER = '_shared/lua/table_util.lua';
 const TEXT_OWNER = '_shared/lua/text_utils/init.lua';
+const PATH_OWNER = '_shared/lua/native_path.lua';
 
 // Reusable regex fragments over comment-free Lua source.
 const NAME = String.raw`([\w.:]+)`;
@@ -130,6 +132,11 @@ const DETECTORS = {
 				String.raw`table\s*\.\s*sort\s*\(\s*\2\s*[,)]`
 			)
 		]
+	},
+	dirname: {
+		owner: PATH_OWNER,
+		use: 'require("native_path").dirname(path)',
+		patterns: [/(["'])\^\(\.\*\)\/\[\^\/\]\+\$\1/g]
 	},
 	count: {
 		owner: TABLE_OWNER,
@@ -244,6 +251,10 @@ const CONTROLS = [
 		1
 	],
 	['sorted_keys', 'for key in pairs(map) do keys[#keys + 1] = key end', 0],
+	['dirname', 'local dir = path:match("^(.*)/[^/]+$")', 1],
+	['dirname', "local dir = path:match('^(.*)/[^/]+$')", 1],
+	['dirname', 'local dir = NativePath.dirname(path)', 0],
+	['dirname', 'local parent, name = path:match("^(.*)/([^/]+)$")', 0],
 	['count', 'for _ in pairs(_map.apps) do count = count + 1 end', 1],
 	['count', 'local n = 0; for _ in pairs(t) do n = n + 1 end', 1],
 	['count', 'for _, v in pairs(t) do if v then n = n + 1 end end', 0],
@@ -337,6 +348,7 @@ for (const rel of Object.keys(ALLOWED)) {
 // The owners must still define what every site is told to call.
 const OWNER_DEFINITIONS = {
 	[TEXT_OWNER]: ['trim', 'shell_quote', 'percent_encode'],
+	[PATH_OWNER]: ['dirname'],
 	[TABLE_OWNER]: [
 		'shallow_copy',
 		'deep_copy',

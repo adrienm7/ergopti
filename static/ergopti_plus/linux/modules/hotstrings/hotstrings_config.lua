@@ -48,6 +48,7 @@ local PersonalAdoption = require("infra.personal_file_adoption")
 local ManifestReader = require("infra.manifest_reader")
 local Preferences = require("infra.hotstring_preferences")
 local KEY = require("config_keys").KEY
+local NativePath = require("native_path")
 
 local LOG = "modules.hotstrings.hotstrings_config"
 local _personal_sources = {}
@@ -1360,7 +1361,7 @@ local function resolve_paths()
 			local found = Extensions.category_bindings(M.discover_extensions(), category)
 			return M.route_bound_sources({ _config_dir }, found), personal_sources
 		end
-		local root = _config_dir:match("^(.*)/[^/]+$") or ""
+		local root = NativePath.dirname(_config_dir) or ""
 		discover_personal(_config_dir, root)
 		local descriptor = descriptors_by_path[_config_dir]
 		return { descriptor and { path = _config_dir, personal_source = descriptor } or _config_dir }, personal_sources
@@ -1770,7 +1771,7 @@ local function commit_choices(changes, label)
 				row.personal_choice = true
 			end
 		end
-		local directory = config_file():match("^(.*)/[^/]+$")
+		local directory = NativePath.dirname(config_file())
 		if source.status == "absent" and not Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") then
 			return false, "the configuration folder cannot be created"
 		end

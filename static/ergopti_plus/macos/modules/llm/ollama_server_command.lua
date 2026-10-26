@@ -18,6 +18,7 @@ local M = {}
 local text_utils = require("infra.text_utils")
 local AppDirs    = require("app_dirs")
 local NetworkEnv = require("modules.llm.network_env")
+local NativePath = require("native_path")
 
 -- The daemon appends to the same dated file the logger names, so the prefix
 -- and extension come from the one registry that names it.
@@ -41,7 +42,7 @@ local function resolve_log_dir(unified_log_file)
 	if type(unified_log_file) ~= "string" or unified_log_file == "" then
 		return nil, "unified log path is absent"
 	end
-	local log_dir = unified_log_file:match("^(.*)/[^/]+$")
+	local log_dir = NativePath.dirname(unified_log_file)
 	if type(log_dir) ~= "string" or log_dir == "" then
 		return nil, "unified log path has no POSIX parent directory"
 	end

@@ -3536,7 +3536,7 @@ end
 function M.deploy_string(content, dst, expected_source)
 	Logger.trace(LOG, "Deploy: writing %d byte(s) → '%s'…", #content, dst)
 
-	local parent = dst:match("^(.*)/[^/]+$")
+	local parent = NativePath.dirname(dst)
 	local conditional = type(expected_source) == "table"
 	local writer = conditional and FileSystem.write_if_unchanged or FileSystem.write
 	if type(writer) ~= "function" then

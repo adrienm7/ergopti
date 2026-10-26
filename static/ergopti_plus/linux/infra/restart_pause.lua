@@ -14,6 +14,7 @@ local Storage = require("adapters.storage")
 local Shell = require("adapters.shell_runner")
 local Writer = require("toml_codec.writer")
 local Native = require("luv")
+local NativePath = require("native_path")
 local sequence = 0
 
 local function marker_path()
@@ -46,7 +47,7 @@ function M.prepare(paused)
 	if not ok then return nil, tostring(path) end
 	local read, _, status = pcall(Files.read_with_status, path)
 	if not read or status ~= "absent" then return nil, "restart pause handoff is pending or unreadable" end
-	local parent = path:match("^(.*)/[^/]+$")
+	local parent = NativePath.dirname(path)
 	local made, acknowledged = pcall(Shell.run, "mkdir -p -- " .. Shell.quote(parent) .. " 2>/dev/null")
 	if not made or acknowledged ~= true then return nil, "restart pause directory could not be prepared" end
 	sequence = sequence + 1
