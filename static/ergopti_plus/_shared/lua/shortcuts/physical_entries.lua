@@ -4,6 +4,7 @@
 --- This pure planner acquires no native input and publishes no file itself.
 local M = {}
 local Assignment = require("shortcuts.assignment")
+local ConfigKeys = require("config_keys")
 
 local function dictionary(value)
 	return type(value) == "table" and getmetatable(value) == nil
@@ -18,7 +19,7 @@ function M.new(model, actions, options)
 	for _, name in ipairs({ "is_assignable", "get_action_parameter_spec", "validate_action_parameter", "split_action_parameter_key" }) do
 		assert(type(actions) == "table" and type(actions[name]) == "function", "physical entry action catalogue unavailable")
 	end
-	assert(type(options) == "table" and (options.parameter_section == "gestures.action_parameters"
+	assert(type(options) == "table" and (options.parameter_section == ConfigKeys.KEY.GESTURES_ACTION_PARAMETERS
 		or options.parameter_section == "gesture_parameters"), "physical entry parameter owner unavailable")
 	local parameter_section = options.parameter_section
 	local owner = {}
@@ -47,7 +48,7 @@ function M.new(model, actions, options)
 		if operation == "remove" and (request.action ~= nil or request.parameter ~= nil) then return nil, "invalid_request" end
 		local rows = {}
 		local function remove_entry(id)
-			rows[#rows + 1] = { section = "shortcuts.keyboard", key = id, delete = true }
+			rows[#rows + 1] = { section = ConfigKeys.KEY.SHORTCUTS_KEYBOARD, key = id, delete = true }
 			local binding, keys = "keyboard__" .. id, {}
 			for key in pairs(inventory.parameters) do
 				local candidate, action = actions.split_action_parameter_key(key)
