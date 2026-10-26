@@ -650,3 +650,56 @@ TestFMv2_LiteralStringsKeepManifestTypes() {
 }
 Test("ApplyConfigToml: literal strings retain manifest types (toml-literal-string-kind)",
 	TestFMv2_LiteralStringsKeepManifestTypes)
+
+
+; Equivalent quote forms must retain manifest intent after semantic decoding.
+_FM_QuotedStringBootAdmission(Style, Locale := "en", Comment := "") {
+	global Features, _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
+	OldFeatures := _FM_BeginIsolated()
+	OldRejected := _ConfigBootRejectedOverrides
+	OldOutdated := _ConfigBootOutdatedEntries
+	Quote := Style == "single" ? Chr(39) : Style == "basic" ? Chr(34) : Style == "triple-basic" ? Chr(34) . Chr(34) . Chr(34) : Chr(39) . Chr(39) . Chr(39)
+	Source := "[script]`nlocale = " . Quote . Locale . Quote . Comment . "`nlog_level = " . Quote . "ERROR" . Quote . "`n[shortcuts.keyboard]`nctrl_b = " . Quote . "microsoft_bold" . Quote . "`n"
+	try {
+		_ConfigBootRejectedOverrides := 0
+		_ConfigBootOutdatedEntries := Map()
+		Path := _FM_WriteFixture("r4_triple_" . Style, Source)
+		Document := TOML_ParseDocument(Source)
+		AssertEqual(Locale, Document["script"]["locale"], "the actual document reader decodes the valid source")
+		Applied := ApplyBootConfigToml(Features, Path)
+		AssertEqual(3, Applied, "three valid quoted overrides must apply at the real boot owner")
+		AssertEqual(Locale, Features["script"]["locale"])
+		AssertEqual("ERROR", Features["script"]["log_level"])
+		AssertEqual("microsoft_bold", Features["shortcuts"]["keyboard"]["ctrl_b"])
+		AssertEqual(0, _ConfigBootOutdatedEntries.Count, "valid quoted values must not become cleanup candidates")
+	} finally {
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_ConfigBootRejectedOverrides := OldRejected
+		_ConfigBootOutdatedEntries := OldOutdated
+		_FM_EndIsolated(OldFeatures)
+	}
+}
+Test("ApplyBootConfigToml: single strings retain typed intent (toml-triple-literal-boot)",
+	_FM_QuotedStringBootAdmission.Bind("single"))
+
+Test("ApplyBootConfigToml: basic strings retain typed intent (toml-triple-literal-boot)",
+	_FM_QuotedStringBootAdmission.Bind("basic"))
+
+Test("ApplyBootConfigToml: triple-basic strings retain typed intent (toml-triple-literal-boot)",
+	_FM_QuotedStringBootAdmission.Bind("triple-basic"))
+
+Test("ApplyBootConfigToml: triple-literal strings retain typed intent (toml-triple-literal-boot)",
+	_FM_QuotedStringBootAdmission.Bind("triple-literal"))
+
+Test("ApplyBootConfigToml: triple literal hash retains data (toml-triple-literal-boot)",
+	_FM_QuotedStringBootAdmission.Bind("triple-literal", "en#literal", " # actual trailing comment"))
+
+Test("ApplyBootConfigToml: triple literal apostrophe-hash retains data (toml-triple-literal-boot)",
+	_FM_QuotedStringBootAdmission.Bind("triple-literal", "O'Brien#literal", " # actual trailing comment"))
+
+Test("ApplyBootConfigToml: triple literal one-quote retains data (toml-triple-literal-boot)",
+	_FM_QuotedStringBootAdmission.Bind("triple-literal", "ending'", " # actual trailing comment"))
+
+Test("ApplyBootConfigToml: triple literal two-quotes retains data (toml-triple-literal-boot)",
+	_FM_QuotedStringBootAdmission.Bind("triple-literal", "ending''", " # actual trailing comment"))
