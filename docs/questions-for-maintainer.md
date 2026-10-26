@@ -24,6 +24,9 @@ default taken meanwhile.
   Drop the next-start dialog ("one notice")?
 - **Linux Quit refusal:** the only refusal on Linux is "a shutdown already owns the daemon". Default
   meanwhile: that case only. Enough?
+- **`config_template.toml` on the Lua drivers:** no Lua runtime reads it; packaging ships it and the e2e
+  boots use it as a fixture. Default meanwhile: kept per driver. Stop shipping it for macOS and Linux (e2e on a
+  neutral empty config), or generate a shared part plus a delta?
 - **AI-off hint text:** the greyed agent actions reuse `llm.manual_prediction.disabled` ("AI suggestions are
   off: turn them on in the Artificial Intelligence menu."). Default meanwhile: reused. A dedicated string?
 

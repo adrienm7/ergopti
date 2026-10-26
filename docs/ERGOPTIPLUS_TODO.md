@@ -565,11 +565,10 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 - [x] **PAR-62. Contract tests for shared modules no test requires by name.** [CODE] Done (ab086f5020):
       direct contracts for nine shared modules, each proved red by a mutation; personal_model's
       `unowned-personal-section` stays covered by the writer corpus only.
-- [ ] **PAR-63. Remaining 2026-10-18 test items.** [CODE] Windows dynamic hotstrings, Linux personal-info
-      editor, Linux model records and downloads, keystats corpus on Linux, toggle-level gaps
-      (`preview_autocorrect_enabled`, `direct_access_digits`, `reset_on_nav`, `rolls.left_arrow`,
-      `french_magickey.text_expansion`, `chatgpt_url`), Windows root runners and the
-      `test-driver-tree-parity.cjs:19` exclusion. Audit section 14.
+- [ ] **PAR-63. Remaining 2026-10-18 test items.** [CODE] Done on Linux and macOS (personal-info editor,
+      field masking, native-only number row; model records, downloads, keystats corpus and the toggle gaps
+      were already covered). Left: Windows dynamic hotstrings, Windows root runners and the
+      `test-driver-tree-parity.cjs:19` exclusion.
 - [ ] **PAR-64. Installed-record and layout corpora on Windows.** [CODE] Windows replays 1 of 4 files.
       Replay extensions, preservation and updates. Audit L6.
 
@@ -600,10 +599,9 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       `layouts/registry.lua`; `shortcuts/catalogue.lua`; shared gesture `direction.lua` with boundary
       vectors; `llm/temperature.lua` with vectors; healthcheck report core; `llm/agent_learning_store`.
       One commit each. Audit R8, R9, R13, R20, R21.
-- [ ] **PAR-73. Collapse generated per-driver artifacts and tap-hold timeout duplicates.** [CODE]
-      macOS/Linux `features_manifest.lua` (67% common), `action_catalogue.lua` (81%),
-      `config_template.toml` (90%); `[hs_timeouts]` repeated per key in `defaults.toml`. Audit R22,
-      R24.
+- [ ] **PAR-73. Collapse generated per-driver artifacts and tap-hold timeout duplicates.** [CODE] Done:
+      `[hs_timeouts]`, `action_catalogue.lua`, and `features_manifest.lua` (one shared
+      `_shared/lua/features/manifest_data.lua`, eae6f45708). Left: `config_template.toml` (decision pending).
 - [ ] **PAR-74. Config-key and command-id constants by codegen.** [CODE] Generate constants from
       `config.schema.json` and `menu_manifest.json` for AHK, Lua and JS; lint raw literals such as
       `private_filter_enabled`. Audit R10.
@@ -614,9 +612,8 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       from `migrations.toml` (R17); extract menu row-ordering rules to data (R18); pure hotstring
       injection plan (R26); FileSystem port spec for lease/atomic write (R33); canonical `.keylayout`
       parser (R23); Windows updater `check_session`/`rate_limit` vectors (R25).
-- [ ] **PAR-77. Remove platform branches from shared UI JS.** [CODE] `healthcheck/script.js:57`,
-      `layout_manager/script.js:116`, `onboarding/script.js:396,713`, `program_parameter.js:59-66`;
-      the host passes capability flags and one `program_parameter` source. Audit R19.
+- [x] **PAR-77. Remove platform branches from shared UI JS.** [CODE] Done: hosts pass capability flags
+      and `executableSyntax`; `test-shared-ui-no-platform-branches.cjs` guards it.
 
 ### G. Constants, delays, colours, labels (value order)
 
@@ -646,9 +643,9 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 - [ ] **PAR-84. Closed enums for reasons, phases and log tags.** [CODE] About 189 `reason`, 56 `phase`
       and 62 `[TAG]` literals plus the evidence-record field names (not censused: do that first).
       Extend `codegen-contracts-json.cjs`; gate in `test-logger-scalars-single-source.cjs`. Audit K11.
-- [ ] **PAR-85. Tooltip dequeue and ring constants.** [CODE] `dequeue.js` 0.2/0.05 against `dequeue.lua`
-      0/0, `RING_SIZE` 64 against 32, "mirrored" comment at `tooltip/constants.toml:398`. Single-source
-      test in the tooltip family. Audit K2.
+- [x] **PAR-85. Tooltip dequeue and ring constants.** [CODE] Done: dequeue timings single-sourced in
+      `tooltip/constants.toml [timing]` (`test-tooltip-timing-single-source.cjs`); the 64/32 rings are
+      unrelated (keystroke ring, phase attribution ring).
 
 ## Backlog (one line each)
 
