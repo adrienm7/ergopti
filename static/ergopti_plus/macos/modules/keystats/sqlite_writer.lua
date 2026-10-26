@@ -530,33 +530,41 @@ function _builders.typing(e, id)
 		_sql_str(enc_text), _sql_str(e.rich_text), _sql_str(enc_json))
 end
 
+--- A value as the text of a nullable text column: nil stays absent (NULL), anything else is its text.
+local function _opt_text(value)
+	if value == nil then return nil end
+	return tostring(value)
+end
+
 function _builders.app_switch(e, id)
-	return string.format(
-		"INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms) VALUES (%s, %d, %s, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(e.prev_app), _sql_str(e.next_app), _sql_num(e.duration_ms or 0))
+	return Queries.render("events.app_switch", "native", {
+		device_id = tostring(_device_id), id = id,
+		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		prev_app = _opt_text(e.prev_app), next_app = _opt_text(e.next_app),
+		duration_ms = tonumber(e.duration_ms) or 0,
+	})
 end
 
 function _builders.window_switch(e, id)
-	return string.format(
-		"INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms) VALUES (%s, %d, %s, %s, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
+	return Queries.render("events.window_switch", "native", {
+		device_id = tostring(_device_id), id = id,
+		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
 		-- events_window_switch.app is TEXT NOT NULL; a nil would make INSERT OR
 		-- IGNORE drop the whole row. Same "Unknown" fallback the typing builder uses.
-		_sql_str(e.app or "Unknown"), _sql_str(e.prev_title), _sql_str(e.next_title),
-		_sql_num(e.duration_ms or 0))
+		app = tostring(e.app or "Unknown"),
+		prev_title = _opt_text(e.prev_title), next_title = _opt_text(e.next_title),
+		duration_ms = tonumber(e.duration_ms) or 0,
+	})
 end
 
 function _builders.shortcut(e, id)
-	return string.format(
-		"INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key) VALUES (%s, %d, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
+	return Queries.render("events.shortcut", "native", {
+		device_id = tostring(_device_id), id = id,
+		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
 		-- Both columns are TEXT NOT NULL. Losing the key name degrades one field;
 		-- emitting NULL loses the entire shortcut event to INSERT OR IGNORE.
-		_sql_str(e.app or "Unknown"), _sql_str(e.key or ""))
+		app = tostring(e.app or "Unknown"), key = tostring(e.key or ""),
+	})
 end
 
 --- Build the events_system INSERT for an entry.
@@ -573,26 +581,26 @@ function _builders.system(e, id, action_override)
 			meta[k] = v
 		end
 	end
-	return string.format(
-		"INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES (%s, %d, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
+	return Queries.render("events.system", "native", {
+		device_id = tostring(_device_id), id = id,
+		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
 		-- The override covers the types that carry no `action` of their own, but a
 		-- bare "system_event" entry still relies on e.action being present — and the
 		-- column is NOT NULL, the exact swallow this function's docstring warns
 		-- about. Fall back to a sentinel so the event survives as an anomaly rather
 		-- than vanishing entirely.
-		_sql_str(action_override or e.action or "unknown"), _sql_json(meta))
+		action = tostring(action_override or e.action or "unknown"), metadata_json = _json_text(meta),
+	})
 end
 
 function _builders.hotstring(e, id, kind)
-	return string.format(
-		"INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars) VALUES (%s, %d, %s, %s, %s, %s, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(e.app or "Unknown"), _sql_str(kind),
-		_sql_str(e.trigger or ""), _sql_str(e.replacement or ""),
-		_sql_str(e.h_type), _sql_num(e.net_saved_chars))
+	return Queries.render("events.hotstring", "native", {
+		device_id = tostring(_device_id), id = id,
+		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		app = tostring(e.app or "Unknown"), kind = tostring(kind),
+		trigger = tostring(e.trigger or ""), replacement = tostring(e.replacement or ""),
+		h_type = _opt_text(e.h_type), net_saved_chars = tonumber(e.net_saved_chars),
+	})
 end
 
 function _builders.llm(e, id, kind)
@@ -619,11 +627,11 @@ function _builders.llm(e, id, kind)
 end
 
 function _builders.session(e, id, kind)
-	return string.format(
-		"INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms) VALUES (%s, %d, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(kind), _sql_num(e.duration_ms))
+	return Queries.render("events.session", "native", {
+		device_id = tostring(_device_id), id = id,
+		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		kind = tostring(kind), duration_ms = tonumber(e.duration_ms),
+	})
 end
 
 
