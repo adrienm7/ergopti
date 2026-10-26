@@ -74,9 +74,6 @@
 	"macos/infra/personal_info_fields.lua": {
 		"count": 1
 	},
-	"macos/infra/timings.lua": {
-		"count": 1
-	},
 	"macos/infra/toml/record_editor.lua": {
 		"trim": 2
 	},
