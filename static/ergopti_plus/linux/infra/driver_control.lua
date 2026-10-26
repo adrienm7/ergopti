@@ -254,9 +254,12 @@ M.Session = Session
 function M.start(opts)
 	Logger.start(LOG, "Starting the local reload control…")
 	local ok, session_or_err = pcall(function()
-		local file = assert(io.open(opts.declaration or require("infra.paths").shared("modules/control/driver_control.json"), "rb"))
-		local text = assert(file:read("*a"))
-		assert(file:close())
+		local file = assert(require("infra.regular_file_reader").open(
+			opts.declaration or require("infra.paths").shared("modules/control/driver_control.json")))
+		local read, text = pcall(file.read, file, "*a")
+		local closed, acknowledged = pcall(file.close, file)
+		assert(read and type(text) == "string", "the control declaration could not be read")
+		assert(closed and acknowledged == true, "the control declaration close was not acknowledged")
 		local spec = Policy.validate(Json.decode(text))
 		local folder, why = Policy.folder(spec, "linux", os.getenv, require("app_dirs").folder_name, "/")
 		if not folder then error(why, 0) end
