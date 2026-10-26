@@ -15,7 +15,8 @@
 --- the identical algorithm and a second copy would be a second place for the
 --- rule that protects the user's data to rot. What is here is the macOS half:
 --- rows read and written through the SQLite handle sqlite_writer owns, and the
---- slicing that keeps the pass off the typing path.
+--- scheduler port that keeps the pass off the typing path (the public surface
+--- and the slicing live in _shared/lua/keystats/text_migration_driver.lua).
 ---
 --- WHY IT RUNS IN SLICES:
 --- Hammerspoon is single-threaded and every value costs one openssl spawn, so a
@@ -35,13 +36,11 @@
 ---    encrypted here either.
 --- ==============================================================================
 
-local M = {}
-
 local Logger       = require("infra.logger")
 local Scheduler    = require("adapters.timer_scheduler")
 local SqliteWriter = require("modules.keystats.sqlite_writer")
 local TextCipher   = require("modules.keystats.text_cipher")
-local Plan         = require("keystats.text_migration")
+local Driver       = require("keystats.text_migration_driver")
 local Runner       = require("keystats.text_migration_runner")
 
 local LOG = "keystats.text_migration"
@@ -104,111 +103,20 @@ end
 
 
 
--- ==========================
--- ==========================
--- ======= 3/ Slicing =======
--- ==========================
--- ==========================
+-- ===============================
+-- ===============================
+-- ======= 3/ Public API =========
+-- ===============================
+-- ===============================
 
---- The runner in force. Rebuilt by _set_backend so a test can drive the whole
---- algorithm over an in-memory table.
-local _runner = Runner.new({
+--- Sliced here: the scheduler port arms each pass's next slice, and the device
+--- defaults to the one the writer owns. The seam that swaps the backend lets a
+--- test drive the algorithm over an in-memory table.
+local module, err = Driver.new({
 	logger = Logger, log_tag = LOG, cipher = TextCipher, backend = RealBackend,
+	scheduler = { after = Scheduler.after, cancel = Scheduler.cancel, gap_sec = SLICE_GAP_SEC },
+	device_id = function() return SqliteWriter.get_device_id() end,
 })
+assert(module, err)
 
---- Handle of the scheduled next slice, so a pass can be stopped.
-local _slice = nil
-
---- Runs one batch and schedules the next. Declared as a local BEFORE the closure
---- that reschedules it: in Lua the scope of a local starts after its declaration,
---- so a forward reference inside the closure would resolve to a nil global and
---- the pass would convert exactly one batch and stop.
-local run_slice
-
-run_slice = function()
-	_slice = nil
-	if not _runner.pump() then return end
-	_slice = Scheduler.after(SLICE_GAP_SEC, run_slice)
-end
-
-
-
-
-
--- =============================
--- =============================
--- ======= 4/ Public API =======
--- =============================
--- =============================
-
---- Installs a replacement backend (test seam); nil restores the real one.
---- @param replacement table|nil
-function M._set_backend(replacement)
-	_runner = Runner.new({
-		logger = Logger, log_tag = LOG, cipher = TextCipher,
-		backend = (type(replacement) == "table") and replacement or RealBackend,
-	})
-end
-
---- Starts a migration pass and schedules its first slice.
---- @param mode      string Plan.MODE_ENCRYPT or Plan.MODE_DECRYPT.
---- @param device_id string|nil The LOCAL device; defaults to the writer's own.
---- @return boolean True when a pass is now in flight.
-function M.start(mode, device_id)
-	M.cancel()
-	if not _runner.start(mode, device_id or SqliteWriter.get_device_id()) then return false end
-	_slice = Scheduler.after(SLICE_GAP_SEC, run_slice)
-	return true
-end
-
---- Starts the pass matching a posture. Called when the user flips the setting.
---- @param encrypt_enabled boolean The posture now in force.
---- @return boolean True when a pass is now in flight.
-function M.start_for_posture(encrypt_enabled)
-	return M.start(encrypt_enabled and Plan.MODE_ENCRYPT or Plan.MODE_DECRYPT)
-end
-
---- Resumes only a pass a previous run left unfinished.
---- Used at start-up, where an unconditional start() would re-read every stored
---- row on Macs that never enabled the setting at all.
---- @param encrypt_enabled boolean The posture now in force.
---- @param device_id string|nil The LOCAL device; defaults to the writer's own.
---- @return boolean True when a pass is now in flight.
-function M.resume_for_posture(encrypt_enabled, device_id)
-	M.cancel()
-	local mode = encrypt_enabled and Plan.MODE_ENCRYPT or Plan.MODE_DECRYPT
-	if not _runner.resume(mode, device_id or SqliteWriter.get_device_id()) then return false end
-	_slice = Scheduler.after(SLICE_GAP_SEC, run_slice)
-	return true
-end
-
---- Converts one batch synchronously. The slicing calls it; a test drives it
---- directly rather than waiting on a scheduler.
---- @return boolean True when there is more to do.
-function M.pump()
-	return _runner.pump()
-end
-
---- Stops the pass. Converted rows stay converted and the stored cursor lets a
---- later call resume from there, so this is a pause and not a revert.
-function M.cancel()
-	if _slice then
-		Scheduler.cancel(_slice)
-		_slice = nil
-	end
-	_runner.cancel()
-end
-
---- Whether a pass is in flight.
---- @return boolean
-function M.is_running()
-	return _runner.is_running()
-end
-
---- Snapshot of the pass, for the menu and for diagnostics.
---- @return table
-function M.get_progress()
-	return _runner.get_progress()
-end
-
-return M
+return module

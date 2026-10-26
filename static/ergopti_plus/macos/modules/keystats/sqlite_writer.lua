@@ -809,15 +809,11 @@ function M.apply_typing_updates(device_id, updates)
 	if not _db then return false end
 	if type(updates) ~= "table" or #updates == 0 then return true end
 
-	local statements = {}
-	for _, update in ipairs(updates) do
-		local sql = Migration.update_row_sql(device_id, update.id, update.assignments)
-		if not sql then
-			Logger.error(LOG, "Migration produced no statement for row %s — batch refused.",
-				tostring(update.id))
-			return false
-		end
-		statements[#statements + 1] = sql
+	local statements, refused_id = Migration.update_statements(device_id, updates)
+	if not statements then
+		Logger.error(LOG, "Migration produced no statement for row %s — batch refused.",
+			tostring(refused_id))
+		return false
 	end
 
 	if _db:exec("BEGIN TRANSACTION;") ~= sqlite3.OK then
