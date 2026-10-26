@@ -61,6 +61,9 @@ local OWNERS = {
 	"infra.termination_coordinator",
 	"infra.text_utils",
 	"infra.timings",
+	-- The driver bindings of the manifest reader and the timings registry build on these.
+	"manifest_reader",
+	"timings",
 	"infra.toml.reader",
 	"json",
 	"llm.profile_selector",

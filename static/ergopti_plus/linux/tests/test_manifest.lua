@@ -45,6 +45,7 @@ return {
 	"tests.unit.modules.keystats.privacy.test_pointer_focus_privacy",
 	"tests.unit.infra.lifecycle.test_session_lock",
 	"tests.unit.infra.config.test_shared_timings",
+	"tests.unit.infra.config.test_shared_manifest_reader",
 	"tests.unit.infra.control.test_driver_control",
 	"tests.unit.infra.control.test_reload_outcome",
 	"tests.unit.infra.control.test_reload_restart",

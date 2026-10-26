@@ -166,7 +166,7 @@ return function(helpers)
 				helpers.assert_eq(#Manifest.scope_plan("global", mode, {}).presets, 1)
 			end
 		end)
-		if type(Manifest.find_declared_entry_by_path) == "function" then
+		if Manifest.resolves_platform_defaults == true then
 			helpers.it("does not resolve an included native backend for direct planning", function()
 				local name = "modules.llm.backend_detector"
 				local previous, calls = package.loaded[name], 0
