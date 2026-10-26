@@ -143,6 +143,14 @@
 			"args": ["tools/test/test-linux-rpm-publish.cjs"],
 			"repro": "node tools/test/test-linux-rpm-publish.cjs",
 			"platforms": ["linux"]
+		},
+		{
+			"id": "js-linux-distro-native-prerequisites",
+			"ordinal": 496,
+			"name": "Distribution unit preparation installs native GLib and SQLite before executing unchanged groups",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-distro-native-prerequisites.cjs"],
+			"repro": "npm run test:linux-distro-native-prerequisites"
 		}
 	]
 }
