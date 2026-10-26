@@ -6,6 +6,8 @@
 -- retain physical descriptors, emission, persistence and lifecycle ownership.
 -- ============================================================================
 
+local ConfigKeys = require("config_keys")
+
 local M = {}
 
 function M.mode(value)
@@ -138,12 +140,12 @@ end
 function M.native_rows(renderer, commands)
 	if type(renderer) ~= "table" or type(renderer.choice_row) ~= "function"
 		or type(renderer.get_array) ~= "function" or type(commands) ~= "table"
-		or type(commands["number_row_mode"]) ~= "function"
-		or type(commands["number_row_edges"]) ~= "function" then return {} end
+		or type(commands[ConfigKeys.COMMAND.NUMBER_ROW_MODE]) ~= "function"
+		or type(commands[ConfigKeys.COMMAND.NUMBER_ROW_EDGES]) ~= "function" then return {} end
 	local definitions = renderer.get_array("number_row_policy_rows")
 	local declaration = type(definitions) == "table" and #definitions == 2 and definitions[1]
 	local edges = type(definitions) == "table" and definitions[2]
-	if type(edges) ~= "table" or edges.type ~= "check" or edges.path ~= "layout.number_row_reorder_edges"
+	if type(edges) ~= "table" or edges.type ~= "check" or edges.path ~= ConfigKeys.KEY.LAYOUT_NUMBER_ROW_REORDER_EDGES
 		or edges.id ~= "number_row_edges" then return {} end
 	local choices = type(declaration) == "table" and declaration.choices
 	if type(choices) ~= "table" or #choices ~= 3
@@ -153,7 +155,7 @@ function M.native_rows(renderer, commands)
 	end
 	local row = renderer.choice_row("number_row_policy_rows", "number_row_mode",
 		commands,
-		{ ["layout.direct_access_digits"] = function() return "native" end })
+		{ [ConfigKeys.KEY.LAYOUT_DIRECT_ACCESS_DIGITS] = function() return "native" end })
 	if type(row) ~= "table" or type(row.items) ~= "table" or #row.items ~= #choices then return {} end
 	for _, item in ipairs(row.items) do
 		if type(item) ~= "table" then return {} end
@@ -168,7 +170,7 @@ function M.native_rows(renderer, commands)
 	-- The edge keys follow the ordering, which these drivers do not apply.
 	if type(renderer.check_row) ~= "function" then return {} end
 	local check = renderer.check_row("number_row_policy_rows", "number_row_edges",
-		{ number_row_edges = commands["number_row_edges"] },
+		{ number_row_edges = commands[ConfigKeys.COMMAND.NUMBER_ROW_EDGES] },
 		{ number_row_edges_enabled = function() return false end })
 	if type(check) ~= "table" then return {} end
 	check.action = nil
