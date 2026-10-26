@@ -66,10 +66,23 @@ helpers.describe("LLM trigger settings: durable manifest-backed values", functio
 
 	helpers.it("rejects debounce values outside the shared UI range", function()
 		local settings, storage = load_settings()
-		for _, value in ipairs({ 49, 10001, 50.5, "500" }) do
+		for _, value in ipairs({ -2, 0, 49, 10001, 50.5, "500" }) do
 			helpers.assert_eq(settings.set("debounce_ms", value), false)
 		end
 		helpers.assert_eq(#storage.keys(), 0)
+		restore()
+	end)
+
+	helpers.it("stores the shared \"never\" debounce as -1 and reads it back (llm-debounce-never)", function()
+		local Debounce = require("llm.request_plan.debounce")
+		local settings, storage = load_settings()
+		helpers.assert_true(settings.set("debounce_ms", Debounce.NEVER_MS))
+		helpers.assert_eq(storage.get("llm.trigger.debounce_ms"), -1)
+		helpers.assert_true(settings.is_never("debounce_ms", settings.get("debounce_ms")))
+		helpers.assert_true(not settings.is_never("debounce_ms", 500))
+		-- A file written by macOS (same representation) is current, not outdated.
+		local reloaded = load_settings({ ["llm.trigger.debounce_ms"] = -1 })
+		helpers.assert_eq(reloaded.get("debounce_ms"), -1)
 		restore()
 	end)
 end)
@@ -177,6 +190,40 @@ helpers.describe("prediction engine: trigger settings affect requests", function
 		restore()
 	end)
 
+	helpers.it("never debounce: typing sends nothing, an explicit trigger still does (llm-debounce-never)", function()
+		local scheduler = Fakes.timer_scheduler()
+		local chat_calls = 0
+		replace("modules.llm.trigger_settings", {
+			get = function(name)
+				if name == "debounce_ms" then return -1 end
+				if name == "secure_filter_enabled" then return false end
+				if name == "url_bar_filter_enabled" then return false end
+			end,
+			set = function() return true end,
+			is_app_disabled = function() return false end,
+		})
+		replace("modules.llm.api_ollama", {
+			chat = function() chat_calls = chat_calls + 1 end,
+			cancel = function() return true end,
+		})
+		replace("modules.llm.profiles", {
+			init = function() end,
+			is_enabled = function() return true end,
+			get_current_model = function() return "test-model" end,
+			get_base_url = function() return "http://127.0.0.1:11434" end,
+		})
+		package.loaded["modules.llm.prediction_engine"] = nil
+		local engine = require("modules.llm.prediction_engine")
+		engine.init({ focus_id = function() return "owned-prediction-window" end, scheduler = scheduler, clock_ms = function() return scheduler.now * 1000 end })
+		engine.on_char("x", "hello x", { app_id = "editor" })
+		scheduler.test.advance(60)
+		helpers.assert_eq(chat_calls, 0, "never turns the automatic trigger off")
+		engine.on_char("/", "hello //", { app_id = "editor" })
+		scheduler.test.advance(1)
+		helpers.assert_eq(chat_calls, 1, "the typed trigger is an explicit request")
+		restore()
+	end)
+
 	helpers.it("allows ordinary editors with the URL filter and the real lifecycle table (llm-url-app-contract)", function()
 		with_url_request({ app = "code" }, function(observed, lifecycle)
 			helpers.assert_eq(lifecycle.getForegroundApp(), { appId = "code", windowTitle = "Owned document" })
@@ -248,6 +295,45 @@ helpers.describe("LLM trigger settings: tray reachability", function()
 		filter.fn()
 		helpers.assert_eq(storage.get("llm.trigger.secure_filter_enabled"), false)
 		helpers.assert_eq(settings.get("secure_filter_enabled"), false)
+		restore()
+	end)
+
+	helpers.it("offers the \"never\" idle time as macOS does and shows it as the current choice (llm-debounce-never)", function()
+		local settings, storage = load_settings({["llm.enabled"] = true, ["llm.models.selected"] = "ollama"})
+		local i18n = require("infra.i18n")
+		local menu_builder = helpers.load_module("ui.menu.menu_builder")
+		local function build()
+			return menu_builder.build({
+				is_paused = function() return false end,
+				llm = {
+					is_enabled = function() return true end,
+					toggle = function() return true end,
+					get_backend = function() return "ollama" end,
+					streaming_revision = function() return 0 end,
+					get_models = function() return {} end,
+					get_current_model = function() return nil end,
+				},
+			})
+		end
+		local function find(rows, title)
+			for _, row in ipairs(rows or {}) do
+				if row.title == title then return row end
+				local found = type(row.menu) == "table" and find(row.menu, title)
+				if found then return found end
+			end
+		end
+		local never = i18n.get("menu.settings.never")
+		local idle = find(build(), string.format(i18n.get("menu.llm.debounce_label"), "500 ms"))
+		helpers.assert_not_nil(idle, "the idle-time row shows the default delay")
+		local choice = find(idle.menu, never)
+		helpers.assert_not_nil(choice, "the idle-time choices include Never")
+		helpers.assert_true(not choice.checked)
+		choice.fn()
+		helpers.assert_eq(storage.get("llm.trigger.debounce_ms"), -1)
+		helpers.assert_eq(settings.get("debounce_ms"), -1)
+		local after = find(build(), string.format(i18n.get("menu.llm.debounce_label"), never))
+		helpers.assert_not_nil(after, "the idle-time row names Never once chosen")
+		helpers.assert_true(find(after.menu, never).checked)
 		restore()
 	end)
 end)

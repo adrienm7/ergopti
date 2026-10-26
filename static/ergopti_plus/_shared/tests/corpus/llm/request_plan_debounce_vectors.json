@@ -9,7 +9,7 @@
 			"live_instant_word_end": true
 		},
 		"linux": {
-			"allow_never": false,
+			"allow_never": true,
 			"pace_explicit": true,
 			"pace_variants": true,
 			"floor_scope": "per_backend",
@@ -571,8 +571,8 @@
 			]
 		},
 		{
-			"id": "never-is-refused-where-the-driver-has-no-never",
-			"description": "A driver without a never setting rejects a negative debounce.",
+			"id": "never-turns-the-automatic-trigger-off-linux",
+			"description": "Linux offers the same \"never\" as macOS: a negative debounce (the shared sentinel -1) skips typing and overrides, even at a word end.",
 			"options": "linux",
 			"floors": {
 				"ollama": 300,
@@ -583,9 +583,72 @@
 				{
 					"call": "configure",
 					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": true
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing",
+						"ends_word": false
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 500,
+							"why": "Inactivity"
+						}
+					]
+				},
+				{
+					"call": "configure",
+					"args": {
 						"debounce_ms": -1
 					},
-					"expect_error": "negative debounce"
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing",
+						"ends_word": true
+					},
+					"expect": [
+						{
+							"action": "skip",
+							"why": "automatic trigger off"
+						}
+					]
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "override",
+						"delay_ms": 250
+					},
+					"expect": [
+						{
+							"action": "skip",
+							"why": "automatic trigger off"
+						}
+					]
+				},
+				{
+					"call": "on_timer",
+					"args": {
+						"token": 1
+					},
+					"expect": [
+						{
+							"action": "fire",
+							"token": 1,
+							"why": "Inactivity"
+						}
+					]
 				}
 			]
 		},
@@ -1450,6 +1513,25 @@
 						"cause": "typing"
 					},
 					"expect_error": "never configured"
+				}
+			]
+		},
+		{
+			"id": "a-non-numeric-debounce-is-refused",
+			"description": "The debounce is a number of milliseconds, or the negative \"never\" sentinel.",
+			"options": "macos",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"debounce_ms": "500"
+					},
+					"expect_error": "debounce_ms must be a number"
 				}
 			]
 		}

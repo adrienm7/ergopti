@@ -2454,6 +2454,16 @@ local function _build_llm(ctx)
 				end,
 			}
 		end
+		-- "Never" turns the automatic trigger off (the shared sentinel, as on macOS).
+		local delay_never = TriggerSettings.is_never("debounce_ms", current_delay)
+		delay_choices[#delay_choices + 1] = {
+			label = i18n_safe("menu.settings.never"),
+			checked = delay_never,
+			action = function()
+				TriggerSettings.set("debounce_ms", TriggerSettings.NEVER_MS)
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end,
+		}
 		local bounds = TriggerSettings.bounds("debounce_ms")
 		local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
 			["llm_numeric_custom_value"] = function()
@@ -2486,7 +2496,8 @@ local function _build_llm(ctx)
 		})
 		for _, row in ipairs(custom_rows or {}) do delay_choices[#delay_choices + 1] = row end
 		rows[#rows + 1] = {
-			label = string.format(i18n_safe("menu.llm.debounce_label"), tostring(current_delay) .. " ms"),
+			label = string.format(i18n_safe("menu.llm.debounce_label"),
+				delay_never and i18n_safe("menu.settings.never") or (tostring(current_delay) .. " ms")),
 			items = delay_choices,
 		}
 		local boundary_rows = ManifestMenu.template_rows("llm_trigger_provider_boundary", {}, {}, {})
