@@ -451,3 +451,124 @@ _LNCW_NativeOwnerNeverCyclesAnArrow() {
 
 Test("LLM nav: the native owner never matches an arrow, so a press never cycles twice (llm-nav-cycle-windows)",
 	_LNCW_NativeOwnerNeverCyclesAnArrow)
+
+
+; The input hook delivers only keys the consuming AHK hotkey did not own.
+_LNCW_ForwardedCaretInput(Key, ShouldReset, Route) {
+	global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, _KS_PhysicalInputGeneration
+	global _KS_LastPhysicalKeyVk, _KS_LastPhysicalKeySc, _KS_LastPhysicalKeyEpoch, _KS_LastPhysicalKeySources
+	global _UserHotstringsInputSerial, _PrefixLastKeyTick, _PrefixIdleForgotten, HSE_StartIsLineStart
+	Saved := [_LLM_Remote_Async, _LLM_Remote_AsyncCounter, _KS_PhysicalInputGeneration,
+		_KS_LastPhysicalKeyVk, _KS_LastPhysicalKeySc, _KS_LastPhysicalKeyEpoch,
+		_KS_LastPhysicalKeySources.Clone(), _UserHotstringsInputSerial,
+		_PrefixLastKeyTick, _PrefixIdleForgotten, HSE_StartIsLineStart]
+	try {
+		_LLM_Remote_Async := Map()
+		_HNP_Run(Run)
+	} finally {
+		_LLM_Remote_Async := Saved[1]
+		_LLM_Remote_AsyncCounter := Saved[2]
+		_KS_PhysicalInputGeneration := Saved[3]
+		_KS_LastPhysicalKeyVk := Saved[4]
+		_KS_LastPhysicalKeySc := Saved[5]
+		_KS_LastPhysicalKeyEpoch := Saved[6]
+		_KS_LastPhysicalKeySources := Saved[7]
+		_UserHotstringsInputSerial := Saved[8]
+		_PrefixLastKeyTick := Saved[9]
+		_PrefixIdleForgotten := Saved[10]
+		HSE_StartIsLineStart := Saved[11]
+	}
+	Run() {
+		global LPP_BUFFER
+		_LPP_Run(_LPP_Menu(), LPP_BUFFER, Body)
+	}
+	Body(Calls, Lines) {
+		global _LLM_Engine_RemoteTransport, _LLM_Engine, _LLM_Remote_Async, _PrefixInputHook
+		SavedHooks := [HookDispatcher._ih, _PrefixInputHook]
+		global _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading, _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
+		SavedPresentation := [_Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading, _Stub_LlmTooltipText, _Stub_LlmPresentedRecord]
+		Dispatch := _LLMRemote_DispatchManagedCurl
+		State := _ManagedCurlControlState()
+		AssertFalse(Dispatch.HasOwnProp("Call"))
+		try {
+			_Stub_LlmTooltipVisible := false
+			_Stub_LlmTooltipLoading := false
+			_Stub_LlmTooltipText := ""
+			_Stub_LlmPresentedRecord := 0
+			_LLM_Engine_RemoteTransport := 0
+			if Route == "dispatcher" {
+				HookDispatcher._ih := InputHook("V I1 L0")
+				_PrefixInputHook := 0
+			}
+			KS_RecordPhysicalInput()
+			Dispatch.DefineProp("Call", {Call: ObserveDispatch})
+			AssertTrue(LLM_Menu_TriggerPredictionWith("advanced", 1), "the real public prediction must start")
+			AssertEqual(1, State["spawns"], "one native Job is acquired through the controlled outer port")
+			AssertEqual(1, State["starts"])
+			AssertEqual(0, Calls.Length, "the real generic transport must run")
+			Request := State["request"]
+			_ManagedCurlControlAck(State)
+			Request._PollManagedAdmission()
+			AssertTrue(Request.ManagedPayloadPublished, "the current request consumes its exact ACK")
+			OriginalId := _LLM_Engine["request_id"]
+			if Route == "prefix"
+				_OnPrefixKeyDown(0, GetKeyVK(Key), GetKeySC(Key))
+			else {
+				KS_RecordPhysicalKeyDown(GetKeyVK(Key), GetKeySC(Key), "dispatcher")
+				_LLM_Bridge_OnDispatcherKey(HookDispatcher._ih, GetKeyVK(Key), GetKeySC(Key))
+			}
+			Retired := !_LLM_Remote_Async.Has(State["id"]) || _LLM_Remote_Async[State["id"]]["cancelled"]
+			AssertEqual(ShouldReset, _LLM_Engine["request_id"] > OriginalId,
+				"only a forwarded caret/navigation key must revoke the existing generation")
+			AssertEqual(ShouldReset, Retired, "the actual source callback must cancel its exact HTTP owner")
+			if ShouldReset {
+				AssertFalse(_LLM_Engine.Get("timer_active", false), "navigation cannot retain a stale prediction timer")
+				; Native cancellation is deliberately deferred off the keyboard
+				; thread. Receive its real timer before asserting physical release.
+				PreviousCritical := Critical("Off")
+				try {
+					StartedAt := A_TickCount
+					while !Request.Aborted && A_TickCount - StartedAt < 2000
+						Sleep(10)
+				} finally Critical(PreviousCritical)
+				AssertTrue(Request.Aborted, "the deferred native owner must abort the exact canceled request")
+			} else
+				AssertFalse(Request.Aborted, "an unrelated modifier cannot abort the request")
+		} finally {
+			if Dispatch.HasOwnProp("Call")
+				Dispatch.DeleteProp("Call")
+			if State.Has("id") {
+				LLM_RemoteCancelAsync(State["id"])
+				_LLMRemote_PollRequest(State["id"])
+			}
+			if State.Has("request")
+				_ManagedCurlControlRelease(State)
+			HookDispatcher._ih := SavedHooks[1]
+			_PrefixInputHook := SavedHooks[2]
+			_Stub_LlmTooltipVisible := SavedPresentation[1]
+			_Stub_LlmTooltipLoading := SavedPresentation[2]
+			_Stub_LlmTooltipText := SavedPresentation[3]
+			_Stub_LlmPresentedRecord := SavedPresentation[4]
+		}
+		ObserveDispatch(Self, Id, Reservation, Resolved, Url, Payload, Port := 0) {
+			Dispatch.DeleteProp("Call")
+			State["id"] := Id
+			return Dispatch.Call(Id, Reservation, Resolved, Url, Payload,
+				Map("managed_settings", (*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""),
+					"create_http", Create))
+		}
+		Create() {
+			Request := CurlAsyncRequest(Map("spawn", _ManagedCurlControlSpawn.Bind(State)))
+			State["request"] := Request
+			return Request
+		}
+	}
+}
+
+for _LNCW_InputRoute in ["prefix", "dispatcher"] {
+	for _LNCW_CaretKey in ["Left", "Up", "Right", "Down", "Home", "End", "PgUp", "PgDn", "Insert", "Delete"]
+		Test("LLM navigation: forwarded " . _LNCW_InputRoute . " " . _LNCW_CaretKey . " revokes prediction (forwarded-caret-navigation)",
+			_LNCW_ForwardedCaretInput.Bind(_LNCW_CaretKey, true, _LNCW_InputRoute))
+	Test("LLM navigation: forwarded " . _LNCW_InputRoute . " modifier keeps prediction (forwarded-caret-navigation)",
+		_LNCW_ForwardedCaretInput.Bind("LShift", false, _LNCW_InputRoute))
+}

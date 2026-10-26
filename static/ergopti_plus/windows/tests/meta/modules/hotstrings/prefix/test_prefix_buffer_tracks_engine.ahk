@@ -117,8 +117,10 @@ _PBT_BackspaceRecoversTheWordTheEngineStillHolds() {
 _PBT_ResetListExcludesBackspace() {
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "the driver source must be readable")
-	Assert(RegExMatch(Src, "ResetVKs\s*:=\s*Map\(\s*0x08") == 0,
-		"VK_BACK must not be the first entry of ResetVKs — a reset wipes the preview buffer, and the engine only decrements")
+	Owner := _DriverFuncBody("KS_IsContextResetKey")
+	Assert(Owner != "", "the canonical context-reset owner must exist")
+	AssertFalse(KS_IsContextResetKey(0x08),
+		"VK_BACK must not belong to ResetVKs — a reset wipes the preview buffer, and the engine only decrements")
 }
 
 

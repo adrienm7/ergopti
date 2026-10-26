@@ -1080,8 +1080,7 @@ _LLM_Bridge_OnDispatcherKey(ih, vk, sc) {
 	if !IsObject(ih) || !IsObject(HookDispatcher._ih)
 		|| ObjPtr(ih) != ObjPtr(HookDispatcher._ih)
 		return
-	if (vk != 0x08 && ((vk >= 0x21 && vk <= 0x28) || vk == 0x2D || vk == 0x2E
-		|| vk == 0x09 || vk == 0x0D || vk == 0x1B))
+	if (KS_IsContextResetKey(vk) && vk != 0x20)
 		|| (!_PrefixIsModifierVK(vk) && _PrefixShortcutModifierHeld())
 		_PrefixRevokeIncompleteFragments()
 	LLM_Bridge_FeedKeyDownIfActive(vk)
@@ -1290,7 +1289,7 @@ LLM_Bridge_FeedKeyDownIfActive(vk, IsPhysicalEvent := false) {
 		; Predictions are off: only the AI agent's typing observer listens
 		if (vk = 0x08)
 			_LLM_Bridge_ObserveAgentTyping(_TextTailCodeUnits(_LLM_Bridge_AgentBuffer, 1), "")
-		else if (vk = 0x09 or vk = 0x0D or vk = 0x1B)
+		else if (KS_IsContextResetKey(vk) && vk != 0x20)
 			LLM_Bridge_MirrorAgentEdit(0, "", true)
 		return
 	}
@@ -1304,8 +1303,13 @@ LLM_Bridge_FeedKeyDownIfActive(vk, IsPhysicalEvent := false) {
 			return
 		}
 		LLM_Bridge_OnFlush()
-	} else if (vk = 0x0D or vk = 0x1B)
+	} else if (vk = 0x0D or vk = 0x1B) {
 		LLM_Bridge_OnFlush()
+	} else if (KS_IsContextResetKey(vk) && vk != 0x20) {
+		; The I1 hook forwards only keys not consumed by the prediction-cycle
+		; hotkeys. Cursor/editing input must retire both requests and offers.
+		LLM_Bridge_ResetPredictions()
+	}
 }
 
 
