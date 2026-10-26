@@ -13020,7 +13020,11 @@ console.log(
 			'quoted close brace retains exact typed leaf offset'
 		);
 		const controls = [
-			['local renderer = ManifestMenu', 'local renderer = Foreign', 'foreign helper renderer'],
+			[
+				'return PersonalInfoSource.read(ManifestMenu)',
+				'return PersonalInfoSource.read(Foreign)',
+				'foreign helper renderer'
+			],
 			[
 				'rawget(modules, "infra.manifest_menu") ~= renderer',
 				'false',
@@ -13332,13 +13336,48 @@ console.log(
 					'canonical separate chunk loader shadowed'
 				]
 			);
-		for (const [before, after, reason] of controls) {
-			assert.equal(source.split(before).length - 1, 1, reason + ': actual unique preimage');
-			const changed = source.replace(before, after);
-			assert.equal(admits(changed), false, reason + ': no publication credit');
-			assert.equal(typed(changed), false, reason + ': no typed command credit');
+		// The admission body lives once in the shared module: a control whose
+		// preimage is there mutates that text, every other control the driver's.
+		const shared = proof.sharedSource();
+		const anchor = 'local function personal_info_editor_source()';
+		const sharedAnchor = 'local function read_source(renderer)';
+		const sharedControls = controls
+			.filter(([before]) => before === anchor)
+			.map(([, after, reason]) => [
+				sharedAnchor,
+				after.includes('personal_info_editor_source(_ENV)')
+					? 'local function read_source(_ENV)'
+					: after.replace(anchor, sharedAnchor),
+				'shared module: ' + reason
+			]);
+		for (const [before, after, reason] of [...controls, ...sharedControls]) {
+			const inDriver = source.split(before).length - 1;
+			const inShared = shared.split(before).length - 1;
+			assert.equal(inDriver + inShared, 1, reason + ': actual unique preimage');
+			const changed = inDriver === 1 ? source.replace(before, after) : source;
+			const changedShared = inShared === 1 ? shared.replace(before, after) : shared;
+			proof.withSharedSource(changedShared, () => {
+				assert.equal(admits(changed), false, reason + ': no publication credit');
+				assert.equal(typed(changed), false, reason + ': no typed command credit');
+			});
 			assert.equal(admits(source), true, reason + ': exact source inverse');
 			assert.equal(typed(source), true, reason + ': exact typed inverse');
+		}
+		for (const anchored of [
+			'local observer = { manifest = ManifestMenu, t = type }\n',
+			'local observer = { note = "}", manifest = ManifestMenu, t = type }\n'
+		]) {
+			const data = shared.replace(sharedAnchor, anchored + sharedAnchor);
+			assert.equal(shared.split(sharedAnchor).length - 1, 1, 'one shared anchor');
+			proof.withSharedSource(data, () => {
+				assert.equal(
+					proof.retainedPersonalInfoProjection(source),
+					true,
+					'constructor data in the shared module keeps its evidence'
+				);
+				assert.equal(admits(source), true, 'shared constructor data keeps publication evidence');
+				assert.equal(typed(source), true, 'shared constructor data keeps the typed offset');
+			});
 		}
 		const unused =
 			source +

@@ -41,6 +41,7 @@ local MagicKey = require("modules.hotstrings.magic_key")
 local MagicKeySourceRows = require("keymap.magic_key_source")
 local MagicFrame = require("menu.frames.magic_frame")
 local ParentSource = require("menu.frames.parent_source")
+local PersonalInfoSource = require("menu.frames.personal_info_source")
 local PreviewSettings = require("modules.hotstrings.preview_settings")
 local RepeatKey = require("modules.hotstrings.repeat_key")
 local Modal = require("ui.modal")
@@ -708,62 +709,11 @@ local function _build_layouts(ctx)
 	return receive(rows, { layout_enabled = function() return nil end })
 end
 
---- Retains the actual single editor declaration through provider projection.
---- Native callbacks refuse a withdrawn source before scheduling or opening UI.
+--- Delegates the personal-information editor source admission to the shared module.
 --- @return function|nil current
 --- @return function|nil template
 local function personal_info_editor_source()
-	local modules = rawget(package, "loaded")
-	local renderer = ManifestMenu
-	if type(modules) ~= "table" or rawget(modules, "infra.manifest_menu") ~= renderer
-		or type(renderer) ~= "table" or getmetatable(renderer) ~= nil then return nil end
-	local template, root_owner, array_owner = rawget(renderer, "template_rows"),
-		rawget(renderer, "get_root"), rawget(renderer, "get_array")
-	if type(template) ~= "function" or type(root_owner) ~= "function" or type(array_owner) ~= "function" then return nil end
-	local function facade_current()
-		return rawget(package, "loaded") == modules and rawget(modules, "infra.manifest_menu") == renderer
-			and getmetatable(renderer) == nil and rawget(renderer, "template_rows") == template
-			and rawget(renderer, "get_root") == root_owner and rawget(renderer, "get_array") == array_owner
-	end
-	local root, source = root_owner(), array_owner("personal_info_editor_frame")
-	if not facade_current() or type(root) ~= "table" or getmetatable(root) ~= nil
-		or type(source) ~= "table" or getmetatable(source) ~= nil
-		or rawget(root, "personal_info_editor_frame") ~= source or rawget(source, 1) == nil then return nil end
-	for index in next, source do if index ~= 1 then return nil end end
-	local declaration = rawget(source, 1)
-	if type(declaration) ~= "table" or getmetatable(declaration) ~= nil
-		or rawget(declaration, "type") ~= "command" or rawget(declaration, "id") ~= "personal_info_editor_open"
-		or type(rawget(declaration, "i18n")) ~= "string" or rawget(declaration, "i18n") == ""
-		or rawget(declaration, "unavailable") ~= "hide" then return nil end
-	local allowed = { type = true, id = true, i18n = true, platforms = true, unavailable = true }
-	local fields, count = {}, 0
-	for key, value in next, declaration do
-		if not allowed[key] then return nil end
-		fields[key], count = value, count + 1
-	end
-	if count ~= 5 then return nil end
-	local platforms = rawget(declaration, "platforms")
-	if type(platforms) ~= "table" or getmetatable(platforms) ~= nil
-		or rawget(platforms, 1) ~= "hs" or rawget(platforms, 2) ~= "linux" then return nil end
-	for index in next, platforms do if index ~= 1 and index ~= 2 then return nil end end
-	local function current()
-		if not facade_current() then return false end
-		if root_owner() ~= root or array_owner("personal_info_editor_frame") ~= source or not facade_current()
-			or getmetatable(root) ~= nil or rawget(root, "personal_info_editor_frame") ~= source
-			or getmetatable(source) ~= nil or rawget(source, 1) ~= declaration
-			or getmetatable(declaration) ~= nil or getmetatable(platforms) ~= nil then return false end
-		for index in next, source do if index ~= 1 then return false end end
-		local actual_count = 0
-		for key, value in next, declaration do
-			if fields[key] ~= value then return false end
-			actual_count = actual_count + 1
-		end
-		if actual_count ~= count then return false end
-		for index in next, platforms do if index ~= 1 and index ~= 2 then return false end end
-		return rawget(platforms, 1) == "hs" and rawget(platforms, 2) == "linux"
-	end
-	if not current() then return nil end
-	return current, template
+	return PersonalInfoSource.read(ManifestMenu)
 end
 
 --- Whether any hotstring can expand: a category gate open, or the dynamic

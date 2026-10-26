@@ -1,11 +1,42 @@
 // Finite source evidence for the two real personal-information editor leaves.
 // This proves only the guarded helper and direct receiving chain, never runtime authority.
 'use strict';
+const fs = require('node:fs');
+const path = require('node:path');
 const { scriptTokens } = require('./script-source.cjs');
 
-const HELPER_BODY = `
+const SHARED_PATH = path.resolve(
+	__dirname,
+	'../..',
+	'static/ergopti_plus/_shared/lua/menu/frames/personal_info_source.lua'
+);
+const SHARED_IMPORT = 'local PersonalInfoSource = require("menu.frames.personal_info_source")';
+const PORT_BODY = 'return PersonalInfoSource.read(ManifestMenu)';
+const SHARED_COMMAND_IMPORT = 'local COMMAND = require("config_keys").COMMAND';
+const SHARED_PUBLIC_BODY = 'return read_source(renderer)';
+let sharedOverride = null;
+let sharedDisk = null;
+
+/** The shared module text the evidence is judged against. */
+function sharedSource() {
+	if (sharedOverride !== null) return sharedOverride;
+	sharedDisk ??= fs.readFileSync(SHARED_PATH, 'utf8');
+	return sharedDisk;
+}
+
+/** Runs fn with a candidate shared module text, for mutation controls. */
+function withSharedSource(text, fn) {
+	const previous = sharedOverride;
+	sharedOverride = text;
+	try {
+		return fn();
+	} finally {
+		sharedOverride = previous;
+	}
+}
+
+const SHARED_BODY = `
 	local modules = rawget(package, "loaded")
-	local renderer = ManifestMenu
 	if type(modules) ~= "table" or rawget(modules, "infra.manifest_menu") ~= renderer
 		or type(renderer) ~= "table" or getmetatable(renderer) ~= nil then return nil end
 	local template, root_owner, array_owner = rawget(renderer, "template_rows"),
@@ -23,7 +54,7 @@ const HELPER_BODY = `
 	for index in next, source do if index ~= 1 then return nil end end
 	local declaration = rawget(source, 1)
 	if type(declaration) ~= "table" or getmetatable(declaration) ~= nil
-		or rawget(declaration, "type") ~= "command" or rawget(declaration, "id") ~= "personal_info_editor_open"
+		or rawget(declaration, "type") ~= "command" or rawget(declaration, "id") ~= COMMAND.PERSONAL_INFO_EDITOR_OPEN
 		or type(rawget(declaration, "i18n")) ~= "string" or rawget(declaration, "i18n") == ""
 		or rawget(declaration, "unavailable") ~= "hide" then return nil end
 	local allowed = { type = true, id = true, i18n = true, platforms = true, unavailable = true }
@@ -378,6 +409,7 @@ function namespaceCurrent(unit, allowedManifest, sandboxCalls) {
 		'require',
 		'pcall',
 		'DeferredWork',
+		'PersonalInfoSource',
 		'setfenv',
 		'loadfile',
 		'_G',
@@ -610,8 +642,28 @@ function extensionSandboxCallOffset(whole) {
 function personalInfoEvidence(source) {
 	const whole = lex(source);
 	if (!whole) return null;
-	const helper = owner(whole, 'local function personal_info_editor_source()', true);
-	if (!equal(helper, HELPER_BODY)) return null;
+	const port = owner(whole, 'local function personal_info_editor_source()', true);
+	if (!equal(port, PORT_BODY)) return null;
+	// The admission body lives once in the shared module; its namespace is as
+	// closed as a driver's, and its public entry only delegates.
+	const shared = lex(sharedSource());
+	if (!shared) return null;
+	const helper = owner(shared, 'local function read_source(renderer)', true);
+	if (!equal(helper, SHARED_BODY)) return null;
+	const sharedPublic = owner(shared, 'function M.read(renderer)', true);
+	if (!equal(sharedPublic, SHARED_PUBLIC_BODY)) return null;
+	if (
+		positions(shared, 'local M = {}', true).length !== 1 ||
+		positions(shared, 'return M', true).length !== 1 ||
+		positions(shared, SHARED_COMMAND_IMPORT, true).length !== 1 ||
+		shared.tokens.filter((token) => token.kind === 'identifier' && token.value === 'COMMAND')
+			.length !== 3 ||
+		shared.tokens.filter((token) => token.kind === 'identifier' && token.value === 'read_source')
+			.length !== 2 ||
+		shared.tokens.filter((token) => token.kind === 'identifier' && token.value === 'M').length !== 3
+	)
+		return null;
+	if (!namespaceCurrent(shared, new Set(), new Set())) return null;
 	let platform, consumer;
 	const mac = owner(whole, 'local function buildPersonalInfoItems(ctx, description)', true);
 	if (equal(mac, MAC_BODY)) {
@@ -628,8 +680,17 @@ function personalInfoEvidence(source) {
 			? 'local ManifestMenu = require("infra.manifest_menu")'
 			: 'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")';
 	const imports = positions(whole, importStatement, true);
-	if (imports.length !== 1 || whole.tokens[imports[0]].start >= helper.base) return null;
-	const allowed = new Set([imports[0] + (platform === 'hs' ? 1 : 3)]);
+	if (imports.length !== 1 || whole.tokens[imports[0]].start >= port.base) return null;
+	const sharedImports = positions(whole, SHARED_IMPORT, true);
+	if (
+		sharedImports.length !== 1 ||
+		whole.tokens[sharedImports[0]].start >= port.base ||
+		whole.tokens.filter(
+			(token) => token.kind === 'identifier' && token.value === 'PersonalInfoSource'
+		).length !== 2
+	)
+		return null;
+	const allowed = new Set([imports[0] + (platform === 'hs' ? 1 : 3), sharedImports[0] + 1]);
 	if (platform === 'linux') {
 		const fallback = positions(
 			whole,
@@ -666,7 +727,7 @@ function personalInfoEvidence(source) {
 	if (
 		calls.length !== 1 ||
 		templates.length !== 1 ||
-		helper.base >= consumer.base ||
+		port.base >= consumer.base ||
 		consumer.tokens[calls[0]].start >= consumer.tokens[templates[0]].start
 	)
 		return null;
@@ -712,12 +773,12 @@ function personalInfoEvidence(source) {
 		(token) => token.kind === 'identifier' && token.value === 'personal_info_editor_source'
 	);
 	if (helperReferences.length !== 2) return null;
-	const alias = positions(helper, 'local renderer = ManifestMenu', true);
+	const alias = positions(port, PORT_BODY, true);
 	if (alias.length !== 1) return null;
 	return {
 		platform,
 		templateOffset: consumer.base + consumer.tokens[templates[0] + 3].start,
-		manifestAliasOffset: helper.base + helper.tokens[alias[0] + 3].start
+		manifestAliasOffset: port.base + port.tokens[alias[0] + 5].start
 	};
 }
 function retainedPersonalInfoProjection(source) {
@@ -736,5 +797,7 @@ function retainedPersonalInfoManifestAliasOffset(source) {
 module.exports = {
 	retainedPersonalInfoProjection,
 	retainedPersonalInfoTemplateCallOffset,
-	retainedPersonalInfoManifestAliasOffset
+	retainedPersonalInfoManifestAliasOffset,
+	withSharedSource,
+	sharedSource
 };
