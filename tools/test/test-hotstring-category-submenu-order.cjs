@@ -14,6 +14,8 @@
 
 'use strict';
 
+require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a generated config-key constant
+
 const fs = require('fs');
 const assert = require('node:assert/strict');
 const path = require('path');

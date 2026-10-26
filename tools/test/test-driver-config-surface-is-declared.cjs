@@ -41,6 +41,8 @@
 
 'use strict';
 
+require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a generated config-key constant
+
 const fs = require('fs');
 const assert = require('node:assert/strict');
 const path = require('path');
@@ -66,6 +68,13 @@ const MANIFEST = path.join(DRIVERS_DIR, '_shared', 'modules', 'features', 'manif
 // 2026-09-29: 5 -> 3 once the setup wizard wrote catalogue paths only: the
 // Linux [hotstrings] enabled answer and [script] onboarding_done are gone.
 const BASELINE = 3;
+
+// The older macOS `[llm.profiles] user_profiles` array has a reader that imports it into
+// `llm.user_profiles` and a row that deletes it (infra/preferences.lua). It names the key
+// through the generated LEAF constant, which this gate now reads as the literal, so the
+// surface became visible; it is read-and-retired legacy, deleted with the registry op that
+// re-encodes a value, and never a surface the driver keeps writing.
+const RETIRING_SURFACES = new Set(['macos llm.profiles.user_profiles']);
 
 const PLATFORM_OF_DRIVER = { windows: 'ahk', macos: 'hs', linux: 'linux' };
 
@@ -1255,6 +1264,7 @@ for (const driver of DRIVERS) {
 	const known = declared.get(platform) || new Set();
 	for (const surface of [...surfaceOf(driver)].sort()) {
 		if (isDeclaredSurface(surface, known, dynamic)) continue;
+		if (RETIRING_SURFACES.has(`${driver} ${surface}`)) continue;
 		// A key is covered when its own section is declared AND the key is too;
 		// a bare section is covered by the section alone.
 		undeclared.push({ driver, platform, surface });
