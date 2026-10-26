@@ -31,6 +31,7 @@ local M = {}
 local Logger       = require("infra.logger")
 local Timer        = require("adapters.timer_scheduler")
 local EventClock   = require("adapters.event_clock")
+local TableUtil = require("table_util")
 
 local LOG = "key_event_health"
 
@@ -87,9 +88,7 @@ end
 --- @return string summary
 function M.summary()
 	local lease_total, lease_parts = 0, {}
-	local kinds = {}
-	for kind in pairs(_lease_failures) do kinds[#kinds + 1] = kind end
-	table.sort(kinds)
+	local kinds = TableUtil.sorted_keys(_lease_failures)
 	for _, kind in ipairs(kinds) do
 		lease_total = lease_total + _lease_failures[kind]
 		lease_parts[#lease_parts + 1] = string.format("%s=%d", kind, _lease_failures[kind])

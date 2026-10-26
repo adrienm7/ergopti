@@ -32,6 +32,7 @@ local M = {}
 local Logger         = require("infra.logger")
 local Injector       = require("adapters.modifier_injector")
 local TimerScheduler = require("adapters.timer_scheduler")
+local TableUtil = require("table_util")
 
 local LOG = "gestures.sticky"
 
@@ -76,9 +77,7 @@ end
 --- Renders the armed set as a stable, sorted string for the logs.
 --- @return string
 local function armed_description()
-	local names = {}
-	for name in pairs(_armed) do names[#names + 1] = name end
-	table.sort(names)
+	local names = TableUtil.sorted_keys(_armed)
 	return #names > 0 and table.concat(names, "+") or "none"
 end
 

@@ -34,6 +34,7 @@ local Cleanup = require("healthcheck.cleanup")
 local Actions  = require("healthcheck.actions")
 local TimerScheduler = require("adapters.timer_scheduler")
 local DeferredWork = require("infra.deferred_work")
+local TableUtil = require("table_util")
 local NativeClose = require("ui.webview_close_owner").new(DeferredWork, Logger)
 
 local LOG = "healthcheck"
@@ -767,9 +768,7 @@ function M.run(opts)
 	-- session, before the clock starts
 	local schema = M.config().schema
 	local started = hs.timer.absoluteTime()
-	local permission_ids = {}
-	for id in pairs(schema.permissions[M.DRIVER] or {}) do permission_ids[#permission_ids + 1] = id end
-	table.sort(permission_ids)
+	local permission_ids = TableUtil.sorted_keys(schema.permissions[M.DRIVER] or {})
 
 	-- Each collector is isolated: a report exists to be read when things are
 	-- broken, so one collector raising costs its own section, never the window

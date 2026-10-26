@@ -30,6 +30,7 @@ local M = {}
 
 local Logger    = require("infra.logger")
 local PacedJson = require("infra.paced_json")
+local TableUtil = require("table_util")
 
 local LOG = "metrics_typing.projection"
 
@@ -110,9 +111,7 @@ end
 --- @param members table key→encoded JSON.
 --- @return string json
 local function assemble_object(members)
-	local keys = {}
-	for key in pairs(members) do keys[#keys + 1] = key end
-	table.sort(keys)
+	local keys = TableUtil.sorted_keys(members)
 	local parts = {}
 	for index, key in ipairs(keys) do
 		parts[index] = PacedJson.encode(key) .. ":" .. members[key]

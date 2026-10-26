@@ -103,6 +103,7 @@ local function owned_logical_key(key) return physical_key(key) ~= nil end
 -- The owned-alias gates, receipt authority and finalization shared with the
 -- other Lua driver; capture, publish and restore below stay native.
 local Owned = require("storage_owned")
+local TableUtil = require("table_util")
 local _owned = Owned.new({
 	name = "adapters.storage", module = M, logical_key = owned_logical_key, logger = Logger, log = LOG,
 })
@@ -125,10 +126,7 @@ local function normalize_native_keys(result)
 		if type(key) == "string" then seen[key] = true end
 		if type(value) == "string" then seen[value] = true end
 	end
-	local keys = {}
-	for key in pairs(seen) do keys[#keys + 1] = key end
-	table.sort(keys)
-	return keys
+	return TableUtil.sorted_keys(seen)
 end
 
 --- Reads the native key catalogue without collapsing adapter failure.
@@ -414,9 +412,7 @@ function M.migrate_legacy_namespace()
 	if _owned_aliases[MIGRATION_MARKER:sub(#PHYSICAL_PREFIX + 1)] ~= nil then return false end
 	for _, logical_key in pairs(migrations) do if _owned_aliases[logical_key] ~= nil then return false end end
 
-	local legacy_keys = {}
-	for legacy_key in pairs(migrations) do legacy_keys[#legacy_keys + 1] = legacy_key end
-	table.sort(legacy_keys)
+	local legacy_keys = TableUtil.sorted_keys(migrations)
 	for _, legacy_key in ipairs(legacy_keys) do
 		local migrated, migration_err = migrate_one(legacy_key, migrations[legacy_key])
 		if not migrated then

@@ -49,6 +49,7 @@ local LOG = "infra.hotstrings_scope"
 local REPEAT_PATH = "hotstrings.repeat_key_enabled"
 local BASE_DELAY_PATH = require("config_keys").KEY.HOTSTRINGS_EXPANSION_DELAY
 local NativePath = require("native_path")
+local TableUtil = require("table_util")
 local _owner, _sequence = nil, 0
 
 --- Whether a category or section identity can be named by a canonical path.
@@ -111,9 +112,7 @@ function M.new(options)
 		local bundled = Config.bundled_categories()
 		local groups = {}
 		for id, category in pairs(Config.get_categories()) do
-			local sections = {}
-			for section in pairs(category.sections or {}) do sections[#sections + 1] = section end
-			table.sort(sections)
+			local sections = TableUtil.sorted_keys(category.sections or {})
 			-- personal.toml (the "personal" category) and each additional personal file.
 			local personal = id == PERSONAL_CATEGORY or PersonalFiles.components(id) ~= nil
 			groups[#groups + 1] = { id = id, override = { id }, sections = sections, bundled = bundled[id] == true,

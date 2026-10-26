@@ -2,9 +2,6 @@
 	"linux/ergopti_hotstrings.lua": {
 		"dirname": 1
 	},
-	"linux/infra/hotstrings_scope.lua": {
-		"sorted_keys": 1
-	},
 	"linux/infra/i18n.lua": {
 		"shell_quote": 1
 	},
@@ -12,14 +9,8 @@
 		"percent_encode": 1,
 		"shell_quote": 1
 	},
-	"linux/modules/hotstrings/hotstrings_config.lua": {
-		"sorted_keys": 2
-	},
 	"linux/modules/keystats/keystats.lua": {
 		"shell_quote": 1
-	},
-	"linux/ui/gesture_conflicts.lua": {
-		"sorted_keys": 1
 	},
 	"macos/adapters/app_launcher.lua": {
 		"shell_quote": 1
@@ -27,32 +18,14 @@
 	"macos/adapters/http_client.lua": {
 		"percent_encode": 1
 	},
-	"macos/adapters/storage.lua": {
-		"sorted_keys": 2
-	},
 	"macos/infra/driver_control.lua": {
 		"shell_quote": 1
-	},
-	"macos/infra/key_event_health.lua": {
-		"sorted_keys": 1
 	},
 	"macos/init.lua": {
 		"dirname": 2
 	},
-	"macos/modules/dynamic_hotstrings/personal_info.lua": {
-		"sorted_keys": 1
-	},
 	"macos/modules/gestures/actions.lua": {
 		"percent_encode": 1
-	},
-	"macos/modules/gestures/init.lua": {
-		"sorted_keys": 1
-	},
-	"macos/modules/gestures/sticky_modifiers.lua": {
-		"sorted_keys": 1
-	},
-	"macos/modules/llm/init.lua": {
-		"sorted_keys": 1
 	},
 	"macos/modules/llm/mlx_deps_checker.lua": {
 		"shell_quote": 1
@@ -65,17 +38,5 @@
 	},
 	"macos/platform/remap/legacy_release_fixtures.lua": {
 		"shell_quote": 1
-	},
-	"macos/ui/healthcheck/core.lua": {
-		"sorted_keys": 1
-	},
-	"macos/ui/menu/menu_hotstrings_custom.lua": {
-		"sorted_keys": 1
-	},
-	"macos/ui/menu/menu_llm/trigger_orchestrator.lua": {
-		"sorted_keys": 1
-	},
-	"macos/ui/metrics_typing/projection.lua": {
-		"sorted_keys": 1
 	}
 }

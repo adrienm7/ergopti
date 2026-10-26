@@ -15,6 +15,7 @@ local Storage = require("adapters.storage")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
 local ManifestMenu = require("infra.manifest_menu")
+local TableUtil = require("table_util")
 local LOG = "gesture_conflicts"
 local boot_notified = false
 
@@ -25,9 +26,7 @@ function M.groups(gestures)
 	local groups = {}
 	if not gestures.is_enabled() then return groups end
 	local seen = {}
-	local slots = {}
-	for slot in pairs(gestures.DEFAULT_GESTURES) do slots[#slots + 1] = slot end
-	table.sort(slots)
+	local slots = TableUtil.sorted_keys(gestures.DEFAULT_GESTURES)
 	for _, slot in ipairs(slots) do
 		local action = gestures.get_action(slot)
 		local group = slot:match("^(%a+_%d+)")

@@ -880,9 +880,7 @@ function M.new(ctx)
 	--- saved shortcuts for the next switch-on.
 	--- @return boolean settled True when no profile hotkey remains bound.
 	function inst.disarm_shortcuts()
-		local ids = {}
-		for profile_id in pairs(get_profile_hks()) do ids[#ids + 1] = profile_id end
-		table.sort(ids)
+		local ids = TableUtil.sorted_keys(get_profile_hks())
 		local settled = true
 		local released = 0
 		for _, profile_id in ipairs(ids) do

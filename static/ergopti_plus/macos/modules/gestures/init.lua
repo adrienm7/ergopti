@@ -1365,9 +1365,7 @@ function M.start()
 	end
 
 	-- Dump touchdevice top-level methods so we can spot missing APIs.
-	local td_keys = {}
-	for k in pairs(touchdevice) do td_keys[#td_keys + 1] = k end
-	table.sort(td_keys)
+	local td_keys = TableUtil.sorted_keys(touchdevice)
 	Logger.info(LOG, "touchdevice top-level keys (%d): %s", #td_keys, table.concat(td_keys, ", "))
 
 	-- Enumerate devices before doing anything.

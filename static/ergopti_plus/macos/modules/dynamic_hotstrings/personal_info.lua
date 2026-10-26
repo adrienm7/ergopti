@@ -158,10 +158,7 @@ local DEFAULT_CONFIG = {
 --- @param schema table Canonical field map.
 --- @return string[] keys Sorted schema keys.
 local function sorted_schema_keys(schema)
-	local keys = {}
-	for key in pairs(schema) do keys[#keys + 1] = key end
-	table.sort(keys)
-	return keys
+	return TableUtil.sorted_keys(schema)
 end
 
 local INFO_FIELD_KEYS = sorted_schema_keys(DEFAULT_CONFIG.info)

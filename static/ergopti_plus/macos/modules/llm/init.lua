@@ -604,12 +604,7 @@ local function pending_id_set(state)
 	return ids
 end
 
-local function sorted_ids(ids)
-	local out = {}
-	for entry_id in pairs(ids) do out[#out + 1] = entry_id end
-	table.sort(out)
-	return out
-end
+local sorted_ids = TableUtil.sorted_keys
 
 local function validate_id_list(raw)
 	if raw == nil then return {} end
