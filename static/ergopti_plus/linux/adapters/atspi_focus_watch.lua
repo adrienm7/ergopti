@@ -16,6 +16,7 @@ local OwnedProcess = require("adapters.owned_process")
 local Paths = require("infra.paths")
 local AtspiFocus = require("adapters.atspi_focus")
 local Logger = require("logger.shim")
+local ErrorDescription = require("error_description")
 local LOG = "adapters.atspi_focus_watch"
 local MAX_FOCUS_OUTPUT_BYTES = require("llm.process_limits").defaults().max_output_bytes
 local MAX_FRAMES = 128
@@ -138,12 +139,22 @@ function M.new(options)
 		end
 		return cleanup_ok and transport == nil
 	end
+	--- A revocation listener cannot borrow cancellation or endpoint ownership.
+	--- The receipt is cleared before notification; retire its exact native owner
+	--- even when a consumer refuses the accompanying logical-state update.
+	local function retire()
+		local notified, failure = pcall(publish, nil)
+		if operation then operation:cancel() end
+		local retired = cleanup()
+		if not notified then
+			pcall(Logger.error, LOG, "Native focus revocation listener failed: %s", ErrorDescription.describe(failure))
+		end
+		return retired
+	end
 	local function fail(reason)
 		if not failed then Logger.warn(LOG, "Native focus authority withheld (%s).", reason) end
 		failed, ready = true, false
-		publish(nil)
-		if operation then operation:cancel() end
-		cleanup()
+		retire()
 	end
 
 	--- Registers the single privacy owner before starting the native listener.
@@ -325,9 +336,7 @@ function M.new(options)
 	--- @return boolean settled
 	function watcher.stop()
 		active, ready = false, false
-		publish(nil)
-		if operation then operation:cancel() end
-		return cleanup()
+		return retire()
 	end
 
 	--- Returns physical process, descriptor and private-directory settlement.
