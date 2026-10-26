@@ -34,7 +34,7 @@ Calendar.capture = function()
 	return { mono_ms = mono, wall_ms = wall, date = os.date("%Y-%m-%d", math.floor(wall / 1000)),
 		ts = os.date("!%Y-%m-%d %H:%M:%S", math.floor(wall / 1000)) }
 end
-local directory = assert(uv.fs_mkdtemp(assert(os.getenv("XDG_RUNTIME_DIR")) .. "/layout-context-XXXXXX"))
+local directory = assert(uv.fs_mkdtemp(assert(uv.os_tmpdir()) .. "/layout-context-XXXXXX"))
 local databases, observations, violations, checks = {}, {}, 0, 0
 
 --- Checks a native invariant independently of whether attribution is still broken.

@@ -22,7 +22,7 @@ local runtime = assert(require("process.interpreter").from_arguments(arg), "nati
 local function native_fixture_command(interpreter, same_abi)
 	local quote = require("text_utils").shell_quote
 	local provider = same_abi and (" LUA_CPATH=" .. quote(package.cpath)) or ""
-	return "env -u TMPDIR -u LUA_PATH -u LUA_CPATH" .. provider .. " " .. quote(interpreter) .. " "
+	return "env -u XDG_RUNTIME_DIR -u TMPDIR -u LUA_PATH -u LUA_CPATH" .. provider .. " " .. quote(interpreter) .. " "
 end
 
 local HAS_SQLITE = (function()
