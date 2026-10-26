@@ -15,7 +15,16 @@ local SHARED_DEFAULTS = FIXTURE_DIR .. "/../../../_shared/modules/updater/defaul
 local SHARED_CHANNELS = FIXTURE_DIR .. "/../../../_shared/modules/updater/channels.json"
 local SHARED_NETWORK_POLICY = FIXTURE_DIR .. "/../../../_shared/modules/network/managed_network.json"
 
+--- The repository identity of the shared defaults, the updater's own source.
+local function read_shared_github()
+	local handle = assert(io.open(SHARED_DEFAULTS, "r"))
+	local raw = handle:read("*a")
+	handle:close()
+	return assert(require("json").decode(raw)).github
+end
+
 local function with_changelog(callback)
+	local shared_github = read_shared_github()
 	local previous_hs = rawget(_G, "hs")
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({
@@ -184,6 +193,8 @@ local function with_changelog(callback)
 			-- build with no backup, which installs nothing unless a case says so.
 			changelog._deps = {
 				updater = {
+					GH_OWNER = shared_github.owner,
+					GH_REPO = shared_github.repo,
 					is_local_source = function() return false end,
 					current_version = function() return "0.0.0-dev.140" end,
 				},

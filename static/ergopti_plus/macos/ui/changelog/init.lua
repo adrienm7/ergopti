@@ -62,6 +62,7 @@ local HttpClient = require("adapters.http_client")
 local Json       = require("json")
 local JsonCodec  = require("adapters.json_codec")
 local ReleaseSources = require("updater.release_sources")
+local RepositoryUrl = require("updater.repository_url")
 local UpdateChannels = require("updater.channels")
 local DocumentCsp = require("webview.document_csp")
 local ReleaseInstall = require("updater.release_install")
@@ -780,8 +781,12 @@ local function ensure_ucc(owner)
 			end
 		elseif body.action == "restore_backup" then
 			restore_from_page(body.id)
-		elseif body.action == "open_url" and type(body.url) == "string" then
-			if ui_builder.open_http_url(body.url) then
+		elseif body.action == "open_url" then
+			-- A page message is data: only this repository's https surface opens.
+			local updater = deps().updater
+			if not RepositoryUrl.is_repository_url(body.url, updater.GH_OWNER, updater.GH_REPO) then
+				Logger.warn(LOG, "Refused a changelog link outside the repository.")
+			elseif ui_builder.open_http_url(body.url) then
 				Logger.info(LOG, "Opened changelog release URL.")
 			end
 		end
