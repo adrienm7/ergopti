@@ -18,7 +18,7 @@
 
 local M = {}
 
-local Agent          = require("llm.agent")
+local LearningStore  = require("llm.agent_learning_store")
 local Logger         = require("infra.logger")
 local Storage        = require("adapters.storage")
 local TimerScheduler = require("adapters.timer_scheduler")
@@ -29,7 +29,10 @@ local LOG = "llm.agent_learning"
 M.STORAGE_KEY = "llm_agent_thresholds"
 
 -- Most applications kept
-M.MAX_APPS = 200
+M.MAX_APPS = LearningStore.MAX_APPS
+
+-- The shared map logic; this driver persists the thresholds under `intents`.
+local Store = LearningStore.new("intents")
 
 -- Seconds a change waits for the next one before the map is saved
 M.SAVE_DELAY_SEC = 2
@@ -51,7 +54,7 @@ local _save_timer = nil
 --- @param stored any What the storage returned.
 --- @return table map
 local function sanitize(stored)
-	local map = { apps = {}, clock = 0 }
+	local map = Store.new_map()
 	if type(stored) ~= "table" or type(stored.apps) ~= "table" then return map end
 	for app, entry in pairs(stored.apps) do
 		if type(app) == "string" and app ~= "" and type(entry) == "table" and type(entry.intents) == "table" then
@@ -112,17 +115,6 @@ local function schedule_save()
 	_save_timer = handle
 end
 
---- Drops the applications used least recently beyond MAX_APPS.
---- @param map table
-local function bound(map)
-	local apps = {}
-	for app, entry in pairs(map.apps) do apps[#apps + 1] = { app = app, used = entry.used } end
-	if #apps <= M.MAX_APPS then return end
-	table.sort(apps, function(a, b) return a.used < b.used end)
-	for index = 1, #apps - M.MAX_APPS do map.apps[apps[index].app] = nil end
-	Logger.debug(LOG, "Learned thresholds trimmed to %d application(s).", M.MAX_APPS)
-end
-
 
 
 
@@ -138,10 +130,7 @@ end
 --- @param intent string Intent id.
 --- @return number threshold config.system1.threshold until something was learned.
 function M.threshold(config, app, intent)
-	local entry = load().apps[app]
-	local learned = entry and entry.intents[intent] or nil
-	if type(learned) == "number" then return learned end
-	return config.system1.threshold
+	return Store.threshold(load(), config, app, intent)
 end
 
 --- Moves the threshold of an intent in an application after a suggestion was
@@ -155,15 +144,8 @@ function M.record(config, app, intent, accepted)
 	if type(app) ~= "string" or app == "" or type(intent) ~= "string" then
 		error("agent_learning.record: an application and an intent are required")
 	end
-	local map = load()
-	local before = M.threshold(config, app, intent)
-	local after = Agent.learn(config, before, accepted == true)
-	map.clock = map.clock + 1
-	local entry = map.apps[app] or { intents = {} }
-	entry.used = map.clock
-	entry.intents[intent] = after
-	map.apps[app] = entry
-	bound(map)
+	local after, before, dropped = Store.record(load(), config, app, intent, accepted)
+	if dropped > 0 then Logger.debug(LOG, "Learned thresholds trimmed to %d application(s).", M.MAX_APPS) end
 	schedule_save()
 	Logger.info(LOG, "Threshold of '%s' in '%s' %s: %.3f -> %.3f.", intent, app,
 		accepted and "lowered (accepted)" or "raised (dismissed)", before, after)

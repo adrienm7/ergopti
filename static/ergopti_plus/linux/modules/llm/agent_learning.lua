@@ -21,7 +21,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Json = require("json")
-local Agent = require("llm.agent")
+local LearningStore = require("llm.agent_learning_store")
 local NoReplaceMove = require("infra.no_replace_move")
 local RegularFileReader = require("infra.regular_file_reader")
 local RegularFileWriter = require("infra.regular_file_writer")
@@ -32,17 +32,18 @@ local LOG = "modules.llm.agent_learning"
 -- The file under the XDG state folder
 local STATE_FILE = "ergopti_plus/agent_learning.json"
 -- How many applications are remembered
-M.MAX_APPS = 200
+M.MAX_APPS = LearningStore.MAX_APPS
 -- How long after a change the file is written
 local SAVE_DEBOUNCE_SEC = 2
 -- The file's format
 local VERSION = 1
 local ENOENT = 2 -- Linux reports genuine absence separately from read refusal.
 
--- { [app] = { used = integer, thresholds = { [intent] = number } } }
-local _apps = nil
--- The last `used` stamp handed out: larger is more recent
-local _sequence = 0
+-- The shared map logic; this driver persists the thresholds under `thresholds`.
+local Store = LearningStore.new("thresholds")
+-- { apps = { [app] = { used = integer, thresholds = { [intent] = number } } }, clock = the
+-- last `used` stamp handed out: larger is more recent }; nil until loaded.
+local _map = nil
 -- The pending save's timer
 local _save_timer = nil
 -- Boundaries, replaced by the tests: { path, scheduler }
@@ -83,8 +84,8 @@ end
 
 --- Reads the file into memory once.
 local function load()
-	if _apps and not _load_blocked then return end
-	_apps, _sequence = {}, 0
+	if _map and not _load_blocked then return end
+	_map = Store.new_map()
 	local path = state_path()
 	local fh, _, errno = RegularFileReader.open_source(path)
 	if not fh then
@@ -119,8 +120,8 @@ local function load()
 					thresholds[intent] = value
 				end
 			end
-			_apps[app] = { used = entry.used, thresholds = thresholds }
-			if entry.used > _sequence then _sequence = entry.used end
+			_map.apps[app] = { used = entry.used, thresholds = thresholds }
+			if entry.used > _map.clock then _map.clock = entry.used end
 		end
 	end
 	Logger.debug(LOG, "Agent learning loaded.")
@@ -134,7 +135,7 @@ function M.flush()
 		_save_timer = nil
 	end
 	if _load_blocked then return false end
-	if not _apps then return true end
+	if not _map then return true end
 	local path = state_path()
 	local dir = NativePath.dirname(path)
 	if dir and not require("adapters.shell_runner").run("mkdir -p "
@@ -142,7 +143,7 @@ function M.flush()
 		Logger.error(LOG, "The agent's learning folder could not be created.")
 		return false
 	end
-	local text = Json.encode({ version = VERSION, apps = _apps })
+	local text = Json.encode({ version = VERSION, apps = _map.apps })
 	local temp = path .. ".tmp"
 	local opened, fh, _, _, remove_owned = pcall(RegularFileWriter.open, temp, "wx")
 	if not opened or not fh or not text then
@@ -198,9 +199,7 @@ end
 --- @return number
 function M.threshold(config, app, intent)
 	load()
-	local entry = type(app) == "string" and _apps[app] or nil
-	local value = entry and entry.thresholds[intent] or nil
-	return value or config.system1.threshold
+	return Store.threshold(_map, config, app, intent)
 end
 
 --- Records that the user accepted or dismissed an automatic suggestion.
@@ -213,26 +212,8 @@ function M.record(config, app, intent, accepted)
 	load()
 	if _load_blocked then return config.system1.threshold end
 	if type(app) ~= "string" or app == "" then app = "?" end
-	local before = M.threshold(config, app, intent)
-	local after = Agent.learn(config, before, accepted == true)
-	local entry = _apps[app]
-	if not entry then
-		entry = { used = 0, thresholds = {} }
-		_apps[app] = entry
-	end
-	_sequence = _sequence + 1
-	entry.used = _sequence
-	entry.thresholds[intent] = after
-	-- Bounded: the least recently used applications go first.
-	local count = require("table_util").count(_apps)
-	while count > M.MAX_APPS do
-		local oldest, oldest_used = nil, math.huge
-		for name, candidate in pairs(_apps) do
-			if candidate.used < oldest_used then oldest, oldest_used = name, candidate.used end
-		end
-		_apps[oldest] = nil
-		count = count - 1
-	end
+	-- Bounded by the store: the least recently used applications go first.
+	local after, before = Store.record(_map, config, app, intent, accepted)
 	Logger.info(LOG, "Agent %s for '%s': threshold %.3f -> %.3f.", accepted and "accepted" or "dismissed",
 		intent, before, after)
 	schedule_save()
@@ -244,7 +225,7 @@ end
 function M._reset_for_test(opts)
 	opts = opts or {}
 	_path, _scheduler = opts.path, opts.scheduler
-	_apps, _sequence, _save_timer, _load_blocked = nil, 0, nil, false
+	_map, _save_timer, _load_blocked = nil, nil, false
 end
 
 return M
