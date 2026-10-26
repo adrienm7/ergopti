@@ -26,8 +26,9 @@
 ---     else the global delay: `[tap_hold] time_activation_seconds` when the user
 ---     set it, else the timing registry's default. No shipped key carries a
 ---     delay. The per-key delays this build used to ship, copied into a file by
----     a rewrite, are ignored in a file that lacks `[tap_hold] explicit_delays =
----     true` (the writer flags the file when it removes them);
+---     a rewrite, are removed once by the versioned migration of
+---     _shared/tap_hold/migrations.toml (platform/remap/tap_hold_migration.lua);
+---     a file not yet migrated on disk is read as the migration leaves it;
 ---   - a threshold outside 0..10 s falls back to the global delay, a field of
 ---     the wrong type disables its key, and a malformed user file is reported and
 ---     never half-applied.
@@ -42,6 +43,7 @@ local KeyCatalog = require("tap_hold.key_catalog")
 local Manifest = require("infra.manifest_reader")
 local Outdated = require("config_outdated")
 local Shapes = require("platform.remap.tap_hold_shapes")
+local Migration = require("platform.remap.tap_hold_migration")
 
 local LOG = "platform.remap.tap_hold_loader"
 local TIME_FIELD = require("config_keys").LEAF.TIME_ACTIVATION_SECONDS
@@ -220,6 +222,18 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 	local base = type(defaults.tap_hold) == "table" and type(defaults.tap_hold.keys) == "table"
 		and defaults.tap_hold.keys or {}
 	local user_file = user_path or USER_FILE_NAME
+	if type(user) == "table" then
+		-- Migrated in place, like the boot does on disk: the caller owns a
+		-- freshly decoded document and reads nothing from it afterwards.
+		local outcome, detail = Migration.read_as_current(user, shapes, KeyCatalog.retired_delays_for_platform(defaults, "linux"))
+		if outcome == "newer" then
+			Logger.warn(LOG, "'%s' was saved by a newer build (schema v%s); it is read as it is and never written.",
+				user_file, tostring(detail))
+		elseif outcome == "invalid" then
+			Outdated.report_in_file(user_file, { Migration.META_SECTION, Migration.VERSION_KEY },
+				tostring(detail) .. "; the file is read as it is and never written")
+		end
+	end
 	local function table_or_absent(value, path)
 		if value == nil then return {} end
 		if Shapes.is_table(value, shapes) then return value end
@@ -229,7 +243,7 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 	local section = table_or_absent(user and user.tap_hold, { "tap_hold" })
 	local overrides = table_or_absent(section.keys, { "tap_hold", "keys" })
 	local global = {}
-	for _, field in ipairs({ "enabled", "inherit_defaults", "explicit_delays" }) do
+	for _, field in ipairs({ "enabled", "inherit_defaults" }) do
 		local value = section[field]
 		if value ~= nil and type(value) ~= "boolean" then
 			Outdated.report_in_file(user_file, { "tap_hold", field }, "it must be true or false; the stored value is ignored")
@@ -251,10 +265,6 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 					tostring(seconds), MAX_THRESHOLD_SECONDS, M.GLOBAL_DEFAULT_SECONDS))
 		end
 	end
-	-- Delays this build used to ship, copied into the file by a rewrite: not the
-	-- user's choice unless the file is flagged as holding only the user's own.
-	local retired = global.explicit_delays == true and {}
-		or KeyCatalog.retired_delays_for_platform(defaults, "linux")
 	-- Shipped data like the hold picker: a user file cannot move a key.
 	local catalog = KeyCatalog.for_platform(defaults, "linux")
 	local remappable = {}
@@ -281,10 +291,7 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 			if override.hold_modifier ~= nil then merged.hold_layer = nil end
 			if override.hold_layer ~= nil then merged.hold_modifier = nil end
 			for field, value in pairs(override) do
-				if field == TIME_FIELD and retired[key_id] ~= nil and value == retired[key_id] then
-					Logger.info(LOG, "Ignoring time_activation_seconds %s of '%s' in '%s': an earlier build shipped it, "
-						.. "you did not set it; the key follows the global delay.", tostring(value), key_id, user_file)
-				elseif KEY_FIELDS[field] then
+				if KEY_FIELDS[field] then
 					merged[field] = value
 					user_fields[key_id][field] = true
 				else
@@ -292,7 +299,7 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 						"no tap-hold key has this field")
 				end
 			end
-			-- An entry whose only field was a retired delay holds nothing at all.
+			-- An entry holding no field at all configures nothing.
 			if keys[key_id] ~= nil or next(merged) ~= nil then keys[key_id] = merged end
 		else
 			Outdated.report_in_file(user_file, { "tap_hold", "keys", key_id },
@@ -322,7 +329,6 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 		keys = keys,
 		global_seconds = global_seconds,
 		global_user_set = global_user_set,
-		explicit_delays = global.explicit_delays == true,
 		user_error = user_err,
 		user_path = user_file,
 		user_fields = user_fields,

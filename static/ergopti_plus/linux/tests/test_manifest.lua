@@ -464,6 +464,7 @@ return {
 	"tests.unit.adapters.storage.test_storage_adapter_released_regular_file",
 	"tests.unit.adapters.storage.test_storage_owned",
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_writer",
+	"tests.unit.platform.remap.tap_hold.test_tap_hold_migration",
 	"tests.unit.modules.hotstrings.terminators.test_terminator_no_fallback",
 	"tests.unit.adapters.runtime.test_timer_scheduler_adapter",
 	"tests.unit.adapters.runtime.test_timer_delay_ceiling",
