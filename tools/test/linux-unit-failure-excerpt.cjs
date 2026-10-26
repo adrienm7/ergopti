@@ -2,12 +2,14 @@
 
 /**
  * ==============================================================================
- * MODULE: Linux Configuration Failure Annotation
+ * MODULE: Linux Unit Failure Annotations
  * DESCRIPTION:
- * Extracts the complete public assertion of the fixed Configuration restore
- * fixture from a finished failed unit log. The inline failure and terminal
- * replay record must agree; incomplete or ambiguous output is refused. The
- * original reporter, unit exit status and failure artifact remain authoritative.
+ * Publishes the complete assertion of every failed case of a finished failed
+ * Linux unit log as one GitHub notice each. The reporter annotates test names
+ * only; the runner's terminal summary holds the full assertion and its replay
+ * command. The footer count, the summary records and the reporter receipt
+ * must agree; incomplete or ambiguous output is refused. The original
+ * reporter, unit exit status and failure artifact remain authoritative.
  * ==============================================================================
  */
 
@@ -16,12 +18,74 @@
 const fs = require('node:fs');
 const { TextDecoder } = require('node:util');
 
-const CASE = 'routes the Configuration restore row to the recommended hotstrings';
 const MAX_LOG_BYTES = 32 * 1024 * 1024;
 const MAX_MESSAGE_BYTES = 8 * 1024;
+const FOOTER = 'OVERALL RESULTS:';
+const RECORD = '  - ';
+const REPLAY = '    replay: luajit tests/run.lua';
+const REPORTER = '[report:linux-lua] ';
+
+const strict = new TextDecoder('utf-8', { fatal: true });
 
 function refuse(reason) {
 	throw new Error(reason);
+}
+
+/**
+ * Splits raw bytes into complete lines without decoding unrelated output.
+ * @param {Buffer} bytes The fresh unit log.
+ * @returns {Buffer[]} Lines without their newline.
+ */
+function rawLines(bytes) {
+	if (bytes.length === 0 || bytes[bytes.length - 1] !== 10) refuse('unit log is unfinished');
+	const lines = [];
+	for (let start = 0; start < bytes.length; ) {
+		const newline = bytes.indexOf(10, start);
+		lines.push(bytes.subarray(start, newline));
+		start = newline + 1;
+	}
+	return lines;
+}
+
+function startsWith(line, text) {
+	const prefix = Buffer.from(text, 'utf8');
+	return line.length >= prefix.length && line.subarray(0, prefix.length).equals(prefix);
+}
+
+/**
+ * Strictly decodes one selected line; unrelated fixture output is never decoded.
+ * @param {Buffer} line One raw line.
+ * @returns {string} Its text without a carriage return.
+ */
+function decode(line) {
+	try {
+		return strict.decode(line).replace(/\r$/, '');
+	} catch {
+		return refuse('unit log is not valid UTF-8');
+	}
+}
+
+/**
+ * Reverses run.lua's shell_quote of one --only argument.
+ * @param {string} quoted A single-quoted POSIX word.
+ * @returns {string} The original case name.
+ */
+function unquote(quoted) {
+	const match = /^'((?:[^']|'\\'')*)'$/.exec(quoted);
+	if (!match) refuse('replay case name is not one quoted word');
+	return match[1].replaceAll("'\\''", "'");
+}
+
+/**
+ * Renders control bytes visibly so a notice can never carry a hidden command.
+ * @param {string} text Decoded assertion text.
+ * @returns {string} Text whose only line breaks are \n and whose controls read \xNN.
+ */
+function visible(text) {
+	return text.replace(
+		/[\x00-\x08\x0B-\x1F\x7F]/g,
+		(ch) => '\\x' + ch.charCodeAt(0).toString(16).padStart(2, '0')
+	);
 }
 
 function escapeMessage(text) {
@@ -29,114 +93,120 @@ function escapeMessage(text) {
 }
 
 /**
- * Requires a complete failed runner record before publishing its fixed case.
- * @param {string} log Fresh, completed linux-unit.log contents.
- * @returns {string} A single escaped GitHub notice, including its line ending.
+ * Bounds one notice, stating the cut instead of dropping the record.
+ * @param {string} name Failed case name.
+ * @param {string} detail Complete assertion.
+ * @returns {string} Escaped message within MAX_MESSAGE_BYTES.
  */
-function annotation(log) {
-	if (Buffer.byteLength(log, 'utf8') > MAX_LOG_BYTES) refuse('unit log exceeds the read budget');
-	const footers = [
-		...log.matchAll(
-			/^OVERALL RESULTS:\r?\nTotal modules: ([1-9]\d*)\r?\nPassed tests:  (\d+)\r?\nFailed tests:  ([1-9]\d*)\r?\n========================================\r?\n/gm
-		)
-	];
-	if (footers.length !== 1) refuse('expected one complete failed unit footer');
-	const footer = footers[0];
-	const inline = `  FAIL ${CASE} — `;
-	const terminal = `  - ${CASE} : `;
-	const replay = `\n    replay: luajit tests/run.lua --only "${CASE}"\n`;
-	const lines = log.split('\n');
-	if (lines.filter((line) => line.startsWith(inline)).length !== 1)
-		refuse('expected one inline Configuration failure');
-	if (lines.filter((line) => line.startsWith(terminal)).length !== 1)
-		refuse('expected one terminal Configuration failure');
-	const start = log.indexOf(terminal);
-	if (start < footer.index + footer[0].length)
-		refuse('Configuration detail precedes the unit footer');
-	const end = log.indexOf(replay, start + terminal.length);
-	if (end === -1 || log.indexOf(replay, end + replay.length) !== -1)
-		refuse('expected one complete Configuration replay');
-	const detail = log.slice(start + terminal.length, end);
-	if (!/^test_hotstrings_scope\.lua:[1-9]\d*: \S/.test(detail))
-		refuse('assertion does not name the Configuration fixture');
-	if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(detail))
-		refuse('assertion contains unsupported control bytes');
-	const inlineStart = log.indexOf(inline);
-	if (inlineStart >= footer.index || !log.startsWith(`${inline}${detail}\n`, inlineStart))
-		refuse('inline and terminal assertions disagree');
-	const completeReporter =
-		/^\[report:linux-lua\] \x1b\[31mFAIL\x1b\[0m — ([\d\u202F]+) passed, ([\d\u202F]+) failed \(exit 1, format lua\)\.\n$/;
-	if ([...log.matchAll(/^\[report:linux-lua\][^\n]*\n/gm)].length !== 1)
-		refuse('expected one completed reporter receipt');
-	const reporter = log.slice(end + replay.length).match(/\[report:linux-lua\][^\n]*\n$/);
-	const receipt = reporter && reporter[0].match(completeReporter);
-	if (
-		!receipt ||
-		Number(receipt[1].replace(/\u202F/g, '')) !== Number(footer[2]) ||
-		Number(receipt[2].replace(/\u202F/g, '')) !== Number(footer[3])
-	)
-		refuse('completed reporter failure receipt is missing or inconsistent');
-	const message = escapeMessage(`${CASE}\n${detail}`);
-	if (Buffer.byteLength(message, 'utf8') > MAX_MESSAGE_BYTES)
-		refuse('complete assertion exceeds the annotation budget');
-	return `::notice title=linux-lua Configuration assertion::${message}\n`;
+function boundedMessage(name, detail) {
+	const whole = escapeMessage(visible(`${name}\n${detail}`));
+	if (Buffer.byteLength(whole, 'utf8') <= MAX_MESSAGE_BYTES) return whole;
+	const characters = [...detail];
+	const total = Buffer.byteLength(detail, 'utf8');
+	const cut = (count) => {
+		const shown = characters.slice(0, count).join('');
+		const note = `[assertion truncated: ${Buffer.byteLength(shown, 'utf8')} of ${total} bytes shown; the failed unit log artifact keeps it whole]`;
+		return escapeMessage(visible(`${name}\n${shown}\n${note}`));
+	};
+	let low = 0;
+	let high = characters.length;
+	while (low < high) {
+		const middle = Math.ceil((low + high) / 2);
+		if (Buffer.byteLength(cut(middle), 'utf8') <= MAX_MESSAGE_BYTES) low = middle;
+		else high = middle - 1;
+	}
+	const result = cut(low);
+	if (Buffer.byteLength(result, 'utf8') > MAX_MESSAGE_BYTES)
+		refuse('failed case name exceeds the annotation budget');
+	return result;
 }
 
 /**
- * Selects exact failure records before decoding unrelated binary fixture output.
- * Every selected byte remains strict UTF-8; the original ordering and final
- * reporter boundary must hold before the existing identity checks receive it.
+ * Selects the terminal failure records of a finished failed unit log.
  * @param {Buffer} bytes The fresh unit log, without transport normalization.
- * @returns {string} Strictly decoded original failure and completion records.
+ * @returns {Array<{name: string, detail: string}>} One entry per failed case, in runner order.
  */
-function selectedLog(bytes) {
+function failures(bytes) {
 	if (bytes.length > MAX_LOG_BYTES) refuse('unit log exceeds the read budget');
-	const markers = [
-		`  FAIL ${CASE} — `,
-		'OVERALL RESULTS:',
-		`  - ${CASE} : `,
-		`    replay: luajit tests/run.lua --only "${CASE}"`,
-		'[report:linux-lua]'
-	].map((marker) => Buffer.from(marker, 'utf8'));
-	const records = markers.map(() => []);
-	for (let start = 0; start < bytes.length; ) {
-		const newline = bytes.indexOf(10, start);
-		const end = newline === -1 ? bytes.length : newline + 1;
-		for (const [index, marker] of markers.entries()) {
-			if (bytes.subarray(start, start + marker.length).equals(marker)) {
-				records[index].push({ start, end });
-				if (records[index].length > 1) refuse('selected unit log record is duplicated');
-			}
-		}
-		start = end;
+	const lines = rawLines(bytes);
+	const footers = lines.flatMap((line, index) => (startsWith(line, FOOTER) ? [index] : []));
+	if (footers.length !== 1) refuse('expected one complete failed unit footer');
+	const footerAt = footers[0];
+	if (footerAt + 5 > lines.length) refuse('selected unit footer is incomplete');
+	const footer = lines
+		.slice(footerAt, footerAt + 5)
+		.map(decode)
+		.join('\n');
+	const counts =
+		/^OVERALL RESULTS:\nTotal modules: [1-9]\d*\nPassed tests: {2}(\d+)\nFailed tests: {2}([1-9]\d*)\n=+$/.exec(
+			footer
+		);
+	if (!counts) refuse('expected one complete failed unit footer');
+	// The runner prints each failure as "  - name : assertion" (the assertion may
+	// span lines) closed by its replay command, then the reporter its receipt.
+	const records = [];
+	let current = null;
+	let receipt = null;
+	for (let index = footerAt + 5; index < lines.length && receipt === null; index++) {
+		const line = lines[index];
+		if (startsWith(line, REPORTER)) receipt = decode(line);
+		else if (current && startsWith(line, REPLAY)) {
+			current.replay = decode(line).slice(REPLAY.length);
+			records.push(current);
+			current = null;
+		} else if (current) current.lines.push(decode(line));
+		else if (startsWith(line, RECORD)) current = { lines: [decode(line)], replay: null };
 	}
-	if (records.some((record) => record.length !== 1)) refuse('selected unit log record is missing');
-	const [inline, footer, terminal, replay, reporter] = records.map((record) => record[0]);
-	let footerEnd = footer.start;
-	// The runner's footer has exactly five complete lines, counted as raw bytes.
-	for (let line = 0; line < 5; line++) {
-		const newline = bytes.indexOf(10, footerEnd);
-		if (newline === -1) refuse('selected unit footer is incomplete');
-		footerEnd = newline + 1;
-	}
-	const detailLength = replay.start - 1 - terminal.start - markers[2].length;
-	const inlineEnd = inline.start + markers[0].length + detailLength + 1;
+	if (current) refuse('a failure record has no replay command');
+	const reporter =
+		receipt &&
+		/^\[report:linux-lua\] \x1b\[31mFAIL\x1b\[0m — ([\d\u202F ]+) passed, ([\d\u202F ]+) failed \(exit 1, format lua\)\.$/.exec(
+			receipt
+		);
+	const number = (text) => Number(text.replace(/[\u202F ]/g, ''));
 	if (
-		detailLength < 1 ||
-		inlineEnd > footer.start ||
-		footerEnd > terminal.start ||
-		replay.end > reporter.start ||
-		reporter.end !== bytes.length ||
-		bytes[reporter.end - 1] !== 10
+		!reporter ||
+		number(reporter[1]) !== Number(counts[1]) ||
+		number(reporter[2]) !== Number(counts[2])
 	)
-		refuse('selected unit records are unfinished or out of order');
-	const selected = Buffer.concat([
-		bytes.subarray(inline.start, inlineEnd),
-		bytes.subarray(footer.start, footerEnd),
-		bytes.subarray(terminal.start, replay.end),
-		bytes.subarray(reporter.start, reporter.end)
-	]);
-	return new TextDecoder('utf-8', { fatal: true }).decode(selected);
+		refuse('completed reporter failure receipt is missing or inconsistent');
+	if (records.length !== Number(counts[2]))
+		refuse('failure records disagree with the failed test count');
+	return records.map((record) => {
+		const replay = /^(?: --module=[a-z_]+)?(?: --only (.+))?$/.exec(record.replay);
+		if (!replay) refuse('replay command is not the runner replay');
+		const first = record.lines[0].slice(RECORD.length);
+		let name;
+		let rest;
+		if (replay[1] === undefined) {
+			// A module load error has no --only; its name is a dotted module path.
+			const split = first.indexOf(' : ');
+			if (split < 1) refuse('failure record has no assertion');
+			name = first.slice(0, split);
+			rest = first.slice(split + 3);
+		} else {
+			name = unquote(replay[1]);
+			if (!first.startsWith(`${name} : `)) refuse('failure record and replay name disagree');
+			rest = first.slice(name.length + 3);
+		}
+		const detail = [rest, ...record.lines.slice(1)].join('\n');
+		if (detail.trim() === '') refuse('failure record has no assertion');
+		return { name, detail };
+	});
+}
+
+/**
+ * Renders one GitHub notice per failed case.
+ * @param {Buffer} bytes The fresh unit log.
+ * @returns {string} Notices, each with its line ending.
+ */
+function annotations(bytes) {
+	return failures(bytes)
+		.map(
+			({ name, detail }) =>
+				`::notice title=linux-lua failed case::${boundedMessage(name, detail)}\n`
+		)
+		.join('');
 }
 
 /**
@@ -152,16 +222,13 @@ function main(argv) {
 		const stat = fs.fstatSync(descriptor);
 		if (!stat.isFile() || stat.size > MAX_LOG_BYTES)
 			refuse('unit log is not a regular bounded file');
-		const log = selectedLog(fs.readFileSync(descriptor));
-		process.stdout.write(annotation(log));
+		process.stdout.write(annotations(fs.readFileSync(descriptor)));
 	} catch (error) {
 		const reason =
 			descriptor === undefined
 				? 'unit log could not be opened or arguments were refused'
-				: error instanceof TypeError
-					? 'unit log is not valid UTF-8'
-					: error.message;
-		process.stderr.write(`Configuration assertion annotation refused: ${reason}.\n`);
+				: error.message;
+		process.stderr.write(`Failed unit assertion annotation refused: ${reason}.\n`);
 		process.exitCode = 2;
 	} finally {
 		if (descriptor !== undefined) fs.closeSync(descriptor);
@@ -170,4 +237,4 @@ function main(argv) {
 
 if (require.main === module) main(process.argv.slice(2));
 
-module.exports = { annotation };
+module.exports = { annotations, failures };

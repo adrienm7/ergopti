@@ -167,7 +167,7 @@ jobs:
           if-no-files-found: error
 
       # The original red unit run owns this public assertion; no rerun is substituted.
-      - name: Emit Configuration assertion from failed unit log
+      - name: Emit failed unit assertions from the unit log
         if: ${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}
         shell: bash
         run: node tools/test/linux-unit-failure-excerpt.cjs "$RUNNER_TEMP/linux-unit.log"
