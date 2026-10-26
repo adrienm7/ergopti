@@ -237,4 +237,50 @@ function M.apply(document, registry, retired, is_table)
 	return "migrated", from
 end
 
+
+--- The edits that migrate a file in place, for the line-preserving editor of
+--- the config.toml engine (config_migrate.plan_operations): the same result as
+--- M.apply() on the decoded document, written as explicit ops of that engine's
+--- closed set (`delete`, `set_if_absent`), so every byte outside the migrated
+--- lines survives. The guards read the document as it was before the
+--- migration, which is exact for the shipped steps (a guard never depends on
+--- a key another op of its own step removes before it runs).
+--- @param document table Decoded user document, NOT edited.
+--- @param registry table See M.parse_registry.
+--- @param retired table Driver key id -> the delay an earlier build shipped.
+--- @param is_table function(value) -> boolean
+--- @return string outcome "migrated", "current", "newer" or "invalid".
+--- @return number|string|table detail The version the document carried or the
+---   reason, and for "migrated" the ops array as a third result.
+function M.file_operations(document, registry, retired, is_table)
+	local from, detail = M.version(document, registry, is_table)
+	if from == nil then return "invalid", detail end
+	if from > registry.current then return "newer", from end
+	if from == registry.current then return "current", from end
+	local ops = {}
+	for _, step in ipairs(registry.steps) do
+		if step.from >= from then
+			for _, op in ipairs(step.ops) do
+				if op.op == "delete" then
+					ops[#ops + 1] = { op = "delete", section = op.section, key = op.key }
+				else
+					local guard = op.unless and table_at(document, op.unless.section, is_table)
+					local section = table_at(document, op.section, is_table)
+					if not (guard and guard[op.unless.key] == op.unless.value) and section then
+						for _, key_id in ipairs(TableUtil.sorted_keys(retired)) do
+							local entry = section[key_id]
+							if is_table(entry) and entry[op.key] == retired[key_id] then
+								ops[#ops + 1] = { op = "delete", section = op.section .. "." .. key_id, key = op.key }
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	ops[#ops + 1] = { op = "delete", section = M.META_SECTION, key = M.VERSION_KEY }
+	ops[#ops + 1] = { op = "set_if_absent", section = M.META_SECTION, key = M.VERSION_KEY, value = registry.current }
+	return "migrated", from, ops
+end
+
 return M

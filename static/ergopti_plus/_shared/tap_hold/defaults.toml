@@ -135,7 +135,9 @@ keys = ["escape", "tab", "enter", "space", "backspace", "delete"]
 # stamps the file; every delay left in a stamped file is the user's own. Windows
 # does not read the migration registry yet: it keeps the explicit_delays flag
 # until its loader and writer replay the same step. macOS never stored a shipped
-# delay and does not read this table.
+# delay and does not read this table. This table is kept forever: an old file can
+# surface at any time (a restored backup, a copy from another machine), so no
+# step ever retires it.
 [tap_hold.retired_delays]
 caps_lock = 0.35
 left_shift = 0.35

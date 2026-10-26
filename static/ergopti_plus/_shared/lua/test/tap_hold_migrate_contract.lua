@@ -85,6 +85,15 @@ function M.register(helpers, opts)
 					local outcome, from = run(document, shapes)
 					helpers.assert_eq(outcome, case.outcome)
 					if case.outcome == "migrated" then
+						-- The in-place editor reaches the same document as the decoded migration.
+						local source_document, source_shapes = decode(input)
+						local edit_outcome, _, operations = Migrate.file_operations(source_document, registry, retired,
+							function(value) return type(value) == "table" and not source_shapes.arrays[value] end)
+						helpers.assert_eq(edit_outcome, "migrated")
+						local plan = require("config_migrate").plan_operations(input, operations)
+						helpers.assert_eq(plan.outcome, "migrated", tostring(plan.detail))
+						helpers.assert_eq((decode(plan.candidate)), (decode(read(corpus .. "/" .. name .. "/expected.toml"))),
+							"the line-preserving edit")
 						helpers.assert_eq(from, case.from_version)
 						local expected = decode(read(corpus .. "/" .. name .. "/expected.toml"))
 						helpers.assert_eq(document, expected, "the migrated document")
