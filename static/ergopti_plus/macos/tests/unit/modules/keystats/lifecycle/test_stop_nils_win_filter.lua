@@ -11,6 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ActivationFixture = require("tests.unit.modules.keystats.lifecycle.test_activation_callback_fail_closed")
 
 -- Takes a selector unique to one production file rather than that file's
 -- path, so moving or splitting a module cannot turn these invariants into
@@ -49,11 +50,21 @@ helpers.describe("keystats/init.lua: M.stop() nils watcher locals", function()
 			"M.stop() must run the browser watcher release")
 	end)
 
-	helpers.it("_event_tap is nilled after stop() in M.stop()", function()
-		local src = strip_comments(read_source("local function ensure_browser_window_watchers"))
-		helpers.assert_true(
-			src:find("_event_tap%s*=%s*nil") ~= nil,
-			"M.stop() must nil _event_tap after stopping it")
+	helpers.it("retains refused keyboard cleanup and releases it before a restart (keystats-keyboard-cleanup)", function()
+		local ctx = ActivationFixture.load_keystats({ keyboard_stop_results = { false, true } })
+		helpers.assert_eq(ctx.start_result, true)
+		helpers.assert_eq(ctx.keyboard_start_calls, 1)
+		helpers.assert_eq(ctx.keystats.stop(), false, "a refused keyboard release must keep stop incomplete")
+		helpers.assert_eq(ctx.keyboard_stop_calls, 1)
+		helpers.assert_eq(ctx.state.is_enabled, false, "cleanup debt must never keep recording enabled")
+		helpers.assert_eq(ctx.keystats.stop(), true, "the next stop must retry the retained keyboard owner")
+		helpers.assert_eq(ctx.keyboard_stop_calls, 2)
+		helpers.assert_eq(ctx.keystats.stop(), true)
+		helpers.assert_eq(ctx.keyboard_stop_calls, 2, "completed cleanup cannot release an owner twice")
+		helpers.assert_eq(ctx.keystats.start({ is_paused = function() return false end }), true)
+		helpers.assert_eq(ctx.keyboard_start_calls, 2, "a released keyboard owner must be acquired on restart")
+		helpers.assert_eq(ctx.keystats.stop(), true)
+		helpers.assert_eq(ctx.keyboard_stop_calls, 3)
 	end)
 
 	helpers.it("stops the app-activation lifecycle in M.stop()", function()
