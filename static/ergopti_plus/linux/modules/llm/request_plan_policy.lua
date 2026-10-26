@@ -18,7 +18,8 @@
 ---    burst as typing is.
 --- 3. The last request time is kept per backend kind, because the agent, tone and
 ---    screen requests share the same map.
---- 4. Live mode keeps its own debounce at a word end.
+--- 4. A word end fires instantly in live mode too (when the instant word end
+---    is on), as on macOS and Windows.
 --- ==============================================================================
 
 local M = {}
@@ -31,7 +32,7 @@ M.OPTIONS = {
 	pace_explicit = true,
 	pace_variants = true,
 	floor_scope = "per_backend",
-	live_instant_word_end = false,
+	live_instant_word_end = true,
 }
 
 --- Builds the engine's plan.
