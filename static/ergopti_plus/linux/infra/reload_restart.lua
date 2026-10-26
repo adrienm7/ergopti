@@ -25,9 +25,11 @@ local Logger = require("logger.shim")
 local LOG = "infra.reload_restart"
 
 --- Builds the reload owner.
---- @param opts table { gestures = table|nil, restart = function(reason) -> boolean }
+--- @param opts table { gestures = table|nil, restart = function(reason) -> boolean,
+---   cancel = function() -> boolean, detail|nil }
 --- @return function perform `perform(trigger)` -> started, why
 --- @return function in_flight `in_flight()` -> whether a restart was requested and owns the process
+--- @return function abandon `abandon()` -> cancelled, detail: a Quit that wins over the reload
 function M.new(opts)
 	assert(type(opts) == "table" and type(opts.restart) == "function", "the reload owner needs its restart")
 	local in_flight = false
@@ -55,7 +57,21 @@ function M.new(opts)
 		in_flight = true
 		return true
 	end
-	return perform, function() return in_flight end
+	--- Cancels the restart in flight; the daemon then keeps running, or quits on the caller's request.
+	local function abandon()
+		if not in_flight then return true end
+		assert(type(opts.cancel) == "function", "the reload owner needs its cancel to abandon a restart")
+		local cancelled, detail = opts.cancel()
+		if cancelled == true then
+			in_flight = false
+			Logger.info(LOG, "The reload in flight was abandoned.")
+			return true
+		end
+		Logger.error(LOG, "The reload in flight could not be abandoned (%s): the quit goes on, but "
+			.. "the restart may still start a new daemon after this one exits.", tostring(detail))
+		return false, detail
+	end
+	return perform, function() return in_flight end, abandon
 end
 
 return M

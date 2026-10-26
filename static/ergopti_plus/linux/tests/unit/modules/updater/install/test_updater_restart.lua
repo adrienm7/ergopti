@@ -26,6 +26,68 @@ local ON_WINDOWS = WinCompat.is_windows()
 
 helpers.describe("updater restart: starting the installed version", function()
 
+	helpers.it("(quit-wins-over-reload) cancels a pending systemd restart with a stop job", function()
+		local ran = {}
+		local cancelled = Restarter.cancel("systemd", { run = function(cmd) ran[#ran + 1] = cmd; return true end })
+		helpers.assert_eq(cancelled, true)
+		helpers.assert_eq(ran, { "systemctl --user --no-block stop ergopti-hotstrings.service" })
+		local refused, detail = Restarter.cancel("systemd", { run = function() return false end })
+		helpers.assert_eq(refused, false)
+		helpers.assert_contains(detail, "systemctl")
+	end)
+
+	helpers.it("(quit-wins-over-reload) cancels a relay by its marker with no XDG_RUNTIME_DIR", function()
+		local ran = {}
+		local run = function(cmd) ran[#ran + 1] = cmd; return true end
+		local path = Restarter.cancel_path(4242)
+		helpers.assert_eq(path, require("adapters.storage").path() .. ".relay-cancel-4242")
+		helpers.assert_eq(Restarter.cancel("relay", { run = run, pid = 4242 }), true)
+		helpers.assert_eq(ran, { "touch '" .. path .. "'" })
+		local refused, detail = Restarter.cancel("relay", { run = function() return false end, pid = 4242 })
+		helpers.assert_eq(refused, false)
+		helpers.assert_contains(detail, "marker")
+		local none, why = Restarter.cancel("nothing", {})
+		helpers.assert_eq(none, false)
+		helpers.assert_contains(why, "no restart")
+	end)
+
+	helpers.it("(quit-wins-over-reload) a relay command checks the cancellation marker after the wait", function()
+		local command = Restarter.relay_command(4242, "/home/u/launcher", {}, "/run/user/1/ergopti/relay-cancel-4242")
+		local wait, check, launch = command:find("sleep 0.2; done;", 1, true), command:find("relay-cancel-4242", 1, true), command:find("exec ", 1, true)
+		helpers.assert_true(wait and check and launch and wait < check and check < launch,
+			"the marker is read after the old daemon exited and before the launcher starts")
+		helpers.assert_nil(Restarter.relay_command(4242, "/home/u/launcher", {}):find("relay-cancel", 1, true),
+			"without a marker the relay command is unchanged")
+	end)
+
+	helpers.it("(quit-wins-over-reload) a relay whose marker exists does not start the launcher", function()
+		if ON_WINDOWS then return end
+		local dir = os.tmpname()
+		os.remove(dir)
+		os.execute("mkdir -p '" .. dir .. "'")
+		local started, marker = dir .. "/started", dir .. "/cancel"
+		local launcher = dir .. "/launcher"
+		local fh = assert(io.open(launcher, "w"))
+		fh:write("#!/bin/sh\necho started > '" .. started .. "'\n")
+		fh:close()
+		os.execute("chmod +x '" .. launcher .. "'")
+		local pipe = assert(io.popen("sleep 0.4 & echo $!"))
+		local pid = tonumber(pipe:read("*l"))
+		pipe:close()
+		os.execute("touch '" .. marker .. "'")
+		helpers.assert_true(os.execute(Restarter.relay_command(pid, launcher, {}, marker)) ~= nil)
+		local gone = false
+		for _ = 1, 100 do
+			local handle = io.open(marker, "r")
+			if handle then handle:close() else gone = true; break end
+			os.execute("sleep 0.1")
+		end
+		helpers.assert_true(gone, "the relay consumed the marker once the daemon exited")
+		os.execute("sleep 0.3")
+		helpers.assert_nil(io.open(started, "r"), "a cancelled relay never starts the launcher")
+		os.execute("rm -rf '" .. dir .. "'")
+	end)
+
 	helpers.it("asks systemd to restart the unit that runs the daemon", function()
 		local ran = {}
 		local how = Restarter.restart({ wrapper = "/home/u/.local/bin/ergopti-hotstrings", args = { "--tray" },

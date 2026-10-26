@@ -453,6 +453,10 @@ local function with_menu_fixture(options, callback)
 		is_pending = function()
 			return observations.termination_pending or observations.reload_abort ~= nil
 		end,
+		pending_kind = function()
+			if observations.reload_abort ~= nil then return "reload" end
+			if observations.termination_pending then return "exit" end
+		end,
 	}
 
 	local file_mover = {}

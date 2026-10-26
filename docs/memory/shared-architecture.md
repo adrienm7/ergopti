@@ -376,16 +376,21 @@ first. A reload, a signal or a logoff is not a quit and never switches.
 
 ### project-quit-refusals-are-one-shared-decision
 
-The tray's Quit is refused for four causes on macOS and Linux, decided by
-`_shared/lua/quit_admission.lua` from four facts the driver reads (owner
-available, a reload or exit owns the process, a global writer holds a rollback,
-a hotstring publication is pending) and replayed by
-`_shared/lua/test/quit_admission_contract.lua`. Every refusal logs its cause
-line and sends the one `notify.quit_refused` notice. A new cause is a new fact
-there, never a driver-local `if`. A Reload in flight differs on purpose: the
-macOS click gate holds a Quit click and replays it on the reloaded menu, while
-Linux restarts the process and has no hand-off, so it refuses. Windows has no
-refusal notice yet (its OnExit gates veto silently, bounded to five attempts).
+The tray's Quit follows `_shared/lua/quit_admission.lua` on macOS and Linux
+(maintainer, 2026-10-26: the user wants out, so Quit wins). Five facts feed
+`decide()`: owner available, an exit owns the process, a reload is in flight, a
+global writer is active, a hotstring publication is pending. A missing owner or
+an exit already under way is refused with the one `notify.quit_refused` notice;
+a running writer or publication is waited for (`await` polls up to the
+user-quit deadline, then refuses); a reload in flight is abandoned (macOS: the
+coordinator upgrades the reload to the exit and the click gate never holds the
+Quit row; Linux: `daemon_restart.cancel` replaces the systemd restart with a
+stop job or drops a marker the relay checks). The contract test
+`_shared/lua/test/quit_admission_contract.lua` is replayed by both drivers; a new
+cause is a new fact there, never a driver-local `if`. Linux reads "a writer is
+active" from `infra/scope_registry.lua`, where every scope module registers a
+probe over the owner it keeps. Windows has no refusal notice yet (its OnExit
+gates veto silently, bounded to five attempts).
 
 ### project-a-row-a-platform-lacks-is-hidden-or-greyed
 

@@ -1500,15 +1500,20 @@ function M.capture_terminal_admission()
 	}
 end
 
---- Whether a terminal transition cannot be admitted now: another one already
---- holds the admission, or an operation, a recovery or a scope transaction is
---- active. The menu's Quit reads it before it asks, so a refusal is told once.
---- @return boolean blocked
-function M.terminal_admission_blocked()
-	if _terminal_owner ~= nil then return true end
+--- Whether a hotstring operation, a recovery or a scope transaction is active.
+--- The menu's Quit waits for it instead of cutting the write in half.
+--- @return boolean pending
+function M.publication_pending()
 	local state = _state
 	return state ~= nil and (state.operation_active or state.recovery.has_pending()
 		or state.scope_owner ~= nil or state.scope_candidate ~= nil)
+end
+
+--- Whether a terminal transition cannot be admitted now: another one already
+--- holds the admission, or a publication is pending.
+--- @return boolean blocked
+function M.terminal_admission_blocked()
+	return _terminal_owner ~= nil or M.publication_pending()
 end
 
 function M.common_autocorrection_admitted()

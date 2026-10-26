@@ -492,6 +492,16 @@ helpers.describe("controlled termination coordinator", function()
 		helpers.assert_eq(calls.marks, 0)
 	end)
 
+	helpers.it("(quit-wins-over-reload) names the kind of transition that owns the process", function()
+		local coordinator, calls = load_coordinator()
+		helpers.assert_nil(coordinator.pending_kind())
+		helpers.assert_true(coordinator.request_reload("first_reload"))
+		helpers.assert_eq(coordinator.pending_kind(), "reload")
+		helpers.assert_true(coordinator.request_user_exit("menu_quit"))
+		helpers.assert_eq(coordinator.pending_kind(), "exit", "Quit turned the reload into the exit")
+		helpers.assert_eq(calls.lease_requests, 1, "one fence serves both")
+	end)
+
 	helpers.it("preserves an emergency abort callback when exit supersedes reload", function()
 		local coordinator, calls = load_coordinator()
 		local aborts = 0
