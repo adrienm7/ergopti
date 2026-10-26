@@ -481,6 +481,8 @@ Test("system control: owned process PID is retained without termination (process
 	_SysActions_ProcessPidDomain.Bind(DllCall("Kernel32\GetCurrentProcessId", "UInt"), true))
 
 
+#Include %A_LineFile%\..\..\..\..\support\pid_registration_receipt.ahk
+
 _SysActions_PidRegistrationDone(State, Code, Output, ErrorText) {
 	State.Done := true
 	State.Code := Code
@@ -513,7 +515,7 @@ _SysActions_ReadPidRegistration(Path) {
 		AssertTrue(StrCompare(Values[Index], Fields[3], true) == 0, "the last actual bound value stays native PID plus one DWORD domain")
 		Receipt .= " " . Fields[2] . ":" . Fields[3]
 	}
-	FileAppend(Receipt . "`n", "*")
+	_TestPrint("# " . Receipt)
 	return {Pid: Pid, Names: Names}
 }
 
@@ -542,10 +544,10 @@ _SysActions_PidRegistrationsStayStable() {
 		loop {
 			Ready := true
 			for State in Children {
-				if FileExist(State.Report . ".error")
+				if _PidRegistrationReceiptIsReady(State.Report . ".error")
 					throw Error(FileRead(State.Report . ".error", "UTF-8"))
 				AssertFalse(State.Done, "both actual native processes remain live while their source registrations are compared")
-				if !FileExist(State.Report)
+				if !_PidRegistrationReceiptIsReady(State.Report)
 					Ready := false
 			}
 			if Ready
@@ -591,3 +593,35 @@ _SysActions_PidRegistrationsStayStable() {
 
 Test("system control: PID-domain registration stays stable across native processes (process-pid-registration)",
 	_SysActions_PidRegistrationsStayStable)
+
+
+_SysActions_PidReceiptPublication() {
+	Root := _SR_AcquireCaptureDirectory()
+	Target := Root . "registration.tsv"
+	Text := "Owned receipt: café / 漢"
+	Witness := {Calls: 0, NativeDiskHandle: false, ReadyWhileOpen: false}
+	Append(Content, WritingPath, Encoding) {
+		Writer := FileOpen(WritingPath, "w", Encoding)
+		AssertTrue(IsObject(Writer), "the callback owns an actual Windows file object")
+		try {
+			Witness.Calls += 1
+			Witness.NativeDiskHandle := DllCall("kernel32\GetFileType", "Ptr", Writer.Handle, "UInt") == 1
+			; Observe the exact parent's admission predicate before body writes or
+			; close. This is a native file-creation boundary, not a delayed flag.
+			Witness.ReadyWhileOpen := _PidRegistrationReceiptIsReady(Target)
+			Writer.Write(Content)
+		} finally Writer.Close()
+	}
+	try {
+		_PidRegistrationPublish(Text, Target, Append)
+		_TestPrint("# RECEIPT process-pid-publication native_disk_handle=" . Witness.NativeDiskHandle
+			. " ready_while_open=" . Witness.ReadyWhileOpen . " append_calls=" . Witness.Calls)
+		AssertEqual(1, Witness.Calls)
+		AssertTrue(Witness.NativeDiskHandle, "the publication boundary must observe an actually open native disk handle")
+		AssertFalse(Witness.ReadyWhileOpen, "the final receipt cannot be admitted while its original writer still owns an incomplete file")
+		AssertTrue(_PidRegistrationReceiptIsReady(Target), "the complete receipt becomes admitted only after the writer returns")
+		AssertTrue(StrCompare(Text, FileRead(Target, "UTF-8"), true) == 0, "the published receipt contains the complete exact Unicode body")
+	} finally DirDelete(Root, true)
+}
+Test("system control: PID registration receipts publish after writer close (process-pid-publication)",
+	_SysActions_PidReceiptPublication)
