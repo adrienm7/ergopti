@@ -287,11 +287,19 @@ local function sway_focused_node(node)
 	return nil
 end
 
+--- A client can emit valid JSON before failing; only acknowledged acquisition
+--- may publish focus metadata. Shell owns the checked process diagnostics.
+local function checked_json(command)
+	local ok, output = Shell.exec_checked(command)
+	if not ok then return nil end
+	return decode_json(output)
+end
+
 --- Queries sway (and any wlroots compositor speaking the sway IPC).
 --- @return table|nil
 local function focused_sway()
 	if not Shell.has_command("swaymsg") then return nil end
-	local tree = decode_json(Shell.exec("swaymsg -t get_tree 2>/dev/null"))
+	local tree = checked_json("swaymsg -t get_tree 2>/dev/null")
 	if not tree then return nil end
 	local node = sway_focused_node(tree)
 	if not node then return nil end
@@ -312,7 +320,7 @@ end
 --- @return table|nil
 local function focused_hyprland()
 	if not Shell.has_command("hyprctl") then return nil end
-	local win = decode_json(Shell.exec("hyprctl activewindow -j 2>/dev/null"))
+	local win = checked_json("hyprctl activewindow -j 2>/dev/null")
 	if not win then return nil end
 	local info = empty_info()
 	info.windowTitle = tostring(win.title or "")
@@ -325,7 +333,7 @@ end
 --- @return table|nil
 local function focused_niri()
 	if not Shell.has_command("niri") then return nil end
-	local win = decode_json(Shell.exec("niri msg --json focused-window 2>/dev/null"))
+	local win = checked_json("niri msg --json focused-window 2>/dev/null")
 	if not win then return nil end
 	local info = empty_info()
 	info.windowTitle = tostring(win.title or "")
