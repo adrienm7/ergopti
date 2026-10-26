@@ -64,6 +64,40 @@ for (const platform of ['linux', 'win32', 'darwin']) {
 	);
 }
 
+const wineGuard = inventory.checks.filter(
+	(check) => check.args[0] === 'tools/test/test-wine-runner-process-guard.cjs'
+);
+assert.equal(wineGuard.length, 1, 'the Wine admission guard retains one execution owner');
+assert.deepEqual(wineGuard[0].platforms, ['linux']);
+const wineGuardPath = path.join(ROOT, wineGuard[0].args[0]);
+const wineGuardSource = fs.readFileSync(wineGuardPath, 'utf8');
+for (const platform of ['linux', 'win32', 'darwin']) {
+	assert.equal(
+		selectFeature(inventory, 'test-infrastructure', platform).some(
+			(check) => check.id === wineGuard[0].id
+		),
+		platform === 'linux',
+		`${platform}: the /proc Wine guard has an explicit Linux execution owner`
+	);
+	if (platform !== 'linux') {
+		assert.throws(
+			() =>
+				vm.runInNewContext(wineGuardSource, {
+					require,
+					process: {
+						platform,
+						exit() {
+							throw new Error('An unsupported guard host was falsely admitted.');
+						}
+					},
+					__dirname: path.dirname(wineGuardPath)
+				}),
+			/The \/proc Wine admission guard requires Linux\./,
+			`${platform}: direct invocation must refuse instead of returning an empty pass`
+		);
+	}
+}
+
 const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-js-feature-inventory-'));
 const fixtureRoot = path.join(temporaryRoot, 'fixture');
 const featuresRoot = path.join(fixtureRoot, 'tools/test/features');
