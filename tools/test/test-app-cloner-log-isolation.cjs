@@ -157,12 +157,12 @@ def observe_run(argv, *args, **kwargs):
         events.append({"argv": argv, "env": dict(kwargs.get("env", {}))})
     return types.SimpleNamespace(returncode=0, stdout="", stderr="")
 
-def launch(file_path, override=None):
+def launch(file_path, override=None, locale="en"):
     events.clear()
     subject.__file__ = str(file_path)
     os.environ.pop("ERGOPTI_LOCALES_DIR", None)
     os.environ.pop("ERGOPTI_LOCALE", None)
-    os.environ["LANG"] = "en_US.UTF-8"
+    os.environ["LANG"] = locale + "_XX.UTF-8"
     if override is not None:
         os.environ["ERGOPTI_LOCALES_DIR"] = override
     subject.main()
@@ -170,14 +170,19 @@ def launch(file_path, override=None):
         raise AssertionError("the launcher did not dispatch exactly one UI")
     env = events[0]["env"]
     resolved = env["ERGOPTI_LOCALES_DIR"]
-    file = Path(resolved) / "en.json" if resolved else None
+    file = Path(resolved) / (locale + ".json") if resolved else None
     catalog = json.loads(file.read_text()) if file and file.is_file() else {}
+    payload_path = Path(events[0]["argv"][1])
+    payload = payload_path.read_text() if payload_path.is_file() else ""
+    first_picker = payload.split("if step = 1 then", 1)[1].split("set rc to panel's runModal()", 1)[0] if "if step = 1 then" in payload else ""
     return {"locales_dir": resolved, "locale": env["ERGOPTI_LOCALE"],
-            "choose": catalog.get("apps.cloner.btn_choose")}
+            "choose": catalog.get("apps.cloner.btn_choose"),
+            "cancel": catalog.get("button.cancel"), "first_picker": first_picker}
 
 try:
     subject.subprocess.run = observe_run
     source = launch(launcher_path)
+    french = launch(launcher_path, locale="fr")
     with tempfile.TemporaryDirectory(prefix="ergopti-cloner-locales-") as fixture:
         root = Path(fixture)
         installed = root / "ErgoptiPlus.app/Contents/Resources/static/ergopti_plus"
@@ -192,7 +197,7 @@ try:
         override = launch(staged_launcher, str(locales))
         shutil.rmtree(staged_locales)
         missing = launch(staged_launcher)
-        print(json.dumps({"source": source, "staged": staged,
+        print(json.dumps({"source": source, "french": french, "staged": staged,
                           "expected_staged": str(staged_locales),
                           "override": override, "missing": missing}))
 finally:
@@ -249,10 +254,131 @@ test(
 	localeDetail
 );
 
+// The actual main chooses the physical catalogue and hands this exact payload
+// to osascript. Native XCTest independently executes its AppKit construction.
+for (const [locale, choose, cancel] of [
+	['en', 'Choose', 'Cancel'],
+	['fr', 'Choisir', 'Annuler']
+]) {
+	const observation = locale === 'en' ? localeEvents.source : localeEvents.french;
+	test(
+		`the actual ${locale} launch selects its shipped picker catalogue`,
+		localeRun.status === 0 &&
+			observation?.locale === locale &&
+			observation.choose === choose &&
+			observation.cancel === cancel,
+		localeDetail
+	);
+	if (locale !== 'en') continue;
+	test(
+		`the ${locale} launch payload binds the first picker to the selected catalogue`,
+		localeRun.status === 0 &&
+			observation?.first_picker?.includes("panel's setPrompt:(btn_choose of u)") &&
+			observation.first_picker.includes(
+				'panel\'s setValue:(btn_cancel of u) forKey:"cancelButtonTitle"'
+			) &&
+			observation.first_picker.includes("panel's setMessage:(msg_choose_source of u)"),
+		localeDetail
+	);
+}
+
 const launcher = fs.readFileSync(LAUNCHER_PATH, 'utf8');
 const clone = fs.readFileSync(CLONE_PATH, 'utf8');
 const builder = fs.readFileSync(BUILDER_PATH, 'utf8');
 const combined = `${launcher}\n${clone}\n${builder}`;
+
+// Resolve actual local calls across the entire delivered script, including the
+// post-clone branches that the first-picker native observation never reaches.
+function unresolvedBuilderCalls(source) {
+	const executable = source.replace(/^\s*--.*$/gm, '');
+	const definitions = new Set(
+		[...executable.matchAll(/^on\s+([A-Za-z_]\w*)\s*\(/gm)].map((match) => match[1])
+	);
+	const calls = [...executable.matchAll(/\bmy\s+([A-Za-z_]\w*)\s*\(/g)].map((match) => match[1]);
+	return [...new Set(calls.filter((name) => !definitions.has(name)))];
+}
+
+test(
+	'every actual App Cloner handler call remains defined after the catalogue refactor',
+	unresolvedBuilderCalls(builder).length === 0 &&
+		!/\bjson_get\s*\(/.test(builder) &&
+		!/\bhardcoded_fr_strings\s*\(/.test(builder),
+	JSON.stringify(unresolvedBuilderCalls(builder))
+);
+
+// Each previously bypassed wizard surface must both load its canonical key and
+// consume that exact field in executable code. An unused translated declaration
+// cannot conceal a reintroduced literal at its caller.
+const wizardFields = [
+	'msg_choose_source',
+	'msg_clone_name',
+	'msg_pwa_recommended',
+	'msg_pwa_optional',
+	'msg_pwa_url',
+	'title_invalid_url',
+	'msg_native_open_optional',
+	'msg_url_path',
+	'prompt_choose_folder',
+	'title_empty_input',
+	'msg_empty_input',
+	'title_invalid_input',
+	'msg_icon_style',
+	'prompt_choose_icon',
+	'mode_native',
+	'mode_pwa',
+	'summary_source',
+	'summary_name',
+	'summary_mode',
+	'summary_icon',
+	'summary_url',
+	'err_open_empty',
+	'err_path_missing',
+	'err_url_format',
+	'err_teams_url',
+	'err_pwa_required',
+	'err_pwa_scheme',
+	'menu_edit',
+	'menu_cut',
+	'menu_copy',
+	'menu_paste',
+	'menu_select_all',
+	'menu_undo',
+	'menu_redo',
+	'default_clone_name',
+	'diagnostic_log_path'
+];
+
+const executableBuilder = builder.replace(/^\s*--.*$/gm, '');
+function connectedWizardField(source, field) {
+	const binding = `${field}: my ui_string(catalogue, "apps.cloner.${field}")`;
+	// A record label and its canonical key contribute two references. Every
+	// field has one real caller, except Edit's two menu objects and the two
+	// default-name entry paths. Count all of them to catch a missed sibling.
+	const expected = ['menu_edit', 'default_clone_name'].includes(field) ? 4 : 3;
+	const references = [...source.matchAll(new RegExp(`\\b${field}\\b`, 'g'))];
+	return source.includes(binding) && references.length === expected;
+}
+for (const field of wizardFields) {
+	const binding = `${field}: my ui_string(catalogue, "apps.cloner.${field}")`;
+	const references = [...executableBuilder.matchAll(new RegExp(`\\b${field}\\b`, 'g'))];
+	test(
+		`the wizard loads and consumes its canonical ${field} message`,
+		connectedWizardField(executableBuilder, field) &&
+			!connectedWizardField(
+				executableBuilder.replace(`${field} of u`, '"injected literal"'),
+				field
+			),
+		`canonical binding=${executableBuilder.includes(binding)} references=${references.length}`
+	);
+}
+
+const missingStringHandler = builder
+	.replace(/^on ui_string\(/m, 'on removed_ui_string(')
+	.replace(/^end ui_string$/m, 'end removed_ui_string');
+test(
+	'the handler ownership oracle rejects an undefined catalogue reader mutant',
+	unresolvedBuilderCalls(missingStringHandler).includes('ui_string')
+);
 
 test(
 	'the fixed cross-user /tmp App Cloner log is absent from every surface',
@@ -261,7 +387,7 @@ test(
 test(
 	'the failure dialog opens only the exact private log exported by the launcher',
 	!combined.includes('/tmp/clone_diag.log') &&
-		builder.includes('"Le diagnostic complet est dans " & appLogPath') &&
+		builder.includes('my format_ui(diagnostic_log_path of u, appLogPath)') &&
 		builder.includes('quoted form of appLogPath') &&
 		builder.includes('if appLogPath is not "" then') &&
 		launcher.includes('env["ERGOPTI_APPCLONER_LOG"] = log_path or ""')
