@@ -174,6 +174,12 @@ _ATG_MetricsTicksGatedOnSuspend() {
 	; Move-resilient: locate each tick function across the whole driver source
 	; via the framework helper rather than a pinned per-module path. Maps the
 	; bare function name to the original declaration used in assertion messages.
+	; KL_CaptureHeld() is the shared capture gate: driver suspension OR the
+	; user's collection pause. A tick that gates on it also gates on
+	; A_IsSuspended, provided the gate itself still reads A_IsSuspended.
+	HeldBody := _DriverFuncBody("KL_CaptureHeld")
+	Assert(HeldBody != "" && InStr(HeldBody, "A_IsSuspended") > 0,
+		"KL_CaptureHeld() must exist and hold capture on A_IsSuspended (metrics-timers-bypass-pause)")
 	Checks := Map(
 		"KL_Sensors_Tick", "KL_Sensors_Tick()",
 		"KL_IngestOnce",   "KL_IngestOnce(",
@@ -181,8 +187,8 @@ _ATG_MetricsTicksGatedOnSuspend() {
 	for Name, Decl in Checks {
 		Body := _DriverFuncBody(Name)
 		Assert(Body != "", Decl . " must exist")
-		Assert(InStr(Body, "A_IsSuspended") > 0,
-			Decl . " must early-return on A_IsSuspended so metrics timers go quiet while paused (metrics-timers-bypass-pause)")
+		Assert(InStr(Body, "A_IsSuspended") > 0 || InStr(Body, "KL_CaptureHeld()") > 0,
+			Decl . " must early-return on A_IsSuspended or KL_CaptureHeld() so metrics timers go quiet while paused (metrics-timers-bypass-pause)")
 	}
 	; KL_Hook_LivePush is the live-push companion tick.
 	Body := _DriverFuncBody("KL_Hook_LivePush")
