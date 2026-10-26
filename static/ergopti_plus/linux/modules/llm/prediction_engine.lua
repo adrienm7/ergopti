@@ -927,9 +927,10 @@ function M.predict(context, output_context, override)
 		local verdict = _debounce.plan:on_dispatch({
 			-- A live keystroke carries an override too but is automatic: only the
 			-- shortcut, the typed trigger and a prompt action are explicit, and
-			-- the later variants of their sequential run are part of the request.
+			-- the variants of one request are part of it and never held.
 			explicit = (override ~= nil and override.live ~= true)
 				or (type(output_context) == "table" and output_context.explicit == true),
+			variant = request_index + 1,
 		}, now)[1]
 		if verdict.action == "defer" then
 			_rate_timer = _scheduler.after(verdict.delay_ms / 1000, function()

@@ -195,34 +195,36 @@ helpers.describe("prediction backend: the selected backend answers", function()
 
 end)
 
-helpers.describe("prediction backend: variants are paced and diverse", function()
+helpers.describe("prediction backend: requests are paced, variants are diverse", function()
 
-	helpers.it("waits the shared API interval between two requests", function()
-		local engine, calls, scheduler, restore = load("api", ENTRY)
+	helpers.it("sends every variant of one request back to back, then holds the next request (variants-not-held)", function()
+		local engine, calls, scheduler, restore = load("api", ENTRY, { ["llm.trigger.min_request_interval_ms"] = 500 })
 		engine.predict("Bonjour à tous")
-		local first = #calls.remote
+		local variants = #calls.remote
+		engine.predict("Bonjour à tous, et vous")
+		local right_after = #calls.remote
 		scheduler.test.advance(0.49)
 		local before_interval = #calls.remote
 		scheduler.test.advance(0.02)
 		local after_interval = #calls.remote
 		restore()
-		helpers.assert_eq(first, 1, "the first request leaves at once")
-		helpers.assert_eq(before_interval, 1, "the second waits for the interval")
-		helpers.assert_eq(after_interval, 2)
+		helpers.assert_eq(variants, 3, "the variants of one automatic request are never held")
+		helpers.assert_eq(right_after, 3, "a distinct request is inside the interval")
+		helpers.assert_eq(before_interval, 3, "and waits for it")
+		helpers.assert_eq(after_interval, 6, "then all its variants follow without waiting")
 	end)
 
-	helpers.it("waits the interval the user set, not the backend's old fixed one (request-floor-setting)", function()
+	helpers.it("waits the interval the user set between two requests, not the backend's old fixed one (request-floor-setting)", function()
 		local engine, calls, scheduler, restore = load("api", ENTRY, { ["llm.trigger.min_request_interval_ms"] = 1200 })
 		engine.predict("Bonjour à tous")
-		local first = #calls.remote
+		engine.predict("Bonjour à tous, et vous")
 		scheduler.test.advance(1.19)
 		local before_interval = #calls.remote
 		scheduler.test.advance(0.02)
 		local after_interval = #calls.remote
 		restore()
-		helpers.assert_eq(first, 1, "the first request leaves at once")
-		helpers.assert_eq(before_interval, 1, "the next one waits the whole configured interval")
-		helpers.assert_eq(after_interval, 2)
+		helpers.assert_eq(before_interval, 3, "the next request waits the whole configured interval")
+		helpers.assert_eq(after_interval, 6)
 	end)
 
 	helpers.it("sends the variants back to back when the user set no interval (request-floor-setting)", function()
@@ -274,11 +276,14 @@ helpers.describe("prediction backend: variants are paced and diverse", function(
 	end)
 
 	helpers.it("offers the first variant before the next one arrives", function()
-		local engine, _, _, restore = load("api", ENTRY)
+		local engine, calls, _, restore = load("api", ENTRY, nil, nil, true)
 		engine.predict("Bonjour à tous")
+		calls.remote[1].done(" que tout le monde aille bien", nil)
 		local offered = #engine.get_suggestions()
+		local sent = #calls.remote
 		restore()
 		helpers.assert_eq(offered, 1)
+		helpers.assert_eq(sent, 2, "the next variant is already on its way")
 	end)
 
 end)
@@ -432,15 +437,16 @@ end)
 
 helpers.describe("acceptance retires the originating prediction request", function()
 
-	helpers.it("does not send remaining variants after accepting the first paced candidate (acceptance-retires-request)", function()
-		local engine, calls, scheduler, restore = load("api", ENTRY)
+	helpers.it("does not send remaining variants after accepting the first candidate (acceptance-retires-request)", function()
+		local engine, calls, scheduler, restore = load("api", ENTRY, nil, nil, true)
 		local ok, err = pcall(function()
 			engine.predict("Bonjour à tous")
-			helpers.assert_eq(#calls.remote, 1)
-			helpers.assert_eq(#engine.get_suggestions(), 1, "the first candidate is available during pacing")
+			calls.remote[1].done(" que tout le monde aille bien", nil)
+			helpers.assert_eq(#calls.remote, 2, "the second variant is in flight")
+			helpers.assert_eq(#engine.get_suggestions(), 1, "the first candidate is available meanwhile")
 			helpers.assert_eq(engine.accept(1), true)
 			scheduler.settle()
-			helpers.assert_eq(#calls.remote, 1, "acceptance retires the remaining paid requests")
+			helpers.assert_eq(#calls.remote, 2, "acceptance retires the remaining paid requests")
 			helpers.assert_eq(engine.is_predicting(), false)
 			helpers.assert_eq(#engine.get_suggestions(), 0)
 			helpers.assert_eq(calls.applied, 1)
@@ -1102,21 +1108,24 @@ helpers.describe("prediction resident global privacy admission", function()
 		end)
 		restore(); if not okay then error(problem, 0) end
 	end)
-	helpers.it("revokes a paced variant and admits a later ordinary request (llm-global-privacy)", function()
+	helpers.it("revokes a paced request and admits a later ordinary request (llm-global-privacy)", function()
 		local blocked = false
 		local engine, calls, scheduler, restore = load("api", ENTRY, settings, true, true, { guard = function() return blocked end })
 		local okay, problem = pcall(function()
-			-- An automatic request (no prompt override): its next variant waits for the interval.
+			-- An automatic request (no prompt override): its variants go back to back.
 			engine.predict("Bonjour à tous")
-			calls.remote[1].done(" que tout le monde aille bien", nil)
-			helpers.assert_eq(#calls.remote, 1, "the next variant must still be paced")
+			for index = 1, 3 do calls.remote[index].done(" que tout le monde aille bien", nil) end
+			helpers.assert_eq(#calls.remote, 3, "the variants of one request are never held")
+			-- The next automatic request is inside the interval: it waits.
+			engine.predict("Bonjour à tous, et vous")
+			helpers.assert_eq(#calls.remote, 3, "the next request must still be paced")
 			blocked = true; scheduler.settle()
-			helpers.assert_eq(#calls.remote, 1, "revoked context must not send the next request")
+			helpers.assert_eq(#calls.remote, 3, "revoked context must not send the next request")
 			helpers.assert_eq(engine.has_suggestions(), false)
 			helpers.assert_true(engine.is_enabled())
 			blocked = false; request(engine); scheduler.settle()
-			helpers.assert_eq(#calls.remote, 2, "privacy recovery permits a new independent request")
-			calls.remote[2].done(" que tout le monde aille bien", nil)
+			helpers.assert_eq(#calls.remote, 4, "privacy recovery permits a new independent request")
+			calls.remote[4].done(" que tout le monde aille bien", nil)
 			helpers.assert_true(engine.accept(1))
 		end)
 		restore(); if not okay then error(problem, 0) end

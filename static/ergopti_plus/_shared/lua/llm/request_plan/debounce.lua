@@ -238,15 +238,17 @@ end
 --- Decides whether a request may go to its backend now. The last request time is
 --- one value for every backend and every kind of request, and the interval is the
 --- one the user sets (llm.trigger.min_request_interval_ms).
---- @param request table { explicit = boolean|nil }. An explicit request (shortcut, typed
----   trigger, prompt action) is never held, nor are the later variants of its sequential
----   run: each variant is dispatched as an explicit one. Only automatic requests wait.
+--- @param request table { explicit = boolean|nil, variant = integer|nil (1-based) }. The floor
+---   applies between distinct requests only: an explicit request (shortcut, typed trigger,
+---   prompt action) is never held, and the variants of one request (the later calls of a
+---   "predict n" run, automatic or explicit) are part of it, so from the second on they are
+---   never held either. Only the first call of an automatic request waits.
 --- @param now_ms number The caller's monotonic clock in milliseconds.
 --- @return table decisions One `send`, or one `defer` with the milliseconds to wait.
 function M:on_dispatch(request, now_ms)
 	if type(request) ~= "table" then error("a dispatch needs a request table", 2) end
 	if type(now_ms) ~= "number" then error("a dispatch needs the clock", 2) end
-	if request.explicit == true then return { { action = "send" } } end
+	if request.explicit == true or (request.variant or 1) > 1 then return { { action = "send" } } end
 	local last = self._last_sent_ms
 	if last == nil then return { { action = "send" } } end
 	local interval = self._settings.floor_ms()
