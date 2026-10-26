@@ -30,6 +30,7 @@ local Logger  = require("infra.logger")
 local Timings = require("infra.timings")
 local i18n    = require("infra.i18n")
 local TimerScheduler = require("adapters.timer_scheduler")
+local PredictionRenderer = require("adapters.prediction_renderer")
 local TextUtils = require("text_utils")
 
 local LOG = "llm.streaming_handler"
@@ -61,6 +62,7 @@ local CONSECUTIVE_FAIL_WARN_THRESHOLD = 4
 -- Injected dependencies
 local _core_llm  = nil
 local _tooltip   = nil
+local _renderer  = nil   -- the TooltipRenderer port over _tooltip, built on first draw
 local _keystats = nil
 
 local _consecutive_llm_failures = 0  -- Reset on success; triggers notification at threshold
@@ -72,6 +74,14 @@ local _stream_watchdog_timer    = nil
 -- ======= 3/ Private Helpers ==================
 -- =============================================
 -- =============================================
+
+--- The TooltipRenderer over the injected tooltip, built on the first draw so an
+--- init with a tooltip that cannot draw still reports its own refusal.
+--- @return table renderer
+local function renderer()
+	if _renderer == nil then _renderer = PredictionRenderer.wrap(_tooltip) end
+	return _renderer
+end
 
 --- Guards public functions that require initialized dependencies.
 --- @param func_name string Name of the calling function (for the error log).
@@ -385,12 +395,12 @@ function M.build_callbacks(ctx)
 		if not render_predictions("partial render", function()
 			local current     = _tooltip.get_current_index()
 			local display_idx = (current and math.min(math.max(1, current), #new_preds)) or 1
-			return _tooltip.show_predictions(
-				new_preds, display_idx, ctx.is_ai_preview_enabled, streaming_info_bar,
-				nil, prediction_indent, navigation_mods,
-				_tooltip.tint("ai_prediction"), "…", num_predictions, my_fetch_id,
-				request_is_current
-			)
+			return renderer().show({
+				predictions = new_preds, current_index = display_idx, enabled = ctx.is_ai_preview_enabled,
+				info_bar = streaming_info_bar, indent = prediction_indent, navigation_modifiers = navigation_mods,
+				background_color = _tooltip.tint("ai_prediction"), loading_text = "…",
+				reserved_count = num_predictions, session_id = my_fetch_id, commit_guard = request_is_current,
+			})
 		end) then return end
 
 		pending_ref.value = new_preds
@@ -521,11 +531,13 @@ function M.build_callbacks(ctx)
 				math.max(1, math.floor(_tooltip.get_current_index() or 1)),
 				#valid_preds
 			)
-			return _tooltip.show_predictions(
-				valid_preds, selected_idx, ctx.is_ai_preview_enabled, info_bar_text,
-				val_shortcut, prediction_indent, navigation_mods, _tooltip.tint("ai_prediction"),
-				loading_text, slot_count, my_fetch_id, request_is_current
-			)
+			return renderer().show({
+				predictions = valid_preds, current_index = selected_idx, enabled = ctx.is_ai_preview_enabled,
+				info_bar = info_bar_text, shortcut_modifier = val_shortcut, indent = prediction_indent,
+				navigation_modifiers = navigation_mods, background_color = _tooltip.tint("ai_prediction"),
+				loading_text = loading_text, reserved_count = slot_count, session_id = my_fetch_id,
+				commit_guard = request_is_current,
+			})
 		end) then return end
 
 		if is_final and not commit_final_ui() then return end
@@ -603,12 +615,13 @@ function M.build_callbacks(ctx)
 			local val_shortcut = format_validation_shortcut(validation_mods)
 			if not render_predictions("failure fallback render", function()
 				local selected_idx = math.max(1, _tooltip.get_current_index() or 1)
-				return _tooltip.show_predictions(
-					pending_ref.value, selected_idx, ctx.is_ai_preview_enabled, nil,
-					val_shortcut, prediction_indent, navigation_mods,
-					_tooltip.tint("ai_prediction"), nil, #pending_ref.value, my_fetch_id,
-					request_is_current
-				)
+				return renderer().show({
+					predictions = pending_ref.value, current_index = selected_idx,
+					enabled = ctx.is_ai_preview_enabled, shortcut_modifier = val_shortcut,
+					indent = prediction_indent, navigation_modifiers = navigation_mods,
+					background_color = _tooltip.tint("ai_prediction"), reserved_count = #pending_ref.value,
+					session_id = my_fetch_id, commit_guard = request_is_current,
+				})
 			end) then return end
 			if not commit_final_ui() then return end
 			if not request_is_current() then return end
@@ -710,12 +723,12 @@ function M.arm_watchdog(ctx)
 			local info = ctx.show_info_bar
 				and ctx.build_info_bar_text(ctx.llm_display_name, nil, ctx.resolve_backend_label(), "Timeout partiel")
 				or nil
-			local render_result = _tooltip.show_predictions(
-				pending_ref.value, 1, ctx.is_ai_preview_enabled, info,
-				val_shortcut, ctx.prediction_indent, ctx.navigation_mods,
-				_tooltip.tint("ai_prediction"), nil, #pending_ref.value, my_fetch_id,
-				request_is_current
-			)
+			local render_result = renderer().show({
+				predictions = pending_ref.value, current_index = 1, enabled = ctx.is_ai_preview_enabled,
+				info_bar = info, shortcut_modifier = val_shortcut, indent = ctx.prediction_indent,
+				navigation_modifiers = ctx.navigation_mods, background_color = _tooltip.tint("ai_prediction"),
+				reserved_count = #pending_ref.value, session_id = my_fetch_id, commit_guard = request_is_current,
+			})
 			if render_result ~= true then reject_watchdog_ui(render_result) end
 		end, debug.traceback)
 		if not callback_ok then reject_watchdog_ui(callback_err) end

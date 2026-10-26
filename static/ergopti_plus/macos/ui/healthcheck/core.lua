@@ -370,6 +370,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.prediction_renderer",
+		contract = { "wrap" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.program_providers",
 		contract = { "create" },
 		wired    = true,
