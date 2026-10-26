@@ -22,62 +22,52 @@ SetWorkingDir(A_ScriptDir)
 #Include test_framework.ahk
 #Include ../infra/hotpath_profiler.ahk
 
-; --- Mutable tooltip state the stubs report ---
-global _MMP_Visible  := false
-global _MMP_Loading  := false
-global _MMP_InGrace  := false   ; LLM_Tooltip_InGracePeriod() result (shielded shown prediction)
-global _MMP_HideHits := 0   ; counts completed hides (the dismiss signal)
+; The actual public facade and lifecycle owner run in this isolated suite. Only
+; detached graphics disposal and model cancellation cross controlled boundaries.
+#Include ../ui/tooltip/llm.ahk
+#Include ../ui/tooltip/tooltip_llm.ahk
+
+global _MMP_HideHits := 0
 global _MMP_StopHits := 0
 global _MMP_ExactHits := 0
-global _MMP_PresentedToken := 0
+global _MMP_NextGeneration := 0
+global _TooltipActiveSurface := 0
 
 ; --- Globals the bridge reads ---
 global _LLM_Bridge_Active := true
 global _LLM_Engine := Map("reset_on_nav", false)
 
-; --- Dependency stubs (resolved at call time once the bridge is included) ---
-LLM_Tooltip_IsVisible()        => _MMP_Visible
-LLM_Tooltip_IsLoading()        => _MMP_Loading
-LLM_Tooltip_InGracePeriod()    => _MMP_InGrace
-LLM_Engine_IsBusy()            => false
-LLM_Tooltip_GetPresentedToken() => _MMP_PresentedToken
-; The bridge revokes the presented offer before it queues the deferred hide
-; (LLM_Bridge_DeferTooltipHide). Like the production owner, only the record
-; still presented is withdrawn; any other record is refused with 0.
-LLM_Tooltip_WithdrawExact(ExpectedRecord, accepted := false) {
-	global _MMP_PresentedToken
-	if !IsObject(ExpectedRecord) || !IsObject(_MMP_PresentedToken)
-			|| ObjPtr(ExpectedRecord) != ObjPtr(_MMP_PresentedToken)
-		return 0
-	ExpectedRecord.WithdrawalPending := true
-	return ExpectedRecord
-}
-LLM_Tooltip_HideExact(Token, accepted := false) {
-	global _MMP_PresentedToken, _MMP_ExactHits
-	_MMP_ExactHits += 1
-	if !IsObject(Token) || !IsObject(_MMP_PresentedToken)
-		return false
-	SameRecord := ObjPtr(Token) == ObjPtr(_MMP_PresentedToken)
-	SameLifecycle := Token.HasOwnProp("Lifecycle")
-		&& _MMP_PresentedToken.HasOwnProp("Lifecycle")
-		&& IsObject(Token.Lifecycle) && IsObject(_MMP_PresentedToken.Lifecycle)
-		&& ObjPtr(Token.Lifecycle) == ObjPtr(_MMP_PresentedToken.Lifecycle)
-	if !SameRecord && !SameLifecycle
-		return false
-	LLM_Tooltip_Hide(accepted)
-	return true
-}
+LLM_Engine_IsBusy() => false
 LLM_Engine_StopGeneration() {
 	global _MMP_StopHits
 	_MMP_StopHits += 1
 }
-LLM_Tooltip_MarkChainTimingOnly(NowTick) => ""
-LLM_Tooltip_Hide(accepted := false) {
-	global _MMP_HideHits, _MMP_Visible, _MMP_Loading, _MMP_PresentedToken
+
+; Observe the genuine facade without replacing its lifecycle decision.
+_MMP_ObserveExactHide(Self, Token, accepted := false) {
+	global _MMP_ExactHits
+	_MMP_ExactHits += 1
+	Self.DeleteProp("Call")
+	try return Self.Call(Token, accepted)
+	finally Self.DefineProp("Call", {Call: _MMP_ObserveExactHide})
+}
+LLM_Tooltip_HideExact.DefineProp("Call", {Call: _MMP_ObserveExactHide})
+
+; The lifecycle owner must reach this graphics boundary with its exact surface.
+; It is never called to decide whether a stale record is still allowed to hide.
+TooltipHide(DbgTag := "?", Force := false, ExpectedGeneration := unset,
+		ExpectedSurface := unset, ExpectedRequestSerial := unset) {
+	global _TooltipActiveSurface, _MMP_HideHits
+	AssertEqual("LLM", DbgTag)
+	AssertTrue(Force, "the LLM owner must request exact graphics retirement")
+	AssertTrue(IsSet(ExpectedGeneration) && IsSet(ExpectedSurface),
+		"the real owner must supply both native graphics ownership fences")
+	AssertTrue(IsObject(_TooltipActiveSurface) && IsObject(ExpectedSurface))
+	AssertEqual(ObjPtr(_TooltipActiveSurface), ObjPtr(ExpectedSurface),
+		"graphics disposal must retain the actual current surface")
+	AssertEqual(_TooltipActiveSurface.Generation, ExpectedGeneration)
 	_MMP_HideHits += 1
-	_MMP_Visible := false
-	_MMP_Loading := false
-	_MMP_PresentedToken := 0
+	_TooltipActiveSurface := 0
 	return true
 }
 
@@ -114,24 +104,41 @@ _MMP_WaitDismiss(Expected) {
 	}
 }
 
+_MMP_Record(Loading, Grace, Lifecycle := 0) {
+	global _MMP_NextGeneration
+	_MMP_NextGeneration += 1
+	if !IsObject(Lifecycle)
+		Lifecycle := {Outcome: "", Suggested: false}
+	return {Kind: Loading ? "loading" : "prediction", Lifecycle: Lifecycle,
+		Generation: _MMP_NextGeneration, ShownAt: Grace ? A_TickCount : 0}
+}
+
+_MMP_Present(Record) {
+	global _TooltipActiveSurface
+	_TooltipActiveSurface := IsObject(Record)
+		? {Generation: Record.Generation, LlmPresented: Record} : 0
+}
+
 _MMP_SetState(Visible, Loading, Grace) {
-	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits
-	global _MMP_StopHits, _MMP_ExactHits, _MMP_PresentedToken
-	_MMP_Visible := Visible
-	_MMP_Loading := Loading
-	_MMP_InGrace := Grace
+	global _MMP_HideHits, _MMP_StopHits, _MMP_ExactHits
 	_MMP_HideHits := 0
 	_MMP_StopHits := 0
 	_MMP_ExactHits := 0
-	_MMP_PresentedToken := Visible || Loading ? {Lifecycle: {}} : 0
+	_MMP_Present(Visible || Loading ? _MMP_Record(Loading, Grace) : 0)
 }
 
 _MMP_DispatchDeferred() {
 	global _MMP_HideHits
 	PreviousCritical := Critical("On")
 	try {
+		Record := LLM_Tooltip_GetPresentedToken()
 		LLM_Bridge_OnPointerActivity()
 		AssertEqual(0, _MMP_HideHits, "hide must stay outside the pointer callback")
+		AssertTrue(Record.WithdrawalPending, "the real owner must withdraw input before the callback returns")
+		AssertEqual("dismissed", Record.Lifecycle.Outcome,
+			"the actual lifecycle must settle synchronously before graphics disposal")
+		AssertEqual(ObjPtr(Record), ObjPtr(LLM_Tooltip_GetPresentedToken()),
+			"withdrawal retains the exact visual record until deferred cleanup")
 	} finally {
 		Critical(PreviousCritical)
 	}
@@ -142,7 +149,7 @@ _MMP_DispatchDeferred() {
 ; =========================================================
 
 _MMP_DismissDuringLoading() {
-	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits, _MMP_StopHits
+	global _MMP_HideHits, _MMP_StopHits
 	; The user is waiting for a slow model: loading spinner up, no prediction yet.
 	; Per the user's choice + macOS parity, ANY input now cancels it immediately.
 	_MMP_SetState(true, true, false)
@@ -154,7 +161,7 @@ _MMP_DismissDuringLoading() {
 Test("pointer-dismiss: pointer activity cancels the loading spinner", _MMP_DismissDuringLoading)
 
 _MMP_DismissWhenPredictionShown() {
-	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits, _MMP_StopHits
+	global _MMP_HideHits, _MMP_StopHits
 	; A real prediction is on screen, past its grace window — pointer dismisses it.
 	_MMP_SetState(true, false, false)
 	_MMP_DispatchDeferred()
@@ -165,7 +172,7 @@ _MMP_DismissWhenPredictionShown() {
 Test("pointer-dismiss: pointer activity dismisses a shown prediction", _MMP_DismissWhenPredictionShown)
 
 _MMP_GraceShieldsShownPrediction() {
-	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits, _MMP_StopHits
+	global _MMP_HideHits, _MMP_StopHits
 	; A real prediction inside its minimum-display window is shielded: an incidental
 	; click / drift the instant it renders must not kill it before the user sees it.
 	; (The loading spinner has no grace — see _MMP_DismissDuringLoading.)
@@ -178,7 +185,7 @@ _MMP_GraceShieldsShownPrediction() {
 Test("pointer-dismiss: grace window shields a freshly-shown prediction", _MMP_GraceShieldsShownPrediction)
 
 _MMP_NoWorkNoDismiss() {
-	global _MMP_Visible, _MMP_Loading, _MMP_InGrace, _MMP_HideHits, _MMP_StopHits
+	global _MMP_HideHits, _MMP_StopHits
 	; Nothing active — pointer activity is a no-op (no wasteful reset / hide).
 	_MMP_SetState(false, false, false)
 	LLM_Bridge_OnPointerActivity()
@@ -267,37 +274,53 @@ _MMP_ThresholdBoundary() {
 Test("pointer-threshold: boundary is strict greater-than", _MMP_ThresholdBoundary)
 
 _MMP_StaleHideKeepsReplacement() {
-	global _MMP_PresentedToken, _MMP_ExactHits, _MMP_Visible
+	global _MMP_ExactHits
 	_MMP_SetState(true, false, false)
 	PreviousCritical := Critical("On")
 	try {
 		_MMP_DispatchDeferred()
-		Replacement := {Lifecycle: {}}
-		_MMP_PresentedToken := Replacement
+		Replacement := _MMP_Record(false, false)
+		_MMP_Present(Replacement)
 	} finally {
 		Critical(PreviousCritical)
 	}
 	_MMP_WaitDismiss(0)
 	AssertEqual(1, _MMP_ExactHits, "the old exact callback must actually execute")
-	AssertTrue(_MMP_Visible, "a stale callback must leave replacement visible")
-	AssertEqual(ObjPtr(Replacement), ObjPtr(_MMP_PresentedToken), "replacement identity must remain active")
+	AssertTrue(LLM_Tooltip_IsVisible(), "a stale callback must leave replacement visible")
+	AssertEqual(ObjPtr(Replacement), ObjPtr(LLM_Tooltip_GetPresentedToken()), "replacement identity must remain active")
 }
 Test("pointer-dismiss: stale deferred hide preserves replacement identity", _MMP_StaleHideKeepsReplacement)
 
 _MMP_HideAllowsSameLifecycle() {
-	global _MMP_PresentedToken, _MMP_ExactHits
+	global _MMP_ExactHits
 	_MMP_SetState(true, false, false)
 	PreviousCritical := Critical("On")
 	try {
-		Lifecycle := _MMP_PresentedToken.Lifecycle
+		Lifecycle := LLM_Tooltip_GetPresentedToken().Lifecycle
 		_MMP_DispatchDeferred()
-		_MMP_PresentedToken := {Lifecycle: Lifecycle}
+		_MMP_Present(_MMP_Record(false, false, Lifecycle))
 	} finally {
 		Critical(PreviousCritical)
 	}
 	_MMP_WaitDismiss(1)
-	AssertEqual(1, _MMP_ExactHits, "the exact-record double must preserve production lifecycle continuity")
+	AssertEqual(1, _MMP_ExactHits, "the actual owner must preserve same-lifecycle graphics continuity")
 }
 Test("pointer-dismiss: same lifecycle accepts the deferred exact hide", _MMP_HideAllowsSameLifecycle)
+
+_MMP_StaleWithdrawalKeepsReplacement() {
+	global _MMP_ExactHits
+	_MMP_SetState(true, false, false)
+	Retired := LLM_Tooltip_GetPresentedToken()
+	Replacement := _MMP_Record(false, false)
+	_MMP_Present(Replacement)
+	AssertFalse(LLM_Bridge_DeferTooltipHide(false, Retired),
+		"the real withdrawal facade must refuse a record which lost its surface")
+	_MMP_WaitDismiss(0)
+	AssertEqual(0, _MMP_ExactHits, "a refused withdrawal must not enqueue graphics cleanup")
+	AssertEqual("", Retired.Lifecycle.Outcome, "a stale request cannot retire an old lifecycle")
+	AssertEqual("", Replacement.Lifecycle.Outcome, "a stale request cannot retire its replacement")
+	AssertEqual(ObjPtr(Replacement), ObjPtr(LLM_Tooltip_GetPresentedToken()))
+}
+Test("pointer-dismiss: stale withdrawal preserves the actual replacement owner", _MMP_StaleWithdrawalKeepsReplacement)
 
 RunTests()
