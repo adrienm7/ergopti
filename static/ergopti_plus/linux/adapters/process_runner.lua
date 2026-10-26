@@ -11,13 +11,14 @@
 
 local M = {}
 local Logger = require("logger.shim")
+local Timings = require("infra.timings")
 local ShellRunner = require("adapters.shell_runner")
 local OwnedProcess = require("adapters.owned_process")
 local available, Native = pcall(require, "luv")
 if not available then Native = nil end
 
 local LOG = "adapters.process_runner"
-local DEFAULT_TIMEOUT_MS = 30000
+local DEFAULT_TIMEOUT_MS = Timings.ms("adapters", "default_timeout_ms")
 local DEFAULT_MAX_OUTPUT_BYTES = 65536
 local claims = {}
 local stopping = false

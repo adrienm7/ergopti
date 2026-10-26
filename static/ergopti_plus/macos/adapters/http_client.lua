@@ -96,8 +96,11 @@ end
 -- =========================================
 -- =========================================
 
--- Timeout in milliseconds; matches HttpClient.spec.js DEFAULT_TIMEOUT_MS.
-local DEFAULT_TIMEOUT_MS = 30000
+-- Timeout in milliseconds; matches HttpClient.spec.js DEFAULT_TIMEOUT_MS. A copy of
+-- [adapters] default_timeout_ms: this module is built by tests that give it no driver
+-- paths, so it cannot read the registry at load; the pin in
+-- tools/test/test-keystats-timings-single-source.cjs keeps the two equal.
+local HTTP_CLIENT_DEFAULT_TIMEOUT_MS = 30000
 
 -- Conversion factor from milliseconds to scheduler seconds
 local MS_PER_SEC = 1000
@@ -350,7 +353,7 @@ local function new(options)
 	end
 	local timeout_ms = options.timeout_ms
 	if timeout_ms == nil then
-		timeout_ms = DEFAULT_TIMEOUT_MS
+		timeout_ms = HTTP_CLIENT_DEFAULT_TIMEOUT_MS
 	elseif type(timeout_ms) ~= "number"
 		or timeout_ms ~= timeout_ms
 		or timeout_ms == math.huge

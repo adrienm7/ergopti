@@ -34,6 +34,7 @@ local notifications = require("infra.notifications")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("adapters.timer_scheduler")
+local Timings       = require("infra.timings")
 local Logger        = require("infra.logger")
 local Keycodes      = require("infra.keycodes")
 local i18n          = require("infra.i18n")
@@ -104,7 +105,7 @@ M.BINDING_PREFIX = "script__"
 -- osascript on that run loop (e.g. the pause/resume layout switch) can trip it.
 -- A disabled tap silently stops delivering events, stranding the un-pause
 -- shortcut, so a watchdog re-enables it on this interval as a hard safety net.
-local TAP_WATCHDOG_INTERVAL_SEC = 2
+local TAP_WATCHDOG_INTERVAL_SEC = Timings.sec("ui", "script_control_tap_watchdog_interval_ms")
 
 -- Module-level state
 local _is_paused       = false

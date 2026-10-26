@@ -2279,7 +2279,7 @@ Boot.stage("Boot complete (post-init deferrals scheduled)")
 -- Warm up macOS WebKit in the background so the first dashboard open is
 -- not penalised by the framework load (~1-2 s).  Deferred so it never
 -- blocks the boot critical path.
-hs.timer.doAfter(2, function()
+hs.timer.doAfter(require("infra.timings").sec("ui", "webkit_warmup_delay_ms"), function()
 	pcall(function() require("ui.ui_builder").warmup_webkit() end)
 end)
 
@@ -2287,7 +2287,7 @@ end)
 -- Windows loader does at startup: the warning behind what « Nettoyer
 -- config.toml » offers. Off the boot critical path; a failure is logged with
 -- its traceback, never lost in the timer's dispatch.
-hs.timer.doAfter(3, function()
+hs.timer.doAfter(require("infra.timings").sec("ui", "unused_keys_warning_delay_ms"), function()
 	local listed, list_err = xpcall(function()
 		require("ui.menu.unused_keys_cleanup").warn_unused(config_paths.get("ConfigTomlPath"))
 	end, debug.traceback)

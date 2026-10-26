@@ -40,7 +40,7 @@ if not ok_luv then luv = nil end
 -- =========================================
 -- =========================================
 
-local DEFAULT_TIMEOUT_MS = 30000
+local DEFAULT_TIMEOUT_MS = Timings.ms("adapters", "default_timeout_ms")
 local DEFAULT_OWNER = "default"
 local CLEANUP_POLL_MS = Timings.ms("llm", "poll_interval_ms")
 local MAX_DIAGNOSTIC_BYTES = 65536

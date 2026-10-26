@@ -42,7 +42,7 @@
 const fs = require('fs');
 const path = require('path');
 const toml = require('smol-toml');
-const { PINS } = require('./test-keystats-timings-single-source.cjs');
+const { PINS, SOURCE_PINS } = require('./test-keystats-timings-single-source.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -202,7 +202,7 @@ function main() {
 				'the walk is broken, and an empty reader set proves nothing'
 		);
 	const pinGateTexts = PIN_GATES.map((rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8'));
-	const result = analyse(registry, sources, PINS, pinGateTexts);
+	const result = analyse(registry, sources, [...PINS, ...SOURCE_PINS], pinGateTexts);
 	errors.push(...result.errors);
 	errors.push(...selfTest().map((f) => `self-test: ${f}`));
 
