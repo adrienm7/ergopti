@@ -242,9 +242,9 @@ function DEFAULT_OPS.record_ownership(root, previous)
 	return #record.external == 0 or Fs.append(root .. "/" .. schema.MANIFEST, table.concat(record.external))
 end
 
---- Validates a disposable rollback tree through its canonical receipt owner.
---- @param path string Previous backup path.
---- @param current string Active installation whose ownership helper is trusted.
+--- Validates a disposable installation tree through its canonical receipt owner.
+--- @param path string Candidate, failed activation or previous backup path.
+--- @param current string Trusted installation holding the canonical receipt schema.
 --- @return boolean owned
 --- @return string|nil identity Device/inode receipt, unchanged by namespace moves.
 function DEFAULT_OPS.backup_is_owned(path, current)
@@ -399,6 +399,12 @@ local function install_transaction(options, owned_current)
 	if not forward_current() or not ops.record_ownership(candidate, context.install_root) then
 		return fail("could not record the new installation's file ownership")
 	end
+	-- Namespace moves preserve this exact generation; the fixed live path
+	-- alone cannot authorize retiring a root after the smoke child returns.
+	local candidate_owned, candidate_identity = ops.backup_is_owned(candidate, context.install_root)
+	if candidate_owned ~= true or type(candidate_identity) ~= "string" then
+		return fail("could not verify the new installation's file ownership")
+	end
 
 	local backup = context.install_root .. ".old"
 	if not is_direct_child(backup, context.parent) then
@@ -439,9 +445,26 @@ local function install_transaction(options, owned_current)
 		return false, "candidate activation failed; previous installation restored"
 	end
 
-	if not forward_current() or not ops.smoke(context.wrapper) or not forward_current() then
+	local smoke_ok = forward_current() and ops.smoke(context.wrapper) and forward_current()
+	local active_owned, active_identity = ops.backup_is_owned(context.install_root, backup)
+	if active_owned ~= true or active_identity ~= candidate_identity then
+		return fail("updated installation ownership changed; rollback refused; backup remains at " .. backup)
+	end
+	if not smoke_ok or not forward_current() then
 		local failed_root = work_dir .. "/failed"
 		local displaced = ops.move(context.install_root, failed_root)
+		if displaced then
+			local captured_owned, captured_identity = ops.backup_is_owned(failed_root, backup)
+			if captured_owned ~= true or captured_identity ~= candidate_identity then
+				-- Retain an unverified namespace if another owner prevents the
+				-- no-replace restoration; staging cleanup must never erase it.
+				if not ops.move(failed_root, context.install_root) then
+					retained_work = true
+					return fail("updated installation ownership changed; unverified root retained at " .. failed_root .. "; backup remains at " .. backup)
+				end
+				return fail("updated installation ownership changed; rollback refused; backup remains at " .. backup)
+			end
+		end
 		local restored = displaced and ops.move(backup, context.install_root)
 		if restored then
 			cleanup_work(work_dir, context.parent, ops)

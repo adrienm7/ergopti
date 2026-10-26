@@ -178,7 +178,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		local stages = {
 			"validate_archive", "make_work_dir", "extract", "validate_layout",
 			"validate_version", "mkdir_candidate", "move_linux", "move_shared", "move_bin",
-			"record_ownership", "verify_backup", "capture_backup", "revalidate_backup",
+			"record_ownership", "verify_candidate", "verify_backup", "capture_backup", "revalidate_backup",
 			"remove_backup", "backup_current", "activate_candidate", "smoke",
 		}
 
@@ -203,6 +203,8 @@ helpers.describe("modules/updater/manager.lua", function()
 			function ops.mkdir() return failed_stage ~= "mkdir_candidate" end
 			function ops.exists(path) return path == backup end
 			function ops.backup_is_owned(path)
+				if path == candidate then return failed_stage ~= "verify_candidate", "candidate-owned" end
+				if path == root or path == work .. "/failed" then return true, "candidate-owned" end
 				if path == backup then return failed_stage ~= "verify_backup", "previous-owned" end
 				return failed_stage ~= "revalidate_backup" and path == state.retired_path, "previous-owned"
 			end
@@ -661,6 +663,138 @@ helpers.describe("installer-backup-ownership native receipts", function()
 				helpers.assert_true(uv.fs_stat(fixture.archive) ~= nil)
 			end)
 			NativeFixture.remove(fixture.root)
+			if not ok then error(failure, 0) end
+		end)
+	end
+end)
+
+helpers.describe("installer rollback root ownership", function()
+	for _, expected_smoke in ipairs({ false, true }) do
+		helpers.it("(installer-smoke-root-ownership) " .. (expected_smoke and "successful" or "failed") .. " real smoke cannot accept or retire a foreign replacement root", function()
+			local installer = helpers.load_module("modules.updater.installer")
+			local Fixture = require("tests.support.modules.updater.installer_native_fixture")
+			local uv = require("luv")
+			local fixture = Fixture.create(installer)
+			local foreign_identity, smoke_ran
+			local original = assert(uv.fs_lstat(fixture.installed))
+			local ok, failure = pcall(function()
+				Fixture.write(fixture.root .. "/payload/bin/ergopti-hotstrings", "#!/bin/sh\nexit " .. (expected_smoke and "0" or "1") .. "\n")
+				fixture.ops.smoke = function(wrapper)
+					local accepted = installer.DEFAULT_OPS.smoke(wrapper)
+					helpers.assert_eq(accepted, expected_smoke, "the actual selected launcher must return the native smoke outcome")
+					smoke_ran = true
+					assert(installer.DEFAULT_OPS.move(fixture.installed, fixture.root .. "/displaced-candidate"))
+					assert(uv.fs_mkdir(fixture.installed, 448))
+					Fixture.write(fixture.installed .. "/foreign.marker", "concurrent user root bytes\n")
+					foreign_identity = assert(uv.fs_lstat(fixture.installed))
+					return accepted
+				end
+				local installed, reason = installer.install({ archive_path = fixture.archive, expected_version = "1.2.3", context = fixture.context, ops = fixture.ops })
+				helpers.assert_eq(smoke_ran, true, "activation must reach the real smoke boundary")
+				helpers.assert_eq(installed, false, tostring(reason))
+				helpers.assert_eq(Fixture.read(fixture.installed .. "/foreign.marker"), "concurrent user root bytes\n", "rollback cannot recursively remove a foreign root that arrived after activation")
+				local retained = assert(uv.fs_lstat(fixture.installed))
+				helpers.assert_eq({ retained.dev, retained.ino }, { foreign_identity.dev, foreign_identity.ino })
+				local backup = assert(uv.fs_lstat(fixture.installed .. ".old"))
+				helpers.assert_eq({ backup.dev, backup.ino }, { original.dev, original.ino })
+				helpers.assert_true(uv.fs_lstat(fixture.archive) ~= nil, "failed update retains its authenticated artifact")
+			end)
+			Fixture.remove(fixture.root)
+			if not ok then error(failure, 0) end
+		end)
+	end
+end)
+
+helpers.describe("installer rollback capture admission", function()
+	local Fixture = require("tests.support.modules.updater.installer_native_fixture")
+	local uv = require("luv")
+
+	helpers.it("(installer-smoke-root-ownership) ordinary failed real smoke restores the previous root", function()
+		local installer = helpers.load_module("modules.updater.installer")
+		local fixture = Fixture.create(installer)
+		local original = assert(uv.fs_lstat(fixture.installed))
+		local ok, failure = pcall(function()
+			Fixture.write(fixture.root .. "/payload/bin/ergopti-hotstrings", "#!/bin/sh\nexit 1\n")
+			local installed, reason = installer.install({ archive_path = fixture.archive, expected_version = "1.2.3", context = fixture.context, ops = fixture.ops })
+			helpers.assert_eq(installed, false)
+			helpers.assert_eq(reason, "updated wrapper smoke failed; previous installation restored")
+			local current = assert(uv.fs_lstat(fixture.installed))
+			helpers.assert_eq({ current.dev, current.ino }, { original.dev, original.ino })
+			helpers.assert_eq(Fixture.read(fixture.installed .. "/old.marker"), "original installation\n")
+			helpers.assert_true(uv.fs_lstat(fixture.installed .. ".old") == nil)
+			helpers.assert_true(uv.fs_lstat(fixture.archive) ~= nil)
+		end)
+		Fixture.remove(fixture.root)
+		if not ok then error(failure, 0) end
+	end)
+
+	for _, blocked in ipairs({ false, true }) do
+		helpers.it("(installer-smoke-root-ownership) native rollback capture race preserves foreign root with restore blocked=" .. tostring(blocked), function()
+			local installer = helpers.load_module("modules.updater.installer")
+			local fixture = Fixture.create(installer)
+			local old = assert(uv.fs_lstat(fixture.installed))
+			local smoke_ran, checked, injected = false, false, false
+			local captured, foreign, work, marker, foreign_bytes, captured_receipted
+			local verify = fixture.ops.backup_is_owned
+			local allocate = fixture.ops.make_work_dir
+			fixture.ops.make_work_dir = function(...) work = allocate(...); return work end
+			fixture.ops.backup_is_owned = function(path, schema_owner)
+				local owned, identity, detail = verify(path, schema_owner)
+				if smoke_ran and path == fixture.installed then checked = owned == true end
+				if injected and path == captured then captured_receipted = owned end
+				return owned, identity, detail
+			end
+			fixture.ops.smoke = function(wrapper)
+				local result = installer.DEFAULT_OPS.smoke(wrapper)
+				helpers.assert_eq(result, false, "the actual native smoke child must fail")
+				smoke_ran = true
+				return result
+			end
+			fixture.ops.move = function(source, destination)
+				if smoke_ran and not injected and source == fixture.installed and destination ~= fixture.installed .. ".old" then
+					helpers.assert_eq(checked, true, "capture race must happen after actual active-root admission")
+					helpers.assert_true(work ~= nil and destination:sub(1, #work + 1) == work .. "/")
+					assert(installer.DEFAULT_OPS.move(source, fixture.root .. "/displaced-candidate"))
+					if blocked then
+						assert(uv.fs_mkdir(source, 448))
+						marker, foreign_bytes = "/foreign.marker", "foreign captured root bytes\n"
+						Fixture.write(source .. marker, foreign_bytes)
+					else
+						-- A copied valid receipt cannot authorize deleting a different
+						-- native generation, even when every payload hash still matches.
+						local Shell = require("adapters.shell_runner")
+						assert(Shell.run("cp -a -- " .. Shell.quote(fixture.root .. "/displaced-candidate") .. " " .. Shell.quote(source)))
+						marker = "/linux/new.marker"; foreign_bytes = assert(Fixture.read(source .. marker))
+					end
+					foreign = assert(uv.fs_lstat(source)); captured, injected = destination, true
+					local moved = installer.DEFAULT_OPS.move(source, destination)
+					if moved and blocked then
+						assert(uv.fs_mkdir(source, 448))
+						Fixture.write(source .. "/blocker.marker", "concurrent live-root owner\n")
+					end
+					return moved
+				end
+				return installer.DEFAULT_OPS.move(source, destination)
+			end
+			local ok, failure = pcall(function()
+				Fixture.write(fixture.root .. "/payload/bin/ergopti-hotstrings", "#!/bin/sh\nexit 1\n")
+				local installed, reason = installer.install({ archive_path = fixture.archive, expected_version = "1.2.3", context = fixture.context, ops = fixture.ops })
+				helpers.assert_eq(injected, true)
+				helpers.assert_eq(installed, false)
+				local retained_path = blocked and captured or fixture.installed
+				helpers.assert_eq(Fixture.read(retained_path .. marker), foreign_bytes)
+				helpers.assert_eq(captured_receipted, not blocked, "a valid foreign receipt still needs the original candidate identity")
+				local kept = assert(uv.fs_lstat(retained_path))
+				helpers.assert_eq({ kept.dev, kept.ino }, { foreign.dev, foreign.ino })
+				local backup = assert(uv.fs_lstat(fixture.installed .. ".old"))
+				helpers.assert_eq({ backup.dev, backup.ino }, { old.dev, old.ino })
+				helpers.assert_true(uv.fs_lstat(fixture.archive) ~= nil)
+				if blocked then
+					helpers.assert_contains(reason, "unverified root retained at " .. captured)
+					helpers.assert_eq(Fixture.read(fixture.installed .. "/blocker.marker"), "concurrent live-root owner\n")
+				else helpers.assert_contains(reason, "rollback refused") end
+			end)
+			Fixture.remove(fixture.root)
 			if not ok then error(failure, 0) end
 		end)
 	end
