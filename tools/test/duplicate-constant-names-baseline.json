@@ -26,15 +26,6 @@
 		"files": ["linux/adapters/owned_process.lua", "linux/adapters/process_runner.lua"],
 		"divergent": false
 	},
-	"DEFAULT_TIMEOUT_MS": {
-		"files": [
-			"linux/adapters/curl_http_client.lua",
-			"linux/adapters/file_digest.lua",
-			"linux/adapters/process_runner.lua",
-			"macos/adapters/http_client.lua"
-		],
-		"divergent": false
-	},
 	"HEADER_BYTES": {
 		"files": ["macos/adapters/native_python_probe.lua", "macos/adapters/python_interpreter.lua"],
 		"divergent": false
@@ -110,10 +101,6 @@
 		"files": ["macos/infra/ui_restore.lua", "macos/platform/remap/onboarding.lua"],
 		"divergent": false
 	},
-	"PUMP_INTERVAL_SEC": {
-		"files": ["macos/adapters/installed_physical_source.lua", "macos/adapters/log_transport.lua"],
-		"divergent": true
-	},
 	"REQUEST_TIMEOUT_MS": {
 		"files": ["linux/adapters/network_check_ports.lua", "macos/modules/llm/api_remote.lua"],
 		"divergent": false
@@ -144,10 +131,6 @@
 	"STREAM_TMPFILE_CLEANUP_SEC": {
 		"files": ["macos/modules/llm/api_mlx_inference.lua", "macos/modules/llm/api_ollama.lua"],
 		"divergent": false
-	},
-	"TAP_WATCHDOG_INTERVAL_SEC": {
-		"files": ["macos/modules/keystats/init.lua", "macos/modules/shortcuts/script_control.lua"],
-		"divergent": true
 	},
 	"THINK_PAUSE_MS": {
 		"files": [

@@ -26,7 +26,8 @@
  *    the constant was renamed or moved and the pin silently stopped guarding
  *    it; two of them make the value ambiguous.
  * 3. Second-valued copies (`*_SEC`) are converted, never re-declared in ms here.
- * 4. Negative mutations prove the comparison can fail.
+ * 4. Page scripts (SOURCE_PINS) cannot read the registry either; their copy is pinned the same way.
+ * 5. Negative mutations prove the comparison can fail.
  *
  * NOTE — duplication is still duplication:
  * These copies are not READ from the registry at runtime yet. Wiring a static
@@ -156,6 +157,58 @@ const PINS = [
 ];
 
 /**
+ * A page script cannot read the registry, so its copy is pinned too, and so is
+ * the macOS HTTP client, which tests build without driver paths. `pattern`
+ * captures the factors whose product is the value in milliseconds.
+ */
+const LONG_SESSION = /\bLONG_SESSION_THRESHOLD_MS\s*=\s*(\d+)\s*\*\s*(\d+)\s*\*\s*(\d+)/g;
+const SOURCE_PINS = [
+	{
+		section: 'adapters',
+		key: 'default_timeout_ms',
+		file: 'macos/adapters/http_client.lua',
+		pattern: /^local HTTP_CLIENT_DEFAULT_TIMEOUT_MS\s*=\s*(\d+)\s*$/gm
+	},
+	...['metrics_apps/script.js', 'metrics_apps/state.js', 'metrics_typing/data.js'].map((page) => ({
+		section: 'keystats',
+		key: 'long_session_threshold_ms',
+		file: '_shared/ui/' + page,
+		pattern: LONG_SESSION
+	}))
+];
+
+/**
+ * Compares every source pin with the registry.
+ * @param {Object} registry Parsed timing registry.
+ * @param {(rel: string) => string} readSource Returns a file's text.
+ * @param {Object[]} pins The source pin table.
+ * @returns {string[]} One message per broken pin.
+ */
+function sourcePinErrors(registry, readSource, pins) {
+	const errors = [];
+	for (const p of pins) {
+		const expected = registry[p.section] && registry[p.section][p.key];
+		if (typeof expected !== 'number') {
+			errors.push(
+				`[${p.section}].${p.key} is not in ${REGISTRY_PATH}, but ${p.file} is pinned to it.`
+			);
+			continue;
+		}
+		const found = [...readSource(p.file).matchAll(p.pattern)];
+		const value = found.length === 1 ? found[0].slice(1).reduce((a, b) => a * Number(b), 1) : NaN;
+		if (found.length !== 1) {
+			errors.push(`${p.file}: expected exactly one ${p.key} value, found ${found.length}.`);
+		} else if (value !== expected) {
+			errors.push(
+				`${p.file}: ${p.key} = ${value} but [${p.section}].${p.key} = ${expected}. ` +
+					'Make them equal: the page cannot read the registry, so this copy follows it.'
+			);
+		}
+	}
+	return errors;
+}
+
+/**
  * Compares every pin with the registry.
  * @param {Object} registry Parsed timing registry ([section][key] = number).
  * @param {(rel: string) => string} readSource Returns a driver file's text.
@@ -205,7 +258,10 @@ function pinErrors(registry, readSource, pins) {
 function main() {
 	const registry = toml.parse(fs.readFileSync(path.join(SP, REGISTRY_PATH), 'utf8'));
 	const readSource = (rel) => fs.readFileSync(path.join(SP, rel), 'utf8');
-	const errors = pinErrors(registry, readSource, PINS);
+	const errors = [
+		...pinErrors(registry, readSource, PINS),
+		...sourcePinErrors(registry, readSource, SOURCE_PINS)
+	];
 
 	const first = PINS[0];
 	const drifted = structuredClone(registry);
@@ -233,6 +289,13 @@ function main() {
 			secPin
 		]
 	];
+	const jsPin = SOURCE_PINS[0];
+	const jsDrifted = structuredClone(registry);
+	jsDrifted[jsPin.section][jsPin.key] += 1;
+	if (sourcePinErrors(jsDrifted, readSource, [jsPin]).length === 0)
+		errors.push('negative mutation was not rejected: registry value drifted from its source pin');
+	if (sourcePinErrors(registry, () => 'window.x = {};', [jsPin]).length === 0)
+		errors.push('negative mutation was not rejected: pinned source value removed');
 	for (const [name, reg, reader, target] of mutations) {
 		if (pinErrors(reg, reader, [target]).length === 0)
 			errors.push(`negative mutation was not rejected: ${name}`);
@@ -245,10 +308,10 @@ function main() {
 	}
 
 	console.log(
-		`\x1b[32m[OK] ${PINS.length} pinned AHK timing copies match the shared timing registry.\x1b[0m`
+		`\x1b[32m[OK] ${PINS.length} pinned AHK and ${SOURCE_PINS.length} pinned source timing copies match the shared timing registry.\x1b[0m`
 	);
 }
 
 if (require.main === module) main();
 
-module.exports = { PINS, pinErrors };
+module.exports = { PINS, SOURCE_PINS, pinErrors, sourcePinErrors };

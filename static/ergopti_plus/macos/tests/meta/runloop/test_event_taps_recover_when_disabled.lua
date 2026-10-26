@@ -74,7 +74,7 @@ helpers.describe("event taps: persistent watchdog backstops", function()
 	end)
 
 	helpers.it("retains keystats hook-state polling and restart", function()
-		local source = production_unit("local TAP_WATCHDOG_INTERVAL_SEC = 5")
+		local source = production_unit('local TAP_WATCHDOG_INTERVAL_SEC = Timings.sec("keystats", "tap_watchdog_interval_ms")')
 
 		helpers.assert_contains(source,
 			"acquire_recurring_timer(TAP_WATCHDOG_INTERVAL_SEC,")
@@ -90,7 +90,7 @@ helpers.describe("event taps: persistent watchdog backstops", function()
 	end)
 
 	helpers.it("retains script-control tap-state polling and restart", function()
-		local source = production_unit("local TAP_WATCHDOG_INTERVAL_SEC = 2")
+		local source = production_unit('local TAP_WATCHDOG_INTERVAL_SEC = Timings.sec("ui", "script_control_tap_watchdog_interval_ms")')
 
 		helpers.assert_contains(source,
 			"TimerScheduler.every, TAP_WATCHDOG_INTERVAL_SEC, function()")

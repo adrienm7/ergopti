@@ -43,7 +43,7 @@ M.CODESIGN = "/usr/bin/codesign"
 M.MODULE_RELATIVE = "/Contents/Resources/static/ergopti_plus/macos/adapters/native/installed_physical_source.so"
 M.MODULE_ENTRY = "luaopen_ergopti_installed_source_native"
 --- Seconds between two pumps of an open stream. The producer polls every 25 ms.
-M.PUMP_INTERVAL_SEC = 0.025
+M.SOURCE_PUMP_INTERVAL_SEC = 0.025
 --- The native module refuses a single acknowledgement larger than this.
 M.ACKNOWLEDGEMENT_LIMIT = 65536
 
@@ -304,7 +304,7 @@ local function stream_handle(owner, timer, on_done, on_chunk)
 		-- observes its native retirement, so the handle settles only for real.
 		state = started and "running" or "stopping"
 		if not started then owner:request_stop() end
-		local armed, committed = timer.every(M.PUMP_INTERVAL_SEC, pump)
+		local armed, committed = timer.every(M.SOURCE_PUMP_INTERVAL_SEC, pump)
 		if committed ~= true then
 			Logger.error(LOG, "The stream pump could not be scheduled; revoking the stream.")
 			request_stop()

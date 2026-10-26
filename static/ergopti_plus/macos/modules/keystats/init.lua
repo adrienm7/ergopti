@@ -84,8 +84,9 @@ local MAINTENANCE_INTERVAL_SEC   = Timings.sec("keystats", "maintenance_interval
 local BUFFER_EVENT_CAP = 1024
 
 -- How often the tap watchdog checks that the event tap is still running (seconds).
--- Mirrors the keymap module's watchdog cadence (script_control TAP_WATCHDOG_INTERVAL_SEC = 2).
-local TAP_WATCHDOG_INTERVAL_SEC = 5
+-- Deliberately slower than the script-control watchdog: a stalled keystats tap only
+-- loses statistics, a stalled script-control tap strands the un-pause shortcut.
+local TAP_WATCHDOG_INTERVAL_SEC = Timings.sec("keystats", "tap_watchdog_interval_ms")
 local INPUT_SOURCE_SUBSCRIBER_ID = "modules.keystats"
 
 -- Keycodes for all modifier keys (these should not be logged as characters)

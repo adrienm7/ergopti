@@ -28,6 +28,18 @@
  *    timers are not ours to justify.
  * 3. An entry whose call site is gone fails too, so the list shrinks when a
  *    poller is removed instead of accumulating dead justifications.
+ * 4. No numeric literal in a timer or sleep call. `SetTimer(Fn, -100)`,
+ *    `Sleep 50`, `hs.timer.doAfter(0.05, ...)`, `Timers.after(1.5, ...)` and
+ *    `setTimeout(fn, 80)` are delays typed where they are used, so the same
+ *    delay is typed again (the gesture poll `-100` six times, the safety flush
+ *    `-2000` three times) and drifts. A delay is a key of the shared timing
+ *    registry (_shared/modules/timings/constants.toml) read through Timings.
+ *    Zero is the "yield to the event loop" idiom and stays allowed. The sites
+ *    that exist today are frozen per file in timer-literal-baseline.json, which
+ *    can only shrink: node tools/test/test-fast-timer-inventory.cjs
+ *    --update-timer-baseline rewrites it, and refuses while anything has grown.
+ *    The Windows (AHK) sites are baseline entries until the Windows side moves
+ *    them to registry keys; Swift sleeps are not scanned.
  * ==============================================================================
  */
 
@@ -156,12 +168,172 @@ for (const abs of walk(DRIVER)) {
 		});
 }
 
+// ------------------------------------------------------------------
+// No numeric literal in a timer or sleep call, with a shrinking baseline.
+// ------------------------------------------------------------------
+
+const SP = path.join(ROOT, 'static', 'ergopti_plus');
+const TIMER_LITERAL_BASELINE = path.join(__dirname, 'timer-literal-baseline.json');
+const TIMER_LITERAL_COMMENT =
+	'Timer and sleep calls per file that carry a non-zero numeric delay (tools/test/test-fast-timer-inventory.cjs). Shrink it with --update-timer-baseline as delays move to the timing registry; never add to it.';
+const MIN_LITERAL_SCAN_FILES = 1000;
+const LITERAL_SKIPPED_DIRECTORIES = new Set([
+	'node_modules',
+	'.git',
+	'.build',
+	'tests',
+	'Tests',
+	'vendor',
+	'_generated'
+]);
+const LITERAL_EXTENSIONS = /\.(?:ahk|lua|js|cjs|mjs)$/;
+const NONZERO = /^-?(?:\d+\.?\d*|\.\d+)$/;
+
+// Lua: the delay is the first argument of a timer constructor.
+const LUA_TIMER = /\b(?:doAfter|doEvery|after|every|sleep)\(\s*(-?[0-9][0-9.]*)\s*[,)]/g;
+// JavaScript: the delay is the last argument of a one-line call.
+const JS_TIMER = /\b(?:setTimeout|setInterval)\((?:[^()]|\([^()]*\))*,\s*(\d+(?:\.\d+)?)\s*\)/g;
+const AHK_SLEEP = /\bSleep\(?\s*(\d+)\s*\)?/g;
+
+/**
+ * Counts the timer and sleep calls of one file that carry a non-zero numeric
+ * literal as their delay.
+ * @param {string} ext File extension with its dot.
+ * @param {string} text File content.
+ * @returns {number} Literal-delay call count.
+ */
+function literalDelayCount(ext, text) {
+	let count = 0;
+	for (const raw of text.split(/\r?\n/)) {
+		const line = raw.trim();
+		if (ext === '.ahk') {
+			if (line.startsWith(';')) continue;
+			for (const m of line.matchAll(CALL)) {
+				const parts = splitArgs(m[1]);
+				if (parts.length >= 2 && NONZERO.test(parts[1].trim()) && Number(parts[1]) !== 0) count++;
+			}
+			for (const m of line.matchAll(AHK_SLEEP)) if (Number(m[1]) > 0) count++;
+		} else if (ext === '.lua') {
+			if (line.startsWith('--')) continue;
+			for (const m of line.matchAll(LUA_TIMER)) if (Number(m[1]) !== 0) count++;
+		} else {
+			if (line.startsWith('//') || line.startsWith('*')) continue;
+			for (const m of line.matchAll(JS_TIMER)) if (Number(m[1]) > 0) count++;
+		}
+	}
+	return count;
+}
+
+/** Literal-delay call count per production file under static/ergopti_plus. */
+function literalDelayCounts() {
+	const counts = {};
+	let walked = 0;
+	const visit = (dir) => {
+		for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+			const abs = path.join(dir, entry.name);
+			if (entry.isDirectory()) {
+				if (!LITERAL_SKIPPED_DIRECTORIES.has(entry.name)) visit(abs);
+			} else if (LITERAL_EXTENSIONS.test(entry.name)) {
+				walked++;
+				const n = literalDelayCount(path.extname(entry.name), fs.readFileSync(abs, 'utf8'));
+				if (n > 0) counts[path.relative(SP, abs).split(path.sep).join('/')] = n;
+			}
+		}
+	};
+	visit(SP);
+	return { counts, walked };
+}
+
+/**
+ * Compares the counts with the baseline.
+ * @param {Object<string, number>} counts Current literal-delay counts per file.
+ * @param {Object<string, number>} baseline Frozen counts.
+ * @returns {{grown: string[], shrunk: string[]}} Files above and below their baseline.
+ */
+function compareLiteralBaseline(counts, baseline) {
+	const grown = [];
+	const shrunk = [];
+	for (const rel of new Set([...Object.keys(counts), ...Object.keys(baseline)])) {
+		const have = counts[rel] || 0;
+		const frozen = baseline[rel] || 0;
+		if (have > frozen) grown.push(`${rel}: ${have} literal delay(s), baseline ${frozen}`);
+		else if (have < frozen) shrunk.push(`${rel}: ${have} literal delay(s), baseline ${frozen}`);
+	}
+	return { grown, shrunk };
+}
+
+/** Proves the detector counts what it must and ignores what it must. */
+function literalSelfTest() {
+	const failures = [];
+	const expect = (name, ext, text, want) => {
+		const got = literalDelayCount(ext, text);
+		if (got !== want) failures.push(`${name}: expected ${want}, got ${got}`);
+	};
+	expect('AHK one-shot literal', '.ahk', 'SetTimer(Fn.Bind(1, 2), -100)', 1);
+	expect('AHK zero delay', '.ahk', 'SetTimer(Fn, 0)', 0);
+	expect('AHK registry delay', '.ahk', 'SetTimer(Fn, -TimingsGet("ui", "x_ms"))', 0);
+	expect('AHK Sleep literal', '.ahk', '    Sleep 50', 1);
+	expect('AHK Sleep call form', '.ahk', 'Sleep(20)', 1);
+	expect('AHK comment', '.ahk', '; SetTimer(Fn, -100)', 0);
+	expect('Lua doAfter literal', '.lua', 'hs.timer.doAfter(0.05, function() end)', 1);
+	expect('Lua deferred literal', '.lua', 'DeferredWork.after(1.5, fn, "x")', 1);
+	expect('Lua yield', '.lua', 'TimerScheduler.after(0, function() end)', 0);
+	expect('Lua constant', '.lua', 'hs.timer.doAfter(DELAY_SEC, fn)', 0);
+	expect('Lua comment', '.lua', '-- hs.timer.doAfter(2, fn)', 0);
+	expect('JS setTimeout literal', '.js', 'setTimeout(() => el.focus(), 80);', 1);
+	expect('JS yield', '.js', 'setTimeout(() => el.focus(), 0);', 0);
+	expect('JS constant', '.js', 'setTimeout(fn, DELAY_MS);', 0);
+	const verdict = compareLiteralBaseline({ 'a.lua': 2 }, { 'a.lua': 1 });
+	if (verdict.grown.length !== 1) failures.push('a grown count was not reported');
+	if (compareLiteralBaseline({}, { 'a.lua': 1 }).shrunk.length !== 1)
+		failures.push('a stale baseline entry was not reported');
+	return failures;
+}
+
+const literal = literalDelayCounts();
+if (process.argv.includes('--update-timer-baseline')) {
+	const baseline = JSON.parse(fs.readFileSync(TIMER_LITERAL_BASELINE, 'utf8'));
+	delete baseline._comment;
+	if (compareLiteralBaseline(literal.counts, baseline).grown.length > 0) {
+		console.error('refusing to update: a file gained a literal delay. Use a timing registry key.');
+		process.exit(1);
+	}
+	fs.writeFileSync(
+		TIMER_LITERAL_BASELINE,
+		JSON.stringify({ _comment: TIMER_LITERAL_COMMENT, ...literal.counts }, null, '\t') + '\n'
+	);
+	console.log('timer-literal baseline rewritten');
+	process.exit(0);
+}
+
 const errors = [];
 
 if (scanned < 100) {
 	errors.push(
 		`walked only ${scanned} .ahk file(s) — the scan is broken, and an empty inventory proves nothing`
 	);
+}
+
+if (literal.walked < MIN_LITERAL_SCAN_FILES) {
+	errors.push(
+		`the literal-delay scan walked only ${literal.walked} file(s) — it is broken, and an empty count proves nothing`
+	);
+}
+{
+	const frozen = JSON.parse(fs.readFileSync(TIMER_LITERAL_BASELINE, 'utf8'));
+	delete frozen._comment;
+	const verdict = compareLiteralBaseline(literal.counts, frozen);
+	for (const g of verdict.grown)
+		errors.push(
+			`${g}. A timer or sleep delay is a key of _shared/modules/timings/constants.toml, ` +
+				'read through Timings; a number typed at the call is typed again elsewhere and drifts.'
+		);
+	for (const sh of verdict.shrunk)
+		errors.push(
+			`${sh}. Run node tools/test/test-fast-timer-inventory.cjs --update-timer-baseline to ` +
+				'record the improvement.'
+		);
+	for (const f of literalSelfTest()) errors.push(`literal-delay self-test: ${f}`);
 }
 
 for (const [key, site] of found) {
@@ -320,5 +492,5 @@ const list = [...found.entries()]
 	.join(', ');
 console.log(
 	`\x1b[32m[OK] ${found.size} repeating sub-second timer(s), all inventoried (${list}) — ` +
-		`${scanned} file(s) scanned.\x1b[0m`
+		`${scanned} file(s) scanned; ${Object.values(literal.counts).reduce((a, b) => a + b, 0)} literal delay(s) frozen in ${Object.keys(literal.counts).length} file(s).\x1b[0m`
 );

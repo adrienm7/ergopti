@@ -11,6 +11,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Timings = require("infra.timings")
 local ShellRunner = require("adapters.shell_runner")
 local LibuvExit = require("infra.libuv_exit")
 local NativeTimer = require("infra.native_timer")
@@ -27,7 +28,7 @@ if not ok_luv then luv = nil end
 -- =========================================
 -- =========================================
 
-local DEFAULT_TIMEOUT_MS = 30000
+local DEFAULT_TIMEOUT_MS = Timings.ms("adapters", "default_timeout_ms")
 local DEFAULT_OWNER = "default"
 local MAX_OUTPUT_BYTES = 1024
 

@@ -28,6 +28,7 @@ Values are grouped into thematic sections:
 | `[tap_hold]`   | Tap-min, key-repeat initial delay and interval, one-shot shift                                  |
 | `[ergonomics]` | Block-break, flow window, hesitation detection                                                  |
 | `[ui]`         | Menu refresh delays, Karabiner lifecycle, WPM widgets, HS reload debounce                       |
+| `[adapters]`   | Default deadline of the HTTP, digest and child-process adapters (Linux and macOS)               |
 
 All values are in **milliseconds** unless the key name explicitly says `_sec`.
 

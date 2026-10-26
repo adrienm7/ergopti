@@ -36,10 +36,12 @@ helpers.describe("keystats: tap-watchdog behavioral contract (C2)", function()
 
 	helpers.it("TAP_WATCHDOG_INTERVAL_SEC is defined and non-zero", function()
 		local src = read_src()
-		-- The constant must be a local (not a magic number) at module scope
-		local decl = src:match("local TAP_WATCHDOG_INTERVAL_SEC%s*=%s*(%d+)")
-		helpers.assert_true(decl ~= nil, "TAP_WATCHDOG_INTERVAL_SEC must be a named constant")
-		helpers.assert_true(tonumber(decl) > 0, "TAP_WATCHDOG_INTERVAL_SEC must be positive, got: " .. tostring(decl))
+		-- The constant must be a local read from the timing registry (not a magic number)
+		-- at module scope, and the registry value must be positive.
+		local key = src:match('local TAP_WATCHDOG_INTERVAL_SEC%s*=%s*Timings%.sec%("keystats",%s*"([%w_]+)"%)')
+		helpers.assert_true(key ~= nil, "TAP_WATCHDOG_INTERVAL_SEC must be read from the timing registry")
+		local seconds = require("infra.timings").sec("keystats", key)
+		helpers.assert_true(seconds > 0, "TAP_WATCHDOG_INTERVAL_SEC must be positive, got: " .. tostring(seconds))
 	end)
 
 	helpers.it("watchdog timer is created with TAP_WATCHDOG_INTERVAL_SEC and stored in _tap_watchdog_timer", function()

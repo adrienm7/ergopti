@@ -367,6 +367,19 @@ session_timeout_ms = 300000
 # AHK: keystats_watchers.ahk IDLE_CHECK_INTERVAL_MS. HS: keystats/init.lua.
 idle_check_interval_ms = 10000
 
+# macOS: how often the keystats module checks that its event tap still runs. Slower
+# than the script-control watchdog (ui.script_control_tap_watchdog_interval_ms)
+# on purpose: keystats only loses statistics when its tap stalls, while a stalled
+# script-control tap strands the un-pause shortcut.
+# HS: keystats/init.lua TAP_WATCHDOG_INTERVAL_SEC.
+tap_watchdog_interval_ms = 5000
+
+# A single continuous typing session at least this long counts as a long session
+# on the metrics dashboards (90 min, the clinical RSI risk threshold).
+# JS: LONG_SESSION_THRESHOLD_MS in ui/metrics_typing/data.js and ui/metrics_apps/state.js
+# (pages cannot read this file; test-keystats-timings-single-source.cjs pins them).
+long_session_threshold_ms = 5400000
+
 # Maintenance pass interval (log rotation, cache cleanup, etc.).
 # HS: keystats/init.lua MAINTENANCE_INTERVAL_SEC.
 maintenance_interval_ms = 5000
@@ -574,6 +587,22 @@ desktop_open_timeout_ms = 30000
 # Linux Versions and network progress documents refuse unavailable prerequisites.
 document_initialization_ack_timeout_ms = 5000
 
+# macOS: delay before the background WebKit warm-up, so the first dashboard open is
+# not penalised by the framework load and the boot critical path never blocks.
+# HS: init.lua post-boot warm-up.
+webkit_warmup_delay_ms = 2000
+
+# macOS: delay before the one-time listing of config.toml entries that no reader of
+# this build uses, kept off the boot critical path.
+# HS: init.lua post-boot unused-keys warning.
+unused_keys_warning_delay_ms = 3000
+
+# macOS: how often the script-control event tap is checked and re-enabled. A tap
+# stalled past the system timeout is disabled silently and strands the un-pause
+# shortcut, so this is the hard safety net's period.
+# HS: modules/shortcuts/script_control.lua.
+script_control_tap_watchdog_interval_ms = 2000
+
 # Delay before the post-install keyboard-layout menu refresh fires.
 # HS: menu_keyboard_layout.lua POST_INSTALL_REFRESH_DELAY.
 post_install_refresh_ms = 1500
@@ -728,3 +757,15 @@ stall_fatal_ms = 30000
 # launcher.log with the time spent opening files, waiting for locks and writing.
 # Swift: LoggerDatagramWorker.swift kLoggerSlowBatchThresholdMilliseconds.
 native_slow_batch_ms = 500
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Adapters shared by the Linux and macOS drivers
+# ──────────────────────────────────────────────────────────────────────
+
+[adapters]
+
+# Deadline of one HTTP request, file digest or child process when its caller
+# names none. HS: http_client.lua. LX: curl_http_client.lua, file_digest.lua,
+# process_runner.lua.
+default_timeout_ms = 30000

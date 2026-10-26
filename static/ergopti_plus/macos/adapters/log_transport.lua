@@ -34,7 +34,7 @@ local hs = hs
 
 local PROTOCOL_VERSION = 1
 local LOOPBACK_HOST = "127.0.0.1"
-local PUMP_INTERVAL_SEC = 0.01
+local LOG_PUMP_INTERVAL_SEC = 0.01
 -- Native ACK policy. The first resend of an unacknowledged batch keeps the short
 -- retry that recovers a merely lost datagram; each later resend doubles the wait
 -- up to the cap, so a busy worker is not also made to decode a duplicate batch
@@ -1292,7 +1292,7 @@ function M.start(options)
 	_scheduler = options.scheduler
 	local timer_ok, handle_or_err, timer_committed = pcall(
 		_scheduler.every,
-		PUMP_INTERVAL_SEC,
+		LOG_PUMP_INTERVAL_SEC,
 		function() pump_boundary(owner) end
 	)
 	if not timer_ok or timer_committed ~= true or type(handle_or_err) ~= "table" then
