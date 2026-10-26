@@ -58,6 +58,7 @@ local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
 local PythonInterpreter = require("adapters.python_interpreter")
 local NetworkEnv = require("modules.llm.network_env")
 local NetworkAdmission = require("modules.llm.opaque_network_admission")
+local TextUtils = require("text_utils")
 
 local LOG = "mlx_deps"
 
@@ -292,8 +293,7 @@ end
 --- @param value string Raw string.
 --- @return string quoted Shell-safe quoted string.
 local function shell_quote(value)
-	local s = tostring(value or "")
-	return "'" .. s:gsub("'", "'\\''") .. "'"
+	return TextUtils.shell_quote(value or "")
 end
 
 

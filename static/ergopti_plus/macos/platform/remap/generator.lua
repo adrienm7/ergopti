@@ -53,6 +53,7 @@ local ScriptChordRules = require("platform.remap.script_chord_rules")
 local Defaults = require("platform.remap.defaults")
 local Layout = require("modules.keymap.layout")
 local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
 
 local LOG = "karabiner"
 
@@ -734,9 +735,7 @@ end
 --- Quotes one value for a POSIX shell command.
 --- @param value any Value to quote.
 --- @return string quoted Single-quoted shell token.
-local function sq(value)
-	return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
-end
+local sq = TextUtils.shell_quote
 
 --- Builds one physical-key ledger event for the Hammerspoon bridge.
 --- A fresh table is returned for every manipulator so Karabiner rule graphs do
@@ -3561,7 +3560,7 @@ function M.deploy_string(content, dst, expected_source)
 	-- S2: parent directory may not exist yet — create it then retry
 	if parent then
 		local mkdir_out, _, _, mkdir_rc = hs.execute(
-			string.format("/bin/mkdir -p '%s' 2>&1", parent:gsub("'", "'\\''"))
+			string.format("/bin/mkdir -p %s 2>&1", sq(parent))
 		)
 		Logger.debug(LOG, "Deploy S2 mkdir -p rc=%s: %s",
 			tostring(mkdir_rc), (mkdir_out or ""):gsub("%s+$", ""))

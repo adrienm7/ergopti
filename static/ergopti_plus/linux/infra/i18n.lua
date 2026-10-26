@@ -24,6 +24,7 @@ local locale_mod = require("infra.locale")
 local Logger     = require("logger.shim")
 -- The shared section-header decoration, the same one macOS and AutoHotkey draw.
 local Labels     = require("menu.labels")
+local TextUtils = require("text_utils")
 local LOG        = "i18n"
 
 local _locale    = "fr"   -- active locale code
@@ -113,7 +114,7 @@ local function _scan_locales()
 		return { "en", "fr" }
 	end
 
-	local pipe = io.popen(string.format("ls '%s' 2>/dev/null", locales_dir:gsub("'", "'\\''")), "r")
+	local pipe = io.popen(string.format("ls %s 2>/dev/null", TextUtils.shell_quote(locales_dir)), "r")
 	if not pipe then
 		-- Fallback: try common codes.
 		return { "en", "fr" }

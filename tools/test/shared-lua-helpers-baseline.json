@@ -2,41 +2,7 @@
 	"linux/ergopti_hotstrings.lua": {
 		"dirname": 1
 	},
-	"linux/infra/i18n.lua": {
-		"shell_quote": 1
-	},
-	"linux/modules/gestures/manager.lua": {
-		"percent_encode": 1,
-		"shell_quote": 1
-	},
-	"linux/modules/keystats/keystats.lua": {
-		"shell_quote": 1
-	},
-	"macos/adapters/app_launcher.lua": {
-		"shell_quote": 1
-	},
-	"macos/adapters/http_client.lua": {
-		"percent_encode": 1
-	},
-	"macos/infra/driver_control.lua": {
-		"shell_quote": 1
-	},
 	"macos/init.lua": {
 		"dirname": 2
-	},
-	"macos/modules/gestures/actions.lua": {
-		"percent_encode": 1
-	},
-	"macos/modules/llm/mlx_deps_checker.lua": {
-		"shell_quote": 1
-	},
-	"macos/platform/remap/generator.lua": {
-		"shell_quote": 2
-	},
-	"macos/platform/remap/init.lua": {
-		"shell_quote": 1
-	},
-	"macos/platform/remap/legacy_release_fixtures.lua": {
-		"shell_quote": 1
 	}
 }

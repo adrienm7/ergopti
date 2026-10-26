@@ -120,6 +120,7 @@ if ok_sysmetrics then SystemMetrics = sysmetrics_mod end
 
 -- The nine n-gram families, over the shared driver-agnostic accumulators.
 local AggregateWalker = require("modules.keystats.aggregate_walker")
+local TextUtils = require("text_utils")
 
 local LOG = "modules.keystats.keystats"
 
@@ -2625,7 +2626,7 @@ local function flush_json()
 		return false
 	end
 
-	os.execute(string.format("mkdir -p '%s' 2>/dev/null", _log_dir:gsub("'", "'\\''")))
+	os.execute(string.format("mkdir -p %s 2>/dev/null", TextUtils.shell_quote(_log_dir)))
 
 	local path = _log_dir .. "/keystrokes_" .. date .. ".json"
 

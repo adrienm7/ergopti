@@ -55,9 +55,7 @@ end
 function M.launchWithArgs(app_path, args)
 	local ok, err = pcall(function()
 		-- Single-quote POSIX escape: replace each ' with '\'' and wrap in '…'
-		local function shq(s)
-			return "'" .. tostring(s):gsub("'", "'\\''") .. "'"
-		end
+		local shq = text_utils.shell_quote
 		local quoted_args
 		if type(args) == "table" then
 			local parts = {}

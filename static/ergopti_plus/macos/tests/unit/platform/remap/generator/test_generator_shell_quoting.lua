@@ -26,17 +26,18 @@ helpers.assert_true(
 )
 
 -- Test 2: A sq() quoting helper must be present.
-local has_sq = src:find("local function sq(value)", 1, true) ~= nil
+local has_sq = src:find("local sq = TextUtils.shell_quote", 1, true) ~= nil
 helpers.assert_true(
 	has_sq,
-	"generator.lua must define a local sq() POSIX-quoting helper (karabiner-gen-3)"
+	"generator.lua must bind sq() to the shared text_utils.shell_quote (karabiner-gen-3)"
 )
 
--- Test 3: The sq() helper must escape embedded single quotes.
+-- Test 3: The apostrophe escape lives in text_utils, whose contract tests pin
+-- it; generator.lua must not spell it inline again.
 local has_escape = src:find("gsub(\"'\", \"'\\\\''\")", 1, true) ~= nil
 helpers.assert_true(
-	has_escape,
-	"generator.lua sq() must escape embedded single quotes via gsub (karabiner-gen-3)"
+	not has_escape,
+	"generator.lua must not spell the single-quote escape inline (karabiner-gen-3)"
 )
 
 -- Test 4: The canonical ledger factory must quote both payload and path.

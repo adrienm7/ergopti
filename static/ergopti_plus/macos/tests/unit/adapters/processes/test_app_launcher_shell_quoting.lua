@@ -45,7 +45,7 @@ helpers.describe("app_launcher: launchWithArgs shell quoting", function()
 		)
 	end)
 
-	helpers.it("source has a single-quote POSIX escape helper (shq)", function()
+	helpers.it("source quotes through the shared POSIX helper (shq)", function()
 		local src_path = debug.getinfo(1, "S").source:match("^@(.+)$")
 		local base = src_path:match("^(.+)[/\\]tests[/\\]") or ""
 		local src_file = base .. "/adapters/app_launcher.lua"
@@ -56,13 +56,14 @@ helpers.describe("app_launcher: launchWithArgs shell quoting", function()
 		fh:close()
 
 		helpers.assert_true(
-			src:find("local function shq", 1, true) ~= nil,
-			"launchWithArgs must define a shq() POSIX quoting helper"
+			src:find("local shq = text_utils.shell_quote", 1, true) ~= nil,
+			"launchWithArgs must bind shq() to the shared text_utils.shell_quote"
 		)
+		-- The POSIX '\'' escape lives in text_utils, whose contract tests pin it;
+		-- a second inline copy here is what the shared-helper ratchet refuses.
 		helpers.assert_true(
-			src:find([[gsub("'", "'\\''")]], 1, true) ~= nil or
-			src:find("gsub(\"'\",", 1, true) ~= nil,
-			"shq() must escape single quotes with '\\'' POSIX idiom"
+			src:find("gsub(\"'\",", 1, true) == nil,
+			"app_launcher must not spell the single-quote escape inline again"
 		)
 	end)
 end)
