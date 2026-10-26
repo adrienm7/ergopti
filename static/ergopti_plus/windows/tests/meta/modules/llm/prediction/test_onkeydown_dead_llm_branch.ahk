@@ -28,14 +28,17 @@
 
 _OKDLB_TabEnterBranchFeedsBridge() {
 	Seg := _DriverFuncBody("_OnPrefixKeyDown")
-	ResetBranch := InStr(Seg, "else if ResetVKs.Has(VK)")
-	TabEntry := InStr(Seg, "0x09, true")
-	EnterEntry := InStr(Seg, "0x0D, true")
+	Assert(Seg != "", "_OnPrefixKeyDown must exist")
+	ResetBranch := InStr(Seg, "else if KS_IsContextResetKey(VK)")
+	KeyClass := _DriverFuncBody("KS_IsContextResetKey")
+	Assert(KeyClass != "", "the canonical context-reset owner must exist")
+	TabEntry := InStr(KeyClass, "0x09, true")
+	EnterEntry := InStr(KeyClass, "0x0D, true")
 	BridgeFeed := InStr(Seg,
 		"LLM_Bridge_FeedKeyDownIfActive(VK, true)", true, ResetBranch)
 	CatchPos := InStr(Seg, "} catch", true, ResetBranch)
-	Assert(ResetBranch > 0 and TabEntry > 0 and TabEntry < ResetBranch
-		and EnterEntry > 0 and EnterEntry < ResetBranch,
+	Assert(ResetBranch > 0 and TabEntry > 0 and KS_IsContextResetKey(0x09)
+		and EnterEntry > 0 and KS_IsContextResetKey(0x0D),
 		"Tab and Enter must remain enrolled in the live ResetVKs branch")
 	Assert(BridgeFeed > ResetBranch and CatchPos > BridgeFeed,
 		"the live ResetVKs branch must feed its I1-filtered physical Tab/Enter event to the LLM bridge before leaving the guarded dispatch")

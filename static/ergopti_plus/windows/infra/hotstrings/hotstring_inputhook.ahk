@@ -1754,31 +1754,8 @@ _OnPrefixKeyDown(IH, VK, SC) {
 	; Synthetic key events are rejected by InputHook I1.  Only an explicit
 	; engine-level suppression (used by standalone/manual callers) blocks a
 	; physical keydown from updating the buffer.
-	static ResetVKs := Map(
-		; VK_BACK is deliberately ABSENT: backspace decrements both buffers
-		; rather than wiping the preview — see the VK == 0x08 branch below.
-		0x09, true,  ; VK_TAB
-		0x0D, true,  ; VK_RETURN
-		0x1B, true,  ; VK_ESCAPE
-		0x20, true,  ; VK_SPACE
-		; The arrows reset only under hotstrings.arrow_resets_word (below).
-		0x25, true,  ; VK_LEFT
-		0x26, true,  ; VK_UP
-		0x27, true,  ; VK_RIGHT
-		0x28, true,  ; VK_DOWN
-		; The rest of the navigation cluster. The engine's own contract lists
-		; these as buffer-invalidating, but only the arrows were ever enumerated
-		; here — so typing "bonjour ia", pressing Home and typing "." fired
-		; ia -> IA with {BackSpace 3} at line start and ate three characters of
-		; unrelated text. Delete and Insert belong with them: both rewrite the
-		; document by an amount this watcher cannot observe.
-		0x21, true,  ; VK_PRIOR  (PgUp)
-		0x22, true,  ; VK_NEXT   (PgDn)
-		0x23, true,  ; VK_END
-		0x24, true,  ; VK_HOME
-		0x2D, true,  ; VK_INSERT
-		0x2E, true,  ; VK_DELETE
-	)
+	; One key-state class owns the shared context-reset membership. The
+	; watcher retains its existing Space and configurable arrow policies.
 	; Same try guard as _OnPrefixChar — an unhandled error here permanently
 	; silences the OnKeyDown callback for all subsequent keystrokes.
 	try {
@@ -1794,7 +1771,7 @@ _OnPrefixKeyDown(IH, VK, SC) {
 		AltGrHeld := _PrefixAltGrMasksCtrl(KS_IsDown("RAlt"), KS_IsDown("SC138"))
 		if _PrefixHandleCtrlContextChord(VK, CtrlHeld, AltGrHeld)
 			return
-		if ResetVKs.Has(VK) || (!_PrefixIsModifierVK(VK) && _PrefixShortcutModifierHeld())
+		if KS_IsContextResetKey(VK) || (!_PrefixIsModifierVK(VK) && _PrefixShortcutModifierHeld())
 			_PrefixRevokeIncompleteFragments()
 		; An arrow key is an arrow under any modifier: it belongs to
 		; hotstrings.arrow_resets_word, in the ResetVKs branch below.
@@ -1847,7 +1824,7 @@ _OnPrefixKeyDown(IH, VK, SC) {
 				LLM_Bridge_FeedKeyDownIfActive(VK, true)
 		} else if (VK == 0x20) {
 			_ResetPrefixBuffer()
-		} else if ResetVKs.Has(VK) {
+		} else if KS_IsContextResetKey(VK) {
 			; Insert/Delete rewrite text without promising a boundary. Tab/Enter
 			; and Escape may move or destroy the focused control, so publish an
 			; unknown focus token; cursor movers and Space retain the current owner.

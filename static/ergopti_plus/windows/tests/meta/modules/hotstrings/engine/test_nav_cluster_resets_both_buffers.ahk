@@ -28,8 +28,8 @@
 ; Delete rewrite context without moving the caret, so they take the
 ; boundary-false reset the disruptive Ctrl combos take.
 ;
-; SCOPE: source-level over the watcher's own VK tables. _OnPrefixKeyDown is an
-; InputHook callback bound to a live hook and cannot be invoked headlessly.
+; SCOPE: source-level pairing complements the behavioral forwarded-input tests.
+; One key-state owner supplies the class to both prefix and prediction observers.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -56,7 +56,7 @@ global _NCR_CONTEXT_REWRITERS := Map(0x2D, "Insert", 0x2E, "Delete")
 ; ==================================================================
 ; ==================================================================
 
-; The ResetVKs map literal inside _OnPrefixKeyDown.
+; The shared ResetVKs map literal inside KS_IsContextResetKey.
 ;
 ; Terminated on a line whose only content is ")", NOT on the first ")" found:
 ; the entries carry trailing comments that name the key ("; VK_PRIOR (PgUp)"),
@@ -64,7 +64,7 @@ global _NCR_CONTEXT_REWRITERS := Map(0x2D, "Insert", 0x2E, "Delete")
 ; hid every entry below it — the scan reported keys as missing when they were
 ; present, and would equally have reported present keys as covered.
 _NCR_ResetVkMapBody() {
-	Body := _DriverFuncBody("_OnPrefixKeyDown")
+	Body := _DriverFuncBody("KS_IsContextResetKey")
 	if (Body == "")
 		return ""
 	Collecting := false
@@ -86,7 +86,7 @@ _NCR_PreviewResetsForEveryNavKey() {
 	global _NCR_CURSOR_MOVERS, _NCR_CONTEXT_REWRITERS
 	MapBody := _NCR_ResetVkMapBody()
 	Assert(MapBody != "",
-		"_OnPrefixKeyDown must still declare its ResetVKs map — without that landmark this guard measures nothing")
+		"KS_IsContextResetKey must still declare the canonical ResetVKs map — without that landmark this guard measures nothing")
 
 	for VK, Name in _NCR_CURSOR_MOVERS {
 		Hex := Format("0x{:02X}", VK)
@@ -117,7 +117,7 @@ _NCR_PreviewResetsForEveryNavKey() {
 _NCR_EngineResetsForEveryNavKey() {
 	Body := _DriverFuncBody("_OnPrefixKeyDown")
 	Assert(Body != "", "_OnPrefixKeyDown() must exist in the driver source")
-	Gate := InStr(Body, "else if ResetVKs.Has(VK)")
+	Gate := InStr(Body, "else if KS_IsContextResetKey(VK)")
 	Pair := InStr(Body, "_PrefixInvalidateInputContext(FocusToken, KnownBoundary, AtLineStart)", true, Gate)
 	Assert(Gate > 0 and Pair > Gate,
 		"every key enumerated by ResetVKs must flow through the same paired engine+preview transaction; a second VK list is the N-of-M drift this test prevents")
@@ -142,7 +142,8 @@ _NCR_BoundaryPromiseMatchesTheContract() {
 _NCR_EngineContractStillNamesTheCluster() {
 	Src := _StripFullLineComments(_DriverSourceConcat())
 	Assert(Src != "", "the driver source must be readable")
-	Doc := _DriverDirConcat("infra/hotstrings")
+	Doc := _DriverFuncBody("KS_IsContextResetKey")
+	Assert(Doc != "", "the canonical context-reset owner must exist")
 	for Needle in ["Home", "End", "PgUp", "PgDn", "Insert", "Delete"]
 		Assert(InStr(Doc, Needle) > 0,
 			"the hotstring engine's documented buffer-invalidation contract must keep naming '" . Needle . "' — that list is the only statement of which keys belong to this cluster, and it is what revealed that only half of them were wired")

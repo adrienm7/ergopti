@@ -342,3 +342,32 @@ Test("LLM agent: tool cache expires across tick wrap (tools-cache-wrap)",
 	_LAG_ToolsCacheLifetime.Bind(0xFFFFFFF0))
 
 #Include test_llm_agent_tools_native64_ttl.ahk
+
+; A caret move changes the typing location even when only the agent observes.
+_LAG_CaretContext(Key, Reset) {
+	_LAG_Run(_LAG_Menu("auto", "cerebras", "cerebras", false), _LTN_Screen(""), _Body)
+	_Body(Fx, Lines, Sent) {
+		_LAG_WithBridgeOff(_Typing)
+		_Typing() {
+			global _LLM_Bridge_AgentBuffer
+			Before := _LAG_PredictionSnapshot(Fx)
+			_LAG_TypeThroughBridge(Fx, "OLD_LOCATION_ASCII_SENTINEL ")
+			AssertEqual("OLD_LOCATION_ASCII_SENTINEL ", _LLM_Bridge_AgentBuffer,
+				"the real agent typing observer must hold the original location")
+			LLM_Bridge_FeedKeyDownIfActive(GetKeyVK(Key), true)
+			_LAG_TypeThroughBridge(Fx, "new location")
+			Expected := Reset ? "new location" : "OLD_LOCATION_ASCII_SENTINEL new location"
+			AssertEqual(Expected, _LLM_Bridge_AgentBuffer,
+				"typing after navigation must not append to the previous caret location")
+			_LAG_AssertNoPrediction(Fx, Before)
+			AssertEqual(0, Fx.Remote.Length, "observing typing must not dispatch a request")
+			AssertEqual(0, Sent.Length, "observing typing must not send keys")
+		}
+	}
+}
+
+for _LAG_CaretKey in ["Left", "Up", "Right", "Down", "Home", "End", "PgUp", "PgDn", "Insert", "Delete"]
+	Test("LLM agent off: " . _LAG_CaretKey . " retires the old typing location (agent-caret-context)",
+		_LAG_CaretContext.Bind(_LAG_CaretKey, true))
+Test("LLM agent off: modifier preserves the typing location (agent-caret-context)",
+	_LAG_CaretContext.Bind("LShift", false))
