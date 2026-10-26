@@ -43,7 +43,7 @@ local Paths = helpers.load_module("infra.paths")
 -- the scan.
 local PAGE_FILES = {
 	metrics_typing = { "index.html", "data.js", "filters.js", "main.js", "script.js", "state.js" },
-	metrics_apps = { "index.html", "main.js", "script.js", "helpers.js", "modal.js", "state.js" },
+	metrics_apps = { "index.html", "main.js", "helpers.js", "modal.js", "state.js" },
 }
 
 --- Every action string a shared page posts to its bridge.

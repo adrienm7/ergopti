@@ -433,8 +433,8 @@ test('typing NONE empties actual raw and hotstring SFB computations', () => {
 assert.equal(passed, 12, 'all original seven and five selection regressions must execute');
 
 // Date labels are untrusted even when a manifest key cannot be parsed.
-for (const legacy of [false, true]) {
-	test(`metrics date labels remain literal at all HTML sinks (${legacy ? 'legacy' : 'loaded'})`, () => {
+{
+	test('metrics date labels remain literal at all HTML sinks', () => {
 		const elements = Object.fromEntries(
 			['day_timeline_container', 'top_sessions_tbody', 'top_days_tbody'].map((id) => [
 				id,
@@ -448,11 +448,8 @@ for (const legacy of [false, true]) {
 		});
 		vm.runInContext(read('host_bridge.js'), context);
 		vm.runInContext(read('dom_utils.js'), context);
-		const scripts = legacy
-			? ['script.js']
-			: ['helpers.js', 'state.js', 'main.js', 'charts.js', 'modal.js'];
-		for (const name of scripts) {
-			if (!legacy) assert.ok(read('metrics_apps/index.html').includes(`src="${name}"`));
+		for (const name of ['helpers.js', 'state.js', 'main.js', 'charts.js', 'modal.js']) {
+			assert.ok(read('metrics_apps/index.html').includes(`src="${name}"`));
 			vm.runInContext(read(`metrics_apps/${name}`), context);
 		}
 		vm.runInContext('initDashboard = () => {}; renderDashboard = () => {};', context);
@@ -485,22 +482,14 @@ for (const legacy of [false, true]) {
 			assert.ok(element.innerHTML.includes('11/10/2026'));
 	});
 }
-assert.equal(passed, 14, 'the twelve existing controls and both date sink chains must execute');
+assert.equal(passed, 13, 'the twelve existing controls and the date sink chain must execute');
 
 // Replay host data through real aggregation before inspecting its HTML display.
-for (const legacy of [false, true]) {
-	test(`metrics top days escape actual aggregate switch labels (${legacy ? 'legacy' : 'loaded'})`, () => {
-		const context = legacy
-			? vm.createContext({ window: {}, document: { addEventListener() {} }, console })
-			: appsFixture().context;
-		if (legacy) {
-			vm.runInContext(read('host_bridge.js'), context);
-			vm.runInContext(read('metrics_apps/script.js'), context);
-			vm.runInContext('initDashboard = () => {}; renderDashboard = () => {};', context);
-		} else {
-			vm.runInContext(read('metrics_apps/charts.js'), context);
-			vm.runInContext(read('metrics_apps/modal.js'), context);
-		}
+{
+	test('metrics top days escape actual aggregate switch labels', () => {
+		const context = appsFixture().context;
+		vm.runInContext(read('metrics_apps/charts.js'), context);
+		vm.runInContext(read('metrics_apps/modal.js'), context);
 		vm.runInContext(read('dom_utils.js'), context);
 		const tbody = { innerHTML: '' };
 		context.document.getElementById = (id) => (id === 'top_days_tbody' ? tbody : null);
@@ -540,6 +529,21 @@ for (const legacy of [false, true]) {
 		assert.ok(tbody.innerHTML.includes('>2</td>'));
 	});
 }
-assert.equal(passed, 16, 'the fourteen prior controls and both aggregate sink chains must execute');
+assert.equal(passed, 14, 'the thirteen prior controls and the aggregate sink chain must execute');
+
+// A page script no page loads is dead code that still gets tested, linted and
+// baselined (metrics_apps/script.js, a 3600-line copy of the split modules, was
+// retired on 2026-10-26): every script of the dashboard must be loaded by it.
+test('every script of the metrics apps dashboard is loaded by its page', () => {
+	const page = read('metrics_apps/index.html');
+	const scripts = fs
+		.readdirSync(path.join(root, 'metrics_apps'))
+		.filter((name) => name.endsWith('.js'));
+	assert.ok(scripts.length >= 5, 'the dashboard scripts must be found');
+	for (const name of scripts) {
+		assert.ok(page.includes(`src="${name}"`), `metrics_apps/${name} is loaded by no page`);
+	}
+});
+assert.equal(passed, 15, 'the orphan script check must execute');
 
 console.log(`${passed} passed, 0 failed.`);

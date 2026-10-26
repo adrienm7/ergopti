@@ -3454,8 +3454,6 @@
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Nie w Windows: ten sterownik rysuje ikonę flagi na każdym wierszu języka, a wspólny wiersz menu niesie etykietę, znacznik, akcję i podmenu — nie ikonę. Zadeklarowanie tego wiersza tam oznaczałoby wymianę flag na wspólny opis.",
 	"platform_reason.base_layout_is_the_linux_decode_table": "Tylko Linux: ten sterownik czyta surowe kody klawiszy z jądra i musi wiedzieć, który układ fizyczny je wytworzył, więc wybiera tablicę, według której dekoduje. macOS pyta system o źródła wejścia, a Windows instaluje układ klawiatury; żaden nie ma tablicy dekodowania do wyboru.",
 	"platform_reason.shortcuts_restore_is_composed_on_macos": "Jeszcze nie w macOS: tam kombinacje klawiszy są przechowywane w ustawieniach Karabinera i tylko przywracanie w menu Konfiguracja przywraca je razem z pozostałymi ustawieniami skrótów.",
-	"metrics_apps.chart_time_series": "Czas",
-	"metrics_apps.edit_category_hint": "Edytuj kategorię",
 	"menu.llm.generation.temperature": "Temperatura",
 	"menu.llm.generation.context_length": "Długość kontekstu",
 	"numeric_prompt.window_title": "Wartość",

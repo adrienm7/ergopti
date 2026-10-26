@@ -9,7 +9,7 @@
 --- unused feature rather than a defect (keystats SQL census, PAR-67).
 ---
 --- FEATURES & RATIONALE:
---- 1. Key holds: `_shared/ui/metrics_apps/script.js` sums `kc_hold[kc].s` and
+--- 1. Key holds: `_shared/ui/metrics_apps/main.js` and `state.js` sum `kc_hold[kc].s` and
 ---    `.n` for the modifier hold mean; macOS projected `sum` and `count`.
 --- 2. Focus latency: macOS writes focus_to_first_key_* into agg_app_day_ergo
 ---    and the page reads them, but only the Linux reader projected them.

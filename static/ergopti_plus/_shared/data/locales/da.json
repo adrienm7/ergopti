@@ -3454,8 +3454,6 @@
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Ikke på Windows: den driver tegner et flagikon på hver sproglinje, og en delt menurække bærer en etiket, et flueben, en handling og en undermenu — ikke et ikon. At erklære rækken dér ville bytte flagene væk for en fælles beskrivelse.",
 	"platform_reason.base_layout_is_the_linux_decode_table": "Kun Linux: denne driver læser rå tastekoder fra kernen og skal vide, hvilket fysisk layout der frembragte dem, så den vælger den tabel, den afkoder med. macOS spørger systemet om dets inputkilder, og Windows installerer et tastaturlayout; ingen af dem har en afkodningstabel at vælge.",
 	"platform_reason.shortcuts_restore_is_composed_on_macos": "Endnu ikke på macOS: dér gemmes tastekombinationerne i Karabiners indstillinger, og kun gendannelsen i menuen Konfiguration bringer dem tilbage sammen med de øvrige genvejsindstillinger.",
-	"metrics_apps.chart_time_series": "Tid",
-	"metrics_apps.edit_category_hint": "Rediger kategori",
 	"menu.llm.generation.temperature": "Temperatur",
 	"menu.llm.generation.context_length": "Kontekstlængde",
 	"numeric_prompt.window_title": "Værdi",

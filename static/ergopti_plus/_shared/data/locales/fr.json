@@ -3454,8 +3454,6 @@
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Pas sous Windows : ce pilote dessine une icône de drapeau sur chaque ligne de langue, et une ligne de menu partagée porte un libellé, une coche, une action et un sous-menu — pas une icône. Déclarer cette ligne là-bas échangerait les drapeaux contre une description commune.",
 	"platform_reason.base_layout_is_the_linux_decode_table": "Linux uniquement : ce pilote lit les codes touches bruts du noyau et doit savoir quelle disposition physique les a produits ; il choisit donc la table avec laquelle il décode. macOS interroge le système pour ses sources de saisie et Windows installe une disposition clavier ; ni l'un ni l'autre n'a de table de décodage à choisir.",
 	"platform_reason.shortcuts_restore_is_composed_on_macos": "Pas encore sous macOS : ses combinaisons de touches sont gardées dans les réglages de Karabiner, et seule la restauration du menu Configuration les rétablit avec les autres réglages des raccourcis.",
-	"metrics_apps.chart_time_series": "Temps",
-	"metrics_apps.edit_category_hint": "Modifier la catégorie",
 	"menu.llm.generation.temperature": "Température",
 	"menu.llm.generation.context_length": "Longueur du contexte",
 	"numeric_prompt.window_title": "Valeur",

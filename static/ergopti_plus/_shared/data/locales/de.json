@@ -3454,8 +3454,6 @@
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Nicht unter Windows: dieser Treiber zeichnet auf jeder Sprachzeile ein Flaggensymbol, und eine gemeinsame Menüzeile trägt eine Beschriftung, ein Häkchen, eine Aktion und ein Untermenü — kein Symbol. Die Zeile dort zu deklarieren hieße, die Flaggen gegen eine gemeinsame Beschreibung einzutauschen.",
 	"platform_reason.base_layout_is_the_linux_decode_table": "Nur Linux: dieser Treiber liest rohe Tastencodes vom Kernel und muss wissen, welches physische Layout sie erzeugt hat, also wählt er die Tabelle, mit der er dekodiert. macOS fragt das System nach seinen Eingabequellen und Windows installiert ein Tastaturlayout; keines von beiden hat eine Dekodiertabelle zur Auswahl.",
 	"platform_reason.shortcuts_restore_is_composed_on_macos": "Noch nicht unter macOS: Dort liegen die Tastenkombinationen in den Karabiner-Einstellungen, und nur die Wiederherstellung im Menü Konfiguration stellt sie zusammen mit den übrigen Kürzel-Einstellungen wieder her.",
-	"metrics_apps.chart_time_series": "Zeit",
-	"metrics_apps.edit_category_hint": "Kategorie ändern",
 	"menu.llm.generation.temperature": "Temperatur",
 	"menu.llm.generation.context_length": "Kontextlänge",
 	"numeric_prompt.window_title": "Wert",

@@ -3454,8 +3454,6 @@
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Ne na Windows: ten ovladač kreslí na každém řádku jazyka ikonu vlajky, a sdílený řádek nabídky nese popisek, zaškrtnutí, akci a podnabídku — nikoli ikonu. Deklarovat tento řádek tam by znamenalo vyměnit vlajky za sdílený popis.",
 	"platform_reason.base_layout_is_the_linux_decode_table": "Pouze Linux: tento ovladač čte surové kódy kláves z jádra a potřebuje vědět, které fyzické rozložení je vytvořilo, takže volí tabulku, podle níž dekóduje. macOS se ptá systému na vstupní zdroje a Windows instaluje rozložení klávesnice; ani jeden nemá dekódovací tabulku na výběr.",
 	"platform_reason.shortcuts_restore_is_composed_on_macos": "Zatím ne na macOS: tam jsou kombinace kláves uložené v nastavení Karabineru a jen obnovení v nabídce Konfigurace je vrátí spolu s ostatními nastaveními zkratek.",
-	"metrics_apps.chart_time_series": "Čas",
-	"metrics_apps.edit_category_hint": "Změnit kategorii",
 	"menu.llm.generation.temperature": "Teplota",
 	"menu.llm.generation.context_length": "Délka kontextu",
 	"numeric_prompt.window_title": "Hodnota",

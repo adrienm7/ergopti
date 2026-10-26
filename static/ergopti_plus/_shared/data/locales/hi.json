@@ -3454,8 +3454,6 @@
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "Windows पर नहीं: वह ड्राइवर हर भाषा-पंक्ति पर झंडे का चिह्न बनाता है, जबकि साझा मेनू पंक्ति एक लेबल, एक निशान, एक क्रिया और एक उपमेनू रखती है — चिह्न नहीं। वहाँ इस पंक्ति की घोषणा करना झंडों के बदले साझा विवरण लेना होगा।",
 	"platform_reason.base_layout_is_the_linux_decode_table": "केवल Linux: यह ड्राइवर कर्नेल से कच्चे कीकोड पढ़ता है और उसे जानना होता है कि उन्हें कौन-सा भौतिक लेआउट उत्पन्न कर रहा है, इसलिए वह वह तालिका चुनता है जिससे वह डिकोड करता है। macOS सिस्टम से उसके इनपुट स्रोत पूछता है और Windows एक कीबोर्ड लेआउट स्थापित करता है; दोनों में से किसी के पास चुनने योग्य डिकोड तालिका नहीं है।",
 	"platform_reason.shortcuts_restore_is_composed_on_macos": "macOS पर अभी नहीं: वहाँ कुंजी संयोजन Karabiner की सेटिंग्स में रखे जाते हैं, और केवल «कॉन्फ़िगरेशन» मेनू का पुनर्स्थापन ही उन्हें बाकी शॉर्टकट सेटिंग्स के साथ वापस लाता है।",
-	"metrics_apps.chart_time_series": "समय",
-	"metrics_apps.edit_category_hint": "श्रेणी संपादित करें",
 	"menu.llm.generation.temperature": "तापमान",
 	"menu.llm.generation.context_length": "संदर्भ की लंबाई",
 	"numeric_prompt.window_title": "मान",

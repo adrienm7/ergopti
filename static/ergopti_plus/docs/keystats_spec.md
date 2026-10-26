@@ -1067,7 +1067,7 @@ Séance 2 (extraction UI partagée + branchement HS) :
 
 - `static/ergopti_plus/_shared/data/db/schema.sql` — DDL canonique.
 - `static/ergopti_plus/_shared/data/db/migrations/0001_initial.sql`.
-- `static/ergopti_plus/_shared/ui/metrics_apps/{index.html,script.js,style.css,README.md}`.
+- `static/ergopti_plus/_shared/ui/metrics_apps/{index.html,*.js,style.css}`.
 - `static/ergopti_plus/_shared/ui/metrics_typing/{index.html,*.js,style.css,README.md}`.
 - `static/ergopti_plus/_shared/scripts/data_sql_parser.lua` — utilitaire
   partagé pour parser les batches data.sql (utilisé par le replay HS,

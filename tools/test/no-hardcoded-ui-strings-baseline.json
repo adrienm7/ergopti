@@ -150,42 +150,6 @@
 		"count": 1
 	},
 	{
-		"file": "_shared/ui/metrics_apps/script.js",
-		"sink": "html title",
-		"text": "Distraction",
-		"count": 1
-	},
-	{
-		"file": "_shared/ui/metrics_apps/script.js",
-		"sink": "html title",
-		"text": "Neutre",
-		"count": 1
-	},
-	{
-		"file": "_shared/ui/metrics_apps/script.js",
-		"sink": "html title",
-		"text": "Productif",
-		"count": 1
-	},
-	{
-		"file": "_shared/ui/metrics_apps/script.js",
-		"sink": "textContent",
-		"text": " c/min",
-		"count": 1
-	},
-	{
-		"file": "_shared/ui/metrics_apps/script.js",
-		"sink": "textContent",
-		"text": " ms",
-		"count": 2
-	},
-	{
-		"file": "_shared/ui/metrics_apps/script.js",
-		"sink": "textContent",
-		"text": "[render error] ",
-		"count": 1
-	},
-	{
 		"file": "_shared/ui/metrics_typing/modal.js",
 		"sink": "innerText",
 		"text": "Apps (",

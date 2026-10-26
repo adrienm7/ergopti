@@ -3454,8 +3454,6 @@
 	"platform_reason.locale_rows_carry_a_flag_on_windows": "No en Windows: ese controlador dibuja un icono de bandera en cada fila de idioma, y una fila de menú compartida lleva una etiqueta, una marca, una acción y un submenú, no un icono. Declarar esta fila allí cambiaría las banderas por una descripción común.",
 	"platform_reason.base_layout_is_the_linux_decode_table": "Solo Linux: este controlador lee códigos de tecla en bruto del núcleo y necesita saber qué distribución física los produjo, así que elige la tabla con la que decodifica. macOS pregunta al sistema por sus fuentes de entrada y Windows instala una distribución de teclado; ninguno tiene una tabla de decodificación que elegir.",
 	"platform_reason.shortcuts_restore_is_composed_on_macos": "Todavía no en macOS: allí las combinaciones de teclas se guardan en los ajustes de Karabiner, y solo la restauración del menú Configuración las recupera junto con los demás ajustes de los atajos.",
-	"metrics_apps.chart_time_series": "Tiempo",
-	"metrics_apps.edit_category_hint": "Editar categoría",
 	"menu.llm.generation.temperature": "Temperatura",
 	"menu.llm.generation.context_length": "Longitud del contexto",
 	"numeric_prompt.window_title": "Valor",
