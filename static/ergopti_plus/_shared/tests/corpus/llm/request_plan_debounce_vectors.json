@@ -1,0 +1,1457 @@
+{
+	"_comment": "Request transcripts of the prediction debounce and rate floor, replayed through _shared/lua/llm/request_plan/debounce.lua by the macOS and Linux runners. A vector names a driver_options set (or gives one), the floor of each backend in milliseconds (the floor port answers from this map and raises for a backend it lacks), and an ordered list of steps. A step calls one method of the plan with args (plus now_ms for on_dispatch and on_sent, the caller's monotonic clock in milliseconds) and lists the decisions it returns, in order, as expect, or a substring the raised message must contain as expect_error. Tokens count from 1 per plan, one per arm. An arm decision means: cancel nothing else and start a one-shot timer of delay_ms; cancel means stop that token; fire and stale answer on_timer; send and defer answer on_dispatch. driver_options is the deliberate per-driver difference: each driver asserts that its own policy equals its entry, so a drift is a red test, not a silent change. A port in another language replays this file unchanged.",
+	"driver_options": {
+		"macos": {
+			"allow_never": true,
+			"pace_explicit": false,
+			"pace_variants": false,
+			"floor_scope": "global",
+			"live_instant_word_end": true
+		},
+		"linux": {
+			"allow_never": false,
+			"pace_explicit": true,
+			"pace_variants": true,
+			"floor_scope": "per_backend",
+			"live_instant_word_end": false
+		}
+	},
+	"vectors": [
+		{
+			"id": "typing-arms-the-configured-debounce",
+			"description": "An ordinary keystroke arms the configured debounce.",
+			"options": "macos",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": false
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing"
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 500,
+							"why": "Inactivity"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "typing-arms-the-configured-debounce-linux",
+			"description": "The same keystroke on the other driver's options.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": false
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing"
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 500,
+							"why": "Inactivity"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "a-new-keystroke-supersedes-the-pending-timer",
+			"description": "A second keystroke cancels the pending token and arms a new one.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": false
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing"
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 500,
+							"why": "Inactivity"
+						}
+					]
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing"
+					},
+					"expect": [
+						{
+							"action": "cancel",
+							"token": 1
+						},
+						{
+							"action": "arm",
+							"token": 2,
+							"delay_ms": 500,
+							"why": "Inactivity"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "the-current-timer-fires-once",
+			"description": "A fired timer answers fire once; a second delivery is stale.",
+			"options": "macos",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": false
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing"
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 500,
+							"why": "Inactivity"
+						}
+					]
+				},
+				{
+					"call": "on_timer",
+					"args": {
+						"token": 1
+					},
+					"expect": [
+						{
+							"action": "fire",
+							"token": 1,
+							"why": "Inactivity"
+						}
+					]
+				},
+				{
+					"call": "on_timer",
+					"args": {
+						"token": 1
+					},
+					"expect": [
+						{
+							"action": "stale",
+							"token": 1
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "a-superseded-timer-is-stale",
+			"description": "The timer of an older keystroke never fires.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": false
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing"
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 500,
+							"why": "Inactivity"
+						}
+					]
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing"
+					},
+					"expect": [
+						{
+							"action": "cancel",
+							"token": 1
+						},
+						{
+							"action": "arm",
+							"token": 2,
+							"delay_ms": 500,
+							"why": "Inactivity"
+						}
+					]
+				},
+				{
+					"call": "on_timer",
+					"args": {
+						"token": 1
+					},
+					"expect": [
+						{
+							"action": "stale",
+							"token": 1
+						}
+					]
+				},
+				{
+					"call": "on_timer",
+					"args": {
+						"token": 2
+					},
+					"expect": [
+						{
+							"action": "fire",
+							"token": 2,
+							"why": "Inactivity"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "a-cancelled-timer-is-stale",
+			"description": "A cancel makes the pending token stale; a second cancel does nothing.",
+			"options": "macos",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": false
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing"
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 500,
+							"why": "Inactivity"
+						}
+					]
+				},
+				{
+					"call": "on_cancel",
+					"args": {},
+					"expect": [
+						{
+							"action": "cancel",
+							"token": 1
+						}
+					]
+				},
+				{
+					"call": "on_cancel",
+					"args": {},
+					"expect": []
+				},
+				{
+					"call": "on_timer",
+					"args": {
+						"token": 1
+					},
+					"expect": [
+						{
+							"action": "stale",
+							"token": 1
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "word-end-fires-instantly-when-asked",
+			"description": "With instant_on_word_end a word end arms a zero delay; other keys keep the debounce.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": true
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing",
+						"ends_word": true
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 0,
+							"why": "Word-end"
+						}
+					]
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing",
+						"ends_word": false
+					},
+					"expect": [
+						{
+							"action": "cancel",
+							"token": 1
+						},
+						{
+							"action": "arm",
+							"token": 2,
+							"delay_ms": 500,
+							"why": "Inactivity"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "word-end-keeps-the-debounce-when-not-asked",
+			"description": "Without instant_on_word_end a word end waits the debounce.",
+			"options": "macos",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": false
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing",
+						"ends_word": true
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 500,
+							"why": "Inactivity"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "a-disabled-engine-arms-nothing",
+			"description": "With the AI switch off every input is skipped and nothing is cancelled.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": false,
+						"debounce_ms": 500,
+						"instant_on_word_end": false
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing"
+					},
+					"expect": [
+						{
+							"action": "skip",
+							"why": "disabled"
+						}
+					]
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "explicit_trigger"
+					},
+					"expect": [
+						{
+							"action": "skip",
+							"why": "disabled"
+						}
+					]
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "expiry"
+					},
+					"expect": [
+						{
+							"action": "skip",
+							"why": "disabled"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "never-turns-the-automatic-trigger-off",
+			"description": "A negative debounce skips typing and overrides, even at a word end, and keeps the pending timer.",
+			"options": "macos",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": true
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing",
+						"ends_word": false
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 500,
+							"why": "Inactivity"
+						}
+					]
+				},
+				{
+					"call": "configure",
+					"args": {
+						"debounce_ms": -1
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing",
+						"ends_word": true
+					},
+					"expect": [
+						{
+							"action": "skip",
+							"why": "automatic trigger off"
+						}
+					]
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "override",
+						"delay_ms": 250
+					},
+					"expect": [
+						{
+							"action": "skip",
+							"why": "automatic trigger off"
+						}
+					]
+				},
+				{
+					"call": "on_timer",
+					"args": {
+						"token": 1
+					},
+					"expect": [
+						{
+							"action": "fire",
+							"token": 1,
+							"why": "Inactivity"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "never-is-refused-where-the-driver-has-no-never",
+			"description": "A driver without a never setting rejects a negative debounce.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"debounce_ms": -1
+					},
+					"expect_error": "negative debounce"
+				}
+			]
+		},
+		{
+			"id": "never-does-not-stop-an-explicit-trigger",
+			"description": "An explicit trigger is a request, so never leaves it armed at once.",
+			"options": "macos",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": -1,
+						"instant_on_word_end": false
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "explicit_trigger"
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 0,
+							"why": "Explicit-trigger"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "explicit-trigger-uses-the-debounce",
+			"description": "A typed trigger waits the configured debounce.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": false
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "explicit_trigger"
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 500,
+							"why": "Explicit-trigger"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "hotstring-expiry-fires-at-once",
+			"description": "The expiry of a hotstring preview arms a zero delay.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": false
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "expiry"
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 0,
+							"why": "Hotstring-expiry"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "an-override-delay-is-used-as-given",
+			"description": "A chain delay replaces the debounce.",
+			"options": "macos",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": false
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "override",
+						"delay_ms": 1750
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 1750,
+							"why": "Override"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "an-override-needs-a-delay",
+			"description": "An override without a delay is refused.",
+			"options": "macos",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": false
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "override"
+					},
+					"expect_error": "override delay"
+				}
+			]
+		},
+		{
+			"id": "live-mode-replaces-the-debounce",
+			"description": "In live mode a keystroke waits the live debounce.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": false,
+						"live_debounce_ms": 80
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing"
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 80,
+							"why": "Live"
+						}
+					]
+				},
+				{
+					"call": "configure",
+					"args": {
+						"live_debounce_ms": false
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing"
+					},
+					"expect": [
+						{
+							"action": "cancel",
+							"token": 1
+						},
+						{
+							"action": "arm",
+							"token": 2,
+							"delay_ms": 500,
+							"why": "Inactivity"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "live-mode-overrides-never",
+			"description": "Live mode is an explicit request for the trigger, so never does not stop it.",
+			"options": "macos",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": -1,
+						"instant_on_word_end": false,
+						"live_debounce_ms": 80
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing"
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 80,
+							"why": "Live"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "live-word-end-instant-on-macos",
+			"description": "On macOS a word end is instant even in live mode.",
+			"options": "macos",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": true,
+						"live_debounce_ms": 80
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing",
+						"ends_word": true
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 0,
+							"why": "Word-end"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "live-word-end-keeps-the-live-debounce-on-linux",
+			"description": "On Linux live mode keeps its own debounce at a word end.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": true,
+						"live_debounce_ms": 80
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing",
+						"ends_word": true
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 80,
+							"why": "Live"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "live-expiry-has-its-own-why",
+			"description": "The expiry in live mode is logged as the live one.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": false,
+						"live_debounce_ms": 80
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "expiry"
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 0,
+							"why": "Live hotstring-expiry"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "the-floor-defers-an-automatic-request",
+			"description": "A request inside the backend's interval waits the remainder; the exact boundary sends.",
+			"options": "macos",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "ollama"
+					},
+					"now_ms": 1000,
+					"expect": [
+						{
+							"action": "send"
+						}
+					]
+				},
+				{
+					"call": "on_sent",
+					"args": {
+						"backend": "ollama"
+					},
+					"now_ms": 1000,
+					"expect": []
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "ollama"
+					},
+					"now_ms": 1200,
+					"expect": [
+						{
+							"action": "defer",
+							"delay_ms": 100,
+							"why": "rate floor"
+						}
+					]
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "ollama"
+					},
+					"now_ms": 1299,
+					"expect": [
+						{
+							"action": "defer",
+							"delay_ms": 1,
+							"why": "rate floor"
+						}
+					]
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "ollama"
+					},
+					"now_ms": 1300,
+					"expect": [
+						{
+							"action": "send"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "the-floor-follows-the-backend",
+			"description": "The api floor is longer than the local one.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "on_sent",
+					"args": {
+						"backend": "api"
+					},
+					"now_ms": 5000,
+					"expect": []
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "api"
+					},
+					"now_ms": 5499,
+					"expect": [
+						{
+							"action": "defer",
+							"delay_ms": 1,
+							"why": "rate floor"
+						}
+					]
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "api"
+					},
+					"now_ms": 5500,
+					"expect": [
+						{
+							"action": "send"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "macos-lets-an-explicit-request-through",
+			"description": "An explicit request is never throttled on macOS.",
+			"options": "macos",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "on_sent",
+					"args": {
+						"backend": "ollama"
+					},
+					"now_ms": 1000,
+					"expect": []
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "ollama",
+						"explicit": true
+					},
+					"now_ms": 1010,
+					"expect": [
+						{
+							"action": "send"
+						}
+					]
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "ollama"
+					},
+					"now_ms": 1010,
+					"expect": [
+						{
+							"action": "defer",
+							"delay_ms": 290,
+							"why": "rate floor"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "linux-paces-an-explicit-request",
+			"description": "An explicit request waits for the floor on Linux.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "on_sent",
+					"args": {
+						"backend": "ollama"
+					},
+					"now_ms": 1000,
+					"expect": []
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "ollama",
+						"explicit": true
+					},
+					"now_ms": 1010,
+					"expect": [
+						{
+							"action": "defer",
+							"delay_ms": 290,
+							"why": "rate floor"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "macos-does-not-pace-the-next-variants",
+			"description": "The second variant of a sequential request goes straight on macOS.",
+			"options": "macos",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "on_sent",
+					"args": {
+						"backend": "api"
+					},
+					"now_ms": 1000,
+					"expect": []
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "api",
+						"explicit": true,
+						"variant": 2
+					},
+					"now_ms": 1001,
+					"expect": [
+						{
+							"action": "send"
+						}
+					]
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "api",
+						"variant": 2
+					},
+					"now_ms": 1001,
+					"expect": [
+						{
+							"action": "send"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "linux-paces-the-next-variants",
+			"description": "The second variant waits for the floor on Linux.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "on_sent",
+					"args": {
+						"backend": "api"
+					},
+					"now_ms": 1000,
+					"expect": []
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "api",
+						"variant": 2
+					},
+					"now_ms": 1100,
+					"expect": [
+						{
+							"action": "defer",
+							"delay_ms": 400,
+							"why": "rate floor"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "the-global-floor-counts-every-backend",
+			"description": "On macOS the last request of any backend holds the next one.",
+			"options": "macos",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "on_sent",
+					"args": {
+						"backend": "ollama"
+					},
+					"now_ms": 1000,
+					"expect": []
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "api"
+					},
+					"now_ms": 1100,
+					"expect": [
+						{
+							"action": "defer",
+							"delay_ms": 400,
+							"why": "rate floor"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "the-per-backend-floor-counts-its-own-backend",
+			"description": "On Linux another backend is not held back.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "on_sent",
+					"args": {
+						"backend": "ollama"
+					},
+					"now_ms": 1000,
+					"expect": []
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "api"
+					},
+					"now_ms": 1100,
+					"expect": [
+						{
+							"action": "send"
+						}
+					]
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "ollama"
+					},
+					"now_ms": 1100,
+					"expect": [
+						{
+							"action": "defer",
+							"delay_ms": 200,
+							"why": "rate floor"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "reset-forgets-the-last-request-and-the-timer",
+			"description": "Re-initialisation clears both.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": false
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing"
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 500,
+							"why": "Inactivity"
+						}
+					]
+				},
+				{
+					"call": "on_sent",
+					"args": {
+						"backend": "ollama"
+					},
+					"now_ms": 1000,
+					"expect": []
+				},
+				{
+					"call": "reset",
+					"args": {},
+					"expect": []
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "ollama"
+					},
+					"now_ms": 1010,
+					"expect": [
+						{
+							"action": "send"
+						}
+					]
+				},
+				{
+					"call": "on_timer",
+					"args": {
+						"token": 1
+					},
+					"expect": [
+						{
+							"action": "stale",
+							"token": 1
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "an-unknown-backend-fails-where-the-policy-lives",
+			"description": "The floor port raising for an unknown backend is not swallowed.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "on_sent",
+					"args": {
+						"backend": "quantum"
+					},
+					"now_ms": 1000,
+					"expect": []
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "quantum"
+					},
+					"now_ms": 1100,
+					"expect_error": "quantum"
+				}
+			]
+		},
+		{
+			"id": "an-unset-debounce-is-refused",
+			"description": "Typing before the debounce was configured is a programming error.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing"
+					},
+					"expect_error": "never configured"
+				}
+			]
+		}
+	]
+}
