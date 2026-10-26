@@ -9,29 +9,23 @@
 # tools/codegen/codegen-native-theme.cjs. Edit this file, then run
 # `npm run gen`; never edit the generated Lua by hand.
 #
-# The Windows driver still types its own palette (a superset of the one below).
-# tools/test/test-color-presets-parity.cjs holds that copy to this one.
+# The Windows driver still types the same palette in hcw_helpers.ahk;
+# tools/test/test-color-presets-parity.cjs holds that copy to this one, colour
+# for colour and in order, until Windows reads a generated palette too.
 
-# The ordered palette. `i18n` is the locale key of the colour's name.
+# The ordered palette: the 14 colours the three drivers offer, along the hue wheel
+# (warm, cool, neutral). `i18n` is the locale key of the colour's name; the
+# "ai" colour is the AI tooltip's own purple: its hex is not typed here, `hex_from` names the
+# key of [accent_colors] in _shared/modules/tooltip/constants.toml, its one source.
 [[hotstring_palette]]
 name = "red"
 i18n = "hs_config.color_red"
 hex = "#e53935"
 
 [[hotstring_palette]]
-name = "green"
-i18n = "hs_config.color_green"
-hex = "#43a047"
-
-[[hotstring_palette]]
-name = "orange"
-i18n = "hs_config.color_orange"
-hex = "#fb8c00"
-
-[[hotstring_palette]]
-name = "blue"
-i18n = "hs_config.color_blue"
-hex = "#1e88e5"
+name = "pink"
+i18n = "hs_config.color_pink"
+hex = "#e91e63"
 
 [[hotstring_palette]]
 name = "purple"
@@ -39,14 +33,54 @@ i18n = "hs_config.color_purple"
 hex = "#8e44ad"
 
 [[hotstring_palette]]
+name = "ai"
+i18n = "menu.hotstrings.tooltip_ai"
+hex_from = "ai_loading_hex"
+
+[[hotstring_palette]]
+name = "indigo"
+i18n = "hs_config.color_indigo"
+hex = "#3f51b5"
+
+[[hotstring_palette]]
+name = "blue"
+i18n = "hs_config.color_blue"
+hex = "#1e88e5"
+
+[[hotstring_palette]]
 name = "cyan"
 i18n = "hs_config.color_cyan"
 hex = "#00838f"
 
 [[hotstring_palette]]
+name = "turquoise"
+i18n = "hs_config.color_turquoise"
+hex = "#009688"
+
+[[hotstring_palette]]
+name = "green"
+i18n = "hs_config.color_green"
+hex = "#43a047"
+
+[[hotstring_palette]]
+name = "lime"
+i18n = "hs_config.color_lime"
+hex = "#9e9d24"
+
+[[hotstring_palette]]
 name = "yellow"
 i18n = "hs_config.color_yellow"
 hex = "#fdd835"
+
+[[hotstring_palette]]
+name = "orange"
+i18n = "hs_config.color_orange"
+hex = "#fb8c00"
+
+[[hotstring_palette]]
+name = "brown"
+i18n = "hs_config.color_brown"
+hex = "#8d6e63"
 
 [[hotstring_palette]]
 name = "gray"
