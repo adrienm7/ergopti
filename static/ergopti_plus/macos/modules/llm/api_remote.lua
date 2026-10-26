@@ -42,6 +42,7 @@ local Paths          = require("infra.paths")
 local Profiles       = require("modules.llm.profiles")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")
+local TokenBudget = require("llm.request_plan.token_budget")
 local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
 local TokenCrypto    = require("modules.llm.api_token_crypto")
 local _http_adapter  = require("adapters.http_client")
@@ -2732,7 +2733,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
                        on_success, on_fail, request_id_provider, _streaming, _on_partial)
 	local effective_temp     = tonumber(temperature) or ApiCommon.DEFAULT_TEMPERATURE
 	local system_prompt      = Profiles.resolve_system_prompt(profile, num_predictions)
-	local tokens             = (tonumber(max_predict) or 32) * num_predictions + (num_predictions * 5)
+	local tokens             = TokenBudget.for_call(tonumber(max_predict) or 32, num_predictions)
 	local is_batch           = profile.batch
 	local dedup_stats        = ApiCommon.new_dedup_stats()
 	local t0                 = TimerScheduler.now()

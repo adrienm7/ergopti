@@ -1,0 +1,67 @@
+{
+	"_comment": "Output token limit of one backend call, replayed through _shared/lua/llm/request_plan/token_budget.lua by the macOS and Linux runners. A call returning one prediction keeps the base budget; a batch call returning per_call predictions gets per_call * (base + 5), the five being a variant's numbering and separator. Linux used per_call * base (no overhead) before this corpus: a deliberate convergence to the macOS and Windows rule, so a batch of three is no longer cut short on Linux. retry adds the retry policy's extra tokens. expect_error is a substring of the message the plan must raise.",
+	"drivers": {
+		"macos": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
+		"linux": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
+		"windows": "Not ported yet: prediction_exec.ahk caps the batch at max*n+5*n already, so it should call a port of for_call and replay every vector; its retry adds the retry policy's extra tokens the same way."
+	},
+	"differences": {
+		"batch_overhead": "Linux gave a batch of n variants n*base tokens; it now gives n*(base+5) as macOS and Windows do. Convergence, written reason: the five tokens are the numbering and separator each variant spends, and without them the last variant of a batch could be cut short on Linux only."
+	},
+	"vectors": [
+		{
+			"id": "a-single-prediction-keeps-the-base-budget",
+			"base_tokens": 40,
+			"per_call": 1,
+			"expect": 40
+		},
+		{
+			"id": "a-batch-of-three-adds-five-per-variant",
+			"base_tokens": 40,
+			"per_call": 3,
+			"expect": 135
+		},
+		{
+			"id": "a-batch-of-two",
+			"base_tokens": 16,
+			"per_call": 2,
+			"expect": 42
+		},
+		{
+			"id": "a-retry-adds-the-extra-room",
+			"retry": {
+				"call_tokens": 40,
+				"extra_tokens": 24
+			},
+			"expect": 64
+		},
+		{
+			"id": "a-retry-with-no-extra-room",
+			"retry": {
+				"call_tokens": 40,
+				"extra_tokens": 0
+			},
+			"expect": 40
+		},
+		{
+			"id": "a-zero-base-is-refused",
+			"base_tokens": 0,
+			"per_call": 1,
+			"expect_error": "base_tokens must be a whole number from 1"
+		},
+		{
+			"id": "a-fractional-per-call-is-refused",
+			"base_tokens": 40,
+			"per_call": 1.5,
+			"expect_error": "per_call must be a whole number from 1"
+		},
+		{
+			"id": "a-negative-extra-is-refused",
+			"retry": {
+				"call_tokens": 40,
+				"extra_tokens": -1
+			},
+			"expect_error": "extra_tokens must be a whole number from 0"
+		}
+	]
+}

@@ -986,8 +986,8 @@ function M.predict(context, output_context, override)
 				or base_temperature,
 			-- A rewrite's budget follows its sentence; the continuation override
 			-- would truncate it and erase text it could not retype.
-			max_tokens = (rewrite and params.max_tokens or _max_tokens or params.max_tokens)
-				* batching.per_call,
+			max_tokens = require("llm.request_plan.token_budget").for_call(
+				rewrite and params.max_tokens or _max_tokens or params.max_tokens, batching.per_call),
 			-- Decided from the prompt, as macOS does: one continuation, unless the
 			-- prompt asks for the two-line correction format or a batch. By id, a
 			-- user's copy of "basic" never got the single-line stops.
