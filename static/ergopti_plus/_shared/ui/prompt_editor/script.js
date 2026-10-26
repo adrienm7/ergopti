@@ -56,8 +56,8 @@ function parseToNodes(text) {
 		} else if (
 			tokenName === 'context' ||
 			tokenName === 'n' ||
-			tokenName === 'min_words' ||
-			tokenName === 'max_words' ||
+			tokenName === 'min_words' || // config-key-literal-ok: prompt template token, not a configuration key
+			tokenName === 'max_words' || // config-key-literal-ok: prompt template token, not a configuration key
 			tokenName === 'language'
 		) {
 			nodes.push(makeChip(tokenName));
@@ -243,6 +243,7 @@ function tryConvertToken(editorElement) {
 
 var acItems = [];
 var acIdx = 0;
+// config-key-literal-ok: prompt template tokens, not configuration keys
 var TOKEN_NAMES = ['context', 'n', 'min_words', 'max_words', 'language'];
 
 /**
