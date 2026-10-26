@@ -19,27 +19,15 @@ function openAppDrilldown(appName) {
 	const a = agg.apps[appName];
 	if (!a) return;
 
-	// Walk the filtered manifest once more to harvest hourly data for THIS app.
-	const allDates = Object.keys(manifestData)
-		.map((k) => ({ key: k, ts: parseDateKey(k) }))
-		.filter((d) => !isNaN(d.ts));
-	let targetTsStart = 0;
-	const anchorTs = currentSelectedDate
-		? parseDateKey(currentSelectedDate)
-		: allDates.length > 0
-			? Math.max(...allDates.map((d) => d.ts))
-			: 0;
-	if (currentPeriod === 'day') targetTsStart = anchorTs;
-	if (currentPeriod === 'week') targetTsStart = anchorTs - 7 * 86400000;
-	if (currentPeriod === 'month') targetTsStart = anchorTs - 30 * 86400000;
-	if (currentPeriod === 'year') targetTsStart = anchorTs - 365 * 86400000;
+	// The accepted aggregate owns the period and weekday query. Reuse its
+	// selected dates for both detail families instead of rebuilding a wider scope.
+	const selectedDates = Object.keys(agg.rich.by_date);
 
 	const hourly = {};
 	for (let h = 0; h < 24; h++) hourly[String(h).padStart(2, '0')] = { time_ms: 0, chars: 0 };
 
-	allDates.forEach((d) => {
-		if (currentPeriod !== 'all' && (d.ts > anchorTs || d.ts < targetTsStart)) return;
-		const day = manifestData[d.key];
+	selectedDates.forEach((dateKey) => {
+		const day = manifestData[dateKey];
 		if (!day) return;
 		const app_data = day[appName];
 		if (!app_data || !app_data.hourly) return;
@@ -177,12 +165,11 @@ function openAppDrilldown(appName) {
 
 	// Layouts seen — sum from manifest for this app within the period.
 	const layouts = {};
-	allDates.forEach((d) => {
-		if (currentPeriod !== 'all' && (d.ts > anchorTs || d.ts < targetTsStart)) return;
+	selectedDates.forEach((dateKey) => {
 		const ls =
-			manifestData[d.key] &&
-			manifestData[d.key][appName] &&
-			manifestData[d.key][appName].layouts_seen;
+			manifestData[dateKey] &&
+			manifestData[dateKey][appName] &&
+			manifestData[dateKey][appName].layouts_seen;
 		if (!ls) return;
 		Object.entries(ls).forEach(([id, n]) => {
 			layouts[id] = (layouts[id] || 0) + (n || 0);
