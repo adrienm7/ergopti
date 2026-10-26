@@ -94,6 +94,7 @@ return {
 	"tests.unit.infra.network.test_managed_descriptor_cancel",
 	"tests.unit.infra.network.test_curl_identity_exact",
 	"tests.unit.adapters.network.test_system_proxy_exact_identity",
+	"tests.unit.adapters.network.test_system_proxy_probe_policy_limits",
 	"tests.unit.adapters.network.test_managed_http_exact_forwarding",
 	"tests.meta.harness.test_managed_http_fixture_import_isolation",
 	"tests.meta.harness.test_prepared_native_port_import_isolation",
