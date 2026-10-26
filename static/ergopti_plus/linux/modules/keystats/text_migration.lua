@@ -10,11 +10,12 @@
 ---
 --- WHAT IS HERE AND WHAT IS SHARED:
 --- The state machine — cursor discipline, the fail-closed rule, idempotence —
---- lives in _shared/lua/keystats/text_migration_runner.lua, because macOS runs
---- the identical algorithm and a second copy would be a second place for the
---- rule that protects the user's data to rot. What is here is the Linux half:
---- reading and writing rows through the sqlite3 CLI, and being driven by the
---- daemon's periodic tick.
+--- lives in _shared/lua/keystats/text_migration_runner.lua and the public
+--- surface in text_migration_driver.lua, because macOS runs the identical
+--- algorithm and a second copy would be a second place for the rule that
+--- protects the user's data to rot. What is here is the Linux half: reading and
+--- writing rows through the sqlite3 CLI, and being driven by the daemon's
+--- periodic tick (no scheduler port: the daemon calls pump()).
 ---
 --- WHY IT RUNS IN SLICES:
 --- Every value costs one openssl spawn, and the daemon that would pay for it is
@@ -36,12 +37,11 @@
 ---    here either — that would lock its owner out of its own data.
 --- ==============================================================================
 
-local M = {}
-
 local Logger       = require("logger.shim")
 local SqliteWriter = require("modules.keystats.sqlite_writer")
 local TextCipher   = require("modules.keystats.text_cipher")
 local Plan         = require("keystats.text_migration")
+local Driver       = require("keystats.text_migration_driver")
 local Runner       = require("keystats.text_migration_runner")
 
 local LOG = "modules.keystats.text_migration"
@@ -90,12 +90,8 @@ end
 --- @return boolean True on success.
 function RealBackend.apply(device_id, updates)
 	if #updates == 0 then return true end
-	local statements = {}
-	for _, update in ipairs(updates) do
-		local sql = Plan.update_row_sql(device_id, update.id, update.assignments)
-		if not sql then return false end
-		statements[#statements + 1] = sql
-	end
+	local statements = Plan.update_statements(device_id, updates)
+	if not statements then return false end
 	return SqliteWriter.exec_sql("BEGIN;\n" .. table.concat(statements, "\n") .. "\nCOMMIT;\n")
 end
 
@@ -117,60 +113,14 @@ end
 -- =============================
 -- =============================
 
---- The runner in force. Rebuilt by _set_backend so a test can drive the whole
---- algorithm over an in-memory table: io.popen never RAISES on a malformed
---- command, it EXECUTES it, so a test that only checked "nothing crashed" would
---- prove nothing at all about this module.
-local _runner = Runner.new({
+--- Not sliced here: the daemon's periodic tick calls pump() between keystrokes.
+--- The seam that swaps the backend rebuilds the runner so a test can drive the
+--- whole algorithm over an in-memory table: io.popen never RAISES on a
+--- malformed command, it EXECUTES it, so a test that only checked "nothing
+--- crashed" would prove nothing at all about this module.
+local module, err = Driver.new({
 	logger = Logger, log_tag = LOG, cipher = TextCipher, backend = RealBackend,
 })
+assert(module, err)
 
---- Installs a replacement backend (test seam); nil restores the real one.
---- @param replacement table|nil
-function M._set_backend(replacement)
-	_runner = Runner.new({
-		logger = Logger, log_tag = LOG, cipher = TextCipher,
-		backend = (type(replacement) == "table") and replacement or RealBackend,
-	})
-end
-
---- Starts a migration pass.
---- @param mode      string Plan.MODE_ENCRYPT or Plan.MODE_DECRYPT.
---- @param device_id string The LOCAL device.
---- @return boolean True when a pass is now in flight.
-function M.start(mode, device_id)
-	return _runner.start(mode, device_id)
-end
-
---- Resumes only a pass a previous run left unfinished.
---- @param mode      string
---- @param device_id string
---- @return boolean True when a pass is now in flight.
-function M.resume(mode, device_id)
-	return _runner.resume(mode, device_id)
-end
-
---- Converts one bounded batch. Safe to call at any cadence; a no-op when idle.
---- @return boolean True when there is more to do.
-function M.pump()
-	return _runner.pump()
-end
-
---- Stops the pass; the stored cursor lets a later call resume from there.
-function M.cancel()
-	_runner.cancel()
-end
-
---- Whether a pass is in flight.
---- @return boolean
-function M.is_running()
-	return _runner.is_running()
-end
-
---- Snapshot of the pass, for the menu and for diagnostics.
---- @return table
-function M.get_progress()
-	return _runner.get_progress()
-end
-
-return M
+return module

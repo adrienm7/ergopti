@@ -198,6 +198,23 @@ function M.update_row_sql(device_id, row_id, assignments)
 		M.TABLE, table.concat(sets, ", "), M.sql_quote(device_id), math.floor(tonumber(row_id) or 0))
 end
 
+--- Composes the UPDATE statements of one batch, all or nothing: a single row
+--- that yields no statement refuses the whole batch, so a caller can never
+--- commit half of what the runner asked for.
+--- @param device_id string The LOCAL device.
+--- @param updates   table  Array of { id, assignments }.
+--- @return table|nil statements One UPDATE per row, or nil when a row has none.
+--- @return any|nil refused_id The id of the first row that produced no statement.
+function M.update_statements(device_id, updates)
+	local statements = {}
+	for _, update in ipairs(updates) do
+		local sql = M.update_row_sql(device_id, update.id, update.assignments)
+		if not sql then return nil, update.id end
+		statements[#statements + 1] = sql
+	end
+	return statements, nil
+end
+
 --- Reports whether a column name is one this migration may write.
 --- A guard rather than a convenience: a typo'd or caller-supplied column name
 --- reaching update_row_sql() would UPDATE an aggregate with an encrypted blob.
