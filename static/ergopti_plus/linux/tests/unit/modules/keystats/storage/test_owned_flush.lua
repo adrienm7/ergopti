@@ -8,6 +8,134 @@ local Fakes = require("tests.fakes")
 local function assert_false(value) helpers.assert_eq(value, false) end
 require("infra.monotonic") -- Load the genuine clock before temporary native ports.
 
+helpers.describe("native metrics fixture construction deadlines", function()
+	for _, action in ipairs({ "stop", "reset", "flush" }) do
+		for _, constructor in ipairs({ 1, 2 }) do
+			it("native-fixture-deadline: " .. action .. " observes constructor " .. constructor .. " after blocking work", function()
+				local uv = require("luv")
+				helpers.assert_eq(debug.getinfo(uv.fs_stat, "S").what, "C", "the actual native provider is required")
+				local native = require("tests.support.keystats_native_fixture")
+				local batch = require("infra.sqlite_batch_process")
+				local original_start = assert(batch.start)
+				local operation_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+				local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-fixture-deadline-XXXXXX"))
+				local database = directory .. "/metrics.sqlite"
+				local armed, delayed, starts, collector = false, 0, 0, nil
+				batch.start = function(...)
+					helpers.assert_eq(select(3, ...).timeout_ms, operation_ms, "every real child keeps its canonical deadline")
+					if armed and starts + 1 == constructor then
+						armed, delayed = false, delayed + 1
+						-- Construction can block before the genuine operation starts its
+						-- own unchanged deadline. No native receipt is synthesized here.
+						uv.sleep(operation_ms)
+					end
+					starts = starts + 1
+					return original_start(...)
+				end
+				local ok, failure = xpcall(function()
+					native.with(function(owner)
+						collector = owner
+						owner.init({ sqlite_path = database })
+						require("tests.support.metrics_consent_fixture").enable(owner)
+						owner.on_keydown("x", 1000, "fixture-deadline")
+						armed = true
+						if action == "reset" then
+							native.reset(owner)
+							helpers.assert_eq(owner.get_session_stats().keystrokes, 0, "only actual COMMIT resets the session")
+						elseif action == "flush" then
+							native.flush(owner)
+							helpers.assert_eq(owner.get_session_stats().keystrokes, 1, "a COMMIT must preserve the live session")
+						end
+					end)
+				end, debug.traceback)
+				batch.start = original_start
+				-- Keep the regression's negative run from abandoning its real child
+				-- when the unfixed fixture rejects a freshly acquired operation.
+				local until_ns = uv.hrtime() + operation_ms * 1000000
+				local settled = collector and collector.stop()
+				while not settled and collector and uv.hrtime() < until_ns do
+					uv.run("nowait"); uv.sleep(1); settled = collector.stop()
+				end
+				local retained
+				if settled then
+					local quote = require("text_utils").shell_quote
+					local pipe = assert(io.popen("sqlite3 " .. quote(database) .. " " .. quote("SELECT COUNT(*) FROM events_typing;"), "r"))
+					retained = pipe:read("*a")
+					assert(pipe:close())
+				end
+				for name in uv.fs_scandir_next, assert(uv.fs_scandir(directory)) do
+					assert(uv.fs_unlink(directory .. "/" .. name))
+				end
+				assert(uv.fs_rmdir(directory))
+				helpers.assert_true(settled, "the actual native owner must retire even in the negative regression run")
+				helpers.assert_true(ok, failure)
+				helpers.assert_eq(delayed, 1, "exactly one real constructor must exercise the blocked interval")
+				helpers.assert_true(starts >= 1, "the real native transport must execute")
+				helpers.assert_eq(collector.has_flush_debt(), false)
+				helpers.assert_eq(collector.get_flush_status().committed, true)
+				helpers.assert_eq(retained, "1\n", "independent SQLite must observe the exact committed input once")
+			end)
+		end
+	end
+end)
+
+helpers.describe("native metrics fixture finite observation contract", function()
+	for _, scenario in ipairs({
+		{ name = "stable ownership expires", phases = { "reservation", "reservation", "reservation" }, generations = { 1, 1, 1 },
+			error = "native COMMIT and cleanup must acknowledge the reset" },
+		{ name = "a phase cannot be revisited", phases = { "reservation", "commit", "reservation" }, generations = { 1, 1, 1 },
+			error = "revisited an acknowledged phase" },
+		{ name = "only one closing generation is admitted", phases = { "reservation", "reservation", "reservation" }, generations = { 1, 2, 3 },
+			error = "more than one closing generation" },
+		{ name = "an unknown phase cannot renew its budget", phases = { "unpublished" }, generations = { 1 },
+			error = "Unknown native fixture phase" },
+		{ name = "one closing snapshot advances through real phase names", phases = { "reservation", "reservation", "commit" }, generations = { 1, 2, 2 } },
+	}) do
+		it("native-fixture-deadline-model: " .. scenario.name, function()
+			local real = require("modules.keystats.keystats")
+			for _, name in ipairs({ "reset_session", "pump_flush", "get_flush_status" }) do
+				helpers.assert_eq(type(real[name]), "function", "the model must mirror the real public methods")
+			end
+			local uv = require("luv")
+			for _, name in ipairs({ "hrtime", "run", "sleep" }) do
+				helpers.assert_eq(type(uv[name]), "function", "the model must mirror the real native methods")
+			end
+			local budget = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") * 1000000
+			local now, calls = 0, 0
+			local modeled = {
+				reset_session = function() calls = calls + 1; return calls > #scenario.phases end,
+				pump_flush = function() end,
+				get_flush_status = function()
+					return { phase = assert(scenario.phases[calls]), generation = assert(scenario.generations[calls]) }
+				end,
+			}
+			-- These finite protocol controls acquire and pump no real process. A canonical
+			-- budget, split by the declared observations, detects renewal on an
+			-- unchanged state without waiting on wall-clock scheduling.
+			local modeled_uv = {
+				hrtime = function() now = now + budget / #scenario.phases; return now end,
+				run = function(mode) helpers.assert_eq(mode, "nowait"); return false end,
+				sleep = function(ms) helpers.assert_eq(ms, 1) end,
+			}
+			local module_name = "tests.support.keystats_native_fixture"
+			local previous = package.loaded[module_name]
+			local called, ok, detail = pcall(function()
+				local native = helpers.load_module_with_dependency(module_name, "luv", modeled_uv)
+				return pcall(native.reset, modeled)
+			end)
+			package.loaded[module_name] = previous
+			helpers.assert_true(called, ok)
+			if scenario.error then
+				helpers.assert_eq(ok, false, "invalid observation progress must never acquire an acknowledgement")
+				helpers.assert_contains(detail, scenario.error)
+			else
+				helpers.assert_true(ok, detail)
+				helpers.assert_eq(detail, true)
+			end
+		end)
+	end
+end)
+
 local function with_collector(body, launch)
 	local writer_name, keystats_name = "modules.keystats.sqlite_writer", "modules.keystats.keystats"
 	local old_writer, old_keystats = package.loaded[writer_name], package.loaded[keystats_name]

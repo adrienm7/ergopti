@@ -15,9 +15,57 @@ local uv = require("luv")
 
 local MODULES = { "modules.keystats.keystats", "modules.keystats.metrics_collector", "modules.keystats.sqlite_writer" }
 
+-- Public flush-status vocabulary. Unknown phases cannot claim new wait budgets.
+local FLUSH_PHASES = {
+	idle = true, reservation = true, reservation_retry = true, compose_retry = true,
+	commit = true, commit_retry = true, resolve = true, resolve_retry = true,
+	cleanup = true, cleanup_retry = true, uncertain = true,
+}
+
 --- Returns the canonical SQLite operation deadline on the native clock.
 local function deadline()
 	return uv.hrtime() + Timings.ms("keystats", "sqlite_operation_timeout_ms") * 1000000
+end
+
+--- Observes bounded, non-repeating native phases after their constructors return.
+--- An isolated body owns no continuing producer: it may drain an existing
+--- transaction and acquire one closing snapshot, never an unlimited generation.
+--- @param collector table Isolated collector.
+--- @param advance function Drives one native observation.
+--- @param settled boolean Initial admission result.
+--- @return boolean acknowledged
+local function await_native(collector, advance, settled)
+	if settled then return settled end
+	local function status()
+		local value = collector.get_flush_status()
+		assert(type(value) == "table" and FLUSH_PHASES[value.phase], "Unknown native fixture phase")
+		assert(type(value.generation) == "number" and value.generation >= 0 and value.generation % 1 == 0,
+			"Invalid native fixture generation")
+		return value
+	end
+	local previous = status()
+	local seen, closing = { [previous.phase] = true }, true
+	local until_ns = deadline()
+	while not settled and uv.hrtime() < until_ns do
+		uv.run("nowait")
+		uv.sleep(1)
+		settled = advance()
+		if not settled then
+			local current = status()
+			if current.generation ~= previous.generation then
+				assert(closing and current.generation == previous.generation + 1,
+					"Native fixture acquired more than one closing generation")
+				closing, seen = false, {}
+			elseif current.phase ~= previous.phase then
+				assert(not seen[current.phase], "Native fixture revisited an acknowledged phase")
+			end
+			if current.generation ~= previous.generation or current.phase ~= previous.phase then
+				seen[current.phase], until_ns = true, deadline()
+			end
+			previous = current
+		end
+	end
+	return settled
 end
 
 --- Runs a scenario with fresh owners and retires them before restoring caches.
@@ -37,12 +85,7 @@ function M.with(body)
 		local current = package.loaded[MODULES[1]]
 		if current and current ~= collector then owners[#owners + 1] = current end
 		for _, owner in ipairs(owners) do
-			local until_ns, settled = deadline(), owner.stop()
-			while not settled and uv.hrtime() < until_ns do
-				uv.run("nowait")
-				uv.sleep(1)
-				settled = owner.stop()
-			end
+			local settled = await_native(owner, owner.stop, owner.stop())
 			helpers.assert_true(settled, "the scenario must retire its native collector before the next one")
 		end
 	end)
@@ -56,13 +99,10 @@ end
 --- @param collector table Isolated collector.
 --- @return boolean acknowledged
 function M.reset(collector)
-	local until_ns, acknowledged = deadline(), collector.reset_session()
-	while not acknowledged and uv.hrtime() < until_ns do
-		uv.run("nowait")
+	local acknowledged = await_native(collector, function()
 		collector.pump_flush()
-		acknowledged = collector.reset_session()
-		if not acknowledged then uv.sleep(1) end
-	end
+		return collector.reset_session()
+	end, collector.reset_session())
 	helpers.assert_true(acknowledged, "native COMMIT and cleanup must acknowledge the reset")
 	return acknowledged
 end
@@ -73,12 +113,10 @@ function M.flush(collector)
 	local committed = collector.flush()
 	helpers.assert_true(committed == true or collector.has_flush_debt(),
 		"the native flush must commit or acquire an acknowledged operation")
-	local until_ns = deadline()
-	while collector.has_flush_debt() and uv.hrtime() < until_ns do
-		uv.run("nowait")
+	await_native(collector, function()
 		collector.pump_flush()
-		if collector.has_flush_debt() then uv.sleep(1) end
-	end
+		return not collector.has_flush_debt()
+	end, not collector.has_flush_debt())
 	helpers.assert_eq(collector.has_flush_debt(), false, "the snapshot must commit before its projection is readable")
 	helpers.assert_true(collector.get_flush_status().committed, "retirement alone is not a successful native COMMIT")
 end
