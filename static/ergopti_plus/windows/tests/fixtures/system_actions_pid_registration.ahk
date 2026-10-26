@@ -13,9 +13,11 @@
 #NoTrayIcon
 #SingleInstance Off
 
+#Include %A_LineFile%\..\..\support\pid_registration_receipt.ahk
+
 _PidRegistrationFailure(Err, Mode) {
 	if A_Args.Length
-		try FileAppend(Err.Message . "`n" . Err.Stack, A_Args[1] . ".error", "UTF-8")
+		try _PidRegistrationPublish(Err.Message . "`n" . Err.Stack, A_Args[1] . ".error")
 	ExitApp(1)
 }
 OnError(_PidRegistrationFailure)
@@ -73,7 +75,7 @@ for Row in _PidRegistrationRows {
 Done := DllCall("kernel32\OpenEventW", "UInt", 0x100000, "Int", false, "Str", A_Args[2], "Ptr")
 AssertTrue(Done != 0, "the parent owns the observer completion capability")
 try {
-	FileAppend(Report, A_Args[1], "UTF-8")
+	_PidRegistrationPublish(Report, A_Args[1])
 	Waited := DllCall("kernel32\WaitForSingleObject", "Ptr", Done, "UInt", 20000, "UInt")
 } finally AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Done, "Int"), "the exact observer event reference must close")
 ExitApp(Waited == 0 ? 0 : 1)
