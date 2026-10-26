@@ -94,7 +94,11 @@ prefix="${WINEPREFIX:-$HOME/.wine}"
 # Only argv[0] names the Windows image Wine runs; a launcher (this script, wine,
 # timeout) merely carries the interpreter path as an argument.
 for proc in /proc/[0-9]*; do
-	image="$(tr '\0' '\n' <"$proc/cmdline" 2>/dev/null | head -n 1 || true)"
+	# Read argv[0] in the shell: forking two tools per zombie or unrelated
+	# process can delay every admission by minutes on a long-lived test host.
+	if ! IFS= read -r -d '' image 2>/dev/null <"$proc/cmdline"; then
+		continue
+	fi
 	image="${image##*[/\\]}"
 	case "${image,,}" in
 		autohotkey*.exe) ;;
