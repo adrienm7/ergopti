@@ -422,12 +422,14 @@ _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
 _LLM_CurlReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
 	if !(ProcessOwner is Map)
 		return true
-	; Keep failure-to-debt transfer atomic against another AHK thread. Native
-	; operations here are non-blocking: TerminateProcess, zero-time wait and close.
+	; The inner owner serializes native attempts. Job termination can yield,
+	; so only fresh release/debt publication belongs inside this Critical.
+	Released := _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate, Port)
 	NewDebt := false
 	PreviousCritical := Critical("On")
 	try {
-		if _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate, Port) {
+		; Another thread may finish the exact owner after our attempt returns.
+		if Released || ProcessOwner.Get("released", false) {
 			_LLM_CurlRetireProcessCleanupDebt(ProcessOwner)
 			return true
 		}
