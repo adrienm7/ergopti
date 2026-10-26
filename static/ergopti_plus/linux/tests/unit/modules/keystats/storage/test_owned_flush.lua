@@ -1071,7 +1071,15 @@ helpers.describe("native sampled reset acknowledgement", function()
 		local quote = require("text_utils").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_keystats_reset_ack.lua"
-		local status = os.execute("env -u LUA_PATH luajit " .. quote(fixture) .. " " .. quote(root))
+		local runtime, provider = "luajit", ""
+		if rawget(_G, "jit") then
+			-- Distribution suites compile real luv outside the default C search path.
+			runtime = assert(require("process.interpreter").from_arguments(arg))
+			provider = " LUA_CPATH=" .. quote(package.cpath)
+		end
+		-- A stock-Lua parent cannot lend its native-module ABI to the JIT child.
+		local status = os.execute("env -u LUA_PATH -u LUA_CPATH" .. provider .. " " .. quote(runtime) .. " "
+			.. quote(fixture) .. " " .. quote(root))
 		helpers.assert_true(status == true or status == 0, "actual sampled reset must finish once after COMMIT and cleanup")
 	end)
 end)
