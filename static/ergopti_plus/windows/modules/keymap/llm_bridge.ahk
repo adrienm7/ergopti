@@ -1682,11 +1682,13 @@ LLM_Bridge_ResetPredictions() {
 	global _LLM_Bridge_Buffer, _LLM_Engine, _LLM_Bridge_Active
 	if !(IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active)
 		return
+	; Context retention applies even between requests, while work cancellation
+	; and visual disposal remain conditional on actual active work.
+	if (IsSet(_LLM_Engine) and _LLM_Engine.Has("reset_on_nav") and _LLM_Engine["reset_on_nav"])
+		_LLM_Bridge_ClearBuffer()
 	if !LLM_Bridge_HasActivePredictionWork()
 		return
 	try LoggerDebug("LLM.tt", "ResetPredictions: cancelling generation + hiding any tooltip.")
-	if (IsSet(_LLM_Engine) and _LLM_Engine.Has("reset_on_nav") and _LLM_Engine["reset_on_nav"])
-		_LLM_Bridge_ClearBuffer()
 	; Timings only: the surface is about to be hidden, so the full re-render the
 	; old call performed here was painted and thrown away in the same breath.
 	try LLM_Tooltip_MarkChainTimingOnly(A_TickCount)

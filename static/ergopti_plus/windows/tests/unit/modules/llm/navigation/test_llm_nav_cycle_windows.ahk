@@ -572,3 +572,52 @@ for _LNCW_InputRoute in ["prefix", "dispatcher"] {
 	Test("LLM navigation: forwarded " . _LNCW_InputRoute . " modifier keeps prediction (forwarded-caret-navigation)",
 		_LNCW_ForwardedCaretInput.Bind("LShift", false, _LNCW_InputRoute))
 }
+
+
+_LNCW_IdleCaretContext(ResetOnNav, Entry) {
+	_LAG_Run(_LAG_Menu("off", "cerebras", "cerebras"), _LTN_Screen(""), _WithAgent)
+	_WithAgent(Fx, Lines, Sent) {
+		_HNP_Run(_Run)
+	}
+	_Run() {
+		_LPP_Run(_LPP_Menu(), "", _Body)
+	}
+	_Body(Calls, Lines) {
+		global _LLM_Engine, _LLM_Bridge_Buffer
+		global _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading, _Stub_LlmPresentedRecord
+		Saved := [_Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading, _Stub_LlmPresentedRecord]
+		try {
+			_Stub_LlmTooltipVisible := false
+			_Stub_LlmTooltipLoading := false
+			_Stub_LlmPresentedRecord := 0
+			_LLM_Engine["reset_on_nav"] := ResetOnNav
+			for Key in ["Left", "Up", "Right", "Down", "Home", "End", "PgUp", "PgDn", "Insert", "Delete", "LShift"] {
+				LLM_Engine_StopGeneration()
+				_LLM_Bridge_ApplyBufferEdit(, "OLD_LOCATION_ASCII_SENTINEL ")
+				AssertFalse(LLM_Bridge_HasActivePredictionWork(), "the captured typing context must genuinely be idle")
+				if Entry == "reset"
+					LLM_Bridge_ResetPredictions()
+				else if Entry == "pointer"
+					LLM_Bridge_OnPointerActivity("idle pointer witness")
+				else
+					LLM_Bridge_FeedKeyDownIfActive(GetKeyVK(Key), true)
+				LLM_Bridge_FeedCharIfActive("x")
+				Expected := ResetOnNav && Entry != "pointer" && (Entry == "reset" || Key != "LShift")
+					? "x" : "OLD_LOCATION_ASCII_SENTINEL x"
+				AssertEqual(Expected, _LLM_Bridge_Buffer,
+					"idle " . Key . " must apply the configured context retention before new typing")
+				AssertEqual(0, Calls.Length, "idle navigation and one character must not dispatch any request")
+			}
+		} finally {
+			_Stub_LlmTooltipVisible := Saved[1]
+			_Stub_LlmTooltipLoading := Saved[2]
+			_Stub_LlmPresentedRecord := Saved[3]
+		}
+	}
+}
+
+for _LNCW_IdleEntry in ["reset", "forwarded", "pointer"] {
+	for _LNCW_ResetPolicy in [true, false]
+		Test("LLM navigation: idle " . _LNCW_IdleEntry . " context reset=" . _LNCW_ResetPolicy . " (idle-caret-context)",
+			_LNCW_IdleCaretContext.Bind(_LNCW_ResetPolicy, _LNCW_IdleEntry))
+}
