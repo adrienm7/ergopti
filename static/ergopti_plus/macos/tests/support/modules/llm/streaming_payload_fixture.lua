@@ -81,6 +81,16 @@ local function with_stream(backend, callback)
 			return remove(path)
 		end
 		local filesystem = package.loaded["adapters.file_system"]
+		filesystem.remove_exact = function(path)
+			local removed, detail = os.remove(path)
+			return removed == true, detail
+		end
+		filesystem.classify_no_follow = function(path)
+			local attributes, detail, code = hs.fs.symlinkAttributes(path)
+			if type(attributes) == "table" then return attributes, "ok" end
+			if code == 2 then return nil, "absent" end
+			return nil, "error", detail
+		end
 		filesystem.create_secure_temp_file = function()
 			if h.allocation_refusal then return h.allocation_result, "CONTROLLED_ALLOCATION_FAILURE" end
 			local path = os.tmpname()

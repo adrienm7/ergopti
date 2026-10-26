@@ -69,6 +69,7 @@ local STREAM_TMPFILE_CLEANUP_SEC = STREAM_HARD_TIMEOUT_SEC + 10
 -- model identifiers, the active-model-arg reader, and the shared streaming-task
 -- table (mutated here and by api_mlx's cancel_streaming). nil until init().
 local _ctx = nil
+local _payload_cleanup = nil
 
 -- Exact native timer capabilities whose cancellation was refused. The scheduler
 -- also keeps a strong registry, but this request layer must retain its own debt so
@@ -474,6 +475,15 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		return
 	end
 
+	if not _payload_cleanup then
+		_payload_cleanup = require("modules.llm.stream_payload_cleanup").new(Logger, LOG)
+	end
+	if _payload_cleanup.settle_pending() ~= true then
+		Logger.error(LOG, "Cannot start MLX stream while earlier payload cleanup remains owned.")
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
+
 	_ctx.stream.generation = _ctx.stream.generation + 1
 	local my_generation = _ctx.stream.generation
 
@@ -590,13 +600,15 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		return
 	end
 
+	local task = nil
+	local retire_payload = _payload_cleanup.capture(tmp_path, function() return task end)
+
 	local accumulated   = ""
 	local line_buf      = ""
 	local event_data_lines = {}
 	local stream_complete = false
 	local in_reasoning  = false  -- Currently accumulating delta.reasoning(_content) tokens — close </think> on transition or end
 	local t0_req        = TimerScheduler.now()
-	local task = nil
 	local task_completed = false
 	local failure_requested = false
 	local terminal_notified = false
@@ -611,7 +623,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		if not failure_observed and type(owned_task.onSettled) == "function" then
 			failure_observed = true
 			local ok, registered = pcall(owned_task.onSettled, function()
-				pcall(os.remove, tmp_path)
+				retire_payload()
 				report_failure()
 			end)
 			if not ok or registered ~= true then failure_observed = false end
@@ -851,7 +863,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		-- Remove the payload temp file as soon as curl exits so it doesn't linger
 		-- for the full STREAM_TMPFILE_CLEANUP_SEC fallback window (mirrors the
 		-- Ollama backend's streaming twin; F-MED-3).
-		os.remove(tmp_path)
+		retire_payload()
 
 		Logger.debug(LOG, "[%s] #%d STREAM on_done: exit=%s remaining_len=%d stderr='%s'",
 			model_name, req_id, tostring(exit_code),
@@ -977,7 +989,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		}, on_done, on_chunk)
 	end, debug.traceback)
 	if not spawn_ok or type(spawned) ~= "table" or type(spawned.start) ~= "function" then
-		pcall(os.remove, tmp_path)
+		retire_payload()
 		Logger.error(LOG, "[%s] #%d STREAM task creation did not commit (result: %s).",
 			tostring(model_name), req_id, tostring(spawned))
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
@@ -988,12 +1000,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	local start_ok, start_result = xpcall(function() return task.start() end, debug.traceback)
 	if not start_ok or start_result ~= true then
 		local settled = retire_failed_task(task)
-		local removed, remove_err = true, nil
-		if settled then removed, remove_err = pcall(os.remove, tmp_path) end
-		if not removed then
-			Logger.error(LOG, "[%s] #%d STREAM payload cleanup failed: %s",
-				tostring(model_name), req_id, tostring(remove_err))
-		end
+		if settled then retire_payload() end
 		Logger.error(LOG, "[%s] #%d STREAM task start did not commit (result: %s).",
 			tostring(model_name), req_id, tostring(start_result))
 		return
@@ -1007,7 +1014,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	-- this later deadline remains the only safe cleanup owner.
 	local cleanup_ok, cleanup_handle, cleanup_committed = xpcall(function()
 		return TimerScheduler.after(STREAM_TMPFILE_CLEANUP_SEC, function()
-			os.remove(tmp_path)
+			retire_payload()
 		end)
 	end, debug.traceback)
 	if not cleanup_ok or cleanup_committed ~= true then
@@ -1022,7 +1029,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	if arm_stream_idle_watchdog() ~= true then
 		local settled, state = retire_failed_task(task)
 		if settled then
-			pcall(os.remove, tmp_path)
+			retire_payload()
 		elseif state == "refused" then
 			Logger.error(LOG, "[%s] #%d STREAM task retained after initial watchdog failure: %s",
 				tostring(model_name), req_id, state)

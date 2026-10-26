@@ -103,6 +103,7 @@ local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = _RETRY_MAX_MULT
 -- Holds the current in-flight hs.task; cancelled when a new streaming request starts.
 -- The streaming flag itself is owned by modules/llm/init.lua and passed per-call.
 local _active_stream_task = nil
+local _payload_cleanup = nil
 -- Monotonic counter; each new stream gets its own ID so a stale on_done from a
 -- terminated stream does not clobber the active task reference of a newer one.
 local _stream_generation  = 0
@@ -1650,6 +1651,15 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		return
 	end
 
+	if not _payload_cleanup then
+		_payload_cleanup = require("modules.llm.stream_payload_cleanup").new(Logger, LOG)
+	end
+	if _payload_cleanup.settle_pending() ~= true then
+		Logger.error(LOG, "Cannot start Ollama stream while earlier payload cleanup remains owned.")
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
+
 	_stream_generation = _stream_generation + 1
 	local my_generation = _stream_generation
 
@@ -1695,11 +1705,13 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		return
 	end
 
+	local task = nil
+	local retire_payload = _payload_cleanup.capture(tmp_path, function() return task end)
+
 	local accumulated = ""
 	local line_buf    = ""
 	local stream_failed = false
 	local stream_done = false
-	local task = nil
 	local task_completed = false
 
 	-- Parse one complete NDJSON line and append its content to accumulated
@@ -1756,7 +1768,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		end
 		-- Remove the payload temp file as soon as curl exits so it doesn't linger
 		-- for the full STREAM_TMPFILE_CLEANUP_SEC fallback window.
-		os.remove(tmp_path)
+		retire_payload()
 		-- Generation check: a newer request superseded this stream — don't touch
 		-- shared state (otherwise we untrack the active stream and leak its task)
 		if my_generation ~= _stream_generation then
@@ -1835,7 +1847,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		}, on_done, on_chunk)
 	end, debug.traceback)
 	if not spawn_ok or type(spawned) ~= "table" or type(spawned.start) ~= "function" then
-		pcall(os.remove, tmp_path)
+		retire_payload()
 		Logger.error(LOG, "[%s] #%d STREAM task creation did not commit (result: %s).",
 			tostring(model_name), req_id, tostring(spawned))
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
@@ -1850,30 +1862,23 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		-- A refused start can still retain a native task. Revoke business effects,
 		-- but preserve its exact slot and input until physical settlement.
 		if my_generation == _stream_generation then _stream_generation = _stream_generation + 1 end
-		local payload_retirement_attempted = false
-		local function retire_payload()
-			if payload_retirement_attempted then return true end
+		local function settle_failed_start()
 			if not stream_task_is_settled(task) then return false end
-			payload_retirement_attempted = true
 			if _active_stream_task == task then _active_stream_task = nil end
-			local removed, remove_err = pcall(os.remove, tmp_path)
-			if not removed then
-				Logger.error(LOG, "[%s] #%d STREAM payload cleanup failed: %s",
-					tostring(model_name), req_id, tostring(remove_err))
-			end
+			retire_payload()
 			return true
 		end
-		if not retire_payload() then
+		if not settle_failed_start() then
 			-- ShellRunner suppresses business completion after an uncommitted
 			-- start; its exact settlement observer still owns cleanup.
 			local observed, registered = xpcall(function()
-				return task.onSettled(retire_payload)
+				return task.onSettled(settle_failed_start)
 			end, debug.traceback)
 			if not observed or registered ~= true then
 				Logger.error(LOG, "STREAM settlement observer refused; task and payload retained.")
 			end
 			M.cancel_streaming()
-			retire_payload()
+			settle_failed_start()
 		end
 		Logger.error(LOG, "[%s] #%d STREAM task start did not commit (result: %s).",
 			tostring(model_name), req_id, tostring(start_result))
@@ -1887,7 +1892,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	-- at all. Delay must be > STREAM_MAX_TIME_SEC so curl has finished reading.
 	local cleanup_ok, cleanup_handle, cleanup_committed = xpcall(function()
 		return TimerScheduler.after(STREAM_TMPFILE_CLEANUP_SEC, function()
-			if stream_task_is_settled(task) then os.remove(tmp_path) end
+			retire_payload()
 		end)
 	end, debug.traceback)
 	if not cleanup_ok or cleanup_committed ~= true then
