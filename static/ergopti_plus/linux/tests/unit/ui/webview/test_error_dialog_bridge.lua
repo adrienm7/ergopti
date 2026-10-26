@@ -368,9 +368,6 @@ helpers.describe("error window bridge (linux): crash notice (error-dialog-linux)
 			local CrashReport = require("crash_report")
 			fh:write(CrashReport.encode(CrashReport.build({ module = "ergopti_hotstrings", error_msg = "boom" })))
 			fh:close()
-			local Shell = require("adapters.shell_runner")
-			local exec_line = Shell.exec_line
-			Shell.exec_line = function() return dump end
 			local ok, err = pcall(function()
 				bridge.init()
 				helpers.assert_true(bridge.notify_last_crash(dir), "an unannounced dump is announced")
@@ -386,7 +383,6 @@ helpers.describe("error window bridge (linux): crash notice (error-dialog-linux)
 				bridge.on_message({ action = "close" }, {}, page(context))
 				helpers.assert_eq(bridge.notify_last_crash(dir), false, "a dump already announced is not announced again")
 			end)
-			Shell.exec_line = exec_line
 			os.remove(dir .. "/" .. dump)
 			os.remove(dir .. "/.last_crash_notice")
 			os.remove(dir)
@@ -484,7 +480,8 @@ end)
 helpers.describe("native crash notice source admission", function()
 	for _, kind in ipairs({ "regular", "dump-symlink", "marker-fifo", "marker-fifo-symlink", "dump-fifo",
 		"dump-fifo-symlink", "marker-write-refusal", "marker-close-refusal", "marker-replaced", "dump-close-refusal",
-		"marker-unreadable", "dump-unreadable", "marker-read-close-refusal" }) do
+		"marker-unreadable", "dump-unreadable", "marker-read-close-refusal", "foreign-file", "foreign-multiline",
+		"foreign-directory", "newest-mtime", "collision-tie" }) do
 		helpers.it("(crash-notice-native) refuses unsafe startup I/O: " .. kind, function()
 			local Shell = require("adapters.shell_runner")
 			local folder = os.tmpname(); assert(os.remove(folder))
@@ -499,7 +496,10 @@ helpers.describe("native crash notice source admission", function()
 				helpers.assert_eq(receipt:read("*a"), "complete", "native worker reached every assertion")
 				assert(receipt:close())
 			end, debug.traceback)
-			for _, leaf in ipairs({ "crash_probe.json", ".last_crash_notice", ".target", "complete" }) do os.remove(folder .. "/" .. leaf) end
+			local Directory = require("infra.native_directory")
+			for _, entry in ipairs(assert(Directory.entries(folder))) do
+				assert(os.remove(Directory.join(folder, entry.name)), "only owned fixture entries are removed")
+			end
 			assert(os.remove(folder), "native fixture entries must all be retired")
 			if not okay then error(detail, 0) end
 		end)
