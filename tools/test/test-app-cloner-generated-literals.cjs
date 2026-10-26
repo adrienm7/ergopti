@@ -345,15 +345,24 @@ printf icns > "$out"
 	const setupEnd = cloneSource.indexOf('TMPDIR_WORK=');
 	if (setupEnd < 0) throw new Error('clone setup boundary is missing');
 	const cloneSetup = cloneSource.slice(0, setupEnd);
+	const profileStart = cloneSource.indexOf('# Per-clone user-data-dir');
+	const profileEnd = cloneSource.indexOf('# VSCode-specific extras:', profileStart);
+	if (profileStart < 0 || profileEnd <= profileStart) {
+		throw new Error('clone profile initialization boundary is missing');
+	}
+	// Native source-app inspection between these blocks does not allocate the
+	// profile. Execute both actual owners while leaving that OS boundary out.
+	const profileSetup = cloneSource.slice(profileStart, profileEnd);
 	const nativeFixturePath = (value) =>
 		path.join(fixtureRoot, path.posix.relative(toBashPath(fixtureRoot), value));
 	const cloneDestinations = [];
+	const cloneProfiles = [];
 	for (let index = 0; index < 3; index += 1) {
 		const run = spawnSync(
 			bash,
 			[
 				'-c',
-				`${cloneSetup}\nprintf '%s\\0' "$DEST"\n`,
+				`${cloneSetup}\n${profileSetup}\nprintf '%s\\0' "$DEST" "$USER_DATA_DIR"\n`,
 				toBashPath(CLONE_SCRIPT),
 				toBashPath(fixtureRoot),
 				'Clone collision'
@@ -368,10 +377,12 @@ printf icns > "$out"
 			}
 		);
 		if (run.status !== 0) throw new Error(`clone setup failed: ${run.stderr}`);
-		const [reported] = decodeNulFields(run.stdout);
+		const [reported, profile] = decodeNulFields(run.stdout);
 		const destination = nativeFixturePath(reported);
 		cloneDestinations.push(destination);
+		cloneProfiles.push(nativeFixturePath(profile));
 		fs.writeFileSync(path.join(destination, 'owned-marker'), String(index));
+		fs.writeFileSync(path.join(nativeFixturePath(profile), 'profile-marker'), String(index));
 	}
 	test(
 		'the actual clone setup reserves distinct bundles and preserves previous contents',
@@ -381,6 +392,22 @@ printf icns > "$out"
 					fs.readFileSync(path.join(destination, 'owned-marker'), 'utf8') === String(index)
 			),
 		JSON.stringify(cloneDestinations)
+	);
+	test(
+		'repeated clone names keep distinct data profiles and preserve existing profile contents',
+		new Set(cloneProfiles).size === 3 &&
+			cloneProfiles.every(
+				(profile, index) =>
+					path.basename(profile) === path.basename(cloneDestinations[index], '.app') &&
+					fs.readFileSync(path.join(profile, 'profile-marker'), 'utf8') === String(index)
+			),
+		JSON.stringify({ destinations: cloneDestinations, profiles: cloneProfiles })
+	);
+	test(
+		'the first clone keeps its original unsuffixed data profile',
+		cloneProfiles[0] ===
+			path.join(home, 'Library', 'Application Support', 'AppCloner', 'Clone collision'),
+		JSON.stringify(cloneProfiles)
 	);
 	const collisionRuns = [];
 	for (const target of ['first-target', 'second-target', 'third-target']) {
