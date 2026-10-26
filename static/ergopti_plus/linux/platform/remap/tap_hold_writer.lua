@@ -721,10 +721,14 @@ function M.import_recommended(path, key_ids, preset)
 end
 
 --- Migrates the user's file on disk to the current version, once, at boot: a
---- byte-exact backup first, then one atomic publication of the migrated
---- document. A current or absent file is not written. A file this build cannot
---- version (newer, unreadable stamp, malformed) is left untouched and ERROR
---- logged; every later change to it is refused by the writers.
+--- byte-exact backup first, then one atomic publication of the migrated bytes.
+--- The edit is line-preserving (config_migrate.plan_operations, the editor of
+--- the config.toml migrations): comments, order and formatting survive, only
+--- the retired delay lines, emptied tables, the explicit_delays line and the
+--- stamp change. A current or absent file is not written. A file this build
+--- cannot version (newer, unreadable stamp, malformed, or whose edit cannot be
+--- verified) is left untouched and ERROR logged; every later change to it is
+--- refused by the writers.
 --- @param path string The user's tap_hold.toml.
 --- @return string status "absent", "current", "migrated", "newer", "invalid" or "failed".
 --- @return string|nil detail The backup of a migrated file, or why it was refused.
@@ -740,7 +744,7 @@ function M.migrate_file(path)
 		Logger.success(LOG, "No tap-hold file at '%s' yet; nothing to migrate.", path)
 		return "absent"
 	end
-	local outcome, detail = Migration.read_as_current(document, shapes, retired_delays())
+	local outcome, detail, operations = Migration.file_operations(document, shapes, retired_delays())
 	if outcome == "current" then
 		Logger.success(LOG, "'%s' is at schema v%s; nothing to migrate.", path, tostring(detail))
 		return "current"
@@ -750,12 +754,21 @@ function M.migrate_file(path)
 			path, outcome, tostring(detail))
 		return outcome, tostring(detail)
 	end
+	local plan = require("config_migrate").plan_operations(text, operations)
+	if plan.outcome ~= "migrated" then
+		Logger.error(LOG, "'%s' cannot be edited in place (%s) — left untouched and never written.",
+			path, tostring(plan.detail or plan.outcome))
+		return "failed", tostring(plan.detail or plan.outcome)
+	end
 	local backup = back_up(path, text)
 	if not backup then
 		Logger.error(LOG, "'%s' could not be backed up — not migrated.", path)
 		return "failed", "'" .. path .. "' could not be backed up"
 	end
-	if not write_document(path, document, shapes, { status = "ok", content = text }) then
+	local published, publish_err = TomlWriter.publish_if_unchanged(path, plan.candidate, nil,
+		{ status = "ok", content = text })
+	if published ~= true then
+		Logger.error(LOG, "'%s' could not be published (%s) — not migrated.", path, tostring(publish_err))
 		return "failed", "'" .. path .. "' could not be written"
 	end
 	Logger.success(LOG, "Migrated '%s' from schema v%s to v%s; backup at '%s'.", path, tostring(detail),

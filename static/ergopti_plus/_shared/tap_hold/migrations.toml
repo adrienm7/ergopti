@@ -35,6 +35,13 @@
 #       Deletes one key; a section left without keys disappears.
 # Every op is idempotent, so replaying a step on its own output changes nothing.
 #
+# On disk the migration is a line-preserving edit, never a re-render: the driver
+# turns the step into explicit ops of the config.toml engine's closed set
+# (``delete`` of each retired ``time_activation_seconds`` line, of the flag and of
+# the old stamp, then ``set_if_absent`` of ``[_meta] schema_version``) and applies
+# them with the engine's own record editor, so comments, order and formatting
+# survive. Windows config_migrate.ahk already knows both of those ops.
+#
 # Windows: replaying this registry needs a reader for the file plus the two
 # ops above in windows/platform/remap/tap_hold_loader.ahk and
 # tap_hold_writer.ahk; until then Windows keeps writing
