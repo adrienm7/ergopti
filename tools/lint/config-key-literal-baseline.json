@@ -7,7 +7,6 @@
 		"static/ergopti_plus/_shared/lua/keystats/physical_configuration_observation.lua": 2,
 		"static/ergopti_plus/_shared/lua/layout/number_row_policy.lua": 8,
 		"static/ergopti_plus/_shared/lua/menu/personal_files.lua": 13,
-		"static/ergopti_plus/_shared/lua/menu/programmable_hotstrings.lua": 1,
 		"static/ergopti_plus/_shared/lua/menu/wrap_preferences.lua": 13,
 		"static/ergopti_plus/_shared/lua/script_scope_runtime.lua": 2,
 		"static/ergopti_plus/_shared/lua/tap_hold/key_combinations.lua": 2,
