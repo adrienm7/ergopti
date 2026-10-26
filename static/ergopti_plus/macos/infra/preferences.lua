@@ -76,6 +76,7 @@ local PersonalAdoption = require("infra.personal_file_adoption")
 local Agent     = require("llm.agent")
 local AppProfileOverrides = require("llm.app_profile_overrides")
 local ProfileRegistry = require("llm.profile_registry_codec")
+local NEVER_MS = require("llm.request_plan.debounce").NEVER_MS
 local HotstringCore = require("infra.hotstring_engine")
 local WrapPreferences = require("menu.wrap_preferences")
 local UserModels = require("config_user_models")
@@ -153,7 +154,7 @@ local KEY_MAP = {
 	llm_model_ollama                     = { sec = "llm", path = "models", key = "ollama"         },
 	llm_active_profile                   = { sec = "llm", path = "profiles", key = "active"        },
 	llm_num_predictions                  = { sec = "llm", path = "profiles", key = "num_predictions" },
-	llm_debounce                         = { sec = "llm", path = "trigger", key = "debounce_ms", units_per_state = 1000 },
+	llm_debounce                         = { sec = "llm", path = "trigger", key = "debounce_ms", units_per_state = 1000, never = true },
 	llm_instant_on_word_end              = { sec = "llm", path = "trigger", key = "instant_on_word_end" },
 	llm_after_hotstring                  = { sec = "llm", path = "trigger", key = "after_hotstring" },
 	llm_url_bar_filter_enabled           = { sec = "llm", path = "trigger", key = "url_bar_filter_enabled" },
@@ -586,6 +587,9 @@ local function scalar_units(spec, value, reading)
 		return spec.codec.encode(value)
 	end
 	if not spec or not spec.units_per_state then return value end
+	-- "Never" is stored as the shared sentinel, not scaled: its native value is
+	-- the same -1.
+	if spec.never and value == NEVER_MS then return NEVER_MS end
 	assert(type(value) == "number" and value == value and value >= 0 and value < math.huge,
 		"configuration duration must be a finite non-negative number")
 	local result = reading and value / spec.units_per_state or value * spec.units_per_state
@@ -610,6 +614,7 @@ local function persisted_units_fit(spec, value)
 		return true
 	end
 	if not spec or not spec.units_per_state then return true end
+	if spec.never and value == NEVER_MS then return true end
 	if type(value) ~= "number" or value ~= value or value < 0 or value >= math.huge then
 		return false, "the value is not a finite non-negative number"
 	end
