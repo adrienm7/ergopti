@@ -40,6 +40,7 @@ local LocaleTable = require("_generated.locale_table")
 local MagicKey = require("modules.hotstrings.magic_key")
 local MagicKeySourceRows = require("keymap.magic_key_source")
 local MagicFrame = require("menu.frames.magic_frame")
+local ParentSource = require("menu.frames.parent_source")
 local PreviewSettings = require("modules.hotstrings.preview_settings")
 local RepeatKey = require("modules.hotstrings.repeat_key")
 local Modal = require("ui.modal")
@@ -3721,70 +3722,28 @@ end
 --- encryption-migration status, and suspend/reset.
 --- @param ctx table Menu context.
 --- @return table One menu entry with its submenu.
---- Checks raw dense arrays without triggering source metamethods.
+--- Delegates the raw dense-array check to the shared section admission.
 --- @param value table Source array.
 --- @param records boolean Whether its values must be plain records.
 --- @return boolean
 local function metrics_dense(value, records)
-	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
-	local count, maximum = 0, 0
-	for index, row in next, value do
-		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
-		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
-		count, maximum = count + 1, math.max(maximum, index)
-	end
-	return count == maximum
+	return ParentSource.dense(value, records)
 end
 
---- Admits the actual Metrics source structure without interpreting command grammar.
+--- Delegates the actual Metrics source admission to the shared section admission.
 --- @param renderer table|nil Actual manifest renderer.
 --- @param platform string Native platform token.
 --- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
 local function metrics_source(renderer, platform)
-	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
-		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
-
-	local ok, root = pcall(renderer.get_root)
-	if not ok then return nil end
-	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
-	local top, children = rawget(root, "top_level"), rawget(root, "metrics_menu")
-	if not metrics_dense(top, true) or not metrics_dense(children, true) then return nil end
-	local parent
-	for _, row in next, top do
-		if rawget(row, "id") == "metrics" then
-			if parent then return nil end
-			parent = row
-		end
-	end
-	if parent == nil or rawget(parent, "type") ~= "group" or type(rawget(parent, "i18n")) ~= "string"
-		or rawget(parent, "i18n") == "" or not metrics_dense(rawget(parent, "rows"), true) then return nil end
-	local platforms = rawget(parent, "platforms")
-	if platforms ~= nil then
-		if not metrics_dense(platforms, false) then return nil end
-		local visible = false
-		for _, token in next, platforms do
-			if type(token) ~= "string" then return nil end
-			if token == platform then visible = true end
-		end
-		if not visible then return nil end
-	end
-	local fields = {}
-	for key, value in next, parent do fields[key] = value end
-	return root, top, children, parent, fields
+	return ParentSource.read(renderer, platform, "metrics")
 end
 
---- Rechecks the captured direct parent fields without source metamethods.
+--- Delegates the direct parent recheck to the shared section admission.
 --- @param parent table Actual direct source row.
 --- @param fields table Captured raw field references and scalar values.
 --- @return boolean
 local function metrics_parent_unchanged(parent, fields)
-	for key, value in next, parent do
-		if not rawequal(value, rawget(fields, key)) then return false end
-	end
-	for key, value in next, fields do
-		if not rawequal(value, rawget(parent, key)) then return false end
-	end
-	return true
+	return ParentSource.unchanged(parent, fields)
 end
 
 
@@ -5010,69 +4969,28 @@ local function _build_gestures(ctx)
 	return receive(menu, { gestures_enabled = function() return gestures_on end })
 end
 
---- Checks raw dense arrays without triggering source metamethods.
+--- Delegates the raw dense-array check to the shared section admission.
 --- @param value table Source array.
 --- @param records boolean Whether its values must be plain records.
 --- @return boolean
 local function configuration_dense(value, records)
-	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
-	local count, maximum = 0, 0
-	for index, row in next, value do
-		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
-		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
-		count, maximum = count + 1, math.max(maximum, index)
-	end
-	return count == maximum
+	return ParentSource.dense(value, records)
 end
 
---- Admits the actual Configuration source structure without interpreting command grammar.
+--- Delegates the actual Configuration source admission to the shared section admission.
 --- @param renderer table|nil Actual manifest renderer.
 --- @param platform string Native platform token.
 --- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
 local function configuration_source(renderer, platform)
-	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
-		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
-
-	local root = renderer.get_root()
-	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
-	local top, children = rawget(root, "top_level"), rawget(root, "configuration_menu")
-	if not configuration_dense(top, true) or not configuration_dense(children, true) then return nil end
-	local parent
-	for _, row in next, top do
-		if rawget(row, "id") == "configuration" then
-			if parent then return nil end
-			parent = row
-		end
-	end
-	if parent == nil or rawget(parent, "type") ~= "group" or type(rawget(parent, "i18n")) ~= "string"
-		or rawget(parent, "i18n") == "" or not configuration_dense(rawget(parent, "rows"), true) then return nil end
-	local platforms = rawget(parent, "platforms")
-	if platforms ~= nil then
-		if not configuration_dense(platforms, false) then return nil end
-		local visible = false
-		for _, token in next, platforms do
-			if type(token) ~= "string" then return nil end
-			if token == platform then visible = true end
-		end
-		if not visible then return nil end
-	end
-	local fields = {}
-	for key, value in next, parent do fields[key] = value end
-	return root, top, children, parent, fields
+	return ParentSource.read(renderer, platform, "configuration")
 end
 
---- Rechecks the captured direct parent fields without source metamethods.
+--- Delegates the direct parent recheck to the shared section admission.
 --- @param parent table Actual direct source row.
 --- @param fields table Captured raw field references and scalar values.
 --- @return boolean
 local function configuration_parent_unchanged(parent, fields)
-	for key, value in next, parent do
-		if not rawequal(value, rawget(fields, key)) then return false end
-	end
-	for key, value in next, fields do
-		if not rawequal(value, rawget(parent, key)) then return false end
-	end
-	return true
+	return ParentSource.unchanged(parent, fields)
 end
 
 --- Builds the Configuration submenu.
@@ -5440,70 +5358,28 @@ local function _uninstall_command(ctx)
 	end
 end
 
---- Checks raw dense arrays without triggering source metamethods.
+--- Delegates the raw dense-array check to the shared section admission.
 --- @param value table Source array.
 --- @param records boolean Whether its values must be plain records.
 --- @return boolean
 local function about_dense(value, records)
-	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
-	local count, maximum = 0, 0
-	for index, row in next, value do
-		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
-		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
-		count, maximum = count + 1, math.max(maximum, index)
-	end
-	return count == maximum
+	return ParentSource.dense(value, records)
 end
 
---- Admits the actual About source structure without interpreting choice grammar.
+--- Delegates the actual About source admission to the shared section admission.
 --- @param renderer table|nil Actual manifest renderer.
 --- @param platform string Native platform token.
 --- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
 local function about_source(renderer, platform)
-	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
-		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
-
-	local root = renderer.get_root()
-	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
-	local top, children = rawget(root, "top_level"), rawget(root, "about_menu")
-	if not about_dense(top, true) or not about_dense(children, true) or #children == 0 then return nil end
-	local parent
-	for _, row in next, top do
-		if rawget(row, "id") == "about" then
-			if parent then return nil end
-			parent = row
-		end
-	end
-	if parent == nil or rawget(parent, "type") ~= "group" or rawget(parent, "label_prefix") ~= nil
-		or type(rawget(parent, "i18n")) ~= "string" or rawget(parent, "i18n") == ""
-		or not about_dense(rawget(parent, "rows"), true) then return nil end
-	local platforms = rawget(parent, "platforms")
-	if platforms ~= nil then
-		if not about_dense(platforms, false) then return nil end
-		local visible = false
-		for _, token in next, platforms do
-			if type(token) ~= "string" then return nil end
-			if token == platform then visible = true end
-		end
-		if not visible then return nil end
-	end
-	local fields = {}
-	for key, value in next, parent do fields[key] = value end
-	return root, top, children, parent, fields
+	return ParentSource.read(renderer, platform, "about")
 end
 
---- Rechecks the captured direct parent fields without source metamethods.
+--- Delegates the direct parent recheck to the shared section admission.
 --- @param parent table Actual direct source row.
 --- @param fields table Captured raw field references and scalar values.
 --- @return boolean
 local function about_parent_unchanged(parent, fields)
-	for key, value in next, parent do
-		if not rawequal(value, rawget(fields, key)) then return false end
-	end
-	for key, value in next, fields do
-		if not rawequal(value, rawget(parent, key)) then return false end
-	end
-	return true
+	return ParentSource.unchanged(parent, fields)
 end
 
 --- Builds the about item: the updater block, Versions and its GitHub page, then
@@ -5621,69 +5497,28 @@ local function _build_quit(ctx)
 	})
 end
 
---- Checks raw dense arrays without triggering source metamethods.
+--- Delegates the raw dense-array check to the shared section admission.
 --- @param value table Source array.
 --- @param records boolean Whether its values must be plain records.
 --- @return boolean
 local function debug_dense(value, records)
-	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
-	local count, maximum = 0, 0
-	for index, row in next, value do
-		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
-		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
-		count, maximum = count + 1, math.max(maximum, index)
-	end
-	return count == maximum
+	return ParentSource.dense(value, records)
 end
 
---- Admits the actual Debug source structure without interpreting choice grammar.
+--- Delegates the actual Debug source admission to the shared section admission.
 --- @param renderer table|nil Actual manifest renderer.
 --- @param platform string Native platform token.
 --- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
 local function debug_source(renderer, platform)
-	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
-		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
-
-	local root = renderer.get_root()
-	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
-	local top, children = rawget(root, "top_level"), rawget(root, "debug_menu")
-	if not debug_dense(top, true) or not debug_dense(children, true) then return nil end
-	local parent
-	for _, row in next, top do
-		if rawget(row, "id") == "debug" then
-			if parent then return nil end
-			parent = row
-		end
-	end
-	if parent == nil or rawget(parent, "type") ~= "group" or type(rawget(parent, "i18n")) ~= "string"
-		or rawget(parent, "i18n") == "" or not debug_dense(rawget(parent, "rows"), true) then return nil end
-	local platforms = rawget(parent, "platforms")
-	if platforms ~= nil then
-		if not debug_dense(platforms, false) then return nil end
-		local visible = false
-		for _, token in next, platforms do
-			if type(token) ~= "string" then return nil end
-			if token == platform then visible = true end
-		end
-		if not visible then return nil end
-	end
-	local fields = {}
-	for key, value in next, parent do fields[key] = value end
-	return root, top, children, parent, fields
+	return ParentSource.read(renderer, platform, "debug")
 end
 
---- Rechecks the captured direct parent fields without source metamethods.
+--- Delegates the direct parent recheck to the shared section admission.
 --- @param parent table Actual direct source row.
 --- @param fields table Captured raw field references and scalar values.
 --- @return boolean
 local function debug_parent_unchanged(parent, fields)
-	for key, value in next, parent do
-		if not rawequal(value, rawget(fields, key)) then return false end
-	end
-	for key, value in next, fields do
-		if not rawequal(value, rawget(parent, key)) then return false end
-	end
-	return true
+	return ParentSource.unchanged(parent, fields)
 end
 
 --- Builds the debug submenu from the shared manifest.

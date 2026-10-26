@@ -29,6 +29,7 @@ const { existsSync, readFileSync, readdirSync } = require('fs');
 const { resolve, dirname } = require('path');
 const { parse: parseTomlSource } = require('smol-toml');
 const tomlOwnData = require('./fixtures/toml-own-data.cjs');
+const { checkParentSource } = require('../lib/menu-parent-source-gate.cjs');
 const parseToml = (source) => tomlOwnData(parseTomlSource(source));
 
 const REPO_ROOT = resolve(__dirname, '..', '..');
@@ -9045,48 +9046,7 @@ console.log(
 				assert(!hasStatement(changed, statement), 'foreign renderer cannot own Debug');
 			}
 		}
-		for (const [name, statements] of [
-			[
-				'debug_source',
-				[
-					'local root = renderer.get_root()',
-					'local top, children = rawget(root, "top_level"), rawget(root, "debug_menu")',
-					'if not debug_dense(top, true) or not debug_dense(children, true) then return nil end',
-					'local fields = {}',
-					'return root, top, children, parent, fields'
-				]
-			],
-			[
-				'debug_dense',
-				[
-					'if type(value) ~= "table" or getmetatable(value) ~= nil then return false end',
-					'return count == maximum'
-				]
-			],
-			['debug_parent_unchanged', ['return true']]
-		]) {
-			const definition =
-				name === 'debug_source'
-					? 'local function debug_source(renderer, platform)'
-					: name === 'debug_dense'
-						? 'local function debug_dense(value, records)'
-						: 'local function debug_parent_unchanged(parent, fields)';
-			const actual = ownerBody(source, definition);
-			assert.throws(
-				() => ownerBody('if false then\n' + source + '\nend', definition),
-				/physical native Debug owner/
-			);
-			for (const statement of statements)
-				assert(hasStatement(actual, statement), 'actual raw structural helper ' + statement);
-			assert.throws(
-				() => ownerBody(source.replace(definition, '-- ' + definition), definition),
-				/physical native Debug owner/
-			);
-			assert.throws(
-				() => ownerBody(source + '\n' + definition + '\nend\n', definition),
-				/physical native Debug owner/
-			);
-		}
+		checkParentSource({ ownerBody, hasStatement }, 'debug', 'Debug', source, 'debug');
 		const withdrawn =
 			source.replace(finish, 'return nil') +
 			'\nlocal function unused_debug_owner()\n' +
@@ -9345,48 +9305,13 @@ console.log(
 				assert(!hasStatement(changed, statement), 'foreign renderer cannot own Configuration');
 			}
 		}
-		for (const [name, statements] of [
-			[
-				'configuration_source',
-				[
-					'local root = renderer.get_root()',
-					'local top, children = rawget(root, "top_level"), rawget(root, "configuration_menu")',
-					'if not configuration_dense(top, true) or not configuration_dense(children, true) then return nil end',
-					'local fields = {}',
-					'return root, top, children, parent, fields'
-				]
-			],
-			[
-				'configuration_dense',
-				[
-					'if type(value) ~= "table" or getmetatable(value) ~= nil then return false end',
-					'return count == maximum'
-				]
-			],
-			['configuration_parent_unchanged', ['return true']]
-		]) {
-			const definition =
-				name === 'configuration_source'
-					? 'local function configuration_source(renderer, platform)'
-					: name === 'configuration_dense'
-						? 'local function configuration_dense(value, records)'
-						: 'local function configuration_parent_unchanged(parent, fields)';
-			const actual = ownerBody(source, definition);
-			assert.throws(
-				() => ownerBody('if false then\n' + source + '\nend', definition),
-				/physical native Configuration owner/
-			);
-			for (const statement of statements)
-				assert(hasStatement(actual, statement), 'actual raw structural helper ' + statement);
-			assert.throws(
-				() => ownerBody(source.replace(definition, '-- ' + definition), definition),
-				/physical native Configuration owner/
-			);
-			assert.throws(
-				() => ownerBody(source + '\n' + definition + '\nend\n', definition),
-				/physical native Configuration owner/
-			);
-		}
+		checkParentSource(
+			{ ownerBody, hasStatement },
+			'configuration',
+			'Configuration',
+			source,
+			'configuration'
+		);
 		const withdrawn =
 			source.replace(finish, 'return nil') +
 			'\nlocal function unused_configuration_owner()\n' +
@@ -9903,48 +9828,7 @@ console.log(
 				absentPrevious = at;
 			}
 		}
-		for (const [name, signature, statements] of [
-			[
-				'metrics_source',
-				'local function metrics_source(renderer, platform)',
-				[
-					'local ok, root = pcall(renderer.get_root)',
-					'if not ok then return nil end',
-					'local top, children = rawget(root, "top_level"), rawget(root, "metrics_menu")',
-					'if not metrics_dense(top, true) or not metrics_dense(children, true) then return nil end',
-					'return root, top, children, parent, fields'
-				]
-			],
-			[
-				'metrics_dense',
-				'local function metrics_dense(value, records)',
-				[
-					'if type(value) ~= "table" or getmetatable(value) ~= nil then return false end',
-					'return count == maximum'
-				]
-			],
-			[
-				'metrics_parent_unchanged',
-				'local function metrics_parent_unchanged(parent, fields)',
-				['return true']
-			]
-		]) {
-			const body = ownerBody(source, signature);
-			for (const statement of statements)
-				assert(hasStatement(body, statement), 'actual raw structural helper ' + name);
-			assert.throws(
-				() => ownerBody('if false then\n' + source + '\nend', signature),
-				/physical native Metrics owner/
-			);
-			assert.throws(
-				() => ownerBody(source.replace(signature, '-- ' + signature), signature),
-				/physical native Metrics owner/
-			);
-			assert.throws(
-				() => ownerBody(source + '\n' + signature + '\nend\n', signature),
-				/physical native Metrics owner/
-			);
-		}
+		checkParentSource({ ownerBody, hasStatement }, 'metrics', 'Metrics', source, 'metrics');
 		const withdrawn =
 			source.replace(finish, 'return nil') +
 			'\nlocal function unused_metrics_owner()\n' +
@@ -12390,21 +12274,7 @@ console.log(
 				if (at < 0) return false;
 				previous = at;
 			}
-			const guard = ownerBody(source, 'local function about_source(renderer, platform)');
-			if (
-				!hasStatement(
-					guard,
-					'local top, children = rawget(root, "top_level"), rawget(root, "about_menu")'
-				)
-			)
-				return false;
-			if (
-				!hasStatement(
-					guard,
-					'if not about_dense(top, true) or not about_dense(children, true) or #children == 0 then return nil end'
-				)
-			)
-				return false;
+			checkParentSource({ ownerBody, hasStatement }, 'about', 'About', source, 'about');
 			if (!declaredPublicProjection(source, publicOwner)) return false;
 			const tokens = scriptTokens(publicOwner, '.lua');
 			const binding = scriptTokens('["about"] = _build_about', '.lua');
