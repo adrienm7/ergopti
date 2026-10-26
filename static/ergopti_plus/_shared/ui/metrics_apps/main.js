@@ -61,7 +61,7 @@ function initDashboard() {
 		dateSelect.appendChild(option);
 	});
 
-	if (!currentSelectedDate) currentSelectedDate = dates[0].key;
+	if (!dates.some((date) => date.key === currentSelectedDate)) currentSelectedDate = dates[0].key;
 	dateSelect.value = currentSelectedDate;
 
 	rebuildFilterButtons();
