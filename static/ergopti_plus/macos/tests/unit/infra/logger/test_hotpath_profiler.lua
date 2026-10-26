@@ -42,7 +42,7 @@ helpers.describe("infra.hotpath_profiler.log_if_slow", function()
 		reset_capture()
 		NS = 1000 * NS_PER_MS
 		local t0 = hot.now()
-		NS = t0 + 25 * NS_PER_MS          -- 25 ms elapsed (> 20 ms default)
+		NS = t0 + 25 * NS_PER_MS          -- 25 ms elapsed (> 5 ms default)
 		local elapsed = hot.log_if_slow("keydown", t0, "char=a")
 		helpers.assert_eq(#captured, 1, "one WARNING expected for a slow segment")
 		helpers.assert_eq(captured[1].args[1], "keydown")
@@ -51,20 +51,29 @@ helpers.describe("infra.hotpath_profiler.log_if_slow", function()
 		helpers.assert_true(math.abs(elapsed - 25) < 0.01, "returned elapsed ≈ 25 ms")
 	end)
 
+	helpers.it("logs a WARNING from 6 ms, the threshold shared with Windows", function()
+		reset_capture()
+		NS = 1200 * NS_PER_MS
+		local t0 = hot.now()
+		NS = t0 + 6 * NS_PER_MS
+		hot.log_if_slow("hotstring.match", t0, "char=six")
+		helpers.assert_eq(#captured, 1, "6 ms is over 5 ms; the old 20 ms threshold stayed silent")
+	end)
+
 	helpers.it("stays silent for transient scheduler jitter below the default budget", function()
 		reset_capture()
 		NS = 1500 * NS_PER_MS
 		local t0 = hot.now()
-		NS = t0 + 14 * NS_PER_MS          -- 14 ms elapsed (< 20 ms default)
+		NS = t0 + 3 * NS_PER_MS           -- 3 ms elapsed (< 5 ms default)
 		hot.log_if_slow("keydown", t0, "char=jitter")
-		helpers.assert_eq(#captured, 0, "14 ms scheduler jitter must not emit a WARNING")
+		helpers.assert_eq(#captured, 0, "3 ms scheduler jitter must not emit a WARNING")
 	end)
 
 	helpers.it("stays silent for a fast segment below the threshold", function()
 		reset_capture()
 		NS = 2000 * NS_PER_MS
 		local t0 = hot.now()
-		NS = t0 + 1 * NS_PER_MS            -- 1 ms elapsed (< 20 ms default)
+		NS = t0 + 1 * NS_PER_MS            -- 1 ms elapsed (< 5 ms default)
 		local elapsed = hot.log_if_slow("keydown", t0, "char=b")
 		helpers.assert_eq(#captured, 0, "no WARNING for a fast segment")
 		helpers.assert_true(math.abs(elapsed - 1) < 0.01, "still returns the measured duration")
@@ -78,7 +87,7 @@ helpers.describe("infra.hotpath_profiler.log_if_slow", function()
 		NS = t0 + 1 * NS_PER_MS            -- 1 ms now trips the 0.5 ms threshold
 		hot.log_if_slow("keydown", t0, "char=c")
 		helpers.assert_eq(#captured, 1, "1 ms must trip a 0.5 ms threshold")
-		hot.set_threshold_ms(20.0)         -- restore default for any later use
+		hot.set_threshold_ms(5.0)          -- restore default for any later use
 	end)
 
 	helpers.it("logs a repeating slow segment once per window and reports what it withheld", function()

@@ -74,19 +74,26 @@ end)
 
 helpers.describe("perf counters: slow segments", function()
 	local Segments = require("hotpath_segments")
+	local SLOW_MS = require("infra.timings").ms("logger", "hotpath_slow_ms")
 
 	helpers.it("warns once with the name and duration when a segment exceeds its threshold", function()
 		local perf, lines = fixture(30)
-		perf.span("input.dispatch", perf.clock() - (Segments.DEFAULT_SLOW_MS + 5))
+		perf.span("input.dispatch", perf.clock() - (SLOW_MS + 5))
 		helpers.assert_eq(#lines, 1)
 		helpers.assert_contains(lines[1], "[HotPath]")
 		helpers.assert_contains(lines[1], "Slow input.dispatch: ")
 		helpers.assert_eq(perf.snapshot().spans["input.dispatch"].slow, 1)
 	end)
 
+	helpers.it("warns for a 6 ms segment, the 5 ms threshold shared with Windows", function()
+		local perf, lines = fixture(30)
+		perf.span("input.dispatch", perf.clock() - 6)
+		helpers.assert_eq(#lines, 1, "6 ms is over 5 ms; the old 20 ms threshold stayed silent")
+	end)
+
 	helpers.it("stays silent for a segment under its threshold", function()
 		local perf, lines = fixture(10)
-		perf.span("hotstring.match", perf.clock() - (Segments.DEFAULT_SLOW_MS - 10))
+		perf.span("hotstring.match", perf.clock() - (SLOW_MS - 2))
 		helpers.assert_eq(#lines, 0, "a healthy keystroke produces no log line")
 		helpers.assert_eq(perf.snapshot().spans["hotstring.match"].slow, 0)
 	end)
@@ -100,10 +107,10 @@ helpers.describe("perf counters: slow segments", function()
 
 	helpers.it("logs a repeating slow segment once per window yet counts every occurrence", function()
 		local perf, lines = fixture(30)
-		for _ = 1, 5 do perf.span("input.dispatch", perf.clock() - (Segments.DEFAULT_SLOW_MS + 5)) end
+		for _ = 1, 5 do perf.span("input.dispatch", perf.clock() - (SLOW_MS + 5)) end
 		helpers.assert_eq(#lines, 1, "the repeats inside the window are not logged")
 		helpers.assert_eq(perf.snapshot().spans["input.dispatch"].slow, 5, "the count stays exact")
-		perf.span("hotstring.match", perf.clock() - (Segments.DEFAULT_SLOW_MS + 5))
+		perf.span("hotstring.match", perf.clock() - (SLOW_MS + 5))
 		helpers.assert_eq(#lines, 2, "another segment has its own window")
 	end)
 

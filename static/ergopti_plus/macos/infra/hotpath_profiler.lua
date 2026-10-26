@@ -27,6 +27,7 @@ local Logger = require("infra.logger")
 local Timer  = require("adapters.timer_scheduler")
 local PhaseStats = require("infra.phase_stats")
 local Segments = require("hotpath_segments")
+local Timings = require("infra.timings")
 local LOG    = "HotPath"
 
 -- Phase name of each label, built once so a keystroke never concatenates.
@@ -35,13 +36,14 @@ local _phase_names = {}
 -- Segments whose processing exceeds this many milliseconds are logged at
 -- WARNING. The budget and the declared segments live in the shared inventory
 -- (_shared/lua/hotpath_segments.lua), so macOS and Linux share one policy.
-local _slow_ms = Segments.DEFAULT_SLOW_MS
+local DEFAULT_SLOW_MS = Timings.ms("logger", "hotpath_slow_ms")
+local _slow_ms = DEFAULT_SLOW_MS
 -- A declared segment with its own measured threshold keeps it whatever the
 -- runtime default is; built once so the hot path is one table read.
 local _segment_slow_ms = {}
 for name in pairs(Segments.for_driver("macos")) do
-	if Segments.threshold_ms(name) ~= Segments.DEFAULT_SLOW_MS then
-		_segment_slow_ms[name] = Segments.threshold_ms(name)
+	if Segments.threshold_ms(name, DEFAULT_SLOW_MS) ~= DEFAULT_SLOW_MS then
+		_segment_slow_ms[name] = Segments.threshold_ms(name, DEFAULT_SLOW_MS)
 	end
 end
 
