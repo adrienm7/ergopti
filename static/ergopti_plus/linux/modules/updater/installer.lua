@@ -11,6 +11,7 @@
 
 local M = {}
 local TextUtils = require("text_utils")
+local Shell = require("adapters.shell_runner")
 
 local Fs = require("adapters.file_system")
 local Paths = require("infra.paths")
@@ -34,7 +35,7 @@ local WORK_PREFIX = ".ergopti-update."
 
 local shell_quote = TextUtils.shell_quote
 
---- Normalises the variants returned by os.execute and pipe:close across LuaJIT
+--- Normalises the variants returned by os.execute across LuaJIT
 --- and Lua 5.4. A numeric non-zero status is failure even though Lua considers
 --- every number truthy.
 --- @param first any First process result.
@@ -57,11 +58,10 @@ local function run_command(command)
 end
 
 local function capture_command(command)
-	local pipe = io.popen(command)
-	if not pipe then return nil end
-	local output = pipe:read("*a")
-	local first, exit_kind, exit_code = pipe:close()
-	if not status_ok(first, exit_kind, exit_code) then return nil end
+	-- LuaJIT can acknowledge pipe closure without retaining a failed child's
+	-- status. Only the canonical checked receipt authorises captured output.
+	local ok, output = Shell.exec_checked(command)
+	if not ok then return nil end
 	return output
 end
 
