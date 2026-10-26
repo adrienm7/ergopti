@@ -87,6 +87,17 @@ end
 
 helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 
+	helpers.it("keymap-source-exit: refuses failed real source commands before native publication", function()
+		local shell = require("adapters.shell_runner")
+		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"),
+			"native keymap source receipts require Python and the actual LuaJIT FFI runtime")
+		local quote = require("text_utils").shell_quote
+		local runtime = assert(shell.exec_line("command -v luajit"))
+		local fixture = helpers.driver_root() .. "/tests/hardware/test_xkb_source_exit.py"
+		local status = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime))
+		helpers.assert_true(status == true or status == 0, "failed actual keymap acquisition must refuse native publication")
+	end)
+
 	helpers.it("uses xkbcli dump-keymap-wayland when libxkbcommon has it", function()
 		local layout, _, Shell = load_with("wayland", {
 			{ "dump-keymap-wayland", plausible_keymap() },
@@ -97,6 +108,25 @@ helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 		helpers.assert_contains(layout.source(), "dump-keymap-wayland")
 		cleanup(Shell)
 	end)
+
+	for _, fallback in ipairs({ "xwayland", "compile" }) do
+		helpers.it("keymap-source-exit: a failed dump retains the healthy " .. fallback .. " fallback", function()
+			local layout, _, Shell = load_with("wayland", {
+				{ "dump-keymap-wayland", { ok = false, output = plausible_keymap(), error = "command exited with status 73" } },
+				{ "xkbcomp -xkb", fallback == "xwayland" and plausible_keymap() or
+					{ ok = false, output = plausible_keymap(), error = "command exited with status 73" } },
+				{ "compile-keymap --layout us", plausible_keymap() },
+			})
+			local ok, detail = pcall(function()
+				with_env({ DISPLAY = ":fixture", HOME = "/nonexistent-home", XKB_DEFAULT_LAYOUT = "us" }, function()
+					helpers.assert_true(layout.refresh(nil), "a later acknowledged keymap must remain usable")
+				end)
+				helpers.assert_contains(layout.source(), fallback == "xwayland" and "xkbcomp" or "compile-keymap")
+			end)
+			cleanup(Shell)
+			if not ok then error(detail, 0) end
+		end)
+	end
 
 	helpers.it("falls back to XWayland's keymap when the dump command is missing", function()
 		-- libxkbcommon 1.6 (Ubuntu 24.04): `xkbcli dump-keymap-wayland` prints
