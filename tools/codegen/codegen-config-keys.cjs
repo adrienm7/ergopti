@@ -26,6 +26,12 @@
  *    names a configuration leaf (some are not yet declared in the schema), and
  *    the `id` of every dispatchable row (command, check, toggle, choice).
  *
+ * 3. `_shared/core/config_schema/config_key_extras.json`: the few paths code
+ *    spells that neither source declares (dynamic tables, tap-hold timing).
+ *
+ * Every ancestor of a key is a key too (`shortcuts.caps_word` for
+ * `shortcuts.caps_word.enabled`), since code reads and writes whole sections.
+ *
  * Three tables come out of them: KEY (the dotted path), LEAF (the last segment,
  * for code that already scoped itself to a section) and COMMAND (menu ids).
  * A constant name is its value upper-cased with dots folded to underscores; two
@@ -43,6 +49,7 @@ const path = require('path');
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const SCHEMA = 'static/ergopti_plus/_shared/core/config_schema/config.schema.json';
 const MENU_MANIFEST = 'static/ergopti_plus/_shared/modules/menu/menu_manifest.json';
+const EXTRAS = 'static/ergopti_plus/_shared/core/config_schema/config_key_extras.json';
 const LUA_OUTPUT = 'static/ergopti_plus/_shared/lua/config_keys.lua';
 const JS_OUTPUT = 'static/ergopti_plus/_shared/ui/_generated/config_keys.js';
 const AHK_OUTPUT = 'static/ergopti_plus/windows/_generated/config_keys.ahk';
@@ -147,15 +154,27 @@ function collect(root = REPO_ROOT) {
 	const schema = JSON.parse(fs.readFileSync(path.join(root, SCHEMA), 'utf8'));
 	const manifest = JSON.parse(fs.readFileSync(path.join(root, MENU_MANIFEST), 'utf8'));
 	const fromManifest = manifestNames(manifest);
-	const keys = [...schemaPaths(schema), ...fromManifest.paths];
-	if (keys.length === 0) throw new Error('no configuration key found in either source');
+	const extras = JSON.parse(fs.readFileSync(path.join(root, EXTRAS), 'utf8'));
+	if (!Array.isArray(extras.paths)) throw new Error(`${EXTRAS}: expected a "paths" array`);
+	const declared = [...schemaPaths(schema), ...fromManifest.paths, ...extras.paths];
+	const declaredLeafKeys = new Set([...schemaPaths(schema), ...fromManifest.paths]);
+	const keys = new Set(declared);
+	for (const key of declared) {
+		const segments = key.split('.');
+		for (let end = 1; end < segments.length; end++) keys.add(segments.slice(0, end).join('.'));
+	}
+	if (keys.size === 0) throw new Error('no configuration key found in either source');
 	if (fromManifest.commands.length === 0) throw new Error('menu_manifest.json names no command id');
 	return {
 		KEY: table('KEY', keys),
 		LEAF: table(
 			'LEAF',
-			keys.map((key) => key.split('.').pop())
+			[...keys].map((key) => key.split('.').pop())
 		),
+		// Keys no schema property or manifest row declares: ancestors (sections) and the
+		// extras. Their last segment is often a module name too (`tap_keys`), so the
+		// raw-literal lint does not count it as a leaf.
+		SECTION: [...keys].filter((key) => !declaredLeafKeys.has(key)).sort(),
 		COMMAND: table('COMMAND', fromManifest.commands)
 	};
 }
@@ -341,6 +360,7 @@ if (require.main === module) {
 module.exports = {
 	SCHEMA,
 	MENU_MANIFEST,
+	EXTRAS,
 	LUA_OUTPUT,
 	JS_OUTPUT,
 	AHK_OUTPUT,
