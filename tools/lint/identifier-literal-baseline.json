@@ -1,0 +1,243 @@
+{
+	"_comment": "Typed copies of the hosts, bundle ids, service labels and ErgoptiPlus file names declared in _shared/data/identifiers.json, per driver source file and kind, on code lines. Counts may only go down; lower them with node tools/test/test-repo-url-single-source.cjs --shrink.",
+	"files": {
+		"static/ergopti_plus/_shared/modules/llm/install/ollama_install.ps1": {
+			"host": 1
+		},
+		"static/ergopti_plus/_shared/modules/llm/install/ollama_install.sh": {
+			"host": 1
+		},
+		"static/ergopti_plus/_shared/ui/changelog/atom_feed.js": {
+			"host": 1
+		},
+		"static/ergopti_plus/_shared/ui/changelog/script.js": {
+			"host": 3
+		},
+		"static/ergopti_plus/_shared/ui/repository_links.js": {
+			"host": 1
+		},
+		"static/ergopti_plus/linux/install.sh": {
+			"host": 1
+		},
+		"static/ergopti_plus/macos/data/generate_models.py": {
+			"host": 6
+		},
+		"static/ergopti_plus/macos/launcher/Package.swift": {
+			"host": 1
+		},
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LauncherConstants.swift": {
+			"bundle_id_or_label": 2
+		},
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeBootstrapStageOwner.swift": {
+			"bundle_id_or_label": 2
+		},
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeCoreLaunchctl.swift": {
+			"bundle_id_or_label": 4
+		},
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeCorePlistCustody.swift": {
+			"bundle_id_or_label": 1
+		},
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeCoreProvisionOwner.swift": {
+			"bundle_id_or_label": 4
+		},
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeCoreServiceOwner.swift": {
+			"bundle_id_or_label": 2
+		},
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeFirstInstallOwner.swift": {
+			"bundle_id_or_label": 2
+		},
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeInstallJournal.swift": {
+			"bundle_id_or_label": 1
+		},
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeInstallOwner.swift": {
+			"bundle_id_or_label": 8
+		},
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimePublisherIdentity.swift": {
+			"bundle_id_or_label": 4
+		},
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeServiceLifecycleLock.swift": {
+			"bundle_id_or_label": 1
+		},
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportMainOperation.swift": {
+			"bundle_id_or_label": 1
+		},
+		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UninstallWorker.swift": {
+			"bundle_id_or_label": 4
+		},
+		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/GuardianRegistrationTests.swift": {
+			"app_file_name": 1
+		},
+		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/GuardianUnregistrationTests.swift": {
+			"app_file_name": 1
+		},
+		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LauncherEnvironmentTests.swift": {
+			"bundle_id_or_label": 6
+		},
+		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedRuntimeCoreProvisionOwnerTests.swift": {
+			"bundle_id_or_label": 8
+		},
+		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ReleaseArchiveStagingTests.swift": {
+			"app_file_name": 12
+		},
+		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/RemapLeaseWorkerTests.swift": {
+			"app_file_name": 10
+		},
+		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift": {
+			"host": 1,
+			"app_file_name": 7
+		},
+		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/UninstallWorkerTests.swift": {
+			"app_file_name": 2,
+			"bundle_id_or_label": 3
+		},
+		"static/ergopti_plus/macos/modules/llm/ensure-ollama-deps.sh": {
+			"host": 1
+		},
+		"static/ergopti_plus/macos/modules/llm/managed-python-release.sh": {
+			"host": 2
+		},
+		"static/ergopti_plus/macos/modules/llm/managed_bootstrap_http.py": {
+			"host": 1
+		},
+		"static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx_hf.lua": {
+			"host": 2
+		},
+		"static/ergopti_plus/windows/infra/bundle.ahk": {
+			"app_file_name": 1
+		},
+		"static/ergopti_plus/windows/infra/start_at_login.ahk": {
+			"app_file_name": 1
+		},
+		"static/ergopti_plus/windows/modules/llm/ollama_deps_checker.ahk": {
+			"host": 2
+		},
+		"static/ergopti_plus/windows/modules/llm/ollama_managed_files.ps1": {
+			"host": 1
+		},
+		"static/ergopti_plus/windows/modules/updater/core.ahk": {
+			"host": 4
+		},
+		"static/ergopti_plus/windows/modules/updater/self_update.ahk": {
+			"host": 1,
+			"app_file_name": 1
+		},
+		"static/ergopti_plus/windows/ui/changelog/init.ahk": {
+			"host": 2
+		},
+		"static/ergopti_plus/windows/ui/model_browser/init.ahk": {
+			"host": 2
+		},
+		"tools/build/InstalledRuntimePublisher.hpp": {
+			"bundle_id_or_label": 4
+		},
+		"tools/build/appimage-oldest-lts.sh": {
+			"host": 1
+		},
+		"tools/build/build-linux-deb.sh": {
+			"host": 1
+		},
+		"tools/build/build-linux-flatpak.sh": {
+			"host": 2
+		},
+		"tools/build/build-linux-rpm.sh": {
+			"host": 1
+		},
+		"tools/build/build-macos-managed-ollama.py": {
+			"host": 6
+		},
+		"tools/build/build_changelog.py": {
+			"host": 1
+		},
+		"tools/build/build_macos_app.sh": {
+			"bundle_id_or_label": 3,
+			"app_file_name": 6,
+			"host": 1
+		},
+		"tools/build/build_static_bundle.py": {
+			"app_file_name": 2
+		},
+		"tools/build/core_sdk/receive_core_sdk.py": {
+			"host": 1
+		},
+		"tools/build/core_sdk/source/src/share/InstalledRuntimeConfirmedUpdatePeer.hpp": {
+			"bundle_id_or_label": 1
+		},
+		"tools/build/core_sdk/source/src/share/InstalledRuntimeMaintenanceAdmission.hpp": {
+			"bundle_id_or_label": 3
+		},
+		"tools/build/core_sdk/source/src/share/InstalledRuntimeMaintenancePeer.hpp": {
+			"bundle_id_or_label": 1
+		},
+		"tools/build/core_sdk/source/src/share/InstalledRuntimePublisher.hpp": {
+			"bundle_id_or_label": 4
+		},
+		"tools/build/core_sdk/source/src/share/OwnedRuntimeMaintenanceLineage.hpp": {
+			"bundle_id_or_label": 6
+		},
+		"tools/build/core_sdk/source/src/share/remap_runtime_installed_capture.hpp": {
+			"bundle_id_or_label": 7
+		},
+		"tools/build/homebrew-cask.cjs": {
+			"app_file_name": 1,
+			"bundle_id_or_label": 1,
+			"host": 1
+		},
+		"tools/build/macos-release-publication.cjs": {
+			"host": 2
+		},
+		"tools/build/owned-runtime-native/installed_physical_source.mm": {
+			"bundle_id_or_label": 3
+		},
+		"tools/build/owned_runtime_product_build.py": {
+			"bundle_id_or_label": 2,
+			"app_file_name": 1
+		},
+		"tools/build/remap_runtime_build.py": {
+			"host": 1
+		},
+		"tools/build/stage-macos-managed-ollama-catalogue.py": {
+			"host": 1
+		},
+		"tools/build/verify-macos-managed-ollama-publication.py": {
+			"app_file_name": 3,
+			"host": 1
+		},
+		"tools/ci/dev-release-qualification.cjs": {
+			"host": 2
+		},
+		"tools/ci/windows-exe-av-surface.cjs": {
+			"app_file_name": 1
+		},
+		"tools/ci/windows-exe-version-info.cjs": {
+			"app_file_name": 1
+		},
+		"tools/ci/windows-stable-signing.cjs": {
+			"app_file_name": 3,
+			"host": 1
+		},
+		"tools/codegen/codegen-managed-python-release.cjs": {
+			"host": 1
+		},
+		"tools/codegen/codegen-ollama-release.cjs": {
+			"host": 1
+		},
+		"tools/dev/bench-ahk-startup.cjs": {
+			"app_file_name": 3
+		},
+		"tools/dev/sync-private-ahk.js": {
+			"app_file_name": 1
+		},
+		"tools/lib/menu-native-startup-binding.cjs": {
+			"app_file_name": 1
+		},
+		"tools/maintainer/windows-live-checks.cjs": {
+			"app_file_name": 1
+		},
+		"tools/rtk/bootstrap.ps1": {
+			"host": 1
+		},
+		"tools/rtk/bootstrap.sh": {
+			"host": 1
+		}
+	}
+}

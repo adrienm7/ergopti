@@ -16,6 +16,16 @@
  * Scans tracked files under static/ergopti_plus/ and .github/. Tests,
  * corpora and the example extension (which users copy as a standalone file)
  * may spell the URL; driver code may not.
+ *
+ * HOSTS AND IDENTIFIERS (PAR-83):
+ * The same rule covers the other typed identifiers declared once in
+ * _shared/data/identifiers.json: the external hosts (GitHub, Ollama, Hugging
+ * Face), the bundle ids, the service labels and the ErgoptiPlus.ahk/.exe/.app
+ * names. Their code-line copies per file are held to
+ * tools/lint/identifier-literal-baseline.json, which may only go down
+ * (`--shrink` writes a lower count back). The Lua sites of macOS and Linux are
+ * already converted to _shared/lua/identifiers.lua; the AHK, Swift, shell and
+ * Python files stay in the baseline until their generators exist.
  * ==============================================================================
  */
 
@@ -98,6 +108,112 @@ for (const file of files) {
 	});
 }
 
+// ==================================================
+// ======= 1/ Hosts, Bundle Ids and App Names =======
+// ==================================================
+
+const IDENTIFIERS_REL = 'static/ergopti_plus/_shared/data/identifiers.json';
+const BASELINE_REL = 'tools/lint/identifier-literal-baseline.json';
+const identifiers = JSON.parse(fs.readFileSync(path.join(ROOT, IDENTIFIERS_REL), 'utf8'));
+const IDENTIFIER_SOURCE = /\.(lua|js|cjs|mjs|ahk|swift|sh|py|ps1|go|mm|hpp|cpp)$/;
+// Tests, vendored code, generated copies and the maintainer's diagnostics may
+// spell identifiers; so may the example extension users copy as one file.
+const IDENTIFIER_EXEMPT =
+	/(^|\/)(tests?|vendor|node_modules|_generated|diagnostics)\/|^static\/ergopti_plus\/(extensions|_shared\/lua\/identifiers\.lua)|^tools\/test\/|_test\.(py|go)$|\.generated\.swift$/;
+const COMMENT_LINE = /^\s*(--|;|\/\/|#|\*|\/\*)/;
+
+const KIND_PATTERNS = {
+	host: new RegExp(
+		Object.values(identifiers.hosts)
+			.map((host) => `(?<![A-Za-z0-9.-])${escapeRegex(host)}(?![A-Za-z0-9-])`)
+			.join('|'),
+		'g'
+	),
+	bundle_id_or_label: new RegExp(
+		[...Object.values(identifiers.bundle_ids), ...Object.values(identifiers.service_labels)]
+			.map((id) => `(?<![A-Za-z0-9.-])${escapeRegex(id)}(?![A-Za-z0-9-])`)
+			.join('|'),
+		'g'
+	),
+	app_file_name: new RegExp(
+		[identifiers.app.ahk, identifiers.app.exe, identifiers.app.bundle]
+			.map((name) => `(?<![A-Za-z0-9_-])${escapeRegex(name)}(?![A-Za-z0-9])`)
+			.join('|'),
+		'g'
+	)
+};
+
+/** Counts the typed identifier copies on code lines, per file and kind. */
+function countIdentifierLiterals() {
+	const counts = {};
+	const listed = execFileSync('git', ['ls-files', '-z', '--', 'static/ergopti_plus', 'tools'], {
+		cwd: ROOT,
+		encoding: 'utf8',
+		maxBuffer: 64 * 1024 * 1024
+	})
+		.split('\0')
+		.filter((file) => IDENTIFIER_SOURCE.test(file) && !IDENTIFIER_EXEMPT.test(file));
+	for (const file of listed) {
+		const lines = fs.readFileSync(path.join(ROOT, file), 'utf8').split('\n');
+		for (const line of lines) {
+			if (COMMENT_LINE.test(line)) continue;
+			for (const [kind, pattern] of Object.entries(KIND_PATTERNS)) {
+				const hits = line.match(pattern);
+				if (!hits) continue;
+				counts[file] = counts[file] || {};
+				counts[file][kind] = (counts[file][kind] || 0) + hits.length;
+			}
+		}
+	}
+	return { counts, listed: listed.length };
+}
+
+const identifierScan = countIdentifierLiterals();
+if (identifierScan.listed < 500)
+	failures.push(`only ${identifierScan.listed} identifier source file(s) scanned — listing broken`);
+const baselinePath = path.join(ROOT, BASELINE_REL);
+const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+let baselineTotal = 0;
+for (const [file, kinds] of Object.entries(identifierScan.counts)) {
+	for (const [kind, count] of Object.entries(kinds)) {
+		const allowed = (baseline.files[file] || {})[kind] || 0;
+		baselineTotal += allowed;
+		if (count > allowed)
+			failures.push(
+				`${file}: ${count} typed ${kind} literal(s), baseline ${allowed} — derive them from ` +
+					`${IDENTIFIERS_REL} (Lua: require("identifiers"))`
+			);
+	}
+}
+const lowered = {};
+for (const [file, kinds] of Object.entries(baseline.files)) {
+	for (const [kind, allowed] of Object.entries(kinds)) {
+		const count = (identifierScan.counts[file] || {})[kind] || 0;
+		if (count < allowed) {
+			lowered[file] = lowered[file] || {};
+			lowered[file][kind] = count;
+		}
+	}
+}
+if (process.argv.includes('--shrink')) {
+	// Only ever lower a count: a file that grew keeps its old allowance and fails above.
+	const next = {};
+	for (const [file, kinds] of Object.entries(baseline.files))
+		for (const [kind, allowed] of Object.entries(kinds)) {
+			const count = Math.min(allowed, (identifierScan.counts[file] || {})[kind] || 0);
+			if (count > 0) (next[file] = next[file] || {})[kind] = count;
+		}
+	baseline.files = next;
+	fs.writeFileSync(baselinePath, JSON.stringify(baseline, null, '\t') + '\n');
+	console.log(`[OK] ${BASELINE_REL} rewritten from the current counts.`);
+} else if (Object.keys(lowered).length > 0) {
+	for (const [file, kinds] of Object.entries(lowered))
+		failures.push(
+			`${file}: baseline is above the ${JSON.stringify(kinds)} found — lower it with ` +
+				'node tools/test/test-repo-url-single-source.cjs --shrink'
+		);
+}
+
 if (scanned < 500)
 	failures.push(`only ${scanned} file(s) scanned — the tracked-file listing is broken`);
 
@@ -107,5 +223,6 @@ if (failures.length > 0) {
 	process.exit(1);
 }
 console.log(
-	`[OK] repository URL single source: ${scanned} tracked file(s), every link derives from ${DEFAULTS}.`
+	`[OK] repository URL single source: ${scanned} tracked file(s), every link derives from ${DEFAULTS}; ` +
+		`${baselineTotal} typed host/id/name literal(s) held to ${BASELINE_REL}.`
 );
