@@ -14,7 +14,7 @@ require("compat.utf8").install()
 local uv = require("luv")
 local Fixture = require("tests.support.keystats_native_fixture")
 local Preferences = require("tests.support.metrics_preferences_fixture")
-local dir = assert(uv.fs_mkdtemp(assert(os.getenv("TMPDIR")) .. "/system-bind-recovery-XXXXXX"))
+local dir = assert(uv.fs_mkdtemp(assert(uv.os_tmpdir()) .. "/system-bind-recovery-XXXXXX"))
 local database = dir .. "/metrics.sqlite"
 assert(uv.fs_mkdir(database, 448))
 local ok, failure = xpcall(function()

@@ -43,12 +43,13 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		local quote = require("text_utils").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_sqlite_private_files.lua"
+		-- Default Integration sessions may omit TMPDIR; libuv owns temp resolution.
 		for _, mask in ipairs({ "022", "077" }) do
-			local command = "umask " .. mask .. "; exec env -u LUA_PATH -u LUA_CPATH " .. quote(runtime) .. " " .. quote(fixture) .. " " .. quote(root)
+			local command = "umask " .. mask .. "; exec env -u TMPDIR -u LUA_PATH -u LUA_CPATH " .. quote(runtime) .. " " .. quote(fixture) .. " " .. quote(root)
 			local status = os.execute(command)
 			helpers.assert_true(status == true or status == 0, "native SQLite privacy failed under umask " .. mask)
 		end
-		local status = os.execute("env -u LUA_PATH -u LUA_CPATH " .. quote(runtime) .. " " .. quote(fixture) .. " " .. quote(root) .. " close-refusal")
+		local status = os.execute("env -u TMPDIR -u LUA_PATH -u LUA_CPATH " .. quote(runtime) .. " " .. quote(fixture) .. " " .. quote(root) .. " close-refusal")
 		helpers.assert_true(status == true or status == 0, "terminal private-file close debt must retain exact native authority")
 	end)
 
@@ -56,7 +57,7 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		local quote = require("text_utils").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_system_bind_recovery.lua"
-		local status = os.execute("env -u LUA_PATH -u LUA_CPATH luajit " .. quote(fixture) .. " " .. quote(root))
+		local status = os.execute("env -u TMPDIR -u LUA_PATH -u LUA_CPATH luajit " .. quote(fixture) .. " " .. quote(root))
 		helpers.assert_true(status == true or status == 0, "same-path native recovery must preserve captured system history")
 	end)
 
