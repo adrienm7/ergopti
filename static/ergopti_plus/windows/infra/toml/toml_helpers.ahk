@@ -1443,15 +1443,12 @@ ReadPathsToml(FilePath) {
 				try LoggerError("TomlPaths", "Cannot read '{1}': {2}. Falling back to the default configuration directory for this session.", FilePath, Err.Message)
 				return Result
 		}
-		loop parse, Content, "`n", "`r" {
-				Line := Trim(A_LoopField, " `t")
-				if (Line == "" or SubStr(Line, 1, 1) == "#") {
-						continue
-				}
-				Line := TOML_StripInlineComment(Line)
-				if RegExMatch(Line, '^(\S+)\s*=\s*"(.*)"$', &Match) {
-						Result[Match[1]] := StrReplace(Match[2], "/", "\")
-				}
+		; The locator is TOML too: decode quoted key identities and string escapes
+		; through the same semantic owner as the rest of the configuration. A raw
+		; line capture can redirect boot to a different profile or lose the override.
+		for Key, Value in TOML_ParseDocument(Content) {
+				if Value is String
+						Result[Key] := StrReplace(Value, "/", "\")
 		}
 		return Result
 }

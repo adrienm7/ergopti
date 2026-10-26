@@ -185,3 +185,82 @@ Test("meta boot-paths-fail-soft: layer registrations clear HotIf in a finally",
 	_BPF_LayerRegistrationsClearHotIfInFinally)
 Test("meta boot-paths-fail-soft: the CapsLock guard covers every registration",
 	_BPF_CapsLockGuardCoversEveryRegistration)
+
+
+; Read the actual private profile selected by each equivalent TOML spelling.
+; The canonical semantic decoder independently proves the source's identity.
+_BPF_PathsTomlSemanticDirectory(Shape, Key) {
+	Directory := A_Temp . "\ergopti_paths_semantic_" . A_ScriptHwnd . "_" . A_TickCount
+	Desired := Directory . "\café profile\" . AppDirsFolderName() . "\"
+	Path := Directory . "\paths.toml"
+	DirCreate(Desired)
+	try {
+		FileAppend("selected profile", Desired . "receipt.txt", "UTF-8-RAW")
+		Forward := StrReplace(Desired, "\", "/")
+		switch Shape {
+			case "canonical": Source := Key . ' = "' . Forward . '"`n'
+			case "unicode-escape": Source := Key . ' = "' . StrReplace(Forward, "é", "\u00e9") . '"`n'
+			case "escaped-backslashes": Source := Key . " = " . TOML_RenderString(Desired) . "`n"
+			case "literal-string": Source := Key . " = '" . Forward . "'`n"
+			case "quoted-key": Source := '"' . Key . '" = "' . Forward . '"`n'
+			default: throw ValueError("Unknown bootstrap TOML shape")
+		}
+		Document := TOML_ParseDocument(Source)
+		AssertEqual(Shape == "escaped-backslashes" ? Desired : Forward, Document[Key],
+			"the real semantic decoder must admit the fixture")
+		FileAppend(Source, Path, "UTF-8-RAW")
+		Overrides := ReadPathsToml(Path)
+		AssertTrue(Overrides.Has(Key), "a valid locator spelling must retain the configuration key")
+		AssertEqual(Desired, Overrides[Key], "the locator must decode TOML string contents exactly once")
+		Selected := Key == "ConfigDirPath"
+			? ConfigTransitionSelectBootConfigDir(Overrides, Directory . "\fallback\")
+			: LoggerResolveLogsDir(Overrides[Key], Directory . "\fallback\")
+		AssertEqual(Desired, Selected, "boot must select the exact authored profile")
+		AssertEqual("selected profile", FileRead(Selected . "receipt.txt", "UTF-8"),
+			"the selected profile must reach the actual private file")
+		AssertEqual(Source, FileRead(Path, "UTF-8"), "reading must preserve every locator byte")
+	} finally DirDelete(Directory, true)
+}
+for _bpfPathShape in ["canonical", "unicode-escape", "literal-string", "quoted-key", "escaped-backslashes"] {
+	for _bpfPathKey in ["ConfigDirPath", AppDirsLogsOverrideKey()]
+		Test("bootstrap paths: equivalent " . _bpfPathShape . " TOML selects " . _bpfPathKey . " (bootstrap-toml-directory)",
+			_BPF_PathsTomlSemanticDirectory.Bind(_bpfPathShape, _bpfPathKey))
+}
+
+
+_BPF_PathsTomlEarlyOwner(Mode) {
+	Directory := A_Temp . "\ergopti_paths_early_" . A_ScriptHwnd . "_" . A_TickCount
+	DirCreate(Directory)
+	Locator := Directory . "\paths.toml", Receipt := Directory . "\receipt.txt"
+	Source := 'ConfigDirPath = "C:/café/"`n'
+	if Mode == "malformed"
+		Source .= "[unterminated`n"
+	try {
+		FileAppend(Source, Locator, "UTF-8-RAW")
+		Fixture := A_ScriptDir . "\fixtures\paths_toml_early_owner.ahk"
+		AssertTrue(FileExist(Fixture) != "", "the actual early-owner child must exist")
+		Command := '"' . A_AhkPath . '" /ErrorStdOut "' . Fixture . '" "' . Locator . '" "' . Receipt . '"'
+		ExitCode := RunWait(Command, A_ScriptDir, "Hide")
+		Evidence := FileRead(Receipt, "UTF-8")
+		if Mode == "valid" {
+			AssertEqual(0, ExitCode, "reading needs no late manifest or configuration globals")
+			AssertContains(Evidence, "parsed_key=C:\café\")
+			AssertContains(Evidence, "semantic_parses=1")
+			AssertContains(Evidence, "counter_parses=1")
+			AssertContains(Evidence, "after_read")
+			AssertFalse(InStr(Evidence, "fatal-startup=") > 0, "a valid locator must not enter fatal handling")
+		} else {
+			AssertEqual(1, ExitCode, "malformed startup authority must terminate the actual child")
+			AssertContains(Evidence, "fatal-startup=starting")
+			AssertContains(Evidence, "Unterminated TOML document record")
+			AssertContains(Evidence, "ReadPathsToml")
+			AssertContains(Evidence, "toml_document.ahk")
+			AssertFalse(InStr(Evidence, "after_read") > 0, "fatal handling must prevent a partial startup continuation")
+		}
+		AssertContains(Evidence, "exit=Exit/" . ExitCode, "the genuine process exit must be independently observed")
+		AssertEqual(Source, FileRead(Locator, "UTF-8"), "even a refused locator remains unchanged")
+	} finally DirDelete(Directory, true)
+}
+for _bpfEarlyMode in ["valid", "malformed"]
+	Test("bootstrap paths: " . _bpfEarlyMode . " source honors the early error owner (bootstrap-toml-early-owner)",
+		_BPF_PathsTomlEarlyOwner.Bind(_bpfEarlyMode))
