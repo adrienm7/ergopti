@@ -12,6 +12,8 @@ local Logger = require("logger.shim")
 local LOG = "infra.shortcuts_scope"
 local _owner, _sequence = nil, 0
 local _editor_owner, _editor_path, _editor_pause, _editor_busy = nil, nil, nil, false
+require("infra.scope_registry").register("shortcuts_scope", function() return _owner ~= nil and _owner.pending() == true end)
+require("infra.scope_registry").register("shortcuts_editor_scope", function() return _editor_owner ~= nil and _editor_owner.pending() == true end)
 
 --- The script chords' rows of the Shortcuts scope: their section and the
 --- parameters of the bindings they dispatch under. Their submenu's restore and

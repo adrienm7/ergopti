@@ -10,6 +10,7 @@ local KeyPath = require("toml_codec.key_path")
 local Updates = require("shortcuts.physical_availability")
 local M = {}
 local retained, sequence, session_busy = nil, 0, false
+require("infra.scope_registry").register("key_combinations_scope", function() return session_busy or (retained ~= nil and retained.pending() == true) end)
 --- Creates one exact ordered-pair publication owner. Native and source
 --- inverses retain their lease until literal acknowledgement.
 --- @param options table Canonical path, backup, pause and owner ports.

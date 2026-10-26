@@ -8,6 +8,7 @@ local Transaction = require("config_scope_transaction")
 local Fenced = require("config_scope_fenced_transaction")
 local Logger = require("logger.shim")
 local _owner, _sequence = nil, 0
+require("infra.scope_registry").register("script_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
 --- Binds the actual native aliases; policy and available rows come from metadata.
 --- @return table aliases Canonical path -> native alias/field owner.
