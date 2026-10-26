@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tools/build/appimage-distro-matrix.sh
+# tools/build/appimage-distro-sweep.sh
 #
 # Launches a built AppImage in a matrix of distribution containers and checks
 # that each one runs it, or refuses it in words, as its C library dictates
@@ -9,7 +9,7 @@
 # refusal. Extract-and-run mode stands in for FUSE, which containers lack.
 #
 # Usage:
-#   bash tools/build/appimage-distro-matrix.sh <AppImage> [image...]
+#   bash tools/build/appimage-distro-sweep.sh <AppImage> [image...]
 #     Needs Docker. Without images, runs DEFAULT_IMAGES one after the other and
 #     exits non-zero when any of them fails.
 #

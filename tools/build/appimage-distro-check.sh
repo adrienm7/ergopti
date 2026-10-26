@@ -1,7 +1,7 @@
 #!/bin/sh
 # tools/build/appimage-distro-check.sh
 #
-# Runs inside one distribution container for appimage-distro-matrix.sh, in
+# Runs inside one distribution container for appimage-distro-sweep.sh, in
 # plain sh because Alpine has no bash. It reads the C library the image really
 # has, independently of the AppImage's own preflight, decides what the AppImage
 # must do there, and checks it:
@@ -14,7 +14,7 @@
 # The container has no keyboard, so the desktop launch is the no-keyboard
 # state the AppImage catalogue also sees.
 #
-# Usage (from appimage-distro-matrix.sh only):
+# Usage (from appimage-distro-sweep.sh only):
 #   sh appimage-distro-check.sh <AppImage> <glibc ceiling> <refusal exit status>
 
 set -eu

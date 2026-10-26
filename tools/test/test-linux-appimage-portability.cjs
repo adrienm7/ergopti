@@ -320,7 +320,7 @@ assert.deepEqual(Preflight.MESSAGE_KEYS, {
 });
 // The distribution matrix keeps a musl image, an image below the ceiling and
 // the catalogue's LTS, and takes its expectations from the same two sources.
-const matrix = read('tools/build/appimage-distro-matrix.sh');
+const matrix = read('tools/build/appimage-distro-sweep.sh');
 const matrixImages = matrix.slice(matrix.indexOf('DEFAULT_IMAGES=('), matrix.indexOf('\n)\n'));
 for (const image of ['alpine:latest', 'ubuntu:20.04', 'debian:11', Ceiling.OLDEST_LTS_IMAGE]) {
 	assert.ok(matrixImages.includes(` ${image}`) || matrixImages.includes(`\t${image}`), image);

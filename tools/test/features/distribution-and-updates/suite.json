@@ -477,6 +477,14 @@
 			"args": ["tools/test/test-macos-journal-native-receipt.cjs"],
 			"repro": "npm run test:macos-journal-native-receipt",
 			"platforms": ["linux"]
+		},
+		{
+			"id": "js-0483",
+			"ordinal": 505,
+			"name": "AppImage needed-library closure (every ELF library is in the image or on the documented recipient list)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-linux-elf-needed-closure.cjs"],
+			"repro": "npm run test:linux-elf-needed-closure"
 		}
 	]
 }

@@ -1035,6 +1035,18 @@ const STEP_CONDITIONS = [
 	[
 		LINUX_BOX,
 		'install-linux',
+		'Every bundled ELF file finds its libraries in the image or on the recipient list',
+		"env.INSTALL_KIND == 'appimage'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'It runs on the glibc distributions and is refused in words on musl',
+		"env.INSTALL_KIND == 'appimage'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
 		'It shows its tray icon on Ubuntu 22.04, offline',
 		"env.INSTALL_KIND == 'appimage'"
 	],

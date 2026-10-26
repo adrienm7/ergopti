@@ -4980,6 +4980,15 @@ jobs:
         shell: bash
         run: node tools/build/check-elf-glibc-ceiling.cjs squashfs-root pkg
 
+      - name: Every bundled ELF file finds its libraries in the image or on the recipient list
+        if: env.INSTALL_KIND == 'appimage'
+        # Self-contained does not mean carrying glibc: the C library and loader are
+        # the recipient's (baseline in linux_appimage_recipient_libraries.json,
+        # built and launched on ubuntu:22.04, musl refused by AppRun). Every other
+        # DT_NEEDED entry must be in the image.
+        shell: bash
+        run: node tools/build/check-elf-needed-closure.cjs squashfs-root pkg
+
       - name: It shows its tray icon on Ubuntu 22.04, offline
         if: env.INSTALL_KIND == 'appimage'
         # What the AppImage catalogue does with firejail: no network, a desktop
@@ -4987,6 +4996,15 @@ jobs:
         # window or a tray icon appears.
         shell: bash
         run: bash tools/build/appimage-oldest-lts.sh smoke "$(find pkg -name '*.AppImage' -type f | head -1)"
+
+      - name: It runs on the glibc distributions and is refused in words on musl
+        if: env.INSTALL_KIND == 'appimage'
+        # Ubuntu 22.04 to 26.04, Debian 12 and 13, Fedora, openSUSE and Arch must run
+        # the image from the recipient's glibc; Ubuntu 20.04, Debian 11 (glibc below the
+        # baseline) and Alpine (musl cannot run glibc programs at all) must get AppRun's
+        # refusal naming the reason. No bundled C library stands in for the recipient's.
+        shell: bash
+        run: bash tools/build/appimage-distro-sweep.sh "$(find pkg -name '*.AppImage' -type f | head -1)"
 
       - name: The bundled shared data tree resolves and opens
         if: env.INSTALL_KIND == 'appimage'
