@@ -1481,10 +1481,8 @@ end
 --- exact token. Only a pre-fence abort may release the same live owner.
 --- @return table|nil token Private zero-argument current/abort capabilities.
 function M.capture_terminal_admission()
-	if _terminal_owner ~= nil then return nil end
+	if M.terminal_admission_blocked() then return nil end
 	local state = _state
-	if state and (state.operation_active or state.recovery.has_pending()
-		or state.scope_owner ~= nil or state.scope_candidate ~= nil) then return nil end
 	local owner = {}
 	_terminal_owner = owner
 	local function current()
@@ -1500,6 +1498,17 @@ function M.capture_terminal_admission()
 			return true
 		end,
 	}
+end
+
+--- Whether a terminal transition cannot be admitted now: another one already
+--- holds the admission, or an operation, a recovery or a scope transaction is
+--- active. The menu's Quit reads it before it asks, so a refusal is told once.
+--- @return boolean blocked
+function M.terminal_admission_blocked()
+	if _terminal_owner ~= nil then return true end
+	local state = _state
+	return state ~= nil and (state.operation_active or state.recovery.has_pending()
+		or state.scope_owner ~= nil or state.scope_candidate ~= nil)
 end
 
 function M.common_autocorrection_admitted()

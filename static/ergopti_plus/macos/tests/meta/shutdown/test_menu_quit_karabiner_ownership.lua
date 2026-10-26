@@ -50,6 +50,7 @@ local function load_menu_quit_action()
 	package.loaded["ui.menu.global_actions_transaction"] = {
 		create = function(deps)
 			return {
+				is_exclusive_blocked = function() return stock_calls.writer_blocked == true end,
 				run_exclusive = function(_, callback)
 					if deps.terminal_pending() then return false end
 					local ok, result = xpcall(callback, debug.traceback)
@@ -119,8 +120,11 @@ local function load_menu_quit_action()
 		adopt = function() end,
 		setMenu = function() return true end,
 	}
+	package.loaded["modules.hotstrings.hotstrings_config"] = {
+		terminal_admission_blocked = function() return stock_calls.publication_blocked == true end,
+	}
 	package.loaded["infra.termination_coordinator"] = {
-		is_pending = function() return false end,
+		is_pending = function() return exit_mode.pending == true end,
 		request_user_exit = function(reason)
 			exit_calls[#exit_calls + 1] = { reason = reason }
 			if exit_mode.value == "throw" then error("coordinated exit fault") end
@@ -200,6 +204,22 @@ helpers.describe("menu Quit uses exact lease revocation", function()
 		}) do
 			helpers.assert_true(body:find(retired, 1, true) == nil,
 				"menu Quit must not regain stock-process authority: " .. retired)
+		end
+	end)
+
+	helpers.it("refuses with the one notice when the shared quit admission says so, before any exit", function()
+		local cases = {
+			{ label = "writer active", arm = function(stock) stock.writer_blocked = true end },
+			{ label = "publication pending", arm = function(stock) stock.publication_blocked = true end },
+			{ label = "terminal pending", arm = function(_, mode) mode.pending = true end },
+		}
+		for _, case in ipairs(cases) do
+			local quit_action, exit_calls, stock_calls, exit_mode = load_menu_quit_action()
+			case.arm(stock_calls, exit_mode)
+			helpers.assert_eq(quit_action(), false, case.label .. " must refuse the quit")
+			helpers.assert_eq(#exit_calls, 0, case.label .. " must not reach the coordinator")
+			helpers.assert_eq(stock_calls.notifications, { "notify.quit_refused" },
+				case.label .. " must tell the user exactly once")
 		end
 	end)
 

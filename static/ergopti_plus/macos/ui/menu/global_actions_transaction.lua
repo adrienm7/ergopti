@@ -778,6 +778,14 @@ function M.create(deps)
 		return request("reset")
 	end
 
+	--- Reports whether run_exclusive would refuse any caller that holds no retained
+	--- owner: a transaction, an external writer or its retained compensation owns
+	--- the admission. Quit reads it so the refusal is decided by quit_admission.
+	--- @return boolean blocked
+	function owner.is_exclusive_blocked()
+		return external_writer ~= nil or active_transaction ~= nil
+	end
+
 	--- Reports whether a candidate or retained compensation currently owns state.
 	--- @return boolean pending
 	function owner.is_pending()
