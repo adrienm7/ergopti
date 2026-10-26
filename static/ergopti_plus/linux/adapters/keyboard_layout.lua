@@ -270,8 +270,8 @@ local function dump_keymap()
 	end
 
 	for _, cmd in ipairs(candidates) do
-		local out = Shell.exec(cmd)
-		if type(out) == "string" and out:find("xkb_keymap", 1, true) then
+		local ok, out = Shell.exec_checked(cmd)
+		if ok and out:find("xkb_keymap", 1, true) then
 			return out, cmd
 		end
 	end
@@ -279,8 +279,8 @@ local function dump_keymap()
 	local desc = session_layout_names()
 	if desc then
 		local cmd = XkbRmlvo.compile_command(desc)
-		local out = Shell.exec(cmd)
-		if type(out) == "string" and out:find("xkb_keymap", 1, true) then
+		local ok, out = Shell.exec_checked(cmd)
+		if ok and out:find("xkb_keymap", 1, true) then
 			return out, cmd .. " (layout names from " .. desc.source .. ")"
 		end
 		Logger.warn(LOG, "Compiling the session layout (%s from %s) produced no keymap.",

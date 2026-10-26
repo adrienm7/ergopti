@@ -137,9 +137,9 @@ end
 local function desktop_cohort(layout, backend, state, body)
 	local display = require("infra.display_server")
 	local shell = require("adapters.shell_runner")
-	local old_exec = shell.exec
+	local old_exec = shell.exec_checked
 	display._set_for_test("x11")
-	shell.exec = function() return "xkb_keymap { controlled desktop source }" end
+	shell.exec_checked = function() return true, "xkb_keymap { controlled desktop source }", nil end
 	state.native_generation, state.acknowledged = 7, true
 	backend.source_group = function(session)
 		if state.on_source then state.on_source() end
@@ -153,7 +153,7 @@ local function desktop_cohort(layout, backend, state, body)
 		helpers.assert_true(layout.refresh())
 		body()
 	end)
-	shell.exec = old_exec
+	shell.exec_checked = old_exec
 	display._set_for_test(nil)
 	if not ok then error(err, 0) end
 end
