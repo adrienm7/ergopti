@@ -39,13 +39,14 @@ local Logger      = require("logger.shim")
 local Policy      = require("diagnostics.error_policy")
 local DialogCore  = require("error_dialog.core")
 local Redact      = require("diagnostics.redact")
+local ConfigKeys = require("config_keys")
 
 local LOG = "bridge.error_dialog"
 
 -- The window's app id (the _shared/ui directory) and the Debug menu setting,
 -- as the features manifest declares it
 local APP = "error_dialog"
-local SETTING = "script.show_error_dialog"
+local SETTING = ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG
 
 -- The page's actions
 local PAGE_ACTIONS = { report = true, copy = true, open_log = true, close = true }

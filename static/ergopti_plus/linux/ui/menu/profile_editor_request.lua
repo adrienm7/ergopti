@@ -7,6 +7,7 @@
 --- editor's eventual conditional write, including configuration-folder changes.
 --- ==============================================================================
 
+local ConfigKeys = require("config_keys")
 local M = {}
 
 --- Captures a profile menu's source and returns its save and currentness ports.
@@ -38,7 +39,7 @@ function M.capture(owner)
 	if not root_ok or type(root) ~= "string" or not ports_current() then return nil end
 	local loaded = pcall(list, true)
 	local captured, registry = pcall(snapshot)
-	local read, _values, source, revision = pcall(get_many, { "llm.user_profiles" })
+	local read, _values, source, revision = pcall(get_many, { ConfigKeys.KEY.LLM_USER_PROFILES })
 	if not loaded or not captured or type(registry) ~= "table" or type(registry.source) ~= "table"
 		or not read or type(source) ~= "table" or source.status ~= registry.source.status
 		or source.content ~= registry.source.content or type(revision) ~= "number" then return nil end
