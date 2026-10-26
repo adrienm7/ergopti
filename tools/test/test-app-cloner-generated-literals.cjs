@@ -72,6 +72,13 @@ if (!python) {
 	process.exit(1);
 }
 
+const realPython = spawnSync(bash, ['-c', 'command -v "$1"', 'python-runtime', python], {
+	encoding: 'utf8'
+});
+if (realPython.status !== 0 || !realPython.stdout.trim()) {
+	throw new Error(`Required Python unavailable in Bash: ${realPython.stderr}`);
+}
+
 const hostile = [
 	'He said "hi" and $(touch should-not-run)',
 	"apostrophe ' plus backslash \\\ and $HOME `uname`",
@@ -264,6 +271,7 @@ try {
 	const marker = path.join(fixtureRoot, 'command-substitution-ran');
 	fs.mkdirSync(fakeBin, { recursive: true });
 	fs.mkdirSync(home, { recursive: true });
+	writeExecutable(path.join(fakeBin, 'python3'), '#!/usr/bin/env bash\nexec "$REAL_PYTHON" "$@"\n');
 	writeExecutable(
 		path.join(fakeBin, 'qlmanage'),
 		`#!/usr/bin/env bash
@@ -310,6 +318,7 @@ printf icns > "$out"
 			env: {
 				...process.env,
 				HOME: toBashPath(home),
+				REAL_PYTHON: realPython.stdout.trim(),
 				PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
 			}
 		}
@@ -342,7 +351,7 @@ printf icns > "$out"
 		JSON.stringify({ status: generatedRun.status, captured, stderr: generatedRun.stderr })
 	);
 	writeExecutable(path.join(fakeBin, 'date'), "#!/usr/bin/env bash\nprintf '%s\\n' 1700000000\n");
-	const setupEnd = cloneSource.indexOf('TMPDIR_WORK=');
+	const setupEnd = cloneSource.indexOf('# Resolve source app');
 	if (setupEnd < 0) throw new Error('clone setup boundary is missing');
 	const cloneSetup = cloneSource.slice(0, setupEnd);
 	const profileStart = cloneSource.indexOf('# Per-clone user-data-dir');
@@ -362,7 +371,7 @@ printf icns > "$out"
 			bash,
 			[
 				'-c',
-				`${cloneSetup}\n${profileSetup}\nprintf '%s\\0' "$DEST" "$USER_DATA_DIR"\n`,
+				`${cloneSetup}\n${profileSetup}\nCLONE_COMPLETE=1\nprintf '%s\\0' "$DEST" "$USER_DATA_DIR"\n`,
 				toBashPath(CLONE_SCRIPT),
 				toBashPath(fixtureRoot),
 				'Clone collision'
@@ -372,6 +381,7 @@ printf icns > "$out"
 				env: {
 					...process.env,
 					HOME: toBashPath(home),
+					REAL_PYTHON: realPython.stdout.trim(),
 					PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
 				}
 			}
@@ -409,6 +419,268 @@ printf icns > "$out"
 			path.join(home, 'Library', 'Application Support', 'AppCloner', 'Clone collision'),
 		JSON.stringify(cloneProfiles)
 	);
+
+	const rollbackHome = path.join(fixtureRoot, 'rollback-home');
+	fs.mkdirSync(path.join(rollbackHome, 'Applications'), { recursive: true });
+	const preserved = path.join(rollbackHome, 'Applications', 'Rollback.app');
+	fs.mkdirSync(preserved);
+	fs.writeFileSync(path.join(preserved, 'owned-marker'), 'pre-existing bundle');
+	const preservedLink = path.join(rollbackHome, 'Applications', 'Rollback_1.app');
+	fs.symlinkSync(preserved, preservedLink, 'junction');
+	const rollbackBin = path.join(fixtureRoot, 'rollback-bin');
+	fs.mkdirSync(rollbackBin);
+	const realMktemp = spawnSync(bash, ['-c', 'command -v mktemp'], { encoding: 'utf8' });
+
+	writeExecutable(
+		path.join(rollbackBin, 'python3'),
+		'#!/usr/bin/env bash\nexec "$REAL_PYTHON" "$@"\n'
+	);
+	if (realMktemp.status !== 0 || !realMktemp.stdout.trim()) {
+		throw new Error(`Required mktemp unavailable: ${realMktemp.stderr}`);
+	}
+	// Keep native temporary paths inside the owned fixture, including Git Bash's
+	// distinct /tmp mount on Windows. The real allocator still creates them.
+	writeExecutable(
+		path.join(rollbackBin, 'mktemp'),
+		'#!/usr/bin/env bash\nset -eu\nexec "$REAL_MKTEMP" -d "$OWNED_TMP_TEMPLATE"\n'
+	);
+	const runCloneSetup = (tail, prefixBin = rollbackBin) =>
+		spawnSync(
+			bash,
+			[
+				'-c',
+				`${cloneSetup}\n${tail}`,
+				toBashPath(CLONE_SCRIPT),
+				toBashPath(fixtureRoot),
+				'Rollback'
+			],
+			{
+				encoding: 'utf8',
+				timeout: 10000,
+				env: {
+					...process.env,
+					HOME: toBashPath(rollbackHome),
+					REAL_MKTEMP: realMktemp.stdout.trim(),
+					REAL_PYTHON: realPython.stdout.trim(),
+					OWNED_TMP_TEMPLATE: `${toBashPath(fixtureRoot)}/rollback-work.XXXXXX`,
+					PATH: `${toBashPath(prefixBin)}:${process.env.PATH || ''}`
+				}
+			}
+		);
+	const failureBin = path.join(fixtureRoot, 'allocation-failure-bin');
+	fs.mkdirSync(failureBin);
+	writeExecutable(
+		path.join(failureBin, 'mktemp'),
+		'#!/usr/bin/env bash\necho owned-allocation-failure >&2\nexit 73\n'
+	);
+	writeExecutable(
+		path.join(failureBin, 'python3'),
+		'#!/usr/bin/env bash\nexec "$REAL_PYTHON" "$@"\n'
+	);
+	const unavailablePythonBin = path.join(fixtureRoot, 'unavailable-python-bin');
+	fs.mkdirSync(unavailablePythonBin);
+	writeExecutable(
+		path.join(unavailablePythonBin, 'python3'),
+		'#!/usr/bin/env bash\necho required-python-unavailable >&2\nexit 127\n'
+	);
+	const unavailablePython = runCloneSetup('printf unexpected-success', unavailablePythonBin);
+	test(
+		'cleanup runtime absence fails before reserving any clone destination',
+		unavailablePython.status === 127 &&
+			unavailablePython.stdout.includes('required-python-unavailable') &&
+			fs.readdirSync(path.dirname(preserved)).length === 2,
+		JSON.stringify({
+			status: unavailablePython.status,
+			stdout: unavailablePython.stdout,
+			stderr: unavailablePython.stderr
+		})
+	);
+
+	const allocationFailure = runCloneSetup('printf unexpected-success', failureBin);
+	test(
+		'failed temporary-directory allocation removes only its reserved clone bundle',
+		allocationFailure.status === 73 &&
+			allocationFailure.stdout.includes('owned-allocation-failure') &&
+			!fs.existsSync(path.join(rollbackHome, 'Applications', 'Rollback_2.app')),
+		JSON.stringify({
+			status: allocationFailure.status,
+			stdout: allocationFailure.stdout,
+			stderr: allocationFailure.stderr
+		})
+	);
+	const lateFailure = runCloneSetup('printf "%s\\0%s\\0" "$DEST" "$TMPDIR_WORK"; exit 74');
+	const [failedDestination, failedTemporary] = decodeNulFields(Buffer.from(lateFailure.stdout));
+	test(
+		'a later failure removes its reserved bundle and temporary workspace without swallowing the error',
+		lateFailure.status === 74 &&
+			failedDestination &&
+			failedTemporary &&
+			!fs.existsSync(nativeFixturePath(failedDestination)) &&
+			!fs.existsSync(nativeFixturePath(failedTemporary)),
+		JSON.stringify({
+			status: lateFailure.status,
+			stdout: lateFailure.stdout,
+			stderr: lateFailure.stderr
+		})
+	);
+	const interrupted = runCloneSetup(
+		'printf "%s\\0%s\\0" "$DEST" "$TMPDIR_WORK"; kill -TERM $$; printf unexpected-success'
+	);
+	const [interruptedDestination, interruptedTemporary] = decodeNulFields(
+		Buffer.from(interrupted.stdout)
+	);
+	test(
+		'cancelling a clone transaction removes its owned bundle and temporary workspace',
+		interrupted.status === 143 &&
+			interruptedDestination &&
+			interruptedTemporary &&
+			!fs.existsSync(nativeFixturePath(interruptedDestination)) &&
+			!fs.existsSync(nativeFixturePath(interruptedTemporary)) &&
+			!interrupted.stdout.includes('unexpected-success'),
+		JSON.stringify({
+			status: interrupted.status,
+			signal: interrupted.signal,
+			stdout: interrupted.stdout,
+			stderr: interrupted.stderr
+		})
+	);
+	const replaced = runCloneSetup(
+		'mv "$DEST" "$DEST.held"; mkdir "$DEST"; printf foreign > "$DEST/foreign-marker"; printf "%s\\0%s\\0" "$DEST" "$TMPDIR_WORK"; exit 75'
+	);
+	const [replacedDestination, replacedTemporary] = decodeNulFields(Buffer.from(replaced.stdout));
+	test(
+		'rollback refuses a replacement directory and still retires its temporary workspace',
+		replaced.status === 75 &&
+			replacedDestination &&
+			replacedTemporary &&
+			replaced.stdout.includes('reserved bundle ownership changed; refusing cleanup') &&
+			fs.readFileSync(
+				path.join(nativeFixturePath(replacedDestination), 'foreign-marker'),
+				'utf8'
+			) === 'foreign' &&
+			fs.statSync(`${nativeFixturePath(replacedDestination)}.held`).isDirectory() &&
+			!fs.existsSync(nativeFixturePath(replacedTemporary)),
+		JSON.stringify({ status: replaced.status, stdout: replaced.stdout, stderr: replaced.stderr })
+	);
+	const symlinkReplacement = runCloneSetup(
+		'mv "$DEST" "$DEST.held"; ln -s "$DEST.held" "$DEST"; printf "%s\\0%s\\0" "$DEST" "$TMPDIR_WORK"; exit 76'
+	);
+	const [symlinkDestination, symlinkTemporary] = decodeNulFields(
+		Buffer.from(symlinkReplacement.stdout)
+	);
+	test(
+		'rollback refuses a replacement symbolic link without following or deleting it',
+		symlinkReplacement.status === 76 &&
+			symlinkDestination &&
+			symlinkTemporary &&
+			symlinkReplacement.stdout.includes('reserved bundle ownership changed; refusing cleanup') &&
+			fs.lstatSync(nativeFixturePath(symlinkDestination)).isSymbolicLink() &&
+			fs.statSync(`${nativeFixturePath(symlinkDestination)}.held`).isDirectory() &&
+			!fs.existsSync(nativeFixturePath(symlinkTemporary)),
+		JSON.stringify({
+			status: symlinkReplacement.status,
+			stdout: symlinkReplacement.stdout,
+			stderr: symlinkReplacement.stderr
+		})
+	);
+
+	const cleanupFailureBin = path.join(fixtureRoot, 'cleanup-failure-bin');
+	fs.mkdirSync(cleanupFailureBin);
+	writeExecutable(
+		path.join(cleanupFailureBin, 'mktemp'),
+		'#!/usr/bin/env bash\nexec "$REAL_MKTEMP" -d "$OWNED_TMP_TEMPLATE"\n'
+	);
+	writeExecutable(
+		path.join(cleanupFailureBin, 'python3'),
+		'#!/usr/bin/env bash\nif [[ "$#" == 3 ]]; then echo owned-bundle-cleanup-failure >&2; exit 77; fi\nexec "$REAL_PYTHON" "$@"\n'
+	);
+	const cleanupFailure = runCloneSetup(
+		'printf "%s\\0%s\\0" "$DEST" "$TMPDIR_WORK"; exit 74',
+		cleanupFailureBin
+	);
+	const [uncleanedDestination, cleanedTemporary] = decodeNulFields(
+		Buffer.from(cleanupFailure.stdout)
+	);
+	test(
+		'a bundle cleanup failure preserves the primary error and still retires temporary files',
+		cleanupFailure.status === 74 &&
+			uncleanedDestination &&
+			cleanedTemporary &&
+			cleanupFailure.stdout.includes('owned-bundle-cleanup-failure') &&
+			fs.statSync(nativeFixturePath(uncleanedDestination)).isDirectory() &&
+			!fs.existsSync(nativeFixturePath(cleanedTemporary)),
+		JSON.stringify({
+			status: cleanupFailure.status,
+			stdout: cleanupFailure.stdout,
+			stderr: cleanupFailure.stderr
+		})
+	);
+	const identityFailureBin = path.join(fixtureRoot, 'identity-failure-bin');
+	fs.mkdirSync(identityFailureBin);
+	writeExecutable(
+		path.join(identityFailureBin, 'python3'),
+		'#!/usr/bin/env bash\nif [[ "$1" == "-" && "$#" == 2 ]]; then echo owned-identity-capture-failure >&2; exit 78; fi\nexec "$REAL_PYTHON" "$@"\n'
+	);
+	const beforeIdentityFailure = fs.readdirSync(path.dirname(preserved));
+	const identityFailure = runCloneSetup('printf unexpected-success', identityFailureBin);
+	const uncertainBundles = fs
+		.readdirSync(path.dirname(preserved))
+		.filter((name) => !beforeIdentityFailure.includes(name));
+	test(
+		'an identity capture failure reports the error and preserves an unadmitted destination',
+		identityFailure.status === 78 &&
+			identityFailure.stdout.includes('cannot capture reserved bundle ownership') &&
+			identityFailure.stdout.includes('reserved bundle ownership changed; refusing cleanup') &&
+			uncertainBundles.length === 1 &&
+			fs.statSync(path.join(path.dirname(preserved), uncertainBundles[0])).isDirectory() &&
+			!identityFailure.stdout.includes('unexpected-success'),
+		JSON.stringify({
+			status: identityFailure.status,
+			stdout: identityFailure.stdout,
+			stderr: identityFailure.stderr,
+			uncertainBundles
+		})
+	);
+
+	const completed = runCloneSetup('CLONE_COMPLETE=1; printf "%s\\0%s\\0" "$DEST" "$TMPDIR_WORK"');
+	const [completedDestination, completedTemporary] = decodeNulFields(Buffer.from(completed.stdout));
+	test(
+		'a completed clone keeps its owned bundle while retiring its temporary workspace',
+		completed.status === 0 &&
+			completedDestination &&
+			completedTemporary &&
+			fs.statSync(nativeFixturePath(completedDestination)).isDirectory() &&
+			!fs.existsSync(nativeFixturePath(completedTemporary)),
+		JSON.stringify({ status: completed.status, stdout: completed.stdout, stderr: completed.stderr })
+	);
+	const receiptFailure = runCloneSetup(
+		'printf "%s\\0%s\\0" "$DEST" "$TMPDIR_WORK"; CLONE_COMPLETE=1; exec 1>&-; printf unavailable-output'
+	);
+	const [publishedDestination, retiredTemporary] = decodeNulFields(
+		Buffer.from(receiptFailure.stdout)
+	);
+	test(
+		'a completed bundle survives failure to write its final success receipt',
+		receiptFailure.status !== 0 &&
+			publishedDestination &&
+			retiredTemporary &&
+			fs.statSync(nativeFixturePath(publishedDestination)).isDirectory() &&
+			!fs.existsSync(nativeFixturePath(retiredTemporary)),
+		JSON.stringify({
+			status: receiptFailure.status,
+			stdout: receiptFailure.stdout,
+			stderr: receiptFailure.stderr
+		})
+	);
+
+	test(
+		'clone rollback preserves pre-existing same-name bundles and symbolic links',
+		fs.readFileSync(path.join(preserved, 'owned-marker'), 'utf8') === 'pre-existing bundle' &&
+			fs.lstatSync(preservedLink).isSymbolicLink() &&
+			fs.realpathSync(preservedLink) === fs.realpathSync(preserved),
+		JSON.stringify(fs.readdirSync(path.dirname(preserved)))
+	);
+
 	const collisionRuns = [];
 	for (const target of ['first-target', 'second-target', 'third-target']) {
 		const run = spawnSync(
@@ -426,6 +698,7 @@ printf icns > "$out"
 				env: {
 					...process.env,
 					HOME: toBashPath(home),
+					REAL_PYTHON: realPython.stdout.trim(),
 					PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
 				}
 			}

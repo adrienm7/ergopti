@@ -68,9 +68,60 @@ log "============================================================"
 safe_name="$(printf '%s' "$CLONE_NAME" | tr ':/' '-' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 [[ -z "$safe_name" ]] && safe_name="Clone"
 
+# Cleanup requires the same Python runtime as launcher generation. Check it
+# before reserving any destination that would need that cleanup.
+python3 -c 'import os, shutil, stat, sys'
+
 APPS_DIR="$HOME/Applications"
 mkdir -p "$APPS_DIR"
+# Retire only this run's reserved bundle when creation fails. A completed
+# bundle survives the EXIT cleanup, including a failed final stdout write.
+DEST=""
+DEST_ID=""
+TMPDIR_WORK=""
+CLONE_COMPLETE=0
+cleanup_clone() {
+	local cleanup_status=$? cleanup_failed=0
+	trap - EXIT
+	if [[ "$CLONE_COMPLETE" != "1" && -n "$DEST" ]]; then
+		python3 - "$DEST" "$DEST_ID" <<'CLEANUP_BUNDLE' || cleanup_failed=1
+import os, shutil, stat, sys
+path, expected_identity = sys.argv[1:]
+try:
+    entry = os.lstat(path)
+except FileNotFoundError:
+    sys.exit(0)
+identity = f"{entry.st_dev}:{entry.st_ino}"
+if not stat.S_ISDIR(entry.st_mode) or identity != expected_identity:
+    sys.exit(f"Error: reserved bundle ownership changed; refusing cleanup: {path}")
+shutil.rmtree(path)
+CLEANUP_BUNDLE
+	fi
+	if [[ -n "$TMPDIR_WORK" ]]; then
+		rm -rf -- "$TMPDIR_WORK" || cleanup_failed=1
+	fi
+	if [[ "$cleanup_status" == "0" && "$cleanup_failed" != "0" ]]; then
+		return 1
+	fi
+	return "$cleanup_status"
+}
+trap cleanup_clone EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 DEST="$(reserve_bundle_directory "$APPS_DIR/${safe_name}.app")"
+DEST_ID="$(python3 - "$DEST" <<'BUNDLE_IDENTITY'
+import os, stat, sys
+entry = os.lstat(sys.argv[1])
+if not stat.S_ISDIR(entry.st_mode):
+    sys.exit(f"Error: reserved bundle is not a directory: {sys.argv[1]}")
+print(f"{entry.st_dev}:{entry.st_ino}")
+BUNDLE_IDENTITY
+)" || {
+	identity_status=$?
+	echo "Error: cannot capture reserved bundle ownership: $DEST" >&2
+	exit "$identity_status"
+}
 
 CONTENTS="$DEST/Contents"
 MACOS="$CONTENTS/MacOS"
@@ -78,7 +129,6 @@ RES="$CONTENTS/Resources"
 mkdir -p "$MACOS" "$RES"
 
 TMPDIR_WORK=$(mktemp -d "/tmp/appcloner.XXXXXX")
-trap 'rm -rf "$TMPDIR_WORK"' EXIT
 
 UNIQUE_ID="fr.b519hs.clone.$(date +%s)"
 
@@ -1322,4 +1372,5 @@ DOCKEOF
 # The very last line of stdout becomes the AppleScript `do shell script`
 # return value, so we end with just the bundle path. The diagnostic file
 # location is in the log itself if needed.
+CLONE_COMPLETE=1
 echo "$DEST"
