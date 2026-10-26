@@ -294,10 +294,11 @@ function modeledPayload() {
 }
 const { execFileSync } = require('node:child_process');
 const repository = path.resolve(__dirname, '../..');
-function git(root, args) {
+function git(root, args, input) {
 	return execFileSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], {
 		cwd: root,
-		stdio: 'pipe'
+		stdio: 'pipe',
+		input
 	});
 }
 function sourceFixture(change = () => {}) {
@@ -351,6 +352,28 @@ function sourceFixture(change = () => {}) {
 			architecture: 'arm64'
 		}
 	};
+}
+/**
+ * Keeps the selected-blob refusal control independent of Git's pack layout.
+ * Real unpacking preserves every committed object; held packs stay outside the
+ * object database so no packed duplicate can rescue a missing or corrupt blob.
+ */
+function unpackFixtureObjects(root) {
+	const packDirectory = path.join(root, '.git/objects/pack');
+	const packs = fs.readdirSync(packDirectory).filter((name) => name.endsWith('.pack'));
+	assert.ok(packs.length > 0, 'The object control must begin with genuine packed Git objects.');
+	const held = fs.mkdtempSync(path.join(temporary, 'held-source-packs-'));
+	const heldPacks = path.join(held, 'pack');
+	fs.renameSync(packDirectory, heldPacks);
+	fs.mkdirSync(packDirectory);
+	for (const name of packs) {
+		git(root, ['unpack-objects', '-q'], fs.readFileSync(path.join(heldPacks, name)));
+	}
+	assert.deepEqual(
+		fs.readdirSync(packDirectory),
+		[],
+		'No packed duplicate may rescue the selected blob.'
+	);
 }
 function mutation(name, body) {
 	control(name, () => {
@@ -1007,6 +1030,13 @@ try {
 			fs.unlinkSync(source);
 			fs.renameSync(held, source);
 		}
+		git(fixture.root, ['repack', '-ad']);
+		unpackFixtureObjects(fixture.root);
+		assert.deepEqual(
+			evidence.sourceReceipt(fixture.root, fixture.epoch),
+			originalSource,
+			'Real unpacking must preserve the complete source receipt before one blob is mutated.'
+		);
 		const oid = git(fixture.root, ['rev-parse', `${fixture.epoch.candidate}:${SWIFT[0]}`])
 			.toString()
 			.trim();
