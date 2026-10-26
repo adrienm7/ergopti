@@ -387,6 +387,7 @@ return {
 	"tests.unit.modules.keymap.test_keycode_evdev_loader",
 	"tests.meta.architecture.test_keycode_single_source",
 	"tests.unit.modules.keystats.core.test_keystats",
+	"tests.unit.modules.keystats.core.test_keystats_home_fixture",
 	"tests.unit.modules.keystats.core.test_keystats_pointer_metrics",
 	"tests.unit.modules.keystats.core.test_keystats_window_switches",
 	"tests.unit.modules.keystats.core.test_keystats_session_events",
