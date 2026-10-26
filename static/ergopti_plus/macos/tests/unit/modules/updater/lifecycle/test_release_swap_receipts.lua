@@ -61,8 +61,13 @@ local function with_swap(options, check)
 			assert(shell("chmod +x " .. quote(move)) == 0)
 			script = script:gsub("/bin/mv", function() return move end)
 		end
+		local acknowledgement = dir .. "/arming-receipt"
+		local receipt_route = options.arming_refused and " 3>&-" or " 3>" .. quote(acknowledgement)
 		local status, output = shell("/bin/sh -c " .. quote(script) .. " swap 999999999 "
-			.. quote(app) .. " " .. quote(staged) .. " " .. quote(previous))
+			.. quote(app) .. " " .. quote(staged) .. " " .. quote(previous) .. receipt_route)
+		if not options.arming_refused then
+			helpers.assert_eq(read(acknowledgement), "ARMED\n", "the actual worker must acknowledge before moving any app")
+		end
 		check({ status = status, output = output, app = read(app .. "/marker"),
 			previous = read(previous .. "/marker"), opened = read(opened) or "", app_path = app })
 	end, debug.traceback)
@@ -72,6 +77,15 @@ local function with_swap(options, check)
 end
 
 helpers.describe("release swap physical command receipts", function()
+	helpers.it("refuses a closed arming descriptor before touching applications (release-arming-write-refusal)", function()
+		with_swap({ arming_refused = true }, function(result)
+			helpers.assert_true(result.status ~= 0, "an unobserved worker must not continue after a refused receipt")
+			helpers.assert_eq(result.app, "installed")
+			helpers.assert_nil(result.previous)
+			helpers.assert_eq(result.opened, "")
+		end)
+	end)
+
 	helpers.it("reports a refused replacement launch (release-swap-receipts)", function()
 		with_swap({ open_refused = true }, function(result)
 			helpers.assert_eq(result.app, "chosen")
