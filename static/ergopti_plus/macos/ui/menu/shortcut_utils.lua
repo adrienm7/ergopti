@@ -398,9 +398,10 @@ end
 
 --- Greys the picker rows whose catalogue requirement is proven absent: an
 --- action that needs the AI ("ai:on" in _shared/modules/actions/actions.toml,
---- the agent's manual actions) stays visible and greyed, with the AI-off
---- notice as its reason, while the AI is switched off. Read at each open, so
---- switching the AI on offers them again without a reload.
+--- the agent's manual actions) stays visible and greyed, with the AI-off hint
+--- (dialog.action_picker.requires_ai) as its reason, while the AI is switched
+--- off. Read at each open, so switching the AI on offers them again without a
+--- reload.
 --- @param items table Picker items, marked in place.
 local function mark_ai_requirements(items)
 	if not require("modules.shortcuts.ai_actions").off() then return end
@@ -411,7 +412,7 @@ local function mark_ai_requirements(items)
 		for _, token in ipairs(meta and meta.requires or {}) do
 			if token == "ai:on" then
 				item.disabled = true
-				item.hint = i18n.get("llm.manual_prediction.disabled")
+				item.hint = i18n.get("dialog.action_picker.requires_ai")
 			end
 		end
 	end

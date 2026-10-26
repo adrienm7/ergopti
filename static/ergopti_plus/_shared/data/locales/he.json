@@ -276,6 +276,7 @@
 	"dialog.action_picker.requires_tool": "דורש {1}",
 	"dialog.action_picker.requires_x11": "בהפעלת X11 בלבד",
 	"dialog.action_picker.requires_workspaces": "ב-X11, KDE Plasma, sway או Hyprland בלבד",
+	"dialog.action_picker.requires_ai": "הבינה המלאכותית כבויה: הפעילו אותה בתפריט בינה מלאכותית.",
 	"dialog.action_picker.search": "חיפוש פעולה…",
 	"dialog.action_picker.prompt_label": "הנחיה",
 	"dialog.action_picker.count_label": "מספר חיזויים",

@@ -934,8 +934,8 @@ local function requirement_holds(token)
 	end
 	if token == "ai:on" then
 		-- The AI menu's switch: nothing of the AI runs while it is off, so the
-		-- row stays visible and greyed with the notice the action itself gives.
-		if AiActions.off() then return false, i18n.get("llm.manual_prediction.disabled") end
+		-- row stays visible and greyed with the AI-off hint.
+		if AiActions.off() then return false, i18n.get("dialog.action_picker.requires_ai") end
 		return true, nil
 	end
 	error("unknown action requirement token '" .. tostring(token) .. "'")

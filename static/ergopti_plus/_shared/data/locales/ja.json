@@ -276,6 +276,7 @@
 	"dialog.action_picker.requires_tool": "{1} が必要です",
 	"dialog.action_picker.requires_x11": "X11 セッションのみ",
 	"dialog.action_picker.requires_workspaces": "X11、KDE Plasma、sway、Hyprland のみ",
+	"dialog.action_picker.requires_ai": "AI はオフです：人工知能メニューでオンにしてください。",
 	"dialog.action_picker.search": "アクションを検索…",
 	"dialog.action_picker.prompt_label": "プロンプト",
 	"dialog.action_picker.count_label": "予測の数",

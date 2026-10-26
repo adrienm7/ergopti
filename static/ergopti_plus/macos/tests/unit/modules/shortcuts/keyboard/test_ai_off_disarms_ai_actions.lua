@@ -210,7 +210,9 @@ helpers.describe("The action picker greys the agent's manual actions (ai-off-pic
 				utils.picker_parameter_fields(gestures, items, nil)
 				return items
 			end
-			local notice = require("infra.i18n").get("llm.manual_prediction.disabled")
+			local notice = require("infra.i18n").get("dialog.action_picker.requires_ai")
+			helpers.assert_true(notice ~= require("infra.i18n").get("llm.manual_prediction.disabled"),
+				"the greyed row has its own AI-off hint, not the suggestions notice")
 			local off = rows()
 			for index = 1, 2 do
 				helpers.assert_eq(off[index].disabled, true, off[index].id .. " is greyed while the AI is off")
