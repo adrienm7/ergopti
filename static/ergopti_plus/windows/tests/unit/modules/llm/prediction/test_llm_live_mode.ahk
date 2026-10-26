@@ -602,14 +602,14 @@ _LLV_ExpansionReissuesTheLiveRequest() {
 		global _LLM_Bridge_Buffer, _Stub_LlmTooltipVisible, _Stub_LlmPresentedRecord
 		; Outside live mode an expansion arms nothing: next-word prediction is unchanged
 		Plain := _LLV_CaptureRealTimer(() => _HSE_MirrorCanonicalEffectToLlm(
-			{ DeleteFromEnd: 0, InsertedText: "" }))
+			{ IsPrivate: false, DeleteFromEnd: 0, InsertedText: "" }))
 		AssertFalse(Plain.Active, "outside live mode an expansion arms nothing")
 
 		AssertTrue(_LLV_Toggle("translate_en|1"), "live mode on")
 		LLM_Tooltip_Show(["See you dm"], 1, true, Map("offer_id", 1))
 		AssertTrue(_Stub_LlmTooltipVisible, "precondition: a live tooltip is shown")
 		Captured := _LLV_CaptureRealTimer(() => _HSE_MirrorCanonicalEffectToLlm(
-			{ DeleteFromEnd: 2, InsertedText: "demain" }))
+			{ IsPrivate: false, DeleteFromEnd: 2, InsertedText: "demain" }))
 		AssertEqual("on se voit demain", _LLM_Bridge_Buffer, "the expansion reached the buffer")
 		AssertTrue(Captured.Active, "the live request is re-armed after the expansion")
 		Sleep(30)   ; the tooltip teardown is deferred off the hook thread
@@ -632,21 +632,21 @@ _LLV_ExpansionObserverRequiresCurrentFocus() {
 		_LLM_Bridge_ReadLiveFocus := () => Focus.Clone()
 		AssertTrue(_LLV_Toggle("translate_en|1"), "live mode on")
 		Missing := _LLV_CaptureRealTimer(() => _HSE_MirrorCanonicalEffectToLlm(
-			{ DeleteFromEnd: 2, InsertedText: "demain" }))
+			{ IsPrivate: false, DeleteFromEnd: 2, InsertedText: "demain" }))
 		AssertEqual("on se voit demain", _LLM_Bridge_Buffer,
 			"an unknown focus does not discard the committed canonical expansion")
 		AssertFalse(Missing.Active, "an unknown focused control refuses the deferred re-arm")
 		AssertEqual(0, Calls.Length, "an unverified typing target starts no transport")
 		Focus["control"] := 102
 		ChangeTarget() {
-			_HSE_MirrorCanonicalEffectToLlm({ DeleteFromEnd: 0, InsertedText: "" })
+			_HSE_MirrorCanonicalEffectToLlm({ IsPrivate: false, DeleteFromEnd: 0, InsertedText: "" })
 			Focus["control"] := 103
 		}
 		Changed := _LLV_CaptureRealTimer(ChangeTarget)
 		AssertFalse(Changed.Active, "a focused-control change retires the exact deferred owner")
 		AssertEqual(0, Calls.Length, "a stale typing target starts no transport")
 		Stable := _LLV_CaptureRealTimer(() => _HSE_MirrorCanonicalEffectToLlm(
-			{ DeleteFromEnd: 0, InsertedText: "" }))
+			{ IsPrivate: false, DeleteFromEnd: 0, InsertedText: "" }))
 		AssertTrue(Stable.Active, "a verified unchanged typing target re-arms the live request")
 		_LLV_Fire(Map("fn", Stable.Fn))
 		AssertEqual(1, Calls.Length, "the verified deferred re-arm starts exactly one transport")

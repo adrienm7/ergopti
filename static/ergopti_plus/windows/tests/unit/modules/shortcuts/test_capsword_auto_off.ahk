@@ -407,7 +407,7 @@ Test("capsword auto-off: TextSender output ends CapsWord", _CWAO_TextSendEnds)
 _CWAO_HotstringEffectEnds() {
 	Emit() {
 		Previous := Critical("On")
-		try _HSE_MirrorCanonicalEffectToLlm({ DeleteFromEnd: 3, InsertedText: "c'est-à-dire," })
+		try _HSE_MirrorCanonicalEffectToLlm({ IsPrivate: false, DeleteFromEnd: 3, InsertedText: "c'est-à-dire," })
 		finally Critical(Previous)
 	}
 	AssertFalse(_CWAO_SurvivesEmit(Emit), "a hotstring expansion ends CapsWord on the comma it inserts")

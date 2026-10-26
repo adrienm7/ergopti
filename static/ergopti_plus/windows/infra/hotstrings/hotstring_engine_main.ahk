@@ -1085,6 +1085,7 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := fals
 		ClearAll := Spec.HasOwnProp("OnlyText") and !Spec.OnlyText
 		InsertedText := ClearAll ? "" : Replacement . EmittedEndChar
 		Effect := {
+				IsPrivate: Spec.HasOwnProp("IsPrivate") && Spec.IsPrivate,
 				ClearAll: ClearAll,
 				DeleteFromEnd: StripLen,
 				InsertedText: InsertedText,
