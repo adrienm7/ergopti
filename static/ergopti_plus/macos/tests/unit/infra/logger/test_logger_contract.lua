@@ -131,6 +131,27 @@ helpers.describe("Logger: shared contract vectors", function()
 			local captured = nil
 			local orig_pts  = hs.console and hs.console.printStyledtext
 			local orig_print = _G.print
+			local orig_open = io.open
+			-- The native filesystem stub does not create physical log folders.
+			-- Formatting owns healthy sink ports; refusal has its own suite.
+			io.open = function(path, mode)
+				if mode ~= "a" and mode ~= "w" then return orig_open(path, mode) end
+				local file, closed = {}, false
+				function file:write()
+					assert(not closed, "cannot write a closed fixture file")
+					return self
+				end
+				function file:flush()
+					assert(not closed, "cannot flush a closed fixture file")
+					return true
+				end
+				function file:close()
+					assert(not closed, "cannot close a closed fixture file")
+					closed = true
+					return true
+				end
+				return file
+			end
 			if hs.console then
 				hs.console.printStyledtext = function(line) captured = tostring(line) end
 			end
@@ -138,10 +159,14 @@ helpers.describe("Logger: shared contract vectors", function()
 
 			-- Build the argument list from the vector's args array
 			local args = vec.args or {}
-			fn(vec.module, msg, table.unpack(args))
+			local emitted, emit_error = xpcall(function()
+				fn(vec.module, msg, table.unpack(args))
+			end, debug.traceback)
 
+			io.open = orig_open
 			if hs.console then hs.console.printStyledtext = orig_pts end
 			_G.print = orig_print
+			if not emitted then error(emit_error, 0) end
 
 			helpers.assert_true(captured ~= nil,
 				string.format("[%s] logger emitted nothing (level filter?)", id))

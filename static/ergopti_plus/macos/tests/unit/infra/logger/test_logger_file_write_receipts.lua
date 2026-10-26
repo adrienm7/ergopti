@@ -33,6 +33,9 @@ local function capture(refuse, body)
 	io.open = function(path)
 		local key = tostring(path)
 		state.opens[key] = (state.opens[key] or 0) + 1
+		local open_refused, open_detail = refuse(key, "open")
+		if open_refused == "throw" then error(open_detail, 0) end
+		if open_refused then return nil, open_detail or "Permission denied", 13 end
 		local file = {}
 		function file:write(chunk)
 			if refuse(key, "write") then return nil, "No space left on device", 28 end
@@ -119,4 +122,46 @@ helpers.describe("Logger file sinks honour write receipts (logger-write-receipt-
 		helpers.assert_true(count_matching(state.console, "log write refused") >= 1,
 			"a buffered mirror write lost at close must be reported")
 	end)
+
+	for _, case in ipairs({
+		{ channel = "unified" }, { channel = "topical" }, { channel = "errors-only" },
+		{ channel = "unified", throws = true }, { channel = "topical", throws = true },
+		{ channel = "errors-only", throws = true },
+	}) do
+		local channel = case.channel
+		helpers.it("reports and retries refused " .. channel .. " opens" .. (case.throws and " with exception" or " with nil") .. " (logger-open-receipt)", function()
+			local denied = true
+			local function matches(path)
+				if channel == "errors-only" then return path:find("error", 1, true) ~= nil end
+				if channel == "topical" then return path:find("karabiner", 1, true) ~= nil end
+				return not path:find("error", 1, true) and not path:find("karabiner", 1, true)
+			end
+			local state = capture(function(path, operation)
+				if denied and operation == "open" and matches(path) then
+					return case.throws and "throw" or true,
+						"/Users/PrivateUser/private/logs: Permission denied password=secret12345"
+				end
+				return false
+			end, function(state)
+				Logger.warn("karabiner", "first denied open")
+				Logger.warn("karabiner", "second denied open")
+				helpers.assert_eq(count_matching(state.console, channel .. " log write refused"), 1,
+					"one diagnostic must report the refusal episode")
+				helpers.assert_eq(count_matching(state.console, "Permission denied"), 1,
+					"the native refusal detail must survive")
+				helpers.assert_eq(count_matching(state.console, "~/private/logs"), 1)
+				helpers.assert_eq(count_matching(state.console, "/Users/PrivateUser"), 0)
+				helpers.assert_eq(count_matching(state.console, "secret12345"), 0)
+				denied = false
+				Logger.warn("karabiner", "open recovered")
+				local accepted = false
+				for path, text in pairs(state.writes) do
+					if matches(path) and text:find("open recovered", 1, true) then accepted = true end
+				end
+				helpers.assert_true(accepted, "the repaired channel must receive the next line")
+			end)
+			helpers.assert_eq(count_matching(state.console, channel .. " log write refused"), 1)
+		end)
+	end
+
 end)
