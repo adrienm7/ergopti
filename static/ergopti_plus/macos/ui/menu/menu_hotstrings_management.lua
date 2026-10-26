@@ -57,72 +57,16 @@ end
 --- @param ctx table Context.
 --- @return table
 
--- Captures the actual declared frame before native value readers can reenter it.
+local MagicFrame = require("menu.frames.magic_frame")
+
+
+-- The frame snapshot and its currency check are one body shared by both drivers.
 local function magic_frame_snapshot(renderer, key, expected)
-	key, expected = key or "hotstrings_magic_trigger_frame", expected or 3
-	local root = renderer.get_root()
-	local frame = type(root) == "table" and rawget(root, key)
-	if type(frame) ~= "table" or getmetatable(frame) ~= nil or #frame ~= expected then return nil end
-	local slots = 0
-	for index in next, frame do
-		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > expected then return nil end
-		slots = slots + 1
-	end
-	if slots ~= expected then return nil end
-	local snapshot = {}
-	for index, row in ipairs(frame) do
-		if type(row) ~= "table" or getmetatable(row) ~= nil then return nil end
-		local fields = {}
-		for key, value in next, row do
-			if type(value) == "table" then
-				if getmetatable(value) ~= nil then return nil end
-				local entries = {}
-				for field, item in next, value do
-					if type(item) == "table" or type(item) == "function" then return nil end
-					entries[field] = item
-				end
-				fields[key] = { identity = value, entries = entries }
-			elseif type(value) == "function" then return nil
-			else fields[key] = value end
-		end
-		snapshot[index] = { identity = row, fields = fields }
-	end
-	return { root = root, frame = frame, rows = snapshot, key = key }
+	return MagicFrame.snapshot(renderer, key, expected)
 end
 
--- Publication is withheld when any captured declaration identity or field changed.
 local function magic_frame_current(renderer, snapshot)
-	if not snapshot or not rawequal(renderer.get_root(), snapshot.root)
-		or not rawequal(rawget(snapshot.root, snapshot.key), snapshot.frame)
-		or getmetatable(snapshot.frame) ~= nil or #snapshot.frame ~= #snapshot.rows then return false end
-	local slots = 0
-	for index in next, snapshot.frame do
-		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #snapshot.rows then return false end
-		slots = slots + 1
-	end
-	if slots ~= #snapshot.rows then return false end
-	for index, saved in ipairs(snapshot.rows) do
-		local row = rawget(snapshot.frame, index)
-		if not rawequal(row, saved.identity) or getmetatable(row) ~= nil then return false end
-		local count, expected = 0, 0
-		for key, value in next, row do
-			count = count + 1
-			local prior = saved.fields[key]
-			if type(prior) == "table" then
-				if not rawequal(value, prior.identity) or getmetatable(value) ~= nil then return false end
-				local entries, wanted = 0, 0
-				for field, item in next, value do
-					entries = entries + 1
-					if not rawequal(item, prior.entries[field]) then return false end
-				end
-				for _ in next, prior.entries do wanted = wanted + 1 end
-				if entries ~= wanted then return false end
-			elseif not rawequal(value, prior) then return false end
-		end
-		for _ in next, saved.fields do expected = expected + 1 end
-		if count ~= expected then return false end
-	end
-	return true
+	return MagicFrame.current(renderer, snapshot)
 end
 
 function M.build_management(ctx)
