@@ -87,6 +87,16 @@ function Remove-ErgoptiStartupShortcut {
 	Remove-Item -LiteralPath $ShortcutPath
 }
 
+# The login owner accepts exact manual shortcut names as well as the canonical
+# filename. Removal must inspect the complete folder before retiring the image.
+function Remove-ErgoptiStartupShortcuts {
+	param([string]$ExecutablePath, [string]$StartupFolder)
+	foreach ($entry in Get-ChildItem -LiteralPath $StartupFolder -Force) {
+		if ($entry.PSIsContainer -or $entry.Extension -ne '.lnk') { continue }
+		Remove-ErgoptiStartupShortcut $ExecutablePath $entry.FullName
+	}
+}
+
 if ($LibraryOnly) { return }
 
 $ready = $null
@@ -116,7 +126,7 @@ try {
 	}
 	$unregister = {
 		param($Path)
-		Remove-ErgoptiStartupShortcut $Path (Join-Path ([Environment]::GetFolderPath('Startup')) 'ErgoptiPlus.lnk')
+		Remove-ErgoptiStartupShortcuts $Path ([Environment]::GetFolderPath('Startup'))
 	}
 	[void](Invoke-ErgoptiRemoval $Executable $ExpectedHash $authorize $waitOwner $recycle $unregister)
 } catch {
