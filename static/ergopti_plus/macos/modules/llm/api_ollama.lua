@@ -1698,6 +1698,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	local accumulated = ""
 	local line_buf    = ""
 	local stream_failed = false
+	local stream_done = false
 	local task = nil
 	local task_completed = false
 
@@ -1705,7 +1706,11 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	local function process_line(line)
 		if stream_failed or line:match("^%s*$") then return end
 		local obj, _ = JsonCodec.decode(line)
-		if type(obj) ~= "table" or obj.error ~= nil then stream_failed = true; return end
+		-- HTTP EOF proves only transport delivery. Ollama closes generation
+		-- with a boolean done record; no further provider record belongs to it.
+		if stream_done or type(obj) ~= "table" or obj.error ~= nil
+			or type(obj.done) ~= "boolean" then stream_failed = true; return end
+		stream_done = obj.done
 		if type(obj.message) == "table" and type(obj.message.content) == "string" then
 			local token = obj.message.content
 			if token ~= "" then
@@ -1774,7 +1779,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 			line_buf = ""
 			process_line(final_line)
 		end
-		if stream_failed then
+		if stream_failed or not stream_done then
 			Logger.warn(LOG, "[%s] #%d STREAM provider or protocol failure — discarding partial output.", model_name, req_id)
 			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 			return
