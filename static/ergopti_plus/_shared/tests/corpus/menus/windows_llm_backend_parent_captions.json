@@ -2,14 +2,14 @@
 	"ar": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 ثبّت Ollama الآن",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "غير معروف",
 			"menu.llm.backend_ollama_suffix": "قياسي",
 			"menu.llm.backend_api_suffix": "مزوّد عن بُعد"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "غير معروف"
 		},
 		"warning": "📥 ثبّت Ollama الآن",
 		"literal_native": "Local %s & café — literal"
@@ -17,14 +17,14 @@
 	"cs": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 Nainstalovat Ollama nyní",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "Neznámý",
 			"menu.llm.backend_ollama_suffix": "Standardní",
 			"menu.llm.backend_api_suffix": "Vzdálený poskytovatel"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "Neznámý"
 		},
 		"warning": "📥 Nainstalovat Ollama nyní",
 		"literal_native": "Local %s & café — literal"
@@ -32,14 +32,14 @@
 	"da": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 Installer Ollama nu",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "Ukendt",
 			"menu.llm.backend_ollama_suffix": "Standard",
 			"menu.llm.backend_api_suffix": "Ekstern udbyder"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "Ukendt"
 		},
 		"warning": "📥 Installer Ollama nu",
 		"literal_native": "Local %s & café — literal"
@@ -47,14 +47,14 @@
 	"de": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 Ollama jetzt installieren",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "Unbekannt",
 			"menu.llm.backend_ollama_suffix": "Standard",
 			"menu.llm.backend_api_suffix": "Entfernter Anbieter"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "Unbekannt"
 		},
 		"warning": "📥 Ollama jetzt installieren",
 		"literal_native": "Local %s & café — literal"
@@ -77,14 +77,14 @@
 	"es": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 Instalar Ollama ahora",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "Desconocido",
 			"menu.llm.backend_ollama_suffix": "Estándar",
 			"menu.llm.backend_api_suffix": "Proveedor remoto"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "Desconocido"
 		},
 		"warning": "📥 Instalar Ollama ahora",
 		"literal_native": "Local %s & café — literal"
@@ -107,14 +107,14 @@
 	"he": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 התקן את Ollama עכשיו",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "לא ידוע",
 			"menu.llm.backend_ollama_suffix": "רגיל",
 			"menu.llm.backend_api_suffix": "ספק מרוחק"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "לא ידוע"
 		},
 		"warning": "📥 התקן את Ollama עכשיו",
 		"literal_native": "Local %s & café — literal"
@@ -122,14 +122,14 @@
 	"hi": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 अभी Ollama स्थापित करें",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "अज्ञात",
 			"menu.llm.backend_ollama_suffix": "मानक",
 			"menu.llm.backend_api_suffix": "दूरस्थ प्रदाता"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "अज्ञात"
 		},
 		"warning": "📥 अभी Ollama स्थापित करें",
 		"literal_native": "Local %s & café — literal"
@@ -137,14 +137,14 @@
 	"it": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 Installa Ollama adesso",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "Sconosciuto",
 			"menu.llm.backend_ollama_suffix": "Standard",
 			"menu.llm.backend_api_suffix": "Provider remoto"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "Sconosciuto"
 		},
 		"warning": "📥 Installa Ollama adesso",
 		"literal_native": "Local %s & café — literal"
@@ -152,14 +152,14 @@
 	"ja": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 Ollama を今すぐインストール",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "不明",
 			"menu.llm.backend_ollama_suffix": "標準",
 			"menu.llm.backend_api_suffix": "リモート プロバイダ"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "不明"
 		},
 		"warning": "📥 Ollama を今すぐインストール",
 		"literal_native": "Local %s & café — literal"
@@ -167,14 +167,14 @@
 	"ko": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 지금 Ollama 설치",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "알 수 없음",
 			"menu.llm.backend_ollama_suffix": "표준",
 			"menu.llm.backend_api_suffix": "원격 공급자"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "알 수 없음"
 		},
 		"warning": "📥 지금 Ollama 설치",
 		"literal_native": "Local %s & café — literal"
@@ -182,14 +182,14 @@
 	"nl": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 Ollama nu installeren",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "Onbekend",
 			"menu.llm.backend_ollama_suffix": "Standaard",
 			"menu.llm.backend_api_suffix": "Externe provider"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "Onbekend"
 		},
 		"warning": "📥 Ollama nu installeren",
 		"literal_native": "Local %s & café — literal"
@@ -197,14 +197,14 @@
 	"no": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 Installer Ollama nå",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "Ukjent",
 			"menu.llm.backend_ollama_suffix": "Standard",
 			"menu.llm.backend_api_suffix": "Ekstern leverandør"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "Ukjent"
 		},
 		"warning": "📥 Installer Ollama nå",
 		"literal_native": "Local %s & café — literal"
@@ -212,14 +212,14 @@
 	"pl": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 Zainstaluj Ollama teraz",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "Nieznany",
 			"menu.llm.backend_ollama_suffix": "Standardowy",
 			"menu.llm.backend_api_suffix": "Zewnętrzny dostawca"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "Nieznany"
 		},
 		"warning": "📥 Zainstaluj Ollama teraz",
 		"literal_native": "Local %s & café — literal"
@@ -227,14 +227,14 @@
 	"pt": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 Instalar o Ollama agora",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "Desconhecido",
 			"menu.llm.backend_ollama_suffix": "Padrão",
 			"menu.llm.backend_api_suffix": "Fornecedor remoto"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "Desconhecido"
 		},
 		"warning": "📥 Instalar o Ollama agora",
 		"literal_native": "Local %s & café — literal"
@@ -242,14 +242,14 @@
 	"ru": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 Установить Ollama сейчас",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "Неизвестно",
 			"menu.llm.backend_ollama_suffix": "Стандартный",
 			"menu.llm.backend_api_suffix": "Удалённый провайдер"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "Неизвестно"
 		},
 		"warning": "📥 Установить Ollama сейчас",
 		"literal_native": "Local %s & café — literal"
@@ -257,14 +257,14 @@
 	"sv": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 Installera Ollama nu",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "Okänd",
 			"menu.llm.backend_ollama_suffix": "Standard",
 			"menu.llm.backend_api_suffix": "Fjärrleverantör"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "Okänd"
 		},
 		"warning": "📥 Installera Ollama nu",
 		"literal_native": "Local %s & café — literal"
@@ -272,14 +272,14 @@
 	"tr": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 Ollama'yı şimdi yükle",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "Bilinmiyor",
 			"menu.llm.backend_ollama_suffix": "Standart",
 			"menu.llm.backend_api_suffix": "Uzak sağlayıcı"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "Bilinmiyor"
 		},
 		"warning": "📥 Ollama'yı şimdi yükle",
 		"literal_native": "Local %s & café — literal"
@@ -287,14 +287,14 @@
 	"uk": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 Встановити Ollama зараз",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "Невідомо",
 			"menu.llm.backend_ollama_suffix": "Стандартний",
 			"menu.llm.backend_api_suffix": "Віддалений постачальник"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "Невідомо"
 		},
 		"warning": "📥 Встановити Ollama зараз",
 		"literal_native": "Local %s & café — literal"
@@ -302,14 +302,14 @@
 	"zh": {
 		"sources": {
 			"menu.llm.warning_install_ollama": "📥 立即安装 Ollama",
-			"menu.llm.backend_unknown": "Unknown",
+			"menu.llm.backend_unknown": "未知",
 			"menu.llm.backend_ollama_suffix": "标准",
 			"menu.llm.backend_api_suffix": "远程提供商"
 		},
 		"selected": {
 			"ollama": "Ollama 🦙",
 			"api": "API 🌐",
-			"unknown": "Unknown"
+			"unknown": "未知"
 		},
 		"warning": "📥 立即安装 Ollama",
 		"literal_native": "Local %s & café — literal"
