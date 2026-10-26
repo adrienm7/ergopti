@@ -57,7 +57,7 @@ function M.new(options)
 				local value = row.value
 				if row.delete then value = Manifest.default_for(path) end
 				values[key] = clone(value)
-				if path == "metrics.enabled" then enabled = value end
+				if path == require("config_keys").KEY.METRICS_ENABLED then enabled = value end
 			end
 			-- Restore excludes consent; Clear only revokes it. Neither operation
 			-- may turn a demoted or inactive collector on.

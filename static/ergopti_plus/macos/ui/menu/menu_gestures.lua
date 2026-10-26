@@ -481,10 +481,10 @@ function M.build(ctx)
 	-- renderer builds them from the declaration, right after the switch, and
 	-- this driver registers only the behaviour.
 	render_ctx.commands = {}
-	render_ctx.commands["gestures_toggle"] = toggle_gestures
-	render_ctx.commands["scope_restore"] = cmd_scope_restore
-	render_ctx.commands["scope_clear"] = cmd_scope_clear
-	render_ctx.commands["system_gesture_settings"] = gestures.open_system_gestures
+	render_ctx.commands[require("config_keys").COMMAND.GESTURES_TOGGLE] = toggle_gestures
+	render_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = cmd_scope_restore
+	render_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = cmd_scope_clear
+	render_ctx.commands[require("config_keys").COMMAND.SYSTEM_GESTURE_SETTINGS] = gestures.open_system_gestures
 
 	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, render_ctx, providers)
 	local item = receive(gm, { gestures_enabled = function() return state.gestures or nil end })

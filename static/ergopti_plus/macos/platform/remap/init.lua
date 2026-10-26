@@ -5047,7 +5047,7 @@ function M.set_tap_hold_timeout(ms)
 	value = math.floor(value)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.tap_hold_timeout_ms = value
-	end, nil, "tap_holds.timeout_ms")
+	end, nil, require("config_keys").KEY.TAP_HOLDS_TIMEOUT_MS)
 	if committed then Logger.debug(LOG, "Tap/hold timeout: %d ms.", value) end
 	return committed
 end
@@ -5072,7 +5072,7 @@ function M.set_sticky_timeout(ms)
 	value = math.floor(value)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.sticky_timeout_ms = value
-	end, nil, "tap_holds.sticky_timeout_ms")
+	end, nil, require("config_keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
 	if committed then Logger.debug(LOG, "Sticky timeout: %d ms.", value) end
 	return committed
 end
@@ -5097,7 +5097,7 @@ function M.set_simultaneous_threshold(ms)
 	value = math.floor(value)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.simultaneous_threshold_ms = value
-	end, nil, "mod_combos.simultaneous_threshold_ms")
+	end, nil, require("config_keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
 	if committed then Logger.debug(LOG, "Simultaneous threshold: %d ms.", value) end
 	return committed
 end
@@ -5119,7 +5119,7 @@ function M.set_combo_symmetric(value)
 	local normalized = value == true
 	local committed = commit_state_mutation(function(candidate)
 		candidate.combo_symmetric = normalized
-	end, nil, "mod_combos.symmetric")
+	end, nil, require("config_keys").KEY.MOD_COMBOS_SYMMETRIC)
 	if committed then Logger.debug(LOG, "Combo symmetric: %s.", tostring(normalized)) end
 	return committed
 end
@@ -5147,7 +5147,7 @@ function M.set_tap_holds_enabled(value)
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.tap_holds_enabled = value
-	end, nil, "tap_holds.enabled")
+	end, nil, require("config_keys").KEY.TAP_HOLDS_ENABLED)
 	if committed then Logger.info(LOG, "Tap-Holds feature: %s.", value and "on" or "off") end
 	return committed
 end
@@ -5174,7 +5174,7 @@ function M.set_mod_combos_enabled(value)
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.mod_combos_enabled = value
-	end, nil, "mod_combos.enabled")
+	end, nil, require("config_keys").KEY.MOD_COMBOS_ENABLED)
 	if committed then Logger.info(LOG, "Key combinations: %s.", value and "on" or "off") end
 	return committed
 end
@@ -5923,7 +5923,7 @@ function M.apply_scope(request, on_done)
 		end
 		for _, row in ipairs(Manifest.scope_plan(request.scope, request.mode).operations) do
 			local path = row.section .. "." .. row.key
-			assert(path == "tap_holds.enabled", "tap-hold scope row has no remap owner: " .. path)
+			assert(path == require("config_keys").KEY.TAP_HOLDS_ENABLED, "tap-hold scope row has no remap owner: " .. path)
 			if row.delete then
 				candidate.tap_holds_enabled = Manifest.default_for(path)
 			else

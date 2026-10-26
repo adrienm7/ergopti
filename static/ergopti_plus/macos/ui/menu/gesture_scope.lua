@@ -22,9 +22,9 @@ function M.new(options)
 		for _, slot in ipairs(list) do slots[slot] = true end
 	end
 	local function accessor(row)
-		if row.section == "gestures.action_parameters" then return nil end
-		if row.section == "gestures.modes" then return "get_mode", "set_mode", row.key end
-		if row.section == "gestures.sensitivities" then return "get_sensitivity", "set_sensitivity", row.key end
+		if row.section == require("config_keys").KEY.GESTURES_ACTION_PARAMETERS then return nil end
+		if row.section == require("config_keys").KEY.GESTURES_MODES then return "get_mode", "set_mode", row.key end
+		if row.section == require("config_keys").KEY.GESTURES_SENSITIVITIES then return "get_sensitivity", "set_sensitivity", row.key end
 		assert(row.section == "gestures", "unexpected gesture scope owner: " .. row.section)
 		if row.key == "enabled" then return "is_enabled", nil end
 		-- Retired manifest action fields still have persisted ownership but no

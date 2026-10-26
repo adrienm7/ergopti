@@ -47,6 +47,7 @@ local DelayResolver = require("hotstrings.delay_resolver")
 local HotstringPriority = require("hotstring_priority")
 local TextUtils = require("text_utils")
 local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 local LOG        = "hotstrings_config"
 
 
@@ -1589,7 +1590,7 @@ local function load_shared_defaults()
 		return s[key]
 	end
 
-	GLOBAL_DEFAULT_DELAY             = tonumber(require("infra.manifest_reader").default_for("hotstrings.expansion_delay"))
+	GLOBAL_DEFAULT_DELAY             = tonumber(require("infra.manifest_reader").default_for(ConfigKeys.KEY.HOTSTRINGS_EXPANSION_DELAY))
 	GLOBAL_DEFAULT_COLOR             = require_key("colors", "global_default")
 	CATEGORY_DEFAULT_COLORS.personal = require_key("colors", "personal")
 

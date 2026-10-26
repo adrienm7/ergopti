@@ -74,9 +74,9 @@ local MENU_REFRESH_COALESCE_SEC = 0.05
 
 -- config.toml [ui] menubar_icon: its variants and its default are the
 -- manifest's. v1 draws the simple glyph, v2 the detailed Ergopti logo.
-local MENUBAR_ICON_DEFAULT = Manifest.default_for("ui.menubar_icon")
+local MENUBAR_ICON_DEFAULT = Manifest.default_for(require("config_keys").KEY.UI_MENUBAR_ICON)
 local MENUBAR_ICON_VARIANTS = {}
-for _, variant in ipairs(Manifest.find_entry_by_path("ui.menubar_icon").enum_values) do
+for _, variant in ipairs(Manifest.find_entry_by_path(require("config_keys").KEY.UI_MENUBAR_ICON).enum_values) do
 	MENUBAR_ICON_VARIANTS[variant] = true
 end
 

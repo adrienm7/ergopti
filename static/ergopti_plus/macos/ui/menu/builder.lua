@@ -834,7 +834,7 @@ function M.generate(ctx, menu_mods, actions)
 			}
 			dbg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do dbg_ctx.state_getters[key] = value end
-			dbg_ctx.state_getters["script.log_level"] = function() return active_level_name end
+			dbg_ctx.state_getters[require("config_keys").KEY.SCRIPT_LOG_LEVEL] = function() return active_level_name end
 			dbg_ctx.state_getters["error_dialog_enabled"] = function()
 				return require("ui.error_dialog").is_enabled()
 			end

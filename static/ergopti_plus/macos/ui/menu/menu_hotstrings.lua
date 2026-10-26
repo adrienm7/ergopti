@@ -569,7 +569,7 @@ function M.build_groups(ctx, only, counts)
 				render_ctx, {
 					["hotstring_category_file"] = function()
 						if not toml_path then return {} end
-						local row = ManifestMenu.command_row("hotstring_file_commands", "hotstring_file_open",
+						local row = ManifestMenu.command_row("hotstring_file_commands", require("config_keys").COMMAND.HOTSTRING_FILE_OPEN,
 							{ hotstring_file_open = function() return open_toml_path(toml_path) end },
 							{ hotstring_file_ready = function() return type(hs.execute) == "function" end })
 						return row and { row } or {}

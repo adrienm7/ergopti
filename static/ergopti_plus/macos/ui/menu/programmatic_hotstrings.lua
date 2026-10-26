@@ -29,8 +29,8 @@ function M.build(ctx)
 	local function get()
 		local enabled, seconds = ctx.state.dynamichotstrings_user_code_enabled,
 			ctx.state.dynamichotstrings_user_code_time_activation_seconds
-		if enabled == nil then enabled = Features.default_for("hotstrings.dynamic.user_code.enabled") end
-		if seconds == nil then seconds = Features.default_for("hotstrings.dynamic.user_code.time_activation_seconds") end
+		if enabled == nil then enabled = Features.default_for(require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED) end
+		if seconds == nil then seconds = Features.default_for(require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS) end
 		return enabled, seconds
 	end
 	return Policy.build({ manifest = Manifest, i18n = I18n.get, get = get,
