@@ -135,7 +135,11 @@ log "APP_FAMILY=$APP_FAMILY"
 # Per-clone user-data-dir under Application Support — only meaningful for
 # Electron-based apps. We still create the directory unconditionally so
 # downstream code doesn't have to special-case empty paths.
-USER_DATA_DIR="$HOME/Library/Application Support/AppCloner/${safe_name}"
+# The reservation can suffix duplicate names; their profiles must follow the
+# reserved bundle identity instead of sharing the original requested name.
+profile_name="${DEST##*/}"
+profile_name="${profile_name%.app}"
+USER_DATA_DIR="$HOME/Library/Application Support/AppCloner/${profile_name}"
 mkdir -p "$USER_DATA_DIR"
 
 # VSCode-specific extras: shared extensions dir + symlinked User/ subdir,
