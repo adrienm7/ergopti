@@ -134,9 +134,9 @@ function renderRibbon(aggData) {
 		const y = LABEL_TOP + rowIdx * (CELL_H + ROW_GAP);
 		// Day label (e.g. "Lun 04/05")
 		const ts = parseDateKey(dateStr);
-		const dow = (new Date(ts).getDay() + 6) % 7;
-		const dd = String(new Date(ts).getDate()).padStart(2, '0');
-		const mm = String(new Date(ts).getMonth() + 1).padStart(2, '0');
+		const dow = (new Date(ts).getUTCDay() + 6) % 7;
+		const dd = String(new Date(ts).getUTCDate()).padStart(2, '0');
+		const mm = String(new Date(ts).getUTCMonth() + 1).padStart(2, '0');
 		const label = `${WEEKDAY_LABELS_FR[dow]} ${dd}/${mm}`;
 		rows += `<text x="${LABEL_LEFT - 8}" y="${y + CELL_H / 2 + 4}" text-anchor="end" fill="#aaa" font-size="11" font-family="system-ui">${label}</text>`;
 
@@ -405,12 +405,7 @@ function renderComparator(currentAgg) {
 	}
 
 	const anchorTs = parseDateKey(currentSelectedDate);
-	const prevAnchor = new Date(anchorTs);
-	prevAnchor.setDate(prevAnchor.getDate() - days);
-	const yyyy = prevAnchor.getFullYear();
-	const mm = String(prevAnchor.getMonth() + 1).padStart(2, '0');
-	const dd = String(prevAnchor.getDate()).padStart(2, '0');
-	const prevKey = `${yyyy}-${mm}-${dd}`;
+	const prevKey = formatMetricsDateKey(shiftMetricsDay(anchorTs, -days));
 
 	const savedDate = currentSelectedDate;
 	currentSelectedDate = prevKey;
@@ -1030,10 +1025,8 @@ function renderActivityCalendar() {
 	const container = document.getElementById('activity_calendar_container');
 	if (!container) return;
 
-	const today = new Date();
-	today.setHours(0, 0, 0, 0);
-	const start = new Date(today);
-	start.setDate(start.getDate() - 364);
+	const today = new Date(metricsLocalDayOrdinal(new Date()));
+	const start = new Date(shiftMetricsDay(today.getTime(), 1 - METRICS_PERIOD_DAYS.year));
 
 	// Build a date_str → { time_ms, chars } lookup from manifestData. We sum
 	// across all apps (excluding pseudo-apps) for each calendar day.
@@ -1053,27 +1046,24 @@ function renderActivityCalendar() {
 	const cells = [];
 	const cursor = new Date(start);
 	// Snap cursor back to the previous Monday so the first column is aligned.
-	cursor.setDate(cursor.getDate() - ((cursor.getDay() + 6) % 7));
+	cursor.setUTCDate(cursor.getUTCDate() - ((cursor.getUTCDay() + 6) % 7));
 	const end = new Date(today);
-	end.setDate(end.getDate() + 1);
+	end.setUTCDate(end.getUTCDate() + 1);
 
 	let max_v = 0;
 	while (cursor < end) {
-		const yyyy = cursor.getFullYear();
-		const mm = String(cursor.getMonth() + 1).padStart(2, '0');
-		const dd = String(cursor.getDate()).padStart(2, '0');
-		const key = `${yyyy}-${mm}-${dd}`;
+		const key = formatMetricsDateKey(cursor.getTime());
 		const day = per_day[key];
 		const v = !day ? 0 : _calendarMode === 'time' ? day.time_ms || 0 : day.chars || 0;
 		if (v > max_v) max_v = v;
 		cells.push({
 			key,
 			date: new Date(cursor),
-			weekday: (cursor.getDay() + 6) % 7, // 0=Mon … 6=Sun
+			weekday: (cursor.getUTCDay() + 6) % 7, // 0=Mon … 6=Sun
 			value: v,
 			in_window: cursor >= start && cursor <= today
 		});
-		cursor.setDate(cursor.getDate() + 1);
+		cursor.setUTCDate(cursor.getUTCDate() + 1);
 	}
 
 	const CELL = 11,
@@ -1103,10 +1093,10 @@ function renderActivityCalendar() {
 	cells.forEach((c, i) => {
 		if (c.weekday !== 0) return; // only consider Monday cells for column header
 		const col = Math.floor(i / 7);
-		if (c.date.getDate() <= 7 && c.date.getMonth() !== last_label_month) {
-			last_label_month = c.date.getMonth();
+		if (c.date.getUTCDate() <= 7 && c.date.getUTCMonth() !== last_label_month) {
+			last_label_month = c.date.getUTCMonth();
 			const cx = LABEL_W + col * (CELL + GAP);
-			month_labels += `<text x="${cx}" y="12" fill="#888" font-size="10" font-family="system-ui">${MONTHS_FR_SHORT[c.date.getMonth()]}</text>`;
+			month_labels += `<text x="${cx}" y="12" fill="#888" font-size="10" font-family="system-ui">${MONTHS_FR_SHORT[c.date.getUTCMonth()]}</text>`;
 		}
 	});
 
@@ -1128,7 +1118,7 @@ function renderActivityCalendar() {
 			return;
 		}
 		const fill = heat(c.value);
-		const dt = `${c.date.getDate()}/${c.date.getMonth() + 1}/${c.date.getFullYear()}`;
+		const dt = `${c.date.getUTCDate()}/${c.date.getUTCMonth() + 1}/${c.date.getUTCFullYear()}`;
 		const v_txt =
 			_calendarMode === 'time'
 				? c.value > 0

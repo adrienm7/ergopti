@@ -890,10 +890,8 @@ function renderDashboard() {
 					prevTs = null;
 				allKeys.forEach((d) => {
 					const ok = predicate(d.key);
-					// Local calendar days cross DST with varying elapsed durations.
-					const previousCalendarDay = new Date(d.ts);
-					previousCalendarDay.setDate(previousCalendarDay.getDate() - 1);
-					if (ok && (prevTs == null || previousCalendarDay.getTime() === prevTs)) cur += 1;
+					// Recorded adjacent days remain distinct across timezone transitions.
+					if (ok && (prevTs == null || shiftMetricsDay(d.ts, -1) === prevTs)) cur += 1;
 					else cur = ok ? 1 : 0;
 					if (cur > best) best = cur;
 					prevTs = d.ts;

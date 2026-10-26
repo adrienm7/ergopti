@@ -334,39 +334,52 @@ function formatDurationDecimal(ms) {
 	return Number((ms / 3600000).toFixed(2));
 }
 
+// Recorded dates are Gregorian day identities, not instants in the viewer's timezone.
+function metricsDayOrdinal(year, month, day) {
+	const date = new Date(0);
+	date.setUTCFullYear(year, month, day);
+	return date.getTime();
+}
+
+function metricsLocalDayOrdinal(date) {
+	return metricsDayOrdinal(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function shiftMetricsDay(ordinal, days) {
+	const date = new Date(ordinal);
+	date.setUTCDate(date.getUTCDate() + days);
+	return date.getTime();
+}
+
+function formatMetricsDateKey(ordinal) {
+	const date = new Date(ordinal);
+	return `${String(date.getUTCFullYear()).padStart(4, '0')}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+}
+
 function parseDateKey(dateStr) {
 	if (!dateStr || (typeof dateStr !== 'string' && typeof dateStr !== 'number')) return NaN;
 	if (/^\d+$/.test(String(dateStr))) {
 		const n = Number(dateStr);
-		if (String(dateStr).length <= 10) return n * 1000;
-		return n;
+		return metricsLocalDayOrdinal(new Date(String(dateStr).length <= 10 ? n * 1000 : n));
 	}
 	const s = String(dateStr);
 	const isoMatch = s.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})/);
 	if (isoMatch)
-		return new Date(
-			parseInt(isoMatch[1], 10),
-			parseInt(isoMatch[2], 10) - 1,
-			parseInt(isoMatch[3], 10)
-		).getTime();
+		return metricsDayOrdinal(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
 
 	const frMatch = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
 	if (frMatch)
-		return new Date(
-			parseInt(frMatch[3], 10),
-			parseInt(frMatch[2], 10) - 1,
-			parseInt(frMatch[1], 10)
-		).getTime();
+		return metricsDayOrdinal(Number(frMatch[3]), Number(frMatch[2]) - 1, Number(frMatch[1]));
 
 	const t = Date.parse(s);
-	return isNaN(t) ? NaN : t;
+	return isNaN(t) ? NaN : metricsLocalDayOrdinal(new Date(t));
 }
 
 function formatDisplayDate(dateStr) {
 	const ts = parseDateKey(dateStr);
 	if (isNaN(ts)) return dateStr;
 	const d = new Date(ts);
-	return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+	return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`;
 }
 
 // ===================================

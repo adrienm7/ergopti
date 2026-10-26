@@ -236,16 +236,14 @@ function buildAggregatedData() {
 	const anchorTs = currentSelectedDate ? parseDateKey(currentSelectedDate) : allDates[0].ts;
 
 	if (Object.hasOwn(METRICS_PERIOD_DAYS, currentPeriod)) {
-		// The selected day is included, and local dates can cross DST boundaries.
-		const periodStart = new Date(anchorTs);
-		periodStart.setDate(periodStart.getDate() - METRICS_PERIOD_DAYS[currentPeriod] + 1);
-		targetTsStart = periodStart.getTime();
+		// The selected recorded day is included, independent of local timezone changes.
+		targetTsStart = shiftMetricsDay(anchorTs, 1 - METRICS_PERIOD_DAYS[currentPeriod]);
 	}
 
 	const validDates = allDates.filter((d) => {
 		if (currentPeriod !== 'all' && (d.ts > anchorTs || d.ts < targetTsStart)) return false;
 		if (currentWeekdayFilter) {
-			const dow = (new Date(d.ts).getDay() + 6) % 7;
+			const dow = (new Date(d.ts).getUTCDay() + 6) % 7;
 			if (!currentWeekdayFilter.has(dow)) return false;
 		}
 		return true;
@@ -323,8 +321,8 @@ function buildAggregatedData() {
 			byDate.passive_ms += (sysEntry.locked_ms || 0) + (sysEntry.sleep_ms || 0);
 		}
 
-		// Weekday: parseDateKey returns a JS-compatible ts; convert to Mon=0..Sun=6
-		const dow = (new Date(d.ts).getDay() + 6) % 7;
+		// Read the recorded Gregorian weekday as Mon=0..Sun=6.
+		const dow = (new Date(d.ts).getUTCDay() + 6) % 7;
 		const byWk =
 			result.rich.by_weekday[dow] || (result.rich.by_weekday[dow] = { time_ms: 0, chars: 0 });
 
