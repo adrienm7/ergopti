@@ -1,7 +1,7 @@
 // static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/AppClonerWizardLocaleTests.swift
 //
 // Executes the shipped AppleScript first-picker construction against AppKit.
-// An observation before runModal inspects the real panel without opening it.
+// A bounded owned timer observes the visible panel and cancels only that panel.
 
 import Foundation
 import XCTest
@@ -33,21 +33,121 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 			guard source.components(separatedBy: binding).count == 2 else { throw CocoaError(.fileReadCorruptFile) }
 			source = source.replacingOccurrences(of: binding, with: "panel's setPrompt:\"Choisir\"")
 		}
-		let modal = "set rc to panel's runModal()"
-		XCTAssertEqual(source.components(separatedBy: modal).count, 2, "Observe the one actual picker before its modal")
-		guard source.components(separatedBy: modal).count == 2 else { throw CocoaError(.fileReadCorruptFile) }
-		// All locale resolution, catalogue reads and AppKit setters stay original.
-		// Return from the actual on run handler before opening any modal or cloning.
-		let observation = """
-		set observation to current application's NSDictionary's dictionaryWithObjects:{panel's prompt(), panel's message(), panel's valueForKey:"cancelButtonTitle"} forKeys:{"prompt", "message", "cancel"}
-		set observationData to current application's NSJSONSerialization's dataWithJSONObject:observation options:0 |error|:(missing value)
-		return (current application's NSString's alloc()'s initWithData:observationData encoding:(current application's NSUTF8StringEncoding)) as text
-		"""
-		source = source.replacingOccurrences(of: modal, with: observation + "\n" + modal)
+		source = try observingActualPicker(source)
 		let result = try execute(source, arguments: [app.path], locale: locale, root: root)
 		XCTAssertEqual(result.status, 0, "The actual App Cloner construction must execute: \(result.stderr)")
 		XCTAssertTrue(result.stderr.isEmpty, "The App Cloner observation must emit no errors: \(result.stderr)")
-		return try XCTUnwrap(JSONSerialization.jsonObject(with: result.output) as? [String: String])
+		let actual = try XCTUnwrap(JSONSerialization.jsonObject(with: result.output) as? [String: String])
+		XCTAssertEqual(actual["visible"], "true", "Observe a genuinely visible native picker")
+		XCTAssertEqual(actual["cancel_role"], "AXButton", "Observe the public Cancel button itself")
+		print("APPCLONER_PICKER_PUBLIC locale=\(locale) setter=\(actual["setter_selector"] ?? "<missing>") getter=\(actual["getter_selector"] ?? "<missing>") setter_error=\(String(reflecting: actual["setter_error"] ?? "<missing>")) cancel=\(String(reflecting: actual["cancel"] ?? "<missing>"))")
+		return actual
+	}
+
+	private static let pickerObservationInterval: TimeInterval = 0.05
+	private static let pickerObservationDeadline: TimeInterval = 5
+
+	/// Keeps the real picker modal and setters, then inspects its public Cancel control.
+	private func observingActualPicker(_ production: String) throws -> String {
+		let modal = "set rc to panel's runModal()"
+		XCTAssertEqual(production.components(separatedBy: modal).count, 2, "Instrument the one actual picker modal")
+		guard production.components(separatedBy: modal).count == 2 else { throw CocoaError(.fileReadCorruptFile) }
+		let setter = "panel's setValue:(btn_cancel of u) forKey:\"cancelButtonTitle\""
+		XCTAssertEqual(production.components(separatedBy: setter).count, 2, "Retain the one actual Cancel setter")
+		guard production.components(separatedBy: setter).count == 2 else { throw CocoaError(.fileReadCorruptFile) }
+		// The original try already catches setter errors. Record that same outcome
+		// without changing the setter or deciding whether it has a readable getter.
+		let capturedSetter = setter + """
+
+		on error pickerSetterMessage number pickerSetterNumber
+			set my fixturePickerSetterError to (pickerSetterNumber as text) & ": " & pickerSetterMessage
+		"""
+		var source = production.replacingOccurrences(of: setter, with: capturedSetter)
+		let modalObservation = """
+		if (my fixturePickerPanel) is not missing value or (my fixturePickerTimer) is not missing value then error "The native picker observer was already armed."
+		set my fixturePickerPanel to panel
+		set pickerObserverProcess to current application's NSProcessInfo's processInfo()
+		set my fixturePickerDeadline to ((pickerObserverProcess's systemUptime()) as real) + \(Self.pickerObservationDeadline)
+		set my fixturePickerTimer to current application's NSTimer's timerWithTimeInterval:\(Self.pickerObservationInterval) target:me selector:"fixtureObservePicker:" userInfo:(missing value) repeats:true
+		set pickerObserverLoop to current application's NSRunLoop's mainRunLoop()
+		pickerObserverLoop's addTimer:(my fixturePickerTimer) forMode:(current application's NSModalPanelRunLoopMode)
+		pickerObserverLoop's addTimer:(my fixturePickerTimer) forMode:(current application's NSRunLoopCommonModes)
+		try
+			\(modal)
+		on error pickerModalMessage number pickerModalNumber
+			my fixtureRetirePicker()
+			error pickerModalMessage number pickerModalNumber
+		end try
+		my fixtureRetirePicker()
+		if (my fixturePickerError) is not "" then error (my fixturePickerError)
+		if rc is not (current application's NSModalResponseCancel) then error "The owned native picker was not cancelled."
+		if (my fixturePickerReceipt) is "" then error "The native picker observer produced no receipt."
+		return (my fixturePickerReceipt)
+		"""
+		source = source.replacingOccurrences(of: modal, with: modalObservation)
+		return source + """
+
+		property fixturePickerPanel : missing value
+		property fixturePickerTimer : missing value
+		property fixturePickerDeadline : 0.0
+		property fixturePickerReceipt : ""
+		property fixturePickerError : ""
+		property fixturePickerSetterError : ""
+		property fixturePickerFinished : false
+		property fixturePickerReadiness : "panel visibility"
+
+		on fixtureRetirePicker()
+			if (my fixturePickerTimer) is not missing value then
+				(my fixturePickerTimer)'s invalidate()
+				set my fixturePickerTimer to missing value
+			end if
+			if (my fixturePickerPanel) is not missing value then
+				(my fixturePickerPanel)'s orderOut:(missing value)
+				set my fixturePickerPanel to missing value
+			end if
+		end fixtureRetirePicker
+
+		on fixtureObservePicker:theTimer
+			if my fixturePickerFinished then return
+			set ownedPicker to my fixturePickerPanel
+			try
+				set observerProcess to current application's NSProcessInfo's processInfo()
+				set observerNow to (observerProcess's systemUptime()) as real
+				if observerNow ≥ (my fixturePickerDeadline) then error "The actual native picker did not expose " & (my fixturePickerReadiness) & " before its deadline."
+				if not ((ownedPicker's isVisible()) as boolean) then return
+				set my fixturePickerReadiness to "a public Cancel button"
+				set cancelControl to ownedPicker's accessibilityCancelButton()
+				if cancelControl is missing value then return
+				set cancelRole to (cancelControl's accessibilityRole()) as text
+				if cancelRole is not ((current application's NSAccessibilityButtonRole) as text) then error "The native Cancel control is not an accessibility button."
+				set my fixturePickerReadiness to "the public Cancel button visible title"
+				set cancelTitle to cancelControl's accessibilityTitle()
+				if cancelTitle is missing value then return
+				set cancelTitle to cancelTitle as text
+				if cancelTitle is "" then return
+				set observation to current application's NSDictionary's dictionaryWithObjects:{ownedPicker's prompt(), ownedPicker's message(), cancelTitle, cancelRole, (((ownedPicker's isVisible()) as boolean) as text), (((ownedPicker's respondsToSelector:"setCancelButtonTitle:") as boolean) as text), (((ownedPicker's respondsToSelector:"cancelButtonTitle") as boolean) as text), (my fixturePickerSetterError)} forKeys:{"prompt", "message", "cancel", "cancel_role", "visible", "setter_selector", "getter_selector", "setter_error"}
+				set {observationData, observationError} to current application's NSJSONSerialization's dataWithJSONObject:observation options:0 |error|:(reference)
+				if observationData is missing value then error "The native picker observer could not encode its receipt."
+				set my fixturePickerReceipt to (current application's NSString's alloc()'s initWithData:observationData encoding:(current application's NSUTF8StringEncoding)) as text
+			on error observerMessage number observerNumber
+				set my fixturePickerError to "The native picker observer refused: " & (observerNumber as text) & ": " & observerMessage
+			end try
+			set my fixturePickerFinished to true
+			theTimer's invalidate()
+			try
+				ownedPicker's cancel:(missing value)
+			on error cancelMessage number cancelNumber
+				set my fixturePickerError to (my fixturePickerError) & " Native picker cancellation failed: " & (cancelNumber as text) & ": " & cancelMessage
+				-- Failed cancellation never becomes success. Only stop this script's
+				-- exact owned modal so its original observer failure can be reported.
+				set observerApp to current application's NSApplication's sharedApplication()
+				set ownedModal to observerApp's modalWindow()
+				if ownedModal is not missing value then
+					if ((ownedModal's isEqual:ownedPicker) as boolean) then observerApp's stopModalWithCode:(current application's NSModalResponseCancel)
+				end if
+			end try
+		end fixtureObservePicker:
+		"""
 	}
 
 	private struct NativeResult {
@@ -119,6 +219,8 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 		let expected = try catalogue("en")
 		XCTAssertEqual(actual["prompt"], "Choisir", "The injected old prompt must execute in AppKit")
 		XCTAssertNotEqual(actual["prompt"], expected["apps.cloner.btn_choose"], "The real-panel oracle must reject the old French prompt")
+		XCTAssertEqual(actual["cancel"], expected["button.cancel"])
+		XCTAssertEqual(actual["message"], "Application to clone")
 	}
 
 	private func catalogueScript() throws -> String {
