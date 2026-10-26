@@ -671,6 +671,7 @@ function closedModuleExport(unit, lex, rootPositions) {
 		MagicKey: 'modules.hotstrings.magic_key',
 		MagicKeySourceRows: 'keymap.magic_key_source',
 		MagicFrame: 'menu.frames.magic_frame',
+		ParentSource: 'menu.frames.parent_source',
 		PreviewSettings: 'modules.hotstrings.preview_settings',
 		RepeatKey: 'modules.hotstrings.repeat_key',
 		Modal: 'ui.modal',
