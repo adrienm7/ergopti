@@ -150,7 +150,7 @@ local is_apple_silicon = BackendPanel.is_apple_silicon()
 
 M.DEFAULT_STATE = {
 		llm_enabled           = llm_mod.DEFAULT_STATE.llm_enabled,
-		llm_backend           = Manifest.default_for("llm.models.selected"),
+		llm_backend           = Manifest.default_for(require("config_keys").KEY.LLM_MODELS_SELECTED),
 		llm_debounce          = llm_mod.DEFAULT_STATE.llm_debounce,
 		llm_model             = is_apple_silicon and llm_mod.DEFAULT_STATE.llm_model_mlx or llm_mod.DEFAULT_STATE.llm_model_ollama,
 		llm_model_ollama      = llm_mod.DEFAULT_STATE.llm_model_ollama,
@@ -168,8 +168,8 @@ M.DEFAULT_STATE = {
 		llm_user_models       = {},
 		llm_disabled_apps          = {},
 		llm_app_profile_overrides  = "",
-		llm_url_bar_filter_enabled        = Manifest.default_for("llm.trigger.url_bar_filter_enabled"),
-		llm_secure_field_filter_enabled   = Manifest.default_for("llm.trigger.secure_filter_enabled"),
+		llm_url_bar_filter_enabled        = Manifest.default_for(require("config_keys").KEY.LLM_TRIGGER_URL_BAR_FILTER_ENABLED),
+		llm_secure_field_filter_enabled   = Manifest.default_for(require("config_keys").KEY.LLM_TRIGGER_SECURE_FILTER_ENABLED),
 		llm_user_profiles     = {},
 		llm_profile_shortcuts = {},
 		llm_after_hotstring   = llm_mod.DEFAULT_STATE.llm_after_hotstring,
@@ -180,9 +180,9 @@ M.DEFAULT_STATE = {
 		llm_instant_on_word_end = llm_mod.DEFAULT_STATE.llm_instant_on_word_end,
 		-- The AI agent's settings (modules/llm/agent_runner.lua); its top-level
 		-- menu is built by ui/menu/menu_llm/agent_panel.lua
-		llm_agent_system1       = Manifest.default_for("llm.agent_system1"),
-		llm_agent_system2       = Manifest.default_for("llm.agent_system2"),
-		llm_agent_mode          = Manifest.default_for("llm.agent_mode"),
+		llm_agent_system1       = Manifest.default_for(require("config_keys").KEY.LLM_AGENT_SYSTEM1),
+		llm_agent_system2       = Manifest.default_for(require("config_keys").KEY.LLM_AGENT_SYSTEM2),
+		llm_agent_mode          = Manifest.default_for(require("config_keys").KEY.LLM_AGENT_MODE),
 		llm_agent_disabled_apps = {},
 }
 

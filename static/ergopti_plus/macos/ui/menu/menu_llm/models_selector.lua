@@ -646,7 +646,7 @@ function M.build(ctx)
 					end,
 				}
 				if is_inst then
-					model_commands["model_delete"] = function()
+					model_commands[require("config_keys").COMMAND.MODEL_DELETE] = function()
 						local ok, choice = pcall(dialog.block_alert,
 							i18n.get("menu.llm.delete_model_title"),
 							string.format(i18n.get("menu.llm.delete_model_body"), m_name),
@@ -867,7 +867,7 @@ function M.build(ctx)
 	for _, row in ipairs(ManifestMenu.status_rows("llm_menu", "llm_model", "model_picker_tail") or {}) do
 		table.insert(menu, row)
 	end
-	local browser_row = ManifestMenu.command_row("llm_model_commands", "llm_browse_models", {
+	local browser_row = ManifestMenu.command_row("llm_model_commands", require("config_keys").COMMAND.LLM_BROWSE_MODELS, {
 		["llm_browse_models"] = open_model_browser,
 	}, { ["llm_model_browser_ready"] = model_browser_ready })
 	if browser_row then table.insert(menu, browser_row) end

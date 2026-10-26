@@ -93,7 +93,7 @@ local function pretty_key(id, state)
 	if #parts == 0 then return id end
 
 	local key = parts[#parts]
-	if key == "star" or key == "asterisk" then key = (state and state.trigger_char) or ManifestReader.default_for("hotstrings.trigger_char") end
+	if key == "star" or key == "asterisk" then key = (state and state.trigger_char) or ManifestReader.default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR) end
 	if key == "period"   then key = "." end
 	if key == "quote"    then key = "'" end
 	if key == "capslock" then key = "CapsLock" end
@@ -672,7 +672,7 @@ function M.build(ctx)
 								end
 								DeferredWork.after(0.05, function()
 									local mutation = {
-										section = "shortcuts.script_control", key = slot_id,
+										section = require("config_keys").KEY.SHORTCUTS_SCRIPT_CONTROL, key = slot_id,
 										read = function()
 											if type(script_control.get_shortcut_actions) ~= "function" then return nil end
 											local actions = script_control.get_shortcut_actions()
@@ -896,8 +896,8 @@ function M.build(ctx)
 	for key, value in pairs(ctx) do sc_ctx[key] = value end
 	sc_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do sc_ctx.commands[key] = value end
-	sc_ctx.commands["shortcuts_toggle"] = toggle_shortcuts
-	sc_ctx.commands["edit_shortcuts"] = cmd_edit_shortcuts
+	sc_ctx.commands[require("config_keys").COMMAND.SHORTCUTS_TOGGLE] = toggle_shortcuts
+	sc_ctx.commands[require("config_keys").COMMAND.EDIT_SHORTCUTS] = cmd_edit_shortcuts
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
 	local physical_editor = require("shortcuts.physical_editor_menu").new({
@@ -916,7 +916,7 @@ function M.build(ctx)
 				i18n.get("physical_shortcuts.window_unavailable"), i18n.get("button.ok"))
 		end,
 	})
-	sc_ctx.commands["physical_shortcuts_editor"] = physical_editor.open
+	sc_ctx.commands[require("config_keys").COMMAND.PHYSICAL_SHORTCUTS_EDITOR] = physical_editor.open
 	sc_ctx.state_getters["physical_shortcuts_editor_ready"] = physical_editor.ready
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return state.shortcuts and true or false end
 	-- Ticks « Raccourcis de gestion du script » while its switch is on.

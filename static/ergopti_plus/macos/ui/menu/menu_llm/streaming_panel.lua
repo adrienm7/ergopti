@@ -75,7 +75,7 @@ function M.build(ctx)
 		return snapshot
 	end
 	local streaming_source = streaming_snapshot()
-	local indent_values = DisplayPolicy.indentation_values(Manifest.find_entry_by_path("llm.display.pred_indent"))
+	local indent_values = DisplayPolicy.indentation_values(Manifest.find_entry_by_path(require("config_keys").KEY.LLM_DISPLAY_PRED_INDENT))
 	local function indentation_snapshot()
 		local snapshot = streaming_snapshot()
 		local indentation = settings_mgr.setting_snapshot("llm_pred_indent")
@@ -180,7 +180,7 @@ function M.build(ctx)
 			end,
 		},
 		state_getters = {
-			["llm.display.pred_indent"] = function() return indentation_source.indentation end,
+			[require("config_keys").KEY.LLM_DISPLAY_PRED_INDENT] = function() return indentation_source.indentation end,
 			["llm_indentation_ready"] = function() return DisplayPolicy.indentation_ready(indentation_source) end,
 			["llm_show_all_enabled"] = function() return DisplayPolicy.show_all(state.llm_streaming_multi) end,
 			["llm_show_all_ready"] = show_all_ready,

@@ -184,7 +184,7 @@ local function choose_action_for(slot_id, ctx)
 		DeferredWork.after(0.05, function()
 			local committed = ShortcutUtils.prompt_action_parameter(gestures,
 				KbShortcuts.keyboard_binding_id(slot_id), action_id, spec, picked, {
-					publishes_assignment = true, section = "shortcuts.keyboard", key = slot_id,
+					publishes_assignment = true, section = require("config_keys").KEY.SHORTCUTS_KEYBOARD, key = slot_id,
 					read = function() return KbShortcuts.get_keyboard_action(slot_id) end,
 					apply = function(on_error, publication_observer) return KbShortcuts.set_keyboard_action(slot_id, action_id, on_error, publication_observer) == true end,
 					restore = function(previous, on_error, publication_observer) return KbShortcuts.set_keyboard_action(slot_id, previous, on_error, publication_observer) == true end,

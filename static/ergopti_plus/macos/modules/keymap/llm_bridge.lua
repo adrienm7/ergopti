@@ -47,6 +47,7 @@ local TimerScheduler   = require("adapters.timer_scheduler")
 local ManifestReader = require("infra.manifest_reader")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 local Timings          = require("infra.timings")
+local ConfigKeys = require("config_keys")
 local ContextBuffer    = require("llm.context_buffer")  -- shared navigation rule of the AI context
 
 local LOG    = "keymap.llm_bridge"
@@ -922,7 +923,7 @@ local function update_preview_body(buf)
 		-- character their layout no longer produces. The literal remains only as
 		-- the fallback for a state that has not resolved one yet.
 		local magic_key = (_state and _state.magic_key ~= nil and _state.magic_key ~= "")
-			and _state.magic_key or ManifestReader.default_for("hotstrings.trigger_char")
+			and _state.magic_key or ManifestReader.default_for(ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR)
 		local rows          = {}
 		local any_enabled   = false
 		local min_timeout   = nil

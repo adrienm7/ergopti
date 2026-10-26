@@ -369,7 +369,7 @@ local ManifestReader     = require("infra.manifest_reader")
 -- trap as project-lua-closure-before-local-nil-global.
 locale_mod.set_trigger_provider(function()
 	return keymap.get_trigger_char and keymap.get_trigger_char()
-		or ManifestReader.default_for("hotstrings.trigger_char")
+		or ManifestReader.default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
 end)
 -- Expose keymap in the global table so the Hammerspoon console can call
 -- keymap.perf_report_all() / perf_enable() / perf_reset() without
@@ -1477,7 +1477,7 @@ end
 local config_overrides = require("infra.config_overrides")
 config_overrides.apply(config_paths.get("ConfigTomlPath"))
 
-local mlx_cleanup_enabled = config_overrides.read_native_value("llm.enabled") == true
+local mlx_cleanup_enabled = config_overrides.read_native_value(require("config_keys").KEY.LLM_ENABLED) == true
 local mlx_cleanup_settled = not mlx_cleanup_enabled
 local pending_llm_bootstrap = nil
 
@@ -1562,7 +1562,7 @@ end
 local Preferences = require("infra.preferences")
 local ok_core_llm, core_llm = pcall(require, "modules.llm")
 local boot_saved_prefs = Preferences.load(config_paths.get("ConfigTomlPath"))
-local boot_llm_enabled = config_overrides.read_native_value("llm.enabled")
+local boot_llm_enabled = config_overrides.read_native_value(require("config_keys").KEY.LLM_ENABLED)
 if boot_llm_enabled == nil then
 	if type(boot_saved_prefs.llm_enabled) == "boolean" then
 		boot_llm_enabled = boot_saved_prefs.llm_enabled
@@ -1805,7 +1805,7 @@ end
 -- Magic key (the hotstring trigger character) defaults here; a user's custom
 -- value and per-section enabled states are restored from config.toml by
 -- menu_state during menu start (the v2 config is TOML, not the legacy config.json).
-local magic_key = ManifestReader.default_for("hotstrings.trigger_char")
+local magic_key = ManifestReader.default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
 
 -- Pass the trigger char to keymap before loading files so magic-key hotstrings
 -- register against the right character.
@@ -2140,7 +2140,7 @@ end
 -- the one the next deploy writes. An unreadable file refuses the deploy instead
 -- of guessing a product.
 do
-	local virtual_keyboard_default = require("infra.manifest_reader").default_for("layout.virtual_keyboard")
+	local virtual_keyboard_default = require("infra.manifest_reader").default_for(require("config_keys").KEY.LAYOUT_VIRTUAL_KEYBOARD)
 	local registered = type(karabiner) == "table" and karabiner.set_virtual_keyboard_source(function()
 		-- Read-only: a retired key an older release left is warned and ignored, never a refusal.
 		local flat = Preferences.current_view(config_paths.get("ConfigTomlPath"), true)
