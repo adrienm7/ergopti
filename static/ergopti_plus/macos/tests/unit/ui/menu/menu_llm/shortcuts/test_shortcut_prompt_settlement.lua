@@ -125,7 +125,7 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 				logger = package.loaded["infra.logger"],
 			}))
 			package.loaded["modules.llm"] = {
-				DEFAULT_STATE = {llm_debounce = 0.2},
+				DEFAULT_STATE = {llm_debounce = 0.2, llm_min_request_interval = 0.5},
 			}
 			package.loaded["ui.menu.shortcut_utils"] = {
 				prompt_shortcut = function() prompts = prompts + 1 return false end,
@@ -133,7 +133,7 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 			}
 			package.loaded["ui.menu.menu_llm.trigger_panel"] = nil
 			local rows = require("ui.menu.menu_llm.trigger_panel").build({
-				state = {llm_debounce = 0.2},
+				state = {llm_debounce = 0.2, llm_min_request_interval = 0.5},
 				is_disabled = false,
 				settings_mgr = {},
 			})

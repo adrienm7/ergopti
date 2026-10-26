@@ -1017,15 +1017,16 @@ helpers.describe("llm-control-boundaries: actual Linux trigger provider", functi
 				end
 				local row = assert(build())
 				helpers.assert_eq(row.menu[1].title, expected.trigger_debounce_english)
-				helpers.assert_eq(row.menu[2].title, "-")
+				helpers.assert_eq(row.menu[2].title, expected.trigger_min_interval_english)
+				helpers.assert_eq(row.menu[3].title, "-")
 				helpers.assert_not_nil(find_item(row.menu, i18n.get("menu.llm.disable_url_bars")))
 				helpers.assert_not_nil(find_item(row.menu, i18n.get("menu.llm.disable_password_fields")))
 				local before = Sandbox.read_bytes(path)
 				local ok, detail = xpcall(function()
 					root[boundary.section] = { { type = "label", id = "hand_trigger_boundary", i18n = expected.marker_key,
 						platforms = { "ahk", "linux" }, unavailable = "hide" } }
-					row = assert(build()); helpers.assert_eq(row.menu[2].title, expected.marker_english)
-					helpers.assert_eq(row.menu[2].disabled, true); helpers.assert_nil(row.menu[2].fn)
+					row = assert(build()); helpers.assert_eq(row.menu[3].title, expected.marker_english)
+					helpers.assert_eq(row.menu[3].disabled, true); helpers.assert_nil(row.menu[3].fn)
 					helpers.assert_eq(changes, 0); helpers.assert_eq(Sandbox.read_bytes(path), before)
 					local preset = assert(find_item(row.menu[1].menu, "50 ms"))
 					helpers.assert_type(preset.fn, "function"); helpers.assert_nil(preset.fn())
@@ -1040,7 +1041,7 @@ helpers.describe("llm-control-boundaries: actual Linux trigger provider", functi
 				end, debug.traceback)
 				root[boundary.section] = original
 				if not ok then error(detail, 0) end
-				row = assert(build()); helpers.assert_eq(row.menu[2].title, "-")
+				row = assert(build()); helpers.assert_eq(row.menu[3].title, "-")
 				helpers.assert_eq(changes, 1)
 			end)
 		end)

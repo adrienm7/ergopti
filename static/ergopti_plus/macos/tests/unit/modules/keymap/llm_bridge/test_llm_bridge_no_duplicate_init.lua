@@ -145,6 +145,7 @@ local engine_stub = {
 	set_llm_min_words             = function() end,
 	set_llm_max_words             = function() end,
 	set_llm_debounce              = function() end,
+	set_llm_min_request_interval  = function() end,
 	set_llm_streaming             = function() end,
 	set_llm_streaming_multi       = function() end,
 	get_llm_runtime_setting       = function() return false, nil end,
@@ -204,6 +205,7 @@ local FORWARDED_ENGINE_SETTERS = {
 	"set_llm_min_words",
 	"set_llm_max_words",
 	"set_llm_debounce",
+	"set_llm_min_request_interval",
 	"set_llm_streaming",
 	"set_llm_streaming_multi",
 }

@@ -25,13 +25,12 @@ local function read_json(path)
 end
 
 --- Builds the floor port a vector declares.
---- @param floors table Backend to milliseconds.
+--- @param floor_ms number|nil The interval in milliseconds; nil makes the port raise.
 --- @return function floor_ms
-local function floor_port(floors)
-	return function(backend)
-		local value = floors[backend]
-		if value == nil then error("no floor for backend '" .. tostring(backend) .. "'", 0) end
-		return value
+local function floor_port(floor_ms)
+	return function()
+		if floor_ms == nil then error("no floor was declared", 0) end
+		return floor_ms
 	end
 end
 
@@ -44,7 +43,7 @@ local function options_of(corpus, vector)
 	if type(chosen) == "string" then chosen = assert(corpus.driver_options[chosen], "unknown option set " .. chosen) end
 	local options = {}
 	for key, value in pairs(chosen) do options[key] = value end
-	options.floor_ms = floor_port(vector.floors or {})
+	options.floor_ms = floor_port(vector.floor_ms)
 	return options
 end
 
@@ -56,7 +55,7 @@ end
 local function run_step(plan, step)
 	return pcall(function()
 		if step.call == "on_dispatch" then return plan:on_dispatch(step.args, step.now_ms) end
-		if step.call == "on_sent" then return plan:on_sent(step.args.backend, step.now_ms) or {} end
+		if step.call == "on_sent" then return plan:on_sent(step.now_ms) or {} end
 		if step.call == "configure" then return plan:configure(step.args) or {} end
 		if step.call == "reset" then return plan:reset() or {} end
 		if step.call == "on_input" then return plan:on_input(step.args) end
@@ -101,16 +100,16 @@ function M.run_debounce(helpers, corpus_path, driver, driver_options)
 
 		helpers.it("a plan refuses a missing or mistyped option", function()
 			for _, key in ipairs(Debounce.OPTION_KEYS) do
-				local options = options_of(corpus, { options = "macos", floors = {} })
+				local options = options_of(corpus, { options = "macos" })
 				options[key] = nil
 				local ok, err = pcall(Debounce.new, options)
 				helpers.assert_eq(ok, false, key .. " omitted must raise")
 				helpers.assert_contains(tostring(err), key)
 			end
-			local bad = options_of(corpus, { options = "linux", floors = {} })
-			bad.floor_scope = "everywhere"
+			local bad = options_of(corpus, { options = "linux" })
+			bad.allow_never = "yes"
 			helpers.assert_eq(pcall(Debounce.new, bad), false)
-			bad = options_of(corpus, { options = "linux", floors = {} })
+			bad = options_of(corpus, { options = "linux" })
 			bad.floor_ms = nil
 			helpers.assert_eq(pcall(Debounce.new, bad), false)
 		end)

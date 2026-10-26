@@ -92,6 +92,7 @@ local function build_fixture(callback, options)
 			DEFAULT_STATE = {
 				llm_enabled = false,
 				llm_debounce = 0.2,
+				llm_min_request_interval = 0,
 				llm_model_mlx = "",
 				llm_model_ollama = "",
 				llm_context_length = 2048,

@@ -3987,6 +3987,20 @@
 			"unavailable": "hide"
 		}
 	],
+	"llm_debounce_never_row": [
+		{
+			"type": "check",
+			"id": "llm_debounce_never",
+			"i18n": "menu.settings.never",
+			"checked_when": [
+				"llm_debounce_is_never"
+			],
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"llm_profile_builtin_heading": [
 		{
 			"type": "label",

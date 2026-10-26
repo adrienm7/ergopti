@@ -94,6 +94,22 @@ function M.build(ctx)
 	end
 
 
+	-- The one minimum time between two automatic requests (a shortcut is never held).
+	local floor_val = tonumber(state.llm_min_request_interval) or llm_mod.DEFAULT_STATE.llm_min_request_interval
+	rows[#rows + 1] = {
+		label    = string.format(i18n.get("menu.llm.min_interval_label"), math.floor(floor_val * 1000) .. " ms…"),
+		disabled = is_disabled or nil,
+		action   = settings_mgr.set_min_request_interval,
+	}
+	if state.llm_min_request_interval ~= llm_mod.DEFAULT_STATE.llm_min_request_interval then
+		rows[#rows + 1] = {
+			label    = string.format(i18n.get("menu.llm.reset_label"), math.floor(llm_mod.DEFAULT_STATE.llm_min_request_interval * 1000) .. " ms"),
+			disabled = is_disabled or nil,
+			action   = settings_mgr.reset_min_request_interval,
+		}
+	end
+
+
 	-- =====================================================
 	-- ===== 1.2) Instant triggers =====
 	-- =====================================================

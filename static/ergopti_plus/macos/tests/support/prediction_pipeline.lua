@@ -25,6 +25,7 @@ local function make_defaults()
 		llm_show_info_bar = false,
 		llm_sequential_mode = false,
 		llm_debounce = 0.2,
+		llm_min_request_interval = 0,
 		llm_auto_raise_temp = false,
 		llm_streaming = true,
 		llm_streaming_multi = false,
@@ -173,14 +174,17 @@ local function load_fixture(options)
 	local Engine = require("modules.llm.prediction_engine")
 	fixture.handler = StreamingHandler
 	fixture.engine = Engine
-	Engine.init({
+	-- The typed buffer the engine reads at every check: a test changes it to
+	-- pass the freshness guard of an automatic request.
+	fixture.state = {
 		buffer = options.buffer or "hello world",
 		mappings = {},
 		DELAYS = { llm_prediction = 1 },
 		ignored_window_titles = {},
 		ignored_window_patterns = {},
 		suppress_rescan_keep_buffer = function() end,
-	})
+	}
+	Engine.init(fixture.state)
 	fixture.logs = {}
 	return fixture
 end

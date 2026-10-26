@@ -525,6 +525,45 @@ function M.new(deps)
 			llm_mod.DEFAULT_STATE.llm_debounce, "set_llm_debounce")
 	end
 
+	--- Sets the minimum time between two automatic AI requests (all backends).
+	function obj.set_min_request_interval()
+		local state = deps.state
+
+		local current_val = tonumber(state.llm_min_request_interval)
+		if current_val == nil then current_val = llm_mod.DEFAULT_STATE.llm_min_request_interval end
+		local display_def = math.floor(llm_mod.DEFAULT_STATE.llm_min_request_interval * 1000)
+
+		local full_msg = string.format(i18n.get("menu.settings.min_interval_prompt"), display_def)
+
+		local ok_p, btn, raw = pcall(dialog.text_prompt, i18n.get("menu.settings.min_interval_title"), full_msg, tostring(math.floor(current_val * 1000)), i18n.get("button.ok"), i18n.get("common.cancel"))
+
+		if ok_p and btn == i18n.get("button.ok") then
+			local new_val
+			if raw:match("^%s*$") then
+				new_val = llm_mod.DEFAULT_STATE.llm_min_request_interval
+			else
+				new_val = tonumber(raw)
+				if new_val and new_val >= 0 then new_val = new_val / 1000 end
+			end
+
+			if new_val and is_finite_number(new_val) and new_val >= 0 then
+				return obj.apply_setting_transaction({
+					key = "llm_min_request_interval",
+					value = new_val,
+					runtime_fn = "set_llm_min_request_interval",
+					publish_setting = true,
+				})
+			end
+			return reject_numeric_input(i18n.get("menu.settings.min_interval_title"),
+				new_val and "numeric_prompt.out_of_range" or nil)
+		end
+	end
+
+	function obj.reset_min_request_interval()
+		return reset_to_default(obj.apply_setting_transaction, "llm_min_request_interval",
+			llm_mod.DEFAULT_STATE.llm_min_request_interval, "set_llm_min_request_interval")
+	end
+
 	--- Sets the maximum number of words kept per prediction.
 	function obj.set_max_words()
 		local state = deps.state

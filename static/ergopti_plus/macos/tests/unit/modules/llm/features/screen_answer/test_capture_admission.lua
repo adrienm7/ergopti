@@ -46,7 +46,7 @@ local function with_capture(callback)
 			now = function() return 0 end,
 		}
 		package.loaded["modules.llm"] = {
-			DEFAULT_STATE = { llm_enabled = true, llm_min_words = 1, llm_max_words = 0, llm_debounce = 0 },
+			DEFAULT_STATE = { llm_enabled = true, llm_min_words = 1, llm_max_words = 0, llm_debounce = 0, llm_min_request_interval = 0 },
 			get_current_model = function() return "text-model" end,
 			is_backend_ready = function() return f.ready end,
 			set_runtime_llm_enabled = function() return true end,

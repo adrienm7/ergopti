@@ -54,7 +54,7 @@
 		"static/ergopti_plus/linux/ui/menu/agent_rows.lua": 12,
 		"static/ergopti_plus/linux/ui/menu/key_combinations.lua": 9,
 		"static/ergopti_plus/linux/ui/menu/llm_backend_rows.lua": 2,
-		"static/ergopti_plus/linux/ui/menu/menu_builder.lua": 205,
+		"static/ergopti_plus/linux/ui/menu/menu_builder.lua": 202,
 		"static/ergopti_plus/linux/ui/menu/profile_editor_request.lua": 1,
 		"static/ergopti_plus/linux/ui/menu/programmatic_hotstrings.lua": 2,
 		"static/ergopti_plus/linux/ui/menu/unused_keys_cleanup.lua": 1,

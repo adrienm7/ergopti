@@ -19,8 +19,9 @@
 --- 3. Explicit per-driver options instead of silent drift. Where the drivers
 ---    chose differently (see M.OPTION_KEYS) the difference is a named option the
 ---    driver passes, not a second copy of the logic.
---- 4. The floor is a port: the plan asks `floor_ms(backend)` and never reads
----    inference.json itself, so an unknown backend fails where the policy lives.
+--- 4. The floor is a port: the plan asks `floor_ms()` (the user's
+---    llm.trigger.min_request_interval_ms) and never reads the configuration
+---    itself, so an invalid value fails where the setting lives.
 ---
 --- The AutoHotkey twin (windows/modules/llm/prediction_keystats.ahk and
 --- prediction_exec.ahk) replays the same vectors when its side is ported.
@@ -48,9 +49,7 @@ M.NEVER_MS = -1
 M.OPTION_KEYS = {
 	-- boolean: a negative debounce means "never" (the automatic trigger is off).
 	"allow_never",
-	-- string "global"|"per_backend": whether the last request time is one value or one per backend.
-	"floor_scope",
-	-- boolean: in live mode a word end still fires instantly (instead of the live debounce).
+		-- boolean: in live mode a word end still fires instantly (instead of the live debounce).
 	"live_instant_word_end",
 }
 
@@ -102,13 +101,9 @@ local function admit_options(options)
 	for _, key in ipairs({ "allow_never", "live_instant_word_end" }) do
 		if type(options[key]) ~= "boolean" then error("request plan option '" .. key .. "' must be a boolean", 3) end
 	end
-	if options.floor_scope ~= "global" and options.floor_scope ~= "per_backend" then
-		error("request plan option 'floor_scope' must be 'global' or 'per_backend'", 3)
-	end
 	if type(options.floor_ms) ~= "function" then error("request plan option 'floor_ms' must be a function", 3) end
 	return {
 		allow_never = options.allow_never,
-		floor_scope = options.floor_scope,
 		live_instant_word_end = options.live_instant_word_end,
 		floor_ms = options.floor_ms,
 		-- The configured debounce, the AI switch and the live mode are runtime
@@ -121,14 +116,14 @@ local function admit_options(options)
 end
 
 --- Creates a plan.
---- @param options table { allow_never, floor_scope, live_instant_word_end, floor_ms = function(backend) -> milliseconds }.
+--- @param options table { allow_never, live_instant_word_end, floor_ms = function() -> milliseconds }.
 --- @return table plan
 function M.new(options)
 	local plan = {
 		_settings = admit_options(options),
 		_pending = nil,
 		_next_token = 1,
-		_last_sent_ms = {},
+		_last_sent_ms = nil,
 	}
 	return setmetatable(plan, { __index = M })
 end
@@ -266,51 +261,38 @@ end
 -- =================================
 -- =================================
 
---- The key the last request time is kept under.
---- @param self table The plan.
---- @param backend string Backend id.
---- @return string key
-local function floor_key(self, backend)
-	if self._settings.floor_scope == "global" then return "*" end
-	return backend
-end
-
---- Decides whether a request may go to its backend now.
---- @param request table { backend = string, explicit = boolean|nil }. An explicit request
----   (shortcut, typed trigger, prompt action) is never held, nor are the later variants of
----   its sequential run: each variant is dispatched as an explicit one. Only automatic
----   requests wait for the floor.
+--- Decides whether a request may go to its backend now. The last request time is
+--- one value for every backend and every kind of request, and the interval is the
+--- one the user sets (llm.trigger.min_request_interval_ms).
+--- @param request table { explicit = boolean|nil }. An explicit request (shortcut, typed
+---   trigger, prompt action) is never held, nor are the later variants of its sequential
+---   run: each variant is dispatched as an explicit one. Only automatic requests wait.
 --- @param now_ms number The caller's monotonic clock in milliseconds.
 --- @return table decisions One `send`, or one `defer` with the milliseconds to wait.
 function M:on_dispatch(request, now_ms)
-	local own = self._settings
-	if type(request) ~= "table" or type(request.backend) ~= "string" or request.backend == "" then
-		error("a dispatch request needs a backend", 2)
-	end
+	if type(request) ~= "table" then error("a dispatch needs a request table", 2) end
 	if type(now_ms) ~= "number" then error("a dispatch needs the clock", 2) end
 	if request.explicit == true then return { { action = "send" } } end
-	local last = self._last_sent_ms[floor_key(self, request.backend)]
+	local last = self._last_sent_ms
 	if last == nil then return { { action = "send" } } end
-	local interval = own.floor_ms(request.backend)
-	require_delay(interval, "the floor of backend '" .. request.backend .. "'")
+	local interval = self._settings.floor_ms()
+	require_delay(interval, "the request floor")
 	local wait = last + interval - now_ms
 	if wait > 0 then return { { action = "defer", delay_ms = wait, why = "rate floor" } } end
 	return { { action = "send" } }
 end
 
 --- Records that a request went to its backend.
---- @param backend string Backend id.
 --- @param now_ms number The caller's monotonic clock in milliseconds.
-function M:on_sent(backend, now_ms)
-	if type(backend) ~= "string" or backend == "" then error("a sent request needs a backend", 2) end
+function M:on_sent(now_ms)
 	if type(now_ms) ~= "number" then error("a sent request needs the clock", 2) end
-	self._last_sent_ms[floor_key(self, backend)] = now_ms
+	self._last_sent_ms = now_ms
 end
 
 --- Forgets every request time and the pending timer (engine re-initialisation).
 function M:reset()
 	self._pending = nil
-	self._last_sent_ms = {}
+	self._last_sent_ms = nil
 end
 
 return M

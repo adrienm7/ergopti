@@ -2442,64 +2442,72 @@ local function _build_llm(ctx)
 			return
 		end
 		local rows = {}
-		local current_delay = TriggerSettings.get("debounce_ms")
-		local delay_choices = {}
-		for _, value in ipairs(TriggerSettings.presets("debounce_ms")) do
-			delay_choices[#delay_choices + 1] = {
-				label = tostring(value) .. " ms",
-				checked = current_delay == value,
-				action = function()
-					TriggerSettings.set("debounce_ms", value)
+		--- Builds one delay row: the numeric setting's presets, an optional "Never"
+		--- (the shared sentinel, as on macOS) and the free numeric entry.
+		--- @param name string Trigger setting name.
+		--- @param label_key string i18n key of the row label (one %s: the current value).
+		--- @param offers_never boolean Whether "Never" is a choice of this setting.
+		--- @return table row
+		local function delay_row(name, label_key, offers_never)
+			local current = TriggerSettings.get(name)
+			local delay_choices = {}
+			local function choose(value)
+				return function()
+					TriggerSettings.set(name, value)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end
+			end
+			for _, value in ipairs(TriggerSettings.presets(name)) do
+				delay_choices[#delay_choices + 1] = { label = tostring(value) .. " ms", checked = current == value, action = choose(value) }
+			end
+			local never = offers_never and TriggerSettings.is_never(name, current)
+			if offers_never then
+				for _, row in ipairs(ManifestMenu.template_rows("llm_debounce_never_row", {
+					["llm_debounce_never"] = choose(TriggerSettings.NEVER_MS),
+				}, {
+					["llm_debounce_is_never"] = function() return never end,
+				}) or {}) do delay_choices[#delay_choices + 1] = row end
+			end
+			local bounds = TriggerSettings.bounds(name)
+			local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
+				["llm_numeric_custom_value"] = function()
+					local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
+					if not ok_prompt then
+						Logger.error(LOG, "No numeric prompt; %s can only take a preset.", name)
+						return
+					end
+					-- The prompt is headed by the declared caption of the group that opens it.
+					local title_key
+					for _, entry in ipairs(ManifestMenu.get_array("llm_menu")) do
+						if entry.id == "llm_trigger" then title_key = entry.i18n end
+					end
+					if type(title_key) ~= "string" or title_key == "" then
+						Logger.error(LOG, "The AI trigger group declares no caption; %s prompt refused.", name)
+						return
+					end
+					local value, save = numeric_setting_request(ctx.on_menu_changed, TriggerSettings,
+						"modules.llm.trigger_settings", name, "llm.trigger." .. name)
+					if not save then return false end
+					Prompt.ask({
+						title = i18n_safe(title_key),
+						hint = string.format("%d – %d ms", bounds.min, bounds.max),
+						value = value,
+						min = bounds.min,
+						max = bounds.max,
+						on_save = function(number) return save(math.floor(number)) end,
+					}, ctx.webview)
 				end,
+			})
+			for _, row in ipairs(custom_rows or {}) do delay_choices[#delay_choices + 1] = row end
+			return {
+				label = string.format(i18n_safe(label_key),
+					never and i18n_safe("menu.settings.never") or (tostring(current) .. " ms")),
+				items = delay_choices,
 			}
 		end
-		-- "Never" turns the automatic trigger off (the shared sentinel, as on macOS).
-		local delay_never = TriggerSettings.is_never("debounce_ms", current_delay)
-		delay_choices[#delay_choices + 1] = {
-			label = i18n_safe("menu.settings.never"),
-			checked = delay_never,
-			action = function()
-				TriggerSettings.set("debounce_ms", TriggerSettings.NEVER_MS)
-				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-			end,
-		}
-		local bounds = TriggerSettings.bounds("debounce_ms")
-		local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
-			["llm_numeric_custom_value"] = function()
-				local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
-				if not ok_prompt then
-					Logger.error(LOG, "No numeric prompt; debounce can only take a preset.")
-					return
-				end
-				-- The prompt is headed by the declared caption of the group that opens it.
-				local title_key
-				for _, entry in ipairs(ManifestMenu.get_array("llm_menu")) do
-					if entry.id == "llm_trigger" then title_key = entry.i18n end
-				end
-				if type(title_key) ~= "string" or title_key == "" then
-					Logger.error(LOG, "The AI trigger group declares no caption; debounce prompt refused.")
-					return
-				end
-				local value, save = numeric_setting_request(ctx.on_menu_changed, TriggerSettings,
-					"modules.llm.trigger_settings", "debounce_ms", "llm.trigger.debounce_ms")
-				if not save then return false end
-				Prompt.ask({
-					title = i18n_safe(title_key),
-					hint = string.format("%d – %d ms", bounds.min, bounds.max),
-					value = value,
-					min = bounds.min,
-					max = bounds.max,
-					on_save = function(number) return save(math.floor(number)) end,
-				}, ctx.webview)
-			end,
-		})
-		for _, row in ipairs(custom_rows or {}) do delay_choices[#delay_choices + 1] = row end
-		rows[#rows + 1] = {
-			label = string.format(i18n_safe("menu.llm.debounce_label"),
-				delay_never and i18n_safe("menu.settings.never") or (tostring(current_delay) .. " ms")),
-			items = delay_choices,
-		}
+		rows[#rows + 1] = delay_row("debounce_ms", "menu.llm.debounce_label", true)
+		-- The one minimum time between two automatic requests (shortcuts are never held).
+		rows[#rows + 1] = delay_row("min_request_interval_ms", "menu.llm.min_interval_label", false)
 		local boundary_rows = ManifestMenu.template_rows("llm_trigger_provider_boundary", {}, {}, {})
 		if not boundary_rows then return end
 		for _, row in ipairs(boundary_rows) do rows[#rows + 1] = row end

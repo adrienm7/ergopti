@@ -39,6 +39,7 @@ local function with_fixture(raw, callback)
 		DEFAULT_STATE = {
 			llm_context_length = 1500,
 			llm_debounce = 0.35,
+			llm_min_request_interval = 0.5,
 			llm_max_words = 20,
 			llm_min_words = 4,
 			llm_temperature = 0.1,
@@ -91,6 +92,7 @@ local function with_fixture(raw, callback)
 		state = {
 			llm_context_length = 300,
 			llm_debounce = 0.5,
+			llm_min_request_interval = 0.5,
 			llm_max_words = 7,
 			llm_min_words = 2,
 			llm_temperature = 0.2,
@@ -145,6 +147,26 @@ local INVALID_ROUTES = {
 		invoke = function(manager) return manager.set_debounce() end,
 	},
 	{
+		name = "request interval garbage",
+		raw = "garbage",
+		title = "menu.settings.min_interval_title",
+		invoke = function(manager) return manager.set_min_request_interval() end,
+	},
+	{
+		name = "request interval overflow",
+		raw = "1e999",
+		title = "menu.settings.min_interval_title",
+		body = "numeric_prompt.out_of_range",
+		invoke = function(manager) return manager.set_min_request_interval() end,
+	},
+	{
+		name = "negative request interval (only the debounce has a never)",
+		raw = "-1",
+		title = "menu.settings.min_interval_title",
+		body = "numeric_prompt.out_of_range",
+		invoke = function(manager) return manager.set_min_request_interval() end,
+	},
+	{
 		name = "fractional maximum word count",
 		raw = "1.5",
 		title = "menu.settings.max_words_title",
@@ -195,6 +217,29 @@ helpers.describe("settings_manager numeric validation feedback", function()
 			helpers.assert_eq(observations.applications[1].key, "llm_temperature")
 			helpers.assert_eq(observations.applications[1].value, 0.75)
 			helpers.assert_eq(#observations.notifications, 0)
+		end)
+	end)
+
+	helpers.it("sends a valid request interval in seconds to the engine setter and the config (request-floor-setting)", function()
+		with_fixture("750", function(manager, observations)
+			helpers.assert_eq(manager.set_min_request_interval(), true)
+			helpers.assert_eq(#observations.applications, 1)
+			helpers.assert_eq(observations.applications[1].key, "llm_min_request_interval")
+			helpers.assert_eq(observations.applications[1].value, 0.75)
+			helpers.assert_eq(observations.applications[1].runtime_fn, "set_llm_min_request_interval")
+			helpers.assert_eq(observations.applications[1].publish_setting, true)
+			helpers.assert_eq(#observations.notifications, 0)
+		end)
+	end)
+
+	helpers.it("accepts 0 as no minimum interval and a blank answer as the default (request-floor-setting)", function()
+		with_fixture("0", function(manager, observations)
+			helpers.assert_eq(manager.set_min_request_interval(), true)
+			helpers.assert_eq(observations.applications[1].value, 0)
+		end)
+		with_fixture("  ", function(manager, observations)
+			helpers.assert_eq(manager.set_min_request_interval(), true)
+			helpers.assert_eq(observations.applications[1].value, 0.5)
 		end)
 	end)
 end)

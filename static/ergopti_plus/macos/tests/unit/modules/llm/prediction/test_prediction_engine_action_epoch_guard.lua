@@ -26,6 +26,7 @@ local DEFAULTS = {
 	llm_show_info_bar = true,
 	llm_sequential_mode = false,
 	llm_debounce = 0.3,
+	llm_min_request_interval = 0,
 	llm_auto_raise_temp = false,
 	llm_streaming = false,
 	llm_streaming_multi = false,
@@ -121,7 +122,6 @@ local function load_fixture(streaming)
 	package.loaded["modules.llm.api_common"] = {
 		MIN_CALL_INTERVAL_SEC = 0,
 		get_retry_policy = function() return 1, 0, 1 end,
-		get_rate_limit_min_interval_s = function() return 0 end,
 	}
 	package.loaded["modules.shortcuts.script_control"] = nil
 

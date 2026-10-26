@@ -15,8 +15,9 @@
 --- 2. Only an automatic request waits for the backend's interval. An explicit one
 ---    (a shortcut, a typed trigger, a prompt action) is never held, and neither
 ---    are the later variants of its sequential run (maintainer, 2026-10-26).
---- 3. The last request time is kept per backend kind, because the agent, tone and
----    screen requests share the same map.
+--- 3. The last request time is one value, whatever the backend or the kind of
+---    request (prediction, tone, screen answer, agent), and the interval is the
+---    user's llm.trigger.min_request_interval_ms.
 --- 4. A word end fires instantly in live mode too (when the instant word end
 ---    is on), as on macOS and Windows.
 --- ==============================================================================
@@ -28,12 +29,11 @@ local Debounce = require("llm.request_plan.debounce")
 -- The option set this driver runs; compared with the corpus by the contract test.
 M.OPTIONS = {
 	allow_never = true,
-	floor_scope = "per_backend",
 	live_instant_word_end = true,
 }
 
 --- Builds the engine's plan.
---- @param floor_ms function Milliseconds of minimum interval for a backend id.
+--- @param floor_ms function Milliseconds of the user's minimum interval between two requests.
 --- @return table plan
 function M.new(floor_ms)
 	local options = { floor_ms = floor_ms }

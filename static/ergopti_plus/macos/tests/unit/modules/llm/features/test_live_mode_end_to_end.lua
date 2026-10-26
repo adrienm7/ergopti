@@ -265,6 +265,10 @@ local function assert_menu_untouched(world)
 		helpers.assert_true(found, key)
 		helpers.assert_eq(value, expected, "the menu's " .. key .. " is unchanged")
 	end
+	-- The request interval is the shipped one: live mode never sets it.
+	local found, interval = world.engine.get_llm_runtime_setting("llm_min_request_interval")
+	helpers.assert_true(found, "llm_min_request_interval")
+	helpers.assert_eq(interval, world.core.DEFAULT_STATE.llm_min_request_interval, "the menu's request interval is unchanged")
 end
 
 --- Accepts a prediction through the real keymap bridge and expander.

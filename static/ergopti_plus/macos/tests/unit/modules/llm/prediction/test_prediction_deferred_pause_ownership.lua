@@ -24,7 +24,6 @@ local function load_fixture()
 		cancel_mode = nil,
 		dismissed = 0,
 		now = 100,
-		rate_limit = 0,
 		timers = {},
 		profile_pause_calls = 0,
 		profile_pause_result = true,
@@ -90,6 +89,7 @@ local function load_fixture()
 		llm_show_info_bar = true,
 		llm_sequential_mode = false,
 		llm_debounce = 0.1,
+		llm_min_request_interval = 0,
 		llm_auto_raise_temp = false,
 		llm_streaming = false,
 		llm_streaming_multi = false,
@@ -159,9 +159,6 @@ local function load_fixture()
 	fixture.streaming_handler = package.loaded["modules.llm.streaming_handler"]
 	package.loaded["modules.llm.app_filter"] = {
 		is_blocked = function() return false end,
-	}
-	package.loaded["modules.llm.api_common"] = {
-		get_rate_limit_min_interval_s = function() return fixture.rate_limit end,
 	}
 	package.loaded["infra.timings"] = {
 		sec = function() return 0.1 end,
@@ -496,43 +493,6 @@ helpers.describe("prediction engine: settled timer callback ownership", function
 		helpers.assert_eq(observations.fetch, 0,
 			"late and duplicate delivery cannot resurrect the revoked request")
 		helpers.assert_true(fixture.engine.reset({ suppress_telemetry = true }))
-	end)
-
-	helpers.it("cannot rearm a direct rate-limit timer after its backend boundary resets", function()
-		local fixture = load_fixture()
-		local observations = {
-			fetch = 0,
-			reset_result = nil,
-		}
-		fixture.core.fetch_llm_prediction = function(...)
-			observations.fetch = observations.fetch + 1
-			local on_success = select(7, ...)
-			on_success({ { to_type = " committed", deletes = 0 } }, 1, true, false)
-		end
-		fixture.engine.perform_check(true)
-		helpers.assert_eq(observations.fetch, 1,
-			"positive control must publish the request timestamp")
-
-		fixture.now = 100.1
-		fixture.rate_limit = 10
-		local reenter = true
-		fixture.core.get_backend = function()
-			if reenter then
-				reenter = false
-				observations.reset_result = fixture.engine.reset({
-					suppress_telemetry = true,
-				})
-			end
-			return "mlx"
-		end
-		fixture.engine.perform_check(false)
-
-		helpers.assert_true(observations.reset_result,
-			"the direct dependency boundary must actually revoke the request")
-		helpers.assert_eq(observations.fetch, 1,
-			"the revoked request cannot dispatch a second backend call")
-		helpers.assert_eq(#fixture.timers, 0,
-			"the stale rate-limit branch cannot acquire an inactivity successor")
 	end)
 
 	helpers.it("preserves an inactivity successor installed during native settlement", function()

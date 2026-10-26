@@ -126,6 +126,13 @@ local function load_shared_defaults()
 		merged.llm_debounce = parsed.llm_debounce_ms / 1000
 	end
 
+	-- llm_min_request_interval: the same unit change as the debounce.
+	if type(parsed.llm_min_request_interval_ms) ~= "number" then
+		missing[#missing + 1] = "llm_min_request_interval_ms"
+	else
+		merged.llm_min_request_interval = parsed.llm_min_request_interval_ms / 1000
+	end
+
 	if #missing > 0 then
 		Logger.error(LOG, "_shared/modules/llm/defaults.json is missing required key(s): %s — LLM defaults incomplete.", table.concat(missing, ", "))
 		error("ergopti_plus: _shared/modules/llm/defaults.json is missing required key(s): " .. table.concat(missing, ", "))
