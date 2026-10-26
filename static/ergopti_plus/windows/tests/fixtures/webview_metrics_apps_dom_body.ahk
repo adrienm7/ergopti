@@ -138,13 +138,38 @@ _MAD_FailureDiagnostic() {
 	FileAppend("APPS_DOM_FAILURE_DIAGNOSTIC " . KL_JsonEncode(Data) . "`n", "*", "UTF-8-RAW")
 }
 
+; Lists every script and stylesheet the actual Apps page declares, as paths
+; under _shared. A hand-kept copy list missed the generated category aliases
+; that helpers.js requires at load, so the private page rendered no row.
+_MAD_PageAssets() {
+	global _MAD_SourceShared
+	Reader := FSOpenStrict(_MAD_SourceShared . "\ui\metrics_apps\index.html", "r", "UTF-8")
+	try Html := Reader.Read()
+	finally Reader.Close()
+	Assets := ["ui\metrics_apps\index.html"]
+	Pos := 1
+	while (Pos := RegExMatch(Html, '<(?:script\s+src|link\s+rel="stylesheet"\s+href)="([^"]+)"', &Match, Pos)) {
+		Declared := Match[1]
+		_MVSP_Require(!InStr(Declared, ":") && SubStr(Declared, 1, 1) != "/" && !InStr(Declared, "\"),
+			"The Apps page declares a non-local asset: " . Declared)
+		Relative := SubStr(Declared, 1, 3) == "../"
+			? "ui\" . StrReplace(SubStr(Declared, 4), "/", "\")
+			: "ui\metrics_apps\" . StrReplace(Declared, "/", "\")
+		_MVSP_Require(!InStr(Relative, ".."), "The Apps page asset escapes the shared UI root: " . Declared)
+		Assets.Push(Relative)
+		Pos += Match.Len
+	}
+	_MVSP_Require(Assets.Length > 10, "The Apps page must declare its scripts and stylesheets.")
+	return Assets
+}
+
 _MAD_CopyShared() {
 	global _MAD, _MAD_Root, _MAD_SourceShared, _SharedDir
-	for Relative in ["ui\metrics_apps\index.html", "ui\metrics_apps\style.css", "ui\metrics_apps\helpers.js",
-		"ui\metrics_apps\state.js", "ui\metrics_apps\main.js", "ui\metrics_apps\charts.js", "ui\metrics_apps\modal.js",
-		"ui\vendor\chart.umd.js", "ui\host_bridge.js", "ui\dom_utils.js", "ui\i18n.js", "ui\metrics_rebuild_banner.js",
-		"data\locales\fr.json", "data\locales\en.json", "data\db\schema.sql", "data\db\media_schema.sql",
-		"modules\diagnostics\redaction.json", "modules\timings\constants.toml"] {
+	Files := _MAD_PageAssets()
+	for Relative in ["data\locales\fr.json", "data\locales\en.json", "data\db\schema.sql", "data\db\media_schema.sql",
+		"modules\diagnostics\redaction.json", "modules\timings\constants.toml"]
+		Files.Push(Relative)
+	for Relative in Files {
 		Source := _MAD_SourceShared . "\" . Relative, Destination := _SharedDir . "\" . Relative
 		SplitPath(Destination, , &Directory)
 		DirCreate(Directory)
