@@ -548,4 +548,160 @@ test('every script of the metrics apps dashboard is loaded by its page', () => {
 });
 assert.equal(passed, 15, 'the orphan script check must execute');
 
+// The actual page derives streaks from local calendar dates, not 24-hour buckets.
+const { loadMetricsAppsPage } = require('./support/metrics-apps-page.cjs');
+const streakCases = [
+	{
+		name: 'Paris DST fallback',
+		zone: 'Europe/Paris',
+		dates: ['2026-10-24', '2026-10-25', '2026-10-26'],
+		expected: 3,
+		lastDayHours: 25
+	},
+	{
+		name: 'Paris DST spring',
+		zone: 'Europe/Paris',
+		dates: ['2026-03-28', '2026-03-29', '2026-03-30'],
+		expected: 3,
+		lastDayHours: 23
+	},
+	{
+		name: 'UTC ordinary days',
+		zone: 'UTC',
+		dates: ['2026-10-24', '2026-10-25', '2026-10-26'],
+		expected: 3,
+		lastDayHours: 24
+	},
+	{
+		name: 'Lord Howe half-hour fallback',
+		zone: 'Australia/Lord_Howe',
+		dates: ['2026-04-04', '2026-04-05', '2026-04-06'],
+		expected: 3,
+		lastDayHours: 24.5
+	},
+	{
+		name: 'leap day',
+		zone: 'Europe/Paris',
+		dates: ['2024-02-28', '2024-02-29', '2024-03-01'],
+		expected: 3
+	},
+	{
+		name: 'year boundary',
+		zone: 'Europe/Paris',
+		dates: ['2025-12-31', '2026-01-01', '2026-01-02'],
+		expected: 3
+	},
+	{
+		name: 'missing calendar day',
+		zone: 'Europe/Paris',
+		dates: ['2026-10-22', '2026-10-24', '2026-10-25'],
+		expected: 2
+	},
+	{
+		name: 'ineligible middle day',
+		zone: 'Europe/Paris',
+		dates: ['2026-10-24', '2026-10-25', '2026-10-26'],
+		expected: 1,
+		ineligible: '2026-10-25'
+	},
+	{
+		name: 'no eligible days',
+		zone: 'Europe/Paris',
+		dates: ['2026-10-24', '2026-10-25', '2026-10-26'],
+		expected: 0,
+		empty: true
+	},
+	{
+		name: 'unordered local dates',
+		zone: 'Europe/Paris',
+		dates: ['2026-10-26', '2026-10-24', '2026-10-25'],
+		expected: 3
+	}
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of streakCases) {
+		test(`${host} streak preserves ${vector.name}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = vector.zone;
+			try {
+				const page = loadMetricsAppsPage(host);
+				for (const id of ['kpi-streak-chars', 'kpi-streak-focus'])
+					page.elements.set(id, page.context.document.createElement('div'));
+				const manifest = Object.fromEntries(
+					vector.dates.map((day) => {
+						const eligible = !vector.empty && day !== vector.ineligible;
+						return [
+							day,
+							{
+								Editor: {
+									category: 'Productivity',
+									app_time_ms: 3600000,
+									chars: eligible ? 1000 : 999,
+									time: eligible ? 1800000 : 1799999
+								}
+							}
+						];
+					})
+				);
+				if (host === 'windows') {
+					const listener = page.messageListeners.find((entry) => entry.name === 'message');
+					assert.ok(listener, 'the actual Windows prefetch handler must be installed');
+					listener.callback({
+						data: {
+							type: 'prefetch',
+							blob: { metrics_manifest: manifest, user_categories: {}, app_icons: {} }
+						}
+					});
+				} else if (host === 'linux') {
+					page.context.__hostBridgeResponse(
+						'metrics_apps_bridge',
+						false,
+						encodeURIComponent(
+							JSON.stringify({ metrics_manifest: manifest, user_categories: {}, app_icons: {} })
+						)
+					);
+				} else {
+					page.context.publishMetricsAppsData(
+						manifest,
+						{},
+						{},
+						{ manifest_revision: 1, categories_revision: 1 }
+					);
+				}
+				if (vector.lastDayHours !== undefined) {
+					const [previous, latest] = vector.dates.slice(-2);
+					const actualHours = vm.runInContext(
+						`(parseDateKey(${JSON.stringify(latest)}) - parseDateKey(${JSON.stringify(previous)})) / 3600000`,
+						page.context
+					);
+					assert.equal(
+						actualHours,
+						vector.lastDayHours,
+						'the real Date owner must observe the selected timezone transition'
+					);
+				}
+				for (const id of ['kpi-streak-chars', 'kpi-streak-focus'])
+					assert.equal(
+						page.elements.get(id).textContent,
+						`${vector.expected} j`,
+						'adjacent eligible local days must count once, including DST transitions'
+					);
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false,
+					'the actual page must finish rendering without fixture errors'
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+}
+assert.equal(
+	passed,
+	15 + 3 * streakCases.length,
+	'all previous and local-calendar page controls must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);
