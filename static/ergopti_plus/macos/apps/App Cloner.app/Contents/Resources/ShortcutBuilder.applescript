@@ -1289,7 +1289,9 @@ on run argv
 	logmsg("openArg: " & openArg & "  pwaMode: " & (pwaMode as text))
 	logmsg("iconMode: " & iconMode & "  iconPath: " & iconPath & "  colorHex: " & colorHex)
 
-	do shell script "chmod +x " & quoted form of cloneScript
+	-- The build owns the helper's executable mode inside the signed bundle.
+	-- Refuse an invalid helper without changing an installed app's permissions.
+	do shell script "test -f " & quoted form of cloneScript & " && test -x " & quoted form of cloneScript
 
 	set pwaArg to "0"
 	if pwaMode then set pwaArg to "1"
