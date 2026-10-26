@@ -35,7 +35,6 @@ local M = {}
 local Logger    = require("logger.shim")
 local Monotonic = require("infra.monotonic")
 local Segments  = require("hotpath_segments")
-local Timings   = require("infra.timings")
 
 local LOG = "PerfCounters"
 -- Tag of the slow-segment WARNING, shared with the Windows and macOS drivers so
@@ -76,10 +75,20 @@ local _interval_start_ms = nil
 
 -- Slow threshold in milliseconds of each span that is a declared Linux segment.
 -- A span absent here (an idle wait, a tray build) is timed but never a warning:
--- an idle wait is long by design. Built once, so the hot path is one table read.
-local _slow_ms = {}
-local DEFAULT_SLOW_MS = Timings.ms("logger", "hotpath_slow_ms")
-for name in pairs(Segments.for_driver("linux")) do _slow_ms[name] = Segments.threshold_ms(name, DEFAULT_SLOW_MS) end
+-- an idle wait is long by design. Built at the first closed span, not at require:
+-- shell_runner loads this module, and loading it must not parse the timings file.
+local _slow_ms = nil
+
+--- The per-segment slow thresholds, read once from the shared timings registry.
+--- @return table name -> milliseconds
+local function slow_limits()
+	if _slow_ms then return _slow_ms end
+	local default_ms = require("infra.timings").ms("logger", "hotpath_slow_ms")
+	local limits = {}
+	for name in pairs(Segments.for_driver("linux")) do limits[name] = Segments.threshold_ms(name, default_ms) end
+	_slow_ms = limits
+	return limits
+end
 -- Rate limiter of the WARNING (window shared with macOS); the slow counts stay exact.
 local _admit_slow = Segments.new_slow_gate()
 
@@ -128,7 +137,7 @@ function M.span(name, started)
 	_span_n[name] = n + 1
 	_span_sum[name] = _span_sum[name] + elapsed
 	if elapsed > _span_max[name] then _span_max[name] = elapsed end
-	local limit = _slow_ms[name]
+	local limit = slow_limits()[name]
 	if limit ~= nil and elapsed > limit then
 		_span_slow[name] = _span_slow[name] + 1
 		local admitted, skipped = _admit_slow(name, now)
