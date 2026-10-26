@@ -34,6 +34,14 @@
  *    a missing key fails here, before the fail-fast reader throws at boot on
  *    the one driver that executes that line.
  * 3. The walk is floored and the gate proves it can fail on synthetic inputs.
+ * 4. [limits] holds the byte caps (a child process's output, a declaration file,
+ *    a feed, an identifier). Each key ends in `_bytes` and holds a positive
+ *    integer, and a Lua or JavaScript `*_BYTES` constant may not retype the
+ *    number of one of them: it reads the key, or it is listed in
+ *    limit-literal-baseline.json, which can only shrink
+ *    (--update-limit-baseline rewrites it and refuses while anything has
+ *    grown). A byte cap that differs from every [limits] value is outside the
+ *    section and is not flagged.
  * ==============================================================================
  */
 
@@ -148,6 +156,66 @@ function analyse(registry, sources, pins, pinGateTexts) {
 	return { errors, runtime, pinned };
 }
 
+const LIMIT_BASELINE = path.join(__dirname, 'limit-literal-baseline.json');
+const LIMIT_BASELINE_COMMENT =
+	'Lua and JavaScript *_BYTES constants that retype a [limits] value (tools/test/test-timings-registry-liveness.cjs). Shrink it with --update-limit-baseline; never add to it.';
+const BYTES_LITERAL =
+	/\b([A-Za-z_][A-Za-z0-9_]*(?:BYTES|bytes)[A-Za-z0-9_]*)\s*=\s*(\d+(?:\s*\*\s*\d+)*)(?![\w.*+\-/])/g;
+
+/**
+ * Evaluates a product of integer literals.
+ * @param {string} text Such as "4 * 1024 * 1024".
+ * @returns {number} The product.
+ */
+function product(text) {
+	return text.split('*').reduce((a, b) => a * Number(b.trim()), 1);
+}
+
+/**
+ * The [limits] section and the literal copies of its values.
+ * @param {Object} registry Parsed registry.
+ * @param {{rel: string, text: string}[]} sources Production sources.
+ * @param {Set<string>} pinnedFiles Files that hold a pinned canon copy, exempt from the scan.
+ * @returns {{errors: string[], copies: string[]}} Shape errors and "file:NAME" copies.
+ */
+function limitsAnalysis(registry, sources, pinnedFiles = new Set()) {
+	const errors = [];
+	const limits = registry.limits;
+	if (limits === null || typeof limits !== 'object') {
+		return { errors: [`${REGISTRY_REL} has no [limits] section`], copies: [] };
+	}
+	const values = new Set();
+	for (const [key, value] of Object.entries(limits)) {
+		if (!key.endsWith('_bytes') || !Number.isInteger(value) || value < 1)
+			errors.push(`[limits].${key} must be a positive integer number of bytes named *_bytes`);
+		else values.add(value);
+	}
+	const copies = new Set();
+	for (const source of sources) {
+		if (!/\.(?:lua|js)$/.test(source.rel) || pinnedFiles.has(source.rel)) continue;
+		for (const raw of source.text.split('\n')) {
+			const line = raw.trim();
+			if (line.startsWith('--') || line.startsWith('//') || line.startsWith('*')) continue;
+			for (const m of line.matchAll(BYTES_LITERAL))
+				if (values.has(product(m[2]))) copies.add(`${source.rel}:${m[1]}`);
+		}
+	}
+	return { errors, copies: [...copies].sort() };
+}
+
+/**
+ * Compares the copies with the baseline.
+ * @param {string[]} copies Current "file:NAME" copies.
+ * @param {string[]} baseline Frozen copies.
+ * @returns {{grown: string[], stale: string[]}} Copies not frozen, frozen ones gone.
+ */
+function limitBaselineVerdict(copies, baseline) {
+	return {
+		grown: copies.filter((c) => !baseline.includes(c)),
+		stale: baseline.filter((c) => !copies.includes(c))
+	};
+}
+
 /** Proves the analysis rejects what it exists to reject. */
 function selfTest() {
 	const failures = [];
@@ -189,6 +257,19 @@ function selfTest() {
 		),
 		1
 	);
+	const limitsRegistry = { limits: { cap_bytes: 65536 } };
+	const retyped = { rel: 'linux/a.lua', text: 'local MAX_OUTPUT_BYTES = 65536\n' };
+	const other = { rel: 'linux/b.lua', text: 'local MAX_OTHER_BYTES = 777\nlocal X = 65536 * 2\n' };
+	const found = limitsAnalysis(limitsRegistry, [retyped, other]);
+	if (found.copies.join() !== 'linux/a.lua:MAX_OUTPUT_BYTES')
+		failures.push(`a retyped limit was not found exactly: ${found.copies.join()}`);
+	if (limitsAnalysis({ limits: { cap: 1 } }, []).errors.length !== 1)
+		failures.push('a [limits] key not named *_bytes was accepted');
+	if (limitsAnalysis({}, []).errors.length !== 1) failures.push('a missing [limits] was accepted');
+	if (limitBaselineVerdict(['a:X'], []).grown.length !== 1)
+		failures.push('a new copy was not reported');
+	if (limitBaselineVerdict([], ['a:X']).stale.length !== 1)
+		failures.push('a vanished copy was not reported');
 	return failures;
 }
 
@@ -206,6 +287,36 @@ function main() {
 	errors.push(...result.errors);
 	errors.push(...selfTest().map((f) => `self-test: ${f}`));
 
+	const limits = limitsAnalysis(registry, sources, new Set(SOURCE_PINS.map((p) => p.file)));
+	errors.push(...limits.errors);
+	if (process.argv.includes('--update-limit-baseline')) {
+		const frozen = JSON.parse(fs.readFileSync(LIMIT_BASELINE, 'utf8')).copies;
+		if (limitBaselineVerdict(limits.copies, frozen).grown.length > 0) {
+			console.error('refusing to update: a byte cap retypes a [limits] value. Read the key.');
+			process.exit(1);
+		}
+		fs.writeFileSync(
+			LIMIT_BASELINE,
+			JSON.stringify({ _comment: LIMIT_BASELINE_COMMENT, copies: limits.copies }, null, '\t') + '\n'
+		);
+		console.log('limit-literal baseline rewritten');
+		process.exit(0);
+	}
+	const verdict = limitBaselineVerdict(
+		limits.copies,
+		JSON.parse(fs.readFileSync(LIMIT_BASELINE, 'utf8')).copies
+	);
+	for (const c of verdict.grown)
+		errors.push(
+			`${c} retypes the number of a [limits] key. Fix: read it (Timings.count("limits", "<key>")) ` +
+				'or, for a process output cap, llm.process_limits.'
+		);
+	for (const c of verdict.stale)
+		errors.push(
+			`${c} is in limit-literal-baseline.json but no longer retypes a [limits] value. Run ` +
+				'node tools/test/test-timings-registry-liveness.cjs --update-limit-baseline.'
+		);
+
 	if (errors.length > 0) {
 		console.error('\x1b[31m[ERROR] The shared timing registry has dead or dangling keys:\x1b[0m');
 		for (const e of errors) console.error('    ' + e);
@@ -219,4 +330,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { analyse, productionSources };
+module.exports = { analyse, productionSources, limitsAnalysis };

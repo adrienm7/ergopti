@@ -164,6 +164,12 @@ const PINS = [
 const LONG_SESSION = /\bLONG_SESSION_THRESHOLD_MS\s*=\s*(\d+)\s*\*\s*(\d+)\s*\*\s*(\d+)/g;
 const SOURCE_PINS = [
 	{
+		section: 'limits',
+		key: 'process_output_bytes',
+		file: '_shared/lua/llm/process_limits.lua',
+		pattern: /\bmax_output_bytes\s*=\s*(\d+)\b/g
+	},
+	{
 		section: 'adapters',
 		key: 'default_timeout_ms',
 		file: 'macos/adapters/http_client.lua',

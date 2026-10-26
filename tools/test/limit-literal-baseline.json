@@ -1,0 +1,14 @@
+{
+	"_comment": "Lua and JavaScript *_BYTES constants that retype a [limits] value (tools/test/test-timings-registry-liveness.cjs). Shrink it with --update-limit-baseline; never add to it.",
+	"copies": [
+		"_shared/lua/keymap/layer_editor.lua:MAX_TEXT_BYTES",
+		"_shared/lua/program_providers.lua:MAX_CATALOGUE_BYTES",
+		"_shared/lua/test/shared_helpers_contract.lua:max_declaration_bytes",
+		"linux/adapters/curl_http_client.lua:MAX_DIAGNOSTIC_BYTES",
+		"linux/adapters/system_proxy.lua:MAX_PACKET_BYTES",
+		"macos/adapters/apple_shortcuts.lua:MAX_BYTES",
+		"macos/adapters/log_transport.lua:MAX_PREPARE_BYTES_PER_TICK",
+		"macos/adapters/shell_runner.lua:CAPTURED_OUTPUT_MAX_BYTES",
+		"macos/adapters/toml_cache.lua:SOURCE_CHUNK_BYTES"
+	]
+}

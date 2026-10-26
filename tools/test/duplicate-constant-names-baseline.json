@@ -43,11 +43,7 @@
 		"divergent": true
 	},
 	"MAX_BYTES": {
-		"files": [
-			"_shared/lua/network/pac_check.lua",
-			"linux/adapters/atspi_focus_watch.lua",
-			"windows/infra/config_registry_cache.ahk"
-		],
+		"files": ["_shared/lua/network/pac_check.lua", "windows/infra/config_registry_cache.ahk"],
 		"divergent": true
 	},
 	"MAX_FRAME_BYTES": {
@@ -59,11 +55,10 @@
 	},
 	"MAX_SOURCE_BYTES": {
 		"files": [
-			"linux/ui/changelog/bridge.lua",
 			"macos/adapters/input_source_selector.lua",
 			"macos/adapters/keyboard_source_probe.lua"
 		],
-		"divergent": true
+		"divergent": false
 	},
 	"MAX_TEXT_BYTES": {
 		"files": ["_shared/lua/keymap/layer_editor.lua", "_shared/lua/layout/number_row_native.lua"],

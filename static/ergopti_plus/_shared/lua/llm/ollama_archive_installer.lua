@@ -181,7 +181,7 @@ function M.start(ports, options, callback)
 	local function process(program, args, timeout, delivered)
 		active.native_dispatch = true
 		return ports.process.start(program, args, {
-			owner = native_owner, authorized = current, timeout_ms = timeout, max_output_bytes = 65536,
+			owner = native_owner, authorized = current, timeout_ms = timeout, max_output_bytes = require("llm.process_limits").defaults().max_output_bytes,
 		}, delivered)
 	end
 

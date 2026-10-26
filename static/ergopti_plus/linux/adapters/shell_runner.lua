@@ -481,7 +481,7 @@ M.HAS_ASYNC = luv ~= nil
 
 -- What an asynchronous child may print before it is stopped: the callers read
 -- a version line or a df row, never a stream
-local ASYNC_MAX_OUTPUT_BYTES = 65536
+local ASYNC_MAX_OUTPUT_BYTES = require("llm.process_limits").defaults().max_output_bytes
 
 --- Closes one libuv handle at most once.
 --- @param handle any
