@@ -1,0 +1,10 @@
+{
+	"_comment": "Configuration paths the drivers spell that the schema and the menu manifest do not declare as properties: tables whose children are dynamic (one key per shortcut slot or binding) and the tap-hold timing leaves the Karabiner generator reads. They join the generated KEY table (tools/codegen/codegen-config-keys.cjs), so code names them by constant. Add a path here only when code reads or writes it and no schema property or manifest row does.",
+	"paths": [
+		"gestures.action_parameters",
+		"shortcuts.keyboard",
+		"shortcuts.tap_keys",
+		"tap_holds.sticky_timeout_ms",
+		"tap_holds.timeout_ms"
+	]
+}

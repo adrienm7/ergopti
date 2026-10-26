@@ -53,6 +53,11 @@ const EXEMPT_MARKER = 'config-key-literal-ok';
 const STRING_LITERAL = /"([^"\\\n]*)"|'([^'\\\n]*)'/g;
 // A module path is not a config key even when it is spelt like one
 // (`require("llm.app_profile_overrides")`).
+// A string that names a log channel, a window or a stop label is a homonym of a key, found by
+// the syntax around it: `LOG = "x"`, `get_app_geometry("x")`, `Logger.info("x", ...)`,
+// `label = "x"`, `name = "x"`.
+const HOMONYM_BEFORE =
+	/(?:\b(?:LOG|APP_NAME|MODULE_NAME|TAG)\s*=|\b(?:label|name)\s*=|\b(?:get_app_geometry|ControllerPool\.reserve|Logger\.\w+)\s*\()\s*$/;
 const REQUIRE_BEFORE = /\brequire\s*(?:\(\s*|,\s*)?$/;
 
 // ==========================================
@@ -71,9 +76,24 @@ function vocabulary(tables) {
 	const metaLeaves = new Set(
 		tables.KEY.filter(([, key]) => key.startsWith('_meta.')).map(([, key]) => key.split('.').pop())
 	);
+	// A section's own name (`tap_keys`, `caps_word`) is also a module name: only a leaf that
+	// some declared property carries counts.
+	const sectionOnly = new Set(tables.SECTION.map((key) => key.split('.').pop()));
+	const declaredLeaf = new Set(
+		tables.KEY.map(([, key]) => key)
+			.filter((key) => !tables.SECTION.includes(key))
+			.map((key) => key.split('.').pop())
+	);
+	for (const leaf of declaredLeaf) sectionOnly.delete(leaf);
 	for (const [, key] of tables.KEY) if (key.includes('.')) words.add(key);
 	for (const [, leaf] of tables.LEAF)
-		if (leaf.includes('_') && !leaf.startsWith('_') && !metaLeaves.has(leaf)) words.add(leaf);
+		if (
+			leaf.includes('_') &&
+			!leaf.startsWith('_') &&
+			!metaLeaves.has(leaf) &&
+			!sectionOnly.has(leaf)
+		)
+			words.add(leaf);
 	for (const [, id] of tables.COMMAND) if (id.includes('_')) words.add(id);
 	return words;
 }
@@ -94,6 +114,7 @@ function countLiterals(text, words) {
 		for (const m of line.matchAll(STRING_LITERAL)) {
 			if (!words.has(m[1] ?? m[2])) continue;
 			if (REQUIRE_BEFORE.test(line.slice(0, m.index))) continue;
+			if (HOMONYM_BEFORE.test(line.slice(0, m.index))) continue;
 			count++;
 		}
 	}
@@ -189,6 +210,10 @@ function selfTest(words) {
 		'local m = "metrics.private_filter_enabled is the key"',
 		'local Overrides = require("llm.app_profile_overrides")',
 		'local ok, mod = pcall(require, "llm.app_profile_overrides")',
+		'local LOG = "shortcuts.tap_keys"',
+		'local geo = ui_builder.get_app_geometry("layout_manager")',
+		'Logger.info("scope_restore", "x")',
+		'{ name = "tap_holds", stop = f }',
 		'x = "min_words" -- config-key-literal-ok: a prompt token',
 		'-- config-key-literal-ok: the next line is a homonym',
 		'local tokens = { "max_words" }',

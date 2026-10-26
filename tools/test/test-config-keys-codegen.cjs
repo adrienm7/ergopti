@@ -40,6 +40,15 @@ for (const required of [
 	'metrics'
 ])
 	assert.ok(keys.has(required), `KEY lost ${required}`);
+// Paths code spells that no schema property or menu row declares come from the extras file,
+// and every ancestor of a key is a key too.
+const extras = JSON.parse(fs.readFileSync(path.join(ROOT, Codegen.EXTRAS), 'utf8'));
+assert.ok(extras.paths.length > 0, 'the extras file names no path');
+for (const extra of extras.paths) assert.ok(keys.has(extra), `KEY lost the extra path ${extra}`);
+for (const key of [...keys])
+	for (let end = 1; end < key.split('.').length; end++)
+		assert.ok(keys.has(key.split('.').slice(0, end).join('.')), `KEY lost the ancestor of ${key}`);
+assert.ok(keys.has('tap_holds.timeout_ms') && keys.has('shortcuts.caps_word'));
 const leaves = values('LEAF');
 for (const key of keys) assert.ok(leaves.has(key.split('.').pop()), `LEAF lost the leaf of ${key}`);
 
@@ -77,7 +86,7 @@ assert.deepEqual(Codegen.table('KEY', ['b', 'a', 'b']), [
 
 const privateRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-config-keys-'));
 try {
-	for (const rel of [Codegen.SCHEMA, Codegen.MENU_MANIFEST]) {
+	for (const rel of [Codegen.SCHEMA, Codegen.MENU_MANIFEST, Codegen.EXTRAS]) {
 		fs.mkdirSync(path.dirname(path.join(privateRoot, rel)), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, rel), path.join(privateRoot, rel));
 	}
