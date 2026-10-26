@@ -70,38 +70,18 @@ global CS_SECTION := "metrics"
 ; Comments (lines starting with #) and blank lines are skipped.
 CS_Read(&Snapshot := 0, &SourcePath := "") {
 		Snapshot := 0
-		out := Map()
 		path := CS_GetTomlPath()
 		SourcePath := path
-		if !FileExist(path)
-				return out
-		content := ""
-		ReadFailed := false
 		try {
-				content := FileRead(path, "UTF-8")
+				; Bootstrap, feature application and metrics must retain one native
+				; source generation. A physical edit alone grants no new admission.
+				Snapshot := ConfigTomlReadSnapshot(path)
 		} catch as Err {
-				ReadFailed := true
-				try LoggerError("ConfigShortcuts", "Cannot read '{1}': {2}. Metrics settings stay at their in-memory defaults, and persistence is blocked so those defaults cannot be written over the real file.", path, Err.Message)
-		}
-		if (ReadFailed) {
-				; Latch the SAME sentinel SaveFullConfig already honours. This reader
-				; feeds the metrics settings, and a swallowed read left them at their
-				; in-memory DEFAULTS — indistinguishable from a user who never changed
-				; them — which the next full save then wrote over the user's real
-				; values. The file here is config.toml, so reusing the boot latch keeps
-				; one owner for "the in-memory config is not the user's".
 				global _ConfigBootReadFailed
 				_ConfigBootReadFailed := true
-				return out
+				try LoggerError("ConfigShortcuts", "Cannot admit '{1}': {2}. Metrics settings stay at their in-memory defaults, and persistence is blocked so those defaults cannot be written over the real file.", path, Err.Message)
+				return Map()
 		}
-		if (content = "")
-				return out
-
-		; Use the same semantic projection as the boot configuration reader.
-		; Dotted assignments, inline namespaces and quoted headers can all name
-		; the metrics section; a flat parse silently loses those consent choices.
-		; Project the bytes already read without publishing another boot snapshot.
-		Snapshot := ConfigTomlDecodeSnapshotShared(content)
 		return Snapshot.Cache
 }
 
