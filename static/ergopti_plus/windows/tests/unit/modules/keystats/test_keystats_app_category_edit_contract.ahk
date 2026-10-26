@@ -178,3 +178,56 @@ Test("App category edit contract: final native admission refuses a retired owner
 	_KLACEC_With.Bind(_KLACEC_Staging.Bind("revoke")))
 Test("App category edit contract: discovery during staging survives durable retry (app-category-edit-contract)",
 	_KLACEC_With.Bind(_KLACEC_Staging.Bind("discover")))
+
+
+_KLACEC_CaseAliases(Kind, Root, Path, Original) {
+	Resident := KLAppCat.categories, Model := KLAppCat.store_model
+	Candidate := Kind == "legacy"
+		? '{"audit.exe":"productive","AUDIT.EXE":"distracting"}'
+		: StrReplace(Original, '"other.exe":"neutral"',
+			'"AUDIT.EXE":{"type":"distracting","score":-1,"extra":{"source":"upper"}},"other.exe":"neutral"')
+	Document := JsonParse(Candidate)
+	Apps := Kind == "legacy" ? Document : Document["apps"]
+	AssertTrue(Apps.Has("audit.exe") && Apps.Has("AUDIT.EXE"),
+		"the source contains two valid JSON members for one Windows process identity")
+	AssertTrue(FSWriteDurable(Path, Candidate))
+	AssertFalse(KL_AppCat_Reload(), "ambiguous process aliases cannot replace the admitted category store")
+	AssertTrue(KLAppCat.categories == Resident && KLAppCat.store_model == Model && !KLAppCat.dirty,
+		"refusal preserves both runtime authorities and the original clean state")
+	Snapshot := KL_AppCat_EditorStoreSnapshot(Root)
+	AssertTrue(Snapshot is Integer && Snapshot == 0,
+		"an ambiguous disk image cannot become editor defaults")
+	AssertEqual(Candidate, FSReadUtf8Exact(Path), "refusal must not canonicalize away either original record")
+	AssertEqual(0, _KLACEC_Stages(Path), "invalid source owns no publication stage")
+	AssertTrue(FSWriteDurable(Path, Original))
+	AssertTrue(KL_AppCat_Reload(), "repairing the real source restores ordinary reload admission")
+	AssertEqual("productive", KL_AppCat_Get("AUDIT.EXE"))
+}
+
+_KLACEC_UniqueMixedCase(Root, Path, Original) {
+	Candidate := StrReplace(Original, '"audit.exe":', '"AuDiT.ExE":')
+	AssertTrue(!(Candidate == Original), "the real source changes only its key spelling")
+	AssertTrue(FSWriteDurable(Path, Candidate))
+	AssertTrue(KL_AppCat_Reload(), "one mixed-case spelling remains a valid process identity")
+	Snapshot := KL_AppCat_EditorSnapshot("AUDIT.EXE", Root)
+	AssertTrue(Snapshot is Map)
+	AssertEqual("productive", Snapshot["current_type"])
+	AssertEqual(1, Snapshot["current_score"])
+	AssertTrue(KL_AppCat_CommitEdit(Snapshot, "Reviewed", 0.75))
+	Committed := FSReadUtf8Exact(Path)
+	Apps := JsonParse(Committed)["apps"]
+	AssertTrue(Apps.Has("AuDiT.ExE") && !Apps.Has("audit.exe"),
+		"a native edit must preserve the unique original key spelling")
+	Before := JsonObjectMemberSpans(Candidate, ["apps", "AuDiT.ExE"])
+	After := JsonObjectMemberSpans(Committed, ["apps", "AuDiT.ExE"])
+	AssertEqual(Before["extra"]["member_text"], After["extra"]["member_text"],
+		"unique process normalization retains unknown typed record metadata")
+	AssertTrue(KL_AppCat_Reload())
+	AssertEqual("Reviewed", KL_AppCat_Get("audit.exe"))
+}
+
+for _KLACEC_AliasKind in ["legacy", "versioned"]
+	Test("App category identity: " . _KLACEC_AliasKind . " case aliases refuse without replacing authority (app-category-case-alias)",
+		_KLACEC_With.Bind(_KLACEC_CaseAliases.Bind(_KLACEC_AliasKind)))
+Test("App category identity: one mixed-case process keeps record metadata (app-category-case-alias)",
+	_KLACEC_With.Bind(_KLACEC_UniqueMixedCase))

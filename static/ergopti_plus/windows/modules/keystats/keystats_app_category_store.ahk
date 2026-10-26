@@ -54,6 +54,9 @@ _KL_AppCat_DecodeStore(Content, Path := "") {
 	for Key, Value in Apps {
 		if !(Key is String) || Key == ""
 			throw TypeError("An app category key must be a nonempty process name.")
+		CanonicalKey := StrLower(Key)
+		if Categories.Has(CanonicalKey)
+			throw ValueError("App category entries require distinct case-insensitive process names.")
 		if Value is String {
 			if Value == ""
 				throw ValueError("A legacy app category cannot be empty.")
@@ -63,12 +66,12 @@ _KL_AppCat_DecodeStore(Content, Path := "") {
 				|| !Value.Has("score") || !_KL_AppCat_ScoreValid(Value["score"])
 				|| !RegExMatch(Trim(Fields["score"]["text"]), "^[-0-9]")
 				throw ValueError("An app category edit requires a label and finite score between -2 and 2.")
-			Records[StrLower(Key)] := Fields
+			Records[CanonicalKey] := Fields
 		} else {
 			throw TypeError("Invalid app category entry or unknown store schema.")
 		}
-		Categories[StrLower(Key)] := Value
-		OriginalKeys[StrLower(Key)] := Key
+		Categories[CanonicalKey] := Value
+		OriginalKeys[CanonicalKey] := Key
 	}
 	return Map("path", Path, "source", Content, "versioned", Versioned,
 		"categories", Categories, "members", Members, "original_keys", OriginalKeys,
