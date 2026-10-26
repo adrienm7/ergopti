@@ -25,6 +25,7 @@
 //
 // Exit 0 when clean, 1 with a list of violations otherwise.
 
+require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a generated config-key constant
 const { existsSync, readFileSync, readdirSync } = require('fs');
 const { resolve, dirname } = require('path');
 const { parse: parseTomlSource } = require('smol-toml');

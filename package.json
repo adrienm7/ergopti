@@ -118,6 +118,7 @@
 		"test:logger-scalars": "node ./tools/test/test-logger-scalars-single-source.cjs",
 		"test:config-keys-codegen": "node ./tools/test/test-config-keys-codegen.cjs",
 		"test:config-key-literals": "node ./tools/test/test-config-key-literals.cjs",
+		"test:config-key-tokens": "node ./tools/test/test-config-key-tokens.cjs",
 		"test:log-vocabulary-scan": "node ./tools/test/test-log-vocabulary-scan.cjs",
 		"audit:log-vocabulary": "node ./tools/audit/census-log-vocabulary.cjs",
 		"test:log-file-names-single-source": "node ./tools/test/test-log-file-names-single-source.cjs",
