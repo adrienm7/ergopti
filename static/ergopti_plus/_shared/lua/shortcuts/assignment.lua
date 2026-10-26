@@ -2,6 +2,8 @@
 
 --- Keeps explicit ordinary keyboard assignments distinct from neutral absence.
 --- Scope clear/restoration and fresh templates retain their sparse semantics.
+local ConfigKeys = require("config_keys")
+
 local M = {}
 
 M.INTENT = "keyboard_assignment"
@@ -18,7 +20,7 @@ function M.operation(slot_id, action_id, is_owned, is_assignable)
 		"keyboard assignment requires its actual slot and action owners")
 	assert(is_owned(slot_id) == true, "keyboard assignment slot is not owned")
 	assert(is_assignable(action_id) == true, "keyboard assignment action is not assignable")
-	return { section = "shortcuts.keyboard", key = slot_id, value = action_id, intent = M.INTENT }
+	return { section = ConfigKeys.KEY.SHORTCUTS_KEYBOARD, key = slot_id, value = action_id, intent = M.INTENT }
 end
 
 --- Recognizes only the closed keyboard assignment intent at the writer boundary.
@@ -26,7 +28,7 @@ end
 --- @return boolean intentional Whether sparse normalization must preserve value.
 function M.is_intentional(row)
 	if row.intent == nil then return false end
-	assert(row.intent == M.INTENT and row.section == "shortcuts.keyboard"
+	assert(row.intent == M.INTENT and row.section == ConfigKeys.KEY.SHORTCUTS_KEYBOARD
 		and type(row.key) == "string" and row.key ~= ""
 		and row.delete == nil and type(row.value) == "string",
 		"keyboard assignment intent requires an exact nondelete ordinary action row")

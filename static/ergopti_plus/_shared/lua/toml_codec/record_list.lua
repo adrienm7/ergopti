@@ -14,6 +14,7 @@ local KeyPath = require("toml_codec.key_path")
 local Bom = require("toml_codec.bom")
 local LeafRows = require("toml_codec.leaf_rows")
 local Models = require("config_user_models")
+local ConfigKeys = require("config_keys")
 local operations = setmetatable({}, { __mode = "k" })
 local removals = setmetatable({}, { __mode = "k" })
 local transitions = {}
@@ -253,7 +254,7 @@ function M.prepare(source, desired, path)
 			"Obsolete user model list 'llm.models.user_models' requires manual source cleanup before replacement")
 		return nil
 	end
-	local row = { section = "llm.models", key = "user_models", value = desired, record_list = {} }
+	local row = { section = ConfigKeys.KEY.LLM_MODELS, key = "user_models", value = desired, record_list = {} }
 	operations[row] = { token = row.record_list, source = source, desired = desired,
 		literal = LeafRows.value_literal(desired), path = path, mapping = map_rows(capture, desired, path), capture = capture }
 	return row
@@ -264,7 +265,7 @@ function M.authentic(row, source, path)
 	assert(type(row) == "table" and getmetatable(row) == nil, "saved model operation needs a plain row")
 	local operation = operations[row]
 	if not operation and row.record_list == nil then return false end
-	assert(operation and rawequal(row.record_list, operation.token) and getmetatable(row.record_list) == nil and row.section == "llm.models" and row.key == "user_models"
+	assert(operation and rawequal(row.record_list, operation.token) and getmetatable(row.record_list) == nil and row.section == ConfigKeys.KEY.LLM_MODELS and row.key == "user_models"
 		and row.delete == nil and rawequal(row.value, operation.desired), "saved model row capability is unowned or changed")
 	assert(LeafRows.value_literal(row.value) == operation.literal, "saved model desired rows changed after preparation")
 	if source ~= nil then assert(source == operation.source, "saved model operation belongs to another source") end
@@ -467,7 +468,7 @@ function M.cleanup_entries(source, outdated, file_path)
 	if not capture or capture.obsolete then return entries, false end
 	for index, element in ipairs(capture.elements) do
 		if not element.valid and outdated["llm.models.user_models." .. index] then
-			local entry = { section = "llm.models.user_models", key = tostring(index), kind = "saved_model_record",
+			local entry = { section = ConfigKeys.KEY.LLM_MODELS_USER_MODELS, key = tostring(index), kind = "saved_model_record",
 				path = { "llm", "models", "user_models", tostring(index) }, value = Codec.encode_value_with_shapes(capture.rows[index], capture.shapes, capture.rows, index), source_record = {} }
 			removals[entry] = { source = source, index = index, raw = element.raw, path = entry.path, file_path = file_path, token = entry.source_record, value = entry.value }
 			entries[#entries + 1] = entry
@@ -485,7 +486,7 @@ function M.cleanup_selection(source, entries, path)
 		if receipt or entry.kind == "saved_model_record" or entry.source_record ~= nil then
 			assert(receipt and not receipt.consumed and receipt.source == source
 				and (path == nil or receipt.file_path == path), "saved model cleanup capability is unowned, stale or withdrawn")
-			assert(entry.section == "llm.models.user_models" and entry.key == tostring(receipt.index)
+			assert(entry.section == ConfigKeys.KEY.LLM_MODELS_USER_MODELS and entry.key == tostring(receipt.index)
 				and entry.kind == "saved_model_record" and entry.value == receipt.value and rawequal(entry.source_record, receipt.token) and getmetatable(entry.source_record) == nil
 				and getmetatable(entry) == nil and getmetatable(entry.path) == nil and rawequal(entry.path, receipt.path)
 				and same(entry.path, { "llm", "models", "user_models", tostring(receipt.index) }), "saved model cleanup row changed")
