@@ -262,20 +262,25 @@ package.preload['logger.shim'] = function() return {
  end,
 } end
 package.preload['adapters.shell_runner'] = function() return { validate_spawn_args = function() return '' end } end
--- The simulated luv above owns no descriptors, so the native regular-file
--- admission cannot classify a source here. The only TOML source this client
--- loads is the checked-in timings registry, a regular file: admit it through
--- stdio and refuse any other path. Both public entries are modeled, strict
--- (open) and configuration-source (open_source), so a caller switching
--- between them keeps the same stand-in instead of a missing function.
-local function admit_timings_registry(path)
- assert(path:gsub('\\\\', '/'):find('/_shared/modules/timings/constants%.toml$'),
-  'the simulated backend admits only the checked-in timings registry: ' .. tostring(path))
+-- The simulated luv above owns no descriptors. The client reads the checked-in
+-- timings registry, locale sentinel and finite network policy declarations. Admit
+-- only these declared sources through stdio; every other path is refused.
+-- Both public reader entries share the same strict modeled boundary.
+local function admit_client_source(path)
+ local normalized = path:gsub('\\\\', '/')
+ assert(normalized:find('/_shared/modules/timings/constants%.toml$')
+  or normalized:find('/_shared/data/locales/en%.json$')
+  or normalized:find('/_shared/modules/network/route_origins%.json$')
+  or normalized:find('/_shared/modules/network/proxy_policy%.json$')
+  or normalized:find('/_shared/data/http/transport_policy%.json$')
+  or normalized:find('/_shared/data/http/header_policy%.json$')
+  or normalized:find('/_shared/data/http/redirect_policy%.json$'),
+  'the simulated backend admits only declared checked-in client sources: ' .. tostring(path))
  return io.open(path, 'r')
 end
 package.preload['infra.regular_file_reader'] = function() return {
- open = admit_timings_registry,
- open_source = admit_timings_registry,
+ open = admit_client_source,
+ open_source = admit_client_source,
 } end
 local driver = assert(arg[1], 'authentication fixture needs the explicit driver root')
 package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. package.path
