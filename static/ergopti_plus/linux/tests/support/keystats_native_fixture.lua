@@ -15,11 +15,12 @@ local uv = require("luv")
 
 local MODULES = { "modules.keystats.keystats", "modules.keystats.metrics_collector", "modules.keystats.sqlite_writer" }
 
--- Public flush-status vocabulary. Unknown phases cannot claim new wait budgets.
+-- Public vocabulary; true marks a physical phase that can own a native child.
+-- Unknown phases cannot claim new wait budgets.
 local FLUSH_PHASES = {
-	idle = true, reservation = true, reservation_retry = true, compose_retry = true,
-	commit = true, commit_retry = true, resolve = true, resolve_retry = true,
-	cleanup = true, cleanup_retry = true, uncertain = true,
+	idle = false, reservation = true, reservation_retry = false, compose_retry = false,
+	commit = true, commit_retry = false, resolve = true, resolve_retry = false,
+	cleanup = true, cleanup_retry = false, uncertain = false,
 }
 
 --- Returns the canonical SQLite operation deadline on the native clock.
@@ -28,6 +29,12 @@ local function deadline()
 end
 
 --- Observes bounded, non-repeating native phases after their constructors return.
+--- Each physical phase gets an execution observation window and, on expiry, one
+--- additional canonical window to observe physical retirement. Logical phases
+--- get one window. This is a test observation policy, not a product timeout or
+--- a hard wall-clock bound: constructors and callbacks may block synchronously.
+--- Four physical phases times two windows plus seven logical phases, across
+--- at most two generations, admit at most thirty canonical windows per wait.
 --- An isolated body owns no continuing producer: it may drain an existing
 --- transaction and acquire one closing snapshot, never an unlimited generation.
 --- @param collector table Isolated collector.
@@ -38,17 +45,22 @@ local function await_native(collector, advance, settled)
 	if settled then return settled end
 	local function status()
 		local value = collector.get_flush_status()
-		assert(type(value) == "table" and FLUSH_PHASES[value.phase], "Unknown native fixture phase")
+		assert(type(value) == "table" and FLUSH_PHASES[value.phase] ~= nil, "Unknown native fixture phase")
 		assert(type(value.generation) == "number" and value.generation >= 0 and value.generation % 1 == 0,
 			"Invalid native fixture generation")
 		return value
 	end
 	local previous = status()
 	local seen, closing = { [previous.phase] = true }, true
-	local until_ns = deadline()
-	while not settled and uv.hrtime() < until_ns do
-		uv.run("nowait")
+	local until_ns, retirement_window = deadline(), false
+	while not settled do
+		if uv.hrtime() >= until_ns then
+			if retirement_window or not FLUSH_PHASES[previous.phase] then break end
+			retirement_window, until_ns = true, deadline()
+			print(string.format("Native fixture observation: execution window expired; observing physical retirement phase=%s generation=%d", previous.phase, previous.generation))
+		end
 		uv.sleep(1)
+		uv.run("nowait")
 		settled = advance()
 		if not settled then
 			local current = status()
@@ -60,7 +72,7 @@ local function await_native(collector, advance, settled)
 				assert(not seen[current.phase], "Native fixture revisited an acknowledged phase")
 			end
 			if current.generation ~= previous.generation or current.phase ~= previous.phase then
-				seen[current.phase], until_ns = true, deadline()
+				seen[current.phase], until_ns, retirement_window = true, deadline(), false
 			end
 			previous = current
 		end

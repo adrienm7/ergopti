@@ -79,9 +79,136 @@ helpers.describe("native metrics fixture construction deadlines", function()
 	end
 end)
 
+helpers.describe("native metrics fixture retirement observation", function()
+	it("native-fixture-retirement: observes a real timed-out child until physical retirement", function()
+		local uv = require("luv")
+		local native = require("tests.support.keystats_native_fixture")
+		local batch = require("infra.sqlite_batch_process")
+		local operation_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+		local original_spawn, original_timer_start, original_start = uv.spawn, uv.timer_start, batch.start
+		for _, name in ipairs({ "spawn", "timer_start", "run", "sleep", "new_check", "check_start", "walk" }) do
+			helpers.assert_eq(debug.getinfo(uv[name], "S").what, "C", "the regression requires the actual native " .. name)
+		end
+		local before = {}
+		uv.walk(function(handle) before[handle] = true end)
+		local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-fixture-retirement-XXXXXX"))
+		local collector, child, pid, check
+		local armed, deadline_fired, blocked, exited = false, false, false, false
+		uv.timer_start = function(handle, timeout, repeat_ms, callback)
+			if armed and not pid and timeout == operation_ms and repeat_ms == 0 then
+				return original_timer_start(handle, timeout, repeat_ms, function(...)
+					deadline_fired = true
+					return callback(...)
+				end)
+			end
+			return original_timer_start(handle, timeout, repeat_ms, callback)
+		end
+		uv.spawn = function(executable, options, callback)
+			if armed and not pid and options.args and tostring(options.args[1]):find("sqlite_process_worker.lua", 1, true) then
+				local handle, actual_pid, code = original_spawn(executable, options, function(...)
+					exited = true
+					return callback(...)
+				end)
+				if handle then
+					pid = actual_pid
+					assert(uv.kill(pid, "sigstop") == 0)
+				end
+				return handle, actual_pid, code
+			end
+			return original_spawn(executable, options, callback)
+		end
+		batch.start = function(...)
+			helpers.assert_eq(select(3, ...).timeout_ms, operation_ms, "the real execution deadline must remain canonical")
+			local request = original_start(...)
+			if armed and pid and not child then
+				child = assert(request)
+				check = assert(uv.new_check())
+				assert(uv.check_start(check, function()
+					assert(uv.check_stop(check) == 0)
+					uv.close(check)
+					blocked = true
+					-- A real callback can cross the execution deadline before native
+					-- exit and close receipts get their next observation turn.
+					uv.sleep(operation_ms)
+				end) == 0)
+			end
+			return request
+		end
+		local ok, failure = xpcall(function()
+			native.with(function(owner)
+				collector = owner
+				owner.init({ sqlite_path = directory .. "/metrics.sqlite" })
+				require("tests.support.metrics_consent_fixture").enable(owner)
+				owner.on_keydown("x", 1000, "fixture-retirement")
+				armed = true
+			end)
+		end, debug.traceback)
+		uv.spawn, uv.timer_start, batch.start = original_spawn, original_timer_start, original_start
+		if check and not uv.is_closing(check) then uv.check_stop(check); uv.close(check) end
+		-- The negative baseline must also retire its exact real child. Preserve
+		-- its failed assertion while independently draining the acquired owner.
+		local until_ns = uv.hrtime() + operation_ms * 1000000
+		local retired = collector and collector.stop()
+		while not retired and collector and uv.hrtime() < until_ns do
+			uv.sleep(1); uv.run("nowait"); retired = collector.stop()
+		end
+		for _ = 1, 4 do uv.run("nowait") end
+		local residual = 0
+		uv.walk(function(handle) if not before[handle] then residual = residual + 1 end end)
+		local status = collector and collector.get_flush_status()
+		local result = child and child:poll()
+		local absent, _, absence_code
+		if pid then absent, _, absence_code = uv.kill(pid, 0) end
+		for name in uv.fs_scandir_next, assert(uv.fs_scandir(directory)) do assert(uv.fs_unlink(directory .. "/" .. name)) end
+		assert(uv.fs_rmdir(directory))
+		helpers.assert_true(retired, "even the negative baseline must physically retire its child")
+		helpers.assert_true(blocked and deadline_fired and exited, "the actual callback, unchanged execution timeout and native exit must execute")
+		helpers.assert_eq(absent, nil)
+		helpers.assert_eq(absence_code, "ESRCH", "the exact owned native PID must be gone")
+		helpers.assert_eq(residual, 0, "no newly acquired native handle may survive the scenario")
+		helpers.assert_true(child:is_settled(), "the real batch must acknowledge physical settlement")
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(result.exit_code, 137, "the real execution timeout must terminate the stopped child")
+		helpers.assert_eq(status.committed, false, "physical retirement cannot invent a COMMIT")
+		helpers.assert_eq(status.has_debt, true, "failed persistence must retain its logical source")
+		helpers.assert_true(ok, failure)
+	end)
+	for _, phase in ipairs({ "reservation", "commit", "resolve", "cleanup", "idle", "reservation_retry", "compose_retry",
+		"commit_retry", "resolve_retry", "cleanup_retry", "uncertain" }) do
+		it("native-fixture-retirement-model: frozen " .. phase .. " has a finite observation limit", function()
+			local budget = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") * 1000000
+			local now, calls = 0, 0
+			local modeled = {
+				reset_session = function() calls = calls + 1; return false end,
+				pump_flush = function() end,
+				get_flush_status = function() return { phase = phase, generation = 1 } end,
+			}
+			local modeled_uv = {
+				hrtime = function() return now end,
+				run = function(mode) helpers.assert_eq(mode, "nowait"); return false end,
+				sleep = function(ms) helpers.assert_eq(ms, 1); now = now + budget / 4 end,
+			}
+			local module_name = "tests.support.keystats_native_fixture"
+			local previous = package.loaded[module_name]
+			local called, ok, detail = pcall(function()
+				local fixture = helpers.load_module_with_dependency(module_name, "luv", modeled_uv)
+				return pcall(fixture.reset, modeled)
+			end)
+			package.loaded[module_name] = previous
+			helpers.assert_true(called, ok)
+			helpers.assert_eq(ok, false, "an unchanged phase must never renew indefinitely")
+			helpers.assert_contains(detail, "native COMMIT and cleanup must acknowledge the reset")
+			local physical = phase == "reservation" or phase == "commit" or phase == "resolve" or phase == "cleanup"
+			local windows = physical and 2 or 1
+			helpers.assert_eq(now, windows * budget, "only a physical phase receives one bounded retirement observation window")
+			helpers.assert_eq(calls, 1 + windows * 4, "each bounded observation must drive its original public owner")
+		end)
+	end
+end)
+
 helpers.describe("native metrics fixture finite observation contract", function()
 	for _, scenario in ipairs({
-		{ name = "stable ownership expires", phases = { "reservation", "reservation", "reservation" }, generations = { 1, 1, 1 },
+		{ name = "stable ownership expires", frozen = true, phases = { "reservation", "reservation", "reservation" }, generations = { 1, 1, 1 },
 			error = "native COMMIT and cleanup must acknowledge the reset" },
 		{ name = "a phase cannot be revisited", phases = { "reservation", "commit", "reservation" }, generations = { 1, 1, 1 },
 			error = "revisited an acknowledged phase" },
@@ -103,10 +230,11 @@ helpers.describe("native metrics fixture finite observation contract", function(
 			local budget = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") * 1000000
 			local now, calls = 0, 0
 			local modeled = {
-				reset_session = function() calls = calls + 1; return calls > #scenario.phases end,
+				reset_session = function() calls = calls + 1; return not scenario.frozen and calls > #scenario.phases end,
 				pump_flush = function() end,
 				get_flush_status = function()
-					return { phase = assert(scenario.phases[calls]), generation = assert(scenario.generations[calls]) }
+					local index = scenario.frozen and math.min(calls, #scenario.phases) or calls
+					return { phase = assert(scenario.phases[index]), generation = assert(scenario.generations[index]) }
 				end,
 			}
 			-- These finite protocol controls acquire and pump no real process. A canonical
