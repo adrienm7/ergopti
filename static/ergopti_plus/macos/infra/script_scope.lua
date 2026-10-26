@@ -6,14 +6,15 @@ local Manifest = require("infra.manifest_reader")
 local Runtime = require("script_scope_runtime")
 local Transaction = require("config_scope_transaction")
 local Fenced = require("config_scope_fenced_transaction")
+local ConfigKeys = require("config_keys")
 
 --- Binds actual legacy native aliases without copying canonical value policy.
 --- @return table aliases Canonical path -> native alias/field owner.
 local function aliases()
 	return {
-		["script.locale"] = { alias = "i18n_locale", native = require("infra.i18n") },
-		["script.log_level"] = { alias = "log_level", native = require("infra.logger") },
-		["script.show_error_dialog"] = { alias = "script.show_error_dialog", native = require("ui.error_dialog") },
+		[ConfigKeys.KEY.SCRIPT_LOCALE] = { alias = "i18n_locale", native = require("infra.i18n") },
+		[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = { alias = "log_level", native = require("infra.logger") },
+		[ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG] = { alias = ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG, native = require("ui.error_dialog") },
 	}
 end
 
