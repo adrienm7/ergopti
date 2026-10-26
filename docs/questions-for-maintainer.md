@@ -32,6 +32,15 @@ None. The next batch goes here, each line naming the default taken meanwhile.
   - **Prediction request floor (PAR-65):** an explicit request is never held by the floor (only automatic
     requests wait); one global floor (not per backend), settable from the menu on the three OS; a "never"
     debounce (no automatic trigger) on the three OS; live mode fires instantly at a word end on the three OS.
+  - **Prediction floor, follow-up:** the variants of one request (a "predict n" profile run as n calls) are
+    never held, automatic or explicit; the floor only separates distinct requests. Default floor 300 ms, 0
+    accepted (no floor). A mashed explicit shortcut supersedes its in-flight request instead of stacking one.
+  - **`tap_hold.toml` migration:** a byte-preserving rewrite (comments and layout kept), as config.toml;
+    `[tap_hold.retired_delays]` is kept forever.
+  - **Quit:** Quit wins on the three OS: during a reload it abandons the reload and exits, once a write
+    already in progress has finished. A pending per-category scope write blocks Linux Quit, as macOS.
+  - **Localized "general" metrics category:** the live dashboard folds its 19 spellings into one id, from the
+    generated alias file.
 
 - **Answers of 2026-10-25 (QCM), implemented the same day unless noted:**
   - **CI design:** one lane per OS plus Common, each Unit → Integration → E2E → Build → Install and launch →
