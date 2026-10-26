@@ -319,7 +319,7 @@ function M.new(options)
 		end,
 		validate_update = function(scope, row)
 			if scope ~= "shortcuts" or options.only ~= nil then return false end
-			if row.section == "shortcuts.keyboard" then
+			if row.section == ConfigKeys.KEY.SHORTCUTS_KEYBOARD then
 				return keyboard.physical_slot_descriptor(row.key) ~= nil
 					and (row.delete == true or parameters.is_assignable(row.value) == true)
 			end

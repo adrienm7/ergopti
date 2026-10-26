@@ -131,6 +131,7 @@ local webkit_host = require("ui.webkit_host")
 -- every object a page posted became nil and no reply reached a page, so the
 -- metrics windows stayed empty and the editors' buttons did nothing.
 local Json = require("json")
+local ConfigKeys = require("config_keys")
 
 
 -- =========================================
@@ -470,7 +471,7 @@ function M.show(app_name, active_locale, contextual_receipt)
 		local ok, I18n = pcall(require, "infra.i18n")
 		active_locale = ok and type(I18n.get_locale) == "function" and I18n.get_locale() or nil
 		if type(active_locale) ~= "string" or active_locale == "" then
-			active_locale = require("infra.manifest_reader").default_for("script.locale")
+			active_locale = require("infra.manifest_reader").default_for(ConfigKeys.KEY.SCRIPT_LOCALE)
 		end
 	end
 

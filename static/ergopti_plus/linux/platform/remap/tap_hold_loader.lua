@@ -44,6 +44,7 @@ local Manifest = require("infra.manifest_reader")
 local Outdated = require("config_outdated")
 local Shapes = require("platform.remap.tap_hold_shapes")
 local Migration = require("platform.remap.tap_hold_migration")
+local ConfigKeys = require("config_keys")
 
 local LOG = "platform.remap.tap_hold_loader"
 local TIME_FIELD = require("config_keys").LEAF.TIME_ACTIVATION_SECONDS
@@ -325,7 +326,7 @@ function M.load_document(defaults_path, user, user_err, user_path, shapes)
 	end
 
 	return {
-		enabled = global.enabled == true or (global.enabled == nil and Manifest.default_for("tap_holds.enabled")),
+		enabled = global.enabled == true or (global.enabled == nil and Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED)),
 		keys = keys,
 		global_seconds = global_seconds,
 		global_user_set = global_user_set,

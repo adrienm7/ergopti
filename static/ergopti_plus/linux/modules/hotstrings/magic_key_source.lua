@@ -46,11 +46,12 @@ local EvdevCodes  = require("infra.evdev_codes")
 local Timings     = require("infra.timings")
 local InputEvent  = require("infra.input_event")
 local Shared      = require("keymap.magic_key_source")
+local ConfigKeys = require("config_keys")
 
 local LOG = "magic_key_source"
 
 -- The canonical configuration path of the setting, and its automatic value.
-M.PATH = "hotstrings.magic_key_source"
+M.PATH = ConfigKeys.KEY.HOTSTRINGS_MAGIC_KEY_SOURCE
 local AUTOMATIC = Manifest.default_for(M.PATH)
 
 -- How long a capture waits for a key (shared with macOS and Windows).
@@ -625,7 +626,7 @@ collision_factory = function()
 	end
 	local function private_current()
 		if not rawequal(package.loaded["modules.hotstrings.magic_key_source"], M)
-			or M.PATH ~= "hotstrings.magic_key_source" or M.capture_collision_inventory ~= collision_factory
+			or M.PATH ~= ConfigKeys.KEY.HOTSTRINGS_MAGIC_KEY_SOURCE or M.capture_collision_inventory ~= collision_factory
 			or _deps ~= deps or _capture ~= nil or _capture_epoch ~= capture_epoch
 			or _pending_choices ~= pending or next(pending) ~= nil
 			or preference_ports.generation() ~= preference_epoch or preference_ports.is_acquired()

@@ -54,6 +54,7 @@ local KeyboardOwnerCurrent = KeyboardPublication.owner_is_current
 local PhysicalSlots = require("shortcuts.physical_slots")
 local PhysicalSlotConstructor = PhysicalSlots.new
 local PhysicalAvailability = require("shortcuts.physical_availability")
+local ConfigKeys = require("config_keys")
 
 local LOG = "modules.shortcuts.keyboard_shortcuts"
 
@@ -133,7 +134,7 @@ M.SLOT_GROUPS = {
 -- The manifest section whose entries are this driver's shipped slot bindings
 -- (Super+Space generates an AI prediction).
 -- tools/test/test-keyboard-slot-recommended-bindings.cjs pins what it holds.
-local KEYBOARD_SECTION = "shortcuts.keyboard"
+local KEYBOARD_SECTION = ConfigKeys.KEY.SHORTCUTS_KEYBOARD
 
 -- The shared key catalogue.
 local CATALOGUE_REL_PATH = "modules/actions/modifier_chords.json"

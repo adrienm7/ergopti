@@ -29,13 +29,14 @@ local Timings   = require("infra.timings")
 local Manifest  = require("infra.manifest_reader")
 local Preferences = require("infra.metrics_preferences")
 local Model     = require("wpm_widget.model")
+local ConfigKeys = require("config_keys")
 
 local LOG = "ui.wpm.widget"
 
 local PREF_PATHS = {
-	visible = "metrics.wpm_widget_visible",
-	source_colors = "metrics.wpm_widget_colors",
-	graph = "metrics.wpm_widget_graph",
+	visible = ConfigKeys.KEY.METRICS_WPM_WIDGET_VISIBLE,
+	source_colors = ConfigKeys.KEY.METRICS_WPM_WIDGET_COLORS,
+	graph = ConfigKeys.KEY.METRICS_WPM_WIDGET_GRAPH,
 }
 
 
@@ -57,9 +58,9 @@ local function shipped(path)
 end
 
 local DEFAULTS = {
-	visible = shipped("metrics.wpm_widget_visible"),
-	source_colors = shipped("metrics.wpm_widget_colors"),
-	graph = shipped("metrics.wpm_widget_graph"),
+	visible = shipped(ConfigKeys.KEY.METRICS_WPM_WIDGET_VISIBLE),
+	source_colors = shipped(ConfigKeys.KEY.METRICS_WPM_WIDGET_COLORS),
+	graph = shipped(ConfigKeys.KEY.METRICS_WPM_WIDGET_GRAPH),
 }
 
 local _state = {
