@@ -191,7 +191,7 @@ Test("meta boot-paths-fail-soft: the CapsLock guard covers every registration",
 ; The canonical semantic decoder independently proves the source's identity.
 _BPF_PathsTomlSemanticDirectory(Shape, Key) {
 	Directory := A_Temp . "\ergopti_paths_semantic_" . A_ScriptHwnd . "_" . A_TickCount
-	Desired := Directory . "\café profile\" . AppDirsFolderName() . "\"
+	Desired := Directory . "\café O'Brien profile\" . AppDirsFolderName() . "\"
 	Path := Directory . "\paths.toml"
 	DirCreate(Desired)
 	try {
@@ -201,7 +201,9 @@ _BPF_PathsTomlSemanticDirectory(Shape, Key) {
 			case "canonical": Source := Key . ' = "' . Forward . '"`n'
 			case "unicode-escape": Source := Key . ' = "' . StrReplace(Forward, "é", "\u00e9") . '"`n'
 			case "escaped-backslashes": Source := Key . " = " . TOML_RenderString(Desired) . "`n"
-			case "literal-string": Source := Key . " = '" . Forward . "'`n"
+			case "literal-string":
+				Template := FileRead(A_ScriptDir . "\fixtures\paths_literal_string.toml.template", "UTF-8")
+				Source := StrReplace(StrReplace(Template, "__key__", Key), "__path__", Forward)
 			case "quoted-key": Source := '"' . Key . '" = "' . Forward . '"`n'
 			default: throw ValueError("Unknown bootstrap TOML shape")
 		}

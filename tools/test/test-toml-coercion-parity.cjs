@@ -12,11 +12,14 @@
 // This gate does NOT run the coercion functions — it only prevents drift by
 // asserting that the shared corpus and the test consumers still reference each
 // other, and that the coercion functions still exist at their known locations.
+// It also validates the consumed Windows bootstrap literal fixture through an
+// independent strict TOML parser: the legacy AHK decoder is not a syntax oracle.
 
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
+const { parse, TomlError } = require('smol-toml');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
@@ -122,6 +125,47 @@ if (fs.existsSync(tclPath)) {
 // be no hand-rolled coercion site in the Linux driver.
 const linuxOverridePath = path.join(LINUX, 'infra', 'config_overrides.lua');
 assert(!fs.existsSync(linuxOverridePath), 'Linux has no config_overrides.lua (uses toml_codec)');
+
+// The actual AHK consumer interpolates these two tokens in this same fixture.
+// Backslashes must stay literal, while apostrophes rule out single delimiters.
+const literalFixture = fs.readFileSync(
+	path.join(WINDOWS, 'tests', 'fixtures', 'paths_literal_string.toml.template'),
+	'utf8'
+);
+const literalPaths = [
+	'C:/plain/ergopti_plus/',
+	"C:/fixture/O'Brien/café/ergopti_plus/",
+	"C:\\notes\\O'Brien\\ergopti_plus\\"
+];
+
+/** Decodes the authored fixture after the consumer's exact token substitution. */
+function decodeLiteralFixture(template, key, value) {
+	return parse(template.replaceAll('__key__', key).replaceAll('__path__', value));
+}
+
+for (const key of ['ConfigDirPath', 'LogsDirPath']) {
+	for (const value of literalPaths) {
+		const label = `bootstrap literal fixture preserves ${key}: ${JSON.stringify(value)}`;
+		try {
+			const decoded = decodeLiteralFixture(literalFixture, key, value);
+			assert(Object.keys(decoded).length === 1 && decoded[key] === value, label);
+		} catch (error) {
+			assert(false, `${label}: ${error.message}`);
+		}
+	}
+	for (const [template, value] of [
+		["__key__ = '__path__'\n", literalPaths[1]],
+		['__key__ = "__path__"\n', literalPaths[2]]
+	]) {
+		let rejected = false;
+		try {
+			decodeLiteralFixture(template, key, value);
+		} catch (error) {
+			rejected = error instanceof TomlError;
+		}
+		assert(rejected, `strict bootstrap fixture rejects invalid raw delimiters for ${key}`);
+	}
+}
 
 // ─── Summary ─────────────────────────────────────────────────────────
 console.log(`\n${passed} passed, ${failed} failed`);
