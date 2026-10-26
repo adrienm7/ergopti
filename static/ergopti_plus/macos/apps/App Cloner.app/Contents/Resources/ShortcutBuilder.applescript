@@ -55,110 +55,102 @@ on resolve_locales_dir()
 	return d
 end resolve_locales_dir
 
--- Extract a single string value from a JSON file by key, using grep+sed.
--- Returns the fallback string if the key is absent or the file does not exist.
-on json_get(json_path, json_key, fallback)
-	try
-		set cmd to "grep -m1 '\"" & json_key & "\"' " & quoted form of json_path ¬
-			& " | sed 's/.*\"" & json_key & "\"[[:space:]]*:[[:space:]]*\"//;s/\"[[:space:]]*,\\{0,1\\}[[:space:]]*$//'"
-		set val to do shell script cmd
-		if val is "" then return fallback
-		return val
-	on error
-		return fallback
-	end try
-end json_get
-
--- Load all UI strings for the given locale from the locale JSON file.
--- Falls back to French (App Cloner's native language) if the locale file
--- is not found, then to hardcoded French as a last resort.
-on load_ui(loc, locales_dir)
+-- Load the requested locale once. The selected catalogue must exist and be a JSON object.
+on load_catalogue(loc, locales_dir)
 	set json_path to locales_dir & "/" & loc & ".json"
-	set ok to false
-	try
-		do shell script "test -f " & quoted form of json_path
-		set ok to true
-	end try
-	if not ok then
-		set json_path to locales_dir & "/fr.json"
-		try
-			do shell script "test -f " & quoted form of json_path
-		on error
-			return my hardcoded_fr_strings()
-		end try
-	end if
+	set json_data to current application's NSData's dataWithContentsOfFile:json_path
+	if json_data is missing value then error "App Cloner locale catalogue is unavailable."
+	set {catalogue, parse_error} to current application's NSJSONSerialization's JSONObjectWithData:json_data options:0 |error|:(reference)
+	if catalogue is missing value then error "App Cloner locale catalogue is invalid JSON."
+	if not ((catalogue's isKindOfClass:(current application's NSDictionary)) as boolean) then ¬
+		error "App Cloner locale catalogue must be a JSON object."
+	return catalogue
+end load_catalogue
 
+-- UI text is an actual nonempty JSON string, never a coerced number, null or container.
+on ui_string(catalogue, json_key)
+	set localized_value to catalogue's objectForKey:json_key
+	if localized_value is missing value then error "App Cloner locale key is missing."
+	if not ((localized_value's isKindOfClass:(current application's NSString)) as boolean) then ¬
+		error "App Cloner locale value must be a string."
+	if ((localized_value's |length|()) as integer) is 0 then error "App Cloner locale string is empty."
+	return localized_value as text
+end ui_string
+
+-- Load one selected catalogue for the whole wizard; every UI value is required.
+on load_ui(loc, locales_dir)
+	set catalogue to my load_catalogue(loc, locales_dir)
 	return {¬
-		btn_cancel: my json_get(json_path, "button.cancel", "Annuler"), ¬
-		btn_ok: my json_get(json_path, "common.ok", "OK"), ¬
-		btn_back: my json_get(json_path, "apps.cloner.btn_back", "Retour"), ¬
-		btn_choose: my json_get(json_path, "apps.cloner.btn_choose", "Choisir"), ¬
-		btn_clone: my json_get(json_path, "apps.cloner.btn_clone", "Cloner l'application"), ¬
-		btn_validate: my json_get(json_path, "apps.cloner.btn_validate", "Valider"), ¬
-		btn_browse: my json_get(json_path, "apps.cloner.btn_browse", "Parcourir…"), ¬
-		btn_pwa_recommended: my json_get(json_path, "apps.cloner.btn_pwa_recommended", "PWA (recommandé)"), ¬
-		btn_try_native: my json_get(json_path, "apps.cloner.btn_try_native", "Tenter natif"), ¬
-		btn_native_clone: my json_get(json_path, "apps.cloner.btn_native_clone", "Cloner l'app native"), ¬
-		btn_pwa_webapp: my json_get(json_path, "apps.cloner.btn_pwa_webapp", "PWA web app"), ¬
-		btn_custom_icon: my json_get(json_path, "apps.cloner.btn_custom_icon", "Personnalisée"), ¬
-		btn_tint_icon: my json_get(json_path, "apps.cloner.btn_tint_icon", "Teinte couleur"), ¬
-		btn_open_log: my json_get(json_path, "apps.cloner.btn_open_log", "Ouvrir le log"), ¬
-		btn_close: my json_get(json_path, "common.close", "Fermer"), ¬
-		title_clone_name: my json_get(json_path, "apps.cloner.title_clone_name", "Nom du clone"), ¬
-		title_pwa_mode: my json_get(json_path, "apps.cloner.title_pwa_mode", "Mode PWA ?"), ¬
-		title_pwa_recommended: my json_get(json_path, "apps.cloner.title_pwa_recommended", "Mode PWA recommandé"), ¬
-		title_open_arg: my json_get(json_path, "apps.cloner.title_open_arg", "Élément à ouvrir au lancement"), ¬
-		title_url_path: my json_get(json_path, "apps.cloner.title_url_path", "URL ou chemin"), ¬
-		title_pwa_url: my json_get(json_path, "apps.cloner.title_pwa_url", "URL PWA"), ¬
-		title_icon_style: my json_get(json_path, "apps.cloner.title_icon_style", "Style d'icône"), ¬
-		title_summary: my json_get(json_path, "apps.cloner.title_summary", "Récapitulatif"), ¬
-		title_error: my json_get(json_path, "apps.cloner.title_error", "❌  Échec de la création du clone"), ¬
-		title_tint: my json_get(json_path, "apps.cloner.title_tint", "Teinte de couleur"), ¬
-		msg_bundle_missing: my json_get(json_path, "apps.cloner.msg_bundle_missing", "Erreur : chemin du bundle manquant. Lancez l'app normalement."), ¬
-		lbl_progress_prep: my json_get(json_path, "apps.cloner.lbl_progress_prep", "Préparation de l'icône et du bundle"), ¬
-		lbl_progress_icon: my json_get(json_path, "apps.cloner.lbl_progress_icon", "Génération de l'icône teintée…"), ¬
-		lbl_progress_sign: my json_get(json_path, "apps.cloner.lbl_progress_sign", "Signature ad-hoc du bundle…"), ¬
-		lbl_progress_dock: my json_get(json_path, "apps.cloner.lbl_progress_dock", "Enregistrement dans le Dock…"), ¬
-		lbl_progress_done: my json_get(json_path, "apps.cloner.lbl_progress_done", "Terminé"), ¬
-		lbl_progress_title: my json_get(json_path, "apps.cloner.lbl_progress_title", "Création du clone en cours…")}
+		btn_cancel: my ui_string(catalogue, "button.cancel"), ¬
+		btn_ok: my ui_string(catalogue, "common.ok"), ¬
+		btn_back: my ui_string(catalogue, "apps.cloner.btn_back"), ¬
+		btn_choose: my ui_string(catalogue, "apps.cloner.btn_choose"), ¬
+		btn_clone: my ui_string(catalogue, "apps.cloner.btn_clone"), ¬
+		btn_validate: my ui_string(catalogue, "apps.cloner.btn_validate"), ¬
+		btn_browse: my ui_string(catalogue, "apps.cloner.btn_browse"), ¬
+		btn_pwa_recommended: my ui_string(catalogue, "apps.cloner.btn_pwa_recommended"), ¬
+		btn_try_native: my ui_string(catalogue, "apps.cloner.btn_try_native"), ¬
+		btn_native_clone: my ui_string(catalogue, "apps.cloner.btn_native_clone"), ¬
+		btn_pwa_webapp: my ui_string(catalogue, "apps.cloner.btn_pwa_webapp"), ¬
+		btn_custom_icon: my ui_string(catalogue, "apps.cloner.btn_custom_icon"), ¬
+		btn_tint_icon: my ui_string(catalogue, "apps.cloner.btn_tint_icon"), ¬
+		btn_open_log: my ui_string(catalogue, "apps.cloner.btn_open_log"), ¬
+		btn_close: my ui_string(catalogue, "common.close"), ¬
+		title_clone_name: my ui_string(catalogue, "apps.cloner.title_clone_name"), ¬
+		title_pwa_mode: my ui_string(catalogue, "apps.cloner.title_pwa_mode"), ¬
+		title_pwa_recommended: my ui_string(catalogue, "apps.cloner.title_pwa_recommended"), ¬
+		title_open_arg: my ui_string(catalogue, "apps.cloner.title_open_arg"), ¬
+		title_url_path: my ui_string(catalogue, "apps.cloner.title_url_path"), ¬
+		title_pwa_url: my ui_string(catalogue, "apps.cloner.title_pwa_url"), ¬
+		title_icon_style: my ui_string(catalogue, "apps.cloner.title_icon_style"), ¬
+		title_summary: my ui_string(catalogue, "apps.cloner.title_summary"), ¬
+		title_error: my ui_string(catalogue, "apps.cloner.title_error"), ¬
+		title_tint: my ui_string(catalogue, "apps.cloner.title_tint"), ¬
+		msg_bundle_missing: my ui_string(catalogue, "apps.cloner.msg_bundle_missing"), ¬
+		lbl_progress_prep: my ui_string(catalogue, "apps.cloner.lbl_progress_prep"), ¬
+		lbl_progress_icon: my ui_string(catalogue, "apps.cloner.lbl_progress_icon"), ¬
+		lbl_progress_sign: my ui_string(catalogue, "apps.cloner.lbl_progress_sign"), ¬
+		lbl_progress_dock: my ui_string(catalogue, "apps.cloner.lbl_progress_dock"), ¬
+		lbl_progress_done: my ui_string(catalogue, "apps.cloner.lbl_progress_done"), ¬
+		lbl_progress_title: my ui_string(catalogue, "apps.cloner.lbl_progress_title"), ¬
+		msg_choose_source: my ui_string(catalogue, "apps.cloner.msg_choose_source"), ¬
+		msg_clone_name: my ui_string(catalogue, "apps.cloner.msg_clone_name"), ¬
+		msg_pwa_recommended: my ui_string(catalogue, "apps.cloner.msg_pwa_recommended"), ¬
+		msg_pwa_optional: my ui_string(catalogue, "apps.cloner.msg_pwa_optional"), ¬
+		msg_pwa_url: my ui_string(catalogue, "apps.cloner.msg_pwa_url"), ¬
+		title_invalid_url: my ui_string(catalogue, "apps.cloner.title_invalid_url"), ¬
+		msg_native_open_optional: my ui_string(catalogue, "apps.cloner.msg_native_open_optional"), ¬
+		msg_url_path: my ui_string(catalogue, "apps.cloner.msg_url_path"), ¬
+		prompt_choose_folder: my ui_string(catalogue, "apps.cloner.prompt_choose_folder"), ¬
+		title_empty_input: my ui_string(catalogue, "apps.cloner.title_empty_input"), ¬
+		msg_empty_input: my ui_string(catalogue, "apps.cloner.msg_empty_input"), ¬
+		title_invalid_input: my ui_string(catalogue, "apps.cloner.title_invalid_input"), ¬
+		msg_icon_style: my ui_string(catalogue, "apps.cloner.msg_icon_style"), ¬
+		prompt_choose_icon: my ui_string(catalogue, "apps.cloner.prompt_choose_icon"), ¬
+		mode_native: my ui_string(catalogue, "apps.cloner.mode_native"), ¬
+		mode_pwa: my ui_string(catalogue, "apps.cloner.mode_pwa"), ¬
+		summary_source: my ui_string(catalogue, "apps.cloner.summary_source"), ¬
+		summary_name: my ui_string(catalogue, "apps.cloner.summary_name"), ¬
+		summary_mode: my ui_string(catalogue, "apps.cloner.summary_mode"), ¬
+		summary_icon: my ui_string(catalogue, "apps.cloner.summary_icon"), ¬
+		summary_url: my ui_string(catalogue, "apps.cloner.summary_url"), ¬
+		err_open_empty: my ui_string(catalogue, "apps.cloner.err_open_empty"), ¬
+		err_path_missing: my ui_string(catalogue, "apps.cloner.err_path_missing"), ¬
+		err_url_format: my ui_string(catalogue, "apps.cloner.err_url_format"), ¬
+		err_teams_url: my ui_string(catalogue, "apps.cloner.err_teams_url"), ¬
+		err_pwa_required: my ui_string(catalogue, "apps.cloner.err_pwa_required"), ¬
+		err_pwa_scheme: my ui_string(catalogue, "apps.cloner.err_pwa_scheme"), ¬
+		menu_edit: my ui_string(catalogue, "apps.cloner.menu_edit"), ¬
+		menu_cut: my ui_string(catalogue, "apps.cloner.menu_cut"), ¬
+		menu_copy: my ui_string(catalogue, "apps.cloner.menu_copy"), ¬
+		menu_paste: my ui_string(catalogue, "apps.cloner.menu_paste"), ¬
+		menu_select_all: my ui_string(catalogue, "apps.cloner.menu_select_all"), ¬
+		menu_undo: my ui_string(catalogue, "apps.cloner.menu_undo"), ¬
+		menu_redo: my ui_string(catalogue, "apps.cloner.menu_redo"), ¬
+		default_clone_name: my ui_string(catalogue, "apps.cloner.default_clone_name"), ¬
+		diagnostic_log_path: my ui_string(catalogue, "apps.cloner.diagnostic_log_path"), ¬
+		value_none: my ui_string(catalogue, "common.none")}
 end load_ui
-
--- Hardcoded French strings used only when the locales directory is unavailable.
-on hardcoded_fr_strings()
-	return {¬
-		btn_cancel: "Annuler", ¬
-		btn_ok: "OK", ¬
-		btn_back: "Retour", ¬
-		btn_choose: "Choisir", ¬
-		btn_clone: "Cloner l'application", ¬
-		btn_validate: "Valider", ¬
-		btn_browse: "Parcourir…", ¬
-		btn_pwa_recommended: "PWA (recommandé)", ¬
-		btn_try_native: "Tenter natif", ¬
-		btn_native_clone: "Cloner l'app native", ¬
-		btn_pwa_webapp: "PWA web app", ¬
-		btn_custom_icon: "Personnalisée", ¬
-		btn_tint_icon: "Teinte couleur", ¬
-		btn_open_log: "Ouvrir le log", ¬
-		btn_close: "Fermer", ¬
-		title_clone_name: "Nom du clone", ¬
-		title_pwa_mode: "Mode PWA ?", ¬
-		title_pwa_recommended: "Mode PWA recommandé", ¬
-		title_open_arg: "Élément à ouvrir au lancement", ¬
-		title_url_path: "URL ou chemin", ¬
-		title_pwa_url: "URL PWA", ¬
-		title_icon_style: "Style d'icône", ¬
-		title_summary: "Récapitulatif", ¬
-		title_error: "❌  Échec de la création du clone", ¬
-		title_tint: "Teinte de couleur", ¬
-		msg_bundle_missing: "Erreur : chemin du bundle manquant. Lancez l'app normalement.", ¬
-		lbl_progress_prep: "Préparation de l'icône et du bundle", ¬
-		lbl_progress_icon: "Génération de l'icône teintée…", ¬
-		lbl_progress_sign: "Signature ad-hoc du bundle…", ¬
-		lbl_progress_dock: "Enregistrement dans le Dock…", ¬
-		lbl_progress_done: "Terminé", ¬
-		lbl_progress_title: "Création du clone en cours…"}
-end hardcoded_fr_strings
 
 
 -- osascript runs without a real Edit menu. Even though NSTextField responds
@@ -302,7 +294,7 @@ on trim(s)
 end trim
 
 -- Validate the optional launch argument the user pasted at clone-creation
--- time. Returns "" when the value is acceptable, or a French error message
+-- time. Returns "" when the value is acceptable, or a localized error message
 -- describing what's wrong so we can re-prompt.
 --
 -- Catches the most common mistakes:
@@ -310,8 +302,8 @@ end trim
 --   * the user typed text instead of pasting a URL / path
 --   * a typo in the scheme such as «mstems:» or «msteams//» (missing colon)
 --   * a Teams clone with a non-Teams URL (and vice-versa) — best-effort hint
-on validateOpenArg(inputVal, sourceAppPath)
-	if inputVal is "" then return "Le champ est vide. Coller une URL ou un chemin de fichier."
+on validateOpenArg(inputVal, sourceAppPath, u)
+	if inputVal is "" then return (err_open_empty of u)
 
 	-- File-system path: must point to something that actually exists
 	if (inputVal starts with "/") or (inputVal starts with "~") then
@@ -322,7 +314,7 @@ on validateOpenArg(inputVal, sourceAppPath)
 		try
 			do shell script "test -e " & quoted form of resolvedPath
 		on error
-			return "Le chemin « " & inputVal & " » n’existe pas sur le disque."
+			return my format_ui(err_path_missing of u, inputVal)
 		end try
 		return ""
 	end if
@@ -332,7 +324,7 @@ on validateOpenArg(inputVal, sourceAppPath)
 	if inputVal does not contain "://" then
 		-- Tolerate the single-slash msteams form Microsoft documents
 		if not (inputVal starts with "msteams:/l/" or inputVal starts with "msteams:/calendar") then
-			return "Format invalide. Une URL doit contenir « :// » (ex. https://… , msteams://… , slack://…)."
+			return (err_url_format of u)
 		end if
 	end if
 
@@ -345,11 +337,17 @@ on validateOpenArg(inputVal, sourceAppPath)
 	set isTeamsURL to (inputLower starts with "msteams:")
 	set isHTTP to (inputLower starts with "http")
 	if isTeamsSource and not (isTeamsURL or isHTTP or (inputLower starts with "/")) then
-		return "Cette app source est Teams, mais l’URL ne commence pas par « msteams: » ni « https: »."
+		return (err_teams_url of u)
 	end if
 
 	return ""
 end validateOpenArg
+
+-- Substitute one canonical positional placeholder without interpreting user data.
+on format_ui(templateText, argumentText)
+	set templateString to current application's NSString's stringWithString:templateText
+	return (templateString's stringByReplacingOccurrencesOfString:"{1}" withString:argumentText) as text
+end format_ui
 
 -- Lowercase via NSString since AppleScript has no case-insensitive ops.
 on toLower(s)
@@ -392,11 +390,11 @@ end pwaSuggestionFor
 
 -- Validate a URL specifically for PWA mode. Stricter than validateOpenArg:
 -- requires http(s) since Edge --app= only accepts navigable web URLs.
-on validatePWAURL(inputVal)
-	if inputVal is "" then return "L’URL de la PWA est obligatoire en mode PWA."
+on validatePWAURL(inputVal, u)
+	if inputVal is "" then return (err_pwa_required of u)
 	set v to my toLower(inputVal)
 	if not (v starts with "http://" or v starts with "https://") then
-		return "L’URL doit commencer par http:// ou https:// (Edge --app= n’accepte que des URLs web)."
+		return (err_pwa_scheme of u)
 	end if
 	return ""
 end validatePWAURL
@@ -897,7 +895,7 @@ on showTintColorPicker(appPath, titleStr, btnValidate, btnBack)
 	return colorWell's |color|
 end showTintColorPicker
 
-on installEditMenu()
+on installEditMenu(u)
 	try
 		set theApp to current application's NSApplication's sharedApplication
 		-- Always rebuild the main menu from scratch. The existence check is unsafe:
@@ -905,15 +903,15 @@ on installEditMenu()
 		-- items from being installed, silently leaving Cmd+V/A/C/X non-functional.
 		set appMainMenu to current application's NSMenu's alloc()'s init
 		theApp's setMainMenu:appMainMenu
-		set editItem to current application's NSMenuItem's alloc()'s initWithTitle:"Edit" action:(missing value) keyEquivalent:""
-		set editMenu to current application's NSMenu's alloc()'s initWithTitle:"Edit"
-		editMenu's addItemWithTitle:"Cut"        action:"cut:"        keyEquivalent:"x"
-		editMenu's addItemWithTitle:"Copy"       action:"copy:"       keyEquivalent:"c"
-		editMenu's addItemWithTitle:"Paste"      action:"paste:"      keyEquivalent:"v"
-		editMenu's addItemWithTitle:"Select All" action:"selectAll:"  keyEquivalent:"a"
-		editMenu's addItemWithTitle:"Undo"       action:"undo:"       keyEquivalent:"z"
+		set editItem to current application's NSMenuItem's alloc()'s initWithTitle:(menu_edit of u) action:(missing value) keyEquivalent:""
+		set editMenu to current application's NSMenu's alloc()'s initWithTitle:(menu_edit of u)
+		editMenu's addItemWithTitle:(menu_cut of u)        action:"cut:"        keyEquivalent:"x"
+		editMenu's addItemWithTitle:(menu_copy of u)       action:"copy:"       keyEquivalent:"c"
+		editMenu's addItemWithTitle:(menu_paste of u)      action:"paste:"      keyEquivalent:"v"
+		editMenu's addItemWithTitle:(menu_select_all of u) action:"selectAll:"  keyEquivalent:"a"
+		editMenu's addItemWithTitle:(menu_undo of u)       action:"undo:"       keyEquivalent:"z"
 		editMenu's addItem:(current application's NSMenuItem's separatorItem())
-		editMenu's addItemWithTitle:"Redo"       action:"redo:"       keyEquivalent:"Z"
+		editMenu's addItemWithTitle:(menu_redo of u)       action:"redo:"       keyEquivalent:"Z"
 		editItem's setSubmenu:editMenu
 		appMainMenu's addItem:editItem
 	on error errMsg
@@ -966,7 +964,7 @@ on run argv
 
 	-- Install a standard Edit menu (Cut/Copy/Paste/Select All/Undo/Redo) so
 	-- the keyboard shortcuts work in every NSAlert text input we open later.
-	my installEditMenu()
+	my installEditMenu(u)
 
 	-- Bring App Cloner to the front (switch Space if needed) on every relaunch.
 	-- Without this, after going into Teams to copy a chat link, clicking the
@@ -1011,8 +1009,8 @@ on run argv
 			-- `choose file` exposes Cancel via the osascript bundle which
 			-- often falls back to English even on a French system.
 			set panel to current application's NSOpenPanel's openPanel
-			panel's setMessage:"Application à cloner"
-			panel's setPrompt:"Choisir"
+			panel's setMessage:(msg_choose_source of u)
+			panel's setPrompt:(btn_choose of u)
 			panel's setCanChooseFiles:true
 			panel's setCanChooseDirectories:false
 			panel's setAllowsMultipleSelection:false
@@ -1021,7 +1019,7 @@ on run argv
 			-- on NSSavePanel (NSOpenPanel's superclass) but the KVC accessor
 			-- works on Tahoe; if it does not, the system label is shown.
 			try
-				panel's setValue:"Annuler" forKey:"cancelButtonTitle"
+				panel's setValue:(btn_cancel of u) forKey:"cancelButtonTitle"
 			end try
 			set appsFolder to path to applications folder
 			try
@@ -1036,20 +1034,20 @@ on run argv
 			set sourcePath to (chosenURL's |path|()) as text
 			logmsg("source: " & sourcePath)
 			set defaultName to do shell script "basename " & quoted form of sourcePath & " .app"
-			set cloneName to defaultName & " — Clone"
+			set cloneName to my format_ui(default_clone_name of u, defaultName)
 			set step to 2
 
 		-- ===== 2) Clone name =====
 		else if step = 2 then
 			tell me to activate
 			try
-				set r to my customDialog((title_clone_name of u), "Nom à afficher sous l’icône du Dock.", ¬
+				set r to my customDialog((title_clone_name of u), (msg_clone_name of u), ¬
 					{btn_back of u, btn_ok of u}, true, cloneName, 1, 280, false, "")
 				if (chosenButton of r) is (btn_back of u) then
 					set step to 1
 				else
 					set entered to my trim(inputText of r)
-					if entered is "" then set entered to defaultName & " Clone"
+					if entered is "" then set entered to my format_ui(default_clone_name of u, defaultName)
 					set cloneName to entered
 					logmsg("cloneName: " & cloneName)
 					set step to 3
@@ -1071,16 +1069,11 @@ on run argv
 			try
 				if pwaForced then
 					set pwaAnswer to my chooseButton((title_pwa_recommended of u), ¬
-						"Cette app ne peut pas être clonée au niveau binaire" & return & ¬
-						"(sandbox + signature liée au fournisseur)." & return & return & ¬
-						"Le mode PWA installe une version web isolée via un navigateur" & return & ¬
-						"avec sa propre fenêtre, son propre profil et son propre compte.", ¬
+						(msg_pwa_recommended of u), ¬
 						{btn_back of u, btn_try_native of u, btn_pwa_recommended of u}, "App Cloner")
 				else
 					set pwaAnswer to my chooseButton((title_pwa_mode of u), ¬
-						"Cloner via une web app (navigateur --app=URL)" & return & ¬
-						"au lieu de relancer l’app native." & return & return & ¬
-						"Utile pour avoir des comptes séparés sans dépendance au binaire.", ¬
+						(msg_pwa_optional of u), ¬
 						{btn_back of u, btn_pwa_webapp of u, btn_native_clone of u}, "App Cloner")
 				end if
 				if pwaAnswer is (btn_back of u) then
@@ -1108,15 +1101,7 @@ on run argv
 				-- are dispatched to the source desktop app via `open -a`,
 				-- forcing the user to switch to the real app for anything
 				-- outside the original conversation/page.
-				set urlBody to ¬
-					"URL à ouvrir dans la PWA (Entrée pour valider) :" & return & return & ¬
-					"── Microsoft Teams ──────────────────────────────" & return & ¬
-					"App entière : https://teams.microsoft.com/v2/" & return & ¬
-					"Conversation : Teams → conv → ⋯ → « Copier le lien »" & return & ¬
-					"Canal : clic-droit canal → « Lien vers le canal »" & return & return & ¬
-					"── Outlook ──────────────────────────────────────" & return & ¬
-					"Boîte de réception : https://outlook.office.com/mail/" & return & ¬
-					"Calendrier : https://outlook.office.com/calendar/"
+				set urlBody to (msg_pwa_url of u)
 				try
 					set r to my customDialog((title_pwa_url of u), urlBody, ¬
 						{btn_back of u, btn_ok of u}, true, pwaURL, -1, 600, false, "")
@@ -1124,13 +1109,13 @@ on run argv
 						set step to 3
 					else
 						set candidate to my trim(inputText of r)
-						set pwaErr to my validatePWAURL(candidate)
+						set pwaErr to my validatePWAURL(candidate, u)
 						if pwaErr is "" then
 							set pwaURL to candidate
 							set openArg to candidate
 							set step to 5
 						else
-							display alert "URL invalide" message pwaErr as warning
+							display alert (title_invalid_url of u) message pwaErr as warning
 							-- Stay on step 4 to re-prompt
 						end if
 					end if
@@ -1148,12 +1133,12 @@ on run argv
 					if nativeSubStep = 0 then
 						try
 							set openTypeAnswer to my chooseButton((title_open_arg of u), ¬
-								"Optionnel — laisser à « Rien » pour simplement lancer l’app.", ¬
-								{btn_back of u, "Rien", (title_url_path of u)}, "App Cloner")
+								(my format_ui(msg_native_open_optional of u, value_none of u)), ¬
+								{btn_back of u, value_none of u, title_url_path of u}, "App Cloner")
 							if openTypeAnswer is (btn_back of u) then
 								set step to 3
 								set nativeDone to true
-							else if openTypeAnswer is "Rien" then
+							else if openTypeAnswer is (value_none of u) then
 								set openArg to ""
 								set step to 5
 								set nativeDone to true
@@ -1168,20 +1153,7 @@ on run argv
 					else
 						-- URL / path input with an inline Parcourir… button that fills
 						-- the field with a folder path chosen via the system picker.
-						set urlPrompt to ¬
-							"Coller l’URL ou le chemin à ouvrir au lancement." & return & return & ¬
-							"📅  Outlook calendrier :   ms-outlook://events" & return & return & ¬
-							"📨  Outlook mail :         ms-outlook://" & return & return & ¬
-							"💬  Teams (une conv) :     msteams:/l/chat/0/0?users=foo@bar.com" & return & ¬
-							"     → Teams : clic-droit conv → « Get link to chat »" & return & return & ¬
-							"📅  Teams calendrier :     msteams:/l/calendar" & return & return & ¬
-							"💼  Slack (chaîne) :       slack://channel?team=T1234&id=C5678" & return & ¬
-							"     → Slack → ⋮ d'une chaîne → « Copy link »" & return & return & ¬
-							"📝  Notion (page) :        notion://www.notion.so/My-Page-abc123" & return & return & ¬
-							"🎵  Spotify (playlist) :   spotify:playlist:37i9dQZF1DXcBWIGoYBM5M" & return & return & ¬
-							"🎮  Discord (salon) :      discord://discord.com/channels/SERVER/CHANNEL" & return & return & ¬
-							"🌐  Tout site web :        https://example.com" & return & return & ¬
-							"📁  Dossier ou fichier :   /Users/moi/projet"
+						set urlPrompt to (msg_url_path of u)
 						set inputDefault to openArg
 						set inputDone to false
 						repeat while not inputDone
@@ -1196,7 +1168,7 @@ on run argv
 								else if btnChosen is (btn_browse of u) then
 									-- Open folder picker and pre-fill the text field
 									try
-										set folderAlias to choose folder with prompt "Dossier à ouvrir avec le clone"
+										set folderAlias to choose folder with prompt (prompt_choose_folder of u)
 										set inputDefault to POSIX path of folderAlias
 									on error
 										-- Picker cancelled — keep current inputDefault
@@ -1205,16 +1177,16 @@ on run argv
 									-- Valider
 									set candidate to my trim(inputText of r)
 									if candidate is "" then
-										display alert "Champ vide" message "Saisir une URL ou un chemin, ou cliquer sur Parcourir…" as warning
+										display alert (title_empty_input of u) message (my format_ui(msg_empty_input of u, btn_browse of u)) as warning
 									else
-										set validationError to my validateOpenArg(candidate, sourcePath)
+										set validationError to my validateOpenArg(candidate, sourcePath, u)
 										if validationError is "" then
 											set openArg to candidate
 											set step to 5
 											set nativeDone to true
 											set inputDone to true
 										else
-											display alert "Entrée invalide" message validationError as warning
+											display alert (title_invalid_input of u) message validationError as warning
 											set inputDefault to candidate
 										end if
 									end if
@@ -1236,11 +1208,7 @@ on run argv
 			repeat while not iconChosen
 				try
 					set iconChoice to my chooseButton((title_icon_style of u), ¬
-						"  • Personnalisée — utilise une image (PNG, ICNS, JPG…)" & return & ¬
-						"    en remplacement de l’icône d’origine." & return & ¬
-						return & ¬
-						"  • Teinte couleur — applique une teinte sur l’icône d’origine." & return & ¬
-						"    (opacité 0 = noir & blanc)", ¬
+						(msg_icon_style of u), ¬
 						{btn_back of u, btn_custom_icon of u, btn_tint_icon of u}, "App Cloner")
 					if iconChoice is (btn_back of u) then
 						set step to 4
@@ -1263,7 +1231,7 @@ on run argv
 					else if iconChoice is (btn_custom_icon of u) then
 						try
 							set iconAlias to choose file ¬
-								with prompt "Image à utiliser pour l’icône" ¬
+								with prompt (prompt_choose_icon of u) ¬
 								of type {"public.image", "com.apple.icns"} ¬
 								default location (path to downloads folder)
 							set iconPath to POSIX path of iconAlias
@@ -1284,21 +1252,21 @@ on run argv
 
 		-- ===== 6) Confirmation and creation =====
 		else if step = 6 then
-			set openArgDisplay to "(aucun)"
+			set openArgDisplay to (value_none of u)
 			if openArg is not "" then set openArgDisplay to openArg
 			set iconDisplay to ""
 			if iconMode is "tint" then
-				set iconDisplay to "Teinte " & colorHex
+				set iconDisplay to (btn_tint_icon of u) & " " & colorHex
 			else
-				set iconDisplay to "Personnalisée — " & iconPath
+				set iconDisplay to (btn_custom_icon of u) & " — " & iconPath
 			end if
-			set modeDisplay to "App native"
-			if pwaMode then set modeDisplay to "PWA web app (WKWebView)"
-			set summary to "• Source : " & sourcePath & return ¬
-				& "• Nom : " & cloneName & return ¬
-				& "• Mode : " & modeDisplay & return ¬
-				& "• Icône : " & iconDisplay & return ¬
-				& "• URL : " & openArgDisplay
+			set modeDisplay to (mode_native of u)
+			if pwaMode then set modeDisplay to (mode_pwa of u)
+			set summary to "• " & (summary_source of u) & " : " & sourcePath & return ¬
+				& "• " & (summary_name of u) & " : " & cloneName & return ¬
+				& "• " & (summary_mode of u) & " : " & modeDisplay & return ¬
+				& "• " & (summary_icon of u) & " : " & iconDisplay & return ¬
+				& "• " & (summary_url of u) & " : " & openArgDisplay
 			tell me to activate
 			try
 				set summaryResult to my customDialog((title_summary of u), summary, ¬
@@ -1394,7 +1362,7 @@ on run argv
 		set diagnosticMessage to (title_error of u)
 		set errorButtons to {btn_close of u}
 		if appLogPath is not "" then
-			set diagnosticMessage to "Le diagnostic complet est dans " & appLogPath
+			set diagnosticMessage to my format_ui(diagnostic_log_path of u, appLogPath)
 			set errorButtons to {btn_open_log of u, btn_close of u}
 		end if
 		set errBtn to my chooseButton((title_error of u), ¬
