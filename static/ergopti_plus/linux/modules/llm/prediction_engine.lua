@@ -440,14 +440,7 @@ end
 --- @return table|nil config { debounce_ms, min_words }, string|nil reason
 function M.parse_live_config(text)
 	local ok, root = pcall(function() return type(text) == "string" and Json.decode(text) or nil end)
-	if not ok or type(root) ~= "table" then return nil, "live.json is missing or not JSON" end
-	for _, key in ipairs({ "debounce_ms", "min_words" }) do
-		local value = root[key]
-		if type(value) ~= "number" or value < 0 or value % 1 ~= 0 then
-			return nil, "live.json " .. key .. " is not a non-negative integer"
-		end
-	end
-	return { debounce_ms = root.debounce_ms, min_words = root.min_words }, nil
+	return require("llm.request_plan.live").config(ok and root or nil)
 end
 
 --- The shipped live.json. A missing or malformed file is an installation
@@ -486,16 +479,17 @@ local function live_override()
 	if not _live then return nil end
 	-- Loaded when live mode started, which refuses without it: never nil here.
 	local config = live_config()
-	local profile = binding_profile(_live)
-	if not profile then
+	local decision = require("llm.request_plan.live").decide(
+		config, _live, ProfileSettings.get("num_predictions") or 1, binding_profile(_live))
+	if decision.action == "stop" then
 		Logger.warn(LOG, "Live mode stopped: the prompt '%s' no longer exists.", _live.profile_id)
-		M.stop_live("prompt deleted", false)
+		M.stop_live(decision.cause, false)
 		return nil
 	end
 	return {
-		profile = profile,
-		num_predictions = _live.num_predictions,
-		min_words = config.min_words,
+		profile = decision.profile,
+		num_predictions = decision.num_predictions,
+		min_words = decision.min_words,
 		live = true,
 	}
 end

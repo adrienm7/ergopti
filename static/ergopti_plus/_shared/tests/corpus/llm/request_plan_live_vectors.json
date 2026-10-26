@@ -1,0 +1,130 @@
+{
+	"_comment": "What a live-mode keystroke asks for, replayed through _shared/lua/llm/request_plan/live.lua by the macOS and Linux runners. config vectors validate the decoded live.json (the real file is {debounce_ms: 80, min_words: 0}); decide vectors give the receipt live mode started with, the menu's count and whether the prompt still exists (profile_found). A deleted prompt stops live mode and asks for nothing; macOS used to run the keystroke with the menu's prompt after stopping, a convergence to Linux and to the rule that live typing never falls back. A receipt without its own count uses the menu's. expect_error is a substring of the message the plan must raise.",
+	"drivers": {
+		"macos": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
+		"linux": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
+		"windows": "Not ported yet: the AutoHotkey live mode must validate live.json as config does, and stop (asking for nothing) when the prompt is deleted; it must replay every vector."
+	},
+	"differences": {
+		"deleted_prompt": "macOS used to run the keystroke once with the menu's prompt after stopping live mode; it now asks for nothing, as Linux did. Convergence, written reason: live typing never falls back to a prompt the user did not choose for it.",
+		"strict_config": "macOS floored a fractional min_words and accepted numeric strings; both drivers now refuse them like Linux. The shipped file is valid, so no user sees a change."
+	},
+	"vectors": [
+		{
+			"id": "config-accepts-the-shipped-file",
+			"config": {
+				"debounce_ms": 80,
+				"min_words": 0
+			},
+			"expect": {
+				"debounce_ms": 80,
+				"min_words": 0
+			}
+		},
+		{
+			"id": "config-refuses-a-missing-file",
+			"config_missing": true,
+			"expect_reason": "live.json is missing or not JSON"
+		},
+		{
+			"id": "config-refuses-a-negative-debounce",
+			"config": {
+				"debounce_ms": -1,
+				"min_words": 0
+			},
+			"expect_reason": "live.json debounce_ms is not a non-negative integer"
+		},
+		{
+			"id": "config-refuses-a-fractional-min-words",
+			"config": {
+				"debounce_ms": 80,
+				"min_words": 1.5
+			},
+			"expect_reason": "live.json min_words is not a non-negative integer"
+		},
+		{
+			"id": "config-refuses-a-string-number",
+			"config": {
+				"debounce_ms": "80",
+				"min_words": 0
+			},
+			"expect_reason": "live.json debounce_ms is not a non-negative integer"
+		},
+		{
+			"id": "decide-uses-the-receipts-count",
+			"live_config": {
+				"debounce_ms": 80,
+				"min_words": 2
+			},
+			"receipt": {
+				"profile_id": "translate",
+				"num_predictions": 1
+			},
+			"menu_count": 3,
+			"profile_found": true,
+			"expect": {
+				"action": "request",
+				"num_predictions": 1,
+				"min_words": 2
+			}
+		},
+		{
+			"id": "decide-falls-back-to-the-menus-count",
+			"live_config": {
+				"debounce_ms": 80,
+				"min_words": 0
+			},
+			"receipt": {
+				"profile_id": "user_1_2"
+			},
+			"menu_count": 3,
+			"profile_found": true,
+			"expect": {
+				"action": "request",
+				"num_predictions": 3,
+				"min_words": 0
+			}
+		},
+		{
+			"id": "decide-stops-when-the-prompt-was-deleted",
+			"live_config": {
+				"debounce_ms": 80,
+				"min_words": 0
+			},
+			"receipt": {
+				"profile_id": "user_1_2",
+				"num_predictions": 2
+			},
+			"menu_count": 3,
+			"profile_found": false,
+			"expect": {
+				"action": "stop",
+				"cause": "prompt deleted"
+			}
+		},
+		{
+			"id": "decide-refuses-a-receipt-without-a-prompt",
+			"live_config": {
+				"debounce_ms": 80,
+				"min_words": 0
+			},
+			"receipt": {},
+			"menu_count": 3,
+			"profile_found": true,
+			"expect_error": "receipt needs a profile_id"
+		},
+		{
+			"id": "decide-refuses-a-zero-menu-count",
+			"live_config": {
+				"debounce_ms": 80,
+				"min_words": 0
+			},
+			"receipt": {
+				"profile_id": "basic"
+			},
+			"menu_count": 0,
+			"profile_found": true,
+			"expect_error": "menu_count must be a whole number from 1"
+		}
+	]
+}
