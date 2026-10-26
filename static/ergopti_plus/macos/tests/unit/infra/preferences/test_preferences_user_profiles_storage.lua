@@ -56,4 +56,42 @@ helpers.describe("user prompt profiles are stored at the key every OS reads (par
 			helpers.assert_eq(saved.llm.enabled, true)
 		end)
 	end)
+
+	helpers.it("keeps the profiles an older build stored at [llm.profiles] user_profiles", function()
+		local source = "[llm]\nenabled = true\n[llm.profiles]\nactive = \"user_first\"\n"
+			.. "user_profiles = [{ id = \"user_first\", label = \"First Profile\", system_single = \"first\" }, "
+			.. "{ id = \"user_second\", label = \"Second Profile\", system_single = \"second\" }]\n"
+		Sandbox.with_config(source, function(path)
+			local saved, status = Preferences.load(path)
+			helpers.assert_eq(status, "ok")
+			helpers.assert_eq(saved.llm_user_profiles, PROFILES, "the old array is imported")
+			helpers.assert_eq(saved.llm_active_profile, "user_first", "its ids stay valid profile references")
+			helpers.assert_eq(Preferences.save(path, { llm_user_profiles = saved.llm_user_profiles }, {}, {}), true)
+			local written = TomlCodec.decode(Sandbox.read_bytes(path))
+			helpers.assert_eq(ProfileRegistry.decode(written.llm.user_profiles), PROFILES)
+			helpers.assert_nil(type(written.llm.profiles) == "table" and written.llm.profiles.user_profiles or nil,
+				"the old array leaves the file in the write that stores the envelope")
+			helpers.assert_eq(written.llm.profiles.active, "user_first")
+		end)
+	end)
+
+	helpers.it("does not bring the old array back once the registry was emptied", function()
+		local source = "[llm]\nenabled = true\n[llm.profiles]\n"
+			.. "user_profiles = [{ id = \"user_first\", label = \"First Profile\", system_single = \"first\" }]\n"
+		Sandbox.with_config(source, function(path)
+			local saved = Preferences.load(path)
+			helpers.assert_eq(#saved.llm_user_profiles, 1)
+			helpers.assert_eq(Preferences.save(path, { llm_user_profiles = {} }, {}, {}), true)
+			local again = Preferences.load(path)
+			helpers.assert_nil(again.llm_user_profiles, "nothing is imported twice")
+		end)
+	end)
+
+	helpers.it("lets the shared envelope win over an older array", function()
+		local source = "[llm]\nuser_profiles = \"" .. ProfileRegistry.encode(PROFILES) .. "\"\n[llm.profiles]\n"
+			.. "user_profiles = [{ id = \"user_old\", label = \"Old\" }]\n"
+		Sandbox.with_config(source, function(path)
+			helpers.assert_eq(select(1, Preferences.load(path)).llm_user_profiles, PROFILES)
+		end)
+	end)
 end)
