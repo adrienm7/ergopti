@@ -236,7 +236,7 @@ _WMPW_EveryReopenPresentsThroughTheHelper() {
 	Sites := Map(
 		"_CLW_OpenCapturedRequest", "WMPresentWindow(_CLW_Gui)",
 		"Updater_ShowUpdatePrompt", "WMPresentWindow(_Updater_PromptGui)",
-		"_LLM_ModelBrowser_ShowWeb", "WMPresentWindow(_LLM_MBW_Gui)",
+		"_LLM_ModelBrowser_ShowWeb", "WMPresentWindow(Window)",
 		"_PathsEdWeb_TryOpen", "WMPresentWindow(_PathsEdWeb_Gui)",
 		"_PiEdWeb_TryOpen", "WMPresentWindow(_PiEdWeb_Gui)",
 		"LayoutManager_Open", "WMPresentWindow(_LayMgrWeb_Gui)",
@@ -247,7 +247,8 @@ _WMPW_EveryReopenPresentsThroughTheHelper() {
 		"OpenHotstringsConfigWindow", "WMPresentWindow(_HCWGui)",
 		"KLWV_Focus", 'WMPresentWindow(KLWV.windows[which]["gui"])'
 	)
-	CapturedGlobals := Map("_HsEdWeb_TryOpen", "_HsEdWeb_Gui",
+	CapturedGlobals := Map("_LLM_ModelBrowser_ShowWeb", "_LLM_MBW_Gui",
+		"_HsEdWeb_TryOpen", "_HsEdWeb_Gui",
 		"_PromptEdWeb_TryOpen", "_PromptEdWeb_Gui")
 	for Name, Call in Sites {
 		Body := _StripFullLineComments(_DriverFuncBody(Name))

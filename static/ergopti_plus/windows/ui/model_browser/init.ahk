@@ -371,92 +371,135 @@ global LLM_MBW_HOST_ACCESS_ALLOW := 1
  * @returns {Gui|string}
  */
 _LLM_ModelBrowser_ShowWeb() {
-	global _LLM_MBW_Gui, _LLM_MBW_Controller, _LLM_MBW_WebView, _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_ResetDone, _LLM_MBW_SessionEpoch, _VendorDir, _I18nLocale
+	global _LLM_MBW_Gui, _LLM_MBW_Controller, _LLM_MBW_WebView, _LLM_MBW_MsgSub
+	global _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_ResetDone, _LLM_MBW_SessionEpoch
+	global _VendorDir, _SharedDir, _I18nLocale
 
-	; Singleton: reuse the open window and just refresh the catalogue.
 	if IsSet(_LLM_MBW_Gui) {
-		WMPresentWindow(_LLM_MBW_Gui)
-		_LLM_MBW_InjectCatalogue()
-		return _LLM_MBW_Gui
+		Window := _LLM_MBW_Gui, SessionEpoch := _LLM_MBW_SessionEpoch
+		WMPresentWindow(Window)
+		if _LLM_MBW_StartupCurrent(SessionEpoch, Window)
+			_LLM_MBW_InjectCatalogue(SessionEpoch)
+		return Window
 	}
-
-	EpochCritical := Critical("On")
+	PreviousCritical := Critical("On")
 	try {
 		_LLM_MBW_SessionEpoch += 1
 		SessionEpoch := _LLM_MBW_SessionEpoch
+		_LLM_MBW_ResetDone := false
 		_LLM_MBW_Ready := false
 		_LLM_MBW_Queue := []
-	} finally {
-		Critical(EpochCritical)
-	}
+	} finally Critical(PreviousCritical)
 
 	g := Gui_Create("+Resize +MinSize780x460", t("model_browser.window_title"))
-	g.BackColor := "0x1e1e1e"
-	g.MarginX   := 0
-	g.MarginY   := 0
-	Placeholder := g.Add("Text", "x0 y0 w900 h580", "")
-	g.OnEvent("Close",  _LLM_MBW_OnClose)
-	g.OnEvent("Escape", _LLM_MBW_OnClose)
-	g.OnEvent("Size",   _LLM_MBW_OnResize)
-	g.Show("w900 h580")
-	_LLM_MBW_Gui := g
-
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-
+	Installed := false, FactoryFailed := false, ResetForFallback := false
 	try {
-		; Reuse the shared session environment (infra/webview_utils.ahk) so no
-		; second Chromium process boots and reopens are near-instant.
-		_LLM_MBW_Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
-	} catch as Err {
-		try LoggerError("LLM.browser", "WebView2 create failed: {1}.", Err.Message)
-		try g.Destroy()
-		_LLM_MBW_Reset()
-		; Clear the handle explicitly: the reset above short-circuits when a
-		; previous session already latched _LLM_MBW_ResetDone, and a _LLM_MBW_Gui
-		; left pointing at the Gui just destroyed would make every later open take
-		; the singleton branch instead of building a window.
-		_LLM_MBW_Gui := unset
-		return ""
+		if !_LLM_MBW_StartupCurrent(SessionEpoch)
+			return g
+		g.BackColor := "0x1e1e1e"
+		g.MarginX := 0
+		g.MarginY := 0
+		Placeholder := g.Add("Text", "x0 y0 w900 h580", "")
+		g.OnEvent("Close", _LLM_MBW_SessionCall.Bind(SessionEpoch, _LLM_MBW_OnClose))
+		g.OnEvent("Escape", _LLM_MBW_SessionCall.Bind(SessionEpoch, _LLM_MBW_OnClose))
+		g.OnEvent("Size", _LLM_MBW_SessionCall.Bind(SessionEpoch, _LLM_MBW_OnResize))
+		; Show pumps native Close. Publish before that call, never after it.
+		PreviousCritical := Critical("On")
+		try {
+			if !_LLM_MBW_StartupCurrent(SessionEpoch)
+				return g
+			_LLM_MBW_Gui := g
+		} finally Critical(PreviousCritical)
+		g.Show("w900 h580")
+		if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
+			return g
+
+		loader := _VendorDir . "\64bit\WebView2Loader.dll"
+		try {
+			Environment := WebView_SharedEnvironment(loader)
+			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
+				return g
+			Controller := WebView2.create(Placeholder.Hwnd, , Environment)
+		} catch as Err {
+			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
+				return g
+			try LoggerError("LLM.browser", "WebView2 create failed: {1}.", Err.Message)
+			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
+				return g
+			FactoryFailed := true
+		}
+		if !FactoryFailed {
+			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
+				return g
+			View := Controller.CoreWebView2
+			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
+				return g
+			try {
+				s := View.Settings
+				for Setting in ["AreDevToolsEnabled", "AreDefaultContextMenusEnabled", "IsStatusBarEnabled",
+					"AreBrowserAcceleratorKeysEnabled", "IsSwipeNavigationEnabled"] {
+					if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
+						return g
+					s.%Setting% := false
+				}
+			}
+			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
+				return g
+			MsgSub := View.WebMessageReceived(_LLM_MBW_OnWebMessage.Bind(SessionEpoch))
+			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
+				return g
+			try View.SetVirtualHostNameToFolderMapping(LLM_MBW_VHOST, _SharedDir, LLM_MBW_HOST_ACCESS_ALLOW)
+			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
+				return g
+			seed := "window.__i18n_base='" . _LLM_MBW_LocalesUrl() . "';"
+				. "window._i18n_locale='" . _I18nLocale . "';"
+			try View.AddScriptToExecuteOnDocumentCreated(seed)
+			PreviousCritical := Critical("On")
+			try {
+				if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
+					return g
+				_LLM_MBW_Controller := Controller
+				_LLM_MBW_WebView := View
+				_LLM_MBW_MsgSub := MsgSub
+				MsgSub := unset
+				Installed := true
+			} finally Critical(PreviousCritical)
+			try View.Navigate(_LLM_MBW_HtmlUrl())
+			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
+				return g
+			try Controller.Fill()
+			if !_LLM_MBW_StartupCurrent(SessionEpoch, g)
+				return g
+			SetTimer(_LLM_MBW_SafetyFlush.Bind(SessionEpoch), -2000)
+			Script := _LLM_MBW_I18nApplyScript()
+			_LLM_MBW_Eval(Script, SessionEpoch)
+			return g
+		}
+	} finally {
+		if !Installed {
+			; Only this frame's captured resources retire, even if Close reopens.
+			ResetForFallback := _LLM_MBW_Reset(SessionEpoch, g)
+			try MsgSub := unset
+			if IsSet(Controller)
+				try Controller.Close()
+			try g.Destroy()
+		}
 	}
+	; A retired constructor is handled. Only a still-owned factory failure
+	; may ask the public entry to open the native fallback.
+	return FactoryFailed && ResetForFallback && _LLM_MBW_SessionEpoch == SessionEpoch + 1
+		&& !IsSet(_LLM_MBW_Gui) ? "" : g
+}
 
-	_LLM_MBW_WebView := _LLM_MBW_Controller.CoreWebView2
-	; This controller/webview pair is fresh — re-arm the Reset() guard so this
-	; session's close actually tears it down instead of short-circuiting on a flag
-	; left behind by an earlier _LLM_MBW_Reset() call.
-	_LLM_MBW_ResetDone := false
+_LLM_MBW_StartupCurrent(SessionEpoch, Window := unset) {
+	global _LLM_MBW_SessionEpoch, _LLM_MBW_ResetDone, _LLM_MBW_Gui
+	return SessionEpoch == _LLM_MBW_SessionEpoch && !_LLM_MBW_ResetDone
+		&& (!IsSet(Window) || (IsSet(_LLM_MBW_Gui) && _LLM_MBW_Gui == Window))
+}
 
-	; Harden the webview — no devtools, context menu, status bar, or accelerators.
-	try {
-		s := _LLM_MBW_WebView.Settings
-		s.AreDevToolsEnabled               := false
-		s.AreDefaultContextMenusEnabled    := false
-		s.IsStatusBarEnabled               := false
-		s.AreBrowserAcceleratorKeysEnabled := false
-		s.IsSwipeNavigationEnabled         := false
-	}
-
-	; JS -> AHK bridge. Store the subscription handle in a persistent global --
-	; discarding it lets the binding GC it and silently unsubscribe the handler.
-	global _LLM_MBW_MsgSub := _LLM_MBW_WebView.WebMessageReceived(
-		_LLM_MBW_OnWebMessage.Bind(SessionEpoch))
-
-	; Map the virtual host BEFORE navigating so the document and every relative
-	; asset and the locale fetch resolve through it instead of an opaque file://
-	; origin.
-	try _LLM_MBW_WebView.SetVirtualHostNameToFolderMapping(LLM_MBW_VHOST, _SharedDir, LLM_MBW_HOST_ACCESS_ALLOW)
-
-	; Seed the i18n base + locale before the page scripts run so i18n.js resolves.
-	seed := "window.__i18n_base='" . _LLM_MBW_LocalesUrl() . "';"
-		. "window._i18n_locale='" . _I18nLocale . "';"
-	try _LLM_MBW_WebView.AddScriptToExecuteOnDocumentCreated(seed)
-
-	try _LLM_MBW_WebView.Navigate(_LLM_MBW_HtmlUrl())
-	try _LLM_MBW_Controller.Fill()
-
-	SetTimer(_LLM_MBW_SafetyFlush.Bind(SessionEpoch), -2000)
-	; Inject the locale strings (read from disk) once the page is ready.
-	_LLM_MBW_Eval(_LLM_MBW_I18nApplyScript())
-	return g
+_LLM_MBW_SessionCall(SessionEpoch, Callback, Params*) {
+	if _LLM_MBW_StartupCurrent(SessionEpoch)
+		return Callback.Call(Params*)
 }
 
 /**
@@ -771,19 +814,13 @@ _LLM_MBW_Num(v) {
 	return Format("{:.2f}", n)
 }
 
-_LLM_MBW_OnClose(*) {
+_LLM_MBW_OnClose(ExpectedWindow := unset, *) {
 	global _LLM_MBW_Gui
-	; Save the Gui reference BEFORE Reset clears the global, then close the
-	; WebView2 controller first (while the parent window is still alive) and
-	; only destroy the Gui afterwards — the WebView2 spec requires Controller
-	; to be closed before its host HWND is destroyed
-	saved_gui := IsSet(_LLM_MBW_Gui) ? _LLM_MBW_Gui : 0
-	_LLM_MBW_Reset()
-	try {
-		if saved_gui
-			saved_gui.Destroy()
-	}
-	_LLM_MBW_Gui := unset   ; Always clear the reference, even if Destroy threw
+	Window := IsSet(ExpectedWindow) ? ExpectedWindow : (IsSet(_LLM_MBW_Gui) ? _LLM_MBW_Gui : 0)
+	if !_LLM_MBW_Reset(, Window)
+		return
+	if IsObject(Window)
+		try Window.Destroy()
 }
 
 _LLM_MBW_OnResize(GuiObj, MinMax, Width, Height) {
@@ -794,28 +831,37 @@ _LLM_MBW_OnResize(GuiObj, MinMax, Width, Height) {
 		try _LLM_MBW_Controller.Fill()
 }
 
-_LLM_MBW_Reset() {
-	global _LLM_MBW_Gui, _LLM_MBW_WebView, _LLM_MBW_Controller, _LLM_MBW_MsgSub, _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_ResetDone, _LLM_MBW_SessionEpoch
-	; Close, Escape and the deferred model-apply all land here, and
-	; Controller.Close() pumps messages — so a second dispatch can re-enter this
-	; function while the first teardown is still in flight. Short-circuit instead
-	; of running the release + Close sequence twice against a controller that is
-	; already going away.
-	if _LLM_MBW_ResetDone
-		return
-	_LLM_MBW_ResetDone := true
-	; Invalidate timers and callbacks before releasing any COM owner. A timer that
-	; was already queued may still run, but it cannot target a later WebView.
-	_LLM_MBW_SessionEpoch += 1
-	; Release the subscription FIRST, while the controller is still alive. Its
-	; __Delete unsubscribes via remove_WebMessageReceived on the live
-	; controller; doing it AFTER Controller.Close() raises a COM error.
-	try _LLM_MBW_MsgSub := unset
-	if IsSet(_LLM_MBW_Controller)
-		try _LLM_MBW_Controller.Close()
-	_LLM_MBW_Gui        := unset
-	_LLM_MBW_WebView    := unset
-	_LLM_MBW_Controller := unset
-	_LLM_MBW_Ready      := false
-	_LLM_MBW_Queue      := []
+_LLM_MBW_Reset(ExpectedEpoch := unset, ExpectedWindow := unset) {
+	global _LLM_MBW_Gui, _LLM_MBW_WebView, _LLM_MBW_Controller, _LLM_MBW_MsgSub
+	global _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_ResetDone, _LLM_MBW_SessionEpoch
+	PreviousCritical := Critical("On")
+	try {
+		if _LLM_MBW_ResetDone
+			return false
+		if (IsSet(ExpectedEpoch) && ExpectedEpoch != _LLM_MBW_SessionEpoch)
+			|| (IsSet(ExpectedWindow) && IsSet(_LLM_MBW_Gui) && _LLM_MBW_Gui != ExpectedWindow)
+			return false
+		; Detach RAM before releasing subscriptions or closing COM: either can
+		; pump a replacement which owns entirely different global references.
+		if IsSet(_LLM_MBW_Gui)
+			RetiredWindow := _LLM_MBW_Gui
+		if IsSet(_LLM_MBW_WebView)
+			RetiredView := _LLM_MBW_WebView
+		if IsSet(_LLM_MBW_Controller)
+			RetiredController := _LLM_MBW_Controller
+		if IsSet(_LLM_MBW_MsgSub)
+			RetiredMsgSub := _LLM_MBW_MsgSub
+		_LLM_MBW_ResetDone := true
+		_LLM_MBW_SessionEpoch += 1
+		_LLM_MBW_Gui := unset
+		_LLM_MBW_WebView := unset
+		_LLM_MBW_Controller := unset
+		_LLM_MBW_MsgSub := unset
+		_LLM_MBW_Ready := false
+		_LLM_MBW_Queue := []
+	} finally Critical(PreviousCritical)
+	try RetiredMsgSub := unset
+	if IsSet(RetiredController)
+		try RetiredController.Close()
+	return true
 }
