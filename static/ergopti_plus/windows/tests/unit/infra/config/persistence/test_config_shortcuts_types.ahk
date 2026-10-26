@@ -13,15 +13,52 @@ _CSTT_WriteConfig(Path, Body, Header := "[metrics]") {
 	FileAppend(Header . "`n" . Body . "`n", Path, "UTF-8")
 }
 
+_CSTT_SaveRuntime() {
+	Filters := Map()
+	for Name in ["private_browsing", "secure_field", "system_auth", "encrypt"]
+		Filters[Name] := MetricsFilters.%Name%
+	return { Enabled: MetricsShortcuts.enabled, Filters: Filters,
+		Apps: MetricsFilters.disabled_apps, Cipher: KL_Enc_IsEnabled(),
+		Visible: WPMWidget.visible, Colors: WPMWidget.use_colors, Graph: WPMWidget.show_graph }
+}
+
+_CSTT_RestoreRuntime(Saved) {
+	MetricsShortcuts.enabled := Saved.Enabled
+	MetricsFilters.disabled_apps := Saved.Apps
+	for Name, Value in Saved.Filters
+		MetricsFilters.%Name% := Value
+	KL_Enc_SetEnabled(Saved.Cipher)
+	WPMWidget.visible := Saved.Visible
+	WPMWidget.use_colors := Saved.Colors
+	WPMWidget.show_graph := Saved.Graph
+}
+
+_CSTT_ExpectedValue(Key) {
+	TomlConfigExpectedType(ConfigKey.METRICS, Key, &Entry)
+	AssertTrue(Entry is Map, "the fixture must name an actual manifest setting")
+	return ManifestDefaultFor(Entry["path"])
+}
+
+_CSTT_ActualValue(Key) {
+	if Key == ConfigLeaf.ENABLED
+		return MetricsShortcuts.enabled
+	if Key == ConfigLeaf.DISABLED_APPS
+		return MetricsFilters.disabled_apps
+	Props := Map(ConfigLeaf.PRIVATE_FILTER_ENABLED, "private_browsing",
+		ConfigLeaf.SECURE_FILTER_ENABLED, "secure_field",
+		ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED, "system_auth", ConfigLeaf.ENCRYPT, "encrypt")
+	Prop := Props[Key]
+	return MetricsFilters.%Prop%
+}
+
 TestConfigShortcutsRejectsEveryInvalidScalarType() {
 	global _ConfigDir, _AhkSubDir
-	SavedConfigDir := _ConfigDir
-	SavedAhkSubDir := _AhkSubDir
+	SavedConfigDir := _ConfigDir, SavedAhkSubDir := _AhkSubDir
+	SavedRuntime := _CSTT_SaveRuntime()
 	TestDir := A_Temp . "\ergopti_cs_types_" . A_TickCount . "_" . A_ScriptHwnd . "\"
 	DirCreate(TestDir)
 	try {
-		_ConfigDir := TestDir
-		_AhkSubDir := ""
+		_ConfigDir := TestDir, _AhkSubDir := ""
 		Path := CS_GetTomlPath()
 		Cases := [
 			["enabled", '"false"'],
@@ -33,15 +70,21 @@ TestConfigShortcutsRejectsEveryInvalidScalarType() {
 		]
 		for Fixture in Cases {
 			_CSTT_WriteConfig(Path, Fixture[1] . " = " . Fixture[2])
-			Thrown := false
-			try CS_Load()
-			catch
-				Thrown := true
-			AssertTrue(Thrown, Fixture[1] . " must reject the wrong TOML type")
+			Before := FSReadUtf8Exact(Path)
+			MetricsShortcuts.enabled := true
+			MetricsFilters.disabled_apps := Map("previous.exe", true)
+			CS_Load()
+			Expected := _CSTT_ExpectedValue(Fixture[1])
+			Actual := _CSTT_ActualValue(Fixture[1])
+			if Expected is Array
+				AssertEqual(Expected.Length, Actual.Count, "an outdated application list keeps its manifest value")
+			else
+				AssertEqual(Expected, Actual, Fixture[1] . " must ignore the outdated value without aborting startup")
+			AssertEqual(Before, FSReadUtf8Exact(Path), "an outdated read must preserve the exact authored file")
 		}
 	} finally {
-		_ConfigDir := SavedConfigDir
-		_AhkSubDir := SavedAhkSubDir
+		_CSTT_RestoreRuntime(SavedRuntime)
+		_ConfigDir := SavedConfigDir, _AhkSubDir := SavedAhkSubDir
 		if DirExist(TestDir)
 			DirDelete(TestDir, true)
 	}
@@ -50,31 +93,19 @@ Test("metrics config: every field preserves its manifest type (AHK-105)",
 	TestConfigShortcutsRejectsEveryInvalidScalarType)
 
 TestConfigShortcutsValidatesBeforePublishing() {
-	global _ConfigDir, _AhkSubDir
-	SavedConfigDir := _ConfigDir
-	SavedAhkSubDir := _AhkSubDir
 	SavedEnabled := MetricsShortcuts.enabled
-	TestDir := A_Temp . "\ergopti_cs_atomic_" . A_TickCount . "_" . A_ScriptHwnd . "\"
-	DirCreate(TestDir)
 	try {
-		_ConfigDir := TestDir
-		_AhkSubDir := ""
 		MetricsShortcuts.enabled := true
-		_CSTT_WriteConfig(CS_GetTomlPath(),
-			'enabled = false`nsecure_filter_enabled = ""')
 		Thrown := false
-		try CS_Load()
-		catch
+		try _CS_ValidateMetricsSection(Map(ConfigLeaf.ENABLED, false,
+			ConfigLeaf.SECURE_FILTER_ENABLED, ""))
+		catch TypeError
 			Thrown := true
-		AssertTrue(Thrown, "an invalid late privacy field must fail the load")
+		AssertTrue(Thrown, "a malformed in-memory candidate must still fail strict validation")
 		AssertTrue(MetricsShortcuts.enabled,
-			"validation must finish before an earlier field is published")
+			"candidate validation must never publish a prefix of the proposed values")
 	} finally {
 		MetricsShortcuts.enabled := SavedEnabled
-		_ConfigDir := SavedConfigDir
-		_AhkSubDir := SavedAhkSubDir
-		if DirExist(TestDir)
-			DirDelete(TestDir, true)
 	}
 }
 Test("metrics config: validation precedes live publication (AHK-105)",
@@ -196,3 +227,144 @@ for Shape in ["dotted", "inline", "quoted"] {
 	Test("metrics config: " . Shape . " opt-out reaches runtime (metrics-semantic-source)",
 		_CSTT_SemanticPrivacySettings.Bind(Shape, false))
 }
+
+
+; Keep the exact primary boot admission and the later metrics consumer in the
+; same private source. The old reader threw on quoted booleans and reinterpreted
+; signed numeric zero/one after the primary owner had rejected their lexemes.
+global _CSTT_MetricsWarnings := 0
+
+_CSTT_ObserveWarning(Self, Tag, Message, Args*) {
+	global _CSTT_MetricsWarnings
+	if Tag == "ConfigShortcuts"
+		_CSTT_MetricsWarnings += 1
+	Self.DeleteProp("Call")
+	try return Self.Call(Tag, Message, Args*)
+	finally Self.DefineProp("Call", {Call: _CSTT_ObserveWarning})
+}
+
+_CSTT_NoStoredPosition(Key) => "_"
+
+_CSTT_BootAdmission(Key, Raw, Outdated := true, ExpectedValue := unset) {
+	static FixtureSequence := 0
+	FixtureSequence += 1
+	global _ConfigDir, _AhkSubDir, ConfigurationFile, _BootConfigSnapshot
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries, _ConfigBootReadFailed
+	global _CSTT_MetricsWarnings
+	SavedConfigDir := _ConfigDir, SavedAhkSubDir := _AhkSubDir
+	SavedFileSet := IsSet(ConfigurationFile)
+	SavedFile := SavedFileSet ? ConfigurationFile : ""
+	SavedSnapshotSet := IsSet(_BootConfigSnapshot)
+	SavedSnapshot := SavedSnapshotSet ? _BootConfigSnapshot : 0
+	SavedRejected := _ConfigBootRejectedOverrides
+	SavedOutdated := _ConfigBootOutdatedEntries
+	SavedReadFailure := _ConfigBootReadFailed
+	SavedRuntime := _CSTT_SaveRuntime()
+	TestDir := A_Temp . "\ergopti_cs_admission_" . A_TickCount . "_" . A_ScriptHwnd
+		. "_" . FixtureSequence . "\"
+	DirCreate(TestDir)
+	Observing := false
+	try {
+		_ConfigDir := TestDir, _AhkSubDir := ""
+		ConfigurationFile := CS_GetTomlPath()
+		Source := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion()
+			. "`n[metrics]`n"
+		if Key != ConfigLeaf.ENABLED
+			Source .= "enabled = true`n"
+		Source .= Key . " = " . Raw . "`n"
+		AssertTrue(FSWrite(ConfigurationFile, Source))
+		Before := FSReadUtf8Exact(ConfigurationFile)
+		_ConfigBootRejectedOverrides := 0
+		_ConfigBootOutdatedEntries := Map()
+		_ConfigBootReadFailed := false
+		; Match the real entry's journal constructor before asking its snapshot
+		; owner to capture a read. A schema stamp alone does not grant admission.
+		Journal := ConfigMigrateBoot(ConfigurationFile)
+		AssertTrue(Journal is Map, "the real boot journal must return its native result")
+		AssertEqual("current", Journal.Get("status", "missing"),
+			"the private current-schema source must complete the genuine boot constructor")
+		Tree := ManifestBuildFeaturesMap()
+		Applied := ApplyBootConfigToml(Tree, ConfigurationFile, &_BootConfigSnapshot)
+		AssertTrue(Applied >= 0,
+			"the actual primary boot owner must admit the complete private source; applied=" . Applied)
+		AssertEqual(0, _ConfigBootRejectedOverrides, "outdated values cannot refuse the whole configuration")
+		AssertFalse(_ConfigBootReadFailed)
+		AssertEqual(Outdated ? 1 : 0, _ConfigBootOutdatedEntries.Count)
+		Physical := _BootConfigSnapshot.Cache[ConfigKey.METRICS][Key]
+		MetricsShortcuts.enabled := Key == ConfigLeaf.ENABLED
+			? (Outdated ? !ManifestDefaultFor(ConfigKey.METRICS_ENABLED) : !ExpectedValue) : false
+		MetricsFilters.disabled_apps := Map("previous.exe", true)
+		AssertFalse(LoggerWarn.HasOwnProp("Call"), "the fixture must own its warning observer")
+		_CSTT_MetricsWarnings := 0
+		LoggerWarn.DefineProp("Call", {Call: _CSTT_ObserveWarning})
+		Observing := true
+		Cache := CS_Load()
+		Expected := Outdated ? _CSTT_ExpectedValue(Key) : ExpectedValue
+		WidgetProps := Map(ConfigLeaf.WPM_WIDGET_VISIBLE, "visible",
+			ConfigLeaf.WPM_WIDGET_COLORS, "use_colors", ConfigLeaf.WPM_WIDGET_GRAPH, "show_graph")
+		if WidgetProps.Has(Key) {
+			AssertTrue(Cache is Map, "the widget must receive the same admitted metrics cache")
+			Prop := WidgetProps[Key]
+			WPMWidget.%Prop% := !Expected
+			WPMWidget_LoadConfig(Cache, [], _CSTT_NoStoredPosition)
+			Actual := WPMWidget.%Prop%
+		} else
+			Actual := _CSTT_ActualValue(Key)
+		if Expected is Array
+			AssertEqual(Expected.Length, Actual.Count)
+		else
+			AssertEqual(Expected, Actual,
+				"secondary reading must preserve the primary manifest admission for " . Key)
+		if Key != ConfigLeaf.ENABLED
+			AssertTrue(MetricsShortcuts.enabled, "the valid sibling consent remains applied")
+		AssertEqual(Physical, _BootConfigSnapshot.Cache[ConfigKey.METRICS][Key],
+			"effective values must never mutate the physical admitted snapshot")
+		AssertEqual(0, _CSTT_MetricsWarnings,
+			"an exact primary boot warning must not be duplicated by its secondary reader")
+		AssertEqual(Before, FSReadUtf8Exact(ConfigurationFile),
+			"ignored values and all authored bytes remain available to cleanup")
+	} finally {
+		if Observing
+			LoggerWarn.DeleteProp("Call")
+		_CSTT_RestoreRuntime(SavedRuntime)
+		_ConfigDir := SavedConfigDir, _AhkSubDir := SavedAhkSubDir
+		ConfigurationFile := SavedFileSet ? SavedFile : unset
+		_BootConfigSnapshot := SavedSnapshotSet ? SavedSnapshot : unset
+		_ConfigBootRejectedOverrides := SavedRejected
+		_ConfigBootOutdatedEntries := SavedOutdated
+		_ConfigBootReadFailed := SavedReadFailure
+		if DirExist(TestDir)
+			DirDelete(TestDir, true)
+	}
+}
+
+for Fixture in [
+	[ConfigLeaf.ENABLED, '"false"'],
+	[ConfigLeaf.ENABLED, "+1"],
+	[ConfigLeaf.PRIVATE_FILTER_ENABLED, "+0"],
+	[ConfigLeaf.PRIVATE_FILTER_ENABLED, "-0"],
+	[ConfigLeaf.PRIVATE_FILTER_ENABLED, '"false"'],
+	[ConfigLeaf.SECURE_FILTER_ENABLED, '""'],
+	[ConfigLeaf.SYSTEM_AUTH_FILTER_ENABLED, "-1"],
+	[ConfigLeaf.ENCRYPT, '"true"'],
+	[ConfigLeaf.DISABLED_APPS, '"chrome.exe"'],
+	[ConfigLeaf.WPM_WIDGET_VISIBLE, '"true"'],
+	[ConfigLeaf.WPM_WIDGET_COLORS, '"true"'],
+	[ConfigLeaf.WPM_WIDGET_GRAPH, '"true"']
+]
+	Test("metrics boot: outdated " . Fixture[1] . " = " . Fixture[2]
+		. " keeps primary admission " . (InStr(Fixture[1], "wpm_widget_") == 1
+			? "(metrics-secondary-widget-admission)" : "(metrics-secondary-admission)"),
+		_CSTT_BootAdmission.Bind(Fixture[1], Fixture[2]))
+
+Test("metrics boot: legacy unsigned zero retains recording opt-out (metrics-secondary-admission)",
+	_CSTT_BootAdmission.Bind(ConfigLeaf.ENABLED, "0", false, false))
+Test("metrics boot: legacy unsigned one retains recording opt-in (metrics-secondary-admission)",
+	_CSTT_BootAdmission.Bind(ConfigLeaf.ENABLED, "1", false, true))
+Test("metrics boot: legacy unsigned zero retains privacy opt-out (metrics-secondary-admission)",
+	_CSTT_BootAdmission.Bind(ConfigLeaf.PRIVATE_FILTER_ENABLED, "0", false, false))
+
+Test("metrics boot: legacy comment preserves recording opt-in (metrics-secondary-admission)",
+	_CSTT_BootAdmission.Bind(ConfigLeaf.ENABLED, "1 # explicit recording consent", false, true))
+Test("metrics boot: legacy comment preserves privacy opt-out (metrics-secondary-admission)",
+	_CSTT_BootAdmission.Bind(ConfigLeaf.PRIVATE_FILTER_ENABLED, "0 # explicit privacy choice", false, false))
