@@ -68,16 +68,29 @@ helpers.describe("perf counters: spans are always timed", function()
 
 	helpers.it("a counted and timed hot call allocates nothing", function()
 		local perf = fixture(20)
+		-- The first closed span builds the slow-threshold table once; that
+		-- lazy setup is not the hot call, so it happens before the count.
+		perf.span("input.dispatch", perf.clock())
+		-- LuaJIT's trace compiler allocates its IR on the Lua heap whenever it
+		-- happens to record this loop, which made the count flaky (4 to 5 KB on
+		-- the distribution rows). Only the interpreter's own allocations are
+		-- the code under test, so the compiler is off while counting.
+		local compiler = rawget(_G, "jit")
+		if compiler then compiler.off() end
 		local before = collectgarbage("count")
 		collectgarbage("stop")
-		for _ = 1, 10000 do
-			perf.count("input.events")
-			perf.span("input.dispatch", perf.clock())
-		end
+		local counted, failure = pcall(function()
+			for _ = 1, 10000 do
+				perf.count("input.events")
+				perf.span("input.dispatch", perf.clock())
+			end
+		end)
 		local grown = collectgarbage("count") - before
 		collectgarbage("restart")
+		if compiler then compiler.on() end
+		if not counted then error(failure, 0) end
 		-- Counted allocation, not wall clock: a fast span builds no string.
-		helpers.assert_true(grown < 4, "hot-path timing allocated " .. grown .. " KB")
+		helpers.assert_true(grown < 1, "hot-path timing allocated " .. grown .. " KB")
 	end)
 end)
 
