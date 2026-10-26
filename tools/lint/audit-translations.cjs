@@ -44,6 +44,7 @@ const DRIVERS_DIR = path.join(REPO_ROOT, 'static/ergopti_plus');
 const LOCALES_DIR = shared('data/locales');
 const MANIFEST_PATH = shared('modules/menu/menu_manifest.json');
 const BASELINE_PATH = path.join(__dirname, 'audit-translations-unused-baseline.json');
+const IDENTICAL_ALLOWLIST_PATH = path.join(__dirname, 'locale-identical-to-english-allowlist.json');
 
 // Directories that never carry user-facing source.
 const SKIPPED_DIRECTORIES = new Set(['node_modules', '.git', '_generated', 'tests', 'vendor']);
@@ -242,8 +243,8 @@ function findUnusedKeys(available) {
 			} catch {
 				continue;
 			}
-			// The baseline names every unused key, which would make each one used.
-			if (stat.size > 3e6 || file === BASELINE_PATH) continue;
+			// The baseline and the equal-to-English allowlist name keys without using them.
+			if (stat.size > 3e6 || file === BASELINE_PATH || file === IDENTICAL_ALLOWLIST_PATH) continue;
 			const content = fs.readFileSync(file, 'utf8');
 			let match;
 			literal.lastIndex = 0;
