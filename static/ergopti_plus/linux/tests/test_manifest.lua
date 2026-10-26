@@ -239,6 +239,7 @@ return {
 	"tests.unit.infra.scope.test_dynamic_hotstrings_scope",
 	"tests.unit.infra.scope.test_gesture_scope",
 	"tests.unit.infra.scope.test_global_scope",
+	"tests.unit.infra.scope.test_scope_registry",
 	"tests.unit.infra.preferences.test_hotstring_preferences",
 	"tests.unit.infra.scope.test_hotstrings_scope",
 	"tests.unit.infra.preferences.test_legacy_hotstring_storage",
