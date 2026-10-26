@@ -90,7 +90,10 @@ LLM_Tone_Trigger(Direction, Cycle) {
 	global _LLM_Tone_Generation
 	AuxGeneration := LLM_AuxGeneration()
 	Generation := ++_LLM_Tone_Generation
-	if !LLM_SelectionReader().Call(_LLM_Tone_OnSelection.Bind(Generation, AuxGeneration, Direction, Cycle)) {
+	; The destination belongs to the original selection, before any planning
+	; or readiness getter can pump a focus change after the copy completes.
+	Focus := _LLM_Tone_CurrentFocus()
+	if !LLM_SelectionReader().Call(_LLM_Tone_OnSelection.Bind(Generation, AuxGeneration, Direction, Cycle, Focus)) {
 		LoggerInfo("LLM", "Tone step skipped: the selection could not be read (paused or clipboard busy).")
 		return false
 	}
@@ -122,8 +125,9 @@ LLM_SelectionReader() {
 ; @param {Integer} AuxGeneration The backend lifecycle at the original trigger.
 ; @param {Integer} Direction The ladder direction.
 ; @param {Boolean} Cycle Whether to wrap around.
+; @param {String} Focus The original selected control.
 ; @param {String} Text The selected text ("" when nothing is selected).
-_LLM_Tone_OnSelection(Generation, AuxGeneration, Direction, Cycle, Text) {
+_LLM_Tone_OnSelection(Generation, AuxGeneration, Direction, Cycle, Focus, Text) {
 	global _LLM_Tone_Generation, _LLM_Tone_Memory, _LLM_Menu, LLM_TONE_MORE_FORMAL
 	if !_LLM_Tone_GenerationCurrent(Generation, AuxGeneration) {
 		LoggerDebug("LLM", "Tone step dropped: its request lifecycle ended before the selection arrived.")
@@ -152,7 +156,7 @@ _LLM_Tone_OnSelection(Generation, AuxGeneration, Direction, Cycle, Text) {
 	if _LLM_Engine_ShouldSuppressForDisabledApps()
 		return
 	Plan["aux_generation"] := AuxGeneration
-	_LLM_Tone_Dispatch(Generation, Plan, _LLM_Tone_CurrentFocus())
+	_LLM_Tone_Dispatch(Generation, Plan, Focus)
 }
 
 ; Sends the one request of a step to the current backend.

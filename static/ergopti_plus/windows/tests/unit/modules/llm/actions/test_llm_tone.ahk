@@ -562,3 +562,50 @@ _LTN_BackendRetirement(Phase) {
 Test("LLM tone: disabling AI rejects an automatic rewrite (tone-backend-retirement)", _LTN_BackendRetirement.Bind("disabled"))
 Test("LLM tone: backend retirement rejects a delayed answer (tone-backend-retirement)", _LTN_BackendRetirement.Bind("answer"))
 Test("LLM tone: backend retirement rejects a delayed selection (tone-backend-retirement)", _LTN_BackendRetirement.Bind("selection"))
+
+
+; Selection replacement must retain its destination before post-copy planning.
+_LTN_SelectionFocusOwner(Boundary, Move) {
+	Screen := _LTN_Screen("merci pour ton aide")
+	_LTN_Run(_LPP_Menu(), Screen, Body)
+	Body(Calls, Lines, Sent) {
+		Gate := Boundary == "plan" ? LLM_Tone_Plan : _LLM_Menu_BackendIsReadyForUse
+		Seen := false
+		AssertFalse(Gate.HasOwnProp("Call"), "the real planning boundary must be unmodified")
+		try {
+			Gate.DefineProp("Call", {Call: Observe})
+			AssertTrue(LLM_Tone_Trigger(LLM_TONE_MORE_FORMAL, false), "the original selection is captured")
+			AssertTrue(Seen, "the genuine post-selection boundary must run")
+			if Calls.Length {
+				_LTN_AssertRequest(Calls[1], "tone_formal", "merci pour ton aide")
+				_LPP_Answer(Calls[1], "REWRITE: Thank you for your help.")
+			}
+			AssertEqual(Move ? 0 : 2, Sent.Length,
+				"only the original control may receive the rewrite and courtesy selection")
+			AssertEqual(Move ? 0 : 1, Calls.Length,
+				"selection from the original control cannot be reassigned after a post-copy focus change")
+			if !Move {
+				AssertEqual("{Text}Thank you for your help.", Sent[1], "the admitted rewrite stays intact")
+				AssertEqual("+{Left 24}", Sent[2], "the admitted rewrite is selected again")
+			}
+		} finally {
+			if Gate.HasOwnProp("Call")
+				Gate.DeleteProp("Call")
+		}
+		Observe(Self, Args*) {
+			Gate.DeleteProp("Call")
+			Result := Gate.Call(Args*)
+			Seen := true
+			if Move
+				Screen.Focus := "window-2"
+			return Result
+		}
+	}
+}
+
+for _LTN_FocusBoundary in ["plan", "readiness"] {
+	Test("LLM tone: original selection focus " . _LTN_FocusBoundary . " moved (tone-selection-focus-owner)",
+		_LTN_SelectionFocusOwner.Bind(_LTN_FocusBoundary, true))
+	Test("LLM tone: original selection focus " . _LTN_FocusBoundary . " unchanged (tone-selection-focus-owner)",
+		_LTN_SelectionFocusOwner.Bind(_LTN_FocusBoundary, false))
+}
