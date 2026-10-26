@@ -14,12 +14,13 @@
 -- Placeholders:
 --   {{where}}           the driver's filter clause, empty or " WHERE …";
 --                       each driver keeps its own literal quoting.
---   {{s name}} {{i name}}
+--   {{s name}} {{i name}} {{r name}}
 --                       a typed value slot of a write or keyed statement: a TEXT
---                       literal or an integer, quoted by the generated renderer
+--                       literal, an integer or a real, quoted by the generated renderer
 --                       (sqlite.literal) from the raw value the driver passes.
 --                       `{{s? name}}` and `{{i? name}}` render NULL for a missing
---                       value; every other slot refuses one.
+--                       value; every other slot refuses one. A real keeps 17
+--                       significant digits.
 --   {{merge <column>}}  at generation time, the expression that sums the stored
 --                       JSON number map of <column> with the incoming one key by
 --                       key (esrc_json, e_buckets_json, length_buckets_json).
@@ -252,3 +253,93 @@ VALUES ({{s device_id}}, {{s name}}, {{s os}}, {{s os_version}}, {{s host_signat
 ON CONFLICT(device_id) DO UPDATE SET
   name = excluded.name, os = excluded.os, os_version = excluded.os_version,
   host_signature = excluded.host_signature, updated_at = excluded.updated_at;
+
+
+-- ============================================================================
+-- 5. AGGREGATE UPSERTS (one row per application and day, per device)
+-- ============================================================================
+-- Every statement adds a flush's delta to the stored row. Sums add, records
+-- take a MAX, the first and last typed minute take a MIN and a MAX, and the
+-- number maps and the duration list merge key by key in SQL, because each
+-- flush only knows what happened since the previous one.
+
+-- name: agg.app_day
+-- doc: Typing totals of an application day. A caller that knows only some of the
+-- doc: counters passes 0 for the others, which adds nothing; the category is
+-- doc: kept once set.
+INSERT INTO agg_app_day (device_id, date, app, chars, pauses, time_ms, think_time_ms, hs_chars, llm_chars, hs_triggers, llm_triggers, hs_suggested, llm_suggested, hs_input_chars, llm_input_chars, app_time_ms, category)
+VALUES ({{s device_id}}, {{s date}}, {{s app}}, {{i chars}}, {{i pauses}}, {{i time_ms}}, {{i think_time_ms}}, {{i hs_chars}}, {{i llm_chars}}, {{i hs_triggers}}, {{i llm_triggers}}, {{i hs_suggested}}, {{i llm_suggested}}, {{i hs_input_chars}}, {{i llm_input_chars}}, {{i app_time_ms}}, {{s? category}})
+ON CONFLICT(device_id, date, app) DO UPDATE SET
+  chars = chars + excluded.chars, pauses = pauses + excluded.pauses,
+  time_ms = time_ms + excluded.time_ms, think_time_ms = think_time_ms + excluded.think_time_ms,
+  hs_chars = hs_chars + excluded.hs_chars, llm_chars = llm_chars + excluded.llm_chars,
+  hs_triggers = hs_triggers + excluded.hs_triggers, llm_triggers = llm_triggers + excluded.llm_triggers,
+  hs_suggested = hs_suggested + excluded.hs_suggested, llm_suggested = llm_suggested + excluded.llm_suggested,
+  hs_input_chars = hs_input_chars + excluded.hs_input_chars, llm_input_chars = llm_input_chars + excluded.llm_input_chars,
+  app_time_ms = app_time_ms + excluded.app_time_ms,
+  category = COALESCE(agg_app_day.category, excluded.category);
+
+-- name: agg.buckets
+-- doc: Cumulative pause buckets of an application day.
+INSERT INTO agg_app_day_buckets (device_id, date, app, bucket_ms, time_sum, credited, hs_input_time_sum, hs_input_credited, llm_input_time_sum, llm_input_credited)
+VALUES ({{s device_id}}, {{s date}}, {{s app}}, {{i bucket_ms}}, {{i time_sum}}, {{i credited}}, {{i hs_input_time_sum}}, {{i hs_input_credited}}, {{i llm_input_time_sum}}, {{i llm_input_credited}})
+ON CONFLICT(device_id, date, app, bucket_ms) DO UPDATE SET
+  time_sum = time_sum + excluded.time_sum, credited = credited + excluded.credited,
+  hs_input_time_sum = hs_input_time_sum + excluded.hs_input_time_sum,
+  hs_input_credited = hs_input_credited + excluded.hs_input_credited,
+  llm_input_time_sum = llm_input_time_sum + excluded.llm_input_time_sum,
+  llm_input_credited = llm_input_credited + excluded.llm_input_credited;
+
+-- name: agg.kc_hold
+-- doc: Hold durations of one key code. The longest hold is a record, not a sum.
+INSERT INTO agg_app_day_kc_hold (device_id, date, app, keycode, sum_ms, count, max_ms, tap_count, hold_count)
+VALUES ({{s device_id}}, {{s date}}, {{s app}}, {{i keycode}}, {{i sum_ms}}, {{i count}}, {{i max_ms}}, {{i tap_count}}, {{i hold_count}})
+ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET
+  sum_ms = sum_ms + excluded.sum_ms, count = count + excluded.count,
+  max_ms = MAX(max_ms, excluded.max_ms),
+  tap_count = tap_count + excluded.tap_count, hold_count = hold_count + excluded.hold_count;
+
+-- name: agg.layouts
+-- doc: Keystrokes typed under one keyboard layout.
+INSERT INTO agg_app_day_layouts (device_id, date, app, layout, count)
+VALUES ({{s device_id}}, {{s date}}, {{s app}}, {{s layout}}, {{i count}})
+ON CONFLICT(device_id, date, app, layout) DO UPDATE SET count = count + excluded.count;
+
+-- name: agg.switches_to
+-- doc: Switches from one application to another.
+INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count)
+VALUES ({{s device_id}}, {{s date}}, {{s app_from}}, {{s app_to}}, {{i count}})
+ON CONFLICT(device_id, date, app_from, app_to) DO UPDATE SET count = count + excluded.count;
+
+-- name: agg.errors
+-- doc: Backspace and correction analysis. The longest cascade is a record.
+INSERT INTO agg_app_day_errors (device_id, date, app, bs_total, cascade_count, cascade_max_len, recovery_sum_ms, recovery_count)
+VALUES ({{s device_id}}, {{s date}}, {{s app}}, {{i bs_total}}, {{i cascade_count}}, {{i cascade_max_len}}, {{i recovery_sum_ms}}, {{i recovery_count}})
+ON CONFLICT(device_id, date, app) DO UPDATE SET
+  bs_total = bs_total + excluded.bs_total, cascade_count = cascade_count + excluded.cascade_count,
+  cascade_max_len = MAX(cascade_max_len, excluded.cascade_max_len),
+  recovery_sum_ms = recovery_sum_ms + excluded.recovery_sum_ms,
+  recovery_count = recovery_count + excluded.recovery_count;
+
+-- name: agg.ergo
+-- doc: Streak records and focus latency. Streaks are records, the rest sums.
+INSERT INTO agg_app_day_ergo (device_id, date, app, same_finger_streak_max, same_hand_streak_max, auto_repeat_count, focus_to_first_key_sum_ms, focus_to_first_key_count)
+VALUES ({{s device_id}}, {{s date}}, {{s app}}, {{i same_finger_streak_max}}, {{i same_hand_streak_max}}, {{i auto_repeat_count}}, {{i focus_to_first_key_sum_ms}}, {{i focus_to_first_key_count}})
+ON CONFLICT(device_id, date, app) DO UPDATE SET
+  same_finger_streak_max = MAX(same_finger_streak_max, excluded.same_finger_streak_max),
+  same_hand_streak_max = MAX(same_hand_streak_max, excluded.same_hand_streak_max),
+  auto_repeat_count = auto_repeat_count + excluded.auto_repeat_count,
+  focus_to_first_key_sum_ms = focus_to_first_key_sum_ms + excluded.focus_to_first_key_sum_ms,
+  focus_to_first_key_count = focus_to_first_key_count + excluded.focus_to_first_key_count;
+
+-- name: agg.chars_class
+-- doc: Character classes of an application day. The five counts add; the first
+-- doc: and last typed minute are a MIN and a MAX, so a late flush cannot move
+-- doc: the first keystroke of the morning forward.
+INSERT INTO agg_app_day_chars_class (device_id, date, app, letter, digit, punct, space, other, first_typed_min, last_typed_min)
+VALUES ({{s device_id}}, {{s date}}, {{s app}}, {{i letter}}, {{i digit}}, {{i punct}}, {{i space}}, {{i other}}, {{s? first_typed_min}}, {{s? last_typed_min}})
+ON CONFLICT(device_id, date, app) DO UPDATE SET
+  letter = letter + excluded.letter, digit = digit + excluded.digit,
+  punct = punct + excluded.punct, space = space + excluded.space, other = other + excluded.other,
+  first_typed_min = MIN(COALESCE(first_typed_min, excluded.first_typed_min), COALESCE(excluded.first_typed_min, first_typed_min)),
+  last_typed_min = MAX(COALESCE(last_typed_min, excluded.last_typed_min), COALESCE(excluded.last_typed_min, last_typed_min));
