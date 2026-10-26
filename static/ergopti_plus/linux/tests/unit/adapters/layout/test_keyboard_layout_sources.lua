@@ -87,6 +87,17 @@ end
 
 helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 
+	helpers.it("keymap-session-exit: failed native metadata cannot select the compiled keymap", function()
+		local shell = require("adapters.shell_runner")
+		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"),
+			"native session keymap receipts require Python and the actual LuaJIT FFI runtime")
+		local quote = require("text_utils").shell_quote
+		local runtime = assert(shell.exec_line("command -v luajit"))
+		local fixture = helpers.driver_root() .. "/tests/hardware/test_xkb_session_exit.py"
+		local status = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime))
+		helpers.assert_true(status == true or status == 0, "failed actual metadata must not select native compilation")
+	end)
+
 	helpers.it("keymap-source-exit: refuses failed real source commands before native publication", function()
 		local shell = require("adapters.shell_runner")
 		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"),
