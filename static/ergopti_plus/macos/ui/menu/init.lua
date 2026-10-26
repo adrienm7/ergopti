@@ -27,6 +27,7 @@ local Manifest         = require("infra.manifest_reader")
 local Preferences   = require("infra.preferences")
 local Builder       = require("ui.menu.builder")
 local ClickGate     = require("ui.menu.click_gate")
+local QuitAdmission = require("quit_admission")
 local HotCounter    = require("ui.menu.hotstring_counter")
 local MenuPaths     = require("ui.menu.menu_paths")
 local MenuState     = require("ui.menu.menu_state")
@@ -1048,6 +1049,23 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return do_reload("menu")
 		end,
 		quit                      = function()
+			-- The refusal is decided by the one admission both drivers share
+			-- (_shared/lua/quit_admission.lua); run_global_exclusive and the coordinator
+			-- below stay the authority and refuse again on a race.
+			local decision = QuitAdmission.decide({
+				owner_available = global_actions_owner ~= nil
+					and type(global_actions_owner.run_exclusive) == "function"
+					and type(global_actions_owner.is_exclusive_blocked) == "function",
+				terminal_pending = TerminationCoordinator.is_pending() == true,
+				writer_active = global_actions_owner ~= nil
+					and global_actions_owner.is_exclusive_blocked() == true,
+				publication_pending = require("modules.hotstrings.hotstrings_config")
+					.terminal_admission_blocked() == true,
+			})
+			if not decision.admitted then
+				QuitAdmission.refuse(notice_ports, i18n.get, decision)
+				return false
+			end
 			-- request_user_exit arms the bounded quit watchdog: once accepted, a stuck
 			-- fence, input drain, or teardown force-exits instead of hanging the app.
 			local accepted = run_global_exclusive("Quit", function()
