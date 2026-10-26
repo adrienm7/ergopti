@@ -3,6 +3,7 @@
 --- This never resolves a native data path, follows a symlink, or guesses a cwd.
 
 local M = {}
+local host_separators = require("native_path").separators
 
 --- Normalizes only an actual @file debug source, preserving case and requiring an explicit anchor for relative coordinates.
 --- @param source string
@@ -10,15 +11,18 @@ local M = {}
 --- @return string|nil
 local function normalize(source, directory)
 	if type(source) ~= "string" or source:sub(1, 1) ~= "@" then return nil end
-	local path = source:sub(2):gsub("\\", "/")
+	-- A POSIX backslash is a filename byte, including in the captured cwd.
+	-- Use one host rule for both coordinates so normalization is idempotent.
+	local separators = host_separators()
+	local path = source:sub(2):gsub("[" .. separators .. "]", "/")
 	if path == "" or path:find("%z") then return nil end
 	-- The ordinary Windows Lua loader emits drive-qualified @file sources.
 	-- Preserve that root exactly; drive-relative sources still need an anchor.
-	local drive = path:match("^%a:/")
+	local drive = separators ~= "/" and path:match("^%a:/") or nil
 	local absolute = drive ~= nil or path:sub(1, 1) == "/"
 	if not absolute then
 		if type(directory) ~= "string" or directory:sub(1, 1) ~= "/" or directory:find("%z") then return nil end
-		path = directory .. "/" .. path
+		path = directory:gsub("[" .. separators .. "]", "/") .. "/" .. path
 		absolute = true
 	end
 	local root = drive or "/"
