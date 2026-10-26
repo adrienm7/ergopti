@@ -191,4 +191,103 @@ helpers.describe("Linux local driver control", function()
 	end)
 end)
 
+-- A declaration is consumed before the optional control can yield to the daemon.
+helpers.describe("driver-control-declaration", function()
+	for _, refusal in ipairs({ "read-nil", "read-throw", "close-nil", "close-false", "close-throw" }) do
+		helpers.it("(driver-control-declaration) closes and refuses " .. refusal, function()
+			local Reader = require("infra.regular_file_reader")
+			local open, new, stdio_open = Reader.open, DriverControl.new, io.open
+			local closes, acquired = 0, 0
+			Reader.open = function()
+				return {
+					read = function()
+						if refusal == "read-nil" then return nil, "refused" end
+						if refusal == "read-throw" then error("refused read") end
+						return Json.encode(SPEC)
+					end,
+					close = function()
+						closes = closes + 1
+						if refusal == "close-nil" then return nil end
+						if refusal == "close-false" then return false end
+						if refusal == "close-throw" then error("refused close") end
+						return true
+					end,
+				}
+			end
+			-- A stream refusal is independent of how that exact declaration was acquired.
+			io.open = function(path, ...)
+				if path == "/modeled-control-declaration" then return Reader.open(path) end
+				return stdio_open(path, ...)
+			end
+			DriverControl.new = function() acquired = acquired + 1; error("unacknowledged declaration acquired a session") end
+			local ok, err = pcall(function()
+				local session, detail = DriverControl.start({ declaration = "/modeled-control-declaration", pid = 4242,
+					reload = function() return true end })
+				helpers.assert_nil(session, "an unreadable declaration cannot publish a session")
+				helpers.assert_true(type(detail) == "string" and detail ~= "", "the refusal must be explained")
+				helpers.assert_eq(closes, 1, "even a refused read closes its exact acquired stream")
+				helpers.assert_eq(acquired, 0, "declaration refusal precedes session acquisition")
+			end)
+			Reader.open, DriverControl.new, io.open = open, new, stdio_open
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	if package.config:sub(1, 1) == "/" then
+		local uv = require("luv")
+		for _, variant in ipairs({ "explicit-fifo", "default-fifo", "default-fifo-link", "explicit-file",
+			"default-file-link", "default-directory", "default-missing", "default-denied" }) do
+			helpers.it("(driver-control-declaration) classifies native " .. variant, function()
+				local root = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/erg-control-XXXXXX"))
+				local source, target = root .. "/declaration\\source\n", root .. "/target"
+				local Shell = require("adapters.shell_runner")
+				local expired, status, signal, exited = false, nil, nil, false
+				local ok, err = xpcall(function()
+					if variant:find("fifo", 1, true) then
+						assert(Shell.run("mkfifo -- " .. Shell.quote(variant == "default-fifo-link" and target or source)))
+					elseif variant == "default-directory" then assert(uv.fs_mkdir(source, 448))
+					elseif variant ~= "default-missing" then
+						local file = assert(io.open(variant == "default-file-link" and target or source, "wb"))
+						assert(file:write(read(shared .. "/modules/control/driver_control.json"))); assert(file:close())
+					end
+					if variant:find("-link", 1, true) then assert(uv.fs_symlink(target, source)) end
+					if variant == "default-denied" then assert(uv.fs_chmod(source, 0)) end
+					local admitted = variant == "explicit-file" or variant == "default-file-link"
+					local code = string.format([[package.path = %q
+local uv = require("luv")
+local paths = require("infra.paths")
+package.loaded["infra.paths"] = setmetatable({ shared = function(relative)
+ if relative == "modules/control/driver_control.json" then return %q end
+ return paths.shared(relative)
+end }, { __index = paths })
+local getenv = os.getenv
+os.getenv = function(name) if name == "XDG_RUNTIME_DIR" then return %q end; return getenv(name) end
+local options = { pid = uv.os_getpid(), reload = function() return true end }
+if %s then options.declaration = %q end
+local session, detail = require("infra.driver_control").start(options)
+assert((session ~= nil) == %s, "control declaration admission: " .. tostring(detail))
+if session then assert(session:stop()) end
+]], package.path, source, root, tostring(variant:find("explicit-", 1, true) == 1), source, tostring(admitted))
+					local timer, child = assert(uv.new_timer()), nil
+					child = assert(uv.spawn(assert(arg[-1]), { args = { "-e", code } }, function(result, killed)
+						status, signal, exited = result, killed, true
+						uv.timer_stop(timer); uv.close(timer); uv.close(child)
+					end))
+					assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+						expired = true; child:kill("sigkill")
+					end))
+					while not exited do uv.run("once") end
+					uv.run("nowait")
+					helpers.assert_eq(expired, false, "optional control startup must not wait for a FIFO writer")
+					helpers.assert_eq(status, 0, "only complete regular declarations may publish a session")
+					helpers.assert_eq(signal, 0, "a killed control never counts as classified")
+				end, debug.traceback)
+				uv.fs_chmod(source, 384)
+				assert(Shell.run("rm -r -- " .. Shell.quote(root)))
+				if not ok then error(err, 0) end
+			end)
+		end
+	end
+end)
+
 return true
