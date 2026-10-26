@@ -513,6 +513,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-duplicate-constant-names.cjs"],
 			"repro": "npm run test:duplicate-constant-names"
+		},
+		{
+			"id": "js-0500",
+			"ordinal": 500,
+			"name": "source-shape gates read a generated config-key constant as the literal it stands for",
+			"cmd": "node",
+			"args": ["tools/test/test-config-key-tokens.cjs"],
+			"repro": "npm run test:config-key-tokens"
 		}
 	]
 }
