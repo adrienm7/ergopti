@@ -588,11 +588,11 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 - [ ] **PAR-67. Shared keystats query catalogue and walker.** [CODE] About 85/73/66 SQL statements and
       three walkers; named queries in `data/db/queries.sql` with codegen, walker in
       `_shared/lua/keystats/walker.lua`, AHK replays `aggregation_vectors.json`. Audit R3.
-- [ ] **PAR-68. Hotstring override parser into `_shared` on `toml_codec`.** [CODE] macOS hand-rolls 190
-      lines that Linux does in 25. Vectors for `[__global__]` passthrough. Audit R4.
-- [ ] **PAR-69. Shared ownership protocols.** [CODE] `scope_owner.lua` (5 methods copied 6 times,
-      `S`/`L`), `storage_owned.lua` (104 identical windows), shared `error_dialog/core.lua`, and
-      `owned_timer` for the dependency checkers. Do these four as small commits. Audit R5-R7, R14.
+- [ ] **PAR-68. Hotstring override parser into `_shared` on `toml_codec`.** [CODE] Done on macOS and Linux
+      (shared `hotstrings/overrides.lua`, `override_parse_vectors.json`). macOS now reads a duplicate key or
+      header as invalid TOML (was last-wins). Left: Windows `_ParseOverrides` replaying the vectors.
+- [x] **PAR-69. Shared ownership protocols.** [CODE] Done: `scope_owner.lua`, `storage_owned.lua`,
+      `error_dialog/core.lua`, `owned_timer_slots.lua`, each with a contract (4947f7a445).
 - [ ] **PAR-70. Factory per macOS/Linux infra shim.** [CODE] `native_presentation`, `manifest_reader`,
       `manifest_menu`, `timings`, `text_cipher`, `text_migration`, `config_backup`, `locale`,
       `user_code` take `{platform}` and live in `_shared/lua`. Audit R15, R28, R32.
@@ -610,8 +610,9 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 - [ ] **PAR-74. Config-key and command-id constants by codegen.** [CODE] Generate constants from
       `config.schema.json` and `menu_manifest.json` for AHK, Lua and JS; lint raw literals such as
       `private_filter_enabled`. Audit R10.
-- [ ] **PAR-75. Shared Lua helper modules and a redefinition lint.** [CODE] `table_util`, `path_util`,
-      `shell_quote`, URL-encode, trim (54 inline patterns); lint forbids redefinition. Audit R16, K10.
+- [ ] **PAR-75. Shared Lua helper modules and a redefinition lint.** [CODE] Done: `table_util`,
+      `text_utils`, `native_path` (26 dirname sites moved), lint `test-shared-lua-helpers-single-use.cjs`.
+      Left: burn down the 115 baselined inline sites; no `basename` detector yet.
 - [ ] **PAR-76. Long refactors, plan before starting.** [CODE] Generate the AHK config-migration op table
       from `migrations.toml` (R17); extract menu row-ordering rules to data (R18); pure hotstring
       injection plan (R26); FileSystem port spec for lease/atomic write (R33); canonical `.keylayout`
