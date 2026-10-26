@@ -13,7 +13,7 @@
 			"pace_explicit": true,
 			"pace_variants": true,
 			"floor_scope": "per_backend",
-			"live_instant_word_end": false
+			"live_instant_word_end": true
 		}
 	},
 	"vectors": [
@@ -956,8 +956,8 @@
 			]
 		},
 		{
-			"id": "live-word-end-keeps-the-live-debounce-on-linux",
-			"description": "On Linux live mode keeps its own debounce at a word end.",
+			"id": "live-word-end-instant-on-linux",
+			"description": "On Linux, as on macOS, a word end is instant even in live mode.",
 			"options": "linux",
 			"floors": {
 				"ollama": 300,
@@ -971,6 +971,43 @@
 						"enabled": true,
 						"debounce_ms": 500,
 						"instant_on_word_end": true,
+						"live_debounce_ms": 80
+					},
+					"expect": []
+				},
+				{
+					"call": "on_input",
+					"args": {
+						"cause": "typing",
+						"ends_word": true
+					},
+					"expect": [
+						{
+							"action": "arm",
+							"token": 1,
+							"delay_ms": 0,
+							"why": "Word-end"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "live-word-end-keeps-the-live-debounce-when-instant-is-off",
+			"description": "With the instant word end switched off in the menu, live mode keeps its own debounce at a word end on every driver.",
+			"options": "linux",
+			"floors": {
+				"ollama": 300,
+				"mlx": 300,
+				"api": 500
+			},
+			"steps": [
+				{
+					"call": "configure",
+					"args": {
+						"enabled": true,
+						"debounce_ms": 500,
+						"instant_on_word_end": false,
 						"live_debounce_ms": 80
 					},
 					"expect": []
