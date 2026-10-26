@@ -47,6 +47,9 @@ const SCANNED_EXTENSIONS = /\.(lua|ahk|js)$/;
 // Tests spell keys on purpose (they assert the spelling); vendored code is not ours.
 const EXCLUDED = /(^|\/)(tests|test|vendor|node_modules)\//;
 const COMMENT_LINE = /^\s*(--|;|\/\/|\*|\/\*)/;
+// A line (or the line below a whole-line marker comment) that spells a homonym of a key on
+// purpose, such as a prompt template token, says so and is not counted.
+const EXEMPT_MARKER = 'config-key-literal-ok';
 const STRING_LITERAL = /"([^"\\\n]*)"|'([^'\\\n]*)'/g;
 // A module path is not a config key even when it is spelt like one
 // (`require("llm.app_profile_overrides")`).
@@ -83,8 +86,11 @@ function vocabulary(tables) {
  */
 function countLiterals(text, words) {
 	let count = 0;
+	let exemptNext = false;
 	for (const line of text.split('\n')) {
-		if (COMMENT_LINE.test(line)) continue;
+		const exempt = exemptNext || line.includes(EXEMPT_MARKER);
+		exemptNext = COMMENT_LINE.test(line) && line.includes(EXEMPT_MARKER);
+		if (COMMENT_LINE.test(line) || exempt) continue;
 		for (const m of line.matchAll(STRING_LITERAL)) {
 			if (!words.has(m[1] ?? m[2])) continue;
 			if (REQUIRE_BEFORE.test(line.slice(0, m.index))) continue;
@@ -182,10 +188,14 @@ function selfTest(words) {
 		'local s = "enabled" .. "schema_version"',
 		'local m = "metrics.private_filter_enabled is the key"',
 		'local Overrides = require("llm.app_profile_overrides")',
-		'local ok, mod = pcall(require, "llm.app_profile_overrides")'
+		'local ok, mod = pcall(require, "llm.app_profile_overrides")',
+		'x = "min_words" -- config-key-literal-ok: a prompt token',
+		'-- config-key-literal-ok: the next line is a homonym',
+		'local tokens = { "max_words" }',
+		'local again = "max_words"'
 	].join('\n');
 	const n = countLiterals(probe, words);
-	if (n !== 3) throw new Error(`self-test: expected 3 counted literals in the probe, got ${n}`);
+	if (n !== 4) throw new Error(`self-test: expected 4 counted literals in the probe, got ${n}`);
 	const { grown, stale } = compare({ 'a.lua': 2, 'b.lua': 1 }, { 'a.lua': 1, 'c.lua': 4 });
 	if (grown.length !== 2 || stale.length !== 1)
 		throw new Error('self-test: compare() no longer reports a rise, a new file and headroom');
