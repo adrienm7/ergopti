@@ -144,6 +144,10 @@ const manifest = {
 // entry point; extracting the wrapper alone would omit its lifecycle state.
 const appsContext = vm.createContext({ window: { ManifestData: manifest } });
 vm.runInContext(read('static/ergopti_plus/_shared/ui/host_bridge.js'), appsContext);
+vm.runInContext(
+	read('static/ergopti_plus/_shared/ui/_generated/metrics_general_category_aliases.js'),
+	appsContext
+);
 vm.runInContext(read('static/ergopti_plus/_shared/ui/metrics_apps/helpers.js'), appsContext);
 vm.runInContext(appsSource, appsContext);
 vm.runInContext(

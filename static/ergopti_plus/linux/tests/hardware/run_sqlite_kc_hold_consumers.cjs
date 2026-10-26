@@ -49,7 +49,12 @@ if (
 }
 const manifest = JSON.parse(fs.readFileSync(path.join(ownedProof, 'manifest.json'), 'utf8'));
 const context = vm.createContext({ window: { ManifestData: manifest } });
-for (const source of ['host_bridge.js', 'metrics_apps/helpers.js', 'metrics_apps/state.js'])
+for (const source of [
+	'host_bridge.js',
+	'_generated/metrics_general_category_aliases.js',
+	'metrics_apps/helpers.js',
+	'metrics_apps/state.js'
+])
 	vm.runInContext(read('static/ergopti_plus/_shared/ui/' + source), context, { filename: source });
 vm.runInContext(
 	"currentSelectedDate='2026-10-03';currentPeriod='all';currentCountAwake=true;",

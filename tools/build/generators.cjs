@@ -131,7 +131,10 @@ const GENERATORS = [
 	},
 	{
 		script: 'build/gen-metrics-category-aliases.cjs',
-		outputs: ['static/ergopti_plus/_shared/data/metrics_general_category_aliases.json']
+		outputs: [
+			'static/ergopti_plus/_shared/data/metrics_general_category_aliases.json',
+			'static/ergopti_plus/_shared/ui/_generated/metrics_general_category_aliases.js'
+		]
 	},
 	{
 		script: 'codegen/codegen-terminators.cjs',
