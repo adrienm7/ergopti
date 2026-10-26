@@ -128,6 +128,47 @@ check(
 check(getCategoryColor('productivity', 1) === '#30D158', 'a positive score must render green');
 check(getCategoryColor('productivity', -1) === '#FF453A', 'a negative score must render red');
 
+// 6b. Every stored spelling of the default category, in every shipped language, folds
+//     into the canonical id, and the corpus vectors resolve as the file on disk of
+//     a user who switched language would need.
+const corpus = JSON.parse(
+	fs.readFileSync(
+		path.join(
+			ROOT,
+			'static',
+			'ergopti_plus',
+			'_shared',
+			'tests',
+			'corpus',
+			'metrics',
+			'app_categories_vectors.json'
+		),
+		'utf8'
+	)
+);
+check(
+	corpus.vectors.length >= 20,
+	`the corpus holds only ${corpus.vectors.length} vector(s) — it must cover every locale`
+);
+for (const v of corpus.vectors) {
+	for (const [app, stored] of Object.entries(v.stored)) {
+		const want = v.expected_ids[app];
+		const got = categoryToId(stored.type);
+		check(
+			got === want,
+			`corpus "${v.id}": ${app} is stored as ${JSON.stringify(stored.type)} and must resolve to ` +
+				`${JSON.stringify(want)}, got ${JSON.stringify(got)} — it would show as a custom category`
+		);
+	}
+}
+for (const alias of aliasDoc.aliases) {
+	check(categoryToId(alias) === 'general', `"${alias}" must fold into the general category`);
+}
+check(
+	categoryToId('عام') === 'general' && categoryToId('Allgemein') === 'general',
+	'a non-Latin and a German spelling of the default category must resolve to general'
+);
+
 // 7. The generated alias file must still match the locales. Regenerating is one
 //    command; a stale list silently orphans the overrides of whichever language
 //    was added or corrected since.
@@ -141,6 +182,12 @@ for (const [code, label] of Object.entries(live)) {
 			'Run `node tools/build/gen-metrics-category-aliases.cjs`.'
 	);
 }
+const generated = require('../build/gen-metrics-category-aliases.cjs');
+check(
+	fs.readFileSync(generated.SCRIPT_OUT, 'utf8') === generated.renderScript(aliasDoc),
+	'_generated/metrics_general_category_aliases.js is stale against the alias file. ' +
+		'Run `node tools/build/gen-metrics-category-aliases.cjs`.'
+);
 check(
 	Object.keys(aliasDoc.by_locale).length === Object.keys(live).length,
 	`the alias file covers ${Object.keys(aliasDoc.by_locale).length} locale(s), the tree ships ` +
@@ -149,7 +196,7 @@ check(
 
 function loadedPage(host) {
 	const page = loadMetricsAppsPage(host);
-	assert.equal(page.scripts.filter((name) => name !== '#inline').length, 11);
+	assert.equal(page.scripts.filter((name) => name !== '#inline').length, 12);
 	assert.equal(
 		page.scripts.includes('script.js'),
 		false,

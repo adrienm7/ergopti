@@ -387,8 +387,8 @@ test('loaded HTML admits the exact Lua readiness query and paints normal native 
 	const f = loadMetricsAppsPage();
 	assert.equal(
 		f.scripts.length,
-		12,
-		'all eleven external scripts and the actual inline script execute'
+		13,
+		'all twelve external scripts and the actual inline script execute'
 	);
 	assert.equal(f.scripts.includes('script.js'), false, 'the legacy dashboard is not loaded');
 	const lua = fs.readFileSync(
@@ -504,7 +504,7 @@ test('defensive order control exposes native publishers only after the final ext
 		});
 	});
 	const external = phases.filter(({ name }) => name !== '#inline');
-	assert.equal(external.length, 11);
+	assert.equal(external.length, 12);
 	assert.equal(external[external.length - 1].name, 'modal.js');
 	for (const phase of external.slice(0, -1)) {
 		assert.equal(

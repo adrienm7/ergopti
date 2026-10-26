@@ -37,6 +37,7 @@ function appsFixture() {
 	});
 	const index = read('metrics_apps/index.html');
 	vm.runInContext(read('host_bridge.js'), context);
+	vm.runInContext(read('_generated/metrics_general_category_aliases.js'), context);
 	for (const name of ['helpers.js', 'state.js', 'main.js']) {
 		assert.ok(index.includes(`src="${name}"`), `${name} must be loaded by the actual page`);
 		vm.runInContext(read(`metrics_apps/${name}`), context);
@@ -448,6 +449,7 @@ assert.equal(passed, 12, 'all original seven and five selection regressions must
 		});
 		vm.runInContext(read('host_bridge.js'), context);
 		vm.runInContext(read('dom_utils.js'), context);
+		vm.runInContext(read('_generated/metrics_general_category_aliases.js'), context);
 		for (const name of ['helpers.js', 'state.js', 'main.js', 'charts.js', 'modal.js']) {
 			assert.ok(read('metrics_apps/index.html').includes(`src="${name}"`));
 			vm.runInContext(read(`metrics_apps/${name}`), context);
