@@ -27,6 +27,7 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local TextContinuation = require("modules.shortcuts.actions.text_continuation")
 local TextDispatch = require("modules.shortcuts.actions.text_dispatch")
 local TransformGrace = require("modules.shortcuts.actions.text_transform_grace")
+local TableUtil = require("table_util")
 
 local LOG = "shortcuts.actions.text"
 
@@ -679,8 +680,7 @@ end
 -- from. Kept permanently — cheap (fires once) and invaluable when wrapping
 -- mysteriously stops in a given deployment.
 do
-	local key_count = 0
-	for _ in pairs(WRAP_PAIRS) do key_count = key_count + 1 end
+	local key_count = TableUtil.count(WRAP_PAIRS)
 	if key_count == 0 then
 		Logger.error(LOG, "Wrap catalogue is EMPTY — selection wrapping is disabled. Catalogue path/parse failed.")
 	else

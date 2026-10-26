@@ -22,6 +22,7 @@ local LearningStore  = require("llm.agent_learning_store")
 local Logger         = require("infra.logger")
 local Storage        = require("adapters.storage")
 local TimerScheduler = require("adapters.timer_scheduler")
+local TableUtil = require("table_util")
 
 local LOG = "llm.agent_learning"
 
@@ -77,8 +78,7 @@ local function load()
 	local ok, stored = Storage.read_exact(M.STORAGE_KEY)
 	if not ok then Logger.error(LOG, "The learned thresholds could not be read; starting afresh.") end
 	_map = sanitize(ok and stored or nil)
-	local count = 0
-	for _ in pairs(_map.apps) do count = count + 1 end
+	local count = TableUtil.count(_map.apps)
 	Logger.info(LOG, "Learned thresholds loaded for %d application(s).", count)
 	return _map
 end

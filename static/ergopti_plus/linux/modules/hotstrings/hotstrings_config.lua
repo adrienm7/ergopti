@@ -49,6 +49,7 @@ local ManifestReader = require("infra.manifest_reader")
 local Preferences = require("infra.hotstring_preferences")
 local KEY = require("config_keys").KEY
 local NativePath = require("native_path")
+local TableUtil = require("table_util")
 
 local LOG = "modules.hotstrings.hotstrings_config"
 local _personal_sources = {}
@@ -304,9 +305,7 @@ local function _count_groups(mappings)
 	for _, m in ipairs(mappings) do
 		if type(m.group) == "string" then seen[m.group] = true end
 	end
-	local count = 0
-	for _ in pairs(seen) do count = count + 1 end
-	return count
+	return TableUtil.count(seen)
 end
 
 local function _collect_groups(mappings)

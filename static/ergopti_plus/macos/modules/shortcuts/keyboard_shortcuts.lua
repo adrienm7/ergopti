@@ -45,6 +45,7 @@ local PhysicalSlotConstructor = PhysicalSlots.new
 local PhysicalAvailability = require("shortcuts.physical_availability")
 local i18n = require("infra.i18n")
 local AiActions = require("modules.shortcuts.ai_actions")
+local TableUtil = require("table_util")
 
 local LOG = "shortcuts.keyboard_shortcuts"
 
@@ -1154,8 +1155,7 @@ function M.start(candidate, raw_claims)
 	_started = true
 	_delivery_enabled = true
 	_start_attempt = nil
-	local count = 0
-	for _ in pairs(_hotkeys) do count = count + 1 end
+	local count = TableUtil.count(_hotkeys)
 	Logger.success(LOG, "Keyboard shortcuts started (%d active binding(s)).", count)
 	return true
 end

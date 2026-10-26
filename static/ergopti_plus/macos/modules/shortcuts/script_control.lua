@@ -45,6 +45,7 @@ local KeyState  = require("adapters.key_state")
 local KeyEventHealth = require("infra.key_event_health")
 local ScriptChords = require("script_chords")
 local ChordCatalogue = require("infra.script_chord_catalogue")
+local TableUtil = require("table_util")
 
 local LOG = "shortcuts.script_control"
 
@@ -2046,8 +2047,7 @@ function M.set_extras(tbl)
 		return
 	end
 	_extras = tbl
-	local count = 0
-	for _ in pairs(tbl) do count = count + 1 end
+	local count = TableUtil.count(tbl)
 	Logger.debug(LOG, "Extras table registered (%d handler(s)).", count)
 end
 

@@ -27,6 +27,7 @@ local JsonCodec = require("adapters.json_codec")
 local PredictionLockRegistry = require("ui.menu.menu_llm.prediction_lock_registry")
 local OllamaEndpoint = require("modules.llm.ollama_endpoint")
 local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_registry")
+local TableUtil = require("table_util")
 
 local LOG = "startup_ctrl"
 -- The lifecycle line Windows writes for the same boot (menu_llm/init.ahk)
@@ -744,8 +745,7 @@ function M.new(ctx)
 			Logger.debug(LOG, string.format("User profiles loaded: %d.", user_count))
 
 			local profile_shortcuts = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts or {}
-			local sc_count = 0
-			for _ in pairs(profile_shortcuts) do sc_count = sc_count + 1 end
+			local sc_count = TableUtil.count(profile_shortcuts)
 			Logger.info(LOG, string.format("Profile shortcuts loaded: %d entries.", sc_count))
 
 			for profile_id, sc in pairs(profile_shortcuts) do
@@ -930,7 +930,7 @@ function M.new(ctx)
 			if _startup_paused == true or not runtime_current(my_pause_epoch) then
 				return false
 			end
-			local count = 0; for _ in pairs(installed) do count = count + 1 end
+			local count = TableUtil.count(installed)
 			Logger.debug(LOG, string.format("Startup installed-models cache count: %d.", count))
 			if count == 0 then
 				if not _check_startup_attempts then _check_startup_attempts = 0 end

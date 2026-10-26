@@ -31,6 +31,7 @@ local M = {}
 local hs     = hs
 local Chord  = require("chord")
 local Logger = require("infra.logger")
+local TableUtil = require("table_util")
 
 local LOG = "adapters.hotkey_registrar"
 
@@ -531,9 +532,7 @@ end
 --- exposed for the suite to assert against after a stop/start cycle.
 --- @return number
 function M.live_count()
-	local n = 0
-	for _ in pairs(_bindings) do n = n + 1 end
-	return n
+	return TableUtil.count(_bindings)
 end
 
 return M

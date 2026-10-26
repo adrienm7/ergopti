@@ -25,6 +25,7 @@ local Manifest    = require("infra.manifest_reader")
 local TapKeys     = require("modules.shortcuts.tap_keys")
 local Hotkeys     = require("adapters.hotkey_registrar")
 local Chord       = require("chord")
+local TableUtil = require("table_util")
 
 local LOG = "shortcuts.bindings"
 
@@ -832,8 +833,7 @@ local function start_bindings(preserve_pause_intent, hotkeys_only)
 	-- Seed random for keep-awake jitter on first start
 	math.randomseed(os.time())
 
-	local count = 0
-	for _ in pairs(hotkeys) do count = count + 1 end
+	local count = TableUtil.count(hotkeys)
 	started = true
 	delivery_enabled = true
 	if preserve_pause_intent ~= true then pause_restore_intent = nil end

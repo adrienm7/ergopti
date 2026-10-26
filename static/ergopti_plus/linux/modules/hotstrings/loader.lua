@@ -47,6 +47,7 @@ local Paths  = require("infra.paths")
 local NativeDirectory = require("infra.native_directory")
 local CatalogueFiles = require("hotstrings.catalogue_files")
 local PersonalFiles = require("hotstrings.personal_files")
+local TableUtil = require("table_util")
 
 local LOG = "modules.hotstrings.loader"
 
@@ -107,9 +108,7 @@ end
 --- @param t table
 --- @return integer
 local function count_categories(t)
-	local n = 0
-	for _ in pairs(t) do n = n + 1 end
-	return n
+	return TableUtil.count(t)
 end
 
 --- A set of section names from an optional source list.

@@ -52,6 +52,7 @@ local Json = require("json")
 local TomlCodec = require("toml_codec")
 local Layers = require("keymap.layers")
 local Writer = require("toml_codec.writer")
+local TableUtil = require("table_util")
 local original_read, original_json, original_toml = Writer.read_classified, Json.decode, TomlCodec.decode
 local source_records = setmetatable({}, { __mode = "k" })
 local layer_ports = {}
@@ -563,8 +564,7 @@ function M.load(opts)
 		end
 	end
 	local bindings = result.layers[M.NAV_LAYER_ID] or {}
-	local count = 0
-	for _ in pairs(bindings) do count = count + 1 end
+	local count = TableUtil.count(bindings)
 	local wheel = M.wheel_slots(bindings, ctx.registry)
 	Logger.success(LOG, "Navigation layer loaded: %d key(s) bound.", count)
 	local layer = { bindings = bindings, registry = ctx.registry, wheel = wheel }

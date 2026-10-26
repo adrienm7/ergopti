@@ -17,6 +17,7 @@
 ---    multi-megabyte payload never needs one table slot per token.
 --- ==============================================================================
 
+local TableUtil = require("table_util")
 local M = {}
 
 local utf8 = utf8
@@ -128,8 +129,7 @@ function M.encode(value, pacer)
 		elseif kind == "boolean" then emit(v and "true" or "false")
 		elseif kind == "table" then
 			local n = #v
-			local keys = 0
-			for _ in pairs(v) do keys = keys + 1 end
+			local keys = TableUtil.count(v)
 			if keys == 0 then
 				emit("[]")
 			elseif n == keys then

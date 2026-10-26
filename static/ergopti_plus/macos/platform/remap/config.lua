@@ -39,6 +39,7 @@ local ActionCatalogue = require("platform.remap.action_catalogue")
 local Manifest = require("infra.manifest_reader")
 local Outdated = require("config_outdated")
 local KePaths = require("platform.remap.ke_paths")
+local TableUtil = require("table_util")
 
 local LOG = "karabiner"
 
@@ -437,8 +438,7 @@ function M.compute_non_canonical_combos(mod_combos)
 		::next::
 	end
 
-	local count = 0
-	for _ in pairs(non_canonical) do count = count + 1 end
+	local count = TableUtil.count(non_canonical)
 	Logger.debug(LOG, "Non-canonical combos computed: %d.", count)
 	return non_canonical
 end

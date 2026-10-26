@@ -44,6 +44,7 @@ local touchdevice = load_touchdevice_module()
 local Engine    = require("modules.gestures.engine")
 local Actions   = require("modules.gestures.actions")
 local Conflicts = require("modules.gestures.conflicts")
+local TableUtil = require("table_util")
 
 
 
@@ -319,9 +320,7 @@ local health_reported_watchers = nil
 --- Counts currently-registered watchers (diagnostic helper).
 --- @return number Watcher count.
 local function count_watchers()
-	local n = 0
-	for _ in pairs(touch_watchers) do n = n + 1 end
-	return n
+	return TableUtil.count(touch_watchers)
 end
 
 --- Safely invokes a method on the touchdevice object and stringifies the result.
