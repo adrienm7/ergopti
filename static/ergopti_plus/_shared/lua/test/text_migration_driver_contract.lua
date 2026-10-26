@@ -43,7 +43,8 @@ function M.register(helpers)
 			available = function() return true end,
 			count = function() return #rows end,
 			get_cursor = function() return store.cursor end,
-			set_cursor = function(value) store.cursor = value end,
+			-- Both real backends acknowledge committed cursor writes explicitly.
+			set_cursor = function(value) store.cursor = value; return true end,
 			fetch = function(device, after, limit)
 				store.devices[#store.devices + 1] = device
 				local out = {}
@@ -147,7 +148,7 @@ function M.register(helpers)
 			local store = backend(450)
 			local clock = scheduler()
 			local module = build(store, { scheduler = clock, device_id = function() return DEVICE end })
-			module.start(Plan.MODE_ENCRYPT)
+			helpers.assert_true(module.start(Plan.MODE_ENCRYPT))
 			table.remove(clock.queue, 1).fn()
 			module.cancel()
 			helpers.assert_eq(module.is_running(), false)
@@ -161,9 +162,9 @@ function M.register(helpers)
 			local store = backend(450)
 			local clock = scheduler()
 			local module = build(store, { scheduler = clock, device_id = function() return DEVICE end })
-			module.start(Plan.MODE_ENCRYPT)
+			helpers.assert_true(module.start(Plan.MODE_ENCRYPT))
 			local first = clock.queue[1]
-			module.start(Plan.MODE_ENCRYPT)
+			helpers.assert_true(module.start(Plan.MODE_ENCRYPT))
 			helpers.assert_true(first.dead, "the first pass's slice was cancelled")
 		end)
 
@@ -184,12 +185,12 @@ function M.register(helpers)
 			local real, fake = backend(2), backend(2)
 			local module = build(real)
 			module._set_backend(fake.port)
-			module.start(Plan.MODE_ENCRYPT, DEVICE)
+			helpers.assert_true(module.start(Plan.MODE_ENCRYPT, DEVICE))
 			while module.pump() do end
 			helpers.assert_true(TextCrypto.is_encrypted(fake.rows[1].values.text))
 			helpers.assert_eq(real.rows[1].values.text, "t1", "the real backend was not touched")
 			module._set_backend(nil)
-			module.start(Plan.MODE_ENCRYPT, DEVICE)
+			helpers.assert_true(module.start(Plan.MODE_ENCRYPT, DEVICE))
 			while module.pump() do end
 			helpers.assert_true(TextCrypto.is_encrypted(real.rows[1].values.text))
 		end)
