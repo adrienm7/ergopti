@@ -27,16 +27,19 @@ if arg[1] == "--no-luv" then
 	assert(K._pending_buffer_count_for_test() == 1)
 	assert(K.get_range_payload().today.minimal.c.a.c == 1)
 	assert(K.apply_configuration(assert(K.configuration_snapshot())) == true)
-	assert(K.set_app_category("minimal", "productive", 1) == true)
+	-- Categories live in the shared category file since dc40857660. Its atomic
+	-- publication may need luv (PUC Lua) or not (LuaJIT FFI): the result must be
+	-- true only when the file holds the edit, and SQLite is never the fallback.
+	local edited = K.set_app_category("minimal", "productive", 1)
 	assert(K.stop() == true and K.stop() == true)
 	assert(K._pending_buffer_count_for_test() == 1 and not K.get_flush_status().committed)
 	assert(K.get_flush_status().stopping and not K.has_flush_debt())
 	assert(#assert(W.query_rows("SELECT id FROM events_typing;")) == 0)
 	assert(W.get_revision() == revision, "unavailable flush must not advance the durable watermark")
-	-- Scores and categories live in the shared category file since dc40857660.
 	local stored = assert(require("modules.keystats.app_category_file").load())
-	assert(require("keystats.app_category_store").projection(stored).minimal, "the edit must reach the category file")
-	assert(W.get_meta("app_score.minimal") == nil, "the category edit must not touch SQLite")
+	assert(edited == (require("keystats.app_category_store").projection(stored).minimal ~= nil),
+		"the edit result must match what the category file holds")
+	assert(W.get_meta("app_score.minimal") == nil, "the category edit must not fall back to SQLite")
 	local warnings = 0
 	for _, line in ipairs(require("logger").ring_buffer_snapshot()) do
 		if line:find("SQLite flush transport unavailable", 1, true) then warnings = warnings + 1 end
