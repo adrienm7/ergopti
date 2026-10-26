@@ -58,7 +58,7 @@ def source_identity(repo):
     parser = PageAssets()
     parser.feed(page.read_text(encoding="utf-8"))
     require(
-        len(parser.scripts) == 11 and parser.scripts[-1] == "modal.js", "page script census differs"
+        len(parser.scripts) == 12 and parser.scripts[-1] == "modal.js", "page script census differs"
     )
     require("script.js" not in parser.scripts, "legacy dashboard cannot qualify the loaded page")
     paths = {repo / name for name in (*DEPENDENCIES, PAGE)}

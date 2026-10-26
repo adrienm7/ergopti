@@ -34,7 +34,7 @@ function run({
 		['macos_action_picker_pool_test.py', 19],
 		['macos_layout_manager_pool_test.py', 22],
 		['macos_permission_dialog_pool_test.py', 23],
-		['macos_metrics_apps_page_test.py', 23]
+		['macos_metrics_apps_page_test.py', 24]
 	]) {
 		const result = spawn(
 			python,

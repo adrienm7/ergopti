@@ -223,6 +223,7 @@ class MetricsAppsPageControls(unittest.TestCase):
             "../i18n.js",
             "../metrics_rebuild_banner.js",
             "../metrics_freshness.js",
+            "../_generated/metrics_general_category_aliases.js",
             "helpers.js",
             "state.js",
             "main.js",
@@ -427,6 +428,16 @@ class MetricsAppsPageControls(unittest.TestCase):
         self.assertEqual(probe.source_identity(aliased_repo), (sources, digest))
         self.assertEqual(probe.source_identity(repo.resolve()), (sources, digest))
         self.assertTrue(all(not Path(name).is_absolute() for name in sources))
+
+    def test_actual_repository_page_is_admitted(self):
+        # The fixture above is a copy; the census must also hold for the real page,
+        # which gained the generated category aliases in 81635a815a.
+        repo = Path(__file__).resolve().parents[2]
+        sources, digest = probe.source_identity(repo)
+        self.assertEqual(len(digest), 64)
+        self.assertTrue(
+            any(name.endswith("metrics_general_category_aliases.js") for name in sources)
+        )
 
     def test_missing_or_remote_asset_cannot_be_accepted(self):
         repo = self.source_fixture()
