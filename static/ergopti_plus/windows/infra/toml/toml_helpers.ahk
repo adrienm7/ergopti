@@ -530,22 +530,40 @@ TOML_StripInlineComment(Line) {
 				return Trim(Line)
 		Quote := ""
 		Escaped := false
+		Skip := 0
 		Loop Parse Line {
+				if Skip {
+						Skip -= 1
+						continue
+				}
 				if (Escaped) {
 						Escaped := false
 						continue
 				}
-				if (A_LoopField == "\" && Quote == '"') {
+				if (A_LoopField == "\" && SubStr(Quote, 1, 1) == '"') {
 						Escaped := true
 						continue
 				}
 				if Quote != "" {
-						if A_LoopField == Quote
+						if SubStr(Line, A_Index, StrLen(Quote)) == Quote {
+								Skip := StrLen(Quote) - 1
+								if StrLen(Quote) == 3 {
+										Position := A_Index
+										while SubStr(Line, Position + Skip + 1, 1) == A_LoopField
+												Skip += 1
+								}
 								Quote := ""
+						}
 						continue
 				}
 				if A_LoopField == '"' || (A_LoopField == "'" && _TOML_IsLiteralStart(Line, A_Index)) {
 						Quote := A_LoopField
+						; A triple delimiter owns hashes and embedded single quotes
+						; until its matching triple, including physical newlines.
+						if SubStr(Line, A_Index, 3) == Quote . Quote . Quote {
+								Quote := Quote . Quote . Quote
+								Skip := 2
+						}
 						continue
 				}
 				if A_LoopField == "#"
@@ -564,7 +582,10 @@ TOML_LiteralKind(RawValue) {
 				return "number"
 		; Literal strings carry the same string intent as basic strings. The
 		; coercers already decode them without interpreting Windows backslashes.
+		; Multiline literals also allow one or two quotes inside the body or
+		; immediately before the closing triple, but never a closed-token tail.
 		if RegExMatch(Literal, "^'[^']*'$")
+				|| RegExMatch(Literal, "s)^'''(?:(?!''').)*'{3,5}$")
 				return "string"
 		if (StrLen(Literal) >= 2
 		and SubStr(Literal, 1, 1) == '"'

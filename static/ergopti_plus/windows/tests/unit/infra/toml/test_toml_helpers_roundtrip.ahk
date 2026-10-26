@@ -284,3 +284,27 @@ Test("toml literal kind: single quotes retain string intent (toml-literal-string
 	_TTHRT_LiteralStringKind)
 
 #Include test_toml_reader_publication.ahk
+
+
+_TTHRT_TripleLiteralStringKind() {
+	Quote := Chr(39), Triple := Quote . Quote . Quote
+	for Body in ["", "en", "O'Brien", "first`nsecond", "a#b", "O'Brien#literal", "back\slash", "two''quotes", "ending'", "ending''"]
+		AssertEqual("string", TOML_LiteralKind(Triple . Body . Triple),
+			"valid multiline literal strings retain source string intent: " . Body)
+	for Delimiter in [Chr(39), Chr(34)] {
+		TripleDelimiter := Delimiter . Delimiter . Delimiter
+		for Body in ["a#b", "first`nsecond#data", "ending" . Delimiter,
+				"ending" . Delimiter . Delimiter] {
+			Token := TripleDelimiter . Body . TripleDelimiter
+			AssertEqual(Token, TOML_StripInlineComment(Token . " # outside comment"),
+				"only a comment outside a complete multiline token may be stripped")
+		}
+	}
+	for Raw in [Triple . "unclosed", Triple . "en" . Quote . Quote,
+			Triple . "en" . Triple . "bare", Triple . "a" . Triple . "b" . Triple,
+			"O'Brien", "true", "42", "[1]", "'a'b'"]
+		AssertFalse(TOML_LiteralKind(Raw) == "string",
+			"unknown or non-string source intent must never become a quoted string")
+}
+Test("toml literal kind: triple quotes retain exact intent (toml-triple-literal-boot)",
+	_TTHRT_TripleLiteralStringKind)
