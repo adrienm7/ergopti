@@ -93,6 +93,23 @@ helpers.describe("AI typing context: fed by the typed text", function()
 		end)
 	end)
 
+	helpers.it("(private-ai-context) a private mapping fired by the engine never reaches the context", function()
+		scenario({}, function(s)
+			assert(s.engine:load_mappings({
+				{ trigger = "28401", replacement = "2840175123456", auto_expand = true, is_word = false, is_private = true },
+			}))
+			type_text(s, "Mon numero 2840")
+			local result = s.engine:on_char("1")
+			helpers.assert_not_nil(result, "the control must match the private trigger")
+			helpers.assert_eq(result.is_private, true, "the engine flags the result as private")
+			s.engine:apply_expansion(result)
+			helpers.assert_eq(s.context:text(), "", "neither the secret, nor its trigger, nor the text before it")
+			s.engine:reset(nil, nil, "keep")
+			type_text(s, " merci")
+			helpers.assert_eq(s.context:text(), " merci", "what is typed afterwards is the context")
+		end)
+	end)
+
 	helpers.it("(ai-context) keeps an accepted prediction in the context", function()
 		scenario({}, function(s)
 			type_text(s, "Je pense //")

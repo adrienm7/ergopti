@@ -69,3 +69,18 @@ helpers.describe("AI context buffer strictness", function()
 		helpers.assert_throws(function() ContextBuffer.retained_after_navigation("abc", "yes") end)
 	end)
 end)
+
+helpers.describe("AI context buffer private mirror corpus", function()
+	for _, vector in ipairs(VECTORS.private_mirror.cases) do
+		helpers.it("(private-ai-context) " .. vector.id, function()
+			local visible, mark = ContextBuffer.after_private(vector.text, vector.mark)
+			helpers.assert_eq(visible, vector.expect.visible, vector.id .. " visible text")
+			helpers.assert_eq(mark, vector.expect.mark, vector.id .. " mark")
+		end)
+	end
+
+	helpers.it("(private-ai-context) rejects a malformed text or mark", function()
+		helpers.assert_throws(function() ContextBuffer.after_private(nil, "") end)
+		helpers.assert_throws(function() ContextBuffer.after_private("x", nil) end)
+	end)
+end)

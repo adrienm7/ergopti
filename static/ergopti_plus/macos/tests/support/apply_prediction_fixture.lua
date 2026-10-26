@@ -29,7 +29,7 @@ end
 
 
 --- Loads and drives one prediction acceptance inside a real callback collector.
---- @param options table { text, buffer?, expander_failure?, real_overlap?, prediction? };
+--- @param options table { text, buffer?, llm_private_mark?, expander_failure?, real_overlap?, prediction? };
 ---   prediction is a complete parser record the engine hands over instead of
 ---   one built from text and deletes.
 --- @return table result Captured call, event, state, and side-effect data.
@@ -245,6 +245,7 @@ function M.run(options)
 	local state = {
 		buffer = options.buffer or "prefix ",
 		llm_buffer = options.llm_buffer or options.buffer or "prefix ",
+		llm_private_mark = options.llm_private_mark or "",
 		magic_key = "\u{2605}",
 		lifecycle_generation = 0,
 		mappings = {},

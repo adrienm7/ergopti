@@ -227,5 +227,91 @@
 				"length": 2048
 			}
 		}
-	]
+	],
+	"private_mirror": {
+		"_comment": "After a private (personal-information) expansion the hotstring buffer holds a secret. macOS mirrors that buffer into the AI context, so ContextBuffer.after_private(text, mark) withholds everything up to the mark (the buffer content through the expansion) and follows the tail edits of the buffer. Linux clears its context object on a private replacement instead; the Linux suite replays these cases against the same shared function so both drivers keep one rule.",
+		"cases": [
+			{
+				"id": "no-private-expansion-shows-everything",
+				"mark": "",
+				"text": "Bonjour tout",
+				"expect": {
+					"visible": "Bonjour tout",
+					"mark": ""
+				}
+			},
+			{
+				"id": "text-typed-after-the-secret-is-visible",
+				"mark": "Voici 2840175123456",
+				"text": "Voici 2840175123456 merci",
+				"expect": {
+					"visible": " merci",
+					"mark": "Voici 2840175123456"
+				}
+			},
+			{
+				"id": "nothing-after-the-secret-shows-nothing",
+				"mark": "Voici 2840175123456",
+				"text": "Voici 2840175123456",
+				"expect": {
+					"visible": "",
+					"mark": "Voici 2840175123456"
+				}
+			},
+			{
+				"id": "backspace-into-the-secret-keeps-the-rest-marked",
+				"mark": "Voici 2840175123456",
+				"text": "Voici 28401",
+				"expect": {
+					"visible": "",
+					"mark": "Voici 28401"
+				}
+			},
+			{
+				"id": "typing-after-a-backspace-is-visible",
+				"mark": "Voici 28401",
+				"text": "Voici 28401x",
+				"expect": {
+					"visible": "x",
+					"mark": "Voici 28401"
+				}
+			},
+			{
+				"id": "backspace-far-back-keeps-the-surviving-prefix-marked",
+				"mark": "Voici 2840175123456",
+				"text": "Voi",
+				"expect": {
+					"visible": "",
+					"mark": "Voi"
+				}
+			},
+			{
+				"id": "another-field-releases-the-mark",
+				"mark": "Voici 2840175123456",
+				"text": "Salut",
+				"expect": {
+					"visible": "Salut",
+					"mark": ""
+				}
+			},
+			{
+				"id": "divergence-inside-the-secret-keeps-the-common-part",
+				"mark": "Voici 2840175123456",
+				"text": "Voici 28409 ok",
+				"expect": {
+					"visible": "9 ok",
+					"mark": "Voici 2840"
+				}
+			},
+			{
+				"id": "never-cuts-inside-a-codepoint",
+				"mark": "é",
+				"text": "è",
+				"expect": {
+					"visible": "è",
+					"mark": ""
+				}
+			}
+		]
+	}
 }

@@ -298,6 +298,19 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 			return false, transaction
 		end
 	end
+	if is_private == true then
+		-- The replacement is a secret that now sits in the hotstring buffer. The AI
+		-- must forget the buffer through it, and a failure to do so is the same
+		-- transaction failure as a buffer that cannot be committed: nothing may
+		-- be displayed that a prompt could later repeat.
+		local ok_mark, mark_err = pcall(_llm.mark_private_context, _state.buffer)
+		if not ok_mark then
+			if replay_owner then pcall(TerminatorReplay.cancel_prepared, replay_owner) end
+			pcall(SyntheticInput.cancel, transaction)
+			Logger.error(LOG, "private AI context mark failed: %s.", tostring(mark_err))
+			return false, transaction
+		end
+	end
 
 	-- From this point through ownership publication every operation is a bounded
 	-- Lua table mutation. Native clocks, timers, target lookup, callback
