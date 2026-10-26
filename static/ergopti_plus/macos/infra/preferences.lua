@@ -65,6 +65,7 @@ local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
 local Manifest = require("infra.manifest_reader")
 local LEAF = require("config_keys").LEAF
+local KEY = require("config_keys").KEY
 local HotstringLanguages = require("hotstrings.languages")
 local ConfigOutdated = require("config_outdated")
 local ChoiceCatalogue = require("infra.hotstring_choice_catalogue")
@@ -322,6 +323,28 @@ local function delay_fits(key, value)
 	return true
 end
 
+--- The user profiles an older macOS build kept as an array at [llm.profiles]
+--- user_profiles, importable only while the shared llm.user_profiles key is
+--- absent: the shared envelope wins once it exists. The migration registry cannot
+--- carry them (its closed ops cannot re-encode a value, and the Windows engine
+--- validates the same registry), so this reader is their one migration; the save
+--- deletes the old array in the same write that stores the envelope.
+--- @param llm table|nil Decoded [llm] table.
+--- @return table|nil profiles Detached dense array, nil when there is nothing to import.
+local function legacy_user_profiles(llm)
+	if type(llm) ~= "table" or llm.user_profiles ~= nil then return nil end
+	local profiles = type(llm.profiles) == "table" and llm.profiles.user_profiles or nil
+	if type(profiles) ~= "table" or #profiles == 0 then return nil end
+	local encodable, envelope = pcall(ProfileRegistry.encode, profiles)
+	if not encodable then
+		-- Not imported means not deleted: the array stays on disk for a later build.
+		Logger.error(LOG, "Older [llm.profiles] user_profiles cannot be imported; keeping it untouched: %s",
+			tostring(envelope))
+		return nil
+	end
+	return ProfileRegistry.decode(envelope)
+end
+
 --- The prompt profile ids a document can name: the shipped built-ins and the
 --- document's own llm.user_profiles, plus the legacy ids the active
 --- profile's owner still migrates silently. nil when the shipped list cannot
@@ -345,7 +368,7 @@ local function known_profile_ids(grouped)
 	if type(stored) == "string" and not ProfileRegistry.is_outdated(stored) then
 		readable, user_profiles = pcall(ProfileRegistry.decode, stored)
 	end
-	for _, profile in ipairs(readable and user_profiles or {}) do
+	for _, profile in ipairs(readable and user_profiles or legacy_user_profiles(llm) or {}) do
 		if type(profile) == "table" and type(profile.id) == "string" then ids[profile.id] = true end
 	end
 	return ids, legacy
@@ -1053,6 +1076,11 @@ local function flatten_from_disk(grouped, mark, shapes)
 				end
 			end
 		end
+	end
+	local imported = legacy_user_profiles(grouped.llm)
+	if imported then
+		flat.llm_user_profiles = ProfileRegistry.encode(imported)
+		take(KEY.LLM, LEAF.PROFILES, LEAF.USER_PROFILES)
 	end
 	for key, value in pairs(flat) do flat[key] = scalar_units(KEY_MAP[key], value, true) end
 	return flat
@@ -2114,6 +2142,11 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 		local leaves = {}
 		local proposed = sparse_updates(existing)
 		for _, row in ipairs(cleared_orders) do proposed[#proposed + 1] = row end
+		if document and legacy_user_profiles(document.llm) then
+			-- Imported at load: the envelope replaces the array in this very write,
+			-- or an emptied registry would import the array again at the next boot.
+			proposed[#proposed + 1] = { section = KEY.LLM_PROFILES, key = LEAF.USER_PROFILES, delete = true }
+		end
 		for _, row in ipairs(WrapPreferences.prepare(expected_source.content or "", existing)) do
 			proposed[#proposed + 1] = row
 		end
