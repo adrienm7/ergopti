@@ -1525,26 +1525,30 @@ function closedNativeContextRegistration(unit, parseTree = luaProducerTree) {
 		if (node?.type !== 'table' || node.fields.length !== keys.length) return null;
 		const fields = new Map();
 		for (const field of node.fields) {
-			if (
-				field.key?.type !== 'string' ||
-				!keys.includes(field.key.value) ||
-				fields.has(field.key.value)
-			)
-				return null;
-			fields.set(field.key.value, field.value);
+			// The agent command key is the generated COMMAND constant, never a hand-typed string.
+			const name =
+				field.key?.type === 'string'
+					? field.key.value
+					: field.key?.type === 'field' &&
+						  field.key.object?.type === 'id' &&
+						  field.key.object.name === 'COMMAND'
+						? 'COMMAND.' + field.key.key
+						: null;
+			if (name === null || !keys.includes(name) || fields.has(name)) return null;
+			fields.set(name, field.value);
 		}
 		return fields.size === keys.length ? fields : null;
 	}
 	const context = record(declarations[0].values[0], ['commands', 'state_getters']);
 	if (!context) return false;
-	const commands = record(context.get('commands'), ['agent_mode']);
+	const commands = record(context.get('commands'), ['COMMAND.AGENT_MODE']);
 	const getters = record(context.get('state_getters'), ['llm.agent_mode', 'agent_mode_ready']);
 	if (!commands || !getters) return false;
 	const shape = (node) =>
 		JSON.stringify(node, (key, value) => (['start', 'end'].includes(key) ? undefined : value));
 	const expression = (source) => luaProducerTree('local registered = ' + source).body[0].values[0];
 	return (
-		shape(commands.get('agent_mode')) ===
+		shape(commands.get('COMMAND.AGENT_MODE')) ===
 			shape(
 				expression(
 					'function(id) if not llm or type(llm.set_agent_mode) ~= "function" then return false end local committed = llm.set_agent_mode(id) == true if committed then changed() end return committed end'
@@ -2462,7 +2466,7 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 			!terminal(producer, 'return NativeParent.finish(parent, children)')
 		)
 			return false;
-		const nativeCommand = body(producer, 'agent_mode = function(id)');
+		const nativeCommand = body(producer, '[COMMAND.AGENT_MODE] = function(id)');
 		if (
 			!isDeepStrictEqual(
 				tokenShape(nativeCommand),

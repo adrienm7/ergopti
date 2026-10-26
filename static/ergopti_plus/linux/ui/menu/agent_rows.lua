@@ -25,6 +25,7 @@ local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local AgentSettings = require("modules.llm.agent_settings")
+local COMMAND = require("config_keys").COMMAND
 
 local LOG = "ui.menu.agent_rows"
 
@@ -286,7 +287,7 @@ function M.build(ctx, dialogs)
 	end
 	local menu_ctx = {
 		commands = {
-			[require("config_keys").COMMAND.AGENT_MODE] = function(id)
+			[COMMAND.AGENT_MODE] = function(id)
 				if not llm or type(llm.set_agent_mode) ~= "function" then return false end
 				local committed = llm.set_agent_mode(id) == true
 				if committed then changed() end
