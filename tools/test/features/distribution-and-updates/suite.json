@@ -453,7 +453,7 @@
 		},
 		{
 			"id": "js-0479",
-			"ordinal": 490,
+			"ordinal": 496,
 			"name": "macOS development installer emits executable Lua for literal paths and preserves original backups",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-dev-bootstrap.cjs"],
@@ -462,7 +462,7 @@
 		},
 		{
 			"id": "js-0480",
-			"ordinal": 491,
+			"ordinal": 497,
 			"name": "HS-274 aggregate failure receipts preserve failed child diagnostics after later healthy suites",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-hs274-diagnostic-receipts.cjs"],
@@ -471,7 +471,7 @@
 		},
 		{
 			"id": "js-0481",
-			"ordinal": 492,
+			"ordinal": 498,
 			"name": "macOS journal retries and initial ledger publication recover from actual Common Linux write and close failures",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-journal-native-receipt.cjs"],
