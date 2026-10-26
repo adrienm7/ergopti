@@ -715,6 +715,7 @@ return {
 	"tests.unit.ui.healthcheck.test_healthcheck_recent_issues_source",
 	"tests.unit.ui.healthcheck.test_healthcheck_configuration",
 	"tests.unit.ui.healthcheck.test_healthcheck_report_issue",
+	"tests.unit.ui.healthcheck.test_diagnostics_runner",
 	"tests.unit.ui.editors.test_layout_manager_bridge",
 	"tests.unit.ui.menu.llm.test_llm_menu_toggle_row",
 	"tests.unit.ui.menu.llm.test_ai_config_parents",
