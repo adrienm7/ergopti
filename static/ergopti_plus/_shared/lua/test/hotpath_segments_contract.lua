@@ -30,9 +30,26 @@ local SKIPPED_DIRECTORIES = { tests = true, vendor = true, _generated = true, na
 --- Lists every production .lua file under a driver root, through lfs when it is
 --- installed and the platform's directory listing otherwise.
 --- @param root string Absolute driver root.
---- @return table paths Sorted, forward slashes.
-local function production_files(root)
+--- @param directory table|nil Native directory port supplied by the driver.
+--- @return table paths Sorted, native path bytes preserved.
+local function production_files(root, directory)
 	local found = {}
+	if directory then
+		local function walk(dir)
+			for _, entry in ipairs(assert(directory.entries(dir))) do
+				if not SKIPPED_DIRECTORIES[entry.name] then
+					local full = directory.join(dir, entry.name)
+					local kind = entry.kind
+					if kind == "link" then kind = assert(directory.target_kind(full)) end
+					if kind == "directory" then walk(full)
+					elseif kind == "file" and entry.name:match("%.lua$") then found[#found + 1] = full end
+				end
+			end
+		end
+		walk(root)
+		table.sort(found)
+		return found
+	end
 	local ok_lfs, lfs = pcall(require, "lfs")
 	if ok_lfs then
 		local function walk(dir)
@@ -80,11 +97,12 @@ end
 --- Collects the segment names a driver emits, with the file of the first emission.
 --- @param root string Absolute driver root.
 --- @param call_pattern string Lua pattern with one capture: the segment name.
+--- @param directory table|nil Native directory port supplied by the driver.
 --- @return table emitted name -> relative path
 --- @return number sites Call sites parsed.
-local function emitted_segments(root, call_pattern)
+local function emitted_segments(root, call_pattern, directory)
 	local emitted, sites = {}, 0
-	for _, path in ipairs(production_files(root)) do
+	for _, path in ipairs(production_files(root, directory)) do
 		local handle = assert(io.open(path, "rb"))
 		local source = handle:read("*a")
 		handle:close()
@@ -104,13 +122,14 @@ end
 --- @param helpers table The runner's test helpers.
 --- @param options table { driver = "macos"|"linux", root = absolute driver root,
 ---   call_pattern = pattern capturing the segment name of one emission,
+---   directory = optional native directory port,
 ---   timed_only = optional set of emitted names that are deliberately not
 ---   segments (a timed wait or a background build) }.
 function M.register(helpers, options)
 	local declared = Inventory.for_driver(options.driver)
 	local timed_only = options.timed_only or {}
 	assert(type(options.default_slow_ms) == "number", "the contract needs the registry's hotpath_slow_ms")
-	local emitted, sites = emitted_segments(options.root, options.call_pattern)
+	local emitted, sites = emitted_segments(options.root, options.call_pattern, options.directory)
 
 	helpers.describe("hot-path segment inventory: " .. options.driver, function()
 		helpers.it("parses the driver's emissions", function()

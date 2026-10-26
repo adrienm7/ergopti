@@ -132,72 +132,22 @@ local TEST_DIRS = {
 	"tests/unit",
 }
 
---- Recursively collects test files under a directory.
---- Uses lfs if available, otherwise shells out to dir/ls.
+--- Recursively collects test files through the canonical native directory owner.
+--- Discovery preserves native filename bytes independently of optional lfs.
 --- @param dir string Directory relative to the driver root.
 --- @return table|nil List of dotted module names ready for require.
 --- @return string|nil Discovery error.
 local function discover_tests(dir)
 	local results = {}
-	local abs     = driver_root .. "/" .. dir
-
-	local ok_lfs, lfs = pcall(require, "lfs")
-	if ok_lfs then
-		local function walk(path, mod_prefix)
-			for entry in lfs.dir(path) do
-				if entry ~= "." and entry ~= ".." then
-					local full = path .. "/" .. entry
-					local attr = lfs.attributes(full)
-					if attr and attr.mode == "directory" then
-						walk(full, mod_prefix .. "." .. entry)
-					elseif entry:match("^test_.+%.lua$") then
-						local name = entry:gsub("%.lua$", "")
-						results[#results + 1] = mod_prefix .. "." .. name
-					end
-				end
-			end
-		end
-		local ok_walk, walk_error = pcall(walk, abs, dir:gsub("/", "."))
-		if not ok_walk then return nil, tostring(walk_error) end
-		return results, nil
-	end
-
-	-- Fallback: shell out using io.popen.
-	local windows = package.config:sub(1, 1) == "\\"
-	local cmd
-	if windows then
-		cmd = string.format('cmd /c dir /b /s /a-d "%s"', abs:gsub("/", "\\"))
-	else
-		-- find runs inside the directory, so its paths never contain the
-		-- checkout prefix: a POSIX prefix may hold a backslash or a newline.
-		cmd = "cd " .. shell_quote(abs) .. " && find . -type f -name 'test_*.lua'"
-	end
-	local pipe, open_error = io.popen(cmd)
-	if not pipe then return nil, tostring(open_error or "could not start discovery command") end
-
-	local strip_prefix = driver_root
-	for line in pipe:lines() do
-		local rel
-		if windows then
-			line = line:gsub("\\", "/")
-			if strip_prefix ~= "" and line:sub(1, #strip_prefix):lower() == strip_prefix:lower() then
-				rel = line:sub(#strip_prefix + 2):gsub("%.lua$", "")
-			else
-				rel = line:match("([^/]+/test_[^/]+)%.lua$")
-			end
-		else
-			local inside = line:match("^%./(.+)%.lua$")
-			rel = inside and (dir .. "/" .. inside)
-		end
-		if rel and rel:match("/test_[^/]+$") then
-			results[#results + 1] = rel:gsub("/", ".")
-		end
-	end
-	local close_ok, close_reason, close_code = pipe:close()
-	if close_ok ~= true then
-		return nil, string.format("discovery command failed (%s %s)",
-			tostring(close_reason), tostring(close_code))
-	end
+	local Directory = require("infra.native_directory")
+	local ok, failure = pcall(Directory.walk, driver_root .. "/" .. dir, nil, function(path, kind)
+		if kind ~= "file" or not path:match("/test_[^/]+%.lua$") then return end
+		local relative = path:sub(#driver_root + 2):gsub("%.lua$", "")
+		results[#results + 1] = relative:gsub("/", ".")
+	end, function(path, message, code)
+		error(string.format("cannot discover %s (%s %s)", path, tostring(message), tostring(code)), 0)
+	end)
+	if not ok then return nil, tostring(failure) end
 	return results, nil
 end
 
