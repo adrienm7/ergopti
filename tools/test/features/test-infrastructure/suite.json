@@ -497,6 +497,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-host-toolchain.cjs"],
 			"repro": "npm run test:host-toolchain"
+		},
+		{
+			"id": "js-0499",
+			"ordinal": 490,
+			"name": "Wine runner preserves process exclusion without forking per unrelated PID",
+			"cmd": "node",
+			"args": ["tools/test/test-wine-runner-process-guard.cjs"],
+			"repro": "node tools/test/test-wine-runner-process-guard.cjs"
 		}
 	]
 }
