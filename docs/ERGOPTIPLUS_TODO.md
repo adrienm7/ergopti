@@ -33,6 +33,14 @@ a sealed Windows updater source, reseal with
 
 Work done on Linux and macOS only; the AHK side is built and run live on the Windows PC.
 
+- [ ] **PRIVACY: private hotstring text reaches AI prompts on Windows.** [CODE] Fixed on macOS (private
+      expansions now hidden from every prompt) and Linux (separate AI context). Read-only look at Windows:
+      `_HSE_MirrorCanonicalEffectToLlm` (`hotstring_dispatch.ahk`) and `_HSE_MirrorLiteralEditToLlm`
+      (`hotstring_send.ahk`) copy `Effect.InsertedText` into `_LLM_Bridge_Buffer` and the agent buffer, and the
+      Effect objects from `HSE_ApplyExpansion` carry no private flag, so a phone/SSN/IBAN expansion can be sent
+      to Ollama or a remote provider. Add `IsPrivate` to those Effects, clear both buffers on a private effect
+      and keep appending later typing (as Linux); AHK test: a private expansion then a prediction request
+      carries no secret. Do this first on the PC.
 - [ ] **Hosted Windows unit failures.** [CODE] Run 40235626114 (e2aa642f8c) still fails `meta`,
       `config-scope-features`, `core` and `keymap-gestures` (likely the gesture greying, dbc29c5077);
       `hotstrings-shortcuts` passes since the second round of fixes. `test_hotstrings_scope.ahk:520` (expected 0.5, got 1.0) is
