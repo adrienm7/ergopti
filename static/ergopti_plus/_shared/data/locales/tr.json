@@ -3577,6 +3577,7 @@
 	"menu.gestures.sensitivity_current": "Hassasiyet: %s",
 	"platform_reason.llm_saved_user_models_are_macos": "Bu kontroller macOS’ta kaydedilen “Modellerim” listesini yönetir. Windows ve Linux kendi model listelerini kullanır.",
 	"platform_reason.llm_request_interval_is_per_backend_on_windows": "Windows her arka uç için sabit bir en kısa aralık uygular ve bunun için bir ayar sunmaz; macOS ve Linux ayarlanabilir tek bir değeri paylaşır.",
+	"platform_reason.llm_profile_follows_model_is_not_on_macos": "Windows ve Linux, istem profilini otomatik değiştirerek seçilen modeli izleyebilir. macOS'ta önerilen profil, Profiller menüsünden istek üzerine uygulanır.",
 	"startup.linux_input_access_label": "Klavye erişimi kullanılamıyor",
 	"updater.tray_new_version_label": "Güncelleme mevcut",
 	"dialog.action_picker.program_provider_changed": "Betik veya yorumlayıcı değişti. Eylem seçiciyi yeniden açın.",

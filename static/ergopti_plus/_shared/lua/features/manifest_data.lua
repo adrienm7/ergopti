@@ -410,7 +410,7 @@ M.features = {
 		path = "llm.profiles.num_predictions", id = "num_predictions", section = "llm.profiles", default = 3, type = "number", description_key = "menu.llm.profiles.num_predictions", platforms = { "ahk", "hs", "linux" }, recommended = 3, input_altering = false,
 	},
 	{
-		path = "llm.profiles.auto_profile_for_model", id = "auto_profile_for_model", section = "llm.profiles", default = true, type = "boolean", description_key = "menu.llm.profiles.auto_profile_for_model", platforms = { "ahk", "linux" }, recommended = true, input_altering = false,
+		path = "llm.profiles.auto_profile_for_model", id = "auto_profile_for_model", section = "llm.profiles", default = true, type = "boolean", description_key = "menu.llm.profiles.auto_profile_for_model", platforms = { "ahk", "linux" }, recommended = true, input_altering = false, reason_key = "platform_reason.llm_profile_follows_model_is_not_on_macos",
 	},
 	{
 		path = "llm.trigger.disabled_apps", id = "disabled_apps", section = "llm.trigger", default = {  }, type = "array", description_key = "menu.llm.title", platforms = { "ahk", "hs", "linux" }, recommended = {  }, input_altering = false,
