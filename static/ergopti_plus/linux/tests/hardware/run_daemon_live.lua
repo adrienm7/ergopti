@@ -533,7 +533,10 @@ end
 
 -- The rewrite prompt, bound to Super+Space by the live preferences: the
 -- sentence being typed is sent as TAIL, and accepting the rewrite erases it
--- whole before typing the rewritten one.
+-- whole before typing the rewritten one. The AI keeps its own typing context
+-- (e934ae45c8): the accepted prediction above belongs to the same unbroken
+-- sentence, so the TAIL is "bonjour <prediction> ok pr jd", not only the last
+-- words typed after it.
 if LLM_PORT and LLM_REWRITE_REPLY then
 	local Json = require("json")
 	--- The user turn of the first rewrite request after `from`, if one arrived.
@@ -549,6 +552,7 @@ if LLM_PORT and LLM_REWRITE_REPLY then
 		end
 		return nil
 	end
+	local sentence = "bonjour " .. (LLM_REPLY:gsub("^%s+", "")) .. " ok pr jd"
 	local before = #api_requests()
 	type_text(" ok pr jd")
 	read_output(1)
@@ -558,8 +562,8 @@ if LLM_PORT and LLM_REWRITE_REPLY then
 		failures[#failures + 1] = "Super+Space sent no rewrite request to the API"
 	else
 		print("  the API received the user turn: " .. turn)
-		if turn:sub(-#'TAIL: "ok pr jd"') ~= 'TAIL: "ok pr jd"' then
-			failures[#failures + 1] = "the rewrite request did not send the sentence as TAIL"
+		if turn:sub(-#('TAIL: "' .. sentence .. '"')) ~= 'TAIL: "' .. sentence .. '"' then
+			failures[#failures + 1] = "the rewrite request did not send the whole sentence as TAIL"
 		end
 		sleep(1.5)
 		Keyboard.emit(KEY_1, 1)
@@ -571,9 +575,9 @@ if LLM_PORT and LLM_REWRITE_REPLY then
 		for event in rewrite_trail:gmatch("%S+") do
 			if event == EvdevCodes.KEY_BACKSPACE .. "↓" then erased = erased + 1 end
 		end
-		if erased ~= #"ok pr jd" then
+		if erased ~= #sentence then
 			failures[#failures + 1] = string.format("the rewrite erased %d character(s), not the sentence's %d",
-				erased, #"ok pr jd")
+				erased, #sentence)
 		end
 		local expected = LLM_REWRITE_REPLY:gsub("^REWRITE:%s*", "")
 		if rewritten ~= expected then
