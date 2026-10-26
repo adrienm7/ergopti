@@ -20,11 +20,11 @@ case "$suite" in
 	*) echo 'Unsupported distribution suite.' >&2; exit 1 ;;
 esac
 case "$distro" in
-	debian) apt-get install -y --no-install-recommends luajit python3 ca-certificates git gcc libc6-dev make cmake pkg-config libluajit-5.1-dev libuv1-dev libglib2.0-0t64 sqlite3 curl ;;
-	fedora) dnf install -y luajit python3 ca-certificates git gcc make cmake pkgconf-pkg-config luajit-devel libuv-devel glib2 sqlite curl ;;
-	arch) pacman -Sy --noconfirm luajit python ca-certificates git gcc make cmake pkgconf libuv glib2 sqlite curl ;;
-	alpine) apk add --no-cache luajit python3 ca-certificates git build-base cmake pkgconf luajit-dev libuv-dev glib sqlite curl ;;
-	opensuse) zypper --non-interactive install luajit python3 ca-certificates git gcc make cmake pkg-config luajit-devel libuv-devel libglib-2_0-0 sqlite3 curl ;;
+	debian) apt-get install -y --no-install-recommends luajit python3 ca-certificates git gcc libc6-dev make cmake pkg-config libluajit-5.1-dev libuv1-dev libglib2.0-0t64 sqlite3 tar curl ;;
+	fedora) dnf install -y luajit python3 ca-certificates git gcc make cmake pkgconf-pkg-config luajit-devel libuv-devel glib2 sqlite tar curl ;;
+	arch) pacman -Sy --noconfirm luajit python ca-certificates git gcc make cmake pkgconf libuv glib2 sqlite tar curl ;;
+	alpine) apk add --no-cache luajit python3 ca-certificates git build-base cmake pkgconf luajit-dev libuv-dev glib sqlite tar curl ;;
+	opensuse) zypper --non-interactive install luajit python3 ca-certificates git gcc make cmake pkg-config luajit-devel libuv-devel libglib-2_0-0 sqlite3 tar curl ;;
 	*) echo 'Unsupported mandatory unit distribution.' >&2; exit 1 ;;
 esac
 
@@ -75,8 +75,9 @@ checkout_source() {
 	git -C "$target" fsck --strict
 }
 
-checkout_source "$native_root/luv" https://github.com/luvit/luv.git ebc79ee5aa082f90e53f75f3f326dcea11e8478d
-checkout_source "$native_root/lfs" https://github.com/lunarmodules/luafilesystem.git 7c6e1b013caec0602ca4796df3b1d7253a2dd258
+pin_reader="$source_root/tools/build/read-native-source-pin.py"
+checkout_source "$native_root/luv" "$(python3 "$pin_reader" luv repository)" "$(python3 "$pin_reader" luv revision)"
+checkout_source "$native_root/lfs" "$(python3 "$pin_reader" lfs repository)" "$(python3 "$pin_reader" lfs revision)"
 git -C "$native_root/luv" submodule update --init --depth=1 -- deps/lua-compat-5.3
 
 include_dir="$(pkg-config --variable=includedir luajit)"
@@ -90,6 +91,12 @@ cmake --build "$native_root/luv-build" --parallel 2
 make -C "$native_root/lfs" lib LUA_INC="$(pkg-config --cflags-only-I luajit)"
 install -m 0644 "$native_root/luv-build/luv.so" "$native_root/modules/luv.so"
 install -m 0644 "$native_root/lfs/src/lfs.so" "$native_root/modules/lfs.so"
+
+# The Integration fixture deliberately keeps both original ABIs and all 16
+# admission modes. A second genuine interpreter is required, never a JIT alias.
+bash "$source_root/tools/test/build-linux-distro-lua54.sh" "$source_root" "$native_root/lua54" "$native_root/luv"
+stock_interpreter="$(command -v lua5.4)"
+test -x "$stock_interpreter"
 
 unit_tmp="$(mktemp -d "$native_root/unit.XXXXXXXX")"
 chown ergopti-ci "$unit_tmp"
@@ -120,6 +127,17 @@ local variant = glib.g_variant_new_string("native-unit-admission")
 assert(variant ~= nil)
 glib.g_variant_unref(variant)
 print(jit.version)
+'
+# Admit the second ABI under the actual suite UID before any group starts.
+# Generic LuaJIT module paths must never reach the stock interpreter.
+sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER -u LUA_CPATH -u LUA_CPATH_5_4 \
+	"$stock_interpreter" -e '
+assert(_VERSION == "Lua 5.4" and jit == nil)
+local uv = require("luv")
+assert(uv.getuid() ~= 0)
+assert(debug.getinfo(uv.fs_stat, "S").what == "C")
+assert(uv.fs_stat(".").type == "directory")
+print(_VERSION .. ": native ordinary-user admission")
 '
 sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \
 	/usr/bin/python3 -c 'import os; assert(os.geteuid() != 0)'

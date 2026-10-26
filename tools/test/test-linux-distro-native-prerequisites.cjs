@@ -63,6 +63,7 @@ try {
 				.split('\0')
 				.filter(Boolean);
 			assert.equal(actualManager, manager, `${distro}: the actual authored backend must execute`);
+			assert.ok(args.includes('tar'), `${distro}: the verified Lua archive needs extraction`);
 			assert.ok(args.includes(glib), `${distro}: native GVariant requires declared ${glib}`);
 			assert.ok(
 				args.includes(sqlite),
@@ -82,6 +83,182 @@ try {
 		assert.notEqual(result.status, 73, 'invalid preparation must refuse before any package action');
 		assert.equal(fs.existsSync(recorded), false);
 		checks++;
+	}
+	// Exercise the real closed pin reader and both consumers, including malformed
+	// contracts. The independent retained-product hash fence stays immutable.
+	const pinFile = path.join(ROOT, 'tools/build/native-source-pins.json');
+	const reader = path.join(ROOT, 'tools/build/read-native-source-pin.py');
+	const pins = JSON.parse(fs.readFileSync(pinFile, 'utf8'));
+	const readPin = (script, section, field) =>
+		spawnSync('python3', [script, section, field], { encoding: 'utf8', timeout: 5000 });
+	for (const [section, fields] of Object.entries(pins)) {
+		for (const [field, value] of Object.entries(fields)) {
+			const result = readPin(reader, section, field);
+			assert.equal(result.error, undefined);
+			assert.equal(result.status, 0, result.stderr);
+			assert.equal(result.stdout, value + '\n');
+			checks++;
+		}
+	}
+	const productFence = fs.readFileSync(
+		path.join(ROOT, 'tools/build/owned_runtime_product_build.py'),
+		'utf8'
+	);
+	assert.ok(productFence.includes(`LUA_ARCHIVE_SHA256 = "${pins.lua54.sha256}"`));
+	assert.ok(productFence.includes(`lua-${pins.lua54.version}/src`));
+	const mac = fs.readFileSync(path.join(ROOT, 'tools/build/bundle-macos-luasocket.sh'), 'utf8');
+	const preparation = fs.readFileSync(helper, 'utf8');
+	assert.ok(mac.includes('read-native-source-pin.py'));
+	assert.ok(preparation.includes('read-native-source-pin.py'));
+	assert.equal(
+		mac.includes(pins.lua54.sha256),
+		false,
+		'the download owner must read the shared pin'
+	);
+	for (const source of ['luv', 'lfs']) {
+		assert.equal(
+			preparation.includes(pins[source].revision),
+			false,
+			'Git pins have one download owner'
+		);
+	}
+	checks++;
+	const malformed = path.join(scratch, 'malformed');
+	fs.mkdirSync(malformed);
+	const copiedReader = path.join(malformed, 'read-native-source-pin.py');
+	fs.copyFileSync(reader, copiedReader);
+	const cases = [
+		(data) => {
+			delete data.lua54.sha256;
+		},
+		(data) => {
+			data.lua54.extra = 'unknown';
+		},
+		(data) => {
+			data.extra = {};
+		},
+		(data) => {
+			data.lua54.sha256 = '0';
+		},
+		(data) => {
+			data.lua54.url = 'https://example.invalid/lua.tar.gz';
+		},
+		(data) => {
+			data.luv.revision = 'latest';
+		},
+		(data) => {
+			data.lfs.repository = 'https://github.com/';
+		},
+		(data) => {
+			data.lua54.version += '\n';
+		}
+	];
+	for (const change of cases) {
+		const data = structuredClone(pins);
+		change(data);
+		fs.writeFileSync(path.join(malformed, 'native-source-pins.json'), JSON.stringify(data));
+		const result = readPin(copiedReader, 'lua54', 'version');
+		assert.equal(result.error, undefined);
+		assert.notEqual(result.status, 0, 'a malformed source contract must refuse before download');
+		assert.equal(result.stdout, '');
+		checks++;
+	}
+	fs.writeFileSync(
+		path.join(malformed, 'native-source-pins.json'),
+		fs.readFileSync(pinFile, 'utf8').replace('"version":', '"version":"ignored","version":')
+	);
+	assert.notEqual(
+		readPin(copiedReader, 'lua54', 'version').status,
+		0,
+		'duplicate fields must refuse'
+	);
+	assert.notEqual(
+		readPin(reader, 'lua54', 'unknown').status,
+		0,
+		'unknown query fields must refuse'
+	);
+	checks += 2;
+	// Execute the actual authored destination guards. AND lists under errexit
+	// must not let incumbent files or links reach a later installation.
+	const buildSource = fs.readFileSync(
+		path.join(ROOT, 'tools/test/build-linux-distro-lua54.sh'),
+		'utf8'
+	);
+	const interpreterStart = 'stock_interpreter=/usr/bin/lua5.4\n';
+	assert.equal(
+		buildSource.split(interpreterStart).length,
+		2,
+		'one interpreter installation owner is required'
+	);
+	const interpreterGuard = buildSource.slice(
+		buildSource.indexOf(interpreterStart) + interpreterStart.length,
+		buildSource.indexOf('pin_reader=')
+	);
+	const moduleAssignment = buildSource.match(/stock_module="\$[\s\S]*?\n'\)"\n/g);
+	assert.equal(
+		moduleAssignment?.length,
+		1,
+		'one genuine interpreter module-site query is required'
+	);
+	const moduleGuard = buildSource.slice(
+		buildSource.indexOf(moduleAssignment[0]) + moduleAssignment[0].length,
+		buildSource.indexOf('mkdir -p "$(dirname "$stock_module")"')
+	);
+	for (const [variable, guard] of [
+		['stock_interpreter', interpreterGuard],
+		['stock_module', moduleGuard]
+	]) {
+		assert.ok(guard.trim(), `${variable}: the actual guard must exist`);
+		for (const mode of ['absent', 'file', 'link', 'dangling']) {
+			const owned = path.join(scratch, variable + '-' + mode);
+			fs.mkdirSync(owned);
+			const destination = path.join(owned, 'destination');
+			const target = path.join(owned, 'owned-source');
+			const marker = path.join(owned, 'install-marker');
+			fs.writeFileSync(target, 'untouched target bytes', { mode: 0o600 });
+			if (mode === 'file')
+				fs.writeFileSync(destination, 'untouched destination bytes', { mode: 0o600 });
+			if (mode === 'link' || mode === 'dangling')
+				fs.symlinkSync(mode === 'link' ? 'owned-source' : 'missing-source', destination);
+			const before = mode === 'absent' ? null : fs.lstatSync(destination);
+			const script = path.join(owned, 'actual-guard.sh');
+			fs.writeFileSync(
+				script,
+				`set -euo pipefail\n${variable}="$1"\n${guard}\nprintf installed > "$2"\n`
+			);
+			const result = spawnSync(
+				bashExecutable(),
+				[bashPath(script), bashPath(destination), bashPath(marker)],
+				{ encoding: 'utf8', timeout: 5000 }
+			);
+			assert.equal(result.error, undefined, `${variable}/${mode}: actual guard must finish`);
+			if (mode === 'absent') {
+				assert.equal(result.status, 0, result.stderr);
+				assert.equal(fs.readFileSync(marker, 'utf8'), 'installed');
+				assert.equal(fs.existsSync(destination), false);
+			} else {
+				assert.notEqual(
+					result.status,
+					0,
+					`${variable}/${mode}: incumbent must refuse before install`
+				);
+				assert.equal(
+					fs.existsSync(marker),
+					false,
+					`${variable}/${mode}: installation must not execute`
+				);
+				assert.equal(fs.lstatSync(destination).mode, before.mode);
+				if (mode === 'file')
+					assert.equal(fs.readFileSync(destination, 'utf8'), 'untouched destination bytes');
+				else
+					assert.equal(
+						fs.readlinkSync(destination),
+						mode === 'link' ? 'owned-source' : 'missing-source'
+					);
+			}
+			assert.equal(fs.readFileSync(target, 'utf8'), 'untouched target bytes');
+			checks++;
+		}
 	}
 	console.log(
 		`Linux native unit prerequisites: ${checks} executed dispatch/refusal controls; 0 skipped.`
