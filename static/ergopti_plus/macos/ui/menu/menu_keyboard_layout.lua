@@ -39,14 +39,14 @@ local PauseSwitchPolicy = require("layout.pause_switch_policy")
 local LOG           = "menu.keyboard_layout"
 
 M.DEFAULT_STATE = {
-	layout_number_row_mode       = Manifest.default_for("layout.direct_access_digits"),
-	layout_pause_switch_enabled = Manifest.default_for("layout.pause_switch_enabled"),
-	layout_on_pause             = Manifest.default_for("layout.on_pause"),
-	layout_on_resume            = Manifest.default_for("layout.on_resume"),
+	layout_number_row_mode       = Manifest.default_for(require("config_keys").KEY.LAYOUT_DIRECT_ACCESS_DIGITS),
+	layout_pause_switch_enabled = Manifest.default_for(require("config_keys").KEY.LAYOUT_PAUSE_SWITCH_ENABLED),
+	layout_on_pause             = Manifest.default_for(require("config_keys").KEY.LAYOUT_ON_PAUSE),
+	layout_on_resume            = Manifest.default_for(require("config_keys").KEY.LAYOUT_ON_RESUME),
 	-- config.toml [ui] menubar_icon; its values and default are the manifest's.
-	menubar_icon                = Manifest.default_for("ui.menubar_icon"),
+	menubar_icon                = Manifest.default_for(require("config_keys").KEY.UI_MENUBAR_ICON),
 	-- config.toml [layout] virtual_keyboard: the Karabiner virtual keyboard type.
-	layout_virtual_keyboard     = Manifest.default_for("layout.virtual_keyboard"),
+	layout_virtual_keyboard     = Manifest.default_for(require("config_keys").KEY.LAYOUT_VIRTUAL_KEYBOARD),
 }
 
 
@@ -683,8 +683,8 @@ function M.build(ctx)
 	for key, value in pairs(type(ctx) == "table" and type(ctx.state_getters) == "table" and ctx.state_getters or {}) do
 		render_ctx.state_getters[key] = value
 	end
-	render_ctx.state_getters["ui.menubar_icon"] = function() return state and state.menubar_icon end
-	render_ctx.commands["menubar_icon"] = function(variant)
+	render_ctx.state_getters[require("config_keys").KEY.UI_MENUBAR_ICON] = function() return state and state.menubar_icon end
+	render_ctx.commands[require("config_keys").COMMAND.MENUBAR_ICON] = function(variant)
 		if not state then return false end
 		state.menubar_icon = variant
 		if type(save_prefs) ~= "function" or save_prefs() ~= true then return false end
@@ -695,8 +695,8 @@ function M.build(ctx)
 		if type(update_menu) == "function" then pcall(update_menu) end
 		return true
 	end
-	render_ctx.state_getters["layout.virtual_keyboard"] = function() return state and state.layout_virtual_keyboard end
-	render_ctx.commands["virtual_keyboard"] = function(choice)
+	render_ctx.state_getters[require("config_keys").KEY.LAYOUT_VIRTUAL_KEYBOARD] = function() return state and state.layout_virtual_keyboard end
+	render_ctx.commands[require("config_keys").COMMAND.VIRTUAL_KEYBOARD] = function(choice)
 		if not state then return false end
 		local previous = state.layout_virtual_keyboard
 		state.layout_virtual_keyboard = choice
@@ -721,7 +721,7 @@ function M.build(ctx)
 		if type(update_menu) == "function" then pcall(update_menu) end
 		return true
 	end
-	render_ctx.commands["layout_manager"] = LayoutManagerWindow.menu_command()
+	render_ctx.commands[require("config_keys").COMMAND.LAYOUT_MANAGER] = LayoutManagerWindow.menu_command()
 	for command, mode in pairs({ scope_restore = "recommended", scope_clear = "clear" }) do
 		render_ctx.commands[command] = function()
 			if ctx.paused == true or type(ctx.apply_preference_scope) ~= "function" then return false end
@@ -729,8 +729,8 @@ function M.build(ctx)
 		end
 	end
 	-- Native-only status never acquires a preference or forced-input writer.
-	render_ctx.commands["number_row_mode"] = function() return false end
-	render_ctx.commands["number_row_edges"] = function() return false end
+	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_MODE] = function() return false end
+	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_EDGES] = function() return false end
 	local function bundle_frame_rows()
 		local function system_provider() return latest and {bundle_rows[1]} or {} end
 		local function user_provider() return latest and {bundle_rows[2]} or {} end

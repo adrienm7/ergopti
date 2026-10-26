@@ -464,7 +464,7 @@ function M.build(ctx)
 	}, nil, {
 		commands = { agent_mode = function(id) return set_mode(ctx, id) end },
 		state_getters = {
-			["llm.agent_mode"] = function() return ctx.state.llm_agent_mode end,
+			[require("config_keys").KEY.LLM_AGENT_MODE] = function() return ctx.state.llm_agent_mode end,
 			agent_mode_ready = function() return type(ctx.settings_mgr) == "table" and type(ctx.settings_mgr.apply_setting_transaction) == "function" end,
 		},
 	})

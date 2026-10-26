@@ -45,6 +45,7 @@ local KeystrokeIntegrity = require("infra.keystroke_integrity")
 local KeyEventHealth = require("infra.key_event_health")
 local EventClock = require("adapters.event_clock")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
+local ConfigKeys = require("config_keys")
 
 local M   = {}
 local LOG = "keymap"
@@ -94,21 +95,21 @@ M.DELAY_KEY_TO_CATEGORY = {
 --- builds its whole `Features` map from the same manifest). `default_for` fails
 --- fast if a path is missing, so a renamed feature never silently becomes nil.
 M.DEFAULT_STATE = {
-	keymap                      = Manifest.default_for("hotstrings.enabled"),
-	repeat_key_enabled          = Manifest.default_for("hotstrings.repeat_key_enabled"),
-	expansion_delay             = Manifest.default_for("hotstrings.expansion_delay"),
-	idle_reset_seconds          = Manifest.default_for("hotstrings.idle_reset_seconds"),
+	keymap                      = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_ENABLED),
+	repeat_key_enabled          = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED),
+	expansion_delay             = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_EXPANSION_DELAY),
+	idle_reset_seconds          = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_IDLE_RESET_SECONDS),
 	cascade_max_arrows          = Manifest.default_for(require("config_keys").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS),
-	click_resets_word           = Manifest.default_for("hotstrings.click_resets_word"),
-	arrow_resets_word           = Manifest.default_for("hotstrings.arrow_resets_word"),
-	shortcut_resets_word        = Manifest.default_for("hotstrings.shortcut_resets_word"),
+	click_resets_word           = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_CLICK_RESETS_WORD),
+	arrow_resets_word           = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_ARROW_RESETS_WORD),
+	shortcut_resets_word        = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_SHORTCUT_RESETS_WORD),
 	delays                      = {},     -- Per-group overrides; empty = use DELAYS_DEFAULT
-	trigger_char                = Manifest.default_for("hotstrings.trigger_char"),
-	preview_star_enabled        = Manifest.default_for("hotstrings.preview_star_enabled"),
-	preview_autocorrect_enabled = Manifest.default_for("hotstrings.preview_autocorrect_enabled"),
-	preview_ai_enabled          = Manifest.default_for("hotstrings.preview_ai_enabled"),
-	preview_colored_tooltips    = Manifest.default_for("hotstrings.preview_colored_tooltips"),
-	magic_key_source            = Manifest.default_for("hotstrings.magic_key_source"),
+	trigger_char                = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR),
+	preview_star_enabled        = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_PREVIEW_STAR_ENABLED),
+	preview_autocorrect_enabled = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_PREVIEW_AUTOCORRECT_ENABLED),
+	preview_ai_enabled          = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_PREVIEW_AI_ENABLED),
+	preview_colored_tooltips    = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_PREVIEW_COLORED_TOOLTIPS),
+	magic_key_source            = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_MAGIC_KEY_SOURCE),
 }
 
 

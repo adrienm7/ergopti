@@ -45,11 +45,12 @@ local Codec      = require("toml_codec")
 local Preferences = require("infra.preferences")
 local ConfigPaths = require("infra.config_paths")
 local ShortcutCatalogue = require("shortcuts.catalogue")
+local ConfigKeys = require("config_keys")
 
 local LOG = "shortcuts.tap_keys"
 
 -- The canonical assignment section.
-local CONFIG_SECTION = "shortcuts.tap_keys"
+local CONFIG_SECTION = ConfigKeys.KEY.SHORTCUTS_TAP_KEYS
 
 -- The shared key list (tap_keys.json) and its published identity, shared with Linux.
 local TapKeys = ShortcutCatalogue.new_tap_keys({

@@ -40,6 +40,7 @@ local Manifest = require("infra.manifest_reader")
 local Outdated = require("config_outdated")
 local KePaths = require("platform.remap.ke_paths")
 local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 local LOG = "karabiner"
 
@@ -84,7 +85,7 @@ end
 --- @return boolean value
 --- @return boolean outdated
 local function tap_holds_switch(section, path)
-	return boolean_leaf(section, "enabled", Manifest.default_for("tap_holds.enabled"), path, "tap_holds",
+	return boolean_leaf(section, "enabled", Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED), path, "tap_holds",
 		"a tap-hold switch is boolean; the neutral state is used")
 end
 
@@ -486,8 +487,8 @@ local function build_state(tap_hold_keys, mod_combos, recommended)
 
 	return {
 		enabled                   = M.INTEGRATION_ENABLED_DEFAULT,
-		tap_holds_enabled         = recommended and Manifest.recommended_for("tap_holds.enabled")
-			or Manifest.default_for("tap_holds.enabled"),
+		tap_holds_enabled         = recommended and Manifest.recommended_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED)
+			or Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED),
 		-- Absent: the key combinations are on whatever the Tap-Holds switch says
 		-- (Generator.key_combinations_enabled), in the preset as on a fresh install.
 		mod_combos_enabled        = nil,
@@ -680,11 +681,11 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		local section_name = assert(label:match("^([^.]+)%."), "a timing needs its owning section")
 		return timing_leaf(section, key, default, user_config_path, section_name)
 	end
-	local timeout_ms = timing(tap_holds, "timeout_ms", TAP_HOLD_TIMEOUT_MS_DEFAULT, "tap_holds.timeout_ms")
+	local timeout_ms = timing(tap_holds, "timeout_ms", TAP_HOLD_TIMEOUT_MS_DEFAULT, ConfigKeys.KEY.TAP_HOLDS_TIMEOUT_MS)
 	local sticky_ms = timing(tap_holds, "sticky_timeout_ms", STICKY_TIMEOUT_MS_DEFAULT,
-		"tap_holds.sticky_timeout_ms")
+		ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
 	local simultaneous_ms = timing(combos, "simultaneous_threshold_ms", SIMULTANEOUS_THRESHOLD_MS_DEFAULT,
-		"mod_combos.simultaneous_threshold_ms")
+		ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
 
 	local combo_symmetric = combinations_symmetric(combos, user_config_path)
 
@@ -713,9 +714,9 @@ end
 
 -- The scalar leaves a menu setter can name as explicitly set by the user.
 local INTENT_LEAVES = {
-	["tap_holds.enabled"] = true, ["tap_holds.timeout_ms"] = true, ["tap_holds.sticky_timeout_ms"] = true,
-	["mod_combos.enabled"] = true, ["mod_combos.simultaneous_threshold_ms"] = true,
-	["mod_combos.symmetric"] = true,
+	[ConfigKeys.KEY.TAP_HOLDS_ENABLED] = true, [ConfigKeys.KEY.TAP_HOLDS_TIMEOUT_MS] = true, [ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS] = true,
+	[ConfigKeys.KEY.MOD_COMBOS_ENABLED] = true, [ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS] = true,
+	[ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC] = true,
 }
 
 --- Validates a save's explicit leaf intent: only owned leaves, each set to true.
@@ -907,13 +908,13 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			table_at(document, INTEGRATION_SECTION)[INTEGRATION_KEY] = state.enabled
 		end
 		if not preserve_array(document.tap_holds, { "tap_holds" },
-			(state.tap_holds_enabled == nil or state.tap_holds_enabled == Manifest.default_for("tap_holds.enabled"))
+			(state.tap_holds_enabled == nil or state.tap_holds_enabled == Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED))
 			and (state.tap_hold_timeout_ms == nil or state.tap_hold_timeout_ms == TAP_HOLD_TIMEOUT_MS_DEFAULT)
 			and (state.sticky_timeout_ms == nil or state.sticky_timeout_ms == STICKY_TIMEOUT_MS_DEFAULT)
 			and bindings_neutral(state.tap_hold_config, { "tap", "hold", "timeout_ms" })) then
 			local tap_holds = table_at(document, "tap_holds")
 			assign_boolean(tap_holds, "tap_holds", "enabled", state.tap_holds_enabled,
-				Manifest.default_for("tap_holds.enabled"), tap_holds_switch)
+				Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED), tap_holds_switch)
 			assign_timing(tap_holds, "tap_holds", "timeout_ms", state.tap_hold_timeout_ms, TAP_HOLD_TIMEOUT_MS_DEFAULT)
 			assign_timing(tap_holds, "tap_holds", "sticky_timeout_ms", state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT)
 			if not preserve_array(tap_holds.config, { "tap_holds", "config" },
@@ -931,7 +932,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			local mod_combos = table_at(document, "mod_combos")
 			-- Written only once set: an absent flag is on (Generator.key_combinations_enabled).
 			local _, outdated_enabled = combinations_enabled(mod_combos, user_config_path)
-			if not overwrite_corrupt and outdated_enabled and not explicit["mod_combos.enabled"] then
+			if not overwrite_corrupt and outdated_enabled and not explicit[ConfigKeys.KEY.MOD_COMBOS_ENABLED] then
 				if state.mod_combos_enabled ~= nil then
 					candidate_refusal = "candidate has no explicit repair owner for mod_combos.enabled"
 					error(candidate_refusal, 0)

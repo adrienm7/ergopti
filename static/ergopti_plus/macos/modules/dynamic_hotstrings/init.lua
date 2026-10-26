@@ -20,6 +20,7 @@ local RulesEngine  = require("modules.dynamic_hotstrings.rules_engine")
 local UserCode     = require("modules.dynamic_hotstrings.user_code")
 local Logger       = require("infra.logger")
 local Manifest     = require("infra.manifest_reader")
+local ConfigKeys = require("config_keys")
 local LOG          = "dynamic_hotstrings"
 local _started     = false
 local _starting    = false
@@ -85,16 +86,16 @@ local function rollback_start(reason)
 end
 
 M.DEFAULT_STATE = {
-	dynamichotstrings_user_code_enabled = Manifest.default_for("hotstrings.dynamic.user_code.enabled"),
-	dynamichotstrings_user_code_time_activation_seconds = Manifest.default_for("hotstrings.dynamic.user_code.time_activation_seconds"),
-	personal_info                    = feat_enabled("hotstrings.dynamic.text_expansion_personal_information"),
-	dynamichotstrings_enabled        = Manifest.default_for("hotstrings.dynamic.enabled"),
-	dynamichotstrings_datefr         = feat_enabled("hotstrings.dynamic.date_fr"),
-	dynamichotstrings_datelongfr     = feat_enabled("hotstrings.dynamic.date_long_fr"),
-	dynamichotstrings_date           = feat_enabled("hotstrings.dynamic.date"),
-	dynamichotstrings_phoneprefixes  = feat_enabled("hotstrings.dynamic.phone_prefixes"),
-	dynamichotstrings_ssnprefixes    = feat_enabled("hotstrings.dynamic.ssn_prefixes"),
-	dynamichotstrings_ibanprefixes   = feat_enabled("hotstrings.dynamic.iban_prefixes"),
+	dynamichotstrings_user_code_enabled = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED),
+	dynamichotstrings_user_code_time_activation_seconds = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS),
+	personal_info                    = feat_enabled(ConfigKeys.KEY.HOTSTRINGS_DYNAMIC_TEXT_EXPANSION_PERSONAL_INFORMATION),
+	dynamichotstrings_enabled        = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_DYNAMIC_ENABLED),
+	dynamichotstrings_datefr         = feat_enabled(ConfigKeys.KEY.HOTSTRINGS_DYNAMIC_DATE_FR),
+	dynamichotstrings_datelongfr     = feat_enabled(ConfigKeys.KEY.HOTSTRINGS_DYNAMIC_DATE_LONG_FR),
+	dynamichotstrings_date           = feat_enabled(ConfigKeys.KEY.HOTSTRINGS_DYNAMIC_DATE),
+	dynamichotstrings_phoneprefixes  = feat_enabled(ConfigKeys.KEY.HOTSTRINGS_DYNAMIC_PHONE_PREFIXES),
+	dynamichotstrings_ssnprefixes    = feat_enabled(ConfigKeys.KEY.HOTSTRINGS_DYNAMIC_SSN_PREFIXES),
+	dynamichotstrings_ibanprefixes   = feat_enabled(ConfigKeys.KEY.HOTSTRINGS_DYNAMIC_IBAN_PREFIXES),
 }
 
 

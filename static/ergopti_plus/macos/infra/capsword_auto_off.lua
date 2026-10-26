@@ -26,10 +26,11 @@ local Logger   = require("infra.logger")
 local Manifest = require("infra.manifest_reader")
 local Policy   = require("caps_word.auto_off")
 local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 local LOG = "capsword"
 local PLATFORM = "hs"
-local SECTION = "shortcuts.caps_word"
+local SECTION = ConfigKeys.KEY.SHORTCUTS_CAPS_WORD
 local POINTER_SECTION = "shortcuts.caps_word.pointer"
 
 --- Menu-state key of the inactivity delay.
