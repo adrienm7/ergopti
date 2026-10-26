@@ -85,6 +85,47 @@ helpers.describe("versioned tap_hold.toml (tap-hold-versioned-file)", function()
 		end)
 	end)
 
+	helpers.it("edits a commented, hand-formatted file in place: every byte outside the migrated lines survives (tap-hold-byte-preserving)", function()
+		local hand = "# My tap-hold setup — keep this comment\r\n"
+			.. "[tap_hold]   # master switch\r\n"
+			.. "enabled   =   true\r\n"
+			.. "explicit_delays = false\r\n"
+			.. "\r\n"
+			.. "# Caps Lock is my Ctrl\r\n"
+			.. "[tap_hold.keys.caps_lock]\r\n"
+			.. "tap_action = 'enter'   # single quotes stay\r\n"
+			.. "time_activation_seconds = 0.35   # shipped copy\r\n"
+			.. "hold_modifier = \"ctrl\"\r\n"
+			.. "\r\n"
+			.. "[tap_hold.keys.tab]\r\n"
+			.. "time_activation_seconds = 0.2\r\n"
+			.. "\r\n"
+			.. "[tap_hold.keys.left_ctrl]\r\n"
+			.. "time_activation_seconds   =   0.45 # my own\r\n"
+		with_file(hand, function(writer, path, backups)
+			local status, backup = writer.migrate_file(path)
+			backups[#backups + 1] = backup
+			helpers.assert_eq(status, "migrated")
+			helpers.assert_eq(read_file(backup), hand, "the backup holds the original bytes")
+			local expected = "# My tap-hold setup — keep this comment\r\n"
+				.. "[_meta]\r\nschema_version = 1\r\n\r\n"
+				.. "[tap_hold]   # master switch\r\n"
+				.. "enabled   =   true\r\n"
+				.. "\r\n"
+				.. "# Caps Lock is my Ctrl\r\n"
+				.. "[tap_hold.keys.caps_lock]\r\n"
+				.. "tap_action = 'enter'   # single quotes stay\r\n"
+				.. "hold_modifier = \"ctrl\"\r\n"
+				.. "\r\n"
+				.. "\r\n" -- the blank lines around the removed [tap_hold.keys.tab] stay: not migrated lines
+				.. "[tap_hold.keys.left_ctrl]\r\n"
+				.. "time_activation_seconds   =   0.45 # my own\r\n"
+			helpers.assert_eq(read_file(path), expected)
+			helpers.assert_eq((writer.migrate_file(path)), "current")
+			helpers.assert_eq(read_file(path), expected, "a second boot changes nothing")
+		end)
+	end)
+
 	helpers.it("migrates an old file with the marker: every delay stays, the marker goes", function()
 		local flagged = OLD_FILE:gsub("%[tap_hold%]\n", "[tap_hold]\nexplicit_delays = true\n", 1)
 		with_file(flagged, function(writer, path, backups)

@@ -47,6 +47,18 @@ function M.read_as_current(document, shapes, retired)
 	return Migrate.apply(document, M.registry(), retired, function(value) return Shapes.is_table(value, shapes) end)
 end
 
+--- The ops that migrate a file in place (see migrate.file_operations); the
+--- document is not edited.
+--- @param document table Decoded user document.
+--- @param shapes table|nil Canonical shape receipt of the document.
+--- @param retired table Driver key id -> the delay an earlier build shipped.
+--- @return string outcome "migrated", "current", "newer" or "invalid".
+--- @return number|string detail Version or reason.
+--- @return table|nil ops The edits, for "migrated".
+function M.file_operations(document, shapes, retired)
+	return Migrate.file_operations(document, M.registry(), retired, function(value) return Shapes.is_table(value, shapes) end)
+end
+
 --- Test seam: forgets the cached registry.
 function M._reset_for_test()
 	_registry = nil
