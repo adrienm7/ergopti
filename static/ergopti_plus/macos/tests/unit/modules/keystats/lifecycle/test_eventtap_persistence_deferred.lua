@@ -315,6 +315,11 @@ local function load_fixture(options)
 		execute = function() return "" end,
 	}
 	package.loaded["adapters.file_system"] = {
+		-- This non-IO scenario begins with an existing user metrics ignore.
+		path_status = function(path)
+			assert(path:sub(-#"/.gitignore") == "/.gitignore", "unexpected metadata inspection")
+			return "present"
+		end,
 		write = function() return true end,
 		create_if_absent = function() return true, "created" end,
 		read = function() return nil end,

@@ -262,6 +262,11 @@ local function load_log_manager_fixture(sink_failures, initialize)
 
 	local saved_file_system = package.loaded["adapters.file_system"]
 	package.loaded["adapters.file_system"] = {
+		-- This non-IO scenario begins with an existing user metrics ignore.
+		path_status = function(path)
+			assert(path:sub(-#"/.gitignore") == "/.gitignore", "unexpected metadata inspection")
+			return "present"
+		end,
 		write = function() return true end,
 		create_if_absent = function() return true, "created" end,
 		read = function() return nil end,

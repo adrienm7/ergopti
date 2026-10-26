@@ -115,6 +115,9 @@ local _ingest_timer_committed = false
 --- timer/database has been released. No later init may publish over that debt.
 local _init_cleanup_pending = false
 
+--- Exact create-only publication to settle before admitting any later metrics root.
+local _gitignore_publication_pending = nil
+
 --- Last foreign-sync failure already surfaced by the log-manager boundary.
 --- Repeated ingest ticks retain the retry without alternating two ERROR lines
 --- with infra.fs_dir's own diagnostic; a changed failure is reported again.
@@ -1892,6 +1895,41 @@ local function _rollback_failed_init()
 	return complete
 end
 
+local function _settle_metrics_gitignore_publication()
+	local pending = _gitignore_publication_pending
+	if pending == nil then return true end
+	-- Keep the receipt before entering the owner: a thrown or post-publication
+	-- refusal must not become a successful present-entry shortcut on retry.
+	local created, status, detail = FileSystem.create_if_absent(pending.path, pending.body)
+	if detail == nil and ((created == true and status == "created")
+		or (created == false and status == "exists")) then
+		_gitignore_publication_pending = nil
+		return true
+	end
+	Logger.error(LOG, "M.init(): metrics Git exclusion publication remains incomplete for '%s' — %s (%s).",
+		pending.path, tostring(detail or "invalid publication receipt"), tostring(status))
+	return false
+end
+
+local function _ensure_metrics_gitignore(paths)
+	-- A previous attempt may own staging cleanup even when its final file is
+	-- already present, including when the configured metrics root has changed.
+	if not _settle_metrics_gitignore_publication() then return false end
+	local path = paths.metrics_dir .. ".gitignore"
+	local status, detail = FileSystem.path_status(path)
+	if status == "present" then return true end
+	if status ~= "absent" then
+		Logger.error(LOG, "M.init(): cannot inspect metrics Git exclusion '%s' — %s.", path, tostring(detail))
+		return false
+	end
+	_gitignore_publication_pending = {
+		path = path,
+		body = "# Local hot-path log — never commit, never sync. One writer per device.\n"
+			.. NativePath.basename(paths.today_log_path) .. "\n",
+	}
+	return _settle_metrics_gitignore_publication()
+end
+
 --- Initialize the log manager. Resolves the device, opens the SQLite cache,
 --- creates the filesystem layout. Idempotent; calling twice is a warning.
 --- @param core_state table The shared CoreState from modules/keystats/init.lua.
@@ -1918,6 +1956,8 @@ local function _init(core_state)
 	_mkdir_p(paths.metrics_dir)
 	_mkdir_p(paths.by_device_dir)
 	_mkdir_p(paths.tmpdir_dir)
+
+	if not _ensure_metrics_gitignore(paths) then return false end
 
 	if needs_publication then
 		local identity_committed, published_device = _write_device_json(

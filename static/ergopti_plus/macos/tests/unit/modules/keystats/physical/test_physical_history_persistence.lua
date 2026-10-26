@@ -116,6 +116,8 @@ local identity = "physical-release-device"
 local by_device = metrics .. "/by_device/" .. identity
 for _, path in ipairs({ metrics, metrics .. "/by_device", by_device, temporary .. "/ergopti_metrics",
 	temporary .. "/ergopti_metrics/" .. identity }) do assert(request({ op = "mkdir", path = path }).ok) end
+-- This physical persistence scenario starts with the user's ignore already present.
+write(metrics .. "/.gitignore", "# Fixture-owned user exclusion\n")
 write(by_device .. "/device.json", json.encode({ device_id = identity, host_signature = "physical-fixture-host",
 	name = "Fixture", os = "darwin", os_version = "fixture", created_at = "2026-09-12 00:00:00.000" }))
 
@@ -459,6 +461,8 @@ local identity = "physical-release-device"
 local by_device = metrics .. "/by_device/" .. identity
 for _, path in ipairs({ metrics, metrics .. "/by_device", by_device, temporary .. "/ergopti_metrics",
 	temporary .. "/ergopti_metrics/" .. identity }) do assert(request({ op = "mkdir", path = path }).ok) end
+-- This physical persistence scenario starts with the user's ignore already present.
+write(metrics .. "/.gitignore", "# Fixture-owned user exclusion\n")
 write(by_device .. "/device.json", json.encode({ device_id = identity, host_signature = "physical-fixture-host",
 	name = "Fixture", os = "darwin", os_version = "fixture", created_at = "2026-09-12 00:00:00.000" }))
 
