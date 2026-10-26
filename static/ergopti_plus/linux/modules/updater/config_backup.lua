@@ -16,8 +16,8 @@
 --- 2. Exact bytes: copies are created and restored through toml_codec.writer's
 ---    classified read and compare-and-publish, never through a plain write.
 --- 3. Native directory entries preserve every filename byte. Links to folders
----    are not traversed, and special endpoints are never opened. A dangling
----    file link retains the canonical classified read refusal.
+---    are not traversed, and special endpoints are never opened. Proven dangling
+---    links are omitted; other target metadata failures refuse the backup.
 --- ==============================================================================
 
 local M = {}
