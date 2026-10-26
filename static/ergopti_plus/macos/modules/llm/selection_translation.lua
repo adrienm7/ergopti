@@ -206,15 +206,19 @@ end
 --- @param language string Native name of the target language.
 --- @param selection string The selected text.
 --- @param parent string|nil Stable action parent.
-local function request_translation(generation, language, selection, parent, focus, continuation_current)
+--- @param request_owner table Captured engine and pending-copy revision.
+local function request_translation(generation, language, selection, parent, focus, continuation_current, request_owner)
 	if not is_current(generation, "selection") or not continuation_current.current() then return end
-	local engine = dependency("modules.llm.prediction_engine", "open_answer_surface")
-	if not engine then return end
+	local engine = request_owner.engine
 	local session = engine.open_answer_surface(LABEL)
 	if not session then
 		Logger.warn(LOG, "Translation stopped: the prediction tooltip could not be opened.")
 		return
 	end
+	-- The exact returned session now owns dispatch and answer publication.
+	-- Acceptance legitimately consumes and resets its revision before replacing
+	-- text; later clipboard stages retain the translation generation and AI gate.
+	request_owner.revision = nil
 	local config = M.config()
 	if not continuation_current.current() then
 		engine.close_answer_surface(session)
@@ -318,10 +322,15 @@ function M.run(value, parent)
 	end
 	local Text = dependency("modules.shortcuts.actions.text", "read_copied_selection")
 	if not Text then return false end
+	local request_owner = { engine = engine, revision = engine.current_request_revision() }
 	local previous = _generation
 	_generation = previous + 1
 	local generation = _generation
-	local continuation_current = SelectionPublication.capture(focus, function() return generation == _generation end)
+	local continuation_current = SelectionPublication.capture(focus, function()
+		return generation == _generation and engine.get_llm_enabled() == true
+			and (request_owner.revision == nil
+				or engine.current_request_revision() == request_owner.revision)
+	end)
 	if not continuation_current then
 		if _generation == generation then _generation = previous end
 		Logger.info(LOG, "Translation refused: the text destination is not classified.")
@@ -334,7 +343,7 @@ function M.run(value, parent)
 			show_notice("llm.translate.no_selection")
 			return
 		end
-		request_translation(generation, language, selection, parent, focus, continuation_current)
+		request_translation(generation, language, selection, parent, focus, continuation_current, request_owner)
 	end, function()
 		if not is_current(generation, "selection") then return end
 		Logger.info(LOG, "Translation refused: nothing is selected.")
@@ -357,5 +366,12 @@ function M.reset()
 	_config, _names, _order = nil, nil, nil
 	Logger.debug(LOG, "Translation generation advanced to %d.", _generation)
 end
+
+-- Accepted replacements outlive the consumed answer surface. Retire their
+-- generation on the canonical off edge so re-enabling cannot revive old work.
+local AiActions = require("modules.shortcuts.ai_actions")
+AiActions.subscribe("selection_translation", function()
+	if AiActions.off() then _generation = _generation + 1 end
+end)
 
 return M
