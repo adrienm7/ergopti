@@ -13,6 +13,8 @@ require("compat.utf8").install()
 local Fixture = require("tests.support.keystats_native_fixture")
 local Preferences = require("tests.support.metrics_preferences_fixture")
 local uv = require("luv")
+assert(jit and jit.os == "Linux", "sampled reset must exercise the real Linux JIT runtime")
+assert(debug.getinfo(uv.fs_stat, "S").what == "C", "sampled reset requires the actual native luv provider")
 local Clock = require("infra.monotonic")
 local Timings = require("infra.timings")
 local checks = 0
