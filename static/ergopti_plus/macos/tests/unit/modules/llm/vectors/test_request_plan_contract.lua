@@ -15,5 +15,12 @@ Contract.run_batching(helpers, helpers.shared("tests/corpus/llm/request_plan_bat
 Contract.run_token_budget(helpers, helpers.shared("tests/corpus/llm/request_plan_token_budget_vectors.json"))
 Contract.run_info_bar(helpers, helpers.shared("tests/corpus/llm/request_plan_info_bar_vectors.json"))
 Contract.run_live(helpers, helpers.shared("tests/corpus/llm/request_plan_live_vectors.json"))
+-- macOS has no renderer owner of the TooltipRenderer shape yet: tooltip_llm draws through
+-- show_predictions with the text line as one argument. Its adapter is the open item the
+-- report lists, so the port is left out here rather than faked.
+Contract.run_ports(helpers, {
+	HttpClient = require("adapters.http_client"),
+	TimerScheduler = require("adapters.timer_scheduler"),
+})
 
 return true

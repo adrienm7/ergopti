@@ -17,6 +17,7 @@ local Batching = require("llm.request_plan.batching")
 local TokenBudget = require("llm.request_plan.token_budget")
 local InfoBar = require("llm.request_plan.info_bar")
 local Live = require("llm.request_plan.live")
+local Ports = require("llm.request_plan.ports")
 
 --- Reads and decodes one corpus file.
 --- @param path string Absolute path.
@@ -204,6 +205,35 @@ function M.run_live(helpers, corpus_path)
 				end
 			end)
 		end
+	end)
+end
+
+--- Registers the port contract checks against a driver's real owners.
+--- @param helpers table Driver assertions and case registration.
+--- @param owners table { HttpClient?, TimerScheduler?, TooltipRenderer? } the driver's adapters;
+---   a port a driver has no owner for yet is left out and its absence is the driver's to explain.
+function M.run_ports(helpers, owners)
+	helpers.describe("Shared request plan ports", function()
+		for port_name in pairs(Ports.CONTRACTS) do
+			if owners[port_name] ~= nil then
+				helpers.it("the driver's " .. port_name .. " owner satisfies the contract", function()
+					helpers.assert_eq(Ports.check(port_name, owners[port_name]), owners[port_name])
+				end)
+			end
+		end
+		helpers.it("refuses an owner that lacks a method, naming it", function()
+			local ok, err = pcall(Ports.check, "TimerScheduler", { after = function() end })
+			helpers.assert_eq(ok, false, "must raise")
+			helpers.assert_contains(tostring(err), "TimerScheduler lacks: cancel")
+		end)
+		helpers.it("refuses an unknown port and a non-table owner", function()
+			local ok, err = pcall(Ports.check, "Nope", {})
+			helpers.assert_eq(ok, false)
+			helpers.assert_contains(tostring(err), "unknown port: Nope")
+			ok, err = pcall(Ports.check, "HttpClient", nil)
+			helpers.assert_eq(ok, false)
+			helpers.assert_contains(tostring(err), "HttpClient must be a table")
+		end)
 	end)
 end
 
