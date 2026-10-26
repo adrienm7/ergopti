@@ -1021,6 +1021,12 @@ const OPENS_SUBMENU = {
 		},
 		'llm_trigger_menu',
 		{
+			menu: 'llm_debounce_never_row',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		},
+		{
 			menu: 'llm_numeric_custom_rows',
 			platforms: ['linux'],
 			kind: 'compose',

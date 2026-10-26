@@ -40,6 +40,7 @@ local DEFAULTS = {
 	llm_show_info_bar = false,
 	llm_sequential_mode = false,
 	llm_debounce = 0.2,
+	llm_min_request_interval = 0,
 	llm_auto_raise_temp = false,
 	llm_streaming = false,
 	llm_streaming_multi = false,
@@ -147,9 +148,6 @@ local function load_fixture(loading_result, options)
 		reset_failure_count = function() end,
 	}
 	package.loaded["modules.llm.app_filter"] = { is_blocked = function() return false end }
-	package.loaded["modules.llm.api_common"] = {
-		get_rate_limit_min_interval_s = function() return options.min_interval or 0 end,
-	}
 	package.loaded["modules.shortcuts.script_control"] = nil
 	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
@@ -184,6 +182,7 @@ local function load_fixture(loading_result, options)
 	package.loaded["modules.llm.prediction_engine"] = nil
 	local Engine = require("modules.llm.prediction_engine")
 	fixture.engine = Engine
+	helpers.assert_eq(Engine.set_llm_min_request_interval(options.min_interval or 0), true)
 	fixture.tooltip = tooltip
 	Engine.init({
 		buffer = "hello world",

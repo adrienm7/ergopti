@@ -36,6 +36,12 @@
 # is missed (HS prediction_engine.lua CHAIN_FALLBACK_SEC).
 chain_fallback_ms = 500
 
+# How long an automatic request that found its backend busy waits before it
+# asks again. The wait is at least the user's request interval; this keeps it
+# positive when that interval is 0 (llm.trigger.min_request_interval_ms).
+# LX: modules/llm/prediction_engine.lua send_when_free.
+backend_busy_recheck_ms = 300
+
 # HTTP request hard timeout for the remote LLM API.
 # AHK: api_remote.ahk LLM_REMOTE_TIMEOUT_MS.
 # HS:  api_remote.lua REQUEST_TIMEOUT_MS.

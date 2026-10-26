@@ -55,11 +55,6 @@ local FALLBACK = {
 		retry_temperature_step = 0.18,
 		retry_extra_tokens     = 5,
 	},
-	rate_limit_min_interval_ms = {
-		ollama = 300,
-		mlx    = 300,
-		api    = 500,
-	},
 	stop_sequences = {
 		batch = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:" },
 		line  = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:", "\n\n", "===", "\n", "\r", "</", "Suite finale", "SUITE", "NEXT_WORDS:" },
@@ -162,17 +157,6 @@ for _, key in ipairs(Temperature.POLICY_KEYS) do
 	DIVERSITY_POLICY[key] = cfg("diversity_temperature", key)
 end
 Temperature.validate(DIVERSITY_POLICY)
-
---- Returns the minimum interval (seconds) between two prediction requests
---- for the given backend id. Mirrors the AHK twin's
---- LLM_BACKEND_MIN_REQUEST_INTERVAL_MS so the floor is identical across
---- drivers. Falls back to 0.3 s for unknown backends.
-function M.get_rate_limit_min_interval_s(backend_id)
-	local map = INFERENCE.rate_limit_min_interval_ms or FALLBACK.rate_limit_min_interval_ms
-	local ms  = tonumber(map[backend_id])
-	if ms == nil then ms = 300 end
-	return ms / 1000.0
-end
 
 --- Returns the full retry policy, intended for the sequential fetch loop.
 --- @return number max_multiplier, number retry_temperature_step, number retry_extra_tokens

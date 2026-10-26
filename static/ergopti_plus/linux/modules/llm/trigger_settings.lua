@@ -34,6 +34,14 @@ local DEFINITIONS = {
 		-- The one value outside the range: no automatic trigger at all.
 		never = NEVER_MS,
 	},
+	-- The minimum time between two automatic AI requests (the rate floor).
+	min_request_interval_ms = {
+		path = KEY.LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS,
+		type = "number",
+		min = 0,
+		max = 10000,
+		presets = { 0, 100, 200, 300, 500, 750, 1000, 2000, 5000 },
+	},
 	instant_on_word_end = {
 		path = KEY.LLM_TRIGGER_INSTANT_ON_WORD_END,
 		type = "boolean",

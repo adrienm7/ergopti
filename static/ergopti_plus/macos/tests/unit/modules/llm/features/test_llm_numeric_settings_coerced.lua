@@ -69,6 +69,7 @@ package.loaded["modules.llm"] = {
 		llm_show_info_bar       = false,
 		llm_sequential_mode     = false,
 		llm_debounce            = 0.3,
+		llm_min_request_interval = 0,
 		llm_auto_raise_temp     = true,
 		llm_streaming           = false,
 		llm_streaming_multi     = false,
@@ -116,7 +117,6 @@ package.loaded["modules.llm.app_filter"] = {
 package.loaded["modules.llm.api_common"] = {
 	MIN_CALL_INTERVAL_SEC         = 0.5,
 	get_retry_policy              = function() return 2, 0.18, 5 end,
-	get_rate_limit_min_interval_s = function(_backend) return 0 end,
 }
 
 package.loaded["infra.i18n"] = {

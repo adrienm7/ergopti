@@ -219,15 +219,16 @@ local _deferred_telemetry_handles = {}
 -- True between an accepted prediction and the F16 chain trigger that follows it
 local chain_pending = false
 
--- Minimum gap between consecutive backend calls — protects paid APIs from per-keystroke
--- bursts and caps energy on local backends. Sourced from _shared/modules/llm/inference.json
--- so the AHK twin (modules/llm/api_common.ahk) reads the same floor.
-local ApiCommon = require("modules.llm.api_common")
+-- Minimum gap between two automatic backend calls: protects paid APIs from
+-- per-keystroke bursts and caps energy on local backends. The user sets it
+-- (llm.trigger.min_request_interval_ms, shared with Linux); an explicit request
+-- is never held. It is one value for every backend.
+local request_floor_sec = LLM_DEFAULTS.llm_min_request_interval
 -- The debounce and rate-floor decisions (_shared/lua/llm/request_plan): this
 -- engine feeds the plan events and the clock, and owns the native timers and
 -- the backend calls. The plan also holds when the last request went out.
-local _plan = require("modules.llm.request_plan_policy").new(function(backend_id)
-	return ApiCommon.get_rate_limit_min_interval_s(backend_id) * 1000
+local _plan = require("modules.llm.request_plan_policy").new(function()
+	return request_floor_sec * 1000
 end)
 
 -- ── LLM engine configuration ─────────────────────────────────────────────────
@@ -949,6 +950,7 @@ function M.get_llm_runtime_setting(key)
 	if key == "llm_display_model_name" then return true, llm_display_name end
 	if key == "llm_backend_name" then return true, llm_backend_label end
 	if key == "llm_debounce" then return true, inactivity_debounce_sec end
+	if key == "llm_min_request_interval" then return true, request_floor_sec end
 	if key == "llm_max_words" then return true, max_words end
 	if key == "llm_min_words" then return true, min_words end
 	if key == "llm_temperature" then return true, temperature end
@@ -990,6 +992,21 @@ function M.set_llm_debounce(seconds)
 		end
 	end
 	Logger.debug(LOG, "Inactivity timer delay updated: %.3fs.", inactivity_debounce_sec)
+	return true
+end
+
+--- Updates the minimum time between two automatic requests. It applies to the
+--- next dispatch; no timer is armed with it, so there is nothing to settle.
+--- @param seconds number|string A finite non-negative number of seconds (0 = no floor).
+--- @return boolean accepted False, with the previous value kept, for anything else.
+function M.set_llm_min_request_interval(seconds)
+	local value = tonumber(seconds)
+	if value == nil or value ~= value or value < 0 or value == math.huge then
+		Logger.error(LOG, "Request interval refused: %s is not a finite non-negative number of seconds.", tostring(seconds))
+		return false
+	end
+	request_floor_sec = value
+	Logger.debug(LOG, "Request interval updated: %.3fs.", request_floor_sec)
 	return true
 end
 
@@ -1812,19 +1829,16 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 		end
 	end
 
-	-- Backend-aware request floor — re-arm the debounce timer for the
-	-- remaining gap instead of firing immediately. The plan lets force_trigger
-	-- (the manual hotkey path) through: it is an explicit user request, not a
-	-- per-keystroke burst.
-	local backend_id = core_llm.get_backend and core_llm.get_backend() or "ollama"
-	local floor_verdict = _plan:on_dispatch({ backend = backend_id, explicit = force_trigger },
+	-- Request floor — re-arm the debounce timer for the remaining gap instead
+	-- of firing immediately. The plan lets force_trigger (the manual hotkey
+	-- path) through: it is an explicit user request, not a per-keystroke burst.
+	local floor_verdict = _plan:on_dispatch({ explicit = force_trigger },
 		hs.timer.secondsSinceEpoch() * 1000)[1]
 	if not predispatch_is_current() then return end
 	if floor_verdict.action == "defer" then
-		local min_interval = ApiCommon.get_rate_limit_min_interval_s(backend_id)
 		local remaining = floor_verdict.delay_ms / 1000
-		Logger.debug(LOG, "Backend '%s' floor (%dms) — deferring %dms.",
-			backend_id, math.floor(min_interval * 1000), math.floor(remaining * 1000))
+		Logger.debug(LOG, "Request floor (%dms) — deferring %dms.",
+			math.floor(request_floor_sec * 1000), math.floor(remaining * 1000))
 		-- Reuse the single canonical timer instead of creating an orphan;
 		-- store profile_name so the callback can forward it when it fires
 		defer_check(remaining, "Rate-limit deferral")
@@ -2087,7 +2101,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	-- Rate-limit and duplicate-suppression state describes real backend calls,
 	-- never a loading paint or failed watchdog construction.
 	last_buffer_signature    = signature
-	_plan:on_sent(backend_id, hs.timer.secondsSinceEpoch() * 1000)
+	_plan:on_sent(hs.timer.secondsSinceEpoch() * 1000)
 end
 
 -- The reasons a manual request is refused, each with the locale key of the

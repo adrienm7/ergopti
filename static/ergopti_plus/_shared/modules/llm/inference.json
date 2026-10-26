@@ -23,7 +23,7 @@
 	},
 
 	"rate_limit_min_interval_ms": {
-		"_comment": "Minimum interval between two consecutive prediction requests per backend. Floors the user's debounce so paid API providers are protected from per-keystroke token burn, and local backends save GPU energy on back-to-back calls.",
+		"_comment": "Minimum interval between two consecutive prediction requests per backend. Floors the user's debounce so paid API providers are protected from per-keystroke token burn, and local backends save GPU energy on back-to-back calls. Read by the Windows driver only: macOS and Linux use the one value the user sets (llm.trigger.min_request_interval_ms, default llm_min_request_interval_ms in defaults.json) and an explicit request is never held. Remove this section when Windows adopts that setting.",
 		"ollama": 300,
 		"mlx": 300,
 		"api": 500

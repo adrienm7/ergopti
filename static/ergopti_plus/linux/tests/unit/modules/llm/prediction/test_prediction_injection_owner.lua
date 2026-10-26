@@ -159,7 +159,7 @@ local function scenario(action, phase, body)
 			engine.predict("btw", nil, { num_predictions = 1, profile = { id = "raw", system_single = "{context}" } })
 			-- A successor observes the real canonical provider pacing; advance only
 			-- this controlled scheduler, never a native/privacy deadline.
-			scheduler.test.advance(require("modules.llm.inference").min_interval_ms("api") / 1000)
+			scheduler.test.advance(require("modules.llm.trigger_settings").get("min_request_interval_ms") / 1000)
 			assert(#state.requests == before + 1, "the real Engine dispatches one controlled provider request")
 			state.requests[#state.requests](state.text, nil)
 			assert(engine.has_suggestions(), "the real parser admits the six-word response")

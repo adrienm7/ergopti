@@ -73,6 +73,23 @@ helpers.describe("LLM trigger settings: durable manifest-backed values", functio
 		restore()
 	end)
 
+	helpers.it("keeps one minimum request interval for every backend, in its own range (request-floor-setting)", function()
+		local settings, storage = load_settings()
+		local manifest = require("infra.manifest_reader")
+		helpers.assert_eq(settings.get("min_request_interval_ms"), manifest.default_for("llm.trigger.min_request_interval_ms"))
+		helpers.assert_eq(settings.bounds("min_request_interval_ms"), { min = 0, max = 10000 })
+		helpers.assert_true(settings.set("min_request_interval_ms", 0), "0 turns the floor off")
+		helpers.assert_eq(storage.get("llm.trigger.min_request_interval_ms"), 0)
+		helpers.assert_true(settings.set("min_request_interval_ms", 1500))
+		helpers.assert_eq(settings.get("min_request_interval_ms"), 1500)
+		for _, value in ipairs({ -1, 10001, 0.5, "500" }) do
+			helpers.assert_eq(settings.set("min_request_interval_ms", value), false)
+		end
+		helpers.assert_eq(settings.get("min_request_interval_ms"), 1500)
+		helpers.assert_true(not settings.is_never("min_request_interval_ms", -1), "only the debounce has a never")
+		restore()
+	end)
+
 	helpers.it("stores the shared \"never\" debounce as -1 and reads it back (llm-debounce-never)", function()
 		local Debounce = require("llm.request_plan.debounce")
 		local settings, storage = load_settings()
@@ -150,6 +167,7 @@ helpers.describe("prediction engine: trigger settings affect requests", function
 		replace("modules.llm.trigger_settings", {
 			get = function(name)
 				if name == "debounce_ms" then return 500 end
+				if name == "min_request_interval_ms" then return 300 end
 				if name == "secure_filter_enabled" then return false end
 				if name == "url_bar_filter_enabled" then return false end
 			end,
@@ -196,6 +214,7 @@ helpers.describe("prediction engine: trigger settings affect requests", function
 		replace("modules.llm.trigger_settings", {
 			get = function(name)
 				if name == "debounce_ms" then return -1 end
+				if name == "min_request_interval_ms" then return 300 end
 				if name == "secure_filter_enabled" then return false end
 				if name == "url_bar_filter_enabled" then return false end
 			end,
@@ -295,6 +314,39 @@ helpers.describe("LLM trigger settings: tray reachability", function()
 		filter.fn()
 		helpers.assert_eq(storage.get("llm.trigger.secure_filter_enabled"), false)
 		helpers.assert_eq(settings.get("secure_filter_enabled"), false)
+		restore()
+	end)
+
+	helpers.it("offers the minimum request interval next to the idle time and saves a preset (request-floor-setting)", function()
+		local settings, storage = load_settings({["llm.enabled"] = true, ["llm.models.selected"] = "ollama"})
+		local i18n = require("infra.i18n")
+		local menu_builder = helpers.load_module("ui.menu.menu_builder")
+		local menu = menu_builder.build({
+			is_paused = function() return false end,
+			llm = {
+				is_enabled = function() return true end,
+				toggle = function() return true end,
+				get_backend = function() return "ollama" end,
+				streaming_revision = function() return 0 end,
+				get_models = function() return {} end,
+				get_current_model = function() return nil end,
+			},
+		})
+		local function find(rows, title)
+			for _, row in ipairs(rows or {}) do
+				if row.title == title then return row end
+				local found = type(row.menu) == "table" and find(row.menu, title)
+				if found then return found end
+			end
+		end
+		local row = find(menu, string.format(i18n.get("menu.llm.min_interval_label"), "500 ms"))
+		helpers.assert_not_nil(row, "the minimum interval row shows the default")
+		local preset = find(row.menu, "0 ms")
+		helpers.assert_not_nil(preset, "0 ms turns the floor off")
+		preset.fn()
+		helpers.assert_eq(storage.get("llm.trigger.min_request_interval_ms"), 0)
+		helpers.assert_eq(settings.get("min_request_interval_ms"), 0)
+		helpers.assert_nil(find(row.menu, i18n.get("menu.settings.never")), "an interval has no never")
 		restore()
 	end)
 

@@ -606,6 +606,7 @@ function M.set_llm_nav_modifiers(mods)      return engine.set_llm_nav_modifiers(
 function M.set_llm_min_words(w)             return engine.set_llm_min_words(w)             end
 function M.set_llm_max_words(w)             return engine.set_llm_max_words(w)             end
 function M.set_llm_debounce(seconds)        return engine.set_llm_debounce(seconds)        end
+function M.set_llm_min_request_interval(seconds) return engine.set_llm_min_request_interval(seconds) end
 function M.set_llm_streaming(v)             return engine.set_llm_streaming(v)             end
 function M.set_llm_streaming_multi(v)       return engine.set_llm_streaming_multi(v)       end
 function M.set_llm_agent_system1(v)         return AgentRunner.set_system1(v)              end

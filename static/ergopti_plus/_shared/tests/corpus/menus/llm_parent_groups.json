@@ -31,6 +31,10 @@
 					"callback": true
 				},
 				{
+					"title": "menu.llm.min_interval_label",
+					"callback": true
+				},
+				{
 					"title": "menu.llm.instant_on_word_end",
 					"callback": true,
 					"checked": false
@@ -303,6 +307,65 @@
 						},
 						{
 							"title": "Jamais",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "-",
+							"callback": false
+						},
+						{
+							"title": "Autre valeur…",
+							"callback": true
+						}
+					]
+				},
+				{
+					"title": "Délai minimum entre deux requêtes IA automatiques : 500 ms",
+					"callback": false,
+					"children": [
+						{
+							"title": "0 ms",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "100 ms",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "200 ms",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "300 ms",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "500 ms",
+							"callback": true,
+							"checked": true
+						},
+						{
+							"title": "750 ms",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "1000 ms",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "2000 ms",
+							"callback": true,
+							"checked": false
+						},
+						{
+							"title": "5000 ms",
 							"callback": true,
 							"checked": false
 						},

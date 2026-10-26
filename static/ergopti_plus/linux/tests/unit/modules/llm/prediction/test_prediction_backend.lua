@@ -211,6 +211,28 @@ helpers.describe("prediction backend: variants are paced and diverse", function(
 		helpers.assert_eq(after_interval, 2)
 	end)
 
+	helpers.it("waits the interval the user set, not the backend's old fixed one (request-floor-setting)", function()
+		local engine, calls, scheduler, restore = load("api", ENTRY, { ["llm.trigger.min_request_interval_ms"] = 1200 })
+		engine.predict("Bonjour à tous")
+		local first = #calls.remote
+		scheduler.test.advance(1.19)
+		local before_interval = #calls.remote
+		scheduler.test.advance(0.02)
+		local after_interval = #calls.remote
+		restore()
+		helpers.assert_eq(first, 1, "the first request leaves at once")
+		helpers.assert_eq(before_interval, 1, "the next one waits the whole configured interval")
+		helpers.assert_eq(after_interval, 2)
+	end)
+
+	helpers.it("sends the variants back to back when the user set no interval (request-floor-setting)", function()
+		local engine, calls, _, restore = load("api", ENTRY, { ["llm.trigger.min_request_interval_ms"] = 0 })
+		engine.predict("Bonjour à tous")
+		local without_waiting = #calls.remote
+		restore()
+		helpers.assert_eq(without_waiting, 3)
+	end)
+
 	helpers.it("never holds an explicit request, nor the later variants of its run (explicit-never-held)", function()
 		local engine, calls, _, restore = load("api", ENTRY)
 		engine.predict("Bonjour à tous", { explicit = true })

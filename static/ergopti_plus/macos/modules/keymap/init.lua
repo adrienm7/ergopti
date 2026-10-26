@@ -909,6 +909,7 @@ M.set_llm_app_profile_overrides = LLMBridge.set_llm_app_profile_overrides
 M.set_llm_enabled            = LLMBridge.set_llm_enabled
 M.set_llm_after_hotstring    = LLMBridge.set_llm_after_hotstring
 M.set_llm_debounce           = LLMBridge.set_llm_debounce
+M.set_llm_min_request_interval = LLMBridge.set_llm_min_request_interval
 M.set_llm_auto_raise_temp    = LLMBridge.set_llm_auto_raise_temp
 M.set_llm_streaming              = LLMBridge.set_llm_streaming
 M.set_llm_streaming_multi        = LLMBridge.set_llm_streaming_multi

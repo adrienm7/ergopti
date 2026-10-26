@@ -4,15 +4,15 @@
 --- MODULE: Shared Inference Policy (Linux)
 --- DESCRIPTION:
 --- Reads _shared/modules/llm/inference.json, the file the macOS and Windows
---- backends read, for the two rules the Linux engine applies to every request:
---- the minimum interval between requests per backend, and the temperature of
---- each variant when several predictions are asked for one after another.
+--- backends read, for the rule the Linux engine applies to every sequential
+--- multi-prediction: the temperature of each variant when several predictions
+--- are asked for one after another. (The minimum interval between requests is
+--- the user's llm.trigger.min_request_interval_ms, not a rule of this file.)
 ---
 --- WHY THIS EXISTS:
 --- The Linux engine sent every variant at the same temperature, so a second
 --- and third request mostly repeated the first and deduplication left one
---- suggestion; and it sent a request on every word end, which a paid or
---- rate-limited API (Cerebras' free tier) answers with HTTP 429.
+--- suggestion.
 --- ==============================================================================
 
 local M = {}
@@ -34,8 +34,7 @@ local function policy()
 	local fh = path and io.open(path, "r")
 	local root = fh and Json.decode(fh:read("*a")) or nil
 	if fh then fh:close() end
-	if type(root) ~= "table" or type(root.rate_limit_min_interval_ms) ~= "table"
-		or type(root.diversity_temperature) ~= "table" then
+	if type(root) ~= "table" or type(root.diversity_temperature) ~= "table" then
 		error("inference.json is missing or malformed: " .. tostring(path), 0)
 	end
 	_policy = root
@@ -50,13 +49,6 @@ local function number(section, key)
 	local value = tonumber(policy()[section][key])
 	if not value then error(string.format("inference.json %s.%s is not a number", section, key), 0) end
 	return value
-end
-
---- Minimum milliseconds between two requests to one backend.
---- @param backend string "ollama" or "api"
---- @return number
-function M.min_interval_ms(backend)
-	return number("rate_limit_min_interval_ms", backend)
 end
 
 --- Temperature of one variant of a sequential multi-prediction, through the

@@ -34,6 +34,7 @@ local function fixture(values)
 		get = function(name)
 			if values[name] ~= nil then return values[name] end
 			if name == "debounce_ms" then return 500 end
+			if name == "min_request_interval_ms" then return 300 end
 			if name == "instant_on_word_end" or name == "after_hotstring" then return true end
 			return false
 		end,

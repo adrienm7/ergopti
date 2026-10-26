@@ -419,6 +419,9 @@ M.features = {
 		path = "llm.trigger.debounce_ms", id = "debounce_ms", section = "llm.trigger", default = 500, type = "number", description_key = "menu.llm.trigger.debounce_ms", platforms = { "ahk", "hs", "linux" }, recommended = 500, input_altering = false,
 	},
 	{
+		path = "llm.trigger.min_request_interval_ms", id = "min_request_interval_ms", section = "llm.trigger", default = 500, type = "number", description_key = "menu.llm.trigger.min_request_interval_ms", platforms = { "hs", "linux" }, recommended = 500, input_altering = false, reason_key = "platform_reason.llm_request_interval_is_per_backend_on_windows",
+	},
+	{
 		path = "llm.trigger.instant_on_word_end", id = "instant_on_word_end", section = "llm.trigger", default = true, type = "boolean", description_key = "menu.llm.trigger.instant_on_word_end", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
 	},
 	{

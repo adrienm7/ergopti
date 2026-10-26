@@ -155,6 +155,7 @@ local KEY_MAP = {
 	llm_active_profile                   = { sec = "llm", path = "profiles", key = "active"        },
 	llm_num_predictions                  = { sec = "llm", path = "profiles", key = "num_predictions" },
 	llm_debounce                         = { sec = "llm", path = "trigger", key = "debounce_ms", units_per_state = 1000, never = true },
+	llm_min_request_interval             = { sec = "llm", path = "trigger", key = LEAF.MIN_REQUEST_INTERVAL_MS, units_per_state = 1000 },
 	llm_instant_on_word_end              = { sec = "llm", path = "trigger", key = "instant_on_word_end" },
 	llm_after_hotstring                  = { sec = "llm", path = "trigger", key = "after_hotstring" },
 	llm_url_bar_filter_enabled           = { sec = "llm", path = "trigger", key = "url_bar_filter_enabled" },

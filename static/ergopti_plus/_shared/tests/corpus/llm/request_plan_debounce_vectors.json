@@ -1,14 +1,12 @@
 {
-	"_comment": "Request transcripts of the prediction debounce and rate floor, replayed through _shared/lua/llm/request_plan/debounce.lua by the macOS and Linux runners. A vector names a driver_options set (or gives one), the floor of each backend in milliseconds (the floor port answers from this map and raises for a backend it lacks), and an ordered list of steps. A step calls one method of the plan with args (plus now_ms for on_dispatch and on_sent, the caller's monotonic clock in milliseconds) and lists the decisions it returns, in order, as expect, or a substring the raised message must contain as expect_error. Tokens count from 1 per plan, one per arm. An arm decision means: cancel nothing else and start a one-shot timer of delay_ms; cancel means stop that token; fire and stale answer on_timer; send and defer answer on_dispatch. driver_options is the deliberate per-driver difference: each driver asserts that its own policy equals its entry, so a drift is a red test, not a silent change. A port in another language replays this file unchanged.",
+	"_comment": "Request transcripts of the prediction debounce and rate floor, replayed through _shared/lua/llm/request_plan/debounce.lua by the macOS and Linux runners. A vector names a driver_options set (or gives one), the floor in milliseconds (floor_ms, the one value the user sets, which the floor port answers), and an ordered list of steps. A step calls one method of the plan with args (plus now_ms for on_dispatch and on_sent, the caller's monotonic clock in milliseconds) and lists the decisions it returns, in order, as expect, or a substring the raised message must contain as expect_error. Tokens count from 1 per plan, one per arm. An arm decision means: cancel nothing else and start a one-shot timer of delay_ms; cancel means stop that token; fire and stale answer on_timer; send and defer answer on_dispatch. driver_options is the deliberate per-driver difference: each driver asserts that its own policy equals its entry, so a drift is a red test, not a silent change. A port in another language replays this file unchanged.",
 	"driver_options": {
 		"macos": {
 			"allow_never": true,
-			"floor_scope": "global",
 			"live_instant_word_end": true
 		},
 		"linux": {
 			"allow_never": true,
-			"floor_scope": "per_backend",
 			"live_instant_word_end": true
 		}
 	},
@@ -17,11 +15,7 @@
 			"id": "typing-arms-the-configured-debounce",
 			"description": "An ordinary keystroke arms the configured debounce.",
 			"options": "macos",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -52,11 +46,7 @@
 			"id": "typing-arms-the-configured-debounce-linux",
 			"description": "The same keystroke on the other driver's options.",
 			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -87,11 +77,7 @@
 			"id": "a-new-keystroke-supersedes-the-pending-timer",
 			"description": "A second keystroke cancels the pending token and arms a new one.",
 			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -140,11 +126,7 @@
 			"id": "the-current-timer-fires-once",
 			"description": "A fired timer answers fire once; a second delivery is stale.",
 			"options": "macos",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -200,11 +182,7 @@
 			"id": "a-superseded-timer-is-stale",
 			"description": "The timer of an older keystroke never fires.",
 			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -278,11 +256,7 @@
 			"id": "a-cancelled-timer-is-stale",
 			"description": "A cancel makes the pending token stale; a second cancel does nothing.",
 			"options": "macos",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -340,11 +314,7 @@
 			"id": "word-end-fires-instantly-when-asked",
 			"description": "With instant_on_word_end a word end arms a zero delay; other keys keep the debounce.",
 			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -395,11 +365,7 @@
 			"id": "word-end-keeps-the-debounce-when-not-asked",
 			"description": "Without instant_on_word_end a word end waits the debounce.",
 			"options": "macos",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -431,11 +397,7 @@
 			"id": "a-disabled-engine-arms-nothing",
 			"description": "With the AI switch off every input is skipped and nothing is cancelled.",
 			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -488,11 +450,7 @@
 			"id": "never-turns-the-automatic-trigger-off",
 			"description": "A negative debounce skips typing and overrides, even at a word end, and keeps the pending timer.",
 			"options": "macos",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -570,11 +528,7 @@
 			"id": "never-turns-the-automatic-trigger-off-linux",
 			"description": "Linux offers the same \"never\" as macOS: a negative debounce (the shared sentinel -1) skips typing and overrides, even at a word end.",
 			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -652,11 +606,7 @@
 			"id": "never-does-not-stop-an-explicit-trigger",
 			"description": "An explicit trigger is a request, so never leaves it armed at once.",
 			"options": "macos",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -687,11 +637,7 @@
 			"id": "explicit-trigger-uses-the-debounce",
 			"description": "A typed trigger waits the configured debounce.",
 			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -722,11 +668,7 @@
 			"id": "hotstring-expiry-fires-at-once",
 			"description": "The expiry of a hotstring preview arms a zero delay.",
 			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -757,11 +699,7 @@
 			"id": "an-override-delay-is-used-as-given",
 			"description": "A chain delay replaces the debounce.",
 			"options": "macos",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -793,11 +731,7 @@
 			"id": "an-override-needs-a-delay",
 			"description": "An override without a delay is refused.",
 			"options": "macos",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -821,11 +755,7 @@
 			"id": "live-mode-replaces-the-debounce",
 			"description": "In live mode a keystroke waits the live debounce.",
 			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -882,11 +812,7 @@
 			"id": "live-mode-overrides-never",
 			"description": "Live mode is an explicit request for the trigger, so never does not stop it.",
 			"options": "macos",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -918,11 +844,7 @@
 			"id": "live-word-end-instant-on-macos",
 			"description": "On macOS a word end is instant even in live mode.",
 			"options": "macos",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -955,11 +877,7 @@
 			"id": "live-word-end-instant-on-linux",
 			"description": "On Linux, as on macOS, a word end is instant even in live mode.",
 			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -992,11 +910,7 @@
 			"id": "live-word-end-keeps-the-live-debounce-when-instant-is-off",
 			"description": "With the instant word end switched off in the menu, live mode keeps its own debounce at a word end on every driver.",
 			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -1029,11 +943,7 @@
 			"id": "live-expiry-has-its-own-why",
 			"description": "The expiry in live mode is logged as the live one.",
 			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -1065,17 +975,11 @@
 			"id": "the-floor-defers-an-automatic-request",
 			"description": "A request inside the backend's interval waits the remainder; the exact boundary sends.",
 			"options": "macos",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "on_dispatch",
-					"args": {
-						"backend": "ollama"
-					},
+					"args": {},
 					"now_ms": 1000,
 					"expect": [
 						{
@@ -1085,17 +989,12 @@
 				},
 				{
 					"call": "on_sent",
-					"args": {
-						"backend": "ollama"
-					},
 					"now_ms": 1000,
 					"expect": []
 				},
 				{
 					"call": "on_dispatch",
-					"args": {
-						"backend": "ollama"
-					},
+					"args": {},
 					"now_ms": 1200,
 					"expect": [
 						{
@@ -1107,9 +1006,7 @@
 				},
 				{
 					"call": "on_dispatch",
-					"args": {
-						"backend": "ollama"
-					},
+					"args": {},
 					"now_ms": 1299,
 					"expect": [
 						{
@@ -1121,56 +1018,8 @@
 				},
 				{
 					"call": "on_dispatch",
-					"args": {
-						"backend": "ollama"
-					},
+					"args": {},
 					"now_ms": 1300,
-					"expect": [
-						{
-							"action": "send"
-						}
-					]
-				}
-			]
-		},
-		{
-			"id": "the-floor-follows-the-backend",
-			"description": "The api floor is longer than the local one.",
-			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
-			"steps": [
-				{
-					"call": "on_sent",
-					"args": {
-						"backend": "api"
-					},
-					"now_ms": 5000,
-					"expect": []
-				},
-				{
-					"call": "on_dispatch",
-					"args": {
-						"backend": "api"
-					},
-					"now_ms": 5499,
-					"expect": [
-						{
-							"action": "defer",
-							"delay_ms": 1,
-							"why": "rate floor"
-						}
-					]
-				},
-				{
-					"call": "on_dispatch",
-					"args": {
-						"backend": "api"
-					},
-					"now_ms": 5500,
 					"expect": [
 						{
 							"action": "send"
@@ -1183,24 +1032,16 @@
 			"id": "an-explicit-request-is-never-held",
 			"description": "An explicit request (shortcut, typed trigger, prompt action) is sent at once, whatever the last request time; an automatic one still waits.",
 			"options": "macos",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "on_sent",
-					"args": {
-						"backend": "ollama"
-					},
 					"now_ms": 1000,
 					"expect": []
 				},
 				{
 					"call": "on_dispatch",
 					"args": {
-						"backend": "ollama",
 						"explicit": true
 					},
 					"now_ms": 1010,
@@ -1212,9 +1053,7 @@
 				},
 				{
 					"call": "on_dispatch",
-					"args": {
-						"backend": "ollama"
-					},
+					"args": {},
 					"now_ms": 1010,
 					"expect": [
 						{
@@ -1230,24 +1069,16 @@
 			"id": "an-explicit-request-is-not-held-on-linux-either",
 			"description": "Linux follows the same rule: the explicit request goes straight on.",
 			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "on_sent",
-					"args": {
-						"backend": "ollama"
-					},
 					"now_ms": 1000,
 					"expect": []
 				},
 				{
 					"call": "on_dispatch",
 					"args": {
-						"backend": "ollama",
 						"explicit": true
 					},
 					"now_ms": 1010,
@@ -1263,24 +1094,16 @@
 			"id": "later-variants-of-an-explicit-request-are-not-held",
 			"description": "The variants of an explicit sequential request are part of that request: each is dispatched as an explicit one and goes straight on, although the previous variant just went out.",
 			"options": "macos",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 500,
 			"steps": [
 				{
 					"call": "on_sent",
-					"args": {
-						"backend": "api"
-					},
 					"now_ms": 1000,
 					"expect": []
 				},
 				{
 					"call": "on_dispatch",
 					"args": {
-						"backend": "api",
 						"explicit": true
 					},
 					"now_ms": 1001,
@@ -1292,16 +1115,12 @@
 				},
 				{
 					"call": "on_sent",
-					"args": {
-						"backend": "api"
-					},
 					"now_ms": 1001,
 					"expect": []
 				},
 				{
 					"call": "on_dispatch",
 					"args": {
-						"backend": "api",
 						"explicit": true
 					},
 					"now_ms": 1002,
@@ -1317,25 +1136,16 @@
 			"id": "later-variants-of-an-automatic-request-wait",
 			"description": "The variants of an automatic sequential request wait for the floor like the request itself.",
 			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 500,
 			"steps": [
 				{
 					"call": "on_sent",
-					"args": {
-						"backend": "api"
-					},
 					"now_ms": 1000,
 					"expect": []
 				},
 				{
 					"call": "on_dispatch",
-					"args": {
-						"backend": "api"
-					},
+					"args": {},
 					"now_ms": 1100,
 					"expect": [
 						{
@@ -1347,9 +1157,7 @@
 				},
 				{
 					"call": "on_dispatch",
-					"args": {
-						"backend": "api"
-					},
+					"args": {},
 					"now_ms": 1500,
 					"expect": [
 						{
@@ -1359,17 +1167,12 @@
 				},
 				{
 					"call": "on_sent",
-					"args": {
-						"backend": "api"
-					},
 					"now_ms": 1500,
 					"expect": []
 				},
 				{
 					"call": "on_dispatch",
-					"args": {
-						"backend": "api"
-					},
+					"args": {},
 					"now_ms": 1600,
 					"expect": [
 						{
@@ -1382,94 +1185,10 @@
 			]
 		},
 		{
-			"id": "the-global-floor-counts-every-backend",
-			"description": "On macOS the last request of any backend holds the next one.",
-			"options": "macos",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
-			"steps": [
-				{
-					"call": "on_sent",
-					"args": {
-						"backend": "ollama"
-					},
-					"now_ms": 1000,
-					"expect": []
-				},
-				{
-					"call": "on_dispatch",
-					"args": {
-						"backend": "api"
-					},
-					"now_ms": 1100,
-					"expect": [
-						{
-							"action": "defer",
-							"delay_ms": 400,
-							"why": "rate floor"
-						}
-					]
-				}
-			]
-		},
-		{
-			"id": "the-per-backend-floor-counts-its-own-backend",
-			"description": "On Linux another backend is not held back.",
-			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
-			"steps": [
-				{
-					"call": "on_sent",
-					"args": {
-						"backend": "ollama"
-					},
-					"now_ms": 1000,
-					"expect": []
-				},
-				{
-					"call": "on_dispatch",
-					"args": {
-						"backend": "api"
-					},
-					"now_ms": 1100,
-					"expect": [
-						{
-							"action": "send"
-						}
-					]
-				},
-				{
-					"call": "on_dispatch",
-					"args": {
-						"backend": "ollama"
-					},
-					"now_ms": 1100,
-					"expect": [
-						{
-							"action": "defer",
-							"delay_ms": 200,
-							"why": "rate floor"
-						}
-					]
-				}
-			]
-		},
-		{
 			"id": "reset-forgets-the-last-request-and-the-timer",
 			"description": "Re-initialisation clears both.",
 			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -1496,9 +1215,6 @@
 				},
 				{
 					"call": "on_sent",
-					"args": {
-						"backend": "ollama"
-					},
 					"now_ms": 1000,
 					"expect": []
 				},
@@ -1509,9 +1225,7 @@
 				},
 				{
 					"call": "on_dispatch",
-					"args": {
-						"backend": "ollama"
-					},
+					"args": {},
 					"now_ms": 1010,
 					"expect": [
 						{
@@ -1534,42 +1248,10 @@
 			]
 		},
 		{
-			"id": "an-unknown-backend-fails-where-the-policy-lives",
-			"description": "The floor port raising for an unknown backend is not swallowed.",
-			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
-			"steps": [
-				{
-					"call": "on_sent",
-					"args": {
-						"backend": "quantum"
-					},
-					"now_ms": 1000,
-					"expect": []
-				},
-				{
-					"call": "on_dispatch",
-					"args": {
-						"backend": "quantum"
-					},
-					"now_ms": 1100,
-					"expect_error": "quantum"
-				}
-			]
-		},
-		{
 			"id": "an-unset-debounce-is-refused",
 			"description": "Typing before the debounce was configured is a programming error.",
 			"options": "linux",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -1591,11 +1273,7 @@
 			"id": "a-non-numeric-debounce-is-refused",
 			"description": "The debounce is a number of milliseconds, or the negative \"never\" sentinel.",
 			"options": "macos",
-			"floors": {
-				"ollama": 300,
-				"mlx": 300,
-				"api": 500
-			},
+			"floor_ms": 300,
 			"steps": [
 				{
 					"call": "configure",
@@ -1603,6 +1281,113 @@
 						"debounce_ms": "500"
 					},
 					"expect_error": "debounce_ms must be a number"
+				}
+			]
+		},
+		{
+			"id": "the-floor-is-the-configured-interval",
+			"description": "The interval is the one value the user sets: a request inside it waits the remainder, the exact boundary sends.",
+			"options": "linux",
+			"floor_ms": 750,
+			"steps": [
+				{
+					"call": "on_sent",
+					"now_ms": 5000,
+					"expect": []
+				},
+				{
+					"call": "on_dispatch",
+					"args": {},
+					"now_ms": 5749,
+					"expect": [
+						{
+							"action": "defer",
+							"delay_ms": 1,
+							"why": "rate floor"
+						}
+					]
+				},
+				{
+					"call": "on_dispatch",
+					"args": {},
+					"now_ms": 5750,
+					"expect": [
+						{
+							"action": "send"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "a-zero-floor-never-holds-a-request",
+			"description": "An interval of 0 turns the floor off.",
+			"options": "linux",
+			"floor_ms": 0,
+			"steps": [
+				{
+					"call": "on_sent",
+					"now_ms": 1000,
+					"expect": []
+				},
+				{
+					"call": "on_dispatch",
+					"args": {},
+					"now_ms": 1000,
+					"expect": [
+						{
+							"action": "send"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "the-last-request-holds-the-next-whatever-sent-it",
+			"description": "There is one last-request time for every backend and every kind of request: the latest send counts.",
+			"options": "macos",
+			"floor_ms": 500,
+			"steps": [
+				{
+					"call": "on_sent",
+					"now_ms": 1000,
+					"expect": []
+				},
+				{
+					"call": "on_sent",
+					"now_ms": 1200,
+					"expect": []
+				},
+				{
+					"call": "on_dispatch",
+					"args": {},
+					"now_ms": 1300,
+					"expect": [
+						{
+							"action": "defer",
+							"delay_ms": 400,
+							"why": "rate floor"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "an-invalid-floor-is-refused",
+			"description": "A floor that is not a non-negative number fails where the plan is asked, never silently sends.",
+			"options": "linux",
+			"floor_ms": -5,
+			"steps": [
+				{
+					"call": "on_sent",
+					"now_ms": 1000,
+					"expect": []
+				},
+				{
+					"call": "on_dispatch",
+					"args": {},
+					"now_ms": 1100,
+					"expect_error": "the request floor must be a non-negative finite number"
 				}
 			]
 		}

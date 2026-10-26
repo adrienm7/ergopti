@@ -269,7 +269,9 @@ local _clock_ms = Monotonic.now_ms
 -- engine feeds it events and the clock, and owns the timers and the requests.
 -- (one table, not locals: this chunk is at Lua's limit of 200 local variables).
 local _debounce = {
-	plan = require("modules.llm.request_plan_policy").new(function(kind) return Inference.min_interval_ms(kind) end),
+	-- How long an automatic request that found its backend busy waits to ask again.
+	busy_recheck_ms = require("infra.timings").ms("llm", "backend_busy_recheck_ms"),
+	plan = require("modules.llm.request_plan_policy").new(function() return TriggerSettings.get(require("config_keys").LEAF.MIN_REQUEST_INTERVAL_MS) end),
 }
 
 --- Cancels the native debounce timer and withdraws it from the plan.
@@ -923,7 +925,6 @@ function M.predict(context, output_context, override)
 		local kind = M.get_backend()
 		local now = _clock_ms()
 		local verdict = _debounce.plan:on_dispatch({
-			backend = kind,
 			-- A live keystroke carries an override too but is automatic: only the
 			-- shortcut, the typed trigger and a prompt action are explicit, and
 			-- the later variants of their sequential run are part of the request.
@@ -946,7 +947,7 @@ function M.predict(context, output_context, override)
 			end
 			return
 		end
-		_debounce.plan:on_sent(kind, now)
+		_debounce.plan:on_sent(now)
 		request_index = request_index + 1
 		local think_filter = Parser.new_thinking_filter()
 		local streamed = ""
@@ -1469,7 +1470,6 @@ function M.shift_tone(direction, cycle)
 
 		local function send()
 			if _runtime_closed or _scope_owner or generation ~= _tone_generation then return end
-			local kind = M.get_backend()
 			local now = _clock_ms()
 			local blocked = global_privacy_blocks()
 			if _runtime_closed or _scope_owner or generation ~= _tone_generation then return end
@@ -1481,7 +1481,7 @@ function M.shift_tone(direction, cycle)
 				Logger.info(LOG, "Tone request dropped: the active text field changed before it was sent.")
 				return
 			end
-			_debounce.plan:on_sent(kind, now)
+			_debounce.plan:on_sent(now)
 			-- Not the prediction's _inflight_backend: a dropped step is left to finish
 			-- and ignored, and the next request on that backend cancels it anyway.
 			backend.chat(target, model, messages, request_opts, nil, function(full_text, err)
@@ -1575,11 +1575,8 @@ end
 --- @param epoch integer The offer's _request_epoch.
 --- @param what string What the log names the request.
 --- @param send function Called when the request may go.
---- @param kind string|nil The backend kind ("ollama" or "api") the request goes
----   to; nil for the AI menu's.
-local function send_checked(epoch, what, send, kind)
+local function send_checked(epoch, what, send)
 	if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
-	kind = kind or M.get_backend()
 	local now = _clock_ms()
 	local blocked = global_privacy_blocks()
 	-- A resident barrier can dispatch scope changes, shutdown or a new offer.
@@ -1590,7 +1587,7 @@ local function send_checked(epoch, what, send, kind)
 		M.dismiss()
 		return
 	end
-	_debounce.plan:on_sent(kind, now)
+	_debounce.plan:on_sent(now)
 	send()
 end
 
@@ -2380,7 +2377,7 @@ local function run_agent(source, text, opts)
 		system2_transport(chat, payload, function(full_text, err)
 			finish_agent(epoch, meta, config, tools, full_text, err)
 		end)
-	end, chat.kind)
+	end)
 	return true
 end
 
@@ -2558,12 +2555,12 @@ end
 --- @param send function Called when the request may go.
 local function send_when_free(generation, chat, what, send)
 	if _runtime_closed or _scope_owner or generation ~= _agent_generation then return end
-	local interval = Inference.min_interval_ms(chat.kind)
-	local verdict = _debounce.plan:on_dispatch({ backend = chat.kind, explicit = false }, _clock_ms())[1]
+	local interval = TriggerSettings.get(require("config_keys").LEAF.MIN_REQUEST_INTERVAL_MS)
+	local verdict = _debounce.plan:on_dispatch({ explicit = false }, _clock_ms())[1]
 	local wait_ms = verdict.action == "defer" and verdict.delay_ms or 0
 	local busy = type(chat.module.is_active) == "function" and chat.module.is_active() == true
 	if wait_ms > 0 or busy then
-		local delay_ms = math.max(wait_ms, busy and interval or 0)
+		local delay_ms = math.max(wait_ms, busy and math.max(interval, _debounce.busy_recheck_ms) or 0)
 		Logger.debug(LOG, "%s waits %d ms for its backend.", what, delay_ms)
 		_agent_timer = _scheduler.after(delay_ms / 1000, function()
 			_agent_timer = nil
@@ -2575,7 +2572,7 @@ local function send_when_free(generation, chat, what, send)
 		end
 		return
 	end
-	_debounce.plan:on_sent(chat.kind, _clock_ms())
+	_debounce.plan:on_sent(_clock_ms())
 	send()
 end
 

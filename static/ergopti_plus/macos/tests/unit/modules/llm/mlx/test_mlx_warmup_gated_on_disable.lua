@@ -389,7 +389,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 				llm_enabled = false, llm_temperature = 0.1, llm_context_length = 4000,
 				llm_min_words = 2, llm_max_words = 0, llm_num_predictions = 3,
 				llm_pred_indent = 0, llm_val_modifiers = { "alt" }, llm_nav_modifiers = { "ctrl" },
-				llm_show_info_bar = false, llm_sequential_mode = false, llm_debounce = 0.3,
+				llm_show_info_bar = false, llm_sequential_mode = false, llm_debounce = 0.3, llm_min_request_interval = 0,
 				llm_auto_raise_temp = true, llm_streaming = false, llm_streaming_multi = false,
 				llm_instant_on_word_end = false,
 			},
@@ -419,7 +419,6 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 		package.loaded["modules.llm.api_common"] = {
 			MIN_CALL_INTERVAL_SEC = 0.5,
 			get_retry_policy = function() return 2, 0.18, 5 end,
-			get_rate_limit_min_interval_s = function(_) return 0 end,
 		}
 		package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 		package.loaded["ui.tooltip"] = {

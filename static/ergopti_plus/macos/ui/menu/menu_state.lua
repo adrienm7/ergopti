@@ -419,6 +419,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			{ fn = "set_llm_after_hotstring",         val = state.llm_after_hotstring },
 			{ fn = "set_llm_auto_raise_temp",         val = state.llm_auto_raise_temp },
 			{ fn = "set_llm_debounce",                val = state.llm_debounce },
+			{ fn = "set_llm_min_request_interval",    val = state.llm_min_request_interval },
 			{ fn = "set_llm_backend_name",            val = backend_labels[state.llm_backend] or state.llm_backend },
 			{ fn = "set_llm_display_model_name",      val = state.llm_model },
 			{ fn = "set_llm_context_length",          val = state.llm_context_length },

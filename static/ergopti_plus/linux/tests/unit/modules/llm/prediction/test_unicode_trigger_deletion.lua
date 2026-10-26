@@ -45,7 +45,11 @@ local function exercise(trigger, characters, raw_bytes)
 		end,
 	}
 	package.loaded["modules.llm.trigger_settings"] = {
-		get = function(key) if key == "debounce_ms" then return 0 end; return false end,
+		get = function(key)
+			if key == "debounce_ms" then return 0 end
+			if key == "min_request_interval_ms" then return 300 end
+			return false
+		end,
 		-- No application is excluded from the trigger here (llm.trigger.disabled_apps).
 		is_app_disabled = function() return false end,
 	}

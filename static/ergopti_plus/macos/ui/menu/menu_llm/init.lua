@@ -152,6 +152,7 @@ M.DEFAULT_STATE = {
 		llm_enabled           = llm_mod.DEFAULT_STATE.llm_enabled,
 		llm_backend           = Manifest.default_for("llm.models.selected"),
 		llm_debounce          = llm_mod.DEFAULT_STATE.llm_debounce,
+		llm_min_request_interval = llm_mod.DEFAULT_STATE.llm_min_request_interval,
 		llm_model             = is_apple_silicon and llm_mod.DEFAULT_STATE.llm_model_mlx or llm_mod.DEFAULT_STATE.llm_model_ollama,
 		llm_model_ollama      = llm_mod.DEFAULT_STATE.llm_model_ollama,
 		llm_model_mlx         = llm_mod.DEFAULT_STATE.llm_model_mlx,
