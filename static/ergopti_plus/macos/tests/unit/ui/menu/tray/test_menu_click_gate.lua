@@ -148,6 +148,19 @@ helpers.describe("menubar click gate", function()
 		helpers.assert_true(items[1].menu[1].fn == guarded, "a cached subtree is not wrapped twice")
 	end)
 
+	helpers.it("(menu-click-quit-wins) a Quit click during a reload runs at once and is never held or replayed", function()
+		local f = fixture()
+		local quits = 0
+		local quit = function() quits = quits + 1; return true end
+		local tree = f.gate.wrap({ { title = "Quit", bypasses_reload = true, fn = quit } })
+		f.terminal = true; f.reloading = true
+		helpers.assert_eq(tree[1].fn(), true, "the quit action's answer is forwarded")
+		helpers.assert_eq(quits, 1, "Quit runs while the reload is in flight")
+		helpers.assert_eq(#f.timers, 0, "no poll timer holds it")
+		helpers.assert_true(f.gate.handoff())
+		helpers.assert_eq(f.store[KEY], nil, "no Quit click is handed to the reloaded menu")
+	end)
+
 	helpers.it("(menu-click-reload-joins) a Reload click during a reload joins it instead of replaying a second reload", function()
 		local f = fixture()
 		local reloads = 0

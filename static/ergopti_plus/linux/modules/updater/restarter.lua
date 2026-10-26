@@ -61,22 +61,71 @@ end
 --- @param pid integer The process to outlive.
 --- @param wrapper string The installed launcher.
 --- @param args table The daemon's own arguments.
+--- @param cancel_path string|nil A marker file: when it exists once the process has
+---   exited, the relay removes it and does not start the launcher (Quit won over the reload).
 --- @return string
-function M.relay_command(pid, wrapper, args)
+function M.relay_command(pid, wrapper, args, cancel_path)
 	local argv = { ShellRunner.quote(wrapper) }
 	for _, value in ipairs(args or {}) do argv[#argv + 1] = ShellRunner.quote(tostring(value)) end
 	-- A zombie has exited: its parent may reap it late (or, as PID 1 in a
 	-- container, never), and kill -0 alone would wait on it forever.
 	-- stat embeds raw comm bytes, including newlines; status escapes that name
 	-- and supplies a separate State record safe to read one line at a time.
+	-- Checked after the wait: a Quit that abandons the reload creates the marker
+	-- while this process is still shutting down.
+	local cancel = ""
+	if cancel_path ~= nil then
+		local marker = ShellRunner.quote(cancel_path)
+		cancel = string.format(" if [ -e %s ]; then rm -f %s; exit 0; fi;", marker, marker)
+	end
 	local script = string.format("while kill -0 %d 2>/dev/null"
-		.. " && [ \"$(sed -n 's/^State:[[:space:]]*\\([A-Z]\\).*/\\1/p' /proc/%d/status 2>/dev/null)\" != Z ]; do sleep 0.2; done; exec %s",
-		pid, pid, table.concat(argv, " "))
+		.. " && [ \"$(sed -n 's/^State:[[:space:]]*\\([A-Z]\\).*/\\1/p' /proc/%d/status 2>/dev/null)\" != Z ]; do sleep 0.2; done;%s exec %s",
+		pid, pid, cancel, table.concat(argv, " "))
 	-- Keep dispatch in the foreground until the detached shell has forked its
 	-- relay. An outer '&' reports success even when setsid cannot start at all,
 	-- which would authorize shutdown with no process left to launch the update.
 	return "setsid sh -c " .. ShellRunner.quote("(" .. script .. ") </dev/null >/dev/null 2>&1 &")
 		.. " </dev/null >/dev/null 2>&1"
+end
+
+--- The marker a Quit creates to stop the relay of this process from starting the launcher.
+--- It sits beside the bootstrap storage file, the per-user private location the driver
+--- already owns for its restart handoffs (infra/restart_pause.lua), so it never depends on
+--- XDG_RUNTIME_DIR.
+--- @param pid integer The relay's target process.
+--- @return string path
+function M.cancel_path(pid)
+	return require("adapters.storage").path() .. ".relay-cancel-" .. tostring(pid)
+end
+
+--- Cancels the restart that restart() requested, for a Quit that wins over a reload.
+--- Under the unit, a stop job replaces the queued restart job; with a relay, the marker
+--- tells the relay not to start the launcher once this process has exited.
+--- @param how string "systemd" or "relay", as restart() returned.
+--- @param opts table|nil { run?, pid? }
+--- @return boolean cancelled
+--- @return string|nil detail Why the restart could not be cancelled.
+function M.cancel(how, opts)
+	opts = opts or {}
+	local run = opts.run or ShellRunner.run
+	if how == "systemd" then
+		if run("systemctl --user --no-block stop " .. M.UNIT) then
+			Logger.info(LOG, "The pending restart was replaced by a stop.")
+			return true
+		end
+		return false, "systemctl refused the stop"
+	end
+	if how == "relay" then
+		local pid = opts.pid or M.own_pid()
+		if not pid then return false, "own process id unreadable" end
+		local path = M.cancel_path(pid)
+		if not run("touch " .. ShellRunner.quote(path)) then
+			return false, "the relay cancellation marker could not be written"
+		end
+		Logger.info(LOG, "The restart relay was told not to start the launcher.")
+		return true
+	end
+	return false, "no restart is pending"
 end
 
 --- Starts the installed version in place of this process.
@@ -114,7 +163,7 @@ function M.restart(opts)
 			Logger.error(LOG, "Own process id unreadable — the update applies at the next start.")
 			return nil
 		end
-		if not run(M.relay_command(pid, opts.wrapper, opts.args)) then
+		if not run(M.relay_command(pid, opts.wrapper, opts.args, M.cancel_path(pid))) then
 			Logger.error(LOG, "The restart relay could not be started — the update applies at the next start.")
 			return nil
 		end

@@ -36,6 +36,29 @@ local function fixture(cgroup, context, accepted)
 end
 
 helpers.describe("daemon restart", function()
+	helpers.it("(quit-wins-over-reload) cancels the restart it requested, once", function()
+		DaemonRestart._reset_for_test()
+		local none, why = DaemonRestart.cancel({ restarter = Restarter })
+		helpers.assert_eq(none, false)
+		helpers.assert_contains(why, "no restart")
+		local opts, record = fixture(UNIT_CGROUP, nil)
+		helpers.assert_eq(DaemonRestart.restart(opts), "systemd")
+		helpers.assert_eq(DaemonRestart.cancel({ restarter = Restarter, run = opts.run }), true)
+		helpers.assert_eq(record.commands[2], "systemctl --user --no-block stop " .. Restarter.UNIT)
+		helpers.assert_eq(DaemonRestart.cancel({ restarter = Restarter, run = opts.run }), false,
+			"the restart is no longer pending")
+	end)
+
+	helpers.it("(quit-wins-over-reload) keeps the restart pending when it cannot be cancelled", function()
+		DaemonRestart._reset_for_test()
+		local opts = fixture(UNIT_CGROUP, nil)
+		helpers.assert_eq(DaemonRestart.restart(opts), "systemd")
+		local cancelled = DaemonRestart.cancel({ restarter = Restarter, run = function() return false end })
+		helpers.assert_eq(cancelled, false)
+		helpers.assert_eq(DaemonRestart.cancel({ restarter = Restarter, run = function() return true end }), true,
+			"a refused cancellation can be retried")
+	end)
+
 	helpers.it("asks systemd to restart the user unit without resolving an installation", function()
 		local opts, record = fixture(UNIT_CGROUP, nil)
 		helpers.assert_eq(DaemonRestart.restart(opts), "systemd")

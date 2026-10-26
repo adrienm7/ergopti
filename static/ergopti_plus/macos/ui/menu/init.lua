@@ -1049,35 +1049,64 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return do_reload("menu")
 		end,
 		quit                      = function()
-			-- The refusal is decided by the one admission both drivers share
-			-- (_shared/lua/quit_admission.lua); run_global_exclusive and the coordinator
-			-- below stay the authority and refuse again on a race.
-			local decision = QuitAdmission.decide({
-				owner_available = global_actions_owner ~= nil
-					and type(global_actions_owner.run_exclusive) == "function"
-					and type(global_actions_owner.is_exclusive_blocked) == "function",
-				terminal_pending = TerminationCoordinator.is_pending() == true,
-				writer_active = global_actions_owner ~= nil
-					and global_actions_owner.is_exclusive_blocked() == true,
-				publication_pending = require("modules.hotstrings.hotstrings_config")
-					.terminal_admission_blocked() == true,
+			-- What Quit does is decided by the one admission both drivers share
+			-- (_shared/lua/quit_admission.lua): it wins over a reload in flight (the
+			-- coordinator upgrades that reload to this exit), waits for a running
+			-- configuration write or publication up to the user-quit deadline, and is
+			-- refused only for a missing owner or an exit already under way.
+			local function start_exit(decision)
+				-- request_user_exit arms the bounded quit watchdog: once accepted, a stuck
+				-- fence, input drain, or teardown force-exits instead of hanging the app.
+				local function request()
+					local request_ok, request_accepted = xpcall(function()
+						return TerminationCoordinator.request_user_exit("menu_quit")
+					end, debug.traceback)
+					return request_ok and request_accepted == true
+				end
+				-- A reload in flight makes run_exclusive refuse on terminal quiescence;
+				-- the coordinator's own reload-to-exit upgrade is what Quit asks for.
+				local accepted
+				if decision.abandon_reload then
+					accepted = request()
+				else
+					accepted = run_global_exclusive("Quit", request)
+				end
+				if accepted ~= true then
+					FeatureNotice.quit_refused(notice_ports, i18n.get)
+				end
+				return accepted
+			end
+			local pending_kind = TerminationCoordinator.pending_kind
+			local started = false
+			local state = QuitAdmission.await({
+				facts = function()
+					local kind = pending_kind()
+					return {
+						owner_available = global_actions_owner ~= nil
+							and type(global_actions_owner.run_exclusive) == "function"
+							and type(global_actions_owner.is_exclusive_blocked) == "function",
+						exit_pending = kind ~= nil and kind ~= "reload",
+						reload_pending = kind == "reload",
+						writer_active = global_actions_owner ~= nil
+							and global_actions_owner.is_exclusive_blocked() == true,
+						publication_pending = require("modules.hotstrings.hotstrings_config")
+							.publication_pending() == true,
+					}
+				end,
+				schedule = function(delay, callback)
+					local _, committed = TimerScheduler.after(delay, callback)
+					return committed == true
+				end,
+				now = function() return hs.timer.absoluteTime() / 1e9 end,
+				timeout = require("infra.timings").sec("ui", "user_quit_deadline_ms"),
+				poll = 0.25,
+				on_admitted = function(decision) started = start_exit(decision) == true end,
+				on_refused = function(decision)
+					QuitAdmission.refuse(notice_ports, i18n.get, decision)
+				end,
+				warn = notice_ports.warn,
 			})
-			if not decision.admitted then
-				QuitAdmission.refuse(notice_ports, i18n.get, decision)
-				return false
-			end
-			-- request_user_exit arms the bounded quit watchdog: once accepted, a stuck
-			-- fence, input drain, or teardown force-exits instead of hanging the app.
-			local accepted = run_global_exclusive("Quit", function()
-				local request_ok, request_accepted = xpcall(function()
-					return TerminationCoordinator.request_user_exit("menu_quit")
-				end, debug.traceback)
-				return request_ok and request_accepted == true
-			end)
-			if accepted ~= true then
-				FeatureNotice.quit_refused(notice_ports, i18n.get)
-			end
-			return accepted
+			return state == "waiting" or started
 		end,
 		open_logs                 = function() return LogOpeners.open_logs_folder(open_async) end,
 		open_console              = function() return require("ui.console_window").open() end,
