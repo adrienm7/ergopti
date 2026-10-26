@@ -77,6 +77,7 @@ helpers.describe("LLM trigger settings: durable manifest-backed values", functio
 		local settings, storage = load_settings()
 		local manifest = require("infra.manifest_reader")
 		helpers.assert_eq(settings.get("min_request_interval_ms"), manifest.default_for("llm.trigger.min_request_interval_ms"))
+		helpers.assert_eq(settings.get("min_request_interval_ms"), 300, "the shipped interval is 300 ms")
 		helpers.assert_eq(settings.bounds("min_request_interval_ms"), { min = 0, max = 10000 })
 		helpers.assert_true(settings.set("min_request_interval_ms", 0), "0 turns the floor off")
 		helpers.assert_eq(storage.get("llm.trigger.min_request_interval_ms"), 0)
@@ -339,7 +340,7 @@ helpers.describe("LLM trigger settings: tray reachability", function()
 				if found then return found end
 			end
 		end
-		local row = find(menu, string.format(i18n.get("menu.llm.min_interval_label"), "500 ms"))
+		local row = find(menu, string.format(i18n.get("menu.llm.min_interval_label"), "300 ms"))
 		helpers.assert_not_nil(row, "the minimum interval row shows the default")
 		local preset = find(row.menu, "0 ms")
 		helpers.assert_not_nil(preset, "0 ms turns the floor off")

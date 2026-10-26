@@ -1552,8 +1552,8 @@ description_key = "menu.llm.trigger.debounce_ms"
 # entry is not declared there (reason_key).
 [[features.llm.trigger]]
 id = "min_request_interval_ms"
-default = 500
-recommended = 500
+default = 300
+recommended = 300
 input_altering = false
 type = "number"
 description_key = "menu.llm.trigger.min_request_interval_ms"
