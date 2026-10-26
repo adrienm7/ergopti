@@ -94,3 +94,27 @@ helpers.describe("FileSystem.directory_status", function()
 		end)
 	end)
 end)
+
+helpers.describe("FileSystem.followed_mode (config-backup-special-nodes)", function()
+	helpers.it("(config-backup-special-nodes) reports the followed mode without opening anything", function()
+		with_adapter(function(adapter, state)
+			state.followed = { mode = "named pipe" }
+			local status, mode = adapter.followed_mode("/fixture/pipe")
+			helpers.assert_eq(status, "present")
+			helpers.assert_eq(mode, "named pipe")
+		end)
+	end)
+
+	helpers.it("(config-backup-special-nodes) reports a dangling link as absent and any other refusal as an error", function()
+		with_adapter(function(adapter, state)
+			state.followed = nil
+			state.follow_error = "No such file or directory"
+			helpers.assert_eq((adapter.followed_mode("/fixture/dangling")), "absent")
+			state.follow_error = "Permission denied"
+			helpers.assert_eq((adapter.followed_mode("/fixture/denied")), "error")
+			state.throw = true
+			helpers.assert_eq((adapter.followed_mode("/fixture/throws")), "error")
+			helpers.assert_eq((adapter.followed_mode("relative")), "error")
+		end)
+	end)
+end)

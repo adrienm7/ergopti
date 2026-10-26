@@ -431,6 +431,27 @@ function M.directory_status(path)
 	return "present", attributes
 end
 
+--- Mode of what a path leads to, a symbolic link followed, without opening it
+--- (a FIFO or a device node would block an open).
+--- @param path string Absolute pathname to inspect.
+--- @return string status `present`, `absent` (nothing at the end of a dangling
+---   link) or `error`.
+--- @return string|nil detail The followed mode ("file", "directory", "named pipe",
+---   "socket", "char device", "block device", ...) on present, a diagnostic otherwise.
+function M.followed_mode(path)
+	if type(path) ~= "string" or path:sub(1, 1) ~= "/" then
+		return "error", "path must be an absolute pathname"
+	end
+	if not hs or not hs.fs or type(hs.fs.attributes) ~= "function" then
+		return "error", "hs.fs.attributes is unavailable"
+	end
+	local ok, followed, follow_err, errno = pcall(hs.fs.attributes, path)
+	if not ok then return "error", tostring(followed) end
+	if type(followed) == "table" then return "present", followed.mode end
+	if errno == 2 or tostring(follow_err):find("No such file", 1, true) then return "absent" end
+	return "error", tostring(follow_err or "cannot inspect the link target")
+end
+
 --- Splits a slash-separated path into its root and ordered components.
 --- Dot segments are deliberately preserved until preceding symlinks resolve.
 --- @param path string Filesystem path.
