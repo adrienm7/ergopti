@@ -197,6 +197,8 @@ helpers.describe("config-backup-native-metadata", function()
 					if mode == "denied" then assert(uv.fs_chmod(root, 448)) end
 					return attributes, message, code
 				end,
+				-- Links are followed through fs_stat only to classify their target.
+				fs_stat = uv.fs_stat,
 			}
 			local ok, err = pcall(function()
 				local Directory = helpers.load_module_with_dependency("infra.native_directory", "luv", backend)
