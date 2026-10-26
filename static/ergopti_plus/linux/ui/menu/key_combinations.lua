@@ -146,7 +146,10 @@ function M.build(ctx,ui)
 	local render={commands={},state_getters={key_combinations_enabled=function() return pairs.is_enabled()==true end}}
 	render.commands["key_combinations_toggle"]=function()
 		local source=snapshot();if not source then return feedback(false) end
-		return feedback(Scope.set_enabled(not pairs.is_enabled(),ctx.is_paused,source))
+		local desired=not pairs.is_enabled()
+		local committed=feedback(Scope.set_enabled(desired,ctx.is_paused,source))
+		if committed==true then require("ui.menu.feature_notice").feature(t("menu.shortcuts.key_combinations"),desired) end
+		return committed
 	end
 	render.commands["scope_restore"]=function()
 		local source=snapshot();if not source then return feedback(false) end

@@ -3990,6 +3990,7 @@ local function _build_shortcuts(ctx)
 		["selection_caps_word"] = function()
 			if not caps_word_ready() or sc.toggle_caps_word() ~= true then return false end
 			Logger.info(LOG, "CapsWord toggled: %s", tostring(sc.is_caps_word_active()))
+			require("ui.menu.feature_notice").feature(i18n_safe("sg_actions.caps_word"), sc.is_caps_word_active() == true)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end,

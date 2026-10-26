@@ -206,6 +206,30 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 		end)
 	end
 
+	helpers.it("announces each committed CapsWord switch with its new state and never a refused one (selection-caps-word)", function()
+		with_caps_word_menu(function(manager, row)
+			local saved, notices = package.loaded["ui.menu.feature_notice"], {}
+			package.loaded["ui.menu.feature_notice"] = { feature = function(label, enabled)
+				notices[#notices + 1] = { label, enabled }
+			end }
+			local ok, err = pcall(function()
+				helpers.assert_eq(row().fn(), true)
+				helpers.assert_eq(row().fn(), true)
+				helpers.assert_eq(#notices, 2)
+				helpers.assert_eq(notices[1][1], require("infra.i18n").get("sg_actions.caps_word"))
+				helpers.assert_eq(notices[1][2], true)
+				helpers.assert_eq(notices[2][2], false)
+				local owner = {}
+				helpers.assert_eq(manager.acquire_configuration(owner), true)
+				helpers.assert_eq(row().fn(), false)
+				helpers.assert_eq(#notices, 2, "a refused switch must stay silent")
+				helpers.assert_eq(manager.release_configuration(owner), true)
+			end)
+			package.loaded["ui.menu.feature_notice"] = saved
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	helpers.it("rechecks a real reservation acquired inside protected metric delivery (selection-caps-word)", function()
 		with_caps_word_menu(function(manager, row, changed)
 			local owner, observed = {}, {}
