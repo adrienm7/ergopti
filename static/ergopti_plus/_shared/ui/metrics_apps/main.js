@@ -323,7 +323,7 @@ function updateCharts(appsArray, aggregatedData) {
 
 		let tlKeys = Object.keys(aggregatedData.timeline);
 		if (currentPeriod === 'day') tlKeys.sort((a, b) => parseInt(a) - parseInt(b));
-		else tlKeys.reverse();
+		else tlKeys.sort((a, b) => parseDateKey(a) - parseDateKey(b));
 
 		const uniqueCats = new Set();
 		tlKeys.forEach((k) =>
@@ -354,7 +354,7 @@ function updateCharts(appsArray, aggregatedData) {
 		timelineChart = new Chart(tlCtx.getContext('2d'), {
 			type: 'bar',
 			data: {
-				labels: tlKeys.map((k) => (currentPeriod === 'day' ? k + 'h' : k)),
+				labels: tlKeys.map((k) => (currentPeriod === 'day' ? k + 'h' : formatDisplayDate(k))),
 				datasets: datasets
 			},
 			options: {
