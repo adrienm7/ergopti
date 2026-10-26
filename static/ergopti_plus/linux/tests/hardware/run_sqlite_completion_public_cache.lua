@@ -49,7 +49,9 @@ for _,tbl in ipairs({"agg_app_day","agg_app_day_errors","agg_app_day_session"}) 
  checks=checks+1
  local ok,err=xpcall(function()
   if tbl=="agg_app_day" then
-   assert(result==nil and reason=="SQLite projection unavailable","unreadable categories must refuse the complete public dashboard")
+   -- Categories live in the app category file, so a hidden SQLite table only degrades the manifest.
+   assert(type(result)=="table" and reason==nil and partial~=nil,"a hidden primary table must keep the partial public manifest")
+   assert((partial.llm_chars or 0)==0,"a hidden primary table must not report accepted software chars")
   else
    assert(type(result)=="table" and reason==nil and partial~=nil,"derived refusal must preserve the independently available partial manifest")
    assert(partial.llm_chars==3,"derived refusal lost the independently stored software chars")
