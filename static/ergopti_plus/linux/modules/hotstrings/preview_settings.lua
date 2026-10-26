@@ -36,6 +36,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Preferences = require("infra.hotstring_preferences")
 local ManifestReader = require("infra.manifest_reader")
+local ConfigKeys = require("config_keys")
 
 local LOG = "hotstrings.preview_settings"
 
@@ -45,10 +46,10 @@ local LOG = "hotstrings.preview_settings"
 -- An array rather than a map because the menu needs a stable order and a map
 -- has none; the lookups below index it once into `_by_name`.
 local TOGGLES = {
-	{ name = "star",        manifest = "hotstrings.preview_star_enabled",        label = "menu.hotstrings.tooltip_magic" },
-	{ name = "autocorrect", manifest = "hotstrings.preview_autocorrect_enabled", label = "menu.hotstrings.tooltip_autocorrect" },
-	{ name = "ai",          manifest = "hotstrings.preview_ai_enabled",          label = "menu.hotstrings.tooltip_ai" },
-	{ name = "colored",     manifest = "hotstrings.preview_colored_tooltips",    label = "menu.hotstrings.tooltip_colored" },
+	{ name = "star",        manifest = ConfigKeys.KEY.HOTSTRINGS_PREVIEW_STAR_ENABLED,        label = "menu.hotstrings.tooltip_magic" },
+	{ name = "autocorrect", manifest = ConfigKeys.KEY.HOTSTRINGS_PREVIEW_AUTOCORRECT_ENABLED, label = "menu.hotstrings.tooltip_autocorrect" },
+	{ name = "ai",          manifest = ConfigKeys.KEY.HOTSTRINGS_PREVIEW_AI_ENABLED,          label = "menu.hotstrings.tooltip_ai" },
+	{ name = "colored",     manifest = ConfigKeys.KEY.HOTSTRINGS_PREVIEW_COLORED_TOOLTIPS,    label = "menu.hotstrings.tooltip_colored" },
 }
 
 -- The manifest path is the canonical config.toml leaf: the two name the same

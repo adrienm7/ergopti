@@ -341,10 +341,10 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 		local current = entries.active()
 		return active ~= nil and current ~= nil and current.id == active.id
 	end
-	local test_row = ManifestMenu.command_row("llm_api_active_commands", "api_test_active", {
+	local test_row = ManifestMenu.command_row("llm_api_active_commands", require("config_keys").COMMAND.API_TEST_ACTIVE, {
 		api_test_active = function() return run_test(remote, dialogs, active, active_name) end,
 	}, { llm_api_active_ready = active_commands_ready })
-	local remove_row = ManifestMenu.command_row("llm_api_active_commands", "api_remove_active", {
+	local remove_row = ManifestMenu.command_row("llm_api_active_commands", require("config_keys").COMMAND.API_REMOVE_ACTIVE, {
 		api_remove_active = function()
 			local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return active_name end))
 			if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end

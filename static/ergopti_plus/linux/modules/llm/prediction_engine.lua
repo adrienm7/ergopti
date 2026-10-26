@@ -257,7 +257,7 @@ end
 
 -- Which backend answers: "ollama" (local) or "api" (a remote provider). The
 -- manifest declares the key and its default for every driver.
-local BACKEND_KEY = "llm.models.selected"
+local BACKEND_KEY = require("config_keys").KEY.LLM_MODELS_SELECTED
 local BACKENDS = { ollama = true, api = true }
 
 -- The backend module serving the request in flight, so dismiss cancels it.
@@ -292,7 +292,7 @@ end
 -- The stored setting is the only source: an in-memory override set at boot
 -- once shadowed the menu's choice for the whole session.
 local function max_context_chars()
-	return Settings.get("context_length") or HttpBridge.DEFAULT_CONTEXT_LENGTH
+	return Settings.get(require("config_keys").LEAF.CONTEXT_LENGTH) or HttpBridge.DEFAULT_CONTEXT_LENGTH
 end
 
 --- Validates native application identities without accepting labels as a fallback.
@@ -327,8 +327,8 @@ end
 local function _is_secure_context()
 	local blocked, app_id = global_privacy_blocks()
 	if blocked then return true end
-	local secure_enabled = TriggerSettings.get("secure_filter_enabled")
-	local url_enabled = TriggerSettings.get("url_bar_filter_enabled")
+	local secure_enabled = TriggerSettings.get(require("config_keys").LEAF.SECURE_FILTER_ENABLED)
+	local url_enabled = TriggerSettings.get(require("config_keys").LEAF.URL_BAR_FILTER_ENABLED)
 	if secure_enabled == nil then secure_enabled = HttpBridge.DEFAULT_DISABLE_PASSWORD_FIELDS end
 	if url_enabled == nil then url_enabled = HttpBridge.DEFAULT_DISABLE_URL_BARS end
 	if not secure_enabled and not url_enabled then return false end
@@ -493,8 +493,8 @@ function _debounce.input(event)
 	local live_config_now = _live and live_config() or nil
 	_debounce.plan:configure({
 		enabled = _enabled,
-		debounce_ms = TriggerSettings.get("debounce_ms"),
-		instant_on_word_end = TriggerSettings.get("instant_on_word_end") == true,
+		debounce_ms = TriggerSettings.get(require("config_keys").LEAF.DEBOUNCE_MS),
+		instant_on_word_end = TriggerSettings.get(require("config_keys").LEAF.INSTANT_ON_WORD_END) == true,
 		live_debounce_ms = live_config_now and live_config_now.debounce_ms or false,
 	})
 	return _debounce.plan:on_input(event)
@@ -686,7 +686,7 @@ function M.on_char(ch, buffer, output_context)
 	-- always in live mode, whose tooltip would otherwise cover it at every
 	-- keystroke; with the "after a hotstring" setting otherwise.
 	if type(output_context) == "table" and output_context.hotstring_preview_visible == true
-		and (_live or TriggerSettings.get("after_hotstring") == true) then return end
+		and (_live or TriggerSettings.get(require("config_keys").LEAF.AFTER_HOTSTRING) == true) then return end
 	if _live then
 		-- The live prompt, count and debounce replace the menu's; a new keystroke
 		-- has already withdrawn the request in flight above.
@@ -708,7 +708,7 @@ function M.on_hotstring_expired(context, output_context)
 	arm_agent(context, output_context)
 	if not _enabled then return false end
 	-- Live mode held its request back while the preview was shown (on_char).
-	if not _live and TriggerSettings.get("after_hotstring") ~= true then return false end
+	if not _live and TriggerSettings.get(require("config_keys").LEAF.AFTER_HOTSTRING) ~= true then return false end
 	if _predicting or #_suggestions > 0 then M.dismiss() end
 	if _live then return schedule(context, output_context, { cause = "expiry" }, true) end
 	return schedule(context, output_context, { cause = "expiry" })
@@ -726,7 +726,7 @@ local function prompt_language()
 	local ok, I18n = pcall(require, "infra.i18n")
 	local locale = ok and type(I18n.get_locale) == "function" and I18n.get_locale() or nil
 	if type(locale) == "string" and locale ~= "" then return locale end
-	return require("infra.manifest_reader").default_for("script.locale")
+	return require("infra.manifest_reader").default_for(require("config_keys").KEY.SCRIPT_LOCALE)
 end
 
 --- The profile's name as the menu shows it, for the suggestions' info bar:
@@ -813,7 +813,7 @@ function M.predict(context, output_context, override)
 
 	local clean_context, trigger_chars = context_without_trigger(context,
 		type(output_context) == "table" and output_context.input_chars or 0)
-	local requested = override and override.num_predictions or ProfileSettings.get("num_predictions") or 1
+	local requested = override and override.num_predictions or ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS) or 1
 	-- A request naming its own prompt keeps it; otherwise the profile the user mapped
 	-- to the application typed in wins over the menu's.
 	local profile = override and override.profile
@@ -821,11 +821,11 @@ function M.predict(context, output_context, override)
 		or ProfileSettings.resolve(model)
 	if not profile then Logger.error(LOG, "Prediction profile catalogue is unavailable."); return end
 	local params = PromptBuilder.build_params(clean_context, {
-		max_words = Settings.get("max_words"),
-		min_words = override and override.min_words or Settings.get("min_words"),
+		max_words = Settings.get(require("config_keys").LEAF.MAX_WORDS),
+		min_words = override and override.min_words or Settings.get(require("config_keys").LEAF.MIN_WORDS),
 		num_predictions = requested,
 		temperature = Settings.get("temperature"),
-		auto_raise_temp = Settings.get("auto_raise_temp"),
+		auto_raise_temp = Settings.get(require("config_keys").LEAF.AUTO_RAISE_TEMP),
 		language = prompt_language(),
 		context_window_chars = max_context_chars(),
 	})
@@ -844,7 +844,7 @@ function M.predict(context, output_context, override)
 	local batching = require("llm.request_plan.batching").plan(profile.batch == true, requested)
 	local is_batch = batching.mode == "batch"
 	local base_temperature = Settings.get("temperature")
-	local auto_raise = Settings.get("auto_raise_temp") == true
+	local auto_raise = Settings.get(require("config_keys").LEAF.AUTO_RAISE_TEMP) == true
 	local system_prompt = resolve_system_prompt(profile, params, batching.per_call)
 	-- Empty is valid: the raw profile is its context alone, sent as the user turn.
 	if type(system_prompt) ~= "string" then
@@ -980,7 +980,7 @@ function M.predict(context, output_context, override)
 			if not request_current(false) then return end
 			streamed = streamed .. think_filter:feed(delta)
 			if DisplaySettings.get("streaming") ~= true then return end
-			if requested > 1 and DisplaySettings.get("streaming_multi") ~= true then return end
+			if requested > 1 and DisplaySettings.get(require("config_keys").LEAF.STREAMING_MULTI) ~= true then return end
 			local partials = parse_response(streamed, is_batch, trigger_chars)
 			publish(partials[#partials])
 		end, function(full_text, err, usage)
@@ -1005,7 +1005,7 @@ function M.predict(context, output_context, override)
 			Logger.info(LOG, "Prediction request complete: %d chars, %d candidates.", #clean, #candidates)
 			if request_index < batching.calls then
 				-- Shown now: the next variant may wait for the backend's interval.
-				if #candidates > 0 and DisplaySettings.get("streaming_multi") == true then publish() end
+				if #candidates > 0 and DisplaySettings.get(require("config_keys").LEAF.STREAMING_MULTI) == true then publish() end
 				dispatch()
 				return
 			end
@@ -1203,7 +1203,7 @@ local function start_live(prompt, source)
 		translation_target = prompt.translation_target }
 	Logger.info(LOG, "Live mode on from %s (prompt %s, count %s).", source, profile.id,
 		prompt.num_predictions and tostring(prompt.num_predictions) or "from the menu")
-	local count = prompt.num_predictions or ProfileSettings.get("num_predictions") or 1
+	local count = prompt.num_predictions or ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS) or 1
 	local template = i18n.get(LIVE_ON_KEY)
 	local at = template:find("{1}", 1, true)
 	local label = ProfileSettings.menu_label(profile, count)
@@ -1447,8 +1447,8 @@ function M.shift_tone(direction, cycle)
 		local backend, target, model, runtime_response = M.resolve_backend()
 		if not backend then return false end
 		local system_prompt = resolve_system_prompt(profile, {
-			min_words = Settings.get("min_words"),
-			max_words = Settings.get("max_words"),
+			min_words = Settings.get(require("config_keys").LEAF.MIN_WORDS),
+			max_words = Settings.get(require("config_keys").LEAF.MAX_WORDS),
 			language = prompt_language(),
 		}, 1)
 		if type(system_prompt) ~= "string" or system_prompt == "" then
@@ -3324,15 +3324,15 @@ function M.enable(on_changed)
 	local Preferences = require("infra.llm_preferences")
 	local modal_generation_offset = 0
 	local function snapshot()
-		local values, source = Preferences.get_many({ BACKEND_KEY, "llm.models.ollama", "llm.enabled" })
+		local values, source = Preferences.get_many({ BACKEND_KEY, require("config_keys").KEY.LLM_MODELS_OLLAMA, require("config_keys").KEY.LLM_ENABLED })
 		local backend = M.get_backend()
 		return {
-			backend = backend, model = values["llm.models.ollama"], origin = M.get_base_url(),
+			backend = backend, model = values[require("config_keys").KEY.LLM_MODELS_OLLAMA], origin = M.get_base_url(),
 			generation = Preferences.generation() + _enable_generation
 				- modal_generation_offset, source = source,
-			enabled = values["llm.enabled"], paused = _is_paused(),
-			blocked = _scope_owner ~= nil or not Preferences.admit() or _enabled ~= values["llm.enabled"]
-				or (backend == "ollama" and M.get_current_model() ~= values["llm.models.ollama"])
+			enabled = values[require("config_keys").KEY.LLM_ENABLED], paused = _is_paused(),
+			blocked = _scope_owner ~= nil or not Preferences.admit() or _enabled ~= values[require("config_keys").KEY.LLM_ENABLED]
+				or (backend == "ollama" and M.get_current_model() ~= values[require("config_keys").KEY.LLM_MODELS_OLLAMA])
 				or _runtime_closed,
 		}
 	end
@@ -3478,7 +3478,7 @@ function M.enable(on_changed)
 				if not result or not result.saved or not result.entry then return nil end
 				local source = Entries.capture_source()
 				local function selection_current(phase)
-					local values, live_source = Preferences.get_many({ BACKEND_KEY, "llm.models.ollama", "llm.enabled" })
+					local values, live_source = Preferences.get_many({ BACKEND_KEY, require("config_keys").KEY.LLM_MODELS_OLLAMA, require("config_keys").KEY.LLM_ENABLED })
 					local active = Entries.active()
 					-- Only the backend owner's second admission observes its one revision
 					-- advance. A reset or preference rewrite during dismissal cannot borrow
@@ -3486,8 +3486,8 @@ function M.enable(on_changed)
 					local expected_revision = selection_revision + (phase == "after" and 1 or 0)
 					return not _is_paused() and M.can_configure_local_servers() and not _enabled
 						and _enable_generation == expected_revision and Preferences.generation() == preference_revision
-						and values["llm.enabled"] == false and values[BACKEND_KEY] == captured.backend
-						and values["llm.models.ollama"] == captured.model
+						and values[require("config_keys").KEY.LLM_ENABLED] == false and values[BACKEND_KEY] == captured.backend
+						and values[require("config_keys").KEY.LLM_MODELS_OLLAMA] == captured.model
 						and live_source.status == captured.source.status and live_source.content == captured.source.content
 						and source ~= nil and Entries.source_is_current(source)
 						and active ~= nil and active.id == result.entry.id and active.model == replacement.model
@@ -3805,7 +3805,7 @@ function M.set_model(model_name)
 		return not _runtime_closed and _scope_owner == nil
 			and revision == _enable_generation and app_epoch == _runtime_app_epoch
 	end
-	local _, source = require("infra.llm_preferences").get_many({ "llm.models.ollama" })
+	local _, source = require("infra.llm_preferences").get_many({ require("config_keys").KEY.LLM_MODELS_OLLAMA })
 	local profiles = get_profiles()
 	local selected = current() and profiles and type(profiles.set_model) == "function"
 		and profiles.set_model(model_name, source, current) == true and current() or false
@@ -3914,7 +3914,7 @@ function M.set_temperature(value) return Settings.set("temperature", tonumber(va
 function M.get_max_context() return max_context_chars() end
 
 function M.set_max_context(value)
-	return Settings.set("context_length", value)
+	return Settings.set(require("config_keys").LEAF.CONTEXT_LENGTH, value)
 end
 
 function M.get_stop_sequences() return {} end

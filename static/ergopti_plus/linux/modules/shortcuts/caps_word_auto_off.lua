@@ -36,10 +36,11 @@ local ConfigOutdated = require("config_outdated")
 local Policy = require("caps_word.auto_off")
 local EvdevCodes = require("infra.evdev_codes")
 local InputEvent = require("infra.input_event")
+local ConfigKeys = require("config_keys")
 
 local LOG = "modules.shortcuts.caps_word_auto_off"
 
-local SECTION = "shortcuts.caps_word"
+local SECTION = ConfigKeys.KEY.SHORTCUTS_CAPS_WORD
 local POINTER_SECTION = "shortcuts.caps_word.pointer"
 local IDLE_PATH = SECTION .. ".idle_timeout_seconds"
 local TERMINATORS_PATH = SECTION .. ".terminators"

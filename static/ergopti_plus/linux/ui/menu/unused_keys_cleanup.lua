@@ -56,7 +56,7 @@ function M.collect(decoded, mark)
 	end
 	require("modules.llm.profiles").mark_config_reads(decoded, mark)
 	require("modules.llm.agent_settings").mark_config_reads(decoded, mark)
-	require("infra.llm_preferences").mark_config_read(decoded, "llm.models.selected", mark, function(value)
+	require("infra.llm_preferences").mark_config_read(decoded, require("config_keys").KEY.LLM_MODELS_SELECTED, mark, function(value)
 		return require("modules.llm.prediction_engine").is_backend(value)
 	end)
 	require("modules.updater.manager").mark_config_reads(decoded, mark)

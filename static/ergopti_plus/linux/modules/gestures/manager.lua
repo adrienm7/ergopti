@@ -62,6 +62,7 @@ local DesktopNavigation = require("desktop_navigation")
 local SystemActions = require("modules.gestures.system_actions")
 local TableUtil = require("table_util")
 local TextUtils = require("text_utils")
+local ConfigKeys = require("config_keys")
 
 -- Retain the admitted issuer at owner construction. Later module/export swaps
 -- cannot appoint another producer or certify unavailable custody.
@@ -79,7 +80,7 @@ local function emitter_authority_current()
 		and rawequal(rawget(_emitter_owner, "can_fallback"), _emitter_certify)
 end
 local LOG = "modules.gestures.manager"
-local ENABLED_PATH = "gestures.enabled"
+local ENABLED_PATH = ConfigKeys.KEY.GESTURES_ENABLED
 local DEFAULT_ENABLED = Manifest.default_for(ENABLED_PATH)
 
 if type(DEFAULT_ENABLED) ~= "boolean" then
@@ -1564,7 +1565,7 @@ function M.get_picker_parameter_fields(items, binding)
 		prompt_choices = ProfileSettings.choices(),
 		vision_choices = require("modules.llm.vision_request").backend_choices(),
 		language_choices = require("modules.llm.translation").choices(),
-		default_count = ProfileSettings.get("num_predictions"),
+		default_count = ProfileSettings.get(ConfigKeys.LEAF.NUM_PREDICTIONS),
 		edit_current_label = i18n.get("dialog.action_picker.edit_current"),
 		parameter_strings = {
 			save = i18n.get("button.save"),

@@ -3,6 +3,7 @@
 --- Joins four captured Linux claim families and configured Magic Key/wrap-symbol/prediction consumers to the original physical-chord source.
 --- This preflight is partial; it never publishes all-owner or output readiness.
 local Policy = require("shortcuts.physical_conflicts")
+local ConfigKeys = require("config_keys")
 local M = {}
 local conflicts = Policy.conflicts
 
@@ -64,7 +65,7 @@ function M.new(keyboard, taps, combinations, manager, capture)
 		end
 		local requests, candidates = {}, {}
 		for _, update in ipairs(updates) do
-			if update.section == "shortcuts.keyboard" and update.delete ~= true and update.value ~= "none" then
+			if update.section == ConfigKeys.KEY.SHORTCUTS_KEYBOARD and update.delete ~= true and update.value ~= "none" then
 				local row, code = descriptor(update.key), native_code(update.key)
 				if not row or type(code) ~= "number" then return false, "save_failed" end
 				requests[#requests + 1] = { code = code, mods = row.mods }
