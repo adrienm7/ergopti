@@ -381,7 +381,7 @@ _LTR_NewTriggerSupersedes() {
 		_LPP_Answer(Calls[1], "TRANSLATION: Trop tard")
 		AssertEqual(0, _Stub_LlmTooltipCalls.Length, "the superseded answer is not shown")
 		AssertEqual(1, _LPP_LinesWith(Lines, "INFO", "newer translation superseded"), "its drop is logged")
-		AssertFalse(_LLM_Translate_RenderIsCurrent(_LLM_Translate_Generation - 1, LLM_AuxGeneration()),
+		AssertFalse(_LLM_Translate_RenderIsCurrent(_LLM_Translate_Generation - 1, LLM_AuxGeneration(), KS_GetPhysicalInputGeneration()),
 			"an older translation can no longer paint")
 		_LPP_Answer(Calls[2], "TRANSLATION: 明日会いましょう")
 		Final := _LPP_LastFinalRender()
