@@ -5,7 +5,11 @@
  * MODULE: Metrics Default-Category Alias Generator
  * DESCRIPTION:
  * Emits _shared/data/metrics_general_category_aliases.json — every localised
- * spelling of the metrics "General" category, in every shipped locale.
+ * spelling of the metrics "General" category, in every shipped locale — and
+ * the page-data script _shared/ui/_generated/metrics_general_category_aliases.js
+ * built from the same document (a page cannot read the JSON file, so the apps
+ * dashboard loads the script and helpers.js folds each spelling into the
+ * canonical "general" id).
  *
  * WHY THIS FILE HAS TO EXIST:
  * The metrics app picker persists a user's category choice into
@@ -73,7 +77,41 @@ function collect() {
 	return out;
 }
 
-module.exports = { collect, KEY, OUT };
+const SCRIPT_OUT = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'ui',
+	'_generated',
+	'metrics_general_category_aliases.js'
+);
+
+/**
+ * Renders the page-data script of a document produced by this generator.
+ * @param {{aliases: string[]}} doc The alias document.
+ * @returns {string} The script text, LF terminated.
+ */
+function renderScript(doc) {
+	return (
+		'// _shared/ui/_generated/metrics_general_category_aliases.js\n\n' +
+		'// ==========================================\n' +
+		'// AUTO-GENERATED — do not edit manually\n' +
+		'// Source: static/ergopti_plus/_shared/data/metrics_general_category_aliases.json\n' +
+		'// Run: node tools/build/gen-metrics-category-aliases.cjs\n' +
+		'// ==========================================\n\n' +
+		'// Every localised spelling of the metrics default category, as page data.\n' +
+		'// metrics_apps/helpers.js folds each one into the canonical "general" id.\n' +
+		'(function (global) {\n' +
+		"\t'use strict';\n" +
+		'\tglobal.GeneralCategoryAliases = Object.freeze(' +
+		JSON.stringify(doc.aliases) +
+		');\n' +
+		'})(typeof window !== "undefined" ? window : globalThis);\n'
+	);
+}
+
+module.exports = { collect, renderScript, KEY, OUT, SCRIPT_OUT };
 
 if (require.main === module) {
 	const byLocale = collect();
@@ -90,6 +128,8 @@ if (require.main === module) {
 	};
 	fs.mkdirSync(path.dirname(OUT), { recursive: true });
 	fs.writeFileSync(OUT, JSON.stringify(doc, null, '\t') + '\n', 'utf8');
+	fs.mkdirSync(path.dirname(SCRIPT_OUT), { recursive: true });
+	fs.writeFileSync(SCRIPT_OUT, renderScript(doc), 'utf8');
 	console.log(
 		`[gen] ${aliases.length} distinct spelling(s) across ${Object.keys(byLocale).length} locale(s) → ${path.relative(ROOT, OUT)}`
 	);

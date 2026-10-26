@@ -96,6 +96,13 @@ actual.window = actual;
 installHostCapabilities(actual);
 actual.__ergopti_host_capabilities = { document_bridge: true };
 actual.webkit = { messageHandlers: { metrics_apps_bridge: { postMessage() {} } } };
+vm.runInContext(
+	fs.readFileSync(
+		path.join(path.dirname(PAGE), '../_generated/metrics_general_category_aliases.js'),
+		'utf8'
+	),
+	actual
+);
 for (const file of ['helpers.js', 'state.js', 'main.js']) {
 	vm.runInContext(fs.readFileSync(path.join(path.dirname(PAGE), file), 'utf8'), actual, {
 		filename: file
