@@ -40,6 +40,8 @@ local Logger      = require("logger.shim")
 local Policy      = require("diagnostics.error_policy")
 local DialogCore  = require("error_dialog.core")
 local Redact      = require("diagnostics.redact")
+local FileReader  = require("infra.regular_file_reader")
+local FileWriter  = require("infra.regular_file_writer")
 
 local LOG = "bridge.error_dialog"
 
@@ -437,14 +439,19 @@ end
 -- =================================
 -- =================================
 
---- Reads a whole small file.
+--- Reads an admitted regular source and requires its read and close receipts.
 --- @param path string
---- @return string|nil
+--- @return string|nil content
+--- @return string|nil failure
+--- @return number|string|nil errno
 local function read_file(path)
-	local fh = io.open(path, "rb")
-	if not fh then return nil end
-	local content = fh:read("*a")
-	fh:close()
+	local fh, detail, errno = FileReader.open_source(path)
+	if not fh then return nil, detail, errno end
+	local read_ok, content = pcall(fh.read, fh, "*a")
+	local close_ok, closed = pcall(fh.close, fh)
+	if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true then
+		return nil, "the crash notice source could not be read and closed"
+	end
 	return content
 end
 
@@ -480,17 +487,12 @@ function M.notify_last_crash(crash_dir)
 	local newest = Shell.exec_line("ls -1t " .. Shell.quote(crash_dir) .. " 2>/dev/null | grep -v '^%.' | head -n 1")
 	if type(newest) ~= "string" or newest == "" then return false end
 	local ack_path = crash_dir .. "/" .. CRASH_ACK_FILE
-	local acknowledged = read_file(ack_path)
-	if acknowledged and acknowledged:gsub("%s+$", "") == newest then return false end
-	-- Remembered before the window opens: a notice that crashes the daemon
-	-- again must not become a crash loop of notices
-	local fh = io.open(ack_path, "wb")
-	if not fh then
-		Logger.error(LOG, "The crash notice cannot be remembered in %s; it is not shown.", crash_dir)
+	local acknowledged, detail, errno = read_file(ack_path)
+	if acknowledged == nil and errno ~= FileReader.ENOENT then
+		Logger.error(LOG, "The crash notice marker cannot be read: %s.", tostring(detail))
 		return false
 	end
-	fh:write(newest, "\n")
-	fh:close()
+	if acknowledged == newest .. "\n" then return false end
 	local path = crash_dir .. "/" .. newest
 	local text = read_file(path)
 	if not text then
@@ -500,6 +502,21 @@ function M.notify_last_crash(crash_dir)
 	local module_name, message = M.parse_crash_dump(text)
 	if module_name == nil then
 		Logger.error(LOG, "The crash report %s cannot be shown: %s.", path, message)
+		return false
+	end
+	-- Remembered before the window opens: a notice that crashes the daemon
+	-- again must not become a crash loop of notices. Only a retained marker
+	-- authorizes presentation; a refused write never authorizes a notice.
+	local bytes = newest .. "\n"
+	local fh = FileWriter.open(ack_path, "w")
+	if not fh then
+		Logger.error(LOG, "The crash notice cannot be remembered in %s; it is not shown.", crash_dir)
+		return false
+	end
+	local write_ok, written = pcall(fh.write, fh, bytes)
+	local close_ok, closed = pcall(fh.close, fh)
+	if not write_ok or not written or not close_ok or closed ~= true or read_file(ack_path) ~= bytes then
+		Logger.error(LOG, "The crash notice marker could not be retained; it is not shown.")
 		return false
 	end
 	Logger.info(LOG, "The daemon crashed since the last start (%s); showing the notice.", newest)
