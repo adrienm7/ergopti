@@ -18,7 +18,7 @@ handle:close()
 require("test.config_backup_contract").register(helpers, { defaults = defaults })
 
 --- Lists a real temporary folder through the Linux listing port.
---- @param entries table { { name, kind } } with kind file, dir, link_file or link_dir
+--- @param entries table { { name, kind } } with kind file, dir, link_file, link_dir, fifo, link_fifo or link_dangling
 --- @param body function fn(list, root)
 local function real_listing(entries, body)
 	local function quote(value) return "'" .. tostring(value):gsub("'", "'\\''") .. "'" end
@@ -33,6 +33,9 @@ local function real_listing(entries, body)
 			dir = "mkdir " .. path,
 			link_file = "ln -s " .. quote(root .. "/elsewhere/file.toml") .. " " .. path,
 			link_dir = "ln -s " .. quote(root .. "/elsewhere/folder") .. " " .. path,
+			fifo = "mkfifo " .. path,
+			link_fifo = "mkfifo " .. quote(root .. "/elsewhere/pipe") .. " && ln -s " .. quote(root .. "/elsewhere/pipe") .. " " .. path,
+			link_dangling = "ln -s " .. quote(root .. "/elsewhere/missing.toml") .. " " .. path,
 		})[entry.kind]
 		assert(os.execute(command))
 	end

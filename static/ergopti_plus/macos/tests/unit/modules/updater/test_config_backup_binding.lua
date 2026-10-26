@@ -32,8 +32,15 @@ local function with_binding(tree, body)
 			path_status = function(path)
 				local kind = tree[path]
 				if not kind then return "absent" end
-				local mode = (kind == "link_file" or kind == "link_dir") and "link" or (kind == "dir" and "directory" or "file")
+				local mode = kind:find("^link_") and "link" or (kind == "dir" and "directory" or (kind == "fifo" and "named pipe" or "file"))
 				return "present", { mode = mode }
+			end,
+			followed_mode = function(path)
+				local kind = tree[path]
+				if kind == "link_dangling" then return "absent" end
+				if kind == "link_dir" then return "present", "directory" end
+				if kind == "link_fifo" then return "present", "named pipe" end
+				return "present", "file"
 			end,
 			directory_status = function(path)
 				local kind = tree[path]
@@ -85,7 +92,7 @@ helpers.describe("config_backup binding (macOS)", function()
 end)
 
 --- Lists a stubbed tree through the macOS listing port (the FileSystem adapter).
---- @param entries table { { name, kind } } with kind file, dir, link_file or link_dir
+--- @param entries table { { name, kind } } with kind file, dir, link_file, link_dir, fifo, link_fifo or link_dangling
 --- @param body function fn(list, root)
 local function stub_listing(entries, body)
 	local root = "/cfg"

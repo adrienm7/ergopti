@@ -10,7 +10,7 @@
 --- the owner is rebuilt on every call because the configuration folder can move.
 --- It also replays, through each driver's own listing port, the classification
 --- of folder entries: a link to a folder is reported and never walked, a link to
---- a file is a file, and an absent folder is reported as absent.
+--- a file is a file, a FIFO (or a link to one) is "other" and a dangling link a file, and an absent folder is reported as absent.
 --- ==============================================================================
 
 local M = {}
@@ -21,7 +21,7 @@ local M = {}
 ---   defaults = decoded _shared/modules/updater/defaults.json,
 ---   listing  = function(entries, body): builds the driver's real listing port
 ---              over entries { { name, kind } } (kind: "file", "dir", "link_file",
----              "link_dir") and calls body(list, root).
+---              "link_dir", "fifo", "link_fifo", "link_dangling") and calls body(list, root).
 --- }
 function M.register(helpers, env)
 	local Binding = require("updater.config_backup_binding")
@@ -140,12 +140,15 @@ function M.register(helpers, env)
 			helpers.assert_eq(binding.owner().folder, "/second/" .. env.defaults.config_backup.folder)
 		end)
 
-		helpers.it("(config-backup-binding-contract) classifies entries and never walks a link to a folder", function()
+		helpers.it("(config-backup-binding-contract) classifies entries, never walks a link to a folder and never reads a special file", function()
 			env.listing({
 				{ name = "config.toml", kind = "file" },
 				{ name = "hotstrings", kind = "dir" },
 				{ name = "linked.toml", kind = "link_file" },
 				{ name = "loop", kind = "link_dir" },
+				{ name = "pipe.toml", kind = "fifo" },
+				{ name = "linked_pipe.toml", kind = "link_fifo" },
+				{ name = "dangling.toml", kind = "link_dangling" },
 			}, function(list, root)
 				local kinds = {}
 				for _, entry in ipairs(assert(list(root))) do kinds[entry.name] = entry.kind end
@@ -153,6 +156,11 @@ function M.register(helpers, env)
 				helpers.assert_eq(kinds["hotstrings"], "dir")
 				helpers.assert_eq(kinds["linked.toml"], "file")
 				helpers.assert_eq(kinds["loop"], "other")
+				-- Opening a FIFO blocks forever: only a regular file is ever read.
+				helpers.assert_eq(kinds["pipe.toml"], "other")
+				helpers.assert_eq(kinds["linked_pipe.toml"], "other")
+				-- A dangling link has nothing to block on: the read refuses it.
+				helpers.assert_eq(kinds["dangling.toml"], "file")
 			end)
 		end)
 
