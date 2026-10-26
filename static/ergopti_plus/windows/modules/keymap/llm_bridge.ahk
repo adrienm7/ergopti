@@ -1399,6 +1399,9 @@ LLM_Bridge_DeferTooltipHide(accepted := false, ExpectedRecord := 0) {
 		? ExpectedRecord : LLM_Tooltip_GetPresentedToken()
 	if !IsObject(Record)
 		return false
+	Record := LLM_Tooltip_WithdrawExact(Record, accepted)
+	if !IsObject(Record)
+		return false
 	SetTimer(_LLM_Bridge_DeferredTooltipHide.Bind(Record, accepted), -1)
 	return true
 }

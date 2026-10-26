@@ -107,6 +107,10 @@ LLM_Tooltip_Hide(accepted := false) {
 	return LLM_TooltipHide(accepted)
 }
 
+LLM_Tooltip_WithdrawExact(ExpectedRecord, accepted := false) {
+	return LLM_TooltipWithdrawExact(ExpectedRecord, accepted)
+}
+
 LLM_Tooltip_HideExact(ExpectedRecord, accepted := false) {
 	return LLM_TooltipHide(accepted, unset, unset, ExpectedRecord)
 }
