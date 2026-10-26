@@ -106,10 +106,30 @@ class TrayStartupClick {
 				this.CloseFn.Call()
 			return false
 		}
+		Generation := this.Generation
 		this.Pending := false
 		this.Scheduled := true
-		this.ScheduleFn.Call(ObjBindMethod(this, "ShowPending", this.Generation), -1)
+		try this.ScheduleFn.Call(ObjBindMethod(this, "ShowPending", Generation), -1)
+		catch as Err {
+			this._RetainPending(Generation)
+			throw Err
+		}
 		return true
+	}
+
+	/** Retains undelivered navigation without reviving a canceled generation. */
+	_RetainPending(Generation) {
+		PreviousCritical := Critical("On")
+		try {
+			if Generation != this.Generation
+				return false
+			; The failed producer may already hold its callback. Revoke that
+			; exact generation before a fresh readiness notification can retry.
+			this.Generation += 1
+			this.Pending := true
+			this.Scheduled := false
+			return true
+		} finally Critical(PreviousCritical)
 	}
 
 	CancelPending() {
@@ -119,8 +139,15 @@ class TrayStartupClick {
 	}
 
 	ShowPending(Generation) {
-		if Generation != this.Generation || !this.ReadyFn.Call()
-			return
+		if Generation != this.Generation
+			return false
+		Ready := this.ReadyFn.Call()
+		if Generation != this.Generation
+			return false
+		if !Ready {
+			this._RetainPending(Generation)
+			return false
+		}
 		this.Scheduled := false
 		try LoggerInfo("BootProfile", Format("Opening the ready tray after {1} early request(s); request wait={2} ms.",
 			this.RequestCount, TickElapsed(this.RequestedAt)))
