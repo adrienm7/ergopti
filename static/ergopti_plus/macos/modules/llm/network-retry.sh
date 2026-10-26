@@ -569,7 +569,7 @@ apply_system_network() {
 		return $?
 	fi
 	local settings line
-	if [ -z "${HTTPS_PROXY:-}${https_proxy:-}${HTTP_PROXY:-}${http_proxy:-}${ALL_PROXY:-}${all_proxy:-}" ]; then
+	if [ -z "${http_proxy:-}${HTTP_PROXY:-}${https_proxy:-}${HTTPS_PROXY:-}${all_proxy:-}${ALL_PROXY:-}" ]; then
 		# Reuse the native getter; explicit inherited routes never trigger it.
 		settings="$(opaque_system_proxy_snapshot 2>/dev/null | system_network_from_scutil)" || settings=""
 		while IFS= read -r line; do

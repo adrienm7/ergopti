@@ -30,6 +30,23 @@ local function run(command)
 	return output
 end
 
+helpers.describe("managed-network-children: the HTTPS route precedence is the shared policy's (proxy-policy-single-source)", function()
+	helpers.it("builds the bootstrap guard from proxy_policy.json, not from a typed list", function()
+		package.loaded["modules.llm.network_env"] = nil
+		local NetworkEnv = require("modules.llm.network_env")
+		local Json = require("json")
+		local file = assert(io.open(helpers.shared("modules/network/proxy_policy.json"), "rb"))
+		local policy = assert(Json.decode(file:read("*a"))); file:close()
+		local expected = ""
+		for index = #policy.environment_precedence.https, 1, -1 do
+			expected = "${" .. policy.environment_precedence.https[index] .. ":-" .. expected .. "}"
+		end
+		helpers.assert_eq(NetworkEnv.https_route_expansion(), expected)
+		local prelude = assert(NetworkEnv.bootstrap_prelude("TEST", "/usr/bin/python3"))
+		helpers.assert_true(prelude:find('[ -z "' .. expected .. '" ]', 1, true) ~= nil, prelude)
+	end)
+end)
+
 helpers.describe("managed-network-children", function()
 	helpers.it("names the shared policy and exports the settings for the next command", function()
 		package.loaded["modules.llm.network_env"] = nil

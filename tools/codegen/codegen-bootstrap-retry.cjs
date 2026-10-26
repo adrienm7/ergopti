@@ -5,6 +5,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const proxyPrecedence = require('./codegen-proxy-precedence.cjs');
 const SOURCE = 'static/ergopti_plus/_shared/modules/network/bootstrap_retry.json';
 const SHELL = 'static/ergopti_plus/macos/modules/llm/network-retry.sh';
 const LUA = 'static/ergopti_plus/macos/modules/llm/bootstrap_retry_generated.lua';
@@ -24,7 +25,7 @@ function validate(data) {
 	return data;
 }
 
-function render(raw, shell) {
+function render(raw, shell, proxyPolicy = null) {
 	const data = validate(JSON.parse(raw));
 	if (JSON.stringify(data, null, '\t') + '\n' !== raw)
 		throw new TypeError('Bootstrap retry canonical bytes refused.');
@@ -39,6 +40,8 @@ function render(raw, shell) {
 			throw new TypeError('Bootstrap shell binding refused.');
 		shell = shell.replace(expression, `${name}=${data[key]}`);
 	}
+	// The script's two proxy expansions follow proxy_policy.json (one owner per output).
+	if (proxyPolicy) shell = proxyPrecedence.project(shell, proxyPolicy);
 	const digest = crypto.createHash('sha256').update(raw).digest('hex');
 	return {
 		[SHELL]: shell,
@@ -58,7 +61,8 @@ return {
 function generate(root = path.resolve(__dirname, '../..'), { check = false } = {}) {
 	const outputs = render(
 		fs.readFileSync(path.join(root, SOURCE), 'utf8'),
-		fs.readFileSync(path.join(root, SHELL), 'utf8')
+		fs.readFileSync(path.join(root, SHELL), 'utf8'),
+		JSON.parse(fs.readFileSync(path.join(root, proxyPrecedence.SOURCE), 'utf8'))
 	);
 	for (const [relative, bytes] of Object.entries(outputs)) {
 		const output = path.join(root, relative);

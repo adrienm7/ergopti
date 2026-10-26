@@ -54,6 +54,12 @@ const GENERATORS = [
 		]
 	},
 	{
+		// Patches the proxy expansions of release_stage.sh in place; network-retry.sh,
+		// owned by the generator above, takes the same projection from it.
+		script: 'codegen/codegen-proxy-precedence.cjs',
+		outputs: ['static/ergopti_plus/macos/adapters/release_stage.sh']
+	},
+	{
 		script: 'codegen/codegen-native-http-failure-stages.cjs',
 		outputs: [
 			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift',
