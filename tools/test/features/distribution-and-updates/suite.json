@@ -471,7 +471,7 @@
 		},
 		{
 			"id": "js-0481",
-			"ordinal": 500,
+			"ordinal": 501,
 			"name": "macOS journal retries and initial ledger publication recover from actual Common Linux write and close failures",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-journal-native-receipt.cjs"],
