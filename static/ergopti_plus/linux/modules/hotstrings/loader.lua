@@ -41,7 +41,7 @@ local M = {}
 -- =========================================
 
 local Logger = require("logger.shim")
-local Reader = require("toml_codec.reader")
+local Reader = require("infra.toml.reader")
 local Priority = require("hotstring_priority")
 local Paths  = require("infra.paths")
 local NativeDirectory = require("infra.native_directory")

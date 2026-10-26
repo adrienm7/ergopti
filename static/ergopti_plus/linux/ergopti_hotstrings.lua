@@ -2495,7 +2495,7 @@ local function main()
 				end,
 				build = function()
 					local ctx = context()
-					return build(ctx), ctx.paused == true
+					return require("ui.menu.timed_build").run(build, ctx), ctx.paused == true
 				end,
 				publish = publish,
 				appearance = type(set_paused) == "function" and function(paused) return set_paused(paused) end or nil,

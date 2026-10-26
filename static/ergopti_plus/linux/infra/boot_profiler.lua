@@ -28,6 +28,7 @@ local TableUtil = require("table_util")
 
 local Logger    = require("logger.shim")
 local Monotonic = require("infra.monotonic")
+local PhaseStats = require("infra.phase_stats")
 
 local LOG = "BootProfile"
 
@@ -111,7 +112,12 @@ function M.stage_done(name, detail)
 	end
 	local cpu_ms = _cpu_ms() - _open_cpu[name]
 	_open[name], _open_cpu[name] = nil, nil
-	_done_stages[#_done_stages + 1] = { name, Monotonic.now_ms() - started, cpu_ms }
+	local wall_ms = Monotonic.now_ms() - started
+	_done_stages[#_done_stages + 1] = { name, wall_ms, cpu_ms }
+	-- The same phases the macOS profiler records, so the summary line carries the
+	-- boot's stage count, wall time and CPU time next to the other families.
+	PhaseStats.add_ms("boot.stage", wall_ms)
+	PhaseStats.add_ms("boot.stage_cpu", cpu_ms)
 	local suffix = (type(detail) == "string" and detail ~= "") and (": " .. detail) or ""
 	Logger.success(LOG, "Boot stage '%s' done in %.0f ms (cpu %.0f ms)%s (total %.0f ms).",
 		name, Monotonic.now_ms() - started, cpu_ms, suffix, M.elapsed_ms())
