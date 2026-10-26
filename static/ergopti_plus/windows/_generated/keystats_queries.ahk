@@ -112,6 +112,9 @@ KeystatsQuery(Name, Params := Map()) {
 			["param", "where"],
 			["param", "conjunction"],
 			["literal", "NOT (typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real'))`;"]
+		],
+		"meta.rev", [
+			["literal", "SELECT value FROM meta WHERE key='rev'`;"]
 		]
 	)
 	if !Queries.Has(Name)

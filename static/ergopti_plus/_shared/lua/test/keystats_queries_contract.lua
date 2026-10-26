@@ -38,7 +38,12 @@ function M.register(helpers)
 						if not found then break end
 						count, at = count + 1, found + #WHERE
 					end
-					helpers.assert_true(count >= 1, name .. " splices the filter")
+					-- A query without a filter parameter (the revision read) has nothing to splice.
+					local takes_filter = false
+					for _, param in ipairs(Queries.params(name)) do
+						if param == "where" then takes_filter = true end
+					end
+					helpers.assert_true(count >= 1 or not takes_filter, name .. " splices the filter")
 					helpers.assert_true(not sql:find("{{", 1, true), name .. " leaves no placeholder")
 				end
 			end
