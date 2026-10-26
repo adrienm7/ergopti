@@ -3,10 +3,11 @@
 --- ==============================================================================
 --- MODULE: Typed-Text Cipher (Hammerspoon)
 --- DESCRIPTION:
---- macOS counterpart of linux/modules/keystats/text_cipher.lua. Runs the shared
---- at-rest codec (_shared/lua/keystats/text_crypto.lua) against the columns that
---- hold literal typed text, with a key derived once from this Mac's hardware
---- UUID.
+--- macOS counterpart of linux/modules/keystats/text_cipher.lua. Supplies the
+--- ports of the shared cipher policy (_shared/lua/keystats/text_cipher.lua),
+--- which runs the shared at-rest codec (_shared/lua/keystats/text_crypto.lua)
+--- against the columns that hold literal typed text, with a key derived once
+--- from this Mac's hardware UUID.
 ---
 --- WHAT THIS REPLACES:
 --- The "Chiffrement" menu entry used to call two empty stubs. It ticked its box,
@@ -59,27 +60,6 @@ local MACHINE_ID_COMMAND =
 	"/usr/sbin/ioreg -rd1 -c IOPlatformExpertDevice | " ..
 	"/usr/bin/awk -F'\"' '/IOPlatformUUID/{print $4}'"
 
-
-
-
-
--- ========================
--- ========================
--- ======= 2/ State =======
--- ========================
--- ========================
-
--- Whether at-rest encryption is active. Off by default, matching the shared
--- manifest's metrics.encrypt.
-local _enabled = false
-
--- Cached derived key (64 hex characters). nil until first use.
-local _key_hex = nil
-
--- Set once a derivation has failed, so a broken install does not re-run a
--- 600 000-iteration derivation on every flush.
-local _derivation_failed = false
-
 -- Overrides the machine-id command (test seam).
 local _machine_id_command_override = nil
 
@@ -89,17 +69,9 @@ local _machine_id_command_override = nil
 
 -- ==================================
 -- ==================================
--- ======= 3/ Key Derivation ========
+-- ======= 2/ Ports =================
 -- ==================================
 -- ==================================
-
---- Points the machine-id lookup at a specific command, or nil to restore.
---- @param command string|nil
-function M._set_machine_id_command(command)
-	_machine_id_command_override = (type(command) == "string" and command ~= "") and command or nil
-	_key_hex = nil
-	_derivation_failed = false
-end
 
 --- Runs one openssl command whose stdin is ciphertext, which may appear in the
 --- process table, and returns stdout after exit 0.
@@ -112,23 +84,18 @@ local function run_with_public_stdin(cmd, input)
 	return Shell.exec_checked(command)
 end
 
---- Derives and caches the session key. Runs at most once per process.
---- @return string|nil The 64-hex key, or nil when it cannot be derived.
-local function ensure_key()
-	if _key_hex then return _key_hex end
-	if _derivation_failed then return nil end
-
+--- Derives the key from the hardware UUID.
+--- @return string|nil The 64-hex key, or nil after logging why not.
+local function derive_key()
 	local machine_id = Shell.exec(_machine_id_command_override or MACHINE_ID_COMMAND)
 	machine_id = type(machine_id) == "string" and machine_id:gsub("%s+", "") or ""
 	if machine_id == "" then
-		_derivation_failed = true
 		Logger.error(LOG, "No hardware UUID available — at-rest encryption unavailable.")
 		return nil
 	end
 
 	local derive, reason = TextCrypto.derive_key_command("stdin")
 	if not derive then
-		_derivation_failed = true
 		Logger.error(LOG, "Cannot compose the key derivation: %s.", reason)
 		return nil
 	end
@@ -141,68 +108,16 @@ local function ensure_key()
 	local output, failure = Shell.exec_private_stdin(derive, machine_id)
 	local key = TextCrypto.parse_derived_key(output)
 	if not key then
-		_derivation_failed = true
 		Logger.error(LOG, "Key derivation produced no usable key — is openssl available? (%s)",
 			failure or "no key in its output")
 		return nil
 	end
-
-	_key_hex = key
-	Logger.success(LOG, "At-rest key derived (cached for this session).")
-	return _key_hex
+	return key
 end
 
-
-
-
-
--- =====================================
--- =====================================
--- ======= 4/ Public API ===============
--- =====================================
--- =====================================
-
---- Turns at-rest encryption on or off.
---- @param enabled boolean
-function M.set_enabled(enabled)
-	_enabled = (enabled == true)
-	Logger.debug(LOG, "At-rest encryption: %s.", tostring(_enabled))
-end
-
---- Returns whether at-rest encryption is active.
---- @return boolean
-function M.is_enabled()
-	return _enabled
-end
-
---- Reports whether a usable key can be derived on this machine.
---- @return boolean
-function M.is_available()
-	return ensure_key() ~= nil
-end
-
---- Encrypts one value for storage.
---- @param device_id string    Owning device.
---- @param event_id  number|string Row identifier, unique per device.
---- @param plaintext string    Value to protect.
---- @return string|nil The envelope, the untouched plaintext when disabled, or
----   nil when encryption is enabled but impossible — the caller must NOT store
----   the plaintext in that case.
-function M.encrypt(device_id, event_id, plaintext)
-	if not _enabled then return plaintext end
-	if type(plaintext) ~= "string" or plaintext == "" then return plaintext end
-	if TextCrypto.is_encrypted(plaintext) then return plaintext end
-
-	local key = ensure_key()
-	if not key then return nil end
-
-	local iv = TextCrypto.iv_for(device_id, event_id, Crypto.sha256)
-	if not iv then
-		Logger.error(LOG, "Cannot derive an IV for %s/%s — refusing to store plaintext.",
-			tostring(device_id), tostring(event_id))
-		return nil
-	end
-
+--- Encrypts one value through the openssl child.
+--- @return string|nil The envelope payload, or nil after logging the refusal.
+local function encrypt_value(key, iv, plaintext)
 	local cmd, reason = TextCrypto.encrypt_command(key, iv)
 	if not cmd then
 		Logger.error(LOG, "Cannot compose the encryption command: %s.", reason)
@@ -217,35 +132,58 @@ function M.encrypt(device_id, event_id, plaintext)
 			failure or "no output")
 		return nil
 	end
-
-	return (TextCrypto.wrap(iv, (ciphertext:gsub("%s+$", ""))))
+	return (ciphertext:gsub("%s+$", ""))
 end
 
---- Decrypts one stored value.
---- @param value any Stored column value.
---- @return any The plaintext, or the value unchanged when it is not an envelope.
-function M.decrypt(value)
-	local iv, ciphertext = TextCrypto.unwrap(value)
-	if not iv then return value end
-
-	local key = ensure_key()
-	if not key then
-		Logger.warn(LOG, "Encrypted row cannot be read: no key on this machine.")
-		return ""
-	end
-
+--- Decrypts one envelope payload through the openssl child.
+--- @return string|nil The plaintext, or nil after logging the refusal.
+local function decrypt_value(key, iv, ciphertext)
 	local cmd, reason = TextCrypto.decrypt_command(key, iv)
 	if not cmd then
 		Logger.error(LOG, "Cannot compose the decryption command: %s.", reason)
-		return ""
+		return nil
 	end
 
 	local plaintext, failure = run_with_public_stdin(cmd, ciphertext)
 	if type(plaintext) ~= "string" then
 		Logger.error(LOG, "Encrypted row cannot be read: decryption refused (%s).", failure)
-		return ""
+		return nil
 	end
 	return plaintext
 end
+
+local Cipher = require("keystats.text_cipher").new({
+	logger = Logger,
+	log = LOG,
+	sha256 = Crypto.sha256,
+	derive_key = derive_key,
+	-- The openssl child is the primitive here: nothing to probe up front.
+	ready = function() return true end,
+	encrypt = encrypt_value,
+	decrypt = decrypt_value,
+})
+
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 3/ Public API ===============
+-- =====================================
+-- =====================================
+
+--- Points the machine-id lookup at a specific command, or nil to restore.
+--- @param command string|nil
+function M._set_machine_id_command(command)
+	_machine_id_command_override = (type(command) == "string" and command ~= "") and command or nil
+	Cipher.reset_key()
+end
+
+M.set_enabled = Cipher.set_enabled
+M.is_enabled = Cipher.is_enabled
+M.is_available = Cipher.is_available
+M.encrypt = Cipher.encrypt
+M.decrypt = Cipher.decrypt
 
 return M
