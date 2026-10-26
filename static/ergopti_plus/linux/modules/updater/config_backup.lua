@@ -57,11 +57,10 @@ local function classify(path, kind)
 	if kind == "file" then return "file" end
 	if kind ~= "link" then return "other" end
 	-- A link to a folder could lead back up the tree: it is reported, never walked.
-	local target, _, code = NativeDirectory.target_kind(path)
+	local target = NativeDirectory.target_kind(path)
 	if target == "directory" then return "other" end
 	if target == "file" then return "file" end
-	-- A dangling link has nothing to block on: the read refuses it with a clear error.
-	if target == nil and code == "ENOENT" then return "file" end
+	-- A dangling link holds no configuration: "other", so it never fails the snapshot.
 	return "other"
 end
 

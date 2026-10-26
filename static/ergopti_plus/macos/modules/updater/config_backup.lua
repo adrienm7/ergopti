@@ -53,10 +53,9 @@ local function classify(path)
 	if attributes.mode == "link" then
 		-- A link to a folder could lead back up the tree: it is reported, never walked.
 		-- Only a regular file is read: opening a FIFO, a socket or a device node can
-		-- block forever, so those targets are "other". A dangling link is "file": the
-		-- read refuses it at once.
+		-- block forever, so those targets are "other". A dangling link holds no
+		-- configuration and is "other" too, so it never fails the snapshot.
 		local target_status, target_mode = FileSystem.followed_mode(path)
-		if target_status == "absent" then return "file" end
 		if target_status == "present" and target_mode == "file" then return "file" end
 		return "other"
 	end
