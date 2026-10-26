@@ -31,27 +31,25 @@ a sealed Windows updater source, reseal with
 
 ## Handover of 2026-10-26 (read first if the session was lost)
 
-- **State.** dev is linear and pushed; every push of dev had its CI cancelled (a dev push builds a release).
-  Latest stable release: v1.0.6. Full CI on `tmp/preflight-dev` at 5f4a8be89b: everything green except
-  Windows unit lots `config-scope-features`, `meta`, `keymap-gestures` (PC work below). A full CI on
-  9c08c747ba (dev) was dispatched on `tmp/preflight-dev` at 17:04 UTC: read its result first.
-- **Integrated from the ChatGPT fix branches:** fix/macos 54 commits, fix/windows 68 of 74, fix/linux 97 (all as
-  of 26 Oct 14:00 UTC). Left to those agents on rebase: fix/linux a37d38dd16 (event-loop pumping, conflicts
-  with dev's input-wait loop) and fix/windows 19e6e13993 + b3535cd6b0 (repo-url test, diverged). Their
-  per-branch seal refresh commits are never integrated: reseal once on dev instead.
-- **Agent work in flight (local worktrees, Linux/macOS only, no AHK):** if lost, redo from the spec.
-  - `work/todo-af` (backup pushed as `tmp/wip-todo-af`): 6 commits not yet in dev (ee1dad5a89 macOS "never"
-    debounce persisted, b3b186478c Linux "never", 613ccaa5c6 Linux live instant at word end, e5f502e2a2 explicit
-    requests never held, 2447329d0d one user-set request interval `llm.trigger.min_request_interval_ms`,
-    b8ad2ecbbf request plan one behaviour). Then in progress: variants of one request never held (automatic
-    or explicit), default floor 300 ms, 0 accepted, a mashed explicit shortcut supersedes its in-flight
-    request.
-  - `work/todo-ae`: byte-preserving `tap_hold.toml` migration rewrite (comments kept, as config.toml);
-    `[tap_hold.retired_delays]` kept forever.
-  - `work/todo-ag`: Quit wins on the three OS (during a reload it abandons the reload and exits after a write
-    in progress finishes); a pending per-category scope write blocks Linux Quit (registry of scope owners);
-    the live metrics dashboard folds the 19 localized "general" spellings via
-    `metrics_general_category_aliases.json`.
+- **State.** dev ef7d7c6f54 is linear and pushed; every push of dev had its CI cancelled (a dev push builds a
+  release). Latest stable release: v1.0.6. A full CI on ef7d7c6f54 was dispatched on `tmp/preflight-dev` at
+  21:11 UTC: read it first. It carries the fixes for the previous full run's reds (Git 2.55 packed fixture
+  objects, Linux fixtures asserting TMPDIR, children run with `-u LUA_CPATH`, sqlite3/GLib in the distro rows,
+  the failure excerpt that hid the real Linux assertion). Expected reds: Windows unit lots
+  `config-scope-features`, `meta`, `keymap-gestures` (PC work below).
+- **Integrated from the ChatGPT fix branches** (fix/linux, fix/macos, fix/windows, up to 26 Oct 20:00 UTC).
+  Their per-branch seal refresh commits are never integrated: reseal once on dev instead. fix/linux
+  a37d38dd16 (event-loop pumping) is still theirs to rebase.
+- **Agent work in flight (Linux/macOS only, no AHK)**, each backed up on a remote `tmp/wip-*` branch; if lost,
+  redo from the spec:
+  - `tmp/wip-todo-af`: AppImage closure check and distro sweep (1c34b40594, not in dev), then PAR-65 phase 2
+    (request chain, token budget, live prompt, info-bar text behind HttpClient/TimerScheduler/TooltipRenderer
+    ports, with transcript vectors).
+  - `tmp/wip-todo-ae`: PAR-67 write-statement catalogue with typed slots (one family per commit, old and new
+    statements executed on the same SQLite fixture and compared).
+  - `tmp/wip-todo-ag`: storage dir 0700 (ec2a203c1b) and PAR-74 constant swaps (5d770c62cf, c767d7ae20,
+    4dcf9fb2e3, 51016ca9e2), not in dev; then pin gates that read `ConfigKeys.*` as the literal, structural
+    homonym recognition in the lint, missing generated keys, further burn-down.
 - **Integration procedure** (each batch): fetch `origin/fix/{linux,macos,windows}`; list commits whose subject
   is not on dev; cherry-pick them on a local `integ/*` branch from dev (skip seal refresh commits; on a
   conflict prefer dev when it already fixed the same thing, otherwise merge both by hand); renumber
@@ -65,7 +63,8 @@ a sealed Windows updater source, reseal with
   `test-managed-remote-retirement` (no pwsh), `test-linux-deb-package-owner` (refuses root),
   `test-drift-guard-covers-every-output` (worktrees only, node_modules symlink). Lua as root: every
   EACCES/unreadable/denied case, Linux test 102, four `test_sqlite_first_open` native cases; macOS screenshot
-  EACCES, two mlx-repair unreadable neighbour, errors-log refuses denied. Confirm with
+  EACCES, two mlx-repair unreadable neighbour, errors-log refuses denied, the eight `release-arming-physical`
+  cases (refuse root). Confirm with
   `setpriv --reuid=65534 --regid=65534 --clear-groups` and set `XDG_RUNTIME_DIR`. Run the macOS suite per
   group: one process slows down progressively here.
 - **Windows counterparts of the 26 October work** (add to the PC list below once the Lua side is in dev):
@@ -572,10 +571,8 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 
 ### C. UI-only gaps, reasons and docs
 
-- [ ] **PAR-37. Platform reasons for two-platform restrictions.** [CODE] The single-platform ratchet went from 88
-      to 1 (the last one is `llm.profiles.auto_profile_for_model`). 98 entries restricted to two platforms (mostly menu frames and
-      boundaries) still have no reason: extend `test-platform-restrictions-explained` to them. The 13 new
-      reason texts and the nav-layer ones are drafts in 20 locales: native review wanted.
+- [x] **PAR-37. Platform reasons for restrictions.** [CODE] Done: every restriction has a reason, the ratchet
+      is frozen at 0; the drafted reason texts in 20 locales still want a native review.
 - [x] **PAR-40. Unify user LLM profile storage.** [CODE] Done: one `llm.user_profiles` envelope on the three
       OS (a6f0fd8ad9, manifest rows d6146eb82b, 300aa8c4a6). An older macOS `[llm.profiles] user_profiles`
       array is imported on load and deleted by the next save (0146a938c5). Left: check on a real Mac that an
@@ -605,8 +602,9 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 - [ ] **PAR-53. Bring HotPath-style slow-segment logging to macOS and Linux.** [CODE] Done (shared
       `hotpath_segments.lua`, always-on Linux spans, one warning per segment per 10 s). Left: nesting
       attribution (Windows has it), the threshold question.
-- [ ] **PAR-54. PhaseStats and child-process timing on Windows and Linux; CPU in boot profile on macOS and
-      Linux.** [CODE] Mirror macOS `process.*` phases. Audit P3-P5.
+- [ ] **PAR-54. PhaseStats and child-process timing.** [CODE] Done on macOS and Linux (`process.<program>`,
+      `toml.parse`, `menu.rebuild`, `boot.stage`, `boot.stage_cpu`). Windows: port `phase_stats_core.lua` with
+      the same phases (`boot_profiler.ahk` already measures stages).
 - [ ] **PAR-55. Crash reports: one content, one cap, one notice.** [CODE] Done on macOS and Linux (shared
       `crash_report.lua`, vectors `diagnostics/crash_report_vectors.json`, 20 newest kept). Left: Windows
       `crash_report_worker.ahk` adopting the same fields, names and cap.
@@ -648,16 +646,13 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       replayed by both drivers (48be669def, 7442ab5edd, d18f573791; the decisions of October 26 are on
       `work/todo-af`). Left: the Windows twin replaying the vectors, then the HttpClient, TimerScheduler and
       TooltipRenderer ports, the live prompt, the token budget, the info-bar text and the agent flows. Audit R1.
-- [ ] **PAR-66. Move the menu frame builders to `_shared/lua/menu/frames`.** [CODE] Phase 1 done: the magic
-      trigger frame snapshot is shared (`_shared/lua/menu/frames/magic_frame.lua`, contract replayed by both
-      drivers). Left (decided October 26): re-point the source-pin gates (`test-menu-parity.cjs`,
-      `test-menu-manifest.cjs`, `tools/lib/menu-native-personal-info-binding.cjs`) to the shared module text, keep
-      only the call pins in the drivers, then extract `personal_info_editor_source` and the
-      metrics/configuration/debug/about readers (one reader with an option for the `pcall` around `get_root`).
-      Audit R2.
-- [ ] **PAR-67. Shared keystats query catalogue and walker.** [CODE] About 85/73/66 SQL statements and
-      three walkers; named queries in `data/db/queries.sql` with codegen, walker in
-      `_shared/lua/keystats/walker.lua`, AHK replays `aggregation_vectors.json`. Audit R3.
+- [x] **PAR-66. Move the menu frame builders to `_shared/lua/menu/frames`.** [CODE] Done on macOS and Linux:
+      `magic_frame`, `parent_source` (Debug, Configuration, Metrics, About) and `personal_info_source`, with
+      contracts replayed by both drivers; the source-pin gates own the shared text and pin only the driver
+      ports (`tools/lib/menu-parent-source-gate.cjs`). Windows has its own AHK reader.
+- [ ] **PAR-67. Shared keystats query catalogue and walker.** [CODE] Reader catalogue, shared walker and
+      aggregation vectors done; `meta.rev` shared and a gate refuses SQL spelled by hand in both Lua drivers.
+      In progress: write-statement catalogue with typed slots (agent). Windows: adopt it later.
 - [ ] **PAR-68. Hotstring override parser into `_shared` on `toml_codec`.** [CODE] Done on macOS and Linux
       (shared `hotstrings/overrides.lua`, `override_parse_vectors.json`). macOS now reads a duplicate key or
       header as invalid TOML (was last-wins). Left: Windows `_ParseOverrides` replaying the vectors.
@@ -666,9 +661,10 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 - [x] **PAR-70. Factory per macOS/Linux infra shim.** [CODE] Done on macOS and Linux: `timings`,
       `manifest_reader`, `text_cipher`, `text_migration`, `config_backup`, `user_code` share their policy in
       `_shared/lua` with contracts replayed by both drivers. Windows keeps its own AHK implementations.
-- [ ] **PAR-71. Finish the route-plan rollout and make `proxy_policy.json` the codegen source.** [CODE]
-      `route_plan.lua` has no production consumer on Windows or Linux; policies are hand-typed in Lua,
-      Python, Go and generated Swift. Audit R12, C21.
+- [ ] **PAR-71. Finish the route-plan rollout and make `proxy_policy.json` the codegen source.** [CODE] Done on
+      macOS and Linux (generated shell and Lua precedence, Linux lookup limits from the policy, drift guard).
+      Left, Windows: generated or read AHK copy in `http_client.ahk` (reseal), the route-plan consumer
+      replaying `route_plan_vectors.json`, the native lookup limits from the policy.
 - [ ] **PAR-72. Shared registries and catalogues.** [CODE] Done: layout registry store, shortcuts
       catalogue, healthcheck report runner, agent learning store (daee88e48d..e105336d39); gesture
       direction and temperature were already shared with vectors. Left: the registry install/select flows and
