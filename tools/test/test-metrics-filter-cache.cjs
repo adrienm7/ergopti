@@ -581,6 +581,27 @@ function publishLoadedAppsData(page, host, manifest) {
 }
 const streakCases = [
 	{
+		name: 'Havana midnight spring',
+		zone: 'America/Havana',
+		dates: ['2026-03-07', '2026-03-08', '2026-03-09'],
+		expected: 3,
+		lastDayHours: 23
+	},
+	{
+		name: 'Santiago midnight spring',
+		zone: 'America/Santiago',
+		dates: ['2026-09-05', '2026-09-06', '2026-09-07'],
+		expected: 3,
+		lastDayHours: 23
+	},
+	{
+		name: 'Apia archived skipped date',
+		zone: 'Pacific/Apia',
+		dates: ['2011-12-29', '2011-12-30', '2011-12-31'],
+		expected: 3,
+		lastDayHours: 0
+	},
+	{
 		name: 'Paris DST fallback',
 		zone: 'Europe/Paris',
 		dates: ['2026-10-24', '2026-10-25', '2026-10-26'],
@@ -676,7 +697,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 				if (vector.lastDayHours !== undefined) {
 					const [previous, latest] = vector.dates.slice(-2);
 					const actualHours = vm.runInContext(
-						`(parseDateKey(${JSON.stringify(latest)}) - parseDateKey(${JSON.stringify(previous)})) / 3600000`,
+						`(() => { const localMidnight = key => { const [y,m,d] = key.split('-').map(Number); return new Date(y,m-1,d).getTime(); }; return (localMidnight(${JSON.stringify(latest)}) - localMidnight(${JSON.stringify(previous)})) / 3600000; })()`,
 						page.context
 					);
 					assert.equal(
@@ -744,7 +765,7 @@ const drilldownCases = [
 		layouts: ['OldSunday', 'Sunday', 'Monday', 'Tuesday']
 	}
 ];
-assert.equal(streakCases.length, 10, 'all local-calendar vectors must remain registered');
+assert.equal(streakCases.length, 13, 'all local-calendar vectors must remain registered');
 assert.equal(drilldownCases.length, 8, 'all modal date-selection vectors must remain registered');
 for (const host of ['windows', 'macos', 'linux']) {
 	for (const vector of drilldownCases) {
@@ -848,6 +869,9 @@ assert.equal(
 );
 
 const periodAnchors = [
+	{ name: 'Havana midnight transition', zone: 'America/Havana', date: '2026-03-08' },
+	{ name: 'Santiago midnight transition', zone: 'America/Santiago', date: '2026-09-06' },
+	{ name: 'Apia archived skipped date', zone: 'Pacific/Apia', date: '2011-12-31' },
 	{ name: 'ordinary UTC dates', zone: 'UTC', date: '2026-01-31' },
 	{ name: 'Paris spring transition', zone: 'Europe/Paris', date: '2026-04-01' },
 	{ name: 'Paris autumn transition', zone: 'Europe/Paris', date: '2026-10-27' },
@@ -865,12 +889,12 @@ for (const host of ['windows', 'macos', 'linux']) {
 					for (const id of ['compare-panel', 'compare-rows', 'compare-window'])
 						page.elements.set(id, page.context.document.createElement('div'));
 					const [year, month, date] = vector.date.split('-').map(Number);
-					// These are independent input rows, one per real local calendar
+					// These are independent input rows, one per recorded Gregorian calendar
 					// date, with different focus totals so a shifted comparator is visible.
 					const rows = Array.from({ length: 760 }, (_, index) => {
-						const day = new Date(year, month - 1, date);
-						day.setDate(day.getDate() - index);
-						const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+						const day = new Date(Date.UTC(year, month - 1, date));
+						day.setUTCDate(day.getUTCDate() - index);
+						const key = `${day.getUTCFullYear()}-${String(day.getUTCMonth() + 1).padStart(2, '0')}-${String(day.getUTCDate()).padStart(2, '0')}`;
 						return [
 							key,
 							{
@@ -945,8 +969,8 @@ for (const host of ['windows', 'macos', 'linux']) {
 		}
 	}
 }
-assert.equal(periodAnchors.length, 4, 'every calendar boundary vector must execute');
-assert.equal(passed, 117, 'all prior and calendar-period page controls must execute');
+assert.equal(periodAnchors.length, 7, 'every calendar boundary vector must execute');
+assert.equal(passed, 162, 'all prior and calendar-period page controls must execute');
 
 const goalCases = [
 	{
@@ -1038,6 +1062,133 @@ for (const host of ['windows', 'macos', 'linux']) {
 	}
 }
 assert.equal(goalCases.length, 3, 'every daily-goal lifecycle vector must execute');
-assert.equal(passed, 126, 'all query, calendar and daily-goal controls must execute');
+assert.equal(passed, 171, 'all query, calendar and daily-goal controls must execute');
 
+const civilZones = ['Pacific/Apia', 'America/Havana', 'America/Santiago', 'America/Los_Angeles'];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const zone of civilZones) {
+		test(`${host} recorded day identity survives ${zone}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = zone;
+			try {
+				const page = loadMetricsAppsPage(host);
+				page.elements.set('ribbon_container', page.context.document.createElement('div'));
+				vm.runInContext(
+					"currentSelectedDate='2011-12-30'; currentPeriod='day'; currentWeekdayFilter=new Set([4]);",
+					page.context
+				);
+				publishLoadedAppsData(
+					page,
+					host,
+					Object.fromEntries(
+						['29', '30', '31'].map((day, i) => [
+							`2011-12-${day}`,
+							{
+								Editor: {
+									category: 'Productivity',
+									chars: 2 ** i,
+									app_time_ms: 60000,
+									hourly: { '09': { app_time_ms: 60000, chars: 2 ** i } }
+								}
+							}
+						])
+					)
+				);
+				const agg = page.context.getAggregatedData();
+				assert.deepEqual(Object.keys(agg.rich.by_date), ['2011-12-30']);
+				assert.equal(agg.rich.by_weekday[4].chars, 2);
+				assert.equal(page.context.formatDisplayDate('2011-12-30'), '30/12/2011');
+				assert.equal(page.context.formatDisplayDate('30/12/2011'), '30/12/2011');
+				assert.ok(page.elements.get('ribbon_container').innerHTML.includes('Ven 30/12'));
+				for (const key of ['0001-01-01', '0099-12-31', '2011-12-30'])
+					assert.equal(page.context.formatMetricsDateKey(page.context.parseDateKey(key)), key);
+				for (const instant of [1767227400000, '1767227400', 'Thu, 01 Jan 2026 00:30:00 GMT']) {
+					const native = new Date(
+						typeof instant === 'string' && /^\d+$/.test(instant) ? Number(instant) * 1000 : instant
+					);
+					const expected = `${String(native.getDate()).padStart(2, '0')}/${String(native.getMonth() + 1).padStart(2, '0')}/${native.getFullYear()}`;
+					assert.equal(
+						page.context.formatDisplayDate(instant),
+						expected,
+						'legacy instants retain their local displayed day'
+					);
+				}
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+}
+const annualCases = [
+	{ zone: 'America/Havana', now: '2026-03-09T17:00:00Z', today: '9/3/2026', future: '10/3/2026' },
+	{
+		zone: 'Pacific/Apia',
+		now: '2011-12-31T00:00:00Z',
+		today: '31/12/2011',
+		future: '1/1/2012',
+		archived: '30/12/2011'
+	},
+	{
+		zone: 'America/Los_Angeles',
+		now: '2026-01-01T00:30:00Z',
+		today: '31/12/2025',
+		future: '1/1/2026'
+	},
+	{ zone: 'Pacific/Kiritimati', now: '2025-12-31T12:00:00Z', today: '1/1/2026', future: '2/1/2026' }
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of annualCases) {
+		test(`${host} annual calendar ends on local today in ${vector.zone}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = vector.zone;
+			try {
+				const page = loadMetricsAppsPage(host);
+				page.elements.set(
+					'activity_calendar_container',
+					page.context.document.createElement('div')
+				);
+				const fixedNow = Date.parse(vector.now);
+				// Freeze only the browser clock; date parsing, calendar arithmetic
+				// and native timezone rules remain the real Date implementation.
+				page.context.Date = class ClockPort extends Date {
+					constructor(...args) {
+						super(...(args.length ? args : [fixedNow]));
+					}
+					static now() {
+						return fixedNow;
+					}
+				};
+				publishLoadedAppsData(page, host, {
+					'2011-12-30': { Editor: { category: 'Productivity', chars: 2, app_time_ms: 60000 } }
+				});
+				const html = page.elements.get('activity_calendar_container').innerHTML;
+				assert.equal((html.match(/<title>/g) || []).length, 365);
+				assert.ok(
+					html.includes(`<title>${vector.today} — `),
+					'local today must remain in the rendered year'
+				);
+				assert.ok(
+					!html.includes(`<title>${vector.future} — `),
+					'a UTC date change must not insert tomorrow'
+				);
+				if (vector.archived) assert.ok(html.includes(`<title>${vector.archived} — 2 car.</title>`));
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+}
+assert.equal(civilZones.length, 4);
+assert.equal(annualCases.length, 4);
+assert.equal(passed, 195, 'all recorded-date, real-clock and timezone controls must execute');
 console.log(`${passed} passed, 0 failed.`);
