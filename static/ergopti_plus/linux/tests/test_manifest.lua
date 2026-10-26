@@ -440,6 +440,7 @@ return {
 	"tests.unit.ui.menu.structure.test_menu_row_dialect",
 	"tests.unit.ui.menu.structure.test_menu_magic_frame",
 	"tests.unit.ui.menu.structure.test_menu_parent_source",
+	"tests.unit.ui.menu.structure.test_menu_separators",
 	"tests.unit.ui.menu.structure.test_menu_personal_info_source",
 	"tests.unit.ui.menu.structure.test_menu_toggle_row_is_check",
 	"tests.meta.boot.test_metrics_persist_before_shutdown",
