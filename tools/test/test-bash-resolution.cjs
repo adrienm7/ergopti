@@ -306,7 +306,13 @@ if (process.platform === 'linux') {
 		const nativeModules = path.join(temporary, 'native-modules');
 		fs.mkdirSync(nativeModules);
 		fs.symlinkSync(path.resolve(ROOT, library), path.join(nativeModules, 'luv.so'));
-		const withoutLfs = { ...process.env, LUA_CPATH: `${nativeModules}/?.so`, LUA_PATH: ';;' };
+		const withoutLfs = {
+			...process.env,
+			LUA_CPATH: `${nativeModules}/?.so`,
+			LUA_CPATH_5_4: `${nativeModules}/?.so`,
+			LUA_PATH: ';;',
+			LUA_PATH_5_4: ';;'
+		};
 		const absence = spawnSync(
 			runtime,
 			[
