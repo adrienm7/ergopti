@@ -948,4 +948,96 @@ for (const host of ['windows', 'macos', 'linux']) {
 assert.equal(periodAnchors.length, 4, 'every calendar boundary vector must execute');
 assert.equal(passed, 117, 'all prior and calendar-period page controls must execute');
 
+const goalCases = [
+	{
+		name: 'latest accepted goal',
+		answers: ['60', '90', { accept: true }],
+		defaults: [120, 60, 90],
+		goals: [60, 90, 90]
+	},
+	{
+		name: 'cancelled prompt',
+		answers: ['60', null, { accept: true }],
+		defaults: [120, 60, 60],
+		goals: [60, 60, 60]
+	},
+	{
+		name: 'unchanged input bounds',
+		answers: ['0', '1440', '60', '-1', { accept: true }],
+		defaults: [120, 120, 120, 60, 60],
+		goals: [120, 120, 60, 60, 60]
+	}
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of goalCases) {
+		test(`${host} daily goal prompt retains ${vector.name}`, () => {
+			const page = loadMetricsAppsPage(host);
+			const goal = page.context.document.createElement('div');
+			const listeners = new Map();
+			goal.addEventListener = (name, callback) => {
+				const callbacks = listeners.get(name) || [];
+				callbacks.push(callback);
+				listeners.set(name, callbacks);
+			};
+			page.elements.set('kpi-goal-value', goal);
+			page.elements.set('kpi-goal-progress', page.context.document.createElement('div'));
+			const proposed = [];
+			// This is the native prompt boundary, including pressing Enter on
+			// the actual proposed value. The real click owner validates and stores it.
+			page.context.prompt = (question, defaultValue) => {
+				const response = vector.answers[proposed.length];
+				proposed.push(defaultValue);
+				return response && typeof response === 'object' ? defaultValue : response;
+			};
+			publishLoadedAppsData(page, host, {
+				'2026-10-26': {
+					Editor: { category: 'Productivity', app_time_ms: 60000, time: 60000, chars: 1 }
+				}
+			});
+			assert.equal(
+				goal.textContent,
+				'120 min',
+				'the existing daily-goal default remains unchanged'
+			);
+			assert.equal(
+				listeners.get('click').length,
+				1,
+				'the real page must bind one persistent click owner'
+			);
+			const projection = page.context.getAggregatedData();
+			for (const [index, expectedGoal] of vector.goals.entries()) {
+				listeners.get('click')[0]();
+				assert.equal(
+					proposed[index],
+					String(vector.defaults[index]),
+					'each actual prompt must propose the current window-owned goal'
+				);
+				assert.equal(
+					goal.textContent,
+					`${expectedGoal} min`,
+					'accepting the current proposal cannot reset the goal to its initial default'
+				);
+				assert.equal(page.elements.get('kpi-goal-progress').textContent, `1 / ${expectedGoal} min`);
+				assert.equal(
+					listeners.get('click').length,
+					1,
+					'repainting must not duplicate the real click handler'
+				);
+				assert.strictEqual(
+					page.context.getAggregatedData(),
+					projection,
+					'a display-only goal change must reuse the accepted data query'
+				);
+			}
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false,
+				'the actual page must render without fixture errors'
+			);
+		});
+	}
+}
+assert.equal(goalCases.length, 3, 'every daily-goal lifecycle vector must execute');
+assert.equal(passed, 126, 'all query, calendar and daily-goal controls must execute');
+
 console.log(`${passed} passed, 0 failed.`);

@@ -921,8 +921,8 @@ function renderDashboard() {
 			// we keep the goal in a window-scoped fallback that lives for the
 			// lifetime of the open dashboard. Persistence across reloads would
 			// need a Lua-side bridge — out of scope for the MVP.
-			window._goalStore = window._goalStore || {};
-			let goalMin = window._goalStore.daily_min || 120;
+			window._goalStore = window._goalStore || { daily_min: 120 };
+			const goalMin = window._goalStore.daily_min;
 
 			const todayKey = currentSelectedDate || Object.keys(manifestData).sort().slice(-1)[0];
 			let todayActiveMs = 0;
@@ -949,7 +949,7 @@ function renderDashboard() {
 			const valEl = document.getElementById('kpi-goal-value');
 			if (valEl && !valEl._bound) {
 				valEl.addEventListener('click', () => {
-					const next = prompt(_t('ui_apps.goal_prompt'), String(goalMin));
+					const next = prompt(_t('ui_apps.goal_prompt'), String(window._goalStore.daily_min));
 					const n = parseInt(next || '', 10);
 					if (isFinite(n) && n > 0 && n < 24 * 60) {
 						window._goalStore.daily_min = n;
