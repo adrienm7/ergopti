@@ -15,8 +15,9 @@
 ---    from the config_backup block of _shared/modules/updater/defaults.json.
 --- 2. Exact bytes: copies are created and restored through toml_codec.writer's
 ---    classified read and compare-and-publish, never through a plain write.
---- 3. A link to a folder is neither followed nor copied: `ls -L` sees a folder
----    that plain `ls` does not, and following it could loop.
+--- 3. A link to a folder is neither followed nor copied (following it could
+---    loop), and only a regular file is read: a FIFO, a socket or a device node
+---    is "other", because opening one can block forever.
 --- ==============================================================================
 
 local M = {}
@@ -26,6 +27,7 @@ local Paths       = require("infra.paths")
 local ConfigPaths = require("infra.config_paths")
 local Json        = require("json")
 local Shell       = require("adapters.shell_runner")
+local NativeDirectory = require("infra.native_directory")
 local Writer      = require("toml_codec.writer")
 local Binding     = require("updater.config_backup_binding")
 
@@ -44,16 +46,23 @@ M._overrides = nil
 -- ==============================
 -- ==============================
 
---- Runs `ls` on one folder and returns its entry lines.
---- @param flags string
---- @param dir string
---- @return table|nil lines
-local function ls(flags, dir)
-	local ok, output = Shell.exec_checked("ls " .. flags .. " -- " .. Shell.quote(dir))
-	if not ok then return nil end
-	local lines = {}
-	for line in output:gmatch("[^\n]+") do lines[#lines + 1] = line end
-	return lines
+--- Classifies one folder entry exactly as the macOS port does. Only a regular
+--- file is "file": reading a FIFO, a socket or a device node can block forever,
+--- so those are "other" and never opened.
+--- @param path string
+--- @param kind string Kind of the entry itself (not followed).
+--- @return string kind "file", "dir" or "other"
+local function classify(path, kind)
+	if kind == "directory" then return "dir" end
+	if kind == "file" then return "file" end
+	if kind ~= "link" then return "other" end
+	-- A link to a folder could lead back up the tree: it is reported, never walked.
+	local target, _, code = NativeDirectory.target_kind(path)
+	if target == "directory" then return "other" end
+	if target == "file" then return "file" end
+	-- A dangling link has nothing to block on: the read refuses it with a clear error.
+	if target == nil and code == "ENOENT" then return "file" end
+	return "other"
 end
 
 --- Lists one folder: files, folders, and anything else as "other".
@@ -61,25 +70,17 @@ end
 --- @return table|nil entries
 --- @return string|nil error "absent" for a folder that does not exist
 local function list(dir)
-	if not Shell.run("test -d " .. Shell.quote(dir)) then
-		if Shell.run("test -e " .. Shell.quote(dir)) then return nil, "not a folder" end
-		return nil, "absent"
+	local target, message, code = NativeDirectory.target_kind(dir)
+	if target == nil then
+		if code == "ENOENT" then return nil, "absent" end
+		return nil, tostring(message)
 	end
-	local plain, followed = ls("-1Ap", dir), ls("-1ApL", dir)
-	if not plain or not followed then return nil, "cannot list" end
-	local linked_dirs = {}
-	for _, line in ipairs(followed) do
-		if line:sub(-1) == "/" then linked_dirs[line:sub(1, -2)] = true end
-	end
+	if target ~= "directory" then return nil, "not a folder" end
+	local listed, list_message = NativeDirectory.entries(dir)
+	if not listed then return nil, tostring(list_message or "cannot list") end
 	local entries = {}
-	for _, line in ipairs(plain) do
-		if line:sub(-1) == "/" then
-			entries[#entries + 1] = { name = line:sub(1, -2), kind = "dir" }
-		elseif linked_dirs[line] then
-			entries[#entries + 1] = { name = line, kind = "other" }
-		else
-			entries[#entries + 1] = { name = line, kind = "file" }
-		end
+	for _, entry in ipairs(listed) do
+		entries[#entries + 1] = { name = entry.name, kind = classify(NativeDirectory.join(dir, entry.name), entry.kind) }
 	end
 	return entries
 end

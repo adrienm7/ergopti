@@ -240,6 +240,8 @@ local function with_scripted_native(listing, kinds, body)
 			if kinds[path] == nil then return nil, "ENOENT: " .. path, "ENOENT" end
 			return { type = kinds[path] }
 		end,
+		-- Required by the module's backend check; discovery never follows a link.
+		fs_stat = function() error("the hotstring discovery must not follow links") end,
 	}
 	local Walker = helpers.load_module_with_dependency("infra.native_directory", "luv", fake)
 	package.loaded["infra.native_directory"] = Walker

@@ -48,17 +48,17 @@ local KINDS = { file = "file", directory = "directory", link = "link" }
 local Native = (function()
 	local ok, uv = pcall(require, "luv")
 	if not ok or type(uv) ~= "table" then return nil end
-	for _, name in ipairs({ "fs_opendir", "fs_readdir", "fs_closedir", "fs_lstat" }) do
+	for _, name in ipairs({ "fs_opendir", "fs_readdir", "fs_closedir", "fs_lstat", "fs_stat" }) do
 		if type(uv[name]) ~= "function" then return nil end
 	end
-	return { opendir = uv.fs_opendir, readdir = uv.fs_readdir, closedir = uv.fs_closedir, lstat = uv.fs_lstat }
+	return { opendir = uv.fs_opendir, readdir = uv.fs_readdir, closedir = uv.fs_closedir, lstat = uv.fs_lstat, stat = uv.fs_stat }
 end)()
 
 --- Returns the captured backend, or raises when the runtime has none.
 --- @return table
 local function native()
 	if Native == nil then
-		error("native_directory: luv with fs_opendir, fs_readdir, fs_closedir and fs_lstat is required", 3)
+		error("native_directory: luv with fs_opendir, fs_readdir, fs_closedir, fs_lstat and fs_stat is required", 3)
 	end
 	return Native
 end
@@ -111,6 +111,18 @@ function M.kind(path)
 	local stat, message, code = M.stat(path)
 	if stat == nil then return nil, message, code end
 	return stat.kind
+end
+
+--- Kind of what a path leads to, a symbolic link followed (stat(2)). It never
+--- opens the target, so a FIFO or a device node cannot block it.
+--- @param path string
+--- @return string|nil kind "file", "directory" or "other".
+--- @return string|nil message libuv's refusal (a dangling link is ENOENT).
+--- @return string|nil code libuv's error code (e.g. "ENOENT").
+function M.target_kind(path)
+	local stat, message, code = native().stat(path)
+	if type(stat) ~= "table" then return nil, message, code end
+	return KINDS[stat.type] or "other"
 end
 
 --- Lists a directory's entries in the kernel's readdir order, without "." and
