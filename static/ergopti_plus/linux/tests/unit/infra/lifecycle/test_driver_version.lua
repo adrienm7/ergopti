@@ -210,8 +210,10 @@ describe("Driver version: the crash dump names the version and the app dir", fun
 			io.open, os.execute, io.popen = real_open, real_exec, real_popen
 			if not ok then error(err, 0) end
 			local body = table.concat(parts)
-			assert_true(body:find("Version:   " .. Version.VERSION .. " (" .. Version.SOURCE .. ")", 1, true) ~= nil, body)
-			assert_true(body:find("App dir:   " .. redact(Paths.driver_root()), 1, true) ~= nil, body)
+			local report = require("json").decode(body)
+			assert_true(report ~= nil, "the dump is the shared JSON report: " .. body)
+			assert_true(report.version == Version.VERSION, body)
+			assert_true(report.script_dir == redact(Paths.driver_root()), body)
 		end)
 	end)
 end)

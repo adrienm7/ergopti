@@ -22,6 +22,7 @@ return {
 	"tests.unit.ui.menu.llm.test_numeric_configuration_owner",
 	"tests.unit.ui.menu.llm.test_profile_editor_configuration_owner",
 	"tests.unit.modules.diagnostics.test_crash_privacy",
+	"tests.unit.modules.diagnostics.test_crash_report_contract",
 	"tests.unit.adapters.processes.test_owned_process_deadline",
 	"tests.unit.ui.editors.prompt_editor.test_profile_roundtrip",
 	"tests.unit.modules.hotstrings.injector.test_hotstring_undo_owner",

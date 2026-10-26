@@ -338,14 +338,23 @@ helpers.describe("error window bridge (linux): page and actions (error-dialog-li
 end)
 
 helpers.describe("error window bridge (linux): crash notice (error-dialog-linux)", function()
-	helpers.it("parses a crash dump's module, error and stack (error-dialog-linux)", function()
+	helpers.it("parses a crash report's module, error and stack (error-dialog-linux)", function()
 		with_bridge(nil, function(bridge)
-			local module_name, message = bridge.parse_crash_dump(table.concat({
-				"=== Ergopti Linux Crash Dump ===", "Timestamp: Wed Sep 23 21:04:11 2026", "Module:    ergopti_hotstrings",
-				"Error:     boom", "Version:   2.1.0 (build)", "Stack:", "boom", "stack traceback:", "\tmain.lua:3", "",
-			}, "\n"))
+			local CrashReport = require("crash_report")
+			local module_name, message = bridge.parse_crash_dump(CrashReport.encode(CrashReport.build({
+				driver = "linux", timestamp = "2026-09-23T21:04:11Z", module = "ergopti_hotstrings",
+				error_msg = "boom", stack_trace = "boom\nstack traceback:\n\tmain.lua:3\n",
+			})))
 			helpers.assert_eq(module_name, "ergopti_hotstrings")
 			helpers.assert_eq(message, "boom\nboom\nstack traceback:\n\tmain.lua:3")
+		end)
+	end)
+
+	helpers.it("refuses a document that is not a crash report instead of guessing a module (error-dialog-linux)", function()
+		with_bridge(nil, function(bridge)
+			local module_name, reason = bridge.parse_crash_dump("=== Ergopti Linux Crash Dump ===\nModule:    x\n")
+			helpers.assert_eq(module_name, nil)
+			helpers.assert_contains(reason, "not a crash report")
 		end)
 	end)
 
@@ -354,9 +363,10 @@ helpers.describe("error window bridge (linux): crash notice (error-dialog-linux)
 			local dir = os.tmpname()
 			os.remove(dir)
 			os.execute("mkdir -p '" .. dir .. "'")
-			local dump = "crash_2026-09-23T21-04-11_ergopti_hotstrings.txt"
+			local dump = "2026-09-23T21-04-11Z.json"
 			local fh = io.open(dir .. "/" .. dump, "wb")
-			fh:write("=== Ergopti Linux Crash Dump ===\nModule:    ergopti_hotstrings\nError:     boom\n")
+			local CrashReport = require("crash_report")
+			fh:write(CrashReport.encode(CrashReport.build({ module = "ergopti_hotstrings", error_msg = "boom" })))
 			fh:close()
 			local Shell = require("adapters.shell_runner")
 			local exec_line = Shell.exec_line
