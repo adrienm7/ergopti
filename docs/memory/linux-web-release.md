@@ -613,9 +613,14 @@ has no bash) sources `libc-preflight.sh`, rendered by
 `startup.linux_appimage_*` locale keys, which refuses in words with exit 69
 (`getconf GNU_LIBC_VERSION` answers only on glibc). Action: never put a bash
 construct before that `.` line.
-`tools/build/appimage-distro-matrix.sh <AppImage>` replays the musl refusal,
+`tools/build/appimage-distro-sweep.sh <AppImage>` replays the musl refusal,
 the old-glibc refusal and the desktop launch per distribution image. Action:
 run it on every change to AppRun, the stager or the build image.
+The AppImage deliberately does not bundle glibc or its loader (they must agree with the
+host's GTK, GL and NSS modules): it is built on the oldest supported LTS and
+`check-elf-needed-closure.cjs` refuses any ELF `NEEDED` entry that is neither in the image
+nor on `_shared/data/linux_appimage_recipient_libraries.json`. Action: a library the build
+host links by accident is staged, or listed there with a reason, never ignored.
 
 The catalogue's runner has GTK 3 but no libayatana, no StatusNotifier host and
 no keyboard; its tray retry docks XEmbed icons into stalonetray. v1.0.3 held its

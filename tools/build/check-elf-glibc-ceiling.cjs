@@ -174,5 +174,7 @@ module.exports = {
 	OLDEST_LTS_IMAGE,
 	parseVersionNeeds,
 	exceedsCeiling,
-	checkTree
+	checkTree,
+	isElf,
+	regularFiles
 };

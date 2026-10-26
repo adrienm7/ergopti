@@ -162,6 +162,13 @@ python3 "$SCRIPT_DIR/stage-linux-network-runtime.py" \
 # than on the user's machine.
 node "$SCRIPT_DIR/check-elf-glibc-ceiling.cjs" "$APPDIR"
 
+# And every library an ELF file needs is in the image or on the documented
+# recipient list (_shared/data/linux_appimage_recipient_libraries.json): the C
+# library and its loader are the recipient's by design, the baseline being the
+# oldest supported glibc above; anything else the build host linked by accident
+# fails here rather than on a machine that lacks it.
+node "$SCRIPT_DIR/check-elf-needed-closure.cjs" "$APPDIR"
+
 # ----------------------------------------------------------------------
 # 5. AppRun — the single entry point
 # ----------------------------------------------------------------------

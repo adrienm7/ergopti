@@ -230,6 +230,16 @@ which version it found. Distributions built on **musl** instead of glibc
 glibc at all, so neither the AppImage nor the `.deb`/`.rpm` packages run there;
 the AppImage refuses with a message saying so.
 
+The image is self-contained except for the C library, its loader, GLib, the
+C++ runtime and GTK 3, which a program that draws a tray icon and web views
+must share with the desktop it runs on: bundling a second glibc or GTK next to
+the host's graphics and NSS modules breaks them. Instead the image is built and
+launched on the oldest supported glibc (Ubuntu 22.04), a symbol-version check
+refuses anything newer, and a closure check refuses any other library an ELF
+file needs that the image does not carry. The list of what the recipient
+supplies, with the reason for each group, is
+`_shared/data/linux_appimage_recipient_libraries.json`.
+
 Requirements:
 
 - `uinput` kernel module loaded (`modprobe uinput`)

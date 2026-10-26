@@ -1,0 +1,51 @@
+{
+	"version": 1,
+	"description": "The shared libraries an ELF file of the Linux AppImage may need without the image carrying them: the recipient's own. Everything else a bundled ELF file needs must be in the image. tools/build/check-elf-needed-closure.cjs reads this file; a library added here needs a reason a reviewer can check, because the image then stops being self-contained for it.",
+	"baseline": {
+		"glibc": "2.35",
+		"reference_image": "ubuntu:22.04",
+		"musl": "unsupported: a musl system (Alpine) cannot run glibc programs; the AppImage's AppRun preflight refuses it in the user's language (startup.linux_appimage_musl_body)."
+	},
+	"groups": [
+		{
+			"id": "glibc",
+			"reason": "One glibc installation, loader included. It cannot be bundled piecemeal: the loader, libc and the recipient's GTK, GL and NSS modules must agree. The image is built on the oldest supported LTS instead, and check-elf-glibc-ceiling.cjs refuses a newer symbol version.",
+			"sonames": [
+				"libc.so.6",
+				"libm.so.6",
+				"libdl.so.2",
+				"libpthread.so.0",
+				"librt.so.1",
+				"libresolv.so.2",
+				"libutil.so.1"
+			],
+			"prefixes": ["ld-linux-"]
+		},
+		{
+			"id": "glib-and-cxx",
+			"reason": "The recipient's GTK stack links its own GLib and C++ runtime; a bundled older copy shadows them and the tray fails to load (see stage-linux-network-runtime.py recipient_base).",
+			"sonames": [
+				"libglib-2.0.so.0",
+				"libgobject-2.0.so.0",
+				"libgio-2.0.so.0",
+				"libgmodule-2.0.so.0",
+				"libstdc++.so.6",
+				"libgcc_s.so.1"
+			]
+		},
+		{
+			"id": "gtk3-stack",
+			"reason": "The tray library and the webview windows load the recipient's GTK 3 into the daemon's process; the image bundles only the tray's own libraries without GTK.",
+			"sonames": [
+				"libgtk-3.so.0",
+				"libgdk-3.so.0",
+				"libgdk_pixbuf-2.0.so.0",
+				"libcairo.so.2",
+				"libcairo-gobject.so.2",
+				"libpango-1.0.so.0",
+				"libpangocairo-1.0.so.0",
+				"libatk-1.0.so.0"
+			]
+		}
+	]
+}
