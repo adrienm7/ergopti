@@ -14,6 +14,7 @@ local i18n    = require("infra.i18n")
 local Parser         = require("modules.llm.parser")
 local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")
+local TokenBudget = require("llm.request_plan.token_budget")
 -- Independent inference, availability, and warmup owners prevent one semantic
 -- operation from superseding another merely because both use HTTP
 local _infer_client  = require("adapters.http_client").new()
@@ -1930,7 +1931,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 
 	local effective_temp = tonumber(temperature) or ApiCommon.DEFAULT_TEMPERATURE
 	local system_prompt  = Profiles.resolve_system_prompt(profile, num_predictions)
-	local tokens         = tonumber(max_predict) * num_predictions + (num_predictions * 5)
+	local tokens         = TokenBudget.for_call(tonumber(max_predict), num_predictions)
 	local is_batch       = profile.batch
 	local dedup_stats    = ApiCommon.new_dedup_stats()
 	local post_fn        = streaming and post_and_parse_streaming or post_and_parse

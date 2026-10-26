@@ -91,6 +91,7 @@ function M.new(root, production, options)
 	}, { __index = _G })
 	local owned_paths = {
 		["modules.llm.api_ollama"] = "macos/modules/llm/api_ollama.lua",
+		["llm.request_plan.token_budget"] = "_shared/lua/llm/request_plan/token_budget.lua",
 		["adapters.managed_ollama_daemon"] = "macos/adapters/managed_ollama_daemon.lua",
 		["adapters.owned_program_runner"] = "macos/adapters/owned_program_runner.lua",
 		["core.llm.ollama_runtime_choice"] = "_shared/lua/core/llm/ollama_runtime_choice.lua",

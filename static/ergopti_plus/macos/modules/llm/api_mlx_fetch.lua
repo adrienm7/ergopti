@@ -23,6 +23,7 @@ local M = {}
 local Logger         = require("infra.logger")
 local ApiCommon      = require("modules.llm.api_common")
 local Profiles       = require("modules.llm.profiles")
+local TokenBudget = require("llm.request_plan.token_budget")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
@@ -99,7 +100,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 
 	local effective_temp = tonumber(temperature) or ApiCommon.DEFAULT_TEMPERATURE
 	local system_prompt  = Profiles.resolve_system_prompt(profile, num_predictions)
-	local tokens         = tonumber(max_predict) * num_predictions + (num_predictions * 5)
+	local tokens         = TokenBudget.for_call(tonumber(max_predict), num_predictions)
 	local is_batch       = profile.batch
 	local dedup_stats    = ApiCommon.new_dedup_stats()
 	local post_fn        = streaming and _post_and_parse_streaming or _post_and_parse

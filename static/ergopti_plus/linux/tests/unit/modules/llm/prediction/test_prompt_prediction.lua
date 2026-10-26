@@ -326,6 +326,11 @@ helpers.describe("prompt prediction: the binding's prompt and count, for this re
 			helpers.assert_eq(#world.posts, 1, "a batch is one request")
 			helpers.assert_true(system_turn(world.posts[1]):find("exactly 2 different", 1, true) ~= nil,
 				"the batch template asks for the binding's two: " .. system_turn(world.posts[1]))
+			-- The shared token budget: every variant of a batch adds its numbering room
+			-- (macOS and Windows already did; Linux used to give the bare product).
+			local base = PromptBuilder.build_params("Je vous envoie ce mail pour",
+				{ max_words = require("modules.llm.settings").get("max_words") }).max_tokens
+			helpers.assert_eq(world.posts[1].body.max_tokens, 2 * (base + 5), "a batch of two budget")
 			assert_menu_untouched(world)
 		end)
 	end)

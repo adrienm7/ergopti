@@ -14,6 +14,7 @@ local M = {}
 local Json = require("json")
 local Debounce = require("llm.request_plan.debounce")
 local Batching = require("llm.request_plan.batching")
+local TokenBudget = require("llm.request_plan.token_budget")
 
 --- Reads and decodes one corpus file.
 --- @param path string Absolute path.
@@ -105,6 +106,32 @@ function M.run_batching(helpers, corpus_path)
 		for _, vector in ipairs(corpus.vectors) do
 			helpers.it("transcript '" .. vector.id .. "'", function()
 				local ok, result = pcall(Batching.plan, vector.batch_profile, vector.requested)
+				if vector.expect_error then
+					helpers.assert_eq(ok, false, "must raise")
+					helpers.assert_contains(tostring(result), vector.expect_error)
+				else
+					helpers.assert_eq(ok, true, tostring(result))
+					helpers.assert_eq(result, vector.expect)
+				end
+			end)
+		end
+	end)
+end
+
+--- Registers the token budget transcripts.
+--- @param helpers table Driver assertions and case registration.
+--- @param corpus_path string Canonical shared token budget corpus path.
+function M.run_token_budget(helpers, corpus_path)
+	local corpus = read_json(corpus_path)
+	helpers.describe("Shared request plan token budget transcripts", function()
+		for _, vector in ipairs(corpus.vectors) do
+			helpers.it("transcript '" .. vector.id .. "'", function()
+				local ok, result
+				if vector.retry then
+					ok, result = pcall(TokenBudget.for_retry, vector.retry.call_tokens, vector.retry.extra_tokens)
+				else
+					ok, result = pcall(TokenBudget.for_call, vector.base_tokens, vector.per_call)
+				end
 				if vector.expect_error then
 					helpers.assert_eq(ok, false, "must raise")
 					helpers.assert_contains(tostring(result), vector.expect_error)
