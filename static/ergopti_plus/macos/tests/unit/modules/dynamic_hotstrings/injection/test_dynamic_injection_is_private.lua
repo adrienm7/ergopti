@@ -204,6 +204,7 @@ helpers.describe("expander: is_private is forwarded to the keystats, not dropped
 		package.loaded["modules.keymap.expander"] = nil
 		Expander = helpers.load_with_stubs("modules.keymap.expander")
 
+		local marked = {}
 		local expander_state = {
 			buffer                     = "abc",
 			llm_buffer                 = "",
@@ -229,6 +230,8 @@ helpers.describe("expander: is_private is forwarded to the keystats, not dropped
 			cancel          = function() end,
 			set_buffer      = function() end,
 			update_preview  = function() end,
+			-- A private replacement tells the bridge to forget the AI context.
+			mark_private_context = function(buffer) marked[#marked + 1] = buffer end,
 			get_llm_enabled = function() return false end,
 			start_timer     = function() end,
 		})
@@ -249,6 +252,7 @@ helpers.describe("expander: is_private is forwarded to the keystats, not dropped
 		helpers.assert_eq(seen.is_private, true,
 			"is_private must survive the hop from perform_text_replacement to notify_synthetic; "
 			.. "a flag that is accepted and dropped is worse than one that is absent")
+		helpers.assert_eq(#marked, 1, "a private replacement tells the AI bridge to forget its context")
 
 		package.loaded["modules.keystats"] = nil
 	end)

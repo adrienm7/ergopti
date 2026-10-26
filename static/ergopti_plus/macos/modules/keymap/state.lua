@@ -91,6 +91,9 @@ function M.new(defaults, delays_default)
 		-- hotstring buffer. Navigation always invalidates hotstring eligibility,
 		-- while the user-facing llm_reset_on_nav preference may retain this text.
 		llm_buffer                 = "",
+		-- The hotstring buffer content up to the last private (personal-information)
+		-- expansion: the AI context never shows anything of it. "" when none.
+		llm_private_mark           = "",
 		-- True when the character immediately to the LEFT of `buffer` is
 		-- known to be a word terminator (or there is no character at all
 		-- — start of input). Flipped to false whenever the cursor moves
@@ -185,6 +188,7 @@ function M.new(defaults, delays_default)
 		s.no_rescan_until = deadline
 		s.buffer = ""
 		s.llm_buffer = ""
+		s.llm_private_mark = ""
 		-- Post-expansion: the replacement just landed on screen. Treat the
 		-- new cursor position as abutting a word boundary so the next typed
 		-- char can fire word-boundary-required triggers — that mirrors the

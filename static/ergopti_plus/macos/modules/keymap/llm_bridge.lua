@@ -700,6 +700,44 @@ local function arm_llm_timer(label, fn, delay)
 	return true
 end
 
+--- The part of a hotstring-buffer text the AI may see, and the mark it keeps.
+---
+--- The AI context mirrors the hotstring buffer, which holds the replacement of
+--- a private (personal-information) expansion like any other text. That text
+--- must never reach a prompt, local or remote, so everything up to the last
+--- private expansion is withheld (the shared rule, see
+--- ContextBuffer.after_private; Linux clears its context object instead).
+--- @param text string The hotstring buffer.
+--- @return string visible
+local function ai_context_of(text)
+	local visible, mark = ContextBuffer.after_private(text, _state.llm_private_mark or "")
+	_state.llm_private_mark = mark
+	return visible
+end
+
+--- Declares that a private expansion just landed: the AI forgets the buffer.
+---
+--- Called by the expander once the replacement is committed, with the buffer
+--- the engine now holds, so the secret (and the trigger, a fragment of it)
+--- stays out of every later prompt.
+--- @param buffer string The hotstring buffer after the private replacement.
+function M.mark_private_context(buffer)
+	if not require_state("mark_private_context") then error("keymap LLM bridge is not initialised", 2) end
+	if type(buffer) ~= "string" then error("private context buffer must be a string", 2) end
+	_state.llm_private_mark = buffer
+	_state.llm_buffer = ""
+	Logger.debug(LOG, "Private expansion — AI typing context forgotten.")
+end
+
+--- Keeps the private mark aligned with a hotstring buffer whose head was cut.
+--- @param buffer string The buffer before the cut.
+--- @param removed integer Bytes removed from its head.
+function M.private_context_trimmed(buffer, removed)
+	if not _state or (_state.llm_private_mark or "") == "" then return end
+	local _, mark = ContextBuffer.after_private(buffer, _state.llm_private_mark)
+	_state.llm_private_mark = removed >= #mark and "" or mark:sub(removed + 1)
+end
+
 --- Refreshes the preview tooltip from the current buffer content.
 ---
 --- Decision tree:
@@ -715,10 +753,12 @@ local function update_preview_body(buf)
 	-- `_state.buffer`; LLM prompting owns this separate context so navigation can
 	-- revoke cursor-relative actions without defeating the user's keep-context
 	-- preference.
-	_state.llm_buffer = buf
+	local ai_context = buf
+	if type(buf) == "string" then ai_context = ai_context_of(buf) end
+	_state.llm_buffer = ai_context
 	-- The agent's automatic mode waits for a pause in the typing: every
 	-- keystroke drops what it had in flight and re-arms its own timer
-	local agent_ok, agent_error = xpcall(AgentRunner.observe_typing, debug.traceback, buf)
+	local agent_ok, agent_error = xpcall(AgentRunner.observe_typing, debug.traceback, ai_context)
 	if not agent_ok then Logger.error(LOG, "Agent typing observer raised: %s.", tostring(agent_error)) end
 
 	-- Skip timer ops entirely when LLM is off: stop_timer()/start_timer() involve
@@ -1726,7 +1766,7 @@ function M.apply_prediction(idx)
 			-- transaction events already carry their provenance independently of
 			-- whether the text path used direct key pairs or Cmd+V.
 			_state.buffer = next_buffer
-			_state.llm_buffer = _state.buffer
+			_state.llm_buffer = ai_context_of(_state.buffer)
 		end,
 		true,   -- is_final
 		true,   -- is_ignored

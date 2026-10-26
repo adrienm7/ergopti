@@ -84,6 +84,36 @@ local function strict_length(text, what)
 	return length
 end
 
+--- What the model may see of a mirrored typing buffer after a private expansion.
+---
+--- macOS mirrors the hotstring buffer instead of editing a separate window, so
+--- the text of a private expansion (personal information) stays inside the
+--- mirrored text. The mark is the buffer content up to and including that
+--- expansion; only what was typed after it is visible. The mark follows the
+--- tail edits the buffer undergoes: typing leaves it, a Backspace into it keeps
+--- the surviving part marked, and any other divergence (another field, a reset)
+--- keeps only the common prefix. Linux needs none of this: its context object
+--- clears on a private replacement and appends from there.
+--- @param text string The mirrored buffer.
+--- @param mark string The buffer content through the last private expansion, "" for none.
+--- @return string visible The part of `text` that may reach a prompt.
+--- @return string mark The mark to keep for the next call.
+function M.after_private(text, mark)
+	if type(text) ~= "string" then error("context text must be a string", 2) end
+	if type(mark) ~= "string" then error("private mark must be a string", 2) end
+	if mark == "" then return text, "" end
+	if text:sub(1, #mark) == mark then return text:sub(#mark + 1), mark end
+	local limit = math.min(#text, #mark)
+	local common = 0
+	while common < limit and text:byte(common + 1) == mark:byte(common + 1) do common = common + 1 end
+	-- Never cut inside a codepoint: the visible text must stay valid UTF-8.
+	while common > 0 and text:byte(common + 1) and text:byte(common + 1) >= 0x80
+		and text:byte(common + 1) < 0xC0 do
+		common = common - 1
+	end
+	return text:sub(common + 1), mark:sub(1, common)
+end
+
 --- Creates an empty context buffer.
 --- @return table buffer With text(), length(), set(), append(), backspace(),
 ---   replace_tail(), clear() and navigated().

@@ -59,6 +59,7 @@ end
 local function make_llm()
 	return {
 		update_preview   = function() end,
+		mark_private_context = function() end,
 		get_llm_enabled  = function() return false end,
 		start_timer      = function() end,
 	}

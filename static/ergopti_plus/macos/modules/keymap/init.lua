@@ -217,6 +217,7 @@ local function observe_context_epoch(epoch)
 	if epoch ~= _last_context_epoch then
 		CoreState.buffer = ""
 		CoreState.llm_buffer = ""
+		CoreState.llm_private_mark = ""
 		-- Deliberately not governed by hotstrings.arrow_resets_word or
 		-- shortcut_resets_word. An epoch is an opaque token for "an Ergopti
 		-- action handed output to Quartz": it does not say whether that output was
@@ -396,6 +397,7 @@ local function invalidate_observed_context()
 	if _one_shot_shift then _one_shot_shift.disarm() end
 	CoreState.buffer = ""
 	CoreState.llm_buffer = ""
+	CoreState.llm_private_mark = ""
 	cancel_action_preview_recovery()
 	-- Not a word boundary: the cursor sits in territory we never observed, so
 	-- word-anchored triggers must stay silent until a real terminator is seen.
@@ -415,6 +417,7 @@ local function discard_paused_text_context()
 	if _one_shot_shift then _one_shot_shift.disarm() end
 	CoreState.buffer = ""
 	CoreState.llm_buffer = ""
+	CoreState.llm_private_mark = ""
 	CoreState.start_is_word_boundary = false
 	CoreState.start_is_line_start = false
 	cancel_action_preview_recovery()
@@ -427,6 +430,7 @@ end
 local function invalidate_window_context()
 	CoreState.buffer = ""
 	CoreState.llm_buffer = ""
+	CoreState.llm_private_mark = ""
 	cancel_action_preview_recovery()
 	CoreState.start_is_word_boundary = false
 	CoreState.start_is_line_start = false
@@ -985,6 +989,7 @@ function M.inject_dynamic(deletes, result_text, emit_action, source_variant, is_
 			tostring(splice_error))
 		CoreState.buffer = ""
 		CoreState.llm_buffer = ""
+		CoreState.llm_private_mark = ""
 		CoreState.start_is_word_boundary = false
 		CoreState.start_is_line_start = false
 		local cleanup_ok, cleanup_result = xpcall(LLMBridge.reset_predictions, debug.traceback)
@@ -1100,7 +1105,7 @@ local function publication_receipt(transaction, capture)
 		if notified or receipt.is_settled() ~= true then return end
 		notified = true
 		if transaction.completion_status ~= "complete" and capture.input == _user_hotstring_input then
-			CoreState.buffer, CoreState.llm_buffer = "", ""
+			CoreState.buffer, CoreState.llm_buffer, CoreState.llm_private_mark = "", "", ""
 			CoreState.start_is_word_boundary = false
 			CoreState.start_is_line_start = false
 		end
@@ -1723,6 +1728,9 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 			CoreState.start_is_line_start = false
 		end
 		CoreState.llm_buffer = ""
+		-- The mark describes the hotstring buffer: it goes with it, and stays while a
+		-- bare Backspace keeps the word before the pause (and so a secret in it).
+		if CoreState.buffer == "" then CoreState.llm_private_mark = "" end
 		LLMBridge.reset_predictions()
 	end
 
@@ -1883,6 +1891,8 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	CoreState.buffer = CoreState.buffer .. chars
 	if #CoreState.buffer > BUFFER_TRIM_BYTE_GATE then
 		local ok, off = pcall(utf8.offset, CoreState.buffer, -BUFFER_MAX_CHARS)
+		-- The private mark loses the same head, so it keeps describing the buffer.
+		LLMBridge.private_context_trimmed(CoreState.buffer, (ok and off) and off - 1 or #CoreState.buffer)
 		-- Fall back to empty on a failed offset (malformed UTF-8) rather than
 		-- keeping the full overgrown buffer — losing ≤500 chars of history is
 		-- acceptable, unbounded growth is not.
@@ -2685,6 +2695,7 @@ function M.stop(teardown)
 	_window_context_reconcile_pending = false
 	CoreState.buffer = ""
 	CoreState.llm_buffer = ""
+	CoreState.llm_private_mark = ""
 	CoreState.start_is_word_boundary = false
 	CoreState.start_is_line_start = false
 	cancel_action_preview_recovery()

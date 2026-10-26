@@ -275,6 +275,24 @@ or System 2 request while the AI is off, `set_llm_enabled(false)` cancels the
 pause, and the first keystroke after the switch-on re-arms it. The gate is required lazily where a fixture
 snapshots `package.loaded`.
 
+### project-macos-private-expansions-never-reach-the-ai-context
+
+`llm_buffer` mirrors the hotstring buffer at each `update_preview`, and a
+private (personal-information) mapping is not a `final_result`, so its
+replacement stayed in that buffer and the next prediction, the automatic agent
+and any remote provider received the SSN, IBAN or phone number. (The @-tag
+injectors are final: `commit_suppress_rescan` wipes both buffers.) The
+expander now calls `LLMBridge.mark_private_context(buffer)` right after the
+buffer commit of any `is_private` replacement, and every read of the mirror
+goes through `ContextBuffer.after_private(text, mark)` (shared with Linux and
+pinned by `private_mirror` in `context_buffer_vectors.json`): only what was
+typed after the mark is visible, Backspace into the secret keeps the surviving
+part marked, and the head cut of the 500-character buffer shrinks the mark
+(`private_context_trimmed`). Every site that empties `buffer` empties
+`llm_private_mark` with it. Action: a new writer of `llm_buffer`, or a new
+reader of the mirror for a prompt, goes through `ai_context_of`; extend
+`test_private_expansion_never_prompted.lua`.
+
 ### project-macos-local-openai-servers-are-keyless-api-entries
 
 Servers the user runs (oMLX, LM Studio, llama-server/LocalAI, Jan) come from
