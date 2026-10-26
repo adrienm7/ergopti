@@ -38,6 +38,7 @@ local LayerPreset = require("keymap.layer_preset")
 local NativePath = require("native_path")
 local LOG = "infra.tap_hold_scope"
 local _owner, _sequence = nil, 0
+require("infra.scope_registry").register("tap_hold_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
 --- Whether a parameter binding belongs to the tap-hold domain: the daemon runs
 --- tap actions under the binding "tap_hold"; per-key bindings keep its prefix.

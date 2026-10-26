@@ -51,6 +51,7 @@ local BASE_DELAY_PATH = require("config_keys").KEY.HOTSTRINGS_EXPANSION_DELAY
 local NativePath = require("native_path")
 local TableUtil = require("table_util")
 local _owner, _sequence = nil, 0
+require("infra.scope_registry").register("hotstrings_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
 --- Whether a category or section identity can be named by a canonical path.
 --- @param id string

@@ -102,6 +102,8 @@ helpers.describe("Linux gesture scope transaction", function()
 				if backup then controls.backups[#controls.backups + 1] = backup end
 				helpers.assert_eq(committed, false)
 				helpers.assert_eq(detail, "runtime rollback remains pending")
+				helpers.assert_eq(require("infra.scope_registry").pending_names(), { "gesture_scope" },
+					"the tray's Quit waits for the retained gesture rollback (quit-waits-for-writer)")
 				helpers.assert_eq(gestures.set_action("tap_3", "vol_up"), false)
 				helpers.assert_eq(gestures.set_action_parameter("tap_3", "open_url", "https://new.example"), false)
 				helpers.assert_eq(gestures.set_enabled(false), false)
