@@ -466,6 +466,31 @@ _LLM_CurlProcessExited(ProcessOwner, Port := 0) {
 	return Result = 0
 }
 
+
+; Read the terminal status while custody still retains the exact native object.
+; A signaled exit code 259 is a failed exit, not a process-liveness verdict.
+_LLM_CurlProcessExitCode(ProcessOwner) {
+	PreviousCritical := Critical("On")
+	try {
+		if !(ProcessOwner is Map) || ProcessOwner.Get("released", false)
+				|| ProcessOwner.Get("releasing", false)
+			throw Error("The curl process owner cannot provide a terminal exit receipt.")
+		if !_LLM_CurlProcessExited(ProcessOwner)
+			throw Error("The exact curl process has not acknowledged exit.")
+		if ProcessOwner.Has("tree") {
+			ExitCode := ProcessOwner["terminal"].Get("exit", "")
+			if !(ExitCode is Integer)
+				throw Error("The curl process tree returned an invalid exit receipt.")
+			return ExitCode
+		}
+		ExitCode := 0
+		Diagnostic := ""
+		if !_SR_TreeReadExitCode(ProcessOwner["handle"], &ExitCode, &Diagnostic)
+			throw Error(Diagnostic)
+		return ExitCode
+	} finally Critical(PreviousCritical)
+}
+
 _LLM_CurlMaxFileSizeArg(CurlExe := "", VersionFn := 0) {
 	global HTTP_CURL_MAX_RESPONSE_BYTES
 	if CurlExe == ""
