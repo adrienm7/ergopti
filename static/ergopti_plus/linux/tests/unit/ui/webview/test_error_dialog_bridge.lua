@@ -479,3 +479,29 @@ helpers.describe("error opener cancellation reentry", function()
 		end)
 	end
 end)
+
+
+helpers.describe("native crash notice source admission", function()
+	for _, kind in ipairs({ "regular", "dump-symlink", "marker-fifo", "marker-fifo-symlink", "dump-fifo",
+		"dump-fifo-symlink", "marker-write-refusal", "marker-close-refusal", "marker-replaced", "dump-close-refusal",
+		"marker-unreadable", "dump-unreadable", "marker-read-close-refusal" }) do
+		helpers.it("(crash-notice-native) refuses unsafe startup I/O: " .. kind, function()
+			local Shell = require("adapters.shell_runner")
+			local folder = os.tmpname(); assert(os.remove(folder))
+			assert(Shell.run("mkdir -m 700 -- " .. Shell.quote(folder)))
+			local okay, detail = xpcall(function()
+				local fixture = helpers.driver_root() .. "/tests/fixtures/native_crash_notice_source.lua"
+				local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
+				local completed = Shell.run("timeout --kill-after=2 5 " .. Shell.quote(executable)
+					.. " " .. Shell.quote(fixture) .. " " .. Shell.quote(folder) .. " " .. Shell.quote(kind))
+				helpers.assert_true(completed, "the actual notifier must finish without a FIFO peer")
+				local receipt = assert(io.open(folder .. "/complete", "rb"))
+				helpers.assert_eq(receipt:read("*a"), "complete", "native worker reached every assertion")
+				assert(receipt:close())
+			end, debug.traceback)
+			for _, leaf in ipairs({ "crash_probe.json", ".last_crash_notice", ".target", "complete" }) do os.remove(folder .. "/" .. leaf) end
+			assert(os.remove(folder), "native fixture entries must all be retired")
+			if not okay then error(detail, 0) end
+		end)
+	end
+end)
