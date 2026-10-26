@@ -127,9 +127,10 @@ _LLM_TooltipRetireSurfaceRecord(Surface, ReplacementLifecycle := 0) {
 	if (IsObject(ReplacementLifecycle)
 		and ObjPtr(Lifecycle) == ObjPtr(ReplacementLifecycle))
 		return Record
-	if (Lifecycle.Suggested and Lifecycle.Outcome == "") {
+	if Lifecycle.Outcome == "" {
 		Lifecycle.Outcome := "dismissed"
-		_LLM_TooltipQueueMetricUnsafe("dismissed", Lifecycle)
+		if Lifecycle.Suggested
+			_LLM_TooltipQueueMetricUnsafe("dismissed", Lifecycle)
 	}
 	return Record
 }
@@ -188,6 +189,8 @@ _LLM_TooltipCommitSurfaceState(slots, active_idx, RenderGeneration,
 				or !Previous.Lifecycle.HasOwnProp("Outcome")
 			throw TypeError("Visible LLM lifecycle is missing its terminal outcome.")
 		if Previous.Lifecycle.Outcome != ""
+				&& !(Previous.Lifecycle.Outcome == "dismissed"
+					&& Previous.HasOwnProp("WithdrawalPending") && Previous.WithdrawalPending)
 			throw TooltipLlmTerminalOutcomeError(
 				"Visible LLM lifecycle already reached a terminal outcome.")
 	}
@@ -595,6 +598,35 @@ LLM_TooltipShowLoading(PresentationMeta := 0) {
 	return true
 }
 
+; Revoke input ownership before the keyboard callback returns. The captured
+; surface still owns its pixels; only its later exact hide may dispose them.
+LLM_TooltipWithdrawExact(ExpectedRecord, Accepted := false) {
+	Record := 0
+	PreviousCritical := Critical("On")
+	try {
+		Presentation := _LLM_TooltipGetCurrentPresentation()
+		if !IsObject(Presentation) || !IsObject(ExpectedRecord)
+				|| Presentation.Record != ExpectedRecord
+			return 0
+		Record := Presentation.Record
+		if Record.HasOwnProp("WithdrawalPending") && Record.WithdrawalPending
+			return Record
+		if Accepted
+			LLM_TooltipFinalizeAcceptance(Record.Lifecycle, true)
+		; A claimed output already belongs to its sender. Cancellation revokes
+		; further input, without changing that transaction's eventual outcome.
+		_LLM_TooltipRetireSurfaceRecord(Presentation.Surface)
+		Record.WithdrawalPending := true
+		if Record.Kind == "prediction" && IsSet(LLM_NavEventOwner_BeginSurfaceSwap) {
+			Swap := LLM_NavEventOwner_BeginSurfaceSwap(Presentation.Surface, 0)
+			if Swap is Map && !Swap.Get("retry", false)
+				LLM_NavEventOwner_CommitSurfaceSwap(Swap, true)
+		}
+	} finally Critical(PreviousCritical)
+	_LLM_TooltipScheduleMetricDrain()
+	return Record
+}
+
 LLM_TooltipHide(accepted := false, ExpectedGeneration := unset,
 		ExpectedRequestSerial := unset, ExpectedRecord := 0) {
 	Presentation := _LLM_TooltipGetCurrentPresentation()
@@ -685,6 +717,7 @@ LLM_TooltipGetText() {
 	Presentation := _LLM_TooltipGetCurrentPresentation()
 	Record := IsObject(Presentation) ? Presentation.Record : 0
 	if !IsObject(Record) or Record.Kind != "prediction"
+			|| (Record.HasOwnProp("WithdrawalPending") && Record.WithdrawalPending)
 		return ""
 	if IsSet(LLM_NavEventOwner_SyncRecord)
 			&& !LLM_NavEventOwner_SyncRecord(Record)

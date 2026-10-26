@@ -335,3 +335,5 @@ _LTAV_RefusedPhysicalTabIsTracedOnlyOverAPrediction() {
 
 Test("LLM accept: a refused physical Tab is traced only over a shown prediction (llm-tab-accepts-visible-prediction)",
 	_LTAV_RefusedPhysicalTabIsTracedOnlyOverAPrediction)
+
+#Include test_llm_offer_withdrawal.ahk

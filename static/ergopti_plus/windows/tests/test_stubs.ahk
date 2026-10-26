@@ -747,6 +747,19 @@ LLM_Tooltip_Hide(accepted := false) {
     _Stub_LlmPresentedRecord := 0
 }
 
+LLM_Tooltip_WithdrawExact(ExpectedRecord, accepted := false) {
+    global _Stub_LlmPresentedRecord
+    Record := _Stub_LlmPresentedRecord
+    if !IsObject(Record) || Record != ExpectedRecord
+        return 0
+    if accepted
+        LLM_Tooltip_FinalizeAcceptance(Record.Lifecycle, true)
+    if Record.Lifecycle.Outcome == ""
+        Record.Lifecycle.Outcome := "dismissed"
+    Record.WithdrawalPending := true
+    return Record
+}
+
 LLM_Tooltip_HideExact(ExpectedRecord, accepted := false) {
     global _Stub_LlmPresentedRecord
     if (IsObject(_Stub_LlmPresentedRecord)
@@ -772,7 +785,10 @@ LLM_Tooltip_IsLoading() {
 }
 
 LLM_Tooltip_GetText() {
-    global _Stub_LlmTooltipText
+    global _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
+    if IsObject(_Stub_LlmPresentedRecord)
+            && _Stub_LlmPresentedRecord.HasOwnProp("WithdrawalPending") && _Stub_LlmPresentedRecord.WithdrawalPending
+        return ""
     return _Stub_LlmTooltipText
 }
 

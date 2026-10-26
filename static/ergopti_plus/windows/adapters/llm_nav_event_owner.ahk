@@ -1623,7 +1623,7 @@ LLM_NavEventOwner_BeginSurfaceSwap(RetiredSurface, PreparedSurface,
 		OldEntry := _LLM_NavEventOwnerRecords[OldToken]
 		if OldEntry.NativeDetached {
 			NativeOldToken := 0
-			; A successful acceptance CAS already cleared native A. Hiding its
+			; Acceptance or logical withdrawal already cleared native A. Hiding its
 			; pixels is a logical retirement only and must not open a 0-to-0 fence.
 			if NewToken == 0
 				return Transaction
@@ -1650,7 +1650,7 @@ LLM_NavEventOwner_BeginSurfaceSwap(RetiredSurface, PreparedSurface,
 	return Transaction
 }
 
-LLM_NavEventOwner_CommitSurfaceSwap(Transaction) {
+LLM_NavEventOwner_CommitSurfaceSwap(Transaction, KeepRetiredSurface := false) {
 	global _LLM_NavEventOwnerRecords
 	if !(Transaction is Map)
 		return false
@@ -1681,7 +1681,11 @@ LLM_NavEventOwner_CommitSurfaceSwap(Transaction) {
 	if OldToken > 0 && _LLM_NavEventOwnerRecords.Has(OldToken) {
 		Old := _LLM_NavEventOwnerRecords[OldToken]
 		Old.Active := false
-		Old.Retired := true
+		; Logical withdrawal precedes the exact pixel hide. Retain this token's
+		; detached state so a replacement/hide starts from native owner zero.
+		Old.Retired := !KeepRetiredSurface
+		if KeepRetiredSurface
+			Old.NativeDetached := true
 	}
 	if NewToken > 0 && _LLM_NavEventOwnerRecords.Has(NewToken) {
 		New := _LLM_NavEventOwnerRecords[NewToken]
