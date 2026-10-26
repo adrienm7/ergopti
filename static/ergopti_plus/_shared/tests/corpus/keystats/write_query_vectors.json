@@ -1,0 +1,65 @@
+{
+	"_description": "Rendered SQL of the typed-slot and keyed catalogue statements. The JS reference renderer (tools/codegen/codegen-keystats-queries.cjs) and the Lua renderer of both drivers must produce exactly these texts; the values hold what the slot encoder must protect: quotes, a carriage return, a NUL, a line feed. A missing or null value is a missing slot.",
+	"vectors": [
+		{
+			"name": "meta.get",
+			"dialect": "native",
+			"values": { "key": "rev" },
+			"sql": "SELECT value FROM meta WHERE key='rev';"
+		},
+		{
+			"name": "meta.get",
+			"dialect": "cli_json",
+			"values": { "key": "it's" },
+			"sql": "SELECT json_quote(value) AS value_json FROM meta WHERE key='it''s';"
+		},
+		{
+			"name": "meta.set",
+			"dialect": "native",
+			"values": { "key": "k", "value": "a\r\nb\u0000c'd" },
+			"sql": "INSERT OR REPLACE INTO meta (key, value) VALUES ('k', 'a'||char(13)||'\nb'||char(0)||'c''d');"
+		},
+		{
+			"name": "meta.set",
+			"dialect": "cli_json",
+			"values": { "key": "k", "value": "" },
+			"sql": "INSERT OR REPLACE INTO meta (key, value) VALUES ('k', '');"
+		},
+		{
+			"name": "meta.upsert",
+			"dialect": "native",
+			"values": { "key": "open_walk:d", "value": "[]" },
+			"sql": "INSERT INTO meta(key,value) VALUES ('open_walk:d','[]') ON CONFLICT(key) DO UPDATE SET value = excluded.value;"
+		},
+		{
+			"name": "meta.upsert",
+			"dialect": "cli_json",
+			"values": { "key": "open_walk:d", "value": "[]" },
+			"sql": "INSERT INTO meta(key,value) VALUES ('open_walk:d','[]') ON CONFLICT(key) DO UPDATE SET value = excluded.value;"
+		},
+		{
+			"name": "meta.seed",
+			"dialect": "native",
+			"values": { "key": "rev", "value": "0" },
+			"sql": "INSERT OR IGNORE INTO meta (key, value) VALUES ('rev', '0');"
+		},
+		{
+			"name": "meta.seed",
+			"dialect": "cli_json",
+			"values": { "key": "rev", "value": "0" },
+			"sql": "INSERT OR IGNORE INTO meta (key, value) VALUES ('rev', '0');"
+		},
+		{
+			"name": "meta.rev_bump",
+			"dialect": "native",
+			"values": {},
+			"sql": "UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev';"
+		},
+		{
+			"name": "meta.rev_bump",
+			"dialect": "cli_json",
+			"values": {},
+			"sql": "UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev';"
+		}
+	]
+}

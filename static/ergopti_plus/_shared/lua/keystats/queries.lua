@@ -5,6 +5,7 @@
 local M = {}
 
 local TableUtil = require("table_util")
+local Literal = require("sqlite.literal")
 
 --- In-process engines (Hammerspoon, AHK) and the Linux sqlite3 -json CLI.
 M.DIALECTS = { "native", "cli_json" }
@@ -12,6 +13,7 @@ M.DIALECTS = { "native", "cli_json" }
 local QUERIES = {
 	["manifest.app_day"] = {
 		params = { "where" },
+		slots = {  },
 		texts = { "app", "category" },
 		templates = {
 			native = {
@@ -28,6 +30,7 @@ local QUERIES = {
 	},
 	["manifest.buckets"] = {
 		params = { "where" },
+		slots = {  },
 		texts = { "app" },
 		templates = {
 			native = {
@@ -44,6 +47,7 @@ local QUERIES = {
 	},
 	["manifest.burst"] = {
 		params = { "where" },
+		slots = {  },
 		texts = { "app" },
 		templates = {
 			native = {
@@ -60,6 +64,7 @@ local QUERIES = {
 	},
 	["manifest.session"] = {
 		params = { "where" },
+		slots = {  },
 		texts = { "app" },
 		templates = {
 			native = {
@@ -76,6 +81,7 @@ local QUERIES = {
 	},
 	["manifest.chars_class"] = {
 		params = { "where" },
+		slots = {  },
 		texts = { "app" },
 		templates = {
 			native = {
@@ -92,6 +98,7 @@ local QUERIES = {
 	},
 	["manifest.errors"] = {
 		params = { "where" },
+		slots = {  },
 		texts = { "app" },
 		templates = {
 			native = {
@@ -108,6 +115,7 @@ local QUERIES = {
 	},
 	["manifest.ergo"] = {
 		params = { "where" },
+		slots = {  },
 		texts = { "app" },
 		templates = {
 			native = {
@@ -124,6 +132,7 @@ local QUERIES = {
 	},
 	["manifest.layouts"] = {
 		params = { "where" },
+		slots = {  },
 		texts = { "app", "layout" },
 		templates = {
 			native = {
@@ -140,6 +149,7 @@ local QUERIES = {
 	},
 	["manifest.kc_hold"] = {
 		params = { "where" },
+		slots = {  },
 		texts = { "app" },
 		templates = {
 			native = {
@@ -156,6 +166,7 @@ local QUERIES = {
 	},
 	["manifest.media_keys"] = {
 		params = { "where" },
+		slots = {  },
 		texts = { "app" },
 		templates = {
 			native = {
@@ -172,6 +183,7 @@ local QUERIES = {
 	},
 	["manifest.media_hold"] = {
 		params = { "where" },
+		slots = {  },
 		texts = { "app" },
 		templates = {
 			native = {
@@ -188,6 +200,7 @@ local QUERIES = {
 	},
 	["manifest.titles"] = {
 		params = { "where" },
+		slots = {  },
 		texts = { "app", "title" },
 		templates = {
 			native = {
@@ -204,6 +217,7 @@ local QUERIES = {
 	},
 	["manifest.hourly"] = {
 		params = { "where" },
+		slots = {  },
 		texts = { "app" },
 		templates = {
 			native = {
@@ -220,6 +234,7 @@ local QUERIES = {
 	},
 	["manifest.hourly_min5"] = {
 		params = { "where" },
+		slots = {  },
 		texts = { "app" },
 		templates = {
 			native = {
@@ -236,6 +251,7 @@ local QUERIES = {
 	},
 	["manifest.switches_to"] = {
 		params = { "where" },
+		slots = {  },
 		texts = { "app", "app_to" },
 		templates = {
 			native = {
@@ -252,6 +268,7 @@ local QUERIES = {
 	},
 	["manifest.system_day"] = {
 		params = { "where" },
+		slots = {  },
 		texts = {  },
 		templates = {
 			native = {
@@ -268,6 +285,7 @@ local QUERIES = {
 	},
 	["ngram.tokens"] = {
 		params = { "table", "where", "conjunction" },
+		slots = {  },
 		texts = { "token" },
 		templates = {
 			native = {
@@ -296,6 +314,7 @@ local QUERIES = {
 	},
 	["ngram.tokens_by_app"] = {
 		params = { "table", "where", "conjunction" },
+		slots = {  },
 		texts = { "app", "token" },
 		templates = {
 			native = {
@@ -324,6 +343,7 @@ local QUERIES = {
 	},
 	["meta.rev"] = {
 		params = {  },
+		slots = {  },
 		texts = {  },
 		templates = {
 			native = {
@@ -334,13 +354,129 @@ local QUERIES = {
 			},
 		},
 	},
+	["meta.get"] = {
+		params = { "key" },
+		slots = { { "key", "s", false } },
+		texts = { "value" },
+		templates = {
+			native = {
+				"SELECT value FROM meta WHERE key=",
+				{ slot = "key", kind = "s", nullable = false },
+				";",
+			},
+			cli_json = {
+				"SELECT json_quote(value) AS value_json FROM meta WHERE key=",
+				{ slot = "key", kind = "s", nullable = false },
+				";",
+			},
+		},
+	},
+	["meta.set"] = {
+		params = { "key", "value" },
+		slots = { { "key", "s", false }, { "value", "s", false } },
+		texts = {  },
+		templates = {
+			native = {
+				"INSERT OR REPLACE INTO meta (key, value) VALUES (",
+				{ slot = "key", kind = "s", nullable = false },
+				", ",
+				{ slot = "value", kind = "s", nullable = false },
+				");",
+			},
+			cli_json = {
+				"INSERT OR REPLACE INTO meta (key, value) VALUES (",
+				{ slot = "key", kind = "s", nullable = false },
+				", ",
+				{ slot = "value", kind = "s", nullable = false },
+				");",
+			},
+		},
+	},
+	["meta.upsert"] = {
+		params = { "key", "value" },
+		slots = { { "key", "s", false }, { "value", "s", false } },
+		texts = {  },
+		templates = {
+			native = {
+				"INSERT INTO meta(key,value) VALUES (",
+				{ slot = "key", kind = "s", nullable = false },
+				",",
+				{ slot = "value", kind = "s", nullable = false },
+				") ON CONFLICT(key) DO UPDATE SET value = excluded.value;",
+			},
+			cli_json = {
+				"INSERT INTO meta(key,value) VALUES (",
+				{ slot = "key", kind = "s", nullable = false },
+				",",
+				{ slot = "value", kind = "s", nullable = false },
+				") ON CONFLICT(key) DO UPDATE SET value = excluded.value;",
+			},
+		},
+	},
+	["meta.seed"] = {
+		params = { "key", "value" },
+		slots = { { "key", "s", false }, { "value", "s", false } },
+		texts = {  },
+		templates = {
+			native = {
+				"INSERT OR IGNORE INTO meta (key, value) VALUES (",
+				{ slot = "key", kind = "s", nullable = false },
+				", ",
+				{ slot = "value", kind = "s", nullable = false },
+				");",
+			},
+			cli_json = {
+				"INSERT OR IGNORE INTO meta (key, value) VALUES (",
+				{ slot = "key", kind = "s", nullable = false },
+				", ",
+				{ slot = "value", kind = "s", nullable = false },
+				");",
+			},
+		},
+	},
+	["meta.rev_bump"] = {
+		params = {  },
+		slots = {  },
+		texts = {  },
+		templates = {
+			native = {
+				"UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev';",
+			},
+			cli_json = {
+				"UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev';",
+			},
+		},
+	},
 }
 
+--- Renders one typed slot. An absent value is NULL for a nullable slot and an
+--- error for any other; a text slot is quoted through sqlite.literal; an
+--- integer slot floors its number.
+--- @param name string Query name, for errors.
+--- @param part table Slot part { slot, kind, nullable }.
+--- @param value any Raw value.
+--- @return string SQL text.
+local function render_slot(name, part, value)
+	if value == nil then
+		if part.nullable then return "NULL" end
+		error(name .. " requires the value " .. part.slot, 3)
+	end
+	if part.kind == "s" then
+		if type(value) ~= "string" then error(name .. ": " .. part.slot .. " must be a string", 3) end
+		return "'" .. Literal.escape(value) .. "'"
+	end
+	if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then
+		error(name .. ": " .. part.slot .. " must be a finite number", 3)
+	end
+	return string.format("%d", math.floor(value))
+end
+
 --- Renders a named query. Fails on an unknown name or dialect, a missing or
---- non-string parameter, and a parameter the query does not declare.
+--- non-string parameter, a missing or mistyped slot value, and a parameter the
+--- query does not declare.
 --- @param name string Catalogue name, such as "manifest.app_day".
 --- @param dialect string "native" or "cli_json".
---- @param params table|nil Value of every declared parameter.
+--- @param params table|nil Raw string of every declared parameter, raw value of every slot.
 --- @return string The SQL text.
 function M.render(name, dialect, params)
 	local query = QUERIES[name]
@@ -362,6 +498,8 @@ function M.render(name, dialect, params)
 	for index, part in ipairs(parts) do
 		if type(part) == "string" then
 			out[index] = part
+		elseif part.slot then
+			out[index] = render_slot(name, part, params[part.slot])
 		else
 			local value = params[part.param]
 			if type(value) ~= "string" then
@@ -393,6 +531,19 @@ function M.params(name)
 	if not query then error("Unknown keystats query: " .. tostring(name), 2) end
 	local out = {}
 	for index, param in ipairs(query.params) do out[index] = param end
+	return out
+end
+
+--- Lists the typed value slots a query declares, in first-use order.
+--- @param name string Catalogue name.
+--- @return table Array of { name, kind ("s" or "i"), nullable }.
+function M.slots(name)
+	local query = QUERIES[name]
+	if not query then error("Unknown keystats query: " .. tostring(name), 2) end
+	local out = {}
+	for index, slot in ipairs(query.slots) do
+		out[index] = { name = slot[1], kind = slot[2], nullable = slot[3] }
+	end
 	return out
 end
 

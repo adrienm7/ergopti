@@ -582,6 +582,7 @@
 		"test:keystats-sql-census": "node ./tools/test/test-keystats-sql-census.cjs",
 		"test:keystats-query-catalogue": "node ./tools/test/test-keystats-query-catalogue.cjs",
 		"test:keystats-sql-shared-spelling": "node ./tools/test/test-keystats-sql-shared-spelling.cjs",
+		"test:keystats-write-catalogue": "node ./tools/test/test-keystats-write-catalogue.cjs",
 		"test:duplicate-constant-names": "node ./tools/test/test-duplicate-constant-names.cjs",
 		"test:network-field-check-parity": "node ./tools/test/test-network-field-check-parity.cjs"
 	},
