@@ -31,6 +31,7 @@ local PromptBuilder    = require("modules.llm.prompt_builder")
 local StreamingHandler = require("modules.llm.streaming_handler")
 local AppFilter        = require("modules.llm.app_filter")
 local InfoBar = require("llm.request_plan.info_bar")
+local LivePlan = require("llm.request_plan.live")
 local AppProfileOverrides = require("llm.app_profile_overrides")
 local Rewrite          = require("llm.rewrite")
 local PromptAction     = require("llm.prompt_action")
@@ -115,13 +116,11 @@ local function load_live_config()
 	local path = Paths.shared("modules/llm/live.json")
 	local raw = path and FileSystem.read(path) or nil
 	local decoded = raw and JsonCodec.decode(raw) or nil
-	local debounce_ms = type(decoded) == "table" and tonumber(decoded.debounce_ms) or nil
-	local live_min_words = type(decoded) == "table" and tonumber(decoded.min_words) or nil
-	if not debounce_ms or debounce_ms < 0 or not live_min_words or live_min_words < 0 then
-		error("prediction_engine: " .. tostring(path)
-			.. " is unreadable or lacks a non-negative debounce_ms and min_words.")
+	local config, reason = LivePlan.config(decoded)
+	if not config then
+		error("prediction_engine: " .. tostring(path) .. " is unusable: " .. tostring(reason))
 	end
-	return { debounce_sec = debounce_ms / 1000, min_words = math.floor(live_min_words) }
+	return { debounce_sec = config.debounce_ms / 1000, min_words = config.min_words }
 end
 local LIVE_CONFIG = load_live_config()
 
@@ -1718,15 +1717,19 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 			return
 		end
 		if not predispatch_is_current() then return end
-		if type(live_profile) ~= "table" then
+		local decision = LivePlan.decide(
+			{ debounce_ms = LIVE_CONFIG.debounce_sec * 1000, min_words = LIVE_CONFIG.min_words },
+			live, num_predictions, type(live_profile) == "table" and live_profile or nil)
+		if decision.action == "stop" then
+			-- The shared rule: live typing never falls back to the menu's prompt, so the
+			-- keystroke asks for nothing (it used to run once with the menu's prompt).
 			Logger.warn(LOG, "Live prompt '%s' no longer exists — live mode turned off.", live.profile_id)
-			M.stop_live_prompt("prompt deleted", true)
-			live = nil
-		else
-			request_profile   = live_profile
-			request_count     = live.num_predictions or num_predictions
-			request_min_words = LIVE_CONFIG.min_words
+			M.stop_live_prompt(decision.cause, true)
+			return
 		end
+		request_profile   = decision.profile
+		request_count     = decision.num_predictions
+		request_min_words = decision.min_words
 	end
 	-- The profile the user mapped to the focused application wins over the menu's; a live
 	-- prompt or a request that names its own keeps its own.

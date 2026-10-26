@@ -22,7 +22,7 @@
 		"static/ergopti_plus/linux/modules/gestures/manager.lua": 4,
 		"static/ergopti_plus/linux/modules/hotstrings/magic_key_source.lua": 2,
 		"static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua": 1,
-		"static/ergopti_plus/linux/modules/llm/prediction_engine.lua": 2,
+		"static/ergopti_plus/linux/modules/llm/prediction_engine.lua": 1,
 		"static/ergopti_plus/linux/modules/shortcuts/caps_word_auto_off.lua": 1,
 		"static/ergopti_plus/linux/modules/shortcuts/chatgpt.lua": 2,
 		"static/ergopti_plus/linux/modules/shortcuts/manager.lua": 4,

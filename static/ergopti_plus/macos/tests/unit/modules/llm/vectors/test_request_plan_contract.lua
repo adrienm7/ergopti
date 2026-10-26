@@ -14,5 +14,6 @@ Contract.run_debounce(helpers, helpers.shared("tests/corpus/llm/request_plan_deb
 Contract.run_batching(helpers, helpers.shared("tests/corpus/llm/request_plan_batching_vectors.json"))
 Contract.run_token_budget(helpers, helpers.shared("tests/corpus/llm/request_plan_token_budget_vectors.json"))
 Contract.run_info_bar(helpers, helpers.shared("tests/corpus/llm/request_plan_info_bar_vectors.json"))
+Contract.run_live(helpers, helpers.shared("tests/corpus/llm/request_plan_live_vectors.json"))
 
 return true
