@@ -305,6 +305,8 @@ package.loaded["adapters.file_system"] = {
 	read             = function() return nil end,
 	read_with_status = function() return nil, "absent" end,
 }
+	require("tests.support.keystats.absent_ledger_file_system").model_initial_header(
+		package.loaded["adapters.file_system"], false)
 	local km = helpers.load_with_stubs("modules.keystats.init", hs_overrides)
 	package.loaded["adapters.file_system"] = saved_file_system
 	local synthetic_input = require("adapters.synthetic_input")

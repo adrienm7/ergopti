@@ -326,6 +326,8 @@ local function load_fixture(options)
 		read_with_status = function() return nil, "absent" end,
 	}
 
+	require("tests.support.keystats.absent_ledger_file_system").model_initial_header(
+		package.loaded["adapters.file_system"], true)
 	local keystats = helpers.load_with_stubs("modules.keystats.init", hs_overrides)
 	local script_control = { is_paused = function() return paused end }
 	local timers_before_start = #timers

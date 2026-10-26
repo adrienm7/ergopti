@@ -169,7 +169,7 @@ return function()
 	local Fixture = require("tests.support.file_system_transaction_fixture")
 	Fixture.with_fixture(function(native)
 		local outcome = table.pack(xpcall(function()
-			local adapter = native.make_adapter()
+			local adapter = native.make_adapter(nil, nil, nil, Lfs.link)
 			Helpers.load_with_stubs("hs", {
 				fs = { attributes = Lfs.attributes, dir = Lfs.dir, mkdir = Lfs.mkdir,
 					rmdir = Lfs.rmdir, symlinkAttributes = Lfs.symlinkattributes },

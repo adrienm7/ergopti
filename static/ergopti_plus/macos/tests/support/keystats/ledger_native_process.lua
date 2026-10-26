@@ -37,7 +37,7 @@ return function()
 	end
 	local fixture = require("tests.support.file_system_transaction_fixture")
 	fixture.with_fixture(function(native)
-		package.loaded["adapters.file_system"] = native.make_adapter()
+		package.loaded["adapters.file_system"] = native.make_adapter(nil, nil, nil, require("lfs").link)
 		local errors, logger = {}, helpers.make_logger_stub()
 		logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 		package.loaded["infra.logger"] = logger

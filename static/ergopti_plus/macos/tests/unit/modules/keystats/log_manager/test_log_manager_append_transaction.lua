@@ -271,6 +271,8 @@ local function load_log_manager_fixture(sink_failures, initialize)
 		create_if_absent = function() return true, "created" end,
 		read = function() return nil end,
 	}
+	require("tests.support.keystats.absent_ledger_file_system").model_initial_header(
+		package.loaded["adapters.file_system"], false)
 	local manager = require("modules.keystats.log_manager")
 	package.loaded["adapters.file_system"] = saved_file_system
 

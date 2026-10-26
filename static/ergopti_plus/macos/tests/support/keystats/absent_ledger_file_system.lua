@@ -11,6 +11,51 @@
 local helpers = require("tests.helpers")
 local M = {}
 local MODELS = setmetatable({}, { __mode = "k" })
+local INITIAL_HEADERS = setmetatable({}, { __mode = "k" })
+
+--- Models only the create-only initial header of a non-IO fixture volume.
+--- Other files keep their existing failure, identity and publication ports.
+--- @param files table Fixture-owned filesystem model.
+--- @param initially_present boolean Whether its empty ledger already exists.
+function M.model_initial_header(files, initially_present)
+	assert(type(files) == "table" and type(initially_present) == "boolean", "explicit initial volume required")
+	if INITIAL_HEADERS[files] then return end
+	local headers = {}
+	INITIAL_HEADERS[files] = headers
+	local path_status, create, read = files.path_status, files.create_if_absent, files.read_with_status
+	local function is_ledger(path) return path:sub(-#"/data.sql") == "/data.sql" end
+	local function header(path)
+		if initially_present and headers[path] == nil then headers[path] = "" end
+		return headers[path]
+	end
+	function files.path_status(path)
+		if is_ledger(path) then
+			return header(path) ~= nil and "present" or "absent"
+		end
+		assert(type(path_status) == "function", "unmodeled initial-volume metadata: " .. path)
+		return path_status(path)
+	end
+	function files.create_if_absent(path, body)
+		if not is_ledger(path) then
+			assert(type(create) == "function", "unmodeled initial-volume creation: " .. path)
+			return create(path, body)
+		end
+		if header(path) ~= nil then return false, "exists" end
+		assert(type(body) == "string" and body:sub(1, 2) == "--", "initial header must retain its comment")
+		local statements = body:gsub("%-%-[^\n]*\n", ""):match("^%s*(.-)%s*$")
+		assert(statements == "PRAGMA foreign_keys = OFF;", "empty volume cannot publish schema or outbox SQL")
+		headers[path] = body
+		return true, "created"
+	end
+	function files.read_with_status(path, ...)
+		if is_ledger(path) then
+			if header(path) ~= nil then return headers[path], "ok" end
+			return nil, "absent"
+		end
+		if read then return read(path, ...) end
+		return nil, "absent"
+	end
+end
 
 --- Extends a fixture's filesystem model without admitting a real SQL publication.
 --- @param files table Existing fixture-owned filesystem model.
@@ -18,6 +63,7 @@ local MODELS = setmetatable({}, { __mode = "k" })
 function M.extend(files, get_current_paths)
 	assert(type(files) == "table", "fixture filesystem model required")
 	assert(get_current_paths == nil or type(get_current_paths) == "function", "invalid fixture path owner")
+	M.model_initial_header(files, false)
 	local model = MODELS[files]
 	if model then
 		assert(model.held == nil, "cannot rebind an empty volume with a held lease")

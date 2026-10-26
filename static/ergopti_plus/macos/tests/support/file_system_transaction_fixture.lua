@@ -8,13 +8,16 @@
 
 local helpers = require("tests.helpers")
 
-local function with_fixture(callback)
+--- Captures explicit native ports before wrapping the fresh transaction host.
+--- @param callback function Receives the transaction adapter factory.
+--- @param native_overrides table|nil Host ports, including physical metadata.
+local function with_fixture(callback, native_overrides)
 	local saved_open, saved_rename = io.open, os.rename
 	local outcome = table.pack(xpcall(function()
 		return helpers.with_stub_scope({ "adapters.file_system", "infra.fs_dir", "infra.logger" }, function()
 			-- Capture a fresh host before installing this transaction's filesystem doubles.
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			local host = helpers.load_with_stubs("hs")
+			local host = helpers.load_with_stubs("hs", native_overrides)
 			local STAGING_LOCK_SUFFIX = ".ergoptiplus-stage-lock"
 			local WRITE_LOCK_SUFFIX = ".ergoptiplus-write-lock-v1"
 			local HOST_ATTRIBUTES = host.fs.attributes

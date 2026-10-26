@@ -116,7 +116,7 @@ local _ingest_timer_committed = false
 local _init_cleanup_pending = false
 
 --- Exact create-only publication to settle before admitting any later metrics root.
-local _gitignore_publication_pending = nil
+local _initial_publication_pending = nil
 
 --- Last foreign-sync failure already surfaced by the log-manager boundary.
 --- Repeated ingest ticks retain the retry without alternating two ERROR lines
@@ -1895,39 +1895,48 @@ local function _rollback_failed_init()
 	return complete
 end
 
-local function _settle_metrics_gitignore_publication()
-	local pending = _gitignore_publication_pending
+local function _settle_initial_publication()
+	local pending = _initial_publication_pending
 	if pending == nil then return true end
 	-- Keep the receipt before entering the owner: a thrown or post-publication
 	-- refusal must not become a successful present-entry shortcut on retry.
 	local created, status, detail = FileSystem.create_if_absent(pending.path, pending.body)
 	if detail == nil and ((created == true and status == "created")
 		or (created == false and status == "exists")) then
-		_gitignore_publication_pending = nil
+		_initial_publication_pending = nil
 		return true
 	end
-	Logger.error(LOG, "M.init(): metrics Git exclusion publication remains incomplete for '%s' — %s (%s).",
-		pending.path, tostring(detail or "invalid publication receipt"), tostring(status))
+	Logger.error(LOG, "M.init(): %s publication remains incomplete for '%s' — %s (%s).",
+		pending.kind, pending.path, tostring(detail or "invalid publication receipt"), tostring(status))
 	return false
 end
 
-local function _ensure_metrics_gitignore(paths)
+local function _ensure_initial_file(path, body, kind)
 	-- A previous attempt may own staging cleanup even when its final file is
 	-- already present, including when the configured metrics root has changed.
-	if not _settle_metrics_gitignore_publication() then return false end
-	local path = paths.metrics_dir .. ".gitignore"
+	if not _settle_initial_publication() then return false end
 	local status, detail = FileSystem.path_status(path)
 	if status == "present" then return true end
 	if status ~= "absent" then
-		Logger.error(LOG, "M.init(): cannot inspect metrics Git exclusion '%s' — %s.", path, tostring(detail))
+		Logger.error(LOG, "M.init(): cannot inspect %s '%s' — %s.", kind, path, tostring(detail))
 		return false
 	end
-	_gitignore_publication_pending = {
-		path = path,
-		body = "# Local hot-path log — never commit, never sync. One writer per device.\n"
-			.. NativePath.basename(paths.today_log_path) .. "\n",
-	}
-	return _settle_metrics_gitignore_publication()
+	_initial_publication_pending = { path = path, body = body, kind = kind }
+	return _settle_initial_publication()
+end
+
+local function _ensure_metrics_gitignore(paths)
+	return _ensure_initial_file(paths.metrics_dir .. ".gitignore",
+		"# Local hot-path log — never commit, never sync. One writer per device.\n"
+			.. NativePath.basename(paths.today_log_path) .. "\n", "metrics Git exclusion")
+end
+
+local function _ensure_ledger_header(paths, device_id)
+	return _ensure_initial_file(paths.data_sql_path, string.format(
+		"-- ergopti metrics — device %s — schema_version 1\n"
+			.. "-- This file is APPEND-ONLY. Do not edit by hand.\n"
+			.. "-- The keystats replays its content into db.sqlite at startup.\n"
+			.. "PRAGMA foreign_keys = OFF;\n", device_id), "canonical ledger")
 end
 
 --- Initialize the log manager. Resolves the device, opens the SQLite cache,
@@ -1969,6 +1978,10 @@ local function _init(core_state)
 		device_id = device_obj.device_id
 		paths = _resolve_paths(core_state.LOG_DIR, device_id)
 	end
+
+	-- A torn header would permanently block durable outbox publication. Admit
+	-- neither SQLite nor the journal until its create-only publication settles.
+	if not _ensure_ledger_header(paths, device_id) then return false end
 
 	-- Publish the shared state only after a new identity is durable (or an
 	-- existing identity was read and owned). Every public method remains behind
@@ -2056,23 +2069,6 @@ local function _init(core_state)
 	if not Rotation.is_initialized() then
 		Logger.warn(LOG, "SQLite cache unavailable — initialising rotation for JSONL-only operation.")
 		Rotation.init({ paths = _paths, state = _state })
-	end
-
-	-- Bootstrap data.sql header on first run.
-	if not fs.attributes(_paths.data_sql_path) then
-		local f, err = io.open(_paths.data_sql_path, "w")
-		if f then
-			f:write(string.format(
-				"-- ergopti metrics — device %s — schema_version 1\n"
-				.. "-- This file is APPEND-ONLY. Do not edit by hand.\n"
-				.. "-- The keystats replays its content into db.sqlite at startup.\n"
-				.. "PRAGMA foreign_keys = OFF;\n",
-				_device_id))
-			f:close()
-		else
-			Logger.error(LOG, "Cannot create data.sql at %s: %s.",
-				_paths.data_sql_path, tostring(err))
-		end
 	end
 
 	_state.today_idx = _state.today_idx or {}

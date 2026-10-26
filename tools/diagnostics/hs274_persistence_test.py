@@ -12,6 +12,7 @@ from pathlib import Path
 import shutil
 import selectors
 import sqlite3
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -19,6 +20,36 @@ from unittest.mock import patch
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def native_attributes(path, follow):
+    """Expose actual stat identity for native FileSystem publication fixtures."""
+    try:
+        observed = os.stat(path, follow_symlinks=follow)
+    except FileNotFoundError:
+        return False
+    mode = observed.st_mode
+    kind = (
+        "directory"
+        if stat.S_ISDIR(mode)
+        else "file"
+        if stat.S_ISREG(mode)
+        else "link"
+        if stat.S_ISLNK(mode)
+        else "other"
+    )
+    attributes = {
+        "type": kind,
+        "size": observed.st_size,
+        "dev": observed.st_dev,
+        "ino": observed.st_ino,
+        "uid": observed.st_uid,
+        "gid": observed.st_gid,
+        "permissions": stat.filemode(mode)[1:],
+    }
+    if stat.S_ISLNK(mode):
+        attributes["target"] = os.readlink(path)
+    return attributes
 
 
 def owned_path(temporary, candidate):
@@ -88,6 +119,8 @@ def run_fixture(lua, temporary, fixture=None):
                     )
                 elif operation == "directory":
                     value = sorted(path.name for path in Path(request["path"]).iterdir())
+                elif operation in ("stat_identity", "lstat_identity"):
+                    value = native_attributes(request["path"], operation == "stat_identity")
                 elif operation == "mkdir":
                     owned_path(temporary, request["path"]).mkdir(mode=0o700)
                     value = True
@@ -95,6 +128,12 @@ def run_fixture(lua, temporary, fixture=None):
                     os.replace(
                         owned_path(temporary, request["source"]),
                         owned_path(temporary, request["path"]),
+                    )
+                    value = True
+                elif operation == "link":
+                    os.link(
+                        owned_path(temporary, request["source"]),
+                        owned_path(temporary, request["destination"]),
                     )
                     value = True
                 elif operation == "open":
@@ -229,6 +268,42 @@ class PhysicalReleasePersistenceTests(unittest.TestCase):
             self.assertEqual(list(outside.iterdir()), [])
             self.assertEqual(owned_source.read_text(encoding="utf-8"), "controlled original")
             self.assertFalse((root / "outside-target").exists())
+
+
+class NativeMetadataTests(unittest.TestCase):
+    def test_actual_file_identity_matches_the_operating_system(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "owned.txt"
+            path.write_bytes(b"physical metadata")
+            observed = native_attributes(path, True)
+            expected = path.stat()
+            self.assertEqual(observed["type"], "file")
+            for name in ("size", "dev", "ino", "uid", "gid"):
+                self.assertEqual(observed[name], getattr(expected, "st_" + name))
+            self.assertEqual(observed["permissions"], stat.filemode(expected.st_mode)[1:])
+            self.assertEqual(native_attributes(temporary, False)["type"], "directory")
+
+    def test_actual_symlink_and_target_identities_remain_distinct(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            target, link = Path(temporary) / "target.txt", Path(temporary) / "link.txt"
+            target.write_bytes(b"preserved target")
+            link.symlink_to(target.name)
+            followed, exact = native_attributes(link, True), native_attributes(link, False)
+            self.assertEqual(followed["ino"], target.stat().st_ino)
+            self.assertEqual(exact["ino"], link.lstat().st_ino)
+            self.assertEqual(exact["type"], "link")
+            self.assertEqual(exact["target"], target.name)
+            self.assertNotEqual(followed["ino"], exact["ino"])
+            target.unlink()
+            self.assertFalse(native_attributes(link, True))
+            self.assertEqual(native_attributes(link, False)["ino"], exact["ino"])
+
+    def test_only_proven_missing_metadata_is_absence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            self.assertFalse(native_attributes(Path(temporary) / "missing", False))
+            with patch.object(os, "stat", side_effect=PermissionError("metadata denied")):
+                with self.assertRaisesRegex(PermissionError, "metadata denied"):
+                    native_attributes(temporary, False)
 
 
 class ForeignLedgerGenerationTests(unittest.TestCase):

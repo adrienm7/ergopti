@@ -88,7 +88,7 @@ function timer.absoluteTime() return math.floor(os.clock() * 1000000000) end
 function timer.secondsSinceEpoch() return os.time() end
 local file_system
 require("tests.support.file_system_transaction_fixture").with_fixture(function(native)
-	file_system = native.make_adapter()
+	file_system = native.make_adapter(nil, nil, nil, require("lfs").link)
 end)
 local complete_batch_offset
 local function ports()
@@ -433,7 +433,7 @@ function timer.absoluteTime() return math.floor(os.clock() * 1000000000) end
 function timer.secondsSinceEpoch() return os.time() end
 local file_system
 require("tests.support.file_system_transaction_fixture").with_fixture(function(native)
-	file_system = native.make_adapter()
+	file_system = native.make_adapter(nil, nil, nil, require("lfs").link)
 end)
 local complete_batch_offset
 local function ports()
