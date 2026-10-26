@@ -13,5 +13,6 @@ local Contract = require("test.llm_request_plan_contract")
 Contract.run_debounce(helpers, helpers.shared("tests/corpus/llm/request_plan_debounce_vectors.json"), "macos")
 Contract.run_batching(helpers, helpers.shared("tests/corpus/llm/request_plan_batching_vectors.json"))
 Contract.run_token_budget(helpers, helpers.shared("tests/corpus/llm/request_plan_token_budget_vectors.json"))
+Contract.run_info_bar(helpers, helpers.shared("tests/corpus/llm/request_plan_info_bar_vectors.json"))
 
 return true

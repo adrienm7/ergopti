@@ -96,6 +96,23 @@ helpers.describe("LLM suggestion overlay: headless row decisions", function()
 		restore()
 	end)
 
+	helpers.it("shortens a prompt label to its name by the shared rule, joined with the Linux separator", function()
+		replace("modules.llm.display_settings", {
+			get = function(name)
+				if name == "pred_indent" then return 0 end
+				if name == "show_info_bar" then return true end
+			end,
+		})
+		package.loaded["ui.tooltip.llm"] = nil
+		local overlay = require("ui.tooltip.llm")
+		local rows = overlay.build_rows({ { to_type = "a" }, { to_type = "b" } }, 1, {
+			model = "qwen:4b", profile = "Mon profil  —  texte long", validation_modifiers = { "alt" },
+		})
+		-- A user prompt's own label used to reach the bar whole.
+		helpers.assert_eq(rows[3].text, "qwen:4b \194\183 Mon profil \194\183 1/2")
+		restore()
+	end)
+
 	helpers.it("redraws selection through an injected renderer", function()
 		replace("modules.llm.display_settings", {
 			get = function(name) return name == "pred_indent" and 0 or false end,

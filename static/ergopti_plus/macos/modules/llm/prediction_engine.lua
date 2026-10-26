@@ -30,6 +30,7 @@ local WarmupController = require("modules.llm.warmup_controller")
 local PromptBuilder    = require("modules.llm.prompt_builder")
 local StreamingHandler = require("modules.llm.streaming_handler")
 local AppFilter        = require("modules.llm.app_filter")
+local InfoBar = require("llm.request_plan.info_bar")
 local AppProfileOverrides = require("llm.app_profile_overrides")
 local Rewrite          = require("llm.rewrite")
 local PromptAction     = require("llm.prompt_action")
@@ -44,7 +45,6 @@ local i18n             = require("infra.i18n")
 local Keycodes         = require("infra.keycodes")
 local tooltip          = require("ui.tooltip")
 local keystats        = require("modules.keystats")
-local TextUtils = require("text_utils")
 
 local LOG    = "llm.prediction_engine"
 local _state = nil  -- Shared keymap core state; injected via M.init()
@@ -1088,22 +1088,6 @@ local function format_validation_shortcut(mods)
 	return table.concat(mods, "+")
 end
 
---- Strips the em-dash suffix from a profile label for compact info-bar display.
---- "Mon profil — texte long" → "Mon profil"
---- @param label string|nil The raw profile label.
---- @return string|nil The trimmed label, or nil if it was blank.
-local function trim_profile_label(label)
-	if type(label) ~= "string" then return nil end
-	local clean = TextUtils.trim(label)
-	if clean == "" then return nil end
-	local head = clean:match("^(.-)%s*—")
-	-- head:match("%S") guards against a bare "— foo" where head="" falling through to clean
-	local picked = (head and head:match("%S")) and head or clean
-	picked = TextUtils.trim(picked):gsub("%s*—%s*$", "")
-	if picked == "" then return nil end
-	return picked
-end
-
 --- Assembles the info-bar text displayed beneath the prediction list.
 --- Returns nil when model_name is absent, which hides the info bar entirely.
 --- @param model_name string Display name of the active model.
@@ -1114,10 +1098,11 @@ end
 local function build_info_bar_text(model_name, elapsed_ms, backend, profile_name)
 	if not model_name or model_name == "" then return nil end
 
-	local pieces = { model_name }
-	if type(backend) == "string" and backend ~= "" then pieces[#pieces + 1] = backend end
-	local short_profile = trim_profile_label(profile_name)
-	if short_profile and short_profile ~= "" then pieces[#pieces + 1] = short_profile end
+	-- The pieces and the short prompt name are the shared plan's; the separator is macOS's.
+	local pieces = InfoBar.parts({
+		model = model_name, backend = backend, profile_label = profile_name, require_model = true,
+	})
+	if not pieces then return nil end
 	local text = table.concat(pieces, " — ")
 	-- elapsed_ms intentionally discarded — tooltip_llm owns the timing zone to avoid duplication
 	local _ = elapsed_ms

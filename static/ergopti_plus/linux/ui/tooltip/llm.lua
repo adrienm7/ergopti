@@ -15,6 +15,7 @@ local Config = require("ui.tooltip.config")
 local DisplaySettings = require("modules.llm.display_settings")
 local LlmLine = require("tooltip.llm_line")
 local ConfigKeys = require("config_keys")
+local InfoBar = require("llm.request_plan.info_bar")
 
 local LOG = "ui.tooltip.llm"
 
@@ -101,11 +102,13 @@ function M.build_rows(candidates, active_index, meta)
 		rows[1] = { text = "…", label = "", dimmed = true }
 	end
 	if DisplaySettings.get(ConfigKeys.LEAF.SHOW_INFO_BAR) and #rows > 0 then
-		local info = {}
-		if type(meta.model) == "string" and meta.model ~= "" then info[#info + 1] = meta.model end
-		if type(meta.profile) == "string" and meta.profile ~= "" then info[#info + 1] = meta.profile end
-		if #candidates > 1 then info[#info + 1] = string.format("%d/%d", active_index, #candidates) end
-		if #info > 0 then rows[#rows + 1] = { text = table.concat(info, " · "), dimmed = true } end
+		-- The pieces and the short prompt name are the shared plan's; the separator and
+		-- the i/n position (candidates are cycled here, listed on macOS) are Linux's.
+		local info = InfoBar.parts({
+			model = meta.model, profile_label = meta.profile,
+			position = { index = active_index, count = #candidates },
+		})
+		if info then rows[#rows + 1] = { text = table.concat(info, " · "), dimmed = true } end
 	end
 	return rows
 end

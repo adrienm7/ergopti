@@ -15,6 +15,7 @@ local Json = require("json")
 local Debounce = require("llm.request_plan.debounce")
 local Batching = require("llm.request_plan.batching")
 local TokenBudget = require("llm.request_plan.token_budget")
+local InfoBar = require("llm.request_plan.info_bar")
 
 --- Reads and decodes one corpus file.
 --- @param path string Absolute path.
@@ -138,6 +139,31 @@ function M.run_token_budget(helpers, corpus_path)
 				else
 					helpers.assert_eq(ok, true, tostring(result))
 					helpers.assert_eq(result, vector.expect)
+				end
+			end)
+		end
+	end)
+end
+
+--- Registers the info bar transcripts.
+--- @param helpers table Driver assertions and case registration.
+--- @param corpus_path string Canonical shared info bar corpus path.
+function M.run_info_bar(helpers, corpus_path)
+	local corpus = read_json(corpus_path)
+	helpers.describe("Shared request plan info bar transcripts", function()
+		for _, vector in ipairs(corpus.vectors) do
+			helpers.it("transcript '" .. vector.id .. "'", function()
+				local ok, result = pcall(InfoBar.parts, vector.spec)
+				if vector.expect_error then
+					helpers.assert_eq(ok, false, "must raise")
+					helpers.assert_contains(tostring(result), vector.expect_error)
+				else
+					helpers.assert_eq(ok, true, tostring(result))
+					if vector.expect_none then
+						helpers.assert_eq(result, nil)
+					else
+						helpers.assert_eq(result, vector.expect)
+					end
 				end
 			end)
 		end
