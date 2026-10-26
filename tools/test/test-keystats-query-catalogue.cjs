@@ -57,6 +57,12 @@ function check(name, fn) {
 
 const queries = Codegen.parse(fs.readFileSync(path.join(ROOT, Codegen.SOURCE), 'utf8'));
 const expected = JSON.parse(fs.readFileSync(EXPECTED, 'utf8'));
+// Writes and keyed statements (typed value slots, UPDATE) are proved by
+// test-keystats-write-catalogue.cjs, which executes them against the legacy
+// driver SQL; this file proves the filter-driven reads.
+const reads = queries.filter(
+	(query) => query.slots.size === 0 && query.segments[0].literal.startsWith('SELECT')
+);
 
 /** Opens a fresh fixture database with the canonical schema. */
 function fixture() {
@@ -103,10 +109,10 @@ function cutAtNul(rows) {
 const db = fixture();
 
 check('every catalogue query has expected rows and nothing else is expected', () => {
-	assert.deepEqual(Object.keys(expected.queries).sort(), queries.map((q) => q.name).sort());
+	assert.deepEqual(Object.keys(expected.queries).sort(), reads.map((q) => q.name).sort());
 });
 
-for (const query of queries) {
+for (const query of reads) {
 	for (const [filter, where] of Object.entries(expected.filters)) {
 		check(`${query.name} (${filter}) returns the legacy rows in both dialects`, () => {
 			// The n-gram family table and the filter's connective are parameters too;
@@ -187,7 +193,13 @@ check('the compiler refuses malformed catalogues', () => {
 		unterminated: '-- name: a.b\nSELECT 1\n',
 		badName: '-- name: nodot\nSELECT 1;\n',
 		conflictingText: '-- name: a.b\nSELECT {{text app}}, {{text MAX(app) AS app}} FROM t;\n',
-		empty: '-- nothing\n'
+		empty: '-- nothing\n',
+		unknownSlotKind: '-- name: a.b\nSELECT {{x name}} FROM t;\n',
+		realSlot: '-- name: a.b\nSELECT {{r name}} FROM t;\n',
+		slotTwoKinds: '-- name: a.b\nSELECT {{s v}}, {{i v}} FROM t;\n',
+		slotNullableTwice: '-- name: a.b\nSELECT {{s v}}, {{s? v}} FROM t;\n',
+		slotAndParam: '-- name: a.b\nSELECT {{s v}}, {{v}} FROM t;\n',
+		mergeUnknownColumn: '-- name: a.b\nSELECT {{merge payload}} FROM t;\n'
 	};
 	for (const [label, text] of Object.entries(refusals))
 		assert.throws(() => Codegen.parse(text), SyntaxError, label);

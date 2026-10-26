@@ -29,6 +29,7 @@ local sqlite3 = require("hs.sqlite3")
 local Logger = require("infra.logger")
 local Paths  = require("infra.paths")
 local Literal = require("sqlite.literal")
+local Queries = require("keystats.queries")
 -- At-rest encryption of the typed-text columns. Hard require: the setting must
 -- never silently degrade into "stored in clear".
 local TextCipher = require("modules.keystats.text_cipher")
@@ -308,9 +309,8 @@ local function _initialize_db(db, existed)
 		{ "rev",              "0"  },
 		{ "last_applied_data_sql_off", "0" },
 	}) do
-		_exec_startup_sql(db, string.format(
-			"INSERT OR IGNORE INTO meta (key, value) VALUES ('%s', '%s');",
-			kv[1], kv[2]), "meta seed " .. kv[1])
+		_exec_startup_sql(db, Queries.render("meta.seed", "native", { key = kv[1], value = kv[2] }),
+			"meta seed " .. kv[1])
 	end
 
 	local next_event_id = 1
@@ -318,7 +318,7 @@ local function _initialize_db(db, existed)
 	-- silent restart at 1 would make INSERT OR IGNORE drop every colliding new
 	-- event, and a float would raise later in the insert builders.
 	local cursor_refused = false
-	for r in db:nrows("SELECT value FROM meta WHERE key='next_event_id'") do
+	for r in db:nrows(Queries.render("meta.get", "native", { key = "next_event_id" })) do
 		local text = math.type(r.value) == "integer" and tostring(r.value) or r.value
 		local value = type(text) == "string" and text:match("^[1-9]%d*$")
 			and math.tointeger(tonumber(text)) or nil
@@ -840,7 +840,7 @@ end
 function M.get_meta(key)
 	if not _db or type(key) ~= "string" or key == "" then return nil end
 	local value = nil
-	for row in _db:nrows(string.format("SELECT value FROM meta WHERE key=%s;", _sql_str(key))) do
+	for row in _db:nrows(Queries.render("meta.get", "native", { key = key })) do
 		value = row.value
 	end
 	return value
@@ -852,8 +852,7 @@ end
 --- @return boolean True on success.
 function M.set_meta(key, value)
 	if not _db or type(key) ~= "string" or key == "" then return false end
-	return _db:exec(string.format("INSERT OR REPLACE INTO meta (key, value) VALUES (%s, %s);",
-		_sql_str(key), _sql_str(tostring(value)))) == sqlite3.OK
+	return _db:exec(Queries.render("meta.set", "native", { key = key, value = tostring(value) })) == sqlite3.OK
 end
 
 return M

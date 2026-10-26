@@ -10,7 +10,7 @@ local M = {}
 
 --- Registers the contract on a driver's test helpers.
 --- @param helpers table The driver's test helpers (describe/it/assert_*).
-function M.register(helpers)
+function M.register(helpers, vectors_path)
 	local Queries = require("keystats.queries")
 	local WHERE = " WHERE date >= '2026-10-01'"
 
@@ -23,9 +23,22 @@ function M.register(helpers)
 		return out
 	end
 
+	--- The filter-driven reads: no typed slot and a SELECT. Writes and keyed
+	--- statements are replayed from the shared vectors below.
+	local function reads()
+		local out = {}
+		for _, name in ipairs(Queries.names()) do
+			if #Queries.slots(name) == 0
+				and Queries.render(name, "native", params_for(name, "")):sub(1, 7) == "SELECT " then
+				out[#out + 1] = name
+			end
+		end
+		return out
+	end
+
 	helpers.describe("keystats named queries (shared contract)", function()
 		helpers.it("renders every query in both dialects with the caller's filter spliced in", function()
-			local names = Queries.names()
+			local names = reads()
 			helpers.assert_true(#names > 0, "the catalogue must declare queries")
 			for _, name in ipairs(names) do
 				for _, dialect in ipairs(Queries.DIALECTS) do
@@ -50,7 +63,7 @@ function M.register(helpers)
 		end)
 
 		helpers.it("projects TEXT columns raw in-process and through json_quote for the CLI", function()
-			for _, name in ipairs(Queries.names()) do
+			for _, name in ipairs(reads()) do
 				local native = Queries.render(name, "native", params_for(name, ""))
 				local cli = Queries.render(name, "cli_json", params_for(name, ""))
 				for _, column in ipairs(Queries.text_columns(name)) do
@@ -74,6 +87,36 @@ function M.register(helpers)
 			helpers.assert_true(refused("manifest.app_day", "native", {}), "missing parameter")
 			helpers.assert_true(refused("manifest.app_day", "native", { where = 1 }), "non-string parameter")
 			helpers.assert_true(refused("manifest.app_day", "native", { where = "", extra = "" }), "undeclared parameter")
+		end)
+
+		helpers.it("renders every write vector to the exact SQL the JS reference renders", function()
+			local Json = require("json")
+			local handle = assert(io.open(vectors_path, "rb"))
+			local decoded = assert(Json.decode(handle:read("*a")))
+			handle:close()
+			local seen = {}
+			for _, vector in ipairs(decoded.vectors) do
+				helpers.assert_eq(Queries.render(vector.name, vector.dialect, vector.values), vector.sql,
+					vector.name .. " (" .. vector.dialect .. ")")
+				seen[vector.name .. "/" .. vector.dialect] = true
+			end
+			for _, name in ipairs(Queries.names()) do
+				if #Queries.slots(name) > 0 or Queries.render(name, "native", params_for(name, "")):sub(1, 7) ~= "SELECT " then
+					for _, dialect in ipairs(Queries.DIALECTS) do
+						helpers.assert_true(seen[name .. "/" .. dialect], name .. " has a " .. dialect .. " vector")
+					end
+				end
+			end
+		end)
+
+		helpers.it("refuses a missing, mistyped or non-finite slot value", function()
+			local function refused(values)
+				return not pcall(Queries.render, "meta.set", "native", values)
+			end
+			helpers.assert_true(refused({ key = "k" }), "missing value")
+			helpers.assert_true(refused({ key = "k", value = 1 }), "number for a text slot")
+			helpers.assert_true(refused({ key = "k", value = "v", extra = "x" }), "undeclared slot")
+			helpers.assert_true(refused({ key = "k", value = "v", other = "x" }), "undeclared slot")
 		end)
 
 		helpers.it("splices a filter holding pattern characters verbatim", function()

@@ -14,6 +14,15 @@
 -- Placeholders:
 --   {{where}}           the driver's filter clause, empty or " WHERE …";
 --                       each driver keeps its own literal quoting.
+--   {{s name}} {{i name}}
+--                       a typed value slot of a write or keyed statement: a TEXT
+--                       literal or an integer, quoted by the generated renderer
+--                       (sqlite.literal) from the raw value the driver passes.
+--                       `{{s? name}}` and `{{i? name}}` render NULL for a missing
+--                       value; every other slot refuses one.
+--   {{merge <column>}}  at generation time, the expression that sums the stored
+--                       JSON number map of <column> with the incoming one key by
+--                       key (esrc_json, e_buckets_json, length_buckets_json).
 --   {{text <expr>}}     a TEXT column. In-process engines (Hammerspoon, the
 --                       AHK sqlite3.dll) read `<expr>` as is; the Linux CLI's
 --                       JSON mode cuts raw TEXT at NUL, so its dialect selects
@@ -206,3 +215,25 @@ FROM {{table}}{{where}}{{conjunction}}NOT (typeof(c) IN ('integer','real') AND t
 -- doc: compare it to know whether anything changed. A numeric string, so no
 -- doc: dialect has to protect it.
 SELECT value FROM meta WHERE key='rev';
+
+-- name: meta.get
+-- doc: One metadata value by key. The CLI dialect quotes the value so a NUL or
+-- doc: a line break survives the one-line scalar framing.
+SELECT {{text value}} FROM meta WHERE key={{s key}};
+
+-- name: meta.set
+-- doc: Writes one metadata value, replacing any earlier one.
+INSERT OR REPLACE INTO meta (key, value) VALUES ({{s key}}, {{s value}});
+
+-- name: meta.upsert
+-- doc: Writes one metadata value inside a flush transaction, keeping the row.
+INSERT INTO meta(key,value) VALUES ({{s key}},{{s value}}) ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+
+-- name: meta.seed
+-- doc: Creates a metadata key with its first value when it does not exist yet.
+INSERT OR IGNORE INTO meta (key, value) VALUES ({{s key}}, {{s value}});
+
+-- name: meta.rev_bump
+-- doc: Advances the revision counter. The value is stored as text, which is the
+-- doc: column's own affinity, so every driver reads back the same string.
+UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev';
