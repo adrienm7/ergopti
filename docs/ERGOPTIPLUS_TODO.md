@@ -52,6 +52,10 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
       metrics dir and accepts legacy flat string values the Lua codec refuses, and it preserves unknown
       members the codec drops. Align the location (decision pending), the record shape and the score range,
       and replay `_shared/tests/corpus/metrics/app_category_store_vectors.json` in AHK.
+- [ ] **AI off disarms the agent's automatic mode.** [CODE] Done on Linux and macOS (e284077ba9). Windows:
+      the AHK agent runner arms no typing pause and refuses a triage or request in flight while the AI is
+      off, cancels the pause at the switch-off and re-arms on the next keystroke; rewrite
+      `test_llm_agent_ai_off.ahk` (it feeds the agent with the AI off on purpose) to assert that.
 - [ ] **Release notes in the update-check window (PAR-52).** [CODE] `windows/ui/update_check/init.ahk`:
       seed `state.notes = {body, owner, repo}` in the `available` message (from `UPDATER_LATEST_RELEASE.Body`,
       `UPDATER_GH_OWNER`, `UPDATER_GH_REPO`, as `_Updater_ReleaseNotesSeed`), serve `open_url` in the
@@ -428,9 +432,9 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 ### A. Behaviour that differs without a good reason (fix first)
 
 - [ ] **Tests write the real user config.** [CODE] Fixed (the magic-key catalogue test, and both Lua
-      runners now move a real HOME to a scratch dir, `_shared/lua/test/runner_home.lua`). Left: route
-      `test_keystats.lua` and `test_keystats_system_events.lua` through their own fixtures instead of the
-      runner net; on Lua 5.4 an `io.popen` child still sees the real HOME.
+      runners now move a real HOME to a scratch dir, `_shared/lua/test/runner_home.lua`). The keystats
+      tests own their HOME fixture (29b7c5a0fe). Left: on Lua 5.4 an `io.popen` child still sees the real
+      HOME.
 - [ ] **Retire the orphaned Windows gesture-notice entries.** [CODE] The gesture status submenu and notice
       are gone (dbc29c5077); the `gesture_conflict_dismissed.*` storage entries they wrote stay in user
       state. Remove them in a config migration.
