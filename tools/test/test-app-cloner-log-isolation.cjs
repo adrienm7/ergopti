@@ -131,6 +131,137 @@ test(
 	behaviorDetail
 );
 
+// Fault ports retain real files and descriptor ownership. Native XCTest runs
+// the same probe against actual regular-file resource refusals on Darwin.
+const logIORun = spawnSync(
+	python,
+	[path.join(__dirname, 'lib', 'app-cloner-log-io-probe.py'), 'portable', LAUNCHER_PATH],
+	{
+		cwd: ROOT,
+		encoding: 'utf8',
+		maxBuffer: 4 * 1024 * 1024
+	}
+);
+let logIO = {};
+try {
+	logIO = JSON.parse((logIORun.stdout || '').trim());
+} catch {
+	/* Producer failure cannot supply a valid case. */
+}
+const logIODetail = JSON.stringify({
+	status: logIORun.status,
+	error: logIORun.error?.message,
+	stderr: logIORun.stderr
+});
+const logCases = new Map((logIO.cases || []).map((entry) => [entry.name, entry]));
+for (const [name, entry] of logCases) {
+	const normal = entry.events.filter(
+		(event) => event.argv[0] === 'osascript' && event.argv[1] !== '-e'
+	);
+	const dialogs = entry.events.filter(
+		(event) => event.argv[0] === 'osascript' && event.argv[1] === '-e'
+	);
+	const detail = logIODetail + JSON.stringify(entry);
+	test(
+		`the ${name} log probe retires its exact owned descriptors`,
+		logIORun.status === 0 &&
+			entry.all_streams_closed === true &&
+			entry.descriptor_errors.length === 0 &&
+			(entry.open_attempts > 0 || name === 'allocation'),
+		detail
+	);
+	if (name === 'icon-operation') {
+		test(
+			'diagnostic isolation does not swallow an unrelated icon operation failure',
+			entry.error?.type === 'FileNotFoundError' &&
+				entry.error.message.includes('injected icon operation refusal') &&
+				normal.length === 0,
+			detail
+		);
+		continue;
+	}
+	if (name === 'invalid-catalogue-write-refusal') {
+		test(
+			'a failed diagnostic transaction preserves the visible fatal catalogue refusal',
+			normal.length === 0 &&
+				dialogs.length === 1 &&
+				entry.error?.type === 'ValueError' &&
+				dialogs[0].argv[5] === 'App Cloner — Locale error' &&
+				dialogs[0].argv[4] ===
+					'App Cloner cannot start because the selected locale catalogue is unavailable or invalid.\n\nApp Cloner startup locale catalogue is unavailable or invalid.' &&
+				entry.warnings.includes('diagnostic log persistence failed'),
+			detail
+		);
+		continue;
+	}
+	test(
+		`the ${name} diagnostic result preserves actual normal UI admission`,
+		entry.error === null && normal.length === 1,
+		detail
+	);
+	if (name.startsWith('healthy')) {
+		// Windows chmod cannot express POSIX mode bits. Its control still checks
+		// real persistence and descriptor ownership; POSIX hosts pin both modes.
+		test(
+			`the ${name} control exports a persisted private log`,
+			normal[0]?.log_path.endsWith('appcloner.log') &&
+				normal[0].log_content.includes('[AppCloner] locale=en') &&
+				(process.platform === 'win32' ||
+					(normal[0].log_mode === 0o600 && normal[0].directory_mode === 0o700)) &&
+				entry.warnings === '',
+			detail
+		);
+	} else {
+		test(
+			`the ${name} refusal is explicit and disables the unusable log`,
+			entry.warnings.includes(
+				name === 'allocation'
+					? 'diagnostic log allocation failed'
+					: 'diagnostic log persistence failed'
+			) &&
+				(name.startsWith('post-ui-')
+					? normal[0]?.log_path.endsWith('appcloner.log')
+					: normal[0]?.log_path === ''),
+			detail
+		);
+	}
+	if (name === 'healthy-ui-error' || name.startsWith('post-ui-')) {
+		const body = dialogs[0]?.argv[4];
+		test(
+			`the ${name} result preserves the original startup error notification`,
+			dialogs.length === 1 &&
+				(name === 'healthy-ui-error'
+					? body ===
+							`Original native startup failure.\n\nThe complete diagnostic is in ${normal[0].log_path}` &&
+						entry.remaining_logs.some(
+							(log) =>
+								log.content.includes('[AppCloner] exit=1') &&
+								log.content.includes('Original native startup failure.')
+						)
+					: body === 'Original native startup failure.'),
+			detail
+		);
+	}
+}
+const expectedLogCases = [
+	'healthy',
+	'healthy-ui-error',
+	'allocation',
+	'icon-operation',
+	'invalid-catalogue-write-refusal'
+];
+for (const stage of ['open', 'fdopen', 'write', 'flush', 'close'])
+	expectedLogCases.push(`initial-${stage}`, `post-ui-${stage}`);
+test(
+	'the diagnostic I/O producer executes every admitted scenario',
+	logIORun.status === 0 &&
+		logCases.size === expectedLogCases.length &&
+		logIO.permission_scope ===
+			(process.platform === 'win32' ? 'content_and_descriptors_only' : 'posix_mode_bits') &&
+		expectedLogCases.every((name) => logCases.has(name)),
+	logIODetail
+);
+
 // Exercise the actual launcher through the osascript boundary. Menu launches
 // inject the locale path, while Finder launches must resolve the shipped tree.
 const localeHarness = String.raw`
