@@ -33,6 +33,22 @@ DEPENDENCIES = (
 PAGE = "static/ergopti_plus/_shared/ui/metrics_apps/index.html"
 CALLER = "static/ergopti_plus/macos/ui/metrics_apps/init.lua"
 
+# Ordered admission contract for the actual page; every declared asset is hashed below.
+PAGE_SCRIPTS = (
+    "../vendor/chart.umd.js",
+    "../host_bridge.js",
+    "../dom_utils.js",
+    "../i18n.js",
+    "../metrics_rebuild_banner.js",
+    "../metrics_freshness.js",
+    "../_generated/metrics_general_category_aliases.js",
+    "helpers.js",
+    "state.js",
+    "main.js",
+    "charts.js",
+    "modal.js",
+)
+
 
 class PageAssets(HTMLParser):
     """Read only assets that the actual HTML declares, including its inline owner."""
@@ -57,9 +73,7 @@ def source_identity(repo):
     page = repo / PAGE
     parser = PageAssets()
     parser.feed(page.read_text(encoding="utf-8"))
-    require(
-        len(parser.scripts) == 12 and parser.scripts[-1] == "modal.js", "page script census differs"
-    )
+    require(tuple(parser.scripts) == PAGE_SCRIPTS, "page script census differs")
     require("script.js" not in parser.scripts, "legacy dashboard cannot qualify the loaded page")
     paths = {repo / name for name in (*DEPENDENCIES, PAGE)}
     for name in parser.paths:
