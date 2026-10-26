@@ -170,7 +170,11 @@ function M.register(helpers, driver)
 		end
 		helpers.it("a native owner without its malformed-source branch fails the malformed vectors (mutation)", function()
 			scope(function()
-				local file_path = assert(package.searchpath(native, package.path), "native tap-key source unavailable")
+				-- The malformed-source branch lives in the shared tap-key list both
+				-- drivers build (shortcuts/catalogue.lua); the native owner is reloaded
+				-- over the mutant so it builds its list from it.
+				local shared_module = "shortcuts.catalogue"
+				local file_path = assert(package.searchpath(shared_module, package.path), "shared tap-key source unavailable")
 				local source = bytes(file_path)
 				local first, last = source:find('error("tap_keys: " .. tostring(path) .. "' .. MALFORMED .. '")', 1, true)
 				assert(first, "the malformed-source branch must exist in " .. file_path)
@@ -178,10 +182,10 @@ function M.register(helpers, driver)
 				local mutant_source = source:sub(1, first - 1) .. "local _ = nil" .. source:sub(last + 1)
 				local compile = loadstring or load
 				-- The mutant registers as the native owner; an earlier suite may have
-				-- loaded the real one, and scope() restores it afterwards.
+				-- loaded the real one, and scope() restores both afterwards.
+				package.loaded[shared_module] = assert(compile(mutant_source, "@" .. file_path .. " (mutant)"))()
 				package.loaded[native] = nil
-				local mutant = assert(compile(mutant_source, "@" .. file_path .. " (mutant)"))()
-				package.loaded[native] = mutant
+				local mutant = require(native)
 				local malformed, caught = 0, 0
 				for _, row in ipairs(malformed_sources) do
 					if row.expected == MALFORMED then

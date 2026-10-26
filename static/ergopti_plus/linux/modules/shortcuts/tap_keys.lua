@@ -35,6 +35,7 @@ local AiActions = require("modules.shortcuts.ai_actions")
 local Manifest = require("infra.manifest_reader")
 local TomlCodec = require("toml_codec")
 local TomlWriter = require("toml_codec.writer")
+local ShortcutCatalogue = require("shortcuts.catalogue")
 
 local LOG = "modules.shortcuts.tap_keys"
 
@@ -42,20 +43,34 @@ local LOG = "modules.shortcuts.tap_keys"
 -- one binding instead of all three.
 local PREF_PREFIX = "shortcuts.tap_keys."
 
--- The binding a tap key's action runs under and stores its parameter under.
-local BINDING_PREFIX = "tap_key__"
-
--- The shared key list.
-local KEYS_REL_PATH = "modules/actions/tap_keys.json"
-
 -- The modifiers that make a press "not a plain tap". AltGr is one: it selects a
 -- layout level, and the key must type that level's character.
 local BLOCKING_MODIFIERS = { "ctrl", "shift", "alt", "altgr", "meta" }
 
--- Decoded tap_keys.json entries in menu order; nil until read.
-local _keys = nil
-local _binding_source = nil
-local _binding_catalogue = nil
+-- The shared key list (tap_keys.json) in menu order and its published identity,
+-- shared with macOS.
+local TapKeys = ShortcutCatalogue.new_tap_keys({
+	keys_rel_path = "modules/actions/tap_keys.json",
+	-- Resolved on every read: tests redirect Paths.shared to a throwaway file.
+	resolve_path = function(rel) return Paths.shared(rel) end,
+	read = function(path)
+		local handle = path and io.open(path, "r")
+		if not handle then error("tap_keys: cannot read " .. tostring(path)) end
+		local read_ok, body = pcall(handle.read, handle, "*a")
+		local close_ok, closed = pcall(handle.close, handle)
+		if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
+			error("tap_keys: cannot complete read of " .. tostring(path))
+		end
+		return body
+	end,
+	decode = function(body)
+		local ok, parsed = pcall(require("json").decode, body)
+		return ok and parsed or nil
+	end,
+	valid_entry = function(entry) return type(entry.id) == "string" and type(entry.linux) == "number" end,
+	invalid_entry_message = "lacks its id or evdev code",
+	owner = M,
+})
 
 -- tap key id -> action id, read once from config.toml over the manifest defaults.
 local _assignments = nil
@@ -101,65 +116,21 @@ end
 --- The shared key list, read once. A missing or malformed file raises: the
 --- menu would otherwise show no tap key and nothing would say why.
 --- @return table Array of { id, linux }.
-function M.keys()
-	if _keys then return _keys end
-	local path = Paths.shared(KEYS_REL_PATH)
-	local handle = path and io.open(path, "r")
-	if not handle then error("tap_keys: cannot read " .. tostring(path)) end
-	local read_ok, body = pcall(handle.read, handle, "*a")
-	local close_ok, closed = pcall(handle.close, handle)
-	if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
-		error("tap_keys: cannot complete read of " .. tostring(path))
-	end
-	local Json = require("json")
-	local ok, parsed = pcall(Json.decode, body)
-	if not ok or type(parsed) ~= "table" or type(parsed.keys) ~= "table" or #parsed.keys == 0 then
-		error("tap_keys: " .. tostring(path) .. " is malformed")
-	end
-	for _, entry in ipairs(parsed.keys) do
-		if type(entry.id) ~= "string" or type(entry.linux) ~= "number" then
-			error("tap_keys: an entry of " .. tostring(path) .. " lacks its id or evdev code")
-		end
-	end
-	local publication = require("config_binding_identity").tap_binding_catalogue(parsed.keys)
-	_keys, _binding_source, _binding_catalogue = parsed.keys, parsed.keys, publication
-	return _keys
-end
+function M.keys() return TapKeys.keys() end
 
 --- Returns only the detached identity of the acknowledged current native source.
 --- A changed source withdraws publication; this accessor performs no IO.
 --- @return table|nil catalogue
-function M.published_binding_catalogue()
-	if not BindingPublication.owner_is_current("tap", "modules.shortcuts.tap_keys", M) then return nil end
-	if _binding_catalogue == nil or not rawequal(_keys, _binding_source) then return nil end
-	local current = require("config_binding_identity").tap_binding_catalogue(_keys)
-	for id in pairs(current.slots) do
-		if _binding_catalogue.slots[id] ~= true then return nil end
-	end
-	for id in pairs(_binding_catalogue.slots) do
-		if current.slots[id] ~= true then return nil end
-	end
-	return current
-end
-
+function M.published_binding_catalogue() return TapKeys.published_binding_catalogue() end
 
 --- The binding id a tap key dispatches under.
 --- @param id string
 --- @return string
-function M.binding_id(id)
-	return BINDING_PREFIX .. tostring(id)
-end
+function M.binding_id(id) return TapKeys.binding_id(id) end
 
 --- The gestures manager, whose catalogue decides which ids a key may hold.
 --- @return table|nil
-local function action_catalogue()
-	local ok, Gestures = pcall(require, "modules.gestures.manager")
-	if not ok or type(Gestures) ~= "table" or type(Gestures.is_assignable) ~= "function" then
-		Logger.error(LOG, "The action catalogue is unavailable: %s", tostring(Gestures))
-		return nil
-	end
-	return Gestures
-end
+local function action_catalogue() return ShortcutCatalogue.action_catalogue(Logger, LOG) end
 
 --- Visits exactly the canonical assignments consumed by this owner.
 --- @param decoded table Decoded config.toml.
@@ -381,11 +352,9 @@ end
 
 --- Test seam: forgets what was loaded.
 function M._reset()
-	_binding_source = nil
-	_binding_catalogue = nil
 	_configuration_owner = nil
 	_dispatch_generation = _dispatch_generation + 1
-	_keys = nil
+	TapKeys.reset()
 	_assignments = nil
 	_is_active = NEVER_ACTIVE
 	_defer = nil
@@ -454,7 +423,7 @@ function M.apply_configuration(owner, state)
 	return true
 end
 
-BindingPublication.register("tap", "modules.shortcuts.tap_keys", M, M.published_binding_catalogue)
+BindingPublication.register(ShortcutCatalogue.TAP_OWNER, ShortcutCatalogue.TAP_MODULE, M, M.published_binding_catalogue)
 
 
 --- Captures the actual plain-tap claims and their canonical source/runtime epoch.
@@ -467,11 +436,11 @@ function M.capture_collision_inventory()
 	local bytes, status = read(path)
 	if status ~= "ok" and status ~= "absent" then return nil end
 	local expected = M.configuration_candidate(TomlCodec.decode(bytes or "")).assignments
-	local actual, keys, epoch, active = _assignments, _keys, _dispatch_generation, _is_active
+	local actual, keys, epoch, active = _assignments, TapKeys.loaded_keys(), _dispatch_generation, _is_active
 	local key_source = {}; for index, key in ipairs(keys) do key_source[index] = { row = key, id = key.id, code = key.linux } end
 	local function runtime()
 		if not rawequal(package.loaded["modules.shortcuts.tap_keys"], M) or _configuration_owner ~= nil
-			or _dispatch_generation ~= epoch or not rawequal(_assignments, actual) or not rawequal(_keys, keys)
+			or _dispatch_generation ~= epoch or not rawequal(_assignments, actual) or not rawequal(TapKeys.loaded_keys(), keys)
 			or _is_active ~= active or not rawequal(package.loaded["infra.config_paths"], Routes)
 			or Routes.config ~= route or TomlWriter.read_classified ~= read or M.capture_collision_inventory ~= factory then return false end
 		if #keys ~= #key_source then return false end
