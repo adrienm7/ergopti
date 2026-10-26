@@ -412,7 +412,7 @@
 		},
 		{
 			"id": "js-0493",
-			"ordinal": 493,
+			"ordinal": 497,
 			"name": "proxy precedence shell projection (the shell expansions are generated from proxy_policy.json)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-codegen-proxy-precedence.cjs"],
