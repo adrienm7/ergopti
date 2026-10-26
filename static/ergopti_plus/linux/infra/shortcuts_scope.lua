@@ -9,6 +9,7 @@ local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 local Parents = require("config_obsolete_parents")
 local Logger = require("logger.shim")
+local ConfigKeys = require("config_keys")
 local LOG = "infra.shortcuts_scope"
 local _owner, _sequence = nil, 0
 local _editor_owner, _editor_path, _editor_pause, _editor_busy = nil, nil, nil, false
@@ -20,7 +21,7 @@ require("infra.scope_registry").register("shortcuts_editor_scope", function() re
 --- clear narrow the scope to these rows.
 --- @param parameter_domain function Path -> parameter domain or nil.
 --- @return function select Path -> boolean.
-local SCRIPT_CHORD_SECTION = "shortcuts.script_control"
+local SCRIPT_CHORD_SECTION = ConfigKeys.KEY.SHORTCUTS_SCRIPT_CONTROL
 local function script_chord_rows(parameter_domain)
 	return function(path)
 		return path == SCRIPT_CHORD_SECTION

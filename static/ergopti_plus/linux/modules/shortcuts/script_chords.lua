@@ -37,11 +37,12 @@ local Manifest = require("infra.manifest_reader")
 local ScriptChords = require("script_chords")
 local TomlCodec = require("toml_codec")
 local TomlWriter = require("toml_codec.writer")
+local ConfigKeys = require("config_keys")
 
 local LOG = "modules.shortcuts.script_chords"
 
 -- The manifest section of the slots and of the switch.
-local SECTION = "shortcuts.script_control"
+local SECTION = ConfigKeys.KEY.SHORTCUTS_SCRIPT_CONTROL
 local SWITCH_KEY = "chords_enabled"
 
 -- The binding a slot's action runs under and stores its parameter under, the

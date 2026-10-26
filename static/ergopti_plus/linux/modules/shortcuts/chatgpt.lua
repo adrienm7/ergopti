@@ -28,9 +28,10 @@ local Shell = require("adapters.shell_runner")
 local Paths = require("infra.config_paths")
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
+local ConfigKeys = require("config_keys")
 
 local LOG = "modules.shortcuts.chatgpt"
-local FEATURE_PATH = "shortcuts.chatgpt_url"
+local FEATURE_PATH = ConfigKeys.KEY.SHORTCUTS_CHATGPT_URL
 local _configuration_owner = nil
 
 M.DEFAULT_URL = Manifest.default_for(FEATURE_PATH)
