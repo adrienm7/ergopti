@@ -7,8 +7,9 @@
 --- Rendering reads metadata only; source factories run solely on explicit actions.
 --- ==============================================================================
 
+local ConfigKeys = require("config_keys")
 local M = {}
-local FEATURE = "hotstrings.dynamic.user_code"
+local FEATURE = ConfigKeys.KEY.HOTSTRINGS_DYNAMIC_USER_CODE
 
 --- Projects the declared parent around already rendered native child controls.
 --- @param manifest table Driver-bound manifest renderer.
