@@ -206,9 +206,9 @@ local secure_field_detector = RuntimeGuard.optional_require("adapters.secure_fie
 local webview_manager = RuntimeGuard.optional_require("ui.webview_manager")
 local input_capture_gate = nil
 
--- The error window: a logged ERROR can open it (the shared policy decides),
--- and the start after a crash announces the crash. Installed before main() so
--- the boot's own errors count; it opens nothing before the event loop runs.
+-- The error window: a logged ERROR can open it (the shared policy decides); a
+-- crash is announced by the crash reporter's immediate notification only.
+-- Installed before main() so the boot's own errors count; it opens nothing before the event loop runs.
 local ErrorDialog = RuntimeGuard.optional_require("ui.error_dialog.bridge")
 if ErrorDialog and ErrorDialog.init() then Logger.set_error_observer(ErrorDialog.on_error) end
 
@@ -2936,12 +2936,6 @@ local function main()
 
 	if not privacy_owners.startup_checkpoint() then return end
 	CrashReporter.remove_legacy_dumps()
-	-- systemd restarts a crashed daemon, and the crash left no window behind: the
-	-- first tick of the new loop announces the newest crash dump, once
-	if ErrorDialog then
-		event_loop.defer(function() ErrorDialog.notify_last_crash(CrashReporter.get_crash_dir()) end, 0)
-	end
-
 	if not privacy_owners.startup_checkpoint() then return end
 	-- UI preparation can outlive an XKB change; resolve again before grabbing.
 	if not keyboard_layout.refresh(opts.keymap) then

@@ -8,7 +8,8 @@
 --- 1. the observer is installed, with the bridge's on_error, and only after
 ---    the bridge initialised (an uninitialised bridge has no policy);
 --- 2. both happen before main() runs, so the boot's own errors count;
---- 3. the newest crash dump is announced from the loop's first tick.
+--- 3. no crash dialog is queued at the next start: a crash is announced by the
+---    crash reporter's immediate notification only, as on macOS.
 ---
 --- WHY A SOURCE-ORDER SCAN: the daemon's entry point cannot run headless, and
 --- both halves of a wrong wiring succeed on their own: a bridge that is never
@@ -44,27 +45,17 @@ helpers.describe("daemon wiring: the error window observes logged errors (error-
 		helpers.assert_true(observer_pos < main_pos, "the observer must be installed before main(), so boot errors count")
 	end)
 
-	helpers.it("announces the last crash from the new loop's first tick (error-dialog-linux)", function()
+	helpers.it("queues no crash dialog at the next start, the immediate notification being the only notice (error-dialog-linux)", function()
 		local src = daemon_code()
-		local notice_pos = src:find("ErrorDialog.notify_last_crash(CrashReporter.get_crash_dir())", 1, true)
-		local defer_pos = src:find("event_loop.defer(function() ErrorDialog.notify_last_crash", 1, true)
-		local ready_pos = src:find('Logger.success(LOG, "Daemon ready', 1, true)
-		helpers.assert_true(ready_pos ~= nil, "the application loop must follow the daemon readiness announcement")
-		-- Startup retirement may run the same adapter earlier to collect native ACKs.
-		local run_pos = src:find("event_loop.run({", ready_pos, true)
-		helpers.assert_true(notice_pos ~= nil, "the daemon must announce a crash found in the crash reporter's folder")
-		helpers.assert_true(defer_pos ~= nil, "the notice must be deferred onto the loop, where a window can open")
-		helpers.assert_true(run_pos ~= nil, "the event loop must still be findable, or this test compares nothing")
-		helpers.assert_true(defer_pos < run_pos, "the notice is queued before the loop starts, so it runs on its first tick")
+		helpers.assert_eq(src:find("notify_last_crash", 1, true), nil, "the next-start crash dialog is gone")
+		helpers.assert_true(src:find("CrashReporter", 1, true) ~= nil, "the crash reporter must still be wired")
 	end)
 
-	helpers.it("removes the legacy text dumps once, before the crash notice reads the folder (legacy-crash-cleanup)", function()
+	helpers.it("removes the legacy text dumps once at startup (legacy-crash-cleanup)", function()
 		local src = daemon_code()
 		local call = "CrashReporter.remove_legacy_dumps()"
 		local first = src:find(call, 1, true)
 		helpers.assert_true(first ~= nil, "the daemon must clean the legacy crash dumps at startup")
 		helpers.assert_eq(src:find(call, first + 1, true), nil, "the cleanup runs once per start")
-		local defer_pos = src:find("event_loop.defer(function() ErrorDialog.notify_last_crash", 1, true)
-		helpers.assert_true(defer_pos ~= nil and first < defer_pos, "the cleanup precedes the next-start crash notice")
 	end)
 end)

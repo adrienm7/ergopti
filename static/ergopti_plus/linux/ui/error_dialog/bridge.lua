@@ -4,9 +4,8 @@
 --- BRIDGE HANDLER: Error Window (Linux)
 --- DESCRIPTION:
 --- Opens the shared error window (_shared/ui/error_dialog/) when a logged ERROR
---- passes the shared policy (_shared/modules/diagnostics/error_policy.json), or
---- at start-up when the daemon crashed since the last notice, and serves the
---- page's actions: report on GitHub, copy the report, open the file the error
+--- passes the shared policy (_shared/modules/diagnostics/error_policy.json), and
+--- serves the page's actions: report on GitHub, copy the report, open the file the error
 --- is logged in, close.
 --- Bridge name: "error_dialog"
 --- The host-independent half (policy load, Debug switch, report, first
@@ -21,9 +20,9 @@
 ---    session, at most max_dialogs per window_sec, errors logged while a window
 ---    is open are counted in it, nothing while the Debug menu's "Show a window
 ---    for every error" is unticked.
---- 3. A crash stops the daemon before any window can open, and systemd starts
----    it again: the next start shows the newest crash dump once, as a crash
----    notice, and remembers it in the crash folder.
+--- 3. A crash stops the daemon before any window can open; it is announced by the
+---    crash reporter's immediate desktop notification (as on macOS), and this
+---    window never opens for it at the next start.
 --- 4. The report is diagnostics.error_report's, built from the diagnostics
 ---    snapshot and redacted before the page sees it; copy, report and open go
 ---    through the diagnostics window's own actions (ui.healthcheck.report),
@@ -40,12 +39,6 @@ local Logger      = require("logger.shim")
 local Policy      = require("diagnostics.error_policy")
 local DialogCore  = require("error_dialog.core")
 local Redact      = require("diagnostics.redact")
-local FileReader  = require("infra.regular_file_reader")
-local FileWriter  = require("infra.regular_file_writer")
-local Directory   = require("infra.native_directory")
-local CrashReport = require("crash_report")
-local Numbers     = require("number_policy")
-local Failure     = require("error_description")
 
 local LOG = "bridge.error_dialog"
 
@@ -53,10 +46,6 @@ local LOG = "bridge.error_dialog"
 -- as the features manifest declares it
 local APP = "error_dialog"
 local SETTING = "script.show_error_dialog"
-
--- The name of the file, in the crash folder, that remembers the newest crash
--- dump already announced
-local CRASH_ACK_FILE = ".last_crash_notice"
 
 -- The page's actions
 local PAGE_ACTIONS = { report = true, copy = true, open_log = true, close = true }
@@ -439,128 +428,9 @@ end
 
 -- =================================
 -- =================================
--- ======= 5/ Crash Notice =========
+-- ======= 5/ Test Seam ============
 -- =================================
 -- =================================
-
---- Reads an admitted regular source and requires its read and close receipts.
---- @param path string
---- @return string|nil content
---- @return string|nil failure
---- @return number|string|nil errno
-local function read_file(path)
-	local fh, detail, errno = FileReader.open_source(path)
-	if not fh then return nil, detail, errno end
-	local read_ok, content = pcall(fh.read, fh, "*a")
-	local close_ok, closed = pcall(fh.close, fh)
-	if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true then
-		return nil, "the crash notice source could not be read and closed"
-	end
-	return content
-end
-
---- The module and the error of a crash report (the shared crash_report JSON).
---- @param text string The report document.
---- @return string|nil module The protected module that raised, or "daemon".
---- @return string message The error, then the stack when the report has one; the
----   reason when the document cannot be read (module is then nil).
-function M.parse_crash_dump(text)
-	local report = require("json").decode(text)
-	if type(report) ~= "table" or type(report.error_msg) ~= "string" then
-		return nil, "the document is not a crash report"
-	end
-	local module_name = type(report.module) == "string" and report.module ~= "" and report.module or "daemon"
-	local message = report.error_msg
-	if type(report.stack_trace) == "string" and report.stack_trace ~= "" then
-		message = message .. "\n" .. report.stack_trace:gsub("\n+$", "")
-	end
-	return module_name, message
-end
-
---- Selects the newest named report without interpreting filenames as line records.
---- Foreign directory entries never suppress the pending report.
---- @param crash_dir string
---- @return string|nil report_name
-local function newest_report(crash_dir)
-	local listed, entries, detail, code = pcall(Directory.entries, crash_dir)
-	if not listed or entries == nil then
-		if listed and code == "ENOENT" then return nil end
-		Logger.error(LOG, "The crash directory cannot be listed: %s.", Failure.describe(listed and detail or entries))
-		return nil
-	end
-	local newest, modified, latest_stem, latest_attempt
-	for _, entry in ipairs(entries) do
-		local stem, attempt = CrashReport.parse_name(entry.name)
-		if stem and (entry.kind == "file" or entry.kind == "link") then
-			local inspected, stat, reason, errno = pcall(Directory.stat, Directory.join(crash_dir, entry.name))
-			if not inspected or (stat == nil and errno ~= "ENOENT") then
-				Logger.error(LOG, "A crash report cannot be inspected: %s.", Failure.describe(inspected and reason or stat))
-				return nil
-			end
-			if stat and (stat.kind == "file" or stat.kind == "link") then
-				if not Numbers.is_finite(stat.modified) then
-					Logger.error(LOG, "A crash report has no valid modification time.")
-					return nil
-				end
-				if newest == nil or stat.modified > modified or (stat.modified == modified
-					and (stem > latest_stem or (stem == latest_stem and attempt > latest_attempt))) then
-					newest, modified, latest_stem, latest_attempt = entry.name, stat.modified, stem, attempt
-				end
-			end
-		end
-	end
-	return newest
-end
-
---- Shows the newest crash dump once, when the daemon crashed since the last
---- notice. Called by the daemon once its loop runs.
---- @param crash_dir string The crash reporter's folder.
---- @return boolean shown
-function M.notify_last_crash(crash_dir)
-	if not _scope.idle() then return false end
-	if _policy == nil then return false end
-	-- Unticked, or a window already on its way: the dump stays unannounced and
-	-- is offered again at the next start
-	if not M.is_enabled() or _busy then return false end
-	local newest = newest_report(crash_dir)
-	if type(newest) ~= "string" or newest == "" then return false end
-	local ack_path = crash_dir .. "/" .. CRASH_ACK_FILE
-	local acknowledged, detail, errno = read_file(ack_path)
-	if acknowledged == nil and errno ~= FileReader.ENOENT then
-		Logger.error(LOG, "The crash notice marker cannot be read: %s.", tostring(detail))
-		return false
-	end
-	if acknowledged == newest .. "\n" then return false end
-	local path = crash_dir .. "/" .. newest
-	local text = read_file(path)
-	if not text then
-		Logger.error(LOG, "The crash dump %s cannot be read.", path)
-		return false
-	end
-	local module_name, message = M.parse_crash_dump(text)
-	if module_name == nil then
-		Logger.error(LOG, "The crash report %s cannot be shown: %s.", path, message)
-		return false
-	end
-	-- Remembered before the window opens: a notice that crashes the daemon
-	-- again must not become a crash loop of notices. Only a retained marker
-	-- authorizes presentation; a refused write never authorizes a notice.
-	local bytes = newest .. "\n"
-	local fh = FileWriter.open(ack_path, "w")
-	if not fh then
-		Logger.error(LOG, "The crash notice cannot be remembered in %s; it is not shown.", crash_dir)
-		return false
-	end
-	local write_ok, written = pcall(fh.write, fh, bytes)
-	local close_ok, closed = pcall(fh.close, fh)
-	if not write_ok or not written or not close_ok or closed ~= true or read_file(ack_path) ~= bytes then
-		Logger.error(LOG, "The crash notice marker could not be retained; it is not shown.")
-		return false
-	end
-	Logger.info(LOG, "The daemon crashed since the last start (%s); showing the notice.", newest)
-	schedule({ kind = "crash", module = module_name, message = message, time = newest, log_path = path })
-	return true
-end
 
 --- Test seam: forgets the policy, the decisions and the window.
 function M._reset()

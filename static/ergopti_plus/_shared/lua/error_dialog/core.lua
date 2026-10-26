@@ -163,10 +163,6 @@ function M.compose(record, snapshot, driver)
 	local paths = {}
 	for id, path in pairs(sections.paths or {}) do paths[id] = path end
 	local open_id = "errors_today"
-	if record.kind == "crash" then
-		open_id = "crash_report"
-		paths.crash_report = record.log_path
-	end
 	local log_path = paths[open_id]
 	if type(log_path) ~= "string" or log_path == "" then error("the file this error is logged in is unknown") end
 	return { report = report, paths = paths, open_id = open_id, log_path = log_path }

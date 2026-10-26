@@ -13,8 +13,8 @@
 ---    report from either driver has the same fields in the same order, including
 ---    the log ring buffer that explains the crash.
 --- 2. One notice with macOS: a saved report raises a desktop notification naming
----    the file, a failed save raises the failure notice. The next-start dialog of
----    ui/error_dialog stays: it reads the same report.
+---    the file, a failed save raises the failure notice. That immediate
+---    notification is the only crash notice: the next start opens no dialog.
 --- 3. Low overhead: only writes on actual errors; zero allocations on the
 ---    hot path (pcall returning ok=true is the common case).
 --- 4. Privacy: the whole document goes through the admitted redactor before it
@@ -38,8 +38,8 @@ local LOG = "diagnostics.crash_reporter"
 local MAX_REPORT_FILENAME_ATTEMPTS = 1000
 
 -- The name of a dump written before the shared JSON report existed:
--- crash_<UTC stamp>_<sanitised module>.txt. The retention and the next-start
--- dialog no longer see these, so they would otherwise stay forever.
+-- crash_<UTC stamp>_<sanitised module>.txt. The retention no longer sees these,
+-- so they would otherwise stay forever.
 local LEGACY_DUMP_PATTERN = "^crash_%d%d%d%d%-%d%d%-%d%dT%d%d%-%d%d%-%d%d_[%w_.-]+%.txt$"
 
 local EEXIST = 17 -- Linux exclusive-create collision receipt.
@@ -94,7 +94,7 @@ end
 
 --- Deletes the legacy text dumps of the crash folder, once per start.
 --- Idempotent: after the first run no name matches, and the exact pattern leaves
---- JSON reports, the next-start marker and any file the user keeps untouched. A
+--- JSON reports, a leftover marker file and any file the user keeps untouched. A
 --- refused deletion is a warning: cleanup must never stop the daemon.
 --- @param directory string|nil Crash folder (default: the reporter's folder).
 --- @return integer removed Number of legacy dumps deleted.

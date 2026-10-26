@@ -327,7 +327,7 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 	end)
 
 	-- The dumps of the pre-JSON reporter (crash_<stamp>_<module>.txt) are invisible
-	-- to the retention and to the next-start dialog, so the startup removes them.
+	-- to the retention, so the startup removes them.
 	helpers.it("removes exactly the legacy text dumps and nothing else (legacy-crash-cleanup)", function()
 		local listing = {
 			{ name = "crash_2026-09-01T10-00-00_ergopti_hotstrings.txt", kind = "file" },
