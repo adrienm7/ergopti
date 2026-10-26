@@ -240,6 +240,7 @@
 		"test:managed-ollama-handoff": "node ./tools/test/test-managed-ollama-handoff.cjs",
 		"test:linux:http-stream": "node ./tools/test/run-linux-http-stream-receipts.cjs",
 		"test:linux:runtime-native": "node ./tools/test/run-linux-runtime-native.cjs",
+		"test:lua-features-manifest-projection": "node ./tools/test/test-lua-features-manifest-projection.cjs",
 		"test:linux-portable-commands": "node ./tools/test/test-linux-portable-commands.cjs",
 		"test:linux-portable-network-runtime": "node ./tools/test/test-linux-portable-network-runtime.cjs",
 		"test:linux-portable-network-registration": "node ./tools/test/test-linux-portable-network-registration.cjs",
