@@ -347,12 +347,12 @@ if package.config:sub(1, 1) == "/" then
 			local date, Sink, Logger = os.date
 			local Writer = require("infra.regular_file_writer")
 			local native_write = Writer.open
-			local timestamp = "2026-10-25T12-00-00"
+			local timestamp = "2026-10-25T12:00:00Z"
 			local ok, err = xpcall(function()
 				Logger, Sink = require("logger.shim"), require("infra.logger_sink")
 				assert(Sink.install(Logger, { log_dir = directory, redaction_context = { home = HOME, user = USER } }))
 				os.date = function(format, ...)
-					if format == "!%Y-%m-%dT%H-%M-%S" then return timestamp end
+					if format == "!%Y-%m-%dT%H:%M:%SZ" then return timestamp end
 					return date(format, ...)
 				end
 				local Reporter = require("modules.diagnostics.crash_reporter")
@@ -360,15 +360,19 @@ if package.config:sub(1, 1) == "/" then
 					helpers.assert_eq(Reporter.dump("engine", marker .. " " .. PAYLOAD), true)
 				end
 				helpers.assert_eq(Reporter.dump("other", "OTHER_MODULE_MARKER " .. PAYLOAD), true)
-				timestamp = "2026-10-25T12-00-01"
+				timestamp = "2026-10-25T12:00:01Z"
 				helpers.assert_eq(Reporter.dump("engine", "OTHER_SECOND_MARKER " .. PAYLOAD), true)
-				timestamp = "2026-10-25T12-00-00"
+				timestamp = "2026-10-25T12:00:00Z"
 				package.loaded["modules.diagnostics.crash_reporter"] = nil
 				Reporter = require("modules.diagnostics.crash_reporter")
 				helpers.assert_eq(Reporter.dump("engine", "RELOADED_HISTORY_MARKER " .. PAYLOAD), true)
 				local raced = false
+				local CrashReport = require("crash_report")
+				-- Four reports already occupy this second; race its next free candidate.
+				local race_path = directory .. "/crash_reports/" .. CrashReport.file_name(CrashReport.stem(timestamp), 5)
 				Writer.open = function(path, mode)
-					if path:find("_racing", 1, true) and not raced then
+					if path == race_path and not raced then
+						helpers.assert_eq(mode, "wx", "the competing inode precedes exclusive acquisition")
 						raced = true
 						local descriptor = assert(uv.fs_open(path, "wx", 384))
 						assert(uv.fs_write(descriptor, "RACE_OWNER_MARKER", 0))
