@@ -550,6 +550,35 @@ assert.equal(passed, 15, 'the orphan script check must execute');
 
 // The actual page derives streaks from local calendar dates, not 24-hour buckets.
 const { loadMetricsAppsPage } = require('./support/metrics-apps-page.cjs');
+
+/** Delivers through each actual host handler; it never computes metrics. */
+function publishLoadedAppsData(page, host, manifest) {
+	if (host === 'windows') {
+		const listener = page.messageListeners.find((entry) => entry.name === 'message');
+		assert.ok(listener, 'the actual Windows prefetch handler must be installed');
+		listener.callback({
+			data: {
+				type: 'prefetch',
+				blob: { metrics_manifest: manifest, user_categories: {}, app_icons: {} }
+			}
+		});
+	} else if (host === 'linux') {
+		page.context.__hostBridgeResponse(
+			'metrics_apps_bridge',
+			false,
+			encodeURIComponent(
+				JSON.stringify({ metrics_manifest: manifest, user_categories: {}, app_icons: {} })
+			)
+		);
+	} else {
+		page.context.publishMetricsAppsData(
+			manifest,
+			{},
+			{},
+			{ manifest_revision: 1, categories_revision: 1 }
+		);
+	}
+}
 const streakCases = [
 	{
 		name: 'Paris DST fallback',
@@ -643,31 +672,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 						];
 					})
 				);
-				if (host === 'windows') {
-					const listener = page.messageListeners.find((entry) => entry.name === 'message');
-					assert.ok(listener, 'the actual Windows prefetch handler must be installed');
-					listener.callback({
-						data: {
-							type: 'prefetch',
-							blob: { metrics_manifest: manifest, user_categories: {}, app_icons: {} }
-						}
-					});
-				} else if (host === 'linux') {
-					page.context.__hostBridgeResponse(
-						'metrics_apps_bridge',
-						false,
-						encodeURIComponent(
-							JSON.stringify({ metrics_manifest: manifest, user_categories: {}, app_icons: {} })
-						)
-					);
-				} else {
-					page.context.publishMetricsAppsData(
-						manifest,
-						{},
-						{},
-						{ manifest_revision: 1, categories_revision: 1 }
-					);
-				}
+				publishLoadedAppsData(page, host, manifest);
 				if (vector.lastDayHours !== undefined) {
 					const [previous, latest] = vector.dates.slice(-2);
 					const actualHours = vm.runInContext(
@@ -702,6 +707,144 @@ assert.equal(
 	passed,
 	15 + 3 * streakCases.length,
 	'all previous and local-calendar page controls must execute'
+);
+
+const drilldownCases = [
+	{ name: 'weekly Monday filter', period: 'week', weekdays: [0], chars: 23, layouts: ['Monday'] },
+	{ name: 'weekly Sunday filter', period: 'week', weekdays: [6], chars: 17, layouts: ['Sunday'] },
+	{
+		name: 'weekly unrestricted weekdays',
+		period: 'week',
+		weekdays: null,
+		chars: 77,
+		layouts: ['Sunday', 'Monday', 'Tuesday']
+	},
+	{ name: 'all-time Monday filter', period: 'all', weekdays: [0], chars: 23, layouts: ['Monday'] },
+	{
+		name: 'weekly multiple weekdays',
+		period: 'week',
+		weekdays: [0, 6],
+		chars: 40,
+		layouts: ['Sunday', 'Monday']
+	},
+	{ name: 'weekly empty weekday selection', period: 'week', weekdays: [], chars: 0, layouts: [] },
+	{
+		name: 'single local date',
+		period: 'day',
+		weekdays: null,
+		anchor: '2026-10-26',
+		chars: 23,
+		layouts: ['Monday']
+	},
+	{
+		name: 'all-time unrestricted weekdays',
+		period: 'all',
+		weekdays: null,
+		chars: 88,
+		layouts: ['OldSunday', 'Sunday', 'Monday', 'Tuesday']
+	}
+];
+assert.equal(streakCases.length, 10, 'all local-calendar vectors must remain registered');
+assert.equal(drilldownCases.length, 8, 'all modal date-selection vectors must remain registered');
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of drilldownCases) {
+		test(`${host} app drilldown retains ${vector.name}`, () => {
+			const page = loadMetricsAppsPage(host);
+			for (const id of [
+				'app_drilldown_modal',
+				'app_modal_title',
+				'app_modal_tiles',
+				'app_modal_hourly',
+				'app_modal_dests',
+				'app_modal_layouts',
+				'app_modal_records',
+				'app_modal_assist'
+			])
+				page.elements.set(id, page.context.document.createElement('div'));
+			const charts = [];
+			// Canvas drawing is an explicit browser boundary. The real modal
+			// owns every plotted value, selected date and rendered layout row.
+			page.context.Chart = class ModalChartPort {
+				constructor(port, config) {
+					charts.push(config);
+				}
+				destroy() {}
+			};
+			page.elements.get('app_modal_hourly').getContext = () => ({ kind: 'modal' });
+			vm.runInContext(
+				`currentPeriod = ${JSON.stringify(vector.period)}; currentSelectedDate = ${JSON.stringify(vector.anchor || '2026-10-27')}; currentWeekdayFilter = ${vector.weekdays === null ? 'null' : `new Set(${JSON.stringify(vector.weekdays)})`};`,
+				page.context
+			);
+			const rows = [
+				['2025-10-26', 11, 'OldSunday'],
+				['2026-10-25', 17, 'Sunday'],
+				['2026-10-26', 23, 'Monday'],
+				['2026-10-27', 37, 'Tuesday']
+			];
+			const manifest = Object.fromEntries(
+				rows.map(([date, chars, layout]) => [
+					date,
+					{
+						Editor: {
+							category: 'Productivity',
+							app_time_ms: 3600000,
+							chars,
+							hourly: { 12: { time_ms: 3600000, c: chars } },
+							layouts_seen: { [layout]: chars }
+						}
+					}
+				])
+			);
+			publishLoadedAppsData(page, host, manifest);
+			const aggregate = page.context.getAggregatedData();
+			assert.equal(
+				aggregate.apps.Editor?.chars || 0,
+				vector.chars,
+				'the actual aggregate must receive the selected date scope'
+			);
+			assert.equal(
+				charts.length,
+				0,
+				'the selected modal canvas must not be rendered by unrelated charts'
+			);
+			page.context.openAppDrilldown('Editor');
+			if (vector.chars === 0) {
+				assert.equal(charts.length, 0, 'a completely excluded app cannot acquire a modal chart');
+			} else {
+				assert.equal(page.elements.get('app_modal_title').textContent, 'Editor');
+				assert.equal(page.elements.get('app_drilldown_modal').style.display, 'flex');
+				assert.equal(charts.length, 1, 'the actual modal must publish one chart');
+				const series = Array.from(charts[0].data.datasets[0].data);
+				assert.equal(series.length, 24);
+				assert.equal(
+					series[12],
+					vector.chars,
+					'the modal chart must obey the same accepted query as its stat tiles'
+				);
+				assert.equal(
+					series.reduce((sum, value) => sum + value, 0),
+					vector.chars
+				);
+				const html = page.elements.get('app_modal_layouts').innerHTML;
+				for (const [, , layout] of rows)
+					assert.equal(
+						html.includes(`<span>${layout}</span>`),
+						vector.layouts.includes(layout),
+						'layout rows must obey the same accepted dates as the hourly chart'
+					);
+			}
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false,
+				'the actual page must render without fixture errors'
+			);
+		});
+	}
+}
+assert.equal(
+	passed,
+	15 + 3 * (streakCases.length + drilldownCases.length),
+	'all previous, calendar and drilldown controls must execute'
 );
 
 console.log(`${passed} passed, 0 failed.`);
