@@ -879,6 +879,8 @@ function M.generate(ctx, menu_mods, actions)
 		["quit"]            = function()
 			local row = ManifestMenu.command_row("top_level", "quit", { quit = actions.quit })
 			if not row then return {} end
+			-- Read by ui.menu.click_gate: Quit wins over a reload in flight and runs at once.
+			row.bypasses_reload = true
 			return { row }
 		end,
 		["debug"]           = function()

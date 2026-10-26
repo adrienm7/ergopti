@@ -680,8 +680,9 @@ end
 --- that the successor claims (infra/driver_control.lua). The successor also
 --- inherits the live pause (infra/restart_pause.lua): main() installs its
 --- script controller before any Reload trigger can fire.
-local perform_reload, reload_in_flight = require("infra.reload_restart").new({ gestures = gestures,
-	restart = function(reason) return restart_daemon(reason, privacy_owners.script_actions.is_paused()) end })
+local perform_reload, reload_in_flight, abandon_reload = require("infra.reload_restart").new({ gestures = gestures,
+	restart = function(reason) return restart_daemon(reason, privacy_owners.script_actions.is_paused()) end,
+	cancel = function() return require("infra.daemon_restart").cancel() end })
 
 
 --- Emits facts prepared before capture only after actual driver readiness.
@@ -720,9 +721,17 @@ end
 privacy_owners.tray_quit = require("infra.quit_request").new({
 	shutdown = shutdown,
 	reload_in_flight = reload_in_flight,
-	writer_active = function() return require("infra.global_scope").pending() end,
+	abandon_reload = abandon_reload,
+	writer_active = function() return require("infra.scope_registry").pending() end,
 	publication_pending = function() return hotstrings_config.publication_pending() end,
 	apply_pause_layout = function() require("modules.keymap.pause_layout_switch").quit_safely() end,
+	schedule = function(seconds, callback)
+		return TimerScheduler.after(seconds, callback).armed == true
+	end,
+	now = function() return require("luv").hrtime() / 1e9 end,
+	timeout = Timings.ms("ui", "user_quit_deadline_ms") / 1000,
+	poll = 0.25,
+	notify_refused = function() require("ui.menu.feature_notice").quit_refused(require("infra.i18n").get) end,
 })
 
 

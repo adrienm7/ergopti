@@ -715,6 +715,18 @@ function M.is_pending()
 	return _admission_abort ~= nil or (_transaction ~= nil and not _transaction.settled)
 end
 
+--- Names what kind of terminal transition owns the process, so the menu's Quit can
+--- tell a reload (which it abandons) from an exit (which it must not repeat).
+--- Never logs.
+--- @return string|nil kind "reload", "exit", "admission-abort" (a refused pre-fence
+---   release still owns the admission), or nil when nothing owns the process.
+function M.pending_kind()
+	if _admission_abort ~= nil then return "admission-abort" end
+	local transaction = _transaction
+	if transaction == nil or transaction.settled then return nil end
+	return transaction.kind
+end
+
 --- Names the stage the active terminal transaction is waiting on. It never logs,
 --- so the quit watchdog may call it after the logger sink was finalized.
 --- @return string stage
