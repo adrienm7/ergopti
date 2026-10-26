@@ -763,7 +763,7 @@ console.log(
 			{ length: 305 },
 			(_, index) => `[sections.hand_floor_${index}]\ndescription_key = "hand"\n`
 		).join('\n');
-	// One identity the ledger still holds; the earlier sections.ui entry got its reason.
+	// The ledger is empty since 2026-10-26: this once-held identity may not come back.
 	const knownDebt =
 		'[[features.llm.profiles]]\nid = "auto_profile_for_model"\ntype = "boolean"\nplatforms = ["ahk", "linux"]\n';
 	const command =
@@ -774,9 +774,13 @@ console.log(
 	function errorsFor(source) {
 		return coverage.coverageErrors(coverage.readCoverage(source));
 	}
-	assert.deepEqual(errorsFor(complete + knownDebt), []);
-	const valid = coverage.readCoverage(complete + knownDebt + hidden + separator);
-	assert.equal(valid.unexplained.length, 1);
+	assert.deepEqual(errorsFor(complete), []);
+	assert.ok(
+		errorsFor(complete + knownDebt).some((error) => error.includes('rose to 1 (baseline 0)')),
+		'a retired debt cannot return'
+	);
+	const valid = coverage.readCoverage(complete + hidden + separator);
+	assert.equal(valid.unexplained.length, 0);
 	assert.equal(valid.notApplicable.length, 2);
 	assert.deepEqual(coverage.coverageErrors(valid), []);
 	assert.ok(
@@ -841,10 +845,9 @@ console.log(
 	for (const identity of anonymousIdentities)
 		assert.ok(anonymousErrors.some((error) => error.includes(identity)));
 	const namedKnown = knownDebt;
-	assert.deepEqual(errorsFor(complete + namedKnown), []);
 	assert.ok(
 		errorsFor(complete + namedKnown + namedKnown).some((error) =>
-			error.includes('duplicate unexplained identity')
+			error.includes('rose to 2 (baseline 0)')
 		)
 	);
 

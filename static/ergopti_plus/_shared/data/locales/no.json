@@ -3577,6 +3577,7 @@
 	"menu.gestures.sensitivity_current": "Følsomhet: %s",
 	"platform_reason.llm_saved_user_models_are_macos": "Disse kontrollene administrerer den lagrede listen «Mine modeller» på macOS. Windows og Linux bruker sine egne modellister.",
 	"platform_reason.llm_request_interval_is_per_backend_on_windows": "Windows bruker et fast minsteintervall per backend og har ingen innstilling for det; macOS og Linux deler én verdi som kan stilles inn.",
+	"platform_reason.llm_profile_follows_model_is_not_on_macos": "Windows og Linux kan følge den valgte modellen ved å bytte promptprofil automatisk. På macOS brukes den anbefalte profilen på forespørsel, fra Profiler-menyen.",
 	"startup.linux_input_access_label": "Tilgang til tastaturet er utilgjengelig",
 	"updater.tray_new_version_label": "Oppdatering tilgjengelig",
 	"dialog.action_picker.program_provider_changed": "Skriptet eller tolken er endret. Åpne handlingsvelgeren på nytt.",
