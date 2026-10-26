@@ -12,6 +12,7 @@ local M = {}
 local ShellRunner = require("adapters.shell_runner")
 local Scheduler = require("adapters.timer_scheduler")
 local Logger = require("infra.logger")
+local TableUtil = require("table_util")
 local runtime = hs
 local LOG = "healthcheck.appleevents"
 local active = {}
@@ -224,9 +225,7 @@ end
 --- Counts only physically unretired local owners, not inferred running PIDs.
 --- @return integer retained count.
 function M.active_count()
-	local count = 0
-	for _ in pairs(active) do count = count + 1 end
-	return count
+	return TableUtil.count(active)
 end
 
 return M

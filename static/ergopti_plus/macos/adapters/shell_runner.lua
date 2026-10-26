@@ -33,6 +33,7 @@ local PhaseStats = require("infra.phase_stats")
 local DeferredWork = require("infra.deferred_work")
 local TaskEnvironment = require("adapters.task_environment")
 local RuntimeLog = require("diagnostics.runtime_log")
+local TableUtil = require("table_util")
 
 local LOG = "adapters.shell_runner"
 
@@ -308,9 +309,7 @@ function M.validate_spawn_args(executable, args)
 	if type(args) ~= "table" then
 		return "args must be a table, got " .. type(args)
 	end
-	local keys = 0
-	for _ in pairs(args) do keys = keys + 1 end
-	if keys ~= #args then
+	if TableUtil.count(args) ~= #args then
 		return "args must be a pure array, not a keyed or sparse table"
 	end
 	for index = 1, #args do

@@ -42,6 +42,7 @@ local LOG = "menu_llm.mlx"
 -- api_mlx is the MLX backend's core module — if it cannot load, MLX predictions
 -- are dead anyway, so failing fast is correct.
 local ApiMlx = require("modules.llm.api_mlx")
+local TableUtil = require("table_util")
 
 
 
@@ -175,8 +176,7 @@ function M.new(deps, presets)
 				end
 			end
 		end
-		local count = 0
-		for _ in pairs(installed) do count = count + 1 end
+		local count = TableUtil.count(installed)
 		obj._installed_cache = installed
 		obj._installed_cache_ts = now
 		Logger.debug(LOG, "MLX installed models scan complete: %d model(s).", count)

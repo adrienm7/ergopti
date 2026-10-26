@@ -33,6 +33,7 @@ local NativePath = require("native_path")
 local Timings = require("infra.timings")
 local TimerScheduler = require("adapters.timer_scheduler")
 local TextUtils = require("text_utils")
+local TableUtil = require("table_util")
 local LOG     = "keystats.kc_bridge"
 
 -- Absolute path to the hand-off log file written by KE shell_command actions.
@@ -170,7 +171,6 @@ local function build_managed_output_set(tap_hold_config, available_actions)
 	end
 
 	local new_set  = {}
-	local count    = 0
 
 	for _key_id, cfg in pairs(tap_hold_config) do
 		for _, slot_id in ipairs({ cfg.tap or "none", cfg.hold or "none" }) do
@@ -183,7 +183,7 @@ local function build_managed_output_set(tap_hold_config, available_actions)
 		end
 	end
 
-	for _ in pairs(new_set) do count = count + 1 end
+	local count = TableUtil.count(new_set)
 	_managed_output_kcs = new_set
 	Logger.info(LOG, "Managed output kc set rebuilt: %d unique kc(s) claimed.", count)
 end
@@ -644,8 +644,7 @@ end
 ---   require("modules.keystats.kc_bridge").get_stats()
 --- @return table { drained_total = number, suppressed = number, offset = number }
 function M.get_stats()
-	local n = 0
-	for _ in pairs(_managed_output_kcs) do n = n + 1 end
+	local n = TableUtil.count(_managed_output_kcs)
 	return {
 		drained_total = _drained_total,
 		suppressed    = n,

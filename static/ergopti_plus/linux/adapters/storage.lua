@@ -113,6 +113,7 @@ local function owned_logical_key(key) return type(key) == "string" and key ~= ""
 -- other Lua driver; capture, publish and restore below stay native.
 local Owned = require("storage_owned")
 local NativePath = require("native_path")
+local TableUtil = require("table_util")
 local _owned = Owned.new({
 	name = "adapters.storage", module = M, logical_key = owned_logical_key, logger = Logger, log = LOG,
 	-- An ordinary commit in flight, or its unsettled debt, refuses owned work;
@@ -960,7 +961,7 @@ local function released_source_commit(updates, clear_all)
 		record.publication_effect = prepared.effect
 		if not settle_ordinary_record(record) then return false end
 		if record.outcome == "ack" and clear_all then
-			local count = 0; for _ in pairs(document) do count = count + 1 end
+			local count = TableUtil.count(document)
 			Logger.debug(LOG, "clear(): removed %d key(s).", count)
 		end
 		return written == true and record.outcome == "ack"

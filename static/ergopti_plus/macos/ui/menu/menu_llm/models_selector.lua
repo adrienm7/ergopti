@@ -22,6 +22,7 @@ local DeferredWork = require("infra.deferred_work")
 local BackendLabels = require("ui.menu.menu_llm.backend_labels")
 local ManifestMenu = require("infra.manifest_menu")
 local TextUtils = require("text_utils")
+local TableUtil = require("table_util")
 
 local LOG = "models_selector"
 
@@ -156,8 +157,7 @@ function M.build(ctx)
 	Logger.debug(LOG, "Building models selection menu…")
 	local menu = {}
 	local installed      = models_mgr.get_installed_models()
-	local installed_count = 0
-	for _ in pairs(installed) do installed_count = installed_count + 1 end
+	local installed_count = TableUtil.count(installed)
 	Logger.debug(LOG, string.format("Installed models detected: %d", installed_count))
 	local presets        = models_mgr.get_presets()
 	local active_backend = state.llm_backend
