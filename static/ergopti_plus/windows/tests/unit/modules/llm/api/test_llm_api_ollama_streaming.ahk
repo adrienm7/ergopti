@@ -363,6 +363,31 @@ Test("_LLM_Ollama_NextStreamUid: returns non-empty string", _OllamaStreamUid_IsN
 #Include %A_LineFile%/../test_llm_api_ollama_stream_nul.ahk
 
 
+; Reader cancellation fixtures retain a real completed native process too.
+; Their supplied provider bytes remain independent from this exit-only child.
+_OllamaStream_CompletedNativeOwner() {
+	Owner := 0
+	try {
+		Pid := 0
+		Command := _SR_BuildDirectCommandLine(A_ComSpec, ["/D", "/C", "exit", "/b", "0"])
+		_LLM_CurlArtifactRun(Command, "", "Hide", &Pid, &Owner)
+		Start := A_TickCount
+		while !_LLM_CurlProcessExited(Owner) && TickElapsed(Start) < 5000
+			Sleep(10)
+		AssertTrue(_LLM_CurlProcessExited(Owner), "the reader fixture child must acknowledge exit")
+		ExitCode := 0
+		Diagnostic := ""
+		AssertTrue(_SR_TreeReadExitCode(Owner["handle"], &ExitCode, &Diagnostic),
+			"the reader fixture keeps its actual native exit receipt")
+		AssertEqual(0, ExitCode, "reader cancellation starts from a successful transport")
+		return Owner
+	} catch as Err {
+		if Owner is Map
+			_LLM_CurlReleaseProcess(Owner, true)
+		throw Err
+	}
+}
+
 ; The live poll must fence the same real-reader return boundary as final flush.
 ; Only cancellation is injected: production reads/parses every JSONL byte.
 _OllamaLivePoll_ReaderCancellation(CancelAtRead, Boundary := "read", FinalOnly := false) {
@@ -381,6 +406,8 @@ _OllamaLivePoll_ReaderCancellation(CancelAtRead, Boundary := "read", FinalOnly :
 		AssertFalse(HadReadCall, "the production reader starts with its genuine Call boundary")
 		_LLM_ManagedBootstrap := 0
 		_LLM_Ollama_IsReady := true
+		Handle.ProcessOwner := _OllamaStream_CompletedNativeOwner()
+		Handle.Pid := Handle.ProcessOwner["pid"]
 		_LLM_Ollama_ActiveStreams := [Handle]
 		FileAppend('{"message":{"content":"live answer"},"done":true}' . (FinalOnly ? "" : "`n"),
 			Handle.TmpStdout, "UTF-8-RAW")
@@ -397,6 +424,7 @@ _OllamaLivePoll_ReaderCancellation(CancelAtRead, Boundary := "read", FinalOnly :
 		AssertFalse(FileExist(Handle.TmpStdout), "the settled poll removes its private response")
 		AssertEqual(0, _LLM_Ollama_ActiveStreams.Length, "the poll relinquishes its exact stream handle")
 	} finally {
+		_LLM_CurlReleaseProcess(Handle.ProcessOwner, true)
 		if ObservedFn.HasOwnProp("Call")
 			ObservedFn.DeleteProp("Call")
 		if HadReadCall
@@ -436,6 +464,8 @@ _OllamaLivePoll_PartialCancellationKeepsSuccessor() {
 	try {
 		_LLM_ManagedBootstrap := 0
 		_LLM_Ollama_IsReady := true
+		Handle.ProcessOwner := _OllamaStream_CompletedNativeOwner()
+		Handle.Pid := Handle.ProcessOwner["pid"]
 		_LLM_Ollama_ActiveStreams := [Handle]
 		FileAppend('{"message":{"content":"first"},"done":false}' . "`n"
 			. '{"message":{"content":" stale final"},"done":true}', Handle.TmpStdout, "UTF-8-RAW")
@@ -453,6 +483,7 @@ _OllamaLivePoll_PartialCancellationKeepsSuccessor() {
 		AssertEqual("owned next response", FileRead(Successor.TmpStdout, "UTF-8-RAW"))
 		AssertFalse(Successor.Cancelled, "the new request retains its own cancellation intent")
 	} finally {
+		_LLM_CurlReleaseProcess(Handle.ProcessOwner, true)
 		for FilePath in [Handle.TmpPayload, Handle.TmpStdout, Successor.TmpPayload, Successor.TmpStdout]
 			if FileExist(FilePath)
 				FileDelete(FilePath)
@@ -576,3 +607,87 @@ _OllamaStreaming_PreparationFailureRetiresReservation() {
 	}
 }
 Test("Ollama stream: preparation failure retires its exact reservation (ollama-stream-early-reservation)", _OllamaStreaming_PreparationFailureRetiresReservation)
+
+
+; A complete provider frame cannot overrule a failed native transport receipt.
+_OllamaStream_NativeExitStatus(ExitCode, Queryable := true) {
+	global _LLM_Ollama_ActiveStreams, _LLM_Ollama_IsReady, _LLM_ManagedBootstrap
+	SavedStreams := _LLM_Ollama_ActiveStreams
+	SavedReady := _LLM_Ollama_IsReady
+	SavedBootstrap := _LLM_ManagedBootstrap
+	Directory := A_Temp . "\ergopti_stream_exit_" . A_TickCount . "_" . Random(1, 1000000)
+	Script := Directory . "\child.ahk"
+	Owner := 0
+	State := Map("partials", 0, "successes", 0, "failures", 0, "text", "")
+	try {
+		DirCreate(Directory)
+		SplitPath(A_LineFile, , &TestDirectory)
+		FixtureScript := TestDirectory . "\..\..\..\..\fixtures\ollama_stream_exit_child.ahk"
+		AssertTrue(FileExist(FixtureScript), "the standalone native child source must exist")
+		FileCopy(FixtureScript, Script)
+		Output := Directory . "\response.jsonl"
+		Command := _SR_BuildDirectCommandLine(A_AhkPath, ["/ErrorStdOut", Script, Output, String(ExitCode)])
+		Pid := 0
+		_LLM_CurlArtifactRun(Command, Directory, "Hide", &Pid, &Owner)
+		AssertTrue(Owner is Map && Owner.Get("handle", 0) != 0,
+			"the fixture retains the actual native child handle")
+		Start := A_TickCount
+		while !_LLM_CurlProcessExited(Owner) && TickElapsed(Start) < 5000
+			Sleep(10)
+		AssertTrue(_LLM_CurlProcessExited(Owner), "the native child exits within the fixture deadline")
+		NativeExit := 0
+		AssertTrue(DllCall("Kernel32\GetExitCodeProcess", "Ptr", Owner["handle"], "UInt*", &NativeExit, "Int"),
+			"the native exit receipt is queryable before production retirement")
+		AssertEqual(ExitCode, NativeExit, "the native child produced the requested transport exit status")
+		AssertEqual('{"message":{"content":"native answer"},"done":true}' . "`n",
+			FileRead(Output, "UTF-8-RAW"), "every exit mode emits identical complete provider bytes")
+		if !Queryable {
+			RestrictedHandle := 0
+			CurrentProcess := DllCall("Kernel32\GetCurrentProcess", "Ptr")
+			AssertTrue(DllCall("Kernel32\DuplicateHandle", "Ptr", CurrentProcess,
+				"Ptr", Owner["handle"], "Ptr", CurrentProcess, "Ptr*", &RestrictedHandle,
+				"UInt", 0x00100001, "Int", false, "UInt", 0, "Int"),
+				"an exact duplicate preserves terminate/synchronize rights without query rights")
+			CreatorHandle := Owner["handle"]
+			Owner["handle"] := RestrictedHandle
+			AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", CreatorHandle, "Int"),
+				"the creator query handle is retired after exact-object custody transfer")
+			QueryExit := 0
+			QueryDiagnostic := ""
+			AssertFalse(_SR_TreeReadExitCode(RestrictedHandle, &QueryExit, &QueryDiagnostic),
+				"the real native query is refused when the exact handle lacks query rights")
+			AssertTrue(QueryDiagnostic != "", "the failed query retains its native diagnostic")
+		}
+		Handle := {Pid: Pid, ProcessOwner: Owner, Cancelled: false,
+			TmpPayload: Directory . "\payload.json", TmpStdout: Output}
+		_LLM_ManagedBootstrap := 0
+		_LLM_Ollama_IsReady := true
+		_LLM_Ollama_ActiveStreams := [Handle]
+		_LLM_Ollama_StreamPoll(Handle, Map("acc", "", "last_pos", 0),
+			(Text) => (State["partials"] += 1, State["text"] := Text),
+			(Text) => (State["successes"] += 1, State["text"] := Text), (*) => State["failures"] += 1)
+		AssertEqual(ExitCode == 0 && Queryable ? 1 : 0, State["successes"],
+			"a provider done frame succeeds only after a successful transport exit")
+		AssertEqual(ExitCode == 0 && Queryable ? 0 : 1, State["failures"],
+			"a nonzero native transport exit settles failure exactly once")
+		if ExitCode == 0 && Queryable
+			AssertEqual("native answer", State["text"], "the positive completion carries the actual parsed provider text")
+		AssertTrue(Owner.Get("released", false), "the terminal child handle is acknowledged and released")
+		AssertEqual(0, Owner.Get("handle", 0), "no native handle remains after terminal delivery")
+		AssertFalse(FileExist(Output), "the terminal response is removed")
+		AssertEqual(0, _LLM_Ollama_ActiveStreams.Length, "the exact stream registration is retired")
+	} finally {
+		if Owner is Map
+			_LLM_CurlReleaseProcess(Owner, true)
+		_LLM_Ollama_ActiveStreams := SavedStreams
+		_LLM_Ollama_IsReady := SavedReady
+		_LLM_ManagedBootstrap := SavedBootstrap
+		if DirExist(Directory)
+			DirDelete(Directory, true)
+	}
+}
+Test("Ollama streaming: native transport exit zero allows done (ollama-native-stream-exit)", _OllamaStream_NativeExitStatus.Bind(0))
+Test("Ollama streaming: truncated transfer exit rejects done (ollama-native-stream-exit)", _OllamaStream_NativeExitStatus.Bind(18))
+Test("Ollama streaming: timeout exit rejects done (ollama-native-stream-exit)", _OllamaStream_NativeExitStatus.Bind(28))
+Test("Ollama streaming: signaled exit 259 rejects done (ollama-native-stream-exit)", _OllamaStream_NativeExitStatus.Bind(259))
+Test("Ollama streaming: unavailable native exit receipt fails closed (ollama-native-stream-exit)", _OllamaStream_NativeExitStatus.Bind(0, false))

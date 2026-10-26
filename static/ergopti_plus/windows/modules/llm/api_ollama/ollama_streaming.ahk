@@ -1057,6 +1057,18 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 		SetTimer(() => _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail), -LLM_OLLAMA_POLL_MS)
 		return
 	}
+	; A provider done frame cannot authorize success after a failed transfer.
+	; Capture status before release retires the only exact native query handle.
+	try {
+		ExitCode := _LLM_CurlProcessExitCode(handle.ProcessOwner)
+		if ExitCode != 0 {
+			state["failed"] := true
+			state["stream_error"] := "Streaming curl exited with code " . ExitCode . "."
+		}
+	} catch as Err {
+		state["failed"] := true
+		state["stream_error"] := "Streaming process exit receipt failed: " . Err.Message
+	}
 	_LLM_CurlReleaseProcess(handle.ProcessOwner)
 	; Process exited: flush whatever is left on disk before declaring the
 	; result. The child's stdout can lag its exit by a few ms, so hand off to
