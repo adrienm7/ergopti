@@ -9,6 +9,7 @@
 --- follows from installing the verified official runtime archive.
 --- ==============================================================================
 
+local Identifiers = require("identifiers")
 local M = {}
 local owners = {}
 
@@ -22,7 +23,7 @@ local function valid_asset(asset)
 		or not asset.name:match("^ollama%-linux%-[a-z0-9]+%.tar%.zst$")
 		or type(asset.sha256) ~= "string" or #asset.sha256 ~= 64 or not asset.sha256:match("^[0-9a-f]+$")
 		or type(asset.bytes) ~= "number" or asset.bytes <= 0 or asset.bytes % 1 ~= 0 then return false end
-	return asset.url == "https://github.com/ollama/ollama/releases/download/v" .. asset.version .. "/" .. asset.name
+	return asset.url == "https://" .. Identifiers.hosts.github .. "/ollama/ollama/releases/download/v" .. asset.version .. "/" .. asset.name
 end
 
 --- Starts one explicitly chosen archive transaction through strong native ports.

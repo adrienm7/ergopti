@@ -266,6 +266,7 @@
 		"codegen:config-keys": "node ./tools/codegen/codegen-config-keys.cjs",
 		"codegen:llm-profiles-data:ahk": "node ./tools/codegen/codegen-llm-profiles-data-ahk.cjs",
 		"codegen:app-dirs": "node ./tools/codegen/codegen-app-dirs.cjs",
+		"codegen:identifiers": "node ./tools/codegen/codegen-identifiers.cjs",
 		"codegen:logger-sub-files": "node ./tools/codegen/codegen-logger-sub-files.cjs",
 		"codegen:locale-tables": "node ./tools/codegen/codegen-locale-tables.cjs",
 		"codegen:gesture-emit-actions": "node ./tools/codegen/codegen-gesture-emit-actions.cjs",

@@ -42,6 +42,8 @@ local OWNERS = {
 	"tap_hold.key_combinations",
 	"config_binding_publication",
 	"config_keyboard_publication",
+	-- infra.notifications names the launcher bundle id through this shared table.
+	"identifiers",
 	"_generated.gesture_emit_actions",
 	"adapters.file_system",
 	"adapters.clipboard",

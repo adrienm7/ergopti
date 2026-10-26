@@ -58,6 +58,7 @@ local OWNED = {
 	"llm.rewrite",
 	"llm.tone",
 	"llm.translate",
+	"identifiers",
 	"llm.vision",
 	"logger.shim",
 	"manifest_reader",

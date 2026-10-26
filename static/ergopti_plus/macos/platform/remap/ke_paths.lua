@@ -18,6 +18,7 @@
 ---    loudly, rather than silently substituted here.
 --- ==============================================================================
 
+local Identifiers = require("identifiers")
 local M = {}
 
 -- Shared package root. Command-line helpers remain under bin/, while v15.7+
@@ -83,9 +84,9 @@ M.OWNED = {
 	CLI = OWNED_RUNTIME_DIR .. "/bin/ergoptiplus_remap_cli",
 	CORE_SERVICE = OWNED_RUNTIME_DIR .. "/ErgoptiPlus-Remap-Core.app/Contents/MacOS/ErgoptiPlus-Remap-Core",
 	CONSOLE = OWNED_RUNTIME_DIR .. "/ErgoptiPlus-Remap-Console.app/Contents/MacOS/ErgoptiPlus-Remap-Console",
-	CORE_JOB_FILE = "/Library/LaunchDaemons/com.ergoptiplus.runtime.core.plist",
-	CORE_LABEL = "com.ergoptiplus.runtime.core",
-	VIRTUAL_HID_LABEL = "com.ergoptiplus.runtime.vhid",
+	CORE_JOB_FILE = "/Library/LaunchDaemons/" .. Identifiers.service_labels.macos_core .. ".plist",
+	CORE_LABEL = Identifiers.service_labels.macos_core,
+	VIRTUAL_HID_LABEL = Identifiers.service_labels.macos_virtual_hid,
 	CONFIG_HOME = "~/Library/Application Support/ErgoptiPlus",
 	CONFIG_FILE = "~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json",
 }

@@ -14,6 +14,7 @@
 local M = {}
 
 local hs         = hs
+local Identifiers = require("identifiers")
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local FileSystem = require("adapters.file_system")
@@ -23,7 +24,7 @@ local VersionLabel = require("updater.version_label")
 local Snapshot   = require("diagnostics.snapshot")
 
 local LOG = "updater"
-local BUNDLED_ID = "com.ergoptiplus.app.hammerspoon"
+local BUNDLED_ID = Identifiers.bundle_ids.hammerspoon
 local DEFAULT_GITHUB = { owner = "adrienm7", repo = "ergopti" }
 
 --- Loads the shared repository identity without introducing a second update
@@ -110,7 +111,7 @@ end
 --- Returns the public releases page used by the About menu.
 --- @return string url
 function M.releases_page_url()
-	return string.format("https://github.com/%s/%s/releases", M.GH_OWNER, M.GH_REPO)
+	return string.format("https://%s/%s/%s/releases", Identifiers.hosts.github, M.GH_OWNER, M.GH_REPO)
 end
 
 --- Resolves the build identity the About menu's version row names: a stamped

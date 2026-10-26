@@ -16,6 +16,7 @@
 --- 3. PURE Lua (LuaJIT and 5.4): no driver imports, no io, no OS calls.
 --- ==============================================================================
 
+local Identifiers = require("identifiers")
 local M = {}
 
 local NAME_PATTERN = "^[A-Za-z0-9._-]+$"
@@ -31,7 +32,7 @@ local REST_PATTERN = "^[/%?#][A-Za-z0-9._~/%?=&+#%%-]*$"
 function M.is_repository_url(value, owner, repo)
 	if type(value) ~= "string" or type(owner) ~= "string" or type(repo) ~= "string" then return false end
 	if not owner:match(NAME_PATTERN) or not repo:match(NAME_PATTERN) then return false end
-	local root = "https://github.com/" .. owner .. "/" .. repo
+	local root = "https://" .. Identifiers.hosts.github .. "/" .. owner .. "/" .. repo
 	if value:sub(1, #root) ~= root then return false end
 	local rest = value:sub(#root + 1)
 	return rest == "" or rest:match(REST_PATTERN) ~= nil

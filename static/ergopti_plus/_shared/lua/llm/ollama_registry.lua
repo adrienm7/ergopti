@@ -9,9 +9,10 @@
 --- daemon the resulting HTTPS_PROXY.
 --- ==============================================================================
 
+local Identifiers = require("identifiers")
 local M = {}
 
 --- The registry origin, with no path, query or credentials.
-M.URL = "https://registry.ollama.ai"
+M.URL = "https://" .. Identifiers.hosts.ollama_registry
 
 return M

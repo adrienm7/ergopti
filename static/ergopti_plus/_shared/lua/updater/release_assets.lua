@@ -10,6 +10,7 @@
 --- selection policy while the native driver owns extraction and installation.
 --- ==============================================================================
 
+local Identifiers = require("identifiers")
 local M = {}
 local NAME_PATTERN = "^[A-Za-z0-9._%-]+$"
 local FORMATS = { zip = ".zip", ["tar.xz"] = ".tar.xz" }
@@ -93,8 +94,8 @@ function M.select(release, identity)
 			end
 		end
 		if found then
-			local expected = string.format("https://github.com/%s/%s/releases/download/%s/%s",
-				identity.owner, identity.repo, tag, candidate.name)
+			local expected = string.format("https://%s/%s/%s/releases/download/%s/%s",
+				Identifiers.hosts.github, identity.owner, identity.repo, tag, candidate.name)
 			local digest = type(found.digest) == "string" and found.digest:match("^sha256:(%x+)$") or nil
 			if found.browser_download_url ~= expected or not digest or #digest ~= 64 then
 				return nil, "invalid-archive-integrity"

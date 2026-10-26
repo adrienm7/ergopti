@@ -21,6 +21,7 @@
 
 local M = {}
 local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
+local Identifiers = require("identifiers")
 local RunningApplication = require("adapters.running_application")
 
 local hs            = hs
@@ -606,7 +607,7 @@ function M.install(ctx)
 			return false
 		end
 
-		local url = "https://huggingface.co/" .. repo
+		local url = "https://" .. Identifiers.hosts.huggingface .. "/" .. repo
 		local ok_open, opened = xpcall(function()
 			return hs.urlevent.openURL(url)
 		end, debug.traceback)
@@ -655,7 +656,7 @@ function M.install(ctx)
 			pcall(function() hs_app:activate(true) end)
 		end
 
-		local hf_token_url = "https://huggingface.co/settings/tokens"
+		local hf_token_url = "https://" .. Identifiers.hosts.huggingface .. "/settings/tokens"
 		local clipboard_token_raw = hs.pasteboard and hs.pasteboard.getContents
 			and hs.pasteboard.getContents() or ""
 		local clipboard_token = type(clipboard_token_raw) == "string"

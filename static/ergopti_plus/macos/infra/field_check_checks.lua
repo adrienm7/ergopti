@@ -28,6 +28,7 @@
 ---    once, so a hung launchctl never leaves a window waiting.
 --- ==============================================================================
 
+local Identifiers = require("identifiers")
 local KePaths = require("platform.remap.ke_paths")
 
 local M = {}
@@ -35,8 +36,8 @@ local M = {}
 local STATE = { pass = "pass", fail = "fail", info = "info", skip = "skip" }
 
 local OWNED_RUNTIME_DIR = "/Library/Application Support/ErgoptiPlus/Runtime"
-local OWNED_JOB_FILE = "/Library/LaunchDaemons/com.ergoptiplus.runtime.core.plist"
-local OWNED_JOB = "system/com.ergoptiplus.runtime.core"
+local OWNED_JOB_FILE = "/Library/LaunchDaemons/" .. Identifiers.service_labels.macos_core .. ".plist"
+local OWNED_JOB = "system/" .. Identifiers.service_labels.macos_core
 local STOCK_APP = "/Applications/Karabiner-Elements.app"
 local VHID_EXTENSION = "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice"
 
