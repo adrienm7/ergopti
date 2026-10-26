@@ -23,8 +23,8 @@ helpers.describe("linux-sqlite-ngram-source-map", function()
 			}))
 			helpers.assert_eq(#statements, 1)
 			local sql = statements[1]
-			helpers.assert_contains(sql, "json_each(esrc_json)")
-			helpers.assert_contains(sql, "json_each(excluded.esrc_json)")
+			helpers.assert_contains(sql, "json_each(COALESCE(esrc_json, '{}'))")
+			helpers.assert_contains(sql, "json_each(COALESCE(excluded.esrc_json, '{}'))")
 			helpers.assert_contains(sql, "SUM(value)")
 			helpers.assert_contains(sql, "GROUP BY key")
 			for _, key in ipairs({ "extension", "hotstring", "llm", "other" }) do
@@ -46,8 +46,8 @@ helpers.describe("linux-sqlite-ngram-source-map", function()
 				}, target))
 				local sql = statements[families]
 				helpers.assert_contains(sql, "INSERT INTO " .. target .. " ")
-				helpers.assert_contains(sql, "json_each(esrc_json)")
-				helpers.assert_contains(sql, "json_each(excluded.esrc_json)")
+				helpers.assert_contains(sql, "json_each(COALESCE(esrc_json, '{}'))")
+				helpers.assert_contains(sql, "json_each(COALESCE(excluded.esrc_json, '{}'))")
 			end
 			helpers.assert_eq(families, 9)
 			helpers.assert_eq(#statements, 9)
@@ -417,7 +417,7 @@ helpers.describe("linux-sqlite-nul-map-keys", function()
 		local command = require("modules.keystats.sqlite_command")
 		local previous_build, merges = command.build, {}
 		command.build = function(path, sql, options)
-			if sql:find("json_each(excluded.", 1, true) then merges[#merges + 1] = sql end
+			if sql:find("json_each(COALESCE(excluded.", 1, true) then merges[#merges + 1] = sql end
 			return previous_build(path, sql, options)
 		end
 		local ok, reason = xpcall(function()
