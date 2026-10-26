@@ -9,6 +9,7 @@
 
 local helpers = require("tests.helpers")
 local CHILD_TIMEOUT_MS = 3000
+local TIMINGS_SOURCE = require("timings").REGISTRY_REL_PATH
 local SOURCES = {
 	{ "local", "local_servers.json" }, { "local", "api_providers.json" },
 	{ "environment", "managed_ollama_environment.json" },
@@ -49,11 +50,14 @@ local function observe(family, target, mode)
 	local ok, err = xpcall(function()
 		local driver = base .. "/driver"
 		for _, dir in ipairs({ driver, driver .. "/infra", driver .. "/_shared", driver .. "/_shared/data",
-			driver .. "/_shared/data/locales", driver .. "/_shared/modules", driver .. "/_shared/modules/llm" }) do
+			driver .. "/_shared/data/locales", driver .. "/_shared/modules", driver .. "/_shared/modules/llm",
+			driver .. "/_shared/" .. require("native_path").dirname(TIMINGS_SOURCE) }) do
 			assert(uv.fs_mkdir(dir, 448))
 		end
 		write(driver .. "/infra/paths.lua", read(root .. "/infra/paths.lua"))
 		write(driver .. "/_shared/data/locales/en.json", read(root .. "/../_shared/data/locales/en.json"))
+		-- The environment loader's shared timings owner reads this installed resource.
+		write(driver .. "/_shared/" .. TIMINGS_SOURCE, read(root .. "/../_shared/" .. TIMINGS_SOURCE))
 		for _, source in ipairs(SOURCES) do
 			write(driver .. "/_shared/modules/llm/" .. source[2], read(root .. "/../_shared/modules/llm/" .. source[2]))
 		end
