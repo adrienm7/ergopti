@@ -10,7 +10,11 @@
 _CSTT_WriteConfig(Path, Body, Header := "[metrics]") {
 	if FileExist(Path)
 		FileDelete(Path)
-	FileAppend(Header . "`n" . Body . "`n", Path, "UTF-8")
+	FileAppend("[_meta]`nschema_version = " . ConfigMigrateCurrentVersion()
+		. "`n" . Header . "`n" . Body . "`n", Path, "UTF-8")
+	Journal := ConfigMigrateBoot(Path)
+	AssertTrue(Journal is Map, "the private source requires the real native boot constructor")
+	AssertEqual("current", Journal.Get("status", "missing"))
 }
 
 _CSTT_SaveRuntime() {
@@ -59,7 +63,6 @@ TestConfigShortcutsRejectsEveryInvalidScalarType() {
 	DirCreate(TestDir)
 	try {
 		_ConfigDir := TestDir, _AhkSubDir := ""
-		Path := CS_GetTomlPath()
 		Cases := [
 			["enabled", '"false"'],
 			["private_filter_enabled", '""'],
@@ -68,7 +71,9 @@ TestConfigShortcutsRejectsEveryInvalidScalarType() {
 			["encrypt", '"true"'],
 			["disabled_apps", '"chrome.exe"']
 		]
-		for Fixture in Cases {
+		for Index, Fixture in Cases {
+			_ConfigDir := TestDir . Index . "\"
+			Path := CS_GetTomlPath()
 			_CSTT_WriteConfig(Path, Fixture[1] . " = " . Fixture[2])
 			Before := FSReadUtf8Exact(Path)
 			MetricsShortcuts.enabled := true
@@ -176,6 +181,8 @@ Test("metrics config: commented headers and multiline opt-outs apply (metrics-to
 	_CSTT_ValidTomlPrivacySettings)
 
 _CSTT_SemanticPrivacySettings(Shape, Enabled) {
+	static FixtureSequence := 0
+	FixtureSequence += 1
 	global _ConfigDir, _AhkSubDir
 	SavedConfigDir := _ConfigDir, SavedAhkSubDir := _AhkSubDir
 	SavedEnabled := MetricsShortcuts.enabled
@@ -183,7 +190,8 @@ _CSTT_SemanticPrivacySettings(Shape, Enabled) {
 	SavedFilters := Map()
 	for Name in ["private_browsing", "secure_field", "system_auth", "encrypt"]
 		SavedFilters[Name] := MetricsFilters.%Name%
-	TestDir := A_Temp . "\ergopti_cs_semantic_" . A_TickCount . "_" . A_ScriptHwnd . "\"
+	TestDir := A_Temp . "\ergopti_cs_semantic_" . A_TickCount . "_" . A_ScriptHwnd
+		. "_" . FixtureSequence . "\"
 	DirCreate(TestDir)
 	try {
 		_ConfigDir := TestDir, _AhkSubDir := ""
@@ -198,8 +206,12 @@ _CSTT_SemanticPrivacySettings(Shape, Enabled) {
 				. "`ndisabled_apps = " . Apps . "`n"
 			default: throw ValueError("Unknown metrics semantic fixture")
 		}
+		Source := "_meta = { schema_version = " . ConfigMigrateCurrentVersion() . " }`n" . Source
 		Path := CS_GetTomlPath()
 		AssertTrue(FSWrite(Path, Source))
+		Journal := ConfigMigrateBoot(Path)
+		AssertTrue(Journal is Map, "the real native constructor must admit the semantic fixture")
+		AssertEqual("current", Journal.Get("status", "missing"))
 		Data := CS_Read()
 		AssertTrue(Data.Has("metrics"), "the real metrics reader must retain the semantic namespace")
 		AssertEqual(Enabled, Data["metrics"]["enabled"])
@@ -368,3 +380,85 @@ Test("metrics boot: legacy comment preserves recording opt-in (metrics-secondary
 	_CSTT_BootAdmission.Bind(ConfigLeaf.ENABLED, "1 # explicit recording consent", false, true))
 Test("metrics boot: legacy comment preserves privacy opt-out (metrics-secondary-admission)",
 	_CSTT_BootAdmission.Bind(ConfigLeaf.PRIVATE_FILTER_ENABLED, "0 # explicit privacy choice", false, false))
+
+
+; A physical edit does not retire the primary native boot generation. The
+; metrics owner must consume that same admission until the canonical writer or
+; explicit cache retirement opens a later generation.
+_CSTT_RetainedBootGeneration(Key, ReplacePhysicalSource) {
+	static FixtureSequence := 0
+	FixtureSequence += 1
+	global _ConfigDir, _AhkSubDir, ConfigurationFile, _BootConfigSnapshot
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries, _ConfigBootReadFailed
+	SavedConfigDir := _ConfigDir, SavedAhkSubDir := _AhkSubDir
+	SavedFileSet := IsSet(ConfigurationFile)
+	SavedFile := SavedFileSet ? ConfigurationFile : ""
+	SavedSnapshotSet := IsSet(_BootConfigSnapshot)
+	SavedSnapshot := SavedSnapshotSet ? _BootConfigSnapshot : 0
+	SavedRejected := _ConfigBootRejectedOverrides
+	SavedOutdated := _ConfigBootOutdatedEntries
+	SavedReadFailure := _ConfigBootReadFailed
+	SavedRuntime := _CSTT_SaveRuntime()
+	TestDir := A_Temp . "\ergopti_cs_generation_" . A_TickCount . "_" . A_ScriptHwnd
+		. "_" . FixtureSequence . "\"
+	DirCreate(TestDir)
+	Path := ""
+	try {
+		_ConfigDir := TestDir, _AhkSubDir := ""
+		ConfigurationFile := CS_GetTomlPath(), Path := ConfigurationFile
+		Header := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n[metrics]`n"
+		Initial := Header . "enabled = false`nprivate_filter_enabled = true`n"
+		Replacement := Header . "enabled = true`nprivate_filter_enabled = false`n"
+		AssertTrue(FSWrite(Path, Initial))
+		_ConfigBootRejectedOverrides := 0
+		_ConfigBootOutdatedEntries := Map()
+		_ConfigBootReadFailed := false
+		Journal := ConfigMigrateBoot(Path)
+		AssertTrue(Journal is Map, "the real native journal must initialize the private boot path")
+		AssertEqual("current", Journal.Get("status", "missing"))
+		Bootstrap := ParseConfigTomlFile(Path)
+		AssertTrue(Bootstrap.Has(ConfigKey.METRICS), "the actual bootstrap must publish its native generation")
+		Tree := ManifestBuildFeaturesMap()
+		AssertTrue(ApplyBootConfigToml(Tree, Path, &_BootConfigSnapshot) >= 0)
+		AssertEqual(0, _ConfigBootRejectedOverrides)
+		AssertEqual(0, _ConfigBootOutdatedEntries.Count)
+		AssertFalse(_ConfigBootReadFailed)
+		Primary := _BootConfigSnapshot
+		AssertEqual(Initial, Primary.Source)
+		AssertTrue(Bootstrap == Primary.Cache, "bootstrap and primary application must share the same admitted cache")
+		if ReplacePhysicalSource
+			AssertTrue(FSWrite(Path, Replacement), "the race must actually replace the private native source")
+		Physical := ReplacePhysicalSource ? Replacement : Initial
+		AssertEqual(Physical, FSReadUtf8Exact(Path))
+		Retained := ConfigTomlReadSnapshot(Path)
+		AssertTrue(Retained == Primary, "the genuine canonical reader must retain the already admitted generation")
+		AssertEqual(Initial, Retained.Source, "an external edit cannot silently replace the primary source authority")
+		MetricsShortcuts.enabled := true
+		MetricsFilters.private_browsing := false
+		CS_Load()
+		Expected := Primary.Cache[ConfigKey.METRICS][Key]
+		AssertEqual(Expected, _CSTT_ActualValue(Key),
+			"secondary metrics publication must use the retained primary generation for " . Key)
+		AssertEqual(Physical, FSReadUtf8Exact(Path), "a secondary read cannot rewrite the external source")
+		AssertEqual(Initial, Primary.Source, "secondary reading cannot replace the admitted snapshot")
+	} finally {
+		_CSTT_RestoreRuntime(SavedRuntime)
+		_ConfigDir := SavedConfigDir, _AhkSubDir := SavedAhkSubDir
+		ConfigurationFile := SavedFileSet ? SavedFile : unset
+		_BootConfigSnapshot := SavedSnapshotSet ? SavedSnapshot : unset
+		_ConfigBootRejectedOverrides := SavedRejected
+		_ConfigBootOutdatedEntries := SavedOutdated
+		_ConfigBootReadFailed := SavedReadFailure
+		if Path != ""
+			_TOML_InvalidateParseCache(Path)
+		if DirExist(TestDir)
+			DirDelete(TestDir, true)
+	}
+}
+
+for Key in [ConfigLeaf.ENABLED, ConfigLeaf.PRIVATE_FILTER_ENABLED] {
+	Test("metrics boot: external replacement retains " . Key . " generation (metrics-retained-generation)",
+		_CSTT_RetainedBootGeneration.Bind(Key, true))
+	Test("metrics boot: unchanged source retains " . Key . " generation (metrics-retained-generation)",
+		_CSTT_RetainedBootGeneration.Bind(Key, false))
+}
