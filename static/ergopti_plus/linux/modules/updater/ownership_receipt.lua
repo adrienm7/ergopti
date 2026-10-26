@@ -10,6 +10,7 @@
 local M = {}
 local Fs = require("adapters.file_system")
 local Crypto = require("adapters.crypto")
+local NativePath = require("native_path")
 local MAX_SAFE_INTEGER = 2 ^ 53 - 1 -- Exact numeric range shared by LuaJIT metadata.
 local SCHEMA_KEYS = { MANIFEST = true, HEX_LENGTH = true, DRIVER_TREE = true, SHARED_TREE = true,
 	LAUNCHER = true, EXTERNAL_RECORDS = true, DRIVER_SENTINEL = true, SHARED_SENTINEL = true }
@@ -78,8 +79,8 @@ function M.parse(bytes, schema)
 		elseif path == schema.LAUNCHER or path:sub(1, #schema.DRIVER_TREE + 1) == schema.DRIVER_TREE .. "/"
 			or path:sub(1, #schema.SHARED_TREE + 1) == schema.SHARED_TREE .. "/" then
 			record.files[path] = digest
-			local parent = path:match("^(.*)/[^/]+$")
-			while parent do record.directories[parent] = true; parent = parent:match("^(.*)/[^/]+$") end
+			local parent = NativePath.dirname(path)
+			while parent do record.directories[parent] = true; parent = NativePath.dirname(parent) end
 		else return nil, "ownership receipt path escapes payload roots" end
 	end
 	if not record.files[schema.DRIVER_TREE .. "/" .. schema.DRIVER_SENTINEL]
