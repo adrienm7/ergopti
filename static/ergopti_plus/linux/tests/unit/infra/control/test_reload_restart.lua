@@ -30,6 +30,16 @@ helpers.describe("Linux Reload is a daemon restart (reload-is-a-restart-2026-10-
 		helpers.assert_eq(reasons[1], "reload")
 	end)
 
+	helpers.it("reports a restart in flight so the tray's Quit can be refused (quit-admission)", function()
+		local answers = { false, true }
+		local perform, in_flight = ReloadRestart.new({ restart = function() return table.remove(answers, 1) end })
+		helpers.assert_eq(in_flight(), false)
+		perform("the tray menu")
+		helpers.assert_eq(in_flight(), false, "a refused restart leaves nothing in flight")
+		perform("the tray menu")
+		helpers.assert_eq(in_flight(), true)
+	end)
+
 	helpers.it("postpones on window or program cleanup debt without restarting", function()
 		for _, case in ipairs({ { false, true }, { true, false } }) do
 			local restarted = 0

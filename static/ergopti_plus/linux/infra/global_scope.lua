@@ -98,6 +98,13 @@ function M.apply(mode, registry)
 	return committed, report
 end
 
+--- Whether a refused rollback of a global request is still retained. The tray's
+--- Quit reads it: the macOS menu refuses Quit while its global writer is owned.
+--- @return boolean pending
+function M.pending()
+	return _composition ~= nil and _composition.pending() == true
+end
+
 --- Test seam: forgets the composition and its debt.
 function M._reset_for_test()
 	_composition, _registry = nil, {}

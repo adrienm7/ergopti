@@ -44,6 +44,14 @@ local function with_modules(body)
 	if not ok then error(err, 0) end
 end
 
+helpers.describe("Linux global scope: pending writer", function()
+	helpers.it("reports no pending writer before any request", function()
+		with_modules(function()
+			helpers.assert_eq(require("infra.global_scope").pending(), false)
+		end)
+	end)
+end)
+
 helpers.describe("Linux global scope: registry and composition", function()
 	helpers.it("registers only the owners the daemon runs", function()
 		with_modules(function()
@@ -123,8 +131,11 @@ helpers.describe("Linux global scope: registry and composition", function()
 			-- The refused retry is the acquire point, as on Windows: another
 			-- transaction still owns the configuration.
 			helpers.assert_eq({ report.point, report.kind, report.scope }, { "acquire", "rollback_pending", "global" })
+			-- The tray's Quit reads this as an active global writer (quit-admission).
+			helpers.assert_eq(GlobalScope.pending(), true, "a retained rollback is a pending global writer")
 			stuck = false
 			committed = GlobalScope.apply("clear", { tap_holds = stub(trace, "fresh") })
+			helpers.assert_eq(GlobalScope.pending(), false, "a settled composition is no longer pending")
 			helpers.assert_eq(committed, true)
 			helpers.assert_eq(trace, { "tap_holds:clear", "llm:clear", "tap_holds:revert", "tap_holds:revert",
 				"tap_holds:revert", "fresh:clear", "fresh:release" })

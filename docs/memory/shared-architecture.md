@@ -374,6 +374,19 @@ target (a quit uses the pause one, only an exact `true` enables) is
 `_shared/tests/corpus/layouts/pause_switch_vectors.json`; change the corpus
 first. A reload, a signal or a logoff is not a quit and never switches.
 
+### project-quit-refusals-are-one-shared-decision
+
+The tray's Quit is refused for four causes on macOS and Linux, decided by
+`_shared/lua/quit_admission.lua` from four facts the driver reads (owner
+available, a reload or exit owns the process, a global writer holds a rollback,
+a hotstring publication is pending) and replayed by
+`_shared/lua/test/quit_admission_contract.lua`. Every refusal logs its cause
+line and sends the one `notify.quit_refused` notice. A new cause is a new fact
+there, never a driver-local `if`. A Reload in flight differs on purpose: the
+macOS click gate holds a Quit click and replays it on the reloaded menu, while
+Linux restarts the process and has no hand-off, so it refuses. Windows has no
+refusal notice yet (its OnExit gates veto silently, bounded to five attempts).
+
 ### project-a-row-a-platform-lacks-is-hidden-or-greyed
 
 A manifest row restricted by `platforms` declares how the other platforms lack
