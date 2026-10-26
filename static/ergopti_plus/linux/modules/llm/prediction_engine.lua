@@ -271,7 +271,7 @@ local _clock_ms = Monotonic.now_ms
 local _debounce = {
 	-- How long an automatic request that found its backend busy waits to ask again.
 	busy_recheck_ms = require("infra.timings").ms("llm", "backend_busy_recheck_ms"),
-	plan = require("modules.llm.request_plan_policy").new(function() return TriggerSettings.get(require("config_keys").LEAF.MIN_REQUEST_INTERVAL_MS) end),
+	plan = require("llm.request_plan.debounce").new(function() return TriggerSettings.get(require("config_keys").LEAF.MIN_REQUEST_INTERVAL_MS) end),
 }
 
 --- Cancels the native debounce timer and withdraws it from the plan.

@@ -63,7 +63,6 @@ local OWNED = {
 	"llm.vision",
 	"logger.shim",
 	"manifest_reader",
-	"modules.llm.request_plan_policy",
 	"platform.remap.lease_helper",
 	"program_parameter",
 	"script_chords",
