@@ -11,6 +11,7 @@
 --- ==============================================================================
 
 local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
 local M = {}
 
 local LAYOUT_MARKER_PREFIX = "__ergopti_release_layout_key__"
@@ -229,9 +230,7 @@ local function detect_sticky_base(tap_id, hold_id)
 	return nil
 end
 
-local function shell_quote(value)
-	return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
-end
+local shell_quote = TextUtils.shell_quote
 
 local function physical_log_command(release, payload, physical_log_path)
 	if release.safe_shell_quoting then

@@ -46,7 +46,7 @@ helpers.describe("mlx_deps_checker source invariants", function()
 
 	helpers.it("defines shell_quote helper with apostrophe escaping", function()
 		helpers.assert_true(SOURCE:find("local function shell_quote(value)", 1, true) ~= nil)
-		helpers.assert_true(SOURCE:find("return \"'\" .. s:gsub(\"'\", \"'\\\\''\") .. \"'\"", 1, true) ~= nil)
+		helpers.assert_true(SOURCE:find("return TextUtils.shell_quote(value or \"\")", 1, true) ~= nil)
 	end)
 
 	helpers.it("uses resolver output instead of hardcoded static root", function()

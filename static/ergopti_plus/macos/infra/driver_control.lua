@@ -27,6 +27,7 @@ local Logger = require("infra.logger")
 local Policy = require("control.driver_control")
 local Json = require("json")
 local ErrorDescription = require("error_description")
+local TextUtils = require("text_utils")
 
 local LOG = "driver_control"
 
@@ -46,9 +47,7 @@ local _starting = nil
 -- ==========================
 -- ==========================
 
-local function quote(path)
-	return "'" .. path:gsub("'", "'\\''") .. "'"
-end
+local quote = TextUtils.shell_quote
 
 --- Native operations, replaceable by tests.
 --- @return table ports

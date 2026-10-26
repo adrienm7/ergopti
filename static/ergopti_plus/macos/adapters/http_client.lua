@@ -55,6 +55,7 @@
 local hs             = hs
 local Logger         = require("infra.logger")
 local TimerScheduler = require("adapters.timer_scheduler")
+local TextUtils = require("text_utils")
 
 local LOG = "adapters.http_client"
 local CACHE_POLICIES = {
@@ -1006,18 +1007,7 @@ end
 --- @param value any Value to encode.
 --- @return string encoded Percent-encoded component.
 local function encode_rfc3986_component(value)
-	local raw = tostring(value or "")
-	local encoded = {}
-	for index = 1, #raw do
-		local byte = raw:byte(index)
-		local unreserved = (byte >= 0x41 and byte <= 0x5A)
-			or (byte >= 0x61 and byte <= 0x7A)
-			or (byte >= 0x30 and byte <= 0x39)
-			or byte == 0x2D or byte == 0x2E or byte == 0x5F or byte == 0x7E
-		encoded[#encoded + 1] = unreserved and string.char(byte)
-			or string.format("%%%02X", byte)
-	end
-	return table.concat(encoded)
+	return TextUtils.percent_encode(tostring(value or ""))
 end
 
 --- URL-encodes a string for safe inclusion in a query string.

@@ -61,6 +61,7 @@ local ShellRunner = require("adapters.shell_runner")
 local DesktopNavigation = require("desktop_navigation")
 local SystemActions = require("modules.gestures.system_actions")
 local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
 
 -- Retain the admitted issuer at owner construction. Later module/export swaps
 -- cannot appoint another producer or certify unavailable custody.
@@ -374,13 +375,11 @@ local function run_background(cmd)
 end
 
 local function shell_quote(value)
-	return "'" .. tostring(value or ""):gsub("'", "'\\''") .. "'"
+	return TextUtils.shell_quote(value or "")
 end
 
 local function url_encode_query(value)
-	return (tostring(value or ""):gsub("[^%w%-%._~]", function(char)
-		return string.format("%%%02X", string.byte(char))
-	end))
+	return TextUtils.percent_encode(tostring(value or ""))
 end
 
 local function primary_selection()

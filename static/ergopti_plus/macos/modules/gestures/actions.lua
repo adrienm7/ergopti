@@ -228,10 +228,7 @@ local function defer_key(label, mods, key, delay)
 end
 
 local function url_encode_query(value)
-	value = tostring(value or "")
-	return (value:gsub("[^%w%-%._~]", function(char)
-		return string.format("%%%02X", string.byte(char))
-	end))
+	return text_utils.percent_encode(tostring(value or ""))
 end
 
 local function open_url(url)
