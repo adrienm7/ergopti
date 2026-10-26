@@ -44,21 +44,30 @@ local Writer     = require("toml_codec.writer")
 local Codec      = require("toml_codec")
 local Preferences = require("infra.preferences")
 local ConfigPaths = require("infra.config_paths")
+local ShortcutCatalogue = require("shortcuts.catalogue")
 
 local LOG = "shortcuts.tap_keys"
 
--- The canonical assignment section, and the binding its action runs
--- under (and stores its parameter under).
+-- The canonical assignment section.
 local CONFIG_SECTION = "shortcuts.tap_keys"
-local BINDING_PREFIX  = "tap_key__"
 
--- The shared key list, relative to the shared tree.
-local KEYS_REL_PATH = "modules/actions/tap_keys.json"
-
--- Decoded tap_keys.json entries in menu order; nil until read.
-local _keys = nil
-local _binding_source = nil
-local _binding_catalogue = nil
+-- The shared key list (tap_keys.json) and its published identity, shared with Linux.
+local TapKeys = ShortcutCatalogue.new_tap_keys({
+	keys_rel_path = "modules/actions/tap_keys.json",
+	-- Resolved on every read: tests redirect Paths.shared to a throwaway file.
+	resolve_path = function(rel) return Paths.shared(rel) end,
+	read = function(path)
+		-- A failed read and malformed content are distinct diagnoses: the first is
+		-- the file system, the second is the shared file itself.
+		local raw = FileSystem.read(path)
+		if type(raw) ~= "string" then error("tap_keys: cannot complete read of " .. tostring(path)) end
+		return raw
+	end,
+	decode = JsonCodec.decode,
+	valid_entry = function(entry) return type(entry.id) == "string" and type(entry.hs) == "table" and #entry.hs > 0 end,
+	invalid_entry_message = "lacks its id or keycodes",
+	owner = M,
+})
 
 -- tap key id -> action id, filled by load(); nil until then.
 local _assignments = nil
@@ -75,50 +84,17 @@ local _assignments = nil
 --- The shared key list, read once. A missing or malformed file raises: the menu
 --- would otherwise show no tap key and nothing would say why.
 --- @return table Array of { id, hs = { keycode... } }.
-function M.keys()
-	if _keys then return _keys end
-	local path = Paths.shared(KEYS_REL_PATH)
-	local raw = FileSystem.read(path)
-	-- A failed read and malformed content are distinct diagnoses: the first is
-	-- the file system, the second is the shared file itself.
-	if type(raw) ~= "string" then error("tap_keys: cannot complete read of " .. tostring(path)) end
-	local decoded = JsonCodec.decode(raw)
-	if type(decoded) ~= "table" or type(decoded.keys) ~= "table" or #decoded.keys == 0 then
-		error("tap_keys: " .. tostring(path) .. " is malformed")
-	end
-	for _, entry in ipairs(decoded.keys) do
-		if type(entry.id) ~= "string" or type(entry.hs) ~= "table" or #entry.hs == 0 then
-			error("tap_keys: an entry of " .. tostring(path) .. " lacks its id or keycodes")
-		end
-	end
-	local publication = require("config_binding_identity").tap_binding_catalogue(decoded.keys)
-	_keys, _binding_source, _binding_catalogue = decoded.keys, decoded.keys, publication
-	return _keys
-end
+function M.keys() return TapKeys.keys() end
 
 --- Returns only the detached identity of the acknowledged current native source.
 --- A changed source withdraws publication; this accessor performs no IO.
 --- @return table|nil catalogue
-function M.published_binding_catalogue()
-	if not BindingPublication.owner_is_current("tap", "modules.shortcuts.tap_keys", M) then return nil end
-	if _binding_catalogue == nil or not rawequal(_keys, _binding_source) then return nil end
-	local current = require("config_binding_identity").tap_binding_catalogue(_keys)
-	for id in pairs(current.slots) do
-		if _binding_catalogue.slots[id] ~= true then return nil end
-	end
-	for id in pairs(_binding_catalogue.slots) do
-		if current.slots[id] ~= true then return nil end
-	end
-	return current
-end
-
+function M.published_binding_catalogue() return TapKeys.published_binding_catalogue() end
 
 --- The binding a tap key dispatches under.
 --- @param id string
 --- @return string
-function M.binding_id(id)
-	return BINDING_PREFIX .. tostring(id)
-end
+function M.binding_id(id) return TapKeys.binding_id(id) end
 
 --- Reads a complete canonical source without consulting or migrating legacy storage.
 --- @return table decoded
@@ -346,12 +322,10 @@ end
 
 --- Test seam: forgets the key list and the assignments.
 function M._reset()
-	_binding_source = nil
-	_binding_catalogue = nil
-	_keys = nil
+	TapKeys.reset()
 	_assignments = nil
 end
 
-BindingPublication.register("tap", "modules.shortcuts.tap_keys", M, M.published_binding_catalogue)
+BindingPublication.register(ShortcutCatalogue.TAP_OWNER, ShortcutCatalogue.TAP_MODULE, M, M.published_binding_catalogue)
 
 return M

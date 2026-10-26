@@ -30,6 +30,7 @@ local M = {}
 local BindingPublication = require("config_binding_publication")
 
 local Logger = require("logger.shim")
+local ShortcutCatalogue = require("shortcuts.catalogue")
 local ConfigOutdated = require("config_outdated")
 local Paths = require("infra.paths")
 local Manifest = require("infra.manifest_reader")
@@ -155,14 +156,7 @@ end
 
 --- The gestures manager, whose catalogue decides which ids a slot may hold.
 --- @return table|nil
-local function action_catalogue()
-	local ok, Gestures = pcall(require, "modules.gestures.manager")
-	if not ok or type(Gestures) ~= "table" or type(Gestures.is_assignable) ~= "function" then
-		Logger.error(LOG, "The action catalogue is unavailable: %s", tostring(Gestures))
-		return nil
-	end
-	return Gestures
-end
+local function action_catalogue() return ShortcutCatalogue.action_catalogue(Logger, LOG) end
 
 --- Visits the canonical values this owner consumes: each slot and the switch.
 --- @param decoded table Decoded config.toml.

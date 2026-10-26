@@ -39,6 +39,7 @@ local M = {}
 local TableUtil = require("table_util")
 
 local Logger = require("logger.shim")
+local ShortcutCatalogue = require("shortcuts.catalogue")
 local ConfigOutdated = require("config_outdated")
 local Paths = require("infra.paths")
 local ScriptActions = require("modules.shortcuts.script_actions")
@@ -372,14 +373,7 @@ end
 --- The gestures manager, whose catalogue decides which action ids a slot may
 --- hold. Required lazily: the daemon loads it after this module.
 --- @return table|nil The manager, or nil (logged) when its catalogue is unavailable.
-local function action_catalogue()
-	local ok, Gestures = pcall(require, "modules.gestures.manager")
-	if not ok or type(Gestures) ~= "table" or type(Gestures.is_assignable) ~= "function" then
-		Logger.error(LOG, "The action catalogue is unavailable: %s", tostring(Gestures))
-		return nil
-	end
-	return Gestures
-end
+local function action_catalogue() return ShortcutCatalogue.action_catalogue(Logger, LOG) end
 
 --- The shipped bindings: every manifest shortcuts.keyboard entry for Linux.
 --- @return table slot_id → action_id
