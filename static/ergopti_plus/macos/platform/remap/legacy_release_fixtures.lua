@@ -10,6 +10,7 @@
 --- positions with a one-to-one logical/physical mapping.
 --- ==============================================================================
 
+local TableUtil = require("table_util")
 local M = {}
 
 local LAYOUT_MARKER_PREFIX = "__ergopti_release_layout_key__"
@@ -196,12 +197,7 @@ local RELEASES = {
 local RELEASE_BY_ID = {}
 for _, release in ipairs(RELEASES) do RELEASE_BY_ID[release.id] = release end
 
-local function deep_copy(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, nested in pairs(value) do copy[deep_copy(key)] = deep_copy(nested) end
-	return copy
-end
+local deep_copy = TableUtil.deep_copy_with_keys
 
 local function deep_equal(first, second)
 	if type(first) ~= type(second) then return false end

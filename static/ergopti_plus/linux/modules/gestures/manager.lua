@@ -60,6 +60,7 @@ local AiActions = require("modules.shortcuts.ai_actions")
 local ShellRunner = require("adapters.shell_runner")
 local DesktopNavigation = require("desktop_navigation")
 local SystemActions = require("modules.gestures.system_actions")
+local TableUtil = require("table_util")
 
 -- Retain the admitted issuer at owner construction. Later module/export swaps
 -- cannot appoint another producer or certify unavailable custody.
@@ -1056,11 +1057,7 @@ end
 --- Copies one flat state map for a persistence-before-publication transaction.
 --- @param source table
 --- @return table
-local function copy_state(source)
-	local staged = {}
-	for key, value in pairs(source) do staged[key] = value end
-	return staged
-end
+local copy_state = TableUtil.shallow_copy
 
 -- Initialize actions with defaults.
 for k, v in pairs(M.DEFAULT_GESTURES) do

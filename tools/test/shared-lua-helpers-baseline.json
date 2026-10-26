@@ -13,7 +13,6 @@
 	},
 	"linux/modules/gestures/manager.lua": {
 		"percent_encode": 1,
-		"shallow_copy": 1,
 		"shell_quote": 1
 	},
 	"linux/modules/hotstrings/hotstrings_config.lua": {
@@ -44,17 +43,11 @@
 	"macos/adapters/input_source_broker.lua": {
 		"count": 1
 	},
-	"macos/adapters/json_codec.lua": {
-		"deep_copy": 1
-	},
 	"macos/adapters/shell_runner.lua": {
 		"count": 1
 	},
 	"macos/adapters/storage.lua": {
 		"sorted_keys": 2
-	},
-	"macos/infra/capsword_auto_off.lua": {
-		"shallow_copy": 1
 	},
 	"macos/infra/driver_control.lua": {
 		"shell_quote": 1
@@ -72,7 +65,6 @@
 		"dirname": 2
 	},
 	"macos/modules/dynamic_hotstrings/personal_info.lua": {
-		"shallow_copy": 1,
 		"sorted_keys": 1
 	},
 	"macos/modules/gestures/actions.lua": {
@@ -85,16 +77,6 @@
 	"macos/modules/gestures/sticky_modifiers.lua": {
 		"sorted_keys": 1
 	},
-	"macos/modules/hotstrings/hotstrings_config.lua": {
-		"deep_copy": 1
-	},
-	"macos/modules/keymap/registry_groups.lua": {
-		"deep_copy": 1,
-		"shallow_copy": 1
-	},
-	"macos/modules/keystats/init.lua": {
-		"deep_copy": 1
-	},
 	"macos/modules/keystats/kc_bridge.lua": {
 		"count": 2
 	},
@@ -102,7 +84,6 @@
 		"count": 1
 	},
 	"macos/modules/llm/init.lua": {
-		"deep_copy": 2,
 		"sorted_keys": 1
 	},
 	"macos/modules/llm/mlx_deps_checker.lua": {
@@ -124,14 +105,12 @@
 		"count": 1
 	},
 	"macos/platform/remap/generator.lua": {
-		"deep_copy": 1,
 		"shell_quote": 2
 	},
 	"macos/platform/remap/init.lua": {
 		"shell_quote": 1
 	},
 	"macos/platform/remap/legacy_release_fixtures.lua": {
-		"deep_copy": 1,
 		"shell_quote": 1
 	},
 	"macos/platform/remap/nav_layer.lua": {
@@ -143,12 +122,6 @@
 	"macos/ui/healthcheck/core.lua": {
 		"sorted_keys": 1
 	},
-	"macos/ui/menu/global_actions_transaction.lua": {
-		"deep_copy": 1
-	},
-	"macos/ui/menu/hotstrings_scope.lua": {
-		"deep_copy": 1
-	},
 	"macos/ui/menu/menu_hotstrings_custom.lua": {
 		"sorted_keys": 1
 	},
@@ -158,36 +131,11 @@
 	"macos/ui/menu/menu_llm/models_selector.lua": {
 		"count": 1
 	},
-	"macos/ui/menu/menu_llm/scope_runtime.lua": {
-		"deep_copy": 1
-	},
-	"macos/ui/menu/menu_llm/settings_manager.lua": {
-		"deep_copy": 1
-	},
 	"macos/ui/menu/menu_llm/startup_controller.lua": {
 		"count": 2
 	},
 	"macos/ui/menu/menu_llm/trigger_orchestrator.lua": {
-		"deep_copy": 1,
 		"sorted_keys": 1
-	},
-	"macos/ui/menu/menu_state.lua": {
-		"deep_copy": 1
-	},
-	"macos/ui/menu/metrics_scope.lua": {
-		"deep_copy": 1
-	},
-	"macos/ui/menu/preferences_transaction.lua": {
-		"deep_copy": 1
-	},
-	"macos/ui/menu/program_parameter_transaction.lua": {
-		"shallow_copy": 1
-	},
-	"macos/ui/menu/session_demotions.lua": {
-		"deep_copy": 1
-	},
-	"macos/ui/menu/shortcuts_scope.lua": {
-		"deep_copy": 1
 	},
 	"macos/ui/metrics_typing/projection.lua": {
 		"sorted_keys": 1

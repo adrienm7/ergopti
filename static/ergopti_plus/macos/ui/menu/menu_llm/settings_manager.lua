@@ -17,18 +17,14 @@ local i18n    = require("infra.i18n")
 local dialog  = require("infra.dialog_util")
 local Notifications = require("infra.notifications")
 local ManifestMenu = require("infra.manifest_menu")
+local TableUtil = require("table_util")
 
 local LOG = "menu_llm.settings"
 
 --- Creates a detached value snapshot for rollback.
 --- @param value any Value to clone.
 --- @return any clone
-local function clone_value(value)
-	if type(value) ~= "table" then return value end
-	local clone = {}
-	for key, child in pairs(value) do clone[clone_value(key)] = clone_value(child) end
-	return clone
-end
+local clone_value = TableUtil.deep_copy_with_keys
 
 --- Retains the exact source authority across forward, inverse and debt retry saves.
 --- Source adoption is never a publication receipt; only one next owned ACK may

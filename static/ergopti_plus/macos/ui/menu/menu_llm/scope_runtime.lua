@@ -5,14 +5,10 @@ local M = {}
 local Manifest = require("infra.manifest_reader")
 local Preferences = require("infra.preferences")
 local Logger = require("infra.logger")
+local TableUtil = require("table_util")
 local LOG = "menu_llm.scope"
 
-local function clone(value)
-	if type(value) ~= "table" then return value end
-	local result = {}
-	for key, child in pairs(value) do result[key] = clone(child) end
-	return result
-end
+local clone = TableUtil.deep_copy
 
 local function equal(left, right)
 	if type(left) ~= type(right) then return false end

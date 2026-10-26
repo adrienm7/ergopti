@@ -41,6 +41,7 @@ local ScopeFile = require("config_scope_file")
 local Extensions = require("hotstrings.extensions")
 local ConfigSchema = require("modules.hotstrings.hotstrings_config_schema")
 local Logger = require("infra.logger")
+local TableUtil = require("table_util")
 
 local LOG = "menu.hotstrings_scope"
 
@@ -74,12 +75,7 @@ for _, owner in ipairs(OWNERS) do OWNER[owner.key] = owner end
 --- Menu-state key of the typing-engine switch (hotstrings.enabled).
 local ENGINE_KEY = "keymap"
 
-local function clone(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do copy[key] = clone(child) end
-	return copy
-end
+local clone = TableUtil.deep_copy
 
 --- Whether a group or section identity can be named by a canonical path.
 --- @param id string

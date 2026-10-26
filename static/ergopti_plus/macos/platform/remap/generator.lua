@@ -52,6 +52,7 @@ local NavLayer = require("platform.remap.nav_layer")
 local ScriptChordRules = require("platform.remap.script_chord_rules")
 local Defaults = require("platform.remap.defaults")
 local Layout = require("modules.keymap.layout")
+local TableUtil = require("table_util")
 
 local LOG = "karabiner"
 
@@ -639,14 +640,7 @@ end
 --- timing and generation gates mutate the deployed rule graph in place.
 --- @param value any Value to copy.
 --- @return any copy Structurally independent copy.
-local function deep_copy(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, nested in pairs(value) do
-		copy[deep_copy(key)] = deep_copy(nested)
-	end
-	return copy
-end
+local deep_copy = TableUtil.deep_copy_with_keys
 
 --- Copies only catalogue actions whose runtime-variable references will be
 --- rewritten or whose navigation output receives the F20 sentinel. All other

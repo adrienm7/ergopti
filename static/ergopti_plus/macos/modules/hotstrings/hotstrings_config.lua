@@ -46,6 +46,7 @@ local PublicationRecovery = require("hotstrings.publication_recovery")
 local DelayResolver = require("hotstrings.delay_resolver")
 local HotstringPriority = require("hotstring_priority")
 local TextUtils = require("text_utils")
+local TableUtil = require("table_util")
 local LOG        = "hotstrings_config"
 
 
@@ -437,12 +438,7 @@ end
 --- Clones an override tree so a setter can build an unpublished candidate.
 --- @param value any Value to clone.
 --- @return any clone
-local function clone_value(value)
-	if type(value) ~= "table" then return value end
-	local clone = {}
-	for key, child in pairs(value) do clone[key] = clone_value(child) end
-	return clone
-end
+local clone_value = TableUtil.deep_copy
 
 --- Returns whether two classified source snapshots denote identical bytes.
 --- @param left table|nil

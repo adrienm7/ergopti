@@ -4,13 +4,9 @@
 local M = {}
 local Manifest = require("infra.manifest_reader")
 local Preferences = require("infra.preferences")
+local TableUtil = require("table_util")
 
-local function clone(value)
-	if type(value) ~= "table" then return value end
-	local result = {}
-	for key, child in pairs(value) do result[key] = clone(child) end
-	return result
-end
+local clone = TableUtil.deep_copy
 
 --- Builds the complete Metrics scope over the existing native owners.
 --- @param options table Common persistence ports and concrete Metrics runtime ports.

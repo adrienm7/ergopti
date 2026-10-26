@@ -18,6 +18,7 @@ local Logger = require("infra.logger")
 local Storage = require("adapters.storage")
 local DeferredWork = require("infra.deferred_work")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
+local TableUtil = require("table_util")
 local LOG    = "menu_state"
 
 -- Delay before starting the keystats engine. Its start (~1.3 s of SQLite +
@@ -45,12 +46,7 @@ function M.metrics_start_pending() return _keystats_start_pending end
 --- Deep-copies plain Lua data so a demotion record cannot alias live state.
 --- @param value any Value to copy.
 --- @return any copy
-local function clone_value(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do copy[clone_value(key)] = clone_value(child) end
-	return copy
-end
+local clone_value = TableUtil.deep_copy_with_keys
 
 --- Synchronises the loaded state table back into all engine modules.
 --- Called once at startup after preferences are loaded, after a failed save
