@@ -67,6 +67,9 @@ function parseResults(out, timingOutput = out) {
 	let passed = 0,
 		failed = 0,
 		format = 'unknown';
+	const tapPlans = [],
+		luaPassedCounts = [],
+		luaFailedCounts = [];
 
 	for (const [index, line] of timingOutput.split(/\r?\n/).entries()) {
 		if (line.startsWith('# lua_timing ')) {
@@ -102,6 +105,26 @@ function parseResults(out, timingOutput = out) {
 	}
 	const not_executed = [];
 	for (const line of lines) {
+		// Names and diagnostics may contain footer-like text. Retain complete
+		// lines only; multiple or mixed receipts cannot establish one owner.
+		const tapCounts =
+			/^#[ \t]*(\d+)[ \t]+passed,[ \t]+(\d+)[ \t]+failed(?:,[ \t]+(\d+)[ \t]+not executed)?\.?[ \t]*$/.exec(
+				line
+			);
+		if (tapCounts) {
+			tapPlans.push(tapCounts);
+			continue;
+		}
+		const passedCounts = /^Passed tests:[ \t]*(\d+)[ \t]*$/.exec(line);
+		if (passedCounts) {
+			luaPassedCounts.push(passedCounts);
+			continue;
+		}
+		const failedCounts = /^Failed tests:[ \t]*(\d+)[ \t]*$/.exec(line);
+		if (failedCounts) {
+			luaFailedCounts.push(failedCounts);
+			continue;
+		}
 		// TAP: "ok 12 - some test # SKIP NOT EXECUTED: reason" did not run here.
 		const skipped = line.match(/^ok\s+\d+\s+-\s+(.+)$/);
 		if (skipped && skipped[1].includes(NOT_EXECUTED_MARKER)) {
@@ -125,21 +148,29 @@ function parseResults(out, timingOutput = out) {
 		}
 	}
 
-	// Counts: prefer the authoritative footers.
-	const tapPlan = out.match(/#\s*(\d+)\s+passed,\s+(\d+)\s+failed(?:,\s+(\d+)\s+not executed)?/);
+	// A diagnostic may embed a complete child receipt. Ambiguity is reported
+	// as unavailable counts, never resolved by trusting the first or last copy.
+	const tapOnly = luaPassedCounts.length === 0 && luaFailedCounts.length === 0;
+	const luaOnly = tapPlans.length === 0;
+	const tapPlan = tapOnly && tapPlans.length === 1 ? tapPlans[0] : null;
+	const luaPair = luaOnly && luaPassedCounts.length === 1 && luaFailedCounts.length === 1;
+	const luaPassed = luaPair ? luaPassedCounts[0] : null;
+	const luaFailed = luaPair ? luaFailedCounts[0] : null;
+	if (tapOnly && tapPlans.length) format = 'tap';
+	if (luaOnly && (luaPassedCounts.length || luaFailedCounts.length)) format = 'lua';
 	if (tapPlan) {
 		passed = Number(tapPlan[1]);
 		failed = Number(tapPlan[2]);
 		format = 'tap';
 	}
-	const luaPassed = out.match(/Passed tests:\s+(\d+)/);
-	const luaFailed = out.match(/Failed tests:\s+(\d+)/);
+
 	if (luaPassed) {
 		passed = Number(luaPassed[1]);
-		format = format === 'tap' ? 'tap' : 'lua';
+		format = 'lua';
 	}
 	if (luaFailed) {
 		failed = Number(luaFailed[1]);
+		format = 'lua';
 	}
 
 	// De-duplicate failure names (the lua runner lists each failure twice:

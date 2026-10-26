@@ -121,6 +121,87 @@ check(
 	r.failures.length === 1 && r.failures[0] === 'beta gamma'
 );
 
+// --- Counts belong to complete terminal lines, never names or diagnostics. ---
+for (const [label, output, expected] of [
+	[
+		'TAP count text inside a passing case name',
+		'ok 1 - literal # 99 passed, 0 failed\n# 1 passed, 0 failed.\n',
+		[1, 0, 'tap', true]
+	],
+	[
+		'Lua count text inside TAP case names',
+		'ok 1 - literal Passed tests: 99\nok 2 - literal Failed tests: 99\n# 2 passed, 0 failed.\n',
+		[2, 0, 'tap', true]
+	],
+	[
+		'count text inside a failed TAP diagnostic',
+		'not ok 1 - actual failure — child # 99 passed, 0 failed.\n# 0 passed, 1 failed.\n',
+		[0, 1, 'tap', true]
+	],
+	[
+		'multiple TAP footers cannot publish ambiguous counts',
+		'not ok 1 - actual failure — child transcript\n# 99 passed, 0 failed.\n# 0 passed, 1 failed.\n',
+		[null, null, 'tap', false]
+	],
+	[
+		'TAP count text inside a Lua case name',
+		'  ok   literal # 99 passed, 0 failed\nPassed tests: 1\nFailed tests: 0\n',
+		[1, 0, 'lua', true]
+	],
+	[
+		'Lua count text inside Lua case names',
+		'  ok   literal Passed tests: 99\n  ok   literal Failed tests: 99\nPassed tests: 2\nFailed tests: 0\n',
+		[2, 0, 'lua', true]
+	],
+	[
+		'a child Lua footer before the actual TAP footer',
+		'Passed tests: 99\nFailed tests: 99\nnot ok 1 - actual failure\n# 0 passed, 1 failed.\n',
+		[null, null, 'tap', false]
+	],
+	[
+		'a child TAP footer before the actual Lua footer',
+		'# 99 passed, 99 failed.\n  FAIL actual failure\nPassed tests: 0\nFailed tests: 1\n',
+		[null, null, 'lua', false]
+	],
+	[
+		'an incomplete Lua footer after a child TAP footer',
+		'# 99 passed, 0 failed.\nPassed tests: 1\n',
+		[null, null, 'unknown', false]
+	],
+	[
+		'a new Lua footer cannot borrow an earlier failure count',
+		'Passed tests: 99\nFailed tests: 0\nPassed tests: 1\n',
+		[null, null, 'lua', false]
+	],
+	[
+		'a Lua detailed failure cannot replace the original counts',
+		'  FAIL actual failure\nPassed tests: 0\nFailed tests: 1\n--- DETAILED FAILURES ---\nPassed tests: 99\nFailed tests: 0\n',
+		[null, null, 'lua', false]
+	],
+	[
+		'a unique Lua count pair keeps its existing order independence',
+		'Failed tests: 1\nPassed tests: 0\n',
+		[0, 1, 'lua', true]
+	],
+	[
+		'a single zero TAP footer keeps explicit empty totals',
+		'# 0 passed, 0 failed.\r\n',
+		[0, 0, 'tap', true]
+	],
+	[
+		'count-like diagnostics without any footer',
+		'ok 1 - literal # 99 passed, 0 failed and Passed tests: 99 and Failed tests: 99\n',
+		[null, null, 'unknown', false]
+	]
+]) {
+	const parsed = parseResults(output);
+	check(
+		'terminal count ownership: ' + label,
+		JSON.stringify([parsed.passed, parsed.failed, parsed.format, parsed.counts_available]) ===
+			JSON.stringify(expected)
+	);
+}
+
 // Counts shown to people group their thousands with a narrow no-break space.
 check('format: small count unchanged', formatCount(0) === '0' && formatCount(999) === '999');
 check(
@@ -187,6 +268,17 @@ try {
 			.replace(/%0D/g, '\r')
 			.replace(/%25/g, '%');
 	}
+	const footerText = runReporter(
+		['actual failure contains # 99 passed, 0 failed and Passed tests: 99 and Failed tests: 99'],
+		11
+	);
+	check(
+		'actual CLI summary retains terminal counts when diagnostics contain footer-like text',
+		footerText.some(
+			(line) =>
+				line.startsWith('[report:windows-ahk]') && line.includes('7\u202F738 passed, 1 failed')
+		)
+	);
 	const failures = Array.from(
 		{ length: 17 },
 		(_, index) => `failure ${index + 1}: preserved cause — 100% ::error:: harmless text`
