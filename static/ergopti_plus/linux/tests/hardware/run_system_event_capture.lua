@@ -45,7 +45,7 @@ Calendar.capture = function()
 	return { wall_ms = at, mono_ms = Clock.now_ms(), date = os.date("%Y-%m-%d", math.floor(at / 1000)),
 		ts = os.date("!%Y-%m-%d %H:%M:%S", math.floor(at / 1000)) }
 end
-local directory = assert(uv.fs_mkdtemp(assert(os.getenv("XDG_RUNTIME_DIR")) .. "/system-privacy-XXXXXX"))
+local directory = assert(uv.fs_mkdtemp(assert(uv.os_tmpdir()) .. "/system-privacy-XXXXXX"))
 local observations, violations, owned_databases = {}, 0, {}
 local function own_database(name)
 	local database = directory .. "/" .. name .. ".sqlite"
