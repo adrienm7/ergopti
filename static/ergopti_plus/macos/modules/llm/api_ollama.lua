@@ -24,6 +24,7 @@ local _vision_client = require("adapters.http_client").new()
 -- The AI agent menu's model listing never supersedes a request in flight
 local _listing_client = require("adapters.http_client").new()
 local JsonCodec      = require("adapters.json_codec")
+local FileSystem     = require("adapters.file_system")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
 local ShellRunner    = require("adapters.shell_runner")
@@ -1678,16 +1679,15 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		return
 	end
 
-	-- Write payload to a temp file so curl reads it directly — avoids the
-	-- stdin-pipe/streaming-callback conflict in hs.task.
-	-- os.tmpname() creates an empty file at the base path; remove it immediately
-	-- so only the suffixed path (which we own) exists in /tmp.
-	-- Declared BEFORE on_done so the closure captures the real `tmp_path` upvalue
-	-- (Lua lexical scoping: a local declared after the closure resolves to the
-	-- nil global, making os.remove(tmp_path) throw and abort the whole callback).
-	local _tmp_base = os.tmpname()
-	local tmp_path = _tmp_base .. "_ollama_stream.json"
-	os.remove(_tmp_base)
+	-- Retain the private file created by the allocator. Removing it and opening
+	-- a suffixed pathname would lose its owner-only mode under a normal umask.
+	-- Declare the path before callbacks so they capture this exact request file.
+	local tmp_path, allocation_error = FileSystem.create_secure_temp_file()
+	if type(tmp_path) ~= "string" or tmp_path == "" then
+		Logger.error(LOG, "Failed to allocate a private Ollama streaming payload: %s.", tostring(allocation_error))
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
 	local written, write_error = ApiCommon.write_stream_payload(tmp_path, encoded)
 	if not written then
 		Logger.error(LOG, "Failed to write temp file '%s' for Ollama streaming payload: %s.", tmp_path, tostring(write_error))

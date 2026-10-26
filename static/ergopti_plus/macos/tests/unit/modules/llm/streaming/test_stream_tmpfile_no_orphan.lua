@@ -1,46 +1,49 @@
 --- tests/unit/modules/llm/streaming/test_stream_tmpfile_no_orphan.lua
 
---- Regression test for llm-api-net-02: os.tmpname() creates an empty file at
---- the base path it returns. The streaming code appended a suffix to get the
---- actual payload path but never deleted the base file, orphaning one zero-byte
---- file per streaming request in /tmp.
----
---- Fix: after `local tmp_path = os.tmpname() .. "_..._stream.json"`, immediately
---- call `os.remove(base)` so the only file remaining is the suffixed one the
---- code owns. Both api_ollama.lua and api_mlx.lua had the bug.
+--- ==============================================================================
+--- MODULE: Private Streaming Payload Ownership
+--- DESCRIPTION:
+--- The allocator already creates a private file. Preserve that exact pathname
+--- through writing and transport admission, rather than orphaning or replacing
+--- its inode with a second file whose permissions depend on the ambient umask.
+--- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Fixture = require("tests.support.modules.llm.streaming_payload_fixture")
+local with_stream = Fixture.with_stream
+local CommandLines = require("tests.support.command_lines")
+local shell_quote = require("text_utils").shell_quote
+local Json = require("json")
 
--- Takes a selector unique to one production file rather than that file's
--- path, so moving or splitting a module cannot turn these invariants into
--- path errors.
-local function check_file(selector, suffix)
-	local src = helpers.read_driver_source(selector)
+helpers.describe("streaming retains its private temporary file", function()
+	for _, backend in ipairs({ "mlx", "ollama" }) do
+		helpers.it(backend .. " retains the allocated inode through transport (stream-private-payload-case)", function()
+			Fixture.assert_private_payload(backend)
+		end)
+		for _, refusal in ipairs({ "nil", "false", "empty" }) do
+			helpers.it(backend .. " refuses allocation " .. refusal .. " before writing (stream-private-allocation)", function()
+				with_stream(backend, function(h)
+					h.allocation_refusal = true
+					if refusal == "false" then h.allocation_result = false end
+					if refusal == "empty" then h.allocation_result = "" end
+					helpers.assert_true(h.request(), "allocation failures must reach the failure callback")
+					helpers.assert_eq(h.failures, 1)
+					helpers.assert_eq(h.writes, 0)
+					helpers.assert_eq(h.closes, 0)
+					helpers.assert_eq(h.spawns, 0)
+					helpers.assert_eq(h.timers, 0)
+				end)
+			end)
+		end
+	end
 
-	-- Test 1: the base tmpname variable is stored before the suffix is appended.
-	local has_base_var = src:find("os.tmpname()", 1, true) ~= nil
-	helpers.assert_true(has_base_var, selector .. ": os.tmpname() call must still be present")
-
-	-- Test 2: os.remove is called on the base (not just on the suffixed path).
-	-- The fix stores the base in a local and removes it immediately.
-	-- Pattern: os.remove(<base_var>) where base_var is defined as os.tmpname().
-	-- We check that `os.remove` appears near `os.tmpname()` (within same block).
-	local remove_base = src:find("os.remove(_tmp_base)", 1, true) ~= nil
-	helpers.assert_true(
-		remove_base,
-		selector .. ": os.remove(_tmp_base) must appear after os.tmpname() to remove the orphan base file (" .. suffix .. ")"
-	)
-
-	-- Test 3: the suffixed path is still used (the payload file must still exist).
-	local uses_suffix = src:find(suffix, 1, true) ~= nil
-	helpers.assert_true(
-		uses_suffix,
-		selector .. ": suffixed tmp path (" .. suffix .. ") must still be used for the payload"
-	)
-end
-
-check_file("local function read_ollama_port_override", "_ollama_stream.json")
--- MLX streaming lives in the request engine.
-check_file("function M.post_and_parse_streaming", "_mlx_stream.json")
-
-print("[PASS] test_stream_tmpfile_no_orphan")
+	helpers.it("checks native private modes under an explicit child umask (stream-private-native-receipt)", function()
+		local root = helpers.driver_root() .. "../../.."
+		local lines = CommandLines.read("python3 " .. shell_quote(root .. "/tools/diagnostics/macos_stream_payload_mode_test.py")
+			.. " " .. shell_quote(helpers.driver_root()) .. " 2>&1")
+		local receipt = assert(Json.decode(table.concat(lines, "\n")))
+		helpers.assert_eq(receipt.passed, 2, "both backend payload paths must run inside the native control")
+		helpers.assert_eq(receipt.umask, "0022")
+		helpers.assert_eq(receipt.parent_umask_preserved, true)
+	end)
+end)
