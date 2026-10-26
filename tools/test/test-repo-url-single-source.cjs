@@ -150,7 +150,6 @@ for (const product of [
 	assert.match(found[1], /is not the repository/);
 }
 
-
 const files = execFileSync('git', ['ls-files', '-z', '--', SP, '.github'], {
 	cwd: ROOT,
 	encoding: 'utf8',
