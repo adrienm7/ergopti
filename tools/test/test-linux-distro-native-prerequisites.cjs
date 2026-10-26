@@ -14,14 +14,41 @@ const bashPath = (value) =>
 	process.platform === 'win32'
 		? value.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`)
 		: value;
-// These are runtime ABI/CLI package providers, not desktop networking backends.
-// Genuine distro qualification separately executes GVariant and SQLite fixtures.
+// These are native ABI/data/CLI providers, not desktop networking backends.
+// Genuine distro qualification separately executes GVariant, SQLite and XKB fixtures.
 const providers = [
-	['debian', 'apt-get', 'libglib2.0-0t64', 'sqlite3', 'tzdata', 'libxkbcommon0'],
-	['fedora', 'dnf', 'glib2', 'sqlite', 'tzdata', 'libxkbcommon'],
-	['arch', 'pacman', 'glib2', 'sqlite', 'tzdata', 'libxkbcommon'],
-	['alpine', 'apk', 'glib', 'sqlite', 'tzdata', 'libxkbcommon'],
-	['opensuse', 'zypper', 'libglib-2_0-0', 'sqlite3', 'timezone', 'libxkbcommon0']
+	[
+		'debian',
+		'apt-get',
+		'libglib2.0-0t64',
+		'sqlite3',
+		'tzdata',
+		'libxkbcommon0',
+		'xkb-data',
+		'libx11-data'
+	],
+	[
+		'fedora',
+		'dnf',
+		'glib2',
+		'sqlite',
+		'tzdata',
+		'libxkbcommon',
+		'xkeyboard-config',
+		'libX11-common'
+	],
+	['arch', 'pacman', 'glib2', 'sqlite', 'tzdata', 'libxkbcommon', 'xkeyboard-config', 'libx11'],
+	['alpine', 'apk', 'glib', 'sqlite', 'tzdata', 'libxkbcommon', 'xkeyboard-config', 'libx11'],
+	[
+		'opensuse',
+		'zypper',
+		'libglib-2_0-0',
+		'sqlite3',
+		'timezone',
+		'libxkbcommon0',
+		'xkeyboard-config',
+		'libX11-data'
+	]
 ];
 /** Execute every package, pin and destination guard in one physical scratch tree. */
 function runControls(scratch) {
@@ -51,7 +78,7 @@ function runControls(scratch) {
 				}
 			});
 		let checks = 0;
-		for (const [distro, manager, glib, sqlite, timezone, xkb] of providers) {
+		for (const [distro, manager, glib, sqlite, timezone, xkb, keymaps, compose] of providers) {
 			for (const suite of ['unit', 'integration']) {
 				fs.rmSync(recorded, { force: true });
 				const result = invoke(distro, suite);
@@ -66,6 +93,11 @@ function runControls(scratch) {
 					.split('\0')
 					.filter(Boolean);
 				assert.equal(actualManager, manager, `${distro}: the actual authored backend must execute`);
+				assert.equal(
+					args.at(-1),
+					'curl',
+					`${distro}: curl remains the final acquisition prerequisite`
+				);
 				assert.ok(args.includes('tar'), `${distro}: the verified Lua archive needs extraction`);
 				assert.ok(
 					args.includes('openssl'),
@@ -79,6 +111,14 @@ function runControls(scratch) {
 				assert.ok(
 					args.includes(xkb),
 					`${distro}: native keymap publication requires declared ${xkb}`
+				);
+				assert.ok(
+					args.includes(keymaps),
+					`${distro}: native XKB context requires declared ${keymaps}`
+				);
+				assert.ok(
+					args.includes(compose),
+					`${distro}: native Compose state requires declared ${compose}`
 				);
 				assert.ok(
 					args.includes(sqlite),

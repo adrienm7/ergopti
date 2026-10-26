@@ -55,7 +55,8 @@ def native_keymap():
     keymap = None
     serialized = None
     try:
-        # Self-contained native input avoids requiring the host's XKB data package.
+        # Self-contained symbols avoid host layout includes. The real native context
+        # still needs its default include directory and separate Compose data.
         # These are fixture coordinates, never a product layout or typing fallback.
         letters = dict(
             zip(
