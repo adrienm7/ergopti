@@ -24,6 +24,8 @@ let userCategories = window.UserCategories || {};
 let appIcons = window.AppIcons || {};
 let currentSelectedDate = null;
 let currentPeriod = 'day';
+// One calendar-length owner for period queries and their previous-period comparison.
+const METRICS_PERIOD_DAYS = Object.freeze({ day: 1, week: 7, month: 30, year: 365 });
 // #53 — null means "all categories enabled"; otherwise a Set of allowed cats.
 let currentCategoryFilter = null;
 // #54 — null means "all weekdays enabled"; otherwise a Set of allowed dows (0=Mon..6=Sun).

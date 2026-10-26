@@ -398,15 +398,15 @@ function renderComparator(currentAgg) {
 
 	// Compute the equivalent prior period by shifting the anchor backwards
 	// by the period length. Restore state after.
-	const PERIOD_DAYS = { day: 1, week: 7, month: 30, year: 365 };
-	const days = PERIOD_DAYS[currentPeriod];
+	const days = METRICS_PERIOD_DAYS[currentPeriod];
 	if (!days || !currentSelectedDate) {
 		panel.innerHTML = `<div style="font-size:12px;color:var(--text-muted);">${_t('ui_apps.empty_comparator')}</div>`;
 		return;
 	}
 
 	const anchorTs = parseDateKey(currentSelectedDate);
-	const prevAnchor = new Date(anchorTs - days * 86400000);
+	const prevAnchor = new Date(anchorTs);
+	prevAnchor.setDate(prevAnchor.getDate() - days);
 	const yyyy = prevAnchor.getFullYear();
 	const mm = String(prevAnchor.getMonth() + 1).padStart(2, '0');
 	const dd = String(prevAnchor.getDate()).padStart(2, '0');

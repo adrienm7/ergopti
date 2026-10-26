@@ -235,10 +235,12 @@ function buildAggregatedData() {
 	let targetTsStart = 0;
 	const anchorTs = currentSelectedDate ? parseDateKey(currentSelectedDate) : allDates[0].ts;
 
-	if (currentPeriod === 'day') targetTsStart = anchorTs;
-	else if (currentPeriod === 'week') targetTsStart = anchorTs - 7 * 86400000;
-	else if (currentPeriod === 'month') targetTsStart = anchorTs - 30 * 86400000;
-	else if (currentPeriod === 'year') targetTsStart = anchorTs - 365 * 86400000;
+	if (Object.hasOwn(METRICS_PERIOD_DAYS, currentPeriod)) {
+		// The selected day is included, and local dates can cross DST boundaries.
+		const periodStart = new Date(anchorTs);
+		periodStart.setDate(periodStart.getDate() - METRICS_PERIOD_DAYS[currentPeriod] + 1);
+		targetTsStart = periodStart.getTime();
+	}
 
 	const validDates = allDates.filter((d) => {
 		if (currentPeriod !== 'all' && (d.ts > anchorTs || d.ts < targetTsStart)) return false;

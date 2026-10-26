@@ -847,4 +847,105 @@ assert.equal(
 	'all previous, calendar and drilldown controls must execute'
 );
 
+const periodAnchors = [
+	{ name: 'ordinary UTC dates', zone: 'UTC', date: '2026-01-31' },
+	{ name: 'Paris spring transition', zone: 'Europe/Paris', date: '2026-04-01' },
+	{ name: 'Paris autumn transition', zone: 'Europe/Paris', date: '2026-10-27' },
+	{ name: 'Lord Howe half-hour spring', zone: 'Australia/Lord_Howe', date: '2026-10-08' }
+];
+const expectedPeriodDays = { day: 1, week: 7, month: 30, year: 365 };
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of periodAnchors) {
+		for (const [period, days] of Object.entries(expectedPeriodDays)) {
+			test(`${host} ${period} calendar window retains ${vector.name}`, () => {
+				const previousTimezone = process.env.TZ;
+				process.env.TZ = vector.zone;
+				try {
+					const page = loadMetricsAppsPage(host);
+					for (const id of ['compare-panel', 'compare-rows', 'compare-window'])
+						page.elements.set(id, page.context.document.createElement('div'));
+					const [year, month, date] = vector.date.split('-').map(Number);
+					// These are independent input rows, one per real local calendar
+					// date, with different focus totals so a shifted comparator is visible.
+					const rows = Array.from({ length: 760 }, (_, index) => {
+						const day = new Date(year, month - 1, date);
+						day.setDate(day.getDate() - index);
+						const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+						return [
+							key,
+							{
+								Editor: {
+									category: 'Productivity',
+									app_time_ms: (index + 1) * 60000,
+									chars: index + 1
+								}
+							}
+						];
+					});
+					const manifest = Object.fromEntries(rows);
+					vm.runInContext(
+						`currentSelectedDate = ${JSON.stringify(vector.date)}; currentPeriod = ${JSON.stringify(period)}; currentCompareEnabled = true;`,
+						page.context
+					);
+					publishLoadedAppsData(page, host, manifest);
+					const aggregate = page.context.getAggregatedData();
+					const currentRows = rows.slice(0, days);
+					const previousRows = rows.slice(days, 2 * days);
+					assert.equal(
+						aggregate.rich.date_range.days,
+						days,
+						'the displayed period must own exactly its declared number of calendar dates'
+					);
+					assert.deepEqual(
+						Object.keys(aggregate.rich.by_date),
+						currentRows.map(([key]) => key),
+						'the actual date scope must end at the selected local day'
+					);
+					const currentFocus = currentRows.reduce(
+						(sum, [, data]) => sum + data.Editor.app_time_ms,
+						0
+					);
+					const previousFocus = previousRows.reduce(
+						(sum, [, data]) => sum + data.Editor.app_time_ms,
+						0
+					);
+					assert.equal(aggregate.rich.time.focus_ms, currentFocus);
+					const previousKey = previousRows[0][0];
+					assert.ok(
+						page.elements
+							.get('compare-window')
+							.textContent.includes(page.context.formatDisplayDate(previousKey)),
+						'the actual comparator must shift by local calendar dates rather than elapsed hours'
+					);
+					const previousFormatted = page.context.formatDuration(previousFocus);
+					assert.notEqual(
+						previousFormatted,
+						page.context.formatDuration(currentFocus),
+						'the input must distinguish current and previous totals'
+					);
+					assert.ok(
+						page.elements.get('compare-rows').innerHTML.includes(previousFormatted),
+						'the actual rendered comparator must own the disjoint previous date scope'
+					);
+					assert.equal(
+						vm.runInContext('currentSelectedDate', page.context),
+						vector.date,
+						'comparator rendering must return the selected query owner'
+					);
+					assert.equal(
+						page.diagnostics.some((entry) => entry.level === 'error'),
+						false,
+						'the real page must render without fixture errors'
+					);
+				} finally {
+					if (previousTimezone === undefined) delete process.env.TZ;
+					else process.env.TZ = previousTimezone;
+				}
+			});
+		}
+	}
+}
+assert.equal(periodAnchors.length, 4, 'every calendar boundary vector must execute');
+assert.equal(passed, 117, 'all prior and calendar-period page controls must execute');
+
 console.log(`${passed} passed, 0 failed.`);
