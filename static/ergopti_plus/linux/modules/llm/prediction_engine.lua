@@ -262,11 +262,22 @@ local BACKENDS = { ollama = true, api = true }
 
 -- The backend module serving the request in flight, so dismiss cancels it.
 local _inflight_backend = nil
--- When each backend was last sent a request, and the timer holding one back
--- until its minimum interval has passed.
-local _last_request_ms = {}
+-- The timer holding a request back until its backend's minimum interval has
+-- passed. When each backend was last sent a request is the plan's state.
 local _rate_timer = nil
 local _clock_ms = Monotonic.now_ms
+-- The debounce and rate-floor decisions (_shared/lua/llm/request_plan): this
+-- engine feeds it events and the clock, and owns the timers and the requests.
+-- (one table, not locals: this chunk is at Lua's limit of 200 local variables).
+local _debounce = {
+	plan = require("modules.llm.request_plan_policy").new(function(kind) return Inference.min_interval_ms(kind) end),
+}
+
+--- Cancels the native debounce timer and withdraws it from the plan.
+function _debounce.cancel()
+	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	_debounce.plan:on_cancel()
+end
 
 local function get_profiles()
 	local ok, module = pcall(require, "modules.llm.profiles")
@@ -475,9 +486,33 @@ local function live_override()
 	}
 end
 
-local function schedule(context, output_context, delay_ms, reason, live)
+--- Feeds the plan the settings read at this keystroke, then one input event.
+--- @param event table The plan's input event.
+--- @return table decisions What the plan answers.
+function _debounce.input(event)
+	local live_config_now = _live and live_config() or nil
+	_debounce.plan:configure({
+		enabled = _enabled,
+		debounce_ms = TriggerSettings.get("debounce_ms"),
+		instant_on_word_end = TriggerSettings.get("instant_on_word_end") == true,
+		live_debounce_ms = live_config_now and live_config_now.debounce_ms or false,
+	})
+	return _debounce.plan:on_input(event)
+end
+
+local function schedule(context, output_context, event, live)
 	if type(context) ~= "string" or context == "" then return false end
-	if _pending_trigger then _scheduler.cancel(_pending_trigger) end
+	local decisions = _debounce.input(event)
+	local arm
+	for _, decision in ipairs(decisions) do
+		if decision.action == "cancel" and _pending_trigger then
+			_scheduler.cancel(_pending_trigger)
+			_pending_trigger = nil
+		elseif decision.action == "arm" then
+			arm = decision
+		end
+	end
+	if not arm then return false end
 	local captured = {
 		app_id = type(output_context) == "table" and output_context.app_id or nil,
 		input_chars = type(output_context) == "table" and output_context.input_chars or 0,
@@ -485,8 +520,10 @@ local function schedule(context, output_context, delay_ms, reason, live)
 		-- automatic agent may replace this offer.
 		automatic = not live and not (type(output_context) == "table" and output_context.explicit == true),
 	}
-	local handle = _scheduler.after(math.max(0, tonumber(delay_ms) or 0) / 1000, function()
+	local handle = _scheduler.after(arm.delay_ms / 1000, function()
 		if _runtime_closed or _scope_owner then return end
+		-- A timer a newer keystroke or a cancel already superseded sends nothing.
+		if _debounce.plan:on_timer(arm.token)[1].action ~= "fire" then return end
 		_pending_trigger = nil
 		if not live then
 			M.predict(context, captured)
@@ -500,11 +537,12 @@ local function schedule(context, output_context, delay_ms, reason, live)
 	end)
 	if type(handle) ~= "table" or handle.armed ~= true then
 		_pending_trigger = nil
-		Logger.error(LOG, "%s prediction could not be scheduled: timer unavailable.", reason)
+		_debounce.plan:on_cancel()
+		Logger.error(LOG, "%s prediction could not be scheduled: timer unavailable.", arm.why)
 		return false
 	end
 	_pending_trigger = handle
-	Logger.debug(LOG, "%s prediction scheduled in %d ms.", reason, math.max(0, tonumber(delay_ms) or 0))
+	Logger.debug(LOG, "%s prediction scheduled in %d ms.", arm.why, math.max(0, arm.delay_ms))
 	return true
 end
 
@@ -579,7 +617,7 @@ function M.init(opts)
 	_tone_memory = nil
 	_offer_notified = false
 	if type(options.triggers) == "table" then _triggers = options.triggers end
-	if _pending_trigger then _scheduler.cancel(_pending_trigger) end
+	_debounce.cancel()
 	M.drop_agent_triage("engine initialised")
 	_agent_triaged = {}
 	_agent_last_app = nil
@@ -587,7 +625,7 @@ function M.init(opts)
 	-- The pacing clock must be the scheduler's: a test's virtual timers would
 	-- otherwise be measured against real time.
 	_clock_ms = type(options.clock_ms) == "function" and options.clock_ms or Monotonic.now_ms
-	_last_request_ms = {}
+	_debounce.plan:reset()
 	_pending_trigger = nil
 	advance_request_epoch()
 	_predicting = false
@@ -632,16 +670,15 @@ function M.on_char(ch, buffer, output_context)
 	-- The user went on typing: the screen answers would be dismissed at once.
 	M.drop_vision("typing")
 	if _predicting or #_suggestions > 0 then M.dismiss() end
-	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	_debounce.cancel()
 	arm_agent(buffer, output_context)
 	for _, trigger in ipairs(_triggers) do
 		if buffer:sub(-#trigger) == trigger then
-			local delay_ms = TriggerSettings.get("debounce_ms")
 			schedule(buffer, {
 				app_id = type(output_context) == "table" and output_context.app_id or nil,
 				input_chars = #trigger,
 				explicit = true,
-			}, delay_ms, "Explicit-trigger")
+			}, { cause = "explicit_trigger" })
 			return
 		end
 	end
@@ -654,12 +691,10 @@ function M.on_char(ch, buffer, output_context)
 		-- The live prompt, count and debounce replace the menu's; a new keystroke
 		-- has already withdrawn the request in flight above.
 		local config = live_config()
-		if config then schedule(buffer, output_context, config.debounce_ms, "Live", true) end
+		if config then schedule(buffer, output_context, { cause = "typing", ends_word = ends_word(buffer, ch) }, true) end
 		return
 	end
-	local immediate = TriggerSettings.get("instant_on_word_end") == true and ends_word(buffer, ch)
-	schedule(buffer, output_context, immediate and 0 or TriggerSettings.get("debounce_ms"),
-		immediate and "Word-end" or "Inactivity")
+	schedule(buffer, output_context, { cause = "typing", ends_word = ends_word(buffer, ch) })
 end
 
 --- Fires immediately after the current hotstring preview expires.
@@ -675,8 +710,8 @@ function M.on_hotstring_expired(context, output_context)
 	-- Live mode held its request back while the preview was shown (on_char).
 	if not _live and TriggerSettings.get("after_hotstring") ~= true then return false end
 	if _predicting or #_suggestions > 0 then M.dismiss() end
-	if _live then return schedule(context, output_context, 0, "Live hotstring-expiry", true) end
-	return schedule(context, output_context, 0, "Hotstring-expiry")
+	if _live then return schedule(context, output_context, { cause = "expiry" }, true) end
+	return schedule(context, output_context, { cause = "expiry" })
 end
 
 -- What {max_words} reads when the user chose no maximum (0). The built-in
@@ -806,10 +841,11 @@ function M.predict(context, output_context, override)
 		params.context_tail = Rewrite.sentence_span(params.context)
 		params.max_tokens = Rewrite.max_tokens(params.context_tail)
 	end
-	local is_batch = profile.batch == true and requested > 1
+	local batching = require("llm.request_plan.batching").plan(profile.batch == true, requested)
+	local is_batch = batching.mode == "batch"
 	local base_temperature = Settings.get("temperature")
 	local auto_raise = Settings.get("auto_raise_temp") == true
-	local system_prompt = resolve_system_prompt(profile, params, is_batch and requested or 1)
+	local system_prompt = resolve_system_prompt(profile, params, batching.per_call)
 	-- Empty is valid: the raw profile is its context alone, sent as the user turn.
 	if type(system_prompt) ~= "string" then
 		Logger.error(LOG, "Prediction profile '%s' has no usable system prompt.", tostring(profile.id))
@@ -889,9 +925,13 @@ function M.predict(context, output_context, override)
 		if not request_current(true) then return end
 		local kind = M.get_backend()
 		local now = _clock_ms()
-		local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
-		if wait_ms > 0 then
-			_rate_timer = _scheduler.after(wait_ms / 1000, function()
+		local verdict = _debounce.plan:on_dispatch({
+			backend = kind,
+			explicit = override ~= nil or (type(output_context) == "table" and output_context.explicit == true),
+			variant = request_index + 1,
+		}, now)[1]
+		if verdict.action == "defer" then
+			_rate_timer = _scheduler.after(verdict.delay_ms / 1000, function()
 				if _runtime_closed or _scope_owner then return end
 				_rate_timer = nil
 				dispatch()
@@ -906,7 +946,7 @@ function M.predict(context, output_context, override)
 			end
 			return
 		end
-		_last_request_ms[kind] = now
+		_debounce.plan:on_sent(kind, now)
 		request_index = request_index + 1
 		local think_filter = Parser.new_thinking_filter()
 		local streamed = ""
@@ -931,7 +971,7 @@ function M.predict(context, output_context, override)
 			-- A rewrite's budget follows its sentence; the continuation override
 			-- would truncate it and erase text it could not retype.
 			max_tokens = (rewrite and params.max_tokens or _max_tokens or params.max_tokens)
-				* (is_batch and requested or 1),
+				* batching.per_call,
 			-- Decided from the prompt, as macOS does: one continuation, unless the
 			-- prompt asks for the two-line correction format or a batch. By id, a
 			-- user's copy of "basic" never got the single-line stops.
@@ -963,7 +1003,7 @@ function M.predict(context, output_context, override)
 				append_unique(candidates, candidate, 0)
 			end
 			Logger.info(LOG, "Prediction request complete: %d chars, %d candidates.", #clean, #candidates)
-			if not is_batch and request_index < requested then
+			if request_index < batching.calls then
 				-- Shown now: the next variant may wait for the backend's interval.
 				if #candidates > 0 and DisplaySettings.get("streaming_multi") == true then publish() end
 				dispatch()
@@ -1047,7 +1087,7 @@ local function run_manual(output_context, prompt)
 		end
 		override = { profile = profile, num_predictions = prompt.num_predictions }
 	end
-	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	_debounce.cancel()
 	if _predicting or #_suggestions > 0 then M.dismiss() end
 	Logger.info(LOG, "Manual prediction requested (%d context byte(s), prompt %s).", #context,
 		override and override.profile.id or "from the menu")
@@ -1127,7 +1167,7 @@ function M.stop_live(reason, notice)
 	if not _live then return false end
 	local profile_id = _live.profile_id
 	_live = nil
-	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	_debounce.cancel()
 	if _suggestion_context and _suggestion_context.live then M.dismiss() end
 	Logger.info(LOG, "Live mode off (%s; prompt %s).", tostring(reason), profile_id)
 	if notice then announce(i18n.get(LIVE_OFF_KEY), "live off") end
@@ -1157,7 +1197,7 @@ local function start_live(prompt, source)
 		return false
 	end
 	if not live_config() then return false end
-	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	_debounce.cancel()
 	if _predicting or #_suggestions > 0 then M.dismiss() end
 	_live = { profile_id = profile.id, num_predictions = prompt.num_predictions,
 		translation_target = prompt.translation_target }
@@ -1417,7 +1457,7 @@ function M.shift_tone(direction, cycle)
 		end
 		-- The backends serve one request at a time: a prediction in flight or on
 		-- offer is withdrawn, or its callback would never come and block the next.
-		if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+		_debounce.cancel()
 		if _predicting or #_suggestions > 0 then M.dismiss() end
 
 		local messages = PromptBuilder.build_messages(system_prompt, plan.source, plan.source)
@@ -1438,9 +1478,9 @@ function M.shift_tone(direction, cycle)
 			if _runtime_closed or _scope_owner or generation ~= _tone_generation then return end
 			local kind = M.get_backend()
 			local now = _clock_ms()
-			local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
-			if wait_ms > 0 then
-				_tone_timer = _scheduler.after(wait_ms / 1000, function()
+			local verdict = _debounce.plan:on_dispatch({ backend = kind, explicit = true }, now)[1]
+			if verdict.action == "defer" then
+				_tone_timer = _scheduler.after(verdict.delay_ms / 1000, function()
 					_tone_timer = nil
 					send()
 				end)
@@ -1460,7 +1500,7 @@ function M.shift_tone(direction, cycle)
 				Logger.info(LOG, "Tone request dropped: the active text field changed while pacing.")
 				return
 			end
-			_last_request_ms[kind] = now
+			_debounce.plan:on_sent(kind, now)
 			-- Not the prediction's _inflight_backend: a dropped step is left to finish
 			-- and ignored, and the next request on that backend cancels it anyway.
 			backend.chat(target, model, messages, request_opts, nil, function(full_text, err)
@@ -1532,7 +1572,7 @@ end
 --- @return integer epoch The offer's _request_epoch.
 --- @return table meta The tooltip's metadata, loading until the offer settles.
 local function open_offer(action, label, model, focus)
-	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	_debounce.cancel()
 	if _predicting or #_suggestions > 0 then M.dismiss() end
 	local meta = {
 		model = model,
@@ -1561,9 +1601,9 @@ local function send_paced(epoch, what, send, on_unpaced, kind)
 	if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
 	kind = kind or M.get_backend()
 	local now = _clock_ms()
-	local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
-	if wait_ms > 0 then
-		_rate_timer = _scheduler.after(wait_ms / 1000, function()
+	local verdict = _debounce.plan:on_dispatch({ backend = kind, explicit = true }, now)[1]
+	if verdict.action == "defer" then
+		_rate_timer = _scheduler.after(verdict.delay_ms / 1000, function()
 			if _runtime_closed or _scope_owner then return end
 			_rate_timer = nil
 			send_paced(epoch, what, send, on_unpaced, kind)
@@ -1584,7 +1624,7 @@ local function send_paced(epoch, what, send, on_unpaced, kind)
 		M.dismiss()
 		return
 	end
-	_last_request_ms[kind] = now
+	_debounce.plan:on_sent(kind, now)
 	send()
 end
 
@@ -1883,7 +1923,7 @@ function M.read_screen(action, value)
 		return false
 	end
 	M.drop_vision("superseded")
-	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	_debounce.cancel()
 	if _predicting or #_suggestions > 0 then M.dismiss() end
 
 	local spec = {
@@ -2561,7 +2601,8 @@ end
 local function send_when_free(generation, chat, what, send)
 	if _runtime_closed or _scope_owner or generation ~= _agent_generation then return end
 	local interval = Inference.min_interval_ms(chat.kind)
-	local wait_ms = (_last_request_ms[chat.kind] or -math.huge) + interval - _clock_ms()
+	local verdict = _debounce.plan:on_dispatch({ backend = chat.kind, explicit = false }, _clock_ms())[1]
+	local wait_ms = verdict.action == "defer" and verdict.delay_ms or 0
 	local busy = type(chat.module.is_active) == "function" and chat.module.is_active() == true
 	if wait_ms > 0 or busy then
 		local delay_ms = math.max(wait_ms, busy and interval or 0)
@@ -2576,7 +2617,7 @@ local function send_when_free(generation, chat, what, send)
 		end
 		return
 	end
-	_last_request_ms[chat.kind] = _clock_ms()
+	_debounce.plan:on_sent(chat.kind, _clock_ms())
 	send()
 end
 
@@ -2742,7 +2783,7 @@ end
 --- Backspace and Escape update it precisely, and a reset here undid the edit.
 function M.withdraw(resync_owner)
 	if _scope_owner then return false end
-	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	_debounce.cancel()
 	-- Backspace, Escape, a desync or a blocked capture: the selection a tone
 	-- step was about to rewrite may be gone, and Escape cancels a screen action.
 	M.drop_tone("withdrawn")
@@ -2805,7 +2846,7 @@ end
 local function close_accepted_offer()
 	advance_request_epoch()
 	local retired_epoch = _request_epoch
-	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	_debounce.cancel()
 	if _rate_timer then _scheduler.cancel(_rate_timer); _rate_timer = nil end
 	local backend = _predicting and _inflight_backend or nil
 	_inflight_backend, _predicting = nil, false
@@ -3917,6 +3958,7 @@ function M.quiesce_configuration(owner)
 	if _pending_trigger then
 		if _scheduler.cancel(_pending_trigger) ~= true then return false end
 		_pending_trigger = nil
+		_debounce.plan:on_cancel()
 	end
 	if _rate_timer then
 		if _scheduler.cancel(_rate_timer) ~= true then return false end
