@@ -1148,14 +1148,16 @@ LSR=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.
 # to the Finder's path-based lookup which tends to find a stale system
 # icon. The `book` field — an NSURL bookmark blob — is what manual
 # drag-to-Dock generates and what makes the entry survive moves.
-python3 - "$DEST" "$UNIQUE_ID" "$SOURCE_APP" "${PWA_BROWSER:-}" <<'DOCKEOF'
-import sys, plistlib, os, subprocess, time
+python3 - "$DEST" "$UNIQUE_ID" "$SOURCE_APP" "${PWA_BROWSER:-}" "$USER_DATA_DIR" <<'DOCKEOF'
+import sys, plistlib, os, subprocess, time, fcntl, stat
+from contextlib import contextmanager
 from urllib.parse import quote
 
 app_path     = sys.argv[1]
 bundle_id    = sys.argv[2]
 source_app   = sys.argv[3]
-pwa_browser  = sys.argv[4] if len(sys.argv) > 4 else ""  # path to Edge/Chrome app, or "" for native mode
+pwa_browser  = sys.argv[4]  # path to Edge/Chrome app, or "" for native mode
+user_data_dir = sys.argv[5]
 plist_path   = os.path.expanduser("~/Library/Preferences/com.apple.dock.plist")
 lsr          = ("/System/Library/Frameworks/CoreServices.framework"
                 "/Frameworks/LaunchServices.framework/Support/lsregister")
@@ -1165,158 +1167,180 @@ lsr          = ("/System/Library/Frameworks/CoreServices.framework"
 # track the bundle by inode rather than by path, so renames/moves don't
 # break the tile, and the tile resolves the correct icon via LS.
 def make_bookmark(path):
-	try:
-		from Foundation import NSURL
-		url = NSURL.fileURLWithPath_(path)
-		bookmark, err = url.bookmarkDataWithOptions_includingResourceValuesForKeys_relativeToURL_error_(
-			0, None, None, None
-		)
-		if bookmark is None:
-			return None
-		return bytes(bookmark)
-	except Exception as e:
-		print(f"Bookmark generation failed ({e}); Dock will fall back to path-only entry")
-		return None
+    try:
+        from Foundation import NSURL
+        url = NSURL.fileURLWithPath_(path)
+        bookmark, err = url.bookmarkDataWithOptions_includingResourceValuesForKeys_relativeToURL_error_(
+            0, None, None, None
+        )
+        if bookmark is None:
+            return None
+        return bytes(bookmark)
+    except Exception as e:
+        print(f"Bookmark generation failed ({e}); Dock will fall back to path-only entry")
+        return None
 
 def dock_file_url(path):
-	return 'file://' + quote(path.rstrip('/'), safe='/') + '/'
+    return 'file://' + quote(path.rstrip('/'), safe='/') + '/'
 
-with open(plist_path, 'rb') as f:
-	dock = plistlib.load(f)
-
-apps = dock.get('persistent-apps', [])
-url  = dock_file_url(app_path)
-
-# If the same app is already pinned, remove it so we always end up with a
-# fresh, correct entry (manual re-drag behavior). Avoids stale entries
-# pointing at obsolete clone paths after re-clones with the same name.
-apps = [
-	e for e in apps
-	if e.get('tile-data', {}).get('file-data', {}).get('_CFURLString', '') != url
-]
-
-label = os.path.basename(app_path).removesuffix('.app')
-tile_data = {
-	'bundle-identifier': bundle_id,
-	'dock-extra': False,
-	'file-data': {
-		'_CFURLString': url,
-		'_CFURLStringType': 15,
-	},
-	'file-label': label,
-	'file-mod-date': 0,
-	'file-type': 41,
-	'parent-mod-date': 0,
-}
-book = make_bookmark(app_path)
-if book is not None:
-	tile_data['book'] = book
-
-apps.append({
-	'GUID': int.from_bytes(os.urandom(4), 'big'),
-	'tile-data': tile_data,
-	'tile-type': 'file-tile',
-})
-dock['persistent-apps'] = apps
-
-# Copy the source app's Space assignment to the clone.
-#
-# macOS stores per-app Space pinning in two places:
-#   1. com.apple.dock.plist  →  "workspaces-application-assignments"
-#      dict  bundle-id → Space UUID. Only present when the user right-clicked
-#      the Dock tile → "Options" → "Assign to this desktop". Mission-Control
-#      drag-and-drop does NOT write this key, so the dict is often empty.
-#
-#   2. com.apple.spaces.plist (binary, read via plutil) → ManagedDisplaySpaces
-#      → each Space has a list of app bundle-ids under "apps". This IS written
-#      when a window is moved to a Space in Mission Control. We scan it as a
-#      fallback to find the Space UUID for the source app.
-def _find_space_uuid_in_spaces_plist(src_bundle_id):
-    """Scan com.apple.spaces to find which Space UUID hosts src_bundle_id."""
-    import json
-    spaces_path = os.path.expanduser(
-        "~/Library/Preferences/com.apple.spaces.plist"
-    )
+@contextmanager
+def dock_update_lock():
+    # Every clone profile shares this parent. Keep the lock inode permanently:
+    # unlinking it would let existing waiters and new writers lock different files.
+    parent = os.path.realpath(os.path.dirname(user_data_dir))
+    parent_status = os.stat(parent)
+    if parent_status.st_uid != os.geteuid() or stat.S_IMODE(parent_status.st_mode) & 0o022:
+        raise PermissionError("The App Cloner coordination directory must be owned and not writable by other users")
+    descriptor = os.open(os.path.join(parent, ".dock-update.lock"),
+                         os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
     try:
-        result = subprocess.run(
-            ["plutil", "-convert", "json", "-o", "-", spaces_path],
-            capture_output=True, text=True
+        status = os.fstat(descriptor)
+        if not stat.S_ISREG(status.st_mode) or status.st_uid != os.geteuid() or stat.S_IMODE(status.st_mode) != 0o600:
+            raise PermissionError("The Dock update lock must be an owned private regular file")
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(descriptor)
+
+# Coordinate cooperating App Cloner writers for the entire read-modify-write.
+# The system Dock and other preference writers do not participate in this lock.
+with dock_update_lock():
+    with open(plist_path, 'rb') as f:
+        dock = plistlib.load(f)
+
+    apps = dock.get('persistent-apps', [])
+    url  = dock_file_url(app_path)
+
+    # If the same app is already pinned, remove it so we always end up with a
+    # fresh, correct entry (manual re-drag behavior). Avoids stale entries
+    # pointing at obsolete clone paths after re-clones with the same name.
+    apps = [
+        e for e in apps
+        if e.get('tile-data', {}).get('file-data', {}).get('_CFURLString', '') != url
+    ]
+
+    label = os.path.basename(app_path).removesuffix('.app')
+    tile_data = {
+        'bundle-identifier': bundle_id,
+        'dock-extra': False,
+        'file-data': {
+            '_CFURLString': url,
+            '_CFURLStringType': 15,
+        },
+        'file-label': label,
+        'file-mod-date': 0,
+        'file-type': 41,
+        'parent-mod-date': 0,
+    }
+    book = make_bookmark(app_path)
+    if book is not None:
+        tile_data['book'] = book
+
+    apps.append({
+        'GUID': int.from_bytes(os.urandom(4), 'big'),
+        'tile-data': tile_data,
+        'tile-type': 'file-tile',
+    })
+    dock['persistent-apps'] = apps
+
+    # Copy the source app's Space assignment to the clone.
+    #
+    # macOS stores per-app Space pinning in two places:
+    #   1. com.apple.dock.plist  →  "workspaces-application-assignments"
+    #      dict  bundle-id → Space UUID. Only present when the user right-clicked
+    #      the Dock tile → "Options" → "Assign to this desktop". Mission-Control
+    #      drag-and-drop does NOT write this key, so the dict is often empty.
+    #
+    #   2. com.apple.spaces.plist (binary, read via plutil) → ManagedDisplaySpaces
+    #      → each Space has a list of app bundle-ids under "apps". This IS written
+    #      when a window is moved to a Space in Mission Control. We scan it as a
+    #      fallback to find the Space UUID for the source app.
+    def _find_space_uuid_in_spaces_plist(src_bundle_id):
+        """Scan com.apple.spaces to find which Space UUID hosts src_bundle_id."""
+        import json
+        spaces_path = os.path.expanduser(
+            "~/Library/Preferences/com.apple.spaces.plist"
         )
-        if result.returncode != 0:
-            return None
-        data = json.loads(result.stdout)
-        for display in data.get("ManagedDisplaySpaces", []):
-            for space in display.get("Spaces", []):
-                uuid = space.get("uuid", "")
-                apps = space.get("apps", [])
-                if src_bundle_id in apps:
-                    return uuid
-    except Exception:
-        pass
-    return None
-
-def _read_bundle_id(app_path):
-    """Return CFBundleIdentifier for the given .app path, or empty string."""
-    try:
-        info = os.path.join(app_path, "Contents", "Info.plist")
-        with open(info, 'rb') as f:
-            return plistlib.load(f).get("CFBundleIdentifier", "")
-    except Exception:
-        return ""
-
-def copy_space_assignment(src_app_path, clone_bundle_id, browser_app_path, dock_plist):
-    try:
-        src_bundle_id = _read_bundle_id(src_app_path)
-        if not src_bundle_id:
-            print("Space assignment skipped: source bundle-id not found")
-            return
-
-        # Try dock.plist first (explicit "Assign to desktop" action)
-        assignments = dock_plist.get("workspaces-application-assignments", {})
-        space_uuid = assignments.get(src_bundle_id)
-
-        # Fallback: scan com.apple.spaces (Mission Control window placement)
-        if not space_uuid:
-            space_uuid = _find_space_uuid_in_spaces_plist(src_bundle_id)
-            if space_uuid:
-                print(f"Space UUID found via com.apple.spaces: {space_uuid}")
-
-        if not space_uuid:
-            print(f"Space assignment skipped: no Space pinning found for {src_bundle_id}")
-            print("Tip: right-click the source app in Dock → Options → Assign to Desktop, then recreate the clone.")
-            return
-
-        # Assign the Space to our clone bundle-id
-        assignments[clone_bundle_id] = space_uuid
-        dock_plist["workspaces-application-assignments"] = assignments
-        print(f"Space assignment: {src_bundle_id} → {clone_bundle_id} (Space {space_uuid})")
-
-        # For PWA mode, write two files into the profile dir that the Swift
-        # launcher reads on every click to enforce the Space pinning:
-        #   * target_space_uuid — static UUID of the source app's Space at clone
-        #     time. Used as the primary lookup; survives across reboots.
-        #   * source_bundle_id — fallback for dynamic resolution. If the user
-        #     moves Teams to a different Space later, the launcher uses this
-        #     bundle-id to query com.apple.spaces and follow the move.
-        # We never touch the browser's own Space assignment — Edge stays pinned
-        # wherever the user set it.
-        if browser_app_path:
-            profile_dir = os.path.expanduser(
-                f"~/Library/Application Support/AppCloner/{os.path.basename(app_path).removesuffix('.app')}_pwa"
+        try:
+            result = subprocess.run(
+                ["plutil", "-convert", "json", "-o", "-", spaces_path],
+                capture_output=True, text=True
             )
-            os.makedirs(profile_dir, exist_ok=True)
-            with open(os.path.join(profile_dir, "target_space_uuid"), 'w') as fh:
-                fh.write(space_uuid)
-            with open(os.path.join(profile_dir, "source_bundle_id"), 'w') as fh:
-                fh.write(src_bundle_id)
-            print(f"Space hint written: uuid={space_uuid}  source={src_bundle_id}")
-    except Exception as e:
-        print(f"Space assignment copy skipped ({e})")
+            if result.returncode != 0:
+                return None
+            data = json.loads(result.stdout)
+            for display in data.get("ManagedDisplaySpaces", []):
+                for space in display.get("Spaces", []):
+                    uuid = space.get("uuid", "")
+                    apps = space.get("apps", [])
+                    if src_bundle_id in apps:
+                        return uuid
+        except Exception:
+            pass
+        return None
 
-copy_space_assignment(source_app, bundle_id, pwa_browser, dock)
+    def _read_bundle_id(app_path):
+        """Return CFBundleIdentifier for the given .app path, or empty string."""
+        try:
+            info = os.path.join(app_path, "Contents", "Info.plist")
+            with open(info, 'rb') as f:
+                return plistlib.load(f).get("CFBundleIdentifier", "")
+        except Exception:
+            return ""
 
-with open(plist_path, 'wb') as f:
-    plistlib.dump(dock, f)
+    def copy_space_assignment(src_app_path, clone_bundle_id, browser_app_path, dock_plist):
+        try:
+            src_bundle_id = _read_bundle_id(src_app_path)
+            if not src_bundle_id:
+                print("Space assignment skipped: source bundle-id not found")
+                return
+
+            # Try dock.plist first (explicit "Assign to desktop" action)
+            assignments = dock_plist.get("workspaces-application-assignments", {})
+            space_uuid = assignments.get(src_bundle_id)
+
+            # Fallback: scan com.apple.spaces (Mission Control window placement)
+            if not space_uuid:
+                space_uuid = _find_space_uuid_in_spaces_plist(src_bundle_id)
+                if space_uuid:
+                    print(f"Space UUID found via com.apple.spaces: {space_uuid}")
+
+            if not space_uuid:
+                print(f"Space assignment skipped: no Space pinning found for {src_bundle_id}")
+                print("Tip: right-click the source app in Dock → Options → Assign to Desktop, then recreate the clone.")
+                return
+
+            # Assign the Space to our clone bundle-id
+            assignments[clone_bundle_id] = space_uuid
+            dock_plist["workspaces-application-assignments"] = assignments
+            print(f"Space assignment: {src_bundle_id} → {clone_bundle_id} (Space {space_uuid})")
+
+            # For PWA mode, write two files into the profile dir that the Swift
+            # launcher reads on every click to enforce the Space pinning:
+            #   * target_space_uuid — static UUID of the source app's Space at clone
+            #     time. Used as the primary lookup; survives across reboots.
+            #   * source_bundle_id — fallback for dynamic resolution. If the user
+            #     moves Teams to a different Space later, the launcher uses this
+            #     bundle-id to query com.apple.spaces and follow the move.
+            # We never touch the browser's own Space assignment — Edge stays pinned
+            # wherever the user set it.
+            if browser_app_path:
+                profile_dir = os.path.expanduser(
+                    f"~/Library/Application Support/AppCloner/{os.path.basename(app_path).removesuffix('.app')}_pwa"
+                )
+                os.makedirs(profile_dir, exist_ok=True)
+                with open(os.path.join(profile_dir, "target_space_uuid"), 'w') as fh:
+                    fh.write(space_uuid)
+                with open(os.path.join(profile_dir, "source_bundle_id"), 'w') as fh:
+                    fh.write(src_bundle_id)
+                print(f"Space hint written: uuid={space_uuid}  source={src_bundle_id}")
+        except Exception as e:
+            print(f"Space assignment copy skipped ({e})")
+
+    copy_space_assignment(source_app, bundle_id, pwa_browser, dock)
+
+    with open(plist_path, 'wb') as f:
+        plistlib.dump(dock, f)
 
 # Unregister + force-register (recursive) before killing Dock so it reads
 # the right metadata on restart — without this, single-kill races produce
