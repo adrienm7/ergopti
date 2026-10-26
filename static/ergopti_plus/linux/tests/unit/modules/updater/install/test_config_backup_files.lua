@@ -492,3 +492,56 @@ assert((owner ~= nil) == %s, "backup rules admission disagrees with actual sourc
 		helpers.assert_true(type(detail) == "string")
 	end)
 end)
+
+helpers.describe("installer-native-exit-receipt", function()
+	local Fixture = require("tests.support.modules.updater.installer_native_fixture")
+	local uv = require("luv")
+	local Shell = require("adapters.shell_runner")
+
+	local function with_listing_child(exit_code, callback)
+		local root = Fixture.scratch()
+		local original_path = os.getenv("PATH")
+		local marker = root .. "/native-listings"
+		local script = "#!/bin/sh\nprintf '%s\\n' \"$1\" >> " .. Shell.quote(marker)
+			.. "\ncase \"$1\" in\n"
+			.. "-tzf) printf 'linux/\\n_shared/\\nbin/\\ninstall.sh\\n' ;;\n"
+			.. "-tvzf) printf 'drwxr-xr-x linux/\\ndrwxr-xr-x _shared/\\ndrwxr-xr-x bin/\\n-rwxr-xr-x install.sh\\n' ;;\n"
+			.. "*) exit 91 ;;\nesac\nexit " .. exit_code .. "\n"
+		Fixture.write(root .. "/tar", script)
+		assert(uv.fs_chmod(root .. "/tar", 448))
+		assert(uv.os_setenv("PATH", root .. ":" .. assert(original_path)))
+		local ok, err = xpcall(function()
+			callback(helpers.load_module("modules.updater.installer"), root, marker)
+		end, debug.traceback)
+		assert(uv.os_setenv("PATH", original_path))
+		Fixture.remove(root)
+		if not ok then error(err, 0) end
+	end
+
+	for _, exit_code in ipairs({ 0, 73 }) do
+		helpers.it("(installer-native-exit-receipt) complete native listings retain exit " .. exit_code, function()
+			with_listing_child(exit_code, function(Installer, root, marker)
+				local accepted, reason = Installer.DEFAULT_OPS.validate_archive(root .. "/selected.tar.gz")
+				helpers.assert_eq(Fixture.read(marker), "-tzf\n-tvzf\n", "both actual child listings must execute")
+				helpers.assert_eq(accepted, exit_code == 0, "complete output cannot acknowledge a failed native listing")
+				if exit_code ~= 0 then helpers.assert_eq(reason, "archive listing failed") end
+			end)
+		end)
+	end
+
+	helpers.it("(installer-native-exit-receipt) failed listing refuses staging and extraction", function()
+		with_listing_child(73, function(Installer, root, marker)
+			local staging, extraction, ops = 0, 0, {}
+			for name, operation in pairs(Installer.DEFAULT_OPS) do ops[name] = operation end
+			ops.make_work_dir = function() staging = staging + 1; return nil end
+			ops.extract = function() extraction = extraction + 1; return false end
+			local installed, reason = Installer.install({ archive_path = root .. "/selected.tar.gz", expected_version = "1.2.3",
+				context = { kind = "standalone", parent = root, install_root = root .. "/installed", wrapper = root .. "/launcher" }, ops = ops })
+			helpers.assert_eq(installed, false)
+			helpers.assert_eq(Fixture.read(marker), "-tzf\n-tvzf\n", "the real archive reader must reach both children")
+			helpers.assert_eq(staging, 0, "a failed listing grants no staging authority")
+			helpers.assert_eq(extraction, 0, "a failed listing grants no extraction authority")
+			helpers.assert_eq(reason, "archive listing failed")
+		end)
+	end)
+end)
