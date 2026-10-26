@@ -423,7 +423,9 @@ helpers.describe("AT-SPI focus watcher: native lifecycle", function()
 		local root = helpers.driver_root()
 		-- The production transport uses LuaJIT FFI; both suite ABIs qualify that
 		-- actual driver runtime instead of fabricating a stock-Lua native backend.
-		local status = os.execute("env -u LUA_PATH -u LUA_CPATH luajit "
+		-- Default Linux sessions need not export TMPDIR; the native temp owner
+		-- must still allocate private, uniquely owned fixture directories.
+		local status = os.execute("env -u TMPDIR -u LUA_PATH -u LUA_CPATH luajit "
 			.. quote(root .. "/tests/hardware/run_focus_listener_retirement.lua") .. " " .. quote(root))
 		helpers.assert_true(status == true or status == 0, "native focus listener retirement must remain truthful")
 	end)
