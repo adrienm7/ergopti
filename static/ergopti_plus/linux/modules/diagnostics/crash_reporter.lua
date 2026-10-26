@@ -37,6 +37,11 @@ local LOG = "diagnostics.crash_reporter"
 -- a hostile folder from turning persistence into an unbounded collision loop.
 local MAX_REPORT_FILENAME_ATTEMPTS = 1000
 
+-- The name of a dump written before the shared JSON report existed:
+-- crash_<UTC stamp>_<sanitised module>.txt. The retention and the next-start
+-- dialog no longer see these, so they would otherwise stay forever.
+local LEGACY_DUMP_PATTERN = "^crash_%d%d%d%d%-%d%d%-%d%dT%d%d%-%d%d%-%d%d_[%w_.-]+%.txt$"
+
 -- Crash reports live in the logs folder, next to the daily log that explains
 -- them, and follow a LogsDirPath override: resolved per call.
 --- @return string Absolute folder, no trailing slash.
@@ -83,6 +88,42 @@ local function _rotate(directory)
 	end
 end
 
+
+
+--- Deletes the legacy text dumps of the crash folder, once per start.
+--- Idempotent: after the first run no name matches, and the exact pattern leaves
+--- JSON reports, the next-start marker and any file the user keeps untouched. A
+--- refused deletion is a warning: cleanup must never stop the daemon.
+--- @param directory string|nil Crash folder (default: the reporter's folder).
+--- @return integer removed Number of legacy dumps deleted.
+function M.remove_legacy_dumps(directory)
+	directory = directory or crash_dir()
+	local listed, entries, message = pcall(require("infra.native_directory").entries, directory)
+	if not listed then
+		Logger.warn(LOG, "Legacy crash dump cleanup skipped, the folder cannot be listed: %s.", tostring(entries))
+		return 0
+	end
+	if entries == nil then
+		-- A missing folder only means no crash was ever reported.
+		Logger.debug(LOG, "Legacy crash dump cleanup skipped, no crash folder: %s.", tostring(message))
+		return 0
+	end
+	Logger.start(LOG, "Removing the legacy crash text dumps from %s…", directory)
+	local FileSystem = require("adapters.file_system")
+	local removed = 0
+	for _, entry in ipairs(entries) do
+		if entry.kind == "file" and entry.name:match(LEGACY_DUMP_PATTERN) then
+			if FileSystem.delete(directory .. "/" .. entry.name) == true then
+				removed = removed + 1
+				Logger.info(LOG, "Legacy crash dump '%s' deleted.", entry.name)
+			else
+				Logger.warn(LOG, "Legacy crash dump '%s' could not be deleted.", entry.name)
+			end
+		end
+	end
+	Logger.success(LOG, "Legacy crash text dumps removed: %d.", removed)
+	return removed
+end
 
 
 
