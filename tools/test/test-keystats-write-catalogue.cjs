@@ -77,14 +77,29 @@ function catalogue(name, values = {}, dialect = 'native') {
 	return Codegen.render(queries, name, dialect, values);
 }
 
+/** A JSON object stored as text compares by its content: key order is not data. */
+function canonicalJson(value) {
+	if (typeof value !== 'string' || !value.startsWith('{')) return value;
+	try {
+		const parsed = JSON.parse(value);
+		return JSON.stringify(
+			Object.fromEntries(Object.entries(parsed).sort(([a], [b]) => (a < b ? -1 : 1)))
+		);
+	} catch {
+		return value;
+	}
+}
+
 /** Every row of the given tables, in a stable order, as plain JSON. */
 function dump(db, tables) {
 	return Object.fromEntries(
 		tables.map((table) => [
 			table,
-			JSON.parse(JSON.stringify(db.prepare(`SELECT * FROM ${table}`).all())).sort((a, b) =>
-				JSON.stringify(a) < JSON.stringify(b) ? -1 : 1
-			)
+			JSON.parse(JSON.stringify(db.prepare(`SELECT * FROM ${table}`).all()))
+				.map((row) =>
+					Object.fromEntries(Object.entries(row).map(([k, v]) => [k, canonicalJson(v)]))
+				)
+				.sort((a, b) => (JSON.stringify(a) < JSON.stringify(b) ? -1 : 1))
 		])
 	);
 }
@@ -587,6 +602,327 @@ check('counters: first and last typed minute take MIN and MAX, whatever the flus
 			last: '09:45'
 		}
 	);
+});
+
+// ---------------------------------------------------------------------------
+// Family: number-map aggregates (hourly, burst, session, n-grams, titles)
+// ---------------------------------------------------------------------------
+
+const MAP_TABLES = [
+	'agg_app_day_hourly',
+	'agg_app_day_hourly_min5',
+	'agg_app_day_burst',
+	'agg_app_day_session',
+	'ngram_chars',
+	'agg_app_day_titles'
+];
+const CAP = 3;
+const jsonOf = (value) => JSON.stringify(value);
+const KEYED = { device_id: KEY.device_id, date: KEY.date, app: KEY.app };
+
+/** macOS number_map_merge_expr: it only touches the keys of the incoming delta. */
+function macMerge(column, delta) {
+	if (Object.keys(delta).length === 0) return `COALESCE(${column},'{}')`;
+	let out = `json_set(COALESCE(${column},'{}')`;
+	for (const key of Object.keys(delta)) {
+		const path = `$.${key}`.replaceAll("'", "''");
+		out += `,'${path}',COALESCE(json_extract(${column},'${path}'),0)+COALESCE(json_extract(excluded.${column},'${path}'),0)`;
+	}
+	return out + ')';
+}
+
+/** Linux number_map_merge_sql: the full key-by-key sum of both maps. */
+const linuxMerge = (column) =>
+	`${column} = (SELECT COALESCE('{' || group_concat(json_quote(k) || ':' || v, ',') || '}', '{}') FROM (SELECT key AS k, SUM(value) AS v FROM (SELECT key, value FROM json_each(${column}) UNION ALL SELECT key, value FROM json_each(excluded.${column})) GROUP BY key))`;
+
+const legacyMapMac = {
+	hourly: (r) =>
+		`INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c, e, em, es, e_buckets_json) VALUES (${sq(KEY.device_id)},${sq(KEY.date)},${sq(KEY.app)},${sq(r.hour)},${iv(r.c)},${iv(r.e)},${iv(r.em)},${iv(r.es)},${sq(jsonOf(r.e_buckets))}) ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c=c+excluded.c, e=e+excluded.e, em=em+excluded.em, es=es+excluded.es, e_buckets_json=${macMerge('e_buckets_json', r.e_buckets)}`,
+	hourly_min5: (r) =>
+		`INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c, e, es, e_buckets_json) VALUES (${sq(KEY.device_id)},${sq(KEY.date)},${sq(KEY.app)},${sq(r.slot)},${iv(r.c)},${iv(r.e)},${iv(r.es)},${sq(jsonOf(r.e_buckets))}) ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=c+excluded.c, e=e+excluded.e, es=es+excluded.es, e_buckets_json=${macMerge('e_buckets_json', r.e_buckets)}`,
+	burst: (r) =>
+		`INSERT INTO agg_app_day_burst (device_id, date, app, count_total, max_cpm, max_chars, length_buckets_json, inter_delay_count, inter_delay_sum, inter_delay_sumsq) VALUES (${sq(KEY.device_id)},${sq(KEY.date)},${sq(KEY.app)},${iv(r.count_total)},${r.max_cpm.toFixed(6)},${iv(r.max_chars)},${sq(jsonOf(r.length_buckets))},${iv(r.inter_delay_count)},${iv(r.inter_delay_sum)},${iv(r.inter_delay_sumsq)}) ON CONFLICT(device_id, date, app) DO UPDATE SET count_total=count_total+excluded.count_total,max_cpm=MAX(max_cpm, excluded.max_cpm),max_chars=MAX(max_chars, excluded.max_chars),length_buckets_json=${macMerge('length_buckets_json', r.length_buckets)},inter_delay_count=inter_delay_count+excluded.inter_delay_count,inter_delay_sum=inter_delay_sum+excluded.inter_delay_sum,inter_delay_sumsq=inter_delay_sumsq+excluded.inter_delay_sumsq`,
+	session: (r) =>
+		`INSERT INTO agg_app_day_session (device_id, date, app, count_total, longest_ms, longest_chars, total_active_ms, durations_json) VALUES (${sq(KEY.device_id)},${sq(KEY.date)},${sq(KEY.app)},${iv(r.count_total)},${iv(r.longest_ms)},${iv(r.longest_chars)},${iv(r.total_active_ms)},${sq(jsonOf(r.durations))}) ON CONFLICT(device_id, date, app) DO UPDATE SET count_total=count_total+excluded.count_total,longest_ms=MAX(longest_ms, excluded.longest_ms),longest_chars=MAX(longest_chars, excluded.longest_chars),total_active_ms=total_active_ms+excluded.total_active_ms,durations_json=(SELECT json_group_array(duration) FROM (SELECT value AS duration FROM json_each(COALESCE(durations_json,'[]')) UNION ALL SELECT value FROM json_each(COALESCE(excluded.durations_json,'[]')) LIMIT ${CAP}))`,
+	ngram: (r) =>
+		`INSERT INTO ngram_chars (device_id, date, app, token, c, td, cd, e, esrc_json) VALUES (${sq(KEY.device_id)},${sq(KEY.date)},${sq(KEY.app)},${sq(r.token)},${iv(r.c)},${iv(r.td)},${iv(r.cd)},${iv(r.e)},${sq(jsonOf(r.esrc))}) ON CONFLICT(device_id, date, app, token) DO UPDATE SET c=c+excluded.c, td=td+excluded.td, cd=cd+excluded.cd, e=e+excluded.e, esrc_json=${macMerge('esrc_json', r.esrc)}`,
+	title: (r) =>
+		`INSERT INTO agg_app_day_titles (device_id, date, app, title, c, ms) VALUES (${sq(KEY.device_id)},${sq(KEY.date)},${sq(KEY.app)},${sq(r.title)},${iv(r.c)},${iv(r.ms)}) ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=c+excluded.c, ms=ms+excluded.ms`,
+	titlePrune: () =>
+		`DELETE FROM agg_app_day_titles WHERE device_id=${sq(KEY.device_id)} AND date=${sq(KEY.date)} AND app=${sq(KEY.app)} AND title NOT IN (SELECT title FROM agg_app_day_titles WHERE device_id=${sq(KEY.device_id)} AND date=${sq(KEY.date)} AND app=${sq(KEY.app)} ORDER BY (c + ms) DESC LIMIT 2)`
+};
+
+const legacyMapLinux = {
+	hourly: (r) =>
+		`INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c, e, em, es, e_buckets_json) VALUES (${sq(KEY.device_id)},${sq(KEY.date)},${sq(KEY.app)},${sq(r.hour)},${iv(r.c)},${iv(r.e)},${iv(r.em)},${iv(r.es)},${sq(jsonOf(r.e_buckets))}) ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c = c + excluded.c, e = e + excluded.e, em = em + excluded.em, es = es + excluded.es, ${linuxMerge('e_buckets_json')};`,
+	burst: (r) =>
+		`INSERT INTO agg_app_day_burst (device_id, date, app, count_total, max_cpm, max_chars, length_buckets_json, inter_delay_count, inter_delay_sum, inter_delay_sumsq) VALUES (${sq(KEY.device_id)},${sq(KEY.date)},${sq(KEY.app)},${iv(r.count_total)},${r.max_cpm.toFixed(6)},${iv(r.max_chars)},${sq(jsonOf(r.length_buckets))},${iv(r.inter_delay_count)},${iv(r.inter_delay_sum)},${iv(r.inter_delay_sumsq)}) ON CONFLICT(device_id, date, app) DO UPDATE SET count_total = count_total + excluded.count_total, max_cpm = MAX(max_cpm, excluded.max_cpm), max_chars = MAX(max_chars, excluded.max_chars), ${linuxMerge('length_buckets_json')}, inter_delay_count = inter_delay_count + excluded.inter_delay_count, inter_delay_sum = inter_delay_sum + excluded.inter_delay_sum, inter_delay_sumsq = inter_delay_sumsq + excluded.inter_delay_sumsq;`,
+	session: (r) =>
+		`INSERT INTO agg_app_day_session (device_id, date, app, count_total, longest_ms, longest_chars, total_active_ms, durations_json) VALUES (${sq(KEY.device_id)},${sq(KEY.date)},${sq(KEY.app)},${iv(r.count_total)},${iv(r.longest_ms)},${iv(r.longest_chars)},${iv(r.total_active_ms)},${sq(jsonOf(r.durations))}) ON CONFLICT(device_id, date, app) DO UPDATE SET count_total = count_total + excluded.count_total, longest_ms = MAX(longest_ms, excluded.longest_ms), longest_chars = MAX(longest_chars, excluded.longest_chars), total_active_ms = total_active_ms + excluded.total_active_ms, durations_json = (SELECT json_group_array(d) FROM (SELECT value AS d FROM json_each(durations_json) UNION ALL SELECT value FROM json_each(excluded.durations_json) LIMIT ${CAP}));`,
+	/** Linux batched all tokens of a flush into one multi-row INSERT. */
+	ngrams: (rows) =>
+		`INSERT INTO ngram_chars (device_id, date, app, token, c, td, cd, e, esrc_json) VALUES ${rows.map((r) => `(${sq(KEY.device_id)},${sq(KEY.date)},${sq(KEY.app)},${sq(r.token)},${iv(r.c)},${iv(r.td)},${iv(r.cd)},${iv(r.e)},${sq(jsonOf(r.esrc))})`).join(',')} ON CONFLICT(device_id, date, app, token) DO UPDATE SET c = c + excluded.c, td = td + excluded.td, cd = cd + excluded.cd, e = e + excluded.e, ${linuxMerge('esrc_json')};`,
+	title: (r) =>
+		`INSERT INTO agg_app_day_titles (device_id, date, app, title, c, ms) VALUES (${sq(KEY.device_id)},${sq(KEY.date)},${sq(KEY.app)},${sq(r.title)},${iv(r.c)},${iv(r.ms)}) ON CONFLICT(device_id, date, app, title) DO UPDATE SET c = c + excluded.c, ms = ms + excluded.ms; DELETE FROM agg_app_day_titles WHERE device_id = ${sq(KEY.device_id)} AND date = ${sq(KEY.date)} AND app = ${sq(KEY.app)} AND title NOT IN (SELECT title FROM agg_app_day_titles WHERE device_id = ${sq(KEY.device_id)} AND date = ${sq(KEY.date)} AND app = ${sq(KEY.app)} ORDER BY (c + ms) DESC LIMIT 2);`
+};
+
+const MAP_FLUSHES = [
+	{
+		hourly: { hour: '09', c: 10, e: 2, em: 1, es: 1, e_buckets: { backspace: 2, other: 1 } },
+		hourly_min5: { slot: '09:05', c: 4, e: 1, es: 0, e_buckets: { backspace: 1 } },
+		burst: {
+			count_total: 3,
+			max_cpm: 312.5,
+			max_chars: 40,
+			length_buckets: { '5-9': 2, '10+': 1 },
+			inter_delay_count: 4,
+			inter_delay_sum: 400,
+			inter_delay_sumsq: 50000
+		},
+		session: {
+			count_total: 1,
+			longest_ms: 1200,
+			longest_chars: 80,
+			total_active_ms: 1200,
+			durations: [1200]
+		},
+		tokens: [
+			{ token: 'ab', c: 3, td: 90, cd: 3, e: 1, esrc: { hotstring: 1, other: 2 } },
+			{ token: "it's", c: 1, td: 10, cd: 1, e: 0, esrc: {} }
+		],
+		titles: [
+			{ title: 'one', c: 1, ms: 10 },
+			{ title: 'two', c: 5, ms: 50 }
+		]
+	},
+	{
+		hourly: { hour: '09', c: 5, e: 0, em: 0, es: 0, e_buckets: { other: 4, delete: 1 } },
+		hourly_min5: { slot: '09:05', c: 1, e: 0, es: 0, e_buckets: {} },
+		burst: {
+			count_total: 1,
+			max_cpm: 280.25,
+			max_chars: 55,
+			length_buckets: { '10+': 3 },
+			inter_delay_count: 1,
+			inter_delay_sum: 100,
+			inter_delay_sumsq: 10000
+		},
+		session: {
+			count_total: 2,
+			longest_ms: 900,
+			longest_chars: 120,
+			total_active_ms: 1000,
+			durations: [500, 500, 700]
+		},
+		tokens: [{ token: 'ab', c: 2, td: 20, cd: 2, e: 1, esrc: { hotstring: 3, llm: 1 } }],
+		titles: [
+			{ title: 'three', c: 9, ms: 90 },
+			{ title: 'one', c: 1, ms: 10 }
+		]
+	}
+];
+
+/** Strips undefined fields, which the renderer rejects as undeclared parameters. */
+function withoutUndefined(values) {
+	return Object.fromEntries(Object.entries(values).filter(([, v]) => v !== undefined));
+}
+
+check('maps: the catalogue leaves the rows of the macOS flush', () => {
+	const rows = equivalent(
+		MAP_TABLES,
+		(db) => {
+			for (const flush of MAP_FLUSHES) {
+				db.exec(legacyMapMac.hourly(flush.hourly));
+				db.exec(legacyMapMac.hourly_min5(flush.hourly_min5));
+				db.exec(legacyMapMac.burst(flush.burst));
+				db.exec(legacyMapMac.session(flush.session));
+				for (const t of flush.tokens) db.exec(legacyMapMac.ngram(t));
+				for (const t of flush.titles) db.exec(legacyMapMac.title(t));
+				db.exec(legacyMapMac.titlePrune());
+			}
+		},
+		(db) => {
+			for (const flush of MAP_FLUSHES) applyMapFlush(db, flush);
+		}
+	);
+	assert.deepEqual(JSON.parse(rows.agg_app_day_hourly[0].e_buckets_json), {
+		backspace: 2,
+		other: 5,
+		delete: 1
+	});
+	assert.deepEqual(JSON.parse(rows.agg_app_day_session[0].durations_json), [1200, 500, 500]);
+});
+
+check(
+	'maps: the catalogue leaves the rows of the Linux flush, with its batched n-gram insert',
+	() => {
+		equivalent(
+			MAP_TABLES.filter((t) => t !== 'agg_app_day_hourly_min5'),
+			(db) => {
+				for (const flush of MAP_FLUSHES) {
+					db.exec(legacyMapLinux.hourly(flush.hourly));
+					db.exec(legacyMapLinux.burst(flush.burst));
+					db.exec(legacyMapLinux.session(flush.session));
+					db.exec(legacyMapLinux.ngrams(flush.tokens));
+					for (const t of flush.titles) db.exec(legacyMapLinux.title(t));
+				}
+			},
+			(db) => {
+				for (const flush of MAP_FLUSHES) {
+					const first = withoutUndefined({
+						...KEYED,
+						...flush.hourly,
+						e_buckets_json: jsonOf(flush.hourly.e_buckets),
+						e_buckets: undefined
+					});
+					db.exec(catalogue('agg.hourly', first));
+					db.exec(
+						catalogue(
+							'agg.burst',
+							withoutUndefined({
+								...KEYED,
+								...flush.burst,
+								length_buckets_json: jsonOf(flush.burst.length_buckets),
+								length_buckets: undefined
+							})
+						)
+					);
+					db.exec(
+						catalogue(
+							'agg.session',
+							withoutUndefined({
+								...KEYED,
+								...flush.session,
+								durations_json: jsonOf(flush.session.durations),
+								durations: undefined,
+								duration_cap: CAP
+							})
+						)
+					);
+					// One statement per token instead of one multi-row INSERT: the same rows.
+					for (const t of flush.tokens)
+						db.exec(
+							catalogue(
+								'agg.ngram',
+								withoutUndefined({
+									table: 'ngram_chars',
+									...KEYED,
+									...t,
+									esrc_json: jsonOf(t.esrc),
+									esrc: undefined
+								})
+							)
+						);
+					for (const t of flush.titles) {
+						db.exec(catalogue('agg.title', { ...KEYED, ...t }));
+						db.exec(catalogue('agg.title_prune', { ...KEYED, cap: 2 }));
+					}
+				}
+			}
+		);
+	}
+);
+
+/** Applies a flush through the catalogue (macOS order: prune after every title). */
+function applyMapFlush(db, flush) {
+	db.exec(
+		catalogue(
+			'agg.hourly',
+			withoutUndefined({
+				...KEYED,
+				...flush.hourly,
+				e_buckets_json: jsonOf(flush.hourly.e_buckets),
+				e_buckets: undefined
+			})
+		)
+	);
+	db.exec(
+		catalogue(
+			'agg.hourly_min5',
+			withoutUndefined({
+				...KEYED,
+				...flush.hourly_min5,
+				e_buckets_json: jsonOf(flush.hourly_min5.e_buckets),
+				e_buckets: undefined
+			})
+		)
+	);
+	db.exec(
+		catalogue(
+			'agg.burst',
+			withoutUndefined({
+				...KEYED,
+				...flush.burst,
+				length_buckets_json: jsonOf(flush.burst.length_buckets),
+				length_buckets: undefined
+			})
+		)
+	);
+	db.exec(
+		catalogue(
+			'agg.session',
+			withoutUndefined({
+				...KEYED,
+				...flush.session,
+				durations_json: jsonOf(flush.session.durations),
+				durations: undefined,
+				duration_cap: CAP
+			})
+		)
+	);
+	for (const t of flush.tokens)
+		db.exec(
+			catalogue(
+				'agg.ngram',
+				withoutUndefined({
+					table: 'ngram_chars',
+					...KEYED,
+					...t,
+					esrc_json: jsonOf(t.esrc),
+					esrc: undefined
+				})
+			)
+		);
+	for (const t of flush.titles) db.exec(catalogue('agg.title', { ...KEYED, ...t }));
+	db.exec(catalogue('agg.title_prune', { ...KEYED, cap: 2 }));
+}
+
+check('maps: a key with a dot or a quote no longer merges into a nested path', () => {
+	// Intentional change on macOS: its merge built a JSON path from the key, so
+	// "a.b" was read as the nested path $.a.b and a key with a quote broke the
+	// statement. The merge reads both maps with json_each and quotes every key.
+	const db = freshDb();
+	const first = {
+		...KEYED,
+		token: 't',
+		c: 1,
+		td: 0,
+		cd: 0,
+		e: 0,
+		esrc_json: jsonOf({ 'a.b': 1, 'we"ird': 2 })
+	};
+	db.exec(catalogue('agg.ngram', { table: 'ngram_chars', ...first }));
+	db.exec(
+		catalogue('agg.ngram', {
+			table: 'ngram_chars',
+			...first,
+			esrc_json: jsonOf({ 'a.b': 4, 'we"ird': 1, plain: 3 })
+		})
+	);
+	assert.deepEqual(JSON.parse(db.prepare('SELECT esrc_json FROM ngram_chars').get().esrc_json), {
+		'a.b': 5,
+		'we"ird': 3,
+		plain: 3
+	});
+	const legacy = freshDb();
+	legacy.exec(legacyMapMac.ngram({ token: 't', c: 1, td: 0, cd: 0, e: 0, esrc: { 'a.b': 1 } }));
+	legacy.exec(legacyMapMac.ngram({ token: 't', c: 1, td: 0, cd: 0, e: 0, esrc: { 'a.b': 4 } }));
+	assert.notDeepEqual(
+		JSON.parse(legacy.prepare('SELECT esrc_json FROM ngram_chars').get().esrc_json),
+		{ 'a.b': 5 }
+	);
+	legacy.close();
+	db.close();
 });
 
 if (failures > 0) {

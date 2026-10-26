@@ -268,7 +268,7 @@ ON CONFLICT(device_id) DO UPDATE SET
 -- doc: counters passes 0 for the others, which adds nothing; the category is
 -- doc: kept once set.
 INSERT INTO agg_app_day (device_id, date, app, chars, pauses, time_ms, think_time_ms, hs_chars, llm_chars, hs_triggers, llm_triggers, hs_suggested, llm_suggested, hs_input_chars, llm_input_chars, app_time_ms, category)
-VALUES ({{s device_id}}, {{s date}}, {{s app}}, {{i chars}}, {{i pauses}}, {{i time_ms}}, {{i think_time_ms}}, {{i hs_chars}}, {{i llm_chars}}, {{i hs_triggers}}, {{i llm_triggers}}, {{i hs_suggested}}, {{i llm_suggested}}, {{i hs_input_chars}}, {{i llm_input_chars}}, {{i app_time_ms}}, {{s? category}})
+VALUES ({{s device_id}},{{s date}},{{s app}},{{i chars}},{{i pauses}},{{i time_ms}},{{i think_time_ms}},{{i hs_chars}},{{i llm_chars}},{{i hs_triggers}},{{i llm_triggers}},{{i hs_suggested}},{{i llm_suggested}},{{i hs_input_chars}},{{i llm_input_chars}},{{i app_time_ms}},{{s? category}})
 ON CONFLICT(device_id, date, app) DO UPDATE SET
   chars = chars + excluded.chars, pauses = pauses + excluded.pauses,
   time_ms = time_ms + excluded.time_ms, think_time_ms = think_time_ms + excluded.think_time_ms,
@@ -282,7 +282,7 @@ ON CONFLICT(device_id, date, app) DO UPDATE SET
 -- name: agg.buckets
 -- doc: Cumulative pause buckets of an application day.
 INSERT INTO agg_app_day_buckets (device_id, date, app, bucket_ms, time_sum, credited, hs_input_time_sum, hs_input_credited, llm_input_time_sum, llm_input_credited)
-VALUES ({{s device_id}}, {{s date}}, {{s app}}, {{i bucket_ms}}, {{i time_sum}}, {{i credited}}, {{i hs_input_time_sum}}, {{i hs_input_credited}}, {{i llm_input_time_sum}}, {{i llm_input_credited}})
+VALUES ({{s device_id}},{{s date}},{{s app}},{{i bucket_ms}},{{i time_sum}},{{i credited}},{{i hs_input_time_sum}},{{i hs_input_credited}},{{i llm_input_time_sum}},{{i llm_input_credited}})
 ON CONFLICT(device_id, date, app, bucket_ms) DO UPDATE SET
   time_sum = time_sum + excluded.time_sum, credited = credited + excluded.credited,
   hs_input_time_sum = hs_input_time_sum + excluded.hs_input_time_sum,
@@ -293,7 +293,7 @@ ON CONFLICT(device_id, date, app, bucket_ms) DO UPDATE SET
 -- name: agg.kc_hold
 -- doc: Hold durations of one key code. The longest hold is a record, not a sum.
 INSERT INTO agg_app_day_kc_hold (device_id, date, app, keycode, sum_ms, count, max_ms, tap_count, hold_count)
-VALUES ({{s device_id}}, {{s date}}, {{s app}}, {{i keycode}}, {{i sum_ms}}, {{i count}}, {{i max_ms}}, {{i tap_count}}, {{i hold_count}})
+VALUES ({{s device_id}},{{s date}},{{s app}},{{i keycode}},{{i sum_ms}},{{i count}},{{i max_ms}},{{i tap_count}},{{i hold_count}})
 ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET
   sum_ms = sum_ms + excluded.sum_ms, count = count + excluded.count,
   max_ms = MAX(max_ms, excluded.max_ms),
@@ -302,19 +302,19 @@ ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET
 -- name: agg.layouts
 -- doc: Keystrokes typed under one keyboard layout.
 INSERT INTO agg_app_day_layouts (device_id, date, app, layout, count)
-VALUES ({{s device_id}}, {{s date}}, {{s app}}, {{s layout}}, {{i count}})
+VALUES ({{s device_id}},{{s date}},{{s app}},{{s layout}},{{i count}})
 ON CONFLICT(device_id, date, app, layout) DO UPDATE SET count = count + excluded.count;
 
 -- name: agg.switches_to
 -- doc: Switches from one application to another.
 INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count)
-VALUES ({{s device_id}}, {{s date}}, {{s app_from}}, {{s app_to}}, {{i count}})
+VALUES ({{s device_id}},{{s date}},{{s app_from}},{{s app_to}},{{i count}})
 ON CONFLICT(device_id, date, app_from, app_to) DO UPDATE SET count = count + excluded.count;
 
 -- name: agg.errors
 -- doc: Backspace and correction analysis. The longest cascade is a record.
 INSERT INTO agg_app_day_errors (device_id, date, app, bs_total, cascade_count, cascade_max_len, recovery_sum_ms, recovery_count)
-VALUES ({{s device_id}}, {{s date}}, {{s app}}, {{i bs_total}}, {{i cascade_count}}, {{i cascade_max_len}}, {{i recovery_sum_ms}}, {{i recovery_count}})
+VALUES ({{s device_id}},{{s date}},{{s app}},{{i bs_total}},{{i cascade_count}},{{i cascade_max_len}},{{i recovery_sum_ms}},{{i recovery_count}})
 ON CONFLICT(device_id, date, app) DO UPDATE SET
   bs_total = bs_total + excluded.bs_total, cascade_count = cascade_count + excluded.cascade_count,
   cascade_max_len = MAX(cascade_max_len, excluded.cascade_max_len),
@@ -324,7 +324,7 @@ ON CONFLICT(device_id, date, app) DO UPDATE SET
 -- name: agg.ergo
 -- doc: Streak records and focus latency. Streaks are records, the rest sums.
 INSERT INTO agg_app_day_ergo (device_id, date, app, same_finger_streak_max, same_hand_streak_max, auto_repeat_count, focus_to_first_key_sum_ms, focus_to_first_key_count)
-VALUES ({{s device_id}}, {{s date}}, {{s app}}, {{i same_finger_streak_max}}, {{i same_hand_streak_max}}, {{i auto_repeat_count}}, {{i focus_to_first_key_sum_ms}}, {{i focus_to_first_key_count}})
+VALUES ({{s device_id}},{{s date}},{{s app}},{{i same_finger_streak_max}},{{i same_hand_streak_max}},{{i auto_repeat_count}},{{i focus_to_first_key_sum_ms}},{{i focus_to_first_key_count}})
 ON CONFLICT(device_id, date, app) DO UPDATE SET
   same_finger_streak_max = MAX(same_finger_streak_max, excluded.same_finger_streak_max),
   same_hand_streak_max = MAX(same_hand_streak_max, excluded.same_hand_streak_max),
@@ -337,9 +337,71 @@ ON CONFLICT(device_id, date, app) DO UPDATE SET
 -- doc: and last typed minute are a MIN and a MAX, so a late flush cannot move
 -- doc: the first keystroke of the morning forward.
 INSERT INTO agg_app_day_chars_class (device_id, date, app, letter, digit, punct, space, other, first_typed_min, last_typed_min)
-VALUES ({{s device_id}}, {{s date}}, {{s app}}, {{i letter}}, {{i digit}}, {{i punct}}, {{i space}}, {{i other}}, {{s? first_typed_min}}, {{s? last_typed_min}})
+VALUES ({{s device_id}},{{s date}},{{s app}},{{i letter}},{{i digit}},{{i punct}},{{i space}},{{i other}},{{s? first_typed_min}},{{s? last_typed_min}})
 ON CONFLICT(device_id, date, app) DO UPDATE SET
   letter = letter + excluded.letter, digit = digit + excluded.digit,
   punct = punct + excluded.punct, space = space + excluded.space, other = other + excluded.other,
   first_typed_min = MIN(COALESCE(first_typed_min, excluded.first_typed_min), COALESCE(excluded.first_typed_min, first_typed_min)),
   last_typed_min = MAX(COALESCE(last_typed_min, excluded.last_typed_min), COALESCE(excluded.last_typed_min, last_typed_min));
+
+-- name: agg.hourly
+-- doc: Typing and error counts of one hour. The error histogram merges key by key.
+INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c, e, em, es, e_buckets_json)
+VALUES ({{s device_id}},{{s date}},{{s app}},{{s hour}},{{i c}},{{i e}},{{i em}},{{i es}},{{s e_buckets_json}})
+ON CONFLICT(device_id, date, app, hour) DO UPDATE SET
+  c = c + excluded.c, e = e + excluded.e, em = em + excluded.em, es = es + excluded.es,
+  e_buckets_json = {{merge e_buckets_json}};
+
+-- name: agg.hourly_min5
+-- doc: The same counts for one five-minute slot.
+INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c, e, es, e_buckets_json)
+VALUES ({{s device_id}},{{s date}},{{s app}},{{s slot}},{{i c}},{{i e}},{{i es}},{{s e_buckets_json}})
+ON CONFLICT(device_id, date, app, slot) DO UPDATE SET
+  c = c + excluded.c, e = e + excluded.e, es = es + excluded.es,
+  e_buckets_json = {{merge e_buckets_json}};
+
+-- name: agg.burst
+-- doc: Burst records. The peaks are records, the counts and moments add, and the
+-- doc: length histogram merges key by key, since a flush only sees its own bursts.
+INSERT INTO agg_app_day_burst (device_id, date, app, count_total, max_cpm, max_chars, length_buckets_json, inter_delay_count, inter_delay_sum, inter_delay_sumsq)
+VALUES ({{s device_id}},{{s date}},{{s app}},{{i count_total}},{{r max_cpm}},{{i max_chars}},{{s length_buckets_json}},{{i inter_delay_count}},{{i inter_delay_sum}},{{i inter_delay_sumsq}})
+ON CONFLICT(device_id, date, app) DO UPDATE SET
+  count_total = count_total + excluded.count_total,
+  max_cpm = MAX(max_cpm, excluded.max_cpm), max_chars = MAX(max_chars, excluded.max_chars),
+  length_buckets_json = {{merge length_buckets_json}},
+  inter_delay_count = inter_delay_count + excluded.inter_delay_count,
+  inter_delay_sum = inter_delay_sum + excluded.inter_delay_sum,
+  inter_delay_sumsq = inter_delay_sumsq + excluded.inter_delay_sumsq;
+
+-- name: agg.session
+-- doc: Typing sessions. The longest are records; the duration samples append
+-- doc: stored first and stop at the cap, so a later flush cannot displace an
+-- doc: earlier sample and every driver observes the same bound.
+INSERT INTO agg_app_day_session (device_id, date, app, count_total, longest_ms, longest_chars, total_active_ms, durations_json)
+VALUES ({{s device_id}},{{s date}},{{s app}},{{i count_total}},{{i longest_ms}},{{i longest_chars}},{{i total_active_ms}},{{s durations_json}})
+ON CONFLICT(device_id, date, app) DO UPDATE SET
+  count_total = count_total + excluded.count_total,
+  longest_ms = MAX(longest_ms, excluded.longest_ms), longest_chars = MAX(longest_chars, excluded.longest_chars),
+  total_active_ms = total_active_ms + excluded.total_active_ms,
+  durations_json = (SELECT json_group_array(duration) FROM (SELECT value AS duration FROM json_each(COALESCE(durations_json, '[]')) UNION ALL SELECT value FROM json_each(COALESCE(excluded.durations_json, '[]')) LIMIT {{i duration_cap}}));
+
+-- name: agg.ngram
+-- doc: One token of an n-gram family. {{table}} is a family table name the driver
+-- doc: takes from its fixed list; the source map merges key by key.
+INSERT INTO {{table}} (device_id, date, app, token, c, td, cd, e, esrc_json)
+VALUES ({{s device_id}},{{s date}},{{s app}},{{s token}},{{i c}},{{i td}},{{i cd}},{{i e}},{{s esrc_json}})
+ON CONFLICT(device_id, date, app, token) DO UPDATE SET
+  c = c + excluded.c, td = td + excluded.td, cd = cd + excluded.cd, e = e + excluded.e,
+  esrc_json = {{merge esrc_json}};
+
+-- name: agg.title
+-- doc: One window title's counters for an application day.
+INSERT INTO agg_app_day_titles (device_id, date, app, title, c, ms)
+VALUES ({{s device_id}},{{s date}},{{s app}},{{s title}},{{i c}},{{i ms}})
+ON CONFLICT(device_id, date, app, title) DO UPDATE SET c = c + excluded.c, ms = ms + excluded.ms;
+
+-- name: agg.title_prune
+-- doc: Keeps the cap titles of an application day with the most activity, so a
+-- doc: window the user glanced at loses to one they worked in.
+DELETE FROM agg_app_day_titles WHERE device_id = {{s device_id}} AND date = {{s date}} AND app = {{s app}}
+AND title NOT IN (SELECT title FROM agg_app_day_titles WHERE device_id = {{s device_id}} AND date = {{s date}} AND app = {{s app}} ORDER BY (c + ms) DESC LIMIT {{i cap}});
