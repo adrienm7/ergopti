@@ -39,7 +39,7 @@ helpers.describe("Gesture actions fixture ownership", function()
 					for _, name in ipairs({ "modules.gestures.actions", "infra.notifications",
 						"adapters.timer_scheduler", "_generated.gesture_emit_actions",
 						"_generated.action_catalogue", "config_binding_identity", "tap_hold.key_combinations", "config_binding_publication", "config_keyboard_publication", "hs", "hs.timer",
-						"llm.translate", "toml_codec.record_scanner", "ui.menu.gesture_fixture_unrelated" }) do
+						"llm.translate", "manifest_reader", "timings", "toml_codec.record_scanner", "ui.menu.gesture_fixture_unrelated" }) do
 						package.loaded[name] = sentinel
 					end
 					_G.hs = sentinel

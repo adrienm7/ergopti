@@ -74,7 +74,7 @@ const MIN_UNAVAILABLE = 40;
 // The files that must consume the table. A generator emitting a section nobody
 // reads is how `description_key` came to be dead weight in both manifests.
 const READERS = [
-	{ file: path.join(SP, 'macos', 'infra', 'manifest_reader.lua'), token: 'unavailable' },
+	{ file: path.join(SP, '_shared', 'lua', 'manifest_reader.lua'), token: 'unavailable' },
 	{ file: path.join(SP, 'macos', 'ui', 'healthcheck', 'helpers.lua'), token: 'coverage_gaps' },
 	{ file: path.join(SP, 'macos', 'ui', 'healthcheck', 'core.lua'), token: 'platform_coverage' }
 ];
