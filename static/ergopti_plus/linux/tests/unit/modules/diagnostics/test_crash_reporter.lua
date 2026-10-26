@@ -134,6 +134,7 @@ local function with_sandbox(opts, fn)
 		local cap = { path = nil, mode = nil, parts = {} }
 		Writer.open = function(path, mode)
 			if path:sub(1, #EXPECTED_DIR + 1) == EXPECTED_DIR .. "/" then
+				if opts.occupied and opts.occupied(path, mode) then return nil, "occupied", "EEXIST" end
 				local file = io.open(path, mode)
 				return file, nil, nil, nil, function(expected) return table.concat(cap.parts, "") == expected end
 			end
@@ -246,24 +247,20 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 	end)
 
 	helpers.it("a second report within the same second gets the numeric suffix", function()
-		local FileSystem = require("adapters.file_system")
-		local real_exists, probed = FileSystem.exists, {}
-		FileSystem.exists = function(path)
-			probed[#probed + 1] = path
-			return path:match("%d%d%d%d%-%d%d%-%d%dT%d%d%-%d%d%-%d%dZ%.json$") ~= nil
-		end
-		local ok, err = pcall(function()
-			local cap = with_sandbox(nil, function() cr.dump("engine", "again") end)
-			helpers.assert_true(cap.path:match("%-2%.json$") ~= nil, "the colliding name is suffixed: " .. tostring(cap.path))
-			local plain, suffixed = false, false
-			for _, probe in ipairs(probed) do
-				plain = plain or probe:match("Z%.json$") ~= nil
-				suffixed = suffixed or probe:match("Z%-2%.json$") ~= nil
-			end
-			helpers.assert_true(plain and suffixed, "the plain name is probed, then the first suffix")
+		local acquired = {}
+		local cap = with_sandbox({ occupied = function(path, mode)
+			acquired[#acquired + 1] = { path = path, mode = mode }
+			return #acquired == 1
+		end }, function()
+			helpers.assert_eq(cr.dump("engine", "again"), true, "the suffixed report is acknowledged")
 		end)
-		FileSystem.exists = real_exists
-		if not ok then error(err, 0) end
+		helpers.assert_true(cap.path:match("%-2%.json$") ~= nil, "the colliding name is suffixed: " .. tostring(cap.path))
+		helpers.assert_eq(#acquired, 2, "one native collision selects exactly one successor")
+		helpers.assert_true(acquired[1].path:match("Z%.json$") ~= nil, "the plain name is acquired first")
+		helpers.assert_eq(acquired[2].path, cap.path, "the next acquisition owns the first suffix")
+		for _, attempt in ipairs(acquired) do
+			helpers.assert_eq(attempt.mode, "wx", "every attempt uses exclusive native acquisition")
+		end
 	end)
 
 	helpers.it("tells the user where the report landed, and says so when it cannot be saved", function()
