@@ -25,6 +25,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DEV = path.join(ROOT, 'tools', 'dev');
@@ -151,3 +154,110 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 console.log('\x1b[32m[OK] Private-AHK dev tools reference only live post-reorg paths.\x1b[0m');
+
+/** Runs the actual sync CLI on owned data files; no AutoHotkey source is executed. */
+function testPrivateSyncEncoding() {
+	const date = '; Last modified on 2000-01-01 at 00:00 (UTC+0)\n';
+	const otherDate = '; Last modified on 2001-01-01 at 00:00 (UTC+0)\n';
+	const body =
+		'#Requires AutoHotkey v2.0\n; Unicode: café / 漢\nglobal SyncFixture := "owned data"\n';
+	const cases = [
+		{ name: 'BOM and existing date with LF', input: '\uFEFF' + date + body },
+		{ name: 'BOM without a date with LF', input: '\uFEFF' + body },
+		{
+			name: 'BOM and existing date with CRLF',
+			input: ('\uFEFF' + date + body).replaceAll('\n', '\r\n')
+		},
+		{ name: 'no BOM with CRLF', input: (date + body).replaceAll('\n', '\r\n') },
+		{ name: 'BOM without date with CR', input: ('\uFEFF' + body).replaceAll('\n', '\r') },
+		{
+			name: 'equal body repairs missing public BOM',
+			input: '\uFEFF' + otherDate + body,
+			existing: date + body,
+			expected: '\uFEFF' + date + body
+		},
+		{
+			name: 'equal body repairs public CRLF',
+			input: '\uFEFF' + otherDate + body,
+			existing: ('\uFEFF' + date + body).replaceAll('\n', '\r\n'),
+			expected: '\uFEFF' + date + body
+		},
+		{
+			name: 'equal canonical body preserves its public date',
+			input: '\uFEFF' + otherDate + body,
+			existing: '\uFEFF' + date + body,
+			expected: '\uFEFF' + date + body
+		}
+	];
+	const failures = [];
+	for (const test of cases) {
+		const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-private-sync-'));
+		try {
+			const directory = path.join(temporary, 'static', 'ergopti_plus', 'windows');
+			fs.mkdirSync(directory, { recursive: true });
+			const privateFile = path.join(temporary, 'private-input.ahk');
+			const publicFile = path.join(directory, 'ErgoptiPlus.ahk');
+			fs.writeFileSync(privateFile, test.input);
+			fs.writeFileSync(path.join(directory, '.local_ahk_path'), privateFile);
+			if (test.existing !== undefined) fs.writeFileSync(publicFile, test.existing);
+			const run = () => {
+				const result = spawnSync(process.execPath, [path.join(DEV, 'sync-private-ahk.js')], {
+					cwd: temporary,
+					encoding: 'utf8',
+					timeout: 10000,
+					windowsHide: true
+				});
+				assert.ifError(result.error);
+				assert.equal(result.status, 0, result.stdout + result.stderr);
+			};
+			run();
+			const actual = fs.readFileSync(publicFile);
+			assert.deepEqual(
+				[...actual.subarray(0, 3)],
+				[0xef, 0xbb, 0xbf],
+				'the public driver must begin with its UTF-8 BOM'
+			);
+			assert.equal(actual.includes(0x0d), false, 'all public line endings must be LF');
+			const text = actual.toString('utf8');
+			assert.equal(
+				[...text].filter((character) => character === '\uFEFF').length,
+				1,
+				'the private BOM must never become an embedded source character'
+			);
+			assert.equal(
+				text.slice(text.indexOf('\n') + 1),
+				body,
+				'the entire Unicode source body must remain byte-for-byte exact'
+			);
+			if (test.expected !== undefined)
+				assert.equal(
+					text,
+					test.expected,
+					'encoding repair and unchanged sync preserve the existing public date'
+				);
+			run();
+			assert.deepEqual(
+				fs.readFileSync(publicFile),
+				actual,
+				'a second sync must preserve the exact canonical bytes and date'
+			);
+			assert.equal(
+				fs.readFileSync(privateFile, 'utf8'),
+				test.input,
+				'the private input is never rewritten'
+			);
+		} catch (failure) {
+			failures.push(test.name + ': ' + failure.message);
+		} finally {
+			fs.rmSync(temporary, { recursive: true, force: true });
+		}
+	}
+	assert.deepEqual(failures, [], 'private AHK sync encoding regressions');
+	console.log(
+		'[OK] Actual private AHK sync preserves BOM, LF, Unicode and unchanged dates in ' +
+			cases.length +
+			' data-only cases.'
+	);
+}
+
+testPrivateSyncEncoding();
