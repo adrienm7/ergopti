@@ -6,6 +6,7 @@
  * DESCRIPTION:
  * Proves that an unwritable diagnostic sink cannot prevent osascript launch,
  * and that every generated App Cloner surface uses a private, mode-077 log.
+ * Exercises standalone locale resolution through the actual launcher boundary.
  * ============================================================================
  */
 
@@ -125,6 +126,127 @@ test(
 	'an unwritable diagnostic log cannot prevent osascript launch',
 	behavior.status === 0 && events.some((argv) => argv[0] === 'osascript'),
 	behaviorDetail
+);
+
+// Exercise the actual launcher through the osascript boundary. Menu launches
+// inject the locale path, while Finder launches must resolve the shipped tree.
+const localeHarness = String.raw`
+import importlib.machinery
+import importlib.util
+import json
+import os
+from pathlib import Path
+import shutil
+import sys
+import tempfile
+import types
+
+launcher_path = Path(sys.argv[1])
+locales = Path(sys.argv[2])
+loader = importlib.machinery.SourceFileLoader("appcloner_locale_fixture", str(launcher_path))
+spec = importlib.util.spec_from_loader(loader.name, loader)
+subject = importlib.util.module_from_spec(spec)
+loader.exec_module(subject)
+original_env = dict(os.environ)
+original_run = subject.subprocess.run
+original_file = subject.__file__
+events = []
+
+def observe_run(argv, *args, **kwargs):
+    if argv[0] == "osascript":
+        events.append({"argv": argv, "env": dict(kwargs.get("env", {}))})
+    return types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+def launch(file_path, override=None):
+    events.clear()
+    subject.__file__ = str(file_path)
+    os.environ.pop("ERGOPTI_LOCALES_DIR", None)
+    os.environ.pop("ERGOPTI_LOCALE", None)
+    os.environ["LANG"] = "en_US.UTF-8"
+    if override is not None:
+        os.environ["ERGOPTI_LOCALES_DIR"] = override
+    subject.main()
+    if len(events) != 1:
+        raise AssertionError("the launcher did not dispatch exactly one UI")
+    env = events[0]["env"]
+    resolved = env["ERGOPTI_LOCALES_DIR"]
+    file = Path(resolved) / "en.json" if resolved else None
+    catalog = json.loads(file.read_text()) if file and file.is_file() else {}
+    return {"locales_dir": resolved, "locale": env["ERGOPTI_LOCALE"],
+            "choose": catalog.get("apps.cloner.btn_choose")}
+
+try:
+    subject.subprocess.run = observe_run
+    source = launch(launcher_path)
+    with tempfile.TemporaryDirectory(prefix="ergopti-cloner-locales-") as fixture:
+        root = Path(fixture)
+        installed = root / "ErgoptiPlus.app/Contents/Resources/static/ergopti_plus"
+        staged_launcher = installed / "macos/apps/App Cloner.app/Contents/MacOS/AppCloner"
+        staged_launcher.parent.mkdir(parents=True)
+        shutil.copyfile(launcher_path, staged_launcher)
+        staged_locales = installed / "_shared/data/locales"
+        staged_locales.mkdir(parents=True)
+        for name in ("en.json", "fr.json"):
+            shutil.copyfile(locales / name, staged_locales / name)
+        staged = launch(staged_launcher)
+        override = launch(staged_launcher, str(locales))
+        shutil.rmtree(staged_locales)
+        missing = launch(staged_launcher)
+        print(json.dumps({"source": source, "staged": staged,
+                          "expected_staged": str(staged_locales),
+                          "override": override, "missing": missing}))
+finally:
+    subject.subprocess.run = original_run
+    subject.__file__ = original_file
+    os.environ.clear()
+    os.environ.update(original_env)
+`;
+const localesDirectory = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'locales');
+const localeRun = spawnSync(python, ['-c', localeHarness, LAUNCHER_PATH, localesDirectory], {
+	cwd: ROOT,
+	encoding: 'utf8',
+	maxBuffer: 4 * 1024 * 1024
+});
+let localeEvents = {};
+try {
+	localeEvents = JSON.parse((localeRun.stdout || '').trim());
+} catch {
+	// Assertions retain the child diagnostics when observation fails.
+}
+const localeDetail = JSON.stringify({
+	status: localeRun.status,
+	stdout: localeRun.stdout,
+	stderr: localeRun.stderr
+});
+const chooseLabel = JSON.parse(fs.readFileSync(path.join(localesDirectory, 'en.json'), 'utf8'))[
+	'apps.cloner.btn_choose'
+];
+test(
+	'Finder launch resolves the canonical locale catalog in a source checkout',
+	localeRun.status === 0 &&
+		localeEvents.source?.locales_dir === localesDirectory &&
+		localeEvents.source?.locale === 'en' &&
+		localeEvents.source?.choose === chooseLabel,
+	localeDetail
+);
+test(
+	'Finder launch resolves the same catalog in the installed bundle layout',
+	localeRun.status === 0 &&
+		localeEvents.staged?.locales_dir === localeEvents.expected_staged &&
+		localeEvents.staged?.choose === chooseLabel,
+	localeDetail
+);
+test(
+	'the injected menu locale directory keeps precedence over bundle resolution',
+	localeRun.status === 0 &&
+		localeEvents.override?.locales_dir === localesDirectory &&
+		localeEvents.override?.choose === chooseLabel,
+	localeDetail
+);
+test(
+	'an absent standalone catalog is reported as unavailable',
+	localeRun.status === 0 && localeEvents.missing?.locales_dir === '',
+	localeDetail
 );
 
 const launcher = fs.readFileSync(LAUNCHER_PATH, 'utf8');
