@@ -514,6 +514,7 @@ return {
 	"tests.unit.modules.hotstrings.catalogue.test_extension_geometry_routing",
 	"tests.unit.modules.hotstrings.menu.test_hotstrings_menu_skeleton",
 	"tests.unit.modules.hotstrings.catalogue.test_hotstrings_scope_overrides",
+	"tests.unit.modules.hotstrings.catalogue.test_hotstring_override_parser",
 	"tests.unit.modules.hotstrings.injector.test_injector_caps_lock",
 	"tests.unit.modules.hotstrings.injector.test_injector_held_terminator",
 	"tests.unit.modules.hotstrings.injector.test_injector_fast_channel",

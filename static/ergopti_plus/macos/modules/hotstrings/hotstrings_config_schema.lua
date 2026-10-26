@@ -11,6 +11,7 @@
 
 local M = {}
 local BasicString = require("toml_codec.basic_string")
+local Overrides = require("hotstrings.overrides")
 
 --- Returns whether a value is one bare TOML key segment used by this schema.
 --- @param value any Candidate value.
@@ -25,11 +26,7 @@ end
 --- @param value any Candidate category.
 --- @return string|nil canonical Lowercase category key, or nil when invalid.
 function M.normalize_category(value)
-	if type(value) ~= "string" then return nil end
-	local extension_id = value:match("^[eE][xX][tT]%.([%w_%-]+)$")
-	if is_bare_segment(extension_id) then return "ext." .. extension_id:lower() end
-	if is_bare_segment(value) then return value:lower() end
-	return nil
+	return Overrides.normalize_category(value)
 end
 
 --- Returns whether a category is bare or uses the canonical ext.<id> namespace.
@@ -43,8 +40,7 @@ end
 --- @param value any Candidate section.
 --- @return string|nil canonical Lowercase key, or nil when absent/invalid.
 function M.normalize_section(value)
-	if not is_bare_segment(value) then return nil end
-	return value:lower()
+	return Overrides.normalize_section(value)
 end
 
 --- Returns whether a section is absent or one bare TOML key segment.
@@ -67,10 +63,7 @@ end
 --- @param value any Candidate delay in seconds.
 --- @return boolean valid
 function M.is_delay(value)
-	return type(value) == "number"
-		and value == value
-		and value >= 0
-		and value < math.huge
+	return Overrides.is_delay(value)
 end
 
 --- Validates the stored offset of a delay override: the signed seconds it adds
@@ -78,9 +71,7 @@ end
 --- @param value any Candidate offset in seconds.
 --- @return boolean valid
 function M.is_delay_offset(value)
-	return type(value) == "number"
-		and value == value
-		and math.abs(value) < math.huge
+	return Overrides.is_delay_offset(value)
 end
 
 --- Encodes a string as one TOML basic-string literal.

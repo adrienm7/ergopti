@@ -237,7 +237,8 @@ function M.new(options)
 			or (source.status == "ok" and source.content ~= committed.source.content) then
 			return false, "the override file changed since it was loaded"
 		end
-		local parsed = Config.parse_override_content(file.candidate() or "")
+		local readable, parsed = pcall(Config.parse_override_content, file.candidate() or "")
+		if not readable then return false, "the prepared override file is not valid TOML: " .. tostring(parsed) end
 		for _, change in ipairs(changes) do
 			local key = change.override[1] == "ext" and ("ext." .. change.override[2]) or change.override[1]
 			local entry = parsed[key]

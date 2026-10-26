@@ -38,6 +38,7 @@ local ConfigPaths = require("infra.config_paths")
 local Paths = require("infra.paths")
 local TomlReader = require("toml_codec.reader")
 local TomlCodec = require("toml_codec")
+local Overrides = require("hotstrings.overrides")
 local KeyPath = require("toml_codec.key_path")
 local Languages = require("hotstrings.languages")
 local BulkScope = require("hotstrings.bulk_scope")
@@ -444,35 +445,7 @@ end
 --- @return table overrides { [category] = { delay_offset, delay_unlimited, legacy_delay, color,
 ---   show_tooltip, priority, sections } }
 local function parse_override_content(content)
-	local parsed = TomlCodec.decode(content)
-	assert(type(parsed) == "table", "the override file is not valid TOML")
-	local function override_fields(values)
-		local offset = tonumber(values.delay_offset)
-		return {
-			-- Seconds added to the base expansion delay; the finite check refuses nan and inf.
-			delay_offset = offset ~= nil and offset == offset and math.abs(offset) < math.huge and offset or nil,
-			delay_unlimited = values.delay_unlimited == true or nil,
-			-- The absolute delay of earlier builds, held only until load_overrides migrates it.
-			legacy_delay = tonumber(values.delay),
-			color = values.color,
-			show_tooltip = values.show_tooltip,
-			priority = tonumber(values.priority),
-		}
-	end
-	local overrides = {}
-	for category, values in pairs(parsed) do
-		if type(values) == "table" then
-			local entry = override_fields(values)
-			entry.sections = {}
-			for section, section_values in pairs(values) do
-				if type(section_values) == "table" then
-					entry.sections[section] = override_fields(section_values)
-				end
-			end
-			overrides[category] = entry
-		end
-	end
-	return overrides
+	return Overrides.parse(content, Overrides.POLICIES.verbatim)
 end
 
 --- Reads the override file into memory. A missing file is the normal case.
