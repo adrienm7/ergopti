@@ -38,6 +38,7 @@ local reload_gate = require("reload_gate")
 local FileSystem = require("adapters.file_system")
 local RuntimeLog = require("diagnostics.runtime_log")
 local Shell = require("adapters.shell_runner")
+local NativePath = require("native_path")
 local LOG = "file_watchers"
 
 
@@ -387,11 +388,11 @@ local function _arm_luv_watcher(path, accept_fn)
 			if type(fname) == "string" and fname ~= "" then
 				-- Directory watcher: filter by filename.
 				if accept_fn(fname) then
-					_schedule_reload(string.format("inotify: %s/%s", path:match("[^/]+$"), fname), { path .. "/" .. fname })
+					_schedule_reload(string.format("inotify: %s/%s", NativePath.basename(path), fname), { path .. "/" .. fname })
 				end
 			elseif events and #events > 0 then
 				-- File watcher: fire on any event.
-				_schedule_reload(string.format("inotify: %s (%s)", path:match("[^/]+$"), table.concat(events, ",")), { path })
+				_schedule_reload(string.format("inotify: %s (%s)", NativePath.basename(path), table.concat(events, ",")), { path })
 			end
 		end)
 	end)
@@ -715,7 +716,7 @@ local function _ensure_personal_anchor(epoch)
 		Logger.warn(LOG, "Personal parent watcher admission refused for '%s': %s.", parent, tostring(detail))
 		return false
 	end
-	entry.parent_name = parent:match("([^/]+)$")
+	entry.parent_name = NativePath.basename(parent)
 	if epoch ~= _personal_epoch then _retire_personal(entry); return false end
 	local previous = _personal_anchor
 	_personal_anchor = entry

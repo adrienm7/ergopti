@@ -110,7 +110,7 @@ function M.load(ctx)
 
 		local observed, status, attr = pcall(require("adapters.file_system").path_status, dir)
 		if observed and status == "present" and type(attr) == "table" and attr.mode == "link" then
-			blocked[#blocked + 1] = { path = dir, label = #components > 0 and table.concat(components, "/") or dir:match("([^/]+)$"), reason = "linked-directory" }
+			blocked[#blocked + 1] = { path = dir, label = #components > 0 and table.concat(components, "/") or NativePath.basename(dir), reason = "linked-directory" }
 			return
 		end
 		if not (observed and status == "present" and type(attr) == "table" and attr.mode == "directory") then return end

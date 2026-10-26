@@ -48,6 +48,7 @@ local NativeDirectory = require("infra.native_directory")
 local CatalogueFiles = require("hotstrings.catalogue_files")
 local PersonalFiles = require("hotstrings.personal_files")
 local TableUtil = require("table_util")
+local NativePath = require("native_path")
 
 local LOG = "modules.hotstrings.loader"
 
@@ -425,7 +426,7 @@ end
 function M.unavailable_directories(dir, max_directory_depth)
 	if type(dir) ~= "string" or dir == "" or type(max_directory_depth) ~= "number" then return {} end
 	if NativeDirectory.kind(dir) == "link" then
-		return { { path = dir, label = dir:gsub("/+$", ""):match("([^/]+)$"), reason = "linked-directory" } }
+		return { { path = dir, label = NativePath.basename(NativePath.without_trailing_separators(dir)), reason = "linked-directory" } }
 	end
 	local prefix = dir:gsub("/+$", "") .. "/"
 	local rows = {}

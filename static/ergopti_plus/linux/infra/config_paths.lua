@@ -40,6 +40,7 @@
 local M = {}
 
 local AppDirs = require("app_dirs")
+local NativePath = require("native_path")
 
 local CONFIG_DIR_STORAGE_KEY = "paths.config_dir"
 -- Bootstrap storage key of the LogsDirPath override, from the shared registry.
@@ -241,7 +242,7 @@ function M.normalize_logs_dir(path)
 	if normalized:sub(1, 1) ~= "/" then
 		return nil, "the logs folder must be an absolute path"
 	end
-	if normalized ~= M.default_logs_dir() and normalized:match("([^/]+)$") ~= AppDirs.folder_name then
+	if normalized ~= M.default_logs_dir() and NativePath.basename(normalized) ~= AppDirs.folder_name then
 		normalized = normalized .. "/" .. AppDirs.folder_name
 	end
 	return normalized

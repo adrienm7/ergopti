@@ -19,7 +19,9 @@ do
 	local _src = debug.getinfo(1, "S").source:gsub("^@", "")
 	-- Resolve absolute path when source is relative (Hammerspoon always provides abs)
 	local _abs = _src:sub(1, 1) == "/" and _src or (hs.fs and hs.fs.currentDir and hs.fs.currentDir() .. "/" .. _src or _src)
-	-- Strip "init.lua" to get the HS driver root
+	-- Strip "init.lua" to get the HS driver root. This runs before the shared Lua
+	-- root is on package.path, so native_path cannot be required yet; macOS has
+	-- no backslash separator, so splitting at slashes alone is the native rule.
 	local _hs_root = _abs:match("^(.*)/[^/]+$") or _abs
 	-- _shared/ lives one level up from the HS driver root (in ergopti_plus/)
 	local _ergopti_plus = _hs_root:match("^(.*)/[^/]+$") or _hs_root
