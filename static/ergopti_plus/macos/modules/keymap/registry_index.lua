@@ -19,10 +19,11 @@ local i18n   = require("infra.i18n")
 local ManifestReader = require("infra.manifest_reader")
 local Languages = require("hotstrings.languages")
 local PersonalFiles = require("hotstrings.personal_files")
+local ConfigKeys = require("config_keys")
 local LOG    = "keymap.registry"
 
 local _state = nil
-local _repeat_enabled = ManifestReader.default_for("hotstrings.repeat_key_enabled")
+local _repeat_enabled = ManifestReader.default_for(ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED)
 
 --- Guard: verifies that M.setup() was called before any state-dependent public
 --- function. Mirrors registry_groups.lua's require_state verbatim (section 5.8).

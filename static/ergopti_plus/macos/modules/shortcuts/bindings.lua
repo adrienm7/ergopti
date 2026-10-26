@@ -26,6 +26,7 @@ local TapKeys     = require("modules.shortcuts.tap_keys")
 local Hotkeys     = require("adapters.hotkey_registrar")
 local Chord       = require("chord")
 local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 local LOG = "shortcuts.bindings"
 
@@ -43,7 +44,7 @@ local LOG = "shortcuts.bindings"
 -- than re-declared, so a change to shortcuts.chatgpt_url cannot diverge from the
 -- AHK driver (which reads the same default from its generated map). Fails fast
 -- if the path is absent.
-M.DEFAULT_CHATGPT_URL = Manifest.default_for("shortcuts.chatgpt_url")
+M.DEFAULT_CHATGPT_URL = Manifest.default_for(ConfigKeys.KEY.SHORTCUTS_CHATGPT_URL)
 local SHORTCUT_ACTION_PARENT = "shortcut_bindings"
 
 local hotkeys       = {}   -- Active hotkey/tap objects, keyed by shortcut id
