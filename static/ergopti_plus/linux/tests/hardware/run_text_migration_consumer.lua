@@ -4,6 +4,7 @@
 --- DESCRIPTION:
 --- Exercises the real collector, SQLite backend and AES provider. The setting
 --- acknowledges future-write posture; migration acceptance is a separate receipt.
+--- An owned machine identity keeps the proof independent of the host's ID.
 --- ==============================================================================
 
 local root = assert(arg[1])
@@ -12,7 +13,14 @@ require("compat.utf8").install()
 local Fixture = require("tests.support.keystats_native_fixture")
 local Preferences = require("tests.support.metrics_preferences_fixture")
 local TextCrypto = require("keystats.text_crypto")
-local path = os.tmpname()
+local uv = require("luv")
+local cipher = require("modules.keystats.text_cipher")
+local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-migration-consumer-XXXXXX"))
+local path, machine_id = directory .. "/metrics.sqlite", directory .. "/machine-id"
+local machine = assert(io.open(machine_id, "wb"))
+assert(machine:write("0123456789abcdef0123456789abcdef\n"))
+assert(machine:close())
+cipher._set_machine_id_path(machine_id)
 local Logger = require("logger.shim")
 local original_error, failures = Logger.error, 0
 local original_success, completions = Logger.success, 0
@@ -30,8 +38,8 @@ local ok, failure = xpcall(function()
 			k.init({ sqlite_path = path })
 			require("tests.support.metrics_consent_fixture").enable(k)
 			local writer = require("modules.keystats.sqlite_writer")
-			local cipher = require("modules.keystats.text_cipher")
-			assert(cipher.is_available(), "This public-consumer proof requires native AES")
+			assert(require("infra.openssl_cipher").available, "This public-consumer proof requires native AES")
+			assert(cipher.is_available(), "The owned machine identity must derive a real encryption key")
 			local device = assert(writer.query_rows("SELECT device_id FROM devices LIMIT 1;"))[1]
 			assert(writer.insert_typing_events(device, { { app = "owned-app", text = "historical-original" } }))
 			local key = require("keystats.text_migration_runner").CURSOR_META_KEY
@@ -78,5 +86,12 @@ local ok, failure = xpcall(function()
 end, debug.traceback)
 Logger.error = original_error
 Logger.success = original_success
-os.remove(path)
+local cleaned, cleanup_error = pcall(function()
+	cipher._set_machine_id_path(nil)
+	for name in uv.fs_scandir_next, assert(uv.fs_scandir(directory)) do
+		assert(uv.fs_unlink(directory .. "/" .. name))
+	end
+	assert(uv.fs_rmdir(directory))
+end)
 assert(ok, failure)
+assert(cleaned, cleanup_error)
