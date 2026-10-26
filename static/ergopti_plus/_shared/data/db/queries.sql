@@ -237,3 +237,18 @@ INSERT OR IGNORE INTO meta (key, value) VALUES ({{s key}}, {{s value}});
 -- doc: Advances the revision counter. The value is stored as text, which is the
 -- doc: column's own affinity, so every driver reads back the same string.
 UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev';
+
+
+-- ============================================================================
+-- 4. DEVICES
+-- ============================================================================
+
+-- name: devices.upsert
+-- doc: Registers or refreshes this machine's row. The conflict clause leaves
+-- doc: created_at and the imported data.sql watermark alone, which a REPLACE
+-- doc: would delete and so make the ledger import start over.
+INSERT INTO devices (device_id, name, os, os_version, host_signature, created_at, updated_at)
+VALUES ({{s device_id}}, {{s name}}, {{s os}}, {{s os_version}}, {{s host_signature}}, {{s created_at}}, {{s updated_at}})
+ON CONFLICT(device_id) DO UPDATE SET
+  name = excluded.name, os = excluded.os, os_version = excluded.os_version,
+  host_signature = excluded.host_signature, updated_at = excluded.updated_at;
