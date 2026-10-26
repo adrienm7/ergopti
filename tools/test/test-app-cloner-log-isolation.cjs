@@ -85,6 +85,9 @@ def fake_run(argv, *args, **kwargs):
     events.append(list(argv))
     return types.SimpleNamespace(returncode=0, stdout="", stderr="")
 
+# This positive log-refusal control requires a real, supported catalogue.
+os.environ["ERGOPTI_LOCALE"] = "en"
+os.environ.pop("ERGOPTI_LOCALES_DIR", None)
 builtins.open = rejecting_open
 subject.os.open = rejecting_os_open
 subject.subprocess.run = fake_run
@@ -165,9 +168,14 @@ def launch(file_path, override=None, locale="en"):
     os.environ["LANG"] = locale + "_XX.UTF-8"
     if override is not None:
         os.environ["ERGOPTI_LOCALES_DIR"] = override
-    subject.main()
+    failure = None
+    try:
+        subject.main()
+    except ValueError as error:
+        failure = str(error)
     if len(events) != 1:
         raise AssertionError("the launcher did not dispatch exactly one UI")
+    fatal = events[0]["argv"][1] == "-e"
     env = events[0]["env"]
     resolved = env["ERGOPTI_LOCALES_DIR"]
     file = Path(resolved) / (locale + ".json") if resolved else None
@@ -177,7 +185,8 @@ def launch(file_path, override=None, locale="en"):
     first_picker = payload.split("if step = 1 then", 1)[1].split("set rc to panel's runModal()", 1)[0] if "if step = 1 then" in payload else ""
     return {"locales_dir": resolved, "locale": env["ERGOPTI_LOCALE"],
             "choose": catalog.get("apps.cloner.btn_choose"),
-            "cancel": catalog.get("button.cancel"), "first_picker": first_picker}
+            "cancel": catalog.get("button.cancel"), "first_picker": first_picker,
+            "failure": failure, "fatal": fatal}
 
 try:
     subject.subprocess.run = observe_run
@@ -196,8 +205,17 @@ try:
         staged = launch(staged_launcher)
         override = launch(staged_launcher, str(locales))
         shutil.rmtree(staged_locales)
-        missing = launch(staged_launcher)
-        print(json.dumps({"source": source, "french": french, "staged": staged,
+        cwd_catalogue = json.loads((locales / "en.json").read_text(encoding="utf-8"))
+        cwd_catalogue["apps.cloner.btn_choose"] = "Wrong working-directory catalogue"
+        (root / "en.json").write_text(json.dumps(cwd_catalogue), encoding="utf-8")
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(root)
+            missing = launch(staged_launcher)
+            source_with_cwd = launch(launcher_path)
+        finally:
+            os.chdir(original_cwd)
+        print(json.dumps({"source": source, "source_with_cwd": source_with_cwd, "french": french, "staged": staged,
                           "expected_staged": str(staged_locales),
                           "override": override, "missing": missing}))
 finally:
@@ -231,7 +249,10 @@ test(
 	localeRun.status === 0 &&
 		localeEvents.source?.locales_dir === localesDirectory &&
 		localeEvents.source?.locale === 'en' &&
-		localeEvents.source?.choose === chooseLabel,
+		localeEvents.source?.choose === chooseLabel &&
+		localeEvents.source_with_cwd?.choose === chooseLabel &&
+		localeEvents.source_with_cwd.fatal === false &&
+		localeEvents.source_with_cwd.failure === null,
 	localeDetail
 );
 test(
@@ -249,8 +270,12 @@ test(
 	localeDetail
 );
 test(
-	'an absent standalone catalog is reported as unavailable',
-	localeRun.status === 0 && localeEvents.missing?.locales_dir === '',
+	'an absent standalone catalog is refused visibly without reading a working-directory catalog',
+	localeRun.status === 0 &&
+		localeEvents.missing?.locales_dir === '' &&
+		localeEvents.missing.fatal === true &&
+		localeEvents.missing.failure ===
+			'App Cloner startup locale catalogue is unavailable or invalid.',
 	localeDetail
 );
 
@@ -281,6 +306,212 @@ for (const [locale, choose, cancel] of [
 		localeDetail
 	);
 }
+
+// Execute the real error branch with physical locale files. Only the child
+// terminal boundary is controlled; the launcher owns decoding and dispatch.
+const startupHarness = String.raw`
+import importlib.machinery
+import importlib.util
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import types
+
+launcher = Path(sys.argv[1])
+locales = Path(sys.argv[2])
+loader = importlib.machinery.SourceFileLoader("appcloner_startup_fixture", str(launcher))
+spec = importlib.util.spec_from_loader(loader.name, loader)
+subject = importlib.util.module_from_spec(spec)
+loader.exec_module(subject)
+original_env = dict(os.environ)
+original_run = subprocess.run
+original_temp = tempfile.tempdir
+original_umask = os.umask(0o077)
+cases = []
+
+with tempfile.TemporaryDirectory(prefix="ergopti-cloner-startup-{1}-") as fixture:
+    root = Path(fixture)
+    tempfile.tempdir = str(root)
+    def run_case(name, locale, status, stderr, stdout="", override=None, expected_failure=None, remove_catalogue=False):
+        events = []
+        def capture(argv, **kwargs):
+            events.append({"argv": list(argv), "environment": kwargs.get("env", {})})
+            if argv[0] == "osascript" and argv[1] != "-e":
+                if remove_catalogue:
+                    (override / (locale + ".json")).unlink()
+                return types.SimpleNamespace(returncode=status, stderr=stderr, stdout=stdout)
+            return types.SimpleNamespace(returncode=0, stderr="", stdout="")
+        os.environ["ERGOPTI_LOCALE"] = locale
+        os.environ["ERGOPTI_LOCALES_DIR"] = str(override or locales)
+        subprocess.run = capture
+        failure = None
+        try:
+            subject.main()
+        except Exception as error:
+            failure = {"type": type(error).__name__, "message": str(error)}
+        dialogs = [event["argv"] for event in events if event["argv"][0] == "osascript" and event["argv"][1] == "-e"]
+        ui = [event for event in events if event["argv"][0] == "osascript" and event["argv"][1] != "-e"]
+        cases.append({"name": name, "dialogs": dialogs, "failure": failure,
+                      "normal_ui_count": len(ui), "expected_failure": expected_failure,
+                      "log_path": next((event["environment"].get("ERGOPTI_APPCLONER_LOG", "") for event in events if event["argv"][0] == "osascript"), "")})
+    try:
+        hostile = "A \"quote\" C:\\path {1}\n\n--not-an-option 🌍"
+        run_case("english", "en", 1, "Native panel operation failed.")
+        run_case("french", "fr", 1, "Native panel operation failed.")
+        run_case("unknown", "en", 1, "")
+        run_case("whitespace", "en", 1, " \n\t", "stdout diagnostic")
+        run_case("hostile", "en", 1, hostile)
+        run_case("success", "en", 0, "")
+        run_case("legacy-negative-status", "en", -128, "Injected negative status.")
+        baseline = json.loads((locales / "en.json").read_text(encoding="utf-8"))
+        changing = root / "changing-catalogue"
+        changing.mkdir()
+        (changing / "en.json").write_text(json.dumps(baseline), encoding="utf-8")
+        run_case("catalogue-changed-after-ui", "en", 1, "Native panel operation failed.", override=changing, remove_catalogue=True)
+        invalid = [("missing-file", None), ("malformed", "{"), ("not-object", "[]")]
+        for key in ["apps.cloner.startup_error_title", "apps.cloner.error_unknown", "common.ok", "apps.cloner.diagnostic_log_path"]:
+            for kind, value in [("missing", None), ("null", None), ("empty", ""), ("whitespace", " \t\n"), ("number", 7), ("boolean", True), ("array", []), ("object", {})]:
+                document = dict(baseline)
+                if kind == "missing": document.pop(key, None)
+                else: document[key] = value
+                invalid.append((kind + ":" + key, json.dumps(document)))
+        document = dict(baseline)
+        document["apps.cloner.diagnostic_log_path"] = "No placeholder"
+        invalid.append(("missing-diagnostic-placeholder", json.dumps(document)))
+        document["apps.cloner.diagnostic_log_path"] = "{1} twice {1}"
+        invalid.append(("duplicate-diagnostic-placeholder", json.dumps(document)))
+        direct_loader_cases = []
+        for index, (name, document) in enumerate(invalid):
+            directory = root / ("invalid-" + str(index))
+            directory.mkdir()
+            if document is not None: (directory / "en.json").write_text(document, encoding="utf-8")
+            if name in ("missing-file", "malformed"):
+                expected = "App Cloner startup locale catalogue is unavailable or invalid."
+            elif name == "not-object":
+                expected = "App Cloner startup locale catalogue must be a JSON object."
+            elif "diagnostic-placeholder" in name:
+                expected = "App Cloner diagnostic locale template requires exactly one {1} placeholder."
+            else:
+                expected = "App Cloner startup locale key must be a nonempty string: " + name.split(":", 1)[1]
+            run_case(name, "en", 1, "Native panel operation failed.", override=directory, expected_failure=expected)
+            failure = None
+            try:
+                subject.load_error_ui("en", str(directory))
+            except Exception as error:
+                failure = {"type": type(error).__name__, "message": str(error)}
+            direct_loader_cases.append({"name": name, "failure": failure, "expected": expected})
+        (root / "en.json").write_text(json.dumps(baseline), encoding="utf-8")
+        original_cwd = os.getcwd()
+        failure = None
+        try:
+            os.chdir(root)
+            subject.load_error_ui("en", "")
+        except Exception as error:
+            failure = {"type": type(error).__name__, "message": str(error)}
+        finally:
+            os.chdir(original_cwd)
+        direct_loader_cases.append({"name": "unresolved-directory-with-cwd-catalogue", "failure": failure,
+                                    "expected": "App Cloner startup locale catalogue is unavailable or invalid."})
+        print(json.dumps({"cases": cases, "hostile": hostile, "direct_loader_cases": direct_loader_cases}))
+    finally:
+        subprocess.run = original_run
+        tempfile.tempdir = original_temp
+        os.environ.clear()
+        os.environ.update(original_env)
+        os.umask(original_umask)
+`;
+const startupRun = spawnSync(python, ['-c', startupHarness, LAUNCHER_PATH, localesDirectory], {
+	cwd: ROOT,
+	encoding: 'utf8',
+	maxBuffer: 4 * 1024 * 1024
+});
+let startup = {};
+try {
+	startup = JSON.parse((startupRun.stdout || '').trim());
+} catch {
+	// A failed producer cannot supply passing observations.
+}
+const startupDetail = JSON.stringify({
+	status: startupRun.status,
+	error: startupRun.error?.message,
+	stderr: startupRun.stderr
+});
+const startupCases = new Map((startup.cases || []).map((entry) => [entry.name, entry]));
+function startupDialog(name) {
+	const entry = startupCases.get(name);
+	if (startupRun.status !== 0 || entry?.failure || entry?.dialogs.length !== 1) return null;
+	const argv = entry.dialogs[0];
+	return argv.length === 7 && argv[3] === '--'
+		? { source: argv[2], body: argv[4], title: argv[5], button: argv[6], log: entry.log_path }
+		: null;
+}
+for (const [name, locale, diagnostic] of [
+	['english', 'en', 'Native panel operation failed.'],
+	['french', 'fr', 'Native panel operation failed.'],
+	['unknown', 'en', 'Unknown error.'],
+	['whitespace', 'en', 'stdout diagnostic'],
+	['hostile', 'en', startup.hostile],
+	['catalogue-changed-after-ui', 'en', 'Native panel operation failed.']
+]) {
+	const actual = startupDialog(name);
+	const expected = JSON.parse(
+		fs.readFileSync(path.join(localesDirectory, `${locale}.json`), 'utf8')
+	);
+	test(
+		`the actual startup ${name} failure dispatches selected text and untrusted data as arguments`,
+		actual !== null &&
+			actual.title ===
+				(locale === 'en' ? 'App Cloner — Startup error' : 'App Cloner — Erreur de démarrage') &&
+			actual.button === expected['common.ok'] &&
+			actual.body ===
+				`${diagnostic}\n\n${expected['apps.cloner.diagnostic_log_path'].replace('{1}', actual.log)}` &&
+			actual.source.includes('on run argv') &&
+			!actual.source.includes(diagnostic),
+		startupDetail + JSON.stringify(actual)
+	);
+}
+for (const name of ['success', 'legacy-negative-status']) {
+	const entry = startupCases.get(name);
+	test(
+		`the actual startup ${name} control dispatches no error dialog`,
+		startupRun.status === 0 && entry?.failure === null && entry.dialogs.length === 0,
+		startupDetail
+	);
+}
+const invalidStartupCases = (startup.cases || []).slice(8);
+test(
+	'the actual startup visibly refuses every invalid catalogue before normal UI admission',
+	startupRun.status === 0 &&
+		invalidStartupCases.length === 37 &&
+		invalidStartupCases.every((entry) => {
+			const argv = entry.dialogs[0];
+			return (
+				entry.normal_ui_count === 0 &&
+				entry.dialogs.length === 1 &&
+				entry.failure?.type === 'ValueError' &&
+				entry.failure.message === entry.expected_failure &&
+				argv.length === 7 &&
+				argv[3] === '--' &&
+				argv[5] === 'App Cloner — Locale error' &&
+				argv[6] === 'OK' &&
+				argv[4] ===
+					`App Cloner cannot start because the selected locale catalogue is unavailable or invalid.\n\n${entry.expected_failure}\n\nDiagnostic log: ${entry.log_path}`
+			);
+		}),
+	startupDetail + JSON.stringify(invalidStartupCases)
+);
+test(
+	'the direct startup loader refuses every invalid typed value with its exact developer error',
+	startupRun.status === 0 &&
+		startup.direct_loader_cases?.length === 38 &&
+		startup.direct_loader_cases.every(
+			(entry) => entry.failure?.type === 'ValueError' && entry.failure.message === entry.expected
+		),
+	startupDetail + JSON.stringify(startup.direct_loader_cases)
+);
 
 const launcher = fs.readFileSync(LAUNCHER_PATH, 'utf8');
 const clone = fs.readFileSync(CLONE_PATH, 'utf8');
