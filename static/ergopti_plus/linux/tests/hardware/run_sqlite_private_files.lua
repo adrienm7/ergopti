@@ -13,7 +13,7 @@ require("compat.utf8").install()
 local uv = require("luv")
 local Fixture = require("tests.support.keystats_native_fixture")
 local Private
-local directory = assert(uv.fs_mkdtemp(assert(os.getenv("TMPDIR")) .. "/sqlite-private-XXXXXX"))
+local directory = assert(uv.fs_mkdtemp(assert(uv.os_tmpdir()) .. "/sqlite-private-XXXXXX"))
 assert(uv.fs_chmod(directory, 493)) -- 0755 is intentional user-selected directory policy.
 local database, token = directory .. "/metrics.sqlite", "private-sqlite-fixture"
 
