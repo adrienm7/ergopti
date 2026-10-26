@@ -522,13 +522,9 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       composes `dialog.reset_defaults.reason.*` for the macOS (`ui/menu/init.lua`) and Linux
       (`ui/menu/menu_builder.lua`) restore and clear rows; `reload_refused` has no entry there because they
       reload nothing.
-- [ ] **PAR-45. Notifications: one behaviour for toggles and refusals.** [CODE] Add `NotifyFeature(label, enabled)`
-      on Windows (wrapping `NotifierSend`) and Linux (`adapters/notifier.lua`) and call it from the
-      equivalents of the macOS handlers (hotstring group and section toggles, personal info, preview bubbles,
-      word expander prefixes, shortcuts master and individual, gestures master; macOS call sites in
-      `ui/menu/menu_hotstrings*.lua`, `menu_shortcuts.lua`, `menu_gestures.lua`, `builder.lua`); add a
-      quit-refusal path on Windows and Linux firing `notify.quit_refused` (macOS: `macos/ui/menu/init.lua`
-      around the `quit` command). The `notify.*` strings exist in 21 locales.
+- [ ] **PAR-45. Notifications: one behaviour for toggles and refusals.** [CODE] Done on macOS and Linux
+      (shared `feature_notice.lua`, Linux quit refusal). Left: Windows `NotifyFeature(label, enabled)` around
+      `NotifierSend` at the same call sites, and a Windows quit-refusal path firing `notify.quit_refused`.
 - [ ] **PAR-48. Review values equal to English in each locale.** [CODE] 263-385 per locale and about 30 in
       `fr` (`sg_actions.sticky_*`, `shortcuts.altgr*`). Triage through the i18n skill. Audit I3.
 - [ ] **PAR-52. Release notes on macOS and Linux update windows.** [CODE] Done on macOS and Linux
@@ -537,16 +533,17 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 
 ### D. Instrumentation and diagnostics
 
-- [ ] **PAR-53. Bring HotPath-style slow-segment logging to macOS and Linux.** [CODE] Windows declares
-      31 segments, macOS 2, Linux spans exist but only time at DEBUG. Always time on Linux, add the
-      inventory test for both Lua drivers, then cover the typing path. Audit P1, P2, P6.
+- [ ] **PAR-53. Bring HotPath-style slow-segment logging to macOS and Linux.** [CODE] Done (shared
+      `hotpath_segments.lua`, always-on Linux spans, one warning per segment per 10 s). Left: nesting
+      attribution (Windows has it), the threshold question.
 - [ ] **PAR-54. PhaseStats and child-process timing on Windows and Linux; CPU in boot profile on macOS and
       Linux.** [CODE] Mirror macOS `process.*` phases. Audit P3-P5.
-- [ ] **PAR-55. Crash reports: one content, one cap, one notice.** [CODE] macOS content and notice wins;
-      Linux caps at 20, Windows no cap. Share the format and retention policy with vectors. Audit D6,
-      R31.
-- [ ] **PAR-56. Log-volume metrics on all three drivers.** [CODE] Nothing counts lines per level or
-      dropped/collapsed lines. Add counters to the evidence record. Audit G6.
+- [ ] **PAR-55. Crash reports: one content, one cap, one notice.** [CODE] Done on macOS and Linux (shared
+      `crash_report.lua`, vectors `diagnostics/crash_report_vectors.json`, 20 newest kept). Left: Windows
+      `crash_report_worker.ahk` adopting the same fields, names and cap.
+- [ ] **PAR-56. Log-volume metrics on all three drivers.** [CODE] Done on macOS and Linux (per-level,
+      dropped, suppressed and collapsed counts in the shared logger core, on the interval evidence record).
+      Left: Windows `_LoggerEmit` counting the same seven figures in the same order.
 - [ ] **PAR-57. Retention read from timings on Windows.** [CODE] `logger.ahk:112` is a literal 14. Read
       `Timings` and extend `test-logger-scalars-single-source.cjs`. Audit G5.
 
