@@ -43,12 +43,19 @@ const FIXTURE_LINT = path.join(FIXTURE_ROOT, 'tools/lint/lint-conventions.js');
 
 /** Runs the unchanged CLI against small, explicit language scan roots. */
 function prepareLintFixture() {
-	for (const relative of ['tools/lint/lint-conventions.js', 'tools/lib/paths.cjs']) {
+	for (const relative of [
+		'tools/lint/lint-conventions.js',
+		'tools/lint/hex-colours.cjs',
+		'tools/lib/paths.cjs'
+	]) {
 		const target = path.join(FIXTURE_ROOT, relative);
 		fs.mkdirSync(path.dirname(target), { recursive: true });
 		fs.copyFileSync(path.join(REPO_ROOT, relative), target);
 	}
 	fs.writeFileSync(path.join(FIXTURE_ROOT, 'package.json'), '{"type":"module"}\n');
+	// The hex-colour rule lists the tracked sources of the tree it lints, so the
+	// miniature tree is a repository with an empty baseline.
+	fs.writeFileSync(path.join(FIXTURE_ROOT, 'tools/lint/hex-literal-baseline.json'), '{}\n');
 	for (const driver of ['macos', 'linux']) {
 		for (const directory of ['adapters', 'infra', 'modules', 'ui', 'tests', 'platform']) {
 			const target = path.join(
@@ -66,6 +73,13 @@ function prepareLintFixture() {
 	fs.mkdirSync(path.join(shared, 'lua'), { recursive: true });
 	fs.writeFileSync(path.join(shared, 'lua/fixture.lua'), '-- lua/fixture.lua\nreturn {}\n');
 	fs.writeFileSync(path.join(shared, 'fixture.toml'), 'enabled = true\n');
+	for (const args of [
+		['init', '-q'],
+		['add', '-A']
+	]) {
+		const result = spawnSync('git', args, { cwd: FIXTURE_ROOT, encoding: 'utf8' });
+		assert.equal(result.status, 0, result.stderr);
+	}
 }
 
 /**
@@ -219,6 +233,25 @@ try {
 					.join('\n')
 			: undefined
 	);
+
+	// 1b) A hex colour literal outside the theme is a violation: the baseline of
+	// this miniature tree is empty, so a tracked file spelling one must be named.
+	const hexFixture = path.join(
+		FIXTURE_ROOT,
+		'static/ergopti_plus/macos/ui/_zzz_hex_outside_theme_fixture.lua'
+	);
+	fs.writeFileSync(hexFixture, '-- ui/_zzz_hex_outside_theme_fixture.lua\nreturn "#123456"\n');
+	spawnSync('git', ['add', '-A'], { cwd: FIXTURE_ROOT, encoding: 'utf8' });
+	const hexResult = runLint([]);
+	test(
+		'a hex colour literal outside the theme is reported',
+		/_zzz_hex_outside_theme_fixture\.lua:2\s+1 hex colour literal\(s\) outside the theme/.test(
+			hexResult.stderr
+		),
+		hexResult.stderr
+	);
+	fs.rmSync(hexFixture);
+	spawnSync('git', ['add', '-A'], { cwd: FIXTURE_ROOT, encoding: 'utf8' });
 
 	// 2) --fix-banners must be a byte-identical no-op on an already-aligned banner.
 	const fixed = runLint(['--fix-banners']);
