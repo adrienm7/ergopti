@@ -70,6 +70,21 @@ helpers.describe("bounded actual ordered-pair menu",function()
 			helpers.assert_eq(state.prompts,0);helpers.assert_eq(state.pickers,0)
 		end)
 	end)
+	helpers.it("announces the committed key-combinations switch and stays silent when it is refused (feature-notice)",function()
+		with_menu(function(state)
+			local notices={}
+			package.loaded["ui.menu.feature_notice"]={feature=function(label,enabled) notices[#notices+1]={label,enabled} end}
+			local row=assert(state.find(state.translate("menu.shortcuts.key_combinations_enable")),"the switch row must exist")
+			local before=require("modules.shortcuts.key_combinations").is_enabled()==true
+			helpers.assert_eq(state.click(row),true)
+			helpers.assert_eq(#notices,1)
+			helpers.assert_eq(notices[1][1],state.translate("menu.shortcuts.key_combinations"))
+			helpers.assert_eq(notices[1][2],not before)
+			package.loaded["infra.key_combinations_scope"].set_enabled=function() return false end
+			state.click(row)
+			helpers.assert_eq(#notices,1,"a refused switch must not announce anything")
+		end)
+	end)
 	-- The maintainer's decision of 2026-10-22: the hold slot opens the shared
 	-- action picker on the hold options, as the tap slot opens it on actions.
 	helpers.it("opens the shared picker on the hold options only on click and publishes an exact hold (key-combination-hold-picker)",function()
