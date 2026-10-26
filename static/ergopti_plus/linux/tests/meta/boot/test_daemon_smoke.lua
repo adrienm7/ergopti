@@ -154,7 +154,7 @@ local function daemon_paths_callback(environment)
   local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
   local source = assert(file:read("*a")); assert(file:close())
   local restart_first = assert(source:find("local function restart_daemon(reason, paused)", 1, true))
-  local owner_first = assert(source:find("local perform_reload, reload_in_flight = require(\"infra.reload_restart\")", restart_first, true))
+  local owner_first = assert(source:find("local perform_reload, reload_in_flight, abandon_reload = require(\"infra.reload_restart\")", restart_first, true))
   local restart_last = assert(source:find("\n\n\n--- Emits facts", owner_first, true))
   local wiring = assert(source:find("webview_manager.set_daemon_state({", 1, true))
   local callback = assert(source:sub(wiring):match(

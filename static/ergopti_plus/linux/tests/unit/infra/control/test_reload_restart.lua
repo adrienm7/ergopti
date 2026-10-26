@@ -40,6 +40,21 @@ helpers.describe("Linux Reload is a daemon restart (reload-is-a-restart-2026-10-
 		helpers.assert_eq(in_flight(), true)
 	end)
 
+	helpers.it("(quit-wins-over-reload) abandons the restart in flight through its cancel", function()
+		local cancels, answers = 0, { false, true }
+		local perform, in_flight, abandon = ReloadRestart.new({ restart = function() return true end,
+			cancel = function() cancels = cancels + 1; return table.remove(answers, 1), "refused" end })
+		helpers.assert_eq(abandon(), true, "nothing in flight is nothing to cancel")
+		helpers.assert_eq(cancels, 0)
+		perform("the tray menu")
+		local ok, detail = abandon()
+		helpers.assert_eq({ ok, detail }, { false, "refused" })
+		helpers.assert_eq(in_flight(), true, "a refused cancellation leaves the restart in flight")
+		helpers.assert_eq(abandon(), true)
+		helpers.assert_eq(in_flight(), false)
+		helpers.assert_eq(perform("SIGHUP"), true, "a reload may be requested again after the abandon")
+	end)
+
 	helpers.it("postpones on window or program cleanup debt without restarting", function()
 		for _, case in ipairs({ { false, true }, { true, false } }) do
 			local restarted = 0

@@ -23,10 +23,13 @@
 --- 3. Stale tree: the cached static menu lags a state change by the refresh
 ---    coalescing delay, longer when a native push was refused. A click on a
 ---    dirty tree is resolved on a freshly built one by its row path.
---- 4. A Reload click made while a reload is already in flight joins that reload:
+--- 4. A Quit click is never held: Quit wins over a reload in flight, so it runs at
+---    once and the coordinator turns the reload into the exit (no replay after the
+---    reload, no refusal).
+--- 5. A Reload click made while a reload is already in flight joins that reload:
 ---    it is logged and dropped, never held and replayed by the successor as a
 ---    second reload (the Linux tray follows the same rule).
---- 5. The successor consumes the hand-off once at boot, rejecting a malformed
+--- 6. The successor consumes the hand-off once at boot, rejecting a malformed
 ---    or expired record, and reports a row it cannot match once with a
 ---    localized notice.
 --- ==============================================================================
@@ -190,9 +193,15 @@ function M.new(deps)
 	end
 
 	--- Dispatches one click made on a gated row.
-	local function dispatch(path, checked, action, joins_reload, ...)
+	local function dispatch(path, checked, action, joins_reload, bypasses_reload, ...)
 		local click = { path = path, desired = ClickIntent.desired(checked),
 			args = { n = select("#", ...), ... } }
+		if bypasses_reload then
+			-- Quit: the user wants out, whatever reload is in flight. It is never held.
+			Logger.info(LOG, "Menu click on '%s' runs at once; it wins over a reload in flight.",
+				ClickIntent.describe(path))
+			return action(...)
+		end
 		if pending() then
 			if joins_reload then
 				Logger.info(LOG, "Menu click on '%s' joined the reload in flight; no second reload.",
@@ -229,8 +238,9 @@ function M.new(deps)
 					local action = row.fn
 					if type(action) == "function" and raws[action] == nil then
 						local checked, joins_reload = row.checked, row.joins_reload == true
+						local bypasses_reload = row.bypasses_reload == true
 						local guarded
-						guarded = function(...) return dispatch(path, checked, action, joins_reload, ...) end
+						guarded = function(...) return dispatch(path, checked, action, joins_reload, bypasses_reload, ...) end
 						raws[guarded] = action
 						row.fn = guarded
 					end
