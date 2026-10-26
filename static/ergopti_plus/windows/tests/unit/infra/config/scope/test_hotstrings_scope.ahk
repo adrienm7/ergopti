@@ -510,10 +510,12 @@ _HotstringsScopeMeasuredDelayRoundTrip(SelectedFamily) {
 			Receipt := HotstringsScopeApply(Mode, Fixture.options)
 			AssertEqual("pending", Receipt["status"])
 			Overrides := TOML_ParseFreshFile(Fixture.overrides)
-			if Mode == "recommended"
+			if Mode == "recommended" {
+				AssertTrue(Overrides[OwnedSection]["delay_offset"] is Float,
+					"the acknowledged offset must retain its TOML numeric type through persistence")
 				AssertEqual(Round(0.5 - HotstringsBaseDelay(), 3), Overrides[OwnedSection]["delay_offset"],
 					"the acknowledged candidate explicitly stores the recommendation as an offset of the base")
-			else
+			} else
 				Assert(!Overrides.Has(OwnedSection) || !Overrides[OwnedSection].Has("delay_offset"),
 					"clear removes the recommendation and returns to corpus inheritance")
 			Assert(!Overrides.Has(OwnedSection) || !Overrides[OwnedSection].Has("delay"),
