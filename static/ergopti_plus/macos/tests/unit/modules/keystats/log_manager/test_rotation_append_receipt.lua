@@ -59,6 +59,7 @@ local function with_receipt(count, check, options)
 					if failures > 0 then
 						failures = failures - 1
 						local written = count(bytes)
+						controls.refused_prefix_bytes = written
 						if written > 0 then assert(file:write(bytes:sub(1, written))) end
 						return nil, "injected receipt after physical prefix", 28
 					end
@@ -77,7 +78,7 @@ local function with_receipt(count, check, options)
 			end
 		end
 		local ok, reason = xpcall(function()
-			rotation.init({ paths = { today_log_path = path }, state = {}, recovery_turn_bytes = 65536 })
+			rotation.init({ paths = { today_log_path = path }, state = {}, recovery_turn_bytes = options.recovery_turn_bytes or 65536 })
 			helpers.assert_eq(rotation.append_log(entry), false, "the first native-style refusal must retain ownership")
 			check(rotation, entry, function() return opens, closes, owner_calls end, controls)
 			local file = assert(original_open(path, "r")); local bytes = assert(file:read("*a")); assert(file:close())
@@ -158,6 +159,53 @@ helpers.describe("rotation exact refused append receipt", function()
 			helpers.assert_true(turns >= 3, "the fixture must exceed two verification budgets")
 		end, { text = string.rep("x", 150000) })
 	end)
+	for _, budget in ipairs({ 2, 17, 64, 129 }) do
+		helpers.it("(journal-append-injected-budget) honors a " .. budget .. " byte injected retry budget", function()
+			with_receipt(function(bytes) return #bytes - 1 end, function(rotation, entry, _, controls)
+				local expected_turns = math.ceil(controls.refused_prefix_bytes / (budget - 1))
+				local turns, accepted = 0, false
+				repeat
+					controls.read_bytes = 0
+					local writes_before = controls.writes
+					accepted = rotation.append_log(entry)
+					turns = turns + 1
+					helpers.assert_true(controls.read_bytes <= budget,
+						string.format("FILE requested %d bytes including EOF against the injected %d-byte budget",
+							controls.read_bytes, budget))
+					helpers.assert_true(turns <= expected_turns, "bounded retries must make forward progress")
+					if not accepted then
+						helpers.assert_eq(controls.writes, writes_before,
+							"cooperative yielding must not append before the complete prefix is verified")
+					end
+				until accepted
+				helpers.assert_eq(turns, expected_turns)
+				helpers.assert_true(turns > 1, "the UTF-8 prefix must require cooperative retries")
+			end, { text = string.rep("é🌍", 60), recovery_turn_bytes = budget })
+		end)
+	end
+
+	for _, invalid in ipairs({ { name = "zero", value = 0 }, { name = "EOF-only", value = 1 },
+		{ name = "fractional", value = 2.5 }, { name = "missing" } }) do
+		helpers.it("(journal-append-injected-budget) refuses a " .. invalid.name .. " init budget before journal IO", function()
+			helpers.with_stub_scope({ "modules.keystats.rotation", "infra.logger", "adapters.ledger_append" }, function()
+				local logger = helpers.make_logger_stub()
+				local errors, opens = 0, 0
+				logger.error = function() errors = errors + 1 end
+				package.loaded["infra.logger"] = logger
+				package.loaded["adapters.ledger_append"] = {}
+				local rotation = helpers.load_with_stubs("modules.keystats.rotation")
+				local original_open = io.open
+				io.open = function() opens = opens + 1; return nil, "unexpected journal IO" end
+				local ok, reason = pcall(rotation.init, { paths = { today_log_path = "/tmp/unused-budget.log" },
+					state = {}, recovery_turn_bytes = invalid.value })
+				io.open = original_open
+				helpers.assert_eq(ok, true, tostring(reason))
+				helpers.assert_eq(rotation.is_initialized(), false)
+				helpers.assert_eq(opens, 0, "invalid budgets must be refused before journal IO")
+				helpers.assert_eq(errors, 1, "invalid dependency receipt must be observable once")
+			end)
+		end)
+	end
 	for _, fault in ipairs({ "read_refusal", "seek_refusal" }) do
 		helpers.it("(journal-append-receipt) restarts exact prefix verification after " .. fault, function()
 			with_receipt(function(bytes) return #bytes - 1 end, function(rotation, entry, _, controls)
