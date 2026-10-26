@@ -91,7 +91,7 @@ function M.build_management(ctx)
 			return true
 		end,
 	}, {
-		["hotstrings.preview_star_enabled"] = function() return state.preview_star_enabled == true end,
+		[require("config_keys").KEY.HOTSTRINGS_PREVIEW_STAR_ENABLED] = function() return state.preview_star_enabled == true end,
 		["preview_magic_ready"] = function() return not ctx.paused end,
 	})
 	if magic_row then table.insert(bubble_sub, magic_row) end
@@ -130,7 +130,7 @@ function M.build_management(ctx)
 			return true
 		end,
 	}, {
-		["hotstrings.preview_colored_tooltips"] = function() return state.preview_colored_tooltips == true end,
+		[require("config_keys").KEY.HOTSTRINGS_PREVIEW_COLORED_TOOLTIPS] = function() return state.preview_colored_tooltips == true end,
 		["preview_colored_ready"] = function() return not ctx.paused end,
 	})
 	if colored_row then table.insert(bubble_sub, colored_row) end
@@ -272,7 +272,7 @@ function M.build_management(ctx)
 		local consume_sfx = ct.consume and (" (" .. i18n.get("menu.hotstrings.consumed") .. ")") or ""
 		local ct_lbl = ct.char .. " : " .. i18n.get("menu.hotstrings.custom_label") .. consume_sfx
 
-		local delete_row = ManifestMenu.command_row("word_expander_custom_menu", "word_expander_delete", {
+		local delete_row = ManifestMenu.command_row("word_expander_custom_menu", require("config_keys").COMMAND.WORD_EXPANDER_DELETE, {
 			["word_expander_delete"] = (function(k) return function()
 					local res = dialog.block_alert(
 						i18n.get("dialog.hotstrings.delete_title"),
@@ -311,7 +311,7 @@ function M.build_management(ctx)
 		::continue_ct::
 	end
 
-	local add_row = ManifestMenu.command_row("word_expander_custom_menu", "word_expander_add", {
+	local add_row = ManifestMenu.command_row("word_expander_custom_menu", require("config_keys").COMMAND.WORD_EXPANDER_ADD, {
 		["word_expander_add"] = function()
 			local existing_keys = {}
 			for _, d in ipairs(defs) do
@@ -526,7 +526,7 @@ function M.build_management(ctx)
 	-- dedicated configuration window where colors can also be tuned. Categories
 	-- that do not have a TOML counterpart (llm_prediction, dynamichotstrings)
 	-- and the global baseline keep their per-prompt menu items as quick access.
-	local settings_row = ManifestMenu.command_row("hotstrings_delays_menu", "hotstrings_config_window", {
+	local settings_row = ManifestMenu.command_row("hotstrings_delays_menu", require("config_keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW, {
 		hotstrings_config_window = function()
 			local ok, win = pcall(require, "ui.hotstrings_config_window")
 			if not ok or not win or type(win.open) ~= "function" then return end
@@ -570,7 +570,7 @@ function M.build_management(ctx)
 
 	local hs_state  = ctx and ctx.state
 	local hs_paused = ctx and ctx.paused
-	local magic_key_value = (hs_state and hs_state.trigger_char or ManifestReader.default_for("hotstrings.trigger_char"))
+	local magic_key_value = (hs_state and hs_state.trigger_char or ManifestReader.default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR))
 	local magic_key_action = function()
 			if not hs_state then return end
 			local ok_p, btn, raw = pcall(dialog.text_prompt,
@@ -615,7 +615,7 @@ function M.build_management(ctx)
 	for key, value in pairs(ctx) do params_ctx[key] = value end
 	params_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do params_ctx.commands[key] = value end
-	params_ctx.commands["repeat_key"] = function()
+	params_ctx.commands[require("config_keys").COMMAND.REPEAT_KEY] = function()
 		if not ctx.keymap or type(ctx.keymap.set_repeat_feature_enabled) ~= "function" then return false end
 		local wanted = not repeat_enabled
 		local ok, committed = pcall(ctx.keymap.set_repeat_feature_enabled, wanted)
@@ -647,7 +647,7 @@ function M.build_management(ctx)
 		end
 		return ctx.state.idle_reset_seconds
 	end
-	params_ctx.commands["idle_reset"] = function(seconds)
+	params_ctx.commands[require("config_keys").COMMAND.IDLE_RESET] = function(seconds)
 		return commit_word_reset("idle_reset_seconds", "set_idle_reset_seconds", seconds)
 	end
 	params_ctx.commands["idle_reset_custom"] = function()
@@ -682,25 +682,25 @@ function M.build_management(ctx)
 	end
 	local click_enabled = ctx.keymap and type(ctx.keymap.is_click_resets_word_enabled) == "function"
 		and ctx.keymap.is_click_resets_word_enabled()
-	params_ctx.commands["click_resets_word"] = function()
+	params_ctx.commands[require("config_keys").COMMAND.CLICK_RESETS_WORD] = function()
 		return commit_word_reset("click_resets_word", "set_click_resets_word", not click_enabled)
 	end
 	-- The arrow and shortcut checkboxes (tap_hold_resets_word is greyed by the
 	-- manifest on macOS: Karabiner owns tap-hold, so it has no command here).
 	local arrow_enabled = ctx.keymap and type(ctx.keymap.is_arrow_resets_word_enabled) == "function"
 		and ctx.keymap.is_arrow_resets_word_enabled()
-	params_ctx.commands["arrow_resets_word"] = function()
+	params_ctx.commands[require("config_keys").COMMAND.ARROW_RESETS_WORD] = function()
 		return commit_word_reset("arrow_resets_word", "set_arrow_resets_word", not arrow_enabled)
 	end
 	local shortcut_enabled = ctx.keymap and type(ctx.keymap.is_shortcut_resets_word_enabled) == "function"
 		and ctx.keymap.is_shortcut_resets_word_enabled()
-	params_ctx.commands["shortcut_resets_word"] = function()
+	params_ctx.commands[require("config_keys").COMMAND.SHORTCUT_RESETS_WORD] = function()
 		return commit_word_reset("shortcut_resets_word", "set_shortcut_resets_word", not shortcut_enabled)
 	end
 	params_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do params_ctx.state_getters[key] = value end
 	params_ctx.state_getters["hotstrings_repeat_enabled"] = function() return repeat_enabled end
-	params_ctx.state_getters["hotstrings.idle_reset_seconds"] = current_idle_reset
+	params_ctx.state_getters[require("config_keys").KEY.HOTSTRINGS_IDLE_RESET_SECONDS] = current_idle_reset
 	params_ctx.state_getters[ConfigKeys.KEY.HOTSTRINGS_CASCADE_MAX_ARROWS] = current_cascade_max_arrows
 	params_ctx.state_getters["hotstrings_click_resets_word"] = function() return click_enabled == true end
 	params_ctx.state_getters["hotstrings_arrow_resets_word"] = function() return arrow_enabled == true end

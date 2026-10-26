@@ -47,6 +47,7 @@ local DeferredWork = require("infra.deferred_work")
 local NativeClose = require("ui.webview_close_owner").new(DeferredWork, Logger)
 local Storage        = require("adapters.storage")
 local WebviewResult  = require("adapters.webview_result")
+local ConfigKeys = require("config_keys")
 
 local LOG = "error_dialog"
 
@@ -54,7 +55,7 @@ local LOG = "error_dialog"
 local BRIDGE = "error_dialog"
 
 -- The Debug menu setting, as the features manifest declares it
-local SETTING = "script.show_error_dialog"
+local SETTING = ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG
 
 -- The page's actions and what the host does for each
 local PAGE_ACTIONS = { report = true, copy = true, open_log = true, close = true }

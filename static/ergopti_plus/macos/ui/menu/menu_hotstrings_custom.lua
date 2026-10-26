@@ -585,7 +585,7 @@ function M.build_custom(ctx, counts)
 			if editor_ready() then pcall(ctx.hotstring_editor.open) end
 		end, "menu_hotstrings_custom.open_editor")
 	end
-	local editor_row = ManifestMenu.command_row("personal_hotstring_commands", "personal_hotstring_open_editor",
+	local editor_row = ManifestMenu.command_row("personal_hotstring_commands", require("config_keys").COMMAND.PERSONAL_HOTSTRING_OPEN_EDITOR,
 		{ personal_hotstring_open_editor = open_editor },
 		{ personal_hotstring_editor_ready = editor_ready })
 	local close_action = function()

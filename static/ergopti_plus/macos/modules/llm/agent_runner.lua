@@ -64,6 +64,7 @@ local WindowInfo     = require("adapters.window_info")
 local SystemInfo     = require("adapters.system_info")
 local TimerScheduler = require("adapters.timer_scheduler")
 local TextUtils = require("text_utils")
+local ConfigKeys = require("config_keys")
 
 local LOG = "llm.agent_runner"
 
@@ -88,10 +89,10 @@ end
 
 -- The runtime keys of the settings, as the preference owner names them
 local SETTING_KEYS = {
-	llm_agent_system1       = "llm.agent_system1",
-	llm_agent_system2       = "llm.agent_system2",
-	llm_agent_mode          = "llm.agent_mode",
-	llm_agent_disabled_apps = "llm.agent_disabled_apps",
+	llm_agent_system1       = ConfigKeys.KEY.LLM_AGENT_SYSTEM1,
+	llm_agent_system2       = ConfigKeys.KEY.LLM_AGENT_SYSTEM2,
+	llm_agent_mode          = ConfigKeys.KEY.LLM_AGENT_MODE,
+	llm_agent_disabled_apps = ConfigKeys.KEY.LLM_AGENT_DISABLED_APPS,
 }
 
 -- The Shortcuts list is read again after this many seconds

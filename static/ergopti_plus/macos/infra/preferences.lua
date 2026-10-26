@@ -84,6 +84,7 @@ local PauseSwitchPolicy = require("layout.pause_switch_policy")
 local RecordList = require("toml_codec.record_list")
 local LOG       = "preferences"
 local OperationReporter = require("diagnostics.operation_reporter")
+local ConfigKeys = require("config_keys")
 
 
 --- Top-level TOML section names in the order they appear on disk.
@@ -103,7 +104,7 @@ local KEY_MAP = {
 
 	-- ── Hotstrings ─────────────────────────────────────────────────────────
 	keymap                               = { sec = "hotstrings", key = "enabled"                      },
-	repeat_key_enabled                   = { sec = "hotstrings", key = "repeat_key_enabled"           },
+	repeat_key_enabled                   = { sec = "hotstrings", key = ConfigKeys.LEAF.REPEAT_KEY_ENABLED           },
 	expansion_delay                      = { sec = "hotstrings"                                        },
 	idle_reset_seconds                   = { sec = "hotstrings"                                        },
 	cascade_max_arrows                   = { sec = "hotstrings"                                        },
@@ -137,14 +138,14 @@ local KEY_MAP = {
 	-- ── Metrics (formerly Keystats) ───────────────────────────────────────
 	keystats_enabled                    = { sec = "metrics", key = "enabled"                       },
 	keystats_encrypt                    = { sec = "metrics", key = "encrypt"                       },
-	keystats_float_colors               = { sec = "metrics", key = "wpm_widget_colors"             },
-	keystats_float_graph                = { sec = "metrics", key = "wpm_widget_graph"              },
-	keystats_float_wpm                  = { sec = "metrics", key = "wpm_widget_visible"            },
-	keystats_menubar_colors             = { sec = "metrics", key = "wpm_menubar_colors"            },
-	keystats_menubar_wpm                = { sec = "metrics", key = "wpm_menubar_visible"           },
-	keystats_private_filter_enabled     = { sec = "metrics", key = "private_filter_enabled"        },
-	keystats_secure_filter_enabled      = { sec = "metrics", key = "secure_filter_enabled"         },
-	keystats_system_auth_filter_enabled = { sec = "metrics", key = "system_auth_filter_enabled"   },
+	keystats_float_colors               = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_COLORS             },
+	keystats_float_graph                = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_GRAPH              },
+	keystats_float_wpm                  = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_VISIBLE            },
+	keystats_menubar_colors             = { sec = "metrics", key = ConfigKeys.LEAF.WPM_MENUBAR_COLORS            },
+	keystats_menubar_wpm                = { sec = "metrics", key = ConfigKeys.LEAF.WPM_MENUBAR_VISIBLE           },
+	keystats_private_filter_enabled     = { sec = "metrics", key = ConfigKeys.LEAF.PRIVATE_FILTER_ENABLED        },
+	keystats_secure_filter_enabled      = { sec = "metrics", key = ConfigKeys.LEAF.SECURE_FILTER_ENABLED         },
+	keystats_system_auth_filter_enabled = { sec = "metrics", key = ConfigKeys.LEAF.SYSTEM_AUTH_FILTER_ENABLED   },
 
 	-- ── LLM ────────────────────────────────────────────────────────────────
 	llm_enabled                          = { sec = "llm", key = "enabled"                           },
@@ -152,29 +153,29 @@ local KEY_MAP = {
 	llm_model_mlx                        = { sec = "llm", path = "models", key = "mlx"            },
 	llm_model_ollama                     = { sec = "llm", path = "models", key = "ollama"         },
 	llm_active_profile                   = { sec = "llm", path = "profiles", key = "active"        },
-	llm_num_predictions                  = { sec = "llm", path = "profiles", key = "num_predictions" },
-	llm_debounce                         = { sec = "llm", path = "trigger", key = "debounce_ms", units_per_state = 1000 },
-	llm_instant_on_word_end              = { sec = "llm", path = "trigger", key = "instant_on_word_end" },
-	llm_after_hotstring                  = { sec = "llm", path = "trigger", key = "after_hotstring" },
-	llm_url_bar_filter_enabled           = { sec = "llm", path = "trigger", key = "url_bar_filter_enabled" },
-	llm_secure_field_filter_enabled      = { sec = "llm", path = "trigger", key = "secure_filter_enabled" },
-	llm_context_length                   = { sec = "llm", path = "generation", key = "context_length" },
-	llm_min_words                        = { sec = "llm", path = "generation", key = "min_words"   },
-	llm_max_words                        = { sec = "llm", path = "generation", key = "max_words"   },
+	llm_num_predictions                  = { sec = "llm", path = "profiles", key = ConfigKeys.LEAF.NUM_PREDICTIONS },
+	llm_debounce                         = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.DEBOUNCE_MS, units_per_state = 1000 },
+	llm_instant_on_word_end              = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.INSTANT_ON_WORD_END },
+	llm_after_hotstring                  = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.AFTER_HOTSTRING },
+	llm_url_bar_filter_enabled           = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.URL_BAR_FILTER_ENABLED },
+	llm_secure_field_filter_enabled      = { sec = "llm", path = "trigger", key = ConfigKeys.LEAF.SECURE_FILTER_ENABLED },
+	llm_context_length                   = { sec = "llm", path = "generation", key = ConfigKeys.LEAF.CONTEXT_LENGTH },
+	llm_min_words                        = { sec = "llm", path = "generation", key = ConfigKeys.LEAF.MIN_WORDS   },
+	llm_max_words                        = { sec = "llm", path = "generation", key = ConfigKeys.LEAF.MAX_WORDS   },
 	llm_temperature                      = { sec = "llm", path = "generation", key = "temperature" },
-	llm_auto_raise_temp                  = { sec = "llm", path = "generation", key = "auto_raise_temp" },
-	llm_reset_on_nav                     = { sec = "llm", path = "generation", key = "reset_on_nav" },
-	llm_sequential_mode                  = { sec = "llm", path = "generation", key = "sequential_mode" },
-	llm_show_info_bar                    = { sec = "llm", path = "display", key = "show_info_bar" },
+	llm_auto_raise_temp                  = { sec = "llm", path = "generation", key = ConfigKeys.LEAF.AUTO_RAISE_TEMP },
+	llm_reset_on_nav                     = { sec = "llm", path = "generation", key = ConfigKeys.LEAF.RESET_ON_NAV },
+	llm_sequential_mode                  = { sec = "llm", path = "generation", key = ConfigKeys.LEAF.SEQUENTIAL_MODE },
+	llm_show_info_bar                    = { sec = "llm", path = "display", key = ConfigKeys.LEAF.SHOW_INFO_BAR },
 	llm_streaming                        = { sec = "llm", path = "display", key = "streaming"     },
-	llm_streaming_multi                  = { sec = "llm", path = "display", key = "streaming_multi" },
-	llm_pred_indent                      = { sec = "llm", path = "display", key = "pred_indent"   },
-	llm_arrow_nav_enabled                = { sec = "llm", path = "navigation", key = "arrow_nav_enabled" },
-	llm_val_modifiers                    = { sec = "llm", path = "navigation", key = "val_modifiers" },
+	llm_streaming_multi                  = { sec = "llm", path = "display", key = ConfigKeys.LEAF.STREAMING_MULTI },
+	llm_pred_indent                      = { sec = "llm", path = "display", key = ConfigKeys.LEAF.PRED_INDENT   },
+	llm_arrow_nav_enabled                = { sec = "llm", path = "navigation", key = ConfigKeys.LEAF.ARROW_NAV_ENABLED },
+	llm_val_modifiers                    = { sec = "llm", path = "navigation", key = ConfigKeys.LEAF.VAL_MODIFIERS },
 	-- The AI agent (modules/llm/agent_runner.lua): System 1 and System 2 backends and the mode
-	llm_agent_system1                    = { sec = "llm", key = "agent_system1"                     },
-	llm_agent_system2                    = { sec = "llm", key = "agent_system2"                     },
-	llm_agent_mode                       = { sec = "llm", key = "agent_mode"                        },
+	llm_agent_system1                    = { sec = "llm", key = ConfigKeys.LEAF.AGENT_SYSTEM1                     },
+	llm_agent_system2                    = { sec = "llm", key = ConfigKeys.LEAF.AGENT_SYSTEM2                     },
+	llm_agent_mode                       = { sec = "llm", key = ConfigKeys.LEAF.AGENT_MODE                        },
 	-- Per-application prompt profiles: the v1 text of _shared/lua/llm/app_profile_overrides.lua
 	llm_app_profile_overrides            = { sec = "llm", key = LEAF.APP_PROFILE_OVERRIDES          },
 	-- User prompt profiles: the v1 envelope Windows and Linux store at the same key,
@@ -182,12 +183,12 @@ local KEY_MAP = {
 	llm_user_profiles                    = { sec = "llm", key = LEAF.USER_PROFILES, codec = ProfileRegistry },
 
 	-- ── Layout ─────────────────────────────────────────────────────────────
-	layout_number_row_mode               = { sec = "layout", key = "direct_access_digits", enum = true },
+	layout_number_row_mode               = { sec = "layout", key = ConfigKeys.LEAF.DIRECT_ACCESS_DIGITS, enum = true },
 	-- Declared for macOS like the ordering it extends: kept, never applied here.
-	layout_number_row_reorder_edges      = { sec = "layout", key = "number_row_reorder_edges" },
-	layout_pause_switch_enabled          = { sec = "layout", key = "pause_switch_enabled"    },
-	layout_on_pause                      = { sec = "layout", key = "on_pause"                },
-	layout_on_resume                     = { sec = "layout", key = "on_resume"               },
+	layout_number_row_reorder_edges      = { sec = "layout", key = ConfigKeys.LEAF.NUMBER_ROW_REORDER_EDGES },
+	layout_pause_switch_enabled          = { sec = "layout", key = ConfigKeys.LEAF.PAUSE_SWITCH_ENABLED    },
+	layout_on_pause                      = { sec = "layout", key = ConfigKeys.LEAF.ON_PAUSE                },
+	layout_on_resume                     = { sec = "layout", key = ConfigKeys.LEAF.ON_RESUME               },
 	-- The Karabiner virtual keyboard type (auto / iso / ansi): platform/remap deploys it.
 	layout_virtual_keyboard              = { sec = "layout", key = LEAF.VIRTUAL_KEYBOARD, enum = true },
 
@@ -195,12 +196,12 @@ local KEY_MAP = {
 	shortcuts                            = { sec = "shortcuts", key = "enabled"              },
 	chatgpt_url                          = { sec = "shortcuts"                                },
 	script_control_enabled               = { sec = "shortcuts", path = "script_control", key = "chords_enabled" },
-	caps_word_idle_timeout_seconds       = { sec = "shortcuts", path = "caps_word", key = "idle_timeout_seconds" },
+	caps_word_idle_timeout_seconds       = { sec = "shortcuts", path = "caps_word", key = ConfigKeys.LEAF.IDLE_TIMEOUT_SECONDS },
 	caps_word_terminators                = { sec = "shortcuts", path = "caps_word", key = "terminators" },
 
 	-- ── Updater ────────────────────────────────────────────────────────────
 	update_channel                       = { sec = "updater",  key = "channel"               },
-	update_check_interval_seconds        = { sec = "updater",  key = "check_interval_seconds" },
+	update_check_interval_seconds        = { sec = "updater",  key = ConfigKeys.LEAF.CHECK_INTERVAL_SECONDS },
 
 	-- ── Interface ──────────────────────────────────────────────────────────
 	menubar_icon                         = { sec = "ui"                                        },
@@ -230,21 +231,21 @@ local NESTED_KEY_MAP = {
 	section_states           = { sec = "hotstrings", key = "modules"                   },
 	terminator_states        = { sec = "hotstrings", key = "terminator_states"          },
 	terminator_consume       = { sec = "hotstrings", key = "terminator_consume"         },
-	sections_order_overrides = { sec = "hotstrings", key = "order_overrides"            },
+	sections_order_overrides = { sec = "hotstrings", key = ConfigKeys.LEAF.ORDER_OVERRIDES            },
 	custom_editor_shortcut   = { sec = "hotstrings", key = "editor.shortcut"            },
 	custom_terminators       = { sec = "hotstrings", key = "terminators"                },
 	custom_delimiters        = { sec = "hotstrings", key = "delimiters"                 },
 	-- Metrics nested tables
-	keystats_disabled_apps  = { sec = "metrics",    key = "disabled_apps"              },
+	keystats_disabled_apps  = { sec = "metrics",    key = ConfigKeys.LEAF.DISABLED_APPS              },
 	-- LLM nested tables
 	llm_disabled_apps        = { sec = "llm",        key = "trigger.disabled_apps"      },
 	llm_nav_modifiers        = { sec = "llm",        key = "navigation.nav_modifiers"   },
 	llm_profile_shortcuts    = { sec = "llm",        key = "profiles.shortcuts"         },
 	llm_user_models          = { sec = "llm",        key = "models.user_models"         },
-	llm_agent_disabled_apps  = { sec = "llm",        key = "agent_disabled_apps"        },
+	llm_agent_disabled_apps  = { sec = "llm",        key = ConfigKeys.LEAF.AGENT_DISABLED_APPS        },
 	-- Shortcuts nested tables
 	shortcut_keys            = { sec = "shortcuts",  key = "keys"                       },
-	script_control_shortcuts = { sec = "shortcuts",  key = "script_control"             },
+	script_control_shortcuts = { sec = "shortcuts",  key = ConfigKeys.LEAF.SCRIPT_CONTROL             },
 	-- One boolean per manifest pointer kind (infra/capsword_auto_off).
 	caps_word_pointer        = { sec = "shortcuts",  key = "caps_word.pointer"          },
 	wrap_symbol_states       = WrapPreferences.locations.wrap_symbol_states,
@@ -1483,7 +1484,7 @@ function M.prepare_gesture_updates(source, updates)
 	local admitted_updates, retained_script_inline = {}, false
 	for _, row in ipairs(updates) do
 		local retained_script = false
-		if row.section == "gestures.action_parameters" and type(row.key) == "string" and row.key:sub(1, 8) == "script__" then
+		if row.section == ConfigKeys.KEY.GESTURES_ACTION_PARAMETERS and type(row.key) == "string" and row.key:sub(1, 8) == "script__" then
 			local parameters = disk_gestures.action_parameters
 			local prior = type(parameters) == "table" and parameters[row.key] or nil
 			if row.delete ~= true and prior ~= nil and rawequal(prior, row.value) then
@@ -1612,7 +1613,7 @@ local function prepare_inline_updates(source, updates, root)
 				parent = #segments > 0 and require("toml_codec.key_path").render(segments) or ""
 			else parent = parent:match("^(.*)%.[^.]+$") or "" end
 		end
-		if path == "llm.profiles.shortcuts" and type(row.value) == "table" and next(row.value) == nil then
+		if path == ConfigKeys.KEY.LLM_PROFILES_SHORTCUTS and type(row.value) == "table" and next(row.value) == nil then
 			-- An empty runtime dictionary owns no unknown profile leaves on disk.
 		elseif inline[parent] and not direct_parents[parent] then
 			local candidate = candidates[parent] or clone_value(inline[parent].value)
@@ -1719,7 +1720,7 @@ local function prepare_order_updates(source, updates)
 				prepared[#prepared + 1] = row
 			elseif not malformed_parent then
 				for id in pairs(orders) do
-					if not bad[id] then prepared[#prepared + 1] = { section = "hotstrings.order_overrides", key = id, delete = true } end
+					if not bad[id] then prepared[#prepared + 1] = { section = ConfigKeys.KEY.HOTSTRINGS_ORDER_OVERRIDES, key = id, delete = true } end
 				end
 			end
 		elseif malformed_parent or #path == 2 and next(bad) ~= nil or bad[path[3]] then
@@ -2132,7 +2133,7 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 				-- existing order must remove it, while a carried source [] keeps its
 				-- exact kind and is not silently replaced by an empty map.
 				if old ~= nil and next(old) ~= nil and next(value) == nil then
-					cleared_orders[#cleared_orders + 1] = { section = "hotstrings.order_overrides", key = id, delete = true }
+					cleared_orders[#cleared_orders + 1] = { section = ConfigKeys.KEY.HOTSTRINGS_ORDER_OVERRIDES, key = id, delete = true }
 				end
 			end
 		end
@@ -2153,7 +2154,7 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 		for _, row in ipairs(proposed) do
 			local path = row.section .. "." .. row.key
 			local reset = reset_keeping_outdated(row, outdated, document)
-			if model_operation and path == "llm.models.user_models" then
+			if model_operation and path == ConfigKeys.KEY.LLM_MODELS_USER_MODELS then
 				-- The row owner is appended after ordinary parent projections.
 			elseif reset then
 				for _, child in ipairs(reset) do leaves[#leaves + 1] = child end

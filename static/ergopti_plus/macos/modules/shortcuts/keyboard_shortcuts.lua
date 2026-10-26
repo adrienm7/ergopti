@@ -46,6 +46,7 @@ local PhysicalAvailability = require("shortcuts.physical_availability")
 local i18n = require("infra.i18n")
 local AiActions = require("modules.shortcuts.ai_actions")
 local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 local LOG = "shortcuts.keyboard_shortcuts"
 
@@ -130,7 +131,7 @@ local KEY_CATALOGUE_PATH = Paths.shared("modules/actions/modifier_chords.json")
 
 -- The manifest section whose entries are this driver's shipped slot bindings.
 -- tools/test/test-keyboard-slot-recommended-bindings.cjs pins what it holds.
-local KEYBOARD_SECTION = "shortcuts.keyboard"
+local KEYBOARD_SECTION = ConfigKeys.KEY.SHORTCUTS_KEYBOARD
 
 --- The shipped bindings: every manifest shortcuts.keyboard entry for macOS (the
 --- generated manifest lists only this driver's entries with their defaults).
@@ -563,7 +564,7 @@ function M.validate_physical_edits(rows, claim)
 		return called and accepted == true and current()
 	end
 	for _, row in ipairs(rows) do
-		if row.section == "shortcuts.keyboard" and row.delete ~= true then
+		if row.section == ConfigKeys.KEY.SHORTCUTS_KEYBOARD and row.delete ~= true then
 			local descriptor = M.physical_slot_descriptor(row.key)
 			if not current() then return false, "source_changed" end
 			if not descriptor then return false, "unavailable" end

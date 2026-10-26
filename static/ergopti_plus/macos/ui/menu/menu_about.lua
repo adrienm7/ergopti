@@ -115,7 +115,7 @@ local function channel_picker(owner, subscribed)
 			local ok, committed = pcall(owner.set, id)
 			return ok and committed == true
 		end,
-	}, { ["updater.channel"] = function() return subscribed end })
+	}, { [require("config_keys").KEY.UPDATER_CHANNEL] = function() return subscribed end })
 end
 
 --- The check-frequency picker: one row per shared preset, ticked on the
@@ -131,7 +131,7 @@ local function frequency_picker(checks, stored_seconds)
 			return checks.set_interval(seconds) == true
 		end,
 	}, {
-		["updater.check_interval_seconds"] = function()
+		[require("config_keys").KEY.UPDATER_CHECK_INTERVAL_SECONDS] = function()
 			if stored_seconds ~= nil then return stored_seconds end
 			return checks.interval()
 		end,
@@ -222,7 +222,7 @@ function M.build(ctx, actions)
 				return ok and accepted == true
 			end
 		end
-		local check_row = ManifestMenu.command_row("about_source_menu", "about_source_check", {
+		local check_row = ManifestMenu.command_row("about_source_menu", require("config_keys").COMMAND.ABOUT_SOURCE_CHECK, {
 			["about_source_check"] = check_action,
 		}, { ["about_source_release_ready"] = function() return not local_src end })
 		if check_row then
@@ -240,7 +240,7 @@ function M.build(ctx, actions)
 		-- out, nobody could tell whether the automatic update exists.
 		local state = type(ctx) == "table" and type(ctx.state) == "table" and ctx.state or {}
 		local seconds = require("modules.updater.auto_check").stored_interval(state)
-		local source_row = ManifestMenu.command_row("about_source_menu", "about_source_check", {
+		local source_row = ManifestMenu.command_row("about_source_menu", require("config_keys").COMMAND.ABOUT_SOURCE_CHECK, {
 			["about_source_check"] = function() return false end,
 		}, { ["about_source_release_ready"] = function() return not local_src end })
 		if source_row then table.insert(menu_items, source_row) end

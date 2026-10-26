@@ -683,7 +683,7 @@ function M.build(ctx)
 		if not boundary_rows then return "", {} end
 		for _, row in ipairs(boundary_rows) do rows[#rows + 1] = row end
 	end
-	local test_row = ManifestMenu.command_row("llm_api_active_commands", "api_test_active", {
+	local test_row = ManifestMenu.command_row("llm_api_active_commands", require("config_keys").COMMAND.API_TEST_ACTIVE, {
 		api_test_active = function()
 			local probed_id = active_entry.id
 			local probed_label = active_label
@@ -740,7 +740,7 @@ function M.build(ctx)
 	-- the AHK tray's "remove active" semantics. Disabled when nothing is
 	-- configured so the user does not chase a no-op click. Test sits above
 	-- it: the destructive action stays last.
-	local remove_row = ManifestMenu.command_row("llm_api_active_commands", "api_remove_active", {
+	local remove_row = ManifestMenu.command_row("llm_api_active_commands", require("config_keys").COMMAND.API_REMOVE_ACTIVE, {
 		api_remove_active = function()
 			if _mutation_owner ~= nil then return false end
 			-- Confirm before destroying — the saved token is gone for good once

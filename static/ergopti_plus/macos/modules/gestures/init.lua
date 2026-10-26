@@ -45,6 +45,7 @@ local Engine    = require("modules.gestures.engine")
 local Actions   = require("modules.gestures.actions")
 local Conflicts = require("modules.gestures.conflicts")
 local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 
 
@@ -146,7 +147,7 @@ M.DEFAULT_MODES = {
 M.DEFAULT_SENSITIVITY = 3.5
 
 M.DEFAULT_STATE = {
-	gestures = Manifest.default_for("gestures.enabled"),
+	gestures = Manifest.default_for(ConfigKeys.KEY.GESTURES_ENABLED),
 	modes = {},
 	sensitivities = {},
 }

@@ -67,10 +67,11 @@ local _active_start_token = nil
 local _starting_token = nil
 local ManifestReader = require("infra.manifest_reader")
 local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 -- The magic key as declared in the shared feature manifest. Named once here so
 -- the three sites below cannot drift apart from each other or from the manifest.
-local DEFAULT_TRIGGER = ManifestReader.default_for("hotstrings.trigger_char")
+local DEFAULT_TRIGGER = ManifestReader.default_for(ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR)
 
 -- Same-directory staging keeps the final rename atomic on macOS
 local SAVE_TEMP_SUFFIX = ".ergopti-save.tmp"
@@ -119,7 +120,7 @@ end
 local DEFAULT_CONFIG = {
 	-- Read from the shared manifest rather than restated: a second copy of the
 	-- magic key is a second thing to change when the user picks another one.
-	trigger_char = ManifestReader.default_for("hotstrings.trigger_char"),
+	trigger_char = ManifestReader.default_for(ConfigKeys.KEY.HOTSTRINGS_TRIGGER_CHAR),
 	info = {
 		first_name            = "Prénom",
 		last_name             = "Nom",
