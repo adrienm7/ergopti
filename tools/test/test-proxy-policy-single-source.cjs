@@ -39,19 +39,19 @@ const KNOWN_COPIES = new Map([
 	],
 	[
 		'static/ergopti_plus/macos/adapters/release_stage.sh',
-		{ count: 1, reason: 'POSIX shell parameter expansion before any JSON reader is available' }
+		{
+			count: 1,
+			reason:
+				'POSIX shell parameter expansion before any JSON reader is available; patched in place by codegen-proxy-precedence.cjs'
+		}
 	],
 	[
 		'static/ergopti_plus/macos/modules/llm/network-retry.sh',
 		{
 			count: 2,
 			reason:
-				'POSIX shell parameter expansion and relay presence check before any JSON reader is available'
+				'POSIX shell parameter expansion and relay presence check before any JSON reader is available; patched in place by codegen-proxy-precedence.cjs'
 		}
-	],
-	[
-		'static/ergopti_plus/macos/modules/llm/network_env.lua',
-		{ count: 1, reason: 'emits the shell admission guard that network-retry.sh evaluates' }
 	]
 ]);
 

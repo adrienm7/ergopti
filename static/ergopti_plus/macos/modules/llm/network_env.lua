@@ -80,6 +80,36 @@ function M.route_origins(client)
 	return origins, nil
 end
 
+-- The shared proxy policy, relative to the driver root's shared tree.
+local PROXY_POLICY_RELATIVE = "/../_shared/modules/network/proxy_policy.json"
+
+--- The shell parameter expansion of the HTTPS proxy precedence, built from the
+--- shared proxy policy: one nested ${name:-...} level per variable, in order.
+--- @return string|nil expansion
+--- @return string|nil err Why the policy cannot be used.
+function M.https_route_expansion()
+	local root = driver_root()
+	if not root then return nil, "the bundled proxy policy owner is missing" end
+	-- Read directly: this runs inside prelude builders whose callers double the file system.
+	local file = io.open(root .. PROXY_POLICY_RELATIVE, "rb")
+	local bytes = file and file:read("*a")
+	if file then file:close() end
+	if type(bytes) ~= "string" then return nil, "the shared proxy policy is unreadable" end
+	local decoded, policy = pcall(Json.decode, bytes)
+	local names = decoded and type(policy) == "table" and type(policy.environment_precedence) == "table"
+		and policy.environment_precedence.https or nil
+	if type(names) ~= "table" or #names < 2 then return nil, "the shared proxy policy names no HTTPS precedence" end
+	local expansion = ""
+	for index = #names, 1, -1 do
+		local name = names[index]
+		if type(name) ~= "string" or not name:match("^[%a_][%w_]*$") then
+			return nil, "the shared proxy policy names an invalid variable"
+		end
+		expansion = "${" .. name .. ":-" .. expansion .. "}"
+	end
+	return expansion, nil
+end
+
 --- The shell lines, ending in "; ", that export the system network settings
 --- for the command that follows them.
 --- @param tag string Log prefix of the child, e.g. "MLX".
@@ -204,9 +234,11 @@ function M.bootstrap_prelude(tag, python)
 	local managed = managed_receiver_prelude(tag, root)
 	local opaque, opaque_error = M.opaque_prelude(tag)
 	if not opaque then return nil, opaque_error end
+	local route, route_error = M.https_route_expansion()
+	if not route then return nil, route_error end
 	local helper = text_utils.shell_quote(root .. "/modules/llm/managed_bootstrap_http.py")
 	return "if [ -n \"${ERGOPTI_LAUNCHER_EXECUTABLE:-}\" ] "
-		.. "&& [ -z \"${https_proxy:-${HTTPS_PROXY:-${all_proxy:-${ALL_PROXY:-}}}}\" ] "
+		.. "&& [ -z \"" .. route .. "\" ] "
 		.. "&& [ -f " .. helper .. " ]; then PYTHON_BIN=" .. text_utils.shell_quote(python) .. "; "
 		.. managed .. "else " .. opaque .. "fi; ", nil
 end

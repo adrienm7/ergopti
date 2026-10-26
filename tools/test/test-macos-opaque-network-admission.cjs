@@ -1161,6 +1161,13 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 	);
 	fs.mkdirSync(path.join(bootstrapRoot, 'platform/network'), { recursive: true });
 	fs.mkdirSync(path.join(bootstrapRoot, 'modules/llm'), { recursive: true });
+	// A shipped bundle carries the shared proxy policy the guard's precedence is built from.
+	const bundledPolicy = path.join(bootstrapRoot, '../_shared/modules/network');
+	fs.mkdirSync(bundledPolicy, { recursive: true });
+	fs.copyFileSync(
+		path.join(root, 'static/ergopti_plus/_shared/modules/network/proxy_policy.json'),
+		path.join(bundledPolicy, 'proxy_policy.json')
+	);
 	fs.copyFileSync(
 		path.join(root, 'static/ergopti_plus/macos/platform/network/native_http.py'),
 		path.join(bootstrapRoot, 'platform/network/native_http.py')
