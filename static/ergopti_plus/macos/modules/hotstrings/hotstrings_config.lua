@@ -38,7 +38,7 @@ local TomlRecordEditor = require("infra.toml.record_editor")
 local FileSystem = require("adapters.file_system")
 local ConfigSchema = require("modules.hotstrings.hotstrings_config_schema")
 local PersonalFiles = require("hotstrings.personal_files")
-local TomlCodec = require("toml_codec.codec")
+local Overrides = require("hotstrings.overrides")
 local PublicationRecovery = require("hotstrings.publication_recovery")
 -- The five-rung precedence, shared with Linux. It was written once here and
 -- once in AutoHotkey and the two had already drifted; the rule is the thing
@@ -158,194 +158,49 @@ end
 --- ====================================
 --- ====================================
 
---- Advances the small amount of TOML lexical state needed to identify a
---- complete assignment. This is deliberately not a second TOML parser: the
---- module only needs to know whether the next physical line is still part of
---- an array, inline table, or multiline string so it can preserve unowned raw
---- records byte-for-byte.
---- @param raw string One physical source line.
---- @param depth number Current array/inline-table nesting depth.
---- @param multiline_quote string|nil Active triple-quote delimiter.
---- @return number depth Updated nesting depth.
---- @return string|nil multiline_quote Updated triple-quote delimiter.
+--- Collects the exact raw records of a [__global__] table. No key of it is
+--- owned (the word and consumed delimiter strings moved to config.toml leaves), so
+--- a table an earlier build or another tool wrote is preserved byte-for-byte by
+--- the serializer. This is deliberately not a second TOML parser: it only needs
+--- to know whether the next physical line is still part of an array, inline table
+--- or multiline string, to tell a continuation from a new header.
+--- @param content string Exact override source bytes.
+--- @return string[] global_passthrough Exact raw records of the [__global__] table.
+local function global_records(content)
+	local records = {}
+	local in_global = false
+	-- Open array, inline table or multiline string of the current record, in or out of the global table.
+	local depth, multiline_quote = 0, nil
+	for raw in (content .. "\n"):gmatch("([^\n]*)\n") do
+		raw = raw:gsub("\r$", "")
+		local line = raw:match("^%s*(.-)%s*$")
+		-- A header-looking line can legally occur inside an open multiline value:
+		-- consume continuations before interpreting any header syntax.
+		local open = depth > 0 or multiline_quote ~= nil
+		if open then
+			if in_global then records[#records + 1] = raw end
+			depth, multiline_quote = TomlRecordEditor.advance_continuation(raw, depth, multiline_quote)
+		elseif line == "[__global__]" then
+			in_global = true
+		elseif line:sub(1, 1) == "[" then
+			in_global = false
+		else
+			if in_global then records[#records + 1] = raw end
+			depth, multiline_quote = TomlRecordEditor.advance_continuation(raw, 0, nil)
+		end
+	end
+	return records
+end
+
 --- Parses the user override TOML file into two structures:
 --- - overrides: { [category] = { delay_offset = n, color = s, sections = { [name] = { ... } } } }
+---   read by the shared parser (hotstrings.overrides), which raises on invalid TOML;
 --- - global_passthrough: the raw records of a [__global__] table.
---- Unknown category keys are ignored. No [__global__] key is owned any more (the
---- word and consumed delimiter strings moved to config.toml leaves), so a table
---- an earlier build or another tool wrote is preserved byte-for-byte.
 --- @param content string Exact override source bytes.
 --- @return table overrides The parsed overrides.
 --- @return string[] global_passthrough Exact raw records of the [__global__] table.
 local function parse_override_content(content)
-	local result = {}
-	local global_passthrough = {}
-	local current_cat = nil
-	local current_sec = nil
-	local in_global   = false
-	local global_depth = 0
-	local global_multiline_quote = nil
-	local record_depth, record_quote = 0, nil
-
-	for raw in (content .. "\n"):gmatch("([^\n]*)\n") do
-		raw = raw:gsub("\r$", "")
-		local line = raw:match("^%s*(.-)%s*$")
-
-		if not in_global and (record_depth > 0 or record_quote ~= nil) then
-			record_depth, record_quote = TomlRecordEditor.advance_continuation(raw, record_depth, record_quote)
-			goto continue
-		end
-
-		-- A line that resembles a section header can legally occur inside an
-		-- open multiline global value. Consume continuations before interpreting
-		-- any header syntax so such data cannot reset the section state.
-		local global_record_open = in_global
-			and (global_depth > 0 or global_multiline_quote ~= nil)
-		if global_record_open then
-			global_passthrough[#global_passthrough + 1] = raw
-			global_depth, global_multiline_quote = TomlRecordEditor.advance_continuation(
-				raw,
-				global_depth,
-				global_multiline_quote
-			)
-			goto continue
-		end
-
-		-- [__global__] — no key of it is interpreted.
-		if line == "[__global__]" then
-			in_global = true
-			current_cat, current_sec = nil, nil
-			global_depth = 0
-			global_multiline_quote = nil
-			goto continue
-		end
-
-		-- Retain the complete raw records, including multiline values, comments
-		-- and blank lines, instead of silently deleting fields this parser does
-		-- not interpret. A '[' only starts a new section when no value is open;
-		-- inside an array it is continuation data.
-		if in_global then
-			if line:sub(1, 1) == "[" then
-				in_global = false
-			else
-				global_passthrough[#global_passthrough + 1] = raw
-				global_depth, global_multiline_quote = TomlRecordEditor.advance_continuation(
-					raw,
-					global_depth,
-					global_multiline_quote
-				)
-				goto continue
-			end
-		end
-
-		-- Global passthrough keeps its original, narrower lexical ownership.
-		-- Standard scalar and header comments belong to the canonical codec.
-		line = TomlCodec.strip_inline_comment(raw):match("^%s*(.-)%s*$")
-		if not line or line == "" or line:sub(1, 1) == "#" then goto continue end
-
-		-- [ext.name.section] — extension section override (3 dotted segments)
-		local ext_name, ext_sec = line:match("^%[ext%.([%w_%-]+)%.([%w_%-]+)%]$")
-		if ext_name and ext_sec then
-			local key = ConfigSchema.normalize_category("ext." .. ext_name)
-			ext_sec = ConfigSchema.normalize_section(ext_sec)
-			result[key] = result[key] or { sections = {} }
-			result[key].sections = result[key].sections or {}
-			result[key].sections[ext_sec] = result[key].sections[ext_sec] or {}
-			current_cat, current_sec = key, ext_sec
-			goto continue
-		end
-
-		-- [ext.name] — extension file-level override (2 dotted segments, "ext." prefix)
-		local ext_only = line:match("^%[ext%.([%w_%-]+)%]$")
-		if ext_only then
-			local key = ConfigSchema.normalize_category("ext." .. ext_only)
-			result[key] = result[key] or { sections = {} }
-			current_cat, current_sec = key, nil
-			goto continue
-		end
-
-		-- [category.section] — standard section override (must be tested before plain [category])
-		local cat, sec = line:match("^%[([%w_%-]+)%.([%w_%-]+)%]$")
-		if cat and sec then
-			cat = ConfigSchema.normalize_category(cat)
-			sec = ConfigSchema.normalize_section(sec)
-			result[cat] = result[cat] or { sections = {} }
-			result[cat].sections = result[cat].sections or {}
-			result[cat].sections[sec] = result[cat].sections[sec] or {}
-			current_cat, current_sec = cat, sec
-			goto continue
-		end
-
-		-- [category]
-		local cat_only = line:match("^%[([%w_%-]+)%]$")
-		if cat_only then
-			cat_only = ConfigSchema.normalize_category(cat_only)
-			result[cat_only] = result[cat_only] or { sections = {} }
-			current_cat, current_sec = cat_only, nil
-			goto continue
-		end
-
-		-- Unowned headers and open values cannot lend their fields to the prior category.
-		if line:sub(1, 1) == "[" then
-			current_cat, current_sec = nil, nil
-			goto continue
-		end
-		record_depth, record_quote = TomlRecordEditor.advance_continuation(raw, 0, nil)
-
-		-- key = value (delay number, color string)
-		if current_cat then
-			local target = current_sec
-				and result[current_cat].sections[current_sec]
-				or result[current_cat]
-
-			-- The stored form of a delay override: an offset of the base expansion
-			-- delay, or the flag of an unlimited one (0 is not an offset of anything).
-			local offset = line:match("^delay_offset%s*=%s*([%-%d%.]+)%s*$")
-			if offset then
-				local n = tonumber(offset)
-				if ConfigSchema.is_delay_offset(n) then target.delay_offset = n end
-				goto continue
-			end
-			if line:match("^delay_unlimited%s*=%s*true%s*$") then
-				target.delay_unlimited = true
-				goto continue
-			end
-
-			-- The absolute spelling of earlier builds, kept until the boot migration
-			-- turns it into an offset of the base and rewrites the file.
-			local num = line:match("^delay%s*=%s*([%-%d%.]+)%s*$")
-			if num then
-				local n = tonumber(num)
-				if ConfigSchema.is_delay(n) then target.legacy_delay = n end
-				goto continue
-			end
-
-			local col = line:match("^color%s*=%s*\"([^\"]*)\"%s*$")
-			if col then
-				target.color = col
-				goto continue
-			end
-
-			-- Lua patterns have no alternation (|); test "true" and "false" separately.
-			local bool_val = line:match("^show_tooltip%s*=%s*(true)%s*$")
-				or line:match("^show_tooltip%s*=%s*(false)%s*$")
-			if bool_val then
-				target.show_tooltip = (bool_val == "true")
-				goto continue
-			end
-
-			local prio = line:match("^priority%s*=%s*(%d+)%s*$")
-			if prio then
-				local p = tonumber(prio)
-				if p then target.priority = p end
-				goto continue
-			end
-		end
-
-		::continue::
-	end
-
-	return result, global_passthrough
+	return Overrides.parse(content, Overrides.POLICIES.lowercase_bare), global_records(content)
 end
 
 --- Checks every captured logical field without entering a path callback.
@@ -445,7 +300,11 @@ local function parse_overrides(path)
 		Logger.error(LOG, "Override source returned an invalid read status: %s.", tostring(read_status))
 		return {}, "error", nil, {}
 	end
-	local result, global_passthrough = parse_override_content(content)
+	local parsed, result, global_passthrough = pcall(parse_override_content, content)
+	if not parsed then
+		Logger.error(LOG, "Override source is not valid TOML: %s.", tostring(result))
+		return {}, "error", nil, {}
+	end
 	return result, "committed", { status = "ok", content = content }, global_passthrough, migrated.common_admitted ~= false
 end
 
@@ -1509,7 +1368,11 @@ function M.adopt_scope_source(owner, source, publish)
 	assert(type(source) == "table" and (source.status == "absent"
 		or (source.status == "ok" and type(source.content) == "string")), "scope override source is not classified")
 	assert(type(publish) == "function", "scope override adoption needs its publication")
-	local overrides, global_passthrough = parse_override_content(source.content or "")
+	local parsed, overrides, global_passthrough = pcall(parse_override_content, source.content or "")
+	if not parsed then
+		Logger.error(LOG, "Scope override source is not valid TOML: %s.", tostring(overrides))
+		return false
+	end
 	local candidate = { owner = owner, overrides = overrides }
 	_state.scope_candidate = candidate
 	local ok, committed = pcall(function()

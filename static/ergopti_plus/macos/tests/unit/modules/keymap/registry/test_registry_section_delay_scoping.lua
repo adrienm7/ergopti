@@ -303,8 +303,8 @@ helpers.describe("canonical hotstring override delays reach the real runtime", f
 		{ name = "unterminated neighbor", source = "[group_a.rolls]\ndelay = 2\nfuture = [1,\n", init_admitted = false },
 		{ name = "inline ancestor", source = "[group_a]\nrolls = { delay = 2, future = true }\n" },
 		{ name = "table-valued leaf", source = "[group_a.rolls.delay_offset]\nfuture = true\n" },
-		{ name = "duplicate header", source = "[group_a.rolls]\ndelay = 2\n[group_a.rolls]\nfuture = true\n" },
-		{ name = "duplicate field", source = "[group_a.rolls]\ndelay = 2\ndelay = 3\n" },
+		{ name = "duplicate header", source = "[group_a.rolls]\ndelay = 2\n[group_a.rolls]\nfuture = true\n", init_admitted = false },
+		{ name = "duplicate field", source = "[group_a.rolls]\ndelay = 2\ndelay = 3\n", init_admitted = false },
 		{ name = "quoted reader-unowned header", source = '[group_a."rolls"]\ndelay = 2\n' },
 		{ name = "case-normalized header", source = "[GROUP_A.rolls]\ndelay = 2\n" },
 	}) do

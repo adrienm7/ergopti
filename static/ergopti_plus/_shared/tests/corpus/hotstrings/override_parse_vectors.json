@@ -1,0 +1,178 @@
+{
+	"description": "Contract of the shared hotstring override parser (hotstrings.overrides). Each vector names a key policy (hotstrings.overrides POLICIES), gives the exact bytes of hotstrings_overrides.toml and the tree every driver must read from them, or error=true when the bytes are not valid TOML. A reader on another platform replays this file unchanged.",
+	"vectors": [
+		{
+			"name": "empty file",
+			"content": "",
+			"expect": {},
+			"policy": "lowercase_bare"
+		},
+		{
+			"name": "category and section leaves",
+			"content": "[autocorrection]\ndelay_offset = -0.25\ncolor = \"#ff0000\"\nshow_tooltip = false\npriority = 3\n\n[autocorrection.caps]\ndelay_unlimited = true\n",
+			"expect": {
+				"autocorrection": {
+					"delay_offset": -0.25,
+					"color": "#ff0000",
+					"show_tooltip": false,
+					"priority": 3,
+					"sections": {
+						"caps": {
+							"delay_unlimited": true
+						}
+					}
+				}
+			},
+			"policy": "lowercase_bare"
+		},
+		{
+			"name": "absolute delay of earlier builds is kept apart",
+			"content": "[rolls]\ndelay = 0.5\n",
+			"expect": {
+				"rolls": {
+					"legacy_delay": 0.5,
+					"sections": {}
+				}
+			},
+			"policy": "lowercase_bare"
+		},
+		{
+			"name": "reserved global table is not a category",
+			"content": "[__global__]\nword = \"x\"\ndelay = 1.0\n\n[__global__.sub]\ncolor = \"#000000\"\n\n[rolls]\ncolor = \"#00ff00\"\n",
+			"expect": {
+				"rolls": {
+					"color": "#00ff00",
+					"sections": {}
+				}
+			},
+			"policy": "lowercase_bare"
+		},
+		{
+			"name": "global table alone leaves nothing",
+			"content": "[__global__]\nwords = [\n  \"a\",\n  \"[rolls]\",\n]\n",
+			"expect": {},
+			"policy": "lowercase_bare"
+		},
+		{
+			"name": "extension categories",
+			"content": "[ext.Demo]\ncolor = \"#111111\"\n\n[ext.demo.main]\npriority = 2\n",
+			"expect": {
+				"ext.demo": {
+					"color": "#111111",
+					"sections": {
+						"main": {
+							"priority": 2
+						}
+					}
+				}
+			},
+			"policy": "lowercase_bare"
+		},
+		{
+			"name": "identifiers are lowercased and merged",
+			"content": "[Rolls]\ncolor = \"#010101\"\n\n[rolls.Left]\nshow_tooltip = true\n",
+			"expect": {
+				"rolls": {
+					"color": "#010101",
+					"sections": {
+						"left": {
+							"show_tooltip": true
+						}
+					}
+				}
+			},
+			"policy": "lowercase_bare"
+		},
+		{
+			"name": "values of the wrong type are dropped, not coerced",
+			"content": "[rolls]\ndelay_offset = \"1.5\"\ndelay_unlimited = false\ncolor = 12\nshow_tooltip = \"true\"\npriority = -1\n",
+			"expect": {
+				"rolls": {
+					"sections": {}
+				}
+			},
+			"policy": "lowercase_bare"
+		},
+		{
+			"name": "negative absolute delay and fractional priority are refused",
+			"content": "[rolls]\ndelay = -1\npriority = 1.5\n",
+			"expect": {
+				"rolls": {
+					"sections": {}
+				}
+			},
+			"policy": "lowercase_bare"
+		},
+		{
+			"name": "a duplicate field is invalid TOML",
+			"policy": "lowercase_bare",
+			"content": "[rolls]\ndelay = 2\ndelay = 3\n",
+			"error": true
+		},
+		{
+			"name": "a duplicate header is invalid TOML",
+			"policy": "verbatim",
+			"content": "[rolls]\ndelay = 2\n[rolls]\ncolor = \"#000000\"\n",
+			"error": true
+		},
+		{
+			"name": "invalid TOML raises",
+			"content": "[rolls\ncolor = \n",
+			"error": true,
+			"policy": "lowercase_bare"
+		},
+		{
+			"name": "verbatim keeps extension and dotted keys as written",
+			"policy": "verbatim",
+			"content": "[\"ext:pack:second\"]\ncolor = \"#123456\"\n\n[\"ext:pack:second\".main]\npriority = 90\n\n[Rolls.\"a.b\"]\ndelay_offset = 1.25\n",
+			"expect": {
+				"ext:pack:second": {
+					"color": "#123456",
+					"sections": {
+						"main": {
+							"priority": 90
+						}
+					}
+				},
+				"Rolls": {
+					"sections": {
+						"a.b": {
+							"delay_offset": 1.25
+						}
+					}
+				}
+			}
+		},
+		{
+			"name": "verbatim also skips the reserved global table",
+			"policy": "verbatim",
+			"content": "[__global__]\ncolor = \"#000000\"\n\n[rolls]\npriority = 1\n",
+			"expect": {
+				"rolls": {
+					"priority": 1,
+					"sections": {}
+				}
+			}
+		},
+		{
+			"name": "verbatim treats ext as an ordinary category",
+			"policy": "verbatim",
+			"content": "[ext.demo]\ncolor = \"#111111\"\n",
+			"expect": {
+				"ext": {
+					"sections": {
+						"demo": {
+							"color": "#111111"
+						}
+					}
+				}
+			}
+		},
+		{
+			"name": "verbatim raises on invalid TOML",
+			"policy": "verbatim",
+			"content": "[rolls\n",
+			"error": true
+		}
+	]
+}
