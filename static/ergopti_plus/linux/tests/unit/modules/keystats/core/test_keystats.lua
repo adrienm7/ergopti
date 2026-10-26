@@ -5,19 +5,17 @@
 --- JSON export, file flush, session lifecycle, edge cases.
 
 local helpers   = require("tests.helpers")
-local it = require("tests.support.metrics_preferences_fixture").it
+local Home = require("tests.support.keystats_home_fixture")
+local it = Home.it
 local Fakes     = helpers.load_module("tests.fakes")
 local keystats = helpers.load_module("modules.keystats.keystats")
 
--- The default path is the real user's metrics store, and every case in this
--- file used it. Once flushes started succeeding, rows written by one case were
--- read back by the next: a dashboard projection counted a keystroke that an
--- earlier case had typed. Each init now starts from an empty database.
-local TEST_SQLITE_PATH = (os.getenv("TMPDIR") or "/tmp") .. "/ergopti_test_keystats.sqlite"
-local function fresh_db()
-  os.remove(TEST_SQLITE_PATH)
-  return TEST_SQLITE_PATH
-end
+-- Every case runs in a home of its own (keystats_home_fixture), and each init
+-- names its database and its log directory inside it. Once flushes started
+-- succeeding, rows written by one case were read back by the next: a dashboard
+-- projection counted a keystroke that an earlier case had typed. Each init now
+-- starts from an empty database.
+local fresh_db = Home.fresh_db
 
 helpers.describe("keystats", function()
 
@@ -91,7 +89,7 @@ helpers.describe("keystats", function()
         "init(nil) must behave like init({}), not disable collection")
     end)
     it("init with a custom log_dir leaves the collector usable", function()
-      keystats.init({ sqlite_path = fresh_db(), log_dir = "/tmp/ergopti_test_logs" })
+      keystats.init({ sqlite_path = fresh_db(), log_dir = Home.path("logs") })
       require("tests.support.metrics_consent_fixture").enable(keystats)
       helpers.assert_true(keystrokes_for("probe-log-dir") > 0,
         "a custom log_dir must not stop keystrokes being counted")
@@ -253,7 +251,7 @@ helpers.describe("keystats", function()
 
   helpers.describe("flush()", function()
     it("flush with configured log_dir does not crash", function()
-      keystats.init({ sqlite_path = fresh_db(), log_dir = os.getenv("TEMP") or "/tmp" })
+      keystats.init({ sqlite_path = fresh_db(), log_dir = Home.path("logs") })
       require("tests.support.metrics_consent_fixture").enable(keystats)
       keystats.on_keydown("f", 1234, "flush-test")
       -- Called directly. flush answers what it wrote, and the caller advances on it.
@@ -315,7 +313,7 @@ helpers.describe("keystats", function()
       package.loaded[logger_name] = nil
       local ok, err = pcall(function()
         local isolated = require(logger_name)
-        isolated.init({ sqlite_path = "/tmp/ergopti_keystats_mock.sqlite" })
+        isolated.init({ sqlite_path = Home.fresh_db() })
         require("tests.support.metrics_consent_fixture").enable(isolated)
         isolated.reset_session()
         isolated.on_app_focus("org.mozilla.firefox", 1000)
@@ -371,7 +369,7 @@ helpers.describe("keystats", function()
       helpers.assert_eq(keystats.get_session_stats().keystrokes, 0)
     end)
     it("full lifecycle does not crash", function()
-      keystats.init({ sqlite_path = fresh_db(), log_dir = os.getenv("TEMP") or "/tmp" })
+      keystats.init({ sqlite_path = fresh_db(), log_dir = Home.path("logs") })
       require("tests.support.metrics_consent_fixture").enable(keystats)
       keystats.on_keydown("a", 100, "app1")
       keystats.on_keydown("b", 200, "app2")

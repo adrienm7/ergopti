@@ -12,6 +12,16 @@
 
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
+local Home = require("tests.support.keystats_home_fixture")
+local Preferences = require("tests.support.metrics_preferences_fixture")
+
+--- Registers one case that owns its home and its metrics preferences: the
+--- collector's paths and the metrics flag stay inside the case.
+--- @param name string
+--- @param body function
+local function it(name, body)
+	helpers.it(name, function() Preferences.with(function() Home.run(body) end) end)
+end
 
 --- Runs the real recorder with a scripted sampler and a fake writer.
 --- @param transitions table Lists handed out by successive take_events() calls.
@@ -42,7 +52,7 @@ local function with_recorder(transitions, script)
 	}
 	local ok, err = pcall(function()
 		local keystats = require(names[2])
-		keystats.init({ sqlite_path = "/tmp/ergopti_keystats_system_mock.sqlite" })
+		keystats.init(Home.options())
 		require("tests.support.metrics_consent_fixture").enable(keystats)
 		keystats.reset_session()
 		script(keystats, fake_writer)
@@ -52,7 +62,7 @@ local function with_recorder(transitions, script)
 end
 
 helpers.describe("keystats system events: the recorder", function()
-	helpers.it("writes the sampler's transitions once, with their metadata", function()
+	it("writes the sampler's transitions once, with their metadata", function()
 		with_recorder({ { { action = "lock" }, { action = "wake", metadata = { asleep_ms = 90000 } } } },
 			function(keystats, writer)
 				keystats.flush()
@@ -63,7 +73,7 @@ helpers.describe("keystats system events: the recorder", function()
 			end)
 	end)
 
-	helpers.it("drops the transitions seen while recording is forbidden", function()
+	it("drops the transitions seen while recording is forbidden", function()
 		with_recorder({ { { action = "unlock" } } }, function(keystats, writer)
 			keystats.set_enabled(false)
 			keystats.flush()
@@ -75,7 +85,7 @@ helpers.describe("keystats system events: the recorder", function()
 end)
 
 helpers.describe("keystats system events: the writer", function()
-	helpers.it("stores the canonical events_system columns", function()
+	it("stores the canonical events_system columns", function()
 		local has_sqlite = os.execute("command -v sqlite3 >/dev/null 2>&1")
 		local writer = helpers.load_module("modules.keystats.sqlite_writer")
 		local dir = os.tmpname()
