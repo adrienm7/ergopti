@@ -589,10 +589,9 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       header as invalid TOML (was last-wins). Left: Windows `_ParseOverrides` replaying the vectors.
 - [x] **PAR-69. Shared ownership protocols.** [CODE] Done: `scope_owner.lua`, `storage_owned.lua`,
       `error_dialog/core.lua`, `owned_timer_slots.lua`, each with a contract (4947f7a445).
-- [ ] **PAR-70. Factory per macOS/Linux infra shim.** [CODE] Done: `timings`, `manifest_reader`,
-      `text_cipher` shared (8553bfaf87, 54e0faa49a, 6f6098c0b9); `native_presentation`, `manifest_menu`, `locale`
-      were already factory bindings. Left: `text_migration`, `config_backup`, `user_code` (135-185 differing
-      lines each: design the ports first).
+- [x] **PAR-70. Factory per macOS/Linux infra shim.** [CODE] Done on macOS and Linux: `timings`,
+      `manifest_reader`, `text_cipher`, `text_migration`, `config_backup`, `user_code` share their policy in
+      `_shared/lua` with contracts replayed by both drivers. Windows keeps its own AHK implementations.
 - [ ] **PAR-71. Finish the route-plan rollout and make `proxy_policy.json` the codegen source.** [CODE]
       `route_plan.lua` has no production consumer on Windows or Linux; policies are hand-typed in Lua,
       Python, Go and generated Swift. Audit R12, C21.
