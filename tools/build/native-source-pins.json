@@ -1,0 +1,15 @@
+{
+	"lua54": {
+		"version": "5.4.7",
+		"url": "https://www.lua.org/ftp/lua-5.4.7.tar.gz",
+		"sha256": "9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30"
+	},
+	"luv": {
+		"repository": "https://github.com/luvit/luv.git",
+		"revision": "ebc79ee5aa082f90e53f75f3f326dcea11e8478d"
+	},
+	"lfs": {
+		"repository": "https://github.com/lunarmodules/luafilesystem.git",
+		"revision": "7c6e1b013caec0602ca4796df3b1d7253a2dd258"
+	}
+}
