@@ -2918,7 +2918,7 @@
 	"ui_apps.goal_reached": "Mål nådd i dag ✓",
 	"ui_apps.goal_remaining": "{pct}% igjen for å nå mål",
 	"ui_apps.h2_active_time": "Aktiv tid",
-	"ui_apps.h2_app_hopping": "App-hopping",
+	"ui_apps.h2_app_hopping": "App-bytte",
 	"ui_apps.h2_autorepeat": "Auto-repetisjon",
 	"ui_apps.h2_battery": "Batteri",
 	"ui_apps.h2_best_hour": "Beste time",
