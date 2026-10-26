@@ -13,13 +13,9 @@ local M = {}
 local Logger = require("infra.logger")
 local LOG = "menu"
 local OperationReporter = require("diagnostics.operation_reporter")
+local TableUtil = require("table_util")
 
-local function clone_value(value)
-	if type(value) ~= "table" then return value end
-	local clone = {}
-	for key, child in pairs(value) do clone[clone_value(key)] = clone_value(child) end
-	return clone
-end
+local clone_value = TableUtil.deep_copy_with_keys
 
 --- Creates a detached transaction snapshot.
 --- @param value any Value to clone.

@@ -15,13 +15,10 @@ local Writer = require("toml_codec.writer")
 local Assignment = require("shortcuts.assignment")
 local Manifest = require("infra.manifest_reader")
 local PhysicalSlots = require("shortcuts.physical_slots")
+local TableUtil = require("table_util")
 local LOG = "menu.program_parameter_transaction"
 
-local function copy(source)
-	local result = {}
-	for key, value in pairs(source) do result[key] = value end
-	return result
-end
+local copy = TableUtil.shallow_copy
 
 local function equal(left, right)
 	if type(left) ~= "table" or type(right) ~= "table" then return false end

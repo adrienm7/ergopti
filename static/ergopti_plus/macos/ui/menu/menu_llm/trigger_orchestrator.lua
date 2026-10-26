@@ -29,6 +29,7 @@ local llm_mod   = require("modules.llm")
 local Chord     = require("chord")
 local Hotkeys   = require("adapters.hotkey_registrar")
 local shortcut_ui = require("ui.menu.shortcut_utils")
+local TableUtil = require("table_util")
 
 local LOG = "menu_llm.trigger_orchestrator"
 
@@ -74,12 +75,7 @@ function M.new(ctx)
 	--- Creates a detached shortcut snapshot for comparison and rollback.
 	--- @param value any Shortcut value.
 	--- @return any clone
-	local function clone_value(value)
-		if type(value) ~= "table" then return value end
-		local clone = {}
-		for key_name, child in pairs(value) do clone[clone_value(key_name)] = clone_value(child) end
-		return clone
-	end
+	local clone_value = TableUtil.deep_copy_with_keys
 
 	--- Compares two normalized shortcut values without relying on table identity.
 	--- @param left table|boolean|nil First shortcut.

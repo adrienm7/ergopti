@@ -25,6 +25,7 @@ local hs     = hs
 local Logger = require("infra.logger")
 
 local PersonalFiles = require("hotstrings.personal_files")
+local TableUtil = require("table_util")
 local LOG = "keymap.registry"
 
 local _delay_resolver = nil
@@ -96,9 +97,7 @@ end
 --- @param source table
 --- @return table
 local function copy_map(source)
-	local out = {}
-	for key, value in pairs(source or {}) do out[key] = value end
-	return out
+	return TableUtil.shallow_copy(source or {})
 end
 
 --- Copies a two-level ownership map without retaining mutable child aliases.
@@ -354,12 +353,7 @@ end
 --- Deep-copies corpus metadata so a caller cannot reach the registered record.
 --- @param value any Plain Lua data.
 --- @return any copy
-local function copy_plain(value)
-	if type(value) ~= "table" then return value end
-	local out = {}
-	for key, child in pairs(value) do out[key] = copy_plain(child) end
-	return out
-end
+local copy_plain = TableUtil.deep_copy
 
 --- Returns the delay inputs of every registered TOML group, detached: its
 --- section names (separators and placeholders excluded) and the corpus

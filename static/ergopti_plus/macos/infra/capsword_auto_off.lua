@@ -25,6 +25,7 @@ local M = {}
 local Logger   = require("infra.logger")
 local Manifest = require("infra.manifest_reader")
 local Policy   = require("caps_word.auto_off")
+local TableUtil = require("table_util")
 
 local LOG = "capsword"
 local PLATFORM = "hs"
@@ -66,9 +67,7 @@ end
 --- Detached copy of one setting value.
 local function copy_value(value)
 	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, item in pairs(value) do copy[key] = item end
-	return copy
+	return TableUtil.shallow_copy(value)
 end
 
 --- Detached copy of the owned keys of a menu state.

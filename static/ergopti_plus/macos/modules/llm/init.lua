@@ -24,6 +24,7 @@ local Paths     = require("infra.paths")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Storage = require("adapters.storage")
 local JsonCodec = require("adapters.json_codec")
+local TableUtil = require("table_util")
 
 local LOG = "llm.core"
 
@@ -398,14 +399,7 @@ local ApiCommon = require("modules.llm.api_common")
 --- stub's by-reference backing store or our last-known durable snapshot.
 --- @param value any Value to copy.
 --- @return any copy
-local function copy_settings_value(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do
-		copy[copy_settings_value(key)] = copy_settings_value(child)
-	end
-	return copy
-end
+local copy_settings_value = TableUtil.deep_copy_with_keys
 
 --- Structural equality for the exact settings readback contract.
 --- @param left any First value.
@@ -1727,12 +1721,7 @@ end
 --- Clones preference data so callers cannot mutate the live profile registry.
 --- @param value any Configuration value.
 --- @return any copy Detached configuration value.
-local function clone_configuration(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do copy[key] = clone_configuration(child) end
-	return copy
-end
+local clone_configuration = TableUtil.deep_copy
 
 --- Captures actual configuration independently from the menu's desired values.
 --- Credentials and backend request ownership are deliberately outside this scope.

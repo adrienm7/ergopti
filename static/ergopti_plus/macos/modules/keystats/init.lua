@@ -49,6 +49,7 @@ local ProcessLifecycle = require("adapters.process_lifecycle")
 local KeyboardHook   = require("adapters.keyboard_hook")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
+local TableUtil = require("table_util")
 local LOG            = "keystats"
 
 
@@ -1184,12 +1185,7 @@ end
 --- Copies only plain configuration data, never native handles or metrics records.
 --- @param value any Configuration value.
 --- @return any copy Detached value.
-local function copy_configuration(value)
-	if type(value) ~= "table" then return value end
-	local result = {}
-	for key, child in pairs(value) do result[key] = copy_configuration(child) end
-	return result
-end
+local copy_configuration = TableUtil.deep_copy
 
 -- A retired channel remains bound until its exact token is explicitly detached.
 local _physical_configuration_binding

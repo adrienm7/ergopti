@@ -66,6 +66,7 @@ local _refresh_personal_data = nil
 local _active_start_token = nil
 local _starting_token = nil
 local ManifestReader = require("infra.manifest_reader")
+local TableUtil = require("table_util")
 
 -- The magic key as declared in the shared feature manifest. Named once here so
 -- the three sites below cannot drift apart from each other or from the manifest.
@@ -189,9 +190,7 @@ end
 --- @param source table
 --- @return table copy
 local function copy_config_map(source)
-	local copy = {}
-	for key, value in pairs(source or {}) do copy[key] = value end
-	return copy
+	return TableUtil.shallow_copy(source or {})
 end
 
 --- Returns a fresh default configuration with no mutable table shared with

@@ -26,6 +26,7 @@ local M = {}
 
 local Logger = require("infra.logger")
 local ChordCatalogue = require("infra.script_chord_catalogue")
+local TableUtil = require("table_util")
 
 local LOG = "menu_global_actions"
 local DISABLED_ACTION = "none"
@@ -38,12 +39,7 @@ for _, slot in ipairs(ChordCatalogue.get().slots) do SCRIPT_SLOTS[#SCRIPT_SLOTS 
 --- Clones nested values without sharing keys or children.
 --- @param value any Source value.
 --- @return any clone
-local function clone_value(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do copy[clone_value(key)] = clone_value(child) end
-	return copy
-end
+local clone_value = TableUtil.deep_copy_with_keys
 
 --- Compares nested values by exact type, key set, and leaf value.
 --- @param left any First value.
