@@ -924,42 +924,6 @@
 		"count": 1
 	},
 	{
-		"file": "macos/ui/download_window/script.js",
-		"sink": "textContent",
-		"text": "Cancelling…",
-		"count": 1
-	},
-	{
-		"file": "macos/ui/download_window/script.js",
-		"sink": "textContent",
-		"text": "Download failed",
-		"count": 1
-	},
-	{
-		"file": "macos/ui/download_window/script.js",
-		"sink": "textContent",
-		"text": "Progression",
-		"count": 1
-	},
-	{
-		"file": "macos/ui/download_window/script.js",
-		"sink": "textContent",
-		"text": "Unknown error.",
-		"count": 1
-	},
-	{
-		"file": "macos/ui/download_window/script.js",
-		"sink": "textContent",
-		"text": "✅ Done",
-		"count": 1
-	},
-	{
-		"file": "macos/ui/download_window/script.js",
-		"sink": "textContent",
-		"text": "🛑 Annuler",
-		"count": 1
-	},
-	{
 		"file": "macos/ui/menu/menu_hotstrings_custom.lua",
 		"sink": "text_prompt",
 		"text": "OK",
