@@ -38,6 +38,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { SYSTEM_BASH, bashExecutable, gitForWindowsRoot } = require('../lib/git-bash.cjs');
 
@@ -278,3 +279,66 @@ console.log(
 		`of the shared resolver, no bare spawn in ${scanned.length} tools/ file(s) ` +
 		`or ${npmScripts.length} npm script(s).\x1b[0m`
 );
+
+// A native cwd is data: POSIX backslashes and newlines cannot become separators
+// or shell record boundaries before the actual Linux test loader starts.
+if (process.platform === 'linux') {
+	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-runner-path-'));
+	try {
+		for (const prefix of ['ordinary', 'literal\\backslash', 'literal\nnewline']) {
+			const checkout = path.join(temporary, prefix);
+			const driver = path.join(checkout, 'static/ergopti_plus/linux');
+			fs.mkdirSync(driver, { recursive: true });
+			for (const entry of fs.readdirSync(path.join(ROOT, 'static/ergopti_plus/linux'), {
+				withFileTypes: true
+			})) {
+				const source = path.join(ROOT, 'static/ergopti_plus/linux', entry.name);
+				const target = path.join(driver, entry.name);
+				if (entry.name === 'tests') fs.cpSync(source, target, { recursive: true });
+				else fs.symlinkSync(source, target);
+			}
+			fs.symlinkSync(
+				path.join(ROOT, 'static/ergopti_plus/_shared'),
+				path.join(checkout, 'static/ergopti_plus/_shared')
+			);
+			const tools = path.join(checkout, 'tools');
+			fs.mkdirSync(path.join(tools, 'test'), { recursive: true });
+			fs.copyFileSync(
+				path.join(TOOLS, 'test/run-linux-lua.cjs'),
+				path.join(tools, 'test/run-linux-lua.cjs')
+			);
+			fs.symlinkSync(path.join(TOOLS, 'control'), path.join(tools, 'control'));
+			const home = path.join(checkout, 'home');
+			fs.mkdirSync(home);
+			const launched = spawnSync(
+				process.execPath,
+				[
+					path.join(tools, 'test/run-linux-lua.cjs'),
+					'tests/run.lua',
+					'--module=infra',
+					'--only=keeps the POSIX request tool'
+				],
+				{
+					cwd: checkout,
+					encoding: 'utf8',
+					timeout: 30000,
+					maxBuffer: 8 * 1024 * 1024,
+					env: { ...process.env, HOME: home }
+				}
+			);
+			assert.ifError(launched.error);
+			assert.equal(
+				launched.status,
+				0,
+				`${JSON.stringify(prefix)}: ${launched.stdout}\n${launched.stderr}`
+			);
+			assert.match(launched.stdout, /ok   keeps the POSIX request tool/);
+			assert.match(launched.stdout, /Passed tests:\s+1\nFailed tests:\s+0/);
+			console.log(
+				`[OK] Linux native prefix ${JSON.stringify(prefix)} executes one existing case without loader errors.`
+			);
+		}
+	} finally {
+		fs.rmSync(temporary, { recursive: true, force: true });
+	}
+}

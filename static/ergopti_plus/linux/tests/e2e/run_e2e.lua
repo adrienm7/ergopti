@@ -29,20 +29,10 @@
 -- ---------------------------------------------------------------------------
 -- Bootstrap: resolve driver root from this file's own path, mirror run.lua.
 -- ---------------------------------------------------------------------------
-local self_path   = debug.getinfo(1, "S").source:gsub("^@", "")
-local driver_root = self_path:match("^(.*)[/\\]tests[/\\]e2e[/\\]run_e2e%.lua$") or "."
-driver_root = driver_root:gsub("\\", "/")
-
-if driver_root == "." then
-	local sep      = package.config:sub(1, 1)
-	local cwd_cmd  = (sep == "\\") and "cd" or "pwd"
-	local h        = io.popen(cwd_cmd)
-	if h then
-		local cwd = h:read("*l") or "."
-		h:close()
-		driver_root = cwd:gsub("\\", "/"):gsub("/$", "")
-	end
-end
+local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+local tests_dir = assert(self_path:match("^(.*)[/\\]e2e[/\\]run_e2e%.lua$"),
+	"the E2E runner needs its tests directory")
+local driver_root = assert(loadfile(tests_dir .. "/runner_root.lua"))()
 
 local drivers_root = driver_root:match("^(.*)/[^/]+$") or driver_root
 local shared_root  = drivers_root .. "/_shared"

@@ -18,23 +18,9 @@
 --- ==============================================================================
 
 -- Resolve our own directory so the runner works no matter the cwd.
-local self_path  = debug.getinfo(1, "S").source:gsub("^@", "")
-local driver_root = self_path:match("^(.*)[/\\]tests[/\\]run%.lua$") or "."
-driver_root = driver_root:gsub("\\", "/")
-
--- When launched as "luajit tests/run.lua" from the linux root, self_path may
--- be a relative path and driver_root resolves to ".". Canonicalise it to an
--- absolute path so downstream path arithmetic is reliable.
-if driver_root == "." then
-	local sep      = package.config:sub(1, 1)
-	local cwd_cmd  = (sep == "\\") and "cd" or "pwd"
-	local cwd_pipe = io.popen(cwd_cmd)
-	if cwd_pipe then
-		local cwd = cwd_pipe:read("*l") or "."
-		cwd_pipe:close()
-		driver_root = cwd:gsub("\\", "/"):gsub("/$", "")
-	end
-end
+local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+local tests_dir = assert(self_path:match("^(.*)[/\\]run%.lua$"), "the unit runner needs its tests directory")
+local driver_root = assert(loadfile(tests_dir .. "/runner_root.lua"))()
 
 -- The _shared/ Lua libraries live one level above the linux driver root
 -- (i.e. in static/ergopti_plus/_shared/lua/).
