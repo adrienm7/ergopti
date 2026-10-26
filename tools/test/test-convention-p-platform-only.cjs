@@ -69,12 +69,14 @@ const PATH_BASELINE = 1;
 /**
  * Every staged driver file, excluding local runtime residue.
  * @param {string} root - Repository root.
+ * @param {NodeJS.ProcessEnv} [env] - Native Git environment; omitted for the staged candidate.
  * @returns {string[]} Repo-relative paths with forward slashes.
  */
-function trackedDriverFiles(root = ROOT) {
+function trackedDriverFiles(root = ROOT, env) {
 	return execFileSync('git', ['ls-files', '--cached', '-z', '--', 'static/ergopti_plus'], {
 		cwd: root,
-		encoding: 'utf8'
+		encoding: 'utf8',
+		env
 	})
 		.split('\0')
 		.filter(Boolean);
@@ -114,7 +116,17 @@ function platformInventory(drivers, files) {
 /** Real Git fixtures distinguish generated folders from actual tracked asymmetry. */
 function assertTrackedPlatformInventory() {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-platform-inventory-'));
-	const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+	// An enclosing candidate gate may intentionally supply its own index. This
+	// private fixture must not write into that owner's Git namespace.
+	const env = { ...process.env };
+	const localNames = execFileSync('git', ['rev-parse', '--local-env-vars'], {
+		cwd: root,
+		encoding: 'utf8'
+	})
+		.trim()
+		.split('\n');
+	for (const name of localNames) delete env[name];
+	const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', env });
 	const put = (relative, content = 'fixture\n') => {
 		const filename = path.join(root, relative);
 		fs.mkdirSync(path.dirname(filename), { recursive: true });
@@ -122,6 +134,10 @@ function assertTrackedPlatformInventory() {
 	};
 	try {
 		git('init', '--quiet');
+		assert.equal(
+			fs.realpathSync(git('rev-parse', '--absolute-git-dir').trim()),
+			fs.realpathSync(path.join(root, '.git'))
+		);
 		git('config', 'core.quotePath', 'true');
 		const drivers = ['linux', 'macos', 'windows'];
 		const folder = 'shared space é';
@@ -136,7 +152,7 @@ function assertTrackedPlatformInventory() {
 		put(ignored);
 		put(untracked);
 		assert.equal(git('check-ignore', '--', ignored).trim(), ignored);
-		let files = trackedDriverFiles(root);
+		let files = trackedDriverFiles(root, env);
 		assert.deepEqual(files.sort(), tracked.sort(), 'NUL inventory must preserve quoted path bytes');
 		assert.deepEqual(
 			platformFolders('macos', files),
@@ -151,14 +167,14 @@ function assertTrackedPlatformInventory() {
 		const asymmetric = 'static/ergopti_plus/linux/platform/linux-only/README.md';
 		put(asymmetric);
 		git('add', '--', asymmetric);
-		files = trackedDriverFiles(root);
+		files = trackedDriverFiles(root, env);
 		assert.deepEqual(
 			platformInventory(drivers, files).missing,
 			['macos/platform/linux-only', 'windows/platform/linux-only'],
 			'a newly tracked Linux-only folder must still fail parity'
 		);
 		git('add', '-f', '--', ignored);
-		files = trackedDriverFiles(root);
+		files = trackedDriverFiles(root, env);
 		assert.ok(
 			platformFolders('macos', files).includes('__pycache__'),
 			'tracked names are never exempt'
