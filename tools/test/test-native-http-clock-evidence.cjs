@@ -294,10 +294,10 @@ function modeledPayload() {
 }
 const { execFileSync } = require('node:child_process');
 const repository = path.resolve(__dirname, '../..');
-function git(root, args, input) {
+function git(root, args, input, stdio = 'pipe') {
 	return execFileSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], {
 		cwd: root,
-		stdio: 'pipe',
+		stdio,
 		input
 	});
 }
@@ -1009,7 +1009,44 @@ try {
 			if (previousGlobalConfig === undefined) delete process.env.GIT_CONFIG_GLOBAL;
 			else process.env.GIT_CONFIG_GLOBAL = previousGlobalConfig;
 		}
+		const oid = git(fixture.root, ['rev-parse', `${fixture.epoch.candidate}:${SWIFT[0]}`])
+			.toString()
+			.trim();
+		const loose = path.join(fixture.root, '.git/objects', oid.slice(0, 2), oid.slice(2));
+		git(fixture.root, ['repack', '-ad']);
+		assert.equal(fs.existsSync(loose), false, 'The packed source control must own no loose copy.');
+		const packedReceipt = evidence.sourceReceipt(fixture.root, fixture.epoch);
+
+		// Fresh commits need not write loose blobs. Receive the actual Git graph
+		// into a private loose store before testing exact object loss and corruption.
+		const archive = path.join(temporary, 'committed-source-objects.pack');
+		const packOutput = fs.openSync(archive, 'wx');
+		try {
+			git(fixture.root, ['pack-objects', '--revs', '--all', '--stdout'], undefined, [
+				'ignore',
+				packOutput,
+				'pipe'
+			]);
+		} finally {
+			fs.closeSync(packOutput);
+		}
+		const objects = path.join(fixture.root, '.git/objects');
+		const retained = fs.mkdtempSync(path.join(temporary, 'packed-source-objects-'));
+		fs.renameSync(objects, path.join(retained, 'objects'));
+		fs.mkdirSync(objects);
+		const packInput = fs.openSync(archive, 'r');
+		try {
+			git(fixture.root, ['unpack-objects', '--strict'], undefined, [packInput, 'pipe', 'pipe']);
+		} finally {
+			fs.closeSync(packInput);
+		}
+		assert.ok(fs.statSync(loose).isFile(), 'The corruption control must own its exact loose blob.');
 		const receipt = evidence.sourceReceipt(fixture.root, fixture.epoch);
+		assert.deepEqual(
+			receipt,
+			packedReceipt,
+			'Git object storage must not change source authority.'
+		);
 		const originalSource = structuredClone(receipt);
 		assert.deepEqual(
 			withNativeGit(() => evidence.sourceReceipt(fixture.root, fixture.epoch)),
@@ -1054,10 +1091,6 @@ try {
 			originalSource,
 			'Real unpacking must preserve the complete source receipt before one blob is mutated.'
 		);
-		const oid = git(fixture.root, ['rev-parse', `${fixture.epoch.candidate}:${SWIFT[0]}`])
-			.toString()
-			.trim();
-		const loose = path.join(fixture.root, '.git/objects', oid.slice(0, 2), oid.slice(2));
 		const objectBytes = fs.readFileSync(loose),
 			objectMode = fs.statSync(loose).mode;
 		const heldObject = path.join(temporary, 'held-committed-source-object');
