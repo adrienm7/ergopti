@@ -252,11 +252,14 @@ local function _open_owned_temp()
 	}
 end
 
---- Creates the native storage directory through the existing shell owner.
+--- Creates the native storage directory through the existing shell owner, private to
+--- the user (0700): restart handoffs such as the pause marker and the relay cancel
+--- marker sit beside the store and rely on no other user being able to write there.
+--- A directory that already exists keeps its mode; only a created one is restricted.
 --- @param directory string Captured destination's parent directory.
 --- @return boolean prepared
 local function prepare_config_dir(directory)
-	return Shell.run(string.format("mkdir -p %s 2>/dev/null", Shell.quote(directory))) == true
+	return Shell.run(string.format("mkdir -p -m 700 %s 2>/dev/null", Shell.quote(directory))) == true
 end
 
 --- Persists a staged cache to disk atomically.
