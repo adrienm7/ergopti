@@ -158,19 +158,15 @@ local function common_categories()
 	return order, labels
 end
 
--- Color palette offered in the "couleur" dropdown. The first six values
--- mirror the bootstrap defaults shipped in the category TOMLs so a user
--- who wandered too far can recover the original look in one click.
-local COLOR_PRESETS = {
-	{ label = i18n.get("hs_config.color_red"),    hex = "#e53935" },
-	{ label = i18n.get("hs_config.color_green"),  hex = "#43a047" },
-	{ label = i18n.get("hs_config.color_orange"), hex = "#fb8c00" },
-	{ label = i18n.get("hs_config.color_blue"),   hex = "#1e88e5" },
-	{ label = i18n.get("hs_config.color_purple"), hex = "#8e44ad" },
-	{ label = i18n.get("hs_config.color_cyan"),   hex = "#00838f" },
-	{ label = i18n.get("hs_config.color_yellow"), hex = "#fdd835" },
-	{ label = i18n.get("hs_config.color_gray"),   hex = "#6e6e73" },
-}
+-- Color palette offered in the "couleur" dropdown. The palette is generated from
+-- _shared/data/native_theme.toml, the one list the Linux window reads too.
+local NativeTheme = require("native_theme_data")
+local COLOR_PRESETS = {}
+local PRESET_HEX = {}
+for _, preset in ipairs(NativeTheme.hotstring_palette) do
+	COLOR_PRESETS[#COLOR_PRESETS + 1] = { label = i18n.get(preset.i18n), hex = preset.hex }
+	PRESET_HEX[preset.name] = preset.hex
+end
 
 
 
@@ -718,7 +714,7 @@ local function on_message(msg, owner)
 	if action == "set_all_grey" then
 		-- Set every common category's file-level colour to grey and wipe any
 		-- per-section colour override so the grey cascades down. Delays untouched.
-		local grey = "#6e6e73"
+		local grey = PRESET_HEX.gray
 		for _, c in ipairs((common_categories())) do
 			if owner and not owner_is_current(owner) then return false end
 			if hotstrings_config.set_override(c, nil, "color", grey) ~= true then return false end
