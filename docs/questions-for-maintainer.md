@@ -7,38 +7,28 @@ answer once, then move the answered line below.
 
 ## Open
 
-Batched for the next answer round (the maintainer asked for no QCM overnight, October 25). Each line names the
-default taken meanwhile.
-
-- **Slow-segment threshold:** macOS and Linux warn at 20 ms per typing-path segment, Windows at 5 ms. Default
-  meanwhile: 20 ms until a real Linux session is measured. Align on 5 ms, keep 20 ms, or give measured
-  per-segment values?
-- **Tap-hold delay migration marker:** `tap_hold.toml` has no version stamp, so the cleanup of the old shipped
-  per-key delays relies on a permanent `[tap_hold] explicit_delays = true` marker. Default meanwhile: kept.
-  Build a versioned migrator for `tap_hold.toml` on the three OS instead?
-- **Duplicate keys in the macOS hotstring override file:** the shared parser reads a duplicate field or
-  header as invalid TOML (the file is then treated as unreadable, as Linux already did); macOS used to keep
-  the last value. Default meanwhile: strict. Keep it, or add a lenient mode?
-- **Linux crash notice:** a Linux crash now shows the same immediate notification as macOS, and the
-  next-start crash dialog is kept too, so a crash can show a toast then a dialog. Default meanwhile: both.
-  Drop the next-start dialog ("one notice")?
-- **Linux Quit refusal:** the only refusal on Linux is "a shutdown already owns the daemon". Default
-  meanwhile: that case only. Enough?
-- **`config_template.toml` on the Lua drivers:** no Lua runtime reads it; packaging ships it and the e2e
-  boots use it as a fixture. Default meanwhile: kept per driver. Stop shipping it for macOS and Linux (e2e on a
-  neutral empty config), or generate a shared part plus a delta?
-- **Hotstring colour palette:** Windows offers 14 colours (plus pink, indigo, turquoise, lime, brown and an AI
-  purple), macOS and Linux 8. Default meanwhile: unchanged. Give macOS and Linux the same 14?
-- **`_shared/ui/metrics_apps/script.js`:** 3607 lines no page loads (index.html does not), yet a Linux test
-  file list names it. Default meanwhile: kept. Retire it?
-- **AI-off hint text:** the greyed agent actions reuse `llm.manual_prediction.disabled` ("AI suggestions are
-  off: turn them on in the Artificial Intelligence menu."). Default meanwhile: reused. A dedicated string?
-- **Older macOS LLM user profiles:** the `[llm.profiles] user_profiles` array of older macOS builds is
-  imported by the macOS config reader, because the migration registry has no op that re-encodes a value and
-  the Windows engine refuses an unknown op at boot. Default meanwhile: reader import. Add a registry op
-  (Windows `config_migrate.ahk` must learn it first) and delete the reader import?
+None. The next batch goes here, each line naming the default taken meanwhile.
 
 ## Answered
+
+- **Answers of 2026-10-26 (QCM):**
+  - **Slow-segment threshold:** 5 ms on the three OS (macOS and Linux were at 20 ms).
+  - **Tap-hold delay migration marker:** a versioned migrator for `tap_hold.toml` on the three OS replaces the
+    permanent `[tap_hold] explicit_delays = true` marker.
+  - **Duplicate keys in the macOS hotstring override file:** strict, as Linux (kept).
+  - **Linux crash notice:** the immediate notification only; the next-start crash dialog goes (one notice, as
+    macOS).
+  - **Linux Quit refusal:** the same refusals as macOS.
+  - **`config_template.toml`:** asked for advice; rule: share as much as possible. Advice given: the three
+    templates are already one generator over the schema (filtered per OS), so keep them generated and shipped
+    as the commented reference of every setting.
+  - **Hotstring colour palette:** the 14 Windows colours on the three OS, from one source.
+  - **`_shared/ui/metrics_apps/script.js`:** retire it.
+  - **AI-off hint text:** a dedicated string in every locale.
+  - **Older macOS LLM user profiles:** add a registry op that re-encodes a value (Windows `config_migrate.ahk`
+    learns it first, on the PC), then delete the macOS reader import.
+  - **PAR-66 section readers:** re-point the source-pin gates to the shared module text, keep only the call
+    pins in the drivers, then extract the five readers.
 
 - **Answers of 2026-10-25 (QCM), implemented the same day unless noted:**
   - **CI design:** one lane per OS plus Common, each Unit → Integration → E2E → Build → Install and launch →

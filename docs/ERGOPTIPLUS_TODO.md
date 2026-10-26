@@ -71,6 +71,21 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
       `UC_PAGE_ACTIONS`, then drop `open_url:available` from `luaHostsOnly` in
       `tools/test/test-update-check-dialog.cjs`.
 
+## Decisions of 2026-10-26 to implement (docs/questions-for-maintainer.md)
+
+- [ ] **Slow-segment threshold 5 ms on macOS and Linux.** [CODE] One registry value read by the three drivers.
+- [ ] **Versioned `tap_hold.toml` migrator.** [CODE] Replaces the `explicit_delays` marker on the three OS;
+      Windows side on the PC.
+- [ ] **Linux crash: notification only.** [CODE] Drop the next-start crash dialog.
+- [ ] **Linux Quit refusals as macOS.** [CODE]
+- [ ] **14 hotstring colours on the three OS.** [CODE] One shared palette source.
+- [ ] **Retire `_shared/ui/metrics_apps/script.js`.** [CODE] With the Linux test list entry.
+- [ ] **Dedicated AI-off hint string.** [CODE] [I18N] Every locale; Windows reader on the PC.
+- [ ] **Registry op that re-encodes a value.** [CODE] Windows `config_migrate.ahk` first (PC), then the Lua
+      engines, then delete the macOS `[llm.profiles] user_profiles` reader import (0146a938c5).
+- [ ] **PAR-66 section readers.** [CODE] Re-point the source-pin gates to the shared module, then extract
+      `personal_info_editor_source` and the metrics/configuration/debug/about readers.
+
 ## Integration pass of 2026-10-24 evening: what landed and what is left
 
 A coordinator session ran a parallel pass on the parity and performance items. Its work is now on `dev` (about 495
