@@ -1071,7 +1071,7 @@ helpers.describe("native sampled reset acknowledgement", function()
 		local quote = require("text_utils").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_keystats_reset_ack.lua"
-		local status = os.execute("env -u LUA_PATH -u LUA_CPATH luajit " .. quote(fixture) .. " " .. quote(root))
+		local status = os.execute("env -u LUA_PATH luajit " .. quote(fixture) .. " " .. quote(root))
 		helpers.assert_true(status == true or status == 0, "actual sampled reset must finish once after COMMIT and cleanup")
 	end)
 end)
