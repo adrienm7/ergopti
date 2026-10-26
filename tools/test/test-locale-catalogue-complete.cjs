@@ -23,6 +23,15 @@
  * reading the German UI sees plausible text. The bug is only visible to someone
  * who both speaks German and knows what that label should say.
  *
+ * VALUES LEFT EQUAL TO ENGLISH (section 5):
+ * Parity cannot see a key that was "translated" by copying the English text.
+ * Counting every locale value identical to en.json gave 263–385 per locale, and
+ * most are legitimate (key names, product names, units, words spelled the same).
+ * `tools/lint/locale-identical-to-english-allowlist.json` lists each legitimate
+ * (key, locale) pair with a reason, and the gate is shrink-only: a new identical
+ * value fails until it is translated or listed, and a listed value that has been
+ * translated fails until its entry is removed.
+ *
  * WHAT THIS DELIBERATELY DOES NOT CHECK — FORMAT PLACEHOLDERS:
  * A "translations must carry the same %s / {n} as English" rule was measured and
  * rejected: it fires on correct work. Czech renders `Disabled in %d application%s`
@@ -50,6 +59,9 @@ const MIN_LOCALES = 21; // The shipped set; adding one raises this deliberately.
 const MIN_KEYS = 2000; // 2 339 today.
 
 const REFERENCE = 'en'; // The canonical key set every other catalogue mirrors.
+
+const ALLOWLIST = path.join(ROOT, 'tools', 'lint', 'locale-identical-to-english-allowlist.json');
+const ALL_LOCALES = '*'; // Allowlist shorthand: identical in every locale except the reference.
 
 const errors = [];
 
@@ -232,9 +244,98 @@ if (reference && reference.size >= MIN_KEYS) {
 	}
 }
 
+// =================================================
+// =================================================
+// ======= 5/ Values left equal to English =======
+// =================================================
+// =================================================
+
+/** Reads the allowlist and returns Map(key -> {reason, locales:Set}) after
+ *  checking its own shape, so a typo in the file cannot silently allow nothing. */
+function loadAllowlist() {
+	const entries = new Map();
+	let raw;
+	try {
+		raw = JSON.parse(fs.readFileSync(ALLOWLIST, 'utf8'));
+	} catch (e) {
+		errors.push(`${path.relative(ROOT, ALLOWLIST)} is unreadable — ${e.message}`);
+		return entries;
+	}
+	const reasons = raw.reasons || {};
+	for (const [key, entry] of Object.entries(raw.entries || {})) {
+		if (!reference || !reference.has(key)) {
+			errors.push(`allowlist key "${key}" is not in ${REFERENCE}.json — delete the entry`);
+			continue;
+		}
+		if (typeof entry.reason !== 'string' || !(entry.reason in reasons)) {
+			errors.push(
+				`allowlist key "${key}" has no known reason (one of: ${Object.keys(reasons).join(', ')})`
+			);
+			continue;
+		}
+		const locales = entry.locales === ALL_LOCALES ? ALL_LOCALES : new Set(entry.locales);
+		if (locales !== ALL_LOCALES) {
+			if (!Array.isArray(entry.locales) || entry.locales.length === 0) {
+				errors.push(`allowlist key "${key}" needs "*" or a non-empty locale list`);
+				continue;
+			}
+			for (const code of locales) {
+				if (code === REFERENCE || !catalogues.has(code)) {
+					errors.push(
+						`allowlist key "${key}" names "${code}", which is not a translated catalogue`
+					);
+				}
+			}
+		}
+		entries.set(key, { reason: entry.reason, locales });
+	}
+	return entries;
+}
+
+if (reference && reference.size >= MIN_KEYS) {
+	const allow = loadAllowlist();
+	const translated = [...catalogues.keys()].filter((c) => c !== REFERENCE).sort();
+	const fresh = new Map(); // locale -> keys equal to English and not allowlisted
+	const stale = []; // "key (locale)" allowlisted but no longer equal to English
+
+	for (const code of translated) {
+		const kv = catalogues.get(code);
+		for (const [key, en] of reference) {
+			if (key.startsWith('_meta.') || typeof en !== 'string') continue;
+			const identical = kv.get(key) === en;
+			const entry = allow.get(key);
+			const listed =
+				entry !== undefined && (entry.locales === ALL_LOCALES || entry.locales.has(code));
+			if (identical && !listed) {
+				if (!fresh.has(code)) fresh.set(code, []);
+				fresh.get(code).push(key);
+			} else if (!identical && listed) {
+				stale.push(`${key} (${code})`);
+			}
+		}
+	}
+
+	for (const [code, keys] of [...fresh].sort()) {
+		errors.push(
+			`${code}.json has ${keys.length} value(s) identical to English that are not allowlisted: ` +
+				`${keys.slice(0, 5).join(', ')}${keys.length > 5 ? ', …' : ''}. The UI shows English text ` +
+				'in that language. Translate the value, or — only for a key name, product name, unit ' +
+				'or word spelled the same in that language — add it to ' +
+				`${path.relative(ROOT, ALLOWLIST).replace(/\\/g, '/')} with a reason.`
+		);
+	}
+	if (stale.length > 0) {
+		errors.push(
+			`${stale.length} allowlist entr${stale.length === 1 ? 'y is' : 'ies are'} stale (the value is no ` +
+				`longer equal to English): ${stale.slice(0, 6).join(', ')}${stale.length > 6 ? ', …' : ''}. ` +
+				'Delete them so the allowlist only ever shrinks.'
+		);
+	}
+}
+
 // ==========================
 // ==========================
-// ======= 5/ Verdict =======
+// ======= 6/ Verdict =======
 // ==========================
 // ==========================
 
@@ -246,5 +347,5 @@ if (errors.length > 0) {
 
 console.log(
 	`\x1b[32m[OK] all ${catalogues.size} locale catalogue(s) carry the same ${reference ? reference.size : 0} ` +
-		'key(s), no value renders blank, and each names itself.\x1b[0m'
+		'key(s), no value renders blank, each names itself, and every value equal to English is allowlisted.\x1b[0m'
 );

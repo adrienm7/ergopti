@@ -1,0 +1,2642 @@
+{
+	"_comment": "Catalogue values that are legitimately identical to en.json. Entries may only be removed: tools/test/test-locale-catalogue-complete.cjs fails on any new identical value that is not listed here, and on a listed value that is no longer identical (translate it, then delete the entry). Keep the reason specific: a plain English sentence is never a legitimate entry.",
+	"reasons": {
+		"keyboard-key-name": "Keyboard key or shortcut name, printed as on the keycap in every layout.",
+		"brand-or-feature-name": "Product, platform, protocol or feature name kept in its original form (Ergopti, Ollama, Spotlight, Hotstrings, Sticky…).",
+		"unit-or-abbreviation": "Unit or technical abbreviation (s, km, RAM, CPM, WPM).",
+		"file-name-or-token": "File name, URL or placeholder token that must not be translated.",
+		"symbol-or-placeholder-only": "Glyphs, key sequences or placeholders without translatable words.",
+		"loanword-or-cognate": "Word that is spelled the same in this locale (cognate or established loanword), checked per key."
+	},
+	"entries": {
+		"app_category.finance": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "fr"]
+		},
+		"app_category.lifestyle": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
+		},
+		"app_category.navigation": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "fr"]
+		},
+		"app_category.video": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "de", "it", "nl", "no", "sv", "tr"]
+		},
+		"app_picker.agent_remove_marker": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"apps.cloner.title_pwa_url": {
+			"reason": "brand-or-feature-name",
+			"locales": ["hi", "ja", "ko", "tr"]
+		},
+		"apps.encryptor.lbl_file": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it"]
+		},
+		"apps.encryptor.prompt_password": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it"]
+		},
+		"ax_actions.spaces": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "he", "hi", "no", "sv"]
+		},
+		"ax_actions.tabs": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"ax_actions.volume": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr", "it", "nl", "pt"]
+		},
+		"button.ok": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "de", "fr", "it", "ja", "nl", "no", "pl", "pt", "sv", "uk"]
+		},
+		"category.autocorrection": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"category.rolls": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
+		},
+		"changelog_window.badge_prerelease": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it", "nl"]
+		},
+		"common.error_prefix": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es"]
+		},
+		"common.error_title": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es"]
+		},
+		"common.key_enter": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "da", "he", "ja", "ko", "nl", "no", "pl", "pt", "tr", "uk"]
+		},
+		"common.later": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
+		},
+		"common.ok": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "de", "fr", "it", "ja", "nl", "no", "pl", "pt", "sv", "uk"]
+		},
+		"dialog.action_picker.program_provider_label": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "es", "fr", "it", "nl", "pt"]
+		},
+		"dialog.action_picker.prompt_label": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv"]
+		},
+		"dialog.gestures.param_app_filter": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"dialog.metrics.encryptor_error_title": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es"]
+		},
+		"dialog.path_copy.btn_backslash": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "it", "ja", "ko", "nl"]
+		},
+		"dialog.shortcuts.chatgpt_title": {
+			"reason": "brand-or-feature-name",
+			"locales": ["hi", "ja", "ko"]
+		},
+		"distancesreduction.ecircumflexe": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"download_window.btn_terminal": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "nl", "no", "pl", "pt", "sv", "tr"]
+		},
+		"editor.hotstrings.btn_add_section": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"editor.hotstrings.cmd_escape": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"editor.hotstrings.cmd_tab": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"editor.hotstrings.col_auto": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv"]
+		},
+		"editor.hotstrings.col_final": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "es", "fr", "pt"]
+		},
+		"editor.hotstrings.col_priority": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv"]
+		},
+		"editor.hotstrings.col_trigger": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it", "nl"]
+		},
+		"editor.hotstrings.desc_title": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"editor.hotstrings.label_trigger": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it", "nl"]
+		},
+		"editor.hotstrings.sec_desc_label": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"editor.hotstrings.title_confirm": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"editor.hotstrings.title_error": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es"]
+		},
+		"editor.hotstrings.trigger_label": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it", "nl"]
+		},
+		"healthcheck.bus.bluetooth": {
+			"reason": "brand-or-feature-name",
+			"locales": [
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"it",
+				"ja",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk"
+			]
+		},
+		"healthcheck.bus.usb": {
+			"reason": "brand-or-feature-name",
+			"locales": "*"
+		},
+		"healthcheck.column.configuration.type": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "fr", "nl", "no"]
+		},
+		"healthcheck.column.peripherals.kind": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "fr", "nl", "no"]
+		},
+		"healthcheck.column.peripherals.name": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"healthcheck.config_file.config": {
+			"reason": "file-name-or-token",
+			"locales": "*"
+		},
+		"healthcheck.config_file.layers": {
+			"reason": "file-name-or-token",
+			"locales": "*"
+		},
+		"healthcheck.config_file.tap_hold": {
+			"reason": "file-name-or-token",
+			"locales": "*"
+		},
+		"healthcheck.device.mouse": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it"]
+		},
+		"healthcheck.device.touchpad": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "it", "nl", "pl", "pt"]
+		},
+		"healthcheck.export.commit": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "tr"]
+		},
+		"healthcheck.export.driver": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "it", "nl", "no"]
+		},
+		"healthcheck.export.schema": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "fr", "no", "pl", "sv"]
+		},
+		"healthcheck.export.system": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "no", "pl", "sv"]
+		},
+		"healthcheck.export.version": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "fr", "sv"]
+		},
+		"healthcheck.field.ai_backend": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "de", "it", "nl", "no", "pl", "sv"]
+		},
+		"healthcheck.field.ai_model": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "nl", "pl", "tr"]
+		},
+		"healthcheck.field.arch": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"healthcheck.field.commit": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "tr"]
+		},
+		"healthcheck.field.cpu": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "nl", "sv"]
+		},
+		"healthcheck.field.desktop": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it"]
+		},
+		"healthcheck.field.github_api": {
+			"reason": "file-name-or-token",
+			"locales": "*"
+		},
+		"healthcheck.field.kanata": {
+			"reason": "brand-or-feature-name",
+			"locales": "*"
+		},
+		"healthcheck.field.karabiner": {
+			"reason": "brand-or-feature-name",
+			"locales": "*"
+		},
+		"healthcheck.field.kernel": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de", "it", "nl"]
+		},
+		"healthcheck.field.model": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "nl", "pl", "tr"]
+		},
+		"healthcheck.field.runtime": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
+		},
+		"healthcheck.section.configuration": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"healthcheck.section.hardware": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "de", "es", "it", "nl", "pt"]
+		},
+		"healthcheck.section.versions": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"healthcheck.value.no": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es", "it"]
+		},
+		"hs_config.cat_autocorrection": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"hs_config.cat_rolls": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
+		},
+		"hs_config.color_cyan": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "fr", "no", "sv"]
+		},
+		"hs_config.color_indigo": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "fr", "nl", "no", "sv"]
+		},
+		"hs_config.color_lime": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it", "sv"]
+		},
+		"hs_config.color_orange": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "fr", "sv"]
+		},
+		"hs_config.color_turquoise": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"hs_config.delim_tab": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"hs_config.group_extensions": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"hs_config.group_personal": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es"]
+		},
+		"hs_config.label_color": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es"]
+		},
+		"hs_config.label_file": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it"]
+		},
+		"input_probe.hook_line": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk"
+			]
+		},
+		"input_probe.scenario.expansion": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de", "fr", "sv"]
+		},
+		"keystats.category_general": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es"]
+		},
+		"layer_editor.caption.keystroke": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"layer_editor.caption.repeat_count": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"layer_editor.group.system": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "no", "pl", "sv"]
+		},
+		"layer_editor.key.alt": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"layer_editor.key.alt_gr": {
+			"reason": "keyboard-key-name",
+			"locales": ["ar", "cs", "fr", "he", "hi", "ja", "ko", "pl", "ru", "tr", "uk", "zh"]
+		},
+		"layer_editor.key.backspace": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "he", "it", "ja", "ko", "nl", "pl", "ru", "uk"]
+		},
+		"layer_editor.key.caps_lock": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk"
+			]
+		},
+		"layer_editor.key.ctrl": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layer_editor.key.delete": {
+			"reason": "keyboard-key-name",
+			"locales": ["ar", "cs", "he", "hi", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "uk", "zh"]
+		},
+		"layer_editor.key.end": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layer_editor.key.enter": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "da", "he", "ja", "ko", "nl", "no", "pl", "pt", "ru", "tr", "uk"]
+		},
+		"layer_editor.key.escape": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layer_editor.key.home": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layer_editor.key.insert": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"pl",
+				"pt",
+				"ru",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layer_editor.key.menu": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "da", "fr", "it", "nl", "pl", "pt"]
+		},
+		"layer_editor.key.num_lock": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk"
+			]
+		},
+		"layer_editor.key.page_down": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layer_editor.key.page_up": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layer_editor.key.shift": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layer_editor.key.tab": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"layer_editor.pane.mouse": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it", "pt"]
+		},
+		"layout_composer.level_alt": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"layout_composer.level_altgr": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"layout_composer.level_base": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es", "fr", "it", "pt"]
+		},
+		"layout_composer.level_caps": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_composer.level_ctrl": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_composer.level_meta": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"layout_composer.level_shift": {
+			"reason": "keyboard-key-name",
+			"locales": ["ar", "cs", "he", "hi", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "uk", "zh"]
+		},
+		"layout_composer.level_shift_altgr": {
+			"reason": "keyboard-key-name",
+			"locales": ["ar", "cs", "he", "hi", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "uk", "zh"]
+		},
+		"layout_composer.name": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"layout_composer.problem_other": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "no", "pl", "sv"]
+		},
+		"layout_manager.btn_homepage": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de", "nl"]
+		},
+		"layout_manager.meta_licence": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs"]
+		},
+		"layout_manager.meta_version": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "fr", "sv"]
+		},
+		"layout_manager.result_failed": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": ["da", "hi", "ko", "tr"]
+		},
+		"layout_manager.status_active": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"llm.agent.label.calendar": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"llm.agent.label.mail": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"llm.agent.label.mail_to": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"llm.agent.label.reminder": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"llm.agent.label.reminder_due": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"llm.agent.label.shortcut": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"llm.deps.tray_title": {
+			"reason": "brand-or-feature-name",
+			"locales": ["cs", "da", "he", "hi", "ja", "ko", "nl", "no", "pl", "sv", "zh"]
+		},
+		"llm.unreachable.start": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "no"]
+		},
+		"llm.vision.local_backend": {
+			"reason": "brand-or-feature-name",
+			"locales": ["es", "fr", "pt"]
+		},
+		"menu.about.version_release": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "fr", "sv"]
+		},
+		"menu.agent.model": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "nl", "pl", "tr"]
+		},
+		"menu.apps.title": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"menu.builder.active_brand": {
+			"reason": "brand-or-feature-name",
+			"locales": "*"
+		},
+		"menu.builder.title": {
+			"reason": "brand-or-feature-name",
+			"locales": "*"
+		},
+		"menu.builder.title_paused": {
+			"reason": "brand-or-feature-name",
+			"locales": "*"
+		},
+		"menu.caps_word.idle_timeout_unit": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv"]
+		},
+		"menu.configuration.title": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"menu.debug.console": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr", "it", "nl", "pt"]
+		},
+		"menu.debug.title": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it"]
+		},
+		"menu.debug.window_spy": {
+			"reason": "brand-or-feature-name",
+			"locales": [
+				"ar",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"sv",
+				"tr"
+			]
+		},
+		"menu.extensions.header": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"menu.hotstrings.cascade_max_arrows_unit": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"menu.hotstrings.idle_reset_unit": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv"]
+		},
+		"menu.hotstrings.infinite": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.assign": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.assign_arrow_equal_left": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.assign_arrow_equal_right": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.assign_arrow_minus_left": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.assign_arrow_minus_right": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.bracket_quote": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.chevron_equal": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.chevron_greater": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.chevron_less": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.close_chevron_tag": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.comment_close": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.comment_open": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.ct": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.cx": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.english_negation": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.equal_string": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.ez": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.hashtag_close_bracket": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.hashtag_open_bracket": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.hashtag_parenthesis": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.hashtag_quote": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.hc": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.left_arrow": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.not_equal": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.paren_quote": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.rolls.sx": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.hotstrings.shortcut_default_ctrl": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"menu.hotstrings.title": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "he", "hi", "nl", "no", "pt", "sv"]
+		},
+		"menu.layout.native_variant_caption": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": "*"
+		},
+		"menu.layout.scope_system": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "no", "pl"]
+		},
+		"menu.layout.virtual_keyboard.ansi": {
+			"reason": "brand-or-feature-name",
+			"locales": "*"
+		},
+		"menu.layout.virtual_keyboard.iso": {
+			"reason": "brand-or-feature-name",
+			"locales": "*"
+		},
+		"menu.llm.backend_ollama_suffix": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "fr", "it", "no", "sv"]
+		},
+		"menu.llm.browse_col_name": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"menu.llm.browse_col_params": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
+		},
+		"menu.llm.browse_col_ram": {
+			"reason": "unit-or-abbreviation",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "ko", "nl", "no", "pl", "pt", "sv", "tr"]
+		},
+		"menu.llm.browse_col_status": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "nl", "no", "pl", "sv"]
+		},
+		"menu.llm.browse_col_type": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "fr", "nl", "no"]
+		},
+		"menu.llm.browse_models_filter": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "nl", "no", "sv"]
+		},
+		"menu.llm.hw_download": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de", "it", "nl", "pt"]
+		},
+		"menu.llm.model_backend": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "de", "es", "it", "nl", "no", "pl", "pt"]
+		},
+		"menu.llm.model_specs_ram": {
+			"reason": "unit-or-abbreviation",
+			"locales": ["cs", "da", "de", "es", "hi", "it", "nl", "no", "pl", "pt", "sv", "tr"]
+		},
+		"menu.llm.model_tags": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "nl", "pt"]
+		},
+		"menu.llm.model_type": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "nl", "no"]
+		},
+		"menu.llm.model_type_chat": {
+			"reason": "brand-or-feature-name",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pt"]
+		},
+		"menu.llm.nav_menu_title": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "fr"]
+		},
+		"menu.llm.prediction_count_label_one": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"menu.llm.prediction_count_label_other": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"menu.metrics.wpm_unit": {
+			"reason": "unit-or-abbreviation",
+			"locales": ["it", "nl"]
+		},
+		"menu.shortcuts.right_opt_back": {
+			"reason": "keyboard-key-name",
+			"locales": ["ar"]
+		},
+		"menu.shortcuts.right_opt_escape": {
+			"reason": "keyboard-key-name",
+			"locales": ["ar"]
+		},
+		"menu.shortcuts.right_opt_return": {
+			"reason": "keyboard-key-name",
+			"locales": ["ar"]
+		},
+		"menu.tapholds.key_tap_delay_inherited": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "es", "fr", "no", "pt", "sv"]
+		},
+		"menu.tapholds.title": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "he", "hi", "no", "pt", "sv"]
+		},
+		"menu.ui": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr", "nl", "pt"]
+		},
+		"metrics_apps.general_category": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es"]
+		},
+		"metrics_apps.score_title": {
+			"reason": "loanword-or-cognate",
+			"locales": ["ar", "cs", "da", "de", "fr", "nl"]
+		},
+		"mlx.machine_apple_silicon": {
+			"reason": "brand-or-feature-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk"
+			]
+		},
+		"mlx.repair_detail": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de", "nl"]
+		},
+		"model_browser.col_name": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "nl", "pl", "tr"]
+		},
+		"model_browser.col_ram": {
+			"reason": "unit-or-abbreviation",
+			"locales": "*"
+		},
+		"model_browser.col_type": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "fr", "nl", "no"]
+		},
+		"model_browser.type_chat": {
+			"reason": "brand-or-feature-name",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pt", "sv"]
+		},
+		"notify.hotstrings": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "he", "hi", "nl", "no", "pt", "sv", "zh"]
+		},
+		"notify.screenshot_title": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de", "it"]
+		},
+		"ollama.delete_error": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "nl", "pl", "tr"]
+		},
+		"ollama.offer_download": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da"]
+		},
+		"ollama.runtime_start": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "no"]
+		},
+		"onboarding.btn.no": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es", "it"]
+		},
+		"onboarding.btn.ok": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "de", "fr", "it", "ja", "nl", "no", "pl", "pt", "sv", "uk"]
+		},
+		"onboarding.error.title": {
+			"reason": "brand-or-feature-name",
+			"locales": ["es"]
+		},
+		"onboarding.layout.emulated_ergopti": {
+			"reason": "brand-or-feature-name",
+			"locales": "*"
+		},
+		"onboarding.layout.emulated_ergopti_plus": {
+			"reason": "brand-or-feature-name",
+			"locales": "*"
+		},
+		"onboarding.no": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es", "it"]
+		},
+		"sfbsreduction.bu": {
+			"reason": "loanword-or-cognate",
+			"locales": "*"
+		},
+		"sg_actions.app_expose": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "es", "fr", "he", "hi", "it", "no", "sv", "uk", "zh"]
+		},
+		"sg_actions.backspace": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "it", "ja", "ko", "nl", "pl", "pt", "ru", "uk"]
+		},
+		"sg_actions.caps_lock": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"fr",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"sg_actions.caps_word": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"sg_actions.capsword": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"sg_actions.cmd_backspace": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"sg_actions.cmd_delete_fwd": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"sg_actions.ctrl_backspace": {
+			"reason": "keyboard-key-name",
+			"locales": ["fr"]
+		},
+		"sg_actions.ctrl_delete": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"fr",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"sg_actions.delete": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "ja", "ko", "nl", "pl", "pt", "ru", "uk"]
+		},
+		"sg_actions.end": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"sg_actions.enter": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "da", "he", "ja", "ko", "nl", "no", "pl", "pt", "ru", "tr", "uk"]
+		},
+		"sg_actions.escape": {
+			"reason": "keyboard-key-name",
+			"locales": ["ar", "cs", "de", "es", "it", "ja", "ko", "nl", "pl", "pt", "ru", "uk"]
+		},
+		"sg_actions.find": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da"]
+		},
+		"sg_actions.home": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"sg_actions.microsoft_bold": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk"
+			]
+		},
+		"sg_actions.mission_control": {
+			"reason": "brand-or-feature-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk"
+			]
+		},
+		"sg_actions.notification_center": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"sg_actions.one_shot_shift": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"sg_actions.open_config": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"sg_actions.open_console": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr", "it", "nl", "pt"]
+		},
+		"sg_actions.open_window_spy": {
+			"reason": "brand-or-feature-name",
+			"locales": [
+				"ar",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"sv",
+				"tr"
+			]
+		},
+		"sg_actions.opt_backspace": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"sg_actions.opt_delete_fwd": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"sg_actions.page_down": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"sg_actions.page_up": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"sg_actions.sg_order.header.cursor": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"sg_actions.sg_order.header.debug": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "fr", "it", "no", "sv"]
+		},
+		"sg_actions.sg_order.header.grp_app": {
+			"reason": "brand-or-feature-name",
+			"locales": "*"
+		},
+		"sg_actions.sg_order.header.grp_input": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "it"]
+		},
+		"sg_actions.sg_order.header.grp_media": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it", "nl", "sv"]
+		},
+		"sg_actions.sg_order.header.grp_system": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "no", "pl", "sv"]
+		},
+		"sg_actions.sg_order.header.grp_text": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "de", "sv"]
+		},
+		"sg_actions.sg_order.header.media": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
+		},
+		"sg_actions.sg_order.header.navigation": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "fr"]
+		},
+		"sg_actions.sg_order.header.screenshot": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"sg_actions.sg_order.header.system": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "no", "pl", "sv"]
+		},
+		"sg_actions.sg_order.header.tabs": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"sg_actions.sg_order.header.ui": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr", "nl", "pt"]
+		},
+		"sg_actions.spotlight": {
+			"reason": "brand-or-feature-name",
+			"locales": "*"
+		},
+		"sg_actions.sticky_cmd": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+		},
+		"sg_actions.sticky_cmd_ctrl": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+		},
+		"sg_actions.sticky_cmd_option": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+		},
+		"sg_actions.sticky_cmd_option_ctrl": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+		},
+		"sg_actions.sticky_cmd_option_shift": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+		},
+		"sg_actions.sticky_cmd_shift": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+		},
+		"sg_actions.sticky_cmd_shift_ctrl": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+		},
+		"sg_actions.sticky_ctrl": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+		},
+		"sg_actions.sticky_ctrl_shift": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+		},
+		"sg_actions.sticky_hyper": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+		},
+		"sg_actions.sticky_option": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+		},
+		"sg_actions.sticky_option_ctrl": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+		},
+		"sg_actions.sticky_option_shift": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+		},
+		"sg_actions.sticky_option_shift_ctrl": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+		},
+		"sg_actions.sticky_shift": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "zh"]
+		},
+		"sg_actions.tab": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"sg_actions.vol_down": {
+			"reason": "keyboard-key-name",
+			"locales": ["fr", "it", "nl", "pt"]
+		},
+		"sg_actions.vol_up": {
+			"reason": "keyboard-key-name",
+			"locales": ["fr", "it", "nl", "pt"]
+		},
+		"sg_labels.script_altgr_backspace": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"sg_labels.script_altgr_delete": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"sg_labels.script_altgr_enter": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "da", "he", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "tr", "uk"]
+		},
+		"sg_labels.script_altgr_escape": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"sg_labels.script_ropt_backspace": {
+			"reason": "keyboard-key-name",
+			"locales": ["ar"]
+		},
+		"sg_labels.script_ropt_delete": {
+			"reason": "keyboard-key-name",
+			"locales": ["ar"]
+		},
+		"sg_labels.script_ropt_escape": {
+			"reason": "keyboard-key-name",
+			"locales": ["ar"]
+		},
+		"sg_labels.script_ropt_return": {
+			"reason": "keyboard-key-name",
+			"locales": ["ar"]
+		},
+		"shortcuts.altgrcapslock.backspace": {
+			"reason": "keyboard-key-name",
+			"locales": ["da", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "uk", "zh"]
+		},
+		"shortcuts.altgrcapslock.capslock": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"shortcuts.altgrcapslock.capsword": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"shortcuts.altgrcapslock.ctrlbackspace": {
+			"reason": "keyboard-key-name",
+			"locales": ["da", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "uk", "zh"]
+		},
+		"shortcuts.altgrcapslock.ctrldelete": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"cs",
+				"da",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"uk",
+				"zh"
+			]
+		},
+		"shortcuts.altgrcapslock.delete": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"cs",
+				"da",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"uk",
+				"zh"
+			]
+		},
+		"shortcuts.altgrcapslock.enter": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "da", "he", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "uk", "zh"]
+		},
+		"shortcuts.altgrcapslock.escape": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"cs",
+				"da",
+				"es",
+				"he",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"uk",
+				"zh"
+			]
+		},
+		"shortcuts.altgrcapslock.oneshotshift": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"shortcuts.altgrcapslock.tab": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"shortcuts.altgrlalt.backspace": {
+			"reason": "keyboard-key-name",
+			"locales": ["da", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "uk", "zh"]
+		},
+		"shortcuts.altgrlalt.capslock": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"shortcuts.altgrlalt.capsword": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"shortcuts.altgrlalt.ctrlbackspace": {
+			"reason": "keyboard-key-name",
+			"locales": ["da", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "uk", "zh"]
+		},
+		"shortcuts.altgrlalt.ctrldelete": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"cs",
+				"da",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"uk",
+				"zh"
+			]
+		},
+		"shortcuts.altgrlalt.delete": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"cs",
+				"da",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"uk",
+				"zh"
+			]
+		},
+		"shortcuts.altgrlalt.enter": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"cs",
+				"da",
+				"he",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"shortcuts.altgrlalt.escape": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"cs",
+				"da",
+				"es",
+				"he",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"uk",
+				"zh"
+			]
+		},
+		"shortcuts.altgrlalt.oneshotshift": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"shortcuts.altgrlalt.tab": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"shortcuts.laltcapslock.backspace": {
+			"reason": "keyboard-key-name",
+			"locales": ["da", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "uk", "zh"]
+		},
+		"shortcuts.laltcapslock.capslock": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"shortcuts.laltcapslock.capsword": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"shortcuts.laltcapslock.ctrlbackspace": {
+			"reason": "keyboard-key-name",
+			"locales": ["da", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "uk", "zh"]
+		},
+		"shortcuts.laltcapslock.ctrldelete": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"cs",
+				"da",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"uk",
+				"zh"
+			]
+		},
+		"shortcuts.laltcapslock.delete": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"cs",
+				"da",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"uk",
+				"zh"
+			]
+		},
+		"shortcuts.laltcapslock.enter": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "da", "he", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "uk", "zh"]
+		},
+		"shortcuts.laltcapslock.escape": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"cs",
+				"da",
+				"es",
+				"he",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"uk",
+				"zh"
+			]
+		},
+		"shortcuts.laltcapslock.oneshotshift": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"shortcuts.laltcapslock.tab": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"shortcuts.screenshot_title": {
+			"reason": "keyboard-key-name",
+			"locales": ["de", "it"]
+		},
+		"shortcuts.wincapslock": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"tap_hold.group.alt_gr": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"tap_hold.group.backspace": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "he", "nl", "pl", "ru", "uk"]
+		},
+		"tap_hold.group.caps_lock": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"tap_hold.group.delete": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"tap_hold.group.enter": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "da", "he", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk"]
+		},
+		"tap_hold.group.escape": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"it",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk"
+			]
+		},
+		"tap_hold.group.fn": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"tap_hold.group.left_alt": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"tap_hold.group.left_command": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"sv",
+				"zh"
+			]
+		},
+		"tap_hold.group.left_ctrl": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"sv",
+				"zh"
+			]
+		},
+		"tap_hold.group.left_option": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"sv",
+				"zh"
+			]
+		},
+		"tap_hold.group.left_shift": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"sv",
+				"zh"
+			]
+		},
+		"tap_hold.group.right_command": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"tap_hold.group.right_ctrl": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"tap_hold.group.right_option": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"tap_hold.group.right_shift": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"tap_hold.group.tab": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"tap_hold.group.win": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"tap_hold.hold.alt": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"tap_hold.hold.alt_gr": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"tap_hold.hold.ctrl": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"tap_hold.hold.shift": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"tap_hold.hold.win": {
+			"reason": "keyboard-key-name",
+			"locales": "*"
+		},
+		"tap_hold.picker.hold": {
+			"reason": "keyboard-key-name",
+			"locales": ["da", "de", "es", "fr", "he", "hi", "it", "no", "sv"]
+		},
+		"tap_hold.picker.tap": {
+			"reason": "keyboard-key-name",
+			"locales": ["da", "de", "es", "fr", "he", "hi", "it", "no", "sv"]
+		},
+		"terminators.label_backslash": {
+			"reason": "keyboard-key-name",
+			"locales": ["de", "nl"]
+		},
+		"terminators.label_enter": {
+			"reason": "keyboard-key-name",
+			"locales": ["cs", "da", "he", "ja", "ko", "nl", "no", "pl", "pt", "tr", "uk"]
+		},
+		"terminators.label_slash": {
+			"reason": "keyboard-key-name",
+			"locales": ["fr"]
+		},
+		"terminators.label_tab": {
+			"reason": "keyboard-key-name",
+			"locales": ["nl"]
+		},
+		"token_prompt.placeholder": {
+			"reason": "file-name-or-token",
+			"locales": "*"
+		},
+		"ui_apps.col_app": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"ui_apps.col_app_name": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"ui_apps.col_focus": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr", "it", "nl"]
+		},
+		"ui_apps.col_hold": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "fr", "no", "sv"]
+		},
+		"ui_apps.col_hs_pct": {
+			"reason": "unit-or-abbreviation",
+			"locales": [
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"uk",
+				"zh"
+			]
+		},
+		"ui_apps.ds_bursts": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "he", "hi", "nl", "no", "sv", "tr"]
+		},
+		"ui_apps.ds_focus_h": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr", "it"]
+		},
+		"ui_apps.h2_spaces": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "fr", "he", "hi", "no", "sv"]
+		},
+		"ui_apps.h2_top_trio": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl", "pt"]
+		},
+		"ui_apps.kpi_bursts_count": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "nl", "no"]
+		},
+		"ui_apps.kpi_in_app": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de", "it", "nl"]
+		},
+		"ui_apps.kpi_top_layout": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "nl"]
+		},
+		"ui_apps.label_period": {
+			"reason": "loanword-or-cognate",
+			"locales": ["sv"]
+		},
+		"ui_apps.lbl_top_wifi": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
+		},
+		"ui_apps.modal_app_title": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"ui_apps.modal_destinations": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"ui_apps.modal_records": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr", "nl"]
+		},
+		"ui_apps.prod_negative": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"ui_apps.prod_neutral": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "es", "sv"]
+		},
+		"ui_apps.tile_backspaces": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "he", "nl", "pt"]
+		},
+		"ui_apps.tile_focus": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr", "it", "nl"]
+		},
+		"ui_typing.calendar_month_0": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"ui_typing.calendar_month_1": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"ui_typing.calendar_month_10": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"ui_typing.calendar_month_2": {
+			"reason": "loanword-or-cognate",
+			"locales": ["tr"]
+		},
+		"ui_typing.calendar_month_3": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"ui_typing.calendar_month_4": {
+			"reason": "loanword-or-cognate",
+			"locales": ["tr"]
+		},
+		"ui_typing.calendar_month_5": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"ui_typing.calendar_month_6": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"ui_typing.calendar_month_7": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"ui_typing.calendar_month_8": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"ui_typing.charmix_letters": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
+		},
+		"ui_typing.col_app": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "es", "fr", "it", "nl", "no", "pt", "sv"]
+		},
+		"ui_typing.col_occ": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"ui_typing.dataset_ai": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "hi", "ja", "ko", "zh"]
+		},
+		"ui_typing.dataset_hs": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "he", "hi", "nl", "no", "pt", "sv", "zh"]
+		},
+		"ui_typing.dataset_manual": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es", "pt"]
+		},
+		"ui_typing.errors_table_bigram": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "pl", "sv", "tr"]
+		},
+		"ui_typing.errors_table_occ": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"ui_typing.finger.hand_l": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": ["cs", "de", "nl", "pl"]
+		},
+		"ui_typing.finger.hand_r": {
+			"reason": "symbol-or-placeholder-only",
+			"locales": ["de", "nl"]
+		},
+		"ui_typing.h2_hs": {
+			"reason": "brand-or-feature-name",
+			"locales": ["da", "de", "es", "fr", "he", "hi", "nl", "no", "pt", "sv"]
+		},
+		"ui_typing.h2_lexicon": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
+		},
+		"ui_typing.key_caps": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"ui_typing.key_enter": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"he",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"ui_typing.key_esc": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"ui_typing.key_shift": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"he",
+				"hi",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"ui_typing.key_tab": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"ui_typing.key_tip_freq": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it", "nl", "pt"]
+		},
+		"ui_typing.lbl_cascades": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "fr", "nl"]
+		},
+		"ui_typing.lbl_letters": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
+		},
+		"ui_typing.lbl_redir": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es", "fr", "it"]
+		},
+		"ui_typing.lbl_total": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "es", "fr", "pt"]
+		},
+		"ui_typing.lbl_via_hotstrings": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "fr", "nl", "no", "pt", "sv"]
+		},
+		"ui_typing.month_0": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"ui_typing.month_1": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de", "it"]
+		},
+		"ui_typing.month_10": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de", "it"]
+		},
+		"ui_typing.month_2": {
+			"reason": "loanword-or-cognate",
+			"locales": ["it", "pl", "tr"]
+		},
+		"ui_typing.month_3": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de", "it"]
+		},
+		"ui_typing.month_7": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"ui_typing.month_8": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"ui_typing.opt_pause.1000": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"ui_typing.opt_pause.10000": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"ui_typing.opt_pause.2000": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"ui_typing.opt_pause.20000": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"ui_typing.opt_pause.3000": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"ui_typing.opt_pause.30000": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"ui_typing.opt_pause.5000": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"ui_typing.opt_pause.60000": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"ui_typing.opt_quick_range.": {
+			"reason": "loanword-or-cognate",
+			"locales": ["sv"]
+		},
+		"ui_typing.rep_table_bigram": {
+			"reason": "loanword-or-cognate",
+			"locales": ["cs", "da", "pl", "sv", "tr"]
+		},
+		"ui_typing.rep_table_manual": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es", "pt"]
+		},
+		"ui_typing.rep_table_total": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "es", "fr", "pt"]
+		},
+		"ui_typing.rep_table_via_star": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "fr", "it", "nl", "no", "pt", "sv"]
+		},
+		"ui_typing.sfb_table_finger": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "no", "sv"]
+		},
+		"ui_typing.sfb_table_hand": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de", "nl", "sv"]
+		},
+		"ui_typing.tab_keycodes": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "fr", "he", "hi", "no", "sv"]
+		},
+		"ui_typing.unit_activations": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"ui_typing.unit_cpm": {
+			"reason": "unit-or-abbreviation",
+			"locales": ["es", "fr", "it", "pt"]
+		},
+		"ui_typing.unit_km": {
+			"reason": "unit-or-abbreviation",
+			"locales": [
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"sv",
+				"tr"
+			]
+		},
+		"ui_typing.unit_mpm": {
+			"reason": "unit-or-abbreviation",
+			"locales": ["de", "fr", "it", "nl", "pl", "pt"]
+		},
+		"ui_typing.unit_triggers": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
+		},
+		"update_check.window_title": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
+		},
+		"updater.channel.dev": {
+			"reason": "brand-or-feature-name",
+			"locales": "*"
+		},
+		"updater.channel.main": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"updater.title_update": {
+			"reason": "brand-or-feature-name",
+			"locales": ["nl"]
+		},
+		"updater.update_dialog_later": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
+		},
+		"updater.window_title": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
+		}
+	}
+}
