@@ -298,8 +298,16 @@ _GSS_StatusSubmenuAbsent() {
 	for Section in ["gesture_system_status_windows_frame", "gesture_system_windows_children",
 		"gesture_system_slot_windows_frame", "gesture_system_slot_configured", "gesture_system_slot_not_configured"]
 		AssertFalse(Root.Has(Section), "retired Windows status declaration: " . Section)
-	Status := _MR_FindItemById("gestures_menu", "system_gesture_status")
-	Assert(Status is Map, "macOS and Linux keep the row, so the declaration exists")
+	Status := false
+	for Item in Root["gestures_menu"] {
+		if Item.Get("id", "") == "system_gesture_status" {
+			AssertFalse(Status is Map, "the shared declaration has exactly one status row")
+			Status := Item
+		}
+	}
+	Assert(Status is Map, "macOS and Linux keep the row, so the raw declaration exists")
+	AssertFalse(_MR_FindItemById("gestures_menu", "system_gesture_status"),
+		"the actual Windows declaration lookup must hide the foreign status row")
 	for Platform in Status["platforms"]
 		AssertTrue(Platform != "ahk", "the status row is not declared for the Windows driver")
 	for Name in ["GestureSystemRows", "GestureSystemNotice", "GestureSystemFinishNotice",
