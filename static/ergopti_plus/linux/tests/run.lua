@@ -163,23 +163,31 @@ local function discover_tests(dir)
 	end
 
 	-- Fallback: shell out using io.popen.
+	local windows = package.config:sub(1, 1) == "\\"
 	local cmd
-	if package.config:sub(1, 1) == "\\" then
+	if windows then
 		cmd = string.format('cmd /c dir /b /s /a-d "%s"', abs:gsub("/", "\\"))
 	else
-		cmd = string.format("find '%s' -type f -name 'test_*.lua'", abs)
+		-- find runs inside the directory, so its paths never contain the
+		-- checkout prefix: a POSIX prefix may hold a backslash or a newline.
+		cmd = "cd " .. shell_quote(abs) .. " && find . -type f -name 'test_*.lua'"
 	end
 	local pipe, open_error = io.popen(cmd)
 	if not pipe then return nil, tostring(open_error or "could not start discovery command") end
 
 	local strip_prefix = driver_root
 	for line in pipe:lines() do
-		line = line:gsub("\\", "/")
 		local rel
-		if strip_prefix ~= "" and line:sub(1, #strip_prefix):lower() == strip_prefix:lower() then
-			rel = line:sub(#strip_prefix + 2):gsub("%.lua$", "")
+		if windows then
+			line = line:gsub("\\", "/")
+			if strip_prefix ~= "" and line:sub(1, #strip_prefix):lower() == strip_prefix:lower() then
+				rel = line:sub(#strip_prefix + 2):gsub("%.lua$", "")
+			else
+				rel = line:match("([^/]+/test_[^/]+)%.lua$")
+			end
 		else
-			rel = line:match("([^/]+/test_[^/]+)%.lua$")
+			local inside = line:match("^%./(.+)%.lua$")
+			rel = inside and (dir .. "/" .. inside)
 		end
 		if rel and rel:match("/test_[^/]+$") then
 			results[#results + 1] = rel:gsub("/", ".")

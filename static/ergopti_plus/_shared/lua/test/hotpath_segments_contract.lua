@@ -51,14 +51,23 @@ local function production_files(root)
 		walk(root)
 	else
 		local windows = package.config:sub(1, 1) == "\\"
+		-- On POSIX find runs inside the root, so the listed paths never contain
+		-- it: a POSIX root may hold a backslash or a newline.
 		local command = windows and string.format('cmd /c dir /b /s /a-d "%s"', root:gsub("/", "\\"))
-			or string.format("find '%s' -type f -name '*.lua'", root)
+			or "cd '" .. root:gsub("'", "'\\''") .. "' && find . -type f -name '*.lua'"
 		local pipe = assert(io.popen(command))
 		for line in pipe:lines() do
-			line = line:gsub("\\", "/")
-			local skipped = false
+			local inside
+			if windows then
+				line = line:gsub("\\", "/")
+				inside = line:sub(#root + 1)
+			else
+				inside = line:match("^%.(/.+)$")
+				line = inside and (root .. inside)
+			end
+			local skipped = inside == nil
 			for directory in pairs(SKIPPED_DIRECTORIES) do
-				if line:find("/" .. directory .. "/", #root, true) then skipped = true end
+				if inside and inside:find("/" .. directory .. "/", 1, true) then skipped = true end
 			end
 			if not skipped and line:match("%.lua$") then found[#found + 1] = line end
 		end
