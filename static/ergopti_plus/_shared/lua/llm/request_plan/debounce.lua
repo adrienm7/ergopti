@@ -48,10 +48,6 @@ M.NEVER_MS = -1
 M.OPTION_KEYS = {
 	-- boolean: a negative debounce means "never" (the automatic trigger is off).
 	"allow_never",
-	-- boolean: an explicit request (hotkey, typed trigger, prompt action) waits for the floor.
-	"pace_explicit",
-	-- boolean: the second and later variants of a sequential request wait for the floor.
-	"pace_variants",
 	-- string "global"|"per_backend": whether the last request time is one value or one per backend.
 	"floor_scope",
 	-- boolean: in live mode a word end still fires instantly (instead of the live debounce).
@@ -103,7 +99,7 @@ local function admit_options(options)
 	for _, key in ipairs(M.OPTION_KEYS) do
 		if options[key] == nil then error("request plan option '" .. key .. "' is required", 3) end
 	end
-	for _, key in ipairs({ "allow_never", "pace_explicit", "pace_variants", "live_instant_word_end" }) do
+	for _, key in ipairs({ "allow_never", "live_instant_word_end" }) do
 		if type(options[key]) ~= "boolean" then error("request plan option '" .. key .. "' must be a boolean", 3) end
 	end
 	if options.floor_scope ~= "global" and options.floor_scope ~= "per_backend" then
@@ -112,8 +108,6 @@ local function admit_options(options)
 	if type(options.floor_ms) ~= "function" then error("request plan option 'floor_ms' must be a function", 3) end
 	return {
 		allow_never = options.allow_never,
-		pace_explicit = options.pace_explicit,
-		pace_variants = options.pace_variants,
 		floor_scope = options.floor_scope,
 		live_instant_word_end = options.live_instant_word_end,
 		floor_ms = options.floor_ms,
@@ -127,8 +121,7 @@ local function admit_options(options)
 end
 
 --- Creates a plan.
---- @param options table { allow_never, pace_explicit, pace_variants, floor_scope,
----   live_instant_word_end, floor_ms = function(backend) -> milliseconds }.
+--- @param options table { allow_never, floor_scope, live_instant_word_end, floor_ms = function(backend) -> milliseconds }.
 --- @return table plan
 function M.new(options)
 	local plan = {
@@ -283,7 +276,10 @@ local function floor_key(self, backend)
 end
 
 --- Decides whether a request may go to its backend now.
---- @param request table { backend = string, explicit = boolean|nil, variant = number|nil (1-based) }.
+--- @param request table { backend = string, explicit = boolean|nil }. An explicit request
+---   (shortcut, typed trigger, prompt action) is never held, nor are the later variants of
+---   its sequential run: each variant is dispatched as an explicit one. Only automatic
+---   requests wait for the floor.
 --- @param now_ms number The caller's monotonic clock in milliseconds.
 --- @return table decisions One `send`, or one `defer` with the milliseconds to wait.
 function M:on_dispatch(request, now_ms)
@@ -292,15 +288,7 @@ function M:on_dispatch(request, now_ms)
 		error("a dispatch request needs a backend", 2)
 	end
 	if type(now_ms) ~= "number" then error("a dispatch needs the clock", 2) end
-	local variant = request.variant or 1
-	local explicit = request.explicit == true
-	local floored
-	if variant > 1 then
-		floored = own.pace_variants
-	else
-		floored = (not explicit) or own.pace_explicit
-	end
-	if not floored then return { { action = "send" } } end
+	if request.explicit == true then return { { action = "send" } } end
 	local last = self._last_sent_ms[floor_key(self, request.backend)]
 	if last == nil then return { { action = "send" } } end
 	local interval = own.floor_ms(request.backend)

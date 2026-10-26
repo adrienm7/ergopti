@@ -12,10 +12,9 @@
 --- FEATURES & RATIONALE:
 --- 1. "Never" (the shared debounce sentinel, -1) turns the automatic trigger off,
 ---    so the plan accepts a negative debounce.
---- 2. Every request waits for the backend's interval, explicit ones and the next
----    variants of a sequential request included: a hosted API with a free tier
----    answers a burst with HTTP 429, and a typed trigger or a hotkey is as much a
----    burst as typing is.
+--- 2. Only an automatic request waits for the backend's interval. An explicit one
+---    (a shortcut, a typed trigger, a prompt action) is never held, and neither
+---    are the later variants of its sequential run (maintainer, 2026-10-26).
 --- 3. The last request time is kept per backend kind, because the agent, tone and
 ---    screen requests share the same map.
 --- 4. A word end fires instantly in live mode too (when the instant word end
@@ -29,8 +28,6 @@ local Debounce = require("llm.request_plan.debounce")
 -- The option set this driver runs; compared with the corpus by the contract test.
 M.OPTIONS = {
 	allow_never = true,
-	pace_explicit = true,
-	pace_variants = true,
 	floor_scope = "per_backend",
 	live_instant_word_end = true,
 }

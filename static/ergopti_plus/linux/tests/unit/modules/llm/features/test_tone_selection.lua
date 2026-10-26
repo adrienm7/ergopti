@@ -489,16 +489,12 @@ helpers.describe("tone actions: refusals and dropped answers", function()
 		end)
 	end)
 
-	helpers.it("retires a paced tone step after changing backend (ai-pass2-revision)", function()
+	helpers.it("sends a second tone step at once, without waiting for the request interval (explicit-never-held)", function()
 		scenario({ selection = "merci pour ton aide" }, function(world)
 			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), true)
 			world.respond(1, "REWRITE: Merci pour votre aide.")
 			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), true)
-			helpers.assert_eq(#world.posts, 1, "the second step is waiting for the provider interval")
-			helpers.assert_eq(world.engine.set_backend("ollama"), true)
-			world.wait_for(2)
-			helpers.assert_eq(#world.posts, 1, "the retired provider receives no queued selection")
-			helpers.assert_eq(#world.ollama, 0, "the old tone step is not redirected to the new backend")
+			helpers.assert_eq(#world.posts, 2, "a tone shortcut is an explicit request: nothing holds it")
 		end)
 	end)
 
@@ -589,17 +585,6 @@ helpers.describe("selection rewrites require a known stable native focus", funct
 			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"))
 		end)
 	end)
-	helpers.it("refuses a paced tone request after its native field changes (selection-native-focus)", function()
-		scenario({ selection = "merci pour ton aide" }, function(world)
-			helpers.assert_true(world.handlers.llm_tone_more_formal("tap_3", nil))
-			world.respond(1, "REWRITE: Merci pour votre aide.")
-			helpers.assert_true(world.handlers.llm_tone_more_formal("tap_3", nil))
-			helpers.assert_eq(#world.posts, 1, "the second request must wait for pacing")
-			world.focus = "atspi::1.42:/different-field"
-			world.wait_for(2)
-			helpers.assert_eq(#world.posts, 1, "a stale selected field cannot be sent after the timer fires")
-		end)
-	end)
 	for _, missing in ipairs({"empty", "unavailable"}) do
 		helpers.it("refuses tone before reading selection when focus is " .. missing .. " (selection-native-focus)", function()
 			scenario({selection = "merci pour ton aide"}, function(world)
@@ -648,16 +633,14 @@ helpers.describe("tone resident global privacy admission", function()
 			helpers.assert_eq(#world.posts, 0)
 		end)
 	end)
-	helpers.it("rechecks global privacy before paced tone send and physical replacement (llm-global-privacy)", function()
+	helpers.it("rechecks global privacy before the tone send and the physical replacement (llm-global-privacy)", function()
 		local blocked = false
 		scenario({ selection = "merci pour ton aide", privacy_guard = function() return blocked end }, function(world)
 			helpers.assert_true(world.handlers.llm_tone_more_formal("tap_3", nil))
 			blocked = true; world.respond(1, "REWRITE: Merci pour votre aide.")
 			helpers.assert_eq(#world.emitted, 0, "a completed protected selection is never replaced")
-			blocked = false
-			helpers.assert_true(world.handlers.llm_tone_more_formal("tap_3", nil))
-			helpers.assert_eq(#world.posts, 1, "the next request must wait for pacing")
-			blocked = true; world.wait_for(2)
+			helpers.assert_eq(#world.posts, 1)
+			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), false, "a protected field refuses the next step")
 			helpers.assert_eq(#world.posts, 1)
 			helpers.assert_true(world.engine.is_enabled())
 		end)
@@ -746,77 +729,65 @@ helpers.describe("active API entry deletion", function()
 end)
 
 helpers.describe("tone dispatch retains its native admission owner", function()
-	for _, paced in ipairs({ false, true }) do
-		for _, boundary in ipairs({ "privacy", "focus" }) do
-			for _, action in ipairs({ "scope", "shutdown", "successor" }) do
-				helpers.it("(tone-dispatch-owner) rechecks " .. action .. " after " .. boundary .. " paced=" .. tostring(paced), function()
-					local subject, armed, observed, action_result, boundary_finished
-					local focus_reads, retired_focus_reads = 0, 0
-					local owner = { pending = function() return false end }
-					local function intervene()
-						if not armed then return end
-						armed, observed = false, true
-						if action == "scope" then action_result = subject.engine.acquire_configuration(owner)
-						elseif action == "shutdown" then action_result = subject.engine.shutdown_runtime()
-						else
-							subject.selection = "Bonjour"
-							action_result = subject.engine.shift_tone(require("llm.tone").MORE_FORMAL, false)
-						end
-						boundary_finished = true
+	for _, boundary in ipairs({ "privacy", "focus" }) do
+		for _, action in ipairs({ "scope", "shutdown", "successor" }) do
+			helpers.it("(tone-dispatch-owner) rechecks " .. action .. " after " .. boundary, function()
+				local subject, armed, observed, action_result, boundary_finished
+				local focus_reads, retired_focus_reads = 0, 0
+				local owner = { pending = function() return false end }
+				local function intervene()
+					if not armed then return end
+					armed, observed = false, true
+					if action == "scope" then action_result = subject.engine.acquire_configuration(owner)
+					elseif action == "shutdown" then action_result = subject.engine.shutdown_runtime()
+					else
+						subject.selection = "Bonjour"
+						action_result = subject.engine.shift_tone(require("llm.tone").MORE_FORMAL, false)
 					end
-					scenario({ selection = "Merci pour ton aide !", privacy_guard = function()
-						if boundary == "privacy" then intervene() end
-						return false
-					end }, function(world)
-						subject = world
-						if paced then
-							helpers.assert_true(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false))
-							world.respond(1, "REWRITE: Merci pour votre aide.")
+					boundary_finished = true
+				end
+				scenario({ selection = "Merci pour ton aide !", privacy_guard = function()
+					if boundary == "privacy" then intervene() end
+					return false
+				end }, function(world)
+					subject = world
+					world.emitted = {}
+					local previous_posts = #world.posts
+					-- The capture callback has one separate focus check before
+					-- send(). Arm only after selection capture begins and skip
+					-- that earlier observer so the pre-send barrier is tested.
+					world.on_read_selection = function() world.on_read_selection = nil; armed = true end
+					if boundary == "focus" then
+						world.on_focus = function()
+							if not armed then return end
+							focus_reads = focus_reads + 1
+							if focus_reads > 1 then intervene() end
 						end
+					else
+						world.on_focus = function() if boundary_finished then retired_focus_reads = retired_focus_reads + 1 end end
+					end
+					helpers.assert_true(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false))
+					world.wait_for(previous_posts + (action == "successor" and 2 or 1))
+					helpers.assert_true(observed, "the actual pre-send " .. boundary .. " boundary must dispatch the competing action")
+					helpers.assert_true(action_result, "the competing action must acquire its real engine owner")
+					helpers.assert_eq(retired_focus_reads, 0, "a revoked privacy owner must not begin another native focus observation")
+					world.on_focus = nil
+					helpers.assert_eq(#world.posts, previous_posts + (action == "successor" and 1 or 0),
+						"a retired tone selection must never reach the real remote client's HTTP transport")
+					helpers.assert_eq(#world.emitted, 0, "dispatch does not authorize physical replacement")
+					if action == "successor" then
+						local index = previous_posts + 1
+						helpers.assert_eq(user_turn(world.posts[index]), 'PREFIX: "Bonjour"\nTAIL: "Bonjour"', "only the successor selection may be sent")
+						world.respond(index, "REWRITE: Bonjour")
+						assert_replaced(world, "Bonjour")
+						helpers.assert_eq(world.selection, "Bonjour", "the successor callback retains its tone generation")
 						world.emitted = {}
-						local previous_posts = #world.posts
-						if not paced then
-							-- The capture callback has one separate focus check before
-							-- send(). Arm only after selection capture begins and skip
-							-- that earlier observer so the pre-send barrier is tested.
-							world.on_read_selection = function() world.on_read_selection = nil; armed = true end
-						end
-						if boundary == "focus" then
-							world.on_focus = function()
-								if not armed then return end
-								focus_reads = focus_reads + 1
-								if paced or focus_reads > 1 then intervene() end
-							end
-						else
-							world.on_focus = function() if boundary_finished then retired_focus_reads = retired_focus_reads + 1 end end
-						end
 						helpers.assert_true(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false))
-						if paced then
-							helpers.assert_eq(#world.posts, previous_posts, "the original request must be paced before its observer runs")
-							armed = true
-						end
-						world.wait_for(previous_posts + (action == "successor" and 2 or 1))
-						helpers.assert_true(observed, "the actual pre-send " .. boundary .. " boundary must dispatch the competing action")
-						helpers.assert_true(action_result, "the competing action must acquire its real engine owner")
-						helpers.assert_eq(retired_focus_reads, 0, "a revoked privacy owner must not begin another native focus observation")
-						world.on_focus = nil
-						helpers.assert_eq(#world.posts, previous_posts + (action == "successor" and 1 or 0),
-							"a retired tone selection must never reach the real remote client's HTTP transport")
-						helpers.assert_eq(#world.emitted, 0, "dispatch does not authorize physical replacement")
-						if action == "successor" then
-							local index = previous_posts + 1
-							helpers.assert_eq(user_turn(world.posts[index]), 'PREFIX: "Bonjour"\nTAIL: "Bonjour"', "only the successor selection may be sent")
-							world.respond(index, "REWRITE: Bonjour")
-							assert_replaced(world, "Bonjour")
-							helpers.assert_eq(world.selection, "Bonjour", "the successor callback retains its tone generation")
-							world.emitted = {}
-							helpers.assert_true(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false))
-							world.wait_for(index + 1)
-							helpers.assert_eq(user_turn(world.posts[index + 1]), 'PREFIX: "Bonjour"\nTAIL: "Bonjour"', "the next ladder step must retain the successor's original source")
-						elseif action == "scope" then helpers.assert_true(world.engine.release_configuration(owner)) end
-					end)
+						world.wait_for(index + 1)
+						helpers.assert_eq(user_turn(world.posts[index + 1]), 'PREFIX: "Bonjour"\nTAIL: "Bonjour"', "the next ladder step must retain the successor's original source")
+					elseif action == "scope" then helpers.assert_true(world.engine.release_configuration(owner)) end
 				end)
-			end
+			end)
 		end
 	end
 end)

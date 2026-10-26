@@ -110,7 +110,6 @@ local current_focus
 -- ties the rewrite left selected to its original text (llm/tone.lua).
 local _tone_generation = 0
 local _tone_memory = nil
-local _tone_timer = nil
 
 -- Injected by init() for the screen actions: how the screen is captured
 -- (adapters/screen_capture.lua in the daemon).
@@ -611,8 +610,6 @@ function M.init(opts)
 	-- Live mode is a session state: every start begins with it off.
 	_live = nil
 	M.drop_vision("engine initialised")
-	if _tone_timer then _scheduler.cancel(_tone_timer) end
-	_tone_timer = nil
 	_tone_generation = _tone_generation + 1
 	_tone_memory = nil
 	_offer_notified = false
@@ -927,8 +924,11 @@ function M.predict(context, output_context, override)
 		local now = _clock_ms()
 		local verdict = _debounce.plan:on_dispatch({
 			backend = kind,
-			explicit = override ~= nil or (type(output_context) == "table" and output_context.explicit == true),
-			variant = request_index + 1,
+			-- A live keystroke carries an override too but is automatic: only the
+			-- shortcut, the typed trigger and a prompt action are explicit, and
+			-- the later variants of their sequential run are part of the request.
+			explicit = (override ~= nil and override.live ~= true)
+				or (type(output_context) == "table" and output_context.explicit == true),
 		}, now)[1]
 		if verdict.action == "defer" then
 			_rate_timer = _scheduler.after(verdict.delay_ms / 1000, function()
@@ -1289,17 +1289,11 @@ end
 
 --- Drops the tone step in flight, if any: its answer will be ignored. For an
 --- event after which the selection it would replace may be gone (typing, a
---- click, Backspace, Escape). Called on every keystroke, so it logs only when a
---- step was actually waiting for its pacing timer.
---- @param reason string What the log names the cause.
-function M.drop_tone(reason)
+--- click, Backspace, Escape). Called on every keystroke, so it logs nothing.
+--- @param _ string The cause, kept for the callers' readability.
+function M.drop_tone(_)
 	_tone_generation = _tone_generation + 1
 	if _cancel_selection then pcall(_cancel_selection) end
-	if _tone_timer then
-		_scheduler.cancel(_tone_timer)
-		_tone_timer = nil
-		Logger.debug(LOG, "Paced tone step dropped (%s).", tostring(reason))
-	end
 end
 
 --- The focused window's identity, "" when unknown.
@@ -1473,23 +1467,10 @@ function M.shift_tone(direction, cycle)
 		Logger.info(LOG, "Sending tone rewrite (backend=%s, model=%s, profile=%s, %d byte(s)).",
 			M.get_backend(), model, plan.profile_id, #plan.source)
 
-		local send
-		send = function()
+		local function send()
 			if _runtime_closed or _scope_owner or generation ~= _tone_generation then return end
 			local kind = M.get_backend()
 			local now = _clock_ms()
-			local verdict = _debounce.plan:on_dispatch({ backend = kind, explicit = true }, now)[1]
-			if verdict.action == "defer" then
-				_tone_timer = _scheduler.after(verdict.delay_ms / 1000, function()
-					_tone_timer = nil
-					send()
-				end)
-				if type(_tone_timer) ~= "table" or _tone_timer.armed ~= true then
-					_tone_timer = nil
-					Logger.error(LOG, "Tone rewrite could not be paced: timer unavailable.")
-				end
-				return
-			end
 			local blocked = global_privacy_blocks()
 			if _runtime_closed or _scope_owner or generation ~= _tone_generation then return end
 			if not blocked then blocked = current_focus() ~= focus end
@@ -1497,7 +1478,7 @@ function M.shift_tone(direction, cycle)
 			-- Only the originating tone generation may submit its captured text.
 			if _runtime_closed or _scope_owner or generation ~= _tone_generation then return end
 			if blocked then
-				Logger.info(LOG, "Tone request dropped: the active text field changed while pacing.")
+				Logger.info(LOG, "Tone request dropped: the active text field changed before it was sent.")
 				return
 			end
 			_debounce.plan:on_sent(kind, now)
@@ -1588,33 +1569,18 @@ local function open_offer(action, label, model, focus)
 	return _request_epoch, meta
 end
 
---- Sends one request of an offer once the backend's minimum interval allows
---- it, through the offer's pacing timer. Nothing is sent once the offer is
---- superseded or the configuration is being changed.
+--- Sends one explicit request of an offer (a shortcut is never held by the
+--- minimum request interval). Nothing is sent once the offer is superseded, the
+--- configuration is being changed or global privacy no longer admits it.
 --- @param epoch integer The offer's _request_epoch.
 --- @param what string What the log names the request.
 --- @param send function Called when the request may go.
---- @param on_unpaced function Called when the pacing timer could not be armed.
 --- @param kind string|nil The backend kind ("ollama" or "api") the request goes
 ---   to; nil for the AI menu's.
-local function send_paced(epoch, what, send, on_unpaced, kind)
+local function send_checked(epoch, what, send, kind)
 	if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
 	kind = kind or M.get_backend()
 	local now = _clock_ms()
-	local verdict = _debounce.plan:on_dispatch({ backend = kind, explicit = true }, now)[1]
-	if verdict.action == "defer" then
-		_rate_timer = _scheduler.after(verdict.delay_ms / 1000, function()
-			if _runtime_closed or _scope_owner then return end
-			_rate_timer = nil
-			send_paced(epoch, what, send, on_unpaced, kind)
-		end)
-		if type(_rate_timer) ~= "table" or _rate_timer.armed ~= true then
-			_rate_timer = nil
-			Logger.error(LOG, "%s could not be paced: timer unavailable.", what)
-			on_unpaced()
-		end
-		return
-	end
 	local blocked = global_privacy_blocks()
 	-- A resident barrier can dispatch scope changes, shutdown or a new offer.
 	-- Its old result owns neither permission to send nor the successor to dismiss.
@@ -1763,15 +1729,15 @@ local function request_screen_answers(spec, screen)
 				end
 			end
 			if index < #answers then
-				-- Shown now: the next answer may wait for the backend's interval.
+				-- Shown now, before the next answer is asked.
 				if #candidates > 0 then publish() end
-				send_paced(epoch, "Screen answers", dispatch, settle)
+				send_checked(epoch, "Screen answers", dispatch)
 				return
 			end
 			settle()
 		end)
 	end
-	send_paced(epoch, "Screen answers", dispatch, settle)
+	send_checked(epoch, "Screen answers", dispatch)
 end
 
 --- Reads the vision model's transcription and asks for the answers.
@@ -2094,11 +2060,11 @@ function M.translate_selection(value)
 		}
 		Logger.info(LOG, "Sending translation (backend=%s, model=%s, target=%s, %d byte(s)).",
 			M.get_backend(), model, code, #selection)
-		send_paced(epoch, "Translation", function()
+		send_checked(epoch, "Translation", function()
 			local observed_focus = current_focus()
 			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
 			if observed_focus ~= focus then
-				Logger.info(LOG, "Translation request dropped: the active text field changed while pacing.")
+				Logger.info(LOG, "Translation request dropped: the active text field changed before it was sent.")
 				_predicting = false
 				clear_offer()
 				return
@@ -2106,10 +2072,6 @@ function M.translate_selection(value)
 			_inflight_backend = backend
 			backend.chat(backend_target, model, messages, offer_request_opts(config.max_tokens, nil, runtime_response), nil,
 				function(full_text, err) finish_translation(epoch, meta, config, full_text, err, focus) end)
-		end, function()
-			_predicting = false
-			clear_offer()
-			show_notice(TRANSLATE_FAILED_KEY, "failed")
 		end)
 		return true
 	end
@@ -2414,14 +2376,10 @@ local function run_agent(source, text, opts)
 	-- The text, the window and the answer are the user's: only sizes are logged.
 	Logger.info(LOG, "Sending agent request (source=%s, backend=%s, model=%s, %d byte(s), %d tool(s)).",
 		source, chat.backend, chat.model, #text, #tools)
-	send_paced(epoch, "Agent request", function()
+	send_checked(epoch, "Agent request", function()
 		system2_transport(chat, payload, function(full_text, err)
 			finish_agent(epoch, meta, config, tools, full_text, err)
 		end)
-	end, function()
-		_predicting = false
-		clear_offer()
-		show_notice(AGENT_KEYS.failed, "failed")
 	end, chat.kind)
 	return true
 end
@@ -2570,7 +2528,7 @@ end
 local function agent_blocked()
 	local offer = _predicting or #_suggestions > 0
 	local automatic_prediction = _suggestion_context ~= nil and _suggestion_context.automatic == true
-	return not _enabled or _live ~= nil or (offer and not automatic_prediction) or _vision_flow ~= nil or _tone_timer ~= nil
+	return not _enabled or _live ~= nil or (offer and not automatic_prediction) or _vision_flow ~= nil
 		or _is_paused() or AgentSettings.get_mode() ~= "auto"
 end
 
@@ -3964,10 +3922,6 @@ function M.quiesce_configuration(owner)
 		if _scheduler.cancel(_rate_timer) ~= true then return false end
 		_rate_timer = nil
 	end
-	if _tone_timer then
-		if _scheduler.cancel(_tone_timer) ~= true then return false end
-		_tone_timer = nil
-	end
 	_tone_generation = _tone_generation + 1
 	M.drop_vision("configuration change")
 	M.drop_agent_triage("configuration change")
@@ -3988,7 +3942,7 @@ end
 --- @param owner table Admission identity.
 --- @return table|nil snapshot
 function M.configuration_snapshot(owner)
-	if _scope_owner ~= owner or _predicting or _pending_trigger or _rate_timer or _tone_timer
+	if _scope_owner ~= owner or _predicting or _pending_trigger or _rate_timer
 		or _inflight_backend or _vision_flow or _agent_timer or _agent_triage
 		or (_enable_admission and _enable_admission.pending()) or M.runtime_pending() then return nil end
 	return { enabled = _enabled }

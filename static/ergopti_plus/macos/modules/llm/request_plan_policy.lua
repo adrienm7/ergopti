@@ -12,10 +12,9 @@
 --- FEATURES & RATIONALE:
 --- 1. "Never" is a macOS menu setting (a negative debounce turns the automatic
 ---    trigger off), so the plan accepts a negative debounce here only.
---- 2. An explicit request (the manual hotkey, a prompt action, the chain after an
----    accepted prediction) is never throttled by the floor, as the floor's own
----    commit (05b4b79338) documents; the variants of a sequential request are not
----    paced either, the backend modules own their cadence.
+--- 2. Only an automatic request waits for the backend's interval. An explicit one
+---    (the manual hotkey, a prompt action, the chain after an accepted
+---    prediction) is never held, as the floor's own commit (05b4b79338) documents.
 --- 3. The last request time is one value, whatever the backend, as on Windows.
 --- ==============================================================================
 
@@ -26,8 +25,6 @@ local Debounce = require("llm.request_plan.debounce")
 -- The option set this driver runs; compared with the corpus by the contract test.
 M.OPTIONS = {
 	allow_never = true,
-	pace_explicit = false,
-	pace_variants = false,
 	floor_scope = "global",
 	live_instant_word_end = true,
 }

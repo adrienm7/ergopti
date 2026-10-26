@@ -211,6 +211,14 @@ helpers.describe("prediction backend: variants are paced and diverse", function(
 		helpers.assert_eq(after_interval, 2)
 	end)
 
+	helpers.it("never holds an explicit request, nor the later variants of its run (explicit-never-held)", function()
+		local engine, calls, _, restore = load("api", ENTRY)
+		engine.predict("Bonjour à tous", { explicit = true })
+		local without_waiting = #calls.remote
+		restore()
+		helpers.assert_eq(without_waiting, 3, "every variant leaves without the floor holding any of them")
+	end)
+
 	helpers.it("warms each next variant", function()
 		local engine, calls, scheduler, restore = load("api", ENTRY)
 		engine.predict("Bonjour à tous")
@@ -1076,7 +1084,8 @@ helpers.describe("prediction resident global privacy admission", function()
 		local blocked = false
 		local engine, calls, scheduler, restore = load("api", ENTRY, settings, true, true, { guard = function() return blocked end })
 		local okay, problem = pcall(function()
-			request(engine, 2)
+			-- An automatic request (no prompt override): its next variant waits for the interval.
+			engine.predict("Bonjour à tous")
 			calls.remote[1].done(" que tout le monde aille bien", nil)
 			helpers.assert_eq(#calls.remote, 1, "the next variant must still be paced")
 			blocked = true; scheduler.settle()
