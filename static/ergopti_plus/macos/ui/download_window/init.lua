@@ -38,6 +38,7 @@ local i18n       = require("infra.i18n")
 local text_utils = require("infra.text_utils")
 local JavaScript = require("ui.download_window.javascript")
 local PendingQueue = require("ui.download_window.pending_queue")
+local NativeTheme = require("native_theme_data")
 
 local LOG = "download_window"
 
@@ -94,25 +95,25 @@ local PRESETS = {
 		mode             = "bootstrap",
 		default_title    = i18n.get("mlx.install_title"),
 		default_subtitle = i18n.get("mlx.install_subtitle"),
-		accent           = "#4da6ff",
+		accent           = NativeTheme.download_accent.mlx_install,
 	},
 	ollama_install = {
 		mode             = "bootstrap",
 		default_title    = i18n.get("ollama.install_title"),
 		default_subtitle = i18n.get("ollama.install_subtitle"),
-		accent           = "#73d98c",
+		accent           = NativeTheme.download_accent.ollama_install,
 	},
 	mlx_model = {
 		mode             = "download",
 		default_title    = i18n.get("mlx.download_title"),
 		default_subtitle = i18n.get("mlx.download_subtitle"),
-		accent           = "#9973f2",
+		accent           = NativeTheme.download_accent.mlx_model,
 	},
 	ollama_model = {
 		mode             = "download",
 		default_title    = i18n.get("ollama.download_title"),
 		default_subtitle = i18n.get("ollama.download_subtitle"),
-		accent           = "#f2bf4d",
+		accent           = NativeTheme.download_accent.ollama_model,
 	},
 }
 
