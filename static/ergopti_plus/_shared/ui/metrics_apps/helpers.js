@@ -167,6 +167,16 @@ const FIXED_CAT_COLORS = {
 	general: '#8E8E93'
 };
 
+// Every localised spelling of the default category, from the generated alias
+// data (tools/build/gen-metrics-category-aliases.cjs). app_categories.json stores
+// the spelling of the language active when it was written, so a user who changed
+// language holds an older one: all fold into the canonical 'general' id instead of
+// showing as a custom category. A page without the data would orphan them, so it
+// fails here rather than falling back to a partial list.
+if (!Array.isArray(window.GeneralCategoryAliases))
+	throw new Error('metrics_general_category_aliases.js must load before helpers.js');
+const _GENERAL_CATEGORY_ALIASES = new Set(window.GeneralCategoryAliases);
+
 /**
  * Resolves a preset to its stable i18n id while preserving custom category text.
  * Accepts an English macOS category, a French legacy label, or an already-stable id.
@@ -185,6 +195,8 @@ function categoryToId(catName) {
 	if (CATEGORY_IDS.has(catName)) return catName;
 	// Reverse cache populated by previous translateCategory calls
 	if (Object.prototype.hasOwnProperty.call(_labelToId, catName)) return _labelToId[catName];
+	// The default category as written under any other UI language
+	if (_GENERAL_CATEGORY_ALIASES.has(catName)) return 'general';
 	return catName;
 }
 
