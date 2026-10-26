@@ -59,6 +59,7 @@ local PythonInterpreter = require("adapters.python_interpreter")
 local NetworkEnv = require("modules.llm.network_env")
 local NetworkAdmission = require("modules.llm.opaque_network_admission")
 local TextUtils = require("text_utils")
+local NativePath = require("native_path")
 
 local LOG = "mlx_deps"
 
@@ -280,7 +281,7 @@ function M.owned_venv_dir()
 	for segment in venv:gmatch("[^/]+") do
 		if segment == "." or segment == ".." then return nil, "relative segment" end
 	end
-	local leaf = venv:match("([^/]+)$")
+	local leaf = NativePath.basename(venv)
 	if leaf ~= "mlx-venv" and leaf ~= ".venv" then return nil, "unexpected folder name" end
 	local probed, mode = pcall(hs.fs.symlinkAttributes, venv, "mode")
 	if not probed then return nil, "link state unreadable" end

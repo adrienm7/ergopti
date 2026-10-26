@@ -19,6 +19,7 @@ local M = {}
 local WindowTitles = require("window_titles")
 local ConfigPaths = require("infra.config_paths")
 local AppParameter = require("app_parameter")
+local NativePath = require("native_path")
 
 --- Where the system installs its desktop entries.
 M.APPLICATIONS_DIR = "/usr/share/applications/"
@@ -62,7 +63,7 @@ function M.desktop_id(path)
 	if type(path) ~= "string" or path:sub(-1) == "/" then return nil end
 	path = absolute_path(path)
 	if not path then return nil end
-	local name = path:match("([^/]+)$")
+	local name = NativePath.basename(path)
 	if not name or name:sub(-#DESKTOP_SUFFIX) ~= DESKTOP_SUFFIX or #name == #DESKTOP_SUFFIX then return nil end
 	for _, root in ipairs(application_roots()) do
 		if path:sub(1, #root) == root then

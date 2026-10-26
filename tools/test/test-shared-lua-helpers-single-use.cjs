@@ -7,7 +7,7 @@
  * The macOS driver, the Linux driver and the shared Lua they both load copy,
  * count, trim, shell-quote and percent-encode only through the shared owners:
  * _shared/lua/table_util.lua, _shared/lua/text_utils/init.lua and, for the parent
- * directory of a path, _shared/lua/native_path.lua.
+ * directory or the last component of a path, _shared/lua/native_path.lua.
  *
  * ROOT CAUSE ENCODED:
  * The cross-OS parity audit (R16, K10) counted 26 deep-copy definitions, the
@@ -138,6 +138,11 @@ const DETECTORS = {
 		use: 'require("native_path").dirname(path)',
 		patterns: [/(["'])\^\(\.\*\)\/\[\^\/\]\+\$\1/g]
 	},
+	basename: {
+		owner: PATH_OWNER,
+		use: 'require("native_path").basename(path)',
+		patterns: [/\bmatch\(\s*(["'])\(?\[\^\/\]\+\)?\$\1/g]
+	},
 	count: {
 		owner: TABLE_OWNER,
 		use: 'require("table_util").count(source)',
@@ -154,10 +159,34 @@ const DETECTORS = {
 // Sites that spell a detected pattern for another job: path -> helper ->
 // { count, reason }. These are not debt and are not expected to shrink.
 const ALLOWED = {
+	'macos/init.lua': {
+		dirname: {
+			count: 2,
+			reason: 'boot code that runs before the shared Lua root is on package.path'
+		}
+	},
+	'linux/ergopti_hotstrings.lua': {
+		dirname: {
+			count: 1,
+			reason: 'boot code that runs before the shared Lua root is on package.path'
+		}
+	},
+	'macos/ui/menu/menu_llm/models_manager.lua': {
+		basename: { count: 1, reason: 'last segment of an Ollama library URL, not a native path' }
+	},
+	'macos/platform/remap/runtime_manifest.lua': {
+		basename: { count: 1, reason: 'file name of a download URL, not a native path' }
+	},
 	'macos/adapters/shell_runner.lua': {
 		shell_quote: {
 			count: 1,
 			reason: "printf '%b' operand: backslashes and NUL are escaped before the quote"
+		}
+	},
+	'linux/adapters/desktop_opener_worker.lua': {
+		basename: {
+			count: 1,
+			reason: 'arg[0] has its backslashes rewritten to "/" first, which native_path never does'
 		}
 	},
 	'linux/ui/webview_manager.lua': {
@@ -255,6 +284,14 @@ const CONTROLS = [
 	['dirname', "local dir = path:match('^(.*)/[^/]+$')", 1],
 	['dirname', 'local dir = NativePath.dirname(path)', 0],
 	['dirname', 'local parent, name = path:match("^(.*)/([^/]+)$")', 0],
+	['basename', 'local name = path:match("([^/]+)$")', 1],
+	['basename', "local name = path:match('([^/]+)$')", 1],
+	['basename', 'local name = path:match("[^/]+$")', 1],
+	['basename', 'local name = dir:gsub("/+$", ""):match("([^/]+)$")', 1],
+	['basename', 'local name = NativePath.basename(path)', 0],
+	['basename', 'local stem = path:match("([^/]+)%.toml$")', 0],
+	['basename', 'local leaf = url:match("/([^/]+)$")', 0],
+	['basename', 'local parent, name = path:match("^(.*)/([^/]+)$")', 0],
 	['count', 'for _ in pairs(_map.apps) do count = count + 1 end', 1],
 	['count', 'local n = 0; for _ in pairs(t) do n = n + 1 end', 1],
 	['count', 'for _, v in pairs(t) do if v then n = n + 1 end end', 0],
@@ -293,6 +330,49 @@ function lineOf(text, offset) {
 	return line;
 }
 
+/**
+ * Judges one helper in one file: an error text when the inline count is not
+ * exactly the allowed sites plus the baselined debt, null when it is.
+ */
+function judge(rel, code, helper, allowed, debt) {
+	const found = countMatches(helper, code);
+	if (found > allowed + debt) {
+		const lines = [];
+		for (const pattern of DETECTORS[helper].patterns) {
+			pattern.lastIndex = 0;
+			for (const match of code.matchAll(pattern)) lines.push(lineOf(code, match.index));
+		}
+		return (
+			`${rel}:${lines.sort((a, b) => a - b).join(',')}: ${found} inline ${helper} ` +
+			`(allowed ${allowed}, baseline ${debt}). Call ${DETECTORS[helper].use} instead.`
+		);
+	}
+	if (found < allowed + debt) {
+		return (
+			`${rel}: ${helper} now has ${found - allowed} inline site(s) but the baseline still ` +
+			`counts ${debt}. Lower ${path.basename(BASELINE_FILE)} to match: it only shrinks.`
+		);
+	}
+	return null;
+}
+
+// The verdict itself must fail on a planted inline copy and pass once the
+// baseline names it, so a rewrite of the judge cannot turn the ratchet off.
+for (const [helper, planted, call] of [
+	['basename', 'local name = path:match("([^/]+)$")', 'native_path").basename'],
+	['trim', 'local line = raw:match("^%s*(.-)%s*$")', 'text_utils").trim']
+]) {
+	const code = stripComments(planted, '.lua');
+	const refused = judge('planted.lua', code, helper, 0, 0);
+	assert(refused?.includes(call), `a planted inline ${helper} must be refused: ${refused}`);
+	assert.equal(judge('planted.lua', code, helper, 0, 1), null, `${helper}: baselined debt passes`);
+	assert.equal(judge('planted.lua', code, helper, 1, 0), null, `${helper}: allowed site passes`);
+	assert(
+		judge('planted.lua', code, helper, 0, 2)?.includes('Lower'),
+		`${helper}: a stale baseline must be refused`
+	);
+}
+
 const baseline = JSON.parse(fs.readFileSync(BASELINE_FILE, 'utf8'));
 const errors = [];
 const observed = {};
@@ -319,22 +399,8 @@ for (const tree of TREES) {
 					for (const match of code.matchAll(pattern))
 						console.log(`${rel}:${lineOf(code, match.index)}: ${helper}`);
 				}
-			if (found > allowed + debt) {
-				const lines = [];
-				for (const pattern of DETECTORS[helper].patterns) {
-					pattern.lastIndex = 0;
-					for (const match of code.matchAll(pattern)) lines.push(lineOf(code, match.index));
-				}
-				errors.push(
-					`${rel}:${lines.sort((a, b) => a - b).join(',')}: ${found} inline ${helper} ` +
-						`(allowed ${allowed}, baseline ${debt}). Call ${DETECTORS[helper].use} instead.`
-				);
-			} else if (found < allowed + debt) {
-				errors.push(
-					`${rel}: ${helper} now has ${found - allowed} inline site(s) but the baseline still ` +
-						`counts ${debt}. Lower ${path.basename(BASELINE_FILE)} to match: it only shrinks.`
-				);
-			}
+			const verdict = judge(rel, code, helper, allowed, debt);
+			if (verdict) errors.push(verdict);
 		}
 	}
 }
@@ -354,7 +420,7 @@ for (const rel of Object.keys(ALLOWED)) {
 // The owners must still define what every site is told to call.
 const OWNER_DEFINITIONS = {
 	[TEXT_OWNER]: ['trim', 'shell_quote', 'percent_encode'],
-	[PATH_OWNER]: ['dirname'],
+	[PATH_OWNER]: ['dirname', 'basename'],
 	[TABLE_OWNER]: [
 		'shallow_copy',
 		'deep_copy',

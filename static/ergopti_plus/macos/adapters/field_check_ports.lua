@@ -24,6 +24,7 @@ local Logger = require("infra.logger")
 local ShellRunner = require("adapters.shell_runner")
 local Timer = require("adapters.timer_scheduler")
 local FileSystem = require("adapters.file_system")
+local NativePath = require("native_path")
 
 local LOG = "adapters.field_check_ports"
 
@@ -55,7 +56,7 @@ local function exec(executable, args, timeout_s, callback, environment)
 		settle(code, stdout)
 	end, nil, environment)
 	if handle.isSettled() or not handle.start() then
-		Logger.warn(LOG, "Could not start %s.", executable:match("[^/]+$") or "a command")
+		Logger.warn(LOG, "Could not start %s.", NativePath.basename(executable) or "a command")
 		settle(nil, "")
 		return
 	end

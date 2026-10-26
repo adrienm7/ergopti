@@ -91,9 +91,7 @@ local function dirname(path)
 	return NativePath.dirname(path) or "/"
 end
 
-local function basename(path)
-	return path:match("([^/]+)$")
-end
+local basename = NativePath.basename
 
 local function is_direct_child(path, parent)
 	return dirname(path) == parent and basename(path) ~= nil

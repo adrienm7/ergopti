@@ -28,6 +28,7 @@ local Logger = require("infra.logger")
 local OperationReporter = require("diagnostics.operation_reporter")
 local FsDir  = require("infra.fs_dir")
 local TextUtils = require("infra.text_utils")
+local NativePath = require("native_path")
 
 local LOG = "adapters.file_system"
 
@@ -344,7 +345,7 @@ local function parent_listing_proves_absence(path, known_parent, known_basename)
 	if type(FsDir) ~= "table" or type(FsDir.try_entries) ~= "function" then
 		return false, "infra.fs_dir.try_entries is unavailable"
 	end
-	local basename = known_basename or path:match("([^/]+)$")
+	local basename = known_basename or NativePath.basename(path)
 	if type(basename) ~= "string" or basename == "" then
 		return false, "pathname has no basename"
 	end

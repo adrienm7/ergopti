@@ -1,8 +1,1 @@
-{
-	"linux/ergopti_hotstrings.lua": {
-		"dirname": 1
-	},
-	"macos/init.lua": {
-		"dirname": 2
-	}
-}
+{}
