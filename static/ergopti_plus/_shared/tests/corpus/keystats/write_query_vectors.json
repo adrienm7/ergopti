@@ -4,49 +4,71 @@
 		{
 			"name": "meta.get",
 			"dialect": "native",
-			"values": { "key": "rev" },
+			"values": {
+				"key": "rev"
+			},
 			"sql": "SELECT value FROM meta WHERE key='rev';"
 		},
 		{
 			"name": "meta.get",
 			"dialect": "cli_json",
-			"values": { "key": "it's" },
+			"values": {
+				"key": "it's"
+			},
 			"sql": "SELECT json_quote(value) AS value_json FROM meta WHERE key='it''s';"
 		},
 		{
 			"name": "meta.set",
 			"dialect": "native",
-			"values": { "key": "k", "value": "a\r\nb\u0000c'd" },
+			"values": {
+				"key": "k",
+				"value": "a\r\nb\u0000c'd"
+			},
 			"sql": "INSERT OR REPLACE INTO meta (key, value) VALUES ('k', 'a'||char(13)||'\nb'||char(0)||'c''d');"
 		},
 		{
 			"name": "meta.set",
 			"dialect": "cli_json",
-			"values": { "key": "k", "value": "" },
+			"values": {
+				"key": "k",
+				"value": ""
+			},
 			"sql": "INSERT OR REPLACE INTO meta (key, value) VALUES ('k', '');"
 		},
 		{
 			"name": "meta.upsert",
 			"dialect": "native",
-			"values": { "key": "open_walk:d", "value": "[]" },
+			"values": {
+				"key": "open_walk:d",
+				"value": "[]"
+			},
 			"sql": "INSERT INTO meta(key,value) VALUES ('open_walk:d','[]') ON CONFLICT(key) DO UPDATE SET value = excluded.value;"
 		},
 		{
 			"name": "meta.upsert",
 			"dialect": "cli_json",
-			"values": { "key": "open_walk:d", "value": "[]" },
+			"values": {
+				"key": "open_walk:d",
+				"value": "[]"
+			},
 			"sql": "INSERT INTO meta(key,value) VALUES ('open_walk:d','[]') ON CONFLICT(key) DO UPDATE SET value = excluded.value;"
 		},
 		{
 			"name": "meta.seed",
 			"dialect": "native",
-			"values": { "key": "rev", "value": "0" },
+			"values": {
+				"key": "rev",
+				"value": "0"
+			},
 			"sql": "INSERT OR IGNORE INTO meta (key, value) VALUES ('rev', '0');"
 		},
 		{
 			"name": "meta.seed",
 			"dialect": "cli_json",
-			"values": { "key": "rev", "value": "0" },
+			"values": {
+				"key": "rev",
+				"value": "0"
+			},
 			"sql": "INSERT OR IGNORE INTO meta (key, value) VALUES ('rev', '0');"
 		},
 		{
@@ -60,6 +82,34 @@
 			"dialect": "cli_json",
 			"values": {},
 			"sql": "UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev';"
+		},
+		{
+			"name": "devices.upsert",
+			"dialect": "native",
+			"values": {
+				"device_id": "dev'1",
+				"name": "Mac\r",
+				"os": "darwin",
+				"os_version": "",
+				"host_signature": "sig",
+				"created_at": "2026-10-01T00:00:00Z",
+				"updated_at": "2026-10-02T00:00:00Z"
+			},
+			"sql": "INSERT INTO devices (device_id, name, os, os_version, host_signature, created_at, updated_at) VALUES ('dev''1', 'Mac'||char(13)||'', 'darwin', '', 'sig', '2026-10-01T00:00:00Z', '2026-10-02T00:00:00Z') ON CONFLICT(device_id) DO UPDATE SET name = excluded.name, os = excluded.os, os_version = excluded.os_version, host_signature = excluded.host_signature, updated_at = excluded.updated_at;"
+		},
+		{
+			"name": "devices.upsert",
+			"dialect": "cli_json",
+			"values": {
+				"device_id": "dev'1",
+				"name": "Mac\r",
+				"os": "darwin",
+				"os_version": "",
+				"host_signature": "sig",
+				"created_at": "2026-10-01T00:00:00Z",
+				"updated_at": "2026-10-02T00:00:00Z"
+			},
+			"sql": "INSERT INTO devices (device_id, name, os, os_version, host_signature, created_at, updated_at) VALUES ('dev''1', 'Mac'||char(13)||'', 'darwin', '', 'sig', '2026-10-01T00:00:00Z', '2026-10-02T00:00:00Z') ON CONFLICT(device_id) DO UPDATE SET name = excluded.name, os = excluded.os, os_version = excluded.os_version, host_signature = excluded.host_signature, updated_at = excluded.updated_at;"
 		}
 	]
 }

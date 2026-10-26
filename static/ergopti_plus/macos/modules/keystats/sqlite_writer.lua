@@ -333,36 +333,18 @@ local function _initialize_db(db, existed)
 		return false
 	end
 
-	-- Upsert the local device row so name / os_version stay fresh.
-	local stmt = db:prepare(
-		"INSERT OR REPLACE INTO devices "
-		.. "(device_id, name, os, os_version, host_signature, created_at, updated_at) "
-		.. "VALUES (?, ?, ?, ?, ?, ?, ?)")
-	if not stmt then
-		Logger.error(LOG, "Cannot prepare local device startup row: %s.", db:errmsg())
+	-- Upsert the local device row so name / os_version stay fresh. The conflict
+	-- clause keeps created_at and the imported ledger watermark: a REPLACE here
+	-- deleted the watermark at every start and made the foreign import begin again.
+	local device_rc = db:exec(Queries.render("devices.upsert", "native", {
+		device_id = _device_obj.device_id, name = _device_obj.name, os = _device_obj.os,
+		os_version = _device_obj.os_version or "", host_signature = _device_obj.host_signature,
+		created_at = _device_obj.created_at, updated_at = _now_ts(),
+	}))
+	if device_rc ~= sqlite3.OK then
+		Logger.error(LOG, "Local device startup failed: %s.", tostring(db:errmsg()))
 		return false
 	end
-	local device_ok, device_result = xpcall(function()
-		local bound = stmt:bind_values(
-			_device_obj.device_id, _device_obj.name, _device_obj.os,
-			_device_obj.os_version or "", _device_obj.host_signature,
-			_device_obj.created_at, _now_ts())
-		if bound ~= sqlite3.OK then
-			error("Cannot bind local device startup row: " .. tostring(bound), 0)
-		end
-		local stepped = stmt:step()
-		if stepped ~= sqlite3.DONE then
-			error("Cannot write local device startup row: " .. tostring(stepped), 0)
-		end
-	end, debug.traceback)
-	-- SQLite finalize consumes the statement even when it reports the previous
-	-- step's error. Always attempt it once, including after a bind/step failure.
-	local finalized, finalize_result = pcall(stmt.finalize, stmt)
-	if not device_ok then Logger.error(LOG, "Local device startup failed: %s.", tostring(device_result)) end
-	if not finalized or finalize_result ~= sqlite3.OK then
-		Logger.error(LOG, "Local device startup finalization failed: %s.", tostring(finalize_result))
-	end
-	if not device_ok or not finalized or finalize_result ~= sqlite3.OK then return false end
 
 	return true, next_event_id
 end

@@ -145,6 +145,23 @@ KeystatsQuery(Name, Params := Map()) {
 		],
 		"meta.rev_bump", [
 			["literal", "UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev'`;"]
+		],
+		"devices.upsert", [
+			["literal", "INSERT INTO devices (device_id, name, os, os_version, host_signature, created_at, updated_at) VALUES ("],
+			["slot", "device_id", "s"],
+			["literal", ", "],
+			["slot", "name", "s"],
+			["literal", ", "],
+			["slot", "os", "s"],
+			["literal", ", "],
+			["slot", "os_version", "s"],
+			["literal", ", "],
+			["slot", "host_signature", "s"],
+			["literal", ", "],
+			["slot", "created_at", "s"],
+			["literal", ", "],
+			["slot", "updated_at", "s"],
+			["literal", ") ON CONFLICT(device_id) DO UPDATE SET name = excluded.name, os = excluded.os, os_version = excluded.os_version, host_signature = excluded.host_signature, updated_at = excluded.updated_at`;"]
 		]
 	)
 	if !Queries.Has(Name)
