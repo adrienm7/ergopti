@@ -46,4 +46,20 @@ helpers.describe("streaming retains its private temporary file", function()
 		helpers.assert_eq(receipt.umask, "0022")
 		helpers.assert_eq(receipt.parent_umask_preserved, true)
 	end)
+
+	for _, control in ipairs({ "absolute", "name", "missing", "empty" }) do
+		helpers.it("honors configured Lua " .. control .. " without bare fallback (stream-private-interpreter)", function()
+			local root = helpers.driver_root() .. "../../.."
+			local fixture = helpers.driver_root() .. "tests/support/modules/llm/stream_payload_interpreter_fixture.py"
+			local lines = CommandLines.read("python3 " .. shell_quote(fixture)
+				.. " " .. shell_quote(root .. "/tools/diagnostics/macos_stream_payload_mode_test.py")
+				.. " " .. shell_quote(helpers.driver_root())
+				.. " " .. shell_quote(os.getenv("LUA") or "lua")
+				.. " " .. shell_quote(control) .. " " .. shell_quote(helpers.temp_dir()) .. " 2>&1")
+			local receipt = assert(Json.decode(table.concat(lines, "\n")))
+			helpers.assert_eq(receipt.control, control)
+			helpers.assert_eq(receipt.passed, true)
+			helpers.assert_eq(receipt.native_cases, (control == "absolute" or control == "name") and 2 or 0)
+		end)
+	end
 end)

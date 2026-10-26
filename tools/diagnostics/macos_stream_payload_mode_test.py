@@ -30,7 +30,7 @@ def main():
     if os.name != "posix":
         raise RuntimeError("The native private-file control requires a POSIX host")
     root = Path(sys.argv[1]).resolve(strict=True)
-    lua = shutil.which("lua")
+    lua = shutil.which(os.environ.get("LUA", "lua"))
     if not lua:
         raise RuntimeError("Lua 5.4 is required for the native private-file control")
     original_umask = os.umask(0)
