@@ -3,15 +3,11 @@
 	"driver_options": {
 		"macos": {
 			"allow_never": true,
-			"pace_explicit": false,
-			"pace_variants": false,
 			"floor_scope": "global",
 			"live_instant_word_end": true
 		},
 		"linux": {
 			"allow_never": true,
-			"pace_explicit": true,
-			"pace_variants": true,
 			"floor_scope": "per_backend",
 			"live_instant_word_end": true
 		}
@@ -1184,8 +1180,8 @@
 			]
 		},
 		{
-			"id": "macos-lets-an-explicit-request-through",
-			"description": "An explicit request is never throttled on macOS.",
+			"id": "an-explicit-request-is-never-held",
+			"description": "An explicit request (shortcut, typed trigger, prompt action) is sent at once, whatever the last request time; an automatic one still waits.",
 			"options": "macos",
 			"floors": {
 				"ollama": 300,
@@ -1231,8 +1227,8 @@
 			]
 		},
 		{
-			"id": "linux-paces-an-explicit-request",
-			"description": "An explicit request waits for the floor on Linux.",
+			"id": "an-explicit-request-is-not-held-on-linux-either",
+			"description": "Linux follows the same rule: the explicit request goes straight on.",
 			"options": "linux",
 			"floors": {
 				"ollama": 300,
@@ -1257,17 +1253,15 @@
 					"now_ms": 1010,
 					"expect": [
 						{
-							"action": "defer",
-							"delay_ms": 290,
-							"why": "rate floor"
+							"action": "send"
 						}
 					]
 				}
 			]
 		},
 		{
-			"id": "macos-does-not-pace-the-next-variants",
-			"description": "The second variant of a sequential request goes straight on macOS.",
+			"id": "later-variants-of-an-explicit-request-are-not-held",
+			"description": "The variants of an explicit sequential request are part of that request: each is dispatched as an explicit one and goes straight on, although the previous variant just went out.",
 			"options": "macos",
 			"floors": {
 				"ollama": 300,
@@ -1287,8 +1281,7 @@
 					"call": "on_dispatch",
 					"args": {
 						"backend": "api",
-						"explicit": true,
-						"variant": 2
+						"explicit": true
 					},
 					"now_ms": 1001,
 					"expect": [
@@ -1298,12 +1291,20 @@
 					]
 				},
 				{
+					"call": "on_sent",
+					"args": {
+						"backend": "api"
+					},
+					"now_ms": 1001,
+					"expect": []
+				},
+				{
 					"call": "on_dispatch",
 					"args": {
 						"backend": "api",
-						"variant": 2
+						"explicit": true
 					},
-					"now_ms": 1001,
+					"now_ms": 1002,
 					"expect": [
 						{
 							"action": "send"
@@ -1313,8 +1314,8 @@
 			]
 		},
 		{
-			"id": "linux-paces-the-next-variants",
-			"description": "The second variant waits for the floor on Linux.",
+			"id": "later-variants-of-an-automatic-request-wait",
+			"description": "The variants of an automatic sequential request wait for the floor like the request itself.",
 			"options": "linux",
 			"floors": {
 				"ollama": 300,
@@ -1333,10 +1334,43 @@
 				{
 					"call": "on_dispatch",
 					"args": {
-						"backend": "api",
-						"variant": 2
+						"backend": "api"
 					},
 					"now_ms": 1100,
+					"expect": [
+						{
+							"action": "defer",
+							"delay_ms": 400,
+							"why": "rate floor"
+						}
+					]
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "api"
+					},
+					"now_ms": 1500,
+					"expect": [
+						{
+							"action": "send"
+						}
+					]
+				},
+				{
+					"call": "on_sent",
+					"args": {
+						"backend": "api"
+					},
+					"now_ms": 1500,
+					"expect": []
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"backend": "api"
+					},
+					"now_ms": 1600,
 					"expect": [
 						{
 							"action": "defer",
