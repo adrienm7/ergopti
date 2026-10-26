@@ -561,10 +561,10 @@ local function install_session()
 					detail, failure_receipt)
 			end) == true
 		end,
-		install = function(staged)
-			local armed, err = deps().installer.arm_swap(staged)
-			if armed == true then return true end
-			return false, ReleaseInstall.REASON.install, err
+		install_async = function(staged, release, asset, done)
+			return deps().installer.arm_swap(staged, function(armed, detail)
+				done(armed == true, ReleaseInstall.REASON.install, detail)
+			end) == true
 		end,
 		restart = function()
 			return deps().coordinator.request_user_exit("release_install") == true

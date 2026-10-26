@@ -179,6 +179,104 @@ function M.register(helpers)
 			helpers.assert_eq(installs, 0, "a second completion of a settled download installs nothing")
 		end)
 	end)
+	helpers.describe("shared release install capabilities (release-install-capabilities)", function()
+		local function names_refusal(reason, messages)
+			if type(reason) ~= "string" then return false end
+			for _, message in ipairs(messages) do
+				if reason:find(message, 1, true) then return true end
+			end
+			return false
+		end
+		helpers.it("runs a sync-only capability through its actual completion", function()
+			local ports, seen = recording()
+			local session = Install.new(ports)
+			helpers.assert_eq(#seen.calls, 0, "construction must not dispatch work")
+			helpers.assert_eq(session.install("v1", "main"), true)
+			helpers.assert_eq(table.concat(seen.calls, ","),
+				"blocked,find_release,backup,resolve_asset,download,install,restart")
+			helpers.assert_eq(phases(seen), "backing_up,downloading,installing,restarting")
+		end)
+
+		helpers.it("runs an async-only capability and waits for its actual completion", function()
+			local ports, seen = recording()
+			ports.install = nil
+			local completed
+			ports.install_async = function(path, release, asset, done)
+				seen.calls[#seen.calls + 1] = "install_async"
+				helpers.assert_eq(path, "/tmp/verified")
+				helpers.assert_eq(release.tag, "v1")
+				helpers.assert_eq(asset.name, "bundle")
+				completed = done
+				return true
+			end
+			local session = Install.new(ports)
+			helpers.assert_eq(#seen.calls, 0, "construction must not dispatch work")
+			helpers.assert_eq(session.install("v1", "main"), true)
+			helpers.assert_eq(type(completed), "function")
+			helpers.assert_eq(session.busy(), true)
+			helpers.assert_eq(table.concat(seen.calls, ","),
+				"blocked,find_release,backup,resolve_asset,download,install_async")
+			helpers.assert_eq(phases(seen), "backing_up,downloading,installing")
+			completed(true)
+			helpers.assert_eq(table.concat(seen.calls, ","),
+				"blocked,find_release,backup,resolve_asset,download,install_async,restart")
+			helpers.assert_eq(phases(seen), "backing_up,downloading,installing,restarting")
+		end)
+
+		for _, installed in ipairs({ true, false }) do
+			helpers.it("prefers async over sync without fallback after completion " .. tostring(installed), function()
+				local ports, seen = recording()
+				local completed
+				ports.install_async = function(_, _, _, done)
+					seen.calls[#seen.calls + 1] = "install_async"
+					completed = done
+					return true
+				end
+				local session = Install.new(ports)
+				helpers.assert_eq(session.install("v1", "main"), true)
+				helpers.assert_eq(type(completed), "function")
+				helpers.assert_eq(phases(seen), "backing_up,downloading,installing")
+				completed(installed, Install.REASON.install, "controlled completion")
+				helpers.assert_eq(table.concat(seen.calls, ","),
+					"blocked,find_release,backup,resolve_asset,download,install_async" .. (installed and ",restart" or ""))
+				helpers.assert_eq(last(seen).phase, installed and "restarting" or "failed")
+				if not installed then
+					helpers.assert_eq(last(seen).reason_key, Install.REASON.install)
+					helpers.assert_eq(session.busy(), false)
+				end
+			end)
+		end
+
+		helpers.it("refuses missing install capabilities before any side effect", function()
+			local ports, seen = recording()
+			ports.install = nil
+			local ok, reason = pcall(Install.new, ports)
+			helpers.assert_eq(ok, false)
+			helpers.assert_true(names_refusal(reason, { "release_install needs the install port",
+				"release_install needs an install or async install port" }))
+			helpers.assert_eq(seen.calls, {}, "constructor refusal must precede backup and download")
+			helpers.assert_eq(seen.reports, {})
+		end)
+
+		for _, invalid in ipairs({ { name = "false", value = false }, { name = "string", value = "not a capability" } }) do
+			for _, capability in ipairs({ "install", "install_async" }) do
+				helpers.it("refuses " .. capability .. " " .. invalid.name .. " despite a valid counterpart", function()
+					local ports, seen = recording()
+					ports.install_async = function() error("construction must not dispatch async work") end
+					ports[capability] = invalid.value
+					local ok, reason = pcall(Install.new, ports)
+					helpers.assert_eq(ok, false)
+					local label = capability == "install" and "sync" or "async"
+					local messages = { "release_install " .. label .. " install port is invalid" }
+					if capability == "install" then messages[#messages + 1] = "release_install needs the install port" end
+					helpers.assert_true(names_refusal(reason, messages), "the refusal must name the actual invalid capability")
+					helpers.assert_eq(seen.calls, {}, "invalid capability must be refused before backup and download")
+					helpers.assert_eq(seen.reports, {})
+				end)
+			end
+		end
+	end)
+
 end
 
 return M

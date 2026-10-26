@@ -56,7 +56,7 @@ for _, key in pairs(M.REASON) do KNOWN_REASON[key] = true end
 ---   backup(release) -> record|nil, error (record.path is shown to the user),
 ---   resolve_asset(release, native_owner?) -> asset|nil,
 ---   download(asset, release, done(path|nil, reason_key, detail, failure_receipt?), native_owner?) -> dispatched,
----   install(path, release, asset) -> true | false, reason_key, detail,
+---   install?(path, release, asset) -> true | false, reason_key, detail,
 ---   install_async?(path, release, asset, done(completed, reason, detail, receipt?), native_owner?) -> admitted,
 ---   restart(release) -> true | false,
 ---   report(message, native_owner?) -- safe public message plus optional PRIVATE native owner,
@@ -72,12 +72,15 @@ for _, key in pairs(M.REASON) do KNOWN_REASON[key] = true end
 --- @return table session { install(tag, channel), busy() }
 function M.new(ports)
 	assert(type(ports) == "table", "release_install needs its ports")
-	for _, name in ipairs({ "blocked", "find_release", "backup", "resolve_asset", "download", "install",
+	for _, name in ipairs({ "blocked", "find_release", "backup", "resolve_asset", "download",
 		"restart", "report" }) do
 		assert(type(ports[name]) == "function", "release_install needs the " .. name .. " port")
 	end
+	local install = ports.install
 	local install_async = rawget(ports, "install_async")
+	assert(install == nil or type(install) == "function", "release_install sync install port is invalid")
 	assert(install_async == nil or type(install_async) == "function", "release_install async install port is invalid")
+	assert(install ~= nil or install_async ~= nil, "release_install needs an install or async install port")
 	local accept_execution = rawget(ports, "accept_execution")
 	assert(accept_execution == nil or type(accept_execution) == "function", "release_install execution admission port is invalid")
 	local Logger, LOG = ports.logger, ports.log or "release_install"

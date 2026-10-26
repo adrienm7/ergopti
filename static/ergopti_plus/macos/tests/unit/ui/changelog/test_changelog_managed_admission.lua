@@ -30,7 +30,11 @@ local function listed(body)
 			installer = {
 				find_asset = function() return { url = "https://fixture.invalid/app", digest = "literal", version = TAG } end,
 				stage = function(_, done) state.stages[#state.stages + 1] = done; return true end,
-				arm_swap = function() state.arms = state.arms + 1; return true end,
+				arm_swap = function(_, done)
+					state.arms = state.arms + 1
+					done(true)
+					return true
+				end,
 			},
 			coordinator = { request_user_exit = function() state.exits = state.exits + 1; return true end },
 		}

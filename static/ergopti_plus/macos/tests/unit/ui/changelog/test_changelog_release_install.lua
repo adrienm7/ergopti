@@ -67,9 +67,11 @@ local function owners(opts)
 				done(result.path, result.stage, "detail")
 				return true
 			end,
-			arm_swap = function(staged)
+			arm_swap = function(staged, done)
 				event("arm:" .. tostring(staged))
 				if opts.armed == false then return false, "refused" end
+				if opts.defer_arm then opts.arm_done = done; return true end
+				if done then done(true) end
 				return true
 			end,
 		},
@@ -144,6 +146,38 @@ helpers.describe("Changelog one-click release install (macOS)", function()
 				"arm:/tmp/stage/app/ErgoptiPlus.app", "exit:release_install" }, ","))
 			helpers.assert_eq(phases(state), "backing_up,downloading,installing,restarting")
 			helpers.assert_true(last_install_message(state):find('"backup_path":"/cfg/backups/pre-install-x"', 1, true) ~= nil)
+		end)
+	end)
+
+	helpers.it("waits for the detached worker before quitting (release-arming-bridge)", function()
+		with_changelog(function(changelog, state, post)
+			local options = { defer_arm = true }
+			local deps, events = owners(options)
+			open_listed(changelog, state, post, deps)
+			post({ action = "install_release", tag = "v0.0.0-dev.139", channel = "dev" })
+			helpers.assert_eq(phases(state), "backing_up,downloading,installing")
+			helpers.assert_eq(events[#events], "arm:/tmp/stage/app/ErgoptiPlus.app")
+			helpers.assert_eq(type(options.arm_done), "function")
+			options.arm_done(true)
+			helpers.assert_eq(events[#events], "exit:release_install")
+			helpers.assert_eq(phases(state), "backing_up,downloading,installing,restarting")
+			options.arm_done(false, "late refusal")
+			helpers.assert_eq(phases(state), "backing_up,downloading,installing,restarting")
+		end)
+	end)
+
+	helpers.it("keeps the driver running when arming refuses (release-arming-bridge)", function()
+		with_changelog(function(changelog, state, post)
+			local options = { defer_arm = true }
+			local deps, events = owners(options)
+			open_listed(changelog, state, post, deps)
+			post({ action = "install_release", tag = "v0.0.0-dev.139", channel = "dev" })
+			helpers.assert_eq(phases(state), "backing_up,downloading,installing")
+			options.arm_done(false, "log open refused")
+			helpers.assert_eq(phases(state), "backing_up,downloading,installing,failed")
+			helpers.assert_eq(events[#events], "arm:/tmp/stage/app/ErgoptiPlus.app")
+			options.arm_done(true)
+			helpers.assert_eq(phases(state), "backing_up,downloading,installing,failed")
 		end)
 	end)
 
