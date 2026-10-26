@@ -8,6 +8,40 @@ local Fakes = require("tests.fakes")
 local function assert_false(value) helpers.assert_eq(value, false) end
 require("infra.monotonic") -- Load the genuine clock before temporary native ports.
 
+local function read_committed_input(database)
+	local shell = require("adapters.shell_runner")
+	assert(shell.has_command("sqlite3"), "SQLite CLI is required for the independent native COMMIT assertion")
+	local quote = require("text_utils").shell_quote
+	local pipe = assert(io.popen("sqlite3 " .. quote(database) .. " " .. quote("SELECT COUNT(*) FROM events_typing;"), "r"))
+	local retained = pipe:read("*a")
+	assert(pipe:close())
+	return retained
+end
+
+helpers.describe("native metrics fixture SQLite admission", function()
+	it("native-fixture-sqlite-admission: a missing CLI refuses before opening the independent query", function()
+		local shell = require("adapters.shell_runner")
+		helpers.assert_eq(type(shell.has_command), "function", "the probe must mirror the real shell API")
+		local original_probe, original_open = shell.has_command, io.popen
+		local probes, opens = 0, 0
+		shell.has_command = function(program)
+			helpers.assert_eq(program, "sqlite3")
+			probes = probes + 1
+			return false
+		end
+		io.popen = function()
+			opens = opens + 1
+			return nil, "the independent query must not launch without SQLite"
+		end
+		local ok, detail = pcall(read_committed_input, "/nonexistent/ergopti-fixture-admission/metrics.sqlite")
+		shell.has_command, io.popen = original_probe, original_open
+		helpers.assert_eq(ok, false, "missing mandatory SQLite must never skip its native assertion")
+		helpers.assert_eq(opens, 0, "the mandatory CLI must be admitted before any independent query")
+		helpers.assert_eq(probes, 1, "the real required-tool boundary must be exercised")
+		helpers.assert_contains(detail, "SQLite CLI is required for the independent native COMMIT assertion")
+	end)
+end)
+
 helpers.describe("native metrics fixture construction deadlines", function()
 	for _, action in ipairs({ "stop", "reset", "flush" }) do
 		for _, constructor in ipairs({ 1, 2 }) do
@@ -58,10 +92,7 @@ helpers.describe("native metrics fixture construction deadlines", function()
 				end
 				local retained
 				if settled then
-					local quote = require("text_utils").shell_quote
-					local pipe = assert(io.popen("sqlite3 " .. quote(database) .. " " .. quote("SELECT COUNT(*) FROM events_typing;"), "r"))
-					retained = pipe:read("*a")
-					assert(pipe:close())
+					retained = read_committed_input(database)
 				end
 				for name in uv.fs_scandir_next, assert(uv.fs_scandir(directory)) do
 					assert(uv.fs_unlink(directory .. "/" .. name))
