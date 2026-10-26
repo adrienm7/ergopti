@@ -127,19 +127,29 @@ helpers.describe("config-backup-native-names", function()
 		end)
 	end
 
-	helpers.it("(config-backup-native-names) a dangling link cannot block unrelated configuration backup", function()
+	helpers.it("(config-backup-native-names) a dangling file link refuses through the canonical read", function()
 		local dir = scratch()
 		local Backup = helpers.load_module("modules.updater.config_backup")
 		Backup._overrides = { roots = { { id = "config", dir = dir .. "/cfg" } } }
 		local ok, err = pcall(function()
 			assert(require("luv").fs_symlink(dir .. "/not-here", dir .. "/cfg/dangling.toml"))
 			local owner = assert(Backup.owner())
-			local record, reason = owner.create("pre_install")
-			helpers.assert_true(type(record) == "table", "a dangling link is neither a file nor a directory: " .. tostring(reason))
-			helpers.assert_eq(read(record.path .. "/config/config.toml"), "[script]\nlocale = \"fr\"\n")
-			for _, file in ipairs(record.files) do
-				helpers.assert_true(file.path ~= "dangling.toml", "an absent target must never become a backup file")
+			local Writer = require("toml_codec.writer")
+			local native_read, attempts, observed = Writer.read_classified, 0, nil
+			Writer.read_classified = function(path, ...)
+				local content, status, detail = native_read(path, ...)
+				if path == dir .. "/cfg/dangling.toml" then attempts, observed = attempts + 1, status end
+				return content, status, detail
 			end
+			local called, record, reason = pcall(owner.create, "pre_install")
+			Writer.read_classified = native_read
+			if not called then error(record, 0) end
+			helpers.assert_nil(record, "a listed file with an absent target cannot certify a complete backup")
+			helpers.assert_eq(attempts, 1, "the native dangling link must reach classified read, not disappear from the walk")
+			helpers.assert_eq(observed, "absent")
+			helpers.assert_contains(reason, "cannot read " .. dir .. "/cfg/dangling.toml")
+			helpers.assert_eq(read(dir .. "/cfg/config.toml"), "[script]\nlocale = \"fr\"\n")
+			helpers.assert_nil(owner.latest("pre_install"), "the refused snapshot must publish no complete record")
 		end)
 		Backup._overrides = nil
 		os.execute("rm -rf " .. quote(dir))
@@ -160,6 +170,37 @@ helpers.describe("config-backup-native-names", function()
 	end)
 end)
 
+
+helpers.describe("config-backup-target-refusal", function()
+	for _, mode in ipairs({ "denied", "loop" }) do
+		helpers.it("(config-backup-target-refusal) refuses actual " .. mode .. " link target metadata", function()
+			local uv = require("luv")
+			local dir = scratch()
+			local target = dir .. "/cfg/refused.toml"
+			local protected = dir .. "/protected"
+			if mode == "denied" then
+				assert(uv.fs_mkdir(protected, 448))
+				write(protected .. "/private.toml", "[retained]\n")
+				assert(uv.fs_symlink(protected .. "/private.toml", target))
+				assert(uv.fs_chmod(protected, 0))
+			else
+				assert(uv.fs_symlink(target, target))
+			end
+			local Backup = helpers.load_module("modules.updater.config_backup")
+			local called, entries, reason = pcall(Backup._list, dir .. "/cfg")
+			if mode == "denied" then assert(uv.fs_chmod(protected, 448)) end
+			local link = assert(uv.fs_lstat(target))
+			local retained = read(dir .. "/cfg/config.toml")
+			os.execute("rm -rf " .. quote(dir))
+			if not called then error(entries, 0) end
+			helpers.assert_eq(link.type, "link", "the actual link must remain unchanged after refusal")
+			helpers.assert_nil(entries, "non-ENOENT target refusal must never silently omit configuration")
+			helpers.assert_contains(reason, mode == "denied" and "EACCES" or "ELOOP")
+			helpers.assert_eq(retained, "[script]\nlocale = \"fr\"\n")
+		end)
+	end
+end)
+
 helpers.describe("config-backup-native-metadata", function()
 	for _, mode in ipairs({ "denied", "gone", "file" }) do
 		helpers.it("(config-backup-native-metadata) unknown d_type requires actual " .. mode .. " metadata", function()
@@ -173,6 +214,7 @@ helpers.describe("config-backup-native-metadata", function()
 			local closed, probed, native_code = 0, 0, nil
 			local backend = {
 				fs_opendir = uv.fs_opendir,
+				fs_stat = uv.fs_stat,
 				fs_readdir = function(handle)
 					local entries, message, code = uv.fs_readdir(handle)
 					for _, entry in ipairs(entries or {}) do
