@@ -945,35 +945,27 @@ _derived_sql.app_day = function(device_id, date, app, fields)
 		-- suggestions were being accepted all day.
 		hs_suggested = true, llm_suggested = true,
 	}
-	local sets = {}
-	for k, v in pairs(fields) do
-		if allowed[k] and type(v) == "number" and v > 0 then
-			sets[#sets + 1] = string.format("%s = %s + %d",
-				_sql_escape(k), _sql_escape(k), v)
+	-- Only a positive counter is added; any other field adds nothing.
+	local any = false
+	local function counted(name)
+		local v = fields[name]
+		if allowed[name] and type(v) == "number" and v > 0 then
+			any = true
+			return math.floor(v)
 		end
+		return 0
 	end
-	if #sets == 0 then return end
 
-	local sql = string.format(
-		"INSERT INTO agg_app_day (device_id, date, app, chars, time_ms, app_time_ms, hs_chars, hs_triggers, hs_input_chars, llm_chars, llm_triggers, llm_input_chars, hs_suggested, llm_suggested) "
-		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d) "
-		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET %s;",
-		_sql_escape(device_id),
-		_sql_escape(date),
-		_sql_escape(app),
-		tonumber(fields.chars) or 0,
-		tonumber(fields.time_ms) or 0,
-		tonumber(fields.app_time_ms) or 0,
-		tonumber(fields.hs_chars) or 0,
-		tonumber(fields.hs_triggers) or 0,
-		tonumber(fields.hs_input_chars) or 0,
-		tonumber(fields.llm_chars) or 0,
-		tonumber(fields.llm_triggers) or 0,
-		tonumber(fields.llm_input_chars) or 0,
-		tonumber(fields.hs_suggested) or 0,
-		tonumber(fields.llm_suggested) or 0,
-		table.concat(sets, ", ")
-	)
+	local sql = Queries.render("agg.app_day", "cli_json", {
+		device_id = device_id, date = date, app = app,
+		chars = counted("chars"), pauses = 0, time_ms = counted("time_ms"), think_time_ms = 0,
+		hs_chars = counted("hs_chars"), llm_chars = counted("llm_chars"),
+		hs_triggers = counted("hs_triggers"), llm_triggers = counted("llm_triggers"),
+		hs_suggested = counted("hs_suggested"), llm_suggested = counted("llm_suggested"),
+		hs_input_chars = counted("hs_input_chars"), llm_input_chars = counted("llm_input_chars"),
+		app_time_ms = counted("app_time_ms"),
+	})
+	if not any then return end
 	return sql
 end
 
@@ -995,27 +987,18 @@ end
 ---        first_typed_min?, last_typed_min? }
 _derived_sql.chars_class = function(device_id, row)
 	if type(row) ~= "table" then return end
-	local function quoted_or_null(value)
-		if type(value) ~= "string" or value == "" then return "NULL" end
-		return "'" .. _sql_escape(value) .. "'"
+	-- An empty minute is no minute: NULL, which the MIN and MAX in SQL ignore.
+	local function text_or_nil(value)
+		if type(value) ~= "string" or value == "" then return nil end
+		return value
 	end
-	local sql = string.format(
-		"INSERT INTO agg_app_day_chars_class "
-		.. "(device_id, date, app, letter, digit, punct, space, other, first_typed_min, last_typed_min) "
-		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,%d,%s,%s) "
-		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
-		.. "letter = letter + excluded.letter, digit = digit + excluded.digit, "
-		.. "punct = punct + excluded.punct, space = space + excluded.space, "
-		.. "other = other + excluded.other, "
-		.. "first_typed_min = MIN(COALESCE(first_typed_min, excluded.first_typed_min), "
-		.. "COALESCE(excluded.first_typed_min, first_typed_min)), "
-		.. "last_typed_min = MAX(COALESCE(last_typed_min, excluded.last_typed_min), "
-		.. "COALESCE(excluded.last_typed_min, last_typed_min));",
-		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
-		math.floor(tonumber(row.letter) or 0), math.floor(tonumber(row.digit) or 0),
-		math.floor(tonumber(row.punct) or 0), math.floor(tonumber(row.space) or 0),
-		math.floor(tonumber(row.other) or 0),
-		quoted_or_null(row.first_typed_min), quoted_or_null(row.last_typed_min))
+	local sql = Queries.render("agg.chars_class", "cli_json", {
+		device_id = device_id, date = row.date, app = row.app,
+		letter = math.floor(tonumber(row.letter) or 0), digit = math.floor(tonumber(row.digit) or 0),
+		punct = math.floor(tonumber(row.punct) or 0), space = math.floor(tonumber(row.space) or 0),
+		other = math.floor(tonumber(row.other) or 0),
+		first_typed_min = text_or_nil(row.first_typed_min), last_typed_min = text_or_nil(row.last_typed_min),
+	})
 	return sql
 end
 
@@ -1035,22 +1018,14 @@ end
 ---        recovery_sum_ms, recovery_count }
 _derived_sql.errors = function(device_id, row)
 	if type(row) ~= "table" then return end
-	local sql = string.format(
-		"INSERT INTO agg_app_day_errors "
-		.. "(device_id, date, app, bs_total, cascade_count, cascade_max_len, recovery_sum_ms, recovery_count) "
-		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,%d) "
-		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
-		.. "bs_total = bs_total + excluded.bs_total, "
-		.. "cascade_count = cascade_count + excluded.cascade_count, "
-		.. "cascade_max_len = MAX(cascade_max_len, excluded.cascade_max_len), "
-		.. "recovery_sum_ms = recovery_sum_ms + excluded.recovery_sum_ms, "
-		.. "recovery_count = recovery_count + excluded.recovery_count;",
-		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
-		math.floor(tonumber(row.bs_total) or 0),
-		math.floor(tonumber(row.cascade_count) or 0),
-		math.floor(tonumber(row.cascade_max_len) or 0),
-		math.floor(tonumber(row.recovery_sum_ms) or 0),
-		math.floor(tonumber(row.recovery_count) or 0))
+	local sql = Queries.render("agg.errors", "cli_json", {
+		device_id = device_id, date = row.date, app = row.app,
+		bs_total = math.floor(tonumber(row.bs_total) or 0),
+		cascade_count = math.floor(tonumber(row.cascade_count) or 0),
+		cascade_max_len = math.floor(tonumber(row.cascade_max_len) or 0),
+		recovery_sum_ms = math.floor(tonumber(row.recovery_sum_ms) or 0),
+		recovery_count = math.floor(tonumber(row.recovery_count) or 0),
+	})
 	return sql
 end
 
@@ -1137,24 +1112,15 @@ end
 ---        hotstring or a prediction erased, credited the same way.
 _derived_sql.app_bucket = function(device_id, row)
 	if type(row) ~= "table" then return end
-	local sql = string.format(
-		"INSERT INTO agg_app_day_buckets (device_id, date, app, bucket_ms, time_sum, credited, "
-		.. "hs_input_time_sum, hs_input_credited, llm_input_time_sum, llm_input_credited) "
-		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,%d,%d,%d) "
-		.. "ON CONFLICT(device_id, date, app, bucket_ms) DO UPDATE SET "
-		.. "time_sum = time_sum + excluded.time_sum, credited = credited + excluded.credited, "
-		.. "hs_input_time_sum = hs_input_time_sum + excluded.hs_input_time_sum, "
-		.. "hs_input_credited = hs_input_credited + excluded.hs_input_credited, "
-		.. "llm_input_time_sum = llm_input_time_sum + excluded.llm_input_time_sum, "
-		.. "llm_input_credited = llm_input_credited + excluded.llm_input_credited;",
-		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
-		math.floor(tonumber(row.bucket_ms) or 0),
-		math.floor(tonumber(row.time_sum) or 0),
-		math.floor(tonumber(row.credited) or 0),
-		math.floor(tonumber(row.hs_in_t) or 0),
-		math.floor(tonumber(row.hs_in_c) or 0),
-		math.floor(tonumber(row.llm_in_t) or 0),
-		math.floor(tonumber(row.llm_in_c) or 0))
+	local sql = Queries.render("agg.buckets", "cli_json", {
+		device_id = device_id, date = row.date, app = row.app,
+		bucket_ms = math.floor(tonumber(row.bucket_ms) or 0), time_sum = math.floor(tonumber(row.time_sum) or 0),
+		credited = math.floor(tonumber(row.credited) or 0),
+		hs_input_time_sum = math.floor(tonumber(row.hs_in_t) or 0),
+		hs_input_credited = math.floor(tonumber(row.hs_in_c) or 0),
+		llm_input_time_sum = math.floor(tonumber(row.llm_in_t) or 0),
+		llm_input_credited = math.floor(tonumber(row.llm_in_c) or 0),
+	})
 	return sql
 end
 
@@ -1365,21 +1331,12 @@ _derived_sql.kc_hold = function(device_id, row)
 	if type(row) ~= "table" then return end
 	local keycode = tonumber(row.keycode)
 	if not keycode then return end
-	local sql = string.format(
-		"INSERT INTO agg_app_day_kc_hold (device_id, date, app, keycode, sum_ms, count, "
-		.. "max_ms, tap_count, hold_count) VALUES ('%s','%s','%s',%d,%d,%d,%d,%d,%d) "
-		.. "ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET "
-		.. "sum_ms = sum_ms + excluded.sum_ms, count = count + excluded.count, "
-		-- A record, not a sum: the longest hold of the day does not get longer by
-		-- being flushed twice.
-		.. "max_ms = MAX(max_ms, excluded.max_ms), "
-		.. "tap_count = tap_count + excluded.tap_count, "
-		.. "hold_count = hold_count + excluded.hold_count;",
-		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
-		math.floor(keycode),
-		math.floor(tonumber(row.sum_ms) or 0), math.floor(tonumber(row.count) or 0),
-		math.floor(tonumber(row.max_ms) or 0),
-		math.floor(tonumber(row.tap_count) or 0), math.floor(tonumber(row.hold_count) or 0))
+	local sql = Queries.render("agg.kc_hold", "cli_json", {
+		device_id = device_id, date = row.date, app = row.app, keycode = math.floor(keycode),
+		sum_ms = math.floor(tonumber(row.sum_ms) or 0), count = math.floor(tonumber(row.count) or 0),
+		max_ms = math.floor(tonumber(row.max_ms) or 0), tap_count = math.floor(tonumber(row.tap_count) or 0),
+		hold_count = math.floor(tonumber(row.hold_count) or 0),
+	})
 	return sql
 end
 
@@ -1400,13 +1357,10 @@ end
 _derived_sql.layout = function(device_id, row)
 	if type(row) ~= "table" then return end
 	if type(row.layout) ~= "string" or row.layout == "" then return end
-	local sql = string.format(
-		"INSERT INTO agg_app_day_layouts (device_id, date, app, layout, count) "
-		.. "VALUES ('%s','%s','%s','%s',%d) "
-		.. "ON CONFLICT(device_id, date, app, layout) DO UPDATE SET "
-		.. "count = count + excluded.count;",
-		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
-		_sql_escape(row.layout), math.floor(tonumber(row.count) or 0))
+	local sql = Queries.render("agg.layouts", "cli_json", {
+		device_id = device_id, date = row.date, app = row.app, layout = row.layout,
+		count = math.floor(tonumber(row.count) or 0),
+	})
 	return sql
 end
 
@@ -1426,22 +1380,14 @@ end
 ---        auto_repeat_count, focus_to_first_key_sum_ms, focus_to_first_key_count }
 _derived_sql.ergo = function(device_id, row)
 	if type(row) ~= "table" then return end
-	local sql = string.format(
-		"INSERT INTO agg_app_day_ergo (device_id, date, app, same_finger_streak_max, "
-		.. "same_hand_streak_max, auto_repeat_count, focus_to_first_key_sum_ms, "
-		.. "focus_to_first_key_count) VALUES ('%s','%s','%s',%d,%d,%d,%d,%d) "
-		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
-		.. "same_finger_streak_max = MAX(same_finger_streak_max, excluded.same_finger_streak_max), "
-		.. "same_hand_streak_max = MAX(same_hand_streak_max, excluded.same_hand_streak_max), "
-		.. "auto_repeat_count = auto_repeat_count + excluded.auto_repeat_count, "
-		.. "focus_to_first_key_sum_ms = focus_to_first_key_sum_ms + excluded.focus_to_first_key_sum_ms, "
-		.. "focus_to_first_key_count = focus_to_first_key_count + excluded.focus_to_first_key_count;",
-		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
-		math.floor(tonumber(row.same_finger_streak_max) or 0),
-		math.floor(tonumber(row.same_hand_streak_max) or 0),
-		math.floor(tonumber(row.auto_repeat_count) or 0),
-		math.floor(tonumber(row.focus_to_first_key_sum_ms) or 0),
-		math.floor(tonumber(row.focus_to_first_key_count) or 0))
+	local sql = Queries.render("agg.ergo", "cli_json", {
+		device_id = device_id, date = row.date, app = row.app,
+		same_finger_streak_max = math.floor(tonumber(row.same_finger_streak_max) or 0),
+		same_hand_streak_max = math.floor(tonumber(row.same_hand_streak_max) or 0),
+		auto_repeat_count = math.floor(tonumber(row.auto_repeat_count) or 0),
+		focus_to_first_key_sum_ms = math.floor(tonumber(row.focus_to_first_key_sum_ms) or 0),
+		focus_to_first_key_count = math.floor(tonumber(row.focus_to_first_key_count) or 0),
+	})
 	return sql
 end
 
@@ -1461,14 +1407,10 @@ end
 --- @param row table { date, app_from, app_to, count }
 _derived_sql.switch_to = function(device_id, row)
 	if type(row) ~= "table" then return end
-	local sql = string.format(
-		"INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count) "
-		.. "VALUES ('%s','%s','%s','%s',%d) "
-		.. "ON CONFLICT(device_id, date, app_from, app_to) DO UPDATE SET "
-		.. "count = count + excluded.count;",
-		_sql_escape(device_id), _sql_escape(row.date),
-		_sql_escape(row.app_from), _sql_escape(row.app_to),
-		math.floor(tonumber(row.count) or 0))
+	local sql = Queries.render("agg.switches_to", "cli_json", {
+		device_id = device_id, date = row.date, app_from = row.app_from, app_to = row.app_to,
+		count = math.floor(tonumber(row.count) or 0),
+	})
 	return sql
 end
 
