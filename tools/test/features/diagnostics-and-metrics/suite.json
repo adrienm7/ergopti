@@ -401,6 +401,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-sql-shared-spelling.cjs"],
 			"repro": "npm run test:keystats-sql-shared-spelling"
+		},
+		{
+			"id": "keystats-write-catalogue",
+			"ordinal": 501,
+			"name": "keystats write statements of the catalogue leave the rows the legacy driver SQL left and render to the shared vectors",
+			"cmd": "node",
+			"args": ["tools/test/test-keystats-write-catalogue.cjs"],
+			"repro": "npm run test:keystats-write-catalogue"
 		}
 	]
 }

@@ -4,7 +4,8 @@
 ; Source: _shared/data/db/queries.sql (the named keystats queries).
 
 /**
- * Renders a named keystats query for the in-process SQLite engine.
+ * Renders a named keystats query for the in-process SQLite engine. Queries with
+ * typed value slots (the write statements) are refused until Windows adopts them.
  * @param {string} Name - Catalogue name, such as "manifest.app_day".
  * @param {Map} Params - Value of every parameter the query declares.
  * @returns {string} The SQL text.
@@ -115,6 +116,35 @@ KeystatsQuery(Name, Params := Map()) {
 		],
 		"meta.rev", [
 			["literal", "SELECT value FROM meta WHERE key='rev'`;"]
+		],
+		"meta.get", [
+			["literal", "SELECT value FROM meta WHERE key="],
+			["slot", "key", "s"],
+			["literal", "`;"]
+		],
+		"meta.set", [
+			["literal", "INSERT OR REPLACE INTO meta (key, value) VALUES ("],
+			["slot", "key", "s"],
+			["literal", ", "],
+			["slot", "value", "s"],
+			["literal", ")`;"]
+		],
+		"meta.upsert", [
+			["literal", "INSERT INTO meta(key,value) VALUES ("],
+			["slot", "key", "s"],
+			["literal", ","],
+			["slot", "value", "s"],
+			["literal", ") ON CONFLICT(key) DO UPDATE SET value = excluded.value`;"]
+		],
+		"meta.seed", [
+			["literal", "INSERT OR IGNORE INTO meta (key, value) VALUES ("],
+			["slot", "key", "s"],
+			["literal", ", "],
+			["slot", "value", "s"],
+			["literal", ")`;"]
+		],
+		"meta.rev_bump", [
+			["literal", "UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev'`;"]
 		]
 	)
 	if !Queries.Has(Name)

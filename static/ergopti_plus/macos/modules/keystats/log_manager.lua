@@ -45,6 +45,7 @@ local timer   = require("hs.timer")
 local Logger  = require("infra.logger")
 local Timings = require("infra.timings")
 local Literal = require("sqlite.literal")
+local Queries = require("keystats.queries")
 local i18n    = require("infra.i18n")  -- kept for MAC_CATEGORIES_FR still used by export
 local FileSystem = require("adapters.file_system")
 local LedgerAppend = require("adapters.ledger_append")
@@ -1373,7 +1374,7 @@ local function _mark_aggregate_cache_rebuilt(db, partition_only)
 				.. " WHERE key='aggregate_cache_revision';")
 			if version_rc ~= sqlite3.OK then error(db:errmsg() or "cannot update aggregate cache revision") end
 		end
-		local rev_rc = db:exec("UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev';")
+		local rev_rc = db:exec(Queries.render("meta.rev_bump", "native"))
 		if rev_rc ~= sqlite3.OK then error(db:errmsg() or "cannot update metrics revision") end
 		local commit_rc = db:exec("COMMIT;")
 		if commit_rc ~= sqlite3.OK then error(db:errmsg() or "cannot commit aggregate cache revision") end
@@ -1593,8 +1594,7 @@ function M.ingest_once()
 		if SqliteWriter.persist_next_event_id() ~= true then
 			error("cannot persist next event id", 0)
 		end
-		_exec_sqlite_or_error(db,
-			"UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev';",
+		_exec_sqlite_or_error(db, Queries.render("meta.rev_bump", "native"),
 			"cannot increment metrics revision")
 		-- Serialise n-gram walking context so a crash mid-tick does not lose
 		-- the partial cur_word / p1..p6 / current_burst / streak state.
