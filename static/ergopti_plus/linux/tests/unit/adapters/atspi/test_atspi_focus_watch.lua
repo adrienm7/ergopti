@@ -418,6 +418,52 @@ end)
 -- =======================================
 
 helpers.describe("AT-SPI focus watcher: native lifecycle", function()
+	helpers.it("focus-retirement-listener-native: retires real processes and FIFOs after observer refusal", function()
+		local quote = require("text_utils").shell_quote
+		local root = helpers.driver_root()
+		-- The production transport uses LuaJIT FFI; both suite ABIs qualify that
+		-- actual driver runtime instead of fabricating a stock-Lua native backend.
+		local status = os.execute("env -u LUA_PATH -u LUA_CPATH luajit "
+			.. quote(root .. "/tests/hardware/run_focus_listener_retirement.lua") .. " " .. quote(root))
+		helpers.assert_true(status == true or status == 0, "native focus listener retirement must remain truthful")
+	end)
+
+	for _, trigger in ipairs({ "stop", "eof", "worker" }) do
+		for _, failure_kind in ipairs({ "string", "foreign" }) do
+			helpers.it("focus-retirement-listener: " .. trigger .. " retains cleanup after " .. failure_kind .. " notification failure", function()
+				local state = fixture()
+				local failure = failure_kind == "string" and "listener refusal" or setmetatable({}, {
+					__tostring = function() error("foreign renderer refused") end,
+				})
+				state.watch.on_change(function(snapshot) if snapshot == nil then error(failure) end end)
+				state.ready()
+				local Logger = require("logger.shim")
+				local original_error, diagnostics = Logger.error, {}
+				Logger.error = function(_, template, detail) diagnostics[#diagnostics + 1] = { template, detail } end
+				local ok, result = pcall(function()
+					if trigger == "stop" then return state.watch.stop() end
+					if trigger == "eof" then state.eof = true else state.running = false end
+					return state.watch.pump()
+				end)
+				Logger.error = original_error
+				helpers.assert_true(ok, "notification refusal cannot prevent native cancellation")
+				helpers.assert_eq(#diagnostics, 1, "the original listener refusal must remain observable once")
+				helpers.assert_eq(diagnostics[1][1], "Native focus revocation listener failed: %s")
+				helpers.assert_true(diagnostics[1][2]:find(failure_kind == "string" and "listener refusal" or "error object (table)", 1, true) ~= nil)
+				assert_false(result, "physical cleanup still requires the original worker receipt")
+				helpers.assert_true(state.cancelled, "the exact worker must receive cancellation despite its listener")
+				helpers.assert_nil(state.watch.snapshot(), "revoked receipt must never regain authority")
+				assert_false(state.watch.start(), "native cleanup debt forbids successor admission")
+				helpers.assert_eq(state.closed, 0, "live worker retains its FIFO endpoints")
+				state.retire()
+				helpers.assert_true(state.watch.is_settled())
+				helpers.assert_eq(state.closed, 1)
+				helpers.assert_eq(state.removed, 2, "ready unlink and final retirement each retain their own receipt")
+				helpers.assert_true(state.watch.stop(), "retired cleanup remains idempotent")
+			end)
+		end
+	end
+
 	helpers.it("distinguishes initial no-writer EOF from authority loss after a receipt", function()
 		local state = fixture()
 		state.eof = true
