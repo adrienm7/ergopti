@@ -347,7 +347,7 @@ Test("tap-hold duration: held prompt rejects replaced source and rebased target 
 _THD_FutureSource() {
 	return Chr(0xFEFF)
 		. '# the unknown root is user data`nfuture.version = "001" # keep root spelling`n'
-		. '[tap_hold]`ninherit_defaults = false # explicit opt-out`n'
+		. '[tap_hold]`nexplicit_delays = true`ninherit_defaults = false # explicit opt-out`n'
 		. '[tap_hold.keys.caps_lock] # keep key header`n'
 		. 'enabled = false # keep the literal Boolean`n'
 		. 'tap_action = "escape"`nhold_modifier = "ctrl"`n'
@@ -434,9 +434,9 @@ _THD_AliasAndNoOpSources(TargetPath) {
 	global TapHold
 	_THD_Reset()
 	Sources := [
-		Chr(0xFEFF) . '# root dotted leaf`ntap_hold.keys.caps_lock.time_activation_seconds = 0.2`nfuture = "001"`n',
-		Chr(0xFEFF) . '["tap_hold"."keys"."caps_lock"] # quoted exact owner`ntime_activation_seconds = 0.2`nfuture_note = "001"`n',
-		Chr(0xFEFF) . '[tap_hold]`nkeys = { caps_lock = { time_activation_seconds = 0.2, enabled = false }, tab = { tap_action = "copy" } }`n'
+		Chr(0xFEFF) . '# root dotted leaf`ntap_hold.explicit_delays = true`ntap_hold.keys.caps_lock.time_activation_seconds = 0.2`nfuture = "001"`n',
+		Chr(0xFEFF) . '[tap_hold]`nexplicit_delays = true`n["tap_hold"."keys"."caps_lock"] # quoted exact owner`ntime_activation_seconds = 0.2`nfuture_note = "001"`n',
+		Chr(0xFEFF) . '[tap_hold]`nexplicit_delays = true`nkeys = { caps_lock = { time_activation_seconds = 0.2, enabled = false }, tab = { tap_action = "copy" } }`n'
 	]
 	for Source in Sources {
 		TapHold := _THGT_FreshState()
@@ -670,10 +670,30 @@ _THD_GlobalChangeAndResetFollowTheModel(TargetPath) {
 	AssertFalse(TapHoldHasOwnDuration(TapHold, "tab"))
 	AssertEqual(0.31, TapHoldDuration(TapHold, "tab"), "a reset key follows the global delay again")
 	AssertEqual(0.31, TapHoldGlobalDuration(TapHold), "the reset leaves the global delay alone")
-	Assert(!InStr(_THGT_Writes[2]["content"], "[tap_hold.keys.tab]"), "a key left with nothing of its own is not listed")
+	Persisted := TOML_ParseDocument(_THGT_Writes[2]["content"])
+	AssertEqual("copy", Persisted["tap_hold"]["keys"]["tab"]["tap_action"],
+		"resetting a delay preserves the key's independent tap mapping")
+	AssertFalse(Persisted["tap_hold"]["keys"]["tab"].Has(ConfigLeaf.TIME_ACTIVATION_SECONDS),
+		"the persisted mapped key follows the global delay again")
+	_THD_WithPhysicalSource(TargetPath, _THGT_Writes[2]["content"], _THD_PersistedEmptyDurationReset)
 }
 Test("tap-hold delay: global change spares a key's own delay, a reset follows the global again (PAR-15)",
 	() => _THHS_WithNativeFixture(_THD_GlobalChangeAndResetFollowTheModel))
+
+; The absence check requires a real prior file row, not an entry added only to RAM.
+_THD_PersistedEmptyDurationReset(TargetPath) {
+	global TapHold
+	AssertEqual(1, WriteTapHoldDuration("left_ctrl", 0.42), "the actual writer persists a duration-only key")
+	Before := TOML_ParseDocument(FSReadUtf8Exact(TargetPath))
+	AssertEqual(1, Before["tap_hold"]["keys"]["left_ctrl"].Count, "the physical input has only its own duration")
+	AssertEqual(0.42, Before["tap_hold"]["keys"]["left_ctrl"][ConfigLeaf.TIME_ACTIVATION_SECONDS],
+		"the independent file read proves the key existed before reset")
+	AssertEqual(1, WriteTapHoldDurationReset("left_ctrl"), "the actual reset persists the empty-key removal")
+	AssertFalse(TapHold["keys"].Has("left_ctrl"), "a reset removes a truly empty modeled key")
+	After := TOML_ParseDocument(FSReadUtf8Exact(TargetPath))
+	AssertFalse(After["tap_hold"]["keys"].Has("left_ctrl"), "the formerly persisted empty key is removed")
+	AssertEqual("copy", After["tap_hold"]["keys"]["tab"]["tap_action"], "the mapped neighbor remains persisted")
+}
 
 _THD_GlobalAndResetRefuseInvalidInput(TargetPath) {
 	global TapHold, _THGT_Writes
