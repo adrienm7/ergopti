@@ -88,11 +88,9 @@
 	},
 	"MS_PER_SEC": {
 		"files": [
-			"linux/infra/timings.lua",
 			"linux/ui/hotstrings_config_window/bridge.lua",
 			"linux/ui/menu/menu_builder.lua",
 			"macos/adapters/http_client.lua",
-			"macos/infra/timings.lua",
 			"macos/modules/updater/auto_check.lua"
 		],
 		"divergent": false
