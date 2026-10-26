@@ -22,8 +22,8 @@ function M.build(ctx,ui)
 	local t,renderer = ui.get,ui.manifest
 	if type(th)~="table" or type(actions)~="table" or type(ctx.is_paused)~="function" then return {} end
 	local keys,holds = th.key_catalog(),th.hold_options()
-	local delay_entry=Features.find_entry_by_path("mod_combos.simultaneous_threshold_ms")
-	local symmetry_entry=Features.find_entry_by_path("mod_combos.symmetric")
+	local delay_entry=Features.find_entry_by_path(require("config_keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
+	local symmetry_entry=Features.find_entry_by_path(require("config_keys").KEY.MOD_COMBOS_SYMMETRIC)
 	local chord_declared=type(delay_entry)=="table" and delay_entry.type=="number"
 		and type(symmetry_entry)=="table" and symmetry_entry.type=="boolean"
 		and type(pairs.get_chord)=="function" and type(pairs.chord_settings)=="function"
@@ -144,18 +144,18 @@ function M.build(ctx,ui)
 		return rows
 	end
 	local render={commands={},state_getters={key_combinations_enabled=function() return pairs.is_enabled()==true end}}
-	render.commands["key_combinations_toggle"]=function()
+	render.commands[require("config_keys").COMMAND.KEY_COMBINATIONS_TOGGLE]=function()
 		local source=snapshot();if not source then return feedback(false) end
 		local desired=not pairs.is_enabled()
 		local committed=feedback(Scope.set_enabled(desired,ctx.is_paused,source))
 		if committed==true then require("ui.menu.feature_notice").feature(t("menu.shortcuts.key_combinations"),desired) end
 		return committed
 	end
-	render.commands["scope_restore"]=function()
+	render.commands[require("config_keys").COMMAND.SCOPE_RESTORE]=function()
 		local source=snapshot();if not source then return feedback(false) end
 		return feedback(Scope.apply("recommended",ctx.is_paused,source))
 	end
-	render.commands["scope_clear"]=function()
+	render.commands[require("config_keys").COMMAND.SCOPE_CLEAR]=function()
 		local source=snapshot();if not source then return feedback(false) end
 		return feedback(Scope.apply("clear",ctx.is_paused,source))
 	end
@@ -164,13 +164,13 @@ function M.build(ctx,ui)
 		return settings~=nil and settings.combo_symmetric==true
 	end
 	if chord_declared then
-	render.commands["combo_symmetric"]=function()
+	render.commands[require("config_keys").COMMAND.COMBO_SYMMETRIC]=function()
 		local source=snapshot();local settings=chord_declared and pairs.chord_settings() or nil
 		if not source or not settings then return feedback(false) end
 		settings.combo_symmetric=not settings.combo_symmetric
 		return feedback(Scope.set_chord_settings(settings,ctx.is_paused,source))
 	end
-	render.commands["copy_tap_to_combo"]=function()
+	render.commands[require("config_keys").COMMAND.COPY_TAP_TO_COMBO]=function()
 		local source=snapshot();if not source or not chord_declared then return feedback(false) end
 		return feedback(Scope.copy_taps_to_chords(ctx.is_paused,source))
 	end

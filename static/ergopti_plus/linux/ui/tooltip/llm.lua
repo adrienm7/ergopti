@@ -14,6 +14,7 @@ local Logger = require("logger.shim")
 local Config = require("ui.tooltip.config")
 local DisplaySettings = require("modules.llm.display_settings")
 local LlmLine = require("tooltip.llm_line")
+local ConfigKeys = require("config_keys")
 
 local LOG = "ui.tooltip.llm"
 
@@ -72,7 +73,7 @@ function M.build_rows(candidates, active_index, meta)
 	local selected_prefix, unselected_prefix
 	if chrome then
 		selected_prefix, unselected_prefix = LlmLine.prefixes(
-			DisplaySettings.get("pred_indent") or 0, #shown, chrome.mark, chrome.align)
+			DisplaySettings.get(ConfigKeys.LEAF.PRED_INDENT) or 0, #shown, chrome.mark, chrome.align)
 	end
 	for _, entry in ipairs(shown) do
 		local active = entry.index == active_index
@@ -99,7 +100,7 @@ function M.build_rows(candidates, active_index, meta)
 	if meta.loading == true and #rows == 0 then
 		rows[1] = { text = "…", label = "", dimmed = true }
 	end
-	if DisplaySettings.get("show_info_bar") and #rows > 0 then
+	if DisplaySettings.get(ConfigKeys.LEAF.SHOW_INFO_BAR) and #rows > 0 then
 		local info = {}
 		if type(meta.model) == "string" and meta.model ~= "" then info[#info + 1] = meta.model end
 		if type(meta.profile) == "string" and meta.profile ~= "" then info[#info + 1] = meta.profile end

@@ -50,6 +50,7 @@ local Preferences = require("infra.hotstring_preferences")
 local KEY = require("config_keys").KEY
 local NativePath = require("native_path")
 local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 local LOG = "modules.hotstrings.hotstrings_config"
 local _personal_sources = {}
@@ -358,7 +359,7 @@ local function load_shared_defaults()
 		return s[key]
 	end
 
-	GLOBAL_DEFAULT_DELAY = tonumber(ManifestReader.default_for("hotstrings.expansion_delay"))
+	GLOBAL_DEFAULT_DELAY = tonumber(ManifestReader.default_for(ConfigKeys.KEY.HOTSTRINGS_EXPANSION_DELAY))
 	GLOBAL_DEFAULT_COLOR = require_key("colors", "global_default")
 	NEUTRAL_COLOR        = require_key("colors", "neutral")
 	CATEGORY_DEFAULT_COLORS.personal = require_key("colors", "personal")

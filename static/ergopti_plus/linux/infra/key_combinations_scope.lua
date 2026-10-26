@@ -8,6 +8,7 @@ local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 local KeyPath = require("toml_codec.key_path")
 local Updates = require("shortcuts.physical_availability")
+local ConfigKeys = require("config_keys")
 local M = {}
 local retained, sequence, session_busy = nil, 0, false
 require("infra.scope_registry").register("key_combinations_scope", function() return session_busy or (retained ~= nil and retained.pending() == true) end)
@@ -32,8 +33,8 @@ function M.new(options)
 	local chord_operations, no_op_frame
 	local function chord_declared()
 		if type(manifest.find_entry_by_path) ~= "function" or type(manifest.sparse_operation) ~= "function" then return false end
-		local delay = manifest.find_entry_by_path("mod_combos.simultaneous_threshold_ms")
-		local symmetry = manifest.find_entry_by_path("mod_combos.symmetric")
+		local delay = manifest.find_entry_by_path(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
+		local symmetry = manifest.find_entry_by_path(ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC)
 		return type(delay) == "table" and delay.type == "number"
 			and type(symmetry) == "table" and symmetry.type == "boolean"
 	end
@@ -272,8 +273,8 @@ function M.new(options)
 		if not called then return false end
 		return perform(function()
 			chord_operations = {
-				manifest.sparse_operation("mod_combos.simultaneous_threshold_ms",settings.simultaneous_threshold_ms),
-				manifest.sparse_operation("mod_combos.symmetric",settings.combo_symmetric),
+				manifest.sparse_operation(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS,settings.simultaneous_threshold_ms),
+				manifest.sparse_operation(ConfigKeys.KEY.MOD_COMBOS_SYMMETRIC,settings.combo_symmetric),
 			}
 			return transaction.apply("key_combinations_chord","configured")
 		end)
