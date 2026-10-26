@@ -1,0 +1,6 @@
+[case]
+description = "explicit_delays = false is not the flag: the cleanup runs and the key is removed."
+drivers = ["linux"]
+outcome = "migrated"
+from_version = 0
+to_version = 1

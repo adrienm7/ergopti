@@ -127,13 +127,15 @@ keys = ["escape", "tab", "enter", "space", "backspace", "delete"]
 # ===================================
 
 # The per-key delays this file used to ship, in seconds. They are NOT defaults
-# any more: they are kept so the loaders and the writers of Windows and Linux
-# can tell a delay a user never chose (a rewrite of tap_hold.toml copied the
-# shipped value into the file, as it did for every key) from one the user set.
-# A tap_hold.toml without `[tap_hold] explicit_delays = true` is read with these
-# exact values ignored, and the first write that file receives removes them and
-# sets the flag, so every delay left in a flagged file is the user's own. macOS
-# never stored a shipped delay and does not read this table.
+# any more: they are kept so the migration of tap_hold.toml can tell a delay a
+# user never chose (a rewrite of the file copied the shipped value into it, as it
+# did for every key) from one the user set. On Linux step v0_to_v1 of
+# _shared/tap_hold/migrations.toml removes these exact values once, from a file
+# that is not stamped and does not carry `[tap_hold] explicit_delays = true`, and
+# stamps the file; every delay left in a stamped file is the user's own. Windows
+# does not read the migration registry yet: it keeps the explicit_delays flag
+# until its loader and writer replay the same step. macOS never stored a shipped
+# delay and does not read this table.
 [tap_hold.retired_delays]
 caps_lock = 0.35
 left_shift = 0.35

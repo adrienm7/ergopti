@@ -1,0 +1,14 @@
+[_meta]
+schema_version = 1
+
+[tap_hold]
+time_activation_seconds = 0.3
+
+[tap_hold.keys.caps_lock]
+time_activation_seconds = 0.5
+
+[tap_hold.keys.tab]
+time_activation_seconds = 0.35
+
+[tap_hold.keys.left_alt]
+time_activation_seconds = 0.3

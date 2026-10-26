@@ -1,0 +1,4 @@
+[case]
+description = "A v1 file is never rewritten: a delay equal to a shipped one is then the user's own, and a stray flag is not read."
+drivers = ["linux"]
+outcome = "current"

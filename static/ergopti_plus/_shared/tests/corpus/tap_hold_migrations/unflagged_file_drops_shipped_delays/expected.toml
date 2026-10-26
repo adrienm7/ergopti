@@ -1,0 +1,13 @@
+[_meta]
+schema_version = 1
+
+[tap_hold]
+enabled = true
+inherit_defaults = true
+
+[tap_hold.keys.caps_lock]
+tap_action = "enter"
+hold_modifier = "ctrl"
+
+[tap_hold.keys.left_ctrl]
+time_activation_seconds = 0.45

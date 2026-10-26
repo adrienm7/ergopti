@@ -1,0 +1,65 @@
+# _shared/tap_hold/migrations.toml
+# Versioned tap_hold.toml: the ordered, data-only migration registry.
+#
+# READ AT RUNTIME, ON EVERY BOOT, BY THE LINUX DRIVER through
+# _shared/lua/tap_hold/migrate.lua. Windows does not read it yet (see "Windows"
+# below); macOS has no tap_hold.toml. This is NOT the config.toml registry
+# (_shared/core/config_schema/migrations.toml): that one is validated at every
+# Windows boot by windows/infra/config_migrate.ahk, which refuses an op it does
+# not know, and no op of its closed set can drop a value only when it equals
+# the delay an earlier build shipped for that key. A separate registry keeps
+# the config.toml one untouched.
+#
+# A tap_hold.toml carries its version in ``[_meta] schema_version``, the same
+# spelling as config.toml. A file with no stamp is ``unstamped_version``. A
+# driver:
+#   - older file  -> byte-exact backup, every step from the file's version to
+#                    ``current_version`` in order, the stamp last, one atomic
+#                    publish;
+#   - current     -> nothing is written;
+#   - newer file  -> never written (ERROR logged): a downgrade cannot destroy
+#                    settings a newer build wrote.
+# Every write the driver makes afterwards keeps the stamp.
+#
+# Steps are ``[steps.v<from>_to_v<to>]`` tables with to = from + 1. ``ops`` is
+# an array drawn from a CLOSED set, addressed by explicit dotted section / key:
+#   { op = "drop_retired_values", section, key, retired, unless? }
+#       In every table directly under ``section`` (one per key id), removes
+#       ``key`` when its value equals the delay an earlier build shipped for
+#       that key id (``retired`` names the table of the shared defaults.toml
+#       that records them, resolved to the driver's key ids). A table left
+#       empty disappears, and so does ``section`` when it ends empty.
+#       ``unless = { section, key, value }`` skips the op when that key holds
+#       exactly that value.
+#   { op = "delete", section, key }
+#       Deletes one key; a section left without keys disappears.
+# Every op is idempotent, so replaying a step on its own output changes nothing.
+#
+# Windows: replaying this registry needs a reader for the file plus the two
+# ops above in windows/platform/remap/tap_hold_loader.ahk and
+# tap_hold_writer.ahk; until then Windows keeps writing
+# ``[tap_hold] explicit_delays = true`` and ignores ``[_meta]``.
+# The corpus _shared/tests/corpus/tap_hold_migrations/ pins the semantics.
+
+[registry]
+current_version = 1
+unstamped_version = 0
+
+
+
+
+
+# ===================================
+# ===================================
+# ======= 1. Steps (in order) =======
+# ===================================
+# ===================================
+
+[steps.v0_to_v1]
+from = 0
+to = 1
+reason = "No key ships a hold delay: a per-key delay equal to one an earlier build shipped was copied in by a rewrite, not chosen. It goes once, unless the file already carried the [tap_hold] explicit_delays flag that said every delay in it is the user's own; the flag goes too, the version replaces it."
+ops = [
+	{ op = "drop_retired_values", section = "tap_hold.keys", key = "time_activation_seconds", retired = "tap_hold.retired_delays", unless = { section = "tap_hold", key = "explicit_delays", value = true } },
+	{ op = "delete", section = "tap_hold", key = "explicit_delays" },
+]

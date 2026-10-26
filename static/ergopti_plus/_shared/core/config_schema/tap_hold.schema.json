@@ -5,9 +5,19 @@
 	"description": "JSON Schema for _shared/tap_hold/defaults.toml AND for the Windows and Linux per-driver tap_hold.toml. The shared defaults are read at runtime on every boot; the user file is laid over them key by key on Windows, and on Linux when it sets [tap_hold] inherit_defaults = true.",
 	"type": "object",
 	"additionalProperties": false,
-	"required": ["tap_hold"],
 
 	"properties": {
+		"_meta": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"schema_version": {
+					"type": "integer",
+					"minimum": 0,
+					"description": "The version of the user file, written by the Linux driver and migrated at boot by _shared/tap_hold/migrations.toml. Absent: an unstamped file from before versioning."
+				}
+			}
+		},
 		"tap_hold": {
 			"type": "object",
 			"additionalProperties": false,
@@ -28,7 +38,7 @@
 				},
 				"explicit_delays": {
 					"type": "boolean",
-					"description": "Written by the Windows and Linux writers: true means every per-key time_activation_seconds in the file is the user's own. Without it, a per-key delay equal to one an earlier build shipped ([tap_hold.retired_delays] in the shared defaults) is ignored."
+					"description": "Retired. Windows still writes it: true means every per-key time_activation_seconds in the file is the user's own. Linux no longer reads or writes it; its v0_to_v1 migration (_shared/tap_hold/migrations.toml) uses it once, to leave the delays of a flagged file alone, and removes it."
 				},
 				"keys": { "$ref": "#/$defs/keys_map" }
 			}
