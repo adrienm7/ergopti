@@ -2,11 +2,45 @@
 # Launcher for the App Cloner bundle.
 # Python is used instead of zsh because macOS refuses to execute a plain shell
 # script as the main binary of an .app bundle (no Mach-O header).
+import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+
+ERROR_DIALOG_SCRIPT = """
+on run argv
+    display dialog (item 1 of argv) with title (item 2 of argv) buttons {item 3 of argv} default button 1
+end run
+"""
+
+
+def load_error_ui(locale_code, locales_dir):
+    """Require the selected catalogue's startup error strings without fallback."""
+    try:
+        if not locales_dir:
+            raise FileNotFoundError("The App Cloner locale directory is unresolved.")
+        with open(os.path.join(locales_dir, locale_code + ".json"), encoding="utf-8") as catalog_file:
+            catalog = json.load(catalog_file)
+    except (OSError, ValueError) as error:
+        raise ValueError("App Cloner startup locale catalogue is unavailable or invalid.") from error
+    if not isinstance(catalog, dict):
+        raise ValueError("App Cloner startup locale catalogue must be a JSON object.")
+    keys = (
+        "apps.cloner.startup_error_title",
+        "apps.cloner.error_unknown",
+        "common.ok",
+        "apps.cloner.diagnostic_log_path",
+    )
+    for key in keys:
+        value = catalog.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("App Cloner startup locale key must be a nonempty string: " + key)
+    if catalog["apps.cloner.diagnostic_log_path"].count("{1}") != 1:
+        raise ValueError("App Cloner diagnostic locale template requires exactly one {1} placeholder.")
+    return {key: catalog[key] for key in keys}
+
 
 def create_log_path():
     """Return a private per-launch directory and log path, or empty strings."""
@@ -107,6 +141,28 @@ def main():
     env["ERGOPTI_LOCALES_DIR"] = locales_dir
     env["ERGOPTI_APPCLONER_LOG"] = log_path or ""
 
+    try:
+        ui = load_error_ui(locale_code, locales_dir)
+    except ValueError as error:
+        # Fatal pre-i18n exception: an invalid selected catalogue cannot supply
+        # translated text. These English strings report refusal before UI boot.
+        fatal_text = (
+            "App Cloner cannot start because the selected locale catalogue is unavailable or invalid."
+            + "\n\n" + str(error)
+        )
+        if log_path:
+            fatal_text += "\n\nDiagnostic log: " + log_path
+        try:
+            # Notify before another diagnostic write can fail and hide refusal.
+            subprocess.run([
+                "osascript", "-e", ERROR_DIALOG_SCRIPT, "--", fatal_text,
+                "App Cloner — Locale error", "OK",
+            ], capture_output=True, env=env)
+            with open_log(log_path) as log:
+                log.write(f"[AppCloner] startup locale refusal={error}\n")
+        finally:
+            raise error
+
     with open_log(log_path) as log:
         log.write(f"[AppCloner] app_root={app_root}\n")
         log.write(f"[AppCloner] applescript={applescript}\n")
@@ -128,16 +184,12 @@ def main():
             log.write(f"[AppCloner] stderr={result.stderr}\n")
 
     if result.returncode not in (0, -128):
-        err_text = (result.stderr or result.stdout or "Erreur inconnue.").strip()
+        err_text = result.stderr.strip() or result.stdout.strip() or ui["apps.cloner.error_unknown"]
         if log_path:
-            err_text += f"\n\nLog : {log_path}"
-        clean = err_text.replace("\\", "\\\\").replace('"', '\\"')
+            err_text += "\n\n" + ui["apps.cloner.diagnostic_log_path"].replace("{1}", log_path)
         subprocess.run([
-            "osascript", "-e",
-            'display dialog "App Cloner — Erreur de démarrage :\\n\\n'
-            + clean
-            + '" '
-            'buttons {"OK"} default button 1',
+            "osascript", "-e", ERROR_DIALOG_SCRIPT, "--", err_text,
+            ui["apps.cloner.startup_error_title"], ui["common.ok"],
         ], capture_output=True)
     elif log_dir:
         shutil.rmtree(log_dir, ignore_errors=True)
