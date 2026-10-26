@@ -27,6 +27,8 @@ default taken meanwhile.
 - **`config_template.toml` on the Lua drivers:** no Lua runtime reads it; packaging ships it and the e2e
   boots use it as a fixture. Default meanwhile: kept per driver. Stop shipping it for macOS and Linux (e2e on a
   neutral empty config), or generate a shared part plus a delta?
+- **Hotstring colour palette:** Windows offers 14 colours (plus pink, indigo, turquoise, lime, brown and an AI
+  purple), macOS and Linux 8. Default meanwhile: unchanged. Give macOS and Linux the same 14?
 - **AI-off hint text:** the greyed agent actions reuse `llm.manual_prediction.disabled` ("AI suggestions are
   off: turn them on in the Artificial Intelligence menu."). Default meanwhile: reused. A dedicated string?
 

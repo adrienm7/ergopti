@@ -628,11 +628,12 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       with a baseline, hosted in `test-fast-timer-inventory.cjs`. Audit K1.
 - [ ] **PAR-80. `[limits]` section for byte caps.** [CODE] `MAX_OUTPUT_BYTES` 65536 in 3 files and
       similar in 6; gate in the registry test. Audit K3.
-- [ ] **PAR-81. Theme tokens and palette codegen.** [CODE] 810 hex literals, 19 `--accent` declarations,
-      the hotstring palette typed in three drivers, byte-identical `macos/ui/download_window/style.css`
-      against `_shared`. Create `_shared/ui/theme.css` and a native-theme TOML; codegen the palette and
-      retire `test-color-presets-parity.cjs`; lint "hex literal outside theme" with a baseline in
-      `lint-conventions.js`. Audit K5.
+- [ ] **PAR-81. Theme tokens and palette codegen.** [CODE] Done: `_shared/ui/theme.css` linked by the
+      shared pages; `_shared/data/native_theme.toml` generating `_shared/lua/native_theme_data.lua` for the macOS
+      and Linux palettes; the dead macOS download-window page removed; hex lint with a shrink-only baseline
+      (`tools/lint/hex-literal-baseline.json`, 53 files). Left: an AHK emitter replacing the typed palette in
+      `hcw_helpers.ahk` (then retire `test-color-presets-parity.cjs`), and moving the baselined literals onto
+      tokens with per-page pixel diffs.
 - [ ] **PAR-82. Hard-coded UI string gate.** [CODE] New `tools/test/test-no-hardcoded-ui-strings.cjs`
       (TrayTip, MsgBox, alert, title literals fail unless allowlisted; reuse
       `tools/lint/audit-gui-titles.cjs`), including the Linux `install.sh` echo table. Audit K6, I9.
