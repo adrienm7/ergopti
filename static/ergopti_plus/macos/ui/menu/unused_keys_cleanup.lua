@@ -107,7 +107,10 @@ function M.run_from_menu(deps)
 		whole_unread_roots = true,
 		file_adapter = deps.file_adapter or require("adapters.file_system"),
 		on_removed = function(result)
-			return preferences.adopt_cleanup(path, result.previous, result.content)
+			if preferences.adopt_cleanup(path, result.previous, result.content) ~= true then
+				error("Preference baseline adoption refused after configuration cleanup", 0)
+			end
+			return true
 		end,
 	})
 end
