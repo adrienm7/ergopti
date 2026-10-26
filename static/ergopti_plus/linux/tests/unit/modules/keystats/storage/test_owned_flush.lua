@@ -11,10 +11,9 @@ require("infra.monotonic") -- Load the genuine clock before temporary native por
 local function read_committed_input(database)
 	local shell = require("adapters.shell_runner")
 	assert(shell.has_command("sqlite3"), "SQLite CLI is required for the independent native COMMIT assertion")
-	local quote = require("text_utils").shell_quote
-	local pipe = assert(io.popen("sqlite3 " .. quote(database) .. " " .. quote("SELECT COUNT(*) FROM events_typing;"), "r"))
-	local retained = pipe:read("*a")
-	assert(pipe:close())
+	local ok, retained, failure = shell.exec_checked("sqlite3 -init /dev/null -bail -readonly "
+		.. shell.quote(database) .. " " .. shell.quote("SELECT COUNT(*) FROM events_typing;"))
+	assert(ok, failure)
 	return retained
 end
 
@@ -22,23 +21,73 @@ helpers.describe("native metrics fixture SQLite admission", function()
 	it("native-fixture-sqlite-admission: a missing CLI refuses before opening the independent query", function()
 		local shell = require("adapters.shell_runner")
 		helpers.assert_eq(type(shell.has_command), "function", "the probe must mirror the real shell API")
-		local original_probe, original_open = shell.has_command, io.popen
-		local probes, opens = 0, 0
+		helpers.assert_eq(type(shell.exec_checked), "function", "the query must mirror the real checked shell API")
+		local original_probe, original_checked = shell.has_command, shell.exec_checked
+		local probes, executions = 0, 0
 		shell.has_command = function(program)
 			helpers.assert_eq(program, "sqlite3")
 			probes = probes + 1
 			return false
 		end
-		io.popen = function()
-			opens = opens + 1
-			return nil, "the independent query must not launch without SQLite"
+		shell.exec_checked = function()
+			executions = executions + 1
+			return false, "", "the independent query must not launch without SQLite"
 		end
 		local ok, detail = pcall(read_committed_input, "/nonexistent/ergopti-fixture-admission/metrics.sqlite")
-		shell.has_command, io.popen = original_probe, original_open
+		shell.has_command, shell.exec_checked = original_probe, original_checked
 		helpers.assert_eq(ok, false, "missing mandatory SQLite must never skip its native assertion")
-		helpers.assert_eq(opens, 0, "the mandatory CLI must be admitted before any independent query")
+		helpers.assert_eq(executions, 0, "the mandatory CLI must be admitted before any independent query")
 		helpers.assert_eq(probes, 1, "the real required-tool boundary must be exercised")
 		helpers.assert_contains(detail, "SQLite CLI is required for the independent native COMMIT assertion")
+	end)
+	it("native-fixture-sqlite-exit: expected-looking rows from a failed real CLI cannot certify COMMIT", function()
+		local uv = require("luv")
+		for _, name in ipairs({ "fs_mkdtemp", "os_getenv", "os_setenv", "os_unsetenv", "fs_open", "fs_write", "fs_close", "kill", "walk" }) do
+			helpers.assert_eq(debug.getinfo(uv[name], "S").what, "C", "the regression requires the actual native " .. name)
+		end
+		helpers.assert_eq(debug.getinfo(io.popen, "S").what, "C", "the real native child pipe must execute")
+		local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-sqlite-witness-XXXXXX"))
+		local original_path = assert(uv.os_getenv("PATH"), "the test runner must declare PATH")
+		local original_tmp = uv.os_getenv("TMPDIR")
+		local shell = require("adapters.shell_runner")
+		local before = {}
+		uv.walk(function(handle) before[handle] = true end)
+		local accepted, detail, pid
+		local ok, failure = xpcall(function()
+			local script = table.concat({
+				"#!/bin/sh",
+				"printf '%s\\n' \"$$\" > " .. shell.quote(directory .. "/pid"),
+				"printf '1\\n'",
+				"exit 73",
+				"",
+			}, "\n")
+			local fd = assert(uv.fs_open(directory .. "/sqlite3", "wx", 448))
+			local written, write_error = uv.fs_write(fd, script, 0)
+			local closed, close_error = uv.fs_close(fd)
+			helpers.assert_eq(written, #script, write_error)
+			helpers.assert_true(closed, close_error)
+			assert(uv.os_setenv("PATH", directory .. ":" .. original_path))
+			assert(uv.os_setenv("TMPDIR", directory))
+			accepted, detail = pcall(read_committed_input, directory .. "/unused.sqlite")
+			local file = assert(io.open(directory .. "/pid", "rb"))
+			pid = tonumber(file:read("*a"))
+			assert(file:close())
+		end, debug.traceback)
+		assert(uv.os_setenv("PATH", original_path))
+		if original_tmp then assert(uv.os_setenv("TMPDIR", original_tmp)) else assert(uv.os_unsetenv("TMPDIR")) end
+		local absent, _, absence_code
+		if pid then absent, _, absence_code = uv.kill(pid, 0) end
+		local residual = 0
+		uv.walk(function(handle) if not before[handle] then residual = residual + 1 end end)
+		for name in uv.fs_scandir_next, assert(uv.fs_scandir(directory)) do assert(uv.fs_unlink(directory .. "/" .. name)) end
+		assert(uv.fs_rmdir(directory))
+		helpers.assert_true(ok, failure)
+		helpers.assert_true(type(pid) == "number" and pid > 0, "the exact private native CLI must execute")
+		helpers.assert_eq(absent, nil)
+		helpers.assert_eq(absence_code, "ESRCH", "the failed native CLI must be reaped before accepting a witness")
+		helpers.assert_eq(residual, 0, "the independent query must leave no new native handles")
+		helpers.assert_eq(accepted, false, "stdout alone cannot certify a native COMMIT witness")
+		helpers.assert_contains(detail, "command exited with status 73")
 	end)
 end)
 
