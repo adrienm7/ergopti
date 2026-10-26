@@ -163,6 +163,6 @@ _HESO_Case(Mode) {
 		throw ExportFailure
 }
 
-for _HESO_Mode in ["current", "close", "reopen"]
+for _HESO_Mode in ["current", "close", "reopen", "close-after-return"]
 	Test("Native HCW Show: " . _HESO_Mode . " preserves its owner (hcw-early-show-owner)",
 		_HESO_Case.Bind(_HESO_Mode))

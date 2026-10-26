@@ -52,10 +52,32 @@ Gui_Create(Options := "", Title := "") {
 		_HESW.FallbackAttempts += 1
 		throw Error("Business oracle: a retired web opening attempted native fallback.")
 	}
-	; This observer is first, returns no event result, and never invokes the
-	; production handler. The original SessionCall is registered next by SUT.
-	Window.OnEvent("Close", _HESW_CloseObserved.Bind(Record))
+	; Capture the native method before installing an own registration observer.
+	; Only the actual Close callback supplied by production gets a relay.
+	; ObjBindMethod would resolve the later own method instead of retaining this Func.
+	Register := Gui.Prototype.OnEvent.Bind(Window)
+	Window.DefineProp("OnEvent", {Call: _HESW_RegisterEvent.Bind(Record, Register)})
 	return Window
+}
+
+_HESW_RegisterEvent(Record, Register, Window, Name, Callback, Options*) {
+	_HESW_Require(Window == Record.Window, "native event registration retains its exact GUI")
+	if Name != "Close"
+		return Register.Call(Name, Callback, Options*)
+	_HESW_Require(!HasProp(Record, "Callback") && Options.Length == 0,
+		"the exact production Close callback is registered once with its original options")
+	Record.Callback := Callback
+	Record.Relay := _HESW_CloseEvent.Bind(Record, Callback)
+	return Register.Call(Name, Record.Relay, Options*)
+}
+
+_HESW_CloseEvent(Record, Callback, Params*) {
+	; This relay is invoked only by the real native Close event. Never replace
+	; cancellation with a test cleanup, and preserve the genuine return value.
+	_HESW_CloseObserved(Record, Params*)
+	Result := Callback.Call(Params*)
+	_HESW_CloseCompleted(Record)
+	return Result
 }
 
 _HESW_ShowMessage(WParam, LParam, Message, Hwnd) {
@@ -104,38 +126,52 @@ _HESW_CloseObserved(Record, Window) {
 			"The actual Close event must precede browser startup, not run during await.")
 		Record.CloseCount += 1
 		_HESW_Record("actual-close-before-production", Record)
-		; Only this newly admitted GUI-event thread becomes Critical. Its original
-		; Close handler runs next without a nested reopen; thread retirement restores
-		; the caller's eligibility. The high private message cannot be an emergency
-		; OnMessage interruption and is delivered by the same native Show pump later.
+		; Hold only this already-admitted native event thread. The exact original
+		; callback and synchronous completion observer run before Gui.Show resumes.
 		Critical("On")
-		_HESW_Require(DllCall("User32\PostMessageW", "Ptr", A_ScriptHwnd, "UInt", _HESW.Signal,
-			"UPtr", Record.Hwnd, "Ptr", 0, "Int"), "The private after-Close signal must queue.")
 	} catch Any as Failure {
 		if !IsObject(_HESW.Failure)
 			_HESW.Failure := Failure
 	}
 }
 
-_HESW_AfterClose(WParam, LParam, Message, Hwnd) {
+_HESW_CloseCompleted(Record) {
 	global _HESW
+	if Record.Index != 1 || _HESW.Mode == "current"
+		return
 	try {
-		Record := _HESW.Windows[1]
-		_HESW_Require(Hwnd == A_ScriptHwnd && Message == _HESW.Signal && WParam == Record.Hwnd,
-			"Only the exact private child signal may admit the successor.")
-		_HESW.Signals += 1
+		_HESW.Continuations += 1
 		State := _HESW_State()
-		_HESW_Require(_HESW.Signals == 1 && Record.CloseCount == 1 && State.Epoch > Record.Epoch
+		_HESW_Record("original-close-returned-before-show-resume", Record)
+		_HESW_Require(_HESW.Continuations == 1 && Record.CloseCount == 1 && State.Epoch > Record.Epoch
 			&& !_HESW.PublicReturned && _HESW.Controllers.Length == 0 && _HESW.Environments == 0,
-			"The original production Close must revoke its epoch before the native Show pump resumes.")
+			"The exact original Close callback must retire its owner before its native event thread returns.")
 		Record.ExistsAfterClose := DllCall("User32\IsWindow", "Ptr", Record.Hwnd, "Int")
-		_HESW_Record("production-close-completed-before-browser", Record)
+		_HESW_Require(!Record.ExistsAfterClose && State.Reset && State.Window != Record.Window,
+			"The original Close callback must detach and destroy its exact native owner.")
 		if _HESW.Mode == "reopen" {
 			_HESW_Open()
 			_HESW_Require(_HESW.Windows.Length == 2, "The successor must use the same genuine public constructor.")
 			_HESW.Successor := _HESW_State()
 			_HESW_Record("successor-public-return", _HESW.Windows[2])
 		}
+	} catch Any as Failure {
+		if !IsObject(_HESW.Failure)
+			_HESW.Failure := Failure
+	}
+}
+
+_HESW_LateNotification(WParam, LParam, Message, Hwnd) {
+	global _HESW
+	try {
+		Record := _HESW.Windows[1]
+		_HESW_Require(_HESW.Mode == "close-after-return" && Hwnd == A_ScriptHwnd
+			&& Message == _HESW.Signal && WParam == Record.Hwnd,
+			"the late message is fixture bookkeeping for the exact already-retired owner")
+		_HESW.LateNotifications += 1
+		_HESW_Require(_HESW.PublicReturned && _HESW.Continuations == 1,
+			"late bookkeeping must follow the observed real callback and public return")
+		_HESW_Record("late-test-notification", Record)
 	} catch Any as Failure {
 		if !IsObject(_HESW.Failure)
 			_HESW.Failure := Failure
@@ -217,11 +253,11 @@ _HESW_Check() {
 	Old := _HESW.Windows[1], State := _HESW_State()
 	if _HESW.Mode == "current" {
 		_HESW_Require(_HESW.Windows.Length == 1 && _HESW.Controllers.Length == 1
-			&& _HESW.CloseSent == 0 && _HESW.Signals == 0 && _HESW_CurrentReady(Old),
+			&& _HESW.CloseSent == 0 && _HESW.Continuations == 0 && _HESW_CurrentReady(Old),
 			"The normal positive must publish one fully current native/browser owner.")
 		return
 	}
-	_HESW_Require(Old.ShowCount > 0 && Old.NativeClose == 1 && Old.CloseCount == 1 && _HESW.Signals == 1,
+	_HESW_Require(Old.ShowCount > 0 && Old.NativeClose == 1 && Old.CloseCount == 1 && _HESW.Continuations == 1,
 		"The early cancellation must be an observed native Show/WM_CLOSE/original-handler chain.")
 	_HESW_Require(!Old.ExistsAfterClose,
 		"Close during native Show must destroy the exact original native window.")
@@ -258,9 +294,9 @@ _HESW_Main() {
 		&& CryptoSha256Bytes(FileRead(A_AhkPath, "RAW")) == A_Args[5], "Actual child source/runtime bytes must match.")
 	Persistent(true)
 	_HESW := {Owner: A_Args[1], Mode: A_Args[2], Windows: [], Controllers: [], Trace: [], Failure: 0,
-		CloseSent: 0, Signals: 0, PublicReturned: false, Environments: 0, Successor: 0, FallbackAttempts: 0}
+		CloseSent: 0, Continuations: 0, LateNotifications: 0, PublicReturned: false, Environments: 0, Successor: 0, FallbackAttempts: 0}
 	_HESW_Require(_HESW.Owner == "hcw", "The source owner must be exact.")
-	_HESW_Require(_HESW.Mode == "current" || _HESW.Mode == "close" || _HESW.Mode == "reopen", "The mode must be exact.")
+	_HESW_Require(_HESW.Mode == "current" || _HESW.Mode == "close" || _HESW.Mode == "reopen" || _HESW.Mode == "close-after-return", "The mode must be exact.")
 	_HESW.Signal := DllCall("User32\RegisterWindowMessageW", "Str", "ErgoptiPlus.EarlyShow." . A_ScriptHwnd, "UInt")
 	_HESW_Require(_HESW.Signal >= 0xC000, "The private signal must be outside emergency OnMessage IDs.")
 	_VendorDir := A_Args[3], _SharedDir := A_Args[3] . "\shared", _ConfigDir := A_Args[3] . "\"
@@ -271,13 +307,24 @@ _HESW_Main() {
 		"The genuine category builder must receive exact delivered index bytes.")
 	Primary := 0
 	OnError(_HESW_OnError)
-	OnMessage(0x18, _HESW_ShowMessage), OnMessage(0x10, _HESW_NativeClose), OnMessage(_HESW.Signal, _HESW_AfterClose)
+	OnMessage(0x18, _HESW_ShowMessage), OnMessage(0x10, _HESW_NativeClose), OnMessage(_HESW.Signal, _HESW_LateNotification)
 	try {
 		; Critical Off changes only this child caller, making the native final Show
 		; pump eligible. No zero-grace default or extra sleep manufactures a yield.
 		Critical("Off"), Thread("Priority", 0)
 		_HESW_Open()
 		_HESW.PublicReturned := true
+		if _HESW.Mode == "close-after-return" {
+			Old := _HESW.Windows[1], State := _HESW_State()
+			_HESW_Require(Old.NativeClose == 1 && Old.CloseCount == 1 && State.Epoch > Old.Epoch
+				&& State.Reset && State.Window != Old.Window && !DllCall("User32\IsWindow", "Ptr", Old.Hwnd, "Int")
+				&& !IsObject(State.Controller) && !IsObject(State.View) && !State.Message && !State.Navigation
+				&& _HESW.Controllers.Length == 0 && _HESW.Environments == 0,
+				"The original Close must already fully retire its actual GUI before late test bookkeeping.")
+			_HESW_Record("closed-before-late-test-signal", Old)
+			DllCall("User32\SendMessageW", "Ptr", A_ScriptHwnd, "UInt", _HESW.Signal, "UPtr", Old.Hwnd, "Ptr", 0, "Ptr")
+			_HESW_Require(_HESW.LateNotifications == 1, "the actual late bookkeeping message must be observed once")
+		}
 		_HESW_Require(_TomlFileCache.Has(Index) && HotstringsLanguagePacks().Length > 0
 			&& _HCW_CATEGORY_LIST.Length > 6 && _HCW_GROUP_LIST.Length >= 2,
 			"The public opener must use its genuine index/cache/category/group data path.")
@@ -288,7 +335,7 @@ _HESW_Main() {
 			"fallback_attempts", _HESW.FallbackAttempts, "boundary_failure", IsObject(_HESW.Failure),
 			"close_sent", _HESW.CloseSent,
 			"native_close", _HESW.Windows[1].NativeClose, "close_events", _HESW.Windows[1].CloseCount,
-			"after_close_signals", _HESW.Signals, "old_exists", DllCall("User32\IsWindow", "Ptr", _HESW.Windows[1].Hwnd, "Int"),
+			"after_close_callbacks", _HESW.Continuations, "late_notifications", _HESW.LateNotifications, "old_exists", DllCall("User32\IsWindow", "Ptr", _HESW.Windows[1].Hwnd, "Int"),
 			"old_published", _HESW_State().Window == _HESW.Windows[1].Window,
 			"epoch", _HESW_State().Epoch, "categories", _HCW_CATEGORY_LIST.Length,
 			"groups", _HCW_GROUP_LIST.Length, "index_sha256", _HESW_SourceIndexHash,
@@ -298,7 +345,7 @@ _HESW_Main() {
 		Primary := IsObject(_HESW.Failure) ? _HESW.Failure : Failure
 	} finally {
 		OnMessage(0x18, _HESW_ShowMessage, 0), OnMessage(0x10, _HESW_NativeClose, 0)
-		OnMessage(_HESW.Signal, _HESW_AfterClose, 0)
+		OnMessage(_HESW.Signal, _HESW_LateNotification, 0)
 		try {
 			_HCWWeb_Close()
 			for Controller in _HESW.Controllers
