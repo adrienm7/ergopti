@@ -30,6 +30,7 @@
 
 local Identifiers = require("identifiers")
 local KePaths = require("platform.remap.ke_paths")
+local TextUtils = require("text_utils")
 
 local M = {}
 
@@ -475,7 +476,7 @@ end
 --- @param text any Output.
 --- @return string value
 local function trimmed(text)
-	return (tostring(text or ""):match("^%s*(.-)%s*$"))
+	return TextUtils.trim(tostring(text or ""))
 end
 
 --- Reads a launch agent's label and program with plutil.

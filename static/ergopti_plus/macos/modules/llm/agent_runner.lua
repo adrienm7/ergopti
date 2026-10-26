@@ -63,6 +63,7 @@ local JsonCodec      = require("adapters.json_codec")
 local WindowInfo     = require("adapters.window_info")
 local SystemInfo     = require("adapters.system_info")
 local TimerScheduler = require("adapters.timer_scheduler")
+local TextUtils = require("text_utils")
 
 local LOG = "llm.agent_runner"
 
@@ -859,7 +860,7 @@ function M.run_command()
 			return
 		end
 		if not is_current(generation, "command") then return end
-		run_agent(generation, "command", typed:match("^%s*(.-)%s*$"), focus, backend, nil)
+		run_agent(generation, "command", TextUtils.trim(typed), focus, backend, nil)
 	end)
 	if committed ~= true then
 		Logger.error(LOG, "Agent command dialog could not be scheduled.")

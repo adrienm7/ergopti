@@ -35,6 +35,7 @@ local notifications = require("infra.notifications")
 local llm_mod       = require("modules.llm")
 local ApiPanel      = require("ui.menu.menu_llm.api_panel")
 local ServerMenu    = require("llm.local_server_menu")
+local TextUtils = require("text_utils")
 
 local LOG = "menu_llm.local_servers"
 
@@ -179,7 +180,7 @@ local function ask(message, informative, default, secure)
 		return nil
 	end
 	if button ~= ok_label or type(typed) ~= "string" then return nil end
-	return (typed:gsub("^%s+", ""):gsub("%s+$", ""))
+	return TextUtils.trim(typed)
 end
 
 --- Sweeps the servers again and redraws the menu when a verdict changed.

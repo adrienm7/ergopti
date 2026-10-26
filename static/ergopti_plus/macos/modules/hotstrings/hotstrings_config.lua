@@ -45,6 +45,7 @@ local PublicationRecovery = require("hotstrings.publication_recovery")
 -- that must not differ, and where the override file lives is the thing that may.
 local DelayResolver = require("hotstrings.delay_resolver")
 local HotstringPriority = require("hotstring_priority")
+local TextUtils = require("text_utils")
 local LOG        = "hotstrings_config"
 
 
@@ -173,7 +174,7 @@ local function global_records(content)
 	local depth, multiline_quote = 0, nil
 	for raw in (content .. "\n"):gmatch("([^\n]*)\n") do
 		raw = raw:gsub("\r$", "")
-		local line = raw:match("^%s*(.-)%s*$")
+		local line = TextUtils.trim(raw)
 		-- A header-looking line can legally occur inside an open multiline value:
 		-- consume continuations before interpreting any header syntax.
 		local open = depth > 0 or multiline_quote ~= nil
@@ -553,7 +554,7 @@ local function prepare_override_content(overrides)
 			if prefix(header.segments, target) then return nil, "override scalar is already a table" end
 			if #header.segments == #section and prefix(section, header.segments) then
 				headers = headers + 1
-				local raw = scan.lines[header.index].text:match("^%s*(.-)%s*$")
+				local raw = TextUtils.trim(scan.lines[header.index].text)
 				if raw ~= "[" .. row.section .. "]" then return nil, "override header is not reader-owned" end
 			end
 		end
@@ -567,7 +568,7 @@ local function prepare_override_content(overrides)
 				for _, part in ipairs(record.header and record.header.segments or {}) do path[#path + 1] = part end
 				for _, part in ipairs(key) do path[#path + 1] = part end
 				if prefix(target, path) or prefix(path, target) then
-					if #path ~= #target or #key ~= 1 or key_text:match("^%s*(.-)%s*$") ~= row.key then
+					if #path ~= #target or #key ~= 1 or TextUtils.trim(key_text) ~= row.key then
 						return nil, "override leaf conflicts with an unowned representation"
 					end
 					fields = fields + 1

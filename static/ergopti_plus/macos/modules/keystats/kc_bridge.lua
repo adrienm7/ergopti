@@ -32,6 +32,7 @@ local Logger  = require("infra.logger")
 local NativePath = require("native_path")
 local Timings = require("infra.timings")
 local TimerScheduler = require("adapters.timer_scheduler")
+local TextUtils = require("text_utils")
 local LOG     = "keystats.kc_bridge"
 
 -- Absolute path to the hand-off log file written by KE shell_command actions.
@@ -273,7 +274,7 @@ local function drain_log()
 
 	local drained = 0
 	for line in fh:lines() do
-		local raw = line:match("^%s*(.-)%s*$")  -- trim whitespace
+		local raw = TextUtils.trim(line)
 		if raw ~= "" then
 			-- Discriminate release lines (prefix "U:") from press lines (bare
 			-- key_code). On release, compute hold duration vs the matching

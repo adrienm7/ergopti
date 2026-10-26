@@ -40,6 +40,7 @@ local dialog       = require("infra.dialog_util")
 local Vision       = require("llm.vision")
 local Agent        = require("llm.agent")
 local ProviderUses = require("modules.llm.provider_uses")
+local TextUtils = require("text_utils")
 
 local LOG = "menu_llm.agent_panel"
 
@@ -232,7 +233,7 @@ local function prompt_model(ctx, system, parsed)
 		return false
 	end
 	if button ~= ok_label or type(typed) ~= "string" then return false end
-	local model = typed:match("^%s*(.-)%s*$")
+	local model = TextUtils.trim(typed)
 	local value = model == "" and parsed.backend or (parsed.backend .. "|" .. model)
 	if not Vision.parse(value) then
 		Logger.warn(LOG, "Agent model refused: '%s' is not a model name.", model)

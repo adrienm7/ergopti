@@ -35,6 +35,7 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
 local Timings        = require("infra.timings")
 local ApiCommon = require("modules.llm.api_common")
+local TextUtils = require("text_utils")
 local _probe_client  = require("adapters.http_client").new()  -- Dedicated client for discover() POST probes; never shares state with warmup
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
 local LOG            = "llm.api_mlx"
@@ -179,7 +180,7 @@ local function read_active_model_arg()
 		_active_model_cache = nil
 		return nil
 	end
-	local trimmed = raw:gsub("^%s+", ""):gsub("%s+$", "")
+	local trimmed = TextUtils.trim(raw)
 	local value = trimmed ~= "" and trimmed or nil
 	_active_model_cache = { identity = identity, value = value }
 	return value

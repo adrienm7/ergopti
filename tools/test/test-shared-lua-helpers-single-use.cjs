@@ -313,6 +313,12 @@ for (const tree of TREES) {
 			const allowed = ALLOWED[rel]?.[helper]?.count ?? 0;
 			const debt = baseline[rel]?.[helper] ?? 0;
 			if (found > allowed) (observed[rel] ??= {})[helper] = found - allowed;
+			if (found > 0 && process.argv.includes('--sites'))
+				for (const pattern of DETECTORS[helper].patterns) {
+					pattern.lastIndex = 0;
+					for (const match of code.matchAll(pattern))
+						console.log(`${rel}:${lineOf(code, match.index)}: ${helper}`);
+				}
 			if (found > allowed + debt) {
 				const lines = [];
 				for (const pattern of DETECTORS[helper].patterns) {

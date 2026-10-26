@@ -2700,7 +2700,7 @@ function M.test_request(entry, spec, on_ok, on_fail)
 			end,
 			ApiCommon.new_dedup_stats(),
 			function(raw)
-				local text = type(raw) == "string" and raw:match("^%s*(.-)%s*$") or ""
+				local text = type(raw) == "string" and text_utils.trim(raw) or ""
 				if text == "" then
 					if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", "empty_reply") end
 					return

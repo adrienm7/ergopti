@@ -44,6 +44,7 @@ local i18n             = require("infra.i18n")
 local Keycodes         = require("infra.keycodes")
 local tooltip          = require("ui.tooltip")
 local keystats        = require("modules.keystats")
+local TextUtils = require("text_utils")
 
 local LOG    = "llm.prediction_engine"
 local _state = nil  -- Shared keymap core state; injected via M.init()
@@ -1045,12 +1046,12 @@ end
 --- @return string|nil The trimmed label, or nil if it was blank.
 local function trim_profile_label(label)
 	if type(label) ~= "string" then return nil end
-	local clean = label:match("^%s*(.-)%s*$")
+	local clean = TextUtils.trim(label)
 	if clean == "" then return nil end
 	local head = clean:match("^(.-)%s*—")
 	-- head:match("%S") guards against a bare "— foo" where head="" falling through to clean
 	local picked = (head and head:match("%S")) and head or clean
-	picked = picked:gsub("^%s+", ""):gsub("%s+$", ""):gsub("%s*—%s*$", "")
+	picked = TextUtils.trim(picked):gsub("%s*—%s*$", "")
 	if picked == "" then return nil end
 	return picked
 end

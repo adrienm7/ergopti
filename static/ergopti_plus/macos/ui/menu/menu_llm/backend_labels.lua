@@ -15,6 +15,7 @@
 ---    the dash comes from the locale.
 --- ==============================================================================
 
+local TextUtils = require("text_utils")
 local M = {}
 
 -- Brand, emoji and description key of every backend the Backend submenu offers
@@ -62,7 +63,7 @@ function M.head(label)
 	local text = tostring(label)
 	local dash = text:find(EM_DASH, 1, true)
 	if dash then text = text:sub(1, dash - 1) end
-	return (text:gsub("^%s+", ""):gsub("%s+$", ""))
+	return TextUtils.trim(text)
 end
 
 return M
