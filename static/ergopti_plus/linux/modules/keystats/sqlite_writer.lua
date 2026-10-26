@@ -1037,35 +1037,16 @@ function M.upsert_errors(device_id, row)
 	return _exec(sql)
 end
 
---- Merges cumulative numeric histogram deltas using the existing burst SQL policy.
---- The object is spelled with json_quote rather than json_group_object, which
---- cuts a key at an embedded NUL: "a\u0000b" came back as "a", merged into a
---- second "a" key and the stored map stopped describing what was counted.
---- @param column string Owned histogram column.
---- @return string
-local function number_map_merge_sql(column)
-	return column .. " = (SELECT COALESCE('{' || group_concat(json_quote(k) || ':' || v, ',') || '}', '{}') FROM ("
-		.. "SELECT key AS k, SUM(value) AS v FROM ("
-		.. "SELECT key, value FROM json_each(" .. column .. ") "
-		.. "UNION ALL SELECT key, value FROM json_each(excluded." .. column .. ")"
-		.. ") GROUP BY key))"
-end
-
 --- Upserts one hour of the activity histogram.
 --- @param row table { date, app, hour, c, e, em, es, e_buckets? }
 _derived_sql.hourly = function(device_id, row)
 	if type(row) ~= "table" then return end
-	local sql = string.format(
-		"INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c, e, em, es, e_buckets_json) "
-		.. "VALUES ('%s','%s','%s','%s',%d,%d,%d,%d,'%s') "
-		.. "ON CONFLICT(device_id, date, app, hour) DO UPDATE SET "
-		.. "c = c + excluded.c, e = e + excluded.e, em = em + excluded.em, es = es + excluded.es, "
-		.. number_map_merge_sql("e_buckets_json") .. ";",
-		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
-		_sql_escape(tostring(row.hour or "")),
-		math.floor(tonumber(row.c) or 0), math.floor(tonumber(row.e) or 0),
-		math.floor(tonumber(row.em) or 0), math.floor(tonumber(row.es) or 0),
-		_sql_escape(Json.encode(row.e_buckets or {})))
+	local sql = Queries.render("agg.hourly", "cli_json", {
+		device_id = device_id, date = row.date, app = row.app, hour = tostring(row.hour or ""),
+		c = math.floor(tonumber(row.c) or 0), e = math.floor(tonumber(row.e) or 0),
+		em = math.floor(tonumber(row.em) or 0), es = math.floor(tonumber(row.es) or 0),
+		e_buckets_json = Json.encode(row.e_buckets or {}),
+	})
 	return sql
 end
 
@@ -1081,16 +1062,11 @@ end
 --- @param row table { date, app, slot, c, e, es, e_buckets? }
 _derived_sql.hourly_min5 = function(device_id, row)
 	if type(row) ~= "table" then return end
-	local sql = string.format(
-		"INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c, e, es, e_buckets_json) "
-		.. "VALUES ('%s','%s','%s','%s',%d,%d,%d,'%s') "
-		.. "ON CONFLICT(device_id, date, app, slot) DO UPDATE SET "
-		.. "c = c + excluded.c, e = e + excluded.e, es = es + excluded.es, "
-		.. number_map_merge_sql("e_buckets_json") .. ";",
-		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
-		_sql_escape(tostring(row.slot or "")),
-		math.floor(tonumber(row.c) or 0), math.floor(tonumber(row.e) or 0),
-		math.floor(tonumber(row.es) or 0), _sql_escape(Json.encode(row.e_buckets or {})))
+	local sql = Queries.render("agg.hourly_min5", "cli_json", {
+		device_id = device_id, date = row.date, app = row.app, slot = tostring(row.slot or ""),
+		c = math.floor(tonumber(row.c) or 0), e = math.floor(tonumber(row.e) or 0),
+		es = math.floor(tonumber(row.es) or 0), e_buckets_json = Json.encode(row.e_buckets or {}),
+	})
 	return sql
 end
 
@@ -1149,29 +1125,14 @@ _derived_sql.burst = function(device_id, row)
 		end
 	end
 	local buckets_json = "{" .. table.concat(parts, ",") .. "}"
-	local sql = string.format(
-		"INSERT INTO agg_app_day_burst (device_id, date, app, count_total, max_cpm, max_chars, "
-		.. "length_buckets_json, inter_delay_count, inter_delay_sum, inter_delay_sumsq) "
-		.. "VALUES ('%s','%s','%s',%d,%f,%d,'%s',%d,%d,%d) "
-		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
-		.. "count_total = count_total + excluded.count_total, "
-		.. "max_cpm = MAX(max_cpm, excluded.max_cpm), "
-		.. "max_chars = MAX(max_chars, excluded.max_chars), "
-		-- Merged key by key rather than replaced: each flush sees only its own
-		-- bursts, so overwriting would leave the histogram describing the last
-		-- few seconds of the day.
-		.. number_map_merge_sql("length_buckets_json") .. ", "
-		.. "inter_delay_count = inter_delay_count + excluded.inter_delay_count, "
-		.. "inter_delay_sum = inter_delay_sum + excluded.inter_delay_sum, "
-		.. "inter_delay_sumsq = inter_delay_sumsq + excluded.inter_delay_sumsq;",
-		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
-		math.floor(tonumber(row.count_total) or 0),
-		tonumber(row.max_cpm) or 0,
-		math.floor(tonumber(row.max_chars) or 0),
-		_sql_escape(buckets_json),
-		math.floor(tonumber(row.inter_count) or 0),
-		math.floor(tonumber(row.inter_sum) or 0),
-		math.floor(tonumber(row.inter_sumsq) or 0))
+	local sql = Queries.render("agg.burst", "cli_json", {
+		device_id = device_id, date = row.date, app = row.app,
+		count_total = math.floor(tonumber(row.count_total) or 0), max_cpm = tonumber(row.max_cpm) or 0,
+		max_chars = math.floor(tonumber(row.max_chars) or 0), length_buckets_json = buckets_json,
+		inter_delay_count = math.floor(tonumber(row.inter_count) or 0),
+		inter_delay_sum = math.floor(tonumber(row.inter_sum) or 0),
+		inter_delay_sumsq = math.floor(tonumber(row.inter_sumsq) or 0),
+	})
 	return sql
 end
 
@@ -1208,21 +1169,12 @@ local TITLE_CAP_PER_APP_DAY =
 _derived_sql.title = function(device_id, row)
 	if type(row) ~= "table" then return end
 	if type(row.title) ~= "string" or row.title == "" then return end
-	local sql = string.format(
-		"INSERT INTO agg_app_day_titles (device_id, date, app, title, c, ms) "
-		.. "VALUES ('%s','%s','%s','%s',%d,%d) "
-		.. "ON CONFLICT(device_id, date, app, title) DO UPDATE SET "
-		.. "c = c + excluded.c, ms = ms + excluded.ms; "
-		.. "DELETE FROM agg_app_day_titles WHERE device_id = '%s' AND date = '%s' "
-		.. "AND app = '%s' AND title NOT IN ("
-		.. "SELECT title FROM agg_app_day_titles WHERE device_id = '%s' AND date = '%s' "
-		.. "AND app = '%s' ORDER BY (c + ms) DESC LIMIT %d);",
-		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
-		_sql_escape(row.title),
-		math.floor(tonumber(row.c) or 0), math.floor(tonumber(row.ms) or 0),
-		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
-		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
-		math.floor(TITLE_CAP_PER_APP_DAY))
+	local sql = Queries.render("agg.title", "cli_json", {
+		device_id = device_id, date = row.date, app = row.app, title = row.title,
+		c = math.floor(tonumber(row.c) or 0), ms = math.floor(tonumber(row.ms) or 0),
+	}) .. "\n" .. Queries.render("agg.title_prune", "cli_json", {
+		device_id = device_id, date = row.date, app = row.app, cap = math.floor(TITLE_CAP_PER_APP_DAY),
+	})
 	return sql
 end
 
@@ -1436,25 +1388,14 @@ _derived_sql.session = function(device_id, row)
 		parts[#parts + 1] = string.format("%d", math.floor(tonumber(duration) or 0))
 	end
 	local durations_json = "[" .. table.concat(parts, ",") .. "]"
-	local sql = string.format(
-		"INSERT INTO agg_app_day_session (device_id, date, app, count_total, longest_ms, "
-		.. "longest_chars, total_active_ms, durations_json) "
-		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,'%s') "
-		.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
-		.. "count_total = count_total + excluded.count_total, "
-		.. "longest_ms = MAX(longest_ms, excluded.longest_ms), "
-		.. "longest_chars = MAX(longest_chars, excluded.longest_chars), "
-		.. "total_active_ms = total_active_ms + excluded.total_active_ms, "
-		.. "durations_json = (SELECT json_group_array(d) FROM ("
-		.. "SELECT value AS d FROM json_each(durations_json) "
-		.. "UNION ALL SELECT value FROM json_each(excluded.durations_json) "
-		.. "LIMIT " .. SESSION_DURATIONS_CAP .. "));",
-		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
-		math.floor(tonumber(row.count_total) or 0),
-		math.floor(tonumber(row.longest_ms) or 0),
-		math.floor(tonumber(row.longest_chars) or 0),
-		math.floor(tonumber(row.total_active_ms) or 0),
-		_sql_escape(durations_json))
+	local sql = Queries.render("agg.session", "cli_json", {
+		device_id = device_id, date = row.date, app = row.app,
+		count_total = math.floor(tonumber(row.count_total) or 0),
+		longest_ms = math.floor(tonumber(row.longest_ms) or 0),
+		longest_chars = math.floor(tonumber(row.longest_chars) or 0),
+		total_active_ms = math.floor(tonumber(row.total_active_ms) or 0),
+		durations_json = durations_json, duration_cap = SESSION_DURATIONS_CAP,
+	})
 	return sql
 end
 
@@ -1499,7 +1440,9 @@ _derived_sql.ngrams = function(device_id, date, app, ngrams, table_name)
 		return
 	end
 
-	local parts = {}
+	-- One statement per token, in a script the caller runs as one batch: the rows
+	-- are those one multi-row INSERT left, and the statement is the catalogue's.
+	local statements = {}
 	for token, value in pairs(ngrams) do
 		local is_row  = type(value) == "table"
 		local count   = is_row and value.c or value
@@ -1518,41 +1461,18 @@ _derived_sql.ngrams = function(device_id, date, app, ngrams, table_name)
 					Json.encode(source), math.floor(source_count))
 				end
 			end
-			local source_json = "{" .. table.concat(source_parts, ",") .. "}"
-			parts[#parts + 1] = string.format(
-				"('%s','%s','%s','%s',%d,%d,%d,%d,'%s')",
-				_sql_escape(device_id),
-				_sql_escape(date),
-				_sql_escape(app),
-				_sql_escape(token),
-				math.floor(count),
-				math.floor(total_delay or 0),
-				math.floor(delay_count or 0),
-				math.floor(error_count or 0),
-				_sql_escape(source_json)
-			)
+			statements[#statements + 1] = Queries.render("agg.ngram", "cli_json", {
+				table = target, device_id = device_id, date = date, app = app, token = token,
+				c = math.floor(count), td = math.floor(total_delay or 0),
+				cd = math.floor(delay_count or 0), e = math.floor(error_count or 0),
+				esrc_json = "{" .. table.concat(source_parts, ",") .. "}",
+			})
 		end
 	end
-	if #parts == 0 then return end
-
-	local sql = string.format(
-		"INSERT INTO " .. target .. " (device_id, date, app, token, c, td, cd, e, esrc_json) "
-		.. "VALUES %s "
-		.. "ON CONFLICT(device_id, date, app, token) DO UPDATE SET "
-		.. "c = c + excluded.c, "
-		-- Summed, not replaced: the mean delay for a token is td/cd across the
-		-- whole day, and a flush lands every few seconds. Overwriting would
-		-- leave the average describing the last handful of keystrokes.
-		.. "td = td + excluded.td, "
-		.. "cd = cd + excluded.cd, "
-		.. "e = e + excluded.e, "
-		.. number_map_merge_sql("esrc_json") .. ";",
-		table.concat(parts, ",")
-	)
-	return sql
+	if #statements == 0 then return end
+	return table.concat(statements, "\n")
 end
 
---- Commits one canonical ngrams upsert and returns its native receipt.
 function M.upsert_ngrams(device_id, date, app, ngrams, table_name)
 	if not M.is_available() then return end
 	local sql = _derived_sql.ngrams(device_id, date, app, ngrams, table_name)
