@@ -188,14 +188,17 @@ _THHS_KeyChildren(KeyId) {
 	throw Error("Missing actual key template: " . KeyId)
 }
 
-_THHS_KeyHeadRows(KeyId) {
+_THHS_KeyHeadRows(KeyId, ExpectedHeadCount := 4) {
 	Rows := _THHS_KeyChildren(KeyId)
-	Assert(Rows.Length == 7 && !Rows[6].Has("items")
-		&& HasMethod(Rows[6].Get("action", 0), "Call"),
-		"the existing head must be followed by the separator, the genuine Windows delay command row and its reset")
+	Assert(Rows.Length == ExpectedHeadCount + 3
+		&& Rows[ExpectedHeadCount + 1].Get("separator", false)
+		&& !Rows[ExpectedHeadCount + 2].Has("items")
+		&& HasMethod(Rows[ExpectedHeadCount + 2].Get("action", 0), "Call")
+		&& HasMethod(Rows[ExpectedHeadCount + 3].Get("action", 0), "Call"),
+		"the projected head must retain the separator, genuine delay command and reset in order")
 	Head := []
 	for Index, Row in Rows {
-		if Index <= 4
+		if Index <= ExpectedHeadCount
 			Head.Push(Row)
 	}
 	return Head
@@ -265,7 +268,7 @@ _THHS_KeyHeadPlatform(TargetPath) {
 	Previous := Tap["platforms"]
 	try {
 		Tap["platforms"] := ["linux"]
-		Rows := _THHS_KeyHeadRows("caps_lock")
+		Rows := _THHS_KeyHeadRows("caps_lock", 3)
 		AssertEqual(3, Rows.Length, "only the unavailable tap row is hidden")
 		Assert(Rows[2]["separator"], "the shared separator retains its declared position")
 		Assert(HasMethod(Rows[3].Get("action", 0), "Call"), "the hold command remains present")
@@ -388,13 +391,14 @@ _THHS_KeyDelayVisible(TargetPath) {
 		"a key with its own delay offers the reset to the global delay")
 	Rendered := Menu()
 	try {
-		AssertEqual(6, _MR_RenderRows(Rendered, Rows, "tap_hold_key_delay_test", 1),
-			"the complete receipt counts six labelled rows and excludes its two separators")
+		AssertEqual(5, _MR_RenderRows(Rendered, Rows, "tap_hold_key_delay_test", 1),
+			"the complete receipt counts five labelled rows and excludes its two separators")
 		AssertEqual(7, DllCall("GetMenuItemCount", "ptr", Rendered.Handle, "int"),
 			"the actual native menu retains all seven physical positions")
 		AssertEqual(Rows[7]["label"], _THHS_LabelAt(Rendered, 6), "the reset to the global delay is last")
 		AssertEqual(Rows[6]["label"], _THHS_LabelAt(Rendered, 5), "the genuine delay precedes it")
 		Assert(TrayMenuIsSeparatorAt(Rendered, 1), "the original separator remains second")
+		Assert(TrayMenuIsSeparatorAt(Rendered, 4), "the delay tail separator remains fifth")
 	} finally {
 		_CTC_ReleaseMenu(Rendered)
 	}
