@@ -139,9 +139,20 @@ helpers.describe("rotation — init validation", function()
 		helpers.assert_eq(r.get_offset(), 0)
 	end)
 
+	helpers.it("rejects deps without an integer recovery turn budget", function()
+		local r = helpers.load_with_stubs("modules.keystats.rotation")
+		r.init({ paths = { today_log_path = "/tmp/today.log" }, state = {}, today_log_offset = 64 })
+		helpers.assert_eq(r.get_offset(), 0)
+		helpers.assert_eq(r.is_initialized(), false)
+		r.init({ paths = { today_log_path = "/tmp/today.log" }, state = {}, today_log_offset = 64,
+			recovery_turn_bytes = 4096.5 })
+		helpers.assert_eq(r.is_initialized(), false)
+	end)
+
 	helpers.it("accepts valid deps and restores provided offset", function()
 		local r = helpers.load_with_stubs("modules.keystats.rotation")
 		r.init({
+			recovery_turn_bytes = 65536,
 			paths              = { today_log_path = "/tmp/today.log" },
 			state              = {},
 			today_log_offset   = 1024,
@@ -154,6 +165,7 @@ helpers.describe("rotation — init validation", function()
 	helpers.it("defaults offset to 0 when not provided in deps", function()
 		local r = helpers.load_with_stubs("modules.keystats.rotation")
 		r.init({
+			recovery_turn_bytes = 65536,
 			paths  = { today_log_path = "/tmp/today.log" },
 			state  = {},
 		})
@@ -163,12 +175,14 @@ helpers.describe("rotation — init validation", function()
 	helpers.it("ignores a duplicate init call", function()
 		local r = helpers.load_with_stubs("modules.keystats.rotation")
 		r.init({
+			recovery_turn_bytes = 65536,
 			paths  = { today_log_path = "/tmp/today.log" },
 			state  = {},
 			today_log_offset = 512,
 		})
 		-- Second call with a different offset must be silently ignored.
 		r.init({
+			recovery_turn_bytes = 65536,
 			paths  = { today_log_path = "/tmp/today.log" },
 			state  = {},
 			today_log_offset = 9999,
@@ -196,7 +210,7 @@ helpers.describe("rotation — init validation", function()
 		-- so a rollover could re-emit it, this module would start holding raw
 		-- keys — in a table that is written to disk on every rotation.
 		local r = helpers.load_with_stubs("modules.keystats.rotation")
-		r.init({ paths = { today_log_path = "/tmp/today.log" }, state = {} })
+		r.init({ recovery_turn_bytes = 65536, paths = { today_log_path = "/tmp/today.log" }, state = {} })
 		r.set_offset(4096, "2024-06-15")
 		helpers.assert_eq(type(r.get_offset()), "number", "the offset must stay a byte count")
 		helpers.assert_eq(type(r.get_date()), "string", "the date must stay a date")
@@ -220,6 +234,7 @@ helpers.describe("rotation — set_offset / get_offset / get_date", function()
 	helpers.it("setup: init with zero offset", function()
 		r = helpers.load_with_stubs("modules.keystats.rotation")
 		r.init({
+			recovery_turn_bytes = 65536,
 			paths = { today_log_path = "/tmp/today.log" },
 			state = {},
 		})
@@ -344,6 +359,7 @@ local function with_rollover_owner(callback)
 				return real_date(format, ...)
 			end
 			r.init({
+				recovery_turn_bytes = 65536,
 				paths = { today_log_path = "/tmp/today.log" }, state = {},
 				today_log_offset = 8192, today_log_date = "2024-06-30",
 			})

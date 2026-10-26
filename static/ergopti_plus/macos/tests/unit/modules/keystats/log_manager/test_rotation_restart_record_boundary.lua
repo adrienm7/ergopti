@@ -26,7 +26,7 @@ local function replay(prefix, expected)
 		end }
 		local rotation = helpers.load_with_stubs("modules.keystats.rotation")
 		local ok, reason = xpcall(function()
-			rotation.init({ paths = { today_log_path = path }, state = {} })
+			rotation.init({ paths = { today_log_path = path }, state = {}, recovery_turn_bytes = 65536 })
 			helpers.assert_eq(rotation.append_log({ type = "typing", timestamp = TIMESTAMP, text = "after_restart" }), true)
 			local file = assert(io.open(path, "r"))
 			local bytes = assert(file:read("*a")); assert(file:close())
@@ -106,7 +106,7 @@ helpers.describe("rotation restart framing", function()
 					}
 				end
 				local ok, reason = xpcall(function()
-					rotation.init({ paths = { today_log_path = path }, state = {} })
+					rotation.init({ paths = { today_log_path = path }, state = {}, recovery_turn_bytes = 65536 })
 					helpers.assert_eq(rotation.append_log({ type = "typing", timestamp = TIMESTAMP, text = "refused" }), false)
 					helpers.assert_eq(writes, 0, "an uninspected journal cannot accept another event")
 					for _, file in ipairs(handles) do helpers.assert_eq(io.type(file), "closed file") end

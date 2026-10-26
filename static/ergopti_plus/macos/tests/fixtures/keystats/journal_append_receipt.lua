@@ -89,7 +89,7 @@ io.open = function(path, access)
   end,
  }
 end
-local Rotation=require('modules.keystats.rotation');Rotation.init({paths=paths,state={}})
+local Rotation=require('modules.keystats.rotation');Rotation.init({paths=paths,state={},recovery_turn_bytes=65536})
 assert(Rotation.is_initialized())
 local Manager=require('modules.keystats.log_manager')
 local function upvalue(fn,wanted,new)

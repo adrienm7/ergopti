@@ -258,6 +258,7 @@ local function load_log_manager_fixture(sink_failures, initialize)
 	package.loaded["infra.timings"] = {
 		sec = function() return 5 end,
 		ms = function() return 2000 end,
+		count = function() return 65536 end,
 	}
 
 	local saved_file_system = package.loaded["adapters.file_system"]
@@ -331,7 +332,7 @@ helpers.describe("rotation exact append transaction", function()
 		with_fixture(function()
 			return load_rotation_fixture({ write_failures = 1 })
 		end, function(fixture)
-			fixture.rotation.init({ paths = { today_log_path = "/tmp/today.log" }, state = {} })
+			fixture.rotation.init({ paths = { today_log_path = "/tmp/today.log" }, state = {}, recovery_turn_bytes = 65536 })
 			local entry = { type = "typing", text = "owned" }
 			local first = fixture.rotation.append_log(entry)
 			local second = fixture.rotation.append_log(entry)
@@ -351,7 +352,7 @@ helpers.describe("rotation exact append transaction", function()
 		with_fixture(function()
 			return load_rotation_fixture({ open_failures = 2 })
 		end, function(fixture)
-			fixture.rotation.init({ paths = { today_log_path = "/tmp/today.log" }, state = {} })
+			fixture.rotation.init({ paths = { today_log_path = "/tmp/today.log" }, state = {}, recovery_turn_bytes = 65536 })
 			helpers.assert_eq(fixture.rotation.append_log({ type = "typing", text = "open" }), false,
 				"nil, ENOSPC from io.open must be an explicit refusal")
 			helpers.assert_true(fixture.rotation.append_log({ type = "typing", text = "open" }))
@@ -361,7 +362,7 @@ helpers.describe("rotation exact append transaction", function()
 		with_fixture(function()
 			return load_rotation_fixture({ setvbuf_failures = 2 })
 		end, function(fixture)
-			fixture.rotation.init({ paths = { today_log_path = "/tmp/today.log" }, state = {} })
+			fixture.rotation.init({ paths = { today_log_path = "/tmp/today.log" }, state = {}, recovery_turn_bytes = 65536 })
 			helpers.assert_eq(fixture.rotation.append_log({ type = "typing", text = "mode" }), false,
 				"a setvbuf refusal must not publish a buffered handle")
 			helpers.assert_true(fixture.rotation.append_log({ type = "typing", text = "mode" }))

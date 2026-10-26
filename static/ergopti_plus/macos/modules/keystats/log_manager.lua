@@ -76,6 +76,9 @@ local INGEST_TICK_SEC = Timings.sec("keystats", "ingest_tick_ms")
 --- value ([keystats] max_keystroke_delay_ms).
 local WPM_MAX_EVENT_DELAY_MS = Timings.ms("keystats", "max_keystroke_delay_ms")
 
+--- Refused journal bytes rotation re-verifies per deferred retry turn.
+local JOURNAL_RECOVERY_TURN_BYTES = Timings.count("limits", "journal_recovery_turn_bytes")
+
 --- Maximum drain iterations during day_rollover. At 5000 lines/batch this
 --- covers 100 000 lines before giving up and preserving the file.
 local MAX_ROLLOVER_DRAIN_ITERS = 20
@@ -2049,7 +2052,8 @@ local function _init(core_state)
 			for r in db:nrows("SELECT value FROM meta WHERE key='today_log_date'") do
 				date_val = (type(r.value) == "string" and r.value ~= "") and r.value or nil
 			end
-			Rotation.init({ paths = _paths, state = _state, today_log_offset = offset_val, today_log_date = date_val })
+			Rotation.init({ paths = _paths, state = _state, today_log_offset = offset_val, today_log_date = date_val,
+				recovery_turn_bytes = JOURNAL_RECOVERY_TURN_BYTES })
 			for r in db:nrows("SELECT value FROM meta WHERE key='ngram_ctx_json'") do
 				local ok, decoded = pcall(json.decode, r.value or "{}")
 				if ok and type(decoded) == "table" then
@@ -2068,7 +2072,7 @@ local function _init(core_state)
 	-- must interrogate the initialisation flag itself, never a function's existence.
 	if not Rotation.is_initialized() then
 		Logger.warn(LOG, "SQLite cache unavailable — initialising rotation for JSONL-only operation.")
-		Rotation.init({ paths = _paths, state = _state })
+		Rotation.init({ paths = _paths, state = _state, recovery_turn_bytes = JOURNAL_RECOVERY_TURN_BYTES })
 	end
 
 	_state.today_idx = _state.today_idx or {}

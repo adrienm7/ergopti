@@ -77,7 +77,7 @@ local function with_receipt(count, check, options)
 			end
 		end
 		local ok, reason = xpcall(function()
-			rotation.init({ paths = { today_log_path = path }, state = {} })
+			rotation.init({ paths = { today_log_path = path }, state = {}, recovery_turn_bytes = 65536 })
 			helpers.assert_eq(rotation.append_log(entry), false, "the first native-style refusal must retain ownership")
 			check(rotation, entry, function() return opens, closes, owner_calls end, controls)
 			local file = assert(original_open(path, "r")); local bytes = assert(file:read("*a")); assert(file:close())
