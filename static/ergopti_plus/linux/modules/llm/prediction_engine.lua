@@ -274,6 +274,19 @@ local _debounce = {
 	plan = require("llm.request_plan.debounce").new(function() return TriggerSettings.get(require("config_keys").LEAF.MIN_REQUEST_INTERVAL_MS) end),
 }
 
+--- Asks the plan what pressing an explicit shortcut does while its previous
+--- request may be in flight: the new request is never delayed, the one in flight
+--- under the same shortcut is superseded.
+--- @param key string The shortcut's identity.
+--- @param in_flight boolean Whether the engine still has a request of that shortcut running.
+--- @return boolean superseded True when the caller must cancel the request in flight.
+function _debounce.supersedes(key, in_flight)
+	local decisions = _debounce.plan:on_explicit({ key = key, in_flight = in_flight })
+	if decisions[1].action ~= "supersede" then return false end
+	Logger.info(LOG, "Shortcut '%s' pressed again: the request in flight is superseded.", key)
+	return true
+end
+
 --- Cancels the native debounce timer and withdraws it from the plan.
 function _debounce.cancel()
 	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
@@ -614,6 +627,7 @@ function M.init(opts)
 	M.drop_vision("engine initialised")
 	_tone_generation = _tone_generation + 1
 	_tone_memory = nil
+	_debounce.tone_inflight = nil
 	_offer_notified = false
 	if type(options.triggers) == "table" then _triggers = options.triggers end
 	_debounce.cancel()
@@ -1090,7 +1104,8 @@ local function run_manual(output_context, prompt)
 		override = { profile = profile, num_predictions = prompt.num_predictions }
 	end
 	_debounce.cancel()
-	if _predicting or #_suggestions > 0 then M.dismiss() end
+	local superseded = _debounce.supersedes("prediction:" .. (prompt and prompt.profile_id or "menu"), _predicting)
+	if superseded or #_suggestions > 0 then M.dismiss() end
 	Logger.info(LOG, "Manual prediction requested (%d context byte(s), prompt %s).", #context,
 		override and override.profile.id or "from the menu")
 	local refusal = M.predict(context, output_context, override)
@@ -1398,6 +1413,14 @@ function M.shift_tone(direction, cycle)
 		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
 		return false
 	end
+	local inflight = _debounce.tone_inflight
+	if _debounce.supersedes("tone", inflight ~= nil) then
+		_debounce.tone_inflight = nil
+		local ok, cancelled = pcall(inflight.backend.cancel)
+		if not ok or cancelled ~= true then
+			Logger.error(LOG, "The superseded tone request could not be cancelled: %s.", ok and "termination refused" or tostring(cancelled))
+		end
+	end
 	M.drop_tone("superseded")
 	local focus = current_focus()
 	if focus == "" then
@@ -1485,7 +1508,10 @@ function M.shift_tone(direction, cycle)
 			_debounce.plan:on_sent(now)
 			-- Not the prediction's _inflight_backend: a dropped step is left to finish
 			-- and ignored, and the next request on that backend cancels it anyway.
+			local inflight = { backend = backend }
+			_debounce.tone_inflight = inflight
 			backend.chat(target, model, messages, request_opts, nil, function(full_text, err)
+				if _debounce.tone_inflight == inflight then _debounce.tone_inflight = nil end
 				finish_tone(generation, plan, focus, receipt, full_text, err)
 			end)
 		end
@@ -1551,11 +1577,14 @@ end
 --- @param model string The text model.
 --- @param focus string|nil The focused window's identity, for an offer whose
 ---   acceptance replaces the selection; nil for one typed at the caret.
+--- @param explicit boolean|nil True for a shortcut's request, which supersedes its own
+---   request still in flight (a mashed shortcut).
 --- @return integer epoch The offer's _request_epoch.
 --- @return table meta The tooltip's metadata, loading until the offer settles.
-local function open_offer(action, label, model, focus)
+local function open_offer(action, label, model, focus, explicit)
 	_debounce.cancel()
-	if _predicting or #_suggestions > 0 then M.dismiss() end
+	local superseded = explicit == true and _debounce.supersedes(action, _predicting)
+	if superseded or _predicting or #_suggestions > 0 then M.dismiss() end
 	local meta = {
 		model = model,
 		profile = label,
@@ -1669,7 +1698,7 @@ local function request_screen_answers(spec, screen)
 	local language = prompt_language()
 	local candidates = {}
 	local index = 0
-	local epoch, meta = open_offer(spec.action, spec.label, model, nil)
+	local epoch, meta = open_offer(spec.action, spec.label, model, nil, true)
 	Logger.info(LOG, "Requesting %d screen answer(s) (backend=%s, model=%s).", #answers, M.get_backend(), model)
 
 	local function publish()
@@ -2050,7 +2079,7 @@ function M.translate_selection(value)
 		-- and a tone step would rewrite the text being translated.
 		M.drop_vision("superseded")
 		M.drop_tone("superseded")
-		local epoch, meta = open_offer(TRANSLATE_ACTION, i18n.get("sg_actions." .. TRANSLATE_ACTION), model, focus)
+		local epoch, meta = open_offer(TRANSLATE_ACTION, i18n.get("sg_actions." .. TRANSLATE_ACTION), model, focus, true)
 		_suggestion_context.selection_receipt = receipt
 		local messages = {
 			{ role = "system", content = Translate.system_prompt(config, language) },
@@ -2369,7 +2398,7 @@ local function run_agent(source, text, opts)
 	-- replace or rewrite what the actions are made from.
 	M.drop_vision("superseded")
 	M.drop_tone("superseded")
-	local epoch, meta = open_offer(action, i18n.get("sg_actions." .. action), chat.model, current_focus())
+	local epoch, meta = open_offer(action, i18n.get("sg_actions." .. action), chat.model, current_focus(), true)
 	_suggestion_context.agent = { source = source, config = config }
 	-- The text, the window and the answer are the user's: only sizes are logged.
 	Logger.info(LOG, "Sending agent request (source=%s, backend=%s, model=%s, %d byte(s), %d tool(s)).",

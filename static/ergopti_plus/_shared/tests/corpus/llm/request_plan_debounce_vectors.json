@@ -5,7 +5,8 @@
 		"explicit_requests": "An explicit request (shortcut, typed trigger, prompt action) is never held by the rate floor.",
 		"floor": "One last-request time for every backend and every kind of request; the interval is the user's llm.trigger.min_request_interval_ms.",
 		"live_word_end": "A word end fires instantly in live mode too when the instant word end setting is on.",
-		"variants": "The variants of one request (the n sequential calls of a predict-n run, automatic or explicit) are never held: the floor applies only between distinct requests."
+		"variants": "The variants of one request (the n sequential calls of a predict-n run, automatic or explicit) are never held: the floor applies only between distinct requests.",
+		"mashed_shortcuts": "Pressing an explicit shortcut again while its previous request is in flight supersedes that request (cancels it) and starts the new one at once; two requests of one shortcut are never concurrent."
 	},
 	"drivers": {
 		"macos": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
@@ -1170,6 +1171,103 @@
 					"args": {},
 					"now_ms": 1100,
 					"expect_error": "the request floor must be a non-negative finite number"
+				}
+			]
+		},
+		{
+			"id": "a-mashed-shortcut-supersedes-its-request-in-flight",
+			"description": "Pressing an explicit shortcut again while its previous request is in flight supersedes that request and sends the new one at once, whatever the last request time; the floor is not asked.",
+			"floor_ms": 300,
+			"steps": [
+				{
+					"call": "on_sent",
+					"now_ms": 1000,
+					"expect": []
+				},
+				{
+					"call": "on_explicit",
+					"args": {
+						"key": "tone",
+						"in_flight": true
+					},
+					"expect": [
+						{
+							"action": "supersede",
+							"key": "tone"
+						},
+						{
+							"action": "send"
+						}
+					]
+				},
+				{
+					"call": "on_explicit",
+					"args": {
+						"key": "tone",
+						"in_flight": false
+					},
+					"expect": [
+						{
+							"action": "send"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "an-explicit-shortcut-is-not-held-nor-does-it-supersede-another",
+			"description": "The in-flight state is per shortcut: another shortcut's request is not superseded by this decision, and an explicit request is never delayed by the floor.",
+			"floor_ms": 300,
+			"steps": [
+				{
+					"call": "on_sent",
+					"now_ms": 1000,
+					"expect": []
+				},
+				{
+					"call": "on_explicit",
+					"args": {
+						"key": "translation",
+						"in_flight": false
+					},
+					"expect": [
+						{
+							"action": "send"
+						}
+					]
+				},
+				{
+					"call": "on_dispatch",
+					"args": {
+						"explicit": true
+					},
+					"now_ms": 1001,
+					"expect": [
+						{
+							"action": "send"
+						}
+					]
+				}
+			]
+		},
+		{
+			"id": "an-explicit-request-needs-a-key-and-a-state",
+			"description": "A malformed explicit request fails where the plan is asked.",
+			"floor_ms": 300,
+			"steps": [
+				{
+					"call": "on_explicit",
+					"args": {
+						"in_flight": true
+					},
+					"expect_error": "shortcut key"
+				},
+				{
+					"call": "on_explicit",
+					"args": {
+						"key": "tone"
+					},
+					"expect_error": "in_flight"
 				}
 			]
 		}

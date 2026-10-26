@@ -75,3 +75,43 @@ helpers.describe("request floor: the interval the user set (request-floor-settin
 		helpers.assert_eq(fixture.fetches, 2)
 	end)
 end)
+
+helpers.describe("mashed explicit shortcuts: the request in flight is superseded (mashed-shortcut)", function()
+	helpers.it("cancels the previous hotkey request at the backend before the next one leaves", function()
+		local fixture = Pipeline.load({})
+		fixture.engine.perform_check(true)
+		helpers.assert_eq(fixture.fetches, 1)
+		helpers.assert_eq(fixture.cancels, 0, "a first press has nothing to supersede")
+		fixture.engine.perform_check(true)
+		helpers.assert_eq(fixture.fetches, 2, "the new request is never delayed")
+		helpers.assert_eq(fixture.cancels, 1, "the one in flight is cancelled")
+	end)
+
+	helpers.it("does not cancel anything for an automatic request", function()
+		local fixture = Pipeline.load({})
+		helpers.assert_eq(fixture.engine.set_llm_min_request_interval(0), true)
+		fixture.engine.perform_check(true)
+		fixture.state.buffer = "hello world, again"
+		fixture.engine.perform_check(false)
+		helpers.assert_eq(fixture.cancels, 0)
+	end)
+
+	helpers.it("cancels the previous answer surface's request when a shortcut opens its surface again", function()
+		local fixture = Pipeline.load({})
+		helpers.assert_not_nil(fixture.engine.open_answer_surface("Translation"))
+		helpers.assert_eq(fixture.cancels, 0)
+		helpers.assert_not_nil(fixture.engine.open_answer_surface("Translation"))
+		helpers.assert_eq(fixture.cancels, 1)
+	end)
+
+	helpers.it("cancels the previous tone step's request when the tone shortcut is pressed again", function()
+		local fixture = Pipeline.load({ profiles = { tone = { id = "tone", label = "Tone" } } })
+		local sent = 0
+		package.loaded["modules.llm"].fetch_raw_completion = function() sent = sent + 1 end
+		helpers.assert_eq(fixture.engine.request_selection_rewrite("tone", "merci pour ton aide", function() end), true)
+		helpers.assert_eq(fixture.cancels, 0)
+		helpers.assert_eq(fixture.engine.request_selection_rewrite("tone", "merci pour ton aide", function() end), true)
+		helpers.assert_eq(sent, 2, "the second press is not delayed")
+		helpers.assert_eq(fixture.cancels, 1)
+	end)
+end)
