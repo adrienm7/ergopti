@@ -1,0 +1,5 @@
+[_meta]
+schema_version = 2
+
+[tap_hold.keys.caps_lock]
+time_activation_seconds = 0.35

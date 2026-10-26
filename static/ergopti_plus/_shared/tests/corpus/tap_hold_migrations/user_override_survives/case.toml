@@ -1,0 +1,6 @@
+[case]
+description = "A per-key delay the user set survives, including a value that equals another key's shipped delay and the global delay."
+drivers = ["linux"]
+outcome = "migrated"
+from_version = 0
+to_version = 1

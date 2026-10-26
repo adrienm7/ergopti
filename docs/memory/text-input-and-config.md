@@ -394,11 +394,15 @@ choice, frozen against later changes of the shared value. That is why no key
 ships a tap-hold delay (`[tap_hold.keys.*]` has no `time_activation_seconds`;
 every key follows the global delay, the registry's
 `tap_hold.default_activation_ms`) and why `[tap_hold.retired_delays]` exists:
-a file without `[tap_hold] explicit_delays = true` is read with exactly the
-retired values ignored, and the first write removes them and sets the flag.
-Action: do not ship a per-key default for anything the user can also override;
-ship a global one, and when retiring a shipped per-key value, record it as
-retired and flag the files that were cleaned.
+Linux's tap_hold.toml carries `[_meta] schema_version`, and step `v0_to_v1` of
+`_shared/tap_hold/migrations.toml` (its own registry: the config.toml one
+cannot express a delete-if-equal and Windows validates it at every boot)
+removes exactly the retired values, once, from a file that was never stamped
+and does not carry the old `explicit_delays = true` flag, then stamps it.
+Windows still uses that flag until it replays the step. Action: do not ship a
+per-key default for anything the user can also override; ship a global one, and
+when retiring a shipped per-key value, record it as retired and add a migration
+step instead of a marker.
 
 ### project-outdated-config-entries-warn-never-refuse
 

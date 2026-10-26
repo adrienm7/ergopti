@@ -1,0 +1,4 @@
+[case]
+description = "A stamp that is not a non-negative integer refuses the file."
+drivers = ["linux"]
+outcome = "invalid"
