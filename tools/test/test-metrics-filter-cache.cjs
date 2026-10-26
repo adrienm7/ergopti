@@ -1318,4 +1318,61 @@ for (const host of ['windows', 'macos', 'linux']) {
 }
 assert.equal(timelineCases.length, 3);
 assert.equal(passed, 216, 'all chronological timeline and hourly controls must execute');
+const windowTitleCases = ['constructor', 'toString', '__proto__', 'Ordinary document'];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const title of windowTitleCases) {
+		test(`${host} native window title retains dictionary key ${title}`, () => {
+			const page = loadMetricsAppsPage(host);
+			page.elements.set('top_windows_tbody', page.context.document.createElement('tbody'));
+			vm.runInContext("currentPeriod='all';", page.context);
+			const manifest = Object.fromEntries(
+				['2026-10-26', '2026-10-27'].map((date, i) => [
+					date,
+					{
+						Editor: {
+							category: 'Productivity',
+							app_time_ms: 60000,
+							chars: 1,
+							win_titles: Object.fromEntries([[title, { c: 3 + i, ms: (i + 1) * 60000 }]])
+						}
+					}
+				])
+			);
+			assert.equal(
+				vm.runInContext(
+					"Object.hasOwn(Object.prototype, 'c') || Object.hasOwn(Object.prototype, 'ms')",
+					page.context
+				),
+				false
+			);
+			publishLoadedAppsData(page, host, manifest);
+			const titles = page.context.getAggregatedData().apps.Editor.win_titles;
+			assert.deepEqual(
+				Object.keys(titles),
+				[title],
+				'valid native title strings must remain own dictionary entries'
+			);
+			assert.equal(titles[title].c, 7);
+			assert.equal(titles[title].ms, 180000);
+			assert.equal(
+				vm.runInContext(
+					"Object.hasOwn(Object.prototype, 'c') || Object.hasOwn(Object.prototype, 'ms')",
+					page.context
+				),
+				false,
+				'data keys must never mutate shared object prototypes'
+			);
+			const html = page.elements.get('top_windows_tbody').innerHTML;
+			assert.ok(html.includes(`title="${title}"`));
+			assert.ok(html.includes('>7</td>'));
+			assert.ok(html.includes('>3m</td>'));
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false
+			);
+		});
+	}
+}
+assert.equal(windowTitleCases.length, 4);
+assert.equal(passed, 228, 'all native title dictionary and rendering controls must execute');
 console.log(`${passed} passed, 0 failed.`);
