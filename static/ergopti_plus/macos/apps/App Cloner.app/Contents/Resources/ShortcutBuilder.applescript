@@ -80,7 +80,8 @@ end ui_string
 -- Load one selected catalogue for the whole wizard; every UI value is required.
 on load_ui(loc, locales_dir)
 	set catalogue to my load_catalogue(loc, locales_dir)
-	return {¬
+	-- Keep each record within the native compiler's line-continuation limit.
+	set controls_ui to {¬
 		btn_cancel: my ui_string(catalogue, "button.cancel"), ¬
 		btn_ok: my ui_string(catalogue, "common.ok"), ¬
 		btn_back: my ui_string(catalogue, "apps.cloner.btn_back"), ¬
@@ -112,7 +113,8 @@ on load_ui(loc, locales_dir)
 		lbl_progress_sign: my ui_string(catalogue, "apps.cloner.lbl_progress_sign"), ¬
 		lbl_progress_dock: my ui_string(catalogue, "apps.cloner.lbl_progress_dock"), ¬
 		lbl_progress_done: my ui_string(catalogue, "apps.cloner.lbl_progress_done"), ¬
-		lbl_progress_title: my ui_string(catalogue, "apps.cloner.lbl_progress_title"), ¬
+		lbl_progress_title: my ui_string(catalogue, "apps.cloner.lbl_progress_title")}
+	set wizard_ui to {¬
 		msg_choose_source: my ui_string(catalogue, "apps.cloner.msg_choose_source"), ¬
 		msg_clone_name: my ui_string(catalogue, "apps.cloner.msg_clone_name"), ¬
 		msg_pwa_recommended: my ui_string(catalogue, "apps.cloner.msg_pwa_recommended"), ¬
@@ -150,6 +152,7 @@ on load_ui(loc, locales_dir)
 		default_clone_name: my ui_string(catalogue, "apps.cloner.default_clone_name"), ¬
 		diagnostic_log_path: my ui_string(catalogue, "apps.cloner.diagnostic_log_path"), ¬
 		value_none: my ui_string(catalogue, "common.none")}
+	return controls_ui & wizard_ui
 end load_ui
 
 
