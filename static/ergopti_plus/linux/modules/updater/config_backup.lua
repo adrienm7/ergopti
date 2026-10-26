@@ -4,7 +4,7 @@
 --- MODULE: Configuration Backup (Linux)
 --- DESCRIPTION:
 --- Binds the shared configuration backup owner (_shared/lua/updater/
---- config_backup.lua) to this driver: the configuration folder, the settings
+--- config_backup.lua, assembled by config_backup_binding.lua) to this driver: the configuration folder, the settings
 --- store beside it (storage.json, which holds the folder override and the tray
 --- choices), and file ports over the shared atomic writer. The Versions window
 --- backs the configuration up through it before installing a release, and
@@ -27,7 +27,7 @@ local ConfigPaths = require("infra.config_paths")
 local Json        = require("json")
 local Shell       = require("adapters.shell_runner")
 local Writer      = require("toml_codec.writer")
-local Shared      = require("updater.config_backup")
+local Binding     = require("updater.config_backup_binding")
 
 local LOG = "modules.updater.config_backup"
 
@@ -126,10 +126,10 @@ end
 -- ==============================
 -- ==============================
 
---- Reads the shared backup rules.
---- @return table|nil rules
+--- Reads the shared updater defaults the backup rules come from.
+--- @return table|nil defaults
 --- @return string|nil error
-local function load_rules()
+local function read_defaults()
 	local path = Paths.shared("modules/updater/defaults.json")
 	local handle = path and io.open(path, "rb") or nil
 	if not handle then return nil, "the shared updater defaults are unreadable" end
@@ -137,45 +137,45 @@ local function load_rules()
 	handle:close()
 	local ok, decoded = pcall(Json.decode, raw)
 	if not ok then return nil, "the shared updater defaults are not JSON" end
-	return Shared.rules(decoded)
+	return decoded
 end
+
+--- The roots of this driver: the configuration folder and the settings store
+--- file beside it (it holds the folder override and the tray choices).
+--- @return table|nil roots
+--- @return string|nil reason
+--- @return string|nil log_text
+local function default_roots()
+	local roots = { { id = "config", dir = ConfigPaths.get_config_dir() } }
+	local ok_storage, Storage = pcall(require, "adapters.storage")
+	if not (ok_storage and type(Storage) == "table" and type(Storage.path) == "function") then
+		return nil, "settings store unavailable",
+			"Configuration backup refused: the settings store path is unknown."
+	end
+	roots[#roots + 1] = { id = "settings_store", file = Storage.path() }
+	return roots
+end
+
+local _binding = Binding.new({
+	logger = Logger,
+	log = LOG,
+	defaults = read_defaults,
+	json = { encode = Json.encode, decode = function(text)
+		local ok, value = pcall(Json.decode, text)
+		if not ok then return nil, tostring(value) end
+		return value
+	end },
+	file_ports = file_ports,
+	clock = clock,
+	default_roots = default_roots,
+	overrides = function() return M._overrides end,
+})
 
 --- Builds the owner over the current configuration folder. It is built per
 --- use: the folder can move while the daemon runs (the paths editor).
 --- @return table|nil owner
 --- @return string|nil error
-function M.owner()
-	local rules, err = load_rules()
-	if not rules then
-		Logger.error(LOG, "Configuration backup unavailable: %s.", tostring(err))
-		return nil, err
-	end
-	local overrides = M._overrides or {}
-	local roots = overrides.roots
-	if not roots then
-		roots = { { id = "config", dir = ConfigPaths.get_config_dir() } }
-		local ok_storage, Storage = pcall(require, "adapters.storage")
-		if ok_storage and type(Storage) == "table" and type(Storage.path) == "function" then
-			roots[#roots + 1] = { id = "settings_store", file = Storage.path() }
-		else
-			Logger.error(LOG, "Configuration backup refused: the settings store path is unknown.")
-			return nil, "settings store unavailable"
-		end
-	end
-	return Shared.new({
-		rules = rules,
-		roots = roots,
-		io = overrides.io or file_ports(),
-		json = { encode = Json.encode, decode = function(text)
-			local ok, value = pcall(Json.decode, text)
-			if not ok then return nil, tostring(value) end
-			return value
-		end },
-		clock = overrides.clock or clock,
-		logger = Logger,
-		log = LOG,
-	}), nil
-end
+function M.owner() return _binding.owner() end
 
 M._list = list
 
