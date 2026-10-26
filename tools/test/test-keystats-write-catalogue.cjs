@@ -218,6 +218,86 @@ check('meta: seed, set, upsert, get and the revision bump store the legacy rows'
 	db.close();
 });
 
+// ---------------------------------------------------------------------------
+// Family: devices
+// ---------------------------------------------------------------------------
+
+const deviceValues = (updated, name = 'Mac') => ({
+	device_id: "dev'1",
+	name,
+	os: 'darwin',
+	os_version: '',
+	host_signature: 'sig',
+	created_at: '2026-10-01T00:00:00Z',
+	updated_at: updated
+});
+
+/** The legacy Linux registration: upsert in one transaction. */
+function legacyLinuxDevice(db, values) {
+	const q = (v) => legacyQuote(v);
+	db.exec(
+		`INSERT INTO devices (device_id, name, os, os_version, host_signature, created_at, updated_at)
+VALUES (${q(values.device_id)}, ${q(values.name)}, ${q(values.os)}, ${q(values.os_version)}, ${q(values.host_signature)}, ${q(values.created_at)}, ${q(values.updated_at)})
+ON CONFLICT(device_id) DO UPDATE SET
+  name = excluded.name,
+  os = excluded.os,
+  os_version = excluded.os_version,
+  host_signature = excluded.host_signature,
+  updated_at = excluded.updated_at;`
+	);
+}
+
+check('devices: the catalogue upsert stores the rows the Linux registration stored', () => {
+	const rows = equivalent(
+		['devices'],
+		(db) => {
+			legacyLinuxDevice(db, deviceValues('2026-10-02T00:00:00Z'));
+			db.exec(
+				"UPDATE devices SET imported_data_sql_size = 4096, imported_data_sql_sha256 = 'abc' WHERE device_id = 'dev''1'"
+			);
+			legacyLinuxDevice(db, deviceValues('2026-10-03T00:00:00Z', 'Renamed\r'));
+		},
+		(db) => {
+			db.exec(catalogue('devices.upsert', deviceValues('2026-10-02T00:00:00Z')));
+			db.exec(
+				"UPDATE devices SET imported_data_sql_size = 4096, imported_data_sql_sha256 = 'abc' WHERE device_id = 'dev''1'"
+			);
+			db.exec(catalogue('devices.upsert', deviceValues('2026-10-03T00:00:00Z', 'Renamed\r')));
+		}
+	);
+	assert.equal(rows.devices[0].imported_data_sql_size, 4096, 'the ledger watermark survives');
+	assert.equal(rows.devices[0].created_at, '2026-10-01T00:00:00Z', 'created_at survives');
+});
+
+check(
+	'devices: macOS no longer replaces the row, so its ledger watermark survives a restart',
+	() => {
+		// Intentional change: the macOS startup used INSERT OR REPLACE, which deleted
+		// imported_data_sql_size/sha256 at every start and made the foreign import begin
+		// again. The catalogue upsert is what the Linux driver already ran.
+		const legacy = freshDb();
+		const current = freshDb();
+		const replace = (db, updated) =>
+			db.exec(
+				`INSERT OR REPLACE INTO devices (device_id, name, os, os_version, host_signature, created_at, updated_at) VALUES ('d', 'Mac', 'darwin', '', 'sig', '2026-10-01T00:00:00Z', '${updated}')`
+			);
+		replace(legacy, '2026-10-02T00:00:00Z');
+		current.exec(
+			catalogue('devices.upsert', { ...deviceValues('2026-10-02T00:00:00Z'), device_id: 'd' })
+		);
+		for (const db of [legacy, current])
+			db.exec("UPDATE devices SET imported_data_sql_size = 4096 WHERE device_id = 'd'");
+		replace(legacy, '2026-10-03T00:00:00Z');
+		current.exec(
+			catalogue('devices.upsert', { ...deviceValues('2026-10-03T00:00:00Z'), device_id: 'd' })
+		);
+		assert.equal(legacy.prepare('SELECT imported_data_sql_size AS n FROM devices').get().n, 0);
+		assert.equal(current.prepare('SELECT imported_data_sql_size AS n FROM devices').get().n, 4096);
+		legacy.close();
+		current.close();
+	}
+);
+
 if (failures > 0) {
 	console.error(`\n${failures} keystats write catalogue check(s) failed.`);
 	process.exit(1);
