@@ -212,6 +212,13 @@ local function main()
 					return ordinary_ingest(...)
 				end
 			end
+			-- Begin this physical recovery scenario with an existing user ignore.
+			local ignore = temporary .. "/metrics/.gitignore"
+			if not Lfs.symlinkattributes(ignore) then
+				local file = assert(real_open(ignore, "wb"))
+				assert(file:write("# Fixture-owned user exclusion\n"))
+				assert(file:close())
+			end
 			assert(manager.init({LOG_DIR = temporary .. "/metrics"}), table.concat(errors, " | "))
 			assert(writer.get_db() ~= nil, "actual SQLite handle was not admitted")
 			if phase == "seed" then

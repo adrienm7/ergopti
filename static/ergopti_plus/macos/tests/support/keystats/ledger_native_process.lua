@@ -103,6 +103,13 @@ return function()
 			end
 		end
 		if phase == "cache_loss" then
+			-- Begin this physical recovery scenario with an existing user ignore.
+			local ignore = temporary .. "/metrics/.gitignore"
+			if not lfs.symlinkattributes(ignore) then
+				local file = assert(original_open(ignore, "wb"))
+				assert(file:write("# Fixture-owned user exclusion\n"))
+				assert(file:close())
+			end
 			assert(manager.init({ LOG_DIR = temporary .. "/metrics" }), "actual fresh-cache manager init must succeed: " .. table.concat(errors, " | "))
 			assert(offset == 123, "actual startup must replay the repaired batch before restoring its cursor: " .. tostring(offset) .. " | " .. table.concat(errors, " | "))
 		else

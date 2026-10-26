@@ -200,6 +200,13 @@ return function()
 			writer = require("modules.keystats.sqlite_writer")
 			rotation = require("modules.keystats.rotation")
 			scheduler = require("adapters.timer_scheduler")
+			-- Begin this physical recovery scenario with an existing user ignore.
+			local ignore = temporary .. "/metrics/.gitignore"
+			if not Lfs.symlinkattributes(ignore) then
+				local file = assert(real_open(ignore, "wb"))
+				assert(file:write("# Fixture-owned user exclusion\n"))
+				assert(file:close())
+			end
 			local initialized = manager.init({ LOG_DIR = temporary .. "/metrics" })
 			if phase == "reject_boot" then
 				assert(initialized == false, "unowned identity/nonprefix suffix must reject public initialization")

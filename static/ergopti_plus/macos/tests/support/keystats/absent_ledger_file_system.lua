@@ -28,6 +28,14 @@ function M.extend(files, get_current_paths)
 	model = { get_current_paths = get_current_paths }
 	MODELS[files] = model
 	local read = files.read_with_status
+	local path_status = files.path_status
+	-- These non-IO scenarios begin with the user's metrics ignore already in
+	-- place. Bootstrap/publication behavior is covered by the physical fixture.
+	function files.path_status(path)
+		if path:sub(-#"/.gitignore") == "/.gitignore" then return "present" end
+		assert(path_status ~= nil, "unmodeled empty-volume metadata inspection: " .. path)
+		return path_status(path)
+	end
 	function files.acquire_write_locks(paths)
 		assert(model.held == nil and type(paths) == "table" and getmetatable(paths) == nil
 			and type(paths[1]) == "string", "invalid empty-volume lease request")
