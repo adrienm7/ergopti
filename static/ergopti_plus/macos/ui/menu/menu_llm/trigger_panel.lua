@@ -78,7 +78,7 @@ function M.build(ctx)
 	-- =====================================================
 
 	local debounce_val     = tonumber(state.llm_debounce) or llm_mod.DEFAULT_STATE.llm_debounce
-	local debounce_display = (debounce_val <= 0) and i18n.get("menu.settings.never") or (math.floor(debounce_val * 1000) .. " ms…")
+	local debounce_display = (debounce_val < 0) and i18n.get("menu.settings.never") or (math.floor(debounce_val * 1000) .. " ms…")
 
 	rows[#rows + 1] = {
 		label    = string.format(i18n.get("menu.llm.debounce_label"), debounce_display),

@@ -38,6 +38,11 @@ local M = {}
 -- ===================================
 -- ===================================
 
+-- The debounce that turns the automatic trigger off ("never"). It is the value
+-- the configuration file stores (llm.trigger.debounce_ms) and every driver's
+-- menu offers; any negative number given to the plan means the same.
+M.NEVER_MS = -1
+
 -- The options a driver must state, each one a deliberate choice. A missing or
 -- mistyped option raises: a default would hide which behaviour a driver runs.
 M.OPTION_KEYS = {

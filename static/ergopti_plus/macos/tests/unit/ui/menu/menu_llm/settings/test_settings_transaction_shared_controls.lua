@@ -240,6 +240,21 @@ helpers.describe("LLM shared automatic trigger controls", function()
 		end)
 	end)
 
+	helpers.it("labels only the negative debounce \"never\": a zero delay is an immediate trigger (shared-automatic-triggers)", function()
+		for _, case in ipairs({ { 0, "0 ms", "NEVER" }, { -1, "NEVER", "0 ms" } }) do
+			local translate = function(key)
+				if key == "menu.llm.debounce_label" then return "Idle %s" end
+				return key == "menu.settings.never" and "NEVER" or key
+			end
+			with_fixture({ translate = translate }, function(fixture)
+				fixture.state.llm_debounce = case[1]
+				local title = fixture.trigger_menu()[1].title
+				helpers.assert_true(title:find(case[2], 1, true) ~= nil, "debounce " .. case[1] .. " shows " .. case[2])
+				helpers.assert_eq(title:find(case[3], 1, true), nil, "debounce " .. case[1] .. " does not show " .. case[3])
+			end)
+		end
+	end)
+
 	helpers.it("rereads current values and refuses old callbacks after pause or master withdrawal (shared-automatic-triggers)", function()
 		for _, expected in ipairs(trigger_corpus().rows) do
 			local options = {trigger_states = {false, false}, prediction_count = 2}

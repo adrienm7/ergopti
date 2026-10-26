@@ -234,7 +234,11 @@
 					"type": "object",
 					"additionalProperties": false,
 					"properties": {
-						"debounce_ms": { "type": "integer", "minimum": 0 },
+						"debounce_ms": {
+							"type": "integer",
+							"minimum": -1,
+							"description": "-1 is \"never\": the automatic trigger is off."
+						},
 						"instant_on_word_end": { "type": "boolean" },
 						"after_hotstring": { "type": "boolean" },
 						"inline_autotype": { "type": "boolean" },
