@@ -11,7 +11,7 @@ local shared = driver .. "/../_shared/lua"
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
 require("compat.utf8").install()
 local uv = require("luv")
-local root = assert(uv.fs_mkdtemp(assert(os.getenv("TMPDIR")) .. "/source-id-XXXXXX"))
+local root = assert(uv.fs_mkdtemp(assert(uv.os_tmpdir()) .. "/source-id-XXXXXX"))
 local literal = root .. "/native\\\nname"
 local separated = root .. "/native/\nname"
 assert(uv.fs_mkdir(literal, 448))
