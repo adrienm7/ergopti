@@ -79,10 +79,16 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 			error pickerModalMessage number pickerModalNumber
 		end try
 		my fixtureRetirePicker()
-		if (my fixturePickerError) is not "" then error (my fixturePickerError)
+		-- Materialize callback-owned properties before commands can receive an
+		-- object specifier instead of its current text value.
+		set pickerFailureSnapshot to (get my fixturePickerError) as text
+		set pickerReadinessSnapshot to (get my fixturePickerReadiness) as text
+		set pickerSetterSnapshot to (get my fixturePickerSetterError) as text
+		set pickerReceiptSnapshot to (get my fixturePickerReceipt) as text
+		if pickerFailureSnapshot is not "" then error (pickerFailureSnapshot & " [readiness=" & pickerReadinessSnapshot & "; setter_error=" & pickerSetterSnapshot & "]")
 		if rc is not (current application's NSModalResponseCancel) then error "The owned native picker was not cancelled."
-		if (my fixturePickerReceipt) is "" then error "The native picker observer produced no receipt."
-		return (my fixturePickerReceipt)
+		if pickerReceiptSnapshot is "" then error "The native picker observer produced no receipt."
+		return pickerReceiptSnapshot
 		"""
 		source = source.replacingOccurrences(of: modal, with: modalObservation)
 		return source + """
@@ -113,7 +119,8 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 			try
 				set observerProcess to current application's NSProcessInfo's processInfo()
 				set observerNow to (observerProcess's systemUptime()) as real
-				if observerNow ≥ (my fixturePickerDeadline) then error "The actual native picker did not expose " & (my fixturePickerReadiness) & " before its deadline."
+				set pickerReadinessSnapshot to (get my fixturePickerReadiness) as text
+				if observerNow ≥ (my fixturePickerDeadline) then error ("The actual native picker did not expose " & pickerReadinessSnapshot & " before its deadline.")
 				if not ((ownedPicker's isVisible()) as boolean) then return
 				set my fixturePickerReadiness to "a public Cancel button"
 				set cancelControl to ownedPicker's accessibilityCancelButton()
@@ -125,7 +132,8 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 				if cancelTitle is missing value then return
 				set cancelTitle to cancelTitle as text
 				if cancelTitle is "" then return
-				set observation to current application's NSDictionary's dictionaryWithObjects:{ownedPicker's prompt(), ownedPicker's message(), cancelTitle, cancelRole, (((ownedPicker's isVisible()) as boolean) as text), (((ownedPicker's respondsToSelector:"setCancelButtonTitle:") as boolean) as text), (((ownedPicker's respondsToSelector:"cancelButtonTitle") as boolean) as text), (my fixturePickerSetterError)} forKeys:{"prompt", "message", "cancel", "cancel_role", "visible", "setter_selector", "getter_selector", "setter_error"}
+				set pickerSetterSnapshot to (get my fixturePickerSetterError) as text
+				set observation to current application's NSDictionary's dictionaryWithObjects:{ownedPicker's prompt(), ownedPicker's message(), cancelTitle, cancelRole, (((ownedPicker's isVisible()) as boolean) as text), (((ownedPicker's respondsToSelector:"setCancelButtonTitle:") as boolean) as text), (((ownedPicker's respondsToSelector:"cancelButtonTitle") as boolean) as text), pickerSetterSnapshot} forKeys:{"prompt", "message", "cancel", "cancel_role", "visible", "setter_selector", "getter_selector", "setter_error"}
 				set {observationData, observationError} to current application's NSJSONSerialization's dataWithJSONObject:observation options:0 |error|:(reference)
 				if observationData is missing value then error "The native picker observer could not encode its receipt."
 				set my fixturePickerReceipt to (current application's NSString's alloc()'s initWithData:observationData encoding:(current application's NSUTF8StringEncoding)) as text
@@ -137,7 +145,8 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 			try
 				ownedPicker's cancel:(missing value)
 			on error cancelMessage number cancelNumber
-				set my fixturePickerError to (my fixturePickerError) & " Native picker cancellation failed: " & (cancelNumber as text) & ": " & cancelMessage
+				set pickerFailureSnapshot to (get my fixturePickerError) as text
+				set my fixturePickerError to pickerFailureSnapshot & " Native picker cancellation failed: " & (cancelNumber as text) & ": " & cancelMessage
 				-- Failed cancellation never becomes success. Only stop this script's
 				-- exact owned modal so its original observer failure can be reported.
 				set observerApp to current application's NSApplication's sharedApplication()
@@ -148,6 +157,61 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 			end try
 		end fixtureObservePicker:
 		"""
+	}
+
+	func testPickerObserverMaterializesCallbackDiagnosticsAndReceipt() throws {
+		let root = FileManager.default.temporaryDirectory.appendingPathComponent("ErgoptiClonerObserver-" + UUID().uuidString)
+		try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+		defer {
+			if fixtureCanRetire {
+				do { try FileManager.default.removeItem(at: root) }
+				catch { XCTFail("The exact observer diagnostic fixture did not retire") }
+			}
+		}
+		let production = try String(contentsOf: Self.payloadURL.appendingPathComponent("macos/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript"), encoding: .utf8)
+		let instrumented = try observingActualPicker(production)
+		// Reuse the actual generated post-modal branch, including its error and
+		// return commands. A mirrored test-only implementation could hide a bug.
+		let parts = instrumented.components(separatedBy: "\nmy fixtureRetirePicker()\n")
+		XCTAssertEqual(parts.count, 2, "Admit exactly one real post-modal observer branch")
+		guard parts.count == 2 else { throw CocoaError(.fileReadCorruptFile) }
+		let lines = parts[1].components(separatedBy: "\n")
+		let returnIndex = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("return ") })
+		let tail = lines[...returnIndex].joined(separator: "\n")
+		let probe = """
+		use framework "AppKit"
+		use scripting additions
+		property fixturePickerError : ""
+		property fixturePickerReadiness : ""
+		property fixturePickerSetterError : ""
+		property fixturePickerReceipt : ""
+		on run argv
+			set my fixturePickerReadiness to "owned readiness marker"
+			set my fixturePickerSetterError to "owned setter marker"
+			if item 1 of argv is "failure" then
+				set my fixturePickerError to "owned callback failure"
+			else if item 1 of argv is "receipt" then
+				set my fixturePickerReceipt to "owned callback receipt"
+			end if
+			set rc to current application's NSModalResponseCancel
+			\(tail)
+		end run
+		"""
+		let failed = try execute(probe, arguments: ["failure"], locale: "en", root: root)
+		XCTAssertNotEqual(failed.status, 0)
+		XCTAssertTrue(failed.output.isEmpty)
+		for marker in ["owned callback failure", "owned readiness marker", "owned setter marker"] {
+			XCTAssertTrue(failed.stderr.contains(marker), "The real observer error must expose stored callback values")
+		}
+		XCTAssertFalse(failed.stderr.contains("fixturePickerError of"), "A property specifier is not the callback error text")
+		let receipt = try execute(probe, arguments: ["receipt"], locale: "en", root: root)
+		XCTAssertEqual(receipt.status, 0, receipt.stderr)
+		XCTAssertTrue(receipt.stderr.isEmpty)
+		XCTAssertEqual(String(decoding: receipt.output, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines), "owned callback receipt")
+		let missing = try execute(probe, arguments: ["missing"], locale: "en", root: root)
+		XCTAssertNotEqual(missing.status, 0)
+		XCTAssertTrue(missing.output.isEmpty)
+		XCTAssertTrue(missing.stderr.contains("The native picker observer produced no receipt."))
 	}
 
 	private struct NativeResult {
