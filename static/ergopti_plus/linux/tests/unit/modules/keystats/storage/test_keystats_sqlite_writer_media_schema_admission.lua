@@ -246,8 +246,8 @@ helpers.describe("sqlite_writer", function()
 			helpers.assert_contains(sql,
 				"esrc_json = (SELECT COALESCE('{' || group_concat(json_quote(k) || ':' || v, ',') || '}', '{}')")
 			helpers.assert_contains(sql, "SELECT key AS k, SUM(value) AS v")
-			helpers.assert_contains(sql, "SELECT key, value FROM json_each(esrc_json)")
-			helpers.assert_contains(sql, "UNION ALL SELECT key, value FROM json_each(excluded.esrc_json)")
+			helpers.assert_contains(sql, "SELECT key, value FROM json_each(COALESCE(esrc_json, '{}'))")
+			helpers.assert_contains(sql, "UNION ALL SELECT key, value FROM json_each(COALESCE(excluded.esrc_json, '{}'))")
 			helpers.assert_contains(sql, "GROUP BY key")
 			for _, scalar in ipairs({ "c", "td", "cd", "e" }) do
 				helpers.assert_contains(sql, scalar .. " = " .. scalar .. " + excluded." .. scalar .. ", ")
