@@ -294,6 +294,18 @@ end)
 
 helpers.describe("window_info: Wayland", function()
 
+	for _, backend in ipairs({ "sway", "hyprland", "niri" }) do
+		helpers.it("(linux-focus-command-exit) rejects failed " .. backend .. " client output", function()
+			local executable = assert(arg and arg[-1], "the current interpreter must be identifiable")
+			local quote = require("text_utils").shell_quote
+			local fixture = helpers.driver_root() .. "/tests/hardware/run_wayland_query_exit.lua"
+			local status = os.execute(quote(executable) .. " " .. quote(fixture) .. " " .. quote(helpers.driver_root()) .. " " .. quote(backend))
+			helpers.assert_true(status == true or status == 0,
+				"actual compositor status must authorize metadata while preserving successful fallback")
+		end)
+	end
+
+
 	helpers.it("(linux-focus-native-query-error) refuses unexpected compositor errors before accessible fallback", function()
 		local name = "adapters.user_hotstring_destination"
 		local saved, captures = package.loaded[name], 0
