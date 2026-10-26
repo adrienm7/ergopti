@@ -23,6 +23,7 @@
 --- ==============================================================================
 
 local M = {}
+local NativePath = require("native_path")
 
 local XDG_VARIABLES = {
 	XDG_CONFIG_HOME = true, XDG_DATA_HOME = true, XDG_STATE_HOME = true, XDG_CACHE_HOME = true,
@@ -31,7 +32,9 @@ local XDG_VARIABLES = {
 local TEMPORARY_ROOTS = { "/tmp", "/private/tmp", "/var/folders", "/private/var/folders" }
 
 local function normalised(path)
-	return (tostring(path):gsub("\\", "/"):gsub("/+$", ""))
+	local spelling = tostring(path)
+	if package.config:sub(1, 1) == "\\" then spelling = spelling:gsub("\\", "/") end
+	return NativePath.without_trailing_separators(spelling)
 end
 
 local function inside(path, root)
