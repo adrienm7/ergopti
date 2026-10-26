@@ -276,6 +276,7 @@
 	"dialog.action_picker.requires_tool": "Потрібен {1}",
 	"dialog.action_picker.requires_x11": "Лише сеанс X11",
 	"dialog.action_picker.requires_workspaces": "Лише X11, KDE Plasma, sway або Hyprland",
+	"dialog.action_picker.requires_ai": "ШІ вимкнено: увімкніть його в меню «Штучний інтелект».",
 	"dialog.action_picker.search": "Пошук дії…",
 	"dialog.action_picker.prompt_label": "Промпт",
 	"dialog.action_picker.count_label": "Кількість прогнозів",

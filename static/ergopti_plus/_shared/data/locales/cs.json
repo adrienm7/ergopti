@@ -276,6 +276,7 @@
 	"dialog.action_picker.requires_tool": "Vyžaduje {1}",
 	"dialog.action_picker.requires_x11": "Pouze v relaci X11",
 	"dialog.action_picker.requires_workspaces": "Pouze X11, KDE Plasma, sway nebo Hyprland",
+	"dialog.action_picker.requires_ai": "AI je vypnutá: zapněte ji v nabídce Umělá inteligence.",
 	"dialog.action_picker.search": "Hledat akci…",
 	"dialog.action_picker.prompt_label": "Prompt",
 	"dialog.action_picker.count_label": "Počet předpovědí",

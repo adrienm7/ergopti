@@ -282,7 +282,9 @@ helpers.describe("action picker items (Linux)", function()
 				for _, item in ipairs(M.get_picker_items()) do if item.type == "action" then by_id[item.id] = item end end
 				return by_id
 			end
-			local notice = require("infra.i18n").get("llm.manual_prediction.disabled")
+			local notice = require("infra.i18n").get("dialog.action_picker.requires_ai")
+			helpers.assert_true(notice ~= require("infra.i18n").get("llm.manual_prediction.disabled"),
+				"the greyed row has its own AI-off hint, not the suggestions notice")
 			local off = rows()
 			for _, id in ipairs({ "llm_agent_selection", "llm_agent_command" }) do
 				helpers.assert_eq(off[id].disabled, true, id .. ": greyed while the AI is off")
