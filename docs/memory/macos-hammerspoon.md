@@ -269,7 +269,10 @@ disarm there. Action: a new key-claiming layer asks `AiActions.blocked`; extend
 `test_ai_off_disarms_ai_actions.lua`. The agent's manual actions refuse with the
 AI off (`agent_runner.admit`, notice `llm.manual_prediction.disabled`) and the
 picker greys them: `shortcut_utils.picker_parameter_fields` reads the `ai:on`
-token of the generated catalogue. The gate is required lazily where a fixture
+token of the generated catalogue. The agent's automatic mode is disarmed too:
+`agent_runner.observe_typing` arms no pause and `auto_blocker` refuses a triage
+or System 2 request while the AI is off, `set_llm_enabled(false)` cancels the
+pause, and the first keystroke after the switch-on re-arms it. The gate is required lazily where a fixture
 snapshots `package.loaded`.
 
 ### project-macos-local-openai-servers-are-keyless-api-entries

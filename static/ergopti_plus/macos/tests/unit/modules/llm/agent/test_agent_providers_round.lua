@@ -14,7 +14,9 @@
 ---   where; when they are nowhere, it logs the reply's top-level keys only;
 --- - System 2 through Backboard is a plain Backboard message;
 --- - an automatic next-word prediction no longer holds the automatic mode back:
----   its tooltip is replaced by the agent's actions.
+---   its tooltip is replaced by the agent's actions;
+--- - the AI menu's switch off disarms the automatic mode (no pause, no triage,
+---   nothing in flight) and the switch-on re-arms it with no reload.
 ---
 --- ROOT CAUSES ENCODED:
 --- 1. The prediction tooltip appears about 500 ms after the last keystroke,
@@ -262,10 +264,33 @@ helpers.describe("AI agent over the automatic prediction (macOS)", function()
 		helpers.assert_eq(#covered.posts, 0, "a hotstring tooltip holds the agent back")
 	end)
 
-	helpers.it("runs with the AI menu off", function()
+	helpers.it("is disarmed with the AI menu off (ai-off-inert-macos)", function()
 		local world = auto_world({ system1 = "cerebras" })
 		world.engine.set_llm_enabled(false)
 		pause_after(world, SENTENCE)
-		helpers.assert_eq(#world.posts, 1, "the automatic mode does not use the AI menu")
+		helpers.assert_eq(#world.posts, 0, "no pause is armed and no triage is sent")
+	end)
+
+	helpers.it("drops its pause and request at the switch-off and re-arms on the next keystroke after the switch-on", function()
+		local world = auto_world({ system1 = "cerebras" })
+		world.runner.observe_typing(SENTENCE)
+		world.engine.set_llm_enabled(false)
+		World.settle(world)
+		helpers.assert_eq(#world.posts, 0, "the pause armed before the switch-off never fires")
+		pause_after(world, SENTENCE)
+		helpers.assert_eq(#world.posts, 0, "typing with the AI off arms nothing")
+		world.engine.set_llm_enabled(true)
+		pause_after(world, SENTENCE)
+		helpers.assert_eq(#world.posts, 1, "the first keystroke after the switch-on arms the pause again, no reload")
+	end)
+
+	helpers.it("withdraws a triage in flight when the AI is switched off", function()
+		local world = auto_world({ system1 = "typesafe" })
+		pause_after(world, SENTENCE)
+		helpers.assert_eq(#world.posts, 1, "the triage is in flight")
+		world.engine.set_llm_enabled(false)
+		reply(world.posts[1], { answers = JEV_ANSWERS })
+		World.settle(world)
+		helpers.assert_eq(#world.posts, 1, "its answer wakes nothing: System 2 is never asked")
 	end)
 end)
