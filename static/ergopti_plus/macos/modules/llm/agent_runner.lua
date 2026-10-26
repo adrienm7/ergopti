@@ -23,7 +23,10 @@
 ---    notices of llm_generate_prediction (the picker greys the manual actions
 ---    while the AI is off), then the agent's own (mode off, no usable System
 ---    2), before anything is read. The agent never uses the AI menu's
----    prediction backend: that backend not ready refuses nothing. A secure
+---    prediction backend: that backend not ready refuses nothing. The AI
+---    switched off also disarms the automatic mode (no pause, no triage, no
+---    request in flight), as on Linux; the next keystroke after the switch-on
+---    arms it again. A secure
 ---    field refuses like the tone actions.
 --- 4. One transport per system, each behind one function taking the backend and
 ---    its payload, so a new request format plugs in there. A chat backend gets
@@ -929,6 +932,9 @@ local function auto_blocker()
 	local s = settings()
 	if s.llm_agent_mode ~= M.MODE_AUTO then return "mode" end
 	if is_paused() then return "paused" end
+	-- The AI switched off disarms the automatic mode, as on Linux: no pause,
+	-- no triage, no request in flight survives it.
+	if require("modules.shortcuts.ai_actions").off() then return "AI off" end
 	local engine = package.loaded["modules.llm.prediction_engine"]
 	if type(engine) ~= "table" then return "no engine" end
 	if engine.get_live_prompt() ~= nil then return "live mode" end
@@ -1013,6 +1019,12 @@ end
 function M.observe_typing(buffer)
 	if settings().llm_agent_mode ~= M.MODE_AUTO then
 		if _pause_timer then M.cancel_typing("mode") end
+		return
+	end
+	-- With the AI off no pause is armed: a keystroke only withdraws what is
+	-- left, and the first keystroke after the switch-on arms it again.
+	if require("modules.shortcuts.ai_actions").off() then
+		M.cancel_typing("AI off")
 		return
 	end
 	M.cancel_typing("keystroke")

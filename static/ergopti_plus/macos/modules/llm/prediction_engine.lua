@@ -682,6 +682,9 @@ function M.set_llm_enabled(enabled)
 		-- Turning the AI off ends live mode too: turning it back on must not
 		-- resume a translation the user no longer sees announced
 		M.stop_live_prompt("AI disabled", true)
+		-- The agent's automatic mode is disarmed too: its pause and requests go
+		local agent_runner = rawget(package.loaded, "modules.llm.agent_runner")
+		if agent_runner ~= nil then agent_runner.cancel_typing("AI off") end
 		settle("Ollama daemon recovery retirement", retire_ollama_daemon_recovery,
 			"prediction runtime disabled")
 		settle("prediction reset", M.reset)
