@@ -35,11 +35,11 @@ local function with_stream(callback)
 		local original_spawn = runner.spawn
 		local original_after = scheduler.after
 		local fixture = { tasks = {}, handles = {}, business_done = {}, timers = {}, failures = 0,
-			successes = 0, partials = 0, partial_values = {}, start_mode = "true" }
+			successes = 0, partials = 0, partial_values = {}, start_mode = "true", timer_delays = {} }
 
 		hs.task.new = function(_, done, chunk, args)
 			local environment = { HOME = "/Users/fixture" }
-			local task = { done = done, running = false, terminate_calls = 0 }
+			local task = { done = done, running = false, terminate_calls = 0, args = args }
 			for index, arg in ipairs(args) do
 				if arg == "--data-binary" then task.payload = args[index + 1]:sub(2) end
 			end
@@ -70,7 +70,8 @@ local function with_stream(callback)
 			fixture.handles[#fixture.handles + 1] = handle
 			return handle
 		end
-		scheduler.after = function(_, timer)
+		scheduler.after = function(delay, timer)
+			fixture.timer_delays[#fixture.timer_delays + 1] = delay
 			fixture.timers[#fixture.timers + 1] = timer
 			return { timer = {} }, true
 		end
@@ -98,6 +99,22 @@ local function with_stream(callback)
 end
 
 helpers.describe("Ollama stream retirement ownership", function()
+	helpers.it("(stream-cleanup-deadline) schedules cleanup after the actual native curl ceiling", function()
+		with_stream(function(_, fixture)
+			fixture.request()
+			helpers.assert_eq(#fixture.tasks, 1)
+			helpers.assert_eq(#fixture.timer_delays, 1)
+			local ceilings = {}
+			for index, argument in ipairs(fixture.tasks[1].args) do
+				if argument == "--max-time" then ceilings[#ceilings + 1] = tonumber(fixture.tasks[1].args[index + 1]) end
+			end
+			helpers.assert_eq(#ceilings, 1, "the native curl request must have exactly one numeric ceiling")
+			helpers.assert_true(ceilings[1] > 0)
+			helpers.assert_true(fixture.timer_delays[1] > ceilings[1],
+				"the actual fallback deadline must exceed the actual subprocess ceiling")
+		end)
+	end)
+
 	helpers.it("(ollama-stream-provider-error) refuses explicit failure after valid partial output", function()
 		with_stream(function(_, fixture)
 			fixture.request()

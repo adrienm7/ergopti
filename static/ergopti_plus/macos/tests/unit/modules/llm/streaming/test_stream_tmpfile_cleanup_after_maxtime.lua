@@ -73,11 +73,8 @@ do
 		not has_max_time_literal,
 		"api_ollama.lua must not use bare literal \"60\" for --max-time (llm-api-net-03)"
 	)
-	local has_max_time_const = src:find("STREAM_MAX_TIME_SEC", 1, true) ~= nil
-	helpers.assert_true(
-		has_max_time_const,
-		"api_ollama.lua must reference STREAM_MAX_TIME_SEC in the curl --max-time argument (llm-api-net-03)"
-	)
+	-- The registered stream-cleanup-deadline case compares actual native curl
+	-- arguments with the scheduled timer; a declaration is not argument coverage.
 
 	-- Test 5: Safety-net timer must use STREAM_TMPFILE_CLEANUP_SEC, not the old 10s literal.
 	local has_old_delay = src:find("TimerScheduler.after(10,", 1, true) ~= nil
