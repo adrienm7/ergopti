@@ -408,7 +408,7 @@ function buildAggregatedData() {
 			}
 			// #39 aggregate window titles
 			if (appData.win_titles) {
-				appOut.win_titles = appOut.win_titles || {};
+				appOut.win_titles = appOut.win_titles || Object.create(null);
 				Object.entries(appData.win_titles).forEach(([t, w]) => {
 					const slot = appOut.win_titles[t] || (appOut.win_titles[t] = { c: 0, ms: 0 });
 					slot.c += w.c || 0;
