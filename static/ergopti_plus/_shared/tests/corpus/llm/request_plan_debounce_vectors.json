@@ -2,9 +2,10 @@
 	"_comment": "Request transcripts of the prediction debounce and rate floor, replayed through _shared/lua/llm/request_plan/debounce.lua by the macOS and Linux runners. A vector gives the floor in milliseconds (floor_ms, the one value the user sets, which the floor port answers) and an ordered list of steps. A step calls one method of the plan with args (plus now_ms for on_dispatch and on_sent, the caller's monotonic clock in milliseconds) and lists the decisions it returns, in order, as expect, or a substring the raised message must contain as expect_error. Tokens count from 1 per plan, one per arm. An arm decision means: cancel nothing else and start a one-shot timer of delay_ms; cancel means stop that token; fire and stale answer on_timer; send and defer answer on_dispatch. There is one behaviour for every driver, written in shared_behaviour; drivers records who replays this file. A port in another language replays it unchanged.",
 	"shared_behaviour": {
 		"never": "A negative debounce (the stored value -1) turns the automatic trigger off; an explicit trigger, an override request and live mode still arm.",
-		"explicit_requests": "An explicit request (shortcut, typed trigger, prompt action) and the later variants of its sequential run are never held by the rate floor; only automatic requests wait.",
+		"explicit_requests": "An explicit request (shortcut, typed trigger, prompt action) is never held by the rate floor.",
 		"floor": "One last-request time for every backend and every kind of request; the interval is the user's llm.trigger.min_request_interval_ms.",
-		"live_word_end": "A word end fires instantly in live mode too when the instant word end setting is on."
+		"live_word_end": "A word end fires instantly in live mode too when the instant word end setting is on.",
+		"variants": "The variants of one request (the n sequential calls of a predict-n run, automatic or explicit) are never held: the floor applies only between distinct requests."
 	},
 	"drivers": {
 		"macos": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
@@ -904,10 +905,20 @@
 			]
 		},
 		{
-			"id": "later-variants-of-an-explicit-request-are-not-held",
-			"description": "The variants of an explicit sequential request are part of that request: each is dispatched as an explicit one and goes straight on, although the previous variant just went out.",
+			"id": "later-variants-of-one-request-are-never-held",
+			"description": "The variants of one request (the later calls of a \"predict n\" run) are part of it: from the second on they go straight on whether the request is automatic or explicit, although the previous call just went out. The next distinct request still waits.",
 			"floor_ms": 500,
 			"steps": [
+				{
+					"call": "on_dispatch",
+					"args": {},
+					"now_ms": 1000,
+					"expect": [
+						{
+							"action": "send"
+						}
+					]
+				},
 				{
 					"call": "on_sent",
 					"now_ms": 1000,
@@ -916,7 +927,7 @@
 				{
 					"call": "on_dispatch",
 					"args": {
-						"explicit": true
+						"variant": 2
 					},
 					"now_ms": 1001,
 					"expect": [
@@ -933,6 +944,7 @@
 				{
 					"call": "on_dispatch",
 					"args": {
+						"variant": 3,
 						"explicit": true
 					},
 					"now_ms": 1002,
@@ -941,17 +953,10 @@
 							"action": "send"
 						}
 					]
-				}
-			]
-		},
-		{
-			"id": "later-variants-of-an-automatic-request-wait",
-			"description": "The variants of an automatic sequential request wait for the floor like the request itself.",
-			"floor_ms": 500,
-			"steps": [
+				},
 				{
 					"call": "on_sent",
-					"now_ms": 1000,
+					"now_ms": 1002,
 					"expect": []
 				},
 				{
@@ -961,34 +966,7 @@
 					"expect": [
 						{
 							"action": "defer",
-							"delay_ms": 400,
-							"why": "rate floor"
-						}
-					]
-				},
-				{
-					"call": "on_dispatch",
-					"args": {},
-					"now_ms": 1500,
-					"expect": [
-						{
-							"action": "send"
-						}
-					]
-				},
-				{
-					"call": "on_sent",
-					"now_ms": 1500,
-					"expect": []
-				},
-				{
-					"call": "on_dispatch",
-					"args": {},
-					"now_ms": 1600,
-					"expect": [
-						{
-							"action": "defer",
-							"delay_ms": 400,
+							"delay_ms": 402,
 							"why": "rate floor"
 						}
 					]
