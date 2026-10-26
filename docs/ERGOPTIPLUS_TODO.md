@@ -589,16 +589,17 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       header as invalid TOML (was last-wins). Left: Windows `_ParseOverrides` replaying the vectors.
 - [x] **PAR-69. Shared ownership protocols.** [CODE] Done: `scope_owner.lua`, `storage_owned.lua`,
       `error_dialog/core.lua`, `owned_timer_slots.lua`, each with a contract (4947f7a445).
-- [ ] **PAR-70. Factory per macOS/Linux infra shim.** [CODE] `native_presentation`, `manifest_reader`,
-      `manifest_menu`, `timings`, `text_cipher`, `text_migration`, `config_backup`, `locale`,
-      `user_code` take `{platform}` and live in `_shared/lua`. Audit R15, R28, R32.
+- [ ] **PAR-70. Factory per macOS/Linux infra shim.** [CODE] Done: `timings`, `manifest_reader`,
+      `text_cipher` shared (8553bfaf87, 54e0faa49a, 6f6098c0b9); `native_presentation`, `manifest_menu`, `locale`
+      were already factory bindings. Left: `text_migration`, `config_backup`, `user_code` (135-185 differing
+      lines each: design the ports first).
 - [ ] **PAR-71. Finish the route-plan rollout and make `proxy_policy.json` the codegen source.** [CODE]
       `route_plan.lua` has no production consumer on Windows or Linux; policies are hand-typed in Lua,
       Python, Go and generated Swift. Audit R12, C21.
-- [ ] **PAR-72. Shared registries and catalogues.** [CODE] `layout_registry` state machine into
-      `layouts/registry.lua`; `shortcuts/catalogue.lua`; shared gesture `direction.lua` with boundary
-      vectors; `llm/temperature.lua` with vectors; healthcheck report core; `llm/agent_learning_store`.
-      One commit each. Audit R8, R9, R13, R20, R21.
+- [ ] **PAR-72. Shared registries and catalogues.** [CODE] Done: layout registry store, shortcuts
+      catalogue, healthcheck report runner, agent learning store (daee88e48d..e105336d39); gesture
+      direction and temperature were already shared with vectors. Left: the registry install/select flows and
+      the healthcheck bridge stay per driver (different converters and bridges).
 - [ ] **PAR-73. Collapse generated per-driver artifacts and tap-hold timeout duplicates.** [CODE] Done:
       `[hs_timeouts]`, `action_catalogue.lua`, and `features_manifest.lua` (one shared
       `_shared/lua/features/manifest_data.lua`, eae6f45708). Left: `config_template.toml` (decision pending).
@@ -617,17 +618,16 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 
 ### G. Constants, delays, colours, labels (value order)
 
-- [ ] **PAR-78. Timing registry liveness and duplicate-name gate.** [CODE] 41 of 145 keys have no reader,
-      111 constant names are defined in more than one file (38 with different values). Add
-      `tools/test/test-timings-registry-liveness.cjs` and a duplicate check in
-      `test-keystats-timings-single-source.cjs`; prune or wire the unread keys. Audit K2, K1.
-- [ ] **PAR-79. Replace repeated timer literals with registry keys.** [CODE] `STALE_TEMP_MS` x5,
-      gesture poll `-100` x6, safety flush `-2000` x3, `DEFAULT_TIMEOUT_MS = 30000` x4,
-      `LONG_SESSION_THRESHOLD_MS` x3 JS, `TAP_WATCHDOG_INTERVAL_SEC` 5 against 2, `PUMP_INTERVAL_SEC`,
-      Swift `usleep` literals. Gate: no numeric literal in `SetTimer/Sleep/doAfter/setTimeout`
-      with a baseline, hosted in `test-fast-timer-inventory.cjs`. Audit K1.
-- [ ] **PAR-80. `[limits]` section for byte caps.** [CODE] `MAX_OUTPUT_BYTES` 65536 in 3 files and
-      similar in 6; gate in the registry test. Audit K3.
+- [x] **PAR-78. Timing registry liveness and duplicate-name gate.** [CODE] Done:
+      `test-timings-registry-liveness.cjs`, the duplicate ratchet `test-duplicate-constant-names.cjs`, and source
+      pins for copies that cannot read the registry (ed257e285a).
+- [ ] **PAR-79. Replace repeated timer literals with registry keys.** [CODE] Done on Lua and JS
+      (ed257e285a): registry keys for the repeated delays, the literal gate in `test-fast-timer-inventory.cjs`
+      with a shrink-only `timer-literal-baseline.json`. Left: 139 AHK sites (`STALE_TEMP_MS` x5, gesture poll
+      `-100` x6, safety flush `-2000` x3...), ~25 Swift `usleep`, 40 baselined Lua/JS sites.
+- [ ] **PAR-80. `[limits]` section for byte caps.** [CODE] Done (7376321788): `[limits]` with the process
+      output, declaration file and changelog caps, a retyping gate with a shrink-only baseline. Left: the AHK
+      caps, `MAX_TEXT_BYTES` and `MAX_BODY_BYTES` (public module fields).
 - [ ] **PAR-81. Theme tokens and palette codegen.** [CODE] Done: `_shared/ui/theme.css` linked by the
       shared pages; `_shared/data/native_theme.toml` generating `_shared/lua/native_theme_data.lua` for the macOS
       and Linux palettes; the dead macOS download-window page removed; hex lint with a shrink-only baseline
@@ -637,13 +637,11 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 - [ ] **PAR-82. Hard-coded UI string gate.** [CODE] New `tools/test/test-no-hardcoded-ui-strings.cjs`
       (TrayTip, MsgBox, alert, title literals fail unless allowlisted; reuse
       `tools/lint/audit-gui-titles.cjs`), including the Linux `install.sh` echo table. Audit K6, I9.
-- [ ] **PAR-83. Identifiers and hosts in one file.** [CODE] `_shared/data/identifiers.json` via codegen
-      for `ErgoptiPlus.ahk/.exe/.app`, bundle ids, service names, GitHub/Ollama/HuggingFace hosts;
-      extend `test-repo-url-single-source.cjs` to hosts and ids. Add the `ollama_install.sh` port to
-      `test-ollama-port-single-source.cjs`. Audit K9, K4.
-- [ ] **PAR-84. Closed enums for reasons, phases and log tags.** [CODE] About 189 `reason`, 56 `phase`
-      and 62 `[TAG]` literals plus the evidence-record field names (not censused: do that first).
-      Extend `codegen-contracts-json.cjs`; gate in `test-logger-scalars-single-source.cjs`. Audit K11.
+- [ ] **PAR-83. Identifiers and hosts in one file.** [CODE] Done for Lua (948ebef074, bb1899206e):
+      `_shared/data/identifiers.json` generating `_shared/lua/identifiers.lua`, typed copies held to a
+      shrink-only baseline. Left: an AHK emitter and the AHK, Swift, shell, Python and JS-page copies.
+- [x] **PAR-84. Closed enums for reasons, phases and log tags.** [CODE] Done: `vocabulary.json`, the scan,
+      the census and the gate in `test-logger-scalars-single-source.cjs` with a shrink-only free-form baseline.
 - [x] **PAR-85. Tooltip dequeue and ring constants.** [CODE] Done: dequeue timings single-sourced in
       `tooltip/constants.toml [timing]` (`test-tooltip-timing-single-source.cjs`); the 64/32 rings are
       unrelated (keystroke ring, phase attribution ring).
