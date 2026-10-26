@@ -922,7 +922,7 @@ local _refused_channels = {}
 local function _report_sink_refusal(channel, detail)
 	if _refused_channels[channel] then return end
 	_refused_channels[channel] = true
-	_console_out("[logger] " .. channel .. " log write refused: " .. tostring(detail))
+	_console_out(private_line("[logger] " .. channel .. " log write refused: " .. tostring(detail)))
 end
 
 --- Ends a reported refusal episode once the channel accepts a line again.
@@ -1008,8 +1008,11 @@ local function _ensure_log_file()
 		pcall(function() _file_handle:close() end)
 		_file_handle = nil
 	end
-	local ok, fh = pcall(io.open, _unified_path, "a")
-	if not ok or not fh then return nil end
+	local ok, fh, open_err = pcall(io.open, _unified_path, "a")
+	if not ok or not fh then
+		_report_sink_refusal("unified", ok and open_err or fh)
+		return nil
+	end
 	-- Session boundary marker so tailing reveals where HS restarted
 	local refusal = _sink_refusal(function()
 		local wrote, write_err = fh:write("\n===== " .. _timestamp() .. " — ErgoptiPlus session opened =====\n")
@@ -1136,8 +1139,8 @@ local function _write_to_file(line, immediate)
 					entry = nil
 				end
 				if not entry then
-					local fh = io.open(path, mode)
-					if not fh then return nil end
+					local fh, open_err = io.open(path, mode)
+					if not fh then return _refused(fh, open_err) end
 					entry = { fh = fh, mode = "a" }
 					_sub_handles[path] = entry
 				end
@@ -1224,8 +1227,8 @@ _driver_sink = function(line, variant)
 	if level >= Core.LEVELS.WARNING then
 		local err_full = line .. "\n"
 		local refusal = _sink_refusal(function()
-			local f = io.open(_errors_path, "a")
-			if not f then return nil end
+			local f, open_err = io.open(_errors_path, "a")
+			if not f then return _refused(f, open_err) end
 			local wrote, write_err = f:write(err_full)
 			local closed, close_err = f:close()
 			return _refused(wrote, write_err) or _refused(closed, close_err)
