@@ -22,7 +22,7 @@
  *    query or a body comment aborts generation instead of shipping a template
  *    that renders something else.
  * 4. Typed value slots for write statements. `{{s name}}` renders a TEXT
- *    literal and `{{i name}}` an integer; a trailing `?` on
+ *    literal, `{{i name}}` an integer and `{{r name}}` a real; a trailing `?` on
  *    the kind (`{{s? name}}`) renders NULL for a missing value and every other
  *    slot refuses one. The driver passes the raw Lua value and the generated
  *    renderer quotes it through the one shared literal encoder
@@ -50,7 +50,7 @@ const DIALECTS = ['native', 'cli_json'];
 const NAME = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
 const PARAM = /^[a-z][a-z0-9_]*$/;
 const IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
-const SLOT = /^([si])(\?)?\s+([a-z][a-z0-9_]*)$/;
+const SLOT = /^([sir])(\?)?\s+([a-z][a-z0-9_]*)$/;
 
 // The JSON number-map columns a `{{merge column}}` may name.
 const MERGE_COLUMNS = new Set(['esrc_json', 'e_buckets_json', 'length_buckets_json']);
@@ -300,6 +300,27 @@ function escapeLiteral(value) {
 }
 
 /**
+ * Formats a finite number like C's "%.17g": the shortest fixed or exponent
+ * spelling that carries 17 significant digits, trailing zeros removed. The
+ * generated Lua renderer formats a real exactly this way, so the stored double
+ * is the one the driver held.
+ * @param {number} value - Finite number.
+ * @returns {string} Text.
+ */
+function formatReal(value) {
+	if (value === 0) return Object.is(value, -0) ? '-0' : '0';
+	const [mantissa, exponentText] = value.toExponential(16).split('e');
+	const exponent = Number(exponentText);
+	if (exponent < -4 || exponent >= 17) {
+		const digits = mantissa.replace(/\.?0+$/, '');
+		const sign = exponent < 0 ? '-' : '+';
+		return `${digits}e${sign}${String(Math.abs(exponent)).padStart(2, '0')}`;
+	}
+	const fixed = value.toFixed(Math.max(0, 16 - exponent));
+	return fixed.includes('.') ? fixed.replace(/\.?0+$/, '') : fixed;
+}
+
+/**
  * Renders one typed slot. An absent value is NULL for a nullable slot and an
  * error for any other; an integer slot floors its number.
  * @param {string} name - Query name, for errors.
@@ -318,7 +339,7 @@ function renderSlot(name, slot, value) {
 	}
 	if (typeof value !== 'number' || !Number.isFinite(value))
 		throw new TypeError(`${name}: ${slot.name} must be a finite number.`);
-	return String(Math.floor(value));
+	return slot.kind === 'i' ? String(Math.floor(value)) : formatReal(value);
 }
 
 // ===================================
@@ -384,7 +405,7 @@ ${entries}
 
 --- Renders one typed slot. An absent value is NULL for a nullable slot and an
 --- error for any other; a text slot is quoted through sqlite.literal; an
---- integer slot floors its number.
+--- integer slot floors its number; a real slot keeps 17 significant digits.
 --- @param name string Query name, for errors.
 --- @param part table Slot part { slot, kind, nullable }.
 --- @param value any Raw value.
@@ -401,6 +422,7 @@ local function render_slot(name, part, value)
 	if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then
 		error(name .. ": " .. part.slot .. " must be a finite number", 3)
 	end
+	if part.kind == "r" then return string.format("%.17g", value) end
 	return string.format("%d", math.floor(value))
 end
 
@@ -469,7 +491,7 @@ end
 
 --- Lists the typed value slots a query declares, in first-use order.
 --- @param name string Catalogue name.
---- @return table Array of { name, kind ("s" or "i"), nullable }.
+--- @return table Array of { name, kind ("s", "i" or "r"), nullable }.
 function M.slots(name)
 	local query = QUERIES[name]
 	if not query then error("Unknown keystats query: " .. tostring(name), 2) end

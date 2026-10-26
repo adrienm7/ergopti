@@ -195,7 +195,6 @@ check('the compiler refuses malformed catalogues', () => {
 		conflictingText: '-- name: a.b\nSELECT {{text app}}, {{text MAX(app) AS app}} FROM t;\n',
 		empty: '-- nothing\n',
 		unknownSlotKind: '-- name: a.b\nSELECT {{x name}} FROM t;\n',
-		realSlot: '-- name: a.b\nSELECT {{r name}} FROM t;\n',
 		slotTwoKinds: '-- name: a.b\nSELECT {{s v}}, {{i v}} FROM t;\n',
 		slotNullableTwice: '-- name: a.b\nSELECT {{s v}}, {{s? v}} FROM t;\n',
 		slotAndParam: '-- name: a.b\nSELECT {{s v}}, {{v}} FROM t;\n',
