@@ -57,7 +57,7 @@ end
 
 for _, trigger in ipairs({ "stop", "eof", "worker" }) do
 	for _, kind in ipairs({ "string", "foreign" }) do
-		local directory = assert(uv.fs_mkdtemp(assert(os.getenv("TMPDIR")) .. "/focus-listener-XXXXXX"))
+		local directory = assert(uv.fs_mkdtemp(assert(uv.os_tmpdir()) .. "/focus-listener-XXXXXX"))
 		local signal_path, pid_path = directory .. "/go", directory .. "/pid"
 		local operation, events, control, throwing, diagnostics
 		diagnostics = {}
