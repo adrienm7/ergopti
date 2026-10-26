@@ -33,9 +33,9 @@ local Crypto       = require("adapters.crypto")
 local Json         = require("json")
 local Registry     = require("layouts.registry")
 local Catalogue    = require("layouts.catalogue")
-local Outdated     = require("config_outdated")
 local Extension    = require("layouts.extension")
 local Composer     = require("layouts.composer")
+local RegistryStore = require("layouts.registry_store")
 
 local M = {}
 
@@ -70,15 +70,23 @@ local PLATFORM = "macos"
 -- ===========================
 -- ===========================
 
--- Last refresh outcome: { index, source, error } (see Catalogue.resolve_index).
-local _catalogue = { index = nil, source = Catalogue.SOURCE_NONE, error = nil }
 -- The one operation in flight ({ id, action }), nil when idle: an installation
 -- and an uninstallation of the same layout must never interleave their writes.
 local _busy = nil
--- Decoded index shipped with the app, read once.
-local _bundled_index = nil
-local _bundled_index_read = false
 
+-- Catalogue, shipped index, installed record and refresh, shared with Linux.
+local Store = RegistryStore.new({
+	logger = Logger,
+	log = LOG,
+	shipped_noun = "app",
+	prepare_parent = function(deps, path)
+		local prepared, prepare_err = deps.prepare_parent(path)
+		if prepared then return true, nil end
+		return false, "cannot create the folder of " .. path .. ": " .. tostring(prepare_err)
+	end,
+})
+local write_file, bundled_index = Store.write_file, Store.bundled_index
+local read_installed, write_installed = Store.read_installed, Store.write_installed
 
 
 
@@ -189,62 +197,6 @@ end
 -- ==============================
 -- ==============================
 
---- Writes one file, creating its folder first.
---- @param deps table
---- @param path string
---- @param content string
---- @return boolean ok
---- @return string|nil error
-local function write_file(deps, path, content)
-	local prepared, prepare_err = deps.prepare_parent(path)
-	if not prepared then return false, "cannot create the folder of " .. path .. ": " .. tostring(prepare_err) end
-	local written, write_err = deps.write(path, content)
-	if not written then return false, "cannot write " .. path .. ": " .. tostring(write_err) end
-	return true, nil
-end
-
---- The shipped index, reread for source checkouts so Refresh sees local edits.
---- @param deps table
---- @return table|nil
-local function bundled_index(deps)
-	if deps.bundled_index ~= nil then return deps.bundled_index or nil end
-	if _bundled_index_read and not deps.local_source then return _bundled_index end
-	_bundled_index_read = true
-	if type(deps.bundled_dir) ~= "string" then return nil end
-	local text = deps.read(deps.bundled_dir .. deps.settings.index_file)
-	local index, _, detail = Catalogue.decode_index(text, deps.decode_json, deps.settings.max_file_bytes)
-	if not index then
-		Logger.error(LOG, "The layout index shipped with the app is unusable: %s.", tostring(detail))
-	end
-	_bundled_index = index
-	return index
-end
-
---- Reads the installed-layouts record. An entry this build cannot use is
---- warned once and left out; the other layouts stay installed.
---- @param deps table
---- @return table|nil record
---- @return string|nil error
-local function read_installed(deps)
-	local path = deps.local_dir .. deps.settings.installed_file
-	local text = deps.exists(path) and deps.read(path) or nil
-	if deps.exists(path) and type(text) ~= "string" then return nil, "cannot read " .. path end
-	local record, err = Catalogue.decode_installed(text, deps.decode_installed_json or Json.decode_lossless)
-	for id, item in pairs(record and record.outdated or {}) do
-		Outdated.report_in_file(path, { "layouts", id }, item.detail)
-	end
-	return record, err
-end
-
---- Writes the installed-layouts record.
---- @param deps table
---- @param record table
---- @return boolean ok
---- @return string|nil error
-local function write_installed(deps, record)
-	return write_file(deps, deps.local_dir .. deps.settings.installed_file, deps.encode_json(record))
-end
-
 --- Keyboard names the installed Ergopti bundles already provide.
 --- @param deps table
 --- @return table Set { [name] = true }.
@@ -281,37 +233,7 @@ function M.refresh(on_done, deps)
 		return false
 	end
 	deps = resolved
-	Logger.start(LOG, "Refreshing the layout catalogue…")
-	Catalogue.refresh(deps.settings, {
-		local_source = deps.local_source,
-		read_cache = function()
-			local index_path = deps.local_dir .. deps.settings.index_file
-			if not deps.exists(index_path) then return nil end
-			local etag_path = deps.local_dir .. deps.settings.etag_file
-			return { text = deps.read(index_path), etag = deps.exists(etag_path) and deps.read(etag_path) or nil }
-		end,
-		write_cache = function(text, etag)
-			local ok, err = write_file(deps, deps.local_dir .. deps.settings.index_file, text)
-			if not ok then return false, err end
-			local etag_path = deps.local_dir .. deps.settings.etag_file
-			if type(etag) == "string" then return write_file(deps, etag_path, etag) end
-			if not deps.delete(etag_path) then return false, "cannot remove " .. etag_path end
-			return true, nil
-		end,
-		bundled_index = bundled_index(deps),
-		decode_json = deps.decode_json,
-		transport = deps.transport,
-	}, function(outcome)
-		_catalogue = { index = outcome.index, source = outcome.source, error = outcome.error }
-		if outcome.cache_warning then Logger.warn(LOG, "%s; refreshed without it.", outcome.cache_warning) end
-		if outcome.error then
-			Logger.warn(LOG, "The layout catalogue shows the %s index: %s (%s).", outcome.source,
-				outcome.error.code, tostring(outcome.error.detail))
-		end
-		if outcome.cache_error then Logger.error(LOG, "%s.", outcome.cache_error) end
-		Logger.success(LOG, "Layout catalogue refreshed from the %s index.", outcome.source)
-		if on_done then on_done(outcome) end
-	end)
+	Store.refresh(deps, nil, on_done)
 	return true
 end
 
@@ -379,9 +301,9 @@ end
 function M.snapshot(deps)
 	local resolved = resolve_deps(deps)
 	local snapshot = {
-		index = _catalogue.index,
-		source = _catalogue.source,
-		error = _catalogue.error,
+		index = Store.catalogue().index,
+		source = Store.catalogue().source,
+		error = Store.catalogue().error,
 		installed = {},
 		provided = {},
 		busy = _busy,
@@ -886,10 +808,8 @@ end
 
 --- Test seam: forgets the catalogue, the operation slot and the shipped index.
 function M._reset()
-	_catalogue = { index = nil, source = Catalogue.SOURCE_NONE, error = nil }
+	Store.reset()
 	_busy = nil
-	_bundled_index = nil
-	_bundled_index_read = false
 end
 
 --- Roots of committed extension generations, without changing activation choices.

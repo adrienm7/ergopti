@@ -583,6 +583,7 @@ return {
 	"tests.unit.modules.keystats.privacy.test_window_titles",
 	"tests.unit.modules.keymap.test_layout_catalogue",
 	"tests.unit.modules.keymap.test_layout_registry",
+	"tests.unit.modules.keymap.test_layout_registry_store",
 	"tests.unit.ui.composer_check.test_composer_check_window",
 	"tests.unit.adapters.network.test_network_check",
 	"tests.unit.infra.updater.test_asset_signature",
