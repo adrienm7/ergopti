@@ -169,6 +169,10 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/windows/_generated/touchpad_registry.ahk']
 	},
 	{
+		script: 'codegen/codegen-native-theme.cjs',
+		outputs: ['static/ergopti_plus/_shared/lua/native_theme_data.lua']
+	},
+	{
 		script: 'codegen/codegen-brightness-actions.cjs',
 		outputs: ['static/ergopti_plus/_shared/lua/brightness_actions_data.lua']
 	},
