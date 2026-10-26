@@ -33,7 +33,10 @@ if arg[1] == "--no-luv" then
 	assert(K.get_flush_status().stopping and not K.has_flush_debt())
 	assert(#assert(W.query_rows("SELECT id FROM events_typing;")) == 0)
 	assert(W.get_revision() == revision, "unavailable flush must not advance the durable watermark")
-	assert(W.get_meta("app_score.minimal") == "1")
+	-- Scores and categories live in the shared category file since dc40857660.
+	local stored = assert(require("modules.keystats.app_category_file").load())
+	assert(require("keystats.app_category_store").projection(stored).minimal, "the edit must reach the category file")
+	assert(W.get_meta("app_score.minimal") == nil, "the category edit must not touch SQLite")
 	local warnings = 0
 	for _, line in ipairs(require("logger").ring_buffer_snapshot()) do
 		if line:find("SQLite flush transport unavailable", 1, true) then warnings = warnings + 1 end

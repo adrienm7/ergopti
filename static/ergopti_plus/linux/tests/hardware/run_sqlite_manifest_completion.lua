@@ -62,15 +62,11 @@ for _, table_name in ipairs({ "agg_app_day", "agg_app_day_errors", "agg_app_day_
 	check("native refusal in " .. table_name .. " preserves the partial first return without acknowledging completion", function()
 		assert(complete == false)
 		assert(chars(partial) == (table_name == "agg_app_day" and 0 or 3))
-		if table_name == "agg_app_day" then
-			-- Saved category projection also owns this table, before manifest cache lookup.
-			assert(refused_payload == nil and refusal == "SQLite projection unavailable",
-				"an unreadable category source must refuse the complete public dashboard")
-		else
-			assert(type(refused_payload) == "table" and refusal == nil,
-				"an independently refused derived table retains the public partial manifest")
-			assert(chars(refused_payload.metrics_manifest) == chars(partial))
-		end
+		-- Categories live in the app category file, so a hidden SQLite table only
+		-- degrades the manifest: the payload keeps the partial public manifest.
+		assert(type(refused_payload) == "table" and refusal == nil,
+			"an independently refused SQLite table retains the public partial manifest")
+		assert(chars(refused_payload.metrics_manifest) == chars(partial))
 	end)
 	local fresh, recovered = Reader.read_manifest(path)
 	local rebuilt = payload()
@@ -94,6 +90,17 @@ check("successful completed projection retains healthy cache reuse", function()
 end)
 Keystats.clear_cache()
 check("explicit cache clear still rebuilds the healthy native projection", function() assert(chars(payload()) == 3) end)
+check("a damaged app category file refuses the complete public dashboard", function()
+	local category_path = root .. "/config/ergopti/" .. require("keystats.app_category_store").FILE_NAME
+	local file = assert(io.open(category_path, "wb"))
+	assert(file:write("{ not a category document"))
+	assert(file:close())
+	Keystats.clear_cache()
+	local refused, reason = Keystats.get_dashboard_payload({ include_prefetch = false })
+	assert(os.remove(category_path))
+	assert(refused == nil and reason == "app category file unavailable",
+		"a damaged category source must refuse the dashboard, never read it as empty")
+end)
 Writer.close_db()
 local function remove_owned(file_path)
 	local stat = assert(uv.fs_lstat(file_path))
@@ -103,6 +110,6 @@ local function remove_owned(file_path)
 	else assert(uv.fs_unlink(file_path)) end
 end
 remove_owned(root)
-assert(checks == 10, "all native completion and public cache controls must execute")
+assert(checks == 11, "all native completion and public cache controls must execute")
 print(string.format("Native SQLite manifest completion: %d checks, %d failures", checks, failures))
 os.exit(failures == 0 and 0 or 1)
