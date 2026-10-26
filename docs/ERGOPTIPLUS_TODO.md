@@ -83,6 +83,9 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
 - [ ] **Dedicated AI-off hint string.** [CODE] [I18N] Every locale; Windows reader on the PC.
 - [ ] **Registry op that re-encodes a value.** [CODE] Windows `config_migrate.ahk` first (PC), then the Lua
       engines, then delete the macOS `[llm.profiles] user_profiles` reader import (0146a938c5).
+- [ ] **Prediction request floor.** [CODE] Explicit requests never wait for the floor; one global floor
+      settable from the menu on the three OS; "never" debounce on the three OS; live mode instant at a word
+      end. Set the shared `driver_options` of the request plan (PAR-65) to one option set; Windows on the PC.
 - [ ] **PAR-66 section readers.** [CODE] Re-point the source-pin gates to the shared module, then extract
       `personal_info_editor_source` and the metrics/configuration/debug/about readers.
 

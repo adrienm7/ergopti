@@ -29,6 +29,9 @@ None. The next batch goes here, each line naming the default taken meanwhile.
     learns it first, on the PC), then delete the macOS reader import.
   - **PAR-66 section readers:** re-point the source-pin gates to the shared module text, keep only the call
     pins in the drivers, then extract the five readers.
+  - **Prediction request floor (PAR-65):** an explicit request is never held by the floor (only automatic
+    requests wait); one global floor (not per backend), settable from the menu on the three OS; a "never"
+    debounce (no automatic trigger) on the three OS; live mode fires instantly at a word end on the three OS.
 
 - **Answers of 2026-10-25 (QCM), implemented the same day unless noted:**
   - **CI design:** one lane per OS plus Common, each Unit → Integration → E2E → Build → Install and launch →
