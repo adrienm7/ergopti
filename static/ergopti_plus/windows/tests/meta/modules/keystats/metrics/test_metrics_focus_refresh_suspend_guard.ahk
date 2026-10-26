@@ -23,9 +23,9 @@
 ;      `if MetricsShortcuts.enabled` guard, so users with metrics disabled paid
 ;      the poll for a cache whose only reader (MF_ShouldFilter) never runs.
 ;
-; Meta-static rather than behavioral: the headless harness cannot run a real
-; repeating OS timer across a suspend transition, so the STRUCTURAL guarantees
-; are what we pin.
+; Structural checks retain timer ownership and acquisition ordering. The real
+; capture predicate is also exercised through all four independent pause states;
+; the native sampler child tests separately prove publication and resume.
 ;
 ; NOTE on shape: this test deliberately asserts the invariant across the whole
 ; suspend-reactor CLASS (guard + cancel + re-arm), not just the one line that
@@ -169,7 +169,8 @@ _MFS_PollIsFeatureGated() {
 }
 Test("metrics: the focus poll is gated on MetricsShortcuts.enabled (F-06)", _MFS_PollIsFeatureGated)
 
-; metrics-timers-bypass-pause: the four recurring metrics ticks gate on A_IsSuspended.
+; Sensor sampling delegates to the collection gate, which also owns native Suspend.
+; The other recurring ticks still own their direct native pause checks.
 _ATG_MetricsTicksGatedOnSuspend() {
 	; Move-resilient: locate each tick function across the whole driver source
 	; via the framework helper rather than a pinned per-module path. Maps the
@@ -181,7 +182,6 @@ _ATG_MetricsTicksGatedOnSuspend() {
 	Assert(HeldBody != "" && InStr(HeldBody, "A_IsSuspended") > 0,
 		"KL_CaptureHeld() must exist and hold capture on A_IsSuspended (metrics-timers-bypass-pause)")
 	Checks := Map(
-		"KL_Sensors_Tick", "KL_Sensors_Tick()",
 		"KL_IngestOnce",   "KL_IngestOnce(",
 		"KL_Hook_Tick",    "KL_Hook_Tick()")
 	for Name, Decl in Checks {
@@ -190,6 +190,18 @@ _ATG_MetricsTicksGatedOnSuspend() {
 		Assert(InStr(Body, "A_IsSuspended") > 0 || InStr(Body, "KL_CaptureHeld()") > 0,
 			Decl . " must early-return on A_IsSuspended or KL_CaptureHeld() so metrics timers go quiet while paused (metrics-timers-bypass-pause)")
 	}
+	Sensor := _StripFullLineComments(_DriverFuncBody("KL_Sensors_Tick"))
+	Assert(Sensor != "", "KL_Sensors_Tick() must exist")
+	Gate := InStr(Sensor, "KL_CaptureHeld()")
+	Filter := InStr(Sensor, "MF_ShouldFilter()")
+	Native := InStr(Sensor, "DllCall(")
+	Publish := InStr(Sensor, "KL_LogSystemEvent(")
+	Assert(Gate > 0 && Filter > Gate && Native > Gate && Publish > Gate,
+		"the real collection pause gate must precede sensor filtering, native acquisition and publication")
+	Capture := _StripFullLineComments(_DriverFuncBody("KL_CaptureHeld"))
+	Assert(Capture != "", "the delegated collection pause gate must have a real production owner")
+	Assert(InStr(Capture, "A_IsSuspended") > 0 && InStr(Capture, "KLCollection.suspended") > 0,
+		"the shared sensor gate must retain both the driver pause and the independent collection pause")
 	; KL_Hook_LivePush is the live-push companion tick.
 	Body := _DriverFuncBody("KL_Hook_LivePush")
 	Assert(Body != "", "KL_Hook_LivePush() must exist")
@@ -197,6 +209,27 @@ _ATG_MetricsTicksGatedOnSuspend() {
 		"KL_Hook_LivePush must gate on A_IsSuspended (metrics-timers-bypass-pause)")
 }
 Test("metrics: the recurring keystats/metrics ticks gate on A_IsSuspended (metrics-timers-bypass-pause)", _ATG_MetricsTicksGatedOnSuspend)
+
+_MFS_CaptureGateKeepsBothPauseCauses() {
+	WasSuspended := A_IsSuspended
+	CollectionWasSuspended := KLCollection.suspended
+	try {
+		Suspend(false)
+		KLCollection.suspended := false
+		AssertFalse(KL_CaptureHeld(), "neither pause must leave capture available")
+		KLCollection.suspended := true
+		AssertTrue(KL_CaptureHeld(), "the independent metrics pause must hold capture")
+		Suspend(true)
+		AssertTrue(KL_CaptureHeld(), "the combined pauses must retain the hold")
+		KLCollection.suspended := false
+		AssertTrue(KL_CaptureHeld(), "the driver pause alone must still hold capture")
+	} finally {
+		KLCollection.suspended := CollectionWasSuspended
+		Suspend(WasSuspended)
+	}
+}
+Test("metrics: the real capture gate retains both independent pause causes (metrics-capture-pause-owner)",
+	_MFS_CaptureGateKeepsBothPauseCauses)
 
 
 
