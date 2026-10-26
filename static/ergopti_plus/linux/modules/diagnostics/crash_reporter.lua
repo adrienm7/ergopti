@@ -3,21 +3,26 @@
 --- ==============================================================================
 --- MODULE: Crash Reporter (Linux)
 --- DESCRIPTION:
---- Basic crash diagnostics for the Linux daemon. Writes crash dumps to the
---- crash_reports folder inside the logs folder when a pcall-wrapped operation
---- fails with a non-trivial error. Mirrors macOS infra/crash_reporter.lua in intent but
---- uses filesystem dumps instead of hs.crash.crashReporter.
+--- Crash reports for the Linux daemon. Writes a report to the crash_reports
+--- folder inside the logs folder when a pcall-wrapped operation fails with a
+--- non-trivial error, and tells the user where it landed.
 ---
 --- FEATURES & RATIONALE:
---- 1. File-based dump: writes timestamped crash files with error message,
----    stack trace, and daemon state snapshot.
---- 2. Low overhead: only writes on actual errors; zero allocations on the
+--- 1. One content with macOS: the document, its file name and the retention cap
+---    come from the shared crash_report module (parity audit D6, R31), so a
+---    report from either driver has the same fields in the same order, including
+---    the log ring buffer that explains the crash.
+--- 2. One notice with macOS: a saved report raises a desktop notification naming
+---    the file, a failed save raises the failure notice. The next-start dialog of
+---    ui/error_dialog stays: it reads the same report.
+--- 3. Low overhead: only writes on actual errors; zero allocations on the
 ---    hot path (pcall returning ok=true is the common case).
---- 3. Crash history: keeps up to MAX_CRASH_FILES dumps, rotating oldest.
+--- 4. Privacy: the whole document goes through the admitted redactor before it
+---    reaches the disk, and every effect is re-checked against that admission.
 --- ==============================================================================
 
 local M = {}
-local TextUtils = require("text_utils")
+local CrashReport = require("crash_report")
 
 local Logger = require("logger.shim")
 local LOG = "diagnostics.crash_reporter"
@@ -28,8 +33,11 @@ local LOG = "diagnostics.crash_reporter"
 -- =========================================
 -- =========================================
 
-local MAX_CRASH_FILES = 20
--- Crash dumps live in the logs folder, next to the daily log that explains
+-- A crash storm can fill many names within one timestamp second; the bound keeps
+-- a hostile folder from turning persistence into an unbounded collision loop.
+local MAX_REPORT_FILENAME_ATTEMPTS = 1000
+
+-- Crash reports live in the logs folder, next to the daily log that explains
 -- them, and follow a LogsDirPath override: resolved per call.
 --- @return string Absolute folder, no trailing slash.
 local function crash_dir()
@@ -45,25 +53,37 @@ end
 
 --- Ensures the crash directory exists.
 local function _ensure_dir(directory)
-	return os.execute("mkdir -p " .. TextUtils.shell_quote(directory) .. " 2>/dev/null")
+	return os.execute("mkdir -p " .. require("text_utils").shell_quote(directory) .. " 2>/dev/null")
 end
 
---- Rotates old crash files when the directory exceeds MAX_CRASH_FILES.
+--- Deletes the reports beyond the shared cap, oldest first.
+--- The names come from the shared policy, which selects report names only, so a
+--- file the user keeps in the folder is never removed.
+--- @param directory string Crash folder, no trailing slash.
 local function _rotate(directory)
-	local files = {}
-	local pipe = io.popen("ls -1t " .. TextUtils.shell_quote(directory) .. " 2>/dev/null")
-	if not pipe then return end
-	for line in pipe:lines() do
-		files[#files + 1] = line
+	local NativeDirectory = require("infra.native_directory")
+	local listed, entries, message = pcall(NativeDirectory.entries, directory)
+	if not listed then
+		Logger.warn(LOG, "Crash report retention skipped, the folder cannot be listed: %s.", tostring(entries))
+		return
 	end
-	pipe:close()
-
-	while #files > MAX_CRASH_FILES do
-		local oldest = files[#files]
-		os.remove(directory .. "/" .. oldest)
-		files[#files] = nil
+	if entries == nil then
+		Logger.warn(LOG, "Crash report retention skipped, the folder cannot be listed: %s.", tostring(message))
+		return
+	end
+	local names = {}
+	for _, entry in ipairs(entries) do
+		if entry.kind == "file" then names[#names + 1] = entry.name end
+	end
+	local FileSystem = require("adapters.file_system")
+	for _, name in ipairs(CrashReport.expired(names)) do
+		if FileSystem.delete(directory .. "/" .. name) ~= true then
+			Logger.warn(LOG, "Crash report '%s' could not be deleted by the retention policy.", name)
+		end
 	end
 end
+
+
 
 
 -- =========================================
@@ -72,54 +92,95 @@ end
 -- =========================================
 -- =========================================
 
---- The build commit and the configuration directory, rendered for the dump.
---- Which build crashed is the first question of every report, so both are read
---- on the crash path itself (a few file reads, no subprocess), before the dump
---- file is opened, and a resolver failure is written as its own reason rather
---- than costing the dump.
---- The version and the application directory are written the same way: the
---- daemon's only caller passes no context, so a dump that depended on it never
---- said which release crashed or which install tree it ran from.
---- @return string commit_line "<commit> (<source>)" or the failure reason.
---- @return string config_line The configuration directory or the failure reason.
---- @return string version_line "<version> (<source>)" or the failure reason.
---- @return string app_dir_line The driver root or the failure reason.
+--- The facts of the running build, gathered on the crash path itself.
+--- Which build crashed is the first question of every report, so the commit, the
+--- version, the install tree and the configuration directory are read here (a few
+--- file reads, no subprocess) before the report file is opened. A resolver that
+--- fails is written as its own reason rather than costing the report.
+--- @return table fields Keys of the shared record: version, git_hash,
+---   commit_source, config_dir, script_dir.
 local function _build_facts()
 	local ok_commit, commit, source = pcall(function()
 		return require("infra.diagnostic_snapshot").resolve_commit()
 	end)
-	local commit_line = ok_commit and string.format("%s (%s)", tostring(commit), tostring(source))
-		or ("unknown (resolution failed: " .. tostring(commit) .. ")")
 	local ok_config, config_dir = pcall(function()
 		return require("infra.config_paths").get_config_dir()
 	end)
-	local config_line = ok_config and tostring(config_dir)
-		or ("unknown (resolution failed: " .. tostring(config_dir) .. ")")
-	local ok_version, version, version_source = pcall(function()
-		local Version = require("infra.version")
-		return Version.VERSION, Version.SOURCE
+	local ok_version, version = pcall(function()
+		return require("infra.version").VERSION
 	end)
-	local version_line = ok_version and string.format("%s (%s)", tostring(version), tostring(version_source))
-		or ("unknown (resolution failed: " .. tostring(version) .. ")")
 	local ok_app, app_dir = pcall(function()
 		return require("infra.paths").driver_root()
 	end)
-	local app_dir_line = ok_app and tostring(app_dir)
-		or ("unknown (resolution failed: " .. tostring(app_dir) .. ")")
-	return commit_line, config_line, version_line, app_dir_line
+	local function failed(reason) return "unknown (resolution failed: " .. tostring(reason) .. ")" end
+	return {
+		version = ok_version and tostring(version) or failed(version),
+		git_hash = ok_commit and tostring(commit) or failed(commit),
+		commit_source = ok_commit and tostring(source) or "unknown",
+		config_dir = ok_config and tostring(config_dir) or failed(config_dir),
+		script_dir = ok_app and tostring(app_dir) or failed(app_dir),
+	}
+end
+
+--- The session counters and the log ring buffer, the fields that explain a crash.
+--- @return table fields Keys session_warnings, session_errors, log_tail.
+local function _session_facts()
+	local fields = {}
+	local ok_issues, issues = pcall(Logger.session_issues)
+	if ok_issues and type(issues) == "table" then
+		fields.session_warnings = issues.warn_count
+		fields.session_errors = issues.err_count
+	end
+	local ok_ring, ring = pcall(Logger.ring_buffer_snapshot)
+	if ok_ring and type(ring) == "table" then
+		fields.log_tail = table.concat(ring, "\n")
+	else
+		fields.log_tail = "unavailable: " .. tostring(ring)
+	end
+	return fields
+end
+
+--- Tells the user how the save ended, as the macOS reporter does. A desktop
+--- notification never blocks, so it is safe in an error handler.
+--- @param saved boolean Whether the report is on disk.
+--- @param path string|nil The report path, shown when saved.
+local function _notify(saved, path)
+	pcall(function()
+		local i18n = require("infra.i18n")
+		local Notifier = require("adapters.notifier")
+		if saved then
+			Notifier.send(path, { title = i18n.get("crash.report.saved_title"), level = "info" })
+		else
+			Notifier.send(i18n.get("crash.report.save_failed"), { level = "error" })
+		end
+	end)
 end
 
 --- Only a fixed failure may bypass the admitted sink through stderr.
 local function refused()
 	pcall(function() io.stderr:write("[crash_reporter] Crash dump refused; privacy or output acknowledgement unavailable.\n") end)
+	_notify(false)
 	return false
 end
 
---- Writes a fully redacted document under the original sink admission.
+--- Reserves the first free report name in the folder.
+--- @param directory string Crash folder, no trailing slash.
+--- @param stem string From CrashReport.stem.
+--- @return string|nil path
+local function _free_path(directory, stem)
+	local FileSystem = require("adapters.file_system")
+	for attempt = 1, MAX_REPORT_FILENAME_ATTEMPTS do
+		local path = directory .. "/" .. CrashReport.file_name(stem, attempt)
+		if not FileSystem.exists(path) then return path end
+	end
+	return nil
+end
+
+--- Writes a fully redacted report under the original sink admission.
 --- Safe in error handlers: a reporting failure must not replace the real error.
 --- @param module_name string Name of the module where the error occurred.
 --- @param error_msg string Error message (tostring(err) from pcall).
---- @param context table|nil Optional { stack_trace?, layout?, locale? }.
+--- @param context table|nil Optional { stack_trace?, locale? }.
 --- @return boolean True after the redacted file's write and close acknowledge.
 function M.dump(module_name, error_msg, context)
 	if type(module_name) ~= "string" or type(error_msg) ~= "string" or error_msg == "" then return false end
@@ -137,24 +198,25 @@ function M.dump(module_name, error_msg, context)
 	end
 	local resolved, directory = pcall(resolve)
 	if not resolved or type(directory) ~= "string" or directory == "" or not live() then return refused() end
-	local prepared, document, name = pcall(function()
-		local commit, config, version, app = _build_facts()
-		local parts = { "=== Ergopti Linux Crash Dump ===\n", "Timestamp: " .. os.date() .. "\n",
-			"Module:    " .. module_name .. "\n", "Error:     " .. error_msg .. "\n",
-			"Version:   " .. version .. "\n", "Commit:    " .. commit .. "\n",
-			"App dir:   " .. app .. "\n", "Config:    " .. config .. "\n" }
+	local timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+	local prepared, document = pcall(function()
+		local fields = _build_facts()
+		for key, value in pairs(_session_facts()) do fields[key] = value end
+		fields.driver = "linux"
+		fields.timestamp = timestamp
+		fields.module = module_name
+		fields.error_msg = error_msg
 		if type(context) == "table" then
-			for _, field in ipairs({ { "stack_trace", "Stack:\n" }, { "layout", "Layout: " }, { "locale", "Locale: " } }) do
-				local value = context[field[1]]
-				if type(value) == "string" then parts[#parts + 1] = field[2] .. value .. "\n" end
-			end
+			if type(context.stack_trace) == "string" then fields.stack_trace = context.stack_trace end
+			if type(context.locale) == "string" then fields.locale = context.locale end
 		end
-		return redact(table.concat(parts)), redact(module_name)
+		return redact(CrashReport.encode(CrashReport.build(fields)))
 	end)
-	if not prepared or type(document) ~= "string" or type(name) ~= "string" or not live() then return refused() end
-	local path = directory .. "/crash_" .. os.date("!%Y-%m-%dT%H-%M-%S") .. "_" .. name:gsub("[^%w_.-]", "_") .. ".txt"
+	if not prepared or type(document) ~= "string" or not live() then return refused() end
 	local made, status = pcall(_ensure_dir, directory)
 	if not made or (status ~= true and status ~= 0) or not live() then return refused() end
+	local reserved, path = pcall(_free_path, directory, CrashReport.stem(timestamp))
+	if not reserved or type(path) ~= "string" then return refused() end
 	local opened, file = pcall(io.open, path, "w")
 	if not opened or not file then return refused() end
 	local written, ack
@@ -165,7 +227,8 @@ function M.dump(module_name, error_msg, context)
 		-- a reentrant close may already have published a successor at that name.
 		return refused()
 	end
-	pcall(Logger.error, LOG, "Crash dump written: %s", path)
+	pcall(Logger.error, LOG, "Crash report written: %s", path)
+	_notify(true, path)
 	if live() then pcall(_rotate, directory) end
 	return true
 end
@@ -211,17 +274,17 @@ function M.get_crash_dir()
 	return crash_dir()
 end
 
---- Returns the number of crash files currently on disk.
+--- Returns the number of crash reports currently on disk.
+--- Counts report names only, as the retention policy does.
 --- @return number
 function M.get_crash_count()
-	local count = 0
-	local pipe = io.popen("ls -1 " .. TextUtils.shell_quote(crash_dir()) .. " 2>/dev/null | wc -l")
-	if pipe then
-		local line = pipe:read("*l")
-		pipe:close()
-		count = tonumber(line) or 0
+	local listed, entries = pcall(require("infra.native_directory").entries, crash_dir())
+	if not listed or entries == nil then return 0 end
+	local names = {}
+	for _, entry in ipairs(entries) do
+		if entry.kind == "file" and CrashReport.parse_name(entry.name) then names[#names + 1] = entry.name end
 	end
-	return count
+	return #names
 end
 
 return M

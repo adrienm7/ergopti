@@ -14,9 +14,9 @@
 ---    suite redirects HOME via an os.getenv shim (Lua 5.4 has no os.setenv) and
 ---    an empty bootstrap store around every call, and asserts get_crash_dir()
 ---    reflects the sandbox path.
---- 2. Hermetic I/O: the module shells out with Unix-only mkdir -p / ls, which do
+--- 2. Hermetic I/O: the module shells out with a Unix-only mkdir -p, which does
 ---    not exist under the Windows test host. The sandbox stubs os.execute, io.popen
----    and io.open so M.dump is exercised end to end — path construction and dump
+---    and io.open so M.dump is exercised end to end — path construction and report
 ---    body — without touching the real filesystem, identically on every platform.
 --- 3. Full pcall contract: protect is verified on the success, throw and bad-payload
 ---    paths, including that the throw path routes through dump (a crash file open).
@@ -132,6 +132,8 @@ local function with_sandbox(opts, fn)
 		local cap = { path = nil, mode = nil, parts = {} }
 
 		io.open = function(path, mode)
+			-- Only the crash folder is virtual: the notice reads the locale catalogue.
+			if path:sub(1, #EXPECTED_DIR) ~= EXPECTED_DIR then return real_open(path, mode) end
 			cap.path, cap.mode = path, mode
 			return {
 				write = function(_, s) cap.parts[#cap.parts + 1] = s; return true end,
@@ -193,8 +195,8 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 		end)
 		helpers.assert_not_nil(cap.path, "throw path opens a crash file via dump")
 		helpers.assert_true(
-			cap.path:match("/crash_[%d%-T]+_engine%.txt$") ~= nil,
-			"dump filename is crash_<timestamp>_<module>.txt")
+			cap.path:match("/%d%d%d%d%-%d%d%-%d%dT%d%d%-%d%d%-%d%dZ%.json$") ~= nil,
+			"report filename is the shared <timestamp>.json")
 	end)
 
 	helpers.it("protect rejects a non-function payload", function()
@@ -203,27 +205,96 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 		helpers.assert_eq(msg, "fn is not a function", "explicit guard message returned")
 	end)
 
-	helpers.it("dump writes a timestamped file with the expected fields", function()
+	helpers.it("dump writes the shared JSON report with the expected fields", function()
 		local cap = with_sandbox(nil, function()
 			cr.dump("prediction_engine", "segfault", {
 				stack_trace = "stack-frame-A",
-				layout      = "ergopti",
 				locale      = "fr",
 			})
 		end)
 		helpers.assert_not_nil(cap.path, "dump opened a file")
 		helpers.assert_eq(cap.mode, "w", "opened for writing")
 		helpers.assert_true(cap.path:sub(1, #EXPECTED_DIR) == EXPECTED_DIR, "file under the crash dir")
-		helpers.assert_true(
-			cap.path:match("/crash_[%d%-T]+_prediction_engine%.txt$") ~= nil,
-			"filename is crash_<timestamp>_<module>.txt")
-		helpers.assert_contains(cap.content, "Ergopti Linux Crash Dump", "dump header present")
-		helpers.assert_contains(cap.content, "prediction_engine", "module name in body")
-		helpers.assert_contains(cap.content, "segfault", "error message in body")
-		helpers.assert_contains(cap.content, "stack-frame-A", "stack trace in body")
-		helpers.assert_contains(cap.content, "Version:   ", "version line in body without any context version")
-		helpers.assert_contains(cap.content, "App dir:   ", "application directory line in body")
-		helpers.assert_contains(cap.content, "ergopti", "layout in body")
+		local report = require("json").decode(cap.content)
+		helpers.assert_not_nil(report, "the file is a JSON document")
+		helpers.assert_eq(report.driver, "linux")
+		helpers.assert_eq(report.module, "prediction_engine", "module name in the report")
+		helpers.assert_eq(report.error_msg, "segfault", "error message in the report")
+		helpers.assert_eq(report.stack_trace, "stack-frame-A", "stack trace in the report")
+		helpers.assert_eq(report.locale, "fr", "locale in the report")
+		helpers.assert_true(report.timestamp:match("^%d%d%d%d%-%d%d%-%d%dT%d%d:%d%d:%d%dZ$") ~= nil, "UTC timestamp")
+		helpers.assert_not_nil(report.version, "version field present without any context version")
+		helpers.assert_not_nil(report.script_dir, "application directory field present")
+		helpers.assert_not_nil(report.log_tail, "the log ring buffer field is present")
+		-- Same keys, same order as every other driver's report.
+		local last = 0
+		for _, field in ipairs(require("crash_report").FIELDS) do
+			local at = cap.content:find('"' .. field[1] .. '":', 1, true)
+			helpers.assert_true(at ~= nil and at > last, "field " .. field[1] .. " is written in the shared order")
+			last = at
+		end
+	end)
+
+	helpers.it("a second report within the same second gets the numeric suffix", function()
+		local FileSystem = require("adapters.file_system")
+		local real_exists, probed = FileSystem.exists, {}
+		FileSystem.exists = function(path)
+			probed[#probed + 1] = path
+			return path:match("%d%d%d%d%-%d%d%-%d%dT%d%d%-%d%d%-%d%dZ%.json$") ~= nil
+		end
+		local ok, err = pcall(function()
+			local cap = with_sandbox(nil, function() cr.dump("engine", "again") end)
+			helpers.assert_true(cap.path:match("%-2%.json$") ~= nil, "the colliding name is suffixed: " .. tostring(cap.path))
+			local plain, suffixed = false, false
+			for _, probe in ipairs(probed) do
+				plain = plain or probe:match("Z%.json$") ~= nil
+				suffixed = suffixed or probe:match("Z%-2%.json$") ~= nil
+			end
+			helpers.assert_true(plain and suffixed, "the plain name is probed, then the first suffix")
+		end)
+		FileSystem.exists = real_exists
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("tells the user where the report landed, and says so when it cannot be saved", function()
+		local sent = {}
+		local saved = { package.loaded["adapters.notifier"], package.loaded["infra.i18n"] }
+		package.loaded["adapters.notifier"] = { send = function(text, opts) sent[#sent + 1] = { text = text, opts = opts }; return true end }
+		package.loaded["infra.i18n"] = { get = function(key) return "T:" .. key end }
+		local ok, err = pcall(function()
+			local cap = with_sandbox(nil, function() cr.dump("engine", "notice me") end)
+			helpers.assert_eq(sent[1].text, cap.path)
+			helpers.assert_eq(sent[1].opts, { title = "T:crash.report.saved_title", level = "info" })
+			local real_open = io.open
+			local failed = with_sandbox(nil, function()
+				io.open = function() return nil end
+				cr.dump("engine", "cannot write")
+			end)
+			io.open = real_open
+			helpers.assert_nil(failed.path)
+			helpers.assert_eq(sent[2], { text = "T:crash.report.save_failed", opts = { level = "error" } })
+		end)
+		package.loaded["adapters.notifier"], package.loaded["infra.i18n"] = saved[1], saved[2]
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("keeps at most the shared cap of reports and never deletes another file", function()
+		local CrashReport = require("crash_report")
+		local listing, deleted = { { name = "notes.txt", kind = "file" }, { name = "sub", kind = "directory" } }, {}
+		for index = 1, CrashReport.MAX_REPORTS + 2 do
+			listing[#listing + 1] = { name = string.format("2026-10-24T10-00-%02dZ.json", index), kind = "file" }
+		end
+		local saved_directory, saved_delete = package.loaded["infra.native_directory"], require("adapters.file_system").delete
+		package.loaded["infra.native_directory"] = { entries = function() return listing end }
+		require("adapters.file_system").delete = function(path) deleted[#deleted + 1] = path; return true end
+		local ok, err = pcall(function()
+			with_sandbox(nil, function() cr.dump("engine", "rotate") end)
+			helpers.assert_eq(#deleted, 2)
+			helpers.assert_eq(deleted[1], EXPECTED_DIR .. "/2026-10-24T10-00-01Z.json")
+			helpers.assert_eq(deleted[2], EXPECTED_DIR .. "/2026-10-24T10-00-02Z.json")
+		end)
+		package.loaded["infra.native_directory"], require("adapters.file_system").delete = saved_directory, saved_delete
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("dump ignores calls with a non-string or empty error", function()
@@ -235,11 +306,17 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 		helpers.assert_nil(cap.path, "no file opened for invalid dump inputs")
 	end)
 
-	helpers.it("get_crash_count parses the file tally", function()
-		local cap = with_sandbox({ popen_read = "3" }, function()
-			helpers.assert_eq(cr.get_crash_count(), 3, "count parsed from the shell tally")
+	helpers.it("get_crash_count counts report names only", function()
+		local saved = package.loaded["infra.native_directory"]
+		package.loaded["infra.native_directory"] = { entries = function()
+			return { { name = "2026-10-24T10-00-01Z.json", kind = "file" }, { name = "2026-10-24T10-00-01Z-2.json", kind = "file" },
+				{ name = ".last_crash_notice", kind = "file" }, { name = "crash_old.txt", kind = "file" } }
+		end }
+		local ok, err = pcall(function()
+			with_resolution(function() helpers.assert_eq(cr.get_crash_count(), 2) end)
 		end)
-		helpers.assert_nil(cap.path, "count reads no crash files")
+		package.loaded["infra.native_directory"] = saved
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("captures the stack where the error was RAISED", function()

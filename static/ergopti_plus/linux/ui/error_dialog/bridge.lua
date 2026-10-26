@@ -448,15 +448,21 @@ local function read_file(path)
 	return content
 end
 
---- The module and the error of a crash dump, from its header lines.
---- @param text string
---- @return string module
---- @return string message The error, then the stack when the dump has one.
+--- The module and the error of a crash report (the shared crash_report JSON).
+--- @param text string The report document.
+--- @return string|nil module The protected module that raised, or "daemon".
+--- @return string message The error, then the stack when the report has one; the
+---   reason when the document cannot be read (module is then nil).
 function M.parse_crash_dump(text)
-	local module_name = text:match("\nModule:%s*([^\n]*)") or "daemon"
-	local message = text:match("\nError:%s*([^\n]*)") or ""
-	local stack = text:match("\nStack:\n(.*)$")
-	if stack and stack ~= "" then message = message .. "\n" .. stack:gsub("\n+$", "") end
+	local report = require("json").decode(text)
+	if type(report) ~= "table" or type(report.error_msg) ~= "string" then
+		return nil, "the document is not a crash report"
+	end
+	local module_name = type(report.module) == "string" and report.module ~= "" and report.module or "daemon"
+	local message = report.error_msg
+	if type(report.stack_trace) == "string" and report.stack_trace ~= "" then
+		message = message .. "\n" .. report.stack_trace:gsub("\n+$", "")
+	end
 	return module_name, message
 end
 
@@ -492,6 +498,10 @@ function M.notify_last_crash(crash_dir)
 		return false
 	end
 	local module_name, message = M.parse_crash_dump(text)
+	if module_name == nil then
+		Logger.error(LOG, "The crash report %s cannot be shown: %s.", path, message)
+		return false
+	end
 	Logger.info(LOG, "The daemon crashed since the last start (%s); showing the notice.", newest)
 	schedule({ kind = "crash", module = module_name, message = message, time = newest, log_path = path })
 	return true

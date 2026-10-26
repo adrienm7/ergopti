@@ -249,8 +249,10 @@ describe("Build commit: the crash dump names the build and the config dir", func
 				if not ok then error(err, 0) end
 			end)
 			local body = table.concat(parts)
-			assert_true(body:find("Commit:    " .. SHORT .. " (build)", 1, true) ~= nil, body)
-			assert_true(body:find("Config:    " .. redact(ConfigPaths.get_config_dir()), 1, true) ~= nil, body)
+			local report = require("json").decode(body)
+			assert_true(report ~= nil, "the dump is the shared JSON report: " .. body)
+			assert_true(report.git_hash == SHORT and report.commit_source == "build", body)
+			assert_true(report.config_dir == redact(ConfigPaths.get_config_dir()), body)
 		end)
 	end)
 
@@ -275,9 +277,11 @@ describe("Build commit: the crash dump names the build and the config dir", func
 				if not ok then error(err, 0) end
 			end)
 			local body = table.concat(parts)
-			assert_true(body:find("Commit:    unknown (resolution failed:", 1, true) ~= nil, body)
-			assert_true(body:find("stamp read exploded", 1, true) ~= nil, body)
-			assert_true(body:find("Error:     boom", 1, true) ~= nil, "the dump itself is still written")
+			local report = require("json").decode(body)
+			assert_true(report ~= nil, "the dump is the shared JSON report: " .. body)
+			assert_true(report.git_hash:find("unknown (resolution failed:", 1, true) == 1, body)
+			assert_true(report.git_hash:find("stamp read exploded", 1, true) ~= nil, body)
+			assert_true(report.error_msg == "boom", "the dump itself is still written")
 		end)
 	end)
 end)
