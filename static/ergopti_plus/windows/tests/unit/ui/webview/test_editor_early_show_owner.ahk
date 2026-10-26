@@ -125,6 +125,6 @@ _ESOT_Case(Owner, Mode) {
 }
 
 for _ESOT_Owner in ["action-picker", "paths"]
-	for _ESOT_Mode in ["current", "close", "reopen"]
+	for _ESOT_Mode in ["current", "close", "reopen", "close-after-return"]
 		Test("Native editor Show: " . _ESOT_Owner . " " . _ESOT_Mode . " preserves its owner (editor-early-show-owner)",
 			_ESOT_Case.Bind(_ESOT_Owner, _ESOT_Mode))
