@@ -16,11 +16,11 @@ const bashPath = (value) =>
 // These are runtime ABI/CLI package providers, not desktop networking backends.
 // Genuine distro qualification separately executes GVariant and SQLite fixtures.
 const providers = [
-	['debian', 'apt-get', 'libglib2.0-0t64', 'sqlite3'],
-	['fedora', 'dnf', 'glib2', 'sqlite'],
-	['arch', 'pacman', 'glib2', 'sqlite'],
-	['alpine', 'apk', 'glib', 'sqlite'],
-	['opensuse', 'zypper', 'libglib-2_0-0', 'sqlite3']
+	['debian', 'apt-get', 'libglib2.0-0t64', 'sqlite3', 'tzdata'],
+	['fedora', 'dnf', 'glib2', 'sqlite', 'tzdata'],
+	['arch', 'pacman', 'glib2', 'sqlite', 'tzdata'],
+	['alpine', 'apk', 'glib', 'sqlite', 'tzdata'],
+	['opensuse', 'zypper', 'libglib-2_0-0', 'sqlite3', 'timezone']
 ];
 try {
 	const bin = path.join(scratch, 'bin');
@@ -48,7 +48,7 @@ try {
 			}
 		});
 	let checks = 0;
-	for (const [distro, manager, glib, sqlite] of providers) {
+	for (const [distro, manager, glib, sqlite, timezone] of providers) {
 		for (const suite of ['unit', 'integration']) {
 			fs.rmSync(recorded, { force: true });
 			const result = invoke(distro, suite);
@@ -64,6 +64,14 @@ try {
 				.filter(Boolean);
 			assert.equal(actualManager, manager, `${distro}: the actual authored backend must execute`);
 			assert.ok(args.includes('tar'), `${distro}: the verified Lua archive needs extraction`);
+			assert.ok(
+				args.includes('openssl'),
+				`${distro}: native key derivation requires the declared OpenSSL CLI`
+			);
+			assert.ok(
+				args.includes(timezone),
+				`${distro}: native local-calendar fixtures require declared timezone data`
+			);
 			assert.ok(args.includes(glib), `${distro}: native GVariant requires declared ${glib}`);
 			assert.ok(
 				args.includes(sqlite),
