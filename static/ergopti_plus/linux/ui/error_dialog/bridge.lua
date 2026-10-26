@@ -42,6 +42,10 @@ local DialogCore  = require("error_dialog.core")
 local Redact      = require("diagnostics.redact")
 local FileReader  = require("infra.regular_file_reader")
 local FileWriter  = require("infra.regular_file_writer")
+local Directory   = require("infra.native_directory")
+local CrashReport = require("crash_report")
+local Numbers     = require("number_policy")
+local Failure     = require("error_description")
 
 local LOG = "bridge.error_dialog"
 
@@ -473,6 +477,41 @@ function M.parse_crash_dump(text)
 	return module_name, message
 end
 
+--- Selects the newest named report without interpreting filenames as line records.
+--- Foreign directory entries never suppress the pending report.
+--- @param crash_dir string
+--- @return string|nil report_name
+local function newest_report(crash_dir)
+	local listed, entries, detail, code = pcall(Directory.entries, crash_dir)
+	if not listed or entries == nil then
+		if listed and code == "ENOENT" then return nil end
+		Logger.error(LOG, "The crash directory cannot be listed: %s.", Failure.describe(listed and detail or entries))
+		return nil
+	end
+	local newest, modified, latest_stem, latest_attempt
+	for _, entry in ipairs(entries) do
+		local stem, attempt = CrashReport.parse_name(entry.name)
+		if stem and (entry.kind == "file" or entry.kind == "link") then
+			local inspected, stat, reason, errno = pcall(Directory.stat, Directory.join(crash_dir, entry.name))
+			if not inspected or (stat == nil and errno ~= "ENOENT") then
+				Logger.error(LOG, "A crash report cannot be inspected: %s.", Failure.describe(inspected and reason or stat))
+				return nil
+			end
+			if stat and (stat.kind == "file" or stat.kind == "link") then
+				if not Numbers.is_finite(stat.modified) then
+					Logger.error(LOG, "A crash report has no valid modification time.")
+					return nil
+				end
+				if newest == nil or stat.modified > modified or (stat.modified == modified
+					and (stem > latest_stem or (stem == latest_stem and attempt > latest_attempt))) then
+					newest, modified, latest_stem, latest_attempt = entry.name, stat.modified, stem, attempt
+				end
+			end
+		end
+	end
+	return newest
+end
+
 --- Shows the newest crash dump once, when the daemon crashed since the last
 --- notice. Called by the daemon once its loop runs.
 --- @param crash_dir string The crash reporter's folder.
@@ -483,8 +522,7 @@ function M.notify_last_crash(crash_dir)
 	-- Unticked, or a window already on its way: the dump stays unannounced and
 	-- is offered again at the next start
 	if not M.is_enabled() or _busy then return false end
-	local Shell = require("adapters.shell_runner")
-	local newest = Shell.exec_line("ls -1t " .. Shell.quote(crash_dir) .. " 2>/dev/null | grep -v '^%.' | head -n 1")
+	local newest = newest_report(crash_dir)
 	if type(newest) ~= "string" or newest == "" then return false end
 	local ack_path = crash_dir .. "/" .. CRASH_ACK_FILE
 	local acknowledged, detail, errno = read_file(ack_path)
