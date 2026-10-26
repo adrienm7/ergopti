@@ -758,7 +758,7 @@ local function profile_display_name(profile)
 	if type(label) ~= "string" or label == "" or label == key then return tostring(profile.id) end
 	-- The menu's long form is "●○○ Basic — Simple prediction"; the bar keeps
 	-- the name.
-	return (label:gsub("%s+—.*$", ""))
+	return require("llm.request_plan.info_bar").short_profile_label(label) or tostring(profile.id)
 end
 
 local function resolve_system_prompt(profile, params, count)

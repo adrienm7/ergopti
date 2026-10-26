@@ -15,5 +15,6 @@ local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/llm/"
 Contract.run_debounce(helpers, CORPUS .. "request_plan_debounce_vectors.json", "linux")
 Contract.run_batching(helpers, CORPUS .. "request_plan_batching_vectors.json")
 Contract.run_token_budget(helpers, CORPUS .. "request_plan_token_budget_vectors.json")
+Contract.run_info_bar(helpers, CORPUS .. "request_plan_info_bar_vectors.json")
 
 return true

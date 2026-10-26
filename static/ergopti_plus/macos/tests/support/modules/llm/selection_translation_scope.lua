@@ -56,6 +56,7 @@ local OWNED = {
 	"llm.provider_config_policy",
 	"llm.remote_formats",
 	"llm.request_plan.debounce",
+	"llm.request_plan.info_bar",
 	"llm.request_plan.token_budget",
 	"llm.rewrite",
 	"llm.tone",
