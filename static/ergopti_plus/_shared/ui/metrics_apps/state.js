@@ -608,10 +608,9 @@ function buildAggregatedData() {
 					});
 				}
 			} else {
-				const dayLabel = formatDisplayDate(d.key).substring(0, 5);
-				if (!result.timeline[dayLabel]) result.timeline[dayLabel] = Object.create(null);
-				result.timeline[dayLabel][catName] =
-					(result.timeline[dayLabel][catName] || 0) + (Number(appData.app_time_ms) || 0);
+				if (!result.timeline[d.key]) result.timeline[d.key] = Object.create(null);
+				result.timeline[d.key][catName] =
+					(result.timeline[d.key][catName] || 0) + (Number(appData.app_time_ms) || 0);
 			}
 		}
 	});

@@ -1253,4 +1253,69 @@ for (const host of ['windows', 'macos', 'linux']) {
 }
 assert.equal(replacementDateCases.length, 4);
 assert.equal(passed, 207, 'all full-snapshot selection lifecycle controls must execute');
+const timelineCases = [
+	{
+		name: 'same month/day across years',
+		period: 'all',
+		dates: ['2026-01-01', '2025-01-01'],
+		labels: ['01/01/2025', '01/01/2026']
+	},
+	{
+		name: 'weekly year boundary',
+		period: 'week',
+		dates: ['2026-01-01', '2025-12-31'],
+		labels: ['31/12/2025', '01/01/2026']
+	},
+	{ name: 'hourly day view', period: 'day', dates: ['2026-01-01'], labels: ['09h', '10h'] }
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of timelineCases) {
+		test(`${host} chart preserves distinct dates for ${vector.name}`, () => {
+			const page = loadMetricsAppsPage(host);
+			const charts = [];
+			page.elements.set('timeline_chart_title', page.context.document.createElement('div'));
+			const canvas = page.context.document.createElement('canvas');
+			canvas.getContext = () => ({ owner: 'timeline' });
+			page.elements.set('timeline_stacked_chart', canvas);
+			page.context.Chart = class ChartPort {
+				constructor(port, config) {
+					assert.equal(port.owner, 'timeline');
+					charts.push(config);
+				}
+				destroy() {}
+			};
+			vm.runInContext(
+				`currentPeriod=${JSON.stringify(vector.period)};currentSelectedDate='2026-01-01';`,
+				page.context
+			);
+			const manifest = Object.fromEntries(
+				vector.dates.map((date, i) => [
+					date,
+					{
+						Editor: {
+							category: 'Productivity',
+							chars: 2,
+							app_time_ms: (i + 1) * 3600000,
+							hourly: { '09': { c: 1, time_ms: 600000 }, 10: { c: 1, time_ms: 1200000 } }
+						}
+					}
+				])
+			);
+			publishLoadedAppsData(page, host, manifest);
+			const chart = charts.at(-1);
+			assert.deepEqual(Array.from(chart.data.labels), vector.labels);
+			assert.deepEqual(
+				Array.from(chart.data.datasets[0].data),
+				vector.period === 'day' ? [0.17, 0.33] : [2, 1]
+			);
+			assert.equal(page.context.getAggregatedData().rich.date_range.days, vector.dates.length);
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false
+			);
+		});
+	}
+}
+assert.equal(timelineCases.length, 3);
+assert.equal(passed, 216, 'all chronological timeline and hourly controls must execute');
 console.log(`${passed} passed, 0 failed.`);
