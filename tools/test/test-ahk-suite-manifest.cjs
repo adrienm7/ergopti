@@ -443,6 +443,50 @@ assert.deepEqual(
 	[1, 2, 3]
 );
 
+// A declared plan cannot turn a tiny malformed receipt into plan-sized work.
+// Observe the genuine Map lookup boundary without supplying any parser answers.
+function validateWithinTranscriptWork(source) {
+	const descriptor = Object.getOwnPropertyDescriptor(Map.prototype, 'get');
+	const original = descriptor.value;
+	const exceeded = new Error('Manifest validation work exceeded its input size.');
+	let reads = 0;
+	let failure;
+	let result;
+	try {
+		Object.defineProperty(Map.prototype, 'get', {
+			...descriptor,
+			value: function (...args) {
+				reads += 1;
+				if (reads > source.length) throw exceeded;
+				return Reflect.apply(original, this, args);
+			}
+		});
+		result = validateAhkSuiteManifest(source);
+	} catch (error) {
+		failure = error;
+	} finally {
+		Object.defineProperty(Map.prototype, 'get', descriptor);
+	}
+	assert.notEqual(failure, exceeded, 'TAP validation must be bounded by actual transcript records');
+	assert.ifError(failure);
+	assert.equal(Map.prototype.get, original, 'the observer must retire its exact native boundary');
+	return result;
+}
+assert.equal(validateWithinTranscriptWork(afterSlowTail).complete, true);
+for (const declared of ['1000000000', '9007199254740993', '9'.repeat(309)]) {
+	const missing = validateWithinTranscriptWork(`1..${declared}\n# 0 passed, 0 failed.\n`);
+	assert.equal(missing.complete, false, 'an impossible declared plan must remain refused');
+	assert.match(missing.errors.join('\n'), /available execution records/);
+	if (declared !== '1000000000') assert.match(missing.errors.join('\n'), /not a safe integer/);
+}
+const oversizedPartial = validateWithinTranscriptWork(
+	'1..1000000000\nRUNNING 1/1000000000 - owned\nok 1 - owned\n# 1 passed, 0 failed.\n'
+);
+assert.equal(oversizedPartial.complete, false);
+assert.equal(oversizedPartial.planned, 1000000000, 'refusal retains the original declared count');
+assert.equal(oversizedPartial.executed_count, 1, 'refusal retains the actual terminal observation');
+assert.equal(oversizedPartial.executed[0].name, 'owned');
+
 for (const [status, detail] of [
 	['ok', 'a different case'],
 	['ok', 'fast head — unexpected suffix'],
