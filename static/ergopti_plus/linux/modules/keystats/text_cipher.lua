@@ -3,9 +3,10 @@
 --- ==============================================================================
 --- MODULE: Typed-Text Cipher (Linux)
 --- DESCRIPTION:
---- Runs the shared at-rest codec (_shared/lua/keystats/text_crypto.lua) against
---- the columns that hold literal typed text, using a key derived once from this
---- machine's ID.
+--- Supplies the ports of the shared cipher policy
+--- (_shared/lua/keystats/text_cipher.lua), which runs the shared at-rest codec
+--- (_shared/lua/keystats/text_crypto.lua) against the columns that hold literal
+--- typed text, using a key derived once from this machine's ID.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The key is derived ONCE and cached. `openssl enc -pbkdf2 -iter 600000`
@@ -51,48 +52,20 @@ local MACHINE_ID_PATH = "/etc/machine-id"
 --- Older/alternative location, populated by dbus on non-systemd systems.
 local MACHINE_ID_FALLBACK_PATH = "/var/lib/dbus/machine-id"
 
-
-
-
-
--- ========================
--- ========================
--- ======= 2/ State =======
--- ========================
--- ========================
-
--- Whether at-rest encryption is active. Off by default, matching the shared
--- manifest's metrics.encrypt.
-local _enabled = false
-
--- Cached derived key (64 hex characters). nil until first use.
-local _key_hex = nil
-
--- Set once the derivation has been attempted and failed, so a broken install
--- does not re-run a 600 000-iteration derivation on every single flush.
-local _derivation_failed = false
-
-
-
-
--- ==================================
--- ==================================
--- ======= 3/ Key Derivation ========
--- ==================================
--- ==================================
-
 -- Overrides the machine-id search (test seam). The real paths are absolute and
 -- root-owned, so a test cannot create them; without this seam the happy path
 -- could only ever be exercised on a live Linux box.
 local _machine_id_override = nil
 
---- Points the machine-id lookup at a specific file, or nil to restore.
---- @param path string|nil
-function M._set_machine_id_path(path)
-	_machine_id_override = (type(path) == "string" and path ~= "") and path or nil
-	_key_hex = nil
-	_derivation_failed = false
-end
+
+
+
+
+-- ==================================
+-- ==================================
+-- ======= 2/ Ports =================
+-- ==================================
+-- ==================================
 
 --- Returns the readable machine-id path, or nil when the system has none.
 --- @return string|nil
@@ -111,15 +84,11 @@ local function machine_id_path()
 	return nil
 end
 
---- Derives and caches the session key. Runs at most once per process.
---- @return string|nil The 64-hex key, or nil when it cannot be derived.
-local function ensure_key()
-	if _key_hex then return _key_hex end
-	if _derivation_failed then return nil end
-
+--- Derives the key from the machine id, which openssl itself reads.
+--- @return string|nil The 64-hex key, or nil after logging why not.
+local function derive_key()
 	local path = machine_id_path()
 	if not path then
-		_derivation_failed = true
 		Logger.error(LOG, "No machine id found (%s, %s) — at-rest encryption unavailable.",
 			MACHINE_ID_PATH, MACHINE_ID_FALLBACK_PATH)
 		return nil
@@ -127,7 +96,6 @@ local function ensure_key()
 
 	local cmd, reason = TextCrypto.derive_key_command("file:" .. path)
 	if not cmd then
-		_derivation_failed = true
 		Logger.error(LOG, "Cannot compose the key derivation: %s.", reason)
 		return nil
 	end
@@ -136,75 +104,28 @@ local function ensure_key()
 	local derived, native_error = OpenSSL.exec(cmd)
 	local key = TextCrypto.parse_derived_key(derived)
 	if not key then
-		_derivation_failed = true
 		Logger.error(LOG, "Key derivation failed or returned no usable key — %s.", native_error or "invalid key output")
 		return nil
 	end
-
-	_key_hex = key
-	Logger.success(LOG, "At-rest key derived (cached for this session).")
-	return _key_hex
+	return key
 end
 
-
-
-
--- =====================================
--- =====================================
--- ======= 4/ Public API ===============
--- =====================================
--- =====================================
-
---- Turns at-rest encryption on or off.
---- @param enabled boolean
---- @return boolean acknowledged
-function M.set_enabled(enabled)
-	_enabled = (enabled == true)
-	Logger.debug(LOG, "At-rest encryption: %s.", tostring(_enabled))
-	return true
-end
-
---- Returns whether at-rest encryption is active.
+--- Whether the native AES primitive can serve an action.
+--- @param action string "encrypt" or "decrypt".
 --- @return boolean
-function M.is_enabled()
-	return _enabled
-end
-
---- Reports whether a usable key can be derived on this machine. Used by the menu
---- to refuse to tick a box the backend cannot honour.
---- @return boolean
-function M.is_available()
-	return NativeCipher.available and ensure_key() ~= nil
-end
-
---- Encrypts one value for storage.
---- @param device_id string    Owning device.
---- @param event_id  number|string Row identifier, unique per device.
---- @param plaintext string    Value to protect.
---- @return string|nil The envelope, the untouched plaintext when disabled, or
----   nil when encryption is enabled but impossible — the caller must NOT store
----   the plaintext in that case.
-function M.encrypt(device_id, event_id, plaintext)
-	if not _enabled then return plaintext end
-	if type(plaintext) ~= "string" or plaintext == "" then return plaintext end
-	-- Already an envelope: re-encrypting would double-wrap and make the value
-	-- undecryptable in one pass.
-	if TextCrypto.is_encrypted(plaintext) then return plaintext end
-	if not NativeCipher.available then
+local function ready(action)
+	if NativeCipher.available then return true end
+	if action == "encrypt" then
 		Logger.error(LOG, "Native AES unavailable — refusing to store plaintext.")
-		return nil
+	else
+		Logger.warn(LOG, "Encrypted row cannot be read: native AES unavailable.")
 	end
+	return false
+end
 
-	local key = ensure_key()
-	if not key then return nil end
-
-	local iv = TextCrypto.iv_for(device_id, event_id, Crypto.sha256)
-	if not iv then
-		Logger.error(LOG, "Cannot derive an IV for %s/%s — refusing to store plaintext.",
-			tostring(device_id), tostring(event_id))
-		return nil
-	end
-
+--- Encrypts one value with the native primitive.
+--- @return string|nil The Base64 payload, or nil after logging the refusal.
+local function encrypt_value(key, iv, plaintext)
 	local ciphertext = NativeCipher.encrypt(key, iv, plaintext)
 	if type(ciphertext) ~= "string" or ciphertext == "" then
 		Logger.error(LOG, "Native encryption refused — refusing to store plaintext.")
@@ -216,37 +137,64 @@ function M.encrypt(device_id, event_id, plaintext)
 		Logger.error(LOG, "Native ciphertext encoding refused.")
 		return nil
 	end
-	return TextCrypto.wrap(iv, encoded)
+	return encoded
 end
 
---- Decrypts one stored value.
---- @param value any Stored column value.
---- @return any The plaintext, or the value unchanged when it is not an envelope.
-function M.decrypt(value)
-	local iv, ciphertext = TextCrypto.unwrap(value)
-	if not iv then return value end
-	if not NativeCipher.available then
-		Logger.warn(LOG, "Encrypted row cannot be read: native AES unavailable.")
-		return ""
-	end
-	local bytes = NativeCipher.decode_base64(ciphertext)
+--- Decrypts one Base64 payload with the native primitive.
+--- @return string|nil The plaintext, or nil after logging the refusal.
+local function decrypt_value(key, iv, payload)
+	local bytes = NativeCipher.decode_base64(payload)
 	if not bytes then
 		Logger.error(LOG, "Encrypted row has invalid Base64.")
-		return ""
-	end
-
-	local key = ensure_key()
-	if not key then
-		Logger.warn(LOG, "Encrypted row cannot be read: no key on this machine.")
-		return ""
+		return nil
 	end
 
 	local plaintext = NativeCipher.decrypt(key, iv, bytes)
 	if type(plaintext) ~= "string" then
 		Logger.error(LOG, "Native decryption refused.")
-		return ""
+		return nil
 	end
 	return plaintext
 end
+
+local Cipher = require("keystats.text_cipher").new({
+	logger = Logger,
+	log = LOG,
+	sha256 = Crypto.sha256,
+	derive_key = derive_key,
+	ready = ready,
+	encrypt = encrypt_value,
+	decrypt = decrypt_value,
+})
+
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 3/ Public API ===============
+-- =====================================
+-- =====================================
+
+--- Points the machine-id lookup at a specific file, or nil to restore.
+--- @param path string|nil
+function M._set_machine_id_path(path)
+	_machine_id_override = (type(path) == "string" and path ~= "") and path or nil
+	Cipher.reset_key()
+end
+
+M.set_enabled = Cipher.set_enabled
+M.is_enabled = Cipher.is_enabled
+
+--- Reports whether a usable key can be derived on this machine. Used by the menu
+--- to refuse to tick a box the backend cannot honour.
+--- @return boolean
+function M.is_available()
+	return NativeCipher.available and Cipher.is_available()
+end
+
+M.encrypt = Cipher.encrypt
+M.decrypt = Cipher.decrypt
 
 return M

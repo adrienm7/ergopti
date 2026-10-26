@@ -43,6 +43,7 @@ return {
 	"tests.unit.adapters.atspi.test_atspi_focus_watch",
 	"tests.unit.adapters.atspi.test_atspi_focus_watch_worker",
 	"tests.unit.modules.keystats.privacy.test_focus_guard_async",
+	"tests.unit.modules.keystats.test_shared_text_cipher",
 	"tests.unit.modules.keystats.privacy.test_pointer_focus_privacy",
 	"tests.unit.infra.lifecycle.test_session_lock",
 	"tests.unit.infra.config.test_shared_timings",
