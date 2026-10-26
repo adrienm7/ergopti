@@ -16,6 +16,9 @@ default taken meanwhile.
 - **Tap-hold delay migration marker:** `tap_hold.toml` has no version stamp, so the cleanup of the old shipped
   per-key delays relies on a permanent `[tap_hold] explicit_delays = true` marker. Default meanwhile: kept.
   Build a versioned migrator for `tap_hold.toml` on the three OS instead?
+- **Duplicate keys in the macOS hotstring override file:** the shared parser reads a duplicate field or
+  header as invalid TOML (the file is then treated as unreadable, as Linux already did); macOS used to keep
+  the last value. Default meanwhile: strict. Keep it, or add a lenient mode?
 - **AI-off hint text:** the greyed agent actions reuse `llm.manual_prediction.disabled` ("AI suggestions are
   off: turn them on in the Artificial Intelligence menu."). Default meanwhile: reused. A dedicated string?
 
