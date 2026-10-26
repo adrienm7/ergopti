@@ -557,7 +557,7 @@ do
 			put("infra.script_settings", { apply = yes, current = function() return "ERROR" end })
 			put("infra.boot_profiler", { begin = noop, stage = noop, stage_done = noop, complete = function() return 0 end })
 			put("infra.diagnostic_snapshot", { pid = function() return "controlled" end, prepare = function() return noop end })
-			put("modules.diagnostics.crash_reporter", { protect = function(_, body)
+			put("modules.diagnostics.crash_reporter", { remove_legacy_dumps = function() return 0 end, protect = function(_, body)
 			  local ok, result = xpcall(body, debug.traceback)
 			  if not ok then io.stderr:write("MAIN_SETUP_FAILURE " .. tostring(result) .. "\n") end
 			  return ok, result
