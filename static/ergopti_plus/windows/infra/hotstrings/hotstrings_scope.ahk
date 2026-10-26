@@ -430,7 +430,7 @@ class HotstringsScopeFiles {
 				if Row.Section == Section && Row.Key == "delay_offset" {
 					; The file stores delays as offsets of the base expansion delay.
 					RowsByPath[this.overrides][Index] := { Section: Section, Key: "delay_offset",
-						Value: Round(Recommendation["seconds"] - HotstringsBaseDelay(), HOTSTRINGS_DELAY_DECIMALS) }
+						Value: Float(Round(Recommendation["seconds"] - HotstringsBaseDelay(), HOTSTRINGS_DELAY_DECIMALS)) }
 					Found := true
 					break
 				}
