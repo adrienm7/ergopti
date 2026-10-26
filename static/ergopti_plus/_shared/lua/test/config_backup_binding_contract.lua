@@ -10,7 +10,7 @@
 --- the owner is rebuilt on every call because the configuration folder can move.
 --- It also replays, through each driver's own listing port, the classification
 --- of folder entries: a link to a folder is reported and never walked, a link to
---- a file is a file, a FIFO (or a link to one) is "other" and a dangling link a file, and an absent folder is reported as absent.
+--- a file is a file, a FIFO (or a link to one) and a dangling link are "other", and an absent folder is reported as absent.
 --- ==============================================================================
 
 local M = {}
@@ -159,8 +159,8 @@ function M.register(helpers, env)
 				-- Opening a FIFO blocks forever: only a regular file is ever read.
 				helpers.assert_eq(kinds["pipe.toml"], "other")
 				helpers.assert_eq(kinds["linked_pipe.toml"], "other")
-				-- A dangling link has nothing to block on: the read refuses it.
-				helpers.assert_eq(kinds["dangling.toml"], "file")
+				-- A dangling link holds no configuration: reading it would fail the snapshot.
+				helpers.assert_eq(kinds["dangling.toml"], "other")
 			end)
 		end)
 

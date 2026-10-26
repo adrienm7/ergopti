@@ -72,7 +72,7 @@ helpers.describe("configuration backup listing of special files (config-backup-s
 		helpers.assert_eq(kinds["pipe.toml"], "other")
 		helpers.assert_eq(kinds["socket.toml"], "other")
 		helpers.assert_eq(kinds["linked_pipe.toml"], "other")
-		helpers.assert_eq(kinds["dangling.toml"], "file")
+		helpers.assert_eq(kinds["dangling.toml"], "other")
 		helpers.assert_eq(kinds["plain.toml"], "file")
 	end)
 end)
