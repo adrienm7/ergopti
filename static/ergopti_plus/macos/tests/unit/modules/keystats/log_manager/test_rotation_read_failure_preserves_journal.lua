@@ -264,6 +264,8 @@ local function run_rollover_case(failure_mode, exercise_resume)
 			create_if_absent = function() return true, "created" end,
 			read = function() return nil end,
 		}
+		require("tests.support.keystats.absent_ledger_file_system").model_initial_header(
+			package.loaded["adapters.file_system"], false)
 		local rotation = helpers.load_with_stubs("modules.keystats.rotation")
 		manager = helpers.load_with_stubs("modules.keystats.log_manager", {
 			execute = function(command)

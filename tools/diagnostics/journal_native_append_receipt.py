@@ -11,6 +11,7 @@ import signal
 import unittest
 
 from hs274_journal_append_test import JournalAppendReceiptTests
+from hs274_ledger_bootstrap_test import LedgerBootstrapTests
 
 
 class NativeLimitControl:
@@ -48,6 +49,33 @@ class NativeLimitControl:
 
 
 class NativeJournalAppendReceiptTests(unittest.TestCase):
+    def test_actual_native_bootstrap_close_refusal_then_retry(self):
+        self.assertTrue(
+            callable(getattr(resource, "prlimit", None)), "native prlimit boundary required"
+        )
+        original_parent_limits = resource.getrlimit(resource.RLIMIT_FSIZE)
+        receipt = LedgerBootstrapTests().replay("native", NativeLimitControl)
+        self.assertEqual(resource.getrlimit(resource.RLIMIT_FSIZE), original_parent_limits)
+        self.assertEqual(
+            NativeLimitControl.original, {}, "the native child's exact limit receipt must settle"
+        )
+        fields = (
+            "fault_mode",
+            "raw_rows",
+            "duration_ms",
+            "outbox_empty",
+            "header_bytes",
+            "failed_write",
+            "failed_close",
+            "canonical_absent_after_refusal",
+            "journal_absent_after_refusal",
+            "retry_initialized",
+            "native_limit_changes",
+        )
+        print(
+            "NATIVE_LEDGER_BOOTSTRAP_RECEIPT " + json.dumps({key: receipt[key] for key in fields})
+        )
+
     def test_actual_native_short_write_counts_one_event_and_duration(self):
         self.assertTrue(
             callable(getattr(resource, "prlimit", None)),

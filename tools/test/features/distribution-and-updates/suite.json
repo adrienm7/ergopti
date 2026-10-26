@@ -472,7 +472,7 @@
 		{
 			"id": "js-0481",
 			"ordinal": 491,
-			"name": "macOS journal retries preserve one public event and duration after an actual Common Linux short write",
+			"name": "macOS journal retries and initial ledger publication recover from actual Common Linux write and close failures",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-journal-native-receipt.cjs"],
 			"repro": "npm run test:macos-journal-native-receipt",

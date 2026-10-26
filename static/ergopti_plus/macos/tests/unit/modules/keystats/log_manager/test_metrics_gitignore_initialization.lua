@@ -40,7 +40,10 @@ Helpers.describe("metrics Git exclusion initialization", function()
 					return read(path, ...)
 				end
 				local create = f.files.create_if_absent
-				f.files.create_if_absent = function(...) creates = creates + 1; return create(...) end
+				f.files.create_if_absent = function(path, ...)
+					if path == f.ignore then creates = creates + 1 end
+					return create(path, ...)
+				end
 				Helpers.assert_eq(f.init(), true)
 				local after = assert(Lfs.symlinkattributes(f.ignore))
 				Helpers.assert_eq(after.ino, before.ino)

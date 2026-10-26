@@ -5,6 +5,7 @@
 
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const { constants } = require('node:os');
 const { spawnSync } = require('node:child_process');
 
 assert.equal(
@@ -21,7 +22,7 @@ const result = spawnSync(
 assert.ifError(result.error);
 assert.equal(result.signal, null, result.stderr);
 assert.equal(result.status, 0, result.stdout + result.stderr);
-assert.match(result.stderr, /Ran 1 test\b/, 'the selected actual native control must execute');
+assert.match(result.stderr, /Ran 2 tests\b/, 'both selected actual native controls must execute');
 assert.match(result.stderr, /\bOK\s*$/, 'the native assertion suite must complete');
 const prefix = 'NATIVE_JOURNAL_APPEND_RECEIPT ';
 const receipts = result.stdout.split('\n').filter((line) => line.startsWith(prefix));
@@ -35,6 +36,29 @@ assert.deepEqual(JSON.parse(receipts[0].slice(prefix.length)), {
 	append_streams: 1,
 	native_limit_changes: 2
 });
+const bootstrapPrefix = 'NATIVE_LEDGER_BOOTSTRAP_RECEIPT ';
+const bootstrapReceipts = result.stdout
+	.split('\n')
+	.filter((line) => line.startsWith(bootstrapPrefix));
+assert.equal(bootstrapReceipts.length, 1, result.stdout);
+const bootstrap = JSON.parse(bootstrapReceipts[0].slice(bootstrapPrefix.length));
+assert.equal(Number.isInteger(bootstrap.header_bytes) && bootstrap.header_bytes > 0, true);
+assert.equal(typeof bootstrap.failed_close.error, 'string');
+assert.notEqual(bootstrap.failed_close.error, '');
+delete bootstrap.header_bytes;
+delete bootstrap.failed_close.error;
+assert.deepEqual(bootstrap, {
+	fault_mode: 'native',
+	raw_rows: 1,
+	duration_ms: 100,
+	outbox_empty: true,
+	failed_write: { accepted: true },
+	failed_close: { accepted: false, code: constants.errno.EFBIG, native_closed: true },
+	canonical_absent_after_refusal: true,
+	journal_absent_after_refusal: true,
+	retry_initialized: true,
+	native_limit_changes: 2
+});
 console.log(
-	'PASS: actual native journal refusal and retry preserve one public event and its duration.'
+	'PASS: native journal and initial ledger refusals recover without partial canonical bytes or duplicate events.'
 );
