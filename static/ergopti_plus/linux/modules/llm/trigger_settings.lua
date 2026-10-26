@@ -14,8 +14,12 @@ local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local Manifest = require("infra.manifest_reader")
 local AppIdentity = require("llm.app_identity")
+local NEVER_MS = require("llm.request_plan.debounce").NEVER_MS
 local ConfigKeys = require("config_keys")
 local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
+
+-- Exported so the menu offers the same choice the file stores.
+M.NEVER_MS = NEVER_MS
 
 local LOG = "modules.llm.trigger_settings"
 local PREF_PREFIX = "llm.trigger."
@@ -27,6 +31,8 @@ local DEFINITIONS = {
 		min = 50,
 		max = 10000,
 		presets = { 50, 100, 200, 300, 500, 750, 1000, 2000 },
+		-- The one value outside the range: no automatic trigger at all.
+		never = NEVER_MS,
 	},
 	instant_on_word_end = {
 		path = KEY.LLM_TRIGGER_INSTANT_ON_WORD_END,
@@ -96,6 +102,7 @@ local function valid(name, value)
 	if not def or type(value) ~= def.type then return false end
 	if def.apps then return valid_apps(value) end
 	if def.type == "number" then
+		if def.never ~= nil and value == def.never then return true end
 		return value == math.floor(value) and value >= def.min and value <= def.max
 	end
 	return true
@@ -213,6 +220,15 @@ function M.presets(name)
 	local values = {}
 	for index, value in ipairs(def and def.presets or {}) do values[index] = value end
 	return values
+end
+
+--- Whether a value of a numeric setting means "never" (the setting is off).
+--- @param name string
+--- @param value any
+--- @return boolean never
+function M.is_never(name, value)
+	local def = definition(name)
+	return def ~= nil and def.never ~= nil and value == def.never
 end
 
 --- Returns the accepted numeric range.

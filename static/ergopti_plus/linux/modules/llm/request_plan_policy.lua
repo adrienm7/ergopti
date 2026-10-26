@@ -10,7 +10,8 @@
 --- table under driver_options.linux and the contract test compares the two.
 ---
 --- FEATURES & RATIONALE:
---- 1. The debounce menu has a 50 ms minimum, so there is no "never" here.
+--- 1. "Never" (the shared debounce sentinel, -1) turns the automatic trigger off,
+---    so the plan accepts a negative debounce.
 --- 2. Every request waits for the backend's interval, explicit ones and the next
 ---    variants of a sequential request included: a hosted API with a free tier
 ---    answers a burst with HTTP 429, and a typed trigger or a hotkey is as much a
@@ -26,7 +27,7 @@ local Debounce = require("llm.request_plan.debounce")
 
 -- The option set this driver runs; compared with the corpus by the contract test.
 M.OPTIONS = {
-	allow_never = false,
+	allow_never = true,
 	pace_explicit = true,
 	pace_variants = true,
 	floor_scope = "per_backend",

@@ -302,6 +302,11 @@
 							"checked": false
 						},
 						{
+							"title": "Jamais",
+							"callback": true,
+							"checked": false
+						},
+						{
 							"title": "-",
 							"callback": false
 						},
