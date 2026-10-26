@@ -24,6 +24,7 @@ local NativePath = require("native_path")
 local LOG = "infra.dynamic_hotstrings_scope"
 local PROGRAMMABLE_PATH = "hotstrings.dynamic.user_code"
 local _owner, _sequence = nil, 0
+require("infra.scope_registry").register("dynamic_hotstrings_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
 --- Builds one recoverable transaction through the actual runtime owners.
 --- @param options table Configuration/backup paths, config, preferences, dynamic, files.

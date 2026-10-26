@@ -9,6 +9,7 @@ local FencedTransaction = require("config_scope_fenced_transaction")
 local Logger = require("logger.shim")
 local LOG = "infra.llm_scope"
 local _owner, _sequence = nil, 0
+require("infra.scope_registry").register("llm_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
 local OWNERS = { "settings", "trigger_settings", "display_settings", "navigation_settings",
 	"profile_settings", "agent_settings", "profiles" }

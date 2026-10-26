@@ -1025,6 +1025,9 @@ local _touchpad      = nil   -- what touchpad_finder chose, and what it can expr
 local _parameter_configuration_owner = nil
 local _parameter_delivery_epoch = 0
 local _scope_owner   = nil   -- retains refused runtime compensation
+require("infra.scope_registry").register("gesture_scope", function()
+	return _scope_owner ~= nil and _scope_owner.pending() == true
+end)
 local _scope_native = false -- admits only the scope's synchronous native inverse
 local _scope_sequence = 0
 local _program_owner = nil

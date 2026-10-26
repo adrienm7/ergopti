@@ -12,6 +12,7 @@ local Logger = require("logger.shim")
 local KEY = require("config_keys").KEY
 local LOG = "infra.metrics_scope"
 local _owner, _sequence = nil, 0
+require("infra.scope_registry").register("metrics_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
 --- Builds one recoverable transaction with acknowledged native compensation.
 --- @param options table Configuration path, backup path and runtime owners.

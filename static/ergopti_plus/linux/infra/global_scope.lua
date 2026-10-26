@@ -28,6 +28,7 @@ local Composition = require("config_scope_composition")
 local Logger = require("logger.shim")
 local LOG = "infra.global_scope"
 local _composition, _registry = nil, {}
+require("infra.scope_registry").register("global_scope", function() return _composition ~= nil and _composition.pending() == true end)
 
 --- The composite owner, created once so its debt survives between requests.
 --- @return table composition
