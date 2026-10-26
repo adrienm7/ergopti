@@ -552,14 +552,15 @@ assert.equal(passed, 15, 'the orphan script check must execute');
 const { loadMetricsAppsPage } = require('./support/metrics-apps-page.cjs');
 
 /** Delivers through each actual host handler; it never computes metrics. */
-function publishLoadedAppsData(page, host, manifest) {
+function publishLoadedAppsData(page, host, manifest, icons = {}, revision = 1) {
 	if (host === 'windows') {
+		assert.equal(Object.keys(icons).length, 0, 'the actual Windows producer emits empty icon maps');
 		const listener = page.messageListeners.find((entry) => entry.name === 'message');
 		assert.ok(listener, 'the actual Windows prefetch handler must be installed');
 		listener.callback({
 			data: {
 				type: 'prefetch',
-				blob: { metrics_manifest: manifest, user_categories: {}, app_icons: {} }
+				blob: { metrics_manifest: manifest, user_categories: {}, app_icons: icons }
 			}
 		});
 	} else if (host === 'linux') {
@@ -567,16 +568,14 @@ function publishLoadedAppsData(page, host, manifest) {
 			'metrics_apps_bridge',
 			false,
 			encodeURIComponent(
-				JSON.stringify({ metrics_manifest: manifest, user_categories: {}, app_icons: {} })
+				JSON.stringify({ metrics_manifest: manifest, user_categories: {}, app_icons: icons })
 			)
 		);
 	} else {
-		page.context.publishMetricsAppsData(
-			manifest,
-			{},
-			{},
-			{ manifest_revision: 1, categories_revision: 1 }
-		);
+		page.context.publishMetricsAppsData(manifest, {}, icons, {
+			manifest_revision: revision,
+			categories_revision: 1
+		});
 	}
 }
 const streakCases = [
@@ -1191,4 +1190,67 @@ for (const host of ['windows', 'macos', 'linux']) {
 assert.equal(civilZones.length, 4);
 assert.equal(annualCases.length, 4);
 assert.equal(passed, 195, 'all recorded-date, real-clock and timezone controls must execute');
+const replacementDateCases = [
+	{
+		name: 'removed selected day',
+		initial: ['2026-10-26'],
+		replacement: ['2026-10-27'],
+		expected: '2026-10-27'
+	},
+	{
+		name: 'retained historical selection',
+		initial: ['2026-10-26'],
+		replacement: ['2026-10-26', '2026-10-27'],
+		expected: '2026-10-26'
+	},
+	{ name: 'empty replacement', initial: ['2026-10-26'], replacement: [], expected: null },
+	{
+		name: 'first recorded day after empty state',
+		initial: [],
+		replacement: ['2026-10-27'],
+		expected: '2026-10-27'
+	}
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of replacementDateCases) {
+		test(`${host} full snapshot reconciles ${vector.name}`, () => {
+			const page = loadMetricsAppsPage(host);
+			const manifest = (dates) =>
+				Object.fromEntries(
+					dates.map((date, i) => [
+						date,
+						{ Editor: { category: 'Productivity', chars: 23 + i, app_time_ms: 60000 } }
+					])
+				);
+			const publish = (data, revision) => {
+				if (host === 'linux') {
+					// Native Linux polls merge dates rather than replacing snapshots.
+					// Exercise the same public full-snapshot owner explicitly.
+					page.context.bootstrapMetricsAppsData(data, {}, {});
+				} else publishLoadedAppsData(page, host, data, {}, revision);
+			};
+			publish(manifest(vector.initial), 1);
+			vm.runInContext("currentPeriod='day'; renderDashboard();", page.context);
+			publish(manifest(vector.replacement), 2);
+			const selected = vm.runInContext('currentSelectedDate', page.context);
+			assert.equal(selected, vector.expected);
+			if (vector.expected !== null)
+				assert.equal(page.elements.get('date-select').value, vector.expected);
+			assert.deepEqual(
+				page.elements.get('date-select').children.map((option) => option.value),
+				[...vector.replacement].sort().reverse()
+			);
+			const agg = page.context.getAggregatedData();
+			assert.deepEqual(Object.keys(agg.rich.by_date), vector.expected ? [vector.expected] : []);
+			const expectedChars = vector.expected ? 23 + vector.replacement.indexOf(vector.expected) : 0;
+			assert.equal(agg.rich.typing.chars, expectedChars);
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false
+			);
+		});
+	}
+}
+assert.equal(replacementDateCases.length, 4);
+assert.equal(passed, 207, 'all full-snapshot selection lifecycle controls must execute');
 console.log(`${passed} passed, 0 failed.`);
