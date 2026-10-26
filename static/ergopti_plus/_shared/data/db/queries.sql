@@ -195,3 +195,14 @@ FROM {{table}}{{where}}{{conjunction}}(typeof(c) IN ('integer','real') AND typeo
 GROUP BY app, token, esrc_json
 UNION ALL SELECT {{text app}}, {{text token}}, c, td, e, esrc_json, 1 AS source_rows
 FROM {{table}}{{where}}{{conjunction}}NOT (typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real'));
+
+
+-- ============================================================================
+-- 3. METADATA
+-- ============================================================================
+
+-- name: meta.rev
+-- doc: The revision counter every writer bumps on a successful commit; readers
+-- doc: compare it to know whether anything changed. A numeric string, so no
+-- doc: dialect has to protect it.
+SELECT value FROM meta WHERE key='rev';

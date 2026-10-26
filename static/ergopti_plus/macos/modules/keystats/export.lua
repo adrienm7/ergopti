@@ -29,6 +29,7 @@ local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 
 local Logger = require("infra.logger")
+local Queries = require("keystats.queries")
 local i18n   = require("infra.i18n")
 local FsDir  = require("infra.fs_dir")
 local RunningApplication = require("adapters.running_application")
@@ -240,7 +241,7 @@ end
 function M.get_db_rev()
 	local db = _get_db and _get_db()
 	if not db then return 0 end
-	for r in db:nrows("SELECT value FROM meta WHERE key='rev'") do
+	for r in db:nrows(Queries.render("meta.rev", "native")) do
 		return tonumber(r.value) or 0
 	end
 	return 0
