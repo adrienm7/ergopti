@@ -295,7 +295,7 @@ function M.build(ctx, dialogs)
 			end,
 		},
 		state_getters = {
-			["llm.agent_mode"] = AgentSettings.get_mode,
+			[require("config_keys").KEY.LLM_AGENT_MODE] = AgentSettings.get_mode,
 			agent_mode_ready = function() return llm ~= nil and type(llm.set_agent_mode) == "function" end,
 		},
 	}

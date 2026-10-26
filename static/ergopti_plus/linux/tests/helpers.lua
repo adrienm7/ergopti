@@ -39,6 +39,27 @@ local _fail_msg = fmt.fail_msg_for("helpers%.lua$")
 -- ===================================
 -- ===================================
 
+--- Source text in which each generated config-key reference reads as the quoted string it
+--- stands for, for tests that scan driver source for the literal a call passes. A name the
+--- generated tables do not hold is left as written, so the scan still refuses it.
+--- @param text string Lua source text.
+--- @return string expanded
+function M.expand_config_keys(text)
+	local keys = require("config_keys")
+	local function resolve(whole, root_table, name)
+		local found, tbl = pcall(function() return keys[root_table] end)
+		if not found then return whole end
+		local ok, value = pcall(function() return tbl[name] end)
+		return ok and type(value) == "string" and string.format("%q", value) or whole
+	end
+	text = text:gsub('require%("config_keys"%)%.(%u+)%.([%u%d_]+)', function(root_table, name)
+		return resolve('require("config_keys").' .. root_table .. "." .. name, root_table, name)
+	end)
+	return (text:gsub("ConfigKeys%.(%u+)%.([%u%d_]+)", function(root_table, name)
+		return resolve("ConfigKeys." .. root_table .. "." .. name, root_table, name)
+	end))
+end
+
 --- Returns the absolute path of the Linux driver root (no trailing slash).
 --- @return string Absolute path.
 function M.driver_root()

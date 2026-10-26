@@ -354,7 +354,7 @@ helpers.describe("word reset: the daemon wiring", function()
 		local f = assert(io.open(helpers.driver_root() .. "/" .. rel, "rb"))
 		local text = f:read("*a")
 		f:close()
-		return text
+		return helpers.expand_config_keys(text)
 	end
 
 	helpers.it("word reset, resets the engine after an idle pause before feeding the character", function()

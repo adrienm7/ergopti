@@ -547,7 +547,7 @@ local function _build_layouts(ctx)
 	-- The "Manage layouts…" row opens the shared layout manager window.
 	render_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do render_ctx.commands[key] = value end
-	render_ctx.commands["layout_manager"] = function()
+	render_ctx.commands[require("config_keys").COMMAND.LAYOUT_MANAGER] = function()
 		if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 			Logger.error(LOG, "No webview manager in the menu context — the layout manager cannot open.")
 			return false
@@ -680,8 +680,8 @@ local function _build_layouts(ctx)
 	end
 
 	-- Native-only status never acquires a preference or forced-input writer.
-	render_ctx.commands["number_row_mode"] = function() return false end
-	render_ctx.commands["number_row_edges"] = function() return false end
+	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_MODE] = function() return false end
+	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_EDGES] = function() return false end
 	providers["number_row_policy"] = function() return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end
 	-- Layout on pause / resume: the shared frames macOS draws, listing the
 	-- desktop's own layouts (ui/menu/pause_layout_rows.lua).
@@ -1078,7 +1078,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				["hotstring_category_file"] = function()
 					if not category or not category.path then return {} end
 					local source = category.path
-					local row = ManifestMenu.command_row("hotstring_file_commands", "hotstring_file_open",
+					local row = ManifestMenu.command_row("hotstring_file_commands", require("config_keys").COMMAND.HOTSTRING_FILE_OPEN,
 						{ hotstring_file_open = function() return ctx.on_open_file(source) end },
 						{ hotstring_file_ready = function() return type(ctx.on_open_file) == "function" end })
 					return row and { row } or {}
@@ -1453,7 +1453,7 @@ local function _manifest_hotstring_rows(ctx, config)
 						end,
 					}
 					if def.custom then
-						local delete_row = ManifestMenu.command_row("word_expander_custom_menu", "word_expander_delete", {
+						local delete_row = ManifestMenu.command_row("word_expander_custom_menu", require("config_keys").COMMAND.WORD_EXPANDER_DELETE, {
 							["word_expander_delete"] = function()
 								local saved = snapshot()
 								if Terminators.remove_custom_terminator(key) ~= true then return false end
@@ -1467,7 +1467,7 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			local catalogue_rows = sub
 			sub = {}
-			local add_row = ManifestMenu.command_row("word_expander_custom_menu", "word_expander_add", {
+			local add_row = ManifestMenu.command_row("word_expander_custom_menu", require("config_keys").COMMAND.WORD_EXPANDER_ADD, {
 				["word_expander_add"] = function()
 					local char = prompt_text(
 						i18n_safe("dialog.hotstrings.new_delimiter_title"),
@@ -1572,7 +1572,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- The values were all there; only the prompts were missing.
 			if not captions then return {} end
 
-			local settings_row = ManifestMenu.command_row("hotstrings_delays_menu", "hotstrings_config_window", {
+			local settings_row = ManifestMenu.command_row("hotstrings_delays_menu", require("config_keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW, {
 				hotstrings_config_window = function()
 					if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 						Logger.error(LOG, "No webview manager in the menu context — cannot open the hotstrings settings.")
@@ -1786,7 +1786,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				local ok, current = pcall(ctx.is_paused)
 				return ok and current == false
 			end
-			local editor_row = ManifestMenu.command_row("personal_hotstring_commands", "personal_hotstring_open_editor",
+			local editor_row = ManifestMenu.command_row("personal_hotstring_commands", require("config_keys").COMMAND.PERSONAL_HOTSTRING_OPEN_EDITOR,
 				{ personal_hotstring_open_editor = function() return ctx.webview.show("hotstring_editor") end },
 				{ personal_hotstring_editor_ready = editor_ready })
 
@@ -2096,7 +2096,7 @@ local function _manifest_hotstring_rows(ctx, config)
 					return true
 				end,
 			}, {
-				["hotstrings.preview_star_enabled"] = function() return PreviewSettings.get("star") == true end,
+				[require("config_keys").KEY.HOTSTRINGS_PREVIEW_STAR_ENABLED] = function() return PreviewSettings.get("star") == true end,
 				-- Preserve configuration access while the Linux engine is paused.
 				["preview_magic_ready"] = function() return true end,
 			})
@@ -2131,7 +2131,7 @@ local function _manifest_hotstring_rows(ctx, config)
 					return true
 				end,
 			}, {
-				["hotstrings.preview_colored_tooltips"] = function() return PreviewSettings.get("colored") == true end,
+				[require("config_keys").KEY.HOTSTRINGS_PREVIEW_COLORED_TOOLTIPS] = function() return PreviewSettings.get("colored") == true end,
 				-- Configuring a preview remains allowed while the Linux engine is paused.
 				["preview_colored_ready"] = function() return true end,
 			})
@@ -2161,7 +2161,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			for key, value in pairs(c) do params_ctx[key] = value end
 			params_ctx.commands = {}
 			for key, value in pairs(c.commands or {}) do params_ctx.commands[key] = value end
-			params_ctx.commands["repeat_key"] = function()
+			params_ctx.commands[require("config_keys").COMMAND.REPEAT_KEY] = function()
 				RepeatKey.toggle()
 				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			end
@@ -2181,7 +2181,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				return committed
 			end
-			params_ctx.commands["idle_reset"] = function(seconds)
+			params_ctx.commands[require("config_keys").COMMAND.IDLE_RESET] = function(seconds)
 				return word_reset_changed(WordReset.set_idle_seconds(seconds))
 			end
 			params_ctx.commands["idle_reset_custom"] = function()
@@ -2201,19 +2201,19 @@ local function _manifest_hotstring_rows(ctx, config)
 			params_ctx.commands[COMMAND.CASCADE_MAX_ARROWS] = function(arrows)
 				return word_reset_changed(WordReset.set_cascade_max_arrows(arrows))
 			end
-			params_ctx.commands["click_resets_word"] = function()
+			params_ctx.commands[require("config_keys").COMMAND.CLICK_RESETS_WORD] = function()
 				return word_reset_changed(WordReset.toggle_click_resets_word())
 			end
-			params_ctx.commands["arrow_resets_word"] = function()
+			params_ctx.commands[require("config_keys").COMMAND.ARROW_RESETS_WORD] = function()
 				return word_reset_changed(WordReset.toggle_arrow_resets_word())
 			end
-			params_ctx.commands["shortcut_resets_word"] = function()
+			params_ctx.commands[require("config_keys").COMMAND.SHORTCUT_RESETS_WORD] = function()
 				return word_reset_changed(WordReset.toggle_shortcut_resets_word())
 			end
-			params_ctx.commands["tap_hold_resets_word"] = function()
+			params_ctx.commands[require("config_keys").COMMAND.TAP_HOLD_RESETS_WORD] = function()
 				return word_reset_changed(WordReset.toggle_tap_hold_resets_word())
 			end
-			params_ctx.state_getters["hotstrings.idle_reset_seconds"] = function()
+			params_ctx.state_getters[require("config_keys").KEY.HOTSTRINGS_IDLE_RESET_SECONDS] = function()
 				return WordReset.idle_seconds()
 			end
 			params_ctx.state_getters[require("config_keys").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS] = function()
@@ -2442,14 +2442,14 @@ local function _build_llm(ctx)
 			return
 		end
 		local rows = {}
-		local current_delay = TriggerSettings.get("debounce_ms")
+		local current_delay = TriggerSettings.get(require("config_keys").LEAF.DEBOUNCE_MS)
 		local delay_choices = {}
 		for _, value in ipairs(TriggerSettings.presets("debounce_ms")) do
 			delay_choices[#delay_choices + 1] = {
 				label = tostring(value) .. " ms",
 				checked = current_delay == value,
 				action = function()
-					TriggerSettings.set("debounce_ms", value)
+					TriggerSettings.set(require("config_keys").LEAF.DEBOUNCE_MS, value)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				end,
 			}
@@ -2472,7 +2472,7 @@ local function _build_llm(ctx)
 					return
 				end
 				local value, save = numeric_setting_request(ctx.on_menu_changed, TriggerSettings,
-					"modules.llm.trigger_settings", "debounce_ms", "llm.trigger.debounce_ms")
+					"modules.llm.trigger_settings", "debounce_ms", require("config_keys").KEY.LLM_TRIGGER_DEBOUNCE_MS)
 				if not save then return false end
 				Prompt.ask({
 					title = i18n_safe(title_key),
@@ -2501,7 +2501,7 @@ local function _build_llm(ctx)
 				paused = true, blocked = true}
 			local ok, detail = xpcall(function()
 				local path = "llm.trigger." .. name
-				local values, source = Preferences.get_many({"llm.enabled", "llm.models.selected", path})
+				local values, source = Preferences.get_many({require("config_keys").KEY.LLM_ENABLED, require("config_keys").KEY.LLM_MODELS_SELECTED, path})
 				snapshot.source = source
 				snapshot.preferences_generation = Preferences.generation()
 				if type(llm.streaming_revision) ~= "function" then error("Native admission revision is unavailable") end
@@ -2512,8 +2512,8 @@ local function _build_llm(ctx)
 				snapshot.backend = llm.get_backend()
 				snapshot.paused = ctx.paused == true or ctx.is_paused()
 				snapshot.blocked = Preferences.admit() ~= true
-					or values["llm.enabled"] ~= snapshot.enabled
-					or values["llm.models.selected"] ~= snapshot.backend or values[path] ~= snapshot.value
+					or values[require("config_keys").KEY.LLM_ENABLED] ~= snapshot.enabled
+					or values[require("config_keys").KEY.LLM_MODELS_SELECTED] ~= snapshot.backend or values[path] ~= snapshot.value
 			end, debug.traceback)
 			if not ok then
 				Logger.warn(LOG, "Privacy row source is unavailable: %s.", tostring(detail))
@@ -2552,12 +2552,12 @@ local function _build_llm(ctx)
 				["llm_after_hotstring"] = function() return toggle("after_hotstring") end,
 			},
 			state_getters = {
-				["llm_url_bar_filter_enabled"] = function() return TriggerSettings.get("url_bar_filter_enabled") end,
-				["llm_secure_field_filter_enabled"] = function() return TriggerSettings.get("secure_filter_enabled") end,
+				["llm_url_bar_filter_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.URL_BAR_FILTER_ENABLED) end,
+				["llm_secure_field_filter_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.SECURE_FILTER_ENABLED) end,
 				["llm_url_bar_filter_ready"] = function() return PrivacyPolicy.ready(url_source) end,
 				["llm_secure_field_filter_ready"] = function() return PrivacyPolicy.ready(secure_source) end,
-				["llm_instant_on_word_end_enabled"] = function() return TriggerSettings.get("instant_on_word_end") end,
-				["llm_after_hotstring_enabled"] = function() return TriggerSettings.get("after_hotstring") end,
+				["llm_instant_on_word_end_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.INSTANT_ON_WORD_END) end,
+				["llm_after_hotstring_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.AFTER_HOTSTRING) end,
 				["llm_trigger_ready"] = ready,
 			},
 		}
@@ -2597,7 +2597,7 @@ local function _build_llm(ctx)
 		-- The model predictions actually use: an API entry's when the API answers.
 		local current_model = llm.get_prediction_model and llm.get_prediction_model() or nil
 		local effective = ProfileSettings.effective_profile(current_model)
-		local count = ProfileSettings.get("num_predictions") or 1
+		local count = ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS) or 1
 		local function refresh()
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end
@@ -2667,9 +2667,9 @@ local function _build_llm(ctx)
 		local active_builtin, user_profiles, seed
 		local function auto_profile()
 			if not create_ready() then return false end
-			local current = ProfileSettings.get("auto_profile_for_model")
+			local current = ProfileSettings.get(require("config_keys").LEAF.AUTO_PROFILE_FOR_MODEL)
 			if type(current) ~= "boolean" or not create_ready() then return false end
-			local saved = ProfileSettings.set("auto_profile_for_model", not current, current_model)
+			local saved = ProfileSettings.set(require("config_keys").LEAF.AUTO_PROFILE_FOR_MODEL, not current, current_model)
 			if saved ~= true then return false end
 			refresh()
 			return true
@@ -2804,7 +2804,7 @@ local function _build_llm(ctx)
 		}, {
 			["llm_profile_recommendation_present"] = function() return false end,
 			["llm_profile_recommendation_paused"] = function() return false end,
-			["llm_profile_auto_detect_checked"] = function() return ProfileSettings.get("auto_profile_for_model") == true end,
+			["llm_profile_auto_detect_checked"] = function() return ProfileSettings.get(require("config_keys").LEAF.AUTO_PROFILE_FOR_MODEL) == true end,
 			["llm_profile_custom_present"] = custom_present,
 			["llm_profile_clone_present"] = clone_present,
 			["llm_profile_create_ready"] = create_ready,
@@ -2839,7 +2839,7 @@ local function _build_llm(ctx)
 		local DisplayPolicy = require("llm.display_policy")
 		local ProfileSettings = require("modules.llm.profile_settings")
 		local function show_all_ready()
-			return DisplayPolicy.ready(ProfileSettings.get("num_predictions"),
+			return DisplayPolicy.ready(ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS),
 				ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
 				or type(llm.is_enabled) ~= "function" or llm.is_enabled() ~= true)
 		end
@@ -2847,18 +2847,18 @@ local function _build_llm(ctx)
 		local function streaming_snapshot()
 			local paused
 			if type(ctx.is_paused) == "function" then paused = ctx.is_paused() end
-			local values, source = Preferences.get_many({ "llm.enabled", "llm.display.streaming", "llm.display.streaming_multi" })
+			local values, source = Preferences.get_many({ require("config_keys").KEY.LLM_ENABLED, require("config_keys").KEY.LLM_DISPLAY_STREAMING, require("config_keys").KEY.LLM_DISPLAY_STREAMING_MULTI })
 			local revision = type(llm.streaming_revision) == "function" and llm.streaming_revision() or nil
 			local enabled = type(llm.is_enabled) == "function" and llm.is_enabled() or nil
-			local streaming, progressive = DisplaySettings.get("streaming"), DisplaySettings.get("streaming_multi")
+			local streaming, progressive = DisplaySettings.get("streaming"), DisplaySettings.get(require("config_keys").LEAF.STREAMING_MULTI)
 			return {
 				owner = Preferences, source = source,
 				generation = type(revision) == "number" and Preferences.generation() + revision or nil,
 				platform = "linux",
 				backend = type(llm.get_backend) == "function" and llm.get_backend() or nil,
 				enabled = enabled, paused = paused,
-				blocked = Preferences.admit() ~= true or enabled ~= values["llm.enabled"]
-					or streaming ~= values["llm.display.streaming"] or progressive ~= values["llm.display.streaming_multi"],
+				blocked = Preferences.admit() ~= true or enabled ~= values[require("config_keys").KEY.LLM_ENABLED]
+					or streaming ~= values[require("config_keys").KEY.LLM_DISPLAY_STREAMING] or progressive ~= values[require("config_keys").KEY.LLM_DISPLAY_STREAMING_MULTI],
 				progressive = progressive, streaming = streaming,
 			}
 		end
@@ -2866,11 +2866,11 @@ local function _build_llm(ctx)
 		local rows = {}
 		local function indentation_snapshot()
 			local snapshot = streaming_snapshot()
-			local values, source = Preferences.get_many({ "llm.profiles.num_predictions", "llm.display.pred_indent" })
-			snapshot.count = ProfileSettings.get("num_predictions")
-			snapshot.indentation = DisplaySettings.get("pred_indent")
-			snapshot.blocked = snapshot.blocked or snapshot.count ~= values["llm.profiles.num_predictions"]
-				or snapshot.indentation ~= values["llm.display.pred_indent"]
+			local values, source = Preferences.get_many({ require("config_keys").KEY.LLM_PROFILES_NUM_PREDICTIONS, require("config_keys").KEY.LLM_DISPLAY_PRED_INDENT })
+			snapshot.count = ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS)
+			snapshot.indentation = DisplaySettings.get(require("config_keys").LEAF.PRED_INDENT)
+			snapshot.blocked = snapshot.blocked or snapshot.count ~= values[require("config_keys").KEY.LLM_PROFILES_NUM_PREDICTIONS]
+				or snapshot.indentation ~= values[require("config_keys").KEY.LLM_DISPLAY_PRED_INDENT]
 			-- Re-reading the canonical owner advances its revision for every source
 			-- change, including unrelated fields and away/back transitions.
 			snapshot.source = source
@@ -2882,10 +2882,10 @@ local function _build_llm(ctx)
 		end
 		local indentation_source = indentation_snapshot()
 		local function info_bar_snapshot()
-			local values, source = Preferences.get_many({ "llm.enabled", "llm.display.show_info_bar" })
+			local values, source = Preferences.get_many({ require("config_keys").KEY.LLM_ENABLED, require("config_keys").KEY.LLM_DISPLAY_SHOW_INFO_BAR })
 			local revision = type(llm.streaming_revision) == "function" and llm.streaming_revision() or nil
 			local enabled = type(llm.is_enabled) == "function" and llm.is_enabled() or nil
-			local selected = DisplaySettings.get("show_info_bar")
+			local selected = DisplaySettings.get(require("config_keys").LEAF.SHOW_INFO_BAR)
 			local paused
 			if type(ctx.is_paused) == "function" then paused = ctx.is_paused() end
 			return {
@@ -2893,8 +2893,8 @@ local function _build_llm(ctx)
 				generation = type(revision) == "number" and Preferences.generation() + revision or nil,
 				backend = type(llm.get_backend) == "function" and llm.get_backend() or nil,
 				info_bar = selected, enabled = enabled, paused = paused,
-				blocked = Preferences.admit() ~= true or enabled ~= values["llm.enabled"]
-					or selected ~= values["llm.display.show_info_bar"],
+				blocked = Preferences.admit() ~= true or enabled ~= values[require("config_keys").KEY.LLM_ENABLED]
+					or selected ~= values[require("config_keys").KEY.LLM_DISPLAY_SHOW_INFO_BAR],
 			}
 		end
 		local info_bar_source = info_bar_snapshot()
@@ -2904,13 +2904,13 @@ local function _build_llm(ctx)
 					local current = indentation_snapshot()
 					local decision = DisplayPolicy.indentation_intent(indentation_source, current, value, DisplaySettings.indent_values())
 					if decision.admitted ~= true then return false end
-					if DisplaySettings.set("pred_indent", decision.value, current.source) ~= true then return false end
+					if DisplaySettings.set(require("config_keys").LEAF.PRED_INDENT, decision.value, current.source) ~= true then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
 				["llm_show_all"] = function()
 					if not show_all_ready() then return false end
-					if DisplaySettings.set("streaming_multi", not DisplaySettings.get("streaming_multi")) ~= true then return false end
+					if DisplaySettings.set(require("config_keys").LEAF.STREAMING_MULTI, not DisplaySettings.get(require("config_keys").LEAF.STREAMING_MULTI)) ~= true then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
@@ -2926,15 +2926,15 @@ local function _build_llm(ctx)
 					local current = info_bar_snapshot()
 					local decision = DisplayPolicy.info_bar_intent(info_bar_source, current)
 					if decision.admitted ~= true then return false end
-					if DisplaySettings.set("show_info_bar", decision.value, current.source) ~= true then return false end
+					if DisplaySettings.set(require("config_keys").LEAF.SHOW_INFO_BAR, decision.value, current.source) ~= true then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
 			},
 			state_getters = {
-				["llm.display.pred_indent"] = function() return indentation_source.indentation end,
+				[require("config_keys").KEY.LLM_DISPLAY_PRED_INDENT] = function() return indentation_source.indentation end,
 				["llm_indentation_ready"] = function() return DisplayPolicy.indentation_ready(indentation_source) end,
-				["llm_show_all_enabled"] = function() return DisplayPolicy.show_all(DisplaySettings.get("streaming_multi")) end,
+				["llm_show_all_enabled"] = function() return DisplayPolicy.show_all(DisplaySettings.get(require("config_keys").LEAF.STREAMING_MULTI)) end,
 				["llm_show_all_ready"] = show_all_ready,
 				["llm_token_streaming_enabled"] = function()
 					return DisplayPolicy.streaming_capable(streaming_source.platform, streaming_source.backend)
@@ -3107,7 +3107,7 @@ local function _build_llm(ctx)
 				rows[#rows + 1] = row
 			end
 		end
-		local browser_row = ManifestMenu.command_row("llm_model_commands", "llm_browse_models", {
+		local browser_row = ManifestMenu.command_row("llm_model_commands", require("config_keys").COMMAND.LLM_BROWSE_MODELS, {
 			["llm_browse_models"] = function()
 				return ctx.webview.show("model_browser") == true
 			end,
@@ -3151,7 +3151,7 @@ local function _build_llm(ctx)
 				tostring(ProfileSettings))
 			return nil
 		end
-		local current = ProfileSettings.get("num_predictions")
+		local current = ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS)
 		local choices = {}
 		for value = 1, 10 do
 			-- One key per plural form, the rows macOS and Windows draw.
@@ -3161,7 +3161,7 @@ local function _build_llm(ctx)
 				label = string.format(i18n_safe(count_key), value),
 				checked = current == value,
 				action = function()
-					ProfileSettings.set("num_predictions", value)
+					ProfileSettings.set(require("config_keys").LEAF.NUM_PREDICTIONS, value)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				end,
 			}
@@ -3247,7 +3247,7 @@ local function _build_llm(ctx)
 		--- Reads current group, pause and prediction-count facts before delivery.
 		--- @return boolean ready
 		local function ready()
-			local count = ProfileSettings.get("num_predictions")
+			local count = ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS)
 			return ctx.paused ~= true and type(llm.is_enabled) == "function" and llm.is_enabled() == true
 				and type(count) == "number" and count >= 2
 		end
@@ -3255,13 +3255,13 @@ local function _build_llm(ctx)
 			commands = {
 				["llm_auto_raise_temperature"] = function()
 					if not ready() then return false end
-					if Settings.set("auto_raise_temp", not Settings.get("auto_raise_temp")) ~= true then return false end
+					if Settings.set(require("config_keys").LEAF.AUTO_RAISE_TEMP, not Settings.get(require("config_keys").LEAF.AUTO_RAISE_TEMP)) ~= true then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
 			},
 			state_getters = {
-				["llm_auto_raise_enabled"] = function() return Settings.get("auto_raise_temp") end,
+				["llm_auto_raise_enabled"] = function() return Settings.get(require("config_keys").LEAF.AUTO_RAISE_TEMP) end,
 				["llm_auto_raise_ready"] = ready,
 			},
 		}
@@ -3312,7 +3312,7 @@ local function _build_llm(ctx)
 		return require("config_migrate").read_only_status(require("infra.config_paths").config("config.toml")) == "newer"
 	end
 	-- The restore alone: the AI menu's clear row was retired.
-	llm_ctx.commands["scope_restore"] = function()
+	llm_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
 		-- A retained row rechecks what greyed it when it was built.
 		if not scope_ready() then
 			Logger.warn(LOG, "AI settings restore refused: %s.", ctx.paused == true and "the script is paused"
@@ -3323,7 +3323,7 @@ local function _build_llm(ctx)
 		if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
 	end
-	llm_ctx.commands["llm_toggle"] = function()
+	llm_ctx.commands[require("config_keys").COMMAND.LLM_TOGGLE] = function()
 		if not toggle_ready() then return false end
 		if llm.toggle then llm.toggle(ctx.on_menu_changed) end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
@@ -4252,7 +4252,7 @@ local function _build_shortcuts(ctx)
 		for key, value in pairs(ctx) do chords_ctx[key] = value end
 		chords_ctx.commands = {}
 		for key, value in pairs(ctx.commands or {}) do chords_ctx.commands[key] = value end
-		chords_ctx.commands["script_control_toggle"] = function()
+		chords_ctx.commands[require("config_keys").COMMAND.SCRIPT_CONTROL_TOGGLE] = function()
 			local read, current = false, nil
 			if type(Chords.chords_enabled) == "function" then read, current = pcall(Chords.chords_enabled) end
 			local called, committed = false, false
@@ -4268,8 +4268,8 @@ local function _build_shortcuts(ctx)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end
-		chords_ctx.commands["scope_restore"] = function() return apply_chords_scope("recommended") end
-		chords_ctx.commands["scope_clear"] = function() return apply_chords_scope("clear") end
+		chords_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_chords_scope("recommended") end
+		chords_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_chords_scope("clear") end
 		chords_ctx.state_getters = {}
 		for key, value in pairs(ctx.state_getters or {}) do chords_ctx.state_getters[key] = value end
 		chords_ctx.state_getters["script_control_enabled"] = function() return chords_on end
@@ -4326,10 +4326,10 @@ local function _build_shortcuts(ctx)
 		for key, value in pairs(ctx.commands or {}) do cw_ctx.commands[key] = value end
 		cw_ctx.state_getters = {}
 		for key, value in pairs(ctx.state_getters or {}) do cw_ctx.state_getters[key] = value end
-		cw_ctx.commands["caps_word_idle_timeout"] = function(seconds)
+		cw_ctx.commands[require("config_keys").COMMAND.CAPS_WORD_IDLE_TIMEOUT] = function(seconds)
 			return changed(AutoOff.set_idle_timeout_seconds(seconds))
 		end
-		cw_ctx.state_getters["shortcuts.caps_word.idle_timeout_seconds"] = function()
+		cw_ctx.state_getters[require("config_keys").KEY.SHORTCUTS_CAPS_WORD_IDLE_TIMEOUT_SECONDS] = function()
 			return settings.idle_timeout_seconds
 		end
 		-- One checkbox per kind the manifest declares, in its order; a kind
@@ -4389,9 +4389,9 @@ local function _build_shortcuts(ctx)
 		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
 	end
-	sc_ctx.commands["scope_restore"] = function() return apply_shortcuts_scope("recommended") end
-	sc_ctx.commands["scope_clear"] = function() return apply_shortcuts_scope("clear") end
-	sc_ctx.commands["shortcuts_toggle"] = function()
+	sc_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_shortcuts_scope("recommended") end
+	sc_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_shortcuts_scope("clear") end
+	sc_ctx.commands[require("config_keys").COMMAND.SHORTCUTS_TOGGLE] = function()
 		local read, current = false, nil
 		if type(sc.is_enabled) == "function" then read, current = pcall(sc.is_enabled) end
 		local called, committed = false, false
@@ -4407,7 +4407,7 @@ local function _build_shortcuts(ctx)
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return true
 	end
-	sc_ctx.commands["edit_chatgpt_url"] = function()
+	sc_ctx.commands[require("config_keys").COMMAND.EDIT_CHATGPT_URL] = function()
 		local ok_chatgpt, ChatGPT = pcall(require, "modules.shortcuts.chatgpt")
 		if not ok_chatgpt or type(ChatGPT.get_url) ~= "function"
 			or type(ChatGPT.set_url) ~= "function" then
@@ -4438,7 +4438,7 @@ local function _build_shortcuts(ctx)
 		host = function() return require("ui.physical_shortcuts.bridge") end,
 		refused = function() show_error(i18n_safe("physical_shortcuts.window_unavailable")) end,
 	})
-	sc_ctx.commands["physical_shortcuts_editor"] = physical_editor.open
+	sc_ctx.commands[require("config_keys").COMMAND.PHYSICAL_SHORTCUTS_EDITOR] = physical_editor.open
 	sc_ctx.state_getters["physical_shortcuts_editor_ready"] = physical_editor.ready
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return enabled end
 	sc_ctx.state_getters["key_combinations_enabled"] = function()
@@ -4460,7 +4460,7 @@ local function _build_shortcuts(ctx)
 			and type(sc.is_wrap_on_type_enabled) == "function" and type(sc.set_wrap_on_type_enabled) == "function"
 	end
 	if type(sc.is_wrap_on_type_enabled) == "function" then
-		sc_ctx.feature_rows["shortcuts.wrap_text_if_selected"] = function()
+		sc_ctx.feature_rows[require("config_keys").KEY.SHORTCUTS_WRAP_TEXT_IF_SELECTED] = function()
 			local on = sc.is_wrap_on_type_enabled()
 			local rows = ManifestMenu.template_rows("shortcut_wrap_live_control", {
 				["shortcut_wrap_on_type"] = function()
@@ -4791,7 +4791,7 @@ local function _build_tap_holds(ctx)
 	-- The feature switch is persisted in the file ([tap_hold] enabled), as the
 	-- Windows toggle is in its config; turning it on also lifts a runtime
 	-- « Disable all ».
-	render_ctx.commands["tapholds_toggle"] = function()
+	render_ctx.commands[require("config_keys").COMMAND.TAPHOLDS_TOGGLE] = function()
 		local want = not feature_on
 		local ok = Writer.set_enabled(want)
 		if ok and want then ok = th.set_enabled(true) end
@@ -4806,15 +4806,15 @@ local function _build_tap_holds(ctx)
 		changed(committed)
 		return committed
 	end
-	render_ctx.commands["scope_restore"] = function() return apply_scope("recommended") end
-	render_ctx.commands["scope_clear"] = function() return apply_scope("clear") end
+	render_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_scope("recommended") end
+	render_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_scope("clear") end
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
 	render_ctx.state_getters["tapholds_enabled"] = function() return feature_on end
 
 	-- The navigation layer editor: the shared page, saved and applied by
 	-- ui/layer_editor/bridge.lua.
-	render_ctx.commands["edit_nav_layer"] = function()
+	render_ctx.commands[require("config_keys").COMMAND.EDIT_NAV_LAYER] = function()
 		if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 			Logger.error(LOG, "No webview manager in the menu context — the layer editor cannot open.")
 			return
@@ -4898,7 +4898,7 @@ local function _build_gestures(ctx)
 	providers["system_gesture_status"] = function() return require("ui.gesture_conflicts").rows(ge) end
 	-- The recommended-defaults note and why Linux recommends no swipe.
 	providers["gesture_recommended_notes"] = function() return ManifestMenu.template_rows("gesture_recommended_notes", {}) end
-	gesture_commands["system_gesture_settings"] = function() return require("ui.gesture_conflicts").open_settings() end
+	gesture_commands[require("config_keys").COMMAND.SYSTEM_GESTURE_SETTINGS] = function() return require("ui.gesture_conflicts").open_settings() end
 	providers["gesture_slots_linux"] = function()
 		local out = {}
 		-- Every known slot is configurable here. A partial quick list made
@@ -4979,7 +4979,7 @@ local function _build_gestures(ctx)
 	for key, value in pairs(ctx) do gesture_ctx[key] = value end
 	gesture_ctx.commands = {}
 	for key, value in pairs(gesture_commands or {}) do gesture_ctx.commands[key] = value end
-	gesture_ctx.commands["gestures_toggle"] = master_toggle_action
+	gesture_ctx.commands[require("config_keys").COMMAND.GESTURES_TOGGLE] = master_toggle_action
 	gesture_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do gesture_ctx.state_getters[key] = value end
 	gesture_ctx.state_getters["gestures_enabled"] = function() return gestures_on end
@@ -5224,7 +5224,7 @@ local function _channel_picker(ctx, up)
 			end
 			return true
 		end,
-	}, { ["updater.channel"] = function() return up.get_channel() end })
+	}, { [require("config_keys").KEY.UPDATER_CHANNEL] = function() return up.get_channel() end })
 end
 
 --- Supplies the registered cadence choice to the existing updater owner.
@@ -5241,7 +5241,7 @@ local function _frequency_picker(ctx, up)
 			return true
 		end,
 	}, {
-		["updater.check_interval_seconds"] = function()
+		[require("config_keys").KEY.UPDATER_CHECK_INTERVAL_SECONDS] = function()
 			return Schedule.snap_interval(up.get_check_interval(), up.TIMING)
 		end,
 	})
@@ -5291,7 +5291,7 @@ local function _about_update_rows(ctx)
 
 	-- A check discovers releases; installation needs the separately named row.
 	if source_run then
-		local source_row = ManifestMenu.command_row("about_source_menu", "about_source_check", {
+		local source_row = ManifestMenu.command_row("about_source_menu", require("config_keys").COMMAND.ABOUT_SOURCE_CHECK, {
 			["about_source_check"] = function() return false end,
 		}, { ["about_source_release_ready"] = function() return not source_run end })
 		if source_row then out[#out + 1] = source_row end
@@ -5716,7 +5716,7 @@ local function _build_debug(ctx)
 	}
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
-	render_ctx.state_getters["script.log_level"] = function() return ctx.log_level end
+	render_ctx.state_getters[require("config_keys").KEY.SCRIPT_LOG_LEVEL] = function() return ctx.log_level end
 	render_ctx.state_getters["error_dialog_enabled"] = function()
 		return require("ui.error_dialog.bridge").is_enabled()
 	end

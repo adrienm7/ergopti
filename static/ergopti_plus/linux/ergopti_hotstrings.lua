@@ -1190,10 +1190,10 @@ local function main()
 		end
 		local user_preferences = require("infra.hotstring_preferences")
 		if dyn_hotstrings.set_user_code_time_activation(
-			user_preferences.get("hotstrings.dynamic.user_code.time_activation_seconds")) ~= true then
+			user_preferences.get(require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS)) ~= true then
 			error("canonical programmable-hotstring interval did not commit before hook startup")
 		end
-		if dyn_hotstrings.set_user_code_enabled(user_preferences.get("hotstrings.dynamic.user_code.enabled")) ~= true then
+		if dyn_hotstrings.set_user_code_enabled(user_preferences.get(require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED)) ~= true then
 			Logger.error(LOG, "Programmable hotstrings remain closed after source admission refusal.")
 		end
 	end
