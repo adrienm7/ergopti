@@ -75,6 +75,7 @@ LLM_Translate_Trigger(Value) {
 	global _LLM_Translate_SourceProbe
 	; A readiness or source getter may reenter a backend lifecycle transition.
 	AuxGeneration := LLM_AuxGeneration()
+	PhysicalGeneration := KS_GetPhysicalInputGeneration()
 	Enabled := _LLM_Menu.Get("enabled", false)
 	Refusal := LLM_Menu_ManualPredictionRefusal(A_IsSuspended, Enabled,
 		Enabled && _LLM_Menu_BackendIsReadyForUse(), LLM_TRANSLATE_REFUSAL_CONTEXT)
@@ -110,6 +111,7 @@ LLM_Translate_Trigger(Value) {
 		"source", _LLM_Engine_NormalizeAcceptSource(Source),
 		"generation", _LLM_Translate_Generation,
 		"aux_generation", AuxGeneration,
+		"physical_generation", PhysicalGeneration,
 		"locale", Locale,
 		"language", Language,
 		"config", Config
@@ -221,7 +223,7 @@ _LLM_Translate_Show(Flow, Text) {
 		"accept_source", Source,
 		"app_name", _LLM_Engine_AppNameForAcceptSource(Source),
 		"is_final", true,
-		"render_guard", _LLM_Translate_RenderIsCurrent.Bind(Flow["generation"], Flow["aux_generation"])
+		"render_guard", _LLM_Translate_RenderIsCurrent.Bind(Flow["generation"], Flow["aux_generation"], Flow["physical_generation"])
 	)
 	if !_LLM_Translate_IsCurrent(Flow)
 		return false
@@ -231,17 +233,19 @@ _LLM_Translate_Show(Flow, Text) {
 ; @param {Map} Flow The translation.
 ; @returns {Boolean} True while both the translation and its backend lifecycle are current.
 _LLM_Translate_IsCurrent(Flow) {
-	return _LLM_Translate_RenderIsCurrent(Flow["generation"], Flow["aux_generation"])
+	return _LLM_Translate_RenderIsCurrent(Flow["generation"], Flow["aux_generation"], Flow["physical_generation"])
 }
 
 ; Render guard of the candidate: a strict Boolean the tooltip checks before
 ; painting.
 ; @param {Integer} Generation The translation's generation.
 ; @param {Integer} AuxGeneration The backend lifecycle at the original trigger.
+; @param {Integer} PhysicalGeneration The original selected-input ticket.
 ; @returns {Integer}
-_LLM_Translate_RenderIsCurrent(Generation, AuxGeneration) {
+_LLM_Translate_RenderIsCurrent(Generation, AuxGeneration, PhysicalGeneration) {
 	global _LLM_Translate_Generation, _LLM_Menu
 	return (Generation == _LLM_Translate_Generation && AuxGeneration == LLM_AuxGeneration()
+		&& PhysicalGeneration is Integer && PhysicalGeneration == KS_GetPhysicalInputGeneration()
 		&& !A_IsSuspended && _LLM_Menu is Map && _LLM_Menu.Get("enabled", false) == true) ? true : false
 }
 

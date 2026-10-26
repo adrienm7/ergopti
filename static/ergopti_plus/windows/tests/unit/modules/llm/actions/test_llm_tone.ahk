@@ -423,7 +423,7 @@ _LTQ_Case(Mode) {
 		_LLM_Tone_ReadSelection := _LTQ_SelectionReader.Bind(State)
 		_LLM_Tone_FocusProbe := _LTQ_Focus.Bind(State)
 		Plan := Map("source", "original selection", "level", 3, "profile_id", "tone_formal",
-			"aux_generation", LLM_AuxGeneration())
+			"aux_generation", LLM_AuxGeneration(), "physical_generation", KS_GetPhysicalInputGeneration())
 		Rewrite := "Thank you " . Chr(0x1F600)
 		_LLM_Tone_OnAnswer(41, Plan, State.Focus, "REWRITE: " . Rewrite, "",
 			_LTQ_Capture.Bind(State))
@@ -608,4 +608,185 @@ for _LTN_FocusBoundary in ["plan", "readiness"] {
 		_LTN_SelectionFocusOwner.Bind(_LTN_FocusBoundary, true))
 	Test("LLM tone: original selection focus " . _LTN_FocusBoundary . " unchanged (tone-selection-focus-owner)",
 		_LTN_SelectionFocusOwner.Bind(_LTN_FocusBoundary, false))
+}
+
+
+; Drive both selection actions through real request/response and output owners.
+_LCO_SelectedTextInput(Action, Phase, Withdraw) {
+	global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, _KS_PhysicalInputGeneration
+	global _KS_LastPhysicalKeyVk, _KS_LastPhysicalKeySc, _KS_LastPhysicalKeyEpoch, _KS_LastPhysicalKeySources
+	global _UserHotstringsInputSerial, _PrefixLastKeyTick, _PrefixIdleForgotten, HSE_StartIsLineStart
+	Saved := [_LLM_Remote_Async, _LLM_Remote_AsyncCounter, _KS_PhysicalInputGeneration,
+		_KS_LastPhysicalKeyVk, _KS_LastPhysicalKeySc, _KS_LastPhysicalKeyEpoch,
+		_KS_LastPhysicalKeySources.Clone(), _UserHotstringsInputSerial,
+		_PrefixLastKeyTick, _PrefixIdleForgotten, HSE_StartIsLineStart]
+	try {
+		_LLM_Remote_Async := Map()
+		_HNP_Run(Run)
+	} finally {
+		_LLM_Remote_Async := Saved[1]
+		_LLM_Remote_AsyncCounter := Saved[2]
+		_KS_PhysicalInputGeneration := Saved[3]
+		_KS_LastPhysicalKeyVk := Saved[4]
+		_KS_LastPhysicalKeySc := Saved[5]
+		_KS_LastPhysicalKeyEpoch := Saved[6]
+		_KS_LastPhysicalKeySources := Saved[7]
+		_UserHotstringsInputSerial := Saved[8]
+		_PrefixLastKeyTick := Saved[9]
+		_PrefixIdleForgotten := Saved[10]
+		HSE_StartIsLineStart := Saved[11]
+	}
+	Run() {
+		if Action == "tone"
+			_LTN_Run(_LPP_Menu(), _LTN_Screen("merci pour ton aide"), Body)
+		else
+			_LTR_Run(_LPP_Menu(), _LTN_Screen("merci pour ton aide"), "fr", Body)
+	}
+	Body(Calls, Lines, Sent) {
+		global _LLM_Engine_RemoteTransport, _LLM_Bridge_Active, _LLM_Bridge_ReadLiveFocus
+		global _LLM_AcceptInProgress, _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
+		global _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
+		SavedPresentation := [_LLM_Bridge_ReadLiveFocus, _LLM_AcceptInProgress,
+			_Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading, _Stub_LlmTooltipText, _Stub_LlmPresentedRecord]
+		AssertFalse(SavedPresentation[2], "the fixture cannot adopt another acceptance")
+		Dispatch := _LLMRemote_DispatchManagedCurl
+		Gate := Phase == "before"
+			? (Action == "tone" ? LLM_Tone_Plan : LLM_Translate_SystemPrompt)
+			: (Action == "tone" ? LLM_Tone_Extract : LLM_Translate_Extract)
+		State := _ManagedCurlControlState()
+		Queued := []
+		Seen := false
+		Accepted := false
+		AssertFalse(Dispatch.HasOwnProp("Call"))
+		AssertFalse(Gate.HasOwnProp("Call"))
+		AssertFalse(TextSend.HasOwnProp("Call"))
+		try {
+			_LLM_Bridge_ReadLiveFocus := () => Map("hwnd", 7, "control", 9)
+			_Stub_LlmTooltipVisible := false
+			_Stub_LlmTooltipLoading := false
+			_Stub_LlmTooltipText := ""
+			_Stub_LlmPresentedRecord := 0
+			_LLM_Engine_RemoteTransport := 0
+			AssertTrue(_LLM_Bridge_Active, "the actual input callback must run with its prediction feed enabled")
+			; Start distinct intent through the real owner, without zeroing its
+			; monotonic counter or borrowing a preceding key's peer callback.
+			KS_RecordPhysicalInput()
+			Dispatch.DefineProp("Call", {Call: ObserveDispatch})
+			if Phase == "before" || Phase == "render"
+				Gate.DefineProp("Call", {Call: ObserveGate})
+			if Phase == "queued"
+				TextSend.DefineProp("Call", {Call: CaptureOutput})
+			Started := Action == "tone" ? LLM_Tone_Trigger(LLM_TONE_MORE_FORMAL, false) : LLM_Translate_Trigger("en")
+			AssertTrue(Started, "the original selected-text capture starts")
+			if !(Withdraw && Phase == "before")
+				AssertEqual(1, State["spawns"], "the current action must acquire its controlled native Job")
+			AssertEqual(0, Calls.Length, "the real generic transport must replace the fixture recorder")
+			if State.Has("request") {
+				Request := State["request"]
+				_ManagedCurlControlAck(State)
+				Request._PollManagedAdmission()
+				AssertTrue(Request.ManagedPayloadPublished, "the admitted request must consume its owned native ACK")
+				if Phase == "during" {
+					Seen := true
+					if Withdraw
+						MoveCaret()
+				}
+				; A real cancellation never receives a manufactured response.
+				if _LLM_Remote_Async.Has(State["id"]) && !_LLM_Remote_Async[State["id"]]["cancelled"] {
+					Reply := (Action == "tone" ? "REWRITE: " : "TRANSLATION: ") . "Thank you for your help."
+					AssertTrue(FSWrite(Request.BodyPath, '{"choices":[{"message":{"content":' . JsonStringLiteral(Reply) . '}}]}'))
+					AssertTrue(FSWrite(Request.HeaderPath, "HTTP/1.1 200 OK`r`nContent-Type: application/json`r`n`r`n"))
+					State["callback"].Call(0, '{"schema_version":1,"ok":true,"status":200,"child_quiesced":true,"receipt":{}}', "")
+					AssertTrue(Request.Completed, "the actual HTTP facade consumes the terminal receipt")
+					_LLMRemote_PollRequest(State["id"])
+				} else
+					AssertTrue(Withdraw, "unchanged input must not cancel its own request")
+			}
+			if Action == "translate" {
+				Shown := _LPP_LastFinalRender()
+				if IsObject(Shown) {
+					AssertTrue(Shown.meta["render_guard"].Call(), "the real requester authorizes its published offer")
+					; Tab is itself newer physical input. A published offer hands
+					; off to its existing fresh acceptance seed, without an exception.
+					KS_RecordPhysicalKeyDown(0x09, 0x0F, "dispatcher")
+					Accepted := LLM_Tooltip_TryAcceptTab(true, [], _LTAP_Input(true, false, false, false, false, 7, 9))
+					AssertTrue(Accepted, "the actual Tab policy, claim and injection owner must run")
+				}
+			}
+			if Phase == "queued" {
+				AssertEqual(1, Queued.Length, "the actual answer/accept hands off exactly one asynchronous output")
+				AssertFalse(_LLM_Remote_Async.Has(State["id"]), "late output is tested after HTTP ownership retired")
+				AssertEqual(0, Sent.Length, "the captured output has not emitted native keys")
+				Seen := true
+				if Withdraw
+					MoveCaret()
+				TextSend.DeleteProp("Call")
+				TextSend(Queued[1].Text, Queued[1].Opts, Queued[1].Callback)
+			}
+			AssertTrue(Seen, "the actual pipeline reaches the selected withdrawal boundary")
+			AssertEqual(Withdraw ? 0 : 2, Sent.Length,
+				"only the original selection may receive its rewrite/translation and courtesy selection")
+			if !Withdraw
+				AssertEqual("{Text}Thank you for your help.", Sent[1], "an unchanged selection keeps its real output")
+		} finally {
+			if Gate.HasOwnProp("Call")
+				Gate.DeleteProp("Call")
+			if Dispatch.HasOwnProp("Call")
+				Dispatch.DeleteProp("Call")
+			if TextSend.HasOwnProp("Call")
+				TextSend.DeleteProp("Call")
+			if State.Has("id") {
+				LLM_RemoteCancelAsync(State["id"])
+				_LLMRemote_PollRequest(State["id"])
+			}
+			if State.Has("request")
+				_ManagedCurlControlRelease(State)
+			if Accepted
+				SetTimer(_LLM_Accept_ReleaseClaim, 0)
+			_LLM_Bridge_ReadLiveFocus := SavedPresentation[1]
+			_LLM_AcceptInProgress := SavedPresentation[2]
+			_Stub_LlmTooltipVisible := SavedPresentation[3]
+			_Stub_LlmTooltipLoading := SavedPresentation[4]
+			_Stub_LlmTooltipText := SavedPresentation[5]
+			_Stub_LlmPresentedRecord := SavedPresentation[6]
+		}
+		MoveCaret() {
+			Before := KS_GetPhysicalInputGeneration()
+			_OnPrefixKeyDown(0, 0x25, 0x14B)
+			AssertTrue(KS_GetPhysicalInputGeneration() > Before, "the real input owner advances its physical ticket")
+		}
+		ObserveGate(Self, Args*) {
+			Gate.DeleteProp("Call")
+			Result := Gate.Call(Args*)
+			Seen := true
+			if Withdraw
+				MoveCaret()
+			return Result
+		}
+		ObserveDispatch(Self, Id, Reservation, Resolved, Url, Payload, Port := 0) {
+			Dispatch.DeleteProp("Call")
+			State["id"] := Id
+			return Dispatch.Call(Id, Reservation, Resolved, Url, Payload,
+				Map("managed_settings", (*) => Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", ""),
+					"create_http", Create))
+		}
+		Create() {
+			Request := CurlAsyncRequest(Map("spawn", _ManagedCurlControlSpawn.Bind(State)))
+			State["request"] := Request
+			return Request
+		}
+		CaptureOutput(Self, Text, Opts, Callback) {
+			Queued.Push({ Text: Text, Opts: Opts, Callback: Callback })
+			return true
+		}
+	}
+}
+
+for _LCO_Action in ["tone", "translate"] {
+	for _LCO_Phase in ["before", "during", "render", "queued"] {
+		Test("LLM selection input: " . _LCO_Action . " " . _LCO_Phase . " withdrawn (selected-text-input-owner)",
+			_LCO_SelectedTextInput.Bind(_LCO_Action, _LCO_Phase, true))
+		Test("LLM selection input: " . _LCO_Action . " " . _LCO_Phase . " unchanged (selected-text-input-owner)",
+			_LCO_SelectedTextInput.Bind(_LCO_Action, _LCO_Phase, false))
+	}
 }
