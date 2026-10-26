@@ -48,6 +48,7 @@ local Logger = require("logger.shim")
 local LOG = "infra.hotstrings_scope"
 local REPEAT_PATH = "hotstrings.repeat_key_enabled"
 local BASE_DELAY_PATH = require("config_keys").KEY.HOTSTRINGS_EXPANSION_DELAY
+local NativePath = require("native_path")
 local _owner, _sequence = nil, 0
 
 --- Whether a category or section identity can be named by a canonical path.
@@ -213,7 +214,7 @@ function M.new(options)
 			if Config.apply_configuration(owner, decoded, secondary.candidate(), secondary.target()) ~= true then return false end
 			if not apply_dependents(trigger, previous, active_snapshot.programmable) then return false end
 			-- A first write creates the configuration folder the two files share.
-			local directory = options.path:match("^(.*)/[^/]+$")
+			local directory = NativePath.dirname(options.path)
 			if not Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") then return false end
 			local published, why = secondary.publish()
 			if published ~= true then

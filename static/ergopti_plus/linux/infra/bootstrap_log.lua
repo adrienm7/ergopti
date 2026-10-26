@@ -44,6 +44,7 @@ M.CODES = {
 }
 
 local AppDirs = require("app_dirs")
+local NativePath = require("native_path")
 
 
 
@@ -73,7 +74,7 @@ function M.append(code, opts)
 		return M.path()
 	end)
 	if not ok then return false, "default logs folder unresolved" end
-	local dir = path:match("^(.*)/[^/]+$")
+	local dir = NativePath.dirname(path)
 	-- Required here, not at load: Main loads this module before the session
 	-- lock retains the launcher's lock, and text_utils pulls compat.utf8 and the
 	-- rest of the shared tree that must load after it.

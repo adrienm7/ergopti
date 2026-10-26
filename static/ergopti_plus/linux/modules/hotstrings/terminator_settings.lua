@@ -48,6 +48,7 @@ local LeafRows = require("toml_codec.leaf_rows")
 local Codec = require("toml_codec")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
+local NativePath = require("native_path")
 
 local LOG = "hotstrings.terminator_settings"
 
@@ -515,7 +516,7 @@ function M.persist()
 		-- The shared writer replaces the complete list, including a table-array
 		-- spelling; it still rejects attempts to address an individual element.
 		local rows = LeafRows.prepare(source.content or "", operations)
-		local directory = file():match("^(.*)/[^/]+$")
+		local directory = NativePath.dirname(file())
 		if source.status == "absent" and not Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") then
 			return false, "the configuration folder cannot be created"
 		end

@@ -16,6 +16,7 @@ local Fs = require("adapters.file_system")
 local Paths = require("infra.paths")
 local Version = require("updater.version")
 local Snapshot = require("diagnostics.snapshot")
+local NativePath = require("native_path")
 
 local WORK_PREFIX = ".ergopti-update."
 
@@ -85,7 +86,7 @@ end
 
 local function dirname(path)
 	if path == "/" then return nil end
-	return path:match("^(.*)/[^/]+$") or "/"
+	return NativePath.dirname(path) or "/"
 end
 
 local function basename(path)

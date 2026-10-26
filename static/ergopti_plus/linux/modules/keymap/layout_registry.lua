@@ -46,6 +46,7 @@ local Composer      = require("layouts.composer")
 
 local M = {}
 local TextUtils = require("text_utils")
+local NativePath = require("native_path")
 
 local LOG = "layout_registry"
 local REQUEST_OWNER = "layout_registry"
@@ -380,7 +381,7 @@ end
 --- @return boolean ok
 --- @return string|nil error
 local function write_file(deps, path, content)
-	local parent = assert(path:match("^(.*)/[^/]+$"), "layout write requires an absolute parent")
+	local parent = assert(NativePath.dirname(path), "layout write requires an absolute parent")
 	if not deps.ensure_dir(parent) then return false, "cannot create " .. parent end
 	local written, write_err = deps.write(path, content)
 	if not written then return false, "cannot write " .. path .. ": " .. tostring(write_err) end

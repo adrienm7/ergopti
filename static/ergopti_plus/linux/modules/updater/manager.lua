@@ -77,6 +77,7 @@ M._file_digest = FileDigest
 
 -- Single source of the driver version.
 local DriverVersion = require("infra.version")
+local NativePath = require("native_path")
 
 -- =========================================
 -- =========================================
@@ -549,7 +550,7 @@ local function _build_fetch_request(channel, page)
 	_load_list_cache()
 	local cache_key = page and (channel .. "-page-" .. page .. "-size-" .. RELEASE_PAGE_SIZE) or channel
 	local etag_file = etag_cache_path(cache_key)
-	local parent = etag_file:match("^(.*)/[^/]+$")
+	local parent = NativePath.dirname(etag_file)
 	local options = {
 		owner = REQUEST_OWNER,
 		timeout_ms = RELEASE_TIMEOUT_MS,

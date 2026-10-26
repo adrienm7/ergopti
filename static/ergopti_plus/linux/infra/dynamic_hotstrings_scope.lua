@@ -19,6 +19,7 @@ local LeafRows = require("toml_codec.leaf_rows")
 local KeyPath = require("toml_codec.key_path")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
+local NativePath = require("native_path")
 
 local LOG = "infra.dynamic_hotstrings_scope"
 local PROGRAMMABLE_PATH = "hotstrings.dynamic.user_code"
@@ -97,7 +98,7 @@ function M.new(options)
 			-- Prefix families live in the ordinary matcher, unlike date guards.
 			local _, committed = Config.reload()
 			if committed ~= true then return false end
-			local directory = options.path:match("^(.*)/[^/]+$")
+			local directory = NativePath.dirname(options.path)
 			return Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") == true
 		end,
 		restore = function(snapshot)

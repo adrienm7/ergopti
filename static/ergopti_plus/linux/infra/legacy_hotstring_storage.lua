@@ -34,6 +34,7 @@ local LeafRows = require("toml_codec.leaf_rows")
 local Codec = require("toml_codec")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
+local NativePath = require("native_path")
 
 local LOG = "infra.legacy_hotstring_storage"
 
@@ -275,7 +276,7 @@ function M.import(options)
 		end
 		if #operations == 0 then return true, 0 end
 		local rows = LeafRows.prepare(content or "", operations)
-		local directory = options.path:match("^(.*)/[^/]+$")
+		local directory = NativePath.dirname(options.path)
 		if status == "absent" and not Shell.run("mkdir -p " .. Shell.quote(directory) .. " 2>/dev/null") then
 			return false, "the configuration folder cannot be created"
 		end

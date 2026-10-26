@@ -26,6 +26,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Policy = require("control.driver_control")
 local Json = require("json")
+local NativePath = require("native_path")
 
 local LOG = "infra.driver_control"
 local PRIVATE_MODE = 448 -- 0700
@@ -132,7 +133,7 @@ end
 function Session:start()
 	if self.started then error("the driver control session cannot be started twice", 2) end
 	self.started = true
-	local parent = self.folder:match("^(.*)/[^/]+$")
+	local parent = NativePath.dirname(self.folder)
 	if not parent or not self.ports.private_dir(parent) or not self.ports.private_dir(self.folder) then
 		error("the control folder could not be made private: " .. self.folder, 0)
 	end

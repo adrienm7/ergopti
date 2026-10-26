@@ -25,6 +25,7 @@ local Agent = require("llm.agent")
 local NoReplaceMove = require("infra.no_replace_move")
 local RegularFileReader = require("infra.regular_file_reader")
 local RegularFileWriter = require("infra.regular_file_writer")
+local NativePath = require("native_path")
 
 local LOG = "modules.llm.agent_learning"
 
@@ -135,7 +136,7 @@ function M.flush()
 	if _load_blocked then return false end
 	if not _apps then return true end
 	local path = state_path()
-	local dir = path:match("^(.*)/[^/]+$")
+	local dir = NativePath.dirname(path)
 	if dir and not require("adapters.shell_runner").run("mkdir -p "
 		.. require("adapters.shell_runner").quote(dir) .. " 2>/dev/null") then
 		Logger.error(LOG, "The agent's learning folder could not be created.")

@@ -112,6 +112,7 @@ local function owned_logical_key(key) return type(key) == "string" and key ~= ""
 -- The owned-alias gates, receipt authority and finalization shared with the
 -- other Lua driver; capture, publish and restore below stay native.
 local Owned = require("storage_owned")
+local NativePath = require("native_path")
 local _owned = Owned.new({
 	name = "adapters.storage", module = M, logical_key = owned_logical_key, logger = Logger, log = LOG,
 	-- An ordinary commit in flight, or its unsettled debt, refuses owned work;
@@ -641,7 +642,7 @@ function M.publish_owned(owner, receipt, updates, backup_path, files)
 			-- ordinary write. Serialize preparation as a same-file native effect.
 			local publish, remove = files.write_if_unchanged, files.delete
 			local prepared = owned_file_effect(function()
-				return prepare_config_dir(_STORE_PATH:match("^(.*)/[^/]+$"))
+				return prepare_config_dir(NativePath.dirname(_STORE_PATH))
 			end, _STORE_PATH)
 			if prepared ~= true or not rawequal(files.write_if_unchanged, publish)
 				or not rawequal(files.delete, remove) then return false end
