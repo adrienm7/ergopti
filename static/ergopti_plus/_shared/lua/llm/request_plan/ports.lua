@@ -37,9 +37,10 @@ M.CONTRACTS = {
 		cancel = "cancel(handle): stops a handle that has not fired; harmless on one that has.",
 	},
 	TooltipRenderer = {
-		show = "show(rows) -> boolean: draws the predictions and, last, the info bar row.",
+		show = "show(...) -> boolean: draws the predictions and their info bar. The argument "
+			.. "shape is the driver's: one named view on macOS (adapters/prediction_renderer.lua), "
+			.. "(candidates, meta) on the Linux overlay (ui/tooltip/llm.lua).",
 		hide = "hide(): removes the tooltip.",
-		is_visible = "is_visible() -> boolean: whether the tooltip is on screen.",
 	},
 }
 
