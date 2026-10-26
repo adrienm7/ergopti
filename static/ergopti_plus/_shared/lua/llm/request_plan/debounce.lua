@@ -16,9 +16,10 @@
 ---    driver (_shared/tests/corpus/llm/request_plan_debounce_vectors.json).
 --- 2. One token per armed timer: a timer that fired after a newer arm or a cancel
 ---    answers `stale` and is dropped, so a superseded keystroke never sends.
---- 3. Explicit per-driver options instead of silent drift. Where the drivers
----    chose differently (see M.OPTION_KEYS) the difference is a named option the
----    driver passes, not a second copy of the logic.
+--- 3. One behaviour for every driver, no per-driver option: "never" is a
+---    negative debounce, an explicit request is never held by the floor, a word
+---    end is instant in live mode too, and the last request time is one value.
+---    A difference between drivers is a red vector, not a named option.
 --- 4. The floor is a port: the plan asks `floor_ms()` (the user's
 ---    llm.trigger.min_request_interval_ms) and never reads the configuration
 ---    itself, so an invalid value fails where the setting lives.
@@ -43,15 +44,6 @@ local M = {}
 -- the configuration file stores (llm.trigger.debounce_ms) and every driver's
 -- menu offers; any negative number given to the plan means the same.
 M.NEVER_MS = -1
-
--- The options a driver must state, each one a deliberate choice. A missing or
--- mistyped option raises: a default would hide which behaviour a driver runs.
-M.OPTION_KEYS = {
-	-- boolean: a negative debounce means "never" (the automatic trigger is off).
-	"allow_never",
-		-- boolean: in live mode a word end still fires instantly (instead of the live debounce).
-	"live_instant_word_end",
-}
 
 -- The causes an input event may carry.
 M.CAUSES = {
@@ -90,37 +82,22 @@ local function require_delay(value, name)
 	end
 end
 
---- Validates and copies the construction options.
---- @param options table Driver options.
---- @return table settings Private copy.
-local function admit_options(options)
-	if type(options) ~= "table" then error("the request plan needs an options table", 3) end
-	for _, key in ipairs(M.OPTION_KEYS) do
-		if options[key] == nil then error("request plan option '" .. key .. "' is required", 3) end
-	end
-	for _, key in ipairs({ "allow_never", "live_instant_word_end" }) do
-		if type(options[key]) ~= "boolean" then error("request plan option '" .. key .. "' must be a boolean", 3) end
-	end
-	if type(options.floor_ms) ~= "function" then error("request plan option 'floor_ms' must be a function", 3) end
-	return {
-		allow_never = options.allow_never,
-		live_instant_word_end = options.live_instant_word_end,
-		floor_ms = options.floor_ms,
-		-- The configured debounce, the AI switch and the live mode are runtime
-		-- settings, changed by M.configure; they start off.
-		debounce_ms = nil,
-		instant_on_word_end = false,
-		enabled = false,
-		live_debounce_ms = nil,
-	}
-end
-
 --- Creates a plan.
---- @param options table { allow_never, live_instant_word_end, floor_ms = function() -> milliseconds }.
+--- @param floor_ms function The floor port: returns the user's minimum interval
+---   between two automatic requests, in milliseconds, read at every dispatch.
 --- @return table plan
-function M.new(options)
+function M.new(floor_ms)
+	if type(floor_ms) ~= "function" then error("the request plan needs a floor_ms function", 2) end
 	local plan = {
-		_settings = admit_options(options),
+		_settings = {
+			floor_ms = floor_ms,
+			-- The configured debounce, the AI switch and the live mode are runtime
+			-- settings, changed by M.configure; they start off.
+			debounce_ms = nil,
+			instant_on_word_end = false,
+			enabled = false,
+			live_debounce_ms = nil,
+		},
 		_pending = nil,
 		_next_token = 1,
 		_last_sent_ms = nil,
@@ -150,11 +127,8 @@ function M:configure(settings)
 	if settings.debounce_ms ~= nil then
 		local value = settings.debounce_ms
 		if type(value) ~= "number" or value ~= value then error("debounce_ms must be a number", 2) end
-		if value < 0 then
-			if not own.allow_never then error("a negative debounce is not allowed on this driver", 2) end
-		else
-			require_delay(value, "the debounce")
-		end
+		-- A negative debounce is "never" (M.NEVER_MS); anything else is a delay.
+		if value >= 0 then require_delay(value, "the debounce") end
 		own.debounce_ms = value
 	end
 	if settings.instant_on_word_end ~= nil then
@@ -221,7 +195,7 @@ function M:on_input(event)
 		require_delay(event.delay_ms, "the override delay")
 		return arm(self, {}, event.delay_ms, M.REASON.override)
 	end
-	if live and not (event.ends_word == true and own.instant_on_word_end and own.live_instant_word_end) then
+	if live and not (event.ends_word == true and own.instant_on_word_end) then
 		return arm(self, {}, own.live_debounce_ms, M.REASON.live)
 	end
 	if event.ends_word == true and own.instant_on_word_end then

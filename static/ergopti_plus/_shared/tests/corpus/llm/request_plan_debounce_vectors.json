@@ -1,51 +1,20 @@
 {
-	"_comment": "Request transcripts of the prediction debounce and rate floor, replayed through _shared/lua/llm/request_plan/debounce.lua by the macOS and Linux runners. A vector names a driver_options set (or gives one), the floor in milliseconds (floor_ms, the one value the user sets, which the floor port answers), and an ordered list of steps. A step calls one method of the plan with args (plus now_ms for on_dispatch and on_sent, the caller's monotonic clock in milliseconds) and lists the decisions it returns, in order, as expect, or a substring the raised message must contain as expect_error. Tokens count from 1 per plan, one per arm. An arm decision means: cancel nothing else and start a one-shot timer of delay_ms; cancel means stop that token; fire and stale answer on_timer; send and defer answer on_dispatch. driver_options is the deliberate per-driver difference: each driver asserts that its own policy equals its entry, so a drift is a red test, not a silent change. A port in another language replays this file unchanged.",
-	"driver_options": {
-		"macos": {
-			"allow_never": true,
-			"live_instant_word_end": true
-		},
-		"linux": {
-			"allow_never": true,
-			"live_instant_word_end": true
-		}
+	"_comment": "Request transcripts of the prediction debounce and rate floor, replayed through _shared/lua/llm/request_plan/debounce.lua by the macOS and Linux runners. A vector gives the floor in milliseconds (floor_ms, the one value the user sets, which the floor port answers) and an ordered list of steps. A step calls one method of the plan with args (plus now_ms for on_dispatch and on_sent, the caller's monotonic clock in milliseconds) and lists the decisions it returns, in order, as expect, or a substring the raised message must contain as expect_error. Tokens count from 1 per plan, one per arm. An arm decision means: cancel nothing else and start a one-shot timer of delay_ms; cancel means stop that token; fire and stale answer on_timer; send and defer answer on_dispatch. There is one behaviour for every driver, written in shared_behaviour; drivers records who replays this file. A port in another language replays it unchanged.",
+	"shared_behaviour": {
+		"never": "A negative debounce (the stored value -1) turns the automatic trigger off; an explicit trigger, an override request and live mode still arm.",
+		"explicit_requests": "An explicit request (shortcut, typed trigger, prompt action) and the later variants of its sequential run are never held by the rate floor; only automatic requests wait.",
+		"floor": "One last-request time for every backend and every kind of request; the interval is the user's llm.trigger.min_request_interval_ms.",
+		"live_word_end": "A word end fires instantly in live mode too when the instant word end setting is on."
+	},
+	"drivers": {
+		"macos": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
+		"linux": "Replays every vector (_shared/lua/test/llm_request_plan_contract.lua).",
+		"windows": "Not ported yet: the AutoHotkey engine must reach the same shared_behaviour and replay every vector; see the report of the 2026-10-26 request floor pass for the list of changes."
 	},
 	"vectors": [
 		{
 			"id": "typing-arms-the-configured-debounce",
 			"description": "An ordinary keystroke arms the configured debounce.",
-			"options": "macos",
-			"floor_ms": 300,
-			"steps": [
-				{
-					"call": "configure",
-					"args": {
-						"enabled": true,
-						"debounce_ms": 500,
-						"instant_on_word_end": false
-					},
-					"expect": []
-				},
-				{
-					"call": "on_input",
-					"args": {
-						"cause": "typing"
-					},
-					"expect": [
-						{
-							"action": "arm",
-							"token": 1,
-							"delay_ms": 500,
-							"why": "Inactivity"
-						}
-					]
-				}
-			]
-		},
-		{
-			"id": "typing-arms-the-configured-debounce-linux",
-			"description": "The same keystroke on the other driver's options.",
-			"options": "linux",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -76,7 +45,6 @@
 		{
 			"id": "a-new-keystroke-supersedes-the-pending-timer",
 			"description": "A second keystroke cancels the pending token and arms a new one.",
-			"options": "linux",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -125,7 +93,6 @@
 		{
 			"id": "the-current-timer-fires-once",
 			"description": "A fired timer answers fire once; a second delivery is stale.",
-			"options": "macos",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -181,7 +148,6 @@
 		{
 			"id": "a-superseded-timer-is-stale",
 			"description": "The timer of an older keystroke never fires.",
-			"options": "linux",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -255,7 +221,6 @@
 		{
 			"id": "a-cancelled-timer-is-stale",
 			"description": "A cancel makes the pending token stale; a second cancel does nothing.",
-			"options": "macos",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -313,7 +278,6 @@
 		{
 			"id": "word-end-fires-instantly-when-asked",
 			"description": "With instant_on_word_end a word end arms a zero delay; other keys keep the debounce.",
-			"options": "linux",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -364,7 +328,6 @@
 		{
 			"id": "word-end-keeps-the-debounce-when-not-asked",
 			"description": "Without instant_on_word_end a word end waits the debounce.",
-			"options": "macos",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -396,7 +359,6 @@
 		{
 			"id": "a-disabled-engine-arms-nothing",
 			"description": "With the AI switch off every input is skipped and nothing is cancelled.",
-			"options": "linux",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -449,85 +411,6 @@
 		{
 			"id": "never-turns-the-automatic-trigger-off",
 			"description": "A negative debounce skips typing and overrides, even at a word end, and keeps the pending timer.",
-			"options": "macos",
-			"floor_ms": 300,
-			"steps": [
-				{
-					"call": "configure",
-					"args": {
-						"enabled": true,
-						"debounce_ms": 500,
-						"instant_on_word_end": true
-					},
-					"expect": []
-				},
-				{
-					"call": "on_input",
-					"args": {
-						"cause": "typing",
-						"ends_word": false
-					},
-					"expect": [
-						{
-							"action": "arm",
-							"token": 1,
-							"delay_ms": 500,
-							"why": "Inactivity"
-						}
-					]
-				},
-				{
-					"call": "configure",
-					"args": {
-						"debounce_ms": -1
-					},
-					"expect": []
-				},
-				{
-					"call": "on_input",
-					"args": {
-						"cause": "typing",
-						"ends_word": true
-					},
-					"expect": [
-						{
-							"action": "skip",
-							"why": "automatic trigger off"
-						}
-					]
-				},
-				{
-					"call": "on_input",
-					"args": {
-						"cause": "override",
-						"delay_ms": 250
-					},
-					"expect": [
-						{
-							"action": "skip",
-							"why": "automatic trigger off"
-						}
-					]
-				},
-				{
-					"call": "on_timer",
-					"args": {
-						"token": 1
-					},
-					"expect": [
-						{
-							"action": "fire",
-							"token": 1,
-							"why": "Inactivity"
-						}
-					]
-				}
-			]
-		},
-		{
-			"id": "never-turns-the-automatic-trigger-off-linux",
-			"description": "Linux offers the same \"never\" as macOS: a negative debounce (the shared sentinel -1) skips typing and overrides, even at a word end.",
-			"options": "linux",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -605,7 +488,6 @@
 		{
 			"id": "never-does-not-stop-an-explicit-trigger",
 			"description": "An explicit trigger is a request, so never leaves it armed at once.",
-			"options": "macos",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -636,7 +518,6 @@
 		{
 			"id": "explicit-trigger-uses-the-debounce",
 			"description": "A typed trigger waits the configured debounce.",
-			"options": "linux",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -667,7 +548,6 @@
 		{
 			"id": "hotstring-expiry-fires-at-once",
 			"description": "The expiry of a hotstring preview arms a zero delay.",
-			"options": "linux",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -698,7 +578,6 @@
 		{
 			"id": "an-override-delay-is-used-as-given",
 			"description": "A chain delay replaces the debounce.",
-			"options": "macos",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -730,7 +609,6 @@
 		{
 			"id": "an-override-needs-a-delay",
 			"description": "An override without a delay is refused.",
-			"options": "macos",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -754,7 +632,6 @@
 		{
 			"id": "live-mode-replaces-the-debounce",
 			"description": "In live mode a keystroke waits the live debounce.",
-			"options": "linux",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -811,7 +688,6 @@
 		{
 			"id": "live-mode-overrides-never",
 			"description": "Live mode is an explicit request for the trigger, so never does not stop it.",
-			"options": "macos",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -841,42 +717,8 @@
 			]
 		},
 		{
-			"id": "live-word-end-instant-on-macos",
-			"description": "On macOS a word end is instant even in live mode.",
-			"options": "macos",
-			"floor_ms": 300,
-			"steps": [
-				{
-					"call": "configure",
-					"args": {
-						"enabled": true,
-						"debounce_ms": 500,
-						"instant_on_word_end": true,
-						"live_debounce_ms": 80
-					},
-					"expect": []
-				},
-				{
-					"call": "on_input",
-					"args": {
-						"cause": "typing",
-						"ends_word": true
-					},
-					"expect": [
-						{
-							"action": "arm",
-							"token": 1,
-							"delay_ms": 0,
-							"why": "Word-end"
-						}
-					]
-				}
-			]
-		},
-		{
-			"id": "live-word-end-instant-on-linux",
-			"description": "On Linux, as on macOS, a word end is instant even in live mode.",
-			"options": "linux",
+			"id": "live-word-end-is-instant",
+			"description": "A word end is instant even in live mode, on every driver.",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -909,7 +751,6 @@
 		{
 			"id": "live-word-end-keeps-the-live-debounce-when-instant-is-off",
 			"description": "With the instant word end switched off in the menu, live mode keeps its own debounce at a word end on every driver.",
-			"options": "linux",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -942,7 +783,6 @@
 		{
 			"id": "live-expiry-has-its-own-why",
 			"description": "The expiry in live mode is logged as the live one.",
-			"options": "linux",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -974,7 +814,6 @@
 		{
 			"id": "the-floor-defers-an-automatic-request",
 			"description": "A request inside the backend's interval waits the remainder; the exact boundary sends.",
-			"options": "macos",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -1031,7 +870,6 @@
 		{
 			"id": "an-explicit-request-is-never-held",
 			"description": "An explicit request (shortcut, typed trigger, prompt action) is sent at once, whatever the last request time; an automatic one still waits.",
-			"options": "macos",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -1066,34 +904,8 @@
 			]
 		},
 		{
-			"id": "an-explicit-request-is-not-held-on-linux-either",
-			"description": "Linux follows the same rule: the explicit request goes straight on.",
-			"options": "linux",
-			"floor_ms": 300,
-			"steps": [
-				{
-					"call": "on_sent",
-					"now_ms": 1000,
-					"expect": []
-				},
-				{
-					"call": "on_dispatch",
-					"args": {
-						"explicit": true
-					},
-					"now_ms": 1010,
-					"expect": [
-						{
-							"action": "send"
-						}
-					]
-				}
-			]
-		},
-		{
 			"id": "later-variants-of-an-explicit-request-are-not-held",
 			"description": "The variants of an explicit sequential request are part of that request: each is dispatched as an explicit one and goes straight on, although the previous variant just went out.",
-			"options": "macos",
 			"floor_ms": 500,
 			"steps": [
 				{
@@ -1135,7 +947,6 @@
 		{
 			"id": "later-variants-of-an-automatic-request-wait",
 			"description": "The variants of an automatic sequential request wait for the floor like the request itself.",
-			"options": "linux",
 			"floor_ms": 500,
 			"steps": [
 				{
@@ -1187,7 +998,6 @@
 		{
 			"id": "reset-forgets-the-last-request-and-the-timer",
 			"description": "Re-initialisation clears both.",
-			"options": "linux",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -1250,7 +1060,6 @@
 		{
 			"id": "an-unset-debounce-is-refused",
 			"description": "Typing before the debounce was configured is a programming error.",
-			"options": "linux",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -1272,7 +1081,6 @@
 		{
 			"id": "a-non-numeric-debounce-is-refused",
 			"description": "The debounce is a number of milliseconds, or the negative \"never\" sentinel.",
-			"options": "macos",
 			"floor_ms": 300,
 			"steps": [
 				{
@@ -1287,7 +1095,6 @@
 		{
 			"id": "the-floor-is-the-configured-interval",
 			"description": "The interval is the one value the user sets: a request inside it waits the remainder, the exact boundary sends.",
-			"options": "linux",
 			"floor_ms": 750,
 			"steps": [
 				{
@@ -1322,7 +1129,6 @@
 		{
 			"id": "a-zero-floor-never-holds-a-request",
 			"description": "An interval of 0 turns the floor off.",
-			"options": "linux",
 			"floor_ms": 0,
 			"steps": [
 				{
@@ -1345,7 +1151,6 @@
 		{
 			"id": "the-last-request-holds-the-next-whatever-sent-it",
 			"description": "There is one last-request time for every backend and every kind of request: the latest send counts.",
-			"options": "macos",
 			"floor_ms": 500,
 			"steps": [
 				{
@@ -1375,7 +1180,6 @@
 		{
 			"id": "an-invalid-floor-is-refused",
 			"description": "A floor that is not a non-negative number fails where the plan is asked, never silently sends.",
-			"options": "linux",
 			"floor_ms": -5,
 			"steps": [
 				{

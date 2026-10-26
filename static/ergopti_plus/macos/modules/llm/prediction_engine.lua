@@ -227,7 +227,7 @@ local request_floor_sec = LLM_DEFAULTS.llm_min_request_interval
 -- The debounce and rate-floor decisions (_shared/lua/llm/request_plan): this
 -- engine feeds the plan events and the clock, and owns the native timers and
 -- the backend calls. The plan also holds when the last request went out.
-local _plan = require("modules.llm.request_plan_policy").new(function()
+local _plan = require("llm.request_plan.debounce").new(function()
 	return request_floor_sec * 1000
 end)
 
