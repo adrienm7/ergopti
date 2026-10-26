@@ -610,7 +610,7 @@ const STEP_CONDITIONS = [
 	[
 		LINUX_BOX,
 		'test-linux',
-		'Emit Configuration assertion from failed unit log',
+		'Emit failed unit assertions from the unit log',
 		"${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}"
 	],
 	[
@@ -1471,7 +1471,7 @@ const LUA_TIMING_RETENTION = [
 		file: LINUX_BOX,
 		job: 'test-linux',
 		producer: 'Run the driver unit test suite',
-		after: 'Emit Configuration assertion from failed unit log',
+		after: 'Emit failed unit assertions from the unit log',
 		directory: 'static/ergopti_plus/linux',
 		step: 'Retain Linux Lua timing diagnostics',
 		// Only a module-group row runs the reporter; a distribution row keeps its raw log.
@@ -4643,9 +4643,9 @@ mustCatch(
 // The assertion annotation belongs only to the original failed unit run.
 // A skipped or renamed diagnostic must be observed by the normal wiring gate.
 for (const condition of ['', 'success()', 'failure()', 'always()', 'false']) {
-	const head = '      - name: Emit Configuration assertion from failed unit log\n';
+	const head = '      - name: Emit failed unit assertions from the unit log\n';
 	mustCatch(
-		'Configuration assertion condition ' + condition,
+		'failed unit assertions condition ' + condition,
 		LINUX_BOX,
 		head +
 			"        if: ${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}\n",
@@ -4654,10 +4654,10 @@ for (const condition of ['', 'success()', 'failure()', 'always()', 'false']) {
 	);
 }
 mustCatch(
-	'missing Configuration assertion diagnostic',
+	'missing failed unit assertions diagnostic',
 	LINUX_BOX,
-	'      - name: Emit Configuration assertion from failed unit log\n',
-	'      - name: Omitted Configuration assertion diagnostic\n',
+	'      - name: Emit failed unit assertions from the unit log\n',
+	'      - name: Omitted failed unit assertions diagnostic\n',
 	stepProblems
 );
 // Passive diagnostics never authorize a receiving gate or forgive its failure.

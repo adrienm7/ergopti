@@ -2646,7 +2646,7 @@ for (const [from, to] of unitLogMutations) {
  */
 function assertLinuxUnitFailureExcerpt(job) {
 	assertLinuxUnitFailureLog(job);
-	const excerpt = pipeline.step(job, 'Emit Configuration assertion from failed unit log');
+	const excerpt = pipeline.step(job, 'Emit failed unit assertions from the unit log');
 	assert.strictEqual(
 		pipeline.stepField(excerpt, 'if'),
 		"${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}"
@@ -2660,18 +2660,12 @@ function assertLinuxUnitFailureExcerpt(job) {
 	]);
 	const steps = pipeline.steps(job);
 	const uploadAt = steps.findIndex((step) => step.name === 'Upload failed unit log');
-	assert.strictEqual(
-		steps[uploadAt + 1]?.name,
-		'Emit Configuration assertion from failed unit log'
-	);
+	assert.strictEqual(steps[uploadAt + 1]?.name, 'Emit failed unit assertions from the unit log');
 	assert.strictEqual(steps[uploadAt + 2]?.name, 'Retain Linux Lua timing diagnostics');
 }
 assertLinuxUnitFailureExcerpt(testLinux);
 const unitExcerptMutations = [
-	[
-		'name: Emit Configuration assertion from failed unit log',
-		'name: Omitted Configuration assertion'
-	],
+	['name: Emit failed unit assertions from the unit log', 'name: Omitted failed unit assertions'],
 	["failure() && !cancelled() && steps.linux_unit.outcome == 'failure'", 'success()'],
 	["failure() && !cancelled() && steps.linux_unit.outcome == 'failure'", 'failure()'],
 	['shell: bash', 'shell: sh'],
@@ -2687,14 +2681,14 @@ assert.strictEqual(
 	'every independent excerpt wiring mutation is present'
 );
 for (const [from, to] of unitExcerptMutations) {
-	const excerpt = pipeline.step(testLinux, 'Emit Configuration assertion from failed unit log');
+	const excerpt = pipeline.step(testLinux, 'Emit failed unit assertions from the unit log');
 	assert.strictEqual(excerpt.split(from).length - 1, 1, 'the excerpt mutation anchor is unique');
 	assert.strictEqual(testLinux.split(excerpt).length - 1, 1, 'the actual excerpt step is unique');
 	const changed = testLinux.replace(excerpt, () => excerpt.replace(from, () => to));
 	assert.notStrictEqual(changed, testLinux);
 	assert.throws(() => assertLinuxUnitFailureExcerpt(changed));
 }
-const actualExcerpt = pipeline.step(testLinux, 'Emit Configuration assertion from failed unit log');
+const actualExcerpt = pipeline.step(testLinux, 'Emit failed unit assertions from the unit log');
 assert.throws(
 	() =>
 		assertLinuxUnitFailureExcerpt(

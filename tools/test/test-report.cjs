@@ -634,53 +634,98 @@ async function testOutputDrain() {
 	}
 }
 
-// The current Linux failure log is public, but the original reporter retains
-// only test names. These independent transcripts prove the receiving CLI
-// publishes the fixed fixture's exact complete assertion and rejects ambiguity.
+// The Linux failure log is public, but the original reporter annotates test
+// names only. These independent transcripts, in the runner's current format
+// (group replay, quoted --only, slowest-test lines after the receipt), prove
+// the receiving CLI publishes every failed case's complete assertion and
+// rejects ambiguity.
 const excerptFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-unit-excerpt-'));
 try {
 	const excerptCommand = path.join(__dirname, 'linux-unit-failure-excerpt.cjs');
 	const excerptLog = path.join(excerptFixture, 'linux-unit.log');
-	const caseName = 'routes the Configuration restore row to the recommended hotstrings';
-	const assertion = 'test_hotstrings_scope.lua:435: the restored catalogue fires — actual: false';
+	const caseName = "focus-retirement-listener-native: retires the user's FIFOs";
+	const quotedName = "'focus-retirement-listener-native: retires the user'\\''s FIFOs'";
+	const assertion =
+		'test_atspi_focus_watch.lua:428: native focus listener retirement — actual: false';
 	const inline = `  FAIL ${caseName} — ${assertion}\n`;
-	const detail = `  - ${caseName} : ${assertion}\n    replay: luajit tests/run.lua --only "${caseName}"\n`;
+	const replay = `    replay: luajit tests/run.lua --module=core --only ${quotedName}\n`;
+	const detail = `  - ${caseName} : ${assertion}\n${replay}`;
 	const footer =
-		'OVERALL RESULTS:\nTotal modules: 498\nPassed tests:  11224\nFailed tests:  1\n========================================\n';
+		'\n========================================\nOVERALL RESULTS:\nTotal modules: 498\nPassed tests:  11224\nFailed tests:  1\n========================================\n';
 	const reporter =
-		'[report:linux-lua] \x1b[31mFAIL\x1b[0m — 11\u202F224 passed, 1 failed (exit 1, format lua).\n';
-	const transcript = inline + footer + detail + reporter;
+		'[report:linux-lua] \x1b[31mFAIL\x1b[0m — 11 224 passed, 1 failed (exit 1, format lua).\n';
+	// The receipt is no longer the final line: the slowest tests follow it.
+	const slowest =
+		'[report:linux-lua] slowest 10 test(s):\n      1007.7 ms  tests.unit.x: a slow case\n';
+	const transcript = inline + footer + detail + reporter + slowest;
+	const notice = (name, text) =>
+		`::notice title=linux-lua failed case::${name}%0A${text.replace(/%/g, '%25').replace(/\n/g, '%0A')}\n`;
 	function receiveExcerpt(log) {
 		fs.writeFileSync(excerptLog, log);
 		return spawnSync(process.execPath, [excerptCommand, excerptLog], { encoding: 'utf8' });
 	}
 	const accepted = receiveExcerpt(transcript);
 	check(
-		'Configuration assertion CLI receives the exact complete failure',
+		'failed unit CLI publishes the exact complete assertion of a grouped, quoted replay',
 		accepted.status === 0 &&
 			accepted.signal === null &&
 			accepted.stderr === '' &&
-			accepted.stdout ===
-				'::notice title=linux-lua Configuration assertion::routes the Configuration restore row to the recommended hotstrings%0Atest_hotstrings_scope.lua:435: the restored catalogue fires — actual: false\n'
+			accepted.stdout === notice(caseName, assertion)
+	);
+	// The original CI regression: any failure other than one fixed case was
+	// refused as a "duplicated" record because of the slowest-test lines.
+	const actualCiShape = receiveExcerpt(
+		inline +
+			'  ok   a passing case\n' +
+			footer +
+			detail +
+			'##[error]focus-retirement-listener-native\n' +
+			reporter +
+			slowest +
+			'[report:linux-lua] wrote timing JSON\n'
+	);
+	check(
+		'failed unit CLI reports the real failure when the reporter prints several lines',
+		actualCiShape.status === 0 && actualCiShape.stdout === notice(caseName, assertion)
 	);
 	const multiline =
 		'test_hotstrings_scope.lua:429: the Configuration row is registered:\n  expected: "function"\n    actual: "nil"';
 	const escaped = receiveExcerpt(transcript.replaceAll(assertion, multiline));
 	check(
-		'Configuration equality assertion retains both independently known values',
-		escaped.status === 0 &&
-			escaped.stderr === '' &&
-			escaped.stdout ===
-				'::notice title=linux-lua Configuration assertion::routes the Configuration restore row to the recommended hotstrings%0Atest_hotstrings_scope.lua:429: the Configuration row is registered:%0A  expected: "function"%0A    actual: "nil"\n'
+		'failed unit CLI retains both lines of an equality assertion',
+		escaped.status === 0 && escaped.stderr === '' && escaped.stdout === notice(caseName, multiline)
 	);
-	const injection = 'test_hotstrings_scope.lua:435: 50%\r\n::error::injected';
+	const second = 'a module load failure';
+	const twoFailures = receiveExcerpt(
+		(inline + footer + detail)
+			.replace('Failed tests:  1', 'Failed tests:  2')
+			.concat(
+				`  FAIL tests.unit.broken — ${second}\n  - tests.unit.broken : ${second}\n    replay: luajit tests/run.lua --module=core\n`
+			) + reporter.replace('1 failed', '2 failed')
+	);
+	check(
+		'failed unit CLI publishes every failed case, including a module load error',
+		twoFailures.status === 0 &&
+			twoFailures.stdout === notice(caseName, assertion) + notice('tests.unit.broken', second)
+	);
+	const injection = 'test_x.lua:435: 50%\r\n::error::injected\x1b[31m';
 	const safe = receiveExcerpt(transcript.replaceAll(assertion, injection));
 	check(
-		'Configuration assertion escapes percent and every injected command line',
+		'failed unit CLI escapes percent, line breaks and control bytes',
 		safe.status === 0 &&
 			safe.stderr === '' &&
 			safe.stdout ===
-				'::notice title=linux-lua Configuration assertion::routes the Configuration restore row to the recommended hotstrings%0Atest_hotstrings_scope.lua:435: 50%25%0D%0A::error::injected\n'
+				`::notice title=linux-lua failed case::${caseName}%0Atest_x.lua:435: 50%25%0A::error::injected\\x1b[31m\n`
+	);
+	const huge = 'test_x.lua:1: ' + 'é'.repeat(9000);
+	const bounded = receiveExcerpt(transcript.replaceAll(assertion, huge));
+	check(
+		'failed unit CLI states the cut of an assertion above the annotation budget',
+		bounded.status === 0 &&
+			Buffer.byteLength(bounded.stdout) <= 8 * 1024 + 100 &&
+			/%0A\[assertion truncated: \d+ of 18014 bytes shown; the failed unit log artifact keeps it whole\]\n$/.test(
+				bounded.stdout
+			)
 	);
 	// Real onboarding controls print unsafe byte strings in successful test
 	// names. Those unrelated bytes must not hide this valid completed failure.
@@ -691,86 +736,34 @@ try {
 			Buffer.from('"\n')
 		]);
 		const mixed = receiveExcerpt(
-			Buffer.concat([Buffer.from(inline), binaryPass, Buffer.from(footer + detail + reporter)])
+			Buffer.concat([
+				Buffer.from(inline),
+				binaryPass,
+				Buffer.from(footer + detail + reporter + slowest)
+			])
 		);
 		check(
-			'Configuration assertion survives unrelated invalid UTF-8 fixture bytes',
-			mixed.status === 0 &&
-				mixed.signal === null &&
-				mixed.stderr === '' &&
-				mixed.stdout ===
-					'::notice title=linux-lua Configuration assertion::routes the Configuration restore row to the recommended hotstrings%0Atest_hotstrings_scope.lua:435: the restored catalogue fires — actual: false\n'
-		);
-	}
-	// Each marked byte is inside a selected record. A permissive decoder could
-	// otherwise normalize an assertion; none may be repaired or ignored here.
-	for (const [label, text] of [
-		['inline assertion', transcript.replace(inline, inline.replace('false', 'fa\x7fse'))],
-		['terminal assertion', transcript.replace(detail, detail.replace('false', 'fa\x7fse'))],
-		['equal assertion copies', transcript.replaceAll(assertion, assertion + '\x7f')],
-		['footer', transcript.replace('Passed tests:  11224', 'Passed tests:  112\x7f24')],
-		['replay tail', transcript.replace(`--only "${caseName}"\n`, `--only "${caseName}"\x7f\n`)],
-		['reporter', transcript.replace('11\u202F224 passed', '11\u202F2\x7f24 passed')]
-	]) {
-		const corrupted = Buffer.from(text).map((byte) => (byte === 0x7f ? 0xff : byte));
-		const refusal = receiveExcerpt(corrupted);
-		check(
-			`Configuration excerpt strictly rejects invalid UTF-8 in ${label}`,
-			refusal.status === 2 &&
-				refusal.signal === null &&
-				refusal.stdout === '' &&
-				refusal.stderr ===
-					'Configuration assertion annotation refused: unit log is not valid UTF-8.\n'
-		);
-	}
-	for (const [label, log] of [
-		['finished reporter has a trailing unrelated record', transcript + '  ok   later record\n'],
-		['reporter moved before terminal replay', inline + footer + reporter + detail],
-		['inline moved after footer', footer + inline + detail + reporter],
-		[
-			'duplicate replay identity',
-			transcript.replace(detail, detail + `    replay: luajit tests/run.lua --only "${caseName}"\n`)
-		]
-	]) {
-		const refusal = receiveExcerpt(log);
-		check(
-			`Configuration byte selection refuses ${label}`,
-			refusal.status === 2 &&
-				refusal.signal === null &&
-				refusal.stdout === '' &&
-				refusal.stderr.startsWith('Configuration assertion annotation refused: ')
+			'failed unit CLI survives unrelated invalid UTF-8 fixture bytes',
+			mixed.status === 0 && mixed.stderr === '' && mixed.stdout === notice(caseName, assertion)
 		);
 	}
 	const refusedLogs = [
-		['missing inline case', transcript.replace(inline, '')],
-		['missing terminal case', inline + footer + reporter],
-		['duplicate inline case', inline + transcript],
-		['duplicate terminal case', transcript.replace(detail, detail + detail)],
-		['other case name', transcript.replaceAll(caseName, 'another failing test')],
-		['truncated replay', transcript.slice(0, transcript.indexOf('    replay:'))],
-		['truncated reporter', transcript.slice(0, -1)],
-		[
-			'truncated inline assertion',
-			transcript.replace(inline, `  FAIL ${caseName} — ${assertion.slice(0, -5)}\n`)
-		],
-		['conflicting assertion copies', transcript.replace(inline, inline.replace('false', 'nil'))],
+		['missing terminal record', inline + footer + reporter],
+		['duplicate terminal record', transcript.replace(detail, detail + detail)],
+		['record without replay', transcript.replace(replay, '')],
+		['record and replay names disagree', transcript.replace(`  - ${caseName}`, '  - another case')],
+		['foreign replay command', transcript.replace('--module=core', '--module=core; rm -rf x')],
+		['unquoted replay name', transcript.replace(quotedName, caseName)],
+		['truncated reporter', transcript.slice(0, transcript.indexOf('[report:linux-lua]'))],
+		['unfinished final line', transcript.slice(0, -1)],
 		['duplicate footer', transcript.replace(footer, footer + footer)],
-		['duplicate reporter', transcript + reporter],
 		['successful runner footer', transcript.replace('Failed tests:  1', 'Failed tests:  0')],
 		['successful reporter', transcript.replace('(exit 1, format lua)', '(exit 0, format lua)')],
 		['inconsistent failure count', transcript.replace('Failed tests:  1', 'Failed tests:  2')],
+		['reporter moved before the records', inline + footer + reporter + detail + slowest],
 		[
-			'foreign assertion source',
-			transcript.replaceAll('test_hotstrings_scope.lua', 'test_other.lua')
-		],
-		['control byte', transcript.replaceAll(assertion, assertion + '\x00')],
-		[
-			'escaped annotation exceeds budget',
-			transcript.replaceAll(assertion, assertion + '%'.repeat(3000))
-		],
-		[
-			'invalid UTF-8',
-			Buffer.from(transcript.replaceAll(assertion, assertion + '\x7f')).map((byte) =>
+			'invalid UTF-8 in the record',
+			Buffer.from(transcript.replace(detail, detail.replace('false', 'fa\x7fse'))).map((byte) =>
 				byte === 0x7f ? 0xff : byte
 			)
 		]
@@ -778,11 +771,11 @@ try {
 	for (const [label, log] of refusedLogs) {
 		const refusal = receiveExcerpt(log);
 		check(
-			`Configuration excerpt refuses ${label} without publishing detail`,
+			`failed unit CLI refuses ${label} without publishing detail`,
 			refusal.status === 2 &&
 				refusal.signal === null &&
 				refusal.stdout === '' &&
-				refusal.stderr.startsWith('Configuration assertion annotation refused: ') &&
+				refusal.stderr.startsWith('Failed unit assertion annotation refused: ') &&
 				!refusal.stderr.includes(assertion)
 		);
 	}
@@ -794,11 +787,11 @@ try {
 	]) {
 		const refusal = spawnSync(process.execPath, [excerptCommand, ...args], { encoding: 'utf8' });
 		check(
-			'Configuration excerpt refuses argument or read failures without a notice',
+			'failed unit CLI refuses argument or read failures without a notice',
 			refusal.status === 2 &&
 				refusal.signal === null &&
 				refusal.stdout === '' &&
-				refusal.stderr.startsWith('Configuration assertion annotation refused: ')
+				refusal.stderr.startsWith('Failed unit assertion annotation refused: ')
 		);
 	}
 	// A removed no-follow guard must reach a valid log and publish it, so a
@@ -809,20 +802,20 @@ try {
 		fs.symlinkSync(excerptLog, link);
 		const refusal = spawnSync(process.execPath, [excerptCommand, link], { encoding: 'utf8' });
 		check(
-			'Configuration excerpt refuses a symbolic log alias',
+			'failed unit CLI refuses a symbolic log alias',
 			refusal.status === 2 &&
 				refusal.stdout === '' &&
-				refusal.stderr.startsWith('Configuration assertion annotation refused: ')
+				refusal.stderr.startsWith('Failed unit assertion annotation refused: ')
 		);
 	}
 	fs.truncateSync(excerptLog, 32 * 1024 * 1024 + 1);
 	const oversized = spawnSync(process.execPath, [excerptCommand, excerptLog], { encoding: 'utf8' });
 	check(
-		'Configuration excerpt refuses oversized input before decoding',
+		'failed unit CLI refuses oversized input before decoding',
 		oversized.status === 2 &&
 			oversized.stdout === '' &&
 			oversized.stderr ===
-				'Configuration assertion annotation refused: unit log is not a regular bounded file.\n'
+				'Failed unit assertion annotation refused: unit log is not a regular bounded file.\n'
 	);
 } finally {
 	fs.rmSync(excerptFixture, { recursive: true, force: true });
