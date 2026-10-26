@@ -59,7 +59,7 @@ _ESOW_Record(Phase, Record) {
 			"state_controller_record", _ESOW_IdentityRecord(State.Controller, "controller"),
 			"state_view_record", _ESOW_IdentityRecord(State.View, "view"),
 			"reset", State.Reset, "message_sub_set", State.Message, "navigation_sub_set", State.Navigation,
-			"close_return_instrumented", false))
+			"close_return_instrumented", HasProp(Record, "CallbackReturned") && Record.CallbackReturned))
 }
 
 Gui_Create(Options := "", Title := "") {
@@ -68,10 +68,32 @@ Gui_Create(Options := "", Title := "") {
 	Record := {Window: Window, Hwnd: Window.Hwnd, Index: _ESOW.Windows.Length + 1,
 		Epoch: _ESOW_State().Epoch, ShowCount: 0, CloseCount: 0, NativeClose: 0, Controller: 0, ExistsAfterClose: true}
 	_ESOW.Windows.Push(Record)
-	; This observer is first, returns no event result, and never invokes the
-	; production handler. The original SessionCall is registered next by SUT.
-	Window.OnEvent("Close", _ESOW_CloseObserved.Bind(Record))
+	; Capture the native Func before installing an own registration observer;
+	; ObjBindMethod would resolve that later own method instead of retaining it.
+	Register := Gui.Prototype.OnEvent.Bind(Window)
+	Window.DefineProp("OnEvent", {Call: _ESOW_RegisterEvent.Bind(Record, Register)})
 	return Window
+}
+
+_ESOW_RegisterEvent(Record, Register, Window, Name, Callback, Options*) {
+	_ESOW_Require(Window == Record.Window, "native event registration retains its exact GUI")
+	if Name != "Close"
+		return Register.Call(Name, Callback, Options*)
+	_ESOW_Require(!HasProp(Record, "Callback") && Options.Length == 0,
+		"the exact production Close callback is registered once with its original options")
+	Record.Callback := Callback
+	Record.Relay := _ESOW_CloseEvent.Bind(Record, Callback)
+	return Register.Call(Name, Record.Relay, Options*)
+}
+
+_ESOW_CloseEvent(Record, Callback, Params*) {
+	; This relay is invoked only by the real native Close event. Never replace
+	; cancellation with a test cleanup, and preserve the genuine return value.
+	_ESOW_CloseObserved(Record, Params*)
+	Result := Callback.Call(Params*)
+	Record.CallbackReturned := true
+	_ESOW_CloseCompleted(Record)
+	return Result
 }
 
 _ESOW_ShowMessage(WParam, LParam, Message, Hwnd) {
@@ -119,32 +141,28 @@ _ESOW_CloseObserved(Record, Window) {
 			"The actual Close event must precede browser startup, not run during await.")
 		Record.CloseCount += 1
 		_ESOW_Record("actual-close-before-production", Record)
-		; Critical applies only to this GUI-event thread; native Destroy may pump.
-		; The high private signal observes retirement of the epoch, not the return
-		; of the original Close callback. Its actual state stays in the trace.
+		; Hold only this admitted native event thread. The exact original Close
+		; callback and synchronous observer finish before the old Show resumes.
 		Critical("On")
-		_ESOW_Require(DllCall("User32\PostMessageW", "Ptr", A_ScriptHwnd, "UInt", _ESOW.Signal,
-			"UPtr", Record.Hwnd, "Ptr", 0, "Int"), "The private after-Close signal must queue.")
 	} catch Any as Failure {
 		_ESOW.Failure := Failure
 	}
 }
 
-_ESOW_AfterClose(WParam, LParam, Message, Hwnd) {
+_ESOW_CloseCompleted(Record) {
 	global _ESOW
+	if Record.Index != 1 || _ESOW.Mode == "current"
+		return
 	try {
-		Record := _ESOW.Windows[1]
-		_ESOW_Require(Hwnd == A_ScriptHwnd && Message == _ESOW.Signal && WParam == Record.Hwnd,
-			"Only the exact private child signal may admit the successor.")
-		_ESOW.Signals += 1
+		_ESOW.Continuations += 1
 		State := _ESOW_State()
-		_ESOW_Require(_ESOW.Signals == 1 && Record.CloseCount == 1 && State.Epoch > Record.Epoch
+		_ESOW_Record("original-close-returned-before-show-resume", Record)
+		_ESOW_Require(_ESOW.Continuations == 1 && Record.CloseCount == 1 && State.Epoch > Record.Epoch
 			&& !_ESOW.PublicReturned && _ESOW.Controllers.Length == 0 && _ESOW.Environments == 0,
-			"The original production Close must revoke its epoch before the native Show pump resumes.")
+			"The exact original Close callback must retire its owner before its native event thread returns.")
 		Record.ExistsAfterClose := DllCall("User32\IsWindow", "Ptr", Record.Hwnd, "Int")
-		; Keep the historical marker label, while explicitly recording that this
-		; is an epoch observation and does not acknowledge Close callback return.
-		_ESOW_Record("production-close-completed-before-browser", Record)
+		_ESOW_Require(!Record.ExistsAfterClose && State.Reset && State.Window != Record.Window,
+			"The original Close callback must detach and destroy its exact native owner.")
 		if _ESOW.Mode == "reopen" {
 			_ESOW_Open()
 			_ESOW_Require(_ESOW.Windows.Length == 2, "The successor must use the same genuine public constructor.")
@@ -152,7 +170,25 @@ _ESOW_AfterClose(WParam, LParam, Message, Hwnd) {
 			_ESOW_Record("successor-public-return", _ESOW.Windows[2])
 		}
 	} catch Any as Failure {
-		_ESOW.Failure := Failure
+		if !IsObject(_ESOW.Failure)
+			_ESOW.Failure := Failure
+	}
+}
+
+_ESOW_LateNotification(WParam, LParam, Message, Hwnd) {
+	global _ESOW
+	try {
+		Record := _ESOW.Windows[1]
+		_ESOW_Require(_ESOW.Mode == "close-after-return" && Hwnd == A_ScriptHwnd
+			&& Message == _ESOW.Signal && WParam == Record.Hwnd,
+			"the late message is fixture bookkeeping for the exact already-retired owner")
+		_ESOW.LateNotifications += 1
+		_ESOW_Require(_ESOW.PublicReturned && _ESOW.Continuations == 1,
+			"late bookkeeping must follow the observed real callback and public return")
+		_ESOW_Record("late-test-notification", Record)
+	} catch Any as Failure {
+		if !IsObject(_ESOW.Failure)
+			_ESOW.Failure := Failure
 	}
 }
 
@@ -296,11 +332,11 @@ _ESOW_Check() {
 	_ESOW_Require(_ESOW.Confirmations == 0, "A native Close must never confirm an action.")
 	if _ESOW.Mode == "current" {
 		_ESOW_Require(_ESOW.Windows.Length == 1 && _ESOW.Controllers.Length == 1
-			&& _ESOW.CloseSent == 0 && _ESOW.Signals == 0 && _ESOW_CurrentReady(Old),
+			&& _ESOW.CloseSent == 0 && _ESOW.Continuations == 0 && _ESOW_CurrentReady(Old),
 			"The normal positive must publish one fully current native/browser owner.")
 		return
 	}
-	_ESOW_Require(Old.ShowCount > 0 && Old.NativeClose == 1 && Old.CloseCount == 1 && _ESOW.Signals == 1,
+	_ESOW_Require(Old.ShowCount > 0 && Old.NativeClose == 1 && Old.CloseCount == 1 && _ESOW.Continuations == 1,
 		"The early cancellation must be an observed native Show/WM_CLOSE/original-handler chain.")
 	_ESOW_Require(!Old.ExistsAfterClose,
 		"Close during native Show must destroy the exact original native window.")
@@ -337,28 +373,40 @@ _ESOW_Main() {
 		&& CryptoSha256Bytes(FileRead(A_AhkPath, "RAW")) == A_Args[5], "Actual child source/runtime bytes must match.")
 	Persistent(true)
 	_ESOW := {Owner: A_Args[1], Mode: A_Args[2], Windows: [], Controllers: [], Trace: [], Failure: 0,
-		CloseSent: 0, Signals: 0, PublicReturned: false, Environments: 0, Successor: 0, Confirmations: 0}
+		CloseSent: 0, Continuations: 0, LateNotifications: 0, PublicReturned: false, Environments: 0, Successor: 0, Confirmations: 0}
 	_ESOW_Require(_ESOW.Owner == "action-picker" || _ESOW.Owner == "paths", "The source owner must be exact.")
-	_ESOW_Require(_ESOW.Mode == "current" || _ESOW.Mode == "close" || _ESOW.Mode == "reopen", "The mode must be exact.")
+	_ESOW_Require(_ESOW.Mode == "current" || _ESOW.Mode == "close" || _ESOW.Mode == "reopen" || _ESOW.Mode == "close-after-return", "The mode must be exact.")
 	_ESOW.Signal := DllCall("User32\RegisterWindowMessageW", "Str", "ErgoptiPlus.EarlyShow." . A_ScriptHwnd, "UInt")
 	_ESOW_Require(_ESOW.Signal >= 0xC000, "The private signal must be outside emergency OnMessage IDs.")
 	_VendorDir := A_Args[3], _SharedDir := A_Args[3], _ConfigDir := A_Args[3] . "\", _PathsFile := A_Args[3] . "\unwritten.toml"
 	_I18nLocale := "en", _LLM_Menu := Map("n_predictions", 3), _ActPickWeb_ProgramCapturing := true
 	Primary := 0
 	OnError(_ESOW_OnError)
-	OnMessage(0x18, _ESOW_ShowMessage), OnMessage(0x10, _ESOW_NativeClose), OnMessage(_ESOW.Signal, _ESOW_AfterClose)
+	OnMessage(0x18, _ESOW_ShowMessage), OnMessage(0x10, _ESOW_NativeClose), OnMessage(_ESOW.Signal, _ESOW_LateNotification)
 	try {
 		; Critical Off changes only this child caller, making the native final Show
 		; pump eligible. No zero-grace default or extra sleep manufactures a yield.
 		Critical("Off"), Thread("Priority", 0)
 		_ESOW_Open()
 		_ESOW.PublicReturned := true
+		if _ESOW.Mode == "close-after-return" {
+			Old := _ESOW.Windows[1], State := _ESOW_State()
+			_ESOW_Require(Old.NativeClose == 1 && Old.CloseCount == 1 && State.Epoch > Old.Epoch
+				&& State.Reset && State.Window != Old.Window && !DllCall("User32\IsWindow", "Ptr", Old.Hwnd, "Int")
+				&& !IsObject(State.Controller) && !IsObject(State.View) && !State.Message && !State.Navigation
+				&& _ESOW.Controllers.Length == 0 && _ESOW.Environments == 0,
+				"The original Close must already fully retire its actual GUI before late test bookkeeping.")
+			_ESOW_Record("closed-before-late-test-signal", Old)
+			DllCall("User32\SendMessageW", "Ptr", A_ScriptHwnd, "UInt", _ESOW.Signal, "UPtr", Old.Hwnd, "Ptr", 0, "Ptr")
+			_ESOW_Require(_ESOW.LateNotifications == 1, "the actual late bookkeeping message must be observed once")
+			_ESOW_Record("closed-after-late-test-signal", Old)
+		}
 		for Entry in _ESOW.Trace
 			FileAppend("TRACE editor-early-show " . KL_JsonEncode(Entry) . "`n", "*", "UTF-8")
 		FileAppend("RECEIPT editor-early-show " . KL_JsonEncode(Map("owner", _ESOW.Owner, "mode", _ESOW.Mode,
 			"windows", _ESOW.Windows.Length, "constructors", _ESOW.Controllers.Length, "close_sent", _ESOW.CloseSent,
 			"native_close", _ESOW.Windows[1].NativeClose, "close_events", _ESOW.Windows[1].CloseCount,
-			"after_close_signals", _ESOW.Signals, "old_exists", DllCall("User32\IsWindow", "Ptr", _ESOW.Windows[1].Hwnd, "Int"),
+			"after_close_callbacks", _ESOW.Continuations, "late_notifications", _ESOW.LateNotifications, "old_exists", DllCall("User32\IsWindow", "Ptr", _ESOW.Windows[1].Hwnd, "Int"),
 			"old_published", _ESOW_State().Window == _ESOW.Windows[1].Window,
 			"epoch", _ESOW_State().Epoch, "source_sha256", A_Args[4], "runtime_sha256", A_Args[5])) . "`n", "*", "UTF-8")
 		_ESOW_FinalDiagnostic()
@@ -367,7 +415,7 @@ _ESOW_Main() {
 		Primary := Failure
 	} finally {
 		OnMessage(0x18, _ESOW_ShowMessage, 0), OnMessage(0x10, _ESOW_NativeClose, 0)
-		OnMessage(_ESOW.Signal, _ESOW_AfterClose, 0)
+		OnMessage(_ESOW.Signal, _ESOW_LateNotification, 0)
 		try {
 			if _ESOW.Owner == "action-picker"
 				_ActPickWeb_Close()
