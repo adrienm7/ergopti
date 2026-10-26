@@ -15,7 +15,6 @@
 		"static/ergopti_plus/_shared/lua/toml_codec/writer.lua": 1,
 		"static/ergopti_plus/_shared/modules/features/caps_word_auto_off_policy.ahk": 2,
 		"static/ergopti_plus/_shared/modules/hotstrings/scope_overrides.ahk": 2,
-		"static/ergopti_plus/_shared/ui/prompt_editor/script.js": 4,
 		"static/ergopti_plus/linux/ergopti_hotstrings.lua": 4,
 		"static/ergopti_plus/linux/infra/diagnostic_snapshot.lua": 1,
 		"static/ergopti_plus/linux/infra/dynamic_hotstrings_scope.lua": 3,
