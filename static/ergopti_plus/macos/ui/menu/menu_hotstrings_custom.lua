@@ -434,7 +434,7 @@ function M.build_custom(ctx, counts)
 			current_str, "OK", i18n.get("common.cancel")
 		)
 		if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return false end
-		raw = raw:match("^%s*(.-)%s*$"):lower()
+		raw = text_utils.trim(raw):lower()
 		if raw == "" then return apply_shortcut(nil, nil) end
 		local chord_input = raw:find("+", 1, true) and raw or ("ctrl+" .. raw)
 		local parsed = Chord.parse(chord_input)

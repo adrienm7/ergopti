@@ -56,14 +56,8 @@
 	"macos/infra/capsword_auto_off.lua": {
 		"shallow_copy": 1
 	},
-	"macos/infra/config_overrides.lua": {
-		"trim": 1
-	},
 	"macos/infra/driver_control.lua": {
 		"shell_quote": 1
-	},
-	"macos/infra/field_check_checks.lua": {
-		"trim": 1
 	},
 	"macos/infra/key_event_health.lua": {
 		"sorted_keys": 1
@@ -73,9 +67,6 @@
 	},
 	"macos/infra/personal_info_fields.lua": {
 		"count": 1
-	},
-	"macos/infra/toml/record_editor.lua": {
-		"trim": 2
 	},
 	"macos/init.lua": {
 		"dirname": 2
@@ -87,9 +78,6 @@
 	"macos/modules/gestures/actions.lua": {
 		"percent_encode": 1
 	},
-	"macos/modules/gestures/conflicts.lua": {
-		"trim": 1
-	},
 	"macos/modules/gestures/init.lua": {
 		"count": 1,
 		"sorted_keys": 1
@@ -98,8 +86,7 @@
 		"sorted_keys": 1
 	},
 	"macos/modules/hotstrings/hotstrings_config.lua": {
-		"deep_copy": 1,
-		"trim": 3
+		"deep_copy": 1
 	},
 	"macos/modules/keymap/registry_groups.lua": {
 		"deep_copy": 1,
@@ -109,39 +96,17 @@
 		"deep_copy": 1
 	},
 	"macos/modules/keystats/kc_bridge.lua": {
-		"count": 2,
-		"trim": 1
-	},
-	"macos/modules/llm/agent_connectors.lua": {
-		"trim": 1
+		"count": 2
 	},
 	"macos/modules/llm/agent_learning.lua": {
 		"count": 1
-	},
-	"macos/modules/llm/agent_runner.lua": {
-		"trim": 1
-	},
-	"macos/modules/llm/api_mlx_discovery.lua": {
-		"trim": 1
-	},
-	"macos/modules/llm/api_remote.lua": {
-		"trim": 1
 	},
 	"macos/modules/llm/init.lua": {
 		"deep_copy": 2,
 		"sorted_keys": 1
 	},
-	"macos/modules/llm/mlx_bootstrap_diagnosis.lua": {
-		"trim": 1
-	},
 	"macos/modules/llm/mlx_deps_checker.lua": {
 		"shell_quote": 1
-	},
-	"macos/modules/llm/prediction_engine.lua": {
-		"trim": 2
-	},
-	"macos/modules/llm/streaming_handler.lua": {
-		"trim": 2
 	},
 	"macos/modules/shortcuts/actions/text.lua": {
 		"count": 1
@@ -185,33 +150,13 @@
 		"deep_copy": 1
 	},
 	"macos/ui/menu/menu_hotstrings_custom.lua": {
-		"sorted_keys": 1,
-		"trim": 1
-	},
-	"macos/ui/menu/menu_hotstrings_management.lua": {
-		"trim": 1
-	},
-	"macos/ui/menu/menu_llm/agent_panel.lua": {
-		"trim": 1
-	},
-	"macos/ui/menu/menu_llm/api_panel.lua": {
-		"trim": 2
-	},
-	"macos/ui/menu/menu_llm/backend_labels.lua": {
-		"trim": 1
-	},
-	"macos/ui/menu/menu_llm/local_server_panel.lua": {
-		"trim": 1
+		"sorted_keys": 1
 	},
 	"macos/ui/menu/menu_llm/models_manager_mlx.lua": {
 		"count": 1
 	},
-	"macos/ui/menu/menu_llm/models_manager_mlx_hf.lua": {
-		"trim": 3
-	},
 	"macos/ui/menu/menu_llm/models_selector.lua": {
-		"count": 1,
-		"trim": 2
+		"count": 1
 	},
 	"macos/ui/menu/menu_llm/scope_runtime.lua": {
 		"deep_copy": 1
@@ -225,9 +170,6 @@
 	"macos/ui/menu/menu_llm/trigger_orchestrator.lua": {
 		"deep_copy": 1,
 		"sorted_keys": 1
-	},
-	"macos/ui/menu/menu_shortcuts.lua": {
-		"trim": 1
 	},
 	"macos/ui/menu/menu_state.lua": {
 		"deep_copy": 1
@@ -244,16 +186,10 @@
 	"macos/ui/menu/session_demotions.lua": {
 		"deep_copy": 1
 	},
-	"macos/ui/menu/shortcut_utils.lua": {
-		"trim": 4
-	},
 	"macos/ui/menu/shortcuts_scope.lua": {
 		"deep_copy": 1
 	},
 	"macos/ui/metrics_typing/projection.lua": {
 		"sorted_keys": 1
-	},
-	"macos/ui/tooltip/tooltip_llm.lua": {
-		"trim": 1
 	}
 }

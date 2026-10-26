@@ -23,6 +23,7 @@ local ManifestMenu   = require("infra.manifest_menu")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local Terminators     = require("keymap.terminators")
 local HotstringCore   = require("infra.hotstring_engine")
+local TextUtils = require("text_utils")
 local LOG               = "menu_hotstrings"
 
 
@@ -715,7 +716,7 @@ function M.build_management(ctx)
 			ok_label, i18n.get("button.cancel"))
 		if not ok_p or btn ~= ok_label or type(raw) ~= "string" then return false end
 		-- A decimal comma is how half the locales write 1,5 s.
-		local seconds = tonumber((raw:gsub("^%s+", ""):gsub("%s+$", ""):gsub(",", ".")))
+		local seconds = tonumber((TextUtils.trim(raw):gsub(",", ".")))
 		if not HotstringCore.valid_idle_reset_seconds(seconds) then
 			Logger.warn(LOG, "Invalid idle reset '%s' — ignored.", raw)
 			pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),

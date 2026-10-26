@@ -14,6 +14,7 @@ local i18n   = require("infra.i18n")
 local Logger = require("infra.logger")
 local SendInput = require("send_input")
 local NativePresentation = require("infra.native_presentation")
+local TextUtils = require("text_utils")
 local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title
 
 local LOG = "menu.shortcut_utils"
@@ -68,13 +69,13 @@ end
 --- @return table|nil Normalized shortcut table or nil when invalid.
 function M.normalize_shortcut(mods, key, default_mods)
 	if type(key) ~= "string" then return nil end
-	local clean_key = key:match("^%s*(.-)%s*$")
+	local clean_key = TextUtils.trim(key)
 	if clean_key == "" then return nil end
 
 	local seen = {}
 	local out_mods = {}
 	for _, m in ipairs(type(mods) == "table" and mods or {}) do
-		local mod = tostring(m):lower():match("^%s*(.-)%s*$")
+		local mod = TextUtils.trim(tostring(m):lower())
 		if mod == "option" then mod = "alt" end
 		if mod == "control" then mod = "ctrl" end
 		if VALID_MODS[mod] and not seen[mod] then
@@ -104,7 +105,7 @@ end
 --- @return table|nil Parsed shortcut.
 function M.parse_shortcut_input(raw, default_mods)
 	if type(raw) ~= "string" then return nil end
-	local normalized = raw:match("^%s*(.-)%s*$"):lower()
+	local normalized = TextUtils.trim(raw):lower()
 	if normalized == "" then return nil end
 
 	local parts = {}
@@ -256,7 +257,7 @@ function M.prompt_shortcut(opts)
 	local ok_prompt, button, raw = pcall(prompt, title, message, current, "OK", cancel_label)
 	if not ok_prompt or button ~= "OK" or type(raw) ~= "string" then return false end
 
-	local cleaned = raw:match("^%s*(.-)%s*$")
+	local cleaned = TextUtils.trim(raw)
 	if cleaned == "" then
 		return apply_prompt_update(opts.on_apply, nil, nil)
 	end

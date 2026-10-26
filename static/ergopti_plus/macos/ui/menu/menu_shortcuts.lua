@@ -28,6 +28,7 @@ local ShortcutUtils = require("ui.menu.shortcut_utils")
 local KeyboardSlots = require("ui.menu.menu_keyboard_slots")
 local TapKeysMenu   = require("ui.menu.menu_tap_keys")
 local ManifestReader = require("infra.manifest_reader")
+local TextUtils = require("text_utils")
 local utf8_lib      = (type(utf8) == "table" and type(utf8.len) == "function")
 	and utf8 or require("compat.utf8")
 local LOG           = "menu_shortcuts"
@@ -192,7 +193,7 @@ local function make_shortcut_item(s, shortcuts, ctx)
 	-- The checkmark is the preference: with the layer off or paused no hotkey is
 	-- bound, and a binding-based mark hid which shortcuts will come back.
 	local is_on  = s.enabled == true
-	local desc   = ctx.applyTriggerChar((s.label or ""):gsub("^%s*(.-)%s*$", "%1"))
+	local desc   = ctx.applyTriggerChar(TextUtils.trim(s.label or ""))
 	local pk     = pretty_key(s.id, state)
 	-- The wrap row reads as its behaviour alone, « Taper un symbole encadre la
 	-- sélection », as on Windows and Linux: its trigger is any typed symbol, so

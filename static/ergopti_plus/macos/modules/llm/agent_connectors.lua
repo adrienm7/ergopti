@@ -27,6 +27,7 @@ local Agent       = require("llm.agent")
 local Logger      = require("infra.logger")
 local ShellRunner = require("adapters.shell_runner")
 local FileSystem  = require("adapters.file_system")
+local TextUtils = require("text_utils")
 
 local LOG = "llm.agent_connectors"
 
@@ -320,7 +321,7 @@ function M.list_tools(max, on_done)
 		end
 		local names = {}
 		for line in stdout:gmatch("[^\r\n]+") do
-			local name = line:match("^%s*(.-)%s*$")
+			local name = TextUtils.trim(line)
 			if name ~= "" and #names < max then names[#names + 1] = name end
 		end
 		Logger.info(LOG, "Shortcuts listed: %d tool(s).", #names)

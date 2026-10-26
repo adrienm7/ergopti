@@ -32,6 +32,7 @@ local Paths         = require("infra.paths")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Logger        = require("infra.logger")
+local TextUtils = require("text_utils")
 
 local LOG = "menu_llm.models.mlx_hf"
 
@@ -520,7 +521,7 @@ function M.install(ctx)
 		if not fh then return nil end
 		local raw = fh:read("*a")
 		fh:close()
-		local token = raw and raw:match("^%s*(.-)%s*$") or ""
+		local token = raw and TextUtils.trim(raw) or ""
 		return token ~= "" and token or nil
 	end
 
@@ -660,7 +661,7 @@ function M.install(ctx)
 		local clipboard_token_raw = hs.pasteboard and hs.pasteboard.getContents
 			and hs.pasteboard.getContents() or ""
 		local clipboard_token = type(clipboard_token_raw) == "string"
-			and clipboard_token_raw:match("^%s*(.-)%s*$") or ""
+			and TextUtils.trim(clipboard_token_raw) or ""
 		local token_seed = clipboard_token:match("^hf_[%w_%-]+$")
 			and clipboard_token or ""
 		if token_seed == "" then token_seed = read_hf_token() or "" end
@@ -815,7 +816,7 @@ function M.install(ctx)
 						end
 						flow.prompt_action_consumed = true
 						local token = type(msg.body.token) == "string"
-							and msg.body.token:match("^%s*(.-)%s*$") or ""
+							and TextUtils.trim(msg.body.token) or ""
 						if token == "" and token_seed ~= "" then
 							token = token_seed
 							pcall(notifications.notify, i18n.get("mlx.token_detected"),

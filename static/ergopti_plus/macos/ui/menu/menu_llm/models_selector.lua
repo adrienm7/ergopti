@@ -21,6 +21,7 @@ local dialog = require("infra.dialog_util")
 local DeferredWork = require("infra.deferred_work")
 local BackendLabels = require("ui.menu.menu_llm.backend_labels")
 local ManifestMenu = require("infra.manifest_menu")
+local TextUtils = require("text_utils")
 
 local LOG = "models_selector"
 
@@ -309,7 +310,7 @@ function M.build(ctx)
 			if body.action == "cancel" then
 				return close_custom_model_session(session)
 			elseif body.action == "add" then
-				local name = type(body.value) == "string" and body.value:gsub("^%s+", ""):gsub("%s+$", "") or ""
+				local name = type(body.value) == "string" and TextUtils.trim(body.value) or ""
 				if close_custom_model_session(session) ~= true then return false end
 				if name == "" then
 					pcall(dialog.block_alert, i18n.get("menu.llm.custom_model_title"), i18n.get("menu.llm.empty_model_id"), i18n.get("button.ok"))
@@ -476,7 +477,7 @@ function M.build(ctx)
 		local fh = io.open(hf_token_file, "r")
 		if fh then
 			local raw = fh:read("*a"); fh:close()
-			has_hf_token = type(raw) == "string" and raw:match("^%s*(.-)%s*$") ~= ""
+			has_hf_token = type(raw) == "string" and TextUtils.trim(raw) ~= ""
 		end
 		local token_status = has_hf_token
 			and i18n.get("menu.llm.hf_token_set")

@@ -29,6 +29,7 @@ local ProviderUses   = require("modules.llm.provider_uses")
 local EntryNames     = require("llm.api_entry_names")
 local EntryIdentity  = require("llm.api_entry_identity")
 local LocalAuth      = require("llm.local_server_auth")
+local TextUtils = require("text_utils")
 
 local LOG = "api_panel"
 
@@ -197,7 +198,7 @@ local function probe_fail_body(label, detail)
 	if type(detail) == "table" then
 		local status = tonumber(detail.status) or 0
 		local message = type(detail.message) == "string"
-			and detail.message:match("^%s*(.-)%s*$") or ""
+			and TextUtils.trim(detail.message) or ""
 		if message ~= "" then
 			fail_body = fail_body .. "\n"
 				.. (status > 0 and string.format("[%d] %s", status, message) or message)
@@ -471,7 +472,7 @@ function M.build(ctx)
 				disabled = (paused or mutation_busy) or nil,
 				action       = (not paused and not mutation_busy) and function()
 					if not add_commands_ready() then return false end
-					local function trim(s) return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", "")) end
+					local function trim(s) return TextUtils.trim(tostring(s or "")) end
 					local function prompt_field(title_key, default_val, hint)
 						if not add_commands_ready() then return false, nil end
 						local ok, ret_a, ret_b = pcall(dialog.text_prompt,

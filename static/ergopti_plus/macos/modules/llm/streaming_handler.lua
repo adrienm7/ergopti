@@ -30,6 +30,7 @@ local Logger  = require("infra.logger")
 local Timings = require("infra.timings")
 local i18n    = require("infra.i18n")
 local TimerScheduler = require("adapters.timer_scheduler")
+local TextUtils = require("text_utils")
 
 local LOG = "llm.streaming_handler"
 
@@ -117,7 +118,7 @@ local function build_dedup_key(pred)
 		table.insert(parts, next_words)
 	end
 
-	return (table.concat(parts):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", ""))
+	return TextUtils.trim((table.concat(parts):gsub("%s+", " ")))
 end
 
 --- Formats the validation modifier shortcut for tooltip display.
@@ -333,7 +334,7 @@ function M.build_callbacks(ctx)
 		-- and the last (still streaming) block may fail to parse — that's fine
 		local raw_blocks = {}
 		for b in (stripped .. "==="):gmatch("(.-)===") do
-			local clean = b:gsub("^%s+", ""):gsub("%s+$", "")
+			local clean = TextUtils.trim(b)
 			if clean ~= "" then table.insert(raw_blocks, clean) end
 		end
 		if #raw_blocks == 0 then table.insert(raw_blocks, stripped) end

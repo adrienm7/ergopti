@@ -27,6 +27,7 @@ local Projection = require("script_override_projection")
 local Manifest = require("infra.manifest_reader")
 local ConfigOutdated = require("config_outdated")
 local FileSystem = require("adapters.file_system")
+local TextUtils = require("text_utils")
 local LOG       = "config_overrides"
 
 
@@ -45,7 +46,7 @@ local LOG       = "config_overrides"
 --- @param raw string Raw scalar literal.
 --- @return any coerced
 function M.coerce(raw)
-	local trimmed = raw:match("^%s*(.-)%s*$") or ""
+	local trimmed = TextUtils.trim(raw)
 	local lower = trimmed:lower()
 	if lower == "true" then return true end
 	if lower == "false" then return false end
