@@ -24,6 +24,7 @@ class WebViewBrowserWarmup {
 		this.Host := 0
 		this.EnvironmentPromise := 0
 		this.ControllerPromise := 0
+		this.ControllerAcquiring := false
 		this.Controller := 0
 		; Main-thread time spent inside this chain's own synchronous steps. The elapsed
 		; wall and process CPU of the whole warm-up include everything else the driver
@@ -42,7 +43,15 @@ class WebViewBrowserWarmup {
 		this.BeginCpuMs := BootClockCpuMs()
 		BeginTicks := PerfStage_Begin()
 		try {
+			if this.Stopped
+				return false
 			this.Host := this.HostFn.Call()
+			; Shutdown may retire this owner while native host construction pumps.
+			; The late return remains a cleanup capability, never new browser work.
+			if this.Stopped {
+				this.DestroyHost()
+				return false
+			}
 			Promise := this.EnvironmentFn.Call()
 			this.EnvironmentPromise := Promise
 			Promise.onSettled(ObjBindMethod(this, "EnvironmentReady", Promise),
@@ -57,15 +66,32 @@ class WebViewBrowserWarmup {
 	}
 
 	EnvironmentReady(Promise, Environment) {
-		if this.EnvironmentPromise !== Promise
-			return false
-		this.EnvironmentPromise := 0
-		if this.Stopped
-			return false
-		StepTicks := PerfStage_Begin()
+		PreviousCritical := Critical("On")
 		try {
-			NextPromise := this.ControllerFn.Call(Environment, this.Host.Hwnd)
-			this.ControllerPromise := NextPromise
+			; Keep consumed references alive until native work is interruptible.
+			RetainedPromise := this.EnvironmentPromise
+			if RetainedPromise !== Promise
+				return false
+			this.EnvironmentPromise := 0
+			if this.Stopped
+				return false
+			Host := this.Host
+			this.ControllerAcquiring := true
+		} finally Critical(PreviousCritical)
+		try {
+			; Profiling may yield just like the native controller factory.
+			; Publish the actual promise before releasing its parent reservation.
+			try {
+				StepTicks := PerfStage_Begin()
+				if this.Stopped
+					return false
+				NextPromise := this.ControllerFn.Call(Environment, Host.Hwnd)
+				this.ControllerPromise := NextPromise
+			} finally {
+				this.ControllerAcquiring := false
+				if this.Stopped && !this.ControllerPromise
+					this.DestroyHost()
+			}
 			NextPromise.onSettled(ObjBindMethod(this, "ControllerReady", NextPromise),
 				ObjBindMethod(this, "Failed", "controller", NextPromise))
 		} catch as Err {
@@ -78,7 +104,18 @@ class WebViewBrowserWarmup {
 	}
 
 	ControllerReady(Promise, Controller) {
-		if this.ControllerPromise !== Promise || this.Stopped {
+		PreviousCritical := Critical("On")
+		try {
+			RetainedPromise := this.ControllerPromise
+			Retired := RetainedPromise !== Promise || this.Stopped
+			if !Retired {
+				; Finalizers and native close stay outside this RAM-only handoff.
+				RetainedController := this.Controller
+				this.ControllerPromise := 0
+				this.Controller := Controller
+			}
+		} finally Critical(PreviousCritical)
+		if Retired {
 			Controller.Close()
 			if this.ControllerPromise == Promise {
 				this.ControllerPromise := 0
@@ -86,9 +123,9 @@ class WebViewBrowserWarmup {
 			}
 			return false
 		}
-		this.ControllerPromise := 0
-		this.Controller := Controller
 		StepTicks := PerfStage_Begin()
+		if this.Stopped
+			return false
 		try Controller.IsVisible := false
 		catch as Err {
 			this.Stop()
@@ -124,7 +161,7 @@ class WebViewBrowserWarmup {
 			this.Controller.Close()
 			this.Controller := 0
 		}
-		if !this.ControllerPromise
+		if !this.ControllerAcquiring && !this.ControllerPromise
 			this.DestroyHost()
 		if !WasStopped
 			LoggerInfo("WebView", "Shared browser warmup retired.")

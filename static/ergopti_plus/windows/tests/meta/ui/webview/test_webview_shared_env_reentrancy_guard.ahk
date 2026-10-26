@@ -284,3 +284,253 @@ _WSERG_ForegroundJoinsBackground() {
 }
 Test("webview_utils: foreground joins background creation without nested awaiting (webview-browser-warmup)",
 	_WSERG_ForegroundJoinsBackground)
+
+
+_WSERG_FactoryDestroy(State, *) {
+	State.Calls.Push("destroy")
+	State.NativeHost.Destroy.Call()
+}
+
+_WSERG_FactoryHost(State) {
+	State.NativeHost := WMBrowserWarmHost()
+	State.Hwnd := State.NativeHost.Hwnd
+	if State.Phase == "host" {
+		State.Owner.Stop()
+		State.StoppedInFactory := true
+	}
+	return {Hwnd: State.Hwnd, Destroy: _WSERG_FactoryDestroy.Bind(State)}
+}
+
+_WSERG_FactoryEnvironment(State) {
+	State.EnvironmentCalls += 1
+	return State.Env
+}
+
+_WSERG_FactoryController(State, Environment, Hwnd) {
+	State.ControllerCalls += 1
+	AssertEqual(State.Hwnd, Hwnd, "the actual parent identity reaches controller acquisition")
+	State.Owner.Stop()
+	State.StoppedInFactory := true
+	State.ParentAliveDuringFactory := WMHandleExists(Hwnd)
+	return State.ControllerPromise
+}
+
+_WSERG_WarmupFactoryRetirement(Phase) {
+	State := {Phase: Phase, Owner: 0, NativeHost: 0, Hwnd: 0,
+		Env: _WSERG_NeverCompletes(), ControllerPromise: _WSERG_NeverCompletes(),
+		EnvironmentCalls: 0, ControllerCalls: 0, Calls: [],
+		StoppedInFactory: false, ParentAliveDuringFactory: false,
+		EnvironmentResolved: false, ControllerResolved: false}
+	Controller := {IsVisible: true, Close: (*) => State.Calls.Push("close")}
+	Owner := WebViewBrowserWarmup(_WSERG_FactoryEnvironment.Bind(State),
+		_WSERG_FactoryController.Bind(State), _WSERG_FactoryHost.Bind(State))
+	State.Owner := Owner
+	try {
+		Owner.Begin()
+		if Phase == "host" {
+			AssertTrue(State.StoppedInFactory, "retirement occurs before the host factory returns")
+			AssertEqual(0, State.EnvironmentCalls,
+				"a host returned after retirement cannot dispatch browser creation")
+			AssertEqual(0, Owner.Host, "a late native parent cannot remain owned after retirement")
+			AssertFalse(WMHandleExists(State.Hwnd), "the actual late native parent must be destroyed")
+			AssertEqual(1, State.Calls.Length)
+			AssertEqual("destroy", State.Calls[1])
+		} else {
+			State.EnvironmentResolved := true
+			State.Env.Resolve({})
+			AssertTrue(State.StoppedInFactory, "retirement occurs before the controller factory returns")
+			AssertEqual(1, State.ControllerCalls)
+			AssertTrue(State.ParentAliveDuringFactory,
+				"the actual HWND must survive retirement while controller acquisition is in flight")
+			AssertEqual(0, State.Calls.Length, "native parent retirement waits for the actual terminal callback")
+			State.ControllerResolved := true
+			State.ControllerPromise.Resolve(Controller)
+			AssertEqual("close", State.Calls[1], "late controller closes before its real native parent")
+			AssertEqual("destroy", State.Calls[2])
+			AssertEqual(2, State.Calls.Length)
+			AssertFalse(WMHandleExists(State.Hwnd))
+			AssertEqual(0, Owner.Controller, "a cancelled late controller cannot publish")
+		}
+	} finally {
+		Owner.Stop()
+		if !State.EnvironmentResolved && HasMethod(State.Env.SuccessFn, "Call")
+			State.Env.Resolve({})
+		if !State.ControllerResolved && HasMethod(State.ControllerPromise.SuccessFn, "Call")
+			State.ControllerPromise.Resolve(Controller)
+		if State.Hwnd && WMHandleExists(State.Hwnd)
+			State.NativeHost.Destroy.Call()
+		; Release external promise observation edges only after actual retirement.
+		State.Env.SuccessFn := 0, State.Env.FailureFn := 0
+		State.ControllerPromise.SuccessFn := 0, State.ControllerPromise.FailureFn := 0
+		State.Owner := 0
+	}
+}
+Test("webview_utils: warmup retires a host returned after cancellation (webview-warmup-factory-reentry)",
+	_WSERG_WarmupFactoryRetirement.Bind("host"))
+Test("webview_utils: warmup retains the native parent during controller factory cancellation (webview-warmup-factory-reentry)",
+	_WSERG_WarmupFactoryRetirement.Bind("controller"))
+
+
+_WSERG_ProfileRetire(State, Self, Params*) {
+	; Observe the genuine QPC-backed function, never answer for its value.
+	Self.DeleteProp("Call")
+	try Counter := Self.Call(Params*)
+	finally Self.DefineProp("Call", {Call: State.Observer})
+	if State.Armed {
+		State.Armed := false
+		State.Observed := true
+		State.Counter := Counter
+		State.Owner.Stop()
+		State.ParentAliveAfterStop := WMHandleExists(State.Hwnd)
+	}
+	return Counter
+}
+
+_WSERG_WarmupProfileBoundaryRetirement() {
+	AssertFalse(PerfStage_Begin.HasOwnProp("Call"),
+		"the fixture cannot replace a foreign performance observation owner")
+	State := {Phase: "profiling", Owner: 0, NativeHost: 0, Hwnd: 0,
+		Env: _WSERG_NeverCompletes(), ControllerPromise: _WSERG_NeverCompletes(),
+		EnvironmentCalls: 0, ControllerCalls: 0, Calls: [], StoppedInFactory: false,
+		ParentAliveDuringFactory: false, Armed: false, Observed: false,
+		ParentAliveAfterStop: false, Counter: 0, Observer: 0}
+	Controller := {IsVisible: true, Close: (*) => State.Calls.Push("close")}
+	Owner := WebViewBrowserWarmup(_WSERG_FactoryEnvironment.Bind(State),
+		_WSERG_FactoryController.Bind(State), _WSERG_FactoryHost.Bind(State))
+	State.Owner := Owner
+	State.Observer := _WSERG_ProfileRetire.Bind(State)
+	PerfStage_Begin.DefineProp("Call", {Call: State.Observer})
+	try {
+		Owner.Begin()
+		State.Armed := true
+		State.Env.Resolve({})
+		AssertTrue(State.Observed, "the actual environment-ready profiling boundary must execute")
+		AssertTrue(State.Counter is Integer && State.Counter > 0,
+			"the real performance owner must supply the native QPC observation")
+		AssertTrue(State.ParentAliveAfterStop,
+			"the native parent reservation must precede profiling that can yield to retirement")
+		AssertEqual(0, State.ControllerCalls,
+			"retirement during profiling must be observed before native controller dispatch")
+		AssertEqual(1, State.Calls.Length)
+		AssertEqual("destroy", State.Calls[1], "the cancelled reserved parent must still be released once")
+		AssertFalse(WMHandleExists(State.Hwnd))
+		AssertEqual(0, Owner.ControllerPromise)
+	} finally {
+		if PerfStage_Begin.HasOwnProp("Call") {
+			Descriptor := PerfStage_Begin.GetOwnPropDesc("Call")
+			AssertTrue(Descriptor.Call == State.Observer,
+				"the fixture may retire only its exact performance observer")
+			PerfStage_Begin.DeleteProp("Call")
+		}
+		Owner.Stop()
+		if HasMethod(State.ControllerPromise.SuccessFn, "Call")
+			State.ControllerPromise.Resolve(Controller)
+		if State.Hwnd && WMHandleExists(State.Hwnd)
+			State.NativeHost.Destroy.Call()
+		State.Env.SuccessFn := 0, State.Env.FailureFn := 0
+		State.ControllerPromise.SuccessFn := 0, State.ControllerPromise.FailureFn := 0
+		State.Owner := 0, State.Observer := 0
+	}
+}
+Test("webview_utils: native warmup reservation precedes profiling retirement (webview-warmup-profile-retirement)",
+	_WSERG_WarmupProfileBoundaryRetirement)
+
+_WSERG_WarmupBeginProfileRetirement() {
+	AssertFalse(PerfStage_Begin.HasOwnProp("Call"),
+		"the fixture cannot replace a foreign performance observation owner")
+	State := {Phase: "profiling", Owner: 0, NativeHost: 0, Hwnd: 0,
+		Env: _WSERG_NeverCompletes(), ControllerPromise: _WSERG_NeverCompletes(),
+		EnvironmentCalls: 0, ControllerCalls: 0, Calls: [], StoppedInFactory: false,
+		ParentAliveDuringFactory: false, Armed: true, Observed: false,
+		ParentAliveAfterStop: false, Counter: 0, Observer: 0}
+	Owner := WebViewBrowserWarmup(_WSERG_FactoryEnvironment.Bind(State),
+		_WSERG_FactoryController.Bind(State), _WSERG_FactoryHost.Bind(State))
+	State.Owner := Owner
+	State.Observer := _WSERG_ProfileRetire.Bind(State)
+	PerfStage_Begin.DefineProp("Call", {Call: State.Observer})
+	try {
+		AssertFalse(Owner.Begin())
+		AssertTrue(State.Observed, "the genuine initial profiling boundary must execute")
+		AssertTrue(State.Counter is Integer && State.Counter > 0)
+		AssertEqual(0, State.Hwnd,
+			"retirement during initial profiling cannot dispatch new native host construction")
+		AssertEqual(0, State.EnvironmentCalls)
+		AssertEqual(0, State.Calls.Length)
+	} finally {
+		if PerfStage_Begin.HasOwnProp("Call") {
+			Descriptor := PerfStage_Begin.GetOwnPropDesc("Call")
+			AssertTrue(Descriptor.Call == State.Observer)
+			PerfStage_Begin.DeleteProp("Call")
+		}
+		Owner.Stop()
+		if State.Hwnd && WMHandleExists(State.Hwnd)
+			State.NativeHost.Destroy.Call()
+		State.Env.SuccessFn := 0, State.Env.FailureFn := 0
+		State.ControllerPromise.SuccessFn := 0, State.ControllerPromise.FailureFn := 0
+		State.Owner := 0, State.Observer := 0
+	}
+}
+Test("webview_utils: initial profiling retirement prevents native warmup dispatch (webview-warmup-begin-profile-retirement)",
+	_WSERG_WarmupBeginProfileRetirement)
+
+_WSERG_ProfileController(State, Environment, Hwnd) {
+	State.ControllerCalls += 1
+	AssertEqual(State.Hwnd, Hwnd)
+	return State.ControllerPromise
+}
+
+_WSERG_ProfileClose(State, *) {
+	State.Closed := true
+	State.Calls.Push("close")
+}
+
+_WSERG_ProfileVisibility(State, Self, Value) {
+	State.VisibilityCalls += 1
+}
+
+_WSERG_WarmupControllerProfileRetirement() {
+	AssertFalse(PerfStage_Begin.HasOwnProp("Call"),
+		"the fixture cannot replace a foreign performance observation owner")
+	State := {Phase: "profiling", Owner: 0, NativeHost: 0, Hwnd: 0,
+		Env: _WSERG_NeverCompletes(), ControllerPromise: _WSERG_NeverCompletes(),
+		EnvironmentCalls: 0, ControllerCalls: 0, Calls: [], StoppedInFactory: false,
+		ParentAliveDuringFactory: false, Armed: false, Observed: false,
+		ParentAliveAfterStop: false, Counter: 0, Observer: 0, Closed: false, VisibilityCalls: 0}
+	Owner := WebViewBrowserWarmup(_WSERG_FactoryEnvironment.Bind(State),
+		_WSERG_ProfileController.Bind(State), _WSERG_FactoryHost.Bind(State))
+	State.Owner := Owner
+	State.Observer := _WSERG_ProfileRetire.Bind(State)
+	Controller := {Close: _WSERG_ProfileClose.Bind(State)}
+	Controller.DefineProp("IsVisible", {Set: _WSERG_ProfileVisibility.Bind(State)})
+	PerfStage_Begin.DefineProp("Call", {Call: State.Observer})
+	try {
+		Owner.Begin()
+		State.Env.Resolve({})
+		AssertEqual(1, State.ControllerCalls)
+		State.Armed := true
+		State.ControllerPromise.Resolve(Controller)
+		AssertTrue(State.Observed, "the genuine controller-ready profiling boundary must execute")
+		AssertTrue(State.Counter is Integer && State.Counter > 0)
+		AssertTrue(State.Closed, "retirement must close the exact acquired controller")
+		AssertFalse(WMHandleExists(State.Hwnd), "the real native parent must retire after controller close")
+		AssertEqual(0, State.VisibilityCalls,
+			"retirement during profiling cannot invoke visibility on the already closed controller")
+		AssertEqual(2, State.Calls.Length)
+		AssertEqual("close", State.Calls[1])
+		AssertEqual("destroy", State.Calls[2])
+	} finally {
+		if PerfStage_Begin.HasOwnProp("Call") {
+			Descriptor := PerfStage_Begin.GetOwnPropDesc("Call")
+			AssertTrue(Descriptor.Call == State.Observer)
+			PerfStage_Begin.DeleteProp("Call")
+		}
+		Owner.Stop()
+		if State.Hwnd && WMHandleExists(State.Hwnd)
+			State.NativeHost.Destroy.Call()
+		State.Env.SuccessFn := 0, State.Env.FailureFn := 0
+		State.ControllerPromise.SuccessFn := 0, State.ControllerPromise.FailureFn := 0
+		State.Owner := 0, State.Observer := 0
+	}
+}
+Test("webview_utils: controller profiling retirement fences closed native visibility (webview-warmup-controller-profile-retirement)",
+	_WSERG_WarmupControllerProfileRetirement)
