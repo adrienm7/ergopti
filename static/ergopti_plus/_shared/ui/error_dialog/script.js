@@ -4,8 +4,7 @@
  * ==============================================================================
  * MODULE: Error Window Page
  * DESCRIPTION:
- * The window the three drivers open when an error is logged, or at the next
- * launch after a crash: what went wrong, where it is logged, the report that
+ * The window the three drivers open when an error is logged: what went wrong, where it is logged, the report that
  * would be shared, and the buttons to report it on GitHub, copy it, open the
  * log it is in, or close the window.
  *
@@ -102,20 +101,12 @@
 			setButtonsEnabled(false);
 			return;
 		}
-		var crash = state.kind === 'crash';
-		heading.textContent = t(crash ? 'error_dialog.heading_crash' : 'error_dialog.heading');
-		document.getElementById('intro').textContent = t(
-			crash ? 'error_dialog.intro_crash' : 'error_dialog.intro'
-		);
+		heading.textContent = t('error_dialog.heading');
+		document.getElementById('intro').textContent = t('error_dialog.intro');
 		document.getElementById('module').textContent = state.module;
 		document.getElementById('message').textContent = state.message;
-		document.getElementById('logged').textContent = t(
-			crash ? 'error_dialog.crash_saved_in' : 'error_dialog.logged_in',
-			state.log_path
-		);
-		document.getElementById('btn-open-log').textContent = t(
-			crash ? 'error_dialog.open_crash_report' : 'error_dialog.open_log'
-		);
+		document.getElementById('logged').textContent = t('error_dialog.logged_in', state.log_path);
+		document.getElementById('btn-open-log').textContent = t('error_dialog.open_log');
 		var more = document.getElementById('more');
 		var count = Number(state.more) || 0;
 		more.hidden = count <= 0;

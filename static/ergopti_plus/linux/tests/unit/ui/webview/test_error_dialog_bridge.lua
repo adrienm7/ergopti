@@ -337,56 +337,11 @@ helpers.describe("error window bridge (linux): page and actions (error-dialog-li
 	end)
 end)
 
-helpers.describe("error window bridge (linux): crash notice (error-dialog-linux)", function()
-	helpers.it("parses a crash report's module, error and stack (error-dialog-linux)", function()
+helpers.describe("error window bridge (linux): no next-start crash notice (error-dialog-linux)", function()
+	helpers.it("offers no crash dialog: a crash is announced by the crash reporter's notification only (error-dialog-linux)", function()
 		with_bridge(nil, function(bridge)
-			local CrashReport = require("crash_report")
-			local module_name, message = bridge.parse_crash_dump(CrashReport.encode(CrashReport.build({
-				driver = "linux", timestamp = "2026-09-23T21:04:11Z", module = "ergopti_hotstrings",
-				error_msg = "boom", stack_trace = "boom\nstack traceback:\n\tmain.lua:3\n",
-			})))
-			helpers.assert_eq(module_name, "ergopti_hotstrings")
-			helpers.assert_eq(message, "boom\nboom\nstack traceback:\n\tmain.lua:3")
-		end)
-	end)
-
-	helpers.it("refuses a document that is not a crash report instead of guessing a module (error-dialog-linux)", function()
-		with_bridge(nil, function(bridge)
-			local module_name, reason = bridge.parse_crash_dump("=== Ergopti Linux Crash Dump ===\nModule:    x\n")
-			helpers.assert_eq(module_name, nil)
-			helpers.assert_contains(reason, "not a crash report")
-		end)
-	end)
-
-	helpers.it("announces the newest crash dump once (error-dialog-linux)", function()
-		with_bridge(nil, function(bridge, context)
-			local dir = os.tmpname()
-			os.remove(dir)
-			os.execute("mkdir -p '" .. dir .. "'")
-			local dump = "2026-09-23T21-04-11Z.json"
-			local fh = io.open(dir .. "/" .. dump, "wb")
-			local CrashReport = require("crash_report")
-			fh:write(CrashReport.encode(CrashReport.build({ module = "ergopti_hotstrings", error_msg = "boom" })))
-			fh:close()
-			local ok, err = pcall(function()
-				bridge.init()
-				helpers.assert_true(bridge.notify_last_crash(dir), "an unannounced dump is announced")
-				helpers.assert_eq(#context.deferred, 1)
-				run_deferred(context)
-				local init = bridge.on_message("ready", {}, page(context))
-				helpers.assert_eq(init.kind, "crash")
-				helpers.assert_eq(init.module, "ergopti_hotstrings")
-				helpers.assert_eq(init.message, "boom")
-				bridge.on_message({ action = "open_log" }, {}, page(context))
-				helpers.assert_eq(context.performed[1].action.id, "crash_report")
-				helpers.assert_eq(context.performed[1].paths.crash_report, dir .. "/" .. dump)
-				bridge.on_message({ action = "close" }, {}, page(context))
-				helpers.assert_eq(bridge.notify_last_crash(dir), false, "a dump already announced is not announced again")
-			end)
-			os.remove(dir .. "/" .. dump)
-			os.remove(dir .. "/.last_crash_notice")
-			os.remove(dir)
-			if not ok then error(err, 0) end
+			helpers.assert_eq(bridge.notify_last_crash, nil, "the next-start crash dialog is gone")
+			helpers.assert_eq(bridge.parse_crash_dump, nil, "the bridge no longer reads crash reports")
 		end)
 	end)
 end)
@@ -472,36 +427,6 @@ helpers.describe("error opener cancellation reentry", function()
 				helpers.assert_true(nested.current())
 				local before = #c.pushed; nested.complete({ ok = true }); helpers.assert_eq(#c.pushed, before + 1)
 			end)
-		end)
-	end
-end)
-
-
-helpers.describe("native crash notice source admission", function()
-	for _, kind in ipairs({ "regular", "dump-symlink", "marker-fifo", "marker-fifo-symlink", "dump-fifo",
-		"dump-fifo-symlink", "marker-write-refusal", "marker-close-refusal", "marker-replaced", "dump-close-refusal",
-		"marker-unreadable", "dump-unreadable", "marker-read-close-refusal", "foreign-file", "foreign-multiline",
-		"foreign-directory", "newest-mtime", "collision-tie" }) do
-		helpers.it("(crash-notice-native) refuses unsafe startup I/O: " .. kind, function()
-			local Shell = require("adapters.shell_runner")
-			local folder = os.tmpname(); assert(os.remove(folder))
-			assert(Shell.run("mkdir -m 700 -- " .. Shell.quote(folder)))
-			local okay, detail = xpcall(function()
-				local fixture = helpers.driver_root() .. "/tests/fixtures/native_crash_notice_source.lua"
-				local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
-				local completed = Shell.run("timeout --kill-after=2 5 " .. Shell.quote(executable)
-					.. " " .. Shell.quote(fixture) .. " " .. Shell.quote(folder) .. " " .. Shell.quote(kind))
-				helpers.assert_true(completed, "the actual notifier must finish without a FIFO peer")
-				local receipt = assert(io.open(folder .. "/complete", "rb"))
-				helpers.assert_eq(receipt:read("*a"), "complete", "native worker reached every assertion")
-				assert(receipt:close())
-			end, debug.traceback)
-			local Directory = require("infra.native_directory")
-			for _, entry in ipairs(assert(Directory.entries(folder))) do
-				assert(os.remove(Directory.join(folder, entry.name)), "only owned fixture entries are removed")
-			end
-			assert(os.remove(folder), "native fixture entries must all be retired")
-			if not okay then error(detail, 0) end
 		end)
 	end
 end)

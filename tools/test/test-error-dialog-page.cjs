@@ -12,7 +12,7 @@
  * 2. the details block shows exactly the report text the host sent (the
  *    report the Copy and Report buttons use), and the error, its module and
  *    the file it is logged in are shown as sent;
- * 3. a crash notice reads as one (its own heading and open-file label);
+ * 3. the page has no crash variant: a crash never opens this window;
  * 4. buttons send action names only, never a path, a text or a URL;
  * 5. errors folded into the window are counted; action results reach the
  *    status line; the Linux bridge response reaches the same entry point;
@@ -208,35 +208,35 @@ const ERROR = {
 }
 
 {
-	// A crash notice, delivered as Linux does: through the bridge response hook
+	// An error delivered as Linux does: through the bridge response hook. No
+	// crash variant exists: a crash is announced by the driver's immediate
+	// notification, never by this window (maintainer decision of 2026-10-26).
 	const page = loadPage();
 	const el = page.elements;
-	const crash = Object.assign({}, ERROR, {
-		kind: 'crash',
-		log_path: '~/crash_reports/2026-09-23T21-04-11Z.json',
-		more: 1
-	});
 	page.sandbox.window.__hostBridgeResponse(
 		'error_dialog',
 		true,
-		Buffer.from(JSON.stringify(crash)).toString('base64')
+		Buffer.from(JSON.stringify(Object.assign({}, ERROR, { more: 1 }))).toString('base64')
 	);
 	if (el['btn-copy'].disabled) fail('the Linux bridge response did not initialise the page');
-	if (el.heading.textContent !== en['error_dialog.heading_crash'])
-		fail('a crash notice does not read as one');
-	if (el.intro.textContent !== en['error_dialog.intro_crash'])
-		fail('a crash notice keeps the error introduction');
-	if (el.logged.textContent !== label('error_dialog.crash_saved_in', crash.log_path))
-		fail('the crash report is not named');
-	if (el['btn-open-log'].textContent !== en['error_dialog.open_crash_report'])
-		fail('the open button does not name the crash report');
+	if (el.heading.textContent !== en['error_dialog.heading']) fail('the error heading is not shown');
+	if (el['btn-open-log'].textContent !== en['error_dialog.open_log'])
+		fail('the open button does not name the log');
 	if (el.more.hidden) fail('an initial fold count is not shown');
+	const crashKeys = Object.keys(en).filter((key) => /^error_dialog\..*crash/.test(key));
+	if (crashKeys.length) fail(`crash strings of the retired next-start dialog remain: ${crashKeys}`);
+	if (
+		/crash/i.test(
+			fs.readFileSync(path.join(PAGE, 'script.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+		)
+	)
+		fail('the page still has a crash variant');
 	page.sandbox.window.__hostBridgeResponse(
 		'healthcheck',
 		true,
 		Buffer.from(JSON.stringify(ERROR)).toString('base64')
 	);
-	if (el.heading.textContent !== en['error_dialog.heading_crash'])
+	if (el.heading.textContent !== en['error_dialog.heading'])
 		fail('another bridge reached the error window');
 }
 
@@ -288,5 +288,5 @@ if (failures.length > 0) {
 	process.exit(1);
 }
 console.log(
-	'[OK] error window page behaviour: ready, report shown as sent, crash notice, buttons by name, folds, results.'
+	'[OK] error window page behaviour: ready, report shown as sent, no crash variant, buttons by name, folds, results.'
 );
