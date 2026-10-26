@@ -203,6 +203,12 @@ if (process.argv.includes('--measure')) {
 }
 
 let failed = false;
+if (union.length === 0) {
+	failed = true;
+	console.error(
+		'\x1b[31m[ERROR] Convention P: no tracked platform/ sub-folders found — the candidate has no subjects.\x1b[0m'
+	);
+}
 if (offenders.length > PATH_BASELINE) {
 	failed = true;
 	console.error(
