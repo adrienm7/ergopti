@@ -35,6 +35,7 @@ local Codec = require("toml_codec")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
 local NativePath = require("native_path")
+local ConfigKeys = require("config_keys")
 
 local LOG = "infra.legacy_hotstring_storage"
 
@@ -44,7 +45,7 @@ local ENABLED_MARK = "+"
 
 -- The repeat leaf, whose legacy storage key had the same name, and the value
 -- that legacy reader answered for an absent key (its DEFAULT_ENABLED).
-local REPEAT_PATH = "hotstrings.repeat_key_enabled"
+local REPEAT_PATH = ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED
 local LEGACY_REPEAT_DEFAULT = true
 
 -- Legacy dynamic family switches were keyed by engine section.

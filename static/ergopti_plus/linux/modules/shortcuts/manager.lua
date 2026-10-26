@@ -49,10 +49,11 @@ local EvdevCodes = require("infra.evdev_codes")
 local Monotonic = require("infra.monotonic")
 local CapsWordPolicy = require("caps_word.auto_off")
 local CapsWordAutoOff = require("modules.shortcuts.caps_word_auto_off")
+local ConfigKeys = require("config_keys")
 local LOG = "modules.shortcuts.manager"
 local _configuration_owner = nil
 local _capture_text_owner = nil
-local ENABLED_PATH = "shortcuts.enabled"
+local ENABLED_PATH = ConfigKeys.KEY.SHORTCUTS_ENABLED
 
 -- The send_text / send_key / send_shortcut vocabulary, read on first use.
 local SEND_KEYS_REL_PATH = "modules/actions/send_keys.json"

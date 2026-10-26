@@ -20,9 +20,10 @@ local KeyPath = require("toml_codec.key_path")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
 local NativePath = require("native_path")
+local ConfigKeys = require("config_keys")
 
 local LOG = "infra.dynamic_hotstrings_scope"
-local PROGRAMMABLE_PATH = "hotstrings.dynamic.user_code"
+local PROGRAMMABLE_PATH = ConfigKeys.KEY.HOTSTRINGS_DYNAMIC_USER_CODE
 local _owner, _sequence = nil, 0
 require("infra.scope_registry").register("dynamic_hotstrings_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
@@ -47,7 +48,7 @@ function M.new(options)
 		for _, entry in ipairs(Manifest.features()) do
 			-- The programmable hotstrings run the user's own code and keep their
 			-- own switch: a bulk click of the families never enables them.
-			if entry.section == "hotstrings.dynamic" and entry.type == "feature"
+			if entry.section == ConfigKeys.KEY.HOTSTRINGS_DYNAMIC and entry.type == "feature"
 				and entry.path ~= PROGRAMMABLE_PATH then
 				assert(owned[entry.path .. ".enabled"], "dynamic family has no preference owner")
 				families[#families + 1] = entry.id
@@ -57,7 +58,7 @@ function M.new(options)
 		assert(changes, detail)
 		local operations = {}
 		for _, change in ipairs(changes) do
-			local section = "hotstrings.dynamic" .. (change.section and ("." .. change.section) or "")
+			local section = ConfigKeys.KEY.HOTSTRINGS_DYNAMIC .. (change.section and ("." .. change.section) or "")
 			local path = section .. ".enabled"
 			assert(owned[path], "dynamic selection has no preference owner")
 			local row = { section = section, key = "enabled" }

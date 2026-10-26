@@ -37,10 +37,11 @@ local Codec = require("toml_codec")
 local Preferences = require("infra.hotstring_preferences")
 local ConfigOutdated = require("config_outdated")
 local TextUtils = require("text_utils")
+local ConfigKeys = require("config_keys")
 
 local LOG = "hotstrings.repeat_key"
 
-local FEATURE_PATH = "hotstrings.repeat_key_enabled"
+local FEATURE_PATH = ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED
 local _enabled = nil -- populated once; no preference IO on each keystroke
 
 -- One UTF-8 codepoint, as a byte pattern. LuaJIT is 5.1-based and has no `utf8`
