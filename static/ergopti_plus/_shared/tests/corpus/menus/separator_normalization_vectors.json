@@ -1,0 +1,79 @@
+{
+	"vectors": [
+		{ "name": "empty menu", "input": [], "expected": [] },
+		{ "name": "only separators", "input": [{ "title": "-" }, { "title": "-" }], "expected": [] },
+		{
+			"name": "leading separator dropped",
+			"input": [{ "title": "-" }, { "title": "a" }],
+			"expected": [{ "title": "a" }]
+		},
+		{
+			"name": "trailing separator dropped",
+			"input": [{ "title": "a" }, { "title": "-" }],
+			"expected": [{ "title": "a" }]
+		},
+		{
+			"name": "separator between two rows kept",
+			"input": [{ "title": "a" }, { "title": "-" }, { "title": "b" }],
+			"expected": [{ "title": "a" }, { "title": "-" }, { "title": "b" }]
+		},
+		{
+			"name": "doubled separators collapse to the first",
+			"input": [
+				{ "title": "a" },
+				{ "title": "-" },
+				{ "title": "-" },
+				{ "title": "-" },
+				{ "title": "b" }
+			],
+			"expected": [{ "title": "a" }, { "title": "-" }, { "title": "b" }]
+		},
+		{
+			"name": "separator row at both edges of a provider block",
+			"input": [{ "title": "-" }, { "title": "a" }, { "title": "-" }],
+			"expected": [{ "title": "a" }]
+		},
+		{
+			"name": "submenu is normalised recursively",
+			"input": [
+				{
+					"title": "a",
+					"menu": [
+						{ "title": "-" },
+						{ "title": "x" },
+						{ "title": "-" },
+						{ "title": "-" },
+						{ "title": "y" },
+						{ "title": "-" }
+					]
+				}
+			],
+			"expected": [{ "title": "a", "menu": [{ "title": "x" }, { "title": "-" }, { "title": "y" }] }]
+		},
+		{
+			"name": "submenu emptied by normalisation stays a row",
+			"input": [{ "title": "a", "menu": [{ "title": "-" }] }],
+			"expected": [{ "title": "a", "menu": [] }]
+		},
+		{
+			"name": "a separator row owning a menu is still a separator",
+			"input": [
+				{ "title": "a" },
+				{ "title": "-", "menu": [{ "title": "x" }] },
+				{ "title": "-" },
+				{ "title": "b" }
+			],
+			"expected": [{ "title": "a" }, { "title": "-", "menu": [{ "title": "x" }] }, { "title": "b" }]
+		},
+		{
+			"name": "a row merely titled like a separator word is kept",
+			"input": [{ "title": "--" }, { "title": "-" }, { "title": "–" }],
+			"expected": [{ "title": "--" }, { "title": "-" }, { "title": "–" }]
+		},
+		{
+			"name": "non-table entries are rows",
+			"input": ["text", { "title": "-" }, "other"],
+			"expected": ["text", { "title": "-" }, "other"]
+		}
+	]
+}
