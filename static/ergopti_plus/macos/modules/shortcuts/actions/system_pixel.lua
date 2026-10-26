@@ -478,23 +478,67 @@ local function pixel_hex_at(operation, x, y, on_hex)
 	-- wrapper and its quoting are gone and the interpreter receives the program
 	-- exactly as written here.
 	local py_src = [[
-import struct,sys,zlib
+import binascii,struct,sys,zlib
+
+
+def paeth(left, up, upper_left):
+    estimate = left + up - upper_left
+    distances = [abs(estimate - value) for value in (left, up, upper_left)]
+    return (left, up, upper_left)[distances.index(min(distances))]
+
+
 try:
-  data=open(sys.argv[1],'rb').read()
-  w,h=struct.unpack('>II',data[16:24])
-  ct=data[25];bpp=4 if ct==6 else 3
-  i,chunks=8,b''
-  while i<len(data)-12:
-    l=struct.unpack('>I',data[i:i+4])[0];t=data[i+4:i+8]
-    if t==b'IDAT':chunks+=data[i+8:i+8+l]
-    elif t==b'IEND':break
-    i+=l+12
-  raw=zlib.decompress(chunks)
-  cx=w//2;cy=h//2;off=cy*(1+w*bpp)+1+cx*bpp
-  r,g,b=raw[off],raw[off+1],raw[off+2]
-  print('#%02x%02x%02x' % (r,g,b))
-except Exception:
-  pass
+    with open(sys.argv[1], 'rb') as capture:
+        data = capture.read()
+    if data[:8] != b'\x89PNG\r\n\x1a\n':
+        raise ValueError('invalid PNG signature')
+    offset, compressed, header, ended = 8, bytearray(), None, False
+    while offset < len(data):
+        length, kind = struct.unpack('>I4s', data[offset:offset + 8])
+        body = data[offset + 8:offset + 8 + length]
+        crc = struct.unpack('>I', data[offset + 8 + length:offset + 12 + length])[0]
+        if binascii.crc32(kind + body) != crc:
+            raise ValueError('invalid PNG chunk checksum')
+        if header is None:
+            if kind != b'IHDR' or length != 13:
+                raise ValueError('missing PNG header')
+            header = struct.unpack('>IIBBBBB', body)
+        elif kind == b'IDAT':
+            compressed.extend(body)
+        elif kind == b'IEND':
+            ended = length == 0
+            break
+        offset += length + 12
+    if header is None or not ended:
+        raise ValueError('incomplete PNG image')
+    width, height, depth, color, compression, filtering, interlace = header
+    if width < 1 or height < 1 or depth != 8 or color not in (2, 6) \
+            or compression != 0 or filtering != 0 or interlace != 0:
+        raise ValueError('unsupported PNG encoding')
+    channels = 4 if color == 6 else 3
+    stride = width * channels
+    raw = zlib.decompress(compressed)
+    if len(raw) != height * (stride + 1):
+        raise ValueError('invalid PNG scanline size')
+    previous = bytearray(stride)
+    for y in range(height // 2 + 1):
+        start = y * (stride + 1)
+        filter_kind = raw[start]
+        if filter_kind > 4:
+            raise ValueError('invalid PNG scanline filter')
+        row = bytearray(raw[start + 1:start + 1 + stride])
+        for index in range(stride):
+            left = row[index - channels] if index >= channels else 0
+            up = previous[index]
+            upper_left = previous[index - channels] if index >= channels else 0
+            predictor = (0, left, up, (left + up) // 2, paeth(left, up, upper_left))[filter_kind]
+            row[index] = (row[index] + predictor) % 256
+        previous = row
+    center = (width // 2) * channels
+    print('#%02x%02x%02x' % tuple(previous[center:center + 3]))
+except (OSError, ValueError, IndexError, struct.error, zlib.error):
+    print('Pixel PNG decode failed.', file=sys.stderr)
+    sys.exit(1)
 ]]
 
 	return start_task_phase(operation, "Pixel screencapture", SCREENCAPTURE_BIN,
