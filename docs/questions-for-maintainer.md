@@ -33,6 +33,10 @@ default taken meanwhile.
   file list names it. Default meanwhile: kept. Retire it?
 - **AI-off hint text:** the greyed agent actions reuse `llm.manual_prediction.disabled` ("AI suggestions are
   off: turn them on in the Artificial Intelligence menu."). Default meanwhile: reused. A dedicated string?
+- **Older macOS LLM user profiles:** the `[llm.profiles] user_profiles` array of older macOS builds is
+  imported by the macOS config reader, because the migration registry has no op that re-encodes a value and
+  the Windows engine refuses an unknown op at boot. Default meanwhile: reader import. Add a registry op
+  (Windows `config_migrate.ahk` must learn it first) and delete the reader import?
 
 ## Answered
 

@@ -499,18 +499,13 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 ### C. UI-only gaps, reasons and docs
 
 - [ ] **PAR-37. Platform reasons for two-platform restrictions.** [CODE] The single-platform ratchet went from 88
-      to 1 (the last one is PAR-40). 98 entries restricted to two platforms (mostly menu frames and
+      to 1 (the last one is `llm.profiles.auto_profile_for_model`). 98 entries restricted to two platforms (mostly menu frames and
       boundaries) still have no reason: extend `test-platform-restrictions-explained` to them. The 13 new
       reason texts and the nav-layer ones are drafts in 20 locales: native review wanted.
-- [ ] **PAR-40. Unify user LLM profile storage.** [CODE] Reverted attempt, steps: move
-      `linux/modules/llm/profile_registry_codec.lua` to `_shared/lua/llm/` and repoint the Linux requires and
-      the 7 Linux tests; in `macos/infra/preferences.lua` move `llm_user_profiles` from the nested map to the
-      scalar map with the codec (encode on write, decode on read and in `known_profile_ids`);
-      `macos/ui/menu/llm_scope.lua` reads the registry from `llm.user_profiles`; `manifest.toml`:
-      `features.llm.user_profiles` for all platforms, delete the macOS-only
-      `features.llm.profiles.user_profiles`; fix `config.schema.json` and `hs_config.example.toml`; update
-      `test_llm_scope_contract`, `test_preferences_existing_key_spellings`, `test_unused_keys_cleanup` and
-      the nested-array round trip; ratchet baseline to 0. Needs a macOS run.
+- [x] **PAR-40. Unify user LLM profile storage.** [CODE] Done: one `llm.user_profiles` envelope on the three
+      OS (a6f0fd8ad9, manifest rows d6146eb82b, 300aa8c4a6). An older macOS `[llm.profiles] user_profiles`
+      array is imported on load and deleted by the next save (0146a938c5). Left: check on a real Mac that an
+      old config keeps its profiles in the menu.
 - [ ] **PAR-41. One shortcut data model.** [CODE] Design note written
       (`docs/design/one-shortcut-model.md`, 4ca41ed2e9): one action slot per chord with neutral role-based ids,
       no migration, eight steps; step 1 is the inventory of the Windows legacy boolean list. Large.
