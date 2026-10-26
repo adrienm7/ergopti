@@ -127,29 +127,19 @@ helpers.describe("config-backup-native-names", function()
 		end)
 	end
 
-	helpers.it("(config-backup-native-names) a dangling file link refuses through the canonical read", function()
+	helpers.it("(config-backup-native-names) a dangling link cannot block unrelated configuration backup", function()
 		local dir = scratch()
 		local Backup = helpers.load_module("modules.updater.config_backup")
 		Backup._overrides = { roots = { { id = "config", dir = dir .. "/cfg" } } }
 		local ok, err = pcall(function()
 			assert(require("luv").fs_symlink(dir .. "/not-here", dir .. "/cfg/dangling.toml"))
 			local owner = assert(Backup.owner())
-			local Writer = require("toml_codec.writer")
-			local native_read, attempts, observed = Writer.read_classified, 0, nil
-			Writer.read_classified = function(path, ...)
-				local content, status, detail = native_read(path, ...)
-				if path == dir .. "/cfg/dangling.toml" then attempts, observed = attempts + 1, status end
-				return content, status, detail
+			local record, reason = owner.create("pre_install")
+			helpers.assert_true(type(record) == "table", "a dangling link holds no configuration: " .. tostring(reason))
+			helpers.assert_eq(read(record.path .. "/config/config.toml"), "[script]\nlocale = \"fr\"\n")
+			for _, file in ipairs(record.files) do
+				helpers.assert_true(file.path ~= "dangling.toml", "an absent target must never become a backup file")
 			end
-			local called, record, reason = pcall(owner.create, "pre_install")
-			Writer.read_classified = native_read
-			if not called then error(record, 0) end
-			helpers.assert_nil(record, "a listed file with an absent target cannot certify a complete backup")
-			helpers.assert_eq(attempts, 1, "the native dangling link must reach classified read, not disappear from the walk")
-			helpers.assert_eq(observed, "absent")
-			helpers.assert_contains(reason, "cannot read " .. dir .. "/cfg/dangling.toml")
-			helpers.assert_eq(read(dir .. "/cfg/config.toml"), "[script]\nlocale = \"fr\"\n")
-			helpers.assert_nil(owner.latest("pre_install"), "the refused snapshot must publish no complete record")
 		end)
 		Backup._overrides = nil
 		os.execute("rm -rf " .. quote(dir))

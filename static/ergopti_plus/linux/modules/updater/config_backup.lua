@@ -51,17 +51,20 @@ M._overrides = nil
 --- so those are "other" and never opened.
 --- @param path string
 --- @param kind string Kind of the entry itself (not followed).
---- @return string kind "file", "dir" or "other"
+--- @return string|nil kind "file", "dir" or "other"; nil when the link target is unknowable
+--- @return string|nil error Why the link target cannot be classified
 local function classify(path, kind)
 	if kind == "directory" then return "dir" end
 	if kind == "file" then return "file" end
 	if kind ~= "link" then return "other" end
 	-- A link to a folder could lead back up the tree: it is reported, never walked.
-	local target = NativeDirectory.target_kind(path)
+	local target, message, code = NativeDirectory.target_kind(path)
 	if target == "directory" then return "other" end
-	if target == "file" then return "file" end
-	-- A dangling link holds no configuration: "other", so it never fails the snapshot.
-	return "other"
+	if target ~= nil then return target == "file" and "file" or "other" end
+	-- A dangling link holds no configuration, so it cannot block the snapshot.
+	if code == "ENOENT" then return "other" end
+	-- A denied or looping target may hide configuration: refuse, never omit it.
+	return nil, string.format("cannot classify %s: %s", path, tostring(message or code))
 end
 
 --- Lists one folder: files, folders, and anything else as "other".
@@ -79,7 +82,9 @@ local function list(dir)
 	if not listed then return nil, tostring(list_message or "cannot list") end
 	local entries = {}
 	for _, entry in ipairs(listed) do
-		entries[#entries + 1] = { name = entry.name, kind = classify(NativeDirectory.join(dir, entry.name), entry.kind) }
+		local kind, refusal = classify(NativeDirectory.join(dir, entry.name), entry.kind)
+		if kind == nil then return nil, refusal end
+		entries[#entries + 1] = { name = entry.name, kind = kind }
 	end
 	return entries
 end

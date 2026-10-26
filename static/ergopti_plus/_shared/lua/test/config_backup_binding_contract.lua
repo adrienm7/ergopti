@@ -21,7 +21,7 @@ local M = {}
 ---   defaults = decoded _shared/modules/updater/defaults.json,
 ---   listing  = function(entries, body): builds the driver's real listing port
 ---              over entries { { name, kind } } (kind: "file", "dir", "link_file",
----              "link_dir", "fifo", "link_fifo", "link_dangling") and calls body(list, root).
+---              "link_dir", "fifo", "link_fifo", "link_dangling", "link_loop") and calls body(list, root).
 --- }
 function M.register(helpers, env)
 	local Binding = require("updater.config_backup_binding")
@@ -161,6 +161,20 @@ function M.register(helpers, env)
 				helpers.assert_eq(kinds["linked_pipe.toml"], "other")
 				-- A dangling link holds no configuration: reading it would fail the snapshot.
 				helpers.assert_eq(kinds["dangling.toml"], "other")
+			end)
+		end)
+
+		helpers.it("(config-backup-binding-contract) refuses a listing whose link target cannot be classified", function()
+			-- A looping (or denied) target may hide configuration: the snapshot refuses
+			-- rather than omitting it, unlike a dangling link, which holds nothing.
+			env.listing({
+				{ name = "config.toml", kind = "file" },
+				{ name = "looping.toml", kind = "link_loop" },
+			}, function(list, root)
+				local entries, reason = list(root)
+				helpers.assert_nil(entries)
+				helpers.assert_true(type(reason) == "string" and reason:find("looping.toml", 1, true) ~= nil,
+					"the refusal names the unclassifiable link: " .. tostring(reason))
 			end)
 		end)
 
