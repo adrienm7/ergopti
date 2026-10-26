@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-24 (see the handover section below). Latest stable: [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6)
+Updated: 2026-10-26 evening (read "Handover of 2026-10-26" first). Latest stable: [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6)
 (tag 950979d19c, 2026-10-23). **Next step: issue #101 follow-ups on the Mac (Backlog).** Open work only: a finished item is removed, its lessons go to
 [docs/memory](memory/README.md), and the history stays in Git
 (`git log -p -- docs/ERGOPTIPLUS_TODO.md`). Item numbers are stable and never reused. Open
@@ -28,6 +28,60 @@ ruff 0.15.8 and Prettier before every commit. After touching
 a sealed Windows updater source, reseal with
 `node tools/ci/seal-windows-updater-original-source.cjs --ref <commit> --write`. Procedures:
 [COORDINATOR-MEMORY](todo-agents/COORDINATOR-MEMORY.md).
+
+## Handover of 2026-10-26 (read first if the session was lost)
+
+- **State.** dev is linear and pushed; every push of dev had its CI cancelled (a dev push builds a release).
+  Latest stable release: v1.0.6. Full CI on `tmp/preflight-dev` at 5f4a8be89b: everything green except
+  Windows unit lots `config-scope-features`, `meta`, `keymap-gestures` (PC work below). A full CI on
+  9c08c747ba (dev) was dispatched on `tmp/preflight-dev` at 17:04 UTC: read its result first.
+- **Integrated from the ChatGPT fix branches:** fix/macos 54 commits, fix/windows 68 of 74, fix/linux 97 (all as
+  of 26 Oct 14:00 UTC). Left to those agents on rebase: fix/linux a37d38dd16 (event-loop pumping, conflicts
+  with dev's input-wait loop) and fix/windows 19e6e13993 + b3535cd6b0 (repo-url test, diverged). Their
+  per-branch seal refresh commits are never integrated: reseal once on dev instead.
+- **Agent work in flight (local worktrees, Linux/macOS only, no AHK):** if lost, redo from the spec.
+  - `work/todo-af` (backup pushed as `tmp/wip-todo-af`): 6 commits not yet in dev (ee1dad5a89 macOS "never"
+    debounce persisted, b3b186478c Linux "never", 613ccaa5c6 Linux live instant at word end, e5f502e2a2 explicit
+    requests never held, 2447329d0d one user-set request interval `llm.trigger.min_request_interval_ms`,
+    b8ad2ecbbf request plan one behaviour). Then in progress: variants of one request never held (automatic
+    or explicit), default floor 300 ms, 0 accepted, a mashed explicit shortcut supersedes its in-flight
+    request.
+  - `work/todo-ae`: byte-preserving `tap_hold.toml` migration rewrite (comments kept, as config.toml);
+    `[tap_hold.retired_delays]` kept forever.
+  - `work/todo-ag`: Quit wins on the three OS (during a reload it abandons the reload and exits after a write
+    in progress finishes); a pending per-category scope write blocks Linux Quit (registry of scope owners);
+    the live metrics dashboard folds the 19 localized "general" spellings via
+    `metrics_general_category_aliases.json`.
+- **Integration procedure** (each batch): fetch `origin/fix/{linux,macos,windows}`; list commits whose subject
+  is not on dev; cherry-pick them on a local `integ/*` branch from dev (skip seal refresh commits; on a
+  conflict prefer dev when it already fixed the same thing, otherwise merge both by hand); renumber
+  `tools/test/features/*/suite.json` ordinals on collision (`test-js-feature-inventory.cjs`); reseal if
+  `test-windows-updater-original-source.cjs` fails; run gen:check, the complete JS sweep (every `node` check
+  of the suite.json files, `xargs -P6`), the Linux suite and the macOS suite per `--module` group; then
+  fast-forward dev, push, cancel the push CI, and dispatch `ci.yml` on `tmp/preflight-dev` with
+  `os_lanes=all`.
+- **Host-only reds on the Linux container** (not bugs): JS `test-ahk-tap-follower`, `test-linux-install-sandbox`,
+  `test-linux-runtime-native-registration`, `test-macos-managed-bootstrap-http`, `test-managed-ollama-protocol`,
+  `test-managed-remote-retirement` (no pwsh), `test-linux-deb-package-owner` (refuses root),
+  `test-drift-guard-covers-every-output` (worktrees only, node_modules symlink). Lua as root: every
+  EACCES/unreadable/denied case, Linux test 102, four `test_sqlite_first_open` native cases; macOS screenshot
+  EACCES, two mlx-repair unreadable neighbour, errors-log refuses denied. Confirm with
+  `setpriv --reuid=65534 --regid=65534 --clear-groups` and set `XDG_RUNTIME_DIR`. Run the macOS suite per
+  group: one process slows down progressively here.
+- **Windows counterparts of the 26 October work** (add to the PC list below once the Lua side is in dev):
+  - read `[logger] hotpath_slow_ms` in `hotpath_profiler.ahk`;
+  - drop the dead crash kind (`error_dialog/init.ahk`, `ERROR_REPORT_KINDS`, then the shared `KINDS` and the
+    `crash_multi_line_without_recent_issues` vector together);
+  - read the 14-colour palette from `native_theme.toml`;
+  - use `dialog.action_picker.requires_ai` for the greyed AI actions;
+  - port `llm/request_plan` (debounce, batching) with its vectors, accept -1 "never", never hold explicit
+    requests, read `llm.trigger.min_request_interval_ms` with a menu row, then delete
+    `rate_limit_min_interval_ms` from `inference.json`;
+  - `tap_hold.toml` v0→v1 migration (`_shared/tap_hold/migrations.toml`) in the loader and writer, stop
+    reading and writing `explicit_delays`;
+  - Quit refusals before `ExitApp` with `notify.quit_refused` (PAR-45);
+  - the registry op that re-encodes a value in `config_migrate.ahk`, then delete the macOS
+    `[llm.profiles] user_profiles` reader import.
 
 ## Windows side to do on the PC (from October 25)
 
@@ -73,19 +127,21 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
 
 ## Decisions of 2026-10-26 to implement (docs/questions-for-maintainer.md)
 
-- [ ] **Slow-segment threshold 5 ms on macOS and Linux.** [CODE] One registry value read by the three drivers.
-- [ ] **Versioned `tap_hold.toml` migrator.** [CODE] Replaces the `explicit_delays` marker on the three OS;
-      Windows side on the PC.
-- [ ] **Linux crash: notification only.** [CODE] Drop the next-start crash dialog.
-- [ ] **Linux Quit refusals as macOS.** [CODE]
-- [ ] **14 hotstring colours on the three OS.** [CODE] One shared palette source.
-- [ ] **Retire `_shared/ui/metrics_apps/script.js`.** [CODE] With the Linux test list entry.
-- [ ] **Dedicated AI-off hint string.** [CODE] [I18N] Every locale; Windows reader on the PC.
+- [x] **Slow-segment threshold 5 ms on macOS and Linux.** [CODE] Done (`[logger] hotpath_slow_ms`); Windows reader left.
+- [ ] **Versioned `tap_hold.toml` migrator.** [CODE] Linux done (`_shared/tap_hold/migrations.toml`,
+      macOS has no tap_hold.toml); in progress: byte-preserving rewrite (agent AE); Windows side on the PC.
+- [x] **Linux crash: notification only.** [CODE] Done; Windows dead crash kind left.
+- [ ] **Linux Quit refusals as macOS.** [CODE] Done (shared `quit_admission.lua`); in progress: Quit wins over a reload, scope debts block (agent AG).
+- [x] **14 hotstring colours on the three OS.** [CODE] Done (`native_theme.toml`); Windows reader left.
+- [x] **Retire `_shared/ui/metrics_apps/script.js`.** [CODE] Done; the "general" alias folding moves to the live modules (agent AG).
+- [x] **Dedicated AI-off hint string.** [CODE] [I18N] Done (`dialog.action_picker.requires_ai`); Windows reader left.
 - [ ] **Registry op that re-encodes a value.** [CODE] Windows `config_migrate.ahk` first (PC), then the Lua
       engines, then delete the macOS `[llm.profiles] user_profiles` reader import (0146a938c5).
 - [ ] **Prediction request floor.** [CODE] Explicit requests never wait for the floor; one global floor
-      settable from the menu on the three OS; "never" debounce on the three OS; live mode instant at a word
-      end. Set the shared `driver_options` of the request plan (PAR-65) to one option set; Windows on the PC.
+      settable from the menu on the three OS; "never" debounce on the three OS; live mode instant at a word end;
+      the variants of one request never wait; default 300 ms, 0 accepted; a mashed explicit shortcut supersedes
+      its in-flight request. macOS and Linux: first part on `work/todo-af` (not yet in dev), the rest in
+      progress. Windows on the PC.
 - [ ] **PAR-66 section readers.** [CODE] Re-point the source-pin gates to the shared module, then extract
       `personal_info_editor_source` and the metrics/configuration/debug/about readers.
 
@@ -587,13 +643,18 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 
 ### F. Centralisation and hexagonal architecture (value order)
 
-- [ ] **PAR-65. Extract the LLM request plan to `_shared/lua/llm/request_plan`.** [CODE] Prediction
-      orchestration is 3007 / 3927 / 2108 lines in three drivers and only prompt, parser, rewrite and
-      tone are shared. Pure state machine with HttpClient, TimerScheduler and TooltipRenderer ports and
-      a request-transcript corpus. Phase it: debounce and batching first. Audit R1.
-- [ ] **PAR-66. Move the menu frame builders to `_shared/lua/menu/frames`.** [CODE] Six identical bodies
-      in macOS `menu_*` and Linux `menu_builder.lua` (5648 lines); frames from a state snapshot,
-      replayed by `corpus/menus`. Audit R2.
+- [ ] **PAR-65. Extract the LLM request plan to `_shared/lua/llm/request_plan`.** [CODE] Phase 1 done on macOS
+      and Linux: `debounce.lua` and `batching.lua` with request-transcript vectors (`_shared/tests/corpus/llm/`)
+      replayed by both drivers (48be669def, 7442ab5edd, d18f573791; the decisions of October 26 are on
+      `work/todo-af`). Left: the Windows twin replaying the vectors, then the HttpClient, TimerScheduler and
+      TooltipRenderer ports, the live prompt, the token budget, the info-bar text and the agent flows. Audit R1.
+- [ ] **PAR-66. Move the menu frame builders to `_shared/lua/menu/frames`.** [CODE] Phase 1 done: the magic
+      trigger frame snapshot is shared (`_shared/lua/menu/frames/magic_frame.lua`, contract replayed by both
+      drivers). Left (decided October 26): re-point the source-pin gates (`test-menu-parity.cjs`,
+      `test-menu-manifest.cjs`, `tools/lib/menu-native-personal-info-binding.cjs`) to the shared module text, keep
+      only the call pins in the drivers, then extract `personal_info_editor_source` and the
+      metrics/configuration/debug/about readers (one reader with an option for the `pcall` around `get_root`).
+      Audit R2.
 - [ ] **PAR-67. Shared keystats query catalogue and walker.** [CODE] About 85/73/66 SQL statements and
       three walkers; named queries in `data/db/queries.sql` with codegen, walker in
       `_shared/lua/keystats/walker.lua`, AHK replays `aggregation_vectors.json`. Audit R3.
@@ -618,9 +679,9 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 - [ ] **PAR-74. Config-key and command-id constants by codegen.** [CODE] Generate constants from
       `config.schema.json` and `menu_manifest.json` for AHK, Lua and JS; lint raw literals such as
       `private_filter_enabled`. Audit R10.
-- [ ] **PAR-75. Shared Lua helper modules and a redefinition lint.** [CODE] Done: `table_util`,
-      `text_utils`, `native_path` (26 dirname sites moved), lint `test-shared-lua-helpers-single-use.cjs`.
-      Left: burn down the 115 baselined inline sites; no `basename` detector yet.
+- [x] **PAR-75. Shared Lua helper modules and a redefinition lint.** [CODE] Done: every inline site burned
+      down (baseline `{}`), basename detector added; the allowed exceptions are listed in the gate's `ALLOWED`
+      list (two URL segments, the Linux worker `arg[0]` check, boot-time dirname splits).
 - [ ] **PAR-76. Long refactors, plan before starting.** [CODE] Generate the AHK config-migration op table
       from `migrations.toml` (R17); extract menu row-ordering rules to data (R18); pure hotstring
       injection plan (R26); FileSystem port spec for lease/atomic write (R33); canonical `.keylayout`
