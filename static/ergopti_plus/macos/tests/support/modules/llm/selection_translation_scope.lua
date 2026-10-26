@@ -161,6 +161,8 @@ local OWNED = {
 	"modules.shortcuts.actions.text_continuation",
 	"modules.shortcuts.actions.text_dispatch",
 	"modules.shortcuts.actions.text_transform_grace",
+	-- Translation now owns one canonical AI-off subscription per module lifetime.
+	"modules.shortcuts.ai_actions",
 	"tests.support.modules.llm.selection_translation_destination",
 	"ui.tooltip",
 
