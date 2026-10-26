@@ -723,16 +723,16 @@ helpers.describe("keyboard_layout: exact native authority and preserved logical 
 		cohort_fixture(function(_, layout, _, backend)
 			local display = require("infra.display_server")
 			local shell = require("adapters.shell_runner")
-			local old_exec = shell.exec
+			local old_exec = shell.exec_checked
 			display._set_for_test("wayland")
-			shell.exec = function() return "xkb_keymap { controlled logical source }" end
+			shell.exec_checked = function() return true, "xkb_keymap { controlled logical source }", nil end
 			backend.source_group = function() return nil, "native-wayland-seat-unqualified" end
 			local ok, err = pcall(function()
 				helpers.assert_true(layout.refresh())
 				helpers.assert_true(layout.is_ready())
 				helpers.assert_eq(layout.resolve("z").keycode, 44)
 			end)
-			shell.exec = old_exec
+			shell.exec_checked = old_exec
 			display._set_for_test(nil)
 			if not ok then error(err, 0) end
 		end)
