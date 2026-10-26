@@ -21,6 +21,7 @@ local TIMED_ONLY = {
 
 require("test.hotpath_segments_contract").register(helpers, {
 	driver = "linux",
+	directory = require("infra.native_directory"),
 	root = helpers.driver_root(),
 	call_pattern = 'Perf%.span%(%s*"([^"]+)"',
 	timed_only = TIMED_ONLY,
