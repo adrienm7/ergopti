@@ -227,27 +227,33 @@ final class NativeAppClonerReadOnlyBundleTests: XCTestCase {
 		return try run("/usr/bin/osascript", arguments: ["-e", program, "--", helper.path], root: root)
 	}
 
-	func testActualAdmissionExecutesReadOnlyHelperAndRejectsOldMutation() throws {
+	func testActualAdmissionExecutesReadOnlyHelperWithNoOpPermissions() throws {
 		let admission = try actualAdmission()
 		try withReadOnlyHelpers { helper, _, root in
 			let original = try Data(contentsOf: helper)
+			let originalPermissions = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: helper.path)[.posixPermissions] as? NSNumber).intValue
+			XCTAssertEqual(originalPermissions & 0o7777, 0o755)
 			let allowed = try executeAdmission(admission, helper: helper, root: root)
 			XCTAssertEqual(allowed.status, 0, "The actual admission must accept an executable signed resource: \(allowed.stderr)")
 			XCTAssertTrue(allowed.stderr.isEmpty)
 			XCTAssertEqual(String(decoding: allowed.output, as: UTF8.self), "readonly-cloner-helper\n")
 			XCTAssertEqual(try Data(contentsOf: helper), original)
+			XCTAssertEqual(try XCTUnwrap(FileManager.default.attributesOfItem(atPath: helper.path)[.posixPermissions] as? NSNumber).intValue, originalPermissions)
+			// A direct syscall still reaches the read-only kernel even when its mode is unchanged.
 			let (mutation, mutationError) = helper.path.withCString { path in
 				let result = Darwin.chmod(path, mode_t(0o755))
 				return (result, errno)
 			}
 			XCTAssertEqual(mutation, -1)
 			XCTAssertTrue(mutationError == EROFS || mutationError == EPERM, "The real kernel must refuse metadata mutation on this fixture")
-			let old = try executeAdmission("do shell script \"chmod +x \" & quoted form of cloneScript", helper: helper, root: root)
-			XCTAssertNotEqual(old.status, 0)
-			XCTAssertTrue(old.stderr.contains("CLONER_ADMISSION_REFUSED:1:"), "The old command must fail at runtime, not parsing: \(old.stderr)")
-			XCTAssertTrue(old.stderr.contains("Read-only file system") || old.stderr.contains("Operation not permitted"), "Require the native metadata refusal rather than an unrelated command failure")
-			XCTAssertTrue(old.output.isEmpty)
+			// BSD chmod skips its syscall when +x leaves an executable helper's mode unchanged.
+			// The real UDRO volume therefore permits this command while refusing Darwin.chmod.
+			let noOp = try executeAdmission("do shell script \"chmod +x \" & quoted form of cloneScript", helper: helper, root: root)
+			XCTAssertEqual(noOp.status, 0, "The actual BSD no-op must execute the helper: \(noOp.stderr)")
+			XCTAssertTrue(noOp.stderr.isEmpty)
+			XCTAssertEqual(String(decoding: noOp.output, as: UTF8.self), "readonly-cloner-helper\n")
 			XCTAssertEqual(try Data(contentsOf: helper), original)
+			XCTAssertEqual(try XCTUnwrap(FileManager.default.attributesOfItem(atPath: helper.path)[.posixPermissions] as? NSNumber).intValue, originalPermissions)
 		}
 	}
 
