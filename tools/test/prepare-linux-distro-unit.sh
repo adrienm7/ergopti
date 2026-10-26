@@ -35,6 +35,8 @@ test -x /usr/bin/python3
 sqlite="$(command -v sqlite3)"
 test -x "$sqlite"
 "$sqlite" --version
+# The GNOME proxy check decodes gsettings output with the native GLib.
+"$interpreter" -e 'require("ffi").load("libglib-2.0.so.0")'
 
 # Root bypasses the suite's real unreadable-file permission premise, so the
 # suite runs as the same ordinary user the archive installation lot creates.
