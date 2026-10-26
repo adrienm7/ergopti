@@ -40,9 +40,9 @@ local ShutdownHelpers, HelpersSettled = ProcessRunner.shutdown, ProcessRunner.is
 local CancelHttp, CancelDigest = HttpClient.cancel, FileDigest.cancel
 local Registry      = require("layouts.registry")
 local Catalogue     = require("layouts.catalogue")
-local Outdated      = require("config_outdated")
 local Extension     = require("layouts.extension")
 local Composer      = require("layouts.composer")
+local RegistryStore = require("layouts.registry_store")
 
 local M = {}
 local TextUtils = require("text_utils")
@@ -115,20 +115,30 @@ M.FAILURE_INVALID = "invalid"
 -- ===========================
 -- ===========================
 
--- Last refresh outcome: { index, source, error } (see Catalogue.resolve_index).
-local _catalogue = { index = nil, source = Catalogue.SOURCE_NONE, error = nil }
 -- The one operation in flight ({ id, action }), nil when idle.
 local _busy = nil
 -- The layout this session last made the input source, "" when none: the
 -- desktop owns the real answer and offers no cheap way to ask it.
 local _active = ""
--- Decoded index shipped with the package, read once.
-local _bundled_index = nil
-local _bundled_index_read = false
 local _epoch = 0
 local _stopping = false
 local _checking_shutdown = false
 local _transports_cancelled = false
+
+-- Catalogue, shipped index, installed record and refresh, shared with macOS.
+local Store = RegistryStore.new({
+	logger = Logger,
+	log = LOG,
+	shipped_noun = "driver",
+	missing_bundle_notice = "No layout registry is shipped with this driver; offline installation is unavailable.",
+	prepare_parent = function(deps, path)
+		local parent = assert(NativePath.dirname(path), "layout write requires an absolute parent")
+		if deps.ensure_dir(parent) then return true, nil end
+		return false, "cannot create " .. parent
+	end,
+})
+local write_file, bundled_index = Store.write_file, Store.bundled_index
+local read_installed, write_installed = Store.read_installed, Store.write_installed
 
 --- Tests the original registry lifetime without borrowing a later request.
 --- @param epoch number Captured lifetime generation.
@@ -374,65 +384,6 @@ end
 -- ==============================
 -- ==============================
 
---- Writes one file in the local folder, creating it first.
---- @param deps table
---- @param path string
---- @param content string
---- @return boolean ok
---- @return string|nil error
-local function write_file(deps, path, content)
-	local parent = assert(NativePath.dirname(path), "layout write requires an absolute parent")
-	if not deps.ensure_dir(parent) then return false, "cannot create " .. parent end
-	local written, write_err = deps.write(path, content)
-	if not written then return false, "cannot write " .. path .. ": " .. tostring(write_err) end
-	return true, nil
-end
-
---- The shipped index, reread for source checkouts so Refresh sees local edits.
---- @param deps table
---- @return table|nil
-local function bundled_index(deps)
-	if _bundled_index_read and not deps.local_source then return _bundled_index end
-	_bundled_index_read = true
-	if type(deps.bundled_dir) ~= "string" then
-		Logger.warn(LOG, "No layout registry is shipped with this driver; offline installation is unavailable.")
-		return nil
-	end
-	local text = deps.read(deps.bundled_dir .. deps.settings.index_file)
-	local index, _, detail = Catalogue.decode_index(text, deps.decode_json, deps.settings.max_file_bytes)
-	if not index then
-		Logger.error(LOG, "The layout index shipped with the driver is unusable: %s.", tostring(detail))
-	end
-	_bundled_index = index
-	return index
-end
-
---- Reads the installed-layouts record. An entry this build cannot use is
---- warned once and left out; the other layouts stay installed.
---- @param deps table
---- @return table|nil record
---- @return string|nil error
-local function read_installed(deps)
-	local path = deps.local_dir .. deps.settings.installed_file
-	if not deps.exists(path) then return Catalogue.decode_installed(nil, deps.decode_installed_json or Json.decode_lossless) end
-	local text = deps.read(path)
-	if type(text) ~= "string" then return nil, "cannot read " .. path end
-	local record, err = Catalogue.decode_installed(text, deps.decode_installed_json or Json.decode_lossless)
-	for id, item in pairs(record and record.outdated or {}) do
-		Outdated.report_in_file(path, { "layouts", id }, item.detail)
-	end
-	return record, err
-end
-
---- Writes the installed-layouts record.
---- @param deps table
---- @param record table
---- @return boolean ok
---- @return string|nil error
-local function write_installed(deps, record)
-	return write_file(deps, deps.local_dir .. deps.settings.installed_file, deps.encode_json(record))
-end
-
 --- The last JSON line a Python helper printed (its report), or nil.
 --- @param stdout string|nil
 --- @param decode function
@@ -574,39 +525,7 @@ function M.refresh(on_done, deps)
 		return false
 	end
 	deps = resolved
-	Logger.start(LOG, "Refreshing the layout catalogue…")
-	Catalogue.refresh(deps.settings, {
-		local_source = deps.local_source,
-		read_cache = function()
-			local index_path = deps.local_dir .. deps.settings.index_file
-			if not deps.exists(index_path) then return nil end
-			local etag_path = deps.local_dir .. deps.settings.etag_file
-			return { text = deps.read(index_path), etag = deps.exists(etag_path) and deps.read(etag_path) or nil }
-		end,
-		write_cache = function(text, etag)
-			if not current(epoch) then return false, "layout registry stopped" end
-			local ok, err = write_file(deps, deps.local_dir .. deps.settings.index_file, text)
-			if not ok then return false, err end
-			local etag_path = deps.local_dir .. deps.settings.etag_file
-			if type(etag) == "string" then return write_file(deps, etag_path, etag) end
-			if not deps.delete(etag_path) then return false, "cannot remove " .. etag_path end
-			return true, nil
-		end,
-		bundled_index = bundled_index(deps),
-		decode_json = deps.decode_json,
-		transport = deps.transport,
-	}, function(outcome)
-		if not current(epoch) then return end
-		_catalogue = { index = outcome.index, source = outcome.source, error = outcome.error }
-		if outcome.cache_warning then Logger.warn(LOG, "%s; refreshed without it.", outcome.cache_warning) end
-		if outcome.error then
-			Logger.warn(LOG, "The layout catalogue shows the %s index: %s (%s).", outcome.source,
-				outcome.error.code, tostring(outcome.error.detail))
-		end
-		if outcome.cache_error then Logger.error(LOG, "%s.", outcome.cache_error) end
-		Logger.success(LOG, "Layout catalogue refreshed from the %s index.", outcome.source)
-		if on_done then on_done(outcome) end
-	end)
+	Store.refresh(deps, function() return current(epoch) end, on_done)
 	return true
 end
 
@@ -617,9 +536,9 @@ end
 function M.snapshot(deps)
 	local resolved = resolve_deps(deps)
 	local snapshot = {
-		index = _catalogue.index,
-		source = _catalogue.source,
-		error = _catalogue.error,
+		index = Store.catalogue().index,
+		source = Store.catalogue().source,
+		error = Store.catalogue().error,
 		installed = {},
 		busy = _busy,
 		active = _active,
@@ -1158,11 +1077,9 @@ end
 function M._reset()
 	if _stopping or HelpersSettled() ~= true then error("layout registry still owns terminal native lifetime", 2) end
 	_epoch = _epoch + 1
-	_catalogue = { index = nil, source = Catalogue.SOURCE_NONE, error = nil }
+	Store.reset()
 	_busy = nil
 	_active = ""
-	_bundled_index = nil
-	_bundled_index_read = false
 end
 
 --- Roots of committed extension generations, without changing activation choices.
