@@ -339,3 +339,98 @@ _KCT_ResetFlushCase(Mode) {
 for _KCT_FlushMode in ["default", "false", "throw"]
 	Test("keystats collection: reset refuses unaccepted flush " . _KCT_FlushMode
 		. " (reset-flush-refusal)", _KCT_ResetRefusesUnacceptedFlush.Bind(_KCT_FlushMode))
+
+
+_KCSP_ChildSource() {
+	global _DriverDir
+	Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
+	for Symbol in ["MF_ShouldFilter", "WallClockTimestamp", "KL_CaptureHeld", "KL_Sensors_Tick"] {
+		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
+		AssertTrue(Owner != "", "The child requires the unique actual owner of " . Symbol)
+		Source .= "#Include " . Owner . "`n"
+	}
+	StateOwner := _DriverProductionFileForSymbol("KL_AppendLog", _DriverDir)
+	StateSource := FileRead(StateOwner, "UTF-8")
+	AssertTrue(RegExMatch(StateSource, "ms)^class Keystats \{.*?^\}", &StateClass) > 0,
+		"The genuine state class must own the actual publication queue")
+	SplitPath(StateOwner, , &StateDirectory)
+	Source .= "#Include " . StateDirectory . "\keystats_constants.ahk`n" . StateClass[0] . "`n"
+	for Symbol in ["KL_LogSystemEvent", "KL_AppendLog", "KL_AssignStableEventId",
+		"KL_AllocEventId", "KL_RecordPrivacyHit", "KL_NowTimestamp"] {
+		Body := _DriverFuncBody(Symbol)
+		AssertTrue(Body != "", "Every exercised real publication function must have a body: " . Symbol)
+		Source .= Body . "`n"
+	}
+	return Source . "#Include " . _DriverDir . "\tests\fixtures\sensor_collection_pause_owner_body.ahk`n"
+}
+
+_KCSP_Complete(State, Code, Output, ErrorText) {
+	State.Code := Code, State.Output := Output, State.ErrorText := ErrorText
+	State.Calls += 1
+}
+
+_KCSP_Case(Mode) {
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "An unresolved old child cannot be replaced")
+	Directory := A_Temp . "\ergopti_sensor_pause_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	FSCreateDirectoryExclusiveStrict(Directory)
+	Script := Directory . "\subject.ahk"
+	State := {Calls: 0, Code: -1, Output: "", ErrorText: ""}, Handle := 0, Primary := 0, Retired := false
+	AtDeadline := 0, ExportFailure := 0
+	PreviousCritical := Critical("Off")
+	try {
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _KCSP_ChildSource()) != 0)
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _KCSP_Complete.Bind(State))
+		AssertTrue(Handle.start(), "The real private child must start")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AtDeadline := {Calls: State.Calls, Code: State.Code, Output: State.Output, ErrorText: State.ErrorText}
+		if State.Calls == 0
+			Primary := Error("The exact sensor-collection child did not settle within its 15000 ms deadline.")
+	} catch Any as Failure {
+		Primary := Failure
+	} finally {
+		try {
+			if IsObject(Handle) && State.Calls == 0
+				Handle.requestTerminate()
+			Receipt := IsObject(Handle) ? Handle.terminate() : 1
+			Retired := (Receipt is Integer) && Receipt == 1
+			if Retired
+				DirDelete(Directory, true)
+		} catch Any as Failure {
+			if !IsObject(Primary)
+				Primary := Failure
+		} finally {
+			if IsObject(Handle) && !Retired
+				RetirementDebt := {Handle: Handle, Directory: Directory}
+			Critical(PreviousCritical)
+		}
+	}
+	try {
+		if State.Calls == 1 {
+			; The tree adapter combines its native stdout/stderr captures. This is
+			; not an independently measured stderr channel.
+			for Line in StrSplit(State.Output, "`n", "`r")
+				if Line != ""
+					_TestPrint("# sensor-collection-child " . Line)
+		}
+	} catch Any as Failure
+		ExportFailure := Failure
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired)
+	AssertEqual(1, AtDeadline.Calls)
+	AssertEqual("", AtDeadline.ErrorText, AtDeadline.Output)
+	AssertEqual(0, AtDeadline.Code, AtDeadline.Output)
+	AssertContains(AtDeadline.Output, "PASS sensor-owner " . Mode)
+	if IsObject(ExportFailure)
+		throw ExportFailure
+}
+
+for _KCSP_Mode in ["collection", "driver"]
+	Test("keystats sensors: actual " . _KCSP_Mode . " pause silences native publication (sensor-collection-pause)",
+		_KCSP_Case.Bind(_KCSP_Mode))
