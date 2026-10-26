@@ -517,6 +517,7 @@
 		"test:app-cloner-shortcut-maximize": "node ./tools/test/test-app-cloner-shortcut-maximize.cjs",
 		"test:app-cloner-run-isolation": "node ./tools/test/test-app-cloner-run-isolation.cjs",
 		"test:app-cloner-log-isolation": "node ./tools/test/test-app-cloner-log-isolation.cjs",
+		"test:encryptor-launch": "node ./tools/test/test-encryptor-launch.cjs",
 		"test:app-cloner-generated-literals": "node ./tools/test/test-app-cloner-generated-literals.cjs",
 		"test:app-cloner-dock-url": "node ./tools/test/test-app-cloner-dock-url.cjs",
 		"test:ollama-bootstrap-network-hardening": "node ./tools/test/test-ollama-bootstrap-network-hardening.cjs",

@@ -292,6 +292,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-shared-ui-theme.cjs"],
 			"repro": "npm run test:shared-ui-theme"
+		},
+		{
+			"id": "encryptor-startup-receipt",
+			"ordinal": 492,
+			"name": "Encryptor startup preserves icon helper and process replacement without a fixed temporary log",
+			"cmd": "node",
+			"args": ["tools/test/test-encryptor-launch.cjs"],
+			"repro": "npm run test:encryptor-launch"
 		}
 	]
 }
