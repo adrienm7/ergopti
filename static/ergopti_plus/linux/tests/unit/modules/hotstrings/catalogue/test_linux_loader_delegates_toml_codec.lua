@@ -70,12 +70,17 @@ describe("Linux TOML loader delegation to toml_codec.reader", function()
 		helpers.assert_eq(parsed.sections.s.entries[1].output, "")
 	end)
 
-	it("loader.lua requires toml_codec.reader (delegates to shared codec)", function()
+	it("loader.lua parses through the shared codec (directly, or through the timed wrapper that delegates to it)", function()
 		assert_true(
 			loader_src:find('require%("toml_codec%.reader"%)', 1, false) ~= nil
-				or loader_src:find("require%('toml_codec%.reader'%)", 1, false) ~= nil,
+				or loader_src:find('require%("infra%.toml%.reader"%)', 1, false) ~= nil,
 			"loader.lua must delegate to toml_codec.reader — no local parser fork allowed."
 		)
+		local wrapper = io.open(helpers.driver_root() .. "/infra/toml/reader.lua", "rb")
+		local wrapper_src = wrapper and wrapper:read("*a") or ""
+		if wrapper then wrapper:close() end
+		assert_true(wrapper_src:find('require%("toml_codec%.reader"%)', 1, false) ~= nil,
+			"the timed wrapper must delegate to toml_codec.reader")
 	end)
 
 	it("loader.lua does not define parse_toml_file (no parallel parser)", function()
