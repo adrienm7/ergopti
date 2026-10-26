@@ -8,6 +8,8 @@
 //   3. No PascalCase TOML keys — keys in config/**/*.toml must start with lowercase
 //   4. Section spacing — major sections need 5 blank lines before, minor 3
 //   5. Banner alignment — = counts must match title line length exactly
+//   6. Hex colour literals — only the theme files may spell a colour; the others are held to
+//      tools/lint/hex-literal-baseline.json, which can only shrink
 //
 // Usage:
 //   node scripts/lint-conventions.js [--fail-on-violations] [--warn-only]
@@ -17,6 +19,7 @@ import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { join, relative, extname } from 'path';
 import { execSync } from 'child_process';
 import sharedPaths from '../lib/paths.cjs';
+import hexColours from './hex-colours.cjs';
 
 const { shared } = sharedPaths;
 
@@ -30,6 +33,7 @@ const WARN_ONLY = process.argv.includes('--warn-only');
 const FIX_BANNERS = process.argv.includes('--fix-banners');
 const FIX_SPACING = process.argv.includes('--fix-spacing');
 const FIX_UNBALANCED = process.argv.includes('--fix-unbalanced');
+const UPDATE_HEX_BASELINE = process.argv.includes('--update-hex-baseline');
 
 let totalViolations = 0;
 
@@ -662,6 +666,69 @@ function checkMacOsPathIntegrity() {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Check 12 — Hex colour literals outside the theme
+// ──────────────────────────────────────────────────────────────────────────────
+
+// The files that own a colour. Every other source file reaches a colour through a
+// theme token (var(--theme-*)) or the generated native palette.
+const THEME_OWNER_FILES = new Set([
+	'static/ergopti_plus/_shared/ui/theme.css',
+	'static/ergopti_plus/_shared/data/native_theme.toml',
+	'static/ergopti_plus/_shared/lua/native_theme_data.lua'
+]);
+const HEX_BASELINE_PATH = join(REPO_ROOT, 'tools/lint/hex-literal-baseline.json');
+
+// The literals each file may still spell, from before the theme existed (the
+// Windows driver's included: its palette awaits an AHK emitter). A file may
+// only go down: a rise is a new literal outside the theme, and a drop must
+// lower the entry so the debt cannot grow back unnoticed.
+function checkHexLiteralsOutsideTheme() {
+	const found = new Map();
+	for (const [file, literals] of hexColours.scanTree(REPO_ROOT)) {
+		if (!THEME_OWNER_FILES.has(file)) found.set(file, literals);
+	}
+	if (UPDATE_HEX_BASELINE) {
+		const next = {};
+		for (const [file, literals] of [...found].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+			next[file] = literals.length;
+		}
+		writeFileSync(HEX_BASELINE_PATH, JSON.stringify(next, null, '\t') + '\n');
+		console.log(`  Wrote ${HEX_BASELINE_PATH} (${found.size} file(s)).`);
+		return;
+	}
+	const baseline = JSON.parse(readFileSync(HEX_BASELINE_PATH, 'utf8'));
+	const hint =
+		'Use a var(--theme-*) token or the generated native palette (_shared/data/native_theme.toml).';
+	for (const [file, literals] of found) {
+		const allowed = baseline[file] ?? 0;
+		const abs = join(REPO_ROOT, file);
+		if (literals.length > allowed) {
+			const lines = literals.map((l) => `${l.line}:${l.value}`).join(', ');
+			warn(
+				abs,
+				literals[0].line,
+				`${literals.length} hex colour literal(s) outside the theme, baseline ${allowed} (${lines}). ${hint}`
+			);
+		} else if (literals.length < allowed) {
+			warn(
+				abs,
+				null,
+				`Only ${literals.length} hex colour literal(s) remain, baseline says ${allowed}: lower it with --update-hex-baseline.`
+			);
+		}
+	}
+	for (const file of Object.keys(baseline)) {
+		if (!found.has(file)) {
+			warn(
+				join(REPO_ROOT, file),
+				null,
+				'Has no hex colour literal left (or is gone), but the baseline lists it: lower it with --update-hex-baseline.'
+			);
+		}
+	}
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Runner
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -825,6 +892,7 @@ checkNoCoAuthor();
 checkWebUiAntiPatterns();
 checkMacOsGestureDefaults();
 checkMacOsPathIntegrity();
+checkHexLiteralsOutsideTheme();
 
 // Report
 console.log('');
