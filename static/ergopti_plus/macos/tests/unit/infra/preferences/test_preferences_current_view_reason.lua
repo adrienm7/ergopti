@@ -63,10 +63,12 @@ helpers.describe("current view refusal reasons", function()
 
 	helpers.it("names a value of the wrong type", function()
 		with_source("[layout]\npause_switch_enabled = \"yes\"\n", function(preferences, path)
-			local view, _, reason = preferences.current_view(path, true)
+			local view, _, reason, key_path = preferences.current_view(path, true)
 			helpers.assert_nil(view)
 			helpers.assert_true(reason == "value_type" or reason == "value_out_of_range",
 				"a wrong value type must be named, got " .. tostring(reason))
+			-- Field run 2026-10-27 19:47: value_type on every regeneration, no key named.
+			helpers.assert_eq(key_path, "layout.pause_switch_enabled")
 		end)
 	end)
 
