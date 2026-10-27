@@ -906,8 +906,8 @@ if [ -z "$NATIVE_LUV_STAGE" ] && [ -f "${LIB_DIR}/.ergopti-owned-files" ] \
 		fi
 	done < "${LIB_DIR}/.ergopti-owned-files"
 fi
-tar -C "$SRC_DRIVER" --exclude='./bin/libergopti_archive_publication.so' -cf - . \
-	| tar -C "${LIB_DIR}/linux" -xf -
+(cd -- "$SRC_DRIVER" && tar --exclude='./bin/libergopti_archive_publication.so' -cf - .) \
+	| (cd -- "${LIB_DIR}/linux" && tar -xf -)
 # Re-read after the payload/native directory operations; a payload bin alias
 # must not become write authority for the target helper.
 _native_output_bin_parents || exit 1
