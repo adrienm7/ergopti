@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "Системний порядок",
 	"menu.layout.number_row_digits": "Спочатку цифри",
 	"menu.layout.number_row_symbols": "Спочатку символи",
-	"platform_reason.number_row_override_unsupported": "Не підтримується: Цей драйвер зберігає системний цифровий ряд; примусове введення цифр і символів недоступне.",
+	"platform_reason.number_row_override_unsupported": "Поки не в цій системі: ряд цифр друкує розкладка, встановлена в системі. Ergopti планує передруковувати його клавіші тут; зараз лише Windows, де розкладка емулюється, ставить цифри або символи першими.",
 	"platform_reason.number_row_source_unavailable": "Недоступно: Режим «Спочатку символи» потребує активної емульованої розкладки з коректними рівнями цифр і символів у кожній позиції ряду.",
 	"menu.layout.number_row_not_applied": " (не застосовано)",
 	"platform_reason.number_row_already_digits_first": "Без ефекту: ця розкладка вже друкує цифри без Shift.",

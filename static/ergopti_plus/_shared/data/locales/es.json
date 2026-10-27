@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "Orden nativo",
 	"menu.layout.number_row_digits": "Números primero",
 	"menu.layout.number_row_symbols": "Símbolos primero",
-	"platform_reason.number_row_override_unsupported": "No compatible: Este controlador conserva la fila nativa del sistema; no permite forzar números ni símbolos.",
+	"platform_reason.number_row_override_unsupported": "Todavía no en este sistema: la distribución instalada en el sistema escribe la fila de números. Ergopti prevé volver a escribir sus teclas aquí; hoy solo Windows, que emula la distribución, pone primero los dígitos o los símbolos.",
 	"platform_reason.number_row_source_unavailable": "No disponible: Símbolos primero requiere una distribución emulada activa con niveles válidos de números y símbolos en cada posición de la fila.",
 	"menu.layout.number_row_not_applied": " (no aplicado)",
 	"platform_reason.number_row_already_digits_first": "Sin efecto: esta distribución ya escribe sus números sin Mayús.",

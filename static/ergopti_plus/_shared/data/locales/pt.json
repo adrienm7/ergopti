@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "Ordem nativa",
 	"menu.layout.number_row_digits": "Números primeiro",
 	"menu.layout.number_row_symbols": "Símbolos primeiro",
-	"platform_reason.number_row_override_unsupported": "Não suportado: Este controlador mantém a fila nativa do sistema; não é possível forçar números ou símbolos.",
+	"platform_reason.number_row_override_unsupported": "Ainda não neste sistema: o layout instalado no sistema digita a linha de números. O Ergopti prevê redigitar as suas teclas aqui; hoje só o Windows, que emula o layout, coloca primeiro os dígitos ou os símbolos.",
 	"platform_reason.number_row_source_unavailable": "Indisponível: Símbolos primeiro requer uma disposição emulada ativa com níveis válidos de números e símbolos em todas as posições da fila.",
 	"menu.layout.number_row_not_applied": " (não aplicado)",
 	"platform_reason.number_row_already_digits_first": "Sem efeito: este layout já digita os números sem Shift.",

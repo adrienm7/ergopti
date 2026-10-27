@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "الترتيب الأصلي",
 	"menu.layout.number_row_digits": "الأرقام أولًا",
 	"menu.layout.number_row_symbols": "الرموز أولًا",
-	"platform_reason.number_row_override_unsupported": "غير مدعوم: يحتفظ هذا المشغّل بصف الأرقام الأصلي للنظام، ولا يمكن فرض الأرقام أو الرموز.",
+	"platform_reason.number_row_override_unsupported": "ليس على هذا النظام بعد: يكتب التخطيط المثبّت في النظام صف الأرقام. يخطط Ergopti لإعادة كتابة مفاتيحه هنا؛ اليوم وحده Windows، الذي يحاكي التخطيط، يضع الأرقام أو الرموز أولًا.",
 	"platform_reason.number_row_source_unavailable": "غير متاح: تتطلب أولوية الرموز تخطيطًا محاكى نشطًا بمستويات صالحة للأرقام والرموز في كل موضع من صف الأرقام.",
 	"menu.layout.number_row_not_applied": " (غير مطبق)",
 	"platform_reason.number_row_already_digits_first": "بلا تأثير: هذا التخطيط يكتب أرقامه بالفعل دون Shift.",

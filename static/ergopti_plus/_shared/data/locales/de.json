@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "Native Reihenfolge",
 	"menu.layout.number_row_digits": "Ziffern zuerst",
 	"menu.layout.number_row_symbols": "Symbole zuerst",
-	"platform_reason.number_row_override_unsupported": "Nicht unterstützt: Dieser Treiber behält die native Ziffernreihe des Systems bei; erzwungene Ziffern und Symbole sind nicht verfügbar.",
+	"platform_reason.number_row_override_unsupported": "Auf diesem System noch nicht: Die im System installierte Tastaturbelegung tippt die Zahlenreihe. Ergopti soll deren Tasten hier künftig neu tippen; heute stellt nur Windows, das die Belegung emuliert, Ziffern oder Symbole voran.",
 	"platform_reason.number_row_source_unavailable": "Nicht verfügbar: Symbole zuerst erfordert ein aktives emuliertes Layout mit gültigen Ziffern- und Symbolebenen an jeder Position der Ziffernreihe.",
 	"menu.layout.number_row_not_applied": " (nicht angewendet)",
 	"platform_reason.number_row_already_digits_first": "Ohne Wirkung: Dieses Layout tippt seine Ziffern bereits ohne Umschalt.",

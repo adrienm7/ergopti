@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "Ordine nativo",
 	"menu.layout.number_row_digits": "Numeri prima",
 	"menu.layout.number_row_symbols": "Simboli prima",
-	"platform_reason.number_row_override_unsupported": "Non supportato: Questo driver mantiene la riga nativa del sistema; non consente di forzare numeri e simboli.",
+	"platform_reason.number_row_override_unsupported": "Non ancora su questo sistema: il layout installato nel sistema digita la riga dei numeri. Ergopti prevede di riscriverne qui i tasti; oggi solo Windows, che emula il layout, mette prima le cifre o i simboli.",
 	"platform_reason.number_row_source_unavailable": "Non disponibile: Simboli prima richiede un layout emulato attivo con livelli validi di numeri e simboli in ogni posizione della riga.",
 	"menu.layout.number_row_not_applied": " (non applicato)",
 	"platform_reason.number_row_already_digits_first": "Nessun effetto: questo layout digita già le cifre senza Maiusc.",

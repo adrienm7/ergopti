@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "Sistemin sırası",
 	"menu.layout.number_row_digits": "Önce rakamlar",
 	"menu.layout.number_row_symbols": "Önce simgeler",
-	"platform_reason.number_row_override_unsupported": "Desteklenmiyor: Bu sürücü sistemin sayı satırını korur; rakamlar ve simgeler zorlanamaz.",
+	"platform_reason.number_row_override_unsupported": "Bu sistemde henüz yok: rakam sırasını sisteme kurulu düzen yazar. Ergopti buradaki tuşları yeniden yazmayı planlıyor; bugün rakamları veya simgeleri öne yalnızca düzeni taklit eden Windows alır.",
 	"platform_reason.number_row_source_unavailable": "Kullanılamıyor: Önce simgeler için sayı satırının her konumunda geçerli rakam ve simge düzeyleri bulunan etkin bir öykünülmüş düzen gerekir.",
 	"menu.layout.number_row_not_applied": " (uygulanmadı)",
 	"platform_reason.number_row_already_digits_first": "Etkisiz: bu düzen rakamlarını zaten Shift olmadan yazıyor.",
