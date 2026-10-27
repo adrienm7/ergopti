@@ -90,14 +90,9 @@ function apply_quick_date_range() {
 			start = format_date_iso(d);
 		} else if (val === 'month') {
 			start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-		} else if (val === '3m') {
-			const d = new Date(now);
-			d.setMonth(d.getMonth() - 3);
-			start = format_date_iso(d);
-		} else if (val === '6m') {
-			const d = new Date(now);
-			d.setMonth(d.getMonth() - 6);
-			start = format_date_iso(d);
+		} else if (val === '3m' || val === '6m') {
+			const months = Number(val.slice(0, -1));
+			start = formatMetricsDateKey(shiftMetricsMonth(metricsLocalDayOrdinal(now), -months));
 		} else if (val === 'year') {
 			start = `${now.getFullYear()}-01-01`;
 		} else if (val === 'all') {
