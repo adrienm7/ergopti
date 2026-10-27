@@ -829,6 +829,17 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       tap-hold off and theirs present, never activate ours (this rewords ADR 011 decision 3). WebView2 stays
       the system copy, with a version check and a clear refusal. Linux and Windows: inventory every external tool the drivers call (ydotool, xdotool, wmctrl,
       curl, Python, PowerShell modules, WebView2) and decide per tool whether Ergopti ships its own.
+- [ ] **Ergopti's own Ollama on Windows and Linux too (maintainer requirement, 27 October).** [CODE] Same rule
+      as macOS on every OS: Ergopti always installs and runs its own pinned Ollama, whether or not the system
+      has one, and never selects, reuses, stops or modifies the user's Ollama. macOS is done (bc09e4584c:
+      `ollama_binary.resolve()` returns only the owned runtime, pinned 0.40.4 from `managed_ollama_runtime.json`;
+      the shared key `llm_ollama_owned_port` = 11435 in `defaults.json`, read through `ollama_endpoint`; a saved
+      11434 override is refused and the old `llm.ollama_port` is migrated once and logged). Left: Linux
+      (`managed_ollama_proxy.lua`, the Ollama resolver and the endpoint still on `llm_ollama_port` 11434) and
+      Windows (it already has an owner for its own Ollama taking a models directory and port; check its
+      installer and every caller against the rule), both moved to `llm_ollama_owned_port`, the user's daemon
+      on 11434 left untouched, with regression tests that an installed system Ollama is never resolved or
+      started. [PHYS-W] [PHYS-L] confirm with a system Ollama running on 11434: Ergopti's listens on 11435.
 - [ ] **Ctrl+Caps Lock slot on macOS.** [PHYS-M] The `secondary_capslock` slot binds through its own native
       entry again (ea02cf7000: the generic registrar refuses Caps Lock and the whole shortcut start rolled
       back). The registrar tests say macOS never fires a Caps Lock hotkey: check on a real Mac that Ctrl+Caps
