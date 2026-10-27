@@ -926,3 +926,52 @@ _LCT_SchemaSourceKind(Fixture) {
 for Fixture in _LayoutSchemaKindFixtures(LAYOUT_CATALOGUE_INSTALLED_SCHEMA)
 	Test("layout schema: installed " . Fixture.Label . " retains native kind (layout-schema-kind)",
 		_LCT_SchemaSourceKind.Bind(Fixture))
+
+
+; Installed-record membership requires usable text identity fields. Wrong
+; types remain opaque outdated source data while a valid sibling can still
+; update through the actual native writer without deleting the stale entry.
+_LCT_InstalledEntryTypes(Field, Raw, Accepted) {
+	Dir := _LCT_TempDir()
+	Path := Dir . LayoutRegistry_Settings()["installed_file"]
+	Sha := Field == "sha256" ? Raw : JsonStringLiteral("sample-digest")
+	Version := Field == "version" ? Raw : JsonStringLiteral("1")
+	Sample := '{"id":"sample","sha256":' . Sha . ',"version":' . Version
+		. ',"size":1,"future":{"boolean":true,"null":null}}'
+	Good := '{"id":"good","sha256":"good-digest","version":"1","size":1}'
+	Source := '{"schema_version":' . LAYOUT_CATALOGUE_INSTALLED_SCHEMA
+		. ',"layouts":{"sample":' . Sample . ',"good":' . Good . '},"future":true}'
+	AssertTrue(JsonParse(Source) is Map, "installed entry controls must be real valid JSON")
+	try {
+		_LCT_WriteRaw(Path, Source)
+		Installed := LayoutCatalogue_ReadInstalled(Dir)
+		AssertTrue(Installed.Has("good"), "an incompatible sibling must not hide a valid installed entry")
+		AssertEqual(Accepted, Installed.Has("sample"),
+			"only checksum/version strings are usable installed layout metadata")
+		AssertEqual(Accepted ? 2 : 1, Installed.Count)
+		AssertEqual(Sample, Installed._LayoutCatalogueRecordSource.layout_members["sample"]["text"],
+			"both accepted and outdated entries retain exact native source spans")
+		Installed["good"]["version"] := "2"
+		LayoutCatalogue_WriteInstalled(Dir, Installed)
+		Written := FSReadUtf8Exact(Path)
+		Members := JsonObjectMemberSpans(Written, ["layouts"])
+		AssertTrue(Members.Has("sample"), "publishing a valid sibling cannot delete the outdated opaque entry")
+		AssertEqual(Sample, Members["sample"]["text"], "the unchanged sibling keeps every exact source token")
+		Again := LayoutCatalogue_ReadInstalled(Dir)
+		AssertEqual("2", Again["good"]["version"], "the real native writer must publish the valid update")
+		AssertEqual(Accepted, Again.Has("sample"), "a sibling update cannot admit or lose the target entry")
+	} finally DirDelete(Dir, true)
+}
+
+for Field in ["sha256", "version"]
+	for Token in ["true", "1", "[]", "{}", "null"]
+		Test("layout entry types: " . Field . " rejects " . Token . " and preserves source (layout-entry-source-types)",
+			_LCT_InstalledEntryTypes.Bind(Field, Token, false))
+
+for Fixture in [
+	["ordinary text", "", ""], ["empty checksum", "sha256", '""'],
+	["empty version", "version", '""'], ["numeric checksum text", "sha256", '"123"'],
+	["numeric version text", "version", '"2"']
+]
+	Test("layout entry types: " . Fixture[1] . " remains compatible (layout-entry-source-types)",
+		_LCT_InstalledEntryTypes.Bind(Fixture[2], Fixture[3], true))
