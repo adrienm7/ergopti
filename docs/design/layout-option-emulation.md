@@ -127,7 +127,9 @@ What is in the repository today:
   after the input source is toggled or the user logs in again.
 
 Proposed sequence (worker `--replace-input-source`, the upgrade worker's
-retain-before-mutate shape):
+retain-before-mutate shape). Steps 3 and 4 assumed that `TISEnableInputSource` enables a
+registered layout; the Mac runs showed it does not, so step 4 becomes the preferences route
+or the in-bundle route above, to be fixed once P5 and P7 answer:
 
 1. Compile the new `composed.keylayout` with the name `<Base> <n>` (counter from
    the installed record; the integer `id` follows from the name).
@@ -181,18 +183,43 @@ Result of the first version (arm64, current source `com.apple.keyboardlayout.erg
 - M4a/M4b FAIL: `TISSelectInputSource` on the freshly registered loose file returns
   -50 (paramErr), so the live switch is blocked until a way to select is found.
 
-The second version tries the ways around -50, one line each: P1 capabilities before
-selecting (IsSelectCapable, IsEnableCapable, category, type) with a numeric id outside
-every installed layout's range, P2 select at once, P3 select after a run-loop turn and
-after re-reading the list, P4 the same layout as a `.bundle` (Info.plist plus
-`Resources/*.keylayout`), P5 (only with `--write-prefs`, which edits the user's
-`AppleEnabledInputSources` and puts it back) select once the source is enabled through
-the preferences, P6 ghosts after the cleanup; `/tmp/ep_tis_probe after-logout` repeats
-P6 after a logout. It changes only throw-away layouts named `EPProbe<pid>...`, puts the
-user back on the source they started with and removes its files, also on failure.
+Result of the second version (macOS 26.6.2, arm64):
 
-If M1 prints a non-zero status the note
-is amended before slice 5.
+- A loose file with an id outside every installed layout is registered and listed at
+  once with `selectCapable=true enableCapable=true enabled=false`. `TISEnableInputSource`
+  answers 0 but the source stays `enabled=false`, so `TISSelectInputSource` answers -50,
+  at once, after a run-loop turn and after re-reading the list. So the numeric id
+  collisions of the first run were not the cause (the warnings concerned the installed
+  Ergopti files among themselves).
+- A bundle with a made-up identifier was not listed at all.
+
+What the repository already does on this Mac, and why it works: the driver never calls
+`TISEnableInputSource` for a layout. `macos/modules/keymap/input_sources.lua` adds
+`{InputSourceKind = "Keyboard Layout", "KeyboardLayout ID" = <integer id of the
+.keylayout>, "KeyboardLayout Name" = <name>}` to `AppleEnabledInputSources` of
+`com.apple.HIToolbox` (`defaults export`, edit, `defaults import`) and restarts
+SystemUIServer with `launchctl kickstart -k`; only then is the source enabled and
+selectable. The shipped Ergopti bundle declares `CFBundleIdentifier`
+`com.apple.keyboardlayout.ergopti`, one `KLInfo_<layout name>` per layout with
+`TISInputSourceID` `com.apple.keyboardlayout.ergopti.plus` and so on,
+`TICapsLockLanguageSwitchCapable`, `TISIconIsTemplate`, `TISIntendedLanguage`, a
+`version.plist`, and the display names in a UTF-16 `InfoPlist.strings`.
+
+The third version therefore tests, one line each: P4 a bundle with exactly that shape
+(`com.apple.keyboardlayout.*` identifiers); P5, with `--write-prefs`, the driver's route
+(preferences edit plus SystemUIServer restart, restored at the end) for the loose file and
+the bundle, then enabled? select?; P7, with `--replace-ergopti`, a layout added under a new
+name and id inside the installed bundle that holds the current source (backed up first and
+put back at the end, refused if the bundle is not writable by the user), checking whether it
+is enabled by inheritance and selectable. `--write-prefs` and `--replace-ergopti` each write
+more than the default run and neither is on by default.
+
+What this already decides for the design, pending the third run: the live switch cannot rely
+on `TISEnableInputSource`. It needs the preferences route (which the driver already owns and
+tests) or a new layout inside an already enabled bundle. Either way the versioned id stays
+(an in-place rewrite is cached), and the ghost left by a removed file (until logout) argues
+for adding layouts to a bundle rather than removing files; whether a layout added inside an
+already enabled bundle is selectable without the preferences route is exactly what P7 answers.
 
 ### 3.2 Linux
 
