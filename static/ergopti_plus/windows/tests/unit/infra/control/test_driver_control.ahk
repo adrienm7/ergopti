@@ -761,3 +761,77 @@ _TDC_BootStateEnum(StateName, Expected) {
 for _TDC_BootStateRow in [["canonical", "requested", true], ["uppercase", "REQUESTED", false], ["title case", "Requested", false]]
 	Test("driver-control: boot private result " . _TDC_BootStateRow[1] . " preserves canonical state admission (driver-control-state-enum)",
 		_TDC_BootStateEnum.Bind(_TDC_BootStateRow[2], _TDC_BootStateRow[3]))
+
+_TDC_RequestKeyDomain(Extra, Expected) {
+	Spec := _TDC_Spec(), Corpus := _TDC_Corpus()
+	Text := '{"schema":1,"token":"' . Corpus["token"] . '","request_id":"key-domain"'
+		. (Extra == "" ? "" : "," . Extra) . "}"
+	Decoded := JsonParse(Text)
+	AssertEqual(1, Decoded["schema"])
+	AssertEqual(Corpus["token"], Decoded["token"])
+	AssertEqual("key-domain", Decoded["request_id"])
+	Id := DriverControl_ParseRequest(Spec, Text, Corpus["token"], &Reason, &Echoed)
+	if Expected {
+		AssertEqual("key-domain", Id)
+		AssertEqual("", Reason)
+		AssertEqual("", Echoed)
+	} else {
+		AssertEqual("", Id, "only the exact decoded request key domain is admitted")
+		AssertEqual("malformed", Reason)
+		AssertEqual("key-domain", Echoed)
+	}
+}
+for _TDC_KeyRow in [
+	["canonical", "", true],
+	["canonical duplicate", '"schema":1', true],
+	["escaped canonical duplicate", '"sc\u0068ema":1', true],
+	["known unknown", '"force":true', false],
+	["uppercase schema", '"SCHEMA":99', false],
+	["mixed schema", '"sChEmA":99', false],
+	["uppercase token", '"TOKEN":"ignored"', false],
+	["mixed token", '"ToKeN":"ignored"', false],
+	["uppercase request id", '"REQUEST_ID":"ignored"', false],
+	["mixed request id", '"Request_Id":"ignored"', false],
+	["escaped uppercase schema", '"\u0053CHEMA":99', false],
+	["escaped uppercase token", '"\u0054OKEN":"ignored"', false],
+	["escaped uppercase request id", '"\u0052EQUEST_ID":"ignored"', false]
+]
+	Test("driver-control: request " . _TDC_KeyRow[1] . " preserves the decoded key domain (driver-control-request-key-domain)",
+		_TDC_RequestKeyDomain.Bind(_TDC_KeyRow[2], _TDC_KeyRow[3]))
+
+_TDC_RequestKeySession(Extra, Expected) {
+	_TDC_World(Body)
+	Body(World) {
+		World.Session.Start()
+		Text := '{"schema":1,"token":"' . World.Token . '","request_id":"key-domain"'
+			. (Extra == "" ? "" : "," . Extra) . "}"
+		Decoded := JsonParse(Text)
+		AssertEqual(1, Decoded["schema"])
+		AssertEqual(World.Token, Decoded["token"])
+		AssertEqual("key-domain", Decoded["request_id"])
+		AssertTrue(FSWriteDurable(World.Session.Path("request"), Text))
+		Acknowledged := World.Endpoint.Call()
+		if Expected {
+			AssertEqual(1, World.Calls.Length)
+			AssertTrue(Acknowledged)
+			Result := JsonParse(_TDC_Read(World, "result"))
+			AssertEqual("requested", Result["state"])
+		} else {
+			AssertEqual(0, World.Calls.Length, "an undeclared decoded key cannot reach the real reload boundary")
+			AssertFalse(Acknowledged)
+			Result := JsonParse(_TDC_Read(World, "result"))
+			AssertEqual("refused", Result["state"])
+			AssertEqual("malformed", Result["reason"])
+		}
+		AssertEqual("key-domain", Result["request_id"])
+		AssertFalse(FileExist(World.Session.Path("request")))
+	}
+}
+for _TDC_KeySessionRow in [
+	["canonical", "", true], ["known unknown", '"force":true', false],
+	["uppercase schema", '"SCHEMA":99', false],
+	["uppercase token", '"TOKEN":"ignored"', false],
+	["uppercase request id", '"REQUEST_ID":"ignored"', false]
+]
+	Test("driver-control: private request " . _TDC_KeySessionRow[1] . " preserves the decoded key domain (driver-control-request-key-domain)",
+		_TDC_RequestKeySession.Bind(_TDC_KeySessionRow[2], _TDC_KeySessionRow[3]))
