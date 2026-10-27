@@ -38,8 +38,12 @@ local SHORTCUTS_BIN = "/usr/bin/shortcuts"
 -- The application each scripted action drives, named in the permission notice
 M.APPS = { calendar = "Calendar", reminder = "Reminders", mail = "Mail" }
 
--- System Settings pane where the user grants the Automation permission
-M.AUTOMATION_SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"
+--- The System Settings pane where the user grants the Automation permission,
+--- for the running macOS (adapters/privacy_settings.lua).
+--- @return string url
+function M.automation_settings_url()
+	return require("adapters.privacy_settings").url("automation")
+end
 
 -- The Apple event error macOS returns when the Automation permission is refused
 local NOT_AUTHORIZED_CODE = "-1743"
@@ -335,7 +339,7 @@ end
 --- Opens System Settings at the Automation permissions.
 --- @return boolean started
 function M.open_automation_settings()
-	return ShellRunner.open(M.AUTOMATION_SETTINGS_URL) == true
+	return ShellRunner.open(M.automation_settings_url()) == true
 end
 
 return M

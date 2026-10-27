@@ -33,6 +33,8 @@ const SCRIPT = 'tools/dev/collect-macos-field-report.sh';
 const SPEC_PATH = 'static/ergopti_plus/macos/data/field_run.json';
 const CHECKS_PATH = 'static/ergopti_plus/macos/infra/field_check_checks.lua';
 const IDENTIFIERS = 'static/ergopti_plus/_shared/data/identifiers.sh';
+const SHELL_CHECKS = 'tools/dev/macos-field-shell-checks.sh';
+const PRIVACY_PANES = 'static/ergopti_plus/macos/data/privacy_panes.json';
 
 if (process.platform === 'win32') {
 	console.log('[SKIP] The macOS field report collector is a macOS shell tool; not run on Windows.');
@@ -87,7 +89,7 @@ function fixture(name) {
 	const origin = path.join(base, 'origin.git');
 	const bin = path.join(base, 'bin');
 	const home = path.join(base, 'home');
-	for (const relative of [SCRIPT, SPEC_PATH, IDENTIFIERS]) {
+	for (const relative of [SCRIPT, SPEC_PATH, IDENTIFIERS, SHELL_CHECKS, PRIVACY_PANES]) {
 		fs.mkdirSync(path.dirname(path.join(clone, relative)), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, relative), path.join(clone, relative));
 	}
@@ -317,6 +319,25 @@ function reportFolder(paths) {
 				collector,
 				/build\/field-run/,
 				'the folder must come from the declaration'
+			);
+		});
+
+		await check('the collector runs the shell checklist steps from their own file', () => {
+			assert.match(collector, /^\. "\$REPO_ROOT\/tools\/dev\/macos-field-shell-checks\.sh"$/m);
+			assert.match(
+				collector,
+				/^step privacy_pane_urls field_privacy_pane_urls "\$\{REPO_ROOT\}"$/m
+			);
+			assert.match(collector, /^step system_bash field_system_bash$/m);
+			const checks = fs.readFileSync(path.join(ROOT, SHELL_CHECKS), 'utf8');
+			assert.match(
+				checks,
+				/PRIVACY_PANES_SPEC="static\/ergopti_plus\/macos\/data\/privacy_panes\.json"/
+			);
+			// System Settings is quit only when the run opened it
+			assert.match(
+				checks,
+				/was_running\}" = false \]; then\n\t\t\/usr\/bin\/osascript -e 'tell application "System Settings" to quit'/
 			);
 		});
 
