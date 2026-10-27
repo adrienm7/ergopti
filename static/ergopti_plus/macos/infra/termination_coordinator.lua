@@ -727,6 +727,15 @@ function M.pending_kind()
 	return transaction.kind
 end
 
+--- Names the stable reason the active terminal transition was requested with
+--- ("watcher", "menu", "hammerspoon_reload"...). Never logs.
+--- @return string|nil reason Nil when nothing owns the process.
+function M.pending_reason()
+	local transaction = _transaction
+	if transaction == nil or transaction.settled then return nil end
+	return transaction.reason
+end
+
 --- Names the stage the active terminal transaction is waiting on. It never logs,
 --- so the quit watchdog may call it after the logger sink was finalized.
 --- @return string stage

@@ -48,7 +48,7 @@ end
 --- In-memory world: files, a manual clock and timers, a fake folder watcher.
 --- @param runners table|nil step id → fn(step, finish, world); default: pass.
 local function world(runners)
-	local state = { files = {}, dirs = {}, now = 0, timers = {}, calls = {}, ring = {}, restored = nil }
+	local state = { files = {}, dirs = {}, now = 0, timers = {}, calls = {}, ring = {}, restored = nil, mark = 0 }
 	state.ports = {
 		read_declaration = function() return SPEC_TEXT end,
 		read = function(path)
@@ -73,6 +73,7 @@ local function world(runners)
 		end,
 		cancel = function(handle) handle.cancelled = true; return true end,
 		now_ms = function() return state.now end,
+		progress_mark = function() return state.mark end,
 		iso_now = function() return "2026-10-27T10:00:00Z" end,
 		-- A copy, as the logger's snapshot is
 		log_ring = function() return { table.unpack(state.ring) } end,
@@ -332,21 +333,94 @@ helpers.describe("field run: a run", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
 			local late
-			local state = world({ ollama_runtime = function(_, finish) late = finish end })
+			local state = world({ field_network = function(_, finish) late = finish end })
 			local spec = spec_of(FieldRun)
 			started(FieldRun, state)
-			state.request({ schema = 1, request_id = "r14", steps = Json.array({ "ollama_runtime", "diagnostics" }) })
+			state.request({ schema = 1, request_id = "r14", steps = Json.array({ "field_network", "diagnostics" }) })
 			state.advance(0)
 			helpers.assert_nil(state.files[FOLDER .. "/results/r14/done.json"], "the step is still pending")
-			state.advance(spec.step_by_id.ollama_runtime.deadline_seconds * 1000)
-			local timed = state.json(result_path("r14", 2, "ollama_runtime"))
+			state.advance(spec.step_by_id.field_network.deadline_seconds * 1000)
+			local timed = state.json(result_path("r14", 1, "field_network"))
 			helpers.assert_eq(timed.verdict, "timeout")
-			helpers.assert_eq(timed.codes[1], "deadline_" .. spec.step_by_id.ollama_runtime.deadline_seconds .. "s")
+			helpers.assert_eq(timed.codes[1], "deadline_" .. spec.step_by_id.field_network.deadline_seconds .. "s")
 			late("pass", { "too_late" })
 			state.advance(0)
-			helpers.assert_eq(state.json(result_path("r14", 2, "ollama_runtime")).verdict, "timeout",
+			helpers.assert_eq(state.json(result_path("r14", 1, "field_network")).verdict, "timeout",
 				"a late answer must not overwrite the timeout")
 			helpers.assert_eq(state.json(FOLDER .. "/results/r14/done.json").verdicts.diagnostics, "pass")
+		end)
+	end)
+
+	helpers.it("keeps a progressing download alive past its deadline", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local finish_pull
+			local state = world({ ollama_model = function(_, finish) finish_pull = finish end })
+			local spec = spec_of(FieldRun)
+			local step = spec.step_by_id.ollama_model
+			helpers.assert_true(step.progress_max_seconds > step.deadline_seconds,
+				"the model download must be progress-aware")
+			started(FieldRun, state)
+			state.request({ schema = 1, request_id = "r30", steps = Json.array({ "ollama_model" }) })
+			state.advance(0)
+			-- The 16:47 field run: granite4:350m-h finished after 240 s of steady bytes
+			for _ = 1, 3 do
+				state.advance(step.deadline_seconds * 500)
+				state.mark = state.mark + 1
+				state.advance(step.deadline_seconds * 500)
+			end
+			helpers.assert_nil(state.files[result_path("r30", 1, "ollama_model")],
+				"a download that keeps moving must not time out")
+			finish_pull("pass", { "pulled" })
+			state.advance(0)
+			helpers.assert_eq(state.json(result_path("r30", 1, "ollama_model")).verdict, "pass")
+		end)
+	end)
+
+	helpers.it("times a stalled download out after one silent window, and any download at its bound", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world({ ollama_model = function() end, mlx_model = function() end })
+			local spec = spec_of(FieldRun)
+			local step = spec.step_by_id.ollama_model
+			started(FieldRun, state)
+			state.request({ schema = 1, request_id = "r31", steps = Json.array({ "ollama_model" }) })
+			state.advance(0)
+			state.mark = state.mark + 1
+			state.advance(step.deadline_seconds * 1000)
+			helpers.assert_nil(state.files[result_path("r31", 1, "ollama_model")], "progress grants a window")
+			state.advance(step.deadline_seconds * 1000)
+			local stalled = state.json(result_path("r31", 1, "ollama_model"))
+			helpers.assert_eq(stalled.verdict, "timeout")
+			helpers.assert_eq(stalled.codes[1], "stalled_" .. step.deadline_seconds .. "s")
+
+			local bound = spec.step_by_id.mlx_model
+			state.request({ schema = 1, request_id = "r32", steps = Json.array({ "mlx_model" }) })
+			state.advance(0)
+			local waited = 0
+			while state.files[result_path("r32", 1, "mlx_model")] == nil and waited <= bound.progress_max_seconds do
+				state.mark = state.mark + 1
+				state.advance(10000)
+				waited = waited + 10
+			end
+			local bounded = state.json(result_path("r32", 1, "mlx_model"))
+			helpers.assert_eq(bounded.codes[1], "bound_" .. bound.progress_max_seconds .. "s")
+			helpers.assert_eq(waited, bound.progress_max_seconds, "the bound ends the step exactly")
+		end)
+	end)
+
+	helpers.it("declares a default request deadline that covers every step at its bound", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local spec = spec_of(FieldRun)
+			local total = 0
+			for _, step in ipairs(spec.steps) do total = total + FieldRun.step_bound_seconds(step) end
+			helpers.assert_true(spec.deadline_seconds.default >= total)
+			local short = Json.decode(SPEC_TEXT)
+			short.deadline_seconds.default = total - 1
+			local ok, err = pcall(FieldRun.validate, short)
+			helpers.assert_eq(ok, false)
+			helpers.assert_true(tostring(err):find("sum of the step bounds", 1, true) ~= nil, tostring(err))
 		end)
 	end)
 
@@ -442,6 +516,32 @@ helpers.describe("field run: interrupted run and stale request", function()
 			helpers.assert_nil(state.files[FOLDER .. "/request.json"])
 			state.advance(0)
 			helpers.assert_eq(#state.calls, 0, "a stale request must not run")
+		end)
+	end)
+end)
+
+helpers.describe("field run: a reload during a run", function()
+	helpers.it("holds reloads while it runs and closes a run teardown cuts short with its cause", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world({ ollama_model = function() end })
+			local ports = state.ports
+			local ok = FieldRun.start({ root = "/repo", pid = 4242, ports = ports })
+			helpers.assert_eq(ok, true)
+			helpers.assert_eq(FieldRun.holds_reload(), false, "no run, no hold")
+			state.request({ schema = 1, request_id = "r40", steps = Json.array({ "field_lease", "ollama_model" }) })
+			state.advance(0)
+			helpers.assert_eq(FieldRun.holds_reload(), true, "a running field run holds the auto reloads")
+			helpers.assert_eq(FieldRun.stop({ kind = "reload", reason = "watcher" }), true)
+			local done = state.json(FOLDER .. "/results/r40/done.json")
+			helpers.assert_eq(done.interrupted, true)
+			helpers.assert_eq(done.cause.kind, "reload")
+			helpers.assert_eq(done.cause.reason, "watcher")
+			helpers.assert_eq(done.cause.step, "ollama_model")
+			helpers.assert_eq(done.verdicts.field_lease, "pass", "the steps already run are kept")
+			helpers.assert_nil(state.files[FOLDER .. "/running.json"])
+			helpers.assert_eq(FieldRun.holds_reload(), false)
+			FieldRun._reset()
 		end)
 	end)
 end)

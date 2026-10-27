@@ -19,14 +19,16 @@
 # every Debug field check, the diagnostics collection and the Ollama and MLX
 # download flows (infra/field_run.lua; contract in
 # static/ergopti_plus/macos/data/field_run.json), waits for its done marker
-# within a global deadline and copies its results.
+# until the request's own deadline plus a grace, and copies its results.
 #
 # USAGE:
 #   bash tools/dev/collect-macos-field-report.sh            update, collect, commit, push
 #   bash tools/dev/collect-macos-field-report.sh --no-push  same, without the push
 #
 # Each step records its exit status in steps.txt; a failed step never hides
-# the others, and the summary names it.
+# the others, and the summary names it. Ctrl-C or a TERM never loses the
+# evidence: the collector still copies the results and logs that exist, then
+# commits and pushes them, marked interrupted.
 # ==============================================================================
 
 set -uo pipefail
@@ -44,9 +46,10 @@ set +e
 LOG_DIR="${HOME}/Library/Logs/ergopti_plus"
 FIELD_BRANCH_PREFIX="field/"
 FIELD_RUN_SPEC="static/ergopti_plus/macos/data/field_run.json"
-# The whole field run, from the app start to its done marker. The request's own
-# deadline is the declared default, below this one, so done arrives first.
-FIELD_RUN_DEADLINE_SECONDS=900
+# How long the collector keeps waiting for done after the request's own
+# deadline (the declared default, which covers every step at its bound): the
+# app needs a moment to settle the last step, run the guard and write done.
+FIELD_RUN_GRACE_SECONDS=120
 # How long the developer app may take to publish its readiness, and to accept.
 FIELD_RUN_READY_SECONDS=240
 FIELD_RUN_ACCEPT_SECONDS=60
@@ -98,6 +101,9 @@ out="docs/field-reports/mac-${stamp}"
 mkdir -p "${out}" || fail "Cannot create ${out}."
 steps="${out}/steps.txt"
 : > "${steps}"
+# Set by the INT/TERM trap; the remaining evidence is still collected.
+interrupted=false
+finalized=false
 
 # Runs one named step, captures its output into a file and records its status.
 step() {
@@ -109,6 +115,79 @@ step() {
 	[ "${status}" -eq 0 ] || log "step '${name}' exited ${status} (kept in ${file})"
 	return 0
 }
+
+# Reads one value of the field run declaration.
+spec_value() {
+	plutil -extract "$1" raw -o - "${REPO_ROOT}/${FIELD_RUN_SPEC}"
+}
+
+# The field run's paths, resolved in the main shell: the interrupt trap copies
+# the partial results from them, and run_field_run runs in a pipeline subshell.
+request_id="mac-${stamp}"
+run_folder=""
+results_dir=""
+if folder="$(spec_value folder)" && results_name="$(spec_value files.results)"; then
+	run_folder="${REPO_ROOT}/${folder}"
+	results_dir="${run_folder}/${results_name}/${request_id}"
+fi
+
+# Copies the results the app wrote so far, once; a later copy never replaces it.
+copy_field_run_results() {
+	[ -n "${results_dir}" ] && [ -d "${results_dir}" ] || return 1
+	[ -e "${out}/field_run" ] && return 0
+	cp -R "${results_dir}" "${out}/field_run"
+}
+
+# Copies the logs, commits and pushes, once: from the normal end and from the
+# INT/TERM trap, so an interrupted run still leaves its evidence on the branch.
+finalize() {
+	"${finalized}" && return 0
+	finalized=true
+	local today day f subject
+	today="$(date +%Y-%m-%d)"
+	if [ -d "${LOG_DIR}" ]; then
+		for f in "${LOG_DIR}"/ErgoptiPlus_"${today}".log "${LOG_DIR}"/ErgoptiPlus_errors_"${today}".log \
+			"${LOG_DIR}"/ErgoptiPlus_llm.log "${LOG_DIR}"/launcher.log; do
+			[ -f "${f}" ] && cp "${f}" "${out}/" && printf '%-28s copied\n' "$(basename "${f}")" >> "${steps}"
+		done
+		day="${LOG_DIR}/ErgoptiPlus_${today}.log"
+		if [ -f "${day}" ]; then
+			step digest_boot grep -E "Boot complete|Boot CPU|Boot stage completed|held the main thread" "${day}"
+			step digest_slow grep -E "\[HotPath\]|Slow " "${day}"
+			step digest_errors grep -E "\[(ERROR|WARNING)\]" "${day}"
+			step digest_input grep -E "key_event_health|karabiner.lease|guardian" "${day}"
+		fi
+	else
+		printf '%-28s missing\n' "logs" >> "${steps}"
+	fi
+
+	log "Collected into ${out}:"
+	ls -1 "${out}" | sed 's/^/  /'
+	git add -f -- "${out}" || fail "git add of ${out} failed."
+	subject="docs(field): macOS field report ${stamp}"
+	"${interrupted}" && subject="${subject} (interrupted)"
+	git commit -q -m "${subject}" -- "${out}" || fail "git commit failed."
+	if [ "${push}" = true ]; then
+		git push -u origin HEAD || fail "git push failed; run 'git push -u origin HEAD' by hand."
+		log "Pushed ${branch}. Tell the coordinator: report ${out}."
+	else
+		log "Committed on ${branch} without pushing."
+	fi
+}
+
+# Ctrl-C or TERM: the field run's partial results and today's logs are still
+# copied, committed and pushed. A second signal during that work is ignored.
+on_interrupt() {
+	trap '' INT TERM HUP
+	interrupted=true
+	printf '\n'
+	log "Interrupted: keeping the results and logs collected so far."
+	printf '%-28s interrupted\n' "collector" >> "${steps}"
+	copy_field_run_results || true
+	finalize
+	exit 130
+}
+trap on_interrupt INT TERM HUP
 
 # ===========================================
 # ======= 2/ System and toolchain ===========
@@ -127,11 +206,6 @@ step user_layouts sh -c 'ls -la "${HOME}/Library/Keyboard Layouts" 2>&1'
 # ===========================================
 # ======= 3/ Field run in the app ===========
 # ===========================================
-
-# Reads one value of the field run declaration.
-spec_value() {
-	plutil -extract "$1" raw -o - "${REPO_ROOT}/${FIELD_RUN_SPEC}"
-}
 
 # Prints the pid a readiness file names when that process is alive.
 ready_pid() {
@@ -158,17 +232,14 @@ report_new_results() {
 
 # Opens the developer app, sends the request, waits for done and copies it.
 run_field_run() {
-	local folder request_name accepted_name done_name refused_name request_id deadline_seconds
-	folder="$(spec_value folder)" || { log "Cannot read ${FIELD_RUN_SPEC}."; return 1; }
-	run_folder="${REPO_ROOT}/${folder}"
+	local request_name accepted_name done_name refused_name deadline_seconds
+	[ -n "${run_folder}" ] || { log "Cannot read ${FIELD_RUN_SPEC}."; return 1; }
 	ready_file="${run_folder}/$(spec_value files.ready)"
 	request_name="$(spec_value files.request)"
 	refused_name="$(spec_value files.refused)"
 	accepted_name="$(spec_value files.accepted)"
 	done_name="$(spec_value files.done)"
 	deadline_seconds="$(spec_value deadline_seconds.default)"
-	request_id="mac-${stamp}"
-	results_dir="${run_folder}/$(spec_value files.results)/${request_id}"
 	seen_results=""
 	local started_at now pid
 	started_at="$(date +%s)"
@@ -222,10 +293,10 @@ run_field_run() {
 			log "The app did not accept the request within ${FIELD_RUN_ACCEPT_SECONDS} s."
 			return 1
 		fi
-		if [ $((now - started_at)) -ge "${FIELD_RUN_DEADLINE_SECONDS}" ]; then
-			log "No done marker after ${FIELD_RUN_DEADLINE_SECONDS} s; keeping the partial results."
+		if [ $((now - sent_at)) -ge $((deadline_seconds + FIELD_RUN_GRACE_SECONDS)) ]; then
+			log "No done marker $((deadline_seconds + FIELD_RUN_GRACE_SECONDS)) s after the request; keeping the partial results."
 			report_new_results
-			[ -d "${results_dir}" ] && cp -R "${results_dir}" "${out}/field_run"
+			copy_field_run_results
 			return 1
 		fi
 		report_new_results
@@ -237,8 +308,13 @@ run_field_run() {
 		sleep "${FIELD_RUN_POLL_SECONDS}"
 	done
 	report_new_results
-	cp -R "${results_dir}" "${out}/field_run" || { log "Cannot copy the field run results."; return 1; }
+	copy_field_run_results || { log "Cannot copy the field run results."; return 1; }
 	log "Field run done: $(cat "${results_dir}/${done_name}")"
+	# A run a reload cut short is closed by the app with interrupted=true
+	if [ "$(plutil -extract interrupted raw -o - "${results_dir}/${done_name}" 2>/dev/null)" = "true" ]; then
+		log "The field run was cut short in the app (see its log); the results so far are kept."
+		return 1
+	fi
 	return 0
 }
 
@@ -270,37 +346,7 @@ if [ -f "${probe_src}" ]; then
 fi
 
 # ===========================================
-# ======= 5/ Logs and their digest ==========
+# ======= 5/ Logs, commit and push ==========
 # ===========================================
 
-today="$(date +%Y-%m-%d)"
-if [ -d "${LOG_DIR}" ]; then
-	for f in "${LOG_DIR}"/ErgoptiPlus_"${today}".log "${LOG_DIR}"/ErgoptiPlus_errors_"${today}".log \
-		"${LOG_DIR}"/ErgoptiPlus_llm.log "${LOG_DIR}"/launcher.log; do
-		[ -f "${f}" ] && cp "${f}" "${out}/" && printf '%-28s copied\n' "$(basename "${f}")" >> "${steps}"
-	done
-	day="${LOG_DIR}/ErgoptiPlus_${today}.log"
-	if [ -f "${day}" ]; then
-		step digest_boot grep -E "Boot complete|Boot CPU|Boot stage completed|held the main thread" "${day}"
-		step digest_slow grep -E "\[HotPath\]|Slow " "${day}"
-		step digest_errors grep -E "\[(ERROR|WARNING)\]" "${day}"
-		step digest_input grep -E "key_event_health|karabiner.lease|guardian" "${day}"
-	fi
-else
-	printf '%-28s missing\n' "logs" >> "${steps}"
-fi
-
-# ===========================================
-# ======= 6/ Commit and push ================
-# ===========================================
-
-log "Collected into ${out}:"
-ls -1 "${out}" | sed 's/^/  /'
-git add -f -- "${out}" || fail "git add of ${out} failed."
-git commit -q -m "docs(field): macOS field report ${stamp}" -- "${out}" || fail "git commit failed."
-if [ "${push}" = true ]; then
-	git push -u origin HEAD || fail "git push failed; run 'git push -u origin HEAD' by hand."
-	log "Pushed ${branch}. Tell the coordinator: report ${out}."
-else
-	log "Committed on ${branch} without pushing."
-fi
+finalize

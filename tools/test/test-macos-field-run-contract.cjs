@@ -8,11 +8,14 @@
  * developer app's field run (static/ergopti_plus/macos/infra/field_run.lua),
  * both of which read static/ergopti_plus/macos/data/field_run.json:
  * 1. the declaration: a step for every Debug field check, the person verdicts,
- *    and a request deadline that ends before the collector stops waiting;
+ *    progress-aware AI downloads, and a request deadline that covers every
+ *    step at its bound and ends before the collector stops waiting;
  * 2. the collector reads every name it uses from the declaration;
  * 3. the real collector, in a fixture clone with a recording driver, writes a
  *    request of the declared shape, waits for done, copies the results and
- *    records the step, and reports a refusal without losing the other steps.
+ *    records the step, and reports a refusal without losing the other steps;
+ * 4. Ctrl-C during the field run still copies the partial results and the
+ *    logs, then commits them, marked interrupted.
  * ==============================================================================
  */
 
@@ -88,7 +91,8 @@ function fixture(name) {
 		fs.mkdirSync(path.dirname(path.join(clone, relative)), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, relative), path.join(clone, relative));
 	}
-	fs.writeFileSync(path.join(clone, '.gitignore'), '/build/\n');
+	// The logs are ignored in the real clone too: the collector adds them with -f
+	fs.writeFileSync(path.join(clone, '.gitignore'), '/build/\n*.log\n');
 	fs.mkdirSync(bin, { recursive: true });
 	fs.mkdirSync(home, { recursive: true });
 	const env = { ...process.env, ...GIT_IDENTITY, HOME: home };
@@ -144,7 +148,12 @@ const timer = setInterval(() => {
 	fs.rmSync(requestPath);
 	fs.writeFileSync(record, text);
 	const request = JSON.parse(text);
-	if (mode === 'refuse') {
+	if (mode === 'hang') {
+		const dir = path.join(folder, spec.files.results, request.request_id);
+		fs.mkdirSync(dir, { recursive: true });
+		fs.writeFileSync(path.join(dir, spec.files.accepted), JSON.stringify({ schema: 1, request_id: request.request_id }));
+		fs.writeFileSync(path.join(dir, '01_field_lease.json'), JSON.stringify({ schema: 1, step: 'field_lease', verdict: 'pass', codes: [] }));
+	} else if (mode === 'refuse') {
 		fs.writeFileSync(path.join(folder, spec.files.refused), JSON.stringify({ schema: 1, request_id: request.request_id, reason: 'busy' }));
 	} else {
 		const dir = path.join(folder, spec.files.results, request.request_id);
@@ -174,13 +183,19 @@ async function waitFor(file, ms = 10000) {
 	}
 }
 
-/** Runs the real collector, without pushing, inside a fixture. */
-function runCollector(paths) {
+/**
+ * Runs the real collector, without pushing, inside a fixture.
+ * @param {object} paths Fixture paths.
+ * @param {(child: object) => void} [onStart] Receives the child, in its own process group.
+ */
+function runCollector(paths, onStart) {
 	return new Promise((resolve) => {
 		const child = spawn(bashExecutable(), [path.join(paths.clone, SCRIPT), '--no-push'], {
 			cwd: paths.clone,
-			env: { ...paths.env, PATH: `${paths.bin}${path.delimiter}${process.env.PATH}` }
+			env: { ...paths.env, PATH: `${paths.bin}${path.delimiter}${process.env.PATH}` },
+			detached: Boolean(onStart)
 		});
+		if (onStart) onStart(child);
 		let stdout = '';
 		let stderr = '';
 		child.stdout.on('data', (chunk) => (stdout += chunk));
@@ -231,16 +246,40 @@ function reportFolder(paths) {
 				);
 		});
 
-		await check('the request deadline ends before the collector stops waiting', () => {
-			const global = Number(collector.match(/^FIELD_RUN_DEADLINE_SECONDS=(\d+)$/m)?.[1]);
-			assert(
-				global >= 840 && global <= 960,
-				`the collector waits ${global} s, about 15 minutes expected`
-			);
-			const { min, default: fallback, max } = spec.deadline_seconds;
-			assert(min <= fallback && fallback <= max, 'deadline_seconds needs min <= default <= max');
-			assert(max < global, 'the longest request deadline must end before the collector gives up');
-		});
+		await check(
+			'the request deadline covers every step and ends before the collector stops waiting',
+			() => {
+				const grace = Number(collector.match(/^FIELD_RUN_GRACE_SECONDS=(\d+)$/m)?.[1]);
+				assert(grace >= 60 && grace <= 300, `the collector grace is ${grace} s`);
+				assert.match(
+					collector,
+					/\$\(\(now - sent_at\)\) -ge \$\(\(deadline_seconds \+ FIELD_RUN_GRACE_SECONDS\)\)/,
+					'the collector must wait for the request deadline it sent plus its grace'
+				);
+				assert.doesNotMatch(
+					collector,
+					/FIELD_RUN_DEADLINE_SECONDS/,
+					'no second, fixed run deadline'
+				);
+				const { min, default: fallback, max } = spec.deadline_seconds;
+				assert(min <= fallback && fallback <= max, 'deadline_seconds needs min <= default <= max');
+				const bounds = spec.steps.reduce(
+					(sum, step) => sum + (step.progress_max_seconds ?? step.deadline_seconds),
+					0
+				);
+				assert(
+					fallback >= bounds,
+					`the default request (${fallback} s) is below the step bounds (${bounds} s)`
+				);
+				for (const id of ['ollama_runtime', 'ollama_model', 'mlx_runtime', 'mlx_model']) {
+					const step = spec.steps.find((item) => item.id === id);
+					assert(
+						step.progress_max_seconds >= step.deadline_seconds,
+						`${id} must be judged by its progress, with a bound`
+					);
+				}
+			}
+		);
 
 		await check('the collector reads every name it uses from the declaration', () => {
 			const used = [...collector.matchAll(/spec_value ([\w.]+)/g)].map((match) => match[1]);
@@ -320,6 +359,55 @@ function reportFolder(paths) {
 					/"reason":"busy"/
 				);
 				assert.match(fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'), /^versions\s+exit=/m);
+			} finally {
+				driver.child.kill();
+			}
+		});
+
+		await check('Ctrl-C during the field run still commits its results and logs', async () => {
+			const paths = fixture('interrupted');
+			const logs = path.join(paths.home, 'Library/Logs/ergopti_plus');
+			fs.mkdirSync(logs, { recursive: true });
+			const today = new Date();
+			const day = [
+				today.getFullYear(),
+				String(today.getMonth() + 1).padStart(2, '0'),
+				String(today.getDate()).padStart(2, '0')
+			].join('-');
+			fs.writeFileSync(path.join(logs, `ErgoptiPlus_${day}.log`), '[INFO] fixture day log\n');
+			const driver = startDriver(paths, 'hang');
+			try {
+				await waitFor(driver.readyPath);
+				const result = await runCollector(paths, (child) => {
+					const poll = setInterval(() => {
+						const reports = path.join(paths.clone, 'docs/field-reports');
+						const folders = fs.existsSync(reports) ? fs.readdirSync(reports) : [];
+						const text = folders.length ? path.join(reports, folders[0], 'field_run.txt') : '';
+						if (
+							text &&
+							fs.existsSync(text) &&
+							/01_field_lease: pass/.test(fs.readFileSync(text, 'utf8'))
+						) {
+							clearInterval(poll);
+							// The terminal sends Ctrl-C to the whole foreground group
+							process.kill(-child.pid, 'SIGINT');
+						}
+					}, 100);
+					child.on('close', () => clearInterval(poll));
+				});
+				assert.equal(result.status, 130, `${result.stdout}\n${result.stderr}`);
+				const folder = reportFolder(paths);
+				assert(fs.existsSync(path.join(folder, 'field_run', '01_field_lease.json')));
+				assert(fs.existsSync(path.join(folder, `ErgoptiPlus_${day}.log`)));
+				assert.match(
+					fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
+					/^collector\s+interrupted$/m
+				);
+				assert.match(git(paths.clone, 'log', '-1', '--format=%s'), /\(interrupted\)$/);
+				const committed = git(paths.clone, 'show', '--name-only', '--format=', 'HEAD');
+				assert.match(committed, /field_run\/01_field_lease\.json/);
+				assert.match(committed, /ErgoptiPlus_\d{4}-\d{2}-\d{2}\.log/);
+				assert.equal(git(paths.clone, 'status', '--porcelain', '--untracked-files=no'), '');
 			} finally {
 				driver.child.kill();
 			}
