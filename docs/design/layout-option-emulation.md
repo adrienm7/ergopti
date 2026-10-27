@@ -279,6 +279,41 @@ A small shell probe for W1 to W3 will ship with slice 3 (it prints the
 compiled keysyms through `xkbcli` or the ctypes call used here and the
 `gsettings` read-back), so the check is one command on the target desktop.
 
+## 3.3 Windows reading the same options (answer for the PC, no AHK change made)
+
+Question: can the AHK emulation read `rows` from `composition.json` instead of its
+own path, so there is one source? Findings from reading the code (not run on a PC):
+
+- The options already have one source on every OS: the two `[layout]` keys of
+  `config.toml` (`direct_access_digits`, `number_row_reorder_edges`). Windows reads
+  them in `NumberRowEffectiveMode` / `NumberRowEdgesEffective`; Linux now reads them
+  through `infra/number_row_preferences.lua`. `rows` in `composition.json` is only the
+  page's copy of those two values, written when the page compiles; no driver needs to
+  read it. Reading it on Windows would add a second source, not remove one.
+- Applying the options twice is harmless, so a compiled file that already carries
+  them can be emulated on Windows. The hotkeys decide per layout from what the ten
+  keys hold (`NumberRowPolicyAvailability`): on a layout the page compiled symbols
+  first, `symbols` reads `already_symbols_first`, is inert, and the edge keys then read
+  `no_ordering`; nothing is swapped back. The same holds in the Linux converter (the
+  differential test applies the options to a compiled layout again and requires no
+  change). If the stored choice and the compiled file disagree, the stored choice wins
+  on Windows (the hotkeys swap from what the file holds) and on Linux (the converter
+  is run from the stored values).
+- What the PC should check, none of which needs an edit unless it fails:
+  1. emulate a `composed` layout compiled with `rows` baked and the same option
+     stored: typing 1, Shift+1, Ctrl+1, AltGr+2 matches `row_options_vectors.json`
+     (the case ids are the test names);
+  2. the same with the option stored but not baked: same characters;
+  3. CapsLock on, on the digit keys: the composer and the Linux converter give Caps
+     the cell the key typed with Shift and Caps, and Shift+Caps the Shift cell. The
+     hotkey path was not read for this combination; if Windows differs, the vectors
+     get a Caps case first and the divergence is fixed on the side the maintainer picks.
+- macOS follows from this: the daemon there installs a `.keylayout` file, and only the
+  page compiles with the composer. Applying stored options without the page needs the
+  same swap on the `.keylayout` text in Lua (the Linux converter swaps converted
+  levels, not file cells). That is a slice of its own, to be written once the probe
+  answers M1 to M6.
+
 ## 4. Counts
 
 There is no variant matrix. One compiled file per request. The number of
