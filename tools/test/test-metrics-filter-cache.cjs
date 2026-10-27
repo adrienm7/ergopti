@@ -1737,7 +1737,7 @@ for (const host of ['windows', 'macos', 'linux']) {
 					[vector.start, vector.end, ['Editor']],
 					'the actual native query owns the clamped local date interval'
 				);
-				assert.equal(vm.runInContext('app_state.hour_cutoff', page.context), null);
+				assert.equal(vm.runInContext('app_state.hour_window', page.context), null);
 				assert.equal(
 					page.diagnostics.some((entry) => entry.level === 'error'),
 					false
@@ -1778,7 +1778,9 @@ for (const host of ['windows', 'macos', 'linux']) {
 				quick.value = preset;
 				runTypingControlChange(page, 'quick_range');
 				const start = page.elements.get('date_start').value;
-				const cutoff = vm.runInContext('app_state.hour_cutoff', page.context);
+				const cutoff = JSON.parse(
+					vm.runInContext('JSON.stringify(app_state.hour_window)', page.context)
+				);
 				assert.equal(
 					quick.value,
 					'',
@@ -1796,7 +1798,10 @@ for (const host of ['windows', 'macos', 'linux']) {
 					'the same action remains selectable after a manual date edit'
 				);
 				assert.equal(page.elements.get('date_end').value, '2026-10-28');
-				assert.equal(vm.runInContext('app_state.hour_cutoff', page.context), cutoff);
+				assert.deepEqual(
+					JSON.parse(vm.runInContext('JSON.stringify(app_state.hour_window)', page.context)),
+					cutoff
+				);
 				assert.deepEqual(
 					JSON.parse(vm.runInContext('app_state.range_request_selection', page.context)),
 					[start, '2026-10-28', ['Editor']]
@@ -1829,4 +1834,282 @@ for (const host of ['windows', 'macos', 'linux']) {
 }
 assert.equal(quickPresets.length, 8, 'all actual quick actions must participate');
 assert.equal(passed, 363, 'all quick-action, manual-edit and placeholder controls must execute');
+const typingHourWindows = [
+	{
+		name: 'UTC year midnight',
+		now: '2026-01-01T00:30:00Z',
+		start: '2025-12-31',
+		first: '23:35',
+		end: '2026-01-01',
+		second: '00:05'
+	},
+	{
+		name: 'UTC month midnight',
+		now: '2026-05-01T00:30:00Z',
+		start: '2026-04-30',
+		first: '23:35',
+		end: '2026-05-01',
+		second: '00:05'
+	},
+	{
+		name: 'first full hour of the day',
+		now: '2026-01-01T01:30:00Z',
+		start: '2026-01-01',
+		first: '00:35',
+		end: '2026-01-01',
+		second: '01:05'
+	},
+	{
+		name: 'same-day detailed hour',
+		now: '2026-01-01T12:30:00Z',
+		start: '2026-01-01',
+		first: '11:35',
+		end: '2026-01-01',
+		second: '12:05'
+	},
+	{
+		name: 'Los Angeles local midnight',
+		zone: 'America/Los_Angeles',
+		now: '2026-01-01T08:30:00Z',
+		start: '2025-12-31',
+		first: '23:35',
+		end: '2026-01-01',
+		second: '00:05'
+	},
+	{
+		name: 'Kiritimati local midnight',
+		zone: 'Pacific/Kiritimati',
+		now: '2025-12-31T10:30:00Z',
+		start: '2025-12-31',
+		first: '23:35',
+		end: '2026-01-01',
+		second: '00:05'
+	},
+	{
+		name: 'Havana midnight DST',
+		zone: 'America/Havana',
+		now: '2026-03-08T05:30:00Z',
+		start: '2026-03-07',
+		first: '23:35',
+		end: '2026-03-08',
+		second: '01:05'
+	},
+	{
+		name: 'Paris skipped spring hour',
+		zone: 'Europe/Paris',
+		now: '2026-03-29T01:30:00Z',
+		start: '2026-03-29',
+		first: '01:35',
+		end: '2026-03-29',
+		second: '03:05'
+	},
+	{
+		name: 'Apia skipped local date',
+		zone: 'Pacific/Apia',
+		now: '2011-12-30T10:30:00Z',
+		start: '2011-12-29',
+		first: '23:35',
+		end: '2011-12-31',
+		second: '00:05'
+	}
+];
+function typingChartPage(host, now) {
+	const page = loadMetricsTypingPage(host);
+	freezePageClock(page, now);
+	page.elements.get('pause_threshold').value = '1000';
+	const charts = [];
+	for (const id of ['wpm_chart', 'precision_chart']) {
+		const canvas = page.context.document.createElement('canvas');
+		canvas.getContext = () => ({ owner: id });
+		page.elements.set(id, canvas);
+	}
+	page.context.Chart = class ChartPort {
+		constructor(port, config) {
+			charts.push({ owner: port.owner, config });
+		}
+		destroy() {}
+	};
+	page.lastChart = (owner) => charts.filter((chart) => chart.owner === owner).at(-1).config;
+	return page;
+}
+function typingHourManifest(vector) {
+	const manifest = {};
+	for (const [date, bucket, chars, errors] of [
+		[vector.start, vector.first, 7, 1],
+		[vector.end, vector.second, 3, 0]
+	]) {
+		const app = ((manifest[date] ||= {}).Editor ||= {
+			chars: 0,
+			time: 0,
+			hourly: {},
+			hourly_min5: {}
+		});
+		app.chars += chars;
+		app.time += chars * 1000;
+		const hour = bucket.slice(0, 2);
+		app.hourly[hour] = { c: chars, e_buckets: { 1000: errors } };
+		app.hourly_min5[bucket] = { c: chars, e_buckets: { 1000: errors } };
+	}
+	// A date-qualified window must not merge yesterday's same-clock bucket
+	// into today's point, or expose later clock buckets from imported data.
+	if (vector.start !== vector.end) {
+		const app = manifest[vector.start].Editor;
+		app.hourly_min5[vector.second] = { c: 999, e_buckets: { 1000: 999 } };
+		app.chars += 999;
+		app.time += 999000;
+	}
+	const later = manifest[vector.end].Editor;
+	later.hourly_min5['23:55'] = { c: 997, e_buckets: { 1000: 997 } };
+	later.chars += 997;
+	later.time += 997000;
+	return manifest;
+}
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of typingHourWindows) {
+		test(`${host} last-hour query and chart preserve ${vector.name}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = vector.zone || 'UTC';
+			try {
+				const page = typingChartPage(host, vector.now);
+				publishTypingPage(page, host, typingHourManifest(vector));
+				const oldRequest = vm.runInContext('app_state.range_request_sequence', page.context);
+				page.elements.get('quick_range').value = 'last_hour';
+				runTypingControlChange(page, 'quick_range');
+				const selection = JSON.parse(
+					vm.runInContext('app_state.range_request_selection', page.context)
+				);
+				assert.deepEqual(
+					selection,
+					[vector.start, vector.end, ['Editor']],
+					'the native range admits both date-qualified hours'
+				);
+				page.timers.at(-1)(); // The actual paced native dispatch, after its UI loader turn.
+				const rawRequest = host === 'macos' ? page.context._lua_request : page.posts.at(-1);
+				const request = typeof rawRequest === 'string' ? JSON.parse(rawRequest) : rawRequest;
+				if (host === 'macos')
+					assert.equal(
+						Object.hasOwn(request, 'action'),
+						false,
+						'the actual macOS poll mailbox keeps its native request shape'
+					);
+				else assert.equal(request.action, 'range');
+				assert.equal(request.start_date, vector.start);
+				assert.equal(request.end_date, vector.end);
+				const activity = page.lastChart('wpm_chart');
+				const precision = page.lastChart('precision_chart');
+				const expectedTimes = [
+					new Date(`${vector.start}T${vector.first}:00`).getTime(),
+					new Date(`${vector.end}T${vector.second}:00`).getTime()
+				];
+				assert.deepEqual(
+					Array.from(activity.data.datasets[0].data, (point) => point.x.getTime()),
+					expectedTimes
+				);
+				assert.deepEqual(
+					Array.from(activity.data.datasets[0].data, (point) => point.y),
+					[7, 3]
+				);
+				assert.deepEqual(
+					Array.from(precision.data.datasets[0].data, (point) => point.x.getTime()),
+					expectedTimes
+				);
+				assert.deepEqual(
+					Array.from(precision.data.datasets[0].data, (point) => point.y),
+					[600 / 7, 100]
+				);
+				assert.equal(
+					page.elements.get('wpm_chart_title').textContent,
+					page.context._t('ui_typing.chart_title_activity_5min')
+				);
+				assert.equal(activity.options.scales.x.time.unit, 'minute');
+				assert.ok(activity.options.scales.x.min.getTime() <= expectedTimes[0]);
+				assert.ok(activity.options.scales.x.max.getTime() >= expectedTimes[1]);
+				const retainedHistory = vm.runInContext(
+					'JSON.stringify(app_state.historical_cache)',
+					page.context
+				);
+				const stale = { historical: { c: { stale: { count: 999 } } }, today: {} };
+				if (host === 'windows')
+					page.messageListeners
+						.filter((entry) => entry.name === 'message')
+						.at(-1)
+						.callback({ data: { type: 'range_data', request_id: oldRequest, payload: stale } });
+				else if (host === 'linux')
+					page.context.__hostBridgeResponse(
+						'metrics_typing_bridge',
+						false,
+						encodeURIComponent(
+							JSON.stringify({
+								metrics_manifest: {},
+								_prefetch_data: stale,
+								range_request_id: oldRequest
+							})
+						)
+					);
+				else assert.equal(page.context.receive_range_data(stale, oldRequest), false);
+				assert.equal(
+					vm.runInContext('JSON.stringify(app_state.historical_cache)', page.context),
+					retainedHistory,
+					'a late older query cannot change the selected hour window data'
+				);
+				assert.equal(page.lastChart('wpm_chart'), activity);
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+	test(`${host} last-hour ownership clears for ordinary date modes`, () => {
+		const previousTimezone = process.env.TZ;
+		process.env.TZ = 'UTC';
+		try {
+			const page = typingChartPage(host, typingHourWindows[0].now);
+			publishTypingPage(page, host, typingHourManifest(typingHourWindows[0]));
+			const choose = (preset) => {
+				page.elements.get('quick_range').value = preset;
+				runTypingControlChange(page, 'quick_range');
+			};
+			choose('last_hour');
+			choose('today');
+			assert.equal(vm.runInContext('app_state.hour_window', page.context), null);
+			assert.equal(
+				page.elements.get('wpm_chart_title').textContent,
+				page.context._t('ui_typing.h3_activity_hourly')
+			);
+			choose('last_hour');
+			page.elements.get('date_start').value = '2026-01-01';
+			runTypingControlChange(page, 'date_start');
+			assert.equal(vm.runInContext('app_state.hour_window', page.context), null);
+			assert.equal(
+				page.elements.get('wpm_chart_title').textContent,
+				page.context._t('ui_typing.h3_activity_hourly')
+			);
+			choose('last_hour');
+			choose('week');
+			assert.equal(vm.runInContext('app_state.hour_window', page.context), null);
+			assert.equal(
+				page.elements.get('wpm_chart_title').textContent,
+				page.context._t('ui_typing.h3_speed')
+			);
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false
+			);
+		} finally {
+			if (previousTimezone === undefined) delete process.env.TZ;
+			else process.env.TZ = previousTimezone;
+		}
+	});
+}
+assert.equal(typingHourWindows.length, 9);
+assert.equal(
+	passed,
+	393,
+	'all date-qualified hour-window, precision and stale-response controls must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);

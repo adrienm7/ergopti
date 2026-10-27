@@ -92,7 +92,9 @@ function render_charts() {
 
 	// Single-day view: use hourly_series for precision and activity charts so the
 	// user sees an intra-day curve instead of a single meaningless dot.
-	if (sorted_keys.length === 1) {
+	if (app_state.hour_window !== null) {
+		_render_minute5_charts(rgb_wpm, rgb_prc, app_state.hour_window);
+	} else if (sorted_keys.length === 1) {
 		_render_hourly_charts(sorted_keys[0], rgb_wpm, rgb_prc);
 	} else {
 		// Restore daily titles in case they were previously changed by an hourly view
@@ -583,20 +585,13 @@ const tooltipTitleCallbackHourly = (context) => {
 /**
  * Builds the hourly data points from app_state.hourly_series and renders both
  * the activity (touches/h) and precision charts for the given single-day date.
- * Called from render_charts() when sorted_keys.length === 1.
+ * Called from render_charts() for a single day without a captured hour window.
  * @param {string} date_str - The ISO date string for the single selected day.
  * @param {string} rgb_wpm  - CSS RGB string for the activity chart color.
  * @param {string} rgb_prc  - CSS RGB string for the precision chart color.
  */
 function _render_hourly_charts(date_str, rgb_wpm, rgb_prc) {
-	// hour_cutoff: null or 0 → show all hours (hourly); N > 0 → last-hour view (5-min)
-	const cutoff = typeof app_state.hour_cutoff === 'number' ? app_state.hour_cutoff : 0;
-
-	if (cutoff > 0) {
-		// Last-hour preset: switch to 5-minute resolution for a detailed intra-hour view
-		_render_minute5_charts(date_str, rgb_wpm, rgb_prc, cutoff);
-		return;
-	}
+	const cutoff = 0;
 
 	const act_pts = []; // { x: Date, y: chars_count } — typing activity per hour
 	const prec_pts = []; // { x: Date, y: accuracy_pct }
@@ -796,14 +791,13 @@ const tooltipTitleCallbackMinute5 = (context) => {
 
 /**
  * Builds the 5-minute data points and renders both the activity and precision
- * charts using app_state.minute5_series. Called by _render_hourly_charts when
- * hour_cutoff > 0 (last-hour preset).
- * @param {string} date_str - The ISO date string for the selected day.
+ * charts using date-qualified app_state.minute5_series. Called by render_charts
+ * for the captured current-and-previous-hour window.
  * @param {string} rgb_wpm  - CSS RGB string for the activity chart color.
  * @param {string} rgb_prc  - CSS RGB string for the precision chart color.
- * @param {number} cutoff   - First hour shown; the window spans cutoff to cutoff+2.
+ * @param {Object} hourWindow - Captured date-qualified current-and-previous-hour bounds.
  */
-function _render_minute5_charts(date_str, rgb_wpm, rgb_prc, cutoff) {
+function _render_minute5_charts(rgb_wpm, rgb_prc, hourWindow) {
 	const act_pts = []; // { x: Date, y: chars_count } per 5-min bucket
 	const prec_pts = []; // { x: Date, y: accuracy_pct }
 	const bucket_key = pause_thresh_to_bucket_key(
@@ -813,15 +807,15 @@ function _render_minute5_charts(date_str, rgb_wpm, rgb_prc, cutoff) {
 	// Iterate the 5-minute buckets sorted so the chart line is always left-to-right
 	const sorted_buckets = Object.keys(app_state.minute5_series).sort();
 	sorted_buckets.forEach((bucket) => {
-		const bh = parseInt(bucket.split(':')[0], 10);
-		// Only show buckets at or after the cutoff hour
-		if (bh < cutoff) return;
+		const [date_key, time_key] = bucket.split('T');
+		const hour = parseInt(time_key.split(':')[0], 10);
+		if (!metricsHourWindowContains(hourWindow, date_key, hour)) return;
 
 		const md = app_state.minute5_series[bucket];
 		if (!md || md.c === 0) return;
 
 		// Use the bucket start time as the data point x coordinate
-		const date_obj = new Date(`${date_str}T${bucket}:00`);
+		const date_obj = new Date(`${bucket}:00`);
 		act_pts.push({ x: date_obj, y: md.c });
 
 		const filtered_e = md.e_buckets?.[bucket_key] || 0;
@@ -835,8 +829,8 @@ function _render_minute5_charts(date_str, rgb_wpm, rgb_prc, cutoff) {
 	const prc_title_el = document.getElementById('precision_chart_title');
 	if (prc_title_el) prc_title_el.textContent = _t('ui_typing.chart_title_precision_5min');
 
-	_render_minute5_activity_chart(act_pts, rgb_wpm, date_str, cutoff);
-	_render_minute5_precision_chart(prec_pts, rgb_prc, date_str, cutoff);
+	_render_minute5_activity_chart(act_pts, rgb_wpm, hourWindow);
+	_render_minute5_precision_chart(prec_pts, rgb_prc, hourWindow);
 }
 
 /**
@@ -847,15 +841,12 @@ function _render_minute5_charts(date_str, rgb_wpm, rgb_prc, cutoff) {
  * @param {string}   date_str - ISO date string for the selected day.
  * @param {number}   cutoff   - First hour shown (> 0 in this path).
  */
-function _render_minute5_activity_chart(pts, color, date_str, cutoff) {
+function _render_minute5_activity_chart(pts, color, hourWindow) {
 	if (wpm_chart_instance) wpm_chart_instance.destroy();
 	const elem = document.getElementById('wpm_chart');
 	if (!elem) return;
 
-	const today_str = get_local_date_string();
-	const end_hour = date_str === today_str ? Math.min(new Date().getHours() + 1, 23) : cutoff + 1;
-	const x_min = new Date(`${date_str}T${String(cutoff).padStart(2, '0')}:00:00`);
-	const x_max = new Date(`${date_str}T${String(end_hour).padStart(2, '0')}:59:59`);
+	const { start: x_min, end: x_max } = metricsHourWindowBounds(hourWindow);
 
 	wpm_chart_instance = new Chart(elem.getContext('2d'), {
 		type: 'line',
@@ -907,15 +898,12 @@ function _render_minute5_activity_chart(pts, color, date_str, cutoff) {
  * @param {string}   date_str - ISO date string for the selected day.
  * @param {number}   cutoff   - First hour shown (> 0 in this path).
  */
-function _render_minute5_precision_chart(pts, color, date_str, cutoff) {
+function _render_minute5_precision_chart(pts, color, hourWindow) {
 	if (precision_chart_instance) precision_chart_instance.destroy();
 	const elem = document.getElementById('precision_chart');
 	if (!elem) return;
 
-	const today_str = get_local_date_string();
-	const end_hour = date_str === today_str ? Math.min(new Date().getHours() + 1, 23) : cutoff + 1;
-	const x_min = new Date(`${date_str}T${String(cutoff).padStart(2, '0')}:00:00`);
-	const x_max = new Date(`${date_str}T${String(end_hour).padStart(2, '0')}:59:59`);
+	const { start: x_min, end: x_max } = metricsHourWindowBounds(hourWindow);
 
 	precision_chart_instance = new Chart(elem.getContext('2d'), {
 		type: 'line',
