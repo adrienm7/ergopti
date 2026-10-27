@@ -1,11 +1,12 @@
 """Convert any macOS .keylayout into an XKB symbols file and an XCompose file.
 
-This is the one converter from the layout registry's only layout format (a
-macOS keyboard layout) to Linux. The repository uses it to regenerate the
-shipped Ergopti files (generate_xkb_files.py), and the Linux package runs it on
-the user's machine when a registry layout is installed, so it must stay
-standard-library only and importable by the oldest Python the installers
-support (3.8).
+This converter regenerates the shipped Ergopti files (generate_xkb_files.py) and
+is the reference the Linux driver's Lua converter (_shared/lua/layouts/
+xkb_converter.lua, which installs a registry layout on the user's machine) is
+compared with, byte for byte, on every registry and archived layout
+(tools/test/test-keylayout-canonical-parity.cjs). Change the two together. It
+must stay standard-library only and importable by the oldest Python the
+installers support (3.8).
 
 Nothing here is specific to one layout:
 
@@ -918,13 +919,7 @@ def hints_from_index(index_path: Path, layout_id: str) -> XkbHints:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Convert a macOS .keylayout to XKB files.")
-    source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--keylayout", type=Path)
-    source.add_argument(
-        "--canonical",
-        type=Path,
-        help="schema-1 canonical keylayout JSON, as the shared Lua parser writes it",
-    )
+    parser.add_argument("--keylayout", required=True, type=Path)
     parser.add_argument("--keycodes", required=True, type=Path, help="shared mac_keycodes.json")
     parser.add_argument("--convention", required=True, choices=("iso", "ansi"))
     parser.add_argument("--layout-id", required=True)
@@ -940,14 +935,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         registry_id = args.registry_id or args.layout_id
         hints = hints_from_index(args.index, registry_id) if args.index else XkbHints()
-        if args.canonical is not None:
-            layout = Keylayout.from_canonical(
-                json.loads(args.canonical.read_text(encoding="utf-8"))
-            )
-        else:
-            layout = parse_keylayout(args.keylayout.read_text(encoding="utf-8"))
         result = convert_layout(
-            layout,
+            parse_keylayout(args.keylayout.read_text(encoding="utf-8")),
             load_keycodes(args.keycodes, args.convention),
             args.layout_id,
             args.display_name,
