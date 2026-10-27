@@ -459,19 +459,21 @@ const CHORD_PREFIXES = {
 		['alt_', 'Alt + ']
 	],
 	hs: [
-		['hs_ctrl_shift_', 'Ctrl + Shift + '],
-		['hs_ctrl_', 'Ctrl + '],
-		['hs_option_', 'Option + '],
-		['cmd_shift_', 'Cmd + Shift + '],
+		['secondary_shift_', 'Ctrl + Shift + '],
+		['secondary_', 'Ctrl + '],
+		['alt_', 'Option + '],
+		['primary_shift_', 'Cmd + Shift + '],
+		['primary_', 'Cmd + '],
+		// The built-in switches that are not slots yet (ctrl_g, cmd_star).
 		['cmd_', 'Cmd + '],
 		['ctrl_', 'Ctrl + ']
 	],
 	linux: [
-		['ctrl_shift_', 'Ctrl + Shift + '],
-		['super_shift_', 'Super + Shift + '],
+		['primary_shift_', 'Ctrl + Shift + '],
+		['meta_shift_', 'Super + Shift + '],
 		['alt_shift_', 'Alt + Shift + '],
-		['ctrl_', 'Ctrl + '],
-		['super_', 'Super + '],
+		['primary_', 'Ctrl + '],
+		['meta_', 'Super + '],
 		['alt_', 'Alt + ']
 	]
 };
