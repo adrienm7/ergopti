@@ -559,6 +559,16 @@ _LLM_Ollama_PollCurl(req_id, Port := 0) {
 				Terminal["exit"], Terminal["status"], StrLen(body))
 			Failure := entry.Get("presence_admitted", false)
 				? LLM_LocalModelResponseFailure(Terminal, entry["base_url"]) : 0
+			if Failure is Map {
+				RequestedModel := entry["presence_model"]
+				if LLM_LocalModelNormalize(Failure["model"]) != LLM_LocalModelNormalize(RequestedModel) {
+					try LoggerWarn("LLM.ollama", "Rejected an Ollama missing-model response for an unrequested model (request={1}).", req_id)
+					Failure := Map("reason", "model_identity_mismatch")
+				} else {
+					; The admitted request owns recovery identity and spelling.
+					Failure := LLM_LocalModelFailure(RequestedModel, entry["base_url"])
+				}
+			}
 			if Failure is Map
 				_LLM_InvokeCallback(on_fail, "on_fail", Failure)
 			else

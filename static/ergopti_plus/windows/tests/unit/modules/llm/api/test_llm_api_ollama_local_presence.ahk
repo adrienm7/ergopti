@@ -429,7 +429,8 @@ _OllamaPresenceRemovedAfterAdmission() {
 			Entry := Map("requester_current", 0, "pid", 0, "process_owner", 0, "cancelled", false,
 				"tmp_payload", Prefix . ".json", "tmp_stdout", Prefix . ".out", "tmp_status", Prefix . ".status", "tmp_exit", Prefix . ".exit",
 				"on_success", (*) => State["successes"] += 1, "on_fail", _OllamaPresenceRecordFailure.Bind(State),
-				"presence_admitted", true, "presence_generation", LLM_AuxGeneration(), "base_url", LLM_OLLAMA_BASE_URL)
+				"presence_admitted", true, "presence_model", "qwen2.5:7b",
+				"presence_generation", LLM_AuxGeneration(), "base_url", LLM_OLLAMA_BASE_URL)
 			_LLM_Ollama_Async[98046] := Entry
 			Terminal := Map("complete", true, "exit", 0, "status", 404, "body_read", true, "body", Body)
 			_LLM_Ollama_PollCurl(98046, Map("read_terminal", (*) => Terminal))
@@ -534,3 +535,77 @@ _G4O_Presence(Mode, F) {
 for _G4O_PresenceMode in ["installed", "missing", "replacement"]
 	Test("Ollama managed origin: actual preflight " . _G4O_PresenceMode . " (managed-origin-custody)",
 		_G4O_WithManaged.Bind(_G4O_Presence.Bind(_G4O_PresenceMode)))
+
+; Production admission, filesystem terminal parsing and model-offer ownership.
+; Append to the included local-presence test only after the current cohort ends.
+; All substituted ports are OS/UI boundaries; no classifier or offer is replaced.
+
+_RWMO_AdmittedTerminal(ProviderModel, ExpectedOffer, State) {
+	global _LLM_LocalModelOfferPort
+	State["callback"].Call(LLM_LocalModelListReceipt(Map("ok", true, "status", 200,
+		"body", '{"models":[{"name":"qwen2.5:latest"}]}')))
+	Entry := State["entry"]
+	AssertTrue(Entry["presence_admitted"], "the genuine tags preflight must admit the actual request")
+	AssertEqual("QWEN2.5", Entry["presence_model"], "the genuine admission captures the requested model")
+	AssertEqual(1, State["posts"], "only the native POST boundary is replaced")
+	AssertTrue(Entry["redact"], "the public caller-written chat body owns private diagnostics")
+	Body := '{"error":' . JsonStringLiteral("model '" . ProviderModel . "' not found") . '}'
+	AssertTrue(FSWrite(Entry["tmp_stdout"], Body))
+	AssertTrue(FSWrite(Entry["tmp_status"], "404`r`n"))
+	AssertTrue(FSWrite(Entry["tmp_exit"], "0`r`n"))
+	_LLM_Ollama_PollCurl(State["id"])
+	AssertEqual(1, State["failures"].Length, "the actual terminal must settle exactly one failure")
+	Failure := State["failures"][1]
+	Offers := [], Installs := []
+	Confirm(Title, Text) {
+		Offers.Push(Text)
+		return true
+	}
+	Install(Origin, Model) {
+		Installs.Push(Map("origin", Origin, "model", Model))
+		return false
+	}
+	_LLM_LocalModelOfferPort := Map("confirm", Confirm, "install", Install)
+	AssertTrue(LLM_OllamaOriginMatches(Entry["base_url"]), "the actual captured origin remains current")
+	LLM_LocalModelOffer(Failure)
+	AssertEqual(ExpectedOffer, Offers.Length,
+		"a response naming another model cannot acquire consent for an unrequested download")
+	AssertEqual(ExpectedOffer, Installs.Length,
+		"the provider body cannot replace the exact model admitted before the private POST")
+	if ExpectedOffer {
+		AssertTrue(LLM_LocalModelIsMissing(Failure), "matching model removal retains its actual recovery path")
+		AssertEqual(Entry["presence_model"], Failure["model"], "recovery must keep the admitted spelling")
+		AssertEqual(Entry["presence_model"], Installs[1]["model"])
+		AssertEqual(Entry["base_url"], Installs[1]["origin"])
+	} else {
+		AssertFalse(LLM_LocalModelIsMissing(Failure), "a foreign provider echo is a generic failure, not model recovery")
+	}
+}
+
+_RWMO_ResponseIdentity(ProviderModel, ExpectedOffer) {
+	global _LLM_ManagedBootstrap, _LLM_LocalModelOfferPort, _LLM_LocalModelNotified, _LLM_LocalModelAsking
+	PreviousCritical := Critical("On")
+	Saved := [_LLM_ManagedBootstrap, _LLM_LocalModelOfferPort, _LLM_LocalModelNotified, _LLM_LocalModelAsking]
+	try {
+		_LLM_ManagedBootstrap := 0
+		_LLM_LocalModelOfferPort := 0
+		_LLM_LocalModelNotified := Map()
+		_LLM_LocalModelAsking := false
+		_OllamaPresenceWithFixture(_RWMO_AdmittedTerminal.Bind(ProviderModel, ExpectedOffer))
+	} finally {
+		_LLM_ManagedBootstrap := Saved[1]
+		_LLM_LocalModelOfferPort := Saved[2]
+		_LLM_LocalModelNotified := Saved[3]
+		_LLM_LocalModelAsking := Saved[4]
+		Critical(PreviousCritical)
+	}
+}
+
+Test("Ollama response identity: matching removed model preserves recovery (ollama-terminal-model-affinity)",
+	_RWMO_ResponseIdentity.Bind("QWEN2.5", 1))
+Test("Ollama response identity: normalized removed model keeps admitted spelling (ollama-terminal-model-affinity)",
+	_RWMO_ResponseIdentity.Bind("qwen2.5:latest", 1))
+Test("Ollama response identity: foreign model cannot acquire download consent (ollama-terminal-model-affinity)",
+	_RWMO_ResponseIdentity.Bind("foreign:latest", 0))
+Test("Ollama response identity: private provider echo cannot acquire download consent (ollama-terminal-model-affinity)",
+	_RWMO_ResponseIdentity.Bind("SCREEN_PRIVATE_MODEL_ECHO", 0))
