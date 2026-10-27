@@ -10,6 +10,7 @@
 
 const METRICS_CALENDAR_YEAR_DAYS = 365;
 const METRICS_HOUR_MILLISECONDS = 60 * 60 * 1000;
+const METRICS_DAY_MILLISECONDS = 24 * METRICS_HOUR_MILLISECONDS;
 
 // Recorded dates are Gregorian day identities, not instants in the viewer's timezone.
 function metricsDayOrdinal(year, month, day) {
