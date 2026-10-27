@@ -691,3 +691,39 @@ Test("Ollama streaming: truncated transfer exit rejects done (ollama-native-stre
 Test("Ollama streaming: timeout exit rejects done (ollama-native-stream-exit)", _OllamaStream_NativeExitStatus.Bind(28))
 Test("Ollama streaming: signaled exit 259 rejects done (ollama-native-stream-exit)", _OllamaStream_NativeExitStatus.Bind(259))
 Test("Ollama streaming: unavailable native exit receipt fails closed (ollama-native-stream-exit)", _OllamaStream_NativeExitStatus.Bind(0, false))
+
+; The provider's terminal marker is a JSON boolean, independent of AHK coercion.
+_OllamaStream_DoneLiteral(SourceTail, ExpectedSuccess) {
+	Source := '{"message":{"content":"typed answer"}' . SourceTail . '}'
+	Parsed := _LLM_Ollama_ParseStreamLine(Source)
+	State := Map("acc", "")
+	Observed := Map("partials", 0)
+	_LLM_Ollama_ConsumeStreamChunk(Source . "`n", State, (*) => Observed["partials"] += 1)
+	Result := _LLM_Ollama_StreamTerminalResult(State)
+	AssertEqual(ExpectedSuccess, Result["ok"],
+		"only the last decoded JSON boolean true may authorize terminal completion")
+	if ExpectedSuccess {
+		AssertTrue(Parsed["ok"], "the literal-true control is parsed through the genuine envelope owner")
+		AssertTrue(Parsed["done"], "the valid marker is actually admitted")
+		AssertEqual("typed answer", Result["text"], "the completed provider text stays byte-exact")
+		AssertEqual(1, Observed["partials"], "the valid control reaches the actual consumer callback")
+	}
+}
+for _OllamaDoneVector in [
+	["literal true", ',"done":true', true],
+	["literal false", ',"done":false', false],
+	["missing marker", '', false],
+	["integer one", ',"done":1', false],
+	["decimal one", ',"done":1.0', false],
+	["exponent one", ',"done":1e0', false],
+	["quoted one", ',"done":"1"', false],
+	["quoted true", ',"done":"true"', false],
+	["null marker", ',"done":null', false],
+	["array marker", ',"done":[true]', false],
+	["object marker", ',"done":{"value":true}', false],
+	["last true duplicate", ',"done":"1","done":true', true],
+	["last quoted duplicate", ',"done":true,"done":"1"', false],
+	["escaped last true", ',"done":"1","d\u006fne":true', true],
+	["escaped last quoted", ',"done":true,"d\u006fne":"1"', false]]
+	Test("Ollama done marker: " . _OllamaDoneVector[1] . " keeps JSON type (ollama-stream-done-kind)",
+		_OllamaStream_DoneLiteral.Bind(_OllamaDoneVector[2], _OllamaDoneVector[3]))
