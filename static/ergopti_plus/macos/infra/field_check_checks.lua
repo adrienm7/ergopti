@@ -31,6 +31,7 @@
 local Identifiers = require("identifiers")
 local Logger = require("infra.logger")
 local KePaths = require("platform.remap.ke_paths")
+local RuntimeVhid = require("platform.remap.runtime_vhid")
 local TextUtils = require("text_utils")
 
 local M = {}
@@ -302,6 +303,8 @@ end
 -- with the closed token a step value carries for each (Security framework
 -- error strings, stable across macOS releases).
 local SIGNATURE_CAUSES = {
+	{ "resource fork, Finder information, or similar detritus not allowed", "finder_detritus" },
+	{ "Disallowed xattr com.apple.FinderInfo", "finder_detritus" },
 	{ "a sealed resource is missing or invalid", "sealed_resource_invalid" },
 	{ "nested code is modified or invalid", "nested_code_invalid" },
 	{ "code object is not signed at all", "not_signed" },
@@ -336,9 +339,32 @@ function M.signature_cause(text)
 	return nil
 end
 
+-- The strict-only cause a notarized app may carry without being altered: a
+-- Finder extended attribute on the bundle (Mac of 2026-10-27 22:55, Karabiner
+-- 16.0.0 from the pqrs package). --strict refuses it, Gatekeeper does not.
+local BENIGN_STRICT_CAUSE = "finder_detritus"
+
+--- Reports whether a failed strict verification names only the Finder
+--- detritus, and no other known cause, on any line.
+--- @param text any The tool's stderr.
+--- @return boolean benign
+function M.only_finder_detritus(text)
+	local found = false
+	for line in tostring(text or ""):gmatch("[^\r\n]+") do
+		for _, cause in ipairs(SIGNATURE_CAUSES) do
+			if line:find(cause[1], 1, true) then
+				if cause[2] ~= BENIGN_STRICT_CAUSE then return false end
+				found = true
+			end
+		end
+	end
+	return found
+end
+
 --- Reads Gatekeeper's answer from `spctl --assess -vv` output.
 --- @param text any The tool's stderr.
---- @return boolean accepted, string|nil source Closed token of its source= line.
+--- @return boolean accepted, string|nil source Closed token of its source= line,
+---   string|nil team The Developer ID team of its origin= line.
 function M.parse_assessment(text)
 	text = tostring(text or "")
 	local accepted = text:match(": accepted%s*\n") ~= nil or text:match(": accepted%s*$") ~= nil
@@ -347,7 +373,8 @@ function M.parse_assessment(text)
 		source = source:lower():gsub("[^%w]+", "_"):gsub("^_+", ""):gsub("_+$", ""):sub(1, 30)
 		if source == "" then source = nil end
 	end
-	return accepted, source
+	local team = text:match("origin=[^\r\n]*%((%w+)%)")
+	return accepted, source, team
 end
 
 --- Bounds a tool's diagnostic for the log: a few lines, each cut short, with
@@ -382,10 +409,11 @@ end
 --- then Homebrew itself, the Karabiner-Elements cask, the code signature of
 --- the installed app (package provenance) and Gatekeeper's assessment of it.
 --- The strict deep verification and the assessment each log their bounded
---- diagnostic and carry its first known cause in the step value: a strict
---- failure Gatekeeper still accepts stays a failure with its cause, since
---- nothing here can prove that cause harmless. Read-only: nothing is
---- installed, run or changed.
+--- diagnostic and carry its first known cause in the step value. Gatekeeper
+--- decides: the app passes when it accepts it from the pqrs Developer ID team.
+--- A strict failure whose only cause is Finder detritus is then information;
+--- any other strict failure stays a failure with its cause. Read-only:
+--- nothing is installed, run or changed.
 function M.toolchain(ports, report, finish)
 	local function brew_stage()
 		local brew
@@ -402,36 +430,42 @@ function M.toolchain(ports, report, finish)
 				finish()
 				return
 			end
-			local function gatekeeper_stage()
-				ports.exec(SPCTL, { "--assess", "-vv", STOCK_APP }, COMMAND_TIMEOUT, function(code, output, errors)
-					local text = tostring(output or "") .. "\n" .. tostring(errors or "")
-					local accepted, source = M.parse_assessment(text)
-					Logger.evidence(LOG, "Karabiner-Elements Gatekeeper assessment: exit=%s, %s", tostring(code),
-						M.diagnostic_excerpt(text, STOCK_APP))
-					local value
-					if code == 0 and accepted then
-						value = "accepted" .. (source and ":" .. source or "")
-					elseif code == nil then
-						value = "timeout"
-					else
-						value = "rejected:" .. (M.signature_cause(text) or source or failure_token(code))
-					end
-					report.step("karabiner_gatekeeper", code == 0 and accepted and STATE.pass or STATE.fail, value)
-					finish()
-				end)
+			local function record(code, text, gatekeeper_code, gatekeeper_text)
+				local accepted, source, team = M.parse_assessment(gatekeeper_text)
+				local trusted = gatekeeper_code == 0 and accepted and team == RuntimeVhid.TEAM_ID
+				if code == 0 then
+					report.step("karabiner_signature", STATE.pass, "valid")
+				elseif code ~= nil and trusted and M.only_finder_detritus(text) then
+					report.step("karabiner_signature", STATE.info, "strict_only:" .. BENIGN_STRICT_CAUSE)
+				else
+					report.step("karabiner_signature", STATE.fail, code == nil and "timeout"
+						or failure_token(code) .. ":" .. (M.signature_cause(text) or "unclassified"))
+				end
+				local value
+				if trusted then
+					value = "accepted" .. (source and ":" .. source or "")
+				elseif gatekeeper_code == nil then
+					value = "timeout"
+				elseif gatekeeper_code == 0 and accepted then
+					value = "accepted:other_team"
+				else
+					value = "rejected:" .. (M.signature_cause(gatekeeper_text) or source or failure_token(gatekeeper_code))
+				end
+				report.step("karabiner_gatekeeper", trusted and STATE.pass or STATE.fail, value)
+				finish()
 			end
 			ports.exec(CODESIGN, { "--verify", "--deep", "--strict", "--verbose=4", STOCK_APP }, COMMAND_TIMEOUT,
 				function(code, output, errors)
 					local text = tostring(output or "") .. "\n" .. tostring(errors or "")
 					Logger.evidence(LOG, "Karabiner-Elements strict signature verification: exit=%s, %s", tostring(code),
 						M.diagnostic_excerpt(text, STOCK_APP))
-					local value = "valid"
-					if code ~= 0 then
-						value = failure_token(code)
-						if code ~= nil then value = value .. ":" .. (M.signature_cause(text) or "unclassified") end
-					end
-					report.step("karabiner_signature", code == 0 and STATE.pass or STATE.fail, value)
-					gatekeeper_stage()
+					ports.exec(SPCTL, { "--assess", "-vv", STOCK_APP }, COMMAND_TIMEOUT,
+						function(gatekeeper_code, gatekeeper_output, gatekeeper_errors)
+							local gatekeeper_text = tostring(gatekeeper_output or "") .. "\n" .. tostring(gatekeeper_errors or "")
+							Logger.evidence(LOG, "Karabiner-Elements Gatekeeper assessment: exit=%s, %s",
+								tostring(gatekeeper_code), M.diagnostic_excerpt(gatekeeper_text, STOCK_APP))
+							record(code, text, gatekeeper_code, gatekeeper_text)
+						end)
 				end)
 		end
 		if not brew then
