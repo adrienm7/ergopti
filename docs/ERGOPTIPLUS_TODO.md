@@ -297,10 +297,17 @@ dev.
   names it: `value_type at hotstrings.dynamic.date`. That manifest entry is a feature row (a
   table such as `date = { enabled = true }`); a bare `date = true` or `date = false` reproduces the
   refusal here, while `Preferences.load` accepts the same file, so only the read-only view fails
-  and every Karabiner regeneration and wake refresh stops on it. Next [CODE]: find which writer
-  stored the scalar (an older build or another OS sharing the file), then either migrate it or make
-  the view accept what load accepts. Mac must send the `[hotstrings.dynamic]` lines of
-  config.toml.
+  and every Karabiner regeneration and wake refresh stops on it. Writer found: the current macOS
+  preferences save, whose `dynamichotstrings_date` state key mapped the boolean onto the row
+  itself, so every save wrote `date = false` or `true`. Fixed in three parts: c84e0f3a95 (load
+  and the view admit values through one rule; a value load leaves out as outdated is left out of
+  the read-only view, never refused by a second rule), 9db1dea667 (the macOS key maps to
+  `hotstrings.dynamic.date.enabled`), 54767a938d and 1b7abe4e29 (op `wrap_value` in the three
+  engines, then schema v16 rewrites a bare switch of any dynamic feature row into
+  `[hotstrings.dynamic.<id>] enabled = <bool>` on Windows, macOS and Linux). Mac confirms: after
+  the update the boot logs the v16 migration (with its `config.pre-v<N>-*.toml` backup),
+  `[hotstrings.dynamic]` holds no bare `date`, and no "config.toml cannot be read" appears on a
+  Karabiner regeneration or a wake refresh.
 - **L21** Fixed 708bc6671d. Ollama
   `stop_warmup() could not retire its HTTP owner: false` and settlement 'Ollama warmup stop' did
   not commit (new.txt 16:28:07, after "startup_model_download_declined"). Cause: hs.http.asyncPost

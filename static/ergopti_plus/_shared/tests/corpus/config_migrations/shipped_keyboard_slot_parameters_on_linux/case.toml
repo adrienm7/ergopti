@@ -5,4 +5,4 @@ description = "Every action parameter of a retired Linux slot follows its slot t
 drivers = ["linux"]
 outcome = "migrated"
 from_version = 14
-to_version = 15
+to_version = 16
