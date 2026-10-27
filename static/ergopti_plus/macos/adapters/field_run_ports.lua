@@ -374,6 +374,8 @@ function M.new(root)
 		after = Timer.after,
 		cancel = Timer.cancel,
 		now_ms = function() return hs.timer.absoluteTime() / 1e6 end,
+		-- Every AI flow shows its progress in the one shared download window
+		progress_mark = function() return require("ui.download_window").progress_mark() end,
 		iso_now = function() return os.date("!%Y-%m-%dT%H:%M:%SZ") end,
 		log_ring = Logger.ring_buffer_snapshot,
 		config_snapshot = config_snapshot,
