@@ -1048,11 +1048,10 @@ function _render_activity_calendar() {
 	let month_labels = '';
 	let last_month = -1;
 	const cursor = new Date(start);
-	let col = 0;
+	let cell_count = 0;
 	while (cursor <= today) {
 		const dow = (cursor.getUTCDay() + 6) % 7; // 0 = Mon
-		if (dow === 0 && col > 0) col++; // new column at start of each week
-		// Actually the simplest: increment column when we hit Monday OR the very first iteration
+		const col = Math.floor(cell_count / ROWS);
 		const x = PAD_LEFT + col * (CELL + GAP);
 		const y = PAD_TOP + dow * (CELL + GAP);
 		const date_str = formatMetricsDateKey(cursor.getTime());
@@ -1082,7 +1081,7 @@ function _render_activity_calendar() {
 		}
 
 		cursor.setUTCDate(cursor.getUTCDate() + 1);
-		if ((cursor.getUTCDay() + 6) % 7 === 0) col++;
+		cell_count++;
 	}
 
 	const weekday_labels = [
@@ -1096,7 +1095,7 @@ function _render_activity_calendar() {
 		)
 		.join('');
 
-	const total_cols = col + 1;
+	const total_cols = Math.ceil(cell_count / ROWS);
 	const svg_w = PAD_LEFT + total_cols * (CELL + GAP);
 	const svg_h = PAD_TOP + ROWS * (CELL + GAP);
 
