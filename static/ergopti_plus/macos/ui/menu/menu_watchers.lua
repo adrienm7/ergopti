@@ -41,6 +41,15 @@ local DEBOUNCE_SEC = Timings.sec("ui", "hs_reload_debounce_ms")
 -- reload a half-checked-out tree. Kept identical to infra/file_watchers.
 local GIT_HOLD_WARN_DEFERRALS = 120   -- 120 * 0.5s = 60s before one warning
 
+--- Whether a developer field run is running (infra/field_run.lua), read through
+--- package.loaded: only a developer app ever loads that module.
+--- @return boolean
+local function field_run_holds_reload()
+	local field_run = package.loaded["infra.field_run"]
+	return type(field_run) == "table" and type(field_run.holds_reload) == "function"
+		and field_run.holds_reload() == true
+end
+
 --- Checks the complete lifecycle surface before any native activation.
 --- @param candidate any Constructor result.
 --- @return boolean valid
@@ -103,6 +112,7 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 	-- while ``fire_reload`` itself re-arms through ``arm_reload`` (the Lua
 	-- local-after-closure trap: a closure only captures a local declared above it).
 	local fire_reload
+	local field_run_hold_logged = false
 
 	--- Stops one exact native capability without dropping it after uncertainty.
 	--- @param handle table|userdata Native pathwatcher or timer.
@@ -161,6 +171,20 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 			arm_reload()
 			return
 		end
+		-- A field run must not reload itself: the burst waits for its end.
+		if field_run_holds_reload() then
+			if not field_run_hold_logged then
+				field_run_hold_logged = true
+				local names = {}
+				for file in pairs(burst_paths) do names[#names + 1] = file end
+				table.sort(names)
+				Logger.warn(LOG, "Menu source reload held while the developer field run runs (%d file(s): %s).",
+					#names, table.concat(names, ", ", 1, math.min(#names, 5)))
+			end
+			arm_reload()
+			return
+		end
+		field_run_hold_logged = false
 		if git_status.operation_in_progress(base_dir) then
 			if defer_count < GIT_HOLD_WARN_DEFERRALS then
 				defer_count = defer_count + 1
@@ -184,6 +208,11 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 			return ui_restore.defer_reload(function()
 				callback_invoked = true
 				if not _lifecycle_active or reload_generation ~= _lifecycle_generation then return end
+				if field_run_holds_reload() then
+					Logger.info(LOG, "Reload aborted at fire time: a developer field run started; re-arming.")
+					arm_reload()
+					return
+				end
 				if git_status.operation_in_progress(base_dir) then
 					Logger.info(LOG,
 						"Reload aborted at fire time: a Git operation started during the UI hold; re-arming.")

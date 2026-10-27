@@ -86,3 +86,42 @@ helpers.describe("file_watchers: a genuine hotstring edit still reloads", functi
 		end)
 	end)
 end)
+
+
+
+
+
+-- ================================================================
+-- ================================================================
+-- ======= 3/ A developer field run never reloads itself ==========
+-- ================================================================
+-- ================================================================
+
+helpers.describe("file_watchers: a field run and non-source files never reload", function()
+	helpers.it("holds a source reload while a field run runs, then reloads once it ends", function()
+		local previous = package.loaded["infra.field_run"]
+		local running = true
+		package.loaded["infra.field_run"] = { holds_reload = function() return running end }
+		local ok, err = pcall(Fixture.with_watchers, function(w)
+			w.fire("/fake/base/modules/edited.lua")
+			w.settle()
+			helpers.assert_eq(w.reloads(), 0, "a reload during the 16:47 field run cut it short")
+			helpers.assert_true(type(w.scheduled()) == "function", "the held burst keeps its poll")
+			running = false
+			w.settle()
+			helpers.assert_eq(w.reloads(), 1, "the held burst reloads once the run ends")
+		end)
+		package.loaded["infra.field_run"] = previous
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("ignores Git objects and Finder files in the personal hotstrings tree", function()
+		Fixture.with_watchers(function(w)
+			w.fire({ "/fake/personal/.git/objects/ab/cdef", "/fake/personal/.DS_Store" })
+			helpers.assert_true(w.scheduled() == nil,
+				"a fetch in the personal Git repository is not a hotstring edit")
+			w.fire("/fake/personal/mine.toml")
+			helpers.assert_true(type(w.scheduled()) == "function", "a personal hotstring edit still reloads")
+		end)
+	end)
+end)
