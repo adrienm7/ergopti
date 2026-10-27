@@ -576,8 +576,10 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 - [ ] **PAR-30. Sign the Windows and Linux update assets.** [CODE] [CI] Done: ECDSA P-256 detached signatures
       over a record of asset name, size and SHA-256, signer and reference verifier
       (`tools/build/update-asset-signature.cjs`), Linux verifies with OpenSSL, Windows with CNG, shared
-      vectors, CI signs the Windows exe and publishes the `.sig`. Left: call the verification in the Linux
-      manager's transfer flow and the Windows `release_install`/`self_update` path (enforcement `"off"` until
+      vectors, CI signs the Windows exe and publishes the `.sig`. Linux transfer flow done (cd824ccf8e:
+      `signature_gate.lua` fetches the `.sig` and verifies after adoption; no separate "warn" value, a bad
+      signature is logged in words while enforcement is "off"); macOS needs nothing beyond Sparkle's EdDSA
+      and the release-installer SHA-256 plus designated requirement. Left: the Windows `release_install`/`self_update` path (enforcement `"off"` until
       the maintainer provisions the key: five steps in `docs/tooling/update-signing.md`), then flip it to
       `"required"`.
 - [x] **PAR-34. Mouse metrics, event families and app-category store on Linux and macOS.** [CODE] Done:
@@ -698,15 +700,21 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       `_shared/lua/features/manifest_data.lua`, eae6f45708). Left: `config_template.toml` (decision pending).
 - [ ] **PAR-74. Config-key and command-id constants by codegen.** [CODE] Generate constants from
       `config.schema.json` and `menu_manifest.json` for AHK, Lua and JS; lint raw literals such as
-      `private_filter_enabled`. Audit R10. Lua and shared Lua done (567 sites to 0). Left: 1243 AHK and JS
-      literals in the shrink-only `config-key-literal-baseline.json`.
+      `private_filter_enabled`. Audit R10. Lua and shared Lua done (567 sites to 0); JS and Node tools done
+      (83 sites to 0, the ratchet now scans `tools/`, CommonJS `tools/lib/_generated/config_keys.cjs`). Left
+      [PC]: 1243 AHK literals in the shrink-only `config-key-literal-baseline.json` (read
+      `windows/_generated/config_keys.ahk`).
 - [x] **PAR-75. Shared Lua helper modules and a redefinition lint.** [CODE] Done: every inline site burned
       down (baseline `{}`), basename detector added; the allowed exceptions are listed in the gate's `ALLOWED`
       list (two URL segments, the Linux worker `arg[0]` check, boot-time dirname splits).
 - [ ] **PAR-76. Long refactors, plan before starting.** [CODE] Generate the AHK config-migration op table
       from `migrations.toml` (R17); extract menu row-ordering rules to data (R18); pure hotstring
       injection plan (R26); FileSystem port spec for lease/atomic write (R33); canonical `.keylayout`
-      parser (R23); Windows updater `check_session`/`rate_limit` vectors (R25).
+      parser (R23); Windows updater `check_session`/`rate_limit` vectors (R25). Done on macOS and Linux: R18
+      (`_shared/modules/menu/row_order.json`, generated `row_order_data.lua`, single-source gate), R33
+      (`_shared/lua/file_system/ports.lua`, both owners checked at load), R23 (`layouts/keylayout.lua` the
+      only reader, gate), R26 (`hotstring_engine/injection_plan.lua`, both engines, 18 vectors, no driver
+      divergence). Left [PC]: R17, R25, and the AHK readers of R18, R23, R26 and R33.
 - [x] **PAR-77. Remove platform branches from shared UI JS.** [CODE] Done: hosts pass capability flags
       and `executableSyntax`; `test-shared-ui-no-platform-branches.cjs` guards it.
 
@@ -774,8 +782,18 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       build for now. The next Mac log carries `Lease token decision=` and `written in N ms`: if the
       write is short, keep it; if long, shrink the 743 KB file instead.
 - [ ] **Linux correction parity remainders.** [CODE] Done (06bbbe5985): Backspace pops the word, erased
-      n-grams get `e`, synthetic output chains. Left: erased and synthetic vectors in the shared corpus
-      (needs the AHK and macOS replayers); Windows word separators are wider than Linux's three.
+      n-grams get `e`, synthetic output chains. Erased and synthetic vectors in the shared corpus, replayed on
+      macOS and Linux (ee2eab6b1e, `keystats/correction_erased_vectors.json`). Left [PC]: the AHK replayer
+      (`KLW_WalkTypingEntry`); Windows word separators are wider than Linux's three.
+- [ ] **Ctrl+Caps Lock slot on macOS.** [PHYS-M] The `secondary_capslock` slot binds through its own native
+      entry again (ea02cf7000: the generic registrar refuses Caps Lock and the whole shortcut start rolled
+      back). The registrar tests say macOS never fires a Caps Lock hotkey: check on a real Mac that Ctrl+Caps
+      Lock toggles Caps Lock; if not, report it and drop the slot's recommendation on macOS with a reason.
+- [ ] **Linux layout and number-row values read at runtime.** [CODE] The Linux `keyboard_layout` scope
+      participant is config only: nothing reads `layout.direct_access_digits` or
+      `layout.number_row_reorder_edges` at runtime and the keyboard hook starts once in `main()` with no
+      in-process restart. Design a hook restart (key loss, hotstring buffer) and the hook reading these
+      values, then make the participant acknowledge on the hook's started report.
 - [ ] **Windows updater -File workers: real update check.** [PHYS] Install a build with 5d6beccf83
       by hand, then update from it to the next release: the exe is replaced and restarts, the
       three scripts are in `%LOCALAPPDATA%\Ergopti\vendor\`, the PowerShell command line shows
