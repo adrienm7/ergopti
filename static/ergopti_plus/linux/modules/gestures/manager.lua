@@ -424,15 +424,29 @@ local MEDIA_ACTIONS = {
 	track_prev      = { tool = "playerctl previous", key = "XF86AudioPrev" },
 }
 
---- The webview window each `open_*` action raises, by action id.
+--- The webview window each `open_*` action toggles, by action id: closed
+--- opens it, covered brings it to the front, frontmost closes it
+--- (ui/webview_manager.lua toggle()).
 ---
 --- Data rather than branches so the set can be compared against the shared
 --- catalogue by a gate: a table has a length, a chain of `elseif` does not.
 local OPEN_WINDOW = {
-	["open_metrics_typing"]    = "metrics_typing",
-	["open_metrics_apps"]      = "metrics_apps",
-	["open_hotstrings_editor"] = "hotstring_editor",
-	["open_paths_editor"]      = "paths_editor",
+	["open_metrics_typing"]      = "metrics_typing",
+	["open_metrics_apps"]        = "metrics_apps",
+	["open_hotstrings_editor"]   = "hotstring_editor",
+	["open_paths_editor"]        = "paths_editor",
+	["open_hotstrings_settings"] = ConfigKeys.COMMAND.HOTSTRINGS_CONFIG_WINDOW,
+	["open_layout_manager"]      = ConfigKeys.COMMAND.LAYOUT_MANAGER,
+	["open_layer_editor"]        = "layer_editor",
+	["open_model_browser"]       = "model_browser",
+	["open_changelog"]           = "changelog",
+	["open_healthcheck"]         = ConfigKeys.COMMAND.HEALTHCHECK,
+}
+
+--- The pages whose opener is not the manager's show(), by app name: the
+--- diagnostics window starts its probes in its bridge's open().
+local OPEN_WINDOW_OPENER = {
+	[ConfigKeys.COMMAND.HEALTHCHECK] = function() return require("ui.healthcheck.bridge").open() end,
 }
 
 --- The user-editable file each `open_*` action reveals, as a path resolver.
@@ -641,14 +655,17 @@ local function _execute_action(action_name, go_next, binding)
 		local window = OPEN_WINDOW[name]
 		if window then
 			local ok, Webview = pcall(require, "ui.webview_manager")
-			if not ok or type(Webview.show) ~= "function" then
+			if not ok or type(Webview.toggle) ~= "function" then
 				-- Loud, because the user asked for a window and none appeared. A
 				-- headless daemon (no GTK, no display) is the ordinary reason and it
 				-- is worth naming rather than leaving the chord looking dead.
 				Logger.error(LOG, "No webview manager — '%s' cannot open its window.", name)
 				return true
 			end
-			pcall(Webview.show, window)
+			local called, err = pcall(Webview.toggle, window, OPEN_WINDOW_OPENER[window])
+			if not called then
+				Logger.error(LOG, "Toggling the '%s' window raised: %s.", window, tostring(err))
+			end
 			return true
 		end
 

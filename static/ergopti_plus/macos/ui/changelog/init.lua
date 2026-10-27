@@ -1011,6 +1011,10 @@ function M.open(opts)
 	return _focus_owner == owner and _wv_committed == true
 end
 
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return _wv end
+
 --- Closes the changelog window if open.
 --- @return boolean committed
 function M.close()
