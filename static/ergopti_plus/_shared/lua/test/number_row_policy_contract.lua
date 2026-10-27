@@ -211,7 +211,7 @@ function M.run(helpers, corpus_path)
 				return bytes
 			end
 			local registry = assert(Migrate.load_registry(shared .. Migrate.REGISTRY_PATH))
-			helpers.assert_eq(registry.current, 14, "the actual shipped registry includes the cascade arrow migration")
+			helpers.assert_eq(registry.current, 15, "the actual shipped registry includes the role-named keyboard slot migration")
 			local replays = 0
 			for index = 0, 10 do
 				-- A case the Windows-only dynamic-master step changes is split in two: the
