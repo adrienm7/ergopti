@@ -318,3 +318,47 @@ _R7NB_NativeUninstallPolicy() {
 }
 Test("Uninstall native policy: actual Windows CLI executes the removal and startup controls (uninstall-native-policy-cli)",
 	_R7NB_NativeUninstallPolicy)
+
+; Native allocation refusal and the exact public cancellation handoff.
+_R7UA_WorkerAllocation(Foreign) {
+	State := UninstallState()
+	AssertFalse(State.Has("Owner"), "fixture cannot retire a foreign uninstall transaction")
+	Owner := 0
+	Root := A_Temp . "\ergopti_r7_uninstall_allocation_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Source := Root . "\worker-source.ps1", Script := Root . "\ergopti-uninstall-0123456789abcdef.ps1"
+	try {
+		_RIT_WriteFile(Source, "owned worker source`n")
+		if Foreign
+			AssertTrue(FSWriteCreateDurable(Script, "foreign existing stage`n"))
+		Owner := Map("Phase", "Preparing", "Script", Script, "ScriptCopied", false)
+		State["Owner"] := Owner
+		Caught := 0
+		try {
+			FileCopy(Source, Script, false)
+			Owner["ScriptCopied"] := true
+		}
+		catch as Err
+			Caught := Err
+		if Foreign {
+			AssertTrue(IsObject(Caught), "the actual create-only copy must refuse the occupied stage")
+			AssertEqual("foreign existing stage`n", FSReadUtf8Exact(Script), "native refusal must leave the foreign file unchanged")
+		} else {
+			AssertEqual(0, Caught, "the actual create-only copy must acquire an absent stage")
+			AssertEqual("owned worker source`n", FSReadUtf8Exact(Script))
+		}
+		UninstallCancel()
+		AssertFalse(State.Has("Owner"), "public cancellation must retire this handoff")
+		if Foreign {
+			AssertTrue(FileExist(Script), "a refused native create never grants deletion authority to public cancellation")
+			AssertEqual("foreign existing stage`n", FSReadUtf8Exact(Script))
+		} else
+			AssertFalse(FileExist(Script), "an acquired worker copy must be retired on cancellation")
+	} finally {
+		if State.Has("Owner") && State["Owner"] == Owner
+			State.Delete("Owner")
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("Uninstall worker allocation: actual acquired copy retires on public cancel (uninstall-worker-allocation)", _R7UA_WorkerAllocation.Bind(false))
+Test("Uninstall worker allocation: actual refused copy retains foreign file (uninstall-worker-allocation)", _R7UA_WorkerAllocation.Bind(true))
