@@ -44,6 +44,9 @@ local function make_scheduler()
 		return result
 	end
 
+	-- The probe times its stages through the scheduler clock (L23).
+	function scheduler.now_ns() return 0 end
+
 	function scheduler.running_count(delay)
 		local count = 0
 		for _, handle in ipairs(scheduler.timers) do
