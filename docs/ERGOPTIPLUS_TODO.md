@@ -76,6 +76,8 @@ a sealed Windows updater source, reseal with
     SwiftPM cache trial); run them on `tmp/preflight-dev` before dev.
   - `tmp/wip-ci-fix`: f44fcc1e64, c9b90d11d7, ba13937b8c, 5009ad87b8 (Linux distribution-row CI fixtures):
     check each against dev first, later fixes may have replaced them.
+  - `tmp/wip-fr-uncommitted` (0d7e53b28b): the uncommitted Ollama warmup-stop attempt of a stopped agent,
+    saved as a commit whose tree holds only those three files; superseded by 708bc6671d, kept for reference.
   - `tmp/wip-todo-ae-par30`: 41f72525cf is an unvalidated work-in-progress snapshot of the PAR-30 Linux
     updater signature gate; redo it from the item, do not cherry-pick it as is.
 - **Review the Windows antivirus surface ceilings (27 Oct).** d7d98e133b raised the exe bundle's DllImport
