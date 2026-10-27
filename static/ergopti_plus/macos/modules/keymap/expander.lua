@@ -26,6 +26,7 @@ local text_utils = require("infra.text_utils")
 -- codepoints, and neither has to convert for the other.
 local HotstringCore = require("infra.hotstring_engine")
 local Cascade = require("hotstring_engine.cascade")
+local InjectionPlan = require("hotstring_engine.injection_plan")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("infra.logger")
 local HotPath    = require("infra.hotpath_profiler")
@@ -1027,29 +1028,27 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 		is_final    = plan.final_result
 	end
 
-	-- Compute how many backspaces and what to type. The whole trigger is erased and
-	-- the whole replacement typed, the net edit every driver applies (no shared
-	-- prefix is kept on screen). In an ignored window (char_len == 0) there is no
-	-- "last char" to keep, so we must erase the full trigger length. m.tlen is the precomputed UTF-8
-	-- length of the trigger (avoids three utf8_len calls per hot-path hit).
-	local char_offset      = is_ignored and 0 or char_len
-	local screen_len       = trig_len - char_offset
-	-- Clamped at zero. A trigger shorter than the typed event's codepoint count
-	-- (a multi-codepoint composed character arriving as one event) cannot require
-	-- a negative number of on-screen deletions. Keeping the clamp at the operation
-	-- boundary also prevents malformed replacement transactions.
-	if screen_len < 0 then
+	-- What to erase and type comes from the shared injection plan: the whole
+	-- trigger is erased and the whole replacement typed, the net edit every
+	-- driver applies (no shared prefix is kept on screen). The typed event is on
+	-- screen only in an ignored window, where it is erased with the trigger.
+	-- A trigger shorter than the typed event (a multi-codepoint composed
+	-- character arriving as one event) cannot require a negative number of
+	-- on-screen deletions; the plan clamps it at zero.
+	if not is_ignored and trig_len < char_len then
 		Logger.warn(LOG, "Trigger shorter than the typed event (%d < %d) — clamping deletes to 0.",
-			trig_len, char_offset)
-		screen_len = 0
+			trig_len, char_len)
 	end
-	local deletes, to_type = screen_len, repl_text
+	local injection = InjectionPlan.build({
+		path = InjectionPlan.PATH_AUTO, trigger_len = trig_len, event_len = char_len,
+		event_on_screen = is_ignored == true, replacement = repl_text, final_result = is_final,
+	})
 
 	local replaced = M.perform_text_replacement(
-		deletes,
-		function() return emit_dispatch(m, to_type) end,
+		injection.erase,
+		function() return emit_dispatch(m, injection.text) end,
 		function()
-			_state.buffer = active_buffer:sub(1, tstart_byte - 1) .. repl_text
+			_state.buffer = active_buffer:sub(1, tstart_byte - 1) .. injection.buffer_suffix
 		end,
 		is_final,
 		is_ignored,
@@ -1130,45 +1129,40 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 		-- The EFFECTIVE replacement, which in conform mode carries the casing the
 		-- user typed. tokens_from_repl() is only called below when we actually need
 		-- to emit tokens (replacements with {Token} directives).
-		local repl_text        = eff_plain
-		local deletes, to_type = trig_len, repl_text
-		local replay_spec = nil
-		-- The terminator replayed after the replacement: the typed one, unless its
-		-- delimiter is consumed. A cascade keeps it after the final text (no link
-		-- may swallow it), and swallows it once at the end when it is consumed.
-		local replay_tail = (not consume_term) and chars or nil
-		local start_byte = buf_start
-		local is_private = m.is_private
-		local is_final = m.final_result
+		local repl_text   = eff_plain
+		local start_byte  = buf_start
+		local is_private  = m.is_private
+		-- The cascade: one net edit whose trigger is the text the user really
+		-- typed. Without a chain these are the first step's own values.
+		local cascade_edit = nil
 		local plan = plan_cascade(_state.buffer, m, buf_start, eff_plain, chars, consume_term)
 		if plan then
-			repl_text    = plan.text
-			start_byte   = plan.start
-			replay_tail  = plan.tail
+			repl_text     = plan.text
+			start_byte    = plan.start
 			typed_trigger = _state.buffer:sub(start_byte, #_state.buffer - #chars - extra_bs_bytes)
-			trig_len     = text_utils.utf8_len(typed_trigger)
-			deletes, to_type = trig_len, repl_text
-			is_final     = plan.final_result
+			trig_len      = text_utils.utf8_len(typed_trigger)
+			cascade_edit  = {
+				replacement = plan.text, trigger_len = trig_len,
+				tail = plan.tail, final_result = plan.final_result,
+			}
 		end
-		if replay_tail then
-			if chars == "\r" or chars == "\n" then
-				replay_spec = { kind = "key", key = "return", chars = chars }
-		elseif chars == "\t" then
-				replay_spec = { kind = "key", key = "tab", chars = chars }
-		else
-				replay_spec = { kind = "text", chars = chars }
-			end
-		end
-
-		-- In an ignored window there is no "char" kept on screen — erase it too.
-		if is_ignored then deletes = deletes + char_len end
-
-		-- When a NNBSP/NBSP was stripped before matching (typographic ``:``/`` ; ``),
-		-- add 1 extra backspace to erase the nbsp that sits between trigger and endchar.
-		if extra_bs_bytes > 0 then deletes = deletes + 1 end
+		-- Erase, type, then replay the terminator once the text has landed. The
+		-- terminator is the typed one unless its delimiter is consumed; a cascade
+		-- keeps it after the final text and swallows it once when consumed. In an
+		-- ignored window the event is on screen and is erased too; a stripped
+		-- NNBSP/NBSP (typographic ``:``/`` ; ``) sits between trigger and
+		-- terminator and costs one more backspace.
+		local injection = InjectionPlan.build({
+			path = InjectionPlan.PATH_TERMINATOR, trigger_len = trig_len, event_len = char_len,
+			event_on_screen = is_ignored == true, nbsp_stripped = extra_bs_bytes > 0,
+			replacement = eff_plain, terminator = chars, consume_terminator = consume_term,
+			final_result = m.final_result, cascade = cascade_edit,
+		})
+		local to_type, replay_tail, replay_spec = injection.text, injection.tail, injection.replay
+		local is_final = injection.final_result
 
 		local replacement_ok = M.perform_text_replacement(
-			deletes,
+			injection.erase,
 			function()
 				local c, s, logical, order_delay = emit_dispatch(m, to_type)
 
@@ -1193,9 +1187,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 			function()
 				-- buf_start is a valid byte index into _state.buffer: the buffer
 				-- is only mutated by this very closure, which runs after emit.
-				_state.buffer = _state.buffer:sub(1, start_byte - 1)
-					.. repl_text
-					.. (replay_tail or "")
+				_state.buffer = _state.buffer:sub(1, start_byte - 1) .. injection.buffer_suffix
 			end,
 			is_final,
 			is_ignored,
