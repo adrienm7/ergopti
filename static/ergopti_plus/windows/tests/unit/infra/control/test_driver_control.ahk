@@ -422,3 +422,40 @@ _TDCR_ReadinessAfterNativeActivationBody(World) {
 }
 Test("driver-control: token publication follows actual native endpoint activation (driver-control-endpoint-readiness)",
 	_TDCR_ReadinessAfterNativeActivation)
+
+_TDC_RequestSchemaToken(Fields, Expected) {
+	Spec := _TDC_Spec(), Corpus := _TDC_Corpus()
+	Text := '{' . Fields . ',"token":"' . Corpus["token"] . '","request_id":"schema-token"}'
+	Decoded := JsonParse(Text)
+	AssertTrue(Decoded is Map, "every candidate must be genuine valid JSON")
+	AssertEqual(Corpus["token"], Decoded["token"])
+	AssertEqual("schema-token", Decoded["request_id"])
+	Id := DriverControl_ParseRequest(Spec, Text, Corpus["token"], &Reason, &Echoed)
+	if Expected {
+		AssertEqual("schema-token", Id, "the authoritative JSON member must admit the canonical schema token")
+		AssertEqual("", Reason)
+		AssertEqual("", Echoed)
+	} else {
+		AssertEqual("", Id, "an earlier numeric member cannot bless a noncanonical authoritative schema token")
+		AssertEqual("malformed", Reason)
+		AssertEqual("schema-token", Echoed, "the malformed request keeps its own valid diagnostic identity")
+	}
+}
+for _TDC_SchemaCase in [
+	["canonical integer", '"schema":1', true],
+	["whitespace integer", '"schema" : 1 ', true],
+	["escaped schema key", '"sc\u0068ema":1', true],
+	["last canonical integer", '"schema":true,"schema":1', true],
+	["last escaped canonical integer", '"schema":true,"sc\u0068ema":1', true],
+	["boolean", '"schema":true', false],
+	["numeric string", '"schema":"1"', false],
+	["decimal", '"schema":1.0', false],
+	["exponent", '"schema":1e0', false],
+	["last boolean", '"schema":1,"schema":true', false],
+	["last numeric string", '"schema":1,"schema":"1"', false],
+	["last decimal", '"schema":1,"schema":1.0', false],
+	["last exponent", '"schema":1,"schema":1e0', false],
+	["last escaped boolean", '"schema":1,"sc\u0068ema":true', false]
+]
+	Test("driver-control: " . _TDC_SchemaCase[1] . " follows the decoded schema member (driver-control-schema-token-identity)",
+		_TDC_RequestSchemaToken.Bind(_TDC_SchemaCase[2], _TDC_SchemaCase[3]))
