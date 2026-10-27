@@ -184,3 +184,71 @@ _R7UR_RevokedReadyReturn() {
 }
 Test("Uninstall: retirement after native READY return cannot admit continuation (uninstall-ready-retirement)",
 	_R7UR_RevokedReadyReturn)
+
+
+; The common JavaScript lane is Linux. Register its Windows-only policy CLI in
+; the native driver suite so an OS skip cannot certify native uninstall policy.
+_R7NB_NativeUninstallPolicy() {
+	global _DriverDir, _SR_TreeOwnedTasks, _SR_TreeCaptureDebts
+	Repo := FSResolveDirectoryPath(_DriverDir . "\..\..\..")
+	Script := Repo . "\tools\test\test-windows-uninstall.cjs"
+	AssertTrue(FileExist(Script), "the actual native uninstall policy CLI must be present")
+	Observed := [], Control := Map(), Handle := 0
+	Capture(State, Native) {
+		Control["state"] := State
+		Control["capture_file"] := State["TmpFile"]
+		Control["capture_directory"] := State["CaptureDir"]
+	}
+	try {
+		Handle := ShellRunner_SpawnTreeOwned("node.exe", [Script],
+			(Code, Out, Err) => Observed.Push(Map("exit", Code, "output", Out)), , Capture, 16384)
+		AssertTrue(Handle.start(), "the actual Windows Node policy process must start")
+		Started := A_TickCount
+		while !TickExpired64(Started, 45000) {
+			_SR_TreePoll()
+			if Observed.Length == 1 && Control.Has("state") {
+				Claim := Control["state"]["TerminalClaim"]
+				if Claim is Map && Claim["TreeQuiesced"]
+						&& !FileExist(Claim["TmpFile"]) && !DirExist(Claim["CaptureDir"])
+					break
+			}
+			Sleep(10)
+		}
+		AssertEqual(1, Observed.Length, "the actual native uninstall policy must settle within its bound")
+		AssertEqual(0, Observed[1]["exit"], "native uninstall policy output: " . Observed[1]["output"])
+		Marker := "[OK] Windows uninstall requires confirmation, exact process exit and an unchanged owned executable."
+		Markers := 0
+		for Line in StrSplit(StrReplace(Observed[1]["output"], "`r`n", "`n"), "`n")
+			if Line == Marker
+				Markers += 1
+		AssertEqual(1, Markers, "a platform SKIP or missing native policy cannot replace the actual Windows success receipt")
+		AssertTrue(Control.Has("state"), "the real native construction observer must retain its exact owner")
+		State := Control["state"], Claim := State["TerminalClaim"]
+		AssertTrue(Control["capture_file"] != "" && Control["capture_directory"] != "", "the native CLI must own its actual bounded capture")
+		AssertEqual(Control["capture_file"], Claim["TmpFile"], "completion cannot erase capture identity instead of retiring its file")
+		AssertEqual(Control["capture_directory"], Claim["CaptureDir"], "completion retains the original capture directory identity")
+		AssertTrue(Claim is Map && Claim["TreeQuiesced"], "the exact Node and PowerShell process tree must be physically retired")
+		AssertFalse(State["FinalizationPending"], "native finalization cannot remain pending after policy success")
+		for Key in ["ProcessHandle", "ThreadHandle", "JobHandle"] {
+			AssertEqual(0, State[Key], "the original construction owner must release " . Key)
+			AssertEqual(0, Claim[Key], "the terminal owner must release " . Key)
+		}
+		AssertEqual(0, Claim["NativeErrors"].Length, "the actual native retirement must acknowledge all resources")
+		AssertFalse(_SR_TreeOwnedTasks.Has(State["TaskId"]), "the completed policy cannot retain an active native owner")
+		AssertFalse(_SR_TreeCaptureDebts.Has(ObjPtr(Claim)), "the completed policy cannot retain private capture cleanup debt")
+		AssertFalse(FileExist(Claim["TmpFile"]), "the private native policy capture must be removed")
+		AssertFalse(DirExist(Claim["CaptureDir"]), "the private native policy capture directory must be removed")
+	} finally {
+		if IsObject(Handle) {
+			Acknowledged := Handle.terminate()
+			if !Acknowledged {
+				AssertTrue(Control.Has("state"), "an unacknowledged task cannot lose its exact cleanup owner")
+				State := Control["state"]
+				AssertTrue(State["TreeQuiesced"] && !State["FinalizationPending"],
+					"an already completed task must retain its genuine physical retirement receipt")
+			}
+		}
+	}
+}
+Test("Uninstall native policy: actual Windows CLI executes the removal and startup controls (uninstall-native-policy-cli)",
+	_R7NB_NativeUninstallPolicy)
