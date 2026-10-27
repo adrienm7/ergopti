@@ -31,6 +31,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..', '..');
 const driversRoot = path.join(root, 'static', 'ergopti_plus');
@@ -122,21 +123,25 @@ function stripComments(source, syntax) {
 }
 
 /**
- * Collects every driver source outside tests and the catalogue itself.
+ * Collects every tracked driver source outside tests and the catalogue itself.
+ * The tracked list comes from the index, not a directory walk: other tests
+ * create and remove files under the driver tree while they run, and a walk
+ * that lists a file just before it disappears fails with ENOENT.
  * @param {string} dir Directory to scan.
- * @param {{driver: string, code: string}[]} out Accumulated sources.
  * @returns {{driver: string, code: string}[]} Comment-free sources, each with its driver.
  */
-function driverSources(dir, out = []) {
-	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-		const full = path.join(dir, entry.name);
-		const syntax = SYNTAX_BY_EXTENSION[path.extname(entry.name)];
-		if (entry.isDirectory()) {
-			if (!SKIPPED_DIRS.has(entry.name)) driverSources(full, out);
-		} else if (syntax) {
-			const driver = path.relative(driversRoot, full).split(path.sep)[0];
-			out.push({ driver, code: stripComments(fs.readFileSync(full, 'utf8'), syntax) });
-		}
+function driverSources(dir) {
+	const listed = execFileSync('git', ['-C', root, 'ls-files', '-z', '--', dir], {
+		encoding: 'utf8',
+		maxBuffer: 64 * 1024 * 1024
+	});
+	const out = [];
+	for (const relative of listed.split('\0').filter(Boolean)) {
+		const full = path.join(root, relative);
+		const inside = path.relative(dir, full).split(path.sep);
+		const syntax = SYNTAX_BY_EXTENSION[path.extname(full)];
+		if (!syntax || inside.slice(0, -1).some((name) => SKIPPED_DIRS.has(name))) continue;
+		out.push({ driver: inside[0], code: stripComments(fs.readFileSync(full, 'utf8'), syntax) });
 	}
 	return out;
 }
