@@ -805,7 +805,9 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       always the managed daemon on its own port and models directory (agent AK, macOS first, then Linux and
       Windows). MLX: already Ergopti's own environment; keep it so. Karabiner on macOS: this activates item 31
       (owned Karabiner runtime, ADR 011, dormant today behind `[karabiner] runtime = "owned"`); plan it as the
-      default. Linux and Windows: inventory every external tool the drivers call (ydotool, xdotool, wmctrl,
+      default. Rule from the maintainer: with tap-hold on, quit the user's Karabiner and run ours; with
+      tap-hold off and theirs present, never activate ours (this rewords ADR 011 decision 3). WebView2 stays
+      the system copy, with a version check and a clear refusal. Linux and Windows: inventory every external tool the drivers call (ydotool, xdotool, wmctrl,
       curl, Python, PowerShell modules, WebView2) and decide per tool whether Ergopti ships its own.
 - [ ] **Ctrl+Caps Lock slot on macOS.** [PHYS-M] The `secondary_capslock` slot binds through its own native
       entry again (ea02cf7000: the generic registrar refuses Caps Lock and the whole shortcut start rolled
