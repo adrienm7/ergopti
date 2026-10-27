@@ -5,6 +5,8 @@
 # daemon must remain alive while its menu reports the result.
 
 set -euo pipefail
+# The sentences this script prints, in the user's language (install/messages.sh).
+source "$(dirname -- "${BASH_SOURCE[0]}")/messages.sh"
 DRIVER_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "$DRIVER_ROOT/install/desktop_entry.sh"
 source "$DRIVER_ROOT/install/config_home.sh"
@@ -19,7 +21,7 @@ elif [[ "$DRIVER_ROOT" = */lib/ergopti/linux ]]; then
 	DESKTOP_NAME=ergopti-hotstrings.desktop
 	LAUNCHER="${DRIVER_ROOT%/lib/ergopti/linux}/bin/ergopti-hotstrings"
 else
-	echo 'Automatic startup requires an installed application.' >&2
+	ergopti_msg startup.requires_installed >&2
 	exit 78
 fi
 DESKTOP_FILE="$CONFIG_ROOT/autostart/$DESKTOP_NAME"
@@ -45,13 +47,13 @@ if [ "$ACTION" = status ]; then
 fi
 
 if [ -L "$DESKTOP_FILE" ]; then
-	echo 'Refusing to replace a linked startup setting.' >&2
+	ergopti_msg startup.linked_setting >&2
 	exit 78
 fi
 if [ -f "$DESKTOP_FILE" ] && ! grep -Fxq "Exec=$LAUNCHER --tray" "$DESKTOP_FILE" \
 	&& ! grep -Fxq "Exec=$LAUNCHER --session-start --tray" "$DESKTOP_FILE" \
 	&& ! grep -Fxq "$(ergopti_desktop_exec "$LAUNCHER")" "$DESKTOP_FILE"; then
-	echo 'The startup entry belongs to another command.' >&2
+	ergopti_msg startup.foreign_entry >&2
 	exit 78
 fi
 
@@ -94,7 +96,7 @@ mv -f -- "$desktop_tmp" "$DESKTOP_FILE"
 # by this menu. Never claim an unrelated payload file while updating this row.
 manifest="$DRIVER_ROOT/../.ergopti-owned-files"
 if [ -f "$manifest" ]; then
-	[ ! -L "$manifest" ] || { echo 'Linked ownership receipt refused.' >&2; exit 78; }
+	[ ! -L "$manifest" ] || { ergopti_msg startup.linked_receipt >&2; exit 78; }
 	receipt_tmp="$(mktemp "$manifest.XXXXXX")"
 	while IFS=$'\t' read -r digest relative; do
 		if [ "$relative" != @autostart ]; then printf '%s\t%s\n' "$digest" "$relative"; fi

@@ -5,6 +5,8 @@
 # the daemon grabs a keyboard, so the user can type into the system prompt.
 
 set -euo pipefail
+# The sentences this script prints, in the user's language (install/messages.sh).
+source "$(dirname -- "${BASH_SOURCE[0]}")/messages.sh"
 DRIVER_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 GROUPS_REFRESHED=false
 if [ "${1:-}" = --groups-refreshed ]; then GROUPS_REFRESHED=true; shift; fi
@@ -44,14 +46,14 @@ for arg in "$@"; do
 					export ERGOPTI_MISSING_PROGRAM="${BASH_REMATCH[1]}"
 					break
 				fi
-				echo 'Input permission authorization was cancelled or failed.' >&2
+				ergopti_msg launch.authorization_failed >&2
 				exit 78
 			fi
 		fi
 		groups=" $(id -nG) "
 		if [[ "$groups" != *' input '* || "$groups" != *' uinput '* ]]; then
 			if "$GROUPS_REFRESHED"; then
-				echo 'The session could not acquire its configured input groups.' >&2
+				ergopti_msg launch.groups_unavailable >&2
 				exit 78
 			fi
 			# sg acquires only its named group. Nest both missing groups, then
@@ -103,7 +105,7 @@ if "$DAEMON_LAUNCH"; then
 	else
 		status=$?
 		if [ "$status" -eq 1 ] && [ -z "$lock_diagnostic" ]; then
-			echo "Ergopti+ is already running in this session ($lock_root/ergopti.lock is held); this launch was refused." >&2
+			ergopti_msg launch.already_running "$lock_root/ergopti.lock" >&2
 			# A second session start (autostart racing the unit, a tray relaunch)
 			# is expected and succeeds; a direct launch reports the refusal.
 			if "$SESSION_START"; then exit 0; fi
