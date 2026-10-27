@@ -30,6 +30,8 @@
 
 'use strict';
 
+require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a generated config-key constant
+
 const fs = require('fs');
 const path = require('path');
 
@@ -208,7 +210,7 @@ for (const [file, needles] of [
 	],
 	[
 		['linux', 'ui', 'menu', 'menu_builder.lua'],
-		['set_global_threshold', 'TAP_HOLD_KEY_DELAY_USE_GLOBAL']
+		['set_global_threshold', 'tap_hold_key_delay_use_global']
 	],
 	[
 		['macos', 'ui', 'menu', 'menu_tap_holds.lua'],

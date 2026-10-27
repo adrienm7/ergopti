@@ -9,6 +9,8 @@
 
 'use strict';
 
+require('../lib/config-key-source-view.cjs').install(); // driver Lua may name a generated config-key constant
+
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
