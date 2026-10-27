@@ -1,6 +1,7 @@
 --- _shared/lua/keystats/physical_configuration_observation.lua
 
 --- Bounded configuration receipts only; native context and capture are separate owners.
+local ConfigKeys = require("config_keys")
 local M = {}
 
 --- Shared numeric values must be finite and integral on both Lua54 and LuaJIT.
@@ -37,7 +38,7 @@ function M.copy(configuration)
 	assert(type(configuration) == "table" and getmetatable(configuration) == nil,
 		"Invalid physical filter configuration")
 	local snapshot = {}
-	for _, field in ipairs({ "private_filter_enabled", "secure_field_filter_enabled", "system_auth_filter_enabled" }) do
+	for _, field in ipairs({ ConfigKeys.LEAF.PRIVATE_FILTER_ENABLED, "secure_field_filter_enabled", ConfigKeys.LEAF.SYSTEM_AUTH_FILTER_ENABLED }) do
 		assert(type(configuration[field]) == "boolean", "Invalid physical filter: " .. field)
 		snapshot[field] = configuration[field]
 	end

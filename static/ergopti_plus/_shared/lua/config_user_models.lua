@@ -10,7 +10,8 @@
 local M = {}
 local Outdated = require("config_outdated")
 local LeafRows = require("toml_codec.leaf_rows")
-M.PATH = { "llm", "models", "user_models" }
+local ConfigKeys = require("config_keys")
+M.PATH = { "llm", "models", ConfigKeys.LEAF.USER_MODELS }
 M.REASON = "a saved model record needs nonempty plain string backend and name fields"
 
 --- Judges only the fields the actual native saved-model selector consumes.
@@ -41,7 +42,7 @@ function M.partition(rows, shapes, mark)
 	-- Historical empty table headers are an existing neutral spelling. A
 	-- nonempty map never gains array ownership through that exception.
 	if next(rows) == nil then
-		if mark then mark("llm", "models", "user_models") end
+		if mark then mark("llm", "models", ConfigKeys.LEAF.USER_MODELS) end
 		return LeafRows.clone_value(rows)
 	end
 	if not shapes or not shapes.arrays or shapes.arrays[rows] ~= true then
@@ -51,9 +52,9 @@ function M.partition(rows, shapes, mark)
 	for index, row in ipairs(rows) do
 		if M.fits(row, shapes) then
 			kept[#kept + 1] = LeafRows.clone_value(row)
-			if mark then mark("llm", "models", "user_models", tostring(index)) end
+			if mark then mark("llm", "models", ConfigKeys.LEAF.USER_MODELS, tostring(index)) end
 		else
-			Outdated.report({ "llm", "models", "user_models", tostring(index) }, M.REASON)
+			Outdated.report({ "llm", "models", ConfigKeys.LEAF.USER_MODELS, tostring(index) }, M.REASON)
 		end
 	end
 	return kept
