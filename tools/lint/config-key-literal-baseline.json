@@ -1,16 +1,6 @@
 {
 	"_comment": "Raw config-key and menu-command-id literals per driver source file. Counts may only go down: tools/test/test-config-key-literals.cjs fails on a rise and on headroom left after a migration (lower it with --shrink).",
 	"files": {
-		"static/ergopti_plus/_shared/lua/config_unused_keys.lua": 1,
-		"static/ergopti_plus/_shared/lua/config_user_models.lua": 4,
-		"static/ergopti_plus/_shared/lua/diagnostics/snapshot.lua": 1,
-		"static/ergopti_plus/_shared/lua/keystats/physical_configuration_observation.lua": 2,
-		"static/ergopti_plus/_shared/lua/layout/number_row_policy.lua": 3,
-		"static/ergopti_plus/_shared/lua/menu/personal_files.lua": 13,
-		"static/ergopti_plus/_shared/lua/menu/wrap_preferences.lua": 13,
-		"static/ergopti_plus/_shared/lua/tap_hold/key_combinations.lua": 2,
-		"static/ergopti_plus/_shared/lua/toml_codec/record_list.lua": 4,
-		"static/ergopti_plus/_shared/lua/toml_codec/writer.lua": 1,
 		"static/ergopti_plus/_shared/modules/features/caps_word_auto_off_policy.ahk": 2,
 		"static/ergopti_plus/_shared/modules/hotstrings/scope_overrides.ahk": 2,
 		"static/ergopti_plus/linux/ergopti_hotstrings.lua": 2,

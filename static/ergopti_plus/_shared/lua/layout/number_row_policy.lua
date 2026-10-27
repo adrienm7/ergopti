@@ -146,14 +146,14 @@ function M.native_rows(renderer, commands)
 	local declaration = type(definitions) == "table" and #definitions == 2 and definitions[1]
 	local edges = type(definitions) == "table" and definitions[2]
 	if type(edges) ~= "table" or edges.type ~= "check" or edges.path ~= ConfigKeys.KEY.LAYOUT_NUMBER_ROW_REORDER_EDGES
-		or edges.id ~= "number_row_edges" then return {} end
+		or edges.id ~= ConfigKeys.COMMAND.NUMBER_ROW_EDGES then return {} end
 	local choices = type(declaration) == "table" and declaration.choices
 	if type(choices) ~= "table" or #choices ~= 3
 		then return {} end
 	for index, value in ipairs({ "native", "digits", "symbols" }) do
 		if type(choices[index]) ~= "table" or choices[index].value ~= value then return {} end
 	end
-	local row = renderer.choice_row("number_row_policy_rows", "number_row_mode",
+	local row = renderer.choice_row("number_row_policy_rows", ConfigKeys.COMMAND.NUMBER_ROW_MODE,
 		commands,
 		{ [ConfigKeys.KEY.LAYOUT_DIRECT_ACCESS_DIGITS] = function() return "native" end })
 	if type(row) ~= "table" or type(row.items) ~= "table" or #row.items ~= #choices then return {} end
@@ -169,7 +169,7 @@ function M.native_rows(renderer, commands)
 	end
 	-- The edge keys follow the ordering, which these drivers do not apply.
 	if type(renderer.check_row) ~= "function" then return {} end
-	local check = renderer.check_row("number_row_policy_rows", "number_row_edges",
+	local check = renderer.check_row("number_row_policy_rows", ConfigKeys.COMMAND.NUMBER_ROW_EDGES,
 		{ number_row_edges = commands[ConfigKeys.COMMAND.NUMBER_ROW_EDGES] },
 		{ number_row_edges_enabled = function() return false end })
 	if type(check) ~= "table" then return {} end
