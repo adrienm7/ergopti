@@ -214,7 +214,7 @@ helpers.describe("prompt prediction: a rewrite from the key press to the injecte
 
 	helpers.it("llm_predict_rewrite rewrites the current sentence with the menu's count", function()
 		scenario({ buffer = "Bonjour Marc. ok pr jd 14h" }, function(world)
-			helpers.assert_eq(world.handlers.llm_predict_rewrite("keyboard__super_r", nil), true,
+			helpers.assert_eq(world.handlers.llm_predict_rewrite("keyboard__meta_r", nil), true,
 				"the preset starts a request")
 			helpers.assert_eq(#world.posts, 1, "the first variant is sent at once")
 			local post = world.posts[1]
@@ -265,7 +265,7 @@ helpers.describe("prompt prediction: a rewrite from the key press to the injecte
 
 	helpers.it("a normal prediction is unchanged: the menu's prompt, count, tail and budget", function()
 		scenario({ buffer = "Bonjour Marc, je voulais te dire" }, function(world)
-			helpers.assert_eq(world.handlers.llm_generate_prediction("keyboard__super_space", nil), true)
+			helpers.assert_eq(world.handlers.llm_generate_prediction("keyboard__meta_space", nil), true)
 			local post = world.posts[1]
 			helpers.assert_true(system_turn(post):find("REWRITE:", 1, true) == nil, "not the rewrite prompt")
 			helpers.assert_eq(user_turn(post), "Bonjour Marc, je voulais te dire", "basic sends the text alone")

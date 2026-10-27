@@ -34,11 +34,11 @@ local Codec = require("toml_codec")
 local Manifest = require("infra.manifest_reader")
 
 local SOURCE = '[shortcuts]\nenabled = true\nwrap_text_if_selected = true\nchatgpt_url = "https://old.example"\nunknown = "keep"\n'
-	.. '[shortcuts.keyboard]\nctrl_j = "open_url"\nctrl_k = "enter"\nctrl_p = "script_reload"\nforeign_slot = "keep"\n'
+	.. '[shortcuts.keyboard]\nprimary_j = "open_url"\nprimary_k = "enter"\nprimary_p = "script_reload"\nforeign_slot = "keep"\n'
 	.. '[shortcuts.tap_keys]\nnumber_row_left = "send_text"\nunknown = "keep"\n'
-	.. '[gesture_parameters]\nkeyboard__ctrl_j__open_url = "https://old.example"\ntap_key__number_row_left__send_text = "typed"\n'
+	.. '[gesture_parameters]\nkeyboard__primary_j__open_url = "https://old.example"\ntap_key__number_row_left__send_text = "typed"\n'
 	.. 'tap_3__open_url = "https://gesture.example"\ntap_hold__caps_lock__open_url = "https://hold.example"\nunknown = "keep"\n'
-	.. '[linux.action_parameters]\nkeyboard__ctrl_k__open_url = "https://legacy.example"\nunknown = "keep"\n'
+	.. '[linux.action_parameters]\nkeyboard__primary_k__open_url = "https://legacy.example"\nunknown = "keep"\n'
 	.. '[gestures]\nenabled = false\ntap_3 = "enter"\n[metrics]\nenabled = true\n[llm]\nenabled = true\n[other]\nvalue = 42\n'
 
 --- Uses real state owners and only controlled native/file publication ports.
@@ -120,7 +120,7 @@ local function with_scope(body, source, options)
 			end
 			local apply_parameters = gestures.apply_parameter_configuration
 			gestures.apply_parameter_configuration = function(token, state)
-				if controls.refuse_restore and state.keyboard__ctrl_j__open_url then return false end
+				if controls.refuse_restore and state.keyboard__primary_j__open_url then return false end
 				return apply_parameters(token, state)
 			end
 			local chords = require("modules.shortcuts.script_chords")

@@ -4,7 +4,7 @@
 --- MODULE: Configurable Keyboard Shortcuts (Linux)
 --- DESCRIPTION:
 --- The user's own modifier chords, bound to the same action catalogue the
---- gestures use. A slot is a modifier prefix plus a key — `ctrl_shift_p` — and
+--- gestures use. A slot is a modifier prefix plus a key — `primary_shift_p` — and
 --- the user assigns an action to it from the tray menu.
 ---
 --- WHY THIS DRIVER HAD NONE:
@@ -41,6 +41,7 @@ local TableUtil = require("table_util")
 local Logger = require("logger.shim")
 local ShortcutCatalogue = require("shortcuts.catalogue")
 local ConfigOutdated = require("config_outdated")
+local SlotRoles = require("shortcuts.slot_roles")
 local Paths = require("infra.paths")
 local ScriptActions = require("modules.shortcuts.script_actions")
 local AiActions = require("modules.shortcuts.ai_actions")
@@ -60,21 +61,21 @@ local LOG = "modules.shortcuts.keyboard_shortcuts"
 
 -- The modifier prefixes a slot id can start with, longest first.
 --
--- Ordered, and iterated with ipairs: "ctrl_shift_x" also starts with "ctrl_",
--- so a shorter prefix reached first would resolve the wrong chord. macOS keeps
--- the same list in the same order for the same reason.
+-- They come from the role-named families of the shared table
+-- (shortcuts.slot_roles): "primary_g" is Ctrl+G, "meta_space" Super+Space.
+-- Ordered, and iterated with ipairs: "primary_shift_x" also starts with
+-- "primary_", so a shorter prefix reached first would resolve the wrong chord.
 --
--- No `cmd`: there is no command key on a PC keyboard. `super` is what the key
--- between Ctrl and Alt is called on Linux, and calling it cmd here would put a
--- label on screen that names a key the user does not have.
-local SLOT_MODS = {
-	{ "ctrl_shift_", { "ctrl", "shift" } },
-	{ "super_shift_", { "meta", "shift" } },
-	{ "alt_shift_", { "alt", "shift" } },
-	{ "ctrl_", { "ctrl" } },
-	{ "super_", { "meta" } },
-	{ "alt_", { "alt" } },
-}
+-- No `cmd`: there is no command key on a PC keyboard. `meta` is what the key
+-- between Ctrl and Alt is called here, and calling it cmd would put a label on
+-- screen that names a key the user does not have.
+local SLOT_MODS = {}
+for _, family in ipairs(SlotRoles.families("linux")) do
+	local mods = {}
+	for index, native in ipairs(family.native) do mods[index] = native == "super" and "meta" or native end
+	SLOT_MODS[#SLOT_MODS + 1] = { family.prefix, mods }
+end
+table.sort(SLOT_MODS, function(a, b) return #a[1] > #b[1] end)
 
 -- What each modifier is drawn as in a menu label. Words rather than symbols:
 -- Linux desktops have no single convention for modifier glyphs, and a symbol
@@ -125,10 +126,10 @@ local SPECIAL_KEYS = {
 -- catalogue prefixes; contextual slots retain their stable logical identity.
 M.SLOT_GROUPS = {
 	{ prefix = "contextual", group_key = "menu.shortcuts.group_contextual" },
-	{ prefix = "ctrl_", group_key = "menu.shortcuts.ctrl_group", add_key = "menu.shortcuts.ctrl_add" },
-	{ prefix = "ctrl_shift_", group_key = "menu.shortcuts.ctrl_shift_group", add_key = "menu.shortcuts.ctrl_shift_add" },
+	{ prefix = "primary_", group_key = "menu.shortcuts.ctrl_group", add_key = "menu.shortcuts.ctrl_add" },
+	{ prefix = "primary_shift_", group_key = "menu.shortcuts.ctrl_shift_group", add_key = "menu.shortcuts.ctrl_shift_add" },
 	{ prefix = "alt_", group_key = "menu.shortcuts.alt_group", add_key = "menu.shortcuts.alt_add" },
-	{ prefix = "super_", group_key = "menu.shortcuts.super_group", add_key = "menu.shortcuts.super_add" },
+	{ prefix = "meta_", group_key = "menu.shortcuts.super_group", add_key = "menu.shortcuts.super_add" },
 }
 
 -- The manifest section whose entries are this driver's shipped slot bindings
@@ -620,7 +621,7 @@ function M.magic_editor_decision(admission)
 	for _, candidate in ipairs(source.candidates) do
 		if candidate.direct and not candidate.dead then
 			local suffix = suffix_of(candidate.native_text or candidate.text)
-			local slot = suffix and ("super_" .. suffix) or nil
+			local slot = suffix and ("meta_" .. suffix) or nil
 			local action = slot and _explicit_assignments[slot] or nil
 			if action ~= nil then claims[candidate.identity] = { action = action, binding_id = M.binding_id(slot) } end
 			local physical_slot = physical_slots().encode(candidate.code, { super = true })

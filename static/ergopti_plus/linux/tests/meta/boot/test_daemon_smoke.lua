@@ -178,7 +178,7 @@ local function with_paths_restart(mode, body)
     end
     for _, id in ipairs({ "a", "b" }) do
       write(f.dirs[id] .. "/config.toml", "# owner " .. id .. "\n[shortcuts]\nenabled = "
-        .. tostring(id == "a") .. "\n[shortcuts.keyboard]\nctrl_j = \""
+        .. tostring(id == "a") .. "\n[shortcuts.keyboard]\nprimary_j = \""
         .. (id == "a" and "copy" or "none") .. "\"\n[hotstrings]\ngroups = { autocorrection = false }\n")
     end
     for _, name in ipairs({ "modules.gestures.manager", "modules.shortcuts.manager",
@@ -187,7 +187,7 @@ local function with_paths_restart(mode, body)
     gestures.init({ persist = true, enabled = false })
     local shortcuts = require("modules.shortcuts.manager"); shortcuts.init({ persist = true })
     local keyboard = require("modules.shortcuts.keyboard_shortcuts")
-    helpers.assert_eq(keyboard.get_action("ctrl_j"), "copy")
+    helpers.assert_eq(keyboard.get_action("primary_j"), "copy")
     helpers.assert_true(shortcuts.is_enabled())
     local hotstrings = require("modules.hotstrings.hotstrings_config")
     local engine = require("modules.hotstrings.engine").new()
@@ -256,7 +256,7 @@ helpers.describe("paths editor complete daemon restart", function()
         helpers.assert_eq(state.shutdowns, mode == "relay" and 1 or 0)
         helpers.assert_eq(#state.commands, 1)
         helpers.assert_contains(state.commands[1], mode == "relay" and "setsid sh -c" or "systemctl --user --no-block restart")
-        helpers.assert_eq(keyboard.get_action("ctrl_j"), "copy", "old A generation remains A until exit")
+        helpers.assert_eq(keyboard.get_action("primary_j"), "copy", "old A generation remains A until exit")
         helpers.assert_true(shortcuts.is_enabled(), "request acknowledgement is not synchronous reinitialization")
       end)
     end)

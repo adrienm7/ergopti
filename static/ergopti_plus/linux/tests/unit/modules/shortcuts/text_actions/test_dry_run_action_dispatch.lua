@@ -50,11 +50,11 @@ local function with_action(route, mode, action, body)
 		helpers.assert_eq(environment.opts.grab, route ~= "observe")
 		local configuration = assert(io.open(path, "wb"))
 		configuration:write('[shortcuts]\nenabled = true\nwrap_text_if_selected = false\n'
-			.. '[shortcuts.keyboard]\nctrl_j = "' .. action .. '"\n'
+			.. '[shortcuts.keyboard]\nprimary_j = "' .. action .. '"\n'
 			.. '[shortcuts.tap_keys]\nnumber_row_left = "' .. action .. '"\n'
 			.. '[shortcuts.script_control]\nchords_enabled = true\nscript_altgr_enter = "' .. action .. '"\n'
 			.. '[gestures]\nenabled = ' .. tostring(route == "gesture") .. '\ntap_3 = "' .. action .. '"\n'
-			.. '[gesture_parameters]\nkeyboard__ctrl_j__send_text = "ok"\n'
+			.. '[gesture_parameters]\nkeyboard__primary_j__send_text = "ok"\n'
 			.. 'tap_key__number_row_left__send_text = "ok"\nscript__script_altgr_enter__send_text = "ok"\n'
 			.. 'tap_3__send_text = "ok"\n')
 		assert(configuration:close())

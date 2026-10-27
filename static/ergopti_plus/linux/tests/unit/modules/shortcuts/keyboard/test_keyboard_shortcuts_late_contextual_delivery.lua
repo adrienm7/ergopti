@@ -392,7 +392,7 @@ helpers.describe("Keyboard consumption queue acknowledgement", function()
 	for _, scenario in ipairs({ "inline true", "inline false", "inline throw",
 		"retained false", "retained nil", "retained unknown", "retained throw" }) do
 		helpers.it("(consume-queue-ack) refuses " .. scenario .. " before any action", function()
-			local shortcuts = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
+			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
 			local gestures = require("modules.gestures.manager")
 			local execute, pending, fired, before_ack = gestures.execute_action, nil, {}, nil
 			gestures.execute_action = function(action) fired[#fired + 1] = action end
@@ -427,7 +427,7 @@ helpers.describe("Keyboard consumption queue acknowledgement", function()
 
 	for _, scenario in ipairs({ "duplicate delivery", "reentrant delivery" }) do
 		helpers.it("(consume-queue-ack) acknowledges one action under " .. scenario, function()
-			local shortcuts = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
+			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
 			local gestures = require("modules.gestures.manager")
 			local execute, pending, fired, reentered = gestures.execute_action, nil, {}, false
 			gestures.execute_action = function(action)
@@ -443,7 +443,7 @@ helpers.describe("Keyboard consumption queue acknowledgement", function()
 					end,
 				})
 				helpers.assert_eq(consumed, true)
-				helpers.assert_eq(slot, "ctrl_j")
+				helpers.assert_eq(slot, "primary_j")
 				helpers.assert_eq(fired, {})
 				pending()
 				pending()
@@ -461,23 +461,23 @@ end)
 
 helpers.describe("keyboard collision claim source", function()
 	helpers.it("retains explicit native reservations and refuses source divergence", function()
-		local keyboard, storage = load_over_config({ ctrl_j = "none", magic_editor = "none" })
+		local keyboard, storage = load_over_config({ primary_j = "none", magic_editor = "none" })
 		local ok, why = pcall(function()
 			local frame = assert(keyboard.capture_collision_inventory())
 			helpers.assert_true(frame.current())
 			local found = false
 			for _, claim in ipairs(frame.claims) do
-				if claim.binding == "keyboard__ctrl_j" then found = claim.key == "j" and claim.mods.ctrl == true end
+				if claim.binding == "keyboard__primary_j" then found = claim.key == "j" and claim.mods.ctrl == true end
 			end
 			helpers.assert_true(found, "None is a retained ordinary native-behavior reservation")
-			Sandbox.write_bytes(storage.path, '[shortcuts.keyboard]\nctrl_j = "copy"\nmagic_editor = "none"\n')
+			Sandbox.write_bytes(storage.path, '[shortcuts.keyboard]\nprimary_j = "copy"\nmagic_editor = "none"\n')
 			helpers.assert_eq(frame.current(), false)
 			helpers.assert_nil(keyboard.capture_collision_inventory())
 		end)
 		drop_config(); if not ok then error(why, 0) end
 	end)
 	helpers.it("configuration acquisition and its release cannot revive an old collision frame", function()
-		local keyboard = load_over_config({ ctrl_j = "none", magic_editor = "none" })
+		local keyboard = load_over_config({ primary_j = "none", magic_editor = "none" })
 		local ok, why = pcall(function()
 			local frame = assert(keyboard.capture_collision_inventory()); local token = {}
 			helpers.assert_true(keyboard.acquire_configuration(token))
@@ -495,7 +495,7 @@ end)
 helpers.describe("keyboard shortcuts: live deferred admission", function()
 	for _, gate in ipairs({ "master", "paused", "inhibited", "reader failure", "reader replacement" }) do
 		helpers.it("(ordinary-live-admission) cancels an ordinary action after " .. gate, function()
-			local shortcuts = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
+			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
 			local gestures = require("modules.gestures.manager")
 			local execute = gestures.execute_action
 			local pending, fired, refuse = nil, 0, false
@@ -531,7 +531,7 @@ helpers.describe("keyboard shortcuts: live deferred admission", function()
 
 	for _, gate in ipairs({ "master", "paused" }) do
 		helpers.it("(ordinary-live-admission) keeps script control available through " .. gate, function()
-			local shortcuts = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "script_pause_toggle" })
+			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "script_pause_toggle" })
 			local gestures = require("modules.gestures.manager")
 			local execute, pending, fired = gestures.execute_action, nil, 0
 			local admission = { master = true, paused = false, inhibited = false }
@@ -558,7 +558,7 @@ end)
 helpers.describe("keyboard shortcuts: admission callback boundaries", function()
 	for _, phase in ipairs({ "capture", "queue acknowledgement", "execution log" }) do
 		helpers.it("(ordinary-live-admission) rechecks pause at " .. phase, function()
-			local shortcuts = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
+			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
 			local gestures, logger = require("modules.gestures.manager"), require("logger.shim")
 			local execute, debug_log = gestures.execute_action, logger.debug
 			local pending, fired, queued = nil, 0, 0
