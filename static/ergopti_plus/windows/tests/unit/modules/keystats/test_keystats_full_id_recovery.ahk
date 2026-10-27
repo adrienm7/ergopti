@@ -172,3 +172,101 @@ for Date in ["", "2024-02-29", "2000-02-29", "2026-09-12"]
 for JsonDate in ['"\u0000"', '"\u0000hidden"', '"2026-09-12\u0000"']
 	Test("keystats: reject NUL date case " . A_Index . " (state-calendar-nul)",
 		_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":4,"today_log_date":' . JsonDate . '}'))
+
+Test("keystats: reject nonnumeric state counter-boolean (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":true,"today_log_offset":4}'))
+Test("keystats: reject nonnumeric state counter-final-boolean (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"next_event_id":true,"today_log_offset":4}'))
+Test("keystats: reject nonnumeric state counter-escaped-boolean (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_\u0069d":true,"today_log_offset":4}'))
+Test("keystats: reject nonnumeric state counter-final-escaped-boolean (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"next_event_\u0069d":true,"today_log_offset":4}'))
+Test("keystats: reject nonnumeric state offset-true (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":true}'))
+Test("keystats: reject nonnumeric state offset-false (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":false}'))
+Test("keystats: reject nonnumeric state offset-final-boolean (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":4,"today_log_offset":true}'))
+Test("keystats: reject nonnumeric state offset-escaped-boolean (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_\u006fffset":true}'))
+Test("keystats: reject nonnumeric state offset-final-escaped-boolean (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":4,"today_log_\u006fffset":false}'))
+Test("keystats: preserve canonical numeric state counter-final-number (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":true,"next_event_id":42,"today_log_offset":4,"today_log_date":"2026-09-11"}', true))
+Test("keystats: preserve canonical numeric state offset-final-number (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":true,"today_log_offset":4,"today_log_date":"2026-09-11"}', true))
+Test("keystats: preserve canonical numeric state counter-escaped-number (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_\u0069d":42,"today_log_offset":4,"today_log_date":"2026-09-11"}', true))
+Test("keystats: preserve canonical numeric state offset-escaped-number (state-numeric-provenance)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_\u006fffset":4,"today_log_date":"2026-09-11"}', true))
+
+_KFIR_StateOffsetIngest(BooleanOffset) {
+	Names := ["initialized", "_shutting_down", "today_log_path", "today_log_offset",
+		"today_log_date", "state_json_path", "data_sql_path", "_today_fh",
+		"_today_fh_date", "_pending_entries", "next_event_id", "device_id", "_device_id_lit", "rollover_pending"]
+	Saved := Map()
+	for Name in Names
+		if Keystats.HasOwnProp(Name)
+			Saved[Name] := Keystats.%Name%
+	Windows := KLWV.windows
+	Root := _FSWL_Path() . "-state-ingest"
+	Db := 0, OwnsRoot := false, OwnsJournal := false
+	try {
+		AssertFalse(DirExist(Root))
+		DirCreate(Root)
+		OwnsRoot := true
+		Keystats.initialized := true
+		Keystats._shutting_down := false
+		Keystats.today_log_path := Root . "\today.log"
+		Keystats.today_log_offset := 0
+		Keystats.today_log_date := KL_Today()
+		Keystats.state_json_path := Root . "\state.json"
+		Keystats.data_sql_path := Root . "\data.sql"
+		Keystats._today_fh := unset
+		OwnsJournal := true
+		Keystats._today_fh_date := ""
+		Keystats.next_event_id := 77
+		Keystats.device_id := "dev-one"
+		Keystats._device_id_lit := KL_SqlStr("dev-one")
+		Keystats._pending_entries := []
+		Keystats.rollover_pending := 0
+		KLWV.windows := Map()
+		FileAppend("-- private source`n", Keystats.data_sql_path, "UTF-8-RAW")
+		Entry := Map("type", "mouse_click", "_event_id", 3, "timestamp", KL_NowTimestamp(), "app", "fixture.exe")
+		FileAppend(KL_JsonEncode(Entry) . "`n", Keystats.today_log_path, "UTF-8-RAW")
+		Source := '{"next_event_id":42,"today_log_offset":' . (BooleanOffset ? "true" : "0")
+			. ',"today_log_date":"' . KL_Today() . '"}'
+		FileAppend(Source, Keystats.state_json_path, "UTF-8-RAW")
+		Loaded := KL_LoadState()
+		Result := KL_IngestOnce(true, true)
+		FileAppend("# state_offset_boolean=" . BooleanOffset . " loaded=" . Loaded
+			. " ingest_ok=" . Result["ok"] . " reason=" . Result.Get("reason", "accepted") . "`n", "*")
+		AssertTrue(Result["ok"], "a rejected boolean checkpoint must leave the real journal readable from its intact initial boundary")
+		AssertEqual(!BooleanOffset, Loaded)
+		AssertEqual(FileGetSize(Keystats.today_log_path), Keystats.today_log_offset)
+		_KLRDC_EnsureSharedDir()
+		Db := SQLite_Open(":memory:")
+		AssertTrue(Db != 0)
+		AssertTrue(KLR_LoadSchema(Db))
+		AssertTrue(SQLite_Exec(Db, FileRead(Keystats.data_sql_path, "UTF-8")))
+		AssertEqual(1, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_mouse WHERE id=3;")[1]["n"],
+			"the actual saved journal record must reach native SQL exactly once")
+	} finally {
+		if Db
+			SQLite_Close(Db)
+		if OwnsJournal && Keystats.HasOwnProp("_today_fh") && IsObject(Keystats._today_fh)
+			Keystats._today_fh.Close()
+		for Name in Names {
+			if Saved.Has(Name)
+				Keystats.%Name% := Saved[Name]
+			else if Keystats.HasOwnProp(Name)
+				Keystats.DeleteProp(Name)
+		}
+		KLWV.windows := Windows
+		if OwnsRoot
+			DirDelete(Root, true)
+	}
+}
+for _KFIR_BooleanOffset in [false, true]
+	Test("keystats: state checkpoint boolean=" . _KFIR_BooleanOffset . " cannot block real journal ingestion (state-numeric-ingest-boundary)",
+		_KFIR_StateOffsetIngest.Bind(_KFIR_BooleanOffset))

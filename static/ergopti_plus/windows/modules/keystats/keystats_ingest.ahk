@@ -15,19 +15,25 @@ KL_LoadState() {
 	if !FileExist(Keystats.state_json_path)
 		return false
 	try {
-		State := KL_JsonDecode(FileRead(Keystats.state_json_path, "UTF-8"))
+		Source := FileRead(Keystats.state_json_path, "UTF-8")
+		State := KL_JsonDecode(Source)
 		if !(State is Map)
 			return false
 		; Even an invalid surrounding state cannot erase a pending rotation.
 		; The negative sentinel fences admission until a valid receipt is loaded.
 		if State.Has("rollover_pending")
 			Keystats.rollover_pending := -1
-		CounterValid := State.Has("next_event_id") && State["next_event_id"] is Integer
-			&& State["next_event_id"] > 0
+		; AHK aliases JSON booleans to Integers. Only numeric source members
+		; may authorize identity recovery or publish a journal byte checkpoint.
+		Members := JsonObjectMemberSpans(Source)
+		CounterValid := State.Has("next_event_id")
+			&& Members["next_event_id"]["kind"] = "number"
+			&& State["next_event_id"] is Integer && State["next_event_id"] > 0
 		if !CounterValid
 			return false
 		if State.Has("today_log_offset")
-			&& (!(State["today_log_offset"] is Integer) || State["today_log_offset"] < 0)
+			&& (Members["today_log_offset"]["kind"] != "number"
+				|| !(State["today_log_offset"] is Integer) || State["today_log_offset"] < 0)
 			return false
 		if State.Has("today_log_date") && !_KL_JournalDateValid(State["today_log_date"], true)
 			return false
