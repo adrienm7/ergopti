@@ -186,6 +186,68 @@ Test("Uninstall: retirement after native READY return cannot admit continuation 
 	_R7UR_RevokedReadyReturn)
 
 
+; Node prints its assertion header after bootstrap frames; surface its actual
+; message in the single-line failure annotation and retain the bounded capture.
+_R7NB_FailureHeadline(Output) {
+	static MAX_HEADLINE_CHARS := 768
+	Lines := StrSplit(StrReplace(Output, "`r", ""), "`n")
+	Headline := "", FoundAssertion := false
+	for _, Line in Lines {
+		if !FoundAssertion {
+			if RegExMatch(Line, "^\s*AssertionError(?:\s+\[[^\]]+\])?:") {
+				Headline := Trim(Line)
+				FoundAssertion := true
+			}
+			continue
+		}
+		if RegExMatch(Line, "^\s+at\s")
+			break
+		if Trim(Line) != ""
+			Headline .= " " . Trim(Line)
+		if StrLen(Headline) >= MAX_HEADLINE_CHARS
+			break
+	}
+	if !FoundAssertion {
+		for _, Line in Lines {
+			if Trim(Line) != "" {
+				Headline := Trim(Line)
+				break
+			}
+		}
+	}
+	return SubStr(Headline, 1, MAX_HEADLINE_CHARS)
+}
+
+_R7NB_DiagnosticAssertionHeadline() {
+	Output := "node:assert:150`n  throw new AssertionError(obj);`n  ^`n`n"
+		. "AssertionError [ERR_ASSERTION]: The native worker refused cleanup.`n"
+		. "Foreign startup shortcut removed`n    at Object.<anonymous> (native-policy.cjs:149:9)`n"
+	Headline := _R7NB_FailureHeadline(Output)
+	AssertEqual("AssertionError [ERR_ASSERTION]: The native worker refused cleanup. Foreign startup shortcut removed", Headline)
+	Caught := 0
+	try AssertEqual(0, 1, "native uninstall policy output: " . Headline)
+	catch as Err
+		Caught := Err
+	AssertTrue(IsObject(Caught), "the real status assertion must remain a failure")
+	FirstLine := StrSplit(Caught.Message, "`n")[1]
+	AssertTrue(InStr(FirstLine, "Foreign startup shortcut removed"), "the actual cause must survive the annotation's first-line boundary")
+	AssertFalse(InStr(FirstLine, "node:assert:150"), "bootstrap frames cannot hide the actual assertion message")
+}
+Test("Uninstall native policy diagnostics: assertion cause survives the first-line annotation (uninstall-native-policy-diagnostic)",
+	_R7NB_DiagnosticAssertionHeadline)
+
+_R7NB_DiagnosticRuntimeHeadline() {
+	AssertEqual("Error: native policy process could not start", _R7NB_FailureHeadline("`nError: native policy process could not start`n    at start (native-policy.cjs:1:1)`n"))
+	LongOutput := "AssertionError [ERR_ASSERTION]: "
+	Loop 2000
+		LongOutput .= "x"
+	Headline := _R7NB_FailureHeadline(LongOutput)
+	AssertTrue(StrLen(Headline) > 0 && StrLen(Headline) < StrLen(LongOutput), "the annotation must remain bounded without losing the assertion identity")
+	AssertTrue(InStr(Headline, "AssertionError [ERR_ASSERTION]: ") == 1)
+}
+Test("Uninstall native policy diagnostics: runtime errors remain visible and bounded (uninstall-native-policy-diagnostic)",
+	_R7NB_DiagnosticRuntimeHeadline)
+
 ; The common JavaScript lane is Linux. Register its Windows-only policy CLI in
 ; the native driver suite so an OS skip cannot certify native uninstall policy.
 _R7NB_NativeUninstallPolicy() {
@@ -215,7 +277,11 @@ _R7NB_NativeUninstallPolicy() {
 			Sleep(10)
 		}
 		AssertEqual(1, Observed.Length, "the actual native uninstall policy must settle within its bound")
-		AssertEqual(0, Observed[1]["exit"], "native uninstall policy output: " . Observed[1]["output"])
+		if Observed[1]["exit"] != 0 {
+			for _, Line in StrSplit(StrReplace(Observed[1]["output"], "`r", ""), "`n")
+				_TestPrint("# native uninstall policy output: " . Line)
+		}
+		AssertEqual(0, Observed[1]["exit"], "native uninstall policy output: " . _R7NB_FailureHeadline(Observed[1]["output"]))
 		Marker := "[OK] Windows uninstall requires confirmation, exact process exit and an unchanged owned executable."
 		Markers := 0
 		for Line in StrSplit(StrReplace(Observed[1]["output"], "`r`n", "`n"), "`n")
