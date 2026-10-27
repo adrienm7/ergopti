@@ -53,6 +53,10 @@ the switch, the build produces no release archive, and every entry of
 stages (LuaSocket) are read from the developer app's own payload; everything else
 comes from the clone, including the commit shown in About (from `.git`).
 
+Linux and Windows have the same mode (`tools/dev/run-linux-dev.sh`,
+`tools/dev/run-windows-dev.ps1`); `docs/design/developer-mode.md` lists, per OS,
+what still differs from the built app.
+
 ## Abrupt launcher termination
 
 `applicationWillTerminate` covers a normal launcher quit, but macOS cannot run
