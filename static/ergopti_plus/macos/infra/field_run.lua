@@ -26,8 +26,12 @@
 --- 5. The user's configuration is snapshot before the first step and compared
 ---    after the last; anything a step changed is put back and named in the
 ---    config_guard result, which then fails.
---- 6. A run cut short by a reload is closed at the next start: its done file
----    says interrupted, so the collector never waits for a run that is gone.
+--- 6. A run never reloads itself: while one runs, the auto-reload watchers hold
+---    a source-change reload (M.holds_reload) and name the paths they hold.
+---    A reload or quit that still happens (the menu, a person) closes the run
+---    at teardown with its kind and reason; a run cut short without teardown is
+---    closed at the next start. Either way the done file says interrupted, so
+---    the collector never waits for a run that is gone.
 --- ==============================================================================
 
 local M = {}
@@ -413,13 +417,35 @@ function Session:queue_request()
 	end)
 end
 
---- Stops watching and withdraws the readiness file; a running run is abandoned
---- and closed as interrupted by the next start.
+--- Closes the running run as interrupted, naming what cut it short.
+--- @param cause table|nil { kind, reason } of the terminal transition.
+function Session:close_running(cause)
+	local run = self.run
+	if run == nil or run.abandoned then return end
+	run.abandoned = true
+	run.cancel_timers()
+	local kind = type(cause) == "table" and safe_code(cause.kind) or nil
+	local reason = type(cause) == "table" and safe_code(cause.reason) or nil
+	local step = run.current_step or "none"
+	self:publish(run.dir .. "/" .. self.spec.files.done, { schema = self.spec.schema,
+		request_id = run.request.request_id, pid = self.pid, interrupted = true,
+		cause = { kind = kind or "unknown", reason = reason or "unknown", step = step },
+		started_at = run.started_at, finished_at = self.ports.iso_now(),
+		verdicts = run.verdicts, order = Json.array(run.order) })
+	self.ports.remove(self:path("running"))
+	Logger.warn(LOG, "Field run %s cut short by a %s (%s) during step '%s'; closed as interrupted.",
+		run.request.request_id, kind or "teardown", reason or "no reason", step)
+	self.run = nil
+end
+
+--- Stops watching and withdraws the readiness file; a running run is closed
+--- as interrupted, with the cause when the caller knows it.
+--- @param cause table|nil { kind, reason } of the terminal transition.
 --- @return boolean stopped
-function Session:stop()
+function Session:stop(cause)
 	self.active = false
 	if self.pending then pcall(self.ports.cancel, self.pending); self.pending = nil end
-	if self.run then self.run.abandoned = true; self.run.cancel_timers() end
+	self:close_running(cause)
 	local stopped = true
 	if self.watcher then
 		local ok, result = pcall(function() return self.watcher:stop() end)
@@ -549,6 +575,7 @@ function Session:run_step(index, step, continue)
 	local started_ms, started_at = ports.now_ms(), ports.iso_now()
 	local settled, timer = false, nil
 	local last_mark = progress_aware and ports.progress_mark() or nil
+	run.current_step = step.id
 	Logger.info(LOG, "Field run step %d/%d '%s' started.", index, #run.request.steps, step.id)
 	local function settle(verdict, codes, report)
 		if settled then
@@ -716,11 +743,19 @@ function M.start(opts)
 	return true
 end
 
+--- Reports whether a field run is running: the auto-reload watchers hold a
+--- source-change reload meanwhile, so a run never reloads itself.
+--- @return boolean running
+function M.holds_reload()
+	return _session ~= nil and _session.run ~= nil and not _session.run.abandoned
+end
+
 --- Retires the field run watcher.
+--- @param cause table|nil { kind, reason } of the terminal transition, if any.
 --- @return boolean stopped
-function M.stop()
+function M.stop(cause)
 	if _session == nil then return true end
-	local stopped = _session:stop()
+	local stopped = _session:stop(cause)
 	if stopped then
 		_session = nil
 		Logger.info(LOG, "Developer field run watcher retired.")
