@@ -103,6 +103,7 @@ function apply_quick_date_range() {
 
 	document.getElementById('date_start').value = start;
 	document.getElementById('date_end').value = today;
+	sel.value = '';
 
 	apply_date_app_filters();
 }
