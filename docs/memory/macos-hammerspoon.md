@@ -152,8 +152,14 @@ Ollama daemon Ergopti starts reads only HTTPS_PROXY, so under a PAC-only
 network `network-retry.sh` asks the launcher role `--managed-proxy-route` for
 the registry origin (`resolve_system_route_for_probe`, enabled by
 `pac_probe_url` of the prelude) and exports the first route, or nothing for
-DIRECT; the pull is admitted only then, and a daemon start whose lookup fails
-still starts. Only the failing stage code is logged, never the route.
+DIRECT. A lookup that fails at a stage of `proxy_policy.json`
+`pac_unavailable_fallback` (the PAC or WPAD could not be fetched or evaluated)
+goes direct with one WARNING and a `__ERGOPTI_PAC_DIRECT_FALLBACK_V1__:<stage>`
+marker the Lua callers read to name both causes if direct fails too; any other
+stage, a PAC-named relay that fails, or an unnamed failure stays refused, and an
+inherited relay never reaches the lookup. The Swift worker, the spool and the
+Python receiver gate on the same generated list. Only the failing stage code
+is logged, never the route.
 
 ### project-managed-ollama-native-hooks-follow-the-pinned-source
 
