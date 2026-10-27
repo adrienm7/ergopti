@@ -1525,4 +1525,54 @@ assert.equal(
 	'all apps controls and full loaded typing-page calendar controls must execute'
 );
 
+const typingGridDates = ['2026-10-26T12:00:00Z', '2026-10-25T12:00:00Z', '2026-10-28T12:00:00Z'];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const now of typingGridDates) {
+		test(`${host} typing calendar packs consecutive weeks at ${now.slice(0, 10)}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = 'UTC';
+			try {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, now);
+				publishTypingPage(page, host, { '2026-10-20': { Editor: { chars: 10, time: 10000 } } });
+				const html = page.elements.get('activity_calendar_container').innerHTML;
+				const cells = Array.from(
+					html.matchAll(/<rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/g),
+					(match) => ({ x: +match[1], y: +match[2], width: +match[3], height: +match[4] })
+				);
+				assert.ok(
+					cells.length >= 365 && cells.length <= 371,
+					'the real calendar renders a year and its leading week alignment'
+				);
+				const xs = [...new Set(cells.map((cell) => cell.x))].sort((a, b) => a - b);
+				const ys = [...new Set(cells.map((cell) => cell.y))].sort((a, b) => a - b);
+				assert.equal(ys.length, 7);
+				const step = ys[1] - ys[0];
+				assert.ok(step > cells[0].height);
+				assert.equal(xs.length, Math.ceil(cells.length / ys.length));
+				for (let index = 1; index < xs.length; index++)
+					assert.equal(
+						xs[index] - xs[index - 1],
+						step,
+						'weeks use the same cell gap as consecutive weekdays'
+					);
+				const svgWidth = Number(html.match(/<svg width="(\d+)"/)[1]);
+				assert.equal(
+					svgWidth,
+					xs[0] + xs.length * step,
+					'the SVG width includes exactly the visible week columns'
+				);
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+}
+assert.equal(typingGridDates.length, 3);
+assert.equal(passed, 288, 'all weekday-boundary calendar grid controls must execute');
 console.log(`${passed} passed, 0 failed.`);
