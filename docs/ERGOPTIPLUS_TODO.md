@@ -183,14 +183,15 @@ dev.
   16:49:17 to 16:49:22). Line 1585 is the recovery slice timer: one slice overran its budget.
   Next: find the unbounded statement in the restart rebuild path and bound it per slice; a test
   replays a ledger with an id restart and asserts every slice stays under its budget.
-- **L20** [CODE] "config.toml cannot be read, so the virtual keyboard choice is unknown"
-  (init.lua:2168 on 228f79f2, new.txt 16:28:07, 16:48:12, 16:54:32, developer mode).
-  `Preferences.current_view` returns nil for six causes (a publication in flight, read failure,
-  decode, section shape, outdated keys, a value outside the manifest) and the error names none.
-  Earlier "Config migration ... refused (newer)" (15:32:19, 15:34:29) shows this config was
-  written by a newer schema than one build. Next: return a closed reason token from
-  `current_view`, log it in the karabiner error, and decide which causes must not refuse the
-  deploy.
+- **L20** Fixed (commit "fix(macos): name why the current config view is refused"). "config.toml
+  cannot be read, so the virtual keyboard choice is unknown" (init.lua:2168 on 228f79f2, new.txt
+  16:28:07, 16:48:12, 16:54:32, developer mode). `Preferences.current_view` now returns a closed
+  reason (publication_in_flight, schema_refused, unreadable, undecodable, section_shape,
+  outdated_keys, value_type, value_out_of_range, ...) and the error prints it. An absent
+  config.toml was already the defaults, so the field cause is one of those reasons; the earlier
+  "Config migration ... refused (newer)" (15:32:19, 15:34:29) points at schema_refused. Mac
+  confirms: the next occurrence names its reason; if it is schema_refused, decide whether a
+  read-only view may read a newer schema.
 - **L21** [CODE] Ollama `stop_warmup() could not retire its HTTP owner: false` and settlement
   'Ollama warmup stop' did not commit (new.txt 16:28:07, after "Disabling LLM ...
   startup_model_download_declined"). Next: reproduce with the startup decline before any warmup
