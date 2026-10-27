@@ -3919,4 +3919,110 @@ assert.equal(
 	'all native Unicode, case mode, host and history/live controls must execute'
 );
 
+const nativeCaseProjection = JSON.parse(
+	fs.readFileSync(
+		path.resolve(root, '../../windows/tests/fixtures/metrics_case_projection.json'),
+		'utf8'
+	)
+);
+assert.deepEqual(
+	nativeCaseProjection.cases.map((vector) => vector.id),
+	['capital-i-dot', 'separate-combining-dot', 'corrected-i-dot', 'greek-word-context', 'dotless-i']
+);
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const source of ['historical', 'today']) {
+		for (const sensitive of [true, false]) {
+			for (const vector of nativeCaseProjection.cases) {
+				test(`${host} ${source} keeps native case boundaries ${vector.id}, case-sensitive ${sensitive}`, () => {
+					const page = loadMetricsTypingPage(host);
+					freezePageClock(
+						page,
+						source === 'historical' ? '2026-10-27T12:00:00' : '2026-10-26T12:00:00'
+					);
+					publishTypingPage(page, host, vector.manifest);
+					if (sensitive) page.elements.get('btn_case_sensitive').classList.add('active');
+					else page.elements.get('btn_case_sensitive').classList.remove('active');
+					deliverTypingManifest(page, host, vector.manifest, {
+						range:
+							source === 'historical'
+								? vector.range
+								: { historical: {}, today: { [nativeCaseProjection.app]: vector.range.historical } }
+					});
+					for (const tab of ['c', 'bg', 'tg', 'qg', 'pg', 'hx', 'hp', 'w']) {
+						vm.runInContext(`app_state.current_tab=${JSON.stringify(tab)}`, page.context);
+						page.context.render_current_tab();
+						page.timers.at(-1)();
+						const rows = JSON.parse(
+							vm.runInContext(
+								'JSON.stringify(app_state.rendered_list.map(row=>({key:row.key,count:row.count,accuracy:row.acc})))',
+								page.context
+							)
+						);
+						const expected = structuredClone(
+							vector.expected_rows[sensitive ? 'case_sensitive' : 'case_folded'][tab]
+						);
+						const sort = (items) => items.sort((a, b) => a.key.localeCompare(b.key));
+						assert.deepEqual(
+							sort(rows),
+							sort(expected),
+							'case mode preserves native scalar counts, errors and n-gram boundaries'
+						);
+					}
+					assert.equal(
+						page.diagnostics.some((entry) => entry.level === 'error'),
+						false
+					);
+				});
+			}
+		}
+	}
+}
+assert.equal(
+	passed,
+	1194,
+	'all native case-boundary and unchanged word-fold histories must execute'
+);
+
+test('fixed-token lowercase preserves every Unicode scalar arity', () => {
+	const fixture = typingFixture();
+	assert.equal(typeof fixture.context.lowercase_metric_key, 'function');
+	const maxCodepoint = 0x10ffff,
+		surrogateStart = 0xd800,
+		surrogateEnd = 0xdfff;
+	let checked = 0;
+	for (let codepoint = 0; codepoint <= maxCodepoint; codepoint++) {
+		if (codepoint >= surrogateStart && codepoint <= surrogateEnd) continue;
+		const scalar = String.fromCodePoint(codepoint);
+		assert.equal(
+			Array.from(fixture.context.lowercase_metric_key(scalar, 'c')).length,
+			1,
+			`U+${codepoint.toString(16)} retains one native scalar`
+		);
+		checked++;
+	}
+	assert.equal(checked, maxCodepoint + 1 - (surrogateEnd - surrogateStart + 1));
+});
+test('metric-key case policy preserves Greek context, dotless I and full-text word keys', () => {
+	const fixture = typingFixture(),
+		lower = fixture.context.lowercase_metric_key;
+	assert.equal(typeof lower, 'function');
+	for (const tab of ['c', 'bg', 'tg', 'qg', 'pg', 'hx', 'hp']) {
+		assert.equal(lower('İΟΣ', tab), 'İος');
+		assert.equal(lower('ΟΣİ', tab), 'οσİ');
+		assert.equal(lower('AİΣ', tab), 'aİς');
+		assert.equal(lower('ıIİ', tab), 'ıiİ');
+		assert.equal(lower('𐐀', tab), '𐐨');
+	}
+	for (const tab of ['w', 'w_bg', 'w_tg', 'w_qg', 'w_pg']) {
+		assert.equal(lower('İΟΣ', tab), 'i̇ος');
+		assert.equal(lower('ΟΣİ', tab), 'οσi̇');
+	}
+	assert.equal(lower('Ctrl+S', 'sc'), 'ctrl+s');
+});
+assert.equal(
+	passed,
+	1196,
+	'native case-boundary regressions and Unicode scalar policy controls must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);

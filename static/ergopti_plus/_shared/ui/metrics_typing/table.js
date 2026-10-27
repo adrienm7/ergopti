@@ -273,9 +273,6 @@ function count_key_tokens(key) {
 	}, 0);
 }
 
-// Expected token count for each fixed-length n-gram tab
-const NGRAM_EXPECTED_LEN = { bg: 2, tg: 3, qg: 4, pg: 5, hx: 6, hp: 7 };
-
 // ===========================================
 // ===========================================
 // ======= 2.5/ Gradient Color Helpers =======

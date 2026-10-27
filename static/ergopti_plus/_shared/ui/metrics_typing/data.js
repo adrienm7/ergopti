@@ -39,6 +39,38 @@
 // ===================================
 // ===================================
 
+// Expected token count for each fixed-length n-gram tab.
+const NGRAM_EXPECTED_LEN = { bg: 2, tg: 3, qg: 4, pg: 5, hx: 6, hp: 7 };
+
+/**
+ * Lowercases grouping keys without inventing fixed native character tokens.
+ * Word and shortcut keys retain whole-text Unicode default lowercase.
+ * @param {string} key - The original native grouping key.
+ * @param {string} tab_name - The destination metric category.
+ * @returns {string} The category's case-insensitive grouping key.
+ */
+function lowercase_metric_key(key, tab_name) {
+	const lowered = key.toLowerCase();
+	if (tab_name !== 'c' && !Object.hasOwn(NGRAM_EXPECTED_LEN, tab_name)) return lowered;
+	if (lowered === key || /^[\x00-\x7F]*$/.test(key)) return lowered;
+	const source_chars = Array.from(key);
+	const lowered_chars = Array.from(lowered);
+	if (source_chars.length === lowered_chars.length) return lowered;
+
+	// Keep full-string context (Greek final sigma), but retain any scalar whose
+	// lowercase spelling would manufacture additional native character tokens.
+	let lowered_index = 0;
+	const projected = source_chars.map((character) => {
+		const width = Array.from(character.toLowerCase()).length;
+		const result = width === 1 ? lowered_chars[lowered_index] : character;
+		lowered_index += width;
+		return result;
+	});
+	if (lowered_index !== lowered_chars.length)
+		throw new Error('Metric lowercase mapping lost Unicode scalar alignment');
+	return projected.join('');
+}
+
 /**
  * Merges one source n-gram dictionary into a target accumulator, respecting
  * all active toggle filters (HS, LLM, manual, spaces, case-sensitivity).
@@ -74,7 +106,7 @@ function merge_dict(
 		// Native JSON already carries Unicode; byte-repair guesses corrupt literal text.
 		let display_k = k;
 
-		if (!case_sensitive) display_k = display_k.toLowerCase();
+		if (!case_sensitive) display_k = lowercase_metric_key(display_k, tab_name);
 
 		// Normalize known control characters to their bracket-marker or space equivalents
 		// so they pass the ctrl-char filters and render with proper chip labels in all tabs.
