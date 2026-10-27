@@ -25,6 +25,7 @@ local text_utils = require("infra.text_utils")
 -- the buffer traversal is not — macOS slices a byte string, the core an array of
 -- codepoints, and neither has to convert for the other.
 local HotstringCore = require("infra.hotstring_engine")
+local Cascade = require("hotstring_engine.cascade")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("infra.logger")
 local HotPath    = require("infra.hotpath_profiler")
@@ -922,39 +923,42 @@ local function plan_cascade(buffer, first, start_byte, repl, tail, consume_tail)
 	if type(max_arrows) ~= "number" or max_arrows < 2 then return nil end
 	if first.final_result or not is_cascade_link(first) then return nil end
 
-	local vbuf = buffer:sub(1, start_byte - 1) .. repl .. (tail or "")
-	local stable = start_byte - 1
-	local seen = { [spec_key(first)] = true }
-	local last = first
-	local steps = 1
-	while steps < max_arrows and not last.final_result do
-		local step = pick_cascade_step(vbuf, tail, stable)
-		if not step then break end
-		if seen[spec_key(step.mapping)] then
-			Logger.debug(LOG, "Cascade stopped at step %d: the same spec would fire again.", steps)
-			break
-		end
-		seen[spec_key(step.mapping)] = true
-		if step.is_end then
-			vbuf = vbuf:sub(1, step.start - 1) .. step.text .. tail
-		else
-			vbuf = vbuf:sub(1, step.start - 1) .. step.text
-		end
-		if step.start - 1 < stable then stable = step.start - 1 end
-		last = step.mapping
-		steps = steps + 1
-		Logger.debug(LOG, "Cascade step %d fired (trigger of %d char(s)).", steps - 1, step.mapping.tlen)
+	-- The loop (virtual buffer, arrow bound, same-spec guard, carried end
+	-- character, untouched prefix, net edit) is the shared Cascade; this file only
+	-- answers which registry mapping a virtual buffer completes.
+	local buffer_cps = Cascade.codepoints(buffer)
+	local function pick(vcps, _, carried, stable)
+		local vbuf = table.concat(vcps)
+		local step = pick_cascade_step(vbuf, carried, #table.concat(vcps, "", 1, stable))
+		if not step then return nil end
+		return {
+			key             = spec_key(step.mapping),
+			backspace_count = text_utils.utf8_len(vbuf:sub(step.start)),
+			replacement     = step.text,
+			final_result    = step.mapping.final_result,
+			trigger_length  = step.mapping.tlen,
+		}
 	end
-	if steps == 1 then return nil end
-	local text = vbuf:sub(stable + 1, #vbuf - (tail and #tail or 0))
-	-- The consumed choice of the delimiter, applied once to the chain's end.
-	if consume_tail then tail = nil end
+	local net = Cascade.resolve({
+		buffer     = buffer_cps,
+		first      = {
+			key             = spec_key(first),
+			backspace_count = text_utils.utf8_len(buffer:sub(start_byte)),
+			replacement     = repl,
+			terminator      = tail,
+			final_result    = first.final_result,
+		},
+		max_arrows = max_arrows,
+		pick       = pick,
+	})
+	if not net then return nil end
 	return {
-		start        = stable + 1,
-		text         = text,
-		tail         = tail,
-		final_result = last.final_result,
-		steps        = steps,
+		start        = #table.concat(buffer_cps, "", 1, net.stable) + 1,
+		text         = net.replacement,
+		-- The consumed choice of the delimiter, applied once to the chain's end.
+		tail         = (not consume_tail) and net.terminator or nil,
+		final_result = net.final_result,
+		steps        = net.steps,
 	}
 end
 
@@ -986,7 +990,7 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 	-- lives in M.would_fire, which the tooltip preview calls too. Keeping it in one
 	-- place is what guarantees the preview cannot promise an expansion this
 	-- function then declines to perform.
-	local eff_plain, typed, eff_repl, is_noop = M.would_fire(m, active_buffer)
+	local eff_plain, typed, _, is_noop = M.would_fire(m, active_buffer)
 
 	if not eff_plain then
 		-- No-op guard: when the plain-text expansion equals what was typed, signal
@@ -1018,14 +1022,14 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 		repl_text   = plan.text
 		tstart_byte = plan.start
 		typed       = active_buffer:sub(tstart_byte)
-		eff_repl    = repl_text
 		trig_len    = text_utils.utf8_len(typed)
 		is_final    = plan.final_result
 	end
 
-	-- Compute how many backspaces and what to type, keeping common prefix chars.
-	-- In an ignored window (char_len == 0) there is no "last char" to keep, so
-	-- we must erase the full trigger length. m.tlen is the precomputed UTF-8
+	-- Compute how many backspaces and what to type. The whole trigger is erased and
+	-- the whole replacement typed, the net edit every driver applies (no shared
+	-- prefix is kept on screen). In an ignored window (char_len == 0) there is no
+	-- "last char" to keep, so we must erase the full trigger length. m.tlen is the precomputed UTF-8
 	-- length of the trigger (avoids three utf8_len calls per hot-path hit).
 	local char_offset      = is_ignored and 0 or char_len
 	local screen_len       = trig_len - char_offset
@@ -1039,16 +1043,6 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 		screen_len = 0
 	end
 	local deletes, to_type = screen_len, repl_text
-
-	if repl_text == eff_repl then
-		-- Simple text replacement: find the longest shared prefix to minimise
-		-- backspaces. Compare against the TYPED (cased) trigger, not the lowercase
-		-- canonical, so the kept on-screen prefix matches what is actually shown.
-		local screen = text_utils.utf8_sub(typed, 1, screen_len)
-		local common = text_utils.get_common_prefix_utf8(screen, repl_text)
-		deletes = screen_len - common
-		to_type = text_utils.utf8_sub(repl_text, common + 1)
-	end
 
 	local replaced = M.perform_text_replacement(
 		deletes,
@@ -1100,7 +1094,6 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 	local buf_start      = match.buf_start
 	local eff_plain      = match.eff_plain
 	local typed_trigger  = match.typed_trigger
-	local eff_repl       = match.eff_repl
 	local is_noop        = match.is_noop
 	local extra_bs_bytes = match.extra_bs_bytes
 
@@ -1152,7 +1145,6 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 			start_byte   = plan.start
 			replay_tail  = plan.tail
 			typed_trigger = _state.buffer:sub(start_byte, #_state.buffer - #chars - extra_bs_bytes)
-			eff_repl     = repl_text
 			trig_len     = text_utils.utf8_len(typed_trigger)
 			deletes, to_type = trig_len, repl_text
 			is_final     = plan.final_result
@@ -1165,17 +1157,6 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 		else
 				replay_spec = { kind = "text", chars = chars }
 			end
-		end
-
-		if repl_text == eff_repl then
-			-- Simple text: keep common prefix to reduce backspaces. Compared against
-			-- the trigger AS TYPED, not the registered canonical, so the characters
-			-- left on screen are the ones actually there — they differ for a "fold"
-			-- entry, and keeping a "matching" prefix that is cased
-			-- differently would leave the user's capital in front of the expansion.
-			local common = text_utils.get_common_prefix_utf8(typed_trigger, repl_text)
-			deletes = trig_len - common
-			to_type = text_utils.utf8_sub(repl_text, common + 1)
 		end
 
 		-- In an ignored window there is no "char" kept on screen — erase it too.
