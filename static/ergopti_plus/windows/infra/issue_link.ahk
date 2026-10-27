@@ -16,7 +16,10 @@
 ;    a whole code point, ending with the truncation marker; a parameter that
 ;    cannot keep one code point is dropped; the title goes last and the
 ;    template never.
-; 4. The JS original and the Lua port replay the same vectors:
+; 4. A cut field can carry a note (one line saying where the complete text is),
+;    appended after the truncation marker and counted in the budget: the caller
+;    passes it only for the field that holds the complete report.
+; 5. The JS original and the Lua port replay the same vectors:
 ;    _shared/tests/corpus/diagnostics/issue_link_vectors.json.
 ; ==============================================================================
 
@@ -141,10 +144,12 @@ _IssueLink_CutValue(Value, Budget, Marker) {
 ; @param Repository {Map} { owner, repo } from the updater defaults.json.
 ; @param TemplateId {String} Key of Templates["templates"] ("bug", "feature").
 ; @param Values {Map} Title and field values by id.
+; @param Notes {Map|Integer} One line per field id, appended on its own line
+;   after the truncation marker when that field is cut; 0 for none.
 ; @returns {String} The URL, at most Templates["max_url_bytes"] long.
 ; @throws {Error} On an unknown template, a malformed repository, or a URL that
 ;   cannot fit at all.
-IssueLink_BuildUrl(Templates, Repository, TemplateId, Values) {
+IssueLink_BuildUrl(Templates, Repository, TemplateId, Values, Notes := 0) {
 	if !(Templates is Map) || !Templates.Has("templates") || !Templates["templates"].Has(TemplateId)
 		throw ValueError("issue_link: unknown template '" . TemplateId . "'.")
 	if !(Repository is Map) || Repository.Get("owner", "") == "" || Repository.Get("repo", "") == ""
@@ -173,8 +178,10 @@ IssueLink_BuildUrl(Templates, Repository, TemplateId, Values) {
 		Over := StrLen(_IssueLink_JoinUrl(Base, Params)) - Max
 		if (Over <= 0)
 			break
+		Note := (Notes is Map) ? Notes.Get(Params[Index][1], "") : ""
+		Ending := (Note != "") ? Marker . "`n`n" . Note : Marker
 		Cut := _IssueLink_CutValue(Params[Index][2],
-			StrLen(IssueLink_PercentEncode(Params[Index][2])) - Over, Marker)
+			StrLen(IssueLink_PercentEncode(Params[Index][2])) - Over, Ending)
 		if (Cut == "") {
 			Params.RemoveAt(Index)
 		} else {

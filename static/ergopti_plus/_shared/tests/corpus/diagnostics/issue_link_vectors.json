@@ -1,5 +1,5 @@
 {
-	"description": "Golden vectors for the GitHub issue-link builder: RFC 3986 percent-encoding of UTF-8 (only A-Z a-z 0-9 - . _ ~ stay literal, space is %20) and the byte-bounded prefilled URL. Parameters follow the template, then the title (with its prefix), then the declared fields in order; empty values are omitted. When the URL is longer than max_url_bytes, the last parameter is cut first, at a whole code point, and ends with the truncation marker; a parameter that cannot keep one code point plus the marker is dropped; the title is cut only after every field; the template is never cut, and a URL that still does not fit is an error. Fixture templates and repository, independent of the real ones. Replayed by tools/test/test-issue-link-vectors.cjs, the macOS and Linux Lua suites and the AHK suite.",
+	"description": "Golden vectors for the GitHub issue-link builder: RFC 3986 percent-encoding of UTF-8 (only A-Z a-z 0-9 - . _ ~ stay literal, space is %20) and the byte-bounded prefilled URL. Parameters follow the template, then the title (with its prefix), then the declared fields in order; empty values are omitted. When the URL is longer than max_url_bytes, the last parameter is cut first, at a whole code point, and ends with the truncation marker; a parameter that cannot keep one code point plus the marker is dropped; the title is cut only after every field; the template is never cut, and a URL that still does not fit is an error. A vector may carry notes (field id to one line): when that field is cut, a blank line and the note follow the truncation marker, inside the budget. Fixture templates and repository, independent of the real ones. Replayed by tools/test/test-issue-link-vectors.cjs, the macOS and Linux Lua suites and the AHK suite.",
 	"templates": {
 		"issue_new_url": "https://github.com/{owner}/{repo}/issues/new",
 		"truncation_marker": " […]",
@@ -163,6 +163,76 @@
 				"version": "2.1.0"
 			},
 			"expected": "https://github.com/octo/demo/issues/new?template=feature_request.yml&title=%5BFeature%5D%20A%20%5B%E2%80%A6%5D"
+		},
+		{
+			"id": "note_follows_marker_when_cut",
+			"template": "bug",
+			"max_url_bytes": 400,
+			"values": {
+				"version": "2.1.0",
+				"os": "macOS 15.1 (arm64)",
+				"driver": "macos",
+				"diagnostics": "| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n| a | b |\n"
+			},
+			"notes": {
+				"diagnostics": "The full report is on the clipboard and in the saved file."
+			},
+			"expected": "https://github.com/octo/demo/issues/new?template=bug_report.yml&version=2.1.0&os=macOS%2015.1%20%28arm64%29&driver=macos&diagnostics=%7C%20a%20%7C%20b%20%7C%0A%7C%20a%20%7C%20b%20%7C%0A%7C%20a%20%7C%20b%20%7C%0A%7C%20a%20%7C%20b%20%7C%0A%7C%20a%20%7C%20b%20%7C%0A%7C%20a%20%7C%20b%20%7C%0A%7C%20a%20%5B%E2%80%A6%5D%0A%0AThe%20full%20report%20is%20on%20the%20clipboard%20and%20in%20the%20saved%20file."
+		},
+		{
+			"id": "note_absent_when_nothing_is_cut",
+			"template": "bug",
+			"max_url_bytes": 7000,
+			"values": {
+				"version": "2.1.0",
+				"diagnostics": "| a | b |"
+			},
+			"notes": {
+				"diagnostics": "The full report is on the clipboard and in the saved file."
+			},
+			"expected": "https://github.com/octo/demo/issues/new?template=bug_report.yml&version=2.1.0&diagnostics=%7C%20a%20%7C%20b%20%7C"
+		},
+		{
+			"id": "note_only_for_its_own_field",
+			"template": "bug",
+			"max_url_bytes": 150,
+			"values": {
+				"title": "Short",
+				"version": "2.1.0",
+				"os": "an operating system description that is long",
+				"diagnostics": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+			},
+			"notes": {
+				"diagnostics": "The full report is on the clipboard and in the saved file."
+			},
+			"expected": "https://github.com/octo/demo/issues/new?template=bug_report.yml&title=%5BBug%5D%20Short&version=2.1.0&os=an%20operating%20system%20d%20%5B%E2%80%A6%5D"
+		},
+		{
+			"id": "note_dropped_with_its_field",
+			"template": "bug",
+			"max_url_bytes": 100,
+			"values": {
+				"version": "2.1.0",
+				"os": "Linux",
+				"diagnostics": "a very long diagnostics summary that cannot fit at all"
+			},
+			"notes": {
+				"diagnostics": "The full report is on the clipboard and in the saved file."
+			},
+			"expected": "https://github.com/octo/demo/issues/new?template=bug_report.yml&version=2.1.0&os=Linux"
+		},
+		{
+			"id": "note_counted_in_the_budget_with_accents",
+			"template": "bug",
+			"max_url_bytes": 420,
+			"values": {
+				"version": "2.1.0",
+				"diagnostics": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+			},
+			"notes": {
+				"diagnostics": "Rapport complet : presse-papiers 😀"
+			},
+			"expected": "https://github.com/octo/demo/issues/new?template=bug_report.yml&version=2.1.0&diagnostics=%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%C3%A9%20%5B%E2%80%A6%5D%0A%0ARapport%20complet%20%3A%20presse-papiers%20%F0%9F%98%80"
 		},
 		{
 			"id": "base_alone_too_long_is_an_error",
