@@ -57,7 +57,10 @@ for bootstrap in "$HOME/.hammerspoon/init.lua" "${XDG_CONFIG_HOME:-$HOME/.config
 done
 
 if [ "$open_only" = false ]; then
-	ERGOPTI_DEV_SOURCE=1 bash "$REPO_ROOT/tools/build/build_macos_app.sh"
+	# The host slice alone: a two-slice launcher needs Xcode, and a developer app
+	# runs only here. ERGOPTI_LAUNCHER_ARCHS=universal keeps both on an Xcode Mac.
+	ERGOPTI_DEV_SOURCE=1 ERGOPTI_LAUNCHER_ARCHS="${ERGOPTI_LAUNCHER_ARCHS:-native}" \
+		bash "$REPO_ROOT/tools/build/build_macos_app.sh"
 fi
 [ -d "$APP_PATH" ] || fail "No developer app at $APP_PATH; run without --open-only first."
 recorded="$(plutil -extract "$ERGOPTI_DEV_SOURCE_PLIST_KEY" raw -o - "$APP_PATH/Contents/Info.plist" 2>/dev/null)" \

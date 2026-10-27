@@ -122,6 +122,46 @@ try {
 			assert.notEqual(result.status, 0);
 			assert.match(result.stderr, /ERGOPTI_DEV_SOURCE must be 0 or 1, not 'yes'/);
 		});
+		check('the real build refuses a single-architecture release launcher', () => {
+			const result = run({ ERGOPTI_LAUNCHER_ARCHS: 'native', ERGOPTI_RELEASE: 'true' });
+			assert.notEqual(result.status, 0);
+			assert.match(result.stderr, /ERGOPTI_LAUNCHER_ARCHS=native is refused for a release build/);
+			const unknown = run({ ERGOPTI_LAUNCHER_ARCHS: 'arm64' });
+			assert.notEqual(unknown.status, 0);
+			assert.match(unknown.stderr, /must be universal or native, not 'arm64'/);
+		});
+		check('a native launcher build keeps only the host slice and says so', () => {
+			const source = fs.readFileSync(BUILD, 'utf8');
+			const start = source.indexOf('\nselect_launcher_archs() {\n');
+			const body = source.slice(start + 1, source.indexOf('\n}\n', start + 1) + 2);
+			const main = source.slice(source.indexOf('\nmain() {\n'));
+			assert(
+				main.indexOf('\tselect_launcher_archs\n') > 0 &&
+					main.indexOf('\tselect_launcher_archs\n') < main.indexOf('build_launcher'),
+				'the slice choice must precede the launcher build'
+			);
+			for (const host of ['arm64', 'x86_64']) {
+				const result = spawnSync(
+					bashExecutable(),
+					[
+						'-c',
+						`set -euo pipefail
+log() { printf '%s\\n' "$*" >&2; }
+fail() { printf 'ERROR: %s\\n' "$*" >&2; exit 1; }
+uname() { echo ${host}; }
+LAUNCHER_ARCHS=(arm64 x86_64); LAUNCHER_ARCH_FLAGS=(--arch arm64 --arch x86_64)
+ERGOPTI_LAUNCHER_ARCHS=native ERGOPTI_RELEASE=false
+${body}
+select_launcher_archs
+echo "\${LAUNCHER_ARCHS[*]}|\${LAUNCHER_ARCH_FLAGS[*]}"`
+					],
+					{ encoding: 'utf8' }
+				);
+				assert.equal(result.status, 0, result.stderr);
+				assert.equal(result.stdout, `${host}|--arch ${host}\n`);
+				assert.match(result.stderr, new RegExp(`Single-architecture launcher \\(${host} only\\)`));
+			}
+		});
 	}
 } finally {
 	fs.rmSync(scratch, { recursive: true, force: true });

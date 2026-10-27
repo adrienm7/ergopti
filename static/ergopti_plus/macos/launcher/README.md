@@ -24,8 +24,10 @@ bash tools/dev/run-macos-dev-app.sh             # build, then open (npm run dev:
 bash tools/dev/run-macos-dev-app.sh --open-only # reopen it after a Quit
 ```
 
-The runner wraps `ERGOPTI_DEV_SOURCE=1 bash tools/build/build_macos_app.sh` and
-`open build/macos/ErgoptiPlus.app`. Quit an installed ErgoptiPlus first: the
+The runner wraps `ERGOPTI_DEV_SOURCE=1 ERGOPTI_LAUNCHER_ARCHS=native bash
+tools/build/build_macos_app.sh` and `open build/macos/ErgoptiPlus.app`. `native`
+builds the launcher for the host only, which the Command Line Tools can do
+without Xcode (a two-slice `swift build` needs XCBuild); a release refuses it. Quit an installed ErgoptiPlus first: the
 launcher allows one instance. Rebuild only after a change to the Swift launcher,
 a native helper or LuaSocket. Each ad hoc build is a new code identity, so macOS
 asks for Accessibility and Input Monitoring again unless the build is signed
