@@ -187,7 +187,7 @@ tbody tr.active .name-cell::after {
 }
 
 .dot {
-	background: #555;
+	background: var(--theme-grey-555);
 	border-radius: 50%;
 	display: inline-block;
 	height: 9px;
