@@ -1,0 +1,842 @@
+{
+	"schema_version": 1,
+	"description": "Inventory of every shortcut config entry on the three drivers, for PAR-41 (docs/design/one-shortcut-model.md, step 1). 'legacy_boolean' rows are a feature switch bound to one hard-coded chord; 'keyboard_slot' rows are a chord bound to a catalogue action id; 'slot_families' list the modifier prefixes under which a driver accepts any key of modifier_chords.json. 'chord.modifiers' use each driver's own modifier names. 'slot' names the keyboard slot that already binds the same chord, so a boolean and a slot never both own it after the change. Checked against the manifest, the AutoHotkey AddShortcut calls and the Lua hotkey registry by tools/test/test-shortcut-inventory-matches-sources.cjs.",
+	"rows": [
+		{
+			"driver": "windows",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.get_hex_value",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "x"
+			},
+			"action": "pick_color",
+			"slot": "win_x",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.gpt",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "g"
+			},
+			"action": "open_url",
+			"slot": "win_g",
+			"note": "Carries a link parameter (shortcuts.gpt.link); the slot takes the URL as an action parameter."
+		},
+		{
+			"driver": "windows",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.search",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "s"
+			},
+			"action": "search_web",
+			"slot": "win_s",
+			"note": "Carries search_engine and search_engine_url_query parameters."
+		},
+		{
+			"driver": "windows",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.take_note",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "n"
+			},
+			"action": "take_note",
+			"slot": "win_n",
+			"note": "Carries a dated-note parameter set."
+		},
+		{
+			"driver": "windows",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.microsoft_bold",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "b"
+			},
+			"action": "microsoft_bold",
+			"slot": "ctrl_b",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.title_case",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "w"
+			},
+			"action": "titlecase_selection",
+			"slot": "win_w",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.uppercase",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "u"
+			},
+			"action": "uppercase_selection",
+			"slot": "win_u",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.paste_without_formatting",
+			"chord": {
+				"modifiers": ["ctrl", "shift"],
+				"key": "v"
+			},
+			"action": "paste_plain",
+			"slot": "ctrl_shift_v",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.select_line",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "a"
+			},
+			"action": "select_line",
+			"slot": "win_a",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.spotlight_mouse",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "quote"
+			},
+			"action": "spotlight_mouse",
+			"slot": null,
+			"note": "Win+' has no slot id: the slot key list has no apostrophe."
+		},
+		{
+			"driver": "windows",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.surround_with_parentheses",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "o"
+			},
+			"action": "surround_parens",
+			"slot": "win_o",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.teleport_mouse",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "t"
+			},
+			"action": "teleport_mouse",
+			"slot": "win_t",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.open_downloads",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "d"
+			},
+			"action": "open_downloads",
+			"slot": "win_d",
+			"note": "Slot win_d recommends none while the boolean recommends on."
+		},
+		{
+			"driver": "windows",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.move",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "m"
+			},
+			"action": "activity_simulation",
+			"slot": "win_m",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.screen",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "h"
+			},
+			"action": "screen_capture",
+			"slot": "win_h",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.win_caps_lock",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "capslock"
+			},
+			"action": "toggle_capslock",
+			"slot": null,
+			"note": "Win+CapsLock has no slot: CapsLock is not in the slot key list."
+		},
+		{
+			"driver": "windows",
+			"kind": "special_boolean",
+			"config_key": "shortcuts.wrap_text_if_selected",
+			"chord": null,
+			"action": "wrap_selection",
+			"slot": null,
+			"note": "Typing a wrap symbol over a selection; no chord. Shared with macOS and Linux."
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.ctrl_b",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "b"
+			},
+			"action": "microsoft_bold",
+			"slot": "ctrl_b",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.ctrl_shift_v",
+			"chord": {
+				"modifiers": ["ctrl", "shift"],
+				"key": "v"
+			},
+			"action": "paste_plain",
+			"slot": "ctrl_shift_v",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.win_a",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "a"
+			},
+			"action": "select_line",
+			"slot": "win_a",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.win_d",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "d"
+			},
+			"action": null,
+			"slot": "win_d",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.win_g",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "g"
+			},
+			"action": "open_url",
+			"slot": "win_g",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.win_h",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "h"
+			},
+			"action": "screen_capture",
+			"slot": "win_h",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.win_m",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "m"
+			},
+			"action": "activity_simulation",
+			"slot": "win_m",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.win_n",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "n"
+			},
+			"action": "take_note",
+			"slot": "win_n",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.win_o",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "o"
+			},
+			"action": "surround_parens",
+			"slot": "win_o",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.win_s",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "s"
+			},
+			"action": "search_web",
+			"slot": "win_s",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.win_sc029",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "sc029"
+			},
+			"action": "screen_capture_instant",
+			"slot": "win_sc029",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.win_t",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "t"
+			},
+			"action": "teleport_mouse",
+			"slot": "win_t",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.win_u",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "u"
+			},
+			"action": "uppercase_selection",
+			"slot": "win_u",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.win_w",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "w"
+			},
+			"action": "titlecase_selection",
+			"slot": "win_w",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.win_x",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "x"
+			},
+			"action": "pick_color",
+			"slot": "win_x",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.win_space",
+			"chord": {
+				"modifiers": ["win"],
+				"key": "space"
+			},
+			"action": "llm_generate_prediction",
+			"slot": "win_space",
+			"note": null
+		},
+		{
+			"driver": "windows",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.magic_editor",
+			"chord": null,
+			"action": "open_hotstrings_editor",
+			"slot": "magic_editor",
+			"note": "Contextual slot: the magic key, no modifier."
+		},
+		{
+			"driver": "windows",
+			"kind": "personal_toggle",
+			"config_key": "shortcuts.personal.laptop_broken_key",
+			"chord": null,
+			"action": null,
+			"slot": null,
+			"note": "Remaps for a broken laptop key. Not a chord; stays a separate surface."
+		},
+		{
+			"driver": "windows",
+			"kind": "personal_toggle",
+			"config_key": "shortcuts.personal.mouse_drag_window",
+			"chord": null,
+			"action": null,
+			"slot": null,
+			"note": "Mouse gesture. Not a chord; stays a separate surface."
+		},
+		{
+			"driver": "windows",
+			"kind": "personal_toggle",
+			"config_key": "shortcuts.personal.mouse_tab_switching",
+			"chord": null,
+			"action": null,
+			"slot": null,
+			"note": "Mouse gesture. Not a chord; stays a separate surface."
+		},
+		{
+			"driver": "windows",
+			"kind": "personal_toggle",
+			"config_key": "shortcuts.personal.professional_environment",
+			"chord": null,
+			"action": null,
+			"slot": null,
+			"note": "Environment preset. Not a chord; stays a separate surface."
+		},
+		{
+			"driver": "windows",
+			"kind": "personal_toggle",
+			"config_key": "shortcuts.personal.programmable_keyboard",
+			"chord": null,
+			"action": null,
+			"slot": null,
+			"note": "Programmable keyboard preset. Not a chord; stays a separate surface."
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_a",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "a"
+			},
+			"action": "select_line",
+			"slot": null,
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_d",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "d"
+			},
+			"action": "open_downloads",
+			"slot": null,
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_e",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "e"
+			},
+			"action": "open_file_manager",
+			"slot": null,
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_g",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "g"
+			},
+			"action": "open_chatgpt",
+			"slot": null,
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_h",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "h"
+			},
+			"action": "screen_capture",
+			"slot": null,
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_i",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "i"
+			},
+			"action": "open_system_settings",
+			"slot": null,
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_m",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "m"
+			},
+			"action": "activity_simulation",
+			"slot": null,
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_o",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "o"
+			},
+			"action": "surround_parens",
+			"slot": null,
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_p",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "p"
+			},
+			"action": "display_mirror_toggle",
+			"slot": null,
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_s",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "s"
+			},
+			"action": "copy_selected_path",
+			"slot": null,
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_t",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "t"
+			},
+			"action": "teleport_mouse",
+			"slot": null,
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_u",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "u"
+			},
+			"action": "uppercase_selection",
+			"slot": null,
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_w",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "w"
+			},
+			"action": "titlecase_selection",
+			"slot": null,
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_x",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "x"
+			},
+			"action": "pick_color",
+			"slot": null,
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_capslock",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "capslock"
+			},
+			"action": "toggle_capslock",
+			"slot": null,
+			"note": "Key is not in the slot key list."
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_l",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "l"
+			},
+			"action": "lock_screen",
+			"slot": null,
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_period",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "period"
+			},
+			"action": "open_emoji_picker",
+			"slot": null,
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.ctrl_quote",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "quote"
+			},
+			"action": "spotlight_mouse",
+			"slot": null,
+			"note": "Key is not in the slot key list."
+		},
+		{
+			"driver": "macos",
+			"kind": "legacy_boolean",
+			"config_key": "shortcuts.keys.cmd_shift_v",
+			"chord": {
+				"modifiers": ["cmd", "shift"],
+				"key": "v"
+			},
+			"action": "paste_plain",
+			"slot": null,
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "special_boolean",
+			"config_key": "shortcuts.keys.cmd_star",
+			"chord": {
+				"modifiers": ["cmd"],
+				"key": "star"
+			},
+			"action": null,
+			"slot": null,
+			"note": "Cmd+* re-fires Cmd+S; native owner, not a catalogue action."
+		},
+		{
+			"driver": "macos",
+			"kind": "special_boolean",
+			"config_key": "shortcuts.keys.wrap_text_if_selected",
+			"chord": null,
+			"action": "wrap_selection",
+			"slot": null,
+			"note": "Typing a wrap symbol over a selection; no chord."
+		},
+		{
+			"driver": "macos",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.hs_ctrl_space",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "space"
+			},
+			"action": "llm_generate_prediction",
+			"slot": "hs_ctrl_space",
+			"note": null
+		},
+		{
+			"driver": "macos",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.magic_editor",
+			"chord": null,
+			"action": "open_hotstrings_editor",
+			"slot": "magic_editor",
+			"note": "Contextual slot: the magic key, no modifier."
+		},
+		{
+			"driver": "linux",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.ctrl_g",
+			"chord": {
+				"modifiers": ["ctrl"],
+				"key": "g"
+			},
+			"action": "open_chatgpt",
+			"slot": "ctrl_g",
+			"note": null
+		},
+		{
+			"driver": "linux",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.super_space",
+			"chord": {
+				"modifiers": ["super"],
+				"key": "space"
+			},
+			"action": "llm_generate_prediction",
+			"slot": "super_space",
+			"note": null
+		},
+		{
+			"driver": "linux",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.magic_editor",
+			"chord": null,
+			"action": "open_hotstrings_editor",
+			"slot": "magic_editor",
+			"note": "Contextual slot: the magic key, no modifier."
+		},
+		{
+			"driver": "linux",
+			"kind": "special_boolean",
+			"config_key": "shortcuts.wrap_text_if_selected",
+			"chord": null,
+			"action": "wrap_selection",
+			"slot": null,
+			"note": "Typing a wrap symbol over a selection; no chord."
+		}
+	],
+	"slot_families": [
+		{
+			"driver": "windows",
+			"prefix": "alt_",
+			"modifiers": ["alt"]
+		},
+		{
+			"driver": "windows",
+			"prefix": "ctrl_",
+			"modifiers": ["ctrl"]
+		},
+		{
+			"driver": "windows",
+			"prefix": "ctrl_shift_",
+			"modifiers": ["ctrl", "shift"]
+		},
+		{
+			"driver": "windows",
+			"prefix": "win_",
+			"modifiers": ["win"]
+		},
+		{
+			"driver": "macos",
+			"prefix": "cmd_",
+			"modifiers": ["cmd"]
+		},
+		{
+			"driver": "macos",
+			"prefix": "cmd_shift_",
+			"modifiers": ["cmd", "shift"]
+		},
+		{
+			"driver": "macos",
+			"prefix": "hs_ctrl_",
+			"modifiers": ["ctrl"]
+		},
+		{
+			"driver": "macos",
+			"prefix": "hs_ctrl_shift_",
+			"modifiers": ["ctrl", "shift"]
+		},
+		{
+			"driver": "macos",
+			"prefix": "hs_option_",
+			"modifiers": ["option"]
+		},
+		{
+			"driver": "linux",
+			"prefix": "ctrl_",
+			"modifiers": ["ctrl"]
+		},
+		{
+			"driver": "linux",
+			"prefix": "ctrl_shift_",
+			"modifiers": ["ctrl", "shift"]
+		},
+		{
+			"driver": "linux",
+			"prefix": "super_",
+			"modifiers": ["super"]
+		},
+		{
+			"driver": "linux",
+			"prefix": "super_shift_",
+			"modifiers": ["super", "shift"]
+		},
+		{
+			"driver": "linux",
+			"prefix": "alt_",
+			"modifiers": ["alt"]
+		},
+		{
+			"driver": "linux",
+			"prefix": "alt_shift_",
+			"modifiers": ["alt", "shift"]
+		}
+	]
+}

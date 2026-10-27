@@ -529,6 +529,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-drift-guard-isolation-skips-directory-links.cjs"],
 			"repro": "node tools/test/test-drift-guard-isolation-skips-directory-links.cjs"
+		},
+		{
+			"id": "js-0502",
+			"ordinal": 502,
+			"name": "shortcut inventory matches the manifest, handler chords and slot prefix tables",
+			"cmd": "node",
+			"args": ["tools/test/test-shortcut-inventory-matches-sources.cjs"],
+			"repro": "npm run test:shortcut-inventory"
 		}
 	]
 }
