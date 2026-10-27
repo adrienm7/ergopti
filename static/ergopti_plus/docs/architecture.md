@@ -133,6 +133,7 @@ graph TD
         MACOS_physical_observation_clock["PhysicalObservationClock.lua"]
         MACOS_physical_shortcut_hook["PhysicalShortcutHook.lua"]
         MACOS_prediction_tooltip_port["PredictionTooltipPort.lua"]
+        MACOS_privacy_settings["PrivacySettings.lua"]
         MACOS_process_lifecycle["ProcessLifecycle.lua"]
         MACOS_program_providers["ProgramProviders.lua"]
         MACOS_python_interpreter["PythonInterpreter.lua"]

@@ -1294,7 +1294,7 @@ final class PosixLeaseCLIExecutor:
 			Darwin.pipe(buffer.baseAddress!)
 		}
 		guard pipeStatus == 0 else { return .spawnFailed(errno) }
-		var diagnosticReadDescriptor = diagnosticPipe[0]
+		let diagnosticReadDescriptor = diagnosticPipe[0]
 		var diagnosticWriteDescriptor = diagnosticPipe[1]
 		defer {
 			if diagnosticReadDescriptor >= 0 { Darwin.close(diagnosticReadDescriptor) }

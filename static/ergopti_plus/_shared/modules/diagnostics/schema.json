@@ -993,7 +993,16 @@
 											},
 											"state": {
 												"kind": "enum",
-												"values": ["granted", "denied", "unknown", "unsupported", "not_required"],
+												"values": [
+													"granted",
+													"denied",
+													"missing",
+													"unavailable",
+													"not_used",
+													"unknown",
+													"unsupported",
+													"not_required"
+												],
 												"default": "unknown"
 											}
 										}
