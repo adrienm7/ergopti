@@ -143,18 +143,20 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
 - [ ] **Versioned `tap_hold.toml` migrator.** [CODE] Linux done (`_shared/tap_hold/migrations.toml`,
       macOS has no tap_hold.toml); in progress: byte-preserving rewrite (agent AE); Windows side on the PC.
 - [x] **Linux crash: notification only.** [CODE] Done; Windows dead crash kind left.
-- [ ] **Linux Quit refusals as macOS.** [CODE] Done (shared `quit_admission.lua`); in progress: Quit wins over a reload, scope debts block (agent AG).
+- [x] **Linux Quit refusals as macOS.** [CODE] Done (shared `quit_admission.lua`; Quit wins over a reload and waits
+      for a running write, 59e20c6b0a); Windows on the PC (PAR-45).
 - [x] **14 hotstring colours on the three OS.** [CODE] Done (`native_theme.toml`); Windows reader left.
-- [x] **Retire `_shared/ui/metrics_apps/script.js`.** [CODE] Done; the "general" alias folding moves to the live modules (agent AG).
+- [x] **Retire `_shared/ui/metrics_apps/script.js`.** [CODE] Done; the "general" alias folding is in the live modules
+      (81635a815a).
 - [x] **Dedicated AI-off hint string.** [CODE] [I18N] Done (`dialog.action_picker.requires_ai`); Windows reader left.
 - [ ] **Registry op that re-encodes a value.** [CODE] Windows `config_migrate.ahk` first (PC), then the Lua
       engines, then delete the macOS `[llm.profiles] user_profiles` reader import (0146a938c5).
-- [ ] **Prediction request floor.** [CODE] Explicit requests never wait for the floor; one global floor
+- [x] **Prediction request floor.** [CODE] Explicit requests never wait for the floor; one global floor
       settable from the menu on the three OS; "never" debounce on the three OS; live mode instant at a word end;
       the variants of one request never wait; default 300 ms, 0 accepted; a mashed explicit shortcut supersedes
-      its in-flight request. macOS and Linux: in dev (88b27a94c1 to 5c36a116cd); agent AF checks every decided
-      part is covered and finishes any gap. Windows on the PC.
-- [ ] **PAR-66 section readers.** [CODE] Re-point the source-pin gates to the shared module, then extract
+      its in-flight request. macOS and Linux: done and checked part by part (88b27a94c1 to 5c36a116cd,
+      fcaec1a91c, 8fce07aa86, 928bca090e, 15ceb9e044). Windows on the PC (see the counterparts list).
+- [x] **PAR-66 section readers.** [CODE] Done (4c9a672215, 0747800cfc; gates pin the shared text). Re-point the source-pin gates to the shared module, then extract
       `personal_info_editor_source` and the metrics/configuration/debug/about readers.
 
 ## Integration pass of 2026-10-24 evening: what landed and what is left
