@@ -984,7 +984,7 @@
 	"menu.layout.emulated_layout": "Disposition à émuler",
 	"menu.layout.superseded_ergopti_only": "Disposition Ergopti uniquement : une autre disposition est émulée",
 	"menu.layout.superseded_digit_row": "La disposition émulée définit sa propre rangée de chiffres",
-	"layouts.linux_needs_python": "La conversion de cette disposition pour Linux nécessite Python 3.8 ou plus récent (python3). Installez-le, puis réessayez.",
+	"layouts.linux_needs_python": "L'installation de cette disposition sous Linux nécessite Python 3.8 ou plus récent (python3). Installez-le, puis réessayez.",
 	"layouts.linux_xorg_session": "Cette disposition ne peut pas être installée depuis une session Xorg, car Xorg ne lit pas le dossier clavier de l'utilisateur. Ouvrez une session Wayland pour l'installer.",
 	"layout_manager.window_title": "Dispositions de clavier",
 	"layout_manager.subtitle": "Installez, mettez à jour ou désinstallez les dispositions du catalogue.",

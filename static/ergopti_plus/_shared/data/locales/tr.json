@@ -989,7 +989,7 @@
 	"menu.layout.emulated_layout": "Öykünülecek düzen",
 	"menu.layout.superseded_ergopti_only": "Yalnızca Ergopti düzeni: başka bir düzene öykünülüyor",
 	"menu.layout.superseded_digit_row": "Öykünülen düzen kendi rakam sırasını belirler",
-	"layouts.linux_needs_python": "Bu klavye düzenini Linux için dönüştürmek Python 3.8 veya daha yenisini (python3) gerektirir. Yükleyip yeniden deneyin.",
+	"layouts.linux_needs_python": "Bu klavye düzenini Linux'a yüklemek Python 3.8 veya daha yenisini (python3) gerektirir. Yükleyip yeniden deneyin.",
 	"layouts.linux_xorg_session": "Bu düzen bir Xorg oturumundan yüklenemez, çünkü Xorg kullanıcının klavye klasörünü okumaz. Yüklemek için bir Wayland oturumunda oturum açın.",
 	"layout_manager.window_title": "Klavye düzenleri",
 	"layout_manager.subtitle": "Katalogdaki düzenleri yükleyin, güncelleyin veya kaldırın.",

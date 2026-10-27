@@ -989,7 +989,7 @@
 	"menu.layout.emulated_layout": "에뮬레이션할 배열",
 	"menu.layout.superseded_ergopti_only": "Ergopti 자판 전용: 다른 자판을 에뮬레이션하는 중",
 	"menu.layout.superseded_digit_row": "에뮬레이션 중인 자판이 숫자 줄을 직접 정합니다",
-	"layouts.linux_needs_python": "이 자판을 Linux용으로 변환하려면 Python 3.8 이상(python3)이 필요합니다. 설치한 뒤 다시 시도하세요.",
+	"layouts.linux_needs_python": "이 자판을 Linux에 설치하려면 Python 3.8 이상(python3)이 필요합니다. 설치한 뒤 다시 시도하세요.",
 	"layouts.linux_xorg_session": "이 레이아웃은 Xorg 세션에서 설치할 수 없습니다. Xorg는 사용자 키보드 폴더를 읽지 않기 때문입니다. 설치하려면 Wayland 세션으로 로그인하세요.",
 	"layout_manager.window_title": "키보드 자판",
 	"layout_manager.subtitle": "카탈로그의 자판을 설치, 업데이트 또는 제거합니다.",
