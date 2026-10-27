@@ -16,9 +16,10 @@ const { parse } = require('yaml');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
-const BUILD = path.join(ROOT, 'build/linux');
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-flatpak-icon-'));
-const env = { ...process.env, ERGOPTI_BUILD_VERSION: '1.0.3' };
+// This test owns its build directory: another packaging test building at once cannot collide with it.
+const BUILD = path.join(scratch, 'build');
+const env = { ...process.env, ERGOPTI_BUILD_VERSION: '1.0.3', ERGOPTI_LINUX_BUILD_DIR: BUILD };
 function bash(file, args = []) {
 	const result = spawnSync(bashExecutable(), [file, ...args], {
 		cwd: ROOT,
