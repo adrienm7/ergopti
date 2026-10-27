@@ -276,6 +276,10 @@ DriverControl_Completion(Spec, Text, OwnPid) {
 		return ""
 	if !(Result is Map)
 		return ""
+	; AHK aliases JSON true to 1 and compares numeric strings coercively.
+	Members := JsonObjectMemberSpans(Text)
+	if !Members.Has("schema") || Members["schema"]["kind"] != "number"
+		return ""
 	for Key in Result
 		if !(Key ~= "^(schema|request_id|state|driver_pid|successor_pid|reason)$")
 			return ""
@@ -308,6 +312,10 @@ DriverControl_Resolve(Spec, Text, OwnPid, Now, &Kind) {
 	catch
 		return ""
 	if !(Result is Map)
+		return ""
+	; AHK aliases JSON true to 1 and compares numeric strings coercively.
+	Members := JsonObjectMemberSpans(Text)
+	if !Members.Has("schema") || Members["schema"]["kind"] != "number"
 		return ""
 	for Key in Result
 		if !(Key ~= "^(schema|request_id|state|driver_pid|successor_pid|reason|deadline)$")
