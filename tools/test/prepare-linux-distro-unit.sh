@@ -23,7 +23,7 @@ case "$distro" in
 	debian) apt-get install -y --no-install-recommends luajit python3 ca-certificates git gcc libc6-dev make cmake pkg-config libluajit-5.1-dev libuv1-dev libglib2.0-0t64 sqlite3 openssl curl ;;
 	fedora) dnf install -y luajit python3 ca-certificates git gcc make cmake pkgconf-pkg-config luajit-devel libuv-devel glib2 sqlite openssl curl ;;
 	arch) pacman -Sy --noconfirm luajit python ca-certificates git gcc make cmake pkgconf libuv glib2 sqlite openssl curl ;;
-	alpine) apk add --no-cache luajit python3 ca-certificates git build-base cmake pkgconf luajit-dev libuv-dev glib sqlite openssl curl ;;
+	alpine) apk add --no-cache luajit python3 ca-certificates git build-base cmake pkgconf luajit-dev libuv-dev glib sqlite openssl tzdata curl ;;
 	opensuse) zypper --non-interactive install luajit python3 ca-certificates git gcc make cmake pkg-config luajit-devel libuv-devel libglib-2_0-0 sqlite3 openssl curl ;;
 	*) echo 'Unsupported mandatory unit distribution.' >&2; exit 1 ;;
 esac
@@ -47,6 +47,9 @@ if [ ! -s /etc/machine-id ]; then
 	printf '\n' >> /etc/machine-id
 fi
 grep -Eqx '[0-9a-f]{32}' /etc/machine-id
+# The capture calendar fixture replays a real DST day with TZ=Europe/Paris;
+# Alpine ships no zone data by default and would silently compute UTC.
+test -f /usr/share/zoneinfo/Europe/Paris
 
 # Root bypasses the suite's real unreadable-file permission premise, so the
 # suite runs as the same ordinary user the archive installation lot creates.
