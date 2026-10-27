@@ -24,6 +24,8 @@ local _path_cleanup_debt = {}
 local WRAPPER_SOURCE = [[import os, sys, select, subprocess, signal, time
 TERM_GRACE_SECONDS = 1.0
 KILL_DRAIN_SECONDS = 1.0
+EPERM_GRACE_SECONDS = 2.0
+eperm_since = None
 proc = None
 pending_signals = []
 termination_deadline = None
@@ -53,18 +55,32 @@ for pending in pending_signals:
 pending_signals = []
 
 def group_is_alive():
+    global eperm_since
     try: os.killpg(proc.pid, 0)
-    except ProcessLookupError: return False
+    except ProcessLookupError:
+        eperm_since = None
+        return False
     except PermissionError:
         # Darwin can report EPERM for a group containing only the unreaped
         # zombie leader. Reap that exact child, then require a fresh ESRCH.
         # After KILL, orphan zombies may await their own parent's reaping;
         # unconfirmed retirement consumes only the existing drain budget.
-        if proc.poll() is None: raise
-        try: os.killpg(proc.pid, 0)
-        except ProcessLookupError: return False
-        except PermissionError:
-            if not kill_sent: raise
+        if proc.poll() is not None:
+            try: os.killpg(proc.pid, 0)
+            except ProcessLookupError:
+                eperm_since = None
+                return False
+            except PermissionError:
+                if kill_sent: return True
+        # Darwin also answers EPERM while the leader is exiting and not yet
+        # reapable: the MLX installer of the 2026-10-27 21:08 field run had
+        # finished when this raised. Ask again on the next tick; a refusal
+        # that outlasts the bounded grace is still an error.
+        now = time.monotonic()
+        if eperm_since is None: eperm_since = now
+        elif now - eperm_since >= EPERM_GRACE_SECONDS: raise
+        return True
+    eperm_since = None
     return True
 
 def escalate_if_due(now):

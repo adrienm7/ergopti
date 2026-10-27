@@ -130,8 +130,10 @@ log) on the `field/mac-2026-10-27` branch, which never reaches dev. Builds seen:
 92d4615 (15:16), b014076 (15:29), 228f79f2 (16:47 developer app). The 16:28 to 16:54 boots ran
 after every 14:00 to 15:38 fix below, so "not seen after 16:28" is the evidence for those fixes.
 The automatic report `mac-2026-10-27_194738` (developer app from about dev 57fd72c1fb, boots
-19:47:05 and 19:48:21) is "the 19:47 run" below; L40 onwards come from it. Labels are local to
-this ledger. Shas on `tmp/wip-audit-field` change when rebased onto
+19:47:05 and 19:48:21) is "the 19:47 run" below; L40 onwards come from it. The report
+`mac-2026-10-27_210657` is "the 21:06 run": its Lua and shell were current (dev 35725ebc22 era),
+but the collector reused a running developer app whose launcher predates L40 and L41 (fixed by
+e4ca76b1c9), so no Swift fix was active. Labels are local to this ledger. Shas on `tmp/wip-audit-field` change when rebased onto
 dev.
 
 ### Fixed on dev
@@ -204,7 +206,26 @@ dev.
   folder, so it answered `RETIRED 64` before running anything. Fixed 94bfe7e2e4: the guardian
   admits the installers of the folder `LuaSourceSelection` names. Mac confirms: on a developer
   app, choosing Ollama installs Ergopti's own 0.40.4 or names a later closed cause (expect L41's
-  certificate cause while L41 stands).
+  certificate cause while L41 stands). The 21:06 run still shows exit 64 in 120 ms: expected, its
+  launcher was the stale one without this fix.
+
+### Fixed on tmp/wip-field-2106 (to land on dev)
+
+- **L47** MLX install `bootstrap_failed`, `cause_permission` (21:06 run, 21:08:39): every package
+  was downloaded and synced and "Virtualenv ready" printed, then the PTY process-group wrapper
+  raised `PermissionError` from `os.killpg(pgid, 0)`. Darwin answers EPERM for a group whose
+  leader is exiting but not yet reapable, and the wrapper raised as soon as `poll()` still saw the
+  leader. Not the SSL_CERT_FILE drop (the downloads succeeded because of it) and not a clone file
+  mode. Fixed 4058b3d471: EPERM is asked again on the next tick within a 2 s grace; a lasting
+  refusal is still an error (`test-pty-process-group-escalation.cjs`, exiting-leader mode). Mac
+  confirms: the MLX install ends with exit 0 after "Virtualenv ready".
+- **L48** [PHYS-M] 12_mlx_model `download_launcher_failed`: "the launcher failed (code 0)" in a
+  notification only, 0.7 s after the start, with no log line. The launcher script prints the
+  download PID line and exits 0, so code 0 with no PID means the PID line never reached the
+  stream callback; whether it arrived only in the final output, after the stream had stopped, is
+  unproven. 30f49c487b now logs the exit, the PID state and whether the final output carried
+  the PID line. Mac confirms: the next run with a working MLX runtime (L47) either downloads the
+  model or logs that line; "sentinel in final output=yes" points at the stream stopping early.
 
 ### Open TODO
 
@@ -271,7 +292,14 @@ dev.
   both boots of the new code, every regeneration and wake refresh): one stored value has the
   wrong TOML type. The view now also returns that value's config.toml path and the error prints
   it ("value_type at <section.key>"), 52d9113b74. Mac confirms: read the key in the
-  next log, then fix the stored value or the manifest type it is checked against.
+  next log, then fix the stored value or the manifest type it is checked against. The 21:06 run
+  names it: `value_type at hotstrings.dynamic.date`. That manifest entry is a feature row (a
+  table such as `date = { enabled = true }`); a bare `date = true` or `date = false` reproduces the
+  refusal here, while `Preferences.load` accepts the same file, so only the read-only view fails
+  and every Karabiner regeneration and wake refresh stops on it. Next [CODE]: find which writer
+  stored the scalar (an older build or another OS sharing the file), then either migrate it or make
+  the view accept what load accepts. Mac must send the `[hotstrings.dynamic]` lines of
+  config.toml.
 - **L21** Fixed 708bc6671d. Ollama
   `stop_warmup() could not retire its HTTP owner: false` and settlement 'Ollama warmup stop' did
   not commit (new.txt 16:28:07, after "startup_model_download_declined"). Cause: hs.http.asyncPost
@@ -364,7 +392,11 @@ closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swift
   is not compiled on the Linux host (ManagedNetworkBootstrapTests covers it on macOS CI). Mac
   confirms: the next run logs that INFO line, the MLX install passes `uv sync`, and
   03_field_network reads `tls pass:trusted`; if TLS then fails with `certificate`, the company root
-  is missing from the keychain.
+  is missing from the keychain. The 21:06 run confirms the cause: "Inherited SSL_CERT_FILE
+  ignored" was logged, and the MLX staging that goes through the shell then downloaded every
+  package. The network check, which starts the worker without the shell, still read
+  `tls fail:ssl_cert_env` because its launcher was the stale one; it should clear after the
+  rebuild.
 - **L42** [CODE][PHYS-M] 03_field_network on the 19:47 run: `pac_download fail:failed` and
   `pac_script fail:invalid` because the PAC host (http, company intranet name) does not resolve
   off the company network; environmental, the fallback goes direct. Two defects behind the other
@@ -374,7 +406,9 @@ closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swift
   Mac confirms: the next run shows `route_plan info:direct_fallback:<stage>` or a named stage,
   and no URL in "PAC download failed". Next [CODE], once L41 is settled and direct `transfer`
   passes: report `pac_download`/`pac_script` as info when the fallback covers their failure, as
-  L26 asks.
+  L26 asks. The 21:06 run confirms the route fix
+  (`route_plan info:direct_fallback:native_pac_download`) and a URL-free warning; `pac_download`/`pac_script` still fail off the company network, which is
+  the open follow-up above, not a defect of the fixes.
 - **L43** [PHYS-M] 04_field_toolchain `karabiner_signature fail:exit_1` (19:47 run). Not a
   wrong check: `karabiner_cask info:absent` only means Homebrew did not install it; Karabiner
   16.0.0 is installed from the pqrs package (its services run, karabiner.txt), so the app exists
@@ -382,7 +416,8 @@ closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swift
   `codesign --verify --deep --strict --verbose=4 /Applications/Karabiner-Elements.app` and
   `spctl -a -vv` on it. Next
   [CODE]: carry codesign's first stderr cause as a closed token in the step value, so the report
-  says why without a manual run.
+  says why without a manual run. The 21:06 run is unchanged (`exit_1`); not Swift, so the rebuild
+  will not clear it.
 - **L44** Fixed 6593474037. Wake at 19:46:39 (driver booted 16:54): "Cannot refresh Karabiner
   lease liveness — no live generation exists" and "Wake refresh could not renew the exact
   Karabiner lease liveness", twice each, then the layout refresh retries of L20; nothing
@@ -390,7 +425,9 @@ closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swift
   `no-live-generation` (INFO) and the wake handler hands that case to the bounded failure
   recovery, which refuses while the remap is disabled, paused or in a transition. Mac confirms:
   after a sleep that loses the lease, the log shows "Wake found no live Karabiner lease;
-  re-acquiring it." and remapping works again without a reload.
+  re-acquiring it." and remapping works again without a reload. The 21:06 run's warnings (20:06,
+  20:16, 21:06:41) all come from the driver that ran before the 21:06:55 reload, so the fix was
+  not exercised yet.
 
 ### Expected, no defect
 
@@ -400,7 +437,8 @@ closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swift
   controlled reload it had just started was fencing the lease; the reload went ahead (boot
   19:47:05). Both now log at INFO when the termination coordinator reports a reload or quit in
   progress; any other refusal still warns. Mac confirms: a `git pull` during a session logs no
-  such WARNING.
+  such WARNING. The 21:06:55 pair came from the driver that the reload was replacing, which
+  predates the fix.
 
 - **L35** "Ergopti driver not started in this Hammerspoon" (new.txt 11:19 to 11:21): the stock
   Hammerspoon.app started next to a standalone ErgoptiPlus; the guard kept it inert.

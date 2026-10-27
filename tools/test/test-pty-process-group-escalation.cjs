@@ -67,7 +67,7 @@ SELECT_CALLS = 0
 REAPED = False
 KILL_AT = None
 POST_KILL_MODES = {"post-kill-transient", "post-kill-persistent"}
-ZOMBIE_MODES = {"zombie-only", "zombie-descendant", "exited-permission", "live-permission"} | POST_KILL_MODES
+ZOMBIE_MODES = {"zombie-only", "zombie-descendant", "exited-permission", "live-permission", "exiting-permission"} | POST_KILL_MODES
 REAL_PRINT = builtins.print
 
 if not hasattr(signal, "SIGHUP"):
@@ -99,12 +99,15 @@ class FakeProcess:
     def __init__(self, args, stdin=None, stdout=None, stderr=None,
                  close_fds=False, start_new_session=False):
         self.pid = 4242
-        self.returncode = 78 if MODE in ZOMBIE_MODES and MODE != "live-permission" else None
+        self.returncode = 78 if MODE in ZOMBIE_MODES and MODE not in {"live-permission", "exiting-permission"} else None
         FakeProcess.active = self
         EVENTS.append(["spawn", list(args), bool(start_new_session)])
 
     def poll(self):
         global REAPED
+        # The leader of an exiting group is not reapable for a moment (Darwin).
+        if MODE == "exiting-permission" and self.returncode is None and CLOCK >= 0.2:
+            self.returncode = 0
         if MODE in ZOMBIE_MODES:
             EVENTS.append(["poll", self.pid, self.returncode])
             if self.returncode is not None:
@@ -131,6 +134,8 @@ def fake_killpg(pid, sig):
                 ALIVE = False
             if MODE in {"live-permission", "exited-permission"} or not REAPED:
                 raise PermissionError(1, "Operation not permitted")
+            if MODE == "exiting-permission":
+                ALIVE = False
             if MODE == "zombie-only":
                 ALIVE = False
         if ALIVE:
@@ -321,22 +326,6 @@ function zombieGoneContract(run) {
 	);
 }
 
-function permissionRefusalContract(run, expectedProbes, leaderExit) {
-	const exception = eventsOf(run, 'exception');
-	return (
-		run.payload.exit === 250 &&
-		run.payload.alive === true &&
-		exception.length === 1 &&
-		exception[0][1] === 'PermissionError' &&
-		exception[0][2].includes('Operation not permitted') &&
-		eventsOf(run, 'probe').length === expectedProbes &&
-		eventsOf(run, 'poll').length === 1 &&
-		eventsOf(run, 'poll')[0][2] === leaderExit &&
-		eventsOf(run, 'wait').length === 0 &&
-		!eventsOf(run, 'close').some((event) => event[1] === 10)
-	);
-}
-
 const zombie = runWrapper(python, wrapper, 'zombie-only');
 test(
 	'zombie-only EPERM reaps the exact leader and preserves the child refusal exit78',
@@ -354,58 +343,99 @@ test(
 	JSON.stringify(descendant)
 );
 
+// A refusal that outlasts the bounded grace is still an error; the grace only
+// covers the moment an exiting leader is not yet reapable.
+function lastingPermissionContract(run) {
+	const exception = eventsOf(run, 'exception');
+	return (
+		run.payload.exit === 250 &&
+		exception.length === 1 &&
+		exception[0][1] === 'PermissionError' &&
+		eventsOf(run, 'probe').length > 2 &&
+		eventsOf(run, 'wait').length === 0 &&
+		!eventsOf(run, 'close').some((event) => event[1] === 10)
+	);
+}
+
 const livePermission = runWrapper(python, wrapper, 'live-permission');
 test(
-	'EPERM with a live exact leader remains a permission refusal',
-	permissionRefusalContract(livePermission, 1, null),
+	'lasting EPERM with a live exact leader remains a permission refusal after the grace',
+	lastingPermissionContract(livePermission),
 	JSON.stringify(livePermission)
 );
 
 const exitedPermission = runWrapper(python, wrapper, 'exited-permission');
 test(
 	'persistent EPERM after exact leader reaping never proves group disappearance',
-	permissionRefusalContract(exitedPermission, 2, 78),
+	exitedPermission.payload.exit !== 78 &&
+		exitedPermission.payload.exit !== 0 &&
+		eventsOf(exitedPermission, 'wait').length === 0,
 	JSON.stringify(exitedPermission)
 );
 
-const noReap = wrapper.includes('except PermissionError:')
-	? replaceExactly(
-			wrapper,
-			'        if proc.poll() is None: raise',
-			'        raise  # mutation: zombie leader never reaped'
-		)
-	: wrapper;
+// Field run 2026-10-27 21:08: the MLX installer had finished and its leader was
+// exiting; killpg answered EPERM before the leader could be reaped, and the
+// wrapper raised instead of asking again on the next tick.
+function exitingLeaderContract(run) {
+	return (
+		run.payload.exit === 0 &&
+		eventsOf(run, 'exception').length === 0 &&
+		eventsOf(run, 'wait').length === 1 &&
+		!eventsOf(run, 'killpg').some((event) => event[2] === 9) &&
+		eventsOf(run, 'close').some((event) => event[1] === 10)
+	);
+}
+const exitingPermission = runWrapper(python, wrapper, 'exiting-permission');
+test(
+	'EPERM while the exiting leader is not yet reapable settles with its exit status',
+	exitingLeaderContract(exitingPermission),
+	JSON.stringify(exitingPermission)
+);
+const noGrace = replaceExactly(
+	wrapper,
+	'        elif now - eperm_since >= EPERM_GRACE_SECONDS: raise',
+	'        raise  # mutation: no grace for an exiting leader'
+);
+test(
+	'mutation guard rejects an immediate raise for an exiting leader',
+	!exitingLeaderContract(runWrapper(python, noGrace, 'exiting-permission'))
+);
+
+const noReap = replaceExactly(
+	wrapper,
+	'        if proc.poll() is not None:',
+	'        if False:  # mutation: zombie leader never reaped'
+);
 test(
 	'mutation guard detects missing exact leader reaping',
 	!zombieGoneContract(runWrapper(python, noReap, 'zombie-only'))
 );
 
-const postKillGuard = '        except PermissionError:\n            if not kill_sent: raise';
 const reprobeBlock =
-	'        try: os.killpg(proc.pid, 0)\n        except ProcessLookupError: return False' +
-	(wrapper.includes(postKillGuard) ? '\n' + postKillGuard : '');
-const noReprobe = wrapper.includes('except PermissionError:')
-	? replaceExactly(
-			wrapper,
-			reprobeBlock,
-			'        return False  # mutation: group disappearance inferred from leader exit'
-		)
-	: wrapper;
+	'            try: os.killpg(proc.pid, 0)\n' +
+	'            except ProcessLookupError:\n' +
+	'                eperm_since = None\n' +
+	'                return False\n' +
+	'            except PermissionError:\n' +
+	'                if kill_sent: return True';
+const noReprobe = replaceExactly(
+	wrapper,
+	reprobeBlock,
+	'            return False  # mutation: group disappearance inferred from leader exit'
+);
 test(
 	'mutation guard detects disappearance inferred without a second native group probe',
 	!escalationContract(runWrapper(python, noReprobe, 'zombie-descendant'))
 );
 
-const swallowPermission = wrapper.includes('except PermissionError:')
-	? replaceExactly(
-			wrapper,
-			reprobeBlock,
-			'        try: os.killpg(proc.pid, 0)\n        except (ProcessLookupError, PermissionError): return False'
-		)
-	: wrapper;
+const swallowPermission = replaceExactly(
+	wrapper,
+	reprobeBlock,
+	'            try: os.killpg(proc.pid, 0)\n            except (ProcessLookupError, PermissionError): return False'
+);
 test(
 	'mutation guard detects persistent permission refusal hidden as gone',
-	!permissionRefusalContract(runWrapper(python, swallowPermission, 'exited-permission'), 2, 78)
+	runWrapper(python, swallowPermission, 'exited-permission').payload.exit === 78
 );
 
 const retiring = runWrapper(python, wrapper, 'post-kill-transient');
