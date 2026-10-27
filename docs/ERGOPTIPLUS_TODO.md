@@ -190,7 +190,7 @@ dev.
   logged after (1), so (2) or (3) is the hold. Next: time (2) and (3) on a copy of the field
   cache; if (3), add the shared index through schema.sql with a cache version bump; if (2),
   delete in bounded batches between yields.
-- **L20** Fixed (commit "fix(macos): name why the current config view is refused"). "config.toml
+- **L20** Fixed ef3b8ddfd5. "config.toml
   cannot be read, so the virtual keyboard choice is unknown" (init.lua:2168 on 228f79f2, new.txt
   16:28:07, 16:48:12, 16:54:32, developer mode). `Preferences.current_view` now returns a closed
   reason (publication_in_flight, schema_refused, unreadable, undecodable, section_shape,
@@ -199,13 +199,13 @@ dev.
   "Config migration ... refused (newer)" (15:32:19, 15:34:29) points at schema_refused. Mac
   confirms: the next occurrence names its reason; if it is schema_refused, decide whether a
   read-only view may read a newer schema.
-- **L21** Fixed (commit "fix(llm): commit the Ollama warmup stop of a taskless POST"). Ollama
+- **L21** Fixed 708bc6671d. Ollama
   `stop_warmup() could not retire its HTTP owner: false` and settlement 'Ollama warmup stop' did
   not commit (new.txt 16:28:07, after "startup_model_download_declined"). Cause: hs.http.asyncPost
   returns no task, so a warmup POST in flight can only be revoked logically; `cancel()` reported
   that as a refusal. It now answers "pending" for that case and the stop commits, as the MLX fix
   877b922d23 does. Mac confirms: no such ERROR when the startup declines the model download.
-- **L22** Fixed (commit "fix(llm): log every failed Ollama model pull with its cause"). A
+- **L22** Fixed b5b56adbf0. A
   granite model pull showed an error at 100% that no log recorded (maintainer report during the
   field run). A non-zero pull exit only posted a notice; it now logs an ERROR with the exit code
   and the last line the pull printed (the digest or manifest refusal after 100%). A pulled model
@@ -225,8 +225,7 @@ dev.
   returns -50, the HIToolbox preference route is refused too, and removed sources stay listed
   until logout. The rollback disable right after was refused "busy": `run_bounded_process`
   (modules/keymap/input_sources.lua) published the terminal before freeing the mutation slot, so
-  a mutation started from that callback was refused. Fixed (commit "fix(macos): free the
-  input-source slot before its terminal callback"). Mac confirms: after a logout, the probe's `after-logout` mode for M5b/P6.
+  a mutation started from that callback was refused. Fixed af5765a659. Mac confirms: after a logout, the probe's `after-logout` mode for M5b/P6.
 - **L26** [CODE][PHYS-M] field run 03_field_network: fail (`_164726`); the PAC host is unknown
   off the company network (new.txt 16:48:20). Sub-steps were not captured (L13). Next: read the
   sub-steps in the next report; a PAC that cannot be fetched while direct works must not fail the
@@ -236,21 +235,34 @@ dev.
   sub-steps in the next report.
 - **L28** [PHYS-M] field run 06_field_composer: fail, same cause as L25. 07_key_accounting:
   needs_typing, not a failure: the maintainer types the prompted text on the next run.
-- **L29** [CODE] Screen Recording settings could not be opened, openURL returned false (new.txt
-  15:31:46). Next: check the settings URL on macOS 26 and fall back to the Privacy pane.
+- **L29** [CODE][PHYS-M] Screen Recording settings could not be opened, openURL returned false
+  (new.txt 15:31:46). adapters/screen_capture.lua uses
+  `x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture`, the same
+  scheme as the Accessibility and Input Monitoring panes, so the URL alone does not explain it.
+  Next, on the Mac: run `open "<that URL>"` in Terminal; if it fails on macOS 26, switch to the
+  `com.apple.settings.PrivacySecurity.extension?Privacy_ScreenCapture` form, else trace the
+  `hs.urlevent.openURL` call made from the notification click.
 - **L30** [CODE] karabiner.lease "'status' called before M.init()" (new.txt 15:32:19, right
-  after the config migration refusal). Next: find the caller that runs when init stopped early.
+  after the config migration refusal stopped that boot early). The guard is
+  platform/remap/lease_controller.lua:165. Next: log the caller's traceback in that guard, then
+  make the caller check the controller's init state when the boot stopped before init.
 - **L31** [CODE] "Accessibility observer setup failed ... for PID 31319" (new.txt 14:27:31): 31319
-  is the ErgoptiPlus runtime itself (issue #104 `runtime_pid`). Next: never observe the own
-  process.
+  is the ErgoptiPlus runtime itself (issue #104 `runtime_pid`). `M.update_ax_observer`
+  (modules/keystats/context_tracker.lua) attaches to whatever app is frontmost, including the
+  runtime's own windows, and `hs.axuielement.applicationElement` refused its own PID. Next:
+  decide whether typing in Ergopti's own windows is tracked; if not, return early for
+  `hs.processInfo.processID` with a test, otherwise log this refusal at INFO.
 - **L32** [CODE] issue #104 diagnostics: Input Monitoring, Login Items and Screen Recording read
   `unknown`; memory used 843 MB with 93 MB free. Next: read or label those permissions, and
   measure the 843 MB resident size.
-- **L33** [CODE] Swift warnings in the launcher build (`_164726` field_run.txt):
-  OwnedVirtualHIDDaemonReportMainOperation.swift:112 compares a non-optional descriptor to nil
-  (always true, so `scriptReturned` only checks the error), main.swift:1290 "will never be
-  executed", OwnedSuspendedImageGuardian.swift:58-59 trailing closures, RemapLeaseWorker.swift:1297
-  `var`. Next: fix the comparison first, then the rest.
+- **L33** [CODE] Swift warnings in the launcher build (`_164726` field*run.txt). The "always
+  true" one, OwnedVirtualHIDDaemonReportMainOperation.swift:112 `returned != nil && error ==
+nil`, has no behavior effect: `executeAndReturnError` returns a non-optional descriptor and
+  `error == nil` alone decides, which is the intended check. Next, on a Mac with swiftc: replace it
+  by `* = script.executeAndReturnError(&error)`and`scriptReturned = error == nil`, then fix
+main.swift:1290 "will never be executed", OwnedSuspendedImageGuardian.swift:58-59 trailing
+closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swiftc to compile
+  them.
 - **L34** [CODE] HotPath over budget: preview.rebuild 5.3 to 13.3 ms, hotstring.match 6.4 ms,
   keydown 5.8 ms (new.txt 14:26 to 16:18). Low priority; profile with perf-profiling.
 
