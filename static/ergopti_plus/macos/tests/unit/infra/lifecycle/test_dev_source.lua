@@ -30,12 +30,9 @@ local function env(value)
 	end
 end
 
---- Reads one driver source file for wiring checks.
-local function source(relative)
-	local handle = assert(io.open(helpers.driver_root() .. "/" .. relative, "r"))
-	local text = handle:read("*a")
-	handle:close()
-	return text
+--- Reads the one production file holding a unique marker, for wiring checks.
+local function source(marker)
+	return assert(helpers.read_driver_unit(marker))
 end
 
 helpers.describe("developer source mode: the runtime recognises its clone exactly", function()
@@ -184,7 +181,7 @@ end)
 
 helpers.describe("developer source mode: boot wiring", function()
 	helpers.it("installs the payload searcher only for a developer root, before the admission", function()
-		local init = source("init.lua")
+		local init = source("DevSource.payload_searcher(payload, loadfile, package.loadlib)")
 		local searcher = init:find("DevSource.payload_searcher(payload, loadfile, package.loadlib)", 1, true)
 		local guard = init:find("if dev_ok and dev_root and searchers then", 1, true)
 		local admission = init:find("local InstanceAdmission = require(\"infra.instance_admission\")", 1, true)
@@ -193,10 +190,10 @@ helpers.describe("developer source mode: boot wiring", function()
 	end)
 
 	helpers.it("watches the clone's shared Lua only in a developer app", function()
-		local init = source("init.lua")
+		local init = source("DevSource.payload_searcher(payload, loadfile, package.loadlib)")
 		helpers.assert_contains(init,
 			'shared_source_dir       = require("infra.dev_source").is_active() and (logger_shared_root .. "/lua") or nil')
-		helpers.assert_contains(source("infra/file_watchers.lua"),
+		helpers.assert_contains(source("ctx.shared_source_dir ~= nil"),
 			'acquire_watcher(ctx.shared_source_dir, project_changed, "Shared source watcher", false)')
 	end)
 end)
