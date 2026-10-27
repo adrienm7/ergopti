@@ -442,12 +442,6 @@ const BAD = {
 	rows_invalid: (d) => {
 		d.rows = { order: 'digits', extra: 1 };
 	},
-	rows_order_invalid: (d) => {
-		d.rows = { order: 'both' };
-	},
-	rows_edges_invalid: (d) => {
-		d.rows = { order: 'digits', edges: 'yes' };
-	},
 	unknown_shortcut: (d) => {
 		d.shortcuts.hyper = { source: 'ergol' };
 	},
@@ -483,6 +477,25 @@ check(
 	}).includes('output_invalid'),
 	'validation: nine characters is too long'
 );
+// A bad order or edges value is a rows problem whose detail names the field.
+for (const [rows, detail] of [
+	[{ order: 'both' }, 'order: both'],
+	[{ order: 'digits', edges: 'yes' }, 'edges: yes']
+]) {
+	const declaration = JSON.parse(JSON.stringify(MIXED));
+	declaration.rows = rows;
+	const found = Composer.validate(declaration, SOURCES, TABLE).problems.filter(
+		(entry) => entry.code === 'rows_invalid'
+	);
+	check(
+		found.length === 1 && found[0].detail === detail,
+		`validation: rows ${JSON.stringify(rows)} is rows_invalid (${detail}), got ${JSON.stringify(found)}`
+	);
+	check(
+		!Composer.build(declaration, SOURCES, TABLE).ok,
+		`validation rows ${detail}: must not build`
+	);
+}
 check(
 	Composer.validate(null, SOURCES, TABLE).problems[0].code === 'declaration_invalid',
 	'validation: null declaration'

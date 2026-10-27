@@ -1248,6 +1248,7 @@
 	"layout_composer.problem_unknown_source": "Un livello usa un layout non disponibile qui.",
 	"layout_composer.problem_spec_invalid": "Una voce di livello è malformata.",
 	"layout_composer.problem_shortcuts_invalid": "Le scorciatoie sono malformate.",
+	"layout_composer.problem_rows_invalid": "Le opzioni della riga dei numeri sono malformate.",
 	"layout_composer.problem_unknown_shortcut": "Un modificatore di scorciatoia è sconosciuto.",
 	"layout_composer.problem_overrides_invalid": "Le modifiche ai tasti sono malformate.",
 	"layout_composer.problem_unknown_target": "Una modifica di tasto nomina un livello sconosciuto.",

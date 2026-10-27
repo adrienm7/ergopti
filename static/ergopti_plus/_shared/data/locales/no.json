@@ -1248,6 +1248,7 @@
 	"layout_composer.problem_unknown_source": "Et lag bruker en layout som ikke er tilgjengelig her.",
 	"layout_composer.problem_spec_invalid": "En lagoppføring er feilformet.",
 	"layout_composer.problem_shortcuts_invalid": "Snarveiene er feilformet.",
+	"layout_composer.problem_rows_invalid": "Tallradens alternativer er feilformet.",
 	"layout_composer.problem_unknown_shortcut": "En snarveismodifikator er ukjent.",
 	"layout_composer.problem_overrides_invalid": "Tasteendringene er feilformet.",
 	"layout_composer.problem_unknown_target": "En tasteendring nevner et ukjent lag.",

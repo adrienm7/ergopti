@@ -1243,6 +1243,7 @@
 	"layout_composer.problem_unknown_source": "Une couche utilise une disposition indisponible ici.",
 	"layout_composer.problem_spec_invalid": "Une entrée de couche est mal formée.",
 	"layout_composer.problem_shortcuts_invalid": "Les raccourcis sont mal formés.",
+	"layout_composer.problem_rows_invalid": "Les options de la rangée des chiffres sont mal formées.",
 	"layout_composer.problem_unknown_shortcut": "Un modificateur de raccourci est inconnu.",
 	"layout_composer.problem_overrides_invalid": "Les modifications de touches sont mal formées.",
 	"layout_composer.problem_unknown_target": "Une modification de touche nomme une couche inconnue.",

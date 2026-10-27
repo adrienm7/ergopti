@@ -1248,6 +1248,7 @@
 	"layout_composer.problem_unknown_source": "Слой использует раскладку, недоступную здесь.",
 	"layout_composer.problem_spec_invalid": "Запись слоя имеет неверный формат.",
 	"layout_composer.problem_shortcuts_invalid": "Сочетания клавиш имеют неверный формат.",
+	"layout_composer.problem_rows_invalid": "Параметры ряда цифр имеют неверный формат.",
 	"layout_composer.problem_unknown_shortcut": "Неизвестный модификатор сочетания.",
 	"layout_composer.problem_overrides_invalid": "Изменения клавиш имеют неверный формат.",
 	"layout_composer.problem_unknown_target": "Изменение клавиши указывает неизвестный слой.",
