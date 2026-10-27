@@ -1,6 +1,6 @@
 {
 	"schema_version": 1,
-	"description": "Neutral keyboard-slot grammar of the one-shortcut model (docs/design/one-shortcut-model.md, PAR-41 step 2). A slot id is zero or more modifier ROLES in the fixed order of \"modifier_order\", then one key id of modifier_chords.json, joined by underscores (primary_g, primary_shift_v, meta_space). A role names what the modifier does, not what it is called: \"primary\" is the main command modifier. Each role lists the modifier id every driver calls it (the ids of modifier_chords.json platforms), or null with the reason when the driver's keyboard has no such key. tools/test/test-slot-roles-single-source.cjs holds the table to modifier_chords.json and to the drivers' slot prefix families; tools/codegen/codegen-slot-roles.cjs projects it to _shared/lua/shortcuts/slot_roles_data.lua.",
+	"description": "Neutral keyboard-slot grammar of the one-shortcut model (docs/design/one-shortcut-model.md, PAR-41 step 2). A slot id is zero or more modifier ROLES in the fixed order of \"modifier_order\", then one key id of modifier_chords.json, joined by underscores (primary_g, primary_shift_v, meta_space). A role names what the modifier does, not what it is called: \"primary\" is the main command modifier. Each role lists the modifier id every driver calls it (the ids of modifier_chords.json platforms), or null with the reason when the driver's keyboard has no such key. tools/test/test-slot-roles-single-source.cjs holds the table to modifier_chords.json and to the drivers' slot prefix families; tools/codegen/codegen-slot-roles.cjs projects it to _shared/lua/shortcuts/slot_roles_data.lua. \"families\" lists, per driver and in menu order, the role combinations under which that driver accepts any key; \"extra_keys\" are keys a driver accepts in slots that modifier_chords.json (which also feeds the chord actions of every driver) does not carry.",
 	"modifier_order": ["primary", "secondary", "alt", "meta", "shift"],
 	"roles": {
 		"primary": {
@@ -35,6 +35,34 @@
 			"macos": "shift",
 			"linux": "shift"
 		}
+	},
+	"families": {
+		"windows": [["alt"], ["primary"], ["primary", "shift"], ["meta"]],
+		"macos": [["alt"], ["secondary"], ["secondary", "shift"], ["primary"], ["primary", "shift"]],
+		"linux": [
+			["primary"],
+			["meta"],
+			["alt"],
+			["primary", "shift"],
+			["meta", "shift"],
+			["alt", "shift"]
+		]
+	},
+	"extra_keys": {
+		"windows": [],
+		"macos": [
+			{
+				"id": "quote",
+				"label": "'",
+				"chord_key": "'"
+			},
+			{
+				"id": "capslock",
+				"label": "Caps Lock",
+				"chord_key": "capslock"
+			}
+		],
+		"linux": []
 	},
 	"reserved_chords": []
 }

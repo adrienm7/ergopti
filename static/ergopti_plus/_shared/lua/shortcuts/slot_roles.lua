@@ -130,4 +130,37 @@ function M.from_native(driver, modifiers, key)
 	return M.id(roles, key)
 end
 
+--- The role combinations a driver accepts, in menu order.
+--- @param driver string "windows", "macos" or "linux".
+--- @return table families Dense array of { prefix, roles, native } with detached tables.
+function M.families(driver)
+	require_driver(driver)
+	local result = {}
+	for _, family in ipairs(Data.families) do
+		if family.driver == driver then
+			local roles, native = {}, {}
+			for index, role in ipairs(family.roles) do
+				roles[index] = role
+				native[index] = assert(Data.roles[role][driver], "family names a role absent on " .. driver)
+			end
+			result[#result + 1] = { prefix = family.prefix, roles = roles, native = native }
+		end
+	end
+	return result
+end
+
+--- Keys a driver accepts in slots beyond the shared key catalogue.
+--- @param driver string "windows", "macos" or "linux".
+--- @return table keys Dense array of { id, label, chord_key } with detached tables.
+function M.extra_keys(driver)
+	require_driver(driver)
+	local result = {}
+	for _, key in ipairs(Data.extra_keys) do
+		if key.driver == driver then
+			result[#result + 1] = { id = key.id, label = key.label, chord_key = key.chord_key }
+		end
+	end
+	return result
+end
+
 return M
