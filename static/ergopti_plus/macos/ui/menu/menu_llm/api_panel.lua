@@ -475,17 +475,18 @@ function M.build(ctx)
 					local function trim(s) return TextUtils.trim(tostring(s or "")) end
 					local function prompt_field(title_key, default_val, hint)
 						if not add_commands_ready() then return false, nil end
+						local ok_label = i18n.get("button.ok")
 						local ok, ret_a, ret_b = pcall(dialog.text_prompt,
 							title_key, hint, default_val or "",
-							"OK", i18n.get("button.cancel"))
+							ok_label, i18n.get("button.cancel"))
 						if not ok then return false, nil end
 						local picked_btn, picked_text
-						if ret_a == "OK" or ret_a == i18n.get("button.cancel") then
+						if ret_a == ok_label or ret_a == i18n.get("button.cancel") then
 							picked_btn, picked_text = ret_a, ret_b
 						else
 							picked_text, picked_btn = ret_a, ret_b
 						end
-						if picked_btn ~= "OK" then return false, nil end
+						if picked_btn ~= ok_label then return false, nil end
 						if not add_commands_ready() then return false, nil end
 						return true, trim(picked_text)
 					end
