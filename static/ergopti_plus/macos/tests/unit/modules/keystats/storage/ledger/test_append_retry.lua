@@ -18,6 +18,18 @@ helpers.describe("local SQL append retry", function()
 			assert(state.bytes() == state.prefix .. state.batch)
 		end)
 	end)
+	helpers.it("publishes the journal without forking metadata commands (L16)", function()
+		Fixture.with_manager(function(manager, state)
+			local Stats = require("adapters.metadata_command_stats")
+			local before = Stats.snapshot()
+			manager.ingest_once()
+			assert(state.outbox == "" and state.bytes() == state.prefix .. state.batch)
+			local after = Stats.snapshot()
+			-- Each carried-metadata publication forks four shell commands; the
+			-- pending and settled journal writes made the Mac ingest tick hold 0.3 s.
+			helpers.assert_eq(after - before, 0, "a ledger flush must not fork metadata commands")
+		end)
+	end)
 	for _, fault in ipairs({ "write nil", "write throw", "write foreign", "close nil", "close throw", "close foreign" }) do
 		helpers.it("resumes the exact batch after " .. fault, function()
 			Fixture.with_manager(function(manager, state)

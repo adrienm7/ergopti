@@ -35,14 +35,14 @@ helpers.describe("durable ledger journal admission", function()
 	end)
 	helpers.it("retains pending publication when the terminal journal write refuses", function()
 		Fixture.with_manager(function(manager, state)
-			local write = state.files.write_if_unchanged
-			state.files.write_if_unchanged = function(path, content, ...)
+			local write = state.files.write_private_if_unchanged
+			state.files.write_private_if_unchanged = function(path, content, ...)
 				if content:find('"settled"', 1, true) then return false end
 				return write(path, content, ...)
 			end
 			manager.ingest_once()
 			assert(state.outbox == "" and state.reads == 0 and state.journal().phase == "pending")
-			state.files.write_if_unchanged = write
+			state.files.write_private_if_unchanged = write
 			state.restart().ingest_once()
 			assert(state.journal().phase == "settled" and state.reads == 1)
 			assert(state.bytes() == state.prefix .. state.batch)

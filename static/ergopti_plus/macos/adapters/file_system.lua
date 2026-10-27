@@ -1875,7 +1875,7 @@ end
 --- @param content string UTF-8 content to write.
 --- @return boolean true on success, false on any error.
 --- @return string|nil error_message Concrete failure reason when available.
-local function write_atomic(path, content, expected_source, on_error, admission)
+local function write_atomic(path, content, expected_source, on_error, admission, carry_metadata)
 	local report = OperationReporter.new(on_error, Logger, LOG)
 	if admission ~= nil and type(admission) ~= "function" then
 		return false, "publication admission must be a function"
@@ -2053,7 +2053,7 @@ local function write_atomic(path, content, expected_source, on_error, admission)
 		if not staging_directory_matches(staging_area) then
 			return fail_after_cleanup("staging identity failure", "staging directory identity changed")
 		end
-		if destination_attributes ~= nil then
+		if destination_attributes ~= nil and carry_metadata ~= false then
 			expected_metadata, resolve_err = seed_staging_metadata(resolved_path, tmp_path)
 			-- The copy may leave a partial regular file even when metadata checks fail.
 			local seeded = symlink_attributes(tmp_path)
@@ -2346,6 +2346,27 @@ function M.write_if_unchanged(path, content, expected_source, on_error)
 		return false, "expected_source must be a table"
 	end
 	return write_atomic(path, content, expected_source, on_error)
+end
+
+--- Publishes a driver-owned private file under the same lock, route, staging
+--- and compare-before-write rules, without carrying the destination's ACL and
+--- extended attributes. Carrying them forks four shell commands per write from
+--- the Hammerspoon process (about 40 ms each on the Mac), which made every
+--- keystats ledger journal flush hold the main thread 0.3 to 0.7 s (ledger L16).
+--- Only for files the driver creates itself in its private data folders: their
+--- metadata is the driver's own default, so there is nothing a user set to keep.
+--- @param path string Absolute destination path.
+--- @param content string UTF-8 content.
+--- @param expected_source table `{ status = "ok"|"absent", content = string|nil }`.
+--- @param on_error function|nil Receives only fixed failure categories.
+--- @return boolean written
+--- @return string|nil error_message
+--- @return function|table|nil receipt Ordinary cleanup callback.
+function M.write_private_if_unchanged(path, content, expected_source, on_error)
+	if type(expected_source) ~= "table" then
+		return false, "expected_source must be a table"
+	end
+	return write_atomic(path, content, expected_source, on_error, nil, false)
 end
 
 --- Publishes an exact source only while the captured logical owner still admits it.
