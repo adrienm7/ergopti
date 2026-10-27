@@ -111,6 +111,7 @@
 		"test:shared-pages-never-show-raw-keys": "node ./tools/test/test-shared-pages-never-show-raw-keys.cjs",
 		"test:drift-guard-coverage": "node ./tools/test/test-drift-guard-covers-every-output.cjs",
 		"test:drift-guard-isolation-skips-directory-links": "node ./tools/test/test-drift-guard-isolation-skips-directory-links.cjs",
+		"test:shortcut-inventory": "node ./tools/test/test-shortcut-inventory-matches-sources.cjs",
 		"test:drift-guard-coverage-oracle": "node ./tools/test/test-drift-guard-coverage-oracle.cjs",
 		"test:drift-restore-refusal": "node ./tools/test/test-drift-restore-refusal.cjs",
 		"test:corpus-backspace-semantics": "node ./tools/test/test-corpus-backspace-count-semantics.cjs",
