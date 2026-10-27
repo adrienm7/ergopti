@@ -605,6 +605,7 @@
 	"share_policy": {
 		"version": 1,
 		"notice_key": "healthcheck.export.privacy_notice",
+		"truncated_note_key": "healthcheck.export.url_truncated_note",
 		"projection": {
 			"kind": "object",
 			"fields": {
@@ -667,17 +668,71 @@
 									"kind": "boolean"
 								},
 								"os": {
-									"kind": "runtime",
-									"prefixes": [
-										"macOS ",
-										"Windows ",
-										"Ubuntu ",
-										"Fedora Linux ",
-										"Debian GNU/Linux ",
-										"Alpine Linux ",
-										"openSUSE Leap "
-									],
-									"suffixes": [""]
+									"kind": "platform_name",
+									"families": [
+										"macOS",
+										"Windows",
+										"Ubuntu",
+										"Fedora Linux",
+										"Debian GNU/Linux",
+										"Alpine Linux",
+										"openSUSE",
+										"Arch Linux",
+										"Linux Mint",
+										"Pop!_OS",
+										"Manjaro Linux",
+										"elementary OS",
+										"Zorin OS",
+										"Kali GNU/Linux",
+										"NixOS",
+										"Gentoo",
+										"Red Hat Enterprise Linux",
+										"Rocky Linux",
+										"AlmaLinux",
+										"CentOS",
+										"Void Linux",
+										"EndeavourOS",
+										"Garuda Linux",
+										"Nobara Linux",
+										"Bazzite",
+										"SteamOS",
+										"Raspbian GNU/Linux",
+										"Linux"
+									]
+								},
+								"desktop": {
+									"kind": "platform_name",
+									"families": [
+										"gnome",
+										"kde",
+										"plasma",
+										"xfce",
+										"cinnamon",
+										"x-cinnamon",
+										"mate",
+										"lxqt",
+										"lxde",
+										"budgie",
+										"pantheon",
+										"cosmic",
+										"hyprland",
+										"sway",
+										"i3",
+										"niri",
+										"wayfire",
+										"river",
+										"labwc",
+										"ubuntu",
+										"pop",
+										"unity",
+										"deepin",
+										"enlightenment",
+										"unknown"
+									]
+								},
+								"display_server": {
+									"kind": "enum",
+									"values": ["wayland", "x11", "unknown"]
 								}
 							}
 						},

@@ -20,7 +20,10 @@
  *    refused: the last parameter first, at a whole code point, ending with the
  *    truncation marker; a parameter that cannot keep one code point is dropped;
  *    the title goes last and the template never.
- * 4. One algorithm, three languages: the Lua port
+ * 4. A cut field can carry a note (one line saying where the complete text is),
+ *    appended after the truncation marker and counted in the budget: the
+ *    caller passes it only for the field that holds the complete report.
+ * 5. One algorithm, three languages: the Lua port
  *    (_shared/lua/diagnostics/issue_link.lua) and the AHK port
  *    (windows/infra/issue_link.ahk) replay the same vectors
  *    (_shared/tests/corpus/diagnostics/issue_link_vectors.json).
@@ -129,10 +132,12 @@
 	 * @param {{owner: string, repo: string}} repository From updater defaults.json.
 	 * @param {string} templateId Key of templates.templates ("bug", "feature").
 	 * @param {Object<string, string>} values Title and field values by id.
+	 * @param {Object<string, string>} [notes] One line per field id, appended on
+	 *   its own line after the truncation marker when that field is cut.
 	 * @returns {string}
 	 * @throws {Error} On an unknown template or a URL that cannot fit at all.
 	 */
-	function buildIssueUrl(templates, repository, templateId, values) {
+	function buildIssueUrl(templates, repository, templateId, values, notes) {
 		var template = templates && templates.templates && templates.templates[templateId];
 		if (!template) throw new Error('issue_link: unknown template "' + templateId + '"');
 		if (!repository || !repository.owner || !repository.repo) {
@@ -153,6 +158,7 @@
 				return repository.repo;
 			});
 		values = values || {};
+		notes = notes || {};
 
 		var params = [['template', template.file]];
 		if (values.title) params.push(['title', template.title_prefix + values.title]);
@@ -164,7 +170,8 @@
 		for (var i = params.length - 1; i >= 1; i--) {
 			var over = joinUrl(base, params).length - max;
 			if (over <= 0) break;
-			var cut = cutValue(params[i][1], percentEncode(params[i][1]).length - over, marker);
+			var ending = notes[params[i][0]] ? marker + '\n\n' + notes[params[i][0]] : marker;
+			var cut = cutValue(params[i][1], percentEncode(params[i][1]).length - over, ending);
 			if (cut === null) params.splice(i, 1);
 			else {
 				params[i] = [params[i][0], cut];
