@@ -52,6 +52,10 @@
 #       Same conflict rule.
 #   { op = "map_value", section, key, map = [{ from, to }, ...] }
 #       Replaces a present value equal (same type) to a ``from``.
+#   { op = "wrap_value", section, key, to_key }
+#       Moves a present scalar into its own [section.key] table as to_key (a
+#       bare `date = true` becomes [section.date] enabled = true). A table, an
+#       array or an absent key is left as is, so a replay changes nothing.
 #   { op = "delete", section, key? }
 #       Deletes one key, or without ``key`` a section and every section
 #       below it.
