@@ -88,6 +88,7 @@ local OWNED = {
 	"adapters.clipboard",
 	"adapters.event_provenance",
 	"adapters.file_system",
+	"adapters.metadata_command_stats",
 	"adapters.http_client",
 	"adapters.json_codec",
 	"adapters.key_state",
