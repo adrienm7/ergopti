@@ -53,10 +53,7 @@ helpers.describe("PAC check", function()
 		local _, failed = PacCheck.judge(0, "", "timed out")
 		helpers.assert_eq(PacCheck.with_direct_fallback(failed),
 			"PAC download failed: timed out; downloads then try a direct connection")
-		local probes = assert(io.open("ui/healthcheck/probes.lua", "rb"))
-		local source = probes:read("*a")
-		probes:close()
-		helpers.assert_true(source:find('detail = PacCheck.with_direct_fallback(text)', 1, true) ~= nil,
+		helpers.assert_true(helpers.read_driver_source("detail = PacCheck.with_direct_fallback(text)") ~= nil,
 			"the macOS proxy_pac probe names the direct fallback")
 	end)
 

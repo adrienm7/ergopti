@@ -161,7 +161,7 @@ helpers.describe("field run: developer source mode only", function()
 	end)
 
 	helpers.it("is started by init.lua only behind the developer source check", function()
-		local source = read(helpers.driver_root() .. "init.lua")
+		local source = assert(helpers.read_driver_unit('require("infra.field_run").start('))
 		local gate = source:find('if require("infra.dev_source").is_active() then', 1, true)
 		local start = source:find('require("infra.field_run").start(', 1, true)
 		helpers.assert_not_nil(gate, "init.lua must gate the field run on developer source mode")
