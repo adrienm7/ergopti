@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "Systemets rekkefølge",
 	"menu.layout.number_row_digits": "Tall først",
 	"menu.layout.number_row_symbols": "Symboler først",
-	"platform_reason.number_row_override_unsupported": "Ikke støttet: Denne driveren beholder systemets tallrekke; tall og symboler kan ikke tvinges fram.",
+	"platform_reason.number_row_override_unsupported": "Ikke på dette systemet ennå: Det installerte systemoppsettet skriver tallraden. Ergopti planlegger å skrive tastene på nytt her; i dag setter bare Windows, som emulerer oppsettet, sifre eller symboler først.",
 	"platform_reason.number_row_source_unavailable": "Utilgjengelig: Symboler først krever et aktivt emulert oppsett med gyldige tall- og symbolnivåer på hver plass i tallrekken.",
 	"menu.layout.number_row_not_applied": " (ikke brukt)",
 	"platform_reason.number_row_already_digits_first": "Ingen effekt: dette oppsettet skriver allerede sifrene uten Skift.",

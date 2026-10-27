@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "Ordre natif",
 	"menu.layout.number_row_digits": "Chiffres en premier",
 	"menu.layout.number_row_symbols": "Symboles en premier",
-	"platform_reason.number_row_override_unsupported": "Non pris en charge: Ce pilote conserve la rangée native du système ; les chiffres et symboles forcés sont indisponibles.",
+	"platform_reason.number_row_override_unsupported": "Pas encore sur ce système : la disposition installée dans le système tape la rangée des chiffres. Ergopti prévoit d’en retaper les touches ici ; aujourd’hui, seul Windows, qui émule la disposition, met les chiffres ou les symboles en premier.",
 	"platform_reason.number_row_source_unavailable": "Indisponible: Les symboles en premier nécessitent une disposition émulée active avec des niveaux chiffre et symbole valides sur toute la rangée.",
 	"menu.layout.number_row_not_applied": " — non appliqué",
 	"platform_reason.number_row_already_digits_first": "Sans effet: cette disposition tape déjà ses chiffres sans Maj.",

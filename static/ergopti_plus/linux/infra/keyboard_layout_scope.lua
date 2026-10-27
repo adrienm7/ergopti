@@ -7,12 +7,13 @@
 --- and its edge-key switch) through the shared scope transaction, so a global
 --- restore covers the layout category here as it does on the other drivers.
 ---
---- CONFIG ONLY ON LINUX: no runtime reader yet. The keyboard hook takes its
---- number-row mode when it starts and the daemon passes none (the hook keeps
---- "native"), and nothing reads the edge-key switch. This owner therefore keeps
---- the file honest and has no live state to change, capture or put back; its
---- native snapshot is an empty, opaque receipt. The macOS owner applies the same
---- rows to a live menu state instead (menu_keyboard_layout.lua).
+--- CONFIG ONLY ON LINUX FOR NOW: the rows are not applied yet, and number-row
+--- emulation is planned (docs/design/linux-number-row-runtime.md). The
+--- installed system layout types the number row and the driver does not retype
+--- it yet. The rows stay in config.toml, so this owner restores and clears them
+--- and has no live state to change, capture or put back: its native snapshot is
+--- an empty, opaque receipt. The macOS owner applies the same rows to its menu
+--- state (menu_keyboard_layout.lua).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Same transaction as every other scope: verified backup, conditional
@@ -20,8 +21,8 @@
 ---    refuse, and retained debt when a restore is refused.
 --- 2. Exact ownership: only the manifest's keyboard_layout rows change; unknown
 ---    sections and fields of config.toml survive.
---- 3. Honest absence: the day the daemon reads these rows at hook start, the
----    capture and restore here are the place to add the hook's acknowledgement.
+--- 3. Honest absence: the design note records what the emulation needs here
+---    (an in-hook mode switch, acknowledged by this owner).
 --- ==============================================================================
 
 local M = {}
@@ -69,7 +70,7 @@ function M.apply(mode, is_paused)
 	local path = require("infra.config_paths").config("config.toml")
 	_owner = M.new({ path = path,
 		backup_path = path .. ".layout-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak" })
-	Logger.info(LOG, "Keyboard layout scope '%s' started (config only: no runtime reader yet).", mode)
+	Logger.info(LOG, "Keyboard layout scope '%s' started (config only: not applied yet).", mode)
 	local committed, detail = _owner.apply(mode)
 	if committed then Logger.info(LOG, "Keyboard layout scope '%s' completed.", mode)
 	else Logger.error(LOG, "Keyboard layout scope '%s' refused: %s.", mode, tostring(detail)) end

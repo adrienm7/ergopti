@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "システムの順序",
 	"menu.layout.number_row_digits": "数字を優先",
 	"menu.layout.number_row_symbols": "記号を優先",
-	"platform_reason.number_row_override_unsupported": "未対応: このドライバーはシステムの数字列を維持します。数字や記号を強制することはできません。",
+	"platform_reason.number_row_override_unsupported": "このシステムではまだ利用できません: 数字の列はシステムにインストールされた配列が入力します。Ergopti はここでそのキーを打ち直す予定です。現在、数字や記号を先にできるのは、配列をエミュレートする Windows だけです。",
 	"platform_reason.number_row_source_unavailable": "利用不可: 記号を優先するには、数字列のすべての位置に有効な数字と記号のレベルを持つエミュレーション配列が有効である必要があります。",
 	"menu.layout.number_row_not_applied": "（適用されていません）",
 	"platform_reason.number_row_already_digits_first": "効果なし: この配列はすでに Shift なしで数字を入力します。",

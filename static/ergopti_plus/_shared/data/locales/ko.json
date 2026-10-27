@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "시스템 순서",
 	"menu.layout.number_row_digits": "숫자 우선",
 	"menu.layout.number_row_symbols": "기호 우선",
-	"platform_reason.number_row_override_unsupported": "지원 안 됨: 이 드라이버는 시스템의 숫자 행을 유지하며 숫자나 기호를 강제할 수 없습니다.",
+	"platform_reason.number_row_override_unsupported": "이 시스템에서는 아직 사용할 수 없습니다: 숫자 줄은 시스템에 설치된 자판이 입력합니다. Ergopti는 여기서 그 키를 다시 입력할 예정입니다. 현재 숫자나 기호를 먼저 두는 것은 자판을 에뮬레이션하는 Windows뿐입니다.",
 	"platform_reason.number_row_source_unavailable": "사용 불가: 기호 우선은 숫자 행의 모든 위치에 유효한 숫자와 기호 단계가 있는 활성 에뮬레이션 배열이 필요합니다.",
 	"menu.layout.number_row_not_applied": " (적용 안 됨)",
 	"platform_reason.number_row_already_digits_first": "효과 없음: 이 자판은 이미 Shift 없이 숫자를 입력합니다.",

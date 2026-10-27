@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "הסדר המקורי",
 	"menu.layout.number_row_digits": "ספרות תחילה",
 	"menu.layout.number_row_symbols": "סמלים תחילה",
-	"platform_reason.number_row_override_unsupported": "לא נתמך: מנהל התקן זה שומר על שורת הספרות המקורית של המערכת; אי אפשר לכפות ספרות או סמלים.",
+	"platform_reason.number_row_override_unsupported": "עדיין לא במערכת זו: הפריסה שמותקנת במערכת מקלידה את שורת הספרות. Ergopti מתכנן להקליד מחדש את מקשיה כאן; כיום רק Windows, שמדמה את הפריסה, מציב ספרות או סמלים תחילה.",
 	"platform_reason.number_row_source_unavailable": "לא זמין: העדפת סמלים דורשת פריסה מדומה פעילה עם רמות תקינות לספרות ולסמלים בכל מיקום בשורת הספרות.",
 	"menu.layout.number_row_not_applied": " (לא מוחל)",
 	"platform_reason.number_row_already_digits_first": "ללא השפעה: פריסה זו כבר מקלידה את הספרות ללא Shift.",

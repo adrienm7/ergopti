@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "Kolejność systemowa",
 	"menu.layout.number_row_digits": "Najpierw cyfry",
 	"menu.layout.number_row_symbols": "Najpierw symbole",
-	"platform_reason.number_row_override_unsupported": "Nieobsługiwane: Ten sterownik zachowuje systemowy rząd cyfr; wymuszanie cyfr i symboli jest niedostępne.",
+	"platform_reason.number_row_override_unsupported": "Jeszcze nie w tym systemie: rząd cyfr wpisuje układ zainstalowany w systemie. Ergopti planuje przepisywać tu jego klawisze; dziś tylko Windows, który emuluje układ, stawia cyfry lub symbole na pierwszym miejscu.",
 	"platform_reason.number_row_source_unavailable": "Niedostępne: Symbole najpierw wymagają aktywnego emulowanego układu z prawidłowymi poziomami cyfr i symboli na każdej pozycji rzędu.",
 	"menu.layout.number_row_not_applied": " (niezastosowane)",
 	"platform_reason.number_row_already_digits_first": "Bez efektu: ten układ już wpisuje cyfry bez Shift.",
