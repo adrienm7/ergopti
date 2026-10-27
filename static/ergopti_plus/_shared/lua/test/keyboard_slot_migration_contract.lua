@@ -47,7 +47,7 @@ local SWITCHES = {
 }
 
 local function shared_root()
-	local source = debug.getinfo(1, "S").source:gsub("^@", ""):gsub("\\", "/")
+	local source = debug.getinfo(1, "S").source:gsub("^@", "")
 	return assert(source:match("^(.*)/lua/test/keyboard_slot_migration_contract%.lua$"))
 end
 
