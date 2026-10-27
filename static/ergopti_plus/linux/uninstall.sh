@@ -20,6 +20,15 @@ GUI_TITLE=
 GUI_ERROR=
 GUI_MISSING=
 MISSING_PROGRAM=
+UNINSTALL_RECOVERY=
+UNINSTALL_REMOVAL_STARTED=false
+UNINSTALL_REMOVAL_COMMITTED=false
+UNINSTALL_FINALIZED=false
+SNAPSHOT_SOURCES=()
+SNAPSHOT_DIGESTS=()
+SOURCE_PRESENT=false
+declare -A DIRECTORY_CATALOGS=()
+declare -A DIRECTORY_ENTRIES=()
 
 while [ "$#" -gt 0 ]; do
 	case "$1" in
@@ -60,16 +69,198 @@ show_failure_dialog() {
 	fi
 }
 
+# Recovery is for observed unlink failures only. Snapshot every admitted file
+# before mutation so losing this script or its helpers cannot prevent retry.
+# These copies do not claim hard-kill or concurrent-writer transaction safety.
+uninstall_record() {
+	local record="[uninstall] code=$1 role=$2"
+	printf '%s path=%q\n' "$record" "$3" >&2
+}
+
+# A source refusal keeps the existing startup diagnostic shape on every path.
+uninstall_invalid_source() {
+	local record="[uninstall] code=invalid-source"
+	printf '%s path=%q\n' "$record" "$1" >&2
+}
+
+# Cache only complete native directory catalogs during pre-mutation admission.
+# A failed stat cannot authorize absence, including below an external XDG root.
+catalog_directory() {
+	local directory="$1" entry scan_pid loop_status read_status
+	local completed=false invalid=false
+	local -a entries=()
+	if [ -n "${DIRECTORY_CATALOGS["$directory"]:-}" ]; then return 0; fi
+	if [ -L "$directory" ] || [ ! -d "$directory" ] || [ ! -x "$directory" ] \
+		|| ! (CDPATH= cd -Pe -- "$directory" && [ "$PWD" = "$directory" ]); then
+		return 1
+	fi
+	while :; do
+		entry=
+		if IFS= read -r -d '' entry; then
+			if "$completed"; then invalid=true
+			elif [ -z "$entry" ]; then completed=true
+			else entries+=("$entry")
+			fi
+		else
+			read_status=$?
+			if [ "$read_status" -ne 1 ] || [ -n "$entry" ]; then invalid=true; fi
+			break
+		fi
+	done < <(
+		if find "$directory" -mindepth 1 -maxdepth 1 -print0; then
+			# Empty paths are impossible: this final NUL proves successful completion.
+			printf '\0'
+		else
+			exit "$?"
+		fi
+	)
+	loop_status=$?
+	scan_pid="${!:-}"
+	# Consume the entire pipe and reap its exact producer before publishing data.
+	# Completion is mandatory even if process-substitution allocation was refused.
+	if [ -z "$scan_pid" ]; then return 1; fi
+	if wait "$scan_pid"; then :; else return "$?"; fi
+	if [ "$loop_status" -ne 0 ] || ! "$completed" || "$invalid"; then return 1; fi
+	for entry in "${entries[@]}"; do DIRECTORY_ENTRIES["$entry"]=true; done
+	DIRECTORY_CATALOGS["$directory"]=true
+}
+
+# Walk exact components from a known root. Only a successful complete catalog
+# may prove an optional component absent; aliases are never absence witnesses.
+admit_source_path() {
+	local source="$1" remaining directory=/ component child
+	SOURCE_PRESENT=false
+	case "$source" in /*) remaining="${source#/}" ;; *) return 1 ;; esac
+	# Reject aliases before any optional component can be declared absent.
+	while [ -n "$remaining" ]; do
+		case "$remaining" in
+			*/*) component="${remaining%%/*}"; remaining="${remaining#*/}" ;;
+			*) component="$remaining"; remaining= ;;
+		esac
+		case "$component" in ''|.|..) return 1 ;; esac
+	done
+	if [ -e "$source" ] || [ -L "$source" ]; then SOURCE_PRESENT=true; return 0; fi
+	# Failed probes choose only where to query, never whether a path is absent.
+	# Start at the nearest observable ancestor rather than cataloging unrelated
+	# root or temporary directories for every ordinary optional startup path.
+	directory="${source%/*}"
+	while [ -n "$directory" ] && [ ! -e "$directory" ] && [ ! -L "$directory" ]; do
+		directory="${directory%/*}"
+	done
+	if [ -z "$directory" ]; then directory=/; remaining="${source#/}"
+	else remaining="${source#"$directory"/}"
+	fi
+	while [ -n "$remaining" ]; do
+		case "$remaining" in
+			*/*) component="${remaining%%/*}"; remaining="${remaining#*/}" ;;
+			*) component="$remaining"; remaining= ;;
+		esac
+		case "$component" in ''|.|..) return 1 ;; esac
+		if catalog_directory "$directory"; then :; else return "$?"; fi
+		child="${directory%/}/$component"
+		if [ -z "${DIRECTORY_ENTRIES["$child"]:-}" ]; then return 0; fi
+		if [ -z "$remaining" ]; then SOURCE_PRESENT=true; return 0; fi
+		if [ -L "$child" ] || [ ! -d "$child" ] || [ ! -x "$child" ]; then return 1; fi
+		directory="$child"
+	done
+	return 1
+}
+
+finish_uninstall() {
+	local failed=false index original snapshot parent temporary actual original_mode snapshot_mode
+	[ -n "$UNINSTALL_RECOVERY" ] || return 0
+	if "$UNINSTALL_FINALIZED"; then return 0; fi
+	UNINSTALL_FINALIZED=true
+	if "$UNINSTALL_REMOVAL_STARTED" && ! "$UNINSTALL_REMOVAL_COMMITTED"; then
+		for index in "${!SNAPSHOT_SOURCES[@]}"; do
+			original="${SNAPSHOT_SOURCES[$index]}"
+			snapshot="$UNINSTALL_RECOVERY/$index"
+			# An incumbent, including a replacement link, is never overwritten.
+			parent="$(dirname -- "$original")"
+			if [ -e "$original" ] || [ -L "$original" ]; then
+				if [ -L "$original" ] || [ ! -f "$original" ] \
+					|| [ "$(cd -- "$parent" && pwd -P)" != "$parent" ] \
+					|| ! actual="$(sha256sum < "$original")" \
+					|| [ "${actual%% *}" != "${SNAPSHOT_DIGESTS[$index]}" ] \
+					|| ! original_mode="$(stat -c %a -- "$original")" \
+					|| ! snapshot_mode="$(stat -c %a -- "$snapshot")" \
+					|| [ "$original_mode" != "$snapshot_mode" ]; then
+					uninstall_record rollback-failed original "$original"
+					failed=true
+				fi
+				continue
+			fi
+			if [ ! -d "$parent" ] \
+				|| [ "$(cd -- "$parent" && pwd -P)" != "$parent" ]; then
+				uninstall_record rollback-failed original "$original"
+				failed=true
+				continue
+			fi
+			# Publish by a same-parent hard link, which refuses every incumbent.
+			# Staging in that parent also supports external XDG filesystems.
+			if ! temporary="$(mktemp "$parent/.ergopti-restore.XXXXXX")"; then
+				uninstall_record rollback-failed original "$original"
+				failed=true
+				continue
+			fi
+			if ! cp -p -- "$snapshot" "$temporary" \
+				|| ! actual="$(sha256sum < "$temporary")" \
+				|| [ "${actual%% *}" != "${SNAPSHOT_DIGESTS[$index]}" ] \
+				|| ! ln -T -- "$temporary" "$original"; then
+				uninstall_record rollback-failed original "$original"
+				failed=true
+			fi
+			if ! rm -f -- "$temporary"; then
+				uninstall_record cleanup-failed temporary "$temporary"
+				failed=true
+			fi
+		done
+	fi
+	if "$failed"; then
+		uninstall_record recovery-retained snapshot "$UNINSTALL_RECOVERY"
+		return 1
+	fi
+	# Once payload and receipt removal committed, cleanup cannot roll back it.
+	if ! rm -rf -- "$UNINSTALL_RECOVERY"; then
+		uninstall_record cleanup-failed snapshot "$UNINSTALL_RECOVERY"
+		return 1
+	fi
+	UNINSTALL_RECOVERY=
+}
+
+prepare_uninstall_snapshots() {
+	local index original actual candidate
+	# Refused allocation output cannot grant ownership of a recovery directory.
+	if ! candidate="$(mktemp -d "$LIBRARY/.ergopti-uninstall.XXXXXX")"; then return 1; fi
+	UNINSTALL_RECOVERY="$candidate"
+	# NUL-framed paths and ordered digests make retained copies recoverable
+	# without evaluating filenames as shell text or relying on vanished files.
+	printf '%s\0' "${SNAPSHOT_SOURCES[@]}" > "$UNINSTALL_RECOVERY/paths"
+	printf '%s\n' "${SNAPSHOT_DIGESTS[@]}" > "$UNINSTALL_RECOVERY/digests"
+	for index in "${!SNAPSHOT_SOURCES[@]}"; do
+		original="${SNAPSHOT_SOURCES[$index]}"
+		cp -p -- "$original" "$UNINSTALL_RECOVERY/$index"
+		actual="$(sha256sum < "$UNINSTALL_RECOVERY/$index")"
+		if [ "${actual%% *}" != "${SNAPSHOT_DIGESTS[$index]}" ]; then
+			uninstall_record snapshot-refused original "$original"
+			exit 1
+		fi
+	done
+}
+
 # EX_UNAVAILABLE names a missing program: the menu passes a localized message
 # whose {1} is that program, so the dialog says what to install.
 report_exit() {
 	local status=$?
+	trap - EXIT
+	if ! finish_uninstall; then status=1; fi
 	if [ "$status" -eq 69 ] && [ -n "$MISSING_PROGRAM" ] && [ -n "$GUI_MISSING" ]; then
 		GUI_ERROR="${GUI_MISSING//\{1\}/$MISSING_PROGRAM}"
 	fi
 	if [ "$status" -ne 0 ] && [ -n "$GUI_TITLE" ]; then
 		show_failure_dialog
 	fi
+	exit "$status"
 }
 trap report_exit EXIT
 
@@ -158,7 +349,13 @@ elif ! { grep -Fqx "DRIVER_ROOT=\"$LIBRARY/linux\"" "$WRAPPER" \
 	echo 'The launcher belongs to a different installation.' >&2
 	exit 1
 fi
-if find "$LIBRARY" -name .git -print -quit | grep -q .; then
+# Use a match only as a nonempty marker; never parse filenames as lines.
+# A refused walk cannot prove either absence of a checkout or complete access.
+if ! checkout_marker="$(find "$LIBRARY" -name .git -print -quit)"; then
+	uninstall_record scan-refused library "$LIBRARY"
+	exit 1
+fi
+if [ -n "$checkout_marker" ]; then
 	echo 'Refusing to remove a source checkout.' >&2
 	exit 1
 fi
@@ -175,6 +372,7 @@ UNIT="$CONFIG_ROOT/systemd/user/ergopti-hotstrings.service"
 AUTOSTART="$CONFIG_ROOT/autostart/ergopti-hotstrings.desktop"
 [ -f "$MANIFEST" ] && [ ! -L "$MANIFEST" ] && [ -s "$MANIFEST" ] || { echo 'Installation ownership manifest is missing.' >&2; exit 1; }
 OWNED=()
+OWNED_DIGESTS=()
 REMOVE_UNIT=false
 declare -A SEEN=()
 while IFS=$'\t' read -r digest relative || [ -n "$digest$relative" ]; do
@@ -191,7 +389,13 @@ while IFS=$'\t' read -r digest relative || [ -n "$digest$relative" ]; do
 	esac
 	[ -z "${SEEN[$owned]:-}" ] || { echo 'Duplicate ownership path.' >&2; exit 1; }
 	SEEN[$owned]=1
-	if [ -e "$owned" ] || [ -L "$owned" ]; then
+	if admit_source_path "$owned"; then :
+	else
+		admission_status=$?
+		uninstall_invalid_source "$owned"
+		exit "$admission_status"
+	fi
+	if "$SOURCE_PRESENT"; then
 		[ ! -L "$owned" ] && [ -f "$owned" ] \
 			&& [ "$(cd -- "$(dirname -- "$owned")" && pwd -P)" = "$(dirname -- "$owned")" ] \
 			|| { echo 'Owned file was replaced by a link or another file type.' >&2; exit 1; }
@@ -200,19 +404,25 @@ while IFS=$'\t' read -r digest relative || [ -n "$digest$relative" ]; do
 		# we keep files absent from the installer's payload manifest.
 		if [ "${actual%% *}" = "$digest" ]; then
 			OWNED+=("$owned")
+			OWNED_DIGESTS+=("$digest")
 			if [ "$owned" = "$UNIT" ]; then REMOVE_UNIT=true; fi
 		fi
 	fi
 done < "$MANIFEST"
 
 for entry in "$UNIT" "$AUTOSTART"; do
-	if [ ! -e "$entry" ] && [ ! -L "$entry" ]; then continue; fi
+	if admit_source_path "$entry"; then :
+	else
+		admission_status=$?
+		uninstall_invalid_source "$entry"
+		exit "$admission_status"
+	fi
+	if ! "$SOURCE_PRESENT"; then continue; fi
 	# Unlisted startup entries bypass the payload receipt loop. Admit the same
 	# regular, direct source before grep can follow an alias or wait on a FIFO.
 	if [ -L "$entry" ] || [ ! -f "$entry" ] \
 		|| [ "$(cd -- "$(dirname -- "$entry")" && pwd -P)" != "$(dirname -- "$entry")" ]; then
-		startup_refusal="[uninstall] code=invalid-source"
-		printf '%s path=%q\n' "$startup_refusal" "$entry" >&2
+		uninstall_invalid_source "$entry"
 		exit 1
 	fi
 	if ! grep -Fq "$WRAPPER --tray" "$entry" \
@@ -227,11 +437,18 @@ if [ -f "$UNIT" ] && ! "$REMOVE_UNIT"; then
 	exit 1
 fi
 if "$CHECK_ONLY"; then exit 0; fi
+SNAPSHOT_SOURCES=("${OWNED[@]}" "$MANIFEST")
+manifest_digest="$(sha256sum < "$MANIFEST")"
+SNAPSHOT_DIGESTS=("${OWNED_DIGESTS[@]}" "${manifest_digest%% *}")
+prepare_uninstall_snapshots
 if [ -f "$UNIT" ] && command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
 	systemctl --user disable --now ergopti-hotstrings.service
 fi
+UNINSTALL_REMOVAL_STARTED=true
 for owned in "${OWNED[@]}"; do rm -- "$owned"; done
 rm -- "$MANIFEST"
+UNINSTALL_REMOVAL_COMMITTED=true
+finish_uninstall
 find "$LIBRARY" -depth -type d -empty -delete
 if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
 	systemctl --user daemon-reload

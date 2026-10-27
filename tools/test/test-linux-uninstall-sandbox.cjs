@@ -18,6 +18,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { createHash } = require('crypto');
 const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
+const { pythonExecutable } = require('../lib/python.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const script = path.join(ROOT, 'static/ergopti_plus/linux/uninstall.sh');
@@ -915,7 +916,37 @@ assert results[2].get('status') == 0, 'a reused PID cannot retain a previous own
 	assert.equal(packagedRun('--yes').status, 0);
 	assert.ok(!fs.existsSync(nativeStartup), 'confirmed RPM removal retires its own startup entry');
 	assert.ok(fs.existsSync(path.join(packaged, 'uninstall.sh')), 'RPM alone owns its package files');
-	console.log('[OK] Linux uninstaller removes only the validated standalone installation.');
 } finally {
 	fs.rmSync(sandbox, { recursive: true, force: true });
+}
+
+const reportSuccess = () =>
+	console.log('[OK] Linux uninstaller removes only the validated standalone installation.');
+
+if (process.platform === 'linux') {
+	const transaction = spawnSync(
+		pythonExecutable(),
+		[path.join(ROOT, 'tools/test/linux_uninstall_transaction_test.py'), ROOT],
+		{ encoding: 'utf8', timeout: 60000 }
+	);
+	const diagnostics = [transaction.stdout, transaction.stderr]
+		.filter((value) => typeof value === 'string')
+		.join('');
+	// Complete diagnostic forwarding before an assertion can terminate Node.
+	process.stdout.write(diagnostics, (error) => {
+		assert.ifError(error);
+		assert.equal(
+			transaction.error,
+			undefined,
+			'the native uninstall transaction fixture must finish'
+		);
+		assert.equal(transaction.signal, null, 'the native fixture must finish without a signal');
+		assert.equal(transaction.status, 0, diagnostics);
+		assert.match(diagnostics, /Ran 13 tests in /, 'every native transaction case must execute');
+		assert.match(diagnostics, /\nOK\s*$/, 'the native transaction fixture must pass');
+		assert.doesNotMatch(diagnostics, /\bskipped\b/i, 'native transaction cases cannot be skipped');
+		reportSuccess();
+	});
+} else {
+	reportSuccess();
 }
