@@ -1897,6 +1897,22 @@
 			"stays_in_lua": []
 		},
 		{
+			"contract": "menu_separators_contract.lua",
+			"lua_sites": 2,
+			"data_driven": [
+				{
+					"case": "normalises every shared vector to its expected rows",
+					"corpus": "menus/separator_normalization_vectors.json"
+				}
+			],
+			"stays_in_lua": [
+				{
+					"case": "is idempotent and returns the array it was given",
+					"reason": "lua_identity"
+				}
+			]
+		},
+		{
 			"contract": "menu_top_level_separator_contract.lua",
 			"lua_sites": 5,
 			"data_driven": [],
