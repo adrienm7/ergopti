@@ -1,0 +1,10 @@
+2026-10-27 16:48:20:898 [WARNING] [preferences] Slow preferences save 2065 ms (prepare=1291 write=773 ms; operations=293).
+2026-10-27 16:53:38:978 [WARNING] [keystats.log_manager] Slow ingest tick 544 ms (drain=0 foreign=0 outbox=3 read=2 build=8 apply=9 commit=1 append=517 notify=0 ms; entries=1 statements=1).
+2026-10-27 16:54:58:018 [WARNING] [keystats.log_manager] Slow ingest tick 591 ms (drain=0 foreign=0 outbox=2 read=1 build=7 apply=5 commit=0 append=573 notify=0 ms; entries=5 statements=5).
+2026-10-27 18:17:30:155 [WARNING] [keystats.log_manager] Slow ingest tick 639 ms (drain=0 foreign=0 outbox=3 read=0 build=9 apply=13 commit=4 append=608 notify=0 ms; entries=1 statements=1).
+2026-10-27 19:52:19:825 [WARNING] [keystats.log_manager] Slow ingest tick 519 ms (drain=0 foreign=0 outbox=3 read=0 build=8 apply=10 commit=1 append=494 notify=0 ms; entries=1 statements=1).
+2026-10-27 19:56:29:824 [WARNING] [keystats.log_manager] Slow ingest tick 520 ms (drain=0 foreign=0 outbox=2 read=2 build=8 apply=11 commit=1 append=493 notify=0 ms; entries=1 statements=1).
+2026-10-27 20:00:29:848 [WARNING] [keystats.log_manager] Slow ingest tick 546 ms (drain=0 foreign=0 outbox=4 read=1 build=9 apply=8 commit=1 append=518 notify=0 ms; entries=1 statements=1).
+2026-10-27 20:07:12:113 [WARNING] [keystats.log_manager] Slow ingest tick 714 ms (drain=0 foreign=0 outbox=4 read=0 build=7 apply=8 commit=1 append=689 notify=0 ms; entries=2 statements=2).
+2026-10-27 20:16:59:193 [WARNING] [keystats.log_manager] Slow ingest tick 543 ms (drain=0 foreign=0 outbox=2 read=2 build=9 apply=9 commit=1 append=517 notify=0 ms; entries=1 statements=1).
+2026-10-27 20:43:52:316 [WARNING] [keystats.log_manager] Slow ingest tick 505 ms (drain=0 foreign=0 outbox=3 read=0 build=8 apply=9 commit=1 append=481 notify=0 ms; entries=1 statements=1).
