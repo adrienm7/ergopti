@@ -104,6 +104,23 @@ nothing, as in the shared vectors.
   `layout_composer.problem.*` locale keys; serialization refuses an invalid
   composition (fail fast).
 
+## Number-row options
+
+`composition.json` may carry `rows: { "order": "native" | "digits" | "symbols", "edges": bool }`
+(the values of `layout.direct_access_digits` and `layout.number_row_reorder_edges`).
+`compose` applies them after the four layers and the overrides, by the rule Windows
+applies with hotkeys (`docs/design/layout-option-emulation.md`, section 1): the base
+and Shift cells of the ten digit keys (and of `Backquote`, `Minus`, `Equal` with
+`edges`) trade places, a dead cell with its state machine; AltGr and the shortcut
+maps are untouched; the Caps cell of a swapped key is derived again. A choice the
+layout cannot take (`already_symbols_first`, `mixed`, `edges_incomplete`, ...) is
+kept in the declaration and changes nothing; the built layout reports it in
+`layout.rows` (`order`, `reason`, `edges`). The rule is `rowAvailability`,
+`rowEffective` and `rowEdgesAvailability` in `composer_model.js`, held to
+`tests/corpus/layouts/number_row_policy.json` (also replayed by the AHK and Lua
+tests) and to hand-written outcomes in
+`tests/corpus/layouts/row_options_vectors.json`.
+
 ## Serialization to `.keylayout`
 
 One modifierMap, eight keyMaps, mutually exclusive selectors (so the first
