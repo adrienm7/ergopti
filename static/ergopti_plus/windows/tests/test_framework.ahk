@@ -1016,6 +1016,7 @@ RunTests(PlanModuleOf := 0) {
     }
 	; Close registration before receipt I/O or selection can dispatch a callback.
 	_TEST_RUN_STARTED := true
+	ReplayCommand := _TestReplayCommand(A_AhkPath, A_ScriptFullPath, A_Args)
 	if !IsSet(_AHK_DRY_RUN)
 		_AHK_DRY_RUN := false
 	if !IsSet(_AHK_ONLY_FILTER)
@@ -1108,12 +1109,9 @@ RunTests(PlanModuleOf := 0) {
 		; the marker keeps it out of every pass count.
 		_TestPrint((Status == "not executed" ? "ok" : Status) . " " . Index . " - " . TestEntry.name . Detail)
 		_TestPrint("# duration_ms " . Index . " " . Format("{:.3f}", DurationMs))
-		; Print the exact one-test replay command so a red test is reproducible
-		; without re-running the whole suite (the JS runner sets this bar).
+		; Preserve the actual owner's supported selection, including isolated runners.
 		if (Status == "not ok")
-			_TestPrint("#   replay: AutoHotkey64.exe tests\run_all.ahk"
-				. (TestEntry.interactive ? " --interactive" : "") . " --only "
-				. Chr(34) . TestEntry.name . Chr(34))
+			_TestPrint("#   replay: " . ReplayCommand)
 	}
 	if NotExecuted.Length {
 		_TestPrint("# NOT EXECUTED on this host: " . NotExecuted.Length . " case(s), none counted as passed:")
@@ -1124,6 +1122,24 @@ RunTests(PlanModuleOf := 0) {
 		. (TEST_NOT_EXECUTED_COUNT ? ", " . TEST_NOT_EXECUTED_COUNT . " not executed" : "") . ".")
 	_TestResultsPublishOrExit()
 	ExitApp(TEST_FAIL_COUNT > 0 ? 1 : 0)
+}
+
+; Build a PowerShell invocation without interpolating paths or selection values.
+_TestReplayCommand(Interpreter, Entry, Arguments) {
+	if !(Arguments is Array)
+		throw TypeError("Runner replay arguments must be an Array.")
+	if !(Interpreter is String) || Interpreter == "" || !(Entry is String) || Entry == ""
+		throw TypeError("Runner replay requires an interpreter and entry path.")
+	Operands := [Interpreter, Entry]
+	for Argument in Arguments
+		Operands.Push(Argument)
+	Command := "&"
+	for Operand in Operands {
+		if !(Operand is String)
+			throw TypeError("Runner replay operands must be strings.")
+		Command .= " '" . StrReplace(Operand, "'", "''") . "'"
+	}
+	return Command
 }
 
 ; Measure callback wall time without including TAP output or error formatting.

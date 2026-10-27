@@ -779,3 +779,119 @@ _TRFE_PublicationExit(Mode, Receipt) {
 for _TRFE_PublicationMode in ["success", "missing", "stderr-refusal"]
 	Test("runner canonical exit: " . _TRFE_PublicationMode . " (receipt-publication)",
 		_TRFE_WithSharedTap.Bind(_TRFE_PublicationExit.Bind(_TRFE_PublicationMode)))
+
+; Isolated owners must replay their own entry and original supported selection.
+_TRFE_ReplayExecutingChild() {
+	global _StaticDir
+	Framework := _StaticDir . "\ergopti_plus\windows\tests\test_framework.ahk"
+	Directory := A_Temp . "\ergopti-replay-command-" . DllCall("Kernel32\GetCurrentProcessId", "UInt") . "-" . A_TickCount
+	if !DllCall("Kernel32\CreateDirectoryW", "Str", Directory, "Ptr", 0, "Int")
+		throw OSError(A_LastError, "Cannot acquire the owned replay command fixture")
+	Owned := _TRFE_AbsoluteTapPath(Directory)
+	Receipt := Directory . "\child.tap"
+	Child := Directory . "\replay's " . Chr(0xE9) . ".ahk"
+	FrameworkCopy := Directory . "\framework.ahk"
+	Argument := "two ' quotes " . Chr(34) . " $() " . Chr(96) . " " . Chr(0xE9)
+	Handle := 0
+	CanRetire := true
+	Observation := {Calls: 0, Code: -1, Output: "", Errors: ""}
+	Completed(Code, Output, Errors) {
+		Observation.Calls += 1
+		Observation.Code := Code
+		Observation.Output := Output
+		Observation.Errors := Errors
+	}
+	try {
+		FileCopy(Framework, FrameworkCopy)
+		QuotedReceipt := StrReplace(StrReplace(Receipt, Chr(96), Chr(96) . Chr(96)), Chr(34), Chr(96) . Chr(34))
+		Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n"
+			. 'EnvSet("ERGOPTI_AHK_RESULTS_FILE", "' . QuotedReceipt . '")' . "`n"
+			. "#Include framework.ahk`n"
+			. 'Test("owned intentional replay failure", () => AssertEqual("expected", "actual"))' . "`n"
+			. "RunTests()`n"
+		FileAppend(Source, Child, "UTF-8")
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut", Child, "--owned-selection", Argument], Completed)
+		AssertTrue(Handle.start(), "the real isolated replay child must start")
+		Started := DllCall("Kernel32\GetTickCount64", "UInt64")
+		while !Observation.Calls && DllCall("Kernel32\GetTickCount64", "UInt64") - Started < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, Observation.Calls, "the actual runner completes once")
+		AssertEqual(1, Observation.Code, "only the intentional registered callback must fail: " . Observation.Output . Observation.Errors)
+		AssertEqual("", Observation.Errors, "the child cannot hide a startup or native transport failure")
+		AssertContains(Observation.Output, "# 0 passed, 1 failed.", "the real runner executes its intentional failure")
+		ReplayLines := []
+		; The disk owner writes UTF-8 regardless of the child stdout code page.
+		for Line in StrSplit(FileRead(Receipt, "UTF-8"), "`n", "`r") {
+			if SubStr(Line, 1, 12) == "#   replay: "
+				ReplayLines.Push(Line)
+		}
+		AssertEqual(1, ReplayLines.Length, "one failed callback emits one replay diagnostic")
+		Replay := ReplayLines[1]
+		AssertContains(Replay, "'" . StrReplace(Child, "'", "''") . "'",
+			"the replay must name the actual isolated entry with a PowerShell literal")
+		AssertContains(Replay, "& '" . StrReplace(A_AhkPath, "'", "''") . "' ",
+			"the command preserves the actual interpreter")
+		AssertContains(Replay, " '--owned-selection' 'two '' quotes " . Chr(34) . " $() " . Chr(96) . " " . Chr(0xE9) . "'",
+			"the original supported selection is quoted without interpolation")
+		AssertFalse(InStr(Replay, " --only "), "an isolated runner must not receive an unsupported filter")
+	} finally {
+		if IsObject(Handle) {
+			CanRetire := Handle.terminate()
+			AssertTrue(CanRetire, "retire the exact isolated child before its fixture")
+		}
+		if CanRetire {
+			Attributes := DllCall("Kernel32\GetFileAttributesW", "Str", Directory, "UInt")
+			if _TRFE_AbsoluteTapPath(Directory) != Owned || Attributes == 0xFFFFFFFF || (Attributes & 0x400)
+				throw Error("Owned replay fixture cleanup refused.")
+			for Leaf in [Receipt, Child, FrameworkCopy] {
+				if _TRFE_AbsoluteTapPath(Leaf) != Owned . "\" . SubStr(Leaf, StrLen(Directory) + 2)
+					throw Error("Owned replay fixture leaf cleanup refused.")
+				if FileExist(Leaf)
+					FileDelete(Leaf)
+			}
+			DirDelete(Directory)
+		}
+	}
+}
+Test("runner replay: actual isolated child preserves its executable selection (runner-replay-command)",
+	_TRFE_ReplayExecutingChild)
+
+_TRFE_ReplayCommandLiteral(Vector) {
+	AssertEqual(Vector.Expected, _TestReplayCommand(Vector.Interpreter, Vector.Entry, Vector.Arguments))
+	AssertEqual(Vector.Count, Vector.Arguments.Length, "formatting cannot mutate the original selection")
+}
+_TRFE_ReplayLiteralCases := [
+	{Name: "unfiltered entry", Interpreter: "AutoHotkey64.exe", Entry: "runner.ahk", Arguments: [], Count: 0,
+		Expected: "& 'AutoHotkey64.exe' 'runner.ahk'"},
+	{Name: "empty argument", Interpreter: "AutoHotkey64.exe", Entry: "runner.ahk", Arguments: [""], Count: 1,
+		Expected: "& 'AutoHotkey64.exe' 'runner.ahk' ''"},
+	{Name: "literal original selection", Interpreter: "C:\AHK dir\AutoHotkey64.exe", Entry: "C:\tests\runner's " . Chr(0xE9) . ".ahk",
+		Arguments: ["--owned-selection", "two ' quotes " . Chr(34) . " $() " . Chr(96) . " " . Chr(0xE9)], Count: 2,
+		Expected: "& 'C:\AHK dir\AutoHotkey64.exe' 'C:\tests\runner''s " . Chr(0xE9) . ".ahk' '--owned-selection' 'two '' quotes " . Chr(34) . " $() " . Chr(96) . " " . Chr(0xE9) . "'"}
+]
+for _TRFE_ReplayVector in _TRFE_ReplayLiteralCases
+	Test("runner replay: " . _TRFE_ReplayVector.Name . " (runner-replay-command)", _TRFE_ReplayCommandLiteral.Bind(_TRFE_ReplayVector))
+
+_TRFE_ReplayInvalidOperand(Vector) {
+	Thrown := false
+	try _TestReplayCommand(Vector.Interpreter, Vector.Entry, Vector.Arguments)
+	catch TypeError as Failure {
+		Thrown := true
+		AssertEqual(Vector.Message, Failure.Message, "the exact contract refusal must own the failure")
+	}
+	AssertTrue(Thrown, "invalid replay state cannot produce a misleading command")
+}
+_TRFE_ReplayInvalidCases := [
+	{Name: "invalid selection owner", Interpreter: "ahk.exe", Entry: "runner.ahk", Arguments: 0,
+		Message: "Runner replay arguments must be an Array."},
+	{Name: "missing entry", Interpreter: "ahk.exe", Entry: "", Arguments: [],
+		Message: "Runner replay requires an interpreter and entry path."},
+	{Name: "non-string argument", Interpreter: "ahk.exe", Entry: "runner.ahk", Arguments: [1],
+		Message: "Runner replay operands must be strings."}
+]
+for _TRFE_ReplayInvalidVector in _TRFE_ReplayInvalidCases
+	Test("runner replay: " . _TRFE_ReplayInvalidVector.Name . " (runner-replay-command)",
+		_TRFE_ReplayInvalidOperand.Bind(_TRFE_ReplayInvalidVector))
