@@ -2,9 +2,14 @@
 	"description": "The Linux E2E matrix of .github/workflows/ci-linux.yml (job e2e-linux). Every step of the former single job is listed exactly once: shared steps run in every row, every other step in the one row that lists it. subjects are the evidence subjects each row records; prerequisites are steps whose effect (an installed package, a loaded module, an exported environment) a later step consumes, so both must stay in the same row and in this order.",
 	"shared": [
 		"uses: actions/checkout@v4",
+		"Create the Ubuntu archive cache directory",
+		"Restore the Ubuntu archive cache",
+		"Prepare the Ubuntu archive cache",
 		"Install LuaJIT",
 		"Prepare native GTK dependencies",
 		"Prepare native process and compiler dependencies",
+		"Name the used Ubuntu archive set",
+		"Save the Ubuntu archive cache",
 		"Record mandatory E2E evidence",
 		"Upload mandatory E2E evidence"
 	],
@@ -254,7 +259,8 @@
 	"predicates": {
 		"Install prerequisites for Run manual official runtime and model acceptance": "${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}",
 		"Run manual official runtime and model acceptance": "${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}",
-		"Upload manual runtime acceptance evidence": "${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}"
+		"Upload manual runtime acceptance evidence": "${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}",
+		"Save the Ubuntu archive cache": "${{ !cancelled() && steps.ubuntu-apt-used.outputs.count != '0' && steps.ubuntu-apt-used.outputs.key != steps.ubuntu-apt-cache.outputs.cache-matched-key }}"
 	},
 	"prerequisites": {
 		"Round-trip real events through the kernel": ["Load the uinput module"],

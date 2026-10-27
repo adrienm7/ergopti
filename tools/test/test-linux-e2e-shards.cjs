@@ -203,14 +203,15 @@ function problems(text, manifest = MANIFEST) {
 // ─────────────────────────────────────────────────
 assert.deepEqual(problems(WORKFLOW), []);
 
-// The fixture inventory is the former single job plus two install steps: 160 steps, six shared.
+// The fixture inventory is the former single job plus two install steps: 160 steps, six
+// shared; each row then gained the five Ubuntu archive cache steps, eleven shared.
 const listed = [...FIXTURE.shared, ...Object.values(FIXTURE.shards).flat()];
 assert.equal(new Set(listed).size, listed.length, 'a step is listed twice');
-assert.equal(FIXTURE.shared.length, 6);
+assert.equal(FIXTURE.shared.length, 11);
 assert.equal(
 	listed.length,
-	192,
-	'the former E2E job had 158 steps, gained 25 install steps (two, then one per test step that installed inside itself) and the Go route plan twin, gained the two manual acceptance steps, then the live number-row and reload restart steps, then the installed Ollama route plan and its install step, then the field run step; none may be lost'
+	197,
+	'the former E2E job had 158 steps, gained 25 install steps (two, then one per test step that installed inside itself) and the Go route plan twin, gained the two manual acceptance steps, then the live number-row and reload restart steps, then the installed Ollama route plan and its install step, then the field run step, then the five shared Ubuntu archive cache steps; none may be lost'
 );
 assert.deepEqual(
 	Object.keys(FIXTURE.subjects),
