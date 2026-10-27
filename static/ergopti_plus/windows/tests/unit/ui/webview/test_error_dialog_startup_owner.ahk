@@ -40,15 +40,8 @@ _EDOT_Source(Root) {
 		. "global _LogsDir := " . _EDOT_Quote(Root . "\logs\") . "`n"
 		. "global ConfigurationFile := " . _EDOT_Quote(Root . "\config\absent.toml") . "`n"
 		. 'global _AhkSubDir := "autohotkey\", _ALTGR_KANA_FIXUP := false' . "`n"
-	; This metadata normalizer is needed by feature_state's top-level defaults.
-	CategoryOwner := _DriverProductionFileForSymbol("_CategoryEnabledKey", _DriverDir)
-	CategoryText := FSReadStrict(CategoryOwner)
-	CategoryFunction := _DriverExtractFunctionBody(&CategoryText, "_CategoryEnabledKey")
-	AssertTrue(CategoryFunction != "", "The category normalizer must retain its real production definition.")
-	CategoryCode := _DriverMaskNonCode(&CategoryFunction)
-	AssertEqual(1, _DriverTopLevelDefinitionCount(&CategoryCode, "_CategoryEnabledKey"),
-		"The child must receive exactly one canonical category normalizer.")
-	Source .= CategoryFunction . "`n"
+	; The logger observes the real constructor journal even before admission.
+	; Whole configuration owners keep this isolated graph faithful and inert.
 	for Vendor in ["Promise.ahk", "ComVar.ahk", "WebView2.ahk"] {
 		Source .= "#Include " . _DriverDir . "\vendor\" . Vendor . "`n"
 		Source .= "_EDOS_Phase(" . _EDOT_Quote("included vendor " . Vendor) . ")`n"
@@ -57,10 +50,15 @@ _EDOT_Source(Root) {
 		Source .= "#Include " . _EDOT_Generated(Symbol) . "`n"
 		Source .= "_EDOS_Phase(" . _EDOT_Quote("included generated " . Symbol) . ")`n"
 	}
+	KeyOwner := _DriverDir . "\_generated\config_keys.ahk"
+	AssertTrue(FileExist(KeyOwner), "The logger requires its canonical generated configuration key classes.")
+	Source .= "#Include " . KeyOwner . "`n"
+	Source .= '_EDOS_Phase("included generated configuration keys")' . "`n"
 	Owners := Map()
 	for Symbol in ["JsonStringLiteral", "CryptoSha256Bytes", "FSReadBytesStrict", "HTTPIsValidUtf8", "WallClockTimestamp", "TickElapsed64",
 		"_LoggerPrivacyConfig", "ErrorPolicy_Decide", "ManifestFindEntryByPath", "ConfigBindingIdentityTapPublication", "TapKeyBindingId",
-		"IsCategoryGated", "IniCacheGet", "Gui_Create", "t", "UpdateChannels_Ids", "UpdateSchedule_Timing", "Updater_CurrentVersion",
+		"IsCategoryGated", "_CategoryEnabledKey", "ConfigMigrateBoot", "ConfigTransitionInspect",
+		"ConfigTransitionProductionPort", "PerfCount", "IniCacheGet", "Gui_Create", "t", "UpdateChannels_Ids", "UpdateSchedule_Timing", "Updater_CurrentVersion",
 		"CrashReport_Dir", "DiagSnapshot_ResolveCommit", "KS_IsDown", "HealthCheck_Config", "_HealthCheck_Paths",
 		"ErrorReport_Compose", "IssueReport_Markdown", "Redact_Apply", "WebView_SharedEnvironment", "ErrorDialog_Init", "DayLog_CheckLimits"] {
 		OwnerRoot := Symbol == "ConfigBindingIdentityTapPublication" ? _SharedDir : _DriverDir
