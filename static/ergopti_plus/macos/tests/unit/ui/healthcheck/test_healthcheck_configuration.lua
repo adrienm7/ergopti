@@ -100,6 +100,18 @@ helpers.describe("diagnostics configuration sharing", function()
 		end
 	end
 
+	-- Ledger L32: the drivers report a refused grant as missing and an inert
+	-- remap guardian as unavailable; an enum without them shared both as unknown.
+	helpers.it("shares every permission state the drivers report", function()
+		local items = {
+			{ id = "screen_recording", state = "missing" }, { id = "login_items", state = "unavailable" },
+			{ id = "input_monitoring", state = "not_used" }, { id = "accessibility", state = "granted" },
+		}
+		local snapshot = snapshot_of("macos", {}, {})
+		snapshot.sections.permissions = { items = items }
+		helpers.assert_eq(Share.snapshot(snapshot, schema).sections.permissions.items, items)
+	end)
+
 	helpers.it("bounds the shared configuration rows", function()
 		local rows = {}
 		for index = 1, 801 do rows[index] = { setting = "script.k" .. index, type = "boolean", value = "true" } end
