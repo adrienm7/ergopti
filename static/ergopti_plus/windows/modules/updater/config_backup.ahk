@@ -221,7 +221,8 @@ ConfigBackup_Create(ConfigDir, Kind, Tag := "", FromVersion := "", Rules := 0, C
 	; Collision numbers retain creation order even after older copies are removed.
 	Id := _ConfigBackup_NextId(Folder, Id)
 	BackupPath := Folder . "\" . Id
-	FSEnsureDirectoryStrict(BackupPath)
+	; The allocator's absence check does not acquire a racing producer's path.
+	FSCreateDirectoryExclusiveStrict(BackupPath)
 	FilesJson := []
 	for _, Relative in Files {
 		Copy := _ConfigBackup_Join(BackupPath, "config/" . Relative)
