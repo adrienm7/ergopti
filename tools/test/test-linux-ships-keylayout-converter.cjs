@@ -102,6 +102,7 @@ check('the Lua pieces and shared data of the conversion ship', () => {
 		'linux/adapters/process_runner.lua',
 		'_shared/lua/layouts/registry.lua',
 		'_shared/lua/layouts/catalogue.lua',
+		'_shared/lua/layouts/keylayout.lua',
 		'_shared/modules/layouts/defaults.json',
 		'_shared/modules/layouts/mac_keycodes.json'
 	];
