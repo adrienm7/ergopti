@@ -2878,6 +2878,7 @@ local function main()
 	-- keeps no withheld count waiting for an unrelated line (logger SPEC § 4.2).
 	local function flush_due_repeats() Logger.flush_repeats(false) end
 
+	local file_watchers_retiring = false
 	local on_periodic = function()
 		if shutdown.is_requested() then shutdown.poll(); return end
 		tick_count = tick_count + 1
@@ -2902,10 +2903,20 @@ local function main()
 		secure_focus_guard.refresh(false)
 		if file_watchers then
 			local owner = file_watchers
-			RuntimeGuard.call("file watcher pump", owner.pump, function()
-				if type(owner.stop) == "function" then owner.stop() end
-				file_watchers = nil
-			end)
+			local function retire()
+				if owner.stop() == true then
+					file_watchers, file_watchers_retiring = nil, false
+				end
+			end
+			if file_watchers_retiring then
+				RuntimeGuard.call("file watcher retirement", retire)
+			else
+				RuntimeGuard.call("file watcher pump", owner.pump, function()
+					-- Stop delivery once, retaining native debt for retries and shutdown.
+					file_watchers_retiring = true
+					retire()
+				end)
+			end
 		end
 		-- One bounded batch per tick, and only while a migration is in flight.
 		-- Deliberately NOT on the idle callback: that one runs between keystrokes,
