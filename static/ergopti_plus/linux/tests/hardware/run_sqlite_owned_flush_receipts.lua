@@ -9,6 +9,17 @@
 --- Software collector input is not a claim of evdev/uinput qualification.
 --- ==============================================================================
 
+--- Returns a typing time on the driver's own clock (ergopti_hotstrings passes
+--- Monotonic.now_ms()). A fixed 1000 ms made the session tracker's verdict
+--- depend on the host's uptime; one origin keeps the scripted gaps exact.
+--- @param offset_ms number Scripted time of the keystroke.
+--- @return number typed_ms
+local typing_origin_ms
+local function typed_at(offset_ms)
+	typing_origin_ms = typing_origin_ms or math.floor(require("infra.monotonic").now_ms()) - 10000
+	return typing_origin_ms + offset_ms
+end
+
 -- Standalone degraded-mode control: the required package is deliberately absent,
 -- while SQLite, configuration and the collector remain real. No native owner is
 -- replaced with a fake success and no durability claim is made for the RAM data.
@@ -25,7 +36,7 @@ if arg[1] == "--no-luv" then
 		-- storage. The collector still retains RAM and never claims a save.
 		assert(K.is_enabled() and not W.is_available() and not W.flush_transport_available(),
 			"stock Lua without a descriptor API must not admit the SQLite store")
-		K.on_keydown("a", 1000, "minimal")
+		K.on_keydown("a", typed_at(1000), "minimal")
 		assert(K.flush() == false and not K.has_flush_debt())
 		assert(K._pending_buffer_count_for_test() == 1)
 		assert(K.get_range_payload().today.minimal.c.a.c == 1)
@@ -35,7 +46,7 @@ if arg[1] == "--no-luv" then
 	end
 	assert(K.is_enabled() and W.is_available() and not W.flush_transport_available())
 	local revision = W.get_revision()
-	K.on_keydown("a", 1000, "minimal")
+	K.on_keydown("a", typed_at(1000), "minimal")
 	assert(K.flush() == false and K.flush() == false)
 	assert(not K.has_flush_debt() and not K.is_flush_pending())
 	assert(K._pending_buffer_count_for_test() == 1)
@@ -148,10 +159,10 @@ Process.start = function(path, sql, options)
 		poll = function() if request:poll() then return { ok = false, output = "" } end end,
 	}
 end
-K.on_keydown("a", 1000, "ambiguous")
+K.on_keydown("a", typed_at(1000), "ambiguous")
 assert(K.flush() == false and K.is_flush_pending())
 assert(K.reset_session() == false and K.clear_cache() == false and K.migrate_stored_text() == false)
-K.on_keydown("b", 1100, "ambiguous")
+K.on_keydown("b", typed_at(1100), "ambiguous")
 assert(K._pending_buffer_count_for_test() == 2)
 local callbacks = 0
 assert(K.when_flush_settled(function() callbacks = callbacks + 1 end))
@@ -169,9 +180,9 @@ pass("new input stays in the next immutable snapshot, mutations refuse pending d
 
 assert(W.exec_sql("CREATE TRIGGER refusal BEFORE INSERT ON agg_app_day_chars_class WHEN NEW.app='rollback' "
 	.. "BEGIN SELECT RAISE(ABORT,'owned refusal'); END;"))
-K.on_keydown("x", 2000, "rollback")
+K.on_keydown("x", typed_at(2000), "rollback")
 assert(K.flush() == false)
-K.on_keydown("y", 2100, "rollback")
+K.on_keydown("y", typed_at(2100), "rollback")
 assert(not Drain.wait(K))
 assert(K.get_flush_status().read_safe and K.has_flush_debt())
 assert(total("rollback") == 2 and scalar("SELECT COUNT(*) FROM events_typing WHERE app='rollback';") == 0)
@@ -237,7 +248,7 @@ Process.start = function(path, sql, options)
 	current_commit = false
 	return request
 end
-K.on_keydown("p", 4000, "suspended")
+K.on_keydown("p", typed_at(4000), "suspended")
 assert(K.flush() == false)
 until_true(function()
 	if not selected then return false end
@@ -278,7 +289,7 @@ pass("stopped native SQLite leaves timers/input seam live, times out, retires ph
 -- The persisted reader and uncommitted collector must apply the same selection.
 -- Otherwise selecting an app changes counts merely when an unrelated flush lands.
 for _, app in ipairs({ "org.example.selected", "org.example.excluded" }) do
-	K.on_keydown("a", 4500, app)
+	K.on_keydown("a", typed_at(4500), app)
 	K.record_physical_key(app, 30, 4500)
 end
 local function selected_projection()
@@ -302,7 +313,7 @@ local Reader = require("modules.keystats.sqlite_reader")
 local selected_app = "org.example.selected"
 local today = os.date("%Y-%m-%d")
 assert(W.upsert_ngrams("owned-range-history", "2020-01-01", selected_app, { h = { c = 3 } }, "ngram_chars"))
-K.on_keydown("r", 4600, selected_app)
+K.on_keydown("r", typed_at(4600), selected_app)
 K.record_physical_key(selected_app, 31, 4600)
 for _, phase in ipairs({ "live", "committed" }) do
 	for _, bounds in ipairs({ { "2020-01-01", "2020-01-01" }, { "2100-01-01", "2100-01-01" } }) do
@@ -321,11 +332,11 @@ end
 assert(scalar("SELECT SUM(json_array_length(events_json)) FROM events_typing WHERE app='org.example.selected';") == 2)
 pass("inclusive date ranges keep persisted and live slices stable across an actual COMMIT")
 
-K.on_keydown("z", 5000, "stop")
+K.on_keydown("z", typed_at(5000), "stop")
 assert(K.flush() == false)
-K.on_keydown("q", 5100, "stop")
+K.on_keydown("q", typed_at(5100), "stop")
 assert(K.stop() == false and K.get_flush_status().stopping)
-K.on_keydown("n", 5200, "stop")
+K.on_keydown("n", typed_at(5200), "stop")
 until_true(function() return K.stop() end)
 assert(not K.has_flush_debt())
 assert(scalar("SELECT SUM(json_array_length(events_json)) FROM events_typing WHERE app='stop';") == 2)

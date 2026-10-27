@@ -10,6 +10,17 @@
 --- retries without plaintext or duplicate rows. No physical input is claimed.
 --- ==============================================================================
 
+--- Returns a typing time on the driver's own clock (ergopti_hotstrings passes
+--- Monotonic.now_ms()). A fixed 1000 ms made the session tracker's verdict
+--- depend on the host's uptime; one origin keeps the scripted gaps exact.
+--- @param offset_ms number Scripted time of the keystroke.
+--- @return number typed_ms
+local typing_origin_ms
+local function typed_at(offset_ms)
+	typing_origin_ms = typing_origin_ms or math.floor(require("infra.monotonic").now_ms()) - 10000
+	return typing_origin_ms + offset_ms
+end
+
 local uv = require("luv")
 local Shell = require("adapters.shell_runner")
 local Codec = require("keystats.text_crypto")
@@ -228,7 +239,7 @@ check("saved ON without EVP keeps real collector SQL closed and recovers retaine
 	local K = require("modules.keystats.keystats")
 	assert(K.init({ sqlite_path = root .. "/collector.sqlite", log_dir = root .. "/logs" }) ~= false)
 	assert(K.is_encrypt_enabled() and cipher.is_enabled() and K.get_privacy_state().encrypt)
-	K.on_keydown("a", 1000, "synthetic-app")
+	K.on_keydown("a", typed_at(1000), "synthetic-app")
 	local Drain = require("tests.support.sqlite_flush_native")
 	assert(K.flush() == false and not Drain.wait(K))
 	assert(K._pending_buffer_count_for_test() == 1 and K.has_flush_debt())

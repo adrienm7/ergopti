@@ -7,6 +7,10 @@ answer once, then move the answered line below.
 
 ## Open
 
+- **Typing in Ergopti's own windows (ledger L31, 27 October):** the macOS context tracker tries to observe
+  Ergopti's own process (its menus, dialogs and pages) and logs a failed AX observer setup. Should typing in
+  Ergopti's own windows count in the typing metrics? Default meanwhile: unchanged (observed, warning kept);
+  if not counted, the tracker skips its own PID and the warning goes away.
 - **"Sticky" in French and Latin-script locales:** the sticky-modifier labels keep the English "Sticky", as
   the existing `menu.tapholds.sticky_*` strings do. Default meanwhile: kept. Use a French term such as
   "rémanent" instead?

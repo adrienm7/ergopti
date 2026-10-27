@@ -15,7 +15,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Describe the problem in your own words. Debug > Report a bug copies the approved diagnostic report, technical facts only, to the clipboard and saves it as a file you can attach here. The diagnostics window can also save a redacted copy of today's complete log beside it, only if you tick that box. The app never uploads either file: once you attach one here it is on GitHub, and the app cannot remove it.
+        Describe the problem in your own words. Debug > Report a bug fills in the version, the system, the driver and a compact diagnostic report (technical facts only); the app copies the complete report to the clipboard and saves it as a file too. The diagnostics window can also save a redacted copy of today's complete log beside it, only if you tick that box. The app never uploads either file: once you paste or attach one here it is on GitHub, and the app cannot remove it.
   - type: textarea
     id: what_happened
     attributes:
@@ -59,13 +59,13 @@ body:
     id: diagnostics
     attributes:
       label: Diagnostics
-      description: Paste the diagnostic report from the clipboard or attach the saved file, and add relevant observations. Version, system and driver are prefilled separately.
+      description: Filled in by the app with technical facts only. When it is cut, a last line says the complete report is on your clipboard and in the saved file. Add relevant observations.
     validations:
       required: false
-  - type: checkboxes
-    id: consent
+  - type: textarea
+    id: day_log
     attributes:
-      label: Before submitting
-      options:
-        - label: I reviewed the text and attachments and removed information I do not want to publish.
-          required: true
+      label: Day log (optional)
+      description: Today's complete log file, optional. In the diagnostics window, tick the day log box before Report a bug and the app saves a redacted copy beside the report. Drop that file here, or paste its content. Leave this empty if you prefer not to share it.
+    validations:
+      required: false
