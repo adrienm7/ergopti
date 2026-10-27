@@ -252,7 +252,13 @@ const BASELINE_SHARED = 39;
 //   macOS only: it pins the owned Karabiner remap runtime and its VirtualHID
 //   driver package (ADR 011), which neither Windows nor Linux ships; a
 //   counterpart folder there would hold nothing.
-const BASELINE_UNION = 62;
+//   62 -> 63 on 2026-10-27 - linux/_generated/shell_messages, Linux only: the
+//   catalogues the Linux shell scripts (install.sh, uninstall.sh, the
+//   launcher and install/ helpers) print from, generated from the shared
+//   locales because those scripts run before LuaJIT can be assumed. The macOS
+//   and Windows installers are not shell scripts printing to a terminal, so a
+//   counterpart folder there would hold nothing.
+const BASELINE_UNION = 63;
 
 // ── The canonical features, the third measurement this gate never had ───────
 //

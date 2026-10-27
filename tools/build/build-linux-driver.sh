@@ -158,6 +158,9 @@ REQUIRED_FILES=(
 	"linux/infra/locale.lua"
 	"linux/install/config_home.sh"
 	"linux/install/ownership_schema.sh"
+	# The localized sentences of the shell scripts and their reader.
+	"linux/install/messages.sh"
+	"linux/_generated/shell_messages/en.msg"
 	"linux/modules/updater/ownership_receipt.lua"
 	"linux/infra/i18n.lua"
 	"linux/infra/timings.lua"
