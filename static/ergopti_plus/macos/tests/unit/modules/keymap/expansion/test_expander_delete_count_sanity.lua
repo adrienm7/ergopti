@@ -19,12 +19,18 @@ local helpers = require("tests.helpers")
 helpers.describe("expander: the erase count is sane and the suppression window is named", function()
 
 	helpers.it("never asks for a negative number of deletes", function()
-		local src = helpers.read_driver_source("local screen_len")
+		-- The clamp now lives in the shared injection plan; the expander must
+		-- take its erase count from it rather than subtract on its own.
+		local Plan = require("hotstring_engine.injection_plan")
+		helpers.assert_eq(Plan.erase_count({
+			path = "auto", trigger_len = 1, event_len = 2, event_on_screen = false,
+		}), 0, "a trigger shorter than the typed event must be clamped to zero deletes")
+		local src = helpers.read_driver_source("InjectionPlan.build")
 		helpers.assert_true(type(src) == "string" and src ~= "",
 			"the expander source must be readable or this asserts nothing")
-		helpers.assert_true(src:find("if screen_len < 0", 1, true) ~= nil,
-			"a trigger shorter than the typed event must be clamped before constructing "
-			.. "the deletion events and committing the logical replacement")
+		helpers.assert_true(src:find("InjectionPlan.PATH_AUTO", 1, true) ~= nil
+			and src:find("screen_len", 1, true) == nil,
+			"the automatic path must take its erase count from the injection plan")
 	end)
 
 	helpers.it("the final-result suppression window is a named constant, not a literal", function()
