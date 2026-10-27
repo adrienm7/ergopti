@@ -1,7 +1,7 @@
 # Independently authored complete typed destination model.
 owner = "foreign root"
 [_meta]
-schema_version = 14
+schema_version = 15
 
 [hotstrings.autocorrection.caps]
 enabled = true

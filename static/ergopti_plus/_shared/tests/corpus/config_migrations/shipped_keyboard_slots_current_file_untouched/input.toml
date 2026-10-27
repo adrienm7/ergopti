@@ -1,0 +1,10 @@
+[_meta]
+schema_version = 15
+
+[shortcuts.keyboard]
+primary_a = "copy"
+cmd_b = "undo"
+ctrl_g = "open_chatgpt"
+
+[shortcuts.keys]
+ctrl_a = true

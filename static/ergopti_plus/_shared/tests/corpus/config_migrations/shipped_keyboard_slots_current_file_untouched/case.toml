@@ -1,0 +1,4 @@
+[case]
+description = "A file already at the role-named version is never rewritten, even when it still holds a retired spelling the step would convert."
+drivers = ["hs", "linux"]
+outcome = "current"

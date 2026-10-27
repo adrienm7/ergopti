@@ -1,0 +1,6 @@
+[case]
+description = "Every retired Linux slot id keeps its binding under the role-named slot; ids already role-named (alt) and physical slots stay."
+drivers = ["linux"]
+outcome = "migrated"
+from_version = 14
+to_version = 15

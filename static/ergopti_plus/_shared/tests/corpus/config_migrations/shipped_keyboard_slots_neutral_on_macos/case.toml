@@ -1,0 +1,6 @@
+[case]
+description = "Every retired macOS slot id and Ctrl-letter switch keeps its binding under the role-named slot; a chosen action beats the switch of the same chord, a cleared switch stays off, and the ChatGPT, Cmd+* and wrap switches stay."
+drivers = ["hs"]
+outcome = "migrated"
+from_version = 14
+to_version = 15

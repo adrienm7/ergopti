@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_trigger_shortcut_removed_on_macos/expected.toml
 
 [_meta]
-schema_version = 14
+schema_version = 15
 
 [llm]
 enabled = true
@@ -14,4 +14,4 @@ mods = ["ctrl"]
 key = "space"
 
 [shortcuts.keyboard]
-hs_ctrl_space = "llm_generate_prediction"
+secondary_space = "llm_generate_prediction"
