@@ -86,17 +86,19 @@ local FINGER_COUNT_STABLE_SEC = Timings.sec("gestures", "finger_count_stable_ms"
 -- when fingers staggered down before the candidate could confirm).
 local PEAK_FINGERS_CONFIRM_MS = 0.05
 
--- A two-finger contact set is native scrolling once it travels or outlives its
--- landing. Only fingers landing within this window of the touch-down, before the
--- pair travels LANDING_TRAVEL_MAX, can still make it a three-or-more-finger
--- gesture; a contact joining later (a resting thumb, a grazing palm) belongs to
--- the scroll for the rest of the contact sequence.
+-- A two-finger contact set is native scrolling once it has scrolled: its
+-- direction locked, or it travelled the two-finger lock distance, or macOS
+-- scrolled for it, or it outlived its landing. Until then a third finger that
+-- holds PAIR_JOIN_CONFIRM_SEC joins it; once it has scrolled, a contact joining
+-- it (a resting thumb, a grazing palm) belongs to the scroll for good.
 local MULTI_FINGER_LANDING_SEC = Timings.sec("gestures", "multi_finger_landing_ms")
-local LANDING_TRAVEL_MAX       = Geometry.LANDING_TRAVEL_MAX
+local PAIR_JOIN_CONFIRM_SEC    = Timings.sec("gestures", "pair_join_confirm_ms")
+local PAIR_SCROLL_TRAVEL       = Geometry.SWIPE_MIN_2
 
--- No three-or-more-finger gesture fires when it starts this soon after a
--- two-finger scroll ended or after the last native scroll or momentum event:
--- landing fingers to stop a momentum scroll is not a tab swipe.
+-- No three-or-more-finger gesture fires when it starts this soon after a real
+-- scroll ended: a native momentum phase, or the lift of a locked two-finger
+-- scroll. Landing fingers to stop a momentum scroll is not a tab swipe; a mere
+-- two-finger touch arms nothing.
 local SCROLL_MOMENTUM_GUARD_SEC = Timings.sec("gestures", "scroll_momentum_guard_ms")
 
 -- Quartz scroll phases (kCGScrollPhaseBegan / Changed) and momentum phases
@@ -104,9 +106,10 @@ local SCROLL_MOMENTUM_GUARD_SEC = Timings.sec("gestures", "scroll_momentum_guard
 local SCROLL_PHASES_ACTIVE   = { [1] = true, [2] = true }
 local MOMENTUM_PHASES_ACTIVE = { [1] = true, [2] = true }
 
--- Awake time of the last native scroll activity this engine saw: a scroll or
--- momentum event it let through, or the lift of a two-finger scroll gesture.
-local lastScrollActivityAt = nil
+-- Awake time of the last scroll phase macOS reported for a pair this engine let
+-- through, and of the last real scroll end (momentum, or a locked pair lifting).
+local lastNativeScrollAt = nil
+local lastScrollEndAt    = nil
 
 local scrollBlocker  = nil
 local scrollBlockerCommitted = false
@@ -244,9 +247,21 @@ local function resetGS()
 		contactsOrigin = nil,
 		contactsLast   = nil,
 		cohesive       = false,
+		-- Gates that already logged a rejected candidate for this contact sequence.
+		rejections     = {},
 	}
 end
 resetGS()
+
+--- Logs, once per contact sequence and gate, why a three-finger candidate lost.
+--- @param gate string Name of the rejecting gate.
+--- @param fmt string Measured value, as a format string.
+--- @param ... any Format arguments.
+local function rejectCandidate(gate, fmt, ...)
+	if gs.rejections[gate] then return end
+	gs.rejections[gate] = true
+	Logger.debug(LOG, "Three-finger candidate rejected by %s: " .. fmt .. ".", gate, ...)
+end
 
 --- Snapshots the contacts of the count the gesture has just confirmed.
 --- @param touches table The raw touch data objects.
@@ -270,17 +285,19 @@ end
 local function multiFingerAllowed(mf, axis, slot)
 	if mf < 3 then return true end
 	if gs.multiFingerBlocked then
-		Logger.debug(LOG, "%d-finger %s held back: %s.", mf, tostring(slot), gs.multiFingerBlocked)
+		rejectCandidate("scroll guard", "%s (%d-finger %s)", gs.multiFingerBlocked, mf, tostring(slot))
 		return false
 	end
 	if gs.cohesive or (axis ~= "horiz" and axis ~= "vert") then return true end
 	local origin = gs.contactsOrigin and gs.contactsOrigin[axis]
 	local last   = gs.contactsLast and gs.contactsLast[axis]
-	if Geometry.movedTogether(origin, last, axis) then
+	local together, share = Geometry.movedTogether(origin, last, axis)
+	if together then
 		gs.cohesive = true
 		return true
 	end
-	Logger.debug(LOG, "%d-finger %s held back: the contacts did not travel together.", mf, tostring(slot))
+	rejectCandidate("cohesion", "least contact share %.2f < %.2f since promotion (%d-finger %s)",
+		share, Geometry.COHESION_MIN_SHARE, mf, tostring(slot))
 	return false
 end
 
@@ -288,26 +305,39 @@ end
 --- @param now number Timestamp of the lift.
 local function noteGestureEnd(now)
 	if gs.aborted or (gs.active and gs.maxFingers == 2 and gs.lockedDir ~= nil) then
-		lastScrollActivityAt = now
+		lastScrollEndAt = now
 	end
 end
 
 --- Tells whether a two-finger contact set already belongs to native scrolling.
---- It does once its direction locked, once macOS scrolled for it, or once it
---- travelled or lasted past its landing; a candidate count already pending was
---- admitted during the landing and keeps its chance to confirm.
+--- It does once it has scrolled (direction locked, lock distance travelled, or
+--- macOS scrolled for it) or outlived its landing; a candidate count already
+--- pending was admitted while it had not and keeps its chance to confirm.
 --- @param now number Timestamp of the frame.
 --- @return boolean owned
+--- @return string|nil gate Rejecting gate, for the diagnostic.
+--- @return string|nil detail Measured value, for the diagnostic.
 local function twoFingerScrollOwns(now)
 	if not gs.active or gs.maxFingers ~= 2 or gs.candidateFingers ~= nil then return false end
-	if gs.lockedDir ~= nil then return true end
-	if lastScrollActivityAt and gs.startTime and lastScrollActivityAt >= gs.startTime then return true end
-	if now - (gs.startTime or now) > MULTI_FINGER_LANDING_SEC then return true end
 	local travel = 0
 	if gs.startPos and gs.endPos then
 		travel = math.abs(gs.endPos.x - gs.startPos.x) + math.abs(gs.endPos.y - gs.startPos.y)
 	end
-	return travel >= LANDING_TRAVEL_MAX
+	if gs.lockedDir ~= nil then
+		return true, "pair scroll", string.format("direction %s locked, travel %.2f", gs.lockedDir, travel)
+	end
+	if travel >= PAIR_SCROLL_TRAVEL then
+		return true, "pair scroll", string.format("travel %.2f >= %.2f", travel, PAIR_SCROLL_TRAVEL)
+	end
+	if lastNativeScrollAt and gs.startTime and lastNativeScrollAt >= gs.startTime then
+		return true, "pair scroll", "macOS reported a scroll phase for the pair"
+	end
+	local since_landing = now - (gs.startTime or now)
+	if since_landing > MULTI_FINGER_LANDING_SEC then
+		return true, "landing window", string.format("%.0f ms since the pair landed > %.0f ms",
+			since_landing * 1000, MULTI_FINGER_LANDING_SEC * 1000)
+	end
+	return false
 end
 
 --- Records native scroll activity seen by the scroll-blocker tap.
@@ -318,9 +348,8 @@ local function noteNativeScroll(event, properties)
 	if type(properties) ~= "table" or not event.getProperty then return end
 	local scroll_phase   = event:getProperty(properties.scrollWheelEventScrollPhase)
 	local momentum_phase = event:getProperty(properties.scrollWheelEventMomentumPhase)
-	if SCROLL_PHASES_ACTIVE[scroll_phase] or MOMENTUM_PHASES_ACTIVE[momentum_phase] then
-		lastScrollActivityAt = TimerScheduler.awake_time()
-	end
+	if SCROLL_PHASES_ACTIVE[scroll_phase] then lastNativeScrollAt = TimerScheduler.awake_time() end
+	if MOMENTUM_PHASES_ACTIVE[momentum_phase] then lastScrollEndAt = TimerScheduler.awake_time() end
 end
 
 --- Computes continuous signed distance (absolute trackpad coordinates).
@@ -781,9 +810,10 @@ local function beginGesture(n, pos, now, touches)
 	gs.tentativeLiftingSince  = nil
 	gs.tentativeLiftingFrames = 0
 	snapshotContacts(touches)
-	if lastScrollActivityAt and now - lastScrollActivityAt < SCROLL_MOMENTUM_GUARD_SEC then
-		gs.multiFingerBlocked = string.format("a scroll was active %.0f ms before touch-down",
-			(now - lastScrollActivityAt) * 1000)
+	gs.rejections = {}
+	if lastScrollEndAt and now - lastScrollEndAt < SCROLL_MOMENTUM_GUARD_SEC then
+		gs.multiFingerBlocked = string.format("%.0f ms since the last scroll < %.0f ms",
+			(now - lastScrollEndAt) * 1000, SCROLL_MOMENTUM_GUARD_SEC * 1000)
 	end
 end
 
@@ -901,12 +931,12 @@ function M.process_frame(touches)
 	-- configured three-finger action and swallows the user's scroll. A real
 	-- three-finger gesture still starts at three contacts or lands its third
 	-- within the landing window, before the pair travels.
-	local late_two_finger_upgrade = n > 2 and twoFingerScrollOwns(now)
+	local late_two_finger_upgrade, owner_gate, owner_detail = false, nil, nil
+	if n > 2 then late_two_finger_upgrade, owner_gate, owner_detail = twoFingerScrollOwns(now) end
 	if late_two_finger_upgrade then
 		stopScrollBlock()
 		if not gs.lateUpgradeRejected then
-			Logger.debug(LOG,
-				"Late finger-count upgrade ignored for locked 2-finger scroll: 2 -> %d.", n)
+			rejectCandidate(owner_gate, "%s (2 -> %d)", owner_detail, n)
 			gs.lateUpgradeRejected = true
 		end
 		return
@@ -991,6 +1021,11 @@ function M.process_frame(touches)
 			if gs.candidateFingers ~= nil and n ~= gs.candidateFingers then
 				Logger.debug(LOG, string.format("Finger spike candidate retired (candidate=%d, current=%d).",
 					gs.candidateFingers, n))
+				if gs.maxFingers == 2 then
+					rejectCandidate("frames held", "%d -> %d held %d frame(s), %.0f ms < %.0f ms",
+						gs.maxFingers, gs.candidateFingers, gs.candidateFrames,
+						(now - (gs.candidateSince or now)) * 1000, PAIR_JOIN_CONFIRM_SEC * 1000)
+				end
 				gs.candidateFingers = nil
 				gs.candidateSince   = nil
 				gs.candidateFrames  = 0
@@ -1016,7 +1051,7 @@ function M.process_frame(touches)
 						pair_travel = math.abs(pos.x - gs.dropPos.x) + math.abs(pos.y - gs.dropPos.y)
 					end
 					if n == 2 and gs.maxFingers >= 3
-						and (drop_confirmed or pair_travel >= LANDING_TRAVEL_MAX) then
+						and (drop_confirmed or pair_travel >= PAIR_SCROLL_TRAVEL) then
 						-- Three or more fingers became a scrolling pair: that pair is
 						-- never the rest of the swipe, a tap nor a two-finger action.
 						Logger.info(LOG, "Gesture aborted: %d -> 2 fingers (frames=%d, %.3fs, pair travel %.2f).",
@@ -1096,7 +1131,16 @@ function M.process_frame(touches)
 					if gs.candidateFingers == n then
 						gs.candidateFrames = gs.candidateFrames + 1
 						local elapsed = now - (gs.candidateSince or now)
-						if gs.candidateFrames >= FINGER_CONFIRM_FRAMES and elapsed >= FINGER_CONFIRM_SEC then
+						-- A pair's third finger joins once it has held PAIR_JOIN_CONFIRM_SEC
+						-- (two frames at least, since it was first seen on an earlier one);
+						-- larger spikes keep the stricter frame-and-time confirmation.
+						local confirmed
+						if gs.maxFingers == 2 then
+							confirmed = elapsed >= PAIR_JOIN_CONFIRM_SEC
+						else
+							confirmed = gs.candidateFrames >= FINGER_CONFIRM_FRAMES and elapsed >= FINGER_CONFIRM_SEC
+						end
+						if confirmed then
 							Logger.info(LOG, string.format("Confirmed multi-finger join: %d → %d (frames=%d, %.3fs).", gs.maxFingers, n, gs.candidateFrames, elapsed))
 							gs.maxFingers = n
 							gs.lifting    = false
@@ -1327,7 +1371,8 @@ end
 --- @return boolean settled True only after the exact eventtap is disabled.
 function M.stop()
 	M.cancel_current_gesture()
-	lastScrollActivityAt = nil
+	lastNativeScrollAt = nil
+	lastScrollEndAt    = nil
 	if stop_scroll_blocker("Gesture scroll-blocker teardown") ~= true then return false end
 	_state   = nil
 	_actions = nil
