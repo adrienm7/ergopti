@@ -63,6 +63,8 @@ return {
 	"tests.unit.modules.llm.ollama.test_ollama_retained_composition",
 	"tests.unit.modules.updater.install.test_archive_allocation_refusal",
 	"tests.unit.modules.updater.install.test_archive_transfer_publication",
+	"tests.unit.modules.updater.install.test_archive_transfer_signature",
+	"tests.unit.modules.updater.install.test_signature_gate",
 	"tests.unit.modules.updater.install.test_release_install_async",
 	"tests.unit.modules.updater.install.test_install_budget",
 	"tests.unit.ui.update_check.test_update_check_async_admission",

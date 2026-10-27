@@ -1315,6 +1315,11 @@ local function native_artifact(basename, pinned)
    and records[brand] == record then cleanup(record, true) end
   return record.disposed == true
  end
+ --- Byte length of the archive the adoption sealed, or nil before it (the signature record binds it).
+ function factory.sealed_size(brand)
+  local record = records[brand]
+  return record and record.staged == true and record.sealed_length or nil
+ end
  function factory.artifact_settled(brand)
   local record = records[brand]
   return record ~= nil and record.disposed == true
