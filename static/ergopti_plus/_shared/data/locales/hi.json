@@ -1697,7 +1697,7 @@
 	"menu.llm.min_words_label": "प्रति सुझाव न्यूनतम शब्द: %s",
 	"menu.llm.min_words_prompt": "प्रति सुझाव न्यूनतम शब्दों की संख्या:",
 	"menu.llm.mlx_model_hint": "MLX मॉडल के लिए HuggingFace पहचानकर्ता, उदाहरण के लिए: mlx-community/Qwen2.5-3B-Instruct-4bit",
-	"menu.llm.mlx_port_label": "MLX सर्वर पोर्ट: %s",
+	"menu.llm.server_port_label": "%s सर्वर पोर्ट: %s",
 	"menu.llm.server_port_title": "%s सर्वर पोर्ट",
 	"menu.llm.server_port_prompt": "स्थानीय %s सर्वर का पोर्ट (1024-65535)। डिफ़ॉल्ट: %s।",
 	"menu.llm.model_backend": "बैकएंड: %s",

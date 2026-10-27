@@ -39,7 +39,7 @@ return function(callback, options)
 			if real_caption(key) then return real_strings[key] or key end
 			if key == "menu.llm.prediction_count_label_one" then return "%d prediction" end
 			if key == "menu.llm.prediction_count_label_other" then return "%d predictions" end
-			return key
+			return require("tests.helpers").I18N_PLACEHOLDER_FORMATS[key] or key
 		end, section = function(key) return real_caption(key) and real_strings[key] or key end }
 		package.loaded["modules.llm"] = { DEFAULT_STATE = defaults,
 			get_backend = function() return state.llm_backend end, set_backend = accept,

@@ -1242,6 +1242,7 @@ local function create_menu(deps)
 										return settings_mgr.reset_mlx_port(restart_mlx_for_current_port)
 									end,
 								}, {
+									llm_mlx_port_provider = function() return "MLX" end,
 									llm_mlx_port_caption = function() return tostring(ApiMlx.get_port()) end,
 									llm_mlx_port_reset_caption = function() return tostring(ApiMlx.get_default_port()) end,
 									llm_mlx_port_reset_present = function()

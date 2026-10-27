@@ -313,7 +313,7 @@ local function with_fixture(options, callback)
 	assert(locale_file:close())
 	local function fixture_caption(key)
 		if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
-		return options.translate and options.translate(key) or key
+		return options.translate and options.translate(key) or require("tests.helpers").I18N_PLACEHOLDER_FORMATS[key] or key
 	end
 	package.loaded["infra.i18n"] = {get = fixture_caption, section = fixture_caption}
 	local prompt_value = options.prompt_value or "0.75"

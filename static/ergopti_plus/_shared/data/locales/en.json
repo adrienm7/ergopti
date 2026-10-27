@@ -1710,7 +1710,7 @@
 	"menu.llm.no_model_none": "None",
 	"menu.llm.not_installed_body": "This model is not installed yet.",
 	"menu.llm.num_predictions_label": "Number of suggestions: %s",
-	"menu.llm.mlx_port_label": "MLX server port: %s",
+	"menu.llm.server_port_label": "%s server port: %s",
 	"menu.llm.server_port_title": "%s server port",
 	"menu.llm.server_port_prompt": "Port of the local %s server (1024-65535). Default: %s.",
 	"menu.llm.ollama_port_label": "Ollama server port: %s",

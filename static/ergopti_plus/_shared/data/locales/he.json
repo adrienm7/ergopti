@@ -1697,7 +1697,7 @@
 	"menu.llm.min_words_label": "מילים מינימליות להצעה: %s",
 	"menu.llm.min_words_prompt": "מספר מילים מינימלי להצעה:",
 	"menu.llm.mlx_model_hint": "מזהה HuggingFace למודל MLX, לדוגמה: mlx-community/Qwen2.5-3B-Instruct-4bit",
-	"menu.llm.mlx_port_label": "פורט שרת MLX: %s",
+	"menu.llm.server_port_label": "פורט שרת %s: %s",
 	"menu.llm.server_port_title": "פורט שרת %s",
 	"menu.llm.server_port_prompt": "הפורט של שרת ה-%s המקומי (1024-65535). ברירת מחדל: %s.",
 	"menu.llm.model_backend": "צד שרת: %s",

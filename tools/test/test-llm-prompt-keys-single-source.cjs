@@ -43,7 +43,8 @@ const RETIRED = [
 	'menu.llm.ollama_port_title',
 	'menu.llm.ollama_port_prompt',
 	'menu.llm.mlx_port_title',
-	'menu.llm.mlx_port_prompt'
+	'menu.llm.mlx_port_prompt',
+	'menu.llm.mlx_port_label'
 ];
 const SHARED = [
 	'menu.llm.max_words_prompt',
@@ -51,6 +52,14 @@ const SHARED = [
 	'menu.llm.server_port_title',
 	'menu.llm.server_port_prompt'
 ];
+
+// The port row caption names the provider, then the port: one key, two getters.
+const PORT_LABEL = 'menu.llm.server_port_label';
+// Windows still reads its own caption until the PC switches to the shared label.
+const WINDOWS_PORT_LABEL = 'menu.llm.ollama_port_label';
+// The two idle-delay prompts accept different input on purpose: macOS takes a blank
+// (reset) or "Never"/-1 on top of milliseconds, Windows a plain integer of milliseconds.
+const DELAY_PROMPTS = ['menu.settings.delay_prompt', 'menu.llm.debounce_prompt'];
 
 check('catalogues', () => {
 	for (const locale of LOCALES) {
@@ -68,6 +77,41 @@ check('catalogues', () => {
 			`${locale}: the port prompt takes the provider name and the default port`
 		);
 	}
+});
+
+check('the shared port row label', () => {
+	for (const locale of LOCALES) {
+		const catalogue = JSON.parse(read(`${PLUS}/_shared/data/locales/${locale}.json`));
+		assert.strictEqual(
+			(catalogue[PORT_LABEL].match(/%s/g) || []).length,
+			2,
+			`${locale}: the port label takes the provider name, then the port`
+		);
+		for (const key of [WINDOWS_PORT_LABEL, ...DELAY_PROMPTS])
+			assert(
+				typeof catalogue[key] === 'string',
+				`${locale} lost ${key}, which a driver still reads`
+			);
+	}
+	const manifest = read(`${PLUS}/_shared/modules/features/manifest.toml`);
+	assert(
+		manifest.includes(`i18n = "${PORT_LABEL}"`),
+		'the macOS MLX port row reads the shared label'
+	);
+	assert(
+		manifest.includes(`i18n = "${WINDOWS_PORT_LABEL}"`),
+		'the Windows Ollama port row keeps its label'
+	);
+	assert(
+		read(`${PLUS}/windows/ui/menu/menu_llm/menu_settings.ahk`).includes(
+			'"menu.llm.debounce_prompt"'
+		)
+	);
+	assert(
+		read(`${PLUS}/macos/ui/menu/menu_llm/settings_manager.lua`).includes(
+			'"menu.settings.delay_prompt"'
+		)
+	);
 });
 
 check('no source reads a retired key', () => {

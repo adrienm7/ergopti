@@ -1697,7 +1697,7 @@
 	"menu.llm.min_words_label": "Минимум слов в предложении: %s",
 	"menu.llm.min_words_prompt": "Минимальное количество слов в предложении:",
 	"menu.llm.mlx_model_hint": "Идентификатор HuggingFace для модели MLX, напр.: mlx-community/Qwen2.5-3B-Instruct-4bit",
-	"menu.llm.mlx_port_label": "Порт сервера MLX: %s",
+	"menu.llm.server_port_label": "Порт сервера %s: %s",
 	"menu.llm.server_port_title": "Порт сервера %s",
 	"menu.llm.server_port_prompt": "Порт локального сервера %s (1024-65535). По умолчанию: %s.",
 	"menu.llm.model_backend": "Бэкенд: %s",

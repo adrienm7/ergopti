@@ -1697,7 +1697,7 @@
 	"menu.llm.min_words_label": "Mín. de palavras por sugestão: %s",
 	"menu.llm.min_words_prompt": "Número mínimo de palavras por sugestão:",
 	"menu.llm.mlx_model_hint": "Identificador HuggingFace para o modelo MLX, ex.: mlx-community/Qwen2.5-3B-Instruct-4bit",
-	"menu.llm.mlx_port_label": "Porta do servidor MLX: %s",
+	"menu.llm.server_port_label": "Porta do servidor %s: %s",
 	"menu.llm.server_port_title": "Porta do servidor %s",
 	"menu.llm.server_port_prompt": "Porta do servidor %s local (1024-65535). Predefinição: %s.",
 	"menu.llm.model_backend": "Backend: %s",
