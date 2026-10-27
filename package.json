@@ -458,6 +458,7 @@
 		"test:personal-info-log-sinks-are-judged": "node ./tools/test/test-personal-info-log-sinks-are-judged.cjs",
 		"test:macos-dev-source-build": "node ./tools/test/test-macos-dev-source-build.cjs",
 		"test:macos-hammerspoon-cache": "node ./tools/test/test-macos-hammerspoon-cache.cjs",
+		"test:macos-dev-native-receiver": "node ./tools/test/test-macos-dev-native-receiver.cjs",
 		"test:launcher-single-instance": "node ./tools/test/test-launcher-single-instance.cjs",
 		"test:menu-manifest": "node ./tools/test/test-menu-manifest.cjs",
 		"test:locale-catalogue-complete": "node ./tools/test/test-locale-catalogue-complete.cjs",
