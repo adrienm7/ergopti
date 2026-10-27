@@ -422,6 +422,7 @@
 		"decision",
 		"environment_ready",
 		"exact",
+		"exit",
 		"fired",
 		"garbled",
 		"gdi_objects",
