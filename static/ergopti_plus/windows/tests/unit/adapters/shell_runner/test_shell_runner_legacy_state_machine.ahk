@@ -29,9 +29,9 @@
 
 global _SRLSM_NEXT_TASK_ID := 910000
 
-_SRLSM_NewState(OnDone := 0) {
+_SRLSM_NewState(OnDone := 0, TaskId := 0) {
 	global _SRLSM_NEXT_TASK_ID
-	local task_id := ++_SRLSM_NEXT_TASK_ID
+	local task_id := TaskId ? TaskId : ++_SRLSM_NEXT_TASK_ID
 	; These pure transitions own no native capture or physical cleanup resource.
 	return _SR_LegacyNewState(task_id, "", OnDone)
 }
@@ -394,12 +394,8 @@ _SRLSM_StaleIdentityCannotTouchSuccessor() {
 	local task_id := ++_SRLSM_NEXT_TASK_ID
 	local stale_calls := 0
 	local live_calls := 0
-	local stale := _SR_LegacyNewState(task_id,
-		A_Temp . "\ergopti_sr_stale_" . task_id . ".tmp",
-		(*) => (stale_calls += 1))
-	local live := _SR_LegacyNewState(task_id,
-		A_Temp . "\ergopti_sr_live_" . task_id . ".tmp",
-		(*) => (live_calls += 1))
+	local stale := _SRLSM_NewState((*) => (stale_calls += 1), task_id)
+	local live := _SRLSM_NewState((*) => (live_calls += 1), task_id)
 	try {
 		stale["Phase"] := SR_LEGACY_PHASE_RUNNING
 		stale["Pid"] := 610001
@@ -519,10 +515,8 @@ Test("shell_runner legacy: STARTING failure owns private PID (shellrunner-legacy
 _SRLSM_PublicationCollisionPreservesLiveOwner() {
 	global _SRLSM_NEXT_TASK_ID
 	local task_id := ++_SRLSM_NEXT_TASK_ID
-	local live := _SR_LegacyNewState(task_id,
-		A_Temp . "\ergopti_sr_collision_live_" . task_id . ".tmp", (*) => 0)
-	local candidate := _SR_LegacyNewState(task_id,
-		A_Temp . "\ergopti_sr_collision_candidate_" . task_id . ".tmp", (*) => 0)
+	local live := _SRLSM_NewState((*) => 0, task_id)
+	local candidate := _SRLSM_NewState((*) => 0, task_id)
 	try {
 		_SR_LegacyBeginStart(live)
 		AssertTrue(_SR_LegacyPublishStart(live, 625003)["Published"],
@@ -686,3 +680,14 @@ _SRLSM_SyntheticClaimsDoNotCreateCaptureDebt() {
 }
 Test("shell_runner legacy: synthetic fixtures leave no native capture debt (legacy-fixture-capture-debt)",
 	_SRLSM_SyntheticClaimsDoNotCreateCaptureDebt)
+
+
+_SRLSM_IdentityFixturesDoNotCreateCaptureDebt() {
+	local previous_owners := _SR_LegacyReleaseOwners.Count
+	_SRLSM_StaleIdentityCannotTouchSuccessor()
+	_SRLSM_PublicationCollisionPreservesLiveOwner()
+	AssertEqual(previous_owners, _SR_LegacyReleaseOwners.Count,
+		"identity-only fixtures cannot enroll nonexistent native capture resources")
+}
+Test("shell_runner legacy: identity fixtures leave no native capture debt (legacy-identity-fixture-capture-debt)",
+	_SRLSM_IdentityFixturesDoNotCreateCaptureDebt)
