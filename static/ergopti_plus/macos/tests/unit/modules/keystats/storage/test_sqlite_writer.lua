@@ -188,6 +188,43 @@ helpers.describe("sqlite_writer — init validation", function()
 		helpers.assert_eq(closed, false, "a successful migration must keep the writer open")
 	end)
 
+	helpers.it("creates the late typing replay index on an existing cache (L19)", function()
+		local executed = {}
+		local db = {
+			exec = function(_, sql) executed[#executed + 1] = sql; return 0 end,
+			nrows = function(_, sql)
+				local rows = {}
+				if sql:find("type='table' AND name='meta'", 1, true) then rows = { { name = "meta" } } end
+				if sql:find("key='schema_version'", 1, true) then rows = { { value = "1" } } end
+				local i = 0
+				return function() i = i + 1; return rows[i] end
+			end,
+			prepare = function()
+				return { bind_values = function() return 0 end, step = function() return 101 end,
+					finalize = function() return 0 end }
+			end,
+			close = function() return 0 end,
+			errmsg = function() return "" end,
+		}
+		local sw = helpers.load_with_stubs("modules.keystats.sqlite_writer", {
+			fs = { attributes = function() return { mode = "file" } end },
+			sqlite3 = { OK = 0, ERROR = 1, ROW = 100, DONE = 101, open = function() return db end },
+		})
+		sw.init({
+			paths = { sqlite_path = "/tmp/existing-index.sqlite" },
+			device_obj = { device_id = "existing-device", name = "TestMac", os = "darwin",
+				os_version = "14.0", host_signature = "sig", created_at = "2024-01-01 00:00:00" },
+			device_id = "existing-device",
+		})
+		helpers.assert_true(sw.open_db(), "an existing cache must open after the index migration")
+		local all = table.concat(executed, "\n")
+		helpers.assert_true(all:find("CREATE TABLE IF NOT EXISTS events_typing", 1, true) == nil,
+			"a bootstrapped cache must not replay schema.sql")
+		helpers.assert_true(all:find("CREATE INDEX IF NOT EXISTS idx_events_typing_device_ts_id "
+			.. "ON events_typing(device_id, ts, id);", 1, true) ~= nil,
+			"an existing cache must gain the (device_id, ts, id) replay index")
+	end)
+
 	helpers.it("distinguishes open cleanup debt from a consumed database wrapper", function()
 		for _, mode in ipairs({ "throw", "error-code" }) do
 			local close_calls = 0
