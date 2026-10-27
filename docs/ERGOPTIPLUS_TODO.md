@@ -186,6 +186,30 @@ dev.
 
 ### Open TODO
 
+- **L40** [CODE][PHYS-M] Two-finger scrolls switched tabs through the vertical three-finger swipe
+  (`swipe_3_up` tab_prev, `swipe_3_down` tab_next); the maintainer turned the option off. The
+  day logs hold no live fire line (the swipe action was off and the log collapses repeats), but
+  show the shape: `Finger join (fast-path): 2 → 3` immediately followed by `n 3 -> 2` (14:25:52).
+  Causes in `modules/gestures/engine.lua`: a third contact joined a pair on ONE frame; a count drop
+  shifted startPos but left endPos frozen, so a palm touching below the pair for a frame committed
+  a vertical swipe toward it; a resting thumb moved the centroid two thirds of the scroll; a
+  three-contact touch-down continued as a moving pair; a three-finger touch landing on a scroll's
+  momentum. Fixed on `tmp/wip-three-finger-swipe`: a join to a pair confirms over
+  `FINGER_CONFIRM_FRAMES` frames during the landing only (`multi_finger_landing_ms`,
+  `Direction.LANDING_TRAVEL_FACTOR`), every contact must travel with the centroid
+  (`Geometry.COHESION_MIN_SHARE`), a three-finger gesture that continues as a moving pair aborts,
+  and `scroll_momentum_guard_ms` refuses three-or-more-finger actions after a scroll or native
+  momentum. Linux `mt_decoder.lua` latched a one-frame peak and measured travel over the whole
+  touch: same fix there (stable frames, landing, peak-only travel, pair abort, scroll guard).
+  Windows: no shared flaw, the precision touchpad driver recognises three-finger swipes itself and
+  sends the configured key chords (`windows/modules/gestures/init.ahk`), so Ergopti counts no
+  contacts there. macOS still reads `FINGER_CONFIRM_FRAMES` as a local copy of
+  `[gestures].finger_confirm_frames` because 22 engine tests stub `infra.timings` without
+  `count`. Mac confirms: re-enable the vertical three-finger swipes, scroll normally with two
+  fingers for a few minutes (with and without a thumb resting on the pad), no tab switch and no
+  `Finger join (fast-path): 2 → 3` line; a deliberate three-finger swipe up and down still
+  switches tabs, also a frame-late third finger.
+
 - **L16** [CODE][PHYS-M] Slow ingest tick, `append` phase 466 to 563 ms, peaks 1531 and 1709 ms
   (new.txt 14:25:50 to 16:53:38, 20 lines, still on 228f79f2). The 1.2 to 1.8 s ticks are the
   log_manager.lua:1722 holds. `LedgerAppend.flush` (adapters/ledger_append.lua) takes the lock,
@@ -1377,6 +1401,9 @@ Standing checks:
 
 ### Mac
 
+- [ ] **L40 three-finger swipe vs scroll** (`tmp/wip-three-finger-swipe`): re-enable
+      `swipe_3_up`/`swipe_3_down`, scroll with two fingers for a few minutes, no tab switch; a
+      deliberate three-finger swipe still switches tabs.
 - [ ] **Issue #100 retest** (after v1.0.5: 2353a72eed, 25411ee080, e57f4cce77): with Ollama.app and
       a PAC proxy, enabling the AI downloads the model; with the Ergopti menu held open, no lease
       timeout.
@@ -1411,7 +1438,8 @@ Standing checks:
 Wizard (7) on Wayland, physical input, installed-daemon restart; real kernel capture (93); magic
 key grab, injection and hotplug (30); tap delay row (zenity/kdialog), group restore/clear, open
 target, Backspace word start (GNOME Terminal Enter, `ab`, three Backspaces, `c★`; gedit
-Ctrl+Backspace; Firefox Ctrl+L).
+Ctrl+Backspace; Firefox Ctrl+L). L40: a two-finger scroll with a thumb resting reports two
+fingers, a brisk three-finger tap still reports `tap_3` (the peak must hold four frames).
 
 ## CI final acceptance receipts
 
