@@ -10,6 +10,7 @@ local M = {
 	NONE = "none",
 }
 local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 local function id(value)
 	return type(value) == "string" and value:match("^[a-z][a-z0-9_]*$") ~= nil
 end
@@ -195,7 +196,7 @@ function M.plan_chord_copy(source, options)
 		assert(type(value) == "table" and not shapes.arrays[value], "chord source has an occupied namespace")
 		return value
 	end
-	local combos = namespace(document, "mod_combos")
+	local combos = namespace(document, ConfigKeys.KEY.MOD_COMBOS)
 	local stored = namespace(combos, "config")
 	local linux_taps = options.tap_section == M.TAP_SECTION
 		and namespace(namespace(document, "shortcuts"), "key_combination_taps") or nil
@@ -224,7 +225,7 @@ function M.plan_chord_copy(source, options)
 		end
 		output[entry.id] = { tap = slots.tap, hold = slots.hold, combo = slots.tap }
 		if slots.tap ~= slots.combo then
-			local row = { section = KeyPath.render({ "mod_combos", "config", entry.id }), key = "combo" }
+			local row = { section = KeyPath.render({ ConfigKeys.KEY.MOD_COMBOS, "config", entry.id }), key = "combo" }
 			if slots.tap == M.NONE then row.delete = true else row.value = slots.tap end
 			rows[#rows + 1] = row
 		end

@@ -54,6 +54,7 @@ local BOM           = string.char(0xEF, 0xBB, 0xBF)
 local math_type     = math.type
 
 local RootCleanup = require("toml_codec.cleanup_roots")
+local ConfigKeys = require("config_keys")
 local root_receipts = setmetatable({}, { __mode = "k" })
 
 local function protected_root(root)
@@ -335,7 +336,7 @@ local function find_in_source(source, collect, whole_unread_roots, file_path)
 	local outdated = ConfigOutdated.collect_reports(function() collect(decoded, consumption.mark, shapes) end)
 
 	local record_entries, owns_records = RecordList.cleanup_entries(source, outdated, file_path)
-	if owns_records and #record_entries > 0 then consumption.mark("llm", "models", "user_models") end
+	if owns_records and #record_entries > 0 then consumption.mark("llm", "models", ConfigKeys.LEAF.USER_MODELS) end
 	local keys, whole_roots = {}, {}
 	for _, entry in ipairs(record_entries) do keys[#keys + 1] = entry end
 	local projection = whole_unread_roots and RootCleanup.scan(source)
