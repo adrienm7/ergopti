@@ -241,7 +241,7 @@ ReadScriptConfig(Cache) {
 		RawKana := _FeatureStateIniGet(Cache, "script", "alt_gr_is_kana_remap")
 		if RawKana != "_"
 				ScriptInformation["AltGrIsKanaRemap"] :=
-					_FeatureStateValidateKanaOverride(RawKana)
+					_FeatureStateReadKanaOverride(Cache, RawKana)
 		; Missing repeat-key intent restores the same neutral baseline as first boot.
 		global HSE_RepeatEnabled
 		RawRepeat := _FeatureStateIniGet(Cache, "hotstrings", "repeat_key_enabled")
@@ -331,6 +331,31 @@ _FeatureStateCascadeMaxArrows(Raw) {
 	try LoggerWarn("Config", "hotstrings.cascade_max_arrows '{1}' is not a whole number from 1 to 10 — using {2}.",
 		Raw is Object ? Type(Raw) : String(Raw), Default)
 	return Default
+}
+
+; Only the exact native bootstrap cache carries authored TOML intent. Ordinary
+; in-memory candidates retain strict validation; their integers cannot supply a
+; source lexeme. The later canonical loader owns outdated-key diagnostics and
+; cleanup while this early reader leaves the physical cache unchanged.
+_FeatureStateReadKanaOverride(Cache, Value) {
+	global ConfigurationFile, _ParseTomlCache
+	if IsSet(ConfigurationFile) && ConfigurationFile != ""
+			&& IsSet(_ParseTomlCache) && _ParseTomlCache.Has(ConfigurationFile)
+			&& _ParseTomlCache[ConfigurationFile] == Cache {
+		Snapshot := ConfigTomlReadSnapshot(ConfigurationFile)
+		if Snapshot.Cache != Cache
+			throw Error("The early script reader lost its admitted configuration cache")
+		for Row in Snapshot.Rows {
+			if Row.Section != ConfigKey.SCRIPT || Row.Key != ConfigLeaf.ALT_GR_IS_KANA_REMAP
+				continue
+			if !TomlConfigValueMatchesManifest(Row.Section, Row.Key, Row.Value,
+					&ExpectedType, TOML_StripInlineComment(Row.Raw))
+				return _FeatureStateRequireManifestDefault(ConfigKey.SCRIPT_ALT_GR_IS_KANA_REMAP)
+			return _FeatureStateValidateKanaOverride(Value)
+		}
+		throw Error("The authored Kana override has no admitted semantic row")
+	}
+	return _FeatureStateValidateKanaOverride(Value)
 }
 
 _FeatureStateValidateKanaOverride(Value) {
