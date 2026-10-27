@@ -48,6 +48,14 @@ local XKB_LEVELS = {
 	{ "shift", "option" },
 }
 
+-- The number-row options (layout.direct_access_digits, layout.number_row_reorder_edges):
+-- the XKB names of the ten digit keys (1 to 0) and of the three edge keys, and which
+-- level takes which when a key trades its unshifted and Shift cells (levels 1 to 4 of
+-- XKB_LEVELS: base, Caps, Shift, Shift+Caps). Levels 5 to 7 (Ctrl/Alt/Win, AltGr) never move.
+local ROW_DIGIT_KEYS = { "AE01", "AE02", "AE03", "AE04", "AE05", "AE06", "AE07", "AE08", "AE09", "AE10" }
+local ROW_EDGE_KEYS = { "TLDE", "AE11", "AE12" }
+local ROW_LEVEL_PARTNER = { 3, 4, 1, 1 }
+
 local function set_of(list)
 	local out = {}
 	for _, item in ipairs(list) do out[item] = true end
@@ -333,6 +341,7 @@ local function new_converter(layout, keycodes, hints, keysyms)
 	self.dead_triggers = {}
 	self.dead_trigger_values = {}
 	self.dead_trigger_states = {}
+	self.swapped = {}
 	return self
 end
 
@@ -415,8 +424,10 @@ function Converter:keysyms_typing_action(action_id)
 	if self.action_keysyms == nil then
 		local by_action, seen = {}, {}
 		for _, key in ipairs(self.keycodes) do
-			for level, index in ipairs(self.level_indices) do
-				local entry = key_entry(self.layout, self.layout.canonical.map_set, index, key[2], 0)
+			for level in ipairs(self.level_indices) do
+				-- A key that traded levels holds at grid level L what its keyMap selects for the partner.
+				local source = self.swapped[key[1]] and ROW_LEVEL_PARTNER[level] or level
+				local entry = key_entry(self.layout, self.layout.canonical.map_set, self.level_indices[source], key[2], 0)
 				if entry ~= nil and entry[1] == "action" then
 					local keysym = self:cell_keysym(self.grid[key[1]][level])
 					by_action[entry[2]] = by_action[entry[2]] or {}
@@ -584,6 +595,57 @@ function Converter:compose()
 	return 'include "%L"\n\n' .. table.concat(lines, "\n") .. "\n"
 end
 
+--- The policy descriptor of a grid cell, as layout/number_row_policy.lua reads it.
+function Converter:row_descriptor(cell)
+	if cell.kind == "text" then return { Kind = "text", Text = cell.text } end
+	if cell.kind == "dead" then
+		local terminator = self.layout.terminators[cell.state]
+		return { Kind = "dead", Action = cell.action ~= "" and cell.action or cell.state, State = cell.state,
+			Text = (terminator ~= nil and terminator ~= "") and terminator or cell.state }
+	end
+	return nil
+end
+
+--- Applies the number-row options: the unshifted and Shift cells of the digit keys
+--- (and of the edge keys when asked and possible) trade places, with the Caps pair,
+--- by the rule Windows applies (layout/number_row_policy.lua, one rule for the
+--- drivers). A choice the layout cannot take changes nothing and says why.
+--- @param rows table { order = "native"|"digits"|"symbols", edges = boolean }
+--- @return table { order, reason, edges = { stored, applies, reason } }
+function Converter:apply_rows(rows)
+	local Policy = require("layout.number_row_policy")
+	local stored = Policy.mode(rows.order) or "native"
+	local edges_stored = rows.edges == true
+	local function levels_of(names)
+		local list = {}
+		for index, name in ipairs(names) do
+			local cells = self.grid[name]
+			if cells == nil then fail("the key table has no <" .. name .. "> for the number-row options") end
+			list[index] = { plain = self:row_descriptor(cells[1]), shift = self:row_descriptor(cells[3]) }
+		end
+		return list
+	end
+	local effective = Policy.effective(stored, Policy.availability(levels_of(ROW_DIGIT_KEYS)))
+	local edges_reason = edges_stored and Policy.edges_availability(levels_of(ROW_EDGE_KEYS), effective.mode) or ""
+	local edges_apply = edges_stored and edges_reason == ""
+	local function swap(name)
+		local cells = self.grid[name]
+		-- Shift takes the unshifted cell and the other way round. Caps takes what the key
+		-- typed with Shift and Caps (the digit of a symbols-first row stays under Caps), and
+		-- Shift+Caps follows Shift, as the composer's Shift keyMap does (anyShift caps?).
+		cells[1], cells[3] = cells[3], cells[1]
+		cells[2] = cells[4]
+		cells[4] = cells[3]
+		self.swapped[name] = true
+	end
+	if effective.mode ~= "native" then
+		for _, name in ipairs(ROW_DIGIT_KEYS) do swap(name) end
+		if edges_apply then for _, name in ipairs(ROW_EDGE_KEYS) do swap(name) end end
+	end
+	return { order = effective.mode, reason = effective.reason,
+		edges = { stored = edges_stored, applies = edges_apply, reason = edges_stored and edges_reason or "" } }
+end
+
 --- Converts a canonical keylayout to XKB symbols and XCompose text.
 --- @param canonical table The schema-1 form (layouts/keylayout.lua).
 --- @param options table {
@@ -602,6 +664,7 @@ function M.convert(canonical, options)
 	local ok, result = pcall(function()
 		local layout = index_layout(canonical)
 		local converter = new_converter(layout, options.keycodes, options.hints or {}, options.keysyms)
+		local rows_report = options.rows ~= nil and converter:apply_rows(options.rows) or nil
 		-- Dead triggers first, in state order, so borrowed keysyms do not depend on the
 		-- order keys happen to be listed in.
 		local states, seen = {}, {}
@@ -622,6 +685,7 @@ function M.convert(canonical, options)
 			compose_text = compose_text,
 			conflicts = converter.conflicts,
 			unreachable = converter.unreachable,
+			rows = rows_report,
 		}
 	end)
 	if ok then return result end
