@@ -16,6 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local MetricsState = require("infra.metrics_state_keys")
 
 local original_deferred_work = package.loaded["infra.deferred_work"]
 local original_subject = package.loaded["ui.menu.menu_state"]
@@ -335,7 +336,7 @@ helpers.describe("menu_state: keystats start is deferred off the boot path", fun
 		helpers.assert_eq(0, save_calls,
 			"a missing permission must not rewrite the saved Metrics ON")
 		helpers.assert_eq(#demotions, 1, "the late demotion must reach its session owner")
-		helpers.assert_eq(demotions[1].key, "keystats_enabled")
+		helpers.assert_eq(demotions[1].key, MetricsState.ENABLED)
 		helpers.assert_eq(demotions[1].persisted, true)
 		helpers.assert_eq(demotions[1].demoted, false)
 	end)
