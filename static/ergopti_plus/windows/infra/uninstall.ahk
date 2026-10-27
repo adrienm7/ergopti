@@ -178,10 +178,17 @@ _UninstallAwaitReady(Owner, Info, ClockFn := unset, WaitFn := unset, SleepFn := 
 	Wait := IsSet(WaitFn) ? WaitFn : PLC_WaitHandle
 	Nap := IsSet(SleepFn) ? SleepFn : Sleep
 	Started := Clock.Call()
-	while Wait.Call(Owner.Get("Ready", 0), 0) != 0 {
+	loop {
+		Ready := Owner.Get("Ready", 0)
+		if Wait.Call(Ready, 0) == 0 {
+			; Native success belongs to the exact capability observed by this
+			; wait, not to a local owner that cancellation has already retired.
+			if !Ready || Owner.Get("Ready", 0) != Ready
+				throw Error("The removal worker readiness was revoked during its native wait")
+			return true
+		}
 		if TickElapsed64(Started, Clock.Call()) > 10000 || Wait.Call(NumGet(Info, 0, "Ptr"), 0) != 0x102
 			throw Error("The removal worker did not become ready")
 		Nap.Call(20)
 	}
-	return true
 }
