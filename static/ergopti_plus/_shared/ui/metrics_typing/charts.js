@@ -1078,7 +1078,7 @@ function _render_activity_calendar() {
 				_t('ui_typing.calendar_month_10'),
 				_t('ui_typing.calendar_month_11')
 			][cursor.getUTCMonth()];
-			month_labels += `<text x="${x}" y="${PAD_TOP - 6}" font-size="10" fill="var(--text-muted, #888)">${month_short}</text>`;
+			month_labels += `<text x="${x}" y="${PAD_TOP - 6}" font-size="10" fill="var(--text-muted, ${ThemeTokens.color('grey-888')})">${month_short}</text>`;
 			last_month = cursor.getUTCMonth();
 		}
 
@@ -1093,7 +1093,7 @@ function _render_activity_calendar() {
 	]
 		.map(
 			(lbl, i) =>
-				`<text x="0" y="${PAD_TOP + i * 2 * (CELL + GAP) + CELL - 2}" font-size="9" fill="var(--text-muted, #888)">${lbl}</text>`
+				`<text x="0" y="${PAD_TOP + i * 2 * (CELL + GAP) + CELL - 2}" font-size="9" fill="var(--text-muted, ${ThemeTokens.color('grey-888')})">${lbl}</text>`
 		)
 		.join('');
 
@@ -1217,14 +1217,14 @@ function _render_hour_weekday_heatmap() {
 	const day_labels = days_fr
 		.map(
 			(lbl, i) =>
-				`<text x="0" y="${PAD_TOP + i * (CELL_H + GAP) + CELL_H - 4}" font-size="10" fill="var(--text-muted, #888)">${lbl}</text>`
+				`<text x="0" y="${PAD_TOP + i * (CELL_H + GAP) + CELL_H - 4}" font-size="10" fill="var(--text-muted, ${ThemeTokens.color('grey-888')})">${lbl}</text>`
 		)
 		.join('');
 	const hour_labels = [];
 	for (let h = 0; h < 24; h += 3) {
 		const x = PAD_LEFT + h * (CELL_W + GAP) + CELL_W / 2;
 		hour_labels.push(
-			`<text x="${x}" y="${PAD_TOP - 6}" font-size="9" fill="var(--text-muted, #888)" text-anchor="middle">${String(h).padStart(2, '0')}h</text>`
+			`<text x="${x}" y="${PAD_TOP - 6}" font-size="9" fill="var(--text-muted, ${ThemeTokens.color('grey-888')})" text-anchor="middle">${String(h).padStart(2, '0')}h</text>`
 		);
 	}
 
