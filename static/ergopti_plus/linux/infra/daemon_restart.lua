@@ -6,8 +6,8 @@
 --- Restarts the running daemon so every module starts again from config.toml,
 --- the Linux counterpart of hs.reload() and the Windows Reload. It reuses the
 --- updater's restarter: under the systemd user unit, systemd restarts the
---- daemon; otherwise a detached relay starts the standalone launcher once this
---- process has exited.
+--- daemon; otherwise a detached relay starts the standalone launcher, or the
+--- developer launcher of a developer run, once this process has exited.
 --- ==============================================================================
 
 local M = {}
@@ -29,8 +29,13 @@ function M.restart(opts)
 	assert(type(opts) == "table" and type(opts.reason) == "string" and opts.reason ~= ""
 		and type(opts.args) == "table", "a daemon restart needs a reason and the daemon arguments")
 	local Restarter = opts.restarter or require("modules.updater.restarter")
+	-- A developer run is a checkout, which the updater rightly calls unmanaged;
+	-- its Reload relays the developer launcher (infra/dev_source.lua) instead.
 	local installation = opts.installation
-		or function() return require("modules.updater.manager")._resolve_installation() end
+		or function()
+			return require("infra.dev_source").restart_context()
+				or require("modules.updater.manager")._resolve_installation()
+		end
 	local under_unit = Restarter.under_unit(opts.cgroup)
 	local wrapper
 	if not under_unit then
