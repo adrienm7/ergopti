@@ -2123,6 +2123,9 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 	-- L17: prepare held 1.25 s on the Mac for 293 operations; each stage clock
 	-- names its share so the next slow-save line says which one dominates.
 	local save_started = save_clock()
+	-- The Lua heap before and after says whether a collection ran inside a
+	-- slow save: the Mac's prepare took 20 times the local CPU cost.
+	local heap_before_kb = collectgarbage("count")
 	local stage_ms, stage_last = {}, save_started
 	local function stage(name)
 		local now = save_clock()
@@ -2277,11 +2280,12 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 				parts[#parts + 1] = string.format("%s=%d", name, math.floor(stage_ms[name] or 0))
 			end
 			Logger.warn(LOG, "Slow preferences save %d ms (prepare=%d write=%d ms; operations=%d; "
-				.. "prepare: %s ms; proposed=%d; metadata_commands=%d in %d ms).",
+				.. "prepare: %s ms; proposed=%d; metadata_commands=%d in %d ms; lua_heap=%d->%d MB).",
 				math.floor(total_ms), math.floor((prepare_done - save_started) / NANOSECONDS_PER_MILLISECOND),
 				math.floor((write_done - prepare_done) / NANOSECONDS_PER_MILLISECOND), #updates,
 				table.concat(parts, " "), proposed_count, commands_after - commands_before,
-				math.floor(command_ms_after - command_ms_before))
+				math.floor(command_ms_after - command_ms_before),
+				math.floor(heap_before_kb / 1024), math.floor(collectgarbage("count") / 1024))
 		end
 	end
 	if model_operation then RecordList.acknowledge(model_operation, encoded) end
