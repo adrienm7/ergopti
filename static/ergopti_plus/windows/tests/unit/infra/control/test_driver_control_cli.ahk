@@ -34,7 +34,9 @@ _DCCLI_NativeAdmission(Phase) {
 			Sleep(10)
 		}
 		AssertEqual(1, Observed.Length, "the actual control admission process must settle within its bound")
-		AssertEqual(0, Observed[1]["exit"], "control admission output: " . Observed[1]["output"])
+		if Observed[1]["exit"] != 0
+			NativeCliPrintFailureOutput("control admission " . Phase, Observed[1]["output"])
+		AssertEqual(0, Observed[1]["exit"], "control admission " . Phase . " output: " . NativeCliFailureHeadline(Observed[1]["output"]))
 		Marker := "[OK] Windows control CLI " . Phase . " admission controls passed."
 		Markers := 0
 		for Line in StrSplit(StrReplace(Observed[1]["output"], "`r`n", "`n"), "`n") {
