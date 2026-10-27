@@ -25,6 +25,32 @@ print(require('json').encode({ok=ok,reason=reason or '',ready=capture.is_ready()
 capture.clear()
 """
 
+# Asks the library itself, in the same environment, whether a context can exist
+# with no reachable XKB data. libxkbcommon before the lazy default includes
+# (Debian 13, Ubuntu) refuses the constructor; later releases (Arch, Fedora,
+# Alpine, openSUSE) defer the include paths until a lookup needs them, so a
+# self-contained keymap compiles without any data directory.
+CONTEXT_PROBE = r"""
+local root = arg[1]
+package.path = root .. '/?.lua;' .. root .. '/?/init.lua;'
+  .. root .. '/../_shared/lua/?.lua;' .. root .. '/../_shared/lua/?/init.lua;' .. package.path
+local ffi = require('ffi')
+ffi.cdef[[
+  struct xkb_context;
+  struct xkb_context *xkb_context_new(int flags);
+  unsigned int xkb_context_num_include_paths(struct xkb_context *context);
+  void xkb_context_unref(struct xkb_context *context);
+]]
+local lib = ffi.load(require('_generated.native_runtime').xkbcommon)
+local context = lib.xkb_context_new(0)
+local paths = -1
+if context ~= nil then
+  paths = tonumber(lib.xkb_context_num_include_paths(context))
+  lib.xkb_context_unref(context)
+end
+print(require('json').encode({context = context ~= nil, include_paths = paths}))
+"""
+
 
 class NativeXkbDataTests(unittest.TestCase):
     """Vary only native search-path inputs; retain real constructors and flags."""
@@ -61,7 +87,17 @@ class NativeXkbDataTests(unittest.TestCase):
                     XKB_CONFIG_EXTRA_PATH=str(root / "absent-extra"),
                 )
                 if mode == "missing-xkb":
-                    environment["XKB_CONFIG_ROOT"] = str(root / "absent-xkb")
+                    # An empty root, not an absent one: libxkbcommon 1.11 falls
+                    # back to the legacy /usr/share/X11/xkb when the root it was
+                    # given is missing, and skips that only for an empty root.
+                    # The extension directories it also scans are moved away.
+                    environment["XKB_CONFIG_ROOT"] = ""
+                    environment["XKB_CONFIG_VERSIONED_EXTENSIONS_PATH"] = str(
+                        root / "absent-versioned"
+                    )
+                    environment["XKB_CONFIG_UNVERSIONED_EXTENSIONS_PATH"] = str(
+                        root / "absent-unversioned"
+                    )
                 elif mode == "missing-compose":
                     environment["XLOCALEDIR"] = str(root / "absent-compose")
                 result = subprocess.run(
@@ -73,12 +109,34 @@ class NativeXkbDataTests(unittest.TestCase):
                 )
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 observation = json.loads(result.stdout)
+                admitted = mode == "present"
+                if mode == "missing-xkb":
+                    context_probe = root / "context.lua"
+                    context_probe.write_text(CONTEXT_PROBE, encoding="utf-8")
+                    native = subprocess.run(
+                        [RUNTIME, str(context_probe), str(driver)],
+                        env=environment,
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+                    self.assertEqual(native.returncode, 0, native.stdout + native.stderr)
+                    library = json.loads(native.stdout)
+                    observation["library"] = library
+                    if library["context"]:
+                        # A lazy-include library: the data really is out of
+                        # reach (no include path at all), and the complete
+                        # keymap must still be captured from its own text.
+                        self.assertEqual(
+                            library["include_paths"], 0, "the XKB data must be unreachable"
+                        )
+                        admitted, expected = True, ""
                 print(
                     "Native XKB data admission: " + json.dumps(dict(mode=mode, **observation)),
                     flush=True,
                 )
-                self.assertEqual(observation["ok"], mode == "present")
-                self.assertEqual(observation["ready"], mode == "present")
+                self.assertEqual(observation["ok"], admitted)
+                self.assertEqual(observation["ready"], admitted)
                 self.assertEqual(observation["reason"], expected)
 
 
