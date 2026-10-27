@@ -96,8 +96,6 @@ local KE_SYSEXT_BUNDLE = "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice"
 -- Karabiner-Elements v16+ relies on Accessibility (per the v16.0.0 release
 -- notes); pre-v16 versions rely on Input Monitoring instead. Both panes are
 -- exposed so the wizard can route the user to the right one.
-local URL_INPUT_MONITORING  = "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
-local URL_ACCESSIBILITY     = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
 local URL_SYSTEM_EXTENSIONS = "x-apple.systempreferences:com.apple.LoginItems-Settings.extension?Extensions"
 
 -- Re-poll cadence after the user takes a wizard action, so the next step
@@ -1190,7 +1188,7 @@ end
 --- scripts grant TCC, so a deep-link is the closest we can get to one click.
 function M.open_input_monitoring_pane()
 	Logger.info(LOG, "Opening Input Monitoring pane…")
-	hs.execute("/usr/bin/open " .. text_utils.shell_quote(URL_INPUT_MONITORING))
+	hs.execute("/usr/bin/open " .. text_utils.shell_quote(require("adapters.privacy_settings").url("input_monitoring")))
 end
 
 --- Opens the System Settings pane where the user grants Accessibility
@@ -1198,7 +1196,7 @@ end
 --- Input Monitoring redundant); v15 and older required Input Monitoring.
 function M.open_accessibility_pane()
 	Logger.info(LOG, "Opening Accessibility pane…")
-	hs.execute("/usr/bin/open " .. text_utils.shell_quote(URL_ACCESSIBILITY))
+	hs.execute("/usr/bin/open " .. text_utils.shell_quote(require("adapters.privacy_settings").url("accessibility")))
 end
 
 --- Opens the System Extensions pane where the user must approve the

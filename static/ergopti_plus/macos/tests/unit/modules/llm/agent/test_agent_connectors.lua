@@ -192,7 +192,7 @@ helpers.describe("AI agent connectors (macOS)", function()
 			helpers.assert_eq(other.ok, false)
 			helpers.assert_nil(other.detail.permission)
 			helpers.assert_eq(Connectors.open_automation_settings(), true)
-			helpers.assert_eq(world.opens[1], Connectors.AUTOMATION_SETTINGS_URL)
+			helpers.assert_eq(world.opens[1], Connectors.automation_settings_url())
 		end)
 	end)
 
