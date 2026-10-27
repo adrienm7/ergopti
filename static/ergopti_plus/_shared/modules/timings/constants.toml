@@ -496,6 +496,12 @@ context_retry_ms = 1000
 # callbacks wait no longer than this budget before physical pass-through resumes.
 focus_barrier_timeout_ms = 20
 
+# Linux: how long the accessibility worker's pump sleeps between two polls of its
+# transport while it waits for the desktop to answer (one libuv tick, so the wait
+# neither spins a core nor adds a visible delay).
+# Linux: adapters/atspi_focus_watch.lua.
+focus_pump_sleep_ms = 1
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Tap-hold / key repeat (AHK)
@@ -615,6 +621,11 @@ script_control_tap_watchdog_interval_ms = 2000
 # and gesture parameter prompts, the model selector).
 # HS: ui/menu/*.lua, ui/layout_manager/init.lua, ui/personal_info_editor/init.lua.
 ui_handoff_ms = 50
+
+# Linux: the delay before a health-check probe starts its work off the click that
+# requested it, so the click returns first (one event-loop turn).
+# Linux: ui/healthcheck/probes.lua configuration probe.
+healthcheck_probe_defer_ms = 1
 
 # Delay before the post-install keyboard-layout menu refresh fires.
 # HS: menu_keyboard_layout.lua POST_INSTALL_REFRESH_DELAY.

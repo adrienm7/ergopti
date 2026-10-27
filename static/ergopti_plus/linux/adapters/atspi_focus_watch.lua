@@ -112,7 +112,7 @@ function M.new(options)
 	local lease_ms = Timings.ms("privacy", "atspi_probe_timeout_ms")
 	local barrier_ms = Timings.ms("privacy", "focus_barrier_timeout_ms")
 	local pause = options.pause or function()
-		require("luv").sleep(1)
+		require("luv").sleep(Timings.ms("privacy", "focus_pump_sleep_ms"))
 	end
 	local watcher = {}
 	local transport, operation, callback = nil, nil, nil
@@ -326,7 +326,7 @@ function M.new(options)
 			uv.run("nowait")
 			if watcher.pump() then return true end
 			if failed then return false end
-			uv.sleep(1)
+			uv.sleep(Timings.ms("privacy", "focus_pump_sleep_ms"))
 		end
 		publish(nil)
 		return false
