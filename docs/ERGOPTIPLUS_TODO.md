@@ -803,26 +803,23 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       entry again (ea02cf7000: the generic registrar refuses Caps Lock and the whole shortcut start rolled
       back). The registrar tests say macOS never fires a Caps Lock hotkey: check on a real Mac that Ctrl+Caps
       Lock toggles Caps Lock; if not, report it and drop the slot's recommendation on macOS with a reason.
-- [ ] **Number-row and layout emulation on macOS and Linux, live (maintainer request, 27 October).** [CODE]
-      Windows emulates the layout and applies `layout.direct_access_digits` and
-      `layout.number_row_reorder_edges`; macOS and Linux keep the installed system layout and only store the
-      two values (Linux scope participant config only, bdec8cfc06; design input in
-      `docs/design/linux-number-row-runtime.md`). Wanted: the same options on macOS and Linux, applied live (no
-      logout, no reboot, no daemon restart), with every modifier following the layout (Ctrl+a like a), dead
-      keys and symbols intact. A key-code remap (Karabiner, the Linux evdev writer) moves physical keys under
-      every modifier but cannot make a dead key or a symbol the installed layout lacks, so the layout itself is
-      the right layer. macOS: generate every option combination as one layout of the Ergopti `.keylayout`
-      bundle (its per-modifier key maps carry Ctrl and Cmd, dead keys and symbols), install the bundle once (a
-      new bundle needs one logout the first time), then apply an option live by selecting the matching input
-      source through the Text Input Sources API; Karabiner keeps the tap-hold and physical-key work it does
-      today. Linux: the same variants as XKB symbols (dead keys, levels and Ctrl follow the keysyms), switched
-      live with `setxkbmap` on X11 and through the desktop's input-source setting on Wayland (GNOME, KDE), with
-      an honest reason where a compositor cannot; the dormant evdev number-row owner (d70c2d9aa3) is the
-      fallback for a desktop that cannot load a user layout. Shared: one source for the row orders and the
-      direct-access table (the Windows tables), replay vectors on the three OS, menu rows live on macOS and
-      Linux, the scope participant acknowledging the live switch. First check how Windows applies the options
-      (digits only, or the whole key with its shifted symbol) so the three OS type the same characters. Design
-      note first, then slices.
+- [ ] **Layout emulation on macOS and Linux through one generated `.keylayout`, live (maintainer request, 27
+      October).** [CODE] Decided by the maintainer: no pre-generated variants. The user picks a layout
+      (Ergopti, Bépo, ...), the menu options (number row in direct access or symbols, row switches) and later
+      per-key edits in a page; that produces one custom `.keylayout`, the single source the three OS already
+      share: Windows emulates it (AHK reads a `.keylayout`), macOS installs it as the input source, Linux
+      converts it to XKB (`_shared/lua/layouts/xkb_converter.lua`). The per-layer layout composer
+      (docs/layout-composer.md) already compiles a composition into `composed.keylayout` and installs it on
+      the three OS; build on it, do not add a second format. Left: (1) the menu options (Ergopti or Bépo base,
+      `layout.direct_access_digits`, `layout.number_row_reorder_edges`, the row switches) feed the compiled
+      `.keylayout` on macOS and Linux instead of narrowing a Windows-only emulation, with Ctrl/Cmd maps, dead
+      keys and symbols from the layout; (2) a live replace with no logout: macOS caches a rewritten
+      `.keylayout` until the input source is toggled or the user logs in, so write each build under a new
+      versioned id, register it (`TISRegisterInputSource`), select it, then disable and remove the previous one
+      (verify on the maintainer's Mac); Linux replaces the XKB files and reloads with `setxkbmap` on X11 and the
+      desktop input-source setting on GNOME and KDE Wayland, with an honest reason where a compositor cannot;
+      (3) the scope participant acknowledges only after the new layout is selected. Design note
+      `docs/design/layout-option-emulation.md` first (agent AF), then slices.
 - [ ] **Windows updater -File workers: real update check.** [PHYS] Install a build with 5d6beccf83
       by hand, then update from it to the next release: the exe is replaced and restarts, the
       three scripts are in `%LOCALAPPDATA%\Ergopti\vendor\`, the PowerShell command line shows
