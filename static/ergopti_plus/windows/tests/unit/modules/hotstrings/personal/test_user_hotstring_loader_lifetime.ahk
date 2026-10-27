@@ -42,16 +42,13 @@ _UHLT_Source(Root) {
 		. "global ConfigurationFile := " . _UHLT_Quote(Root . "\config\absent.toml") . "`n"
 		. 'global _AhkSubDir := "autohotkey\"' . "`n"
 		. "EnvSet(" . _UHLT_Quote("LOCALAPPDATA") . ", " . _UHLT_Quote(Root . "\localappdata") . ")`n"
-	CategoryOwner := _DriverProductionFileForSymbol("_CategoryEnabledKey", _DriverDir)
-	CategoryText := FSReadStrict(CategoryOwner)
-	CategoryFunction := _DriverExtractFunctionBody(&CategoryText, "_CategoryEnabledKey")
-	AssertTrue(CategoryFunction != "", "The real category normalizer is required by actual feature defaults.")
-	Code := _DriverMaskNonCode(&CategoryFunction)
-	AssertEqual(1, _DriverTopLevelDefinitionCount(&Code, "_CategoryEnabledKey"))
-	Source .= CategoryFunction . "`n"
+	; The absent-config logger still queries the genuine constructor journal.
+	; Load its complete inert owner graph rather than extracting one helper or
+	; substituting a successful readiness query for this pre-journal role.
 	Owners := Map()
 	for Symbol in ["JsonStringLiteral", "CryptoSha256Bytes", "FSReadStrict", "WallClockTimestamp", "ManifestBuildFeaturesMap",
-		"IsCategoryGated", "LoggerInit", "Redact_Apply", "PLC_CreateProcessWithInheritedHandles", "ShellRunner_SpawnTreeOwned",
+		"IsCategoryGated", "_CategoryEnabledKey", "ConfigMigrateBoot", "TOML_BatchWrite",
+		"ConfigTransitionInspect", "ConfigTransitionProductionPort", "LoggerInit", "Redact_Apply", "PLC_CreateProcessWithInheritedHandles", "ShellRunner_SpawnTreeOwned",
 		"_HSE_RunOwnedTerminalTransaction", "UserHotstringsReload", "PerfCount", "KS_ScancodeToVk"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		AssertTrue(Owner != "", "The child must load its genuine source owner: " . Symbol)
@@ -60,6 +57,9 @@ _UHLT_Source(Root) {
 			Source .= "#Include " . Owner . "`n"
 		}
 	}
+	KeyOwner := _DriverDir . "\_generated\config_keys.ahk"
+	AssertTrue(FileExist(KeyOwner), "The logger must load its real generated configuration key classes.")
+	Source .= "#Include " . KeyOwner . "`n"
 	for Symbol in ["AppDirsFolderName", "LoggerSubFilesData"]
 		Source .= "#Include " . _UHLT_Generated(Symbol) . "`n"
 	return Chr(0xFEFF) . Source . "#Include " . _DriverDir . "\tests\fixtures\user_hotstring_loader_lifetime_body.ahk`n"
