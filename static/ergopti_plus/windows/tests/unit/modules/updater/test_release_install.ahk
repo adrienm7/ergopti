@@ -721,3 +721,53 @@ _R7RS_RestorePreservesForeignStage() {
 }
 Test("Config restore: preexisting sidecar bytes retain their own stage identity (restore-foreign-stage)",
 	_R7RS_RestorePreservesForeignStage)
+
+
+; A backup pathname becomes owned only through exclusive native creation.
+_R7BA_AllocationRace(Race) {
+	static Sequence := 0
+	Sequence += 1
+	Root := A_Temp . "\ergopti_r7_backup_race_" . PLC_CurrentProcessId() . "_" . A_TickCount . "_" . Sequence
+	Cfg := Root . "\cfg", Foreign := "", ObserverCompleted := false, Caught := 0, Result := 0
+	Allocator := _ConfigBackup_NextId
+	AssertFalse(Allocator.HasOwnProp("Call"), "a foreign allocator observer cannot be detached")
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "generation = 1`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Observe(Self, Folder, Base) {
+			Allocator.DeleteProp("Call")
+			Id := Allocator.Call(Folder, Base)
+			Foreign := Folder . "\" . Id
+			AssertFalse(FileExist(Foreign), "the real allocator must initially return an absent identity")
+			DirCreate(Foreign)
+			AssertTrue(FSWriteCreateDurable(Foreign . "\foreign.txt", "foreign directory owner`n"))
+			ObserverCompleted := true
+			return Id
+		}
+		if Race
+			Allocator.DefineProp("Call", {Call: Observe})
+		try Result := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		catch as Err
+			Caught := Err
+		if Race {
+			AssertTrue(ObserverCompleted, "the transparent observer must complete the actual allocation and foreign native creation")
+			AssertEqual("foreign directory owner`n", FSReadUtf8Exact(Foreign . "\foreign.txt"))
+			AssertFalse(FileExist(Foreign . "\" . Rules["manifest"]), "a racing directory cannot acquire this backup transaction's manifest")
+			AssertFalse(FileExist(Foreign . "\config\config.toml"), "the backup cannot write payloads inside a foreign directory")
+			AssertTrue(Caught is OSError, "the actual native collision must refuse backup publication with its native error")
+		} else {
+			AssertEqual(0, Caught, "the same genuine backup path must succeed without a foreign producer")
+			AssertTrue(Result is Map)
+			AssertTrue(FileExist(Result["path"] . "\" . Rules["manifest"]))
+			AssertEqual("generation = 1`n", FSReadUtf8Exact(Result["path"] . "\config\config.toml"))
+		}
+	} finally {
+		if Allocator.HasOwnProp("Call")
+			Allocator.DeleteProp("Call")
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("Config backup allocation: genuine absence permits publication (backup-exclusive-allocation)", _R7BA_AllocationRace.Bind(false))
+Test("Config backup allocation: real racing directory retains exclusive ownership (backup-exclusive-allocation)", _R7BA_AllocationRace.Bind(true))
