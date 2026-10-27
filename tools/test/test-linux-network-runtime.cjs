@@ -553,25 +553,29 @@ function native() {
 					path.join(ROOT, DRIVER, 'platform/network/system_proxy_probe.lua'),
 					path.join(driver, 'platform/network/system_proxy_probe.lua')
 				);
-				const helper = spawnSync(
-					'luajit',
-					[path.join(driver, 'platform/network/system_proxy_probe.lua'), shared],
-					{
-						cwd,
-						encoding: 'utf8',
-						timeout: 10000,
-						maxBuffer: 1024,
-						input: JSON.stringify({ url: 'https://owned-probe.invalid/' }),
-						env: nativeEnvironment(isolated)
-					}
-				);
-				assert.ifError(helper.error);
-				assert.equal(helper.signal, null);
-				assert.equal(helper.status, 0);
-				assert.deepEqual(JSON.parse(helper.stdout), {
-					ok: false,
-					error: 'proxy-backend-unavailable'
-				});
+				const runHelper = () => {
+					const helper = spawnSync(
+						'luajit',
+						[path.join(driver, 'platform/network/system_proxy_probe.lua'), shared],
+						{
+							cwd,
+							encoding: 'utf8',
+							timeout: 10000,
+							maxBuffer: 1024,
+							input: JSON.stringify({ url: 'https://owned-probe.invalid/' }),
+							env: nativeEnvironment(isolated)
+						}
+					);
+					assert.ifError(helper.error);
+					assert.equal(helper.signal, null);
+					assert.equal(helper.status, 0);
+					return JSON.parse(helper.stdout);
+				};
+				assert.deepEqual(runHelper(), { ok: false, error: 'proxy-policy-unavailable' });
+				const policy = path.join(shared, 'modules/network/proxy_policy.json');
+				fs.mkdirSync(path.dirname(policy), { recursive: true });
+				fs.copyFileSync(path.join(ROOT, SHARED, 'modules/network/proxy_policy.json'), policy);
+				assert.deepEqual(runHelper(), { ok: false, error: 'proxy-backend-unavailable' });
 			}
 		);
 		check('actual installed runtime locates native and shared sources independently of CWD', () => {
