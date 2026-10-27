@@ -369,7 +369,8 @@ _OllamaStream_CompletedNativeOwner() {
 	Owner := 0
 	try {
 		Pid := 0
-		Command := _SR_BuildDirectCommandLine(A_ComSpec, ["/D", "/C", "exit", "/b", "0"])
+		; cmd consumes a command expression after /C, not separately quoted argv.
+		Command := _Q(A_ComSpec) . ' /D /C "exit /b 0"'
 		_LLM_CurlArtifactRun(Command, "", "Hide", &Pid, &Owner)
 		Start := A_TickCount
 		while !_LLM_CurlProcessExited(Owner) && TickElapsed(Start) < 5000
@@ -773,3 +774,19 @@ _OllamaStream_InitialOutput(Mode) {
 for _OllamaStartMode in ["missing", "empty", "locked", "missing-parent"]
 	Test("Ollama initial output: " . _OllamaStartMode . " preserves file state (ollama-stream-initial-output)",
 		_OllamaStream_InitialOutput.Bind(_OllamaStartMode))
+
+; Keep the fixture's successful native child independent from provider bytes.
+_OllamaStream_CompletedNativeOwnerControl() {
+	Owner := _OllamaStream_CompletedNativeOwner()
+	try {
+		AssertTrue(Owner is Map && Owner.Get("handle", 0) != 0,
+			"the exit-only control retains the actual completed process handle")
+		AssertEqual(0, DllCall("Kernel32\WaitForSingleObject", "Ptr", Owner["handle"], "UInt", 0, "UInt"),
+			"native acknowledgement independently confirms the fixture process completed")
+		AssertTrue(_LLM_CurlReleaseProcess(Owner), "the completed native owner releases normally")
+		AssertTrue(Owner.Get("released", false), "the real release acknowledgement is retained")
+		AssertEqual(0, Owner.Get("handle", 0), "the exact completed handle is retired")
+	} finally _LLM_CurlReleaseProcess(Owner, true)
+}
+Test("Ollama live fixture: completed native owner starts from exit zero (ollama-live-native-owner)",
+	_OllamaStream_CompletedNativeOwnerControl)
