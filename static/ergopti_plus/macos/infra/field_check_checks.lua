@@ -221,6 +221,10 @@ function M.network(ports, report, finish)
 			end)
 		end,
 		route_plan = ports.route_plan,
+		-- The shared policy, not a platform call: a lookup the PAC fallback covers goes direct.
+		pac_fallback = function(stage)
+			return require("modules.llm.opaque_network_admission").is_pac_fallback_stage(stage)
+		end,
 	}, report, finish)
 end
 

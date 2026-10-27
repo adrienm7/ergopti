@@ -2172,6 +2172,7 @@
 	"network.failure.proxy": "Systemets proxyoppsett kunne ikke brukes, eller proxyen avviste forbindelsen eller krevde autentisering. Kontroller systemets proxyinnstillinger.",
 	"network.failure.host_blocked": "Nettverket blokkerer tilgangen til denne serveren (bedriftens filtrering eller brannmur).",
 	"network.failure.offline": "Nettverket eller nettverksruten er utilgjengelig. Kontroller forbindelsen og systemets nettverksinnstillinger.",
+	"network.failure.pac_unreachable_direct_failed": "Den automatiske proxykonfigurasjonen (PAC) kunne ikke nås eller leses, og den direkte tilkoblingen som ble forsøkt i stedet, mislyktes også. Kontroller nettverkstilkoblingen og systemets proxyinnstillinger, eller spør IT-avdelingen.",
 	"network.failure.disk": "Nedlastingen kunne ikke fortsette fordi det er for lite diskplass eller kvoten er overskredet. Frigjør plass og prøv igjen.",
 	"network.failure.permission": "Systemet avviste en nødvendig filoperasjon. Kontroller rettighetene til målområdet og om det er skrivebeskyttet.",
 	"network.failure.unknown": "Operasjonen mislyktes, men de tilgjengelige diagnoseopplysningene fastslår ikke årsaken.",

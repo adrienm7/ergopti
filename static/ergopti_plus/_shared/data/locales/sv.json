@@ -2172,6 +2172,7 @@
 	"network.failure.proxy": "Systemets proxykonfiguration kunde inte användas, eller proxyn nekade anslutningen eller begärde autentisering. Kontrollera systemets proxyinställningar.",
 	"network.failure.host_blocked": "Nätverket blockerar åtkomsten till den här servern (företagets filtrering eller brandvägg).",
 	"network.failure.offline": "Nätverket eller nätverksvägen är inte tillgänglig. Kontrollera anslutningen och systemets nätverksinställningar.",
+	"network.failure.pac_unreachable_direct_failed": "Den automatiska proxykonfigurationen (PAC) gick inte att nå eller läsa, och den direkta anslutning som provades i stället misslyckades också. Kontrollera nätverksanslutningen och systemets proxyinställningar, eller fråga din IT-avdelning.",
 	"network.failure.disk": "Nedladdningen kunde inte fortsätta eftersom diskutrymmet är otillräckligt eller kvoten har överskridits. Frigör utrymme och försök igen.",
 	"network.failure.permission": "Systemet nekade en nödvändig filåtgärd. Kontrollera målets behörigheter och om det är skrivskyddat.",
 	"network.failure.unknown": "Åtgärden misslyckades, men den tillgängliga diagnostiken kan inte fastställa orsaken.",
