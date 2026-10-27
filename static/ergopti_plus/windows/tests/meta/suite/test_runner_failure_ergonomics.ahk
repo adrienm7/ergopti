@@ -807,11 +807,21 @@ _TRFE_ReplayExecutingChild() {
 		Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n"
 			. 'EnvSet("ERGOPTI_AHK_RESULTS_FILE", "' . QuotedReceipt . '")' . "`n"
 			. "#Include framework.ahk`n"
+			. '_TestResultsBeginRun()' . "`n"
+			. '_TestPrint("# replay_entry " . A_ScriptFullPath)' . "`n"
+			. '_TestPrint("# replay_interpreter " . A_AhkPath)' . "`n"
 			. 'Test("owned intentional replay failure", () => AssertEqual("expected", "actual"))' . "`n"
 			. "RunTests()`n"
 		FileAppend(Source, Child, "UTF-8")
+		; Exercise a real short alias when the volume supplies one. The child owns
+		; its executable spelling: A_Temp and A_ScriptFullPath can differ on Windows.
+		ShortPath := Buffer(32768 * 2)
+		ShortLength := DllCall("Kernel32\GetShortPathNameW", "Str", Child,
+			"Ptr", ShortPath, "UInt", ShortPath.Size // 2, "UInt")
+		LaunchEntry := ShortLength > 0 && ShortLength < ShortPath.Size // 2
+			? StrGet(ShortPath, ShortLength, "UTF-16") : Child
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
-			["/ErrorStdOut", Child, "--owned-selection", Argument], Completed)
+			["/ErrorStdOut", LaunchEntry, "--owned-selection", Argument], Completed)
 		AssertTrue(Handle.start(), "the real isolated replay child must start")
 		Started := DllCall("Kernel32\GetTickCount64", "UInt64")
 		while !Observation.Calls && DllCall("Kernel32\GetTickCount64", "UInt64") - Started < 10000 {
@@ -823,16 +833,27 @@ _TRFE_ReplayExecutingChild() {
 		AssertEqual("", Observation.Errors, "the child cannot hide a startup or native transport failure")
 		AssertContains(Observation.Output, "# 0 passed, 1 failed.", "the real runner executes its intentional failure")
 		ReplayLines := []
+		EntryLines := []
+		InterpreterLines := []
 		; The disk owner writes UTF-8 regardless of the child stdout code page.
 		for Line in StrSplit(FileRead(Receipt, "UTF-8"), "`n", "`r") {
 			if SubStr(Line, 1, 12) == "#   replay: "
 				ReplayLines.Push(Line)
+			if SubStr(Line, 1, 15) == "# replay_entry "
+				EntryLines.Push(SubStr(Line, 16))
+			if SubStr(Line, 1, 21) == "# replay_interpreter "
+				InterpreterLines.Push(SubStr(Line, 22))
 		}
 		AssertEqual(1, ReplayLines.Length, "one failed callback emits one replay diagnostic")
+		AssertEqual(1, EntryLines.Length, "the real child reports one entry identity")
+		AssertEqual(1, InterpreterLines.Length, "the real child reports one interpreter identity")
+		AssertTrue(EntryLines[1] != "" && InterpreterLines[1] != "", "native executable identities cannot be empty")
+		_TestPrint("# replay_identity launch=" . LaunchEntry . " entry=" . EntryLines[1]
+			. " interpreter=" . InterpreterLines[1])
 		Replay := ReplayLines[1]
-		AssertContains(Replay, "'" . StrReplace(Child, "'", "''") . "'",
+		AssertContains(Replay, "'" . StrReplace(EntryLines[1], "'", "''") . "'",
 			"the replay must name the actual isolated entry with a PowerShell literal")
-		AssertContains(Replay, "& '" . StrReplace(A_AhkPath, "'", "''") . "' ",
+		AssertContains(Replay, "& '" . StrReplace(InterpreterLines[1], "'", "''") . "' ",
 			"the command preserves the actual interpreter")
 		AssertContains(Replay, " '--owned-selection' 'two '' quotes " . Chr(34) . " $() " . Chr(96) . " " . Chr(0xE9) . "'",
 			"the original supported selection is quoted without interpolation")
