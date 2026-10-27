@@ -18,7 +18,10 @@
 ---    menu installs it and is kept, as a selection would keep it; a model the
 ---    run downloaded is removed again when it was not there before, and a
 ---    model that was already there is left in place. The model is the
----    catalogue's smallest one (infra/field_run.lua M.smallest_model).
+---    catalogue's smallest one (infra/field_run.lua M.smallest_model). The MLX
+---    step also puts back the active-model file the served model overwrote: a
+---    step leaves the configuration as it found it, and config_guard only
+---    reports what a step failed to put back.
 --- 3. Privacy: step codes and reports carry closed tokens, counts and catalogue
 ---    names; the diagnostics report is the share projection a bug report uses.
 --- 4. Configuration guard: config.toml and its sibling files are compared byte
@@ -294,8 +297,35 @@ local function mlx_runtime(finish)
 	if accepted ~= true then finish("fail", { "bootstrap_refused" }) end
 end
 
+--- Captures the MLX active-model file the model server writes when it starts
+--- and returns the function that puts it back. The download ends by serving
+--- the new model, whose launcher records that model there, so a step that left
+--- it would hand the user's next MLX server a model the step removes again.
+--- @return function restore fn() -> code: "active_model_kept",
+---   "active_model_restored" or "active_model_restore_failed".
+local function keep_mlx_active_model()
+	local path = require("infra.config_paths").get("MlxActiveModelPath")
+	if type(path) ~= "string" or path == "" then error("config path MlxActiveModelPath is unresolved", 0) end
+	local content, status = FileSystem.read_with_status(path)
+	if status ~= "ok" and status ~= "absent" then error("the MLX active-model file is unreadable", 0) end
+	return function()
+		local now, now_status = FileSystem.read_with_status(path)
+		if now_status == status and now == content then return "active_model_kept" end
+		local ok
+		if status == "absent" then ok = FileSystem.delete(path) == true else ok = FileSystem.write(path, content) == true end
+		if not ok then
+			Logger.error(LOG, "The MLX model step could not put the active-model file back.")
+			return "active_model_restore_failed"
+		end
+		Logger.info(LOG, "The MLX model step put the active-model file back (%s).",
+			status == "absent" and "removed" or "rewritten")
+		return "active_model_restored"
+	end
+end
+
 --- Downloads the smallest catalogue MLX model, stops the server its download
---- starts, then removes the model unless it was already there.
+--- starts, then removes the model unless it was already there and puts the
+--- active-model file back as it found it.
 local function mlx_model(finish)
 	if not mlx_supported() then return finish("skip", { "mlx_unsupported_here" }) end
 	local manager = models_manager()
@@ -314,6 +344,12 @@ local function mlx_model(finish)
 	local report = { model = model.name, download_gb = model.download_gb }
 	local before = manager.mlx_model_installed(model.name)
 	local codes = { before and "model_preexisting" or "model_absent" }
+	local restore_active_model = keep_mlx_active_model()
+	local function settle(passed)
+		local restored = restore_active_model()
+		codes[#codes + 1] = restored
+		finish(passed and restored ~= "active_model_restore_failed" and "pass" or "fail", codes, report)
+	end
 	manager.pull_mlx_model(model.name, function()
 		codes[#codes + 1] = "downloaded_and_served"
 		require("ui.menu.menu_llm").stop_mlx_server(function(stopped)
@@ -321,11 +357,11 @@ local function mlx_model(finish)
 			if not before then
 				codes[#codes + 1] = manager.delete_mlx_model(model.name) and "removal_started" or "removal_refused"
 			end
-			finish(stopped and "pass" or "fail", codes, report)
+			settle(stopped)
 		end)
 	end, function(reason)
 		codes[#codes + 1] = "download_" .. tostring(reason)
-		finish("fail", codes, report)
+		settle(false)
 	end)
 end
 

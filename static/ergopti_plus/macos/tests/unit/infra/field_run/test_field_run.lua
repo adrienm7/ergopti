@@ -15,7 +15,10 @@
 ---    dropped; past the request's deadline the remaining steps are skipped;
 --- 5. the configuration guard restores and names what a step changed, and a
 ---    failed snapshot runs no step;
---- 6. a run cut short by a reload is closed as interrupted at the next start.
+--- 6. a run cut short by a reload is closed as interrupted at the next start;
+--- 7. the MLX model step puts back the active-model file its served model
+---    overwrote, so config_guard has nothing to restore (field report of
+---    2026-10-27 22:36, restored_MlxActiveModelPath).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -643,5 +646,95 @@ helpers.describe("field run ports: configuration guard", function()
 				"ConfigTomlPath,KarabinerConfigPath,setting_added,setting_llm_backend")
 			helpers.assert_eq(#outcome.failed, 0)
 		end)
+	end)
+end)
+
+helpers.describe("field run ports: the MLX model step", function()
+	--- Runs the mlx_model step over a manager whose download serves the model,
+	--- whose server launcher records it in the active-model file as the real
+	--- launcher does (models_manager_mlx_server.lua).
+	--- @param initial string|nil The active-model file before the step.
+	--- @param write_ok boolean|nil False makes putting the file back fail.
+	--- @return table outcome { verdict, codes, files }
+	local function run_mlx_model(initial, write_ok)
+		local stubbed = { "infra.logger", "adapters.field_run_ports", "adapters.file_system", "infra.config_paths",
+			"adapters.shell_runner", "adapters.timer_scheduler", "infra.paths", "infra.field_run",
+			"modules.llm.backend_detector", "modules.llm.mlx_deps_checker", "modules.llm", "ui.menu.menu_llm" }
+		local outcome = {}
+		helpers.with_stub_scope(stubbed, function()
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			local active = "/cfg/mlx_active_model.txt"
+			local files = { [active] = initial, ["/shared/models.json"] = "{}" }
+			package.loaded["infra.config_paths"] = { get = function(key)
+				assert(key == "MlxActiveModelPath", "only the active-model path is asked for")
+				return active
+			end }
+			package.loaded["adapters.file_system"] = {
+				read = function(path) return files[path] end,
+				read_with_status = function(path)
+					if files[path] == nil then return nil, "absent" end
+					return files[path], "ok"
+				end,
+				write = function(path, text)
+					if write_ok == false and path == active then return false end
+					files[path] = text
+					return true
+				end,
+				delete = function(path) files[path] = nil; return true end,
+			}
+			package.loaded["adapters.shell_runner"] = { exec = function() return "" end }
+			package.loaded["adapters.timer_scheduler"] = { after = function() end, cancel = function() end }
+			package.loaded["infra.paths"] = { shared_llm_path = function() return "/shared/models.json" end }
+			package.loaded["infra.field_run"] = {
+				smallest_model = function() return { name = "LFM2.5-350M", download_gb = 0.38 } end,
+			}
+			package.loaded["modules.llm.backend_detector"] = { mlx_support = function() return true end }
+			package.loaded["modules.llm.mlx_deps_checker"] = { runtime_installed = function() return true end }
+			package.loaded["modules.llm"] = {
+				get_backend = function() return "ollama" end,
+				get_runtime_llm_enabled = function() return false end,
+			}
+			local manager = {
+				mlx_model_installed = function() return false end,
+				pull_mlx_model = function(_, on_success)
+					files[active] = "/home/.cache/huggingface/hub/models--LiquidAI--LFM2.5-350M-MLX-8bit/snapshots/abc\n"
+					on_success()
+					return true
+				end,
+				delete_mlx_model = function() return true end,
+			}
+			package.loaded["ui.menu.menu_llm"] = {
+				active_models_manager = function() return manager end,
+				stop_mlx_server = function(callback) callback(true) end,
+			}
+			package.loaded["adapters.field_run_ports"] = nil
+			local ports = require("adapters.field_run_ports").new("/repo")
+			ports.run_step({ id = "mlx_model", kind = "ai" }, function(verdict, codes)
+				outcome.verdict, outcome.codes = verdict, table.concat(codes, ",")
+			end)
+			outcome.active = files[active]
+		end)
+		return outcome
+	end
+
+	helpers.it("puts back the active-model file the served model overwrote", function()
+		local outcome = run_mlx_model("/home/models/Qwen3.5-4B\n")
+		helpers.assert_eq(outcome.active, "/home/models/Qwen3.5-4B\n", "the user's model stays the active one")
+		helpers.assert_eq(outcome.verdict, "pass")
+		helpers.assert_eq(outcome.codes,
+			"model_absent,downloaded_and_served,server_stopped,removal_started,active_model_restored")
+	end)
+
+	helpers.it("removes the active-model file the step created", function()
+		local outcome = run_mlx_model(nil)
+		helpers.assert_nil(outcome.active, "a file that did not exist before the step is removed")
+		helpers.assert_eq(outcome.verdict, "pass")
+	end)
+
+	helpers.it("fails when the active-model file cannot be put back", function()
+		local outcome = run_mlx_model("/home/models/Qwen3.5-4B\n", false)
+		helpers.assert_eq(outcome.verdict, "fail")
+		helpers.assert_true(outcome.codes:find("active_model_restore_failed", 1, true) ~= nil,
+			"the step names the file it could not put back")
 	end)
 end)
