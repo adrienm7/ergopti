@@ -468,13 +468,13 @@ saw`native_pac_download`; confirm on the Mac whether the HEAD worker's CFNetwork
 strict_only:finder_detritus`, any other cause, team or a rejection still fails. Mac confirms:
   04_field_toolchain passes with those values. The collector's karabiner.txt lines are the
   coordinator's change on dev.
-- **L49** Fixed on tmp/wip-field-run-hygiene (905137f481). 13_config_guard
+- **L51** Fixed 7c61334393. 13_config_guard
   `restored_MlxActiveModelPath` (22:31 run): the 12_mlx_model download ends by serving the model
   and the server launcher writes its `--model` argument into `mlx_active_model.txt`. The step now
   snapshots that file and puts it back after the server stops (codes `active_model_restored` or
   `active_model_restore_failed`, the latter failing the step); the guard is unchanged. Mac
   confirms: config_guard passes on the next run.
-- **L50** Open. 06_field_composer `composer_ready fail:not_enabled` with "Failed to enable 'Composer
+- **L52** Open. 06_field_composer `composer_ready fail:not_enabled` with "Failed to enable 'Composer
   Check' — reason=process_failed" (22:31 run) is the macOS 26 limitation of L25, but neither the
   verdict nor the log names it yet: they read the generic `process_failed`. Next [CODE]: have the
   enable path report the observed TIS state (register 0, enable 0, still disabled) as its own
