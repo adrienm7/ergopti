@@ -284,15 +284,33 @@ dev.
   log_manager.lua:1722 holds. `LedgerAppend.flush` (adapters/ledger_append.lua) takes the lock,
   reads the journal, publishes it atomically, reads the tail, appends, clears the SQLite outbox
   and publishes the journal again; `prepare_append` reads the whole data.sql (68 MB) only without
-  a journal, so the cost is not proven yet. Next: split the `append` trace mark into lock,
-  journal publish, tail, write, clear and terminal publish, then one Mac run names the slow one.
+  a journal, so the cost is not proven yet. The 22:55 report (`mac-2026-10-27_225536`, code of
+  16:48) shows the same 481 to 689 ms `append` for one entry, all day, while `outbox` (lock and
+  journal read with an empty batch) stays at 2 to 4 ms. Hypothesis from code: each of the two
+  journal publications of a non-empty flush is a `write_atomic` of an existing file, which runs
+  four synchronous `hs.execute` forks (`ls -led` twice on the source, `cp -p`, `ls -led` on the
+  staging copy) from the large Hammerspoon process, so about eight forks per tick. Instrumented on
+  `tmp/wip-mac-holds`: `LedgerAppend.flush` reports its stages and the line now ends with
+  `; append: lock= journal= prepare= publish= write= clear= settle= release= ms; metadata_commands=<n>
+in <ms> ms` (`adapters/metadata_command_stats.lua` counts every metadata fork). Mac confirms: the
+  next `Slow ingest tick` line names the stage; if `publish` and `settle` carry it with
+  metadata_commands=8 near the total, the fix is to stop forking for the private journal.
 - **L17** [CODE][PHYS-M] "Slow preferences save 1.9 to 2.1 s (prepare about 1.25 s, write about
   0.8 s; operations=293)" (new.txt 15:27:35 to 16:48:20, 6 times, also on 228f79f2). It is the
   2.06 s hold of startup_controller.lua:263 (15:28:57, 16:48:20). Next: profile `prepare` for 293
-  operations and why a one-key save carries 293.
+  operations and why a one-key save carries 293. Instrumented on `tmp/wip-mac-holds`: `prepare`
+  now starts before the runtime snapshot and the line adds `; prepare: snapshot= decode= models=
+sparse= wrap= rows= gestures= llm= shortcuts= hotstrings= ms; proposed=<rows>; metadata_commands=<n>
+in <ms> ms` (the forks of the write phase). Not reproduced here: the save writes the whole sparse
+  snapshot by design (the 293 are every non-default row, not the changed key). Mac confirms: the
+  next slow-save line names the prepare stage and how much of `write` the forks take.
 - **L18** [CODE] keystats start still holds the main thread 1.1 to 1.3 s from the deferred timer
   at menu_state.lua:531 (new.txt 16:28:06, 16:48:13, on 228f79f2). Next: move the SQLite open and
-  offset replay of `kl.start` into slices like the recovery.
+  offset replay of `kl.start` into slices like the recovery. The 22:55 report splits it: 150 to
+  270 ms before `sqlite_writer` initializes, then 917 to 1047 ms between `rotation Initialized` and
+  `Aggregate cache recovery continues in 8 ms slices` on the two boots that started a recovery;
+  boots without a recovery hold 264 to 874 ms (16:54 to 22:55). Not changed on `tmp/wip-mac-holds`
+  (time box); the slicing remains the fix.
 - **L19** Fixed 3d6479306a for the measured cause; one smaller residue stays
   open. log_manager.lua:1585 (the recovery slice timer) held the main thread 5288 ms right after
   "Typing ids restart ..." (new.txt 16:49:17 to 16:49:22). Measured on a synthetic cache built
@@ -304,7 +322,12 @@ dev.
   than 100 rows for the device is now deleted in committed batches of 100 with a pace point
   between batches, and the rest keeps the single transaction. Still open [CODE]: the 170 ms sort
   goes over the 8 ms budget; an index on events_typing(device_id, ts, id) added through
-  schema.sql with a cache migration would remove it. Mac confirms: no hold over 1 s from
+  schema.sql with a cache migration would remove it. Residue fixed on `tmp/wip-mac-holds`: schema.sql declares
+  `idx_events_typing_device_ts_id` and the macOS sqlite_writer creates it on an existing cache
+  from that statement (`test_sqlite_writer.lua`, fails without the migration). Measured with the
+  sqlite3 3.45 CLI on 180,000 synthetic typing rows: first replay row 78 ms with a temporary
+  B-tree, under 1 ms with the index; building it once took 153 ms. Linux has no (ts, id) replay
+  query, so a fresh Linux cache only gains the index. Mac confirms: no hold over 1 s from
   log_manager.lua after a "Typing ids restart".
 - **L20** Fixed ef3b8ddfd5. "config.toml
   cannot be read, so the virtual keyboard choice is unknown" (init.lua:2168 on 228f79f2, new.txt
@@ -347,7 +370,12 @@ dev.
   next failed pull has one ERROR line naming its cause.
 - **L23** [CODE] "Ignored-window prewarm incomplete; tracking remains fail-closed" (new.txt
   15:28:28, 16:28:04) and 1 s holds from keymap/utils.lua:1426 and :1455 (14:26:05, 15:34:09).
-  Next: log which prewarm stage was incomplete and bound the 1 s probe.
+  Next: log which prewarm stage was incomplete and bound the 1 s probe. Instrumented on
+  `tmp/wip-mac-holds`: the warning reads `prewarm incomplete (probe stage <watchers|focused_window|
+application|app_name|title|context_watchers|secure_field>, TTL refresh <armed|not armed>)`, and a
+  probe over 250 ms logs `Slow ignored-window probe <ms> ms (<stage>=<ms> ...)` from the refresh
+  and TTL timers too (`test_winfilter_prewarm.lua`). The bound is not added: it needs the stage
+  that waits first. Mac confirms: the next prewarm warning and any slow probe name the AX read.
 - **L24** [PHYS-M] key_event_health: key events 250 ms or more late (max 879 ms), 100 key-downs
   without key-up, 81 key-ups without key-down, 62 keys stuck over 3 s, one key stuck 518 s
   (new.txt 09:54 to 10:36, session totals); issue #104 shows 1 late key. Most late events follow
