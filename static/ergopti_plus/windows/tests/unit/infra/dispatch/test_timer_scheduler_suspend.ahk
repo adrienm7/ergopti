@@ -10,14 +10,10 @@
 ; and the timer fired indefinitely.
 ;
 ; APPROACH:
-; A_IsSuspended cannot be forced true in a headless test, so we exercise the
-; fix through two complementary strategies:
-;   1. Source-structure assertions: verify that after simulating the re-queue
-;      path (by manually populating RequeuedFn on a handle), TimerCancel clears
-;      RequeuedFn and marks the handle Fired -- proving the cancel path is wired.
-;   2. Simulate the re-queue lifecycle directly: populate RequeuedFn on a handle,
-;      call TimerCancel, then assert that the callback never fires and that the
-;      handle is fully cancelled.
+; Keep the logical handle and source invariants. Cancellation cases also use
+; actual native delivery to prove arming, observe exact cancellation requests,
+; and watch the same callback after its due time. An independent native
+; heartbeat proves that this observation window really pumps timers.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -31,6 +27,121 @@ _TS_ResetRegistrySuspend() {
 	}
 	_TIMER_ADAPTER_REGISTRY := Map()
 }
+
+; A real native delivery proves the requeue callback is armed before cancellation.
+_TSSuspTest_NativePulse(Ledger) {
+	Ledger.Calls += 1
+}
+
+_TSSuspTest_ObservedNativeCancel(Calls, Callback) {
+	_TimerAdapterCancelNative(Callback)
+	Calls.Push(Callback)
+}
+
+_TSSuspTest_NativeRequeueCancellation(Mode) {
+	global _TIMER_ADAPTER_REGISTRY
+	static NativePeriodMs := 10, DeliveryDeadlineMs := 1000, ObservationMs := 100
+	static NativeRetirementDebt := []
+	AssertEqual(0, NativeRetirementDebt.Length, "an earlier exact native callback still needs retirement")
+	AssertFalse(A_IsCritical || A_IsSuspended, "native controls require interruptible timer delivery")
+	AssertEqual(0, _TIMER_ADAPTER_REGISTRY.Count, "the native fixture cannot retire foreign timers")
+	Owners := [], Cancelled := [], Original := {Calls: 0}, Heartbeat := {Calls: 0}
+	HeartbeatFn := _TSSuspTest_NativePulse.Bind(Heartbeat)
+	Failure := 0, CleanupFailures := []
+	try {
+		Loop Mode == "all" ? 2 : 1 {
+			Ledger := {Calls: 0}
+			Owner := {Ledger: Ledger, Callback: _TSSuspTest_NativePulse.Bind(Ledger),
+				Handle: 0, Primary: 0, PositiveCalls: 0}
+			Owners.Push(Owner)
+			SetTimer(Owner.Callback, -NativePeriodMs)
+			Started := DllCall("Kernel32\GetTickCount64", "UInt64")
+			while Ledger.Calls == 0 && DllCall("Kernel32\GetTickCount64", "UInt64") - Started < DeliveryDeadlineMs
+				Sleep(1)
+			AssertEqual(1, Ledger.Calls, "positive control: the exact native requeue callback really delivers once")
+			Owner.PositiveCalls := Ledger.Calls
+			Ledger.Calls := 0
+		}
+		PreviousCritical := Critical("On")
+		try {
+			for Owner in Owners {
+				Owner.Handle := TimerAfter(10, _TSSuspTest_NativePulse.Bind(Original))
+				Owner.Primary := Owner.Handle["Fn"]
+				Owner.Handle["RequeuedFn"] := Owner.Callback
+				SetTimer(Owner.Callback, -NativePeriodMs)
+			}
+			if Mode == "all"
+				AssertTrue(TimerCancelAll(), "cancelAll acknowledges the genuine native requests")
+			else {
+				AssertTrue(TimerCancel(Owners[1].Handle, _TSSuspTest_ObservedNativeCancel.Bind(Cancelled)),
+					"cancel acknowledges the genuine native requests")
+				if Mode == "twice"
+					AssertTrue(TimerCancel(Owners[1].Handle, _TSSuspTest_ObservedNativeCancel.Bind(Cancelled)),
+						"duplicate cancellation acknowledges the already settled owner")
+			}
+			for Owner in Owners {
+				AssertTrue(Owner.Handle["Fired"], "the cancelled handle retains its terminal marker")
+				AssertFalse(Owner.Handle.Has("RequeuedFn"), "the cancelled handle retires its requeue reference")
+			}
+			AssertEqual(0, TimerActiveCount(), "all exact cancelled owners leave the registry")
+		} finally Critical(PreviousCritical)
+
+		SetTimer(HeartbeatFn, NativePeriodMs)
+		Started := DllCall("Kernel32\GetTickCount64", "UInt64")
+		while DllCall("Kernel32\GetTickCount64", "UInt64") - Started < ObservationMs
+			Sleep(1)
+		AssertTrue(Heartbeat.Calls > 0, "an independent native heartbeat proves the observation window pumped timers")
+		for Owner in Owners
+			_TestPrint("# native_requeue mode=" . Mode . " positive=" . Owner.PositiveCalls
+				. " late=" . Owner.Ledger.Calls . " heartbeat=" . Heartbeat.Calls
+				. " observed_cancel_requests=" . Cancelled.Length)
+		for Owner in Owners
+			AssertEqual(0, Owner.Ledger.Calls, "a cancelled native requeue must not dispatch after its due time")
+		AssertEqual(0, Original.Calls, "cancellation cannot dispatch the original user callback")
+		if Mode != "all" {
+			AssertEqual(2, Cancelled.Length, "the actual native cancellation retires primary and requeue exactly once")
+			AssertEqual(ObjPtr(Owners[1].Primary), ObjPtr(Cancelled[1]), "native cancellation targets the exact primary")
+			AssertEqual(ObjPtr(Owners[1].Callback), ObjPtr(Cancelled[2]), "native cancellation targets the exact armed requeue")
+		}
+	} catch as PrimaryFailure {
+		Failure := PrimaryFailure
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			Callbacks := [HeartbeatFn]
+			for Owner in Owners {
+				Callbacks.Push(Owner.Callback)
+				if IsObject(Owner.Primary)
+					Callbacks.Push(Owner.Primary)
+			}
+			for Callback in Callbacks {
+				try _TimerAdapterCancelNative(Callback)
+				catch as CleanupFailure {
+					NativeRetirementDebt.Push(Callback)
+					CleanupFailures.Push(CleanupFailure.Message)
+				}
+			}
+			for Owner in Owners {
+				if Owner.Handle is Map {
+					try AssertTrue(TimerCancel(Owner.Handle), "fixture cleanup must acknowledge its exact timer owner")
+					catch as CleanupFailure {
+						NativeRetirementDebt.Push(Owner)
+						CleanupFailures.Push(CleanupFailure.Message)
+					}
+				}
+			}
+		} finally Critical(PreviousCritical)
+	}
+	for Message in CleanupFailures {
+		if IsObject(Failure)
+			Failure.Message .= " Native callback cleanup also failed: " . Message
+		else
+			Failure := Error("Native callback cleanup failed: " . Message)
+	}
+	if IsObject(Failure)
+		throw Failure
+}
+
 
 
 
@@ -54,11 +165,12 @@ _TSSuspTest_CancelClearsRequeuedFn() {
 	Sentinel := () => (SentinelFired := true)
 	H["RequeuedFn"] := Sentinel
 	; Cancel the handle -- must drain RequeuedFn via SetTimer(RequeuedFn, 0).
-	; We cannot observe SetTimer cancellation directly, but we can assert that
-	; the handle is fully marked Fired after the cancel.
+	; Logical handle state remains required alongside the native observations
+	; below, which prove that the exact armed callback cannot dispatch later.
 	TimerCancel(H)
 	AssertTrue(H["Fired"], "handle.Fired must be true after cancel with RequeuedFn set")
 	AssertFalse(Called, "original callback must not have fired on cancel")
+	_TSSuspTest_NativeRequeueCancellation("cancel")
 }
 Test("TimerScheduler/suspend F25 -- cancel sets Fired even when RequeuedFn is present", _TSSuspTest_CancelClearsRequeuedFn)
 
@@ -84,6 +196,7 @@ _TSSuspTest_CancelIdempotentWithRequeuedFn() {
 	TimerCancel(H)
 	TimerCancel(H)  ; second call must not throw
 	AssertTrue(H["Fired"], "handle must remain Fired after double cancel")
+	_TSSuspTest_NativeRequeueCancellation("twice")
 }
 Test("TimerScheduler/suspend F25 -- cancel is idempotent when RequeuedFn is set", _TSSuspTest_CancelIdempotentWithRequeuedFn)
 
@@ -126,6 +239,7 @@ _TSSuspTest_CancelAllDrainsRequeuedFn() {
 	AssertTrue(H1["Fired"], "H1 must be Fired after cancelAll with RequeuedFn")
 	AssertTrue(H2["Fired"], "H2 must be Fired after cancelAll with RequeuedFn")
 	AssertEqual(0, TimerActiveCount(), "registry must be empty after cancelAll")
+	_TSSuspTest_NativeRequeueCancellation("all")
 }
 Test("TimerScheduler/suspend F25 -- cancelAll cancels handles that carry RequeuedFn", _TSSuspTest_CancelAllDrainsRequeuedFn)
 
