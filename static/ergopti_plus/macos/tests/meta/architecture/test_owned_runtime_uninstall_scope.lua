@@ -15,12 +15,19 @@
 
 local helpers = require("tests.helpers")
 local SourceFile = require("tests.support.source_file")
+local IsolationSyntax = require("tests.support.karabiner_isolation.syntax")
 
 helpers.describe("owned runtime uninstall: scope", function()
 	helpers.it("names the very files and jobs the Lua owner and the installer declare", function()
 		package.loaded["platform.remap.ke_paths"] = nil
 		local owned = require("platform.remap.ke_paths").OWNED
-		local source = assert(SourceFile.read(helpers.driver_root() .. "/launcher/Sources/ErgoptiPlus/UninstallWorker.swift"))
+		local launcher = helpers.driver_root() .. "/launcher/Sources/ErgoptiPlus/"
+		-- The worker names its job labels through the generated identifier enum;
+		-- compare the values that enum holds with the Lua owner's declaration.
+		local identifiers = IsolationSyntax.generated_swift_identifiers(
+			assert(SourceFile.read(launcher .. "Identifiers.generated.swift")))
+		local source = IsolationSyntax.fold_generated_identifiers(
+			assert(SourceFile.read(launcher .. "UninstallWorker.swift")), identifiers)
 		helpers.assert_true(source:find('runtimeDirectory = "' .. owned.RUNTIME_DIR .. '"', 1, true) ~= nil)
 		helpers.assert_true(source:find('("' .. owned.CORE_LABEL .. '", "' .. owned.CORE_JOB_FILE .. '")', 1, true) ~= nil)
 		helpers.assert_true(source:find('("' .. owned.VIRTUAL_HID_LABEL .. '", "/Library/LaunchDaemons/' .. owned.VIRTUAL_HID_LABEL
