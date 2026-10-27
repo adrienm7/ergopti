@@ -1,5 +1,9 @@
 {
 	"_comment": "Which cases of the shared Lua contracts moved into JSON vector corpora (PAR-58). Each moved entry names the removed case (an it title, or a loop's title prefix) and the vector ids that now hold it. tools/test/test-contract-vector-ledger.cjs fails when a vector is not listed here, when a listed vector is missing, when a removed case title is still registered in its contract, or when a vector breaks the schema.",
+	"field_semantics": {
+		"entry_point": "Descriptive: names the one function a port's consumer must call for the family's vectors; read by people, checked by tools/test/test-contract-vector-ledger.cjs only for presence of the family.",
+		"windows_consumer": "Descriptive: what the AutoHotkey consumer of the family does with each vector; no replay reads it."
+	},
 	"families": [
 		{
 			"family": "toml_batch_write",
