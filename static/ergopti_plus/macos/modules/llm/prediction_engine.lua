@@ -2917,8 +2917,11 @@ end
 --- Initializes the engine by injecting the shared keymap core state.
 --- Must be called exactly once before any other engine function in this module.
 --- @param core_state table The shared state object from modules/keymap/init.lua.
+--- @param ports table|nil { TimerScheduler?, HttpClient? } replace the real owners; each is
+---   checked against its contract in llm.request_plan.ports. The tooltip is checked as the
+---   TooltipRenderer it is drawn through.
 --- @return boolean committed True only when every dependency is ready.
-function M.init(core_state)
+function M.init(core_state, ports)
 	if type(core_state) ~= "table" then
 		Logger.error(LOG, "M.init(): invalid core_state (expected table, got %s).", type(core_state))
 		return false
@@ -2931,6 +2934,19 @@ function M.init(core_state)
 		Logger.error(LOG, "M.init(): a different state is already active — replacement refused.")
 		return false
 	end
+
+	-- The three ports of the request plan, checked once here so a missing method fails at
+	-- wiring and not inside a timer or a network callback.
+	ports = ports or {}
+	if type(ports) ~= "table" then
+		Logger.error(LOG, "M.init(): ports must be a table (got %s).", type(ports))
+		return false
+	end
+	local Ports = require("llm.request_plan.ports")
+	local timer_port = Ports.check("TimerScheduler", ports.TimerScheduler or TimerScheduler)
+	-- The backends build their own HTTP clients; only an injected one is checked here.
+	local http_port = ports.HttpClient ~= nil and Ports.check("HttpClient", ports.HttpClient) or nil
+	Ports.check("TooltipRenderer", PredictionTooltipPort.wrap(tooltip))
 
 	-- A parent may only publish this engine after every child reports an exact
 	-- commitment. Children treat a duplicate with the same retained binding as
@@ -2951,6 +2967,8 @@ function M.init(core_state)
 		return false
 	end
 
+	TimerScheduler = timer_port
+	if http_port ~= nil then core_llm.set_inference_client(http_port) end
 	_state = core_state
 	Logger.debug(LOG, "Prediction engine state injected (%d mapping(s)).", #(core_state.mappings or {}))
 	return true

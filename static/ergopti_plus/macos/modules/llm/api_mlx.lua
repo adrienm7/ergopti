@@ -1576,4 +1576,10 @@ function M.request_raw(model_name, system_prompt, full_text, tail_text, temperat
 		temperature, max_tokens, 1, false, nil, on_fail, ApiCommon.new_dedup_stats(), false, on_raw, force_chat)
 end
 
+--- Hands the inference HttpClient to the request mechanics.
+--- @see modules.llm.api_mlx_inference M.set_inference_client
+function M.set_inference_client(client)
+	return ApiMlxInference.set_inference_client(client)
+end
+
 return M

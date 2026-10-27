@@ -14,6 +14,7 @@ local i18n    = require("infra.i18n")
 local Parser         = require("modules.llm.parser")
 local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")
+local Ports = require("llm.request_plan.ports")
 local TokenBudget = require("llm.request_plan.token_budget")
 -- Independent inference, availability, and warmup owners prevent one semantic
 -- operation from superseding another merely because both use HTTP
@@ -2264,6 +2265,13 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 	end
 
 	do_next()
+end
+
+--- Hands in the HttpClient that sends inference requests (engine init, the
+--- HttpClient port of the shared request plan). The default stays this module's own client.
+--- @param client table Offers post and cancel (llm.request_plan.ports).
+function M.set_inference_client(client)
+	_infer_client = Ports.check("HttpClient", client)
 end
 
 return M

@@ -16,6 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local PortFakes = require("tests.support.port_fakes")
 
 local function load_fixture(cancel_result)
 	helpers.load_with_stubs("infra.logger")
@@ -74,13 +75,13 @@ local function load_fixture(cancel_result)
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm_dismissed = function() end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["ui.tooltip"] = PortFakes.complete_tooltip({
 		set_navigate_callback = function() end,
 		set_enter_validates = function() end,
 		mark_chain_complete = function() return true end,
 		hide_forced_silent = function() return true end,
 		get_current_index = function() return nil end,
-	}
+	})
 
 	package.loaded["modules.llm.prediction_engine"] = nil
 	local engine = require("modules.llm.prediction_engine")

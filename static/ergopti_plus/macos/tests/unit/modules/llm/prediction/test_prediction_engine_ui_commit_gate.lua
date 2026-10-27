@@ -12,6 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local PortFakes = require("tests.support.port_fakes")
 
 local NIL_RESULT = {}
 
@@ -79,11 +80,11 @@ local function load_fixture(loading_result, options)
 	}
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["adapters.timer_scheduler"] = PortFakes.timer_scheduler({
 		after = function(_delay, callback)
 			return { timer = { stop = function() end }, callback = callback }, true
 		end,
-	}
+	})
 
 	local core = {
 		DEFAULT_STATE = DEFAULTS,
@@ -177,7 +178,7 @@ local function load_fixture(loading_result, options)
 			return resolve_result(options.tint_result, nil)
 		end,
 	}
-	package.loaded["ui.tooltip"] = tooltip
+	package.loaded["ui.tooltip"] = PortFakes.complete_tooltip(tooltip)
 
 	package.loaded["modules.llm.prediction_engine"] = nil
 	local Engine = require("modules.llm.prediction_engine")
