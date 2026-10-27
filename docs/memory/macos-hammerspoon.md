@@ -1035,7 +1035,10 @@ admits no other `hswindow()` caller and ratchets every global enumeration.
 ### project-touchdevice-dormancy-is-kernel
 
 macOS touch-device readiness is gated by the kernel until first physical touch.
-Do not add repeated user-space probes that cannot change readiness.
+Do not add repeated user-space probes that cannot change readiness. "No frame
+yet" is therefore the normal idle state, not a lost stream: the gesture health
+loop must never re-arm the startup probe for it (it warned and recycled every
+minute of idleness until 2026-10-27).
 
 ### project-karabiner-unlisted-held-modifier-blocks-the-rule
 

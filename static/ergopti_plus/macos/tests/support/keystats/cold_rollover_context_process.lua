@@ -162,6 +162,7 @@ local function main()
 		return data
 	end
 
+	local mkdir_forks = 0
 	local Fixture = require("tests.support.file_system_transaction_fixture")
 	Fixture.with_fixture(function(native)
 		local outcome = table.pack(xpcall(function()
@@ -172,6 +173,12 @@ local function main()
 				json = {encode = Json.encode, decode = Json.decode_lossless},
 				sqlite3 = {OK = 0, ERROR = 1, DONE = 101, ROW = 100, open = open_database},
 				execute = function(command)
+					-- A shell fork on the Hammerspoon main thread is what L18 removes
+					-- for directories that already exist; count every one.
+					if command:find("mkdir -p", 1, true) then
+						mkdir_forks = mkdir_forks + 1
+						return "", true, "exit", 0
+					end
 					assert(command:find("IOPlatformUUID", 1, true), "unexpected shell command")
 					return "fixture-host-identity", true, "exit", 0
 				end,
@@ -221,6 +228,13 @@ local function main()
 			end
 			assert(manager.init({LOG_DIR = temporary .. "/metrics"}), table.concat(errors, " | "))
 			assert(writer.get_db() ~= nil, "actual SQLite handle was not admitted")
+			if phase ~= "seed" then
+				-- L18: the deferred keystats start held the main thread 1.3 s on the
+				-- Mac; init must leave the first ingest to the tick and must not fork
+				-- a shell for directories the seed phase already created.
+				assert(before_ingest == nil, "init ingested synchronously instead of leaving it to the first tick")
+				assert(mkdir_forks == 0, "init forked mkdir -p for existing directories: " .. mkdir_forks)
+			end
 			if phase == "seed" then
 				assert(manager.append_log(payload.old))
 				manager.ingest_once()
@@ -242,6 +256,8 @@ local function main()
 				result = {kind = "done", phase = phase, old = old, reset = reset,
 					pre_stop = observations(), new_queued = true}
 			else
+				-- init no longer ingests (L18): the first tick does, here explicitly.
+				manager.ingest_once()
 				local first = observations()
 				manager.ingest_once()
 				local second = observations()

@@ -20,6 +20,8 @@
 ---    logs only before the first frame arrived.
 --- 3. The frame heartbeat logs at most once per touch session (fingers down to
 ---    all fingers lifted), not every 120 frames.
+--- 4. An untouched trackpad is the normal idle state, not a lost frame stream:
+---    the health check neither warns nor re-arms the startup probe for it.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -311,12 +313,12 @@ helpers.describe("gestures health check logs on change only", function()
 			helpers.assert_eq(count_lines(runtime, "Health-check: 1 watcher(s) attached"), 1,
 				"fixture: the first loop reports its settled count")
 
-			-- The frame stream is lost, the startup probe takes over, frames flow
-			-- again and the loop is re-entered with the same count.
-			_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME = false
-			health.callback()
+			-- A restart arms the startup probe again; frames flow and the loop
+			-- is re-entered with the same count.
+			helpers.assert_eq(gestures.stop(), true, "fixture: gestures must stop")
+			helpers.assert_eq(gestures.start(), true, "fixture: gestures must restart")
 			local probe = runtime.timers[#runtime.timers]
-			helpers.assert_true(probe ~= health, "fixture: a lost stream must re-arm the startup probe")
+			helpers.assert_true(probe ~= health, "fixture: a restart must re-arm the startup probe")
 			_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME = true
 			probe.callback()
 			local again = runtime.timers[#runtime.timers]
@@ -324,6 +326,40 @@ helpers.describe("gestures health check logs on change only", function()
 			again.callback()
 			helpers.assert_eq(count_lines(runtime, "Health-check: 1 watcher(s) attached"), 2,
 				"the recovered loop must report the count it reached, even when it did not change")
+		end)
+	end)
+
+	helpers.it("keeps an untouched trackpad in the health loop without warning (gestures-idle-no-frame)", function()
+		with_fixture(function(gestures, runtime)
+			local now = 1000
+			hs.timer.secondsSinceEpoch = function() return now end
+			helpers.assert_eq(gestures.start(), true, "fixture: gestures must start")
+			local probe = runtime.timers[#runtime.timers]
+			_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME = false
+			now = now + 11
+			probe.callback()
+			local health = runtime.timers[#runtime.timers]
+			helpers.assert_eq(health.interval_sec, 30,
+				"fixture: the startup timeout must hand off to the health-check loop")
+			local timers_before = #runtime.timers
+
+			-- Ten idle minutes: no finger ever touches the trackpad. The kernel
+			-- keeps the device dormant until the first touch, so no frame is the
+			-- normal idle state, and re-arming the probe cannot change it.
+			runtime.lines = {}
+			for _ = 1, 20 do
+				now = now + 30
+				health.callback()
+			end
+			helpers.assert_eq(count_lines(runtime, "", "warn"), 0,
+				"an idle trackpad is not a lost frame stream and must not warn")
+			helpers.assert_eq(count_lines(runtime, "ENTER startup phase"), 0,
+				"the health loop must not re-arm the startup probe while the trackpad is idle")
+			helpers.assert_eq(#runtime.timers, timers_before,
+				"no new discovery timer may be acquired by an idle health check")
+			helpers.assert_true(health.active ~= false, "the health-check loop must stay armed")
+			helpers.assert_eq(count_lines(runtime, "Health-check: 1 watcher(s) attached"), 1,
+				"the idle loop still reports its settled watcher count once")
 		end)
 	end)
 end)

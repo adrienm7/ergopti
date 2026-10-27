@@ -1058,6 +1058,17 @@ local function inject_strings(webview)
 	if not ok then Logger.error(LOG, "The diagnostics page's strings were refused: %s.", tostring(err)) end
 end
 
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return _window end
+
+--- Closes the open diagnostics window, for ui/window_toggle.
+--- @return boolean committed
+function M.close_window()
+	if _window == nil then return true end
+	return close_owned_window(_window, "toggle close")
+end
+
 --- Opens the diagnostics window. Replaces any existing window (singleton).
 --- @param opts table|nil { state = menu state|nil }
 --- @return boolean opened

@@ -1042,6 +1042,10 @@ end
 -- =============================
 -- =============================
 
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return M._wv end
+
 --- Closes the published apps dashboard generation.
 --- @return boolean committed
 function M.close()
