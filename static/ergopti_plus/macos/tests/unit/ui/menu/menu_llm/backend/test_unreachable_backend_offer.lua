@@ -149,9 +149,10 @@ local function with_offer(scenario)
 		"infra.i18n",
 	}, function()
 		local api = helpers.load_with_stubs("modules.llm.api_remote")
+		require("tests.support.modules.llm.backends.local_server_scan_fake").install(api)
 		local LocalServers = require("modules.llm.local_servers")
 		local world = { probes = {}, dialogs = {}, actions = {}, installed = false }
-		local probe_clients = get_upvalue(api.detect_local_servers, "_local_probe_clients")
+		local probe_clients = get_upvalue(api._probe_local_target, "_local_probe_clients")
 		assert(type(probe_clients) == "table", "the probe clients must be reachable")
 		world.native_clients = {}
 		for _, id in ipairs(LocalServers.ORDER) do

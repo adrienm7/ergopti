@@ -24,6 +24,10 @@
 ---    fix; a success or a sweep that finds the server up clears it.
 --- 5. An address or a key typed before any model is chosen waits here, for
 ---    this session, until the chosen model creates the server's API entry.
+--- 6. Where a server listens comes from its running process, its settings file
+---    or its listening ports (llm.local_server_ports), before its catalogue
+---    port: a server is probed only while its process runs. The last scan is
+---    kept here, with the source of each port, for the menu and the log.
 --- ==============================================================================
 
 local M = {}
@@ -35,6 +39,7 @@ local JsonCodec      = require("adapters.json_codec")
 local AuthPolicy     = require("llm.local_server_auth")
 local Json           = require("json")
 local Discovery      = require("llm.local_server_discovery")
+local PortPolicy     = require("llm.local_server_ports")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "llm.local_servers"
@@ -76,6 +81,7 @@ M.FAILURE_MODEL_MISSING = "model_missing"
 --- @return table order Server ids in menu order.
 --- @return table servers Server id -> { id, label, base_url }.
 --- @return boolean published Complete same-source local inventory.
+--- @return table discovery Server id -> validated discovery descriptor.
 local function load_catalogue()
 	local path = Paths.shared_llm_path("local_servers.json")
 	local raw, status = nil, "error"
@@ -98,11 +104,19 @@ local function load_catalogue()
 	if #order ~= #root.server_order then
 		Logger.error(LOG, "local_servers.json contains unsupported or duplicate optional-auth descriptors.")
 	end
-	return order, servers, shaped and #order == #source.server_order
+	-- A server without a valid discovery descriptor cannot be found running,
+	-- so it is never probed (api_remote.detect_local_servers)
+	local discovery = {}
+	for _, id in ipairs(order) do
+		local descriptor, reason = PortPolicy.descriptor(id, root.servers[id].discovery)
+		if descriptor then discovery[id] = descriptor
+		else Logger.error(LOG, "local_servers.json: %s; that server is never probed.", reason) end
+	end
+	return order, servers, shaped and #order == #source.server_order, discovery
 end
 
 local config_published
-M.ORDER, M.SERVERS, config_published = load_catalogue()
+M.ORDER, M.SERVERS, config_published, M.DISCOVERY = load_catalogue()
 
 --- Reports admission of the original local catalogue, including a valid empty list.
 --- Runtime mutations and server reachability cannot grant inventory authority.
@@ -182,7 +196,11 @@ local controller = Discovery.new({
 		for _, id in ipairs(M.ORDER) do
 			local result = results[id]
 			if result and result.status == M.STATUS_UP then M.report_success(id) end
-			if result and result.status ~= M.STATUS_DOWN then found[#found + 1] = id .. "=" .. result.status end
+			if result and result.status ~= M.STATUS_DOWN then
+				local scan = M.port_scan(id)
+				found[#found + 1] = string.format("%s=%s at %s%s", id, result.status, tostring(result.base_url),
+					scan and scan.source and scan.base_url == result.base_url and (" (port from " .. scan.source .. ")") or "")
+			end
 		end
 		Logger.info(LOG, "Local servers swept: %s.", #found > 0 and table.concat(found, ", ") or "none answers")
 	end,
@@ -251,9 +269,40 @@ function M.detected() return controller.detected() end
 --- @return boolean
 function M.is_stale() return controller.is_stale() end
 
---- Returns logical activity, never native HTTP/task retirement.
+-- Server id -> the last port scan result (llm.local_server_ports.resolve)
+local _port_scans = {}
+local _scanning = false
+
+--- Records the last port scan, before the sweep it feeds starts.
+--- @param results table Server id -> scan result.
+function M.set_port_scans(results)
+	assert(type(results) == "table", "local_servers.set_port_scans: results are required")
+	_port_scans = results
+end
+
+--- Returns where the last scan found a catalogue server.
+--- @param id string Server id.
+--- @return table|nil { running, pids, base_url, port, source, detail }; nil before any scan.
+function M.port_scan(id)
+	local result = _port_scans[id]
+	if not result then return nil end
+	local pids = {}
+	for index, pid in ipairs(result.pids or {}) do pids[index] = pid end
+	return { running = result.running, pids = pids, base_url = result.base_url, port = result.port,
+		source = result.source, detail = result.detail }
+end
+
+--- Marks the process scan that precedes a sweep as running or finished.
+--- @param active boolean
+function M.set_scanning(active)
+	assert(type(active) == "boolean", "local_servers.set_scanning: a boolean is required")
+	_scanning = active
+end
+
+--- Returns logical activity (the port scan, then the probes), never native
+--- HTTP/task retirement.
 --- @return boolean
-function M.is_sweeping() return controller.is_sweeping() end
+function M.is_sweeping() return _scanning or controller.is_sweeping() end
 
 
 
