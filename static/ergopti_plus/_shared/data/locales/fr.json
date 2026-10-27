@@ -63,7 +63,7 @@
 	"apps.cloner.menu_select_all": "Tout sélectionner",
 	"apps.cloner.menu_undo": "Annuler",
 	"apps.cloner.mode_native": "App native",
-	"apps.cloner.mode_pwa": "PWA web app (WKWebView)",
+	"apps.cloner.mode_pwa": "App web PWA (WKWebView)",
 	"apps.cloner.msg_bundle_missing": "Erreur : chemin du bundle manquant. Lancez l'app normalement.",
 	"apps.cloner.msg_choose_source": "Application à cloner",
 	"apps.cloner.msg_clone_name": "Nom à afficher sous l’icône du Dock.",
