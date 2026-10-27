@@ -269,12 +269,11 @@ dev.
   phase on any boot; it now reports `uninitialized` without calling status() when the controller
   was never initialized. Mac confirms: no such ERROR; if one appears, its traceback names the
   other caller.
-- **L31** [CODE] "Accessibility observer setup failed ... for PID 31319" (new.txt 14:27:31): 31319
-  is the ErgoptiPlus runtime itself (issue #104 `runtime_pid`). `M.update_ax_observer`
-  (modules/keystats/context_tracker.lua) attaches to whatever app is frontmost, including the
-  runtime's own windows, and `hs.axuielement.applicationElement` refused its own PID. Next:
-  decide whether typing in Ergopti's own windows is tracked; if not, return early for
-  `hs.processInfo.processID` with a test, otherwise log this refusal at INFO.
+- **L31** fixed (this commit): "Accessibility observer setup failed ... for PID 31319" was the runtime's own
+  windows (31319 is `runtime_pid`). The maintainer decided their typing counts; the event tap already counts
+  it, so `M.update_ax_observer` now logs that refusal at INFO and rolls the observer back, while another
+  application's refusal stays a WARNING (`test_context_tracker_ax_own_process.lua`). Mac: no such WARNING
+  after focusing an Ergopti menu or page.
 - **L32** [CODE] issue #104 diagnostics: Input Monitoring, Login Items and Screen Recording read
   `unknown`; memory used 843 MB with 93 MB free. Next: read or label those permissions, and
   measure the 843 MB resident size.
