@@ -2210,46 +2210,77 @@ extension SMAppService: RemapGuardianModernService {}
 /// could stay inert after an update with nothing the user could do in-app. The attempt is bounded (one per launch)
 /// and keeps every fail-closed branch: denial and approval still never reach
 /// the legacy path.
+///
+/// A developer build (`developerBuild`, issue #104) is ad hoc signed, single
+/// arch, built in the clone and shares the bundle identifier of the installed
+/// app, so Background Items answers it with whatever it holds for that
+/// identifier: a stale `.enabled` record with no running job, a registration
+/// that leaves the agent unregistered, or an error other than an invalid
+/// signature. Each of those left the developer app's remaps inert with no named
+/// cause. A developer build therefore takes the per-user legacy agent, which
+/// runs its own executable, for every outcome that is not a user decision;
+/// denial and approval stay fail-closed exactly as for a release. Every
+/// `.unavailable` and every fallback writes its exact cause to launcher.log.
 @available(macOS 13.0, *)
 func resolveModernRemapGuardianRegistration(
 	service: RemapGuardianModernService,
 	guardianHealth: () -> Bool,
-	legacyInvalidSignatureFallback: () -> Bool
+	legacyInvalidSignatureFallback: () -> Bool,
+	developerBuild: Bool = false,
+	log: (String) -> Void = { _ in }
 ) -> RemapGuardianRegistrationStatus {
+	func unavailable(_ cause: String) -> RemapGuardianRegistrationStatus {
+		guard developerBuild else {
+			log("registration unavailable: \(cause)")
+			return .unavailable
+		}
+		let ready = legacyInvalidSignatureFallback()
+		log("developer build: \(cause); per-user legacy agent "
+			+ (ready ? "is ready" : "is unavailable too"))
+		return ready ? .ready : .unavailable
+	}
 	switch service.status {
 	case .enabled:
-		return guardianHealth() ? .ready : .unavailable
+		return guardianHealth() ? .ready : unavailable("enabled Background Item has no healthy guardian")
 	case .notRegistered, .notFound:
 		do {
 			try service.register()
 			switch service.status {
 			case .enabled:
-				return guardianHealth() ? .ready : .unavailable
+				return guardianHealth() ? .ready
+					: unavailable("registered Background Item has no healthy guardian")
 			case .requiresApproval:
 				return .requiresApproval
 			case .notRegistered, .notFound:
-				return .unavailable
+				return unavailable("register() left the agent in status \(service.status.rawValue)")
 			@unknown default:
+				log("registration unavailable: unknown status \(service.status.rawValue)")
 				return .unavailable
 			}
 		} catch {
 			if service.status == .enabled {
-				return guardianHealth() ? .ready : .unavailable
+				return guardianHealth() ? .ready
+					: unavailable("enabled Background Item has no healthy guardian")
 			}
 			if service.status == .requiresApproval
 				|| modernGuardianErrorRequiresApproval(error) {
 				return .requiresApproval
 			}
+			let registrationError = error as NSError
+			let cause = "register() failed with \(registrationError.domain)#\(registrationError.code)"
 			guard shouldUseLegacyGuardianAfterModernRegistrationError(error)
-			else { return .unavailable }
+			else { return unavailable(cause) }
 			// Current ZIP releases are ad-hoc signed. Only an exact invalid-
 			// signature result may use the legacy per-user bootstrap; denial,
 			// approval, authorization, and unknown failures stay fail-closed.
-			return legacyInvalidSignatureFallback() ? .ready : .unavailable
+			if legacyInvalidSignatureFallback() { return .ready }
+			log("registration unavailable: \(cause) and the legacy agent did not become healthy")
+			return .unavailable
 		}
 	case .requiresApproval:
 		return .requiresApproval
 	@unknown default:
+		log("registration unavailable: unknown status \(service.status.rawValue)")
 		return .unavailable
 	}
 }
@@ -2359,7 +2390,11 @@ func remapGuardianRegistrationStatus(
 			},
 			legacyInvalidSignatureFallback: {
 				ensureLegacyRemapGuardianRegistered(executablePath: executablePath)
-			}
+			},
+			developerBuild: Bundle.main.object(
+				forInfoDictionaryKey: Identifiers.DevSource.plistKey
+			) != nil,
+			log: { RemapGuardianLog.write(key: "registration:" + $0, message: $0) }
 		)
 	}
 	return ensureLegacyRemapGuardianRegistered(executablePath: executablePath)
