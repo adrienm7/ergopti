@@ -395,7 +395,7 @@ assert.strictEqual(
 	'each manifest refresh must request data for the preserved selection state'
 );
 
-require('./support/typing-prefetch-history-cases.cjs')(html, data);
+require('./support/typing-prefetch-history-cases.cjs')(html);
 
 // Exercise both real message handlers: native queues can cross a controller's navigation.
 for (const pageName of ['metrics_typing', 'metrics_apps']) {

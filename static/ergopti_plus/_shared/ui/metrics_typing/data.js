@@ -223,26 +223,12 @@ window.setTypingMetricsFreshness = function (freshness, revision) {
 	return !!(window.metrics_freshness && window.metrics_freshness.show(freshness, revision));
 };
 
-/**
- * Processes the manifest after it is injected by the Lua backend. On first
- * call initializes untouched filters; on subsequent calls recomputes KPIs and
- * fetches updated n-gram data.
- */
-function process_manifest() {
+/** Reconciles the admitted manifest without changing native range ownership. */
+function update_manifest_scope() {
 	const start_input = document.getElementById('date_start');
 	const end_input = document.getElementById('date_end');
-	// A filtered request or an app-modal selection predates this first reply.
-	// Nonempty date edits also count before the native input dispatches change.
-	// Their projection must retain its original native ownership token.
-	const has_initial_range_intent =
-		app_state.range_request_sequence > 0 ||
-		app_state.app_selection_mode === APP_SELECTION_MODE.NONE ||
-		app_state.app_selection_mode === APP_SELECTION_MODE.SUBSET ||
-		!!start_input?.value ||
-		!!end_input?.value;
-	if (Object.keys(window.metrics_manifest).length > 0) {
-		app_state.manifest_dates_sorted = Object.keys(window.metrics_manifest).sort();
-
+	app_state.manifest_dates_sorted = Object.keys(window.metrics_manifest).sort();
+	if (app_state.manifest_dates_sorted.length > 0) {
 		const app_set = new Set();
 		app_state.manifest_dates_sorted.forEach((date) => {
 			Object.keys(window.metrics_manifest[date]).forEach((app_name) => {
@@ -280,6 +266,34 @@ function process_manifest() {
 		if (!start_input.value) start_input.value = range.start;
 		if (!end_input.value) end_input.value = range.end;
 	}
+}
+
+/** Refreshes manifest charts and metadata without creating another n-gram query. */
+function refresh_manifest_projection() {
+	update_manifest_scope();
+	update_app_btn_text();
+	compute_manifest_metrics();
+}
+
+/**
+ * Processes the manifest after it is injected by the Lua backend. On first
+ * call initializes untouched filters; on subsequent calls recomputes KPIs and
+ * fetches updated n-gram data.
+ */
+function process_manifest() {
+	const start_input = document.getElementById('date_start');
+	const end_input = document.getElementById('date_end');
+	// A filtered request or an app-modal selection predates this first reply.
+	// Nonempty date edits also count before the native input dispatches change.
+	// Their projection must retain its original native ownership token.
+	const has_initial_range_intent =
+		app_state.range_request_sequence > 0 ||
+		app_state.app_selection_mode === APP_SELECTION_MODE.NONE ||
+		app_state.app_selection_mode === APP_SELECTION_MODE.SUBSET ||
+		!!start_input?.value ||
+		!!end_input?.value;
+	update_manifest_scope();
+
 	if (!app_state.did_apply_initial_reset) {
 		app_state.did_apply_initial_reset = true;
 		ensure_live_refresh();

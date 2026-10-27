@@ -1356,6 +1356,10 @@
 								'[apply_prefetch] window.process_manifest not defined — JS scripts may have failed to load'
 							);
 						}
+					} else {
+						// Keep the admitted manifest's charts and inventories current
+						// while the existing native range owner keeps its mailbox.
+						window.refresh_manifest_projection();
 					}
 					if (merged && typeof window.receive_range_data === 'function') {
 						try {
