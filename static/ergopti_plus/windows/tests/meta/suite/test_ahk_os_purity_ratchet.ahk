@@ -162,9 +162,12 @@ _AOPR_AssertTree(Label, Files, Baseline) {
 ;              by category.
 ; ui:          2026-07-31, first measurement (DllCall=108, COM=2, FileIO=20).
 ;              Not a regression — this tree had never been counted.
+;              Re-measured 2026-10-27 at 125 (DllCall=107, COM=0, FileIO=18)
+;              once the WPM widget's window-ownership check moved into the
+;              window_manager adapter, and tightened to that value.
 ; entry point: 2026-07-31, first measurement (DllCall=3, FileIO=5).
 _AOPR_BASELINE_CORE  := 252
-_AOPR_BASELINE_UI    := 126
+_AOPR_BASELINE_UI    := 125
 _AOPR_BASELINE_ENTRY := 7
 
 _AOPR_RatchetCore() {
