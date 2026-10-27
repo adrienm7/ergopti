@@ -39,6 +39,19 @@ helpers.describe("tests/run.lua isolates shared and platform modules", function(
 			"the next file must receive the real shared terminator catalogue")
 	end)
 
+	helpers.it("points every hs.* entry at the fresh stub, never a previous file's double", function()
+		local double = { new = function() return "previous file's double" end }
+		package.loaded["hs.task"] = double
+		package.loaded["hs.no_such_member"] = { poisoned = true }
+
+		Isolation.purge(driver_root, shared_lua)
+
+		helpers.assert_true(package.loaded["hs.task"] ~= double, "the double must not survive")
+		helpers.assert_true(rawequal(package.loaded["hs.task"], hs.task),
+			"require(\"hs.task\") must return the fresh stub's member")
+		helpers.assert_nil(package.loaded["hs.no_such_member"])
+	end)
+
 	for _, module_name in ipairs({ "keymap.terminators", "keymap.terminators_catalogue" }) do
 		helpers.it("reloads a real catalogue after a boolean cache leak in " .. module_name, function()
 			Isolation.purge(driver_root, shared_lua)
