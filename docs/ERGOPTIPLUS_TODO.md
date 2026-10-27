@@ -57,6 +57,21 @@ a sealed Windows updater source, reseal with
   reseal if `test-windows-updater-original-source.cjs` fails
   (`node tools/ci/seal-windows-updater-original-source.cjs --ref <commit> --write`); run the integration
   sweep; push dev and cancel its push CI in the same step; dispatch `ci.yml` on `tmp/preflight-dev`.
+- **Agent commits waiting for integration (paused with the parity work; integrate after the Mac
+  session):** every one is on a remote backup branch; integrate by subject, they were green on their own
+  base.
+  - `tmp/wip-todo-af`: 8634b1ff80 (Linux acknowledges the layout scope once loaded), 358e211a10 (Windows
+    number-row design answer), 3337d99bc8 (Linux number-row order onboarding), 4fcb4a979a (logger scalar),
+    then `tmp/wip-todo-ag3` d5cf3ba50b (number-row strings for that work; it conflicts in the 21 locales
+    unless the AF commits come first). AF also left: reconcile the Linux `keyboard_layout_scope` comments and
+    the design note with the ninth batch.
+  - `tmp/wip-todo-ah`: 53b1bc5375 (reset every `hs.*` cache entry between macOS test files) and five CI
+    speed-ups (Ubuntu archive reuse, AHK shard split, one macOS checkout per E2E cell, Intel E2E start,
+    SwiftPM cache trial); run them on `tmp/preflight-dev` before dev.
+  - `tmp/wip-ci-fix`: f44fcc1e64, c9b90d11d7, ba13937b8c, 5009ad87b8 (Linux distribution-row CI fixtures):
+    check each against dev first, later fixes may have replaced them.
+  - `tmp/wip-todo-ae-par30`: 41f72525cf is an unvalidated work-in-progress snapshot of the PAR-30 Linux
+    updater signature gate; redo it from the item, do not cherry-pick it as is.
 - **The ChatGPT fix branches** fix/linux, fix/macos and fix/windows are fully on dev. The container proxy
   refuses remote deletion, so the maintainer deletes them: `git push origin --delete fix/linux fix/macos
 fix/windows`.
