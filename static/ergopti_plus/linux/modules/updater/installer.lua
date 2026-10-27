@@ -10,6 +10,7 @@
 --- ==============================================================================
 
 local M = {}
+local Errors = require("adapter_errors")
 local TextUtils = require("text_utils")
 local Shell = require("adapters.shell_runner")
 
@@ -109,23 +110,23 @@ end
 function M.resolve(source_path, probe)
 	probe = probe or default_probe
 	local source = normalise_path((source_path or ""):gsub("^@", ""))
-	if not source then return { kind = "unmanaged", reason = "module source path is not absolute" } end
+	if not source then return { kind = "unmanaged", reason = Errors.UPDATER_SOURCE_PATH_RELATIVE } end
 	if os.getenv("APPIMAGE") or os.getenv("APPDIR") or os.getenv("FLATPAK_ID")
 		or source:match("^/usr/") or source:match("^/app/") or source:match("^/nix/store/") then
-		return { kind = "package", reason = "system package or immutable bundle owns this path" }
+		return { kind = "package", reason = Errors.UPDATER_PACKAGE_OWNED }
 	end
 
 	local script_dir = dirname(source)
 	local driver_root = script_dir and normalise_path(script_dir .. "/../..") or nil
 	if not driver_root or basename(driver_root) ~= "linux" then
-		return { kind = "package", reason = "driver is not in the standalone linux/ sibling layout" }
+		return { kind = "package", reason = Errors.UPDATER_LAYOUT_NOT_STANDALONE }
 	end
 
 	local install_root = dirname(driver_root)
 	local lib_dir = install_root and dirname(install_root) or nil
 	local prefix = lib_dir and dirname(lib_dir) or nil
 	if not install_root or not prefix or prefix == "/" then
-		return { kind = "unmanaged", reason = "standalone install root is unsafe" }
+		return { kind = "unmanaged", reason = Errors.UPDATER_INSTALL_ROOT_UNSAFE }
 	end
 
 	local wrapper = prefix .. "/bin/ergopti-hotstrings"
@@ -133,7 +134,7 @@ function M.resolve(source_path, probe)
 		function(path) return probe(path, "file") end)
 	if not shared_root or not probe(shared_root .. "/lua", "dir")
 		or not probe(wrapper, "file") then
-		return { kind = "unmanaged", reason = "standalone wrapper or shared tree is absent" }
+		return { kind = "unmanaged", reason = Errors.UPDATER_STANDALONE_FILES_ABSENT }
 	end
 
 	return {

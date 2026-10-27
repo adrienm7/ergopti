@@ -1827,7 +1827,8 @@ local function finish_capture(flow, spec, outcome)
 			Logger.info(LOG, "Screen reading cancelled: no region was captured.")
 			return
 		end
-		Logger.warn(LOG, "Screen capture failed: %s", tostring(type(outcome) == "table" and outcome.reason or outcome))
+		Logger.warn(LOG, "Screen capture failed: %s%s", tostring(type(outcome) == "table" and outcome.reason or outcome),
+			type(outcome) == "table" and outcome.detail ~= nil and " (" .. tostring(outcome.detail) .. ")" or "")
 		show_notice(VISION_CAPTURE_FAILED_KEY, "capture_failed")
 		return
 	end
