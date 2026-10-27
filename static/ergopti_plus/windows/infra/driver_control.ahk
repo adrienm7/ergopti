@@ -413,8 +413,6 @@ class DriverControlSession {
 			if !DriverControl_IsToken(this.Spec, Token)
 				throw Error("The driver control token source returned a malformed token.")
 			this.Token := Token
-			this.Publish("session", DriverControl_SessionText(this.Spec, this.Pid, Token))
-			this._RequireStarting()
 			this.Endpoint := this.Ports["endpoint"].Call(ObjBindMethod(this, "Handle"))
 			this._RequireStarting()
 			this.Endpoint.Start()
@@ -424,6 +422,9 @@ class DriverControlSession {
 				this.Active := !this.Closed
 				this._RequireStarting()
 			} finally Critical(PreviousCritical)
+			; The receipt advertises a ready endpoint, never in-progress registration.
+			this.Publish("session", DriverControl_SessionText(this.Spec, this.Pid, Token))
+			this._RequireStarting()
 		} catch as FirstError {
 			; A reentrant global Stop may already have withdrawn this session.
 			; The exact Start continuation still owes cleanup of any late return.
