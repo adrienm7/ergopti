@@ -28,7 +28,9 @@
 ---    for byte, the hs.settings preferences by their JSON encoding. Runtime
 ---    state a module declares as such (the Karabiner lease's used-token ledger)
 ---    is neither compared nor put back: rewinding it would undo that module's
----    own invariants.
+---    own invariants. Putting back a file the live preferences were loaded
+---    from asks for a reload (outcome.reload) through the termination
+---    coordinator, since the byte rewrite does not reach the running state.
 --- ==============================================================================
 
 local M = {}
@@ -46,6 +48,10 @@ local LOG = "adapters.field_run_ports"
 local GUARDED_FILES = {
 	"ConfigTomlPath", "KarabinerConfigPath", "MlxActiveModelPath", "PersonalTomlPath", "PersonalInfoTomlPath",
 }
+
+-- The guarded files the running driver holds in memory once loaded: putting
+-- one back under it needs a reload for the live state to read it again.
+local LIVE_STATE_FILES = { ConfigTomlPath = true, PersonalTomlPath = true, PersonalInfoTomlPath = true }
 
 -- Seconds between two model listings while the Ollama server comes up, and how many.
 local LISTING_RETRY_SECONDS = 2
@@ -111,10 +117,10 @@ end
 
 --- Puts back every guarded file and preference a step changed.
 --- @param snapshot table From config_snapshot().
---- @return table outcome { restored = { names }, failed = { names } }
+--- @return table outcome { restored = { names }, failed = { names }, reload = boolean }
 local function config_restore(snapshot)
 	local Storage = require("adapters.storage")
-	local outcome = { restored = {}, failed = {} }
+	local outcome = { restored = {}, failed = {}, reload = false }
 	local function note(ok, name)
 		local list = ok and outcome.restored or outcome.failed
 		list[#list + 1] = name
@@ -123,11 +129,14 @@ local function config_restore(snapshot)
 		local content, status = FileSystem.read_with_status(file.path)
 		if status ~= file.status or content ~= file.content then
 			Logger.warn(LOG, "The field run changed %s; putting it back.", file.key)
+			local put_back
 			if file.status == "absent" then
-				note(FileSystem.delete(file.path) == true, file.key)
+				put_back = FileSystem.delete(file.path) == true
 			else
-				note(FileSystem.write(file.path, file.content) == true, file.key)
+				put_back = FileSystem.write(file.path, file.content) == true
 			end
+			note(put_back, file.key)
+			if put_back and LIVE_STATE_FILES[file.key] then outcome.reload = true end
 		end
 	end
 	local current = {}
@@ -431,6 +440,7 @@ function M.new(root)
 		log_ring = Logger.ring_buffer_snapshot,
 		config_snapshot = config_snapshot,
 		config_restore = config_restore,
+		reload_driver = function(reason) return require("infra.termination_coordinator").request_reload(reason) end,
 		run_step = run_step,
 	}
 end
