@@ -33,6 +33,7 @@ local function with_permissions(states, body)
 			request_permission = function() prompts[#prompts + 1] = "screen" return true end,
 		}
 		package.loaded["platform.remap.lease_controller"] = {
+			is_initialized = function() return true end,
 			status = function()
 				if states.guardian == "raise" then error("not initialised") end
 				return "starting", { phase = "starting", guardian_status = states.guardian }

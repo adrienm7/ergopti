@@ -18,6 +18,7 @@ local git_status  = require("infra.git_status")
 local reload_gate = require("reload_gate")
 local Timings     = require("infra.timings")
 local TimerScheduler = require("adapters.timer_scheduler")
+local TableUtil   = require("table_util")
 local LOG         = "menu_watchers"
 
 
@@ -175,9 +176,7 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 		if field_run_holds_reload() then
 			if not field_run_hold_logged then
 				field_run_hold_logged = true
-				local names = {}
-				for file in pairs(burst_paths) do names[#names + 1] = file end
-				table.sort(names)
+				local names = TableUtil.sorted_keys(burst_paths)
 				Logger.warn(LOG, "Menu source reload held while the developer field run runs (%d file(s): %s).",
 					#names, table.concat(names, ", ", 1, math.min(#names, 5)))
 			end

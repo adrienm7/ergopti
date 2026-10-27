@@ -208,3 +208,5 @@ version.json
 .rtk/
 .locale_work/
 .scratch/
+# Built by tools/dev/run-linux-dev.sh; the packages build their own copy.
+/static/ergopti_plus/linux/bin/libergopti_archive_publication.so

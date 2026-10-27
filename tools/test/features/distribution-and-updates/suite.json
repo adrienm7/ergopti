@@ -535,6 +535,23 @@
 			"args": ["tools/test/test-macos-field-run-contract.cjs"],
 			"repro": "npm run test:macos-field-run-contract",
 			"platforms": ["linux", "darwin"]
+		},
+		{
+			"id": "js-linux-dev-script",
+			"ordinal": 524,
+			"name": "Linux developer runner starts the packages' entry point from this clone with its native backend",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-linux-dev-script.cjs"],
+			"repro": "npm run test:linux-dev-script",
+			"platforms": ["linux", "darwin"]
+		},
+		{
+			"id": "js-windows-dev-script",
+			"ordinal": 525,
+			"name": "Windows developer runner starts this clone's ErgoptiPlus.ahk with the shared developer variable",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-dev-script.cjs"],
+			"repro": "npm run test:windows-dev-script"
 		}
 	]
 }

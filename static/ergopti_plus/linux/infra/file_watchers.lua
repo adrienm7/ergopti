@@ -114,6 +114,12 @@ local _debounce_sec = 0.5
 -- a git operation is currently rewriting it.
 local _base_dir = nil
 
+-- Developer run only (infra/dev_source.lua): the source trees whose saved .lua
+-- edits call _on_source_change, a daemon restart, instead of _on_reload, which
+-- re-reads the hotstrings and cannot load new code.
+local _source_dirs = {}
+local _on_source_change = nil
+
 -- Adaptive-settle burst state: distinct source paths changed since the current
 -- burst began, and the epoch (ms) of the last change. A BULK write (git pull,
 -- OneDrive / Dropbox sync, rsync, mass save — many files) is held until activity
@@ -263,6 +269,21 @@ local function _schedule_reload(reason, paths)
 	_reload_deadline = _now_ms() + _debounce_sec * 1000
 end
 
+--- Whether a settled burst holds a saved .lua file of a developer source tree.
+--- Test folders are excluded: their edits change nothing the daemon runs.
+--- @param paths table Set of changed absolute paths.
+--- @return boolean
+local function _burst_has_source(paths)
+	for path in pairs(paths) do
+		if path:match("%.lua$") and not path:find("/tests/", 1, true) then
+			for _, root in ipairs(_source_dirs) do
+				if path:sub(1, #root + 1) == root .. "/" then return true end
+			end
+		end
+	end
+	return false
+end
+
 --- Fires the reload callback if the deadline has passed AND the working tree has
 --- settled. Called from M.pump().
 local function _check_deadline()
@@ -302,7 +323,14 @@ local function _check_deadline()
 	-- Name what changed. The paths were gathered for the settle heuristic and then
 	-- thrown away, so a reload in the log could never be traced back to a file.
 	local changed = RuntimeLog.describe_paths(_burst_paths)
+	local source_edit = _on_source_change ~= nil and _burst_has_source(_burst_paths)
 	_burst_paths, _burst_count, _defer_count = {}, 0, 0
+	if source_edit then
+		Logger.info(LOG, "Debounced source reload firing (%s).", changed)
+		local ok, err = pcall(_on_source_change)
+		if not ok then Logger.error(LOG, "on_source_change callback raised: %s", tostring(err)) end
+		return
+	end
 	Logger.info(LOG, "Debounced reload firing (%s).", changed)
 	if _on_reload then
 		local ok, err = pcall(_on_reload)
@@ -427,6 +455,27 @@ end
 -- ======= 7/ Pump Backend (mtime poll) ====
 -- =========================================
 -- =========================================
+
+--- Lists the folders and .lua files of a developer source tree, without test
+--- folders and hidden folders, with one find(1) per kind: a stat per entry would
+--- spawn a process for each of the tree's files when posix is absent.
+--- @param root string Absolute source tree.
+--- @param kind string "d" for folders, "f" for .lua files.
+--- @return table paths Absolute paths.
+local function _source_tree(root, kind)
+	local quoted = TextUtils.shell_quote(root)
+	local predicate = kind == "d" and "-type d -print" or "-type f -name '*.lua' -print"
+	local command = "find " .. quoted .. " -mindepth 1 -type d \\( -name tests -o -name '.*' \\) -prune -o "
+		.. predicate .. " 2>/dev/null"
+	local paths = kind == "d" and { root } or {}
+	local fh = io.popen(command, "r")
+	if not fh then return paths end
+	for line in fh:lines() do
+		if line ~= "" then paths[#paths + 1] = line end
+	end
+	fh:close()
+	return paths
+end
 
 --- Registers a pump-mode entry.
 --- @param path string Absolute path to watch.
@@ -864,6 +913,8 @@ end
 ---   .base_dir        string  Absolute path to the project root (for .lua watching).
 ---   .personal_dir    string  Personal hotstrings directory or an existing selected TOML file.
 ---   .on_reload       function()  Called after the debounce window when a change is detected.
+---   .source_dirs     table|nil   Developer run only: source trees watched recursively for .lua.
+---   .on_source_change function|nil Called instead of on_reload when a settled change holds one of their .lua files.
 ---   .now_ms          function() → number  Optional wall-clock source (ms) for tests.
 function M.start(opts)
 	opts = type(opts) == "table" and opts or {}
@@ -968,6 +1019,30 @@ function M.start(opts)
 		Logger.debug(LOG, "Base dir watched for .lua: %s", base_dir)
 	end
 
+	-- ── 9.4) Developer source trees (recursive .lua, developer run only) ──
+	if opts.source_dirs ~= nil then
+		assert(type(opts.source_dirs) == "table" and type(opts.on_source_change) == "function",
+			"source_dirs needs a list of folders and an on_source_change callback")
+		assert(#_source_dirs == 0, "Developer source watchers are already armed")
+		_on_source_change = opts.on_source_change
+		for _, root in ipairs(opts.source_dirs) do
+			assert(type(root) == "string" and _is_dir(root), "Developer source tree is not a folder: " .. tostring(root))
+			_source_dirs[#_source_dirs + 1] = root
+			local dirs = _source_tree(root, "d")
+			if luv then
+				for _, dir in ipairs(dirs) do
+					_arm_luv_watcher(dir, function(fname) return _is_watched_lua(dir .. "/" .. fname) end)
+				end
+			else
+				for _, dir in ipairs(dirs) do _add_pump_entry(dir, nil, true) end
+				for _, file in ipairs(_source_tree(root, "f")) do
+					_add_pump_entry(file, function() return true end, false)
+				end
+			end
+			Logger.info(LOG, "Developer source tree watched: %s (%d folder(s)).", root, #dirs)
+		end
+	end
+
 	local watcher_count = (luv and #_luv_handles or #_pump_entries) + TableUtil.count(_personal_entries)
 	if _personal_anchor then watcher_count = watcher_count + 1 end
 	Logger.success(LOG, "File watchers armed: %d handle(s) (%s).", watcher_count, backend_label)
@@ -1019,6 +1094,7 @@ function M.stop()
 	_reload_deadline = nil
 	_burst_paths, _burst_count, _last_change_ms, _defer_count = {}, 0, 0, 0
 	_base_dir = nil
+	_source_dirs, _on_source_change = {}, nil
 
 	_on_reload = nil
 	local retired = next(_personal_retiring) == nil and next(_legacy_retiring) == nil
