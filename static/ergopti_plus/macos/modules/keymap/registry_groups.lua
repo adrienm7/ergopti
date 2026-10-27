@@ -670,6 +670,11 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 	_state.current_group = name
 	local sections_info  = {}
 	local registrations = {}
+	-- Sections the user switched off: a file whose every section is disabled
+	-- legitimately registers nothing, which is not the path problem the zero
+	-- warning below reports.
+	local disabled_sections = 0
+	local enabled_sections = 0
 
 	-- Collision-priority cascade inputs (individual > section > file > source).
 	-- The shared user-override file (hotstrings_config.toml) sits ABOVE the TOML
@@ -754,6 +759,7 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 		end
 
 		if _callbacks.is_section_enabled(name, sec_name) then
+			enabled_sections = enabled_sections + 1
 			-- Flatten the user/TOML layers into one effective override priority so
 			-- the order matches AHK exactly (user-section > user-file > meta-section
 			-- > meta-file). The individual per-entry priority and the source default
@@ -777,6 +783,7 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 				} }
 			end
 		else
+			disabled_sections = disabled_sections + 1
 			Logger.debug(LOG, "Section '%s/%s' skipped (disabled in hs.settings).", PrivateLabel.mask(name), sec_name)
 		end
 
@@ -847,7 +854,10 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 	-- the one number guaranteed to look healthy. A group that loads zero entries
 	-- is almost always a path or permission problem, and it now says so.
 	local added = #_state.mappings - mappings_before
-	if added == 0 then
+	if added == 0 and enabled_sections == 0 and disabled_sections > 0 then
+		Logger.info(LOG, "TOML mapping file '%s' registered no mapping: its %d section(s) are disabled.",
+			PrivateLabel.mask(name), disabled_sections)
+	elseif added == 0 then
 		Logger.warn(LOG, "TOML mapping file '%s' registered ZERO mappings — check the path and its contents.", PrivateLabel.mask(name))
 	else
 		Logger.success(LOG, "TOML mapping file '%s' loaded (%d mapping(s); %d total).",
