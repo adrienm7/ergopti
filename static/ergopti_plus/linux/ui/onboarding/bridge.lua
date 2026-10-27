@@ -201,12 +201,12 @@ end
 --- @return boolean|string
 local function number_row_capability(state)
 	local live = type(state) == "table" and state.number_row_live or require("modules.keymap.number_row_live")
-	local called, available, reason = pcall(live.available)
+	local called, available, why = pcall(live.available)
 	if called and available == true then return true end
 	if not called then
 		Logger.error(LOG, "The number-row capability could not be read: %s.", tostring(available))
 	end
-	return reason == "no_source_layout" and "platform_reason.number_row_live_no_layout"
+	return why == "no_source_layout" and "platform_reason.number_row_live_no_layout"
 		or "platform_reason.number_row_live_session"
 end
 
