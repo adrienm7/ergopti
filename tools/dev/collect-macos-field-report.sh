@@ -196,6 +196,9 @@ trap on_interrupt INT TERM HUP
 step versions sh -c 'git rev-parse --short HEAD; sw_vers; uname -m; sysctl -n hw.ncpu hw.memsize'
 step toolchain sh -c 'xcode-select -p; swift --version; swift build --version; which -a swift'
 step karabiner sh -c '"/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli" --version'
+# The app's field check only sees codesign's exit code; keep both tools' own
+# reasons so a failed signature check names its cause.
+step karabiner_signature sh -c 'codesign --verify --deep --strict --verbose=4 /Applications/Karabiner-Elements.app; echo "codesign exit=$?"; spctl -a -vv /Applications/Karabiner-Elements.app; echo "spctl exit=$?"'
 step memory sh -c 'memory_pressure | tail -1; vm_stat | head -5'
 step processes sh -c 'pgrep -lf "ErgoptiPlus|Hammerspoon|karabiner|ollama|omlx" || true'
 step launchd sh -c 'launchctl list | grep -iE "ergopti|pqrs" || true'
