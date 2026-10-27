@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "Systemets ordning",
 	"menu.layout.number_row_digits": "Siffror först",
 	"menu.layout.number_row_symbols": "Symboler först",
-	"platform_reason.number_row_override_unsupported": "Stöds inte: Den här drivrutinen behåller systemets sifferrad; siffror och symboler kan inte tvingas fram.",
+	"platform_reason.number_row_override_unsupported": "Ännu inte på det här systemet: Den installerade systemlayouten skriver sifferraden. Ergopti planerar att skriva om tangenterna här; i dag sätter bara Windows, som emulerar layouten, siffror eller symboler först.",
 	"platform_reason.number_row_live_session": "Inte tillgängligt: Bara en X11-session tillämpar detta direkt. Den här sessionen behåller sin nuvarande layout; ditt val är sparat.",
 	"platform_reason.number_row_live_no_layout": "Inte tillgängligt: Installera först en ErgoptiPlus-layout; det här valet ändrar den layout du använder.",
 	"layouts.linux_rows_not_applied": "Valet för siffraden är sparat, men den aktiva tangentbordslayouten kunde inte uppdateras.",
