@@ -1890,6 +1890,30 @@
 			]
 		},
 		{
+			"contract": "menu_row_order_contract.lua",
+			"lua_sites": 4,
+			"data_driven": [
+				{
+					"case": "sorts",
+					"corpus": "menu/row_order_vectors.json"
+				},
+				{
+					"case": "lists",
+					"corpus": "menu/row_order_vectors.json"
+				},
+				{
+					"case": "refuses",
+					"corpus": "menu/row_order_vectors.json"
+				}
+			],
+			"stays_in_lua": [
+				{
+					"case": "hands out a detached list on every call",
+					"reason": "lua_identity"
+				}
+			]
+		},
+		{
 			"contract": "menu_separators.lua",
 			"lua_sites": 0,
 			"note": "A helper module for the menu contracts: it registers no case of its own.",
