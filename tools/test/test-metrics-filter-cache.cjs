@@ -3400,4 +3400,109 @@ assert.equal(
 	'all explicit empty NONE/ALL, subset and native-clear caption controls must execute'
 );
 
+// This browser port links the two real DOM text properties and declared attributes.
+function typingAppFilterLocalePorts(page) {
+	const button = page.elements.get('app_filter_btn');
+	let caption = button.innerText || button.textContent || '';
+	for (const property of ['innerText', 'textContent']) {
+		Object.defineProperty(button, property, {
+			get: () => caption,
+			set: (value) => {
+				caption = String(value);
+			},
+			configurable: true
+		});
+	}
+	const declaration = page.html.match(/<button\b([^>]*\bid="app_filter_btn"[^>]*)>/);
+	assert.ok(declaration, 'the actual page declares its application filter control');
+	const key = declaration[1].match(/data-i18n="([^"]+)"/)?.[1] || null;
+	button.getAttribute = (name) => (name === 'data-i18n' ? key : null);
+	page.context.document.querySelectorAll = (selector) =>
+		selector === '[data-i18n]' && key ? [button] : [];
+	page.context.CustomEvent = class CustomEvent {
+		constructor(type) {
+			this.type = type;
+		}
+	};
+	page.context.document.dispatchEvent = (event) => {
+		for (const listener of page.listeners.filter((entry) => entry.name === event.type))
+			listener.callback(event);
+		return true;
+	};
+	return button;
+}
+const typingCaptionLocaleRoot = path.resolve(root, '../data/locales');
+const typingCaptionCatalogues = fs
+	.readdirSync(typingCaptionLocaleRoot)
+	.filter((name) => name.endsWith('.json'))
+	.sort()
+	.map((name) => ({
+		name,
+		strings: JSON.parse(fs.readFileSync(path.join(typingCaptionLocaleRoot, name), 'utf8'))
+	}));
+assert.ok(typingCaptionCatalogues.some((locale) => locale.name === 'en.json'));
+assert.ok(typingCaptionCatalogues.some((locale) => locale.name === 'fr.json'));
+let typingCaptionLocaleApplications = 0;
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const mode of ['none', 'all', 'subset']) {
+		test(`${host} ${mode} app-filter caption survives every locale application`, () => {
+			const page = loadMetricsTypingPage(host);
+			freezePageClock(page, '2026-10-27T12:00:00Z');
+			const button = typingAppFilterLocalePorts(page);
+			page.elements.get('app_search').focus = () => {};
+			publishTypingPage(page, host, {
+				'2026-10-27': {
+					'Editor.exe': { chars: 5, time: 500 },
+					'Browser.exe': { chars: 6, time: 600 }
+				}
+			});
+			if (mode !== 'all') {
+				page.context.open_app_modal();
+				page.context.deselect_all_apps();
+				if (mode === 'subset')
+					page.context.toggle_app_selection({ value: 'Editor.exe', checked: true });
+				page.context.close_app_modal();
+			}
+			assert.equal(vm.runInContext('app_state.app_selection_mode', page.context), mode);
+			const selection = JSON.stringify(Array.from(page.context.get_app_selection_request_apps()));
+			const posts = page.posts.length;
+			for (const locale of typingCaptionCatalogues) {
+				for (const key of ['ui_typing.apps_none', 'ui_typing.apps_all'])
+					assert.equal(
+						typeof locale.strings[key],
+						'string',
+						`${locale.name} declares the existing dynamic key`
+					);
+				page.context._i18n_locale = locale.name.slice(0, -5);
+				page.context.i18n_apply(locale.strings);
+				if (mode === 'subset') assert.ok(button.innerText.includes('(1/2)'));
+				else
+					assert.equal(
+						button.innerText,
+						locale.strings[mode === 'all' ? 'ui_typing.apps_all' : 'ui_typing.apps_none'],
+						`${locale.name} keeps the real native selection in the visible caption`
+					);
+				assert.equal(button.classList.contains('active'), mode === 'all');
+				assert.equal(vm.runInContext('app_state.app_selection_mode', page.context), mode);
+				assert.equal(
+					JSON.stringify(Array.from(page.context.get_app_selection_request_apps())),
+					selection
+				);
+				assert.equal(
+					page.posts.length,
+					posts,
+					'a locale repaint must not restart a native range query'
+				);
+				typingCaptionLocaleApplications++;
+			}
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false
+			);
+		});
+	}
+}
+assert.equal(typingCaptionLocaleApplications, typingCaptionCatalogues.length * 9);
+assert.equal(passed, 765, 'all native app-filter modes and every locale transition must execute');
+
 console.log(`${passed} passed, 0 failed.`);
