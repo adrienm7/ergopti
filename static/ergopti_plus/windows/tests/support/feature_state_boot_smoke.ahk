@@ -146,6 +146,19 @@ try {
 				"logger_case_warning_lower", "logger_case_warning_mixed", "logger_case_warning_upper",
 				"logger_case_error_lower", "logger_case_error_mixed", "logger_case_error_upper":
 			_FeatureStateSmokeLoggerCase(A_Args[1])
+		case "script_chords_detached_quoted", "script_chords_detached_integer", "script_chords_detached_float",
+				"script_chords_detached_array", "script_chords_detached_record", "script_chords_detached_true",
+				"script_chords_detached_false", "script_chords_detached_marker", "script_chords_detached_absent":
+			_FeatureStateSmokeDetachedChords(A_Args[1])
+		case "script_chords_authored_quoted_boolean", "script_chords_authored_integer",
+				"script_chords_authored_float", "script_chords_authored_array",
+				"script_chords_authored_record", "script_chords_authored_signed_zero",
+				"script_chords_authored_plus_zero", "script_chords_authored_true",
+				"script_chords_authored_false", "script_chords_authored_legacy_zero",
+				"script_chords_authored_legacy_one", "script_chords_authored_legacy_zero_comment",
+				"script_chords_authored_legacy_one_comment", "script_chords_authored_boolean_comment",
+				"script_chords_authored_missing_marker", "script_chords_authored_absent":
+			_FeatureStateSmokeAuthoredChords(A_Args[1])
 		case "logger_generation_deleted_error", "logger_generation_created_error":
 			_FeatureStateSmokeLoggerPresence(A_Args[1])
 		case "logger_generation_replaced_debug", "logger_generation_replaced_error",
@@ -926,4 +939,109 @@ _FeatureStateSmokeLoggerCase(Fixture) {
 			DirDelete(Root, true)
 		}
 	}
+}
+
+
+; The real late boot reader follows canonical feature admission. Rejected
+; authored preferences must not then crash startup or change the live switch.
+_FeatureStateSmokeAuthoredChords(Fixture) {
+	global ConfigurationFile, _IniCache, ScriptShortcutChordsOn, ScriptShortcutAssignments
+	Cases := Map(
+		"script_chords_authored_quoted_boolean", ['"false"', true],
+		"script_chords_authored_integer", ["2", true],
+		"script_chords_authored_float", ["0.0", true],
+		"script_chords_authored_array", ["[]", true],
+		"script_chords_authored_record", ["{}", true],
+		"script_chords_authored_signed_zero", ["-0", true],
+		"script_chords_authored_plus_zero", ["+0", true],
+		"script_chords_authored_true", ["true", false],
+		"script_chords_authored_false", ["false", false],
+		"script_chords_authored_legacy_zero", ["0", false],
+		"script_chords_authored_legacy_one", ["1", false],
+		"script_chords_authored_legacy_zero_comment", ["0 # explicit opt-out", false],
+		"script_chords_authored_legacy_one_comment", ["1 # explicit opt-in", false],
+		"script_chords_authored_boolean_comment", ["true # explicit chords", false],
+		"script_chords_authored_missing_marker", ['"_"', true],
+		"script_chords_authored_absent", [0, false])
+	FixtureCase := Cases[Fixture]
+	Root := A_Temp . "\ergopti_script_chords_" . DllCall("GetCurrentProcessId") . "_" . A_TickCount
+	if DirExist(Root)
+		throw Error("The script chords fixture requires a fresh private native root.")
+	DirCreate(Root)
+	try {
+		ConfigurationFile := Root . "\config.toml"
+		Source := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion()
+			. "`n[shortcuts.script_control]`n"
+		if FixtureCase[1] is String
+			Source .= "chords_enabled = " . FixtureCase[1] . "`n"
+		if !FSWriteCreateDurable(ConfigurationFile, Source)
+			throw Error("The authored script chord source could not be created.")
+		Journal := ConfigMigrateBoot(ConfigurationFile)
+		if !(Journal is Map) || Journal.Get("status", "missing") != "current"
+			throw Error("The real current-schema constructor must admit the private script chord source.")
+		_IniCache := ParseConfigTomlFile(ConfigurationFile)
+		Snapshot := ConfigTomlReadSnapshot(ConfigurationFile)
+		if _IniCache != Snapshot.Cache || StrCompare(Snapshot.Source, Source, true) != 0
+			throw Error("The script chords fixture must retain the actual bootstrap source generation.")
+		Tree := ManifestBuildFeaturesMap()
+		if ApplyConfigToml(Tree, ConfigurationFile, &Rejected, , &Outdated) < 0
+				|| Rejected != 0 || Outdated.Count != (FixtureCase[2] ? 1 : 0)
+			throw Error("The canonical loader must classify the exact authored script chord preference.")
+		Expected := Tree["shortcuts"]["script_control"]["chords_enabled"]
+		if ScriptShortcutChordsOn !== ManifestDefaultFor("shortcuts.script_control.chords_enabled")
+			throw Error("The script switch must start from its genuine cold manifest initialization.")
+		OriginalSlots := ScriptShortcutAssignments.Clone()
+		ReadScriptShortcutsConfig()
+		FileAppend("script chord admission: fixture=" . Fixture . ", expected=" . Expected
+			. ", active=" . ScriptShortcutChordsOn . ", outdated=" . Outdated.Count . "`n", "*")
+		if ScriptShortcutChordsOn !== Expected
+			throw Error("The live script chord switch must match the canonical admitted preference.")
+		if !ManifestValuesEqual(OriginalSlots, ScriptShortcutAssignments)
+			throw Error("Reading the switch cannot alter any absent script slot or recommendation.")
+		if ConfigTomlReadSnapshot(ConfigurationFile) != Snapshot || !FSUtf8ExactMatches(ConfigurationFile, Source)
+			throw Error("The live switch reader cannot mutate the retained or physical authored source.")
+	} finally {
+		_TOML_InvalidateParseCache(ConfigurationFile)
+		DirDelete(Root, true)
+	}
+}
+
+
+; Detached runtime candidates have no authored source generation and must keep
+; the existing strict Boolean contract instead of borrowing disk defaults.
+_FeatureStateSmokeDetachedChords(Fixture) {
+	global _IniCache, ScriptShortcutChordsOn, ScriptShortcutAssignments
+	Cases := Map(
+		"script_chords_detached_quoted", ["false", true],
+		"script_chords_detached_integer", [2, true],
+		"script_chords_detached_float", [0.0, true],
+		"script_chords_detached_array", [[], true],
+		"script_chords_detached_record", [Map(), true],
+		"script_chords_detached_true", [true, false],
+		"script_chords_detached_false", [false, false],
+		"script_chords_detached_marker", ["_", false],
+		"script_chords_detached_absent", ["_", false])
+	FixtureCase := Cases[Fixture]
+	Section := Map()
+	if Fixture != "script_chords_detached_absent"
+		Section["chords_enabled"] := FixtureCase[1]
+	_IniCache := Map("shortcuts.script_control", Section)
+	Initial := ManifestDefaultFor("shortcuts.script_control.chords_enabled")
+	if ScriptShortcutChordsOn !== Initial
+		throw Error("Detached candidates must begin at the genuine cold manifest switch.")
+	OriginalSlots := ScriptShortcutAssignments.Clone()
+	Rejected := false
+	try ReadScriptShortcutsConfig()
+	catch ValueError as Err {
+		Rejected := true
+		if StrCompare(Err.Message, "shortcuts.script_control.chords_enabled must be a TOML boolean", true) != 0
+			throw Error("The native strict refusal must belong to the actual script chord field.")
+	}
+	if Rejected != FixtureCase[2]
+		throw Error("The detached script chord candidate must retain strict typed admission.")
+	Expected := FixtureCase[2] || FixtureCase[1] == "_" ? Initial : FixtureCase[1]
+	if ScriptShortcutChordsOn !== Expected
+		throw Error("The detached script chord candidate published an unexpected switch.")
+	if !ManifestValuesEqual(OriginalSlots, ScriptShortcutAssignments)
+		throw Error("A detached switch candidate cannot change the absent script slots.")
 }
