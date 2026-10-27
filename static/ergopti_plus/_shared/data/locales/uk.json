@@ -226,6 +226,7 @@
 	"field_check.step.integration_enabled": "Інтеграцію з Karabiner увімкнено",
 	"field_check.step.lease_phase": "Стан оренди",
 	"field_check.step.guardian_state": "Страж оренди",
+	"field_check.step.guardian_wait": "Очікування першої відповіді стража",
 	"field_check.step.cli_version": "Версія Karabiner",
 	"field_check.step.config_present": "Файл конфігурації Karabiner знайдено",
 	"field_check.step.lease_failures": "Збої оренди за сеанс",

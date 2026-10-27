@@ -226,6 +226,7 @@
 	"field_check.step.integration_enabled": "Integrace Karabiner je zapnuta",
 	"field_check.step.lease_phase": "Stav zápůjčky",
 	"field_check.step.guardian_state": "Strážce zápůjčky",
+	"field_check.step.guardian_wait": "Čekání na první odpověď strážce",
 	"field_check.step.cli_version": "Verze Karabiner",
 	"field_check.step.config_present": "Konfigurační soubor Karabiner je přítomen",
 	"field_check.step.lease_failures": "Selhání zápůjčky v této relaci",

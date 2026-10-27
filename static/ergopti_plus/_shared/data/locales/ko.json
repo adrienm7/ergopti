@@ -226,6 +226,7 @@
 	"field_check.step.integration_enabled": "Karabiner 연동 사용",
 	"field_check.step.lease_phase": "임대 상태",
 	"field_check.step.guardian_state": "임대 가디언",
+	"field_check.step.guardian_wait": "가디언의 첫 응답 대기",
 	"field_check.step.cli_version": "Karabiner 버전",
 	"field_check.step.config_present": "Karabiner 설정 파일 있음",
 	"field_check.step.lease_failures": "이번 세션의 임대 실패",

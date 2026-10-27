@@ -226,6 +226,7 @@
 	"field_check.step.integration_enabled": "Karabiner 連携は有効",
 	"field_check.step.lease_phase": "リースの状態",
 	"field_check.step.guardian_state": "リースガーディアン",
+	"field_check.step.guardian_wait": "ガーディアンの最初の応答を待機",
 	"field_check.step.cli_version": "Karabiner のバージョン",
 	"field_check.step.config_present": "Karabiner 設定ファイルあり",
 	"field_check.step.lease_failures": "このセッションのリース失敗",

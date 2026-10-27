@@ -226,6 +226,7 @@
 	"field_check.step.integration_enabled": "Integracja z Karabiner włączona",
 	"field_check.step.lease_phase": "Stan dzierżawy",
 	"field_check.step.guardian_state": "Strażnik dzierżawy",
+	"field_check.step.guardian_wait": "Oczekiwanie na pierwszą odpowiedź strażnika",
 	"field_check.step.cli_version": "Wersja Karabiner",
 	"field_check.step.config_present": "Plik konfiguracji Karabiner obecny",
 	"field_check.step.lease_failures": "Błędy dzierżawy w tej sesji",

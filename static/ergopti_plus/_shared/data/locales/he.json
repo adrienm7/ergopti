@@ -226,6 +226,7 @@
 	"field_check.step.integration_enabled": "שילוב Karabiner מופעל",
 	"field_check.step.lease_phase": "מצב החכירה",
 	"field_check.step.guardian_state": "שומר החכירה",
+	"field_check.step.guardian_wait": "המתנה לתשובה הראשונה של השומר",
 	"field_check.step.cli_version": "גרסת Karabiner",
 	"field_check.step.config_present": "קובץ התצורה של Karabiner קיים",
 	"field_check.step.lease_failures": "כשלי חכירה בהפעלה זו",
