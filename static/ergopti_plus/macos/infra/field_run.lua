@@ -25,7 +25,10 @@
 ---    is reported with that verdict and its reason and is not run.
 --- 5. The user's configuration is snapshot before the first step and compared
 ---    after the last; anything a step changed is put back and named in the
----    config_guard result, which then fails.
+---    config_guard result, which then fails. A file the running preferences
+---    were loaded from (config.toml) is put back byte for byte, which leaves
+---    the live state on the changed values, so the guard then asks for one
+---    driver reload once the run is closed: the reload reads the restored file.
 --- 6. A run never reloads itself: while one runs, the auto-reload watchers hold
 ---    a source-change reload (M.holds_reload) and name the paths they hold.
 ---    A reload or quit that still happens (the menu, a person) closes the run
@@ -48,6 +51,9 @@ local REQUEST_ID_CLASS = "^[%w_%-]+$"
 
 -- The request word that selects every declared step.
 M.ALL_STEPS = "all"
+
+-- The reload reason the configuration guard gives the termination coordinator.
+M.RESTORE_RELOAD_REASON = "field_run_config_restored"
 
 local _session = nil
 
@@ -678,9 +684,23 @@ function Session:guard(index)
 			verdict = "fail"
 			Logger.error(LOG, "A field run step changed the configuration: %s.", table.concat(codes, ", "))
 		end
+		if outcome.reload == true then codes[#codes + 1] = "reload_requested" end
 	end
 	self:record(index, step, { verdict = verdict, codes = codes, elapsed_ms = self.ports.now_ms() - started_ms })
-	return self:finish()
+	local finished = self:finish()
+	if ok and type(outcome) == "table" and outcome.reload == true then self:reload_restored_state() end
+	return finished
+end
+
+--- Reloads the driver so its live preferences read the configuration the guard
+--- put back; called once the run is closed, so the reload never cuts it short.
+function Session:reload_restored_state()
+	Logger.warn(LOG, "The guard put back a file the running preferences were loaded from; reloading so they read it.")
+	local ok, accepted = pcall(self.ports.reload_driver, M.RESTORE_RELOAD_REASON)
+	if not ok or accepted ~= true then
+		Logger.error(LOG, "The reload after the configuration guard was refused: %s. Reload the driver by hand.",
+			tostring(accepted))
+	end
 end
 
 --- Publishes the done marker and frees the session for the next request.
