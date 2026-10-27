@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "Oorspronkelijke volgorde",
 	"menu.layout.number_row_digits": "Cijfers eerst",
 	"menu.layout.number_row_symbols": "Symbolen eerst",
-	"platform_reason.number_row_override_unsupported": "Nog niet op dit systeem: de in het systeem geïnstalleerde indeling typt de cijferrij. Ergopti is van plan de toetsen hier opnieuw te typen; nu zet alleen Windows, dat de indeling emuleert, cijfers of symbolen voorop.",
+	"platform_reason.number_row_override_unsupported": "Op dit systeem typt de in het systeem geïnstalleerde indeling de cijferrij; alleen Windows, dat de indeling emuleert, zet cijfers of symbolen voorop.",
 	"platform_reason.number_row_live_session": "Niet beschikbaar: Alleen een X11-sessie past dit direct toe. Deze sessie behoudt haar huidige indeling; je keuze is opgeslagen.",
 	"platform_reason.number_row_live_no_layout": "Niet beschikbaar: Installeer eerst een ErgoptiPlus-indeling; deze keuze wijzigt de indeling die je gebruikt.",
 	"layouts.linux_rows_not_applied": "De keuze voor de cijferrij is opgeslagen, maar de actieve toetsenbordindeling kon niet worden bijgewerkt.",
