@@ -341,6 +341,7 @@ probe_src="tools/diagnostics/macos_tis_register_probe.swift"
 # A unique binary per run: a failed build must never leave an older probe to run.
 probe_bin="/tmp/ep_tis_probe_${stamp}"
 if [ -f "${probe_src}" ]; then
+	log "Compiling and running the input-source probe (a few minutes, silent)..."
 	step probe_compile swiftc -O -o "${probe_bin}" "${probe_src}"
 	if [ -x "${probe_bin}" ]; then
 		# Plain run, then the driver's own enabling route (writes and restores
