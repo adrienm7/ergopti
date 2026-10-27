@@ -251,7 +251,8 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_system_event_capture.lua"
 		local receipt = os.tmpname()
-		local status = os.execute("env -u LUA_PATH luajit " .. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
+		-- The distribution rows export no XDG_RUNTIME_DIR; the fixture must not need one.
+		local status = os.execute("env -u LUA_PATH -u XDG_RUNTIME_DIR luajit " .. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
 		os.remove(receipt)
 		helpers.assert_true(status == true or status == 0, "capture admission must preserve permitted raw events and independent machine aggregates")
 	end)
@@ -261,7 +262,8 @@ helpers.describe("sqlite_writer: bootstrapping a new database", function()
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_keystats_layout_capture.lua"
 		local receipt = os.tmpname()
-		local status = os.execute("env -u LUA_PATH luajit " .. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
+		-- The distribution rows export no XDG_RUNTIME_DIR; the fixture must not need one.
+		local status = os.execute("env -u LUA_PATH -u XDG_RUNTIME_DIR luajit " .. quote(fixture) .. " " .. quote(root) .. " " .. quote(receipt))
 		os.remove(receipt)
 		helpers.assert_true(status == true or status == 0, "captured layout and finger context must survive later provider publication")
 	end)
