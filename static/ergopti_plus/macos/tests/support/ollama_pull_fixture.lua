@@ -44,6 +44,7 @@ local function with_fixture(options, callback)
 	local progress = { shows = 0, completes = 0, aborts = 0, retry_starts = 0 }
 	local notifications = 0
 	local notification_records = {}
+	local error_records = {}
 	local http_callback
 	local terminate_mode = options.terminate_mode or "self"
 
@@ -56,7 +57,9 @@ local function with_fixture(options, callback)
 		done = noop,
 		info = noop,
 		warn = noop,
-		error = noop,
+		error = function(_, fmt, ...)
+			error_records[#error_records + 1] = select("#", ...) > 0 and string.format(fmt, ...) or tostring(fmt)
+		end,
 		callback = function(_, _, fn, ...)
 			if type(fn) ~= "function" then return false, nil end
 			return xpcall(fn, debug.traceback, ...)
@@ -261,6 +264,7 @@ local function with_fixture(options, callback)
 			native_window = function() return native_window end,
 			notifications = function() return notifications end,
 			notification_records = notification_records,
+			error_records = error_records,
 			http_callback = function() return http_callback end,
 			set_terminate_mode = function(mode) terminate_mode = mode end,
 		})
