@@ -109,6 +109,7 @@ M.preparation_admission = preparation_lookup
 
 local math_type = math.type
 local OperationReporter = require("diagnostics.operation_reporter")
+local ConfigKeys = require("config_keys")
 
 
 
@@ -1081,7 +1082,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		else ordinary[#ordinary + 1] = row end
 	end
 	if model_row then
-		local target = { "llm", "models", "user_models" }
+		local target = { "llm", "models", ConfigKeys.LEAF.USER_MODELS }
 		for _, row in ipairs(ordinary) do
 			local path_segments = row_path(row)
 			local collides = true

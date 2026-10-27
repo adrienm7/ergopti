@@ -254,7 +254,7 @@ function M.prepare(source, desired, path)
 			"Obsolete user model list 'llm.models.user_models' requires manual source cleanup before replacement")
 		return nil
 	end
-	local row = { section = ConfigKeys.KEY.LLM_MODELS, key = "user_models", value = desired, record_list = {} }
+	local row = { section = ConfigKeys.KEY.LLM_MODELS, key = ConfigKeys.LEAF.USER_MODELS, value = desired, record_list = {} }
 	operations[row] = { token = row.record_list, source = source, desired = desired,
 		literal = LeafRows.value_literal(desired), path = path, mapping = map_rows(capture, desired, path), capture = capture }
 	return row
@@ -265,7 +265,7 @@ function M.authentic(row, source, path)
 	assert(type(row) == "table" and getmetatable(row) == nil, "saved model operation needs a plain row")
 	local operation = operations[row]
 	if not operation and row.record_list == nil then return false end
-	assert(operation and rawequal(row.record_list, operation.token) and getmetatable(row.record_list) == nil and row.section == ConfigKeys.KEY.LLM_MODELS and row.key == "user_models"
+	assert(operation and rawequal(row.record_list, operation.token) and getmetatable(row.record_list) == nil and row.section == ConfigKeys.KEY.LLM_MODELS and row.key == ConfigKeys.LEAF.USER_MODELS
 		and row.delete == nil and rawequal(row.value, operation.desired), "saved model row capability is unowned or changed")
 	assert(LeafRows.value_literal(row.value) == operation.literal, "saved model desired rows changed after preparation")
 	if source ~= nil then assert(source == operation.source, "saved model operation belongs to another source") end
@@ -469,7 +469,7 @@ function M.cleanup_entries(source, outdated, file_path)
 	for index, element in ipairs(capture.elements) do
 		if not element.valid and outdated["llm.models.user_models." .. index] then
 			local entry = { section = ConfigKeys.KEY.LLM_MODELS_USER_MODELS, key = tostring(index), kind = "saved_model_record",
-				path = { "llm", "models", "user_models", tostring(index) }, value = Codec.encode_value_with_shapes(capture.rows[index], capture.shapes, capture.rows, index), source_record = {} }
+				path = { "llm", "models", ConfigKeys.LEAF.USER_MODELS, tostring(index) }, value = Codec.encode_value_with_shapes(capture.rows[index], capture.shapes, capture.rows, index), source_record = {} }
 			removals[entry] = { source = source, index = index, raw = element.raw, path = entry.path, file_path = file_path, token = entry.source_record, value = entry.value }
 			entries[#entries + 1] = entry
 		end
@@ -489,7 +489,7 @@ function M.cleanup_selection(source, entries, path)
 			assert(entry.section == ConfigKeys.KEY.LLM_MODELS_USER_MODELS and entry.key == tostring(receipt.index)
 				and entry.kind == "saved_model_record" and entry.value == receipt.value and rawequal(entry.source_record, receipt.token) and getmetatable(entry.source_record) == nil
 				and getmetatable(entry) == nil and getmetatable(entry.path) == nil and rawequal(entry.path, receipt.path)
-				and same(entry.path, { "llm", "models", "user_models", tostring(receipt.index) }), "saved model cleanup row changed")
+				and same(entry.path, { "llm", "models", ConfigKeys.LEAF.USER_MODELS, tostring(receipt.index) }), "saved model cleanup row changed")
 			assert(not seen[receipt.index], "saved model cleanup row was selected twice")
 			seen[receipt.index], present = true, true
 		end
