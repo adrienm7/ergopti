@@ -253,6 +253,65 @@ dev.
   for the first answer and reports the wait as `guardian_wait`. Mac confirms: field_lease passes
   after a boot that removes a stale guardian record, with `guardian_wait` when it waited.
 
+### Fixed on tmp/wip-mac-log-truth (to land on dev)
+
+From the whole-day log of the report `mac-2026-10-27_233356`. Boots and their builds: 16:28 a01da5dcc,
+16:48 and 16:54 228f79f27, 19:47 and 19:48 03ae7b5ca, 21:06 44d54126d, 22:32 c8e7bf1b2, 22:55 3b61fe8e3,
+23:34 d6590c69b; a line is charged to the driver that was running when it was written.
+
+- **L53** Fixed 1b3c4f2205. "Global external writer 'Watcher reload' refused ... not proved: true"
+  and "Menu reload request was refused; the source-file burst remains pending for retry: false"
+  (19:47:04, 21:06:55). Both came from drivers older than L45 (228f79f27, 03ae7b5ca) and both
+  reloads happened (boots 19:47:05 and 21:06:59): infra/file_watchers asked for the reload of the
+  pull, and the menu watcher's request for the same burst arrived while it was fencing the lease.
+  The retry was never lost: ": false" was the refused request's result printed after "pending for
+  retry". Left after L45: infra/file_watchers still warned when it lost the same race the other
+  way. Both watchers now ask `termination_coordinator.terminal_in_progress()` (INFO when a reload
+  or quit owns the process) and say "stays pending and is retried". Mac confirms: a `git pull`
+  during a session reloads once and logs no WARNING from either watcher.
+- **L54** Fixed 22ae753f48 (cause fixed by 9481ba78ac, L14). "registered ZERO mappings" only on the
+  16:28 to 16:54 boots, before L14; every later boot logs INFO "registered no mapping: its 2
+  section(s) are disabled" for the bundled `ergopti-demo` pack (`demo-phrases`, sections
+  `greetings` and `farewells`, off by default). Legitimate. The masked name stays (item 139); each
+  result line now adds the file's load ordinal and origin (`#2 (bundled, '<name>')`, `user` for a
+  file under the configuration folder), and a user's own readable file with no mapping yet is INFO.
+  Mac confirms: the boot shows `TOML mapping file #<n> (bundled, '<name>') registered no mapping`
+  and no ZERO warning.
+- **L55** Proved fixed by 9f4dea89b2 (L15), no change. "Duplicate Ergopti Karabiner revocation
+  completion ignored" appears only at 16:28:02 and 16:28:13 (a01da5dcc) and 19:47:04 (the 228f79f27
+  driver); the revocations of the fixed drivers at 19:47:21, 21:06:55, 22:31:34, 22:55:34 and
+  23:33:54 log none. The WARNING stays for a real double delivery.
+- **L56** Fixed 6c3804af6f. "Health-check: frame stream lost — switching back to startup probe
+  loop" every minute while the trackpad was idle (22:33 to 23:37) with a "one-shot" safety recycle
+  each time. The startup phase hands off to the health loop on its 30 s timeout with no frame, and
+  the health loop called that a lost stream and re-armed the probe. No frame yet is the dormant
+  state the kernel ends on the first touch; the health loop now only checks its watchers. Mac
+  confirms: after a boot with the trackpad untouched, one "Startup phase timeout" line and then no
+  gestures WARNING or recycle until the first touch.
+- **L57** Fixed abb8fc98a6. Every MLX stop of the field run (22:36, 22:59, 23:37) ended in "PGID
+  pending timeout (15s)", and every launch warned "Killing zombie ... via ps+awk", "Zombie kill
+  completed; stdout: none" and "Endpoint discovery state reset". The stop settlement (and an
+  adoption) called `reset_endpoints`, which always opened the PGID window that only a cold launch's
+  bash wrapper closes. Only the cold launch now passes `awaiting_pgid`; the reset is INFO and the
+  precautionary sweep warns only when it kills. Mac confirms: an MLX download-and-serve then stop
+  logs no PGID timeout and no zombie WARNING.
+- **L58** Fixed 19cbf7a1a4 (deadline cause fixed by 2790b3239a, L11). "Field run step 'ollama_model'
+  answered after it was settled; answer dropped" (16:53:45, 228f79f27): the fixed 240 s deadline
+  settled the step while the pull still verified its digest; the pull then failed on a digest
+  mismatch. The race stays by design (a timeout does not stop the runner), but its answer was a
+  WARNING that dropped the verdict. Now INFO "answered fail (...) after its timeout; the timeout
+  stands"; a runner answering a step it settled itself still warns. Mac confirms: no such WARNING.
+- **L59** Fixed 8b08121e0f for the sleep; the orphan key-ups stay open. "A character key stayed
+  down 589.8 s ... its key-up was lost" (19:46:46, 2 times): keys pressed around 16:55 before a
+  three-hour sleep behind the lock screen; the awake clock advanced 590 s. A sleep is now detected
+  between two key events (wall clock SLEEP_GAP_MS ahead of the awake clock), held keys are retired
+  at INFO and their key-ups right after are counted apart. Open [PHYS-M]: "A key-up reached the
+  keymap taps with no key-down before it (2 times)" at 16:55:18, 44 s after the 16:54:34 boot,
+  with 2 late events, no sleep and no tap outage; candidates are a secure text field (16:54:47
+  "Secure text field detected"), a key-down consumed by an earlier tap, or a main-thread hold.
+  Mac confirms: a sleep with a key held logs only the INFO line; an orphan key-up WARNING without a
+  sleep names the next lead.
+
 ### Open TODO
 
 - **L46** [CODE][PHYS-M] Two-finger scrolls switched tabs through the vertical three-finger swipe
