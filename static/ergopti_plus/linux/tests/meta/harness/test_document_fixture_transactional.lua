@@ -60,8 +60,9 @@ helpers.describe("document fixture: transactional construction", function()
 	helpers.it("leaves the real timings registry usable after a failure", function()
 		pcall(DocumentFixture.new, "", { bridge_name = "fixture" }, nil)
 		local Timings = require("infra.timings")
-		local read_ok = pcall(Timings.ms, "ui", "document_initialization_ack_timeout_ms")
-		helpers.assert_true(read_ok, "the real registry still answers")
+		local read_ok, timeout_ms = pcall(Timings.ms, "ui", "document_initialization_ack_timeout_ms")
+		helpers.assert_true(read_ok and type(timeout_ms) == "number" and timeout_ms > 0,
+			"the real registry still answers: " .. tostring(timeout_ms))
 		helpers.assert_true(package.loaded.lgi == nil or package.loaded.lgi.WebKit2 == nil
 			or package.loaded.lgi.WebKit2.WebView == nil
 			or debug.getinfo(package.loaded.lgi.WebKit2.WebView, "S").source:find("document_fixture", 1, true) == nil,
