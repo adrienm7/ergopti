@@ -3852,4 +3852,71 @@ for (const host of ['windows', 'macos', 'linux']) {
 }
 assert.equal(passed, 1074, 'all native-empty-map badge, scope and refresh controls must execute');
 
+const nativeUnicodeProjection = JSON.parse(
+	fs.readFileSync(
+		path.resolve(root, '../../windows/tests/fixtures/metrics_unicode_projection.json'),
+		'utf8'
+	)
+);
+assert.deepEqual(
+	nativeUnicodeProjection.cases.map((vector) => vector.id),
+	['nbsp-only', 'nnbsp-only', 'ordinary-nbsp', 'literal-capital-a-nbsp', 'literal-c1-sequence']
+);
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const source of ['historical', 'today']) {
+		for (const sensitive of [true, false]) {
+			for (const vector of nativeUnicodeProjection.cases) {
+				test(`${host} ${source} preserves native Unicode ${vector.id}, case-sensitive ${sensitive}`, () => {
+					const page = loadMetricsTypingPage(host);
+					freezePageClock(
+						page,
+						source === 'historical' ? '2026-10-27T12:00:00' : '2026-10-26T12:00:00'
+					);
+					publishTypingPage(page, host, vector.manifest);
+					if (sensitive) page.elements.get('btn_case_sensitive').classList.add('active');
+					else page.elements.get('btn_case_sensitive').classList.remove('active');
+					const raw = vector.range.historical;
+					deliverTypingManifest(page, host, vector.manifest, {
+						range:
+							source === 'historical'
+								? vector.range
+								: { historical: {}, today: { [nativeUnicodeProjection.app]: raw } }
+					});
+					for (const tab of ['c', 'bg', 'tg']) {
+						vm.runInContext(`app_state.current_tab=${JSON.stringify(tab)}`, page.context);
+						page.context.render_current_tab();
+						page.timers.at(-1)();
+						const rows = JSON.parse(
+							vm.runInContext(
+								'JSON.stringify(app_state.rendered_list.map(row=>({key:row.key,count:row.count,accuracy:row.acc})))',
+								page.context
+							)
+						);
+						const expected = Object.entries(raw[tab]).map(([key, item]) => ({
+							key: sensitive ? key : key.toLowerCase(),
+							count: item.c,
+							accuracy: 100
+						}));
+						const sort = (items) => items.sort((a, b) => a.key.localeCompare(b.key));
+						assert.deepEqual(
+							sort(rows),
+							sort(expected),
+							'native Unicode text remains data rather than a byte-repair instruction'
+						);
+					}
+					assert.equal(
+						page.diagnostics.some((entry) => entry.level === 'error'),
+						false
+					);
+				});
+			}
+		}
+	}
+}
+assert.equal(
+	passed,
+	1134,
+	'all native Unicode, case mode, host and history/live controls must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);

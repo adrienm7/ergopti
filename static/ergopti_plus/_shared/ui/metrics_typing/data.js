@@ -71,17 +71,8 @@ function merge_dict(
 		tab_name === 'sc_pg';
 
 	Object.keys(source).forEach((k) => {
-		// Fix potential mojibake BEFORE toLowerCase: Hammerspoon's json.encode may pass
-		// raw UTF-8 bytes through evaluateJavaScript where each byte is treated as a
-		// Latin-1 code point.
-		// The UTF-8 encoding of NBSP (U+00A0) is [0xC2, 0xA0] → "Â\u00A0" (2 chars).
-		// The UTF-8 encoding of NNBSP (U+202F) is [0xE2, 0x80, 0xAF] → "â\u0080¯" (3 chars).
-		// CRITICAL: normalization must happen before toLowerCase() because toLowerCase()
-		// converts U+00C2 ("Â") to U+00E2 ("â"), breaking the NBSP replacement pattern.
-		// U+0080 (PAD control) never appears in legitimate typed text, making these safe.
-		let display_k = k
-			.replace(/\u00C2\u00A0/g, '\u00A0') // "Â" + NBSP → NBSP
-			.replace(/\u00E2\u0080\u00AF/g, '\u202F'); // "â" + PAD + "¯" → NNBSP
+		// Native JSON already carries Unicode; byte-repair guesses corrupt literal text.
+		let display_k = k;
 
 		if (!case_sensitive) display_k = display_k.toLowerCase();
 
