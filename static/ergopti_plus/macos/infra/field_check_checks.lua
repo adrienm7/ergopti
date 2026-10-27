@@ -220,6 +220,7 @@ function M.network(ports, report, finish)
 				callback(helper_code, helper_code == 0 and M.parse_network_helper(helper_output) or {})
 			end)
 		end,
+		route_plan = ports.route_plan,
 	}, report, finish)
 end
 

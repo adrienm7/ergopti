@@ -283,6 +283,7 @@
 	"field_check.step.tls": "Beveiligde verbinding (certificaat)",
 	"field_check.step.transfer": "Testverzoek naar de downloadserver",
 	"field_check.step.digest": "Integriteitscontrole van de download",
+	"field_check.step.route_plan": "Route van elke downloadbron van de Ollama-daemon (rechtstreeks of via een relay)",
 	"launcher.fatal.stage_detail": "Stap: {1}\nOorzaak: {2}\nDe details staan in {3}.",
 	"launcher.fatal.component_detail": "Onderdeel: {1}\nOorzaak: {2}\nDe details staan in:\n{3}",
 	"menu.llm.deps_download_page_failed": "Kan de downloadpagina van Ollama niet openen.",

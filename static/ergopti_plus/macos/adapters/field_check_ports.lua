@@ -151,6 +151,32 @@ local function network_chain(callback)
 end
 
 
+--- The route the system settings name for each origin of the managed Ollama daemon,
+--- looked up one after the other through the launcher's route command, the lookup the
+--- daemon's own start performs (network-retry.sh).
+--- @param callback function fn({ entries = {{ origin, route }} } | { failure = token }).
+local function route_plan(callback)
+	local NetworkEnv = require("modules.llm.network_env")
+	local origins = NetworkEnv.route_origins("ollama")
+	local budget = NetworkEnv.route_lookup_budget_seconds()
+	local launcher, _, environment = require("platform.remap.lease_helper").resolve()
+	if not origins or not budget then return callback({ failure = "route-origins-unavailable" }) end
+	if not launcher then return callback({ failure = "launcher_unavailable" }) end
+	local entries = {}
+	local function dispatch(index)
+		exec(launcher, { "--managed-proxy-route", origins[index], tostring(budget) }, budget + 5, function(code, output)
+			local route = code == 0 and tostring(output):match("ROUTE ([^\r\n]+)") or nil
+			if not route then
+				local stage = tostring(output):match("STAGE (native_[a-z_]+)")
+				return callback({ failure = stage or "lookup_failed" })
+			end
+			entries[index] = { origin = origins[index], route = route }
+			if index == #origins then callback({ entries = entries }) else dispatch(index + 1) end
+		end, environment)
+	end
+	dispatch(1)
+end
+
 --- Measures how late the timer service fires.
 --- @param seconds number Delay asked of the timer.
 --- @param callback function fn(late_ms) with the lateness in milliseconds.
@@ -218,6 +244,7 @@ function M.new()
 		count_keys = count_keys,
 		fetch_pac = fetch_pac,
 		network_chain = network_chain,
+		route_plan = route_plan,
 		timer_probe = timer_probe,
 		owned_readiness = owned_readiness,
 		app_path = app_path,

@@ -9,7 +9,8 @@
  * (_shared/lua/network/field_check_network.lua), Windows runs the same steps in
  * AutoHotkey (windows/ui/field_check/network_check.ahk). This gate pins what
  * keeps the three reports comparable when a maintainer pastes one back:
- * 1. the Lua and AutoHotkey step lists are the same identities in the same order;
+ * 1. the Lua and AutoHotkey step lists are the same identities in the same order
+ *    (macOS and Linux then report the PLAN_STEPS the Windows check does not have yet);
  * 2. every step has its label in every locale;
  * 3. the menu row is declared once, for every platform, with no platform reason,
  *    and each driver routes it to its check;
@@ -56,6 +57,14 @@ check('Windows reports the same steps in the same order as macOS and Linux', () 
 	assert.deepEqual(ahkSteps, luaSteps);
 });
 
+const planSteps = identities(/M\.PLAN_STEPS = \{([^}]*)\}/.exec(luaSource)?.[1] ?? '');
+
+check('the macOS and Linux only steps are declared apart from the shared list', () => {
+	assert.deepEqual(planSteps, ['route_plan']);
+	for (const step of planSteps)
+		assert.equal(luaSteps.includes(step), false, `${step} is in the Windows list`);
+});
+
 check('the Lua chain steps are a suffix of the full list', () => {
 	const chain = identities(/M\.CHAIN_STEPS = \{([^}]*)\}/.exec(luaSource)?.[1] ?? '');
 	assert.deepEqual(luaSteps.slice(luaSteps.length - chain.length), chain);
@@ -67,7 +76,7 @@ check('every step has a label in every locale', () => {
 	assert.equal(locales.length, 21);
 	for (const file of locales) {
 		const strings = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
-		for (const id of [...luaSteps, 'internal_error']) {
+		for (const id of [...luaSteps, ...planSteps, 'internal_error']) {
 			const key = `field_check.step.${id}`;
 			assert.equal(typeof strings[key], 'string', `${file} misses ${key}`);
 			assert.notEqual(strings[key], '', `${file} has an empty ${key}`);

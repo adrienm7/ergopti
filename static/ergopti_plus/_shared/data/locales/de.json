@@ -283,6 +283,7 @@
 	"field_check.step.tls": "Sichere Verbindung (Zertifikat)",
 	"field_check.step.transfer": "Testanfrage an den Download-Server",
 	"field_check.step.digest": "Integritätsprüfung des Downloads",
+	"field_check.step.route_plan": "Weg jeder Download-Quelle des Ollama-Dienstes (direkt oder über ein Relay)",
 	"launcher.fatal.stage_detail": "Schritt: {1}\nUrsache: {2}\nDie Details wurden in {3} gespeichert.",
 	"launcher.fatal.component_detail": "Komponente: {1}\nUrsache: {2}\nDie Details wurden gespeichert in:\n{3}",
 	"menu.llm.deps_download_page_failed": "Die Ollama-Downloadseite konnte nicht geöffnet werden.",

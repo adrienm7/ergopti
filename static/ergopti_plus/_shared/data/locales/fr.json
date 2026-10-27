@@ -283,6 +283,7 @@
 	"field_check.step.tls": "Connexion sécurisée (certificat)",
 	"field_check.step.transfer": "Requête de test vers le serveur de téléchargement",
 	"field_check.step.digest": "Contrôle d'intégrité du téléchargement",
+	"field_check.step.route_plan": "Route de chaque origine de téléchargement du démon Ollama (directe ou via un relais)",
 	"launcher.fatal.stage_detail": "Étape : {1}\nCause : {2}\nLes détails sont enregistrés dans {3}.",
 	"launcher.fatal.component_detail": "Composant : {1}\nCause : {2}\nLes détails sont enregistrés dans :\n{3}",
 	"menu.llm.deps_download_page_failed": "Impossible d'ouvrir la page de téléchargement Ollama.",

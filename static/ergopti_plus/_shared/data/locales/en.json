@@ -283,6 +283,7 @@
 	"field_check.step.tls": "Secure connection (certificate)",
 	"field_check.step.transfer": "Test request to the download server",
 	"field_check.step.digest": "Download integrity check",
+	"field_check.step.route_plan": "Route taken by each download origin of the Ollama daemon (direct or through a relay)",
 	"launcher.fatal.stage_detail": "Step: {1}\nCause: {2}\nDetails are saved in {3}.",
 	"launcher.fatal.component_detail": "Component: {1}\nCause: {2}\nDetails are saved in:\n{3}",
 	"menu.llm.deps_download_page_failed": "Could not open the Ollama download page.",

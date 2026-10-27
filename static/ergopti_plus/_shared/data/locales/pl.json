@@ -283,6 +283,7 @@
 	"field_check.step.tls": "Bezpieczne połączenie (certyfikat)",
 	"field_check.step.transfer": "Zapytanie testowe do serwera pobierania",
 	"field_check.step.digest": "Kontrola integralności pobrania",
+	"field_check.step.route_plan": "Trasa każdego źródła pobierania demona Ollama (bezpośrednio lub przez przekaźnik)",
 	"launcher.fatal.stage_detail": "Krok: {1}\nPrzyczyna: {2}\nSzczegóły zapisano w {3}.",
 	"launcher.fatal.component_detail": "Komponent: {1}\nPrzyczyna: {2}\nSzczegóły zapisano w:\n{3}",
 	"menu.llm.deps_download_page_failed": "Nie udało się otworzyć strony pobierania Ollama.",

@@ -283,6 +283,7 @@
 	"field_check.step.tls": "Säker anslutning (certifikat)",
 	"field_check.step.transfer": "Testförfrågan till nedladdningsservern",
 	"field_check.step.digest": "Integritetskontroll av nedladdningen",
+	"field_check.step.route_plan": "Väg för varje nedladdningskälla till Ollama-daemonen (direkt eller via ett relä)",
 	"launcher.fatal.stage_detail": "Steg: {1}\nOrsak: {2}\nDetaljerna har sparats i {3}.",
 	"launcher.fatal.component_detail": "Komponent: {1}\nOrsak: {2}\nDetaljerna har sparats i:\n{3}",
 	"menu.llm.deps_download_page_failed": "Det gick inte att öppna Ollamas nedladdningssida.",

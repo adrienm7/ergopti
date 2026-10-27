@@ -283,6 +283,7 @@
 	"field_check.step.tls": "Sikker forbindelse (certifikat)",
 	"field_check.step.transfer": "Testanmodning til downloadserveren",
 	"field_check.step.digest": "Integritetskontrol af downloaden",
+	"field_check.step.route_plan": "Rute for hver downloadkilde til Ollama-dæmonen (direkte eller via et relæ)",
 	"launcher.fatal.stage_detail": "Trin: {1}\nÅrsag: {2}\nDetaljerne er gemt i {3}.",
 	"launcher.fatal.component_detail": "Komponent: {1}\nÅrsag: {2}\nDetaljerne er gemt i:\n{3}",
 	"menu.llm.deps_download_page_failed": "Kunne ikke åbne Ollamas downloadside.",

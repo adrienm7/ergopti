@@ -283,6 +283,7 @@
 	"field_check.step.tls": "الاتصال الآمن (الشهادة)",
 	"field_check.step.transfer": "طلب اختبار إلى خادم التنزيل",
 	"field_check.step.digest": "فحص سلامة التنزيل",
+	"field_check.step.route_plan": "المسار الذي تسلكه كل جهة تنزيل لخدمة Ollama (مباشر أو عبر وسيط)",
 	"launcher.fatal.stage_detail": "الخطوة: {1}\nالسبب: {2}\nالتفاصيل محفوظة في {3}.",
 	"launcher.fatal.component_detail": "المكوّن: {1}\nالسبب: {2}\nالتفاصيل محفوظة في:\n{3}",
 	"menu.llm.deps_download_page_failed": "تعذّر فتح صفحة تنزيل Ollama.",
