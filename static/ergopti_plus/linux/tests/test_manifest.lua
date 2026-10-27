@@ -640,6 +640,7 @@ return {
 	"tests.unit.modules.llm.remote.test_api_entries",
 	"tests.unit.modules.llm.remote.test_api_entries_retired_provider",
 	"tests.unit.modules.llm.remote.test_local_server_auth_policy",
+	"tests.unit.modules.llm.remote.test_local_server_ports",
 	"tests.unit.modules.llm.prediction.test_prediction_backend",
 	"tests.unit.modules.llm.prediction.test_prediction_control_retirement",
 	"tests.unit.modules.llm.prediction.test_prediction_injection_owner",
