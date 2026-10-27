@@ -620,3 +620,5 @@ Test("Ollama response identity: private provider echo cannot acquire download co
 	_RWMO_ResponseIdentity.Bind("SCREEN_PRIVATE_MODEL_ECHO", 0))
 
 #Include %A_LineFile%/../test_llm_api_ollama_dispatch_admission.ahk
+
+#Include %A_LineFile%/../test_llm_api_aux_timer_retirement.ahk
