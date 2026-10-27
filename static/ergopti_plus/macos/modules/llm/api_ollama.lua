@@ -7,6 +7,7 @@
 --- ==============================================================================
 
 local M = {}
+local Errors = require("adapter_errors")
 local Logger  = require("infra.logger")
 local text_utils = require("infra.text_utils")
 local Notifications = require("infra.notifications")
@@ -798,7 +799,7 @@ local function ensure_ollama_running(options)
 		return fail_start("server executable resolution", binary_err)
 	end
 	if RuntimeChoice.classify(source_kind) ~= "native" then
-		return fail_start("external runtime requires manual service management", false)
+		return fail_start(Errors.OLLAMA_EXTERNAL_RUNTIME_MANUAL, false)
 	end
 	if my_generation ~= _ollama_start_generation or not _ollama_starting
 		or ollama_start_authorized(my_generation) ~= true then
@@ -829,7 +830,7 @@ local function ensure_ollama_running(options)
 			return
 		end
 		if _ollama_started ~= true or _ollama_starting == true then
-			fail_start("server task exited before publication", false)
+			fail_start(Errors.OLLAMA_SERVER_EXITED_BEFORE_PUBLICATION, false)
 			return
 		end
 		_ollama_started = false

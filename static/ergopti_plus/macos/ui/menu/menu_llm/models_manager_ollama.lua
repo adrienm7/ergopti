@@ -13,6 +13,7 @@
 local M = {}
 
 local hs            = hs
+local Errors = require("adapter_errors")
 local notifications = require("infra.notifications")
 local Logger        = require("infra.logger")
 local i18n          = require("infra.i18n")
@@ -830,11 +831,11 @@ function M.new(deps, presets, ram_getter)
 				on_settled = function(published, reason)
 					if not owns_operation() then return end
 					if published ~= true then
-						notify_start_failure(reason == "external runtime requires manual service management"
+						notify_start_failure(reason == Errors.OLLAMA_EXTERNAL_RUNTIME_MANUAL
 							and "ollama.external_manual_start_body" or "ollama.daemon_fail")
 						-- Native pre-publication exit retains the established unreachable
 						-- readiness class; ownership/manual refusals keep their reason.
-						settle_operation(false, reason == "server task exited before publication"
+						settle_operation(false, reason == Errors.OLLAMA_SERVER_EXITED_BEFORE_PUBLICATION
 							and "restart_failed" or reason or "restart_failed")
 						return
 					end

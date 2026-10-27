@@ -25,6 +25,7 @@ local M = {}
 
 local Agent       = require("llm.agent")
 local Logger      = require("infra.logger")
+local Errors      = require("adapter_errors")
 local ShellRunner = require("adapters.shell_runner")
 local FileSystem  = require("adapters.file_system")
 local TextUtils = require("text_utils")
@@ -211,15 +212,15 @@ local function run_script(action, on_done)
 			local detail = type(stderr) == "string" and stderr:gsub("%s+$", "") or ""
 			if detail:find(NOT_AUTHORIZED_CODE, 1, true) or detail:find("Not authorized to send Apple events", 1, true) then
 				Logger.error(LOG, "The %s connector was refused the Automation permission for %s.", action.type, app)
-				on_done(false, { reason = "automation refused", permission = app })
+				on_done(false, { reason = Errors.CONNECTOR_AUTOMATION_REFUSED, permission = app })
 				return
 			end
 			Logger.error(LOG, "The %s connector failed (exit %s): %s.", action.type, tostring(exit_code), detail)
-			on_done(false, { reason = "exit " .. tostring(exit_code) .. ": " .. detail })
+			on_done(false, { reason = Errors.CONNECTOR_EXIT_FAILED, detail = "exit " .. tostring(exit_code) .. ": " .. detail })
 		end)
 	if not started then
 		Logger.error(LOG, "The %s connector ended before running.", action.type)
-		on_done(false, { reason = "osascript did not start" })
+		on_done(false, { reason = Errors.CONNECTOR_OSASCRIPT_NOT_STARTED })
 	end
 	return started
 end
@@ -244,7 +245,7 @@ local function run_shortcut(action, on_done)
 		local path, detail = FileSystem.create_secure_temp_file()
 		if not path then
 			Logger.error(LOG, "The shortcut input file could not be created: %s.", tostring(detail))
-			on_done(false, { reason = "no input file" })
+			on_done(false, { reason = Errors.CONNECTOR_NO_INPUT_FILE })
 			return false
 		end
 		-- Appended in place: an atomic write would replace the private file by a
@@ -252,7 +253,7 @@ local function run_shortcut(action, on_done)
 		if FileSystem.append(path, action.input) ~= true then
 			Logger.error(LOG, "The shortcut input could not be written.")
 			remove_input(path)
-			on_done(false, { reason = "input not written" })
+			on_done(false, { reason = Errors.CONNECTOR_INPUT_NOT_WRITTEN })
 			return false
 		end
 		input_path = path
@@ -270,12 +271,12 @@ local function run_shortcut(action, on_done)
 		end
 		local detail = type(stderr) == "string" and stderr:gsub("%s+$", "") or ""
 		Logger.error(LOG, "The shortcut connector failed (exit %s): %s.", tostring(exit_code), detail)
-		on_done(false, { reason = "exit " .. tostring(exit_code) .. ": " .. detail })
+		on_done(false, { reason = Errors.CONNECTOR_EXIT_FAILED, detail = "exit " .. tostring(exit_code) .. ": " .. detail })
 	end)
 	if not started then
 		if input_path then remove_input(input_path) end
 		Logger.error(LOG, "The shortcut connector ended before running.")
-		on_done(false, { reason = "shortcuts did not start" })
+		on_done(false, { reason = Errors.CONNECTOR_SHORTCUTS_NOT_STARTED })
 	end
 	return started
 end
