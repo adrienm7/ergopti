@@ -3,6 +3,13 @@
 # Native-only bootstrap ports shared by dependency installers. The caller's
 # signed native PTY guardian owns the original deadline and every subprocess.
 
+# Names the step the bootstrap entered, on stderr and in BOOTSTRAP_STAGE, so a
+# caller's failure report says which child stopped (a signal leaves no text).
+native_bootstrap_stage() {
+	BOOTSTRAP_STAGE="$1"
+	printf '[NATIVE-BOOTSTRAP] stage: %s\n' "$1" >&2
+}
+
 native_bootstrap_python() {
 	local root="$1" work rc uv_path interpreter actual_hash cached_uv_hash extracted_uv_hash uv_url uv_sha256 native_arch
 	case "$root" in
@@ -37,6 +44,7 @@ native_bootstrap_python() {
 		actual_hash=""
 	fi
 	if [ "$actual_hash" != "$uv_sha256" ]; then
+		native_bootstrap_stage uv_download
 		if ! managed_bootstrap_download "$uv_url" "$work/uv.whl" "$uv_sha256" "" resilient; then
 			rm -rf "$work"; return 1
 		fi
@@ -44,6 +52,7 @@ native_bootstrap_python() {
 		mv -f "$work/uv.whl" "$root/uv.whl" || { rm -rf "$work"; return 1; }
 	fi
 	# Retained verified wheel bytes pin the executable even on a warm runtime.
+	native_bootstrap_stage uv_extract
 	if ! /usr/bin/unzip -p "$root/uv.whl" "uv-$UV_RELEASE_VERSION.data/scripts/uv" > "$work/uv"; then
 		rm -rf "$work"; return 1
 	fi
@@ -56,14 +65,17 @@ native_bootstrap_python() {
 		[ ! -L "$uv_path" ] || { rm -rf "$work"; return 78; }
 		mv -f "$work/uv" "$uv_path" || { rm -rf "$work"; return 1; }
 	fi
+	native_bootstrap_stage python_download
 	if ! managed_bootstrap_download "$MANAGED_PYTHON_URL" "$work/$MANAGED_PYTHON_CACHE_BASENAME" "$MANAGED_PYTHON_SHA256" "" resilient; then
 		rm -rf "$work"; return 1
 	fi
+	native_bootstrap_stage python_install
 	rc=0
 	UV_PYTHON_CACHE_DIR="$work" "$uv_path" python install "$MANAGED_PYTHON_REQUEST" \
 		--offline --no-config --python-downloads-json-url "$SCRIPT_DIR/$MANAGED_PYTHON_DOWNLOADS_BASENAME" >&2 || rc=$?
 	rm -rf "$work"
 	[ "$rc" -eq 0 ] || return "$rc"
+	native_bootstrap_stage python_find
 	interpreter="$("$uv_path" python find "$MANAGED_PYTHON_REQUEST" --offline)" || return 1
 	case "$interpreter" in "$root/python/"*) ;; *) return 78 ;; esac
 	[ -x "$interpreter" ] || return 78

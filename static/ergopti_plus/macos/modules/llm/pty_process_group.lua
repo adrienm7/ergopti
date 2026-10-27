@@ -138,6 +138,11 @@ if drain_timed_out:
 else:
     proc.wait()
     returncode = proc.returncode
+    # Popen reports signal N as -N, which sys.exit turns into 256 - N (247 for
+    # SIGKILL). Report 128 + N like the shell and the native PTY guardian, so
+    # the checkers can name the signal.
+    if returncode < 0:
+        returncode = 128 - returncode
 os.close(master_fd)
 sys.exit(returncode)
 ]]

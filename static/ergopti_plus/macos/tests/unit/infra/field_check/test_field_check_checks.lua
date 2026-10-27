@@ -110,6 +110,42 @@ helpers.describe("lease check", function()
 		helpers.assert_eq(steps.key_losses.value, "3")
 	end)
 
+	-- Field run 2026-10-27 22:32: the check ran while this lifecycle's guardian
+	-- registration was in flight and failed "unknown"; the answer was "ready".
+	helpers.it("waits for the first guardian answer before judging it (lease-guardian-settle)", function()
+		local reads, delays = 0, {}
+		local ports, world = make_ports({
+			remap_facts = function()
+				reads = reads + 1
+				return { enabled = true, phase = reads < 4 and "idle" or "ready", guardian = reads < 4 and "unknown" or "ready" }
+			end,
+			after = function(seconds, callback) delays[#delays + 1] = seconds; callback() end,
+		})
+		world.existing[CLI] = true
+		world.outputs[CLI .. " --version"] = { 0, "16.0.0\n" }
+		local steps, result = run("lease", ports)
+		helpers.assert_true(result.passed)
+		helpers.assert_eq(steps.guardian_state.value, "ready")
+		helpers.assert_eq(steps.lease_phase.value, "ready")
+		helpers.assert_eq(steps.guardian_wait.state, "info")
+		helpers.assert_eq(steps.guardian_wait.value, "1.5s")
+		helpers.assert_eq(#delays, 3)
+	end)
+
+	helpers.it("fails a guardian still unknown after the bounded wait", function()
+		local polls = 0
+		local ports, world = make_ports({
+			remap_facts = function() return { enabled = true, phase = "idle", guardian = "unknown" } end,
+			after = function(_, callback) polls = polls + 1; callback() end,
+		})
+		world.existing[CLI] = true
+		local steps = run("lease", ports)
+		helpers.assert_eq(steps.guardian_state.state, "fail")
+		helpers.assert_eq(steps.guardian_state.value, "unknown")
+		helpers.assert_eq(steps.guardian_wait.value, "30.0s")
+		helpers.assert_eq(polls, 60)
+	end)
+
 	helpers.it("reports a command timeout instead of waiting", function()
 		local ports, world = make_ports()
 		world.existing[CLI] = true
