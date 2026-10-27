@@ -50,6 +50,9 @@ local _scans = {}
 --- cleanup name the entry once.
 M.REFUSED = "its owner no longer accepts this value"
 
+--- The detail for a keyboard slot id no slot of this build owns.
+M.UNKNOWN_SLOT = "no keyboard slot of this build has this id"
+
 
 
 
