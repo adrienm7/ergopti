@@ -64,6 +64,18 @@ local function new_harness()
 	local saved_absolute = hs.timer.absoluteTime
 	local saved_scheduler = package.loaded["adapters.timer_scheduler"]
 	local saved_timings = package.loaded["infra.timings"]
+	local saved_logger = package.loaded["infra.logger"]
+	-- Records every DEBUG line the engine writes, so the rejection diagnostics
+	-- each case expects in the field log can be asserted.
+	local debug_lines = {}
+	local real_logger = require("infra.logger")
+	package.loaded["infra.logger"] = setmetatable({
+		debug = function(module_name, fmt, ...)
+			local ok, line = pcall(string.format, fmt, ...)
+			debug_lines[#debug_lines + 1] = ok and line or tostring(fmt)
+			return real_logger.debug(module_name, fmt, ...)
+		end,
+	}, { __index = real_logger })
 	local clock = 1000.0
 	hs.timer.secondsSinceEpoch = function() return clock end
 	hs.timer.absoluteTime = function() return clock * 1e9 end
@@ -87,7 +99,18 @@ local function new_harness()
 	helpers.assert_true(initialized == true, "the engine must initialize on the stub eventtap")
 	local tap = hs.eventtap.__taps[#hs.eventtap.__taps]
 
-	local harness = { fired = fired }
+	local harness = { fired = fired, debug_lines = debug_lines }
+
+	--- Finds the first rejection line naming a gate.
+	--- @param gate string Gate name as the engine logs it.
+	--- @return string|nil line
+	function harness.rejection(gate)
+		local needle = "Three-finger candidate rejected by " .. gate .. ":"
+		for _, line in ipairs(debug_lines) do
+			if line:find(needle, 1, true) then return line end
+		end
+		return nil
+	end
 
 	--- Plays one frame of contacts, each offset by `dy` along the swipe axis.
 	--- @param contacts table Array of { x, y } base positions.
@@ -134,6 +157,7 @@ local function new_harness()
 		hs.timer.absoluteTime = saved_absolute
 		package.loaded["adapters.timer_scheduler"] = saved_scheduler
 		package.loaded["infra.timings"] = saved_timings
+		package.loaded["infra.logger"] = saved_logger
 		package.loaded["modules.gestures.engine"] = nil
 	end
 
@@ -188,7 +212,10 @@ helpers.describe("a two-finger scroll never fires a three-finger action (three-f
 		for i = 2, 7 do h.frame(pair, nil, i * STEP) end
 		h.lift()
 		local fires = tab_fires(h.fired)
+		local reason = h.rejection("frames held")
 		h.finish()
+		helpers.assert_true(reason ~= nil,
+			"the field log must name the frames held gate with its measured value")
 		helpers.assert_eq(#fires, 0,
 			"a third contact seen for one frame is not a three-finger gesture; fired: "
 				.. table.concat(fires, ", "))
@@ -224,7 +251,10 @@ helpers.describe("a two-finger scroll never fires a three-finger action (three-f
 		end
 		h.lift()
 		local fires = tab_fires(h.fired)
+		local reason = h.rejection("cohesion")
 		h.finish()
+		helpers.assert_true(reason ~= nil,
+			"the field log must name the cohesion gate with its measured value")
 		helpers.assert_eq(#fires, 0,
 			"two fingers moving beside a still thumb are a scroll: every contact must travel "
 				.. "with the swipe; fired: " .. table.concat(fires, ", "))
@@ -242,6 +272,23 @@ helpers.describe("a two-finger scroll never fires a three-finger action (three-f
 		helpers.assert_eq(#fires, 0,
 			"a gesture that drops to a travelling pair is a scroll, neither the swipe nor "
 				.. "the three-finger tap; fired: " .. table.concat(fires, ", "))
+	end)
+
+	helpers.it("a thumb landing after the pair scrolled is refused as the scroll's", function()
+		local h = new_harness()
+		local pair = { FINGER_A, FINGER_B }
+		for i = 0, 10 do h.frame(pair, nil, i * STEP) end
+		for i = 11, 40 do
+			h.frame({ FINGER_A, FINGER_B, THUMB }, { true, true, false }, i * STEP)
+		end
+		h.lift()
+		local fires = tab_fires(h.fired)
+		local reason = h.rejection("pair scroll")
+		h.finish()
+		helpers.assert_true(reason ~= nil and reason:find("locked", 1, true) ~= nil,
+			"a pair whose direction locked never promotes, and the log says so: "
+				.. tostring(reason))
+		helpers.assert_eq(#fires, 0, "fired: " .. table.concat(fires, ", "))
 	end)
 
 	helpers.it("a contact leaving for the lift adds no phantom travel", function()
@@ -266,7 +313,10 @@ helpers.describe("a two-finger scroll never fires a three-finger action (three-f
 		h.wait(0.1)
 		three_finger_swipe(h)
 		local fires = tab_fires(h.fired)
+		local reason = h.rejection("scroll guard")
 		h.finish()
+		helpers.assert_true(reason ~= nil,
+			"the field log must name the scroll guard gate with its measured value")
 		helpers.assert_eq(#fires, 0,
 			"fingers landing while the scroll's momentum still runs must not switch tabs; fired: "
 				.. table.concat(fires, ", "))
@@ -279,7 +329,10 @@ helpers.describe("a two-finger scroll never fires a three-finger action (three-f
 		h.wait(0.05)
 		three_finger_swipe(h)
 		local fires = tab_fires(h.fired)
+		local reason = h.rejection("scroll guard")
 		h.finish()
+		helpers.assert_true(reason ~= nil,
+			"the field log must name the scroll guard gate with its measured value")
 		helpers.assert_eq(#fires, 0,
 			"a momentum scroll event seen by the scroll tap must hold three-finger swipes "
 				.. "back; fired: " .. table.concat(fires, ", "))
@@ -316,6 +369,73 @@ helpers.describe("a deliberate three-finger swipe still switches tabs", function
 		h.finish()
 		helpers.assert_true(#fires > 0 and fires[1] == "tab_next",
 			"a staggered landing is still a three-finger swipe; fired: " .. table.concat(h.fired, ", "))
+	end)
+
+	helpers.it("fingers landing over 200 ms still make the swipe", function()
+		local h = new_harness()
+		-- One finger, the second a frame later, the third 200 ms after the
+		-- second, the pair resting still in between.
+		h.frame({ FINGER_A }, nil, 0)
+		for _ = 1, 25 do h.frame({ FINGER_A, FINGER_B }, nil, 0) end
+		local hand = { FINGER_A, FINGER_B, FINGER_C }
+		for i = 0, 30 do h.frame(hand, nil, i * STEP) end
+		h.lift()
+		local fires = tab_fires(h.fired)
+		h.finish()
+		helpers.assert_true(#fires > 0 and fires[1] == "tab_next",
+			"a slow landing of a still hand is a three-finger swipe; fired: " .. table.concat(h.fired, ", "))
+	end)
+
+	helpers.it("a third finger landing 40 ms late with the motion starting at once fires", function()
+		local h = new_harness()
+		for _ = 1, 5 do h.frame({ FINGER_A, FINGER_B }, nil, 0) end
+		-- The hand starts moving on the very frame the third finger lands, at a
+		-- brisk 125 units per second.
+		local hand = { FINGER_A, FINGER_B, FINGER_C }
+		for i = 1, 25 do h.frame(hand, nil, i * 1.0) end
+		h.lift()
+		local fires = tab_fires(h.fired)
+		h.finish()
+		helpers.assert_true(#fires > 0 and fires[1] == "tab_next",
+			"the confirmation must not outlast the motion; fired: " .. table.concat(h.fired, ", "))
+	end)
+
+	helpers.it("a slow three-finger swipe fires", function()
+		local h = new_harness()
+		local hand = { FINGER_A, FINGER_B, FINGER_C }
+		-- 12 units over 1.2 s.
+		for i = 0, 150 do h.frame(hand, nil, i * 0.08) end
+		h.lift()
+		local fires = tab_fires(h.fired)
+		h.finish()
+		helpers.assert_true(#fires > 0 and fires[1] == "tab_next",
+			"a slow swipe is still a swipe; fired: " .. table.concat(h.fired, ", "))
+	end)
+
+	helpers.it("a fast short three-finger flick fires", function()
+		local h = new_harness()
+		h.frame({ FINGER_A, FINGER_B }, nil, 0)
+		local hand = { FINGER_A, FINGER_B, FINGER_C }
+		-- The third finger lands a frame late; 10 units in 40 ms, then the lift.
+		for i = 0, 5 do h.frame(hand, nil, i * 2.0) end
+		h.lift()
+		local fires = tab_fires(h.fired)
+		h.finish()
+		helpers.assert_true(#fires > 0 and fires[1] == "tab_next",
+			"a flick lifts before any live fire and must fire at the commit; fired: "
+				.. table.concat(h.fired, ", "))
+	end)
+
+	helpers.it("a two-finger touch that did not scroll arms no scroll guard", function()
+		local h = new_harness()
+		for _ = 1, 10 do h.frame({ FINGER_A, FINGER_B }, nil, 0) end
+		h.lift()
+		h.wait(0.05)
+		three_finger_swipe(h)
+		local fires = tab_fires(h.fired)
+		h.finish()
+		helpers.assert_true(#fires > 0,
+			"only a real scroll arms the guard; a resting pair must not block the next swipe")
 	end)
 
 	helpers.it("a swipe once the scroll guard has expired fires", function()
