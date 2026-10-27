@@ -197,14 +197,14 @@ helpers.with_stub_scope(MODULES, function()
 		end)
 
 		helpers.it("unused keys: a removed [shortcuts.keys] hotkey is offered alone (config-outdated-at-hash)", function()
-			local source = "[shortcuts.keys]\nctrl_s = true\nat_hash = true\n"
+			local source = "[shortcuts.keys]\ncmd_star = true\nat_hash = true\n"
 			Sandbox.with_config(source, function(path)
 				local before = driver_state(path)
 				local keys = Cleanup.find(path, IoAdapter).keys
 				helpers.assert_eq(#keys, 1)
 				helpers.assert_eq({ keys[1].section, keys[1].key, keys[1].kind },
 					{ "shortcuts.keys", "at_hash", "leaf" })
-				helpers.assert_eq(before.flat.shortcut_keys, { ctrl_s = true })
+				helpers.assert_eq(before.flat.shortcut_keys, { cmd_star = true })
 				local result = Engine.remove({ path = path, keys = keys, stamp = Sandbox.STAMP,
 					file_adapter = IoAdapter })
 				helpers.assert_eq(result.status, "removed")
@@ -216,11 +216,11 @@ helpers.with_stub_scope(MODULES, function()
 		helpers.it("unused keys: an empty [shortcuts.keys] key never discards the file (config-outdated-empty-key)", function()
 			-- Reporting "" raised inside the loader's pcall: the whole config.toml
 			-- was declared corrupt and the session ran on defaults.
-			local source = "[shortcuts.keys]\n\"\" = true\nctrl_s = true\n"
+			local source = "[shortcuts.keys]\n\"\" = true\ncmd_star = true\n"
 			Sandbox.with_config(source, function(path)
 				local flat, status = Preferences.load(path)
 				helpers.assert_eq(status, "ok")
-				helpers.assert_eq(flat.shortcut_keys, { ctrl_s = true })
+				helpers.assert_eq(flat.shortcut_keys, { cmd_star = true })
 				local scan = Cleanup.find(path, IoAdapter)
 				helpers.assert_eq(scan.status, "ok", "the preview must not fail on the entry it reports")
 				helpers.assert_eq(#scan.keys, 0, "a quoted key has no line the cleanup can cut")
@@ -369,7 +369,7 @@ helpers.with_stub_scope(MODULES, function()
 				"script_altgr_escape = \"script_quit\"",
 				"",
 				"[shortcuts.keyboard]",
-				"cmd_k = \"retired_action_xyz\"",
+				"primary_k = \"retired_action_xyz\"",
 				"",
 				"[shortcuts.tap_keys]",
 				"number_row_left = \"retired_action_xyz\"",
@@ -390,7 +390,7 @@ helpers.with_stub_scope(MODULES, function()
 					offered[#offered + 1] = key.section .. "." .. key.key
 				end
 				table.sort(offered)
-				helpers.assert_eq(offered, { "gestures.tap_3", "shortcuts.keyboard.cmd_k",
+				helpers.assert_eq(offered, { "gestures.tap_3", "shortcuts.keyboard.primary_k",
 					"shortcuts.script_control.script_altgr_backspace", "shortcuts.tap_keys.number_row_left" })
 			end)
 			package.loaded["modules.gestures.actions"] = saved
@@ -685,7 +685,7 @@ helpers.with_stub_scope(MODULES, function()
 					end
 					local admitted, detail = pcall(Preferences.prepare_shortcut_updates,
 						{ status = "ok", content = source },
-						{ { section = "shortcuts.keyboard", key = "cmd_k", value = "copy" } }, { "keyboard" })
+						{ { section = "shortcuts.keyboard", key = "primary_k", value = "copy" } }, { "keyboard" })
 					for name, callback in pairs(previous) do IoAdapter[name] = callback end
 					helpers.assert_eq(admitted, false, "a nondelete child cannot erase its obsolete parent")
 					helpers.assert_true(tostring(detail):find("collides with retained obsolete parent 'shortcuts.keyboard'", 1, true) ~= nil,

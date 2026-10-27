@@ -12,14 +12,14 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.shortcut_bindings_fixture")
 
 helpers.describe("built-in shortcuts: native owners and physical claims", function()
-	helpers.it("starts every existing factory including Ctrl+CapsLock without weakening the generic modifier guard", function()
+	helpers.it("starts every existing factory without weakening the generic modifier guard", function()
 		Fixture.with_recommended_bindings(function(subject, ctx)
 			local registrar = require("adapters.hotkey_registrar")
 			helpers.assert_eq(subject.start(), true)
-			helpers.assert_eq(subject.is_bound("ctrl_capslock"), true)
+			helpers.assert_eq(subject.is_bound("ctrl_g"), true)
 			helpers.assert_eq(registrar.key_is_modifier("capslock"), true)
 			helpers.assert_nil(registrar.bind("Ctrl+CapsLock", function() end))
-			helpers.assert_eq(registrar.physical_claims()[registrar.physical_identity({"ctrl"}, "a")].action,
+			helpers.assert_eq(registrar.physical_claims()[registrar.physical_identity({"ctrl"}, "g")].action,
 				"explicit")
 			helpers.assert_eq(subject.stop(), true)
 			helpers.assert_eq(Fixture.live_count(ctx), 0)
@@ -30,16 +30,16 @@ helpers.describe("built-in shortcuts: native owners and physical claims", functi
 	helpers.it("retains the exact physical claim across refused native deletion and releases it on retry", function()
 		Fixture.with_bindings(function(subject, ctx)
 			local registrar = require("adapters.hotkey_registrar")
-			helpers.assert_eq(subject.enable("ctrl_a"), true)
-			local identity = registrar.physical_identity({"ctrl"}, "a")
+			helpers.assert_eq(subject.enable("ctrl_g"), true)
+			local identity = registrar.physical_identity({"ctrl"}, "g")
 			local native = assert(next(ctx.live))
 			local release = native.delete
 			native.delete = function() error("owned native delete refused") end
-			helpers.assert_eq(subject.disable("ctrl_a"), false)
+			helpers.assert_eq(subject.disable("ctrl_g"), false)
 			helpers.assert_true(registrar.physical_claims()[identity] ~= nil)
 			helpers.assert_nil(registrar.bind_conditional({"ctrl"}, _G.hs.keycodes.map.a, function() end))
 			native.delete = release
-			helpers.assert_eq(subject.disable("ctrl_a"), true)
+			helpers.assert_eq(subject.disable("ctrl_g"), true)
 			helpers.assert_nil(registrar.physical_claims()[identity])
 			helpers.assert_eq(Fixture.live_count(ctx), 0)
 		end)
@@ -56,17 +56,17 @@ helpers.describe("built-in shortcuts: native owners and physical claims", functi
 			local token = assert(registrar.bind_conditional({"ctrl"}, _G.hs.keycodes.map.a, function() end))
 			local observed_claim, observed_suspension
 			_G.hs.hotkey.bind = function(...)
-				observed_claim = registrar.physical_claims()[registrar.physical_identity({"ctrl"}, "a")]
+				observed_claim = registrar.physical_claims()[registrar.physical_identity({"ctrl"}, "g")]
 				observed_suspension = conditional.enabled
 				local native = bind(...)
 				local release = native.delete
 				native.delete = function() release() end -- Hammerspoon delete is void.
 				return native
 			end
-			helpers.assert_eq(subject.enable("ctrl_a"), true)
+			helpers.assert_eq(subject.enable("ctrl_g"), true)
 			helpers.assert_true(observed_claim ~= nil, "claim is published before native acquisition")
 			helpers.assert_eq(observed_suspension, false)
-			helpers.assert_eq(subject.disable("ctrl_a"), true)
+			helpers.assert_eq(subject.disable("ctrl_g"), true)
 			helpers.assert_eq(conditional.enabled, true)
 			helpers.assert_eq(Fixture.live_count(ctx), 0)
 			helpers.assert_eq(registrar.unbind(token), true)
@@ -83,7 +83,7 @@ helpers.describe("built-in shortcuts: native owners and physical claims", functi
 			_G.hs.hotkey.bind = function() return conditional end
 			local token = assert(registrar.bind_conditional({"ctrl"}, _G.hs.keycodes.map.a, function() end))
 			_G.hs.hotkey.bind = function() return nil end
-			helpers.assert_eq(subject.enable("ctrl_a"), false)
+			helpers.assert_eq(subject.enable("ctrl_g"), false)
 			helpers.assert_eq(conditional.enabled, true)
 			helpers.assert_nil(next(registrar.physical_claims()))
 			helpers.assert_eq(registrar.unbind(token), true)
@@ -99,7 +99,7 @@ helpers.describe("built-in shortcuts: native owners and physical claims", functi
 			_G.hs.hotkey.bind = function() return conditional end
 			local token = assert(registrar.bind_conditional({"ctrl"}, _G.hs.keycodes.map.a, function() end))
 			_G.hs.hotkey.bind = function() return nil end
-			helpers.assert_eq(subject.enable("ctrl_a"), false)
+			helpers.assert_eq(subject.enable("ctrl_g"), false)
 			helpers.assert_eq(subject.has_pause_debt(), true)
 			helpers.assert_eq(subject.stop(), false)
 			helpers.assert_true(next(registrar.physical_claims()) ~= nil)
@@ -120,7 +120,7 @@ helpers.describe("built-in shortcuts: native owners and physical claims", functi
 			conditional.delete = function() end
 			_G.hs.hotkey.bind = function() return conditional end
 			local token = assert(registrar.bind_conditional({"ctrl"}, _G.hs.keycodes.map.a, function() end))
-			helpers.assert_eq(subject.enable("ctrl_a"), false)
+			helpers.assert_eq(subject.enable("ctrl_g"), false)
 			helpers.assert_eq(subject.has_pause_debt(), true)
 			helpers.assert_eq(subject.stop(), false)
 			conditional.disable = function(self) self.enabled=false; return self end

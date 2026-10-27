@@ -11,7 +11,7 @@ return function(gestures, state, kind, read_action, save_attempt, controls)
 	controls = controls or {}
 	-- Exact focused discovery must not depend on another test priming Paths.
 	package.loaded["infra.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
-	local content = '[gestures]\ntap_3 = "none"\naction_parameters = { retained = "unrelated" }\n[shortcuts.keyboard]\ncmd_1 = "none"\n[shortcuts.tap_keys]\nnumber_row_left = "none"\n[shortcuts.script_control]\nscript_altgr_enter = "none"\n'
+	local content = '[gestures]\ntap_3 = "none"\naction_parameters = { retained = "unrelated" }\n[shortcuts.keyboard]\nprimary_1 = "none"\n[shortcuts.tap_keys]\nnumber_row_left = "none"\n[shortcuts.script_control]\nscript_altgr_enter = "none"\n'
 	if controls and controls.absent then content = nil end
 	local files = { config = content }
 	local files_port = {
@@ -99,7 +99,7 @@ return function(gestures, state, kind, read_action, save_attempt, controls)
 	})
 	local function publish_assignment(value, on_error)
 		local section = kind == "keyboard" and "shortcuts.keyboard" or "shortcuts.tap_keys"
-		local key = kind == "keyboard" and "cmd_1" or "number_row_left"
+		local key = kind == "keyboard" and "primary_1" or "number_row_left"
 		local row
 		if kind == "keyboard" then row = Assignment.operation(key, value, function() return true end, gestures.is_assignable)
 		else row = Manifest.sparse_operation(section .. "." .. key, value) end

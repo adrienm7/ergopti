@@ -223,7 +223,7 @@ local function fresh_actions(options)
 	local function reenter_during_resume(kind, parent)
 		if controls.reenter_during_resume ~= kind then return end
 		local binding = parent == "shortcut_bindings"
-			and "keyboard__cmd_1" or "tap_3"
+			and "keyboard__primary_1" or "tap_3"
 		calls.reentrant_results[#calls.reentrant_results + 1] =
 			actions.execute_single("open_config", binding)
 	end
@@ -986,7 +986,7 @@ local function with_feature_lifecycles(actions, calls, body)
 
 	feature.keyboard_execute = function(action)
 		if feature.keyboard_started ~= true then return false end
-		return actions.execute_single(action, "keyboard__cmd_1")
+		return actions.execute_single(action, "keyboard__primary_1")
 	end
 	feature.static_screenshot = function()
 		if feature.bindings_started ~= true then return false end

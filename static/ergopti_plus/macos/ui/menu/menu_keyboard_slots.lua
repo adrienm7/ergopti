@@ -255,11 +255,11 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 		keyboard_group_has_scope = function() return not group.fixed end,
 		keyboard_group_has_fixed = function() return #fixed > 0 end,
 		keyboard_group_ready = function() return not disabled and ctx.paused ~= true and not group.fixed end,
-		keyboard_group_add_option = add_for("hs_option_"),
-		keyboard_group_add_ctrl = add_for("hs_ctrl_"),
-		keyboard_group_add_ctrl_shift = add_for("hs_ctrl_shift_"),
-		keyboard_group_add_cmd = add_for("cmd_"),
-		keyboard_group_add_cmd_shift = add_for("cmd_shift_"),
+		keyboard_group_add_option = add_for("alt_"),
+		keyboard_group_add_ctrl = add_for("secondary_"),
+		keyboard_group_add_ctrl_shift = add_for("secondary_shift_"),
+		keyboard_group_add_cmd = add_for("primary_"),
+		keyboard_group_add_cmd_shift = add_for("primary_shift_"),
 	}
 	local function add_action()
 		if not getters.keyboard_group_ready() then return false end

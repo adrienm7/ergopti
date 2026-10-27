@@ -69,8 +69,8 @@ helpers.describe("gestures.actions: parameterized action bindings", function()
 		helpers.assert_true(Actions.validate_action_parameter("search_web", "https://search.example/?q=%s"))
 		helpers.assert_eq(Actions.validate_action_parameter("search_web", "https://search.example/?q=%s&again=%s"), false)
 		helpers.assert_eq(Actions.validate_action_parameter("open_url", "not-a-url"), false)
-		local binding, action = Actions.split_action_parameter_key("keyboard__cmd_k__search_web")
-		helpers.assert_eq(binding, "keyboard__cmd_k", "scoped bindings must not be split at their first separator")
+		local binding, action = Actions.split_action_parameter_key("keyboard__primary_k__search_web")
+		helpers.assert_eq(binding, "keyboard__primary_k", "scoped bindings must not be split at their first separator")
 		helpers.assert_eq(action, "search_web")
 	end)
 end)
@@ -583,10 +583,10 @@ helpers.describe("gestures.actions: published parameter binding identity", funct
 
 	helpers.it("leaves the other qualified binding owners unjudged", function()
 		with_actions(function(actions)
-			for _, binding in ipairs({ "keyboard__cmd_k", "tap_key__a", "script__reload", "tap_hold__caps_lock", "combination__caps_lock_then_space" }) do
+			for _, binding in ipairs({ "keyboard__primary_k", "tap_key__a", "script__reload", "tap_hold__caps_lock", "combination__caps_lock_then_space" }) do
 				local owner = package.loaded["modules.shortcuts.keyboard_shortcuts"]
 				local published = require("config_keyboard_publication").current(owner) ~= nil
-				if binding == "keyboard__cmd_k" and published then
+				if binding == "keyboard__primary_k" and published then
 					helpers.assert_eq(actions.action_parameter_binding_fits(binding), true, "the actual published Mac Cmd+K is current")
 				else
 					helpers.assert_nil(actions.action_parameter_binding_fits(binding), binding)

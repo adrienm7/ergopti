@@ -12,7 +12,7 @@ local function fixture(source)
 	helpers.load_with_stubs("modules.gestures.actions")
 	local gestures = helpers.load_with_stubs("modules.gestures")
 	local controls, state, files = {}, { gestures = true }, {}
-	local original = source or '[gestures]\nenabled = true\ntap_4 = "open_url"\nmodes = { swipe_3_horiz = "incremental", future = "keep" }\nsensitivities = { swipe_3_horiz = 9, future = 17 }\naction_parameters = { tap_4__open_url = "https://apple.com", keyboard__cmd_k__open_url = "https://example.com", future = { preserve = 7 } }\n[future]\nkeep = 42\n'
+	local original = source or '[gestures]\nenabled = true\ntap_4 = "open_url"\nmodes = { swipe_3_horiz = "incremental", future = "keep" }\nsensitivities = { swipe_3_horiz = 9, future = 17 }\naction_parameters = { tap_4__open_url = "https://apple.com", keyboard__primary_k__open_url = "https://example.com", future = { preserve = 7 } }\n[future]\nkeep = 42\n'
 	files.config = original
 	if source == false then files.config = nil end
 	local enabled, writes = true, 0
@@ -31,7 +31,7 @@ local function fixture(source)
 	gestures.set_mode("swipe_3_horiz", "incremental")
 	gestures.set_sensitivity("swipe_3_horiz", 9)
 	gestures.set_action_parameter("tap_4", "open_url", "https://apple.com")
-	gestures.set_action_parameter("keyboard__cmd_k", "open_url", "https://example.com")
+	gestures.set_action_parameter("keyboard__primary_k", "open_url", "https://example.com")
 	local files_port = {
 		read_with_status = function(path) return files[path], files[path] and "ok" or "absent" end,
 		write = function() error("unguarded write") end,
@@ -109,7 +109,7 @@ helpers.describe("macOS complete gesture scope", function()
 		helpers.assert_eq(decoded.gestures.sensitivities.future, 17)
 		helpers.assert_eq(decoded.gestures.action_parameters.tap_4__open_url, nil)
 		helpers.assert_eq(decoded.gestures.action_parameters.future.preserve, 7)
-		helpers.assert_eq(decoded.gestures.action_parameters.keyboard__cmd_k__open_url, "https://example.com")
+		helpers.assert_eq(decoded.gestures.action_parameters.keyboard__primary_k__open_url, "https://example.com")
 		helpers.assert_eq(files.backup, original)
 		helpers.assert_eq(writes(), 2)
 		helpers.assert_eq(state.gestures, true)
@@ -258,7 +258,7 @@ local function actual_frame_fixture(source)
 	assert(engine.init(core, actions) == true, "the actual engine refused the constructor's exact dependencies")
 	assert(gestures.enable_all() == true, "the actual gesture master did not enable")
 	local controls, state, files = {}, { gestures = true }, {}
-	local original = source or '[gestures]\nenabled = true\ntap_4 = "open_url"\nmodes = { swipe_3_horiz = "incremental", future = "keep" }\nsensitivities = { swipe_3_horiz = 9, future = 17 }\naction_parameters = { tap_4__open_url = "https://apple.com", keyboard__cmd_k__open_url = "https://example.com", future = { preserve = 7 } }\n[future]\nkeep = 42\n'
+	local original = source or '[gestures]\nenabled = true\ntap_4 = "open_url"\nmodes = { swipe_3_horiz = "incremental", future = "keep" }\nsensitivities = { swipe_3_horiz = 9, future = 17 }\naction_parameters = { tap_4__open_url = "https://apple.com", keyboard__primary_k__open_url = "https://example.com", future = { preserve = 7 } }\n[future]\nkeep = 42\n'
 	files.config = original
 	if source == false then files.config = nil end
 	local writes, backup_generation = 0, 0
@@ -266,7 +266,7 @@ local function actual_frame_fixture(source)
 	gestures.set_mode("swipe_3_horiz", "incremental")
 	gestures.set_sensitivity("swipe_3_horiz", 9)
 	gestures.set_action_parameter("tap_4", "open_url", "https://apple.com")
-	gestures.set_action_parameter("keyboard__cmd_k", "open_url", "https://example.com")
+	gestures.set_action_parameter("keyboard__primary_k", "open_url", "https://example.com")
 	local files_port = {
 		read_with_status = function(path) return files[path], files[path] and "ok" or "absent" end,
 		write = function() error("unguarded write") end,

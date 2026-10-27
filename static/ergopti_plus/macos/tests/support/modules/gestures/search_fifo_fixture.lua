@@ -47,7 +47,7 @@ function M.with_world(options, callback)
 			package.loaded["modules.gestures.actions"] = nil
 			local actions = require("modules.gestures.actions")
 			actions.init({ action_params = {} })
-			assert(actions.set_action_parameter("keyboard__cmd_1", "search_web", "https://example.test/?q=%s"))
+			assert(actions.set_action_parameter("keyboard__primary_1", "search_web", "https://example.test/?q=%s"))
 			if options.backlog then
 				f.callback_active = true; syn.enter_callback()
 				local tx = syn.begin("test.search.paced", "replacement")
@@ -83,7 +83,7 @@ function M.with_world(options, callback)
 				error("bounded Search timer turns exceeded")
 			end
 			w.actions, w.trace, w.urls = actions, trace, urls
-			function w.start() return actions.execute_single("search_web", "keyboard__cmd_1") end
+			function w.start() return actions.execute_single("search_web", "keyboard__primary_1") end
 			function w.counts() return copies, restores, reads end
 			function w.clipboard() return board end
 			function w.external(text) generation = generation + 1; board = { ["public.utf8-plain-text"] = text } end
