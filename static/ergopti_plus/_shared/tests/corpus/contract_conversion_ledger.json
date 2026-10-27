@@ -1109,6 +1109,25 @@
 			]
 		},
 		{
+			"contract": "config_scope_script_level_contract.lua",
+			"lua_sites": 3,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "restores the exact numeric threshold captured, after release and reacquisition",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses numbers, other spellings and foreign receipts without moving the threshold",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses the ordinary setters while a transaction holds the field",
+					"reason": "transaction_sequence"
+				}
+			]
+		},
+		{
 			"contract": "config_scope_script_runtime_contract.lua",
 			"lua_sites": 15,
 			"data_driven": [],
