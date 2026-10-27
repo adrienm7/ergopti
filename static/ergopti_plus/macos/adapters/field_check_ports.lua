@@ -135,7 +135,10 @@ local function fetch_pac(url, callback)
 	local client = require("adapters.http_client").new({ timeout_ms = 6000 })
 	client.get(url, {}, function(result)
 		if (tonumber(result.status) or 0) == 0 then
-			Logger.warn(LOG, "PAC download failed: %s.", tostring(result.error))
+			-- The transport's error text ends with the request URL: the company PAC
+			-- address reached the field report of 2026-10-27 19:47 through it.
+			local reason = tostring(result.error):gsub("%s*%-?%s*%a[%w+.-]*://%S*", ""):gsub("[%s.]+$", "")
+			Logger.warn(LOG, "PAC download failed: %s.", reason)
 		end
 		callback(result.status, result.body)
 	end)
