@@ -8,6 +8,10 @@ import tempfile
 import unittest
 
 
+# Selects one Lua runtime; unset runs the driver's LuaJIT.
+RUNTIME_VARIABLE = "ERGOPTI_SQLITE_ADMISSION_TEST_LUA"
+
+
 PROBE = """
 local driver = arg[4]
 package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;'
@@ -75,10 +79,12 @@ class SqliteFileAdmissionTests(unittest.TestCase):
         script = root / "probe.lua"
         script.write_text(PROBE, encoding="utf-8")
         environment = dict(os.environ)
-        # A LuaJIT runner exports its 5.1 module paths to children. Each native
-        # ABI must use its own loader defaults instead of that inherited ABI.
+        # The probe sets its own package.path. The default runtime is the suite's
+        # own LuaJIT, whose LUA_CPATH holds luv on the distribution rows; another
+        # ABI selected through RUNTIME_VARIABLE must use its own loader defaults.
         environment.pop("LUA_PATH", None)
-        environment.pop("LUA_CPATH", None)
+        if RUNTIME_VARIABLE in os.environ:
+            environment.pop("LUA_CPATH", None)
         return subprocess.run(
             [runtime, str(script), mode, str(database), str(resource), str(driver)],
             env=environment,
@@ -89,7 +95,9 @@ class SqliteFileAdmissionTests(unittest.TestCase):
         )
 
     def test_native_startup_admission_and_recovery(self):
-        for runtime_name in ("luajit", "lua5.4"):
+        # The driver runs on LuaJIT; the platform-metrics E2E shard replays this
+        # file with RUNTIME_VARIABLE=lua5.4, the shared writer's other ABI.
+        for runtime_name in (os.environ.get(RUNTIME_VARIABLE, "luajit"),):
             runtime = shutil.which(runtime_name)
             self.assertIsNotNone(runtime, "Native file admission requires " + runtime_name)
             for mode in (
