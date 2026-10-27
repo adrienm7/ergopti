@@ -402,6 +402,10 @@ local function walk_assignments(decoded, consume, written)
 		elseif PhysicalSlots.is_namespace(slot) then
 			assert(not written, "physical keyboard candidate contains an invalid slot")
 			ConfigOutdated.report({ "shortcuts", "keyboard", slot }, "invalid physical shortcut identity", Logger)
+		else
+			-- A key no slot owns (an id a past build used, a typo) used to vanish
+			-- without a word. It is named once and offered by the cleanup.
+			ConfigOutdated.report({ "shortcuts", "keyboard", slot }, ConfigOutdated.UNKNOWN_SLOT, Logger)
 		end
 	end
 end
