@@ -80,6 +80,74 @@ test(
 	JSON.stringify(mutant)
 );
 
+// Execute the actual worker command under a zero file-size limit with the
+// default SIGXFSZ disposition. The status write must fail without killing the
+// worker, so the completion file still appears and the wizard stops waiting.
+function shellQuote(value) {
+	return "'" + value.replace(/'/g, "'\\''") + "'";
+}
+function renderWorker(candidate, paths) {
+	const match = /^\tset bgCmd to (.+?)\n\tdo shell script bgCmd$/ms.exec(candidate);
+	if (!match) return null;
+	return match[1]
+		.replace(/¬\s*/g, ' ')
+		.split(/\s&\s/)
+		.map((piece) => {
+			const part = piece.trim();
+			const literal = /^"((?:[^"\\]|\\.)*)"$/.exec(part);
+			if (literal) return literal[1].replace(/\\(.)/g, '$1');
+			if (part === 'cmd') return paths.command;
+			const quoted = /^quoted form of (resultPath|statusPath|donePath)$/.exec(part);
+			if (quoted) return shellQuote(paths[quoted[1]]);
+			throw new Error('unexpected worker command piece: ' + part);
+		})
+		.join('');
+}
+function workerCompletes(candidate) {
+	const { spawnSync } = require('child_process');
+	const os = require('os');
+	const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-appcloner-worker-'));
+	try {
+		const paths = {
+			command: 'true',
+			resultPath: path.join(runDir, 'result'),
+			statusPath: path.join(runDir, 'status'),
+			donePath: path.join(runDir, 'done')
+		};
+		const worker = renderWorker(candidate, paths);
+		if (!worker) return { completed: false, detail: 'worker command not found' };
+		// trap - restores the default disposition the wizard's shell inherits.
+		const run = spawnSync('/bin/sh', ['-c', 'trap - XFSZ; ulimit -f 0; ' + worker], {
+			encoding: 'utf8',
+			timeout: 5000
+		});
+		const deadline = Date.now() + 5000;
+		while (!fs.existsSync(paths.donePath) && Date.now() < deadline)
+			spawnSync('/bin/sleep', ['0.05']);
+		return {
+			completed: fs.existsSync(paths.donePath),
+			status: fs.existsSync(paths.statusPath) ? fs.readFileSync(paths.statusPath, 'utf8') : null,
+			shell: run.status
+		};
+	} finally {
+		fs.rmSync(runDir, { recursive: true, force: true });
+	}
+}
+if (process.platform !== 'win32') {
+	const limited = workerCompletes(source);
+	test(
+		'the worker publishes completion when a file-size limit refuses its status write',
+		limited.completed === true && limited.status === '',
+		JSON.stringify(limited)
+	);
+	const killedMutant = workerCompletes(source.replace('"(trap \'\' XFSZ; " & cmd', '"(" & cmd'));
+	test(
+		'the guard rejects a worker that SIGXFSZ can kill before completion',
+		killedMutant.completed === false,
+		JSON.stringify(killedMutant)
+	);
+}
+
 console.log('TAP version 14');
 console.log(`1..${results.length}`);
 results.forEach((result, index) => {
