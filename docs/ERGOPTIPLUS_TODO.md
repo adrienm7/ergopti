@@ -78,6 +78,16 @@ a sealed Windows updater source, reseal with
     check each against dev first, later fixes may have replaced them.
   - `tmp/wip-todo-ae-par30`: 41f72525cf is an unvalidated work-in-progress snapshot of the PAR-30 Linux
     updater signature gate; redo it from the item, do not cherry-pick it as is.
+- **Review the Windows antivirus surface ceilings (27 Oct).** d7d98e133b raised the exe bundle's DllImport
+  ceiling in `tools/ci/windows-exe-av-surface.json` from 52 to 54 for the two staged-file custody P/Invokes of
+  `vendor/ergopti_updater_download.ps1` (`CreateFileW`, `GetFileInformationByHandle`, from bdfa026d16). Check
+  whether a bundled type already declaring them could be reused, then lower it back. The same build log notes
+  `key_state_polling` dropped to 59: lower its script ceiling from 62 once a Windows build confirms 59.
+- **Last full preflight:** read the newest `ci.yml` run on `tmp/preflight-dev` first. The run of 17e9011468
+  was 70 green and 5 red. All five are fixed on dev: the pinned-source-reads ratchet (948f79c7b8), shared
+  Lua helpers (89a106d4b2), Ollama/bootstrap test expectations (179afb41e2), the AppImage GLib closure
+  list (79c6e0978b), and the Windows antivirus ceilings (d7d98e133b). A new full run is dispatched on the
+  head.
 - **The ChatGPT fix branches** fix/linux, fix/macos and fix/windows are fully on dev. The container proxy
   refuses remote deletion, so the maintainer deletes them: `git push origin --delete fix/linux fix/macos
 fix/windows`.
