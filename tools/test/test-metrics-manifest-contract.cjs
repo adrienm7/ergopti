@@ -258,7 +258,7 @@ const selectionState = {
 	did_apply_initial_reset: true,
 	app_selection_mode: 'all'
 };
-const processManifest = compileFunction(typingSource, 'process_manifest', {
+const selectionContext = {
 	window: { metrics_manifest: manifest },
 	app_state: selectionState,
 	APP_SELECTION_MODE: { ALL: 'all', NONE: 'none', UNINITIALIZED: 'initial' },
@@ -267,7 +267,13 @@ const processManifest = compileFunction(typingSource, 'process_manifest', {
 	compute_manifest_metrics() {},
 	request_range_data() {},
 	ensure_live_refresh() {}
-});
+};
+selectionContext.update_manifest_scope = compileFunction(
+	typingSource,
+	'update_manifest_scope',
+	selectionContext
+);
+const processManifest = compileFunction(typingSource, 'process_manifest', selectionContext);
 processManifest();
 assert.deepStrictEqual(
 	plain(selectionState.available_apps),
