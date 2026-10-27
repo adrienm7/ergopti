@@ -96,6 +96,7 @@ graph TD
         MACOS_event_clock["EventClock.lua"]
         MACOS_event_provenance["EventProvenance.lua"]
         MACOS_field_check_ports["FieldCheckPorts.lua"]
+        MACOS_field_run_ports["FieldRunPorts.lua"]
         MACOS_file_system["FileSystem.lua"]
         MACOS_foreign_ledger_snapshot["ForeignLedgerSnapshot.lua"]
         MACOS_graphics_renderer["GraphicsRenderer.lua"]
