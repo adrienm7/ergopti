@@ -196,6 +196,20 @@ local function values_of(state, path)
 	return values
 end
 
+--- The number-row order capability the page asks: true, or the locale key of why not.
+--- @param state table Daemon state; state.number_row_live may replace the module under test.
+--- @return boolean|string
+local function number_row_capability(state)
+	local live = type(state) == "table" and state.number_row_live or require("modules.keymap.number_row_live")
+	local called, available, reason = pcall(live.available)
+	if called and available == true then return true end
+	if not called then
+		Logger.error(LOG, "The number-row capability could not be read: %s.", tostring(available))
+	end
+	return reason == "no_source_layout" and "platform_reason.number_row_live_no_layout"
+		or "platform_reason.number_row_live_session"
+end
+
 local function build_init_data(state)
 	local i18n = dependency(state, "i18n", "infra.i18n")
 	local config_paths = dependency(state, "config_paths", "infra.config_paths")
@@ -214,8 +228,9 @@ local function build_init_data(state)
 	if not strings or not values then return nil end
 	return {
 		platform = CATALOGUE_DRIVER,
-		-- Gesture registration with the system is a Windows host action only.
-		capabilities = { gesture_registration = false },
+		-- Gesture registration with the system is a Windows host action only. The number-row
+		-- order is applied live when the session loads a layout and one of ours is installed.
+		capabilities = { gesture_registration = false, number_row_live = number_row_capability(state) },
 		locale = current_locale,
 		strings = strings,
 		default_config_dir = default_dir,
