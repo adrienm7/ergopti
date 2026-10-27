@@ -5,10 +5,8 @@
 --- DESCRIPTION:
 --- Prints the canonical form of one .keylayout as compact JSON, read by
 --- test-keylayout-canonical-parity.cjs: `lua keylayout-canonical-dump.lua
---- <_shared dir> <file.keylayout> [shared-json]`. With `shared-json` the form is
---- written by the shared JSON codec, exactly as the Linux layout manager hands
---- it to the converter. Otherwise numbers are integers, empty tables are
---- arrays, and object keys are sorted so the output is stable.
+--- <_shared dir> <file.keylayout>`. Numbers are integers, empty tables are arrays,
+--- and object keys are sorted so the output is stable.
 --- ==============================================================================
 
 package.path = arg[1] .. "/lua/?.lua;" .. arg[1] .. "/lua/?/init.lua;" .. package.path
@@ -47,4 +45,4 @@ if not parsed then
 	io.stderr:write(err, "\n")
 	os.exit(2)
 end
-io.write(arg[3] == "shared-json" and require("json").encode(parsed) or encode(parsed))
+io.write(encode(parsed))
