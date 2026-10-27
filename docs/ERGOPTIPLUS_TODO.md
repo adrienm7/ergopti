@@ -396,7 +396,10 @@ closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swift
   names for every download child with one INFO line per name ("Inherited SSL_CERT_FILE ignored:
   downloads use the system and keychain trust."), the launcher's `--managed-http` and
   `--managed-bootstrap-download` roles unset both before reading their environment, and the Go
-  `native_http` package ignores them on darwin. Linux and Windows are unchanged. The Swift part
+  `native_http` package ignores them on darwin. That Go ignore also refused the native model
+  receiver's own fixture anchor (preflight run 40584261575, pull `certificate`), so the macOS
+  decision moved to the daemon owner: `managed_ollama_serve.py` seals its snapshot with
+  `inherited_trust=False` and Go honors only the sealed snapshot. Linux and Windows are unchanged. The Swift part
   is not compiled on the Linux host (ManagedNetworkBootstrapTests covers it on macOS CI). Mac
   confirms: the next run logs that INFO line, the MLX install passes `uv sync`, and
   03_field_network reads `tls pass:trusted`; if TLS then fails with `certificate`, the company root
