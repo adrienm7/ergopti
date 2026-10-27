@@ -183,10 +183,16 @@ if (moduleSrc) {
 			'utf8'
 		)
 	);
-	const canonicalGroups = catalogue.platforms?.macos?.shortcut_groups;
+	const roleTable = JSON.parse(
+		fs.readFileSync(
+			path.join(ROOT, 'static/ergopti_plus/_shared/modules/actions/slot_roles.json'),
+			'utf8'
+		)
+	);
+	const canonicalGroups = roleTable.families?.macos;
 	const canonicalModifiers = catalogue.platforms?.macos?.modifiers;
 	const slotMods = Array.isArray(canonicalGroups)
-		? canonicalGroups.map((group) => group.prefix)
+		? canonicalGroups.map((roles) => roles.join('_') + '_')
 		: [];
 	if (
 		!Array.isArray(canonicalGroups) ||
@@ -195,27 +201,26 @@ if (moduleSrc) {
 		!Array.isArray(canonicalModifiers)
 	) {
 		errors.push(
-			'the actual macOS catalogue must declare five unique ordinary groups and native modifier aliases'
+			'the role table must declare five unique macOS slot families and the catalogue its native modifier aliases'
 		);
 	}
 	const modifierIds = new Set((canonicalModifiers || []).map((modifier) => modifier.id));
-	for (const group of canonicalGroups || []) {
+	for (const roles of canonicalGroups || []) {
 		if (
-			!Array.isArray(group.modifiers) ||
-			group.modifiers.length === 0 ||
-			group.modifiers.some((modifier) => !modifierIds.has(modifier))
+			roles.length === 0 ||
+			roles.some((role) => !modifierIds.has(roleTable.roles[role]?.macos))
 		) {
-			errors.push(`canonical group ${group.prefix} has no actual modifier owner`);
+			errors.push(`macOS family ${roles.join('_')} has no actual modifier owner`);
 		}
 	}
 	if (
-		!/for _, group in ipairs\(platform\.shortcut_groups\)/.test(moduleSrc) ||
+		!/SlotRoles\.families\("macos"\)/.test(moduleSrc) ||
 		!/aliases\[modifier\.id\] = assert\(modifier\.hammerspoon/.test(moduleSrc) ||
-		!/groups\[#groups \+ 1\] = \{ group\.prefix, mods \}/.test(moduleSrc) ||
+		!/groups\[#groups \+ 1\] = \{ family\.prefix, mods \}/.test(moduleSrc) ||
 		!/SLOT_MODS, SPECIAL_KEYS = groups, keys/.test(moduleSrc)
 	) {
 		errors.push(
-			'SLOT_MODS must derive its actual prefixes and native modifiers from the canonical catalogue'
+			'SLOT_MODS must derive its actual prefixes and native modifiers from the role table and the catalogue'
 		);
 	}
 	const groups = [
