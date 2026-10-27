@@ -618,3 +618,5 @@ Test("Ollama response identity: foreign model cannot acquire download consent (o
 	_RWMO_ResponseIdentity.Bind("foreign:latest", 0))
 Test("Ollama response identity: private provider echo cannot acquire download consent (ollama-terminal-model-affinity)",
 	_RWMO_ResponseIdentity.Bind("SCREEN_PRIVATE_MODEL_ECHO", 0))
+
+#Include %A_LineFile%/../test_llm_api_ollama_dispatch_admission.ahk
