@@ -29,7 +29,6 @@
 
 #Requires AutoHotkey v2.0
 
-global DEV_SOURCE_DRIVER_SUBPATH := "\static\ergopti_plus\windows"
 global DEV_SOURCE_POLL_MS := 1000
 ; The watcher's single owner: 0 until DevSourceWatcher_Start, then a Map.
 global _DevSourceWatcher := 0
@@ -61,25 +60,34 @@ DevSource_EnvironmentName(SharedDir) {
 DevSource_Root() {
 	static Resolved := 0
 	if !(Resolved is Map) {
-		Root := A_IsCompiled ? "" : DevSource_ResolveRoot(
-			EnvGet(DevSource_EnvironmentName(_SharedDir)), A_ScriptDir, A_IsCompiled)
+		Root := Updater_IsLocalSource() ? DevSource_ResolveRoot(
+			EnvGet(DevSource_EnvironmentName(_SharedDir)), A_ScriptDir, true) : ""
 		Resolved := Map("root", Root)
 	}
 	return Resolved["root"]
 }
 
+; Whether this process reads the installed build's paths.toml: an installed
+; build, or a developer run that must see the user's configuration folder.
+; @returns {Boolean}
+DevSource_UsesInstalledPaths() {
+	return !Updater_IsLocalSource() || DevSource_Root() != ""
+}
+
 ; Resolves the clone root of a developer run.
 ; @param EnvValue {String} The developer variable's value ("" when unset).
 ; @param ScriptDir {String} The running script's folder.
-; @param IsCompiled {Integer} A_IsCompiled.
+; @param IsLocalSource {Integer} Updater_IsLocalSource(), the one source-run owner.
 ; @returns {String} The clone root, "" for an ordinary run.
-DevSource_ResolveRoot(EnvValue, ScriptDir, IsCompiled) {
-	if (EnvValue == "" || IsCompiled)
+DevSource_ResolveRoot(EnvValue, ScriptDir, IsLocalSource) {
+	if (EnvValue == "" || !IsLocalSource)
 		return ""
 	Root := StrReplace(EnvValue, "/", "\")
 	if !RegExMatch(Root, "^(?:[A-Za-z]:\\|\\\\)") || SubStr(Root, -1) == "\"
 		throw ValueError("The developer root is not a plain absolute clone path: " . EnvValue)
-	Expected := Root . DEV_SOURCE_DRIVER_SUBPATH
+	; A literal, not a module global: boot.ahk resolves the root before this
+	; include's globals would be assigned.
+	Expected := Root . "\static\ergopti_plus\windows"
 	if (StrLower(StrReplace(ScriptDir, "/", "\")) != StrLower(Expected))
 		throw ValueError("The developer root names the clone " . Root
 			. ", but this driver runs from " . ScriptDir)
