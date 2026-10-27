@@ -255,9 +255,12 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 		for _, value in pairs(MetricsState) do declared[value] = true end
 		local file = assert(io.open(helpers.shared("modules/menu/menu_manifest.json"), "rb"))
 		local manifest_text = file:read("*a"); file:close()
-		local used = {}
-		for name in manifest_text:gmatch('"(keystats_[%w_]+)"') do used[name] = true end
-		helpers.assert_true(next(used) ~= nil, "the manifest must still name its metrics state")
+		local used, named = {}, 0
+		for name in manifest_text:gmatch('"(keystats_[%w_]+)"') do
+			used[name] = true
+			named = named + 1
+		end
+		helpers.assert_true(named > 0, "the manifest must still name its metrics state")
 		for name in pairs(used) do
 			helpers.assert_true(declared[name] == true,
 				name .. " is read by the manifest but not declared in infra/metrics_state_keys.lua")
