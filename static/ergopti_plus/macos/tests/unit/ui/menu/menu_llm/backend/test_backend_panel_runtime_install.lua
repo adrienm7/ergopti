@@ -214,7 +214,7 @@ helpers.describe("Ollama row waits for the accepted download (backend-runtime-in
 
 	helpers.it("keeps the current backend when the offer is declined", function()
 		with_rows({ backend = "api", ollama_installed = false,
-			dialog_choice = "ollama.offer_website" }, function(rows, record, state)
+			dialog_choice = "ollama.native_offer_keep" }, function(rows, record, state)
 			helpers.assert_eq(rows[ROW.ollama].action(), false)
 			helpers.assert_eq(record.ollama.installs, 0)
 			helpers.assert_eq(#record.switches, 0)
