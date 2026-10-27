@@ -30,7 +30,7 @@ local Logger  = require("infra.logger")
 local Timings = require("infra.timings")
 local i18n    = require("infra.i18n")
 local TimerScheduler = require("adapters.timer_scheduler")
-local PredictionRenderer = require("adapters.prediction_renderer")
+local PredictionTooltipPort = require("adapters.prediction_tooltip_port")
 local TextUtils = require("text_utils")
 
 local LOG = "llm.streaming_handler"
@@ -79,7 +79,7 @@ local _stream_watchdog_timer    = nil
 --- init with a tooltip that cannot draw still reports its own refusal.
 --- @return table renderer
 local function renderer()
-	if _renderer == nil then _renderer = PredictionRenderer.wrap(_tooltip) end
+	if _renderer == nil then _renderer = PredictionTooltipPort.wrap(_tooltip) end
 	return _renderer
 end
 

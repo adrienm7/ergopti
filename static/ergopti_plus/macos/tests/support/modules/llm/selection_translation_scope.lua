@@ -93,7 +93,7 @@ local OWNED = {
 	"adapters.log_transport",
 	"adapters.managed_ollama_daemon",
 	"adapters.modifier_injector",
-	"adapters.prediction_renderer",
+	"adapters.prediction_tooltip_port",
 	"adapters.mouse_control",
 	"adapters.owned_program_runner",
 	"adapters.python_interpreter",

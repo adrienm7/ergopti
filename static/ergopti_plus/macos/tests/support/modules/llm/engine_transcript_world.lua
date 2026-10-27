@@ -9,7 +9,7 @@
 --- the shared transcript runner (_shared/lua/test/llm_engine_transcript.lua):
 --- the TimerScheduler is the adapter the engine arms its debounce on, the
 --- HttpClient is the remote backend's inference client, the TooltipRenderer is
---- the prediction tooltip behind adapters.prediction_renderer. What each port is
+--- the prediction tooltip behind adapters.prediction_tooltip_port. What each port is
 --- asked is recorded in the corpus vocabulary.
 --- ==============================================================================
 
