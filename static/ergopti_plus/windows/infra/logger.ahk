@@ -491,17 +491,25 @@ LoggerInit() {
 		LOGGER_SUB_FILES := LoggerSubFilesData()
 		_LoggerInitSubFiles(LogDir)
 		LOGGER_MIN_LEVEL := LOGGER_DEFAULT_LEVEL
-		if IsSet(ConfigurationFile) and FileExist(ConfigurationFile) {
-				try {
-						; The ordinary boot reader admits dotted/inline/quoted namespaces.
-						Content := FSReadStrict(ConfigurationFile)
-						Cache := ConfigTomlDecodeSnapshot(Content).Cache
+		Value := LOGGER_DEFAULT_LEVEL
+		if IsSet(ConfigurationFile) {
+				if ConfigMigrateBoot(ConfigurationFile, "known") {
+						; Normal boot and menu updates retain the canonical source
+						; generation, including its original native presence.
+						Cache := ConfigTomlReadSnapshot(ConfigurationFile).Cache
 						Value := IniCacheGet(Cache, "script", "log_level", LOGGER_DEFAULT_LEVEL)
-						if LOGGER_SEVERITY.Has(Value) {
-								LOGGER_MIN_LEVEL := Value
+				} else if FileExist(ConfigurationFile) {
+						; Fatal startup recovery can initialize logging before the
+						; configuration constructor admits a source; no cache exists yet.
+						try {
+								Content := FSReadStrict(ConfigurationFile)
+								Cache := ConfigTomlDecodeSnapshot(Content).Cache
+								Value := IniCacheGet(Cache, "script", "log_level", LOGGER_DEFAULT_LEVEL)
 						}
 				}
 		}
+		if LOGGER_SEVERITY.Has(Value)
+				LOGGER_MIN_LEVEL := Value
 		_LoggerRefreshFastFlags()
 		; Now that the user's level is finally known, apply it retroactively to
 		; everything the permissive pre-init defaults let through. This is the half
