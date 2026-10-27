@@ -2524,6 +2524,9 @@ jobs:
           ERGOPTI_BUILD: ${{ inputs.release && github.run_number || '' }}
           ERGOPTI_CHANNEL: ${{ inputs.channel }}
           ERGOPTI_RELEASE: ${{ inputs.release }}
+          # Packages are universal payload builds: never the local switches.
+          ERGOPTI_LAUNCHER_ARCHS: universal
+          ERGOPTI_DEV_SOURCE: '0'
           SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
           MACOS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.MACOS_SIGNING_CERTIFICATE_BASE64 }}
           MACOS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_SIGNING_CERTIFICATE_PASSWORD }}
@@ -2842,6 +2845,7 @@ jobs:
                 exit 1
             fi
             lipo -archs /Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus
+            lipo /Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus -verify_arch arm64 x86_64
             echo "runner machine: $(uname -m)"
             node tools/ci/dev-release-qualification.cjs --scope macos-launch-appleevents \
                 --scenario "$scenario" --runner "$MATRIX_RUNNER" \

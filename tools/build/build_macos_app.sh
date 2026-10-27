@@ -134,6 +134,12 @@ for arch in "${LAUNCHER_ARCHS[@]}"; do
 	LAUNCHER_ARCH_FLAGS+=(--arch "$arch")
 done
 
+# A multi-architecture `swift build` needs Xcode's XCBuild, so a Mac with the
+# Command Line Tools alone fails with "xcbuild executable ... doesn't exist".
+# ERGOPTI_LAUNCHER_ARCHS=native builds the host slice only, for a local app;
+# universal (the default) keeps both slices, and a release refuses native.
+ERGOPTI_LAUNCHER_ARCHS="${ERGOPTI_LAUNCHER_ARCHS:-universal}"
+
 
 
 
@@ -203,6 +209,27 @@ record_dev_source_root() {
 	[ "$(plutil -extract "$ERGOPTI_DEV_SOURCE_PLIST_KEY" raw -o - "$plist")" = "$REPO_ROOT" ] \
 		|| fail "$plist did not keep the developer source root $REPO_ROOT."
 	log "Developer source mode: the launcher runs the Lua of $REPO_ROOT"
+}
+
+# Narrows the launcher to the host slice for a local build on request.
+select_launcher_archs() {
+	case "$ERGOPTI_LAUNCHER_ARCHS" in
+		universal) ;;
+		native)
+			[ "${ERGOPTI_RELEASE:-false}" != true ] \
+				|| fail "ERGOPTI_LAUNCHER_ARCHS=native is refused for a release build (ERGOPTI_RELEASE=true): a release ships arm64 and x86_64."
+			local host
+			host="$(uname -m)"
+			case "$host" in
+				arm64 | x86_64) ;;
+				*) fail "Unsupported host architecture '$host' for a native launcher build." ;;
+			esac
+			LAUNCHER_ARCHS=("$host")
+			LAUNCHER_ARCH_FLAGS=(--arch "$host")
+			log "Single-architecture launcher ($host only): this local app runs on $host Macs and is never released."
+			;;
+		*) fail "ERGOPTI_LAUNCHER_ARCHS must be universal or native, not '$ERGOPTI_LAUNCHER_ARCHS'." ;;
+	esac
 }
 
 clean_build_dir() {
@@ -857,6 +884,7 @@ main() {
 	fi
 	[[ $# -eq 0 ]] || fail "Expected no arguments or --native-helper-only."
 	check_dev_source_configuration
+	select_launcher_archs
 	for cmd in curl unzip zip ditto tar swift xcrun awk lipo codesign iconutil sips plutil shasum git node; do
 		require_cmd "$cmd"
 	done

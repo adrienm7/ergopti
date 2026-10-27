@@ -54,7 +54,7 @@ function fixture(name) {
 	// The real build records the clone root in Info.plist; the shim plist holds it raw.
 	fs.writeFileSync(
 		path.join(clone, 'tools/build/build_macos_app.sh'),
-		`echo "build ERGOPTI_DEV_SOURCE=$ERGOPTI_DEV_SOURCE" >> "${log}"
+		`echo "build ERGOPTI_DEV_SOURCE=$ERGOPTI_DEV_SOURCE ERGOPTI_LAUNCHER_ARCHS=$ERGOPTI_LAUNCHER_ARCHS" >> "${log}"
 app="$(cd "$(dirname "$0")/../.." && pwd)/build/macos/ErgoptiPlus.app"
 mkdir -p "$app/Contents"
 printf '%s' "$(cd "$(dirname "$0")/../.." && pwd)" > "$app/Contents/Info.plist"\n`
@@ -96,7 +96,10 @@ try {
 		const result = run(paths);
 		assert.equal(result.status, 0, result.stderr);
 		const app = path.join(paths.clone, 'build/macos/ErgoptiPlus.app');
-		assert.equal(calls(paths), `build ERGOPTI_DEV_SOURCE=1\nopen ${app}\n`);
+		assert.equal(
+			calls(paths),
+			`build ERGOPTI_DEV_SOURCE=1 ERGOPTI_LAUNCHER_ARCHS=native\nopen ${app}\n`
+		);
 		assert.match(result.stdout, /Lua runs from .*clone with space\/static\/ergopti_plus\/macos/);
 	});
 
