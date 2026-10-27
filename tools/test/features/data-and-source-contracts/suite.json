@@ -545,6 +545,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-slot-roles-single-source.cjs"],
 			"repro": "npm run test:slot-roles-single-source"
+		},
+		{
+			"id": "js-contract-vector-ledger",
+			"ordinal": 508,
+			"name": "Contract vector ledger (every case moved into a JSON vector corpus is accounted for once)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-contract-vector-ledger.cjs"],
+			"repro": "npm run test:contract-vector-ledger"
 		}
 	]
 }

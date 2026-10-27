@@ -1,0 +1,931 @@
+{
+	"_comment": "TOML batch-writer vectors, replayed by _shared/lua/test/toml_batch_write_vectors_contract.lua on macOS and Linux. Each vector gives the file bytes (source; \"\" is an empty file), the batch rows and what the writer's prepare step must answer without publishing. The entry point is the batch writer's prepare step: given the source bytes and the rows, it answers accepted or refused, a detail, and the candidate bytes. expect.ok is acceptance; content is the exact candidate bytes; unchanged means the candidate equals the source; decoded lists TOML paths (array of keys) whose decoded value must equal value (a JSON null is not used); contains and not_contains are substrings of the candidate; detail_contains are substrings of the refusal detail; reads is the number of times the source may have been read (0: refused before reading). A row value {\"$number\": \"text\"} is the number the text spells (IEEE: \"-0.0\" is negative zero), which JSON cannot carry. Converted from toml_batch_existing_key_contract.lua and toml_quoted_headers_contract.lua; the ledger in contract_conversion_ledger.json records which cases moved.",
+	"entry_point": "batch writer prepare step: prepare_batch(path, rows, {read source}) -> accepted, detail, candidate bytes",
+	"drivers": {
+		"macos": "Replays every vector.",
+		"linux": "Replays every vector.",
+		"windows": "Not ported: one AHK consumer must call the Windows batch writer's prepare step on (source, rows) and compare accepted, detail and candidate bytes; decode with the Windows TOML codec for the decoded checks."
+	},
+	"vectors": [
+		{
+			"id": "empty-header-table-deleted-comments-kept",
+			"group": "toml-batch-existing-key",
+			"source": "# head\n[llm.models]\nselected = \"mlx\"\n\n[llm.models.user_models]\n# user-added entries here\n\n\n# ===== 3.4 Profiles =====\n[llm.profiles]\nactive = \"basic\"\n",
+			"rows": [
+				{
+					"section": "llm.models",
+					"key": "user_models",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# head\n[llm.models]\nselected = \"mlx\"\n\n# user-added entries here\n\n\n# ===== 3.4 Profiles =====\n[llm.profiles]\nactive = \"basic\"\n"
+			}
+		},
+		{
+			"id": "header-table-descendants-and-interleaved-blocks-replaced-by-scalar",
+			"group": "toml-batch-existing-key",
+			"source": "[metrics]\nenabled = true\n[metrics.shortcut]\nmods = [\"cmd\"]\nkey = \"m\"\n[other]\nx = 1\n[metrics.shortcut.extra]\ny = 2\n",
+			"rows": [
+				{
+					"section": "metrics",
+					"key": "shortcut",
+					"value": false
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[metrics]\nshortcut = false\nenabled = true\n[other]\nx = 1\n"
+			}
+		},
+		{
+			"id": "header-table-without-parent-header-deleted",
+			"group": "toml-batch-existing-key",
+			"source": "[metrics.shortcut]\nmods = [\"cmd\"]\nkey = \"m\"\n[neighbor]\nkeep = true\n",
+			"rows": [
+				{
+					"section": "metrics",
+					"key": "shortcut",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[neighbor]\nkeep = true\n"
+			}
+		},
+		{
+			"id": "header-table-without-parent-header-set-to-a-table",
+			"group": "toml-batch-existing-key",
+			"source": "[metrics.shortcut]\nmods = [\"cmd\"]\nkey = \"m\"\n[neighbor]\nkeep = true\n",
+			"rows": [
+				{
+					"section": "metrics",
+					"key": "shortcut",
+					"value": {
+						"key": "k",
+						"mods": ["alt"]
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"decoded": [
+					{
+						"path": ["metrics", "shortcut"],
+						"value": {
+							"key": "k",
+							"mods": ["alt"]
+						}
+					},
+					{
+						"path": ["neighbor", "keep"],
+						"value": true
+					}
+				]
+			}
+		},
+		{
+			"id": "equal-array-of-tables-left-byte-for-byte",
+			"group": "toml-batch-existing-key",
+			"source": "[hotstrings]\nexpansion_delay = 0.5\n\n# mine\n[[hotstrings.terminators]]\nkey = \"custom_a\"\nchar = \"a\"\nlabel = \"a\"\nconsume = true\n\n[[hotstrings.terminators]]\nkey = \"custom_b\"\nchar = \"b\"\nlabel = \"b\"\nconsume = false\n",
+			"rows": [
+				{
+					"section": "hotstrings",
+					"key": "terminators",
+					"value": [
+						{
+							"key": "custom_a",
+							"char": "a",
+							"label": "a",
+							"consume": true
+						},
+						{
+							"key": "custom_b",
+							"char": "b",
+							"label": "b",
+							"consume": false
+						}
+					]
+				}
+			],
+			"expect": {
+				"ok": true,
+				"unchanged": true
+			}
+		},
+		{
+			"id": "equal-empty-header-table-left-byte-for-byte",
+			"group": "toml-batch-existing-key",
+			"source": "[hotstrings.delays]\n# none yet\n",
+			"rows": [
+				{
+					"section": "hotstrings",
+					"key": "delays",
+					"value": {}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"unchanged": true
+			}
+		},
+		{
+			"id": "equal-inline-parent-value-left-byte-for-byte",
+			"group": "toml-batch-existing-key",
+			"source": "hotstrings = { enabled = false }\n",
+			"rows": [
+				{
+					"section": "hotstrings",
+					"key": "enabled",
+					"value": false
+				}
+			],
+			"expect": {
+				"ok": true,
+				"unchanged": true
+			}
+		},
+		{
+			"id": "changed-array-of-tables-rewritten-as-one-inline-list",
+			"group": "toml-batch-existing-key",
+			"source": "[hotstrings]\nexpansion_delay = 0.5\n\n# mine\n[[hotstrings.terminators]]\nkey = \"custom_a\"\nchar = \"a\"\nlabel = \"a\"\nconsume = true\n[next]\nv = 1\n",
+			"rows": [
+				{
+					"section": "hotstrings",
+					"key": "terminators",
+					"value": [
+						{
+							"key": "custom_a",
+							"char": "a",
+							"label": "a",
+							"consume": false
+						},
+						{
+							"key": "custom_c",
+							"char": "c",
+							"label": "c",
+							"consume": true
+						}
+					]
+				}
+			],
+			"expect": {
+				"ok": true,
+				"decoded": [
+					{
+						"path": ["hotstrings", "terminators"],
+						"value": [
+							{
+								"key": "custom_a",
+								"char": "a",
+								"label": "a",
+								"consume": false
+							},
+							{
+								"key": "custom_c",
+								"char": "c",
+								"label": "c",
+								"consume": true
+							}
+						]
+					},
+					{
+						"path": ["hotstrings", "expansion_delay"],
+						"value": 0.5
+					},
+					{
+						"path": ["next", "v"],
+						"value": 1
+					}
+				],
+				"contains": ["# mine\n"],
+				"not_contains": ["[["]
+			}
+		},
+		{
+			"id": "quoted-bare-key-updated-in-place-double-quoted",
+			"group": "toml-batch-existing-key",
+			"source": "[shortcuts]\n\"enabled\" = true\nother = 1\n",
+			"rows": [
+				{
+					"section": "shortcuts",
+					"key": "enabled",
+					"value": false
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[shortcuts]\nenabled = false\nother = 1\n"
+			}
+		},
+		{
+			"id": "quoted-bare-key-deleted-in-place-double-quoted",
+			"group": "toml-batch-existing-key",
+			"source": "[shortcuts]\n\"enabled\" = true\nother = 1\n",
+			"rows": [
+				{
+					"section": "shortcuts",
+					"key": "enabled",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[shortcuts]\nother = 1\n"
+			}
+		},
+		{
+			"id": "quoted-bare-key-updated-in-place-single-quoted",
+			"group": "toml-batch-existing-key",
+			"source": "[shortcuts]\n'enabled' = true\nother = 1\n",
+			"rows": [
+				{
+					"section": "shortcuts",
+					"key": "enabled",
+					"value": false
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[shortcuts]\nenabled = false\nother = 1\n"
+			}
+		},
+		{
+			"id": "quoted-bare-key-deleted-in-place-single-quoted",
+			"group": "toml-batch-existing-key",
+			"source": "[shortcuts]\n'enabled' = true\nother = 1\n",
+			"rows": [
+				{
+					"section": "shortcuts",
+					"key": "enabled",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[shortcuts]\nother = 1\n"
+			}
+		},
+		{
+			"id": "quoted-bare-key-in-dotted-section-updated",
+			"group": "toml-batch-existing-key",
+			"source": "[hotstrings.groups]\n\"autocorrection\" = false\n",
+			"rows": [
+				{
+					"section": "hotstrings.groups",
+					"key": "autocorrection",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[hotstrings.groups]\nautocorrection = true\n"
+			}
+		},
+		{
+			"id": "inline-table-value-change-names-its-key",
+			"group": "toml-batch-existing-key",
+			"source": "hotstrings = { enabled = false }\n",
+			"rows": [
+				{
+					"section": "hotstrings",
+					"key": "enabled",
+					"value": "changed"
+				}
+			],
+			"expect": {
+				"ok": false,
+				"detail_contains": ["hotstrings.enabled", "inline"]
+			}
+		},
+		{
+			"id": "section-inline-string-updated-without-owning-its-parent",
+			"group": "toml-batch-existing-key",
+			"source": "[metrics]\nshortcut = { key = \"m\" }\n",
+			"rows": [
+				{
+					"section": "metrics.shortcut",
+					"key": "key",
+					"value": "changed"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[metrics]\nshortcut = { key = \"changed\" }\n",
+				"decoded": [
+					{
+						"path": ["metrics", "shortcut", "key"],
+						"value": "changed"
+					}
+				]
+			}
+		},
+		{
+			"id": "batch-replacing-a-header-table-and-writing-inside-it-refused",
+			"group": "toml-batch-existing-key",
+			"source": "[metrics.shortcut]\nmods = [\"cmd\"]\nkey = \"m\"\n",
+			"rows": [
+				{
+					"section": "metrics",
+					"key": "shortcut",
+					"delete": true
+				},
+				{
+					"section": "metrics.shortcut",
+					"key": "key",
+					"value": "x"
+				}
+			],
+			"expect": {
+				"ok": false,
+				"detail_contains": ["metrics.shortcut"]
+			}
+		},
+		{
+			"id": "inline-source-existing-boolean",
+			"group": "shared-section-relative-inline-scalar-ownership",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "first",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a] # header\nchild = { first=true, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n"
+			}
+		},
+		{
+			"id": "inline-source-existing-string",
+			"group": "shared-section-relative-inline-scalar-ownership",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "middle",
+					"value": "002"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a] # header\nchild = { first=false, middle=\"002\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n"
+			}
+		},
+		{
+			"id": "inline-source-precise-number",
+			"group": "shared-section-relative-inline-scalar-ownership",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "last",
+					"value": {
+						"$number": "0.12345678901234567"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a] # header\nchild = { first=false, middle=\"001\", last=0.12345678901234566, future=9007199254740993, empty=[], map={} } # trailer\n"
+			}
+		},
+		{
+			"id": "inline-source-negative-zero",
+			"group": "shared-section-relative-inline-scalar-ownership",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "last",
+					"value": {
+						"$number": "-0.0"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a] # header\nchild = { first=false, middle=\"001\", last=-0.0, future=9007199254740993, empty=[], map={} } # trailer\n"
+			}
+		},
+		{
+			"id": "inline-source-first-deletion",
+			"group": "shared-section-relative-inline-scalar-ownership",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "first",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a] # header\nchild = { middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n"
+			}
+		},
+		{
+			"id": "inline-source-middle-deletion",
+			"group": "shared-section-relative-inline-scalar-ownership",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "middle",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a] # header\nchild = { first=false, last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n"
+			}
+		},
+		{
+			"id": "inline-source-existing-no-op",
+			"group": "shared-section-relative-inline-scalar-ownership",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "first",
+					"value": false
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n"
+			}
+		},
+		{
+			"id": "inline-source-authored-absent-deletion",
+			"group": "shared-section-relative-inline-scalar-ownership",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "missing",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n"
+			}
+		},
+		{
+			"id": "inline-source-scalar-and-absent-sibling-deletion",
+			"group": "shared-section-relative-inline-scalar-ownership",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "first",
+					"value": true
+				},
+				{
+					"section": "a.child",
+					"key": "missing",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a] # header\nchild = { first=true, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n"
+			}
+		},
+		{
+			"id": "nested-dotted-and-quoted-member-fragments-kept-under-a-quoted-header",
+			"group": "shared-section-relative-inline-scalar-ownership",
+			"source": "[\"a\"]\nchild={nested.setting=false,nested.future=0.1,\"literal.dot\"={keep=[]}} # exact\n",
+			"rows": [
+				{
+					"section": "a.child.nested",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[\"a\"]\nchild={nested.setting=true,nested.future=0.1,\"literal.dot\"={keep=[]}} # exact\n"
+			}
+		},
+		{
+			"id": "explicit-empty-inline-parent-kept-after-last-scalar-deletion",
+			"group": "shared-section-relative-inline-scalar-ownership",
+			"source": "[a]\nchild={last=false} # retained\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "last",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a]\nchild={} # retained\n"
+			}
+		},
+		{
+			"id": "owned-extension-leaf-deleted-neighbour-bytes-kept",
+			"group": "toml-quoted-headers",
+			"source": "# retained\n[hotstrings.modules.\"ext:ergopti:rolls\"] # identity\ncustom = true\nunknown = [\n  \"[quoted.data]\",\n]\n[neighbor]\ncustom = true\n",
+			"rows": [
+				{
+					"section": "hotstrings.modules.ext:ergopti:rolls",
+					"key": "custom",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# retained\n[hotstrings.modules.\"ext:ergopti:rolls\"] # identity\nunknown = [\n  \"[quoted.data]\",\n]\n[neighbor]\ncustom = true\n"
+			}
+		},
+		{
+			"id": "equivalent-section-spelling-literal-updated-and-extended",
+			"group": "toml-quoted-headers",
+			"source": "[hotstrings.modules.'ext:ergopti:rolls']\ncustom = false\n",
+			"rows": [
+				{
+					"section": "hotstrings.modules.ext:ergopti:rolls",
+					"key": "custom",
+					"value": true
+				},
+				{
+					"section": "hotstrings.modules.ext:ergopti:rolls",
+					"key": "other",
+					"value": "configured"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"decoded": [
+					{
+						"path": ["hotstrings", "modules", "ext:ergopti:rolls", "custom"],
+						"value": true
+					},
+					{
+						"path": ["hotstrings", "modules", "ext:ergopti:rolls", "other"],
+						"value": "configured"
+					}
+				]
+			}
+		},
+		{
+			"id": "equivalent-section-spelling-basic-updated-and-extended",
+			"group": "toml-quoted-headers",
+			"source": "[hotstrings.modules.\"ext:ergopti:rolls\"]\ncustom = false\n",
+			"rows": [
+				{
+					"section": "hotstrings.modules.ext:ergopti:rolls",
+					"key": "custom",
+					"value": true
+				},
+				{
+					"section": "hotstrings.modules.ext:ergopti:rolls",
+					"key": "other",
+					"value": "configured"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"decoded": [
+					{
+						"path": ["hotstrings", "modules", "ext:ergopti:rolls", "custom"],
+						"value": true
+					},
+					{
+						"path": ["hotstrings", "modules", "ext:ergopti:rolls", "other"],
+						"value": "configured"
+					}
+				]
+			}
+		},
+		{
+			"id": "equivalent-section-spelling-escaped-updated-and-extended",
+			"group": "toml-quoted-headers",
+			"source": "[hotstrings.modules.\"ext:ergopti:roll\\u0073\"]\ncustom = false\n",
+			"rows": [
+				{
+					"section": "hotstrings.modules.ext:ergopti:rolls",
+					"key": "custom",
+					"value": true
+				},
+				{
+					"section": "hotstrings.modules.ext:ergopti:rolls",
+					"key": "other",
+					"value": "configured"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"decoded": [
+					{
+						"path": ["hotstrings", "modules", "ext:ergopti:rolls", "custom"],
+						"value": true
+					},
+					{
+						"path": ["hotstrings", "modules", "ext:ergopti:rolls", "other"],
+						"value": "configured"
+					}
+				]
+			}
+		},
+		{
+			"id": "canonical-colon-segments-rendered-quoted-on-first-insertion",
+			"group": "toml-quoted-headers",
+			"source": "",
+			"rows": [
+				{
+					"section": "hotstrings.modules.ext:ergopti:rolls",
+					"key": "custom",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"contains": ["[hotstrings.modules.\"ext:ergopti:rolls\"]"],
+				"decoded": [
+					{
+						"path": ["hotstrings", "modules", "ext:ergopti:rolls", "custom"],
+						"value": true
+					}
+				]
+			}
+		},
+		{
+			"id": "duplicate-equivalent-rows-refused-before-reading",
+			"group": "toml-quoted-headers",
+			"source": "",
+			"rows": [
+				{
+					"section": "a.\"x\"",
+					"key": "v",
+					"delete": true
+				},
+				{
+					"section": "a.x",
+					"key": "v",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false,
+				"reads": 0
+			}
+		},
+		{
+			"id": "unrelated-case-variants-preserved-on-quoted-delete",
+			"group": "toml-quoted-headers",
+			"source": "[untouched]\nv = true\n[UNTOUCHED]\nv = false\n[a.x]\nv = true\n",
+			"rows": [
+				{
+					"section": "a.\"x\"",
+					"key": "v",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[untouched]\nv = true\n[UNTOUCHED]\nv = false\n[a.x]\n"
+			}
+		},
+		{
+			"id": "quoted-dots-and-brackets-kept-distinct-from-nested-sections",
+			"group": "toml-quoted-headers",
+			"source": "[a.\"b.c]\"]\nvalue = true\n[a.b.c]\nvalue = true\n",
+			"rows": [
+				{
+					"section": "a.\"b.c]\"",
+					"key": "value",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a.\"b.c]\"]\n[a.b.c]\nvalue = true\n"
+			}
+		},
+		{
+			"id": "malformed-table-path-1-refused-before-reading",
+			"group": "toml-quoted-headers",
+			"source": "",
+			"rows": [
+				{
+					"section": "a..b",
+					"key": "value",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": false,
+				"reads": 0
+			}
+		},
+		{
+			"id": "malformed-table-path-2-refused-before-reading",
+			"group": "toml-quoted-headers",
+			"source": "",
+			"rows": [
+				{
+					"section": ".a",
+					"key": "value",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": false,
+				"reads": 0
+			}
+		},
+		{
+			"id": "malformed-table-path-3-refused-before-reading",
+			"group": "toml-quoted-headers",
+			"source": "",
+			"rows": [
+				{
+					"section": "a.",
+					"key": "value",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": false,
+				"reads": 0
+			}
+		},
+		{
+			"id": "malformed-table-path-4-refused-before-reading",
+			"group": "toml-quoted-headers",
+			"source": "",
+			"rows": [
+				{
+					"section": "a.\"open",
+					"key": "value",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": false,
+				"reads": 0
+			}
+		},
+		{
+			"id": "malformed-table-path-5-refused-before-reading",
+			"group": "toml-quoted-headers",
+			"source": "",
+			"rows": [
+				{
+					"section": "a.\"x\"tail",
+					"key": "value",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": false,
+				"reads": 0
+			}
+		},
+		{
+			"id": "malformed-table-path-6-refused-before-reading",
+			"group": "toml-quoted-headers",
+			"source": "",
+			"rows": [
+				{
+					"section": "a.\"bad\\q\"",
+					"key": "value",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": false,
+				"reads": 0
+			}
+		},
+		{
+			"id": "malformed-table-path-7-refused-before-reading",
+			"group": "toml-quoted-headers",
+			"source": "",
+			"rows": [
+				{
+					"section": "a.[]",
+					"key": "value",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": false,
+				"reads": 0
+			}
+		},
+		{
+			"id": "malformed-table-path-8-refused-before-reading",
+			"group": "toml-quoted-headers",
+			"source": "",
+			"rows": [
+				{
+					"section": "a. bad space",
+					"key": "value",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": false,
+				"reads": 0
+			}
+		},
+		{
+			"id": "malformed-source-or-duplicate-table-1-refused",
+			"group": "toml-quoted-headers",
+			"source": "[a..b]\nv = true\n",
+			"rows": [
+				{
+					"section": "a.x",
+					"key": "v",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "malformed-source-or-duplicate-table-2-refused",
+			"group": "toml-quoted-headers",
+			"source": "[a.\"open]\nv = true\n",
+			"rows": [
+				{
+					"section": "a.x",
+					"key": "v",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "malformed-source-or-duplicate-table-3-refused",
+			"group": "toml-quoted-headers",
+			"source": "[a.\"x\"]\nv = true\n[a.'x']\nv = false\n",
+			"rows": [
+				{
+					"section": "a.x",
+					"key": "v",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "ambiguous-case-folded-or-array-target-1-refused",
+			"group": "toml-quoted-headers",
+			"source": "[a.\"x\"]\nv = true\n[A.x]\nv = false\n",
+			"rows": [
+				{
+					"section": "a.x",
+					"key": "v",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "ambiguous-case-folded-or-array-target-2-refused",
+			"group": "toml-quoted-headers",
+			"source": "[a.\"x\"]\nv = true\n[A.x]\nneighbor = false\n",
+			"rows": [
+				{
+					"section": "a.x",
+					"key": "v",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "ambiguous-case-folded-or-array-target-3-refused",
+			"group": "toml-quoted-headers",
+			"source": "[[a.\"x\"]]\nv = true\n",
+			"rows": [
+				{
+					"section": "a.x",
+					"key": "v",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		}
+	]
+}

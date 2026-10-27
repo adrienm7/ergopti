@@ -26,124 +26,6 @@ return function(helpers)
 		})
 	end
 
-	helpers.describe("shared TOML batch over existing key spellings (toml-batch-existing-key)", function()
-		helpers.it("deletes a table declared by an empty header and keeps every comment", function()
-			local source = '# head\n[llm.models]\nselected = "mlx"\n\n[llm.models.user_models]\n'
-				.. '# user-added entries here\n\n\n# ===== 3.4 Profiles =====\n[llm.profiles]\nactive = "basic"\n'
-			local ok, detail, content = prepare(source, {
-				{ section = "llm.models", key = "user_models", delete = true },
-			})
-			helpers.assert_eq(ok, true, detail)
-			helpers.assert_eq(content, (source:gsub("%[llm%.models%.user_models%]\n", "", 1)))
-		end)
-
-		helpers.it("replaces a header table, its descendants and interleaved blocks by one scalar", function()
-			local source = '[metrics]\nenabled = true\n[metrics.shortcut]\nmods = ["cmd"]\nkey = "m"\n'
-				.. '[other]\nx = 1\n[metrics.shortcut.extra]\ny = 2\n'
-			local ok, detail, content = prepare(source, {
-				{ section = "metrics", key = "shortcut", value = false },
-			})
-			helpers.assert_eq(ok, true, detail)
-			helpers.assert_eq(content, '[metrics]\nshortcut = false\nenabled = true\n[other]\nx = 1\n')
-		end)
-
-		helpers.it("removes a header table whose parent has no header of its own", function()
-			local source = '[metrics.shortcut]\nmods = ["cmd"]\nkey = "m"\n[neighbor]\nkeep = true\n'
-			local ok, detail, content = prepare(source, { { section = "metrics", key = "shortcut", delete = true } })
-			helpers.assert_eq(ok, true, detail)
-			helpers.assert_eq(content, '[neighbor]\nkeep = true\n')
-			local set_ok, set_detail, set_content = prepare(source, {
-				{ section = "metrics", key = "shortcut", value = { key = "k", mods = { "alt" } } },
-			})
-			helpers.assert_eq(set_ok, true, set_detail)
-			local decoded = Codec.decode(set_content)
-			helpers.assert_eq(decoded.metrics.shortcut, { key = "k", mods = { "alt" } })
-			helpers.assert_eq(decoded.neighbor.keep, true)
-		end)
-
-		helpers.it("leaves a value another spelling already holds byte-for-byte", function()
-			local list = '[hotstrings]\nexpansion_delay = 0.5\n\n# mine\n[[hotstrings.terminators]]\n'
-				.. 'key = "custom_a"\nchar = "a"\nlabel = "a"\nconsume = true\n\n[[hotstrings.terminators]]\n'
-				.. 'key = "custom_b"\nchar = "b"\nlabel = "b"\nconsume = false\n'
-			local same = {
-				{ key = "custom_a", char = "a", label = "a", consume = true },
-				{ key = "custom_b", char = "b", label = "b", consume = false },
-			}
-			for _, case in ipairs({
-				{ list, { section = "hotstrings", key = "terminators", value = same } },
-				{ '[hotstrings.delays]\n# none yet\n', { section = "hotstrings", key = "delays", value = {} } },
-				{ 'hotstrings = { enabled = false }\n', { section = "hotstrings", key = "enabled", value = false } },
-			}) do
-				local ok, detail, content = prepare(case[1], { case[2] })
-				helpers.assert_eq(ok, true, detail)
-				helpers.assert_eq(content, case[1])
-			end
-		end)
-
-		helpers.it("rewrites a changed array of tables as one inline list and keeps its comments", function()
-			local source = '[hotstrings]\nexpansion_delay = 0.5\n\n# mine\n[[hotstrings.terminators]]\n'
-				.. 'key = "custom_a"\nchar = "a"\nlabel = "a"\nconsume = true\n[next]\nv = 1\n'
-			local list = {
-				{ key = "custom_a", char = "a", label = "a", consume = false },
-				{ key = "custom_c", char = "c", label = "c", consume = true },
-			}
-			local ok, detail, content = prepare(source, { { section = "hotstrings", key = "terminators", value = list } })
-			helpers.assert_eq(ok, true, detail)
-			local decoded = Codec.decode(content)
-			helpers.assert_eq(decoded.hotstrings.terminators, list)
-			helpers.assert_eq(decoded.hotstrings.expansion_delay, 0.5)
-			helpers.assert_eq(decoded.next.v, 1)
-			helpers.assert_true(content:find("# mine\n", 1, true) ~= nil, "a comment is never dropped")
-			helpers.assert_true(content:find("[[", 1, true) == nil, "no array-of-tables header is left")
-		end)
-
-		helpers.it("updates and deletes a quoted bare-compatible key in place", function()
-			for _, spelling in ipairs({ '"enabled"', "'enabled'" }) do
-				local source = '[shortcuts]\n' .. spelling .. ' = true\nother = 1\n'
-				local ok, detail, content = prepare(source, { { section = "shortcuts", key = "enabled", value = false } })
-				helpers.assert_eq(ok, true, detail)
-				helpers.assert_eq(content, '[shortcuts]\nenabled = false\nother = 1\n')
-				local deleted, delete_detail, remaining = prepare(source, { { section = "shortcuts", key = "enabled", delete = true } })
-				helpers.assert_eq(deleted, true, delete_detail)
-				helpers.assert_eq(remaining, '[shortcuts]\nother = 1\n')
-			end
-			local ok, detail, content = prepare('[hotstrings.groups]\n"autocorrection" = false\n', {
-				{ section = "hotstrings.groups", key = "autocorrection", value = true },
-			})
-			helpers.assert_eq(ok, true, detail)
-			helpers.assert_eq(content, '[hotstrings.groups]\nautocorrection = true\n')
-		end)
-
-		helpers.it("names the key an inline table holds when its value changes", function()
-			for _, source in ipairs({ 'hotstrings = { enabled = false }\n' }) do
-				local section = source:find("hotstrings", 1, true) and "hotstrings" or "metrics.shortcut"
-				local key = section == "hotstrings" and "enabled" or "key"
-				local ok, detail = prepare(source, { { section = section, key = key, value = "changed" } })
-				helpers.assert_eq(ok, false, source)
-				helpers.assert_true(tostring(detail):find(section .. "." .. key, 1, true) ~= nil, tostring(detail))
-				helpers.assert_true(tostring(detail):find("inline", 1, true) ~= nil, tostring(detail))
-			end
-		end)
-
-		helpers.it("updates the existing section-inline string without owning its parent", function()
-			local source = '[metrics]\nshortcut = { key = "m" }\n'
-			local ok, detail, content = prepare(source, { { section = "metrics.shortcut", key = "key", value = "changed" } })
-			helpers.assert_eq(ok, true, detail)
-			helpers.assert_eq(content, '[metrics]\nshortcut = { key = "changed" }\n')
-			helpers.assert_eq(Codec.decode(content).metrics.shortcut.key, "changed")
-		end)
-
-		helpers.it("refuses a batch that replaces a header table and writes inside it", function()
-			local source = '[metrics.shortcut]\nmods = ["cmd"]\nkey = "m"\n'
-			local ok, detail = prepare(source, {
-				{ section = "metrics", key = "shortcut", delete = true },
-				{ section = "metrics.shortcut", key = "key", value = "x" },
-			})
-			helpers.assert_eq(ok, false)
-			helpers.assert_true(tostring(detail):find("metrics.shortcut", 1, true) ~= nil, tostring(detail))
-		end)
-	end)
-
 	helpers.describe("shared section-relative inline scalar ownership", function()
 		local source = '[a] # header\nchild = { first=false, middle="001", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n'
 		local rows = { { section = "a.child", key = "first", value = true } }
@@ -153,25 +35,6 @@ return function(helpers)
 			parents["a.child"] = false
 			helpers.assert_eq(Writer.source_inline_scalar_parents(source, rows), { ["a.child"] = true })
 		end)
-		local images = {
-			{ name = "existing boolean", rows = rows, expected = '[a] # header\nchild = { first=true, middle="001", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n' },
-			{ name = "existing string", rows = { { section = "a.child", key = "middle", value = "002" } }, expected = '[a] # header\nchild = { first=false, middle="002", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n' },
-			{ name = "precise number", rows = { { section = "a.child", key = "last", value = 0.12345678901234567 } }, expected = '[a] # header\nchild = { first=false, middle="001", last=0.12345678901234566, future=9007199254740993, empty=[], map={} } # trailer\n' },
-			{ name = "negative zero", rows = { { section = "a.child", key = "last", value = negative_zero() } }, expected = '[a] # header\nchild = { first=false, middle="001", last=-0.0, future=9007199254740993, empty=[], map={} } # trailer\n' },
-			{ name = "first deletion", rows = { { section = "a.child", key = "first", delete = true } }, expected = '[a] # header\nchild = { middle="001", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n' },
-			{ name = "middle deletion", rows = { { section = "a.child", key = "middle", delete = true } }, expected = '[a] # header\nchild = { first=false, last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n' },
-			{ name = "existing no-op", rows = { { section = "a.child", key = "first", value = false } }, expected = source },
-			{ name = "authored absent deletion", rows = { { section = "a.child", key = "missing", delete = true } }, expected = source },
-			{ name = "scalar and absent sibling deletion", rows = { { section = "a.child", key = "first", value = true }, { section = "a.child", key = "missing", delete = true } }, expected = '[a] # header\nchild = { first=true, middle="001", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n' },
-		}
-		for _, vector in ipairs(images) do
-			helpers.it("publishes complete inline source: " .. vector.name, function()
-				helpers.assert_eq(Writer.source_inline_scalar_parents(source, vector.rows), { ["a.child"] = true })
-				local ok, detail, content = prepare(source, vector.rows)
-				helpers.assert_eq(ok, true, detail)
-				helpers.assert_eq(content, vector.expected)
-			end)
-		end
 		local not_admitted = {
 			{ { section = "a.child", key = "first", value = "wrong type" } },
 			{ { section = "a.child", key = "empty", delete = true } },
@@ -205,21 +68,6 @@ return function(helpers)
 				end
 			end)
 		end
-		helpers.it("retains exact nested dotted and quoted member fragments under a quoted header", function()
-			local input = '["a"]\nchild={nested.setting=false,nested.future=0.1,"literal.dot"={keep=[]}} # exact\n'
-			local requests = { { section = "a.child.nested", key = "setting", value = true } }
-			helpers.assert_eq(Writer.source_inline_scalar_parents(input, requests), { ["a.child"] = true })
-			local ok, detail, content = prepare(input, requests)
-			helpers.assert_eq(ok, true, detail)
-			helpers.assert_eq(content, '["a"]\nchild={nested.setting=true,nested.future=0.1,"literal.dot"={keep=[]}} # exact\n')
-		end)
-		helpers.it("preserves the explicit empty inline parent after its last scalar deletion", function()
-			local input = '[a]\nchild={last=false} # retained\n'
-			local requests = { { section = "a.child", key = "last", delete = true } }
-			local ok, detail, content = prepare(input, requests)
-			helpers.assert_eq(ok, true, detail)
-			helpers.assert_eq(content, '[a]\nchild={} # retained\n')
-		end)
 		helpers.it("rejects malformed source, sparse and duplicate descriptions", function()
 			for _, input in ipairs({ '[a]\nchild={bad=false,bad=true}\n', '[a]\nchild={bad=false\n' }) do helpers.assert_nil(Writer.source_inline_scalar_parents(input, rows)) end
 			for _, requests in ipairs({ { [2] = rows[1] }, { rows[1], rows[1] }, { { section = "a.child", key = "first", delete = true, value = false } }, { { section = "a.child", key = "first" } }, { { section = "a..child", key = "first", value = true } } }) do helpers.assert_nil(Writer.source_inline_scalar_parents(source, requests)) end

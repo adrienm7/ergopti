@@ -582,6 +582,7 @@
 		"test:windows-replay-consumers": "node ./tools/test/test-windows-replay-consumers.cjs",
 		"test:go-route-plan-gate": "node ./tools/test/test-go-route-plan-gate.cjs",
 		"test:proxy-policy-single-source": "node ./tools/test/test-proxy-policy-single-source.cjs",
+		"test:contract-vector-ledger": "node ./tools/test/test-contract-vector-ledger.cjs",
 		"test:linux-elf-needed-closure": "node ./tools/test/test-linux-elf-needed-closure.cjs",
 		"test:codegen-proxy-precedence": "node ./tools/test/test-codegen-proxy-precedence.cjs",
 		"test:shared-ui-no-platform-branches": "node ./tools/test/test-shared-ui-no-platform-branches.cjs",
