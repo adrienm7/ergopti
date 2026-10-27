@@ -106,15 +106,20 @@ step user_layouts sh -c 'ls -la "$HOME/Library/Keyboard Layouts" 2>&1'
 # ===========================================
 
 probe_src="tools/diagnostics/macos_tis_register_probe.swift"
+# A unique binary per run: a failed build must never leave an older probe to run.
+probe_bin="/tmp/ep_tis_probe_${stamp}"
 if [ -f "$probe_src" ]; then
-	step probe_compile swiftc -O -o /tmp/ep_tis_probe "$probe_src"
-	if [ -x /tmp/ep_tis_probe ]; then
+	step probe_compile swiftc -O -o "$probe_bin" "$probe_src"
+	if [ -x "$probe_bin" ]; then
 		# Plain run, then the driver's own enabling route (writes and restores
 		# com.apple.HIToolbox, restarts SystemUIServer), then a layout added
 		# inside the enabled Ergopti bundle (backed up and restored).
-		step probe_run /tmp/ep_tis_probe
-		step probe_write_prefs /tmp/ep_tis_probe --write-prefs
-		step probe_replace_ergopti /tmp/ep_tis_probe --replace-ergopti --write-prefs
+		step probe_run "$probe_bin"
+		step probe_write_prefs "$probe_bin" --write-prefs
+		step probe_replace_ergopti "$probe_bin" --replace-ergopti --write-prefs
+		rm -f "$probe_bin"
+	else
+		printf '%-28s skipped (the probe did not compile)\n' "probe_runs" >> "$steps"
 	fi
 fi
 

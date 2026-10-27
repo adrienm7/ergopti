@@ -205,8 +205,17 @@ selectable. The shipped Ergopti bundle declares `CFBundleIdentifier`
 `TICapsLockLanguageSwitchCapable`, `TISIconIsTemplate`, `TISIntendedLanguage`, a
 `version.plist`, and the display names in a UTF-16 `InfoPlist.strings`.
 
-The third version therefore tests, one line each: P4 a bundle with exactly that shape
-(`com.apple.keyboardlayout.*` identifiers); P5, with `--write-prefs`, the driver's route
+Version three did not compile on the Mac (a missing argument label), so its "run" executed the
+second binary: the preferences edit it printed was version two's (no SystemUIServer restart, no
+`KeyboardLayout ID`), and `--replace-ergopti` did nothing because version two does not know it.
+That run therefore does not show that the preferences route fails. Version four prints its
+version first, looks sources up by name or by id (the bundle may have been listed under another
+display name), polls instead of guessing a delay and prints why each step ended. In the user
+folder of that Mac only `Ergopti_v2.2.2.bundle` is installed, and the enabled list holds
+`KeyboardLayout Name` and `KeyboardLayout ID` for Ergopti_v2_2_2_plus (-2605093).
+
+The third version was meant to test, and the fourth tests, one line each: P4 a bundle with exactly that shape
+(`com.apple.keyboardlayout.*` identifiers), with variants: an icon copied from the installed bundle, the inner `.keylayout` registered alone, and a clone of the installed bundle reduced to one layout with only its name and ids changed; P5, with `--write-prefs`, the driver's route
 (preferences edit plus SystemUIServer restart, restored at the end) for the loose file and
 the bundle, then enabled? select?; P7, with `--replace-ergopti`, a layout added under a new
 name and id inside the installed bundle that holds the current source (backed up first and
