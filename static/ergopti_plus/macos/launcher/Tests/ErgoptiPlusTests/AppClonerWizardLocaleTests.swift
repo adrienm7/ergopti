@@ -85,7 +85,15 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 		return (my fixturePickerReceipt)
 		"""
 		source = source.replacingOccurrences(of: modal, with: modalObservation)
-		return source + """
+		// Declare the observer's properties before the run handler that reads
+		// them. Appended after it, the run failed with the bare specifier
+		// "fixturePickerError of «script» (-2700)" rather than any message the
+		// observer sets: `my fixturePickerError` was not read as the property's
+		// value there, so it never equalled "" and was raised as a reference.
+		let runHandler = "\non run argv\n"
+		XCTAssertEqual(source.components(separatedBy: runHandler).count, 2, "Declare the observer before the one actual run handler")
+		guard source.components(separatedBy: runHandler).count == 2 else { throw CocoaError(.fileReadCorruptFile) }
+		source = source.replacingOccurrences(of: runHandler, with: """
 
 		property fixturePickerPanel : missing value
 		property fixturePickerTimer : missing value
@@ -95,6 +103,9 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 		property fixturePickerSetterError : ""
 		property fixturePickerFinished : false
 		property fixturePickerReadiness : "panel visibility"
+
+		""" + runHandler)
+		return source + """
 
 		on fixtureRetirePicker()
 			if (my fixturePickerTimer) is not missing value then
