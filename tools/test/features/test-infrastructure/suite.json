@@ -500,7 +500,7 @@
 		},
 		{
 			"id": "js-0499",
-			"ordinal": 506,
+			"ordinal": 510,
 			"name": "Wine runner preserves process exclusion without forking per unrelated PID",
 			"cmd": "node",
 			"args": ["tools/test/test-wine-runner-process-guard.cjs"],

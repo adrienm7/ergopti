@@ -471,7 +471,7 @@
 		},
 		{
 			"id": "js-0481",
-			"ordinal": 503,
+			"ordinal": 506,
 			"name": "macOS journal retries and initial ledger publication recover from actual Common Linux write and close failures",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-journal-native-receipt.cjs"],
@@ -480,7 +480,7 @@
 		},
 		{
 			"id": "js-0483",
-			"ordinal": 507,
+			"ordinal": 511,
 			"name": "AppImage needed-library closure (every ELF library is in the image or on the documented recipient list)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-linux-elf-needed-closure.cjs"],

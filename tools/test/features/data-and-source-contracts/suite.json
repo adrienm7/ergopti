@@ -532,7 +532,7 @@
 		},
 		{
 			"id": "js-0502",
-			"ordinal": 502,
+			"ordinal": 503,
 			"name": "shortcut inventory matches the manifest, handler chords and slot prefix tables",
 			"cmd": "node",
 			"args": ["tools/test/test-shortcut-inventory-matches-sources.cjs"],
@@ -540,7 +540,7 @@
 		},
 		{
 			"id": "js-0503",
-			"ordinal": 503,
+			"ordinal": 505,
 			"name": "slot roles resolve on every driver and the crosswalk equals the inventory",
 			"cmd": "node",
 			"args": ["tools/test/test-slot-roles-single-source.cjs"],
