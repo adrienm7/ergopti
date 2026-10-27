@@ -88,10 +88,13 @@ a sealed Windows updater source, reseal with
   `vendor/ergopti_updater_download.ps1` (`CreateFileW`, `GetFileInformationByHandle`, from bdfa026d16). Check
   whether a bundled type already declaring them could be reused, then lower it back. The same build log notes
   `key_state_polling` dropped to 59: lower its script ceiling from 62 once a Windows build confirms 59.
-- **Last full preflight:** run 40567247114 on d1f9682904 had 89 green and 3 red, fixed by bfd5401162 (Windows
-  OS-call purity ratchet after the WPM region fix), 2956b2fc3d (macOS 26 input-source fixtures waited for the
-  observed selection) and fbdf2be92d (debian:12 carries no stalonetray; the AppImage check uses trayer). The
-  v1.0.7 release commit sits on top of them and a new full run qualifies it before `main`.
+- **Last full preflight:** run 40584261575 on 54d1c70415 (the first v1.0.7 release commit) had 6 red jobs,
+  fixed by a884588fb9 (bootstrap shell vectors keep inherited CA variables out), f51d970387 (PTY worker test
+  derives the bundle name), 92b2e93ae6 (XCTest census derived from the launcher test sources), 8b24d4e11f
+  (inherited trust dropped at the daemon snapshot, not in Go, so the receiver's own registry certificate
+  reaches Go) and 7dadf0b84d (uinput reports stamped so a still tap reaches the decoder). The second v1.0.7
+  release commit sits on top of them and of the Mac field fixes of 27 October evening; a new full run
+  qualifies it before `main`.
 - **The ChatGPT fix branches** fix/linux, fix/macos and fix/windows are fully on dev. The container proxy
   refuses remote deletion, so the maintainer deletes them: `git push origin --delete fix/linux fix/macos
 fix/windows`.
