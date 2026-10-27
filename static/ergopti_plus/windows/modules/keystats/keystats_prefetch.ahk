@@ -155,6 +155,10 @@ _KLPF_ArmCleanupRetry() {
 		}
 		return true
 	} catch as Err {
+		; The callback binds Token. Retiring its publication must also break
+		; Token's reverse reference, including an admission refusal.
+		if Token.Has("callback")
+			Token.Delete("callback")
 		PreviousCritical := Critical("On")
 		try {
 			if IsObject(_KLPF_CLEANUP_TIMER)
@@ -218,6 +222,10 @@ KLPF_RetryPrivateStageCleanup(ExpectedToken := 0, *) {
 					|| ObjPtr(_KLPF_CLEANUP_TIMER) != ObjPtr(ExpectedToken)
 				return false
 		}
+		; AHK reference counting cannot collect Token -> callback -> Token.
+		; The current timer stack keeps its callback alive through this call.
+		if IsObject(_KLPF_CLEANUP_TIMER)
+			_KLPF_CLEANUP_TIMER.Delete("callback")
 		_KLPF_CLEANUP_TIMER := 0
 		Snapshot := _KLPF_CLEANUP_DEBTS.Clone()
 		Jobs := KLPFWorker.jobs.Clone()

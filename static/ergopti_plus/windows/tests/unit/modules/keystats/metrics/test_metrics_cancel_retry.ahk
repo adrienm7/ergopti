@@ -93,3 +93,94 @@ for Mode in ["false", "throw", "invalid"]
 for Mode in ["false", "throw", "invalid"]
 	Test("Metrics cancel: automatic termination recovery after " . Mode . " (metrics-cancel-auto-retry)",
 		_MCTR_RetryTermination.Bind(Mode, true))
+
+_MCTR_ObserveTokenRelease(Counter, This) {
+	Counter["released"] += 1
+}
+
+_MCTR_NativeRetryRetiresToken() {
+	global _KLPF_CLEANUP_TIMER, _KLPF_CLEANUP_DEBTS
+	Saved := [_KLPF_CLEANUP_TIMER, _KLPF_CLEANUP_DEBTS, KLPFWorker.cleanup_schedule_fn, KLPFWorker.jobs]
+	Stage := _FSWL_Path()
+	Lock := 0
+	Counter := Map("released", 0)
+	try {
+		; This observer owns only its counter, never the observed token. A plain
+		; native Map must be destroyed through the same scalar observation first.
+		Control := Map()
+		Control.DefineProp("__Delete", {Call: _MCTR_ObserveTokenRelease.Bind(Counter)})
+		Control := 0
+		AssertEqual(1, Counter["released"], "the release observer must detect ordinary native Map destruction")
+		Counter["released"] := 0
+		_KLPF_CLEANUP_TIMER := 0
+		_KLPF_CLEANUP_DEBTS := Map()
+		KLPFWorker.cleanup_schedule_fn := 0
+		KLPFWorker.jobs := Map()
+		AssertFalse(FSExists(Stage))
+		FileAppend("private locked cleanup stage", Stage, "UTF-8-RAW")
+		Lock := FileOpen(Stage, "r-wd")
+		AssertTrue(IsObject(Lock))
+		AssertFalse(KLPF_DeletePrivateStage(Stage), "a genuine native delete-sharing lock must schedule retry")
+		AssertTrue(IsObject(_KLPF_CLEANUP_TIMER))
+		_KLPF_CLEANUP_TIMER.DefineProp("__Delete", {Call: _MCTR_ObserveTokenRelease.Bind(Counter)})
+		AssertTrue(_KLPF_CLEANUP_DEBTS.Has(Stage))
+		Lock.Close(), Lock := 0
+		Deadline := A_TickCount + KLPF_CLEANUP_RETRY_MS + 2000
+		while FSExists(Stage) && A_TickCount < Deadline
+			Sleep(10)
+		AssertFalse(FSExists(Stage), "the actual native one-shot must delete its now-unlocked private stage")
+		AssertEqual(0, _KLPF_CLEANUP_DEBTS.Count)
+		AssertEqual(0, _KLPF_CLEANUP_TIMER)
+		AssertEqual(1, Counter["released"], "completed native cleanup cannot retain its token through a self-bound callback cycle")
+	} finally {
+		if IsObject(Lock)
+			Lock.Close()
+		if IsObject(_KLPF_CLEANUP_TIMER) {
+			if _KLPF_CLEANUP_TIMER.Has("callback") {
+				SetTimer(_KLPF_CLEANUP_TIMER["callback"], 0)
+				_KLPF_CLEANUP_TIMER.Delete("callback")
+			}
+		}
+		_KLPF_CLEANUP_TIMER := Saved[1]
+		_KLPF_CLEANUP_DEBTS := Saved[2]
+		KLPFWorker.cleanup_schedule_fn := Saved[3]
+		KLPFWorker.jobs := Saved[4]
+		if FSExists(Stage)
+			FileDelete(Stage)
+	}
+}
+Test("Metrics cancel: native cleanup releases its completed retry token (metrics-cleanup-token-retirement)",
+	_MCTR_NativeRetryRetiresToken)
+
+_MCTR_RefuseObservedRetry(Counter, CompleteEarly, Callback, Delay) {
+	global _KLPF_CLEANUP_TIMER
+	_KLPF_CLEANUP_TIMER.DefineProp("__Delete", {Call: _MCTR_ObserveTokenRelease.Bind(Counter)})
+	if CompleteEarly
+		Callback.Call()
+	return false
+}
+
+_MCTR_RefusedRetryRetiresToken(CompleteEarly := false) {
+	global _KLPF_CLEANUP_TIMER, _KLPF_CLEANUP_DEBTS
+	Saved := [_KLPF_CLEANUP_TIMER, KLPFWorker.cleanup_schedule_fn, _KLPF_CLEANUP_DEBTS, KLPFWorker.jobs]
+	Counter := Map("released", 0)
+	try {
+		_KLPF_CLEANUP_TIMER := 0
+		KLPFWorker.cleanup_schedule_fn := _MCTR_RefuseObservedRetry.Bind(Counter, CompleteEarly)
+		_KLPF_CLEANUP_DEBTS := Map()
+		KLPFWorker.jobs := Map()
+		AssertFalse(_KLPF_ArmCleanupRetry())
+		AssertEqual(0, _KLPF_CLEANUP_TIMER)
+		AssertEqual(1, Counter["released"], "refused admission cannot leak its unpublished token through its bound callback")
+	} finally {
+		_KLPF_CLEANUP_TIMER := Saved[1]
+		KLPFWorker.cleanup_schedule_fn := Saved[2]
+		_KLPF_CLEANUP_DEBTS := Saved[3]
+		KLPFWorker.jobs := Saved[4]
+	}
+}
+Test("Metrics cancel: refused cleanup releases its unpublished retry token (metrics-cleanup-token-retirement)",
+	_MCTR_RefusedRetryRetiresToken)
+
+Test("Metrics cancel: early cleanup then refused scheduling remains retired (metrics-cleanup-token-retirement)",
+	_MCTR_RefusedRetryRetiresToken.Bind(true))
