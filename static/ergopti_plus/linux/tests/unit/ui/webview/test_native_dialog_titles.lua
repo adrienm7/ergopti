@@ -47,7 +47,7 @@ local function scenario(body)
 		exec_checked = function(command)
 			observed.commands[#observed.commands + 1] = command
 			local accepted = observed.status == 0 or observed.status == true
-			return accepted, observed.answer or "", accepted and nil or "command exited with status 1"
+			return accepted, observed.answer or "", accepted and nil or "command exited with status 1", accepted and nil or require("adapter_errors").COMMAND_EXITED_NONZERO, accepted and nil or 1
 		end,
 	}
 	package.loaded["adapters.shell_runner"] = shell

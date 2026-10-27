@@ -3,6 +3,7 @@
 local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
 local driver_root = assert(self_path:match("^(.*)/tests/fixtures/[^/]+$"))
 package.path = driver_root .. "/?.lua;" .. driver_root .. "/?/init.lua;" .. driver_root .. "/../_shared/lua/?.lua;" .. driver_root .. "/../_shared/lua/?/init.lua;" .. package.path
+local Errors = require("adapter_errors")
 local uv = require("luv")
 local Owned = require("adapters.owned_process")
 local Timer = require("infra.native_timer")
@@ -53,9 +54,9 @@ elseif mode == "existing" then
 	uv.sleep(BLOCKED_MS)
 	start()
 	uv.run("nowait")
-	assert(old.result and old.result.error == "process deadline exceeded", "refresh must not restart an existing absolute deadline")
+	assert(old.result and old.result.error == Errors.PROCESS_DEADLINE_EXCEEDED, "refresh must not restart an existing absolute deadline")
 	await(function() return old:is_settled() end)
-	assert(old_result and not old_result.ok and old_result.error == "process deadline exceeded")
+	assert(old_result and not old_result.ok and old_result.error == Errors.PROCESS_DEADLINE_EXCEEDED)
 else
 	error("unknown deadline control")
 end

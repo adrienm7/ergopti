@@ -5,6 +5,7 @@ local driver_root = assert(self_path:match("^(.*)/tests/hardware/[^/]+$"),
 	"launch with an absolute script path")
 local shared_root = driver_root .. "/../_shared/lua"
 package.path = driver_root .. "/?.lua;" .. shared_root .. "/?.lua;" .. package.path
+local Errors = require("adapter_errors")
 
 local uv = require("luv")
 local NativeProcess = require("adapters.owned_process")
@@ -62,6 +63,6 @@ test("real missing binary refuses and retires all shared and native handles", fu
 	local operation = port.start("/nonexistent/ergopti-finite-shared-fixture", {},
 		{ owner = "finite-native-absent", timeout_ms = 1000 }, function(value) result = value end)
 	assert(not operation.started and await(function() return operation:is_settled() end))
-	assert(result and not result.ok and result.error == "native process dispatch failed")
+	assert(result and not result.ok and result.error == Errors.PROCESS_DISPATCH_FAILED)
 end)
 print(string.format("Finite shared process native: %d passed, 0 failed.", passed))
