@@ -537,6 +537,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-shortcut-inventory-matches-sources.cjs"],
 			"repro": "npm run test:shortcut-inventory"
+		},
+		{
+			"id": "js-0503",
+			"ordinal": 503,
+			"name": "slot roles resolve on every driver and the crosswalk equals the inventory",
+			"cmd": "node",
+			"args": ["tools/test/test-slot-roles-single-source.cjs"],
+			"repro": "npm run test:slot-roles-single-source"
 		}
 	]
 }

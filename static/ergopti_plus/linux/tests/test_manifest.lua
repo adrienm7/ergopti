@@ -78,6 +78,7 @@ return {
 	"tests.unit.modules.shortcuts.physical.test_physical_editor_inventory",
 	"tests.unit.modules.shortcuts.physical.test_physical_entries",
 	"tests.unit.modules.shortcuts.physical.test_physical_slots",
+	"tests.unit.modules.shortcuts.keyboard.test_slot_roles",
 	"tests.unit.ui.editors.test_physical_editor",
 	"tests.unit.ui.editors.test_physical_editor_host",
 	"tests.unit.ui.editors.physical.test_picker_refusal",

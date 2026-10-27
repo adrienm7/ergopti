@@ -1,0 +1,493 @@
+{
+	"version": 1,
+	"description": "Independent vectors for the neutral keyboard-slot grammar (_shared/lua/shortcuts/slot_roles.lua). 'valid' holds slots with the exact native chord each driver resolves them to ({\"absent\": true} where the keyboard lacks a role). 'invalid' holds ids the parser must refuse, including every OS-named id the model retires. 'crosswalk' maps each chord the three drivers register today (docs/audits/2026-10-27-shortcut-inventory.json) to its neutral slot; tools/test/test-slot-roles-single-source.cjs keeps it equal to the inventory. 'pending_keys' lists keys of the crosswalk that modifier_chords.json does not yet carry.",
+	"valid": [
+		{
+			"slot": "primary_g",
+			"roles": ["primary"],
+			"key": "g",
+			"native": {
+				"windows": {
+					"modifiers": ["ctrl"],
+					"key": "g"
+				},
+				"macos": {
+					"modifiers": ["cmd"],
+					"key": "g"
+				},
+				"linux": {
+					"modifiers": ["ctrl"],
+					"key": "g"
+				}
+			}
+		},
+		{
+			"slot": "primary_shift_v",
+			"roles": ["primary", "shift"],
+			"key": "v",
+			"native": {
+				"windows": {
+					"modifiers": ["ctrl", "shift"],
+					"key": "v"
+				},
+				"macos": {
+					"modifiers": ["cmd", "shift"],
+					"key": "v"
+				},
+				"linux": {
+					"modifiers": ["ctrl", "shift"],
+					"key": "v"
+				}
+			}
+		},
+		{
+			"slot": "secondary_a",
+			"roles": ["secondary"],
+			"key": "a",
+			"native": {
+				"windows": {
+					"absent": true
+				},
+				"macos": {
+					"modifiers": ["ctrl"],
+					"key": "a"
+				},
+				"linux": {
+					"absent": true
+				}
+			}
+		},
+		{
+			"slot": "secondary_shift_x",
+			"roles": ["secondary", "shift"],
+			"key": "x",
+			"native": {
+				"windows": {
+					"absent": true
+				},
+				"macos": {
+					"modifiers": ["ctrl", "shift"],
+					"key": "x"
+				},
+				"linux": {
+					"absent": true
+				}
+			}
+		},
+		{
+			"slot": "alt_a",
+			"roles": ["alt"],
+			"key": "a",
+			"native": {
+				"windows": {
+					"modifiers": ["alt"],
+					"key": "a"
+				},
+				"macos": {
+					"modifiers": ["option"],
+					"key": "a"
+				},
+				"linux": {
+					"modifiers": ["alt"],
+					"key": "a"
+				}
+			}
+		},
+		{
+			"slot": "alt_shift_period",
+			"roles": ["alt", "shift"],
+			"key": "period",
+			"native": {
+				"windows": {
+					"modifiers": ["alt", "shift"],
+					"key": "period"
+				},
+				"macos": {
+					"modifiers": ["option", "shift"],
+					"key": "period"
+				},
+				"linux": {
+					"modifiers": ["alt", "shift"],
+					"key": "period"
+				}
+			}
+		},
+		{
+			"slot": "meta_space",
+			"roles": ["meta"],
+			"key": "space",
+			"native": {
+				"windows": {
+					"modifiers": ["win"],
+					"key": "space"
+				},
+				"macos": {
+					"absent": true
+				},
+				"linux": {
+					"modifiers": ["super"],
+					"key": "space"
+				}
+			}
+		},
+		{
+			"slot": "meta_shift_s",
+			"roles": ["meta", "shift"],
+			"key": "s",
+			"native": {
+				"windows": {
+					"modifiers": ["win", "shift"],
+					"key": "s"
+				},
+				"macos": {
+					"absent": true
+				},
+				"linux": {
+					"modifiers": ["super", "shift"],
+					"key": "s"
+				}
+			}
+		},
+		{
+			"slot": "primary_alt_enter",
+			"roles": ["primary", "alt"],
+			"key": "enter",
+			"native": {
+				"windows": {
+					"modifiers": ["ctrl", "alt"],
+					"key": "enter"
+				},
+				"macos": {
+					"modifiers": ["cmd", "option"],
+					"key": "enter"
+				},
+				"linux": {
+					"modifiers": ["ctrl", "alt"],
+					"key": "enter"
+				}
+			}
+		},
+		{
+			"slot": "primary_secondary_comma",
+			"roles": ["primary", "secondary"],
+			"key": "comma",
+			"native": {
+				"windows": {
+					"absent": true
+				},
+				"macos": {
+					"modifiers": ["cmd", "ctrl"],
+					"key": "comma"
+				},
+				"linux": {
+					"absent": true
+				}
+			}
+		},
+		{
+			"slot": "primary_alt_shift_0",
+			"roles": ["primary", "alt", "shift"],
+			"key": "0",
+			"native": {
+				"windows": {
+					"modifiers": ["ctrl", "alt", "shift"],
+					"key": "0"
+				},
+				"macos": {
+					"modifiers": ["cmd", "option", "shift"],
+					"key": "0"
+				},
+				"linux": {
+					"modifiers": ["ctrl", "alt", "shift"],
+					"key": "0"
+				}
+			}
+		},
+		{
+			"slot": "secondary_alt_space",
+			"roles": ["secondary", "alt"],
+			"key": "space",
+			"native": {
+				"windows": {
+					"absent": true
+				},
+				"macos": {
+					"modifiers": ["ctrl", "option"],
+					"key": "space"
+				},
+				"linux": {
+					"absent": true
+				}
+			}
+		}
+	],
+	"invalid": [
+		"",
+		"g",
+		"primary",
+		"primary_",
+		"_g",
+		"primary__g",
+		"shift_primary_g",
+		"primary_primary_g",
+		"primary_shift",
+		"ctrl_g",
+		"cmd_a",
+		"hs_ctrl_a",
+		"win_a",
+		"super_space",
+		"Primary_g",
+		"primary_g_",
+		"primary-g",
+		"magic_editor"
+	],
+	"crosswalk": [
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "x",
+			"slot": "meta_x"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "g",
+			"slot": "meta_g"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "s",
+			"slot": "meta_s"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "n",
+			"slot": "meta_n"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["ctrl"],
+			"key": "b",
+			"slot": "primary_b"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "w",
+			"slot": "meta_w"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "u",
+			"slot": "meta_u"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["ctrl", "shift"],
+			"key": "v",
+			"slot": "primary_shift_v"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "a",
+			"slot": "meta_a"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "quote",
+			"slot": "meta_quote"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "o",
+			"slot": "meta_o"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "t",
+			"slot": "meta_t"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "d",
+			"slot": "meta_d"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "m",
+			"slot": "meta_m"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "h",
+			"slot": "meta_h"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "capslock",
+			"slot": "meta_capslock"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "sc029",
+			"slot": "meta_sc029"
+		},
+		{
+			"driver": "windows",
+			"modifiers": ["win"],
+			"key": "space",
+			"slot": "meta_space"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "a",
+			"slot": "secondary_a"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "d",
+			"slot": "secondary_d"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "e",
+			"slot": "secondary_e"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "g",
+			"slot": "secondary_g"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "h",
+			"slot": "secondary_h"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "i",
+			"slot": "secondary_i"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "m",
+			"slot": "secondary_m"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "o",
+			"slot": "secondary_o"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "p",
+			"slot": "secondary_p"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "s",
+			"slot": "secondary_s"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "t",
+			"slot": "secondary_t"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "u",
+			"slot": "secondary_u"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "w",
+			"slot": "secondary_w"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "x",
+			"slot": "secondary_x"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "capslock",
+			"slot": "secondary_capslock"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "l",
+			"slot": "secondary_l"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "period",
+			"slot": "secondary_period"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "quote",
+			"slot": "secondary_quote"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["cmd", "shift"],
+			"key": "v",
+			"slot": "primary_shift_v"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["cmd"],
+			"key": "star",
+			"slot": "primary_star"
+		},
+		{
+			"driver": "macos",
+			"modifiers": ["ctrl"],
+			"key": "space",
+			"slot": "secondary_space"
+		},
+		{
+			"driver": "linux",
+			"modifiers": ["ctrl"],
+			"key": "g",
+			"slot": "primary_g"
+		},
+		{
+			"driver": "linux",
+			"modifiers": ["super"],
+			"key": "space",
+			"slot": "meta_space"
+		}
+	],
+	"pending_keys": ["capslock", "quote", "sc029", "star"]
+}
