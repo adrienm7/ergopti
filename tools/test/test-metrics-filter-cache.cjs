@@ -3589,4 +3589,110 @@ assert.equal(
 	'all native completed-word histories, case modes and host ingress paths must execute'
 );
 
+const nativeAccuracyProjection = JSON.parse(
+	fs.readFileSync(
+		path.resolve(root, '../../windows/tests/fixtures/metrics_accuracy_projection.json'),
+		'utf8'
+	)
+);
+assert.equal(nativeAccuracyProjection.cases.length, 9);
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const source of ['historical', 'today']) {
+		for (const sensitive of [false, true]) {
+			for (const vector of nativeAccuracyProjection.cases) {
+				test(`${host} ${source} original token precision ${vector.id}, case-sensitive ${sensitive}`, () => {
+					const page = loadMetricsTypingPage(host);
+					freezePageClock(
+						page,
+						source === 'historical' ? '2026-10-27T12:00:00' : '2026-10-26T12:00:00'
+					);
+					const app = nativeAccuracyProjection.app;
+					const manifest = { '2026-10-26': { [app]: { chars: vector.events.length, time: 1000 } } };
+					publishTypingPage(page, host, manifest);
+					if (sensitive) page.elements.get('btn_case_sensitive').classList.add('active');
+					else page.elements.get('btn_case_sensitive').classList.remove('active');
+					const raw = { [vector.tab]: { [vector.token]: { c: vector.c, e: vector.e, t: 100 } } };
+					deliverTypingManifest(page, host, manifest, {
+						range:
+							source === 'historical'
+								? { historical: raw, today: {} }
+								: { historical: {}, today: { [app]: raw } }
+					});
+					vm.runInContext(`app_state.current_tab = ${JSON.stringify(vector.tab)}`, page.context);
+					page.context.render_current_tab();
+					page.timers.at(-1)();
+					// Flat bracket strings have an independent, reported token-boundary ambiguity.
+					// Pin their projection policy without claiming the current tokenizer can render them.
+					if (vector.id !== 'literal-bracket') {
+						const rows = vm.runInContext('app_state.rendered_list', page.context);
+						assert.equal(rows.length, 1);
+						assert.equal(
+							rows[0].acc,
+							vector.accuracy,
+							'case folding retains the original native correction policy'
+						);
+						assert.equal(rows[0].count, vector.c);
+					}
+					const key = sensitive ? vector.token : vector.token.toLowerCase();
+					const item = vm.runInContext(
+						`app_state.data[${JSON.stringify(vector.tab)}][${JSON.stringify(key)}]`,
+						page.context
+					);
+					assert.equal(
+						item.errors,
+						vector.e,
+						'raw error counters remain available to correction metrics'
+					);
+					assert.equal(
+						item.accuracy_errors,
+						vector.accuracy === 100 ? 0 : vector.e,
+						'only the original native uppercase control marker receives the existing exemption'
+					);
+					assert.equal(
+						page.diagnostics.some((entry) => entry.level === 'error'),
+						false
+					);
+				});
+			}
+		}
+	}
+}
+assert.equal(passed, 993, 'all original-marker and ordinary-error precision controls must execute');
+
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const sensitive of [false, true]) {
+		test(`${host} derived modifier precision remains finite, case-sensitive ${sensitive}`, () => {
+			const page = loadMetricsTypingPage(host);
+			freezePageClock(page, '2026-10-27T12:00:00');
+			const snapshot = nativeWordProjection.cases.find(
+				(vector) => vector.id === 'case-mixed'
+			).snapshot;
+			publishTypingPage(page, host, snapshot.manifest);
+			if (sensitive) page.elements.get('btn_case_sensitive').classList.add('active');
+			else page.elements.get('btn_case_sensitive').classList.remove('active');
+			const historical = structuredClone(snapshot.range.historical);
+			// Ctrl+S is produced and replayed by the native shortcut-projection contract.
+			historical.sc = { 'Ctrl+S': { c: 1, t: 0 } };
+			deliverTypingManifest(page, host, snapshot.manifest, { range: { historical, today: {} } });
+			vm.runInContext("app_state.current_tab = 'mods'", page.context);
+			page.context.render_current_tab();
+			page.timers.at(-1)();
+			const rows = JSON.parse(
+				vm.runInContext(
+					'JSON.stringify(app_state.rendered_list.map(row => ({key:row.key, count:row.count, accuracy:row.acc})))',
+					page.context
+				)
+			);
+			assert.deepEqual(
+				rows.sort((a, b) => a.key.localeCompare(b.key)),
+				[
+					{ key: 'ctrl', count: 1, accuracy: 100 },
+					{ key: 'shift', count: 1, accuracy: 100 }
+				]
+			);
+		});
+	}
+}
+assert.equal(passed, 999, 'all native and derived precision ownership paths must execute');
+
 console.log(`${passed} passed, 0 failed.`);
