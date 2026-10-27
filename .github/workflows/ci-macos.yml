@@ -515,7 +515,13 @@ jobs:
           identity = official['assets'][contract['official_asset_key']]
           version = contract['go_version']
           assert re.fullmatch(r'go[0-9]+\.[0-9]+\.[0-9]+', version)
-          root = Path(tempfile.mkdtemp(prefix='managed-ollama-native-', dir=os.environ['RUNNER_TEMP']))
+          # The Intel XCTest cell restores its SwiftPM build tree, whose files name
+          # their absolute paths, so its root is the same directory on every run.
+          if os.environ['MACOS_STAGE_SCENARIO'] == 'xctest':
+              root = Path(os.environ['RUNNER_TEMP']) / 'managed-ollama-native-xctest'
+              root.mkdir(mode=0o700)
+          else:
+              root = Path(tempfile.mkdtemp(prefix='managed-ollama-native-', dir=os.environ['RUNNER_TEMP']))
           values = {
               'ERGOPTI_OLLAMA_BUILD_ROOT': str(root),
               'ERGOPTI_OLLAMA_SOURCE': str(root / 'source'),
@@ -650,6 +656,69 @@ jobs:
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/numeric-tls-controls.log
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/api-wire-controls.log
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/serve-lifecycle-controls.log
+      # Trial (run 40498535042): the Intel XCTest cell spent 215 s on one cold
+      # SwiftPM debug build, its tests 48 s. Only this cell caches the build
+      # tree. The key names every input the build reads (the launcher package
+      # with its resolved pins, the .github/ci policies Package.swift reads, the
+      # release context, the runner image and the Swift toolchain) and there is
+      # no fallback key, so a partial match never restores a stale tree.
+      # test-ci-pipeline-wiring refuses this cache in every other cell and job.
+      - name: Name the Intel XCTest SwiftPM build
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        id: swiftpm-xctest-key
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO == 'xctest') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ImageOS" && test -n "$ImageVersion"
+          inputs="$(
+            git ls-files -s static/ergopti_plus/macos/launcher .github/ci
+            printf 'image %s %s %s\n' "$ImageOS" "$ImageVersion" "$(uname -m)"
+            swift --version 2>&1
+            printf 'release %s %s %s %s %s\n' "$ERGOPTI_DEV_RELEASE_RELEASE" "$ERGOPTI_DEV_RELEASE_PRERELEASE" \
+              "$ERGOPTI_DEV_RELEASE_CHANNEL" "$ERGOPTI_DEV_RELEASE_TAG" "$ERGOPTI_DEV_RELEASE_VERSION"
+          )"
+          digest="$(printf '%s\n' "$inputs" | shasum -a 256 | cut -c1-32)"
+          echo "key=swiftpm-intel-xctest-$digest" >> "$GITHUB_OUTPUT"
+      - name: Restore the Intel XCTest SwiftPM build
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        id: swiftpm-xctest-cache
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO == 'xctest') }}
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/swift
+          key: ${{ steps.swiftpm-xctest-key.outputs.key }}
+      - name: Report the Intel XCTest SwiftPM build cache
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO == 'xctest') }}
+        shell: bash
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+          CACHE_HIT: ${{ steps.swiftpm-xctest-cache.outputs.cache-hit }}
+          CACHE_KEY: ${{ steps.swiftpm-xctest-key.outputs.key }}
+        run: |
+          set -euo pipefail
+          if [ "$CACHE_HIT" = true ]; then
+              echo "SwiftPM XCTest cache: hit ($CACHE_KEY)"
+          else
+              echo "SwiftPM XCTest cache: miss ($CACHE_KEY)"
+          fi
       # Runs on macOS 15; the launcher cell runs these classes again on macOS 26 on purpose.
       - name: Qualify actual SDK accepted-owner and deadline XCTest controls
         env:
@@ -854,6 +923,20 @@ jobs:
             ${{ runner.temp }}/number-row-source-evidence/tis-session.*/manifest.json
             ${{ runner.temp }}/number-row-source-evidence/tis-session.*/record-*.dat
             ${{ runner.temp }}/number-row-source-evidence/tis-session.*/refusal.json
+      # Saved only after a successful cold build and its tests, and only on a miss.
+      - name: Save the Intel XCTest SwiftPM build
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO == 'xctest' && steps.swiftpm-xctest-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/swift
+          key: ${{ steps.swiftpm-xctest-key.outputs.key }}
       - name: Qualify native input-source and launcher XCTest controls
         env:
           GOTOOLCHAIN: 'local'
