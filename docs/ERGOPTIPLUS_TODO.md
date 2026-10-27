@@ -33,13 +33,15 @@ a sealed Windows updater source, reseal with
 
 - **Mac hardware session.** The maintainer has a Mac: the checklist is "Mac hardware session" under
   Maintainer checks; their logs land in `docs/field-reports/mac-2026-10-27/` on their branch.
-- **State.** dev is linear and pushed at the head of the sixth integration batch (27 Oct, about 05:00 UTC);
+- **State.** dev is linear and pushed at the head of the eighth integration batch (27 Oct, about 09:30 UTC);
   every push of dev had its CI cancelled (a dev push builds a release). Latest stable release: v1.0.6. A full
   CI of that head is dispatched on `tmp/preflight-dev` with `os_lanes=all`: read it first. The previous full
-  run (40443902044 on 376b28db82) failed only on Linux unit alpine/arch/fedora/opensuse (libxkbcommon 1.13
-  falls back to the legacy XKB root: 03f842b66e), Windows unit core (UIA constructor race, fixed by
-  131131e339) and macOS Launcher XCTest (read-only bundle helper mode, App Cloner Cancel label): all
-  addressed in this batch, CI-only confirmation.
+  run (40467200993 on 8eae6e8b63) was 69 green; its reds (Windows unit core, macOS tooltip canvas, four Linux
+  E2E rows) are fixed in this batch by the CI agent (stale fixtures after recent dev changes), CI-only
+  confirmation. Batch 8 holds PAR-80, PAR-53, PAR-83, item 139, item 5 (config-only Linux participant),
+  PAR-65 agent decisions, PAR-84, PAR-79 and the Mac hardware checklist.
+- **Disk.** The container allowance fills up with `/tmp/ergopti-*` test leftovers; the sandbox refused a
+  sweep of them from the coordinator, so ask the maintainer to remove the ones older than an hour.
 - **The ChatGPT fix branches are finished and fully integrated** (27 Oct, 08:00 UTC): every commit of
   fix/linux fe2413797f, fix/macos e8ea64ff1e and fix/windows d6b075687e is on dev by subject or content
   (the last two Windows test commits in the eighth batch; the per-branch reseal was replaced by one reseal on
@@ -970,7 +972,7 @@ PONG/READY), `Lease-bound input startup failed`, `Layout poll detected change`, 
 - [ ] Issue #100: with Ollama.app and a PAC proxy, enabling the AI downloads the model; with the Ergopti
       menu held open, no lease timeout.
 - [ ] Issue #99: `memory_pressure | tail -1` during lease errors; oMLX listed (DEBUG line `Local server 'omlx'
-    probe answered ...`, else `curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/v1/models`);
+  probe answered ...`, else `curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/v1/models`);
       `Ollama bootstrap failed (exit=137)` with an external Ollama; declining the download opens no error
       window ([issue99-ai-startup-updater.md](todo-agents/issue99-ai-startup-updater.md)).
 
