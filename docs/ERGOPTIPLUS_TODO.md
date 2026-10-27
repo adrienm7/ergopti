@@ -261,6 +261,16 @@ dev.
   guardian must run a private linked snapshot instead (a design change to the unlinked-source pin
   that `ManagedPTYWorkerTests` asserts); B > 0 with nothing in the driver log would point at the
   hs.task stream instead.
+  Cause proven by the 23:55 run: `fileless_bash_probe.txt` read "path script: exit=0 ... survived"
+  and "unlinked /dev/fd/3 script: exit=137" (Killed: 9), and `security_agents.txt` lists Microsoft
+  Defender, Santa, BeyondTrust, Symantec, Trellix and Jamf: endpoint security kills fileless script
+  execution. Fixed on tmp/wip-ollama-linked-snapshot (coordinator's decision for the maintainer):
+  the guardian runs `/bin/bash <private linked snapshot>` (memory
+  `project-macos-installers-run-from-a-linked-private-snapshot`); the three installers recognise it
+  by `ERGOPTI_BOOTSTRAP_SNAPSHOT`. Swift compiled only by macOS CI. Mac confirms: choosing Ollama
+  installs Ergopti's own 0.40.4 (09_ollama_runtime pass) or names a later closed cause, with no
+  `[PTY-WORKER] ... killed by signal 9` line, and the snapshot folder `pty-sources` (under
+  `~/Library/Application Support/ErgoptiPlus`) is empty afterwards.
 - **L50** Fixed c98dceabce. 01_field_lease `guardian_state=fail:unknown` on the 22:32 developer
   run: the check ran 1.5 s after the driver started registering the guardian; the registration
   removed a stale record and answered 'ready' 5 s later. "unknown" is "not yet observed in this
