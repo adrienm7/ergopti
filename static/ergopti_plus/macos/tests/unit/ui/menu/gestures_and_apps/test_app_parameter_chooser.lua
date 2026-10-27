@@ -48,10 +48,10 @@ helpers.describe("open_app parameter chooser (macOS)", function()
 		dialog.text_prompt = function() error("an application is never typed") end
 
 		local stored = {}
-		helpers.assert_eq(SU.prompt_action_parameter(facade(stored), "keyboard__cmd_1", "open_app", "app"), true)
+		helpers.assert_eq(SU.prompt_action_parameter(facade(stored), "keyboard__primary_1", "open_app", "app"), true)
 		helpers.assert_eq(asked, { "Application to open:" })
 		helpers.assert_eq(titles, { SU.action_parameter_title("open_app") }, "the parameter caption reaches the native owner")
-		helpers.assert_eq(stored, { { binding = "keyboard__cmd_1", action = "open_app", value = "/Applications/Safari.app" } })
+		helpers.assert_eq(stored, { { binding = "keyboard__primary_1", action = "open_app", value = "/Applications/Safari.app" } })
 	end)
 
 	helpers.it("choose_application opens /Applications on application bundles only", function()
@@ -115,7 +115,7 @@ helpers.describe("open_app parameter chooser (macOS)", function()
 				local stored = {}
 				local owner = facade(stored)
 				owner.get_action_label = function() return label end
-				helpers.assert_eq(SU.prompt_action_parameter(owner, "keyboard__cmd_1", "open_app", "app"), false)
+				helpers.assert_eq(SU.prompt_action_parameter(owner, "keyboard__primary_1", "open_app", "app"), false)
 				helpers.assert_eq(#scripts, 1, "the real caller reaches one actual native port")
 				local escaped = expected:gsub("\\", "\\\\"):gsub('"', '\\"')
 				helpers.assert_true(scripts[1]:find([[panel's setTitle:"ErgoptiPlus — ]] .. escaped .. '"', 1, true) ~= nil, code)

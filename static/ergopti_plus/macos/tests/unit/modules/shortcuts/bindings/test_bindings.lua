@@ -231,19 +231,19 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 		end
 	end)
 
-	helpers.it("includes the canonical ctrl+letter shortcuts", function()
+	helpers.it("lists the ChatGPT and Cmd+* switches that are not catalogue actions", function()
 		local seen = {}
 		for _, entry in ipairs(list) do seen[entry.id] = true end
-		for _, id in ipairs({ "ctrl_a", "ctrl_e", "ctrl_t", "ctrl_w", "ctrl_u" }) do
-			helpers.assert_true(seen[id], "missing shortcut: " .. id)
-		end
+		helpers.assert_true(seen.ctrl_g, "missing shortcut: ctrl_g")
+		helpers.assert_true(seen.cmd_star, "missing shortcut: cmd_star")
 	end)
 
-	helpers.it("includes the cmd_star and cmd_shift_v shortcuts", function()
+	helpers.it("no longer lists the switches that became role-named slots", function()
 		local seen = {}
 		for _, entry in ipairs(list) do seen[entry.id] = true end
-		helpers.assert_true(seen.cmd_star)
-		helpers.assert_true(seen.cmd_shift_v)
+		for _, id in ipairs({ "ctrl_a", "ctrl_d", "ctrl_e", "ctrl_h", "ctrl_i", "ctrl_m", "ctrl_o", "ctrl_p", "ctrl_s", "ctrl_t", "ctrl_u", "ctrl_w", "ctrl_x", "ctrl_capslock", "ctrl_l", "ctrl_period", "ctrl_quote", "cmd_shift_v" }) do
+			helpers.assert_nil(seen[id], "retired switch still listed: " .. id)
+		end
 	end)
 
 	helpers.it("includes the standalone tap_keys and layer_wheel entries", function()
@@ -255,19 +255,10 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 		helpers.assert_nil(seen.layer_scroll, "Layer + Scroll is retired: the layer's wheel replaces it")
 	end)
 
-	helpers.it("orders ctrl+letter entries before ctrl+punctuation", function()
-		-- Group rule: ctrl_<single letter> comes before ctrl_<word> (period/quote).
-		local idx = {}
-		for i, entry in ipairs(list) do idx[entry.id] = i end
-		helpers.assert_true(idx.ctrl_a < idx.ctrl_period)
-		helpers.assert_true(idx.ctrl_w < idx.ctrl_quote)
-	end)
-
 	helpers.it("orders ctrl_* entries before cmd_* entries", function()
 		local idx = {}
 		for i, entry in ipairs(list) do idx[entry.id] = i end
-		helpers.assert_true(idx.ctrl_a       < idx.cmd_shift_v)
-		helpers.assert_true(idx.ctrl_period  < idx.cmd_star)
+		helpers.assert_true(idx.ctrl_g < idx.cmd_star)
 	end)
 
 	helpers.it("orders cmd_* entries before the catch-all bucket", function()
@@ -294,33 +285,33 @@ helpers.describe("shortcuts.bindings: enable/disable", function()
 	require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 
 	helpers.it("is_bound is false before enable(), while the preference is on", function()
-		helpers.assert_eq(B.is_bound("ctrl_a"), false)
-		helpers.assert_eq(B.is_enabled("ctrl_a"), true)
+		helpers.assert_eq(B.is_bound("ctrl_g"), false)
+		helpers.assert_eq(B.is_enabled("ctrl_g"), true)
 	end)
 
 	helpers.it("enable() binds the hotkey and keeps the preference on", function()
-		helpers.assert_eq(B.enable("ctrl_a"), true)
-		helpers.assert_eq(B.is_enabled("ctrl_a"), true)
-		helpers.assert_eq(B.is_bound("ctrl_a"), true)
+		helpers.assert_eq(B.enable("ctrl_g"), true)
+		helpers.assert_eq(B.is_enabled("ctrl_g"), true)
+		helpers.assert_eq(B.is_bound("ctrl_g"), true)
 	end)
 
 	helpers.it("enable() is idempotent — re-enabling does not crash", function()
-		B.enable("ctrl_a")
-		B.enable("ctrl_a")
-		helpers.assert_eq(B.is_enabled("ctrl_a"), true)
-		helpers.assert_eq(B.is_bound("ctrl_a"), true)
+		B.enable("ctrl_g")
+		B.enable("ctrl_g")
+		helpers.assert_eq(B.is_enabled("ctrl_g"), true)
+		helpers.assert_eq(B.is_bound("ctrl_g"), true)
 	end)
 
 	helpers.it("disable() unbinds the hotkey and switches the preference off", function()
-		helpers.assert_eq(B.disable("ctrl_a"), true)
-		helpers.assert_eq(B.is_enabled("ctrl_a"), false)
-		helpers.assert_eq(B.is_bound("ctrl_a"), false)
+		helpers.assert_eq(B.disable("ctrl_g"), true)
+		helpers.assert_eq(B.is_enabled("ctrl_g"), false)
+		helpers.assert_eq(B.is_bound("ctrl_g"), false)
 	end)
 
 	helpers.it("disable() is idempotent — disabling an inactive id does nothing", function()
-		B.disable("ctrl_a")
-		helpers.assert_eq(B.is_enabled("ctrl_a"), false)
-		helpers.assert_eq(B.is_bound("ctrl_a"), false)
+		B.disable("ctrl_g")
+		helpers.assert_eq(B.is_enabled("ctrl_g"), false)
+		helpers.assert_eq(B.is_bound("ctrl_g"), false)
 	end)
 end)
 

@@ -876,8 +876,8 @@ function M.build(ctx)
 			-- modifier: as groups of their own they drew a second "Ctrl" and
 			-- "Cmd" submenu beside the configurable one.
 			return KeyboardSlots.provide_rows(ctx, (not state.shortcuts) or paused or nil, {
-				hs_ctrl_ = ctrl_items,
-				cmd_     = cmd_items,
+				secondary_ = ctrl_items,
+				primary_   = cmd_items,
 			})
 		end,
 		-- The number-row tap keys, named by what each types under the current

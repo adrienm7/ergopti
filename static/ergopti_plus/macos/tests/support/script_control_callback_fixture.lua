@@ -138,7 +138,7 @@ function M.with_configurable(callback)
 		package.loaded["infra.paths"] = {shared = function() return "catalogue.json" end}
 		package.loaded["adapters.file_system"] = {
 			read = function() return Json.encode(catalogue) end,
-			read_with_status = function() return '[shortcuts.keyboard]\ncmd_a = "throwing_action"\n', "ok" end,
+			read_with_status = function() return '[shortcuts.keyboard]\nprimary_a = "throwing_action"\n', "ok" end,
 			write = function() error("callback dispatch must not publish preferences") end,
 		}
 		package.loaded["adapters.hotkey_registrar"] = {

@@ -19,7 +19,7 @@ local function with_subject(stage, body, options)
 		with_fixture(function(fixture)
 			local source_path = os.tmpname():gsub("\\", "/")
 			local path = options and options.alias_route and (source_path .. ".alias") or source_path
-			local original = '[gestures]\naction_parameters = { retained = "unrelated" }\n[shortcuts.keyboard]\ncmd_1 = "none"\n'
+			local original = '[gestures]\naction_parameters = { retained = "unrelated" }\n[shortcuts.keyboard]\nprimary_1 = "none"\n'
 			local seeded = assert(io.open(source_path, "w")); assert(seeded:write(original)); assert(seeded:close())
 			local original_open, original_rename = io.open, os.rename
 			local control = { locks = 0, unlocks = 0, refusal = stage ~= "healthy", fail_operation = stage == "assignment" and 1 or 2 }
@@ -75,7 +75,7 @@ local function with_subject(stage, body, options)
 				package.loaded["modules.gestures.actions"] = { is_assignable = function() return true end }
 				local preferences = require("infra.preferences"); preferences.load(path)
 				local keyboard = require("modules.shortcuts.keyboard_shortcuts")
-				helpers.assert_eq(keyboard.get_action("cmd_1"), "none")
+				helpers.assert_eq(keyboard.get_action("primary_1"), "none")
 				local parameters, state = { retained = "unrelated" }, {}
 				local gestures = {
 					is_assignable = function() return true end,
@@ -107,14 +107,14 @@ local function with_subject(stage, body, options)
 					admission = global.run_exclusive, paused = function() return false end, save_prefs = save, current_path = function() return path end,
 					capture_checkpoint_candidate = function() return { state = require("ui.menu.preferences_transaction").clone(state), preferences = preferences.snapshot(state, {}, { gestures = gestures }) } end,
 				})
-				local mutation = { publishes_assignment = true, section = "shortcuts.keyboard", key = "cmd_1",
-					read = function() return keyboard.get_action("cmd_1") end,
+				local mutation = { publishes_assignment = true, section = "shortcuts.keyboard", key = "primary_1",
+					read = function() return keyboard.get_action("primary_1") end,
 					-- Keep actual provider boolean coercion: the observer must survive it.
-					apply = function(reporter, observer) return keyboard.set_action("cmd_1", selected, reporter, observer) == true end,
-					restore = function(previous, reporter, observer) return keyboard.set_action("cmd_1", previous, reporter, observer) == true end,
+					apply = function(reporter, observer) return keyboard.set_action("primary_1", selected, reporter, observer) == true end,
+					restore = function(previous, reporter, observer) return keyboard.set_action("primary_1", previous, reporter, observer) == true end,
 				}
 				local function apply()
-					local result = owner.apply("keyboard__cmd_1", selected, scalar, mutation)
+					local result = owner.apply("keyboard__primary_1", selected, scalar, mutation)
 					if stage ~= "healthy" and not (options and options.fail_before_publication) then
 						helpers.assert_eq(type(control.published_candidate), "string",
 							"postpublication control must observe its actual native rename")
@@ -125,7 +125,7 @@ local function with_subject(stage, body, options)
 					end
 					return result
 				end
-				local function inspect() return { content = adapter.read_with_status(path), parameters = copy(parameters), action = keyboard.get_action("cmd_1") } end
+				local function inspect() return { content = adapter.read_with_status(path), parameters = copy(parameters), action = keyboard.get_action("primary_1") } end
 				local function reinstate_candidate() local file = assert(original_open(source_path, "w")); assert(file:write(control.published_candidate)); assert(file:close()) end
 				body(owner, apply, inspect, control, global, preferences, checkpoint, original, adapter, path, logs, reinstate_candidate)
 			end, debug.traceback)
@@ -240,12 +240,12 @@ helpers.describe("actual private native publication ownership", function()
 		with_subject("fullsave", function(owner, apply, _, control)
 			helpers.assert_eq(apply(), false)
 			local keyboard = require("modules.shortcuts.keyboard_shortcuts")
-			helpers.assert_eq(keyboard.apply_configuration({ shortcuts = { keyboard = { cmd_1 = "copy_selection" } } }), true)
+			helpers.assert_eq(keyboard.apply_configuration({ shortcuts = { keyboard = { primary_1 = "copy_selection" } } }), true)
 			local before = control.unlocks
 			control.refusal = false
 			helpers.assert_eq(owner.retry_restore(), false)
 			helpers.assert_eq(control.unlocks, before)
-			helpers.assert_eq(keyboard.get_action("cmd_1"), "copy_selection")
+			helpers.assert_eq(keyboard.get_action("primary_1"), "copy_selection")
 		end)
 	end)
 	helpers.it("does not release or inverse through a foreign symlink route even when candidate bytes are equal", function()
@@ -311,10 +311,10 @@ helpers.describe("non-program actual file publication ownership", function()
 		with_subject("healthy", function(owner, apply, inspect, _, global, preferences, checkpoint, _, _, path)
 			helpers.assert_eq(apply(), true)
 			helpers.assert_eq(inspect().action, "open_url")
-			helpers.assert_eq(inspect().parameters, { retained = "unrelated", keyboard__cmd_1__open_url = "https://example.com" })
+			helpers.assert_eq(inspect().parameters, { retained = "unrelated", keyboard__primary_1__open_url = "https://example.com" })
 			local decoded = require("toml_codec").decode(inspect().content)
-			helpers.assert_eq(decoded.shortcuts.keyboard.cmd_1, "open_url")
-			helpers.assert_eq(decoded.gestures.action_parameters.keyboard__cmd_1__open_url, "https://example.com")
+			helpers.assert_eq(decoded.shortcuts.keyboard.primary_1, "open_url")
+			helpers.assert_eq(decoded.gestures.action_parameters.keyboard__primary_1__open_url, "https://example.com")
 			helpers.assert_eq(preferences.source_snapshot(path).content, inspect().content)
 			helpers.assert_eq(checkpoint.capture().revision, 1)
 			helpers.assert_eq(owner.pending(), false)

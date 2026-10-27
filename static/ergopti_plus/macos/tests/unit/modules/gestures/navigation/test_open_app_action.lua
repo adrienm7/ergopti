@@ -78,8 +78,8 @@ helpers.describe("open_app launches the binding's application (macOS)", function
 
 	helpers.it("opens the application stored for the binding, under its parent", function()
 		with_recorded_system(function(calls)
-			helpers.assert_eq(Actions.set_action_parameter("keyboard__cmd_1", "open_app", "com.apple.Safari"), true)
-			helpers.assert_eq(Actions.execute_single("open_app", "keyboard__cmd_1"), true)
+			helpers.assert_eq(Actions.set_action_parameter("keyboard__primary_1", "open_app", "com.apple.Safari"), true)
+			helpers.assert_eq(Actions.execute_single("open_app", "keyboard__primary_1"), true)
 			helpers.assert_eq(calls[1], { value = "com.apple.Safari", parent = "shortcut_bindings" })
 		end)
 	end)

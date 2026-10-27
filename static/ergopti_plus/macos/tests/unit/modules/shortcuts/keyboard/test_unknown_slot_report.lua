@@ -82,7 +82,7 @@ helpers.describe("keyboard shortcuts: unknown slot ids (unknown-slot-report)", f
 		ConfigOutdated.reset_for_tests()
 		local store = {
 			["no_such_slot"] = "lookup",
-			["hs_ctrl_space"] = "lookup",
+			["secondary_space"] = "lookup",
 		}
 		local reported = ConfigOutdated.collect_reports(function()
 			with_subject(store, function(subject)
@@ -91,7 +91,7 @@ helpers.describe("keyboard shortcuts: unknown slot ids (unknown-slot-report)", f
 		end)
 		helpers.assert_true(reported["shortcuts.keyboard.no_such_slot"] == true,
 			"the unknown id must be offered by the cleanup")
-		helpers.assert_nil(reported["shortcuts.keyboard.hs_ctrl_space"], "an owned slot is not outdated")
+		helpers.assert_nil(reported["shortcuts.keyboard.secondary_space"], "an owned slot is not outdated")
 	end)
 
 	helpers.it("(unknown-slot-report) leaves the stored value in the file", function()

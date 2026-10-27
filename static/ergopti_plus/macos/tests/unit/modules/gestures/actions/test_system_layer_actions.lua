@@ -26,7 +26,7 @@ helpers.describe("gesture actions reach the shortcut layer's system functions", 
 			local last = calls.mouse_actions[#calls.mouse_actions]
 			helpers.assert_eq(last.name, method)
 			helpers.assert_eq(last.parent, "gestures")
-			helpers.assert_eq(actions.execute_single(action_id, "keyboard__cmd_1"), true)
+			helpers.assert_eq(actions.execute_single(action_id, "keyboard__primary_1"), true)
 			helpers.assert_eq(calls.mouse_actions[#calls.mouse_actions].parent, "shortcut_bindings")
 		end
 	end)

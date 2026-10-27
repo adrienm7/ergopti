@@ -237,7 +237,7 @@ helpers.describe("gestures.actions: Mission Control and App Exposé ask the Dock
 		local actions, calls = fresh_actions()
 		local spaces = script_spaces(calls, { ["screen-A"] = { 11 } }, 11, true)
 		helpers.assert_true(actions.execute_single("mission_control"))
-		helpers.assert_true(actions.execute_single("app_expose", "keyboard__cmd_e"))
+		helpers.assert_true(actions.execute_single("app_expose", "keyboard__primary_e"))
 		helpers.assert_eq(spaces.toggles, { "mission_control", "app_expose" })
 		helpers.assert_eq(keys(calls), {}, "a shortcut the user remapped must not decide whether this works")
 	end)

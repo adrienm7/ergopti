@@ -21,7 +21,7 @@
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.shortcut_bindings_fixture")
 
-local DISABLED_ID = "ctrl_d"
+local DISABLED_ID = "ctrl_g"
 -- A registered binding with a raw factory the fixture can make refuse.
 local REFUSED_ID = "cmd_star"
 -- Owners derived from other files (tap-key assignments, the layer's wheel in

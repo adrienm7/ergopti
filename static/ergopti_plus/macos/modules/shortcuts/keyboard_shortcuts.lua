@@ -4,7 +4,7 @@
 --- MODULE: Keyboard Shortcuts
 --- DESCRIPTION:
 --- Manages configurable keyboard shortcuts for Cmd+, Ctrl+, and Option+ combos.
---- Each slot (e.g. "cmd_a", "hs_ctrl_0") maps to any action in the gesture
+--- Each slot (e.g. "primary_a", "secondary_0") maps to any action in the gesture
 --- registry, allowing the user to customise every modifier+key combination
 --- via the tray menu — identical in concept to the AHK system.
 ---
@@ -40,6 +40,7 @@ local KeyboardPublication = require("config_keyboard_publication")
 local KeyboardComposition = KeyboardPublication.compose
 local KeyboardOwnerCurrent = KeyboardPublication.owner_is_current
 local Assignment = require("shortcuts.assignment")
+local SlotRoles = require("shortcuts.slot_roles")
 local PhysicalSlots = require("shortcuts.physical_slots")
 local PhysicalSlotConstructor = PhysicalSlots.new
 local PhysicalAvailability = require("shortcuts.physical_availability")
@@ -117,11 +118,11 @@ local SPECIAL_KEYS = nil
 -- the contextual group owns one logical slot whose numeric source is measured.
 M.SLOT_GROUPS = {
 	{ prefix = "contextual", fixed = true, group_key = "menu.shortcuts.group_contextual", add_key = "menu.shortcuts.add_contextual" },
-	{ prefix = "hs_option_",     group_key = "menu.shortcuts.alt_group",       add_key = "menu.shortcuts.alt_add" },
-	{ prefix = "hs_ctrl_",       group_key = "menu.shortcuts.ctrl_group",      add_key = "menu.shortcuts.ctrl_add" },
-	{ prefix = "hs_ctrl_shift_", group_key = "menu.shortcuts.ctrl_shift_group", add_key = "menu.shortcuts.ctrl_shift_add" },
-	{ prefix = "cmd_",           group_key = "menu.shortcuts.cmd_group",       add_key = "menu.shortcuts.cmd_add" },
-	{ prefix = "cmd_shift_",     group_key = "menu.shortcuts.cmd_shift_group",  add_key = "menu.shortcuts.cmd_shift_add" },
+	{ prefix = "alt_",              group_key = "menu.shortcuts.alt_group",        add_key = "menu.shortcuts.alt_add" },
+	{ prefix = "secondary_",        group_key = "menu.shortcuts.ctrl_group",       add_key = "menu.shortcuts.ctrl_add" },
+	{ prefix = "secondary_shift_",  group_key = "menu.shortcuts.ctrl_shift_group", add_key = "menu.shortcuts.ctrl_shift_add" },
+	{ prefix = "primary_",          group_key = "menu.shortcuts.cmd_group",        add_key = "menu.shortcuts.cmd_add" },
+	{ prefix = "primary_shift_",    group_key = "menu.shortcuts.cmd_shift_group",  add_key = "menu.shortcuts.cmd_shift_add" },
 }
 
 -- Path to the shared key catalogue. The slot space is prefix × key, and the keys
@@ -178,19 +179,24 @@ local function catalogue_keys()
 		end
 		local platform = assert(decoded.platforms and decoded.platforms.macos,
 			"keyboard modifier catalogue lacks macOS metadata")
-		assert(type(platform.shortcut_groups) == "table" and type(platform.modifiers) == "table",
-			"keyboard modifier catalogue lacks ordinary shortcut groups")
+		assert(type(platform.modifiers) == "table", "keyboard modifier catalogue lacks the native modifiers")
 		local aliases, groups, keys = {}, {}, {}
 		for _, modifier in ipairs(platform.modifiers) do
 			aliases[modifier.id] = assert(modifier.hammerspoon, "native modifier alias unavailable")
 		end
-		for _, group in ipairs(platform.shortcut_groups) do
+		-- The prefixes are the role-named families of the shared table; matching
+		-- tries the longest first because "secondary_shift_x" also starts with "secondary_".
+		for _, family in ipairs(SlotRoles.families("macos")) do
 			local mods = {}
-			for _, modifier in ipairs(group.modifiers) do
-				mods[#mods + 1] = assert(aliases[modifier], "ordinary modifier is not owned")
+			for _, native in ipairs(family.native) do
+				mods[#mods + 1] = assert(aliases[native], "ordinary modifier is not owned")
 			end
-			groups[#groups + 1] = { group.prefix, mods }
+			groups[#groups + 1] = { family.prefix, mods }
 		end
+		table.sort(groups, function(a, b) return #a[1] > #b[1] end)
+		-- Keys a slot accepts that the shared chord catalogue (which also feeds
+		-- every driver's chord actions) does not carry.
+		for _, key in ipairs(SlotRoles.extra_keys("macos")) do decoded.keys[#decoded.keys + 1] = key end
 		for _, key in ipairs(decoded.keys) do keys[key.id] = key.chord_key or key.id end
 		SLOT_MODS, SPECIAL_KEYS = groups, keys
 		_catalogue = decoded

@@ -22,7 +22,7 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.shortcut_bindings_fixture")
 
 local CONFIG_PATH = "/virtual/config.toml"
-local DISABLED_ID = "ctrl_d"
+local DISABLED_ID = "ctrl_g"
 
 --- Runs a scenario against real Preferences over an in-memory config file.
 --- @param callback function Receives (preferences, disk).
@@ -158,13 +158,13 @@ helpers.describe("preferences: refused shortcut replay (shortcut-replay-refusal)
 			"ui.menu.session_demotions", "ui.menu.preferences_transaction",
 		}, function()
 			with_preferences(function(preferences, disk, control)
-				disk[CONFIG_PATH] = "[shortcuts]\nenabled = true\n[shortcuts.keys]\nctrl_d = false\n"
+				disk[CONFIG_PATH] = "[shortcuts]\nenabled = true\n[shortcuts.keys]\nctrl_g = false\n"
 				local saved = preferences.load(CONFIG_PATH)
 				Fixture.with_recommended_bindings(function(bindings, ctx)
 					helpers.assert_eq(bindings.start(), true, table.concat(ctx.errors, "\n"))
 					local denied_handle
 					for handle in pairs(ctx.live) do
-						if handle.id == "ctrl+d" then denied_handle = handle end
+						if handle.id == "ctrl+g" then denied_handle = handle end
 					end
 					helpers.assert_type(denied_handle, "table", "the refusal must target a live shortcut")
 					local real_delete = denied_handle.delete
@@ -200,7 +200,7 @@ helpers.describe("preferences: refused shortcut replay (shortcut-replay-refusal)
 						end,
 					})
 					helpers.assert_eq(save(), true)
-					helpers.assert_eq(preferences.load(CONFIG_PATH).shortcut_keys.ctrl_d, nil)
+					helpers.assert_eq(preferences.load(CONFIG_PATH).shortcut_keys.ctrl_g, nil)
 					helpers.assert_eq(bindings.is_enabled(DISABLED_ID), true,
 						"the saved view must not pretend native teardown succeeded")
 					local other
@@ -212,7 +212,7 @@ helpers.describe("preferences: refused shortcut replay (shortcut-replay-refusal)
 					helpers.assert_eq(save(), true)
 					local reloaded = preferences.load(CONFIG_PATH)
 					helpers.assert_eq(reloaded.shortcut_keys[other], nil)
-					helpers.assert_eq(reloaded.shortcut_keys.ctrl_d, nil,
+					helpers.assert_eq(reloaded.shortcut_keys.ctrl_g, nil,
 						"editing a sibling must not end the refused leaf's preservation")
 					helpers.assert_eq(#registry.list(), 1)
 					denied_handle.delete = real_delete
@@ -230,7 +230,7 @@ helpers.describe("preferences: refused shortcut replay (shortcut-replay-refusal)
 					helpers.assert_eq(#registry.list(), 0, "an explicit committed change ends preservation")
 					helpers.assert_eq(bindings.enable(DISABLED_ID), true)
 					helpers.assert_eq(save(), true)
-					helpers.assert_eq(preferences.load(CONFIG_PATH).shortcut_keys.ctrl_d, true)
+					helpers.assert_eq(preferences.load(CONFIG_PATH).shortcut_keys.ctrl_g, true)
 				end)
 			end)
 		end)
