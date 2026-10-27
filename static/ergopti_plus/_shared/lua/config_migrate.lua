@@ -12,8 +12,8 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Data-only steps. A step is a list of ops from a closed set (rename,
----    rename_prefix, move_section, merge_into, map_value, delete,
----    set_if_absent). The engine
+---    rename_prefix, move_section, merge_into, map_value, wrap_value,
+---    delete, set_if_absent). The engine
 ---    holds the only op semantics on this side; the corpus under
 ---    _shared/tests/corpus/config_migrations pins them to the Windows
 ---    interpreter and to the JS reference, and the registry defects under
@@ -164,6 +164,7 @@ local OPS = {
 	move_section  = { required = { "section", "to_section" }, optional = {} },
 	merge_into    = { required = { "section", "to_section" }, optional = {} },
 	map_value     = { required = { "section", "key", "map" }, optional = {} },
+	wrap_value    = { required = { "section", "key", "to_key" }, optional = {} },
 	delete        = { required = { "section" }, optional = { "key" } },
 	set_if_absent = { required = { "section", "key", "value" }, optional = {} },
 }
@@ -946,6 +947,17 @@ function APPLY.map_value(sections, op)
 			return
 		end
 	end
+end
+
+--- A scalar where the manifest keeps a feature row becomes that row's switch
+--- in its own [section.key] table. A table, an array or an absent key stays,
+--- so a replay changes nothing.
+function APPLY.wrap_value(sections, op)
+	local entries = sections[op.section]
+	local entry = entries and entries[op.key]
+	if entry == nil or not is_scalar(entry.value) then return end
+	move_entry(sections, op.section, op.key, op.section .. "." .. op.key, op.to_key)
+	drop_if_empty(sections, op.section)
 end
 
 function APPLY.delete(sections, op)

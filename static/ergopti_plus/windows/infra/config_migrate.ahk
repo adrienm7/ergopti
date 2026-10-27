@@ -13,9 +13,8 @@
 ; FEATURES & RATIONALE:
 ; 1. Data-only steps, read at runtime with the driver's own TOML reader. A
 ;    step is a list of ops from a closed set (rename, rename_prefix,
-;    move_section, merge_into, map_value, delete, set_if_absent) and this file
-;    holds their only Windows
-;    semantics. The corpus under _shared/tests/corpus/config_migrations is
+;    move_section, merge_into, map_value, wrap_value, delete, set_if_absent)
+;    and this file holds their only Windows semantics. The corpus under _shared/tests/corpus/config_migrations is
 ;    replayed here, by the Lua engine and by the JS reference, so the three
 ;    cannot drift; _shared/tests/corpus/config_migration_registries pins which
 ;    registries all three accept.
@@ -67,6 +66,7 @@ _ConfigMigrateOpFields() {
 		"move_section", [["section", "to_section"], []],
 		"merge_into", [["section", "to_section"], []],
 		"map_value", [["section", "key", "map"], []],
+		"wrap_value", [["section", "key", "to_key"], []],
 		"delete", [["section"], ["key"]],
 		"set_if_absent", [["section", "key", "value"], []]
 	)
@@ -585,6 +585,16 @@ _ConfigMigrateApplyOp(Model, Op, Context := 0) {
 					return
 				}
 			}
+		case "wrap_value":
+			; A scalar where the manifest keeps a feature row becomes that row's
+			; switch in its own [section.key] table. A table, an array or an absent
+			; key stays, so a replay is a no-op.
+			if !Model.Has(Section) || !Model[Section].Has(Op["key"])
+				return
+			if !_ConfigMigrateIsScalar(Model[Section][Op["key"]])
+				return
+			_ConfigMigrateMove(Model, Section, Op["key"], Section . "." . Op["key"], Op["to_key"])
+			_ConfigMigrateDropIfEmpty(Model, Section)
 		case "delete":
 			if !Op.Has("key") {
 				for Name in _ConfigMigrateSectionsAtOrBelow(Model, Section)

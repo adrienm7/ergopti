@@ -80,6 +80,7 @@ const OPS = {
 	move_section: { required: ['section', 'to_section'], optional: [] },
 	merge_into: { required: ['section', 'to_section'], optional: [] },
 	map_value: { required: ['section', 'key', 'map'], optional: [] },
+	wrap_value: { required: ['section', 'key', 'to_key'], optional: [] },
 	delete: { required: ['section'], optional: ['key'] },
 	set_if_absent: { required: ['section', 'key', 'value'], optional: [] }
 };
@@ -625,6 +626,16 @@ function applyOp(model, op, context) {
 			if (!values || !values.has(op.key)) break;
 			const pair = op.map.find((entry) => sameValue(entry.from, values.get(op.key)));
 			if (pair) values.set(op.key, pair.to);
+			break;
+		}
+		case 'wrap_value': {
+			// A scalar where the manifest keeps a feature row becomes its switch in
+			// its own [section.key] table; a table, an array or an absent key stays,
+			// so a replay is a no-op.
+			const values = model.get(op.section);
+			if (!values || !values.has(op.key) || !isScalar(values.get(op.key))) break;
+			moveValue(model, op.section, op.key, `${op.section}.${op.key}`, op.to_key);
+			dropIfEmpty(model, op.section);
 			break;
 		}
 		case 'delete': {
