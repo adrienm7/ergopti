@@ -96,6 +96,10 @@ CREATE TABLE IF NOT EXISTS events_typing (
 );
 CREATE INDEX IF NOT EXISTS idx_events_typing_date_app    ON events_typing(date, app);
 CREATE INDEX IF NOT EXISTS idx_events_typing_device_date ON events_typing(device_id, date);
+-- The aggregate recovery replays a device in (ts, id) order; without this index
+-- SQLite sorts the whole table in a temporary B-tree first (170 ms on the Mac
+-- cache). Existing caches gain it through the macOS sqlite_writer migration.
+CREATE INDEX IF NOT EXISTS idx_events_typing_device_ts_id ON events_typing(device_id, ts, id);
 
 CREATE TABLE IF NOT EXISTS events_app_switch (
 	device_id   TEXT NOT NULL,
