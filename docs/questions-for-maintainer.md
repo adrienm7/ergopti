@@ -15,6 +15,9 @@ answer once, then move the answered line below.
 
 ## Answered
 
+- **Answer of 2026-10-27 (every third-party runtime):** Ergopti keeps full control of each runtime it depends on
+  (Ollama, MLX, Karabiner and the like) on the three OS: it installs and runs its own pinned version whether
+  or not the user has one, never relies on the user's copy, and never stops or modifies it.
 - **Answer of 2026-10-27 (AI runtimes):** the Ollama Ergopti uses is always installed and owned by Ergopti at a
   pinned version, the same for MLX; a user's own Ollama may or may not be installed and is never selected,
   stopped or modified. The managed daemon must coexist with it (own port and models directory).
