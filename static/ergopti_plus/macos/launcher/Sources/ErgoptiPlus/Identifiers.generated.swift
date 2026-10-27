@@ -25,4 +25,8 @@ enum Identifiers {
 		static let ollama = "ollama.com"
 		static let ollamaRegistry = "registry.ollama.ai"
 	}
+	enum DevSource {
+		static let plistKey = "ErgoptiDevSourceRoot"
+		static let environment = "ERGOPTI_DEV_SOURCE_ROOT"
+	}
 }

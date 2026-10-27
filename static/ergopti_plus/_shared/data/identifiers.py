@@ -29,3 +29,8 @@ HOSTS = {
     "ollama": "ollama.com",
     "ollama_registry": "registry.ollama.ai",
 }
+
+DEV_SOURCE = {
+    "plist_key": "ErgoptiDevSourceRoot",
+    "environment": "ERGOPTI_DEV_SOURCE_ROOT",
+}

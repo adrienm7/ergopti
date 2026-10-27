@@ -1,5 +1,5 @@
 {
-	"_comment": "The one declaration of the application's file and bundle names, its service labels and the external hosts the drivers talk to. tools/codegen/codegen-identifiers.cjs emits _shared/lua/identifiers.lua from it; Node tools read this file directly. tools/test/test-repo-url-single-source.cjs holds every other driver source to a shrinking baseline of typed copies. The GitHub owner and repository stay in _shared/modules/updater/defaults.json.",
+	"_comment": "The one declaration of the application's file and bundle names, its service labels, the external hosts the drivers talk to and the developer source-mode names (the launcher Info.plist key a source build carries and the environment variable the launcher hands its runtime). tools/codegen/codegen-identifiers.cjs emits _shared/lua/identifiers.lua from it; Node tools read this file directly. tools/test/test-repo-url-single-source.cjs holds every other driver source to a shrinking baseline of typed copies. The GitHub owner and repository stay in _shared/modules/updater/defaults.json.",
 	"app": {
 		"name": "ErgoptiPlus",
 		"ahk": "ErgoptiPlus.ahk",
@@ -20,5 +20,9 @@
 		"huggingface": "huggingface.co",
 		"ollama": "ollama.com",
 		"ollama_registry": "registry.ollama.ai"
+	},
+	"dev_source": {
+		"plist_key": "ErgoptiDevSourceRoot",
+		"environment": "ERGOPTI_DEV_SOURCE_ROOT"
 	}
 }

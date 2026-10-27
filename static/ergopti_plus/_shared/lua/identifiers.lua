@@ -32,4 +32,8 @@ return {
 		ollama = "ollama.com",
 		ollama_registry = "registry.ollama.ai",
 	},
+	dev_source = {
+		plist_key = "ErgoptiDevSourceRoot",
+		environment = "ERGOPTI_DEV_SOURCE_ROOT",
+	},
 }
