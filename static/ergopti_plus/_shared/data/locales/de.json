@@ -989,7 +989,7 @@
 	"menu.layout.emulated_layout": "Zu emulierendes Layout",
 	"menu.layout.superseded_ergopti_only": "Nur Ergopti-Layout: ein anderes Tastaturlayout wird emuliert",
 	"menu.layout.superseded_digit_row": "Das emulierte Tastaturlayout legt seine Ziffernreihe selbst fest",
-	"layouts.linux_needs_python": "Die Umwandlung dieses Tastaturlayouts für Linux erfordert Python 3.8 oder neuer (python3). Installieren Sie es und versuchen Sie es erneut.",
+	"layouts.linux_needs_python": "Die Installation dieses Tastaturlayouts unter Linux erfordert Python 3.8 oder neuer (python3). Installieren Sie es und versuchen Sie es erneut.",
 	"layouts.linux_xorg_session": "Diese Belegung lässt sich nicht aus einer Xorg-Sitzung installieren, weil Xorg den Tastaturordner des Benutzers nicht liest. Melden Sie sich zum Installieren an einer Wayland-Sitzung an.",
 	"layout_manager.window_title": "Tastaturlayouts",
 	"layout_manager.subtitle": "Layouts aus dem Katalog installieren, aktualisieren oder deinstallieren.",

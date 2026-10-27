@@ -989,7 +989,7 @@
 	"menu.layout.emulated_layout": "Розкладка для емуляції",
 	"menu.layout.superseded_ergopti_only": "Лише розкладка Ergopti: емулюється інша розкладка",
 	"menu.layout.superseded_digit_row": "Емульована розкладка сама визначає ряд цифр",
-	"layouts.linux_needs_python": "Для перетворення цієї розкладки для Linux потрібен Python 3.8 або новіший (python3). Установіть його та спробуйте ще раз.",
+	"layouts.linux_needs_python": "Для встановлення цієї розкладки в Linux потрібен Python 3.8 або новіший (python3). Установіть його та спробуйте ще раз.",
 	"layouts.linux_xorg_session": "Цю розкладку не можна встановити із сеансу Xorg, оскільки Xorg не читає папку клавіатури користувача. Увійдіть у сеанс Wayland, щоб її встановити.",
 	"layout_manager.window_title": "Розкладки клавіатури",
 	"layout_manager.subtitle": "Встановлюйте, оновлюйте або видаляйте розкладки з каталогу.",

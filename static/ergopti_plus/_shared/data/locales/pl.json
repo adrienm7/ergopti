@@ -989,7 +989,7 @@
 	"menu.layout.emulated_layout": "Układ do emulacji",
 	"menu.layout.superseded_ergopti_only": "Tylko układ Ergopti: emulowany jest inny układ",
 	"menu.layout.superseded_digit_row": "Emulowany układ sam określa rząd cyfr",
-	"layouts.linux_needs_python": "Konwersja tego układu dla systemu Linux wymaga Pythona 3.8 lub nowszego (python3). Zainstaluj go i spróbuj ponownie.",
+	"layouts.linux_needs_python": "Instalacja tego układu w systemie Linux wymaga Pythona 3.8 lub nowszego (python3). Zainstaluj go i spróbuj ponownie.",
 	"layouts.linux_xorg_session": "Tego układu nie można zainstalować z sesji Xorg, ponieważ Xorg nie czyta folderu klawiatury użytkownika. Zaloguj się do sesji Wayland, aby go zainstalować.",
 	"layout_manager.window_title": "Układy klawiatury",
 	"layout_manager.subtitle": "Instaluj, aktualizuj lub odinstalowuj układy z katalogu.",
