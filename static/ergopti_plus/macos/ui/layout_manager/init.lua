@@ -236,7 +236,7 @@ function M.open()
 		end,
 		on_navigation = function(action)
 			if action == "didFinishNavigation" and candidate ~= nil and candidate == _webview and _controller then
-				DeferredWork.after(0.05, function()
+				DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 					if candidate == _webview and _controller then _controller.on_message({ action = "ready" }) end
 				end, "layout_manager.navigation")
 			end
@@ -285,7 +285,7 @@ end
 --- @return function
 function M.menu_command()
 	return function()
-		DeferredWork.after(0.05, M.open, "layout_manager.open")
+		DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), M.open, "layout_manager.open")
 	end
 end
 

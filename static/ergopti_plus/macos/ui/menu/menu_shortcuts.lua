@@ -670,7 +670,7 @@ function M.build(ctx)
 										.. "store '%s' under a binding key dispatch will not read.", tostring(a))
 									return
 								end
-								DeferredWork.after(0.05, function()
+								DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 									local mutation = {
 										section = require("config_keys").KEY.SHORTCUTS_SCRIPT_CONTROL, key = slot_id,
 										read = function()

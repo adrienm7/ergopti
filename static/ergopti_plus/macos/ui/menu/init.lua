@@ -1043,7 +1043,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return require("ui.menu.unused_keys_cleanup").run_from_menu()
 		end,
 		open_paths                = function()
-			return DeferredWork.after(0.05, MenuPaths.open_editor, "menu.open_paths")
+			return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths")
 		end,
 		reload                    = function()
 			return do_reload("menu")
@@ -1111,7 +1111,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		open_logs                 = function() return LogOpeners.open_logs_folder(open_async) end,
 		open_console              = function() return require("ui.console_window").open() end,
 		open_paths_editor         = function()
-			return DeferredWork.after(0.05, MenuPaths.open_editor, "menu.open_paths_editor")
+			return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths_editor")
 		end,
 		open_hotstrings_editor    = function()
 			local ok, ed = pcall(require, "ui.hotstring_editor")
