@@ -116,7 +116,20 @@ class WebViewBrowserWarmup {
 			}
 		} finally Critical(PreviousCritical)
 		if Retired {
-			Controller.Close()
+			try Controller.Close()
+			catch as Err {
+				PreviousCritical := Critical("On")
+				try {
+					if this.ControllerPromise == Promise {
+						; Retain the failed close capability for a later Stop retry.
+						; The promise reference stays captured outside this handoff.
+						RetainedController := this.Controller
+						this.Controller := Controller
+						this.ControllerPromise := 0
+					}
+				} finally Critical(PreviousCritical)
+				throw Err
+			}
 			if this.ControllerPromise == Promise {
 				this.ControllerPromise := 0
 				this.DestroyHost()
