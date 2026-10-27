@@ -45,8 +45,10 @@ const LINUX = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
 const READER = path.join(LINUX, 'install', 'messages.sh');
 const CATALOGUES = path.join(LINUX, '_generated', 'shell_messages');
 const SCRIPT_ROOTS = ['install.sh', 'uninstall.sh', 'bin', 'install'];
+// The reader's three calls, and install.sh's two wrappers around them (a
+// section title, a --help option line).
 const CALL =
-	/\bergopti_(?:msg_with\s+(?:"[^"]*"|'[^']*'|\S+)|msg|text)\s+([a-z0-9_]+\.[a-z0-9_.]+)/g;
+	/(?:\bergopti_(?:msg_with\s+(?:"[^"]*"|'[^']*'|\S+)|msg|text)|\b_section|\b_help_option\s+(?:"[^"]*"|\S+))\s+([a-z0-9_]+\.[a-z0-9_.]+)/g;
 
 /**
  * Builds a throwaway driver tree holding the real reader and given catalogues.
@@ -215,10 +217,12 @@ check('the shipped reader prints the shipped catalogue', () => {
 });
 
 check('the self-check rejects a call to an unknown key', () => {
-	const sample = 'ergopti_msg launcher.not_a_key\nergopti_msg_with "  " launcher.other\n';
+	const sample =
+		'ergopti_msg launcher.not_a_key\nergopti_msg_with "  " launcher.other\n' +
+		'_section install.title\n_help_option "--prefix <dir>" install.help\n';
 	assert.deepEqual(
 		[...sample.matchAll(CALL)].map((m) => m[1]),
-		['launcher.not_a_key', 'launcher.other']
+		['launcher.not_a_key', 'launcher.other', 'install.title', 'install.help']
 	);
 });
 
