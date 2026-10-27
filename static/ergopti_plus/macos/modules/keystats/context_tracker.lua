@@ -626,15 +626,40 @@ end
 --- @param element table|userdata AX element being attached or detached.
 --- @param label string Diagnostic operation label.
 --- @return boolean committed
+--- Element states macOS reports through the AX error of a watcher mutation.
+--- A destroyed element ("AXUIElementRef is invalid", kAXErrorInvalidUIElement)
+--- takes its watchers with it, so its removal has nothing left to undo. An
+--- element that refuses value notifications (a secure text field answers
+--- "Illegal argument", others "Notification unsupported") is simply not
+--- watchable. Both are ordinary focus traffic, not driver faults (issue #104).
+local AX_DEAD_ELEMENT = "AXUIElementRef is invalid"
+local AX_UNWATCHABLE_ELEMENT = { ["Illegal argument"] = true, ["Notification unsupported"] = true,
+	[AX_DEAD_ELEMENT] = true }
+
+--- Returns the AX message of a watcher error, without its location or traceback.
+--- @param detail any xpcall error value.
+--- @return string|nil message
+local function ax_watcher_error(detail)
+	local first = tostring(detail):match("^[^\n]*")
+	return first:match(":%d+: (.+)$") or first
+end
+
 local function mutate_ax_value_watcher(observer, method, element, label)
 	local ok, result = xpcall(function()
 		return observer[method](observer, element, "AXValueChanged")
 	end, debug.traceback)
-	if not ok or result == false then
-		Logger.error(LOG, "%s failed: %s.", label, tostring(result))
+	if ok and result ~= false then return true end
+	local message = not ok and ax_watcher_error(result) or nil
+	if method == "removeWatcher" and message == AX_DEAD_ELEMENT then
+		Logger.debug(LOG, "%s: the element no longer exists, so its watcher is already gone.", label)
+		return true
+	end
+	if method == "addWatcher" and AX_UNWATCHABLE_ELEMENT[message] then
+		Logger.debug(LOG, "%s skipped: the element cannot be watched (%s).", label, message)
 		return false
 	end
-	return true
+	Logger.error(LOG, "%s failed: %s.", label, tostring(result))
+	return false
 end
 
 --- Rejects one observer candidate while retaining ambiguous cleanup debt.
