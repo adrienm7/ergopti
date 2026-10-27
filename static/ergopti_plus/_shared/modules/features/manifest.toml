@@ -7301,8 +7301,13 @@ id = "number_row_order"
 label_key = "menu.layout.number_row"
 path = "layout.direct_access_digits"
 choice_label_prefix = "menu.layout.number_row_"
-platforms = ["ahk"]
+# Windows emulates the layout and always applies it. Linux applies it live to the
+# layout of the running X11 session when one of ours is installed; the host says so
+# (capability number_row_live) and gives the reason when it cannot. macOS keeps the system row.
+platforms = ["ahk", "linux"]
 reason_key = "platform_reason.number_row_override_unsupported"
+capability = "number_row_live"
+capability_platforms = ["linux"]
 
 [onboarding.pages.hotstrings]
 title_key = "menu.hotstrings.title"
