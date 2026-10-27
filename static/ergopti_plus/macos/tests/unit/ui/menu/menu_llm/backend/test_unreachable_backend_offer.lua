@@ -196,7 +196,7 @@ local function with_offer(scenario)
 			world.native_clients[id] = client
 			probe_clients[id] = client
 		end
-		package.loaded["modules.llm"] = { api_remote = api, DEFAULT_STATE = { llm_ollama_port = 11434 } }
+		package.loaded["modules.llm"] = { api_remote = api, DEFAULT_STATE = { llm_ollama_port = 11434, llm_ollama_owned_port = 11435 } }
 		package.loaded["ui.menu.menu_llm.runtime_install_offer"] = {
 			is_installed = function() return world.installed end,
 		}
@@ -254,7 +254,7 @@ helpers.describe("The offer lists what the real sweep found (unreachable-backend
 					"llm.unreachable.use_server|oMLX|Qwen3-8B-4bit|127.0.0.1:8000",
 					"llm.unreachable.install|Ollama",
 				})
-				helpers.assert_true(dialog.message:find("llm.unreachable.body_missing|Ollama|http://127.0.0.1:11434", 1, true)
+				helpers.assert_true(dialog.message:find("llm.unreachable.body_missing|Ollama|http://127.0.0.1:11435", 1, true)
 					~= nil, dialog.message)
 				helpers.assert_true(dialog.message:find("llm.unreachable.servers_found|oMLX", 1, true) ~= nil, dialog.message)
 				helpers.assert_eq(world.actions, { "use:omlx:Qwen3-8B-4bit" })

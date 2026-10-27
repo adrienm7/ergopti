@@ -35,7 +35,7 @@ local function with_world(body)
 		world.client = upvalue(Api.request_chat, "_vision_client")
 		world.listing = upvalue(Api.refresh_local_models, "_listing_client")
 		function world.port(value)
-			helpers.assert_true(Storage.set("llm.ollama_port", value))
+			helpers.assert_true(Storage.set("llm.ollama_owned_port", value))
 			helpers.assert_eq(Api.get_base_url(), "http://127.0.0.1:" .. tostring(value), "the actual endpoint owner observes its current storage")
 		end
 		hs.http.asyncGet = function(url, _, callback)
