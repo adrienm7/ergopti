@@ -585,7 +585,7 @@
 	"editor.hotstrings.cmd_tab": "tabulation",
 	"editor.hotstrings.cmd_up": "haut",
 	"editor.hotstrings.desc_auto_off": "Nécessite de taper Espace/Entrée (conseillé pour l'autocorrection).",
-	"editor.hotstrings.desc_auto_on": "S'expand immédiatement (idéal pour les déclencheurs finissant par %s).",
+	"editor.hotstrings.desc_auto_on": "Se développe immédiatement (idéal pour les déclencheurs finissant par %s).",
 	"editor.hotstrings.desc_case_off": "Le moteur générera les versions minuscule, Titlecase et MAJUSCULE.",
 	"editor.hotstrings.desc_case_on": "Différencie strictement majuscules/minuscules.<br>Ex : <em>Btw</em> ≠ <em>btw</em>",
 	"editor.hotstrings.desc_final_off": "Le résultat pourra déclencher d'autres hotstrings en cascade.",
