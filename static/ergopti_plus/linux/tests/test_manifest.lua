@@ -242,6 +242,7 @@ return {
 	"tests.unit.infra.lifecycle.test_quit_request",
 	"tests.unit.infra.scope.test_config_scope_transaction",
 	"tests.unit.infra.scope.test_script_log_level_snapshot",
+	"tests.unit.infra.scope.test_keyboard_layout_scope",
 	"tests.unit.infra.scope.test_scope_owner",
 	"tests.unit.infra.lifecycle.test_daemon_restart",
 	"tests.unit.infra.scope.test_dynamic_hotstrings_scope",

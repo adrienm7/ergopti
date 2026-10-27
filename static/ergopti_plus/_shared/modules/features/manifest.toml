@@ -7129,6 +7129,10 @@ prefixes = ["gestures"]
 restore_exclude = []
 clear_exclude = ["gestures.enabled"]
 
+# Config only on Linux: no runtime reader yet. The Linux owner
+# (infra/keyboard_layout_scope.lua) restores or clears these rows in config.toml;
+# the keyboard hook reads its number-row mode at start and the daemon passes none.
+# macOS applies the same rows to its live menu state.
 [scopes.keyboard_layout]
 prefixes = ["layout", "category_enabled.layout", "script.alt_gr_is_kana_remap"]
 restore_exclude = []

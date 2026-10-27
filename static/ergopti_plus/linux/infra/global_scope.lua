@@ -68,6 +68,10 @@ function M.participants(ctx)
 		registry.hotstrings = require("infra.hotstrings_scope").participant(is_paused,
 			{ dynamic = ctx.dyn_hotstrings, preview = ctx.tooltip_preview })
 	end
+	-- Config only on Linux: no runtime reader of the layout rows yet (see the owner).
+	if ctx.config then
+		registry.keyboard_layout = require("infra.keyboard_layout_scope").participant(is_paused)
+	end
 	if ctx.llm then registry.llm = require("infra.llm_scope").participant(is_paused) end
 	if ctx.keystats then registry.metrics = require("infra.metrics_scope").participant(is_paused) end
 	return registry
