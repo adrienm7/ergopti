@@ -257,6 +257,7 @@
 	"field_check.step.brew_version": "Versión de Homebrew",
 	"field_check.step.karabiner_cask": "Karabiner-Elements instalado con Homebrew",
 	"field_check.step.karabiner_signature": "Firma de código de Karabiner-Elements",
+	"field_check.step.karabiner_gatekeeper": "Evaluación de Gatekeeper de Karabiner-Elements",
 	"field_check.step.this_copy_known": "Ubicación de esta copia conocida",
 	"field_check.step.main_app_login_item": "Elemento de inicio de sesión de Ergopti (estado del sistema)",
 	"field_check.step.btm_state": "Lista del sistema de elementos en segundo plano",

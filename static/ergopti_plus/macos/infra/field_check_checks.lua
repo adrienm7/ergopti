@@ -29,10 +29,13 @@
 --- ==============================================================================
 
 local Identifiers = require("identifiers")
+local Logger = require("infra.logger")
 local KePaths = require("platform.remap.ke_paths")
 local TextUtils = require("text_utils")
 
 local M = {}
+
+local LOG = "field_check"
 
 local STATE = { pass = "pass", fail = "fail", info = "info", skip = "skip" }
 
@@ -274,6 +277,7 @@ end
 
 local SHORTCUTS = "/usr/bin/shortcuts"
 local CODESIGN = "/usr/bin/codesign"
+local SPCTL = "/usr/sbin/spctl"
 local BREW_PATHS = { "/opt/homebrew/bin/brew", "/usr/local/bin/brew" }
 
 -- A shortcut name no Mac can hold: running it must be refused at once, which
@@ -294,13 +298,94 @@ local function failure_token(code)
 	return code == nil and "timeout" or "exit_" .. tostring(code)
 end
 
+-- codesign and spctl messages, in the order a cause is looked for on a line,
+-- with the closed token a step value carries for each (Security framework
+-- error strings, stable across macOS releases).
+local SIGNATURE_CAUSES = {
+	{ "a sealed resource is missing or invalid", "sealed_resource_invalid" },
+	{ "nested code is modified or invalid", "nested_code_invalid" },
+	{ "code object is not signed at all", "not_signed" },
+	{ "code or signature have been modified", "signature_modified" },
+	{ "no resources but signature indicates they must be present", "resources_missing" },
+	{ "resource envelope is obsolete", "envelope_obsolete" },
+	{ "unsealed contents present in the bundle root", "unsealed_root_contents" },
+	{ "invalid Info.plist", "info_plist_invalid" },
+	{ "main executable or Info.plist must be a regular file", "main_not_regular" },
+	{ "invalid resource directory", "resource_dir_invalid" },
+	{ "failed to satisfy specified code requirement", "requirement_unsatisfied" },
+	{ "unsupported format for signature", "unsupported_format" },
+	{ "CSSMERR_TP_CERT_REVOKED", "certificate_revoked" },
+	{ "CSSMERR_TP_CERT_EXPIRED", "certificate_expired" },
+	{ "CSSMERR_TP_NOT_TRUSTED", "certificate_not_trusted" },
+	{ "No such file or directory", "no_such_file" },
+}
+
+-- Lines and characters per line of a tool's diagnostic copied into the log.
+M.DIAGNOSTIC_MAX_LINES = 12
+M.DIAGNOSTIC_MAX_LINE_CHARS = 200
+
+--- Names the first known cause in a codesign or spctl diagnostic.
+--- @param text any The tool's stderr.
+--- @return string|nil token A closed token from SIGNATURE_CAUSES.
+function M.signature_cause(text)
+	for line in tostring(text or ""):gmatch("[^\r\n]+") do
+		for _, cause in ipairs(SIGNATURE_CAUSES) do
+			if line:find(cause[1], 1, true) then return cause[2] end
+		end
+	end
+	return nil
+end
+
+--- Reads Gatekeeper's answer from `spctl --assess -vv` output.
+--- @param text any The tool's stderr.
+--- @return boolean accepted, string|nil source Closed token of its source= line.
+function M.parse_assessment(text)
+	text = tostring(text or "")
+	local accepted = text:match(": accepted%s*\n") ~= nil or text:match(": accepted%s*$") ~= nil
+	local source = text:match("source=([^\r\n]+)")
+	if source then
+		source = source:lower():gsub("[^%w]+", "_"):gsub("^_+", ""):gsub("_+$", ""):sub(1, 30)
+		if source == "" then source = nil end
+	end
+	return accepted, source
+end
+
+--- Bounds a tool's diagnostic for the log: a few lines, each cut short, with
+--- the checked app's path shortened to <app>.
+--- @param text any The tool's stderr.
+--- @param app string The path the tool was given.
+--- @return string excerpt Lines joined by " | ", or "none".
+function M.diagnostic_excerpt(text, app)
+	local lines = {}
+	for line in tostring(text or ""):gmatch("[^\r\n]+") do
+		if line:match("%S") then
+			if #lines == M.DIAGNOSTIC_MAX_LINES then
+				lines[#lines + 1] = "…"
+				break
+			end
+			local start = line:find(app, 1, true)
+			while start do
+				line = line:sub(1, start - 1) .. "<app>" .. line:sub(start + #app)
+				start = line:find(app, start + 5, true)
+			end
+			if #line > M.DIAGNOSTIC_MAX_LINE_CHARS then line = line:sub(1, M.DIAGNOSTIC_MAX_LINE_CHARS) .. "…" end
+			lines[#lines + 1] = line
+		end
+	end
+	return #lines > 0 and table.concat(lines, " | ") or "none"
+end
+
 --- The Apple Shortcuts command line tool, the Homebrew install of Karabiner and
 --- the timer service, each isolated so that one failure names itself:
 --- a timer that fires late, the Shortcuts tool listing, and refusing a missing
 --- shortcut inside a bound (the same bound a cancelled invocation relies on),
---- then Homebrew itself, the Karabiner-Elements cask, and the code signature of
---- the installed app (package provenance). Read-only: nothing is installed,
---- run or changed.
+--- then Homebrew itself, the Karabiner-Elements cask, the code signature of
+--- the installed app (package provenance) and Gatekeeper's assessment of it.
+--- The strict deep verification and the assessment each log their bounded
+--- diagnostic and carry its first known cause in the step value: a strict
+--- failure Gatekeeper still accepts stays a failure with its cause, since
+--- nothing here can prove that cause harmless. Read-only: nothing is
+--- installed, run or changed.
 function M.toolchain(ports, report, finish)
 	local function brew_stage()
 		local brew
@@ -317,11 +402,37 @@ function M.toolchain(ports, report, finish)
 				finish()
 				return
 			end
-			ports.exec(CODESIGN, { "--verify", "--deep", "--strict", STOCK_APP }, COMMAND_TIMEOUT, function(code)
-				report.step("karabiner_signature", code == 0 and STATE.pass or STATE.fail,
-					code == 0 and "valid" or failure_token(code))
-				finish()
-			end)
+			local function gatekeeper_stage()
+				ports.exec(SPCTL, { "--assess", "-vv", STOCK_APP }, COMMAND_TIMEOUT, function(code, output, errors)
+					local text = tostring(output or "") .. "\n" .. tostring(errors or "")
+					local accepted, source = M.parse_assessment(text)
+					Logger.evidence(LOG, "Karabiner-Elements Gatekeeper assessment: exit=%s, %s", tostring(code),
+						M.diagnostic_excerpt(text, STOCK_APP))
+					local value
+					if code == 0 and accepted then
+						value = "accepted" .. (source and ":" .. source or "")
+					elseif code == nil then
+						value = "timeout"
+					else
+						value = "rejected:" .. (M.signature_cause(text) or source or failure_token(code))
+					end
+					report.step("karabiner_gatekeeper", code == 0 and accepted and STATE.pass or STATE.fail, value)
+					finish()
+				end)
+			end
+			ports.exec(CODESIGN, { "--verify", "--deep", "--strict", "--verbose=4", STOCK_APP }, COMMAND_TIMEOUT,
+				function(code, output, errors)
+					local text = tostring(output or "") .. "\n" .. tostring(errors or "")
+					Logger.evidence(LOG, "Karabiner-Elements strict signature verification: exit=%s, %s", tostring(code),
+						M.diagnostic_excerpt(text, STOCK_APP))
+					local value = "valid"
+					if code ~= 0 then
+						value = failure_token(code)
+						if code ~= nil then value = value .. ":" .. (M.signature_cause(text) or "unclassified") end
+					end
+					report.step("karabiner_signature", code == 0 and STATE.pass or STATE.fail, value)
+					gatekeeper_stage()
+				end)
 		end
 		if not brew then
 			report.step("brew_version", STATE.skip, "no_brew")

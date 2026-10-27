@@ -257,6 +257,7 @@
 	"field_check.step.brew_version": "Homebrew 버전",
 	"field_check.step.karabiner_cask": "Homebrew로 설치된 Karabiner-Elements",
 	"field_check.step.karabiner_signature": "Karabiner-Elements 코드 서명",
+	"field_check.step.karabiner_gatekeeper": "Karabiner-Elements의 Gatekeeper 평가",
 	"field_check.step.this_copy_known": "이 사본의 위치를 알고 있음",
 	"field_check.step.main_app_login_item": "Ergopti 로그인 항목 (시스템 상태)",
 	"field_check.step.btm_state": "백그라운드 항목 시스템 목록",

@@ -257,6 +257,7 @@
 	"field_check.step.brew_version": "Homebrew-versie",
 	"field_check.step.karabiner_cask": "Karabiner-Elements geïnstalleerd via Homebrew",
 	"field_check.step.karabiner_signature": "Codehandtekening van Karabiner-Elements",
+	"field_check.step.karabiner_gatekeeper": "Gatekeeper-beoordeling van Karabiner-Elements",
 	"field_check.step.this_copy_known": "Locatie van deze kopie bekend",
 	"field_check.step.main_app_login_item": "Inlogonderdeel van Ergopti (systeemstatus)",
 	"field_check.step.btm_state": "Systeemlijst van achtergrondonderdelen",

@@ -257,6 +257,7 @@
 	"field_check.step.brew_version": "Verze Homebrew",
 	"field_check.step.karabiner_cask": "Karabiner-Elements nainstalován přes Homebrew",
 	"field_check.step.karabiner_signature": "Podpis kódu Karabiner-Elements",
+	"field_check.step.karabiner_gatekeeper": "Posouzení Karabiner-Elements nástrojem Gatekeeper",
 	"field_check.step.this_copy_known": "Umístění této kopie známé",
 	"field_check.step.main_app_login_item": "Položka přihlášení Ergopti (stav systému)",
 	"field_check.step.btm_state": "Systémový seznam položek na pozadí",

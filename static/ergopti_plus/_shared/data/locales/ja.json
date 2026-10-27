@@ -257,6 +257,7 @@
 	"field_check.step.brew_version": "Homebrew のバージョン",
 	"field_check.step.karabiner_cask": "Karabiner-Elements を Homebrew でインストール済み",
 	"field_check.step.karabiner_signature": "Karabiner-Elements のコード署名",
+	"field_check.step.karabiner_gatekeeper": "Karabiner-Elements の Gatekeeper 評価",
 	"field_check.step.this_copy_known": "このコピーの場所は判明している",
 	"field_check.step.main_app_login_item": "Ergoptiのログイン項目 (システムの状態)",
 	"field_check.step.btm_state": "バックグラウンド項目のシステム一覧",

@@ -257,6 +257,7 @@
 	"field_check.step.brew_version": "Homebrew sürümü",
 	"field_check.step.karabiner_cask": "Karabiner-Elements Homebrew ile kurulu",
 	"field_check.step.karabiner_signature": "Karabiner-Elements kod imzası",
+	"field_check.step.karabiner_gatekeeper": "Karabiner-Elements için Gatekeeper değerlendirmesi",
 	"field_check.step.this_copy_known": "Bu kopyanın konumu biliniyor",
 	"field_check.step.main_app_login_item": "Ergopti oturum açma öğesi (sistem durumu)",
 	"field_check.step.btm_state": "Arka plan öğelerinin sistem listesi",
