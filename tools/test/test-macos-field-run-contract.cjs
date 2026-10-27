@@ -93,6 +93,23 @@ function fixture(name) {
 	}
 	// The logs are ignored in the real clone too: the collector adds them with -f
 	fs.writeFileSync(path.join(clone, '.gitignore'), '/build/\n*.log\n');
+	// A launcher source, a build recipe and a developer app built after both:
+	// the running app is current, so the collector must reuse it.
+	const launcherSource = path.join(clone, 'static/ergopti_plus/macos/launcher/Sources/main.swift');
+	fs.mkdirSync(path.dirname(launcherSource), { recursive: true });
+	fs.writeFileSync(launcherSource, '// launcher\n');
+	fs.mkdirSync(path.join(clone, 'tools/build'), { recursive: true });
+	fs.writeFileSync(path.join(clone, 'tools/build/build_macos_app.sh'), '# recipe\n');
+	const appBinary = path.join(clone, 'build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus');
+	fs.mkdirSync(path.dirname(appBinary), { recursive: true });
+	fs.writeFileSync(appBinary, '', { mode: 0o755 });
+	const past = new Date(Date.now() - 3600 * 1000);
+	fs.utimesSync(launcherSource, past, past);
+	fs.utimesSync(path.join(clone, 'tools/build/build_macos_app.sh'), past, past);
+	// The runner records how it was asked; it starts nothing.
+	const runnerLog = path.join(base, 'runner.log');
+	const runner = path.join(clone, 'tools/dev/run-macos-dev-app.sh');
+	fs.writeFileSync(runner, `printf '%s\\n' "run $*" >> "${runnerLog}"\n`);
 	fs.mkdirSync(bin, { recursive: true });
 	fs.mkdirSync(home, { recursive: true });
 	const env = { ...process.env, ...GIT_IDENTITY, HOME: home };
@@ -124,7 +141,7 @@ process.stdout.write(typeof value === 'object' ? JSON.stringify(value) : String(
 		'plutil',
 		`[ "$1" = -extract ] && [ "$3" = raw ] && [ "$4" = -o ] && [ "$5" = - ] || exit 9\nexec "${process.execPath}" "${plutil}" "$2" "$6"`
 	);
-	return { clone, bin, home, env };
+	return { clone, bin, home, env, launcherSource, runnerLog };
 }
 
 /**
@@ -302,6 +319,40 @@ function reportFolder(paths) {
 				'the folder must come from the declaration'
 			);
 		});
+
+		await check(
+			'a ready app built from the current launcher is reused, a newer launcher rebuilds it',
+			async () => {
+				const current = fixture('current');
+				const driver = startDriver(current, 'done');
+				try {
+					await waitFor(driver.readyPath);
+					const result = await runCollector(current);
+					assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+					assert.match(result.stdout, /Reusing the running developer app/);
+					assert(!fs.existsSync(current.runnerLog), 'a current, ready app is not restarted');
+				} finally {
+					driver.child.kill();
+				}
+				const stale = fixture('stale');
+				const staleDriver = startDriver(stale, 'done');
+				try {
+					await waitFor(staleDriver.readyPath);
+					// A git pull rewrote the launcher after the build: the ready app is stale.
+					const future = new Date(Date.now() + 3600 * 1000);
+					fs.utimesSync(stale.launcherSource, future, future);
+					const result = await runCollector(stale);
+					assert.match(result.stdout, /Building and opening the developer app/);
+					assert.equal(
+						fs.readFileSync(stale.runnerLog, 'utf8'),
+						'run \n',
+						'the runner rebuilds (no --open-only) even though the stale app answers'
+					);
+				} finally {
+					staleDriver.child.kill();
+				}
+			}
+		);
 
 		await check(
 			'the collector requests every step, waits for done and copies the results',
