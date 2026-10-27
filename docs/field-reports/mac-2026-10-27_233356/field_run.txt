@@ -1,0 +1,19 @@
+[field-report] Reusing the running developer app: it was built from the current launcher.
+[field-report] Waiting for the developer app to publish its readiness...
+[field-report] Developer app ready (pid 51091); requesting every step within 4800 s.
+[field-report]   field run 01_field_lease: pass
+[field-report]   field run 02_field_owned_runtime: pass
+[field-report]   field run 03_field_network: pass
+[field-report]   field run 04_field_toolchain: pass
+[field-report]   field run 05_field_login_items: pass
+[field-report]   field run 06_field_composer: fail
+[field-report]   field run 07_key_accounting: needs_typing
+[field-report]   field run 08_diagnostics: pass
+[field-report]   field run 09_ollama_runtime: fail
+[field-report]   field run 10_ollama_model: skip
+[field-report]   field run 11_mlx_runtime: pass
+[field-report]   field run still running, 60 s since the request...
+[field-report]   field run still running, 121 s since the request...
+[field-report]   field run 12_mlx_model: pass
+[field-report]   field run 13_config_guard: pass
+[field-report] Field run done: {"counts":{"fail":2,"needs_typing":1,"pass":9,"skip":1},"elapsed_ms":165244,"finished_at":"2026-10-27T22:36:45Z","interrupted":false,"order":["field_lease","field_owned_runtime","field_network","field_toolchain","field_login_items","field_composer","key_accounting","diagnostics","ollama_runtime","ollama_model","mlx_runtime","mlx_model","config_guard"],"pid":51091,"request_id":"mac-2026-10-27_233356","schema":1,"started_at":"2026-10-27T22:34:00Z","verdicts":{"config_guard":"pass","diagnostics":"pass","field_composer":"fail","field_lease":"pass","field_login_items":"pass","field_network":"pass","field_owned_runtime":"pass","field_toolchain":"pass","key_accounting":"needs_typing","mlx_model":"pass","mlx_runtime":"pass","ollama_model":"skip","ollama_runtime":"fail"}}
