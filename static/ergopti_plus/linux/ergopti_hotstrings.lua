@@ -1383,8 +1383,7 @@ local function main()
 			local expansion_committed = opts.dry_run
 			if not opts.dry_run then
 				injector._begin_injection()
-				local replay_terminator = result.end_char
-					and not result.consume_terminator and result.terminator or nil
+				local replay_terminator = result.replay_terminator
 				local ok_delivery, delivery = pcall(
 					injector.inject,
 					result.backspace_count,
