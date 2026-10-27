@@ -5,4 +5,4 @@ description = "A Windows configuration without any dynamic switch keeps its fami
 drivers = ["ahk"]
 outcome = "migrated"
 from_version = 12
-to_version = 14
+to_version = 15

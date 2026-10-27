@@ -1,0 +1,25 @@
+[_meta]
+schema_version = 15
+
+[shortcuts.keyboard]
+primary_a = "copy"
+primary_shift_d = "paste_plain"
+secondary_a = "send_text"
+secondary_shift_c = "undo"
+alt_b = "redo"
+secondary_space = "llm_generate_prediction"
+magic_editor = "none"
+physical_none_KeyJ = "mute"
+secondary_d = "open_downloads"
+secondary_e = "none"
+secondary_capslock = "toggle_capslock"
+secondary_quote = "none"
+primary_shift_v = "paste_plain"
+
+[shortcuts.keys]
+ctrl_g = true
+cmd_star = true
+wrap_text_if_selected = true
+
+[gestures.action_parameters]
+keep = "neighbor"
