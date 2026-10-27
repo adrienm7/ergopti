@@ -68,7 +68,7 @@
 		--llm-bg: rgba(var(--kpi-llm-rgb), 0.1);
 		--global-bg: rgba(var(--kpi-wpm-rgb), 0.1);
 
-		--score-pos-color: #32d74b;
+		--score-pos-color: var(--theme-hue-32d74b);
 		--score-neg-color: var(--theme-red-dark);
 		--score-neutral-color: #bdbdbd;
 		--score-pos-bg: rgba(50, 215, 75, 0.08);
