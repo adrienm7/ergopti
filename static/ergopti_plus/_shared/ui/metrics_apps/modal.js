@@ -138,11 +138,11 @@ function openAppDrilldown(appName) {
 			plugins: { legend: { display: false } },
 			scales: {
 				x: {
-					ticks: { color: '#888', font: { size: 9 } },
+					ticks: { color: ThemeTokens.color('grey-888'), font: { size: 9 } },
 					grid: { color: 'rgba(255,255,255,0.04)' }
 				},
 				y: {
-					ticks: { color: '#888', font: { size: 9 } },
+					ticks: { color: ThemeTokens.color('grey-888'), font: { size: 9 } },
 					grid: { color: 'rgba(255,255,255,0.04)' }
 				}
 			}
@@ -157,10 +157,10 @@ function openAppDrilldown(appName) {
 					.slice(0, 8)
 					.map(
 						([dest, n]) =>
-							`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span>${escapeHtml(dest)}</span><span style="color:#aaa;">${n}</span></div>`
+							`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span>${escapeHtml(dest)}</span><span style="color:${ThemeTokens.color('grey-aaa')};">${n}</span></div>`
 					)
 					.join('')
-			: `<div style="color:#888;font-size:12px;">${_t('ui_apps.kpi_no_backslash_out')}</div>`;
+			: `<div style="color:${ThemeTokens.color('grey-888')};font-size:12px;">${_t('ui_apps.kpi_no_backslash_out')}</div>`;
 	document.getElementById('app_modal_dests').innerHTML = dest_html;
 
 	// Layouts seen — sum from manifest for this app within the period.
@@ -181,10 +181,10 @@ function openAppDrilldown(appName) {
 					.sort((x, y) => y[1] - x[1])
 					.map(
 						([id, n]) =>
-							`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span>${escapeHtml(id)}</span><span style="color:#aaa;">${n}×</span></div>`
+							`<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span>${escapeHtml(id)}</span><span style="color:${ThemeTokens.color('grey-aaa')};">${n}×</span></div>`
 					)
 					.join('')
-			: `<div style="color:#888;font-size:12px;">${_t('ui_apps.kpi_no_layout')}</div>`;
+			: `<div style="color:${ThemeTokens.color('grey-888')};font-size:12px;">${_t('ui_apps.kpi_no_layout')}</div>`;
 	document.getElementById('app_modal_layouts').innerHTML = layouts_html;
 
 	// Records
@@ -210,7 +210,7 @@ function openAppDrilldown(appName) {
 	const rec_html =
 		recs.length > 0
 			? recs.map((r) => `<div style="font-size:12px;padding:3px 0;">${r}</div>`).join('')
-			: `<div style="color:#888;font-size:12px;">${_t('ui_apps.kpi_no_record')}</div>`;
+			: `<div style="color:${ThemeTokens.color('grey-888')};font-size:12px;">${_t('ui_apps.kpi_no_record')}</div>`;
 	document.getElementById('app_modal_records').innerHTML = rec_html;
 
 	// Hotstrings & IA
@@ -223,7 +223,7 @@ function openAppDrilldown(appName) {
 		`<div style="font-size:12px;padding:3px 0;">${_t('ui_apps.modal_llm_line')
 			.replace('{n}', format_int(a.llm_chars || 0))
 			.replace('{pct}', llm_pct.toFixed(1))}</div>` +
-		`<div style="font-size:12px;padding:3px 0;color:#888;">${_t('ui_apps.modal_total_chars').replace('{n}', format_int(a.chars || 0))}</div>`;
+		`<div style="font-size:12px;padding:3px 0;color:${ThemeTokens.color('grey-888')};">${_t('ui_apps.modal_total_chars').replace('{n}', format_int(a.chars || 0))}</div>`;
 
 	modal.style.display = 'flex';
 }

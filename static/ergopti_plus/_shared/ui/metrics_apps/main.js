@@ -264,12 +264,12 @@ function updateCharts(appsArray, aggregatedData) {
 					y: {
 						beginAtZero: true,
 						grid: { color: 'rgba(255,255,255,0.1)' },
-						ticks: { color: '#ccc', callback: (val) => val + 'h' }
+						ticks: { color: ThemeTokens.color('grey-ccc'), callback: (val) => val + 'h' }
 					},
 					x: {
 						grid: { display: false },
 						ticks: {
-							color: '#ccc',
+							color: ThemeTokens.color('grey-ccc'),
 							maxRotation: 30,
 							minRotation: 0,
 							padding: 4
@@ -308,7 +308,7 @@ function updateCharts(appsArray, aggregatedData) {
 				responsive: true,
 				maintainAspectRatio: false,
 				plugins: {
-					legend: { position: 'right', labels: { color: '#ccc' } },
+					legend: { position: 'right', labels: { color: ThemeTokens.color('grey-ccc') } },
 					tooltip: { callbacks: { label: HHMM_TOOLTIP } }
 				}
 			}
@@ -362,11 +362,15 @@ function updateCharts(appsArray, aggregatedData) {
 				maintainAspectRatio: false,
 				plugins: { legend: { display: false }, tooltip: { callbacks: { label: HHMM_TOOLTIP } } },
 				scales: {
-					x: { stacked: true, grid: { display: false }, ticks: { color: '#ccc' } },
+					x: {
+						stacked: true,
+						grid: { display: false },
+						ticks: { color: ThemeTokens.color('grey-ccc') }
+					},
 					y: {
 						stacked: true,
 						grid: { color: 'rgba(255,255,255,0.1)' },
-						ticks: { color: '#ccc', callback: (val) => val + 'h' }
+						ticks: { color: ThemeTokens.color('grey-ccc'), callback: (val) => val + 'h' }
 					}
 				}
 			}
@@ -777,11 +781,11 @@ function renderDashboard() {
 					maintainAspectRatio: false,
 					plugins: { legend: { display: false } },
 					scales: {
-						x: { grid: { display: false }, ticks: { color: '#ccc' } },
+						x: { grid: { display: false }, ticks: { color: ThemeTokens.color('grey-ccc') } },
 						y: {
 							beginAtZero: true,
 							grid: { color: 'rgba(255,255,255,0.08)' },
-							ticks: { color: '#ccc' }
+							ticks: { color: ThemeTokens.color('grey-ccc') }
 						}
 					}
 				}
@@ -798,9 +802,9 @@ function renderDashboard() {
 				const pNeu = (ps.neutral_ms / psSum) * 100;
 				const pNeg = (ps.negative_ms / psSum) * 100;
 				elProdBar.innerHTML =
-					`<div title="Productif" style="background:#30D158;width:${pPos}%"></div>` +
-					`<div title="Neutre"    style="background:#8e8e93;width:${pNeu}%"></div>` +
-					`<div title="Distraction" style="background:#FF453A;width:${pNeg}%"></div>`;
+					`<div title="Productif" style="background:${ThemeTokens.color('green-dark')};width:${pPos}%"></div>` +
+					`<div title="Neutre"    style="background:${ThemeTokens.color('gray')};width:${pNeu}%"></div>` +
+					`<div title="Distraction" style="background:${ThemeTokens.color('red-dark')};width:${pNeg}%"></div>`;
 				setText(
 					'kpi-prod-bar-detail',
 					_t('ui_apps.kpi_productive')
@@ -1166,7 +1170,9 @@ function renderDashboard() {
 			banner = document.createElement('div');
 			banner.id = 'render-error-banner';
 			banner.style.cssText =
-				'position:fixed;bottom:8px;left:8px;right:8px;z-index:9999;background:rgba(255,69,58,0.95);color:#fff;font:12px/1.4 system-ui;padding:8px 12px;border-radius:6px;white-space:pre-wrap;max-height:160px;overflow:auto;';
+				'position:fixed;bottom:8px;left:8px;right:8px;z-index:9999;background:rgba(255,69,58,0.95);color:' +
+				ThemeTokens.color('white') +
+				';font:12px/1.4 system-ui;padding:8px 12px;border-radius:6px;white-space:pre-wrap;max-height:160px;overflow:auto;';
 			document.body.appendChild(banner);
 		}
 		banner.textContent = `[render error] ${err && err.stack ? err.stack : err}`;

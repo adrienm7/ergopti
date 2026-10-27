@@ -89,6 +89,30 @@ for (const sheet of stylesheets) {
 	}
 }
 
+// Scripts read the palette through ThemeTokens.color('name') (theme_tokens.js),
+// which cannot use var(): their names are uses too, and must be declared.
+const TOKEN_CALL = /ThemeTokens\.color\('([\w-]+)'\)/g;
+const scriptUsers = new Set();
+function scriptFiles(dir) {
+	const out = [];
+	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+		const full = path.join(dir, entry.name);
+		if (entry.isDirectory()) {
+			if (!['vendor', '_generated'].includes(entry.name)) out.push(...scriptFiles(full));
+		} else if (entry.name.endsWith('.js') && entry.name !== 'theme_tokens.js') out.push(full);
+	}
+	return out;
+}
+for (const file of [...scriptFiles(UI), ...scriptFiles(shared('modules', 'tooltip'))]) {
+	const relative = path.relative(UI, file).split(path.sep).join('/');
+	for (const match of fs.readFileSync(file, 'utf8').matchAll(TOKEN_CALL)) {
+		used.add(`--theme-${match[1]}`);
+		scriptUsers.add(relative);
+		if (!declared.has(`--theme-${match[1]}`))
+			failures.push(`${relative}: reads --theme-${match[1]}, which theme.css does not declare`);
+	}
+}
+
 // The theme's own tokens may build on each other.
 for (const match of themeCss.matchAll(/var\((--theme-[\w-]+)/g)) used.add(match[1]);
 for (const token of declared) {
@@ -114,8 +138,42 @@ for (const entry of fs.readdirSync(UI, { withFileTypes: true })) {
 		failures.push(`${entry.name}/index.html: links the theme after another stylesheet`);
 	}
 	if (themeAt !== -1) linked += 1;
+	// A page whose scripts read tokens loads the theme and theme_tokens.js, in that order.
+	const scripts = [...html.matchAll(/<script\b[^>]*src="([^"?#]+)"/g)].map((m) =>
+		path.posix.normalize(path.posix.join(entry.name, m[1]))
+	);
+	if (scripts.some((script) => scriptUsers.has(script))) {
+		const helperAt = scripts.indexOf('theme_tokens.js');
+		const firstUser = scripts.findIndex((script) => scriptUsers.has(script));
+		if (themeAt === -1)
+			failures.push(
+				`${entry.name}/index.html: scripts read theme tokens but the theme is not linked`
+			);
+		if (helperAt === -1 || helperAt > firstUser)
+			failures.push(
+				`${entry.name}/index.html: must load ../theme_tokens.js before the scripts that read tokens`
+			);
+	}
 }
 assert.ok(linked > 0, 'no shared page links the theme');
+
+// theme_tokens.js answers a declared token and raises for an unknown one: no fallback colour.
+{
+	const vm = require('node:vm');
+	const { installThemeTokens } = require('./support/theme-tokens.cjs');
+	const context = vm.createContext({});
+	installThemeTokens(context);
+	const read = (code) => vm.runInContext(code, context);
+	if (read("ThemeTokens.color('white')") !== '#ffffff')
+		failures.push('ThemeTokens.color(white) is not #ffffff');
+	let raised = false;
+	try {
+		read("ThemeTokens.color('no-such-token')");
+	} catch (error) {
+		raised = /theme token missing: --theme-no-such-token/.test(String(error));
+	}
+	if (!raised) failures.push('ThemeTokens.color must raise for a token the theme does not declare');
+}
 
 if (failures.length > 0) {
 	console.error('\x1b[31m[FAIL] the shared pages and theme.css disagree:\x1b[0m');

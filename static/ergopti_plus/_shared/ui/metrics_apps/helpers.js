@@ -133,45 +133,45 @@ const _FRENCH_LEGACY_LABELS = {
 
 // Perceptually distinct palette — spread across hue wheel to avoid blue clustering
 const CHART_PALETTE = [
-	'#FF375F', // Red-Pink
-	'#FF9F0A', // Orange
-	'#FFD60A', // Yellow
-	'#32D74B', // Green
-	'#64D2FF', // Sky Blue
-	'#0A84FF', // Blue
-	'#5E5CE6', // Indigo
-	'#BF5AF2', // Purple
-	'#FF6B35', // Burnt Orange
-	'#00C7BE', // Teal
-	'#E588F8', // Lavender
-	'#F4A460', // Sandy
-	'#30B0C7', // Cyan-Teal
-	'#FF453A', // Deep Red
-	'#34C759', // Leaf Green
-	'#5AC8FA' // Light Blue
+	ThemeTokens.color('pink-dark'), // Red-Pink
+	ThemeTokens.color('orange-dark'), // Orange
+	ThemeTokens.color('yellow-dark'), // Yellow
+	ThemeTokens.color('hue-32d74b'), // Green
+	ThemeTokens.color('cyan-dark'), // Sky Blue
+	ThemeTokens.color('blue-dark'), // Blue
+	ThemeTokens.color('indigo-dark'), // Indigo
+	ThemeTokens.color('purple-dark'), // Purple
+	ThemeTokens.color('hue-ff6b35'), // Burnt Orange
+	ThemeTokens.color('hue-00c7be'), // Teal
+	ThemeTokens.color('hue-e588f8'), // Lavender
+	ThemeTokens.color('hue-f4a460'), // Sandy
+	ThemeTokens.color('hue-30b0c7'), // Cyan-Teal
+	ThemeTokens.color('red-dark'), // Deep Red
+	ThemeTokens.color('green'), // Leaf Green
+	ThemeTokens.color('hue-5ac8fa') // Light Blue
 ];
 
 // Fixed aesthetic mappings for standard categories keyed on stable i18n ids —
 // each hue is deliberately distant from the others on the colour wheel.
 const FIXED_CAT_COLORS = {
-	productivity: '#0A84FF',
-	development: '#5E5CE6',
-	social: '#FF375F',
-	games: '#FF453A',
-	entertainment: '#BF5AF2',
-	utility: '#64D2FF',
-	education: '#FF9F0A',
-	business: '#FFD60A',
-	finance: '#30B0C7',
-	graphics_design: '#E588F8',
-	photography: '#FF6B35',
-	video: '#FF375F',
-	music: '#32D74B',
-	health: '#34C759',
-	news: '#F4A460',
-	weather: '#5AC8FA',
-	travel: '#00C7BE',
-	general: '#8E8E93'
+	productivity: ThemeTokens.color('blue-dark'),
+	development: ThemeTokens.color('indigo-dark'),
+	social: ThemeTokens.color('pink-dark'),
+	games: ThemeTokens.color('red-dark'),
+	entertainment: ThemeTokens.color('purple-dark'),
+	utility: ThemeTokens.color('cyan-dark'),
+	education: ThemeTokens.color('orange-dark'),
+	business: ThemeTokens.color('yellow-dark'),
+	finance: ThemeTokens.color('hue-30b0c7'),
+	graphics_design: ThemeTokens.color('hue-e588f8'),
+	photography: ThemeTokens.color('hue-ff6b35'),
+	video: ThemeTokens.color('pink-dark'),
+	music: ThemeTokens.color('hue-32d74b'),
+	health: ThemeTokens.color('green'),
+	news: ThemeTokens.color('hue-f4a460'),
+	weather: ThemeTokens.color('hue-5ac8fa'),
+	travel: ThemeTokens.color('hue-00c7be'),
+	general: ThemeTokens.color('gray')
 };
 
 // Every localised spelling of the default category, from the generated alias
@@ -232,8 +232,8 @@ function paletteIndex(str) {
 }
 
 function getCategoryColor(catName, score) {
-	if (score > 0) return '#30D158';
-	if (score < 0) return '#FF453A';
+	if (score > 0) return ThemeTokens.color('green-dark');
+	if (score < 0) return ThemeTokens.color('red-dark');
 	const id = categoryToId(catName);
 	if (Object.prototype.hasOwnProperty.call(FIXED_CAT_COLORS, id)) return FIXED_CAT_COLORS[id];
 	return CHART_PALETTE[paletteIndex(catName)];
@@ -244,8 +244,8 @@ const postBridge = makeHostBridge('metrics_apps_bridge');
 function getAppColor(appName, score) {
 	// Always prefer the dominant icon colour — score is reflected in the score column, not the bar
 	if (_dominantColorCache[appName]) return _dominantColorCache[appName];
-	if (score > 0) return '#30D158';
-	if (score < 0) return '#FF453A';
+	if (score > 0) return ThemeTokens.color('green-dark');
+	if (score < 0) return ThemeTokens.color('red-dark');
 	return CHART_PALETTE[paletteIndex(appName)];
 }
 
