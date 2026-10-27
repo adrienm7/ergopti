@@ -14,7 +14,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -87,13 +86,6 @@ func (s *networkSnapshot) copyEnvironment() map[string]string {
 	return result
 }
 
-// inheritedTrustIgnored drops SSL_CERT_FILE and SSL_CERT_DIR on macOS, where
-// every download uses the system and keychain trust only: the field run of
-// 2026-10-27 19:47 inherited a bundle the loaders refused and every download
-// stopped. Ergopti never sets either there. The anchor channel stays on Linux;
-// tests clear this to exercise it on any host.
-var inheritedTrustIgnored = runtime.GOOS == "darwin"
-
 func nativeWorkerEnvironment(private map[string]string) ([]string, error) {
 	policy, err := nativeBootstrapPolicy()
 	if err != nil {
@@ -121,10 +113,10 @@ func nativeWorkerEnvironment(private map[string]string) ([]string, error) {
 	}
 	// Only certificate data is sent to the signed native worker. Credentials
 	// from explicit proxy choices remain in Go's request-local transport.
+	// The sealed snapshot is the only trust source: on macOS the daemon owner
+	// captures it without SSL_CERT_FILE or SSL_CERT_DIR (system and keychain
+	// trust only), so a value here was placed by a caller that owns its anchor.
 	for _, name := range policy.TrustNames {
-		if inheritedTrustIgnored {
-			break
-		}
 		if value, exists := private[name]; exists {
 			result = append(result, name+"="+value)
 		}
@@ -215,7 +207,7 @@ func bootstrapTLSConfig(original *tls.Config, environment map[string]string) (*t
 	if err != nil {
 		return nil, err
 	}
-	if inheritedTrustIgnored || (environment[policy.TrustNames[0]] == "" && environment[policy.TrustNames[1]] == "") {
+	if environment[policy.TrustNames[0]] == "" && environment[policy.TrustNames[1]] == "" {
 		return original, nil
 	}
 	var selected *tls.Config

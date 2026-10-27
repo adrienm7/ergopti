@@ -30,6 +30,73 @@ const Mac = require('./fixtures/macos-stage-source.cjs');
 const MacRoles = require('../ci/macos-stage-roles.cjs');
 
 /** Checks actual stage metadata and the typed matrix producer used by that stage. */
+/** XCTest classes the SDK accepted-owner step runs, in its census order. */
+const SDK_XCTEST_CLASSES = [
+	'ManagedOllamaAPIWorkerTests',
+	'ManagedPTYWorkerTests',
+	'ManagedImageAliasTests',
+	'OwnedSuspendedImageTests',
+	'ManagedListenerPathIdentityTests',
+	'ManagedNetworkBootstrapTests'
+];
+
+/**
+ * Counts the test methods each XCTestCase class declares in the launcher test
+ * sources, so the macOS-only census in ci-macos.yml is checked on every host.
+ * @param {string[]} classes - The class names to count.
+ * @returns {Record<string, number>} The test method count per class.
+ */
+function xctestCensus(classes) {
+	const directory = path.resolve(
+		__dirname,
+		'../../static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests'
+	);
+	const counts = Object.fromEntries(classes.map((name) => [name, 0]));
+	const declared = new Set();
+	for (const file of fs.readdirSync(directory).filter((name) => name.endsWith('.swift'))) {
+		let owner = null;
+		for (const line of fs.readFileSync(path.join(directory, file), 'utf8').split('\n')) {
+			const opened = /^(?:final )?class (\w+)\s*:\s*XCTestCase\b|^extension (\w+)\b/.exec(line);
+			if (opened) {
+				owner = opened[1] || opened[2];
+				if (opened[1]) declared.add(owner);
+				continue;
+			}
+			if (/^(?:(?:private|fileprivate|final) )*(?:class|struct|enum|actor|protocol) /.test(line))
+				owner = null;
+			else if (owner in counts && /^\s*func test\w*\s*\(\s*\)/.test(line)) counts[owner]++;
+		}
+	}
+	for (const name of classes) {
+		assert.ok(declared.has(name), `${name} must be an XCTestCase in the launcher tests`);
+		assert.ok(counts[name] > 0, `${name} must declare at least one test`);
+	}
+	return counts;
+}
+
+/**
+ * Requires the SDK step to pin each class census and the total to the source.
+ * @param {string} step - The workflow step body.
+ * @param {Record<string, number>} census - The test method count per class.
+ */
+function receiveSdkCensus(step, census) {
+	const lines = step.split('\n');
+	let total = 0;
+	for (const name of SDK_XCTEST_CLASSES) {
+		const suite = lines.findIndex((line) => line.includes(`Test Suite '${name}' passed`));
+		assert.ok(suite >= 0, `${name} suite line`);
+		assert.ok(
+			lines[suite + 1].includes(`'Executed ${census[name]} tests, with 0 failures'`),
+			`${name} census must be ${census[name]}: ${lines[suite + 1].trim()}`
+		);
+		total += census[name];
+	}
+	assert.ok(
+		step.includes(`grep -Fq 'Executed ${total} tests, with 0 failures' "$transcript"`),
+		`SDK step total must be ${total}`
+	);
+}
+
 function macRoleBody(body, role, expectedCount) {
 	const parent = role === 'cold-bootstrap-native' ? 'package-macos' : 'integration-hs';
 	const matrix = role === 'cold-bootstrap-native' ? 'testbuild_matrix' : 'e2e_matrix';
@@ -1030,15 +1097,20 @@ function checkManagedOllamaNative(body) {
 		listener,
 		/--filter 'ManagedOllamaAPIWorkerTests\|ManagedPTYWorkerTests\|ManagedImageAliasTests\|OwnedSuspendedImageTests\|ManagedListenerPathIdentityTests\|ManagedNetworkBootstrapTests'/
 	);
-	assert.match(listener, /Executed 12 tests, with 0 failures/);
-	assert.match(listener, /Executed 11 tests, with 0 failures/);
-	assert.match(listener, /ManagedPTYWorkerTests/);
-	assert.match(listener, /Executed 4 tests, with 0 failures/);
-	assert.match(listener, /Executed 6 tests, with 0 failures/);
-	assert.match(listener, /Executed 14 tests, with 0 failures/);
-	assert.match(listener, /Executed 2 tests, with 0 failures/);
-	assert.match(listener, /ManagedNetworkBootstrapTests/);
-	assert.match(listener, /Executed 49 tests, with 0 failures/);
+	const census = xctestCensus(SDK_XCTEST_CLASSES);
+	receiveSdkCensus(listener, census);
+	// The census pinned before the PTY guardian and CA-drop cases were added
+	// (11, 6 and 49) must be refused, or a stale count reaches macOS CI again.
+	assert.throws(() =>
+		receiveSdkCensus(
+			listener.replace(
+				`Executed ${census.ManagedPTYWorkerTests} tests,`,
+				`Executed ${census.ManagedPTYWorkerTests - 2} tests,`
+			),
+			census
+		)
+	);
+	assert.throws(() => receiveSdkCensus(listener, { ...census, ManagedNetworkBootstrapTests: 6 }));
 	assert.equal(pipeline.stepField(listener, 'continue-on-error'), null);
 	assert.equal(
 		pipeline.stepField(listener, 'if'),

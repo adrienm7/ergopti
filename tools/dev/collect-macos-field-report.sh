@@ -42,6 +42,8 @@ REPO_ROOT="${REPO_ROOT%.}"
 set -e
 # shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
 . "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+# shellcheck source=macos-field-shell-checks.sh
+. "$REPO_ROOT/tools/dev/macos-field-shell-checks.sh"
 set +e
 LOG_DIR="${HOME}/Library/Logs/ergopti_plus"
 FIELD_BRANCH_PREFIX="field/"
@@ -351,6 +353,11 @@ step native_runtime sh -c '
 	printf "== kernel and code-signing kills of the last 30 minutes\n"
 	log show --last 30m --style compact --predicate "(process == \"kernel\" OR sender == \"AppleMobileFileIntegrity\") AND (eventMessage CONTAINS[c] \"code sign\" OR eventMessage CONTAINS[c] \"killed\" OR eventMessage CONTAINS[c] \"cs_invalid\" OR eventMessage CONTAINS[c] \"memorystatus\")" 2>&1 | tail -60
 ' native_runtime "${native_root}"
+
+# Checklist items that need no person: which privacy pane URL form this macOS
+# opens (ledger L29) and the system bash 3.2 (tools/dev/macos-field-shell-checks.sh)
+step privacy_pane_urls field_privacy_pane_urls "${REPO_ROOT}"
+step system_bash field_system_bash
 
 # ===========================================
 # ======= 4/ Input-source probe =============

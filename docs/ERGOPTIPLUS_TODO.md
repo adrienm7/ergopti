@@ -88,10 +88,13 @@ a sealed Windows updater source, reseal with
   `vendor/ergopti_updater_download.ps1` (`CreateFileW`, `GetFileInformationByHandle`, from bdfa026d16). Check
   whether a bundled type already declaring them could be reused, then lower it back. The same build log notes
   `key_state_polling` dropped to 59: lower its script ceiling from 62 once a Windows build confirms 59.
-- **Last full preflight:** run 40567247114 on d1f9682904 had 89 green and 3 red, fixed by bfd5401162 (Windows
-  OS-call purity ratchet after the WPM region fix), 2956b2fc3d (macOS 26 input-source fixtures waited for the
-  observed selection) and fbdf2be92d (debian:12 carries no stalonetray; the AppImage check uses trayer). The
-  v1.0.7 release commit sits on top of them and a new full run qualifies it before `main`.
+- **Last full preflight:** run 40584261575 on 54d1c70415 (the first v1.0.7 release commit) had 6 red jobs,
+  fixed by a884588fb9 (bootstrap shell vectors keep inherited CA variables out), f51d970387 (PTY worker test
+  derives the bundle name), 92b2e93ae6 (XCTest census derived from the launcher test sources), 8b24d4e11f
+  (inherited trust dropped at the daemon snapshot, not in Go, so the receiver's own registry certificate
+  reaches Go) and 7dadf0b84d (uinput reports stamped so a still tap reaches the decoder). The second v1.0.7
+  release commit sits on top of them and of the Mac field fixes of 27 October evening; a new full run
+  qualifies it before `main`.
 - **The ChatGPT fix branches** fix/linux, fix/macos and fix/windows are fully on dev. The container proxy
   refuses remote deletion, so the maintainer deletes them: `git push origin --delete fix/linux fix/macos
 fix/windows`.
@@ -400,7 +403,13 @@ application|app_name|title|context_watchers|secure_field>, TTL refresh <armed|no
   needs_typing, not a failure: the maintainer types the prompted text on the next run. The 19:47
   run is the same (composer_ready fail:not_enabled; the TIS probe again shows register 0, enable
   0, select -50 and the source still disabled): known limitation, not re-fixed.
-- **L29** [CODE][PHYS-M] Screen Recording settings could not be opened, openURL returned false
+- **L29** Fixed on tmp/wip-field-run-checklist (cf852cf23d): every privacy pane URL now comes from
+  macos/data/privacy_panes.json through adapters/privacy_settings.lua, which opens the
+  `com.apple.settings.PrivacySecurity.extension` form from macOS 26 on. The collector's
+  `privacy_pane_urls` step opens every pane in both forms and records each `open` exit code
+  (System Settings is quit only if it was not running): read it in the next report; if the
+  extension form fails too, trace `hs.urlevent.openURL`. The diagnostics schema `settings` URLs
+  still use the legacy form. Original entry: Screen Recording settings could not be opened, openURL returned false
   (new.txt 15:31:46). adapters/screen_capture.lua uses
   `x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture`, the same
   scheme as the Accessibility and Input Monitoring panes, so the URL alone does not explain it.
@@ -419,10 +428,15 @@ application|app_name|title|context_watchers|secure_field>, TTL refresh <armed|no
   it, so `M.update_ax_observer` now logs that refusal at INFO and rolls the observer back, while another
   application's refusal stays a WARNING (`test_context_tracker_ax_own_process.lua`). Mac: no such WARNING
   after focusing an Ergopti menu or page.
-- **L32** [CODE] issue #104 diagnostics: Input Monitoring, Login Items and Screen Recording read
+- **L32** Partly fixed on tmp/wip-field-run-checklist (cce99afbc7): the shared schema enum lacked
+  `missing`, `unavailable` and `not_used`, so the share projection turned a refused Screen Recording
+  grant (and a guardian needing approval) into `unknown`. Still open: Input Monitoring has no
+  non-prompting reader (IOHIDCheckAccess via a native helper), and the resident size breakdown.
+  Original entry: issue #104 diagnostics: Input Monitoring, Login Items and Screen Recording read
   `unknown`; memory used 843 MB with 93 MB free. Next: read or label those permissions, and
   measure the 843 MB resident size.
-- **L33** [CODE] Swift warnings in the launcher build (`_164726` field*run.txt). The "always
+- **L33** Fixed on tmp/wip-field-run-checklist (23ac97fb4a), not compiled here: the next collector
+  rebuild must show none of the four warnings. Original entry: Swift warnings in the launcher build (`_164726` field*run.txt). The "always
   true" one, OwnedVirtualHIDDaemonReportMainOperation.swift:112 `returned != nil && error ==
 nil`, has no behavior effect: `executeAndReturnError` returns a non-optional descriptor and
   `error == nil` alone decides, which is the intended check. Next, on a Mac with swiftc: replace it
@@ -449,7 +463,10 @@ closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swift
   names for every download child with one INFO line per name ("Inherited SSL_CERT_FILE ignored:
   downloads use the system and keychain trust."), the launcher's `--managed-http` and
   `--managed-bootstrap-download` roles unset both before reading their environment, and the Go
-  `native_http` package ignores them on darwin. Linux and Windows are unchanged. The Swift part
+  `native_http` package ignores them on darwin. That Go ignore also refused the native model
+  receiver's own fixture anchor (preflight run 40584261575, pull `certificate`), so the macOS
+  decision moved to the daemon owner: `managed_ollama_serve.py` seals its snapshot with
+  `inherited_trust=False` and Go honors only the sealed snapshot. Linux and Windows are unchanged. The Swift part
   is not compiled on the Linux host (ManagedNetworkBootstrapTests covers it on macOS CI). Mac
   confirms: the next run logs that INFO line, the MLX install passes `uv sync`, and
   03_field_network reads `tls pass:trusted`; if TLS then fails with `certificate`, the company root
@@ -1530,7 +1547,7 @@ probe answered ...`, else `curl -sS -o /dev/null -w '%{http_code}\n' http://127.
 
 #### 7. Edge cases
 
-- [ ] `pipefail` and `printf %b` under the system bash 3.2, the native HTTPS downgrade refusal,
+- [ ] `pipefail` and `printf %b` under the system bash 3.2 (automated: collector step `system_bash`), the native HTTPS downgrade refusal,
       `hs.fs.attributes` on a FIFO, the read-only dashboard with a hot journal.
 - [ ] Recompile `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt` from its source in Script
       Editor so its comment follows the keystats rename, and commit it.
@@ -1643,7 +1660,8 @@ Standing checks:
       111 two displays, 30 magic key on ISO and ANSI, 46-48 and 88 a real local model and the
       tooltip typography, issue 94 (tap-hold menu refusal, symbol-wrap clipboard, ISO/ANSI captured
       once), 119/130/136 MLX PAC download, code 74, Homebrew live upgrade.
-- [ ] **Shell and file edge cases**: `pipefail` and `printf %b` under bash 3.2, the native HTTPS
+- [ ] **Shell and file edge cases**: `pipefail` and `printf %b` under bash 3.2 (automated: collector step
+      `system_bash`), the native HTTPS
       downgrade refusal, `hs.fs.attributes` on a FIFO, the read-only dashboard with a hot journal.
 
 ### Linux (no machine available)

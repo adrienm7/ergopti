@@ -1286,8 +1286,8 @@ installPrivateProcessUmask()
 if OwnedVirtualHIDDaemonReportMainOperation.handles(arguments: CommandLine.arguments) {
 	let reportResult = DispatchSemaphore(value: 0)
 	DispatchQueue.global(qos: .userInitiated).async {
+		// Darwin.exit never returns: the main thread pumps the run loop until it ends the process.
 		Darwin.exit(OwnedVirtualHIDDaemonReportMainOperation.run(arguments: CommandLine.arguments))
-		reportResult.signal()
 	}
 	while reportResult.wait(timeout: .now() + 0.02) == .timedOut { RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.02)) }
 }
