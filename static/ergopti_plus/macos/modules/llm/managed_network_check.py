@@ -43,11 +43,16 @@ def load_bootstrap():
 
 
 def route_step(fallback):
-    """The lookup verdict: no fallback means the native route was usable."""
+    """The lookup verdict: no fallback means the native route was usable.
+
+    A fallback is the policy of proxy_policy.json "pac_unavailable_fallback":
+    the automatic configuration could not be used and the request went direct,
+    so the step informs and the transfer step says whether direct worked.
+    """
     if fallback is None:
         emit("route_lookup", "pass", "selected")
     else:
-        emit("route_lookup", "fail", "direct_" + fallback.removeprefix("native_"))
+        emit("route_lookup", "info", "direct_" + fallback.removeprefix("native_"))
 
 
 def main():
