@@ -74,6 +74,7 @@ local function with_changelog(callback)
 				end,
 			}
 			package.loaded["modules.shortcuts.script_control"] = state.script_control
+			helpers.provide_timings()
 			local hs_stub = require("tests.stubs.hs")
 			hs_stub.__reset()
 			-- The real HttpClient owns redirects, so the window never reaches the

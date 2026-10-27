@@ -175,6 +175,23 @@ const SOURCE_PINS = [
 		file: 'macos/adapters/http_client.lua',
 		pattern: /^local HTTP_CLIENT_DEFAULT_TIMEOUT_MS\s*=\s*(\d+)\s*$/gm
 	},
+	...[
+		['hotstring_editor_focus_delay_ms', /\bconst FOCUS_DELAY_MS = (\d+);/g],
+		['hotstring_editor_edit_focus_delay_ms', /\bconst EDIT_FOCUS_DELAY_MS = (\d+);/g],
+		['hotstring_editor_toast_ms', /\bconst TOAST_MS = (\d+);/g],
+		['hotstring_editor_add_entry_delay_ms', /\bconst ADD_ENTRY_DELAY_MS = (\d+);/g]
+	].map(([key, pattern]) => ({
+		section: 'ui',
+		key,
+		file: '_shared/ui/hotstring_editor/script.js',
+		pattern
+	})),
+	{
+		section: 'ui',
+		key: 'metrics_typing_dispatch_delay_ms',
+		file: '_shared/ui/metrics_typing/data.js',
+		pattern: /\bconst DISPATCH_DELAY_MS = (\d+);/g
+	},
 	...['metrics_apps/state.js', 'metrics_typing/data.js'].map((page) => ({
 		section: 'keystats',
 		key: 'long_session_threshold_ms',

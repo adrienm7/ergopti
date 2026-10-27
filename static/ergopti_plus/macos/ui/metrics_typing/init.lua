@@ -929,7 +929,7 @@ function M.show()
 		return rollback_startup_webview(webview, "prior poller cleanup remains pending")
 	end
 	local poll_ok, poll_candidate, poll_committed = xpcall(function()
-		return TimerScheduler.every(0.3, function()
+		return TimerScheduler.every(require("infra.timings").sec("ui", "metrics_typing_poll_ms"), function()
 		if generation ~= _generation or M._wv ~= webview then return end
 		pcall(function()
 			submit_javascript(generation, webview, "request poll", "window._lua_request", function(req)

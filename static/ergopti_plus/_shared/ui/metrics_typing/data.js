@@ -3258,6 +3258,8 @@ function sort_apps_table(col) {
 // ===================================================
 // ===================================================
 
+// [ui] metrics_typing_dispatch_delay_ms (pinned: a page script cannot read the registry)
+const DISPATCH_DELAY_MS = 50;
 const LONG_SESSION_THRESHOLD_MS = 90 * 60 * 1000; // 90 min — clinical RSI risk threshold
 
 /**
@@ -3639,7 +3641,7 @@ function request_range_data(show_loader = true) {
 		}
 		window._lua_request = JSON.stringify(req);
 	};
-	setTimeout(dispatch, 50);
+	setTimeout(dispatch, DISPATCH_DELAY_MS);
 }
 
 /**

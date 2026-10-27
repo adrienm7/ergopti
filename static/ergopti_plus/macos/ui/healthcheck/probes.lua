@@ -438,7 +438,7 @@ end
 local function configuration(schema, overrides)
 	return function(done, on_cancel)
 		local Timers = require("adapters.timer_scheduler")
-		local handle = Timers.after(0.001, function()
+		local handle = Timers.after(require("infra.timings").sec("ui", "healthcheck_probe_yield_ms"), function()
 			local context = require("ui.healthcheck.helpers").configuration_context(schema, overrides)
 			local ok, result, sections = pcall(require("healthcheck.configuration").probe, context)
 			if not ok then

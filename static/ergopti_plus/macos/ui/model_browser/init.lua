@@ -348,7 +348,7 @@ function M.open(ctx)
 			html_string       = final_html,
 			on_navigation     = function(action)
 				if action == "didFinishNavigation" then
-					DeferredWork.after(0.15, function()
+					DeferredWork.after(require("infra.timings").sec("ui", "webview_navigation_flush_delay_ms"), function()
 						if not candidate_is_active() then return end
 						local navigation_session = _session
 						if not _ready then flush_queue() end
@@ -392,7 +392,7 @@ function M.open(ctx)
 	_wv_committed = true
 
 	-- Safety: flush after 1.5 s if the ready handshake never arrives.
-	DeferredWork.after(1.5, function()
+	DeferredWork.after(require("infra.timings").sec("ui", "webview_ready_safety_flush_ms"), function()
 		if not candidate_is_active() or _ready then return end
 		local fallback_session = _session
 		flush_queue()

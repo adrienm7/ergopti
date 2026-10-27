@@ -187,7 +187,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- and must be initialized here even when ConfigPaths is already ready.
 	if not MenuPaths.is_initialized() then
 		MenuPaths.init(base_dir, function()
-			return DeferredWork.after(0.25,
+			return DeferredWork.after(require("infra.timings").sec("ui", "config_editor_reload_delay_ms"),
 				function() pcall(hs.reload) end,
 				"menu.reload_after_paths")
 		end)

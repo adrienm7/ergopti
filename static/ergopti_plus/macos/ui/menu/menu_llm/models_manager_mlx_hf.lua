@@ -999,7 +999,7 @@ function M.install(ctx)
 		end
 
 		local schedule_ok, handle_or_error, committed = xpcall(function()
-			local handle, started = TimerScheduler.after(0.05, function()
+			local handle, started = TimerScheduler.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 				if owner.callback_consumed == true then return end
 				owner.callback_pending = true
 				deliver_prompt()

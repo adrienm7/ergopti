@@ -72,7 +72,7 @@ function M.run(row_id, services)
 	return Engine.run(row.check, env.ports(), function(result)
 		local text = Engine.format_text(result, I18n.get)
 		-- A modal dialog is shown from a fresh turn, not from the port callback.
-		env.after(0.05, function()
+		env.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 			local copy_label, close_label = I18n.get("field_check.copy"), I18n.get("field_check.close")
 			local clicked = env.alert(I18n.get(row.title), text, copy_label, close_label)
 			if clicked == copy_label then

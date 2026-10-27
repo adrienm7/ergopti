@@ -405,7 +405,7 @@ local function ensure_webview(title)
 		if owner.loaded then flush() end
 
 		-- Safety: even if didFinishNavigation never fires, flush queued JS after 1s
-		DeferredWork.after(1.0, function()
+		DeferredWork.after(require("infra.timings").sec("ui", "download_window_flush_safety_ms"), function()
 				if not _ready then flush() end
 		end, "download_window.ready_fallback")
 		return true
@@ -776,7 +776,7 @@ function M.complete(success, _model_name, error_kind)
         -- the window when it fires. The session identity exists for exactly this
         -- and was applied to one deferred-hide site; these two never got it.
         local sid = M.session_id()
-        DeferredWork.after(4, function()
+        DeferredWork.after(require("infra.timings").sec("ui", "download_window_hide_delay_ms"), function()
             if M.session_id() ~= sid then
                 Logger.debug(LOG, "Auto-hide skipped: the window now belongs to a newer operation.")
                 return

@@ -598,7 +598,7 @@ function M.new(deps)
 			end
 
 			local schedule_ok, handle_or_error, timer_committed = xpcall(function()
-				return TimerScheduler.after(0.1, timer_callback)
+				return TimerScheduler.after(require("infra.timings").sec("ui", "model_manager_retry_ms"), timer_callback)
 			end, debug.traceback)
 			if schedule_ok == true and type(handle_or_error) == "table" then
 				owner.handle = handle_or_error
