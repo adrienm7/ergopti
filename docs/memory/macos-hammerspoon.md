@@ -145,9 +145,14 @@ the MLX model download through `modules/llm/network_env.lua`): relay from
 `scutil --proxy`, loopback always in NO_PROXY, `UV_SYSTEM_CERTS=1`, and never
 a CA file: an inherited `SSL_CERT_FILE` or `SSL_CERT_DIR` is unset with one INFO
 line, the launcher's `--managed-http` and `--managed-bootstrap-download` roles
-unset both in `main.swift` before reading their environment, and the Go
-`native_http` package ignores them on darwin (`inheritedTrustIgnored`). Only the
-wire-test fixture, which has its own entry point, keeps that CA channel. uv comes from its pinned PyPI wheel (`uv-release.sh`), and a native
+unset both in `main.swift` before reading their environment, and the managed
+daemon owner (`managed_ollama_serve.py`) seals its network snapshot with
+`capture(..., inherited_trust=False)`. The Go `native_http` package reads trust
+only from that sealed snapshot and stays policy-neutral: a GOOS-wide ignore in
+Go also closed the anchor channel of the native model receiver, whose fixture
+registry pull then failed with `certificate`. Only fixtures that own their
+anchor (the wire-test entry point, `macos_managed_ollama_receiving.py`) pass
+`inherited_trust=True`. uv comes from its pinned PyPI wheel (`uv-release.sh`), and a native
 Python 3.11–3.14 builds the venv without the managed interpreter download from
 GitHub. Failures use the shared classes (certificate, proxy, host_blocked,
 offline) and `network.failure.*` sentences with their actions. Never log the
