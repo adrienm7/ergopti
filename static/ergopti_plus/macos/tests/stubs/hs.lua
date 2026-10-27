@@ -1094,8 +1094,8 @@ M.console = { printStyledtext = function(_) end }
 M.notify = {
 	new = function(arg1, arg2)
 		local opts = type(arg1) == "function" and arg2 or arg1
+		-- No release(): Hammerspoon 1.1.1 notifications do not have one (issue #104).
 		local notification = {
-			release = function() end,
 			opts = opts,
 		}
 		notification.send = function() return notification end
