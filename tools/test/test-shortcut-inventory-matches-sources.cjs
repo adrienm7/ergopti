@@ -220,22 +220,10 @@ const windowsGroups = [
 	.sort();
 assert.deepStrictEqual(families('windows'), windowsGroups, 'Windows slot prefixes differ');
 
-const macosGroups = JSON.parse(read(SHARED, 'modules', 'actions', 'modifier_chords.json')).platforms
-	.macos.shortcut_groups;
-assert.deepStrictEqual(
-	families('macos'),
-	macosGroups.map((g) => g.prefix).sort(),
-	'macOS slot prefixes differ'
-);
-
-const linuxGroups = [
-	...read(DRIVERS, 'linux', 'modules', 'shortcuts', 'keyboard_shortcuts.lua')
-		.match(/local SLOT_MODS = \{([\s\S]*?)\n\}/)[1]
-		.matchAll(/\{ "([a-z_]+_)"/g)
-]
-	.map((m) => m[1])
-	.sort();
-assert.deepStrictEqual(families('linux'), linuxGroups, 'Linux slot prefixes differ');
+const roleFamilies = JSON.parse(read(SHARED, 'modules', 'actions', 'slot_roles.json')).families;
+const prefixesOf = (driver) => roleFamilies[driver].map((roles) => roles.join('_') + '_').sort();
+assert.deepStrictEqual(families('macos'), prefixesOf('macos'), 'macOS slot prefixes differ');
+assert.deepStrictEqual(families('linux'), prefixesOf('linux'), 'Linux slot prefixes differ');
 
 console.log(
 	`[OK] the shortcut inventory matches the manifest, the handlers' chords and the slot prefix tables (${inventory.rows.length} rows).`
