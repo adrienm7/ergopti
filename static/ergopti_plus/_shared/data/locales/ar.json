@@ -1027,7 +1027,7 @@
 	"menu.layout.emulated_layout": "التخطيط المراد محاكاته",
 	"menu.layout.superseded_ergopti_only": "تخطيط Ergopti فقط: تتم محاكاة تخطيط آخر",
 	"menu.layout.superseded_digit_row": "يحدد التخطيط المحاكى صف الأرقام الخاص به",
-	"layouts.linux_needs_python": "يتطلب تحويل هذا التخطيط لنظام Linux وجود Python 3.8 أو أحدث (python3). ثبّته ثم أعد المحاولة.",
+	"layouts.linux_needs_python": "يتطلب تثبيت هذا التخطيط على نظام Linux وجود Python 3.8 أو أحدث (python3). ثبّته ثم أعد المحاولة.",
 	"layouts.linux_xorg_session": "لا يمكن تثبيت هذا التخطيط من جلسة Xorg، لأن Xorg لا يقرأ مجلد لوحة المفاتيح الخاص بالمستخدم. سجّل الدخول إلى جلسة Wayland لتثبيته.",
 	"layout_manager.window_title": "تخطيطات لوحة المفاتيح",
 	"layout_manager.subtitle": "ثبّت تخطيطات الكتالوج أو حدّثها أو أزل تثبيتها.",

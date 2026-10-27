@@ -1027,7 +1027,7 @@
 	"menu.layout.emulated_layout": "Te emuleren indeling",
 	"menu.layout.superseded_ergopti_only": "Alleen Ergopti-indeling: een andere indeling wordt geëmuleerd",
 	"menu.layout.superseded_digit_row": "De geëmuleerde indeling bepaalt zelf haar cijferrij",
-	"layouts.linux_needs_python": "Het omzetten van deze indeling voor Linux vereist Python 3.8 of nieuwer (python3). Installeer het en probeer het opnieuw.",
+	"layouts.linux_needs_python": "Het installeren van deze indeling op Linux vereist Python 3.8 of nieuwer (python3). Installeer het en probeer het opnieuw.",
 	"layouts.linux_xorg_session": "Deze indeling kan niet worden geïnstalleerd vanuit een Xorg-sessie, omdat Xorg de toetsenbordmap van de gebruiker niet leest. Meld je aan bij een Wayland-sessie om haar te installeren.",
 	"layout_manager.window_title": "Toetsenbordindelingen",
 	"layout_manager.subtitle": "Installeer, werk bij of verwijder de indelingen uit de catalogus.",

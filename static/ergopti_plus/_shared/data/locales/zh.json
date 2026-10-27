@@ -1027,7 +1027,7 @@
 	"menu.layout.emulated_layout": "要模拟的布局",
 	"menu.layout.superseded_ergopti_only": "仅限 Ergopti 布局：正在模拟其他布局",
 	"menu.layout.superseded_digit_row": "所模拟的布局自行决定数字行",
-	"layouts.linux_needs_python": "将此键盘布局转换为 Linux 格式需要 Python 3.8 或更高版本（python3）。请安装后重试。",
+	"layouts.linux_needs_python": "在 Linux 上安装此键盘布局需要 Python 3.8 或更高版本（python3）。请安装后重试。",
 	"layouts.linux_xorg_session": "无法从 Xorg 会话安装此布局，因为 Xorg 不会读取用户的键盘文件夹。请登录 Wayland 会话后再安装。",
 	"layout_manager.window_title": "键盘布局",
 	"layout_manager.subtitle": "安装、更新或卸载目录中的布局。",

@@ -1027,7 +1027,7 @@
 	"menu.layout.emulated_layout": "Disposizione da emulare",
 	"menu.layout.superseded_ergopti_only": "Solo layout Ergopti: è emulato un altro layout",
 	"menu.layout.superseded_digit_row": "Il layout emulato definisce la propria riga dei numeri",
-	"layouts.linux_needs_python": "La conversione di questo layout per Linux richiede Python 3.8 o successivo (python3). Installalo, poi riprova.",
+	"layouts.linux_needs_python": "L'installazione di questo layout su Linux richiede Python 3.8 o successivo (python3). Installalo, poi riprova.",
 	"layouts.linux_xorg_session": "Questo layout non può essere installato da una sessione Xorg, perché Xorg non legge la cartella tastiera dell'utente. Accedi a una sessione Wayland per installarlo.",
 	"layout_manager.window_title": "Layout di tastiera",
 	"layout_manager.subtitle": "Installa, aggiorna o disinstalla i layout del catalogo.",

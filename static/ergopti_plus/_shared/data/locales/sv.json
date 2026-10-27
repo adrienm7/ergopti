@@ -1027,7 +1027,7 @@
 	"menu.layout.emulated_layout": "Layout att emulera",
 	"menu.layout.superseded_ergopti_only": "Endast Ergopti-layout: en annan layout emuleras",
 	"menu.layout.superseded_digit_row": "Den emulerade layouten bestämmer själv sin sifferrad",
-	"layouts.linux_needs_python": "Att konvertera den här tangentbordslayouten för Linux kräver Python 3.8 eller senare (python3). Installera det och försök igen.",
+	"layouts.linux_needs_python": "Att installera den här tangentbordslayouten på Linux kräver Python 3.8 eller senare (python3). Installera det och försök igen.",
 	"layouts.linux_xorg_session": "Den här layouten kan inte installeras från en Xorg-session, eftersom Xorg inte läser användarens tangentbordsmapp. Logga in i en Wayland-session för att installera den.",
 	"layout_manager.window_title": "Tangentbordslayouter",
 	"layout_manager.subtitle": "Installera, uppdatera eller avinstallera katalogens layouter.",

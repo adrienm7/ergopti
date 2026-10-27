@@ -1027,7 +1027,7 @@
 	"menu.layout.emulated_layout": "פריסה להדמיה",
 	"menu.layout.superseded_ergopti_only": "פריסת Ergopti בלבד: פריסה אחרת מדומה",
 	"menu.layout.superseded_digit_row": "הפריסה המדומה קובעת בעצמה את שורת הספרות",
-	"layouts.linux_needs_python": "המרת פריסה זו עבור Linux דורשת Python 3.8 ומעלה (python3). התקינו אותו ונסו שוב.",
+	"layouts.linux_needs_python": "התקנת פריסה זו ב-Linux דורשת Python 3.8 ומעלה (python3). התקינו אותו ונסו שוב.",
 	"layouts.linux_xorg_session": "לא ניתן להתקין פריסה זו מהפעלת Xorg, מפני ש-Xorg אינו קורא את תיקיית המקלדת של המשתמש. התחברו להפעלת Wayland כדי להתקין אותה.",
 	"layout_manager.window_title": "פריסות מקלדת",
 	"layout_manager.subtitle": "התקינו, עדכנו או הסירו את הפריסות שבקטלוג.",

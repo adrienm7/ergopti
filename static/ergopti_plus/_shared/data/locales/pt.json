@@ -1027,7 +1027,7 @@
 	"menu.layout.emulated_layout": "Disposição a emular",
 	"menu.layout.superseded_ergopti_only": "Apenas disposição Ergopti: outra disposição está a ser emulada",
 	"menu.layout.superseded_digit_row": "A disposição emulada define a sua própria fila de números",
-	"layouts.linux_needs_python": "Converter esta disposição para Linux requer Python 3.8 ou mais recente (python3). Instale-o e tente novamente.",
+	"layouts.linux_needs_python": "Instalar esta disposição no Linux requer Python 3.8 ou mais recente (python3). Instale-o e tente novamente.",
 	"layouts.linux_xorg_session": "Este layout não pode ser instalado a partir de uma sessão Xorg, porque o Xorg não lê a pasta de teclado do usuário. Entre em uma sessão Wayland para instalá-lo.",
 	"layout_manager.window_title": "Disposições de teclado",
 	"layout_manager.subtitle": "Instale, atualize ou desinstale as disposições do catálogo.",
