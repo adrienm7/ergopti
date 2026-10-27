@@ -2259,6 +2259,8 @@
 	"ollama.download_title": "正在下载 Ollama 模型",
 	"ollama.error_network": "无法下载 Ollama。请检查网络连接，然后重新选择 Ollama 后端。",
 	"ollama.error_checksum": "下载的 Ollama 压缩包未通过 SHA-256 校验，已被丢弃。未安装任何内容。",
+	"ollama.error_installer_refused": "Ergopti 的 Ollama 安装程序拒绝了自身的请求，因此未安装任何内容。请重新启动 Ergopti 并再次选择 Ollama 后端；如果问题仍然存在，请发送诊断报告。",
+	"ollama.error_runtime_refused": "Ergopti 无法验证其固定版本的 Ollama（发布目录或完整性检查），因此未安装任何内容。请发送诊断报告。",
 	"ollama.external_manual_start_body": "此 Ollama 安装不由 Ergopti 管理。请自行启动或停止其服务，或通过 Ollama 设置提示安装由 Ergopti 管理的运行环境。",
 	"ollama.native_install_declined_body": "当前 Ollama 安装和模型保持不变。托管运行环境未安装。",
 	"ollama.native_migration_body": "在当前 Ollama 安装旁安装由 Ergopti 管理的运行环境。现有模型仍保留在当前位置。Ergopti 不会停止当前服务；如果它使用相同端口，请自行停止。托管运行环境必须通过原生检查才能运行。",

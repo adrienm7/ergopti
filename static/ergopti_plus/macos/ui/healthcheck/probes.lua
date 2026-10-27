@@ -114,7 +114,11 @@ local function start_probe(run, id, timeout_ms, body)
 			Logger.done(LOG, "Probe '%s' cancelled after %d ms.", id, result.ms)
 			return
 		end
-		Logger.done(LOG, "Probe '%s' answered: %s (%d ms).", id, result.state, result.ms)
+		-- A failed answer carries its detail into the log: the diagnostics window
+		-- closes, and a field report holds only the log (issue #104).
+		local detail = result.state ~= "ok" and type(result.detail) == "string" and result.detail ~= ""
+			and (": " .. result.detail) or ""
+		Logger.done(LOG, "Probe '%s' answered: %s (%d ms)%s.", id, result.state, result.ms, detail)
 		run.publish(id, result, sections)
 	end
 	run.finishers[#run.finishers + 1] = function()
@@ -268,7 +272,7 @@ local function proxy_pac()
 			local client = require("adapters.http_client").new({ timeout_ms = 6000 })
 			on_cancel(function() client.cancel() end)
 			client.get(url, { ["User-Agent"] = USER_AGENT }, function(result)
-				local state, text = PacCheck.judge(result.status, result.body)
+				local state, text = PacCheck.judge(result.status, result.body, result.error)
 				if state == "ok" then
 					done({ state = "ok" }, { network = { proxy_pac = text } })
 				else

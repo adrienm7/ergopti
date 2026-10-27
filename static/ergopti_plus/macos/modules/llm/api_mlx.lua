@@ -517,12 +517,19 @@ local function quiesce_warmup()
 	_warmup_in_flight = false
 	_warmup_active = false
 	local local_settled = settle_local_warmup_owners() == true
-	local discovery_ok, discovery_result = xpcall(function()
+	local discovery_ok, discovery_result, discovery_pending = xpcall(function()
 		if type(ApiMlxDiscovery.stop) ~= "function" then return false end
 		return ApiMlxDiscovery.stop()
 	end, debug.traceback)
 	local discovery_settled = discovery_ok == true and discovery_result == true
-	if not discovery_settled then
+	if not discovery_settled and discovery_ok == true and discovery_pending == "pending" then
+		-- The poll task got its SIGTERM and only its native exit is outstanding.
+		-- Discovery keeps that exact debt and fences resume() until it exits, so
+		-- the warmup revocation has committed. Reporting it as unsettled made a
+		-- failed MLX bootstrap log three ERRORs on every disable (issue #104).
+		Logger.debug(LOG, "Warmup discovery stop awaits the poll task's native exit.")
+		discovery_settled = true
+	elseif not discovery_settled then
 		Logger.error(LOG, "Warmup discovery cancellation retained exact cleanup debt: %s.",
 			tostring(discovery_result))
 	end

@@ -50,12 +50,12 @@ function M.run(assert_eq, driver, compose, expected, bypass)
 		if native_mode == "throw" then error("owned native constructor refusal", 0) end
 		local options = properties or first
 		native_callback = properties and first or nil
-		local note = { properties = options, released = 0 }
+		-- Hammerspoon 1.1.1 notifications have no release() (issue #104).
+		local note = { properties = options }
 		note.send = function()
 			if native_mode == "refuse" then return false end
 			return note
 		end
-		note.release = function() note.released = note.released + 1 end
 		notes[#notes + 1] = note
 		return note
 	end } }
@@ -75,7 +75,6 @@ function M.run(assert_eq, driver, compose, expected, bypass)
 			assert_eq(notes[#notes].properties.title, expected.named)
 			assert_eq(notes[#notes].properties.informativeText, options.body)
 			assert_eq(notes[#notes].properties.subTitle, "⚠️ Warning")
-			assert_eq(notes[#notes].released, 1)
 			assert_eq(options.kind, "warn")
 			local callback = function() end
 			local properties = { title = "Bare label", informativeText = options.body,
@@ -91,7 +90,6 @@ function M.run(assert_eq, driver, compose, expected, bypass)
 			assert_eq(properties.title, "Bare label")
 			native_mode = "refuse"
 			assert_eq(application.send("Bare label", options), false)
-			assert_eq(notes[#notes].released, 1)
 			native_mode = "throw"
 			assert_eq(application.send("Bare label", options), false)
 		else

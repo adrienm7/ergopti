@@ -338,6 +338,13 @@ local function start_detached_sweep(label, executable, args)
 	return true
 end
 
+--- The models manager of the last committed AI menu, for owners outside the
+--- menu that run its download flows (the developer field run).
+--- @return table|nil manager nil before the AI menu was created.
+function M.active_models_manager()
+	return _active_models_mgr
+end
+
 --- Retires the owned Ollama daemon and sweeps the local expander/HTTP helpers. Called by the root
 --- teardown shared by every controlled reload and quit path, so the quit entry
 --- points can never drift. Stock Karabiner processes are never owned by Ergopti.

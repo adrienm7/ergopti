@@ -968,6 +968,14 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 		end,
 	}
 	steps[#steps + 1] = {
+		name = "field-run",
+		run = function()
+			local module = package.loaded["infra.field_run"]
+			if module == nil then return true end
+			return module.stop()
+		end,
+	}
+	steps[#steps + 1] = {
 		name = "menu-watchers",
 		run = function()
 			local module = package.loaded["ui.menu"]
@@ -1384,7 +1392,9 @@ end
 -- cleanup, LLM bootstrap, TOML loading and the keymap engine startup have all
 -- completed (F-MED-19).
 local function finish_boot_after_onboarding()
-Boot.stage("Accessibility permission")
+-- stage_once: when the wait below grants trust, this function runs again from
+-- inside this very stage, which must resume rather than open twice.
+Boot.stage_once("Accessibility permission")
 -- Every input owner below is an eventtap, and an untrusted process gets taps
 -- that never enable. The packaged runtime is its own app identity, so a user
 -- whose onboarding was skipped (config.toml already present) may never have
@@ -2329,6 +2339,14 @@ require("infra.driver_control").start({
 		return TerminationCoordinator.request_reload_owned(reason, on_aborted)
 	end,
 })
+-- The developer field run (tools/dev/collect-macos-field-report.sh): only a
+-- developer app runs it, so a packaged runtime never even loads the module.
+if require("infra.dev_source").is_active() then
+	require("infra.field_run").start({
+		root = require("infra.dev_source").root(),
+		pid = assert(tonumber(hs.processInfo.processID), "hs.processInfo.processID is unavailable"),
+	})
+end
 -- Trigger the first Karabiner deploy HERE, after init.lua fully completes.
 -- hs.timer callbacks scheduled during module init do not fire reliably;
 -- calling regenerate() from this top-level context guarantees the event loop

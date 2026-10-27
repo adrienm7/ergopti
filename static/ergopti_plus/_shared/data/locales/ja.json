@@ -2259,6 +2259,8 @@
 	"ollama.download_title": "Ollamaモデルをダウンロード中",
 	"ollama.error_network": "Ollama をダウンロードできませんでした。インターネット接続を確認してから、もう一度 Ollama バックエンドを選択してください。",
 	"ollama.error_checksum": "ダウンロードした Ollama アーカイブは SHA-256 検証に失敗したため破棄されました。何もインストールされていません。",
+	"ollama.error_installer_refused": "Ergopti の Ollama インストーラーが自身の要求を拒否したため、何もインストールされませんでした。Ergopti を再起動し、Ollama バックエンドをもう一度選択してください。解決しない場合は診断レポートを送信してください。",
+	"ollama.error_runtime_refused": "Ergopti が固定バージョンの Ollama を検証できなかったため（リリースカタログまたは整合性チェック）、何もインストールされませんでした。診断レポートを送信してください。",
 	"ollama.external_manual_start_body": "この Ollama インストールは Ergopti の外部で管理されています。サービスをご自身で起動または停止するか、Ollama のセットアップ提案から Ergopti が管理するランタイムをインストールしてください。",
 	"ollama.native_install_declined_body": "現在の Ollama インストールとモデルは変更されません。管理対象のランタイムはインストールされませんでした。",
 	"ollama.native_migration_body": "現在の Ollama インストールと並行して、Ergopti が管理するランタイムをインストールします。既存のモデルは現在の保存場所に残ります。Ergopti は現在のサービスを停止しません。同じポートを使用している場合は、ご自身で停止してください。管理対象のランタイムを実行するには、ネイティブチェックに合格する必要があります。",
