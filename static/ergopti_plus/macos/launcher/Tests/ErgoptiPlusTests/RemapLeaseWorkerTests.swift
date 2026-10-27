@@ -960,6 +960,80 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertEqual(stillMissing.registerCalls, 1, "registration is attempted once, never looped")
 	}
 
+	/// A developer build (issue #104) is ad hoc signed and shares the installed
+	/// app's bundle identifier, so Background Items can answer it with a stale
+	/// enabled record, an agent left unregistered or a non-signature error. Each
+	/// left its remaps inert with no named cause; it now takes its own legacy
+	/// agent, while denial and approval stay fail-closed and a release keeps
+	/// its exact invalid-signature-only policy.
+	func testDeveloperBuildTakesTheLegacyAgentForEveryNonUserOutcome() throws {
+		guard #available(macOS 13.0, *) else { return }
+		let authorizationFailure = NSError(
+			domain: kRemapGuardianServiceErrorDomain,
+			code: kSMErrorAuthorizationFailure
+		)
+		// Fresh scripted services per run: registration mutates their status.
+		let outcomes: [() -> ScriptedModernGuardianService] = [
+			{ ScriptedModernGuardianService(status: .enabled) },
+			{ ScriptedModernGuardianService(status: .notFound, statusAfterRegister: .notFound) },
+			{ ScriptedModernGuardianService(registrationError: authorizationFailure) },
+			// The stale-record replacement runs first; its refused removal is not a user decision.
+			{ ScriptedModernGuardianService(status: .enabled, unregistrationError: authorizationFailure) },
+		]
+		for makeService in outcomes {
+			for developerBuild in [true, false] {
+				var legacyCalls = 0
+				var logged: [String] = []
+				let result = resolveModernRemapGuardianRegistration(
+					service: makeService(),
+					guardianHealth: { false },
+					legacyInvalidSignatureFallback: {
+						legacyCalls += 1
+						return true
+					},
+					developerBuild: developerBuild,
+					report: { logged.append($0) }
+				)
+				let fallbacks = logged.filter { $0.hasPrefix("developer build: ") }
+				if developerBuild {
+					XCTAssertEqual(result, .ready)
+					XCTAssertEqual(legacyCalls, 1)
+					XCTAssertEqual(fallbacks.count, 1, "the developer fallback names its cause: \(logged)")
+				} else {
+					XCTAssertEqual(result, .unavailable)
+					XCTAssertEqual(legacyCalls, 0, "a release keeps its fail-closed policy")
+					XCTAssertTrue(fallbacks.isEmpty)
+				}
+			}
+		}
+
+		var deniedLegacyCalls = 0
+		XCTAssertEqual(resolveModernRemapGuardianRegistration(
+			service: ScriptedModernGuardianService(registrationError: NSError(
+				domain: kRemapGuardianServiceErrorDomain,
+				code: kSMErrorLaunchDeniedByUser
+			)),
+			guardianHealth: { true },
+			legacyInvalidSignatureFallback: {
+				deniedLegacyCalls += 1
+				return true
+			},
+			developerBuild: true
+		), .requiresApproval)
+		XCTAssertEqual(deniedLegacyCalls, 0, "a user denial never bootstraps around Background Items")
+		var approvalLegacyCalls = 0
+		XCTAssertEqual(resolveModernRemapGuardianRegistration(
+			service: ScriptedModernGuardianService(status: .requiresApproval),
+			guardianHealth: { true },
+			legacyInvalidSignatureFallback: {
+				approvalLegacyCalls += 1
+				return true
+			},
+			developerBuild: true
+		), .requiresApproval)
+		XCTAssertEqual(approvalLegacyCalls, 0)
+	}
+
 	/// Runtime observation is read-only and requires both eligibility and health.
 	func testModernGuardianObservationNeverRegistersAndRequiresExactHealth() {
 		guard #available(macOS 13.0, *) else { return }
