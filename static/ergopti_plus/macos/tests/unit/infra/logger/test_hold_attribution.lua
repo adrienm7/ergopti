@@ -67,12 +67,18 @@ helpers.describe("slow-callback report: phase attribution", function()
 		end)
 	end)
 
-	helpers.it("counts a 250 ms hold for the summary without reporting it", function()
+	helpers.it("counts a 250 ms hold for the summary and names it at INFO, not as a warning", function()
 		with_capture(function(_, clock, captured, PhaseStats)
 			hs.timer.doAfter(0, function() clock.now = clock.now + 300 * NS_PER_MS end)
 			for _, line in ipairs(captured) do
 				helpers.assert_true(not line:find("held the main thread", 1, true), "no report below 1 s")
 			end
+			local named
+			for _, line in ipairs(captured) do
+				if line:find("Main-thread hold of 300 ms", 1, true) then named = line end
+			end
+			helpers.assert_true(named ~= nil and named:find("test_hold_attribution.lua", 1, true) ~= nil,
+				"a 250 ms to 1 s hold is named once at INFO with its callback site")
 			helpers.assert_eq(PhaseStats.counter("runtime.timer_hold_over_250ms"), 1)
 			helpers.assert_eq(PhaseStats.counter("runtime.timer_hold_over_1000ms"), 0)
 		end)
