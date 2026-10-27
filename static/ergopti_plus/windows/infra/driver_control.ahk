@@ -163,9 +163,10 @@ DriverControl_ParseRequest(Spec, Text, Token, &Reason, &Echoed) {
 			Reason := "malformed"
 			return ""
 		}
-	; The raw text must spell the schema as the integer itself: this parser
-	; reads true and 1.0 as the same value.
-	if !RegExMatch(Text, '"schema"\s*:\s*' . Spec["schema"] . '\s*[,}]') || Request.Get("schema", "") != Spec["schema"]
+	; Bind the integer token to the parser's decoded, last-member-wins key.
+	; Earlier duplicates cannot authorize a different authoritative value.
+	Members := JsonObjectMemberSpans(Text)
+	if !Members.Has("schema") || StrCompare(Members["schema"]["text"], String(Spec["schema"]), true) != 0
 			|| Echoed == "" || !(Request.Get("token", 0) is String) {
 		Reason := "malformed"
 		return ""
