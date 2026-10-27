@@ -160,15 +160,25 @@ const policy = fs.readFileSync(
 	'utf8'
 );
 assert.match(policy, /return platform == "ahk" and/);
-for (const driver of ['macos', 'linux']) {
-	const file = driver === 'macos' ? 'menu_keyboard_layout.lua' : 'menu_builder.lua';
+// macOS offers the shared rows read-only; Linux applies them live where its
+// session can, so its provider passes the live owner to the same policy.
+for (const [driver, file, pattern, role] of [
+	[
+		'macos',
+		'menu_keyboard_layout.lua',
+		/NumberRowPolicy\.native_rows\(ManifestMenu, render_ctx\.commands\)/,
+		'read-only'
+	],
+	[
+		'linux',
+		'menu_builder.lua',
+		/NumberRowPolicy\.native_rows\(ManifestMenu, render_ctx\.commands, \{/,
+		'live'
+	]
+]) {
 	const native = fs.readFileSync(
 		path.join(ROOT, 'static/ergopti_plus', driver, 'ui/menu', file),
 		'utf8'
 	);
-	assert.match(
-		native,
-		/NumberRowPolicy\.native_rows\(ManifestMenu, render_ctx\.commands\)/,
-		`${driver}: actual read-only native provider`
-	);
+	assert.match(native, pattern, `${driver}: actual ${role} native provider`);
 }
