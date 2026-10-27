@@ -64,4 +64,22 @@ helpers.describe("Ollama warmup keeps its originating endpoint", function()
 			helpers.assert_eq(world.notices, 2, "each endpoint must acknowledge its own warmup")
 		end)
 	end)
+
+	helpers.it("(ollama-warmup-stop-pending) commits a stop while the taskless warmup POST is in flight", function()
+		with_world(function(world)
+			local errors = {}
+			local Logger = require("infra.logger")
+			local previous_error = Logger.error
+			Logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
+			helpers.assert_true(world.api.warmup("model-a"))
+			-- 16:28: startup disabled the AI while this POST was in flight
+			local stopped = world.api.stop_warmup()
+			Logger.error = previous_error
+			helpers.assert_eq(stopped, true, "the logical revocation committed; only the native delivery remains")
+			helpers.assert_eq(#errors, 0, "no ERROR for a revoked warmup: " .. table.concat(errors, " | "))
+			world.answer(1)
+			helpers.assert_eq(world.api.is_ready(), false, "the revoked response is discarded")
+			helpers.assert_eq(world.notices, 0)
+		end)
+	end)
 end)

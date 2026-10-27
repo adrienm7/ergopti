@@ -1,8 +1,0 @@
-# _shared/tests/corpus/config_migrations/chain_starts_at_file_version/input.toml
-
-[_meta]
-note = "kept"
-schema_version = 3
-
-[s]
-a = "x"

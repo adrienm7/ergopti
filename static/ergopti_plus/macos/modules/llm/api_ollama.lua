@@ -609,17 +609,25 @@ local function quiesce_warmup()
 	_warmup_gen = _warmup_gen + 1
 	_warmup_active = false
 	local timer_settled = cancel_warmup_resume_timer() == true
-	local ok, result = xpcall(function() return _warmup_client.cancel() end, debug.traceback)
+	local ok, result, pending = xpcall(function() return _warmup_client.cancel() end, debug.traceback)
 	local client_settled = ok == true and result == true
 	if client_settled then _warmup_client_recovery_token = nil end
-	if not client_settled then
+	-- hs.http.asyncPost returns no task: a warmup POST still in flight can only
+	-- be revoked logically, which cancel() just did (its response is discarded
+	-- by generation). Only its own native delivery remains, so the stop has
+	-- committed; reading that as a refusal logged two ERRORs whenever startup
+	-- disabled the AI during a warmup (16:28, startup_model_download_declined).
+	local client_pending = ok == true and result ~= true and pending == "pending"
+	if client_pending then
+		Logger.debug(LOG, "stop_warmup() revoked the warmup POST; its native completion will self-discard.")
+	elseif not client_settled then
 		Logger.error(LOG, "stop_warmup() could not retire its HTTP owner: %s.", tostring(result))
 	end
 	if _warmup_acquisition_depth > 0 then
 		Logger.error(LOG, "stop_warmup() is waiting for the original POST acquisition to unwind.")
 		return false
 	end
-	if not timer_settled or not client_settled then return false end
+	if not timer_settled or not (client_settled or client_pending) then return false end
 	Logger.debug(LOG, "stop_warmup() — gen bumped to %d, in-flight warmup invalidated.", _warmup_gen)
 	return true
 end

@@ -1,5 +1,0 @@
-[_meta]
-schema_version = 2
-
-[hotstrings.editor]
-shortcut = { MODS = ["ctrl"], key = "d" } # preserve unknown field

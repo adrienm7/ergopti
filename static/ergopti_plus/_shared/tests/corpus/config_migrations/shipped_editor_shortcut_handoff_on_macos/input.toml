@@ -1,5 +1,0 @@
-[_meta]
-schema_version = 8
-
-[hotstrings.editor]
-shortcut = { mods = ["ctrl"], key = "d" }

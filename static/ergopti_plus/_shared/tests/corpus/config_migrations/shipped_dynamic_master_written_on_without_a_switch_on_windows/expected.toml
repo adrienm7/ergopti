@@ -1,8 +1,0 @@
-[_meta]
-schema_version = 15
-
-[hotstrings.dynamic]
-enabled = true
-
-[hotstrings.dynamic.date_fr]
-enabled = true

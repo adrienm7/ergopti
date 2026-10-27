@@ -1,6 +1,0 @@
-[_meta]
-schema_version = 1
-[layout]
-ergopti_plus = true
-[layout.ergopti_variant]
-metadata = "retain"

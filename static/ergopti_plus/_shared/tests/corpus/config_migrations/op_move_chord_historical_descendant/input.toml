@@ -1,5 +1,0 @@
-[hotstrings.editor.shortcut]
-mods = ["ctrl"]
-key = "d"
-[hotstrings.editor.shortcut.future]
-value = false

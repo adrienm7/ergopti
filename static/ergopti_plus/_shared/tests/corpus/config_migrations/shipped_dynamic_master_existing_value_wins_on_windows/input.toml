@@ -1,8 +1,0 @@
-[_meta]
-schema_version = 12
-
-[category_enabled]
-dynamichotstrings = true
-
-[hotstrings.dynamic]
-enabled = false
