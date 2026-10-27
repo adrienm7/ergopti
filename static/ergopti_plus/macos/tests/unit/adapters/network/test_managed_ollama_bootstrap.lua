@@ -692,3 +692,46 @@ helpers.describe("original native bootstrap C getter admission", function()
 		end
 	end)
 end)
+
+-- Field report 2026-10-27 23:55: endpoint security killed /bin/bash /dev/fd/3,
+-- so the native guardian runs a private linked snapshot and names it in
+-- ERGOPTI_BOOTSTRAP_SNAPSHOT. The installer must then take its sources from
+-- the guardian's folder, and only for that exact path (installer-linked-snapshot).
+helpers.describe("native installer run from its private snapshot", function()
+	local function run_snapshot(snapshot_env)
+		local output, created = command("mktemp -d " .. quote(helpers.temp_dir() .. "/ergopti-snapshot.XXXXXX"))
+		helpers.assert_eq(created, 0)
+		local root = assert(output:match("^(/[^\r\n]+)\n?$"))
+		local _, made = command("mkdir " .. quote(root .. "/source") .. " " .. quote(root .. "/snapshot"))
+		helpers.assert_eq(made, 0)
+		local driver = helpers.driver_root()
+		local snapshot = root .. "/snapshot/ensure-ollama-native-deps.sh"
+		write(snapshot, read(driver .. "modules/llm/ensure-ollama-native-deps.sh"))
+		write(root .. "/source/network-retry.sh", read(driver .. "modules/llm/network-retry.sh"))
+		write(root .. "/source/native_python_bootstrap.sh",
+			'native_bootstrap_python() { printf sourced > "$FIXTURE_ROOT/delegate-called"; return 78; }\n')
+		local bytes, status = command("env -u BASH_ENV -u ENV FIXTURE_ROOT=" .. quote(root)
+			.. " ROUTE_ORIGINS_FILE=" .. quote(helpers.shared("modules/network/route_origins.json"))
+			.. " HOME=" .. quote(root) .. " ERGOPTI_BOOTSTRAP_SCRIPT_DIR=" .. quote(root .. "/source")
+			.. " ERGOPTI_BOOTSTRAP_SNAPSHOT=" .. quote(snapshot_env(snapshot))
+			.. " ERGOPTI_BOOTSTRAP_TIMEOUT_MS=1000 /bin/bash " .. quote(snapshot))
+		local delegate = io.open(root .. "/delegate-called", "rb")
+		local called = delegate ~= nil
+		if delegate then delegate:close() end
+		local _, removed = command("rm -rf " .. quote(root))
+		helpers.assert_eq(removed, 0)
+		return called, status, bytes
+	end
+
+	helpers.it("sources the guardian's folder when it runs as the named snapshot", function()
+		local called, status, bytes = run_snapshot(function(path) return path end)
+		helpers.assert_true(called, bytes)
+		helpers.assert_eq(status, 78)
+	end)
+
+	helpers.it("ignores the folder override for any other path", function()
+		local called, status = run_snapshot(function(path) return path .. ".other" end)
+		helpers.assert_eq(called, false)
+		helpers.assert_true(status ~= 0)
+	end)
+end)
