@@ -45,6 +45,7 @@ local Shapes = require("platform.remap.tap_hold_shapes")
 local KeyCatalog = require("tap_hold.key_catalog")
 local Migration = require("platform.remap.tap_hold_migration")
 local Paths = require("infra.paths")
+local ConfigKeys = require("config_keys")
 
 local LOG = "platform.remap.tap_hold_writer"
 
@@ -56,7 +57,7 @@ local MAX_THRESHOLD_SECONDS = 10
 
 -- The per-key fields whose runtime meaning belongs to this writer. A delay is
 -- only ever written when the user sets it: no key ships one.
-local OWNED_KEY_FIELDS = { "tap_action", "hold_modifier", "hold_layer", "enabled", "time_activation_seconds" }
+local OWNED_KEY_FIELDS = { "tap_action", "hold_modifier", "hold_layer", "enabled", ConfigKeys.LEAF.TIME_ACTIVATION_SECONDS }
 
 local HEADER = {
 	"# tap_hold.toml — written by the Ergopti+ tray menu.",
@@ -599,7 +600,7 @@ function M.render_scope(mode, document, rows, preset, shapes)
 	tap_hold.time_activation_seconds = nil
 	clear_owned_keys(tap_hold, preset, shapes)
 	for _, row in ipairs(rows) do
-		if row.section ~= "tap_holds" or row.key ~= "enabled" then
+		if row.section ~= ConfigKeys.KEY.TAP_HOLDS or row.key ~= "enabled" then
 			error("tap-hold scope row has no tap_hold.toml owner: " .. tostring(row.section) .. "." .. tostring(row.key), 0)
 		end
 		if row.delete then tap_hold.enabled = nil else tap_hold.enabled = row.value end

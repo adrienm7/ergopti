@@ -578,7 +578,7 @@ function M.preview_candidates(buffer, start_is_boundary)
 		local user = UserCode.preview(buffer)
 		if user then
 			rows[#rows + 1] = { trigger = user.suffix .. _trigger_char, replacement = user.preview,
-				group = DYNAMIC_GROUP, section = "user_code", fires = true }
+				group = DYNAMIC_GROUP, section = require("config_keys").LEAF.USER_CODE, fires = true }
 		end
 	end
 	if not M.is_rule_enabled(DYNAMIC_GROUP, PERSONAL_SECTION) then return rows end

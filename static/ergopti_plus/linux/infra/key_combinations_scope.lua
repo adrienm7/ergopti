@@ -164,7 +164,7 @@ function M.new(options)
 			for _,entry in ipairs(combinations.configuration_entries()) do
 				dynamic(Shared.TAP_SECTION.."."..entry.id)
 				dynamic(Shared.HOLD_SECTION.."."..entry.id)
-				dynamic(KeyPath.render({"mod_combos","config",entry.id,"combo"}))
+				dynamic(KeyPath.render({ConfigKeys.KEY.MOD_COMBOS,"config",entry.id,"combo"}))
 			end
 			local params = parameters.parameter_configuration_snapshot(owner)
 			for key in pairs(params or {}) do
@@ -192,7 +192,7 @@ function M.new(options)
 				return row.delete == true or combinations.validate_slot(kind,row.key,row.value) == true
 			end
 			local parts=KeyPath.parse(row.section,true)
-			if parts and #parts==3 and parts[1]=="mod_combos" and parts[2]=="config" and row.key=="combo" then
+			if parts and #parts==3 and parts[1]==ConfigKeys.KEY.MOD_COMBOS and parts[2]=="config" and row.key=="combo" then
 				return chord_declared() and combinations.configuration_domain(Shared.BINDING_SCOPE.."__"..parts[3]) == "combination"
 					and (row.delete == true or combinations.validate_slot("combo",parts[3],row.value) == true)
 			end
@@ -268,7 +268,7 @@ function M.new(options)
 	--- Neutral defaults remain sparse; no operation changes either master switch.
 	function owner.set_chord_settings(values)
 		if not chord_declared() or type(values) ~= "table" or getmetatable(values) ~= nil then return false end
-		for key in pairs(values) do if key ~= "simultaneous_threshold_ms" and key ~= "combo_symmetric" then return false end end
+		for key in pairs(values) do if key ~= ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS and key ~= ConfigKeys.COMMAND.COMBO_SYMMETRIC then return false end end
 		local called, settings = pcall(Shared.chord_settings,values)
 		if not called then return false end
 		return perform(function()
@@ -400,7 +400,7 @@ function M.set_enabled(enabled,is_paused,expected_source)
 end
 function M.set_chord_settings(values,is_paused,expected_source)
 	if type(values)~="table" or getmetatable(values)~=nil then return false end
-	for key in pairs(values) do if key~="simultaneous_threshold_ms" and key~="combo_symmetric" then return false end end
+	for key in pairs(values) do if key~=ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS and key~=ConfigKeys.COMMAND.COMBO_SYMMETRIC then return false end end
 	local called,detached=pcall(Shared.chord_settings,values);if not called then return false end
 	values=detached
 	return operate(is_paused,expected_source,function(owner) return owner.set_chord_settings(values) end)

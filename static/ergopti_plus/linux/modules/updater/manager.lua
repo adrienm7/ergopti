@@ -79,6 +79,7 @@ M._file_digest = FileDigest
 -- Single source of the driver version.
 local DriverVersion = require("infra.version")
 local NativePath = require("native_path")
+local ConfigKeys = require("config_keys")
 
 -- =========================================
 -- =========================================
@@ -166,7 +167,7 @@ M.CHANNELS = CHANNELS
 -- interval, as on the other drivers.
 local CONFIG_SECTION = "updater"
 local CONFIG_CHANNEL_KEY = "channel"
-local CONFIG_INTERVAL_KEY = "check_interval_seconds"
+local CONFIG_INTERVAL_KEY = ConfigKeys.LEAF.CHECK_INTERVAL_SECONDS
 
 -- User-Agent header required by GitHub API.
 local USER_AGENT = "ErgoptiPlus-Updater-Linux/1.0"

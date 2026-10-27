@@ -63,10 +63,10 @@ local function resolve(document, mark)
 	local stored = section and section.chatgpt_url
 	if stored == nil then return M.DEFAULT_URL end
 	if not M.is_valid(stored) then
-		ConfigOutdated.report({ "shortcuts", "chatgpt_url" }, "the value is not an HTTP(S) URL", Logger)
+		ConfigOutdated.report({ "shortcuts", ConfigKeys.LEAF.CHATGPT_URL }, "the value is not an HTTP(S) URL", Logger)
 		return M.DEFAULT_URL
 	end
-	if mark then mark("shortcuts", "chatgpt_url") end
+	if mark then mark("shortcuts", ConfigKeys.LEAF.CHATGPT_URL) end
 	return stored
 end
 
