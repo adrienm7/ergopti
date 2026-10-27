@@ -1,0 +1,38 @@
+{
+	"_comment": "Explicit numbered scalar caption policy, replayed by _shared/lua/test/menu_numbered_caption_contract.lua on macOS and Linux. A numbered command row declares caption_format \"numbered\" and an i18n caption that holds the one placeholder {1}; the row's caption getter supplies the value. entry point: the menu renderer's command_row, template_rows and build for a frame holding one such row {type: command, id: native_action, i18n: <caption key>, caption_getter: native_value, caption_format: numbered}, with the i18n text set to `format` and the getter answering `value` (default: the literal text \"Native% $& {1}\", whose percent, dollar, ampersand and {1} must come out untouched). positive: the label must equal `expected` in all three entry points and nothing may run before the row is activated. grammar_refusals: a `format` outside the grammar (exactly one {1}) yields no row and no template. ownership_refusals: the row is first changed by `mutation`, then it yields no row and no template.",
+	"drivers": {
+		"macos": "Replays every vector.",
+		"linux": "Replays every vector.",
+		"windows": "Not ported: one AHK consumer must build the frame row above in the Windows menu engine, apply the named mutation and compare the label or the refusal."
+	},
+	"default_value": "Native% $& {1}",
+	"positive": [
+		{ "id": "single-placeholder", "format": "Caption {1}", "expected": "Caption Native% $& {1}" },
+		{
+			"id": "repeated-placeholder-and-literal-percent",
+			"format": "50% %s {1} / {1}",
+			"expected": "50% %s Native% $& {1} / Native% $& {1}"
+		},
+		{ "id": "empty-value", "format": "Empty ({1})", "value": "", "expected": "Empty ()" }
+	],
+	"grammar_refusals": [
+		{ "id": "no-placeholder", "format": "Caption" },
+		{ "id": "placeholder-two", "format": "Caption {2}" },
+		{ "id": "placeholders-one-and-two", "format": "Caption {1} {2}" },
+		{ "id": "doubled-braces", "format": "Caption {{1}}" },
+		{ "id": "unclosed-placeholder", "format": "Caption {1" },
+		{ "id": "extra-closing-brace", "format": "Caption {1}}" }
+	],
+	"ownership_refusals": [
+		{ "id": "foreign-mode", "mutation": "caption_format = \"foreign\"" },
+		{ "id": "vector", "mutation": "caption_getters = [\"native_value\"] (a getter vector)" },
+		{ "id": "affix", "mutation": "caption_layout = \"suffix\" and caption_joiner = \" \"" },
+		{ "id": "native-source", "mutation": "caption_source = \"native\"" },
+		{ "id": "prefix", "mutation": "label_prefix = \"!\"" },
+		{ "id": "missing-getter", "mutation": "the named getter is absent" },
+		{ "id": "wrong-value", "mutation": "the getter answers a table" },
+		{ "id": "throws", "mutation": "the getter raises \"native caption reader refused\"" },
+		{ "id": "control", "mutation": "the getter answers \"bad\\nvalue\"" },
+		{ "id": "invalid-utf8", "mutation": "the getter answers the byte 0xFF" }
+	]
+}

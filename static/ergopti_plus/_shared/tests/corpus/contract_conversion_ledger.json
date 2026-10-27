@@ -144,6 +144,86 @@
 						}
 					]
 				}
+			],
+			"schema": "toml_batch_write"
+		},
+		{
+			"family": "menu_numbered_caption",
+			"schema": "menu_numbered_caption",
+			"corpus": "menu/numbered_caption_vectors.json",
+			"entry_point": "menu renderer command_row, template_rows and build for a numbered command row (see the corpus comment)",
+			"windows_consumer": "One AHK consumer builds the frame row in the Windows menu engine, applies each named mutation and compares the label or the refusal.",
+			"sources": [
+				{
+					"contract": "menu_numbered_caption_contract.lua",
+					"moved": [
+						{
+							"absent": [
+								"Caption {2}",
+								"Caption {1} {2}",
+								"Caption {{1}}",
+								"Caption {1}}",
+								"\"native source\"",
+								"\"missing getter\""
+							],
+							"vectors": [
+								"single-placeholder",
+								"repeated-placeholder-and-literal-percent",
+								"empty-value",
+								"no-placeholder",
+								"placeholder-two",
+								"placeholders-one-and-two",
+								"doubled-braces",
+								"unclosed-placeholder",
+								"extra-closing-brace",
+								"foreign-mode",
+								"vector",
+								"affix",
+								"native-source",
+								"prefix",
+								"missing-getter",
+								"wrong-value",
+								"throws",
+								"control",
+								"invalid-utf8"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"family": "config_scope_plan",
+			"schema": "config_scope_plan",
+			"corpus": "config_scope/plan_vectors.json",
+			"entry_point": "manifest reader scope_inventory and scope_plan with an action_parameter_domain owner (see the corpus comment)",
+			"windows_consumer": "One AHK consumer calls the Windows manifest reader's scope inventory and plan with an owner built from the generated action catalogue.",
+			"sources": [
+				{
+					"contract": "config_scope_plan_contract.lua",
+					"moved": [
+						{
+							"absent": [
+								"action_parameters.gesture__tap_4__none",
+								"made_up",
+								"gesture__tap__4__open_url",
+								"foreign__tap_4"
+							],
+							"vectors": [
+								"gestures-own-the-gesture-domain",
+								"shortcuts-own-keyboard-script-and-tap-key",
+								"tap-holds-own-the-tap-hold-domain",
+								"hotstrings-own-no-parameter-domain",
+								"action-without-parameter",
+								"unknown-action",
+								"double-underscore-in-binding",
+								"trailing-segment",
+								"foreign-domain",
+								"foreign-section"
+							]
+						}
+					]
+				}
 			]
 		}
 	]

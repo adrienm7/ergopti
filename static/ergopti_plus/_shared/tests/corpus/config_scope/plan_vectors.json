@@ -1,0 +1,33 @@
+{
+	"_comment": "Parameter-domain scope planning, replayed by _shared/lua/test/config_scope_plan_contract.lua on macOS and Linux. entry points: scope_inventory(scope, {actions = <function answering the stored action_parameters paths>}, owners) and scope_plan(scope, mode, paths, owners) of the manifest reader, where owners.action_parameter_domain(path) answers the domain of a path \"action_parameters.<domain>__<binding>__<action>\" (the domain is one of gesture, keyboard, script, tap_key, tap_hold) only when <binding> is lowercase letters, digits and single underscores, never starting or ending with one, and <action> is a generated action that declares a parameter; otherwise it answers nothing. inventories: for each scope, the stored paths below and the number of paths the scope owns (inventory_count); for both modes \"clear\" and \"recommended\" the plan deletes exactly the inventory's paths as action_parameters rows (delete = true, no value). refusals: each path, given alone to scope_inventory and scope_plan of the gestures scope, makes both refuse (raise).",
+	"drivers": {
+		"macos": "Replays every vector.",
+		"linux": "Replays every vector.",
+		"windows": "Not ported: one AHK consumer calls the Windows manifest reader's scope inventory and plan with an owner built from the generated action catalogue."
+	},
+	"stored_paths": [
+		"action_parameters.gesture__tap_4__open_url",
+		"action_parameters.keyboard__ctrl_k__open_url",
+		"action_parameters.script__reload__open_url",
+		"action_parameters.tap_key__digit_1__open_url",
+		"action_parameters.tap_hold__caps_lock__open_url"
+	],
+	"inventories": [
+		{ "id": "gestures-own-the-gesture-domain", "scope": "gestures", "inventory_count": 1 },
+		{
+			"id": "shortcuts-own-keyboard-script-and-tap-key",
+			"scope": "shortcuts",
+			"inventory_count": 3
+		},
+		{ "id": "tap-holds-own-the-tap-hold-domain", "scope": "tap_holds", "inventory_count": 1 },
+		{ "id": "hotstrings-own-no-parameter-domain", "scope": "hotstrings", "inventory_count": 0 }
+	],
+	"refusals": [
+		{ "id": "action-without-parameter", "path": "action_parameters.gesture__tap_4__none" },
+		{ "id": "unknown-action", "path": "action_parameters.gesture__tap_4__made_up" },
+		{ "id": "double-underscore-in-binding", "path": "action_parameters.gesture__tap__4__open_url" },
+		{ "id": "trailing-segment", "path": "action_parameters.gesture__tap_4__open_url.extra" },
+		{ "id": "foreign-domain", "path": "action_parameters.foreign__tap_4__open_url" },
+		{ "id": "foreign-section", "path": "other.gesture__tap_4__open_url" }
+	]
+}

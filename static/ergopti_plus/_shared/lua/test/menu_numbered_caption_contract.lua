@@ -29,12 +29,13 @@ end
 
 --- Appends independent policy subjects to the current already registered native renderer owner.
 function M.register(helpers, driver)
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menu/numbered_caption_vectors.json"), "rb"))
+	local corpus = assert(Json.decode(file:read("*a")))
+	file:close()
+	assert(#corpus.positive == 3 and #corpus.grammar_refusals == 6 and #corpus.ownership_refusals == 10,
+		"numbered_caption_vectors.json must hold the 3, 6 and 10 vectors the contract replays")
 	helpers.describe("explicit numbered scalar caption policy (numbered-caption-contract)", function()
-		for _, vector in ipairs({
-			{format = "Caption {1}", expected = "Caption Native% $& {1}"},
-			{format = "50% %s {1} / {1}", expected = "50% %s Native% $& {1} / Native% $& {1}"},
-			{format = "Empty ({1})", value = "", expected = "Empty ()"},
-		}) do
+		for _, vector in ipairs(corpus.positive) do
 			local case = vector
 			helpers.it("preserves literal and repeated original numbered value for " .. case.format .. " (numbered-caption-contract)", function()
 				with_frame(driver, case.format, function(menu, commands, getters, effects)
@@ -51,8 +52,8 @@ function M.register(helpers, driver)
 				end)
 			end)
 		end
-		for _, format in ipairs({"Caption", "Caption {2}", "Caption {1} {2}", "Caption {{1}}", "Caption {1", "Caption {1}}"}) do
-			local text = format
+		for _, vector in ipairs(corpus.grammar_refusals) do
+			local text = vector.format
 			helpers.it("refuses unsupported original numbered grammar " .. text .. " (numbered-caption-contract)", function()
 				with_frame(driver, text, function(menu, commands, getters, effects)
 					helpers.assert_nil(menu.command_row("frame", "native_action", commands, getters))
@@ -61,18 +62,18 @@ function M.register(helpers, driver)
 				end)
 			end)
 		end
-		for _, kind in ipairs({"foreign mode", "vector", "affix", "native source", "prefix", "missing getter", "wrong value", "throws", "control", "invalid utf8"}) do
-			local case = kind
-			helpers.it("refuses " .. case .. " numbered ownership before publication (numbered-caption-contract)", function()
+		for _, vector in ipairs(corpus.ownership_refusals) do
+			local case = vector.id
+			helpers.it("refuses " .. case:gsub("-", " ") .. " numbered ownership before publication (numbered-caption-contract)", function()
 				with_frame(driver, "Caption {1}", function(menu, commands, getters, effects)
 					local item = menu.get_array("frame")[1]
-					if case == "foreign mode" then item.caption_format = "foreign"
+					if case == "foreign-mode" then item.caption_format = "foreign"
 					elseif case == "vector" then item.caption_getters = {"native_value"}
 					elseif case == "affix" then item.caption_layout = "suffix"; item.caption_joiner = " "
-					elseif case == "native source" then item.caption_source = "native"
+					elseif case == "native-source" then item.caption_source = "native"
 					elseif case == "prefix" then item.label_prefix = "!"
-					elseif case == "missing getter" then getters.native_value = nil
-					elseif case == "wrong value" then getters.native_value = function() return {} end
+					elseif case == "missing-getter" then getters.native_value = nil
+					elseif case == "wrong-value" then getters.native_value = function() return {} end
 					elseif case == "throws" then getters.native_value = function() error("native caption reader refused") end
 					elseif case == "control" then getters.native_value = function() return "bad\nvalue" end
 					else getters.native_value = function() return string.char(0xFF) end end

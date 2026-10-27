@@ -16,6 +16,11 @@ return function(helpers)
 		return meta and type(meta.parameter) == "string" and meta.parameter ~= "" and domain or nil
 	end
 	local owners = { action_parameter_domain = parameter_domain }
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/config_scope/plan_vectors.json"), "rb"))
+	local corpus = assert(require("json").decode(file:read("*a")))
+	file:close()
+	assert(#corpus.stored_paths == 5 and #corpus.inventories == 4 and #corpus.refusals == 6,
+		"plan_vectors.json must hold the 5 paths, 4 inventories and 6 refusals the contract replays")
 	helpers.describe("scoped configuration planning", function()
 		helpers.it("retains generated dynamic scalar types before a native runtime erases false versus zero", function()
 			local found = {}
@@ -37,14 +42,12 @@ return function(helpers)
 			helpers.assert_eq(found.integer, true)
 		end)
 		helpers.it("removes only validated parameter domains for both clear and recommendation restore", function()
-			local paths = { "action_parameters.gesture__tap_4__open_url", "action_parameters.keyboard__ctrl_k__open_url",
-				"action_parameters.script__reload__open_url", "action_parameters.tap_key__digit_1__open_url",
-				"action_parameters.tap_hold__caps_lock__open_url" }
-			for _, selected in ipairs({ { "gestures", 1 }, { "shortcuts", 3 }, { "tap_holds", 1 }, { "hotstrings", 0 } }) do
-				local inventory = Manifest.scope_inventory(selected[1], { actions = function() return paths end }, owners)
-				helpers.assert_eq(#inventory, selected[2])
+			local paths = corpus.stored_paths
+			for _, selected in ipairs(corpus.inventories) do
+				local inventory = Manifest.scope_inventory(selected.scope, { actions = function() return paths end }, owners)
+				helpers.assert_eq(#inventory, selected.inventory_count)
 				for _, mode in ipairs({ "clear", "recommended" }) do
-					local plan = Manifest.scope_plan(selected[1], mode, paths, owners)
+					local plan = Manifest.scope_plan(selected.scope, mode, paths, owners)
 					local actual = {}
 					for _, row in ipairs(plan.operations) do
 						if row.section == "action_parameters" then
@@ -59,9 +62,8 @@ return function(helpers)
 			end
 		end)
 		helpers.it("requires exact host ownership and refuses malformed or non-parameter actions", function()
-			for _, path in ipairs({ "action_parameters.gesture__tap_4__none", "action_parameters.gesture__tap_4__made_up",
-				"action_parameters.gesture__tap__4__open_url", "action_parameters.gesture__tap_4__open_url.extra",
-				"action_parameters.foreign__tap_4__open_url", "other.gesture__tap_4__open_url" }) do
+			for _, refusal in ipairs(corpus.refusals) do
+				local path = refusal.path
 				helpers.assert_eq(pcall(Manifest.scope_plan, "gestures", "clear", { path }, owners), false, path)
 				helpers.assert_eq(pcall(Manifest.scope_inventory, "gestures", { actions = function() return { path } end }, owners), false, path)
 			end
