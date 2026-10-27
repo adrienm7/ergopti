@@ -30,6 +30,12 @@
 #       At least one target field is required; copying to the same path is a no-op.
 #       An explicit ancestor value or descendant table also occupies a target:
 #       copying there is a no-op and leaves both namespaces untouched.
+#   { op = "rename_prefix", section, prefix, to_prefix }
+#       Renames every key of one section that starts with prefix to to_prefix
+#       followed by the same remainder; other keys and sub-sections stay. A
+#       target already held by a key or a table refuses the migration
+#       ("invalid", the file is never written). Neither prefix may extend the
+#       other, so a replay finds nothing left to rename.
 #   { op = "move_chord_action", section, key, to_section, action,
 #     conditional_key, disabled_action, platform = "macos" }
 #       Handoffs only exact legacy mods/key values represented by the injected

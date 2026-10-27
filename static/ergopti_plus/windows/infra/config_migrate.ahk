@@ -12,8 +12,9 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. Data-only steps, read at runtime with the driver's own TOML reader. A
-;    step is a list of ops from a closed set (rename, move_section, merge_into,
-;    map_value, delete, set_if_absent) and this file holds their only Windows
+;    step is a list of ops from a closed set (rename, rename_prefix,
+;    move_section, merge_into, map_value, delete, set_if_absent) and this file
+;    holds their only Windows
 ;    semantics. The corpus under _shared/tests/corpus/config_migrations is
 ;    replayed here, by the Lua engine and by the JS reference, so the three
 ;    cannot drift; _shared/tests/corpus/config_migration_registries pins which
@@ -59,6 +60,7 @@ ConfigMigrateRegistryPath() {
 _ConfigMigrateOpFields() {
 	static Fields := Map(
 		"rename", [["section", "key"], ["to_section", "to_key"]],
+		"rename_prefix", [["section", "prefix", "to_prefix"], []],
 		"copy_if_absent", [["section", "key"], ["to_section", "to_key"]],
 		"move_ergopti_variant", [["section", "key", "to_key", "base_key", "alt_gr_key", "source_key", "false_variant", "true_variant"], ["neutral_variant"]],
 		"move_chord_action", [["section", "key", "to_section", "action", "conditional_key", "disabled_action", "platform"], []],
@@ -129,6 +131,14 @@ _ConfigMigrateValidateOp(Op, Where) {
 	}
 	if ((Op["op"] == "rename" || Op["op"] == "copy_if_absent") && !Op.Has("to_section") && !Op.Has("to_key"))
 		throw Error(Where . ": " . Op["op"] . " needs to_section or to_key")
+	if Op["op"] == "rename_prefix" {
+		if !_ConfigMigrateIsBareKey(Op["prefix"]) || !_ConfigMigrateIsBareKey(Op["to_prefix"])
+			throw Error(Where . ": 'prefix' and 'to_prefix' must be bare key text")
+		; A prefix that extends the other would match a renamed key again on replay.
+		if SubStr(Op["prefix"], 1, StrLen(Op["to_prefix"])) == Op["to_prefix"]
+				|| SubStr(Op["to_prefix"], 1, StrLen(Op["prefix"])) == Op["prefix"]
+			throw Error(Where . ": rename_prefix prefixes must not extend each other")
+	}
 	if Op["op"] == "move_ergopti_variant" {
 		for Field in ["base_key", "alt_gr_key", "source_key", "false_variant", "true_variant"] {
 			if !_ConfigMigrateIsBareKey(Op[Field])
@@ -386,6 +396,32 @@ _ConfigMigrateMove(Model, Section, Key, ToSection, ToKey) {
 		ToSection, ToKey, Section, Key)
 }
 
+; Renames every key of one section that starts with a prefix, keeping the
+; remainder. A renamed key that would land on an occupied key or namespace
+; refuses the whole migration before any key moves: the two values cannot
+; both survive, and dropping either would lose a user's setting unseen.
+_ConfigMigrateRenamePrefix(Model, Op) {
+	Section := Op["section"]
+	if !Model.Has(Section)
+		return
+	Entries := Model[Section]
+	Prefix := Op["prefix"]
+	Moves := []
+	for Key in _ConfigMigrateKeys(Entries) {
+		if !(SubStr(Key, 1, StrLen(Prefix)) == Prefix)
+			continue
+		Target := Op["to_prefix"] . SubStr(Key, StrLen(Prefix) + 1)
+		if !_ConfigMigrateCopyDestinationAbsent(Model, Section, Target)
+			throw ConfigMigratePrefixRefusal("Prefix rename refused: [" . Section . "] " . Key
+				. " would land on the occupied " . Target)
+		Moves.Push([Key, Target])
+	}
+	for Move in Moves {
+		Entries[Move[2]] := Entries[Move[1]]
+		Entries.Delete(Move[1])
+	}
+}
+
 ; Ancestor values and child sections occupy their whole destination namespace.
 ; This check belongs only to conditional copies; existing operations keep
 ; their own conflict rules.
@@ -509,6 +545,8 @@ _ConfigMigrateApplyOp(Model, Op, Context := 0) {
 			_ConfigMigrateMove(Model, Section, Op["key"], ToSection, Op.Get("to_key", Op["key"]))
 			_ConfigMigrateDropIfEmpty(Model, Section)
 			_ConfigMigrateDropIfEmpty(Model, ToSection)
+		case "rename_prefix":
+			_ConfigMigrateRenamePrefix(Model, Op)
 		case "copy_if_absent":
 			if !Model.Has(Section) || !Model[Section].Has(Op["key"])
 				return
@@ -762,7 +800,7 @@ ConfigMigratePlan(Source, Registry, Driver, Context := 0) {
 		return Plan
 	}
 	try After := ConfigMigrateApplySteps(_ConfigMigrateClone(Before), Registry, Driver, Version, Context)
-	catch ConfigMigrateVariantRefusal as Err {
+	catch ConfigMigrateVariantRefusal, ConfigMigratePrefixRefusal as Err {
 		Plan["outcome"] := "invalid"
 		Plan["detail"] := Err.Message
 		return Plan
@@ -936,8 +974,10 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 			return Refuse("failed", "the file is not exact UTF-8, so it cannot be backed up byte for byte")
 		Plan := ConfigMigratePlan(Source, Registry, "ahk", Context)
 		if (Plan["outcome"] != "migrated") {
+			; A typed op refusal keeps its own named detail, as on macOS and Linux.
 			VariantInvalid := Plan["outcome"] == "invalid"
-				&& SubStr(Plan["detail"], 1, StrLen("Ergopti variant migration refused:")) == "Ergopti variant migration refused:"
+				&& (SubStr(Plan["detail"], 1, StrLen("Ergopti variant migration refused:")) == "Ergopti variant migration refused:"
+				|| SubStr(Plan["detail"], 1, StrLen("Prefix rename refused:")) == "Prefix rename refused:")
 			return Refuse(VariantInvalid ? "invalid" : "failed", Plan["detail"] != "" ? Plan["detail"]
 				: "the file changed while it was classified")
 		}
@@ -1728,6 +1768,11 @@ ConfigSchemaAcknowledgeNoop(Path, SourceAdmission, LogicalAdmission := 0) {
 
 ; This typed refusal rejects successor readiness instead of changing helper ownership.
 class ConfigMigrateVariantRefusal extends Error {
+}
+
+; A rename_prefix target is occupied: the plan is "invalid" and the file is
+; never written, so neither of the two values is dropped.
+class ConfigMigratePrefixRefusal extends Error {
 }
 
 ; A scalar participant does not authorize an ancestor or descendant namespace.
