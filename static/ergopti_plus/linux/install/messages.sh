@@ -27,7 +27,11 @@
 #   ergopti_msg_with "  ✔  " install.step_done "luajit"
 # ==============================================================================
 
-ERGOPTI_MESSAGES_DIR="$(dirname "${BASH_SOURCE[0]}")/../_generated/shell_messages"
+# Pure bash, no external command: installer checks source this file under a
+# PATH that holds only the commands they stub.
+_ergopti_messages_install_dir="${BASH_SOURCE[0]%/*}"
+[ "$_ergopti_messages_install_dir" != "${BASH_SOURCE[0]}" ] || _ergopti_messages_install_dir="."
+ERGOPTI_MESSAGES_DIR="${_ergopti_messages_install_dir}/../_generated/shell_messages"
 ERGOPTI_MESSAGES_SOURCE_LOCALE="en"
 declare -gA _ERGOPTI_MESSAGES=()
 _ERGOPTI_MESSAGES_LOADED=""

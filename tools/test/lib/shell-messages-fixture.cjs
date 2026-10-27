@@ -8,7 +8,8 @@
  * catalogues in _generated/shell_messages/ beside the install/ folder. A test
  * that copies a script into a sandbox driver tree provides both through this
  * helper, the way the real driver tree carries them, instead of the script
- * special-casing their absence.
+ * special-casing their absence. A test that runs functions extracted from a
+ * script prepends readerSource() to its bash input instead.
  * ==============================================================================
  */
 
@@ -36,4 +37,17 @@ function provideShellMessages(installDirectory) {
 	);
 }
 
-module.exports = { provideShellMessages };
+/**
+ * A bash line sourcing the genuine message reader, for a harness that runs
+ * functions extracted from a script that prints through it.
+ * @returns {string} The `source` line, newline included.
+ */
+function readerSource() {
+	const reader = path
+		.join(LINUX, 'install', 'messages.sh')
+		.replaceAll('\\', '/')
+		.replace(/^([A-Za-z]):/, (_, drive) => '/' + drive.toLowerCase());
+	return `source '${reader}'\n`;
+}
+
+module.exports = { provideShellMessages, readerSource };

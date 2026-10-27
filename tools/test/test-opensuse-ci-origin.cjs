@@ -331,6 +331,12 @@ try {
 			inputs.push(`${installLibraries}/${file}`);
 		}
 	}
+	// The installer prints through install/messages.sh, which reads the generated
+	// catalogues beside install/; the genuine driver tree carries both.
+	const shellMessages = 'static/ergopti_plus/linux/_generated/shell_messages';
+	for (const file of fs.readdirSync(path.join(ROOT, shellMessages))) {
+		inputs.push(`${shellMessages}/${file}`);
+	}
 	for (const relative of inputs) {
 		const destination = path.join(sourceRoot, relative);
 		fs.mkdirSync(path.dirname(destination), { recursive: true });
@@ -341,14 +347,20 @@ try {
 	const guardScript = path.join(layout, 'guard.sh');
 	fs.writeFileSync(copyScript, 'set -euo pipefail\nSRC="$1"\nE2E_HOME="$2"\n' + copyPhase);
 	const sourceBuildImport = 'source "${SRC_DRIVER}/install/native_source_build.sh"';
-	let guardImports = '';
+	const messagesImport = 'source "${SRC_DRIVER}/install/messages.sh"';
+	assert.strictEqual(
+		installer.split(messagesImport).length,
+		2,
+		'the actual installer sources its message reader once'
+	);
+	let guardImports = messagesImport + '\n';
 	if (installer.includes(sourceBuildImport)) {
 		assert.strictEqual(installer.split(sourceBuildImport).length, 2);
 		assert(
 			inputs.includes(`${installLibraries}/native_source_build.sh`),
 			'the actual installer source-build import has a genuine copied library'
 		);
-		guardImports = sourceBuildImport + '\n';
+		guardImports += sourceBuildImport + '\n';
 	}
 	fs.writeFileSync(
 		guardScript,
