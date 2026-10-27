@@ -540,7 +540,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 				if not start_ok or started ~= true then
 					-- In memory only: persisting OFF here rewrote config.toml whenever
 					-- the engine lacked a permission, so Metrics stayed off for good.
-					local record = demote("metrics", "keystats_enabled", false,
+					local record = demote("metrics", require("infra.metrics_state_keys").ENABLED, false,
 						"the deferred keystats start was refused")
 					if type(deps.on_runtime_demotion) == "function" then
 						local notified, notify_err = pcall(deps.on_runtime_demotion, record)
