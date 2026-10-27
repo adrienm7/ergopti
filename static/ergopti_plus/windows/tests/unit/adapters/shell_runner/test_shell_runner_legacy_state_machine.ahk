@@ -32,8 +32,8 @@ global _SRLSM_NEXT_TASK_ID := 910000
 _SRLSM_NewState(OnDone := 0) {
 	global _SRLSM_NEXT_TASK_ID
 	local task_id := ++_SRLSM_NEXT_TASK_ID
-	return _SR_LegacyNewState(task_id,
-		A_Temp . "\ergopti_sr_state_test_" . task_id . ".tmp", OnDone)
+	; These pure transitions own no native capture or physical cleanup resource.
+	return _SR_LegacyNewState(task_id, "", OnDone)
 }
 
 _SRLSM_DropState(State) {
@@ -46,9 +46,6 @@ _SRLSM_DropState(State) {
 	} finally {
 		Critical(previous_critical)
 	}
-	local tmp_file := State["TmpFile"]
-	if FileExist(tmp_file)
-		FileDelete(tmp_file)
 }
 
 
@@ -665,3 +662,27 @@ _SRLSM_CompletionCallbackIsAtMostOnce() {
 }
 Test("shell_runner legacy: completion callback is at most once (shellrunner-legacy-callback-once)",
 	_SRLSM_CompletionCallbackIsAtMostOnce)
+
+
+_SRLSM_SyntheticClaimsDoNotCreateCaptureDebt() {
+	local state := _SRLSM_NewState()
+	local claim := 0
+	try {
+		AssertFalse(IsObject(state["Native"]), "the transition fixture owns no native process")
+		_SR_LegacyBeginStart(state)
+		AssertTrue(_SR_LegacyPublishStart(state, 640001)["Published"],
+			"publish only the fixture's synthetic identity without starting a process")
+		claim := _SR_LegacyClaimCompletion(state["TaskId"], state)
+		AssertTrue(IsObject(claim), "the actual transition must produce its terminal claim")
+		_SRLSM_DropState(state)
+		AssertFalse(_SR_ActiveTasks.Has(state["TaskId"]), "the fixture retires its exact active state")
+		AssertFalse(_SR_LegacyReleaseOwners.Has(ObjPtr(claim)),
+			"a native-free transition fixture must not leave phantom capture ownership")
+		AssertEqual("", claim["TmpFile"], "a pure state fixture cannot invent an unowned capture path")
+		AssertFalse(claim["CapturePending"], "there is no physical capture resource to release")
+	} finally {
+		_SRLSM_DropState(state)
+	}
+}
+Test("shell_runner legacy: synthetic fixtures leave no native capture debt (legacy-fixture-capture-debt)",
+	_SRLSM_SyntheticClaimsDoNotCreateCaptureDebt)
