@@ -90,6 +90,10 @@ local TOKEN_ALLOCATION_ATTEMPTS = 8
 local MAX_PROTOCOL_BUFFER_BYTES = 64
 local MAX_PING_SEQUENCE = 2147483647
 local TOKEN_LEDGER_KEY = "karabiner.used_tokens.v1"
+-- Preferences this controller owns as runtime state rather than configuration:
+-- the used-token ledger only grows, and rewinding it would let a spent lease
+-- token be accepted again, so the field run's configuration guard skips them.
+M.RUNTIME_SETTING_KEYS = { TOKEN_LEDGER_KEY }
 local WORKER_FLAG = "--karabiner-lease-worker"
 local REVOKE_FLAG = "--karabiner-lease-revoke"
 local GUARDIAN_STATUS_FLAG = "--remap-guardian-status"
