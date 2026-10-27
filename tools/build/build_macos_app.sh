@@ -49,6 +49,12 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # Hammerspoon version pinned at the source of truth here. Bump in lock-step
 # with any breaking API change observed in the Lua tree.
 HAMMERSPOON_VERSION="${HAMMERSPOON_VERSION:-1.1.1}"
+# SHA-256 of the official Hammerspoon-$HAMMERSPOON_VERSION.zip release asset. A
+# cached or downloaded zip with any other digest is refused, so a truncated or
+# tampered cache is fetched again instead of trusted. Bump it with the version;
+# tools/test/test-macos-hammerspoon-cache.cjs holds the CI and cold-bootstrap
+# copies of this pin equal to it.
+HAMMERSPOON_SHA256="${HAMMERSPOON_SHA256:-11bb1c90faf5427f37c7bd4fe7eab9774ae43e1d5cb020c5b3088dac32849efa}"
 
 # Version stamped into the .app Info.plist. CI replaces it with the
 # release-please-driven tag; local builds get a "dev" placeholder.
@@ -120,6 +126,8 @@ BUNDLE_ID="$ERGOPTI_BUNDLE_ID_LAUNCHER"
 HAMMERSPOON_BUNDLE_ID="$ERGOPTI_BUNDLE_ID_HAMMERSPOON"
 
 BUILD_DIR="$REPO_ROOT/build/macos"
+# Outside BUILD_DIR, which every run wipes, and git-ignored with /build/.
+HAMMERSPOON_CACHE_DIR="$REPO_ROOT/build/cache/hammerspoon"
 APP_PATH="$BUILD_DIR/$ERGOPTI_APP_BUNDLE"
 ZIP_PATH="$BUILD_DIR/$ERGOPTI_APP_BUNDLE.zip"
 LAUNCHER_DIR="$REPO_ROOT/static/ergopti_plus/macos/launcher"
@@ -247,20 +255,44 @@ clean_build_dir() {
 # =================================================
 # =================================================
 
+# Reports whether a zip is the pinned official release asset.
+hammerspoon_zip_matches() {
+	local actual
+	actual="$(shasum -a 256 "$1" | awk '{print $1}')" || return 1
+	[ "$actual" = "$HAMMERSPOON_SHA256" ]
+}
+
 # Download and extract the pinned Hammerspoon release. We rely on the GitHub
 # Releases asset rather than building from source: the release zip is signed
 # by the Hammerspoon maintainers, includes all native dylibs, and pins us to
-# a reproducible binary regardless of host SDK drift.
+# a reproducible binary regardless of host SDK drift. The verified zip is kept
+# in HAMMERSPOON_CACHE_DIR, so a rebuild downloads nothing.
 download_hammerspoon() {
-	local cache_dir="$BUILD_DIR/cache"
+	local cache_dir="$HAMMERSPOON_CACHE_DIR"
 	local zip="$cache_dir/Hammerspoon-$HAMMERSPOON_VERSION.zip"
 	local url="https://$ERGOPTI_HOST_GITHUB/Hammerspoon/hammerspoon/releases/download/$HAMMERSPOON_VERSION/Hammerspoon-$HAMMERSPOON_VERSION.zip"
 	mkdir -p "$cache_dir"
-	if [ ! -f "$zip" ]; then
-		log "Downloading Hammerspoon $HAMMERSPOON_VERSION from $url"
-		curl -sSfL "$url" -o "$zip" || fail "Hammerspoon download failed."
+	if [ -f "$zip" ] && hammerspoon_zip_matches "$zip"; then
+		log "Using cached Hammerspoon $HAMMERSPOON_VERSION: $zip"
 	else
-		log "Using cached $zip"
+		if [ -e "$zip" ]; then
+			log "Cached $zip does not match the pinned SHA-256; downloading it again."
+			rm -f "$zip" || fail "The refused cached Hammerspoon zip could not be removed: $zip"
+		fi
+		log "Downloading Hammerspoon $HAMMERSPOON_VERSION from $url"
+		# A partial file is never published under the cached name.
+		local partial
+		partial="$(mktemp "$cache_dir/.Hammerspoon-$HAMMERSPOON_VERSION.XXXXXX")" \
+			|| fail "No temporary file for the Hammerspoon download in $cache_dir."
+		if ! curl --proto '=https' --proto-redir '=https' -sSfL "$url" -o "$partial"; then
+			rm -f "$partial"
+			fail "Hammerspoon download failed."
+		fi
+		if ! hammerspoon_zip_matches "$partial"; then
+			rm -f "$partial"
+			fail "The downloaded Hammerspoon $HAMMERSPOON_VERSION does not match the pinned SHA-256 $HAMMERSPOON_SHA256."
+		fi
+		mv -f "$partial" "$zip" || fail "The verified Hammerspoon zip could not be cached at $zip."
 	fi
 	log "Extracting Hammerspoon into $BUILD_DIR"
 	unzip -q "$zip" -d "$BUILD_DIR"
