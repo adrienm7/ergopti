@@ -1,0 +1,6 @@
+total 16
+drwx------+  5 b519hs@login.axa  staff   160 27 oct.  21:10 .
+drwx------@ 94 b519hs@login.axa  staff  3008 27 oct.  14:21 ..
+-rw-r--r--@  1 b519hs@login.axa  staff  6148 27 oct.   2025 .DS_Store
+-rw-r--r--@  1 b519hs@login.axa  staff     0 27 oct.  14:31 composed.keylayout.ergoptiplus-write-lock-v1
+drwxr-xr-x@  3 b519hs@login.axa  staff    96  9 mai   15:13 Ergopti_v2.2.2.bundle
