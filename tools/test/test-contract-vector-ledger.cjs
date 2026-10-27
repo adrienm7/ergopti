@@ -73,6 +73,20 @@ const SCHEMAS = {
 		}
 		return corpus.vectors.map((vector) => vector.id);
 	},
+	toml_leaf_rows(corpus) {
+		for (const vector of corpus.vectors) {
+			assert.equal(typeof vector.id, 'string', 'vector id');
+			assert(vector.source === null || typeof vector.source === 'string', `${vector.id}: source`);
+			assert(Array.isArray(vector.operations), `${vector.id}: operations`);
+			assert.equal(typeof vector.expect.ok, 'boolean', `${vector.id}: expect.ok`);
+			if (vector.expect.ok)
+				assert(
+					vector.expect.decoded || vector.expect.contains,
+					`${vector.id}: an accepted vector states its result`
+				);
+		}
+		return corpus.vectors.map((vector) => vector.id);
+	},
 	menu_numbered_caption(corpus) {
 		for (const vector of corpus.positive) {
 			assert.equal(typeof vector.format, 'string', `${vector.id}: format`);
@@ -118,6 +132,20 @@ const LUA_COUNTS = {
 				.readFileSync(path.join(ROOT, relative), 'utf8')
 				.match(/batch_write_vectors_contract"\)\(helpers, corpus, (\d+)\)/);
 			assert(match, `${relative} does not replay the batch writer vectors`);
+			found.push([relative, Number(match[1]), corpus.vectors.length]);
+		}
+		return found;
+	},
+	toml_leaf_rows(corpus) {
+		const found = [];
+		for (const relative of [
+			'static/ergopti_plus/linux/tests/unit/infra/config/test_toml_codec_shared_decode.lua',
+			'static/ergopti_plus/macos/tests/unit/infra/toml/test_toml_writer_transaction.lua'
+		]) {
+			const match = fs
+				.readFileSync(path.join(ROOT, relative), 'utf8')
+				.match(/leaf_rows_vectors_contract"\)\(helpers, corpus, (\d+)\)/);
+			assert(match, `${relative} does not replay the leaf rows vectors`);
 			found.push([relative, Number(match[1]), corpus.vectors.length]);
 		}
 		return found;

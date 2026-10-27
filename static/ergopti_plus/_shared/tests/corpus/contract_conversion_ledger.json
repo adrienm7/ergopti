@@ -225,6 +225,50 @@
 					]
 				}
 			]
+		},
+		{
+			"family": "toml_leaf_rows",
+			"schema": "toml_leaf_rows",
+			"corpus": "toml/leaf_rows_vectors.json",
+			"entry_point": "leaf-row planner prepare(source, operations) then the batch writer's prepare step",
+			"windows_consumer": "One AHK consumer calls the Windows leaf-row planner and batch writer in that order and decodes the candidate for the decoded checks.",
+			"sources": [
+				{
+					"contract": "toml_leaf_rows_contract.lua",
+					"moved": [
+						{
+							"case": "writes bare leaves as ordinary table rows in an absent file",
+							"vectors": ["bare-leaves-written-as-ordinary-table-rows-in-an-absent-file"]
+						},
+						{
+							"case": "creates one quoted inline table for a runtime identity and its bare siblings",
+							"vectors": ["runtime-identity-and-bare-siblings-in-one-quoted-inline-table"]
+						},
+						{
+							"case": "rewrites an inline table whole and keeps its unknown entries",
+							"vectors": ["inline-table-rewritten-whole-keeping-unknown-entries"]
+						},
+						{
+							"case": "removes an inline table that its deletions leave empty",
+							"vectors": ["inline-table-left-empty-by-deletions-is-removed"]
+						},
+						{
+							"case": "addresses sections below a quoted table header",
+							"vectors": ["sections-below-a-quoted-table-header-addressed"]
+						},
+						{
+							"case": "refuses malformed operations",
+							"vectors": [
+								"malformed-operation-1-refused",
+								"malformed-operation-2-refused",
+								"malformed-operation-3-refused",
+								"malformed-operation-4-refused",
+								"malformed-source-refused"
+							]
+						}
+					]
+				}
+			]
 		}
 	]
 }
