@@ -1950,6 +1950,27 @@ local function _guard_timer_cb(fn, kind)
 	end
 end
 
+--- Names the program a synchronous shell command runs, for a phase name. Only a
+--- plain basename of the first word is kept (`mkdir`, `ls`, `uname`); anything
+--- else, such as a user script name with spaces or symbols, reads `other`, so
+--- no path or argument reaches the log.
+--- @param command any The hs.execute command.
+--- @return string label
+local function shell_program_label(command)
+	if type(command) ~= "string" then return "other" end
+	local first = command:match("^%s*([^%s]+)")
+	while first and first:find("=", 1, true) do
+		-- Skip leading environment assignments such as LC_ALL=C.
+		command = command:gsub("^%s*[^%s]+", "", 1)
+		first = command:match("^%s*([^%s]+)")
+	end
+	-- A quoted or escaped first word is a caller-built path: never name it.
+	if not first or not first:match("^[%w_%-%./]+$") then return "other" end
+	local base = first:match("([^/]+)$")
+	if base and #base <= 24 and base:match("^[%w_%-%.]+$") then return base end
+	return "other"
+end
+
 --- Installs process-wide capture so EVERY diagnostic — including errors that
 --- Hammerspoon would otherwise only print to its Console — lands in the unified
 --- file log. The console is too noisy to read and cannot be exported, so the
@@ -2028,8 +2049,26 @@ function M.install_runtime_error_capture()
 		end
 	end
 
+	-- 3) Time every synchronous shell command. hs.execute forks from the
+	-- Hammerspoon process and blocks the main thread; on the Mac one fork took
+	-- about 40 ms, and several per tick made the holds no other phase named.
+	-- Each call becomes phase `shell.<program>`, so a slow-callback report
+	-- lists the forks inside its hold and the phase summary counts them.
+	if type(hs_ref) == "table" and type(hs_ref.execute) == "function" then
+		local orig = hs_ref.execute
+		hs_ref.execute = function(command, ...)
+			local started = _callback_clock and _callback_clock() or nil
+			local results = table.pack(orig(command, ...))
+			if started then
+				local elapsed = _callback_clock() - started
+				pcall(PhaseStats.add, "shell." .. shell_program_label(command), elapsed)
+			end
+			return table.unpack(results, 1, results.n)
+		end
+	end
+
 	_log("INFO", "logger",
-		"Runtime error capture installed (hs.timer guards with slow-callback reports + console tee).")
+		"Runtime error capture installed (hs.timer guards with slow-callback reports, shell timing + console tee).")
 end
 
 _scope.install({
