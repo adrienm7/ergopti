@@ -2259,6 +2259,8 @@
 	"ollama.download_title": "Ollama modeli indiriliyor",
 	"ollama.error_network": "Ollama indirilemedi. İnternet bağlantınızı kontrol edin, ardından Ollama arka ucunu yeniden seçin.",
 	"ollama.error_checksum": "İndirilen Ollama arşivi SHA-256 denetimini geçemedi ve silindi. Hiçbir şey yüklenmedi.",
+	"ollama.error_installer_refused": "Ergopti'nin Ollama yükleyicisi kendi isteğini reddetti, bu yüzden hiçbir şey yüklenmedi. Ergopti'yi yeniden başlatın ve Ollama motorunu yeniden seçin; sorun sürerse tanılama raporunu gönderin.",
+	"ollama.error_runtime_refused": "Ergopti sabitlenmiş Ollama sürümünü doğrulayamadı (sürüm kataloğu veya bütünlük denetimi), bu yüzden hiçbir şey yüklenmedi. Tanılama raporunu gönderin.",
 	"ollama.external_manual_start_body": "Bu Ollama kurulumu Ergopti dışında yönetilmektedir. Hizmetini kendiniz başlatın veya durdurun ya da Ollama kurulum teklifinden Ergopti tarafından yönetilen ortamı kurun.",
 	"ollama.native_install_declined_body": "Mevcut Ollama kurulumu ve modeller değişmez. Yönetilen ortam kurulmadı.",
 	"ollama.native_migration_body": "Ergopti tarafından yönetilen ortamı mevcut Ollama kurulumunuzun yanına kurun. Mevcut modeller aynı konumda kalır. Ergopti mevcut hizmeti durdurmaz; aynı bağlantı noktasını kullanıyorsa hizmeti kendiniz durdurun. Yönetilen ortamın çalışabilmesi için yerel sistem denetimlerinin başarıyla tamamlanması gerekir.",

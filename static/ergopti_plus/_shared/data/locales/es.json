@@ -2259,6 +2259,8 @@
 	"ollama.download_title": "Descargando modelo Ollama",
 	"ollama.error_network": "No se pudo descargar Ollama. Compruebe su conexión a Internet y vuelva a seleccionar el backend Ollama.",
 	"ollama.error_checksum": "El archivo de Ollama descargado no superó la verificación SHA-256 y se descartó. No se instaló nada.",
+	"ollama.error_installer_refused": "El instalador de Ollama de Ergopti rechazó su propia solicitud, así que no se instaló nada. Reinicie Ergopti y vuelva a elegir el motor Ollama; si persiste, envíe el informe de diagnóstico.",
+	"ollama.error_runtime_refused": "Ergopti no pudo verificar su versión fijada de Ollama (catálogo de versiones o comprobación de integridad), así que no se instaló nada. Envíe el informe de diagnóstico.",
 	"ollama.external_manual_start_body": "Esta instalación de Ollama se gestiona fuera de Ergopti. Inicie o detenga su servicio usted mismo, o instale el entorno gestionado por Ergopti desde la propuesta de configuración de Ollama.",
 	"ollama.native_install_declined_body": "La instalación actual de Ollama y los modelos no cambian. El entorno gestionado no se ha instalado.",
 	"ollama.native_migration_body": "Instale el entorno gestionado por Ergopti junto a su instalación actual de Ollama. Los modelos existentes permanecen en su ubicación actual. Ergopti no detendrá el servicio actual; deténgalo usted mismo si utiliza el mismo puerto. Las comprobaciones nativas deben superarse antes de que el entorno gestionado pueda ejecutarse.",
