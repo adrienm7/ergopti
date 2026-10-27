@@ -370,7 +370,8 @@ _LayoutCatalogueInstalledEntryProblem(Id, Entry) {
 		return "the entry is not an object"
 	if !Entry.Has("id") || Entry["id"] !== Id
 		return "its id field does not name this entry"
-	if !Entry.Has("sha256") || !Entry.Has("version") || !Entry.Has("size")
+	if !Entry.Has("sha256") || !(Entry["sha256"] is String)
+			|| !Entry.Has("version") || !(Entry["version"] is String) || !Entry.Has("size")
 		return "it has no verified checksum, version or size"
 	return ""
 }
