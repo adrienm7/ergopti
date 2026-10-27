@@ -1,0 +1,1085 @@
+2026-10-27 09:54:59:101 [WARNING] [keymap] Typing context invalidated - keystrokes were missed.
+2026-10-27 09:54:59:324 [WARNING] [logger] ↑ 1 identical line suppressed
+2026-10-27 09:54:59:324 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (4 times); session totals: 3915 key-down(s), 3893 key-up(s), 81 key-up(s) without key-down, 100 key-down(s) without key-up, 62 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 142 key-down(s) and 132 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 09:54:59:324 [WARNING] [key_event_health] Key events that waited behind the main thread passed untouched: no replay, no expansion (2 times); session totals: 3915 key-down(s), 3893 key-up(s), 81 key-up(s) without key-down, 100 key-down(s) without key-up, 62 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 142 key-down(s) and 132 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 09:54:59:324 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 3915 key-down(s), 3893 key-up(s), 81 key-up(s) without key-down, 100 key-down(s) without key-up, 62 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 142 key-down(s) and 132 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 09:55:14:083 [WARNING] [key_event_health] A character key stayed down 13.2 s with no further event: its key-up was lost before the keymap taps; session totals: 3917 key-down(s), 3895 key-up(s), 81 key-up(s) without key-down, 100 key-down(s) without key-up, 63 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 142 key-down(s) and 132 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 09:59:00:114 [WARNING] [karabiner.lease] Lease watchdog e08a557917fd4722a9195fc2ac1f49ce stderr: lease worker: HEARTBEAT 1 7990 answered HEARTBEAT 1 7990 after 1.06 s (deadline 2.50 s).
+2026-10-27 10:03:19:316 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 3926 key-down(s), 3904 key-up(s), 81 key-up(s) without key-down, 100 key-down(s) without key-up, 63 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 142 key-down(s) and 133 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:04:14:316 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 3927 key-down(s), 3906 key-up(s), 82 key-up(s) without key-down, 100 key-down(s) without key-up, 63 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 142 key-down(s) and 133 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:12:29:315 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 3938 key-down(s), 3917 key-up(s), 82 key-up(s) without key-down, 100 key-down(s) without key-up, 63 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 143 key-down(s) and 134 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:23:49:314 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (3 times); session totals: 3953 key-down(s), 3931 key-up(s), 84 key-up(s) without key-down, 100 key-down(s) without key-up, 63 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 145 key-down(s) and 135 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:23:49:314 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream (2 times); session totals: 3953 key-down(s), 3931 key-up(s), 84 key-up(s) without key-down, 100 key-down(s) without key-up, 63 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 145 key-down(s) and 135 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:23:51:312 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps (2 times); session totals: 3966 key-down(s), 3943 key-up(s), 84 key-up(s) without key-down, 102 key-down(s) without key-up, 63 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 145 key-down(s) and 135 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:23:52:311 [WARNING] [key_event_health] A character key stayed down 3.1 s with no further event: its key-up was lost before the keymap taps; session totals: 3971 key-down(s), 3949 key-up(s), 84 key-up(s) without key-down, 102 key-down(s) without key-up, 64 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 145 key-down(s) and 135 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:23:54:311 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 3980 key-down(s), 3958 key-up(s), 85 key-up(s) without key-down, 102 key-down(s) without key-up, 64 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 146 key-down(s) and 135 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:23:54:311 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 3980 key-down(s), 3958 key-up(s), 85 key-up(s) without key-down, 102 key-down(s) without key-up, 64 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 146 key-down(s) and 135 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:23:57:311 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 4000 key-down(s), 3978 key-up(s), 85 key-up(s) without key-down, 103 key-down(s) without key-up, 64 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 146 key-down(s) and 135 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:23:59:311 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 4010 key-down(s), 3988 key-up(s), 87 key-up(s) without key-down, 104 key-down(s) without key-up, 64 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 147 key-down(s) and 136 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:23:59:311 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream (2 times); session totals: 4010 key-down(s), 3988 key-up(s), 87 key-up(s) without key-down, 104 key-down(s) without key-up, 64 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 147 key-down(s) and 136 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:23:59:311 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 4010 key-down(s), 3988 key-up(s), 87 key-up(s) without key-down, 104 key-down(s) without key-up, 64 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 147 key-down(s) and 136 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:24:04:314 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (7 times); session totals: 4033 key-down(s), 4012 key-up(s), 90 key-up(s) without key-down, 104 key-down(s) without key-up, 64 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 151 key-down(s) and 139 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:24:04:314 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream (3 times); session totals: 4033 key-down(s), 4012 key-up(s), 90 key-up(s) without key-down, 104 key-down(s) without key-up, 64 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 151 key-down(s) and 139 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:32:42:311 [WARNING] [key_event_health] A non-character key stayed down 518.4 s with no further event: its key-up was lost before the keymap taps; session totals: 4040 key-down(s), 4020 key-up(s), 90 key-up(s) without key-down, 104 key-down(s) without key-up, 67 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 151 key-down(s) and 139 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:32:42:311 [WARNING] [key_event_health] A character key stayed down 518.4 s with no further event: its key-up was lost before the keymap taps (2 times); session totals: 4040 key-down(s), 4020 key-up(s), 90 key-up(s) without key-down, 104 key-down(s) without key-up, 67 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 151 key-down(s) and 139 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:32:49:309 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 4041 key-down(s), 4021 key-up(s), 90 key-up(s) without key-down, 104 key-down(s) without key-up, 67 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 152 key-down(s) and 140 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:36:26:310 [WARNING] [key_event_health] A non-character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 4050 key-down(s), 4030 key-up(s), 90 key-up(s) without key-down, 106 key-down(s) without key-up, 67 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 152 key-down(s) and 140 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:36:26:310 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 4050 key-down(s), 4030 key-up(s), 90 key-up(s) without key-down, 106 key-down(s) without key-up, 67 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 152 key-down(s) and 140 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 10:36:27:310 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 4055 key-down(s), 4034 key-up(s), 90 key-up(s) without key-down, 107 key-down(s) without key-up, 67 key(s) stuck over 3.0 s, 5 character key(s) held 500 ms or more (0 across a rule switch), 152 key-down(s) and 140 key-up(s) seen 250 ms or more late (max 879 ms), 20 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 11:19:35:000 [WARNING] [init] Ergopti driver not started in this Hammerspoon (pid 91706, bundle org.hammerspoon.Hammerspoon at /Applications/Hammerspoon.app, ErgoptiPlus launcher running: unknown, launcher authority standalone); it keeps running without the driver.
+2026-10-27 11:19:52:000 [WARNING] [init] Ergopti driver not started in this Hammerspoon (pid 92242, bundle org.hammerspoon.Hammerspoon at /Applications/Hammerspoon.app, ErgoptiPlus launcher running: unknown, launcher authority standalone); it keeps running without the driver.
+2026-10-27 11:21:03:000 [WARNING] [init] Ergopti driver not started in this Hammerspoon (pid 92242, bundle org.hammerspoon.Hammerspoon at /Applications/Hammerspoon.app, ErgoptiPlus launcher running: unknown, launcher authority standalone); it keeps running without the driver.
+2026-10-27 14:25:26:144 [WARNING] [BootProfile] Boot stage 'Accessibility permission' opened while 'Accessibility permission' is still open.
+2026-10-27 14:25:27:444 [WARNING] [runtime] An hs.timer.new callback (...i/static/ergopti_plus/macos/infra/accessibility_wait.lua:139) held the main thread for 1301 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile. Phases inside the hold: boot.stage=388.2 ms, boot.stage=312.2 ms, boot.stage_cpu=286.1 ms, boot.stage_cpu=196.2 ms, boot_sub.dynamic hotstrings=110.9 ms.
+2026-10-27 14:25:49:778 [ERROR] [keystats.log_manager] Cannot read typing rollover facts: unsupported or ambiguous typing SQL at a rollover boundary.
+2026-10-27 14:25:49:778 [ERROR] [keystats.log_manager] Aggregate cache recovery failed; raw events remain durable for retry.
+2026-10-27 14:25:50:367 [WARNING] [keystats.log_manager] Slow ingest tick 568 ms (drain=0 foreign=0 outbox=1 read=0 build=1 apply=17 commit=0 append=546 notify=0 ms; entries=4 statements=4).
+2026-10-27 14:25:50:479 [WARNING] [runtime] An hs.timer.new callback (...ergopti/static/ergopti_plus/macos/ui/menu/menu_state.lua:531) held the main thread for 22782 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-27 14:25:50:490 [ERROR] [karabiner] Remap guardian status is 'unavailable': the background helper is not registered, so tap-holds and remaps stay inert.
+2026-10-27 14:25:50:495 [WARNING] [karabiner] Karabiner regeneration remains fail-closed after guardian status 'unavailable' (regeneration-preflight).
+2026-10-27 14:25:52:968 [WARNING] [key_event_health] A non-character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 2 key-down(s), 0 key-up(s), 0 key-up(s) without key-down, 1 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 14:26:01:598 [ERROR] [keystats.context_tracker] Previous AXValueChanged watcher cleanup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: AXUIElementRef is invalid
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:757: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>.
+2026-10-27 14:26:04:032 [ERROR] [keystats.context_tracker] Replacement AXValueChanged watcher setup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: Illegal argument
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:769: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>.
+2026-10-27 14:26:05:083 [WARNING] [runtime] An hs.timer.new callback (...gopti/static/ergopti_plus/macos/modules/keymap/utils.lua:1455) held the main thread for 1001 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-27 14:26:13:381 [WARNING] [HotPath] Slow preview.rebuild: 7.01 ms own, 7.01 ms total, parent keydown (0 similar since the last line).
+2026-10-27 14:26:13:885 [WARNING] [key_event_health] A non-character key stayed down 21.2 s with no further event: its key-up was lost before the keymap taps; session totals: 7 key-down(s), 3 key-up(s), 0 key-up(s) without key-down, 1 key-down(s) without key-up, 1 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 14:26:14:885 [WARNING] [key_event_health] A non-character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 16 key-down(s), 14 key-up(s), 0 key-up(s) without key-down, 2 key-down(s) without key-up, 1 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 14:26:15:885 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 24 key-down(s), 21 key-up(s), 0 key-up(s) without key-down, 2 key-down(s) without key-up, 1 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 256 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 14:26:36:543 [WARNING] [HotPath] Slow preview.rebuild: 5.26 ms own, 5.26 ms total, parent keydown (2 similar since the last line).
+2026-10-27 14:26:38:273 [WARNING] [HotPath] Slow hotstring.match: 6.36 ms own, 6.54 ms total, parent keydown (0 similar since the last line).
+2026-10-27 14:26:53:963 [WARNING] [karabiner] Duplicate Ergopti Karabiner revocation completion ignored.
+2026-10-27 14:26:54:021 [ERROR] [keystats.context_tracker] ↑ "Replacement AXValueChanged watcher setup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: Illegal argument
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:769: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>." repeated 1 more time between 2026-10-27 14:26:05:135 and 2026-10-27 14:26:05:135.
+2026-10-27 14:27:05:424 [WARNING] [keymap.registry] TOML mapping file '<name>' registered ZERO mappings — check the path and its contents.
+2026-10-27 14:27:05:801 [WARNING] [keymap.registry] ↑ "TOML mapping file '<name>' registered ZERO mappings — check the path and its contents." repeated 1 more time between 2026-10-27 14:27:05:426 and 2026-10-27 14:27:05:426.
+2026-10-27 14:27:27:427 [ERROR] [keystats.log_manager] Cannot read typing rollover facts: unsupported or ambiguous typing SQL at a rollover boundary.
+2026-10-27 14:27:27:427 [ERROR] [keystats.log_manager] Aggregate cache recovery failed; raw events remain durable for retry.
+2026-10-27 14:27:29:013 [WARNING] [keystats.log_manager] Slow ingest tick 1567 ms (drain=0 foreign=0 outbox=2 read=0 build=1 apply=26 commit=4 append=1531 notify=0 ms; entries=2 statements=2).
+2026-10-27 14:27:29:328 [WARNING] [runtime] An hs.timer.new callback (...ergopti/static/ergopti_plus/macos/ui/menu/menu_state.lua:531) held the main thread for 23022 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-27 14:27:29:329 [ERROR] [karabiner] Remap guardian status is 'unavailable': the background helper is not registered, so tap-holds and remaps stay inert.
+2026-10-27 14:27:29:344 [WARNING] [karabiner] Karabiner regeneration remains fail-closed after guardian status 'unavailable' (regeneration-preflight).
+2026-10-27 14:27:29:369 [WARNING] [keymap] macOS disabled the keyDown event tap — re-enabling.
+2026-10-27 14:27:29:369 [WARNING] [keymap] macOS disabled the loopbackKeyUp event tap — re-enabling.
+2026-10-27 14:27:29:369 [WARNING] [shortcuts.script_control] Script-control eventtap was disabled by macOS — re-enabling.
+2026-10-27 14:27:30:654 [WARNING] [keymap] Typing context invalidated - keystrokes were missed.
+2026-10-27 14:27:31:616 [WARNING] [keystats.context_tracker] Accessibility observer setup failed: failed to get AX application element for PID 31319.
+2026-10-27 14:27:45:267 [WARNING] [runtime] An hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:1722) held the main thread for 1253 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-27 14:28:44:606 [WARNING] [keystats.log_manager] Slow ingest tick 592 ms (drain=0 foreign=0 outbox=12 read=0 build=5 apply=8 commit=1 append=563 notify=0 ms; entries=2 statements=2).
+2026-10-27 14:29:19:705 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 87 key-down(s), 87 key-up(s), 0 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 397 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 14:29:59:522 [WARNING] [keystats.log_manager] Slow ingest tick 508 ms (drain=0 foreign=0 outbox=3 read=0 build=4 apply=7 commit=1 append=488 notify=0 ms; entries=1 statements=1).
+2026-10-27 14:31:33:713 [ERROR] [keystats.context_tracker] Previous AXValueChanged watcher cleanup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: AXUIElementRef is invalid
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:757: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>.
+2026-10-27 14:31:35:670 [ERROR] [keystats.context_tracker] Replacement AXValueChanged watcher setup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: Illegal argument
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:769: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>.
+2026-10-27 14:31:37:563 [ERROR] [logger] ↑ 10 identical lines suppressed
+2026-10-27 14:31:37:588 [ERROR] [adapters.shell_runner] spawn.start(): hs.task:start() refused to launch /usr/sbin/systemextensionsctl
+2026-10-27 14:31:37:588 [WARNING] [adapters.field_check_ports] Could not start systemextensionsctl.
+2026-10-27 14:31:52:589 [WARNING] [menu.keyboard_layout] Failed to enable 'Composer Check' — reason=process_failed.
+2026-10-27 14:31:52:589 [WARNING] [layout_registry] The composed 'composed' layout is installed but not enabled: process_failed.
+2026-10-27 14:31:52:685 [WARNING] [menu.keyboard_layout] Edit enabled keyboard input sources refused: another input-source mutation is still settling.
+2026-10-27 14:31:52:685 [WARNING] [menu.keyboard_layout] Failed to disable 'Composer Check' — reason=busy.
+2026-10-27 14:31:52:685 [WARNING] [layout_registry] The 'composed' layout could not be removed from the input sources: busy.
+2026-10-27 14:31:59:772 [ERROR] [adapters.notifier] send(): hs.notify failed: .../ergopti/static/ergopti_plus/macos/adapters/notifier.lua:79: attempt to call a nil value (method 'release').
+2026-10-27 14:32:28:604 [ERROR] [keystats.context_tracker] ↑ "Previous AXValueChanged watcher cleanup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: AXUIElementRef is invalid
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:757: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>." repeated 4 more times between 2026-10-27 14:31:39:392 and 2026-10-27 14:32:03:618.
+2026-10-27 14:32:28:604 [ERROR] [adapters.notifier] ↑ "send(): hs.notify failed: .../ergopti/static/ergopti_plus/macos/adapters/notifier.lua:79: attempt to call a nil value (method 'release')." repeated 1 more time between 2026-10-27 14:32:09:813 and 2026-10-27 14:32:09:813.
+2026-10-27 14:32:32:487 [ERROR] [keystats.context_tracker] Previous AXValueChanged watcher cleanup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: AXUIElementRef is invalid
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:757: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>.
+2026-10-27 14:32:39:593 [WARNING] [keystats.log_manager] Slow ingest tick 579 ms (drain=0 foreign=0 outbox=10 read=2 build=3 apply=24 commit=3 append=535 notify=0 ms; entries=3 statements=3).
+2026-10-27 14:32:44:422 [WARNING] [HotPath] Slow preview.rebuild: 13.27 ms own, 13.27 ms total, parent keydown (0 similar since the last line).
+2026-10-27 14:32:49:705 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 209 key-down(s), 209 key-up(s), 1 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 397 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 14:33:00:705 [WARNING] [key_event_health] A non-character key stayed down 10.4 s with no further event: its key-up was lost before the keymap taps; session totals: 211 key-down(s), 211 key-up(s), 1 key-up(s) without key-down, 0 key-down(s) without key-up, 1 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 397 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 14:33:36:075 [WARNING] [karabiner] Duplicate Ergopti Karabiner revocation completion ignored.
+2026-10-27 14:33:36:114 [ERROR] [keystats.context_tracker] ↑ "Previous AXValueChanged watcher cleanup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: AXUIElementRef is invalid
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:757: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>." repeated 1 more time between 2026-10-27 14:32:42:022 and 2026-10-27 14:32:42:022.
+2026-10-27 15:25:40:704 [WARNING] [keymap.registry] TOML mapping file '<name>' registered ZERO mappings — check the path and its contents.
+2026-10-27 15:25:41:075 [WARNING] [keymap.registry] ↑ "TOML mapping file '<name>' registered ZERO mappings — check the path and its contents." repeated 1 more time between 2026-10-27 15:25:40:706 and 2026-10-27 15:25:40:706.
+2026-10-27 15:26:02:243 [ERROR] [keystats.log_manager] Cannot read typing rollover facts: unsupported or ambiguous typing SQL at a rollover boundary.
+2026-10-27 15:26:02:243 [ERROR] [keystats.log_manager] Aggregate cache recovery failed; raw events remain durable for retry.
+2026-10-27 15:26:02:675 [WARNING] [runtime] An hs.timer.new callback (...ergopti/static/ergopti_plus/macos/ui/menu/menu_state.lua:531) held the main thread for 21093 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-27 15:26:02:676 [ERROR] [karabiner] Remap guardian status is 'unavailable': the background helper is not registered, so tap-holds and remaps stay inert.
+2026-10-27 15:26:02:682 [WARNING] [karabiner] Karabiner regeneration remains fail-closed after guardian status 'unavailable' (regeneration-preflight).
+2026-10-27 15:26:08:101 [WARNING] [keystats.log_manager] Slow ingest tick 520 ms (drain=0 foreign=0 outbox=4 read=1 build=4 apply=26 commit=7 append=475 notify=0 ms; entries=1 statements=1).
+2026-10-27 15:26:23:135 [ERROR] [keystats.context_tracker] Previous AXValueChanged watcher cleanup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: AXUIElementRef is invalid
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:757: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>.
+2026-10-27 15:26:29:222 [WARNING] [runtime] An hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:1722) held the main thread for 1641 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-27 15:27:13:112 [WARNING] [keystats.log_manager] Slow ingest tick 531 ms (drain=0 foreign=0 outbox=1 read=0 build=3 apply=7 commit=2 append=515 notify=0 ms; entries=2 statements=2).
+2026-10-27 15:27:18:560 [ERROR] [adapters.shell_runner] spawn.start(): hs.task:start() refused to launch /usr/sbin/systemextensionsctl
+2026-10-27 15:27:18:560 [WARNING] [adapters.field_check_ports] Could not start systemextensionsctl.
+2026-10-27 15:27:35:517 [WARNING] [preferences] Slow preferences save 2117 ms (prepare=1277 write=839 ms; operations=293).
+2026-10-27 15:27:35:613 [ERROR] [mlx_deps] MLX bootstrap failed (exit=78, cause=network_unknown, path=nil). Last output: [MLX-DEPS] The bundled native network receiver is unavailable. No download was started. | __ERGOPTI_OPAQUE_ADMISSION_V1__:refused:unavailable:unavailable
+2026-10-27 15:27:35:655 [WARNING] [download_window] Progress UI flipped to error state: L’opération a échoué, mais les informations disponibles ne permettent pas d’en établir la cause.
+2026-10-27 15:27:35:656 [ERROR] [menu_llm] LLM activation failed (runtime bootstrap reported failure); restoring disabled state.
+2026-10-27 15:27:35:657 [ERROR] [llm.api_mlx] Warmup discovery cancellation retained exact cleanup debt: false.
+2026-10-27 15:27:35:657 [ERROR] [llm.api_mlx] MLX warmup owner remains unsettled after logical revocation.
+2026-10-27 15:27:35:657 [ERROR] [llm.prediction_engine] LLM settlement 'MLX warmup stop' did not commit (result: false).
+2026-10-27 15:27:35:658 [ERROR] [llm.api_mlx] Warmup activation retained discovery cleanup debt: false.
+2026-10-27 15:27:35:658 [ERROR] [llm.prediction_engine] LLM settlement 'MLX warmup resume' did not commit (result: false).
+2026-10-27 15:27:35:658 [ERROR] [menu_llm] Prediction preference rollback after runtime settlement refusal did not commit.
+2026-10-27 15:27:35:658 [ERROR] [menu_llm] Could not persist the compensating LLM disable after activation failure.
+2026-10-27 15:27:35:673 [WARNING] [menu_llm.mlx_repair_offer] Offering the MLX retry/diagnostics action for a network_unknown failure.
+2026-10-27 15:27:37:970 [ERROR] [keystats.context_tracker] ↑ "Previous AXValueChanged watcher cleanup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: AXUIElementRef is invalid
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:757: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>." repeated 3 more times between 2026-10-27 15:27:13:553 and 2026-10-27 15:27:30:111.
+2026-10-27 15:27:37:970 [WARNING] [llm.core] warmup_model: backend warmup did not commit: false
+2026-10-27 15:27:40:333 [ERROR] [keystats.context_tracker] Previous AXValueChanged watcher cleanup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: AXUIElementRef is invalid
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:757: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>
+	[C]: in function 'hs.osascript._osascript'
+	...spoon.app/Contents/Resources/extensions/hs/osascript.lua:61: in function 'hs.applescript.applescript'
+	[C]: in function 'pcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1854: in function 'infra.logger.run_modal'
+	.../ergopti/static/ergopti_plus/macos/infra/dialog_util.lua:248: in function 'infra.dialog_util.choose'
+	[C]: in function 'pcall'
+	...ergopti_plus/macos/ui/menu/menu_llm/mlx_repair_offer.lua:249: in upvalue 'present'
+	...ergopti_plus/macos/ui/menu/menu_llm/mlx_repair_offer.lua:362: in function <...ergopti_plus/macos/ui/menu/menu_llm/mlx_repair_offer.lua:358>
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:107: in upvalue 'invoke_callback'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:222: in function <...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:198>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1936: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1929>.
+2026-10-27 15:27:50:808 [WARNING] [preferences] Slow preferences save 1873 ms (prepare=1260 write=612 ms; operations=293).
+2026-10-27 15:27:51:013 [WARNING] [llm.api_mlx] Endpoint discovery state reset.
+2026-10-27 15:27:53:126 [WARNING] [preferences] Slow preferences save 2107 ms (prepare=1247 write=860 ms; operations=293).
+2026-10-27 15:27:54:662 [WARNING] [adapters.http_client] Request timed out after 1500ms.
+2026-10-27 15:27:56:500 [ERROR] [ollama_deps] Ollama bootstrap failed (exit=64) — Erreur inconnue.
+2026-10-27 15:27:56:522 [WARNING] [llm.core] ↑ "warmup_model: backend warmup did not commit: false" repeated 1 more time between 2026-10-27 15:27:47:971 and 2026-10-27 15:27:47:971.
+2026-10-27 15:27:56:522 [WARNING] [download_window] Progress UI flipped to error state: Erreur inconnue.
+2026-10-27 15:27:56:537 [ERROR] [keystats.context_tracker] Previous AXValueChanged watcher cleanup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: AXUIElementRef is invalid
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:757: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>.
+2026-10-27 15:27:59:990 [WARNING] [model_switcher] switch_model('Qwen3.5-2B') failed — restoring predictions.
+2026-10-27 15:28:06:013 [WARNING] [llm.api_mlx] PGID pending timeout (15s) — unblocking zombie kills.
+2026-10-27 15:28:07:464 [WARNING] [adapters.http_client] ↑ "Request timed out after 1500ms." repeated 3 more times between 2026-10-27 15:27:54:662 and 2026-10-27 15:27:54:663.
+2026-10-27 15:28:11:807 [ERROR] [keystats.context_tracker] Replacement AXValueChanged watcher setup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: Illegal argument
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:769: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>.
+2026-10-27 15:28:28:428 [WARNING] [keymap.registry] TOML mapping file '<name>' registered ZERO mappings — check the path and its contents.
+2026-10-27 15:28:28:698 [WARNING] [keymap.utils] Ignored-window prewarm incomplete; tracking remains fail-closed.
+2026-10-27 15:28:28:698 [WARNING] [keymap] Ignored-window watcher preparation incomplete; tracking remains fail-closed: false.
+2026-10-27 15:28:28:789 [WARNING] [keymap.registry] ↑ "TOML mapping file '<name>' registered ZERO mappings — check the path and its contents." repeated 1 more time between 2026-10-27 15:28:28:436 and 2026-10-27 15:28:28:436.
+2026-10-27 15:28:51:309 [ERROR] [keystats.log_manager] Cannot read typing rollover facts: unsupported or ambiguous typing SQL at a rollover boundary.
+2026-10-27 15:28:51:309 [ERROR] [keystats.log_manager] Aggregate cache recovery failed; raw events remain durable for retry.
+2026-10-27 15:28:51:363 [WARNING] [runtime] An hs.timer.new callback (...ergopti/static/ergopti_plus/macos/ui/menu/menu_state.lua:531) held the main thread for 22066 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-27 15:28:51:368 [ERROR] [karabiner] Remap guardian status is 'unavailable': the background helper is not registered, so tap-holds and remaps stay inert.
+2026-10-27 15:28:51:373 [WARNING] [karabiner] Karabiner regeneration remains fail-closed after guardian status 'unavailable' (regeneration-preflight).
+2026-10-27 15:28:55:203 [WARNING] [startup_ctrl] Disabling LLM: the ollama backend (startup_model_download_declined: Qwen3.5-2B).
+2026-10-27 15:28:57:271 [WARNING] [preferences] Slow preferences save 2028 ms (prepare=1244 write=784 ms; operations=293).
+2026-10-27 15:28:57:272 [WARNING] [runtime] An hs.timer.new callback (...gopti_plus/macos/ui/menu/menu_llm/startup_controller.lua:263) held the main thread for 2058 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-27 15:28:57:275 [ERROR] [keystats.context_tracker] Previous AXValueChanged watcher cleanup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: AXUIElementRef is invalid
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:757: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>.
+2026-10-27 15:29:41:918 [WARNING] [keystats.log_manager] Slow ingest tick 592 ms (drain=0 foreign=0 outbox=3 read=0 build=4 apply=24 commit=2 append=556 notify=0 ms; entries=2 statements=2).
+2026-10-27 15:31:46:876 [WARNING] [keystats.log_manager] Slow ingest tick 552 ms (drain=0 foreign=0 outbox=3 read=1 build=4 apply=22 commit=2 append=516 notify=0 ms; entries=3 statements=3).
+2026-10-27 15:31:46:890 [WARNING] [shortcuts.actions.screen_capture] Clipboard screenshot refused: Screen Recording is not granted to the ErgoptiPlus runtime.
+2026-10-27 15:31:46:937 [ERROR] [shortcuts.actions.screen_capture] Screen Recording settings could not be opened: openURL returned false.
+2026-10-27 15:31:47:700 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 12 key-down(s), 12 key-up(s), 1 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 0 key-up(s) seen 250 ms or more late (max 0 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:32:01:684 [ERROR] [keystats.context_tracker] Previous AXValueChanged watcher cleanup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: AXUIElementRef is invalid
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:757: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>.
+2026-10-27 15:32:12:354 [ERROR] [keystats.context_tracker] Replacement AXValueChanged watcher setup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: AXUIElementRef is invalid
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:769: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>.
+2026-10-27 15:32:19:113 [ERROR] [config_migrate] Config migration of '~/perso/config/ergopti_plus/hammerspoon/config.toml' refused (newer): canonical schema version is newer than this build. The file is left untouched and this session will not write it.
+2026-10-27 15:32:19:765 [ERROR] [karabiner.lease] 'status' called before M.init() — lease controller unavailable.
+2026-10-27 15:34:07:182 [WARNING] [BootProfile] Boot stage 'Accessibility permission' opened while 'Accessibility permission' is still open.
+2026-10-27 15:34:08:302 [WARNING] [runtime] An hs.timer.new callback (...s/static/ergopti_plus/macos/infra/accessibility_wait.lua:139) held the main thread for 1121 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-27 15:34:09:332 [WARNING] [runtime] An hs.timer.new callback (...urces/static/ergopti_plus/macos/modules/keymap/utils.lua:1426) held the main thread for 1004 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-27 15:34:11:353 [ERROR] [karabiner] Remap guardian status is 'unavailable': the background helper is not registered, so tap-holds and remaps stay inert.
+2026-10-27 15:34:11:355 [WARNING] [karabiner] Karabiner regeneration remains fail-closed after guardian status 'unavailable' (regeneration-preflight).
+2026-10-27 15:34:28:174 [WARNING] [karabiner] Duplicate Ergopti Karabiner revocation completion ignored.
+2026-10-27 15:34:29:216 [ERROR] [config_migrate] Config migration of '~/perso/config/ergopti_plus/hammerspoon/config.toml' refused (newer): canonical schema version is newer than this build. The file is left untouched and this session will not write it.
+2026-10-27 15:34:32:935 [ERROR] [karabiner] Remap guardian status is 'unavailable': the background helper is not registered, so tap-holds and remaps stay inert.
+2026-10-27 15:34:32:941 [WARNING] [karabiner] Karabiner regeneration remains fail-closed after guardian status 'unavailable' (regeneration-preflight).
+2026-10-27 15:35:21:632 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 12 key-down(s), 11 key-up(s), 0 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 272 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:35:26:631 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (3 times); session totals: 43 key-down(s), 42 key-up(s), 1 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 2 key-down(s) and 2 key-up(s) seen 250 ms or more late (max 335 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:35:26:631 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 43 key-down(s), 42 key-up(s), 1 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 2 key-down(s) and 2 key-up(s) seen 250 ms or more late (max 335 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:35:27:631 [WARNING] [key_event_health] A non-character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 46 key-down(s), 45 key-up(s), 1 key-up(s) without key-down, 1 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 2 key-down(s) and 2 key-up(s) seen 250 ms or more late (max 335 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:35:31:634 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 77 key-down(s), 77 key-up(s), 3 key-up(s) without key-down, 1 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 4 key-down(s) and 2 key-up(s) seen 250 ms or more late (max 335 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:35:31:634 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream (2 times); session totals: 77 key-down(s), 77 key-up(s), 3 key-up(s) without key-down, 1 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 4 key-down(s) and 2 key-up(s) seen 250 ms or more late (max 335 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:35:32:632 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps (2 times); session totals: 84 key-down(s), 83 key-up(s), 3 key-up(s) without key-down, 3 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 4 key-down(s) and 2 key-up(s) seen 250 ms or more late (max 335 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:35:36:631 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (3 times); session totals: 98 key-down(s), 98 key-up(s), 4 key-up(s) without key-down, 3 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 6 key-down(s) and 3 key-up(s) seen 250 ms or more late (max 361 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:35:36:631 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 98 key-down(s), 98 key-up(s), 4 key-up(s) without key-down, 3 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 6 key-down(s) and 3 key-up(s) seen 250 ms or more late (max 361 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:35:38:631 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 109 key-down(s), 109 key-up(s), 4 key-up(s) without key-down, 4 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 6 key-down(s) and 3 key-up(s) seen 250 ms or more late (max 361 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:35:46:631 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 119 key-down(s), 119 key-up(s), 4 key-up(s) without key-down, 4 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 7 key-down(s) and 3 key-up(s) seen 250 ms or more late (max 361 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:35:51:631 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 140 key-down(s), 140 key-up(s), 5 key-up(s) without key-down, 4 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 8 key-down(s) and 3 key-up(s) seen 250 ms or more late (max 361 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:35:51:631 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 140 key-down(s), 140 key-up(s), 5 key-up(s) without key-down, 4 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 8 key-down(s) and 3 key-up(s) seen 250 ms or more late (max 361 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:35:52:631 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 148 key-down(s), 147 key-up(s), 5 key-up(s) without key-down, 5 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 8 key-down(s) and 3 key-up(s) seen 250 ms or more late (max 361 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:35:56:630 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 164 key-down(s), 164 key-up(s), 5 key-up(s) without key-down, 5 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 9 key-down(s) and 3 key-up(s) seen 250 ms or more late (max 361 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:36:01:630 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (6 times); session totals: 201 key-down(s), 200 key-up(s), 7 key-up(s) without key-down, 5 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 12 key-down(s) and 6 key-up(s) seen 250 ms or more late (max 455 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:36:01:630 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream (2 times); session totals: 201 key-down(s), 200 key-up(s), 7 key-up(s) without key-down, 5 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 12 key-down(s) and 6 key-up(s) seen 250 ms or more late (max 455 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:36:06:630 [WARNING] [key_event_health] A character key stayed down 5.1 s with no further event: its key-up was lost before the keymap taps (2 times); session totals: 213 key-down(s), 212 key-up(s), 7 key-up(s) without key-down, 5 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 12 key-down(s) and 6 key-up(s) seen 250 ms or more late (max 455 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:36:52:630 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 218 key-down(s), 217 key-up(s), 7 key-up(s) without key-down, 6 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 12 key-down(s) and 6 key-up(s) seen 250 ms or more late (max 455 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:36:53:630 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 222 key-down(s), 222 key-up(s), 7 key-up(s) without key-down, 7 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 12 key-down(s) and 6 key-up(s) seen 250 ms or more late (max 455 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:37:01:630 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (5 times); session totals: 269 key-down(s), 269 key-up(s), 7 key-up(s) without key-down, 7 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 14 key-down(s) and 9 key-up(s) seen 250 ms or more late (max 471 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:37:11:631 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 304 key-down(s), 304 key-up(s), 7 key-up(s) without key-down, 7 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 14 key-down(s) and 10 key-up(s) seen 250 ms or more late (max 471 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:37:21:630 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 359 key-down(s), 359 key-up(s), 7 key-up(s) without key-down, 7 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 15 key-down(s) and 11 key-up(s) seen 250 ms or more late (max 471 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:37:26:630 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (6 times); session totals: 390 key-down(s), 389 key-up(s), 8 key-up(s) without key-down, 7 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 18 key-down(s) and 14 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:37:26:630 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 390 key-down(s), 389 key-up(s), 8 key-up(s) without key-down, 7 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 18 key-down(s) and 14 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:37:27:630 [WARNING] [key_event_health] A non-character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 394 key-down(s), 394 key-up(s), 8 key-up(s) without key-down, 8 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 18 key-down(s) and 14 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:37:31:630 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (5 times); session totals: 420 key-down(s), 420 key-up(s), 10 key-up(s) without key-down, 8 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 21 key-down(s) and 16 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:37:31:631 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream (2 times); session totals: 420 key-down(s), 420 key-up(s), 10 key-up(s) without key-down, 8 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 21 key-down(s) and 16 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:37:33:630 [WARNING] [key_event_health] A non-character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 430 key-down(s), 429 key-up(s), 10 key-up(s) without key-down, 10 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 21 key-down(s) and 16 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:37:33:631 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 430 key-down(s), 429 key-up(s), 10 key-up(s) without key-down, 10 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 21 key-down(s) and 16 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:37:51:630 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 506 key-down(s), 506 key-up(s), 10 key-up(s) without key-down, 10 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 22 key-down(s) and 17 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:38:26:630 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 604 key-down(s), 603 key-up(s), 10 key-up(s) without key-down, 10 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 23 key-down(s) and 18 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:38:31:632 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 629 key-down(s), 629 key-up(s), 11 key-up(s) without key-down, 11 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 24 key-down(s) and 19 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:38:31:632 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 629 key-down(s), 629 key-up(s), 11 key-up(s) without key-down, 11 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 24 key-down(s) and 19 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:38:31:632 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 629 key-down(s), 629 key-up(s), 11 key-up(s) without key-down, 11 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 24 key-down(s) and 19 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:38:36:630 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (3 times); session totals: 649 key-down(s), 648 key-up(s), 13 key-up(s) without key-down, 11 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 26 key-down(s) and 20 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:38:36:630 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream (2 times); session totals: 649 key-down(s), 648 key-up(s), 13 key-up(s) without key-down, 11 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 26 key-down(s) and 20 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:38:38:630 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 660 key-down(s), 660 key-up(s), 13 key-up(s) without key-down, 12 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 26 key-down(s) and 20 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:38:39:630 [WARNING] [key_event_health] A character key stayed down 3.0 s with no further event: its key-up was lost before the keymap taps; session totals: 669 key-down(s), 667 key-up(s), 13 key-up(s) without key-down, 12 key-down(s) without key-up, 3 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 26 key-down(s) and 20 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:38:46:630 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 712 key-down(s), 712 key-up(s), 13 key-up(s) without key-down, 12 key-down(s) without key-up, 3 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 26 key-down(s) and 21 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:38:51:630 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (5 times); session totals: 745 key-down(s), 743 key-up(s), 14 key-up(s) without key-down, 12 key-down(s) without key-up, 3 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 28 key-down(s) and 24 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:38:51:630 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 745 key-down(s), 743 key-up(s), 14 key-up(s) without key-down, 12 key-down(s) without key-up, 3 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 28 key-down(s) and 24 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:38:55:630 [WARNING] [key_event_health] A character key stayed down 3.3 s with no further event: its key-up was lost before the keymap taps; session totals: 760 key-down(s), 759 key-up(s), 14 key-up(s) without key-down, 13 key-down(s) without key-up, 4 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 28 key-down(s) and 24 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:38:55:630 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 760 key-down(s), 759 key-up(s), 14 key-up(s) without key-down, 13 key-down(s) without key-up, 4 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 28 key-down(s) and 24 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:38:56:630 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (4 times); session totals: 768 key-down(s), 768 key-up(s), 16 key-up(s) without key-down, 13 key-down(s) without key-up, 4 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 30 key-down(s) and 26 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:38:56:630 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream (2 times); session totals: 768 key-down(s), 768 key-up(s), 16 key-up(s) without key-down, 13 key-down(s) without key-up, 4 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 30 key-down(s) and 26 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:38:57:630 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 775 key-down(s), 773 key-up(s), 16 key-up(s) without key-down, 14 key-down(s) without key-up, 4 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 30 key-down(s) and 26 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:38:58:630 [WARNING] [key_event_health] A non-character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 781 key-down(s), 780 key-up(s), 16 key-up(s) without key-down, 15 key-down(s) without key-up, 4 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 30 key-down(s) and 26 key-up(s) seen 250 ms or more late (max 495 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:39:01:595 [WARNING] [keymap] Typing context invalidated - keystrokes were missed.
+2026-10-27 15:39:01:638 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 795 key-down(s), 795 key-up(s), 16 key-up(s) without key-down, 15 key-down(s) without key-up, 4 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 31 key-down(s) and 27 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:39:01:638 [WARNING] [key_event_health] Key events that waited behind the main thread passed untouched: no replay, no expansion; session totals: 795 key-down(s), 795 key-up(s), 16 key-up(s) without key-down, 15 key-down(s) without key-up, 4 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 31 key-down(s) and 27 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:39:21:630 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 853 key-down(s), 853 key-up(s), 16 key-up(s) without key-down, 15 key-down(s) without key-up, 4 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 33 key-down(s) and 27 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:39:22:630 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 858 key-down(s), 857 key-up(s), 16 key-up(s) without key-down, 16 key-down(s) without key-up, 4 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 33 key-down(s) and 27 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:39:26:630 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 877 key-down(s), 876 key-up(s), 17 key-up(s) without key-down, 16 key-down(s) without key-up, 4 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 34 key-down(s) and 28 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:39:26:630 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 877 key-down(s), 876 key-up(s), 17 key-up(s) without key-down, 16 key-down(s) without key-up, 4 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 34 key-down(s) and 28 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:39:31:630 [WARNING] [key_event_health] A character key stayed down 4.3 s with no further event: its key-up was lost before the keymap taps; session totals: 893 key-down(s), 893 key-up(s), 18 key-up(s) without key-down, 17 key-down(s) without key-up, 5 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 35 key-down(s) and 29 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:39:31:630 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 893 key-down(s), 893 key-up(s), 18 key-up(s) without key-down, 17 key-down(s) without key-up, 5 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 35 key-down(s) and 29 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:39:31:630 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 893 key-down(s), 893 key-up(s), 18 key-up(s) without key-down, 17 key-down(s) without key-up, 5 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 35 key-down(s) and 29 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:39:31:630 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 893 key-down(s), 893 key-up(s), 18 key-up(s) without key-down, 17 key-down(s) without key-up, 5 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 35 key-down(s) and 29 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:39:39:630 [WARNING] [key_event_health] A character key stayed down 7.5 s with no further event: its key-up was lost before the keymap taps; session totals: 911 key-down(s), 909 key-up(s), 18 key-up(s) without key-down, 17 key-down(s) without key-up, 6 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 35 key-down(s) and 29 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:39:46:630 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 924 key-down(s), 924 key-up(s), 18 key-up(s) without key-down, 17 key-down(s) without key-up, 6 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 36 key-down(s) and 30 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:39:50:630 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 933 key-down(s), 932 key-up(s), 18 key-up(s) without key-down, 18 key-down(s) without key-up, 6 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 36 key-down(s) and 30 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:52:21:628 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 1012 key-down(s), 1012 key-up(s), 18 key-up(s) without key-down, 18 key-down(s) without key-up, 6 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 37 key-down(s) and 31 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:52:26:628 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (3 times); session totals: 1034 key-down(s), 1032 key-up(s), 18 key-up(s) without key-down, 18 key-down(s) without key-up, 6 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 39 key-down(s) and 32 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:52:31:628 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 1061 key-down(s), 1061 key-up(s), 19 key-up(s) without key-down, 18 key-down(s) without key-up, 6 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 40 key-down(s) and 33 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:52:31:628 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 1061 key-down(s), 1061 key-up(s), 19 key-up(s) without key-down, 18 key-down(s) without key-up, 6 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 40 key-down(s) and 33 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:52:34:628 [WARNING] [key_event_health] A character key stayed down 3.0 s with no further event: its key-up was lost before the keymap taps; session totals: 1082 key-down(s), 1082 key-up(s), 19 key-up(s) without key-down, 18 key-down(s) without key-up, 7 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 40 key-down(s) and 33 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:52:36:628 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 1096 key-down(s), 1096 key-up(s), 20 key-up(s) without key-down, 18 key-down(s) without key-up, 7 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 41 key-down(s) and 34 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:52:36:628 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 1096 key-down(s), 1096 key-up(s), 20 key-up(s) without key-down, 18 key-down(s) without key-up, 7 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 41 key-down(s) and 34 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:52:40:628 [WARNING] [key_event_health] A character key stayed down 3.5 s with no further event: its key-up was lost before the keymap taps; session totals: 1100 key-down(s), 1098 key-up(s), 20 key-up(s) without key-down, 18 key-down(s) without key-up, 8 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 41 key-down(s) and 34 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:52:46:628 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 1107 key-down(s), 1107 key-up(s), 20 key-up(s) without key-down, 18 key-down(s) without key-up, 8 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 42 key-down(s) and 35 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:53:02:628 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 1132 key-down(s), 1132 key-up(s), 20 key-up(s) without key-down, 18 key-down(s) without key-up, 8 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 42 key-down(s) and 36 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:53:06:629 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 1155 key-down(s), 1155 key-up(s), 20 key-up(s) without key-down, 18 key-down(s) without key-up, 8 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 43 key-down(s) and 36 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:53:11:628 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 1184 key-down(s), 1183 key-up(s), 20 key-up(s) without key-down, 18 key-down(s) without key-up, 8 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 43 key-down(s) and 37 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:53:16:628 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 1209 key-down(s), 1209 key-up(s), 20 key-up(s) without key-down, 18 key-down(s) without key-up, 8 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 45 key-down(s) and 37 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:53:31:628 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 1276 key-down(s), 1275 key-up(s), 20 key-up(s) without key-down, 18 key-down(s) without key-up, 8 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 46 key-down(s) and 37 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:53:36:628 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 1312 key-down(s), 1312 key-up(s), 21 key-up(s) without key-down, 18 key-down(s) without key-up, 8 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 47 key-down(s) and 38 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:53:36:628 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream; session totals: 1312 key-down(s), 1312 key-up(s), 21 key-up(s) without key-down, 18 key-down(s) without key-up, 8 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 47 key-down(s) and 38 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:53:39:628 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 1333 key-down(s), 1333 key-up(s), 21 key-up(s) without key-down, 19 key-down(s) without key-up, 8 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 47 key-down(s) and 38 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 15:53:41:628 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 1344 key-down(s), 1344 key-up(s), 21 key-up(s) without key-down, 19 key-down(s) without key-up, 8 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 47 key-down(s) and 39 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 16:04:45:669 [WARNING] [key_event_health] A character key was pressed again while its previous key-down had no key-up: that key-up was lost before the keymap taps; session totals: 1405 key-down(s), 1405 key-up(s), 21 key-up(s) without key-down, 20 key-down(s) without key-up, 8 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 47 key-down(s) and 39 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 16:04:46:669 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 1407 key-down(s), 1407 key-up(s), 21 key-up(s) without key-down, 20 key-down(s) without key-up, 8 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 48 key-down(s) and 40 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 16:05:01:670 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 1416 key-down(s), 1415 key-up(s), 21 key-up(s) without key-down, 20 key-down(s) without key-up, 8 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 49 key-down(s) and 40 key-up(s) seen 250 ms or more late (max 526 ms), 1 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 16:05:11:949 [WARNING] [karabiner] Duplicate Ergopti Karabiner revocation completion ignored.
+2026-10-27 16:06:18:776 [WARNING] [BootProfile] Boot stage 'Accessibility permission' opened while 'Accessibility permission' is still open.
+2026-10-27 16:06:19:026 [WARNING] [keymap.registry] TOML mapping file '<name>' registered ZERO mappings — check the path and its contents.
+2026-10-27 16:06:19:436 [WARNING] [keymap.registry] ↑ "TOML mapping file '<name>' registered ZERO mappings — check the path and its contents." repeated 1 more time between 2026-10-27 16:06:19:028 and 2026-10-27 16:06:19:028.
+2026-10-27 16:06:41:666 [ERROR] [keystats.log_manager] Cannot read typing rollover facts: unsupported or ambiguous typing SQL at a rollover boundary.
+2026-10-27 16:06:41:666 [ERROR] [keystats.log_manager] Aggregate cache recovery failed; raw events remain durable for retry.
+2026-10-27 16:06:42:328 [WARNING] [runtime] An hs.timer.new callback (...ergopti/static/ergopti_plus/macos/ui/menu/menu_state.lua:531) held the main thread for 22385 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-27 16:06:42:340 [ERROR] [karabiner] Remap guardian status is 'unavailable': the background helper is not registered, so tap-holds and remaps stay inert.
+2026-10-27 16:06:42:345 [WARNING] [karabiner] Karabiner regeneration remains fail-closed after guardian status 'unavailable' (regeneration-preflight).
+2026-10-27 16:09:22:212 [WARNING] [preferences] Slow preferences save 2001 ms (prepare=1191 write=809 ms; operations=293).
+2026-10-27 16:09:23:605 [ERROR] [keystats.context_tracker] Previous AXValueChanged watcher cleanup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: AXUIElementRef is invalid
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:757: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>
+	[C]: in function 'hs.libdialog.blockAlert'
+	[C]: in function 'pcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1854: in function 'infra.logger.run_modal'
+	(...tail calls...)
+	[C]: in function 'pcall'
+	...c/ergopti_plus/macos/ui/menu/menu_llm/models_manager.lua:547: in function <...c/ergopti_plus/macos/ui/menu/menu_llm/models_manager.lua:504>
+	[C]: in function 'xpcall'
+	...c/ergopti_plus/macos/ui/menu/menu_llm/models_manager.lua:577: in upvalue 'deliver_system_check'
+	...c/ergopti_plus/macos/ui/menu/menu_llm/models_manager.lua:596: in function <...c/ergopti_plus/macos/ui/menu/menu_llm/models_manager.lua:590>
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:107: in upvalue 'invoke_callback'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:222: in function <...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:198>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1936: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1929>.
+2026-10-27 16:09:26:096 [ERROR] [keystats.context_tracker] Previous AXValueChanged watcher cleanup failed: .../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: AXUIElementRef is invalid
+stack traceback:
+	[C]: in field '?'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:631: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630>
+	[C]: in function 'xpcall'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:630: in upvalue 'mutate_ax_value_watcher'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:757: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:750>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1774: in function 'infra.logger.callback'
+	.../ergopti_plus/macos/modules/keystats/context_tracker.lua:748: in function <.../ergopti_plus/macos/modules/keystats/context_tracker.lua:742>.
+2026-10-27 16:09:37:714 [WARNING] [keystats.log_manager] Slow ingest tick 516 ms (drain=0 foreign=1 outbox=3 read=2 build=13 apply=27 commit=1 append=466 notify=0 ms; entries=4 statements=4).
+2026-10-27 16:09:38:333 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them; session totals: 4 key-down(s), 4 key-up(s), 0 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 0 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 488 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 16:15:53:986 [WARNING] [keystats.log_manager] Slow ingest tick 1784 ms (drain=0 foreign=0 outbox=2 read=1 build=11 apply=27 commit=31 append=1709 notify=0 ms; entries=2 statements=2).
+2026-10-27 16:15:53:986 [WARNING] [runtime] An hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:1722) held the main thread for 1784 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-27 16:17:22:737 [WARNING] [keystats.log_manager] Slow ingest tick 535 ms (drain=0 foreign=0 outbox=5 read=0 build=14 apply=13 commit=1 append=498 notify=0 ms; entries=2 statements=2).
+2026-10-27 16:18:27:740 [WARNING] [keystats.log_manager] Slow ingest tick 538 ms (drain=0 foreign=0 outbox=3 read=1 build=13 apply=19 commit=1 append=498 notify=0 ms; entries=2 statements=2).
+2026-10-27 16:18:49:583 [WARNING] [HotPath] Slow keydown: 5.84 ms own, 5.84 ms total, parent none (0 similar since the last line).
+2026-10-27 16:19:37:756 [WARNING] [keystats.log_manager] Slow ingest tick 553 ms (drain=0 foreign=0 outbox=4 read=0 build=13 apply=12 commit=1 append=519 notify=0 ms; entries=1 statements=1).
+2026-10-27 16:20:42:741 [WARNING] [keystats.log_manager] Slow ingest tick 537 ms (drain=0 foreign=0 outbox=4 read=1 build=14 apply=13 commit=1 append=502 notify=0 ms; entries=3 statements=3).
+2026-10-27 16:21:47:747 [WARNING] [keystats.log_manager] Slow ingest tick 544 ms (drain=0 foreign=0 outbox=4 read=0 build=13 apply=15 commit=1 append=507 notify=0 ms; entries=1 statements=1).
+2026-10-27 16:27:17:716 [WARNING] [keystats.log_manager] Slow ingest tick 510 ms (drain=0 foreign=0 outbox=3 read=0 build=14 apply=12 commit=1 append=477 notify=0 ms; entries=1 statements=1).
+2026-10-27 16:27:53:341 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 14 key-down(s), 14 key-up(s), 0 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 1 key-down(s) and 2 key-up(s) seen 250 ms or more late (max 488 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 16:28:02:584 [WARNING] [karabiner] Duplicate Ergopti Karabiner revocation completion ignored.
+2026-10-27 16:28:04:016 [WARNING] [keymap.registry] TOML mapping file '<name>' registered ZERO mappings — check the path and its contents.
+2026-10-27 16:28:04:298 [WARNING] [keymap.utils] Ignored-window prewarm incomplete; tracking remains fail-closed.
+2026-10-27 16:28:04:298 [WARNING] [keymap] Ignored-window watcher preparation incomplete; tracking remains fail-closed: false.
+2026-10-27 16:28:04:391 [WARNING] [keymap.registry] ↑ "TOML mapping file '<name>' registered ZERO mappings — check the path and its contents." repeated 1 more time between 2026-10-27 16:28:04:019 and 2026-10-27 16:28:04:019.
+2026-10-27 16:28:06:024 [WARNING] [runtime] An hs.timer.new callback (...ergopti/static/ergopti_plus/macos/ui/menu/menu_state.lua:531) held the main thread for 1123 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-27 16:28:07:886 [ERROR] [karabiner] Karabiner regeneration layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2168: config.toml cannot be read, so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2168: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:6241: in function 'platform.remap.regenerate'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2040: in upvalue 'replay_guardian_regenerations'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2141: in upvalue 'callback'
+	...	(skipping 8 levels)
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1854: in function 'infra.logger.run_modal'
+	(...tail calls...)
+	[C]: in function 'pcall'
+	...c/ergopti_plus/macos/ui/menu/menu_llm/models_manager.lua:547: in function <...c/ergopti_plus/macos/ui/menu/menu_llm/models_manager.lua:504>
+	[C]: in function 'xpcall'
+	...c/ergopti_plus/macos/ui/menu/menu_llm/models_manager.lua:577: in upvalue 'deliver_system_check'
+	...c/ergopti_plus/macos/ui/menu/menu_llm/models_manager.lua:596: in function <...c/ergopti_plus/macos/ui/menu/menu_llm/models_manager.lua:590>
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:107: in upvalue 'invoke_callback'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:222: in function <...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:198>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1936: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1929>.
+2026-10-27 16:28:07:936 [WARNING] [startup_ctrl] Disabling LLM: the ollama backend (startup_model_download_declined: Qwen3.5-2B).
+2026-10-27 16:28:07:949 [ERROR] [llm.api_ollama] stop_warmup() could not retire its HTTP owner: false.
+2026-10-27 16:28:07:949 [ERROR] [llm.prediction_engine] LLM settlement 'Ollama warmup stop' did not commit (result: false).
+2026-10-27 16:28:13:496 [WARNING] [karabiner] Duplicate Ergopti Karabiner revocation completion ignored.
+2026-10-27 16:28:13:520 [WARNING] [keystats.log_manager] Aggregate cache recovery interrupted after 267 slice(s); it restarts at the next start.
+2026-10-27 16:48:11:290 [WARNING] [keymap.registry] TOML mapping file '<name>' registered ZERO mappings — check the path and its contents.
+2026-10-27 16:48:11:715 [WARNING] [keymap.registry] ↑ "TOML mapping file '<name>' registered ZERO mappings — check the path and its contents." repeated 1 more time between 2026-10-27 16:48:11:292 and 2026-10-27 16:48:11:292.
+2026-10-27 16:48:12:044 [ERROR] [karabiner] Karabiner regeneration layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2168: config.toml cannot be read, so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2168: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:6241: in function 'platform.remap.regenerate'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2040: in upvalue 'replay_guardian_regenerations'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2141: in upvalue 'callback'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:179: in function <...c/ergopti_plus/macos/platform/remap/lease_controller.lua:178>
+	[C]: in function 'xpcall'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:178: in upvalue 'invoke_callback'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:1670: in function <...c/ergopti_plus/macos/platform/remap/lease_controller.lua:1654>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:646: in upvalue '_deliver_business_completion'
+	...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:683: in function <...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:662>.
+2026-10-27 16:48:13:523 [WARNING] [runtime] An hs.timer.new callback (...ergopti/static/ergopti_plus/macos/ui/menu/menu_state.lua:531) held the main thread for 1300 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-27 16:48:18:822 [WARNING] [startup_ctrl] Disabling LLM: the ollama backend (startup_model_download_declined: Qwen3.5-2B).
+2026-10-27 16:48:20:898 [WARNING] [preferences] Slow preferences save 2065 ms (prepare=1291 write=773 ms; operations=293).
+2026-10-27 16:48:20:899 [WARNING] [runtime] An hs.timer.new callback (...gopti_plus/macos/ui/menu/menu_llm/startup_controller.lua:263) held the main thread for 2070 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-27 16:48:20:906 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found. - http://vipprseafafr.axa-fr.intraxa/afa-fr-proxy.pac.
+2026-10-27 16:48:44:206 [WARNING] [menu.keyboard_layout] Failed to enable 'Composer Check' — reason=process_failed.
+2026-10-27 16:48:44:206 [WARNING] [layout_registry] The composed 'composed' layout is installed but not enabled: process_failed.
+2026-10-27 16:48:44:255 [WARNING] [menu.keyboard_layout] Edit enabled keyboard input sources refused: another input-source mutation is still settling.
+2026-10-27 16:48:44:255 [WARNING] [menu.keyboard_layout] Failed to disable 'Composer Check' — reason=busy.
+2026-10-27 16:48:44:255 [WARNING] [layout_registry] The 'composed' layout could not be removed from the input sources: busy.
+2026-10-27 16:49:17:714 [WARNING] [keystats.log_manager] Typing ids restart at ledger byte 68020656 (id 87 after rollover bound 174722): rebuilding without day-boundary context resets.
+2026-10-27 16:49:22:998 [WARNING] [runtime] An hs.timer.new callback (...atic/ergopti_plus/macos/modules/keystats/log_manager.lua:1585) held the main thread for 5288 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-27 16:53:38:978 [WARNING] [keystats.log_manager] Slow ingest tick 544 ms (drain=0 foreign=0 outbox=3 read=2 build=8 apply=9 commit=1 append=517 notify=0 ms; entries=1 statements=1).
+2026-10-27 16:53:45:581 [WARNING] [field_run] Field run step 'ollama_model' answered after it was settled; answer dropped.
+2026-10-27 16:54:31:250 [WARNING] [keymap.registry] TOML mapping file '<name>' registered ZERO mappings — check the path and its contents.
+2026-10-27 16:54:31:624 [WARNING] [keymap.registry] ↑ "TOML mapping file '<name>' registered ZERO mappings — check the path and its contents." repeated 1 more time between 2026-10-27 16:54:31:252 and 2026-10-27 16:54:31:252.
+2026-10-27 16:54:32:037 [WARNING] [field_run] Field run mac-2026-10-27_164726 was cut short by a reload; closed as interrupted.
+2026-10-27 16:54:32:486 [ERROR] [karabiner] Karabiner regeneration layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2168: config.toml cannot be read, so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2168: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:6241: in function 'platform.remap.regenerate'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2040: in upvalue 'replay_guardian_regenerations'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2141: in upvalue 'callback'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:179: in function <...c/ergopti_plus/macos/platform/remap/lease_controller.lua:178>
+	[C]: in function 'xpcall'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:178: in upvalue 'invoke_callback'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:1670: in function <...c/ergopti_plus/macos/platform/remap/lease_controller.lua:1654>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:646: in upvalue '_deliver_business_completion'
+	...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:683: in function <...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:662>.
+2026-10-27 16:54:58:018 [WARNING] [keystats.log_manager] Slow ingest tick 591 ms (drain=0 foreign=0 outbox=2 read=1 build=7 apply=5 commit=0 append=573 notify=0 ms; entries=5 statements=5).
+2026-10-27 16:55:18:527 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 35 key-down(s), 35 key-up(s), 2 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 1 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 367 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 16:55:18:527 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream (2 times); session totals: 35 key-down(s), 35 key-up(s), 2 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 1 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 367 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 18:17:30:155 [WARNING] [keystats.log_manager] Slow ingest tick 639 ms (drain=0 foreign=0 outbox=3 read=0 build=9 apply=13 commit=4 append=608 notify=0 ms; entries=1 statements=1).
+2026-10-27 19:46:39:112 [WARNING] [karabiner.lease] Cannot refresh Karabiner lease liveness — no live generation exists.
+2026-10-27 19:46:39:112 [WARNING] [karabiner] Wake refresh could not renew the exact Karabiner lease liveness.
+2026-10-27 19:46:39:634 [ERROR] [karabiner] Settled Wake layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2168: config.toml cannot be read, so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2168: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3007: in upvalue 'perform_settled_layout_refresh'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3161: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in upvalue 'run_async_step'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3149>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1936: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1929>.
+2026-10-27 19:46:39:635 [WARNING] [karabiner] Wake layout refresh retry 1/3 in 1.0 s (layout-action-resolution-failed).
+2026-10-27 19:46:41:630 [WARNING] [karabiner] Wake layout refresh retry 2/3 in 10.0 s (layout-action-resolution-failed).
+2026-10-27 19:46:46:863 [WARNING] [key_event_health] A character key stayed down 589.8 s with no further event: its key-up was lost before the keymap taps (2 times); session totals: 38 key-down(s), 38 key-up(s), 2 key-up(s) without key-down, 0 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 1 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 367 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 19:46:51:648 [WARNING] [karabiner] Wake layout refresh retry 3/3 in 30.0 s (layout-action-resolution-failed).
+2026-10-27 19:47:04:880 [WARNING] [karabiner] Duplicate Ergopti Karabiner revocation completion ignored.
+2026-10-27 19:47:04:881 [WARNING] [menu_global_actions] Global external writer 'Watcher reload' refused because terminal quiescence was not proved: true.
+2026-10-27 19:47:04:882 [WARNING] [menu_watchers] Menu reload request was refused; the source-file burst remains pending for retry: false.
+2026-10-27 19:47:04:940 [WARNING] [karabiner.lease] ↑ "Cannot refresh Karabiner lease liveness — no live generation exists." repeated 1 more time between 2026-10-27 19:46:40:099 and 2026-10-27 19:46:40:099.
+2026-10-27 19:47:04:940 [WARNING] [karabiner] ↑ "Wake refresh could not renew the exact Karabiner lease liveness." repeated 1 more time between 2026-10-27 19:46:40:100 and 2026-10-27 19:46:40:100.
+2026-10-27 19:47:04:940 [ERROR] [karabiner] ↑ "Settled Wake layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2168: config.toml cannot be read, so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2168: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3007: in upvalue 'perform_settled_layout_refresh'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3161: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in upvalue 'run_async_step'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3149>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1936: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1929>." repeated 3 more times between 2026-10-27 19:46:40:622 and 2026-10-27 19:46:51:648.
+2026-10-27 19:47:04:940 [WARNING] [karabiner] ↑ "Wake layout refresh retry 1/3 in 1.0 s (layout-action-resolution-failed)." repeated 1 more time between 2026-10-27 19:46:40:622 and 2026-10-27 19:46:40:622.
+2026-10-27 19:47:06:868 [ERROR] [karabiner] Karabiner regeneration layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: config.toml cannot be read (value_type), so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:6241: in function 'platform.remap.regenerate'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2040: in upvalue 'replay_guardian_regenerations'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2141: in upvalue 'callback'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:180: in function <...c/ergopti_plus/macos/platform/remap/lease_controller.lua:179>
+	[C]: in function 'xpcall'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:179: in upvalue 'invoke_callback'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:1671: in function <...c/ergopti_plus/macos/platform/remap/lease_controller.lua:1655>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:646: in upvalue '_deliver_business_completion'
+	...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:683: in function <...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:662>.
+2026-10-27 19:48:23:535 [ERROR] [karabiner] Karabiner regeneration layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: config.toml cannot be read (value_type), so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:6241: in function 'platform.remap.regenerate'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2040: in upvalue 'replay_guardian_regenerations'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2141: in upvalue 'callback'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:180: in function <...c/ergopti_plus/macos/platform/remap/lease_controller.lua:179>
+	[C]: in function 'xpcall'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:179: in upvalue 'invoke_callback'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:1671: in function <...c/ergopti_plus/macos/platform/remap/lease_controller.lua:1655>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:646: in upvalue '_deliver_business_completion'
+	...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:683: in function <...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:662>.
+2026-10-27 19:48:26:934 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found. - http://vipprseafafr.axa-fr.intraxa/afa-fr-proxy.pac.
+2026-10-27 19:48:48:828 [WARNING] [menu.keyboard_layout] Failed to enable 'Composer Check' — reason=process_failed.
+2026-10-27 19:48:48:828 [WARNING] [layout_registry] The composed 'composed' layout is installed but not enabled: process_failed.
+2026-10-27 19:48:48:985 [WARNING] [menu.keyboard_layout] Failed to disable 'Composer Check' — reason=process_failed.
+2026-10-27 19:48:48:985 [WARNING] [layout_registry] The 'composed' layout could not be removed from the input sources: process_failed.
+2026-10-27 19:48:49:410 [ERROR] [ollama_deps] Ollama bootstrap failed (exit=64) — L'installateur Ollama d'Ergopti a refusé sa propre requête : rien n'a été installé. Redémarrez Ergopti et choisissez de nouveau le moteur Ollama ; si cela persiste, envoyez le rapport de diagnostic.
+2026-10-27 19:48:49:450 [WARNING] [download_window] Progress UI flipped to error state: L'installateur Ollama d'Ergopti a refusé sa propre requête : rien n'a été installé. Redémarrez Ergopti et choisissez de nouveau le moteur Ollama ; si cela persiste, envoyez le rapport de diagnostic.
+2026-10-27 19:51:26:413 [ERROR] [mlx_deps] MLX bootstrap failed (exit=1, cause=exit, path=nil). Last output: __ERGOPTI_OPAQUE_ADMISSION_V1__:accepted | [MLX-DEPS] Automatic network settings will be evaluated by the native download helper. | [MLX-DEPS] Mode bundle détecté — venv redirigé vers ~/Library/Application Support/Ergopti/mlx-venv | [MLX-DEPS] Using the native Python /Library/Frameworks/Python.framework/Versions/Current/bin/python3: no interpreter download. | [MLX-DEPS] Création du virtualenv candidat : ~/Library/Application Support/Ergopti/mlx-venv.bootstrap.77842 | Using CPython 3.13.7 interpreter at: /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 | Creating virtual environment at: ~/Library/Application Support/Ergopti/mlx-venv.bootstrap.77842 | Activate with: source '~/Library/Application Support/Ergopti/mlx-venv.bootstrap.77842/bin/activate' | [MLX-DEPS] Synchronisation des dépendances depuis pyproject.toml… | # managed_bootstrap_failure {"cleanup": "confirmed", "exception_class": "NativeHTTPError", "native_child_pid": 77924, "native_child_status": 74, "native_receipt_reason": "certificate", "stage": "native_certificate_load", "version": 1} | Managed bootstrap request failed: certificate. | [MLX-DEPS] Network attempt 1/6 failed (code 74) -- retrying in 5s. | # managed_bootstrap_failure {"cleanup": "confirmed", "exception_class": "NativeHTTPError", "native_child_pid": 78105, "native_child_status": 74, "native_receipt_reason": "certificate", "stage": "native_certificate_load", "version": 1} | Managed bootstrap request failed: certificate. | [MLX-DEPS] Network attempt 2/6 failed (code 74) -- retrying in 10s. | # managed_bootstrap_failure {"cleanup": "confirmed", "exception_class": "NativeHTTPError", "native_child_pid": 78447, "native_child_status": 74, "native_receipt_reason": "certificate", "stage": "native_certificate_load", "version": 1} | Managed bootstrap request failed: certificate. | [MLX-DEPS] Network attempt 3/6 failed (code 74) -- retrying in 20s. | # managed_bootstrap_failure {"cleanup": "confirmed", "exception_class": "NativeHTTPError", "native_child_pid": 79055, "native_child_status": 74, "native_receipt_reason": "certificate", "stage": "native_certificate_load", "version": 1} | Managed bootstrap request failed: certificate. | [MLX-DEPS] Network attempt 4/6 failed (code 74) -- retrying in 40s. | # managed_bootstrap_failure {"cleanup": "confirmed", "exception_class": "NativeHTTPError", "native_child_pid": 80387, "native_child_status": 74, "native_receipt_reason": "certificate", "stage": "native_certificate_load", "version": 1} | Managed bootstrap request failed: certificate. | [MLX-DEPS] Network attempt 5/6 failed (code 74) -- retrying in 80s. | # managed_bootstrap_failure {"cleanup": "confirmed", "exception_class": "NativeHTTPError", "native_child_pid": 83006, "native_child_status": 74, "native_receipt_reason": "certificate", "stage": "native_certificate_load", "version": 1} | Managed bootstrap request failed: certificate. | [MLX-DEPS] ❌ Network attempt 6/6 failed (code 74) -- giving up. | [MLX-DEPS] ❌ uv sync failed; the uv error above names the cause.
+2026-10-27 19:51:26:441 [WARNING] [download_window] Progress UI flipped to error state: L’installation s’est arrêtée avec le code 1. Détail : [MLX-DEPS] ❌ uv sync failed; the uv error above names the cause.
+2026-10-27 19:51:26:464 [WARNING] [menu_llm.mlx_repair_offer] Offering the MLX repair action for a exit failure.
+2026-10-27 19:52:19:825 [WARNING] [keystats.log_manager] Slow ingest tick 519 ms (drain=0 foreign=0 outbox=3 read=0 build=8 apply=10 commit=1 append=494 notify=0 ms; entries=1 statements=1).
+2026-10-27 19:56:29:824 [WARNING] [keystats.log_manager] Slow ingest tick 520 ms (drain=0 foreign=0 outbox=2 read=2 build=8 apply=11 commit=1 append=493 notify=0 ms; entries=1 statements=1).
+2026-10-27 20:00:29:848 [WARNING] [keystats.log_manager] Slow ingest tick 546 ms (drain=0 foreign=0 outbox=4 read=1 build=9 apply=8 commit=1 append=518 notify=0 ms; entries=1 statements=1).
+2026-10-27 20:06:24:760 [WARNING] [karabiner.lease] Cannot refresh Karabiner lease liveness — no live generation exists.
+2026-10-27 20:06:24:760 [WARNING] [karabiner] Wake refresh could not renew the exact Karabiner lease liveness.
+2026-10-27 20:06:25:727 [ERROR] [karabiner] Settled Wake layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: config.toml cannot be read (value_type), so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3007: in upvalue 'perform_settled_layout_refresh'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3161: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in upvalue 'run_async_step'
+	...	(skipping 2 levels)
+	[C]: in function 'hs.libdialog.blockAlert'
+	[C]: in function 'pcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1854: in function 'infra.logger.run_modal'
+	(...tail calls...)
+	[C]: in function 'pcall'
+	...ergopti_plus/macos/ui/menu/menu_llm/mlx_repair_offer.lua:297: in upvalue 'present'
+	...ergopti_plus/macos/ui/menu/menu_llm/mlx_repair_offer.lua:364: in function <...ergopti_plus/macos/ui/menu/menu_llm/mlx_repair_offer.lua:360>
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:107: in upvalue 'invoke_callback'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:222: in function <...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:198>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1936: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1929>.
+2026-10-27 20:06:25:727 [WARNING] [karabiner] Wake layout refresh retry 1/3 in 1.0 s (layout-action-resolution-failed).
+2026-10-27 20:06:26:736 [WARNING] [karabiner] Wake layout refresh retry 2/3 in 10.0 s (layout-action-resolution-failed).
+2026-10-27 20:06:36:755 [ERROR] [karabiner] Settled Wake layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: config.toml cannot be read (value_type), so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3007: in upvalue 'perform_settled_layout_refresh'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3161: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in upvalue 'run_async_step'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3149>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1936: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1929>.
+2026-10-27 20:06:36:755 [WARNING] [karabiner] Wake layout refresh retry 3/3 in 30.0 s (layout-action-resolution-failed).
+2026-10-27 20:07:07:211 [ERROR] [karabiner] Wake layout refresh exhausted after 3 retry attempt(s); the current lease state was retained (layout-action-resolution-failed).
+2026-10-27 20:07:12:113 [WARNING] [keystats.log_manager] Slow ingest tick 714 ms (drain=0 foreign=0 outbox=4 read=0 build=7 apply=8 commit=1 append=689 notify=0 ms; entries=2 statements=2).
+2026-10-27 20:16:24:832 [WARNING] [karabiner.lease] ↑ "Cannot refresh Karabiner lease liveness — no live generation exists." repeated 3 more times between 2026-10-27 20:06:25:212 and 2026-10-27 20:16:02:425.
+2026-10-27 20:16:24:832 [WARNING] [karabiner] ↑ "Wake refresh could not renew the exact Karabiner lease liveness." repeated 3 more times between 2026-10-27 20:06:25:212 and 2026-10-27 20:16:02:425.
+2026-10-27 20:16:25:942 [ERROR] [karabiner] ↑ "Settled Wake layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: config.toml cannot be read (value_type), so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3007: in upvalue 'perform_settled_layout_refresh'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3161: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in upvalue 'run_async_step'
+	...	(skipping 2 levels)
+	[C]: in function 'hs.libdialog.blockAlert'
+	[C]: in function 'pcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1854: in function 'infra.logger.run_modal'
+	(...tail calls...)
+	[C]: in function 'pcall'
+	...ergopti_plus/macos/ui/menu/menu_llm/mlx_repair_offer.lua:297: in upvalue 'present'
+	...ergopti_plus/macos/ui/menu/menu_llm/mlx_repair_offer.lua:364: in function <...ergopti_plus/macos/ui/menu/menu_llm/mlx_repair_offer.lua:360>
+	[C]: in function 'xpcall'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:107: in upvalue 'invoke_callback'
+	...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:222: in function <...i/static/ergopti_plus/macos/adapters/timer_scheduler.lua:198>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1936: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1929>." repeated 1 more time between 2026-10-27 20:06:26:736 and 2026-10-27 20:06:26:736.
+2026-10-27 20:16:25:942 [WARNING] [karabiner] ↑ "Wake layout refresh retry 1/3 in 1.0 s (layout-action-resolution-failed)." repeated 2 more times between 2026-10-27 20:16:01:560 and 2026-10-27 20:16:02:969.
+2026-10-27 20:16:26:942 [WARNING] [karabiner] ↑ "Wake layout refresh retry 2/3 in 10.0 s (layout-action-resolution-failed)." repeated 1 more time between 2026-10-27 20:16:04:332 and 2026-10-27 20:16:04:332.
+2026-10-27 20:16:36:942 [ERROR] [karabiner] ↑ "Settled Wake layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: config.toml cannot be read (value_type), so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3007: in upvalue 'perform_settled_layout_refresh'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3161: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in upvalue 'run_async_step'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3149>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1936: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1929>." repeated 5 more times between 2026-10-27 20:07:07:211 and 2026-10-27 20:16:14:347.
+2026-10-27 20:16:36:942 [WARNING] [karabiner] ↑ "Wake layout refresh retry 3/3 in 30.0 s (layout-action-resolution-failed)." repeated 1 more time between 2026-10-27 20:16:14:347 and 2026-10-27 20:16:14:347.
+2026-10-27 20:16:44:366 [ERROR] [karabiner] Settled Wake layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: config.toml cannot be read (value_type), so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3007: in upvalue 'perform_settled_layout_refresh'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3161: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in upvalue 'run_async_step'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3149>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1936: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1929>.
+2026-10-27 20:16:59:193 [WARNING] [keystats.log_manager] Slow ingest tick 543 ms (drain=0 foreign=0 outbox=2 read=2 build=9 apply=9 commit=1 append=517 notify=0 ms; entries=1 statements=1).
+2026-10-27 20:17:07:442 [ERROR] [karabiner] ↑ "Wake layout refresh exhausted after 3 retry attempt(s); the current lease state was retained (layout-action-resolution-failed)." repeated 1 more time between 2026-10-27 20:16:44:366 and 2026-10-27 20:16:44:366.
+2026-10-27 20:17:45:079 [ERROR] [mlx_deps] MLX bootstrap failed (exit=1, cause=exit, path=nil). Last output: __ERGOPTI_OPAQUE_ADMISSION_V1__:accepted | [MLX-DEPS] Automatic network settings will be evaluated by the native download helper. | [MLX-DEPS] Mode bundle détecté — venv redirigé vers ~/Library/Application Support/Ergopti/mlx-venv | [MLX-DEPS] Using the native Python /Library/Frameworks/Python.framework/Versions/Current/bin/python3: no interpreter download. | [MLX-DEPS] Création du virtualenv candidat : ~/Library/Application Support/Ergopti/mlx-venv.bootstrap.5689 | Using CPython 3.13.7 interpreter at: /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 | Creating virtual environment at: ~/Library/Application Support/Ergopti/mlx-venv.bootstrap.5689 | Activate with: source '~/Library/Application Support/Ergopti/mlx-venv.bootstrap.5689/bin/activate' | [MLX-DEPS] Synchronisation des dépendances depuis pyproject.toml… | # managed_bootstrap_failure {"cleanup": "confirmed", "exception_class": "NativeHTTPError", "native_child_pid": 5745, "native_child_status": 74, "native_receipt_reason": "certificate", "stage": "native_certificate_load", "version": 1} | Managed bootstrap request failed: certificate. | [MLX-DEPS] Network attempt 1/6 failed (code 74) -- retrying in 5s. | # managed_bootstrap_failure {"cleanup": "confirmed", "exception_class": "NativeHTTPError", "native_child_pid": 5953, "native_child_status": 74, "native_receipt_reason": "certificate", "stage": "native_certificate_load", "version": 1} | Managed bootstrap request failed: certificate. | [MLX-DEPS] Network attempt 2/6 failed (code 74) -- retrying in 10s. | # managed_bootstrap_failure {"cleanup": "confirmed", "exception_class": "NativeHTTPError", "native_child_pid": 6276, "native_child_status": 74, "native_receipt_reason": "certificate", "stage": "native_certificate_load", "version": 1} | Managed bootstrap request failed: certificate. | [MLX-DEPS] Network attempt 3/6 failed (code 74) -- retrying in 20s. | # managed_bootstrap_failure {"cleanup": "confirmed", "exception_class": "NativeHTTPError", "native_child_pid": 6889, "native_child_status": 74, "native_receipt_reason": "certificate", "stage": "native_certificate_load", "version": 1} | Managed bootstrap request failed: certificate. | [MLX-DEPS] Network attempt 4/6 failed (code 74) -- retrying in 40s. | # managed_bootstrap_failure {"cleanup": "confirmed", "exception_class": "NativeHTTPError", "native_child_pid": 8194, "native_child_status": 74, "native_receipt_reason": "certificate", "stage": "native_certificate_load", "version": 1} | Managed bootstrap request failed: certificate. | [MLX-DEPS] Network attempt 5/6 failed (code 74) -- retrying in 80s. | # managed_bootstrap_failure {"cleanup": "confirmed", "exception_class": "NativeHTTPError", "native_child_pid": 10373, "native_child_status": 74, "native_receipt_reason": "certificate", "stage": "native_certificate_load", "version": 1} | Managed bootstrap request failed: certificate. | [MLX-DEPS] ❌ Network attempt 6/6 failed (code 74) -- giving up. | [MLX-DEPS] ❌ uv sync failed; the uv error above names the cause.
+2026-10-27 20:17:45:107 [WARNING] [download_window] Progress UI flipped to error state: L’installation s’est arrêtée avec le code 1. Détail : [MLX-DEPS] ❌ uv sync failed; the uv error above names the cause.
+2026-10-27 20:17:45:111 [ERROR] [menu_llm.mlx_repair_offer] The MLX repair failed (exit).
+2026-10-27 20:17:45:131 [WARNING] [menu_llm.mlx_repair_offer] Offering the MLX repair action for a exit failure.
+2026-10-27 20:43:52:316 [WARNING] [keystats.log_manager] Slow ingest tick 505 ms (drain=0 foreign=0 outbox=3 read=0 build=8 apply=9 commit=1 append=481 notify=0 ms; entries=1 statements=1).
+2026-10-27 21:06:41:427 [WARNING] [karabiner.lease] Cannot refresh Karabiner lease liveness — no live generation exists.
+2026-10-27 21:06:41:427 [WARNING] [karabiner] Wake refresh could not renew the exact Karabiner lease liveness.
+2026-10-27 21:06:41:946 [ERROR] [karabiner] Settled Wake layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: config.toml cannot be read (value_type), so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3007: in upvalue 'perform_settled_layout_refresh'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3161: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in upvalue 'run_async_step'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3149>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1936: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1929>.
+2026-10-27 21:06:41:946 [WARNING] [karabiner] Wake layout refresh retry 1/3 in 1.0 s (layout-action-resolution-failed).
+2026-10-27 21:06:42:986 [WARNING] [karabiner] Wake layout refresh retry 2/3 in 10.0 s (layout-action-resolution-failed).
+2026-10-27 21:06:54:788 [WARNING] [karabiner] Wake layout refresh retry 3/3 in 30.0 s (layout-action-resolution-failed).
+2026-10-27 21:06:55:184 [WARNING] [menu_global_actions] Global external writer 'Watcher reload' refused because terminal quiescence was not proved: true.
+2026-10-27 21:06:55:184 [WARNING] [menu_watchers] Menu reload request was refused; the source-file burst remains pending for retry: false.
+2026-10-27 21:06:55:214 [WARNING] [karabiner.lease] ↑ "Cannot refresh Karabiner lease liveness — no live generation exists." repeated 1 more time between 2026-10-27 21:06:43:239 and 2026-10-27 21:06:43:239.
+2026-10-27 21:06:55:214 [WARNING] [karabiner] ↑ "Wake refresh could not renew the exact Karabiner lease liveness." repeated 1 more time between 2026-10-27 21:06:43:239 and 2026-10-27 21:06:43:239.
+2026-10-27 21:06:55:214 [ERROR] [karabiner] ↑ "Settled Wake layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: config.toml cannot be read (value_type), so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3007: in upvalue 'perform_settled_layout_refresh'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3161: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in upvalue 'run_async_step'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3149>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1936: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1929>." repeated 4 more times between 2026-10-27 21:06:42:986 and 2026-10-27 21:06:54:788.
+2026-10-27 21:06:55:214 [WARNING] [karabiner] ↑ "Wake layout refresh retry 1/3 in 1.0 s (layout-action-resolution-failed)." repeated 1 more time between 2026-10-27 21:06:43:755 and 2026-10-27 21:06:43:755.
+2026-10-27 21:06:55:214 [WARNING] [karabiner] ↑ "Wake layout refresh retry 2/3 in 10.0 s (layout-action-resolution-failed)." repeated 1 more time between 2026-10-27 21:06:44:770 and 2026-10-27 21:06:44:770.
+2026-10-27 21:06:57:288 [ERROR] [karabiner] Karabiner regeneration layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: config.toml cannot be read (value_type at hotstrings.dynamic.date), so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:6241: in function 'platform.remap.regenerate'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2040: in upvalue 'replay_guardian_regenerations'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2141: in upvalue 'callback'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:180: in function <...c/ergopti_plus/macos/platform/remap/lease_controller.lua:179>
+	[C]: in function 'xpcall'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:179: in upvalue 'invoke_callback'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:1671: in function <...c/ergopti_plus/macos/platform/remap/lease_controller.lua:1655>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:646: in upvalue '_deliver_business_completion'
+	...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:683: in function <...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:662>.
+2026-10-27 21:07:00:709 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-27 21:07:22:911 [WARNING] [menu.keyboard_layout] Failed to enable 'Composer Check' — reason=process_failed.
+2026-10-27 21:07:22:911 [WARNING] [layout_registry] The composed 'composed' layout is installed but not enabled: process_failed.
+2026-10-27 21:07:23:072 [WARNING] [menu.keyboard_layout] Failed to disable 'Composer Check' — reason=process_failed.
+2026-10-27 21:07:23:072 [WARNING] [layout_registry] The 'composed' layout could not be removed from the input sources: process_failed.
+2026-10-27 21:07:23:559 [ERROR] [ollama_deps] Ollama bootstrap failed (exit=64) — L'installateur Ollama d'Ergopti a refusé sa propre requête : rien n'a été installé. Redémarrez Ergopti et choisissez de nouveau le moteur Ollama ; si cela persiste, envoyez le rapport de diagnostic.
+2026-10-27 21:07:23:606 [WARNING] [download_window] Progress UI flipped to error state: L'installateur Ollama d'Ergopti a refusé sa propre requête : rien n'a été installé. Redémarrez Ergopti et choisissez de nouveau le moteur Ollama ; si cela persiste, envoyez le rapport de diagnostic.
+2026-10-27 21:08:39:509 [ERROR] [mlx_deps] MLX bootstrap failed (exit=1, cause=permission, path=nil). Last output: __ERGOPTI_OPAQUE_ADMISSION_V1__:accepted | [MLX-DEPS] Automatic network settings will be evaluated by the native download helper. | [MLX-DEPS] Inherited SSL_CERT_FILE ignored: downloads use the system and keychain trust. | [MLX-DEPS] Mode bundle détecté — venv redirigé vers ~/Library/Application Support/Ergopti/mlx-venv | [MLX-DEPS] Using the native Python /Library/Frameworks/Python.framework/Versions/Current/bin/python3: no interpreter download. | [MLX-DEPS] Création du virtualenv candidat : ~/Library/Application Support/Ergopti/mlx-venv.bootstrap.38013 | Using CPython 3.13.7 interpreter at: /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 | Creating virtual environment at: ~/Library/Application Support/Ergopti/mlx-venv.bootstrap.38013 | Activate with: source '~/Library/Application Support/Ergopti/mlx-venv.bootstrap.38013/bin/activate' | [MLX-DEPS] Synchronisation des dépendances depuis pyproject.toml… | Using Python 3.13.7 environment at: ~/Library/Application Support/Ergopti/mlx-venv.bootstrap.38013 | Resolved 40 packages in 5ms | Prepared 40 packages in 1.65s | Installed 40 packages in 126ms | + annotated-doc==0.0.4 | + anyio==4.14.2 | + beautifulsoup4==4.12.3 | + certifi==2026.4.22 | + charset-normalizer==3.4.7 | + click==8.3.3 | + filelock==3.29.0 | + fsspec==2026.6.0 | + h11==0.16.0 | + hf-xet==1.4.3 | + httpcore==1.0.9 | + httpx==0.28.1 | + huggingface-hub==1.13.0 | + idna==3.15 | + jinja2==3.1.6 | + markdown-it-py==4.0.0 | + markupsafe==3.0.3 | + mdurl==0.1.2 | + mlx==0.31.2 | + mlx-lm==0.31.3 | + mlx-metal==0.31.2 | + numpy==2.4.4 | + packaging==26.2 | + protobuf==7.34.1 | + pygments==2.20.0 | + pyyaml==6.0.3 | + regex==2026.4.4 | + requests==2.33.0 | + rich==15.0.0 | + safetensors==0.8.0 | + sentencepiece==0.2.1 | + shellingham==1.5.4 | + soupsieve==2.9 | + tokenizers==0.23.3 | + tqdm==4.67.3 | + transformers==5.17.0 | + truststore==0.10.4 | + typer==0.25.1 | + typing-extensions==4.15.0 | + urllib3==2.8.0 | [MLX-DEPS] ✅ Virtualenv prêt : ~/Library/Application Support/Ergopti/mlx-venv | Traceback (most recent call last): | File "/tmp/lua_9Im7ZI", line 64, in <module> | group_alive = group_is_alive() | File "/tmp/lua_9Im7ZI", line 33, in group_is_alive | try: os.killpg(proc.pid, 0) | PermissionError: [Errno 1] Operation not permitted
+2026-10-27 21:08:39:509 [WARNING] [download_window] Progress UI flipped to error state: macOS a refusé une opération de l’installation. Détail : PermissionError: [Errno 1] Operation not permitted
+2026-10-27 21:08:39:518 [WARNING] [menu_llm.mlx_repair_offer] Offering the MLX repair action for a permission failure.
+2026-10-27 21:11:08:410 [WARNING] [keystats.log_manager] Slow ingest tick 546 ms (drain=0 foreign=0 outbox=4 read=0 build=9 apply=11 commit=3 append=516 notify=0 ms; entries=1 statements=1).
+2026-10-27 21:13:08:374 [WARNING] [keystats.log_manager] Slow ingest tick 509 ms (drain=0 foreign=0 outbox=3 read=0 build=8 apply=9 commit=1 append=484 notify=0 ms; entries=1 statements=1).
+2026-10-27 22:31:22:561 [ERROR] [karabiner] Settled Wake layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: config.toml cannot be read (value_type at hotstrings.dynamic.date), so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3007: in upvalue 'perform_settled_layout_refresh'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3161: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in upvalue 'run_async_step'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3149>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1936: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1929>.
+2026-10-27 22:31:22:561 [WARNING] [karabiner] Wake layout refresh retry 1/3 in 1.0 s (layout-action-resolution-failed).
+2026-10-27 22:31:25:065 [WARNING] [karabiner] Wake layout refresh retry 2/3 in 10.0 s (layout-action-resolution-failed).
+2026-10-27 22:31:34:086 [ERROR] [karabiner] ↑ "Settled Wake layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: config.toml cannot be read (value_type at hotstrings.dynamic.date), so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3007: in upvalue 'perform_settled_layout_refresh'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3161: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in upvalue 'run_async_step'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3149>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1936: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1929>." repeated 2 more times between 2026-10-27 22:31:24:048 and 2026-10-27 22:31:25:065.
+2026-10-27 22:31:34:086 [WARNING] [karabiner] ↑ "Wake layout refresh retry 1/3 in 1.0 s (layout-action-resolution-failed)." repeated 1 more time between 2026-10-27 22:31:24:048 and 2026-10-27 22:31:24:048.
+2026-10-27 22:31:36:260 [ERROR] [karabiner] Karabiner regeneration layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: config.toml cannot be read (value_type at hotstrings.dynamic.date), so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:6241: in function 'platform.remap.regenerate'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2040: in upvalue 'replay_guardian_regenerations'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2141: in upvalue 'callback'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:180: in function <...c/ergopti_plus/macos/platform/remap/lease_controller.lua:179>
+	[C]: in function 'xpcall'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:179: in upvalue 'invoke_callback'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:1671: in function <...c/ergopti_plus/macos/platform/remap/lease_controller.lua:1655>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:646: in upvalue '_deliver_business_completion'
+	...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:683: in function <...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:662>.
+2026-10-27 22:32:16:180 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-27 22:32:21:037 [ERROR] [karabiner] Karabiner regeneration layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: config.toml cannot be read (value_type at hotstrings.dynamic.date), so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:6241: in function 'platform.remap.regenerate'
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2040: in upvalue 'replay_guardian_regenerations'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2141: in upvalue 'callback'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:180: in function <...c/ergopti_plus/macos/platform/remap/lease_controller.lua:179>
+	[C]: in function 'xpcall'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:179: in upvalue 'invoke_callback'
+	...c/ergopti_plus/macos/platform/remap/lease_controller.lua:1671: in function <...c/ergopti_plus/macos/platform/remap/lease_controller.lua:1655>
+	(...tail calls...)
+	[C]: in function 'xpcall'
+	...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:646: in upvalue '_deliver_business_completion'
+	...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:683: in function <...opti/static/ergopti_plus/macos/adapters/shell_runner.lua:662>.
+2026-10-27 22:32:31:064 [WARNING] [keystats.log_manager] Slow ingest tick 519 ms (drain=0 foreign=0 outbox=3 read=0 build=8 apply=11 commit=1 append=491 notify=0 ms; entries=1 statements=1).
+2026-10-27 22:32:39:571 [WARNING] [menu.keyboard_layout] Failed to enable 'Composer Check' — reason=process_failed.
+2026-10-27 22:32:39:571 [WARNING] [layout_registry] The composed 'composed' layout is installed but not enabled: process_failed.
+2026-10-27 22:32:39:716 [WARNING] [menu.keyboard_layout] Failed to disable 'Composer Check' — reason=process_failed.
+2026-10-27 22:32:39:717 [WARNING] [layout_registry] The 'composed' layout could not be removed from the input sources: process_failed.
+2026-10-27 22:32:50:313 [ERROR] [ollama_deps] Ollama bootstrap failed (exit=137) — Erreur inconnue.
+2026-10-27 22:32:50:361 [WARNING] [download_window] Progress UI flipped to error state: Erreur inconnue.
+2026-10-27 22:33:14:325 [WARNING] [gestures] Health-check: frame stream lost — switching back to startup probe loop.
+2026-10-27 22:35:48:810 [WARNING] [llm.api_mlx] Endpoint discovery state reset.
+2026-10-27 22:35:52:091 [WARNING] [llm.api_mlx] Killing zombie mlx_lm Python process(es) via ps+awk (excluding PGID 58524)…
+2026-10-27 22:35:52:191 [WARNING] [llm.api_mlx] Zombie kill completed; stdout: none 
+2026-10-27 22:36:28:905 [WARNING] [adapters.field_run_ports] The field run changed MlxActiveModelPath; putting it back.
+2026-10-27 22:36:28:917 [ERROR] [field_run] A field run step changed the configuration: restored_MlxActiveModelPath.
+2026-10-27 22:36:43:893 [WARNING] [llm.api_mlx] PGID pending timeout (15s) — unblocking zombie kills.
+2026-10-27 22:42:43:145 [ERROR] [karabiner] Settled Wake layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: config.toml cannot be read (value_type at hotstrings.dynamic.date), so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3007: in upvalue 'perform_settled_layout_refresh'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3161: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in upvalue 'run_async_step'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3149>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1936: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1929>.
+2026-10-27 22:42:43:145 [WARNING] [karabiner] Wake layout refresh retry 1/3 in 1.0 s (layout-action-resolution-failed).
+2026-10-27 22:42:44:153 [WARNING] [llm.api_mlx] ↑ "Endpoint discovery state reset." repeated 1 more time between 2026-10-27 22:36:28:892 and 2026-10-27 22:36:28:892.
+2026-10-27 22:42:44:153 [WARNING] [karabiner] Wake layout refresh retry 2/3 in 10.0 s (layout-action-resolution-failed).
+2026-10-27 22:42:54:173 [WARNING] [karabiner] Wake layout refresh retry 3/3 in 30.0 s (layout-action-resolution-failed).
+2026-10-27 22:43:25:014 [WARNING] [gestures] ↑ "Health-check: frame stream lost — switching back to startup probe loop." repeated 9 more times between 2026-10-27 22:34:14:327 and 2026-10-27 22:42:14:337.
+2026-10-27 22:43:49:059 [ERROR] [karabiner] Wake layout refresh exhausted after 3 retry attempt(s); remap recovery remains fail-closed until a new layout event (layout-action-resolution-failed).
+2026-10-27 22:51:50:212 [WARNING] [karabiner] ↑ "Wake layout refresh retry 1/3 in 1.0 s (layout-action-resolution-failed)." repeated 2 more times between 2026-10-27 22:51:30:325 and 2026-10-27 22:51:32:091.
+2026-10-27 22:51:50:221 [WARNING] [karabiner] ↑ "Wake layout refresh retry 2/3 in 10.0 s (layout-action-resolution-failed)." repeated 2 more times between 2026-10-27 22:51:31:334 and 2026-10-27 22:51:33:106.
+2026-10-27 22:51:52:887 [ERROR] [karabiner] ↑ "Settled Wake layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: config.toml cannot be read (value_type at hotstrings.dynamic.date), so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3007: in upvalue 'perform_settled_layout_refresh'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3161: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in upvalue 'run_async_step'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3149>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1936: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1929>." repeated 8 more times between 2026-10-27 22:42:44:152 and 2026-10-27 22:51:43:128.
+2026-10-27 22:51:52:887 [WARNING] [karabiner] ↑ "Wake layout refresh retry 3/3 in 30.0 s (layout-action-resolution-failed)." repeated 1 more time between 2026-10-27 22:51:43:128 and 2026-10-27 22:51:43:128.
+2026-10-27 22:52:13:148 [ERROR] [karabiner] Settled Wake layout-action resolution failed: .../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: config.toml cannot be read (value_type at hotstrings.dynamic.date), so the virtual keyboard choice is unknown
+stack traceback:
+	[C]: in function 'error'
+	.../b519hs/perso/ergopti/static/ergopti_plus/macos/init.lua:2171: in upvalue 'registered_source'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1279: in upvalue 'current_virtual_keyboard_product'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1291: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1288>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1231>
+	(...tail calls...)
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3007: in upvalue 'perform_settled_layout_refresh'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3161: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160>
+	[C]: in function 'xpcall'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:1232: in upvalue 'run_async_step'
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3160: in function <...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:3149>
+	[C]: in function 'xpcall'
+	...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1936: in function <...perso/ergopti/static/ergopti_plus/macos/infra/logger.lua:1929>.
+2026-10-27 22:52:13:149 [ERROR] [karabiner] Wake layout refresh exhausted after 3 retry attempt(s); remap recovery remains fail-closed until a new layout event (layout-action-resolution-failed).
+2026-10-27 22:55:40:109 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-27 22:56:02:699 [WARNING] [menu.keyboard_layout] Failed to enable 'Composer Check' — reason=process_failed.
+2026-10-27 22:56:02:699 [WARNING] [layout_registry] The composed 'composed' layout is installed but not enabled: process_failed.
+2026-10-27 22:56:02:849 [WARNING] [menu.keyboard_layout] Failed to disable 'Composer Check' — reason=process_failed.
+2026-10-27 22:56:02:849 [WARNING] [layout_registry] The 'composed' layout could not be removed from the input sources: process_failed.
+2026-10-27 22:56:13:737 [ERROR] [ollama_deps] Ollama bootstrap failed (exit=137) — Erreur inconnue.
+2026-10-27 22:56:13:810 [WARNING] [download_window] Progress UI flipped to error state: Erreur inconnue.
+2026-10-27 22:56:36:458 [WARNING] [gestures] Health-check: frame stream lost — switching back to startup probe loop.
+2026-10-27 22:58:54:282 [WARNING] [llm.api_mlx] Endpoint discovery state reset.
+2026-10-27 22:58:57:611 [WARNING] [llm.api_mlx] Killing zombie mlx_lm Python process(es) via ps+awk (excluding PGID 85320)…
+2026-10-27 22:58:57:721 [WARNING] [llm.api_mlx] Zombie kill completed; stdout: none 
+2026-10-27 22:58:59:285 [WARNING] [adapters.field_run_ports] The field run changed MlxActiveModelPath; putting it back.
+2026-10-27 22:58:59:291 [ERROR] [field_run] A field run step changed the configuration: restored_MlxActiveModelPath.
+2026-10-27 22:59:06:461 [WARNING] [gestures] ↑ "Health-check: frame stream lost — switching back to startup probe loop." repeated 2 more times between 2026-10-27 22:57:36:460 and 2026-10-27 22:58:36:461.
+2026-10-27 22:59:14:265 [WARNING] [llm.api_mlx] PGID pending timeout (15s) — unblocking zombie kills.
+2026-10-27 23:22:17:255 [WARNING] [llm.api_mlx] ↑ "Endpoint discovery state reset." repeated 1 more time between 2026-10-27 22:58:59:265 and 2026-10-27 22:58:59:265.
+2026-10-27 23:33:59:489 [WARNING] [runtime] An hs.timer.new callback (...ergopti/static/ergopti_plus/macos/ui/menu/menu_state.lua:531) held the main thread for 1300 ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.
+2026-10-27 23:34:01:318 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-27 23:34:25:008 [WARNING] [menu.keyboard_layout] Failed to enable 'Composer Check' — reason=process_failed.
+2026-10-27 23:34:25:008 [WARNING] [layout_registry] The composed 'composed' layout is installed but not enabled: process_failed.
+2026-10-27 23:34:25:148 [WARNING] [menu.keyboard_layout] Failed to disable 'Composer Check' — reason=process_failed.
+2026-10-27 23:34:25:148 [WARNING] [layout_registry] The 'composed' layout could not be removed from the input sources: process_failed.
+2026-10-27 23:34:36:112 [ERROR] [ollama_deps] Ollama bootstrap ended with exit=137 (signal SIGKILL, path=native_runtime_pty); output received: streamed stdout=0 stderr=0 bytes, final stdout=0 stderr=0 bytes; last 0 line(s): none
+2026-10-27 23:34:36:112 [ERROR] [ollama_deps] Ollama bootstrap failed (exit=137) — L'installation d'Ollama a été arrêtée par le système (SIGKILL) avant la fin : rien n'a été installé. Réessayez ; si cela se reproduit, envoyez le rapport de diagnostic.
+2026-10-27 23:34:36:175 [WARNING] [download_window] Progress UI flipped to error state: L'installation d'Ollama a été arrêtée par le système (SIGKILL) avant la fin : rien n'a été installé. Réessayez ; si cela se reproduit, envoyez le rapport de diagnostic.
+2026-10-27 23:34:57:396 [WARNING] [gestures] Health-check: frame stream lost — switching back to startup probe loop.
+2026-10-27 23:36:40:478 [WARNING] [llm.api_mlx] Endpoint discovery state reset.
+2026-10-27 23:36:43:758 [WARNING] [llm.api_mlx] Killing zombie mlx_lm Python process(es) via ps+awk (excluding PGID 6395)…
+2026-10-27 23:36:43:865 [WARNING] [llm.api_mlx] Zombie kill completed; stdout: none 
+2026-10-27 23:36:46:516 [WARNING] [gestures] ↑ "Health-check: frame stream lost — switching back to startup probe loop." repeated 1 more time between 2026-10-27 23:35:57:397 and 2026-10-27 23:35:57:397.
+2026-10-27 23:36:57:399 [WARNING] [gestures] Health-check: frame stream lost — switching back to startup probe loop.
+2026-10-27 23:37:00:734 [WARNING] [llm.api_mlx] PGID pending timeout (15s) — unblocking zombie kills.
+2026-10-27 23:41:35:381 [WARNING] [llm.api_mlx] ↑ "Endpoint discovery state reset." repeated 1 more time between 2026-10-27 23:36:45:733 and 2026-10-27 23:36:45:733.
+2026-10-27 23:41:47:699 [WARNING] [keystats.log_manager] Slow ingest tick 645 ms (drain=0 foreign=0 outbox=2 read=1 build=8 apply=7 commit=0 append=624 notify=0 ms; append: lock=0 journal=0 prepare=0 publish=256 write=1 clear=6 settle=359 release=0 ms; metadata_commands=8 in 601 ms; entries=4 statements=4).
+2026-10-27 23:43:13:852 [WARNING] [keystats.log_manager] Slow ingest tick 588 ms (drain=0 foreign=0 outbox=3 read=1 build=10 apply=33 commit=1 append=537 notify=0 ms; append: lock=0 journal=0 prepare=0 publish=229 write=5 clear=1 settle=299 release=0 ms; metadata_commands=8 in 508 ms; entries=2 statements=2).
+2026-10-27 23:43:17:971 [WARNING] [adapters.field_check_ports] PAC download failed: Network request failed: Connection failed: A server with the specified hostname could not be found.
+2026-10-27 23:43:41:313 [WARNING] [menu.keyboard_layout] Failed to enable 'Composer Check' — reason=process_failed.
+2026-10-27 23:43:41:313 [WARNING] [layout_registry] The composed 'composed' layout is installed but not enabled: process_failed.
+2026-10-27 23:43:41:506 [WARNING] [menu.keyboard_layout] Failed to disable 'Composer Check' — reason=process_failed.
+2026-10-27 23:43:41:506 [WARNING] [layout_registry] The 'composed' layout could not be removed from the input sources: process_failed.
+2026-10-27 23:43:52:468 [ERROR] [ollama_deps] Ollama bootstrap ended with exit=137 (signal SIGKILL, path=native_runtime_pty); output received: streamed stdout=0 stderr=0 bytes, final stdout=0 stderr=0 bytes; last 0 line(s): none
+2026-10-27 23:43:52:469 [ERROR] [ollama_deps] Ollama bootstrap failed (exit=137) — L'installation d'Ollama a été arrêtée par le système (SIGKILL) avant la fin : rien n'a été installé. Réessayez ; si cela se reproduit, envoyez le rapport de diagnostic.
+2026-10-27 23:43:52:601 [WARNING] [download_window] Progress UI flipped to error state: L'installation d'Ollama a été arrêtée par le système (SIGKILL) avant la fin : rien n'a été installé. Réessayez ; si cela se reproduit, envoyez le rapport de diagnostic.
+2026-10-27 23:44:07:409 [WARNING] [gestures] Health-check: frame stream lost — switching back to startup probe loop.
+2026-10-27 23:46:15:018 [WARNING] [llm.api_mlx] Endpoint discovery state reset.
+2026-10-27 23:46:18:275 [WARNING] [llm.api_mlx] Killing zombie mlx_lm Python process(es) via ps+awk (excluding PGID 24405)…
+2026-10-27 23:46:18:381 [WARNING] [llm.api_mlx] Zombie kill completed; stdout: none 
+2026-10-27 23:46:20:111 [WARNING] [adapters.field_run_ports] The field run changed the preference karabiner.used_tokens.v1; putting it back.
+2026-10-27 23:46:20:112 [ERROR] [field_run] A field run step changed the configuration: restored_setting_karabiner.used_tokens.v1.
+2026-10-27 23:46:29:816 [WARNING] [menu_llm] AI remains disabled: ollama_unreachable.
+2026-10-27 23:46:29:824 [WARNING] [menu_llm.unreachable_offer] Ollama does not answer at http://127.0.0.1:11435 (not installed); offering 1 fix(es).
+2026-10-27 23:46:35:090 [WARNING] [llm.api_mlx] PGID pending timeout (15s) — unblocking zombie kills.
+2026-10-27 23:46:35:468 [WARNING] [llm.api_mlx] ↑ "Endpoint discovery state reset." repeated 1 more time between 2026-10-27 23:46:20:090 and 2026-10-27 23:46:20:090.
+2026-10-27 23:46:44:956 [WARNING] [keystats.context_tracker] Accessibility observer setup failed: failed to get AX application element for PID 54776.
+2026-10-27 23:46:46:050 [ERROR] [ollama_deps] Ollama bootstrap ended with exit=137 (signal SIGKILL, path=native_runtime_pty); output received: streamed stdout=0 stderr=0 bytes, final stdout=0 stderr=0 bytes; last 0 line(s): none
+2026-10-27 23:46:46:050 [ERROR] [ollama_deps] Ollama bootstrap failed (exit=137) — L'installation d'Ollama a été arrêtée par le système (SIGKILL) avant la fin : rien n'a été installé. Réessayez ; si cela se reproduit, envoyez le rapport de diagnostic.
+2026-10-27 23:46:46:084 [WARNING] [download_window] Progress UI flipped to error state: L'installation d'Ollama a été arrêtée par le système (SIGKILL) avant la fin : rien n'a été installé. Réessayez ; si cela se reproduit, envoyez le rapport de diagnostic.
+2026-10-27 23:46:46:084 [WARNING] [menu_llm] AI remains disabled: installation refused.

@@ -1,0 +1,14 @@
+== /Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/bin
+total 0
+drwx------@ 2 b519hs@login.axa  staff   64 23 oct.  11:26 .
+drwx------@ 6 b519hs@login.axa  staff  192 23 oct.  11:26 ..
+== /Users/b519hs/Library/Application Support/Ergopti/native-bootstrap/python-bin
+total 0
+drwx------@ 2 b519hs@login.axa  staff   64 23 oct.  11:26 .
+drwx------@ 6 b519hs@login.axa  staff  192 23 oct.  11:26 ..
+== /Users/b519hs/Library/Application Support/Ergopti/ollama-native-http
+ls: /Users/b519hs/Library/Application Support/Ergopti/ollama-native-http: No such file or directory
+== diagnostic reports of the last hour
+/Users/b519hs/Library/Logs/DiagnosticReports/ErgoptiPlus-2026-10-27-234311.ips
+== kernel and code-signing kills of the last 30 minutes
+log: Could not open local log store: Operation not permitted
