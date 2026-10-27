@@ -136,6 +136,7 @@ function merge_dict(
 					count: 0,
 					time: 0,
 					errors: 0,
+					accuracy_errors: 0,
 					synth_hs: 0,
 					synth_llm: 0,
 					synth_other: 0
@@ -149,6 +150,12 @@ function merge_dict(
 		target[display_k].count += real_count;
 		target[display_k].time += item.t || 0;
 		target[display_k].errors += error_c;
+		// Evaluate physical-control policy before case folding can erase marker identity.
+		const accuracy_exempt =
+			tab_name !== 'w' &&
+			!is_word_ngram &&
+			(k.includes('[BS]') || k.includes('\x08') || k.toLowerCase() === 'backspace');
+		target[display_k].accuracy_errors += accuracy_exempt ? 0 : error_c;
 		target[display_k].synth_hs += filtered_hs;
 		target[display_k].synth_llm += filtered_llm;
 		target[display_k].synth_other += other_c;

@@ -177,6 +177,7 @@ function derive_modifier_usage(sc_dict) {
 				count: 0,
 				time: 0,
 				errors: 0,
+				accuracy_errors: 0,
 				synth_hs: 0,
 				synth_llm: 0,
 				synth_other: 0
@@ -189,7 +190,15 @@ function derive_modifier_usage(sc_dict) {
 	const shift_count = count_uppercase_shift();
 	if (shift_count > 0) {
 		if (!result['shift']) {
-			result['shift'] = { count: 0, time: 0, errors: 0, synth_hs: 0, synth_llm: 0, synth_other: 0 };
+			result['shift'] = {
+				count: 0,
+				time: 0,
+				errors: 0,
+				accuracy_errors: 0,
+				synth_hs: 0,
+				synth_llm: 0,
+				synth_other: 0
+			};
 		}
 		// Add inferred shift presses on top of direct flagsChanged counts to get
 		// the total number of shift activations (direct key tap + held for uppercase).
@@ -211,11 +220,20 @@ function derive_modifier_usage(sc_dict) {
 		const mod_key = mods.join('+');
 
 		if (!result[mod_key]) {
-			result[mod_key] = { count: 0, time: 0, errors: 0, synth_hs: 0, synth_llm: 0, synth_other: 0 };
+			result[mod_key] = {
+				count: 0,
+				time: 0,
+				errors: 0,
+				accuracy_errors: 0,
+				synth_hs: 0,
+				synth_llm: 0,
+				synth_other: 0
+			};
 		}
 		result[mod_key].count += item.count || 0;
 		result[mod_key].time += item.time || 0;
 		result[mod_key].errors += item.errors || 0;
+		result[mod_key].accuracy_errors += item.accuracy_errors;
 		result[mod_key].synth_hs += item.synth_hs || 0;
 		result[mod_key].synth_llm += item.synth_llm || 0;
 		result[mod_key].synth_other += item.synth_other || 0;
@@ -478,7 +496,8 @@ function render_current_tab() {
 					synth_llm: 0,
 					synth_other: 0,
 					time: 0,
-					errors: 0
+					errors: 0,
+					accuracy_errors: 0
 				};
 			}
 			char_accum[token].count += item.count || 0;
@@ -488,6 +507,7 @@ function render_current_tab() {
 			if (keep_timing) {
 				char_accum[token].time += item.time || 0;
 				char_accum[token].errors += item.errors || 0;
+				char_accum[token].accuracy_errors += item.accuracy_errors;
 			}
 		};
 
@@ -591,13 +611,8 @@ function render_current_tab() {
 		);
 		const avg = manual_count > 0 ? item.time / manual_count : 0;
 
-		// Precision: [BS]-containing sequences are always 100%; others are 1 - error_rate
-		const acc =
-			app_state.current_tab !== 'w' && (k.includes('[BS]') || k.toLowerCase() === 'backspace')
-				? 100
-				: item.count > 0
-					? ((item.count - item.errors) / item.count) * 100
-					: 0;
+		// The projection retains correction policy from original native keys before folding.
+		const acc = item.count > 0 ? ((item.count - item.accuracy_errors) / item.count) * 100 : 0;
 
 		// Normalize any [BRACKET] marker to a single char before grapheme length computation.
 		// Keycode tab keys are numeric strings ("49") representing a single physical key.
