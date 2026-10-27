@@ -121,7 +121,8 @@ ErrorDialog_Init(Cache) {
 _ErrorDialog_ReadSetting(Cache) {
 	global ED_SETTING_SECTION, ED_SETTING_KEY
 	Path := ED_SETTING_SECTION . "." . ED_SETTING_KEY
-	Raw := IniCacheGet(Cache, ED_SETTING_SECTION, ED_SETTING_KEY)
+	if !ConfigTomlTryReadBootValue(Cache, ED_SETTING_SECTION, ED_SETTING_KEY, &Raw)
+		Raw := IniCacheGet(Cache, ED_SETTING_SECTION, ED_SETTING_KEY)
 	if (Raw == "_") {
 		Entry := ManifestFindEntryByPath(Path)
 		if !(Entry is Map) || !Entry.Has("default")

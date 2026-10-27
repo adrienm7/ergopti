@@ -333,28 +333,9 @@ _FeatureStateCascadeMaxArrows(Raw) {
 	return Default
 }
 
-; Only the exact native bootstrap cache carries authored TOML intent. Ordinary
-; in-memory candidates retain strict validation; their integers cannot supply a
-; source lexeme. The later canonical loader owns outdated-key diagnostics and
-; cleanup while this early reader leaves the physical cache unchanged.
 _FeatureStateReadKanaOverride(Cache, Value) {
-	global ConfigurationFile, _ParseTomlCache
-	if IsSet(ConfigurationFile) && ConfigurationFile != ""
-			&& IsSet(_ParseTomlCache) && _ParseTomlCache.Has(ConfigurationFile)
-			&& _ParseTomlCache[ConfigurationFile] == Cache {
-		Snapshot := ConfigTomlReadSnapshot(ConfigurationFile)
-		if Snapshot.Cache != Cache
-			throw Error("The early script reader lost its admitted configuration cache")
-		for Row in Snapshot.Rows {
-			if Row.Section != ConfigKey.SCRIPT || Row.Key != ConfigLeaf.ALT_GR_IS_KANA_REMAP
-				continue
-			if !TomlConfigValueMatchesManifest(Row.Section, Row.Key, Row.Value,
-					&ExpectedType, TOML_StripInlineComment(Row.Raw))
-				return _FeatureStateRequireManifestDefault(ConfigKey.SCRIPT_ALT_GR_IS_KANA_REMAP)
-			return _FeatureStateValidateKanaOverride(Value)
-		}
-		throw Error("The authored Kana override has no admitted semantic row")
-	}
+	if ConfigTomlTryReadBootValue(Cache, ConfigKey.SCRIPT, ConfigLeaf.ALT_GR_IS_KANA_REMAP, &Admitted)
+		Value := Admitted
 	return _FeatureStateValidateKanaOverride(Value)
 }
 
