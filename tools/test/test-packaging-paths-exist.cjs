@@ -175,6 +175,11 @@ for (const target of [
 
 for (const [file, before, after] of [
 	[DRIVER, 'bash "${SCRIPT_DIR}/build-linux-native-output.sh"', 'true'],
+	[
+		DRIVER,
+		'--output-directory "${BUILD_DIR}/linux/bin"',
+		'--output-directory "${REPO_ROOT}/elsewhere"'
+	],
 	[DRIVER, '"' + OUTPUT + '"', '"linux/bin/missing-native.so"'],
 	[DRIVER, 'if [ ! -f "${BUILD_DIR}/${f}" ]; then', 'if false; then'],
 	[BUILDER, DEFAULT_OUTPUT, 'OUTPUT_DIR="${REPO_ROOT}/build/linux/bin"'],

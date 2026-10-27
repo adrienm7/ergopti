@@ -5,10 +5,12 @@ This engine has no Python HTTP or TLS dependency. Foundation owns the network;
 the caller owns redirects, output descriptors, integrity and publication.
 """
 
+import importlib.util
 import json
 import math
 import os
 from pathlib import Path
+import plistlib
 import re
 import selectors
 import stat
@@ -99,12 +101,55 @@ def _positive_timeout(value):
     )
 
 
+def _dev_source_names(root):
+    """The developer source-mode names declared once in _shared/data/identifiers.json."""
+    path = root.parent / "_shared/data/identifiers.py"
+    spec = importlib.util.spec_from_file_location("_ergopti_identifiers", path)
+    if spec is None or spec.loader is None:
+        raise NativeHTTPError("unavailable")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except OSError:
+        raise NativeHTTPError("unavailable") from None
+    return module.DEV_SOURCE
+
+
+def _developer_launcher(root):
+    """Return the launcher of a developer app that runs this clone.
+
+    A developer build (ERGOPTI_DEV_SOURCE=1) runs the Lua of a clone, so its
+    launcher cannot be derived from this file's path. The launcher's sealed
+    Info.plist records the clone root instead: the exported launcher is admitted
+    only when its own bundle names exactly the clone this file runs from. The
+    device and inode proof in _resolve_worker still applies. Anything else is
+    refused as unavailable, as a driver outside a bundle always was.
+    """
+    names = _dev_source_names(root)
+    clone = os.environ.get(names["environment"])
+    if not clone or str(root) != clone + "/static/ergopti_plus/macos":
+        raise NativeHTTPError("unavailable")
+    launcher = os.environ.get("ERGOPTI_LAUNCHER_EXECUTABLE") or ""
+    suffix = "/Contents/MacOS/ErgoptiPlus"
+    if not launcher.endswith(suffix) or not launcher[: -len(suffix)].endswith(".app"):
+        raise NativeHTTPError("unavailable")
+    try:
+        with open(launcher[: -len(suffix)] + "/Contents/Info.plist", "rb") as handle:
+            info = plistlib.load(handle)
+    except (OSError, plistlib.InvalidFileException, ValueError):
+        raise NativeHTTPError("unavailable") from None
+    if not isinstance(info, dict) or info.get(names["plist_key"]) != clone:
+        raise NativeHTTPError("unavailable")
+    return launcher
+
+
 def _resolve_worker():
     root = Path(__file__).absolute().parents[2]
     suffix = "/Contents/Resources/static/ergopti_plus/macos"
-    if not str(root).endswith(suffix):
-        raise NativeHTTPError("unavailable")
-    expected = str(root)[: -len(suffix)] + "/Contents/MacOS/ErgoptiPlus"
+    if str(root).endswith(suffix):
+        expected = str(root)[: -len(suffix)] + "/Contents/MacOS/ErgoptiPlus"
+    else:
+        expected = _developer_launcher(root)
     if os.environ.get("ERGOPTI_LAUNCHER_EXECUTABLE") != expected:
         raise NativeHTTPError("unavailable")
     try:

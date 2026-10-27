@@ -56,7 +56,12 @@ done
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-BUILD_DIR="$PROJECT_ROOT/build/linux"
+# A caller that runs several builds at once gives each its own output directory.
+BUILD_DIR="${ERGOPTI_LINUX_BUILD_DIR:-$PROJECT_ROOT/build/linux}"
+case "$BUILD_DIR" in
+  /?*) ;;
+  *) echo "[ERR] ERGOPTI_LINUX_BUILD_DIR must be an absolute path, got '$BUILD_DIR'" >&2; exit 1 ;;
+esac
 APPDIR="$BUILD_DIR/AppDir"
 APPDIR_LIB="$APPDIR/usr/lib/ergopti"
 PACKAGE_NAME="ergopti"

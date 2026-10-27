@@ -417,6 +417,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-codegen-proxy-precedence.cjs"],
 			"repro": "npm run test:codegen-proxy-precedence"
+		},
+		{
+			"id": "js-ollama-termination-owned",
+			"ordinal": 522,
+			"name": "Ollama termination ownership (no driver stops Ollama by process name or by its port)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-ollama-termination-owned.cjs"],
+			"repro": "npm run test:ollama-termination-owned"
 		}
 	]
 }

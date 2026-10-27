@@ -440,10 +440,10 @@ function applyLabels() {
 	_renderSubscribeBanner();
 
 	var btnGh = document.getElementById('btn-github');
-	if (btnGh) btnGh.textContent = _t('changelog_window.open_github') || 'Voir sur GitHub ↗';
+	if (btnGh) btnGh.textContent = _t('changelog_window.open_github');
 
 	var btnRetry = document.getElementById('btn-retry');
-	if (btnRetry) btnRetry.textContent = _t('changelog_window.retry') || 'Réessayer';
+	if (btnRetry) btnRetry.textContent = _t('changelog_window.retry');
 
 	var btnPage = document.getElementById('btn-releases-page');
 	var pageLabel = _t('changelog_window.open_releases_page');
@@ -734,7 +734,7 @@ function renderReleaseList() {
 	if (_releases.length === 0) {
 		var empty = document.createElement('div');
 		empty.style.cssText = 'color:#555;font-size:12px;padding:16px 14px;';
-		empty.textContent = _t('changelog_window.no_releases') || 'Aucune version trouvée.';
+		empty.textContent = _t('changelog_window.no_releases');
 		list.appendChild(empty);
 		return;
 	}
@@ -760,12 +760,12 @@ function renderReleaseList() {
 		if (release.prerelease) {
 			var badge = document.createElement('div');
 			badge.className = 'release-item-badge badge-prerelease';
-			badge.textContent = _t('changelog_window.badge_prerelease') || 'pre-release';
+			badge.textContent = _t('changelog_window.badge_prerelease');
 			item.appendChild(badge);
 		} else if (idx === 0) {
 			var badge2 = document.createElement('div');
 			badge2.className = 'release-item-badge badge-latest';
-			badge2.textContent = _t('changelog_window.badge_latest') || 'latest';
+			badge2.textContent = _t('changelog_window.badge_latest');
 			item.appendChild(badge2);
 		}
 		if (_isInstalled(release)) {

@@ -2485,7 +2485,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		[
 			'linux',
 			'ui/menu/menu_builder.lua',
-			'NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands)'
+			// Linux passes its live owner: the rows apply where the session can.
+			'NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands, {'
 		]
 	]) {
 		const source = readFileSync(
@@ -9787,14 +9788,14 @@ console.log(
 			assert(
 				hasStatement(
 					native,
-					'sync_wpm_visibility("keystats_menubar_wpm", "WPM menubar", WpmMenubar)',
+					'sync_wpm_visibility(MetricsState.MENUBAR_WPM, "WPM menubar", WpmMenubar)',
 					1
 				)
 			);
 			assert(
 				hasStatement(
 					native,
-					'sync_wpm_visibility("keystats_float_wpm", "WPM widget", WpmWidget, state.keystats_float_graph)',
+					'sync_wpm_visibility(MetricsState.FLOAT_WPM, "WPM widget", WpmWidget, state.keystats_float_graph)',
 					1
 				)
 			);

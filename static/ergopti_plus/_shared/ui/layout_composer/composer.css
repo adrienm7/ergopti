@@ -60,7 +60,7 @@
 .composer-row input,
 .composer-key-editor select,
 .composer-key-editor input {
-	background: #fff;
+	background: var(--theme-white);
 	border: 1px solid #c8c8cc;
 	border-radius: 6px;
 	color: inherit;
@@ -88,7 +88,7 @@
 
 .composer-tab.is-active {
 	background: var(--theme-blue);
-	color: #fff;
+	color: var(--theme-white);
 }
 
 .composer-board {
@@ -97,7 +97,7 @@
 }
 
 .composer-key {
-	background: #fff;
+	background: var(--theme-white);
 	border: 1px solid #c8c8cc;
 	color: var(--theme-label);
 	font-size: 14px;
@@ -122,8 +122,8 @@
 
 .composer-key-editor {
 	align-items: center;
-	background: #fff;
-	border: 1px solid #e0e0e0;
+	background: var(--theme-white);
+	border: 1px solid var(--theme-grey-e0e0e0);
 	border-radius: 8px;
 	display: flex;
 	flex-wrap: wrap;
@@ -165,7 +165,7 @@
 	.composer-key-editor input,
 	.composer-key,
 	.composer-key-editor {
-		background: #2a2a2c;
+		background: var(--theme-grey-2a2a2c);
 		border-color: var(--theme-gray4-dark);
 		color: var(--theme-page-background);
 	}

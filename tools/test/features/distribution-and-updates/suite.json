@@ -517,6 +517,15 @@
 			"cmd": "node",
 			"args": ["tools/test/test-macos-hammerspoon-cache.cjs"],
 			"repro": "npm run test:macos-hammerspoon-cache"
+		},
+		{
+			"id": "js-macos-dev-native-receiver",
+			"ordinal": 520,
+			"name": "a developer app admits the bundled native network receiver only for the clone its sealed plist records",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-dev-native-receiver.cjs"],
+			"repro": "npm run test:macos-dev-native-receiver",
+			"platforms": ["linux", "darwin"]
 		}
 	]
 }

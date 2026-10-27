@@ -28,6 +28,8 @@
 --- that never ran.
 --- ==============================================================================
 
+-- The cases replace these entries; the module end puts them back.
+local restore_loaded = require("tests.helpers").keep_loaded({ "adapters.evdev_reader" })
 package.loaded["tests.support.adapters.keyboard_hook.evdev_reader_fixture"] = nil
 local Fixture = require("tests.support.adapters.keyboard_hook.evdev_reader_fixture")
 local helpers, recorder, encoded, controlled_held_reader =
@@ -405,3 +407,4 @@ helpers.describe("evdev_reader: controlled fresh native held-state receipts", fu
 
 end)
 
+restore_loaded()

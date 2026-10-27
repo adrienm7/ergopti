@@ -24,6 +24,8 @@
 --- /proc/bus/input/devices, and that has no business on the keystroke path.
 --- ==============================================================================
 
+-- The cases replace these entries; the module end puts them back.
+local restore_loaded = require("tests.helpers").keep_loaded({ "modules.hotstrings.device_finder" })
 package.loaded["tests.support.adapters.keyboard_hook.keyboard_hook_device_watchdog_fixture"] = nil
 local Fixture = require("tests.support.adapters.keyboard_hook.keyboard_hook_device_watchdog_fixture")
 local helpers, load_hook, fake_node, stub_device_finder, recorder, multi_recorder, tick_until_check =
@@ -641,3 +643,4 @@ helpers.describe("keyboard_hook: ordinary overlapping physical-source release", 
 
 end)
 
+restore_loaded()

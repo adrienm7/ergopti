@@ -9,6 +9,8 @@
 ---   lua keylayout-xkb-convert.lua <_shared dir> <data dir> <file.keylayout>
 ---       <mac_keycodes.json> <convention> <layout id> <display name> <out dir>
 ---       [<index.json> <registry id>]
+--- With ERGOPTI_ROWS="<order>,<edges>" (order native|digits|symbols, edges true|false)
+--- the number-row options are applied, and the report is written to rows.json.
 --- Exit status 2 and the reason on stderr when the layout is refused.
 --- ==============================================================================
 
@@ -42,7 +44,13 @@ local canonical, parse_err = Keylayout.parse(read(keylayout_path))
 if not canonical then refuse(parse_err) end
 local keycodes, keycodes_err = Converter.keycodes(assert(Json.decode(read(keycodes_path))), convention)
 if not keycodes then refuse(keycodes_err) end
+local rows = nil
+if os.getenv("ERGOPTI_ROWS") then
+	local order, edges = os.getenv("ERGOPTI_ROWS"):match("^(%a+),(%a+)$")
+	rows = { order = order, edges = edges == "true" }
+end
 local result, err = Converter.convert(canonical, {
+	rows = rows,
 	keycodes = keycodes,
 	keysyms = assert(Json.decode(read(data_dir .. "/key_sym.json"))).keysyms,
 	template = read(data_dir .. "/xkb_symbols.txt"),
@@ -54,5 +62,10 @@ if not result then refuse(err) end
 for name, text in pairs({ [layout_id .. ".xkb"] = result.symbols_text, [layout_id .. ".XCompose"] = result.compose_text }) do
 	local handle = assert(io.open(out_dir .. "/" .. name, "wb"))
 	handle:write(text)
+	handle:close()
+end
+if result.rows then
+	local handle = assert(io.open(out_dir .. "/rows.json", "wb"))
+	handle:write(Json.encode(result.rows))
 	handle:close()
 end

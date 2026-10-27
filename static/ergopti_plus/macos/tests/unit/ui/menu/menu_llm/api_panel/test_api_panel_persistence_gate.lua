@@ -66,7 +66,7 @@ helpers.describe("API panel durable persistence gate", function()
 		package.loaded["infra.dialog_util"] = {
 			text_prompt = function()
 				prompt_index = prompt_index + 1
-				return "OK", prompt_values[prompt_index]
+				return "button.ok", prompt_values[prompt_index]
 			end,
 		}
 		package.loaded["infra.notifications"] = {
