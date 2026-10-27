@@ -29,6 +29,49 @@
 			"reason": "symbol-or-placeholder-only",
 			"locales": "*"
 		},
+		"apps.cloner.default_clone_name": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr", "it", "pt"]
+		},
+		"apps.cloner.mode_native": {
+			"reason": "loanword-or-cognate",
+			"locales": ["nl"]
+		},
+		"apps.cloner.summary_mode": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"apps.cloner.summary_name": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de"]
+		},
+		"apps.cloner.summary_source": {
+			"reason": "loanword-or-cognate",
+			"locales": ["fr"]
+		},
+		"apps.cloner.summary_url": {
+			"reason": "unit-or-abbreviation",
+			"locales": [
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
 		"apps.cloner.title_pwa_url": {
 			"reason": "brand-or-feature-name",
 			"locales": ["hi", "ja", "ko", "tr"]
