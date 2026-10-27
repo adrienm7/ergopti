@@ -543,6 +543,7 @@ return {
 	"tests.unit.modules.dynamic_hotstrings.test_dynamic_unicode_suffix",
 	"tests.unit.modules.hotstrings.engine.test_expansion_delay",
 	"tests.unit.modules.hotstrings.catalogue.test_ergopti_extension_hotstrings_shipped_driver",
+	"tests.unit.modules.hotstrings.catalogue.test_extension_category_name_masked_in_log",
 	"tests.unit.modules.hotstrings.catalogue.test_ergopti_extension_hotstrings_exact_safe_integer",
 	"tests.unit.modules.hotstrings.catalogue.test_extension_geometry_routing",
 	"tests.unit.modules.hotstrings.menu.test_hotstrings_menu_skeleton",
