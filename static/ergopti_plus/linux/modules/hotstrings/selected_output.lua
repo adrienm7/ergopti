@@ -126,7 +126,7 @@ function M.new(text, publication, ports)
 			-- This runs after admission and immediately before a data DOWN on the
 			-- original wire. A failed native ACK may already have changed text;
 			-- modifier masking/neutralisation alone never invalidates the document.
-			if data_codes[code] and (phase == "replacement key down" or phase == "clipboard paste chord") then payload_written = true end
+			if data_codes[code] and (phase == "replacement_key_down" or phase == "clipboard_paste_chord") then payload_written = true end
 		end)
 		key_cleanup = ok and type(native) == "table" and native.cleanup_ok == true
 		-- Clipboard cleanup is independent of business admission and its deadline.

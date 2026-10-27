@@ -66,8 +66,8 @@ function M.new(channel)
 			return false
 		end
 		local ok, emitted
-		if reservation and phase == "physical modifier up" then ok, emitted = pcall(reservation.neutralize, code)
-		elseif reservation and (phase == "physical modifier restore" or phase == "physical modifier restore retry") then
+		if reservation and phase == "physical_modifier_up" then ok, emitted = pcall(reservation.neutralize, code)
+		elseif reservation and (phase == "physical_modifier_restore" or phase == "physical_modifier_restore_retry") then
 			ok, emitted = pcall(reservation.restore, code)
 		else ok, emitted = pcall(reservation and reservation.emit or channel.emit, code, value) end
 		if not ok or emitted ~= true then
@@ -123,7 +123,7 @@ function M.new(channel)
 			if not seen[code] then
 				seen[code] = true
 				physical_modifiers[#physical_modifiers + 1] = code
-				if not wire(code, VALUE_UP, "physical modifier up", false) then return false end
+				if not wire(code, VALUE_UP, "physical_modifier_up", false) then return false end
 			end
 		end
 		return true
@@ -152,7 +152,7 @@ function M.new(channel)
 	function tx.channel()
 		return {
 			is_open = function() return not finished and not failure and channel_open() end,
-			emit = function(code, value) return tx.emit(code, value, "clipboard paste chord") end,
+			emit = function(code, value) return tx.emit(code, value, "clipboard_paste_chord") end,
 		}
 	end
 
@@ -179,11 +179,11 @@ function M.new(channel)
 
 		for index = #physical_modifiers, 1, -1 do
 			local code = physical_modifiers[index]
-			if not wire(code, VALUE_DOWN, "physical modifier restore", false) then
+			if not wire(code, VALUE_DOWN, "physical_modifier_restore", false) then
 				-- One immediate best-effort retry is cleanup, not a commit attempt.
 				-- It handles a one-shot failed write while keeping the first failure
 				-- visible in the transaction result.
-				wire(code, VALUE_DOWN, "physical modifier restore retry", true)
+				wire(code, VALUE_DOWN, "physical_modifier_restore_retry", true)
 			end
 		end
 		physical_modifiers = {}

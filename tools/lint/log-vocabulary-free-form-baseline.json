@@ -36,9 +36,6 @@
 		"static/ergopti_plus/windows/ui/menu/menu_llm/menu_api_entries.ahk": 12
 	},
 	"phase": {
-		"static/ergopti_plus/linux/modules/hotstrings/injector.lua": 1,
-		"static/ergopti_plus/linux/modules/hotstrings/output_transaction.lua": 3,
-		"static/ergopti_plus/linux/modules/hotstrings/selected_output.lua": 2,
 		"static/ergopti_plus/macos/infra/hotpath_profiler.lua": 1,
 		"static/ergopti_plus/windows/infra/config_transition.ahk": 1,
 		"static/ergopti_plus/windows/modules/keystats/keystats_prefetch.ahk": 2
