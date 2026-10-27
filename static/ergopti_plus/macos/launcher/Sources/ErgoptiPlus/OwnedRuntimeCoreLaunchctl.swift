@@ -10,10 +10,10 @@ enum OwnedRuntimeCoreLaunchctl {
 	struct Observation { let status: Int32, bytes: Data }
 	private struct ChildObservation { let status: Int32, bytes: Data, timedOut: Bool }
 	static func run(arguments: [String]) throws -> Observation {
-		guard arguments == ["print", "system/com.ergoptiplus.runtime.core"]
-			|| arguments == ["bootout", "system/com.ergoptiplus.runtime.core"]
-			|| arguments == ["bootstrap", "system", "/Library/LaunchDaemons/com.ergoptiplus.runtime.core.plist"]
-			|| arguments == ["kickstart", "system/com.ergoptiplus.runtime.core"] else { throw OwnedRuntimeInstallFailure.source }
+		guard arguments == ["print", "system/\(Identifiers.ServiceLabels.macosCore)"]
+			|| arguments == ["bootout", "system/\(Identifiers.ServiceLabels.macosCore)"]
+			|| arguments == ["bootstrap", "system", "/Library/LaunchDaemons/\(Identifiers.ServiceLabels.macosCore).plist"]
+			|| arguments == ["kickstart", "system/\(Identifiers.ServiceLabels.macosCore)"] else { throw OwnedRuntimeInstallFailure.source }
 		let result = try child(path: "/bin/launchctl", arguments: arguments, timeout: 3)
 		guard !result.timedOut else { throw OwnedRuntimeInstallFailure.cleanupPending }
 		return Observation(status: result.status, bytes: result.bytes)

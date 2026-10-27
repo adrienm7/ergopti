@@ -20,6 +20,9 @@ done
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# The external hosts are declared once in _shared/data/identifiers.json.
+# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
+. "$PROJECT_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
 BUILD_DIR="$PROJECT_ROOT/build/linux"
 DEB_ROOT="$BUILD_DIR/deb"
 PACKAGE_NAME="ergopti"
@@ -170,7 +173,7 @@ Depends: luajit (>= 2.1), xclip, libnotify-bin, curl, libxkbcommon0, libxkbcommo
 Recommends: lua-luv, lua-filesystem, openssl, xdotool, wmctrl, wl-clipboard
 Section: utils
 Priority: optional
-Homepage: https://github.com/adrienm7/ergopti
+Homepage: https://$ERGOPTI_HOST_GITHUB/adrienm7/ergopti
 Description: Ergonomic keyboard optimizer with AI-powered hotstrings
  Ergopti is a cross-platform keyboard optimizer that provides an
  intelligent hotstring engine, keystroke metrics, and AI-assisted

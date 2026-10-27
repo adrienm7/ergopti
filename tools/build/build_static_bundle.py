@@ -3,7 +3,7 @@
 ==============================================================================
 MODULE: Static Bundle Builder
 DESCRIPTION:
-Assembles the runtime assets the compiled ErgoptiPlus.exe reads into a single
+Assembles the runtime assets the compiled Windows executable reads into a single
 zip archive. The compiled AHK script embeds this archive via FileInstall and
 extracts it on first launch (infra/bundle.ahk), so the EXE is self-contained.
 What ships is declared in tools/build/windows_bundle_manifest.json; this script
@@ -36,6 +36,19 @@ import sys
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+
+# The executable name is declared once in _shared/data/identifiers.json.
+sys.path.insert(
+    0,
+    str(
+        Path(__file__).resolve().parent.parent.parent
+        / "static"
+        / "ergopti_plus"
+        / "_shared"
+        / "data"
+    ),
+)
+from identifiers import APP  # noqa: E402
 
 # Repository root: tools/build/ is two levels below it.
 DEFAULT_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -338,7 +351,7 @@ def write_bundle(selection: Selection, output: Path) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Assemble the ErgoptiPlus.exe static bundle.")
+    parser = argparse.ArgumentParser(description=f"Assemble the {APP['exe']} static bundle.")
     parser.add_argument(
         "--repo-root",
         type=Path,

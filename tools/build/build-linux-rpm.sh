@@ -21,6 +21,9 @@ done
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# The external hosts are declared once in _shared/data/identifiers.json.
+# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
+. "$PROJECT_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
 BUILD_DIR="$PROJECT_ROOT/build/linux"
 RPM_ROOT="$BUILD_DIR/rpm"
 # The release-visible tree holds one runtime artifact; keep the complete native
@@ -173,7 +176,7 @@ Version:        $VERSION
 Release:        $RELEASE%{?dist}
 Summary:        Ergonomic keyboard optimizer with AI-powered hotstrings
 License:        MIT
-URL:            https://github.com/adrienm7/ergopti
+URL:            https://$ERGOPTI_HOST_GITHUB/adrienm7/ergopti
 Source0:        %{name}-%{version}.tar.gz
 
 BuildArch:      $ARCH

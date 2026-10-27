@@ -31,6 +31,13 @@ import re
 import subprocess
 import sys
 from collections import defaultdict
+from pathlib import Path
+
+# The GitHub host is declared once in _shared/data/identifiers.json.
+sys.path.insert(
+    0, str(Path(__file__).resolve().parents[2] / "static" / "ergopti_plus" / "_shared" / "data")
+)
+from identifiers import HOSTS  # noqa: E402
 
 
 # ============================================
@@ -208,7 +215,7 @@ def render(prev_tag: str | None, commits: list[dict[str, str]]) -> str:
     out_lines: list[str] = ["## Changelog", ""]
     if prev_tag:
         out_lines.append(
-            f"_Commits since [`{prev_tag}`](https://github.com/{repo}/releases/tag/{prev_tag})._"
+            f"_Commits since [`{prev_tag}`](https://{HOSTS['github']}/{repo}/releases/tag/{prev_tag})._"
         )
         out_lines.append("")
 
