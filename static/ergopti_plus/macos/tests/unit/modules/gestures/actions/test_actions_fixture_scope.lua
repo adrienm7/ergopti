@@ -85,7 +85,7 @@ helpers.describe("Gesture actions fixture ownership", function()
 						local catalogue = { prefix = "", slots = { tap_3 = true } }
 						helpers.assert_eq(identity.gesture_binding_fits("tap_3", catalogue), true)
 						helpers.assert_eq(identity.gesture_binding_fits("removed_slot", catalogue), false)
-						helpers.assert_nil(identity.gesture_binding_fits("keyboard__cmd_1", catalogue))
+						helpers.assert_nil(identity.gesture_binding_fits("keyboard__primary_1", catalogue))
 						constructions = constructions + 1
 						if mode == "construction failure" then error(marker, 0) end
 						return result

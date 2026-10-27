@@ -19,7 +19,7 @@ helpers.describe("wrap_selection gesture action", function()
 		actions.init({ action_params = {} })
 		helpers.assert_eq(actions.set_action_parameter("tap_3", "wrap_selection", "«"), true)
 		helpers.assert_eq(actions.set_action_parameter(
-			"keyboard__cmd_1", "wrap_selection", "**|**"), true)
+			"keyboard__primary_1", "wrap_selection", "**|**"), true)
 
 		helpers.assert_eq(actions.execute_single("wrap_selection", "tap_3"), true)
 		local last = calls.text_actions[#calls.text_actions]
@@ -28,7 +28,7 @@ helpers.describe("wrap_selection gesture action", function()
 		helpers.assert_eq(last.right, " »")
 		helpers.assert_eq(last.parent, "gestures")
 
-		helpers.assert_eq(actions.execute_single("wrap_selection", "keyboard__cmd_1"), true)
+		helpers.assert_eq(actions.execute_single("wrap_selection", "keyboard__primary_1"), true)
 		last = calls.text_actions[#calls.text_actions]
 		helpers.assert_eq(last.left, "**")
 		helpers.assert_eq(last.right, "**")

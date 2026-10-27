@@ -31,7 +31,7 @@ helpers.describe("llm_generate_prediction action", function()
 		local ok, err = pcall(function()
 			helpers.assert_eq(actions.execute_single("llm_generate_prediction"), true,
 				"the action must be a registered gesture action")
-			helpers.assert_eq(actions.execute_single("llm_generate_prediction", "keyboard__hs_ctrl_space"), true,
+			helpers.assert_eq(actions.execute_single("llm_generate_prediction", "keyboard__secondary_space"), true,
 				"a keyboard slot runs the same action")
 			helpers.assert_eq(requests, 2, "each dispatch must ask the bridge for one prediction")
 		end)

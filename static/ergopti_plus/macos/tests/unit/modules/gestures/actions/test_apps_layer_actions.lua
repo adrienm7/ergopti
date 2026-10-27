@@ -32,7 +32,7 @@ helpers.describe("gesture actions delegate to the app-navigation owner", functio
 			local last = calls.apps_actions[#calls.apps_actions]
 			helpers.assert_eq(last.name, method, action_id .. " must run apps." .. method)
 			helpers.assert_eq(last.parent, "gestures")
-			helpers.assert_eq(actions.execute_single(action_id, "keyboard__cmd_1"), true)
+			helpers.assert_eq(actions.execute_single(action_id, "keyboard__primary_1"), true)
 			helpers.assert_eq(calls.apps_actions[#calls.apps_actions].parent, "shortcut_bindings")
 			checked = checked + 1
 		end
@@ -46,7 +46,7 @@ helpers.describe("gesture actions delegate to the app-navigation owner", functio
 		local last = calls.pixel_actions[#calls.pixel_actions]
 		helpers.assert_eq(last.name, "copy_pixel_color")
 		helpers.assert_eq(last.parent, "gestures")
-		helpers.assert_eq(actions.execute_single("pick_color", "keyboard__cmd_1"), true)
+		helpers.assert_eq(actions.execute_single("pick_color", "keyboard__primary_1"), true)
 		helpers.assert_eq(calls.pixel_actions[#calls.pixel_actions].parent, "shortcut_bindings")
 	end)
 
@@ -60,7 +60,7 @@ helpers.describe("gesture actions delegate to the app-navigation owner", functio
 		helpers.assert_eq(table.concat(paused_parents, ","), "gestures",
 			"a gesture PAUSE must fence the gesture app scope and nothing else")
 		helpers.assert_eq(actions.execute_single("open_downloads"), false)
-		helpers.assert_eq(actions.execute_single("open_downloads", "keyboard__cmd_1"), true)
+		helpers.assert_eq(actions.execute_single("open_downloads", "keyboard__primary_1"), true)
 		helpers.assert_eq(actions.resume_after_cleanup("gestures"), true)
 		helpers.assert_eq(actions.execute_single("open_downloads"), true)
 	end)

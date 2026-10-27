@@ -91,7 +91,7 @@ local function run_fixture(body, source)
 		end
 		return event
 	end
-	local files = { config = source or '[shortcuts]\nenabled = true\nchatgpt_url = "https://example.test"\nkeyboard = { cmd_a = "send_text", foreign = 17 }\ntap_keys = { number_row_left = "send_text", foreign = 21 }\nscript_control = { chords_enabled = true, script_altgr_enter = "open_url", script_altgr_backspace = "none", script_altgr_escape = "none", future = 42 }\nkeys = { ctrl_g = true, future = true }\n[gestures]\naction_parameters = { keyboard__cmd_a__send_text = "keyboard", tap_key__number_row_left__send_text = "tap", script__script_altgr_enter__open_url = "https://example.test", tap_4__open_url = "https://apple.com", future = { keep = 9 } }\n[future]\nkeep = 7\n' }
+	local files = { config = source or '[shortcuts]\nenabled = true\nchatgpt_url = "https://example.test"\nkeyboard = { primary_a = "send_text", foreign = 17 }\ntap_keys = { number_row_left = "send_text", foreign = 21 }\nscript_control = { chords_enabled = true, script_altgr_enter = "open_url", script_altgr_backspace = "none", script_altgr_escape = "none", future = 42 }\nkeys = { ctrl_g = true, future = true }\n[gestures]\naction_parameters = { keyboard__primary_a__send_text = "keyboard", tap_key__number_row_left__send_text = "tap", script__script_altgr_enter__open_url = "https://example.test", tap_4__open_url = "https://apple.com", future = { keep = 9 } }\n[future]\nkeep = 7\n' }
 	if source == false then files.config = nil end
 	local file_port = {
 		read = function(path)

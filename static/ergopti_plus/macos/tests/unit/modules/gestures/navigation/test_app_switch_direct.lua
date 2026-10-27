@@ -185,7 +185,7 @@ helpers.describe("previous application switches directly (app-switch-direct)", f
 	it("(app-switch-direct) a keyboard slot runs the switch under the shortcut parent",
 		function(fresh_actions)
 			with_desk(two_screen_desk(LEFT_SCREEN), function(focused)
-				local _, calls = tap(fresh_actions, "app_previous", "keyboard__cmd_1")
+				local _, calls = tap(fresh_actions, "app_previous", "keyboard__primary_1")
 				helpers.assert_eq(calls.after[1].parent, "shortcut_bindings")
 				helpers.assert_eq(focused, { 22 })
 			end)

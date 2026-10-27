@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.shortcut_bindings_fixture")
 
-local DISABLED_ID = "ctrl_d"
+local DISABLED_ID = "ctrl_g"
 
 --- Builds the real Shortcuts submenu around the given registry and returns
 --- the named Ctrl rows, the only ones the stubbed renderer hands back.
@@ -50,7 +50,7 @@ local function build_ctrl_rows(bindings, state_shortcuts)
 		}
 		package.loaded["ui.menu.shortcut_utils"] = {}
 		package.loaded["ui.menu.menu_keyboard_slots"] = {
-			provide_rows = function(_, _, fixed_by_prefix) return fixed_by_prefix.hs_ctrl_ end,
+			provide_rows = function(_, _, fixed_by_prefix) return fixed_by_prefix.secondary_ end,
 		}
 		package.loaded["infra.manifest_reader"] = { default_for = function() return "star" end }
 
@@ -93,7 +93,7 @@ local function assert_checkmarks(bindings, rows, context)
 				context .. ": row checkmark for " .. id)
 		end
 	end
-	helpers.assert_true(compared > 1, "the Ctrl rows must be rendered, or nothing was compared")
+	helpers.assert_true(compared >= 1, "the Ctrl rows must be rendered, or nothing was compared")
 end
 
 

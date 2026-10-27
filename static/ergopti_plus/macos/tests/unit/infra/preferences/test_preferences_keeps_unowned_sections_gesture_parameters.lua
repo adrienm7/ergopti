@@ -32,7 +32,7 @@ helpers.describe("Published gesture parameter identity source preservation", fun
 		'removed_gesture_slot__open_url = "https://obsolete.example" # cleanup owns this row',
 		'tap_3__open_url = "https://valid.example"',
 		'swipe_3_horiz__open_url = "https://axis.example"',
-		'keyboard__cmd_k__open_url = "https://keyboard.example"',
+		'keyboard__primary_k__open_url = "https://keyboard.example"',
 		'tap_key__a__open_url = "https://tap.example"',
 		'script__reload__open_url = "https://script.example"',
 		'', '[future]', 'keep = "independent"', '',
@@ -83,13 +83,13 @@ helpers.describe("Published gesture parameter identity source preservation", fun
 			helpers.assert_nil(state.gesture_action_parameters.removed_gesture_slot__open_url)
 			helpers.assert_eq(state.gesture_action_parameters.tap_3__open_url, "https://valid.example")
 			helpers.assert_eq(state.gesture_action_parameters.swipe_3_horiz__open_url, "https://axis.example")
-			helpers.assert_eq(state.gesture_action_parameters.keyboard__cmd_k__open_url, "https://keyboard.example")
+			helpers.assert_eq(state.gesture_action_parameters.keyboard__primary_k__open_url, "https://keyboard.example")
 			helpers.assert_eq(state.gesture_action_parameters.tap_key__a__open_url, "https://tap.example")
 			helpers.assert_eq(state.gesture_action_parameters.script__reload__open_url, "https://script.example")
 			local marks = marks_for(preferences)
 			helpers.assert_nil(marks["gestures.action_parameters.removed_gesture_slot__open_url"])
 			helpers.assert_eq(marks["gestures.action_parameters.tap_3__open_url"], true)
-			helpers.assert_eq(marks["gestures.action_parameters.keyboard__cmd_k__open_url"], true)
+			helpers.assert_eq(marks["gestures.action_parameters.keyboard__primary_k__open_url"], true)
 			preferences.load(path)
 			helpers.assert_eq(#warnings, 1, "read and cleanup agree on one deduplicated warning")
 			helpers.assert_contains(warnings[1], "gestures.action_parameters.removed_gesture_slot__open_url")
@@ -114,7 +114,7 @@ helpers.describe("Published gesture parameter identity source preservation", fun
 			helpers.assert_contains(saved, "# Independent user comments survive the admission scan.")
 			local expected = {
 				removed_gesture_slot__open_url = "https://obsolete.example", tap_3__open_url = "https://changed.example",
-				swipe_3_horiz__open_url = "https://axis.example", keyboard__cmd_k__open_url = "https://keyboard.example",
+				swipe_3_horiz__open_url = "https://axis.example", keyboard__primary_k__open_url = "https://keyboard.example",
 				tap_key__a__open_url = "https://tap.example", script__reload__open_url = "https://script.example",
 			}
 			helpers.assert_eq(TomlCodec.decode(saved).gestures.action_parameters, expected, "complete handwritten preserved parameter model")

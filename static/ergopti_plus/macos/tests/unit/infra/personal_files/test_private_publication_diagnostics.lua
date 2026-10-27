@@ -37,7 +37,7 @@ helpers.describe("private publication diagnostic ownership", function()
 					committed = preferences.publish_owned("config", { { section = "gestures", key = "enabled", value = true } }, preferences.source_snapshot("config"), reporter)
 				else
 					committed = preferences.save("config", {}, {}, { gestures = {
-						get_all_action_parameters = function() return { keyboard__cmd_1__run_program = PRIVATE } end,
+						get_all_action_parameters = function() return { keyboard__primary_1__run_program = PRIVATE } end,
 					} }, nil, reporter)
 				end
 				helpers.assert_eq(committed, false)
@@ -131,17 +131,17 @@ helpers.describe("private publication diagnostic ownership", function()
 					read = function(path) local file = assert(io.open(path, "rb")); local body = file:read("*a"); file:close(); return body end,
 					read_with_status = function()
 						if unavailable then return nil, "error", PRIVATE end
-						return '[shortcuts.keyboard]\ncmd_1 = "none"\n', "ok"
+						return '[shortcuts.keyboard]\nprimary_1 = "none"\n', "ok"
 					end,
 				}
 				local keyboard = require("modules.shortcuts.keyboard_shortcuts")
-				helpers.assert_eq(keyboard.get_action("cmd_1"), "none")
+				helpers.assert_eq(keyboard.get_action("primary_1"), "none")
 				unavailable = true
 				local function reporter(category) categories[#categories + 1] = category end
-				local called, committed = pcall(keyboard.set_action, "cmd_1", "run_program", private and reporter or nil)
+				local called, committed = pcall(keyboard.set_action, "primary_1", "run_program", private and reporter or nil)
 				helpers.assert_eq(called, true, "the native setter must acknowledge a raised preparation refusal")
 				helpers.assert_eq(committed, false)
-				helpers.assert_eq(keyboard.get_action("cmd_1"), "none")
+				helpers.assert_eq(keyboard.get_action("primary_1"), "none")
 				local found = false
 				for _, line in ipairs(logs) do if line:find(PRIVATE, 1, true) then found = true end end
 				helpers.assert_eq(found, not private)
