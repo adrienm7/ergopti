@@ -70,6 +70,7 @@ local function with_server_fixture(options, assertions)
 		local events = {}
 		local timer_count = 0
 		local reset_calls = 0
+		local reset_options = {}
 		local function lsof_command_contract(command)
 			local query = "/usr/sbin/lsof -nP -tiTCP:" .. tostring(math.floor(current_port))
 				.. " -sTCP:LISTEN"
@@ -165,8 +166,9 @@ local function with_server_fixture(options, assertions)
 		}
 		package.loaded["modules.llm.api_mlx"] = {
 			get_port = function() return current_port end,
-			reset_endpoints = function()
+			reset_endpoints = function(reset_option)
 				reset_calls = reset_calls + 1
+				reset_options[reset_calls] = reset_option or false
 				events[#events + 1] = "reset"
 				if reset_mode == "throw" then error("fixture reset failure") end
 				if reset_mode == "false" then return false end
@@ -276,6 +278,7 @@ local function with_server_fixture(options, assertions)
 			events = events,
 			timer_count = function() return timer_count end,
 			reset_calls = function() return reset_calls end,
+			reset_options = function() return reset_options end,
 			set_port = function(port) current_port = port end,
 			set_start_mode = function(mode) start_mode = mode end,
 			set_cleanup_mode = function(mode) cleanup_mode = mode end,
@@ -838,6 +841,29 @@ helpers.describe("HS-008: exact MLX server replacement ownership", function()
 				helpers.assert_eq(cancellations, 1)
 			end)
 		end
+	end)
+
+	helpers.it("(mlx-stop-no-pgid-wait) only a cold launch awaits a PGID", function()
+		with_server_fixture("self", function(fixture)
+			helpers.assert_true(fixture.obj.start_server("A", function() end, function() end))
+			local predecessor = fixture.server_tasks[1]
+			mark_ready(predecessor)
+			helpers.assert_eq(fixture.obj.stop_server_if_needed(function() end), true)
+			predecessor:complete(15)
+			local options = fixture.reset_options()
+			helpers.assert_eq(#options, 2, "fixture: launch and stop settlement each reset once")
+			helpers.assert_true(type(options[1]) == "table" and options[1].awaiting_pgid == true,
+				"a cold launch must open the PGID window its bash wrapper closes")
+			helpers.assert_true(options[2] == false or options[2].awaiting_pgid ~= true,
+				"a stop has no launch to report a PGID; waiting for one ends in the 15 s timeout warning")
+		end)
+		with_server_fixture({ probe_body = "models", probe_model = "fixture/A" }, function(fixture)
+			helpers.assert_true(fixture.obj.start_server("A", function() end, function() end))
+			local options = fixture.reset_options()
+			helpers.assert_eq(#options, 1, "fixture: adoption resets once")
+			helpers.assert_true(options[1] == false or options[1].awaiting_pgid ~= true,
+				"an adopted server prints no PGID line, so adoption must not await one")
+		end)
 	end)
 
 	helpers.it("(HS-012-reset-adoption-fence) rejects adoption before ready publication", function()
