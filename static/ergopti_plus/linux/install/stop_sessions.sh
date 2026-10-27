@@ -5,7 +5,9 @@
 # A user override pointing at another installation remains that user's state.
 
 set -euo pipefail
-[ "$(id -u)" = 0 ] || { echo 'Package session cleanup requires root.' >&2; exit 77; }
+# The sentences this script prints, in the user's language (install/messages.sh).
+source "$(dirname -- "${BASH_SOURCE[0]}")/messages.sh"
+[ "$(id -u)" = 0 ] || { ergopti_msg stop_sessions.requires_root >&2; exit 77; }
 # Accounts resolve through NSS (LDAP, sssd), so through getent; without it
 # no session is touched (EX_UNAVAILABLE). The stderr line is a machine-readable
 # token, not a sentence: the package manager prints it in its own output.
