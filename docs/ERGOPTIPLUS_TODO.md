@@ -180,9 +180,16 @@ dev.
   offset replay of `kl.start` into slices like the recovery.
 - **L19** [CODE][PHYS-M] log_manager.lua:1585 held the main thread 5288 ms right after "Typing
   ids restart at ledger byte ... rebuilding without day-boundary context resets" (new.txt
-  16:49:17 to 16:49:22). Line 1585 is the recovery slice timer: one slice overran its budget.
-  Next: find the unbounded statement in the restart rebuild path and bound it per slice; a test
-  replays a ledger with an id restart and asserts every slice stays under its budget.
+  16:49:17 to 16:49:22). Line 1585 is the recovery slice timer: one slice overran its 8 ms
+  budget. Read from code, three operations in `_rebuild_aggregates_from_raw` cannot yield: (1)
+  `_typing_replay_cutoffs` reads the whole data.sql (68 MB) with `FileSystem.read` for each
+  device before any work; (2) `_clear_derived_device_rows` deletes every derived row of a device
+  in one transaction; (3) the replay query `WHERE device_id=... AND id range ORDER BY ts, id` has
+  no index on (device_id, ts, id) (schema.sql only has (device_id, date) and (date, app)), so
+  SQLite sorts the whole partition before the first row reaches the pace check. The warning is
+  logged after (1), so (2) or (3) is the hold. Next: time (2) and (3) on a copy of the field
+  cache; if (3), add the shared index through schema.sql with a cache version bump; if (2),
+  delete in bounded batches between yields.
 - **L20** Fixed (commit "fix(macos): name why the current config view is refused"). "config.toml
   cannot be read, so the virtual keyboard choice is unknown" (init.lua:2168 on 228f79f2, new.txt
   16:28:07, 16:48:12, 16:54:32, developer mode). `Preferences.current_view` now returns a closed
@@ -216,9 +223,10 @@ dev.
   reason=process_failed" (new.txt 14:31:52, 16:48:44). The TIS probe (issue #104 and `_152936`)
   shows macOS 26.6.2 refuses it: register 0 and enable 0, but the source stays disabled, select
   returns -50, the HIToolbox preference route is refused too, and removed sources stay listed
-  until logout. Open [CODE]: the rollback disable right after is refused "busy" because the
-  failed enable is still settling; wait for the settlement or skip a disable of a source that
-  never became enabled. Mac confirms: after a logout, the probe's `after-logout` mode for M5b/P6.
+  until logout. The rollback disable right after was refused "busy": `run_bounded_process`
+  (modules/keymap/input_sources.lua) published the terminal before freeing the mutation slot, so
+  a mutation started from that callback was refused. Fixed (commit "fix(macos): free the
+  input-source slot before its terminal callback"). Mac confirms: after a logout, the probe's `after-logout` mode for M5b/P6.
 - **L26** [CODE][PHYS-M] field run 03_field_network: fail (`_164726`); the PAC host is unknown
   off the company network (new.txt 16:48:20). Sub-steps were not captured (L13). Next: read the
   sub-steps in the next report; a PAC that cannot be fetched while direct works must not fail the

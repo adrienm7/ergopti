@@ -134,6 +134,9 @@ local function run_bounded_process(label, executable, args, on_done, environment
 			return false
 		end
 		owner.pending_terminal = nil
+		-- Both native owners have settled: free the slot first, so a terminal
+		-- callback that starts the next mutation (a rollback) is admitted.
+		release_mutation_if_settled(owner)
 		return publish_terminal(pending.ok, pending.stdout, pending.reason, pending.stderr)
 	end
 
