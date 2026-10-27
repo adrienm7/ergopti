@@ -248,8 +248,12 @@ _UMF_ActualOwnedFileReceipt() {
 				_VendorDir . "\ergopti_updater_download.ps1"],
 			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)))
 		Assert(Handle.start(), "native filesystem receipt fixture must actually start")
+		; The fixture dot-sources the download helper and compiles two Add-Type
+		; blocks in a cold PowerShell before its 43 controls; on a loaded runner
+		; that alone passed 10 s. This bounds a hang, not the fixture's speed, as
+		; the WinHTTP artifact test bounds the same helper.
 		Started := A_TickCount
-		while Observed.Length == 0 && !TickExpired64(Started, 10000) {
+		while Observed.Length == 0 && !TickExpired64(Started, 60000) {
 			_SR_TreePoll()
 			Sleep(10)
 		}
