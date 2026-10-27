@@ -62,6 +62,16 @@ local FAILURE_MESSAGES = {
 	OLLAMA_ERROR_CHECKSUM = "ollama.error_checksum",
 }
 
+-- Exit codes that carry a closed cause without printing a marker. 64 (EX_USAGE)
+-- is the launcher's managed PTY worker or the managed runtime receiver refusing
+-- the installer request Ergopti built; 78 (EX_CONFIG) is the pinned runtime's
+-- catalogue or admission refusing it. Both used to reach the user as
+-- "Unknown error" (issue #104).
+local EXIT_FAILURE_MESSAGES = {
+	[64] = "ollama.error_installer_refused",
+	[78] = "ollama.error_runtime_refused",
+}
+
 local KNOWN_MARKERS = {
 	[MARKER_INSTALLING] = true,
 	[MARKER_VERIFIED]   = true,
@@ -778,6 +788,7 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 
 		if exit_code ~= 0 then
 			local failure_key = FAILURE_MESSAGES[_observed_failure_marker or ""]
+				or EXIT_FAILURE_MESSAGES[exit_code]
 			if failure_key then return publish_failure(i18n.get(failure_key), exit_code) end
 			local tail = tail_for_error(table.concat(diagnostic_tail.lines(), "\n"))
 			if tail == "" then

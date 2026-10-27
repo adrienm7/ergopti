@@ -2259,6 +2259,8 @@
 	"ollama.download_title": "Ollama-model downloaden",
 	"ollama.error_network": "Ollama kon niet worden gedownload. Controleer uw internetverbinding en kies daarna opnieuw de Ollama-backend.",
 	"ollama.error_checksum": "Het gedownloade Ollama-archief faalde voor de SHA-256-controle en is verwijderd. Er is niets geïnstalleerd.",
+	"ollama.error_installer_refused": "Het Ollama-installatieprogramma van Ergopti weigerde zijn eigen verzoek; er is niets geïnstalleerd. Start Ergopti opnieuw en kies opnieuw de Ollama-backend; als het blijft gebeuren, stuur dan het diagnoserapport.",
+	"ollama.error_runtime_refused": "Ergopti kon zijn vastgezette Ollama-runtime niet verifiëren (releasecatalogus of integriteitscontrole); er is niets geïnstalleerd. Stuur het diagnoserapport.",
 	"ollama.external_manual_start_body": "Deze Ollama-installatie wordt buiten Ergopti beheerd. Start of stop de service zelf, of installeer de door Ergopti beheerde runtime via het aanbod om Ollama in te stellen.",
 	"ollama.native_install_declined_body": "De huidige Ollama-installatie en modellen blijven ongewijzigd. De beheerde runtime is niet geïnstalleerd.",
 	"ollama.native_migration_body": "Installeer de door Ergopti beheerde runtime naast uw huidige Ollama-installatie. Bestaande modellen blijven op hun huidige locatie. Ergopti stopt de huidige service niet; stop deze zelf als deze dezelfde poort gebruikt. De native controles moeten slagen voordat de beheerde runtime kan draaien.",
