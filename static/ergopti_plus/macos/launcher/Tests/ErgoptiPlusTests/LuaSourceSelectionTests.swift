@@ -24,7 +24,7 @@ import XCTest
 @testable import ErgoptiPlus
 
 final class LuaSourceSelectionTests: XCTestCase {
-	private let bundle = "/Applications/ErgoptiPlus.app"
+	private let bundle = "/Applications/\(Identifiers.App.bundle)"
 	private let clone = "/Users/maintainer/ergopti"
 	private var key: String { Identifiers.DevSource.plistKey }
 
