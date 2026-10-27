@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-27 morning (read "Handover of 2026-10-26" first). Latest stable: [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6)
+Updated: 2026-10-27 evening (read "Handover of 2026-10-27 evening" first). Latest stable: [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6)
 (tag 950979d19c, 2026-10-23). **Next step: issue #101 follow-ups on the Mac (Backlog).** Open work only: a finished item is removed, its lessons go to
 [docs/memory](memory/README.md), and the history stays in Git
 (`git log -p -- docs/ERGOPTIPLUS_TODO.md`). Item numbers are stable and never reused. Open
@@ -29,46 +29,52 @@ a sealed Windows updater source, reseal with
 `node tools/ci/seal-windows-updater-original-source.cjs --ref <commit> --write`. Procedures:
 [COORDINATOR-MEMORY](todo-agents/COORDINATOR-MEMORY.md).
 
-## Handover of 2026-10-26 (read first if the session was lost)
+## Handover of 2026-10-27 evening (read first)
 
-- **Mac hardware session.** The maintainer has a Mac: the checklist is "Mac hardware session" under
-  Maintainer checks; their logs land in `docs/field-reports/mac-2026-10-27/` on their branch.
-- **State.** dev is linear and pushed at the head of the eighth integration batch (27 Oct, about 09:30 UTC);
-  every push of dev had its CI cancelled (a dev push builds a release). Latest stable release: v1.0.6. A full
-  CI of that head is dispatched on `tmp/preflight-dev` with `os_lanes=all`: read it first. The previous full
-  run (40467200993 on 8eae6e8b63) was 69 green; its reds (Windows unit core, macOS tooltip canvas, four Linux
-  E2E rows) are fixed in this batch by the CI agent (stale fixtures after recent dev changes), CI-only
-  confirmation. Batch 8 holds PAR-80, PAR-53, PAR-83, item 139, item 5 (config-only Linux participant),
-  PAR-65 agent decisions, PAR-84, PAR-79 and the Mac hardware checklist.
-- **Disk.** The container allowance fills up with `/tmp/ergopti-*` test leftovers; the sandbox refused a
-  sweep of them from the coordinator, so ask the maintainer to remove the ones older than an hour.
-- **The ChatGPT fix branches are finished and fully integrated** (27 Oct, 08:00 UTC): every commit of
-  fix/linux fe2413797f, fix/macos e8ea64ff1e and fix/windows d6b075687e is on dev by subject or content
-  (the last two Windows test commits in the eighth batch; the per-branch reseal was replaced by one reseal on
-  dev). The branches can be deleted; the proxy refuses remote deletion from this container, so the
-  maintainer deletes them (`git push origin --delete fix/linux fix/macos fix/windows`).
-- **Sixth integration batch (27 Oct morning)** brought into dev: fix/windows up to 07d2514ef0 (seal commits
-  skipped, resealed once), the Linux daemon account-name fix, the PAR-74 Lua burn-down (567 to 0), the PAR-58
-  vectors and ledger, the network-check `route_plan` step, PAR-43, and PAR-41 on macOS/Linux (schema v15).
-- **Agent work in flight (Linux/macOS only)**, each backed up on a remote `tmp/wip-*` branch; if lost, redo
-  from the spec:
-  - `tmp/wip-todo-ae-sweep`: a sweep of the small Linux/macOS TODO items (anything not owned below).
-  - `tmp/wip-todo-af`: check the prediction floor decisions are all covered, then PAR-66 section readers, then
-    the Lua 5.4 `io.popen` child that still sees the real HOME in tests.
-  - `tmp/wip-todo-ag`: Linux Quit refusals as macOS (Quit wins over reload, a pending scope write blocks).
-- **Scripts used by the coordinator** live in the session scratchpad (lost with the container): `fullsweep.sh`
-  (gen:check, every `node` suite check with `xargs -P6`, Linux suite with `USER=root LOGNAME=root` and a
-  private `XDG_RUNTIME_DIR`, macOS suite per `--module` group), `pick.sh` (cherry-pick a list until a conflict)
-  and `renumber.py` (contiguous suite ordinals, increasing within each file). The commit hook needs Ruff 0.15.8
-  first on PATH (`python3 -m venv` plus `pip install ruff==0.15.8`).
+- **Focus decided by the maintainer (27 Oct afternoon):** fix every macOS problem while their Mac is
+  available. The general TODO and cross-OS parity work are paused until then (they resume afterwards).
+- **State.** dev is linear and pushed; every dev push had its CI cancelled at once (a dev push builds a
+  release; the maintainer allows pushing dev as long as that CI is cancelled). Latest stable: v1.0.6. A full
+  CI of the head is dispatched on `tmp/preflight-dev` with `os_lanes=all`: read it first and fix its reds.
+- **The maintainer's Mac field branch** is `field/mac-2026-10-27` (macOS 26.6.2, arm64, Swift Command Line
+  Tools only, behind a company PAC proxy at work). It carries their logs under `docs/field-reports/` and must
+  never be merged into dev: only dev is merged into it (`git merge` is fine there), then pushed. Their whole
+  procedure is `git pull` then `bash tools/dev/collect-macos-field-report.sh`: it stops any running
+  ErgoptiPlus and its kept-alive guardian, builds the developer app when the launcher changed
+  (`tools/dev/run-macos-dev-app.sh`), runs every Debug check and the Ollama/MLX download flows through the
+  field-run request (`static/ergopti_plus/macos/data/field_run.json`), collects the logs and commits and pushes
+  them, also on Ctrl-C. Read the newest `docs/field-reports/mac-*` folder with
+  `git show origin/field/mac-2026-10-27:<path>`.
+- **Problem ledger of the Mac session:** see "Mac field session 2026-10-27: problem ledger" below; every
+  problem of issue #104 and of the field reports is there as fixed (sha) or open with its next step.
+- **Coordinator scripts** are in `tools/dev/coordinator/`: `integration-sweep.sh <out-dir>` (gen:check,
+  format, every single-file node suite check in parallel with a lone re-run of each red, the Linux suite, the
+  macOS suite per group), `cherry-pick-list.sh <list> [resume-sha]` and `renumber-suite-ordinals.cjs`. The
+  commit hook needs Ruff 0.15.8 first on PATH (`python3 -m venv` plus `pip install ruff==0.15.8`) and Node 22.
 - **Integration procedure** (each batch): list the agent branch commits whose subject is not on dev;
-  cherry-pick them on a local `integ/*` branch from dev (skip seal refresh commits; on a
-  conflict prefer dev when it already fixed the same thing, otherwise merge both by hand); renumber
-  `tools/test/features/*/suite.json` ordinals on collision (`test-js-feature-inventory.cjs`); reseal if
-  `test-windows-updater-original-source.cjs` fails; run gen:check, the complete JS sweep (every `node` check
-  of the suite.json files, `xargs -P6`), the Linux suite and the macOS suite per `--module` group; then
-  fast-forward dev, push, cancel the push CI, and dispatch `ci.yml` on `tmp/preflight-dev` with
-  `os_lanes=all`.
+  cherry-pick them onto dev or a local `integ/*` branch (skip seal refresh commits; on a conflict prefer dev
+  when it already fixed the same thing, otherwise merge both by hand); renumber suite ordinals on a collision;
+  reseal if `test-windows-updater-original-source.cjs` fails
+  (`node tools/ci/seal-windows-updater-original-source.cjs --ref <commit> --write`); run the integration
+  sweep; push dev and cancel its push CI in the same step; dispatch `ci.yml` on `tmp/preflight-dev`.
+- **Agent commits waiting for integration (paused with the parity work; integrate after the Mac
+  session):** every one is on a remote backup branch; integrate by subject, they were green on their own
+  base.
+  - `tmp/wip-todo-af`: 8634b1ff80 (Linux acknowledges the layout scope once loaded), 358e211a10 (Windows
+    number-row design answer), 3337d99bc8 (Linux number-row order onboarding), 4fcb4a979a (logger scalar),
+    then `tmp/wip-todo-ag3` d5cf3ba50b (number-row strings for that work; it conflicts in the 21 locales
+    unless the AF commits come first). AF also left: reconcile the Linux `keyboard_layout_scope` comments and
+    the design note with the ninth batch.
+  - `tmp/wip-todo-ah`: 53b1bc5375 (reset every `hs.*` cache entry between macOS test files) and five CI
+    speed-ups (Ubuntu archive reuse, AHK shard split, one macOS checkout per E2E cell, Intel E2E start,
+    SwiftPM cache trial); run them on `tmp/preflight-dev` before dev.
+  - `tmp/wip-ci-fix`: f44fcc1e64, c9b90d11d7, ba13937b8c, 5009ad87b8 (Linux distribution-row CI fixtures):
+    check each against dev first, later fixes may have replaced them.
+  - `tmp/wip-todo-ae-par30`: 41f72525cf is an unvalidated work-in-progress snapshot of the PAR-30 Linux
+    updater signature gate; redo it from the item, do not cherry-pick it as is.
+- **The ChatGPT fix branches** fix/linux, fix/macos and fix/windows are fully on dev. The container proxy
+  refuses remote deletion, so the maintainer deletes them: `git push origin --delete fix/linux fix/macos
+fix/windows`.
 - **Host-only reds on the Linux container** (not bugs): JS `test-ahk-tap-follower`, `test-linux-install-sandbox`,
   `test-linux-runtime-native-registration`, `test-macos-managed-bootstrap-http`, `test-managed-ollama-protocol`,
   `test-managed-remote-retirement` (no pwsh), `test-linux-deb-package-owner` (refuses root),
@@ -92,6 +98,187 @@ a sealed Windows updater source, reseal with
   - Quit refusals before `ExitApp` with `notify.quit_refused` (PAR-45);
   - the registry op that re-encodes a value in `config_migrate.ahk`, then delete the macOS
     `[llm.profiles] user_profiles` reader import.
+
+## Mac field session 2026-10-27: problem ledger
+
+Every problem seen on the maintainer's Mac on 2026-10-27 (macOS 26.6.2, arm64), from issue
+[#104](https://github.com/adrienm7/ergopti/issues/104) (body; no comments), the field reports
+`mac-2026-10-27_150026`, `_151611`, `_152936`, `_164726` and `new.txt` (the day's WARNING/ERROR
+log) on the `field/mac-2026-10-27` branch, which never reaches dev. Builds seen: ba73f58 (15:00),
+92d4615 (15:16), b014076 (15:29), 228f79f2 (16:47 developer app). The 16:28 to 16:54 boots ran
+after every 14:00 to 15:38 fix below, so "not seen after 16:28" is the evidence for those fixes.
+Labels L1 to L39 are local to this ledger. Shas on `tmp/wip-audit-field` change when rebased onto
+dev.
+
+### Fixed on dev
+
+- **L1** Remap guardian status 'unavailable', regeneration fail-closed (new.txt 14:25:50 to
+  16:06:42, 7 boots). Fixed b3893e0480, 6f667b3380 (developer-build agent fallback, after
+  228f79f2). Not seen after 16:28. Mac confirms: no "guardian status 'unavailable'" at boot of the
+  developer app and of the installed app.
+- **L2** menu_state.lua:531 timer held the main thread 21 to 23 s, with "Cannot read typing
+  rollover facts" and "Aggregate cache recovery failed" (new.txt 14:25:49, 14:27:27, 15:26:02,
+  15:28:51, 16:06:41). Fixed d854d55c79, 18d71c8580, d3cb3e6765 (sliced recovery). At 16:28 the
+  recovery ran in slices ("interrupted after 267 slice(s)", expected). Residual hold: L18. Mac
+  confirms: no rollover ERROR, no hold over 2 s from menu_state.lua:531.
+- **L3** macOS disabled the keyDown, loopbackKeyUp and script-control taps, then "Typing context
+  invalidated" (new.txt 14:27:29). Consequence of the 23 s hold of L2; same fix. Mac confirms:
+  no tap re-enable warning.
+- **L4** AXValueChanged watcher cleanup/setup failed, context_tracker.lua:631 (new.txt 14:26 to
+  16:09, about 20 lines). Fixed 690d7877d8. Not seen after 16:28. Mac confirms: none after
+  switching between apps for a few minutes.
+- **L5** notifier.lua:79 "attempt to call a nil value (method 'release')" (new.txt 14:31:59,
+  14:32:09). Fixed 75c2f02956. Not seen after.
+- **L6** hs.task refused to launch /usr/sbin/systemextensionsctl (new.txt 14:31:37, 15:27:18).
+  Fixed f03227b916. Not seen after.
+- **L7** "Boot stage 'Accessibility permission' opened while ... still open" (new.txt 14:25:26,
+  15:34:07, 16:06:18). Fixed ed5a622eda (AK); verified: absent from the three boots on 228f79f2
+  (16:28, 16:48, 16:54). Mac confirms: absent after a cold start that waits for the permission.
+- **L8** AI activation chain at 15:27:35: MLX bootstrap exit 78 "native network receiver is
+  unavailable", Ollama bootstrap exit 64 "Erreur inconnue", eight MLX warmup settlement ERRORs,
+  "PGID pending timeout", four HTTP 1500 ms timeouts, two download_window error states, failed
+  switch_model. Fixed c0e3359a19 (receiver admitted in a developer app), 8fc33138ec (named exit
+  causes), 0e9fa0c149 (MLX warmup stop), bc09e4584c (owned pinned Ollama). Mac confirms: enabling
+  MLX then Ollama from the menu downloads or names a closed cause, with no settlement ERROR.
+- **L9** TIS probe did not compile, "missing argument label 'name:'" (`_151611`, `_152936`
+  probe_compile.txt), and a stale binary ran anyway. Fixed 678588c625, 1434adcc57.
+- **L10** PAC download failure aborted downloads; issue #104 `probes.proxy_pac.state: error`.
+  Fixed 8e267e23df, 7634296b28, cbaa14ad46, 7af4e65b10, d09303810d (PAC then direct). Field check
+  part: L26.
+- **L11** Field run step 10_ollama_model timed out while still downloading, then "answered after
+  it was settled" (`_164726`, new.txt 16:53:45). Fixed 2790b3239a.
+- **L12** "Field run ... was cut short by a reload" (new.txt 16:54:32). Fixed bde408f3a6.
+- **L13** `_164726` holds no logs: the collector was stopped. Fixed 259244ddb1.
+
+### Fixed on tmp/wip-audit-field (to land on dev)
+
+- **L14** "TOML mapping file '<name>' registered ZERO mappings" on every boot (new.txt 14:27:05 to
+  16:54:31, 7 boots). Cause: a pack whose only section is disabled by the user registers nothing
+  on purpose. Fixed 9481ba78ac: one INFO line names the disabled section count; an empty or
+  unreadable file still warns. `'<name>'` is the deliberate PrivateLabel mask
+  (`_shared/lua/diagnostics/private_label.lua`), not a logging bug. Mac confirms: no ZERO warning.
+- **L15** "Duplicate Ergopti Karabiner revocation completion ignored" on every reload (new.txt
+  14:26:53 to 16:28:13, 6 times). Cause: both revocation halves answer synchronously, the join
+  settles, and the trailing join in `M.revoke` (platform/remap/init.lua) settled again. Fixed
+  9f4dea89b2. Mac confirms: no such warning after a reload.
+
+### Open TODO
+
+- **L16** [CODE][PHYS-M] Slow ingest tick, `append` phase 466 to 563 ms, peaks 1531 and 1709 ms
+  (new.txt 14:25:50 to 16:53:38, 20 lines, still on 228f79f2). The 1.2 to 1.8 s ticks are the
+  log_manager.lua:1722 holds. `LedgerAppend.flush` (adapters/ledger_append.lua) takes the lock,
+  reads the journal, publishes it atomically, reads the tail, appends, clears the SQLite outbox
+  and publishes the journal again; `prepare_append` reads the whole data.sql (68 MB) only without
+  a journal, so the cost is not proven yet. Next: split the `append` trace mark into lock,
+  journal publish, tail, write, clear and terminal publish, then one Mac run names the slow one.
+- **L17** [CODE][PHYS-M] "Slow preferences save 1.9 to 2.1 s (prepare about 1.25 s, write about
+  0.8 s; operations=293)" (new.txt 15:27:35 to 16:48:20, 6 times, also on 228f79f2). It is the
+  2.06 s hold of startup_controller.lua:263 (15:28:57, 16:48:20). Next: profile `prepare` for 293
+  operations and why a one-key save carries 293.
+- **L18** [CODE] keystats start still holds the main thread 1.1 to 1.3 s from the deferred timer
+  at menu_state.lua:531 (new.txt 16:28:06, 16:48:13, on 228f79f2). Next: move the SQLite open and
+  offset replay of `kl.start` into slices like the recovery.
+- **L19** [CODE][PHYS-M] log_manager.lua:1585 held the main thread 5288 ms right after "Typing
+  ids restart at ledger byte ... rebuilding without day-boundary context resets" (new.txt
+  16:49:17 to 16:49:22). Line 1585 is the recovery slice timer: one slice overran its 8 ms
+  budget. Read from code, three operations in `_rebuild_aggregates_from_raw` cannot yield: (1)
+  `_typing_replay_cutoffs` reads the whole data.sql (68 MB) with `FileSystem.read` for each
+  device before any work; (2) `_clear_derived_device_rows` deletes every derived row of a device
+  in one transaction; (3) the replay query `WHERE device_id=... AND id range ORDER BY ts, id` has
+  no index on (device_id, ts, id) (schema.sql only has (device_id, date) and (date, app)), so
+  SQLite sorts the whole partition before the first row reaches the pace check. The warning is
+  logged after (1), so (2) or (3) is the hold. Next: time (2) and (3) on a copy of the field
+  cache; if (3), add the shared index through schema.sql with a cache version bump; if (2),
+  delete in bounded batches between yields.
+- **L20** Fixed ef3b8ddfd5. "config.toml
+  cannot be read, so the virtual keyboard choice is unknown" (init.lua:2168 on 228f79f2, new.txt
+  16:28:07, 16:48:12, 16:54:32, developer mode). `Preferences.current_view` now returns a closed
+  reason (publication_in_flight, schema_refused, unreadable, undecodable, section_shape,
+  outdated_keys, value_type, value_out_of_range, ...) and the error prints it. An absent
+  config.toml was already the defaults, so the field cause is one of those reasons; the earlier
+  "Config migration ... refused (newer)" (15:32:19, 15:34:29) points at schema_refused. Mac
+  confirms: the next occurrence names its reason; if it is schema_refused, decide whether a
+  read-only view may read a newer schema.
+- **L21** Fixed 708bc6671d. Ollama
+  `stop_warmup() could not retire its HTTP owner: false` and settlement 'Ollama warmup stop' did
+  not commit (new.txt 16:28:07, after "startup_model_download_declined"). Cause: hs.http.asyncPost
+  returns no task, so a warmup POST in flight can only be revoked logically; `cancel()` reported
+  that as a refusal. It now answers "pending" for that case and the stop commits, as the MLX fix
+  877b922d23 does. Mac confirms: no such ERROR when the startup declines the model download.
+- **L22** Fixed b5b56adbf0. A
+  granite model pull showed an error at 100% that no log recorded (maintainer report during the
+  field run). A non-zero pull exit only posted a notice; it now logs an ERROR with the exit code
+  and the last line the pull printed (the digest or manifest refusal after 100%). A pulled model
+  that does not load, and a pull task that cannot be settled, log an ERROR too. Mac confirms: the
+  next failed pull has one ERROR line naming its cause.
+- **L23** [CODE] "Ignored-window prewarm incomplete; tracking remains fail-closed" (new.txt
+  15:28:28, 16:28:04) and 1 s holds from keymap/utils.lua:1426 and :1455 (14:26:05, 15:34:09).
+  Next: log which prewarm stage was incomplete and bound the 1 s probe.
+- **L24** [PHYS-M] key_event_health: key events 250 ms or more late (max 879 ms), 100 key-downs
+  without key-up, 81 key-ups without key-down, 62 keys stuck over 3 s, one key stuck 518 s
+  (new.txt 09:54 to 10:36, session totals); issue #104 shows 1 late key. Most late events follow
+  the main-thread holds of L16 to L19. Next: after those, re-read the totals; lost key-ups without
+  a hold point at the Karabiner virtual HID path (big item 2).
+- **L25** Known limitation, plus one open bug. "Failed to enable 'Composer Check' —
+  reason=process_failed" (new.txt 14:31:52, 16:48:44). The TIS probe (issue #104 and `_152936`)
+  shows macOS 26.6.2 refuses it: register 0 and enable 0, but the source stays disabled, select
+  returns -50, the HIToolbox preference route is refused too, and removed sources stay listed
+  until logout. The rollback disable right after was refused "busy": `run_bounded_process`
+  (modules/keymap/input_sources.lua) published the terminal before freeing the mutation slot, so
+  a mutation started from that callback was refused. Fixed af5765a659. Mac confirms: after a logout, the probe's `after-logout` mode for M5b/P6.
+- **L26** [CODE][PHYS-M] field run 03_field_network: fail (`_164726`); the PAC host is unknown
+  off the company network (new.txt 16:48:20). Sub-steps were not captured (L13). Next: read the
+  sub-steps in the next report; a PAC that cannot be fetched while direct works must not fail the
+  check.
+- **L27** [PHYS-M] field run 04_field_toolchain: fail (`_164726`), sub-step unknown; candidates
+  are `timer_late_ms` (main-thread hold) and the Shortcuts or Homebrew steps. Next: read the
+  sub-steps in the next report.
+- **L28** [PHYS-M] field run 06_field_composer: fail, same cause as L25. 07_key_accounting:
+  needs_typing, not a failure: the maintainer types the prompted text on the next run.
+- **L29** [CODE][PHYS-M] Screen Recording settings could not be opened, openURL returned false
+  (new.txt 15:31:46). adapters/screen_capture.lua uses
+  `x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture`, the same
+  scheme as the Accessibility and Input Monitoring panes, so the URL alone does not explain it.
+  Next, on the Mac: run `open "<that URL>"` in Terminal; if it fails on macOS 26, switch to the
+  `com.apple.settings.PrivacySecurity.extension?Privacy_ScreenCapture` form, else trace the
+  `hs.urlevent.openURL` call made from the notification click.
+- **L30** [CODE] karabiner.lease "'status' called before M.init()" (new.txt 15:32:19, right
+  after the config migration refusal stopped that boot early). The guard is
+  platform/remap/lease_controller.lua:165. Next: log the caller's traceback in that guard, then
+  make the caller check the controller's init state when the boot stopped before init.
+- **L31** [CODE] "Accessibility observer setup failed ... for PID 31319" (new.txt 14:27:31): 31319
+  is the ErgoptiPlus runtime itself (issue #104 `runtime_pid`). `M.update_ax_observer`
+  (modules/keystats/context_tracker.lua) attaches to whatever app is frontmost, including the
+  runtime's own windows, and `hs.axuielement.applicationElement` refused its own PID. Next:
+  decide whether typing in Ergopti's own windows is tracked; if not, return early for
+  `hs.processInfo.processID` with a test, otherwise log this refusal at INFO.
+- **L32** [CODE] issue #104 diagnostics: Input Monitoring, Login Items and Screen Recording read
+  `unknown`; memory used 843 MB with 93 MB free. Next: read or label those permissions, and
+  measure the 843 MB resident size.
+- **L33** [CODE] Swift warnings in the launcher build (`_164726` field*run.txt). The "always
+  true" one, OwnedVirtualHIDDaemonReportMainOperation.swift:112 `returned != nil && error ==
+nil`, has no behavior effect: `executeAndReturnError` returns a non-optional descriptor and
+  `error == nil` alone decides, which is the intended check. Next, on a Mac with swiftc: replace it
+  by `* = script.executeAndReturnError(&error)`and`scriptReturned = error == nil`, then fix
+main.swift:1290 "will never be executed", OwnedSuspendedImageGuardian.swift:58-59 trailing
+closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swiftc to compile
+  them.
+- **L34** [CODE] HotPath over budget: preview.rebuild 5.3 to 13.3 ms, hotstring.match 6.4 ms,
+  keydown 5.8 ms (new.txt 14:26 to 16:18). Low priority; profile with perf-profiling.
+
+### Expected, no defect
+
+- **L35** "Ergopti driver not started in this Hammerspoon" (new.txt 11:19 to 11:21): the stock
+  Hammerspoon.app started next to a standalone ErgoptiPlus; the guard kept it inert.
+- **L36** "Config migration ... refused (newer)" (new.txt 15:32:19, 15:34:29): an older build met
+  a config written by a newer schema and left it untouched. Linked to L20.
+- **L37** Lease heartbeat answered after 1.06 s, under its 2.5 s deadline (new.txt 09:59:00): a
+  main-thread hold, covered by L16 to L19.
+- **L38** "Aggregate cache recovery interrupted after 267 slice(s)" (new.txt 16:28:13): the sliced
+  recovery resumes at the next start by design.
+- **L39** Ad hoc signing of the developer app loses the Accessibility and other grants on each
+  build (`_164726`): known; `tools/build/create_macos_signing_identity.sh` gives a stable
+  identity.
 
 ## Release blocker (before the next release)
 
@@ -829,6 +1016,17 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       tap-hold off and theirs present, never activate ours (this rewords ADR 011 decision 3). WebView2 stays
       the system copy, with a version check and a clear refusal. Linux and Windows: inventory every external tool the drivers call (ydotool, xdotool, wmctrl,
       curl, Python, PowerShell modules, WebView2) and decide per tool whether Ergopti ships its own.
+- [ ] **Ergopti's own Ollama on Windows and Linux too (maintainer requirement, 27 October).** [CODE] Same rule
+      as macOS on every OS: Ergopti always installs and runs its own pinned Ollama, whether or not the system
+      has one, and never selects, reuses, stops or modifies the user's Ollama. macOS is done (bc09e4584c:
+      `ollama_binary.resolve()` returns only the owned runtime, pinned 0.40.4 from `managed_ollama_runtime.json`;
+      the shared key `llm_ollama_owned_port` = 11435 in `defaults.json`, read through `ollama_endpoint`; a saved
+      11434 override is refused and the old `llm.ollama_port` is migrated once and logged). Left: Linux
+      (`managed_ollama_proxy.lua`, the Ollama resolver and the endpoint still on `llm_ollama_port` 11434) and
+      Windows (it already has an owner for its own Ollama taking a models directory and port; check its
+      installer and every caller against the rule), both moved to `llm_ollama_owned_port`, the user's daemon
+      on 11434 left untouched, with regression tests that an installed system Ollama is never resolved or
+      started. [PHYS-W] [PHYS-L] confirm with a system Ollama running on 11434: Ergopti's listens on 11435.
 - [ ] **Ctrl+Caps Lock slot on macOS.** [PHYS-M] The `secondary_capslock` slot binds through its own native
       entry again (ea02cf7000: the generic registrar refuses Caps Lock and the whole shortcut start rolled
       back). The registrar tests say macOS never fires a Caps Lock hotkey: check on a real Mac that Ctrl+Caps

@@ -1674,6 +1674,8 @@ function M.new(deps, presets, ram_getter)
 			local authorized = owner.authorized == true
 				and owner.start_committed == true
 			if settle_pull_task(code) ~= true then
+				Logger.error(LOG, "The Ollama pull of %s ended (code %s) but its task could not be settled.",
+					tostring(target_model), tostring(code))
 				owner.authorized = false
 				owner.completion_dispatching = false
 				complete_progress_ui(owner, false, target_model)
@@ -1717,6 +1719,10 @@ function M.new(deps, presets, ram_getter)
 					pcall(notifications.notify, i18n.get("ollama.model_installed_title"), string.format(i18n.get("ollama.model_ready"), target_model), "success")
 					settle_success()
 				end, function(reason)
+					if reason ~= "stale" then
+						Logger.error(LOG, "The Ollama model %s was pulled but does not load: %s.",
+							tostring(target_model), tostring(reason))
+					end
 					settle_cancel(reason == "stale" and "stale" or "model_load_failed")
 				end, opts)
 			elseif code == 15 then
@@ -1728,6 +1734,15 @@ function M.new(deps, presets, ram_getter)
 				-- The CLI prints its refusal (e.g. the 412 "newer version of Ollama") on
 				-- the final stderr, which the stream callback may never have seen (#101).
 				pull_output = pull_output .. sanitize_terminal_stream((stdout or "") .. (stderr or ""))
+				-- The cause is the last line the pull printed, often after a 100%
+				-- progress line (digest or manifest refusal); the notice alone left
+				-- no trace in the log.
+				local last_line = ""
+				for line in pull_output:gmatch("[^\r\n]+") do
+					if line:match("%S") then last_line = line end
+				end
+				Logger.error(LOG, "The Ollama pull of %s failed (code %s): %s.", tostring(target_model),
+					tostring(code), last_line ~= "" and last_line:sub(1, 300) or "no output")
 				local requires_upgrade = needs_ollama_upgrade(pull_output)
 				local connection_error = pull_output:lower():find("could not connect") or pull_output:lower():find("connection refused")
 				

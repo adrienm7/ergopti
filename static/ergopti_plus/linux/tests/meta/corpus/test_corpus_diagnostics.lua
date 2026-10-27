@@ -92,7 +92,7 @@ helpers.describe("diagnostics corpus (linux): GitHub issue link", function()
 			local templates = {}
 			for key, value in pairs(corpus.templates) do templates[key] = value end
 			templates.max_url_bytes = vector.max_url_bytes
-			local ok, url = pcall(IssueLink.build_url, templates, corpus.repository, vector.template, vector.values)
+			local ok, url = pcall(IssueLink.build_url, templates, corpus.repository, vector.template, vector.values, vector.notes)
 			if vector.expect_error then
 				helpers.assert_eq(ok, false, vector.id .. ": an error was expected, got " .. tostring(url))
 			else
@@ -182,6 +182,29 @@ helpers.describe("diagnostics corpus (linux): page actions (page-actions-corpus)
 				helpers.assert_eq(reason, nil, vector.id .. " must be accepted")
 				helpers.assert_eq(action, vector.expected, vector.id)
 			end
+		end)
+	end
+end)
+
+helpers.describe("diagnostics corpus (linux): issue form identity (form-identity-corpus)", function()
+	local corpus = read_corpus("tests/corpus/healthcheck/form_identity_vectors.json")
+	local Share = require("healthcheck.share")
+	local config = require("healthcheck.snapshot").load_config(function(rel) return SHARED_ROOT .. rel end)
+
+	helpers.it("has vectors (form-identity-corpus)", function()
+		helpers.assert_true(type(corpus.vectors) == "table" and #corpus.vectors >= 8,
+			"the form-identity corpus must hold its vectors")
+	end)
+
+	for _, vector in ipairs(corpus.vectors or {}) do
+		helpers.it("form fields: " .. vector.id .. " (form-identity-corpus)", function()
+			local snapshot = { schema_version = 2, driver = vector.snapshot.driver,
+				generated_at = "2026-10-27T10:00:00Z", sections = vector.snapshot.sections }
+			local document = Share.document(snapshot, config.schema, "")
+			helpers.assert_eq(document.fields.version, vector.version, vector.id .. ": version")
+			helpers.assert_eq(document.fields.os, vector.os, vector.id .. ": os")
+			helpers.assert_true(not document.fields.diagnostics:find("```json", 1, true),
+				vector.id .. ": the form report has no JSON block")
 		end)
 	end
 end)

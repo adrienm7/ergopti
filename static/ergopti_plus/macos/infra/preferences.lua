@@ -1165,14 +1165,14 @@ local _load_outdated = {}
 --- @return table|nil snapshot Exact `ok`/`absent` source classification.
 local function classify_source(prefs_file, on_error)
 	local schema_check = capture_schema_read(prefs_file, FileSystem)
-	if schema_check == false then return nil end
+	if schema_check == false then return nil, "schema_owner_unavailable" end
 	local content, read_status = FileSystem.read_with_status(prefs_file, on_error)
-	if not schema_read_admitted(schema_check, content, read_status) then return nil end
+	if not schema_read_admitted(schema_check, content, read_status) then return nil, "schema_refused" end
 	if read_status == "ok" and type(content) == "string" then
 		return { status = "ok", content = content }
 	end
 	if read_status == "absent" then return { status = "absent" } end
-	return nil
+	return nil, "unreadable"
 end
 
 --- Compares two exact source classifications.
@@ -1330,38 +1330,47 @@ local VALUE_LUA_TYPE = { array = "table", feature = "table" }
 ---   A transaction that writes the file back keeps the strict view, which would drop that entry.
 --- @return table|nil flat Current owned preferences, nil on a refused view.
 --- @return table|nil source Exact classified bytes read for this view.
+--- @return string|nil reason Closed refusal cause when flat is nil: invalid_path,
+---   publication_in_flight, schema_owner_unavailable, schema_refused, unreadable,
+---   undecodable, section_shape, outdated_keys, value_type, value_out_of_range or raised.
 function M.current_view(prefs_file, tolerate_outdated)
-	if type(prefs_file) ~= "string" or prefs_file == "" or _owned_publications[prefs_file] then return nil end
-	local called, values, source = pcall(function()
-		local current = classify_source(prefs_file)
-		if not current then return nil end
+	if type(prefs_file) ~= "string" or prefs_file == "" then return nil, nil, "invalid_path" end
+	if _owned_publications[prefs_file] then return nil, nil, "publication_in_flight" end
+	local called, values, source, reason = pcall(function()
+		local current, refusal = classify_source(prefs_file)
+		if not current then return nil, nil, refusal end
 		if current.status == "absent" then return {}, current end
 		local decoded, shapes = require("toml_codec.leaf_rows").decode_source(current.content)
-		if type(decoded) ~= "table" then return nil end
+		if type(decoded) ~= "table" then return nil, nil, "undecodable" end
 		for _, spec in pairs(KEY_MAP) do
 			local node = decoded[spec.sec]
-			if node ~= nil and type(node) ~= "table" then return nil end
+			if node ~= nil and type(node) ~= "table" then return nil, nil, "section_shape" end
 			for segment in (spec.path or ""):gmatch("[^.]+") do
 				node = node and node[segment]
-				if node ~= nil and type(node) ~= "table" then return nil end
+				if node ~= nil and type(node) ~= "table" then return nil, nil, "section_shape" end
 			end
 		end
 		local flat
 		local outdated = ConfigOutdated.collect_reports(function() flat = flatten_from_disk(decoded, nil, shapes) end)
-		if next(outdated) ~= nil and tolerate_outdated ~= true then return nil end
+		if next(outdated) ~= nil and tolerate_outdated ~= true then return nil, nil, "outdated_keys" end
 		for key, value in pairs(flat) do
 			local spec = KEY_MAP[key]
 			-- A codec value was checked against its stored form while it was read.
 			if spec and not spec.codec then
 				local path = spec.sec .. "." .. (spec.path and (spec.path .. ".") or "") .. (spec.key or key)
 				local entry = Manifest.find_entry_by_path(path)
-				if entry and entry.type ~= "enum" and type(value) ~= (VALUE_LUA_TYPE[entry.type] or entry.type) then return nil end
-				if entry and not ConfigOutdated.manifest_value_fits(entry, value, "hs", SCALAR_VALUE_RULES[key]) then return nil end
+				if entry and entry.type ~= "enum" and type(value) ~= (VALUE_LUA_TYPE[entry.type] or entry.type) then
+					return nil, nil, "value_type"
+				end
+				if entry and not ConfigOutdated.manifest_value_fits(entry, value, "hs", SCALAR_VALUE_RULES[key]) then
+					return nil, nil, "value_out_of_range"
+				end
 			end
 		end
 		return flat, current
 	end)
-	if not called then return nil end
+	if not called then return nil, nil, "raised" end
+	if values == nil then return nil, nil, reason end
 	return values, source
 end
 

@@ -401,7 +401,10 @@ helpers.describe("error window (macOS): page and actions (error-dialog-macos)", 
 		helpers.assert_eq(report.fields.title, nil, "a shared title never contains free error text")
 		-- The report owner derives the attachment name from its retained snapshot.
 		helpers.assert_eq(report.name, nil, "a report names no file to save")
-		helpers.assert_eq(report.fields.diagnostics, nil, "the report field is filled from the text, not a summary")
+		helpers.assert_true(report.fields.diagnostics:find("# ErgoptiPlus diagnostics", 1, true) == 1,
+			"the report field is the compact report built from the same snapshot")
+		helpers.assert_true(report.fields.diagnostics:find("Flush failed: disk full", 1, true) == nil, "the compact report excludes free error text")
+		helpers.assert_true(report.fields.diagnostics:find("```json", 1, true) == nil, "the compact report has no JSON block")
 		helpers.assert_eq(report.fields.driver, "macos")
 		helpers.assert_eq(context.focused, focused_at_open, "reporting never brings the error window back to the front")
 		helpers.assert_eq(open.action, "open_path")
