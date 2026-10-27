@@ -244,21 +244,28 @@ run_field_run() {
 	local started_at now pid
 	started_at="$(date +%s)"
 
-	# A ready developer app of this clone is reused. Anything else (an installed
-	# ErgoptiPlus, a guardian launchd keeps alive, a stale build) is stopped by
-	# the runner, which then opens the developer app, rebuilt when the launcher,
-	# a native helper or the build recipe is newer than the built binary.
-	if ! ready_pid >/dev/null; then
-		local app_binary="${REPO_ROOT}/build/macos/${ERGOPTI_APP_BUNDLE}/Contents/MacOS/${ERGOPTI_APP_NAME}"
-		if [ -x "${app_binary}" ] && [ -z "$(find "${REPO_ROOT}/static/ergopti_plus/macos/launcher" \
-			"${REPO_ROOT}/tools/build" -type f -newer "${app_binary}" -print -quit 2>/dev/null)" ]; then
-			log "Opening the developer app..."
-			bash "${REPO_ROOT}/tools/dev/run-macos-dev-app.sh" --open-only \
-				|| { log "The developer app could not be opened."; return 1; }
-		else
-			log "Building and opening the developer app (the launcher changed; a few minutes)..."
-			bash "${REPO_ROOT}/tools/dev/run-macos-dev-app.sh" || { log "The developer app could not be built."; return 1; }
-		fi
+	# A developer app built from the current launcher is reused when it is ready.
+	# A launcher, native helper or build recipe newer than the built binary means
+	# the running app is stale: the runner stops it (and any installed
+	# ErgoptiPlus or kept-alive guardian) and rebuilds, even when it answers. A
+	# Lua-only change needs no rebuild: the developer app reloads it.
+	local app_binary="${REPO_ROOT}/build/macos/${ERGOPTI_APP_BUNDLE}/Contents/MacOS/${ERGOPTI_APP_NAME}"
+	local stale=""
+	if [ ! -x "${app_binary}" ]; then
+		stale="no developer app is built"
+	else
+		stale="$(find "${REPO_ROOT}/static/ergopti_plus/macos/launcher" "${REPO_ROOT}/tools/build" \
+			-type f -newer "${app_binary}" -print -quit 2>/dev/null)"
+	fi
+	if [ -n "${stale}" ]; then
+		log "Building and opening the developer app (${stale#"${REPO_ROOT}/"} is newer than the build; a few minutes)..."
+		bash "${REPO_ROOT}/tools/dev/run-macos-dev-app.sh" || { log "The developer app could not be built."; return 1; }
+	elif ! ready_pid >/dev/null; then
+		log "Opening the developer app..."
+		bash "${REPO_ROOT}/tools/dev/run-macos-dev-app.sh" --open-only \
+			|| { log "The developer app could not be opened."; return 1; }
+	else
+		log "Reusing the running developer app: it was built from the current launcher."
 	fi
 
 	log "Waiting for the developer app to publish its readiness..."
