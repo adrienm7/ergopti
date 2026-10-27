@@ -2034,9 +2034,10 @@ _ConfigResetRollbackRefusedReload(OwnerBundle) {
 ReadScriptShortcutsConfig() {
 		global ScriptShortcutAssignments, SCRIPT_SHORTCUT_SLOTS, _IniCache, GESTURE_ACTIONS
 		global ScriptShortcutChordsOn
-		; The switch of the chords: absent keeps the manifest default, anything but
-		; a TOML boolean stops the boot like a malformed category gate.
-		Raw := IniCacheGet(_IniCache, "shortcuts.script_control", "chords_enabled")
+		; Authored preferences retain the canonical manifest/source-kind decision;
+		; detached runtime candidates keep their strict Boolean contract.
+		if !ConfigTomlTryReadBootValue(_IniCache, "shortcuts.script_control", "chords_enabled", &Raw)
+				Raw := IniCacheGet(_IniCache, "shortcuts.script_control", "chords_enabled")
 		if (Raw != "_")
 				ScriptShortcutChordsOn := _FeatureStateValidateBoolean(Raw, "shortcuts.script_control.chords_enabled")
 		for Slot in SCRIPT_SHORTCUT_SLOTS {

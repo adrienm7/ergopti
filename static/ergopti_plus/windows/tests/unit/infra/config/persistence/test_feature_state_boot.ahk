@@ -221,3 +221,64 @@ for Fixture in [
 ]
 	Test("feature-state authored Kana admission: " . Fixture . " (script-authored-kana-admission)",
 		_FeatureStateBootRun.Bind(Fixture))
+
+
+for Fixture in [
+	"script_chords_authored_quoted_boolean",
+	"script_chords_authored_integer",
+	"script_chords_authored_float",
+	"script_chords_authored_array",
+	"script_chords_authored_record",
+	"script_chords_authored_signed_zero",
+	"script_chords_authored_plus_zero",
+	"script_chords_authored_true",
+	"script_chords_authored_false",
+	"script_chords_authored_legacy_zero",
+	"script_chords_authored_legacy_one",
+	"script_chords_authored_legacy_zero_comment",
+	"script_chords_authored_legacy_one_comment",
+	"script_chords_authored_boolean_comment",
+	"script_chords_authored_missing_marker",
+	"script_chords_authored_absent"
+]
+	Test("script chord authored admission: " . Fixture . " (script-chords-config-admission)",
+		_FeatureStateBootRunCaptured.Bind(Fixture))
+
+
+_FeatureStateBootRunCaptured(Fixture) {
+	Harness := A_ScriptDir . "\support\feature_state_boot_smoke.ahk"
+	AssertTrue(FileExist(Harness), "the actual native script chord harness exists")
+	Receipt := { Calls: 0, Code: -1, Output: "", Errors: "" }
+	OnDone(Code, Output, Errors) {
+		Receipt.Calls += 1
+		Receipt.Code := Code
+		Receipt.Output := Output
+		Receipt.Errors := Errors
+	}
+	Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Harness, Fixture], OnDone)
+	try {
+		AssertTrue(Handle.start(), "the actual native script chord child must start")
+		Started := A_TickCount
+		while !Receipt.Calls && TickElapsed64(Started, A_TickCount) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, Receipt.Calls, "the actual native script chord child must settle once within its bounded wait")
+		AssertEqual(0, Receipt.Code, "the real script chord reader must accept " . Fixture . ": " . Receipt.Output . Receipt.Errors)
+		AssertEqual("", Receipt.Errors, "native script chord startup must not hide an error on stderr")
+	} finally AssertTrue(Handle.terminate(), "the actual native script chord tree must retire")
+}
+
+for Fixture in [
+	"script_chords_detached_quoted",
+	"script_chords_detached_integer",
+	"script_chords_detached_float",
+	"script_chords_detached_array",
+	"script_chords_detached_record",
+	"script_chords_detached_true",
+	"script_chords_detached_false",
+	"script_chords_detached_marker",
+	"script_chords_detached_absent"
+]
+	Test("script chord detached admission: " . Fixture . " (script-chords-config-admission)",
+		_FeatureStateBootRunCaptured.Bind(Fixture))
