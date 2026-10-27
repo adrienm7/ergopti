@@ -211,6 +211,22 @@ Verified here:
   existing `apply_x11` (plain `setxkbmap`) only reaches a layout installed in
   the system tree.
 
+Two facts found while building the X11 path (`apply_x11_user_tree` in
+`desktop_activation.py`, command `user_layout_installer.py apply-x11`, tests on
+Xvfb in `test_user_layout_installer.py`):
+
+- `setxkbmap` does not bind a layout's key types from the user `rules/evdev`: its
+  printed keymap says `include "complete"`, which lacks `ERGOPTI_SEVEN_LEVEL`.
+  The types section is therefore pointed at `types/<layout>` of the user tree
+  before the upload. With that, the real Ergo-L and Ergopti converted layouts load
+  with their seven-level key type and the server reports their levels.
+- A test X server must run with `-noreset`: without it the server resets and
+  forgets the uploaded keymap when the last client (a one-shot `xkbcomp`)
+  disconnects, which looks exactly like a silently ignored upload. A real session
+  always has clients.
+- A rewritten file needs no new name on X11 (every call compiles again), checked by
+  reinstalling a modified Ergo-L and loading it again.
+
 Proposed Linux sequence (same invariant as macOS):
 
 1. Convert with `xkb_converter.lua` to `<id>.xkb` + XCompose, where the id is

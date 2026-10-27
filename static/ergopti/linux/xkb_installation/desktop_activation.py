@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -875,6 +876,89 @@ def apply_x11(spec: LayoutSpec, environ: dict[str, str] | None = None) -> bool:
     return run_reported(
         ["setxkbmap", *setxkbmap_arguments(spec)], "X11 : disposition appliquée immédiatement"
     )
+
+
+# A live replacement from the user XKB tree. Xorg's xkbcomp reads the tree only
+# when given it with -I, and setxkbmap does not bind a layout's key types from
+# the user rules, so the keymap is printed, its types section pointed at the
+# layout's own types file, and compiled straight into the running server. No
+# root, no logout, and every call compiles again, so a rewritten file needs no
+# new name here.
+X11_TOOL_TIMEOUT_SECONDS = 30
+
+X11_APPLIED = "applied"
+X11_NOT_X11 = "not_x11"
+X11_NO_DISPLAY = "no_display"
+X11_TOOL_MISSING = "tool_missing"
+X11_COMPILE_FAILED = "compile_failed"
+X11_NOT_LOADED = "not_loaded"
+
+_TYPES_SECTION = re.compile(r'(xkb_types\s*\{\s*include\s+)"[^"]*"')
+_SYMBOLS_NAME = re.compile(r'xkb_symbols\s+"([^"]*)"')
+
+
+def x11_keymap_text(spec: LayoutSpec, tree_root: Path, display: str) -> str | None:
+    """The keymap description of ``spec`` with its types taken from the user tree.
+
+    ``None`` when ``setxkbmap -print`` fails. The layout's key types live in
+    ``types/<layout>`` of the tree (the installer writes them there)."""
+    printed = run_capture(
+        ["setxkbmap", "-I" + str(tree_root), *setxkbmap_arguments(spec), "-print"],
+        timeout=X11_TOOL_TIMEOUT_SECONDS,
+        env={"DISPLAY": display},
+    )
+    if printed is None:
+        return None
+    if (tree_root / "types" / spec.layout).is_file():
+        printed = _TYPES_SECTION.sub(r'\1"' + spec.layout + '"', printed, count=1)
+    return printed
+
+
+def x11_loaded_symbols(display: str) -> str | None:
+    """The name of the symbols section the running server holds, or ``None``."""
+    dumped = run_capture(["xkbcomp", "-xkb", display, "-"], timeout=X11_TOOL_TIMEOUT_SECONDS)
+    match = _SYMBOLS_NAME.search(dumped or "")
+    return match.group(1) if match else None
+
+
+def apply_x11_user_tree(
+    spec: LayoutSpec, tree_root: Path, environ: dict[str, str] | None = None
+) -> tuple[bool, str]:
+    """Replaces the running X11 keymap with a layout of the user XKB tree.
+
+    Returns ``(applied, code)`` with a closed code: ``applied``, ``not_x11``,
+    ``no_display``, ``tool_missing``, ``compile_failed`` or ``not_loaded`` (the
+    server compiled the upload but still holds another layout, which is what a
+    desktop that re-applies its own settings looks like)."""
+    env = os.environ if environ is None else environ
+    if session_type(environ) != "x11":
+        return False, X11_NOT_X11
+    display = env.get("DISPLAY", "")
+    if not display:
+        return False, X11_NO_DISPLAY
+    if not (shutil.which("setxkbmap") and shutil.which("xkbcomp")):
+        return False, X11_TOOL_MISSING
+    keymap = x11_keymap_text(spec, tree_root, display)
+    if keymap is None:
+        return False, X11_COMPILE_FAILED
+    try:
+        result = subprocess.run(
+            ["xkbcomp", "-I" + str(tree_root), "-", display],
+            input=keymap,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=X11_TOOL_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False, X11_COMPILE_FAILED
+    if result.returncode != 0:
+        return False, X11_COMPILE_FAILED
+    held = x11_loaded_symbols(display)
+    if held is None or ("+" + spec.layout) not in held:
+        return False, X11_NOT_LOADED
+    return True, X11_APPLIED
 
 
 # ---------------------------------------------------------------------------
