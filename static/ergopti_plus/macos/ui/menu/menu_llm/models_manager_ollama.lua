@@ -44,6 +44,22 @@ local OLLAMA_READINESS_MAX_RETRIES = 30              -- Allow thirty bounded pro
 -- Readiness failures after which nothing answers at the Ollama endpoint: no
 -- executable to start, a start that failed, or a start that never answered.
 -- The ownership refusals (pause, overlap, a stale caller) are not the user's to fix.
+--- Opens System Settings > Network, the click of a pull's network failure
+--- notice: the PAC and the direct route are the user's or IT's to fix there.
+--- @return boolean opened
+local function open_network_settings()
+	local Repair = require("ui.menu.menu_llm.mlx_repair_offer")
+	local ok, started = pcall(function()
+		local handle = ShellRunner.spawn(Repair.OPEN_BIN, { Repair.NETWORK_SETTINGS_URL }, nil)
+		return handle ~= nil and handle.start() == true
+	end)
+	if not ok or started ~= true then
+		Logger.error(LOG, "The network settings could not be opened: %s.", tostring(started))
+		return false
+	end
+	return true
+end
+
 local UNREACHABLE_READINESS = {
 	restart_command_unavailable = true,
 	restart_failed = true,
@@ -1730,7 +1746,7 @@ function M.new(deps, presets, ram_getter)
 					Logger.error(LOG, "The automatic network configuration was unreachable (%s) and the direct connection failed (code %s).",
 						pac_fallback, tostring(code))
 					pcall(notifications.notify, i18n.get("ollama.fail_title"),
-						i18n.get("network.failure.pac_unreachable_direct_failed"), "error")
+						i18n.get("network.failure.pac_unreachable_direct_failed"), "error", open_network_settings)
 					complete_progress_ui(owner, false, target_model)
 				else
 					pcall(notifications.notify, i18n.get("ollama.fail_title"), string.format(i18n.get("ollama.download_error"), target_model), "error")
