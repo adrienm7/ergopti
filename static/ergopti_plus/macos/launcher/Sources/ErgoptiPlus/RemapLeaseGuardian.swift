@@ -2193,10 +2193,73 @@ protocol RemapGuardianModernService: AnyObject {
 	var status: SMAppService.Status { get }
 	/// Requests registration through Apple's Background Items authority.
 	func register() throws
+	/// Removes this bundle's record, used only to replace a stale one.
+	func unregister() throws
 }
 
 @available(macOS 13.0, *)
 extension SMAppService: RemapGuardianModernService {}
+
+/// Names one Background Items status for launcher.log.
+@available(macOS 13.0, *)
+func remapGuardianServiceStatusName(_ status: SMAppService.Status) -> String {
+	switch status {
+	case .notRegistered: return "notRegistered"
+	case .enabled: return "enabled"
+	case .requiresApproval: return "requiresApproval"
+	case .notFound: return "notFound"
+	@unknown default: return "unknown(\(status.rawValue))"
+	}
+}
+
+/// One registration attempt and the exact outcome mapping shared by every entry state.
+@available(macOS 13.0, *)
+private func registerModernRemapGuardianOnce(
+	service: RemapGuardianModernService,
+	guardianHealth: () -> Bool,
+	legacyInvalidSignatureFallback: () -> Bool,
+	report: (String) -> Void
+) -> RemapGuardianRegistrationStatus {
+	do {
+		try service.register()
+		switch service.status {
+		case .enabled:
+			let healthy = guardianHealth()
+			report("remap guardian registered; guardian healthy: \(healthy)")
+			return healthy ? .ready : .unavailable
+		case .requiresApproval:
+			report("remap guardian registered; Login Items approval required")
+			return .requiresApproval
+		case .notRegistered, .notFound:
+			report("remap guardian registration left status \(remapGuardianServiceStatusName(service.status))")
+			return .unavailable
+		@unknown default:
+			return .unavailable
+		}
+	} catch {
+		let failure = error as NSError
+		report("remap guardian registration refused: \(failure.domain) \(failure.code)")
+		if service.status == .enabled {
+			return guardianHealth() ? .ready : .unavailable
+		}
+		if service.status == .requiresApproval
+			|| modernGuardianErrorRequiresApproval(error) {
+			return .requiresApproval
+		}
+		guard shouldUseLegacyGuardianAfterModernRegistrationError(error)
+		else { return .unavailable }
+		// Current ZIP releases are ad-hoc signed. Only an exact invalid-
+		// signature result may use the legacy per-user bootstrap; denial,
+		// approval, authorization, and unknown failures stay fail-closed.
+		let legacy = legacyInvalidSignatureFallback()
+		report(legacy
+			? "remap guardian legacy LaunchAgent healthy"
+			: "remap guardian legacy LaunchAgent not healthy; if launchctl reports last exit code 78, "
+				+ "Background Task Management disallows it: allow ErgoptiPlus in System Settings > "
+				+ "General > Login Items & Extensions, then quit and reopen ErgoptiPlus")
+		return legacy ? .ready : .unavailable
+	}
+}
 
 /// Resolves the complete modern registration state with injectable boundaries.
 /// User denial and approval never reach the legacy launchctl compatibility path.
@@ -2210,43 +2273,47 @@ extension SMAppService: RemapGuardianModernService {}
 /// could stay inert after an update with nothing the user could do in-app. The attempt is bounded (one per launch)
 /// and keeps every fail-closed branch: denial and approval still never reach
 /// the legacy path.
+///
+/// An `.enabled` record whose guardian is not healthy is replaced once
+/// (unregister, then the same single attempt): launchd keeps such a record
+/// after a rebuild or a move and refuses to spawn it (launchctl last exit 78),
+/// which left a developer app's remapping inert (field report 2026-10-27).
+/// `report` receives one launcher.log line per decision.
 @available(macOS 13.0, *)
 func resolveModernRemapGuardianRegistration(
 	service: RemapGuardianModernService,
 	guardianHealth: () -> Bool,
-	legacyInvalidSignatureFallback: () -> Bool
+	legacyInvalidSignatureFallback: () -> Bool,
+	report: (String) -> Void = { _ in }
 ) -> RemapGuardianRegistrationStatus {
+	report("remap guardian Background Items status: \(remapGuardianServiceStatusName(service.status))")
 	switch service.status {
 	case .enabled:
-		return guardianHealth() ? .ready : .unavailable
-	case .notRegistered, .notFound:
+		if guardianHealth() { return .ready }
+		// A record can stay enabled while launchd refuses to spawn what it names:
+		// the app was rebuilt (every ad hoc build is a new code identity) or
+		// moved. Replace it once, exactly as a .notFound record is retried.
 		do {
-			try service.register()
-			switch service.status {
-			case .enabled:
-				return guardianHealth() ? .ready : .unavailable
-			case .requiresApproval:
-				return .requiresApproval
-			case .notRegistered, .notFound:
-				return .unavailable
-			@unknown default:
-				return .unavailable
-			}
+			try service.unregister()
 		} catch {
-			if service.status == .enabled {
-				return guardianHealth() ? .ready : .unavailable
-			}
-			if service.status == .requiresApproval
-				|| modernGuardianErrorRequiresApproval(error) {
-				return .requiresApproval
-			}
-			guard shouldUseLegacyGuardianAfterModernRegistrationError(error)
-			else { return .unavailable }
-			// Current ZIP releases are ad-hoc signed. Only an exact invalid-
-			// signature result may use the legacy per-user bootstrap; denial,
-			// approval, authorization, and unknown failures stay fail-closed.
-			return legacyInvalidSignatureFallback() ? .ready : .unavailable
+			let failure = error as NSError
+			report("stale remap guardian record could not be removed: \(failure.domain) \(failure.code)")
+			return .unavailable
 		}
+		report("stale remap guardian record removed; registering again")
+		return registerModernRemapGuardianOnce(
+			service: service,
+			guardianHealth: guardianHealth,
+			legacyInvalidSignatureFallback: legacyInvalidSignatureFallback,
+			report: report
+		)
+	case .notRegistered, .notFound:
+		return registerModernRemapGuardianOnce(
+			service: service,
+			guardianHealth: guardianHealth,
+			legacyInvalidSignatureFallback: legacyInvalidSignatureFallback,
+			report: report
+		)
 	case .requiresApproval:
 		return .requiresApproval
 	@unknown default:
@@ -2359,7 +2426,8 @@ func remapGuardianRegistrationStatus(
 			},
 			legacyInvalidSignatureFallback: {
 				ensureLegacyRemapGuardianRegistered(executablePath: executablePath)
-			}
+			},
+			report: { LauncherLog.write($0) }
 		)
 	}
 	return ensureLegacyRemapGuardianRegistered(executablePath: executablePath)
