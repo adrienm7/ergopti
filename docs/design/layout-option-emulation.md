@@ -162,51 +162,22 @@ Must be verified on the maintainer's Mac (none of this can run on Linux):
 | M5  | Does `TISDisableInputSource` plus deleting the file of the old build leave no ghost in System Settings, and does it survive a logout?                  | The stale-source bound                                                                                                   |
 | M6  | Is the selected source preserved when the previous one is disabled after the new one is selected?                                                      | Step 5 and 7 ordering                                                                                                    |
 
-A small probe the maintainer can run (a draft, **not yet run on any machine**;
-it prints facts, changes only a throw-away layout named `EPProbe <n>`, and
-removes it):
+The probe is a runnable file, `tools/diagnostics/macos_tis_register_probe.swift`
+(written without a Mac or a Swift toolchain: **not compiled or run on any
+machine yet**; a compile error is the first thing to report back). From the
+repository root:
 
-```swift
-// swift probe.swift  (Terminal, macOS 13 or later)
-import Carbon, Foundation
-let dir = NSString(string: "~/Library/Keyboard Layouts").expandingTildeInPath
-func layout(_ n: Int, q: String) -> String { """
-<?xml version="1.1" encoding="UTF-8"?>
-<keyboard group="126" id="-\(24000 + n)" name="EPProbe \(n)" maxout="1">
- <layouts><layout first="0" last="0" modifiers="m" mapSet="s"/></layouts>
- <modifierMap id="m" defaultIndex="0"><keyMapSelect mapIndex="0"><modifier keys=""/></keyMapSelect></modifierMap>
- <keyMapSet id="s"><keyMap index="0"><key code="12" output="\(q)"/></keyMap></keyMapSet>
-</keyboard>
-"""}
-func sources() -> [TISInputSource] { (TISCreateInputSourceList(nil, true).takeRetainedValue() as! [TISInputSource]) }
-func sid(_ s: TISInputSource) -> String { Unmanaged<CFString>.fromOpaque(TISGetInputSourceProperty(s, kTISPropertyInputSourceID)).takeUnretainedValue() as String }
-func typed(_ s: TISInputSource) -> String { // what key code 12 (Q) types, no event posted
-  guard let p = TISGetInputSourceProperty(s, kTISPropertyUnicodeKeyLayoutData) else { return "<no data>" }
-  let data = Unmanaged<CFData>.fromOpaque(p).takeUnretainedValue() as Data
-  var dead: UInt32 = 0; var len = 0; var chars = [UniChar](repeating: 0, count: 4)
-  data.withUnsafeBytes { raw in _ = UCKeyTranslate(raw.bindMemory(to: UCKeyboardLayout.self).baseAddress!, 12,
-    UInt16(kUCKeyActionDown), 0, UInt32(LMGetKbdType()), OptionBits(kUCKeyTranslateNoDeadKeysBit), &dead, 4, &len, &chars) }
-  return String(utf16CodeUnits: chars, count: len)
-}
-func find(_ name: String) -> TISInputSource? { sources().first { sid($0).hasSuffix(".keylayout.\(name)") || sid($0).hasSuffix(name) } }
-for n in 1...2 {
-  let url = URL(fileURLWithPath: "\(dir)/EPProbe-\(n).keylayout")
-  try! layout(n, q: n == 1 ? "A" : "B").write(to: url, atomically: true, encoding: .utf8)
-  print("M1 register", n, TISRegisterInputSource(url as CFURL))
-  let s = find("EPProbe \(n)"); print("M2 id", s.map(sid) ?? "NOT LISTED")
-  if let s = s { print("   enable", TISEnableInputSource(s), "select", TISSelectInputSource(s), "types", typed(s)) }
-}
-// M3: rewrite build 1 in place, ask again without toggling
-try! layout(1, q: "Z").write(to: URL(fileURLWithPath: "\(dir)/EPProbe-1.keylayout"), atomically: true, encoding: .utf8)
-if let s = find("EPProbe 1") { print("M3 same name after rewrite types", typed(s), "(A = stale, Z = fresh)") }
-// M5/M6: retire build 1 while build 2 is selected
-if let s = find("EPProbe 1") { print("M5 disable", TISDisableInputSource(s)) }
-print("M6 still listed:", find("EPProbe 1") != nil, "current:", sid(TISCopyCurrentKeyboardLayoutInputSource().takeRetainedValue()))
-for n in 1...2 { try? FileManager.default.removeItem(atPath: "\(dir)/EPProbe-\(n).keylayout") }
+```
+swiftc -O -o /tmp/ep_tis_probe tools/diagnostics/macos_tis_register_probe.swift && /tmp/ep_tis_probe
 ```
 
-The maintainer sends back the printed lines and, for M5, whether « EPProbe » is
-still in System Settings after a logout. If M1 prints a non-zero status the note
+It changes only two throw-away layouts (`EPProbe<pid>v1`, `EPProbe<pid>v2`) in
+`~/Library/Keyboard Layouts`, puts the user back on the source they started
+with and removes both files, also on failure. It prints one line per question
+(`M1`, `M2`, `M3`, `M4a`, `M4b`, `M5a`, `M6`, then `END`). After a logout and
+login, `/tmp/ep_tis_probe after-logout` prints `M5b`.
+
+The maintainer sends back the printed lines. If M1 prints a non-zero status the note
 is amended before slice 5.
 
 ### 3.2 Linux
