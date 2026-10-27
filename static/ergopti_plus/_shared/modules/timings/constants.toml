@@ -609,6 +609,13 @@ unused_keys_warning_delay_ms = 3000
 # HS: modules/shortcuts/script_control.lua.
 script_control_tap_watchdog_interval_ms = 2000
 
+# macOS: how long a menu action waits before it opens the next window, so the
+# native dialog or WebView callback that triggered it has returned and released its
+# window first (the layout manager, the personal information editor, the shortcut
+# and gesture parameter prompts, the model selector).
+# HS: ui/menu/*.lua, ui/layout_manager/init.lua, ui/personal_info_editor/init.lua.
+ui_handoff_ms = 50
+
 # Delay before the post-install keyboard-layout menu refresh fires.
 # HS: menu_keyboard_layout.lua POST_INSTALL_REFRESH_DELAY.
 post_install_refresh_ms = 1500
