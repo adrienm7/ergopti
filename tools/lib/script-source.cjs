@@ -7,6 +7,7 @@
 const LONG_COMMENT = /--\[(=*)\[/y;
 const LONG_STRING = /\[(=*)\[/y;
 const IDENTIFIER = /[A-Za-z_][A-Za-z_0-9]*/y;
+const INCLUDE_DIRECTIVE = /#Include(?:Again)?(?=\s|$)/iy;
 
 /** Matches a sticky pattern exactly at one offset. */
 function matchAt(pattern, source, at) {
@@ -19,12 +20,39 @@ function scan(source, extension) {
 	const ahk = extension === '.ahk';
 	const tokens = [];
 	let at = 0;
+	let ahkLineLeading = true;
 	while (at < source.length) {
 		if (/\s/.test(source[at])) {
+			if (ahk && (source[at] === '\n' || source[at] === '\r')) ahkLineLeading = true;
 			at += 1;
 			continue;
 		}
 		const start = at;
+		const include = ahk && ahkLineLeading ? matchAt(INCLUDE_DIRECTIVE, source, at) : null;
+		if (ahk) ahkLineLeading = false;
+		if (include) {
+			// Native Include operands are literal paths, so an apostrophe cannot
+			// open a language string and hide the following statement/comment.
+			at += include[0].length;
+			while (at < source.length && source[at] !== '\n' && source[at] !== '\r') {
+				if (source[at] === ';' && /\s/.test(source[at - 1])) break;
+				if (
+					source[at] === '`' &&
+					at + 1 < source.length &&
+					source[at + 1] !== '\n' &&
+					source[at + 1] !== '\r'
+				)
+					at += 1;
+				at += 1;
+			}
+			tokens.push({
+				kind: 'include',
+				value: source.slice(start + include[0].length, at).trim(),
+				start,
+				end: at
+			});
+			continue;
+		}
 		if (
 			(ahk && source[at] === ';' && (at === 0 || /\s/.test(source[at - 1]))) ||
 			(!ahk && source.startsWith('--', at))
@@ -124,7 +152,7 @@ function stripComments(source, extension) {
 	return result + source.slice(previous);
 }
 
-/** Returns code/literal tokens, excluding comments and whitespace. */
+/** Returns code/literal/directive tokens, excluding comments and whitespace. */
 function scriptTokens(source, extension) {
 	// Every code token has exactly these fields, in this order.
 	return cachedScan(source, extension).code.map(({ kind, value, start, end }) => ({
