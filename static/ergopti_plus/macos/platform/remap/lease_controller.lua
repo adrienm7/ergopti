@@ -162,7 +162,8 @@ end
 --- @return boolean True when the module is initialized.
 local function require_state(func_name)
 	if not _state then
-		Logger.error(LOG, "'%s' called before M.init() — lease controller unavailable.", func_name)
+		Logger.error(LOG, "'%s' called before M.init() — lease controller unavailable: %s", func_name,
+			debug.traceback("caller", 3))
 		return false
 	end
 	return true
