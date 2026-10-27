@@ -1,25 +1,14 @@
 {
 	"_comment": "Free-form reason and phase literals per driver source file: prose or runtime-built values that cannot join a closed enum. Counts may only go down; lower them with node tools/test/test-logger-scalars-single-source.cjs --shrink.",
 	"reason": {
-		"static/ergopti_plus/linux/adapters/owned_process.lua": 1,
-		"static/ergopti_plus/linux/adapters/process_runner.lua": 11,
-		"static/ergopti_plus/linux/adapters/screen_capture.lua": 3,
-		"static/ergopti_plus/linux/modules/gestures/touchpad_finder.lua": 3,
-		"static/ergopti_plus/linux/modules/llm/local_model_offer.lua": 1,
-		"static/ergopti_plus/linux/modules/updater/installer.lua": 5,
-		"static/ergopti_plus/linux/ui/text_prompt.lua": 1,
 		"static/ergopti_plus/macos/adapters/file_system.lua": 2,
 		"static/ergopti_plus/macos/adapters/python_interpreter.lua": 3,
 		"static/ergopti_plus/macos/infra/logger.lua": 1,
 		"static/ergopti_plus/macos/infra/paced_job.lua": 1,
 		"static/ergopti_plus/macos/init.lua": 1,
-		"static/ergopti_plus/macos/modules/llm/agent_connectors.lua": 7,
 		"static/ergopti_plus/macos/modules/llm/api_remote.lua": 1,
 		"static/ergopti_plus/macos/modules/shortcuts/script_control.lua": 2,
 		"static/ergopti_plus/macos/platform/remap/generator.lua": 2,
-		"static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_ollama.lua": 2,
-		"static/ergopti_plus/macos/ui/menu/menu_llm/startup_controller.lua": 4,
-		"static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua": 1,
 		"static/ergopti_plus/windows/infra/diagnostic_snapshot.ahk": 1,
 		"static/ergopti_plus/windows/infra/hook_dispatcher.ahk": 1,
 		"static/ergopti_plus/windows/infra/lifecycle.ahk": 2,
@@ -36,7 +25,6 @@
 		"static/ergopti_plus/windows/ui/menu/menu_llm/menu_api_entries.ahk": 12
 	},
 	"phase": {
-		"static/ergopti_plus/macos/infra/hotpath_profiler.lua": 1,
 		"static/ergopti_plus/windows/infra/config_transition.ahk": 1,
 		"static/ergopti_plus/windows/modules/keystats/keystats_prefetch.ahk": 2
 	}
