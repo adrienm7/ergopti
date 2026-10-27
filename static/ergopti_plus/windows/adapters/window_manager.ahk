@@ -112,6 +112,19 @@ WMBrowserWarmHost() {
 	return {Hwnd: Control.Hwnd, Destroy: (*) => Host.Destroy()}
 }
 
+/**
+ * Asks one of this process's windows to close through WM_CLOSE, so its own
+ * Close handler runs exactly as for the title-bar button. A handle that is not
+ * ours (closed, recycled) is refused rather than sent a message.
+ * @param HWnd {Integer} Window handle.
+ * @return {Boolean} True when the request was posted.
+ */
+WMRequestClose(HWnd) {
+	if !HWnd || !WMHandleOwnedByThisProcess(HWnd)
+		return false
+	return DllCall("PostMessageW", "Ptr", HWnd, "UInt", 0x0010, "Ptr", 0, "Ptr", 0, "Int") != 0
+}
+
 ; Forcefully terminates all windows matching Spec.
 ; @param Spec {String} AHK WinTitle spec.
 ; @return {Boolean} True on success, false on error.

@@ -943,6 +943,13 @@ function M.open()
 	return owner_is_current(owner)
 end
 
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window()
+	if _webview ~= nil and owner_is_current(_owner) then return _webview end
+	return nil
+end
+
 --- Close and destroy the window.
 --- @return boolean committed
 function M.close()
