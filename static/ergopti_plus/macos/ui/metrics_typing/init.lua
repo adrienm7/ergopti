@@ -813,6 +813,10 @@ end
 -- =============================
 -- =============================
 
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return M._wv end
+
 --- Closes the typing metrics dashboard without losing an ambiguous native owner.
 --- @return boolean committed
 function M.close()

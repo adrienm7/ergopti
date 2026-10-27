@@ -884,6 +884,24 @@ platform = "hs,ahk"
 platform = "hs,ahk"
 
 # --- UI / Fenêtres de l'app ---
+# Every row of this group TOGGLES one Ergopti web-view window, so a single
+# shortcut both shows and dismisses it (maintainer decision 2026-10-27):
+#   - closed or hidden            -> open it and give it the focus;
+#   - open but behind a window    -> bring it to the front (never close it:
+#                                    the user may not be able to see it);
+#   - open and frontmost          -> close it through the page's own close.
+# Each driver owns the three-state rule once: macOS ui/window_toggle.lua,
+# Linux ui/webview_manager.lua toggle(), Windows GestureToggleOrFocusUI in
+# modules/gestures/actions.ahk. Every page listed here exists on all three
+# drivers, so none is greyed; a page one OS lacks would keep its row with
+# the menu's reason text rather than disappear (AGENTS.md).
+# Not toggles, on purpose: the onboarding wizard (closing a half-finished
+# setup through a shortcut abandons its transaction), the download window
+# (a progress view owned by a running download, with nothing to show
+# otherwise), the release notes (a pane of the update and changelog windows,
+# not a window), and the contextual dialogs (action picker, prompt editor,
+# personal info editor, numeric and token prompts, error and permission
+# dialogs, config cleanup), which open for one item and one callback.
 
 [sg_actions.open_metrics_typing]
 platform = "all"
@@ -895,6 +913,24 @@ platform = "all"
 platform = "all"
 
 [sg_actions.open_paths_editor]
+platform = "all"
+
+[sg_actions.open_hotstrings_settings]
+platform = "all"
+
+[sg_actions.open_layout_manager]
+platform = "all"
+
+[sg_actions.open_layer_editor]
+platform = "all"
+
+[sg_actions.open_model_browser]
+platform = "all"
+
+[sg_actions.open_changelog]
+platform = "all"
+
+[sg_actions.open_healthcheck]
 platform = "all"
 
 # --- Fichiers utilisateur ---
@@ -1784,6 +1820,12 @@ items = [
     "open_metrics_apps",
     "open_hotstrings_editor",
     "open_paths_editor",
+    "open_hotstrings_settings",
+    "open_layout_manager",
+    "open_layer_editor",
+    "open_model_browser",
+    "open_changelog",
+    "open_healthcheck",
     "--",
     "##files",
     "open_script_source",

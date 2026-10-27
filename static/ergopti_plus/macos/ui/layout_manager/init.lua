@@ -281,6 +281,14 @@ function M.open()
 	return true
 end
 
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return _webview end
+
+--- Closes the window this module created, for ui/window_toggle.
+--- @return boolean committed
+function M.close() return close_window() end
+
 --- Builds the "Manage layouts…" menu command.
 --- @return function
 function M.menu_command()

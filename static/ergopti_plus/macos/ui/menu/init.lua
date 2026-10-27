@@ -1574,6 +1574,20 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		update_checks            = update_checks,
 	}
 
+	-- The window toggles (ui/window_toggle) open these pages with the same
+	-- session context as their menu rows: the remap facade, the update channel
+	-- owner and the menu state exist only here.
+	local WindowToggle = require("ui.window_toggle")
+	WindowToggle.set_opener("layer_editor", function()
+		return require("ui.layer_editor").open({ karabiner = karabiner })
+	end)
+	WindowToggle.set_opener("changelog", function()
+		return require("ui.changelog").open({ channel_owner = channel_owner })
+	end)
+	WindowToggle.set_opener("healthcheck", function()
+		return require("ui.healthcheck").show_window({ state = state })
+	end)
+
 	-- updateMenu refreshes the menubar icon and re-wires script_control extras,
 	-- then marks the cached menu tree dirty so the NEXT open reflects the change.
 	-- It does NOT rebuild synchronously — the rebuild happens lazily, once, on the

@@ -872,6 +872,9 @@ function M.build(ctx)
 		end, "models_selector.open_browser")
 	end
 
+	-- The open_model_browser toggle opens the browser with this build's context.
+	require("ui.window_toggle").set_opener("model_browser", open_model_browser)
+
 	for _, row in ipairs(ManifestMenu.status_rows("llm_menu", "llm_model", "model_picker_tail") or {}) do
 		table.insert(menu, row)
 	end

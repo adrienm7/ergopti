@@ -202,6 +202,12 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "open_metrics_apps" })
 	Items.Push({ Kind: "action", Id: "open_hotstrings_editor" })
 	Items.Push({ Kind: "action", Id: "open_paths_editor" })
+	Items.Push({ Kind: "action", Id: "open_hotstrings_settings" })
+	Items.Push({ Kind: "action", Id: "open_layout_manager" })
+	Items.Push({ Kind: "action", Id: "open_layer_editor" })
+	Items.Push({ Kind: "action", Id: "open_model_browser" })
+	Items.Push({ Kind: "action", Id: "open_changelog" })
+	Items.Push({ Kind: "action", Id: "open_healthcheck" })
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.files" })
 	Items.Push({ Kind: "action", Id: "open_script_source" })
 	Items.Push({ Kind: "action", Id: "open_personal_shortcuts" })
@@ -303,17 +309,23 @@ GestureActionCatalogueData() {
 	Actions["ocr_screenshot"] := { Family: "sg", LabelKey: "sg_actions.ocr_screenshot", Parameter: "", Confirm: false }
 	Actions["one_shot_shift"] := { Family: "sg", LabelKey: "sg_actions.one_shot_shift", Parameter: "", Confirm: false }
 	Actions["open_app"] := { Family: "sg", LabelKey: "sg_actions.open_app", Parameter: "app", Confirm: false }
+	Actions["open_changelog"] := { Family: "sg", LabelKey: "sg_actions.open_changelog", Parameter: "", Confirm: false }
 	Actions["open_config"] := { Family: "sg", LabelKey: "sg_actions.open_config", Parameter: "", Confirm: false }
 	Actions["open_downloads"] := { Family: "sg", LabelKey: "sg_actions.open_downloads", Parameter: "", Confirm: false }
 	Actions["open_emoji_picker"] := { Family: "sg", LabelKey: "sg_actions.open_emoji_picker", Parameter: "", Confirm: false }
 	Actions["open_error_log"] := { Family: "sg", LabelKey: "sg_actions.open_error_log", Parameter: "", Confirm: false }
 	Actions["open_file_manager"] := { Family: "sg", LabelKey: "sg_actions.open_file_manager", Parameter: "", Confirm: false }
+	Actions["open_healthcheck"] := { Family: "sg", LabelKey: "sg_actions.open_healthcheck", Parameter: "", Confirm: false }
 	Actions["open_hotstrings_editor"] := { Family: "sg", LabelKey: "sg_actions.open_hotstrings_editor", Parameter: "", Confirm: false }
+	Actions["open_hotstrings_settings"] := { Family: "sg", LabelKey: "sg_actions.open_hotstrings_settings", Parameter: "", Confirm: false }
 	Actions["open_key_history"] := { Family: "sg", LabelKey: "sg_actions.open_key_history", Parameter: "", Confirm: false }
+	Actions["open_layer_editor"] := { Family: "sg", LabelKey: "sg_actions.open_layer_editor", Parameter: "", Confirm: false }
+	Actions["open_layout_manager"] := { Family: "sg", LabelKey: "sg_actions.open_layout_manager", Parameter: "", Confirm: false }
 	Actions["open_list_vars"] := { Family: "sg", LabelKey: "sg_actions.open_list_vars", Parameter: "", Confirm: false }
 	Actions["open_logs_folder"] := { Family: "sg", LabelKey: "sg_actions.open_logs_folder", Parameter: "", Confirm: false }
 	Actions["open_metrics_apps"] := { Family: "sg", LabelKey: "sg_actions.open_metrics_apps", Parameter: "", Confirm: false }
 	Actions["open_metrics_typing"] := { Family: "sg", LabelKey: "sg_actions.open_metrics_typing", Parameter: "", Confirm: false }
+	Actions["open_model_browser"] := { Family: "sg", LabelKey: "sg_actions.open_model_browser", Parameter: "", Confirm: false }
 	Actions["open_paths_editor"] := { Family: "sg", LabelKey: "sg_actions.open_paths_editor", Parameter: "", Confirm: false }
 	Actions["open_personal_hotstrings"] := { Family: "sg", LabelKey: "sg_actions.open_personal_hotstrings", Parameter: "", Confirm: false }
 	Actions["open_personal_info"] := { Family: "sg", LabelKey: "sg_actions.open_personal_info", Parameter: "", Confirm: false }
