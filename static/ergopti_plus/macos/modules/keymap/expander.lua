@@ -191,8 +191,7 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 			return emit_action()
 		end)
 	end)
-	HotPath.log_if_slow("hotstring.expand", inject_started,
-		string.format("deletes=%d", deletes))
+	HotPath.log_if_slow("hotstring.expand", inject_started)
 	if not ok then
 		-- Nothing in the callback collector has reached Quartz yet. Cancel removes
 		-- every already-built prefix, so a producer that emits one token and then
