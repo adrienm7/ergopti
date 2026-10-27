@@ -607,9 +607,8 @@ function doSave() {
 	var promptMode = document.getElementById('p-mode').value;
 	var promptContent = serializeEditor(editorElement).trim();
 
-	// UI text remains in French as requested
 	if (!promptName || !promptContent) {
-		return alert('Le nom et le prompt sont requis.');
+		return alert(window._i18n_strings['prompt_editor.required_fields']);
 	}
 
 	post({
