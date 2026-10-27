@@ -231,6 +231,24 @@ helpers.describe("field run: declaration and requests", function()
 		end)
 	end)
 
+	helpers.it("bounds the request id by the length the declaration names", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local function request(id) return '{"schema":1,"request_id":"' .. id .. '","steps":["all"]}' end
+			local spec = spec_of(FieldRun)
+			helpers.assert_true(FieldRun.parse_request(spec, request(string.rep("a", 64))) ~= nil)
+			helpers.assert_eq(select(2, FieldRun.parse_request(spec, request(string.rep("a", 65)))), "malformed")
+			local narrow = Json.decode(SPEC_TEXT)
+			narrow.request_id_pattern = "^[A-Za-z0-9_-]{1,8}$"
+			narrow = FieldRun.validate(narrow)
+			helpers.assert_true(FieldRun.parse_request(narrow, request("abcdefgh")) ~= nil)
+			helpers.assert_eq(select(2, FieldRun.parse_request(narrow, request("abcdefghi"))), "malformed")
+			local other = Json.decode(SPEC_TEXT)
+			other.request_id_pattern = "^[a-z]{1,64}$"
+			helpers.assert_true(not pcall(FieldRun.validate, other))
+		end)
+	end)
+
 	helpers.it("writes the refusal of an unknown step and runs nothing", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
