@@ -1125,7 +1125,10 @@ class Receiver:
         elif self.options.profile == "explicit-proxy":
             snapshot_environment["https_proxy"] = f"http://127.0.0.1:{self.fixture.ports['first']}"
         with patch.dict(os.environ, snapshot_environment, clear=True):
-            snapshot = self.bootstrap_policy.capture(60000)
+            # The fixture registry's anchor is this receiver's own: it rides the
+            # same snapshot channel a caller-owned anchor would, which the macOS
+            # daemon owner closes for inherited values (inherited_trust=False).
+            snapshot = self.bootstrap_policy.capture(60000, inherited_trust=True)
         self.bootstrap_owner = self.bootstrap_native.EmptyNetworkBootstrap.acquire(
             self.session_owner,
             snapshot,
