@@ -136,3 +136,51 @@ for Started in [100, 0x100000064]
 	for Elapsed in [0x100000000, 0x10000270F, 0x100002710, 0x100002711]
 		Test("Uninstall ready-clock-native64: long pending origin=" . Started . " elapsed=" . Elapsed,
 			_TestUninstallClock.Bind(Started, "pending", Elapsed))
+
+
+; A real native READY result is not a capability after its owner retires.
+; Only the Wait port observes the actual native return and then triggers the
+; same public cancellation called by every shutdown-refusal gate.
+
+_R7UR_RevokedReadyReturn() {
+	State := UninstallState()
+	AssertFalse(State.Has("Owner"), "a foreign uninstall transaction cannot be detached by this fixture")
+	PreviousCritical := Critical("On")
+	Event := 0, Owner := 0, Observed := 0, WaitReturned := false, Result := false, Caught := 0
+	try {
+		Name := "Local\ErgoptiPlus.Uninstall.ReadyRetirement." . PLC_CurrentProcessId() . "." . A_TickCount
+		Event := PLC_CreateNamedManualResetEvent(Name)
+		AssertTrue(PLC_SetEventHandle(Event), "the actual private kernel READY event must be signaled")
+		Info := Buffer(A_PtrSize * 2 + 8, 0)
+		Owner := Map("Phase", "Preparing", "Ready", Event, "ProcessInfo", Info)
+		State["Owner"] := Owner
+		Wait(Handle, Milliseconds) {
+			NativeResult := PLC_WaitHandle(Handle, Milliseconds)
+			if Handle == Event && NativeResult == 0 {
+				Observed += 1
+				UninstallCancel()
+				WaitReturned := true
+			}
+			return NativeResult
+		}
+		try Result := _UninstallAwaitReady(Owner, Info, () => A_TickCount, Wait)
+		catch as Err
+			Caught := Err
+		AssertEqual(1, Observed, "the real wait must have observed the actual READY event before cancellation")
+		AssertTrue(WaitReturned, "cancellation must return normally instead of manufacturing the expected refusal")
+		AssertFalse(State.Has("Owner"), "public cancellation consumes the original transaction identity")
+		AssertEqual(0, Owner.Get("Ready", 0), "public cancellation withdraws the exact native READY capability")
+		AssertTrue(IsObject(Caught), "a revoked native READY receipt must refuse instead of admitting continuation")
+		AssertFalse(Result, "withdrawn removal ownership cannot become ready")
+	} finally {
+		if State.Get("Owner", 0) == Owner
+			UninstallCancel()
+		else if IsObject(Owner)
+			_UninstallClose(Owner, true)
+		else if Event
+			PLC_CloseNativeHandle(Event)
+		Critical(PreviousCritical)
+	}
+}
+Test("Uninstall: retirement after native READY return cannot admit continuation (uninstall-ready-retirement)",
+	_R7UR_RevokedReadyReturn)
