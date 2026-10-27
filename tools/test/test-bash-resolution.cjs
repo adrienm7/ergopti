@@ -39,8 +39,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const vm = require('node:vm');
+const { parse } = require('acorn');
 const { spawnSync } = require('node:child_process');
-const { SYSTEM_BASH, bashExecutable, gitForWindowsRoot } = require('../lib/git-bash.cjs');
+const { SYSTEM_BASH, bashExecutable, bashPath, gitForWindowsRoot } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const TOOLS = path.join(ROOT, 'tools');
@@ -388,3 +390,244 @@ if (process.platform === 'linux') {
 		fs.rmSync(temporary, { recursive: true, force: true });
 	}
 }
+
+/** Exercises filesystem authority, rather than a converted string comparison. */
+function checkNativeBashPaths(convert) {
+	const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-bash-path-'));
+	try {
+		const prefixes =
+			process.platform === 'win32'
+				? ['ordinary']
+				: ['ordinary', 'literal\\backslash', 'literal\nlinefeed'];
+		for (const prefix of prefixes) {
+			const directory = path.join(scratch, prefix);
+			fs.mkdirSync(directory);
+			const file = path.join(directory, 'payload');
+			fs.writeFileSync(file, 'native path bytes');
+			const result = spawnSync(
+				bash,
+				['-c', 'test -f "$1" && cat -- "$1"', 'native-path', convert(file)],
+				{
+					encoding: 'utf8',
+					timeout: 10000
+				}
+			);
+			assert.ifError(result.error);
+			assert.equal(result.signal, null);
+			assert.equal(result.status, 0, `${JSON.stringify(prefix)}: ${result.stderr}`);
+			assert.equal(result.stdout, 'native path bytes');
+			if (process.platform !== 'win32') assert.equal(convert(file), file);
+		}
+	} finally {
+		fs.rmSync(scratch, { recursive: true, force: true });
+	}
+}
+checkNativeBashPaths(bashPath);
+
+// Execute the actual exported implementation under a Windows host model.
+// This is lexical coverage, not a claim that native Windows Bash ran here.
+const windowsPathModule = { exports: {} };
+vm.runInNewContext(fs.readFileSync(path.join(TOOLS, 'lib/git-bash.cjs'), 'utf8'), {
+	require,
+	module: windowsPathModule,
+	process: { platform: 'win32' }
+});
+assert.equal(typeof windowsPathModule.exports.bashPath, 'function');
+for (const [native, expected] of [
+	['C:\\Users\\native path\\file', '/c/Users/native path/file'],
+	['D:/native path/file', '/d/native path/file'],
+	['relative\\file', 'relative/file'],
+	['/usr/bin/file', '/usr/bin/file']
+])
+	assert.equal(windowsPathModule.exports.bashPath(native), expected);
+assert.throws(() => bashPath(null), TypeError);
+
+/** Finds a direct private converter without rejecting Windows-only fixture bridges. */
+function fixturePathBinding(source) {
+	const tree = parse(source, { ecmaVersion: 'latest' });
+	const imports = [];
+	const calls = [];
+	const privateConverters = [];
+	const unsafeBoundaries = [];
+	function conversion(node) {
+		if (!node || typeof node !== 'object') return false;
+		if (
+			node.type === 'ConditionalExpression' &&
+			node.test?.operator === '===' &&
+			node.test.left?.object?.name === 'process' &&
+			node.test.left.property?.name === 'platform' &&
+			node.test.right?.value === 'win32'
+		)
+			return conversion(node.alternate);
+		if (
+			node.type === 'CallExpression' &&
+			node.callee.property?.name === 'replaceAll' &&
+			node.arguments[0]?.value === '\\' &&
+			node.arguments[1]?.value === '/'
+		)
+			return true;
+		return Object.values(node).some((value) =>
+			Array.isArray(value)
+				? value.some(conversion)
+				: value && typeof value === 'object' && conversion(value)
+		);
+	}
+	function visit(node, windowsContext = false) {
+		if (!node || typeof node !== 'object') return;
+		if (
+			node.type === 'VariableDeclarator' &&
+			node.id.type === 'ObjectPattern' &&
+			node.init?.callee?.name === 'require' &&
+			node.init.arguments[0]?.value === '../lib/git-bash.cjs'
+		) {
+			for (const property of node.id.properties) {
+				if (property.key?.name === 'bashPath') imports.push(property.value.name);
+			}
+		}
+		if (node.type === 'CallExpression' && node.callee.name === 'bashPath') calls.push(node);
+		if (
+			!windowsContext &&
+			node.type === 'CallExpression' &&
+			['spawnSync', 'spawn', 'execFileSync', 'execFile'].includes(
+				node.callee.name || node.callee.property?.name
+			) &&
+			node.arguments.some(conversion)
+		)
+			unsafeBoundaries.push(node);
+		if (
+			['IfStatement', 'ConditionalExpression'].includes(node.type) &&
+			node.test?.operator === '===' &&
+			node.test.left?.object?.name === 'process' &&
+			node.test.left.property?.name === 'platform' &&
+			node.test.right?.value === 'win32'
+		) {
+			visit(node.consequent, true);
+			visit(node.alternate, windowsContext);
+			return;
+		}
+		const callable =
+			node.type === 'FunctionDeclaration'
+				? node
+				: node.type === 'VariableDeclarator' &&
+					  ['ArrowFunctionExpression', 'FunctionExpression'].includes(node.init?.type)
+					? node.init
+					: null;
+		let guarded = windowsContext;
+		if (callable) {
+			const body = callable.body;
+			const first = body.body?.[0];
+			const test = first?.test;
+			const windowsOnly =
+				first?.type === 'IfStatement' &&
+				test?.operator === '!==' &&
+				test.left?.object?.name === 'process' &&
+				test.left.property?.name === 'platform' &&
+				test.right?.value === 'win32' &&
+				first.consequent.type === 'ReturnStatement';
+			guarded = guarded || windowsOnly;
+			const returns = [];
+			function collectReturns(value) {
+				if (
+					!value ||
+					typeof value !== 'object' ||
+					['FunctionExpression', 'ArrowFunctionExpression', 'FunctionDeclaration'].includes(
+						value.type
+					)
+				)
+					return;
+				if (value.type === 'ReturnStatement') returns.push(value.argument);
+				for (const child of Object.values(value)) {
+					if (Array.isArray(child)) child.forEach(collectReturns);
+					else if (child && typeof child === 'object') collectReturns(child);
+				}
+			}
+			collectReturns(body);
+			const convertedLocals =
+				body.body
+					?.filter((statement) => statement.type === 'VariableDeclaration')
+					.flatMap((statement) => statement.declarations)
+					.filter((declaration) => conversion(declaration.init)) || [];
+			const returnsConvertedLocal = returns.some(
+				(value) =>
+					value?.type === 'Identifier' &&
+					convertedLocals.some((declaration) => declaration.id.name === value.name)
+			);
+			if (
+				!windowsOnly &&
+				(body.type !== 'BlockStatement'
+					? conversion(body)
+					: returns.some(conversion) || returnsConvertedLocal)
+			)
+				privateConverters.push(callable);
+		}
+		for (const value of Object.values(node)) {
+			if (Array.isArray(value)) value.forEach((child) => visit(child, guarded));
+			else if (value && typeof value === 'object') visit(value, guarded);
+		}
+	}
+	visit(tree);
+	return (
+		imports.length === 1 &&
+		imports[0] === 'bashPath' &&
+		calls.length > 0 &&
+		privateConverters.length === 0 &&
+		unsafeBoundaries.length === 0
+	);
+}
+assert.equal(
+	fixturePathBinding(
+		"const { bashPath } = require('../lib/git-bash.cjs'); consume(bashPath(file));"
+	),
+	true
+);
+assert.equal(fixturePathBinding(''), false);
+assert.equal(
+	fixturePathBinding(
+		"const bashPath = value => value.replaceAll('\\\\', '/'); consume(bashPath(file));"
+	),
+	false
+);
+assert.equal(
+	fixturePathBinding(
+		"const { bashPath } = require('../lib/git-bash.cjs'); const privatePath = value => value.replaceAll('\\\\', '/'); consume(privatePath(file));"
+	),
+	false
+);
+assert.equal(
+	fixturePathBinding(
+		"const { bashPath } = require('../lib/git-bash.cjs'); consume(bashPath(file)); spawnSync(bash, [file.replaceAll('\\\\', '/')]);"
+	),
+	false
+);
+assert.equal(
+	fixturePathBinding(
+		"const { bashPath } = require('../lib/git-bash.cjs'); consume(bashPath(file)); if (process.platform === 'win32') spawnSync(bash, [file.replaceAll('\\\\', '/')]);"
+	),
+	true
+);
+assert.equal(
+	fixturePathBinding(
+		"const { bashPath } = require('../lib/git-bash.cjs'); consume(bashPath(file)); function privatePath(value) { const converted = value.replaceAll('\\\\', '/'); return converted; }"
+	),
+	false
+);
+for (const fixture of [
+	'test-linux-uninstall-sandbox.cjs',
+	'test-linux-package-setup.cjs',
+	'test-linux-tracked-copy.cjs',
+	'test-linux-source-toolchain.cjs',
+	'test-linux-install-layout-registry.cjs',
+	'test-linux-canonical-pack-upgrade.cjs',
+	'test-linux-tray-icon-assets.cjs',
+	'test-linux-launcher-deps.cjs',
+	'test-linux-network-runtime.cjs',
+	'test-linux-portable-network-runtime.cjs'
+]) {
+	assert.ok(
+		fixturePathBinding(fs.readFileSync(path.join(__dirname, fixture), 'utf8')),
+		`${fixture} must consume the one native Bash-path owner without a private converter`
+	);
+}
+console.log(
+	'[OK] Native Bash paths retain filesystem bytes; ten fixture callers share the tested owner.'
+);

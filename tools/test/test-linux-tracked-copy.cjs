@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-tracked-copy-'));
@@ -45,13 +45,7 @@ try {
 	const began = performance.now();
 	const result = spawnSync(
 		bashExecutable(),
-		[
-			'-x',
-			'-s',
-			'--',
-			scratch.replaceAll('\\', '/'),
-			path.join(ROOT, 'tools/build').replaceAll('\\', '/')
-		],
+		['-x', '-s', '--', bashPath(scratch), bashPath(path.join(ROOT, 'tools/build'))],
 		{
 			input: script,
 			encoding: 'utf8',
@@ -135,8 +129,6 @@ try {
 		{ mode: 0o755 }
 	);
 	const smokeCalls = path.join(scratch, 'smoke-calls');
-	const bashPath = (value) =>
-		value.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`);
 	function smoke(failure, skip = false) {
 		fs.writeFileSync(smokeCalls, '');
 		return spawnSync(

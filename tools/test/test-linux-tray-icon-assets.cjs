@@ -23,7 +23,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { spawnSync } = require('child_process');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PAIRS = [
@@ -71,14 +71,14 @@ try {
 		}
 		const script = path.join(sandbox, `${format}.sh`);
 		fs.writeFileSync(script, section[1]);
-		const result = spawnSync(bashExecutable(), ['-eu', script.replaceAll('\\', '/')], {
+		const result = spawnSync(bashExecutable(), ['-eu', bashPath(script)], {
 			encoding: 'utf8',
 			env: {
 				...process.env,
-				BUILD_DIR: sandbox.replaceAll('\\', '/'),
-				DEB_ROOT: stage.replaceAll('\\', '/'),
-				INSTALL_ROOT: stage.replaceAll('\\', '/'),
-				APPDIR: stage.replaceAll('\\', '/')
+				BUILD_DIR: bashPath(sandbox),
+				DEB_ROOT: bashPath(stage),
+				INSTALL_ROOT: bashPath(stage),
+				APPDIR: bashPath(stage)
 			}
 		});
 		if (result.status !== 0)

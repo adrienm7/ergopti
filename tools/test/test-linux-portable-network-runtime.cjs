@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 const root = path.resolve(__dirname, '../..');
 const generator = require('../codegen/codegen-linux-native-runtime.cjs');
 const catalogue = JSON.parse(fs.readFileSync(path.join(root, generator.SOURCE), 'utf8'));
@@ -154,8 +154,6 @@ try {
 		fs.writeFileSync(path.join(prefix, file), 'owned path fixture, never executed');
 	}
 	fs.mkdirSync(driver, { recursive: true });
-	const posix = (value) =>
-		value.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive) => '/' + drive.toLowerCase());
 	const environmentPath = path.join(layoutFixture, 'environment.sh');
 	fs.writeFileSync(environmentPath, source(environmentTemplate));
 	const observe = () =>
@@ -165,9 +163,9 @@ try {
 				'-c',
 				'set -euo pipefail; source "$1" "$2" "$3"; printf "%s\\n" "$GIO_MODULE_DIR"',
 				'owned-meson-layout',
-				posix(environmentPath),
-				posix(prefix),
-				posix(driver)
+				bashPath(environmentPath),
+				bashPath(prefix),
+				bashPath(driver)
 			],
 			{
 				encoding: 'utf8',
@@ -181,7 +179,7 @@ try {
 		0,
 		'actual generated Meson layout must satisfy installed environment admission'
 	);
-	assert.equal(installed.stdout, posix(path.join(prefix, 'lib/gio/modules')) + '\n');
+	assert.equal(installed.stdout, bashPath(path.join(prefix, 'lib/gio/modules')) + '\n');
 	assert.equal(installed.stderr, '');
 	// The original lib64-only layout must still refuse; do not broaden discovery.
 	fs.renameSync(path.join(prefix, 'lib/gio'), path.join(prefix, 'detached-gio'));

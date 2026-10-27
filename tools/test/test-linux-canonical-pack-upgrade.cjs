@@ -16,7 +16,7 @@ const childProcess = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
@@ -30,12 +30,6 @@ function fail(message) {
 
 function shellQuote(value) {
 	return `'${String(value).replaceAll("'", `'"'"'`)}'`;
-}
-
-function bashPath(value) {
-	const normalized = path.resolve(value).replaceAll('\\', '/');
-	if (process.platform !== 'win32') return normalized;
-	return normalized.replace(/^([A-Za-z]):\//, (_, drive) => `/${drive.toLowerCase()}/`);
 }
 
 function write(file, content) {

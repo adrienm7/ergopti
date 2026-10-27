@@ -29,7 +29,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS = path.join(ROOT, 'static', 'ergopti_plus');
@@ -54,20 +54,14 @@ const MARK = '@@';
 
 const errors = [];
 
-function bashPath(value) {
-	const normalized = path.resolve(value).replaceAll('\\', '/');
-	if (process.platform !== 'win32') return normalized;
-	return normalized.replace(/^([A-Za-z]):\//, (_, drive) => `/${drive.toLowerCase()}/`);
-}
-
 function shellQuote(value) {
 	return `'${String(value).replaceAll("'", `'"'"'`)}'`;
 }
 
 /** Runs a Bash script body and returns the child result. */
-function bash(lines) {
+function bash(lines, cwd = ROOT) {
 	return childProcess.spawnSync(bashExecutable(), ['-c', lines.join('\n')], {
-		cwd: ROOT,
+		cwd,
 		encoding: 'utf8'
 	});
 }
@@ -232,20 +226,70 @@ const installer = fs.readFileSync(INSTALLER, 'utf8');
 const resolved = installer.indexOf(
 	'SRC_REGISTRY="$(layout_registry_source "${SRC_DRIVER}" "${DRIVERS_ROOT}")"'
 );
-// Both copies preserve the original source/destination contract. The current
-// tar pipeline additionally excludes only the ignored checkout-local backend.
-const sourcePayloadCopy =
-	'tar -C "$SRC_DRIVER" --exclude=\'./bin/libergopti_archive_publication.so\' -cf - . \\\n\t| tar -C "${LIB_DIR}/linux" -xf -';
-function driverPayloadCopyIndex(source) {
-	const legacy = source.indexOf('cp -r "${SRC_DRIVER}/." "${LIB_DIR}/linux/"');
-	return legacy >= 0 ? legacy : source.indexOf(sourcePayloadCopy);
+// Select the actual installer-owned payload region without pinning its copy syntax.
+function payloadCopyRegion(source) {
+	const beginning = 'NATIVE_LUV_RETAINED_DIGEST=""';
+	assert.equal(source.split(beginning).length, 2, 'the native payload owner must be unique');
+	const start = source.indexOf(beginning);
+	const end = source.indexOf('_native_output_bin_parents || exit 1', start);
+	assert.ok(end > start + beginning.length, 'the actual payload region must be nonempty');
+	return { start, end, source: source.slice(start, end) };
 }
-assert.equal(driverPayloadCopyIndex(sourcePayloadCopy), 0, 'exact target/source tar copy admits');
-assert.equal(
-	driverPayloadCopyIndex('cp -r "${SRC_DRIVER}/." "${LIB_DIR}/linux/"'),
-	0,
-	'original copy contract remains'
-);
+
+/** Receives real source bytes through the actual installer payload owner. */
+function observePayloadCopy(block, prefix) {
+	const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-payload-copy-'));
+	try {
+		const source = path.join(scratch, prefix, 'source');
+		const library = path.join(scratch, prefix, 'installed');
+		fs.mkdirSync(path.join(source, 'bin'), { recursive: true });
+		fs.mkdirSync(path.join(library, 'linux'), { recursive: true });
+		const bytes = Buffer.from('actual payload bytes\n\0tail');
+		fs.writeFileSync(path.join(source, 'payload'), bytes);
+		// This ignored checkout-local sentinel is never executed as a native component.
+		fs.writeFileSync(
+			path.join(source, 'bin/libergopti_archive_publication.so'),
+			'must be excluded'
+		);
+		const result = bash([
+			'set -euo pipefail',
+			`SRC_DRIVER=${shellQuote(bashPath(source))}`,
+			`LIB_DIR=${shellQuote(bashPath(library))}`,
+			'NATIVE_LUV_STAGE=""',
+			block
+		]);
+		assert.ifError(result.error);
+		assert.equal(result.signal, null);
+		assert.notEqual(result.status, null);
+		assert.ok(
+			fs.readFileSync(path.join(source, 'payload')).equals(bytes),
+			'the payload source must remain intact'
+		);
+		const copied = path.join(library, 'linux/payload');
+		return {
+			correct:
+				result.status === 0 &&
+				fs.existsSync(copied) &&
+				fs.readFileSync(copied).equals(bytes) &&
+				!fs.existsSync(path.join(library, 'linux/bin/libergopti_archive_publication.so')),
+			status: result.status,
+			stderr: result.stderr
+		};
+	} finally {
+		fs.rmSync(scratch, { recursive: true, force: true });
+	}
+}
+const payload = payloadCopyRegion(installer);
+for (const prefix of process.platform === 'win32'
+	? ['path with spaces']
+	: ['ordinary', 'literal\\backslash', 'literal\nlinefeed']) {
+	const observed = observePayloadCopy(payload.source, prefix);
+	assert.equal(
+		observed.correct,
+		true,
+		`actual installer payload ${JSON.stringify(prefix)}: ${observed.stderr}`
+	);
+}
 for (const [before, after] of [
 	['"$SRC_DRIVER"', '"$FOREIGN_DRIVER"'],
 	['"${LIB_DIR}/linux"', '"${LIB_DIR}/other"'],
@@ -253,11 +297,137 @@ for (const [before, after] of [
 	['-cf - .', '-cf - native'],
 	['-xf -', '-tf -']
 ]) {
-	assert.ok(sourcePayloadCopy.includes(before), 'copy mutation must hit its real protocol');
-	const mutated = sourcePayloadCopy.replace(before, after);
-	assert.equal(driverPayloadCopyIndex(mutated), -1, 'changed copy authority must refuse');
+	assert.equal(
+		payload.source.split(before).length,
+		2,
+		'copy mutation must hit its exact real protocol'
+	);
+	const mutated = observePayloadCopy(payload.source.replace(before, after), 'rejected copy');
+	assert.equal(
+		mutated.correct,
+		false,
+		'changed source, destination, exclusion or copy behavior must refuse'
+	);
 }
-const driverCopy = driverPayloadCopyIndex(installer);
+/** Selects the actual archive owner after build and before installation setup. */
+function updaterArchiveRegion(source) {
+	const beginning = 'echo "FAIL the build failed"; exit 1; }';
+	const ending = '\nexport HOME=';
+	assert.equal(source.split(beginning).length, 2, 'the updater build boundary must be unique');
+	assert.equal(
+		source.split(ending).length,
+		2,
+		'the updater install environment boundary must be unique'
+	);
+	const start = source.indexOf(beginning) + beginning.length;
+	const end = source.indexOf(ending, start);
+	assert.ok(
+		end > start && source.slice(start, end).trim(),
+		'the actual archive owner must be nonempty'
+	);
+	return source.slice(start, end);
+}
+
+/** Uses only real private files; the build, install and live updater never run. */
+function observeUpdaterArchive(block, prefix, refusal, relativeWork = false) {
+	const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-updater-archive-'));
+	try {
+		const repository = path.join(scratch, prefix, 'repo');
+		const work = path.join(scratch, prefix, 'work');
+		const bundle = path.join(repository, 'build/linux');
+		const files = {
+			'linux/runtime.lua': 'private runtime bytes, never executed',
+			'_shared/data/locales/en.json': '{}\n',
+			'bin/ergopti-hotstrings': 'private launcher bytes, never executed',
+			'install.sh': 'private installer bytes, never executed'
+		};
+		for (const [relative, bytes] of Object.entries(files)) {
+			const file = path.join(bundle, relative);
+			fs.mkdirSync(path.dirname(file), { recursive: true });
+			fs.writeFileSync(file, bytes);
+		}
+		fs.mkdirSync(work, { recursive: true });
+		if (refusal === 'extract') fs.writeFileSync(path.join(work, 'unpacked'), 'not a directory');
+		else fs.mkdirSync(path.join(work, 'unpacked'));
+		if (refusal === 'create') fs.unlinkSync(path.join(bundle, 'install.sh'));
+		if (refusal === 'archive-output') fs.mkdirSync(path.join(work, 'old.tar.gz'));
+		const result = bash(
+			[
+				// The real runner uses set -u, so only its own explicit refusal guards
+				// can prevent either failure from falling through to install.
+				'set -u',
+				`REPO=${shellQuote(bashPath(repository))}`,
+				`WORK=${shellQuote(bashPath(relativeWork ? path.basename(work) : work))}`,
+				'PHASE=build',
+				'CAUSE_STATUS=0',
+				`trap 'printf "ARCHIVE_RESULT phase=%s cause=%s\\n" "$PHASE" "$CAUSE_STATUS"' EXIT`,
+				block,
+				'PHASE=install',
+				'printf "DOWNSTREAM_INSTALL_REACHED\\n"'
+			],
+			relativeWork ? path.dirname(work) : ROOT
+		);
+		assert.ifError(result.error);
+		assert.equal(result.signal, null);
+		assert.notEqual(result.status, null);
+		const exact = Object.entries(files).every(([relative, bytes]) => {
+			const file = path.join(work, 'unpacked', relative);
+			return fs.existsSync(file) && fs.readFileSync(file, 'utf8') === bytes;
+		});
+		assert.ok(
+			Object.entries(files).every(([relative, bytes]) =>
+				refusal === 'create' && relative === 'install.sh'
+					? !fs.existsSync(path.join(bundle, relative))
+					: fs.readFileSync(path.join(bundle, relative), 'utf8') === bytes
+			),
+			'the source fixture must retain its exact admitted state'
+		);
+		return { status: result.status, stdout: result.stdout, stderr: result.stderr, exact };
+	} finally {
+		fs.rmSync(scratch, { recursive: true, force: true });
+	}
+}
+const updaterArchive = updaterArchiveRegion(
+	fs.readFileSync(path.join(DRIVER, 'tests/hardware/run_updater_live.sh'), 'utf8')
+);
+for (const prefix of process.platform === 'win32'
+	? ['path with spaces']
+	: ['ordinary', 'literal\\backslash', 'literal\nlinefeed']) {
+	const observed = observeUpdaterArchive(updaterArchive, prefix);
+	assert.equal(observed.status, 0, observed.stderr);
+	assert.equal(
+		observed.exact,
+		true,
+		`the actual archive owner must preserve payload bytes under ${JSON.stringify(prefix)}`
+	);
+	assert.ok(observed.stdout.includes('ARCHIVE_RESULT phase=install cause=0'));
+}
+const relativeArchive = observeUpdaterArchive(updaterArchive, 'relative work', undefined, true);
+assert.equal(relativeArchive.status, 0, relativeArchive.stderr);
+assert.equal(
+	relativeArchive.exact,
+	true,
+	'relative WORK keeps the original caller directory for the archive'
+);
+for (const [refusal, status] of [
+	['create', 2],
+	['extract', 1],
+	['archive-output', 1]
+]) {
+	const observed = observeUpdaterArchive(updaterArchive, 'actual refusal', refusal);
+	assert.equal(observed.status, 1, 'the archive failure remains a runner failure');
+	assert.ok(
+		observed.stdout.includes(`ARCHIVE_RESULT phase=build cause=${status}`),
+		'preserve the exact refused owner status before install'
+	);
+	assert.ok(
+		!observed.stdout.includes('DOWNSTREAM_INSTALL_REACHED'),
+		'a refused archive must never reach installation'
+	);
+	assert.equal(observed.exact, false);
+}
+
+const driverCopy = payload.start;
 const registryCopy = installer.indexOf(
 	'install_layout_registry "${SRC_REGISTRY}" "${LIB_DIR}/linux"'
 );
@@ -303,7 +473,10 @@ try {
 		`source ${shellQuote(bashPath(HELPER))}`,
 		`SRC_REGISTRY="$(layout_registry_source ${shellQuote(bashPath(DRIVER))} ${shellQuote(bashPath(DRIVERS))})"`,
 		`install -d ${shellQuote(bashPath(path.join(lib, 'linux')))} ${shellQuote(bashPath(path.join(lib, '_shared')))}`,
-		`tar -C ${shellQuote(bashPath(DRIVER))} --exclude='./bin/libergopti_archive_publication.so' -cf - . | tar -C ${shellQuote(bashPath(path.join(lib, 'linux')))} -xf -`,
+		`SRC_DRIVER=${shellQuote(bashPath(DRIVER))}`,
+		`LIB_DIR=${shellQuote(bashPath(lib))}`,
+		'NATIVE_LUV_STAGE=""',
+		payload.source,
 		`cp -r ${shellQuote(bashPath(SHARED))}/. ${shellQuote(bashPath(path.join(lib, '_shared')))}/`,
 		`install_layout_registry "$SRC_REGISTRY" ${shellQuote(bashPath(path.join(lib, 'linux')))}`,
 		`bash ${shellQuote(bashPath(OWNERSHIP))} ${shellQuote(bashPath(DRIVER))} ${shellQuote(bashPath(SHARED))} ` +
@@ -409,18 +582,25 @@ try {
 			const home = path.join(sandbox, 'home');
 			fs.mkdirSync(home);
 			// Native Lua receives host paths; MSYS paths belong only to Bash.
-			const run = childProcess.spawnSync(lua, [probe, path.resolve(lib).replaceAll('\\', '/')], {
-				cwd: path.join(lib, 'linux'),
-				encoding: 'utf8',
-				env: {
-					...process.env,
-					HOME: home,
-					XDG_CONFIG_HOME: path.join(home, '.config'),
-					XDG_DATA_HOME: path.join(home, '.local', 'share'),
-					XDG_STATE_HOME: path.join(home, '.local', 'state'),
-					XDG_CACHE_HOME: path.join(home, '.cache')
+			const run = childProcess.spawnSync(
+				lua,
+				[
+					probe,
+					process.platform === 'win32' ? path.resolve(lib).replaceAll('\\', '/') : path.resolve(lib)
+				],
+				{
+					cwd: path.join(lib, 'linux'),
+					encoding: 'utf8',
+					env: {
+						...process.env,
+						HOME: home,
+						XDG_CONFIG_HOME: path.join(home, '.config'),
+						XDG_DATA_HOME: path.join(home, '.local', 'share'),
+						XDG_STATE_HOME: path.join(home, '.local', 'state'),
+						XDG_CACHE_HOME: path.join(home, '.cache')
+					}
 				}
-			});
+			);
 			const bound = new Map();
 			const counts = new Map();
 			for (const line of String(run.stdout).split(/\r?\n/)) {

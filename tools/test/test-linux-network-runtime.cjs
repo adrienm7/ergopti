@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 const generator = require('../codegen/codegen-linux-native-runtime.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const DRIVER = 'static/ergopti_plus/linux';
@@ -238,10 +238,7 @@ function portable() {
 						const result = spawnSync(bashExecutable(), ['-s'], {
 							input:
 								'set -u\n' +
-								`SRC_DRIVER='${path
-									.join(ROOT, DRIVER)
-									.replaceAll('\\', '/')
-									.replace(/^([A-Za-z]):/, (_, drive) => '/' + drive.toLowerCase())}'\n` +
+								`SRC_DRIVER='${bashPath(path.join(ROOT, DRIVER))}'\n` +
 								'NATIVE_PROBE_COUNT=0\nnative_source_compile_probe() { NATIVE_PROBE_COUNT=$((NATIVE_PROBE_COUNT + 1)); [ "$NATIVE_PROBE_COUNT" -gt 1 ]; }\n' +
 								functions +
 								'\n' +
@@ -317,7 +314,6 @@ function portable() {
 	});
 	const installer = outputs[`${DRIVER}/install.sh`];
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-network-runtime-'));
-	const posix = (value) => value.replace(/^([A-Za-z]):/, '/$1').replaceAll('\\', '/');
 	try {
 		const bin = path.join(root, 'bin');
 		fs.mkdirSync(bin);
@@ -382,14 +378,14 @@ function portable() {
 				timeout: 5000,
 				env: {
 					...process.env,
-					PATH: posix(bin),
+					PATH: bashPath(bin),
 					SRC_DRIVER: '/private driver/linux',
 					SRC_SHARED: '/private shared/_shared',
 					EXPECTED_PROBE: '/private driver/linux/platform/network/runtime_probe.lua',
 					EXPECTED_SHARED: '/private shared/_shared',
-					PRESENT: posix(present),
-					INSTALLS: posix(installs),
-					PROBES: posix(probes),
+					PRESENT: bashPath(present),
+					INSTALLS: bashPath(installs),
+					PROBES: bashPath(probes),
 					PROVIDE: provide ? '1' : '0'
 				}
 			});

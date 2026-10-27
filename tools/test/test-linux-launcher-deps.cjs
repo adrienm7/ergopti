@@ -56,7 +56,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 const nativeRuntimeGenerator = require('../codegen/codegen-linux-native-runtime.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -252,7 +252,6 @@ if (
 } else {
 	const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-linux-deps-'));
 	const fakeManager = path.join(fixtureRoot, 'apk');
-	const toPosix = (value) => value.replace(/^([A-Za-z]):/, '/$1').replaceAll('\\', '/');
 	const bash = bashExecutable();
 	try {
 		fs.writeFileSync(
@@ -278,9 +277,9 @@ if (
 				encoding: 'utf8',
 				env: {
 					...process.env,
-					ERGOPTI_FAKE_BIN: toPosix(fixtureRoot),
+					ERGOPTI_FAKE_BIN: bashPath(fixtureRoot),
 					ERGOPTI_FAKE_PROVIDE: provide ? '1' : '0',
-					PATH: toPosix(fixtureRoot)
+					PATH: bashPath(fixtureRoot)
 				}
 			});
 		const falseSuccess = runFixture(false);
@@ -334,11 +333,11 @@ if (
 						encoding: 'utf8',
 						env: {
 							...process.env,
-							PATH: toPosix(nativeFixture),
+							PATH: bashPath(nativeFixture),
 							ERGOPTI_EXPECTED_PACKAGE: nativePackages[manager][index],
 							ERGOPTI_EXPECTED_SONAME: soname,
-							ERGOPTI_FAKE_PRESENT: toPosix(present),
-							ERGOPTI_PROBE_LOG: toPosix(log),
+							ERGOPTI_FAKE_PRESENT: bashPath(present),
+							ERGOPTI_PROBE_LOG: bashPath(log),
 							ERGOPTI_FAKE_PROVIDE: provide ? '1' : '0'
 						}
 					});
