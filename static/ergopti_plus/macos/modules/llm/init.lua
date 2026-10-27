@@ -1663,8 +1663,9 @@ local function apply_backend_identity(backend, start_service)
 		CoreState.backend_transition_generation =
 			CoreState.backend_transition_generation + 1
 		local my_transition_generation = CoreState.backend_transition_generation
-		-- Any backend transition forces a fresh Ollama readiness verdict: leaving MLX
-		-- kills `ollama serve`, and returning relaunches it async (not yet listening).
+		-- Any backend transition forces a fresh Ollama readiness verdict: switching to
+		-- MLX retires the owned `ollama serve`, and returning relaunches it async (not
+		-- yet listening).
 		-- Without this, a stale-true _is_ready would make the warmup chain self-terminate
 		-- and predictions dispatch to a cold/dead server (F-M8). ensure_running launches
 		-- the daemon but must NEVER imply readiness.
