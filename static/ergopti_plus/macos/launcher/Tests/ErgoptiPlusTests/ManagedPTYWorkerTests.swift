@@ -375,7 +375,7 @@ final class ManagedPTYWorkerTests: XCTestCase {
 	}
 
 	func testPackagedAppAdmitsOnlyItsPayloadAndARefusalAdmitsNothing() {
-		let payload = "/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos"
+		let payload = "/Applications/\(Identifiers.App.bundle)/Contents/Resources/static/ergopti_plus/macos"
 		let admitted = ManagedPTYWorker.admittedSources(for: .packaged(configDir: payload))
 		XCTAssertEqual(admitted, Set(ManagedPTYWorker.admittedSourceNames.map { "\(payload)/modules/llm/\($0)" }))
 		XCTAssertFalse(admitted.contains("/Users/maintainer/ergopti/static/ergopti_plus/macos/modules/llm/ensure-ollama-native-deps.sh"))
