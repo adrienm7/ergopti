@@ -57,7 +57,7 @@ helpers.describe("keyboard shortcuts: which slots exist", function()
 
 	helpers.it("names the modifiers and the special keys of a label through the catalogue", function()
 		local shortcuts = load_over_config()
-		local space = with_marked_translations(function() return shortcuts.get_slot_label("ctrl_space") end)
+		local space = with_marked_translations(function() return shortcuts.get_slot_label("primary_space") end)
 		local enter = with_marked_translations(function() return shortcuts.get_slot_label("alt_enter") end)
 		drop_config()
 		helpers.assert_eq(space, "<layer_editor.key.ctrl> <layer_editor.key.space>",
@@ -67,7 +67,7 @@ helpers.describe("keyboard shortcuts: which slots exist", function()
 
 	helpers.it("offers a slot per key from the shared catalogue", function()
 		local shortcuts = load_over_config()
-		local slots = shortcuts.available_slots("ctrl_")
+		local slots = shortcuts.available_slots("primary_")
 		drop_config()
 		helpers.assert_true(#slots > 20,
 			"the key space is the shared catalogue's forty keys, which the gesture "
@@ -77,7 +77,7 @@ helpers.describe("keyboard shortcuts: which slots exist", function()
 
 	helpers.it("labels a chord in words the user can read", function()
 		local shortcuts = load_over_config()
-		local label = with_marked_translations(function() return shortcuts.get_slot_label("ctrl_shift_p") end)
+		local label = with_marked_translations(function() return shortcuts.get_slot_label("primary_shift_p") end)
 		drop_config()
 		helpers.assert_true(label:find("<layer_editor.key.ctrl>", 1, true) ~= nil, "the label must name the modifier")
 		helpers.assert_true(label:find("<layer_editor.key.shift>", 1, true) ~= nil,
@@ -87,10 +87,10 @@ helpers.describe("keyboard shortcuts: which slots exist", function()
 
 	helpers.it("resolves the longer prefix first", function()
 		local shortcuts = load_over_config()
-		local label = with_marked_translations(function() return shortcuts.get_slot_label("ctrl_shift_a") end)
+		local label = with_marked_translations(function() return shortcuts.get_slot_label("primary_shift_a") end)
 		drop_config()
 		helpers.assert_true(label:find("<layer_editor.key.shift>", 1, true) ~= nil,
-			"'ctrl_shift_a' also starts with 'ctrl_', so a shorter prefix reached "
+			"'primary_shift_a' also starts with 'ctrl_', so a shorter prefix reached "
 				.. "first resolves the wrong chord — which is why the prefix list is "
 				.. "ordered and walked with ipairs")
 	end)
@@ -108,13 +108,13 @@ end)
 
 helpers.describe("keyboard shortcuts: what is stored", function()
 	helpers.it("keyboard-config-owner: ignores legacy storage and clears persisted overrides on restart", function()
-		local shortcuts, config = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
+		local shortcuts, config = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
 		local ok, err = pcall(function()
-			helpers.assert_eq(shortcuts.get_action("ctrl_j"), "select_line")
-			Sandbox.write_bytes(config.path, "[shortcuts.keyboard]\nctrl_k = \"enter\"\n")
+			helpers.assert_eq(shortcuts.get_action("primary_j"), "select_line")
+			Sandbox.write_bytes(config.path, "[shortcuts.keyboard]\nprimary_k = \"enter\"\n")
 			shortcuts._reset()
-			helpers.assert_eq(shortcuts.get_action("ctrl_j"), "none", "legacy storage cannot resurrect a cleared chord")
-			helpers.assert_eq(shortcuts.get_action("ctrl_k"), "enter", "restart consumes canonical config")
+			helpers.assert_eq(shortcuts.get_action("primary_j"), "none", "legacy storage cannot resurrect a cleared chord")
+			helpers.assert_eq(shortcuts.get_action("primary_k"), "enter", "restart consumes canonical config")
 		end)
 		drop_config()
 		helpers.assert_true(ok, tostring(err))
@@ -125,12 +125,12 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 		local ok, err = pcall(function()
 			helpers.assert_eq(shortcuts.get_action("ctrl_not_a_key"), "none")
 			helpers.assert_eq(shortcuts.set_action("ctrl_not_a_key", "enter"), false)
-			Sandbox.write_bytes(config.path, Sandbox.read_bytes(config.path) .. "ctrl_j = \"select_line\"\n[other]\nvalue = 42\n")
+			Sandbox.write_bytes(config.path, Sandbox.read_bytes(config.path) .. "primary_j = \"select_line\"\n[other]\nvalue = 42\n")
 			local decoded = Codec.decode(Sandbox.read_bytes(config.path))
 			local marked = {}
 			shortcuts.mark_config_reads(decoded, function(...) marked[#marked + 1] = table.concat({ ... }, ".") end)
-			helpers.assert_eq(table.concat(marked), "shortcuts.keyboard.ctrl_j")
-			helpers.assert_true(shortcuts.set_action("ctrl_j", "enter"))
+			helpers.assert_eq(table.concat(marked), "shortcuts.keyboard.primary_j")
+			helpers.assert_true(shortcuts.set_action("primary_j", "enter"))
 			local saved = Codec.decode(Sandbox.read_bytes(config.path))
 			helpers.assert_eq(saved.shortcuts.keyboard.ctrl_not_a_key, "select_line", "the owner does not erase unknown keys")
 			helpers.assert_eq(saved.other.value, 42)
@@ -146,11 +146,11 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 			local loaded, failure = pcall(shortcuts.get_assignments)
 			helpers.assert_eq(loaded, false)
 			helpers.assert_true(tostring(failure):find("malformed configuration", 1, true) ~= nil)
-			Sandbox.write_bytes(config.path, "[shortcuts.keyboard]\nctrl_j = \"select_line\"\n")
-			helpers.assert_eq(shortcuts.get_action("ctrl_j"), "select_line", "a repaired source is read without resetting the owner")
+			Sandbox.write_bytes(config.path, "[shortcuts.keyboard]\nprimary_j = \"select_line\"\n")
+			helpers.assert_eq(shortcuts.get_action("primary_j"), "select_line", "a repaired source is read without resetting the owner")
 			Sandbox.write_bytes(config.path, "[shortcuts.keyboard\n")
-			helpers.assert_eq(shortcuts.set_action("ctrl_j", "enter"), false)
-			helpers.assert_eq(shortcuts.get_action("ctrl_j"), "select_line")
+			helpers.assert_eq(shortcuts.set_action("primary_j", "enter"), false)
+			helpers.assert_eq(shortcuts.get_action("primary_j"), "select_line")
 		end)
 		drop_config()
 		helpers.assert_true(ok, tostring(err))
@@ -158,8 +158,8 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 
 	helpers.it("stores a binding the user makes", function()
 		local shortcuts, storage = load_over_config()
-		local ok = shortcuts.set_action("ctrl_shift_p", "select_line")
-		local stored = storage.get("shortcuts.keyboard.ctrl_shift_p")
+		local ok = shortcuts.set_action("primary_shift_p", "select_line")
+		local stored = storage.get("shortcuts.keyboard.primary_shift_p")
 		drop_config()
 		helpers.assert_true(ok)
 		helpers.assert_eq(stored, "select_line",
@@ -168,8 +168,8 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 	end)
 
 	helpers.it("reads a binding back", function()
-		local shortcuts = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
-		local action = shortcuts.get_action("ctrl_j")
+		local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
+		local action = shortcuts.get_action("primary_j")
 		drop_config()
 		helpers.assert_eq(action, "select_line")
 	end)
@@ -187,13 +187,13 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 		package.loaded["logger.shim"] = logger
 		local ok, err = pcall(function()
 			local shortcuts = load_over_config({
-				["shortcuts.keyboard.ctrl_j"] = "select_line",
-				["shortcuts.keyboard.ctrl_k"] = "no_such_action",
+				["shortcuts.keyboard.primary_j"] = "select_line",
+				["shortcuts.keyboard.primary_k"] = "no_such_action",
 			})
-			helpers.assert_eq(shortcuts.get_action("ctrl_j"), "select_line", "a catalogue id still loads")
-			helpers.assert_eq(shortcuts.get_action("ctrl_k"), "none",
+			helpers.assert_eq(shortcuts.get_action("primary_j"), "select_line", "a catalogue id still loads")
+			helpers.assert_eq(shortcuts.get_action("primary_k"), "none",
 				"an id the catalogue does not offer must not be bound")
-			helpers.assert_eq(#shortcuts.assigned_slots("ctrl_"), 1, "only the valid slot is bound")
+			helpers.assert_eq(#shortcuts.assigned_slots("primary_"), 1, "only the valid slot is bound")
 		end)
 		package.loaded["logger.shim"] = saved_logger
 		drop_config()
@@ -206,12 +206,12 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 	end)
 
 	helpers.it("preserves an explicitly native chord after its action is removed", function()
-		local shortcuts, storage = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
+		local shortcuts, storage = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
 		local ok, err = pcall(function()
-			helpers.assert_true(shortcuts.set_action("ctrl_j", "none"))
-			helpers.assert_eq(storage.get("shortcuts.keyboard.ctrl_j"), "none", "explicit native behavior keeps its durable ownership")
+			helpers.assert_true(shortcuts.set_action("primary_j", "none"))
+			helpers.assert_eq(storage.get("shortcuts.keyboard.primary_j"), "none", "explicit native behavior keeps its durable ownership")
 			shortcuts._reset()
-			helpers.assert_eq(shortcuts.get_action("ctrl_j"), "none", "restart never rebinds the removed action")
+			helpers.assert_eq(shortcuts.get_action("primary_j"), "none", "restart never rebinds the removed action")
 			helpers.assert_eq(shortcuts.dispatch(chord("j", { ctrl = true })), false, "the explicitly native chord dispatches no action")
 		end)
 		drop_config()
@@ -220,12 +220,12 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 
 	helpers.it("keeps the active binding when persistence fails", function()
 		local shortcuts, storage = load_over_config({
-			["shortcuts.keyboard.ctrl_j"] = "select_line",
+			["shortcuts.keyboard.primary_j"] = "select_line",
 		}, true)
-		local rebound = shortcuts.set_action("ctrl_j", "enter")
-		local removed = shortcuts.set_action("ctrl_j", "none")
-		local active = shortcuts.get_action("ctrl_j")
-		local stored = storage.get("shortcuts.keyboard.ctrl_j")
+		local rebound = shortcuts.set_action("primary_j", "enter")
+		local removed = shortcuts.set_action("primary_j", "none")
+		local active = shortcuts.get_action("primary_j")
+		local stored = storage.get("shortcuts.keyboard.primary_j")
 		drop_config()
 		helpers.assert_eq(rebound, false, "a failed write must not report a new binding")
 		helpers.assert_eq(removed, false, "a failed explicit None write must not report an unbound slot")
@@ -235,7 +235,7 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 
 	helpers.it("refuses an action the catalogue does not offer", function()
 		local shortcuts, storage = load_over_config()
-		local ok = shortcuts.set_action("ctrl_shift_p", "no_such_action")
+		local ok = shortcuts.set_action("primary_shift_p", "no_such_action")
 		local written = #storage.keys()
 		drop_config()
 		helpers.assert_eq(ok, false,
@@ -257,15 +257,15 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 
 	helpers.it("lists only the slots of the group asked for", function()
 		local shortcuts = load_over_config({
-			["shortcuts.keyboard.ctrl_j"] = "select_line",
+			["shortcuts.keyboard.primary_j"] = "select_line",
 			["shortcuts.keyboard.alt_j"] = "enter",
 		})
-		local ctrl = shortcuts.assigned_slots("ctrl_")
+		local ctrl = shortcuts.assigned_slots("primary_")
 		drop_config()
 		helpers.assert_eq(#ctrl, 1,
-			"'ctrl_' must not match 'alt_j', and it must not match 'ctrl_shift_j' "
+			"'ctrl_' must not match 'alt_j', and it must not match 'primary_shift_j' "
 				.. "either — each group renders its own rows")
-		helpers.assert_eq(ctrl[1], "ctrl_j")
+		helpers.assert_eq(ctrl[1], "primary_j")
 	end)
 
 end)
@@ -282,15 +282,15 @@ end)
 helpers.describe("keyboard shortcuts: matching a chord", function()
 
 	helpers.it("fires the binding for the exact chord", function()
-		local shortcuts = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
+		local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
 		local fired, slot = shortcuts.dispatch(chord("j", { ctrl = true }))
 		drop_config()
 		helpers.assert_true(fired, "the whole feature")
-		helpers.assert_eq(slot, "ctrl_j")
+		helpers.assert_eq(slot, "primary_j")
 	end)
 
 	helpers.it("does not fire when an extra modifier is held", function()
-		local shortcuts = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
+		local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
 		local fired = shortcuts.dispatch(chord("j", { ctrl = true, shift = true }))
 		drop_config()
 		helpers.assert_true(not fired,
@@ -301,14 +301,14 @@ helpers.describe("keyboard shortcuts: matching a chord", function()
 	end)
 
 	helpers.it("does not fire when a required modifier is missing", function()
-		local shortcuts = load_over_config({ ["shortcuts.keyboard.ctrl_shift_j"] = "select_line" })
+		local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_shift_j"] = "select_line" })
 		local fired = shortcuts.dispatch(chord("j", { ctrl = true }))
 		drop_config()
 		helpers.assert_true(not fired)
 	end)
 
 	helpers.it("ignores AltGr, which selects a layout level rather than a chord", function()
-		local shortcuts = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
+		local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
 		local fired = shortcuts.dispatch(chord("j", { ctrl = true, altgr = true }))
 		drop_config()
 		helpers.assert_true(fired,
@@ -347,8 +347,8 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
 
 	helpers.it("leaves Super+Space native on a fresh install", function()
 		local shortcuts = load_over_config()
-		local action = shortcuts.get_action("super_space")
-		local super_slots = shortcuts.assigned_slots("super_")
+		local action = shortcuts.get_action("meta_space")
+		local super_slots = shortcuts.assigned_slots("meta_")
 		local queued = 0
 		local consumed = shortcuts.consume(chord("space", { meta = true }), {
 			defer = function() queued = queued + 1 return true end,
@@ -361,36 +361,36 @@ helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function
 	end)
 
 	helpers.it("binds Super+Space to an explicitly configured prediction action", function()
-		local shortcuts = load_over_config({ ["shortcuts.keyboard.super_space"] = "llm_generate_prediction" })
-		local action = shortcuts.get_action("super_space")
-		local super_slots = shortcuts.assigned_slots("super_")
+		local shortcuts = load_over_config({ ["shortcuts.keyboard.meta_space"] = "llm_generate_prediction" })
+		local action = shortcuts.get_action("meta_space")
+		local super_slots = shortcuts.assigned_slots("meta_")
 		local fired, slot = shortcuts.dispatch(chord("space", { meta = true }))
 		drop_config()
 		helpers.assert_eq(action, "llm_generate_prediction",
 			"an explicit saved action remains effective")
 		helpers.assert_eq(#super_slots, 1)
 		helpers.assert_eq(fired, true)
-		helpers.assert_eq(slot, "super_space")
+		helpers.assert_eq(slot, "meta_space")
 	end)
 
 	helpers.it("offers a Super group in the menu", function()
 		local shortcuts = load_over_config()
 		local found = false
 		for _, group in ipairs(shortcuts.SLOT_GROUPS) do
-			if group.prefix == "super_" then found = true end
+			if group.prefix == "meta_" then found = true end
 		end
-		local slots = shortcuts.available_slots("super_")
+		local slots = shortcuts.available_slots("meta_")
 		drop_config()
 		helpers.assert_true(found, "a default Super binding needs a group the user can see and change")
 		helpers.assert_true(#slots > 20)
 	end)
 
 	helpers.it("keeps a shipped binding the user cleared cleared after a restart", function()
-		local shortcuts, storage = load_over_config({ ["shortcuts.keyboard.super_space"] = "llm_generate_prediction" })
-		helpers.assert_true(shortcuts.set_action("super_space", "none"))
-		local stored = storage.get("shortcuts.keyboard.super_space")
+		local shortcuts, storage = load_over_config({ ["shortcuts.keyboard.meta_space"] = "llm_generate_prediction" })
+		helpers.assert_true(shortcuts.set_action("meta_space", "none"))
+		local stored = storage.get("shortcuts.keyboard.meta_space")
 		shortcuts._reset()
-		local action = shortcuts.get_action("super_space")
+		local action = shortcuts.get_action("meta_space")
 		drop_config()
 		helpers.assert_eq(stored, "none",
 			"deleting the entry would bring the default back at the next start")
@@ -439,7 +439,7 @@ end)
 helpers.describe("Keyboard configuration admission", function()
 	for _, scenario in ipairs({ "ordinary rebind", "owned dispatch", "released generation", "new generation" }) do
 		helpers.it("keeps " .. scenario .. " bounded by the actual dispatcher", function()
-			local shortcuts, config = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
+			local shortcuts, config = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
 			local gestures = require("modules.gestures.manager")
 			local execute = gestures.execute_action
 			local queue, fired = {}, {}
@@ -453,7 +453,7 @@ helpers.describe("Keyboard configuration admission", function()
 				fired = {}
 				helpers.assert_true(shortcuts.consume(detail, options))
 				if scenario == "ordinary rebind" then
-					helpers.assert_true(shortcuts.set_action("ctrl_j", "enter"))
+					helpers.assert_true(shortcuts.set_action("primary_j", "enter"))
 					queue[2]()
 					helpers.assert_eq(#fired, 0, "an already queued old assignment must not fire")
 					helpers.assert_true(shortcuts.consume(detail, options))
@@ -467,9 +467,9 @@ helpers.describe("Keyboard configuration admission", function()
 				helpers.assert_eq(shortcuts.acquire_configuration({}), false)
 				helpers.assert_eq(shortcuts.acquire_configuration(token), false)
 				helpers.assert_eq(shortcuts.release_configuration({}), false)
-				helpers.assert_eq(shortcuts.set_action("ctrl_j", "enter"), false)
+				helpers.assert_eq(shortcuts.set_action("primary_j", "enter"), false)
 				helpers.assert_eq(Sandbox.read_bytes(config.path), before)
-				helpers.assert_eq(shortcuts.get_action("ctrl_j"), "select_line")
+				helpers.assert_eq(shortcuts.get_action("primary_j"), "select_line")
 				helpers.assert_eq(shortcuts.consume(detail, options), false)
 				helpers.assert_eq(shortcuts.dispatch(detail), false)
 				helpers.assert_eq(#queue, 2)
@@ -634,8 +634,8 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 
 	helpers.it("(magic-editor-broker) preserves newly selected physical None across restart", function()
 		with_editor(nil, function(shortcuts, config, state)
-			helpers.assert_true(shortcuts.set_action("super_j", "none"))
-			helpers.assert_eq(config.get("shortcuts.keyboard.super_j"), "none")
+			helpers.assert_true(shortcuts.set_action("meta_j", "none"))
+			helpers.assert_eq(config.get("shortcuts.keyboard.meta_j"), "none")
 			shortcuts._reset()
 			helpers.assert_eq(shortcuts.magic_editor_decision(state.options.admission()).reason, "explicit_assignment")
 			helpers.assert_eq(shortcuts.consume(state.detail, state.options), false)
@@ -645,19 +645,19 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 
 	for _, action in ipairs({ "select_line", "none" }) do
 		helpers.it("(magic-editor-broker) preserves explicit personal physical claims including " .. action, function()
-			with_editor({ ["shortcuts.keyboard.super_j"] = action }, function(shortcuts, config, state)
+			with_editor({ ["shortcuts.keyboard.meta_j"] = action }, function(shortcuts, config, state)
 				helpers.assert_eq(shortcuts.magic_editor_decision(state.options.admission()).reason, "explicit_assignment")
 				local consumed = shortcuts.consume(state.detail, state.options)
 				helpers.assert_eq(consumed, action ~= "none")
 				if consumed then
 					state.queue[1]()
-					helpers.assert_eq(state.fired, { { action, "keyboard__super_j" } })
+					helpers.assert_eq(state.fired, { { action, "keyboard__meta_j" } })
 				else helpers.assert_eq(#state.queue, 0) end
-				helpers.assert_eq(config.get("shortcuts.keyboard.super_j"), action)
+				helpers.assert_eq(config.get("shortcuts.keyboard.meta_j"), action)
 				local token = {}
 				helpers.assert_true(shortcuts.acquire_configuration(token))
 				local snapshot = shortcuts.configuration_snapshot(token)
-				helpers.assert_eq(snapshot.explicit_assignments.super_j, action)
+				helpers.assert_eq(snapshot.explicit_assignments.meta_j, action)
 				helpers.assert_true(shortcuts.apply_configuration(token, shortcuts.configuration_candidate({}, true)))
 				helpers.assert_true(shortcuts.apply_configuration(token, snapshot))
 				helpers.assert_true(shortcuts.release_configuration(token))
