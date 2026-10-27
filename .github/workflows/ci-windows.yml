@@ -76,12 +76,16 @@ jobs:
     # only when one runner would be far too long, by sub-domain:
     #   meta: source-scanning meta tests of the whole driver
     #   llm-server-panel: local LLM server panel
+    #   llm-servers-join: local server publication rollback and join
     #   llm-servers: other local and managed LLM servers (sharing, Ollama)
     #   llm-terminal: LLM terminal navigation owner
+    #   llm-api-add: adding an API entry through the production menu path
     #   llm: the rest of the LLM module (prediction, menus, API clients)
     #   config-transition: configuration version transitions
-    #   config-scope-global: whole-configuration scope and its manifest
-    #   config-scope-features: per-feature scope (hotstrings, tap-hold, files)
+    #   config-scope-global: whole-configuration scope, its menus and shortcuts
+    #   config-scope-restore: recommended restore and the scope manifest
+    #   config-scope-hotstrings: hotstrings configuration scope
+    #   config-scope-features: per-feature scope (categories, tap-hold, files)
     #   config-updater: configuration storage, TOML and the updater
     #   hotstrings-shortcuts: hotstrings, dynamic hotstrings and shortcuts
     #   keymap-gestures: keyboard remapping, layouts and gestures
@@ -95,11 +99,15 @@ jobs:
           [
             meta,
             llm-server-panel,
+            llm-servers-join,
             llm-servers,
             llm-terminal,
+            llm-api-add,
             llm,
             config-transition,
             config-scope-global,
+            config-scope-restore,
+            config-scope-hotstrings,
             config-scope-features,
             config-updater,
             hotstrings-shortcuts,
