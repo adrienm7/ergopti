@@ -16,8 +16,9 @@
 ---    shipped-index fallbacks with the exact error, the installed record, and
 ---    the offline installation of a layout shipped with the package.
 --- 2. Python 3.8 or newer runs the converter and the installer: every Linux
----    layout installer of this project already requires it, and a Lua port
----    would be a second source of truth for every layout. A missing or older
+---    layout installer of this project already requires it. The .keylayout is
+---    read once, by the parser shared with macOS (_shared/lua/layouts/
+---    keylayout.lua), and the converter takes that canonical form. A missing or older
 ---    python3 fails with a translated explanation.
 --- 3. Every child runs asynchronously (adapters/process_runner): the daemon
 ---    owns the keyboard and never waits on a conversion or an installation.
@@ -36,6 +37,7 @@ local FileDigest    = require("adapters.file_digest")
 local ShellRunner   = require("adapters.shell_runner")
 local ProcessRunner = require("adapters.process_runner")
 local Json          = require("json")
+local Keylayout     = require("layouts.keylayout")
 local ShutdownHelpers, HelpersSettled = ProcessRunner.shutdown, ProcessRunner.is_settled
 local CancelHttp, CancelDigest = HttpClient.cancel, FileDigest.cancel
 local Registry      = require("layouts.registry")
@@ -450,9 +452,27 @@ local function convert(deps, entry, layout_path, index_path, on_done)
 		on_done(false, M.FAILURE_CONVERSION, "the .keylayout converter is not shipped with this driver")
 		return
 	end
+	-- The shared parser (layouts/keylayout.lua) reads the file; the converter
+	-- takes its canonical form, the one reading of a .keylayout every driver uses.
+	local text = deps.read(layout_path)
+	if type(text) ~= "string" then
+		on_done(false, M.FAILURE_CONVERSION, "the downloaded .keylayout cannot be read: " .. layout_path)
+		return
+	end
+	local canonical, parse_err = Keylayout.parse(text)
+	if not canonical then
+		on_done(false, M.FAILURE_CONVERSION, parse_err)
+		return
+	end
+	local canonical_path = deps.local_dir .. entry.id .. ".canonical.json"
+	local written, write_err = write_file(deps, canonical_path, deps.encode_json(canonical))
+	if not written then
+		on_done(false, M.FAILURE_WRITE, write_err)
+		return
+	end
 	run_python(deps, {
 		deps.converter,
-		"--keylayout", layout_path,
+		"--canonical", canonical_path,
 		"--keycodes", deps.keycodes,
 		"--convention", entry.keycode_convention,
 		"--layout-id", entry.id,
@@ -766,6 +786,7 @@ function M.uninstall(id, on_done, deps)
 		end
 		for _, path in ipairs({
 			deps.local_dir .. id .. ".keylayout",
+			deps.local_dir .. id .. ".canonical.json",
 			deps.local_dir .. id .. "/" .. id .. ".xkb",
 			deps.local_dir .. id .. "/" .. id .. ".XCompose",
 			deps.local_dir .. id .. "/xkb_types.txt",
