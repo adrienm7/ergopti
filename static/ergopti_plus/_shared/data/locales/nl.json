@@ -2172,6 +2172,7 @@
 	"network.failure.proxy": "De proxyconfiguratie van het systeem kon niet worden gebruikt, of de proxy heeft de verbinding geweigerd of om authenticatie gevraagd. Controleer de proxy-instellingen van het systeem.",
 	"network.failure.host_blocked": "Het netwerk blokkeert de toegang tot deze server (bedrijfsfilter of firewall).",
 	"network.failure.offline": "Het netwerk of de netwerkroute is niet beschikbaar. Controleer uw verbinding en de netwerkinstellingen van het systeem.",
+	"network.failure.pac_unreachable_direct_failed": "De automatische proxyconfiguratie (PAC) was onbereikbaar of onleesbaar, en de directe verbinding die in plaats daarvan werd geprobeerd, is ook mislukt. Controleer de netwerkverbinding en de proxy-instellingen van het systeem, of vraag het uw IT-afdeling.",
 	"network.failure.disk": "De download kon niet doorgaan omdat er onvoldoende schijfruimte is of het quotum is overschreden. Maak ruimte vrij en probeer het opnieuw.",
 	"network.failure.permission": "Het systeem heeft een vereiste bestandsbewerking geweigerd. Controleer de machtigingen van de bestemming en of deze alleen-lezen is.",
 	"network.failure.unknown": "De bewerking is mislukt, maar de beschikbare diagnostische gegevens geven geen uitsluitsel over de oorzaak.",

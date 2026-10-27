@@ -2172,6 +2172,7 @@
 	"network.failure.proxy": "시스템 프록시 설정을 사용할 수 없거나 프록시가 연결을 거부하거나 인증을 요청했습니다. 시스템 프록시 설정을 확인하세요.",
 	"network.failure.host_blocked": "네트워크가 이 서버에 대한 접근을 차단하고 있습니다(회사 필터링 또는 방화벽).",
 	"network.failure.offline": "네트워크 또는 네트워크 경로를 사용할 수 없습니다. 연결과 시스템 네트워크 설정을 확인하세요.",
+	"network.failure.pac_unreachable_direct_failed": "자동 프록시 구성(PAC)에 연결하거나 읽을 수 없었고, 대신 시도한 직접 연결도 실패했습니다. 네트워크 연결과 시스템 프록시 설정을 확인하거나 IT 부서에 문의하세요.",
 	"network.failure.disk": "디스크 공간이 부족하거나 할당량을 초과하여 다운로드를 계속할 수 없습니다. 공간을 확보한 후 다시 시도하세요.",
 	"network.failure.permission": "시스템이 필요한 파일 작업을 거부했습니다. 대상 위치의 권한과 읽기 전용 여부를 확인하세요.",
 	"network.failure.unknown": "작업에 실패했지만 사용 가능한 진단 정보로는 원인을 확인할 수 없습니다.",

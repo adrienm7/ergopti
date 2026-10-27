@@ -2172,6 +2172,7 @@
 	"network.failure.proxy": "Sistemin vekil sunucu yapılandırması kullanılamadı veya vekil sunucu bağlantıyı reddetti ya da kimlik doğrulaması istedi. Sistemin vekil sunucu ayarlarını kontrol edin.",
 	"network.failure.host_blocked": "Ağ bu sunucuya erişimi engelliyor (şirket filtrelemesi veya güvenlik duvarı).",
 	"network.failure.offline": "Ağ veya ağ yolu kullanılamıyor. Bağlantınızı ve sistemin ağ ayarlarını kontrol edin.",
+	"network.failure.pac_unreachable_direct_failed": "Otomatik proxy yapılandırmasına (PAC) ulaşılamadı veya okunamadı; bunun yerine denenen doğrudan bağlantı da başarısız oldu. Ağ bağlantısını ve sistemin proxy ayarlarını denetleyin ya da BT biriminize danışın.",
 	"network.failure.disk": "Diskte yeterli alan olmadığı veya kota aşıldığı için indirme sürdürülemedi. Alan açıp yeniden deneyin.",
 	"network.failure.permission": "Sistem, gerekli bir dosya işlemini reddetti. Hedefin izinlerini ve salt okunur olup olmadığını kontrol edin.",
 	"network.failure.unknown": "İşlem başarısız oldu, ancak mevcut tanılama bilgileri nedenini belirlemeye yetmiyor.",

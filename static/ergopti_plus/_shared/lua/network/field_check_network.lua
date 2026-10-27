@@ -89,10 +89,17 @@ end
 --- address. The daemon holds one relay, so the same refusal that stops its start
 --- (a conflict between relays, an unplanned host) fails this step by its closed reason.
 --- @param report table The run's report.
+--- A lookup that failed at a stage the driver's PAC fallback covers is not a
+--- failure of the download: it goes direct, so the step says so (info).
 --- @param answer table { entries = { { origin, route }, ... } } or { failure = token }
-local function record_route_plan(report, answer)
+--- @param pac_fallback function|nil fn(stage) -> boolean, the driver's fallback policy.
+local function record_route_plan(report, answer, pac_fallback)
 	if answer.failure then
-		report.step("route_plan", STATE.fail, answer.failure)
+		if pac_fallback and pac_fallback(answer.failure) == true then
+			report.step("route_plan", STATE.info, "direct_fallback:" .. answer.failure)
+		else
+			report.step("route_plan", STATE.fail, answer.failure)
+		end
 		return
 	end
 	local entries = answer.entries
@@ -120,6 +127,8 @@ end
 ---   route_plan(callback)      callback{ entries = { { origin, route }, ... } } with one
 ---                             entry per Ollama origin in inventory order and route
 ---                             "direct" or a relay, or callback{ failure = token }
+---   pac_fallback(stage)       optional: true when a failed lookup stage sends the
+---                             download direct (the driver's PAC fallback policy)
 --- @param ports table
 --- @param report table Report from field_check_report.new_report().
 --- @param finish function Called once, after the last step.
@@ -129,7 +138,7 @@ function M.run(ports, report, finish)
 		ports.chain(function(helper_code, steps)
 			record_chain(report, helper_code, helper_code == 0 and steps or {})
 			ports.route_plan(function(answer)
-				record_route_plan(report, answer)
+				record_route_plan(report, answer, ports.pac_fallback)
 				finish()
 			end)
 		end)

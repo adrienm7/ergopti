@@ -276,7 +276,8 @@ local function proxy_pac()
 				if state == "ok" then
 					done({ state = "ok" }, { network = { proxy_pac = text } })
 				else
-					done({ state = "error", detail = text })
+					-- The managed downloads go direct after such a failure (network-retry.sh).
+					done({ state = "error", detail = PacCheck.with_direct_fallback(text) })
 				end
 			end)
 		end, function(detail)

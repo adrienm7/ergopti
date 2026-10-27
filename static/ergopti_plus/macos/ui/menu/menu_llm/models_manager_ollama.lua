@@ -1445,6 +1445,13 @@ function M.new(deps, presets, ram_getter)
 		end
 		local network_admission = NetworkAdmission.new()
 		local pull_output = ""
+		-- The head of the raw stderr, where the admission prints its PAC fallback marker.
+		local pac_fallback_scan = ""
+		local function scan_pac_fallback(stderr)
+			if #pac_fallback_scan < 8192 then
+				pac_fallback_scan = (pac_fallback_scan .. (stderr or "")):sub(1, 8192)
+			end
+		end
 		local maybe_release_pull_owner
 		local launch_retry
 		local function settle_pull_task(callback_status)
@@ -1672,6 +1679,8 @@ function M.new(deps, presets, ram_getter)
 			if not authorized then return finish_result(true) end
 			if not current_or_cancel() then return finish_result(false) end
 			network_admission.push(stderr or "")
+			scan_pac_fallback(stderr)
+			local pac_fallback = NetworkAdmission.pac_fallback_stage(pac_fallback_scan)
 			local network_receipt = network_admission.finish(code)
 			local network_report
 			if network_receipt then
@@ -1681,6 +1690,10 @@ function M.new(deps, presets, ram_getter)
 			end
 			if not current_or_cancel() then return finish_result(false) end
 			if code == 0 then
+				if pac_fallback then
+					Logger.info(LOG, "The direct connection worked after the automatic network configuration failed (%s).",
+						pac_fallback)
+				end
 				complete_progress_ui(owner, true, target_model)
 				
 				-- Pre-load the model in Ollama immediately after pulling without reloading the OS state
@@ -1712,6 +1725,13 @@ function M.new(deps, presets, ram_getter)
 				elseif connection_error then
 					pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get("ollama.service_disconnected"), "error")
 					complete_progress_ui(owner, false, target_model)
+				elseif pac_fallback then
+					-- Both causes: the PAC could not be used, then the direct try failed too.
+					Logger.error(LOG, "The automatic network configuration was unreachable (%s) and the direct connection failed (code %s).",
+						pac_fallback, tostring(code))
+					pcall(notifications.notify, i18n.get("ollama.fail_title"),
+						i18n.get("network.failure.pac_unreachable_direct_failed"), "error")
+					complete_progress_ui(owner, false, target_model)
 				else
 					pcall(notifications.notify, i18n.get("ollama.fail_title"), string.format(i18n.get("ollama.download_error"), target_model), "error")
 					complete_progress_ui(owner, false, target_model)
@@ -1731,6 +1751,7 @@ function M.new(deps, presets, ram_getter)
 			end
 			if not current_or_cancel() then return false end
 			network_admission.push(stderr or "")
+			scan_pac_fallback(stderr)
 			local out = sanitize_terminal_stream((stdout or "") .. (stderr or ""))
 			pull_output = pull_output .. out
 			if out ~= "" then
