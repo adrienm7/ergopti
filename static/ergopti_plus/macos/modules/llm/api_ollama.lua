@@ -79,7 +79,6 @@ local _ollama_started = false
 local _ollama_starting = false
 local _ollama_start_generation = 0
 local _ollama_start_transaction = nil
-local _ollama_kill_task = nil
 local _ollama_launch_timer = nil
 local _ollama_serve_task = nil
 local _ollama_ambiguous_task = nil
@@ -441,7 +440,7 @@ end
 
 --- Clears the readiness flag so the NEXT warmup must re-confirm the backend.
 --- _is_ready is only ever set true by a 200 warmup; nothing else cleared it, so a
---- backend round-trip (MLX kills `ollama serve`, then back to Ollama) or a model
+--- backend round-trip (MLX retires the owned `ollama serve`, then back to Ollama) or a model
 --- switch left it stale-true. The warmup retry chain then self-terminates on the
 --- stale flag and perform_check dispatches to a dead/cold server. Mirrors the MLX
 --- reset_endpoints() invariant: a fresh server/model deserves a fresh verdict (F-M8).
@@ -483,8 +482,7 @@ end
 --- A published daemon deliberately remains outside pause ownership.
 --- @return boolean pending
 has_pending_ollama_start_owner = function()
-	return _ollama_kill_task ~= nil
-		or _ollama_launch_timer ~= nil
+	return _ollama_launch_timer ~= nil
 		or _ollama_ambiguous_task ~= nil
 		or (_ollama_serve_task ~= nil and _ollama_started ~= true)
 end
@@ -563,11 +561,6 @@ end
 --- @return boolean settled
 local function settle_ollama_start_cleanup()
 	if _ollama_start_acquisition_depth > 0 then return false end
-	local kill_task = _ollama_kill_task
-	local kill_settled = settle_ollama_start_task(
-		"Ollama stale-process task", kill_task,
-		function() return _ollama_kill_task == kill_task end,
-		function() if _ollama_kill_task == kill_task then _ollama_kill_task = nil end end)
 	local timer_settled = settle_ollama_launch_timer()
 	local serve_settled = true
 	if _ollama_started ~= true then
@@ -582,7 +575,7 @@ local function settle_ollama_start_cleanup()
 		"Ollama ambiguous startup task", ambiguous_task,
 		function() return _ollama_ambiguous_task == ambiguous_task end,
 		function() if _ollama_ambiguous_task == ambiguous_task then _ollama_ambiguous_task = nil end end)
-	local settled = kill_settled and timer_settled and serve_settled
+	local settled = timer_settled and serve_settled
 		and ambiguous_settled and not has_pending_ollama_start_owner()
 	if settled then _ollama_start_cleanup_pending = false end
 	return settled
@@ -687,9 +680,6 @@ function M.pause_warmup()
 	return daemon_settled and warmup_settled
 end
 
--- Delay before launching Ollama after killing a stale instance (seconds)
-local OLLAMA_KILL_SETTLE_SEC = 0.1
-
 -- curl --max-time ceiling for streaming requests (seconds).
 -- STREAM_TMPFILE_CLEANUP_SEC is the safety-net delay before removing the
 -- payload temp file; it must be strictly greater than STREAM_MAX_TIME_SEC so
@@ -756,8 +746,7 @@ local function ensure_ollama_running(options)
 		if my_generation ~= _ollama_start_generation then
 			settle_ollama_start_transaction(my_generation, false, "startup superseded")
 			if ambiguous_task ~= nil
-				and (_ollama_kill_task == ambiguous_task
-					or _ollama_serve_task == ambiguous_task) then
+				and _ollama_serve_task == ambiguous_task then
 				_ollama_start_cleanup_pending = true
 			end
 			if _ollama_start_acquisition_depth == 0
@@ -768,7 +757,6 @@ local function ensure_ollama_running(options)
 			return false
 		end
 		if ambiguous_task then
-			if _ollama_kill_task == ambiguous_task then _ollama_kill_task = nil end
 			if _ollama_serve_task == ambiguous_task then _ollama_serve_task = nil end
 			_ollama_ambiguous_task = ambiguous_task
 		end

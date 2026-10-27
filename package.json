@@ -604,6 +604,7 @@
 		"test:keystats-write-catalogue": "node ./tools/test/test-keystats-write-catalogue.cjs",
 		"test:duplicate-constant-names": "node ./tools/test/test-duplicate-constant-names.cjs",
 		"test:network-field-check-parity": "node ./tools/test/test-network-field-check-parity.cjs",
+		"test:ollama-termination-owned": "node ./tools/test/test-ollama-termination-owned.cjs",
 		"test:linux-distro-native-prerequisites": "node ./tools/test/test-linux-distro-native-prerequisites.cjs"
 	},
 	"type": "module",
