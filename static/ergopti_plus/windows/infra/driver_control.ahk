@@ -159,7 +159,7 @@ DriverControl_ParseRequest(Spec, Text, Token, &Reason, &Echoed) {
 	if DriverControl_IsRequestId(Request.Get("request_id", ""))
 		Echoed := Request["request_id"]
 	for Key in Request
-		if Key != "schema" && Key != "token" && Key != "request_id" {
+		if Key !== "schema" && Key !== "token" && Key !== "request_id" {
 			Reason := "malformed"
 			return ""
 		}
