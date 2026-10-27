@@ -28,6 +28,8 @@
 --- and by the real owners of both Lua drivers.
 --- ==============================================================================
 
+local TableUtil = require("table_util")
+
 local M = {}
 
 --- Methods every owner offers.
@@ -79,13 +81,6 @@ local function missing_methods(contract, owner)
 	return missing
 end
 
-local function sorted_names(set)
-	local names = {}
-	for name in pairs(set) do names[#names + 1] = name end
-	table.sort(names)
-	return names
-end
-
 
 
 
@@ -117,15 +112,13 @@ function M.check_capabilities(owner)
 	local offered = {}
 	for name, contract in pairs(M.CAPABILITIES) do
 		local missing = missing_methods(contract, owner)
-		local total = 0
-		for _ in pairs(contract) do total = total + 1 end
 		if #missing == 0 then
 			offered[name] = true
-		elseif #missing < total then
+		elseif #missing < TableUtil.count(contract) then
 			error(name .. " is offered by halves, it lacks: " .. table.concat(missing, ", "), 2)
 		end
 	end
-	return sorted_names(offered)
+	return TableUtil.sorted_keys(offered)
 end
 
 --- Checks an owner completely: required methods, then capabilities.
