@@ -593,7 +593,7 @@ function render_current_tab() {
 
 		// Precision: [BS]-containing sequences are always 100%; others are 1 - error_rate
 		const acc =
-			k.includes('[BS]') || k.toLowerCase() === 'backspace'
+			app_state.current_tab !== 'w' && (k.includes('[BS]') || k.toLowerCase() === 'backspace')
 				? 100
 				: item.count > 0
 					? ((item.count - item.errors) / item.count) * 100

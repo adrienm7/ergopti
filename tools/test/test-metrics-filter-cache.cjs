@@ -3505,4 +3505,88 @@ for (const host of ['windows', 'macos', 'linux']) {
 assert.equal(typingCaptionLocaleApplications, typingCaptionCatalogues.length * 9);
 assert.equal(passed, 765, 'all native app-filter modes and every locale transition must execute');
 
+const nativeWordProjection = JSON.parse(
+	fs.readFileSync(
+		path.resolve(root, '../../windows/tests/fixtures/metrics_word_projection.json'),
+		'utf8'
+	)
+);
+assert.equal(nativeWordProjection.cases.length, 10);
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const source of ['historical', 'today']) {
+		for (const sensitive of [false, true]) {
+			for (const vector of nativeWordProjection.cases) {
+				test(`${host} ${source} completed word ${vector.id}, case-sensitive ${sensitive}`, () => {
+					const page = loadMetricsTypingPage(host);
+					freezePageClock(
+						page,
+						source === 'historical' ? '2026-10-27T12:00:00' : '2026-10-26T12:00:00'
+					);
+					publishTypingPage(page, host, vector.snapshot.manifest);
+					if (sensitive) page.elements.get('btn_case_sensitive').classList.add('active');
+					else page.elements.get('btn_case_sensitive').classList.remove('active');
+					const raw = vector.snapshot.range.historical;
+					deliverTypingManifest(page, host, vector.snapshot.manifest, {
+						range:
+							source === 'historical'
+								? vector.snapshot.range
+								: {
+										historical: {},
+										today: { [nativeWordProjection.app]: raw }
+									}
+					});
+					page.context.apply_local_filters();
+					const caption = page.elements.get('wpm_words_sub').innerHTML;
+					assert.ok(
+						caption.includes(`>${vector.snapshot.expected_words}</strong>`),
+						'total words includes every completed word, including corrected completions'
+					);
+					assert.ok(caption.includes(page.context._t('ui_typing.unit_words_typed')));
+					const expected = vector.expected_rows[sensitive ? 'case_sensitive' : 'case_folded'];
+					for (const tab of ['w', 'w_bg']) {
+						vm.runInContext(`app_state.current_tab = ${JSON.stringify(tab)}`, page.context);
+						page.context.render_current_tab();
+						page.timers.at(-1)();
+						const rows = JSON.parse(
+							vm.runInContext(
+								'JSON.stringify(app_state.rendered_list.map(row => ({key: row.key, count: row.count, accuracy: row.acc})))',
+								page.context
+							)
+						);
+						const sort = (items) => items.sort((a, b) => a.key.localeCompare(b.key));
+						assert.deepEqual(sort(rows), sort(structuredClone(expected[tab])));
+					}
+					for (const tab of ['c', 'bg', 'tg', 'qg', 'pg', 'hx', 'hp']) {
+						const counts = new Map();
+						for (const [key, value] of Object.entries(raw[tab] || {})) {
+							const folded = sensitive ? key : key.toLowerCase();
+							counts.set(folded, (counts.get(folded) || 0) + value.c);
+						}
+						const projected = vm.runInContext(
+							`app_state.data[${JSON.stringify(tab)}]`,
+							page.context
+						);
+						for (const [key, count] of counts)
+							if (count > 0)
+								assert.equal(
+									projected[key]?.count,
+									count,
+									'character occurrence counts never add error counts'
+								);
+					}
+					assert.equal(
+						page.diagnostics.some((entry) => entry.level === 'error'),
+						false
+					);
+				});
+			}
+		}
+	}
+}
+assert.equal(
+	passed,
+	885,
+	'all native completed-word histories, case modes and host ingress paths must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);
