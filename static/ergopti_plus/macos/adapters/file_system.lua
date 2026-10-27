@@ -29,6 +29,7 @@ local OperationReporter = require("diagnostics.operation_reporter")
 local FsDir  = require("infra.fs_dir")
 local TextUtils = require("infra.text_utils")
 local NativePath = require("native_path")
+local MetadataCommandStats = require("adapters.metadata_command_stats")
 
 local LOG = "adapters.file_system"
 
@@ -127,7 +128,9 @@ local function run_metadata_command(command, operation)
 	if not hs or type(hs.execute) ~= "function" then
 		return nil, "hs.execute is unavailable for " .. operation
 	end
+	local started = MetadataCommandStats.clock()
 	local call_ok, output, status, exit_type, rc = pcall(hs.execute, command, false)
+	MetadataCommandStats.record(started)
 	if not call_ok then return nil, tostring(output) end
 	if status ~= true or exit_type ~= "exit" or rc ~= 0 then
 		return nil, string.format(
