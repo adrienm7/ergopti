@@ -199,7 +199,8 @@ check(
 );
 const guardianCopy = BUILD_SCRIPT.indexOf('cp "$remap_guardian_plist"');
 const guardianDestination = BUILD_SCRIPT.indexOf(
-	'"$APP_PATH/Contents/Library/LaunchAgents/com.ergoptiplus.remap-guardian.plist"',
+	// The builder names the label through identifiers.sh, the shared single source.
+	'"$APP_PATH/Contents/Library/LaunchAgents/${ERGOPTI_SERVICE_LABEL_MACOS_REMAP_GUARDIAN}.plist"',
 	guardianCopy
 );
 const guardianLint = BUILD_SCRIPT.indexOf('plutil -lint', guardianDestination);
