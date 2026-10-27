@@ -165,11 +165,20 @@ local function load_locale(code)
 	return nil
 end
 
---- Ensures the active locale and both fallback locales are loaded.
+--- Ensures the active locale is loaded. The fallbacks wait for a miss: the
+--- English file is decoded only when the active locale lacks a key, which a
+--- complete locale never does (it cost about 20 ms of every macOS boot).
 local function ensure_loaded()
 	if not _state.strings then
 		_state.strings = load_locale(_state.locale)
 	end
+	if _state.locale == "en" then _state.strings_en = _state.strings end
+	if _state.locale == "fr" then _state.strings_fr = _state.strings end
+end
+
+--- Ensures both fallback locales are loaded, for a miss or the full catalogue.
+local function ensure_fallbacks()
+	ensure_loaded()
 	if _state.locale ~= "en" then
 		_state.strings_en = _state.strings_en or load_locale("en")
 	else
@@ -202,6 +211,7 @@ function M.get(key)
 	ensure_loaded()
 	local s = _state.strings and _state.strings[key]
 	if type(s) ~= "string" or s == "" then
+		ensure_fallbacks()
 		s = _state.strings_en and _state.strings_en[key]
 	end
 	if type(s) ~= "string" or s == "" then
@@ -261,7 +271,7 @@ end
 --- @return table
 function M.catalogue()
 	if not require_init("catalogue") then return {} end
-	ensure_loaded()
+	ensure_fallbacks()
 	local merged = {}
 	for _, layer in ipairs({ _state.strings_fr, _state.strings_en, _state.strings }) do
 		if type(layer) == "table" then
