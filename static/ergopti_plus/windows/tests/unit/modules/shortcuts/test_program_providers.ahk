@@ -390,7 +390,7 @@ _RPP_NativeScript(ProviderId, Context, RequiredCommand := "") {
 	Scripts := Context["directory"] . "\scripts", Tools := Context["directory"] . "\outils été 日本"
 	DirCreate(Scripts), DirCreate(Tools)
 	Gate := Context["directory"] . "\provider gate", Output := Context["output"]
-	for Old in [Gate, Output]
+	for Old in [Gate, Output, Output . ".part"]
 		if FileExist(Old)
 			FileDelete(Old)
 	_RPA_ClearProgramLogs(Context)
@@ -404,6 +404,9 @@ _RPP_NativeScript(ProviderId, Context, RequiredCommand := "") {
 		. "6:71756F746522`n5:7469636B60`n5:73656D693B`n"
 	; These UTF-8 byte counts and hex strings are authored independently. A wrong
 	; provider CLI cannot regenerate the expected native receipt from its result.
+	; Each script writes its receipt beside Output and renames it into place:
+	; the wait below starts on Output's existence, and reading a file the child
+	; still holds open for writing is refused (an exact read shares only reads).
 	Context["preserve_directory"] := true
 	try {
 		if ProviderId == "autohotkey" {
@@ -417,7 +420,8 @@ _RPP_NativeScript(ProviderId, Context, RequiredCommand := "") {
 				. ' BufferBytes := Buffer(StrPut(Value, "UTF-8"))`n'
 				. ' Count := StrPut(Value, BufferBytes, "UTF-8") - 1`n Result .= Count . ":"`n'
 				. ' loop Count`n  Result .= Format("{:02X}", NumGet(BufferBytes, A_Index - 1, "UChar"))`n'
-				. ' Result .= Chr(10)`n}`nFileAppend(Result, A_Args[1], "UTF-8-RAW")`n'
+				. ' Result .= Chr(10)`n}`nFileAppend(Result, A_Args[1] . ".part", "UTF-8-RAW")`n'
+				. 'FileMove(A_Args[1] . ".part", A_Args[1])`n'
 				. 'while !FileExist(A_Args[2])`n Sleep(10)`n'
 				. 'FileAppend("private-stdout106", "*")`nFileAppend("private-stderr106", "**")`nExitApp(37)`n'
 			Path := Tools
@@ -426,7 +430,8 @@ _RPP_NativeScript(ProviderId, Context, RequiredCommand := "") {
 			Source := "import os, sys, time`n"
 				. "data = [str(len(sys.argv) - 3)]`n"
 				. "for value in sys.argv[3:]:`n    raw = value.encode('utf-8')`n    data.append(str(len(raw)) + ':' + raw.hex().upper())`n"
-				. "with open(sys.argv[1], 'wb') as f: f.write(('\n'.join(data) + '\n').encode('utf-8'))`n"
+				. "with open(sys.argv[1] + '.part', 'wb') as f: f.write(('\n'.join(data) + '\n').encode('utf-8'))`n"
+				. "os.replace(sys.argv[1] + '.part', sys.argv[1])`n"
 				. "while not os.path.exists(sys.argv[2]): time.sleep(0.01)`n"
 				. "sys.stdout.write('private-stdout106'); sys.stderr.write('private-stderr106'); sys.exit(37)`n"
 			Path := EnvGet("PATH")
@@ -437,7 +442,8 @@ _RPP_NativeScript(ProviderId, Context, RequiredCommand := "") {
 				. "for ($i = 2; $i -lt $args.Count; $i++) {`n"
 				. " $raw = $utf8.GetBytes([string]$args[$i])`n"
 				. " $lines += [string]$raw.Length + ':' + [BitConverter]::ToString($raw).Replace('-', '')`n}`n"
-				. "[IO.File]::WriteAllText($args[0], [string]::Join([char]10, $lines) + [char]10, $utf8)`n"
+				. "[IO.File]::WriteAllText($args[0] + '.part', [string]::Join([char]10, $lines) + [char]10, $utf8)`n"
+				. "[IO.File]::Move($args[0] + '.part', $args[0])`n"
 				. "while (!(Test-Path -LiteralPath $args[1])) { Start-Sleep -Milliseconds 10 }`n"
 				. "[Console]::Out.Write('private-stdout106'); [Console]::Error.Write('private-stderr106'); exit 37`n"
 			Path := EnvGet("PATH")
