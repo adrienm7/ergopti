@@ -142,8 +142,9 @@ package or invalid keymap, `4` installation aborted.
 
 ## Registry layouts installed by ErgoptiPlus (no sudo)
 
-The ErgoptiPlus layout manager converts a registry `.keylayout` on the device
-(`../xkb_generation/keylayout_to_xkb.py`) and installs the result with
+The ErgoptiPlus layout manager converts a registry `.keylayout` on the device, in
+Lua (`_shared/lua/layouts/xkb_converter.lua`, which writes the bytes
+`../xkb_generation/keylayout_to_xkb.py` writes) and installs the result with
 `user_layout_installer.py` in the user XKB tree that libxkbcommon reads first,
 `${XDG_CONFIG_HOME:-~/.config}/xkb`: `symbols/<id>`, `types/<id>`,
 `compose/<id>.XCompose`, a `rules/evdev` that starts with `! include %S/evdev`
