@@ -792,6 +792,13 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       n-grams get `e`, synthetic output chains. Erased and synthetic vectors in the shared corpus, replayed on
       macOS and Linux (ee2eab6b1e, `keystats/correction_erased_vectors.json`). Left [PC]: the AHK replayer
       (`KLW_WalkTypingEntry`); Windows word separators are wider than Linux's three.
+- [ ] **macOS developer source runs.** [CODE] `tools/dev/install-hammerspoon.sh` points a stock Hammerspoon
+      at the clone, but instance admission (0c954ed49a, a7bdb88a44) admits the driver only in the launcher's
+      embedded runtime, so it stops with "native logging worker is unavailable" (maintainer, 27 October);
+      `launcher/README.md` still says direct developer sessions are supported. Decide one: a supported dev
+      mode (the launcher started against the working tree, or the script starting the async log worker with
+      the managed environment), or retire the script and fix the README and the refusal text to say "build
+      the app".
 - [ ] **Ctrl+Caps Lock slot on macOS.** [PHYS-M] The `secondary_capslock` slot binds through its own native
       entry again (ea02cf7000: the generic registrar refuses Caps Lock and the whole shortcut start rolled
       back). The registrar tests say macOS never fires a Caps Lock hotkey: check on a real Mac that Ctrl+Caps
@@ -891,16 +898,16 @@ writes configuration. Reload the driver from the working tree for dev-only fixes
 ### Mac hardware session (prepared 27 October, run from a branch of dev)
 
 Clone only the current dev state and branch from it:
-`git clone --depth 1 --branch dev --single-branch https://github.com/adrienm7/ergopti.git`, then
-`git switch -c field/mac-2026-10-27` (if the clone is cut off: `git config --global http.version HTTP/1.1`, or
-add `--filter=blob:none --no-checkout` and run `git checkout dev`, which resumes). Run the driver from that
-working tree: quit the installed ErgoptiPlus app, back up `~/.config/hammerspoon` and `~/.hammerspoon` (the
-v15 migration rewrites `config.toml`; keep a copy of the old one for section 3), install stock Hammerspoon
-in `/Applications`, run `bash tools/dev/install-hammerspoon.sh` from the clone (it writes the bootstrap
-`init.lua` files and backs up the previous ones), grant Accessibility and Input Monitoring, then Reload
-config; Cmd+Ctrl+R reloads. To go back: delete both bootstrap `init.lua` files, restore the backups and
-start ErgoptiPlus.app. Packaged-only lines (Sparkle, Login Items, Homebrew) need the app built by
-`static/ergopti_plus/macos/build_macos_app.sh` or wait for the next dev build. Before starting, write down the commit (`git rev-parse
+`git clone --depth 1 --branch dev --single-branch --filter=blob:none https://github.com/adrienm7/ergopti.git`,
+then `git switch -c field/mac-2026-10-27` (if the clone is cut off: `git config --global http.version HTTP/1.1`;
+with `--no-checkout`, `git checkout dev` resumes). Build and run the app from that tree: the driver runs only
+inside the embedded runtime its launcher starts (instance admission, 0c954ed49a), so a stock Hammerspoon
+pointed at the clone is refused with "native logging worker is unavailable". Install the Xcode command-line
+tools, quit the installed ErgoptiPlus app, back up `~/.config/hammerspoon` (the v15 migration rewrites
+`config.toml`; keep a copy of the old one for section 3), then
+`SPARKLE_PUBLIC_KEY="$(head -c 32 /dev/urandom | base64)" bash tools/build/build_macos_app.sh` and
+`open build/macos/ErgoptiPlus.app`. The build is signed ad hoc, so macOS asks again for Accessibility and
+Input Monitoring; Sparkle updates cannot be checked with the throwaway key. Before starting, write down the commit (`git rev-parse
 --short HEAD`), macOS version and build, chip (Apple silicon or Intel), keyboard (ISO or ANSI, built-in or
 external), input source, Karabiner version and whether Ollama.app or oMLX is installed. Report each line as
 pass, fail or not run.
