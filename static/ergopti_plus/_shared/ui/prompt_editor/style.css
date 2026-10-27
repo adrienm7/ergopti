@@ -248,7 +248,7 @@ select:focus {
 
 .btn-p {
 	background: var(--accent);
-	color: #fff;
+	color: var(--theme-white);
 }
 
 .btn-s {

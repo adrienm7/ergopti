@@ -8,8 +8,8 @@
 
 body {
 	align-items: center;
-	background: #242426;
-	color: #e8e8ea;
+	background: var(--theme-grey-242426);
+	color: var(--theme-grey-e8e8ea);
 	display: flex;
 	font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif;
 	justify-content: center;
@@ -18,7 +18,7 @@ body {
 }
 
 #container {
-	background: #2a2a2c;
+	background: var(--theme-grey-2a2a2c);
 	border-radius: 12px;
 	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 	max-width: 1500px;
@@ -27,7 +27,7 @@ body {
 }
 
 h2 {
-	color: #fff;
+	color: var(--theme-white);
 	font-size: 16px;
 	font-weight: 600;
 	margin-bottom: 16px;
@@ -38,7 +38,7 @@ h2 {
 	background: rgba(100, 100, 100, 0.15);
 	border-left: 3px solid #5eb1ff;
 	border-radius: 4px;
-	color: #ccc;
+	color: var(--theme-grey-ccc);
 	font-size: 13px;
 	line-height: 1.5;
 	margin-bottom: 14px;
@@ -46,7 +46,7 @@ h2 {
 }
 
 #link-section {
-	color: #888;
+	color: var(--theme-grey-888);
 	font-size: 12px;
 	margin-bottom: 18px;
 	text-align: center;
@@ -81,7 +81,7 @@ h2 {
 }
 
 label {
-	color: #aaa;
+	color: var(--theme-grey-aaa);
 	font-size: 12px;
 	font-weight: 600;
 	letter-spacing: 0.5px;
@@ -89,11 +89,11 @@ label {
 }
 
 #token-input {
-	background: #2a2a2c;
-	border: 2px solid #555;
+	background: var(--theme-grey-2a2a2c);
+	border: 2px solid var(--theme-grey-555);
 	border-radius: 6px;
 	box-sizing: border-box;
-	color: #e8e8ea;
+	color: var(--theme-grey-e8e8ea);
 	cursor: text;
 	font-family: 'SF Mono', monospace;
 	font-size: 13px;
@@ -103,7 +103,7 @@ label {
 }
 
 #token-input::placeholder {
-	color: #888;
+	color: var(--theme-grey-888);
 }
 
 #token-input:focus {
@@ -112,7 +112,7 @@ label {
 	box-shadow:
 		0 0 0 3px rgba(94, 177, 255, 0.3),
 		inset 0 0 2px rgba(94, 177, 255, 0.2);
-	color: #fff;
+	color: var(--theme-white);
 	outline: none;
 }
 
@@ -135,12 +135,12 @@ button {
 #btn-cancel {
 	background: rgba(100, 100, 100, 0.15);
 	border-color: rgba(150, 150, 150, 0.35);
-	color: #aaa;
+	color: var(--theme-grey-aaa);
 }
 
 #btn-cancel:hover {
 	background: rgba(100, 100, 100, 0.28);
-	color: #ccc;
+	color: var(--theme-grey-ccc);
 }
 
 #btn-validate {
