@@ -50,6 +50,7 @@ local M = {}
 local Identifiers = require("identifiers")
 local Logger    = require("logger.shim")
 local Paths     = require("infra.paths")
+local Timings   = require("infra.timings")
 local NoReplaceMove = require("infra.no_replace_move")
 local Version   = require("updater.version")
 local Parser    = require("updater.release_parser")
@@ -173,7 +174,7 @@ local CONFIG_INTERVAL_KEY = ConfigKeys.LEAF.CHECK_INTERVAL_SECONDS
 local USER_AGENT = "ErgoptiPlus-Updater-Linux/1.0"
 local REQUEST_OWNER = "updater"
 local RELEASE_TIMEOUT_MS = 15000
-local MAX_RELEASE_BODY_BYTES = 2 * 1024 * 1024
+local MAX_RELEASE_BODY_BYTES = Timings.count("limits", "release_list_body_bytes")
 -- Transport pages fit the existing 2 MiB ceiling; the canonical URL still
 -- determines the total candidate count (100), independently of page size.
 local RELEASE_PAGE_SIZE = 20

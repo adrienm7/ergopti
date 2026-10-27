@@ -11,10 +11,11 @@
 
 local M = {}
 local LauncherHelper = require("platform.remap.lease_helper")
+local Timings = require("infra.timings")
 local SELECT_FLAG = "--select-input-source"
 local SELECT_BY_NAME_FLAG = "--select-input-source-by-name"
 local UPGRADE_FLAG = "--upgrade-input-sources"
-local MAX_SOURCE_BYTES = 1024
+local MAX_SOURCE_BYTES = Timings.count("limits", "input_source_id_bytes")
 
 
 --- Rejects identifiers that cannot cross the native argv protocol.
