@@ -16,6 +16,7 @@ local function fixture()
 		karabiner = { snapshot_settings = unused, reset_to_defaults = unused, restore_settings = unused },
 		request_reload = unused, terminal_pending = function()
 			if controls.preflight then controls.preflight() end
+			if type(controls.terminal) == "string" then return controls.terminal end
 			return controls.terminal == true
 		end,
 	}
@@ -23,6 +24,27 @@ local function fixture()
 end
 
 helpers.describe("scope writer admission", function()
+	-- Field run 2026-10-27 19:47:04 (ledger L45): the watcher reload arriving
+	-- during the reload it triggered was a WARNING; it is expected, so INFO.
+	helpers.it("logs a writer refused during a reload or quit at INFO, a failed proof at WARNING", function()
+		local levels = {}
+		helpers.with_stub_scope({ "infra.logger", "ui.menu.global_actions_transaction" }, function()
+			local logger = helpers.make_logger_stub()
+			logger.info = function(_, message) levels[#levels + 1] = "info:" .. message end
+			logger.warn = function(_, message) levels[#levels + 1] = "warn:" .. message end
+			package.loaded["infra.logger"] = logger
+			package.loaded["ui.menu.global_actions_transaction"] = nil
+			local owner, controls = fixture()
+			controls.terminal = true
+			helpers.assert_eq(owner.run_exclusive("Watcher reload", function() error("must not run") end), false)
+			controls.terminal = "unknown"
+			helpers.assert_eq(owner.run_exclusive("Watcher reload", function() error("must not run") end), false)
+		end)
+		helpers.assert_eq(levels, {
+			"info:Global external writer '%s' deferred: a reload or quit is in progress.",
+			"warn:Global external writer '%s' refused because terminal quiescence was not proved: %s.",
+		})
+	end)
 	helpers.it("fences reentrant writers before preflight and retains failed compensation by identity", function()
 		local owner, controls = fixture()
 		local debt, attempts = false, 0
