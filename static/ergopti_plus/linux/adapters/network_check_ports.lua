@@ -3,10 +3,11 @@
 --- ==============================================================================
 --- MODULE: Network Field Check Ports (Linux)
 --- DESCRIPTION:
---- The three ports of the shared network check (network/field_check_network.lua)
+--- The four ports of the shared network check (network/field_check_network.lua)
 --- bound to this driver: how the desktop's proxy settings are read, how a PAC
---- file is downloaded, and how one request runs through the managed transport
---- (route lookup by GIO, then the managed curl engine, both owned and bounded).
+--- file is downloaded, how one request runs through the managed transport
+--- (route lookup by GIO, then the managed curl engine, both owned and bounded) and
+--- which route each origin of the managed Ollama daemon takes.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The managed path, not a probe of its own. The route lookup is the GIO
@@ -75,6 +76,13 @@ local function native()
 		end,
 		lookup = function(url, options, callback)
 			return require("adapters.system_proxy").lookup_owned(url, options, callback)
+		end,
+		-- The origins the managed Ollama daemon contacts, and the shared selection rules.
+		ollama_origins = function() return require("infra.route_origins").client("ollama") end,
+		selection = function(receipt)
+			local policy, reason = require("infra.proxy_policy").load()
+			if not policy then return nil, reason end
+			return policy.selection(receipt)
 		end,
 		feed_url = function()
 			local Paths = require("infra.paths")
@@ -159,7 +167,7 @@ end
 
 --- Builds the ports.
 --- @param deps table|nil Test doubles for the native collaborators.
---- @return table ports { proxy_settings, fetch_pac, chain }
+--- @return table ports { proxy_settings, fetch_pac, chain, route_plan }
 function M.new(deps)
 	deps = deps or native()
 
@@ -230,7 +238,38 @@ function M.new(deps)
 		end
 	end
 
-	return { proxy_settings = proxy_settings, fetch_pac = fetch_pac, chain = chain }
+	--- The route the system settings name for each origin of the managed Ollama daemon,
+	--- looked up one after the other exactly as the daemon's start does. The daemon
+	--- takes the first selection of each origin; DIRECT, or a machine without a
+	--- desktop proxy source, is a direct route.
+	local function route_plan(callback)
+		local origins = deps.ollama_origins()
+		if type(origins) ~= "table" or #origins == 0 then
+			callback({ failure = "route-origins-unavailable" })
+			return
+		end
+		local entries = {}
+		local function failure_of(reason)
+			return type(reason) == "string" and reason:match("^proxy%-%l[%l%-]+$") and reason or "proxy-lookup-failed"
+		end
+		local function dispatch(index)
+			local _, refusal = deps.lookup(origins[index], { owner = M.OWNER .. ".plan", timeout_ms = M.LOOKUP_TIMEOUT_MS },
+				function(receipt)
+					local choices, selection_error = deps.selection(receipt)
+					if not choices then
+						callback({ failure = failure_of(selection_error) })
+						return
+					end
+					local first = choices[1]
+					entries[index] = { origin = origins[index], route = first.mode == "selected" and first.proxy or "direct" }
+					if index == #origins then callback({ entries = entries }) else dispatch(index + 1) end
+				end)
+			if refusal then callback({ failure = failure_of(refusal) }) end
+		end
+		dispatch(1)
+	end
+
+	return { proxy_settings = proxy_settings, fetch_pac = fetch_pac, chain = chain, route_plan = route_plan }
 end
 
 return M

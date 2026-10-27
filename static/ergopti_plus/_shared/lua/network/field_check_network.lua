@@ -28,10 +28,21 @@
 local M = {}
 
 local PacCheck = require("network.pac_check")
+local RoutePlan = require("network.route_plan")
 
 --- Step identities in report order; the locale key of each is
 --- field_check.step.<id>.
 M.STEP_IDS = { "proxy_settings", "pac_download", "pac_script", "route_lookup", "tls", "transfer", "digest" }
+
+--- Steps macOS and Linux report after the chain: the route each origin of the managed
+--- Ollama daemon takes (the Windows check does not report it yet, so the identities the
+--- Windows list must equal stay M.STEP_IDS).
+M.PLAN_STEPS = { "route_plan" }
+
+--- The closed names of the managed Ollama daemon's origins, in the order of
+--- route_origins.json "ollama" (the registry, then its blob host). A host name never
+--- reaches a report; a new origin in the inventory needs a new name here.
+M.OLLAMA_ORIGIN_TOKENS = { "registry", "blob" }
 
 --- Steps the managed download chain reports, in display order.
 M.CHAIN_STEPS = { "route_lookup", "tls", "transfer", "digest" }
@@ -74,6 +85,31 @@ local function record_chain(report, helper_code, steps)
 	end
 end
 
+--- Records the route each Ollama origin takes: direct or through a relay, never an
+--- address. The daemon holds one relay, so the same refusal that stops its start
+--- (a conflict between relays, an unplanned host) fails this step by its closed reason.
+--- @param report table The run's report.
+--- @param answer table { entries = { { origin, route }, ... } } or { failure = token }
+local function record_route_plan(report, answer)
+	if answer.failure then
+		report.step("route_plan", STATE.fail, answer.failure)
+		return
+	end
+	local entries = answer.entries
+	assert(type(entries) == "table" and #entries == #M.OLLAMA_ORIGIN_TOKENS,
+		"route plan entries must follow the Ollama origin inventory")
+	local plan, reason = RoutePlan.plan(entries)
+	if not plan then
+		report.step("route_plan", STATE.fail, reason)
+		return
+	end
+	local parts = {}
+	for index, entry in ipairs(entries) do
+		parts[index] = M.OLLAMA_ORIGIN_TOKENS[index] .. ":" .. (entry.route == "direct" and "direct" or "relay")
+	end
+	report.step("route_plan", STATE.info, table.concat(parts, "+"))
+end
+
 --- Runs the check.
 --- ports:
 ---   proxy_settings(callback)  callback{ kinds = token, pac_url = string|nil } or
@@ -81,14 +117,21 @@ end
 ---   fetch_pac(url, callback)  callback(status|nil, body|nil)
 ---   chain(callback)           callback(helper_code|nil, steps) with steps as
 ---                             parse_chain_lines() returns them
+---   route_plan(callback)      callback{ entries = { { origin, route }, ... } } with one
+---                             entry per Ollama origin in inventory order and route
+---                             "direct" or a relay, or callback{ failure = token }
 --- @param ports table
 --- @param report table Report from field_check_report.new_report().
 --- @param finish function Called once, after the last step.
 function M.run(ports, report, finish)
+	assert(type(ports.route_plan) == "function", "the network check needs a route_plan port")
 	local function native_chain()
 		ports.chain(function(helper_code, steps)
 			record_chain(report, helper_code, helper_code == 0 and steps or {})
-			finish()
+			ports.route_plan(function(answer)
+				record_route_plan(report, answer)
+				finish()
+			end)
 		end)
 	end
 	ports.proxy_settings(function(settings)

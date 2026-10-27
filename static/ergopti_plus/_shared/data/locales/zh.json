@@ -283,6 +283,7 @@
 	"field_check.step.tls": "安全连接(证书)",
 	"field_check.step.transfer": "向下载服务器发送的测试请求",
 	"field_check.step.digest": "下载完整性检查",
+	"field_check.step.route_plan": "Ollama 守护进程每个下载来源所走的路线（直连或经中继）",
 	"launcher.fatal.stage_detail": "步骤：{1}\n原因：{2}\n详细信息已保存到 {3}。",
 	"launcher.fatal.component_detail": "组件：{1}\n原因：{2}\n详细信息已保存到：\n{3}",
 	"menu.llm.deps_download_page_failed": "无法打开 Ollama 下载页面。",

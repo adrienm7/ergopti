@@ -283,6 +283,7 @@
 	"field_check.step.tls": "חיבור מאובטח (אישור)",
 	"field_check.step.transfer": "בקשת בדיקה לשרת ההורדה",
 	"field_check.step.digest": "בדיקת שלמות ההורדה",
+	"field_check.step.route_plan": "המסלול של כל מקור הורדה של שירות Ollama (ישיר או דרך ממסר)",
 	"launcher.fatal.stage_detail": "שלב: {1}\nסיבה: {2}\nהפרטים נשמרו ב־{3}.",
 	"launcher.fatal.component_detail": "רכיב: {1}\nסיבה: {2}\nהפרטים נשמרו ב:\n{3}",
 	"menu.llm.deps_download_page_failed": "לא ניתן לפתוח את עמוד ההורדה של Ollama.",

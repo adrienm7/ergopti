@@ -283,6 +283,7 @@
 	"field_check.step.tls": "Zabezpečené připojení (certifikát)",
 	"field_check.step.transfer": "Zkušební požadavek na server pro stahování",
 	"field_check.step.digest": "Kontrola integrity stahování",
+	"field_check.step.route_plan": "Trasa každého zdroje stahování démona Ollama (přímo nebo přes relé)",
 	"launcher.fatal.stage_detail": "Krok: {1}\nPříčina: {2}\nPodrobnosti jsou uloženy v {3}.",
 	"launcher.fatal.component_detail": "Součást: {1}\nPříčina: {2}\nPodrobnosti jsou uloženy v:\n{3}",
 	"menu.llm.deps_download_page_failed": "Nepodařilo se otevřít stránku stažení Ollama.",

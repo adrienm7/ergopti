@@ -283,6 +283,7 @@
 	"field_check.step.tls": "보안 연결(인증서)",
 	"field_check.step.transfer": "다운로드 서버로 보내는 테스트 요청",
 	"field_check.step.digest": "다운로드 무결성 검사",
+	"field_check.step.route_plan": "Ollama 데몬의 각 다운로드 출처 경로(직접 또는 릴레이 경유)",
 	"launcher.fatal.stage_detail": "단계: {1}\n원인: {2}\n자세한 내용은 {3}에 저장되었습니다.",
 	"launcher.fatal.component_detail": "구성 요소: {1}\n원인: {2}\n자세한 내용이 저장된 위치:\n{3}",
 	"menu.llm.deps_download_page_failed": "Ollama 다운로드 페이지를 열 수 없습니다.",

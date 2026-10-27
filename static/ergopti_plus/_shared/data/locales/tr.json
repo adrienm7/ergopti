@@ -283,6 +283,7 @@
 	"field_check.step.tls": "Güvenli bağlantı (sertifika)",
 	"field_check.step.transfer": "İndirme sunucusuna deneme isteği",
 	"field_check.step.digest": "İndirme bütünlüğü denetimi",
+	"field_check.step.route_plan": "Ollama hizmetinin her indirme kaynağının yolu (doğrudan veya bir aktarıcı üzerinden)",
 	"launcher.fatal.stage_detail": "Adım: {1}\nNeden: {2}\nAyrıntılar {3} konumuna kaydedildi.",
 	"launcher.fatal.component_detail": "Bileşen: {1}\nNeden: {2}\nAyrıntıların kaydedildiği yer:\n{3}",
 	"menu.llm.deps_download_page_failed": "Ollama indirme sayfası açılamadı.",

@@ -32,6 +32,12 @@ local function run(world)
 			callback(world.pac_status, world.pac_body)
 		end,
 		network_chain = function(callback) callback(world.helper_code, world.helper_output or "") end,
+		route_plan = function(callback)
+			callback(world.plan or { entries = {
+				{ origin = "https://registry.ollama.ai", route = "direct" },
+				{ origin = "https://blob.ollama.example", route = "direct" },
+			} })
+		end,
 	}
 	local result
 	helpers.with_stub_scope(MODULES, function()
@@ -103,6 +109,37 @@ helpers.describe("network check", function()
 		helpers.assert_eq(steps.transfer.value, "http_200")
 		helpers.assert_nil(steps.extra)
 		helpers.assert_eq(steps.tls.state, "skip")
+	end)
+
+	helpers.it("shows which route each Ollama origin takes, relay addresses never", function()
+		local relay = "http://secret-proxy.corp.example:3128"
+		local steps, result = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK, plan = { entries = {
+			{ origin = "https://registry.ollama.ai", route = relay },
+			{ origin = "https://blob.ollama.example", route = "direct" },
+		} } })
+		helpers.assert_eq(steps.route_plan.state, "info")
+		helpers.assert_eq(steps.route_plan.value, "registry:relay+blob:direct")
+		helpers.assert_true(result.passed)
+		local all_direct = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK })
+		helpers.assert_eq(all_direct.route_plan.value, "registry:direct+blob:direct")
+	end)
+
+	helpers.it("fails the route plan with the reason that would stop the daemon", function()
+		local conflict, result = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK, plan = { entries = {
+			{ origin = "https://registry.ollama.ai", route = "http://a.example:3128" },
+			{ origin = "https://blob.ollama.example", route = "http://b.example:3128" },
+		} } })
+		helpers.assert_true(not result.passed)
+		helpers.assert_eq(conflict.route_plan.state, "fail")
+		helpers.assert_eq(conflict.route_plan.value, "route-plan-conflict")
+		local stage = run({ scutil = "", helper_code = 0, helper_output = HELPER_OK, plan = { failure = "native_pac_evaluation" } })
+		helpers.assert_eq(stage.route_plan.state, "fail")
+		helpers.assert_eq(stage.route_plan.value, "native_pac_evaluation")
+	end)
+
+	helpers.it("names as many Ollama origins as the shared inventory holds", function()
+		local origins = assert(require("modules.llm.network_env").route_origins("ollama"))
+		helpers.assert_eq(#origins, #require("network.field_check_network").OLLAMA_ORIGIN_TOKENS)
 	end)
 
 	helpers.it("never lets the PAC address or a host reach a step value", function()

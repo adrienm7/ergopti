@@ -283,6 +283,7 @@
 	"field_check.step.tls": "सुरक्षित कनेक्शन (प्रमाणपत्र)",
 	"field_check.step.transfer": "डाउनलोड सर्वर को परीक्षण अनुरोध",
 	"field_check.step.digest": "डाउनलोड की अखंडता जाँच",
+	"field_check.step.route_plan": "Ollama डेमन के प्रत्येक डाउनलोड स्रोत का मार्ग (सीधा या रिले के माध्यम से)",
 	"launcher.fatal.stage_detail": "चरण: {1}\nकारण: {2}\nविवरण {3} में सहेजे गए हैं।",
 	"launcher.fatal.component_detail": "घटक: {1}\nकारण: {2}\nविवरण यहाँ सहेजे गए हैं:\n{3}",
 	"menu.llm.deps_download_page_failed": "Ollama डाउनलोड पृष्ठ नहीं खोला जा सका।",

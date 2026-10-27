@@ -283,6 +283,7 @@
 	"field_check.step.tls": "セキュア接続(証明書)",
 	"field_check.step.transfer": "ダウンロードサーバーへのテスト要求",
 	"field_check.step.digest": "ダウンロードの整合性チェック",
+	"field_check.step.route_plan": "Ollama デーモンの各ダウンロード元の経路（直接またはリレー経由）",
 	"launcher.fatal.stage_detail": "ステップ: {1}\n原因: {2}\n詳細は {3} に保存されています。",
 	"launcher.fatal.component_detail": "コンポーネント: {1}\n原因: {2}\n詳細の保存先:\n{3}",
 	"menu.llm.deps_download_page_failed": "Ollama のダウンロードページを開けませんでした。",
