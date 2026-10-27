@@ -288,6 +288,7 @@ try {
 			path.join(packaged, 'install', helper)
 		);
 	}
+	provideShellMessages(path.join(packaged, 'install'));
 	fs.writeFileSync(
 		path.join(packaged, 'uninstall.sh'),
 		fs
