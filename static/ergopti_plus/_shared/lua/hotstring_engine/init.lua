@@ -55,6 +55,7 @@ local Logger = require("logger.shim")
 local text_utils = require("text_utils")
 local TableUtil = require("table_util")
 local PersonalFiles = require("hotstrings.personal_files")
+local Cascade = require("hotstring_engine.cascade")
 
 local LOG = "shared.hotstring_engine"
 
@@ -875,98 +876,72 @@ function M.new()
 		local gate = options.cascade_gate
 		local consumed = options.terminator_consumed == true
 		local original_len = #_buf_cps
-		local vcps, vtimes = {}, {}
-		for index = 1, original_len do
-			vcps[index] = _buf_cps[index]
-			vtimes[index] = _buf_times[index]
-		end
-		-- The time every produced codepoint carries, as apply_expansion stamps it.
-		local stamp = _buf_times[original_len] or false
-
-		-- Applies one step to the virtual buffer and returns whether a terminator
-		-- is still waiting to be replayed after it.
-		local stable = original_len
-		local function apply(step_bc, step_replacement, replayed_terminator)
-			for _ = 1, step_bc do
-				if #vcps == 0 then break end
-				vcps[#vcps] = nil
-				vtimes[#vtimes] = nil
-			end
-			if #vcps < stable then stable = #vcps end
-			for _, cp in ipairs(utf8_codepoints(step_replacement)) do
-				vcps[#vcps + 1] = cp
-				vtimes[#vtimes + 1] = stamp
-			end
-			if replayed_terminator then
-				for _, cp in ipairs(utf8_codepoints(replayed_terminator)) do
-					vcps[#vcps + 1] = cp
-					vtimes[#vtimes + 1] = stamp
-				end
-			end
-		end
-
-		local seen = { [spec_key(first_mapping)] = true }
-		local last_mapping = first_mapping
 		-- Carried even when its delimiter is consumed: the consumption is applied
 		-- once, at the end (see the tail of this function).
 		local terminator = first.end_char and first.terminator or nil
-		local steps = 1
-		apply(first.backspace_count, first.replacement, terminator)
 
-		while steps < max_arrows and not last_mapping.final_result do
+		-- The registry question of one step; the loop itself is the shared Cascade.
+		local function pick(vcps, vtimes, carried, _)
 			local mapping, tlen, replacement, via_end_char, nbsp_stripped =
-				select_match(vcps, terminator ~= nil)
-			if not mapping then break end
-			if terminator ~= nil and not via_end_char then
-				Logger.debug(LOG, "Cascade stopped at step %d: an auto step would swallow the end character.", steps)
-				break
+				select_match(vcps, carried ~= nil)
+			if not mapping then return nil end
+			if carried ~= nil and not via_end_char then
+				Logger.debug(LOG, "Cascade stopped: an auto step would swallow the end character.")
+				return nil
 			end
 			-- A private mapping (personal information) is never composed into another
 			-- hotstring's output: its text must stay under its own redaction.
 			if mapping.is_private then
-				Logger.debug(LOG, "Cascade stopped at step %d: a private mapping takes no part.", steps)
-				break
-			end
-			if seen[spec_key(mapping)] then
-				Logger.debug(LOG, "Cascade stopped at step %d: the same spec would fire again.", steps)
-				break
+				Logger.debug(LOG, "Cascade stopped: a private mapping takes no part.")
+				return nil
 			end
 			-- A terminator the chain still carries is the end character of an end
 			-- step and the last codepoint of an auto step's trigger.
 			local step_bc = tlen + (via_end_char and 1 or 0)
 				+ ((via_end_char and nbsp_stripped) and 1 or 0)
+			local step = {
+				key             = spec_key(mapping),
+				backspace_count = step_bc,
+				replacement     = replacement,
+				final_result    = mapping.final_result,
+				trigger_length  = tlen,
+			}
 			if gate ~= nil then
-				local allowed = gate({
-					trigger         = mapping.trigger,
-					replacement     = replacement,
-					group           = mapping.group,
-					section         = mapping.section,
-					is_private      = mapping.is_private,
-					end_char        = via_end_char,
-					expander_gap_ms = expander_gap_ms(via_end_char and (step_bc - tlen) or 1,
-						step_bc, vtimes),
-				})
-				if allowed ~= true then
-					Logger.debug(LOG, "Cascade stopped at step %d: the step's gate refused it.", steps)
-					break
+				step.admit = function()
+					return gate({
+						trigger         = mapping.trigger,
+						replacement     = replacement,
+						group           = mapping.group,
+						section         = mapping.section,
+						is_private      = mapping.is_private,
+						end_char        = via_end_char,
+						expander_gap_ms = expander_gap_ms(via_end_char and (step_bc - tlen) or 1,
+							step_bc, vtimes),
+					})
 				end
 			end
-			seen[spec_key(mapping)] = true
-			-- An end step keeps the terminator it took (replayed after it); an auto
-			-- step is only reached when no terminator is carried.
-			apply(step_bc, replacement, terminator)
-			last_mapping = mapping
-			steps = steps + 1
-			Logger.debug(LOG, "Cascade step %d fired (trigger of %d char(s)).", steps - 1, tlen)
+			return step
 		end
 
-		if steps == 1 then return first end
+		local net = Cascade.resolve({
+			buffer     = _buf_cps,
+			times      = _buf_times,
+			stamp      = _buf_times[original_len],
+			first      = {
+				key             = spec_key(first_mapping),
+				backspace_count = first.backspace_count,
+				replacement     = first.replacement,
+				terminator      = terminator,
+				final_result    = first.final_result,
+			},
+			max_arrows = max_arrows,
+			pick       = pick,
+		})
+		if not net then return first end
 
-		-- The net edit: everything after the prefix of the screen that no step
-		-- touched, minus the terminator the caller replays.
-		local produced_end = #vcps - (terminator and #utf8_codepoints(terminator) or 0)
-		local net_replacement = table.concat(vcps, "", stable + 1, produced_end)
-		local net_bc = original_len - stable
+		local stable = net.stable
+		local net_replacement = net.replacement
+		local net_bc = net.backspace_count
 		local net_trigger = first.trigger
 		if net_bc ~= first.backspace_count then
 			-- The chain reached further left than the first trigger: Undo must
@@ -983,8 +958,8 @@ function M.new()
 			first.terminator = terminator
 			first.end_char = terminator ~= nil
 		end
-		first.final_result = last_mapping.final_result
-		first.cascade_steps = steps
+		first.final_result = net.final_result
+		first.cascade_steps = net.steps
 		return first
 	end
 
