@@ -3133,4 +3133,101 @@ assert.equal(
 	'all native word, shortcut and modifier presentation controls must execute'
 );
 
+const ordinaryControlWords = ['space', 'enter', 'Tab', 'return', 'escape', 'left'];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const source of ['historical', 'today']) {
+		for (const sensitive of [true, false]) {
+			for (const word of ordinaryControlWords) {
+				test(`${host} ${source} words distinguish literal ${word}/${sensitive}`, () => {
+					const page = loadMetricsTypingPage(host);
+					freezePageClock(page, '2026-10-27T12:00:00Z');
+					const manifest = {
+						[source === 'historical' ? '2026-10-26' : '2026-10-27']: {
+							'Editor.exe': { chars: (word.length + 1) * 7, time: 7000 }
+						}
+					};
+					publishTypingPage(page, host, manifest);
+					if (sensitive) page.elements.get('btn_case_sensitive').classList.add('active');
+					else page.elements.get('btn_case_sensitive').classList.remove('active');
+					const chars = Object.fromEntries(
+						Array.from(new Set(word + ' '), (char) => [
+							char,
+							{
+								c: Array.from(word + ' ').filter((value) => value === char).length * 7,
+								t: 0
+							}
+						])
+					);
+					const tokenData = { w: { [word]: { c: 7, t: 0 } }, c: chars };
+					deliverTypingManifest(page, host, manifest, {
+						range:
+							source === 'historical'
+								? { historical: tokenData, today: {} }
+								: { historical: {}, today: { 'Editor.exe': tokenData } }
+					});
+					vm.runInContext("app_state.current_tab = 'w';", page.context);
+					page.context.render_current_tab();
+					page.timers.at(-1)();
+					const key = sensitive ? word : word.toLowerCase();
+					const html = page.elements.get('metrics_table_body').innerHTML;
+					assert.equal(vm.runInContext('app_state.rendered_list.length', page.context), 1);
+					assert.ok(
+						html.includes(`<span class="mono-space">${key}</span>`),
+						'ordinary words keep literal text instead of a keyboard control label'
+					);
+					assert.ok(html.includes('<td>7</td>'));
+					assert.equal(
+						page.context.build_searchable_key(word, sensitive),
+						key,
+						'words do not acquire keyboard-only aliases'
+					);
+					page.elements.get('search_input').value = word;
+					page.context.handle_search();
+					page.timers.at(-1)();
+					assert.ok(
+						page.elements
+							.get('metrics_table_body')
+							.innerHTML.includes(`<span class="mono-space">${key}</span>`)
+					);
+					const controlCase = word[0].toUpperCase() + word.slice(1).toLowerCase();
+					const differentCase = word === controlCase ? word.toLowerCase() : controlCase;
+					page.elements.get('search_input').value = differentCase;
+					page.context.handle_search();
+					page.timers.at(-1)();
+					const searched = page.elements.get('metrics_table_body').innerHTML;
+					assert.equal(
+						searched.includes(page.context._t('ui_typing.no_data')),
+						sensitive,
+						'word searches follow only the selected case mode'
+					);
+					// The same real range also contains the physical spaces ending these words.
+					vm.runInContext(
+						"app_state.current_tab = 'c'; app_state.search_query = '';",
+						page.context
+					);
+					page.context.render_current_tab();
+					page.timers.at(-1)();
+					assert.ok(
+						page.elements
+							.get('metrics_table_body')
+							.innerHTML.includes('shortcut-key-control">Space</span>'),
+						'the characters tab retains the actual keyboard Space marker'
+					);
+					assert.ok(page.context.build_searchable_key(' ', true).includes('Space'));
+					assert.equal(
+						page.diagnostics.some((entry) => entry.level === 'error'),
+						false
+					);
+				});
+			}
+		}
+	}
+}
+assert.equal(ordinaryControlWords.length, 6);
+assert.equal(
+	passed,
+	711,
+	'all literal-word versus physical-control display and search controls must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);
