@@ -557,6 +557,27 @@ local _production_sources = nil
 
 --- Loads (once) every production Lua file under the driver root.
 --- @return table Array of file bodies, tests/ excluded.
+--- Source text in which each generated config-key reference reads as the quoted string it
+--- stands for, for tests that scan driver source for the literal a call passes. A name the
+--- generated tables do not hold is left as written, so the scan still refuses it.
+--- @param text string Lua source text.
+--- @return string expanded
+function M.expand_config_keys(text)
+	local keys = require("config_keys")
+	local function resolve(whole, root_table, name)
+		local found, tbl = pcall(function() return keys[root_table] end)
+		if not found then return whole end
+		local ok, value = pcall(function() return tbl[name] end)
+		return ok and type(value) == "string" and string.format("%q", value) or whole
+	end
+	text = text:gsub('require%("config_keys"%)%.(%u+)%.([%u%d_]+)', function(root_table, name)
+		return resolve('require("config_keys").' .. root_table .. "." .. name, root_table, name)
+	end)
+	return (text:gsub("ConfigKeys%.(%u+)%.([%u%d_]+)", function(root_table, name)
+		return resolve("ConfigKeys." .. root_table .. "." .. name, root_table, name)
+	end))
+end
+
 local function production_sources()
 	if _production_sources then return _production_sources end
 
@@ -585,7 +606,7 @@ local function production_sources()
 
 	local bodies = {}
 	for _, path in ipairs(paths) do
-		bodies[#bodies + 1] = SourceFile.read(path)
+		bodies[#bodies + 1] = M.expand_config_keys(SourceFile.read(path))
 	end
 
 	-- A completed but empty inventory is not reusable source evidence. Leaving
