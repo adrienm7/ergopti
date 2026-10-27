@@ -2132,6 +2132,8 @@
 	"ollama.download_title": "Laddar ned Ollama-modell",
 	"ollama.error_network": "Ollama kunde inte laddas ned. Kontrollera internetanslutningen och välj sedan Ollama-backend igen.",
 	"ollama.error_checksum": "Det nedladdade Ollama-arkivet klarade inte SHA-256-kontrollen och kastades. Inget installerades.",
+	"ollama.error_installer_refused": "Ergoptis Ollama-installerare vägrade sin egen begäran, så inget installerades. Starta om Ergopti och välj Ollama-motorn igen; om det kvarstår, skicka diagnostikrapporten.",
+	"ollama.error_runtime_refused": "Ergopti kunde inte verifiera sin fastlåsta Ollama-version (versionskatalog eller integritetskontroll), så inget installerades. Skicka diagnostikrapporten.",
 	"ollama.external_manual_start_body": "Den här Ollama-installationen hanteras utanför Ergopti. Starta eller stoppa tjänsten själv, eller installera Ergoptis hanterade miljö via erbjudandet om att konfigurera Ollama.",
 	"ollama.native_install_declined_body": "Den nuvarande Ollama-installationen och modellerna förblir oförändrade. Den hanterade miljön installerades inte.",
 	"ollama.native_migration_body": "Installera Ergoptis hanterade miljö vid sidan av din nuvarande Ollama-installation. Befintliga modeller finns kvar på sin nuvarande plats. Ergopti stoppar inte den nuvarande tjänsten; stoppa den själv om den använder samma port. De plattformspecifika kontrollerna måste godkännas innan den hanterade miljön kan köras.",

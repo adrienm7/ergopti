@@ -2132,6 +2132,8 @@
 	"ollama.download_title": "Stahování modelu Ollama",
 	"ollama.error_network": "Ollama se nepodařilo stáhnout. Zkontrolujte připojení k internetu a poté znovu vyberte backend Ollama.",
 	"ollama.error_checksum": "Stažený archiv Ollama neprošel kontrolou SHA-256 a byl zahozen. Nic nebylo nainstalováno.",
+	"ollama.error_installer_refused": "Instalátor Ollama v Ergopti odmítl vlastní požadavek, takže nebylo nic nainstalováno. Restartujte Ergopti a znovu vyberte backend Ollama; pokud potíže trvají, odešlete diagnostickou zprávu.",
+	"ollama.error_runtime_refused": "Ergopti nemohl ověřit svou připnutou verzi Ollama (katalog vydání nebo kontrola integrity), takže nebylo nic nainstalováno. Odešlete diagnostickou zprávu.",
 	"ollama.external_manual_start_body": "Tato instalace Ollama je spravována mimo Ergopti. Spusťte nebo zastavte její službu sami, nebo nainstalujte prostředí spravované aplikací Ergopti prostřednictvím nabídky nastavení Ollama.",
 	"ollama.native_install_declined_body": "Současná instalace Ollama a modely zůstanou beze změny. Spravované prostředí nebylo nainstalováno.",
 	"ollama.native_migration_body": "Nainstalujte prostředí spravované aplikací Ergopti vedle současné instalace Ollama. Stávající modely zůstanou na svém současném místě. Ergopti nezastaví současnou službu; pokud používá stejný port, zastavte ji sami. Než bude možné spravované prostředí spustit, musí úspěšně projít nativními kontrolami.",

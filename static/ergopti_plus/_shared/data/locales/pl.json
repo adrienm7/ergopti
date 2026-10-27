@@ -2132,6 +2132,8 @@
 	"ollama.download_title": "Pobieranie modelu Ollama",
 	"ollama.error_network": "Nie udało się pobrać Ollama. Sprawdź połączenie z internetem, a następnie ponownie wybierz backend Ollama.",
 	"ollama.error_checksum": "Pobrane archiwum Ollama nie przeszło weryfikacji SHA-256 i zostało odrzucone. Niczego nie zainstalowano.",
+	"ollama.error_installer_refused": "Instalator Ollama w Ergopti odrzucił własne żądanie, więc nic nie zostało zainstalowane. Uruchom ponownie Ergopti i ponownie wybierz silnik Ollama; jeśli problem się powtarza, wyślij raport diagnostyczny.",
+	"ollama.error_runtime_refused": "Ergopti nie mógł zweryfikować swojej przypiętej wersji Ollama (katalog wydań lub kontrola integralności), więc nic nie zostało zainstalowane. Wyślij raport diagnostyczny.",
 	"ollama.external_manual_start_body": "Ta instalacja Ollama jest zarządzana poza Ergopti. Samodzielnie uruchom lub zatrzymaj jej usługę albo zainstaluj środowisko zarządzane przez Ergopti z propozycji konfiguracji Ollama.",
 	"ollama.native_install_declined_body": "Obecna instalacja Ollama i modele pozostaną bez zmian. Zarządzane środowisko nie zostało zainstalowane.",
 	"ollama.native_migration_body": "Zainstaluj środowisko zarządzane przez Ergopti obok obecnej instalacji Ollama. Istniejące modele pozostaną w obecnej lokalizacji. Ergopti nie zatrzyma obecnej usługi; zatrzymaj ją samodzielnie, jeśli używa tego samego portu. Testy natywne muszą zakończyć się powodzeniem, zanim zarządzane środowisko będzie mogło działać.",

@@ -2132,6 +2132,8 @@
 	"ollama.download_title": "מוריד מודל Ollama",
 	"ollama.error_network": "לא ניתן היה להוריד את Ollama. בדקו את החיבור לאינטרנט ובחרו שוב במנוע Ollama.",
 	"ollama.error_checksum": "ארכיון Ollama שהורד נכשל בבדיקת SHA-256 ונמחק. דבר לא הותקן.",
+	"ollama.error_installer_refused": "מתקין Ollama של Ergopti דחה את הבקשה של עצמו, ולכן לא הותקן דבר. הפעל מחדש את Ergopti ובחר שוב במנוע Ollama; אם הבעיה נמשכת, שלח את דוח האבחון.",
+	"ollama.error_runtime_refused": "‏Ergopti לא הצליח לאמת את גרסת Ollama הנעוצה שלו (קטלוג הגרסאות או בדיקת השלמות), ולכן לא הותקן דבר. שלח את דוח האבחון.",
 	"ollama.external_manual_start_body": "התקנת Ollama זו מנוהלת מחוץ ל־Ergopti. הפעילו או עצרו את השירות שלה בעצמכם, או התקינו את הסביבה בניהול Ergopti דרך הצעת ההתקנה של Ollama.",
 	"ollama.native_install_declined_body": "התקנת Ollama הנוכחית והמודלים נשארים ללא שינוי. הסביבה המנוהלת לא הותקנה.",
 	"ollama.native_migration_body": "התקינו את הסביבה בניהול Ergopti לצד התקנת Ollama הנוכחית. המודלים הקיימים נשארים במיקומם הנוכחי. Ergopti לא יעצור את השירות הנוכחי; עצרו אותו בעצמכם אם הוא משתמש באותה יציאה. יש לעבור את בדיקות ההרצה הייעודיות למערכת לפני שניתן יהיה להפעיל את הסביבה המנוהלת.",

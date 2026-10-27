@@ -2132,6 +2132,8 @@
 	"ollama.download_title": "Ollama-Modell wird heruntergeladen",
 	"ollama.error_network": "Ollama konnte nicht heruntergeladen werden. Prüfen Sie Ihre Internetverbindung und wählen Sie dann erneut das Ollama-Backend.",
 	"ollama.error_checksum": "Das heruntergeladene Ollama-Archiv hat die SHA-256-Prüfung nicht bestanden und wurde verworfen. Es wurde nichts installiert.",
+	"ollama.error_installer_refused": "Der Ollama-Installer von Ergopti hat seine eigene Anfrage abgelehnt; es wurde nichts installiert. Starten Sie Ergopti neu und wählen Sie erneut das Ollama-Backend; falls es weiterhin auftritt, senden Sie den Diagnosebericht.",
+	"ollama.error_runtime_refused": "Ergopti konnte seine festgelegte Ollama-Laufzeit nicht prüfen (Release-Katalog oder Integritätsprüfung); es wurde nichts installiert. Senden Sie den Diagnosebericht.",
 	"ollama.external_manual_start_body": "Diese Ollama-Installation wird außerhalb von Ergopti verwaltet. Starten oder beenden Sie ihren Dienst selbst oder installieren Sie die von Ergopti verwaltete Laufzeit über das Einrichtungsangebot für Ollama.",
 	"ollama.native_install_declined_body": "Die aktuelle Ollama-Installation und die Modelle bleiben unverändert. Die verwaltete Laufzeit wurde nicht installiert.",
 	"ollama.native_migration_body": "Installieren Sie die von Ergopti verwaltete Laufzeit neben Ihrer aktuellen Ollama-Installation. Vorhandene Modelle bleiben an ihrem bisherigen Speicherort. Ergopti beendet den aktuellen Dienst nicht; beenden Sie ihn selbst, wenn er denselben Port verwendet. Die nativen Prüfungen müssen bestanden sein, bevor die verwaltete Laufzeit ausgeführt werden kann.",
