@@ -54,10 +54,20 @@ esac
 # ======= 1/ Update from dev ================
 # ===========================================
 
-log "Fetching dev and fast-forwarding $branch onto it…"
-git fetch --depth 1 origin dev || fail "git fetch of dev failed."
-git merge --ff-only FETCH_HEAD >/dev/null 2>&1 \
-	|| git merge --no-edit FETCH_HEAD \
+# A shallow clone (--depth 1) holds no common ancestor of dev and the field
+# branch, so a plain merge refuses "unrelated histories". Deepen both until the
+# merge base is known; full history is never downloaded.
+log "Fetching dev and bringing it into $branch…"
+depth=50
+while :; do
+	git fetch -q --depth "$depth" origin dev || fail "git fetch of dev failed."
+	dev_head="$(git rev-parse FETCH_HEAD)" || fail "Cannot read the fetched dev head."
+	git merge-base HEAD "$dev_head" >/dev/null 2>&1 && break
+	[ "$depth" -lt 3200 ] || fail "No common history with dev within $depth commits; re-clone with --depth 1."
+	depth=$((depth * 4))
+done
+git merge --ff-only "$dev_head" >/dev/null 2>&1 \
+	|| git merge --no-edit "$dev_head" \
 	|| fail "Could not bring dev into $branch; resolve the merge and run again."
 
 stamp="$(date +%Y-%m-%d_%H%M%S)"
