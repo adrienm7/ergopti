@@ -60,6 +60,23 @@ return function(helpers, SlotRoles, fixture)
 			end)
 		end
 
+		helpers.it("(slot-roles) the " .. driver .. " families keep their menu order and resolve", function()
+			local families = SlotRoles.families(driver)
+			local prefixes = {}
+			for _, family in ipairs(families) do
+				prefixes[#prefixes + 1] = family.prefix
+				local parsed = SlotRoles.parse(family.prefix .. "g")
+				helpers.assert_type(parsed, "table", family.prefix)
+				helpers.assert_eq(parsed.roles, family.roles)
+				local native = SlotRoles.native(driver, family.prefix .. "g")
+				helpers.assert_eq(native.modifiers, family.native)
+			end
+			helpers.assert_eq(prefixes, corpus.families[driver])
+			local extra = {}
+			for _, key in ipairs(SlotRoles.extra_keys(driver)) do extra[#extra + 1] = key.id end
+			helpers.assert_eq(extra, corpus.extra_keys[driver])
+		end)
+
 		helpers.it("(slot-roles) refuses a driver it does not describe", function()
 			local ok = pcall(SlotRoles.native, "beos", "primary_g")
 			helpers.assert_eq(ok, false)
