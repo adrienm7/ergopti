@@ -7,20 +7,8 @@
 		"static/ergopti_plus/_shared/modules/llm/install/ollama_install.sh": {
 			"host": 1
 		},
-		"static/ergopti_plus/_shared/ui/changelog/atom_feed.js": {
-			"host": 1
-		},
-		"static/ergopti_plus/_shared/ui/changelog/script.js": {
-			"host": 3
-		},
-		"static/ergopti_plus/_shared/ui/repository_links.js": {
-			"host": 1
-		},
 		"static/ergopti_plus/linux/install.sh": {
 			"host": 1
-		},
-		"static/ergopti_plus/macos/data/generate_models.py": {
-			"host": 6
 		},
 		"static/ergopti_plus/macos/launcher/Package.swift": {
 			"host": 1
@@ -29,18 +17,6 @@
 			"bundle_id_or_label": 2
 		},
 		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeBootstrapStageOwner.swift": {
-			"bundle_id_or_label": 2
-		},
-		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeCoreLaunchctl.swift": {
-			"bundle_id_or_label": 4
-		},
-		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeCorePlistCustody.swift": {
-			"bundle_id_or_label": 1
-		},
-		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeCoreProvisionOwner.swift": {
-			"bundle_id_or_label": 4
-		},
-		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeCoreServiceOwner.swift": {
 			"bundle_id_or_label": 2
 		},
 		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeFirstInstallOwner.swift": {
@@ -60,9 +36,6 @@
 		},
 		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportMainOperation.swift": {
 			"bundle_id_or_label": 1
-		},
-		"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UninstallWorker.swift": {
-			"bundle_id_or_label": 4
 		},
 		"static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/GuardianRegistrationTests.swift": {
 			"app_file_name": 1
@@ -130,31 +103,11 @@
 		"tools/build/InstalledRuntimePublisher.hpp": {
 			"bundle_id_or_label": 4
 		},
-		"tools/build/appimage-oldest-lts.sh": {
-			"host": 1
-		},
-		"tools/build/build-linux-deb.sh": {
-			"host": 1
-		},
 		"tools/build/build-linux-flatpak.sh": {
 			"host": 2
 		},
-		"tools/build/build-linux-rpm.sh": {
-			"host": 1
-		},
 		"tools/build/build-macos-managed-ollama.py": {
 			"host": 6
-		},
-		"tools/build/build_changelog.py": {
-			"host": 1
-		},
-		"tools/build/build_macos_app.sh": {
-			"bundle_id_or_label": 3,
-			"app_file_name": 6,
-			"host": 1
-		},
-		"tools/build/build_static_bundle.py": {
-			"app_file_name": 2
 		},
 		"tools/build/core_sdk/receive_core_sdk.py": {
 			"host": 1

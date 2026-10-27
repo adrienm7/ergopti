@@ -103,12 +103,15 @@ GH_REPO="${GH_REPO:-${UPDATER_REPOSITORY#*/}}"
 
 # The outer app prohibits duplicate instances. Give the embedded GUI runtime a
 # dedicated Ergopti-owned identity while keeping it isolated from stock HS.
-BUNDLE_ID="com.ergoptiplus.app"
-HAMMERSPOON_BUNDLE_ID="com.ergoptiplus.app.hammerspoon"
+# The names, bundle ids and hosts are declared once in _shared/data/identifiers.json.
+# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
+. "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+BUNDLE_ID="$ERGOPTI_BUNDLE_ID_LAUNCHER"
+HAMMERSPOON_BUNDLE_ID="$ERGOPTI_BUNDLE_ID_HAMMERSPOON"
 
 BUILD_DIR="$REPO_ROOT/build/macos"
-APP_PATH="$BUILD_DIR/ErgoptiPlus.app"
-ZIP_PATH="$BUILD_DIR/ErgoptiPlus.app.zip"
+APP_PATH="$BUILD_DIR/$ERGOPTI_APP_BUNDLE"
+ZIP_PATH="$BUILD_DIR/$ERGOPTI_APP_BUNDLE.zip"
 LAUNCHER_DIR="$REPO_ROOT/static/ergopti_plus/macos/launcher"
 
 # Architectures of the host executable. They must match the universal slices of
@@ -188,7 +191,7 @@ clean_build_dir() {
 download_hammerspoon() {
 	local cache_dir="$BUILD_DIR/cache"
 	local zip="$cache_dir/Hammerspoon-$HAMMERSPOON_VERSION.zip"
-	local url="https://github.com/Hammerspoon/hammerspoon/releases/download/$HAMMERSPOON_VERSION/Hammerspoon-$HAMMERSPOON_VERSION.zip"
+	local url="https://$ERGOPTI_HOST_GITHUB/Hammerspoon/hammerspoon/releases/download/$HAMMERSPOON_VERSION/Hammerspoon-$HAMMERSPOON_VERSION.zip"
 	mkdir -p "$cache_dir"
 	if [ ! -f "$zip" ]; then
 		log "Downloading Hammerspoon $HAMMERSPOON_VERSION from $url"
@@ -518,7 +521,7 @@ generate_info_plist() {
 			<key>CFBundleURLTypes</key>
 			<array>
 				<dict>
-					<key>CFBundleURLName</key>           <string>com.ergoptiplus.app.updater</string>
+					<key>CFBundleURLName</key>           <string>${BUNDLE_ID}.updater</string>
 					<key>CFBundleURLSchemes</key>
 					<array><string>ergoptiplus</string></array>
 				</dict>
@@ -747,9 +750,9 @@ codesign_native_runtime() {
 # versions pop an extra automation-permission dialog on first use.
 codesign_app() {
 	if [ "$SIGN_IDENTITY" = "-" ]; then
-		log "Codesigning ErgoptiPlus.app (ad hoc, identifier: $BUNDLE_ID)"
+		log "Codesigning $ERGOPTI_APP_BUNDLE (ad hoc, identifier: $BUNDLE_ID)"
 	else
-		log "Codesigning ErgoptiPlus.app (certificate $SIGN_IDENTITY, identifier: $BUNDLE_ID)"
+		log "Codesigning $ERGOPTI_APP_BUNDLE (certificate $SIGN_IDENTITY, identifier: $BUNDLE_ID)"
 	fi
 	# Sign nested code first so the host-level pass finds it already valid.
 	# bundle-macos-luasocket.sh builds it into the bundled driver tree.
@@ -787,8 +790,8 @@ build_native_helper() {
 	for cmd in swift xcrun shasum awk lipo codesign plutil zip find; do require_cmd "$cmd"; done
 	check_signing_configuration
 	BUILD_DIR="$REPO_ROOT/build/macos-native-helper"
-	APP_PATH="$BUILD_DIR/ErgoptiPlus.app"
-	ZIP_PATH="$BUILD_DIR/ErgoptiPlus.app.zip"
+	APP_PATH="$BUILD_DIR/$ERGOPTI_APP_BUNDLE"
+	ZIP_PATH="$BUILD_DIR/$ERGOPTI_APP_BUNDLE.zip"
 	[ ! -e "$BUILD_DIR" ] && [ ! -L "$BUILD_DIR" ] \
 		|| fail "Native helper output already exists: $BUILD_DIR"
 	mkdir -p "$BUILD_DIR"

@@ -36,6 +36,9 @@ set -euo pipefail
 OLDEST_LTS_IMAGE="ubuntu:22.04"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
+# The external hosts are declared once in _shared/data/identifiers.json.
+# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
+. "$PROJECT_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
 BUILD_ROOT="$PROJECT_ROOT/build/linux"
 SELF="tools/build/appimage-oldest-lts.sh"
 SMOKE_USER="catalogue"
@@ -68,7 +71,7 @@ container_build() {
 	local tools
 	tools="$(mktemp -d)"
 	curl -fsSL --retry 3 --retry-delay 5 -o "$tools/appimagetool" \
-		https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+		"https://$ERGOPTI_HOST_GITHUB/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
 	chmod +x "$tools/appimagetool"
 	(cd "$tools" && ./appimagetool --appimage-extract >/dev/null)
 	ln -sf "$tools/squashfs-root/AppRun" /usr/local/bin/appimagetool
