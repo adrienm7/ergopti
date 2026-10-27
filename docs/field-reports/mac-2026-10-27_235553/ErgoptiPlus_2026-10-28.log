@@ -1,0 +1,153 @@
+2026-10-28 00:00:00:295 [DEBUG] [adapters.shell_runner] ↑ "Process '%s' exited (status=%s, %.0f ms, %d similar run(s) since the last line)." repeated 23 more times between 2026-10-27 23:56:35:966 and 2026-10-27 23:59:41:113 (last: Process 'defaults' exited (status=0, 10 ms, 30 similar run(s) since the last line).).
+2026-10-28 00:00:00:295 [DEBUG] [keystats.log_manager] ↑ "Ingest cycle: %d entry(ies), offset now %d." repeated 7 more times between 2026-10-27 23:56:51:428 and 2026-10-27 23:59:01:200 (last: Ingest cycle: 1 entry(ies), offset now 550229.).
+2026-10-28 00:00:00:295 [DEBUG] [keystats.watchers] ↑ "Battery: %s%% (%s, charging=%s)." repeated 3 more times between 2026-10-27 23:57:56:057 and 2026-10-27 23:59:56:049 (last: Battery: 97.0% (Battery Power, charging=false).).
+2026-10-28 00:00:00:295 [DEBUG] [gestures] ↑ "Touch session started on device=%s (frame %d, touches=%d)." repeated 21 more times between 2026-10-27 23:57:48:928 and 2026-10-27 23:59:19:361 (last: Touch session started on device=504403158265495662 (frame 3595, touches=1).).
+2026-10-28 00:00:00:295 [DEBUG] [ui_builder] ↑ "Geometry for '%s': %dx%d." repeated 1 more time between 2026-10-27 23:57:20:571 and 2026-10-27 23:57:20:571 (last: Geometry for 'error_dialog': 560x460.).
+2026-10-28 00:00:00:295 [DEBUG] [ui_builder] ↑ "Building injected HTML assets…" repeated 1 more time between 2026-10-27 23:57:20:553 and 2026-10-27 23:57:20:553.
+2026-10-28 00:00:00:295 [INFO] [ui_builder] ↑ "Injected HTML assets built and memoised (%d bytes)." repeated 1 more time between 2026-10-27 23:57:20:571 and 2026-10-27 23:57:20:571 (last: Injected HTML assets built and memoised (328916 bytes).).
+2026-10-28 00:00:00:295 [DEBUG] [ui_builder] ↑ "Forcing window focus and teleporting to active space…" repeated 1 more time between 2026-10-27 23:57:20:581 and 2026-10-27 23:57:20:581.
+2026-10-28 00:00:00:295 [INFO] [ui_builder] ↑ "Window presentation requested (attempt %d)." repeated 1 more time between 2026-10-27 23:57:20:587 and 2026-10-27 23:57:20:587 (last: Window presentation requested (attempt 1).).
+2026-10-28 00:00:00:295 [DEBUG] [keystats.context_tracker] ↑ "%s skipped: the element cannot be watched (%s)." repeated 74 more times between 2026-10-27 23:57:53:421 and 2026-10-27 23:58:51:605 (last: Replacement AXValueChanged watcher setup skipped: the element cannot be watched (Illegal argument).).
+2026-10-28 00:00:00:295 [INFO] [gestures.engine] ↑ "GESTURE START: fingers=%d pos=(%.1f,%.1f) ts=%.3f" repeated 2 more times between 2026-10-27 23:58:09:273 and 2026-10-27 23:58:13:526 (last: GESTURE START: fingers=2 pos=(26.2,33.3) ts=552895.463).
+2026-10-28 00:00:00:295 [INFO] [gestures.engine] ↑ "Confirmed gesture lift below ownership floor: %d -> %d (frames=%d, %.3fs)." repeated 1 more time between 2026-10-27 23:58:13:648 and 2026-10-27 23:58:13:648 (last: Confirmed gesture lift below ownership floor: 2 -> 1 (frames=8, 0.057s).).
+2026-10-28 00:00:00:295 [INFO] [gestures.engine] ↑ "process_frame: n=0 → fingers lifted, calling commitGesture (was active)" repeated 2 more times between 2026-10-27 23:58:09:277 and 2026-10-27 23:58:14:900.
+2026-10-28 00:00:00:295 [INFO] [gestures.engine] ↑ "commitGesture ENTRY: enabled=%s maxFingers=%d startPos=%s endPos=%s lockedDir=%s liveAxisSign=%s stepsCommitted=%d elapsed=%.3fs" repeated 2 more times between 2026-10-27 23:58:09:277 and 2026-10-27 23:58:14:900 (last: commitGesture ENTRY: enabled=true maxFingers=2 startPos=(26.2,33.3) endPos=(27.0,33.8) lockedDir=nil liveAxisSign=nil stepsCommitted=0 elapsed=1.374s).
+2026-10-28 00:00:00:295 [DEBUG] [gestures.engine] ↑ "commitGesture: dx=%.2f dy=%.2f total_delta=%.2f TAP_MAX_DELTA=%.2f TAP_MAX_SEC=%.2f had_live_fire=%s" repeated 2 more times between 2026-10-27 23:58:09:277 and 2026-10-27 23:58:14:900 (last: commitGesture: dx=0.79 dy=0.54 total_delta=1.33 TAP_MAX_DELTA=8.00 TAP_MAX_SEC=0.70 had_live_fire=false).
+2026-10-28 00:00:00:295 [DEBUG] [gestures.engine] ↑ "commitGesture: classified as TAP candidate (lockedDir=%s, total_delta=%.2f < %.2f)" repeated 2 more times between 2026-10-27 23:58:09:277 and 2026-10-27 23:58:14:900 (last: commitGesture: classified as TAP candidate (lockedDir=nil, total_delta=1.33 < 8.00)).
+2026-10-28 00:00:00:295 [DEBUG] [gestures.engine] ↑ "commitGesture: tap too slow (elapsed=%.3fs > TAP_MAX_SEC=%.2fs)" repeated 1 more time between 2026-10-27 23:58:14:900 and 2026-10-27 23:58:14:900 (last: commitGesture: tap too slow (elapsed=1.374s > TAP_MAX_SEC=0.70s)).
+2026-10-28 00:00:00:295 [DEBUG] [karabiner.lease] ↑ "Karabiner lease %s: %s deadline passed on time; reading pending task output before judging the worker." repeated 1 more time between 2026-10-27 23:58:20:265 and 2026-10-27 23:58:20:265 (last: Karabiner lease 6b8473d39d4b48e780351af668019a2c: PONG 17 deadline passed on time; reading pending task output before judging the worker.).
+2026-10-28 00:00:00:295 [INFO] [toml_writer] ↑ "batch_write: committed %d operation(s) to '%s'." repeated 1 more time between 2026-10-27 23:58:09:217 and 2026-10-27 23:58:09:217 (last: batch_write: committed 293 operation(s) to '~/perso/config/ergopti_plus/hammerspoon/config.toml'.).
+2026-10-28 00:00:00:295 [INFO] [karabiner.lease] ↑ "Karabiner lease %s read %s %.2f s after its deadline; task output was not being read meanwhile (an open menu or a modal window)." repeated 1 more time between 2026-10-27 23:58:51:610 and 2026-10-27 23:58:51:610 (last: Karabiner lease 6b8473d39d4b48e780351af668019a2c read PONG 17 31.35 s after its deadline; task output was not being read meanwhile (an open menu or a modal window).).
+2026-10-28 00:00:00:295 [DEBUG] [menu.tap_holds] ↑ "Picker trees served from cache." repeated 2 more times between 2026-10-27 23:58:09:302 and 2026-10-27 23:58:09:302.
+2026-10-28 00:00:00:295 [DEBUG] [app_picker] ↑ "Building application exclusion menu…" repeated 1 more time between 2026-10-27 23:58:09:538 and 2026-10-27 23:58:09:538.
+2026-10-28 00:00:00:295 [INFO] [app_picker] ↑ "Application exclusion menu built successfully (%d excluded app(s), %.1f ms)." repeated 1 more time between 2026-10-27 23:58:09:538 and 2026-10-27 23:58:09:538 (last: Application exclusion menu built successfully (0 excluded app(s), 0.1 ms).).
+2026-10-28 00:00:00:295 [INFO] [notifications] Notification dispatched (success): ✅ Modèle MLX installé — LFM2.5-350M est prêt !.
+2026-10-28 00:00:00:296 [INFO] [menu_llm.mlx] Ensuring MLX server for model LFM2.5-350M…
+2026-10-28 00:00:00:360 [WARNING] [llm.api_mlx] Endpoint discovery state reset.
+2026-10-28 00:00:00:360 [DEBUG] [llm.api_mlx] Model HF path set to 'LiquidAI/LFM2.5-350M-MLX-8bit'.
+2026-10-28 00:00:00:360 [INFO] [menu_llm.mlx] Starting MLX server process for model LFM2.5-350M — output prefixed [MLX-SERVER] in ~/Library/Logs/ergopti_plus/ErgoptiPlus_2026-10-28.log
+2026-10-28 00:00:00:363 [DEBUG] [menu_llm.mlx] MLX server bash_cmd: export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"; export HF_HUB_DISABLE_XET=1; export HF_HUB_OFFLINE=1; export TRANSFORMERS_OFFLINE=1; export PYTHONUNBUFFERED=1; PYTHON_BIN="~/Library/Application Support/Ergopti/mlx-venv/bin/python"; if [ ! -x "$PYTHON_BIN" ]; then echo "[MLX] ❌ venv introuvable : $PYTHON_BIN"; exit 1; fi; echo "[MLX] Python utilisé: $PYTHON_BIN"; MLX_PID_FILE=/tmp/mlx_server.pid; MLX_PGID_FILE=/tmp/mlx_server.pgid; if [ -f "$MLX_PGID_FILE" ]; then OLD_PGID=$(cat "$MLX_PGID_FILE" 2>/dev/null | tr -d '[:space:]'); echo "[MLX] Skipping PGID-kill of $OLD_PGID — PID-based kill is safer on macOS."; rm -f "$MLX_PGID_FILE"; fi; if [ -f "$MLX_PID_FILE" ]; then OLD_PID=$(cat "$MLX_PID_FILE" 2>/dev/null | tr -d '[:space:]'); if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then OLD_COMM=$(ps -o ucomm= -p "$OLD_PID" 2>/dev/null | tr -d '[:space:]'); OLD_ARGS=$(ps -o args= -p "$OLD_PID" 2>/dev/null); if echo "$OLD_COMM" | grep -qi python && echo "$OLD_ARGS" | grep -q mlx_lm; then echo "[MLX] Killing previous server PID $OLD_PID (verified python+mlx_lm)…"; kill -9 "$OLD_PID" 2>/dev/null || true; else echo "[MLX] ⚠️  PID $OLD_PID is alive but not a python+mlx_lm process (comm='$OLD_COMM') — refusing to kill (PID was recycled, likely Hammerspoon)."; fi; else echo "[MLX] PID file stale (PID $OLD_PID not running)."; fi; rm -f "$MLX_PID_FILE"; fi; PGREP_PIDS=$(ps -axo pid=,ucomm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}' || true); if [ -n "$PGREP_PIDS" ]; then echo "[MLX] mlx_lm process(es) still alive (PIDs: $PGREP_PIDS) — killing…"; echo "$PGREP_PIDS" | xargs kill -9 2>/dev/null || true; sleep 1; fi; sleep 3; LSOF_ATTEMPTS=0; while true; do STALE_PIDS=$(lsof -ti TCP:3460 2>/dev/null || true); if [ -z "$STALE_PIDS" ]; then echo "[MLX] Port 3460 free — starting server."; break; fi; LSOF_ATTEMPTS=$((LSOF_ATTEMPTS + 1)); echo "[MLX] Port 3460 still occupied attempt $LSOF_ATTEMPTS (PIDs: $STALE_PIDS) — killing…"; echo "$STALE_PIDS" | xargs kill -9 2>/dev/null || true; if [ "$LSOF_ATTEMPTS" -ge 10 ]; then echo "[MLX] ❌ Port 3460 still occupied after 10 attempts — giving up."; exit 1; fi; sleep 0.5; done; MLX_FIFO=$(mktemp -u /tmp/mlx_out.XXXXXX); mkfifo "$MLX_FIFO"; MLX_PID=''; MLX_PGID=''; MLX_STOP_PENDING=0; MLX_CLEANED=0; OWN_PGID=$(ps -o pgid= -p $$ 2>/dev/null | tr -d '[:space:]'); PARENT_PGID=$(ps -o pgid= -p $PPID 2>/dev/null | tr -d '[:space:]'); cleanup_mlx_child() { if [ "$MLX_CLEANED" -eq 1 ]; then return 0; fi; MLX_CLEANED=1; trap '' TERM INT HUP; if [ -n "$MLX_PID" ] && kill -0 "$MLX_PID" 2>/dev/null; then KILL_TARGET="$MLX_PID"; if [ -n "$MLX_PGID" ] && [ "$MLX_PGID" != "$OWN_PGID" ] && [ "$MLX_PGID" != "$PARENT_PGID" ]; then KILL_TARGET="-$MLX_PGID"; fi; kill -TERM -- "$KILL_TARGET" 2>/dev/null || true; STOP_ATTEMPTS=0; while kill -0 -- "$KILL_TARGET" 2>/dev/null && [ "$STOP_ATTEMPTS" -lt 20 ]; do STOP_ATTEMPTS=$((STOP_ATTEMPTS + 1)); sleep 0.1; done; if kill -0 -- "$KILL_TARGET" 2>/dev/null; then kill -KILL -- "$KILL_TARGET" 2>/dev/null || true; fi; wait "$MLX_PID" 2>/dev/null || true; fi; rm -f "$MLX_FIFO"; }; trap 'MLX_STOP_PENDING=1' TERM INT HUP; set -m; REPO_ID="LiquidAI/LFM2.5-350M-MLX-8bit"; CACHE_NAME="models--$(echo "$REPO_ID" | sed 's|/|--|g')"; CACHE_ROOT="$HOME/.cache/huggingface/hub/$CACHE_NAME"; SNAPSHOT_DIR=$(ls -dt "$CACHE_ROOT/snapshots/"*/ 2>/dev/null | head -1); if [ -n "$SNAPSHOT_DIR" ] && [ -d "$SNAPSHOT_DIR" ]; then MODEL_ARG="${SNAPSHOT_DIR%/}"; echo "[MLX] Using local snapshot path: $MODEL_ARG"; printf '%s\n' "$MODEL_ARG" > '~/perso/config/ergopti_plus/hammerspoon/mlx_active_model.txt'; REVISION=$(basename "$MODEL_ARG"); mkdir -p "$CACHE_ROOT/refs"; if [ ! -f "$CACHE_ROOT/refs/main" ]; then echo "$REVISION" > "$CACHE_ROOT/refs/main"; echo "[MLX] Wrote refs/main = $REVISION (was missing — required by HF offline mode)."; fi; else MODEL_ARG="$REPO_ID"; echo "[MLX] No local snapshot found for $REPO_ID — falling back to repo id."; printf '%s\n' "$REPO_ID" > '~/perso/config/ergopti_plus/hammerspoon/mlx_active_model.txt'; fi; "$PYTHON_BIN" -m mlx_lm server --model "$MODEL_ARG" --port 3460 --decode-concurrency 1 --prompt-concurrency 1 > "$MLX_FIFO" 2>&1 & MLX_PID=$!; trap 'cleanup_mlx_child' EXIT; trap 'cleanup_mlx_child; exit 15' TERM INT HUP; if [ "$MLX_STOP_PENDING" -eq 1 ]; then cleanup_mlx_child; exit 15; fi; set +m; MLX_PGID=$(ps -o pgid= -p $MLX_PID 2>/dev/null | tr -d ' ' || echo ''); echo "[MLX] Server started with PID $MLX_PID PGID $MLX_PGID."; echo "$MLX_PID" > "$MLX_PID_FILE"; if [ -n "$MLX_PGID" ] && [ "$MLX_PGID" != "$OWN_PGID" ] && [ "$MLX_PGID" != "$PARENT_PGID" ]; then echo "$MLX_PGID" > "$MLX_PGID_FILE"; echo "[MLX] Persisted PGID $MLX_PGID (isolated from Hammerspoon group $PARENT_PGID)."; else echo "[MLX] ⚠️  set -m did not isolate python (MLX_PGID=$MLX_PGID, own=$OWN_PGID, parent=$PARENT_PGID) — NOT persisting PGID. Will rely on PID-only kill on next switch."; rm -f "$MLX_PGID_FILE"; fi; while IFS= read -r LINE; do OUT="$(date +%H:%M:%S) [MLX-SERVER] $LINE"; printf '%s\n' "$OUT"; printf '%s\n' "$OUT" >> ~/Library/Logs/ergopti_plus/ErgoptiPlus_2026-10-28.log; done < "$MLX_FIFO"; wait "$MLX_PID"; MLX_STATUS=$?; rm -f "$MLX_FIFO"; exit "$MLX_STATUS"
+2026-10-28 00:00:00:364 [INFO] [menu_llm.mlx] MLX server task started for model ‘LFM2.5-350M’.
+2026-10-28 00:00:00:382 [DEBUG] [menu_llm.mlx] MLX server stream chunk (94 bytes).
+2026-10-28 00:00:00:382 [DEBUG] [menu_llm.mlx] MLX server: [MLX] Python utilisé: ~/Library/Application Support/Ergopti/mlx-venv/bin/python
+2026-10-28 00:00:01:109 [DEBUG] [keystats.log_manager] Ingest cycle: 1 entry(ies), offset now 550371.
+2026-10-28 00:00:01:113 [START] [keystats.watchers] Midnight rotation: archiving 2026-10-27…
+2026-10-28 00:00:01:319 [SUCCESS] [keystats.watchers] Midnight rotation complete — now tracking 2026-10-28.
+2026-10-28 00:00:03:606 [DEBUG] [llm.api_mlx] Active server PGID guard set to 49884.
+2026-10-28 00:00:03:606 [WARNING] [llm.api_mlx] Killing zombie mlx_lm Python process(es) via ps+awk (excluding PGID 49884)…
+2026-10-28 00:00:03:749 [DEBUG] [adapters.shell_runner] Process 'bash' exited (status=0, 140 ms, 0 similar run(s) since the last line).
+2026-10-28 00:00:03:749 [WARNING] [llm.api_mlx] Zombie kill completed; stdout: none 
+2026-10-28 00:00:04:296 [INFO] [ui_builder] Webview 'Installation du moteur IA (Ollama)' closed after 164.3 s open.
+2026-10-28 00:00:04:303 [DEBUG] [keystats.context_tracker] Replacement AXValueChanged watcher setup skipped: the element cannot be watched (Illegal argument).
+00:00:05 [MLX-SERVER] /Users/b519hs/Library/Application Support/Ergopti/mlx-venv/lib/python3.13/site-packages/mlx_lm/server.py:1723: UserWarning: mlx_lm.server is not recommended for production as it only implements basic security checks.
+00:00:05 [MLX-SERVER]   warnings.warn(
+00:00:05 [MLX-SERVER] 2026-10-28 00:00:05,200 - INFO - Starting httpd at 127.0.0.1 on port 3460...
+2026-10-28 00:00:05:213 [DEBUG] [menu_llm.mlx] MLX server stop signal accepted; awaiting exact task completion.
+2026-10-28 00:00:05:223 [INFO] [menu_llm.mlx] MLX server process exited with code 15.
+2026-10-28 00:00:05:226 [DEBUG] [menu_llm.mlx] MLX listener shutdown kill dispatched on port 3460.
+2026-10-28 00:00:05:226 [INFO] [menu_llm.models] MLX server stopped safely.
+2026-10-28 00:00:05:226 [DEBUG] [menu_llm] Invalidated LLM health status.
+2026-10-28 00:00:05:226 [DEBUG] [menu_llm.mlx] Deleting MLX model LFM2.5-350M at ~/.cache/huggingface/hub/models--LiquidAI--LFM2.5-350M-MLX-8bit…
+2026-10-28 00:00:05:229 [INFO] [adapters.field_run_ports] The MLX model step put the active-model file back (removed).
+2026-10-28 00:00:05:240 [INFO] [field_run] Field run step result: step=mlx_model verdict=pass codes=model_absent,downloaded_and_served,server_stopped,removal_started,active_model_restored
+2026-10-28 00:00:05:251 [WARNING] [adapters.field_run_ports] The field run changed ConfigTomlPath; putting it back.
+2026-10-28 00:00:05:371 [ERROR] [field_run] A field run step changed the configuration: restored_ConfigTomlPath.
+2026-10-28 00:00:05:374 [INFO] [field_run] Field run step result: step=config_guard verdict=fail codes=restored_ConfigTomlPath
+2026-10-28 00:00:05:376 [SUCCESS] [field_run] Field run mac-2026-10-27_235553 finished.
+2026-10-28 00:00:05:377 [INFO] [menu_llm.mlx] MLX model LFM2.5-350M deleted successfully.
+2026-10-28 00:00:05:379 [DEBUG] [shortcuts.script_control] Extras table registered (26 handler(s)).
+2026-10-28 00:00:05:435 [DEBUG] [menu.tap_holds] Picker trees served from cache.
+2026-10-28 00:00:05:435 [DEBUG] [logger] ↑ 1 identical line suppressed
+2026-10-28 00:00:05:435 [DEBUG] [builder] Component 'tap_holds.build' added successfully.
+2026-10-28 00:00:05:444 [DEBUG] [shortcuts.bindings] wrap_pairs_getter updated.
+2026-10-28 00:00:05:476 [DEBUG] [builder] Component 'shortcuts.build' added successfully.
+2026-10-28 00:00:05:524 [DEBUG] [builder] Component 'gestures.build' added successfully.
+2026-10-28 00:00:05:528 [DEBUG] [menu.keyboard_layout] Install probe — latest=Ergopti_v2.2.2.bundle, user_best=Ergopti_v2.2.2.bundle, system_best=Ergopti_v2.2.2.bundle, latest_installed=true.
+2026-10-28 00:00:05:529 [DEBUG] [menu.keyboard_layout] Active layout state — stable=2/4 legacy=0 installed=2.2.2 latest_installed=true.
+2026-10-28 00:00:05:601 [DEBUG] [builder] Component 'keyboard_layout.build' added successfully.
+2026-10-28 00:00:05:601 [DEBUG] [builder] Building hotstrings submenu…
+2026-10-28 00:00:05:602 [DEBUG] [hotstring_counter] Counted: common=2813 ergopti=194 personal=263 ext=0.
+2026-10-28 00:00:05:625 [DEBUG] [builder] Built manifest row 'hotstring_extensions' (2 extension(s)).
+2026-10-28 00:00:05:635 [DEBUG] [wpm_menubar] WPM menubar source colors set to true.
+2026-10-28 00:00:05:641 [DEBUG] [app_picker] Building application exclusion menu…
+2026-10-28 00:00:05:641 [INFO] [app_picker] Application exclusion menu built successfully (0 excluded app(s), 0.3 ms).
+2026-10-28 00:00:05:641 [DEBUG] [builder] Component 'keystats.build' added successfully.
+2026-10-28 00:00:05:642 [DEBUG] [builder] Building AI component…
+2026-10-28 00:00:05:642 [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+2026-10-28 00:00:05:642 [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=false, is_disabled=true
+2026-10-28 00:00:05:661 [DEBUG] [menu_llm] Building prediction count menu…
+2026-10-28 00:00:05:682 [DEBUG] [builder] AI component added successfully.
+2026-10-28 00:00:05:682 [TRACE] [menu_apps] Building applications submenu…
+2026-10-28 00:00:05:682 [DONE] [menu_apps] Applications submenu built (2 item(s)).
+2026-10-28 00:00:05:682 [DEBUG] [builder] Component 'apps.build' added successfully.
+2026-10-28 00:00:05:704 [DEBUG] [canvas_badge] Canvas badge built (canvas_w=200 pill_w=74 paused=false).
+2026-10-28 00:00:05:741 [INFO] [menu] Menu tree rebuilt in 272.2 ms (22 top-level item(s)). Slowest: keyboard_layout=77.1 ms, gestures=47.7 ms, shortcuts=40.3 ms, llm=40.1 ms, hotstrings=33.3 ms.
+2026-10-28 00:00:05:743 [DEBUG] [menu.keyboard_layout] Active layouts refreshed asynchronously: 3.
+2026-10-28 00:00:20:226 [WARNING] [llm.api_mlx] PGID pending timeout (15s) — unblocking zombie kills.
+2026-10-28 00:00:22:576 [DEBUG] [keystats.context_tracker] App switch: 'Hammerspoon' → 'Réglages Système' (22462 ms).
+2026-10-28 00:00:22:654 [DEBUG] [adapters.secure_field_detector] AX secure-field classification incomplete (role_read=true, subrole_read=false); suppressing input.
+2026-10-28 00:00:22:654 [TRACE] [keystats.context_tracker] Stopping previous accessibility observer…
+2026-10-28 00:00:22:655 [DONE] [keystats.context_tracker] Previous accessibility observer stopped.
+2026-10-28 00:00:22:655 [TRACE] [keystats.context_tracker] Attaching accessibility observer to PID 27210…
+2026-10-28 00:00:22:674 [DEBUG] [keystats.context_tracker] Focus moved away from secure field — logging resumed.
+2026-10-28 00:00:22:674 [DONE] [keystats.context_tracker] Accessibility observer attached to PID 27210.
+2026-10-28 00:00:24:784 [DEBUG] [keystats.context_tracker] Previous AXValueChanged watcher cleanup: the element no longer exists, so its watcher is already gone.
+2026-10-28 00:00:56:054 [DEBUG] [keystats.watchers] Battery: 97.0% (Battery Power, charging=false).
+2026-10-28 00:01:00:496 [DEBUG] [gestures] Touch session started on device=504403158265495662 (frame 3711, touches=1).
+2026-10-28 00:01:01:596 [INFO] [gestures.engine] GESTURE START: fingers=2 pos=(-4.4,32.2) ts=553063.533
+2026-10-28 00:01:01:800 [INFO] [gestures.engine] Confirmed gesture lift below ownership floor: 2 -> 1 (frames=8, 0.057s).
+2026-10-28 00:01:01:840 [INFO] [gestures.engine] process_frame: n=0 → fingers lifted, calling commitGesture (was active)
+2026-10-28 00:01:01:840 [INFO] [gestures.engine] commitGesture ENTRY: enabled=true maxFingers=2 startPos=(-4.4,32.2) endPos=(-3.9,33.3) lockedDir=nil liveAxisSign=nil stepsCommitted=0 elapsed=0.244s
+2026-10-28 00:01:01:840 [DEBUG] [gestures.engine] commitGesture: dx=0.48 dy=1.08 total_delta=1.57 TAP_MAX_DELTA=8.00 TAP_MAX_SEC=0.70 had_live_fire=false
+2026-10-28 00:01:01:840 [DEBUG] [gestures.engine] commitGesture: classified as TAP candidate (lockedDir=nil, total_delta=1.57 < 8.00)
+2026-10-28 00:01:01:840 [DEBUG] [gestures.engine] commitGesture: tap not fired (slot=tap_2, action=none)
+2026-10-28 00:01:01:962 [DEBUG] [gestures.engine] Centroid jump compensated: n 2 -> 3 (jump: -7.9, -4.6).
+2026-10-28 00:01:01:962 [DEBUG] [gestures.engine] Observed spurious finger spike, awaiting confirmation: 2 → 3.
+2026-10-28 00:01:01:970 [DEBUG] [gestures.engine] Tentative finger spike persists (2 frames, 0.008s): 2 → 3.
+2026-10-28 00:01:01:979 [DEBUG] [gestures.engine] Tentative finger spike persists (3 frames, 0.016s): 2 → 3.
+2026-10-28 00:01:01:987 [INFO] [gestures.engine] Confirmed multi-finger join: 2 → 3 (frames=4, 0.024s).
+2026-10-28 00:01:02:084 [DEBUG] [gestures.engine] Centroid jump compensated: n 3 -> 2 (jump: 8.0, 4.6).
+2026-10-28 00:01:05:285 [DEBUG] [gestures.engine] Centroid jump compensated: n 2 -> 3 (jump: 7.0, 4.1).
+2026-10-28 00:01:05:301 [DEBUG] [gestures.engine] Centroid jump compensated: n 3 -> 4 (jump: 24.8, -13.2).
+2026-10-28 00:01:05:301 [DEBUG] [gestures.engine] Finger spike candidate retired (candidate=3, current=4).
+2026-10-28 00:01:05:301 [DEBUG] [menu_llm.mlx] ↑ "MLX server stream chunk (%d bytes)." repeated 9 more times between 2026-10-28 00:00:00:403 and 2026-10-28 00:00:05:212 (last: MLX server stream chunk (99 bytes).).
+2026-10-28 00:01:05:301 [DEBUG] [gestures.engine] Three-finger candidate rejected by frames held: 2 -> 3 held 2 frame(s), 16 ms < 20 ms.
+2026-10-28 00:01:05:301 [DEBUG] [menu_llm.mlx] ↑ "MLX server: %s" repeated 9 more times between 2026-10-28 00:00:00:403 and 2026-10-28 00:00:05:212 (last: MLX server: 00:00:05 [MLX-SERVER] 2026-10-28 00:00:05,200 - INFO - Starting httpd at 127.0.0.1 on port 3460...).
+2026-10-28 00:01:05:301 [DEBUG] [gestures.engine] Observed spurious finger spike, awaiting confirmation: 2 → 4.
+2026-10-28 00:01:05:309 [DEBUG] [gestures.engine] Tentative finger spike persists (2 frames, 0.008s): 2 → 4.
+2026-10-28 00:01:05:317 [DEBUG] [gestures.engine] Tentative finger spike persists (3 frames, 0.016s): 2 → 4.
+2026-10-28 00:01:05:325 [INFO] [gestures.engine] Confirmed multi-finger join: 2 → 4 (frames=4, 0.025s).
+2026-10-28 00:01:05:415 [WARNING] [llm.api_mlx] ↑ "Endpoint discovery state reset." repeated 1 more time between 2026-10-28 00:00:05:226 and 2026-10-28 00:00:05:226.
+2026-10-28 00:01:05:415 [DEBUG] [gestures.engine] Centroid jump compensated: n 4 -> 2 (jump: -23.9, 12.9).
+2026-10-28 00:01:05:439 [INFO] [gestures.engine] TAP FIRE slot=tap_4 action=win_app_next elapsed=0.162s fingers=4
+2026-10-28 00:01:05:444 [DEBUG] [gestures.app_switch] Application 27210 has 1 window(s) to cycle — nothing to switch to.
+2026-10-28 00:01:05:813 [INFO] [gestures.engine] LOCKED DIR=horiz (dx=1.94 dy=-1.22 maxFingers=2)
+2026-10-28 00:01:06:309 [DEBUG] [gestures.engine] Centroid jump compensated: n 1 -> 2 (jump: -2.6, -4.6).
+2026-10-28 00:01:06:309 [DEBUG] [gestures.engine] Finger flickering recovered (count restored to 2).
+2026-10-28 00:01:06:407 [DEBUG] [gestures.engine] commitGesture: computeDir → diag (lockedDir=vert)
+2026-10-28 00:01:06:407 [DEBUG] [gestures.engine] commitGesture: dir=diag does not match gesture lockedDir=vert — skipping commit
+2026-10-28 00:01:07:001 [INFO] [notifications] ↑ "Notification dispatched (%s): %s — %s." repeated 1 more time between 2026-10-28 00:00:05:379 and 2026-10-28 00:00:05:379 (last: Notification dispatched (success): ✅ Supprimé (MLX) — LFM2.5-350M.).
+2026-10-28 00:01:07:001 [DEBUG] [gestures.engine] A mouse button is down — 2 contact(s) are a click-drag, not a gesture.
+2026-10-28 00:01:07:129 [TRACE] [keystats.context_tracker] Stopping previous accessibility observer…
+2026-10-28 00:01:07:129 [DONE] [keystats.context_tracker] Previous accessibility observer stopped.
+2026-10-28 00:01:07:129 [TRACE] [keystats.context_tracker] Attaching accessibility observer to PID 54776…
+2026-10-28 00:01:07:132 [DONE] [keystats.context_tracker] Accessibility observer attached to PID 54776.
+2026-10-28 00:01:35:307 [INFO] [phase_stats] Phase summary [boot] over 300 s: stage n=24 mean=77.36 max=493.35 total=1856.6 ms | stage_cpu n=24 mean=51.30 max=342.22 total=1231.2 ms | requires n=16 mean=69.79 max=491.51 total=1116.7 ms.
+2026-10-28 00:01:35:309 [INFO] [phase_stats] Phase summary [boot_sub] over 300 s: dynamic hotstrings n=1 mean=99.58 max=99.58 total=99.6 ms | choice catalogue and cache stats n=1 mean=44.44 max=44.44 total=44.4 ms | language hotstring files n=1 mean=34.22 max=34.22 total=34.2 ms | common hotstring files n=1 mean=25.19 max=25.19 total=25.2 ms | personal hotstrings n=1 mean=12.37 max=12.37 total=12.4 ms | extension packs n=1 mean=5.45 max=5.45 total=5.5 ms.
+2026-10-28 00:01:35:310 [INFO] [phase_stats] Phase summary [hotstring_load] over 300 s: common_file n=2 mean=11.48 max=16.13 total=23.0 ms.
+2026-10-28 00:01:35:310 [INFO] [phase_stats] Phase summary [menu] over 300 s: rebuild n=4 mean=421.66 max=603.15 total=1686.6 ms | #refresh_requested=3.
+2026-10-28 00:01:35:311 [INFO] [phase_stats] Phase summary [menu_item] over 300 s: llm n=4 mean=197.95 max=363.17 total=791.8 ms | keyboard_layout n=4 mean=69.73 max=108.38 total=278.9 ms | gestures n=4 mean=41.17 max=47.73 total=164.7 ms | shortcuts n=4 mean=40.71 max=46.59 total=162.8 ms | hotstrings n=4 mean=28.81 max=33.30 total=115.2 ms | metrics n=4 mean=12.26 max=30.12 total=49.0 ms | about n=4 mean=9.72 max=20.97 total=38.9 ms | debug n=4 mean=5.13 max=10.44 total=20.5 ms | configuration n=4 mean=2.42 max=3.43 total=9.7 ms | tap_holds n=4 mean=0.74 max=0.83 total=3.0 ms | apps n=4 mean=0.17 max=0.18 total=0.7 ms | language n=4 mean=0.04 max=0.05 total=0.2 ms | reload n=4 mean=0.01 max=0.01 total=0.0 ms | quit n=4 mean=0.01 max=0.01 total=0.0 ms.
+2026-10-28 00:01:35:312 [INFO] [phase_stats] Phase summary [process] over 300 s: cat n=2 mean=22684.38 max=31351.29 total=45368.8 ms | sfltool n=1 mean=20019.16 max=20019.16 total=20019.2 ms | ErgoptiPlus n=7 mean=1607.73 max=9328.94 total=11254.1 ms | defaults n=154 mean=37.33 max=1344.98 total=5749.1 ms | python3 n=3 mean=301.11 max=712.22 total=903.3 ms | brew n=2 mean=376.10 max=632.65 total=752.2 ms | spctl n=1 mean=628.43 max=628.43 total=628.4 ms | codesign n=1 mean=158.13 max=158.13 total=158.1 ms | sh n=1 mean=154.52 max=154.52 total=154.5 ms | bash n=1 mean=139.91 max=139.91 total=139.9 ms | mkdir n=3 mean=46.47 max=64.46 total=139.4 ms | shortcuts n=2 mean=59.65 max=70.10 total=119.3 ms | Application n=1 mean=59.03 max=59.03 total=59.0 ms | pgrep n=3 mean=19.23 max=19.94 total=57.7 ms | grep n=2 mean=26.93 max=39.13 total=53.9 ms | plutil n=2 mean=23.16 max=38.19 total=46.3 ms | systemextensionsctl n=1 mean=17.29 max=17.29 total=17.3 ms | scutil n=1 mean=9.11 max=9.11 total=9.1 ms | launchctl n=1 mean=4.57 max=4.57 total=4.6 ms | id n=1 mean=2.27 max=2.27 total=2.3 ms.
+2026-10-28 00:01:35:313 [INFO] [phase_stats] Phase summary [runtime] over 300 s: #timer_hold_over_250ms=17.
+2026-10-28 00:01:35:313 [INFO] [phase_stats] Phase summary [toml] over 300 s: parse n=24 mean=1.41 max=4.36 total=33.9 ms.
+2026-10-28 00:01:35:314 [INFO] [phase_stats] Memory snapshot: lua=38289 KB. Log volume over 300 s: debug=515 info=398 warn=16 error=3 dropped=4 suppressed=28 collapsed=506.
+2026-10-28 00:01:44:162 [TRACE] [keystats.context_tracker] Stopping previous accessibility observer…
+2026-10-28 00:01:44:162 [DONE] [keystats.context_tracker] Previous accessibility observer stopped.
+2026-10-28 00:01:44:162 [TRACE] [keystats.context_tracker] Attaching accessibility observer to PID 27210…
+2026-10-28 00:01:44:163 [DONE] [keystats.context_tracker] Accessibility observer attached to PID 27210.
+2026-10-28 00:01:46:854 [DEBUG] [keystats.watchers] System-load sample recorded (CPU user=9.8%, memory=47G).
+2026-10-28 00:01:47:188 [TRACE] [keystats.context_tracker] Stopping previous accessibility observer…
+2026-10-28 00:01:47:188 [DONE] [keystats.context_tracker] Previous accessibility observer stopped.
+2026-10-28 00:01:47:188 [TRACE] [keystats.context_tracker] Attaching accessibility observer to PID 54776…
+2026-10-28 00:01:47:190 [DONE] [keystats.context_tracker] Accessibility observer attached to PID 54776.
+2026-10-28 00:01:47:803 [DEBUG] [gestures.engine] Rapid re-tap detected (2 finger(s)) — committing and restarting.

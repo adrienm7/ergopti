@@ -1,0 +1,7 @@
+2026-10-28 00:00:00:360 [WARNING] [llm.api_mlx] Endpoint discovery state reset.
+2026-10-28 00:00:03:606 [WARNING] [llm.api_mlx] Killing zombie mlx_lm Python process(es) via ps+awk (excluding PGID 49884)…
+2026-10-28 00:00:03:749 [WARNING] [llm.api_mlx] Zombie kill completed; stdout: none 
+2026-10-28 00:00:05:251 [WARNING] [adapters.field_run_ports] The field run changed ConfigTomlPath; putting it back.
+2026-10-28 00:00:05:371 [ERROR] [field_run] A field run step changed the configuration: restored_ConfigTomlPath.
+2026-10-28 00:00:20:226 [WARNING] [llm.api_mlx] PGID pending timeout (15s) — unblocking zombie kills.
+2026-10-28 00:01:05:415 [WARNING] [llm.api_mlx] ↑ "Endpoint discovery state reset." repeated 1 more time between 2026-10-28 00:00:05:226 and 2026-10-28 00:00:05:226.

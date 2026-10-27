@@ -1,0 +1,9 @@
+17679 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus
+17740 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon
+18169 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus --karabiner-lease-guardian
+40645 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus --karabiner-lease-worker /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli ergopti_mode_0ffdfb672cb04bd3a00248fc90d317a4 ergopti_revoked_0ffdfb672cb04bd3a00248fc90d317a4 2 5
+40653 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus --karabiner-lease-inner /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli ergopti_mode_0ffdfb672cb04bd3a00248fc90d317a4 ergopti_revoked_0ffdfb672cb04bd3a00248fc90d317a4 5.0 16777233 120681885
+65321 /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_console_user_server
+65322 /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_session_monitor
+70132 /Applications/Ollama.app/Contents/Resources/ollama serve
+77996 omlx-server ptr_munge= main_stack= executable_file=0x1a01000011,0x41d62a9 dyld_file=0x1a01000011,0xfffffff000a9547 executable_cdhash=3af32e98331491c46756a22efea3fabda03bb2f9 executable_boothash=e6b167276deed627ca09a870a78ecdcee6d200a6 th_port=
