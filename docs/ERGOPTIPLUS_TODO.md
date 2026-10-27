@@ -242,10 +242,13 @@ dev.
   Next, on the Mac: run `open "<that URL>"` in Terminal; if it fails on macOS 26, switch to the
   `com.apple.settings.PrivacySecurity.extension?Privacy_ScreenCapture` form, else trace the
   `hs.urlevent.openURL` call made from the notification click.
-- **L30** [CODE] karabiner.lease "'status' called before M.init()" (new.txt 15:32:19, right
-  after the config migration refusal stopped that boot early). The guard is
-  platform/remap/lease_controller.lua:165. Next: log the caller's traceback in that guard, then
-  make the caller check the controller's init state when the boot stopped before init.
+- **L30** Fixed (lease guard commit). karabiner.lease "'status' called before M.init()" (new.txt
+  15:32:19, right after the config migration refusal stopped that boot early). The guard at
+  platform/remap/lease_controller.lua now logs its caller's traceback. The evident caller is the
+  diagnostics collector (`H.collect_input`, ui/healthcheck/helpers.lua), which reads the remapping
+  phase on any boot; it now reports `uninitialized` without calling status() when the controller
+  was never initialized. Mac confirms: no such ERROR; if one appears, its traceback names the
+  other caller.
 - **L31** [CODE] "Accessibility observer setup failed ... for PID 31319" (new.txt 14:27:31): 31319
   is the ErgoptiPlus runtime itself (issue #104 `runtime_pid`). `M.update_ax_observer`
   (modules/keystats/context_tracker.lua) attaches to whatever app is frontmost, including the
