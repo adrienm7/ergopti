@@ -9,6 +9,17 @@
 --- replays the same file through its own planner and writer.
 --- ==============================================================================
 
+--- Revives the number spellings JSON cannot carry ({"$number": "text"}).
+--- @param value any A decoded JSON value.
+--- @return any revived
+local function revive(value)
+	if type(value) ~= "table" then return value end
+	if value["$number"] ~= nil then return tonumber(value["$number"]) end
+	local copy = {}
+	for key, child in pairs(value) do copy[key] = revive(child) end
+	return copy
+end
+
 --- Registers the vector replay.
 --- @param helpers table Driver test helpers.
 --- @param corpus table The decoded corpus (Json.decode_lossless).
@@ -25,7 +36,7 @@ return function(helpers, corpus, expected_count)
 			helpers.it("(toml-leaf-rows) " .. vector.id, function()
 				-- A JSON null decodes to nil or a driver's null sentinel: both mean an absent file.
 				local source = type(vector.source) == "string" and vector.source or nil
-				local planned, rows = pcall(LeafRows.prepare, source or "", vector.operations)
+				local planned, rows = pcall(LeafRows.prepare, source or "", revive(vector.operations))
 				local ok, content = false, nil
 				if planned then
 					local prepared, _, candidate = Writer.prepare_batch("/virtual/leaf_rows_vector.toml", rows, {
@@ -47,6 +58,7 @@ return function(helpers, corpus, expected_count)
 					if check.absent then helpers.assert_nil(node, table.concat(check.path, "."))
 					else helpers.assert_eq(node, check.value, table.concat(check.path, ".")) end
 				end
+				if vector.expect.content ~= nil then helpers.assert_eq(content, vector.expect.content) end
 				for _, part in ipairs(vector.expect.contains or {}) do
 					helpers.assert_true(content:find(part, 1, true) ~= nil, "contains " .. part)
 				end

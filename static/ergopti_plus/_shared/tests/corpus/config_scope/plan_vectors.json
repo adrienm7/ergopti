@@ -1,5 +1,5 @@
 {
-	"_comment": "Parameter-domain scope planning, replayed by _shared/lua/test/config_scope_plan_contract.lua on macOS and Linux. entry points: scope_inventory(scope, {actions = <function answering the stored action_parameters paths>}, owners) and scope_plan(scope, mode, paths, owners) of the manifest reader, where owners.action_parameter_domain(path) answers the domain of a path \"action_parameters.<domain>__<binding>__<action>\" (the domain is one of gesture, keyboard, script, tap_key, tap_hold) only when <binding> is lowercase letters, digits and single underscores, never starting or ending with one, and <action> is a generated action that declares a parameter; otherwise it answers nothing. inventories: for each scope, the stored paths below and the number of paths the scope owns (inventory_count); for both modes \"clear\" and \"recommended\" the plan deletes exactly the inventory's paths as action_parameters rows (delete = true, no value). refusals: each path, given alone to scope_inventory and scope_plan of the gestures scope, makes both refuse (raise).",
+	"_comment": "Parameter-domain scope planning, replayed by _shared/lua/test/config_scope_plan_contract.lua on macOS and Linux. entry points: scope_inventory(scope, {actions = <function answering the stored action_parameters paths>}, owners) and scope_plan(scope, mode, paths, owners) of the manifest reader, where owners.action_parameter_domain(path) answers the domain of a path \"action_parameters.<domain>__<binding>__<action>\" (the domain is one of gesture, keyboard, script, tap_key, tap_hold) only when <binding> is lowercase letters, digits and single underscores, never starting or ending with one, and <action> is a generated action that declares a parameter; otherwise it answers nothing. inventories: for each scope, the stored paths below and the number of paths the scope owns (inventory_count); for both modes \"clear\" and \"recommended\" the plan deletes exactly the inventory's paths as action_parameters rows (delete = true, no value). refusals: each path, given alone to scope_inventory and scope_plan of the gestures scope, makes both refuse (raise). declaration_plans: a declaration {features, scopes} is built with the config defaults contract (config_defaults.new), then direct_scope_plan(scope, mode, paths, owners) and scope_plan are asked: direct_presets are the presets of the direct plan, scope_preset_count the presets of the full plan, absent lists \"section.key\" rows the plan must not contain, deleted rows that are deletions, restored_not_deleted rows that are present and not deletions, set rows rewritten to a value. declaration_refusals: the call raises (with_owners passes the parameter-domain owner). declaration_cycles: foreign, cyclic or missing includes are not traversed by the direct plan (direct_operations rows) and the full plan raises. inventory_collections: the manifest reader's scope_inventory(scope, providers) where each provider is a function answering paths; calls is how many providers ran, owned the sorted unique paths the scope owns, and the clear plan over them deletes each one with the quoted section spelling in section_of and no row for no_row_for. inventory_refusals: scope_inventory raises (a provider with raises raises, with not_a_function is not callable).",
 	"drivers": {
 		"macos": "Replays every vector.",
 		"linux": "Replays every vector.",
@@ -13,21 +13,564 @@
 		"action_parameters.tap_hold__caps_lock__open_url"
 	],
 	"inventories": [
-		{ "id": "gestures-own-the-gesture-domain", "scope": "gestures", "inventory_count": 1 },
+		{
+			"id": "gestures-own-the-gesture-domain",
+			"scope": "gestures",
+			"inventory_count": 1
+		},
 		{
 			"id": "shortcuts-own-keyboard-script-and-tap-key",
 			"scope": "shortcuts",
 			"inventory_count": 3
 		},
-		{ "id": "tap-holds-own-the-tap-hold-domain", "scope": "tap_holds", "inventory_count": 1 },
-		{ "id": "hotstrings-own-no-parameter-domain", "scope": "hotstrings", "inventory_count": 0 }
+		{
+			"id": "tap-holds-own-the-tap-hold-domain",
+			"scope": "tap_holds",
+			"inventory_count": 1
+		},
+		{
+			"id": "hotstrings-own-no-parameter-domain",
+			"scope": "hotstrings",
+			"inventory_count": 0
+		}
 	],
 	"refusals": [
-		{ "id": "action-without-parameter", "path": "action_parameters.gesture__tap_4__none" },
-		{ "id": "unknown-action", "path": "action_parameters.gesture__tap_4__made_up" },
-		{ "id": "double-underscore-in-binding", "path": "action_parameters.gesture__tap__4__open_url" },
-		{ "id": "trailing-segment", "path": "action_parameters.gesture__tap_4__open_url.extra" },
-		{ "id": "foreign-domain", "path": "action_parameters.foreign__tap_4__open_url" },
-		{ "id": "foreign-section", "path": "other.gesture__tap_4__open_url" }
+		{
+			"id": "action-without-parameter",
+			"path": "action_parameters.gesture__tap_4__none"
+		},
+		{
+			"id": "unknown-action",
+			"path": "action_parameters.gesture__tap_4__made_up"
+		},
+		{
+			"id": "double-underscore-in-binding",
+			"path": "action_parameters.gesture__tap__4__open_url"
+		},
+		{
+			"id": "trailing-segment",
+			"path": "action_parameters.gesture__tap_4__open_url.extra"
+		},
+		{
+			"id": "foreign-domain",
+			"path": "action_parameters.foreign__tap_4__open_url"
+		},
+		{
+			"id": "foreign-section",
+			"path": "other.gesture__tap_4__open_url"
+		}
+	],
+	"declaration_plans": [
+		{
+			"id": "direct-plan-keeps-only-its-own-declarations-on-restore",
+			"declaration": {
+				"features": [
+					{
+						"path": "own.keep",
+						"default": false,
+						"recommended": true
+					},
+					{
+						"path": "own.clear_keep",
+						"default": false,
+						"recommended": true
+					},
+					{
+						"path": "own.switch",
+						"default": true,
+						"recommended": true,
+						"cleared": false
+					},
+					{
+						"path": "child.value",
+						"default": false,
+						"recommended": true
+					}
+				],
+				"scopes": {
+					"root": {
+						"prefixes": ["own"],
+						"includes": ["child"],
+						"preset": "own_file",
+						"restore_exclude": ["own.keep"],
+						"clear_exclude": ["own.clear_keep"],
+						"dynamic_defaults": [
+							{
+								"prefix": "own.dynamic",
+								"depth": 1,
+								"default": false,
+								"recommended": true
+							}
+						],
+						"action_parameters": {
+							"restore": "remove",
+							"domains": ["script"]
+						}
+					},
+					"child": {
+						"prefixes": ["child"],
+						"preset": "child_file",
+						"dynamic_defaults": [
+							{
+								"prefix": "child.dynamic",
+								"depth": 1,
+								"default": false,
+								"recommended": true
+							}
+						],
+						"action_parameters": {
+							"restore": "remove",
+							"domains": ["gesture"]
+						}
+					}
+				}
+			},
+			"scope": "root",
+			"mode": "recommended",
+			"paths": [
+				"own.dynamic.actual",
+				"child.dynamic.other",
+				"action_parameters.script__reload__open_url",
+				"action_parameters.gesture__tap_4__open_url"
+			],
+			"expect": {
+				"direct_presets": [
+					{
+						"scope": "root",
+						"preset": "own_file",
+						"mode": "recommended"
+					}
+				],
+				"scope_preset_count": 2,
+				"absent": [
+					"child.value",
+					"child.dynamic.other",
+					"action_parameters.gesture__tap_4__open_url",
+					"own.keep"
+				],
+				"deleted": ["action_parameters.script__reload__open_url", "own.switch"],
+				"restored_not_deleted": ["own.dynamic.actual"]
+			}
+		},
+		{
+			"id": "direct-plan-keeps-only-its-own-declarations-on-clear",
+			"declaration": {
+				"features": [
+					{
+						"path": "own.keep",
+						"default": false,
+						"recommended": true
+					},
+					{
+						"path": "own.clear_keep",
+						"default": false,
+						"recommended": true
+					},
+					{
+						"path": "own.switch",
+						"default": true,
+						"recommended": true,
+						"cleared": false
+					},
+					{
+						"path": "child.value",
+						"default": false,
+						"recommended": true
+					}
+				],
+				"scopes": {
+					"root": {
+						"prefixes": ["own"],
+						"includes": ["child"],
+						"preset": "own_file",
+						"restore_exclude": ["own.keep"],
+						"clear_exclude": ["own.clear_keep"],
+						"dynamic_defaults": [
+							{
+								"prefix": "own.dynamic",
+								"depth": 1,
+								"default": false,
+								"recommended": true
+							}
+						],
+						"action_parameters": {
+							"restore": "remove",
+							"domains": ["script"]
+						}
+					},
+					"child": {
+						"prefixes": ["child"],
+						"preset": "child_file",
+						"dynamic_defaults": [
+							{
+								"prefix": "child.dynamic",
+								"depth": 1,
+								"default": false,
+								"recommended": true
+							}
+						],
+						"action_parameters": {
+							"restore": "remove",
+							"domains": ["gesture"]
+						}
+					}
+				}
+			},
+			"scope": "root",
+			"mode": "clear",
+			"paths": [
+				"own.dynamic.actual",
+				"child.dynamic.other",
+				"action_parameters.script__reload__open_url",
+				"action_parameters.gesture__tap_4__open_url"
+			],
+			"expect": {
+				"direct_presets": [
+					{
+						"scope": "root",
+						"preset": "own_file",
+						"mode": "clear"
+					}
+				],
+				"scope_preset_count": 2,
+				"absent": [
+					"child.value",
+					"child.dynamic.other",
+					"action_parameters.gesture__tap_4__open_url",
+					"own.clear_keep"
+				],
+				"deleted": ["action_parameters.script__reload__open_url", "own.dynamic.actual"],
+				"set": {
+					"own.switch": false
+				}
+			}
+		}
+	],
+	"declaration_refusals": [
+		{
+			"id": "unknown-scope",
+			"declaration": {
+				"features": [
+					{
+						"path": "own.keep",
+						"default": false,
+						"recommended": true
+					},
+					{
+						"path": "own.clear_keep",
+						"default": false,
+						"recommended": true
+					},
+					{
+						"path": "own.switch",
+						"default": true,
+						"recommended": true,
+						"cleared": false
+					},
+					{
+						"path": "child.value",
+						"default": false,
+						"recommended": true
+					}
+				],
+				"scopes": {
+					"root": {
+						"prefixes": ["own"],
+						"includes": ["child"],
+						"preset": "own_file",
+						"restore_exclude": ["own.keep"],
+						"clear_exclude": ["own.clear_keep"],
+						"dynamic_defaults": [
+							{
+								"prefix": "own.dynamic",
+								"depth": 1,
+								"default": false,
+								"recommended": true
+							}
+						],
+						"action_parameters": {
+							"restore": "remove",
+							"domains": ["script"]
+						}
+					},
+					"child": {
+						"prefixes": ["child"],
+						"preset": "child_file",
+						"dynamic_defaults": [
+							{
+								"prefix": "child.dynamic",
+								"depth": 1,
+								"default": false,
+								"recommended": true
+							}
+						],
+						"action_parameters": {
+							"restore": "remove",
+							"domains": ["gesture"]
+						}
+					}
+				}
+			},
+			"scope": "missing",
+			"mode": "clear"
+		},
+		{
+			"id": "unknown-mode",
+			"declaration": {
+				"features": [
+					{
+						"path": "own.keep",
+						"default": false,
+						"recommended": true
+					},
+					{
+						"path": "own.clear_keep",
+						"default": false,
+						"recommended": true
+					},
+					{
+						"path": "own.switch",
+						"default": true,
+						"recommended": true,
+						"cleared": false
+					},
+					{
+						"path": "child.value",
+						"default": false,
+						"recommended": true
+					}
+				],
+				"scopes": {
+					"root": {
+						"prefixes": ["own"],
+						"includes": ["child"],
+						"preset": "own_file",
+						"restore_exclude": ["own.keep"],
+						"clear_exclude": ["own.clear_keep"],
+						"dynamic_defaults": [
+							{
+								"prefix": "own.dynamic",
+								"depth": 1,
+								"default": false,
+								"recommended": true
+							}
+						],
+						"action_parameters": {
+							"restore": "remove",
+							"domains": ["script"]
+						}
+					},
+					"child": {
+						"prefixes": ["child"],
+						"preset": "child_file",
+						"dynamic_defaults": [
+							{
+								"prefix": "child.dynamic",
+								"depth": 1,
+								"default": false,
+								"recommended": true
+							}
+						],
+						"action_parameters": {
+							"restore": "remove",
+							"domains": ["gesture"]
+						}
+					}
+				}
+			},
+			"scope": "root",
+			"mode": "foreign"
+		},
+		{
+			"id": "unknown-parameter-path",
+			"declaration": {
+				"features": [
+					{
+						"path": "own.keep",
+						"default": false,
+						"recommended": true
+					},
+					{
+						"path": "own.clear_keep",
+						"default": false,
+						"recommended": true
+					},
+					{
+						"path": "own.switch",
+						"default": true,
+						"recommended": true,
+						"cleared": false
+					},
+					{
+						"path": "child.value",
+						"default": false,
+						"recommended": true
+					}
+				],
+				"scopes": {
+					"root": {
+						"prefixes": ["own"],
+						"includes": ["child"],
+						"preset": "own_file",
+						"restore_exclude": ["own.keep"],
+						"clear_exclude": ["own.clear_keep"],
+						"dynamic_defaults": [
+							{
+								"prefix": "own.dynamic",
+								"depth": 1,
+								"default": false,
+								"recommended": true
+							}
+						],
+						"action_parameters": {
+							"restore": "remove",
+							"domains": ["script"]
+						}
+					},
+					"child": {
+						"prefixes": ["child"],
+						"preset": "child_file",
+						"dynamic_defaults": [
+							{
+								"prefix": "child.dynamic",
+								"depth": 1,
+								"default": false,
+								"recommended": true
+							}
+						],
+						"action_parameters": {
+							"restore": "remove",
+							"domains": ["gesture"]
+						}
+					}
+				}
+			},
+			"scope": "root",
+			"mode": "clear",
+			"paths": ["own.unknown"],
+			"with_owners": true
+		}
+	],
+	"declaration_cycles": [
+		{
+			"id": "foreign-cyclic-or-missing-included-declarations-are-not-traversed",
+			"declaration": {
+				"features": [
+					{
+						"path": "own.value",
+						"default": false,
+						"recommended": true
+					}
+				],
+				"scopes": {
+					"root": {
+						"prefixes": ["own"],
+						"includes": ["root", "missing"]
+					}
+				}
+			},
+			"scope": "root",
+			"mode": "recommended",
+			"expect": {
+				"direct_operations": 1,
+				"full_plan_refused": true
+			}
+		}
+	],
+	"inventory_collections": [
+		{
+			"id": "runtime-owned-leaves-collected-once-without-static-or-unknown-siblings",
+			"scope": "hotstrings",
+			"providers": [
+				{
+					"name": "language",
+					"paths": [
+						"hotstrings.groups.french_probe",
+						"hotstrings.modules.french_probe.accents",
+						"gestures.enabled"
+					]
+				},
+				{
+					"name": "extension",
+					"paths": [
+						"hotstrings.modules.ext:ergopti:rolls.custom",
+						"hotstrings.groups.french_probe",
+						"shortcuts.personal.other_scope"
+					]
+				}
+			],
+			"expect": {
+				"calls": 2,
+				"owned": [
+					"hotstrings.groups.french_probe",
+					"hotstrings.modules.ext:ergopti:rolls.custom",
+					"hotstrings.modules.french_probe.accents"
+				],
+				"clear_deletes_every_owned_path": true,
+				"section_of": {
+					"hotstrings.modules.ext:ergopti:rolls.custom": "hotstrings.modules.\"ext:ergopti:rolls\""
+				},
+				"no_row_for": [
+					"hotstrings.modules.ext:ergopti:rolls.unknown",
+					"shortcuts.personal.other_scope"
+				]
+			}
+		}
+	],
+	"inventory_refusals": [
+		{
+			"id": "unknown-group-below-a-module",
+			"scope": "hotstrings",
+			"providers": [
+				{
+					"name": "runtime",
+					"paths": ["hotstrings.modules.group.section.expert"]
+				}
+			]
+		},
+		{
+			"id": "setting-outside-the-scope",
+			"scope": "hotstrings",
+			"providers": [
+				{
+					"name": "runtime",
+					"paths": ["future.setting"]
+				}
+			]
+		},
+		{
+			"id": "empty-path-segment",
+			"scope": "hotstrings",
+			"providers": [
+				{
+					"name": "runtime",
+					"paths": ["hotstrings.groups..invalid"]
+				}
+			]
+		},
+		{
+			"id": "a-later-provider-raises",
+			"scope": "hotstrings",
+			"providers": [
+				{
+					"name": "first",
+					"paths": ["hotstrings.groups.valid"]
+				},
+				{
+					"name": "second",
+					"raises": true
+				}
+			]
+		},
+		{
+			"id": "a-provider-that-is-not-a-function",
+			"scope": "hotstrings",
+			"providers": [
+				{
+					"name": "invalid",
+					"not_a_function": true
+				}
+			]
+		}
 	]
 }

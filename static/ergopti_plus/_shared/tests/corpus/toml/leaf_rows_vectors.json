@@ -1,5 +1,5 @@
 {
-	"_comment": "Leaf-row planning and writing vectors, replayed by _shared/lua/test/toml_leaf_rows_vectors_contract.lua on macOS and Linux. entry point: the leaf-row planner turns (source bytes, operations) into batch rows, then the batch writer prepares the candidate bytes from the source (a null source is an absent file). An operation is {path: [segments], value} or {path, delete: true}; a path has at least two segments and no empty one. expect.ok is acceptance of the whole chain (a refusal may come from either step); decoded lists paths of the decoded candidate whose value must equal value, or must be absent when absent is true; contains are substrings of the candidate bytes. Converted from toml_leaf_rows_contract.lua.",
+	"_comment": "Leaf-row planning and writing vectors, replayed by _shared/lua/test/toml_leaf_rows_vectors_contract.lua on macOS and Linux. entry point: the leaf-row planner turns (source bytes, operations) into batch rows, then the batch writer prepares the candidate bytes from the source (a null source is an absent file). An operation is {path: [segments], value} or {path, delete: true}; a path has at least two segments and no empty one. expect.ok is acceptance of the whole chain (a refusal may come from either step); decoded lists paths of the decoded candidate whose value must equal value, or must be absent when absent is true; contains are substrings of the candidate bytes; content is the exact candidate. A value {\"$number\": \"text\"} is the number the text spells. Converted from toml_leaf_rows_contract.lua.",
 	"entry_point": "leaf-row planner prepare(source, operations) -> rows, then the batch writer's prepare step on (source, rows)",
 	"drivers": {
 		"macos": "Replays every vector.",
@@ -198,6 +198,36 @@
 			"operations": [],
 			"expect": {
 				"ok": false
+			}
+		},
+		{
+			"id": "source-shaped-scalar-request-exact-despite-decoded-integer-aliasing",
+			"source": "a.number=9007199254740993\nfuture=9223372036854775807 # exact\n",
+			"operations": [
+				{
+					"path": ["a", "number"],
+					"value": {
+						"$number": "9007199254740992"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a.number = 9007199254740992\nfuture=9223372036854775807 # exact\n"
+			}
+		},
+		{
+			"id": "unrelated-numeric-tokens-kept-inside-a-source-shaped-carried-model",
+			"source": "[a]\nchild={number=9007199254740993,flag=false,empty=[]}\n",
+			"operations": [
+				{
+					"path": ["a", "child", "flag"],
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a]\nchild = { empty = [], flag = true, number = 9007199254740993 }\n"
 			}
 		}
 	]

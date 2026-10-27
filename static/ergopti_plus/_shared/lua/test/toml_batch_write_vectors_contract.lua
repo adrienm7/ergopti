@@ -17,12 +17,19 @@
 ---    fewer would fail instead of passing less.
 --- ==============================================================================
 
---- Revives the number spellings JSON cannot carry ({"$number": "text"}).
+--- Revives the number spellings JSON cannot carry ({"$number": "text"}; inf, -inf and nan
+--- spell the non-finite ones).
 --- @param value any A decoded JSON value.
 --- @return any revived
 local function revive(value)
 	if type(value) ~= "table" then return value end
-	if value["$number"] ~= nil then return tonumber(value["$number"]) end
+	if value["$number"] ~= nil then
+		local text = value["$number"]
+		if text == "inf" then return math.huge end
+		if text == "-inf" then return -math.huge end
+		if text == "nan" then return 0 / 0 end
+		return tonumber(text)
+	end
 	local copy = {}
 	for key, child in pairs(value) do copy[key] = revive(child) end
 	return copy
@@ -45,10 +52,11 @@ return function(helpers, corpus, expected_count)
 				local ok, detail, content = Writer.prepare_batch("/controlled/batch-vector.toml", revive(vector.rows), {
 					read_with_status = function() reads = reads + 1; return vector.source, "ok" end,
 					write = function() error("preparation must never publish") end,
-				})
+				}, vector.expected_snapshot)
 				local expect = vector.expect
 				helpers.assert_eq(ok, expect.ok, tostring(detail))
 				if expect.reads ~= nil then helpers.assert_eq(reads, expect.reads, "reads of the source") end
+				if expect.detail_equals ~= nil then helpers.assert_eq(detail, expect.detail_equals) end
 				for _, part in ipairs(expect.detail_contains or {}) do
 					helpers.assert_true(tostring(detail):find(part, 1, true) ~= nil,
 						"the refusal names " .. part .. ": " .. tostring(detail))
@@ -70,9 +78,14 @@ return function(helpers, corpus, expected_count)
 					for _, check in ipairs(expect.decoded) do
 						local node = decoded
 						for _, key in ipairs(check.path) do
-						if type(node) == "table" then node = node[key] else node = nil end
-					end
-						helpers.assert_eq(node, revive(check.value), table.concat(check.path, "."))
+							if type(node) == "table" then node = node[key] else node = nil end
+						end
+						if check.absent then
+							helpers.assert_nil(node, table.concat(check.path, "."))
+						else
+							helpers.assert_eq(node, revive(check.value), table.concat(check.path, "."))
+							if check.negative_zero then helpers.assert_eq(1 / node, -math.huge) end
+						end
 					end
 				end
 			end)
