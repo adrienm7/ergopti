@@ -74,8 +74,10 @@ function Remove-ErgoptiStartupShortcut {
 		$link = $shell.CreateShortcut($ShortcutPath)
 		$actualTarget = $link.TargetPath
 		# Normalize both paths through the Shell, including 8.3 directory names.
-		# This object is never saved: the on-disk shortcut remains untouched.
-		$link.TargetPath = $ExecutablePath
+		# The Shell setter keeps "." and ".." segments verbatim, so the path is
+		# made canonical first. This object is never saved: the on-disk shortcut
+		# remains untouched.
+		$link.TargetPath = [IO.Path]::GetFullPath($ExecutablePath)
 		if ($actualTarget -ne $link.TargetPath -or $link.Arguments -ne '') {
 			Write-Warning 'Foreign startup entry retained.'
 			return
