@@ -5,9 +5,13 @@ local helpers = require("tests.helpers")
 local Json = require("json")
 local function isolated(body)
 	local names = { "modules.llm.local_servers", "modules.llm.api_entries", "modules.llm.api_remote",
-		"adapters.http_client", "adapters.event_loop", "ui.menu.local_server_rows", "ui.menu.llm_backend_rows" }
+		"adapters.http_client", "adapters.event_loop", "ui.menu.local_server_rows", "ui.menu.llm_backend_rows",
+		"modules.llm.local_server_ports" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
+	-- Every catalogue server runs at its catalogue address (test_local_server_ports covers the scan)
+	local scan_overrides = {}
+	require("tests.support.modules.llm.local_server_scan_fake").install(scan_overrides)
 	-- Native scheduling is covered independently by test_local_server_startup.
 	package.loaded["adapters.event_loop"] = { defer = function(fn) fn(); return true end }
 	local path = os.tmpname(); os.remove(path)
@@ -35,7 +39,7 @@ local function isolated(body)
 		local out=assert(io.open(stage,"wb")); out:write(text); out:close(); return true
 	end)
 	local servers = require("modules.llm.local_servers")
-	local ok, err = pcall(body, servers, entries, calls, path)
+	local ok, err = pcall(body, servers, entries, calls, path, scan_overrides)
 	servers.shutdown()
 	os.remove(path); os.remove(path..".tmp"); os.remove(path..".corrupt")
 	for _,name in ipairs(names) do package.loaded[name]=previous[name] end
@@ -52,6 +56,39 @@ local function find(rows,label)
 	end
 end
 helpers.describe("Linux local server discovery ownership", function()
+	-- The maintainer's oMLX listened on 8181 (its settings file) while the sweep
+	-- probed the catalogue port 8000 only (field report 2026-10-27)
+	helpers.it("probes a server at the port its scan found and skips a server that does not run (local-server-ports)", function()
+		isolated(function(servers, _, calls, _, scan)
+			scan.omlx = { base_url = "http://127.0.0.1:8181/v1", port = 8181, source = "config" }
+			for _, id in ipairs({ "lmstudio", "llamacpp", "jan" }) do scan[id] = { running = false, pids = {} } end
+			local published = 0
+			helpers.assert_true(servers.rescan(function() return true end, function() published = published + 1 end))
+			helpers.assert_eq(#calls, 1, "a server whose process does not run is not probed")
+			helpers.assert_eq(calls[1].url, "http://127.0.0.1:8181/v1/models")
+			calls[1].finish(models("qwen3"))
+			helpers.assert_eq(published, 1)
+			helpers.assert_eq(table.concat(servers.detected(), ","), "omlx")
+			local views = servers.views()
+			helpers.assert_eq(views[1], { id = "omlx", display_name = "oMLX", port = 8181, port_source = "config",
+				base_url = "http://127.0.0.1:8181/v1", models = { "qwen3" }, status = "up" })
+			helpers.assert_eq(views[2].reason, "not_running")
+			local endpoint = assert(require("modules.llm.api_remote").endpoint(
+				{ provider = "omlx", base_url = "http://127.0.0.1:8000/v1", token = "" }, "qwen3"))
+			helpers.assert_eq(endpoint.url:sub(1, 26), "http://127.0.0.1:8181/v1/c", "a request follows the scanned port")
+		end)
+	end)
+	helpers.it("no running server probes nothing and still publishes none (local-server-ports)", function()
+		isolated(function(servers, _, calls, _, scan)
+			for _, id in ipairs({ "omlx", "lmstudio", "llamacpp", "jan" }) do scan[id] = { running = false, pids = {} } end
+			local changed = {}
+			helpers.assert_true(servers.rescan(function() return true end, function(value) changed[#changed + 1] = value end))
+			helpers.assert_eq(#calls, 0)
+			helpers.assert_eq(#changed, 1)
+			helpers.assert_eq(#servers.detected(), 0)
+			helpers.assert_eq(servers.is_sweeping(), false)
+		end)
+	end)
 	helpers.it("probes four catalogue URLs under independent native owners with optional credentials", function()
 		isolated(function(servers,entries,calls)
 			assert(entries.add({provider="lmstudio",label="Local",model="old",token=" private ",base_url="http://localhost:4321/v1"}))
