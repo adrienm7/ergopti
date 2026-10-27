@@ -480,7 +480,7 @@
 		},
 		{
 			"id": "js-0483",
-			"ordinal": 511,
+			"ordinal": 512,
 			"name": "AppImage needed-library closure (every ELF library is in the image or on the documented recipient list)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-linux-elf-needed-closure.cjs"],
