@@ -1030,7 +1030,7 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       comment change: within about 2 s the driver reloads once and keeps a Pause; the tray's Reload still works;
       AI menus (Ollama), the metrics window (WebView2, sqlite3.dll) and Alt+Tab navigation (ergopti_nav_owner.dll)
       work; Start at login in this mode registers the interpreter and the clone's script, and that login start
-      derives the root, so it is a developer run too: report whether that is wanted. (2) [PHYS-W] check that
+      derives the root, so it is a developer run too (wanted, maintainer decision of 27 October): confirm it. (2) [PHYS-W] check that
       `npm run dev:windows` works from Git Bash and from cmd (it calls Windows PowerShell 5.1). (2b) [PHYS-W]
       double-click works: quit the exe from its tray, double-click `static\ergopti_plus\windows\ErgoptiPlus.ahk`
       in Explorer: the same Debug lines appear, the "Developer source mode" one ending "(clone root from the

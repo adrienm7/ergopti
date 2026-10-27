@@ -15,6 +15,8 @@ answer once, then move the answered line below.
 
 ## Answered
 
+- **Answer of 2026-10-27 (Windows login start from a clone):** a Start at login registered from the clone's
+  `ErgoptiPlus.ahk` is a full developer run too (the user's `%APPDATA%\Ergopti\paths.toml`, auto-reload).
 - **Answer of 2026-10-27 (typing in Ergopti's own windows, ledger L31):** it counts. The event tap counts
   it; the runtime's own refused Accessibility element is logged at INFO, not as a WARNING.
 - **Answer of 2026-10-27 (Karabiner):** when Ergopti's tap-hold feature is on, Ergopti quits the user's own
