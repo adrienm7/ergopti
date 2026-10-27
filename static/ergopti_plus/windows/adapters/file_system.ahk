@@ -898,18 +898,16 @@ FSReadRange(Path, Start, Count, BlankNul := false) {
 ; the copy reads back as its source. The configuration backup's copies.
 ; @param Source {String} File to copy.
 ; @param Destination {String} New path; an existing one is never replaced.
-; @return {Boolean} True only for a complete, verified copy; a mismatched copy
-;   is removed.
+; @return {Boolean} True only for a complete, verified copy. Unverified output
+;   is retained: its pathname may already belong to a different file.
 FSCopyCreateVerified(Source, Destination) {
 	if !FSPathIsAdmissible(Source) || !FSPathIsAdmissible(Destination)
 		return false
 	; Builtin copy/delete operations interpret patterns; this API owns literal names.
 	if !DllCall("kernel32\CopyFileW", "Str", Source, "Str", Destination, "Int", true, "Int")
 		return false
-	if FSSameBytes(Source, Destination)
-		return true
-	FSDelete(Destination)
-	return false
+	; A mismatch can describe a foreign replacement, not the copy just created.
+	return FSSameBytes(Source, Destination)
 }
 
 ; Whether two files hold exactly the same bytes.
@@ -944,10 +942,8 @@ FSCopyReplaceAtomic(Source, Destination) {
 	; The fixed pathname conveys no ownership over a preexisting sidecar.
 	if !FSCopyCreateVerified(Source, Stage)
 		return false
-	if FSAtomicMoveReplace(Stage, Destination)
-		return true
-	try FileDelete(Stage)
-	return false
+	; A refused rename does not identify the file now held at the stage name.
+	return FSAtomicMoveReplace(Stage, Destination)
 }
 
 ; Whether a path is a reparse point (a symbolic link or a junction), which a
