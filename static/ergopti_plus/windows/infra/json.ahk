@@ -74,7 +74,7 @@ JsonParse(text) {
  * identity. Offsets are one-based UTF-16 positions for SubStr, not byte offsets.
  * @param {string} text Complete JSON source.
  * @param {Array} pathParts Decoded object keys, or omitted for the root object.
- * @returns {Map} Decoded key -> value/member start, length and exact source text.
+ * @returns {Map} Decoded key -> value/member spans, exact text and original JSON kind.
  * @throws {Error} Invalid JSON, a missing key or a selected non-object value.
  */
 JsonObjectMemberSpans(text, pathParts := unset) {
@@ -117,9 +117,9 @@ _JsonObjectMemberSpansAt(&text, position) {
 		position++
 		_JsonSkipWs(&text, &position)
 		valueStart := position
-		_JsonParseValue(&text, &position, 1)
+		_JsonParseValue(&text, &position, 1, &kind)
 		members[key] := Map("start", valueStart, "length", position - valueStart,
-			"text", SubStr(text, valueStart, position - valueStart),
+			"text", SubStr(text, valueStart, position - valueStart), "kind", kind,
 			"member_start", memberStart, "member_length", position - memberStart,
 			"member_text", SubStr(text, memberStart, position - memberStart))
 		_JsonSkipWs(&text, &position)
@@ -421,7 +421,7 @@ _JsonSkipWs(&text, &pos) {
 		pos += NativeTextSpanIncluding(StrPtr(text) + (pos - 1) * 2, _JsonWhitespaceUnits())
 }
 
-_JsonParseValue(&text, &pos, depth) {
+_JsonParseValue(&text, &pos, depth, &kind := "") {
 	global JSON_MAX_NESTING_DEPTH
 	if (depth > JSON_MAX_NESTING_DEPTH)
 		throw Error("JSON: maximum nesting depth exceeded at position " . pos . ".", -1)
@@ -431,16 +431,29 @@ _JsonParseValue(&text, &pos, depth) {
 	c := SubStr(text, pos, 1)
 	if (depth == JSON_MAX_NESTING_DEPTH and (c == "{" or c == "["))
 		throw Error("JSON: maximum nesting depth exceeded at position " . pos . ".", -1)
-	if (c == "{")
+	; Report the canonical dispatch kind before native Boolean/number aliases
+	; erase it. Ordinary JsonParse callers keep their existing decoded values.
+	if (c == "{") {
+		kind := "object"
 		return _JsonParseObject(&text, &pos, depth)
-	if (c == "[")
+	}
+	if (c == "[") {
+		kind := "array"
 		return _JsonParseArray(&text, &pos, depth)
-	if (c == '"')
+	}
+	if (c == '"') {
+		kind := "string"
 		return _JsonParseString(&text, &pos)
-	if (c == "t" or c == "f")
+	}
+	if (c == "t" or c == "f") {
+		kind := "boolean"
 		return _JsonParseBool(&text, &pos)
-	if (c == "n")
+	}
+	if (c == "n") {
+		kind := "null"
 		return _JsonParseNull(&text, &pos)
+	}
+	kind := "number"
 	return _JsonParseNumber(&text, &pos)
 }
 
