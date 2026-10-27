@@ -63,6 +63,24 @@ local BOOT_SUPPRESS_SEC = 5
 -- (tools/test/test-file-watchers-constants-single-source.cjs).
 local GIT_HOLD_WARN_DEFERRALS = 120   -- 120 * 0.5s = 60s before one warning
 
+--- Whether a changed path is a hotstring source: a TOML category, an index,
+--- or the AutoHotkey path marker.
+--- @param path string Absolute changed path.
+--- @return boolean
+local function is_hotstring_source(path)
+	return path:match("%.toml$") ~= nil or path:match("_index%.json$") ~= nil
+		or path:match("%.local_ahk_path$") ~= nil
+end
+
+--- Whether a developer field run is running (infra/field_run.lua). Read
+--- through package.loaded: only a developer app ever loads that module.
+--- @return boolean
+local function field_run_holds_reload()
+	local field_run = package.loaded["infra.field_run"]
+	return type(field_run) == "table" and type(field_run.holds_reload) == "function"
+		and field_run.holds_reload() == true
+end
+
 
 
 
@@ -440,6 +458,7 @@ function M.start(ctx)
 		arm_timer(msg)
 	end
 
+	local field_run_hold_logged = false
 	fire_reload = function(msg)
 		if not lifecycle_active then return end
 		-- Hold the reload while the working tree is still being written FROM ANY
@@ -456,6 +475,18 @@ function M.start(ctx)
 			arm_timer(msg)
 			return
 		end
+		-- A field run drives the app through downloads, removals and the config
+		-- guard: a reload would cut it short, so the burst waits for its end.
+		if field_run_holds_reload() then
+			if not field_run_hold_logged then
+				field_run_hold_logged = true
+				Logger.warn(LOG, "Source change reload held while the developer field run runs (%s).",
+					RuntimeLog.describe_paths(burst_paths))
+			end
+			arm_timer(msg)
+			return
+		end
+		field_run_hold_logged = false
 		local busy, repo = any_git_operation_in_progress()
 		if busy then
 			if defer_count < GIT_HOLD_WARN_DEFERRALS then
@@ -487,6 +518,11 @@ function M.start(ctx)
 				-- wait says nothing about the tree now. A pull that starts during the
 				-- hold would otherwise be re-exec'd into mid-write, which is the
 				-- half-updated-tree boot failure the gate exists to prevent.
+				if field_run_holds_reload() then
+					Logger.info(LOG, "Reload aborted at fire time: a developer field run started; re-arming.")
+					arm_timer(msg)
+					return
+				end
 				local busy, repo = any_git_operation_in_progress()
 				if busy then
 					Logger.info(LOG, "Reload aborted at fire time: git operation started in '%s' during the "
@@ -550,7 +586,7 @@ function M.start(ctx)
 		if not lifecycle_active then return end
 		local hit, identities = {}, {}
 		for _, p in ipairs(paths) do
-			if (p:match("%.toml$") or p:match("_index%.json$") or p:match("%.local_ahk_path$"))
+			if is_hotstring_source(p)
 				and not is_self_written(p, identities) and not is_runtime_artefact(p, identities) then
 				hit[#hit + 1] = p
 			end
@@ -582,7 +618,9 @@ function M.start(ctx)
 			-- excluded it. The self-written and runtime-artefact filters are the
 			-- ones the sibling watcher already applies; the per-file watchers had
 			-- neither, so a write the driver made itself could trigger a reload.
-			if not p:match("^/tmp/")
+			-- Hotstring files only: the personal tree is often a Git repository,
+			-- and a fetch, an editor swap file or a .DS_Store is not an edit.
+			if not p:match("^/tmp/") and is_hotstring_source(p)
 				and not is_self_written(p, identities) and not is_runtime_artefact(p, identities) then
 				hit[#hit + 1] = p
 			end

@@ -972,7 +972,9 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 		run = function()
 			local module = package.loaded["infra.field_run"]
 			if module == nil then return true end
-			return module.stop()
+			-- A run this teardown cuts short is closed with what cut it short
+			return module.stop({ kind = TerminationCoordinator.pending_kind(),
+				reason = TerminationCoordinator.pending_reason() })
 		end,
 	}
 	steps[#steps + 1] = {
