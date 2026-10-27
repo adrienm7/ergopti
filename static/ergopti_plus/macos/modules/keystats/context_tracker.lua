@@ -720,6 +720,20 @@ function M.update_ax_observer(app_pid)
 
 	local ok_app, app_element = pcall(hs.axuielement.applicationElement, app_pid)
 	if not ok_app or not app_element then
+		-- The runtime's own windows (menus, dialogs, pages) refuse an AX element of
+		-- their own process. Their typing still counts (the event tap sees it, as
+		-- decided on 27 October); only the secure-field and autocorrect hints are
+		-- unavailable there, which is this process's state, not a fault.
+		if hs.processInfo and app_pid == hs.processInfo.processID then
+			mark_context("secure", false)
+			Logger.info(LOG,
+				"Accessibility observer not attached to Ergopti's own windows (PID %s): their typing is counted from the event tap, without secure-field or autocorrect hints.",
+				tostring(app_pid))
+			if stop_ax_observer("Accessibility observer rollback") ~= true then
+				Logger.error(LOG, "Accessibility observer cleanup remains pending.")
+			end
+			return false
+		end
 		return reject_ax_observer_candidate(
 			"failed to get AX application element for PID " .. tostring(app_pid))
 	end
