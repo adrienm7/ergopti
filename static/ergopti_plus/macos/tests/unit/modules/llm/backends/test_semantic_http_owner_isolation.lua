@@ -17,7 +17,7 @@
 
 local helpers = require("tests.helpers")
 
-local OLLAMA_TEST_PORT = 11434
+local OLLAMA_TEST_PORT = 11435
 
 
 --- Returns one named closure upvalue, or nil when the closure does not own it.
@@ -118,7 +118,7 @@ local function fresh_backend(module_name)
 	package.loaded[module_name] = nil
 	local backend = helpers.load_with_stubs(module_name)
 	if module_name == "modules.llm.api_ollama" then
-		helpers.assert_true(require("adapters.storage").set("llm.ollama_port", OLLAMA_TEST_PORT))
+		helpers.assert_true(require("adapters.storage").set("llm.ollama_owned_port", OLLAMA_TEST_PORT))
 	end
 	return backend
 end

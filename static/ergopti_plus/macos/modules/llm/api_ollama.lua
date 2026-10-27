@@ -40,7 +40,7 @@ local LOG            = "llm.api_ollama"
 local LocalModelPolicy = require("llm.local_model_policy")
 
 -- Ollama bind address. The default port is the single source in
--- _shared/modules/llm/defaults.json (llm_ollama_port, surfaced via DEFAULT_STATE); a user
+-- _shared/modules/llm/defaults.json (llm_ollama_owned_port, surfaced via DEFAULT_STATE); a user
 -- override owned by OllamaEndpoint wins so a port collision can be resolved
 -- without editing any file. Host stays loopback.
 --- Reads a valid user port override from persistent storage, or nil when unset.
@@ -50,7 +50,7 @@ local function read_ollama_port_override()
 end
 
 --- Resolves the Ollama port: a valid user override wins, otherwise the canonical
---- default from _shared/modules/llm/defaults.json (DEFAULT_STATE.llm_ollama_port). init is
+--- default from _shared/modules/llm/defaults.json (DEFAULT_STATE.llm_ollama_owned_port). init is
 --- required lazily to avoid the init <-> api_ollama require cycle.
 --- @return integer
 local function resolve_ollama_port()
