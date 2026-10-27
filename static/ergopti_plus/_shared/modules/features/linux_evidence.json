@@ -569,7 +569,7 @@
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/text_actions/test_tap_keys.lua"
 			]
 		},
-		"shortcuts.keyboard.super_space": {
+		"shortcuts.keyboard.meta_space": {
 			"registered": "yes",
 			"production_caller": "yes",
 			"persisted": "yes",
@@ -875,7 +875,7 @@
 				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_navigation_settings.lua"
 			]
 		},
-		"shortcuts.keyboard.ctrl_g": {
+		"shortcuts.keyboard.primary_g": {
 			"registered": "yes",
 			"production_caller": "yes",
 			"persisted": "yes",

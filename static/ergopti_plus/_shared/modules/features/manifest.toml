@@ -1590,7 +1590,7 @@ description_key = "menu.llm.trigger.url_bar_filter_enabled"
 
 # No dedicated trigger shortcut: a prediction on demand is the
 # llm_generate_prediction action, recommended on each OS's keyboard slot
-# (shortcuts.keyboard.hs_ctrl_space, win_space, super_space).
+# (shortcuts.keyboard.secondary_space, win_space, meta_space).
 
 
 
@@ -2401,7 +2401,7 @@ type = "action"
 description_key = "menu.shortcuts.keyboard.win_space"
 
 [[features.shortcuts.keyboard]]
-id = "hs_ctrl_space"
+id = "secondary_space"
 platforms = ["hs"]
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
@@ -2411,7 +2411,187 @@ type = "action"
 description_key = "menu.shortcuts.keyboard.hs_ctrl_space"
 
 [[features.shortcuts.keyboard]]
-id = "ctrl_g"
+id = "secondary_a"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "select_line"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_a"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_d"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "open_downloads"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_d"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_e"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "open_file_manager"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_e"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_h"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "screenshot_region_clipboard"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_h"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_i"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "open_system_settings"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_i"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_m"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "activity_simulation"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_m"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_o"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "surround_parens"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_o"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_p"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "display_mirror_toggle"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_p"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_s"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "copy_selected_path"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_s"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_t"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "teleport_mouse"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_t"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_u"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "uppercase_selection"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_u"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_w"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "titlecase_selection"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_w"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_x"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "pick_color"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_x"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_capslock"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "toggle_capslock"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_capslock"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_l"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "lock_screen"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_l"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_period"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "open_emoji_picker"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_period"
+
+[[features.shortcuts.keyboard]]
+id = "secondary_quote"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "spotlight_mouse"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_ctrl_quote"
+
+[[features.shortcuts.keyboard]]
+id = "primary_shift_v"
+platforms = ["hs"]
+reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
+default = "none"
+recommended = "paste_plain"
+input_altering = true
+type = "action"
+description_key = "shortcuts.label_cmd_shift_v"
+
+[[features.shortcuts.keyboard]]
+id = "primary_g"
 platforms = ["linux"]
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
@@ -2421,7 +2601,7 @@ type = "action"
 description_key = "shortcuts.label_ctrl_g"
 
 [[features.shortcuts.keyboard]]
-id = "super_space"
+id = "meta_space"
 platforms = ["linux"]
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 default = "none"
@@ -6804,192 +6984,12 @@ platforms = ["hs"]
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
 [[features.shortcuts.keys]]
-id = "ctrl_a"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_a"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_d"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_d"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_e"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_e"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
 id = "ctrl_g"
 default = false
 recommended = true
 input_altering = true
 type = "boolean"
 description_key = "shortcuts.label_ctrl_g"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_h"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_h"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_i"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_i"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_m"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_m"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_o"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_o"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_p"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_p"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_s"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_s"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_t"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_t"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_u"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_u"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_w"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_w"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_x"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_x"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_capslock"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_capslock"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_l"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_l"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_period"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_period"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "ctrl_quote"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_ctrl_quote"
-platforms = ["hs"]
-reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
-
-[[features.shortcuts.keys]]
-id = "cmd_shift_v"
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "shortcuts.label_cmd_shift_v"
 platforms = ["hs"]
 reason_key = "platform_reason.shortcut_settings_are_stored_per_driver"
 
