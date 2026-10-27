@@ -42,6 +42,8 @@ REPO_ROOT="${REPO_ROOT%.}"
 set -e
 # shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
 . "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+# shellcheck source=macos-field-shell-checks.sh
+. "$REPO_ROOT/tools/dev/macos-field-shell-checks.sh"
 set +e
 LOG_DIR="${HOME}/Library/Logs/ergopti_plus"
 FIELD_BRANCH_PREFIX="field/"
@@ -332,6 +334,11 @@ run_field_run 2>&1 | tee "${out}/field_run.txt"
 field_run_status=${PIPESTATUS[0]}
 printf '%-28s exit=%s\n' "field_run" "${field_run_status}" >> "${steps}"
 [ "${field_run_status}" -eq 0 ] || log "step 'field_run' exited ${field_run_status} (kept in ${out}/field_run.txt)"
+
+# Checklist items that need no person: which privacy pane URL form this macOS
+# opens (ledger L29) and the system bash 3.2 (tools/dev/macos-field-shell-checks.sh)
+step privacy_pane_urls field_privacy_pane_urls "${REPO_ROOT}"
+step system_bash field_system_bash
 
 # ===========================================
 # ======= 4/ Input-source probe =============

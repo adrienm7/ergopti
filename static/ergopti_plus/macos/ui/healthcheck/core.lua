@@ -417,6 +417,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.privacy_settings",
+		contract = { "url", "url_for", "os_major" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.tcc_grant",
 		contract = { "bundle_id", "reset" },
 		wired    = true,
