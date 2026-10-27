@@ -25,7 +25,10 @@
 --- 3. Privacy: step codes and reports carry closed tokens, counts and catalogue
 ---    names; the diagnostics report is the share projection a bug report uses.
 --- 4. Configuration guard: config.toml and its sibling files are compared byte
----    for byte, the hs.settings preferences by their JSON encoding.
+---    for byte, the hs.settings preferences by their JSON encoding. Runtime
+---    state a module declares as such (the Karabiner lease's used-token ledger)
+---    is neither compared nor put back: rewinding it would undo that module's
+---    own invariants.
 --- ==============================================================================
 
 local M = {}
@@ -77,12 +80,22 @@ end
 -- ======================================
 -- ======================================
 
+--- Lists the preferences modules own as runtime state, which the guard skips.
+--- @return table runtime_keys Set of preference keys.
+local function runtime_setting_keys()
+	local runtime_keys = {}
+	for _, key in ipairs(require("platform.remap.lease_controller").RUNTIME_SETTING_KEYS) do
+		runtime_keys[key] = true
+	end
+	return runtime_keys
+end
+
 --- Captures the guarded files and preferences.
 --- @return table snapshot
 local function config_snapshot()
 	local ConfigPaths = require("infra.config_paths")
 	local Storage = require("adapters.storage")
-	local snapshot = { files = {}, settings = {} }
+	local snapshot = { files = {}, settings = {}, runtime_keys = runtime_setting_keys() }
 	for _, key in ipairs(GUARDED_FILES) do
 		local path = ConfigPaths.get(key)
 		if type(path) ~= "string" or path == "" then error("config path " .. key .. " is unresolved", 0) end
@@ -91,7 +104,7 @@ local function config_snapshot()
 		snapshot.files[#snapshot.files + 1] = { key = key, path = path, status = status, content = content }
 	end
 	for _, key in ipairs(Storage.keys()) do
-		snapshot.settings[key] = Json.encode(Storage.get(key))
+		if not snapshot.runtime_keys[key] then snapshot.settings[key] = Json.encode(Storage.get(key)) end
 	end
 	return snapshot
 end
@@ -118,7 +131,9 @@ local function config_restore(snapshot)
 		end
 	end
 	local current = {}
-	for _, key in ipairs(Storage.keys()) do current[key] = Json.encode(Storage.get(key)) end
+	for _, key in ipairs(Storage.keys()) do
+		if not snapshot.runtime_keys[key] then current[key] = Json.encode(Storage.get(key)) end
+	end
 	for key, encoded in pairs(snapshot.settings) do
 		if current[key] ~= encoded then
 			Logger.warn(LOG, "The field run changed the preference %s; putting it back.", key)
