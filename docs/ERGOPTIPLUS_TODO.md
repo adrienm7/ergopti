@@ -890,9 +890,17 @@ writes configuration. Reload the driver from the working tree for dev-only fixes
 
 ### Mac hardware session (prepared 27 October, run from a branch of dev)
 
-Work on a branch from dev (`git switch -c field/mac-2026-10-27 origin/dev`), run the driver from that
-working tree (Hammerspoon > Reload config) and, for packaged-only lines, the app built by
-`static/ergopti_plus/macos/build_macos_app.sh`. Before starting, write down the commit (`git rev-parse
+Clone only the current dev state and branch from it:
+`git clone --depth 1 --branch dev --single-branch https://github.com/adrienm7/ergopti.git`, then
+`git switch -c field/mac-2026-10-27` (if the clone is cut off: `git config --global http.version HTTP/1.1`, or
+add `--filter=blob:none --no-checkout` and run `git checkout dev`, which resumes). Run the driver from that
+working tree: quit the installed ErgoptiPlus app, back up `~/.config/hammerspoon` and `~/.hammerspoon` (the
+v15 migration rewrites `config.toml`; keep a copy of the old one for section 3), install stock Hammerspoon
+in `/Applications`, run `bash tools/dev/install-hammerspoon.sh` from the clone (it writes the bootstrap
+`init.lua` files and backs up the previous ones), grant Accessibility and Input Monitoring, then Reload
+config; Cmd+Ctrl+R reloads. To go back: delete both bootstrap `init.lua` files, restore the backups and
+start ErgoptiPlus.app. Packaged-only lines (Sparkle, Login Items, Homebrew) need the app built by
+`static/ergopti_plus/macos/build_macos_app.sh` or wait for the next dev build. Before starting, write down the commit (`git rev-parse
 --short HEAD`), macOS version and build, chip (Apple silicon or Intel), keyboard (ISO or ANSI, built-in or
 external), input source, Karabiner version and whether Ollama.app or oMLX is installed. Report each line as
 pass, fail or not run.
@@ -972,7 +980,7 @@ PONG/READY), `Lease-bound input startup failed`, `Layout poll detected change`, 
 - [ ] Issue #100: with Ollama.app and a PAC proxy, enabling the AI downloads the model; with the Ergopti
       menu held open, no lease timeout.
 - [ ] Issue #99: `memory_pressure | tail -1` during lease errors; oMLX listed (DEBUG line `Local server 'omlx'
-  probe answered ...`, else `curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/v1/models`);
+probe answered ...`, else `curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/v1/models`);
       `Ollama bootstrap failed (exit=137)` with an external Ollama; declining the download opens no error
       window ([issue99-ai-startup-updater.md](todo-agents/issue99-ai-startup-updater.md)).
 
