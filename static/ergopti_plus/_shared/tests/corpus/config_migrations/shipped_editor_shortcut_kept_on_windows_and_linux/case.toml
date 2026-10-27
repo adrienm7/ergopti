@@ -3,4 +3,4 @@ description = "Only the macOS driver consumes its dedicated legacy shortcut sour
 drivers = ["ahk"]
 outcome = "migrated"
 from_version = 8
-to_version = 14
+to_version = 15

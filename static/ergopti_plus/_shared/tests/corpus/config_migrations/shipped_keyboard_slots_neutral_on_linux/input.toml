@@ -1,0 +1,12 @@
+[_meta]
+schema_version = 14
+
+[shortcuts.keyboard]
+ctrl_g = "open_chatgpt"
+ctrl_shift_v = "paste_plain"
+super_space = "llm_generate_prediction"
+super_shift_a = "select_all"
+alt_x = "undo"
+alt_shift_y = "redo"
+magic_editor = "none"
+physical_none_KeyJ = "mute"

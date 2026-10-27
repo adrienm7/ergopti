@@ -5,4 +5,4 @@ description = "A stored category_enabled.dynamichotstrings switch becomes hotstr
 drivers = ["ahk"]
 outcome = "migrated"
 from_version = 12
-to_version = 14
+to_version = 15
