@@ -4993,21 +4993,43 @@
 							"id": "number_row_order",
 							"kind": "choice",
 							"label_key": "menu.layout.number_row",
-							"available": false,
+							"available": true,
 							"choices": [
 								{
 									"value": "native",
-									"label_key": "menu.layout.number_row_native"
+									"label_key": "menu.layout.number_row_native",
+									"writes": [
+										{
+											"path": "layout.direct_access_digits",
+											"value": "native",
+											"default": "native"
+										}
+									]
 								},
 								{
 									"value": "digits",
-									"label_key": "menu.layout.number_row_digits"
+									"label_key": "menu.layout.number_row_digits",
+									"writes": [
+										{
+											"path": "layout.direct_access_digits",
+											"value": "digits",
+											"default": "native"
+										}
+									]
 								},
 								{
 									"value": "symbols",
-									"label_key": "menu.layout.number_row_symbols"
+									"label_key": "menu.layout.number_row_symbols",
+									"writes": [
+										{
+											"path": "layout.direct_access_digits",
+											"value": "symbols",
+											"default": "native"
+										}
+									]
 								}
 							],
+							"capability": "number_row_live",
 							"reason_key": "platform_reason.number_row_override_unsupported"
 						}
 					]

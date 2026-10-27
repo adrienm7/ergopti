@@ -166,9 +166,20 @@ for (const driver of ['macos', 'linux']) {
 		path.join(ROOT, 'static/ergopti_plus', driver, 'ui/menu', file),
 		'utf8'
 	);
-	assert.match(
-		native,
-		/NumberRowPolicy\.native_rows\(ManifestMenu, render_ctx\.commands\)/,
-		`${driver}: actual read-only native provider`
-	);
+	if (driver === 'macos') {
+		assert.match(
+			native,
+			/NumberRowPolicy\.native_rows\(ManifestMenu, render_ctx\.commands\)/,
+			`${driver}: actual read-only native provider`
+		);
+	} else {
+		// Linux applies the order live to an X11 session with a layout of ours: the same
+		// shared provider, given the live owner, which greys the rows where it cannot.
+		assert.match(
+			native,
+			/NumberRowPolicy\.native_rows\(ManifestMenu, render_ctx\.commands, \{/,
+			`${driver}: shared provider with the live owner`
+		);
+		assert.match(native, /require\("modules\.keymap\.number_row_live"\)/, `${driver}: live owner`);
+	}
 }

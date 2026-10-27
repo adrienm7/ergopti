@@ -33,7 +33,8 @@ var _strings = {};
 // Wizard state.
 var _selectedLocale = DEFAULT_LOCALE_CODE;
 var _platform = '';
-// What the host can do beyond persisting answers: { gesture_registration }.
+// What the host can do beyond persisting answers: { gesture_registration, and any runtime
+// capability a control names (true, or the locale key of the reason it is missing) }.
 var _capabilities = null;
 var _pages = [];
 var _steps = [STEP_LANGUAGE, STEP_CONFIG];
@@ -430,7 +431,9 @@ function _operations() {
 		// A control writes only the paths its choice changes against the values
 		// in force; a control left as it was writes nothing.
 		(page.controls || []).forEach(function (control) {
-			var choice = control.available ? _controlChoice(control, state.controls[control.id]) : null;
+			var choice = _controlState(control).available
+				? _controlChoice(control, state.controls[control.id])
+				: null;
 			if (!choice) return;
 			choice.writes.forEach(function (write) {
 				if (!_sameValue(_currentValue(write), write.value)) {
@@ -634,6 +637,27 @@ function _renderPage(page) {
 }
 
 /**
+ * Whether a control can be changed now: the catalogue offers it on this platform and, when
+ * it names a runtime capability, the host holds it. A host that cannot says why with the
+ * locale key it gives; the control's own reason is the fallback.
+ * @param {object} control
+ * @returns {{available: boolean, reason_key: string|undefined}}
+ */
+function _controlState(control) {
+	if (!control.available) return { available: false, reason_key: control.reason_key };
+	if (control.capability) {
+		var held = _capabilities[control.capability];
+		if (held !== true) {
+			return {
+				available: false,
+				reason_key: typeof held === 'string' && held !== '' ? held : control.reason_key
+			};
+		}
+	}
+	return { available: true, reason_key: undefined };
+}
+
+/**
  * Renders the page's persistent controls. A change redraws this box alone:
  * nothing reloads, and every value is kept across Yes/No, navigation and a
  * language preview. A control this platform lacks is drawn greyed with why;
@@ -650,7 +674,8 @@ function _renderControls(page, state) {
 		var group = document.createElement('div');
 		group.className = 'control-group';
 		group.dataset.control = control.id;
-		var disabled = !control.available || !state.answer;
+		var availability = _controlState(control);
+		var disabled = !availability.available || !state.answer;
 		if (control.kind === 'check') {
 			group.appendChild(
 				_checkRow(
@@ -691,10 +716,10 @@ function _renderControls(page, state) {
 				group.appendChild(row);
 			});
 		}
-		if (!control.available) {
+		if (!availability.available) {
 			var reason = document.createElement('p');
 			reason.className = 'hint';
-			reason.textContent = _t(control.reason_key);
+			reason.textContent = _t(availability.reason_key);
 			group.appendChild(reason);
 		}
 		box.appendChild(group);
@@ -978,6 +1003,13 @@ window.initData = function (data) {
 		throw new Error('onboarding host must state its gesture_registration capability');
 	}
 	_capabilities = { gesture_registration: data.capabilities.gesture_registration };
+	// Any other capability is a runtime answer for a control: true, or the reason it is missing.
+	Object.keys(data.capabilities).forEach(function (name) {
+		var held = data.capabilities[name];
+		if (name !== 'gesture_registration' && (held === true || typeof held === 'string')) {
+			_capabilities[name] = held;
+		}
+	});
 	_platform = data.platform;
 	_pages = platform.pages;
 	_steps = [STEP_LANGUAGE, STEP_CONFIG].concat(
