@@ -13,7 +13,9 @@
  * 2. the collector reads every name it uses from the declaration;
  * 3. the real collector, in a fixture clone with a recording driver, writes a
  *    request of the declared shape, waits for done, copies the results and
- *    records the step, and reports a refusal without losing the other steps.
+ *    records the step, and reports a refusal without losing the other steps;
+ * 4. Ctrl-C during the field run still copies the partial results and the
+ *    logs, then commits them, marked interrupted.
  * ==============================================================================
  */
 
@@ -357,6 +359,55 @@ function reportFolder(paths) {
 					/"reason":"busy"/
 				);
 				assert.match(fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'), /^versions\s+exit=/m);
+			} finally {
+				driver.child.kill();
+			}
+		});
+
+		await check('Ctrl-C during the field run still commits its results and logs', async () => {
+			const paths = fixture('interrupted');
+			const logs = path.join(paths.home, 'Library/Logs/ergopti_plus');
+			fs.mkdirSync(logs, { recursive: true });
+			const today = new Date();
+			const day = [
+				today.getFullYear(),
+				String(today.getMonth() + 1).padStart(2, '0'),
+				String(today.getDate()).padStart(2, '0')
+			].join('-');
+			fs.writeFileSync(path.join(logs, `ErgoptiPlus_${day}.log`), '[INFO] fixture day log\n');
+			const driver = startDriver(paths, 'hang');
+			try {
+				await waitFor(driver.readyPath);
+				const result = await runCollector(paths, (child) => {
+					const poll = setInterval(() => {
+						const reports = path.join(paths.clone, 'docs/field-reports');
+						const folders = fs.existsSync(reports) ? fs.readdirSync(reports) : [];
+						const text = folders.length ? path.join(reports, folders[0], 'field_run.txt') : '';
+						if (
+							text &&
+							fs.existsSync(text) &&
+							/01_field_lease: pass/.test(fs.readFileSync(text, 'utf8'))
+						) {
+							clearInterval(poll);
+							// The terminal sends Ctrl-C to the whole foreground group
+							process.kill(-child.pid, 'SIGINT');
+						}
+					}, 100);
+					child.on('close', () => clearInterval(poll));
+				});
+				assert.equal(result.status, 130, `${result.stdout}\n${result.stderr}`);
+				const folder = reportFolder(paths);
+				assert(fs.existsSync(path.join(folder, 'field_run', '01_field_lease.json')));
+				assert(fs.existsSync(path.join(folder, `ErgoptiPlus_${day}.log`)));
+				assert.match(
+					fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
+					/^collector\s+interrupted$/m
+				);
+				assert.match(git(paths.clone, 'log', '-1', '--format=%s'), /\(interrupted\)$/);
+				const committed = git(paths.clone, 'show', '--name-only', '--format=', 'HEAD');
+				assert.match(committed, /field_run\/01_field_lease\.json/);
+				assert.match(committed, /ErgoptiPlus_\d{4}-\d{2}-\d{2}\.log/);
+				assert.equal(git(paths.clone, 'status', '--porcelain', '--untracked-files=no'), '');
 			} finally {
 				driver.child.kill();
 			}
