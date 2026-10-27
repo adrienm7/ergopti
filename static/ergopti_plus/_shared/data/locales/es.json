@@ -2172,6 +2172,7 @@
 	"network.failure.proxy": "No se pudo usar la configuración de proxy del sistema, o el proxy rechazó la conexión o solicitó autenticación. Compruebe la configuración de proxy del sistema.",
 	"network.failure.host_blocked": "La red bloquea el acceso a este servidor (filtrado de la empresa o cortafuegos).",
 	"network.failure.offline": "La red o la ruta de red no está disponible. Compruebe la conexión y la configuración de red del sistema.",
+	"network.failure.pac_unreachable_direct_failed": "No se pudo acceder a la configuración automática del proxy (PAC) o no se pudo leer, y la conexión directa intentada en su lugar también falló. Compruebe la conexión de red y los ajustes de proxy del sistema, o consulte a su departamento de TI.",
 	"network.failure.disk": "La descarga no pudo continuar porque no hay suficiente espacio en disco o se superó la cuota. Libere espacio y vuelva a intentarlo.",
 	"network.failure.permission": "El sistema rechazó una operación necesaria sobre un archivo. Compruebe los permisos del destino y si es de solo lectura.",
 	"network.failure.unknown": "La operación falló, pero los datos de diagnóstico disponibles no permiten determinar la causa.",

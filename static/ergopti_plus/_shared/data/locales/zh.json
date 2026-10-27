@@ -2172,6 +2172,7 @@
 	"network.failure.proxy": "无法使用系统代理配置，或代理拒绝了连接或要求身份验证。请检查系统代理设置。",
 	"network.failure.host_blocked": "网络阻止了对此服务器的访问（公司过滤或防火墙）。",
 	"network.failure.offline": "网络或网络路由不可用。请检查连接和系统网络设置。",
+	"network.failure.pac_unreachable_direct_failed": "无法访问或读取自动代理配置（PAC），改用的直接连接也失败了。请检查网络连接和系统代理设置，或咨询您的 IT 部门。",
 	"network.failure.disk": "磁盘空间不足或已超出配额，无法继续下载。请释放空间后重试。",
 	"network.failure.permission": "系统拒绝了必要的文件操作。请检查目标位置的权限，以及是否为只读。",
 	"network.failure.unknown": "操作失败，但现有诊断信息不足以确定原因。",
