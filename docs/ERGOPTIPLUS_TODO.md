@@ -812,13 +812,30 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       n-grams get `e`, synthetic output chains. Erased and synthetic vectors in the shared corpus, replayed on
       macOS and Linux (ee2eab6b1e, `keystats/correction_erased_vectors.json`). Left [PC]: the AHK replayer
       (`KLW_WalkTypingEntry`); Windows word separators are wider than Linux's three.
-- [ ] **macOS developer source runs.** [CODE] `tools/dev/install-hammerspoon.sh` points a stock Hammerspoon
-      at the clone, but instance admission (0c954ed49a, a7bdb88a44) admits the driver only in the launcher's
-      embedded runtime, so it stops with "native logging worker is unavailable" (maintainer, 27 October);
-      `launcher/README.md` still says direct developer sessions are supported. Decide one: a supported dev
-      mode (the launcher started against the working tree, or the script starting the async log worker with
-      the managed environment), or retire the script and fix the README and the refusal text to say "build
-      the app".
+- [ ] **Developer mode on the three OS (maintainer decision, 27 October).** [CODE] [PHYS-M] [PHYS-W] Each app
+      runs the clone with the built app's helpers, config and AI runtimes, reloads a saved source file, and
+      starts with one command; the updater, uninstall and remote layout catalogue stay off in a source run.
+      Inventory per feature: `docs/design/developer-mode.md`. Commands: macOS `bash tools/dev/run-macos-dev-app.sh`
+      (done: guardian 6f667b3380, network receiver c0e3359a19); Linux `bash tools/dev/run-linux-dev.sh` (done in
+      branch `tmp/wip-devmode3`: Reload relays the runner, a saved driver or `_shared/lua` `.lua` restarts the
+      daemon, the native archive backend is built into the clone); Windows `tools\dev\run-windows-dev.ps1`,
+      run with `powershell -ExecutionPolicy Bypass -File` (same branch: `infra/dev_source.ahk` reloads on a saved
+      `.ahk`, the run reads `%APPDATA%\Ergopti\paths.toml` like the exe). Left: (1) [PHYS-W] on the PC with the exe installed and
+      running, run the command from a PowerShell in the clone: the exe closes by itself (taskkill without /F; if it
+      stays, the script names it and stops), the tray icon appears, Debug logs say "Developer source mode; the driver
+      runs from <clone>\static\ergopti_plus\windows" and "Developer source watcher started"; the config is the
+      exe's (same hotstrings, same `paths.toml` choice, no onboarding); save any driver `.ahk` with a harmless
+      comment change: within about 2 s the driver reloads once and keeps a Pause; the tray's Reload still works;
+      AI menus (Ollama), the metrics window (WebView2, sqlite3.dll) and Alt+Tab navigation (ergopti_nav_owner.dll)
+      work; Start at login in this mode registers a plain source run (no watcher): report whether that should
+      carry the developer variable. (2) [PHYS-W] check that `npm run dev:windows` works from Git Bash and from
+      cmd (it calls Windows PowerShell 5.1). (3) [PHYS-M] the Mac lines of the hardware session cover the macOS
+      mode. (4) Linux, on a real desktop with the package installed: the unit is stopped, the tray appears, a
+      saved `.lua` restarts the daemon (`Debounced source reload firing` then a new boot), the tray's Reload
+      restarts it, and a second `run-linux-dev.sh` while one runs reports "already running". (5) [CODE] decide
+      whether the layout catalogue should fetch the remote registry in a developer run (today all three read the
+      clone's registry, by design of `local_source`). (6) [CODE] `bin/ergopti-hotstrings` run from a clone still
+      prefers `/usr/lib/ergopti` when a package is installed; fix or retire that branch.
 - [ ] **Owned, pinned third-party runtimes on the three OS (maintainer decision, 27 October).** [CODE] Ergopti
       installs and runs its own pinned Ollama, MLX environment, Karabiner runtime and any other third-party
       runtime, whether or not the user has one, and never uses, stops or modifies the user's copy. Ollama:
