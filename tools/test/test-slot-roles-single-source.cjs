@@ -72,7 +72,33 @@ for (const family of inventory.slot_families) {
 	}
 }
 
+for (const driver of DRIVERS) {
+	for (const family of roles.families[driver]) {
+		const ranks = family.map((r) => roles.modifier_order.indexOf(r));
+		assert(
+			ranks.every((r, i) => r >= 0 && (i === 0 || r > ranks[i - 1])),
+			`${driver} family ${family} is not ordered`
+		);
+		for (const role of family)
+			assert.notStrictEqual(roles.roles[role][driver], null, `${driver} family uses ${role}`);
+	}
+}
+assert.deepStrictEqual(
+	Object.entries(corpus.families).map(([d, prefixes]) => [d, prefixes]),
+	DRIVERS.map((d) => [d, roles.families[d].map((f) => f.join('_') + '_')]),
+	'corpus families differ from slot_roles.json'
+);
+
 const keyIds = chords.keys.map((k) => k.id);
+for (const driver of DRIVERS) {
+	for (const key of roles.extra_keys[driver]) {
+		assert(!keyIds.includes(key.id), `extra key "${key.id}" is already in modifier_chords.json`);
+		assert(
+			/^[a-z0-9]+$/.test(key.id) && !roles.modifier_order.includes(key.id),
+			`extra key "${key.id}" is unparseable`
+		);
+	}
+}
 for (const id of keyIds) {
 	assert(!id.includes('_'), `key "${id}" contains an underscore`);
 	assert(!roles.modifier_order.includes(id), `key "${id}" is a role name`);
@@ -107,8 +133,16 @@ assert.deepStrictEqual(
 );
 assert.deepStrictEqual(
 	corpus.pending_keys,
-	[...new Set(derived.map((c) => c.key).filter((k) => !keyIds.includes(k)))].sort(),
-	'pending_keys differ from the keys the catalogue lacks'
+	[
+		...new Set(
+			derived
+				.filter(
+					(c) => !keyIds.includes(c.key) && !roles.extra_keys[c.driver].some((k) => k.id === c.key)
+				)
+				.map((c) => c.key)
+		)
+	].sort(),
+	'pending_keys differ from the keys no driver table carries'
 );
 
 console.log(
