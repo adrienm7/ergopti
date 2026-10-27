@@ -14,6 +14,17 @@ if (!rootArgument || !sourceArgument || !destinationArgument) {
 const root = fs.realpathSync(rootArgument);
 const source = path.resolve(sourceArgument);
 const destination = path.resolve(destinationArgument);
+const exclusions = [];
+// The tree the destination must stay inside: the repository by default, or the build directory a
+// caller owns (ERGOPTI_COPY_DESTINATION_ROOT), so builds that run side by side never share one folder.
+const destinationOwner = process.env.ERGOPTI_COPY_DESTINATION_ROOT
+	? fs.realpathSync(process.env.ERGOPTI_COPY_DESTINATION_ROOT)
+	: root;
+for (let index = 0; index < options.length; index += 2) {
+	if (options[index] !== '--exclude' || !options[index + 1])
+		throw new Error('Invalid exclusion arguments');
+	exclusions.push(options[index + 1]);
+}
 
 function relativeWithin(parent, child) {
 	const relative = path.relative(parent, child);
@@ -29,19 +40,13 @@ function relativeWithin(parent, child) {
 }
 
 const relativeSource = relativeWithin(root, source).split(path.sep).join('/');
-relativeWithin(root, destination);
+relativeWithin(destinationOwner, destination);
 if (
 	destination === source ||
 	destination.startsWith(source + path.sep) ||
 	source.startsWith(destination + path.sep)
 ) {
 	throw new Error('Source and destination trees must not overlap');
-}
-const exclusions = [];
-for (let index = 0; index < options.length; index += 2) {
-	if (options[index] !== '--exclude' || !options[index + 1])
-		throw new Error('Invalid exclusion arguments');
-	exclusions.push(options[index + 1]);
 }
 const inventory = execFileSync('git', ['-C', root, 'ls-files', '-z', '--', relativeSource], {
 	encoding: 'utf8',
@@ -53,7 +58,8 @@ const directories = new Set();
 
 function ensureDirectory(directory) {
 	if (directories.has(directory)) return;
-	if (directory !== root) ensureDirectory(path.dirname(directory));
+	if (directory !== root && directory !== destinationOwner)
+		ensureDirectory(path.dirname(directory));
 	if (!fs.existsSync(directory)) fs.mkdirSync(directory);
 	const stat = fs.lstatSync(directory);
 	if (!stat.isDirectory() || stat.isSymbolicLink())

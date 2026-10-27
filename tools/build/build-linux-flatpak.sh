@@ -81,7 +81,12 @@ done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
-BUILD_DIR="$PROJECT_ROOT/build/linux"
+# A caller that runs several builds at once gives each its own output directory.
+BUILD_DIR="${ERGOPTI_LINUX_BUILD_DIR:-$PROJECT_ROOT/build/linux}"
+case "$BUILD_DIR" in
+  /?*) ;;
+  *) echo "[ERR] ERGOPTI_LINUX_BUILD_DIR must be an absolute path, got '$BUILD_DIR'" >&2; exit 1 ;;
+esac
 FLATPAK_DIR="$BUILD_DIR/flatpak"
 PAYLOAD_DIR="$FLATPAK_DIR/payload"
 REPO_DIR="$FLATPAK_DIR/repo"
