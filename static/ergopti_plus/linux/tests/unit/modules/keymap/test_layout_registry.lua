@@ -25,7 +25,9 @@ local ERGOL_URL = "https://raw.githubusercontent.com/adrienm7/ergopti/" .. CHANN
 local PYTHON_MESSAGE = "translated: layouts.linux_needs_python"
 local LOCAL_DIR = "/cfg/layouts/"
 local SHIPPED_DIR = "/pkg/linux/static/layouts/registry/"
-local CONVERTER = "/pkg/linux/xkb_generation/keylayout_to_xkb.py"
+local CONVERTER_DATA = "/pkg/linux/xkb_generation/data"
+local DATA_SOURCE = helpers.driver_root() .. "/../../ergopti/linux/xkb_generation/data/"
+local KEYCODES_PATH = "/pkg/_shared/modules/layouts/mac_keycodes.json"
 local INSTALLER = "/pkg/linux/xkb_installation/user_layout_installer.py"
 
 --- Reads a file of the repository registry byte for byte.
@@ -68,6 +70,17 @@ local function manager(options)
 		for _, file in ipairs(entry.extension.files) do digests[registry_file(file.file)] = file.sha256 end
 	end
 	local state = { requests = {}, files = {}, runs = {}, deleted = {} }
+	-- The conversion data the package ships: the real files, read once per manager.
+	for _, name in ipairs({ "key_sym.json", "xkb_symbols.txt", "xkb_types.txt" }) do
+		local handle = assert(io.open(DATA_SOURCE .. name, "rb"))
+		state.files[CONVERTER_DATA .. "/" .. name] = handle:read("*a")
+		handle:close()
+	end
+	do
+		local handle = assert(io.open(require("infra.paths").shared("modules/layouts/mac_keycodes.json"), "rb"))
+		state.files[KEYCODES_PATH] = handle:read("*a")
+		handle:close()
+	end
 	for path, text in pairs(options.files or {}) do state.files[path] = text end
 	local runs = options.runs or {}
 	local served = options.served or {}
@@ -103,9 +116,9 @@ local function manager(options)
 		end,
 		local_dir = LOCAL_DIR,
 		bundled_dir = options.no_shipped and nil or SHIPPED_DIR,
-		converter = CONVERTER,
+		converter_data = CONVERTER_DATA,
 		installer = INSTALLER,
-		keycodes = "/pkg/_shared/modules/layouts/mac_keycodes.json",
+		keycodes = KEYCODES_PATH,
 		translate = function(key) return "translated: " .. key end,
 	}
 	return LayoutRegistry, deps, state
@@ -249,7 +262,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		local layout = registry_file("ergol/ergol.keylayout")
 		local LayoutRegistry, deps, state = manager({
 			served = { [INDEX_URL] = INDEX_TEXT, [ERGOL_URL] = layout },
-			runs = { OK_RUN, OK_RUN, OK_RUN, INSTALLED_RUN },
+			runs = { OK_RUN, INSTALLED_RUN },
 		})
 		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
 		helpers.assert_true(result.ok, "the installation must succeed: " .. tostring(result.extra))
@@ -259,18 +272,15 @@ helpers.describe("layout manager (Linux): installing", function()
 		helpers.assert_eq(state.files[LOCAL_DIR .. "index.json"], INDEX_TEXT, "the refreshed index is cached")
 		helpers.assert_eq(state.files[LOCAL_DIR .. "index.etag"], '"e1"')
 		helpers.assert_true(state.files[LOCAL_DIR .. "ergol.keylayout"] == layout, "the verified bytes are converted")
-		helpers.assert_eq(#state.runs, 4, "a version probe and the conversion, then a probe and the installer")
-		local convert = state.runs[2]
-		helpers.assert_eq(convert.args[1], CONVERTER)
-		helpers.assert_eq(arg_value(convert.args, "--canonical"), LOCAL_DIR .. "ergol.canonical.json")
-		helpers.assert_nil(arg_value(convert.args, "--keylayout"), "the converter takes the shared parser's form")
-		local canonical = Json.decode(state.files[LOCAL_DIR .. "ergol.canonical.json"])
-		helpers.assert_eq(canonical.schema, 1, "the canonical form is written for the converter")
-		helpers.assert_eq(canonical.name, "French (Ergo-L)")
-		helpers.assert_eq(arg_value(convert.args, "--convention"), "ansi", "Ergo-L numbers its keys the ANSI way")
-		helpers.assert_eq(arg_value(convert.args, "--index"), LOCAL_DIR .. "index.json")
-		helpers.assert_eq(arg_value(convert.args, "--out"), LOCAL_DIR .. "ergol")
-		local install = state.runs[4]
+		helpers.assert_eq(#state.runs, 2, "the conversion runs in Lua: only the installer's probe and the installer are children")
+		helpers.assert_nil(state.files[LOCAL_DIR .. "ergol.canonical.json"], "no intermediate file is handed to a child")
+		for _, name in ipairs({ "ergol.xkb", "ergol.XCompose", "xkb_types.txt" }) do
+			helpers.assert_type(state.files[LOCAL_DIR .. "ergol/" .. name], "string", name .. " is written for the installer")
+		end
+		helpers.assert_contains(state.files[LOCAL_DIR .. "ergol/ergol.xkb"], 'xkb_symbols "ergol"')
+		helpers.assert_contains(state.files[LOCAL_DIR .. "ergol/ergol.xkb"], 'name[Group1] = "' .. entry_of("ergol").name .. '";')
+		helpers.assert_contains(state.files[LOCAL_DIR .. "ergol/ergol.XCompose"], 'include "%L"')
+		local install = state.runs[2]
 		helpers.assert_eq(install.args[1], INSTALLER)
 		helpers.assert_eq(install.args[2], "install")
 		helpers.assert_eq(arg_value(install.args, "--layout-id"), "ergol")
@@ -291,7 +301,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		local LayoutRegistry, deps, state = manager({
 			served = "offline",
 			files = shipped_files(),
-			runs = { OK_RUN, OK_RUN, OK_RUN, INSTALLED_RUN },
+			runs = { OK_RUN, INSTALLED_RUN },
 		})
 		local directories = {}
 		deps.ensure_dir = function(path) directories[path] = true return true end
@@ -304,8 +314,8 @@ helpers.describe("layout manager (Linux): installing", function()
 		helpers.assert_true(result.ok, "the shipped Ergopti must install offline: " .. tostring(result.extra))
 		helpers.assert_eq(result.detail.source, "bundled")
 		helpers.assert_eq(#state.requests, 1, "only the index refresh is attempted")
-		helpers.assert_eq(arg_value(state.runs[2].args, "--index"), SHIPPED_DIR .. "index.json",
-			"the XKB hints come from the index the entry was taken from")
+		helpers.assert_contains(state.files[LOCAL_DIR .. "ergopti/ergopti.XCompose"], "<guillemotleft>",
+			"the XKB hints come from the entry the shipped index describes")
 		local snapshot = LayoutRegistry.snapshot(deps)
 		helpers.assert_eq(snapshot.source, "bundled")
 		helpers.assert_eq(snapshot.error.code, "offline")
@@ -320,7 +330,7 @@ helpers.describe("layout manager (Linux): installing", function()
 				[LOCAL_DIR .. "installed.json"] = Json.encode({ schema_version = 1, layouts = { ergol = old } }),
 				[LOCAL_DIR .. "ergol.keylayout"] = "old bytes",
 			},
-			runs = { OK_RUN, OK_RUN, OK_RUN, INSTALLED_RUN },
+			runs = { OK_RUN, INSTALLED_RUN },
 		})
 		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
 		helpers.assert_true(result.ok, tostring(result.extra))
@@ -368,7 +378,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		local LayoutRegistry, deps, state = manager({
 			served = "offline",
 			files = shipped_files(),
-			runs = { OK_RUN, OK_RUN, OK_RUN, { exit_code = 3, error = "exit 3", stderr = "",
+			runs = { OK_RUN, { exit_code = 3, error = "exit 3", stderr = "",
 				stdout = '{"ok": false, "verified": null, "detail": "this is an Xorg session", "code": "xorg_session"}\n' } },
 		})
 		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
@@ -396,7 +406,7 @@ helpers.describe("layout manager (Linux): installing", function()
 		local LayoutRegistry, deps, state = manager({
 			served = "offline",
 			files = shipped_files(),
-			runs = { OK_RUN, OK_RUN, OK_RUN, { exit_code = 3, error = "exit 3", stderr = "",
+			runs = { OK_RUN, { exit_code = 3, error = "exit 3", stderr = "",
 				stdout = '{"ok": false, "verified": null, "detail": "rules/evdev is your own file", "code": "conflict"}\n' } },
 		})
 		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
@@ -486,16 +496,16 @@ helpers.describe("layout manager (Linux): uninstalling and activating", function
 end)
 
 helpers.describe("layout manager (Linux): what the package ships", function()
-	helpers.it("finds the converter, the installer and the registry where package and checkout put them (layout-registry-convert)", function()
+	helpers.it("finds the conversion data, the installer and the registry where package and checkout put them (layout-registry-convert)", function()
 		local LayoutRegistry = helpers.load_module("modules.keymap.layout_registry")
 		local settings = assert(LayoutRegistry.settings())
 		local present = {
-			["/pkg/linux/xkb_generation/keylayout_to_xkb.py"] = true,
+			["/pkg/linux/xkb_generation/data/key_sym.json"] = true,
 			["/pkg/linux/xkb_installation/user_layout_installer.py"] = true,
 			["/pkg/linux/static/layouts/registry/index.json"] = true,
 		}
 		local function exists(path) return present[path] == true end
-		helpers.assert_eq(LayoutRegistry.converter_path("/pkg/linux", exists), CONVERTER)
+		helpers.assert_eq(LayoutRegistry.converter_data_path("/pkg/linux", exists), CONVERTER_DATA)
 		helpers.assert_eq(LayoutRegistry.installer_path("/pkg/linux", exists), INSTALLER)
 		helpers.assert_eq(LayoutRegistry.bundled_dir("/pkg/linux", settings, exists), SHIPPED_DIR)
 		local checkout = {
@@ -503,11 +513,15 @@ helpers.describe("layout manager (Linux): what the package ships", function()
 			["/repo/static/ergopti_plus/linux/../../../static/layouts/registry/index.json"] = true,
 		}
 		local function in_checkout(path) return checkout[path] == true end
+		checkout["/repo/static/ergopti_plus/linux/../../ergopti/linux/xkb_generation/data/key_sym.json"] = true
+		helpers.assert_contains(LayoutRegistry.converter_data_path("/repo/static/ergopti_plus/linux", in_checkout),
+			"/ergopti/linux/xkb_generation/data")
 		helpers.assert_contains(LayoutRegistry.installer_path("/repo/static/ergopti_plus/linux", in_checkout),
 			"/ergopti/linux/xkb_installation/user_layout_installer.py")
 		helpers.assert_contains(LayoutRegistry.bundled_dir("/repo/static/ergopti_plus/linux", settings, in_checkout),
 			"/static/layouts/registry/")
 		helpers.assert_nil(LayoutRegistry.installer_path("/nowhere", function() return false end))
+		helpers.assert_nil(LayoutRegistry.converter_data_path("/nowhere", function() return false end))
 	end)
 end)
 

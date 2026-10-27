@@ -188,7 +188,7 @@ page sends (bounds, schema, name, map set) and never trust it.
   against the source layout, mixed compositions, dead-key composition across
   sources, overrides, shortcuts, validation, and a round trip of every
   serialized composition through the reader.
-- Per driver, all replaying the shared corpus: Windows AHK (`test_layout_composer_host.ahk`), the shared Lua contract (`_shared/lua/test/layout_composer_contract.lua`) run by the macOS and Linux registry tests, and the converter test `test_composer_corpus.py` (WSL, `python3 -m unittest`).
+- Per driver, all replaying the shared corpus: Windows AHK (`test_layout_composer_host.ahk`), the shared Lua contract (`_shared/lua/test/layout_composer_contract.lua`) run by the macOS and Linux registry tests, and the converter test `test_composer_corpus.py` (WSL, `python3 -m unittest`). The Linux driver converts in Lua (`_shared/lua/layouts/xkb_converter.lua`); `tools/test/test-keylayout-canonical-parity.cjs` requires its XKB and XCompose to equal the Python converter's on the composer corpus layout and every registry layout.
 
 ## The Debug check
 

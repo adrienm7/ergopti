@@ -103,10 +103,12 @@ echo "--- Copying the .keylayout converter ---"
 
 # Registry layouts reach Linux as their macOS .keylayout only: the package
 # carries no XKB file of any layout, and modules/keymap/layout_registry.lua converts
-# the downloaded file on the user's machine with this converter (python3).
-# The repository-only regeneration script and the tests stay behind.
+# the downloaded file on the user's machine in Lua (_shared/lua/layouts/
+# xkb_converter.lua), from the keysym table, symbols template and key types that
+# ship in data/. The Python converter, the repository-only regeneration script and
+# the tests stay behind: the package does not run them.
 copy_tree "${REPO_ROOT}/static/ergopti/linux/xkb_generation/" "${BUILD_DIR}/linux/xkb_generation/" \
-	--exclude tests --exclude generate_xkb_files.py
+	--exclude tests --exclude generate_xkb_files.py --exclude keylayout_to_xkb.py
 
 echo "--- Copying the user XKB installer and the layout registry ---"
 
@@ -198,16 +200,16 @@ REQUIRED_FILES=(
 	# The About submenu's version row: the tray cannot build without it.
 	"_shared/lua/updater/version_label.lua"
 	# Registry layouts: the client, its settings and keycode table, and the
-	# converter with every data file it reads (tools/test/
+	# conversion data it reads (tools/test/
 	# test-linux-ships-keylayout-converter.cjs keeps this list complete).
 	"_shared/lua/layouts/registry.lua"
 	"_shared/lua/layouts/catalogue.lua"
 	"_shared/lua/layouts/keylayout.lua"
+	"_shared/lua/layouts/xkb_converter.lua"
 	"_shared/modules/layouts/defaults.json"
 	"_shared/modules/layouts/mac_keycodes.json"
 	"linux/modules/keymap/layout_registry.lua"
 	"linux/adapters/process_runner.lua"
-	"linux/xkb_generation/keylayout_to_xkb.py"
 	"linux/xkb_generation/data/key_sym.json"
 	"linux/xkb_generation/data/xkb_symbols.txt"
 	"linux/xkb_generation/data/xkb_types.txt"

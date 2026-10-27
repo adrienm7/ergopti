@@ -5,14 +5,16 @@
  * MODULE: Linux Package Ships the .keylayout Converter
  * DESCRIPTION:
  * A registry layout reaches Linux as its macOS .keylayout only; the XKB files
- * are produced on the user's machine by static/ergopti/linux/xkb_generation/
- * keylayout_to_xkb.py, run by modules/keymap/layout_registry.lua. This guard pins the
- * three places that must agree for that to work in an installed package:
- *   1. the Linux build copies the converter into linux/xkb_generation/ and its
- *      integrity check requires the converter and EVERY data file it reads
- *      (discovered from the converter source, not listed by hand here);
- *   2. the Lua module looks for the converter at that packaged path first, and
- *      its source-checkout candidate resolves to the real converter;
+ * are produced on the user's machine, in Lua, by modules/keymap/layout_registry.lua
+ * (layouts/keylayout.lua and layouts/xkb_converter.lua) from the data files of
+ * static/ergopti/linux/xkb_generation/data. This guard pins the places that must
+ * agree for that to work in an installed package:
+ *   1. the Linux build copies the conversion data into linux/xkb_generation/ and its
+ *      integrity check requires EVERY data file the Lua module reads (discovered
+ *      from the Lua source, not listed by hand here); the Python converter is not
+ *      shipped, nothing in the package runs it;
+ *   2. the Lua module looks for the data at that packaged path first, and its
+ *      source-checkout candidate resolves to the real data folder;
  *   3. the Lua pieces and shared data of the transaction ship as well;
  *   4. the user XKB installer ships with every local module it imports
  *      (discovered from its imports), where the Lua module looks for it;
@@ -31,7 +33,6 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 const CONVERTER_DIR = 'static/ergopti/linux/xkb_generation';
-const CONVERTER = `${CONVERTER_DIR}/keylayout_to_xkb.py`;
 const BUILD = 'tools/build/build-linux-driver.sh';
 const LUA_MODULE = 'static/ergopti_plus/linux/modules/keymap/layout_registry.lua';
 const PACKAGED_DIR = 'linux/xkb_generation';
@@ -60,40 +61,50 @@ function requiredFiles(build) {
 	return [...block[1].matchAll(/^\s*"([^"]+)"/gm)].map((m) => m[1]);
 }
 
-/** Data files the converter opens through DATA_DIR. */
-function converterDataFiles() {
-	const names = [...read(CONVERTER).matchAll(/DATA_DIR\s*\/\s*"([^"]+)"/g)].map((m) => m[1]);
+/** Data files the Lua manager reads from the conversion data folder. */
+function conversionDataFiles() {
+	const names = [...read(LUA_MODULE).matchAll(/data_dir\s*\.\.\s*"\/([^"]+)"/g)].map((m) => m[1]);
 	return [...new Set(names)];
 }
 
-console.log('Linux package ships the .keylayout converter');
+console.log('Linux package ships the .keylayout conversion');
 
 const build = read(BUILD);
 const required = requiredFiles(build);
 
-check('the build copies the converter tree into the driver', () => {
-	const copy =
-		/copy_tree\s+"\$\{REPO_ROOT\}\/static\/ergopti\/linux\/xkb_generation\/"\s+"\$\{BUILD_DIR\}\/linux\/xkb_generation\/"([^\n]*)/.exec(
-			build
+check(
+	'the build copies the conversion data into the driver and leaves the Python converter behind',
+	() => {
+		const copy =
+			/copy_tree\s+"\$\{REPO_ROOT\}\/static\/ergopti\/linux\/xkb_generation\/"\s+"\$\{BUILD_DIR\}\/linux\/xkb_generation\/"((?:[^\n]*\\\n)*[^\n]*)/.exec(
+				build
+			);
+		assert.ok(copy, `${BUILD} must copy ${CONVERTER_DIR}/ into \${BUILD_DIR}/${PACKAGED_DIR}/`);
+		assert.ok(!/--exclude\s+data\b/.test(copy[1]), 'the conversion data must not be excluded');
+		assert.ok(
+			/--exclude\s+keylayout_to_xkb\.py/.test(copy[1]),
+			'the Python converter is not run by the package and must stay behind'
 		);
-	assert.ok(copy, `${BUILD} must copy ${CONVERTER_DIR}/ into \${BUILD_DIR}/${PACKAGED_DIR}/`);
-	assert.ok(!/--exclude\s+data\b/.test(copy[1]), 'the converter data must not be excluded');
-});
+	}
+);
 
-check('the integrity check requires the converter and every data file it reads', () => {
-	const data = converterDataFiles();
-	assert.ok(data.length >= 3, `found only ${data.length} DATA_DIR file(s) in the converter`);
+check('the integrity check requires every data file the Lua manager reads', () => {
+	const data = conversionDataFiles();
+	assert.ok(data.length >= 3, `found only ${data.length} data file(s) in the Lua manager`);
 	for (const name of data) {
 		assert.ok(
 			fs.existsSync(path.join(ROOT, CONVERTER_DIR, 'data', name)),
 			`data/${name} is not in the repository`
 		);
 	}
-	const missing = [
-		`${PACKAGED_DIR}/keylayout_to_xkb.py`,
-		...data.map((name) => `${PACKAGED_DIR}/data/${name}`)
-	].filter((file) => !required.includes(file));
-	assert.deepStrictEqual(missing, [], 'REQUIRED_FILES lacks these converter files');
+	const missing = data
+		.map((name) => `${PACKAGED_DIR}/data/${name}`)
+		.filter((file) => !required.includes(file));
+	assert.deepStrictEqual(missing, [], 'REQUIRED_FILES lacks these conversion data files');
+	assert.ok(
+		!required.includes(`${PACKAGED_DIR}/keylayout_to_xkb.py`),
+		'REQUIRED_FILES must not require the Python converter the package does not ship'
+	);
 });
 
 check('the Lua pieces and shared data of the conversion ship', () => {
@@ -103,6 +114,7 @@ check('the Lua pieces and shared data of the conversion ship', () => {
 		'_shared/lua/layouts/registry.lua',
 		'_shared/lua/layouts/catalogue.lua',
 		'_shared/lua/layouts/keylayout.lua',
+		'_shared/lua/layouts/xkb_converter.lua',
 		'_shared/modules/layouts/defaults.json',
 		'_shared/modules/layouts/mac_keycodes.json'
 	];
@@ -110,10 +122,10 @@ check('the Lua pieces and shared data of the conversion ship', () => {
 	assert.deepStrictEqual(missing, [], 'REQUIRED_FILES lacks these files');
 });
 
-check('the Lua module looks where the package and the source tree put the converter', () => {
+check('the Lua module looks where the package and the source tree put the conversion data', () => {
 	const source = read(LUA_MODULE);
-	const block = /CONVERTER_CANDIDATES\s*=\s*\{([\s\S]*?)\}/.exec(source);
-	assert.ok(block, `${LUA_MODULE} declares no CONVERTER_CANDIDATES`);
+	const block = /CONVERTER_DATA_CANDIDATES\s*=\s*\{([\s\S]*?)\}/.exec(source);
+	assert.ok(block, `${LUA_MODULE} declares no CONVERTER_DATA_CANDIDATES`);
 	const candidates = [...block[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 	assert.strictEqual(
 		candidates.length,
@@ -122,14 +134,14 @@ check('the Lua module looks where the package and the source tree put the conver
 	);
 	assert.strictEqual(
 		`linux/${candidates[0]}`,
-		`${PACKAGED_DIR}/keylayout_to_xkb.py`,
-		'the first candidate must be where the build puts the converter'
+		`${PACKAGED_DIR}/data`,
+		'the first candidate must be where the build puts the data'
 	);
 	const fromDriver = path.resolve(ROOT, 'static/ergopti_plus/linux', candidates[1]);
 	assert.strictEqual(
 		fromDriver,
-		path.join(ROOT, CONVERTER),
-		'the source candidate must resolve to the real converter'
+		path.join(ROOT, CONVERTER_DIR, 'data'),
+		'the source candidate must resolve to the real data folder'
 	);
 });
 

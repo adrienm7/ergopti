@@ -11,8 +11,8 @@ pickers (libxkbregistry merges it with the system registry). Xorg's
 ``xkbcomp`` never reads this tree: an X11 session needs the system installer
 (``install.sh``).
 
-The ErgoptiPlus daemon runs this module to install what it converted with
-``keylayout_to_xkb.py`` from a registry ``.keylayout``:
+The ErgoptiPlus daemon runs this module to install what it converted, in Lua
+(``layouts/xkb_converter.lua``), from a registry ``.keylayout``:
 
     user_layout_installer.py install --layout-id ergol --display-name "Ergo-L" \
         --source-dir ~/.config/ergopti_plus/layouts/ergol
