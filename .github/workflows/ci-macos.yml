@@ -290,8 +290,6 @@ jobs:
           MACOS_STAGE_NEEDS: ${{ toJSON(needs) }}
         run: node tools/ci/macos-stage-roles.cjs admit e2e "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"
       # Retained original role: e2e-hs
-      - uses: actions/checkout@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' }}
 
       - name: Install the E2E interpreter
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' }}
@@ -341,8 +339,6 @@ jobs:
           if-no-files-found: warn
 
       # Retained original role: tooltip-canvas
-      - uses: actions/checkout@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}
       - uses: actions/setup-node@v4
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}
         with:
@@ -1616,8 +1612,6 @@ jobs:
       # reviewer reads: this Ubuntu entry uses the Hammerspoon stub. The packaged
       # clean launch additionally qualifies the real native delayed-timer API.
       # Retained original role: item36-native
-      - uses: actions/checkout@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
       - uses: actions/setup-node@v4
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
         with:
@@ -1733,8 +1727,6 @@ jobs:
       # This no-effect paired-process control runs independently of archive/PAC jobs.
       # It supplements every full/package/install gate and never publishes assets.
       # Retained original role: lease-silence-native
-      - uses: actions/checkout@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
       - uses: actions/setup-node@v4
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}
         with:
@@ -1764,8 +1756,6 @@ jobs:
       # Retained original role: launcher-native
       # The launcher XCTest and the native probes of the build host (macOS 26),
       # out of Build: Build packages the application only after this cell passed.
-      - uses: actions/checkout@v4
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}
 
       - name: Prepare Node for native policy fixtures and XCTest evidence
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}

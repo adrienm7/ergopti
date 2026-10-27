@@ -156,10 +156,6 @@
 					"id": "stage-admission"
 				},
 				{
-					"uses": "actions/checkout@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' }}"
-				},
-				{
 					"name": "Install the E2E interpreter",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' }}"
 				},
@@ -173,10 +169,6 @@
 					"name": "Retain source-bound e2e-hs qualification receipts",
 					"uses": "actions/upload-artifact@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' && (always()) }}"
-				},
-				{
-					"uses": "actions/checkout@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}"
 				},
 				{
 					"uses": "actions/setup-node@v4",
@@ -437,10 +429,6 @@
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (always()) }}"
 				},
 				{
-					"uses": "actions/checkout@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
-				},
-				{
 					"uses": "actions/setup-node@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 				},
@@ -485,10 +473,6 @@
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (always()) }}"
 				},
 				{
-					"uses": "actions/checkout@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
-				},
-				{
 					"uses": "actions/setup-node@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 				},
@@ -505,10 +489,6 @@
 					"name": "Retain exact paired-process native receiving",
 					"uses": "actions/upload-artifact@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (always()) }}"
-				},
-				{
-					"uses": "actions/checkout@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launcher-native' }}"
 				},
 				{
 					"name": "Prepare Node for native policy fixtures and XCTest evidence",
