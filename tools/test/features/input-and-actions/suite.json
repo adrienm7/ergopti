@@ -677,7 +677,7 @@
 		},
 		{
 			"id": "tap-hold-migrations",
-			"ordinal": 504,
+			"ordinal": 507,
 			"name": "the versioned tap_hold.toml registry, its corpus and the retired explicit_delays marker",
 			"cmd": "node",
 			"args": ["tools/test/test-tap-hold-migrations.cjs"],
@@ -685,7 +685,7 @@
 		},
 		{
 			"id": "keylayout-canonical-parity",
-			"ordinal": 502,
+			"ordinal": 508,
 			"name": "keylayout canonical form: the shared Lua parser and the converter's Python parser read every shipped layout the same, and the converter writes the same XKB from it",
 			"cmd": "node",
 			"args": ["tools/test/test-keylayout-canonical-parity.cjs"],
