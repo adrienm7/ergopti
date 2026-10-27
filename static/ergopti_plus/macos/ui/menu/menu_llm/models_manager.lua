@@ -945,6 +945,49 @@ function M.new(deps)
 		end
 		return ollama.pull_model(model, model, on_success, on_cancel, opts) == true
 	end
+
+	--- Removes a model from the local Ollama server, whatever backend the AI
+	--- menu uses for predictions (the developer field run's cleanup).
+	--- @param model string Ollama model name.
+	--- @return boolean accepted
+	function obj.delete_ollama_model(model)
+		return ollama.delete_model(model) == true
+	end
+
+	--- Downloads a catalogue model through the MLX download window, whatever
+	--- backend the AI menu uses. Its owner starts the model's server once the
+	--- download completes, as selecting the model does.
+	--- @param display_name string Display name from _shared/modules/llm/models.json.
+	--- @param on_success function|nil Called once the model is downloaded and served.
+	--- @param on_cancel function|nil Receives the reason of a failed or cancelled download.
+	--- @param opts table|nil Freshness and ownership options.
+	--- @return boolean accepted
+	function obj.pull_mlx_model(display_name, on_success, on_cancel, opts)
+		local repo = mlx.get_mlx_repo(display_name)
+		if not repo then
+			Logger.error(LOG, "MLX download refused: %s names no MLX repository.", tostring(display_name))
+			if type(on_cancel) == "function" then
+				Logger.callback(LOG, "MLX download repository refusal", on_cancel, "unavailable")
+			end
+			return false
+		end
+		return mlx.pull_model(display_name, repo, on_success, on_cancel, opts) ~= false
+	end
+
+	--- Reports whether the MLX cache holds a catalogue model.
+	--- @param display_name string Display name.
+	--- @return boolean installed
+	function obj.mlx_model_installed(display_name)
+		return (mlx.get_installed_models() or {})[display_name] == true
+	end
+
+	--- Removes a catalogue model from the MLX cache, whatever the active backend.
+	--- @param display_name string Display name.
+	--- @return boolean accepted
+	function obj.delete_mlx_model(display_name)
+		return mlx.delete_model(display_name) == true
+	end
+
 	function obj.delete_model(name) return get_active().delete_model(name) end
 	function obj.force_mlx_check(target_model, on_success, on_cancel, opts)
 		return mlx.check_requirements(target_model, on_success, on_cancel,
