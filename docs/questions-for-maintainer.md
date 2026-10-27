@@ -43,6 +43,10 @@ answer once, then move the answered line below.
     `[tap_hold.retired_delays]` is kept forever.
   - **Quit:** Quit wins on the three OS: during a reload it abandons the reload and exits, once a write
     already in progress has finished. A pending per-category scope write blocks Linux Quit, as macOS.
+  - **PAR-41 (coordinator decisions, overridable):** the "no migration" of the design note is superseded by a
+    real config migration (schema v15) so no saved binding is lost, in line with the PAR-40 answer; the
+    parameters of renamed slots wait for a `rename_prefix` op (release blocker in the TODO); macOS `ctrl_g`
+    becomes an `open_url` slot with its URL later, with Windows `gpt`; the role name `secondary` is kept.
   - **Localized "general" metrics category:** the live dashboard folds its 19 spellings into one id, from the
     generated alias file.
 
