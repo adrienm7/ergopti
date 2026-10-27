@@ -7082,11 +7082,22 @@ function M.init(file_system)
 			-- This step is independent and guarded so a layout failure cannot suppress
 			-- the first post-wake liveness proof.
 			if _state.enabled == true then
+				local refresh_reason = nil
 				local refresh_ok, refreshed = run_async_step(
 					"Wake exact-lease liveness refresh",
-					LeaseController.refresh_liveness
+					function()
+						local sent, reason = LeaseController.refresh_liveness()
+						refresh_reason = reason
+						return sent
+					end
 				)
-				if not refresh_ok or refreshed ~= true then
+				if refresh_ok and refreshed ~= true and refresh_reason == "no-live-generation" then
+					-- The 2026-10-27 19:46 wake found the generation gone and only warned, so
+					-- remapping stayed off until a reload. The bounded failure recovery owns
+					-- the re-acquisition: it refuses while disabled, paused or transitioning.
+					Logger.info(LOG, "Wake found no live Karabiner lease; re-acquiring it.")
+					begin_lease_recovery(_last_failed_lease_token or "wake-without-generation")
+				elseif not refresh_ok or refreshed ~= true then
 					Logger.warn(LOG, "Wake refresh could not renew the exact Karabiner lease liveness.")
 				end
 			end

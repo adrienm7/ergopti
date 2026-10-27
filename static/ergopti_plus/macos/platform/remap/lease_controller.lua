@@ -2154,12 +2154,14 @@ end
 
 --- Requests immediate serialized liveness recovery after wake or unlock.
 --- @return boolean True when a ping was sent or another write is already in flight.
+--- @return string|nil reason "no-live-generation" when there is nothing to renew: the
+---   caller re-acquires the lease (platform/remap/init.lua, wake handler).
 function M.refresh_liveness()
 	if not require_state("refresh_liveness") then return false end
 	local generation = _state.current
 	if not generation or generation.failed or generation.stop_requested then
-		Logger.warn(LOG, "Cannot refresh Karabiner lease liveness — no live generation exists.")
-		return false
+		Logger.info(LOG, "No live Karabiner lease generation to renew.")
+		return false, "no-live-generation"
 	end
 	return send_ping(generation, "wake")
 end
