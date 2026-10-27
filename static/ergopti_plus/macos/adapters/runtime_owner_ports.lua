@@ -79,7 +79,7 @@ function M.new()
 		},
 		system_extensions = {
 			listing = function(callback)
-				exec("/usr/sbin/systemextensionsctl", { "list" }, COMMAND_TIMEOUT, function(code, output)
+				exec("/usr/bin/systemextensionsctl", { "list" }, COMMAND_TIMEOUT, function(code, output)
 					callback(code == 0 and output or nil)
 				end)
 			end,

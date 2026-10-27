@@ -54,12 +54,16 @@ end
 --- Judges one PAC answer.
 --- @param status number|nil HTTP status, nil or 0 when the request failed.
 --- @param body string|nil Response body.
+--- @param transport_error string|nil The HTTP client's reason for a failed request.
 --- @return string state "ok" or "error"
 --- @return string text Value (ok) or detail (error), without any URL.
-function M.judge(status, body)
+function M.judge(status, body, transport_error)
 	status = tonumber(status) or 0
 	if status ~= 200 then
-		return "error", status > 0 and ("PAC download: HTTP " .. status) or "PAC download failed"
+		if status > 0 then return "error", "PAC download: HTTP " .. status end
+		-- The transport reason is the only clue a field log carries (issue #104).
+		return "error", type(transport_error) == "string" and transport_error ~= ""
+			and ("PAC download failed: " .. transport_error) or "PAC download failed"
 	end
 	if type(body) ~= "string" or body == "" then return "error", "PAC is empty" end
 	local bytes = #body

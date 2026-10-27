@@ -191,6 +191,10 @@ function M.new(deps)
 			follow_redirects = true,
 		}, function(result)
 			result = type(result) == "table" and result or {}
+			-- The step tokens stay fixed, so the transport reason is logged here.
+			if (tonumber(result.status) or 0) == 0 then
+				Logger.warn(LOG, "PAC download failed: %s.", tostring(result.error))
+			end
 			callback(tonumber(result.status), result.body)
 		end)
 	end

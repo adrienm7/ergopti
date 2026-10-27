@@ -526,6 +526,15 @@
 			"args": ["tools/test/test-macos-dev-native-receiver.cjs"],
 			"repro": "npm run test:macos-dev-native-receiver",
 			"platforms": ["linux", "darwin"]
+		},
+		{
+			"id": "js-macos-field-run-contract",
+			"ordinal": 521,
+			"name": "the macOS field report collector and the developer app's field run share one request and result contract",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-field-run-contract.cjs"],
+			"repro": "npm run test:macos-field-run-contract",
+			"platforms": ["linux", "darwin"]
 		}
 	]
 }

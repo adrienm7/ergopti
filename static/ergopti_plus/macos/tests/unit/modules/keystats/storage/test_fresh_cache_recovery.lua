@@ -95,3 +95,21 @@ INSERT OR IGNORE INTO events_typing VALUES ('device', 2);
 		helpers.assert_eq(cursor.date, "2026-07-17")
 	end)
 end)
+
+helpers.describe("keystats/log_manager: fresh cache id ownership", function()
+	-- Boot-path ordering is reachable only through the source (init needs a live
+	-- cache). A failed derived rebuild must not leave next_event_id at its seed:
+	-- that recreated the legacy id restart which refuses every later rebuild.
+	helpers.it("publishes the replayed id counter before the derived rebuild (issue104-fresh-cache-ids)", function()
+		local src = assert(helpers.read_driver_unit("local function _ensure_ledger_header"))
+		local body = src:sub((assert(src:find("local function _init(core_state)", 1, true))))
+		local replay = assert(body:find("_replay_local_data_sql(db)", 1, true))
+		local persist = body:find("_persist_recovery_state(db, cursor)", 1, true)
+		local rebuild = assert(body:find("_start_aggregate_recovery(db)", 1, true))
+		helpers.assert_true(persist ~= nil and replay < persist and persist < rebuild,
+			"the replay cursor and id counter must be published before the aggregate rebuild can fail")
+		local recovery = src:match("local function _recover_aggregate_cache%(db%)(.-)\nend\n")
+		helpers.assert_true(recovery ~= nil and not recovery:find("_persist_recovery_state", 1, true),
+			"a successful rebuild must not be the only owner of the replay cursor")
+	end)
+end)

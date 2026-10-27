@@ -128,10 +128,15 @@ end
 
 --- Downloads the PAC the way the diagnostics probe does; the address is never logged.
 --- @param url string PAC address from the system proxy settings.
+--- The step tokens stay fixed, so a transport failure's reason is logged here:
+--- it is the only clue a field report carries (issue #104).
 --- @param callback function fn(status|nil, body|nil).
 local function fetch_pac(url, callback)
 	local client = require("adapters.http_client").new({ timeout_ms = 6000 })
 	client.get(url, {}, function(result)
+		if (tonumber(result.status) or 0) == 0 then
+			Logger.warn(LOG, "PAC download failed: %s.", tostring(result.error))
+		end
 		callback(result.status, result.body)
 	end)
 end

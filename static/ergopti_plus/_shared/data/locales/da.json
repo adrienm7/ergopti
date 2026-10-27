@@ -2259,6 +2259,8 @@
 	"ollama.download_title": "Downloader Ollama-model",
 	"ollama.error_network": "Ollama kunne ikke downloades. Tjek din internetforbindelse, og vælg derefter Ollama-backend igen.",
 	"ollama.error_checksum": "Det downloadede Ollama-arkiv bestod ikke SHA-256-kontrollen og blev kasseret. Intet blev installeret.",
+	"ollama.error_installer_refused": "Ergoptis Ollama-installationsprogram afviste sin egen anmodning, så intet blev installeret. Genstart Ergopti, og vælg Ollama-motoren igen; hvis det fortsætter, så send diagnosticeringsrapporten.",
+	"ollama.error_runtime_refused": "Ergopti kunne ikke bekræfte sin fastlåste Ollama-version (udgivelseskatalog eller integritetskontrol), så intet blev installeret. Send diagnosticeringsrapporten.",
 	"ollama.external_manual_start_body": "Denne Ollama-installation administreres uden for Ergopti. Start eller stop selv tjenesten, eller installer Ergoptis administrerede miljø via tilbuddet om opsætning af Ollama.",
 	"ollama.native_install_declined_body": "Den nuværende Ollama-installation og modellerne ændres ikke. Det administrerede miljø blev ikke installeret.",
 	"ollama.native_migration_body": "Installer Ergoptis administrerede miljø ved siden af din nuværende Ollama-installation. Eksisterende modeller bliver på deres nuværende placering. Ergopti stopper ikke den nuværende tjeneste; stop den selv, hvis den bruger samme port. De native kontroller skal være bestået, før det administrerede miljø kan køre.",

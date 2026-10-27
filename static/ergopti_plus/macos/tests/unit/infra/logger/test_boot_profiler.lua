@@ -190,6 +190,36 @@ helpers.describe("infra.boot_profiler stages (boot-stage-trail)", function()
 		helpers.assert_contains(table.concat(journal_lines("/journal/fallback.log")), "Boot complete in 1234 ms.")
 	end)
 
+	-- issue #104: the Accessibility wait runs the boot again inside its own
+	-- stage once the grant arrives; reopening it warned and lost the wait time.
+	helpers.it("resumes a stage the boot is already inside (boot-stage-resume)", function()
+		reset_capture()
+		configure_journal()
+		boot.begin()
+		boot.stage_once("Waited stage")
+		CLOCK_NS = CLOCK_NS + 24000e6
+		boot.stage_once("Waited stage")
+		CLOCK_NS = CLOCK_NS + 9e6
+		boot.mark("Waited stage")
+		for _, call in ipairs(captured) do
+			helpers.assert_true(call.lvl ~= "warn", "a resumed stage is not a double open: " .. tostring(call.fmt))
+		end
+		local starts, completed = 0, nil
+		for _, call in ipairs(captured) do
+			if call.lvl == "start" then starts = starts + 1 end
+			if call.lvl == "success" and call.args[1] == "Waited stage" then completed = call.args[2] end
+		end
+		helpers.assert_eq(starts, 1, "one START line for one stage")
+		helpers.assert_true(completed ~= nil and math.abs(completed - 24009) < 0.01,
+			"the stage keeps the wait it was resumed after")
+		boot.stage_once("Other stage")
+		boot.stage_once("Third stage")
+		local warned = false
+		for _, call in ipairs(captured) do if call.lvl == "warn" then warned = true end end
+		helpers.assert_true(warned, "opening a different stage over an open one still warns")
+		boot.mark("Third stage")
+	end)
+
 	helpers.it("warns when a mark closes no matching open stage", function()
 		configure_journal()
 		reset_capture()
