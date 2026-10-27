@@ -911,15 +911,15 @@ writes configuration. Reload the driver from the working tree for dev-only fixes
 
 Clone only the current dev state and branch from it:
 `git clone --depth 1 --branch dev --single-branch --filter=blob:none https://github.com/adrienm7/ergopti.git`,
-then `git switch -c field/mac-2026-10-27` (if the clone is cut off: `git config --global http.version HTTP/1.1`;
-with `--no-checkout`, `git checkout dev` resumes). Build and run the app from that tree: the driver runs only
-inside the embedded runtime its launcher starts (instance admission, 0c954ed49a), so a stock Hammerspoon
-pointed at the clone is refused with "native logging worker is unavailable". Install the Xcode command-line
-tools, quit the installed ErgoptiPlus app, back up `~/.config/hammerspoon` (the v15 migration rewrites
-`config.toml`; keep a copy of the old one for section 3), then
-`SPARKLE_PUBLIC_KEY="$(head -c 32 /dev/urandom | base64)" bash tools/build/build_macos_app.sh` and
-`open build/macos/ErgoptiPlus.app`. The build is signed ad hoc, so macOS asks again for Accessibility and
-Input Monitoring; Sparkle updates cannot be checked with the throwaway key. Before starting, write down the commit (`git rev-parse
+then `git switch -c field/mac-2026-10-27` (if the clone is cut off: `git config --global http.version HTTP/1.1`).
+Run the developer app: quit the installed ErgoptiPlus, back up `~/.config/hammerspoon` (the v15 migration
+rewrites `config.toml`; keep a copy of the old one for section 3), remove an old `~/.hammerspoon/init.lua`
+bootstrap if one exists, then `bash tools/dev/run-macos-dev-app.sh` (Command Line Tools are enough: it builds a
+native single-architecture app whose Lua runs from the clone, then opens it; `--open-only` reopens without a
+rebuild). Saving a `.lua` file reloads the driver; the menu Reload row reloads on demand. Rebuild only after a
+Swift, native helper or LuaSocket change; each ad hoc rebuild asks again for Accessibility and Input
+Monitoring. `~/Library/Logs/ergopti_plus/launcher.log` must say "developer source mode". Sparkle is off in
+this mode, so the update lines of section 5 need a release build. Before starting, write down the commit (`git rev-parse
 --short HEAD`), macOS version and build, chip (Apple silicon or Intel), keyboard (ISO or ANSI, built-in or
 external), input source, Karabiner version and whether Ollama.app or oMLX is installed. Report each line as
 pass, fail or not run.
