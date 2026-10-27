@@ -146,6 +146,7 @@
 		"test:layouts-defaults-single-source": "node ./tools/test/test-layouts-defaults-single-source.cjs",
 		"test:layout-supersession-declared": "node ./tools/test/test-layout-supersession-declared.cjs",
 		"test:linux-ships-keylayout-converter": "node ./tools/test/test-linux-ships-keylayout-converter.cjs",
+		"test:keylayout-canonical-parity": "node ./tools/test/test-keylayout-canonical-parity.cjs",
 		"test:xkb": "node ./tools/test/run-xkb-python-tests.cjs",
 		"test:shared-js-loadable": "node ./tools/test/test-shared-js-is-loadable.cjs",
 		"test:tap-hold-lifecycle": "node ./tools/test/test-tap-hold-defaults-lifecycle.cjs",
