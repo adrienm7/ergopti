@@ -160,7 +160,7 @@ function renderRibbon(aggData) {
 			const tip = topCat
 				? `${label} · ${hh}h — ${topCat} (${formatDuration(totalMs)})`
 				: `${label} · ${hh}h — inactif`;
-			rows += `<rect x="${x}" y="${y}" width="${CELL_W - 1}" height="${CELL_H}" rx="2" fill="${fill}" fill-opacity="${opacity}"><title>${tip}</title></rect>`;
+			rows += `<rect x="${x}" y="${y}" width="${CELL_W - 1}" height="${CELL_H}" rx="2" fill="${fill}" fill-opacity="${opacity}"><title>${escapeHtml(tip)}</title></rect>`;
 		});
 	});
 
