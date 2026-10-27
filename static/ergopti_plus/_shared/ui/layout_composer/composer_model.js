@@ -673,10 +673,11 @@ var LayoutComposer = (function () {
 				for (const field of Object.keys(rows))
 					if (!ROW_FIELDS.includes(field))
 						problems.push(problem('rows_invalid', 'rows.' + field, field));
+				// One sentence covers the options; the detail names the field and value.
 				if (rows.order !== undefined && !ROW_ORDERS.includes(rows.order))
-					problems.push(problem('rows_order_invalid', 'rows.order', String(rows.order)));
+					problems.push(problem('rows_invalid', 'rows.order', 'order: ' + String(rows.order)));
 				if (rows.edges !== undefined && typeof rows.edges !== 'boolean')
-					problems.push(problem('rows_edges_invalid', 'rows.edges', String(rows.edges)));
+					problems.push(problem('rows_invalid', 'rows.edges', 'edges: ' + String(rows.edges)));
 			}
 		}
 		const keyCodes = new Set(table.keys.map((key) => key.code));

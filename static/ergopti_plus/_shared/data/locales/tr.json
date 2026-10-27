@@ -1248,6 +1248,7 @@
 	"layout_composer.problem_unknown_source": "Bir katman burada bulunmayan bir düzen kullanıyor.",
 	"layout_composer.problem_spec_invalid": "Bir katman girdisi hatalı biçimde.",
 	"layout_composer.problem_shortcuts_invalid": "Kısayollar hatalı biçimde.",
+	"layout_composer.problem_rows_invalid": "Rakam sırası seçenekleri hatalı biçimde.",
 	"layout_composer.problem_unknown_shortcut": "Bilinmeyen bir kısayol değiştiricisi.",
 	"layout_composer.problem_overrides_invalid": "Tuş değişiklikleri hatalı biçimde.",
 	"layout_composer.problem_unknown_target": "Bir tuş değişikliği bilinmeyen bir katmanı belirtiyor.",
