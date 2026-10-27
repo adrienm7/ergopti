@@ -55,6 +55,7 @@ function render_charts() {
 	const rgb_wpm = root.getPropertyValue('--chart-wpm-rgb').trim() || '230, 140, 0';
 	const rgb_prc = root.getPropertyValue('--kpi-precision-rgb').trim() || '33, 136, 56';
 
+	// Daily points are civil dates; a local-time adapter can collapse archived days.
 	const sorted_keys = Object.keys(app_state.time_series).sort();
 	const manual_pts = [],
 		hs_pts = [],
@@ -65,7 +66,7 @@ function render_charts() {
 
 	sorted_keys.forEach((k) => {
 		const d = app_state.time_series[k];
-		const date_obj = new Date(k + 'T12:00:00');
+		const date_obj = new Date(parseDateKey(k));
 
 		manual_pts.push({ x: date_obj, y: Math.max(0, d.chars - d.hs_chars - d.llm_chars) });
 		hs_pts.push({ x: date_obj, y: d.hs_chars });
@@ -81,8 +82,8 @@ function render_charts() {
 	});
 
 	// Shared x-axis range so precision and speed charts always have identical bounds
-	const x_min = sorted_keys.length > 0 ? new Date(sorted_keys[0] + 'T12:00:00') : null;
-	const x_max = sorted_keys.length > 0 ? new Date(sorted_keys.at(-1) + 'T12:00:00') : null;
+	const x_min = sorted_keys.length > 0 ? new Date(parseDateKey(sorted_keys[0])) : null;
+	const x_max = sorted_keys.length > 0 ? new Date(parseDateKey(sorted_keys.at(-1))) : null;
 
 	// Delegation chart always uses daily points — no per-hour HS/LLM breakdown available
 	_render_delegation_chart(manual_pts, hs_pts, llm_pts, rgb_ia, rgb_hs, rgb_man);
@@ -145,7 +146,7 @@ function months_fr() {
 }
 
 /**
- * Returns a two-line French day tick label for a daily x-axis value.
+ * Returns a two-line French day tick label for a canonical daily x-axis value.
  * Used with ticks.color: "transparent" so Chart.js reserves the correct two-line
  * height while the DAY_TICK_RENDERER plugin redraws the text with bold dates.
  * @param {number} value - Timestamp in milliseconds.
@@ -153,7 +154,7 @@ function months_fr() {
  */
 function _format_day_tick(value) {
 	const d = new Date(value);
-	return [days_fr()[d.getDay()], `${d.getDate()} ${months_fr()[d.getMonth()]}`];
+	return [days_fr()[d.getUTCDay()], `${d.getUTCDate()} ${months_fr()[d.getUTCMonth()]}`];
 }
 
 // Canvas IDs of daily charts that use the two-line day+date tick renderer.
@@ -167,6 +168,7 @@ const DAY_TICK_CANVAS_IDS = new Set([
 	'llm_sparkline'
 ]);
 
+// Daily axes use linear UTC day ordinals; local time axes retain their own hour labels.
 // Plugin: redraws daily x-axis tick labels as two lines — day name (normal) + date (bold).
 // Charts in DAY_TICK_CANVAS_IDS must also set ticks.color: "transparent" so Chart.js
 // reserves two-line height without drawing its own unstyled labels.
@@ -175,7 +177,7 @@ if (typeof Chart !== 'undefined') {
 		id: 'day_tick_renderer',
 		afterDraw(chart) {
 			const xScale = chart.scales.x;
-			if (!xScale || !DAY_TICK_CANVAS_IDS.has(chart.canvas?.id)) return;
+			if (!xScale || xScale.type !== 'linear' || !DAY_TICK_CANVAS_IDS.has(chart.canvas?.id)) return;
 
 			const ctx = chart.ctx;
 			const ticks = xScale.ticks;
@@ -204,11 +206,11 @@ if (typeof Chart !== 'undefined') {
 
 				// Line 1 — day name, normal weight
 				ctx.font = `${size}px sans-serif`;
-				ctx.fillText(days_fr()[d.getDay()], x, y1);
+				ctx.fillText(days_fr()[d.getUTCDay()], x, y1);
 
 				// Line 2 — "d month" in bold (e.g. "12 avr.")
 				ctx.font = `bold ${size}px sans-serif`;
-				ctx.fillText(`${d.getDate()} ${months_fr()[d.getMonth()]}`, x, y2);
+				ctx.fillText(`${d.getUTCDate()} ${months_fr()[d.getUTCMonth()]}`, x, y2);
 			});
 
 			ctx.restore();
@@ -280,12 +282,15 @@ function _render_delegation_chart(manual_pts, hs_pts, llm_pts, rgb_ia, rgb_hs, r
 			},
 			scales: {
 				x: {
-					type: 'time',
-					time: { unit: 'day' },
+					type: 'linear',
 					stacked: true,
 					grid: { color: GRID_COLOR },
 					// color: transparent hides Chart.js auto-labels; the plugin redraws them with bold dates
-					ticks: { color: 'transparent', callback: (v) => _format_day_tick(v) }
+					ticks: {
+						stepSize: METRICS_DAY_MILLISECONDS,
+						color: 'transparent',
+						callback: (v) => _format_day_tick(v)
+					}
 				},
 				y: { stacked: true, grid: { color: GRID_COLOR } }
 			}
@@ -305,10 +310,13 @@ function _render_wpm_chart(wpm_pts, rgb_wpm, x_min = null, x_max = null) {
 	if (!elem) return;
 
 	const x_opts = {
-		type: 'time',
-		time: { unit: 'day' },
+		type: 'linear',
 		grid: { color: GRID_COLOR },
-		ticks: { color: 'transparent', callback: (v) => _format_day_tick(v) }
+		ticks: {
+			stepSize: METRICS_DAY_MILLISECONDS,
+			color: 'transparent',
+			callback: (v) => _format_day_tick(v)
+		}
 	};
 	if (x_min) x_opts.min = x_min;
 	if (x_max) x_opts.max = x_max;
@@ -405,7 +413,7 @@ function _render_precision_chart(sorted_keys, rgb_prc, x_min = null, x_max = nul
 			const total_chars = d.daily_chars + synth_hs + synth_llm;
 			const correct = d.daily_chars - filtered_errs + synth_hs + synth_llm;
 			const accuracy = total_chars > 0 ? (correct / total_chars) * 100 : 0;
-			return { x: new Date(k + 'T12:00:00'), y: Math.max(0, Math.min(100, accuracy)) };
+			return { x: new Date(parseDateKey(k)), y: Math.max(0, Math.min(100, accuracy)) };
 		})
 		.filter((pt) => pt.y >= 20);
 
@@ -442,10 +450,13 @@ function _render_precision_chart(sorted_keys, rgb_prc, x_min = null, x_max = nul
 			scales: {
 				x: Object.assign(
 					{
-						type: 'time',
-						time: { unit: 'day' },
+						type: 'linear',
 						grid: { color: GRID_COLOR },
-						ticks: { color: 'transparent', callback: (v) => _format_day_tick(v) }
+						ticks: {
+							stepSize: METRICS_DAY_MILLISECONDS,
+							color: 'transparent',
+							callback: (v) => _format_day_tick(v)
+						}
 					},
 					x_min ? { min: x_min } : {},
 					x_max ? { max: x_max } : {}
@@ -525,10 +536,10 @@ function _render_sparkline(ctx_id, chart_ref, data_pts, color) {
 			},
 			scales: {
 				x: {
-					type: 'time',
+					type: 'linear',
 					display: true,
-					time: { unit: 'day' },
 					ticks: {
+						stepSize: METRICS_DAY_MILLISECONDS,
 						font: { size: 10 },
 						maxTicksLimit: 4,
 						color: 'transparent',
