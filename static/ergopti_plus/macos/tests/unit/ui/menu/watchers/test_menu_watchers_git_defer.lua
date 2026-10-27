@@ -102,8 +102,7 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 		local previous = package.loaded["infra.termination_coordinator"]
 		local terminating = true
 		package.loaded["infra.termination_coordinator"] = {
-			is_initialized = function() return true end,
-			is_pending = function() return terminating end,
+			terminal_in_progress = function() return terminating end,
 		}
 		local levels = {}
 		local logger = helpers.make_logger_stub()
@@ -124,8 +123,11 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 		package.loaded["infra.termination_coordinator"] = previous
 		if not ok then error(err, 0) end
 		helpers.assert_eq(levels[1], "info:Menu reload request deferred: a reload or quit is in progress.")
+		-- The value used to follow "remains pending for retry:", so a refused
+		-- request printed "pending for retry: false" and read as a lost retry
+		-- although the burst was re-armed (field run 19:47:04, 21:06:55).
 		helpers.assert_eq(levels[2],
-			"warn:Menu reload request was refused; the source-file burst remains pending for retry: %s.")
+			"warn:Menu reload request was refused (%s); the source-file burst stays pending and is retried.")
 	end)
 
 	helpers.it("revokes a pending reload and retains failed timer cleanup for an exact retry", function()

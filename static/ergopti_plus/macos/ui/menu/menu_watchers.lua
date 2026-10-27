@@ -26,10 +26,9 @@ local LOG         = "menu_watchers"
 --- @return boolean terminating
 local function reload_already_terminating()
 	local loaded, coordinator = pcall(require, "infra.termination_coordinator")
-	if not loaded or type(coordinator) ~= "table" or type(coordinator.is_pending) ~= "function" then return false end
-	if type(coordinator.is_initialized) == "function" and coordinator.is_initialized() ~= true then return false end
-	local checked, pending = pcall(coordinator.is_pending)
-	return checked and pending == true
+	if not loaded or type(coordinator) ~= "table" then return false end
+	local checked, in_progress = pcall(coordinator.terminal_in_progress)
+	return checked and in_progress == true
 end
 
 
@@ -238,8 +237,8 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 					elseif not reload_refusal_logged then
 						reload_refusal_logged = true
 						Logger.warn(LOG,
-							"Menu reload request was refused; the source-file burst remains pending for retry: %s.",
-							tostring(request_ok and accepted or accepted))
+							"Menu reload request was refused (%s); the source-file burst stays pending and is retried.",
+							request_ok and ("result " .. tostring(accepted)) or tostring(accepted))
 					else
 						Logger.debug(LOG, "Menu reload request remains refused; retaining the source-file burst.")
 					end
@@ -255,8 +254,8 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 			if not reload_refusal_logged then
 				reload_refusal_logged = true
 				Logger.warn(LOG,
-					"Deferred menu reload owner refused the source-file burst; retaining it for retry: %s.",
-					tostring(defer_ok and deferred or deferred))
+					"Deferred menu reload owner refused the source-file burst (%s); it stays pending and is retried.",
+					defer_ok and ("result " .. tostring(deferred)) or tostring(deferred))
 			end
 			arm_reload()
 		end
