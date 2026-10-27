@@ -403,7 +403,7 @@ function M.build(ctx)
 			on_navigation = function(action)
 				if action == "didFinishNavigation" then
 					-- Focus the input field after the page loads
-					DeferredWork.after(0.05, function()
+					DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 						if _custom_model_session == session and session.webview then
 							pcall(function()
 								session.webview:evaluateJavaScript("document.getElementById('inp').focus();")
