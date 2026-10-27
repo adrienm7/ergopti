@@ -347,7 +347,13 @@ dev.
   needs_typing, not a failure: the maintainer types the prompted text on the next run. The 19:47
   run is the same (composer_ready fail:not_enabled; the TIS probe again shows register 0, enable
   0, select -50 and the source still disabled): known limitation, not re-fixed.
-- **L29** [CODE][PHYS-M] Screen Recording settings could not be opened, openURL returned false
+- **L29** Fixed on tmp/wip-field-run-checklist (cf852cf23d): every privacy pane URL now comes from
+  macos/data/privacy_panes.json through adapters/privacy_settings.lua, which opens the
+  `com.apple.settings.PrivacySecurity.extension` form from macOS 26 on. The collector's
+  `privacy_pane_urls` step opens every pane in both forms and records each `open` exit code
+  (System Settings is quit only if it was not running): read it in the next report; if the
+  extension form fails too, trace `hs.urlevent.openURL`. The diagnostics schema `settings` URLs
+  still use the legacy form. Original entry: Screen Recording settings could not be opened, openURL returned false
   (new.txt 15:31:46). adapters/screen_capture.lua uses
   `x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture`, the same
   scheme as the Accessibility and Input Monitoring panes, so the URL alone does not explain it.
@@ -366,10 +372,15 @@ dev.
   it, so `M.update_ax_observer` now logs that refusal at INFO and rolls the observer back, while another
   application's refusal stays a WARNING (`test_context_tracker_ax_own_process.lua`). Mac: no such WARNING
   after focusing an Ergopti menu or page.
-- **L32** [CODE] issue #104 diagnostics: Input Monitoring, Login Items and Screen Recording read
+- **L32** Partly fixed on tmp/wip-field-run-checklist (cce99afbc7): the shared schema enum lacked
+  `missing`, `unavailable` and `not_used`, so the share projection turned a refused Screen Recording
+  grant (and a guardian needing approval) into `unknown`. Still open: Input Monitoring has no
+  non-prompting reader (IOHIDCheckAccess via a native helper), and the resident size breakdown.
+  Original entry: issue #104 diagnostics: Input Monitoring, Login Items and Screen Recording read
   `unknown`; memory used 843 MB with 93 MB free. Next: read or label those permissions, and
   measure the 843 MB resident size.
-- **L33** [CODE] Swift warnings in the launcher build (`_164726` field*run.txt). The "always
+- **L33** Fixed on tmp/wip-field-run-checklist (23ac97fb4a), not compiled here: the next collector
+  rebuild must show none of the four warnings. Original entry: Swift warnings in the launcher build (`_164726` field*run.txt). The "always
   true" one, OwnedVirtualHIDDaemonReportMainOperation.swift:112 `returned != nil && error ==
 nil`, has no behavior effect: `executeAndReturnError` returns a non-optional descriptor and
   `error == nil` alone decides, which is the intended check. Next, on a Mac with swiftc: replace it
@@ -1449,7 +1460,7 @@ probe answered ...`, else `curl -sS -o /dev/null -w '%{http_code}\n' http://127.
 
 #### 7. Edge cases
 
-- [ ] `pipefail` and `printf %b` under the system bash 3.2, the native HTTPS downgrade refusal,
+- [ ] `pipefail` and `printf %b` under the system bash 3.2 (automated: collector step `system_bash`), the native HTTPS downgrade refusal,
       `hs.fs.attributes` on a FIFO, the read-only dashboard with a hot journal.
 - [ ] Recompile `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt` from its source in Script
       Editor so its comment follows the keystats rename, and commit it.
@@ -1562,7 +1573,8 @@ Standing checks:
       111 two displays, 30 magic key on ISO and ANSI, 46-48 and 88 a real local model and the
       tooltip typography, issue 94 (tap-hold menu refusal, symbol-wrap clipboard, ISO/ANSI captured
       once), 119/130/136 MLX PAC download, code 74, Homebrew live upgrade.
-- [ ] **Shell and file edge cases**: `pipefail` and `printf %b` under bash 3.2, the native HTTPS
+- [ ] **Shell and file edge cases**: `pipefail` and `printf %b` under bash 3.2 (automated: collector step
+      `system_bash`), the native HTTPS
       downgrade refusal, `hs.fs.attributes` on a FIFO, the read-only dashboard with a hot journal.
 
 ### Linux (no machine available)
