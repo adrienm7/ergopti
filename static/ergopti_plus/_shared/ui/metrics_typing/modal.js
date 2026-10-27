@@ -76,7 +76,10 @@ function update_app_btn_text() {
 		btn.innerText = _t('ui_typing.apps_all');
 		btn.classList.add('active');
 	} else {
-		btn.innerText = sel === 0 ? _t('ui_typing.apps_none') : `Apps (${sel}/${tot})`;
+		btn.innerText =
+			sel === 0
+				? _t('ui_typing.apps_none')
+				: _t('ui_typing.apps_some').replace('{n}', sel).replace('{total}', tot);
 		btn.classList.remove('active');
 	}
 }

@@ -1614,9 +1614,9 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 					`<tr style="color:#888;">` +
 					`<td style="padding:1px 6px 1px 0;">Paire</td>` +
 					`<td style="padding:1px 4px;text-align:right;">nb</td>` +
-					`<td style="padding:1px 4px;text-align:right;" title="Part de ce SFB parmi les SFBs de la touche">% /SFBs touche</td>` +
+					`<td style="padding:1px 4px;text-align:right;" title="${escapeHtml(_t('ui_typing.sfb_share_key_tooltip'))}">% /SFBs touche</td>` +
 					`<td style="padding:1px 4px;text-align:right;" title="${_t('ui_typing.tooltip_sfb_rate')}">taux</td>` +
-					`<td style="padding:1px 0 1px 4px;text-align:right;" title="Part de ce SFB parmi tous les SFBs">% SFBs tot.</td>` +
+					`<td style="padding:1px 0 1px 4px;text-align:right;" title="${escapeHtml(_t('ui_typing.sfb_share_total_tooltip'))}">% SFBs tot.</td>` +
 					`</tr>`
 			);
 

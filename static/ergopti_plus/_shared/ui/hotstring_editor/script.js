@@ -214,7 +214,7 @@ function showConfirm(msg, fn, opts = {}) {
 		'</div>';
 
 	const okBtn = document.getElementById('confirm-ok');
-	okBtn.textContent = opts.okLabel || _t('common.delete') || 'Delete';
+	okBtn.textContent = opts.okLabel || _t('common.delete');
 	okBtn.style.background = opts.okColor || 'var(--danger)';
 
 	_confirmCb = fn;
@@ -322,8 +322,8 @@ function updateCompactBtn() {
 	const b = document.getElementById('compact-btn');
 	if (b)
 		b.textContent = compactView
-			? _t('editor.hotstrings.btn_view_expanded') || 'Expanded view'
-			: _t('editor.hotstrings.btn_view_compact') || 'Compact view';
+			? _t('editor.hotstrings.btn_view_expanded')
+			: _t('editor.hotstrings.btn_view_compact');
 }
 
 function toggleCompact() {
@@ -966,12 +966,16 @@ function render() {
 					ei +
 					'" onclick="event.stopPropagation(); updateBulk()" onmousedown="event.stopPropagation()"></div>';
 				html +=
-					'<div class="e-trig"><span class="trig-lbl" data-f="trig" title="Clic pour modifier">' +
+					'<div class="e-trig"><span class="trig-lbl" data-f="trig" title="' +
+					escapeHtml(_t('editor.hotstrings.click_to_edit')) +
+					'">' +
 					dispTrig(e.trigger) +
 					'</span></div>';
 				html += '<span class="e-arrow">→</span>';
 				html +=
-					'<div class="e-out-cell"><div class="e-out" data-f="out" title="Clic pour modifier">' +
+					'<div class="e-out-cell"><div class="e-out" data-f="out" title="' +
+					escapeHtml(_t('editor.hotstrings.click_to_edit')) +
+					'">' +
 					dispOutput(e.output) +
 					'</div></div>';
 				html += '<div class="e-tags">';
@@ -1033,8 +1037,9 @@ function render() {
 
 function showAddSec() {
 	edSec = null;
-	document.getElementById('sec-modal-title').textContent =
-		_t('editor.hotstrings.sec_modal_title_new') || 'New section';
+	document.getElementById('sec-modal-title').textContent = _t(
+		'editor.hotstrings.sec_modal_title_new'
+	);
 	const idEl = document.getElementById('sec-id');
 	idEl.value = '';
 	idEl.disabled = false;
@@ -1047,8 +1052,9 @@ function showAddSec() {
 function showEditSec(si) {
 	edSec = si;
 	const s = D.sections[si];
-	document.getElementById('sec-modal-title').textContent =
-		_t('editor.hotstrings.sec_modal_title_rename') || 'Rename section';
+	document.getElementById('sec-modal-title').textContent = _t(
+		'editor.hotstrings.sec_modal_title_rename'
+	);
 	const idEl = document.getElementById('sec-id');
 	idEl.value = s.name;
 	idEl.disabled = true;
@@ -1338,8 +1344,8 @@ window.updateBulk = function () {
 			cnt +
 			' ' +
 			(cnt > 1
-				? _t('editor.hotstrings.bulk_selected_other') || 'selected'
-				: _t('editor.hotstrings.bulk_selected_one') || 'selected');
+				? _t('editor.hotstrings.bulk_selected_other')
+				: _t('editor.hotstrings.bulk_selected_one'));
 		const sel = document.getElementById('bulk-sec-sel');
 		sel.innerHTML =
 			'<option value="">' +
