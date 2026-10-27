@@ -86,9 +86,52 @@ end
 --- Phases in which the lease is not usable.
 local BAD_PHASES = { failed = true, fencing = true, recovering = true, uninitialized = true }
 
+--- Seconds the lease check waits for this lifecycle's first guardian answer.
+--- The driver registers the guardian when the Karabiner integration starts,
+--- and a developer build took 6.5 s (field run 2026-10-27 22:32: the check ran
+--- 1.5 s after boot and read "unknown" while the answer was "ready"). It stays
+--- below the field run's 45 s step deadline.
+M.GUARDIAN_SETTLE_SECONDS = 30
+
+-- Seconds between two reads of the remap facts while the guardian is unknown.
+local GUARDIAN_SETTLE_POLL_SECONDS = 0.5
+
+--- Calls back with the remap facts once the guardian state is observed, or
+--- with the last read after M.GUARDIAN_SETTLE_SECONDS. Unknown means "not yet
+--- observed in this lifecycle", so reading it at once judged a registration
+--- still in flight instead of the guardian.
+--- @param ports table Check ports (remap_facts, after).
+--- @param callback function fn(remap, waited_seconds).
+local function settled_remap_facts(ports, callback)
+	local waited = 0
+	local function poll()
+		local remap = ports.remap_facts()
+		if remap.enabled ~= true or remap.guardian ~= "unknown" or waited >= M.GUARDIAN_SETTLE_SECONDS then
+			return callback(remap, waited)
+		end
+		if type(ports.after) ~= "function" then
+			error("field check lease: the after port is required to wait for the guardian", 0)
+		end
+		waited = waited + GUARDIAN_SETTLE_POLL_SECONDS
+		ports.after(GUARDIAN_SETTLE_POLL_SECONDS, poll)
+	end
+	poll()
+end
+
 --- Karabiner lease health.
 function M.lease(ports, report, finish)
-	local remap = ports.remap_facts()
+	settled_remap_facts(ports, function(remap, waited)
+		M.lease_with_facts(ports, report, finish, remap, waited)
+	end)
+end
+
+--- Karabiner lease health over remap facts already read.
+--- @param ports table Check ports.
+--- @param report table Step reporter.
+--- @param finish function Settles the check.
+--- @param remap table Remap facts { enabled, phase, guardian }.
+--- @param waited number Seconds spent waiting for the guardian answer.
+function M.lease_with_facts(ports, report, finish, remap, waited)
 	local enabled = remap.enabled == true
 	local cli = ports.path_exists(KePaths.CLI)
 	report.step("cli_present", (cli or not enabled) and STATE.pass or STATE.fail, yes_no(cli))
@@ -96,6 +139,7 @@ function M.lease(ports, report, finish)
 	if enabled then
 		report.step("lease_phase", BAD_PHASES[remap.phase] and STATE.fail or STATE.pass, remap.phase)
 		report.step("guardian_state", remap.guardian == "ready" and STATE.pass or STATE.fail, remap.guardian)
+		if waited > 0 then report.step("guardian_wait", STATE.info, string.format("%.1fs", waited)) end
 	else
 		report.step("lease_phase", STATE.skip, remap.phase)
 		report.step("guardian_state", STATE.skip, remap.guardian)
