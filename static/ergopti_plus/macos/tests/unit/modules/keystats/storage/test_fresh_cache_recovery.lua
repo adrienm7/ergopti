@@ -105,11 +105,11 @@ helpers.describe("keystats/log_manager: fresh cache id ownership", function()
 		local body = src:sub((assert(src:find("local function _init(core_state)", 1, true))))
 		local replay = assert(body:find("_replay_local_data_sql(db)", 1, true))
 		local persist = body:find("_persist_recovery_state(db, cursor)", 1, true)
-		local rebuild = assert(body:find("_rebuild_aggregates_from_raw(db)", 1, true))
+		local rebuild = assert(body:find("_start_aggregate_recovery(db)", 1, true))
 		helpers.assert_true(persist ~= nil and replay < persist and persist < rebuild,
 			"the replay cursor and id counter must be published before the aggregate rebuild can fail")
-		local tail = body:sub(rebuild, (assert(body:find("Restore persisted counters", rebuild, true))))
-		helpers.assert_true(not tail:find("_persist_recovery_state", 1, true),
+		local recovery = src:match("local function _recover_aggregate_cache%(db%)(.-)\nend\n")
+		helpers.assert_true(recovery ~= nil and not recovery:find("_persist_recovery_state", 1, true),
 			"a successful rebuild must not be the only owner of the replay cursor")
 	end)
 end)

@@ -88,7 +88,7 @@ helpers.describe("keystats: foreign sync rebuilds UI aggregate partitions", func
 		local source = read_source("local function _mark_aggregate_cache_rebuilt") -- modules/keystats/log_manager.lua
 		local callback_pos = assert(source:find("_sync_foreign_data_sql(function(device_id)", 1, true))
 		local rebuild_pos = assert(source:find("_rebuild_aggregates_from_raw(db, { device_id })", callback_pos, true))
-		local mark_pos = assert(source:find("_mark_aggregate_cache_rebuilt(db)", rebuild_pos, true))
+		local mark_pos = assert(source:find("_mark_aggregate_cache_rebuilt(db, true)", rebuild_pos, true))
 		helpers.assert_true(callback_pos < rebuild_pos and rebuild_pos < mark_pos,
 			"foreign rows must be rebuilt and invalidate the DB revision before their watermark advances")
 		helpers.assert_true(source:find("DERIVED_DEVICE_TABLES", 1, true) ~= nil,
