@@ -664,3 +664,118 @@ _TRFE_ProgressReceipt(Locked) {
 }
 Test("runner progress: selected receipt preserves legacy bytes (progress-receipt)", _TRFE_ProgressReceipt.Bind(false))
 Test("runner progress: refused selected receipt cannot report success (progress-receipt)", _TRFE_ProgressReceipt.Bind(true))
+
+; Canonical publication must expose native refusals instead of retaining an old run.
+_TRFE_CanonicalPublication(Mode, Receipt) {
+	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
+	SavedFile := TEST_RESULTS_FILE
+	SavedCanonical := TEST_RESULTS_CANONICAL
+	Canonical := Receipt . ".canonical"
+	Handle := 0
+	Fresh := "1..1`r`nok 1 - fresh " . Chr(0xE9) . Chr(0x1F642) . "`r`n# 1 passed, 0 failed.`r`n"
+	Stale := "1..7`r`n# preceding canonical receipt`r`n"
+	try {
+		TEST_RESULTS_FILE := Receipt
+		TEST_RESULTS_CANONICAL := Mode == "same" ? Receipt : Canonical
+		FileAppend(Fresh, Receipt, "UTF-8")
+		if Mode == "same" {
+			_CopyTestResultsForCi()
+			AssertEqual(Fresh, FileRead(Receipt, "UTF-8"), "same-path publication preserves the current receipt")
+			return
+		}
+		; Prove genuine copying works on this owned filesystem before testing refusal.
+		FileCopy(Receipt, Canonical, true)
+		AssertEqual(Fresh, FileRead(Canonical, "UTF-8"), "native copy precondition")
+		FileDelete(Canonical)
+		if Mode == "success" {
+			_CopyTestResultsForCi()
+			AssertEqual(Fresh, FileRead(Canonical, "UTF-8"), "publication preserves the complete Unicode receipt")
+			return
+		}
+		FileAppend(Stale, Canonical, "UTF-8")
+		if Mode == "locked" {
+			Handle := DllCall("Kernel32\CreateFileW", "Str", Canonical, "UInt", 0x80000000,
+				"UInt", 1, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+			AssertTrue(Handle != 0 && Handle != -1, "own an actual read-only sharing capability")
+		} else {
+			AssertEqual("missing", Mode, "the fixture only admits its declared refusal modes")
+			FileDelete(Receipt)
+		}
+		NativeRefusal := 0
+		try FileCopy(Receipt, Canonical, true)
+		catch Error as Failure
+			NativeRefusal := Failure
+		AssertTrue(IsObject(NativeRefusal), "the genuine native denial control must refuse copying")
+		AssertEqual("Error", Type(NativeRefusal), "FileCopy uses its documented aggregate failure")
+		AssertEqual("1", NativeRefusal.Extra, "exactly one native file copy must fail")
+		Refusal := 0
+		try _CopyTestResultsForCi()
+		catch Error as Failure
+			Refusal := Failure
+		AssertTrue(IsObject(Refusal), "canonical publication must expose the actual copy refusal")
+		AssertEqual(Type(NativeRefusal), Type(Refusal), "the publication keeps the original native error type")
+		AssertEqual(NativeRefusal.Message, Refusal.Message, "the publication keeps the original failure reason")
+		AssertEqual(NativeRefusal.Extra, Refusal.Extra, "the publication keeps the original failed-file count")
+		AssertEqual(Stale, FileRead(Canonical, "UTF-8"), "refusal cannot fabricate a new canonical receipt")
+	} finally {
+		TEST_RESULTS_FILE := SavedFile
+		TEST_RESULTS_CANONICAL := SavedCanonical
+		if Handle != 0 && Handle != -1
+			AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int"), "retire the actual sharing capability")
+		if FileExist(Canonical)
+			FileDelete(Canonical)
+	}
+}
+for _TRFE_CopyMode in ["success", "same", "locked", "missing"]
+	Test("runner canonical publication: " . _TRFE_CopyMode . " (receipt-publication)",
+		_TRFE_WithSharedTap.Bind(_TRFE_CanonicalPublication.Bind(_TRFE_CopyMode)))
+
+; The runner owns final failure even when the diagnostic destination also refuses.
+_TRFE_PublicationExit(Mode, Receipt) {
+	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
+	SavedFile := TEST_RESULTS_FILE
+	SavedCanonical := TEST_RESULTS_CANONICAL
+	Canonical := Receipt . ".canonical"
+	Port := _TRFE_InitializationExitPort()
+	try {
+		TEST_RESULTS_FILE := Receipt
+		TEST_RESULTS_CANONICAL := Canonical
+		FileAppend("complete owned receipt", Receipt, "UTF-8")
+		FileCopy(Receipt, Canonical, true)
+		AssertEqual("complete owned receipt", FileRead(Canonical, "UTF-8"), "native copy positive control")
+		if Mode != "success"
+			FileDelete(Receipt)
+		Port.ThrowOutput := Mode == "stderr-refusal"
+		if Port.ThrowOutput {
+			Thrown := false
+			try _TestResultsPublishOrExit(Port.ErrorOutput.Bind(Port), Port.Exit.Bind(Port))
+			catch Error as Failure {
+				Thrown := true
+				AssertEqual("Owned TAP stderr port refusal.", Failure.Message)
+			}
+			AssertTrue(Thrown, "secondary diagnostic refusal must remain visible")
+		} else {
+			AssertEqual(Mode == "success",
+				_TestResultsPublishOrExit(Port.ErrorOutput.Bind(Port), Port.Exit.Bind(Port)),
+				"publication reports only actual native success")
+		}
+		if Mode == "success" {
+			AssertEqual(0, Port.Messages.Length, "a successful native copy emits no failure")
+			AssertEqual(0, Port.ExitCodes.Length, "successful publication does not request failure")
+		} else {
+			AssertEqual(1, Port.Messages.Length, "one diagnostic reports the copy refusal")
+			AssertContains(Port.Messages[1], "FATAL TAP PUBLICATION ERROR: Error|1: Failed")
+			AssertEqual(1, Port.ExitCodes.Length, "publication cannot return without requesting process failure")
+			AssertEqual(1, Port.ExitCodes[1])
+		}
+		AssertEqual("complete owned receipt", FileRead(Canonical, "UTF-8"), "no refusal fabricates canonical bytes")
+	} finally {
+		TEST_RESULTS_FILE := SavedFile
+		TEST_RESULTS_CANONICAL := SavedCanonical
+		if FileExist(Canonical)
+			FileDelete(Canonical)
+	}
+}
+for _TRFE_PublicationMode in ["success", "missing", "stderr-refusal"]
+	Test("runner canonical exit: " . _TRFE_PublicationMode . " (receipt-publication)",
+		_TRFE_WithSharedTap.Bind(_TRFE_PublicationExit.Bind(_TRFE_PublicationMode)))
