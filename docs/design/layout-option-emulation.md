@@ -163,21 +163,35 @@ Must be verified on the maintainer's Mac (none of this can run on Linux):
 | M6  | Is the selected source preserved when the previous one is disabled after the new one is selected?                                                      | Step 5 and 7 ordering                                                                                                    |
 
 The probe is a runnable file, `tools/diagnostics/macos_tis_register_probe.swift`
-(written without a Mac or a Swift toolchain: **not compiled or run on any
-machine yet**; a compile error is the first thing to report back). From the
-repository root:
+(written without a Mac or a Swift toolchain; the first version compiled and ran on
+the maintainer's Mac on 27 October). From the repository root:
 
 ```
 swiftc -O -o /tmp/ep_tis_probe tools/diagnostics/macos_tis_register_probe.swift && /tmp/ep_tis_probe
 ```
 
-It changes only two throw-away layouts (`EPProbe<pid>v1`, `EPProbe<pid>v2`) in
-`~/Library/Keyboard Layouts`, puts the user back on the source they started
-with and removes both files, also on failure. It prints one line per question
-(`M1`, `M2`, `M3`, `M4a`, `M4b`, `M5a`, `M6`, then `END`). After a logout and
-login, `/tmp/ep_tis_probe after-logout` prints `M5b`.
+Result of the first version (arm64, current source `com.apple.keyboardlayout.ergopti.plus`):
 
-The maintainer sends back the printed lines. If M1 prints a non-zero status the note
+- M1 PASS: `TISRegisterInputSource` returns 0 and the source is listed at once, with no
+  logout. Its id for a bare user file is `org.unknown.keylayout.<Name>` (M2).
+- M3: a file rewritten in place under the same name keeps typing the old cells, so a
+  versioned name is needed.
+- M6 PASS: disabling a source leaves the selection alone.
+- M5a FAIL: a disabled source whose file was removed stays listed (a ghost) until logout.
+- M4a/M4b FAIL: `TISSelectInputSource` on the freshly registered loose file returns
+  -50 (paramErr), so the live switch is blocked until a way to select is found.
+
+The second version tries the ways around -50, one line each: P1 capabilities before
+selecting (IsSelectCapable, IsEnableCapable, category, type) with a numeric id outside
+every installed layout's range, P2 select at once, P3 select after a run-loop turn and
+after re-reading the list, P4 the same layout as a `.bundle` (Info.plist plus
+`Resources/*.keylayout`), P5 (only with `--write-prefs`, which edits the user's
+`AppleEnabledInputSources` and puts it back) select once the source is enabled through
+the preferences, P6 ghosts after the cleanup; `/tmp/ep_tis_probe after-logout` repeats
+P6 after a logout. It changes only throw-away layouts named `EPProbe<pid>...`, puts the
+user back on the source they started with and removes its files, also on failure.
+
+If M1 prints a non-zero status the note
 is amended before slice 5.
 
 ### 3.2 Linux
