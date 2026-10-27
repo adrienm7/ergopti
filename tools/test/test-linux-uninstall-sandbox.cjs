@@ -18,6 +18,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { createHash } = require('crypto');
 const { bashExecutable } = require('../lib/git-bash.cjs');
+const { provideShellMessages } = require('./lib/shell-messages-fixture.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const script = path.join(ROOT, 'static/ergopti_plus/linux/uninstall.sh');
@@ -378,6 +379,7 @@ try {
 				path.join(nativeDriver, 'install', helper)
 			);
 		}
+		provideShellMessages(path.join(nativeDriver, 'install'));
 		fs.mkdirSync(nativeLibrary, { recursive: true });
 		fs.cpSync(nativeDriver, path.join(nativeLibrary, 'linux'), { recursive: true });
 		fs.cpSync(nativeShared, path.join(nativeLibrary, '_shared'), { recursive: true });

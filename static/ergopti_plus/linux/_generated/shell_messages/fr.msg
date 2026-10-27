@@ -1,6 +1,11 @@
 # linux/_generated/shell_messages/fr.msg
 # AUTO-GENERATED from _shared/data/locales/fr.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
+build_luv.module_generated=Module réseau LuaJIT compilé depuis les sources.
+build_luv.recipe_required=La compilation native de luv requiert sa recette source.
+launch.already_running=Ergopti+ tourne déjà dans cette session ({1} est verrouillé) ; ce lancement a été refusé.
+launch.authorization_failed=L’autorisation d’accès au clavier a été annulée ou a échoué.
+launch.groups_unavailable=La session n’a pas pu obtenir ses groupes d’accès au clavier configurés.
 launcher.dependencies_installed=Dépendances installées.
 launcher.driver_missing=Erreur : répertoire du driver Linux introuvable : {1}
 launcher.install_deps_hint=Lancez : ergopti-hotstrings --install-deps
@@ -8,3 +13,16 @@ launcher.installing_dependencies=Installation des dépendances requises…
 launcher.manual_install_hint=Ou installez manuellement : apt-get install {1}
 launcher.missing_dependencies=Erreur : dépendances manquantes — {1}
 launcher.no_package_manager=Erreur : gestionnaire de paquets introuvable (apt, dnf ou pacman requis).
+layout_registry.not_found=Registre des dispositions introuvable à côté de {1} ni dans {2}.
+permissions.identity_mismatch=L’identité du compte ne correspond pas.
+permissions.no_login_manager=Aucun gestionnaire de connexion n’est actif ; l’inscription de l’utilisateur est reportée au lancement graphique.
+permissions.non_desktop_account=Compte non graphique refusé.
+permissions.requires_admin=La configuration de l’accès au clavier requiert les droits administrateur.
+permissions.session_uninspectable=La session {1} n’a pas pu être examinée ; l’inscription est reportée au lancement graphique.
+permissions.udev_not_running=udev n’est pas actif ; la règle installée s’appliquera à son démarrage.
+permissions.uinput_next_boot=Le noyau actuel n’a pas pu charger uinput ; sa configuration pour le prochain démarrage est installée.
+startup.foreign_entry=L’entrée de démarrage appartient à une autre commande.
+startup.linked_receipt=Reçu de propriété lié refusé.
+startup.linked_setting=Remplacement d’un réglage de démarrage lié refusé.
+startup.requires_installed=Le démarrage automatique requiert une application installée.
+stop_sessions.requires_root=Le nettoyage des sessions du paquet requiert les droits root.
