@@ -182,8 +182,11 @@ _TestHC_WindowControlStartWithdrawal(Phase) {
 	AssertThrows(() => Control.Start())
 	AssertFalse(Control.Active)
 	AssertTrue(Control.Closed)
-	AssertEqual(Phase == "message" ? 0 : 2, State.Listeners.Length,
-		"A resolved message cannot register after its owner was already retired.")
+	AssertEqual(Phase == "message" ? 0 : 3, State.Listeners.Length,
+		"A retired registration return must reconcile its exact listener again.")
+	if Phase == "listen"
+		AssertEqual(0, State.Listeners[3][3],
+			"an early unregister cannot discharge a later registration return")
 	AssertFalse(Control.Listening)
 	AssertEqual(0, Control.OnMessage(202, 303, State.Message, 101))
 	Control.Stop()
@@ -246,3 +249,61 @@ _TestHC_ActualControlTimer(Scenario) {
 Test("Diagnostics native timer: repeating periods are refused (diagnostics-control-native-timer)", _TestHC_ActualControlTimer.Bind("repeating"))
 Test("Diagnostics native timer: actual one-shot executes once (diagnostics-control-native-timer)", _TestHC_ActualControlTimer.Bind("one-shot"))
 Test("Diagnostics native timer: actual cancellation retires its callback (diagnostics-control-native-timer)", _TestHC_ActualControlTimer.Bind("cancelled"))
+
+_TDCL_NativeProbe(State, *) {
+	State.ProbeCalls += 1
+	return 1
+}
+
+_TDCL_NativeObserve(State, OwnerCallback, Params*) {
+	State.NativeDeliveries += 1
+	return OwnerCallback.Call(Params*)
+}
+
+_TDCL_NativeListen(State, Message, Callback, Threads) {
+	if Threads == 1 && !State.Retired {
+		; Retire before the genuine native acquisition returns to its owner.
+		State.Retired := true
+		State.Control.Stop()
+	}
+	OnMessage(Message, State.NativeListener, Threads)
+	if Threads == 1
+		State.RegistrationReturns += 1
+}
+
+_TDCL_LateNativeRegistration() {
+	AssertFalse(A_IsCritical, "the real native delivery control needs an interruptible fixture")
+	Message := DriverControl_RegisterMessage("ErgoptiPlus-fixture-late-diagnostics-" . ProcessExist())
+	Creation := HealthCheck_ControlCreationTime()
+	State := {Control: 0, NativeListener: 0, NativeDeliveries: 0, Retired: false, ProbeCalls: 0, RegistrationReturns: 0}
+	Control := HealthCheckWindowControl(() => Message, _TDCL_NativeListen.Bind(State),
+		HealthCheck_ControlTimer, (*) => 0, () => true, A_ScriptHwnd, ProcessExist(), Creation)
+	State.Control := Control
+	State.NativeListener := _TDCL_NativeObserve.Bind(State, Control.Listener)
+	Probe := _TDCL_NativeProbe.Bind(State)
+	try {
+		OnMessage(Message, Probe, 1)
+		Ack := DllCall("SendMessageW", "Ptr", A_ScriptHwnd, "UInt", Message,
+			"UPtr", ProcessExist(), "Ptr", Creation, "Ptr")
+		AssertEqual(1, Ack, "the genuine native private-message delivery must first work")
+		AssertEqual(1, State.ProbeCalls)
+		OnMessage(Message, Probe, 0)
+		AssertThrows(() => Control.Start(), "native startup cannot succeed after its exact owner retires")
+		AssertEqual(1, State.RegistrationReturns, "the genuine late native acquisition must return")
+		Control.Stop()
+		AssertTrue(Control.Closed)
+		AssertFalse(Control.Active)
+		DllCall("SendMessageW", "Ptr", A_ScriptHwnd, "UInt", Message,
+			"UPtr", ProcessExist(), "Ptr", Creation, "Ptr")
+		AssertEqual(0, State.NativeDeliveries,
+			"no actual registered native callback can retain the fully retired control owner")
+	} finally {
+		; Exact private callback cleanup is independent of the owner's possibly stale flag.
+		OnMessage(Message, State.NativeListener, 0)
+		OnMessage(Message, Probe, 0)
+		Control.Stop()
+		State.NativeListener := 0, State.Control := 0
+	}
+}
+Test("Diagnostics control retires a native listener acquired after cancellation (diagnostics-late-native-registration)",
+	_TDCL_LateNativeRegistration)
