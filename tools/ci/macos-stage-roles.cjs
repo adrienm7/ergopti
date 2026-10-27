@@ -168,18 +168,24 @@ function plan(stage, context) {
 	// ("xctest") beside the runtime receiving ("runtime"), which waits for the
 	// clean build anyway. Apple silicon keeps one cell that runs both.
 	// launcher-native runs the full launcher XCTest and the native probes on the
-	// build host, so Build only builds, packages and signs. It comes last: the
-	// build cells the native cells wait for keep the earlier runners.
+	// build host, so Build only builds, packages and signs.
+	// The account runs five macOS jobs at a time and starts them in this order.
+	// The longest chain is Intel: its build, then the runtime receiving that
+	// waits for it, beside the Intel XCTest cell (about 13 min on run
+	// 40498535042, where it queued 8.7 min behind short cells). The Intel cells
+	// and the two builds therefore take the first five runners; the launcher
+	// cell follows, and the short tooltip cell and the dispatch-only cells come
+	// last.
 	if (stage === 'e2e') {
 		const rows = [
 			cell('e2e-hs', 'stubbed', 360),
-			cell('tooltip-canvas', 'arm64', 10),
-			cell('managed-ollama-native', 'arm64', 60),
-			cell('managed-ollama-native', 'amd64', 60, 'runtime'),
-			cell('managed-ollama-native', 'amd64', 45, 'xctest'),
-			cell('managed-ollama-build', 'arm64', 60),
 			cell('managed-ollama-build', 'amd64', 60),
-			cell('launcher-native', 'host', 30)
+			cell('managed-ollama-native', 'amd64', 45, 'xctest'),
+			cell('managed-ollama-native', 'amd64', 60, 'runtime'),
+			cell('managed-ollama-build', 'arm64', 60),
+			cell('managed-ollama-native', 'arm64', 60),
+			cell('launcher-native', 'host', 30),
+			cell('tooltip-canvas', 'arm64', 10)
 		];
 		if (context.event_name === 'workflow_dispatch' && !context.release)
 			rows.push(

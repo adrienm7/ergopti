@@ -104,14 +104,15 @@ function macRoleBody(body, role, expectedCount) {
 			? [['macos-15', 'arm64', 90]]
 			: role === 'managed-ollama-native'
 				? [
-						['macos-15', 'arm64', '', 60],
-						// Intel runs its XCTest cohorts beside the runtime receiving.
+						// Intel runs its XCTest cohorts beside the runtime receiving,
+						// and the Intel chain takes the first runners.
+						['macos-15-intel', 'amd64', 'xctest', 45],
 						['macos-15-intel', 'amd64', 'runtime', 60],
-						['macos-15-intel', 'amd64', 'xctest', 45]
+						['macos-15', 'arm64', '', 60]
 					]
 				: [
-						['macos-15', 'arm64', '', 60],
-						['macos-15-intel', 'amd64', '', 60]
+						['macos-15-intel', 'amd64', '', 60],
+						['macos-15', 'arm64', '', 60]
 					];
 	assert.deepEqual(
 		rows.map((row) =>
