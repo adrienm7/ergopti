@@ -485,6 +485,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-linux-elf-needed-closure.cjs"],
 			"repro": "npm run test:linux-elf-needed-closure"
+		},
+		{
+			"id": "js-0504",
+			"ordinal": 513,
+			"name": "Windows control CLI rejects malformed session identities through the actual PowerShell entrypoint",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-control-cli.cjs", "--phase=session"],
+			"repro": "node tools/test/test-windows-control-cli.cjs --phase=session"
 		}
 	]
 }

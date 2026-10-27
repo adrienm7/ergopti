@@ -2048,6 +2048,7 @@ _LogBootProgress("keystats modules + tests included")
 ; The local reload control rides the Diagnostics endpoint owner above.
 #Include ../infra/driver_control.ahk
 #Include unit/infra/control/test_driver_control.ahk
+#Include unit/infra/control/test_driver_control_cli.ahk
 #Include ../ui/healthcheck/collection.ahk
 #Include unit/ui/webview/test_ui_warm_hosts.ahk
 #Include ../ui/healthcheck/helpers.ahk
