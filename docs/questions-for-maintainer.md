@@ -15,6 +15,13 @@ answer once, then move the answered line below.
 
 ## Answered
 
+- **Coordinator decisions of 2026-10-27 (the maintainer asked not to be asked; override if needed):**
+  - **App Cloner folder picker on macOS:** the Cancel button keeps the system label. NSOpenPanel has no
+    key-value `cancelButtonTitle`, so the wizard's guarded setter always failed silently; it is removed with
+    its assertion instead of hiding the error.
+  - **AppImage:** no bundled glibc or loader (the host GTK, GL and NSS modules must match the loader that
+    starts them); built on ubuntu:22.04, glibc 2.35 or newer, musl refused in words; a build gate refuses a
+    foreign loader or a staged C library.
 - **Answers of 2026-10-26 (QCM):**
   - **Slow-segment threshold:** 5 ms on the three OS (macOS and Linux were at 20 ms).
   - **Tap-hold delay migration marker:** a versioned migrator for `tap_hold.toml` on the three OS replaces the
