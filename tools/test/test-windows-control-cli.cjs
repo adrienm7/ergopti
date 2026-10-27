@@ -3,8 +3,8 @@
 /**
  * MODULE: Windows Control CLI Admission Tests
  * DESCRIPTION:
- * Executes the real session reader with private data and a genuinely absent
- * process. Windows uses its actual PowerShell 5.1; other hosts verify portable
+ * Executes the real session reader and public result receiver with private
+ * data and a genuinely absent process. Windows uses its actual PowerShell 5.1; other hosts verify portable
  * PowerShell semantics without qualifying Windows messages or live reloads.
  */
 'use strict';
@@ -25,10 +25,10 @@ for (const argument of process.argv.slice(2)) {
 	assert.ok(match && !argumentsByName.has(match[1]), 'expected unique --phase/--receipt arguments');
 	argumentsByName.set(match[1], match[2]);
 }
-assert.equal(
-	argumentsByName.get('phase'),
-	'session',
-	'the session phase must be selected explicitly'
+const phase = argumentsByName.get('phase');
+assert.ok(
+	['session', 'result'].includes(phase),
+	'a known admission phase must be selected explicitly'
 );
 const runtime =
 	process.platform === 'win32'
@@ -64,6 +64,17 @@ const spec = JSON.parse(
 		'utf8'
 	)
 );
+if (phase === 'result') {
+	require('./support/windows-control-cli-result.cjs').runResult({
+		root: ROOT,
+		source: SOURCE,
+		spec,
+		invoke,
+		runtimeVersion,
+		receiptPath: argumentsByName.get('receipt')
+	});
+	process.exit(0);
+}
 const folders = fs.readFileSync(
 	path.join(ROOT, 'static/ergopti_plus/_shared/modules/paths/app_dirs.toml'),
 	'utf8'

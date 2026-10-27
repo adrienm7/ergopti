@@ -493,6 +493,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-control-cli.cjs", "--phase=session"],
 			"repro": "node tools/test/test-windows-control-cli.cjs --phase=session"
+		},
+		{
+			"id": "js-0505",
+			"ordinal": 514,
+			"name": "Windows control CLI accepts only typed matching result records and exact protocol states",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-control-cli.cjs", "--phase=result"],
+			"repro": "node tools/test/test-windows-control-cli.cjs --phase=result"
 		}
 	]
 }
