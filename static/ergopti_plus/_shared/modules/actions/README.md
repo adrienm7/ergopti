@@ -10,12 +10,13 @@ with the picker order, heading levels and locale keys resolved.
 
 ## Key files
 
-| File                   | Description                                                                 |
-| ---------------------- | --------------------------------------------------------------------------- |
-| `actions.toml`         | Every action with its platform, keystrokes, parameter kind and requirements |
-| `modifier_chords.json` | The modifier + key matrix each driver registers as chord actions            |
-| `send_keys.json`       | Named keys, modifiers and text limit of the send_key/shortcut/text actions  |
-| `script_chords.json`   | The four script chords' slots, their key on each driver, the paused actions |
+| File                   | Description                                                                      |
+| ---------------------- | -------------------------------------------------------------------------------- |
+| `actions.toml`         | Every action with its platform, keystrokes, parameter kind and requirements      |
+| `modifier_chords.json` | The modifier + key matrix each driver registers as chord actions                 |
+| `send_keys.json`       | Named keys, modifiers and text limit of the send_key/shortcut/text actions       |
+| `script_chords.json`   | The four script chords' slots, their key on each driver, the paused actions      |
+| `slot_roles.json`      | The neutral slot grammar: modifier roles and the modifier each driver calls them |
 
 ## Generated outputs
 
