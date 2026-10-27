@@ -803,11 +803,19 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       entry again (ea02cf7000: the generic registrar refuses Caps Lock and the whole shortcut start rolled
       back). The registrar tests say macOS never fires a Caps Lock hotkey: check on a real Mac that Ctrl+Caps
       Lock toggles Caps Lock; if not, report it and drop the slot's recommendation on macOS with a reason.
-- [ ] **Linux layout and number-row values read at runtime.** [CODE] The Linux `keyboard_layout` scope
-      participant is config only: nothing reads `layout.direct_access_digits` or
-      `layout.number_row_reorder_edges` at runtime and the keyboard hook starts once in `main()` with no
-      in-process restart. Design a hook restart (key loss, hotstring buffer) and the hook reading these
-      values, then make the participant acknowledge on the hook's started report.
+- [ ] **Number-row and layout emulation on macOS and Linux, live (maintainer request, 27 October).** [CODE]
+      Windows emulates the layout and applies `layout.direct_access_digits` and
+      `layout.number_row_reorder_edges`; macOS and Linux keep the installed system layout and only store the
+      two values (Linux scope participant config only, bdec8cfc06; design input in
+      `docs/design/linux-number-row-runtime.md`). Wanted: the same options on macOS and Linux, applied live
+      (no logout, no reboot, no daemon restart). Design first, one note for both OS, then slices: - macOS, preferred: Karabiner rules generated from the shared layout data (Ergopti already writes
+      `karabiner.json`, and Karabiner reloads it live); the alternative, a generated custom `.keylayout`,
+      needs a logout or input-source re-selection to take a changed file and is the fallback only. - Linux: the evdev hook already grabs the keyboards, so the number-row owner (dormant since
+      d70c2d9aa3) can emit the reordered keys through the uinput writer and switch owner at an event
+      boundary (no restart, no key lost); the alternative, a generated XKB symbols file, loads live with
+      `setxkbmap` on X11 but depends on the compositor on Wayland. - Shared: one source for the row orders and the direct-access table (the Windows tables), replay
+      vectors on the three OS, the menu rows live on macOS and Linux with honest reason text where a
+      desktop cannot, the scope participant acknowledging the live switch.
 - [ ] **Windows updater -File workers: real update check.** [PHYS] Install a build with 5d6beccf83
       by hand, then update from it to the next release: the exe is replaced and restarts, the
       three scripts are in `%LOCALAPPDATA%\Ergopti\vendor\`, the PowerShell command line shows
