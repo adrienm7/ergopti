@@ -268,7 +268,7 @@
 		"fix:unbalanced": "node ./tools/lint/lint-conventions.js --fix-unbalanced --warn-only",
 		"fix:all": "node ./tools/lint/lint-conventions.js --fix-banners --fix-unbalanced --fix-spacing --warn-only",
 		"dev:macos-app": "node ./tools/lib/git-bash.cjs ./tools/dev/run-macos-dev-app.sh",
-		"dev:linux": "bash ./tools/dev/run-linux-dev.sh",
+		"dev:linux": "node ./tools/lib/git-bash.cjs ./tools/dev/run-linux-dev.sh",
 		"dev:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/dev/run-windows-dev.ps1",
 		"sync:ahk": "node ./tools/dev/sync-private-ahk.js && node ./tools/dev/remove_ahk_personal_configuration.js",
 		"watch:ahk": "node ./tools/dev/watch-ahk.js",
