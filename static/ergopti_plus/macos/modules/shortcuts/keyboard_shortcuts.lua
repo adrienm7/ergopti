@@ -741,7 +741,12 @@ local function bind_slot(slot_id, action_id)
 	end
 	local acquisition_epoch = _lifecycle_epoch
 	_native_acquisition_depth = _native_acquisition_depth + 1
-	local ok_bind, handle = xpcall(Registrar.bind, debug.traceback, chord, function()
+	-- The Caps Lock slot keeps the native factory the retired Ctrl+CapsLock
+	-- switch used; the registrar refuses Caps Lock as a key on every other path.
+	local parsed_chord = Chord.parse(chord)
+	local bind = (parsed_chord and parsed_chord.key:lower() == "capslock")
+		and Registrar.bind_capslock_chord or Registrar.bind
+	local ok_bind, handle = xpcall(bind, debug.traceback, chord, function()
 		if _delivery_enabled ~= true or _lifecycle_paused == true then return false end
 		local current_action = _actions[slot_id] or "none"
 		if current_action == "none" then
