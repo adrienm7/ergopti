@@ -69,6 +69,8 @@ local function with_engine_scope(callback)
 			finger_confirm_ms = 0.05,
 			finger_drop_confirm_ms = 0.2,
 			finger_count_stable_ms = 0.06,
+			multi_finger_landing_ms = 0.15,
+			scroll_momentum_guard_ms = 0.3,
 		}
 		package.loaded["infra.timings"] = {
 			sec = function(group, key)
