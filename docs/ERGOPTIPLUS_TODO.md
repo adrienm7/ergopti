@@ -31,6 +31,8 @@ a sealed Windows updater source, reseal with
 
 ## Handover of 2026-10-26 (read first if the session was lost)
 
+- **Mac hardware session.** The maintainer has a Mac: the checklist is "Mac hardware session" under
+  Maintainer checks; their logs land in `docs/field-reports/mac-2026-10-27/` on their branch.
 - **State.** dev is linear and pushed at the head of the sixth integration batch (27 Oct, about 05:00 UTC);
   every push of dev had its CI cancelled (a dev push builds a release). Latest stable release: v1.0.6. A full
   CI of that head is dispatched on `tmp/preflight-dev` with `os_lanes=all`: read it first. The previous full
@@ -883,6 +885,125 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
 Record the commit, OS build, scale, layout and emulation state; report pass, fail or not executed
 per line. Use a disposable profile (`paths.toml` pointing at a scratch folder) for anything that
 writes configuration. Reload the driver from the working tree for dev-only fixes.
+
+### Mac hardware session (prepared 27 October, run from a branch of dev)
+
+Work on a branch from dev (`git switch -c field/mac-2026-10-27 origin/dev`), run the driver from that
+working tree (Hammerspoon > Reload config) and, for packaged-only lines, the app built by
+`static/ergopti_plus/macos/build_macos_app.sh`. Before starting, write down the commit (`git rev-parse
+--short HEAD`), macOS version and build, chip (Apple silicon or Intel), keyboard (ISO or ANSI, built-in or
+external), input source, Karabiner version and whether Ollama.app or oMLX is installed. Report each line as
+pass, fail or not run.
+
+**Give me the logs.** At the end of the session (and right after any failure) use Debug > Report a bug, or copy
+`~/Library/Logs/ergopti_plus/ErgoptiPlus_<date>.log`, `ErgoptiPlus_errors_<date>.log` and
+`ErgoptiPlus_llm.log` into `docs/field-reports/mac-2026-10-27/` on your branch and push it (the logger already
+masks secrets, the home folder, e-mails and personal names; check nothing private is left). Set Debug > Log
+level > DEBUG first for the whole session. I read: `Boot complete in`, `Boot CPU`, `Boot stage`, `Slow <segment>:
+X ms own, Y ms total, parent ...` (HotPath, PAR-53), the periodic PhaseStats and log-volume summaries
+(PAR-54, PAR-56), `Field check result:`, `typed key(s) swallowed`, `key_event_health`, lease lines (`exit 73`,
+PONG/READY), `Lease-bound input startup failed`, `Layout poll detected change`, every ERROR and WARN.
+
+#### 1. Start-up time and idle cost
+
+- [ ] Cold start: quit Ergopti, wait 10 s, start it; note the `Boot complete in … ms` and `Boot CPU` lines.
+      Repeat three times, then once right after a macOS login. Report the three numbers and the slowest
+      `Boot stage` lines.
+- [ ] Reload: Hammerspoon > Reload config three times; same lines. A menu click during the reload is held
+      and replayed; a second Reload click joins the first one (no double reload).
+- [ ] Idle: 10 minutes without typing, then Activity Monitor CPU and memory of Hammerspoon; the PhaseStats
+      summary in the log should show no recurring work above a few ms per minute.
+- [ ] Quit during a busy moment (typing, then Quit within a second): the app ends both processes within
+      10 s (CI item "Quit did not end both processes within 10 s"); Quit wins over a reload in progress.
+
+#### 2. Typing in real conditions (one working day if possible)
+
+- [ ] Type normally for at least an hour in Safari, TextEdit, Terminal, VS Code and one Electron app (Slack
+      or Discord). Note any dropped, doubled or reordered letter with the time; right after one, use Debug >
+      Report a bug. I compare with `typed key(s) swallowed`, `key_event_health` and the lease lines
+      (items "Dropped letters on macOS", "macOS swallowed-keys check on v1.0.6", 117/140).
+- [ ] Hot path: after that hour, the HotPath lines name each slow segment with its own time and its parent;
+      send them, they decide what to optimise next (Issue #101 point 1: `Slow ingest tick`,
+      `Slow preferences save`).
+- [ ] Hotstrings: expansions, chained expansions, the magic key on ISO and ANSI, Backspace right after an
+      expansion (undo), hotstrings in a password field (none must fire, private text never logged), an
+      ignored app. The injection order is new code (PAR-76 R26): any wrong erase count or replayed
+      terminator (Return, Tab, a letter) is a fail.
+- [ ] Tap-hold: each tap-hold key alone, fast rolls (`one-shot`), holding with another key; the Karabiner JSON
+      thresholds equal the shared per-key thresholds (PAR-15: compare `~/.config/karabiner/karabiner.json`
+      with the menu values).
+- [ ] Ctrl+Caps Lock toggles Caps Lock (new `secondary_capslock` slot binding, ea02cf7000; the tests say
+      macOS may never fire a Caps Lock hotkey: report exactly what happens).
+- [ ] Right Option + Return, Delete, Backspace and Escape run their script actions; Backspace word start in
+      Terminal (`ab`, three Backspaces), TextEdit Option+Backspace and Safari Cmd+L.
+- [ ] CapsWord: the pointer cancels it (item 44).
+
+#### 3. Configuration migration and menus
+
+- [ ] Schema v15 (PAR-41, release blocker): with a copy of an old `config.toml` that has keyboard
+      shortcut slots with parameters (for example a shortcut that opens a URL or types text), start the new
+      build: every slot keeps its action under its role-named id, and report any parameter that is lost
+      (this is the known release blocker; the log names each migrated key).
+- [ ] Old `[llm.profiles] user_profiles`: a config that has them still shows the profiles in the AI menu
+      (PAR-40), and the next save writes the new `llm.user_profiles` only.
+- [ ] Clear and Restore per category and global, then restart: unknown keys kept, personal hotstrings kept
+      by Restore, exact backups; recommended-settings restore asks no confirmation where it should not.
+- [ ] Shortcuts group restore and clear; tap delay row opens the dialog and « Use global delay (…) » is
+      right below it; tap and hold pickers (steps in
+      [macos-tap-hold-action-picker.md](todo-agents/macos-tap-hold-action-picker.md)).
+- [ ] Menu row order looks as before in every submenu (orders now come from one data file, PAR-76 R18).
+- [ ] « Retirer les anciennes règles » on an upgrade (item 43); Login Items show one Ergopti (item 24,
+      Debug > Show what starts Ergopti at login).
+
+#### 4. AI predictions
+
+- [ ] With a real local model (Ollama.app, then oMLX if installed): predictions appear; the request floor
+      (default 300 ms, settable in the AI menu, 0 accepted) spaces automatic requests; an explicit
+      shortcut is never held; asking for several variants sends them without delay; mashing the shortcut
+      replaces the request in flight; the debounce "never" setting works; live mode answers at once at a
+      word end.
+- [ ] AI off disarms the AI keys, the agent's manual actions and the automatic mode; greyed actions show
+      the dedicated "requires AI" hint.
+- [ ] Agent: manual action refused with the right notice when paused, AI off or agent mode off; automatic
+      triage skipped while typing a hotstring preview (new shared decisions, PAR-65).
+- [ ] Tooltip typography and placement near screen edges, on two displays (item 111).
+- [ ] Issue #100: with Ollama.app and a PAC proxy, enabling the AI downloads the model; with the Ergopti
+      menu held open, no lease timeout.
+- [ ] Issue #99: `memory_pressure | tail -1` during lease errors; oMLX listed (DEBUG line `Local server 'omlx'
+    probe answered ...`, else `curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/v1/models`);
+      `Ollama bootstrap failed (exit=137)` with an external Ollama; declining the download opens no error
+      window ([issue99-ai-startup-updater.md](todo-agents/issue99-ai-startup-updater.md)).
+
+#### 5. Network, updates and field checks
+
+- [ ] Debug > Test network (PAC, proxy, download), on the office network if possible and at home: send the
+      `Field check result:` lines; the new route-plan step shows which route each Ollama origin takes; an
+      `http://` company PAC is fetched (Issue #101).
+- [ ] Debug > Test Karabiner lease, Test key accounting (30 s, type during it), Test third-party tools
+      (Shortcuts, Homebrew, timer; item 116), Test owned Karabiner runtime (must stay dormant).
+- [ ] Update check window: release notes pane readable in light and dark, links open the repository
+      (PAR-52); a Sparkle update from the previous release installs and relaunches; Homebrew live upgrade.
+- [ ] MLX download behind a proxy (119/130/136); code 74.
+
+#### 6. Windows and pages (visual)
+
+- [ ] Open every page once in light and dark mode: metrics (apps and typing), changelog, release notes,
+      model browser, hotstring editor, layout manager, onboarding wizard, download window. Colours now
+      come from the theme (PAR-81, proven identical in Chromium): report anything that looks different in
+      the real WebView.
+- [ ] Onboarding wizard (item 7): fresh folder, existing folder, moved folder, Cancel, Finish then
+      restart.
+- [ ] App Cloner: clone an app, cancel the folder picker (system « Annuler » label is expected now), and
+      clone into a full or read-only folder: an error dialog must appear, never an endless progress bar
+      (4550befb08).
+- [ ] Trackpad gestures (item 126); Diagnostics window focus (item 122); shared export (item 123).
+
+#### 7. Edge cases
+
+- [ ] `pipefail` and `printf %b` under the system bash 3.2, the native HTTPS downgrade refusal,
+      `hs.fs.attributes` on a FIFO, the read-only dashboard with a hot journal.
+- [ ] Recompile `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt` from its source in Script
+      Editor so its comment follows the keystats rename, and commit it.
 
 ### After v1.0.5 (actions)
 
