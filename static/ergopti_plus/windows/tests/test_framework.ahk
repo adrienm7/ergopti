@@ -46,6 +46,8 @@
 
 ; Registry of all Test() calls. Each entry is { name, callback, interactive }.
 global TEST_REGISTRY := []
+; Once execution owns the plan, registration and nested runners must refuse.
+global _TEST_RUN_STARTED := false
 
 ; Counters updated by RunTests.
 global TEST_PASS_COUNT := 0
@@ -631,7 +633,9 @@ global _DriverDirConcatFn := _DriverDirConcat
 ; Register a test. ``Callback`` must be a 0-arg callable; it receives no
 ; setup/teardown — tests should be self-contained.
 Test(Name, Callback, Interactive := false) {
-	global TEST_REGISTRY
+	global TEST_REGISTRY, _TEST_RUN_STARTED
+	if _TEST_RUN_STARTED
+		throw Error("Tests cannot be registered after execution starts.")
 	; The registering file decides the module shard (see _TestShardGroup).
 	TEST_REGISTRY.Push({ name: Name, callback: Callback, interactive: Interactive,
 		file: Error("", -1).File })
@@ -1003,10 +1007,15 @@ RunTests(PlanModuleOf := 0) {
 	global TEST_NOT_EXECUTED_COUNT, TEST_NOT_EXECUTED_MARKER
 	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
 	global _AHK_INTERACTIVE, _AHK_MODULE, _AHK_LIST_FILE, _AHK_DUMP_PLAN, _AHK_REVERSE
+	global _TEST_RUN_STARTED
+	if _TEST_RUN_STARTED
+		throw Error("The test runner has already started.")
 	PlanClassifier := _TestPlanClassifier(PlanModuleOf)
     if (A_IsCritical != 0) {
         throw Error("RunTests started with A_IsCritical=" . A_IsCritical)
     }
+	; Close registration before receipt I/O or selection can dispatch a callback.
+	_TEST_RUN_STARTED := true
 	if !IsSet(_AHK_DRY_RUN)
 		_AHK_DRY_RUN := false
 	if !IsSet(_AHK_ONLY_FILTER)
