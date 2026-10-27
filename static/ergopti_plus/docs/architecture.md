@@ -117,6 +117,7 @@ graph TD
         MACOS_managed_ollama_daemon["ManagedOllamaDaemon.lua"]
         MACOS_managed_ollama_hint["ManagedOllamaHint.lua"]
         MACOS_managed_ollama_pull["ManagedOllamaPull.lua"]
+        MACOS_metadata_command_stats["MetadataCommandStats.lua"]
         MACOS_modifier_injector["ModifierInjector.lua"]
         MACOS_mouse_control["MouseControl.lua"]
         MACOS_native_bootstrap_pty["NativeBootstrapPty.lua"]

@@ -29,6 +29,7 @@ function M.begin(clock, emit)
 	local started = clock()
 	local last = started
 	local phases, counts = {}, {}
+	local groups, group_order = {}, {}
 	local trace = {}
 
 	--- Charges the time since the previous mark to one phase.
@@ -36,6 +37,25 @@ function M.begin(clock, emit)
 		local now = clock()
 		phases[phase] = (phases[phase] or 0) + (now - last) / NANOSECONDS_PER_MILLISECOND
 		last = now
+	end
+
+	--- Returns a stage clock for the sub-stages of one phase. It does not move
+	--- the phase clock: the phase still gets its whole time, and the line adds
+	--- `<group>: <stage>=<ms> ...` so a slow phase names its slow sub-stage.
+	--- @param group string Phase whose sub-stages are timed.
+	--- @param order table Stage names in report order.
+	--- @return function stage Called with a stage name as each stage ends.
+	function trace.stages(group, order)
+		assert(type(group) == "string" and type(order) == "table", "IngestTrace.stages: group and order required")
+		local record = { order = order, ms = {} }
+		if not groups[group] then group_order[#group_order + 1] = group end
+		groups[group] = record
+		local stage_last = clock()
+		return function(stage)
+			local now = clock()
+			record.ms[stage] = (record.ms[stage] or 0) + (now - stage_last) / NANOSECONDS_PER_MILLISECOND
+			stage_last = now
+		end
 	end
 
 	--- Records an integer size shown beside the timings (never content).
@@ -57,8 +77,24 @@ function M.begin(clock, emit)
 		for _, phase in ipairs(PHASE_ORDER) do
 			parts[#parts + 1] = string.format("%s=%d", phase, math.floor(phases[phase] or 0))
 		end
-		emit(string.format("Slow ingest tick %d ms (%s ms; entries=%d statements=%d).",
-			math.floor(total_ms), table.concat(parts, " "),
+		local details = {}
+		for _, group in ipairs(group_order) do
+			local record, stage_parts = groups[group], {}
+			for _, stage in ipairs(record.order) do
+				if record.ms[stage] then
+					stage_parts[#stage_parts + 1] = string.format("%s=%d", stage, math.floor(record.ms[stage]))
+				end
+			end
+			if #stage_parts > 0 then
+				details[#details + 1] = string.format("; %s: %s ms", group, table.concat(stage_parts, " "))
+			end
+		end
+		if counts.metadata_commands then
+			details[#details + 1] = string.format("; metadata_commands=%d in %d ms",
+				counts.metadata_commands, counts.metadata_command_ms or 0)
+		end
+		emit(string.format("Slow ingest tick %d ms (%s ms%s; entries=%d statements=%d).",
+			math.floor(total_ms), table.concat(parts, " "), table.concat(details),
 			counts.entries or 0, counts.statements or 0))
 		return true
 	end
