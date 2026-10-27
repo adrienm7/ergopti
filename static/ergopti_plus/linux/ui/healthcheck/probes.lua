@@ -361,7 +361,7 @@ local function configuration(schema, run, overrides)
 			done({ state = "unsupported" })
 			return
 		end
-		local handle = Timers.after(0.001, function()
+		local handle = Timers.after(require("infra.timings").sec("ui", "healthcheck_probe_defer_ms"), function()
 			local context = require("ui.healthcheck.bridge").configuration_context(schema, overrides)
 			local ok, result, sections = pcall(require("healthcheck.configuration").probe, context)
 			if not ok then
