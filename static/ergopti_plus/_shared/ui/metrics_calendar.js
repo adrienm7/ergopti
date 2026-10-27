@@ -27,6 +27,16 @@ function shiftMetricsDay(ordinal, days) {
 	return date.getTime();
 }
 
+/** Moves calendar months while clamping to the target month's last valid day. */
+function shiftMetricsMonth(ordinal, months) {
+	const date = new Date(ordinal);
+	const target = new Date(
+		metricsDayOrdinal(date.getUTCFullYear(), date.getUTCMonth() + months + 1, 0)
+	);
+	target.setUTCDate(Math.min(date.getUTCDate(), target.getUTCDate()));
+	return target.getTime();
+}
+
 function formatMetricsDateKey(ordinal) {
 	const date = new Date(ordinal);
 	return `${String(date.getUTCFullYear()).padStart(4, '0')}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
