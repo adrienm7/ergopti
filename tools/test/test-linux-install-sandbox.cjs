@@ -484,9 +484,7 @@ const errors = [];
 				errors.push(`install.sh never asked the package manager for ${pkg}`);
 			}
 		}
-		if (
-			!/icône de la barre système \(libayatana-appindicator\) — capacité vérifiée/.test(run.output)
-		) {
+		if (!/system tray icon \(libayatana-appindicator\) — capability verified/.test(run.output)) {
 			errors.push('the tray backend was not re-probed after its package was installed');
 		}
 	} finally {
