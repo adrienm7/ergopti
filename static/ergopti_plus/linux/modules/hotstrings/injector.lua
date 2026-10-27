@@ -272,7 +272,7 @@ local function send_text_native(tx, text, prepared)
 			for _, mod in ipairs(step.mods) do
 				press(MODIFIER_CODES[mod], "layout modifier down")
 			end
-			press(step.keycode, "replacement key down")
+			press(step.keycode, "replacement_key_down")
 			must_emit(tx, step.keycode, EVDEV_VALUE_UP, "replacement key up")
 			-- Released in reverse, and always: a modifier left held after an
 			-- interrupted injection turns every subsequent keystroke into a shortcut.
@@ -282,7 +282,7 @@ local function send_text_native(tx, text, prepared)
 		end
 	end)
 	if caps then
-		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_DOWN, "capslock restore down")
+		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_DOWN, "capslock_restore_down")
 		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_UP, "capslock restore up")
 	end
 	if not ok_typed then error(typed_err, 0) end
@@ -618,7 +618,7 @@ local function run_transaction(label, body, publication, prepared, data_attempt)
 	-- publication never prevents owned key-ups or physical modifier restore.
 	tx = setmetatable({ publication = publication,
 		emit = function(code, value, phase, admission)
-			if value == EVDEV_VALUE_DOWN and phase ~= "capslock restore down" then
+			if value == EVDEV_VALUE_DOWN and phase ~= "capslock_restore_down" then
 				require_publication(publication, true)
 				if prepared then prepared.cached() end
 			end
@@ -634,7 +634,7 @@ local function run_transaction(label, body, publication, prepared, data_attempt)
 	tx.channel = function()
 		local channel = native_tx.channel()
 		return { is_open = channel.is_open,
-			emit = function(code, value) return tx.emit(code, value, "clipboard paste chord") end }
+			emit = function(code, value) return tx.emit(code, value, "clipboard_paste_chord") end }
 	end
 	local ok, err = pcall(function()
 		if prepared then prepared.cached() else require_publication(publication, false) end
