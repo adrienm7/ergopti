@@ -968,6 +968,14 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 		end,
 	}
 	steps[#steps + 1] = {
+		name = "field-run",
+		run = function()
+			local module = package.loaded["infra.field_run"]
+			if module == nil then return true end
+			return module.stop()
+		end,
+	}
+	steps[#steps + 1] = {
 		name = "menu-watchers",
 		run = function()
 			local module = package.loaded["ui.menu"]
@@ -2329,6 +2337,14 @@ require("infra.driver_control").start({
 		return TerminationCoordinator.request_reload_owned(reason, on_aborted)
 	end,
 })
+-- The developer field run (tools/dev/collect-macos-field-report.sh): only a
+-- developer app runs it, so a packaged runtime never even loads the module.
+if require("infra.dev_source").is_active() then
+	require("infra.field_run").start({
+		root = require("infra.dev_source").root(),
+		pid = assert(tonumber(hs.processInfo.processID), "hs.processInfo.processID is unavailable"),
+	})
+end
 -- Trigger the first Karabiner deploy HERE, after init.lua fully completes.
 -- hs.timer callbacks scheduled during module init do not fire reliably;
 -- calling regenerate() from this top-level context guarantees the event loop

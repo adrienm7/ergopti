@@ -1632,3 +1632,17 @@ covers other user sessions, not `open -n`, a direct exec or a racing update
 relaunch. A modal `hs.dialog.blockAlert` keeps the run loop turning, so any
 producer armed at require time (the KC ledger bridge) must be stopped before a
 fatal dialog.
+
+### project-macos-field-run-drives-the-developer-app
+
+`tools/dev/collect-macos-field-report.sh` asks a developer ErgoptiPlus.app to
+run every Debug field check, the diagnostics snapshot and the Ollama and MLX
+flows through `infra/field_run.lua`: a request file in the clone folder that
+`static/ergopti_plus/macos/data/field_run.json` names, one JSON result per
+step, then a done marker. It starts only behind `infra/dev_source.lua`; a
+packaged runtime never loads it. Runtime installs go through
+`runtime_install_offer` (the only grantor), never `install_for_selection()`
+directly, or `ai-runtime-triggers` fails. Add a new Debug field check to the
+declaration too: `test_field_run.lua` and `test-macos-field-run-contract.cjs`
+refuse a check with no step. A step that needs a person is declared with
+`person`/`reason` and reported, never driven with synthetic input.
