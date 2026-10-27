@@ -2263,6 +2263,7 @@
 	"ollama.error_checksum": "Det nedladdade Ollama-arkivet klarade inte SHA-256-kontrollen och kastades. Inget installerades.",
 	"ollama.error_installer_refused": "Ergoptis Ollama-installerare vägrade sin egen begäran, så inget installerades. Starta om Ergopti och välj Ollama-motorn igen; om det kvarstår, skicka diagnostikrapporten.",
 	"ollama.error_runtime_refused": "Ergopti kunde inte verifiera sin fastlåsta Ollama-version (versionskatalog eller integritetskontroll), så inget installerades. Skicka diagnostikrapporten.",
+	"ollama.error_killed": "Systemet stoppade installationen av Ollama ({1}) innan den var klar, så inget installerades. Försök igen; om det händer igen, skicka diagnosrapporten.",
 	"ollama.external_manual_start_body": "Den här Ollama-installationen hanteras utanför Ergopti. Starta eller stoppa tjänsten själv, eller installera Ergoptis hanterade miljö via erbjudandet om att konfigurera Ollama.",
 	"ollama.native_offer_body": "Installera Ergoptis egen Ollama %s, den version som Ergopti låser och verifierar. Den körs på en egen port bredvid en Ollama som du själv har installerat, som Ergopti aldrig använder, stoppar eller ändrar. Dina modeller ligger kvar där de är.",
 	"ollama.native_offer_install": "Installera hanterad miljö",

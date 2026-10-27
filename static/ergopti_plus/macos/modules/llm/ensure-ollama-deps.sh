@@ -49,6 +49,13 @@ log_error() {
 }
 
 cleanup_install() {
+	local status=$? signal_name=""
+	# A child killed by a signal ends the script through set -e with 128 + N
+	# and prints nothing itself; name the signal for the driver's log.
+	if [ "$status" -gt 128 ]; then
+		signal_name="$(kill -l $((status - 128)) 2>/dev/null || true)"
+		log_error "The installer stopped with exit $status${signal_name:+ (signal SIG${signal_name#SIG})}."
+	fi
 	if [ -n "$DOWNLOAD_PID" ]; then
 		kill "$DOWNLOAD_PID" 2>/dev/null || true
 		wait "$DOWNLOAD_PID" 2>/dev/null || true

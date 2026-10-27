@@ -2263,6 +2263,7 @@
 	"ollama.error_checksum": "İndirilen Ollama arşivi SHA-256 denetimini geçemedi ve silindi. Hiçbir şey yüklenmedi.",
 	"ollama.error_installer_refused": "Ergopti'nin Ollama yükleyicisi kendi isteğini reddetti, bu yüzden hiçbir şey yüklenmedi. Ergopti'yi yeniden başlatın ve Ollama motorunu yeniden seçin; sorun sürerse tanılama raporunu gönderin.",
 	"ollama.error_runtime_refused": "Ergopti sabitlenmiş Ollama sürümünü doğrulayamadı (sürüm kataloğu veya bütünlük denetimi), bu yüzden hiçbir şey yüklenmedi. Tanılama raporunu gönderin.",
+	"ollama.error_killed": "Sistem, Ollama kurulumunu ({1}) tamamlanmadan durdurdu; bu yüzden hiçbir şey kurulmadı. Yeniden deneyin; tekrar olursa tanılama raporunu gönderin.",
 	"ollama.external_manual_start_body": "Bu Ollama kurulumu Ergopti dışında yönetilmektedir. Hizmetini kendiniz başlatın veya durdurun ya da Ollama kurulum teklifinden Ergopti tarafından yönetilen ortamı kurun.",
 	"ollama.native_offer_body": "Ergopti’nin kendi Ollama %s sürümünü yükleyin; Ergopti’nin sabitleyip doğruladığı sürüm. Kendi yüklediğiniz herhangi bir Ollama’nın yanında kendi bağlantı noktasında çalışır; Ergopti onu asla kullanmaz, durdurmaz veya değiştirmez. Modelleriniz oldukları yerde kalır.",
 	"ollama.native_offer_install": "Yönetilen ortamı kur",
