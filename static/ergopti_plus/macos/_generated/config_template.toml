@@ -713,23 +713,5 @@ enabled = false
 
 [shortcuts.keys]
 wrap_text_if_selected = false
-ctrl_a = false
-ctrl_d = false
-ctrl_e = false
 ctrl_g = false
-ctrl_h = false
-ctrl_i = false
-ctrl_m = false
-ctrl_o = false
-ctrl_p = false
-ctrl_s = false
-ctrl_t = false
-ctrl_u = false
-ctrl_w = false
-ctrl_x = false
-ctrl_capslock = false
-ctrl_l = false
-ctrl_period = false
-ctrl_quote = false
-cmd_shift_v = false
 cmd_star = false
