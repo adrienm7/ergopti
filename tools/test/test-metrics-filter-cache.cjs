@@ -3044,4 +3044,93 @@ assert.equal(
 	'all historical/live native token identity and prototype controls must execute'
 );
 
+const typingTokenPresentationCases = [
+	{ tab: 'w_bg', token: 'one two', words: ['one', 'two'], modifiers: 0, controls: 0, arrows: 1 },
+	{
+		tab: 'w_bg',
+		token: 'ctrl shift',
+		words: ['ctrl', 'shift'],
+		modifiers: 0,
+		controls: 0,
+		arrows: 1
+	},
+	{ tab: 'w_bg', token: 'été œuf', words: ['été', 'œuf'], modifiers: 0, controls: 0, arrows: 1 },
+	{
+		tab: 'w_bg',
+		token: 'fish&chips served',
+		words: ['fish&amp;chips', 'served'],
+		modifiers: 0,
+		controls: 0,
+		arrows: 1
+	},
+	{ tab: 'sc', token: 'Ctrl+C', words: [], modifiers: 1, controls: 0, arrows: 0 },
+	{ tab: 'sc', token: 'Ctrl+Enter', words: [], modifiers: 1, controls: 1, arrows: 0 },
+	{ tab: 'sc_bg', token: 'Ctrl+C→Ctrl+V', words: [], modifiers: 2, controls: 0, arrows: 1 },
+	{ tab: 'mods', token: 'Ctrl+C', words: [], modifiers: 1, controls: 0, arrows: 0 }
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const source of ['historical', 'today']) {
+		for (const vector of typingTokenPresentationCases) {
+			test(`${host} ${source} table renders native ${vector.tab}/${vector.token}`, () => {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, '2026-10-27T12:00:00Z');
+				const manifest = {
+					[source === 'historical' ? '2026-10-26' : '2026-10-27']: {
+						'Editor.exe': { chars: 70, time: 7000 }
+					}
+				};
+				publishTypingPage(page, host, manifest);
+				const tokenData = {
+					[vector.tab === 'mods' ? 'sc' : vector.tab]: {
+						[vector.token]: { c: 7, t: 0 }
+					}
+				};
+				deliverTypingManifest(page, host, manifest, {
+					range:
+						source === 'historical'
+							? { historical: tokenData, today: {} }
+							: { historical: {}, today: { 'Editor.exe': tokenData } }
+				});
+				vm.runInContext(`app_state.current_tab = ${JSON.stringify(vector.tab)};`, page.context);
+				page.context.render_current_tab();
+				page.timers.at(-1)();
+				const html = page.elements.get('metrics_table_body').innerHTML;
+				assert.equal(
+					vm.runInContext('app_state.rendered_list.length', page.context),
+					1,
+					'the real native range must reach the selected table'
+				);
+				assert.ok(html.includes('<td>7</td>'));
+				assert.equal(
+					(html.match(/class="mono-space"/g) || []).length,
+					vector.words.length,
+					'word sequences keep one literal chip per recorded word'
+				);
+				for (const word of vector.words)
+					assert.ok(html.includes(`<span class="mono-space">${word}</span>`));
+				assert.equal(
+					(html.match(/class="shortcut-chip shortcut-mod-/g) || []).length,
+					vector.modifiers,
+					'only actual shortcut modifiers receive modifier chips'
+				);
+				assert.equal(
+					(html.match(/class="shortcut-chip shortcut-key-control"/g) || []).length,
+					vector.controls
+				);
+				assert.equal((html.match(/>→<\/span>/g) || []).length, vector.arrows);
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			});
+		}
+	}
+}
+assert.equal(typingTokenPresentationCases.length, 8);
+assert.equal(
+	passed,
+	639,
+	'all native word, shortcut and modifier presentation controls must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);

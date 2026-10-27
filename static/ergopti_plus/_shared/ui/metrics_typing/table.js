@@ -1924,6 +1924,7 @@ function render_table() {
 							)
 							.join('') +
 						`</span>`;
+				} else if (is_shortcut_tab) {
 					key_html = `<span class="shortcut-seq">${format_shortcut_key(item.key)}</span>`;
 				} else if (is_ctrl_display) {
 					// Resolve the best label: pretty symbol > ASCII abbreviation > uppercase name
