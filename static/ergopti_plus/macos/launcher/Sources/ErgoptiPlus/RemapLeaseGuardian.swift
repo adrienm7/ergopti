@@ -44,8 +44,9 @@ let kRegisterRemapGuardianFlag = "--register-remap-guardian"
 let kUnregisterRemapGuardianFlag = "--unregister-remap-guardian"
 let kGuardianLaunchctlUnknownServiceStatus: Int32 = 113
 let kOpenRemapGuardianSettingsFlag = "--open-remap-guardian-settings"
-let kRemapGuardianLabel = "com.ergoptiplus.remap-guardian"
-let kRemapGuardianPlistName = "com.ergoptiplus.remap-guardian.plist"
+// One source: _shared/data/identifiers.json service_labels.macos_remap_guardian.
+let kRemapGuardianLabel = Identifiers.ServiceLabels.macosRemapGuardian
+let kRemapGuardianPlistName = kRemapGuardianLabel + ".plist"
 let kRemapGuardianServiceErrorDomain = "SMAppServiceErrorDomain"
 #if ERGOPTI_GUARDIAN_TEST_SUPPORT
 let kKarabinerLeaseGuardianLifetimeTestFlag =
@@ -87,7 +88,7 @@ func lockGuardianActivationGate(_ descriptor: Int32) -> LeaseGuardianGateLockRes
 /// Serializes persistent guardian diagnostics from state, waiter, and fence
 /// queues while rate-limiting retry loops by stable failure key.
 enum RemapGuardianLog {
-	private static let queue = DispatchQueue(label: "com.ergoptiplus.remap-guardian.log")
+	private static let queue = DispatchQueue(label: kRemapGuardianLabel + ".log")
 	private static var lastWrite: [String: TimeInterval] = [:]
 
 	/// Persists one rate-limited guardian diagnostic through the launcher log.
@@ -954,7 +955,7 @@ private final class LeaseGuardianWatch {
 		self.descriptor = descriptor
 		self.identity = identity
 		self.acknowledged = acknowledged
-		queue = DispatchQueue(label: "com.ergoptiplus.remap-guardian." + token)
+		queue = DispatchQueue(label: kRemapGuardianLabel + "." + token)
 	}
 }
 
@@ -978,7 +979,7 @@ final class RemapLeaseGuardianRuntime {
 	private let singletonProbeObserved: () -> Void
 	private let singletonContentionObserved: () -> Void
 	private let generation: String
-	private let stateQueue = DispatchQueue(label: "com.ergoptiplus.remap-guardian.state")
+	private let stateQueue = DispatchQueue(label: kRemapGuardianLabel + ".state")
 	private var recoveringAcknowledgements = Set<String>()
 	private var watches: [String: LeaseGuardianWatch] = [:]
 	private var isTerminating = false
@@ -2212,27 +2213,50 @@ func remapGuardianServiceStatusName(_ status: SMAppService.Status) -> String {
 	}
 }
 
+/// Answers an outcome that is not a user decision. A release stays fail-closed.
+/// A developer build (issue #104) is ad hoc signed, single arch and shares the
+/// installed app's bundle identifier, so Background Items answers it with what
+/// it holds for that identifier; it takes its own per-user legacy agent instead.
+@available(macOS 13.0, *)
+private func remapGuardianUnavailable(
+	_ cause: String,
+	developerBuild: Bool,
+	legacyFallback: () -> Bool,
+	report: (String) -> Void
+) -> RemapGuardianRegistrationStatus {
+	guard developerBuild else { return .unavailable }
+	let ready = legacyFallback()
+	report("developer build: \(cause); per-user legacy agent "
+		+ (ready ? "is ready" : "is unavailable too"))
+	return ready ? .ready : .unavailable
+}
+
 /// One registration attempt and the exact outcome mapping shared by every entry state.
 @available(macOS 13.0, *)
 private func registerModernRemapGuardianOnce(
 	service: RemapGuardianModernService,
 	guardianHealth: () -> Bool,
 	legacyInvalidSignatureFallback: () -> Bool,
+	developerBuild: Bool,
 	report: (String) -> Void
 ) -> RemapGuardianRegistrationStatus {
+	func unavailable(_ cause: String) -> RemapGuardianRegistrationStatus {
+		remapGuardianUnavailable(cause, developerBuild: developerBuild,
+			legacyFallback: legacyInvalidSignatureFallback, report: report)
+	}
 	do {
 		try service.register()
 		switch service.status {
 		case .enabled:
 			let healthy = guardianHealth()
 			report("remap guardian registered; guardian healthy: \(healthy)")
-			return healthy ? .ready : .unavailable
+			return healthy ? .ready : unavailable("registered guardian is not healthy")
 		case .requiresApproval:
 			report("remap guardian registered; Login Items approval required")
 			return .requiresApproval
 		case .notRegistered, .notFound:
 			report("remap guardian registration left status \(remapGuardianServiceStatusName(service.status))")
-			return .unavailable
+			return unavailable("registration left the agent unregistered")
 		@unknown default:
 			return .unavailable
 		}
@@ -2240,14 +2264,14 @@ private func registerModernRemapGuardianOnce(
 		let failure = error as NSError
 		report("remap guardian registration refused: \(failure.domain) \(failure.code)")
 		if service.status == .enabled {
-			return guardianHealth() ? .ready : .unavailable
+			return guardianHealth() ? .ready : unavailable("enabled guardian is not healthy")
 		}
 		if service.status == .requiresApproval
 			|| modernGuardianErrorRequiresApproval(error) {
 			return .requiresApproval
 		}
 		guard shouldUseLegacyGuardianAfterModernRegistrationError(error)
-		else { return .unavailable }
+		else { return unavailable("registration refused with \(failure.domain) \(failure.code)") }
 		// Current ZIP releases are ad-hoc signed. Only an exact invalid-
 		// signature result may use the legacy per-user bootstrap; denial,
 		// approval, authorization, and unknown failures stay fail-closed.
@@ -2278,12 +2302,15 @@ private func registerModernRemapGuardianOnce(
 /// (unregister, then the same single attempt): launchd keeps such a record
 /// after a rebuild or a move and refuses to spawn it (launchctl last exit 78),
 /// which left a developer app's remapping inert (field report 2026-10-27).
-/// `report` receives one launcher.log line per decision.
+/// `report` receives one launcher.log line per decision. A developer build
+/// (`developerBuild`) then takes its own per-user legacy agent for every outcome
+/// that is not a user decision; denial and approval stay fail-closed.
 @available(macOS 13.0, *)
 func resolveModernRemapGuardianRegistration(
 	service: RemapGuardianModernService,
 	guardianHealth: () -> Bool,
 	legacyInvalidSignatureFallback: () -> Bool,
+	developerBuild: Bool = false,
 	report: (String) -> Void = { _ in }
 ) -> RemapGuardianRegistrationStatus {
 	report("remap guardian Background Items status: \(remapGuardianServiceStatusName(service.status))")
@@ -2298,13 +2325,15 @@ func resolveModernRemapGuardianRegistration(
 		} catch {
 			let failure = error as NSError
 			report("stale remap guardian record could not be removed: \(failure.domain) \(failure.code)")
-			return .unavailable
+			return remapGuardianUnavailable("stale record could not be removed",
+				developerBuild: developerBuild, legacyFallback: legacyInvalidSignatureFallback, report: report)
 		}
 		report("stale remap guardian record removed; registering again")
 		return registerModernRemapGuardianOnce(
 			service: service,
 			guardianHealth: guardianHealth,
 			legacyInvalidSignatureFallback: legacyInvalidSignatureFallback,
+			developerBuild: developerBuild,
 			report: report
 		)
 	case .notRegistered, .notFound:
@@ -2312,6 +2341,7 @@ func resolveModernRemapGuardianRegistration(
 			service: service,
 			guardianHealth: guardianHealth,
 			legacyInvalidSignatureFallback: legacyInvalidSignatureFallback,
+			developerBuild: developerBuild,
 			report: report
 		)
 	case .requiresApproval:
@@ -2427,6 +2457,9 @@ func remapGuardianRegistrationStatus(
 			legacyInvalidSignatureFallback: {
 				ensureLegacyRemapGuardianRegistered(executablePath: executablePath)
 			},
+			developerBuild: Bundle.main.object(
+				forInfoDictionaryKey: Identifiers.DevSource.plistKey
+			) != nil,
 			report: { LauncherLog.write($0) }
 		)
 	}

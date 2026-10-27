@@ -19,7 +19,7 @@ local function with_world(body)
 		hs.http.asyncGet = function(url, _, callback)
 			world.probes[#world.probes + 1] = { url = url, callback = callback }
 		end
-		function world.port(port) helpers.assert_true(Storage.set("llm.ollama_port", port)) end
+		function world.port(port) helpers.assert_true(Storage.set("llm.ollama_owned_port", port)) end
 		function world.detect()
 			Core.auto_detect_backend(function(backend) world.completions[#world.completions + 1] = backend end)
 		end

@@ -374,12 +374,12 @@ assemble_native_runtime() {
 	done
 	lipo -create "$switcher_build/arm64" "$switcher_build/x86_64" \
 		-output "$APP_PATH/Contents/MacOS/SystemSwitcherState"
-	local remap_guardian_plist="$LAUNCHER_DIR/com.ergoptiplus.remap-guardian.plist"
+	local remap_guardian_plist="$LAUNCHER_DIR/${ERGOPTI_SERVICE_LABEL_MACOS_REMAP_GUARDIAN}.plist"
 	[ -f "$remap_guardian_plist" ] || fail "Remap guardian LaunchAgent plist missing."
 	cp "$remap_guardian_plist" \
-		"$APP_PATH/Contents/Library/LaunchAgents/com.ergoptiplus.remap-guardian.plist"
+		"$APP_PATH/Contents/Library/LaunchAgents/${ERGOPTI_SERVICE_LABEL_MACOS_REMAP_GUARDIAN}.plist"
 	plutil -lint \
-		"$APP_PATH/Contents/Library/LaunchAgents/com.ergoptiplus.remap-guardian.plist" \
+		"$APP_PATH/Contents/Library/LaunchAgents/${ERGOPTI_SERVICE_LABEL_MACOS_REMAP_GUARDIAN}.plist" \
 		>/dev/null || fail "Remap guardian LaunchAgent plist failed plutil -lint."
 
 	# Copy Sparkle.framework into Contents/Frameworks/. The launcher links
