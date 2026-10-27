@@ -64,6 +64,8 @@ helpers.describe("slow-callback report: phase attribution", function()
 			helpers.assert_true(report ~= nil, "a 1.2 s hold is reported")
 			helpers.assert_true(report:find("Phases inside the hold: toml.parse=700.0 ms", 1, true) ~= nil,
 				"the report names the phase")
+			helpers.assert_true(report:find(" Lua heap %d+%->%d+ MB%.$") ~= nil,
+				"the report gives the Lua heap before and after, so a collection inside the hold shows")
 		end)
 	end)
 

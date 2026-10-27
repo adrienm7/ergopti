@@ -65,7 +65,7 @@ helpers.describe("Preferences.save reports a slow save by phase", function()
 		helpers.assert_true(slow ~= nil, "one slow-save line")
 		helpers.assert_true(slow:find("prepare: snapshot=50 decode=10 models=10 sparse=10 wrap=10 rows=10 "
 			.. "gestures=800 llm=10 shortcuts=10 hotstrings=10 ms", 1, true) ~= nil, slow)
-		helpers.assert_true(slow:find("; proposed=%d+; metadata_commands=%d+ in %d+ ms%)%.$") ~= nil, slow)
+		helpers.assert_true(slow:find("; proposed=%d+; metadata_commands=%d+ in %d+ ms; lua_heap=%d+%->%d+ MB%)%.$") ~= nil, slow)
 	end)
 
 	helpers.it("stays silent for a fast save", function()
