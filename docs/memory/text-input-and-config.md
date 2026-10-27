@@ -371,6 +371,20 @@ The Windows full save is the one exception: it always writes the current
 version, which is safe only because it runs after the boot migration and never
 in a read-only session.
 
+### project-slot-rename-carries-its-parameters
+
+An action parameter is keyed by its binding, `keyboard__<slot>__<action>`, in
+each driver's own section: macOS `[gestures.action_parameters]`, Linux
+`[gesture_parameters]` and the still-read `[linux.action_parameters]`. Renaming
+a slot id therefore orphans its parameters unless the same step renames the
+keys too. Schema v15 does it with one section-wide `rename_prefix` per retired
+slot family and section; a prefix op must never let one prefix extend the
+other, and an occupied target refuses the migration rather than dropping a
+value. Action: any later slot or binding-id rename adds the matching
+`rename_prefix` ops, and Windows `config_migrate.ahk` learns a new op kind in
+an earlier commit than the first registry step that uses it, because it
+refuses an unknown op at boot.
+
 ### project-action-id-migration-is-per-key
 
 Retiring an action id stored in config.toml needs one `map_value` op per key

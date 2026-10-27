@@ -305,17 +305,6 @@ closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swift
   build (`_164726`): known; `tools/build/create_macos_signing_identity.sh` gives a stable
   identity.
 
-## Release blocker (before the next release)
-
-- [ ] **Shortcut parameters lost by the schema v15 slot renames.** [CODE] PAR-41's `v14_to_v15` step renames
-      the macOS and Linux slot ids (`cmd_*`→`primary_*`, `hs_ctrl_*`→`secondary_*`, `ctrl_*`→`primary_*`,
-      `super_*`→`meta_*`), but the per-slot action parameters (`gestures.action_parameters` keys
-      `keyboard__<slot>__<action>`) cannot follow with the existing op kinds, so they would be orphaned (reported
-      as outdated, re-entered by hand). Fix: a `rename_prefix` op, taught first to Windows
-      `config_migrate.ahk` (it refuses an unknown op at boot) together with the re-encode op of the older macOS
-      LLM profiles, then to the Lua engines and the JS reference, then the parameter ops in `v14_to_v15`. Do
-      not release with v15 before this lands (only after PAR-41 reaches dev).
-
 ## Windows side to do on the PC (from October 25)
 
 Work done on Linux and macOS only; the AHK side is built and run live on the Windows PC.
@@ -837,8 +826,8 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       (`docs/design/one-shortcut-model.md`, 4ca41ed2e9): one action slot per chord with neutral role-based ids.
       Done on macOS and Linux (sixth integration batch): schema v15 `v14_to_v15` migration of the slots and
       Ctrl-letter switches, role table with per-driver families, manifest slots, both drivers adopt the role
-      names, migrated-config binding proof, AHK fixtures pinned to v15. Left: the release blocker above
-      (`rename_prefix` for parameters, PC first), the Windows adoption, macOS `ctrl_g` to `open_url` later.
+      names, migrated-config binding proof, AHK fixtures pinned to v15, per-slot parameters carried by
+      `rename_prefix`. Left: the Windows adoption, macOS `ctrl_g` to `open_url` later.
 - [x] **PAR-43. Duplicated per-OS prompt strings.** [CODE] Done: `max_words`, `temperature` and the port
       dialogs (fb1aa4d934); one shared `menu.llm.server_port_label` row caption through `caption_getters`
       (`mlx_port_label` retired, `ollama_port_label` kept for AHK); `delay_prompt` and `debounce_prompt` stay two
@@ -1246,10 +1235,9 @@ PONG/READY), `Lease-bound input startup failed`, `Layout poll detected change`, 
 
 #### 3. Configuration migration and menus
 
-- [ ] Schema v15 (PAR-41, release blocker): with a copy of an old `config.toml` that has keyboard
-      shortcut slots with parameters (for example a shortcut that opens a URL or types text), start the new
-      build: every slot keeps its action under its role-named id, and report any parameter that is lost
-      (this is the known release blocker; the log names each migrated key).
+- [ ] Schema v15 (PAR-41): with a copy of an old `config.toml` that has keyboard shortcut slots with
+      parameters (for example a shortcut that opens a URL or types text), start the new build: every slot
+      keeps its action and its parameter under its role-named id.
 - [ ] Old `[llm.profiles] user_profiles`: a config that has them still shows the profiles in the AI menu
       (PAR-40), and the next save writes the new `llm.user_profiles` only.
 - [ ] Clear and Restore per category and global, then restart: unknown keys kept, personal hotstrings kept
