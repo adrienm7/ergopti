@@ -175,3 +175,12 @@ _LPIL_SemanticThreshold(Fixture) {
 for Fixture in ["logger_dotted", "logger_inline", "logger_quoted"]
 	Test("logger startup: " . Fixture . " applies its threshold (logger-semantic-level)",
 		_LPIL_SemanticThreshold.Bind(Fixture))
+
+
+for Fixture in [
+	"logger_generation_replaced_debug", "logger_generation_replaced_error",
+	"logger_generation_unchanged_debug", "logger_generation_unchanged_error",
+	"logger_generation_deleted_error", "logger_generation_created_error"
+]
+	Test("logger startup: " . Fixture . " retains native source ownership (logger-retained-generation)",
+		_LPIL_SemanticThreshold.Bind(Fixture))
