@@ -340,6 +340,7 @@ DriverControl_Resolve(Spec, Text, OwnPid, Now, &Kind) {
 			"driver_pid", OwnPid, "successor_pid", OwnPid, "deadline", Deadline))
 	}
 	if State == "claimed" && Successor is Integer && Successor == OwnPid && Deadline is Integer
+			&& Members.Has("driver_pid") && Members["driver_pid"]["kind"] == "number"
 			&& Result.Get("driver_pid", "") == OwnPid {
 		if Now > Deadline {
 			Kind := "timeout"
