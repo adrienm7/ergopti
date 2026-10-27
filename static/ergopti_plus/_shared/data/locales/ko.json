@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "시스템 순서",
 	"menu.layout.number_row_digits": "숫자 우선",
 	"menu.layout.number_row_symbols": "기호 우선",
-	"platform_reason.number_row_override_unsupported": "지원 안 됨: 이 드라이버는 시스템의 숫자 행을 유지하며 숫자나 기호를 강제할 수 없습니다.",
+	"platform_reason.number_row_override_unsupported": "이 시스템에서는 아직 사용할 수 없습니다: 숫자 줄은 시스템에 설치된 자판이 입력합니다. Ergopti는 여기서 그 키를 다시 입력할 예정입니다. 현재 숫자나 기호를 먼저 두는 것은 자판을 에뮬레이션하는 Windows뿐입니다.",
 	"platform_reason.number_row_live_session": "사용 불가: X11 세션에서만 즉시 적용됩니다. 이 세션은 현재 배열을 유지하며 선택 내용은 저장됩니다.",
 	"platform_reason.number_row_live_no_layout": "사용 불가: 먼저 ErgoptiPlus 키보드 배열을 설치하세요. 이 선택은 사용 중인 배열을 변경합니다.",
 	"layouts.linux_rows_not_applied": "숫자 행 선택은 저장되었지만 실행 중인 키보드 배열을 업데이트하지 못했습니다.",

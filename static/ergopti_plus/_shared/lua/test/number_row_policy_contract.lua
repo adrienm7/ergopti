@@ -181,9 +181,13 @@ function M.run(helpers, corpus_path)
 				end
 				local native = renderer.render_rows(rows)
 				helpers.assert_eq(#native[1].menu, 3)
+				-- The title carries the reason's short form, the text before its colon,
+				-- read from the catalogue so a reworded reason does not break the pin.
+				local head = translations["platform_reason.number_row_override_unsupported"]:match("^([^:]+):")
+				helpers.assert_true(head ~= nil, "the reason opens with a short form")
 				for index, item in ipairs(native[1].menu) do
 					helpers.assert_eq(item.disabled, true)
-					if index ~= 1 then helpers.assert_eq(item.title:find("Unsupported", 1, true) ~= nil, true) end
+					if index ~= 1 then helpers.assert_eq(item.title:find(head, 1, true) ~= nil, true) end
 				end
 				local old = translations["menu.layout.number_row_symbols"]
 				translations["menu.layout.number_row_symbols"] = "Changed canonical caption"

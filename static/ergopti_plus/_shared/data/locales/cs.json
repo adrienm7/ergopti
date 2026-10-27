@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "Nativní pořadí",
 	"menu.layout.number_row_digits": "Nejprve číslice",
 	"menu.layout.number_row_symbols": "Nejprve symboly",
-	"platform_reason.number_row_override_unsupported": "Nepodporováno: Tento ovladač zachovává nativní číselnou řadu systému; vynucení číslic ani symbolů není dostupné.",
+	"platform_reason.number_row_override_unsupported": "V tomto systému zatím ne: řadu číslic píše rozložení nainstalované v systému. Ergopti zde plánuje její klávesy přepisovat; dnes dává číslice nebo symboly na první místo jen Windows, který rozložení emuluje.",
 	"platform_reason.number_row_live_session": "Nedostupné: Okamžitě to použije jen relace X11. Tato relace si ponechá současné rozložení; vaše volba je uložena.",
 	"platform_reason.number_row_live_no_layout": "Nedostupné: Nejprve nainstalujte rozložení ErgoptiPlus; tato volba mění rozložení, které používáte.",
 	"layouts.linux_rows_not_applied": "Volba číselné řady je uložena, ale aktivní rozložení klávesnice se nepodařilo aktualizovat.",

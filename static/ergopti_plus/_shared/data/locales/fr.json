@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "Ordre natif",
 	"menu.layout.number_row_digits": "Chiffres en premier",
 	"menu.layout.number_row_symbols": "Symboles en premier",
-	"platform_reason.number_row_override_unsupported": "Non pris en charge: Ce pilote conserve la rangée native du système ; les chiffres et symboles forcés sont indisponibles.",
+	"platform_reason.number_row_override_unsupported": "Pas encore sur ce système : la disposition installée dans le système tape la rangée des chiffres. Ergopti prévoit d’en retaper les touches ici ; aujourd’hui, seul Windows, qui émule la disposition, met les chiffres ou les symboles en premier.",
 	"platform_reason.number_row_live_session": "Indisponible: Seule une session X11 l’applique en direct. Cette session garde sa disposition actuelle ; votre choix est enregistré.",
 	"platform_reason.number_row_live_no_layout": "Indisponible: Installez d’abord une disposition ErgoptiPlus : ce choix modifie la disposition que vous utilisez.",
 	"layouts.linux_rows_not_applied": "Le choix de la rangée des nombres est enregistré, mais la disposition de clavier en cours n’a pas pu être mise à jour.",
