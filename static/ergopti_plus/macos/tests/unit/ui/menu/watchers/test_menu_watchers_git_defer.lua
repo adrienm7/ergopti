@@ -96,6 +96,38 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 		end, { reload = function(attempt) return attempt > 1 end })
 	end)
 
+	-- Field run 2026-10-27 19:47:04 (ledger L45): a burst refused while the reload
+	-- it triggered was terminating logged a WARNING; it is expected, so INFO.
+	helpers.it("logs a refusal during a reload or quit at INFO and still retains the burst", function()
+		local previous = package.loaded["infra.termination_coordinator"]
+		local terminating = true
+		package.loaded["infra.termination_coordinator"] = {
+			is_initialized = function() return true end,
+			is_pending = function() return terminating end,
+		}
+		local levels = {}
+		local logger = helpers.make_logger_stub()
+		local function record(level)
+			return function(_, message)
+				if tostring(message):find("Menu reload request", 1, true) then levels[#levels + 1] = level .. ":" .. message end
+			end
+		end
+		logger.info, logger.warn, logger.debug = record("info"), record("warn"), record("debug")
+		local ok, err = pcall(Fixture.with_watcher, function(w)
+			w.fire({ "/fake/base/modules/refused.lua" })
+			w.set_clock(1001)
+			w.poll()
+			helpers.assert_true(type(w.scheduled()) == "function", "the refused burst must stay owned")
+			terminating = false
+			w.poll()
+		end, { reload = function() return false end, logger = logger })
+		package.loaded["infra.termination_coordinator"] = previous
+		if not ok then error(err, 0) end
+		helpers.assert_eq(levels[1], "info:Menu reload request deferred: a reload or quit is in progress.")
+		helpers.assert_eq(levels[2],
+			"warn:Menu reload request was refused; the source-file burst remains pending for retry: %s.")
+	end)
+
 	helpers.it("revokes a pending reload and retains failed timer cleanup for an exact retry", function()
 		for _, failure in ipairs({ "false", "throw" }) do
 			Fixture.with_watcher(function(w)

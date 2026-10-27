@@ -195,13 +195,13 @@ dev.
   from the driver booted at 16:54 before the clone was updated; the two boots of the new code log
   none. Still to confirm after a reload of the new code.
 
-### Fixed on tmp/wip-field-1947 (to land on dev)
+### Fixed on tmp/wip-field-1947b (to land on dev)
 
 - **L40** Ollama install "exit=64, the installer refused its own request" in 110 ms (19:47 run,
   09_ollama_runtime install_failed/state_failed, 19:48:49). Not the network and not the port
   11435: the driver names `ensure-ollama-native-deps.sh` in its own folder, which a developer
   build reads from the clone, and the launcher's PTY guardian admitted only the bundle payload
-  folder, so it answered `RETIRED 64` before running anything. Fixed 92d1ba890f: the guardian
+  folder, so it answered `RETIRED 64` before running anything. Fixed 94bfe7e2e4: the guardian
   admits the installers of the folder `LuaSourceSelection` names. Mac confirms: on a developer
   app, choosing Ollama installs Ergopti's own 0.40.4 or names a later closed cause (expect L41's
   certificate cause while L41 stands).
@@ -246,7 +246,7 @@ dev.
   read-only view may read a newer schema. The 19:47 run names `value_type` (19:46:39 to 19:48:23,
   both boots of the new code, every regeneration and wake refresh): one stored value has the
   wrong TOML type. The view now also returns that value's config.toml path and the error prints
-  it ("value_type at <section.key>"), 00d3f20f7b. Mac confirms: read the key in the
+  it ("value_type at <section.key>"), 52d9113b74. Mac confirms: read the key in the
   next log, then fix the stored value or the manifest type it is checked against.
 - **L21** Fixed 708bc6671d. Ollama
   `stop_warmup() could not retire its HTTP owner: false` and settlement 'Ollama warmup stop' did
@@ -319,9 +319,9 @@ closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swift
   them.
 - **L34** [CODE] HotPath over budget: preview.rebuild 5.3 to 13.3 ms, hotstring.match 6.4 ms,
   keydown 5.8 ms (new.txt 14:26 to 16:18). Low priority; profile with perf-profiling.
-- **L41** [CODE][PHYS-M] Every native download stops at stage `native_certificate_load` (19:47
-  run: the MLX `uv sync` staging failed 6 of 6 attempts with native receipt reason
-  `certificate`, 19:48:49 to 19:51:26; 03_field_network tls and transfer `certificate`). This is
+- **L41** Fixed bc33bfbc73 [PHYS-M]. Every native download stopped at stage
+  `native_certificate_load` (19:47 run: the MLX `uv sync` staging failed 6 of 6 attempts with
+  native receipt reason `certificate`, 19:48:49 to 19:51:26; 03_field_network tls and transfer `certificate`). This is
   not TLS inspection: that stage runs before any route lookup or connection, and it fails only
   when `SSL_CERT_FILE` or `SSL_CERT_DIR` is set in the environment the driver inherits
   (`ManagedCertificateAuthorities.load`; no Ergopti code sets either). The client is the signed
@@ -331,19 +331,22 @@ closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swift
   strictly PEM certificates (a comment or text header such as `/etc/ssl/cert.pem` carries, a
   non-certificate block, an unreadable path, an empty folder). uv, curl and Python were never
   reached. The check now reports `route_lookup skip not_reached` and `tls fail ssl_cert_env`
-  for that stage (467d99ec1c) instead of "selected" and a TLS verdict. Mac must run:
-  `launchctl getenv SSL_CERT_FILE; launchctl getenv SSL_CERT_DIR` and the same with `echo` in Terminal, then
-  `head -3 "$SSL_CERT_FILE"` or `ls -la "$SSL_CERT_DIR" | head`. Next: if the company sets a
-  bundle with text between certificates, decide whether the Swift and Go loaders accept
-  OpenSSL-style bundles (both refuse a "foreign prefix" on purpose in their tests) or whether the
-  macOS download children drop the inherited variables, since the policy puts the company root in
-  the keychain.
+  for that stage (76c8e5336b) instead of "selected" and a TLS verdict. Maintainer decision: macOS
+  downloads use the system and keychain trust only. bc33bfbc73: `network-retry.sh` unsets both
+  names for every download child with one INFO line per name ("Inherited SSL_CERT_FILE ignored:
+  downloads use the system and keychain trust."), the launcher's `--managed-http` and
+  `--managed-bootstrap-download` roles unset both before reading their environment, and the Go
+  `native_http` package ignores them on darwin. Linux and Windows are unchanged. The Swift part
+  is not compiled on the Linux host (ManagedNetworkBootstrapTests covers it on macOS CI). Mac
+  confirms: the next run logs that INFO line, the MLX install passes `uv sync`, and
+  03_field_network reads `tls pass:trusted`; if TLS then fails with `certificate`, the company root
+  is missing from the keychain.
 - **L42** [CODE][PHYS-M] 03_field_network on the 19:47 run: `pac_download fail:failed` and
   `pac_script fail:invalid` because the PAC host (http, company intranet name) does not resolve
   off the company network; environmental, the fallback goes direct. Two defects behind the other
-  values are fixed on tmp/wip-field-1947: `route_plan fail:lookup_failed` lost the real stage
+  values are fixed on tmp/wip-field-1947b: `route_plan fail:lookup_failed` lost the real stage
   because the port read the route role's stdout while its `STAGE` line is on stderr, so the PAC
-  fallback could not apply (601ffe4808); and the WARNING carried the company PAC URL (aa636a9c9d).
+  fallback could not apply (5d93e78e90); and the WARNING carried the company PAC URL (1dfaec8298).
   Mac confirms: the next run shows `route_plan info:direct_fallback:<stage>` or a named stage,
   and no URL in "PAC download failed". Next [CODE], once L41 is settled and direct `transfer`
   passes: report `pac_download`/`pac_script` as info when the fallback covers their failure, as
@@ -356,19 +359,24 @@ closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swift
   `spctl -a -vv` on it. Next
   [CODE]: carry codesign's first stderr cause as a closed token in the step value, so the report
   says why without a manual run.
-- **L44** [CODE] Wake at 19:46:39 (driver booted 16:54): "Cannot refresh Karabiner lease
-  liveness — no live generation exists" and "Wake refresh could not renew the exact Karabiner
-  lease liveness", twice each, then the layout refresh retries of L20. New pattern. Next: decide
-  whether a wake refresh without a live generation should re-acquire the lease instead of
-  warning, and confirm on a wake of the new code.
+- **L44** Fixed 6593474037. Wake at 19:46:39 (driver booted 16:54): "Cannot refresh Karabiner
+  lease liveness — no live generation exists" and "Wake refresh could not renew the exact
+  Karabiner lease liveness", twice each, then the layout refresh retries of L20; nothing
+  restarted the lease. Maintainer decision: re-acquire it. The controller now returns
+  `no-live-generation` (INFO) and the wake handler hands that case to the bounded failure
+  recovery, which refuses while the remap is disabled, paused or in a transition. Mac confirms:
+  after a sleep that loses the lease, the log shows "Wake found no live Karabiner lease;
+  re-acquiring it." and remapping works again without a reload.
 
 ### Expected, no defect
 
-- **L45** "Global external writer 'Watcher reload' refused because terminal quiescence was not
-  proved: true" and "Menu reload request was refused; the source-file burst remains pending for
-  retry: false" (19:47:04): the clone update's file burst arrived while the controlled reload it
-  had just started was fencing the lease; the reload went ahead (boot 19:47:05). Low priority
-  [CODE]: log it at INFO when the cause is a reload already in progress.
+- **L45** Fixed b721c5c81f. "Global external writer 'Watcher reload' refused because terminal
+  quiescence was not proved: true" and "Menu reload request was refused; the source-file burst
+  remains pending for retry: false" (19:47:04): the clone update's file burst arrived while the
+  controlled reload it had just started was fencing the lease; the reload went ahead (boot
+  19:47:05). Both now log at INFO when the termination coordinator reports a reload or quit in
+  progress; any other refusal still warns. Mac confirms: a `git pull` during a session logs no
+  such WARNING.
 
 - **L35** "Ergopti driver not started in this Hammerspoon" (new.txt 11:19 to 11:21): the stock
   Hammerspoon.app started next to a standalone ErgoptiPlus; the guard kept it inert.

@@ -193,7 +193,16 @@ func TestBootstrapRealPrivateFDAndNamespaceRefusals(t *testing.T) {
 	}
 }
 
+// useAnchorChannel exercises the SSL_CERT_FILE/SSL_CERT_DIR channel, which
+// macOS ignores (inheritedTrustIgnored), on any host.
+func useAnchorChannel(t *testing.T) {
+	saved := inheritedTrustIgnored
+	inheritedTrustIgnored = false
+	t.Cleanup(func() { inheritedTrustIgnored = saved })
+}
+
 func TestBootstrapNativeWorkerGetsOnlyPrivateCertificates(t *testing.T) {
+	useAnchorChannel(t)
 	t.Setenv("https_proxy", "http://inherited-secret@foreign.invalid")
 	t.Setenv("SSL_CERT_FILE", "foreign-certificate")
 	result, err := nativeWorkerEnvironment(map[string]string{"SSL_CERT_FILE": "exact-private-certificate", "https_proxy": "http://private-secret@relay.invalid"})
@@ -204,9 +213,28 @@ func TestBootstrapNativeWorkerGetsOnlyPrivateCertificates(t *testing.T) {
 	if strings.Contains(joined, "secret@") || strings.Contains(joined, "foreign-certificate") || !strings.Contains(joined, "SSL_CERT_FILE=exact-private-certificate") || os.Getenv("SSL_CERT_FILE") != "foreign-certificate" {
 		t.Fatal("secret forwarding or global trust mutation")
 	}
+	// Field run 2026-10-27 19:47 (ledger L41): on macOS neither the worker nor
+	// Go's own TLS reads a trust variable, even one it cannot parse.
+	inheritedTrustIgnored = true
+	result, err = nativeWorkerEnvironment(map[string]string{"SSL_CERT_FILE": "exact-private-certificate"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, pair := range result {
+		if strings.HasPrefix(pair, "SSL_CERT_FILE=") {
+			t.Fatal("ignored trust variable forwarded to the native worker")
+		}
+	}
+	garbage := filepath.Join(t.TempDir(), "company-bundle.pem")
+	os.WriteFile(garbage, []byte("## company bundle\nnot a certificate\n"), 0600)
+	original := &tls.Config{MinVersion: tls.VersionTLS12}
+	if selected, err := bootstrapTLSConfig(original, map[string]string{"SSL_CERT_FILE": garbage, "SSL_CERT_DIR": garbage}); err != nil || selected != original {
+		t.Fatal("ignored trust variable changed or refused the TLS configuration")
+	}
 }
 
 func TestBootstrapCertificateTrustIsScopedAndPreservesOriginal(t *testing.T) {
+	useAnchorChannel(t)
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "literal") }))
 	defer server.Close()
 	certificate := server.Certificate()
@@ -244,6 +272,7 @@ func TestBootstrapCertificateTrustIsScopedAndPreservesOriginal(t *testing.T) {
 }
 
 func TestBootstrapCertificateDirectoryAndMalformedRefusals(t *testing.T) {
+	useAnchorChannel(t)
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	defer server.Close()
 	dir := t.TempDir()
@@ -274,6 +303,7 @@ func TestBootstrapCertificateDirectoryAndMalformedRefusals(t *testing.T) {
 }
 
 func TestBootstrapExplicitProxyUsesActualScopedTLSAnchor(t *testing.T) {
+	useAnchorChannel(t)
 	origin := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "actual-proxy-body") }))
 	defer origin.Close()
 	var owners sync.WaitGroup
