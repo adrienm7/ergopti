@@ -1,0 +1,40 @@
+{
+	"schema_version": 1,
+	"description": "Neutral keyboard-slot grammar of the one-shortcut model (docs/design/one-shortcut-model.md, PAR-41 step 2). A slot id is zero or more modifier ROLES in the fixed order of \"modifier_order\", then one key id of modifier_chords.json, joined by underscores (primary_g, primary_shift_v, meta_space). A role names what the modifier does, not what it is called: \"primary\" is the main command modifier. Each role lists the modifier id every driver calls it (the ids of modifier_chords.json platforms), or null with the reason when the driver's keyboard has no such key. tools/test/test-slot-roles-single-source.cjs holds the table to modifier_chords.json and to the drivers' slot prefix families; tools/codegen/codegen-slot-roles.cjs projects it to _shared/lua/shortcuts/slot_roles_data.lua.",
+	"modifier_order": ["primary", "secondary", "alt", "meta", "shift"],
+	"roles": {
+		"primary": {
+			"meaning": "The main command modifier.",
+			"windows": "ctrl",
+			"macos": "cmd",
+			"linux": "ctrl"
+		},
+		"secondary": {
+			"meaning": "The control modifier a Mac keyboard keeps besides Cmd.",
+			"windows": null,
+			"macos": "ctrl",
+			"linux": null,
+			"absent_reason": "Windows and Linux already use Ctrl as the primary modifier; they have no second control key."
+		},
+		"alt": {
+			"meaning": "The Alt / Option modifier.",
+			"windows": "alt",
+			"macos": "option",
+			"linux": "alt"
+		},
+		"meta": {
+			"meaning": "The operating-system key (Windows key, Super key).",
+			"windows": "win",
+			"macos": null,
+			"linux": "super",
+			"absent_reason": "A Mac keyboard has no operating-system key besides Cmd, which is the primary modifier."
+		},
+		"shift": {
+			"meaning": "The Shift modifier.",
+			"windows": "shift",
+			"macos": "shift",
+			"linux": "shift"
+		}
+	},
+	"reserved_chords": []
+}
