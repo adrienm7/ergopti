@@ -31,12 +31,14 @@ a sealed Windows updater source, reseal with
 
 ## Handover of 2026-10-26 (read first if the session was lost)
 
-- **State.** dev 376b28db82 is linear and pushed; every push of dev had its CI cancelled (a dev push builds a
-  release). Latest stable release: v1.0.6. A full CI on 376b28db82 was dispatched on `tmp/preflight-dev` at
-  03:23 UTC on 27 October: read it first. The previous full run (40424851292 on 34ff85e515) was green except
-  Windows `hotstrings-shortcuts`, macOS E2E Managed Ollama (Intel, likely flaky: rerun) and Launcher XCTest
-  (macOS 26), and the Linux integration rows, all addressed in this batch (CI-only confirmation).
-- **Integrated from the ChatGPT fix branches** up to 27 Oct 01:30 UTC. Per-branch seal refresh commits are never
+- **State.** dev is linear and pushed at the head of the sixth integration batch (27 Oct, about 05:00 UTC);
+  every push of dev had its CI cancelled (a dev push builds a release). Latest stable release: v1.0.6. A full
+  CI of that head is dispatched on `tmp/preflight-dev` with `os_lanes=all`: read it first. The previous full
+  run (40443902044 on 376b28db82) failed only on Linux unit alpine/arch/fedora/opensuse (libxkbcommon 1.13
+  falls back to the legacy XKB root: 03f842b66e), Windows unit core (UIA constructor race, fixed by
+  131131e339) and macOS Launcher XCTest (read-only bundle helper mode, App Cloner Cancel label): all
+  addressed in this batch, CI-only confirmation.
+- **Integrated from the ChatGPT fix branches** up to 27 Oct 04:00 UTC (fix/windows 07d2514ef0). Per-branch seal refresh commits are never
   integrated: reseal once on dev instead.
 - **Sixth integration batch (27 Oct morning)** brought into dev: fix/windows up to 07d2514ef0 (seal commits
   skipped, resealed once), the Linux daemon account-name fix, the PAR-74 Lua burn-down (567 to 0), the PAR-58
