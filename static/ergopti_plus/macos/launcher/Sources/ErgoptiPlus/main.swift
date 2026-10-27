@@ -79,9 +79,16 @@ func launcherChildEnvironment(
 	launcherPid: Int32,
 	launcherBundleId: String?,
 	loggerEndpoint: LoggerDatagramEndpoint? = nil,
-	keyboardGeometry: KeyboardGeometryMap? = nil
+	keyboardGeometry: KeyboardGeometryMap? = nil,
+	developerSourceRoot: String? = nil
 ) -> [String: String] {
 	var environment = base
+	// Only a developer build names a clone root; an inherited value would make
+	// the packaged Lua believe it runs from source and switch its updates off.
+	environment.removeValue(forKey: Identifiers.DevSource.environment)
+	if let developerSourceRoot {
+		environment[Identifiers.DevSource.environment] = developerSourceRoot
+	}
 	// Launch Services injects the outer app identity into its environment.
 	// Process inherits it verbatim, but the child is a second GUI bundle: keeping
 	// either marker makes AppKit/NSUserDefaults treat embedded Hammerspoon as the
@@ -530,6 +537,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var hsLogFolderRefusal: LogDirectoryFailure?
 	private var loggerWorker: LoggerDatagramServing?
 	private var updater: SPUUpdater?
+	// Decided once: the signed payload, or the clone of a developer build.
+	private lazy var luaSource = LuaSourceSelection.resolve(
+		infoDictionary: Bundle.main.infoDictionary,
+		bundlePath: Bundle.main.bundlePath,
+		fileExists: { FileManager.default.fileExists(atPath: $0) }
+	)
 	// Retained here: Sparkle keeps its delegate weakly.
 	private let updateChannelFeed = UpdateChannelFeed()
 	private let updaterCommandRouter = UpdaterCommandRouter()
@@ -663,6 +676,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		// is the only UI affordance the user should see.
 		NSApp.setActivationPolicy(.accessory)
 
+		// Decide where the Lua comes from before anything is started for it.
+		switch luaSource {
+		case let .refused(reason):
+			fail(reason)
+			return
+		case let .developer(root, _):
+			LauncherLog.write("launcher stage: developer source mode; Lua runs from \(root)")
+		case .packaged:
+			break
+		}
+		// A developer app is never updated in place: Sparkle would replace it.
+		if luaSource.developerRoot == nil {
+			startSparkleUpdater()
+		} else {
+			LauncherLog.write("launcher stage: Sparkle updater not started: a developer source build is never updated")
+		}
+
+		// Tell the embedded Hammerspoon where to read its Lua config from.
+		seedConfigDirDefault()
+		LauncherLog.write("launcher stage: \(kHammerspoonConfigKey) seeded to \(bundledInitLuaPath())")
+
+		// Spawn the embedded Hammerspoon binary; if it cannot be located we
+		// surface a hard error rather than silently degrading.
+		guard let hsBinary = locateEmbeddedHammerspoonBinary() else {
+			fail("Embedded Hammerspoon binary not found inside the .app bundle.")
+			return
+		}
+
+		// Hammerspoon itself tolerates a missing/invalid MJConfigFile by starting
+		// normally with no Lua loaded — no crash, exit code 0. Without this check
+		// a partial unzip, a disk-full install, or a build-script regression that
+		// silently drops the Lua tree would all produce an app that launches,
+		// shows nothing wrong, and remaps nothing (F-HIGH-28). Fail loudly instead.
+		guard FileManager.default.fileExists(atPath: bundledInitLuaPath()) else {
+			fail("Bundled configuration (init.lua) not found inside the .app bundle.")
+			return
+		}
+		LauncherLog.write("launcher stage: embedded Hammerspoon and bundled init.lua found at \(hsBinary)")
+		startManagedHammerspoon(at: hsBinary)
+	}
+
+	/// Starts the retained Sparkle controller of a packaged app.
+	@MainActor
+	private func startSparkleUpdater() {
 		// Lua owns the check cadence; Sparkle handles authenticated installation.
 		// Prove the consent policy before starting the localized user driver.
 		// The feed delegate serves the channel selected in the menu.
@@ -693,29 +750,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 				LauncherLog.write("ERROR: Sparkle updater could not start: \(failure.domain) \(failure.code)")
 			}
 		}
-
-		// Tell the embedded Hammerspoon where to read its Lua config from.
-		seedConfigDirDefault()
-		LauncherLog.write("launcher stage: \(kHammerspoonConfigKey) seeded to \(bundledInitLuaPath())")
-
-		// Spawn the embedded Hammerspoon binary; if it cannot be located we
-		// surface a hard error rather than silently degrading.
-		guard let hsBinary = locateEmbeddedHammerspoonBinary() else {
-			fail("Embedded Hammerspoon binary not found inside the .app bundle.")
-			return
-		}
-
-		// Hammerspoon itself tolerates a missing/invalid MJConfigFile by starting
-		// normally with no Lua loaded — no crash, exit code 0. Without this check
-		// a partial unzip, a disk-full install, or a build-script regression that
-		// silently drops the Lua tree would all produce an app that launches,
-		// shows nothing wrong, and remaps nothing (F-HIGH-28). Fail loudly instead.
-		guard FileManager.default.fileExists(atPath: bundledInitLuaPath()) else {
-			fail("Bundled configuration (init.lua) not found inside the .app bundle.")
-			return
-		}
-		LauncherLog.write("launcher stage: embedded Hammerspoon and bundled init.lua found at \(hsBinary)")
-		startManagedHammerspoon(at: hsBinary)
 	}
 
 	/// Routes the private menu commands to the retained Sparkle controller.
@@ -836,7 +870,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	// directory is derived from the file path by HS internally, so every Lua
 	// require() and hs.configdir resolve correctly from this single override.
 	private func bundledConfigDir() -> String {
-		return "\(Bundle.main.bundlePath)/Contents/Resources/static/ergopti_plus/macos"
+		switch luaSource {
+		case let .packaged(configDir), let .developer(_, configDir):
+			return configDir
+		case let .refused(reason):
+			// finishLaunchingAsSoleLauncher() stops on a refusal before any caller.
+			preconditionFailure("Lua source refused before launch: \(reason)")
+		}
 	}
 
 	private func bundledInitLuaPath() -> String {
@@ -957,7 +997,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			launcherPid: ProcessInfo.processInfo.processIdentifier,
 			launcherBundleId: Bundle.main.bundleIdentifier,
 			loggerEndpoint: activeLoggerWorker.endpoint,
-			keyboardGeometry: keyboardGeometry
+			keyboardGeometry: keyboardGeometry,
+			developerSourceRoot: luaSource.developerRoot
 		)
 		env["ERGOPTI_LAUNCHER_VERSION"]       = bundleVersionString()
 		env["ERGOPTI_CONFIG_DIR"]             = bundledConfigDir()
