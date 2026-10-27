@@ -14,6 +14,7 @@ local helpers = require("tests.helpers")
 require("config_keys")
 require("adapter_errors") -- the adapters compare its ids
 require("file_system.ports") -- the file-system owner checks itself against it when it loads
+require("infra.dev_source") -- the updater identity reads it; it only caches this process's mode
 local World = require("tests.support.modules.llm.selection_translation_fixture")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
 local SharedLogger = require("logger")
