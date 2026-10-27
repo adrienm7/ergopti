@@ -192,10 +192,12 @@ dev.
   "Config migration ... refused (newer)" (15:32:19, 15:34:29) points at schema_refused. Mac
   confirms: the next occurrence names its reason; if it is schema_refused, decide whether a
   read-only view may read a newer schema.
-- **L21** [CODE] Ollama `stop_warmup() could not retire its HTTP owner: false` and settlement
-  'Ollama warmup stop' did not commit (new.txt 16:28:07, after "Disabling LLM ...
-  startup_model_download_declined"). Next: reproduce with the startup decline before any warmup
-  request exists and make retirement of an absent owner a success.
+- **L21** Fixed (commit "fix(llm): commit the Ollama warmup stop of a taskless POST"). Ollama
+  `stop_warmup() could not retire its HTTP owner: false` and settlement 'Ollama warmup stop' did
+  not commit (new.txt 16:28:07, after "startup_model_download_declined"). Cause: hs.http.asyncPost
+  returns no task, so a warmup POST in flight can only be revoked logically; `cancel()` reported
+  that as a refusal. It now answers "pending" for that case and the stop commits, as the MLX fix
+  877b922d23 does. Mac confirms: no such ERROR when the startup declines the model download.
 - **L22** [CODE][PHYS-M] A granite model pull showed an error at 100% that no log recorded
   (maintainer report during the field run; no line in any report). Next: log the last status line
   and error of the Ollama pull stream whenever the pull ends, even at 100%.

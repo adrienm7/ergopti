@@ -609,9 +609,17 @@ local function quiesce_warmup()
 	_warmup_gen = _warmup_gen + 1
 	_warmup_active = false
 	local timer_settled = cancel_warmup_resume_timer() == true
-	local ok, result = xpcall(function() return _warmup_client.cancel() end, debug.traceback)
+	local detail
+	local ok, result = xpcall(function()
+		local settled, cancel_detail = _warmup_client.cancel()
+		detail = cancel_detail
+		return settled
+	end, debug.traceback)
 	local client_settled = ok == true and result == true
 	if client_settled then _warmup_client_recovery_token = nil end
+	-- hs.http.asyncPost returns no task: a POST in flight is revoked logically and
+	-- its answer is fenced by _warmup_gen, so the stop has happened (as for MLX).
+	if ok == true and result == false and detail == "pending" then client_settled = true end
 	if not client_settled then
 		Logger.error(LOG, "stop_warmup() could not retire its HTTP owner: %s.", tostring(result))
 	end
