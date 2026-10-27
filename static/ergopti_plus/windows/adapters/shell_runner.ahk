@@ -988,7 +988,7 @@ _SR_LegacyFinishCompletion(Claim, ExitCode, ReadFn := 0) {
 		try {
 			try {
 				local tmp_file := Claim["TmpFile"]
-				if FileExist(tmp_file) {
+				if tmp_file != "" {
 					local output := IsObject(ReadFn) ? ReadFn.Call(tmp_file) : FileRead(tmp_file)
 					stdout := Trim(output, "`r`n")
 				}
