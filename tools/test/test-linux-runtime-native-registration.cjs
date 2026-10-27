@@ -515,6 +515,7 @@ function main() {
 			'tools/test/validate-ahk-suite-manifest.cjs',
 			'tools/test/validate-ahk-e2e-manifest.cjs',
 			'tools/test/test-ahk-test-coverage.cjs',
+			'tools/lib/script-source.cjs',
 			'tools/lint/format.cjs',
 			'static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json',
 			'tools/test/run-js-suite.cjs',

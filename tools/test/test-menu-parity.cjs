@@ -5740,6 +5740,29 @@ function personalFrameEdgePublication(edge, sources, definition, row, platform) 
 		true,
 		'actual declared personal DATA route reaches its native frame publication'
 	);
+	// Native preprocessing ends an include at its line boundary. A flattened
+	// bootstrap cannot borrow the original constructor authority as path data.
+	const constructorSource = 'windows/infra/manifest_menu.ahk';
+	const constructorText = sources[constructorSource];
+	const includeHead = '#Include menu_population.ahk';
+	const includeAt = constructorText.indexOf(includeHead);
+	const bootstrapAt = constructorText.indexOf('if !_MR_FrameNativeConstructorCurrent(Menu)');
+	assert.ok(includeAt >= 0 && bootstrapAt > includeAt);
+	assert.ok(constructorText.slice(includeAt, bootstrapAt).includes('\n'));
+	const flattenedBootstrap =
+		constructorText.slice(0, includeAt) + includeHead + ' ' + constructorText.slice(bootstrapAt);
+	assert.notEqual(flattenedBootstrap, constructorText);
+	assert.equal(
+		personalFrameEdgePublication(
+			edge,
+			{ ...sources, [constructorSource]: flattenedBootstrap },
+			definition,
+			row,
+			'ahk'
+		),
+		false,
+		'a native include operand cannot consume the separate constructor bootstrap'
+	);
 	for (const changed of [
 		{ ...edge, kind: 'include' },
 		{ ...edge, menu: 'foreign_frame' },
