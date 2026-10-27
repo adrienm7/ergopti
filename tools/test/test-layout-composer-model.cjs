@@ -439,6 +439,15 @@ const BAD = {
 	shortcuts_invalid: (d) => {
 		d.shortcuts = 3;
 	},
+	rows_invalid: (d) => {
+		d.rows = { order: 'digits', extra: 1 };
+	},
+	rows_order_invalid: (d) => {
+		d.rows = { order: 'both' };
+	},
+	rows_edges_invalid: (d) => {
+		d.rows = { order: 'digits', edges: 'yes' };
+	},
 	unknown_shortcut: (d) => {
 		d.shortcuts.hyper = { source: 'ergol' };
 	},
@@ -615,6 +624,120 @@ for (const [id, reference] of Object.entries(REFERENCE)) {
 			'the corpus covers the three shortcut modifiers'
 		);
 	}
+}
+
+// ==================================
+// ===== 7/ Number-row options ======
+// ==================================
+// The rule is the Windows one: the shared policy corpus the AHK and Lua tests
+// replay, and hand-written outcomes in Windows terms (scan code, modifiers).
+
+{
+	const POLICY = JSON.parse(
+		fs.readFileSync(shared('tests', 'corpus', 'layouts', 'number_row_policy.json'), 'utf8')
+	);
+	const ROWS = JSON.parse(
+		fs.readFileSync(shared('tests', 'corpus', 'layouts', 'row_options_vectors.json'), 'utf8')
+	);
+	// Corpus spelling of one level: "" types nothing, "dead:x" a dead key, else text.
+	const spelled = (value) =>
+		value === ''
+			? null
+			: value.startsWith('dead:')
+				? { dead: { source: 'corpus', action: value.slice(5) } }
+				: { text: value };
+	const levelsOf = (vector, count) =>
+		Array.from({ length: count }, (_, index) => ({
+			plain: spelled(vector.plain[index]),
+			shift: spelled(vector.shift[index])
+		}));
+
+	const byId = {};
+	for (const vector of POLICY.availability) {
+		byId[vector.id] = vector;
+		const actual = Composer.rowAvailability(levelsOf(vector, 10));
+		check(
+			actual.digits === vector.digits && actual.symbols === vector.symbols,
+			`row availability ${vector.id}: ${JSON.stringify(actual)}`
+		);
+	}
+	for (const vector of POLICY.effective) {
+		const actual = Composer.rowEffective(
+			vector.mode,
+			Composer.rowAvailability(levelsOf(byId[vector.availability], 10))
+		);
+		check(
+			actual.mode === vector.effective && actual.reason === vector.reason,
+			`row effective ${vector.mode} on ${vector.availability}: ${JSON.stringify(actual)}`
+		);
+	}
+	for (const vector of POLICY.edges) {
+		const actual = Composer.rowEdgesAvailability(levelsOf(vector, 3), vector.ordering);
+		check(actual === vector.expected, `row edges ${vector.id}: "${actual}"`);
+	}
+	let threw = 0;
+	for (const call of [
+		() => Composer.rowAvailability([]),
+		() => Composer.rowEdgesAvailability([], 'digits')
+	])
+		try {
+			call();
+		} catch (error) {
+			threw += 1;
+		}
+	check(threw === 2, 'the row rules need all their keys');
+
+	const KINDS = { ctrl: ['control'], meta: ['command'], alt: ['option', 'command'] };
+	let cases = 0;
+	for (const entry of ROWS.cases) {
+		cases += 1;
+		const convention = 'iso';
+		const declaration = Composer.emptyDeclaration(`Rows ${entry.id}`, convention, entry.source);
+		Composer.setShortcutSource(declaration, 'default', { source: entry.source, layer: 'command' });
+		Composer.setRowOptions(declaration, entry.rows.order, entry.rows.edges);
+		if (entry.overrides) declaration.overrides = JSON.parse(JSON.stringify(entry.overrides));
+		const built = Composer.build(declaration, SOURCES, TABLE);
+		if (!built.ok) {
+			fail(`rows ${entry.id}: ${JSON.stringify(built.problems)}`);
+			continue;
+		}
+		const rows = built.layout.rows;
+		check(
+			rows.order === entry.effective.order &&
+				rows.reason === entry.effective.reason &&
+				rows.edges.applies === entry.effective.edges.applies &&
+				rows.edges.reason === entry.effective.edges.reason,
+			`rows ${entry.id}: effective ${JSON.stringify(rows)}`
+		);
+		const text = Composer.serialize(built.layout, TABLE);
+		for (const [press, expected] of entry.types) {
+			const typed = typeOn(text, convention, press.split(','));
+			check(
+				typed === expected,
+				`rows ${entry.id}: ${press} typed "${typed}", expected "${expected}"`
+			);
+		}
+		for (const [scan, modifier, expected] of entry.sends || []) {
+			const sent = shortcutOn(text, convention, scan, KINDS[modifier]);
+			check(
+				sent === expected,
+				`rows ${entry.id}: ${modifier}+${scan} sent "${sent}", expected "${expected}"`
+			);
+		}
+		// Reading the saved declaration back keeps the options.
+		const reread = Composer.readDeclaration(Composer.writeDeclaration(declaration)).declaration;
+		check(
+			JSON.stringify(reread.rows) === JSON.stringify(entry.rows),
+			`rows ${entry.id}: the declaration lost its options`
+		);
+	}
+	check(cases >= 10, `only ${cases} row-option cases`);
+	check(
+		ROWS.cases.some((c) => c.effective.reason === 'mixed') &&
+			ROWS.cases.some((c) => c.effective.edges.reason === 'edges_incomplete') &&
+			ROWS.cases.some((c) => c.effective.edges.applies),
+		'the row-option cases cover a refusal, an edge refusal and an applied edge swap'
+	);
 }
 
 if (errors.length > 0) {

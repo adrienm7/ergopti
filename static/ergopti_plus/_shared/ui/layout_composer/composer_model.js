@@ -54,6 +54,24 @@ var LayoutComposer = (function () {
 	const OVERRIDE_TARGETS = LAYER_IDS.concat([CAPS_LAYER], SHORTCUT_MODIFIERS);
 	const CONVENTIONS = ['iso', 'ansi'];
 
+	// The number-row options (layout.direct_access_digits, layout.number_row_reorder_edges):
+	// the ten digit keys, and the three edge keys left of 1 and right of 0.
+	const ROW_ORDERS = ['native', 'digits', 'symbols'];
+	const ROW_DIGIT_CODES = [
+		'Digit1',
+		'Digit2',
+		'Digit3',
+		'Digit4',
+		'Digit5',
+		'Digit6',
+		'Digit7',
+		'Digit8',
+		'Digit9',
+		'Digit0'
+	];
+	const ROW_EDGE_CODES = ['Backquote', 'Minus', 'Equal'];
+	const ROW_FIELDS = ['order', 'edges'];
+
 	const NEUTRAL_STATE = 'none';
 	const ID_PATTERN = /^[a-z][a-z0-9_]*$/;
 	const MAX_OUTPUT_CODE_POINTS = 8;
@@ -647,6 +665,20 @@ var LayoutComposer = (function () {
 				}
 			}
 		}
+		if (declaration.rows !== undefined) {
+			const rows = declaration.rows;
+			if (!isTable(rows)) {
+				problems.push(problem('rows_invalid', 'rows'));
+			} else {
+				for (const field of Object.keys(rows))
+					if (!ROW_FIELDS.includes(field))
+						problems.push(problem('rows_invalid', 'rows.' + field, field));
+				if (rows.order !== undefined && !ROW_ORDERS.includes(rows.order))
+					problems.push(problem('rows_order_invalid', 'rows.order', String(rows.order)));
+				if (rows.edges !== undefined && typeof rows.edges !== 'boolean')
+					problems.push(problem('rows_edges_invalid', 'rows.edges', String(rows.edges)));
+			}
+		}
 		const keyCodes = new Set(table.keys.map((key) => key.code));
 		if (declaration.overrides !== undefined) {
 			if (!isTable(declaration.overrides)) {
@@ -688,6 +720,143 @@ var LayoutComposer = (function () {
 			}
 		}
 		return { ok: problems.length === 0, problems };
+	}
+
+	// ======================================
+	// ======= 4b/ Number-row options =======
+	// ======================================
+	// The same rule as the Windows policy (_shared/modules/features/number_row_policy.ahk),
+	// held to the same corpus (_shared/tests/corpus/layouts/number_row_policy.json).
+
+	/** What one level of a row key holds: "d" its own digit, "s" another character or a dead key, "n" nothing. */
+	function rowLevelClass(digit, cell) {
+		if (!cell) return 'n';
+		if (cell.dead) return 's';
+		if (cell.text === undefined || cell.text === '') return 'n';
+		return cell.text === digit ? 'd' : 's';
+	}
+
+	/**
+	 * Which orderings can make the row's base level differ from its Shift level.
+	 * @param {{plain: object|null, shift: object|null}[]} levels - Ten keys, 1 to 0.
+	 * @returns {{digits: string, symbols: string}} "" when usable, else the refusal reason.
+	 */
+	function rowAvailability(levels) {
+		if (!Array.isArray(levels) || levels.length !== 10)
+			throw new ComposerError('The number-row availability needs the ten digit keys.');
+		const classes = new Set();
+		levels.forEach((key, index) => {
+			const digit = String((index + 1) % 10);
+			classes.add(rowLevelClass(digit, key.plain) + rowLevelClass(digit, key.shift));
+		});
+		if (classes.size !== 1) return { digits: 'mixed', symbols: 'mixed' };
+		switch ([...classes][0]) {
+			case 'sd':
+				return { digits: '', symbols: 'already_symbols_first' };
+			case 'ds':
+				return { digits: 'already_digits_first', symbols: '' };
+			case 'dd':
+				return { digits: 'digits_on_both', symbols: 'digits_on_both' };
+			case 'ss':
+				return { digits: 'symbols_on_both', symbols: 'symbols_on_both' };
+			case 'dn':
+			case 'nd':
+				return { digits: 'incomplete', symbols: 'incomplete' };
+			default:
+				return { digits: 'no_digits', symbols: 'no_digits' };
+		}
+	}
+
+	/** The ordering in effect: the stored choice, or "native" with the reason it is inert. */
+	function rowEffective(mode, availability) {
+		if (!ROW_ORDERS.includes(mode) || mode === 'native') return { mode: 'native', reason: '' };
+		const reason = availability[mode];
+		return reason === '' ? { mode, reason: '' } : { mode: 'native', reason };
+	}
+
+	const sameCell = (left, right) =>
+		left.dead
+			? Boolean(right.dead) &&
+				left.dead.source === right.dead.source &&
+				left.dead.action === right.dead.action
+			: !right.dead && left.text === right.text;
+
+	/**
+	 * Whether the edge keys can join an ordering: one is in effect and each edge
+	 * key holds two different non-empty cells.
+	 * @returns {string} "" when they can, else no_ordering, edges_incomplete or edges_same.
+	 */
+	function rowEdgesAvailability(edges, ordering) {
+		if (!Array.isArray(edges) || edges.length !== 3)
+			throw new ComposerError('The edge-key availability needs the three edge keys.');
+		if (ordering !== 'digits' && ordering !== 'symbols') return 'no_ordering';
+		for (const key of edges) {
+			const usable = (cell) => cell && (cell.dead || (cell.text !== undefined && cell.text !== ''));
+			if (!usable(key.plain) || !usable(key.shift)) return 'edges_incomplete';
+			if (sameCell(key.plain, key.shift)) return 'edges_same';
+		}
+		return '';
+	}
+
+	/** Caps level of a key: its Shift cell for a cased letter, else its base cell. */
+	function capsCell(row) {
+		if (
+			row.base &&
+			row.base.text !== undefined &&
+			isCased(row.base.text) &&
+			row.shift &&
+			row.shift.text !== undefined
+		)
+			return row.shift;
+		return row.base;
+	}
+
+	/**
+	 * Applies the number-row options to composed cells: the base and Shift cells of
+	 * the digit keys (and of the edge keys when asked and possible) trade places, a
+	 * dead cell with its whole state machine. AltGr, the shortcut maps and every
+	 * other key are untouched, as on Windows, which intercepts only the unmodified
+	 * and the Shift press. The Caps cell of a swapped key is derived again.
+	 * @param {object} cells - code -> level -> cell, as compose builds them.
+	 * @param {object|undefined} rows - The declaration's { order, edges }.
+	 * @param {object} overrides - The declaration's overrides (a Caps override stays).
+	 * @returns {{order: string, reason: string, edges: {stored: boolean, applies: boolean, reason: string}}}
+	 */
+	function applyRowOptions(cells, rows, overrides) {
+		const stored = rows && ROW_ORDERS.includes(rows.order) ? rows.order : 'native';
+		const edgesStored = Boolean(rows && rows.edges === true);
+		const levelsOf = (codes) =>
+			codes.map((code) => ({
+				plain: cells[code] ? cells[code].base : null,
+				shift: cells[code] ? cells[code].shift : null
+			}));
+		const complete = (codes) => codes.every((code) => hasOwn(cells, code));
+		if (!complete(ROW_DIGIT_CODES) || !complete(ROW_EDGE_CODES))
+			return {
+				order: 'native',
+				reason: 'no_digits',
+				edges: { stored: edgesStored, applies: false, reason: 'no_ordering' }
+			};
+		const effective = rowEffective(stored, rowAvailability(levelsOf(ROW_DIGIT_CODES)));
+		const edgesReason = edgesStored
+			? rowEdgesAvailability(levelsOf(ROW_EDGE_CODES), effective.mode)
+			: '';
+		const edgesApply = edgesStored && edgesReason === '';
+		const swap = (code) => {
+			const row = cells[code];
+			[row.base, row.shift] = [row.shift, row.base];
+			const kept = overrides && overrides[CAPS_LAYER];
+			if (!(kept && hasOwn(kept, code))) row[CAPS_LAYER] = capsCell(row);
+		};
+		if (effective.mode !== 'native') {
+			for (const code of ROW_DIGIT_CODES) swap(code);
+			if (edgesApply) for (const code of ROW_EDGE_CODES) swap(code);
+		}
+		return {
+			order: effective.mode,
+			reason: effective.reason,
+			edges: { stored: edgesStored, applies: edgesApply, reason: edgesStored ? edgesReason : '' }
+		};
 	}
 
 	// ==========================
@@ -745,16 +914,7 @@ var LayoutComposer = (function () {
 				const spec = declaration.layers[layer];
 				row[layer] = overridden(layer, spec ? takeCell(sources, spec, layer, code) : null);
 			}
-			let caps = row.base;
-			if (
-				row.base &&
-				row.base.text !== undefined &&
-				isCased(row.base.text) &&
-				row.shift &&
-				row.shift.text !== undefined
-			)
-				caps = row.shift;
-			row[CAPS_LAYER] = overridden(CAPS_LAYER, caps);
+			row[CAPS_LAYER] = overridden(CAPS_LAYER, capsCell(row));
 			for (const modifier of SHORTCUT_MODIFIERS) {
 				const spec = shortcuts[modifier] || shortcuts.default;
 				let taken = row.base;
@@ -765,7 +925,10 @@ var LayoutComposer = (function () {
 				if (row[modifier] && row[modifier].dead) row[modifier] = null;
 			}
 		}
-		return finalize(declaration, sources, cells);
+		const rowState = applyRowOptions(cells, declaration.rows, overrides);
+		const layout = finalize(declaration, sources, cells);
+		layout.rows = rowState;
+		return layout;
 	}
 
 	/** Gives the dead keys their state machines and the typed text its compositions. */
@@ -1010,6 +1173,11 @@ var LayoutComposer = (function () {
 		declaration.layers[layer] = spec;
 	}
 
+	/** Sets the number-row options; "native" and false give the layout's own rows back. */
+	function setRowOptions(declaration, order, edges) {
+		declaration.rows = { order, edges };
+	}
+
 	/** Sets or, with null, removes the shortcuts entry of a modifier (or "default"). */
 	function setShortcutSource(declaration, modifier, spec) {
 		if (!declaration.shortcuts) declaration.shortcuts = {};
@@ -1045,6 +1213,11 @@ var LayoutComposer = (function () {
 			shortcuts: {},
 			overrides: {}
 		};
+		if (declaration.rows !== undefined) {
+			ordered.rows = {};
+			for (const field of ROW_FIELDS)
+				if (hasOwn(declaration.rows, field)) ordered.rows[field] = declaration.rows[field];
+		}
 		for (const layer of LAYER_IDS)
 			if (declaration.layers && hasOwn(declaration.layers, layer))
 				ordered.layers[layer] = declaration.layers[layer];
@@ -1087,6 +1260,9 @@ var LayoutComposer = (function () {
 		SHORTCUT_MODIFIERS,
 		OVERRIDE_TARGETS,
 		CONVENTIONS,
+		ROW_ORDERS,
+		ROW_DIGIT_CODES,
+		ROW_EDGE_CODES,
 		LEVELS,
 		MAX_OUTPUT_CODE_POINTS,
 		ComposerError,
@@ -1104,6 +1280,10 @@ var LayoutComposer = (function () {
 		emptyDeclaration,
 		setLayerSource,
 		setShortcutSource,
+		setRowOptions,
+		rowAvailability,
+		rowEffective,
+		rowEdgesAvailability,
 		setOverride,
 		clearOverride,
 		writeDeclaration,
