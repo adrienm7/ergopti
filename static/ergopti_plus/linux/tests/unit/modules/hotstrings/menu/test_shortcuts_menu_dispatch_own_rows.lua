@@ -107,13 +107,13 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 			helpers.assert_eq(scene.picker.opts.current, "none")
 			helpers.assert_true(scene.picker.on_confirm("open_url"))
 
-			helpers.assert_eq(scene.prompt_args[1], "keyboard__ctrl_k")
+			helpers.assert_eq(scene.prompt_args[1], "keyboard__primary_k")
 			helpers.assert_eq(scene.prompt_args[2], "open_url")
 			helpers.assert_eq(scene.prompt_args[3], "url")
 			helpers.assert_eq(scene.prompt_args[4], "https://old.example")
 			helpers.assert_eq(scene.events[#scene.events - 1],
-				"parameter:keyboard__ctrl_k:open_url:https://new.example")
-			helpers.assert_eq(scene.events[#scene.events], "assign:ctrl_k:open_url",
+				"parameter:keyboard__primary_k:open_url:https://new.example")
+			helpers.assert_eq(scene.events[#scene.events], "assign:primary_k:open_url",
 				"the visible key assignment must be published only after its parameter")
 		end)
 	end)
@@ -122,7 +122,7 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 		with_keyboard_slot_picker(function()
 			error("the value the picker's editor collected must not be asked again")
 		end, function(scene)
-			helpers.assert_eq(scene.events[1], "editor:keyboard__ctrl_k",
+			helpers.assert_eq(scene.events[1], "editor:keyboard__primary_k",
 				"the editor starts from the values this slot's binding holds")
 			helpers.assert_eq(scene.picker.opts.items, scene.items, "the marked items are the ones shown")
 			helpers.assert_eq(scene.picker.opts.send_vocabulary, scene.editor.send_vocabulary)
@@ -130,8 +130,8 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 
 			helpers.assert_true(scene.picker.on_confirm("send_key", {}, "enter"))
 			helpers.assert_eq(scene.prompt_args, nil, "no prompt for a value the page collected")
-			helpers.assert_eq(scene.events[#scene.events - 1], "parameter:keyboard__ctrl_k:send_key:enter")
-			helpers.assert_eq(scene.events[#scene.events], "assign:ctrl_k:send_key")
+			helpers.assert_eq(scene.events[#scene.events - 1], "parameter:keyboard__primary_k:send_key:enter")
+			helpers.assert_eq(scene.events[#scene.events], "assign:primary_k:send_key")
 		end)
 	end)
 
@@ -149,8 +149,8 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 			with_keyboard_slot_picker(nil, function(scene)
 				helpers.assert_true(scene.picker.on_confirm("open_app"))
 				helpers.assert_eq(chooser_titles, { "prompt:open_app" })
-				helpers.assert_eq(scene.events[#scene.events - 1], "parameter:keyboard__ctrl_k:open_app:firefox")
-				helpers.assert_eq(scene.events[#scene.events], "assign:ctrl_k:open_app")
+				helpers.assert_eq(scene.events[#scene.events - 1], "parameter:keyboard__primary_k:open_app:firefox")
+				helpers.assert_eq(scene.events[#scene.events], "assign:primary_k:open_app")
 			end)
 		end)
 		package.loaded["ui.app_chooser"] = prior_chooser
@@ -232,11 +232,11 @@ helpers.describe("shortcuts menu: configured binding labels", function()
 			local saved = {}
 			for _, name in ipairs(owned) do saved[name] = package.loaded[name] end
 			local ok, failure = xpcall(function()
-				local parameters = { ["owner_keyboard__ctrl_k"] = "https://keyboard.example/?q=[x]&p=50%",
+				local parameters = { ["owner_keyboard__primary_k"] = "https://keyboard.example/?q=[x]&p=50%",
 					["owner_tap__number_row_left"] = "https://tap.example" }
 				package.loaded[owned[1]] = {
-					SLOT_GROUPS = { { prefix = "ctrl_", group_key = "menu.shortcuts.mod_ctrl" } },
-					available_slots = function() return { "ctrl_k" } end,
+					SLOT_GROUPS = { { prefix = "primary_", group_key = "menu.shortcuts.mod_ctrl" } },
+					available_slots = function() return { "primary_k" } end,
 					get_action = function() return "open_url" end,
 					get_slot_label = function() return "Ctrl+K" end,
 					binding_id = function(slot) return "owner_keyboard__" .. slot end,
@@ -257,7 +257,7 @@ helpers.describe("shortcuts menu: configured binding labels", function()
 				local rows = shortcuts_menu()
 				local row = find_row_prefix(rows, surface == "keyboard" and "Ctrl+K" or "Left")
 				helpers.assert_not_nil(row, "the real provider must render its assigned row")
-				local value = parameters[surface == "keyboard" and "owner_keyboard__ctrl_k" or "owner_tap__number_row_left"]
+				local value = parameters[surface == "keyboard" and "owner_keyboard__primary_k" or "owner_tap__number_row_left"]
 				helpers.assert_true(row.title:find("Open [" .. value .. "]", 1, true) ~= nil, row.title)
 				helpers.assert_true(row.title:find("[configurable]", 1, true) == nil)
 			end, debug.traceback)

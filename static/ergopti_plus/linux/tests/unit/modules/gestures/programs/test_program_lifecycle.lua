@@ -464,8 +464,8 @@ helpers.describe("private user program real gesture and keyboard bindings", func
 			while manager.stop_programs() ~= true and Native.hrtime() < deadline do Native.run("nowait") end
 			helpers.assert_eq(manager.set_program_paused(false), true)
 			os.remove(output)
-			helpers.assert_eq(keyboard.set_action("ctrl_p", "run_program"), true)
-			helpers.assert_eq(manager.set_action_parameter("keyboard__ctrl_p", "run_program", parameter), true)
+			helpers.assert_eq(keyboard.set_action("primary_p", "run_program"), true)
+			helpers.assert_eq(manager.set_action_parameter("keyboard__primary_p", "run_program", parameter), true)
 			helpers.assert_eq(keyboard.dispatch({ key = "p", mods = { ctrl = true } }), true)
 			deadline = Native.hrtime() + 3e9
 			settled = false
@@ -479,7 +479,7 @@ helpers.describe("private user program real gesture and keyboard bindings", func
 			local canonical = assert(io.open(path, "rb")); local source = canonical:read("*a"); canonical:close()
 			helpers.assert_contains(source, "# retained foreign note")
 			local document = require("toml_codec").decode(source)
-			helpers.assert_eq(document.gesture_parameters["keyboard__ctrl_p__run_program"], parameter)
+			helpers.assert_eq(document.gesture_parameters["keyboard__primary_p__run_program"], parameter)
 			os.remove(output)
 		end)
 	end)

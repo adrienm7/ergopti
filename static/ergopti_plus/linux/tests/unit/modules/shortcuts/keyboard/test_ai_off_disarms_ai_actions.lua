@@ -78,12 +78,12 @@ end
 local function keyboard_fixture()
 	local seen = { executed = {}, deferred = {} }
 	replace("adapters.storage", Fakes.storage({ initial = {
-		["shortcuts.keyboard.ctrl_j"] = "llm_generate_prediction",
-		["shortcuts.keyboard.ctrl_k"] = "select_line",
+		["shortcuts.keyboard.primary_j"] = "llm_generate_prediction",
+		["shortcuts.keyboard.primary_k"] = "select_line",
 	} }))
 	config_path = os.tmpname()
 	Sandbox.write_bytes(config_path,
-		"[shortcuts.keyboard]\nctrl_j = \"llm_generate_prediction\"\nctrl_k = \"select_line\"\n")
+		"[shortcuts.keyboard]\nprimary_j = \"llm_generate_prediction\"\nprimary_k = \"select_line\"\n")
 	replace("infra.config_paths", { config = function() return config_path end })
 	replace("modules.gestures.manager", {
 		is_assignable = function(id) return id == "select_line" or id == "llm_generate_prediction" end,
@@ -118,7 +118,7 @@ helpers.describe("AI chords under the grab (ai-off-inert-linux)", function()
 				helpers.assert_eq(shortcuts.consume({ key = "j", mods = { ctrl = true } }, seen.opts()), true,
 					"the AI back on: the chord is armed again")
 				seen.tick()
-				helpers.assert_eq(seen.executed[2], "llm_generate_prediction@keyboard__ctrl_j")
+				helpers.assert_eq(seen.executed[2], "llm_generate_prediction@keyboard__primary_j")
 			end)
 			restore()
 			if not ok then error(err, 0) end

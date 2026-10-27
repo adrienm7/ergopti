@@ -56,7 +56,7 @@ helpers.describe("acknowledged Linux ordered pair editing",function()
 		end)
 	end)
 	helpers.it("refuses unrelated, unknown, native-only and malformed edit rows",function()
-		for _,row in ipairs({{section="shortcuts.keyboard",key="ctrl_j",value="copy"},
+		for _,row in ipairs({{section="shortcuts.keyboard",key="primary_j",value="copy"},
 			{section="shortcuts.key_combination_taps",key="unknown_then_tab",value="copy"},
 			{section="shortcuts.key_combination_taps",key=pair,value="one_shot_shift"},
 			{section="shortcuts.key_combination_holds",key=pair,value="unknown"},

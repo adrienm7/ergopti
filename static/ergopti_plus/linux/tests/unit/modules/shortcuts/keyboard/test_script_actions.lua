@@ -87,12 +87,12 @@ helpers.describe("script lifecycle actions", function()
 		local paths_before = package.loaded["infra.config_paths"]
 		local path = os.tmpname()
 		require("test.config_unused_keys_contract").sandbox.write_bytes(path,
-			'[shortcuts.keyboard]\nctrl_j = "select_line"\nctrl_k = "script_pause_toggle"\n')
+			'[shortcuts.keyboard]\nprimary_j = "select_line"\nprimary_k = "script_pause_toggle"\n')
 		package.loaded["infra.config_paths"] = { config = function() return path end }
 		local executed = {}
 		package.loaded["adapters.storage"] = require("tests.fakes").storage({ initial = {
-			["shortcuts.keyboard.ctrl_j"] = "select_line",
-			["shortcuts.keyboard.ctrl_k"] = "script_pause_toggle",
+			["shortcuts.keyboard.primary_j"] = "select_line",
+			["shortcuts.keyboard.primary_k"] = "script_pause_toggle",
 		} })
 		package.loaded["modules.gestures.manager"] = {
 			-- The loader keeps only the ids the catalogue offers; both stored ones are.

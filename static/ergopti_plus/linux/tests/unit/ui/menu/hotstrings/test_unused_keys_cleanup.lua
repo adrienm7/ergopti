@@ -238,8 +238,8 @@ helpers.describe("unused keys (linux): the rule is exactly the readers'", functi
 				"tap_3 = \"retired_action_xyz\"",
 				"",
 				"[shortcuts.keyboard]",
-				"ctrl_k = \"select_line\"",
-				"ctrl_j = \"retired_action_xyz\"",
+				"primary_k = \"select_line\"",
+				"primary_j = \"retired_action_xyz\"",
 				"",
 				"[shortcuts.tap_keys]",
 				"number_row_left = \"retired_action_xyz\"",
@@ -250,16 +250,16 @@ helpers.describe("unused keys (linux): the rule is exactly the readers'", functi
 				offered[#offered + 1] = key.section .. "." .. key.key
 			end
 			table.sort(offered)
-			-- ctrl_k is a live binding: offering it would delete the user's shortcut.
+			-- primary_k is a live binding: offering it would delete the user's shortcut.
 			helpers.assert_eq(offered, {
-				"gestures.tap_3", "shortcuts.keyboard.ctrl_j", "shortcuts.tap_keys.number_row_left",
+				"gestures.tap_3", "shortcuts.keyboard.primary_j", "shortcuts.tap_keys.number_row_left",
 			})
 
 			-- The Shortcuts scope resolves the same document instead of refusing it.
 			local decoded = TomlCodec.decode(source)
 			local keyboard = require("modules.shortcuts.keyboard_shortcuts").configuration_candidate(decoded)
-			helpers.assert_eq(keyboard.assignments.ctrl_k, "select_line")
-			helpers.assert_nil(keyboard.assignments.ctrl_j)
+			helpers.assert_eq(keyboard.assignments.primary_k, "select_line")
+			helpers.assert_nil(keyboard.assignments.primary_j)
 			local tap = require("modules.shortcuts.tap_keys").configuration_candidate(decoded)
 			helpers.assert_eq(tap.assignments.number_row_left, "none")
 		end)

@@ -5,7 +5,7 @@ local Sandbox = require("test.config_unused_keys_contract").sandbox
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 
-local SOURCE = '[gestures]\nenabled = true\ntap_3 = "enter"\n[gesture_parameters]\ntap_3__open_url = "https://old.example"\nkeyboard__ctrl_j__open_url = "https://keyboard.example"\nunknown = "keep"\n[linux.gestures]\ntap_4 = "vol_up"\nunknown = "keep"\n[linux.action_parameters]\ntap_4__open_url = "https://legacy.example"\nkeyboard__ctrl_k__open_url = "https://keep.example"\n[other]\nvalue = 42\n'
+local SOURCE = '[gestures]\nenabled = true\ntap_3 = "enter"\n[gesture_parameters]\ntap_3__open_url = "https://old.example"\nkeyboard__primary_j__open_url = "https://keyboard.example"\nunknown = "keep"\n[linux.gestures]\ntap_4 = "vol_up"\nunknown = "keep"\n[linux.action_parameters]\ntap_4__open_url = "https://legacy.example"\nkeyboard__primary_k__open_url = "https://keep.example"\n[other]\nvalue = 42\n'
 
 local function with_scope(body)
 	Sandbox.with_config(SOURCE, function(path)
@@ -221,9 +221,9 @@ helpers.describe("Linux gesture scope transaction", function()
 			helpers.assert_eq(saved.linux.gestures.tap_4, nil)
 			helpers.assert_eq(saved.linux.gestures.unknown, "keep")
 			helpers.assert_eq(saved.linux.action_parameters.tap_4__open_url, nil)
-			helpers.assert_eq(saved.linux.action_parameters.keyboard__ctrl_k__open_url, "https://keep.example")
+			helpers.assert_eq(saved.linux.action_parameters.keyboard__primary_k__open_url, "https://keep.example")
 			helpers.assert_eq(saved.gesture_parameters.tap_3__open_url, nil)
-			helpers.assert_eq(saved.gesture_parameters.keyboard__ctrl_j__open_url, "https://keyboard.example")
+			helpers.assert_eq(saved.gesture_parameters.keyboard__primary_j__open_url, "https://keyboard.example")
 			helpers.assert_eq(saved.gesture_parameters.unknown, "keep")
 			helpers.assert_eq(saved.other.value, 42)
 			helpers.assert_eq(gestures.is_enabled(), true, "the switch stays on")
