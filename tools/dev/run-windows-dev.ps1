@@ -18,6 +18,10 @@
 #
 # A running ErgoptiPlus holds the single-instance mutex, so it is asked to close
 # first (WM_CLOSE, as the tray's Quit); one that stays is named, never killed.
+#
+# Double-clicking static\ergopti_plus\windows\ErgoptiPlus.ahk in a clone starts
+# the same developer mode (the driver derives the root from its own folder),
+# but closes nothing: with the exe running, that source run yields to its mutex.
 # ==============================================================================
 
 [CmdletBinding()]

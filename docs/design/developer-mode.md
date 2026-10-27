@@ -22,6 +22,36 @@ All three hand the clone root to the driver in one variable,
 clone it runs from, and raises otherwise: `infra/dev_source.lua` (macOS and
 Linux) and `infra/dev_source.ahk` (Windows).
 
+### Windows: double-click works too
+
+Double-clicking `static\ergopti_plus\windows\ErgoptiPlus.ahk` in a clone, with
+AutoHotkey v2 installed, starts the same developer mode. Without the variable, a
+source run (`Updater_IsLocalSource()`) derives the root from its own folder: the
+driver folder minus `\static\ergopti_plus\windows`. `DevSource_DeriveRoot`
+accepts it only when that root holds a `.git` folder (a clone) or `.git` file
+(a linked worktree) and `static\ergopti_plus\_shared\data\identifiers.json`.
+The run then takes the same path: `%APPDATA%\Ergopti\paths.toml`, the watcher,
+and the updater, uninstall and remote layout catalogue off with their reasons.
+The startup line names the origin: "Developer source mode; the driver runs from
+… (clone root from the script location)", or "(clone root from the developer
+variable)" under the PowerShell script.
+
+- The variable wins: when set it is validated exactly as before, and a root
+  naming another clone raises even inside a clone.
+- A source tree outside a Git checkout (an extracted zip) stays a plain source
+  run with `windows\_generated\paths.toml`.
+- A compiled exe never derives a root.
+- A double-click does not close a running ErgoptiPlus.exe. The
+  `#SingleInstance Force` directive only replaces an instance of the same
+  script path, and the exe is another one, so the source run meets the
+  single-owner mutex (`Local\ErgoptiPlusDriver`) held by the exe, waits
+  `DRIVER_MUTEX_WAIT_MS` (3 s), writes "Another instance owns the single-owner
+  mutex" as a WARNING to `bootstrap.log` and exits without a tray icon; the exe
+  keeps running. A second double-click while a source run is alive replaces
+  that run, as before. Quit the exe first, or use the PowerShell script, which
+  asks it to close. This is read from `ErgoptiPlus.ahk`'s single-owner gate;
+  the [PHYS-W] check in the TODO confirms it on a PC.
+
 Reload in each mode:
 
 - macOS: a saved `.lua` under `macos/` or `_shared/lua` reloads (`hs.reload`);
@@ -81,19 +111,19 @@ every native helper path, read in `origin/dev` at `bde408f3a6`.
 
 ### Windows
 
-| Feature                                                                                                                      | State                                                                                                                                                    |
-| ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Driver, menus, hotstrings, layers, tap-holds, metrics, AI features                                                           | works: the same `.ahk` the exe embeds, interpreted by AutoHotkey v2                                                                                      |
-| Native helpers (`ergopti_nav_owner.dll`, `ergopti_network_pac.exe`, `sqlite3.dll`, `WebView2Loader.dll`, PowerShell workers) | works: tracked in `vendor\`, the same files the exe extracts                                                                                             |
-| Bundle extraction                                                                                                            | works: not needed, `_StaticDir` is the clone (`infra/bundle.ahk` is a no-op)                                                                             |
-| Config (`paths.toml`)                                                                                                        | fixed by 47cdd2fdb8: a source run read `windows\_generated\paths.toml`; a developer run now reads `%APPDATA%\Ergopti\paths.toml`, as the exe             |
-| Saved-source auto-reload                                                                                                     | fixed by 47cdd2fdb8: `infra/dev_source.ahk` polls the driver's `.ahk` in a developer run only                                                            |
-| Worker processes (metrics projection, UIA probe, keystats prefetch)                                                          | works: started with `A_AhkPath` and the script, the source-mode form of the same command                                                                 |
-| Reload successor                                                                                                             | works: `LifecycleLaunchSuccessor` relaunches the interpreter with the script; the developer variable is inherited                                        |
-| Updater, release installs, uninstall, changelog installs                                                                     | differs (by design): `Updater_IsLocalSource()`                                                                                                           |
-| Layout catalogue                                                                                                             | differs (by design): the checkout's registry, as on macOS and Linux                                                                                      |
-| Start at login                                                                                                               | differs: registers the interpreter command without the developer variable, so a login start is a plain source run (no watcher, the clone's `paths.toml`) |
-| Registry cache identity                                                                                                      | differs (harmless): hashes the parser sources instead of the exe                                                                                         |
+| Feature                                                                                                                      | State                                                                                                                                                                         |
+| ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Driver, menus, hotstrings, layers, tap-holds, metrics, AI features                                                           | works: the same `.ahk` the exe embeds, interpreted by AutoHotkey v2                                                                                                           |
+| Native helpers (`ergopti_nav_owner.dll`, `ergopti_network_pac.exe`, `sqlite3.dll`, `WebView2Loader.dll`, PowerShell workers) | works: tracked in `vendor\`, the same files the exe extracts                                                                                                                  |
+| Bundle extraction                                                                                                            | works: not needed, `_StaticDir` is the clone (`infra/bundle.ahk` is a no-op)                                                                                                  |
+| Config (`paths.toml`)                                                                                                        | fixed by 47cdd2fdb8: a source run read `windows\_generated\paths.toml`; a developer run now reads `%APPDATA%\Ergopti\paths.toml`, as the exe                                  |
+| Saved-source auto-reload                                                                                                     | fixed by 47cdd2fdb8: `infra/dev_source.ahk` polls the driver's `.ahk` in a developer run only                                                                                 |
+| Worker processes (metrics projection, UIA probe, keystats prefetch)                                                          | works: started with `A_AhkPath` and the script, the source-mode form of the same command                                                                                      |
+| Reload successor                                                                                                             | works: `LifecycleLaunchSuccessor` relaunches the interpreter with the script; the developer variable is inherited, or the root is derived again                               |
+| Updater, release installs, uninstall, changelog installs                                                                     | differs (by design): `Updater_IsLocalSource()`                                                                                                                                |
+| Layout catalogue                                                                                                             | differs (by design): the checkout's registry, as on macOS and Linux                                                                                                           |
+| Start at login                                                                                                               | changed: registers the interpreter and the clone's script, and that login start derives the root from the script location, so it is a developer run too ([PHYS-W] to confirm) |
+| Registry cache identity                                                                                                      | differs (harmless): hashes the parser sources instead of the exe                                                                                                              |
 
 ## What a physical machine must confirm
 
