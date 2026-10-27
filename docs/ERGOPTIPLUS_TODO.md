@@ -178,7 +178,7 @@ dev.
 - **L18** [CODE] keystats start still holds the main thread 1.1 to 1.3 s from the deferred timer
   at menu_state.lua:531 (new.txt 16:28:06, 16:48:13, on 228f79f2). Next: move the SQLite open and
   offset replay of `kl.start` into slices like the recovery.
-- **L19** Fixed (derived delete batches commit) for the measured cause; one smaller residue stays
+- **L19** Fixed 3d6479306a for the measured cause; one smaller residue stays
   open. log_manager.lua:1585 (the recovery slice timer) held the main thread 5288 ms right after
   "Typing ids restart ..." (new.txt 16:49:17 to 16:49:22). Measured on a synthetic cache built
   from schema.sql with the sqlite3 3.45 CLI and Python's sqlite3 (180,000 typing rows, 61 MB of
