@@ -489,6 +489,12 @@ function native() {
 			path.join(ROOT, SHARED, 'lua/compat/utf8.lua'),
 			path.join(shared, 'lua/compat/utf8.lua')
 		);
+		// The installed lookup helper bounds its receipt by the shared policy's limits.
+		fs.mkdirSync(path.join(shared, 'modules/network'), { recursive: true });
+		fs.copyFileSync(
+			path.join(ROOT, SHARED, 'modules/network/proxy_policy.json'),
+			path.join(shared, 'modules/network/proxy_policy.json')
+		);
 		fs.writeFileSync(
 			path.join(driver, '_generated/native_runtime.lua'),
 			outputs[generator.LUA_OUTPUT]
