@@ -72,7 +72,7 @@ local function resolve_setting(document, mark)
 		value = nil
 	end
 	if value == nil then value = Manifest.default_for(FEATURE_PATH)
-	elseif mark then mark("hotstrings", "repeat_key_enabled") end
+	elseif mark then mark("hotstrings", ConfigKeys.LEAF.REPEAT_KEY_ENABLED) end
 	assert(type(value) == "boolean", "the manifest default of repeat_key_enabled must be a boolean")
 	return value
 end

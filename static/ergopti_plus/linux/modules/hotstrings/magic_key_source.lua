@@ -348,7 +348,7 @@ end
 function M.init(deps)
 	if _deps ~= nil then error("magic_key_source: already initialized", 2) end
 	if type(deps) ~= "table" then error("magic_key_source.init needs its collaborators", 2) end
-	for _, name in ipairs({ "is_active", "replace_on", "magic_key", "can_type", "type_text", "dispatch_char",
+	for _, name in ipairs({ "is_active", "replace_on", ConfigKeys.LEAF.MAGIC_KEY, "can_type", "type_text", "dispatch_char",
 		"end_selection", "can_capture", "key_text", "defer" }) do
 		if type(deps[name]) ~= "function" then error("magic_key_source.init needs " .. name, 2) end
 	end
@@ -574,7 +574,7 @@ local preference_ports = { get = Preferences.get, generation = Preferences.gener
 local collision_methods = { get = M.get, evdev_code = M.evdev_code, resolver = M.resolver,
 	on_key = M.on_key, capture = M.capture, cancel_capture = M.cancel_capture, init = M.init,
 	_reset_for_test = M._reset_for_test }
-local collision_callback_names = { "is_active", "replace_on", "magic_key", "can_type", "type_text",
+local collision_callback_names = { "is_active", "replace_on", ConfigKeys.LEAF.MAGIC_KEY, "can_type", "type_text",
 	"dispatch_char", "end_selection", "can_capture", "key_text", "defer",
 	"input_source_receipt", "typing_plan", "direct_source_admitted" }
 local collision_factory

@@ -684,10 +684,10 @@ function M.action_handlers()
 		["select_word"] = function() return M.select_word() end,
 		["paste_plain"] = function() return M.paste_plain() end,
 		["surround_parens"] = function() return M.surround_line_with_parens() end,
-		["uppercase_selection"] = function() return M.transform_uppercase() end,
-		["titlecase_selection"] = function() return M.transform_titlecase() end,
+		[ConfigKeys.COMMAND.UPPERCASE_SELECTION] = function() return M.transform_uppercase() end,
+		[ConfigKeys.COMMAND.TITLECASE_SELECTION] = function() return M.transform_titlecase() end,
 		["selection_uppercase"] = function() return M.transform_to_uppercase() end,
-		["selection_lowercase"] = function() return M.transform_lowercase() end,
+		[ConfigKeys.COMMAND.SELECTION_LOWERCASE] = function() return M.transform_lowercase() end,
 		["selection_titlecase"] = function() return M.transform_to_titlecase() end,
 		-- The value is the binding's own parameter, validated by the executor.
 		["send_text"] = function(_, parameter)
@@ -794,7 +794,7 @@ function M.toggle()
 end
 
 -- The wrap-on-type switch (shortcuts.wrap_text_if_selected).
-local WRAP_ON_TYPE_KEY = "wrap_text_if_selected"
+local WRAP_ON_TYPE_KEY = ConfigKeys.LEAF.WRAP_TEXT_IF_SELECTED
 local DEFAULT_WRAP_ON_TYPE = Manifest.default_for(CONFIG_SECTION .. "." .. WRAP_ON_TYPE_KEY)
 if type(DEFAULT_WRAP_ON_TYPE) ~= "boolean" then
 	error("The manifest default for shortcuts." .. WRAP_ON_TYPE_KEY .. " must be a boolean.")

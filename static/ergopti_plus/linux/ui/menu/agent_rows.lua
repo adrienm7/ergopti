@@ -88,7 +88,7 @@ local function system_rows(system, dialogs, changed)
 	local function store(value)
 		if AgentSettings.set_spec(system, value) then changed() end
 	end
-	local off = require("infra.manifest_menu").check_row("agent_system_controls", "agent_system_off", {
+	local off = require("infra.manifest_menu").check_row("agent_system_controls", require("config_keys").COMMAND.AGENT_SYSTEM_OFF, {
 		agent_system_off = function()
 			if AgentSettings.set_spec(system, "") ~= true then return false end
 			changed()
@@ -104,7 +104,7 @@ local function system_rows(system, dialogs, changed)
 		local value, label = choice.value, choice.label
 		local record = ManifestMenu.template_rows("agent_linux_system_backend_record", {
 			-- A new backend starts on its default model.
-			["agent_system_backend"] = function() store(value) end,
+			[require("config_keys").COMMAND.AGENT_SYSTEM_BACKEND] = function() store(value) end,
 		}, {
 			agent_system_backend_label = function() return label end,
 			agent_system_backend_selected = function() return parsed ~= nil and parsed.backend == value end,
@@ -115,7 +115,7 @@ local function system_rows(system, dialogs, changed)
 	local resolved = AgentSettings.resolve(system)
 	local model = resolved and resolved.model or (parsed and parsed.model) or ""
 	local model_rows = ManifestMenu.template_rows("agent_system_model_controls", {
-		["agent_system_model"] = function()
+		[require("config_keys").COMMAND.AGENT_SYSTEM_MODEL] = function()
 			if not parsed then return end
 			local backend = parsed.backend
 			local answer = dialogs.prompt(tr("menu.agent.title"),
@@ -195,7 +195,7 @@ local function disabled_app_rows(llm, dialogs, changed)
 	local removed = {}
 	for _, app in ipairs(apps) do
 		local rows = ManifestMenu.template_rows("agent_linux_disabled_app_remove", {
-			["agent_disabled_app_remove"] = function()
+			[require("config_keys").COMMAND.AGENT_DISABLED_APP_REMOVE] = function()
 				local list = {}
 				for _, existing in ipairs(AgentSettings.get_disabled_apps()) do
 					if existing ~= app then list[#list + 1] = existing end
@@ -208,8 +208,8 @@ local function disabled_app_rows(llm, dialogs, changed)
 	end
 	local last = llm and type(llm.get_agent_last_app) == "function" and llm.get_agent_last_app() or nil
 	local rows = ManifestMenu.template_rows("agent_linux_disabled_apps_children", {
-		["agent_disabled_app_current"] = function() add(last) end,
-		["agent_disabled_app_add"] = function()
+		[require("config_keys").COMMAND.AGENT_DISABLED_APP_CURRENT] = function() add(last) end,
+		[require("config_keys").COMMAND.AGENT_DISABLED_APP_ADD] = function()
 			local answer = dialogs.prompt(tr("menu.agent.title"), tr("app_picker.search_placeholder"), "", false,
 				running_apps(excluded))
 			if answer == nil then return end
@@ -261,29 +261,29 @@ function M.build(ctx, dialogs)
 				frame = ManifestMenu.template_rows("agent_linux_system1_frame", {}, {
 					agent_system_backend_current_caption = function() return current end,
 				}, {
-					["agent_system1"] = function() return rows end,
+					[require("config_keys").LEAF.AGENT_SYSTEM1] = function() return rows end,
 				})
 			else
 				frame = ManifestMenu.template_rows("agent_linux_system2_frame", {}, {
 					agent_system_backend_current_caption = function() return current end,
 				}, {
-					["agent_system2"] = function() return rows end,
+					[require("config_keys").LEAF.AGENT_SYSTEM2] = function() return rows end,
 				})
 			end
 			if not frame then return end
 			for _, row in ipairs(frame) do append(target, row, "agent_" .. system) end
 		end
 	end
-	handlers["agent_disabled_apps"] = function(target)
+	handlers[require("config_keys").COMMAND.AGENT_DISABLED_APPS] = function(target)
 		local count, rows = disabled_app_rows(llm, dialogs, changed)
 		if not rows then return end
 		local frame = ManifestMenu.template_rows("agent_linux_disabled_apps_frame", {}, {
 			agent_disabled_apps_count = function() return tostring(count) end,
 		}, {
-			["agent_disabled_apps"] = function() return rows end,
+			[require("config_keys").LEAF.AGENT_DISABLED_APPS] = function() return rows end,
 		})
 		if not frame then return end
-		for _, row in ipairs(frame) do append(target, row, "agent_disabled_apps") end
+		for _, row in ipairs(frame) do append(target, row, require("config_keys").LEAF.AGENT_DISABLED_APPS) end
 	end
 	local menu_ctx = {
 		commands = {
