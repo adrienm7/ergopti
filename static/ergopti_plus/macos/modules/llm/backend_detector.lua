@@ -27,6 +27,7 @@ local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
 local Storage = require("adapters.storage")
+local SystemInfo = require("adapters.system_info")
 
 local LOG = "backend_detector"
 
@@ -81,6 +82,11 @@ local function is_apple_silicon()
 	-- this used to spawn a subprocess on every call — including twice during
 	-- boot, on the critical path before the keymap starts.
 	if _is_arm_cached ~= nil then return _is_arm_cached end
+	-- The native process architecture answers without a fork (about 40 ms on
+	-- the Mac at boot); uname stays for a host that does not report it.
+	local info = SystemInfo.arch()
+	if info == "arm64" then _probed_arch = "arm64"; _is_arm_cached = true; return true end
+	if info == "x86_64" then _probed_arch = "x86_64"; _is_arm_cached = false; return false end
 	local ok, out = pcall(hs.execute, "/usr/bin/uname -m")
 	_probed_arch = false
 	if ok and type(out) == "string" then

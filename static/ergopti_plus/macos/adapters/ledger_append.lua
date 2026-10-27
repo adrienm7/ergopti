@@ -111,7 +111,8 @@ end
 local function publish_journal(path, receipt, expected)
 	local encoded = json.encode(receipt)
 	if type(encoded) ~= "string" then return false end
-	local written, _, cleanup = FileSystem.write_if_unchanged(path .. JOURNAL_SUFFIX, encoded, expected)
+	-- The journal is the driver's own file: no user metadata to carry (L16).
+	local written, _, cleanup = FileSystem.write_private_if_unchanged(path .. JOURNAL_SUFFIX, encoded, expected)
 	if cleanup ~= nil then
 		assert(type(cleanup) == "function", "ordinary ledger publication requires a cleanup capability")
 		publication_debt = cleanup

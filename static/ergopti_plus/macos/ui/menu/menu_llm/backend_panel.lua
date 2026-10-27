@@ -233,8 +233,16 @@ end
 local _is_apple_silicon = nil
 local function is_apple_silicon()
 	if _is_apple_silicon == nil then
-		local ok, out = pcall(function() return hs.execute("uname -m") end)
-		_is_apple_silicon = ok and (out or ""):find("arm64") ~= nil
+		-- The process architecture is native and answers what `uname -m` prints
+		-- for this process (Rosetta included). The fork it replaces ran while the
+		-- menu module loaded at boot, at about 40 ms per fork on the Mac.
+		local info = type(hs.processInfo) == "table" and hs.processInfo.arch or nil
+		if type(info) == "string" and info ~= "" then
+			_is_apple_silicon = info == "arm64"
+		else
+			local ok, out = pcall(function() return hs.execute("uname -m") end)
+			_is_apple_silicon = ok and (out or ""):find("arm64") ~= nil
+		end
 	end
 	return _is_apple_silicon
 end

@@ -41,6 +41,8 @@ local function load_coordinator(options)
 	package.loaded["infra.termination_coordinator"] = nil
 	local coordinator = require("infra.termination_coordinator")
 	helpers.assert_true(coordinator.is_initialized() == false)
+	helpers.assert_true(coordinator.terminal_in_progress() == false,
+		"before init nothing owns the process, and the query must not raise")
 	local initialized = coordinator.init({
 		capture_publication_admission = options.capture_publication_admission,
 		request_lease = function(reason, callback)
@@ -246,8 +248,11 @@ helpers.describe("controlled termination coordinator", function()
 		helpers.assert_eq(coordinator.request_reload_owned("sibling_reset", function() end), false,
 			"an owned handoff cannot join an older terminal transition")
 		helpers.assert_true(coordinator.is_pending())
+		helpers.assert_eq(coordinator.terminal_in_progress(), true,
+			"the watchers' quiet query must agree with is_pending")
 
 		calls.lease_callback(false, "native fence refused")
+		helpers.assert_eq(coordinator.terminal_in_progress(), false)
 		helpers.assert_eq(aborted, 1)
 		helpers.assert_eq(abort_detail, "exact Karabiner revocation was not proven: native fence refused")
 		helpers.assert_eq(calls.teardowns, 0)

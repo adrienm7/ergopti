@@ -1882,7 +1882,9 @@ end
 --- @param kind string Timer family label.
 --- @param started integer Monotonic start, nanoseconds.
 --- @param modal_before integer Modal wait total when the callback started.
-local function report_slow_timer_callback(fn, kind, started, modal_before)
+--- @param heap_before_kb number Lua heap when the callback started: a drop
+---   says a garbage collection ran inside the hold.
+local function report_slow_timer_callback(fn, kind, started, modal_before, heap_before_kb)
 	local ok_now, now = pcall(_callback_clock)
 	if not ok_now or type(now) ~= "number" then return end
 	local held_ms = (now - started - (_modal_wait_ns - modal_before)) / NANOSECONDS_PER_MILLISECOND
@@ -1892,7 +1894,7 @@ local function report_slow_timer_callback(fn, kind, started, modal_before)
 		PhaseStats.count(held_ms >= SLOW_TIMER_CALLBACK_REPORT_MS and "runtime.timer_hold_over_1000ms"
 			or "runtime.timer_hold_over_250ms")
 	end
-	if held_ms < SLOW_TIMER_CALLBACK_REPORT_MS then return end
+	if held_ms < SLOW_TIMER_CALLBACK_COUNT_MS then return end
 	local ok_site, site = pcall(describe_callback_site, fn)
 	site = ok_site and site or "?"
 	local previous = _slow_callback_reported_at[site]
@@ -1900,10 +1902,20 @@ local function report_slow_timer_callback(fn, kind, started, modal_before)
 	if previous and now_sec - previous < SLOW_TIMER_CALLBACK_REPEAT_SEC then return end
 	_slow_callback_reported_at[site] = now_sec
 	local phases = PhaseStats.recent_since(started)
+	local heap = string.format(" Lua heap %d->%d MB.", math.floor((heap_before_kb or 0) / 1024),
+		math.floor(collectgarbage("count") / 1024))
+	phases = (phases and (" Phases inside the hold: " .. phases .. ".") or "") .. heap
+	if held_ms < SLOW_TIMER_CALLBACK_REPORT_MS then
+		-- The Mac counted 7 to 18 such holds per 5 minutes with no site: key
+		-- events arrive late from 250 ms on, so each one is named once a minute.
+		-- Evidence, not info: one template for every site would be collapsed.
+		M.evidence("runtime", "Main-thread hold of %d ms in an hs.timer.%s callback (%s).%s",
+			math.floor(held_ms), kind, site, phases)
+		return
+	end
 	M.warn("runtime",
 		"An hs.timer.%s callback (%s) held the main thread for %d ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.%s",
-		kind, site, math.floor(held_ms),
-		phases and (" Phases inside the hold: " .. phases .. ".") or "")
+		kind, site, math.floor(held_ms), phases)
 end
 
 --- Wraps a timer callback so an uncaught error is logged WITH a traceback
@@ -1929,6 +1941,7 @@ local function _guard_timer_cb(fn, kind)
 	return function(...)
 		local started = nil
 		local modal_before = _modal_wait_ns
+		local heap_before_kb = collectgarbage("count")
 		if _callback_clock then
 			local ok_start, value = pcall(_callback_clock)
 			if ok_start and type(value) == "number" then started = value end
@@ -1942,12 +1955,33 @@ local function _guard_timer_cb(fn, kind)
 		-- event taps and cost the Karabiner lease in issue #99 (13.4 s inside one
 		-- ingest flush). Naming the callback makes the next log say which one.
 		if started then
-			local reported, report_err = pcall(report_slow_timer_callback, fn, kind, started, modal_before)
+			local reported, report_err = pcall(report_slow_timer_callback, fn, kind, started, modal_before, heap_before_kb)
 			if not reported then
 				M.error("runtime", "Slow timer callback report failed: %s", ErrorDescription.describe(report_err))
 			end
 		end
 	end
+end
+
+--- Names the program a synchronous shell command runs, for a phase name. Only a
+--- plain basename of the first word is kept (`mkdir`, `ls`, `uname`); anything
+--- else, such as a user script name with spaces or symbols, reads `other`, so
+--- no path or argument reaches the log.
+--- @param command any The hs.execute command.
+--- @return string label
+local function shell_program_label(command)
+	if type(command) ~= "string" then return "other" end
+	local first = command:match("^%s*([^%s]+)")
+	while first and first:find("=", 1, true) do
+		-- Skip leading environment assignments such as LC_ALL=C.
+		command = command:gsub("^%s*[^%s]+", "", 1)
+		first = command:match("^%s*([^%s]+)")
+	end
+	-- A quoted or escaped first word is a caller-built path: never name it.
+	if not first or not first:match("^[%w_%-%./]+$") then return "other" end
+	local base = first:match("([^/]+)$")
+	if base and #base <= 24 and base:match("^[%w_%-%.]+$") then return base end
+	return "other"
 end
 
 --- Installs process-wide capture so EVERY diagnostic — including errors that
@@ -2028,8 +2062,26 @@ function M.install_runtime_error_capture()
 		end
 	end
 
+	-- 3) Time every synchronous shell command. hs.execute forks from the
+	-- Hammerspoon process and blocks the main thread; on the Mac one fork took
+	-- about 40 ms, and several per tick made the holds no other phase named.
+	-- Each call becomes phase `shell.<program>`, so a slow-callback report
+	-- lists the forks inside its hold and the phase summary counts them.
+	if type(hs_ref) == "table" and type(hs_ref.execute) == "function" then
+		local orig = hs_ref.execute
+		hs_ref.execute = function(command, ...)
+			local started = _callback_clock and _callback_clock() or nil
+			local results = table.pack(orig(command, ...))
+			if started then
+				local elapsed = _callback_clock() - started
+				pcall(PhaseStats.add, "shell." .. shell_program_label(command), elapsed)
+			end
+			return table.unpack(results, 1, results.n)
+		end
+	end
+
 	_log("INFO", "logger",
-		"Runtime error capture installed (hs.timer guards with slow-callback reports + console tee).")
+		"Runtime error capture installed (hs.timer guards with slow-callback reports, shell timing + console tee).")
 end
 
 _scope.install({

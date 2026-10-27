@@ -354,11 +354,48 @@ helpers.describe("field run: a run", function()
 			local timed = state.json(result_path("r14", 1, "field_network"))
 			helpers.assert_eq(timed.verdict, "timeout")
 			helpers.assert_eq(timed.codes[1], "deadline_" .. spec.step_by_id.field_network.deadline_seconds .. "s")
-			late("pass", { "too_late" })
+			-- The timeout does not stop the runner, so its own answer arrives later
+			-- (field run 2026-10-27 16:53:45: the Ollama pull failed on a digest
+			-- mismatch a minute after the timeout). That answer is expected and is
+			-- the only record of what happened: INFO with its verdict, not a warning.
+			local logger = package.loaded["infra.logger"]
+			local warnings, infos = {}, {}
+			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+			logger.info = function(_, fmt, ...) infos[#infos + 1] = string.format(fmt, ...) end
+			late("fail", { "digest_mismatch" })
 			state.advance(0)
 			helpers.assert_eq(state.json(result_path("r14", 1, "field_network")).verdict, "timeout",
 				"a late answer must not overwrite the timeout")
 			helpers.assert_eq(state.json(FOLDER .. "/results/r14/done.json").verdicts.diagnostics, "pass")
+			helpers.assert_eq(#warnings, 0, "an answer after a timeout is expected (field-run-late-answer)")
+			local logged = false
+			for _, line in ipairs(infos) do
+				if line:find("'field_network' answered fail (digest_mismatch) after its timeout", 1, true) then
+					logged = true
+				end
+			end
+			helpers.assert_true(logged, "the late verdict and codes must reach the log")
+		end)
+	end)
+
+	helpers.it("warns when a runner answers a step it already settled (field-run-double-answer)", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local warnings = {}
+			package.loaded["infra.logger"].warn = function(_, fmt, ...)
+				warnings[#warnings + 1] = string.format(fmt, ...)
+			end
+			local state = world({ field_network = function(_, finish)
+				finish("pass", {})
+				finish("fail", { "second" })
+			end })
+			started(FieldRun, state)
+			state.request({ schema = 1, request_id = "r14b", steps = Json.array({ "field_network" }) })
+			state.advance(0)
+			helpers.assert_eq(state.json(result_path("r14b", 1, "field_network")).verdict, "pass")
+			helpers.assert_eq(#warnings, 1, "a runner that answers twice is a defect")
+			helpers.assert_true(warnings[1]:find("answered twice; second answer fail (second)", 1, true) ~= nil,
+				"the warning must carry the dropped answer: " .. tostring(warnings[1]))
 		end)
 	end)
 

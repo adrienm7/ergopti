@@ -25,7 +25,7 @@ end
 helpers.describe("MLX warmup is generation-guarded against a stale callback", function()
 	helpers.it("reset_endpoints and mark_load_failed bump _warmup_gen", function()
 		local src = read_src()
-		local reset = src:find("function M.reset_endpoints()", 1, true)
+		local reset = src:find("function M.reset_endpoints(", 1, true)
 		local mark  = src:find("function M.mark_load_failed", 1, true)
 		helpers.assert_true(reset and src:find("_warmup_gen%s*=%s*_warmup_gen%s*%+%s*1", reset) ~= nil,
 			"reset_endpoints must bump _warmup_gen")

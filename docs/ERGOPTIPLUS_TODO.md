@@ -279,6 +279,65 @@ dev.
   for the first answer and reports the wait as `guardian_wait`. Mac confirms: field_lease passes
   after a boot that removes a stale guardian record, with `guardian_wait` when it waited.
 
+### Fixed on tmp/wip-mac-log-truth (to land on dev)
+
+From the whole-day log of the report `mac-2026-10-27_233356`. Boots and their builds: 16:28 a01da5dcc,
+16:48 and 16:54 228f79f27, 19:47 and 19:48 03ae7b5ca, 21:06 44d54126d, 22:32 c8e7bf1b2, 22:55 3b61fe8e3,
+23:34 d6590c69b; a line is charged to the driver that was running when it was written.
+
+- **L53** Fixed 1b3c4f2205. "Global external writer 'Watcher reload' refused ... not proved: true"
+  and "Menu reload request was refused; the source-file burst remains pending for retry: false"
+  (19:47:04, 21:06:55). Both came from drivers older than L45 (228f79f27, 03ae7b5ca) and both
+  reloads happened (boots 19:47:05 and 21:06:59): infra/file_watchers asked for the reload of the
+  pull, and the menu watcher's request for the same burst arrived while it was fencing the lease.
+  The retry was never lost: ": false" was the refused request's result printed after "pending for
+  retry". Left after L45: infra/file_watchers still warned when it lost the same race the other
+  way. Both watchers now ask `termination_coordinator.terminal_in_progress()` (INFO when a reload
+  or quit owns the process) and say "stays pending and is retried". Mac confirms: a `git pull`
+  during a session reloads once and logs no WARNING from either watcher.
+- **L54** Fixed 22ae753f48 (cause fixed by 9481ba78ac, L14). "registered ZERO mappings" only on the
+  16:28 to 16:54 boots, before L14; every later boot logs INFO "registered no mapping: its 2
+  section(s) are disabled" for the bundled `ergopti-demo` pack (`demo-phrases`, sections
+  `greetings` and `farewells`, off by default). Legitimate. The masked name stays (item 139); each
+  result line now adds the file's load ordinal and origin (`#2 (bundled, '<name>')`, `user` for a
+  file under the configuration folder), and a user's own readable file with no mapping yet is INFO.
+  Mac confirms: the boot shows `TOML mapping file #<n> (bundled, '<name>') registered no mapping`
+  and no ZERO warning.
+- **L55** Proved fixed by 9f4dea89b2 (L15), no change. "Duplicate Ergopti Karabiner revocation
+  completion ignored" appears only at 16:28:02 and 16:28:13 (a01da5dcc) and 19:47:04 (the 228f79f27
+  driver); the revocations of the fixed drivers at 19:47:21, 21:06:55, 22:31:34, 22:55:34 and
+  23:33:54 log none. The WARNING stays for a real double delivery.
+- **L56** Fixed 6c3804af6f. "Health-check: frame stream lost — switching back to startup probe
+  loop" every minute while the trackpad was idle (22:33 to 23:37) with a "one-shot" safety recycle
+  each time. The startup phase hands off to the health loop on its 30 s timeout with no frame, and
+  the health loop called that a lost stream and re-armed the probe. No frame yet is the dormant
+  state the kernel ends on the first touch; the health loop now only checks its watchers. Mac
+  confirms: after a boot with the trackpad untouched, one "Startup phase timeout" line and then no
+  gestures WARNING or recycle until the first touch.
+- **L57** Fixed abb8fc98a6. Every MLX stop of the field run (22:36, 22:59, 23:37) ended in "PGID
+  pending timeout (15s)", and every launch warned "Killing zombie ... via ps+awk", "Zombie kill
+  completed; stdout: none" and "Endpoint discovery state reset". The stop settlement (and an
+  adoption) called `reset_endpoints`, which always opened the PGID window that only a cold launch's
+  bash wrapper closes. Only the cold launch now passes `awaiting_pgid`; the reset is INFO and the
+  precautionary sweep warns only when it kills. Mac confirms: an MLX download-and-serve then stop
+  logs no PGID timeout and no zombie WARNING.
+- **L58** Fixed 19cbf7a1a4 (deadline cause fixed by 2790b3239a, L11). "Field run step 'ollama_model'
+  answered after it was settled; answer dropped" (16:53:45, 228f79f27): the fixed 240 s deadline
+  settled the step while the pull still verified its digest; the pull then failed on a digest
+  mismatch. The race stays by design (a timeout does not stop the runner), but its answer was a
+  WARNING that dropped the verdict. Now INFO "answered fail (...) after its timeout; the timeout
+  stands"; a runner answering a step it settled itself still warns. Mac confirms: no such WARNING.
+- **L59** Fixed 8b08121e0f for the sleep; the orphan key-ups stay open. "A character key stayed
+  down 589.8 s ... its key-up was lost" (19:46:46, 2 times): keys pressed around 16:55 before a
+  three-hour sleep behind the lock screen; the awake clock advanced 590 s. A sleep is now detected
+  between two key events (wall clock SLEEP_GAP_MS ahead of the awake clock), held keys are retired
+  at INFO and their key-ups right after are counted apart. Open [PHYS-M]: "A key-up reached the
+  keymap taps with no key-down before it (2 times)" at 16:55:18, 44 s after the 16:54:34 boot,
+  with 2 late events, no sleep and no tap outage; candidates are a secure text field (16:54:47
+  "Secure text field detected"), a key-down consumed by an earlier tap, or a main-thread hold.
+  Mac confirms: a sleep with a key held logs only the INFO line; an orphan key-up WARNING without a
+  sleep names the next lead.
+
 ### Open TODO
 
 - **L46** [CODE][PHYS-M] Two-finger scrolls switched tabs through the vertical three-finger swipe
@@ -323,7 +382,7 @@ dev.
   `; append: lock= journal= prepare= publish= write= clear= settle= release= ms; metadata_commands=<n>
 in <ms> ms` (`adapters/metadata_command_stats.lua` counts every metadata fork). Mac confirms: the
   next `Slow ingest tick` line names the stage; if `publish` and `settle` carry it with
-  metadata_commands=8 near the total, the fix is to stop forking for the private journal.
+  metadata_commands=8 near the total, the fix is to stop forking for the private journal. The 23:33 run measured a fork: four `mkdir -p` of the keystats start took 161 ms, about 40 ms each, so eight journal forks match the 0.3 to 0.7 s append. Fixed on `tmp/wip-mac-holds-2` (016ef6adc5): the driver-owned journal is published by `FileSystem.write_private_if_unchanged` (same lock, route, staging and compare-before-write, no carried ACL or xattrs); a flush forks nothing (`test_append_retry.lua`: 4 forks before, 0 after). Mac confirms: no `Slow ingest tick` and no `Main-thread hold` line from log_manager.lua during typing.
 - **L17** [CODE][PHYS-M] "Slow preferences save 1.9 to 2.1 s (prepare about 1.25 s, write about
   0.8 s; operations=293)" (new.txt 15:27:35 to 16:48:20, 6 times, also on 228f79f2). It is the
   2.06 s hold of startup_controller.lua:263 (15:28:57, 16:48:20). Next: profile `prepare` for 293
@@ -332,14 +391,14 @@ in <ms> ms` (`adapters/metadata_command_stats.lua` counts every metadata fork). 
 sparse= wrap= rows= gestures= llm= shortcuts= hotstrings= ms; proposed=<rows>; metadata_commands=<n>
 in <ms> ms` (the forks of the write phase). Not reproduced here: the save writes the whole sparse
   snapshot by design (the 293 are every non-default row, not the changed key). Mac confirms: the
-  next slow-save line names the prepare stage and how much of `write` the forks take.
+  next slow-save line names the prepare stage and how much of `write` the forks take. Not reproduced: the same whole-snapshot save over `_generated/config_template.toml` costs 58 ms of Lua here against 1291 ms of prepare on the Mac, so the gap is not the save's CPU. The slow-save line now also gives `lua_heap=<before>-><after> MB` (380a8d4445) to tell a garbage collection apart. Mac confirms: the next slow save names its prepare stage and whether the heap dropped.
 - **L18** [CODE] keystats start still holds the main thread 1.1 to 1.3 s from the deferred timer
   at menu_state.lua:531 (new.txt 16:28:06, 16:48:13, on 228f79f2). Next: move the SQLite open and
   offset replay of `kl.start` into slices like the recovery. The 22:55 report splits it: 150 to
   270 ms before `sqlite_writer` initializes, then 917 to 1047 ms between `rotation Initialized` and
   `Aggregate cache recovery continues in 8 ms slices` on the two boots that started a recovery;
   boots without a recovery hold 264 to 874 ms (16:54 to 22:55). Not changed on `tmp/wip-mac-holds`
-  (time box); the slicing remains the fix.
+  (time box); the slicing remains the fix. Fixed on `tmp/wip-mac-holds-2` (58f82e9fdc) after the 23:33 run (1300 ms: 161 ms of four `mkdir -p` forks, 696 ms of the one-time L19 index build, 392 ms of the synchronous first `ingest_once`, 48 ms of watchers): existing folders are answered from their attributes and the first ingest runs on the first 5 s tick, which flushes the outbox first (`cold_rollover_context_process.lua` asserts no synchronous ingest and no fork; 4 forks before). The index build happens once per cache and is done on this Mac. Mac confirms: `Keystats engine start (deferred)` under 100 ms and no hold from menu_state.lua:531.
 - **L19** Fixed 3d6479306a for the measured cause; one smaller residue stays
   open. log_manager.lua:1585 (the recovery slice timer) held the main thread 5288 ms right after
   "Typing ids restart ..." (new.txt 16:49:17 to 16:49:22). Measured on a synthetic cache built
@@ -409,7 +468,7 @@ application|app_name|title|context_watchers|secure_field>, TTL refresh <armed|no
   without key-up, 81 key-ups without key-down, 62 keys stuck over 3 s, one key stuck 518 s
   (new.txt 09:54 to 10:36, session totals); issue #104 shows 1 late key. Most late events follow
   the main-thread holds of L16 to L19. Next: after those, re-read the totals; lost key-ups without
-  a hold point at the Karabiner virtual HID path (big item 2).
+  a hold point at the Karabiner virtual HID path (big item 2). `tmp/wip-mac-holds-2` names every timer hold from 250 ms on (82c220c089: one `Main-thread hold of N ms in an hs.timer.<kind> callback (<site>)` evidence line per site and minute, with the `shell.<program>` fork phases of d0993e39e4 and the Lua heap); the 23:33 log counted 7 to 18 such holds per 5 minutes without a site. The menu rebuilt twice at every boot (591 then 513 ms); the login item state is now asked before the prime build (fec27c153e) and each refresh logs its requester at DEBUG.
 - **L25** Known limitation, plus one open bug. "Failed to enable 'Composer Check' —
   reason=process_failed" (new.txt 14:31:52, 16:48:44). The TIS probe (issue #104 and `_152936`)
   shows macOS 26.6.2 refuses it: register 0 and enable 0, but the source stays disabled, select
@@ -471,7 +530,7 @@ main.swift:1290 "will never be executed", OwnedSuspendedImageGuardian.swift:58-5
 closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swiftc to compile
   them.
 - **L34** [CODE] HotPath over budget: preview.rebuild 5.3 to 13.3 ms, hotstring.match 6.4 ms,
-  keydown 5.8 ms (new.txt 14:26 to 16:18). Low priority; profile with perf-profiling.
+  keydown 5.8 ms (new.txt 14:26 to 16:18). Low priority; profile with perf-profiling. Not reproduced on the later runs: the 21:16 hot-path summary reads keydown max 4.6 ms, preview.rebuild max 2.6 ms, hotstring.match max 0.2 ms, all within budget; no change.
 - **L41** Fixed bc33bfbc73 [PHYS-M]. Every native download stopped at stage
   `native_certificate_load` (19:47 run: the MLX `uv sync` staging failed 6 of 6 attempts with
   native receipt reason `certificate`, 19:48:49 to 19:51:26; 03_field_network tls and transfer `certificate`). This is
@@ -1459,6 +1518,39 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
 Record the commit, OS build, scale, layout and emulation state; report pass, fail or not executed
 per line. Use a disposable profile (`paths.toml` pointing at a scratch folder) for anything that
 writes configuration. Reload the driver from the working tree for dev-only fixes.
+
+### Web-view window toggle actions (`tmp/wip-webview-toggle-actions`)
+
+Maintainer decision of 2026-10-27: every Ergopti web-view page has a shortcut action in the shared
+catalogue (`_shared/modules/actions/actions.toml`, group "UI") that toggles it. Closed or hidden:
+open and focus; open behind another window: bring to front, never close; open and frontmost: close
+through the page's own close. Ten actions, all three OS: `open_metrics_typing`,
+`open_metrics_apps`, `open_hotstrings_editor`, `open_paths_editor` (existing ids, now toggles on
+macOS and Linux too), and new `open_hotstrings_settings`, `open_layout_manager`,
+`open_layer_editor`, `open_model_browser`, `open_changelog`, `open_healthcheck`. Not toggles, on
+purpose: onboarding (a shortcut would abandon a half-finished setup), the download window (a
+progress view owned by a running download), the release notes (a pane, not a window) and the
+contextual dialogs. Owners: macOS `ui/window_toggle.lua`, Linux `ui/webview_manager.lua`
+`toggle()`, Windows `GestureToggleOrFocusUI` (`modules/gestures/actions.ahk`). Pending
+coordination: the model selector rework (`tmp/wip-model-selector-page`) must keep
+`ui/model_browser` `window()`/`close()` (macOS) and the macOS `set_opener("model_browser", …)`
+line of `menu_llm/models_selector.lua`.
+
+For each OS, bind each of the ten actions to a keyboard shortcut (Shortcuts menu, keyboard slot or
+tap-hold picker) and press it three times: from closed it opens and has the focus; click another
+app's window so the page is covered, press again: it comes to the front and stays open; press once
+more while it is frontmost: it closes. Also minimize it, press: it comes back.
+
+- [ ] **Windows**: the ten actions above, including the WebView2-less fallbacks (native hotstring
+      editor, native hotstrings settings, native ListView model browser) when WebView2 is absent;
+      the close must run the page's own Close handler (no orphan WebView2 process in Task Manager).
+- [ ] **Mac**: the ten actions. The model browser's opener is registered when the AI menu is
+      built (the menu prime, a few seconds after a reload): press `open_model_browser` right
+      after a reload and with the AI off, and note any `window_toggle` ERROR naming a page with
+      no registered opener. A covered window must be presented, not closed (focus is read
+      through Accessibility).
+- [ ] **Linux** (no machine): GNOME Wayland and X11, the ten actions; GTK's is-active flag decides
+      "frontmost", so check that a page covered by another app is raised, not closed.
 
 ### Mac hardware session (prepared 27 October, run from a branch of dev)
 

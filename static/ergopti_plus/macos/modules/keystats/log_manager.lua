@@ -208,9 +208,16 @@ local function _today()
 	return os.date("%Y-%m-%d")
 end
 
---- mkdir -p equivalent.
+--- mkdir -p equivalent. An existing directory is answered from its attributes:
+--- each `mkdir -p` forks a shell from the Hammerspoon process and waited about
+--- 40 ms on the Mac, and keystats start ran four of them on every boot (L18).
+--- @param path string Directory pathname.
+--- @return boolean forked True when the shell command had to run.
 local function _mkdir_p(path)
+	local ok, mode = pcall(fs.attributes, path, "mode")
+	if ok and mode == "directory" then return false end
 	pcall(hs.execute, "mkdir -p " .. text_utils.shell_quote(path))
+	return true
 end
 
 --- Generates a UUID v4 (RFC 4122).
@@ -2294,8 +2301,10 @@ local function _init(core_state)
 	_state.today_idx = _state.today_idx or {}
 	_state.manifest  = _state.manifest  or {}
 
+	-- The first ingest waits for the first tick: run here it held the deferred
+	-- keystats start 260 to 390 ms on the Mac (L18). today.log keeps every event
+	-- meanwhile and the outbox is flushed at the start of that tick.
 	if not _ingest_timer then
-		Logger.pcall(LOG, M.ingest_once)
 		if not _start_ingest_timer() then error("ingest timer acquisition failed") end
 	end
 

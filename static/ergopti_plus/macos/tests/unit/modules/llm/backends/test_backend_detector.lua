@@ -22,6 +22,29 @@ local function fresh_detector(options)
 end
 
 helpers.describe("backend_detector.auto_default", function()
+	helpers.it("reads the native process architecture instead of forking uname", function()
+		local hs_stub = require("tests.stubs.hs")
+		local ok, err = pcall(function()
+			local det
+			hs_stub, det = fresh_detector()
+			package.loaded["adapters.system_info"] = nil
+			hs_stub.processInfo = { processID = 7001, arch = "x86_64" }
+			package.loaded["modules.llm.backend_detector"] = nil
+			det = require("modules.llm.backend_detector")
+			hs_stub.__set_exec("uname -m", "arm64\n")
+			hs_stub.__set_exec("sw_vers -productVersion", "14.5\n")
+			helpers.assert_eq(det.auto_default(), det.BACKEND_OLLAMA, "the native x86_64 answer wins")
+			for _, call in ipairs(hs_stub.__exec_calls) do
+				helpers.assert_true(not tostring(call):find("uname", 1, true),
+					"a native architecture must not fork uname (40 ms per fork on the Mac)")
+			end
+		end)
+		hs_stub.processInfo = { processID = 7001 }
+		package.loaded["adapters.system_info"] = nil
+		package.loaded["modules.llm.backend_detector"] = nil
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("returns mlx on arm64 + recent macOS", function()
 		local hs_stub, det = fresh_detector()
 		hs_stub.__set_exec("uname -m", "arm64\n")

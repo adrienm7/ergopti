@@ -403,6 +403,10 @@ function M.open(ctx)
 	return true
 end
 
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window() return _wv end
+
 --- Closes the model browser window if open.
 function M.close()
 	if _releasing_controller then return false end
