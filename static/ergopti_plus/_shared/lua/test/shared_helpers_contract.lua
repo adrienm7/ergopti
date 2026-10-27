@@ -120,7 +120,9 @@ function M.register(helpers)
 		end
 		local function keylayout(name, map_set)
 			return '<?xml version="1.1" encoding="UTF-8"?>\n<keyboard group="126" id="1" name="' .. name .. '">\n'
-				.. '<layouts><layout first="0" last="0" mapSet="' .. map_set .. '" modifiers="m"/></layouts>\n</keyboard>\n'
+				.. '<layouts><layout first="0" last="0" mapSet="' .. map_set .. '" modifiers="m"/></layouts>\n'
+				.. '<modifierMap id="m" defaultIndex="0"><keyMapSelect mapIndex="0"><modifier keys=""/></keyMapSelect></modifierMap>\n'
+				.. '<keyMapSet id="' .. map_set .. '"><keyMap index="0"><key code="0" output="a"/></keyMap></keyMapSet>\n</keyboard>\n'
 		end
 		local function check(text, layout, limit)
 			return Composer.check(settings, limit or 100000, text, layout, Json.decode)

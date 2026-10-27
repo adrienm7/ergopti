@@ -25,6 +25,7 @@
 --- ==============================================================================
 
 local Registry = require("layouts.registry")
+local Keylayout = require("layouts.keylayout")
 local TableUtil = require("table_util")
 
 local M = {}
@@ -89,31 +90,6 @@ end
 -- ===========================
 -- ===========================
 
-local ENTITIES = { lt = "<", gt = ">", amp = "&", quot = '"', apos = "'" }
-
---- Decodes the XML character references an attribute can hold.
---- @param value string
---- @return string
-local function decode_attribute(value)
-	return (value:gsub("&(#?x?%w+);", function(token)
-		if ENTITIES[token] then return ENTITIES[token] end
-		local hex = token:match("^#x(%x+)$")
-		local dec = token:match("^#(%d+)$")
-		local code = hex and tonumber(hex, 16) or dec and tonumber(dec, 10) or nil
-		if code and code >= 0 and code < 0x110000 then
-			if code < 0x80 then return string.char(code) end
-			if code < 0x800 then return string.char(0xC0 + math.floor(code / 0x40), 0x80 + code % 0x40) end
-			if code < 0x10000 then
-				return string.char(0xE0 + math.floor(code / 0x1000), 0x80 + math.floor(code / 0x40) % 0x40,
-					0x80 + code % 0x40)
-			end
-			return string.char(0xF0 + math.floor(code / 0x40000), 0x80 + math.floor(code / 0x1000) % 0x40,
-				0x80 + math.floor(code / 0x40) % 0x40, 0x80 + code % 0x40)
-		end
-		return nil
-	end))
-end
-
 --- Counts the characters of a UTF-8 text.
 --- @param text string
 --- @return number
@@ -157,12 +133,16 @@ function M.check(settings, max_file_bytes, declaration_text, keylayout, decode_j
 	if not keylayout:match("^<%?xml") or keylayout:find("<!ENTITY", 1, true) then
 		return refuse("the compiled layout is not a plain .keylayout")
 	end
-	local keyboard_name = keylayout:match('<keyboard[^>]-%sname="([^"]*)"')
-	if keyboard_name == nil or decode_attribute(keyboard_name) ~= name then
+	-- The one .keylayout reader: layouts.keylayout. It finds the default
+	-- <layout first="0"> and refuses a file whose map set or modifier map is undefined.
+	local parsed, parse_error = Keylayout.parse(keylayout)
+	if parsed == nil then
+		return refuse("the compiled layout is not a readable .keylayout: " .. tostring(parse_error))
+	end
+	if parsed.name ~= name then
 		return refuse("the compiled layout is not named after the composition")
 	end
-	local map_set = keylayout:match('<layout%s[^>]-mapSet="([^"]*)"')
-	if map_set ~= settings.id or not keylayout:find('<layout%s[^>]-first="0"') then
+	if parsed.map_set ~= settings.id then
 		return refuse("the compiled layout is not a composer product")
 	end
 	return { name = name, convention = declaration.keycode_convention }, nil, nil
