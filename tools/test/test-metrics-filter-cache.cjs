@@ -554,7 +554,8 @@ assert.equal(passed, 15, 'the orphan script check must execute');
 const { loadMetricsAppsPage } = require('./support/metrics-apps-page.cjs');
 
 /** Delivers through each actual host handler; it never computes metrics. */
-function publishLoadedAppsData(page, host, manifest, icons = {}, revision = 1) {
+function publishLoadedAppsData(page, host, manifest, icons = {}, revision = 1, categories = {}) {
+	const blob = { metrics_manifest: manifest, user_categories: categories, app_icons: icons };
 	if (host === 'windows') {
 		assert.equal(Object.keys(icons).length, 0, 'the actual Windows producer emits empty icon maps');
 		const listener = page.messageListeners.find((entry) => entry.name === 'message');
@@ -562,19 +563,17 @@ function publishLoadedAppsData(page, host, manifest, icons = {}, revision = 1) {
 		listener.callback({
 			data: {
 				type: 'prefetch',
-				blob: { metrics_manifest: manifest, user_categories: {}, app_icons: icons }
+				blob
 			}
 		});
 	} else if (host === 'linux') {
 		page.context.__hostBridgeResponse(
 			'metrics_apps_bridge',
 			false,
-			encodeURIComponent(
-				JSON.stringify({ metrics_manifest: manifest, user_categories: {}, app_icons: icons })
-			)
+			encodeURIComponent(JSON.stringify(blob))
 		);
 	} else {
-		page.context.publishMetricsAppsData(manifest, {}, icons, {
+		page.context.publishMetricsAppsData(manifest, categories, icons, {
 			manifest_revision: revision,
 			categories_revision: 1
 		});
@@ -2549,5 +2548,77 @@ assert.equal(
 	456,
 	'all archived-day, daylight-saving and timezone daily chart controls must execute'
 );
+
+const ribbonCategoryCases = [
+	{
+		name: 'plain control',
+		label: 'Research',
+		escaped: 'Research'
+	},
+	{
+		name: 'literal ampersand',
+		label: 'Research & Development',
+		escaped: 'Research &amp; Development'
+	},
+	{
+		name: 'balanced SVG markup',
+		label: 'Label </title><rect data-category-marker="1"/><title>',
+		escaped: 'Label &lt;/title&gt;&lt;rect data-category-marker=&quot;1&quot;/&gt;&lt;title&gt;'
+	},
+	{
+		name: 'literal attribute quotes',
+		label: '"quoted" & \'apostrophe\'',
+		escaped: '&quot;quoted&quot; &amp; &#039;apostrophe&#039;'
+	},
+	{
+		name: 'Unicode category',
+		label: 'Développement 🧪',
+		escaped: 'Développement 🧪'
+	}
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of ribbonCategoryCases) {
+		test(`${host} native category remains literal ribbon text: ${vector.name}`, () => {
+			const page = loadMetricsAppsPage(host);
+			for (const id of ['ribbon_container', 'ribbon_legend'])
+				page.elements.set(id, page.context.document.createElement('div'));
+			const manifest = {
+				'2026-10-27': {
+					Editor: {
+						app_time_ms: 60000,
+						chars: 10,
+						time: 1000,
+						hourly: { '09': { c: 10, time_ms: 60000 } }
+					}
+				}
+			};
+			publishLoadedAppsData(page, host, manifest, {}, 1, {
+				Editor: { type: vector.label, score: 0 }
+			});
+			const svg = page.elements.get('ribbon_container').innerHTML;
+			assert.equal(
+				(svg.match(/<rect /g) || []).length,
+				24,
+				'one native day renders its24 real hourly cells'
+			);
+			assert.ok(
+				svg.includes(`09h — ${vector.escaped} (`),
+				'custom native categories remain escaped literal tooltip text'
+			);
+			assert.ok(page.elements.get('ribbon_legend').innerHTML.includes(vector.escaped));
+			assert.equal(
+				svg.includes('<rect data-category-marker='),
+				false,
+				'native text cannot introduce SVG elements'
+			);
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false
+			);
+		});
+	}
+}
+assert.equal(ribbonCategoryCases.length, 5);
+assert.equal(passed, 471, 'all native ribbon category literal-text controls must execute');
 
 console.log(`${passed} passed, 0 failed.`);
