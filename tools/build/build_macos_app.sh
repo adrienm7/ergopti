@@ -188,7 +188,7 @@ check_dev_source_configuration() {
 			[ "${ERGOPTI_RELEASE:-false}" != true ] \
 				|| fail "ERGOPTI_DEV_SOURCE=1 is refused for a release build (ERGOPTI_RELEASE=true)."
 			[ -f "$REPO_ROOT/static/ergopti_plus/macos/init.lua" ] \
-				|| fail "Developer source mode needs $REPO_ROOT/static/ergopti_plus/macos/init.lua."
+				|| fail "Developer source mode needs the clone driver $REPO_ROOT/static/ergopti_plus/macos/init.lua"
 			;;
 		*) fail "ERGOPTI_DEV_SOURCE must be 0 or 1, not '$ERGOPTI_DEV_SOURCE'." ;;
 	esac
