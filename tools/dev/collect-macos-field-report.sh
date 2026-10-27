@@ -57,7 +57,7 @@ esac
 # A shallow clone (--depth 1) holds no common ancestor of dev and the field
 # branch, so a plain merge refuses "unrelated histories". Deepen both until the
 # merge base is known; full history is never downloaded.
-log "Fetching dev and bringing it into $branch…"
+log "Fetching dev and bringing it into ${branch}..."
 depth=50
 while :; do
 	git fetch -q --depth "$depth" origin dev || fail "git fetch of dev failed."
