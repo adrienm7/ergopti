@@ -100,7 +100,7 @@
 			"host": 1
 		},
 		"static/ergopti_plus/macos/ui/menu/menu_llm/models_manager_mlx_hf.lua": {
-			"host": 2
+			"host": 1
 		},
 		"static/ergopti_plus/windows/infra/bundle.ahk": {
 			"app_file_name": 1
