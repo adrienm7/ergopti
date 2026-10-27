@@ -46,13 +46,17 @@ function classifyGeneratedNativeArtifacts(sources) {
 	const builder = executableLines(sources[BUILDER]);
 	const required = /REQUIRED_FILES=\(([\s\S]*?)\n\)/.exec(driver);
 	const copy = driver.indexOf('copy_tree "${LINUX_SRC}/" "${BUILD_DIR}/linux/" --exclude vendor');
-	const generate = driver.indexOf('bash "${SCRIPT_DIR}/build-linux-native-output.sh"');
+	// The driver hands the backend build its own bundle's bin directory, so the
+	// generated library lands where the mandatory bundle check looks for it.
+	const generate = driver.indexOf(
+		'bash "${SCRIPT_DIR}/build-linux-native-output.sh" --output-directory "${BUILD_DIR}/linux/bin"'
+	);
 	const check = driver.indexOf('for f in "${REQUIRED_FILES[@]}"; do');
 	const requiredLoop = /for f in "\$\{REQUIRED_FILES\[@\]\}"; do\n([\s\S]*?)\ndone/.exec(driver);
 	const fatalCheck = /if \[ \$MISSING -gt 0 \]; then\n([\s\S]*?)\nfi/.exec(driver);
 	if (
 		!driver.includes('set -euo pipefail') ||
-		!driver.includes('BUILD_DIR="${REPO_ROOT}/build/linux"') ||
+		!driver.includes('BUILD_DIR="${ERGOPTI_LINUX_BUILD_DIR:-${REPO_ROOT}/build/linux}"') ||
 		copy < 0 ||
 		generate <= copy ||
 		check <= generate ||
