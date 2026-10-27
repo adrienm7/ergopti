@@ -72,3 +72,6 @@ _DCCLI_NativeAdmission(Phase) {
 }
 Test("Driver control CLI: actual Windows session admission requires native PowerShell (control-cli-native-session)",
 	_DCCLI_NativeAdmission.Bind("session"))
+
+Test("Driver control CLI: actual Windows result admission requires native PowerShell (control-cli-native-result)",
+	_DCCLI_NativeAdmission.Bind("result"))

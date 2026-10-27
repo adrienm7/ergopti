@@ -83,6 +83,60 @@ function Assert-DriverControlSession($Session, $Spec) {
 	}
 }
 
+function Assert-DriverControlResult($Result, $Spec) {
+	$malformed = 'The driver result is malformed.'
+	if (-not (Test-DriverControlMembers $Result @('schema', 'request_id', 'state', 'driver_pid'))) {
+		throw $malformed
+	}
+	$allowed = @('schema', 'request_id', 'state', 'driver_pid', 'successor_pid', 'reason', 'deadline')
+	foreach ($property in $Result.PSObject.Properties) {
+		if ($allowed -cnotcontains $property.Name) { throw $malformed }
+	}
+	if (-not (Test-DriverControlInteger $Result.schema) -or $Result.schema -ne $Spec.schema -or
+		$Result.request_id -isnot [string] -or $Result.state -isnot [string] -or $Spec.states -cnotcontains $Result.state -or
+		-not (Test-DriverControlInteger $Result.driver_pid) -or $Result.driver_pid -le 0) {
+		throw $malformed
+	}
+	$idMatch = [regex]::Match($Result.request_id, $Spec.request_id_pattern)
+	if (-not $idMatch.Success -or $idMatch.Index -ne 0 -or $idMatch.Length -ne $Result.request_id.Length) {
+		throw $malformed
+	}
+	$hasSuccessor = Test-DriverControlMembers $Result @('successor_pid')
+	$hasDeadline = Test-DriverControlMembers $Result @('deadline')
+	$hasReason = Test-DriverControlMembers $Result @('reason')
+	if ($hasSuccessor -and $null -ne $Result.successor_pid -and
+		(-not (Test-DriverControlInteger $Result.successor_pid) -or $Result.successor_pid -le 0)) {
+		throw $malformed
+	}
+	if ($hasDeadline -and (-not (Test-DriverControlInteger $Result.deadline) -or $Result.deadline -le 0)) {
+		throw $malformed
+	}
+	if ($hasReason -and ($Result.reason -isnot [string] -or $Spec.reasons -cnotcontains $Result.reason)) {
+		throw $malformed
+	}
+	switch -CaseSensitive ($Result.state) {
+		'requested' {
+			if (-not $hasSuccessor -or $hasReason) { throw $malformed }
+			if ($null -eq $Result.successor_pid) {
+				if (-not $hasDeadline) { throw $malformed }
+			} elseif ($hasDeadline) { throw $malformed }
+		}
+		'claimed' {
+			if (-not $hasSuccessor -or $null -eq $Result.successor_pid -or -not $hasDeadline -or $hasReason) { throw $malformed }
+		}
+		'completed' {
+			if (-not $hasSuccessor -or $null -eq $Result.successor_pid -or $hasDeadline -or $hasReason) { throw $malformed }
+		}
+		'refused' {
+			if (-not $hasReason -or $Result.reason -ceq $Spec.timeout_reason -or $hasSuccessor -or $hasDeadline) { throw $malformed }
+		}
+		'timeout' {
+			if (-not $hasReason -or $Result.reason -cne $Spec.timeout_reason -or $hasSuccessor -or $hasDeadline) { throw $malformed }
+		}
+		default { throw $malformed }
+	}
+}
+
 $sessionPath = Join-Path $folder $spec.files.session
 if (-not (Test-Path -LiteralPath $sessionPath -PathType Leaf)) {
 	Write-Outcome ([ordered]@{ state = 'unreachable'; detail = 'no driver session is published' })
@@ -168,16 +222,16 @@ $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMs)
 $last = $null
 while ([DateTime]::UtcNow -lt $deadline) {
 	if (Test-Path -LiteralPath $resultPath -PathType Leaf) {
-		$result = $null
-		try { $result = Get-Content -Raw -Encoding UTF8 -LiteralPath $resultPath | ConvertFrom-Json } catch { $result = $null }
-		if ($null -ne $result -and $result.request_id -eq $requestId) {
+		$result = Read-DriverControlObject $resultPath 'result'
+		Assert-DriverControlResult $result $spec
+		if ($result.request_id -ceq $requestId) {
 			$last = $result
-			if ($result.state -eq 'completed') { Write-Outcome $result; exit 0 }
-			if ($result.state -eq 'refused') { Write-Outcome $result; exit 1 }
-			if ($result.state -eq 'timeout') { Write-Outcome $result; exit 2 }
+			if ($result.state -ceq 'completed') { Write-Outcome $result; exit 0 }
+			if ($result.state -ceq 'refused') { Write-Outcome $result; exit 1 }
+			if ($result.state -ceq 'timeout') { Write-Outcome $result; exit 2 }
 			# A restart that cannot name its successor leaves a pending record with a
 			# deadline: past it, the answer is a timeout and never a completion.
-			if ($result.state -eq 'requested' -and $null -eq $result.successor_pid -and $null -ne $result.deadline -and
+			if ($result.state -ceq 'requested' -and $null -eq $result.successor_pid -and $null -ne $result.deadline -and
 				[DateTimeOffset]::UtcNow.ToUnixTimeSeconds() -gt [int64]$result.deadline) {
 				Write-Outcome ([ordered]@{ request_id = $requestId; state = 'timeout'; reason = $spec.timeout_reason; driver_pid = $driverPid })
 				exit 2
