@@ -7308,6 +7308,9 @@ function M.revoke(reason, on_done)
 		invoke_public_callback("revoke", on_done, ok == true, detail)
 	end
 	local function settle_join_if_ready()
+		-- Both halves may answer inside their own calls; the join then already
+		-- settled, and the trailing join below must not report it twice.
+		if callback_fired then return end
 		if not onboarding_done or not lease_done then return end
 		if onboarding_succeeded ~= true then
 			Logger.error(LOG, "Ergopti onboarding revocation failed: %s.",
