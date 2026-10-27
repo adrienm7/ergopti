@@ -56,8 +56,13 @@ const STRING_LITERAL = /"([^"\\\n]*)"|'([^'\\\n]*)'/g;
 // A string that names a log channel, a window or a stop label is a homonym of a key, found by
 // the syntax around it: `LOG = "x"`, `get_app_geometry("x")`, `Logger.info("x", ...)`,
 // `label = "x"`, `name = "x"`.
+// A menu GROUP or MODULE id is spelt like a section or a command too: `group_receiver("top_level", "x")`,
+// `module_rows("x")`, and the dispatch tables keyed by module name (`["x"] = _build_x`,
+// `["x"] = function() return module_rows("x") end`). A list of METHOD or DEPENDENCY names a
+// participant must provide (`for _, method in ipairs({ ... })`) is not a key list either.
 const HOMONYM_BEFORE =
-	/(?:\b(?:LOG|APP_NAME|MODULE_NAME|TAG)\s*=|\b(?:label|name)\s*=|\b(?:get_app_geometry|ControllerPool\.reserve|Logger\.\w+)\s*\()\s*$/;
+	/(?:\b(?:LOG|APP_NAME|MODULE_NAME|TAG)\s*=|\b(?:label|name)\s*=|\b(?:get_app_geometry|ControllerPool\.reserve|Logger\.\w+|module_rows)\s*\(|\bgroup_receiver\(\s*"[^"]*"\s*,|\b(?:method|dependency)\s+in\s+ipairs\(\{[^}]*)\s*$/;
+const HOMONYM_AFTER = /^\]\s*=\s*(?:_build_\w+\s*,|function\(\)\s*return module_rows\()/;
 const REQUIRE_BEFORE = /\brequire\s*(?:\(\s*|,\s*)?$/;
 
 // ==========================================
@@ -115,6 +120,7 @@ function countLiterals(text, words) {
 			if (!words.has(m[1] ?? m[2])) continue;
 			if (REQUIRE_BEFORE.test(line.slice(0, m.index))) continue;
 			if (HOMONYM_BEFORE.test(line.slice(0, m.index))) continue;
+			if (HOMONYM_AFTER.test(line.slice(m.index + m[0].length))) continue;
 			count++;
 		}
 	}
@@ -217,10 +223,16 @@ function selfTest(words) {
 		'x = "min_words" -- config-key-literal-ok: a prompt token',
 		'-- config-key-literal-ok: the next line is a homonym',
 		'local tokens = { "max_words" }',
-		'local again = "max_words"'
+		'local again = "max_words"',
+		'local receive = Menu.group_receiver("top_level", "tap_holds")',
+		'return module_rows("tap_holds")',
+		'["tap_holds"]       = _build_tap_holds,',
+		'["tap_holds"]       = function() return module_rows("tap_holds") end,',
+		'for _, method in ipairs({ "scope_acquire", "scope_restore" }) do',
+		'for _, field in ipairs({ "private_filter_enabled" }) do'
 	].join('\n');
 	const n = countLiterals(probe, words);
-	if (n !== 4) throw new Error(`self-test: expected 4 counted literals in the probe, got ${n}`);
+	if (n !== 5) throw new Error(`self-test: expected 5 counted literals in the probe, got ${n}`);
 	const { grown, stale } = compare({ 'a.lua': 2, 'b.lua': 1 }, { 'a.lua': 1, 'c.lua': 4 });
 	if (grown.length !== 2 || stale.length !== 1)
 		throw new Error('self-test: compare() no longer reports a rise, a new file and headroom');
