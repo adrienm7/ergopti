@@ -11,6 +11,9 @@ const { bashExecutable } = require('../lib/git-bash.cjs');
 const generator = require('../codegen/codegen-linux-native-runtime.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const DRIVER = 'static/ergopti_plus/linux';
+// The installer's functions print through its message reader; a harness that
+// runs them sources the genuine one, as install.sh does.
+const MESSAGES_READER = require('./lib/shell-messages-fixture.cjs').readerSource();
 const SHARED = 'static/ergopti_plus/_shared';
 const source = JSON.parse(fs.readFileSync(path.join(ROOT, generator.SOURCE), 'utf8'));
 const read = (name) => fs.readFileSync(path.join(ROOT, name), 'utf8');
@@ -73,6 +76,7 @@ function portable() {
 					const result = spawnSync(bashExecutable(), ['-s'], {
 						input:
 							'set -eu\n' +
+							MESSAGES_READER +
 							functions +
 							'\nSRC_DRIVER=' +
 							JSON.stringify(sourceRoot) +
@@ -238,6 +242,7 @@ function portable() {
 						const result = spawnSync(bashExecutable(), ['-s'], {
 							input:
 								'set -u\n' +
+								MESSAGES_READER +
 								`SRC_DRIVER='${path
 									.join(ROOT, DRIVER)
 									.replaceAll('\\', '/')
@@ -370,6 +375,7 @@ function portable() {
 			const result = spawnSync(bashExecutable(), ['-s'], {
 				input:
 					'set -u\n' +
+					MESSAGES_READER +
 					actualHarness +
 					'\n' +
 					`_detect_pkg_manager() { echo ${manager}; }\n` +
