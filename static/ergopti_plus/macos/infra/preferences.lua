@@ -1333,10 +1333,13 @@ local VALUE_LUA_TYPE = { array = "table", feature = "table" }
 --- @return string|nil reason Closed refusal cause when flat is nil: invalid_path,
 ---   publication_in_flight, schema_owner_unavailable, schema_refused, unreadable,
 ---   undecodable, section_shape, outdated_keys, value_type, value_out_of_range or raised.
+--- @return string|nil key The config.toml path of the refused value ("layout.pause_switch_enabled")
+---   for value_type and value_out_of_range: the 2026-10-27 19:47 field run named value_type
+---   on every regeneration and nothing said which key held it. Never the value itself.
 function M.current_view(prefs_file, tolerate_outdated)
 	if type(prefs_file) ~= "string" or prefs_file == "" then return nil, nil, "invalid_path" end
 	if _owned_publications[prefs_file] then return nil, nil, "publication_in_flight" end
-	local called, values, source, reason = pcall(function()
+	local called, values, source, reason, key_path = pcall(function()
 		local current, refusal = classify_source(prefs_file)
 		if not current then return nil, nil, refusal end
 		if current.status == "absent" then return {}, current end
@@ -1360,17 +1363,17 @@ function M.current_view(prefs_file, tolerate_outdated)
 				local path = spec.sec .. "." .. (spec.path and (spec.path .. ".") or "") .. (spec.key or key)
 				local entry = Manifest.find_entry_by_path(path)
 				if entry and entry.type ~= "enum" and type(value) ~= (VALUE_LUA_TYPE[entry.type] or entry.type) then
-					return nil, nil, "value_type"
+					return nil, nil, "value_type", path
 				end
 				if entry and not ConfigOutdated.manifest_value_fits(entry, value, "hs", SCALAR_VALUE_RULES[key]) then
-					return nil, nil, "value_out_of_range"
+					return nil, nil, "value_out_of_range", path
 				end
 			end
 		end
 		return flat, current
 	end)
 	if not called then return nil, nil, "raised" end
-	if values == nil then return nil, nil, reason end
+	if values == nil then return nil, nil, reason, key_path end
 	return values, source
 end
 
