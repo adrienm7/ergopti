@@ -2,6 +2,7 @@
 
 'use strict';
 const { scriptTokens } = require('./script-source.cjs');
+const { COMMAND } = require('./_generated/config_keys.cjs');
 
 /** Finite necessary Layout-owner evidence; it does not certify native TIS execution. */
 function nativeLayoutTemplatePublication(source, section, definition, ownership) {
@@ -539,7 +540,7 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 		return (
 			definition.length === 1 &&
 			definition[0].type === 'check' &&
-			definition[0].id === 'layout_native_select' &&
+			definition[0].id === COMMAND.LAYOUT_NATIVE_SELECT &&
 			definition[0].caption_source === 'native' &&
 			require('node:util').isDeepStrictEqual(definition[0].checked_when, [
 				'layout_native_selected'
@@ -585,7 +586,9 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 			definition.length !== 1 ||
 			definition[0].type !== installKinds[section] ||
 			definition[0].id !==
-				(section === 'layout_bundle_installed' ? 'layout_installed_caption' : 'layout_install')
+				(section === 'layout_bundle_installed'
+					? 'layout_installed_caption'
+					: COMMAND.LAYOUT_INSTALL)
 		)
 			return false;
 		const command = installKinds[section] === 'label' ? '{}' : '{ layout_install = do_install }';
@@ -614,10 +617,10 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 	const kinds = {
 		layout_bundle_in_list: ['label', 'layout_in_list_caption'],
 		layout_bundle_update_install_first: ['label', 'layout_update_install_first_caption'],
-		layout_bundle_upgrade: ['command', 'layout_upgrade_list'],
-		layout_bundle_upgrade_to: ['command', 'layout_upgrade_list'],
+		layout_bundle_upgrade: ['command', COMMAND.LAYOUT_UPGRADE_LIST],
+		layout_bundle_upgrade_to: ['command', COMMAND.LAYOUT_UPGRADE_LIST],
 		layout_bundle_variant_added: ['label', 'layout_added_variant_caption'],
-		layout_bundle_variant_add: ['command', 'layout_enable_variant'],
+		layout_bundle_variant_add: ['command', COMMAND.LAYOUT_ENABLE_VARIANT],
 		layout_bundle_variant_parent: ['group', 'layout_variant_choices'],
 		layout_bundle_install_first: ['label', 'layout_install_first_caption']
 	};

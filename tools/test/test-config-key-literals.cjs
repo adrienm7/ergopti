@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Raw Config-Key and Command-Id Literal Ratchet
  * DESCRIPTION:
- * Counts, per driver source file, the string literals that spell a
+ * Counts, per driver or tool source file, the string literals that spell a
  * configuration key or a menu command id by hand instead of reading the
  * generated constant (`config_keys.lua`, `_generated/config_keys.js`,
  * `_generated/config_keys.ahk`). The committed baseline records today's
@@ -43,7 +43,9 @@ const { allOutputs } = require('../build/generators.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BASELINE = 'tools/lint/config-key-literal-baseline.json';
-const SCANNED_EXTENSIONS = /\.(lua|ahk|js)$/;
+const SCANNED_EXTENSIONS = /\.(lua|ahk|js|cjs|mjs)$/;
+// The drivers and the Node tools: a tool that spells a key by hand drifts from the schema the same way.
+const SCANNED_ROOTS = ['static/ergopti_plus', 'tools'];
 // Tests spell keys on purpose (they assert the spelling); vendored code is not ours.
 const EXCLUDED = /(^|\/)(tests|test|vendor|node_modules)\//;
 const COMMENT_LINE = /^\s*(--|;|\/\/|\*|\/\*)/;
@@ -134,7 +136,7 @@ function countLiterals(text, words) {
  */
 function scan(words) {
 	const generated = new Set(allOutputs());
-	const files = execFileSync('git', ['ls-files', '-z', 'static/ergopti_plus'], { cwd: ROOT })
+	const files = execFileSync('git', ['ls-files', '-z', ...SCANNED_ROOTS], { cwd: ROOT })
 		.toString('utf8')
 		.split('\0')
 		.filter((f) => SCANNED_EXTENSIONS.test(f) && !EXCLUDED.test(f) && !generated.has(f))
@@ -233,6 +235,11 @@ function selfTest(words) {
 	].join('\n');
 	const n = countLiterals(probe, words);
 	if (n !== 5) throw new Error(`self-test: expected 5 counted literals in the probe, got ${n}`);
+	if (
+		!SCANNED_ROOTS.includes('tools') ||
+		!['tools/x.cjs', 'tools/x.mjs'].every((f) => SCANNED_EXTENSIONS.test(f))
+	)
+		throw new Error('self-test: the Node tools must stay under the ratchet');
 	const { grown, stale } = compare({ 'a.lua': 2, 'b.lua': 1 }, { 'a.lua': 1, 'c.lua': 4 });
 	if (grown.length !== 2 || stale.length !== 1)
 		throw new Error('self-test: compare() no longer reports a rise, a new file and headroom');

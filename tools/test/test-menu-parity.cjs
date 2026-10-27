@@ -8447,9 +8447,12 @@ module.exports.receivingParser = luaPublicationParser;
 	const actualRequire = Module.createRequire(bindingFile);
 	receivingModule.require = (name) => {
 		assert(
-			['./script-source.cjs', './menu-native-personal-info-binding.cjs', 'node:util'].includes(
-				name
-			),
+			[
+				'./script-source.cjs',
+				'./_generated/config_keys.cjs',
+				'./menu-native-personal-info-binding.cjs',
+				'node:util'
+			].includes(name),
 			'producer receiving refuses an unreviewed import: ' + name
 		);
 		return actualRequire(name);
