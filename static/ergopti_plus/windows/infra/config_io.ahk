@@ -2036,7 +2036,7 @@ ReadScriptShortcutsConfig() {
 		global ScriptShortcutChordsOn
 		; Authored preferences retain the canonical manifest/source-kind decision;
 		; detached runtime candidates keep their strict Boolean contract.
-		if !ConfigTomlTryReadBootValue(_IniCache, "shortcuts.script_control", "chords_enabled", &Raw)
+		if !ConfigTomlTryReadBootValue(_IniCache, ConfigKey.SHORTCUTS_SCRIPT_CONTROL, "chords_enabled", &Raw)
 				Raw := IniCacheGet(_IniCache, "shortcuts.script_control", "chords_enabled")
 		if (Raw != "_")
 				ScriptShortcutChordsOn := _FeatureStateValidateBoolean(Raw, "shortcuts.script_control.chords_enabled")
