@@ -31,25 +31,25 @@ a sealed Windows updater source, reseal with
 
 ## Handover of 2026-10-26 (read first if the session was lost)
 
-- **State.** dev ef7d7c6f54 is linear and pushed; every push of dev had its CI cancelled (a dev push builds a
-  release). Latest stable release: v1.0.6. A full CI on ef7d7c6f54 was dispatched on `tmp/preflight-dev` at
-  21:11 UTC: read it first. It carries the fixes for the previous full run's reds (Git 2.55 packed fixture
-  objects, Linux fixtures asserting TMPDIR, children run with `-u LUA_CPATH`, sqlite3/GLib in the distro rows,
-  the failure excerpt that hid the real Linux assertion). Expected reds: Windows unit lots
-  `config-scope-features`, `meta`, `keymap-gestures` (PC work below).
-- **Integrated from the ChatGPT fix branches** (fix/linux, fix/macos, fix/windows, up to 26 Oct 20:00 UTC).
-  Their per-branch seal refresh commits are never integrated: reseal once on dev instead. fix/linux
-  a37d38dd16 (event-loop pumping) is still theirs to rebase.
-- **Agent work in flight (Linux/macOS only, no AHK)**, each backed up on a remote `tmp/wip-*` branch; if lost,
-  redo from the spec:
-  - `tmp/wip-todo-af`: AppImage closure check and distro sweep (1c34b40594, not in dev), then PAR-65 phase 2
-    (request chain, token budget, live prompt, info-bar text behind HttpClient/TimerScheduler/TooltipRenderer
-    ports, with transcript vectors).
-  - `tmp/wip-todo-ae`: PAR-67 write-statement catalogue with typed slots (one family per commit, old and new
-    statements executed on the same SQLite fixture and compared).
-  - `tmp/wip-todo-ag`: storage dir 0700 (ec2a203c1b) and PAR-74 constant swaps (5d770c62cf, c767d7ae20,
-    4dcf9fb2e3, 51016ca9e2), not in dev; then pin gates that read `ConfigKeys.*` as the literal, structural
-    homonym recognition in the lint, missing generated keys, further burn-down.
+- **State.** dev 34ff85e515 is linear and pushed; every push of dev had its CI cancelled (a dev push builds a
+  release). Latest stable release: v1.0.6. A full CI on 34ff85e515 was dispatched on `tmp/preflight-dev` at
+  00:12 UTC on 27 October: read it first. It carries the fixes for every red of the previous full run
+  40402212463 (pointer-dismiss stand-in for 14 Windows lots, the metrics-pause meta check, the Apps page fixture
+  assets, the Linux allocation and find-fallback tests, the macOS 26 App Cloner XCTest, the tooltip page census).
+  Expected reds: none outside the Windows unit lots `config-scope-features`, `meta`, `keymap-gestures` if they
+  still fail (PC work below).
+- **Integrated from the ChatGPT fix branches** (fix/linux, fix/macos, fix/windows, up to 26 Oct 23:00 UTC).
+  Their per-branch seal refresh commits are never integrated: reseal once on dev instead.
+- **Agent work in flight (Linux/macOS only)**, each backed up on a remote `tmp/wip-*` branch; if lost, redo
+  from the spec:
+  - `tmp/wip-todo-af`: PAR-65 phase 3 (both engines replay `request_plan_engine_transcripts.json` through
+    recording ports, macOS prediction tooltip adapter), then init-time port injection on macOS and
+    `Ports.check` at engine init.
+  - `tmp/wip-todo-ae`: PAR-76 (a) separator rule shared; then (b) macOS hotstring injection converges on the
+    shared engine (maintainer decisions: Windows end-character behaviour, cascade typed once) and (c) a shared
+    `.keylayout` parser on a canonical JSON schema consumed by the Linux converter.
+  - `tmp/wip-todo-ag`: PAR-48 done (95 keys translated in 19 locales, shrink-only equal-to-English gate);
+    then the drift-guard symlink fix and PAR-41 (one shortcut model) without AHK edits.
 - **Integration procedure** (each batch): fetch `origin/fix/{linux,macos,windows}`; list commits whose subject
   is not on dev; cherry-pick them on a local `integ/*` branch from dev (skip seal refresh commits; on a
   conflict prefer dev when it already fixed the same thing, otherwise merge both by hand); renumber
@@ -591,8 +591,11 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 - [ ] **PAR-45. Notifications: one behaviour for toggles and refusals.** [CODE] Done on macOS and Linux
       (shared `feature_notice.lua`, Linux quit refusal). Left: Windows `NotifyFeature(label, enabled)` around
       `NotifierSend` at the same call sites, and a Windows quit-refusal path firing `notify.quit_refused`.
-- [ ] **PAR-48. Review values equal to English in each locale.** [CODE] 263-385 per locale and about 30 in
-      `fr` (`sg_actions.sticky_*`, `shortcuts.altgr*`). Triage through the i18n skill. Audit I3.
+- [x] **PAR-48. Review values equal to English in each locale.** [CODE] Done on `tmp/wip-todo-ag`: 95 keys
+      translated in 19 locales, sticky and leftover labels, a shrink-only gate in
+      `test-locale-catalogue-complete.cjs` with `tools/lint/locale-identical-to-english-allowlist.json` and
+      `tools/locale/report-identical-to-english.cjs`. Left: a native review of the long `ui_typing.tooltip_*`
+      texts; on the PC re-run the Windows menu caption tests (`menu.llm.backend_unknown` changed).
 - [ ] **PAR-52. Release notes on macOS and Linux update windows.** [CODE] Done on macOS and Linux
       (80a5a650a6): shared `release_notes/pane.js` in the `update_check` page, repository-only links. Left:
       the Windows host (section "Windows side"), a visual check on a Mac and a Linux desktop.

@@ -7,7 +7,11 @@ answer once, then move the answered line below.
 
 ## Open
 
-None. The next batch goes here, each line naming the default taken meanwhile.
+- **"Sticky" in French and Latin-script locales:** the sticky-modifier labels keep the English "Sticky", as
+  the existing `menu.tapholds.sticky_*` strings do. Default meanwhile: kept. Use a French term such as
+  "rémanent" instead?
+- **Dutch "Rolls":** `category.rolls` and `hs_config.cat_rolls` keep "Rolls" (the Dutch "Rollen" means
+  "roles"). Default meanwhile: kept. Another Dutch word?
 
 ## Answered
 
