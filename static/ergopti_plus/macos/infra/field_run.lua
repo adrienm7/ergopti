@@ -18,14 +18,20 @@
 --- 3. One result per step: verdict, closed codes, timings, the step's own
 ---    report and the log lines written while it ran. A step is settled once,
 ---    by its runner or by its deadline, whichever comes first; a late answer
----    is logged and dropped.
+---    is logged and dropped. A download step (progress_max_seconds) is judged
+---    by its progress instead of the wall clock: it times out only after a
+---    full deadline without progress, or at its bound.
 --- 4. Nothing faked. A step that needs a person (typing, a permission prompt)
 ---    is reported with that verdict and its reason and is not run.
 --- 5. The user's configuration is snapshot before the first step and compared
 ---    after the last; anything a step changed is put back and named in the
 ---    config_guard result, which then fails.
---- 6. A run cut short by a reload is closed at the next start: its done file
----    says interrupted, so the collector never waits for a run that is gone.
+--- 6. A run never reloads itself: while one runs, the auto-reload watchers hold
+---    a source-change reload (M.holds_reload) and name the paths they hold.
+---    A reload or quit that still happens (the menu, a person) closes the run
+---    at teardown with its kind and reason; a run cut short without teardown is
+---    closed at the next start. Either way the done file says interrupted, so
+---    the collector never waits for a run that is gone.
 --- ==============================================================================
 
 local M = {}
@@ -69,6 +75,14 @@ local function name_set(list, where)
 		set[item] = true
 	end
 	return set
+end
+
+--- The longest a step may run: its progress bound for a download step, its
+--- deadline otherwise.
+--- @param step table Step declaration.
+--- @return integer seconds
+function M.step_bound_seconds(step)
+	return step.progress_max_seconds or step.deadline_seconds
 end
 
 --- Validates the decoded declaration; a malformed one stops the caller.
@@ -126,6 +140,13 @@ function M.validate(spec)
 		if not is_integer(step.deadline_seconds) or step.deadline_seconds < 1 then
 			error("field run: step " .. step.id .. " needs a positive deadline", 2)
 		end
+		-- A download step is judged by its progress, not by the wall clock: its
+		-- deadline is the longest silence it may keep, and progress_max_seconds
+		-- bounds the whole step however steadily it advances.
+		if step.progress_max_seconds ~= nil and (step.kind ~= "ai" or not is_integer(step.progress_max_seconds)
+			or step.progress_max_seconds < step.deadline_seconds) then
+			error("field run: step " .. step.id .. " needs progress_max_seconds of at least its deadline", 2)
+		end
 		if step.person ~= nil and (not spec.verdict_set[step.person] or type(step.reason) ~= "string") then
 			error("field run: step " .. step.id .. " names an unknown person verdict or no reason", 2)
 		end
@@ -133,6 +154,14 @@ function M.validate(spec)
 	end
 	if type(spec.guard_step) ~= "string" or spec.step_by_id[spec.guard_step] then
 		error("field run: guard_step must name a step outside the requestable list", 2)
+	end
+	-- The default request covers every step at its bound, so a slow but
+	-- progressing download is never skipped by the request's own deadline.
+	local bound_total = 0
+	for _, step in ipairs(spec.steps) do bound_total = bound_total + M.step_bound_seconds(step) end
+	if deadline.default < bound_total then
+		error("field run: deadline_seconds.default is below the sum of the step bounds ("
+			.. bound_total .. " s)", 2)
 	end
 	return spec
 end
@@ -388,13 +417,35 @@ function Session:queue_request()
 	end)
 end
 
---- Stops watching and withdraws the readiness file; a running run is abandoned
---- and closed as interrupted by the next start.
+--- Closes the running run as interrupted, naming what cut it short.
+--- @param cause table|nil { kind, reason } of the terminal transition.
+function Session:close_running(cause)
+	local run = self.run
+	if run == nil or run.abandoned then return end
+	run.abandoned = true
+	run.cancel_timers()
+	local kind = type(cause) == "table" and safe_code(cause.kind) or nil
+	local reason = type(cause) == "table" and safe_code(cause.reason) or nil
+	local step = run.current_step or "none"
+	self:publish(run.dir .. "/" .. self.spec.files.done, { schema = self.spec.schema,
+		request_id = run.request.request_id, pid = self.pid, interrupted = true,
+		cause = { kind = kind or "unknown", reason = reason or "unknown", step = step },
+		started_at = run.started_at, finished_at = self.ports.iso_now(),
+		verdicts = run.verdicts, order = Json.array(run.order) })
+	self.ports.remove(self:path("running"))
+	Logger.warn(LOG, "Field run %s cut short by a %s (%s) during step '%s'; closed as interrupted.",
+		run.request.request_id, kind or "teardown", reason or "no reason", step)
+	self.run = nil
+end
+
+--- Stops watching and withdraws the readiness file; a running run is closed
+--- as interrupted, with the cause when the caller knows it.
+--- @param cause table|nil { kind, reason } of the terminal transition.
 --- @return boolean stopped
-function Session:stop()
+function Session:stop(cause)
 	self.active = false
 	if self.pending then pcall(self.ports.cancel, self.pending); self.pending = nil end
-	if self.run then self.run.abandoned = true; self.run.cancel_timers() end
+	self:close_running(cause)
 	local stopped = true
 	if self.watcher then
 		local ok, result = pcall(function() return self.watcher:stop() end)
@@ -517,10 +568,14 @@ function Session:run_step(index, step, continue)
 		self:record(index, step, { verdict = "skip", codes = { "global_deadline" }, elapsed_ms = 0 })
 		return continue()
 	end
-	local deadline_ms = math.min(step.deadline_seconds * 1000, left_ms)
+	local stall_ms = step.deadline_seconds * 1000
+	local deadline_ms = math.min(M.step_bound_seconds(step) * 1000, left_ms)
+	local progress_aware = step.progress_max_seconds ~= nil
 	local ring_before = ports.log_ring()
 	local started_ms, started_at = ports.now_ms(), ports.iso_now()
 	local settled, timer = false, nil
+	local last_mark = progress_aware and ports.progress_mark() or nil
+	run.current_step = step.id
 	Logger.info(LOG, "Field run step %d/%d '%s' started.", index, #run.request.steps, step.id)
 	local function settle(verdict, codes, report)
 		if settled then
@@ -541,12 +596,33 @@ function Session:run_step(index, step, continue)
 			log_window = { lines = Json.array(lines), truncated = truncated } })
 		continue()
 	end
-	timer = ports.after(deadline_ms / 1000, function()
-		if timer then run.timers[timer] = nil end
-		timer = nil
-		settle("timeout", { "deadline_" .. math.floor(deadline_ms / 1000) .. "s" })
-	end)
-	if timer then run.timers[timer] = true end
+	-- A fixed step times out at its deadline. A download step is checked once
+	-- per silence window: progress since the last check grants another window,
+	-- up to its bound; a full window without progress is a stall.
+	local function arm(seconds)
+		timer = ports.after(seconds, function()
+			if timer then run.timers[timer] = nil end
+			timer = nil
+			if settled then return end
+			local elapsed_ms = ports.now_ms() - started_ms
+			if not progress_aware then
+				return settle("timeout", { "deadline_" .. math.floor(deadline_ms / 1000) .. "s" })
+			end
+			if elapsed_ms >= deadline_ms then
+				return settle("timeout", { "bound_" .. math.floor(deadline_ms / 1000) .. "s" })
+			end
+			local mark = ports.progress_mark()
+			if mark == nil or mark == last_mark then
+				return settle("timeout", { "stalled_" .. math.floor(stall_ms / 1000) .. "s" })
+			end
+			last_mark = mark
+			Logger.debug(LOG, "Field run step '%s' still progressing after %d s; deadline extended.",
+				step.id, math.floor(elapsed_ms / 1000))
+			arm(math.min(stall_ms, deadline_ms - elapsed_ms) / 1000)
+		end)
+		if timer then run.timers[timer] = true end
+	end
+	arm(math.min(progress_aware and stall_ms or deadline_ms, deadline_ms) / 1000)
 	local ran, err = pcall(ports.run_step, step, function(verdict, codes, report)
 		settle(verdict, codes, report)
 	end)
@@ -667,11 +743,19 @@ function M.start(opts)
 	return true
 end
 
+--- Reports whether a field run is running: the auto-reload watchers hold a
+--- source-change reload meanwhile, so a run never reloads itself.
+--- @return boolean running
+function M.holds_reload()
+	return _session ~= nil and _session.run ~= nil and not _session.run.abandoned
+end
+
 --- Retires the field run watcher.
+--- @param cause table|nil { kind, reason } of the terminal transition, if any.
 --- @return boolean stopped
-function M.stop()
+function M.stop(cause)
 	if _session == nil then return true end
-	local stopped = _session:stop()
+	local stopped = _session:stop(cause)
 	if stopped then
 		_session = nil
 		Logger.info(LOG, "Developer field run watcher retired.")
