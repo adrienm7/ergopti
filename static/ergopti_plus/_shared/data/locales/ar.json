@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "الترتيب الأصلي",
 	"menu.layout.number_row_digits": "الأرقام أولًا",
 	"menu.layout.number_row_symbols": "الرموز أولًا",
-	"platform_reason.number_row_override_unsupported": "غير مدعوم: يحتفظ هذا المشغّل بصف الأرقام الأصلي للنظام، ولا يمكن فرض الأرقام أو الرموز.",
+	"platform_reason.number_row_override_unsupported": "ليس على هذا النظام بعد: يكتب التخطيط المثبّت في النظام صف الأرقام. يخطط Ergopti لإعادة كتابة مفاتيحه هنا؛ اليوم وحده Windows، الذي يحاكي التخطيط، يضع الأرقام أو الرموز أولًا.",
 	"platform_reason.number_row_live_session": "غير متاح: جلسة X11 وحدها تطبّق هذا فورًا. تحتفظ هذه الجلسة بتخطيطها الحالي، وقد تم حفظ اختيارك.",
 	"platform_reason.number_row_live_no_layout": "غير متاح: ثبّت أولًا تخطيط ErgoptiPlus للوحة المفاتيح؛ فهذا الاختيار يغيّر التخطيط الذي تستخدمه.",
 	"layouts.linux_rows_not_applied": "تم حفظ اختيار صف الأرقام، لكن تعذّر تحديث تخطيط لوحة المفاتيح الجاري استخدامه.",

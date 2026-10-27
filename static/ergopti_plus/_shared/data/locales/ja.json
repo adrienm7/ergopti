@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "システムの順序",
 	"menu.layout.number_row_digits": "数字を優先",
 	"menu.layout.number_row_symbols": "記号を優先",
-	"platform_reason.number_row_override_unsupported": "未対応: このドライバーはシステムの数字列を維持します。数字や記号を強制することはできません。",
+	"platform_reason.number_row_override_unsupported": "このシステムではまだ利用できません: 数字の列はシステムにインストールされた配列が入力します。Ergopti はここでそのキーを打ち直す予定です。現在、数字や記号を先にできるのは、配列をエミュレートする Windows だけです。",
 	"platform_reason.number_row_live_session": "利用不可: 即時に適用されるのは X11 セッションのみです。このセッションは現在のレイアウトを維持し、選択内容は保存されます。",
 	"platform_reason.number_row_live_no_layout": "利用不可: 先に ErgoptiPlus のキーボードレイアウトをインストールしてください。この選択は使用中のレイアウトを変更します。",
 	"layouts.linux_rows_not_applied": "数字列の選択は保存されましたが、実行中のキーボードレイアウトを更新できませんでした。",

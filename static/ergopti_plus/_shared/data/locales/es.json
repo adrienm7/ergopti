@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "Orden nativo",
 	"menu.layout.number_row_digits": "Números primero",
 	"menu.layout.number_row_symbols": "Símbolos primero",
-	"platform_reason.number_row_override_unsupported": "No compatible: Este controlador conserva la fila nativa del sistema; no permite forzar números ni símbolos.",
+	"platform_reason.number_row_override_unsupported": "Todavía no en este sistema: la distribución instalada en el sistema escribe la fila de números. Ergopti prevé volver a escribir sus teclas aquí; hoy solo Windows, que emula la distribución, pone primero los dígitos o los símbolos.",
 	"platform_reason.number_row_live_session": "No disponible: Solo una sesión X11 lo aplica al instante. Esta sesión conserva su disposición actual; su elección está guardada.",
 	"platform_reason.number_row_live_no_layout": "No disponible: Instale primero una disposición ErgoptiPlus: esta opción modifica la disposición que usa.",
 	"layouts.linux_rows_not_applied": "La elección de la fila de números está guardada, pero no se pudo actualizar la disposición de teclado en uso.",
