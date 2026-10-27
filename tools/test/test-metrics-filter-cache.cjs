@@ -3695,4 +3695,109 @@ for (const host of ['windows', 'macos', 'linux']) {
 }
 assert.equal(passed, 999, 'all native and derived precision ownership paths must execute');
 
+const nativeAppIdentityNames = [
+	'Editor.exe',
+	'__proto__',
+	'constructor',
+	'toString',
+	'hasOwnProperty'
+];
+const nativeAppIdentityFlows = ['source', 'destination', 'reciprocal'];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const name of nativeAppIdentityNames) {
+		for (const flow of nativeAppIdentityFlows) {
+			test(`${host} app KPI retains native ${name} as ${flow}`, () => {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, '2026-10-27T12:00:00');
+				const before = vm.runInContext(
+					'JSON.stringify(Object.getOwnPropertyNames(Object.prototype))',
+					page.context
+				);
+				const manifest = (factor) => ({
+					'2026-10-26':
+						flow === 'source'
+							? {
+									[name]: { chars: 300 * factor, time: 30000 * factor, app_time_ms: 60000 * factor }
+								}
+							: flow === 'destination'
+								? {
+										'Other.exe': {
+											chars: 300 * factor,
+											time: 30000 * factor,
+											app_time_ms: 60000 * factor,
+											switches_to: { [name]: 3 * factor }
+										}
+									}
+								: {
+										[name]: {
+											chars: 300 * factor,
+											time: 30000 * factor,
+											app_time_ms: 60000 * factor,
+											switches_to: { 'Other.exe': 3 * factor }
+										},
+										'Other.exe': {
+											chars: 200 * factor,
+											time: 20000 * factor,
+											app_time_ms: 40000 * factor,
+											switches_to: { [name]: 7 * factor }
+										}
+									}
+				});
+				publishTypingPage(page, host, manifest(1));
+				for (const factor of [1, 2]) {
+					if (factor === 2) deliverTypingManifest(page, host, manifest(factor));
+					page.context.render_apps_kpi();
+					const rows = JSON.parse(vm.runInContext('JSON.stringify(_apps_data)', page.context));
+					const expected =
+						flow === 'destination'
+							? [{ name: 'Other.exe', chars: 300 * factor }]
+							: [{ name, chars: 300 * factor }];
+					if (flow === 'reciprocal') expected.push({ name: 'Other.exe', chars: 200 * factor });
+					const sort = (items) => items.sort((a, b) => a.name.localeCompare(b.name));
+					assert.deepEqual(
+						sort(rows.map((row) => ({ name: row.name, chars: row.chars }))),
+						sort(expected),
+						'every real native app owns a numeric activity row'
+					);
+					for (const row of rows) {
+						assert.equal(row.cpm, 600);
+						assert.ok(
+							page.elements.get('apps_table_container').innerHTML.includes(`<td>${row.name}</td>`)
+						);
+					}
+					assert.ok(page.elements.get('apps_val').innerHTML.startsWith(String(expected.length)));
+					if (flow !== 'source') {
+						assert.equal(
+							page.elements.get('apps_top_pair').innerHTML,
+							`${['Other.exe', name].sort().join(' ↔ ')} (${(flow === 'reciprocal' ? 10 : 3) * factor}×)`
+						);
+						for (const row of rows)
+							for (const count of Object.values(row.switches_out))
+								assert.equal(typeof count, 'number');
+					}
+					assert.equal(
+						vm.runInContext(
+							'JSON.stringify(Object.getOwnPropertyNames(Object.prototype))',
+							page.context
+						),
+						before,
+						'native app identities never mutate the shared object prototype'
+					);
+				}
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			});
+		}
+	}
+}
+assert.equal(nativeAppIdentityNames.length, 5);
+assert.equal(nativeAppIdentityFlows.length, 3);
+assert.equal(
+	passed,
+	1044,
+	'all native app identity, switch direction and refresh controls must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);

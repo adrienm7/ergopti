@@ -3062,13 +3062,18 @@ let _apps_sort_asc = false;
  * is the user's most-alternated workflow (typically editor ↔ browser).
  */
 function render_apps_kpi() {
-	const per_app = {}; // app → { chars, time_ms, switches_out: { other: count } }
+	const per_app = Object.create(null); // app → { chars, time_ms, switches_out: { other: count } }
 	const layouts_total = {}; // layout_id → cumulative count across filtered apps
 	const kc_hold_total = {}; // kc_str → { s, n, m } summed across filtered apps
 	_foreach_filtered_app((app, date_str, app_name) => {
 		const a =
 			per_app[app_name] ||
-			(per_app[app_name] = { chars: 0, time_ms: 0, app_time_ms: 0, switches_out: {} });
+			(per_app[app_name] = {
+				chars: 0,
+				time_ms: 0,
+				app_time_ms: 0,
+				switches_out: Object.create(null)
+			});
 		a.chars += app.chars || 0;
 		a.time_ms += app.time || 0;
 		a.app_time_ms += app.app_time_ms || 0;
