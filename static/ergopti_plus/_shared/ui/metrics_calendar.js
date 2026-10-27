@@ -9,6 +9,7 @@
  */
 
 const METRICS_CALENDAR_YEAR_DAYS = 365;
+const METRICS_HOUR_MILLISECONDS = 60 * 60 * 1000;
 
 // Recorded dates are Gregorian day identities, not instants in the viewer's timezone.
 function metricsDayOrdinal(year, month, day) {
@@ -59,4 +60,39 @@ function parseDateKey(dateStr) {
 
 	const t = Date.parse(s);
 	return isNaN(t) ? NaN : metricsLocalDayOrdinal(new Date(t));
+}
+
+/** Captures the existing current-and-previous-hour chart selection from one clock. */
+function createMetricsHourWindow(now) {
+	const previous = new Date(now.getTime() - METRICS_HOUR_MILLISECONDS);
+	return Object.freeze({
+		start_date: formatMetricsDateKey(metricsLocalDayOrdinal(previous)),
+		start_hour: previous.getHours(),
+		end_date: formatMetricsDateKey(metricsLocalDayOrdinal(now)),
+		end_hour: now.getHours()
+	});
+}
+
+function metricsHourWindowContains(hourWindow, dateKey, hour) {
+	if (hourWindow.start_date === hourWindow.end_date)
+		return (
+			dateKey === hourWindow.start_date &&
+			hour >= hourWindow.start_hour &&
+			hour <= hourWindow.end_hour
+		);
+	if (dateKey === hourWindow.start_date) return hour >= hourWindow.start_hour;
+	if (dateKey === hourWindow.end_date) return hour <= hourWindow.end_hour;
+	return false;
+}
+
+/** Keeps the existing extra context hour at the chart's right edge. */
+function metricsHourWindowBounds(hourWindow) {
+	return {
+		start: new Date(
+			`${hourWindow.start_date}T${String(hourWindow.start_hour).padStart(2, '0')}:00:00`
+		),
+		end: new Date(
+			`${hourWindow.end_date}T${String(Math.min(hourWindow.end_hour + 1, 23)).padStart(2, '0')}:59:59`
+		)
+	};
 }

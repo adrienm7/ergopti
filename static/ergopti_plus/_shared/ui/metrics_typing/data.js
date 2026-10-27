@@ -438,15 +438,16 @@ function compute_manifest_metrics() {
 			if (app.hourly_min5) {
 				Object.keys(app.hourly_min5).forEach((bucket) => {
 					const md = app.hourly_min5[bucket] || {};
-					if (!app_state.minute5_series[bucket]) {
-						app_state.minute5_series[bucket] = { c: 0, es: 0, e_buckets: {} };
+					const datedBucket = `${date_str}T${bucket}`;
+					if (!app_state.minute5_series[datedBucket]) {
+						app_state.minute5_series[datedBucket] = { c: 0, es: 0, e_buckets: {} };
 					}
-					app_state.minute5_series[bucket].c += md.c || 0;
-					app_state.minute5_series[bucket].es += md.es || 0;
+					app_state.minute5_series[datedBucket].c += md.c || 0;
+					app_state.minute5_series[datedBucket].es += md.es || 0;
 					const src_eb = md.e_buckets || {};
 					Object.keys(src_eb).forEach((k) => {
-						app_state.minute5_series[bucket].e_buckets[k] =
-							(app_state.minute5_series[bucket].e_buckets[k] || 0) + (src_eb[k] || 0);
+						app_state.minute5_series[datedBucket].e_buckets[k] =
+							(app_state.minute5_series[datedBucket].e_buckets[k] || 0) + (src_eb[k] || 0);
 					});
 				});
 			}
