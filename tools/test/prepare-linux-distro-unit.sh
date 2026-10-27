@@ -20,11 +20,11 @@ case "$suite" in
 	*) echo 'Unsupported distribution suite.' >&2; exit 1 ;;
 esac
 case "$distro" in
-	debian) apt-get install -y --no-install-recommends luajit python3 ca-certificates git gcc libc6-dev make cmake pkg-config libluajit-5.1-dev libuv1-dev libglib2.0-0t64 sqlite3 curl ;;
-	fedora) dnf install -y luajit python3 ca-certificates git gcc make cmake pkgconf-pkg-config luajit-devel libuv-devel glib2 sqlite curl ;;
-	arch) pacman -Sy --noconfirm luajit python ca-certificates git gcc make cmake pkgconf libuv glib2 sqlite curl ;;
-	alpine) apk add --no-cache luajit python3 ca-certificates git build-base cmake pkgconf luajit-dev libuv-dev glib sqlite curl ;;
-	opensuse) zypper --non-interactive install luajit python3 ca-certificates git gcc make cmake pkg-config luajit-devel libuv-devel libglib-2_0-0 sqlite3 curl ;;
+	debian) apt-get install -y --no-install-recommends luajit python3 ca-certificates git gcc libc6-dev make cmake pkg-config libluajit-5.1-dev libuv1-dev libglib2.0-0t64 sqlite3 openssl curl ;;
+	fedora) dnf install -y luajit python3 ca-certificates git gcc make cmake pkgconf-pkg-config luajit-devel libuv-devel glib2 sqlite openssl curl ;;
+	arch) pacman -Sy --noconfirm luajit python ca-certificates git gcc make cmake pkgconf libuv glib2 sqlite openssl curl ;;
+	alpine) apk add --no-cache luajit python3 ca-certificates git build-base cmake pkgconf luajit-dev libuv-dev glib sqlite openssl curl ;;
+	opensuse) zypper --non-interactive install luajit python3 ca-certificates git gcc make cmake pkg-config luajit-devel libuv-devel libglib-2_0-0 sqlite3 openssl curl ;;
 	*) echo 'Unsupported mandatory unit distribution.' >&2; exit 1 ;;
 esac
 
@@ -37,6 +37,16 @@ test -x "$sqlite"
 "$sqlite" --version
 # The GNOME proxy check decodes gsettings output with the native GLib.
 "$interpreter" -e 'require("ffi").load("libglib-2.0.so.0")'
+# At-rest metrics encryption, declared by install.sh, derives its key with the
+# openssl CLI from the machine id and encrypts through native libcrypto 3. A
+# container is not a booted system and has no machine id, so it gets one.
+command -v openssl >/dev/null
+"$interpreter" -e 'require("ffi").load("libcrypto.so.3")'
+if [ ! -s /etc/machine-id ]; then
+	od -An -tx1 -N16 /dev/urandom | tr -d ' \n' > /etc/machine-id
+	printf '\n' >> /etc/machine-id
+fi
+grep -Eqx '[0-9a-f]{32}' /etc/machine-id
 
 # Root bypasses the suite's real unreadable-file permission premise, so the
 # suite runs as the same ordinary user the archive installation lot creates.
