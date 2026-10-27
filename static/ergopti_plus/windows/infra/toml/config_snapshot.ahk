@@ -13,6 +13,38 @@
 
 global _ConfigTomlSnapshots := Map()
 
+/**
+ * Reads manifest intent only from the published native bootstrap cache. Detached
+ * runtime candidates have no source provenance and keep their strict readers.
+ * Outdated authored values use the manifest default without mutating the raw
+ * cache; the canonical loader retains ownership of diagnostics and cleanup.
+ * @returns {Boolean} Whether Cache has the actual bootstrap source owner.
+ */
+ConfigTomlTryReadBootValue(Cache, Section, Key, &Value) {
+	global ConfigurationFile, _ParseTomlCache
+	if !IsSet(ConfigurationFile) || ConfigurationFile == ""
+			|| !IsSet(_ParseTomlCache) || !_ParseTomlCache.Has(ConfigurationFile)
+			|| _ParseTomlCache[ConfigurationFile] != Cache
+		return false
+	Snapshot := ConfigTomlReadSnapshot(ConfigurationFile)
+	if Snapshot.Cache != Cache
+		throw Error("The early configuration reader lost its admitted cache")
+	Path := Section . "." . Key
+	Entry := ManifestFindEntryByPath(Path)
+	if !(Entry is Map) || !Entry.Has("default")
+		throw Error("Missing required feature manifest default: " . Path)
+	Value := Entry["default"]
+	for Row in Snapshot.Rows {
+		if Row.Section != Section || Row.Key != Key
+			continue
+		if TomlConfigValueMatchesManifest(Section, Key, Row.Value,
+				&ExpectedType, TOML_StripInlineComment(Row.Raw))
+			Value := Row.Value
+		return true
+	}
+	return true
+}
+
 /** Converts typed values at the native reader boundary, retaining nested shape. */
 _ConfigTomlNativeValue(Value, NativeBooleans := true) {
 	if Value is TOML_Bool
