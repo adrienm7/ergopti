@@ -5,6 +5,8 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
+const { parse } = require('acorn');
 const vm = require('node:vm');
 const { spawnSync } = require('node:child_process');
 const { pythonExecutable } = require('../lib/python.cjs');
@@ -704,44 +706,114 @@ if (process.platform === 'win32') {
 }
 
 if (process.platform !== 'win32') {
+	check('rejected native PAC fixtures preserve captured diagnostics', () => {
+		const ownSource = fs.readFileSync(__filename, 'utf8');
+		const owners = parse(ownSource, { ecmaVersion: 'latest' }).body.filter((node) => {
+			const call = node.consequent?.body?.[0]?.declarations?.[0]?.init;
+			return (
+				node.type === 'IfStatement' &&
+				call?.callee?.name === 'spawnSync' &&
+				call.arguments[1]?.elements?.[0]?.value === 'tools/test/native_pac_source_fixture_test.py'
+			);
+		});
+		assert.equal(owners.length, 1, 'the real portable fixture reporting owner must exist uniquely');
+		const reportingBlock = ownSource.slice(owners[0].start, owners[0].end);
+		const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-pac-reporting-'));
+		try {
+			const fixtureDirectory = path.join(fixtureRoot, 'tools', 'test');
+			fs.mkdirSync(fixtureDirectory, { recursive: true });
+			for (const mode of ['exit73', 'buffer-error']) {
+				const stdoutMarker = 'PAC_REPORTING_CHILD_STDOUT';
+				const stderrMarker = 'PAC_REPORTING_CHILD_STDERR';
+				fs.writeFileSync(
+					path.join(fixtureDirectory, 'native_pac_source_fixture_test.py'),
+					[
+						'import sys',
+						`print(${JSON.stringify(stdoutMarker)}, flush=True)`,
+						`print(${JSON.stringify(stderrMarker)}, file=sys.stderr, flush=True)`,
+						mode === 'exit73'
+							? 'raise SystemExit(73)'
+							: "sys.stdout.write('x' * (2 * 1024 * 1024)); sys.stdout.flush()",
+						''
+					].join('\n')
+				);
+				const bootstrap = [
+					"const assert = require('node:assert/strict');",
+					"const { spawnSync } = require('node:child_process');",
+					'const root = process.argv[1];',
+					'const pythonExecutable = () => process.argv[2];',
+					reportingBlock
+				].join('\n');
+				const result = spawnSync(
+					process.execPath,
+					['-e', bootstrap, fixtureRoot, pythonExecutable()],
+					{ cwd: root, encoding: 'utf8', timeout: 10000, maxBuffer: 4 * 1024 * 1024 }
+				);
+				assert.equal(result.error, undefined);
+				assert.equal(result.signal, null);
+				assert.equal(result.status, 1, 'the original failure must remain blocking');
+				assert.match(result.stderr, /AssertionError/);
+				assert.match(result.stderr, mode === 'exit73' ? /73 !== 0/ : /ENOBUFS/);
+				assert.ok(result.stdout.includes(stdoutMarker), `${mode} must preserve captured stdout`);
+				assert.ok(result.stdout.includes(stderrMarker), `${mode} must preserve captured stderr`);
+			}
+		} finally {
+			fs.rmSync(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+}
+
+if (process.platform !== 'win32') {
 	const result = spawnSync(pythonExecutable(), ['tools/test/native_pac_source_fixture_test.py'], {
 		cwd: root,
 		encoding: 'utf8',
 		timeout: 60000
 	});
-	assert.equal(result.error, undefined);
-	assert.equal(result.signal, null);
-	assert.equal(result.status, 0, result.stderr || result.stdout);
-	assert.ok(result.stdout.includes('Planned cases: 15'));
-	assert.match(result.stderr, /Ran 15 tests in/);
-	assert.match(result.stderr, /\bOK\b/);
-	assert.doesNotMatch(result.stderr, /skipped=/);
-	process.stdout.write(result.stdout + result.stderr);
+	// Validate only after the pipe acknowledges all captured diagnostics.
+	const output = [result.stdout, result.stderr]
+		.filter((value) => typeof value === 'string')
+		.join('');
+	process.stdout.write(output, (error) => {
+		assert.ifError(error);
+		assert.equal(result.error, undefined);
+		assert.equal(result.signal, null);
+		assert.equal(result.status, 0, result.stderr || result.stdout);
+		assert.ok(result.stdout.includes('Planned cases: 15'));
+		assert.match(result.stderr, /Ran 15 tests in/);
+		assert.match(result.stderr, /\bOK\b/);
+		assert.doesNotMatch(result.stderr, /skipped=/);
+		finishPortableControls();
+	});
+} else {
+	finishPortableControls();
 }
-// The policy admits an http PAC, but App Transport Security refuses plain http
-// from the launcher bundle unless its generated Info.plist opts out (issue #101).
-check('the launcher Info.plist lets URLSession fetch an http PAC', () => {
-	const build = fs.readFileSync(path.join(root, 'tools', 'build', 'build_macos_app.sh'), 'utf8');
-	const policy = JSON.parse(
-		fs.readFileSync(
-			path.join(
-				root,
-				'static',
-				'ergopti_plus',
-				'_shared',
-				'modules',
-				'network',
-				'proxy_policy.json'
-			),
-			'utf8'
-		)
+
+function finishPortableControls() {
+	// The policy admits an http PAC, but App Transport Security refuses plain http
+	// from the launcher bundle unless its generated Info.plist opts out (issue #101).
+	check('the launcher Info.plist lets URLSession fetch an http PAC', () => {
+		const build = fs.readFileSync(path.join(root, 'tools', 'build', 'build_macos_app.sh'), 'utf8');
+		const policy = JSON.parse(
+			fs.readFileSync(
+				path.join(
+					root,
+					'static',
+					'ergopti_plus',
+					'_shared',
+					'modules',
+					'network',
+					'proxy_policy.json'
+				),
+				'utf8'
+			)
+		);
+		assert.ok(policy.native_pac.source_acquisition.allowed_schemes.includes('http'));
+		assert.match(
+			build,
+			/<key>NSAppTransportSecurity<\/key>\s*<dict>\s*<key>NSAllowsArbitraryLoads<\/key>\s*<true\/>/
+		);
+	});
+	console.log(
+		`Native PAC source contract: ${passed} portable controls passed; native Swift/SSPI not executed.`
 	);
-	assert.ok(policy.native_pac.source_acquisition.allowed_schemes.includes('http'));
-	assert.match(
-		build,
-		/<key>NSAppTransportSecurity<\/key>\s*<dict>\s*<key>NSAllowsArbitraryLoads<\/key>\s*<true\/>/
-	);
-});
-console.log(
-	`Native PAC source contract: ${passed} portable controls passed; native Swift/SSPI not executed.`
-);
+}
