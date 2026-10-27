@@ -284,12 +284,11 @@ finger_confirm_ms = 50
 # HS: gestures/engine.lua FINGER_DROP_CONFIRM_MS.
 finger_drop_confirm_ms = 200
 
-# Consecutive touch frames a higher finger count must hold before a gesture is
-# recognised at it, so a palm or thumb grazing the pad for a frame is not a
-# third finger. HS: gestures/engine.lua FINGER_CONFIRM_FRAMES (same value, a
-# local copy the engine's timing stubs predate).
+# Consecutive touch frames a higher finger count must hold before the Linux
+# decoder recognises a gesture at it, so a palm grazing the pad for one frame
+# is not a third finger. Two frames keep a deliberate staggered landing.
 # LX: gestures/mt_decoder.lua stable_frames.
-finger_confirm_frames = 4
+finger_join_frames = 2
 
 # Window to wait for staggered multi-finger contact to stabilise.
 # HS: gestures/engine.lua FINGER_COUNT_STABLE_MS.
