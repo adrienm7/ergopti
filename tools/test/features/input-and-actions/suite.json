@@ -685,7 +685,7 @@
 		},
 		{
 			"id": "keylayout-canonical-parity",
-			"ordinal": 508,
+			"ordinal": 509,
 			"name": "keylayout canonical form: the shared Lua parser and the converter's Python parser read every shipped layout the same, and the converter writes the same XKB from it",
 			"cmd": "node",
 			"args": ["tools/test/test-keylayout-canonical-parity.cjs"],
