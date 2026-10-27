@@ -903,12 +903,12 @@ FSReadRange(Path, Start, Count, BlankNul := false) {
 FSCopyCreateVerified(Source, Destination) {
 	if !FSPathIsAdmissible(Source) || !FSPathIsAdmissible(Destination)
 		return false
-	try FileCopy(Source, Destination, false)
-	catch
+	; Builtin copy/delete operations interpret patterns; this API owns literal names.
+	if !DllCall("kernel32\CopyFileW", "Str", Source, "Str", Destination, "Int", true, "Int")
 		return false
 	if FSSameBytes(Source, Destination)
 		return true
-	try FileDelete(Destination)
+	FSDelete(Destination)
 	return false
 }
 

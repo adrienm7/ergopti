@@ -771,3 +771,94 @@ _R7BA_AllocationRace(Race) {
 }
 Test("Config backup allocation: genuine absence permits publication (backup-exclusive-allocation)", _R7BA_AllocationRace.Bind(false))
 Test("Config backup allocation: real racing directory retains exclusive ownership (backup-exclusive-allocation)", _R7BA_AllocationRace.Bind(true))
+
+
+; Literal file-copy authority must not expand destination filename patterns.
+_R7LC_RejectDestinationPattern() {
+	Root := A_Temp . "\ergopti_r7_literal_copy_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	try {
+		DirCreate(Root)
+		Source := Root . "\source.toml"
+		Bytes := "owned source bytes`n"
+		AssertTrue(FSWriteCreateDurable(Source, Bytes))
+		Literal := Root . "\literal.tmp"
+		AssertTrue(FSCopyCreateVerified(Source, Literal), "the same actual helper must first create and verify a literal destination")
+		AssertEqual(Bytes, FSReadUtf8Exact(Literal))
+		NativeControl := Root . "\control-*.tmp"
+		FileCopy(Source, NativeControl, false)
+		Controls := []
+		for Path in FSListDirectoryStrict(Root, false) {
+			SplitPath(Path, &Name)
+			if RegExMatch(Name, "^control-.*\.tmp$")
+				Controls.Push(Path)
+		}
+		AssertEqual(1, Controls.Length, "the native builtin must first demonstrate filename-pattern expansion on an unrelated owned path")
+		AssertEqual(Bytes, FSReadUtf8Exact(Controls[1]))
+		Foreign := Root . "\stage-foreign.tmp"
+		Sentinel := "foreign pending transaction`n"
+		AssertTrue(FSWriteCreateDurable(Foreign, Sentinel))
+		Copied := FSCopyCreateVerified(Source, Root . "\stage-*.tmp")
+		FileAppend("# literal-copy-pattern copied=" . Copied . " foreign_exists=" . !!FileExist(Foreign) . "`n", "*")
+		AssertTrue(FileExist(Foreign), "a destination pattern cannot delete an unrelated existing sibling")
+		AssertEqual(Sentinel, FSReadUtf8Exact(Foreign), "literal copy cannot acquire or replace a foreign sibling's bytes")
+		AssertFalse(Copied, "a literal destination cannot grant wildcard filename authority")
+		for Path in FSListDirectoryStrict(Root, false) {
+			SplitPath(Path, &Name)
+			AssertTrue(Name == "source.toml" || Name == "literal.tmp" || Name == "stage-foreign.tmp" || RegExMatch(Name, "^control-.*\.tmp$"),
+				"refusing an invalid literal destination must leave no copied sibling")
+		}
+	} finally {
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("FileSystem literal copy: destination patterns cannot consume foreign sibling bytes (copy-literal-destination)", _R7LC_RejectDestinationPattern)
+
+
+
+; Imported manifest metadata remains literal all the way to native restore I/O.
+_R7LC_RestorePatternPreservesForeignBytes() {
+	Root := A_Temp . "\ergopti_r7_restore_pattern_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	CopyOwner := FSCopyCreateVerified
+	AssertFalse(CopyOwner.HasOwnProp("Call"), "a foreign copy observer cannot be detached")
+	PatternCalls := 0
+	Observe(Self, Source, Destination) {
+		CopyOwner.DeleteProp("Call")
+		try {
+			if InStr(Source, "*") || InStr(Destination, "*")
+				PatternCalls += 1
+			return CopyOwner.Call(Source, Destination)
+		} finally CopyOwner.DefineProp("Call", {Call: Observe})
+	}
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "generation = 1`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Later := () => Map("stamp", "20260930-111500", "iso", "2026-09-30T11:15:00Z")
+		Backup := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		Manifest := Backup["path"] . "\" . Rules["manifest"]
+		Original := FSReadUtf8Exact(Manifest)
+		Changed := StrReplace(Original, '"path":"config.toml"', '"path":"config*.toml"', , &Count)
+		AssertEqual(1, Count, "the actual completed manifest must have one configuration-file member")
+		AssertTrue(FSWriteDurable(Manifest, Changed))
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 2`n"))
+		Foreign := Cfg . "\config-foreign.toml.ergopti-restore.tmp"
+		Sentinel := "foreign unrelated staging bytes`n"
+		AssertTrue(FSWriteCreateDurable(Foreign, Sentinel))
+		CopyOwner.DefineProp("Call", {Call: Observe})
+		Result := ConfigBackup_Restore(Cfg, Backup["id"], Rules, Later)
+		CopyOwner.DeleteProp("Call")
+		FileAppend("# restore-copy-pattern actual_pattern_calls=" . PatternCalls . " ok=" . Result["ok"] . " foreign_exists=" . !!FileExist(Foreign) . "`n", "*")
+		AssertTrue(FileExist(Foreign), "an imported filename pattern cannot consume an unrelated native sidecar")
+		AssertEqual(Sentinel, FSReadUtf8Exact(Foreign), "the public restore must preserve exact foreign bytes")
+		AssertFalse(Result["ok"], "unsupported Windows filename syntax cannot acquire restoration authority")
+		AssertEqual("generation = 2`n", FSReadUtf8Exact(Cfg . "\config.toml"))
+	} finally {
+		if CopyOwner.HasOwnProp("Call")
+			CopyOwner.DeleteProp("Call")
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("Config restore literal paths: imported patterns cannot consume foreign staging bytes (restore-literal-pattern)", _R7LC_RestorePatternPreservesForeignBytes)
