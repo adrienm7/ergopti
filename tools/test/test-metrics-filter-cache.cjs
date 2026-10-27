@@ -2621,4 +2621,174 @@ for (const host of ['windows', 'macos', 'linux']) {
 assert.equal(ribbonCategoryCases.length, 5);
 assert.equal(passed, 471, 'all native ribbon category literal-text controls must execute');
 
+/** Supplies DOM traversal/mutation ports over text from the actual native app table. */
+function typingFindPage(host) {
+	const page = loadMetricsTypingPage(host);
+	freezePageClock(page, '2026-10-27T12:00:00Z');
+	const document = page.context.document;
+	const createElement = document.createElement;
+	const body = document.body;
+	body.tagName = 'DIV';
+	body.closest = () => null;
+	const reparent = () => {
+		for (const child of body.children) {
+			child.parentNode = body;
+			child.parentElement = body;
+		}
+	};
+	body.replaceChild = (replacement, node) => {
+		const index = body.children.indexOf(node);
+		assert.notEqual(index, -1, 'production may only replace an attached text or highlight node');
+		body.children.splice(
+			index,
+			1,
+			...(replacement.fragment ? replacement.children : [replacement])
+		);
+		reparent();
+	};
+	body.normalize = () => {
+		const normalized = [];
+		for (const node of body.children) {
+			if (node.nodeType === 3 && normalized.at(-1)?.nodeType === 3)
+				normalized.at(-1).textContent += node.textContent;
+			else normalized.push(node);
+		}
+		body.children = normalized;
+		reparent();
+	};
+	document.createElement = (tag) => {
+		const node = createElement(tag);
+		node.tagName = tag.toUpperCase();
+		const classes = new Set();
+		node.classList = {
+			add: (name) => classes.add(name),
+			remove: (name) => classes.delete(name),
+			contains: (name) => classes.has(name),
+			toggle(name, force) {
+				const next = force === undefined ? !classes.has(name) : force;
+				if (next) classes.add(name);
+				else classes.delete(name);
+				return next;
+			}
+		};
+		node.scrollIntoView = () => {};
+		return node;
+	};
+	document.createTextNode = (text) => ({ nodeType: 3, textContent: text });
+	document.createDocumentFragment = () => ({
+		fragment: true,
+		children: [],
+		appendChild(node) {
+			this.children.push(node);
+		}
+	});
+	document.querySelectorAll = (selector) =>
+		selector === 'span.find-highlight'
+			? body.children.filter((node) => node.className === 'find-highlight')
+			: [];
+	document.contains = (node) => body.children.includes(node);
+	page.context.NodeFilter = { SHOW_TEXT: 4, FILTER_REJECT: 2, FILTER_ACCEPT: 1 };
+	page.findScans = 0;
+	document.createTreeWalker = (root, show, filter) => {
+		assert.strictEqual(root, body);
+		assert.equal(show, page.context.NodeFilter.SHOW_TEXT);
+		page.findScans++;
+		let index = 0;
+		const nodes = body.children.filter(
+			(node) => node.nodeType === 3 && filter.acceptNode(node) === 1
+		);
+		return { nextNode: () => nodes[index++] || null };
+	};
+	page.admitTableText = () => {
+		const html = page.elements.get('apps_table_container').innerHTML;
+		// These vectors use plain app names. Only the browser's text-node boundary
+		// is supplied; native publication and app-table projection run unchanged.
+		const text = Array.from(html.matchAll(/<tr><td>([^<]*)<\/td>/g), (match) => match[1]).join(' ');
+		body.children = [document.createTextNode(text)];
+		reparent();
+		return text;
+	};
+	page.highlights = () =>
+		body.children
+			.filter((node) => node.className === 'find-highlight')
+			.map((node) => node.textContent);
+	return page;
+}
+const typingFindRecoveryCases = [
+	'new native row',
+	'repeated missing search',
+	'stale match then missing',
+	'backward recovery'
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const scenario of typingFindRecoveryCases) {
+		test(`${host} unchanged find query recovers after ${scenario}`, () => {
+			const page = typingFindPage(host);
+			const manifest = (include) => ({
+				'2026-10-27': {
+					'Editor.exe': liveTypingApp(20),
+					...(include ? { 'RemoteTarget.exe': liveTypingApp(30) } : {})
+				}
+			});
+			let revision = 1;
+			publishTypingPage(page, host, manifest(scenario === 'stale match then missing'));
+			page.elements.get('find_input').value = 'RemoteTarget';
+			page.admitTableText();
+			page.context.find_in_page(true);
+			if (scenario === 'stale match then missing') {
+				assert.deepEqual(page.highlights(), ['RemoteTarget']);
+				deliverTypingManifest(page, host, manifest(false), {
+					revision: ++revision,
+					range: { historical: {}, today: {} }
+				});
+				page.admitTableText();
+				page.context.find_in_page(true);
+			}
+			assert.equal(
+				page.elements.get('find_status').textContent,
+				page.context._t('ui_typing.not_found')
+			);
+			if (scenario === 'repeated missing search') page.context.find_in_page(true);
+			deliverTypingManifest(page, host, manifest(true), {
+				revision: ++revision,
+				range: { historical: {}, today: {} }
+			});
+			assert.ok(
+				page.admitTableText().includes('RemoteTarget'),
+				'the actual newly admitted native table contains the sought row'
+			);
+			const scansBeforeRecovery = page.findScans;
+			page.context.find_in_page(scenario !== 'backward recovery');
+			assert.equal(
+				page.findScans,
+				scansBeforeRecovery + 1,
+				'an empty match cache must be rescanned against the current DOM'
+			);
+			assert.equal(page.elements.get('find_status').textContent, '1\u202f/\u202f1');
+			assert.deepEqual(page.highlights(), ['RemoteTarget']);
+			page.context.find_in_page(true);
+			assert.equal(page.elements.get('find_status').textContent, '1\u202f/\u202f1');
+			assert.deepEqual(
+				page.highlights(),
+				['RemoteTarget'],
+				'normal repeated navigation does not duplicate highlights'
+			);
+			page.elements.get('find_input').value = '';
+			page.context.find_in_page(true);
+			assert.equal(page.elements.get('find_status').textContent, '');
+			assert.deepEqual(page.highlights(), []);
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false
+			);
+		});
+	}
+}
+assert.equal(typingFindRecoveryCases.length, 4);
+assert.equal(
+	passed,
+	483,
+	'all missing-search, stale-DOM and navigation recovery controls must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);

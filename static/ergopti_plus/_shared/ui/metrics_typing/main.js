@@ -255,12 +255,12 @@ function find_in_page(forward) {
 		_find_index = forward ? 0 : _find_matches.length - 1;
 	} else {
 		// Same query: just advance the cursor
-		if (_find_matches.length === 0) {
-			_set_find_status(_t('ui_typing.not_found'), true);
-			return;
-		}
-		// Detect stale spans (table re-rendered) and re-scan transparently
-		if (_find_index >= 0 && !document.contains(_find_matches[_find_index])) {
+		// A native render can introduce matches after a previous empty scan.
+		// Empty results and detached spans both require the current DOM again.
+		if (
+			_find_matches.length === 0 ||
+			(_find_index >= 0 && !document.contains(_find_matches[_find_index]))
+		) {
 			_clear_highlights();
 			_find_matches = [];
 			_scan_and_highlight(lower_query);
