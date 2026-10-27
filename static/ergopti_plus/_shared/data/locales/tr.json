@@ -3667,7 +3667,7 @@
 	"menu.layout.number_row_native": "Sistemin sırası",
 	"menu.layout.number_row_digits": "Önce rakamlar",
 	"menu.layout.number_row_symbols": "Önce simgeler",
-	"platform_reason.number_row_override_unsupported": "Bu sistemde rakam sırasını sisteme kurulu düzen yazar; rakamları veya simgeleri öne yalnızca düzeni taklit eden Windows alır.",
+	"platform_reason.number_row_override_unsupported": "Yalnızca Windows: bu sistemde rakam sırasını sisteme kurulu düzen yazar; rakamları veya simgeleri öne yalnızca düzeni taklit eden Windows alır.",
 	"platform_reason.number_row_live_session": "Kullanılamıyor: Bunu anında yalnızca bir X11 oturumu uygular. Bu oturum mevcut düzenini korur; seçiminiz kaydedildi.",
 	"platform_reason.number_row_live_no_layout": "Kullanılamıyor: Önce bir ErgoptiPlus düzeni kurun; bu seçim kullandığınız düzeni değiştirir.",
 	"layouts.linux_rows_not_applied": "Sayı sırası seçimi kaydedildi, ancak çalışan klavye düzeni güncellenemedi.",
