@@ -123,12 +123,18 @@ private final class ManagedPTYTestSession {
 		}
 	}
 
-	func finish(worker: Int32, admitted: Bool, exit: Int? = nil) throws {
+	func finish(worker: Int32, admitted: Bool, exit: Int? = nil, workerError: String? = nil) throws {
 		try wait { !process.isRunning && outputEOF && errorEOF }
 		process.waitUntilExit()
 		XCTAssertEqual(process.terminationReason, .exit)
 		XCTAssertEqual(process.terminationStatus, worker)
-		XCTAssertTrue(errorBytes.isEmpty, "PTY stderr belongs to the same native terminal stream")
+		if let workerError {
+			// Only the worker's own closed diagnostic may reach its stderr.
+			let written = String(decoding: errorBytes, as: UTF8.self)
+			XCTAssertTrue(written.hasPrefix(workerError) && written.hasSuffix(" byte(s) to its terminal.\n"), written)
+		} else {
+			XCTAssertTrue(errorBytes.isEmpty, "PTY stderr belongs to the same native terminal stream")
+		}
 		let fields = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: receipt)) as? [String: Any])
 		let keys: Set<String> = ["version", "nonce", "state", "group_retired", "guardian_reaped", "pty_eof",
 			"handles_closed", "status_valid", "exit_status", "worker_status", "source_admitted"]
@@ -342,6 +348,17 @@ final class ManagedPTYWorkerTests: XCTestCase {
 		defer { session.cleanup() }
 		try session.finish(worker: 0, admitted: true, exit: 0)
 		XCTAssertTrue(session.bytes.range(of: Data("SECOND-INSTALLER-OWNED".utf8)) != nil)
+	}
+
+	// Field runs of 2026-10-27: the installer ended with 137 and no output, and
+	// nothing said whether bash had run. A leader killed by a signal Ergopti did
+	// not send is now named on the worker's stderr, with its terminal bytes.
+	func testExternallyKilledInstallerIsNamedOnTheWorkerStderr() throws {
+		let session = try ManagedPTYTestSession(script: "#!/bin/bash\nprintf 'BEFORE-KILL\\n'\nkill -KILL $$\n")
+		defer { session.cleanup() }
+		try session.finish(worker: 137, admitted: true, exit: 137,
+			workerError: "[PTY-WORKER] The installer was killed by signal 9, not sent by Ergopti")
+		XCTAssertNotNil(session.bytes.range(of: Data("BEFORE-KILL".utf8)))
 	}
 
 	func testThirdInstallerCannotBorrowTheSecondPinnedSourceAdmission() throws {
