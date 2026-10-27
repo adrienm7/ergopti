@@ -521,6 +521,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-config-key-tokens.cjs"],
 			"repro": "npm run test:config-key-tokens"
+		},
+		{
+			"id": "js-0501",
+			"ordinal": 501,
+			"name": "drift guard isolation skips directory links and keeps file links",
+			"cmd": "node",
+			"args": ["tools/test/test-drift-guard-isolation-skips-directory-links.cjs"],
+			"repro": "node tools/test/test-drift-guard-isolation-skips-directory-links.cjs"
 		}
 	]
 }
