@@ -4,6 +4,8 @@
 local root, production = assert(arg[1]), assert(arg[2])
 local Ports = assert(loadfile(root .. "/tools/test/fixtures/managed_ollama_foreground_ports.lua"))()
 local NONCE, BINARY, LOG, PORT, LAUNCH = Ports.NONCE, Ports.BINARY, Ports.LOG, Ports.PORT, Ports.LAUNCH
+-- The manual-service refusal is a closed adapter error id since PAR-84.
+local Errors = assert(loadfile(production .. "/static/ergopti_plus/_shared/lua/adapter_errors.lua"))()
 local assertions, cases = 0, 0
 local function check(actual, expected) assert(actual == expected, "restart envelope receiving assertion failed"); assertions = assertions + 1 end
 local function case(run) cases = cases + 1; run() end
@@ -55,7 +57,7 @@ end)
 case(function()
 	local state = receiving({ foreign = true, pull_supported = true })
 	check(state.restart(), false); check(#state.calls, 0); check(#state.tasks, 0); check(state.pull_calls, 0)
-	check(state.result, false); check(state.reason, "external runtime requires manual service management")
+	check(state.result, false); check(state.reason, Errors.OLLAMA_EXTERNAL_RUNTIME_MANUAL)
 	check(state.notices[1], "ollama.external_manual_start_body"); check(state.api.migration_idle(), true)
 end)
 print(string.format("PASS %d cases / %d assertions", cases, assertions))
