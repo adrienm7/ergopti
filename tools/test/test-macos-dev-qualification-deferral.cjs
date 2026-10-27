@@ -142,7 +142,7 @@ function admitNativeSdkSelector(mac) {
 		step.split(DAEMON_LOG_BLOCK).length !== 2 ||
 		mac.split(DAEMON_LOG_FILTER).length !== 2 ||
 		!step.endsWith(
-			'          grep -Fq \'Executed 52 tests, with 0 failures\' "$transcript"\n' +
+			'          grep -Fq \'Executed 54 tests, with 0 failures\' "$transcript"\n' +
 				DAEMON_LOG_BLOCK +
 				LOGGER_42_BLOCK +
 				'        timeout-minutes: 10\n'
@@ -179,7 +179,7 @@ function admitNativeSdkSelector(mac) {
 		'          grep -Fq "Test Suite \'ManagedOllamaAPIWorkerTests\' passed" "$transcript"',
 		'          grep -Fq \'Executed 12 tests, with 0 failures\' "$transcript"',
 		'          grep -Fq "Test Suite \'ManagedPTYWorkerTests\' passed" "$transcript"',
-		'          grep -Fq \'Executed 13 tests, with 0 failures\' "$transcript"',
+		'          grep -Fq \'Executed 15 tests, with 0 failures\' "$transcript"',
 		'          grep -Fq "Test Suite \'ManagedImageAliasTests\' passed" "$transcript"',
 		'          grep -Fq \'Executed 4 tests, with 0 failures\' "$transcript"',
 		'          grep -Fq "Test Suite \'OwnedSuspendedImageTests\' passed" "$transcript"',
@@ -188,7 +188,7 @@ function admitNativeSdkSelector(mac) {
 		'          grep -Fq \'Executed 2 tests, with 0 failures\' "$transcript"',
 		'          grep -Fq "Test Suite \'ManagedNetworkBootstrapTests\' passed" "$transcript"',
 		'          test "$(grep -Fc \'Executed 7 tests, with 0 failures\' "$transcript")" -eq 1',
-		'          grep -Fq \'Executed 52 tests, with 0 failures\' "$transcript"',
+		'          grep -Fq \'Executed 54 tests, with 0 failures\' "$transcript"',
 		'        timeout-minutes: 10'
 	]) {
 		if (step.split('\n').filter((actual) => actual === line).length !== 1) return null;
@@ -788,7 +788,7 @@ function run({ includeLeafControls = true } = {}) {
 		],
 		[
 			'sdk-missing-pty-transcript-is-red',
-			'Executed 13 tests, with 0 failures',
+			'Executed 15 tests, with 0 failures',
 			'Executed 10 tests, with 0 failures'
 		],
 		[
@@ -853,7 +853,7 @@ function run({ includeLeafControls = true } = {}) {
 		],
 		[
 			'sdk-incomplete-total-is-red',
-			'Executed 52 tests, with 0 failures',
+			'Executed 54 tests, with 0 failures',
 			'Executed 34 tests, with 0 failures'
 		],
 		['sdk-ignored-swift-status-is-red', '          test "${statuses[0]}" -eq 0', '          true'],
