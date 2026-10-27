@@ -420,7 +420,7 @@
 		},
 		{
 			"id": "js-ollama-termination-owned",
-			"ordinal": 521,
+			"ordinal": 522,
 			"name": "Ollama termination ownership (no driver stops Ollama by process name or by its port)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-ollama-termination-owned.cjs"],

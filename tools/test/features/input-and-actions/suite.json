@@ -693,7 +693,7 @@
 		},
 		{
 			"id": "xkb-row-options",
-			"ordinal": 520,
+			"ordinal": 521,
 			"name": "the number-row options: the Linux converter and the web composer type the same layout, and both match the hand-written Windows outcomes",
 			"cmd": "node",
 			"args": ["tools/test/test-xkb-row-options.cjs"],
