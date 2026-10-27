@@ -294,12 +294,15 @@ LayoutCatalogue_ReadInstalled(LocalDir) {
 	catch
 		throw Error("The installed-layouts record is not valid JSON: " . Path)
 	if !(Record is Map) || !Record.Has("schema_version")
-			|| (Record["schema_version"] != LAYOUT_CATALOGUE_INSTALLED_SCHEMA)
+		throw Error("The installed-layouts record has an unknown schema version: " . Path)
+	TopMembers := JsonObjectMemberSpans(Text)
+	if TopMembers["schema_version"]["kind"] != "number"
+			|| Record["schema_version"] != LAYOUT_CATALOGUE_INSTALLED_SCHEMA
 		throw Error("The installed-layouts record has an unknown schema version: " . Path)
 	if !Record.Has("layouts") || !(Record["layouts"] is Map)
 		throw Error("The installed-layouts record has no layouts table: " . Path)
 	Installed := Map()
-	Source := { path: Path, text: Text, top_members: JsonObjectMemberSpans(Text),
+	Source := { path: Path, text: Text, top_members: TopMembers,
 		layout_members: JsonObjectMemberSpans(Text, ["layouts"]), original: Map() }
 	for Id, Entry in Record["layouts"] {
 		Problem := _LayoutCatalogueInstalledEntryProblem(Id, Entry)
