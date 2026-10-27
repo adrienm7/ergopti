@@ -1,0 +1,1 @@
+{"codes":["restored_ConfigTomlPath"],"deadline_ms":0,"elapsed_ms":127,"finished_at":"2026-10-27T23:00:05Z","index":13,"kind":"guard","log_window":{"lines":[],"truncated":false},"report":{},"request_id":"mac-2026-10-27_235553","schema":1,"started_at":"2026-10-27T23:00:05Z","step":"config_guard","verdict":"fail"}
