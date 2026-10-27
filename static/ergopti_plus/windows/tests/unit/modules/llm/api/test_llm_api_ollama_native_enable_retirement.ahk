@@ -24,7 +24,36 @@ _OllamaNativeEnable_ObserveRun(State, Self, Command, WorkingDir, Options, &Pid, 
 	return Result
 }
 
-_OllamaNativeEnable_Body(Status, Counter, State) {
+_OllamaNativeEnable_ObserveRead(State, Self, Args*) {
+	Self.DeleteProp("Call")
+	Terminal := Self.Call(Args*)
+	if _LLM_CurlTerminalComplete(Terminal) && Terminal["exit"] == 0 && Terminal["body_read"] {
+		try {
+			State["lock"] := FileOpen(Args[3], "r-rwd")
+			State["locked_path"] := Args[3]
+		} catch OSError as Err {
+			; The main test must report a failed observation instead of hiding
+			; an exception in an asynchronous native timer callback.
+			State["read_error"] := Err.Message
+		}
+	} else
+		Self.DefineProp("Call", {Call: _OllamaNativeEnable_ObserveRead.Bind(State)})
+	return Terminal
+}
+
+_OllamaNativeEnable_LockedDebt(Path) {
+	global _LLM_CurlCleanupDebt
+	for Id, Record in _LLM_CurlCleanupDebt {
+		if Record.Get("kind", "") != "paths"
+			continue
+		for PendingPath in Record["paths"]
+			if PendingPath == Path
+				return true
+	}
+	return false
+}
+
+_OllamaNativeEnable_Body(Status, Counter, CancelDuringDebt, State) {
 	global _LLM_AuxOwners, _LLM_AuxCleanupDebt, _LLM_CurlCleanupDebt
 	global _LLM_ManagedBootstrap, LLM_OLLAMA_BASE_URL, _LLM_Menu_EnableAdmission, ConfigurationFile
 	SavedBootstrap := _LLM_ManagedBootstrap, SavedOrigin := LLM_OLLAMA_BASE_URL
@@ -32,11 +61,16 @@ _OllamaNativeEnable_Body(Status, Counter, State) {
 	Directory := A_Temp . "\ergopti_native_enable_" . A_TickCount . "_" . Random(1, 1000000)
 	ReadyPath := Directory . "\port.txt", TranscriptPath := Directory . "\receipt.jsonl"
 	PeerOwner := 0, ProcessOwner := 0
-	NativeState := Map("launches", 0, "native_owner", 0, "counter", Counter)
+	NativeState := Map("launches", 0, "native_owner", 0, "counter", Counter,
+		"lock", 0, "locked_path", "", "read_error", "")
 	RunFn := _LLM_CurlArtifactRun
 	HadRunCall := RunFn.HasOwnProp("Call")
 	SavedRunCall := HadRunCall ? RunFn.GetOwnPropDesc("Call") : 0
 	ObservedRun := false
+	ReadFn := _LLM_CurlReadTerminal
+	HadReadCall := ReadFn.HasOwnProp("Call")
+	SavedReadCall := HadReadCall ? ReadFn.GetOwnPropDesc("Call") : 0
+	ObservedRead := false
 	try {
 		DirCreate(Directory)
 		SplitPath(A_LineFile, , &TestDirectory)
@@ -62,11 +96,40 @@ _OllamaNativeEnable_Body(Status, Counter, State) {
 		AssertFalse(HadRunCall, "the native launch observer must start from the genuine production boundary")
 		RunFn.DefineProp("Call", {Call: _OllamaNativeEnable_ObserveRun.Bind(NativeState)})
 		ObservedRun := true
+		AssertFalse(HadReadCall, "the actual terminal reader must start without another fixture override")
+		if CancelDuringDebt {
+			ReadFn.DefineProp("Call", {Call: _OllamaNativeEnable_ObserveRead.Bind(NativeState)})
+			ObservedRead := true
+		}
 		AssertTrue(LLM_Menu_OnToggle(State["port"]), "the shipped tray toggle must enter actual version admission")
 		ProcessOwner := NativeState["native_owner"]
 		AssertTrue(ProcessOwner is Map, "the actual tray path must acquire a genuine native curl Job")
 		AssertEqual(1, NativeState["launches"], "one genuine native health request owns the tray action")
 		AssertEqual(0, State["probes"], "the old fixture probe cannot synthesize transport or callback delivery")
+		if CancelDuringDebt {
+			Started := A_TickCount
+			while !_OllamaNativeEnable_LockedDebt(NativeState["locked_path"]) && NativeState["read_error"] == ""
+					&& TickElapsed(Started) < 10000
+				Sleep(10)
+			AssertEqual("", NativeState["read_error"], "the genuine native lock observation must succeed")
+			AssertTrue(IsObject(NativeState["lock"]), "the actual private response must remain exclusively open")
+			AssertTrue(_OllamaNativeEnable_LockedDebt(NativeState["locked_path"]),
+				"real native deletion refusal must retain the exact locked artifact in canonical cleanup debt")
+			AssertTrue(ProcessOwner.Get("released", false), "native process retirement precedes the held artifact cleanup")
+			PendingRequest := _LLM_Menu_EnableAdmission
+			AssertTrue(PendingRequest is Map && PendingRequest["active"], "the actual tray request remains pending until cleanup acknowledges")
+			AssertTrue(PendingRequest["aux"]["ping_delivery"] is Map)
+			AssertFalse(PendingRequest["aux"]["ping_delivery"]["delivered"], "unsettled native cleanup cannot commit a receipt")
+			FileAppend("RECEIPT native-tray-cancel locked_artifact_debt=1 process_released=1 pending_request=1`n", "*")
+			AssertFalse(LLM_Menu_OnToggle(State["port"]), "the shipped second tray action cancels pending readiness")
+			AssertFalse(PendingRequest["active"], "the original caller's cancellation must become durable immediately")
+			AssertEqual(0, _LLM_Menu_EnableAdmission, "the actual cancellation removes the original published request")
+			AssertTrue(_OllamaNativeEnable_LockedDebt(NativeState["locked_path"]), "cancellation cannot fabricate native artifact acknowledgement")
+			NativeState["lock"].Close()
+			NativeState["lock"] := 0
+			AssertTrue(LLM_CurlRetryCleanupDebt(), "releasing the actual file lock permits genuine deletion acknowledgement")
+			AssertFalse(FileExist(NativeState["locked_path"]), "the original private response artifact must physically retire")
+		}
 		Started := A_TickCount
 		while (_LLM_Menu_EnableAdmission is Map || !_LLM_CurlProcessExited(PeerOwner)) && TickElapsed(Started) < 10000
 			Sleep(10)
@@ -89,10 +152,10 @@ _OllamaNativeEnable_Body(Status, Counter, State) {
 		AssertEqual(0, _LLM_AuxOwners.Count, "native version admission must retire its exact auxiliary slot")
 		AssertEqual(0, _LLM_AuxCleanupDebt.Count, "the real action cannot hide auxiliary cleanup debt")
 		AssertEqual(0, _LLM_CurlCleanupDebt.Count, "the real action cannot hide process or private-artifact cleanup debt")
-		AssertEqual(Status == 200 ? 1 : 0, State["writes"], "only successful native readiness may reach the actual borrowed writer")
-		AssertEqual(Status == 200 ? 1 : 0, State["applies"], "backend application follows acknowledged persistence")
+		AssertEqual(Status == 200 && !CancelDuringDebt ? 1 : 0, State["writes"], "only successful native readiness may reach the actual borrowed writer")
+		AssertEqual(Status == 200 && !CancelDuringDebt ? 1 : 0, State["applies"], "backend application follows acknowledged persistence")
 		AssertEqual(Status == 200 ? 0 : 1, State["notices"], "only actual HTTP refusal reaches the modal UI boundary")
-		if Status == 200 {
+		if Status == 200 && !CancelDuringDebt {
 			AssertFalse(State["enabled_at_write"], "the real writer sees the old disabled preference")
 			AssertTrue(State["lease_at_write"], "the actual terminal lease owns the durable config write")
 			AssertTrue(State["enabled_at_apply"], "activation observes the successfully published preference")
@@ -103,6 +166,14 @@ _OllamaNativeEnable_Body(Status, Counter, State) {
 		AssertEqual(0, State["callback"], "the fixture never retains the production request callback")
 		AssertEqual(0, State["owner"], "the fixture never retains the production auxiliary owner")
 	} finally {
+		if ObservedRead && ReadFn.HasOwnProp("Call")
+			ReadFn.DeleteProp("Call")
+		if HadReadCall
+			ReadFn.DefineProp("Call", SavedReadCall)
+		if IsObject(NativeState["lock"]) {
+			NativeState["lock"].Close()
+			NativeState["lock"] := 0
+		}
 		if ObservedRun && RunFn.HasOwnProp("Call")
 			RunFn.DeleteProp("Call")
 		if HadRunCall
@@ -129,15 +200,18 @@ _OllamaNativeEnable_Body(Status, Counter, State) {
 	}
 }
 
-_OllamaNativeEnable_Retirement(Status) {
+_OllamaNativeEnable_Retirement(Status, CancelDuringDebt := false) {
 	Counter := Map("deleted", 0)
 	_LLM_TestReleaseIndependentWitness(Counter)
 	AssertEqual(1, Counter["deleted"], "an independent witness proves actual object destruction")
 	Counter["deleted"] := 0
-	_LEA_WithFixture(_OllamaNativeEnable_Body.Bind(Status, Counter))
-	AssertEqual(1, Counter["deleted"], "the completed shipped tray request must release its native receipt callback closure")
+	_LEA_WithFixture(_OllamaNativeEnable_Body.Bind(Status, Counter, CancelDuringDebt))
+	AssertEqual(1, Counter["deleted"], "the retired shipped tray request must release its native receipt callback closure")
 }
 
 for _OllamaNativeEnableStatus in [200, 500]
 	Test("Ollama native tray enable: HTTP" . _OllamaNativeEnableStatus . " releases its request (ollama-native-tray-retirement)",
 		_OllamaStream_WithBootTimings.Bind(_OllamaNativeEnable_Retirement.Bind(_OllamaNativeEnableStatus)))
+
+Test("Ollama native tray cancellation: held artifact cleanup releases its request (ollama-native-tray-cancel-retirement)",
+	_OllamaStream_WithBootTimings.Bind(_OllamaNativeEnable_Retirement.Bind(200, true)))
