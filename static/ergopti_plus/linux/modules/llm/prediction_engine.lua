@@ -34,6 +34,7 @@ local Tone = require("llm.tone")
 local Vision = require("llm.vision")
 local Translate = require("llm.translate")
 local Agent = require("llm.agent")
+local AgentPlan = require("llm.request_plan.agent")
 local Settings = require("modules.llm.settings")
 local TriggerSettings = require("modules.llm.trigger_settings")
 local DisplaySettings = require("modules.llm.display_settings")
@@ -2212,22 +2213,26 @@ end
 --- @param what string What the log names the action.
 --- @return boolean refused
 local function agent_refused(what)
-	if _is_paused() then
+	-- The order of the refusals is the shared plan's (request_plan/agent.lua).
+	-- The mode is read only once the pause and the AI switch passed, as before.
+	local facts = { paused = _is_paused() == true, ai_enabled = _enabled == true, mode = AgentPlan.MODE_ACTION }
+	local decision = AgentPlan.admit(facts)
+	if decision.allowed then
+		facts.mode = AgentSettings.get_mode()
+		decision = AgentPlan.admit(facts)
+	end
+	if decision.allowed then return false end
+	if decision.step == "paused" then
 		Logger.info(LOG, "%s refused (paused).", what)
 		show_notice(MANUAL_REFUSAL_KEYS.paused, "paused")
-		return true
-	end
-	if not _enabled then
+	elseif decision.step == "ai_off" then
 		Logger.info(LOG, "%s refused: the AI is off.", what)
 		show_notice(MANUAL_REFUSAL_KEYS.disabled, "disabled")
-		return true
-	end
-	if AgentSettings.get_mode() == "off" then
+	else
 		Logger.info(LOG, "%s refused: the agent is off.", what)
 		show_notice(AGENT_KEYS.off, "agent_off")
-		return true
 	end
-	return false
+	return true
 end
 
 
@@ -2558,8 +2563,15 @@ end
 local function agent_blocked()
 	local offer = _predicting or #_suggestions > 0
 	local automatic_prediction = _suggestion_context ~= nil and _suggestion_context.automatic == true
-	return not _enabled or _live ~= nil or (offer and not automatic_prediction) or _vision_flow ~= nil
-		or _is_paused() or AgentSettings.get_mode() ~= "auto"
+	local facts = { mode = AgentPlan.MODE_AUTO, paused = _is_paused() == true, ai_enabled = _enabled == true,
+		live = _live ~= nil, ai_busy = offer and not automatic_prediction, vision = _vision_flow ~= nil,
+		hotstring_preview = false, focus_blocked = false }
+	-- The order of the blockers is the shared plan's (request_plan/agent.lua). The
+	-- mode is read last, as before: an invalid stored mode is reported only when
+	-- nothing else already blocked.
+	if AgentPlan.auto_blocker(facts) ~= nil then return true end
+	facts.mode = AgentSettings.get_mode()
+	return AgentPlan.auto_blocker(facts) ~= nil
 end
 
 --- Remembers a triaged sentence, forgetting the oldest beyond the memory.
@@ -2682,7 +2694,8 @@ local function agent_pause_elapsed(generation, buffer, app)
 	if not config then return end
 	-- Trimmed: a space typed after the sentence does not make it a new one.
 	local sentence = require("text_utils").trim(Rewrite.sentence_span(buffer))
-	if code_points(sentence) < config.system1.min_chars or already_triaged(sentence) then return end
+	if AgentPlan.triage_skip({ chars = code_points(sentence), min_chars = config.system1.min_chars,
+		already_triaged = already_triaged(sentence) }) ~= nil then return end
 	if _is_secure_context() then
 		Logger.debug(LOG, "Agent triage suppressed: secure field or excluded context.")
 		return
