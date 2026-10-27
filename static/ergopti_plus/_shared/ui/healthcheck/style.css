@@ -12,7 +12,7 @@
 :root {
 	--text: var(--theme-dialog-text);
 	--muted: var(--theme-dialog-muted);
-	--label: #555;
+	--label: var(--theme-grey-555);
 	--background: var(--theme-dialog-background);
 	--panel: var(--theme-dialog-panel);
 	--border: var(--theme-dialog-border);
