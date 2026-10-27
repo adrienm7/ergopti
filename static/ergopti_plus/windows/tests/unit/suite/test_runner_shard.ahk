@@ -223,3 +223,39 @@ for _RSH_BadPlanLabel in [
 ]
 	Test("runner plan: " . _RSH_BadPlanLabel.Name . " classifier output is refused (runner-plan-owner)",
 		_RSH_InvalidPlanLabel.Bind(_RSH_BadPlanLabel.Value))
+
+
+_RSH_LateFailure() {
+	throw Error("A registration refused after planning must never execute.")
+}
+
+_RSH_RegistrationClosed() {
+	global TEST_REGISTRY
+	Before := TEST_REGISTRY.Length
+	Refused := false
+	try {
+		try Test("valid late registration control", _RSH_LateFailure)
+		catch Error as Err {
+			AssertEqual("Tests cannot be registered after execution starts.", Err.Message)
+			Refused := true
+		}
+		AssertTrue(Refused, "a real callback must not disappear after the execution plan is captured")
+		AssertEqual(Before, TEST_REGISTRY.Length, "a refused registration cannot mutate the registry")
+	} finally {
+		; Keep the original buggy behavior from contaminating following red tests.
+		while TEST_REGISTRY.Length > Before
+			TEST_REGISTRY.Pop()
+	}
+}
+Test("runner lifecycle: registration closes before callbacks start (runner-registration-contract)", _RSH_RegistrationClosed)
+
+_RSH_NestedRunRefused() {
+	Refused := false
+	try RunTests()
+	catch Error as Err {
+		AssertEqual("The test runner has already started.", Err.Message)
+		Refused := true
+	}
+	AssertTrue(Refused, "a nested run must not reset the active owner's TAP receipt")
+}
+Test("runner lifecycle: nested execution cannot replace an active receipt (runner-registration-contract)", _RSH_NestedRunRefused)
