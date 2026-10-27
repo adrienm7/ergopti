@@ -63,6 +63,7 @@ local function schema_read_admitted(check, content, status)
 end
 local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
+local MetadataCommandStats = require("adapters.metadata_command_stats")
 local Manifest = require("infra.manifest_reader")
 local LEAF = require("config_keys").LEAF
 local KEY = require("config_keys").KEY
@@ -2076,6 +2077,9 @@ end
 -- report names the phase because the batch size alone did not explain the hold.
 local SLOW_SAVE_REPORT_MS = 250
 local NANOSECONDS_PER_MILLISECOND = 1000000
+--- Prepare stages of a save, in report order (L17).
+local SAVE_PREPARE_STAGES = { "snapshot", "decode", "models", "sparse", "wrap", "rows",
+	"gestures", "llm", "shortcuts", "hotstrings" }
 
 --- Reads the monotonic clock, or nil when the host has none (headless runs).
 --- @return number|nil nanoseconds
@@ -2119,6 +2123,15 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 		return false
 	end
 	local script_admission = script_parameter_admission()
+	-- L17: prepare held 1.25 s on the Mac for 293 operations; each stage clock
+	-- names its share so the next slow-save line says which one dominates.
+	local save_started = save_clock()
+	local stage_ms, stage_last = {}, save_started
+	local function stage(name)
+		local now = save_clock()
+		if now and stage_last then stage_ms[name] = (stage_ms[name] or 0) + (now - stage_last) / NANOSECONDS_PER_MILLISECOND end
+		stage_last = now
+	end
 	local runtime = M.snapshot(state, hotfiles, core_mods)
 	local existing = runtime
 	if snapshot_view then
@@ -2144,13 +2157,15 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 	-- its default, whose sparse delete must not erase it (see _load_outdated).
 	local outdated = _load_outdated[prefs_file] or {}
 	local replaced = {}
-	local save_started = save_clock()
+	stage("snapshot")
 	local model_operation
+	local proposed_count = 0
 	local ok, updates = pcall(function()
 		local document, shapes
 		if expected_source.status == "ok" then
 			document, shapes = require("toml_codec.leaf_rows").decode_source(expected_source.content)
 		end
+		stage("decode")
 		local source_parameters = document and type(document.gestures) == "table" and document.gestures.action_parameters
 		for key in pairs(type(source_parameters) == "table" and source_parameters or {}) do
 			if type(key) == "string" and key:sub(1, 8) == "script__" then has_script_parameters = true; break end
@@ -2187,8 +2202,10 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 		if existing.llm_user_models ~= nil then
 			model_operation = RecordList.prepare(expected_source.content or "", existing.llm_user_models, prefs_file)
 		end
+		stage("models")
 		local leaves = {}
 		local proposed = sparse_updates(existing)
+		stage("sparse")
 		for _, row in ipairs(cleared_orders) do proposed[#proposed + 1] = row end
 		if document and legacy_user_profiles(document.llm) then
 			-- Imported at load: the envelope replaces the array in this very write,
@@ -2198,6 +2215,8 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 		for _, row in ipairs(WrapPreferences.prepare(expected_source.content or "", existing)) do
 			proposed[#proposed + 1] = row
 		end
+		stage("wrap")
+		proposed_count = #proposed
 		for _, row in ipairs(proposed) do
 			local path = row.section .. "." .. row.key
 			local reset = reset_keeping_outdated(row, outdated, document)
@@ -2210,7 +2229,15 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 				if outdated[path] then replaced[#replaced + 1] = path end
 			end
 		end
-		local prepared = M.prepare_hotstring_updates(expected_source, M.prepare_shortcut_updates(expected_source, M.prepare_llm_updates(expected_source, M.prepare_gesture_updates(expected_source, leaves))))
+		stage("rows")
+		local prepared = M.prepare_gesture_updates(expected_source, leaves)
+		stage("gestures")
+		prepared = M.prepare_llm_updates(expected_source, prepared)
+		stage("llm")
+		prepared = M.prepare_shortcut_updates(expected_source, prepared)
+		stage("shortcuts")
+		prepared = M.prepare_hotstring_updates(expected_source, prepared)
+		stage("hotstrings")
 		if model_operation then prepared[#prepared + 1] = model_operation end
 		return prepared
 	end)
@@ -2222,6 +2249,7 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 	end
 
 	local prepare_done = save_clock()
+	local commands_before, command_ms_before = MetadataCommandStats.snapshot()
 	local write_ok, written, detail, encoded, native, candidate = pcall(
 		TomlWriter.batch_write,
 		prefs_file,
@@ -2246,9 +2274,17 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 	if save_started and prepare_done and write_done then
 		local total_ms = (write_done - save_started) / NANOSECONDS_PER_MILLISECOND
 		if total_ms >= SLOW_SAVE_REPORT_MS then
-			Logger.warn(LOG, "Slow preferences save %d ms (prepare=%d write=%d ms; operations=%d).",
+			local commands_after, command_ms_after = MetadataCommandStats.snapshot()
+			local parts = {}
+			for _, name in ipairs(SAVE_PREPARE_STAGES) do
+				parts[#parts + 1] = string.format("%s=%d", name, math.floor(stage_ms[name] or 0))
+			end
+			Logger.warn(LOG, "Slow preferences save %d ms (prepare=%d write=%d ms; operations=%d; "
+				.. "prepare: %s ms; proposed=%d; metadata_commands=%d in %d ms).",
 				math.floor(total_ms), math.floor((prepare_done - save_started) / NANOSECONDS_PER_MILLISECOND),
-				math.floor((write_done - prepare_done) / NANOSECONDS_PER_MILLISECOND), #updates)
+				math.floor((write_done - prepare_done) / NANOSECONDS_PER_MILLISECOND), #updates,
+				table.concat(parts, " "), proposed_count, commands_after - commands_before,
+				math.floor(command_ms_after - command_ms_before))
 		end
 	end
 	if model_operation then RecordList.acknowledge(model_operation, encoded) end
