@@ -137,7 +137,7 @@ _TDC_SessionPublishes() {
 	Body(World) {
 		World.Session.Start()
 		AssertEqual('{"schema":1,"driver":"windows","pid":1000,"token":"' . World.Token . '"}`n', _TDC_Read(World, "session"))
-		AssertEqual(1, World.Started, "the endpoint is rung only after the session exists")
+		AssertEqual(1, World.Started, "the endpoint is activated exactly once")
 		AssertTrue(HasMethod(World.Endpoint, "Call"), "the endpoint runs the session's own handler")
 		AssertThrows(() => World.Session.Start(), "a second start is refused")
 		World.Session.Stop()
@@ -145,7 +145,7 @@ _TDC_SessionPublishes() {
 		AssertFalse(FileExist(World.Folder . "\session.json"), "the session withdraws its own file")
 	}
 }
-Test("driver-control: a session publishes its token, then rings its endpoint", _TDC_SessionPublishes)
+Test("driver-control: a session publishes its token for an active endpoint", _TDC_SessionPublishes)
 
 _TDC_AuthenticatedRequest() {
 	_TDC_World(Body)
@@ -357,3 +357,68 @@ _TDCR_EndpointStop(State, *) {
 for _TDCR_Phase in ["token", "factory", "start"]
 	Test("driver-control: retirement during " . _TDCR_Phase . " startup cannot resurrect the session (driver-control-start-retirement)",
 		_TDCR_RetireDuringStart.Bind(_TDCR_Phase))
+
+
+; Bound only this fixture's native deferred-delivery observation.
+global _TDCR_NATIVE_WAIT_MS := 2000
+
+_TDCR_ReadinessListen(State, Message, Callback, Threads) {
+	if Threads == 1 {
+		State["session_visible_at_registration"] := FileExist(State["world"].Session.Path("session")) != ""
+		State["registrations"] += 1
+		if State["session_visible_at_registration"]
+			State["premature_ack"] := DllCall("SendMessageW", "Ptr", A_ScriptHwnd,
+				"UInt", Message, "UPtr", State["world"].Session.Pid, "Ptr", State["creation"], "Ptr")
+	}
+	return OnMessage(Message, Callback, Threads)
+}
+
+_TDCR_ReadinessEndpoint(State, Handler) {
+	World := State["world"]
+	Endpoint := HealthCheckWindowControl(() => State["message"],
+		_TDCR_ReadinessListen.Bind(State), HealthCheck_ControlTimer, Handler,
+		() => true, A_ScriptHwnd, World.Session.Pid, State["creation"])
+	State["endpoint"] := Endpoint
+	return Endpoint
+}
+
+_TDCR_ReadinessAfterNativeActivation() {
+	_TDC_World(_TDCR_ReadinessAfterNativeActivationBody)
+}
+
+_TDCR_ReadinessAfterNativeActivationBody(World) {
+	global _TDCR_NATIVE_WAIT_MS
+	AssertFalse(A_IsCritical, "native control delivery needs an interruptible fixture")
+	World.Session.Pid := ProcessExist()
+	Creation := HealthCheck_ControlCreationTime()
+	Message := DriverControl_RegisterMessage(World.Spec["windows_message"] . "-fixture-" . ProcessExist())
+	State := Map("world", World, "message", Message, "creation", Creation,
+		"endpoint", 0, "registrations", 0, "session_visible_at_registration", false, "premature_ack", -1)
+	World.Session.Ports["endpoint"] := _TDCR_ReadinessEndpoint.Bind(State)
+	World.Session.Start()
+	AssertEqual(1, State["registrations"], "the genuine native listener must be installed")
+	if State["session_visible_at_registration"]
+		AssertEqual(0, State["premature_ack"],
+			"an actual early requester sees the token while the native endpoint still refuses it")
+	AssertFalse(State["session_visible_at_registration"],
+		"a control token cannot announce readiness before the native endpoint is registered")
+	AssertTrue(State["endpoint"].Active && World.Session.Active)
+	AssertTrue(FileExist(World.Session.Path("session")) != "",
+		"the fully active native endpoint must publish its actual readiness receipt")
+	_TDC_Request(World, World.Token, "native-ready")
+	Ack := DllCall("SendMessageW", "Ptr", A_ScriptHwnd, "UInt", Message,
+		"UPtr", World.Session.Pid, "Ptr", Creation, "Ptr")
+	AssertEqual(1, Ack, "the actual private native message is admitted after token publication")
+	Started := A_TickCount
+	while World.Calls.Length == 0 && !TickExpired64(Started, _TDCR_NATIVE_WAIT_MS)
+		Sleep(1)
+	AssertEqual(1, World.Calls.Length, "the actual native one-shot must dispatch the authenticated request")
+	World.Session.Stop()
+	AssertFalse(State["endpoint"].Active || World.Session.Active)
+	AssertFalse(FileExist(World.Session.Path("session")))
+	Ack := DllCall("SendMessageW", "Ptr", A_ScriptHwnd, "UInt", Message,
+		"UPtr", World.Session.Pid, "Ptr", Creation, "Ptr")
+	AssertEqual(0, Ack, "the retired native listener cannot accept another control request")
+}
+Test("driver-control: token publication follows actual native endpoint activation (driver-control-endpoint-readiness)",
+	_TDCR_ReadinessAfterNativeActivation)
