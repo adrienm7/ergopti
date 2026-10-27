@@ -22,6 +22,7 @@ function M.new(options)
 		local file = assert(io.open(path, "w")); file:write("controlled source\n"); file:close()
 		paths[id], sources[#sources + 1], queues[path] = path, path, {}
 	end
+	local saved_finder = package.loaded["modules.hotstrings.device_finder"]
 	package.loaded["modules.hotstrings.device_finder"] = {
 		find_devices = function() return sources, {} end,
 		is_key_device = function() return true end,
@@ -109,6 +110,7 @@ function M.new(options)
 		pcall(Hook.stop); pcall(Hook.set_remapper, nil)
 		Reader._reset_backend(); Writer.close_owned(session.cap)
 		for _, path in pairs(paths) do os.remove(path) end
+		package.loaded["modules.hotstrings.device_finder"] = saved_finder
 	end
 	return session
 end
