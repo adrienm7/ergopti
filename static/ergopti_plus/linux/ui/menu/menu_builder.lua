@@ -684,7 +684,28 @@ local function _build_layouts(ctx)
 	-- Native-only status never acquires a preference or forced-input writer.
 	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_MODE] = function() return false end
 	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_EDGES] = function() return false end
-	providers["number_row_policy"] = function() return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end
+	providers["number_row_policy"] = function()
+		local NumberRowLive = require("modules.keymap.number_row_live")
+		local available, reason = NumberRowLive.available()
+		local stored = NumberRowLive.stored()
+		-- The choice is stored first; a refusal after that is told, except the two the
+		-- greyed row already explains.
+		local function applied(ok, code)
+			if not ok and code ~= "session_unsupported" and code ~= "no_source_layout" then
+				show_error(i18n_safe("layouts.linux_rows_not_applied"))
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end
+		return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands, {
+			available = available,
+			reason_key = reason == "no_source_layout" and "platform_reason.number_row_live_no_layout"
+				or "platform_reason.number_row_live_session",
+			get_order = function() return stored.order end,
+			get_edges = function() return stored.edges end,
+			set_order = function(value) return NumberRowLive.set("order", value, applied) end,
+			set_edges = function(value) return NumberRowLive.set("edges", value, applied) end,
+		})
+	end
 	-- Layout on pause / resume: the shared frames macOS draws, listing the
 	-- desktop's own layouts (ui/menu/pause_layout_rows.lua).
 	providers["layout_switching"] = function()
