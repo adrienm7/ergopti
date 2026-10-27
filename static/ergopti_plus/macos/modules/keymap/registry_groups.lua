@@ -25,6 +25,7 @@ local hs     = hs
 local Logger = require("infra.logger")
 
 local PersonalFiles = require("hotstrings.personal_files")
+local PrivateLabel = require("diagnostics.private_label")
 local TableUtil = require("table_util")
 local LOG = "keymap.registry"
 
@@ -506,7 +507,7 @@ function M.load_file(name, path)
 	end
 
 	return run_transaction("load_file:" .. name, function()
-		Logger.start(LOG, "Loading Lua mapping file '%s'…", name)
+		Logger.start(LOG, "Loading Lua mapping file '%s'…", PrivateLabel.mask(name))
 		ensure_group_order(name)
 		_state.current_group = name
 
@@ -520,7 +521,7 @@ function M.load_file(name, path)
 		record_group(name, path, "lua")
 		replace_group_section_delays(name, nil)
 		_callbacks.sort_mappings()
-		Logger.success(LOG, "Lua mapping file '%s' loaded (%d total mapping(s)).", name, #_state.mappings)
+		Logger.success(LOG, "Lua mapping file '%s' loaded (%d total mapping(s)).", PrivateLabel.mask(name), #_state.mappings)
 		return true
 	end)
 end
@@ -628,7 +629,7 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 	if resolution ~= nil and (source_content == nil or type(resolution) ~= "table"
 		or type(resolution.priority_reader) ~= "function" or type(resolution.delay_resolver) ~= "function") then return false end
 	return run_transaction("load_toml:" .. name, function()
-		Logger.start(LOG, "Loading TOML mapping file '%s'…", name)
+		Logger.start(LOG, "Loading TOML mapping file '%s'…", PrivateLabel.mask(name))
 
 		local toml_reader       = require("infra.toml.reader")
 		local ok, data, committed
@@ -644,7 +645,7 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 		if section_sources ~= nil then
 			local merged, merge_err = merge_section_sources(data, section_sources, toml_reader)
 			if not merged then
-				Logger.error(LOG, "TOML group '%s' cannot take its bound sections: %s.", name, merge_err)
+				Logger.error(LOG, "TOML group '%s' cannot take its bound sections: %s.", PrivateLabel.mask(name), merge_err)
 				return false
 			end
 			data = merged
@@ -776,7 +777,7 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 				} }
 			end
 		else
-			Logger.debug(LOG, "Section '%s/%s' skipped (disabled in hs.settings).", name, sec_name)
+			Logger.debug(LOG, "Section '%s/%s' skipped (disabled in hs.settings).", PrivateLabel.mask(name), sec_name)
 		end
 
 		table.insert(sections_info, {
@@ -847,10 +848,10 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 	-- is almost always a path or permission problem, and it now says so.
 	local added = #_state.mappings - mappings_before
 	if added == 0 then
-		Logger.warn(LOG, "TOML mapping file '%s' registered ZERO mappings — check the path and its contents.", name)
+		Logger.warn(LOG, "TOML mapping file '%s' registered ZERO mappings — check the path and its contents.", PrivateLabel.mask(name))
 	else
 		Logger.success(LOG, "TOML mapping file '%s' loaded (%d mapping(s); %d total).",
-			name, added, #_state.mappings)
+			PrivateLabel.mask(name), added, #_state.mappings)
 	end
 	return true
 	end)
@@ -877,7 +878,7 @@ function M.reload_toml(name, path)
 	return run_transaction("reload_toml:" .. name, function()
 		local group = _state.groups[name]
 		if not group then
-			Logger.error(LOG, "reload_toml: unknown group '%s'.", name)
+			Logger.error(LOG, "reload_toml: unknown group '%s'.", PrivateLabel.mask(name))
 			return false
 		end
 		if group.enabled ~= true then
@@ -987,7 +988,7 @@ function M.disable_group(name)
 		_callbacks.drop_classify_cache()
 		replace_group_section_delays(name, nil)
 
-		Logger.debug(LOG, "Group '%s' disabled (%d mapping(s) remaining).", name, #_state.mappings)
+		Logger.debug(LOG, "Group '%s' disabled (%d mapping(s) remaining).", PrivateLabel.mask(name), #_state.mappings)
 		return true
 	end)
 end
@@ -1038,7 +1039,7 @@ function M.register_lua_group(name, meta_description, sections)
 		sections         = type(sections) == "table" and sections or {},
 	}
 	replace_group_section_delays(name, nil)
-	Logger.debug(LOG, "Lua group '%s' registered.", name)
+	Logger.debug(LOG, "Lua group '%s' registered.", PrivateLabel.mask(name))
 end
 
 --- Enables a previously disabled group by reloading its file (or re-running its hook).
@@ -1054,7 +1055,7 @@ function M.enable_group(name)
 	if g.enabled then M.note_registry_mutation(); return true end
 
 	return run_transaction("enable_group:" .. tostring(name), function()
-		Logger.debug(LOG, "Enabling group '%s' (kind: %s)…", name, g.kind or "?")
+		Logger.debug(LOG, "Enabling group '%s' (kind: %s)…", PrivateLabel.mask(name), g.kind or "?")
 
 		if g.path == nil then
 			-- Programmatic group: mark enabled and run the post-load hook if any.
