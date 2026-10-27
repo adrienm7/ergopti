@@ -226,6 +226,7 @@
 	"field_check.step.integration_enabled": "Karabiner entegrasyonu etkin",
 	"field_check.step.lease_phase": "Kiralama durumu",
 	"field_check.step.guardian_state": "Kiralama koruyucusu",
+	"field_check.step.guardian_wait": "Koruyucunun ilk yanıtı bekleniyor",
 	"field_check.step.cli_version": "Karabiner sürümü",
 	"field_check.step.config_present": "Karabiner yapılandırma dosyası mevcut",
 	"field_check.step.lease_failures": "Bu oturumdaki kiralama hataları",

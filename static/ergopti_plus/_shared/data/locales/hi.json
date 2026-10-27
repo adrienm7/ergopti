@@ -226,6 +226,7 @@
 	"field_check.step.integration_enabled": "Karabiner एकीकरण सक्षम है",
 	"field_check.step.lease_phase": "लीज़ की स्थिति",
 	"field_check.step.guardian_state": "लीज़ गार्डियन",
+	"field_check.step.guardian_wait": "गार्डियन के पहले उत्तर की प्रतीक्षा",
 	"field_check.step.cli_version": "Karabiner संस्करण",
 	"field_check.step.config_present": "Karabiner कॉन्फ़िगरेशन फ़ाइल मौजूद है",
 	"field_check.step.lease_failures": "इस सत्र में लीज़ विफलताएँ",

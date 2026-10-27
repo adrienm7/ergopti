@@ -226,6 +226,7 @@
 	"field_check.step.integration_enabled": "Karabiner 集成已启用",
 	"field_check.step.lease_phase": "租约状态",
 	"field_check.step.guardian_state": "租约守护程序",
+	"field_check.step.guardian_wait": "等待守护程序的首次响应",
 	"field_check.step.cli_version": "Karabiner 版本",
 	"field_check.step.config_present": "Karabiner 配置文件存在",
 	"field_check.step.lease_failures": "本次会话的租约失败",

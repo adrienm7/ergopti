@@ -226,6 +226,7 @@
 	"field_check.step.integration_enabled": "Karabiner-Integration aktiviert",
 	"field_check.step.lease_phase": "Lease-Status",
 	"field_check.step.guardian_state": "Lease-Wächter",
+	"field_check.step.guardian_wait": "Warten auf die erste Antwort des Wächters",
 	"field_check.step.cli_version": "Karabiner-Version",
 	"field_check.step.config_present": "Karabiner-Konfigurationsdatei vorhanden",
 	"field_check.step.lease_failures": "Lease-Fehler in dieser Sitzung",

@@ -226,6 +226,7 @@
 	"field_check.step.integration_enabled": "Integración con Karabiner activada",
 	"field_check.step.lease_phase": "Estado de la concesión",
 	"field_check.step.guardian_state": "Guardián de la concesión",
+	"field_check.step.guardian_wait": "Espera de la primera respuesta del guardián",
 	"field_check.step.cli_version": "Versión de Karabiner",
 	"field_check.step.config_present": "Archivo de configuración de Karabiner presente",
 	"field_check.step.lease_failures": "Fallos de la concesión en esta sesión",

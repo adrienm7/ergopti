@@ -226,6 +226,7 @@
 	"field_check.step.integration_enabled": "تكامل Karabiner مفعّل",
 	"field_check.step.lease_phase": "حالة العقد",
 	"field_check.step.guardian_state": "حارس العقد",
+	"field_check.step.guardian_wait": "انتظار أول رد من الحارس",
 	"field_check.step.cli_version": "إصدار Karabiner",
 	"field_check.step.config_present": "ملف إعدادات Karabiner موجود",
 	"field_check.step.lease_failures": "إخفاقات العقد في هذه الجلسة",

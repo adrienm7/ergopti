@@ -256,6 +256,10 @@ function M.new()
 		network_chain = network_chain,
 		route_plan = route_plan,
 		timer_probe = timer_probe,
+		after = function(seconds, callback)
+			local _, committed = Timer.after(seconds, callback)
+			if committed ~= true then error("field check: the wait timer could not be armed", 0) end
+		end,
 		owned_readiness = owned_readiness,
 		app_path = app_path,
 		login_startup_status = login_startup_status,
