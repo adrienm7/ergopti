@@ -1430,7 +1430,7 @@ local function main()
 					_undoable = nil
 					engine:reset(false)
 					local report = ok_delivery and type(delivery) == "table" and delivery.cleanup_ok == true
-						and delivery_error == "programmable publication is no longer current" and Logger.warn or Logger.error
+						and delivery_error == require("adapter_errors").PROGRAMMABLE_PUBLICATION_STALE and Logger.warn or Logger.error
 					report(LOG, "Expansion output did not commit — logical state invalidated: %s.",
 						tostring(delivery_error))
 				end
