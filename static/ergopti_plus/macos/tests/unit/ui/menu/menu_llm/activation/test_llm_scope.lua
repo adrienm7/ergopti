@@ -2,6 +2,7 @@
 
 --- Runs the real planner, preference owner, runtime reconciler and transaction.
 local helpers = require("tests.helpers")
+local MetricsState = require("infra.metrics_state_keys")
 local Codec = require("toml_codec")
 local Manifest = require("infra.manifest_reader")
 local FS = require("adapters.file_system")
@@ -170,7 +171,7 @@ helpers.describe("macOS complete LLM scope", function()
 
 	helpers.it("Clear consumes only the selected consent demotion", function()
 		local owner, _, files, _, save, demotions = fixture(true)
-		demotions.record({ feature = "metrics", key = "keystats_enabled", persisted = true, demoted = false })
+		demotions.record({ feature = "metrics", key = MetricsState.ENABLED, persisted = true, demoted = false })
 		helpers.assert_eq(owner.apply("clear"), true)
 		helpers.assert_eq(#demotions.list(), 1)
 		helpers.assert_eq(demotions.list()[1].feature, "metrics")
