@@ -113,6 +113,21 @@ assert.deepEqual(
 	'an unbundled dependency that is not on the recipient list fails'
 );
 assert.equal(Closure.checkClosure([tree({ 'a.txt': 'x' })], injected, recipient).checked.length, 0);
+// The network runtime's curl closure needs the GLib closure the stager leaves
+// to the recipient (recipient_dependencies); the first hosted build refused it.
+const network = tree({ 'usr/bin/curl': ELF, 'usr/lib/libp11-kit.so.0': ELF });
+const networkDynamics = {
+	'usr/bin/curl': ' (NEEDED) Shared library: [libz.so.1]\n (NEEDED) Shared library: [libc.so.6]',
+	'usr/lib/libp11-kit.so.0':
+		' (SONAME) Library soname: [libp11-kit.so.0]\n (NEEDED) Shared library: [libffi.so.8]'
+};
+result = Closure.checkClosure(
+	[network],
+	(file) => networkDynamics[path.relative(network, file).split(path.sep).join('/')],
+	recipient
+);
+assert.equal(result.checked.length, 2);
+assert.deepEqual(result.violations, [], "the stager's GLib closure is on the recipient list");
 passed++;
 
 // 4. Real ELF files and the real readelf.
