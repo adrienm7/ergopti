@@ -75,7 +75,7 @@ exports.run = function run(root) {
 			);
 			assert.equal(
 				safe.sections.system.os,
-				{ windows: '10.0.26100.1', macos: '15.5', linux: '24.04' }[safe.driver]
+				{ windows: 'Windows 10.0.26100.1', macos: 'macOS 15.5', linux: 'Ubuntu 24.04' }[safe.driver]
 			);
 		} else assert.ok(!Object.hasOwn(safe.sections.system, 'os'));
 		const input = JSON.stringify(vector.snapshot);
