@@ -517,6 +517,15 @@
 			"cmd": "node",
 			"args": ["tools/test/test-macos-hammerspoon-cache.cjs"],
 			"repro": "npm run test:macos-hammerspoon-cache"
+		},
+		{
+			"id": "js-macos-field-run-contract",
+			"ordinal": 519,
+			"name": "the macOS field report collector and the developer app's field run share one request and result contract",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-field-run-contract.cjs"],
+			"repro": "npm run test:macos-field-run-contract",
+			"platforms": ["linux", "darwin"]
 		}
 	]
 }
