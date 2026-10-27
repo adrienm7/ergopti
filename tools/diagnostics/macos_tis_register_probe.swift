@@ -6,41 +6,55 @@
  * DESCRIPTION:
  * A one-file probe for the macOS questions of docs/design/layout-option-emulation.md:
  * can a keyboard layout written while the system runs be registered, enabled and
- * SELECTED without a logout, and what makes TISSelectInputSource refuse it.
- * The first run (probe v1) showed that registering works at once, that an in-place
- * rewrite stays cached, that a removed file leaves a ghost entry until logout, and
- * that selecting a freshly registered loose .keylayout answers -50 (paramErr).
- * This version tries the ways around that refusal, one line each.
+ * SELECTED without a logout, and by which route.
+ *
+ * What the first two runs showed (macOS 26, arm64):
+ *   - TISRegisterInputSource lists a loose .keylayout at once (id org.unknown.keylayout.<Name>);
+ *   - TISEnableInputSource answers 0 but the source stays enabled=false, so
+ *     TISSelectInputSource answers -50 (paramErr), at once, after a run-loop turn and after
+ *     re-reading the list;
+ *   - an in-place rewrite stays cached, and a disabled source whose file was removed stays
+ *     listed until logout;
+ *   - a bundle built with a made-up identifier was not listed at all.
+ * The driver's own install path (macos/modules/keymap/input_sources.lua) does not call
+ * TISEnableInputSource for a layout: it adds {InputSourceKind "Keyboard Layout",
+ * "KeyboardLayout ID" (the integer id of the .keylayout), "KeyboardLayout Name"} to
+ * AppleEnabledInputSources of com.apple.HIToolbox and restarts SystemUIServer. This
+ * version tests that route (P5), a bundle shaped exactly like the shipped Ergopti bundle
+ * (P4), and replacing a layout inside the already enabled Ergopti bundle (P7).
  *
  * Run (Terminal, macOS 13 or later, no Xcode project needed):
  *   swiftc -O -o /tmp/ep_tis_probe tools/diagnostics/macos_tis_register_probe.swift && /tmp/ep_tis_probe
- * Optional: add --write-prefs to also try the last resort (P5), which edits the
- * user's AppleEnabledInputSources in com.apple.HIToolbox and puts it back.
+ * Flags (each writes more; none is on by default):
+ *   --write-prefs       P5: enable the throw-away layouts through com.apple.HIToolbox
+ *                       (exported first, imported back at the end) and restart SystemUIServer
+ *   --replace-ergopti   P7: add a layout under a new name and id inside the bundle that holds
+ *                       the current input source (copied to a backup first, put back at the end)
  * After a logout and login: /tmp/ep_tis_probe after-logout
  *
  * FEATURES & RATIONALE:
- * 1. Throw-away layouts only, named EPProbe<pid>..., with numeric ids drawn from a range
- *    no installed layout uses (the ids found in the layout folders are listed first and
- *    avoided). The user is put back on the input source they started on and every file
- *    is removed at the end, also when a step fails.
- * 2. One verdict line per question:
- *      P<n> PASS|FAIL|INFO <what was observed>
- *    Send all printed lines back. Nothing else is read or written; P5 writes the user's
- *    preferences only with --write-prefs, and restores them.
+ * 1. Throw-away layouts only, named EPProbe<pid>..., with numeric ids outside every layout
+ *    file found in the layout folders. The user is put back on the input source they started
+ *    on and every file the probe wrote is removed at the end, also when a step fails.
+ * 2. One verdict line per question:  P<n> PASS|FAIL|INFO <what was observed>
+ *    Send all printed lines back.
  * 3. No event is posted: what a source types is read from its own layout data with
  *    UCKeyTranslate (key code 12, the Q key, no modifier).
- * 4. The only waits are run-loop turns of 0.3 s (P3, P4, P5), to tell « needs time » from
+ * 4. The only waits are run-loop turns of 0.3 s to 1.5 s, to tell « needs time » from
  *    « refused for good ».
  *
  * Questions:
- *   P0  how many numeric ids are already taken, and where this run's ids start
- *   P1  the capabilities of a freshly registered loose .keylayout before selecting
- *   P2  select at once (the v1 result: -50)
- *   P3  select after a run-loop turn, then after re-reading the source list
- *   P4  the same layout installed as a .bundle (Info.plist + Resources/*.keylayout)
- *   P5  select once the source is enabled through the user's preferences (--write-prefs)
- *   P6  sources named EPProbe still listed after the cleanup (a ghost until logout is
- *       expected); with the argument after-logout, whether any survived the logout
+ *   P0  how many numeric ids are taken, and where this run's ids start
+ *   P1  capabilities of a freshly registered loose .keylayout, before selecting
+ *   P2  select at once (TISEnableInputSource then TISSelectInputSource)
+ *   P3  the same after a run-loop turn and after re-reading the list
+ *   P4  the same layout as a bundle shaped like the Ergopti bundle: listed? capabilities, select
+ *   P5  --write-prefs: enabled through AppleEnabledInputSources, SystemUIServer restarted, then
+ *       enabled? select? (for the loose file and for the bundle)
+ *   P7  --replace-ergopti: the new layout inside the enabled Ergopti bundle: listed? enabled by
+ *       inheritance? select? and the bundle put back
+ *   P6  sources named EPProbe still listed after the cleanup (a ghost until logout is expected);
+ *       with the argument after-logout, whether any survived the logout
  * ==============================================================================
  */
 
@@ -51,8 +65,10 @@ let layoutsDirectory = NSString(string: "~/Library/Keyboard Layouts").expandingT
 let keyCodeQ: UInt16 = 12
 let pidTag = "EPProbe\(getpid())"
 let writePrefs = CommandLine.arguments.contains("--write-prefs")
+let replaceErgopti = CommandLine.arguments.contains("--replace-ergopti")
 var createdPaths: [String] = []
 var createdNames: [String] = []
+var layoutIdentifiers: [String: Int] = [:]
 
 // MARK: - Layout files
 
@@ -102,29 +118,45 @@ func freshIdentifier() -> Int {
 func writeLoose(name: String, output: String) throws -> URL {
 	try FileManager.default.createDirectory(atPath: layoutsDirectory, withIntermediateDirectories: true)
 	let path = "\(layoutsDirectory)/\(name).keylayout"
-	try keylayoutText(name: name, id: freshIdentifier(), output: output).write(toFile: path, atomically: true, encoding: .utf8)
+	let id = freshIdentifier()
+	layoutIdentifiers[name] = id
+	try keylayoutText(name: name, id: id, output: output).write(toFile: path, atomically: true, encoding: .utf8)
 	createdPaths.append(path)
 	createdNames.append(name)
 	return URL(fileURLWithPath: path)
 }
 
+/// A bundle shaped like the shipped Ergopti bundle: a com.apple.keyboardlayout.* identifier,
+/// KLInfo_<layout name> with the same keys, version.plist, and the display name in a
+/// localized InfoPlist.strings (UTF-16, as the shipped one).
 func writeBundle(name: String, output: String) throws -> URL {
 	let root = "\(layoutsDirectory)/\(name).bundle"
 	let resources = root + "/Contents/Resources"
-	try FileManager.default.createDirectory(atPath: resources, withIntermediateDirectories: true)
-	try keylayoutText(name: name, id: freshIdentifier(), output: output)
+	try FileManager.default.createDirectory(atPath: resources + "/en.lproj", withIntermediateDirectories: true)
+	let id = freshIdentifier()
+	layoutIdentifiers[name] = id
+	try keylayoutText(name: name, id: id, output: output)
 		.write(toFile: "\(resources)/\(name).keylayout", atomically: true, encoding: .utf8)
-	let identifier = "org.epprobe.keylayout.\(name)"
+	let sourceID = "com.apple.keyboardlayout.\(name.lowercased())"
 	let info: [String: Any] = [
-		"CFBundleIdentifier": identifier,
+		"CFBundleIdentifier": sourceID,
 		"CFBundleName": name,
-		"CFBundleVersion": "1",
-		"CFBundleShortVersionString": "1",
-		"CFBundlePackageType": "BNDL",
-		"KLInfo_\(name)": ["TISInputSourceID": identifier, "TISIntendedLanguage": "en-US"],
+		"CFBundleShortVersionString": "1.0.0",
+		"CFBundleVersion": "1.0.0",
+		"KLInfo_\(name)": [
+			"TICapsLockLanguageSwitchCapable": true,
+			"TISIconIsTemplate": false,
+			"TISInputSourceID": sourceID,
+			"TISIntendedLanguage": "fr",
+		],
 	]
-	let data = try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
-	try data.write(to: URL(fileURLWithPath: root + "/Contents/Info.plist"))
+	try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+		.write(to: URL(fileURLWithPath: root + "/Contents/Info.plist"))
+	let version: [String: Any] = ["BuildVersion": "1.0.0", "ProjectName": name, "SourceVersion": "1.0.0"]
+	try PropertyListSerialization.data(fromPropertyList: version, format: .xml, options: 0)
+		.write(to: URL(fileURLWithPath: root + "/Contents/version.plist"))
+	try "\"\(name)\" = \"\(name)\";\n".data(using: .utf16)!
+		.write(to: URL(fileURLWithPath: resources + "/en.lproj/InfoPlist.strings"))
 	createdPaths.append(root)
 	createdNames.append(name)
 	return URL(fileURLWithPath: root)
@@ -207,14 +239,16 @@ func trySelect(_ step: String, _ label: String, _ name: String) {
 		"\(label): enable \(enable), select \(select), current \(now), Q types '\(typed(source))'")
 }
 
-// MARK: - User preferences (P5 only, with --write-prefs)
+// MARK: - Processes and user preferences
 
-func defaultsTool(_ arguments: [String], input: Data? = nil) -> (Int32, Data) {
+@discardableResult
+func run(_ path: String, _ arguments: [String], input: Data? = nil) -> (Int32, Data) {
 	let process = Process()
-	process.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
+	process.executableURL = URL(fileURLWithPath: path)
 	process.arguments = arguments
 	let output = Pipe()
 	process.standardOutput = output
+	process.standardError = Pipe()
 	if let input = input {
 		let pipe = Pipe()
 		process.standardInput = pipe
@@ -229,13 +263,119 @@ func defaultsTool(_ arguments: [String], input: Data? = nil) -> (Int32, Data) {
 
 /// The domain as exported, so that it can be put back as it was.
 func exportDomain() -> Data? {
-	let (status, data) = defaultsTool(["export", "com.apple.HIToolbox", "-"])
+	let (status, data) = run("/usr/bin/defaults", ["export", "com.apple.HIToolbox", "-"])
 	return status == 0 ? data : nil
 }
 
-func enabledListContains(_ fragment: String) -> Bool {
-	let (_, data) = defaultsTool(["read", "com.apple.HIToolbox", "AppleEnabledInputSources"])
-	return String(data: data, encoding: .utf8)?.contains(fragment) ?? false
+/// Restarts the agent that reads the enabled list, the way the driver's own install does.
+func restartInputSourceAgent() -> Int32 {
+	return run("/bin/launchctl", ["kickstart", "-k", "user/\(getuid())/com.apple.SystemUIServer"]).0
+}
+
+/// Adds {Keyboard Layout, id, name} to AppleEnabledInputSources, the entry the driver writes.
+func enableThroughPreferences(name: String) -> String {
+	guard let id = layoutIdentifiers[name] else { return "no numeric id known for \(name)" }
+	let (status, data) = run("/usr/bin/defaults", ["export", "com.apple.HIToolbox", "-"])
+	guard status == 0,
+		var domain = (try? PropertyListSerialization.propertyList(from: data, options: [], format: nil)) as? [String: Any]
+	else { return "cannot read com.apple.HIToolbox" }
+	var sources = domain["AppleEnabledInputSources"] as? [[String: Any]] ?? []
+	sources.removeAll { ($0["KeyboardLayout Name"] as? String) == name }
+	sources.append(["InputSourceKind": "Keyboard Layout", "KeyboardLayout ID": id, "KeyboardLayout Name": name])
+	domain["AppleEnabledInputSources"] = sources
+	guard let edited = try? PropertyListSerialization.data(fromPropertyList: domain, format: .xml, options: 0)
+	else { return "cannot encode the edited domain" }
+	let (imported, _) = run("/usr/bin/defaults", ["import", "com.apple.HIToolbox", "-"], input: edited)
+	let restarted = restartInputSourceAgent()
+	return "import status \(imported), SystemUIServer restart status \(restarted)"
+}
+
+/// The route the driver uses, then the checks: enabled? select?
+func tryThroughPreferences(_ step: String, _ label: String, _ name: String) {
+	let did = enableThroughPreferences(name)
+	turn(1.5)
+	guard let source = find(name: name) else {
+		verdict(step, false, "\(label): \(did); not listed afterwards")
+		return
+	}
+	verdict(step, nil, "\(label): \(did); then \(capabilities(source))")
+	let select = TISSelectInputSource(source)
+	let now = currentIdentifier()
+	verdict(step, select == noErr && now == identifier(source),
+		"\(label): select \(select), current \(now), Q types '\(typed(source))'")
+}
+
+// MARK: - The installed bundle that holds the current source (P7 only)
+
+/// The bundle folder in the layout folders whose Info.plist declares `sourceID`.
+func installedBundle(holding sourceID: String) -> String? {
+	for folder in [layoutsDirectory, "/Library/Keyboard Layouts"] {
+		guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder) else { continue }
+		for entry in names where entry.hasSuffix(".bundle") {
+			let plist = "\(folder)/\(entry)/Contents/Info.plist"
+			guard let data = FileManager.default.contents(atPath: plist),
+				let info = (try? PropertyListSerialization.propertyList(from: data, options: [], format: nil)) as? [String: Any]
+			else { continue }
+			for (key, value) in info where key.hasPrefix("KLInfo_") {
+				if (value as? [String: Any])?["TISInputSourceID"] as? String == sourceID { return "\(folder)/\(entry)" }
+			}
+		}
+	}
+	return nil
+}
+
+var bundleBackup: (original: String, backup: String)?
+
+/// Adds one layout (new name, new numeric id, Q types Z) to the bundle that holds the current source.
+func replaceInsideErgoptiBundle() {
+	let current = currentIdentifier()
+	guard let bundle = installedBundle(holding: current) else {
+		verdict("P7", false, "no installed bundle declares the current source \(current)")
+		return
+	}
+	guard FileManager.default.isWritableFile(atPath: bundle + "/Contents/Info.plist") else {
+		verdict("P7", false, "\(bundle) is not writable by this user (a system bundle needs the administrator route)")
+		return
+	}
+	let backup = NSTemporaryDirectory() + "\(pidTag)-bundle-backup"
+	try? FileManager.default.removeItem(atPath: backup)
+	do { try FileManager.default.copyItem(atPath: bundle, toPath: backup) } catch {
+		verdict("P7", false, "cannot back up \(bundle): \(error)")
+		return
+	}
+	bundleBackup = (bundle, backup)
+	let name = pidTag + "d"
+	do {
+		let plistPath = bundle + "/Contents/Info.plist"
+		let data = try Data(contentsOf: URL(fileURLWithPath: plistPath))
+		guard var info = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any]
+		else { verdict("P7", false, "unreadable Info.plist"); return }
+		let sourceID = current + ".epv\(getpid())"
+		info["KLInfo_\(name)"] = [
+			"TICapsLockLanguageSwitchCapable": true,
+			"TISIconIsTemplate": false,
+			"TISInputSourceID": sourceID,
+			"TISIntendedLanguage": "fr",
+		]
+		let id = freshIdentifier()
+		layoutIdentifiers[name] = id
+		try keylayoutText(name: name, id: id, output: "Z")
+			.write(toFile: bundle + "/Contents/Resources/\(name).keylayout", atomically: true, encoding: .utf8)
+		try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+			.write(to: URL(fileURLWithPath: plistPath))
+		createdNames.append(name)
+		let status = TISRegisterInputSource(URL(fileURLWithPath: bundle) as CFURL)
+		turn(0.5)
+		guard let source = find(name: name) else {
+			verdict("P7", false, "register status \(status): \(name) is not listed after adding it to \(bundle)")
+			return
+		}
+		verdict("P7", nil, "register status \(status), inside \(bundle): \(capabilities(source))")
+		trySelect("P7", "new layout inside the enabled bundle, select", name)
+		if writePrefs { tryThroughPreferences("P7", "new layout inside the enabled bundle", name) }
+	} catch {
+		verdict("P7", false, "error: \(error)")
+	}
 }
 
 // MARK: - After-logout mode
@@ -252,10 +392,11 @@ let originalSource = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValu
 print("start current source: \(currentIdentifier())")
 verdict("P0", nil, "\(identifierTaken.count) numeric layout ids already taken; this run draws from \(nextIdentifier) downward")
 
-let originalDomain = writePrefs ? exportDomain() : nil
-if writePrefs && originalDomain == nil {
-	print("P5 FAIL cannot export com.apple.HIToolbox, so --write-prefs is refused and nothing will be written")
+let originalDomain = (writePrefs || replaceErgopti) ? exportDomain() : nil
+if (writePrefs || replaceErgopti) && originalDomain == nil {
+	print("P5 FAIL cannot export com.apple.HIToolbox, so nothing will be written to the preferences")
 }
+let mayWritePreferences = writePrefs && originalDomain != nil
 
 func cleanUp() {
 	if let original = originalSource { _ = TISSelectInputSource(original) }
@@ -263,10 +404,23 @@ func cleanUp() {
 		if let source = find(name: name) { _ = TISDisableInputSource(source) }
 	}
 	for path in createdPaths { try? FileManager.default.removeItem(atPath: path) }
-	if let saved = originalDomain {
-		let (status, _) = defaultsTool(["import", "com.apple.HIToolbox", "-"], input: saved)
-		verdict("P5", nil, "preferences put back from the export (defaults import status \(status))")
+	if let saved = bundleBackup {
+		try? FileManager.default.removeItem(atPath: saved.original)
+		do {
+			try FileManager.default.copyItem(atPath: saved.backup, toPath: saved.original)
+			try? FileManager.default.removeItem(atPath: saved.backup)
+			_ = TISRegisterInputSource(URL(fileURLWithPath: saved.original) as CFURL)
+			verdict("P7", nil, "bundle \(saved.original) put back from its backup")
+		} catch {
+			verdict("P7", false, "THE BUNDLE COULD NOT BE PUT BACK: restore \(saved.original) from \(saved.backup) by hand (\(error))")
+		}
 	}
+	if mayWritePreferences, let saved = originalDomain {
+		let (status, _) = run("/usr/bin/defaults", ["import", "com.apple.HIToolbox", "-"], input: saved)
+		let restarted = restartInputSourceAgent()
+		verdict("P5", nil, "preferences put back from the export (import status \(status), SystemUIServer restart \(restarted))")
+	}
+	if let original = originalSource { _ = TISSelectInputSource(original) }
 }
 
 do {
@@ -286,42 +440,40 @@ do {
 	trySelect("P3", "loose file, after a 0.3 s run-loop turn", loose)
 	turn(0.3)
 	_ = inventory()
-	if let source = find(name: loose) {
-		verdict("P3", nil, "loose file, after re-reading the list: \(capabilities(source))")
-	}
 	trySelect("P3", "loose file, after re-reading the list", loose)
 
-	// P4: the same layout as a bundle.
+	// P4: the same layout as a bundle shaped like the Ergopti one.
 	let bundle = pidTag + "b"
 	let bundleURL = try writeBundle(name: bundle, output: "B")
 	let bundleStatus = TISRegisterInputSource(bundleURL as CFURL)
+	turn(0.5)
 	if let source = find(name: bundle) {
 		verdict("P4", nil, "bundle, register status \(bundleStatus), before selecting: \(capabilities(source))")
 		trySelect("P4", "bundle, select at once", bundle)
-		turn(0.3)
-		trySelect("P4", "bundle, after a 0.3 s run-loop turn", bundle)
 	} else {
-		verdict("P4", false, "bundle, register status \(bundleStatus): not listed")
+		verdict("P4", false, "bundle, register status \(bundleStatus): not listed (compare its Info.plist with the Ergopti bundle's)")
 	}
 
-	// P5: the last resort, only with --write-prefs and a verified export to put back.
-	if writePrefs && originalDomain != nil {
-		let name = pidTag + "c"
-		let url = try writeLoose(name: name, output: "C")
-		_ = TISRegisterInputSource(url as CFURL)
-		let entry = "<dict><key>InputSourceKind</key><string>Keyboard Layout</string><key>KeyboardLayout Name</key><string>\(name)</string></dict>"
-		let (status, _) = defaultsTool(["write", "com.apple.HIToolbox", "AppleEnabledInputSources", "-array-add", entry])
-		verdict("P5", nil, "added \(name) to AppleEnabledInputSources (defaults status \(status), listed there: \(enabledListContains(name)))")
-		turn(0.3)
-		trySelect("P5", "enabled through the preferences, select", name)
+	// P5: the driver's own route, with --write-prefs.
+	if mayWritePreferences {
+		tryThroughPreferences("P5", "loose file enabled through the preferences", loose)
+		tryThroughPreferences("P5", "bundle enabled through the preferences", bundle)
 	} else if !writePrefs {
-		verdict("P5", nil, "skipped: pass --write-prefs to try enabling through com.apple.HIToolbox")
+		verdict("P5", nil, "skipped: the next step is to run with --write-prefs (edits and restores com.apple.HIToolbox)")
+	}
+
+	// P7: a layout added inside the enabled Ergopti bundle, with --replace-ergopti.
+	if replaceErgopti {
+		replaceInsideErgoptiBundle()
+	} else {
+		verdict("P7", nil, "skipped: pass --replace-ergopti to add a layout inside the installed bundle that holds the current source (backed up and restored)")
 	}
 } catch {
 	print("probe error: \(error)")
 }
 
 cleanUp()
+turn(0.5)
 let ghosts = inventory().compactMap { property($0, kTISPropertyLocalizedName) }.filter { $0.hasPrefix(pidTag) }
 verdict("P6", ghosts.isEmpty, "after the cleanup, probe sources still listed: \(ghosts.isEmpty ? "none" : ghosts.joined(separator: ", ")) (a ghost until logout is expected)")
 verdict("END", nil, "restored to \(currentIdentifier()); started on \(identifier(originalSource)); run again with 'after-logout' after a logout for P6")
