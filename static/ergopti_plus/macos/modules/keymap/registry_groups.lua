@@ -494,6 +494,34 @@ local function ensure_group_order(name)
 	end
 end
 
+--- Where a mapping file comes from, without its name: a file under the user's
+--- configuration folder is theirs (a personal pack, a user extension, a copy of
+--- a category); any other file ships with the driver.
+--- @param path string Absolute file path.
+--- @return string origin "user", "bundled" or "origin unknown".
+local function file_origin(path)
+	local loaded, ConfigPaths = pcall(require, "infra.config_paths")
+	if not loaded or type(ConfigPaths) ~= "table" or type(ConfigPaths.get_config_dir) ~= "function" then
+		return "origin unknown"
+	end
+	local resolved, config_dir = pcall(ConfigPaths.get_config_dir)
+	if not resolved or type(config_dir) ~= "string" or config_dir == "" then return "origin unknown" end
+	return path:sub(1, #config_dir) == config_dir and "user" or "bundled"
+end
+
+--- Names a mapping file in a log line without its user-chosen name: the masked
+--- placeholder plus its stable load ordinal and its origin, so a boot log still
+--- tells the files apart and says whether a shipped or a user file is meant.
+--- @param name string Group identifier, masked.
+--- @param path string Absolute file path.
+--- @return string label Such as "#2 (bundled, '<name>')".
+local function file_label(name, path)
+	local group = _state.groups[name]
+	local order = group and group.group_order
+	return string.format("#%s (%s, '%s')", tostring(order or "?"), file_origin(path),
+		PrivateLabel.mask(name))
+end
+
 --- Loads mappings from a Lua file via dofile and records the group.
 --- @param name string Group identifier used as the key in _state.groups.
 --- @param path string Absolute path to the Lua hotstring file.
@@ -853,15 +881,21 @@ function M.load_toml(name, path, section_sources, personal_source, source_conten
 	-- its Logger.start with a success whose count came from every OTHER group —
 	-- the one number guaranteed to look healthy. A group that loads zero entries
 	-- is almost always a path or permission problem, and it now says so.
+	-- The file was read and parsed (a missing or unreadable one failed above),
+	-- so zero mappings is either deliberate or a shipped file gone wrong.
 	local added = #_state.mappings - mappings_before
+	local label = file_label(name, path)
 	if added == 0 and enabled_sections == 0 and disabled_sections > 0 then
-		Logger.info(LOG, "TOML mapping file '%s' registered no mapping: its %d section(s) are disabled.",
-			PrivateLabel.mask(name), disabled_sections)
+		Logger.info(LOG, "TOML mapping file %s registered no mapping: its %d section(s) are disabled.",
+			label, disabled_sections)
+	elseif added == 0 and file_origin(path) == "user" then
+		-- A personal file the user created and has not filled yet.
+		Logger.info(LOG, "TOML mapping file %s holds no mapping yet.", label)
 	elseif added == 0 then
-		Logger.warn(LOG, "TOML mapping file '%s' registered ZERO mappings — check the path and its contents.", PrivateLabel.mask(name))
+		Logger.warn(LOG, "TOML mapping file %s registered ZERO mappings — check the path and its contents.", label)
 	else
-		Logger.success(LOG, "TOML mapping file '%s' loaded (%d mapping(s); %d total).",
-			PrivateLabel.mask(name), added, #_state.mappings)
+		Logger.success(LOG, "TOML mapping file %s loaded (%d mapping(s); %d total).",
+			label, added, #_state.mappings)
 	end
 	return true
 	end)
