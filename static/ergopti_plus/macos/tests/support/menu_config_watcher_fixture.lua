@@ -24,7 +24,7 @@ function M.with_watcher(body, options)
 	local outcome = table.pack(xpcall(function()
 		return helpers.with_fresh_modules(OWNERS, function()
 			for _, name in ipairs(OWNERS) do package.loaded[name] = nil end
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["infra.logger"] = options.logger or helpers.make_logger_stub()
 			package.loaded["infra.git_status"] = {
 				operation_in_progress = options.git_probe or function() return false end,
 			}

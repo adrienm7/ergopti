@@ -21,6 +21,17 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local TableUtil   = require("table_util")
 local LOG         = "menu_watchers"
 
+--- Whether a reload or quit is already under way, which makes a refused reload
+--- request expected rather than a fault.
+--- @return boolean terminating
+local function reload_already_terminating()
+	local loaded, coordinator = pcall(require, "infra.termination_coordinator")
+	if not loaded or type(coordinator) ~= "table" or type(coordinator.is_pending) ~= "function" then return false end
+	if type(coordinator.is_initialized) == "function" and coordinator.is_initialized() ~= true then return false end
+	local checked, pending = pcall(coordinator.is_pending)
+	return checked and pending == true
+end
+
 
 
 
@@ -220,7 +231,11 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until_awake, u
 				end
 				local request_ok, accepted = xpcall(on_reload, debug.traceback)
 				if not request_ok or accepted ~= true then
-					if not reload_refusal_logged then
+					if request_ok and reload_already_terminating() then
+						-- Expected: the reload this burst triggered is already under way
+						-- (field run 2026-10-27 19:47:04, ledger L45); the burst stays owned.
+						Logger.info(LOG, "Menu reload request deferred: a reload or quit is in progress.")
+					elseif not reload_refusal_logged then
 						reload_refusal_logged = true
 						Logger.warn(LOG,
 							"Menu reload request was refused; the source-file burst remains pending for retry: %s.",
