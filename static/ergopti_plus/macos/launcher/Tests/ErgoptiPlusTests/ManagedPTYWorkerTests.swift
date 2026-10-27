@@ -364,4 +364,21 @@ final class ManagedPTYWorkerTests: XCTestCase {
 		try session.finish(worker: 0, admitted: true, exit: 0)
 		XCTAssertNotNil(session.bytes.range(of: Data("OFFICIAL-INSTALLER-PRIVATE-INPUT".utf8)))
 	}
+
+	/// Field run 2026-10-27 19:47: a developer build refused its clone's
+	/// installer with exit 64 because only the payload folder was admitted.
+	func testDeveloperBuildAdmitsTheInstallersOfItsRecordedClone() {
+		let clone = "/Users/maintainer/ergopti/static/ergopti_plus/macos"
+		let admitted = ManagedPTYWorker.admittedSources(for: .developer(root: "/Users/maintainer/ergopti", configDir: clone))
+		XCTAssertEqual(admitted, Set(ManagedPTYWorker.admittedSourceNames.map { "\(clone)/modules/llm/\($0)" }))
+		XCTAssertTrue(admitted.contains("\(clone)/modules/llm/ensure-ollama-native-deps.sh"))
+	}
+
+	func testPackagedAppAdmitsOnlyItsPayloadAndARefusalAdmitsNothing() {
+		let payload = "/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos"
+		let admitted = ManagedPTYWorker.admittedSources(for: .packaged(configDir: payload))
+		XCTAssertEqual(admitted, Set(ManagedPTYWorker.admittedSourceNames.map { "\(payload)/modules/llm/\($0)" }))
+		XCTAssertFalse(admitted.contains("/Users/maintainer/ergopti/static/ergopti_plus/macos/modules/llm/ensure-ollama-native-deps.sh"))
+		XCTAssertTrue(ManagedPTYWorker.admittedSources(for: .refused(reason: "malformed key")).isEmpty)
+	}
 }

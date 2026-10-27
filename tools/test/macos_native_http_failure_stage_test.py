@@ -445,6 +445,34 @@ class NetworkCheckHelper(unittest.TestCase):
             ["step route_lookup info direct_pac_download"],
         )
 
+    def test_a_refused_trust_variable_is_not_a_route_or_tls_verdict(self):
+        # Field run 2026-10-27 19:47: the worker refused SSL_CERT_FILE/SSL_CERT_DIR
+        # before any lookup, and the check read "route_lookup pass selected".
+        failure = Exception("certificate")
+        failure.reason = "certificate"
+        failure.native_diagnostic = {"stage": "native_certificate_load"}
+        self.assertEqual(
+            self.lines(self.helper.failure_steps, failure),
+            [
+                "step route_lookup skip not_reached",
+                "step tls fail ssl_cert_env",
+                "step transfer fail certificate",
+            ],
+        )
+
+    def test_a_handshake_refusal_keeps_the_certificate_verdict(self):
+        failure = Exception("certificate")
+        failure.reason = "certificate"
+        failure.native_diagnostic = {"stage": "native_session_terminal"}
+        self.assertEqual(
+            self.lines(self.helper.failure_steps, failure),
+            [
+                "step route_lookup pass selected",
+                "step tls fail certificate",
+                "step transfer fail certificate",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -129,7 +129,9 @@ Every problem seen on the maintainer's Mac on 2026-10-27 (macOS 26.6.2, arm64), 
 log) on the `field/mac-2026-10-27` branch, which never reaches dev. Builds seen: ba73f58 (15:00),
 92d4615 (15:16), b014076 (15:29), 228f79f2 (16:47 developer app). The 16:28 to 16:54 boots ran
 after every 14:00 to 15:38 fix below, so "not seen after 16:28" is the evidence for those fixes.
-Labels L1 to L39 are local to this ledger. Shas on `tmp/wip-audit-field` change when rebased onto
+The automatic report `mac-2026-10-27_194738` (developer app from about dev 57fd72c1fb, boots
+19:47:05 and 19:48:21) is "the 19:47 run" below; L40 onwards come from it. Labels are local to
+this ledger. Shas on `tmp/wip-audit-field` change when rebased onto
 dev.
 
 ### Fixed on dev
@@ -137,31 +139,37 @@ dev.
 - **L1** Remap guardian status 'unavailable', regeneration fail-closed (new.txt 14:25:50 to
   16:06:42, 7 boots). Fixed b3893e0480, 6f667b3380 (developer-build agent fallback, after
   228f79f2). Not seen after 16:28. Mac confirms: no "guardian status 'unavailable'" at boot of the
-  developer app and of the installed app.
+  developer app and of the installed app. Developer app confirmed on the 19:47 run ("guardian
+  healthy: true"); the installed app is still to confirm.
 - **L2** menu_state.lua:531 timer held the main thread 21 to 23 s, with "Cannot read typing
   rollover facts" and "Aggregate cache recovery failed" (new.txt 14:25:49, 14:27:27, 15:26:02,
   15:28:51, 16:06:41). Fixed d854d55c79, 18d71c8580, d3cb3e6765 (sliced recovery). At 16:28 the
   recovery ran in slices ("interrupted after 267 slice(s)", expected). Residual hold: L18. Mac
-  confirms: no rollover ERROR, no hold over 2 s from menu_state.lua:531.
+  confirms: no rollover ERROR, no hold over 2 s from menu_state.lua:531. Confirmed on the 19:47
+  run: no rollover ERROR, no main-thread hold warning, boot complete in 1.7 s.
 - **L3** macOS disabled the keyDown, loopbackKeyUp and script-control taps, then "Typing context
   invalidated" (new.txt 14:27:29). Consequence of the 23 s hold of L2; same fix. Mac confirms:
-  no tap re-enable warning.
+  no tap re-enable warning. Confirmed on the 19:47 run.
 - **L4** AXValueChanged watcher cleanup/setup failed, context_tracker.lua:631 (new.txt 14:26 to
   16:09, about 20 lines). Fixed 690d7877d8. Not seen after 16:28. Mac confirms: none after
-  switching between apps for a few minutes.
+  switching between apps for a few minutes. Confirmed on the 19:47 run: context_tracker logs only
+  its TRACE and DONE observer lines.
 - **L5** notifier.lua:79 "attempt to call a nil value (method 'release')" (new.txt 14:31:59,
-  14:32:09). Fixed 75c2f02956. Not seen after.
+  14:32:09). Fixed 75c2f02956. Not seen after; confirmed on the 19:47 run (no notifier error).
 - **L6** hs.task refused to launch /usr/sbin/systemextensionsctl (new.txt 14:31:37, 15:27:18).
   Fixed f03227b916. Not seen after.
 - **L7** "Boot stage 'Accessibility permission' opened while ... still open" (new.txt 14:25:26,
   15:34:07, 16:06:18). Fixed ed5a622eda (AK); verified: absent from the three boots on 228f79f2
-  (16:28, 16:48, 16:54). Mac confirms: absent after a cold start that waits for the permission.
+  (16:28, 16:48, 16:54) and the 19:47 run. Mac confirms: absent after a cold start that waits for
+  the permission.
 - **L8** AI activation chain at 15:27:35: MLX bootstrap exit 78 "native network receiver is
   unavailable", Ollama bootstrap exit 64 "Erreur inconnue", eight MLX warmup settlement ERRORs,
   "PGID pending timeout", four HTTP 1500 ms timeouts, two download_window error states, failed
   switch_model. Fixed c0e3359a19 (receiver admitted in a developer app), 8fc33138ec (named exit
   causes), 0e9fa0c149 (MLX warmup stop), bc09e4584c (owned pinned Ollama). Mac confirms: enabling
-  MLX then Ollama from the menu downloads or names a closed cause, with no settlement ERROR.
+  MLX then Ollama from the menu downloads or names a closed cause, with no settlement ERROR. The
+  19:47 run named both causes and logged no settlement ERROR; the causes are new: L40 (Ollama
+  exit 64 again, developer build) and L41 (MLX, native_certificate_load).
 - **L9** TIS probe did not compile, "missing argument label 'name:'" (`_151611`, `_152936`
   probe_compile.txt), and a stale binary ran anyway. Fixed 678588c625, 1434adcc57.
 - **L10** PAC download failure aborted downloads; issue #104 `probes.proxy_pac.state: error`.
@@ -179,10 +187,24 @@ dev.
   on purpose. Fixed 9481ba78ac: one INFO line names the disabled section count; an empty or
   unreadable file still warns. `'<name>'` is the deliberate PrivateLabel mask
   (`_shared/lua/diagnostics/private_label.lua`), not a logging bug. Mac confirms: no ZERO warning.
+  Confirmed on the 19:47 run.
 - **L15** "Duplicate Ergopti Karabiner revocation completion ignored" on every reload (new.txt
   14:26:53 to 16:28:13, 6 times). Cause: both revocation halves answer synchronously, the join
   settles, and the trailing join in `M.revoke` (platform/remap/init.lua) settled again. Fixed
-  9f4dea89b2. Mac confirms: no such warning after a reload.
+  9f4dea89b2. Mac confirms: no such warning after a reload. The 19:47 run has one, at 19:47:04,
+  from the driver booted at 16:54 before the clone was updated; the two boots of the new code log
+  none. Still to confirm after a reload of the new code.
+
+### Fixed on tmp/wip-field-1947 (to land on dev)
+
+- **L40** Ollama install "exit=64, the installer refused its own request" in 110 ms (19:47 run,
+  09_ollama_runtime install_failed/state_failed, 19:48:49). Not the network and not the port
+  11435: the driver names `ensure-ollama-native-deps.sh` in its own folder, which a developer
+  build reads from the clone, and the launcher's PTY guardian admitted only the bundle payload
+  folder, so it answered `RETIRED 64` before running anything. Fixed 92d1ba890f: the guardian
+  admits the installers of the folder `LuaSourceSelection` names. Mac confirms: on a developer
+  app, choosing Ollama installs Ergopti's own 0.40.4 or names a later closed cause (expect L41's
+  certificate cause while L41 stands).
 
 ### Open TODO
 
@@ -221,7 +243,11 @@ dev.
   config.toml was already the defaults, so the field cause is one of those reasons; the earlier
   "Config migration ... refused (newer)" (15:32:19, 15:34:29) points at schema_refused. Mac
   confirms: the next occurrence names its reason; if it is schema_refused, decide whether a
-  read-only view may read a newer schema.
+  read-only view may read a newer schema. The 19:47 run names `value_type` (19:46:39 to 19:48:23,
+  both boots of the new code, every regeneration and wake refresh): one stored value has the
+  wrong TOML type. The view now also returns that value's config.toml path and the error prints
+  it ("value_type at <section.key>"), 00d3f20f7b. Mac confirms: read the key in the
+  next log, then fix the stored value or the manifest type it is checked against.
 - **L21** Fixed 708bc6671d. Ollama
   `stop_warmup() could not retire its HTTP owner: false` and settlement 'Ollama warmup stop' did
   not commit (new.txt 16:28:07, after "startup_model_download_declined"). Cause: hs.http.asyncPost
@@ -252,12 +278,15 @@ dev.
 - **L26** [CODE][PHYS-M] field run 03_field_network: fail (`_164726`); the PAC host is unknown
   off the company network (new.txt 16:48:20). Sub-steps were not captured (L13). Next: read the
   sub-steps in the next report; a PAC that cannot be fetched while direct works must not fail the
-  check.
+  check. The 19:47 run has them: see L41 and L42.
 - **L27** [PHYS-M] field run 04_field_toolchain: fail (`_164726`), sub-step unknown; candidates
   are `timer_late_ms` (main-thread hold) and the Shortcuts or Homebrew steps. Next: read the
-  sub-steps in the next report.
+  sub-steps in the next report. The 19:47 run names it: `karabiner_signature` exit_1, see L43;
+  every other step passed (timer late 0 ms).
 - **L28** [PHYS-M] field run 06_field_composer: fail, same cause as L25. 07_key_accounting:
-  needs_typing, not a failure: the maintainer types the prompted text on the next run.
+  needs_typing, not a failure: the maintainer types the prompted text on the next run. The 19:47
+  run is the same (composer_ready fail:not_enabled; the TIS probe again shows register 0, enable
+  0, select -50 and the source still disabled): known limitation, not re-fixed.
 - **L29** [CODE][PHYS-M] Screen Recording settings could not be opened, openURL returned false
   (new.txt 15:31:46). adapters/screen_capture.lua uses
   `x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture`, the same
@@ -290,8 +319,56 @@ closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swift
   them.
 - **L34** [CODE] HotPath over budget: preview.rebuild 5.3 to 13.3 ms, hotstring.match 6.4 ms,
   keydown 5.8 ms (new.txt 14:26 to 16:18). Low priority; profile with perf-profiling.
+- **L41** [CODE][PHYS-M] Every native download stops at stage `native_certificate_load` (19:47
+  run: the MLX `uv sync` staging failed 6 of 6 attempts with native receipt reason
+  `certificate`, 19:48:49 to 19:51:26; 03_field_network tls and transfer `certificate`). This is
+  not TLS inspection: that stage runs before any route lookup or connection, and it fails only
+  when `SSL_CERT_FILE` or `SSL_CERT_DIR` is set in the environment the driver inherits
+  (`ManagedCertificateAuthorities.load`; no Ergopti code sets either). The client is the signed
+  native worker (`--managed-http`, used by `managed_network_check.py`, `managed_bootstrap_http.py`
+  and the owned Ollama): it keeps the system and keychain trust and adds those variables'
+  certificates as extra anchors, but refuses the whole request when the file or folder is not
+  strictly PEM certificates (a comment or text header such as `/etc/ssl/cert.pem` carries, a
+  non-certificate block, an unreadable path, an empty folder). uv, curl and Python were never
+  reached. The check now reports `route_lookup skip not_reached` and `tls fail ssl_cert_env`
+  for that stage (467d99ec1c) instead of "selected" and a TLS verdict. Mac must run:
+  `launchctl getenv SSL_CERT_FILE; launchctl getenv SSL_CERT_DIR` and the same with `echo` in Terminal, then
+  `head -3 "$SSL_CERT_FILE"` or `ls -la "$SSL_CERT_DIR" | head`. Next: if the company sets a
+  bundle with text between certificates, decide whether the Swift and Go loaders accept
+  OpenSSL-style bundles (both refuse a "foreign prefix" on purpose in their tests) or whether the
+  macOS download children drop the inherited variables, since the policy puts the company root in
+  the keychain.
+- **L42** [CODE][PHYS-M] 03_field_network on the 19:47 run: `pac_download fail:failed` and
+  `pac_script fail:invalid` because the PAC host (http, company intranet name) does not resolve
+  off the company network; environmental, the fallback goes direct. Two defects behind the other
+  values are fixed on tmp/wip-field-1947: `route_plan fail:lookup_failed` lost the real stage
+  because the port read the route role's stdout while its `STAGE` line is on stderr, so the PAC
+  fallback could not apply (601ffe4808); and the WARNING carried the company PAC URL (aa636a9c9d).
+  Mac confirms: the next run shows `route_plan info:direct_fallback:<stage>` or a named stage,
+  and no URL in "PAC download failed". Next [CODE], once L41 is settled and direct `transfer`
+  passes: report `pac_download`/`pac_script` as info when the fallback covers their failure, as
+  L26 asks.
+- **L43** [PHYS-M] 04_field_toolchain `karabiner_signature fail:exit_1` (19:47 run). Not a
+  wrong check: `karabiner_cask info:absent` only means Homebrew did not install it; Karabiner
+  16.0.0 is installed from the pqrs package (its services run, karabiner.txt), so the app exists
+  and `codesign --verify --deep --strict` refused it. Mac must run
+  `codesign --verify --deep --strict --verbose=4 /Applications/Karabiner-Elements.app` and
+  `spctl -a -vv` on it. Next
+  [CODE]: carry codesign's first stderr cause as a closed token in the step value, so the report
+  says why without a manual run.
+- **L44** [CODE] Wake at 19:46:39 (driver booted 16:54): "Cannot refresh Karabiner lease
+  liveness — no live generation exists" and "Wake refresh could not renew the exact Karabiner
+  lease liveness", twice each, then the layout refresh retries of L20. New pattern. Next: decide
+  whether a wake refresh without a live generation should re-acquire the lease instead of
+  warning, and confirm on a wake of the new code.
 
 ### Expected, no defect
+
+- **L45** "Global external writer 'Watcher reload' refused because terminal quiescence was not
+  proved: true" and "Menu reload request was refused; the source-file burst remains pending for
+  retry: false" (19:47:04): the clone update's file burst arrived while the controlled reload it
+  had just started was fencing the lease; the reload went ahead (boot 19:47:05). Low priority
+  [CODE]: log it at INFO when the cause is a reload already in progress.
 
 - **L35** "Ergopti driver not started in this Hammerspoon" (new.txt 11:19 to 11:21): the stock
   Hammerspoon.app started next to a standalone ErgoptiPlus; the guard kept it inert.

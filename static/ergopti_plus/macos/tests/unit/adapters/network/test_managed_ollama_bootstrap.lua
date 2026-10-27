@@ -335,6 +335,19 @@ helpers.describe("native installer source and fixed environment receiving", func
 			end
 		end)
 	end)
+	-- Field run 2026-10-27 19:47: prepare() names the installer in the driver's
+	-- own folder, which a developer build reads from its clone, while the guardian
+	-- admitted only the payload folder and refused it with exit 64. The XCTest
+	-- ManagedPTYWorkerTests covers the paths; this keeps the guardian on the
+	-- launcher's own Lua source selection on hosts without Swift.
+	helpers.it("admits the installer from the folder the launcher reads its Lua from", function()
+		local worker = read(helpers.driver_root() .. "launcher/Sources/ErgoptiPlus/ManagedPTYWorker.swift")
+		local guardian = assert(worker:match("private static func guardian%(.-\n\t}\n"))
+		helpers.assert_true(guardian:find("admittedSources(for: LuaSourceSelection.resolve(", 1, true) ~= nil)
+		helpers.assert_eq(guardian:find("Contents/Resources/static/ergopti_plus/macos/modules/llm", 1, true), nil)
+		local names = assert(worker:match("static let admittedSourceNames = (%b[])"))
+		helpers.assert_true(names:find('"ensure-ollama-native-deps.sh"', 1, true) ~= nil)
+	end)
 	helpers.it("clears executable inherited Python and delegates only to the original fixed bootstrap", function()
 		shell_receiving(function(root, output, status)
 			helpers.assert_eq(status, 78)
