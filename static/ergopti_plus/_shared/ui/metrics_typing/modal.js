@@ -72,7 +72,7 @@ function update_app_btn_text() {
 	const sel = app_state.selected_apps.size;
 	const tot = app_state.available_apps.length;
 
-	if (sel === tot) {
+	if (sel === tot && app_state.app_selection_mode !== APP_SELECTION_MODE.NONE) {
 		btn.innerText = _t('ui_typing.apps_all');
 		btn.classList.add('active');
 	} else {
