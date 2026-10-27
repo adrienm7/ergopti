@@ -172,6 +172,7 @@ REQUIRED_FILES=(
 	"linux/_generated/locale_table.lua"
 	"linux/_generated/config_template.toml"
 	"_shared/lua/hotstring_engine/init.lua"
+	"_shared/lua/hotstring_engine/cascade.lua"
 	"_shared/lua/keystats/utils.lua"
 	"_shared/lua/keystats/metrics.lua"
 	"_shared/lua/keystats/aggregator_helpers.lua"
@@ -201,6 +202,7 @@ REQUIRED_FILES=(
 	# test-linux-ships-keylayout-converter.cjs keeps this list complete).
 	"_shared/lua/layouts/registry.lua"
 	"_shared/lua/layouts/catalogue.lua"
+	"_shared/lua/layouts/keylayout.lua"
 	"_shared/modules/layouts/defaults.json"
 	"_shared/modules/layouts/mac_keycodes.json"
 	"linux/modules/keymap/layout_registry.lua"
