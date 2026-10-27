@@ -12,7 +12,8 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Data-only steps. A step is a list of ops from a closed set (rename,
----    move_section, merge_into, map_value, delete, set_if_absent). The engine
+---    rename_prefix, move_section, merge_into, map_value, delete,
+---    set_if_absent). The engine
 ---    holds the only op semantics on this side; the corpus under
 ---    _shared/tests/corpus/config_migrations pins them to the Windows
 ---    interpreter and to the JS reference, and the registry defects under
@@ -156,6 +157,7 @@ local STEP_FIELDS = { from = true, to = true, drivers = true, reason = true, ops
 --- Fields of each op of the closed set.
 local OPS = {
 	rename        = { required = { "section", "key" }, optional = { "to_section", "to_key" } },
+	rename_prefix = { required = { "section", "prefix", "to_prefix" }, optional = {} },
 	copy_if_absent = { required = { "section", "key" }, optional = { "to_section", "to_key" } },
 	move_ergopti_variant = { required = { "section", "key", "to_key", "base_key", "alt_gr_key", "source_key", "false_variant", "true_variant" }, optional = { "neutral_variant" } },
 	move_chord_action = { required = { "section", "key", "to_section", "action", "conditional_key", "disabled_action", "platform" }, optional = {} },
@@ -430,6 +432,15 @@ local function validate_op(op)
 	end
 	if (op.op == "rename" or op.op == "copy_if_absent") and op.to_section == nil and op.to_key == nil then
 		return false, op.op .. " needs to_section or to_key"
+	end
+	if op.op == "rename_prefix" then
+		if not is_bare_key(op.prefix) or not is_bare_key(op.to_prefix) then
+			return false, "'prefix' and 'to_prefix' must be bare key text"
+		end
+		-- A prefix that extends the other would match a renamed key again on replay.
+		if op.prefix:sub(1, #op.to_prefix) == op.to_prefix or op.to_prefix:sub(1, #op.prefix) == op.prefix then
+			return false, "rename_prefix prefixes must not extend each other"
+		end
 	end
 	if op.op == "move_ergopti_variant" then
 		for _, field in ipairs({ "base_key", "alt_gr_key", "source_key", "false_variant", "true_variant" }) do
@@ -706,6 +717,14 @@ local function copy_destination_absent(sections, section, key)
 end
 
 local VARIANT_REFUSAL = "Ergopti variant migration refused:"
+local PREFIX_REFUSAL = "Prefix rename refused:"
+
+--- Whether a raised migration error is a typed refusal the plan reports as
+--- "invalid" instead of an engine fault.
+local function is_refusal(err)
+	local text = tostring(err)
+	return text:sub(1, #VARIANT_REFUSAL) == VARIANT_REFUSAL or text:sub(1, #PREFIX_REFUSAL) == PREFIX_REFUSAL
+end
 
 
 -- Every new operation names jointly retained physical and semantic owners.
@@ -872,6 +891,29 @@ function APPLY.move_chord_action(sections, op, context, model)
 	if target[op.conditional_key] == nil then target[op.conditional_key] = { value = op.disabled_action } end
 	if child_source then sections[child_path] = nil
 	else source[op.key] = nil; drop_if_empty(sections, op.section) end
+end
+
+--- Renames every key of one section that starts with a prefix, keeping the
+--- remainder. A renamed key that would land on an occupied key or namespace
+--- refuses the whole migration before any key moves: the two values cannot
+--- both survive, and dropping either would lose a user's setting unseen.
+function APPLY.rename_prefix(sections, op)
+	local entries = sections[op.section]
+	if entries == nil then return end
+	local moves = {}
+	for _, key in ipairs(sorted_keys(entries)) do
+		if key:sub(1, #op.prefix) == op.prefix then
+			local target = op.to_prefix .. key:sub(#op.prefix + 1)
+			if not copy_destination_absent(sections, op.section, target) then
+				error(PREFIX_REFUSAL .. " [" .. op.section .. "] " .. key .. " would land on the occupied " .. target, 0)
+			end
+			moves[#moves + 1] = { key, target }
+		end
+	end
+	for _, move in ipairs(moves) do
+		entries[move[2]] = entries[move[1]]
+		entries[move[1]] = nil
+	end
 end
 
 function APPLY.move_section(sections, op)
@@ -1112,7 +1154,7 @@ function M.plan(source, registry, driver, context)
 		return M.apply_steps(clone_model(before), registry, driver, version, context)
 	end)
 	if not applied then
-		if tostring(after):sub(1, #VARIANT_REFUSAL) == VARIANT_REFUSAL then
+		if is_refusal(after) then
 			return { outcome = "invalid", version = version, detail = tostring(after) }
 		end
 		error(after, 0)
@@ -1152,10 +1194,10 @@ function M.plan_operations(source, operations)
 	end
 	local after = clone_model(before)
 	for _, op in ipairs(operations) do
-		if op.op == "move_ergopti_variant" then
+		if op.op == "move_ergopti_variant" or op.op == "rename_prefix" then
 			local accepted, refusal = pcall(APPLY[op.op], after.sections, op, nil, after)
 			if not accepted then
-				if tostring(refusal):sub(1, #VARIANT_REFUSAL) == VARIANT_REFUSAL then
+				if is_refusal(refusal) then
 					return { outcome = "invalid", detail = tostring(refusal) }
 				end
 				error(refusal, 0)
@@ -1430,7 +1472,8 @@ function M.run(opts)
 			.. ", newer than this build's v" .. version_text(registry.current))
 	end
 	if plan.outcome == "invalid" then
-		if type(plan.detail) == "string" and plan.detail:find("Ergopti variant migration refused:", 1, true) == 1 then
+		-- A typed op refusal keeps its own named detail, as on Windows.
+		if type(plan.detail) == "string" and is_refusal(plan.detail) then
 			return refuse("invalid", plan.detail)
 		end
 		return refuse("invalid", "[_meta] schema_version is not a positive integer")
