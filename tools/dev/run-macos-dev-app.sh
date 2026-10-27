@@ -42,11 +42,48 @@ esac
 [ -f "$REPO_ROOT/static/ergopti_plus/macos/init.lua" ] \
 	|| fail "No driver at $REPO_ROOT/static/ergopti_plus/macos/init.lua."
 
-# The launcher prohibits a second instance: an installed ErgoptiPlus would be
-# activated instead and the developer app would exit at once.
-if pgrep -x "$ERGOPTI_APP_NAME" >/dev/null 2>&1; then
-	fail "Quit the running $ERGOPTI_APP_NAME first (menu > Quit), then run this again."
-fi
+# Every process running a binary of an ErgoptiPlus bundle, installed or built
+# here: the launcher, its embedded Hammerspoon and the remap guardian, which
+# runs the launcher binary under the same process name.
+ergopti_pids() {
+	pgrep -f "/${ERGOPTI_APP_BUNDLE}/Contents/" 2>/dev/null || true
+}
+
+# The launcher prohibits a second instance: a running ErgoptiPlus would be
+# activated instead and the developer app would exit at once. Quit it the way
+# the menu does, then stop what is left. The guardian is a launchd agent with
+# KeepAlive, so a plain kill only makes launchd start it again (Activity
+# Monitor's Quit appears to do nothing); it is booted out first, and the next
+# launch registers it again.
+stop_running_ergopti() {
+	local pids waited=0
+	pids="$(ergopti_pids)"
+	[ -n "$pids" ] || return 0
+	log "Stopping the running $ERGOPTI_APP_NAME (pids: $(printf '%s' "$pids" | tr '\n' ' '))..."
+	osascript -e "tell application id \"$ERGOPTI_BUNDLE_ID_LAUNCHER\" to quit" >/dev/null 2>&1 || true
+	launchctl bootout "gui/$(id -u)/$ERGOPTI_SERVICE_LABEL_MACOS_REMAP_GUARDIAN" >/dev/null 2>&1 || true
+	while [ -n "$(ergopti_pids)" ] && [ "$waited" -lt 10 ]; do sleep 1; waited=$((waited + 1)); done
+	pids="$(ergopti_pids)"
+	if [ -n "$pids" ]; then
+		# shellcheck disable=SC2086 # one pid per word
+		kill -TERM $pids 2>/dev/null || true
+		waited=0
+		while [ -n "$(ergopti_pids)" ] && [ "$waited" -lt 5 ]; do sleep 1; waited=$((waited + 1)); done
+	fi
+	pids="$(ergopti_pids)"
+	if [ -n "$pids" ]; then
+		# shellcheck disable=SC2086 # one pid per word
+		kill -KILL $pids 2>/dev/null || true
+		sleep 1
+	fi
+	pids="$(ergopti_pids)"
+	if [ -n "$pids" ]; then
+		ps -o pid=,command= -p "$(printf '%s' "$pids" | paste -sd, -)" >&2 || true
+		fail "These $ERGOPTI_APP_NAME processes survived a quit, SIGTERM and SIGKILL (launchd restarts them); turn ErgoptiPlus off in System Settings > General > Login Items & Extensions, then run this again."
+	fi
+	log "No $ERGOPTI_APP_NAME process is left."
+}
+stop_running_ergopti
 
 # The former bootstrap made a stock Hammerspoon load this clone; it now only
 # shows a refusal there. Name the files, never delete user configuration.
