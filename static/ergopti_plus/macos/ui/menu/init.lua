@@ -1690,8 +1690,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	schedule_menu_refresh = function()
 		PhaseStats.count("menu.refresh_requested")
 		if _menu_refresh_timer then return end
+		-- Each refresh is a full rebuild of 0.5 s or more on the Mac; naming the
+		-- code that asked for it says which state change cost a second one.
+		local caller = debug.getinfo(3, "Sl")
+		local requester = caller and (tostring(caller.short_src):match("[^/]+/[^/]+$") or tostring(caller.short_src))
+			.. ":" .. tostring(caller.currentline) or "?"
 		_menu_refresh_timer = hs.timer.doAfter(MENU_REFRESH_COALESCE_SEC, function()
 			_menu_refresh_timer = nil
+			Logger.debug(LOG, "Menu refresh requested by %s.", requester)
 			pcall(refresh_menu_now)
 		end)
 	end
@@ -1729,6 +1735,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	updateMenu()
+
+	-- Ask the login item state now, before the prime build below: answered only
+	-- by that build, an enabled login item flipped the baked state and forced a
+	-- second full rebuild at every boot (two 0.5 to 0.6 s holds on the Mac, 23:34).
+	-- Before priming its answer only marks the menu dirty.
+	require("ui.menu.start_at_login").request("status", function()
+		if type(updateMenu) == "function" then updateMenu() end
+	end)
 
 	-- Warm the expensive menu-discovery caches off the boot path so the FIRST
 	-- click renders instantly. Without this, building the keyboard-layout and
