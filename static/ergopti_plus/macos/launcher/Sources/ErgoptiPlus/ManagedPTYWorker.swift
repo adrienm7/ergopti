@@ -63,68 +63,193 @@ private final class ManagedPTYSignalLatch: @unchecked Sendable {
 	var cancelled: Bool { lock.lock(); defer { lock.unlock() }; return value }
 }
 
-/// Source bytes are copied into an unlinked descriptor before any child exists.
-/// The child's fixed fd 3 therefore cannot follow a later pathname replacement.
+/// A verified installer copy at a private, linked path. Endpoint-security
+/// agents on managed Macs kill `/bin/bash /dev/fd/3` over an unlinked file as
+/// fileless script execution (field report 2026-10-27 23:55: the same 12 s
+/// script survived from a path and died with SIGKILL from /dev/fd/3), so the
+/// guardian runs this copy as a regular path. The read-only descriptor kept
+/// here is the identity every later check is made through.
+struct ManagedPTYSnapshot {
+	let descriptor: Int32
+	let path: String
+	let directory: String
+	let identity: stat
+
+	private static func sameFile(_ left: stat, _ right: stat) -> Bool {
+		return left.st_dev == right.st_dev && left.st_ino == right.st_ino
+			&& left.st_size == right.st_size && left.st_mode == right.st_mode
+			&& left.st_uid == right.st_uid && left.st_nlink == right.st_nlink
+			&& left.st_mtimespec.tv_sec == right.st_mtimespec.tv_sec
+			&& left.st_mtimespec.tv_nsec == right.st_mtimespec.tv_nsec
+			&& left.st_ctimespec.tv_sec == right.st_ctimespec.tv_sec
+			&& left.st_ctimespec.tv_nsec == right.st_ctimespec.tv_nsec
+	}
+
+	/// Proves, immediately before the payload may read it, that the path still
+	/// names the verified inode, unchanged (a write or chmod moves its ctime),
+	/// and that its bytes still hash to the admitted digest, read through the
+	/// retained descriptor.
+	/// - Parameter sha256: The admitted lowercase hexadecimal digest.
+	/// - Returns: Whether the path may be handed to /bin/bash.
+	func verified(sha256: String) -> Bool {
+		var held = stat()
+		var named = stat()
+		guard fstat(descriptor, &held) == 0, lstat(path, &named) == 0,
+			(named.st_mode & S_IFMT) == S_IFREG, named.st_nlink == 1,
+			Self.sameFile(held, identity), Self.sameFile(named, identity) else { return false }
+		var hash = SHA256()
+		var offset: off_t = 0
+		var bytes = [UInt8](repeating: 0, count: 4096)
+		while offset < identity.st_size {
+			let count = pread(descriptor, &bytes, bytes.count, offset)
+			if count < 0 && errno == EINTR { continue }
+			guard count > 0 else { return false }
+			hash.update(data: Data(bytes.prefix(count)))
+			offset += off_t(count)
+		}
+		guard offset == identity.st_size else { return false }
+		return hash.finalize().map({ String(format: "%02x", $0) }).joined() == sha256
+	}
+
+	/// Unlinks the copy, when the path still names it, and its private folder.
+	/// - Returns: Whether neither remains.
+	func remove() -> Bool {
+		var named = stat()
+		if lstat(path, &named) == 0 {
+			guard named.st_dev == identity.st_dev, named.st_ino == identity.st_ino,
+				Darwin.unlink(path) == 0 else { return false }
+		} else if errno != ENOENT { return false }
+		return Darwin.rmdir(directory) == 0 || errno == ENOENT
+	}
+}
+
+/// Copies the admitted installer, before any child exists, into a private
+/// linked snapshot whose content matches the request's independent digest.
 enum ManagedPTYSource {
-	static func snapshot(_ request: ManagedPTYRequest, interrupted: () -> Bool) -> Int32? {
+	/// Folder of the snapshots, under the person's application data.
+	static let folderName = "pty-sources"
+
+	/// The private snapshot root for one home folder.
+	/// - Parameter home: Absolute home folder.
+	/// - Returns: The root path.
+	static func root(home: String) -> String {
+		return URL(fileURLWithPath: home).appendingPathComponent("Library/Application Support/ErgoptiPlus")
+			.appendingPathComponent(folderName).standardizedFileURL.path
+	}
+
+	/// Accepts only a real folder of this user that nobody else may write.
+	private static func ownedPrivateFolder(_ path: String, privateMode: Bool) -> Bool {
+		var info = stat()
+		guard lstat(path, &info) == 0, (info.st_mode & S_IFMT) == S_IFDIR, info.st_uid == geteuid() else { return false }
+		return privateMode ? info.st_mode & 0o077 == 0 : info.st_mode & 0o022 == 0
+	}
+
+	/// Creates the root on first use, owner-only, and refuses a symlink, a
+	/// foreign owner or a folder group or others may write, at every level
+	/// from the application data folder down.
+	private static func preparedRoot(_ root: String) -> Bool {
+		let parent = URL(fileURLWithPath: root).deletingLastPathComponent().path
+		if Darwin.mkdir(parent, 0o700) != 0 && errno != EEXIST { return false }
+		guard ownedPrivateFolder(parent, privateMode: false) else { return false }
+		if Darwin.mkdir(root, 0o700) != 0 && errno != EEXIST { return false }
+		return ownedPrivateFolder(root, privateMode: true)
+	}
+
+	/// Removes the snapshots of guardians that no longer run. A folder is named
+	/// after its guardian's pid, so a live operation's copy is never touched.
+	/// - Parameter root: The private snapshot root.
+	static func sweepStale(root: String) {
+		guard ownedPrivateFolder(root, privateMode: true),
+			let names = try? FileManager.default.contentsOfDirectory(atPath: root) else { return }
+		for name in names {
+			let parts = name.split(separator: ".")
+			guard parts.count == 3, parts[0] == "op", let pid = pid_t(parts[1]), pid > 0,
+				pid != getpid(), Darwin.kill(pid, 0) != 0, errno == ESRCH else { continue }
+			let folder = root + "/" + name
+			guard ownedPrivateFolder(folder, privateMode: true),
+				let files = try? FileManager.default.contentsOfDirectory(atPath: folder) else { continue }
+			for file in files {
+				var info = stat()
+				let path = folder + "/" + file
+				guard lstat(path, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG, info.st_uid == geteuid() else { continue }
+				_ = Darwin.unlink(path)
+			}
+			_ = Darwin.rmdir(folder)
+		}
+	}
+
+	/// Copies the installer into `<root>/op.<pid>.XXXXXX/<name>`, created
+	/// O_EXCL read-only for its owner, then proves the copy through a fresh
+	/// read-only descriptor against the request digest.
+	/// - Parameters:
+	///   - request: The admitted request.
+	///   - root: The private snapshot root.
+	///   - interrupted: Polled between reads; true abandons the copy.
+	/// - Returns: The verified snapshot, or nil after removing any partial copy.
+	static func snapshot(_ request: ManagedPTYRequest, root: String, interrupted: () -> Bool) -> ManagedPTYSnapshot? {
+		guard preparedRoot(root) else { return nil }
 		let input = Darwin.open(request.sourcePath, O_RDONLY | O_CLOEXEC | O_NONBLOCK)
 		guard input >= 0 else { return nil }
 		defer { Darwin.close(input) }
 		var initial = stat()
 		guard fstat(input, &initial) == 0, (initial.st_mode & S_IFMT) == S_IFREG, initial.st_size > 0 else { return nil }
-		var template = Array((FileManager.default.temporaryDirectory.path + "/ergopti-pty-source.XXXXXX").utf8CString)
-		let output = template.withUnsafeMutableBufferPointer { mkstemp($0.baseAddress!) }
-		guard output >= 0 else { return nil }
-		defer { Darwin.close(output) }
-		let preparedPath = template.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
-		var prepared = stat()
-		guard fstat(output, &prepared) == 0 else { return nil }
-		var unlinked = false
-		func unlinkOwned() -> Bool {
-			var named = stat()
-			guard lstat(preparedPath, &named) == 0, named.st_dev == prepared.st_dev,
-				named.st_ino == prepared.st_ino else { return false }
-			return Darwin.unlink(preparedPath) == 0
+		var template = Array((root + "/op.\(getpid()).XXXXXX").utf8CString)
+		guard template.withUnsafeMutableBufferPointer({ mkdtemp($0.baseAddress!) }) != nil else { return nil }
+		let directory = template.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+		let path = directory + "/" + URL(fileURLWithPath: request.sourcePath).lastPathComponent
+		var published = false
+		defer {
+			if !published {
+				_ = Darwin.unlink(path)
+				_ = Darwin.rmdir(directory)
+			}
 		}
-		defer { if !unlinked { _ = unlinkOwned() } }
-		guard fcntl(output, F_SETFD, FD_CLOEXEC) == 0 else { return nil }
+		guard ownedPrivateFolder(directory, privateMode: true) else { return nil }
+		let output = Darwin.open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o400)
+		guard output >= 0 else { return nil }
+		var written = stat()
+		guard fstat(output, &written) == 0 else { Darwin.close(output); return nil }
 		var hash = SHA256()
 		var remaining = initial.st_size
 		var bytes = [UInt8](repeating: 0, count: 4096)
+		var copied = true
 		while remaining > 0 {
-			guard !interrupted() else { return nil }
+			guard !interrupted() else { copied = false; break }
 			let count = Darwin.read(input, &bytes, Int(min(remaining, off_t(bytes.count))))
 			if count < 0 && errno == EINTR { continue }
-			guard count > 0 else { return nil }
+			guard count > 0 else { copied = false; break }
 			let data = Data(bytes.prefix(count))
-			guard ManagedPTYWorker.write(data, to: output) else { return nil }
+			guard ManagedPTYWorker.write(data, to: output) else { copied = false; break }
 			hash.update(data: data)
 			remaining -= off_t(count)
 		}
+		let synced = copied && Darwin.fsync(output) == 0
+		guard Darwin.close(output) == 0, synced else { return nil }
 		var tail: UInt8 = 0
 		var final = stat()
-		var path = stat()
+		var source = stat()
 		guard Darwin.read(input, &tail, 1) == 0, !interrupted(), fstat(input, &final) == 0,
-			stat(request.sourcePath, &path) == 0, initial.st_dev == final.st_dev, initial.st_ino == final.st_ino,
+			stat(request.sourcePath, &source) == 0, initial.st_dev == final.st_dev, initial.st_ino == final.st_ino,
 			initial.st_size == final.st_size, initial.st_mtimespec.tv_sec == final.st_mtimespec.tv_sec,
 			initial.st_mtimespec.tv_nsec == final.st_mtimespec.tv_nsec,
 			initial.st_ctimespec.tv_sec == final.st_ctimespec.tv_sec,
 			initial.st_ctimespec.tv_nsec == final.st_ctimespec.tv_nsec,
-			path.st_dev == final.st_dev, path.st_ino == final.st_ino,
-			hash.finalize().map({ String(format: "%02x", $0) }).joined() == request.sourceSHA256,
-			Darwin.fsync(output) == 0 else { return nil }
-		// The child receives a read-only capability, never mkstemp's writable fd.
-		// Reopening is fenced by the retained original inode before unlinking.
-		let retained = Darwin.open(preparedPath, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
+			source.st_dev == final.st_dev, source.st_ino == final.st_ino,
+			hash.finalize().map({ String(format: "%02x", $0) }).joined() == request.sourceSHA256 else { return nil }
+		// The child and every later check use this read-only capability, never
+		// the writer; reopening is fenced by the inode the writer created.
+		let retained = Darwin.open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
 		guard retained >= 0 else { return nil }
-		var retainedInfo = stat()
-		guard fstat(retained, &retainedInfo) == 0, retainedInfo.st_dev == prepared.st_dev,
-			retainedInfo.st_ino == prepared.st_ino, retainedInfo.st_nlink == 1,
-			retainedInfo.st_size == initial.st_size, !interrupted(), unlinkOwned() else {
+		var identity = stat()
+		guard fstat(retained, &identity) == 0, identity.st_dev == written.st_dev,
+			identity.st_ino == written.st_ino, identity.st_nlink == 1, identity.st_uid == geteuid(),
+			identity.st_mode & 0o7777 == 0o400, identity.st_size == initial.st_size, !interrupted() else {
 			Darwin.close(retained); return nil
 		}
-		unlinked = true
-		return retained
+		let snapshot = ManagedPTYSnapshot(descriptor: retained, path: path, directory: directory, identity: identity)
+		guard snapshot.verified(sha256: request.sourceSHA256) else { Darwin.close(retained); return nil }
+		published = true
+		return snapshot
 	}
 }
 
@@ -392,10 +517,20 @@ enum ManagedPTYWorker {
 			deadline = ProcessInfo.processInfo.systemUptime - started >= Double(milliseconds) / 1000
 			if deadline || getppid() != parent { cancelled = true }
 		}
+		guard let home = ProcessInfo.processInfo.environment["HOME"], home.hasPrefix("/") else {
+			return write(Data("RETIRED 74 74 0 0 -1\n".utf8), to: controlDescriptor) ? 0 : 74
+		}
+		let snapshotRoot = ManagedPTYSource.root(home: home)
+		ManagedPTYSource.sweepStale(root: snapshotRoot)
 		guard admitted.contains(expected),
-			let source = ManagedPTYSource.snapshot(request, interrupted: { consumeControl(); return cancelled }) else {
+			let snapshot = ManagedPTYSource.snapshot(request, root: snapshotRoot,
+				interrupted: { consumeControl(); return cancelled }) else {
 			return write(Data("RETIRED 64 64 0 0 -1\n".utf8), to: controlDescriptor) ? 0 : 74
 		}
+		// Every return below removes the copy; the final one proves it.
+		var snapshotRemoved = false
+		defer { if !snapshotRemoved { _ = snapshot.remove() } }
+		let source = snapshot.descriptor
 		var master: Int32 = -1
 		var slave: Int32 = -1
 		guard openpty(&master, &slave, nil, nil, nil) == 0 else {
@@ -414,10 +549,12 @@ enum ManagedPTYWorker {
 		}
 		for (name, value) in request.environment { environment[name] = value }
 		environment["ERGOPTI_BOOTSTRAP_SCRIPT_DIR"] = URL(fileURLWithPath: expected).deletingLastPathComponent().path
+		// The installer recognises its own snapshot by this exact path.
+		environment["ERGOPTI_BOOTSTRAP_SNAPSHOT"] = snapshot.path
 		// Child phases inherit only the remainder of the original owner budget.
 		let remainingMilliseconds = max(1, Int((started + Double(milliseconds) / 1000 - ProcessInfo.processInfo.systemUptime) * 1000))
 		environment["ERGOPTI_BOOTSTRAP_TIMEOUT_MS"] = String(remainingMilliseconds)
-		guard let argv = duplicateCStringVector(["/bin/bash", "/dev/fd/3"]),
+		guard let argv = duplicateCStringVector(["/bin/bash", snapshot.path]),
 			let envp = duplicateCStringVector(environment.keys.sorted().map { $0 + "=" + environment[$0]! }) else {
 			let closed = [source, master, slave].map { Darwin.close($0) == 0 }.allSatisfy { $0 }
 			return closed && write(Data("RETIRED 74 74 1 0 -1\n".utf8), to: controlDescriptor) ? 0 : 74
@@ -431,6 +568,9 @@ enum ManagedPTYWorker {
 				ergopti_owned_program_prepare_with_tty_source("/bin/bash", arguments.baseAddress, environment.baseAddress, slave, source, &owner)
 			}
 		}
+		// bash opens the path only once activated: prove the copy unchanged
+		// through the retained descriptor right before that, while it is held.
+		let sourceRefused = owner != nil && !snapshot.verified(sha256: request.sourceSHA256)
 		let sourceClosed = Darwin.close(source) == 0
 		let slaveClosed = Darwin.close(slave) == 0
 		let borrowedClosed = sourceClosed && slaveClosed
@@ -438,7 +578,7 @@ enum ManagedPTYWorker {
 			let masterClosed = Darwin.close(master) == 0
 			return borrowedClosed && masterClosed && write(Data("RETIRED 74 74 1 0 -1\n".utf8), to: controlDescriptor) ? 0 : 74
 		}
-		if error != 0 || !borrowedClosed { cancelled = true }
+		if error != 0 || !borrowedClosed || sourceRefused { cancelled = true }
 		consumeControl()
 		var activatedAt: TimeInterval?
 		if !cancelled {
@@ -491,11 +631,14 @@ enum ManagedPTYWorker {
 		}
 		guard let retired, retired.status_valid, retired.error_code == 0,
 			ergopti_owned_program_destroy(&owner), Darwin.close(master) == 0, borrowedClosed else { return 74 }
-		let status: Int32 = deadline ? 124 : (cancelled ? 130 : retired.exit_status)
+		snapshotRemoved = snapshot.remove()
+		guard snapshotRemoved else { return write(Data("RETIRED 74 74 1 0 -1\n".utf8), to: controlDescriptor) ? 0 : 74 }
+		// A copy changed after admission is refused like a source that never matched.
+		let status: Int32 = deadline ? 124 : (sourceRefused ? 64 : (cancelled ? 130 : retired.exit_status))
 		// -1: the leader was never activated, so it cannot have run.
 		let leaderMilliseconds = activatedAt.flatMap { start in
 			retiredAt.map { max(0, Int(($0 - start) * 1000)) } } ?? -1
-		return write(Data("RETIRED \(retired.exit_status) \(status) 1 \(ptyBytes) \(leaderMilliseconds)\n".utf8),
+		return write(Data("RETIRED \(retired.exit_status) \(status) \(sourceRefused ? 0 : 1) \(ptyBytes) \(leaderMilliseconds)\n".utf8),
 			to: controlDescriptor) ? 0 : 74
 	}
 }
