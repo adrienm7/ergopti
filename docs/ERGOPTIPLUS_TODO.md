@@ -225,6 +225,31 @@ dev.
   the PID line. Mac confirms: the next run with a working MLX runtime (L47) either downloads the
   model or logs that line; "sentinel in final output=yes" points at the stream stopping early.
 
+### Fixed on tmp/wip-ollama-137 (to land on dev)
+
+- **L49** [PHYS-M] Owned Ollama 0.40.4 install "exit=137 — Erreur inconnue" about 10 s after the
+  start, with nothing logged in between (22:32 and 22:55 runs, 09_ollama_runtime
+  install_failed/state_failed). 137 is 128 + SIGKILL through the native PTY guardian; it does not
+  say whether bash or one of its children (the uv or Python that `native_python_bootstrap.sh`
+  downloads, the launcher's download role, `managed_ollama_runtime.py`) was killed, and not even the
+  OLLAMA_INSTALLING marker printed first reached the driver. Root cause NOT proven. eeedd5ab3d
+  (diagnostics first): the installer prints each stage and an EXIT trap "stage <stage> ended with
+  exit N (signal SIGx)"; the checker logs the signal, the PTY path, streamed and final byte counts
+  and the last 12 lines, and shows `ollama.error_killed` naming the signal; the Python PTY wrapper
+  exits 128 + N instead of 247; the collector adds `native_runtime.txt` (native-bootstrap binaries,
+  codesign verdicts, diagnostic reports, kernel and code-signing kills). Mac confirms: the next
+  run's "Ollama bootstrap ended with exit=..." line. Zero streamed bytes means the native PTY
+  output never reaches the driver (a separate stream defect); a "stage X ended with exit 137
+  (signal SIGKILL)" line names the killed child (check native_runtime.txt for an invalid
+  signature on uv or Python); no stage line means bash itself was killed.
+- **L50** Fixed c98dceabce. 01_field_lease `guardian_state=fail:unknown` on the 22:32 developer
+  run: the check ran 1.5 s after the driver started registering the guardian; the registration
+  removed a stale record and answered 'ready' 5 s later. "unknown" is "not yet observed in this
+  lifecycle", so the check read too early; the state is published correctly in developer mode
+  (the 22:55 run passed because registration answered in 55 ms). The check now waits up to 30 s
+  for the first answer and reports the wait as `guardian_wait`. Mac confirms: field_lease passes
+  after a boot that removes a stale guardian record, with `guardian_wait` when it waited.
+
 ### Open TODO
 
 - **L46** [CODE][PHYS-M] Two-finger scrolls switched tabs through the vertical three-finger swipe
