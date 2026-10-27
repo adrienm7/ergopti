@@ -2112,4 +2112,192 @@ assert.equal(
 	'all date-qualified hour-window, precision and stale-response controls must execute'
 );
 
+function deliverTypingManifest(page, host, manifest, { revision = 2, range, requestId } = {}) {
+	if (host === 'macos') {
+		const admitted = page.context.publishTypingMetricsData(
+			{ manifest },
+			{ manifest_revision: revision }
+		);
+		if (admitted && range !== undefined) {
+			const id = vm.runInContext('app_state.active_range_request_id', page.context);
+			assert.equal(page.context.receive_range_data(range, id), true);
+		}
+		return admitted;
+	}
+	const blob = { metrics_manifest: manifest };
+	if (range !== undefined) blob._prefetch_data = range;
+	if (requestId !== undefined) blob.range_request_id = requestId;
+	if (host === 'windows')
+		page.messageListeners
+			.filter((entry) => entry.name === 'message')
+			.at(-1)
+			.callback({ data: { type: 'prefetch', blob } });
+	else
+		page.context.__hostBridgeResponse(
+			'metrics_typing_bridge',
+			false,
+			encodeURIComponent(JSON.stringify(blob))
+		);
+}
+function liveTypingApp(chars) {
+	return {
+		chars,
+		wpm_chars: chars,
+		time: 60000,
+		hourly: { 12: { c: chars, e_buckets: { 1000: chars / 10 } } },
+		hourly_min5: { '12:05': { c: chars, e_buckets: { 1000: chars / 10 } } }
+	};
+}
+const typingLiveCases = [
+	'manifest-only update',
+	'new recorded day',
+	'new application',
+	'cleared manifest',
+	'live range update',
+	'retained hour window',
+	'explicit NONE selection',
+	'retained subset selection'
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const scenario of typingLiveCases) {
+		test(`${host} admitted live manifest refreshes ${scenario}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = 'UTC';
+			try {
+				const page = typingChartPage(host, '2026-01-01T12:30:00Z');
+				const initial = {
+					[scenario === 'new recorded day' ? '2025-12-31' : '2026-01-01']: {
+						Editor: liveTypingApp(30)
+					}
+				};
+				publishTypingPage(page, host, initial);
+				if (scenario === 'explicit NONE selection')
+					vm.runInContext(
+						"app_state.app_selection_mode='none'; app_state.selected_apps=new Set(); apply_date_app_filters();",
+						page.context
+					);
+				if (scenario === 'retained subset selection')
+					vm.runInContext(
+						"app_state.app_selection_mode='subset'; app_state.selected_apps=new Set(['Editor']); apply_date_app_filters();",
+						page.context
+					);
+				if (scenario === 'retained hour window') {
+					page.elements.get('quick_range').value = 'last_hour';
+					runTypingControlChange(page, 'quick_range');
+				}
+				const beforeSequence = vm.runInContext('app_state.range_request_sequence', page.context);
+				const beforeOwner = vm.runInContext('app_state.active_range_request_id', page.context);
+				const beforeWindow = vm.runInContext('app_state.hour_window', page.context);
+				const beforeSelection = vm.runInContext('app_state.range_request_selection', page.context);
+				let updated = { '2026-01-01': { Editor: liveTypingApp(70) } };
+				let expectedPoints = [70],
+					expectedTotal = 70;
+				if (scenario === 'new recorded day') {
+					updated['2025-12-31'] = { Editor: liveTypingApp(30) };
+					expectedPoints = [6, 14];
+					expectedTotal = 100;
+				}
+				if (scenario === 'new application')
+					updated['2026-01-01'] = { Editor: liveTypingApp(30), NewApp: liveTypingApp(40) };
+				if (scenario === 'retained subset selection')
+					updated['2026-01-01'].NewApp = liveTypingApp(40);
+				if (scenario === 'cleared manifest') {
+					updated = {};
+					expectedPoints = [];
+					expectedTotal = 0;
+				}
+				if (scenario === 'explicit NONE selection') {
+					expectedPoints = [];
+					expectedTotal = 0;
+				}
+				const range =
+					scenario === 'live range update'
+						? { historical: {}, today: { Editor: { c: { a: { c: 1, o: 1, t: 1000 } } } } }
+						: undefined;
+				deliverTypingManifest(page, host, updated, { range });
+				assert.deepEqual(
+					Array.from(page.lastChart('wpm_chart').data.datasets[0].data, (point) => point.y),
+					expectedPoints,
+					'the visible chart must use the admitted manifest rather than first-paint data'
+				);
+				assert.ok(
+					page.elements.get('global_details').innerHTML.includes(`>${expectedTotal}</strong>`),
+					'the displayed raw-character KPI and chart share the admitted manifest'
+				);
+				assert.deepEqual(
+					JSON.parse(
+						vm.runInContext('JSON.stringify(app_state.manifest_dates_sorted)', page.context)
+					),
+					Object.keys(updated).sort()
+				);
+				if (host !== 'macos')
+					assert.equal(
+						vm.runInContext('app_state.range_request_sequence', page.context),
+						beforeSequence,
+						'metadata refresh cannot create a new loader/query'
+					);
+				assert.equal(vm.runInContext('app_state.hour_window', page.context), beforeWindow);
+				if (beforeOwner) {
+					assert.equal(
+						vm.runInContext('app_state.active_range_request_id', page.context),
+						beforeOwner
+					);
+					assert.equal(
+						vm.runInContext('app_state.range_request_selection', page.context),
+						beforeSelection
+					);
+					const retainedManifest = JSON.stringify(page.context.metrics_manifest);
+					deliverTypingManifest(
+						page,
+						host,
+						{ '2026-01-01': { Editor: liveTypingApp(999) } },
+						{ revision: 1, range: { historical: {}, today: {} }, requestId: beforeOwner - 1 }
+					);
+					assert.equal(
+						JSON.stringify(page.context.metrics_manifest),
+						retainedManifest,
+						'an older tagged/native revision cannot replace the fresh manifest'
+					);
+					assert.deepEqual(
+						Array.from(page.lastChart('wpm_chart').data.datasets[0].data, (point) => point.y),
+						expectedPoints
+					);
+				}
+				if (scenario === 'new application')
+					assert.deepEqual(
+						JSON.parse(
+							vm.runInContext(
+								'JSON.stringify(Array.from(app_state.selected_apps).sort())',
+								page.context
+							)
+						),
+						['Editor', 'NewApp']
+					);
+				if (scenario === 'retained subset selection')
+					assert.deepEqual(
+						JSON.parse(
+							vm.runInContext('JSON.stringify(Array.from(app_state.selected_apps))', page.context)
+						),
+						['Editor']
+					);
+				if (scenario === 'explicit NONE selection')
+					assert.equal(vm.runInContext('app_state.app_selection_mode', page.context), 'none');
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+}
+assert.equal(typingLiveCases.length, 8);
+assert.equal(
+	passed,
+	417,
+	'all fresh-manifest chart, metadata and native-query ownership controls must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);
