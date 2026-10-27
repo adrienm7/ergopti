@@ -145,19 +145,31 @@ copy_field_run_results() {
 finalize() {
 	"${finalized}" && return 0
 	finalized=true
-	local today day f subject
+	local start_day today d f subject
+	local days=()
+	# A run that crosses midnight spans two day logs: keep both, oldest first.
+	start_day="${stamp%%_*}"
 	today="$(date +%Y-%m-%d)"
+	days=("${start_day}")
+	[ "${today}" = "${start_day}" ] || days+=("${today}")
 	if [ -d "${LOG_DIR}" ]; then
-		for f in "${LOG_DIR}"/ErgoptiPlus_"${today}".log "${LOG_DIR}"/ErgoptiPlus_errors_"${today}".log \
-			"${LOG_DIR}"/ErgoptiPlus_llm.log "${LOG_DIR}"/launcher.log; do
+		for d in "${days[@]}"; do
+			for f in "${LOG_DIR}"/ErgoptiPlus_"${d}".log "${LOG_DIR}"/ErgoptiPlus_errors_"${d}".log; do
+				[ -f "${f}" ] && cp "${f}" "${out}/" && printf '%-28s copied\n' "$(basename "${f}")" >> "${steps}"
+			done
+		done
+		for f in "${LOG_DIR}"/ErgoptiPlus_llm.log "${LOG_DIR}"/launcher.log; do
 			[ -f "${f}" ] && cp "${f}" "${out}/" && printf '%-28s copied\n' "$(basename "${f}")" >> "${steps}"
 		done
-		day="${LOG_DIR}/ErgoptiPlus_${today}.log"
-		if [ -f "${day}" ]; then
-			step digest_boot grep -E "Boot complete|Boot CPU|Boot stage completed|held the main thread" "${day}"
-			step digest_slow grep -E "\[HotPath\]|Slow " "${day}"
-			step digest_errors grep -E "\[(ERROR|WARNING)\]" "${day}"
-			step digest_input grep -E "key_event_health|karabiner.lease|guardian" "${day}"
+		local day_logs=()
+		for d in "${days[@]}"; do
+			[ -f "${LOG_DIR}/ErgoptiPlus_${d}.log" ] && day_logs+=("${LOG_DIR}/ErgoptiPlus_${d}.log")
+		done
+		if [ "${#day_logs[@]}" -gt 0 ]; then
+			step digest_boot grep -hE "Boot complete|Boot CPU|Boot stage completed|held the main thread" "${day_logs[@]}"
+			step digest_slow grep -hE "\[HotPath\]|Slow " "${day_logs[@]}"
+			step digest_errors grep -hE "\[(ERROR|WARNING)\]" "${day_logs[@]}"
+			step digest_input grep -hE "key_event_health|karabiner.lease|guardian" "${day_logs[@]}"
 		fi
 	else
 		printf '%-28s missing\n' "logs" >> "${steps}"
