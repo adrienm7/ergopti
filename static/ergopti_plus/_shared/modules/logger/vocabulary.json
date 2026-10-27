@@ -105,6 +105,7 @@
 		"migrating",
 		"missing",
 		"missing_token",
+		"model_identity_mismatch",
 		"model_list_unavailable",
 		"model_missing",
 		"ms",
