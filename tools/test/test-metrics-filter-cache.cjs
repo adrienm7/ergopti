@@ -1913,22 +1913,26 @@ const typingHourWindows = [
 		second: '00:05'
 	}
 ];
-function typingChartPage(host, now) {
+function typingChartPage(host, now, owners = ['wpm_chart', 'precision_chart']) {
 	const page = loadMetricsTypingPage(host);
 	freezePageClock(page, now);
 	page.elements.get('pause_threshold').value = '1000';
 	const charts = [];
-	for (const id of ['wpm_chart', 'precision_chart']) {
+	for (const id of owners) {
 		const canvas = page.context.document.createElement('canvas');
 		canvas.getContext = () => ({ owner: id });
 		page.elements.set(id, canvas);
 	}
+	page.dayTickPlugin = page.context.Chart.registry.plugins.get('day_tick_renderer');
+	page.linearScale = page.context.Chart.registry.getScale('linear');
+	const chartDefaults = page.context.Chart.defaults;
 	page.context.Chart = class ChartPort {
 		constructor(port, config) {
 			charts.push({ owner: port.owner, config });
 		}
 		destroy() {}
 	};
+	page.context.Chart.defaults = chartDefaults;
 	page.lastChart = (owner) => charts.filter((chart) => chart.owner === owner).at(-1).config;
 	return page;
 }
@@ -2379,5 +2383,171 @@ for (const host of ['windows', 'macos', 'linux']) {
 }
 assert.equal(typingHeatmapCases.length, 6);
 assert.equal(passed, 435, 'all app-modal, Unknown-policy and scoped heatmap controls must execute');
+
+const typingDailyDateCases = [
+	{
+		name: 'archived skipped civil day',
+		timezone: 'Pacific/Apia',
+		dates: ['2011-12-29', '2011-12-30', '2011-12-31']
+	},
+	{
+		name: 'spring daylight saving',
+		timezone: 'Europe/Paris',
+		dates: ['2026-03-28', '2026-03-29', '2026-03-30']
+	},
+	{
+		name: 'fall daylight saving',
+		timezone: 'America/Havana',
+		dates: ['2026-10-31', '2026-11-01', '2026-11-02']
+	},
+	{
+		name: 'negative timezone',
+		timezone: 'America/Los_Angeles',
+		dates: ['2026-01-01', '2026-01-02', '2026-01-04']
+	},
+	{
+		name: 'positive timezone',
+		timezone: 'Pacific/Kiritimati',
+		dates: ['2026-01-01', '2026-01-02', '2026-01-04']
+	},
+	{ name: 'UTC control', timezone: 'UTC', dates: ['2026-01-01', '2026-01-02', '2026-01-04'] },
+	{
+		name: 'accepted early Gregorian year',
+		timezone: 'Pacific/Apia',
+		dates: ['0001-01-01', '0001-01-02', '0001-01-03']
+	}
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of typingDailyDateCases) {
+		test(`${host} daily charts retain ${vector.name}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = vector.timezone;
+			try {
+				const owners = [
+					'wpm_chart',
+					'precision_chart',
+					'delegation_chart',
+					'hs_sparkline',
+					'llm_sparkline'
+				];
+				const page = typingChartPage(host, `${vector.dates.at(-1)}T12:00:00Z`, owners);
+				const manifest = Object.fromEntries(
+					vector.dates.map((date, i) => [date, { Editor: liveTypingApp((i + 1) * 20) }])
+				);
+				publishTypingPage(page, host, manifest);
+				for (const owner of owners) {
+					const config = page.lastChart(owner);
+					const points = config.data.datasets[0].data;
+					const expected = vector.dates.map((date) => Date.parse(`${date}T00:00:00Z`));
+					assert.deepEqual(
+						Array.from(points, (point) => Number(point.x)),
+						expected,
+						'recorded day identities must retain distinct canonical civil-day coordinates'
+					);
+					const axis = config.options.scales.x;
+					assert.equal(
+						axis.type,
+						'linear',
+						'daily ticks must not pass through the local-time adapter'
+					);
+					if (['wpm_chart', 'precision_chart'].includes(owner)) {
+						assert.equal(Number(axis.min), expected[0]);
+						assert.equal(Number(axis.max), expected.at(-1));
+					}
+					const scale = new page.linearScale({
+						id: 'x',
+						type: 'linear',
+						ctx: {},
+						chart: { getContext: () => ({}) }
+					});
+					scale.width = 640;
+					scale.min = expected[0];
+					scale.max = expected.at(-1);
+					scale.options = {
+						...axis,
+						axis: 'x',
+						bounds: 'data',
+						min: expected[0],
+						max: expected.at(-1),
+						ticks: {
+							...axis.ticks,
+							setContext() {
+								return { font: { size: 12, lineHeight: 14 } };
+							}
+						}
+					};
+					const ticks = scale.buildTicks();
+					const dayCount = (expected.at(-1) - expected[0]) / 86400000 + 1;
+					assert.deepEqual(
+						Array.from(ticks, (tick) => tick.value),
+						Array.from({ length: dayCount }, (_, i) => expected[0] + i * 86400000),
+						'the shipped Chart.js scale generates one distinct tick per civil day'
+					);
+					const drawn = [];
+					const drawing = {
+						save() {},
+						restore() {},
+						fillText(text) {
+							drawn.push(text);
+						}
+					};
+					const chart = {
+						canvas: { id: owner },
+						ctx: drawing,
+						scales: {
+							x: {
+								type: 'linear',
+								top: 0,
+								options: axis,
+								ticks,
+								getPixelForTick: (i) => i * 10
+							}
+						}
+					};
+					page.dayTickPlugin.afterDraw(chart);
+					assert.equal(drawn.length, ticks.length * 2);
+					for (let i = 0; i < ticks.length; i++) {
+						const date = new Date(ticks[i].value);
+						const day = page.context._t(`ui_typing.day_${date.getUTCDay()}`);
+						assert.equal(drawn[i * 2], day);
+						assert.equal(
+							drawn[i * 2 + 1],
+							`${date.getUTCDate()} ${page.context.months_fr()[date.getUTCMonth()]}`
+						);
+						assert.deepEqual(
+							Array.from(axis.ticks.callback(ticks[i].value)),
+							drawn.slice(i * 2, i * 2 + 2)
+						);
+						assert.equal(
+							config.options.plugins.tooltip.callbacks.title([{ parsed: { x: ticks[i].value } }]),
+							`${day} ${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}/${date.getUTCFullYear()}`
+						);
+					}
+					chart.scales.x.type = 'time';
+					drawn.length = 0;
+					page.dayTickPlugin.afterDraw(chart);
+					assert.equal(
+						drawn.length,
+						0,
+						'hourly and five-minute instant labels must not be reinterpreted as UTC days'
+					);
+				}
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+}
+assert.equal(typingDailyDateCases.length, 7);
+assert.equal(
+	passed,
+	456,
+	'all archived-day, daylight-saving and timezone daily chart controls must execute'
+);
 
 console.log(`${passed} passed, 0 failed.`);
