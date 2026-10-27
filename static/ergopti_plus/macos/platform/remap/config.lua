@@ -77,7 +77,7 @@ end
 --- @return boolean|nil value
 --- @return boolean outdated
 local function combinations_enabled(section, path)
-	return boolean_leaf(section, "enabled", nil, path, "mod_combos",
+	return boolean_leaf(section, "enabled", nil, path, ConfigKeys.KEY.MOD_COMBOS,
 		"a combination switch is boolean; its absent state is used")
 end
 
@@ -85,7 +85,7 @@ end
 --- @return boolean value
 --- @return boolean outdated
 local function tap_holds_switch(section, path)
-	return boolean_leaf(section, "enabled", Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED), path, "tap_holds",
+	return boolean_leaf(section, "enabled", Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED), path, ConfigKeys.KEY.TAP_HOLDS,
 		"a tap-hold switch is boolean; the neutral state is used")
 end
 
@@ -93,7 +93,7 @@ end
 --- @return boolean value
 --- @return boolean outdated
 local function combinations_symmetric(section, path)
-	return boolean_leaf(section, "symmetric", COMBO_SYMMETRIC_DEFAULT, path, "mod_combos",
+	return boolean_leaf(section, "symmetric", COMBO_SYMMETRIC_DEFAULT, path, ConfigKeys.KEY.MOD_COMBOS,
 		"a combination symmetry switch is boolean; the canonical default is used")
 end
 
@@ -601,9 +601,9 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		return true
 	end
 	local tap_holds = type(data.tap_holds) == "table"
-		and not source_array(data.tap_holds, { "tap_holds" }) and data.tap_holds or {}
+		and not source_array(data.tap_holds, { ConfigKeys.KEY.TAP_HOLDS }) and data.tap_holds or {}
 	local combos = type(data.mod_combos) == "table"
-		and not source_array(data.mod_combos, { "mod_combos" }) and data.mod_combos or {}
+		and not source_array(data.mod_combos, { ConfigKeys.KEY.MOD_COMBOS }) and data.mod_combos or {}
 
 	local function owned_table(parent, key, label, section)
 		if parent[key] == nil then return {} end
@@ -621,10 +621,10 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		end
 	end
 
-	local tap_hold_config = owned_table(tap_holds, "config", "[tap_holds.config]", "tap_holds")
+	local tap_hold_config = owned_table(tap_holds, "config", "[tap_holds.config]", ConfigKeys.KEY.TAP_HOLDS)
 	for _, key_def in ipairs(tap_hold_keys) do
 		if tap_hold_config[key_def.id] == nil then tap_hold_config[key_def.id] = {} end
-		if source_array(tap_hold_config[key_def.id], { "tap_holds", "config", key_def.id }) then
+		if source_array(tap_hold_config[key_def.id], { ConfigKeys.KEY.TAP_HOLDS, "config", key_def.id }) then
 			tap_hold_config[key_def.id] = {}
 		end
 		if type(tap_hold_config[key_def.id]) == "table" then
@@ -632,11 +632,11 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		end
 	end
 
-	local combos_config = owned_table(combos, "config", "[mod_combos.config]", "mod_combos")
+	local combos_config = owned_table(combos, "config", "[mod_combos.config]", ConfigKeys.KEY.MOD_COMBOS)
 	local known_combos = {}
 	for _, def in ipairs(mod_combos) do known_combos[def.id] = true end
 	for id, entry in pairs(combos_config) do
-		if known_combos[id] and source_array(entry, { "mod_combos", "config", tostring(id) }) then
+		if known_combos[id] and source_array(entry, { ConfigKeys.KEY.MOD_COMBOS, "config", tostring(id) }) then
 			combos_config[id] = {}
 		elseif type(entry) == "string" then
 			Logger.info(LOG, "Migrating combo '%s' from legacy string format.", id)
@@ -673,8 +673,8 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 			end
 		end
 	end
-	drop_outdated(tap_hold_config, tap_hold_keys, "tap_holds", { "tap", "hold" })
-	drop_outdated(combos_config, mod_combos, "mod_combos", { "tap", "hold", "combo" })
+	drop_outdated(tap_hold_config, tap_hold_keys, ConfigKeys.KEY.TAP_HOLDS, { "tap", "hold" })
+	drop_outdated(combos_config, mod_combos, ConfigKeys.KEY.MOD_COMBOS, { "tap", "hold", "combo" })
 
 	-- Reads one optional number; absence is the canonical default.
 	local function timing(section, key, default, label)
@@ -684,7 +684,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	local timeout_ms = timing(tap_holds, "timeout_ms", TAP_HOLD_TIMEOUT_MS_DEFAULT, ConfigKeys.KEY.TAP_HOLDS_TIMEOUT_MS)
 	local sticky_ms = timing(tap_holds, "sticky_timeout_ms", STICKY_TIMEOUT_MS_DEFAULT,
 		ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
-	local simultaneous_ms = timing(combos, "simultaneous_threshold_ms", SIMULTANEOUS_THRESHOLD_MS_DEFAULT,
+	local simultaneous_ms = timing(combos, ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS, SIMULTANEOUS_THRESHOLD_MS_DEFAULT,
 		ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
 
 	local combo_symmetric = combinations_symmetric(combos, user_config_path)
@@ -852,7 +852,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 				-- Combo strings keep their distinct explicit legacy migration path.
 				local preserve_scalar = not overwrite_corrupt and not repaired
 					and target[id] ~= nil and type(target[id]) ~= "table"
-					and (section == "tap_holds" or (section == "mod_combos" and type(target[id]) ~= "string"))
+					and (section == ConfigKeys.KEY.TAP_HOLDS or (section == ConfigKeys.KEY.MOD_COMBOS and type(target[id]) ~= "string"))
 				-- The user's own edit of this binding replaces its unusable value.
 				if repaired and (type(target[id]) ~= "table"
 					or (document_shapes and document_shapes.arrays[target[id]])) then
@@ -907,29 +907,29 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			assert(type(state.enabled) == "boolean", "the Karabiner integration switch must be a boolean")
 			table_at(document, INTEGRATION_SECTION)[INTEGRATION_KEY] = state.enabled
 		end
-		if not preserve_array(document.tap_holds, { "tap_holds" },
+		if not preserve_array(document.tap_holds, { ConfigKeys.KEY.TAP_HOLDS },
 			(state.tap_holds_enabled == nil or state.tap_holds_enabled == Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED))
 			and (state.tap_hold_timeout_ms == nil or state.tap_hold_timeout_ms == TAP_HOLD_TIMEOUT_MS_DEFAULT)
 			and (state.sticky_timeout_ms == nil or state.sticky_timeout_ms == STICKY_TIMEOUT_MS_DEFAULT)
 			and bindings_neutral(state.tap_hold_config, { "tap", "hold", "timeout_ms" })) then
-			local tap_holds = table_at(document, "tap_holds")
-			assign_boolean(tap_holds, "tap_holds", "enabled", state.tap_holds_enabled,
+			local tap_holds = table_at(document, ConfigKeys.KEY.TAP_HOLDS)
+			assign_boolean(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "enabled", state.tap_holds_enabled,
 				Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED), tap_holds_switch)
-			assign_timing(tap_holds, "tap_holds", "timeout_ms", state.tap_hold_timeout_ms, TAP_HOLD_TIMEOUT_MS_DEFAULT)
-			assign_timing(tap_holds, "tap_holds", "sticky_timeout_ms", state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT)
-			if not preserve_array(tap_holds.config, { "tap_holds", "config" },
+			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "timeout_ms", state.tap_hold_timeout_ms, TAP_HOLD_TIMEOUT_MS_DEFAULT)
+			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "sticky_timeout_ms", state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT)
+			if not preserve_array(tap_holds.config, { ConfigKeys.KEY.TAP_HOLDS, "config" },
 				bindings_neutral(state.tap_hold_config, { "tap", "hold", "timeout_ms" })) then
-				merge_bindings(table_at(tap_holds, "config"), state.tap_hold_config, { "tap", "hold", "timeout_ms" }, "tap_holds")
+				merge_bindings(table_at(tap_holds, "config"), state.tap_hold_config, { "tap", "hold", "timeout_ms" }, ConfigKeys.KEY.TAP_HOLDS)
 				if next(tap_holds.config) == nil then tap_holds.config = nil end
 			end
 			if next(tap_holds) == nil then document.tap_holds = nil end
 		end
-		if not preserve_array(document.mod_combos, { "mod_combos" },
+		if not preserve_array(document.mod_combos, { ConfigKeys.KEY.MOD_COMBOS },
 			state.mod_combos_enabled == nil
 			and (state.simultaneous_threshold_ms == nil or state.simultaneous_threshold_ms == SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
 			and (state.combo_symmetric == nil or state.combo_symmetric == COMBO_SYMMETRIC_DEFAULT)
 			and bindings_neutral(state.mod_combos_config, { "tap", "hold", "combo" })) then
-			local mod_combos = table_at(document, "mod_combos")
+			local mod_combos = table_at(document, ConfigKeys.KEY.MOD_COMBOS)
 			-- Written only once set: an absent flag is on (Generator.key_combinations_enabled).
 			local _, outdated_enabled = combinations_enabled(mod_combos, user_config_path)
 			if not overwrite_corrupt and outdated_enabled and not explicit[ConfigKeys.KEY.MOD_COMBOS_ENABLED] then
@@ -940,12 +940,12 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			else
 				mod_combos.enabled = state.mod_combos_enabled
 			end
-			assign_timing(mod_combos, "mod_combos", "simultaneous_threshold_ms", state.simultaneous_threshold_ms, SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
-			assign_boolean(mod_combos, "mod_combos", "symmetric", state.combo_symmetric,
+			assign_timing(mod_combos, ConfigKeys.KEY.MOD_COMBOS, ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS, state.simultaneous_threshold_ms, SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
+			assign_boolean(mod_combos, ConfigKeys.KEY.MOD_COMBOS, "symmetric", state.combo_symmetric,
 				COMBO_SYMMETRIC_DEFAULT, combinations_symmetric)
-			if not preserve_array(mod_combos.config, { "mod_combos", "config" },
+			if not preserve_array(mod_combos.config, { ConfigKeys.KEY.MOD_COMBOS, "config" },
 				bindings_neutral(state.mod_combos_config, { "tap", "hold", "combo" })) then
-				merge_bindings(table_at(mod_combos, "config"), state.mod_combos_config, { "tap", "hold", "combo" }, "mod_combos")
+				merge_bindings(table_at(mod_combos, "config"), state.mod_combos_config, { "tap", "hold", "combo" }, ConfigKeys.KEY.MOD_COMBOS)
 				if next(mod_combos.config) == nil then mod_combos.config = nil end
 			end
 			if next(mod_combos) == nil then document.mod_combos = nil end

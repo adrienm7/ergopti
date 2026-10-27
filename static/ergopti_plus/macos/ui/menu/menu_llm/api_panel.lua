@@ -280,7 +280,7 @@ local function add_system1_entry(add)
 					if ok ~= true then
 						Logger.error(LOG, "System 1 API entry committed with cleanup debt: %s", tostring(reason))
 					end
-					if add.previous_active_id ~= "" then add.WarmupCtrl.warmup("api_add_entry") end
+					if add.previous_active_id ~= "" then add.WarmupCtrl.warmup(require("config_keys").COMMAND.API_ADD_ENTRY) end
 					pcall_log("update_menu(add system1 committed)", add.update_menu)
 					notify_probe_verdict(true, label, reply, ms, nil)
 					return
@@ -582,7 +582,7 @@ function M.build(ctx)
 								if not mutation_is_current(my_add_gen) then return end
 								finish_mutation(my_add_gen)
 								if ok == true or durable == true then
-									WarmupCtrl.warmup("api_add_entry")
+									WarmupCtrl.warmup(require("config_keys").COMMAND.API_ADD_ENTRY)
 									pcall_log("update_menu(add committed)", update_menu)
 									if ok == true then
 										pcall_log("notify(api_validated)", notifications.notify,
@@ -856,7 +856,7 @@ function M.build_model_picker(ctx)
 	local names      = entry_names(api_remote, entries)
 
 	local selection_rows = ManifestMenu.template_rows("llm_api_selection_frame", {
-		["llm_api_no_model"] = function()
+		[require("config_keys").COMMAND.LLM_API_NO_MODEL] = function()
 			if _mutation_owner ~= nil then return false end
 			if api_remote and api_remote.set_active_entry_id then
 				if reset_prediction_identity(keymap, "select No Model") ~= true then return false end

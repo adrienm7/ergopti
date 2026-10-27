@@ -1146,7 +1146,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 		set_log_level             = function(level)
 			local L = require("infra.logger")
-			local ok, committed = pcall(Storage.set, "log_level", level)
+			local ok, committed = pcall(Storage.set, require("config_keys").LEAF.LOG_LEVEL, level)
 			if not ok or committed ~= true then
 				L.warn("menu", "Log level %s was refused by settings; the live level was left unchanged.", level)
 				return false
@@ -1725,7 +1725,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		function()
 			-- A failed prime only costs a slower first open, but it used to cost it
 			-- silently; the submenu then looked empty with nothing in the log.
-			for _prime_index, name in ipairs({ "keyboard_layout", "apps", "tap_holds" }) do
+			for _prime_index, name in ipairs({ "keyboard_layout", "apps", require("config_keys").KEY.TAP_HOLDS }) do
 				local mod = menu_mods[name]
 				if mod and type(mod.prime) == "function" then
 					local primed, prime_err = pcall(mod.prime, ctx)

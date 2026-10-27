@@ -442,7 +442,7 @@ function M.build(ctx)
 
 	-- "No model" option so the user can explicitly disable predictions
 	local none_rows = ManifestMenu.template_rows("llm_model_picker_head", {
-		["llm_model_none"] = function()
+		[require("config_keys").COMMAND.LLM_MODEL_NONE] = function()
 			Logger.info(LOG, "Switching model to None (disabled).")
 			return disable_model()
 		end,
@@ -458,7 +458,7 @@ function M.build(ctx)
 	local backend_default = get_display_model_name(backend_default_raw, presets)
 	if backend_default and backend_default ~= "" then
 		local default_rows = ManifestMenu.template_rows("llm_model_picker_default", {
-			["llm_model_backend_default"] = function()
+			[require("config_keys").COMMAND.LLM_MODEL_BACKEND_DEFAULT] = function()
 				Logger.info(LOG, string.format("Restoring backend default model -> %s", backend_default))
 				switch_model(backend_default)
 			end,
@@ -483,7 +483,7 @@ function M.build(ctx)
 			and i18n.get("menu.llm.hf_token_set")
 			or  i18n.get("menu.llm.hf_token_unset")
 		local token_rows = ManifestMenu.template_rows("llm_model_hf_token_command", {
-			["llm_model_hf_token"] = function()
+			[require("config_keys").COMMAND.LLM_MODEL_HF_TOKEN] = function()
 				if models_mgr and type(models_mgr.prompt_hf_login) == "function" then
 					models_mgr.prompt_hf_login(function()
 						if save_prefs() ~= true then return false end
@@ -536,8 +536,8 @@ function M.build(ctx)
 				return ok and live_paused == false
 			end
 			local model_submenu = ManifestMenu.template_rows("llm_user_model_controls", {
-				["llm_user_model_select"] = function() switch_model(m_name) end,
-				["llm_user_model_remove"] = function()
+				[require("config_keys").COMMAND.LLM_USER_MODEL_SELECT] = function() switch_model(m_name) end,
+				[require("config_keys").COMMAND.LLM_USER_MODEL_REMOVE] = function()
 					local ok, choice = pcall(dialog.block_alert,
 						i18n.get("menu.llm.remove_model_title"),
 						string.format(i18n.get("menu.llm.remove_model_body"), m_name),
@@ -629,18 +629,18 @@ function M.build(ctx)
 					model_source_caption = active_source,
 				}
 				local model_commands = {
-					["model_select"] = function() switch_model(m_name) end,
-					["model_backend_hs"] = function() end,
-					["model_type_hs"] = function() end,
-					["model_date_hs"] = function() end,
-					["model_params_total_hs"] = function() end,
-					["model_params_active_hs"] = function() end,
-					["model_speed_hs"] = function() end,
-					["model_tags_hs"] = function() end,
-					["model_hw_download_hs"] = function() end,
-					["model_hw_disk_hs"] = function() end,
-					["model_hw_ram_hs"] = function() end,
-					["model_source"] = function()
+					[require("config_keys").COMMAND.MODEL_SELECT] = function() switch_model(m_name) end,
+					[require("config_keys").COMMAND.MODEL_BACKEND_HS] = function() end,
+					[require("config_keys").COMMAND.MODEL_TYPE_HS] = function() end,
+					[require("config_keys").COMMAND.MODEL_DATE_HS] = function() end,
+					[require("config_keys").COMMAND.MODEL_PARAMS_TOTAL_HS] = function() end,
+					[require("config_keys").COMMAND.MODEL_PARAMS_ACTIVE_HS] = function() end,
+					[require("config_keys").COMMAND.MODEL_SPEED_HS] = function() end,
+					[require("config_keys").COMMAND.MODEL_TAGS_HS] = function() end,
+					[require("config_keys").COMMAND.MODEL_HW_DOWNLOAD_HS] = function() end,
+					[require("config_keys").COMMAND.MODEL_HW_DISK_HS] = function() end,
+					[require("config_keys").COMMAND.MODEL_HW_RAM_HS] = function() end,
+					[require("config_keys").COMMAND.MODEL_SOURCE] = function()
 						local hs = hs  -- luacheck: ignore — intentional global access
 						pcall(hs.urlevent.openURL, active_source)
 					end,
@@ -868,11 +868,11 @@ function M.build(ctx)
 		table.insert(menu, row)
 	end
 	local browser_row = ManifestMenu.command_row("llm_model_commands", require("config_keys").COMMAND.LLM_BROWSE_MODELS, {
-		["llm_browse_models"] = open_model_browser,
+		[require("config_keys").COMMAND.LLM_BROWSE_MODELS] = open_model_browser,
 	}, { ["llm_model_browser_ready"] = model_browser_ready })
 	if browser_row then table.insert(menu, browser_row) end
 	local add_rows = ManifestMenu.template_rows("llm_model_add_command", {
-		["llm_add_model_entry"] = function() return prompt_add_user_model() end,
+		[require("config_keys").COMMAND.LLM_ADD_MODEL_ENTRY] = function() return prompt_add_user_model() end,
 	}, { model_picker_ready = function() return not paused end }, {})
 	if not append_model_rows(menu, add_rows) then return {} end
 

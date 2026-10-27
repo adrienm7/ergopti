@@ -25,6 +25,7 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local Storage = require("adapters.storage")
 local JsonCodec = require("adapters.json_codec")
 local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 local LOG = "llm.core"
 
@@ -47,8 +48,8 @@ local _SHARED_SCALAR_KEYS = {
 	"llm_enabled", "llm_active_profile", "llm_temperature",
 	"llm_num_predictions", "llm_context_length", "llm_min_words",
 	"llm_max_words", "llm_pred_indent", "llm_show_info_bar",
-	"llm_streaming", "llm_streaming_multi", "llm_instant_on_word_end",
-	"llm_after_hotstring", "llm_reset_on_nav", "llm_auto_raise_temp",
+	"llm_streaming", "llm_streaming_multi", ConfigKeys.COMMAND.LLM_INSTANT_ON_WORD_END,
+	ConfigKeys.COMMAND.LLM_AFTER_HOTSTRING, ConfigKeys.COMMAND.LLM_RESET_ON_NAV, "llm_auto_raise_temp",
 	"llm_ollama_port",
 	-- Privacy gates for the prediction path. These were absent from this list AND
 	-- hardcoded to true in prediction_engine.lua, so the shared value was
