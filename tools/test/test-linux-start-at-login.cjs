@@ -16,6 +16,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { createHash } = require('node:crypto');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const root = path.resolve(__dirname, '../..');
@@ -144,6 +145,221 @@ try {
 	assert.notEqual(run('disable').status, 0, 'foreign startup commands are never replaced');
 	assert.equal(fs.readFileSync(desktop, 'utf8'), '[Desktop Entry]\nExec=/other/program\n');
 	if (process.platform === 'linux') {
+		const manifest = path.resolve(installed, '../../.ergopti-owned-files');
+		const manifestArgument = path.dirname(installed) + '/../.ergopti-owned-files';
+		const receiptTarget = path.join(sandbox, 'unrelated-receipt');
+		const receiptBytes = 'Unrelated receipt must remain unchanged.\n';
+		fs.writeFileSync(receiptTarget, receiptBytes);
+		const quotedEvidencePath = (value) => {
+			const result = spawnSync(
+				bashExecutable(),
+				['-c', 'printf %q "$1"', 'startup-evidence', value],
+				{
+					encoding: 'utf8'
+				}
+			);
+			assert.equal(result.status, 0, result.stderr);
+			return result.stdout;
+		};
+		const receiptRefusals = [];
+		for (const [state, sourceKind] of ['absent', 'disabled'].flatMap((state) =>
+			['file-link', 'dangling-link', 'fifo', 'directory'].map((kind) => [state, kind])
+		)) {
+			fs.rmSync(desktop, { force: true });
+			if (state === 'disabled') fs.writeFileSync(desktop, disabled);
+			if (sourceKind === 'directory') fs.mkdirSync(manifest);
+			else if (sourceKind === 'fifo') {
+				const fifo = spawnSync('mkfifo', [manifest], { encoding: 'utf8', timeout: 1000 });
+				assert.equal(fifo.status, 0, fifo.stderr);
+			} else
+				fs.symlinkSync(
+					sourceKind === 'file-link' ? receiptTarget : receiptTarget + '.absent',
+					manifest
+				);
+			const receiptNodeBefore = fs.lstatSync(manifest);
+			const receiptLinkBefore = receiptNodeBefore.isSymbolicLink()
+				? fs.readlinkSync(manifest)
+				: null;
+			const callsBefore = fs.readFileSync(calls, 'utf8');
+			const refused = run('enable');
+			const receiptNodeAfter = fs.lstatSync(manifest);
+			const receiptLinkAfter = receiptNodeAfter.isSymbolicLink() ? fs.readlinkSync(manifest) : null;
+			const nodeUnchanged =
+				receiptNodeAfter.dev === receiptNodeBefore.dev &&
+				receiptNodeAfter.ino === receiptNodeBefore.ino &&
+				(receiptNodeAfter.mode & fs.constants.S_IFMT) ===
+					(receiptNodeBefore.mode & fs.constants.S_IFMT) &&
+				receiptLinkAfter === receiptLinkBefore;
+			const unchanged =
+				state === 'absent'
+					? !fs.existsSync(desktop)
+					: fs.readFileSync(desktop, 'utf8') === disabled;
+			if (
+				refused.status !== 78 ||
+				!unchanged ||
+				!nodeUnchanged ||
+				!refused.stderr.includes(
+					`[startup] code=invalid-source role=receipt path=${quotedEvidencePath(manifestArgument)}\n`
+				) ||
+				fs.readFileSync(calls, 'utf8') !== callsBefore ||
+				fs.readFileSync(receiptTarget, 'utf8') !== receiptBytes
+			) {
+				receiptRefusals.push({
+					state,
+					sourceKind,
+					status: refused.status,
+					unchanged,
+					nodeUnchanged,
+					stderr: refused.stderr
+				});
+			}
+			if (sourceKind === 'directory') fs.rmdirSync(manifest);
+			else fs.unlinkSync(manifest);
+		}
+		for (const sourceKind of ['fifo', 'directory']) {
+			fs.rmSync(desktop, { force: true });
+			if (sourceKind === 'directory') fs.mkdirSync(desktop);
+			else {
+				const fifo = spawnSync('mkfifo', [desktop], { encoding: 'utf8', timeout: 1000 });
+				assert.equal(fifo.status, 0, fifo.stderr);
+			}
+			const callsBefore = fs.readFileSync(calls, 'utf8');
+			const refused = run('enable');
+			const kept = fs.lstatSync(desktop);
+			if (
+				refused.status !== 78 ||
+				!refused.stderr.includes(
+					`[startup] code=invalid-source role=desktop path=${quotedEvidencePath(desktop)}\n`
+				) ||
+				fs.readFileSync(calls, 'utf8') !== callsBefore ||
+				(sourceKind === 'fifo'
+					? !kept.isFIFO()
+					: !kept.isDirectory() || fs.readdirSync(desktop).length !== 0)
+			) {
+				receiptRefusals.push({ sourceKind, role: 'desktop', status: refused.status });
+			}
+			fs.rmSync(desktop, { recursive: true, force: true });
+		}
+		fs.writeFileSync(desktop, disabled);
+		const previousReceipt =
+			`${'a'.repeat(64)}\tlinux/retained-file\n` +
+			`${createHash('sha256').update(disabled).digest('hex')}\t@autostart\n`;
+		fs.writeFileSync(manifest, previousReceipt);
+		fs.chmodSync(desktop, 0o640);
+		fs.chmodSync(manifest, 0o640);
+		fs.writeFileSync(
+			path.join(stubs, 'mv'),
+			[
+				'#!/bin/bash',
+				'if [ "${REFUSE_RECEIPT_MV:-0}" = 1 ] && [ "${!#}" = "$STARTUP_RECEIPT" ]; then exit 73; fi',
+				'if [ "${REFUSE_DESKTOP_MV:-0}" = 1 ] && [ "${!#}" = "$STARTUP_DESKTOP" ]; then exit 74; fi',
+				'if [ "${REFUSE_RECEIPT_ROLLBACK:-0}" = 1 ] && [ "${!#}" = "$STARTUP_RECEIPT" ]; then',
+				'  case "${3:-}" in *.previous.*) exit 75;; esac',
+				'fi',
+				'exec /bin/mv "$@"',
+				''
+			].join('\n'),
+			{ mode: 0o755 }
+		);
+		for (const fault of ['REFUSE_RECEIPT_MV', 'REFUSE_DESKTOP_MV']) {
+			const callsBefore = fs.readFileSync(calls, 'utf8');
+			const refused = run('enable', {
+				[fault]: '1',
+				STARTUP_RECEIPT: manifestArgument,
+				STARTUP_DESKTOP: desktop
+			});
+			const unchanged = fs.readFileSync(desktop, 'utf8') === disabled;
+			const receiptUnchanged = fs.readFileSync(manifest, 'utf8') === previousReceipt;
+			const serviceMutated = /--no-reload disable/.test(
+				fs.readFileSync(calls, 'utf8').slice(callsBefore.length)
+			);
+			if (refused.status === 0 || !unchanged || !receiptUnchanged || serviceMutated) {
+				receiptRefusals.push({
+					fault,
+					status: refused.status,
+					unchanged,
+					receiptUnchanged,
+					serviceMutated
+				});
+			}
+			if (
+				(fs.statSync(desktop).mode & 0o777) !== 0o640 ||
+				(fs.statSync(manifest).mode & 0o777) !== 0o640
+			) {
+				receiptRefusals.push({ fault, modePreserved: false });
+			}
+			fs.writeFileSync(desktop, disabled);
+			fs.writeFileSync(manifest, previousReceipt);
+			fs.chmodSync(desktop, 0o640);
+			fs.chmodSync(manifest, 0o640);
+		}
+		const refusedService = run('enable', { REFUSE: '1' });
+		assert.notEqual(refusedService.status, 0);
+		assert.equal(
+			fs.readFileSync(desktop, 'utf8'),
+			disabled,
+			'startup-receipt-service: service refusal restores the previous setting'
+		);
+		assert.equal(
+			fs.readFileSync(manifest, 'utf8'),
+			previousReceipt,
+			'startup-receipt-service: service refusal restores the previous receipt'
+		);
+		const refusedRollback = run('enable', {
+			REFUSE: '1',
+			REFUSE_RECEIPT_ROLLBACK: '1',
+			STARTUP_RECEIPT: manifestArgument
+		});
+		const recovery = fs
+			.readdirSync(path.dirname(manifest))
+			.filter((name) => name.startsWith(path.basename(manifest) + '.previous.'))
+			.map((name) => path.join(path.dirname(manifest), name));
+		const recoveryRecordPresent =
+			recovery.length === 1 &&
+			refusedRollback.stderr.includes(
+				`[startup] code=rollback-failed role=recovery path=${quotedEvidencePath(manifestArgument + recovery[0].slice(manifest.length))}\n`
+			);
+		if (
+			refusedRollback.status === 0 ||
+			!recoveryRecordPresent ||
+			recovery.length !== 1 ||
+			fs.readFileSync(recovery[0], 'utf8') !== previousReceipt
+		) {
+			receiptRefusals.push({
+				fault: 'REFUSE_RECEIPT_ROLLBACK',
+				status: refusedRollback.status,
+				recovery,
+				stderr: refusedRollback.stderr
+			});
+		}
+		for (const file of recovery) fs.unlinkSync(file);
+		fs.writeFileSync(desktop, disabled);
+		fs.writeFileSync(manifest, previousReceipt);
+		fs.chmodSync(desktop, 0o640);
+		fs.chmodSync(manifest, 0o640);
+		const healthy = run('enable');
+		assert.equal(healthy.status, 0, healthy.stderr);
+		assert.match(fs.readFileSync(desktop, 'utf8'), /^Hidden=false$/m);
+		if (
+			(fs.statSync(desktop).mode & 0o777) !== 0o640 ||
+			(fs.statSync(manifest).mode & 0o777) !== 0o640
+		) {
+			receiptRefusals.push({ healthyPublication: true, modePreserved: false });
+		}
+		const currentDigest = createHash('sha256').update(fs.readFileSync(desktop)).digest('hex');
+		assert.equal(
+			fs.readFileSync(manifest, 'utf8'),
+			`${'a'.repeat(64)}\tlinux/retained-file\n${currentDigest}\t@autostart\n`,
+			'startup-receipt-healthy: the published receipt owns the exact enabled bytes once'
+		);
+		fs.unlinkSync(manifest);
+		fs.unlinkSync(path.join(stubs, 'mv'));
+		fs.writeFileSync(desktop, '[Desktop Entry]\nExec=/other/program\n');
+		assert.deepEqual(
+			receiptRefusals,
+			[],
+			'startup-receipt-transaction: refusal preserves startup settings, ownership and service state'
+		);
 		const disagreements = [];
 		for (const [index, value] of [
 			'',

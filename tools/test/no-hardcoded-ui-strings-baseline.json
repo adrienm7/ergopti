@@ -746,18 +746,6 @@
 	{
 		"file": "linux/install/start_at_login.sh",
 		"sink": "echo",
-		"text": "Linked ownership receipt refused.",
-		"count": 1
-	},
-	{
-		"file": "linux/install/start_at_login.sh",
-		"sink": "echo",
-		"text": "Refusing to replace a linked startup setting.",
-		"count": 1
-	},
-	{
-		"file": "linux/install/start_at_login.sh",
-		"sink": "echo",
 		"text": "The startup entry belongs to another command.",
 		"count": 1
 	},
