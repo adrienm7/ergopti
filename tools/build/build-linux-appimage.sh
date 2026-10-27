@@ -122,6 +122,8 @@ REQUIRED_PAYLOAD=(
   "adapters/tray_menu.lua"
   "ui/webkit_host.lua"
   "_shared/lua/hotstring_engine/init.lua"
+  "_shared/lua/hotstring_engine/cascade.lua"
+  "_shared/lua/layouts/keylayout.lua"
   "_shared/lua/json.lua"
   "_shared/data/keycodes/evdev.json"
   "_shared/data/locales/fr.json"
