@@ -88,7 +88,7 @@ function _t(key) {
 /** Re-applies labels (column headers etc.) whenever i18n strings arrive. */
 function applyLabels() {
 	var useBtn = document.getElementById('btn-use');
-	if (useBtn) useBtn.textContent = _t('model_browser.use_button') || 'Utiliser';
+	if (useBtn) useBtn.textContent = _t('model_browser.use_button');
 	// Header / placeholder data-i18n attributes are handled by i18n.js; re-render
 	// the rows so chips and dynamic cells pick up the freshest strings too.
 	render();
