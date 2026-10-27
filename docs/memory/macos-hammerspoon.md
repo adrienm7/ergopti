@@ -1115,6 +1115,21 @@ only cleared a flag, so the taps and "Health-check tick" lines kept running with
 Gestures off; such a line now proves Gestures was ON. Test doubles:
 `tests/support/gesture_runtime_fixture.lua`.
 
+### project-hs-two-fingers-are-a-scroll
+
+A pair of contacts is the native scroll. Until 2026-10 the engine promoted a
+third contact joining a pair on ONE frame, and a count drop shifted startPos
+without endPos, so a palm touching below two scrolling fingers committed a
+vertical three-finger swipe (tab switching). `modules/gestures/engine.lua` now
+confirms a join to a pair over FINGER_CONFIRM_FRAMES during the landing only
+(`multi_finger_landing_ms`, `Geometry.LANDING_TRAVEL_MAX`), checks that every
+contact travelled with the centroid (`Geometry.movedTogether`), aborts a
+three-finger gesture that continues as a moving pair, and holds three-or-more
+finger actions back for `scroll_momentum_guard_ms` after a scroll or a native
+momentum event seen by the scroll-blocker tap. The Linux `mt_decoder.lua`
+applies the same rules. Action: never give a pair a fast path, and move endPos
+with startPos on every centroid compensation.
+
 ### project-hs-click-drag-is-not-a-gesture
 
 A click-drag text selection (one finger pressing the trackpad, another
