@@ -1206,11 +1206,11 @@ function assertSeparated(row, where) {
 	const rows = checkRows(page);
 	const row = (trigger) => rows.find((candidate) => candidate.trigger === trigger);
 	const expected = {
-		'Cmd + Shift + V': en['shortcuts.label_cmd_shift_v'],
-		'Ctrl + A': en['shortcuts.label_ctrl_a'],
-		'Ctrl + E': en['shortcuts.label_ctrl_e'],
-		'Ctrl + .': en['shortcuts.label_ctrl_period'],
-		'Ctrl + CapsLock': en['shortcuts.label_ctrl_capslock'],
+		'Cmd + Shift + V': en['sg_actions.paste_plain'],
+		'Ctrl + A': en['sg_actions.select_line'],
+		'Ctrl + E': en['sg_actions.open_file_manager'],
+		'Ctrl + .': en['sg_actions.open_emoji_picker'],
+		'Ctrl + CapsLock': en['sg_actions.toggle_capslock'],
 		'Ctrl + Space': en['sg_actions.llm_generate_prediction']
 	};
 	// The layer's wheel is edited with the layer (Tap-Holds › Edit the layer),
@@ -1224,7 +1224,14 @@ function assertSeparated(row, where) {
 	const builtIns = pageOf(page, 'shortcuts').groups[0].items.filter((item) =>
 		item.path.startsWith('shortcuts.keys.')
 	);
-	assert.ok(builtIns.length >= 20, 'macOS recommends its built-in shortcuts');
+	assert.ok(builtIns.length >= 2, 'macOS recommends its fixed ChatGPT and Cmd+* switches');
+	const slots = pageOf(page, 'shortcuts').groups[0].items.filter((item) =>
+		item.path.startsWith('shortcuts.keyboard.')
+	);
+	assert.ok(
+		slots.length >= 19,
+		'macOS recommends the role-named slots of its former built-in shortcuts'
+	);
 	for (const item of builtIns) {
 		const shown = rows.find((candidate) => candidate.action === en[item.value_label[0].key]);
 		assert.ok(shown && shown.trigger !== '', `macOS: ${item.path} names its chord`);

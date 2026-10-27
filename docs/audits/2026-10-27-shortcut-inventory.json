@@ -1,6 +1,6 @@
 {
 	"schema_version": 1,
-	"description": "Inventory of every shortcut config entry on the three drivers, for PAR-41 (docs/design/one-shortcut-model.md, step 1). 'legacy_boolean' rows are a feature switch bound to one hard-coded chord; 'keyboard_slot' rows are a chord bound to a catalogue action id; 'slot_families' list the modifier prefixes under which a driver accepts any key of modifier_chords.json. 'chord.modifiers' use each driver's own modifier names. 'slot' names the keyboard slot that already binds the same chord, so a boolean and a slot never both own it after the change. Checked against the manifest, the AutoHotkey AddShortcut calls and the Lua hotkey registry by tools/test/test-shortcut-inventory-matches-sources.cjs.",
+	"description": "Inventory of every shortcut config entry on the three drivers, for PAR-41 (docs/design/one-shortcut-model.md, step 1). 'legacy_boolean' rows are a feature switch bound to one hard-coded chord; 'keyboard_slot' rows are a chord bound to a catalogue action id; 'slot_families' list the modifier prefixes under which a driver accepts any key of modifier_chords.json. 'chord.modifiers' use each driver's own modifier names. 'slot' names the keyboard slot that already binds the same chord, so a boolean and a slot never both own it after the change. Checked against the manifest, the AutoHotkey AddShortcut calls and the Lua hotkey registry by tools/test/test-shortcut-inventory-matches-sources.cjs. Updated after the macOS and Linux adoption: their slot ids and families are the role-named ones, the 18 macOS Ctrl-letter switches are keyboard slots, and the Windows rows still describe the Windows ids.",
 	"rows": [
 		{
 			"driver": "windows",
@@ -451,39 +451,39 @@
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_a",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_a",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "a"
 			},
 			"action": "select_line",
-			"slot": null,
-			"note": null
+			"slot": "secondary_a",
+			"note": "Was the switch shortcuts.keys.ctrl_a; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_d",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_d",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "d"
 			},
 			"action": "open_downloads",
-			"slot": null,
-			"note": null
+			"slot": "secondary_d",
+			"note": "Was the switch shortcuts.keys.ctrl_d; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_e",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_e",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "e"
 			},
 			"action": "open_file_manager",
-			"slot": null,
-			"note": null
+			"slot": "secondary_e",
+			"note": "Was the switch shortcuts.keys.ctrl_e; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
@@ -499,183 +499,183 @@
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_h",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_h",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "h"
 			},
-			"action": "screen_capture",
-			"slot": null,
-			"note": null
+			"action": "screenshot_region_clipboard",
+			"slot": "secondary_h",
+			"note": "Was the switch shortcuts.keys.ctrl_h; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_i",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_i",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "i"
 			},
 			"action": "open_system_settings",
-			"slot": null,
-			"note": null
+			"slot": "secondary_i",
+			"note": "Was the switch shortcuts.keys.ctrl_i; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_m",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_m",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "m"
 			},
 			"action": "activity_simulation",
-			"slot": null,
-			"note": null
+			"slot": "secondary_m",
+			"note": "Was the switch shortcuts.keys.ctrl_m; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_o",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_o",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "o"
 			},
 			"action": "surround_parens",
-			"slot": null,
-			"note": null
+			"slot": "secondary_o",
+			"note": "Was the switch shortcuts.keys.ctrl_o; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_p",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_p",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "p"
 			},
 			"action": "display_mirror_toggle",
-			"slot": null,
-			"note": null
+			"slot": "secondary_p",
+			"note": "Was the switch shortcuts.keys.ctrl_p; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_s",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_s",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "s"
 			},
 			"action": "copy_selected_path",
-			"slot": null,
-			"note": null
+			"slot": "secondary_s",
+			"note": "Was the switch shortcuts.keys.ctrl_s; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_t",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_t",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "t"
 			},
 			"action": "teleport_mouse",
-			"slot": null,
-			"note": null
+			"slot": "secondary_t",
+			"note": "Was the switch shortcuts.keys.ctrl_t; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_u",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_u",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "u"
 			},
 			"action": "uppercase_selection",
-			"slot": null,
-			"note": null
+			"slot": "secondary_u",
+			"note": "Was the switch shortcuts.keys.ctrl_u; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_w",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_w",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "w"
 			},
 			"action": "titlecase_selection",
-			"slot": null,
-			"note": null
+			"slot": "secondary_w",
+			"note": "Was the switch shortcuts.keys.ctrl_w; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_x",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_x",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "x"
 			},
 			"action": "pick_color",
-			"slot": null,
-			"note": null
+			"slot": "secondary_x",
+			"note": "Was the switch shortcuts.keys.ctrl_x; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_capslock",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_capslock",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "capslock"
 			},
 			"action": "toggle_capslock",
-			"slot": null,
-			"note": "Key is not in the slot key list."
+			"slot": "secondary_capslock",
+			"note": "Key is not in the slot key list. Was the switch shortcuts.keys.ctrl_capslock; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_l",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_l",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "l"
 			},
 			"action": "lock_screen",
-			"slot": null,
-			"note": null
+			"slot": "secondary_l",
+			"note": "Was the switch shortcuts.keys.ctrl_l; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_period",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_period",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "period"
 			},
 			"action": "open_emoji_picker",
-			"slot": null,
-			"note": null
+			"slot": "secondary_period",
+			"note": "Was the switch shortcuts.keys.ctrl_period; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.ctrl_quote",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.secondary_quote",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "quote"
 			},
 			"action": "spotlight_mouse",
-			"slot": null,
-			"note": "Key is not in the slot key list."
+			"slot": "secondary_quote",
+			"note": "Key is not in the slot key list. Was the switch shortcuts.keys.ctrl_quote; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
-			"kind": "legacy_boolean",
-			"config_key": "shortcuts.keys.cmd_shift_v",
+			"kind": "keyboard_slot",
+			"config_key": "shortcuts.keyboard.primary_shift_v",
 			"chord": {
 				"modifiers": ["cmd", "shift"],
 				"key": "v"
 			},
 			"action": "paste_plain",
-			"slot": null,
-			"note": null
+			"slot": "primary_shift_v",
+			"note": "Was the switch shortcuts.keys.cmd_shift_v; migrated by schema v15."
 		},
 		{
 			"driver": "macos",
@@ -701,13 +701,13 @@
 		{
 			"driver": "macos",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.hs_ctrl_space",
+			"config_key": "shortcuts.keyboard.secondary_space",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "space"
 			},
 			"action": "llm_generate_prediction",
-			"slot": "hs_ctrl_space",
+			"slot": "secondary_space",
 			"note": null
 		},
 		{
@@ -722,25 +722,25 @@
 		{
 			"driver": "linux",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.ctrl_g",
+			"config_key": "shortcuts.keyboard.primary_g",
 			"chord": {
 				"modifiers": ["ctrl"],
 				"key": "g"
 			},
 			"action": "open_chatgpt",
-			"slot": "ctrl_g",
+			"slot": "primary_g",
 			"note": null
 		},
 		{
 			"driver": "linux",
 			"kind": "keyboard_slot",
-			"config_key": "shortcuts.keyboard.super_space",
+			"config_key": "shortcuts.keyboard.meta_space",
 			"chord": {
 				"modifiers": ["super"],
 				"key": "space"
 			},
 			"action": "llm_generate_prediction",
-			"slot": "super_space",
+			"slot": "meta_space",
 			"note": null
 		},
 		{
@@ -785,53 +785,53 @@
 		},
 		{
 			"driver": "macos",
-			"prefix": "cmd_",
+			"prefix": "alt_",
+			"modifiers": ["option"]
+		},
+		{
+			"driver": "macos",
+			"prefix": "secondary_",
+			"modifiers": ["ctrl"]
+		},
+		{
+			"driver": "macos",
+			"prefix": "secondary_shift_",
+			"modifiers": ["ctrl", "shift"]
+		},
+		{
+			"driver": "macos",
+			"prefix": "primary_",
 			"modifiers": ["cmd"]
 		},
 		{
 			"driver": "macos",
-			"prefix": "cmd_shift_",
+			"prefix": "primary_shift_",
 			"modifiers": ["cmd", "shift"]
 		},
 		{
-			"driver": "macos",
-			"prefix": "hs_ctrl_",
-			"modifiers": ["ctrl"]
-		},
-		{
-			"driver": "macos",
-			"prefix": "hs_ctrl_shift_",
-			"modifiers": ["ctrl", "shift"]
-		},
-		{
-			"driver": "macos",
-			"prefix": "hs_option_",
-			"modifiers": ["option"]
-		},
-		{
 			"driver": "linux",
-			"prefix": "ctrl_",
+			"prefix": "primary_",
 			"modifiers": ["ctrl"]
 		},
 		{
 			"driver": "linux",
-			"prefix": "ctrl_shift_",
-			"modifiers": ["ctrl", "shift"]
-		},
-		{
-			"driver": "linux",
-			"prefix": "super_",
+			"prefix": "meta_",
 			"modifiers": ["super"]
-		},
-		{
-			"driver": "linux",
-			"prefix": "super_shift_",
-			"modifiers": ["super", "shift"]
 		},
 		{
 			"driver": "linux",
 			"prefix": "alt_",
 			"modifiers": ["alt"]
+		},
+		{
+			"driver": "linux",
+			"prefix": "primary_shift_",
+			"modifiers": ["ctrl", "shift"]
+		},
+		{
+			"driver": "linux",
+			"prefix": "meta_shift_",
+			"modifiers": ["super", "shift"]
 		},
 		{
 			"driver": "linux",
