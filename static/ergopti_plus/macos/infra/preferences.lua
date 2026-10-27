@@ -127,7 +127,9 @@ local KEY_MAP = {
 	dynamichotstrings_user_code_time_activation_seconds = {
 		sec = "hotstrings", path = "dynamic.user_code", key = require("config_keys").LEAF.TIME_ACTIVATION_SECONDS,
 	},
-	dynamichotstrings_date               = { sec = "hotstrings", path = "dynamic", key = "date"         },
+	-- The manifest keeps hotstrings.dynamic.date as a feature row: mapping the
+	-- boolean onto the row itself saved a bare `date = false` (field ledger L20).
+	dynamichotstrings_date               = { sec = "hotstrings", path = "dynamic.date", key = "enabled" },
 	dynamichotstrings_datefr             = { sec = "hotstrings", path = "dynamic", key = "datefr"       },
 	dynamichotstrings_datelongfr         = { sec = "hotstrings", path = "dynamic", key = "datelongfr"   },
 	dynamichotstrings_ibanprefixes       = { sec = "hotstrings", path = "dynamic", key = "ibanprefixes" },
