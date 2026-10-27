@@ -520,7 +520,7 @@
 		},
 		{
 			"id": "js-macos-dev-native-receiver",
-			"ordinal": 519,
+			"ordinal": 520,
 			"name": "a developer app admits the bundled native network receiver only for the clone its sealed plist records",
 			"cmd": "node",
 			"args": ["tools/test/test-macos-dev-native-receiver.cjs"],
