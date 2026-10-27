@@ -23,6 +23,7 @@ return {
 	},
 	service_labels = {
 		macos_core = "com.ergoptiplus.runtime.core",
+		macos_remap_guardian = "com.ergoptiplus.remap-guardian",
 		macos_virtual_hid = "com.ergoptiplus.runtime.vhid",
 	},
 	hosts = {

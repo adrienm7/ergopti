@@ -35,6 +35,12 @@ set -uo pipefail
 # directory name. Capture a sentinel and remove only that final byte afterward.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && printf '%s.' "${PWD}")"
 REPO_ROOT="${REPO_ROOT%.}"
+# The collector keeps going after a failed step, but never without the shared
+# identifiers: a missing file stops it here.
+set -e
+# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
+. "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+set +e
 LOG_DIR="${HOME}/Library/Logs/ergopti_plus"
 FIELD_BRANCH_PREFIX="field/"
 FIELD_RUN_SPEC="static/ergopti_plus/macos/data/field_run.json"
@@ -152,7 +158,6 @@ report_new_results() {
 
 # Opens the developer app, sends the request, waits for done and copies it.
 run_field_run() {
-	. "${REPO_ROOT}/static/ergopti_plus/_shared/data/identifiers.sh"
 	local folder request_name accepted_name done_name refused_name request_id deadline_seconds
 	folder="$(spec_value folder)" || { log "Cannot read ${FIELD_RUN_SPEC}."; return 1; }
 	run_folder="${REPO_ROOT}/${folder}"
@@ -168,14 +173,19 @@ run_field_run() {
 	local started_at now pid
 	started_at="$(date +%s)"
 
-	if ! pgrep -x "${ERGOPTI_APP_NAME}" >/dev/null 2>&1; then
-		if [ -d "${REPO_ROOT}/build/macos/${ERGOPTI_APP_BUNDLE}" ]; then
+	# A ready developer app of this clone is reused. Anything else (an installed
+	# ErgoptiPlus, a guardian launchd keeps alive, a stale build) is stopped by
+	# the runner, which then opens the developer app, rebuilt when the launcher,
+	# a native helper or the build recipe is newer than the built binary.
+	if ! ready_pid >/dev/null; then
+		local app_binary="${REPO_ROOT}/build/macos/${ERGOPTI_APP_BUNDLE}/Contents/MacOS/${ERGOPTI_APP_NAME}"
+		if [ -x "${app_binary}" ] && [ -z "$(find "${REPO_ROOT}/static/ergopti_plus/macos/launcher" \
+			"${REPO_ROOT}/tools/build" -type f -newer "${app_binary}" -print -quit 2>/dev/null)" ]; then
 			log "Opening the developer app..."
 			bash "${REPO_ROOT}/tools/dev/run-macos-dev-app.sh" --open-only \
-				|| bash "${REPO_ROOT}/tools/dev/run-macos-dev-app.sh" \
 				|| { log "The developer app could not be opened."; return 1; }
 		else
-			log "Building and opening the developer app (first run, a few minutes)..."
+			log "Building and opening the developer app (the launcher changed; a few minutes)..."
 			bash "${REPO_ROOT}/tools/dev/run-macos-dev-app.sh" || { log "The developer app could not be built."; return 1; }
 		fi
 	fi

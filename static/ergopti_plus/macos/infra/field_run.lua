@@ -39,7 +39,6 @@ local LOG = "field_run"
 
 local REQUEST_KEYS = { schema = true, request_id = true, steps = true, deadline_seconds = true }
 local REQUEST_ID_CLASS = "^[%w_%-]+$"
-local REQUEST_ID_MAX = 64
 
 -- The request word that selects every declared step.
 M.ALL_STEPS = "all"
@@ -89,9 +88,14 @@ function M.validate(spec)
 	if not is_integer(spec.max_request_bytes) or spec.max_request_bytes < 128 then
 		error("field run: max_request_bytes must be an integer of at least 128", 2)
 	end
-	if spec.request_id_pattern ~= "^[A-Za-z0-9_-]{1,64}$" then
+	-- Lua patterns have no bounded repetition: the class is enforced here and
+	-- the length bound is read from the declaration, its single source.
+	local id_max = type(spec.request_id_pattern) == "string"
+		and spec.request_id_pattern:match("^%^%[A%-Za%-z0%-9_%-%]{1,(%d+)}%$$")
+	if not id_max then
 		error("field run: request_id_pattern differs from the policy this module enforces", 2)
 	end
+	spec.request_id_max = tonumber(id_max)
 	local deadline = spec.deadline_seconds
 	if type(deadline) ~= "table" or not is_integer(deadline.min) or not is_integer(deadline.max)
 		or not is_integer(deadline.default) or deadline.min < 1 or deadline.min > deadline.default
@@ -143,8 +147,8 @@ end
 -- ===========================
 -- ===========================
 
-local function is_request_id(value)
-	return type(value) == "string" and #value >= 1 and #value <= REQUEST_ID_MAX
+local function is_request_id(spec, value)
+	return type(value) == "string" and #value >= 1 and #value <= spec.request_id_max
 		and value:match(REQUEST_ID_CLASS) ~= nil
 end
 
@@ -158,7 +162,7 @@ function M.parse_request(spec, text)
 	if type(text) ~= "string" or #text == 0 or #text > spec.max_request_bytes then return nil, "malformed" end
 	local ok, request = pcall(Json.decode, text)
 	if not ok or type(request) ~= "table" then return nil, "malformed" end
-	local echoed = is_request_id(request.request_id) and request.request_id or nil
+	local echoed = is_request_id(spec, request.request_id) and request.request_id or nil
 	for key in pairs(request) do
 		if not REQUEST_KEYS[key] then return nil, "malformed", echoed end
 	end
@@ -328,7 +332,7 @@ function Session:close_interrupted()
 	local text, status = self.ports.read(self:path("running"))
 	if status == "absent" then return end
 	local ok, running = pcall(Json.decode, text or "")
-	local request_id = ok and type(running) == "table" and is_request_id(running.request_id) and running.request_id or nil
+	local request_id = ok and type(running) == "table" and is_request_id(self.spec, running.request_id) and running.request_id or nil
 	if request_id then
 		local done = self:results_dir(request_id) .. "/" .. self.spec.files.done
 		if not self.ports.exists(done) then
