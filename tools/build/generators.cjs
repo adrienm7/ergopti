@@ -223,7 +223,13 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-identifiers.cjs',
-		outputs: ['static/ergopti_plus/_shared/lua/identifiers.lua']
+		outputs: [
+			'static/ergopti_plus/_shared/lua/identifiers.lua',
+			'static/ergopti_plus/_shared/ui/_generated/identifiers.js',
+			'static/ergopti_plus/_shared/data/identifiers.sh',
+			'static/ergopti_plus/_shared/data/identifiers.py',
+			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/Identifiers.generated.swift'
+		]
 	},
 	{
 		script: 'codegen/codegen-app-dirs.cjs',
