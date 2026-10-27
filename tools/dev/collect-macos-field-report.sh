@@ -19,7 +19,7 @@
 # every Debug field check, the diagnostics collection and the Ollama and MLX
 # download flows (infra/field_run.lua; contract in
 # static/ergopti_plus/macos/data/field_run.json), waits for its done marker
-# within a global deadline and copies its results.
+# until the request's own deadline plus a grace, and copies its results.
 #
 # USAGE:
 #   bash tools/dev/collect-macos-field-report.sh            update, collect, commit, push
@@ -44,9 +44,10 @@ set +e
 LOG_DIR="${HOME}/Library/Logs/ergopti_plus"
 FIELD_BRANCH_PREFIX="field/"
 FIELD_RUN_SPEC="static/ergopti_plus/macos/data/field_run.json"
-# The whole field run, from the app start to its done marker. The request's own
-# deadline is the declared default, below this one, so done arrives first.
-FIELD_RUN_DEADLINE_SECONDS=900
+# How long the collector keeps waiting for done after the request's own
+# deadline (the declared default, which covers every step at its bound): the
+# app needs a moment to settle the last step, run the guard and write done.
+FIELD_RUN_GRACE_SECONDS=120
 # How long the developer app may take to publish its readiness, and to accept.
 FIELD_RUN_READY_SECONDS=240
 FIELD_RUN_ACCEPT_SECONDS=60
@@ -222,8 +223,8 @@ run_field_run() {
 			log "The app did not accept the request within ${FIELD_RUN_ACCEPT_SECONDS} s."
 			return 1
 		fi
-		if [ $((now - started_at)) -ge "${FIELD_RUN_DEADLINE_SECONDS}" ]; then
-			log "No done marker after ${FIELD_RUN_DEADLINE_SECONDS} s; keeping the partial results."
+		if [ $((now - sent_at)) -ge $((deadline_seconds + FIELD_RUN_GRACE_SECONDS)) ]; then
+			log "No done marker $((deadline_seconds + FIELD_RUN_GRACE_SECONDS)) s after the request; keeping the partial results."
 			report_new_results
 			[ -d "${results_dir}" ] && cp -R "${results_dir}" "${out}/field_run"
 			return 1
