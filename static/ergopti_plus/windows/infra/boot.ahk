@@ -44,11 +44,12 @@ global OneShotShiftEnabled := False
 ; persists across updates. The bundle dir (LocalAppData\Ergopti\bundle\) is wiped
 ; and re-extracted on every version change, so storing paths.toml there caused
 ; ConfigDirPath overrides to be lost on every update, which triggered the
-; onboarding wizard again even for existing users. The dev-mode fallback keeps
-; using A_ScriptDir\_generated\paths.toml.
+; onboarding wizard again even for existing users. A developer run
+; (infra/dev_source.ahk) reads the same file, so it sees the user's configuration
+; folder; a plain source run keeps using A_ScriptDir\_generated\paths.toml.
 global _PathsFile := (_DriverStartupSmokeDir != "")
 		? (_DriverStartupSmokeDir . "\paths.toml")
-		: (A_IsCompiled
+		: ((A_IsCompiled || DevSource_Root() != "")
 				? (A_AppData . "\Ergopti\paths.toml")
 				: (A_ScriptDir . "\_generated\paths.toml"))
 ; The OS-default logs folder, %LOCALAPPDATA%\ergopti_plus\logs\. Named before

@@ -666,6 +666,8 @@ BootProfile_Stamp("Module includes initialised")
 ; =============================================
 
 #Include infra/suspend_handoff.ahk
+; Before boot.ahk: a developer run reads the installed build's paths.toml.
+#Include infra/dev_source.ahk
 #Include infra/boot.ahk
 BootProfile_Stamp("Paths and shared configuration loaded")
 #Include infra/feature_state.ahk
@@ -1480,6 +1482,14 @@ HealthCheck_StartWindowControl()
 try DriverControl_Start()
 catch as _DriverControlErr
 	LoggerError("ErgoptiPlus", "Local reload control unavailable: {1}.", _DriverControlErr.Message)
+; A developer run (tools/dev/run-windows-dev.ps1) reloads on a saved .ahk.
+try {
+	if (DevSource_Root() != "") {
+		LoggerInfo("ErgoptiPlus", "Developer source mode; the driver runs from {1}.", _DriverDir)
+		DevSourceWatcher_Start(_DriverDir, ReloadPreservingSuspend)
+	}
+} catch as _DevSourceErr
+	LoggerError("ErgoptiPlus", "Developer source mode refused: {1}.", _DevSourceErr.Message)
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 ; Release retained lifecycle commands only after real input readiness.
 _TrayStartupCommands.NotifyReady()

@@ -260,6 +260,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/suspend_handoff.ahk
 #Include ../infra/reload_terminal_handoff.ahk
 #Include ../infra/reload_successor.ahk
+#Include ../infra/dev_source.ahk
 #Include ../infra/reload_deferral.ahk
 #Include ../infra/suppressive_inputhook_ownership.ahk
 #Include ../infra/lifecycle_transition.ahk
@@ -964,6 +965,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/infra/lifecycle/test_reload_successor_quiescence.ahk
 #Include unit/infra/lifecycle/test_reload_worker_identity.ahk
 #Include unit/infra/lifecycle/test_reload_deferral.ahk
+#Include unit/infra/lifecycle/test_dev_source.ahk
 #Include unit/ui/menu/test_tray_menu_separator_popup.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_hold_picker_options.ahk
 #Include unit/ui/menu/test_menu_command_deferral.ahk

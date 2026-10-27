@@ -45,6 +45,12 @@ a sealed Windows updater source, reseal with
   field-run request (`static/ergopti_plus/macos/data/field_run.json`), collects the logs and commits and pushes
   them, also on Ctrl-C. Read the newest `docs/field-reports/mac-*` folder with
   `git show origin/field/mac-2026-10-27:<path>`.
+- **Developer mode on the three OS** (run the clone's code with the installed app's features, auto-reload on a
+  saved source file; inventory in `docs/design/developer-mode.md`, open checks in the item "Developer mode on
+  the three OS"): macOS `bash tools/dev/run-macos-dev-app.sh` (`--open-only` without rebuilding), Linux
+  `bash tools/dev/run-linux-dev.sh` (`npm run dev:linux`), Windows
+  `powershell -ExecutionPolicy Bypass -File tools\dev\run-windows-dev.ps1` (`npm run dev:windows`). Each passes
+  the clone root in `ERGOPTI_DEV_SOURCE_ROOT` and the driver refuses a root that is not its own clone.
 - **Problem ledger of the Mac session:** see "Mac field session 2026-10-27: problem ledger" below; every
   problem of issue #104 and of the field reports is there as fixed (sha) or open with its next step.
 - **Coordinator scripts** are in `tools/dev/coordinator/`: `integration-sweep.sh <out-dir>` (gen:check,
@@ -178,18 +184,19 @@ dev.
 - **L18** [CODE] keystats start still holds the main thread 1.1 to 1.3 s from the deferred timer
   at menu_state.lua:531 (new.txt 16:28:06, 16:48:13, on 228f79f2). Next: move the SQLite open and
   offset replay of `kl.start` into slices like the recovery.
-- **L19** [CODE][PHYS-M] log_manager.lua:1585 held the main thread 5288 ms right after "Typing
-  ids restart at ledger byte ... rebuilding without day-boundary context resets" (new.txt
-  16:49:17 to 16:49:22). Line 1585 is the recovery slice timer: one slice overran its 8 ms
-  budget. Read from code, three operations in `_rebuild_aggregates_from_raw` cannot yield: (1)
-  `_typing_replay_cutoffs` reads the whole data.sql (68 MB) with `FileSystem.read` for each
-  device before any work; (2) `_clear_derived_device_rows` deletes every derived row of a device
-  in one transaction; (3) the replay query `WHERE device_id=... AND id range ORDER BY ts, id` has
-  no index on (device_id, ts, id) (schema.sql only has (device_id, date) and (date, app)), so
-  SQLite sorts the whole partition before the first row reaches the pace check. The warning is
-  logged after (1), so (2) or (3) is the hold. Next: time (2) and (3) on a copy of the field
-  cache; if (3), add the shared index through schema.sql with a cache version bump; if (2),
-  delete in bounded batches between yields.
+- **L19** Fixed 3d6479306a for the measured cause; one smaller residue stays
+  open. log_manager.lua:1585 (the recovery slice timer) held the main thread 5288 ms right after
+  "Typing ids restart ..." (new.txt 16:49:17 to 16:49:22). Measured on a synthetic cache built
+  from schema.sql with the sqlite3 3.45 CLI and Python's sqlite3 (180,000 typing rows, 61 MB of
+  typing text, 3 million n-gram rows): deleting the device's derived rows in one transaction took
+  9.5 s; 500 rows per committed batch took 30 ms (synchronous=FULL), 5000 rows 225 ms. The
+  replay query `ORDER BY ts, id` uses a temporary B-tree for the sort and returned its first row
+  after 165 to 183 ms (9 ms with `ORDER BY id`). Fix: inside the recovery, a table holding more
+  than 100 rows for the device is now deleted in committed batches of 100 with a pace point
+  between batches, and the rest keeps the single transaction. Still open [CODE]: the 170 ms sort
+  goes over the 8 ms budget; an index on events_typing(device_id, ts, id) added through
+  schema.sql with a cache migration would remove it. Mac confirms: no hold over 1 s from
+  log_manager.lua after a "Typing ids restart".
 - **L20** Fixed ef3b8ddfd5. "config.toml
   cannot be read, so the virtual keyboard choice is unknown" (init.lua:2168 on 228f79f2, new.txt
   16:28:07, 16:48:12, 16:54:32, developer mode). `Preferences.current_view` now returns a closed
@@ -242,10 +249,13 @@ dev.
   Next, on the Mac: run `open "<that URL>"` in Terminal; if it fails on macOS 26, switch to the
   `com.apple.settings.PrivacySecurity.extension?Privacy_ScreenCapture` form, else trace the
   `hs.urlevent.openURL` call made from the notification click.
-- **L30** [CODE] karabiner.lease "'status' called before M.init()" (new.txt 15:32:19, right
-  after the config migration refusal stopped that boot early). The guard is
-  platform/remap/lease_controller.lua:165. Next: log the caller's traceback in that guard, then
-  make the caller check the controller's init state when the boot stopped before init.
+- **L30** Fixed 0e7bff98d2. karabiner.lease "'status' called before M.init()" (new.txt
+  15:32:19, right after the config migration refusal stopped that boot early). The guard at
+  platform/remap/lease_controller.lua now logs its caller's traceback. The evident caller is the
+  diagnostics collector (`H.collect_input`, ui/healthcheck/helpers.lua), which reads the remapping
+  phase on any boot; it now reports `uninitialized` without calling status() when the controller
+  was never initialized. Mac confirms: no such ERROR; if one appears, its traceback names the
+  other caller.
 - **L31** [CODE] "Accessibility observer setup failed ... for PID 31319" (new.txt 14:27:31): 31319
   is the ErgoptiPlus runtime itself (issue #104 `runtime_pid`). `M.update_ax_observer`
   (modules/keystats/context_tracker.lua) attaches to whatever app is frontmost, including the
@@ -999,13 +1009,30 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       n-grams get `e`, synthetic output chains. Erased and synthetic vectors in the shared corpus, replayed on
       macOS and Linux (ee2eab6b1e, `keystats/correction_erased_vectors.json`). Left [PC]: the AHK replayer
       (`KLW_WalkTypingEntry`); Windows word separators are wider than Linux's three.
-- [ ] **macOS developer source runs.** [CODE] `tools/dev/install-hammerspoon.sh` points a stock Hammerspoon
-      at the clone, but instance admission (0c954ed49a, a7bdb88a44) admits the driver only in the launcher's
-      embedded runtime, so it stops with "native logging worker is unavailable" (maintainer, 27 October);
-      `launcher/README.md` still says direct developer sessions are supported. Decide one: a supported dev
-      mode (the launcher started against the working tree, or the script starting the async log worker with
-      the managed environment), or retire the script and fix the README and the refusal text to say "build
-      the app".
+- [ ] **Developer mode on the three OS (maintainer decision, 27 October).** [CODE] [PHYS-M] [PHYS-W] Each app
+      runs the clone with the built app's helpers, config and AI runtimes, reloads a saved source file, and
+      starts with one command; the updater, uninstall and remote layout catalogue stay off in a source run.
+      Inventory per feature: `docs/design/developer-mode.md`. Commands: macOS `bash tools/dev/run-macos-dev-app.sh`
+      (done: guardian 6f667b3380, network receiver c0e3359a19); Linux `bash tools/dev/run-linux-dev.sh` (done in
+      branch `tmp/wip-devmode3`: Reload relays the runner, a saved driver or `_shared/lua` `.lua` restarts the
+      daemon, the native archive backend is built into the clone); Windows `tools\dev\run-windows-dev.ps1`,
+      run with `powershell -ExecutionPolicy Bypass -File` (same branch: `infra/dev_source.ahk` reloads on a saved
+      `.ahk`, the run reads `%APPDATA%\Ergopti\paths.toml` like the exe). Left: (1) [PHYS-W] on the PC with the exe installed and
+      running, run the command from a PowerShell in the clone: the exe closes by itself (taskkill without /F; if it
+      stays, the script names it and stops), the tray icon appears, Debug logs say "Developer source mode; the driver
+      runs from <clone>\static\ergopti_plus\windows" and "Developer source watcher started"; the config is the
+      exe's (same hotstrings, same `paths.toml` choice, no onboarding); save any driver `.ahk` with a harmless
+      comment change: within about 2 s the driver reloads once and keeps a Pause; the tray's Reload still works;
+      AI menus (Ollama), the metrics window (WebView2, sqlite3.dll) and Alt+Tab navigation (ergopti_nav_owner.dll)
+      work; Start at login in this mode registers a plain source run (no watcher): report whether that should
+      carry the developer variable. (2) [PHYS-W] check that `npm run dev:windows` works from Git Bash and from
+      cmd (it calls Windows PowerShell 5.1). (3) [PHYS-M] the Mac lines of the hardware session cover the macOS
+      mode. (4) Linux, on a real desktop with the package installed: the unit is stopped, the tray appears, a
+      saved `.lua` restarts the daemon (`Debounced source reload firing` then a new boot), the tray's Reload
+      restarts it, and a second `run-linux-dev.sh` while one runs reports "already running". (5) [CODE] decide
+      whether the layout catalogue should fetch the remote registry in a developer run (today all three read the
+      clone's registry, by design of `local_source`). (6) [CODE] `bin/ergopti-hotstrings` run from a clone still
+      prefers `/usr/lib/ergopti` when a package is installed; fix or retire that branch.
 - [ ] **Owned, pinned third-party runtimes on the three OS (maintainer decision, 27 October).** [CODE] Ergopti
       installs and runs its own pinned Ollama, MLX environment, Karabiner runtime and any other third-party
       runtime, whether or not the user has one, and never uses, stops or modifies the user's copy. Ollama:

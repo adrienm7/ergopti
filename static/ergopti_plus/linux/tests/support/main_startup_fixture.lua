@@ -194,6 +194,10 @@ function M.run(options)
 			return { missing_program = function() return nil end, report = function() observed.access_reported = true; return 1 end }
 		elseif name == "infra.i18n" then
 			return { init = noop, set_trigger_provider = noop, get = function(key) return key end }
+		elseif name == "infra.dev_source" then
+			-- An installed daemon: no developer root, no source watchers.
+			return { root = function() return nil end, is_active = function() return false end,
+				source_dirs = function() return nil end, DRIVER_SUBPATH = "/static/ergopti_plus/linux" }
 		elseif name == "infra.config_paths" then
 			return { config = function() return "/controlled/config.toml" end }
 		elseif name == "ui.onboarding.startup" then
