@@ -224,6 +224,17 @@ function M.new_nesting(threshold_of, emit)
 	return tracker
 end
 
+--- The phase name a segment's timings are recorded under (PhaseStats and the
+--- closed phase enum of the log vocabulary list `hotpath.<segment>` for each
+--- declared segment). An undeclared name raises: a measurement under an unlisted
+--- phase would escape the vocabulary gate.
+--- @param name string Declared segment name.
+--- @return string phase
+function M.phase(name)
+	if _by_name[name] == nil then error("undeclared hot-path segment: " .. tostring(name), 2) end
+	return "hotpath." .. name
+end
+
 --- Returns whether a name is a declared segment of any driver.
 --- @param name string
 --- @return boolean
