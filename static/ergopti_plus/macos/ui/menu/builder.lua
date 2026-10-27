@@ -495,7 +495,7 @@ local function build_hotstrings_rows(ctx, menu_mods)
 		-- parent row's `action`, which AppKit never sends for an item that
 		-- opens a submenu, so the Hotstrings master could not be switched from
 		-- the menu bar at all.
-		["hotstrings_toggle"]      = function()
+		[require("config_keys").COMMAND.HOTSTRINGS_TOGGLE]      = function()
 			if ctx.paused then
 				Logger.warn(LOG, "Hotstrings switch refused: the script is paused.")
 				return false
@@ -713,11 +713,11 @@ function M.generate(ctx, menu_mods, actions)
 			local cfg_ctx = {}
 			for key, value in pairs(ctx or {}) do cfg_ctx[key] = value end
 			cfg_ctx.commands = {
-				["scope_restore"]       = restore,
-				["scope_clear"]         = clear,
-				["clean_unused_keys"]   = clean,
-				["config_folder"]       = actions.open_paths,
-				["setup_wizard"]        = actions.show_setup_wizard,
+				[require("config_keys").COMMAND.SCOPE_RESTORE]       = restore,
+				[require("config_keys").COMMAND.SCOPE_CLEAR]         = clear,
+				[require("config_keys").COMMAND.CLEAN_UNUSED_KEYS]   = clean,
+				[require("config_keys").COMMAND.CONFIG_FOLDER]       = actions.open_paths,
+				[require("config_keys").COMMAND.SETUP_WIZARD]        = actions.show_setup_wizard,
 			}
 			cfg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do cfg_ctx.state_getters[key] = value end
@@ -816,10 +816,10 @@ function M.generate(ctx, menu_mods, actions)
 			for key, value in pairs(ctx or {}) do dbg_ctx[key] = value end
 			dbg_ctx.commands = {
 				["console"]        = actions.open_console,
-				["log_level"]      = actions.set_log_level,
-				["open_logs"]      = actions.open_logs,
-				["open_today_log"] = actions.open_today_log,
-				["open_error_log"] = actions.open_error_log,
+				[require("config_keys").LEAF.LOG_LEVEL]      = actions.set_log_level,
+				[require("config_keys").COMMAND.OPEN_LOGS]      = actions.open_logs,
+				[require("config_keys").COMMAND.OPEN_TODAY_LOG] = actions.open_today_log,
+				[require("config_keys").COMMAND.OPEN_ERROR_LOG] = actions.open_error_log,
 				["healthcheck"]    = function() healthcheck.show_window({ state = ctx.state }) end,
 				[COMMAND.FIELD_CHECK_LEASE] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_LEASE) end,
 				[COMMAND.FIELD_CHECK_OWNED_RUNTIME] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_OWNED_RUNTIME) end,
@@ -828,9 +828,9 @@ function M.generate(ctx, menu_mods, actions)
 				[COMMAND.FIELD_CHECK_LOGIN_ITEMS] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_LOGIN_ITEMS) end,
 				[COMMAND.FIELD_CHECK_KEY_ACCOUNTING] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_KEY_ACCOUNTING) end,
 				[COMMAND.COMPOSER_CHECK] = function() require("ui.field_check").run(COMMAND.COMPOSER_CHECK) end,
-				["report_bug"]      = function() require("ui.healthcheck.report").report_bug({ state = ctx.state }) end,
-				["suggest_feature"] = function() require("ui.healthcheck.report").suggest_feature() end,
-				["show_error_dialog"] = actions.toggle_error_dialog,
+				[require("config_keys").COMMAND.REPORT_BUG]      = function() require("ui.healthcheck.report").report_bug({ state = ctx.state }) end,
+				[require("config_keys").COMMAND.SUGGEST_FEATURE] = function() require("ui.healthcheck.report").suggest_feature() end,
+				[require("config_keys").LEAF.SHOW_ERROR_DIALOG] = actions.toggle_error_dialog,
 			}
 			dbg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do dbg_ctx.state_getters[key] = value end

@@ -132,7 +132,7 @@ function M.build(ctx)
 
 	local display_ctx = {
 		commands = {
-			["llm_indentation"] = function(value)
+			[require("config_keys").COMMAND.LLM_INDENTATION] = function(value)
 				local current = indentation_snapshot()
 				if not Preferences.source_matches(indentation_source.source, current.source) then return false end
 				local decision = DisplayPolicy.indentation_intent(indentation_source, current, value, indent_values)
@@ -144,7 +144,7 @@ function M.build(ctx)
 						ConfigPaths.get("ConfigTomlPath"), current.source),
 				})
 			end,
-			["llm_show_all"] = function()
+			[require("config_keys").COMMAND.LLM_SHOW_ALL] = function()
 				if not show_all_ready() then return false end
 				return settings_mgr.apply_setting_transaction({
 					key = "llm_streaming_multi",
@@ -153,7 +153,7 @@ function M.build(ctx)
 					publish_setting = false,
 				})
 			end,
-			["llm_token_streaming"] = function()
+			[require("config_keys").COMMAND.LLM_TOKEN_STREAMING] = function()
 				local current = streaming_snapshot()
 				if not Preferences.source_matches(streaming_source.source, current.source) then return false end
 				local decision = DisplayPolicy.streaming_intent(streaming_source, current)
@@ -166,7 +166,7 @@ function M.build(ctx)
 					publication_guard = publication_guard,
 				})
 			end,
-			["llm_info_bar"] = function()
+			[require("config_keys").COMMAND.LLM_INFO_BAR] = function()
 				local current = info_bar_snapshot()
 				if not Preferences.source_matches(info_bar_source.source, current.source) then return false end
 				local decision = DisplayPolicy.info_bar_intent(info_bar_source, current)

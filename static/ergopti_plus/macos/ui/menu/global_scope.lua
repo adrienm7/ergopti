@@ -25,6 +25,7 @@ local Manifest = require("infra.manifest_reader")
 local Composition = require("config_scope_composition")
 local Participant = require("config_scope_participant")
 local Logger = require("infra.logger")
+local ConfigKeys = require("config_keys")
 local LOG = "menu.global_scope"
 
 --- The remap engine's part of one scope, as an asynchronous participant: its
@@ -57,7 +58,7 @@ local function remap_participant(remap, scope, backup_path, defer)
 		if type(snapshot) ~= "table" then return done(false, "remap settings are owned by another transaction") end
 		remap.apply_scope({ scope = scope, mode = mode, backup_path = backup_path(scope) }, function(ok, reason, _, receipt)
 			committed = ok == true
-			if committed and scope == "tap_holds" and mode == "recommended" then
+			if committed and scope == ConfigKeys.KEY.TAP_HOLDS and mode == "recommended" then
 				if type(receipt) ~= "table" then
 					missing_receipt = true
 					return settle(done, false, "missing-navigation-layer-receipt")
@@ -122,7 +123,7 @@ function M.new(options)
 		end
 		local remap = options.remap
 		if type(remap) == "table" and type(remap.get_enabled) == "function" and remap.get_enabled() == true then
-			registry.tap_holds = remap_participant(remap, "tap_holds", options.backup_path, options.defer)
+			registry.tap_holds = remap_participant(remap, ConfigKeys.KEY.TAP_HOLDS, options.backup_path, options.defer)
 			local chords = remap_participant(remap, "shortcuts", options.backup_path, options.defer)
 			registry.shortcuts = registry.shortcuts and { registry.shortcuts, chords } or { chords }
 		end

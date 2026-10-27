@@ -109,7 +109,7 @@ end
 --- @param subscribed string Registry id of the subscribed channel.
 --- @return table row A provider row with its items.
 local function channel_picker(owner, subscribed)
-	return ManifestMenu.choice_row("about_update_channel_menu", "update_channel", {
+	return ManifestMenu.choice_row("about_update_channel_menu", require("config_keys").COMMAND.UPDATE_CHANNEL, {
 		update_channel = function(id)
 			Logger.info(LOG, "User chose the update channel '%s'.", id)
 			local ok, committed = pcall(owner.set, id)
@@ -124,7 +124,7 @@ end
 --- @param stored_seconds number|nil A source run's snapped interval, without an owner.
 --- @return table row A provider row with its items.
 local function frequency_picker(checks, stored_seconds)
-	return ManifestMenu.choice_row("about_update_frequency_menu", "update_check_interval", {
+	return ManifestMenu.choice_row("about_update_frequency_menu", require("config_keys").COMMAND.UPDATE_CHECK_INTERVAL, {
 		update_check_interval = function(seconds)
 			if type(checks) ~= "table" then return false end
 			Logger.info(LOG, "User chose the check interval %ds.", seconds)
@@ -223,7 +223,7 @@ function M.build(ctx, actions)
 			end
 		end
 		local check_row = ManifestMenu.command_row("about_source_menu", require("config_keys").COMMAND.ABOUT_SOURCE_CHECK, {
-			["about_source_check"] = check_action,
+			[require("config_keys").COMMAND.ABOUT_SOURCE_CHECK] = check_action,
 		}, { ["about_source_release_ready"] = function() return not local_src end })
 		if check_row then
 			if offered_label then check_row.label = offered_label end
@@ -241,7 +241,7 @@ function M.build(ctx, actions)
 		local state = type(ctx) == "table" and type(ctx.state) == "table" and ctx.state or {}
 		local seconds = require("modules.updater.auto_check").stored_interval(state)
 		local source_row = ManifestMenu.command_row("about_source_menu", require("config_keys").COMMAND.ABOUT_SOURCE_CHECK, {
-			["about_source_check"] = function() return false end,
+			[require("config_keys").COMMAND.ABOUT_SOURCE_CHECK] = function() return false end,
 		}, { ["about_source_release_ready"] = function() return not local_src end })
 		if source_row then table.insert(menu_items, source_row) end
 		local frequency_row = frequency_picker(nil, seconds)
@@ -259,14 +259,14 @@ function M.build(ctx, actions)
 	local render_ctx = {}
 	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
 	render_ctx.commands = {
-		["about_changelog"] = function()
+		[require("config_keys").COMMAND.ABOUT_CHANGELOG] = function()
 			Logger.info(LOG, "User opened changelog (channel: %s).", channel)
 			show_changelog(channel, owner)
 		end,
-		["about_releases_page"] = function() hs.urlevent.openURL(releases_page_url()) end,
+		[require("config_keys").COMMAND.ABOUT_RELEASES_PAGE] = function() hs.urlevent.openURL(releases_page_url()) end,
 		-- The menu session's uninstall transaction; an unregistered command is
 		-- reported by the renderer and draws no row that would do nothing.
-		["start_at_login"] = type(actions) == "table" and actions.start_at_login or nil,
+		[require("config_keys").COMMAND.START_AT_LOGIN] = type(actions) == "table" and actions.start_at_login or nil,
 		["uninstall"] = type(actions) == "table" and actions.uninstall or nil,
 	}
 	-- A local version run from source has nothing to uninstall: the row stays,

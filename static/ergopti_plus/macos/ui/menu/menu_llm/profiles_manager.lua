@@ -21,6 +21,7 @@ local ManifestMenu  = require("infra.manifest_menu")
 local AppProfileOverrides = require("llm.app_profile_overrides")
 local PreferencesTransaction = require("ui.menu.preferences_transaction")
 local TimerScheduler = require("adapters.timer_scheduler")
+local ConfigKeys = require("config_keys")
 
 local LOG = "menu_llm.profiles"
 
@@ -1079,8 +1080,8 @@ local function build_profile_menu(
 			
 			-- User profiles get a sub-menu for Editing/Deleting
 			local child_commands = {
-				["llm_profile_use"] = function() return select_profile(deps, state, pid) end,
-				["llm_profile_shortcut"] = function()
+				[ConfigKeys.COMMAND.LLM_PROFILE_USE] = function() return select_profile(deps, state, pid) end,
+				[ConfigKeys.COMMAND.LLM_PROFILE_SHORTCUT] = function()
 						if not settle_profile_mutation_recovery(deps) then return false end
 						return shortcut_ui.prompt_shortcut({
 							native_presentation_id = "profile_shortcut_dialog",
@@ -1096,7 +1097,7 @@ local function build_profile_menu(
 							end,
 						})
 					end,
-				["llm_profile_edit"] = function()
+				[ConfigKeys.COMMAND.LLM_PROFILE_EDIT] = function()
 						if not settle_profile_mutation_recovery(deps) then return false end
 						if not prompt_editor or type(prompt_editor.open) ~= "function" then return false end
 						local timer_fired = false
@@ -1127,7 +1128,7 @@ local function build_profile_menu(
 						local _, timer_committed = schedule_editor(open_profile_editor)
 						return timer_committed == true
 					end,
-				["llm_profile_delete"] = function()
+				[ConfigKeys.COMMAND.LLM_PROFILE_DELETE] = function()
 						if not settle_profile_mutation_recovery(deps) then return false end
 						local ok_c, choice = pcall(dialog.block_alert,
 							string.format(i18n.get("menu.profiles.delete_confirm_title"), display_label),
@@ -1244,7 +1245,7 @@ local function build_profile_menu(
 			}
 		end
 		return ManifestMenu.template_rows("llm_profile_app_override_frame", {
-			["llm_profile_override_active_app"] = function()
+			[ConfigKeys.COMMAND.LLM_PROFILE_OVERRIDE_ACTIVE_APP] = function()
 				if not create_ready() then return false end
 				-- Read at click time: the focus engine is not needed to draw the menu
 				local focused = require("modules.llm.app_filter").focused_app_id()
@@ -1260,12 +1261,12 @@ local function build_profile_menu(
 	end
 
 	local rows = ManifestMenu.template_rows("llm_profile_lua_frame", {
-		["llm_profile_recommend"] = recommend_profile,
-		["llm_profile_clone"] = function()
+		[ConfigKeys.COMMAND.LLM_PROFILE_RECOMMEND] = recommend_profile,
+		[ConfigKeys.COMMAND.LLM_PROFILE_CLONE] = function()
 			return clone_builtin_profile(
 				deps, state, active_builtin, activate_candidate, replace_profile, create_ready)
 		end,
-		["llm_profile_create"] = create_profile,
+		[ConfigKeys.COMMAND.LLM_PROFILE_CREATE] = create_profile,
 	}, {
 		["llm_profile_recommendation_present"] = function() return not paused end,
 		["llm_profile_recommendation_paused"] = function() return not not paused end,

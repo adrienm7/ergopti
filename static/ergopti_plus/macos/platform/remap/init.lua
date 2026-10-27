@@ -4144,7 +4144,7 @@ end
 --- @return boolean accepted True when accepted or settled successfully.
 function M.remove_from_karabiner(on_done)
 	Logger.info(LOG, "Remove Ergopti from Karabiner requested.")
-	if not require_state("remove_from_karabiner") then
+	if not require_state(require("config_keys").COMMAND.REMOVE_FROM_KARABINER) then
 		invoke_public_callback("remove from Karabiner", on_done, false, "not-initialized", 0)
 		return false
 	end
@@ -5797,7 +5797,7 @@ end
 -- The bulk scope of the Tap-Hold submenu. The key combinations are drawn in
 -- the Shortcuts group with a switch of their own, so the Tap-Hold restore and
 -- clear rows must leave them, and that switch, as the user set them.
-local BULK_SCOPE_TAP_HOLDS = "tap_holds"
+local BULK_SCOPE_TAP_HOLDS = require("config_keys").KEY.TAP_HOLDS
 
 --- Resolves a bulk command's scope, refusing an unknown one through its callback.
 --- @param label string Stable operation label.
@@ -5871,7 +5871,7 @@ end
 
 --- The remap file's top-level tables, each owned by the manifest scope whose
 --- prefixes declare it: the keys by tap_holds, the chords by shortcuts.
-local REMAP_SCOPE_SECTIONS = { tap_holds = "tap_holds", shortcuts = "mod_combos", key_combinations = "mod_combos" }
+local REMAP_SCOPE_SECTIONS = { tap_holds = require("config_keys").KEY.TAP_HOLDS, shortcuts = require("config_keys").KEY.MOD_COMBOS, key_combinations = require("config_keys").KEY.MOD_COMBOS }
 
 --- Applies the remap part of a manifest scope as one exact transaction: a
 --- verified backup of config_karabiner.toml, a save that only replaces those
@@ -5904,13 +5904,13 @@ function M.apply_scope(request, on_done)
 		return false
 	end
 	Logger.debug(LOG, "Remap scope %s '%s' transaction requested.", request.scope, request.mode)
-	local sibling = request.scope == "tap_holds" and request.mode == "recommended"
+	local sibling = request.scope == require("config_keys").KEY.TAP_HOLDS and request.mode == "recommended"
 		and require("platform.remap.scope_layer").import() or nil
 	return apply_bulk_settings_transaction(label, function(candidate)
 		local target = request.mode == "recommended"
 			and Config.build_recommended_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
 			or Config.build_default_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
-		if section == "mod_combos" then
+		if section == require("config_keys").KEY.MOD_COMBOS then
 			-- The shared combination scope keeps its switch on clear, including
 			-- when composed into Shortcuts; restore imports the neutral-on gate.
 			if request.mode ~= "clear" then

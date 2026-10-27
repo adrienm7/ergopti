@@ -124,7 +124,7 @@ local KEY_MAP = {
 	dynamichotstrings_enabled            = { sec = "hotstrings", path = "dynamic", key = "enabled"      },
 	dynamichotstrings_user_code_enabled  = { sec = "hotstrings", path = "dynamic.user_code", key = "enabled" },
 	dynamichotstrings_user_code_time_activation_seconds = {
-		sec = "hotstrings", path = "dynamic.user_code", key = "time_activation_seconds",
+		sec = "hotstrings", path = "dynamic.user_code", key = require("config_keys").LEAF.TIME_ACTIVATION_SECONDS,
 	},
 	dynamichotstrings_date               = { sec = "hotstrings", path = "dynamic", key = "date"         },
 	dynamichotstrings_datefr             = { sec = "hotstrings", path = "dynamic", key = "datefr"       },
@@ -197,7 +197,7 @@ local KEY_MAP = {
 	-- ── Shortcuts ──────────────────────────────────────────────────────────
 	shortcuts                            = { sec = "shortcuts", key = "enabled"              },
 	chatgpt_url                          = { sec = "shortcuts"                                },
-	script_control_enabled               = { sec = "shortcuts", path = "script_control", key = "chords_enabled" },
+	script_control_enabled               = { sec = "shortcuts", path = require("config_keys").LEAF.SCRIPT_CONTROL, key = "chords_enabled" },
 	caps_word_idle_timeout_seconds       = { sec = "shortcuts", path = "caps_word", key = ConfigKeys.LEAF.IDLE_TIMEOUT_SECONDS },
 	caps_word_terminators                = { sec = "shortcuts", path = "caps_word", key = "terminators" },
 
@@ -1566,7 +1566,7 @@ local function prepare_inline_updates(source, updates, root)
 		for _, row in ipairs(updates) do
 			local path = require("toml_codec.key_path").parse(row.section, true)
 			if path then path[#path + 1] = row.key end
-			if path and #path == 3 and path[1] == "llm" and path[2] == "models" and path[3] == "user_models" then
+			if path and #path == 3 and path[1] == "llm" and path[2] == "models" and path[3] == require("config_keys").LEAF.USER_MODELS then
 				-- A scope's neutral list is not an explicit obsolete-entry cleanup.
 				assert(row.delete or type(row.value) == "table" and next(row.value) == nil,
 					"Obsolete user model list 'llm.models.user_models' requires manual source cleanup before replacement")
@@ -1696,7 +1696,7 @@ local function prepare_order_updates(source, updates)
 	for _, row in ipairs(updates) do
 		local path = KeyPath.parse(row.section, true)
 		if path then path[#path + 1] = row.key end
-		if path and path[1] == "hotstrings" and path[2] == "order_overrides" then relevant = true end
+		if path and path[1] == "hotstrings" and path[2] == require("config_keys").LEAF.ORDER_OVERRIDES then relevant = true end
 	end
 	if not relevant then return updates end
 	local document, shapes = require("toml_codec.leaf_rows").decode_source(source.content or "")
@@ -1716,10 +1716,10 @@ local function prepare_order_updates(source, updates)
 	for _, row in ipairs(updates) do
 		local path = KeyPath.parse(row.section, true)
 		if path then path[#path + 1] = row.key end
-		if path and path[1] == "hotstrings" and path[2] == "order_overrides" and #path == 2 and not row.delete then
+		if path and path[1] == "hotstrings" and path[2] == require("config_keys").LEAF.ORDER_OVERRIDES and #path == 2 and not row.delete then
 			assert(section_orders_are_map(row.value), "section orders candidate is not a table of settings")
 		end
-		if not path or path[1] ~= "hotstrings" or path[2] ~= "order_overrides" then
+		if not path or path[1] ~= "hotstrings" or path[2] ~= require("config_keys").LEAF.ORDER_OVERRIDES then
 			prepared[#prepared + 1] = row
 		elseif #path == 2 and (row.delete or type(row.value) == "table" and next(row.value) == nil) then
 			if not malformed_parent and next(bad) == nil then
@@ -1730,7 +1730,7 @@ local function prepare_order_updates(source, updates)
 				end
 			end
 		elseif malformed_parent or #path == 2 and next(bad) ~= nil or bad[path[3]] then
-			if not row.delete then refuse(malformed_parent and { "hotstrings", "order_overrides" } or path) end
+			if not row.delete then refuse(malformed_parent and { "hotstrings", require("config_keys").LEAF.ORDER_OVERRIDES } or path) end
 		else
 			assert(#path <= 3, "section order mutations must address a whole text list")
 			if not row.delete then
@@ -2132,7 +2132,7 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 				assert(orders == nil or section_orders_are_map(orders, shapes),
 					"Obsolete section orders in '" .. prefs_file .. "' require manual source cleanup")
 				assert(old == nil or section_order_fits(old, shapes),
-					"Obsolete section order '" .. require("toml_codec.key_path").render({ "hotstrings", "order_overrides", id })
+					"Obsolete section order '" .. require("toml_codec.key_path").render({ "hotstrings", require("config_keys").LEAF.ORDER_OVERRIDES, id })
 						.. "' in '" .. prefs_file .. "' requires manual source cleanup before replacement")
 				assert(section_order_fits(value), "section order candidate is not a text list")
 				-- Sparse array encoding omits an empty list. A user who clears an

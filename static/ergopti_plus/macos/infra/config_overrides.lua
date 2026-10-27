@@ -28,6 +28,7 @@ local Manifest = require("infra.manifest_reader")
 local ConfigOutdated = require("config_outdated")
 local FileSystem = require("adapters.file_system")
 local TextUtils = require("text_utils")
+local ConfigKeys = require("config_keys")
 local LOG       = "config_overrides"
 
 
@@ -95,7 +96,7 @@ local function known_value_fits(row)
 		return false, "the value is not a published log threshold"
 	end
 	if row.section == "script" and type(row.key) == "string" then
-		if row.key == "log_level" then
+		if row.key == ConfigKeys.LEAF.LOG_LEVEL then
 			local fits, detail = threshold(row.value)
 			return fits, detail, row.path
 		end

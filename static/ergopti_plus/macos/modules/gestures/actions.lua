@@ -43,6 +43,7 @@ local JsonCodec     = require("adapters.json_codec")
 local ChordCatalogue = require("infra.script_chord_catalogue")
 local LOG           = "gestures.actions"
 local Brightness = require("brightness_actions").load()
+local ConfigKeys = require("config_keys")
 
 -- Explicit inter-key delay for every simulated keystroke. hs.eventtap.keyStroke()
 -- defaults this argument to 200 000 us and implements it as a BLOCKING usleep on the
@@ -1170,10 +1171,10 @@ sg("select_word", text_action("select_word"))
 sg("paste_plain", text_action("paste_as_plain_text"))
 -- The case actions: the two toggles and the three explicit conversions, all
 -- through the shared Unicode table (unicode_case), pinned by the shared corpus.
-sg("uppercase_selection", text_action("toggle_uppercase"))
-sg("titlecase_selection", text_action("toggle_titlecase"))
+sg(ConfigKeys.COMMAND.UPPERCASE_SELECTION, text_action("toggle_uppercase"))
+sg(ConfigKeys.COMMAND.TITLECASE_SELECTION, text_action("toggle_titlecase"))
 sg("selection_uppercase", text_action("selection_uppercase"))
-sg("selection_lowercase", text_action("selection_lowercase"))
+sg(ConfigKeys.COMMAND.SELECTION_LOWERCASE, text_action(ConfigKeys.COMMAND.SELECTION_LOWERCASE))
 sg("selection_titlecase", text_action("selection_titlecase"))
 -- Wraps the current LINE (Cmd+Left, "(", Cmd+Right, ")"), like Windows.
 sg("surround_parens", text_action("surround_with_parens"))
@@ -1544,10 +1545,10 @@ end
 sg("open_logs_folder",                function()
 	return require("ui.log_openers").open_logs_folder(gesture_opener("open logs folder"))
 end)
-sg("open_today_log",                   function()
+sg(ConfigKeys.COMMAND.OPEN_TODAY_LOG,                   function()
 	return require("ui.log_openers").open_today_log(gesture_opener("open today's log"))
 end)
-sg("open_error_log",                   function()
+sg(ConfigKeys.COMMAND.OPEN_ERROR_LOG,                   function()
 	return require("ui.log_openers").open_today_errors(gesture_opener("open error log"))
 end)
 
@@ -2668,7 +2669,7 @@ function M.run_program(binding)
 			end
 			if binding:match("^script__") then
 				local id = binding:sub(9)
-				return require("modules.shortcuts.script_control").get_shortcut_actions()[id], "script_control", id
+				return require("modules.shortcuts.script_control").get_shortcut_actions()[id], ConfigKeys.LEAF.SCRIPT_CONTROL, id
 			end
 			local descriptors = {
 				{ "keyboard__", "modules.shortcuts.keyboard_shortcuts", "keyboard" },

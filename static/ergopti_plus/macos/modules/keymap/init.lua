@@ -1046,7 +1046,7 @@ function M.capture_user_hotstring(rule)
 	local destination = km_utils.capture_text_destination()
 	if not destination or CoreState.buffer:sub(-#rule.suffix) ~= rule.suffix
 		or M.has_registered_magic_action(CoreState.buffer) then return nil end
-	if CoreState.mapping_delay_remaining({ group = "dynamichotstrings", section = "user_code" },
+	if CoreState.mapping_delay_remaining({ group = "dynamichotstrings", section = require("config_keys").LEAF.USER_CODE },
 		_user_hotstring_elapsed, 1) ~= true then return nil end
 	return { lifecycle = _user_hotstring_lifecycle, input = _user_hotstring_input,
 		epoch = SyntheticInput.current_action_epoch(), buffer = CoreState.buffer,

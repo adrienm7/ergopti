@@ -36,6 +36,7 @@ local TooltipRenderer  = require("adapters.tooltip_renderer")
 local TerminatorReplay = require("modules.keymap.terminator_replay")
 local Terminators      = require("modules.keymap.terminators")
 local CapsWordOutput   = require("infra.capsword_output")
+local ConfigKeys = require("config_keys")
 local LOG        = "keymap.expander"
 
 -- Optional modules — loaded with pcall because they are not required for core expansion.
@@ -1309,7 +1310,7 @@ function M.try_repeat_feature(chars, is_ignored)
 		is_ignored and char_len or 0,
 		function() return km_utils.emit_text(last_char) end,
 		function() _state.buffer = next_buffer end,
-		false, is_ignored, "hotstring", "repeat_key", false)
+		false, is_ignored, "hotstring", ConfigKeys.COMMAND.REPEAT_KEY, false)
 	if replaced ~= true then return false end
 
 	Logger.debug(LOG, "Repeat feature: repeated '%s'.", last_char)

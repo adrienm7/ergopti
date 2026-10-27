@@ -636,8 +636,8 @@ end
 --- @return boolean found True when the runtime owner recognizes the key.
 --- @return any value Current runtime value.
 function M.get_llm_runtime_setting(key)
-	if key == "llm_after_hotstring" then return true, fire_llm_after_hotstring end
-	if key == "llm_reset_on_nav" then return true, reset_buffer_on_navigation end
+	if key == ConfigKeys.COMMAND.LLM_AFTER_HOTSTRING then return true, fire_llm_after_hotstring end
+	if key == ConfigKeys.COMMAND.LLM_RESET_ON_NAV then return true, reset_buffer_on_navigation end
 	local found, value = engine.get_llm_runtime_setting(key)
 	if found then return found, value end
 	return AgentRunner.get_runtime_setting(key)

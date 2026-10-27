@@ -53,6 +53,7 @@ local _last_win_time        = 0
 -- cannot be one driver's private variable — the Linux driver had no such filter
 -- at all precisely because this list was never shared.
 local PrivateWindow = require("keystats.private_window")
+local ConfigKeys = require("config_keys")
 
 local function get_private_keywords()
 	local localized = i18n.get("keystats.category_private")
@@ -285,8 +286,8 @@ function M.sample_physical_context(owner, token)
 		binding.channel.mark_app_pid(ticket, nil)
 		binding.channel.mark_window_pid(ticket, nil)
 		local keys = { "is_enabled", "active_app_name", "active_app_bundle", "active_app_path",
-			"active_app_pid", "active_app_start", "private_filter_enabled", "secure_field_filter_enabled",
-			"system_auth_filter_enabled", "disabled_apps", "is_private_window", "is_secure_field",
+			"active_app_pid", "active_app_start", ConfigKeys.LEAF.PRIVATE_FILTER_ENABLED, "secure_field_filter_enabled",
+			ConfigKeys.LEAF.SYSTEM_AUTH_FILTER_ENABLED, ConfigKeys.LEAF.DISABLED_APPS, "is_private_window", "is_secure_field",
 			"foreground_refresh_pending", "ax_observer" }
 		local original = {}
 		for _, key in ipairs(keys) do original[key] = rawget(state, key) end
