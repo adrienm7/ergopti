@@ -1027,7 +1027,7 @@
 	"menu.layout.emulated_layout": "Layout der skal emuleres",
 	"menu.layout.superseded_ergopti_only": "Kun Ergopti-layout: et andet layout emuleres",
 	"menu.layout.superseded_digit_row": "Det emulerede layout bestemmer selv sin talrække",
-	"layouts.linux_needs_python": "Konvertering af dette tastaturlayout til Linux kræver Python 3.8 eller nyere (python3). Installer det, og prøv igen.",
+	"layouts.linux_needs_python": "Installation af dette tastaturlayout på Linux kræver Python 3.8 eller nyere (python3). Installer det, og prøv igen.",
 	"layouts.linux_xorg_session": "Dette layout kan ikke installeres fra en Xorg-session, fordi Xorg ikke læser brugerens tastaturmappe. Log ind på en Wayland-session for at installere det.",
 	"layout_manager.window_title": "Tastaturlayouts",
 	"layout_manager.subtitle": "Installer, opdater eller afinstaller katalogets layouts.",

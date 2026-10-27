@@ -1027,7 +1027,7 @@
 	"menu.layout.emulated_layout": "अनुकरण के लिए लेआउट",
 	"menu.layout.superseded_ergopti_only": "केवल Ergopti लेआउट: किसी दूसरे लेआउट का अनुकरण हो रहा है",
 	"menu.layout.superseded_digit_row": "अनुकरण किया गया लेआउट अपनी अंकों की पंक्ति स्वयं तय करता है",
-	"layouts.linux_needs_python": "इस लेआउट को Linux के लिए बदलने हेतु Python 3.8 या नया (python3) आवश्यक है। इसे इंस्टॉल करें, फिर दोबारा प्रयास करें।",
+	"layouts.linux_needs_python": "इस लेआउट को Linux पर इंस्टॉल करने हेतु Python 3.8 या नया (python3) आवश्यक है। इसे इंस्टॉल करें, फिर दोबारा प्रयास करें।",
 	"layouts.linux_xorg_session": "इस लेआउट को Xorg सत्र से इंस्टॉल नहीं किया जा सकता, क्योंकि Xorg उपयोगकर्ता का कीबोर्ड फ़ोल्डर नहीं पढ़ता। इसे इंस्टॉल करने के लिए Wayland सत्र में लॉग इन करें।",
 	"layout_manager.window_title": "कीबोर्ड लेआउट",
 	"layout_manager.subtitle": "कैटलॉग के लेआउट इंस्टॉल, अपडेट या अनइंस्टॉल करें।",

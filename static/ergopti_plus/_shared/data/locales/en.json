@@ -1022,7 +1022,7 @@
 	"menu.layout.emulated_layout": "Layout to emulate",
 	"menu.layout.superseded_ergopti_only": "Ergopti layout only: another layout is emulated",
 	"menu.layout.superseded_digit_row": "The emulated layout sets its own digit row",
-	"layouts.linux_needs_python": "Converting this layout for Linux needs Python 3.8 or newer (python3). Install it, then try again.",
+	"layouts.linux_needs_python": "Installing this layout on Linux needs Python 3.8 or newer (python3). Install it, then try again.",
 	"layouts.linux_xorg_session": "This layout cannot be installed from an Xorg session, because Xorg does not read the user keyboard folder. Log in to a Wayland session to install it.",
 	"layout_manager.window_title": "Keyboard layouts",
 	"layout_manager.subtitle": "Install, update or uninstall the layouts of the catalogue.",
