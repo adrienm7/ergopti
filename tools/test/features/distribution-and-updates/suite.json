@@ -509,6 +509,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-macos-dev-source-build.cjs"],
 			"repro": "npm run test:macos-dev-source-build"
+		},
+		{
+			"id": "js-macos-hammerspoon-cache",
+			"ordinal": 518,
+			"name": "the macOS build keeps the Hammerspoon zip outside the wiped build folder and admits only the pinned digest",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-hammerspoon-cache.cjs"],
+			"repro": "npm run test:macos-hammerspoon-cache"
 		}
 	]
 }
