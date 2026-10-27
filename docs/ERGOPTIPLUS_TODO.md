@@ -237,21 +237,24 @@ dev.
   shifted startPos but left endPos frozen, so a palm touching below the pair for a frame committed
   a vertical swipe toward it; a resting thumb moved the centroid two thirds of the scroll; a
   three-contact touch-down continued as a moving pair; a three-finger touch landing on a scroll's
-  momentum. Fixed on `tmp/wip-three-finger-swipe`: a join to a pair confirms over
-  `FINGER_CONFIRM_FRAMES` frames during the landing only (`multi_finger_landing_ms`,
-  `Direction.LANDING_TRAVEL_FACTOR`), every contact must travel with the centroid
-  (`Geometry.COHESION_MIN_SHARE`), a three-finger gesture that continues as a moving pair aborts,
-  and `scroll_momentum_guard_ms` refuses three-or-more-finger actions after a scroll or native
-  momentum. Linux `mt_decoder.lua` latched a one-frame peak and measured travel over the whole
-  touch: same fix there (stable frames, landing, peak-only travel, pair abort, scroll guard).
-  Windows: no shared flaw, the precision touchpad driver recognises three-finger swipes itself and
-  sends the configured key chords (`windows/modules/gestures/init.ahk`), so Ergopti counts no
-  contacts there. macOS still reads `FINGER_CONFIRM_FRAMES` as a local copy of
-  `[gestures].finger_confirm_frames` because 22 engine tests stub `infra.timings` without
-  `count`. Mac confirms: re-enable the vertical three-finger swipes, scroll normally with two
-  fingers for a few minutes (with and without a thumb resting on the pad), no tab switch and no
-  `Finger join (fast-path): 2 → 3` line; a deliberate three-finger swipe up and down still
-  switches tabs, also a frame-late third finger.
+  momentum. Fixed on dev (6d3aa65273), then rebalanced on `tmp/wip-three-finger-swipe2` after the
+  first Mac test missed deliberate swipes: a pair that has scrolled (direction locked, travel past
+  the two-finger lock `SWIPE_MIN_2`, or a macOS scroll phase) or outlived `multi_finger_landing_ms`
+  (300) never promotes; before that a third finger promotes once held `pair_join_confirm_ms` (20);
+  every contact must cover `Geometry.COHESION_MIN_SHARE` (0.3) of the travel since the promotion;
+  a three-finger gesture that continues as a moving pair aborts; `scroll_momentum_guard_ms` (200)
+  follows only a native momentum phase or a locked pair lifting. Each refusal writes one DEBUG line
+  `Three-finger candidate rejected by <gate>: <measured value>` (gates: frames held, pair scroll,
+  landing window, cohesion, scroll guard). Linux `mt_decoder.lua` had the same one-frame peak and
+  whole-touch travel: same rules there (`finger_join_frames` 2, landing, peak-only travel, pair
+  abort, scroll guard, same DEBUG lines). The cohesion share stays with the other spatial
+  thresholds in `geometry.lua`: the timings registry is read through `sec` by the 22 engine test
+  stubs, which have no `count`. Windows: no shared flaw, the precision touchpad driver recognises
+  three-finger swipes itself and sends the configured key chords
+  (`windows/modules/gestures/init.ahk`), so Ergopti counts no contacts there. Mac confirms:
+  re-enable the vertical three-finger swipes, scroll with two fingers for a few minutes (with and
+  without a thumb resting), no tab switch; deliberate three-finger swipes (slow, fast flick,
+  staggered landing) switch tabs every time; any miss leaves a `rejected by` line naming the gate.
 
 - **L16** [CODE][PHYS-M] Slow ingest tick, `append` phase 466 to 563 ms, peaks 1531 and 1709 ms
   (new.txt 14:25:50 to 16:53:38, 20 lines, still on 228f79f2). The 1.2 to 1.8 s ticks are the
@@ -1524,9 +1527,10 @@ Standing checks:
 
 ### Mac
 
-- [ ] **L46 three-finger swipe vs scroll** (`tmp/wip-three-finger-swipe`): re-enable
+- [ ] **L46 three-finger swipe vs scroll** (`tmp/wip-three-finger-swipe2`): re-enable
       `swipe_3_up`/`swipe_3_down`, scroll with two fingers for a few minutes, no tab switch; a
-      deliberate three-finger swipe still switches tabs.
+      deliberate three-finger swipe (slow, flick, staggered) switches tabs every time, and a miss
+      leaves a DEBUG `Three-finger candidate rejected by <gate>` line in the day log.
 - [ ] **Issue #100 retest** (after v1.0.5: 2353a72eed, 25411ee080, e57f4cce77): with Ollama.app and
       a PAC proxy, enabling the AI downloads the model; with the Ergopti menu held open, no lease
       timeout.
@@ -1562,7 +1566,7 @@ Wizard (7) on Wayland, physical input, installed-daemon restart; real kernel cap
 key grab, injection and hotplug (30); tap delay row (zenity/kdialog), group restore/clear, open
 target, Backspace word start (GNOME Terminal Enter, `ab`, three Backspaces, `c★`; gedit
 Ctrl+Backspace; Firefox Ctrl+L). L46: a two-finger scroll with a thumb resting reports two
-fingers, a brisk three-finger tap still reports `tap_3` (the peak must hold four frames).
+fingers, a brisk three-finger tap still reports `tap_3` (the peak must hold two frames).
 
 ## CI final acceptance receipts
 
