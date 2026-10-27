@@ -38,13 +38,14 @@ _OllamaFinalFlush_CancellationBoundary(Boundary, Newline) {
 	State := Map("partials", 0, "successes", 0, "failures", 0, "text", "")
 	Path := A_Temp . "\ergopti_flush_cancel_" . A_TickCount . "_" . Random(1, 1000000)
 	Handle := { Pid: 0, ProcessOwner: 0, Cancelled: false,
-		TmpPayload: Path . ".json", TmpStdout: Path . ".out" }
+		TmpPayload: Path . ".json", TmpStdout: Path . ".out", TmpHeaders: "" }
 	_LLM_Ollama_ActiveStreams := [Handle]
 	try {
 		FileAppend('{"message":{"content":"complete answer"},"done":true}'
 			. (Newline ? "`n" : ""), Handle.TmpStdout, "UTF-8-RAW")
 		if Boundary == "before"
 			LLM_OllamaCancelStream(Handle)
+		_OllamaStream_FixtureHttpResponse(Handle)
 		_LLM_Ollama_StreamFinalFlush(Handle, Map("acc", "", "last_pos", 0),
 			_OllamaFinalFlush_Partial.Bind(State, Handle, Boundary),
 			(Text) => (State["successes"] += 1, State["text"] := Text),
@@ -59,10 +60,13 @@ _OllamaFinalFlush_CancellationBoundary(Boundary, Newline) {
 		if Boundary == "none"
 			AssertEqual("complete answer", State["text"], "the positive control must drain the real completion")
 		AssertFalse(FileExist(Handle.TmpStdout), "the final-flush owner must remove its real output file")
+		AssertFalse(FileExist(Handle.TmpHeaders), "the settled stream retires its actual HTTP header image")
 		AssertEqual(0, _LLM_Ollama_ActiveStreams.Length, "a settled flush must release its active handle")
 	} finally {
 		if FileExist(Handle.TmpStdout)
 			FileDelete(Handle.TmpStdout)
+		if FileExist(Handle.TmpHeaders)
+			FileDelete(Handle.TmpHeaders)
 		_LLM_ManagedBootstrap := SavedBootstrap
 		_LLM_Ollama_IsReady := SavedReady
 		_LLM_Ollama_ActiveStreams := SavedStreams

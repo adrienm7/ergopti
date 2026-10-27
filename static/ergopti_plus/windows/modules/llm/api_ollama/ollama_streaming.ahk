@@ -814,7 +814,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	PreviousCritical := Critical("On")
 	try {
 		handle := { Pid: 0, ProcessOwner: 0, Cancelled: false,
-			TmpPayload: "", TmpStdout: "", OriginGeneration: LLM_AuxGeneration() }
+			TmpPayload: "", TmpStdout: "", TmpHeaders: "", OriginGeneration: LLM_AuxGeneration() }
 		_LLM_Ollama_ActiveStreams.Push(handle)
 	} finally Critical(PreviousCritical)
 	try {
@@ -881,6 +881,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	tmp_stdout := tmp_dir . "\ergopti_ollama_" . uid . ".out"
 	handle.TmpPayload := tmp_payload
 	handle.TmpStdout := tmp_stdout
+	handle.TmpHeaders := tmp_stdout . ".headers"
 	if !WriteFn.Call(tmp_payload, payload) {
 		_LLM_InvokeCallback(on_fail, "on_fail")
 		_LLM_Ollama_CleanupStreamFiles(handle)
@@ -899,6 +900,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 		. '-H "Content-Type: application/json" '
 		. '--data-binary @' . _Q(tmp_payload) . ' '
 		. _Q(handle.Origin . "/api/chat") . ' '
+		. '--dump-header ' . _Q(handle.TmpHeaders) . ' '
 		. '-o ' . _Q(tmp_stdout)
 
 	launch_blocked := false
@@ -1024,6 +1026,39 @@ _LLM_Ollama_ReadStreamText(Path, State, Final := false, MaxReadBytes := 0) {
 	}
 }
 
+; curl writes headers before response bytes. Admit only a complete final HTTP
+; response, retaining informational/partial blocks as pending and using the
+; canonical parser and header-size ceiling rather than a second status grammar.
+_LLM_Ollama_ReadStreamHttpStatus(Handle, State) {
+	global HTTP_CURL_MAX_HEADER_BYTES, SR_ERROR_FILE_NOT_FOUND
+	if State.Has("http_status")
+		return State["http_status"]
+	try Raw := FileRead(Handle.TmpHeaders, "RAW m" . (HTTP_CURL_MAX_HEADER_BYTES + 1))
+	catch OSError as Err {
+		if Err.Number == SR_ERROR_FILE_NOT_FOUND
+			return 0
+		throw Err
+	}
+	if Raw.Size > HTTP_CURL_MAX_HEADER_BYTES
+		throw Error("Streaming HTTP headers exceeded the response-header ceiling.")
+	if Raw.Size == 0
+		return 0
+	Headers := StrGet(Raw.Ptr, -Raw.Size, "UTF-8")
+	if RegExMatch(Headers, "\x00")
+		throw Error("Streaming HTTP headers contain a raw NUL byte.")
+	if !RegExMatch(Headers, "(?:`r`n`r`n|`n`n)\z")
+		return 0
+	Status := _HTTP_CurlParseHeaders(Headers)["status"]
+	if Status == 101
+		throw Error("Streaming HTTP upgrade responses are unsupported.")
+	if Status >= 100 && Status < 200
+		return 0
+	if Status < 200 || Status >= 300
+		throw Error("Streaming HTTP response was refused (status=" . Status . ").")
+	State["http_status"] := Status
+	return Status
+}
+
 /**
  * Polling tick for the streaming child process. Reads the tail of the
  * stdout temp file, parses any new JSONL lines, and fires on_partial /
@@ -1045,13 +1080,18 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 	}
 	; Read whatever new bytes appeared.
 	try {
-		chunk := _LLM_Ollama_ReadStreamText(handle.TmpStdout, state)
-		; The filesystem read can pump cancellation before its bytes are admitted.
+		HttpStatus := _LLM_Ollama_ReadStreamHttpStatus(handle, state)
 		if _LLM_Ollama_StopStaleStream(handle, on_fail)
 			return
-		if chunk != ""
-			_LLM_Ollama_ConsumeStreamChunk(chunk, state,
-				_LLM_Ollama_StreamPartial.Bind(handle, on_partial))
+		if HttpStatus {
+			chunk := _LLM_Ollama_ReadStreamText(handle.TmpStdout, state)
+			; The filesystem read can pump cancellation before its bytes are admitted.
+			if _LLM_Ollama_StopStaleStream(handle, on_fail)
+				return
+			if chunk != ""
+				_LLM_Ollama_ConsumeStreamChunk(chunk, state,
+					_LLM_Ollama_StreamPartial.Bind(handle, on_partial))
+		}
 	} catch as Err {
 		state["failed"] := true
 		state["stream_error"] := "Stream output read failed: " . Err.Message
@@ -1079,6 +1119,9 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 		if ExitCode != 0 {
 			state["failed"] := true
 			state["stream_error"] := "Streaming curl exited with code " . ExitCode . "."
+		} else if !state.Has("http_status") {
+			state["failed"] := true
+			state["stream_error"] := "Streaming HTTP response ended without a complete final status."
 		}
 	} catch as Err {
 		state["failed"] := true
@@ -1103,8 +1146,14 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail, Rea
 		return
 	if !IsObject(ReadFn)
 		ReadFn := _LLM_Ollama_ReadStreamText
-	try chunk := ReadFn.Call(handle.TmpStdout, state, true)
-	catch as Err {
+	try {
+		HttpStatus := _LLM_Ollama_ReadStreamHttpStatus(handle, state)
+		if _LLM_Ollama_StopStaleStream(handle, on_fail)
+			return
+		if !HttpStatus
+			throw Error("Streaming HTTP response ended without a complete final status.")
+		chunk := ReadFn.Call(handle.TmpStdout, state, true)
+	} catch as Err {
 		state["failed"] := true
 		state["stream_error"] := "Final stream output read failed: " . Err.Message
 	}
@@ -1333,7 +1382,7 @@ LLM_OllamaCancelStream(handle) {
 _LLM_Ollama_CleanupStreamFiles(handle) {
 	if (handle == "" or !IsObject(handle))
 		return
-	LLM_CurlCleanupPaths([handle.TmpPayload, handle.TmpStdout])
+	LLM_CurlCleanupPaths([handle.TmpPayload, handle.TmpStdout, handle.TmpHeaders])
 }
 
 ; Per-call counter so two streams fired in the same millisecond cannot
