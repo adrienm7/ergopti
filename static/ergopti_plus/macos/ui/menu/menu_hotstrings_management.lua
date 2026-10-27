@@ -430,12 +430,13 @@ function M.build_management(ctx)
 			label    = title .. " : " .. display_ms .. (cur_ms == def_ms and i18n.get("menu.settings.default_indicator") or ""),
 			disabled = paused or nil,
 			action       = not paused and function()
+				local ok_label = i18n.get("button.ok")
 				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					title,
 					i18n.get("menu.hotstrings.delay_prompt"),
-					tostring(cur_ms), "OK", i18n.get("common.cancel")
+					tostring(cur_ms), ok_label, i18n.get("common.cancel")
 				)
-				if not ok_p or btn ~= "OK" then return end
+				if not ok_p or btn ~= ok_label then return end
 
 				local val = tonumber(raw)
 				if not val or val < 0 or val ~= math.floor(val) then
@@ -482,12 +483,13 @@ function M.build_management(ctx)
 			label    = title .. " : " .. display_ms .. ((not has_over) and i18n.get("menu.settings.default_indicator") or ""),
 			disabled = paused or nil,
 			action       = not paused and function()
+				local ok_label = i18n.get("button.ok")
 				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					title,
 					i18n.get("menu.hotstrings.delay_prompt"),
-					tostring(cur_ms), "OK", i18n.get("common.cancel")
+					tostring(cur_ms), ok_label, i18n.get("common.cancel")
 				)
-				if not ok_p or btn ~= "OK" then return end
+				if not ok_p or btn ~= ok_label then return end
 
 				local val = tonumber(raw)
 				if not val or val < 0 or val ~= math.floor(val) then
@@ -573,12 +575,13 @@ function M.build_management(ctx)
 	local magic_key_value = (hs_state and hs_state.trigger_char or ManifestReader.default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR))
 	local magic_key_action = function()
 			if not hs_state then return end
+			local ok_label = i18n.get("button.ok")
 			local ok_p, btn, raw = pcall(dialog.text_prompt,
 				i18n.get("menu.hotstrings.magic_key_title"),
 				i18n.get("menu.hotstrings.magic_key_prompt"),
-				hs_state.trigger_char, "OK", i18n.get("common.cancel")
+				hs_state.trigger_char, ok_label, i18n.get("common.cancel")
 			)
-			if ok_p and btn == "OK" and type(raw) == "string" then
+			if ok_p and btn == ok_label and type(raw) == "string" then
 				if Terminators.validate_character(raw) ~= true then
 					dialog.block_alert(i18n.get("dialog.hotstrings.invalid_title"),
 						i18n.get("dialog.hotstrings.invalid_body"), i18n.get("button.retry"))

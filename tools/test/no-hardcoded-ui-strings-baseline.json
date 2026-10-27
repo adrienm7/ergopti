@@ -876,66 +876,6 @@
 		"count": 1
 	},
 	{
-		"file": "macos/modules/llm/api_mlx.lua",
-		"sink": "Notifications.notify",
-		"text": "MLX incompatible",
-		"count": 1
-	},
-	{
-		"file": "macos/ui/menu/menu_hotstrings_custom.lua",
-		"sink": "text_prompt",
-		"text": "OK",
-		"count": 1
-	},
-	{
-		"file": "macos/ui/menu/menu_hotstrings_management.lua",
-		"sink": "text_prompt",
-		"text": "OK",
-		"count": 3
-	},
-	{
-		"file": "macos/ui/menu/menu_llm/api_panel.lua",
-		"sink": "text_prompt",
-		"text": "OK",
-		"count": 1
-	},
-	{
-		"file": "macos/ui/menu/menu_llm/models_manager_mlx_server.lua",
-		"sink": "notifications.notify",
-		"text": "MLX incompatible",
-		"count": 1
-	},
-	{
-		"file": "macos/ui/menu/menu_llm/models_manager_ollama.lua",
-		"sink": "notifications.notify",
-		"text": "Ollama executable unavailable",
-		"count": 1
-	},
-	{
-		"file": "macos/ui/menu/menu_llm/models_manager_ollama.lua",
-		"sink": "notifications.notify",
-		"text": "readiness failed",
-		"count": 1
-	},
-	{
-		"file": "macos/ui/menu/menu_llm/models_manager_ollama.lua",
-		"sink": "notifications.notify",
-		"text": "task creation failed",
-		"count": 1
-	},
-	{
-		"file": "macos/ui/menu/menu_llm/models_manager_ollama.lua",
-		"sink": "notifications.notify",
-		"text": "task start failed",
-		"count": 1
-	},
-	{
-		"file": "macos/ui/menu/shortcut_utils.lua",
-		"sink": "block_alert",
-		"text": "OK",
-		"count": 1
-	},
-	{
 		"file": "windows/modules/llm/ollama_webview.ahk",
 		"sink": "Gui_Create",
 		"text": "IA",

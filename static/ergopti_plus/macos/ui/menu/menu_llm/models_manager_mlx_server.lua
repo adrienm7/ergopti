@@ -1506,7 +1506,7 @@ function M.install(ctx)
 					tostring(target_model), tostring(reason_line))
 				dump_mlx_server_log("MLX crash for ‘" .. tostring(target_model) .. "’")
 				if not silent_notifications then
-					pcall(notifications.notify, "MLX incompatible",
+					pcall(notifications.notify, i18n.get("mlx.model_incompatible_title"),
 						string.format(i18n.get("mlx.model_incompatible"), tostring(target_model)), "error")
 				end
 				-- Flip api_mlx into the failed state so the status dot turns RED at once
