@@ -87,6 +87,83 @@ _RSH_List() {
 }
 Test("runner module: --list replays the named tests in registry order (runner-module)", _RSH_List)
 
+
+; Exact replay admission must account for every requested name, including a
+; missing name beside a valid control that would otherwise make the run green.
+_RSH_NewReplayDirectory() {
+	Directory := A_Temp . "\ergopti-runner-replay-" . A_ScriptHwnd . "-" . A_TickCount . "-" . Random(100000, 999999)
+	AssertTrue(DllCall("Kernel32\CreateDirectoryW", "Str", Directory, "Ptr", 0, "Int"),
+		"the replay fixture requires an exclusively acquired private root")
+	return Directory
+}
+
+_RSH_ListRefusesUnknown() {
+	Tests := [{name: "retained"}, {name: "other"}]
+	Directory := _RSH_NewReplayDirectory()
+	ListFile := Directory . "\requested.txt"
+	try {
+		for Missing in ["missing", "Retained"] {
+			if FileExist(ListFile)
+				FileDelete(ListFile)
+			FileAppend("retained`n" . Missing . "`n", ListFile, "UTF-8")
+			Refused := false
+			try _SelectListed(Tests, ListFile)
+			catch ValueError as Err {
+				AssertEqual("Unknown test listed for replay: " . Missing, Err.Message)
+				Refused := true
+			}
+			AssertTrue(Refused, "a retained passing case must not conceal an unknown requested name")
+		}
+		AssertEqual(2, Tests.Length, "admission never mutates the registry")
+	} finally DirDelete(Directory, true)
+}
+Test("runner list: unknown names refuse an otherwise valid replay (runner-list-contract)", _RSH_ListRefusesUnknown)
+
+
+_RSH_ListSelectionIntersections() {
+	Core := "C:\repo\static\ergopti_plus\windows\tests\unit\infra\test_text_utils.ahk"
+	Ui := "C:\repo\static\ergopti_plus\windows\tests\unit\ui\menu\test_menu.ahk"
+	Rows := [{name: "alpha", file: Core, interactive: false},
+		{name: "beta", file: Ui, interactive: false},
+		{name: "gamma", file: Core, interactive: true},
+		{name: "alpha", file: Core, interactive: false}]
+	Directory := _RSH_NewReplayDirectory()
+	ListFile := Directory . "\requested.txt"
+	try {
+		FileAppend("gamma`nbeta`nalpha`n", ListFile, "UTF-8")
+		Selected := _SelectRunTests(Rows, "", "core", ListFile, false, false, &Excluded, &UnmodularCount)
+		AssertEqual(2, Selected.Length, "duplicate registered names retain every original occurrence")
+		AssertTrue(Selected[1] == Rows[1])
+		AssertTrue(Selected[2] == Rows[4])
+		AssertEqual(3, UnmodularCount)
+		AssertEqual(1, Excluded.Length)
+		AssertTrue(Excluded[1] == Rows[3])
+		Selected := _SelectRunTests(Rows, "beta", "ui", ListFile, false, false, &Excluded, &UnmodularCount)
+		AssertEqual(1, Selected.Length, "known listed names outside an explicit filter remain legal")
+		AssertTrue(Selected[1] == Rows[2])
+		AssertEqual(0, Excluded.Length)
+		AssertEqual(1, UnmodularCount)
+		Selected := _SelectRunTests(Rows, "", "core", ListFile, true, true, &Excluded, &UnmodularCount)
+		AssertEqual(3, Selected.Length)
+		AssertTrue(Selected[1] == Rows[4], "reverse applies after the requested intersections")
+		AssertTrue(Selected[2] == Rows[3])
+		AssertTrue(Selected[3] == Rows[1])
+		AssertEqual(0, Excluded.Length)
+		AssertEqual(4, Rows.Length)
+		AssertEqual("alpha", Rows[1].name, "selection never reorders the source registry")
+		FileDelete(ListFile)
+		FileAppend("beta`nmissing`n", ListFile, "UTF-8")
+		Refused := false
+		try _SelectRunTests(Rows, "alpha", "core", ListFile, false, false, &Excluded, &UnmodularCount)
+		catch ValueError as Err {
+			AssertEqual("Unknown test listed for replay: missing", Err.Message)
+			Refused := true
+		}
+		AssertTrue(Refused, "explicit filters must not conceal a name missing from the full registry")
+	} finally DirDelete(Directory, true)
+}
+Test("runner list: admission precedes explicit selection intersections (runner-list-contract)", _RSH_ListSelectionIntersections)
+
 _RSH_Reverse() {
 	Tests := [{name: "a"}, {name: "b"}, {name: "c"}]
 	Reversed := _SelectReversed(Tests, true)
