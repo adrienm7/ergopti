@@ -25,7 +25,7 @@ body {
 
 body {
 	background: var(--theme-page-background);
-	color: #333;
+	color: var(--theme-grey-333);
 	display: flex;
 	flex-direction: column;
 	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
@@ -43,7 +43,7 @@ h1 {
 }
 
 .subtitle {
-	color: #888;
+	color: var(--theme-grey-888);
 	flex-shrink: 0;
 	font-size: 11px;
 	margin: 0 0 10px;
@@ -64,7 +64,7 @@ h1 {
 }
 
 .catalogue-status {
-	color: #555;
+	color: var(--theme-grey-555);
 	flex-grow: 1;
 	font-size: 11px;
 	margin: 0;
@@ -108,8 +108,8 @@ h1 {
 }
 
 .layout {
-	background: #fff;
-	border: 1px solid #e0e0e0;
+	background: var(--theme-white);
+	border: 1px solid var(--theme-grey-e0e0e0);
 	border-radius: 8px;
 	flex-shrink: 0;
 	padding: 9px 12px;
@@ -136,7 +136,7 @@ h1 {
 .badge {
 	background: #ececf0;
 	border-radius: 10px;
-	color: #555;
+	color: var(--theme-grey-555);
 	font-size: 10px;
 	padding: 2px 8px;
 }
@@ -186,14 +186,14 @@ h1 {
 }
 
 .busy {
-	color: #888;
+	color: var(--theme-grey-888);
 	flex-grow: 1;
 	font-size: 11px;
 	font-style: italic;
 }
 
 .empty {
-	color: #888;
+	color: var(--theme-grey-888);
 	font-size: 12px;
 	text-align: center;
 }
@@ -208,7 +208,7 @@ button {
 	background: var(--theme-blue);
 	border: none;
 	border-radius: 6px;
-	color: #fff;
+	color: var(--theme-white);
 	cursor: pointer;
 	font-size: 12px;
 	padding: 5px 12px;
@@ -252,7 +252,7 @@ button.danger {
 @media (prefers-color-scheme: dark) {
 	body {
 		background: #1e1e1e;
-		color: #ddd;
+		color: var(--theme-grey-ddd);
 	}
 
 	h1,
@@ -261,12 +261,12 @@ button.danger {
 	}
 
 	.layout {
-		background: #2a2a2c;
+		background: var(--theme-grey-2a2a2c);
 		border-color: var(--theme-gray4-dark);
 	}
 
 	.catalogue-status {
-		color: #aaa;
+		color: var(--theme-grey-aaa);
 	}
 
 	button.secondary,
