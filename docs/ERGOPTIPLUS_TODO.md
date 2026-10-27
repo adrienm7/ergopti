@@ -544,7 +544,15 @@ strict_only:finder_detritus`, any other cause, team or a rejection still fails. 
   and the server launcher writes its `--model` argument into `mlx_active_model.txt`. The step now
   snapshots that file and puts it back after the server stops (codes `active_model_restored` or
   `active_model_restore_failed`, the latter failing the step); the guard is unchanged. Mac
-  confirms: config_guard passes on the next run.
+  confirms: config_guard passes on the next run. The 23:42 run confirms it (the guard then only
+  named the lease's used-token ledger, since excluded). The 23:55 run failed with
+  `restored_ConfigTomlPath`, which no step wrote: the AI menu was open during 12_mlx_model and its
+  API backend row was chosen at 23:58:05 (two 293-operation preferences saves). The guard's byte
+  rewrite then left the running preferences on the API backend, since config.toml is self-written
+  and never reloads. Fixed on tmp/wip-field-run-hygiene-2 (5f63988c6e): putting back config.toml
+  or a personal file adds `reload_requested` and, after the done marker, one reload through the
+  termination coordinator. Mac confirms: do not use the menus during a field run; if the guard
+  restores config.toml, the driver reloads once and the menu shows the backend the file names.
 - **L52** Open. 06_field_composer `composer_ready fail:not_enabled` with "Failed to enable 'Composer
   Check' — reason=process_failed" (22:31 run) is the macOS 26 limitation of L25, but neither the
   verdict nor the log names it yet: they read the generic `process_failed`. Next [CODE]: have the

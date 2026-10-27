@@ -18,7 +18,9 @@
 --- 6. a run cut short by a reload is closed as interrupted at the next start;
 --- 7. the MLX model step puts back the active-model file its served model
 ---    overwrote, so config_guard has nothing to restore (field report of
----    2026-10-27 22:36, restored_MlxActiveModelPath).
+---    2026-10-27 22:36, restored_MlxActiveModelPath);
+--- 8. putting back config.toml under the running preferences asks for one
+---    reload once the run is closed (23:55 run, restored_ConfigTomlPath).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -51,7 +53,8 @@ end
 --- In-memory world: files, a manual clock and timers, a fake folder watcher.
 --- @param runners table|nil step id → fn(step, finish, world); default: pass.
 local function world(runners)
-	local state = { files = {}, dirs = {}, now = 0, timers = {}, calls = {}, ring = {}, restored = nil, mark = 0 }
+	local state = { files = {}, dirs = {}, now = 0, timers = {}, calls = {}, ring = {}, restored = nil, mark = 0,
+		reloads = {} }
 	state.ports = {
 		read_declaration = function() return SPEC_TEXT end,
 		read = function(path)
@@ -87,6 +90,11 @@ local function world(runners)
 		config_restore = function(snapshot)
 			state.restored = snapshot
 			return state.restore_outcome or { restored = {}, failed = {} }
+		end,
+		reload_driver = function(reason)
+			state.reloads[#state.reloads + 1] = { reason = reason,
+				done = state.files[FOLDER .. "/results/" .. tostring(state.request_id) .. "/done.json"] ~= nil }
+			return state.reload_accepted ~= false
 		end,
 		run_step = function(step, finish)
 			state.calls[#state.calls + 1] = step.id
@@ -489,6 +497,40 @@ helpers.describe("field run: configuration guard", function()
 		end)
 	end)
 
+	helpers.it("reloads once the run is closed when it put back a file the live preferences read", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world()
+			-- A preferences save during the 23:55 run rewrote config.toml; putting the
+			-- bytes back left the running state on the changed values.
+			state.restore_outcome = { restored = { "ConfigTomlPath" }, failed = {}, reload = true }
+			state.request_id = "r40"
+			started(FieldRun, state)
+			state.request({ schema = 1, request_id = "r40", steps = Json.array({ "field_lease" }) })
+			state.advance(0)
+			local guard = state.json(result_path("r40", 2, "config_guard"))
+			helpers.assert_eq(guard.verdict, "fail")
+			helpers.assert_eq(table.concat(guard.codes, ","), "restored_ConfigTomlPath,reload_requested")
+			helpers.assert_eq(#state.reloads, 1, "one reload")
+			helpers.assert_eq(state.reloads[1].reason, FieldRun.RESTORE_RELOAD_REASON)
+			helpers.assert_true(state.reloads[1].done, "the done marker is written before the reload")
+		end)
+	end)
+
+	helpers.it("does not reload when nothing the live preferences read was put back", function()
+		helpers.with_stub_scope(MODULES, function()
+			local FieldRun = engine()
+			local state = world()
+			state.restore_outcome = { restored = { "KarabinerConfigPath" }, failed = {}, reload = false }
+			started(FieldRun, state)
+			state.request({ schema = 1, request_id = "r41", steps = Json.array({ "field_lease" }) })
+			state.advance(0)
+			helpers.assert_eq(#state.reloads, 0)
+			helpers.assert_eq(table.concat(state.json(result_path("r41", 2, "config_guard")).codes, ","),
+				"restored_KarabinerConfigPath")
+		end)
+	end)
+
 	helpers.it("runs no step when the configuration cannot be snapshot", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
@@ -646,6 +688,10 @@ helpers.describe("field run ports: configuration guard", function()
 			helpers.assert_eq(table.concat(outcome.restored, ","),
 				"ConfigTomlPath,KarabinerConfigPath,setting_added,setting_llm_backend")
 			helpers.assert_eq(#outcome.failed, 0)
+			helpers.assert_true(outcome.reload, "config.toml put back under the live preferences needs a reload")
+			files["/cfg/KarabinerConfigPath"] = "regenerated"
+			helpers.assert_eq(ports.config_restore(snapshot).reload, false,
+				"a file the driver does not read back into its preferences needs none")
 		end)
 	end)
 end)
