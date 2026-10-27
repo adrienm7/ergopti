@@ -17,6 +17,8 @@ SetWorkingDir(A_ScriptDir)
 #Include test_framework.ahk
 #Include ../vendor/Promise.ahk
 #Include ../infra/webview_script.ahk
+; Browser messages and JavaScript payloads share the actual native JSON owner.
+#Include ../infra/json.ahk
 
 ; --- Globals the browser module reads ---
 global _LLM_Menu   := Map("model", "Qwen3.5-2B")
@@ -35,11 +37,13 @@ LoggerError(args*)     => ""
 LoggerDebug(args*)     => ""
 LoggerStart(args*)     => ""
 LoggerWarn(args*)      => ""
-JsonParse(s)           => Map()
-JsonStringLiteral(s, escapeHtml := false) {
-	return Chr(34) . StrReplace(s, Chr(34), Chr(92) . Chr(34)) . Chr(34)
+global _MBW_SelectedModels := []
+LLM_Menu_SetModel(n) {
+	global _MBW_SelectedModels
+	_MBW_SelectedModels.Push(n)
+	; Recording the effect port does not create or tear down a native WebView.
+	return false
 }
-LLM_Menu_SetModel(n)   => ""
 LLM_Deps_IsReady()     => _MBW_DepsReady
 LLM_OllamaListModels() {
 	global _MBW_OllamaListHits
@@ -238,5 +242,72 @@ _MBInject_DisabledStillListsAllModels() {
 	AssertEqual(0, _MBW_OllamaListHits, "the blocking /api/tags probe must NOT run when the daemon is not ready")
 }
 Test("LLM_MBW_InjectCatalogue: lists all models without probing when the feature is off", _MBInject_DisabledStillListsAllModels)
+
+
+; These independent literals exercise the browser adapter rather than a second
+; quote-only encoder. A valid JavaScript string must retain every source unit.
+_MBW_JsonEscaping(Value, Expected) {
+	AssertEqual(Expected, _LLM_MBW_JsStr(Value), "the native browser must use the actual JSON string owner")
+}
+for Fixture in [
+	["plain", "model", '"model"'],
+	["quote", 'a"b', '"a\"b"'],
+	["unicode", "é" . Chr(0x1F600), '"é' . Chr(0x1F600) . '"'],
+	["backslash", 'a\b', '"a\\b"'],
+	["line feed", "a`nb", '"a\nb"'],
+	["carriage return", "a`rb", '"a\rb"'],
+	["tab", "a`tb", '"a\tb"'],
+	["backspace", "a" . Chr(8) . "b", '"a\bb"'],
+	["form feed", "a" . Chr(12) . "b", '"a\fb"']
+]
+	Test("model browser JSON: " . Fixture[1] . " uses the real codec (model-browser-native-json)",
+		_MBW_JsonEscaping.Bind(Fixture[2], Fixture[3]))
+
+class _MBW_MessageArgs {
+	__New(Text) => this.Text := Text
+	TryGetWebMessageAsString() => this.Text
+}
+
+_MBW_BridgeRoutesRealMessages(Message, Expected) {
+	global _TestIndex, _MBW_SelectedModels, _LLM_MBW_SessionEpoch
+	SavedIndex := _TestIndex, SavedSelections := _MBW_SelectedModels
+	SavedEpoch := _LLM_MBW_SessionEpoch
+	PreviousCritical := Critical("Off")
+	Fence := {Done: false}
+	MarkFence := (*) => Fence.Done := true
+	try {
+		_TestIndex := Map("Qwen3.5-2B", Map(), 'model\path', Map())
+		_MBW_SelectedModels := []
+		_LLM_MBW_SessionEpoch += 1
+		_LLM_MBW_OnWebMessage(_LLM_MBW_SessionEpoch, 0, _MBW_MessageArgs(Message))
+		AssertEqual(0, _MBW_SelectedModels.Length, "the actual COM callback must defer model application")
+		SetTimer(MarkFence, -50)
+		Started := A_TickCount
+		while !Fence.Done && A_TickCount - Started < 2000
+			Sleep(10)
+		AssertTrue(Fence.Done, "the actual native deferred queue must progress")
+		AssertEqual(Expected == "" ? 0 : 1, _MBW_SelectedModels.Length,
+			"only actual catalogue selection messages reach the model effect port")
+		if Expected != ""
+			AssertEqual(Expected, _MBW_SelectedModels[1], "decoded JSON must retain the exact catalogue identity")
+	} finally {
+		SetTimer(MarkFence, 0)
+		_TestIndex := SavedIndex
+		_MBW_SelectedModels := SavedSelections
+		_LLM_MBW_SessionEpoch := SavedEpoch
+		Critical(PreviousCritical)
+	}
+}
+for Fixture in [
+	["valid ASCII", '{"action":"select_model","name":"Qwen3.5-2B"}', "Qwen3.5-2B"],
+	["valid escaped identity", '{"action":"select_model","name":"model\\path"}', 'model\path'],
+	["unknown model", '{"action":"select_model","name":"absent"}', ""],
+	["numeric model", '{"action":"select_model","name":1}', ""],
+	["array message", '[]', ""],
+	["malformed message", '{"action":', ""],
+	["unknown action", '{"action":"unknown","name":"Qwen3.5-2B"}', ""]
+]
+	Test("model browser JSON: " . Fixture[1] . " reaches the actual bridge (model-browser-native-json)",
+		_MBW_BridgeRoutesRealMessages.Bind(Fixture[2], Fixture[3]))
 
 RunTests()
