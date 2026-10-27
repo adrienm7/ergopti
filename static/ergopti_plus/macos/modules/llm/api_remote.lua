@@ -42,6 +42,7 @@ local Paths          = require("infra.paths")
 local Profiles       = require("modules.llm.profiles")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")
+local Ports = require("llm.request_plan.ports")
 local TokenBudget = require("llm.request_plan.token_budget")
 local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
 local TokenCrypto    = require("modules.llm.api_token_crypto")
@@ -3082,6 +3083,13 @@ function M.detect_local_servers(on_done)
 		end)
 		return true
 	end, on_done)
+end
+
+--- Hands in the HttpClient that sends inference requests (engine init, the
+--- HttpClient port of the shared request plan). The default stays this module's own client.
+--- @param client table Offers post and cancel (llm.request_plan.ports).
+function M.set_inference_client(client)
+	_infer_client = Ports.check("HttpClient", client)
 end
 
 return M

@@ -23,6 +23,7 @@
 local M = {}
 
 local Logger         = require("infra.logger")
+local Ports          = require("llm.request_plan.ports")
 local text_utils = require("infra.text_utils")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")
@@ -1036,6 +1037,13 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		end
 		return
 	end
+end
+
+--- Hands in the HttpClient that sends inference requests (engine init, the
+--- HttpClient port of the shared request plan). The default stays this module's own client.
+--- @param client table Offers post and cancel (llm.request_plan.ports).
+function M.set_inference_client(client)
+	_infer_client = Ports.check("HttpClient", client)
 end
 
 return M

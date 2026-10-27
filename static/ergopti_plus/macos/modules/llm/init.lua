@@ -1615,6 +1615,14 @@ function M.set_llm_streaming(v)
 	Logger.debug(LOG, "Streaming: %s.", _streaming_enabled and "on" or "off")
 end
 
+--- Hands the HttpClient port to every backend's inference path (engine init).
+--- @param client table Offers post and cancel (llm.request_plan.ports).
+function M.set_inference_client(client)
+	ApiOllama.set_inference_client(client)
+	ApiMlx.set_inference_client(client)
+	ApiRemote.set_inference_client(client)
+end
+
 --- Cancels the in-flight streaming task on the active backend, if any.
 --- Called when a new request supersedes the current stream.
 function M.cancel_streaming()
