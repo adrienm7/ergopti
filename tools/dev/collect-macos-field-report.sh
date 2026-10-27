@@ -35,6 +35,12 @@ set -uo pipefail
 # directory name. Capture a sentinel and remove only that final byte afterward.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && printf '%s.' "${PWD}")"
 REPO_ROOT="${REPO_ROOT%.}"
+# The collector keeps going after a failed step, but never without the shared
+# identifiers: a missing file stops it here.
+set -e
+# shellcheck source=../../static/ergopti_plus/_shared/data/identifiers.sh
+. "$REPO_ROOT/static/ergopti_plus/_shared/data/identifiers.sh"
+set +e
 LOG_DIR="${HOME}/Library/Logs/ergopti_plus"
 FIELD_BRANCH_PREFIX="field/"
 FIELD_RUN_SPEC="static/ergopti_plus/macos/data/field_run.json"
@@ -152,7 +158,6 @@ report_new_results() {
 
 # Opens the developer app, sends the request, waits for done and copies it.
 run_field_run() {
-	. "${REPO_ROOT}/static/ergopti_plus/_shared/data/identifiers.sh"
 	local folder request_name accepted_name done_name refused_name request_id deadline_seconds
 	folder="$(spec_value folder)" || { log "Cannot read ${FIELD_RUN_SPEC}."; return 1; }
 	run_folder="${REPO_ROOT}/${folder}"
