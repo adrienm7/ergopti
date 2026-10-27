@@ -1,0 +1,2 @@
+ollama    70132 b519hs@login.axa    4u  IPv4 0xd5d5b7079434e844      0t0  TCP 127.0.0.1:11434 (LISTEN)
+Ollama    76032 b519hs@login.axa    4u  IPv4 0xe3a540364c7d68c2      0t0  TCP 127.0.0.1:65338 (LISTEN)

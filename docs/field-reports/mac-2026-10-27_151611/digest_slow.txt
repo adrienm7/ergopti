@@ -1,0 +1,9 @@
+2026-10-27 14:25:50:367 [WARNING] [keystats.log_manager] Slow ingest tick 568 ms (drain=0 foreign=0 outbox=1 read=0 build=1 apply=17 commit=0 append=546 notify=0 ms; entries=4 statements=4).
+2026-10-27 14:26:13:381 [WARNING] [HotPath] Slow preview.rebuild: 7.01 ms own, 7.01 ms total, parent keydown (0 similar since the last line).
+2026-10-27 14:26:36:543 [WARNING] [HotPath] Slow preview.rebuild: 5.26 ms own, 5.26 ms total, parent keydown (2 similar since the last line).
+2026-10-27 14:26:38:273 [WARNING] [HotPath] Slow hotstring.match: 6.36 ms own, 6.54 ms total, parent keydown (0 similar since the last line).
+2026-10-27 14:27:29:013 [WARNING] [keystats.log_manager] Slow ingest tick 1567 ms (drain=0 foreign=0 outbox=2 read=0 build=1 apply=26 commit=4 append=1531 notify=0 ms; entries=2 statements=2).
+2026-10-27 14:28:44:606 [WARNING] [keystats.log_manager] Slow ingest tick 592 ms (drain=0 foreign=0 outbox=12 read=0 build=5 apply=8 commit=1 append=563 notify=0 ms; entries=2 statements=2).
+2026-10-27 14:29:59:522 [WARNING] [keystats.log_manager] Slow ingest tick 508 ms (drain=0 foreign=0 outbox=3 read=0 build=4 apply=7 commit=1 append=488 notify=0 ms; entries=1 statements=1).
+2026-10-27 14:32:39:593 [WARNING] [keystats.log_manager] Slow ingest tick 579 ms (drain=0 foreign=0 outbox=10 read=2 build=3 apply=24 commit=3 append=535 notify=0 ms; entries=3 statements=3).
+2026-10-27 14:32:44:422 [WARNING] [HotPath] Slow preview.rebuild: 13.27 ms own, 13.27 ms total, parent keydown (0 similar since the last line).

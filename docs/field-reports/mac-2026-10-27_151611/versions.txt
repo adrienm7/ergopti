@@ -1,0 +1,7 @@
+92d4615
+ProductName:		macOS
+ProductVersion:		26.6.2
+BuildVersion:		25G83
+arm64
+14
+51539607552
