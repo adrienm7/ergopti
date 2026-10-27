@@ -49,8 +49,11 @@ a sealed Windows updater source, reseal with
   saved source file; inventory in `docs/design/developer-mode.md`, open checks in the item "Developer mode on
   the three OS"): macOS `bash tools/dev/run-macos-dev-app.sh` (`--open-only` without rebuilding), Linux
   `bash tools/dev/run-linux-dev.sh` (`npm run dev:linux`), Windows
-  `powershell -ExecutionPolicy Bypass -File tools\dev\run-windows-dev.ps1` (`npm run dev:windows`). Each passes
-  the clone root in `ERGOPTI_DEV_SOURCE_ROOT` and the driver refuses a root that is not its own clone.
+  `powershell -ExecutionPolicy Bypass -File tools\dev\run-windows-dev.ps1` (`npm run dev:windows`), or a
+  double-click on `static\ergopti_plus\windows\ErgoptiPlus.ahk` in the clone (the same mode, but it does not
+  close a running ErgoptiPlus.exe). Each launcher passes the clone root in `ERGOPTI_DEV_SOURCE_ROOT` and the
+  driver refuses a root that is not its own clone; without it, the Windows driver derives the root from its
+  own folder when that folder is in a Git checkout of this repository.
 - **Problem ledger of the Mac session:** see "Mac field session 2026-10-27: problem ledger" below; every
   problem of issue #104 and of the field reports is there as fixed (sha) or open with its next step.
 - **Coordinator scripts** are in `tools/dev/coordinator/`: `integration-sweep.sh <out-dir>` (gen:check,
@@ -1033,13 +1036,20 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       `.ahk`, the run reads `%APPDATA%\Ergopti\paths.toml` like the exe). Left: (1) [PHYS-W] on the PC with the exe installed and
       running, run the command from a PowerShell in the clone: the exe closes by itself (taskkill without /F; if it
       stays, the script names it and stops), the tray icon appears, Debug logs say "Developer source mode; the driver
-      runs from <clone>\static\ergopti_plus\windows" and "Developer source watcher started"; the config is the
+      runs from <clone>\static\ergopti_plus\windows (clone root from the developer variable)" and "Developer source
+      watcher started"; the config is the
       exe's (same hotstrings, same `paths.toml` choice, no onboarding); save any driver `.ahk` with a harmless
       comment change: within about 2 s the driver reloads once and keeps a Pause; the tray's Reload still works;
       AI menus (Ollama), the metrics window (WebView2, sqlite3.dll) and Alt+Tab navigation (ergopti_nav_owner.dll)
-      work; Start at login in this mode registers a plain source run (no watcher): report whether that should
-      carry the developer variable. (2) [PHYS-W] check that `npm run dev:windows` works from Git Bash and from
-      cmd (it calls Windows PowerShell 5.1). (3) [PHYS-M] the Mac lines of the hardware session cover the macOS
+      work; Start at login in this mode registers the interpreter and the clone's script, and that login start
+      derives the root, so it is a developer run too: report whether that is wanted. (2) [PHYS-W] check that
+      `npm run dev:windows` works from Git Bash and from cmd (it calls Windows PowerShell 5.1). (2b) [PHYS-W]
+      double-click works: quit the exe from its tray, double-click `static\ergopti_plus\windows\ErgoptiPlus.ahk`
+      in Explorer: the same Debug lines appear, the "Developer source mode" one ending "(clone root from the
+      script location)",
+      a saved `.ahk` reloads, About shows the updater off and Uninstall greyed; then start the exe and
+      double-click again while it runs: the source run yields after about 3 s (no second tray icon, a
+      "Another instance owns the single-owner mutex" WARNING in `bootstrap.log`) and the exe keeps running. (3) [PHYS-M] the Mac lines of the hardware session cover the macOS
       mode. (4) Linux, on a real desktop with the package installed: the unit is stopped, the tray appears, a
       saved `.lua` restarts the daemon (`Debounced source reload firing` then a new boot), the tray's Reload
       restarts it, and a second `run-linux-dev.sh` while one runs reports "already running". (5) [CODE] decide
