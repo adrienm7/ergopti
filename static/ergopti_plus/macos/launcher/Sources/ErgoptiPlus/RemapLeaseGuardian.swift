@@ -88,7 +88,7 @@ func lockGuardianActivationGate(_ descriptor: Int32) -> LeaseGuardianGateLockRes
 /// Serializes persistent guardian diagnostics from state, waiter, and fence
 /// queues while rate-limiting retry loops by stable failure key.
 enum RemapGuardianLog {
-	private static let queue = DispatchQueue(label: "com.ergoptiplus.remap-guardian.log")
+	private static let queue = DispatchQueue(label: kRemapGuardianLabel + ".log")
 	private static var lastWrite: [String: TimeInterval] = [:]
 
 	/// Persists one rate-limited guardian diagnostic through the launcher log.
@@ -955,7 +955,7 @@ private final class LeaseGuardianWatch {
 		self.descriptor = descriptor
 		self.identity = identity
 		self.acknowledged = acknowledged
-		queue = DispatchQueue(label: "com.ergoptiplus.remap-guardian." + token)
+		queue = DispatchQueue(label: kRemapGuardianLabel + "." + token)
 	}
 }
 
@@ -979,7 +979,7 @@ final class RemapLeaseGuardianRuntime {
 	private let singletonProbeObserved: () -> Void
 	private let singletonContentionObserved: () -> Void
 	private let generation: String
-	private let stateQueue = DispatchQueue(label: "com.ergoptiplus.remap-guardian.state")
+	private let stateQueue = DispatchQueue(label: kRemapGuardianLabel + ".state")
 	private var recoveringAcknowledgements = Set<String>()
 	private var watches: [String: LeaseGuardianWatch] = [:]
 	private var isTerminating = false
