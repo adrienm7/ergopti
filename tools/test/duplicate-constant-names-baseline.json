@@ -34,10 +34,6 @@
 		"files": ["_shared/ui/metrics_apps/state.js", "_shared/ui/metrics_typing/data.js"],
 		"divergent": false
 	},
-	"MAX_BODY_BYTES": {
-		"files": ["_shared/lua/updater/list_cache.lua", "linux/adapters/network_check_ports.lua"],
-		"divergent": true
-	},
 	"MAX_BYTES": {
 		"files": ["_shared/lua/network/pac_check.lua", "windows/infra/config_registry_cache.ahk"],
 		"divergent": true
@@ -48,17 +44,6 @@
 			"windows/modules/keystats/keystats_reader_rebuild.ahk"
 		],
 		"divergent": false
-	},
-	"MAX_SOURCE_BYTES": {
-		"files": [
-			"macos/adapters/input_source_selector.lua",
-			"macos/adapters/keyboard_source_probe.lua"
-		],
-		"divergent": false
-	},
-	"MAX_TEXT_BYTES": {
-		"files": ["_shared/lua/keymap/layer_editor.lua", "_shared/lua/layout/number_row_native.lua"],
-		"divergent": true
 	},
 	"MICRO_IDLE_TIMEOUT_MS": {
 		"files": [

@@ -834,3 +834,31 @@ changelog_source_bytes = 4194304
 # retry turn, so a large backlog never blocks the event loop.
 # HS: modules/keystats/rotation.lua.
 journal_recovery_turn_bytes = 65536
+
+# Largest layers.toml the navigation layer editor accepts: every registry key
+# bound in all four sections is about 25 KB, anything larger is not a layer file.
+# Lua: _shared/lua/keymap/layer_editor.lua (macOS and Linux hosts).
+layer_file_bytes = 65536
+
+# Longest text one native number-row level may carry (a character, a dead key's
+# output); a larger value is refused before it is turned into text.
+# Lua: _shared/lua/layout/number_row_native.lua.
+number_row_level_text_bytes = 1024
+
+# Largest release-list response the update check reads, and so the largest
+# stored copy it reuses. LX: modules/updater/manager.lua (transport cap).
+# Lua: _shared/lua/updater/list_cache.lua (stored copy bound).
+release_list_body_bytes = 2097152
+
+# What the digest tool may print for one file, beyond the file's own path: the
+# hexadecimal digest and its separators. LX: adapters/file_digest.lua.
+file_digest_output_bytes = 1024
+
+# Longest keyboard input-source identifier the macOS driver selects or probes.
+# HS: adapters/input_source_selector.lua, adapters/keyboard_source_probe.lua.
+input_source_id_bytes = 1024
+
+# Largest answer the Linux network field check reads: one byte over the shared
+# PAC cap (_shared/lua/network/pac_check.lua MAX_BYTES), so an oversized PAC is
+# seen as oversized rather than truncated. LX: adapters/network_check_ports.lua.
+network_check_body_bytes = 1048577
