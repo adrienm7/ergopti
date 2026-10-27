@@ -36,7 +36,8 @@ _UninstallClose(Owner, Cancel) {
 		PLC_CloseNativeHandle(Owner.Get(Key, 0))
 		Owner[Key] := 0
 	}
-	if Cancel && FileExist(Owner.Get("Script", "")) {
+	; A random filename is not ownership when create-only copying was refused.
+	if Cancel && Owner.Get("ScriptCopied", false) && FileExist(Owner.Get("Script", "")) {
 		try FileDelete(Owner["Script"])
 		catch as Err
 			LoggerWarn("Uninstall", "Temporary worker cleanup failed: {1}.", Err.Message)
@@ -92,7 +93,7 @@ ShowUninstallErgopti(*) {
 	State := UninstallState()
 	if State.Has("Owner")
 		return false
-	Owner := Map("Phase", "Confirming")
+	Owner := Map("Phase", "Confirming", "ScriptCopied", false)
 	State["Owner"] := Owner
 	try {
 		ExecutableDigest := CryptoSha256Bytes(FileRead(A_ScriptFullPath, "RAW"))
@@ -125,6 +126,7 @@ ShowUninstallErgopti(*) {
 		CommitName := "Local\ErgoptiPlus.Uninstall.Commit." . Nonce
 		Owner["Script"] := A_Temp . "\ergopti-uninstall-" . Nonce . ".ps1"
 		FileCopy(_VendorDir . "\ergopti_uninstall.ps1", Owner["Script"], false)
+		Owner["ScriptCopied"] := true
 		Owner["Ready"] := PLC_CreateNamedManualResetEvent(ReadyName)
 		Owner["Commit"] := PLC_CreateNamedManualResetEvent(CommitName)
 		Owner["Parent"] := PLC_OpenCurrentProcessHandle(0x100000)
