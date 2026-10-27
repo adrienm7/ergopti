@@ -208,7 +208,7 @@ function resetUI() {
 
 	const pctEl = document.getElementById('pct');
 	pctEl.textContent = '0 %';
-	pctEl.style.color = '#30d158';
+	pctEl.style.color = ThemeTokens.color('green-dark');
 
 	document.getElementById('file-count').style.display = 'none';
 	document.getElementById('file-count').textContent = '';
@@ -363,7 +363,7 @@ function done(isSuccess, message, errorKind) {
 		progressBar.classList.add('error');
 		progressBar.style.width = '100%';
 		document.getElementById('pct').textContent = '❌';
-		document.getElementById('pct').style.color = '#ff453a';
+		document.getElementById('pct').style.color = ThemeTokens.color('red-dark');
 	} // Hide specific stats, files count and ETA to make room for the final message
 
 	document.getElementById('file-count').style.display = 'none';
