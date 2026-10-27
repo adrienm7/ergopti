@@ -73,6 +73,7 @@ require("test.runner_home").isolate()
 local helpers = require("tests.helpers")
 local shell_quote = require("text_utils").shell_quote
 helpers.initialize_timing()
+helpers.warm_timings()
 local ModuleIsolation = require("tests.support.module_isolation")
 local OnlySelector = require("tests.support.only_selector")
 local ModuleGroups = require("tests.support.module_groups")

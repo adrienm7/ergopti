@@ -26,7 +26,7 @@ local MODULES = {
 	"adapters.http_client",
 	"ui.download_window",
 	"ui.ui_builder",
-	"infra.paths",
+	"infra.paths", "infra.timings",
 	"infra.deferred_work",
 	"ui.download_window.javascript",
 	"ui.menu.menu_llm.requirement_operation_registry",
@@ -198,6 +198,7 @@ local function with_fixture(options, callback)
 	package.loaded["ui.menu.menu_llm.models_manager_ollama"] = nil
 	local real_window, native_window
 	if options.real_window then
+		helpers.provide_timings()
 		package.loaded["infra.paths"] = { shared = function()
 			return helpers.driver_root() .. "../_shared"
 		end }

@@ -23,6 +23,36 @@ local M = {}
 --- the key (the usual one) would drop the whole row; a stub that replaces the
 --- baseline starts from these.
 M.I18N_PLACEHOLDER_FORMATS = { ["menu.llm.server_port_label"] = "%s server port: %s" }
+
+--- The shared timing registry, built from the real file on first use. A fixture that virtualises
+--- the file system or the shared paths calls M.provide_timings() before it does, so a call-time
+--- read of the registry (`require("infra.timings").sec(...)`) answers with the real values
+--- instead of failing on a missing virtual constants.toml.
+local REAL_TIMINGS = nil
+
+--- Builds the real timing registry reader once, while the file system is real. The runner calls it
+--- before any test; M.provide_timings() builds it on demand when a suite runs without the runner.
+local function real_timings()
+	if REAL_TIMINGS == nil then
+		local silent = setmetatable({}, { __index = function() return function() end end })
+		REAL_TIMINGS = require("timings").new({
+			logger = silent, log = "timings", loaded_level = "done",
+			shared_path = function(rel) return M.shared(rel) end,
+			parse = require("infra.toml.reader").parse,
+		})
+	end
+	return REAL_TIMINGS
+end
+
+--- Reads the registry now, before a fixture replaces the file system.
+function M.warm_timings()
+	real_timings()
+end
+
+--- Installs the real timing registry reader as the module the code under test requires.
+function M.provide_timings()
+	package.loaded["infra.timings"] = real_timings()
+end
 local CommandLines = require("tests.support.command_lines")
 local SourceFile = require("tests.support.source_file")
 

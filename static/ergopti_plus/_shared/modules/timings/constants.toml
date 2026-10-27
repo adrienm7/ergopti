@@ -296,6 +296,11 @@ click_cooldown_ms = 150
 # AHK: gestures/init.ahk GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS (pinned copy).
 gesture_auto_configure_delay_ms = 2000
 
+# macOS: delay before the emergency recycle of the gesture watchers runs, so the
+# frame that triggered it has been delivered.
+# HS: modules/gestures/init.lua schedule_emergency_recycle.
+emergency_recycle_delay_ms = 20
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Keep-awake (activity simulation)
@@ -710,6 +715,80 @@ ollama_deps_poll_ms = 3000
 # HS: infra/termination_coordinator.lua request_user_exit deadline.
 user_quit_deadline_ms = 12000
 
+# macOS: delay before the editor of a personal information file opens after its
+# menu row is clicked, so the menu has closed.
+# HS: ui/menu/menu_hotstrings.lua.
+editor_open_after_click_ms = 100
+
+# macOS: delay before Hammerspoon reloads after the paths editor changed a path.
+# HS: ui/menu/init.lua.
+config_editor_reload_delay_ms = 250
+
+# macOS: delay after a webview finished navigating before queued JavaScript is
+# flushed, belt and braces beside the page's own ready message.
+# HS: ui/model_browser, ui/changelog.
+webview_navigation_flush_delay_ms = 150
+
+# macOS: flush of the queued JavaScript of a webview whose ready handshake never
+# arrives.
+# HS: ui/model_browser, ui/changelog.
+webview_ready_safety_flush_ms = 1500
+
+# macOS: the same safety flush of the download window, which waits for its own
+# didFinishNavigation.
+# HS: ui/download_window.
+download_window_flush_safety_ms = 1000
+
+# macOS: how long the download window stays before it hides itself once its
+# operation ended, unless a newer operation owns it.
+# HS: ui/download_window.
+download_window_hide_delay_ms = 4000
+
+# macOS: how long the warm-up webview is held so WebKit fully initialises.
+# HS: ui/ui_builder.lua.
+webkit_warmup_hold_ms = 5000
+
+# macOS: how often the typing metrics page is polled for its pending messages.
+# HS: ui/metrics_typing/init.lua.
+metrics_typing_poll_ms = 300
+
+# macOS: delay before the model manager retries a deferred delivery.
+# HS: ui/menu/menu_llm/models_manager.lua.
+model_manager_retry_ms = 100
+
+# macOS: delay before the dialog focus is claimed after a modal opens.
+# HS: infra/dialog_util.lua.
+dialog_focus_delay_ms = 100
+
+# macOS: delay before the notice about a keyboard slot that macOS's own
+# input-source shortcut shadows, so the slot change has settled.
+# HS: ui/menu/menu_keyboard_slots.lua.
+slot_conflict_notice_delay_ms = 300
+
+# macOS and Linux: the health check yields once before it builds the configuration
+# context, so its probe never runs inside the caller's turn.
+# HS: ui/healthcheck/probes.lua. Linux: ui/healthcheck/probes.lua.
+healthcheck_probe_yield_ms = 1
+
+# Page scripts cannot read the registry; their copies are pinned to these keys by
+# tools/test/test-keystats-timings-single-source.cjs.
+# Delay before a field of the hotstring editor takes the focus after its dialog
+# opened.
+hotstring_editor_focus_delay_ms = 80
+
+# The same delay for the trigger field when an existing entry is edited.
+hotstring_editor_edit_focus_delay_ms = 50
+
+# How long the hotstring editor toast stays visible.
+hotstring_editor_toast_ms = 1400
+
+# Delay before the hotstring editor opens the new entry form after a section was
+# created.
+hotstring_editor_add_entry_delay_ms = 300
+
+# Delay before the typing metrics page dispatches its next chart update.
+metrics_typing_dispatch_delay_ms = 50
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Logger
@@ -803,6 +882,10 @@ hotpath_slow_ms = 5
 # names none. HS: http_client.lua. LX: curl_http_client.lua, file_digest.lua,
 # process_runner.lua.
 default_timeout_ms = 30000
+
+# Linux: how long the window switch worker sleeps between two polls of its queue.
+# LX: platform/window_switch_worker.lua.
+window_switch_worker_sleep_ms = 10
 
 
 # ──────────────────────────────────────────────────────────────────────

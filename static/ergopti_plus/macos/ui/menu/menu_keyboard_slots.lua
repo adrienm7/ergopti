@@ -126,7 +126,7 @@ function M.warn_if_input_source_conflict(slot_id)
 		if #ids == 0 then return end
 		Logger.warn(LOG, "Slot '%s' is also macOS's input-source shortcut (symbolic hotkey %s) — it will not fire.",
 			slot_id, table.concat(ids, ", "))
-		DeferredWork.after(0.3, function()
+		DeferredWork.after(require("infra.timings").sec("ui", "slot_conflict_notice_delay_ms"), function()
 			local open_label = i18n.get("button.open_settings")
 			local ok, clicked = pcall(dialog.block_alert,
 				i18n.get("dialog.keyboard_shortcut.input_source_conflict_title"),

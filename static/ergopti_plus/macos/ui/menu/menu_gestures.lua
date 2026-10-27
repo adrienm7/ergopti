@@ -269,7 +269,7 @@ function M.build(ctx)
 			end
 			local spec = type(gestures.get_action_parameter_spec) == "function" and gestures.get_action_parameter_spec(a) or nil
 			if spec then
-				DeferredWork.after(0.05, function()
+				DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
 					local committed = shortcut_utils.prompt_action_parameter(gestures, slot, a, spec, picked, {
 						section = "gestures", key = slot,
 						read = function() return gestures.get_action(slot) end,
@@ -354,7 +354,7 @@ function M.build(ctx)
 
 		local slot_commands = {
 			[require("config_keys").COMMAND.GESTURE_SLOT_CHANGE_ACTION] = function()
-				DeferredWork.after(0.05,
+				DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"),
 					function() open_action_chooser(slot, names, current) end,
 					"menu_gestures.action_chooser")
 			end,

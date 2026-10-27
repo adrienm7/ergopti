@@ -8,7 +8,7 @@ local OWNED = {
 	"ui.download_window", "ui.download_window.javascript",
 	"ui.download_window.pending_queue", "adapters.webview_result",
 	"infra.deferred_work", "adapters.timer_scheduler", "error_description", "number_policy",
-	"infra.logger", "infra.paths", "infra.i18n", "infra.text_utils",
+	"infra.logger", "infra.paths", "infra.timings", "infra.i18n", "infra.text_utils",
 	"adapters.shell_runner", "adapters.own_window", "ui.ui_builder",
 }
 
@@ -24,6 +24,7 @@ local function with_window(scenario)
 		end
 		package.loaded["infra.logger"] = logger
 		package.loaded["infra.paths"] = { shared = function() return "/virtual/download-assets" end }
+		helpers.provide_timings()
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.text_utils"] = {}
 		package.loaded["adapters.shell_runner"] = {}
