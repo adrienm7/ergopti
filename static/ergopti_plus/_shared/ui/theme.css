@@ -64,6 +64,26 @@
 	--theme-grey-d8d8de: #d8d8de;
 	--theme-grey-2a2a2c: #2a2a2c;
 	--theme-grey-242426: #242426;
+	--theme-grey-666: #666666;
+
+	/* More Apple system colours, then the hues the metrics dashboards and the
+	   colour pickers spell more than once. The hue-* names carry their value:
+	   no system colour holds them. */
+	--theme-yellow: #ffcc00;
+	--theme-yellow-dark: #ffd60a;
+	--theme-purple-dark: #bf5af2;
+	--theme-pink-dark: #ff375f;
+	--theme-cyan-dark: #64d2ff;
+	--theme-indigo-dark: #5e5ce6;
+	--theme-hue-1e1e2e: #1e1e2e;
+	--theme-hue-30b0c7: #30b0c7;
+	--theme-hue-5ac8fa: #5ac8fa;
+	--theme-hue-f59e0b: #f59e0b;
+	--theme-hue-32d74b: #32d74b;
+	--theme-hue-ff6b35: #ff6b35;
+	--theme-hue-00c7be: #00c7be;
+	--theme-hue-e588f8: #e588f8;
+	--theme-hue-f4a460: #f4a460;
 }
 
 /* ======================================= */

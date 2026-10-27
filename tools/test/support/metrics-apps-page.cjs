@@ -13,6 +13,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const uiRoot = path.resolve(__dirname, '../../../static/ergopti_plus/_shared/ui');
+const { themeProperties } = require('./theme-tokens.cjs');
 
 /**
  * Loads the real page declarations; timers, network and canvas remain browser ports.
@@ -123,8 +124,9 @@ function loadMetricsPage(app, host, afterScript) {
 			return timers.length;
 		},
 		cancelAnimationFrame() {},
+		// The theme's custom properties, as the browser answers them for the light look.
 		getComputedStyle() {
-			return { getPropertyValue: () => '' };
+			return { getPropertyValue: (name) => themeProperties().get(name) ?? '' };
 		},
 		fetch() {
 			return Promise.resolve({ ok: false });

@@ -55,7 +55,7 @@ body {
 	:root {
 		--surface: #242424;
 		--hint: #a2a2a2;
-		--accent2: #bf5af2;
+		--accent2: var(--theme-purple-dark);
 		--row-sep: var(--theme-gray4-dark);
 		--shadow: none;
 		--tag-bg: var(--theme-gray4-dark);
