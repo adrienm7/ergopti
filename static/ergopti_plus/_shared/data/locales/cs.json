@@ -2172,6 +2172,7 @@
 	"network.failure.proxy": "Nelze použít systémové nastavení proxy, nebo proxy odmítla připojení či vyžaduje ověření. Zkontrolujte systémové nastavení proxy.",
 	"network.failure.host_blocked": "Síť blokuje přístup k tomuto serveru (firemní filtrování nebo firewall).",
 	"network.failure.offline": "Síť nebo síťová trasa není dostupná. Zkontrolujte připojení a systémové nastavení sítě.",
+	"network.failure.pac_unreachable_direct_failed": "Automatická konfigurace proxy (PAC) není dostupná nebo ji nelze přečíst a přímé připojení zkoušené místo ní také selhalo. Zkontrolujte síťové připojení a nastavení proxy v systému, nebo se obraťte na oddělení IT.",
 	"network.failure.disk": "Stahování nemohlo pokračovat kvůli nedostatku místa na disku nebo překročení kvóty. Uvolněte místo a zkuste to znovu.",
 	"network.failure.permission": "Systém odmítl požadovanou operaci se souborem. Zkontrolujte oprávnění cílového umístění a zda není jen pro čtení.",
 	"network.failure.unknown": "Operace selhala, ale dostupné diagnostické údaje neumožňují určit příčinu.",

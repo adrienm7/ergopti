@@ -271,7 +271,8 @@ cuts a release unless the run is cancelled, so cancel the CI run of each push (`
 
 **What was done in this session (details in `git log` and in the items).** Keystats rename (keylogger gone); issue #101
 fixes (ATS key for an http PAC, direct route when the PAC lookup names no route, named lookup stages, no retry of a
-refused route, lease line cap, Ollama 412 upgrade request); WinHTTP transport (item 62); per-layer layout composer on the
+refused route, lease line cap, Ollama 412 upgrade request; later: PAC-then-direct fallback on macOS, see "PAC unusable:
+direct fallback"); WinHTTP transport (item 62); per-layer layout composer on the
 three OS; hotstring expansion delay defined once and aligned (shared corpus `time_gate_vectors.json`, definition in
 `docs/memory/text-input-and-config.md`); chaining pinned by tests (buffer continuity, `test_hotstring_chaining.ahk`);
 Space tap-hold press tick; HS-274 owned Karabiner runtime (dormant, hidden `[karabiner] runtime = "owned"`); one-click
@@ -511,6 +512,24 @@ Not started:
       plan 1fd254d92e and 749e00c4c8); Swift compiled and tested on the hosted macOS cell. Windows
       is covered by the WinHTTP transport (62). Left: a real-PAC pull on the maintainer's Mac (Debug >
       Test network), the Ollama blob host inventory check, a `route_plan` step in the network check.
+      The daemon start now looks up every inventory origin (it read only the single-origin variable,
+      so `pac_probe_client = "ollama"` never resolved at start; fixed with the fallback below).
+- [ ] **PAC unusable: direct fallback (maintainer decision).** [CODE] [PHYS-M] macOS done on branch
+      `tmp/wip-pac-fallback`: when the PAC or WPAD route lookup fails at a stage listed in
+      `proxy_policy.json` `pac_unavailable_fallback` (PAC download, evaluation, WPAD discovery, lookup
+      budget, empty route), `network-retry.sh`, the Swift spool and native worker, and the Python
+      receiver go direct (no relay, loopback exclusions kept) with one WARNING naming the stage, then
+      log that the direct connection worked or an error naming both causes; the Ollama pull shows
+      `network.failure.pac_unreachable_direct_failed`; the Debug network check reports the lookup as
+      `info direct_pac_download` (or the stage met). Decision: an explicit inherited relay
+      (`HTTPS_PROXY` and the others) wins and never falls back; a relay the PAC names that then fails
+      is NOT retried direct (only the PAC's own list, such as `PROXY a; DIRECT`, is followed), on
+      every OS. Mac must confirm: on the company network, an Ollama pull and the MLX install log the
+      WARNING with `native_pac_download` or `native_pac_evaluation`, then the direct success line (or
+      the two-cause error), Debug > Test network shows the `route_lookup` info step, and the Swift
+      change compiles in the macOS cell. Deferred: Linux (`managed_ollama_proxy.lua` still refuses
+      with `runtime_proxy_unavailable`) and Windows (`ergopti_network_routes.ps1` still refuses with
+      `pac_failed` or `wpad_failed`) must follow the same policy.
 - [x] **Menu clicks during a reload.** Done (b0fb0f585b, c280aa4eaf, 8c4314524a, d8f6fbf1d2): a click
       is held during a reload and replayed with its intended state; a Reload click during a reload
       JOINS it (Linux and macOS; Windows in the standing-checks agent's work, see PAR entries); Linux
@@ -780,7 +799,8 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       (1 s): bound it only after measuring the AX call time (secure-field cache); (5) rebuild the
       inverse oracle of `macos_native_http_receiving_facts_test` (red since 719c7fcd76), compile the
       Swift on macOS CI, add Go table cases for the new stages; (6) the network check's digest step
-      is skipped (HEAD only).
+      is skipped (HEAD only); (7) PAC fetch/evaluation failures now fall back to a direct connection on
+      macOS (item "PAC unusable: direct fallback"): confirm on the Mac.
 - [ ] **macOS input follow-ups (swallowed keys).** [CODE] Done: late keys pass through (ed2d9fe65c),
       AXValue read once per burst (34765cde7c), no error window for a lease failure that recovered
       within 60 s (fcf4af85dc), `key_*` counters in the diagnostics (6f2daed2e5). Lease token reuse
