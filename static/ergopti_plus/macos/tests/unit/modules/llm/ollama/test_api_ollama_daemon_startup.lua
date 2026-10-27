@@ -252,7 +252,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 				local storage = require("adapters.storage")
 				local read_setting = storage.get
 				storage.get = function(key)
-					if key ~= "llm.ollama_port" then return read_setting(key) end
+					if key ~= "llm.ollama_owned_port" then return read_setting(key) end
 					storage.get = read_setting
 					api.forget_local_models()
 					if replacement then

@@ -139,11 +139,6 @@ const EXCEPTIONS = [
 		file: 'macos/ui/menu/menu_llm/models_manager_mlx_hf.lua',
 		key: 'mlx.token_missing_body',
 		why: 'the user submitted the HuggingFace login window with no token; only the user has the token, and the login row asks again'
-	},
-	{
-		file: 'macos/ui/menu/menu_llm/runtime_install_offer.lua',
-		key: 'ollama.runtime_missing_body',
-		why: 'the user just declined the Ollama download in the offer dialog; posting it again as a click would override that answer'
 	}
 ];
 
