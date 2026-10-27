@@ -810,7 +810,7 @@ Test("Ollama live fixture: completed native owner starts from exit zero (ollama-
 
 ; Real public streaming admission is independent from the provider HTTP status.
 ; The peer and curl are actual native processes; only launch observation is added.
-_OllamaStream_HttpStatus(Status, ExpectedSuccess) {
+_OllamaStream_HttpStatus(Status, ExpectedSuccess, BodyKind) {
 	global _LLM_Ollama_ActiveStreams, _LLM_Ollama_IsReady, _LLM_ManagedBootstrap, LLM_OLLAMA_BASE_URL
 	Saved := Map("streams", _LLM_Ollama_ActiveStreams, "ready", _LLM_Ollama_IsReady,
 		"bootstrap", _LLM_ManagedBootstrap, "origin", LLM_OLLAMA_BASE_URL)
@@ -826,7 +826,7 @@ _OllamaStream_HttpStatus(Status, ExpectedSuccess) {
 		Peer := TestDirectory . "\..\..\..\..\fixtures\ollama_stream_http_peer.ahk"
 		AssertTrue(FileExist(Peer), "the actual loopback peer fixture must exist")
 		Command := _SR_BuildDirectCommandLine(A_AhkPath,
-			["/ErrorStdOut", Peer, PortPath, RecordPath, String(Status), "done"])
+			["/ErrorStdOut", Peer, PortPath, RecordPath, String(Status), BodyKind])
 		PeerPid := 0
 		_LLM_CurlArtifactRun(Command, Directory, "Hide", &PeerPid, &PeerOwner)
 		Started := A_TickCount
@@ -896,11 +896,11 @@ _OllamaStream_HttpStatus(Status, ExpectedSuccess) {
 		FileAppend(Format("RECEIPT stream-http status={1} native_exit={2} partials={3} successes={4} failures={5}`n",
 			Status, ExitCode, State["partials"], State["successes"], State["failures"]), "*")
 		AssertEqual(ExpectedSuccess ? 1 : 0, State["partials"],
-			"HTTP refusal must withhold provider bytes from every partial callback")
+			"rejected responses must withhold provider bytes from every partial callback")
 		AssertEqual(ExpectedSuccess ? 1 : 0, State["successes"],
-			"a done frame cannot authorize streaming success after an HTTP failure")
+			"a rejected response cannot authorize streaming success")
 		AssertEqual(ExpectedSuccess ? 0 : 1, State["failures"],
-			"an unsuccessful HTTP response must settle the failure callback exactly once")
+			"a rejected response must settle the failure callback exactly once")
 		if ExpectedSuccess
 			AssertEqual("native HTTP answer", State["text"], "the successful HTTP control delivers the actual provider bytes")
 	} finally {
@@ -972,7 +972,7 @@ for _OllamaHttpVector in [[200, true], [201, true], [299, true], [302, false], [
 	[401, false], [404, false], [429, false], [500, false], [503, false]]
 	Test("Ollama public stream: HTTP" . _OllamaHttpVector[1] . " complete response admission (ollama-stream-http-admission)",
 		_OllamaStream_WithBootTimings.Bind(
-			_OllamaStream_HttpStatus.Bind(_OllamaHttpVector[1], _OllamaHttpVector[2])))
+			_OllamaStream_HttpStatus.Bind(_OllamaHttpVector[1], _OllamaHttpVector[2], "done")))
 
 ; Partial/interim headers are not a final response; invalid I/O stays distinct
 ; from a file that curl has not created. Every image lives in a private folder.
@@ -1128,3 +1128,43 @@ for _OllamaHeaderBoundary in [[false, false], [false, true], [true, false], [tru
 		_OllamaStream_HttpHeaderCancellation.Bind(_OllamaHeaderBoundary[1], _OllamaHeaderBoundary[2]))
 
 #Include %A_LineFile%/../test_llm_api_ollama_http_recovery.ahk
+
+; A terminal frame closes generation, including records in the same transport slice.
+_OllamaStream_AfterDone(Mode, Invalid) {
+	State := Map("acc", "")
+	Events := Map("partials", 0, "text", "")
+	Final := '{"message":{"content":"answer"},"done":true}' . "`n"
+	Later := '{"message":{"content":"unadmitted"},"done":false}' . "`n"
+	Observe := (Text) => (Events["partials"] += 1, Events["text"] := Text)
+	if Mode == "same-slice"
+		_LLM_Ollama_ConsumeStreamChunk(Final . Later, State, Observe)
+	else if Mode == "later-slice" {
+		_LLM_Ollama_ConsumeStreamChunk(Final, State, Observe)
+		AssertEqual(1, Events["partials"], "the first genuine final frame was actually consumed")
+		_LLM_Ollama_ConsumeStreamChunk(Later, State, Observe)
+	} else if Mode == "second-final"
+		_LLM_Ollama_ConsumeStreamChunk(Final . Final, State, Observe)
+	else if Mode == "blank-tail"
+		_LLM_Ollama_ConsumeStreamChunk(Final . "`n`r`n", State, Observe)
+	else if Mode == "false-then-true"
+		_LLM_Ollama_ConsumeStreamChunk('{"message":{"content":"first "},"done":false}' . "`n" . Final, State, Observe)
+	else if Mode == "empty-terminal"
+		_LLM_Ollama_ConsumeStreamChunk('{"message":{"content":"answer"},"done":false}' . "`n"
+			. '{"message":{"content":""},"done":true}' . "`n", State, Observe)
+	else
+		_LLM_Ollama_ConsumeStreamChunk(Final, State, Observe)
+	Result := _LLM_Ollama_StreamTerminalResult(State)
+	AssertEqual(!Invalid, Result["ok"], "a complete record after the terminal marker fails the stream")
+	AssertFalse(InStr(Events["text"], "unadmitted"), "post-terminal bytes never reach a partial callback")
+	if !Invalid {
+		AssertEqual(Mode == "false-then-true" ? "first answer" : "answer", Result["text"])
+		AssertEqual(1, Events["partials"], "valid complete input still reaches the consumer exactly once")
+	}
+}
+for _OllamaAfterDoneVector in [["same-slice", true], ["later-slice", true], ["second-final", true],
+	["blank-tail", false], ["false-then-true", false], ["empty-terminal", false], ["single-final", false]]
+	Test("Ollama terminal closure: " . _OllamaAfterDoneVector[1] . " (ollama-stream-after-done)",
+		_OllamaStream_AfterDone.Bind(_OllamaAfterDoneVector[1], _OllamaAfterDoneVector[2]))
+
+Test("Ollama public stream: terminal marker closes native HTTP200 response (ollama-stream-after-done-native)",
+	_OllamaStream_WithBootTimings.Bind(_OllamaStream_HttpStatus.Bind(200, false, "after-done")))

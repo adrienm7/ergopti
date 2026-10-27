@@ -88,10 +88,12 @@ _R7HS_Main() {
 		throw Error("The private service requires ready path, transcript path, status and body kind.")
 	ReadyPath := A_Args[1], Transcript := A_Args[2], ChatStatus := Integer(A_Args[3])
 	BodyKind := A_Args[4]
-	if BodyKind != "done" && BodyKind != "matching" && BodyKind != "foreign" && BodyKind != "private"
+	if BodyKind != "done" && BodyKind != "matching" && BodyKind != "foreign" && BodyKind != "private" && BodyKind != "after-done"
 		throw Error("The private service refused an unknown response body kind.")
-	if BodyKind != "done" && ChatStatus != 404
+	if BodyKind != "done" && BodyKind != "after-done" && ChatStatus != 404
 		throw Error("Missing-model response controls require HTTP404.")
+	if BodyKind == "after-done" && ChatStatus != 200
+		throw Error("The terminal-closure control requires HTTP200.")
 	AllowedStatuses := Map(200, true, 201, true, 299, true, 302, true, 400, true,
 		401, true, 404, true, 429, true, 500, true, 503, true)
 	if !AllowedStatuses.Has(ChatStatus)
@@ -155,7 +157,9 @@ _R7HS_Main() {
 				} else if Request["method"] == "POST" && Request["path"] == "/api/chat" {
 					Status := ChatStatus
 					Body := '{"message":{"content":"native HTTP answer"},"done":true}' . "`n"
-					if BodyKind != "done" {
+					if BodyKind == "after-done"
+						Body .= '{"message":{"content":"unadmitted"},"done":false}' . "`n"
+					else if BodyKind != "done" {
 						ProviderModel := BodyKind == "matching" ? "fixture-model:latest"
 							: BodyKind == "foreign" ? "foreign:latest" : "SCREEN_PRIVATE_MODEL_ECHO"
 						Body := '{"error":"model ' . Chr(39) . ProviderModel . Chr(39) . ' not found"}'

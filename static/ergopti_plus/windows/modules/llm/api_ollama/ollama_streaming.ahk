@@ -1343,6 +1343,11 @@ _LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial) {
 	for _, line in lines {
 		if (line == "")
 			continue
+		if state.Get("done", false) {
+			state["failed"] := true
+			state["stream_error"] := "Ollama returned a record after its terminal marker."
+			break
+		}
 		Parsed := _LLM_Ollama_ParseStreamLine(line)
 		if !Parsed["ok"] {
 			state["failed"] := true
