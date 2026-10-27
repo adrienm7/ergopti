@@ -64,13 +64,13 @@
 		"static/ergopti_plus/windows/tests/unit/test_config_scope_manifest.ahk": "c04ff2f791d9073b05571bb01308a0442156a63217de04058de5244cbb0d886f",
 		"static/ergopti_plus/windows/tests/unit/test_updater.ahk": "01662ae4e36fbcd5981dc19363d241b068d1dbb70999e8fac03852b69fedbf4d",
 		"static/ergopti_plus/windows/tests/unit/updater/test_global_config_admission.ahk": "7b18aa55409e939a0e5a7685f041bf2a7a72867c97cfca2018ceae1eb414a5b1",
-		"tools/test/validate-ahk-suite-manifest.cjs": "9e93ef4fc7b3c27fc8816c9af7d3f1d0a19674f7b97a4390d339dc663546aa61"
+		"tools/test/validate-ahk-suite-manifest.cjs": "e62e82e1c0bbe89ce7d1dc22ceed4e88fbd2458bf77e625e1111cdc342021b2f"
 	},
 	"original_label_oracle_sha256": "2b00c32567273c9e671b3460fe54b52059032b0188f10103076523d58b59eb01",
 	"diagnostic_only": true,
 	"private_cost_fixture_admitted": false,
 	"role": "candidate",
-	"source_pin_base": "cc1c4863904599ab1869e6cf7aa9d4883d9e4404",
+	"source_pin_base": "7aa97f0bfdd08fcfcbb87e262e575f1375b3f97e",
 	"runtime_qualification": "UNRUN",
 	"source_authority": "Pins are data; actual HEAD/Git object/API/artifact receiving remains independently required."
 }
