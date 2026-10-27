@@ -119,6 +119,99 @@ try {
 }
 passed++;
 
+// 1b. The image uses the recipient's glibc AND loader: an executable must ask for
+// the standard loader, and no copy of the C library or its loader may be staged.
+{
+	assert.equal(Ceiling.STANDARD_INTERPRETER, '/lib64/ld-linux-x86-64.so.2');
+	assert.equal(
+		Ceiling.parseInterpreter(
+			'      [Requesting program interpreter: /nix/store/abc-glibc/lib/ld-linux-x86-64.so.2]'
+		),
+		'/nix/store/abc-glibc/lib/ld-linux-x86-64.so.2'
+	);
+	assert.equal(Ceiling.parseInterpreter('There is no dynamic section in this file.'), null);
+	for (const name of [
+		'libc.so.6',
+		'libm.so.6',
+		'libpthread.so.0',
+		'ld-linux-x86-64.so.2',
+		'libnss_dns.so.2',
+		'ld-musl-x86_64.so.1'
+	]) {
+		assert.ok(Ceiling.isHostLibcFile(name), `${name} is the recipient's, never staged`);
+	}
+	for (const name of [
+		'libluv.so.1',
+		'libcurl.so.4',
+		'libayatana-appindicator3.so.1',
+		'libcrypt.so.1'
+	]) {
+		assert.ok(!Ceiling.isHostLibcFile(name), `${name} may be staged`);
+	}
+	const tree = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-loader-'));
+	try {
+		const elf = Buffer.concat([Buffer.from([0x7f, 0x45, 0x4c, 0x46]), Buffer.alloc(16)]);
+		fs.mkdirSync(path.join(tree, 'usr/bin'), { recursive: true });
+		fs.mkdirSync(path.join(tree, 'usr/lib'), { recursive: true });
+		fs.writeFileSync(path.join(tree, 'usr/bin/luajit'), elf);
+		fs.writeFileSync(path.join(tree, 'usr/bin/helper'), elf);
+		fs.writeFileSync(path.join(tree, 'usr/lib/libluv.so.1'), elf);
+		const noNeeds = () => '';
+		const loaders = {
+			luajit: Ceiling.STANDARD_INTERPRETER,
+			helper: '/lib/ld-musl-x86_64.so.1',
+			'libluv.so.1': null
+		};
+		const readInterpreter = (file) => loaders[path.basename(file)];
+		let result = Ceiling.checkTree([tree], noNeeds, readInterpreter);
+		assert.deepEqual(
+			result.loaders.map((loader) => [path.basename(loader.path), loader.interpreter]),
+			[['helper', '/lib/ld-musl-x86_64.so.1']],
+			'a musl loader is refused, a library without one is not'
+		);
+		loaders.helper = '/nix/store/xyz/lib/ld-linux-x86-64.so.2';
+		assert.equal(
+			Ceiling.checkTree([tree], noNeeds, readInterpreter).loaders.length,
+			1,
+			'a Nix loader is refused'
+		);
+		loaders.helper = Ceiling.STANDARD_INTERPRETER;
+		result = Ceiling.checkTree([tree], noNeeds, readInterpreter);
+		assert.deepEqual([result.loaders, result.bundledLibc], [[], []]);
+		assert.equal(
+			Ceiling.checkTree([tree], noNeeds).loaders.length,
+			0,
+			'the loader is only read when asked'
+		);
+		fs.writeFileSync(path.join(tree, 'usr/lib/libc.so.6'), elf);
+		fs.writeFileSync(path.join(tree, 'usr/lib/ld-linux-x86-64.so.2'), elf);
+		assert.deepEqual(
+			Ceiling.checkTree([tree], noNeeds, readInterpreter).bundledLibc.map((file) =>
+				path.basename(file)
+			),
+			['ld-linux-x86-64.so.2', 'libc.so.6'],
+			'a staged C library or loader is refused'
+		);
+	} finally {
+		fs.rmSync(tree, { recursive: true, force: true });
+	}
+	// The plain statement a user reads: the minimum glibc and the musl refusal, in the
+	// docs and in the locale text AppRun prints.
+	const readme = read('static/ergopti_plus/linux/README.md');
+	assert.ok(
+		readme.includes(`**glibc ${Ceiling.GLIBC_CEILING} or newer**`),
+		'the README states the minimum glibc'
+	);
+	assert.ok(
+		/\*\*musl\*\*[\s\S]{0,200}cannot run programs built for\s+glibc/.test(readme),
+		'the README says musl hosts cannot run it'
+	);
+	const english = JSON.parse(read('static/ergopti_plus/_shared/data/locales/en.json'));
+	assert.match(english['startup.linux_appimage_musl_body'], /musl/i);
+	assert.match(english['startup.linux_appimage_musl_body'], /cannot|can't|not/i);
+}
+passed++;
+
 // The packager refuses its own image, and CI builds and launches it in the
 // container of the ceiling's LTS.
 const builder = read('tools/build/build-linux-appimage.sh');
