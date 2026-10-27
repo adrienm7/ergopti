@@ -198,9 +198,12 @@ dev.
   returns no task, so a warmup POST in flight can only be revoked logically; `cancel()` reported
   that as a refusal. It now answers "pending" for that case and the stop commits, as the MLX fix
   877b922d23 does. Mac confirms: no such ERROR when the startup declines the model download.
-- **L22** [CODE][PHYS-M] A granite model pull showed an error at 100% that no log recorded
-  (maintainer report during the field run; no line in any report). Next: log the last status line
-  and error of the Ollama pull stream whenever the pull ends, even at 100%.
+- **L22** Fixed (commit "fix(llm): log every failed Ollama model pull with its cause"). A
+  granite model pull showed an error at 100% that no log recorded (maintainer report during the
+  field run). A non-zero pull exit only posted a notice; it now logs an ERROR with the exit code
+  and the last line the pull printed (the digest or manifest refusal after 100%). A pulled model
+  that does not load, and a pull task that cannot be settled, log an ERROR too. Mac confirms: the
+  next failed pull has one ERROR line naming its cause.
 - **L23** [CODE] "Ignored-window prewarm incomplete; tracking remains fail-closed" (new.txt
   15:28:28, 16:28:04) and 1 s holds from keymap/utils.lua:1426 and :1455 (14:26:05, 15:34:09).
   Next: log which prewarm stage was incomplete and bound the 1 s probe.
