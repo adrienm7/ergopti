@@ -3800,4 +3800,56 @@ assert.equal(
 	'all native app identity, switch direction and refresh controls must execute'
 );
 
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const name of nativeAppIdentityNames) {
+		for (const selection of ['all', 'none']) {
+			test(`${host} native empty icon map keeps ${name} badge in ${selection} scope`, () => {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, '2026-10-27T12:00:00');
+				page.elements.get('app_search').focus = () => {};
+				const manifest = { '2026-10-26': { [name]: { chars: 5, time: 500 } } };
+				publishTypingPage(page, host, manifest);
+				page.context.open_app_modal();
+				if (selection === 'none') page.context.deselect_all_apps();
+				for (const refreshed of [false, true]) {
+					if (refreshed) {
+						page.context.close_app_modal();
+						deliverTypingManifest(page, host, {
+							'2026-10-26': {
+								[name]: { chars: 6, time: 600 },
+								'Other.exe': { chars: 7, time: 700 }
+							}
+						});
+						page.context.open_app_modal();
+					}
+					assert.deepEqual(
+						Object.keys(page.context.window.app_icons),
+						[],
+						'Windows supplies this actual empty icon map'
+					);
+					const html = page.elements.get('app_list').innerHTML;
+					assert.ok(
+						html.includes('class="app-icon-div"'),
+						'absence of a native icon keeps the existing deterministic badge'
+					);
+					assert.equal((html.match(/class="app-icon-div"/g) || []).length, refreshed ? 2 : 1);
+					assert.equal(
+						html.includes('<img '),
+						false,
+						'inherited object members never become native image URLs'
+					);
+					assert.ok(html.includes(`<span class="app-name">${name}</span>`));
+					assert.equal(html.includes(`value="${name}" checked`), selection === 'all');
+					assert.equal(vm.runInContext('app_state.app_selection_mode', page.context), selection);
+				}
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			});
+		}
+	}
+}
+assert.equal(passed, 1074, 'all native-empty-map badge, scope and refresh controls must execute');
+
 console.log(`${passed} passed, 0 failed.`);
