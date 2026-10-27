@@ -1,7 +1,7 @@
--- adapters/prediction_renderer.lua
+-- adapters/prediction_tooltip_port.lua
 
 --- ==============================================================================
---- MODULE: Prediction Renderer Adapter (Hammerspoon)
+--- MODULE: Prediction Tooltip Port Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the TooltipRenderer port of the shared request
 --- plan (_shared/lua/llm/request_plan/ports.lua): show, hide and is_visible over
@@ -37,9 +37,9 @@ local M = {}
 --- @param tooltip table Offers show_predictions, hide and is_visible.
 --- @return table renderer { show(view), hide(), is_visible() }
 function M.wrap(tooltip)
-	if type(tooltip) ~= "table" then error("prediction_renderer.wrap: tooltip must be a table", 2) end
+	if type(tooltip) ~= "table" then error("prediction_tooltip_port.wrap: tooltip must be a table", 2) end
 	if type(tooltip.show_predictions) ~= "function" then
-		error("prediction_renderer.wrap: tooltip lacks show_predictions", 2)
+		error("prediction_tooltip_port.wrap: tooltip lacks show_predictions", 2)
 	end
 	local renderer = {
 		show = function(view)

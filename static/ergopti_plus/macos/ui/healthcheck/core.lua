@@ -370,7 +370,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.prediction_renderer",
+		id       = "adapters.prediction_tooltip_port",
 		contract = { "wrap" },
 		wired    = true,
 	},

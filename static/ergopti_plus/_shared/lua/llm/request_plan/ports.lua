@@ -38,7 +38,7 @@ M.CONTRACTS = {
 	},
 	TooltipRenderer = {
 		show = "show(...) -> boolean: draws the predictions and their info bar. The argument "
-			.. "shape is the driver's: one named view on macOS (adapters/prediction_renderer.lua), "
+			.. "shape is the driver's: one named view on macOS (adapters/prediction_tooltip_port.lua), "
 			.. "(candidates, meta) on the Linux overlay (ui/tooltip/llm.lua).",
 		hide = "hide(): removes the tooltip.",
 	},

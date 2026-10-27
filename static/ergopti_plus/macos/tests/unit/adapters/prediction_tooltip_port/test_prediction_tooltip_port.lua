@@ -1,7 +1,7 @@
---- tests/unit/adapters/prediction_renderer/test_prediction_renderer.lua
+--- tests/unit/adapters/prediction_tooltip_port/test_prediction_tooltip_port.lua
 
 --- ==============================================================================
---- MODULE: Prediction Renderer Adapter (macOS)
+--- MODULE: Prediction Tooltip Port Adapter (macOS)
 --- DESCRIPTION:
 --- The TooltipRenderer port over the prediction tooltip: a named view becomes the
 --- twelve positional arguments of show_predictions, in order, and the tooltip's
@@ -9,9 +9,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Renderer = require("adapters.prediction_renderer")
+local Renderer = require("adapters.prediction_tooltip_port")
 
-helpers.describe("prediction renderer adapter", function()
+helpers.describe("prediction tooltip port adapter", function()
 	helpers.it("spells a view as the positional arguments of show_predictions", function()
 		local seen
 		local tooltip = {

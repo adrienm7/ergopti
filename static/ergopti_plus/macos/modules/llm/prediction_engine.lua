@@ -31,7 +31,7 @@ local PromptBuilder    = require("modules.llm.prompt_builder")
 local StreamingHandler = require("modules.llm.streaming_handler")
 local AppFilter        = require("modules.llm.app_filter")
 local InfoBar = require("llm.request_plan.info_bar")
-local PredictionRenderer = require("adapters.prediction_renderer")
+local PredictionTooltipPort = require("adapters.prediction_tooltip_port")
 local LivePlan = require("llm.request_plan.live")
 local AppProfileOverrides = require("llm.app_profile_overrides")
 local Rewrite          = require("llm.rewrite")
@@ -2497,7 +2497,7 @@ function M.show_answers(session, answers, expected, on_accept, on_dismiss)
 	end
 	local waiting = #answers < expected
 	local shown_ok, shown = xpcall(function()
-		return PredictionRenderer.wrap(tooltip).show({
+		return PredictionTooltipPort.wrap(tooltip).show({
 			predictions = predictions, current_index = 1, enabled = is_ai_preview_enabled,
 			shortcut_modifier = format_validation_shortcut(normalize_mods(validation_mods)),
 			indent = prediction_indent, navigation_modifiers = normalize_mods(navigation_mods),
