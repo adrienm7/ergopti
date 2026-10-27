@@ -87,7 +87,7 @@ local function install(args)
 	package.loaded["infra.dialog_util"] = {
 		text_prompt = function()
 			world.prompt_index = world.prompt_index + 1
-			return "OK", world.prompts[world.prompt_index]
+			return "button.ok", world.prompts[world.prompt_index]
 		end,
 		block_alert = function(_, _, first) return first end,
 	}
