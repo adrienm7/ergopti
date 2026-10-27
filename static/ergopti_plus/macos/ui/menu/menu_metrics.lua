@@ -23,6 +23,7 @@ local M = {}
 local hs = hs
 local fs = require("hs.fs")
 local text_utils = require("infra.text_utils")
+local MetricsState = require("infra.metrics_state_keys")
 
 local AppPickerLib  = require("infra.app_picker")
 local dialog        = require("infra.dialog_util")
@@ -277,13 +278,13 @@ function M.build(ctx)
 		if type(WpmMenubar.set_use_source_colors) == "function" then
 			WpmMenubar.set_use_source_colors(state.keystats_menubar_colors)
 		end
-		sync_wpm_visibility("keystats_menubar_wpm", "WPM menubar", WpmMenubar)
+		sync_wpm_visibility(MetricsState.MENUBAR_WPM, "WPM menubar", WpmMenubar)
 
 		local WpmWidget = require("ui.wpm.wpm_widget")
 		if type(WpmWidget.set_use_source_colors) == "function" then
 			WpmWidget.set_use_source_colors(state.keystats_float_colors)
 		end
-		sync_wpm_visibility("keystats_float_wpm", "WPM widget", WpmWidget,
+		sync_wpm_visibility(MetricsState.FLOAT_WPM, "WPM widget", WpmWidget,
 			state.keystats_float_graph)
 	end
 
@@ -351,21 +352,21 @@ function M.build(ctx)
 	--- Flips the private filter. The ROW is built by the shared renderer from
 	--- the manifest (`type = "check"`); this is only what the row DOES.
 	local function cmd_filter_private()
-		return toggle_metrics_filter("keystats_private_filter_enabled",
+		return toggle_metrics_filter(MetricsState.PRIVATE_FILTER_ENABLED,
 			"set_private_filter_enabled", "Private filter")
 	end
 
 	--- Flips the secure filter. The ROW is built by the shared renderer from
 	--- the manifest (`type = "check"`); this is only what the row DOES.
 	local function cmd_filter_secure()
-		return toggle_metrics_filter("keystats_secure_filter_enabled",
+		return toggle_metrics_filter(MetricsState.SECURE_FILTER_ENABLED,
 			"set_secure_field_filter_enabled", "Secure-field filter")
 	end
 
 	--- Flips the sysauth filter. The ROW is built by the shared renderer from
 	--- the manifest (`type = "check"`); this is only what the row DOES.
 	local function cmd_filter_sysauth()
-		return toggle_metrics_filter("keystats_system_auth_filter_enabled",
+		return toggle_metrics_filter(MetricsState.SYSTEM_AUTH_FILTER_ENABLED,
 			"set_system_auth_filter_enabled", "System-auth filter")
 	end
 
@@ -402,7 +403,7 @@ function M.build(ctx)
 		if type(WpmMenubar.set_use_source_colors) == "function" then
 			WpmMenubar.set_use_source_colors(state.keystats_menubar_colors)
 		end
-		return toggle_wpm_visibility("keystats_menubar_wpm", "WPM menubar", WpmMenubar)
+		return toggle_wpm_visibility(MetricsState.MENUBAR_WPM, "WPM menubar", WpmMenubar)
 	end
 
 	local function cmd_menubar_colors()
@@ -416,7 +417,7 @@ function M.build(ctx)
 		-- item that is not there would start it as a side effect.
 		if state.keystats_menubar_wpm and not paused_now()
 			and not call_wpm_lifecycle("WPM menubar", WpmMenubar, "start") then
-			compensate_rejected_wpm_start("keystats_menubar_wpm", "WPM menubar")
+			compensate_rejected_wpm_start(MetricsState.MENUBAR_WPM, "WPM menubar")
 		end
 		updateMenu()
 	end
@@ -426,7 +427,7 @@ function M.build(ctx)
 		if type(WpmWidget.set_use_source_colors) == "function" then
 			WpmWidget.set_use_source_colors(state.keystats_float_colors)
 		end
-		return toggle_wpm_visibility("keystats_float_wpm", "WPM widget", WpmWidget,
+		return toggle_wpm_visibility(MetricsState.FLOAT_WPM, "WPM widget", WpmWidget,
 			state.keystats_float_graph)
 	end
 
@@ -440,7 +441,7 @@ function M.build(ctx)
 		if state.keystats_float_wpm and not paused_now()
 			and not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
 				state.keystats_float_graph) then
-			compensate_rejected_wpm_start("keystats_float_wpm", "WPM widget")
+			compensate_rejected_wpm_start(MetricsState.FLOAT_WPM, "WPM widget")
 		end
 		updateMenu()
 	end
@@ -455,7 +456,7 @@ function M.build(ctx)
 		if state.keystats_float_wpm and not paused_now()
 			and not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
 				state.keystats_float_graph) then
-			compensate_rejected_wpm_start("keystats_float_wpm", "WPM widget")
+			compensate_rejected_wpm_start(MetricsState.FLOAT_WPM, "WPM widget")
 		end
 		updateMenu()
 	end
@@ -587,14 +588,14 @@ function M.build(ctx)
 			local wpm_committed = true
 			if state.keystats_menubar_wpm and not paused_now() then
 				if not call_wpm_lifecycle("WPM menubar", WpmMenubar, "start") then
-					compensate_rejected_wpm_start("keystats_menubar_wpm", "WPM menubar")
+					compensate_rejected_wpm_start(MetricsState.MENUBAR_WPM, "WPM menubar")
 					wpm_committed = false
 				end
 			end
 			if state.keystats_float_wpm and not paused_now() then
 				if not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
 					state.keystats_float_graph) then
-					compensate_rejected_wpm_start("keystats_float_wpm", "WPM widget")
+					compensate_rejected_wpm_start(MetricsState.FLOAT_WPM, "WPM widget")
 					wpm_committed = false
 				end
 			end

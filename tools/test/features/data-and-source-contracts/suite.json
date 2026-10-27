@@ -569,6 +569,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-file-system-port-wired.cjs"],
 			"repro": "npm run test:file-system-port-wired"
+		},
+		{
+			"id": "js-linux-shell-messages",
+			"ordinal": 519,
+			"name": "Linux shell messages (catalogue reader contract and every printed key in the generated catalogue)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-linux-shell-messages.cjs"],
+			"repro": "npm run test:linux-shell-messages"
 		}
 	]
 }

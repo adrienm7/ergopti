@@ -6412,11 +6412,59 @@ function numberRowGetterSource(source) {
 			'symbol:,',
 			'identifier:render_ctx',
 			'symbol:.',
-			'identifier:commands',
-			'symbol:)'
+			'identifier:commands'
 		])
 	)
 		return '';
+	const callTail = (tail) =>
+		contains(source, [
+			'identifier:NumberRowPolicy',
+			'symbol:.',
+			'identifier:native_rows',
+			'symbol:(',
+			'identifier:ManifestMenu',
+			'symbol:,',
+			'identifier:render_ctx',
+			'symbol:.',
+			'identifier:commands',
+			...tail
+		]);
+	// A driver that applies the rows live (Linux) passes its owner as a third
+	// argument; the shared policy then answers the choice from that owner's getter.
+	if (callTail(['symbol:,', 'symbol:{'])) {
+		const shared = fs.readFileSync(
+			path.join(SP, '_shared/lua/layout/number_row_policy.lua'),
+			'utf8'
+		);
+		if (
+			!contains(source, ['identifier:get_order', 'symbol:=', 'identifier:function']) ||
+			!contains(shared, [
+				'identifier:return',
+				'identifier:M',
+				'symbol:.',
+				'identifier:live_rows',
+				'symbol:(',
+				'identifier:renderer',
+				'symbol:,',
+				'identifier:choices',
+				'symbol:,',
+				'identifier:live',
+				'symbol:)'
+			]) ||
+			!contains(shared, [
+				'symbol:[',
+				'string:layout.direct_access_digits',
+				'symbol:]',
+				'symbol:=',
+				'identifier:live',
+				'symbol:.',
+				'identifier:get_order'
+			])
+		)
+			return '';
+		return shared;
+	}
+	if (!callTail(['symbol:)'])) return '';
 	if (
 		!contains(source, [
 			'identifier:render_ctx',
@@ -6449,6 +6497,8 @@ function numberRowGetterSource(source) {
 			'identifier:renderer',
 			'symbol:,',
 			'identifier:commands',
+			'symbol:,',
+			'identifier:live',
 			'symbol:)'
 		]) ||
 		!contains(sharedSource, [
@@ -6508,6 +6558,23 @@ function numberRowGetterSource(source) {
 			numberRowGetterSource(source),
 			'',
 			'a missing actual shared port cannot borrow its getter'
+		);
+	}
+	// The live provider borrows the shared getter only with its own get_order.
+	const live = 'NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands, {';
+	assert(
+		numberRowGetterSource(
+			binding + '\n' + live + ' get_order = function() return 1 end })'
+		).includes('layout.direct_access_digits')
+	);
+	for (const source of [
+		live + ' get_order = function() return 1 end })',
+		binding + '\n' + live + ' })'
+	]) {
+		assert.equal(
+			numberRowGetterSource(source),
+			'',
+			'a live provider without its owner borrows nothing'
 		);
 	}
 }
@@ -7669,14 +7736,14 @@ function languageParentSource(source, driver) {
 			assert(
 				hasStatement(
 					native,
-					'sync_wpm_visibility("keystats_menubar_wpm", "WPM menubar", WpmMenubar)',
+					'sync_wpm_visibility(MetricsState.MENUBAR_WPM, "WPM menubar", WpmMenubar)',
 					1
 				)
 			);
 			assert(
 				hasStatement(
 					native,
-					'sync_wpm_visibility("keystats_float_wpm", "WPM widget", WpmWidget, state.keystats_float_graph)',
+					'sync_wpm_visibility(MetricsState.FLOAT_WPM, "WPM widget", WpmWidget, state.keystats_float_graph)',
 					1
 				)
 			);

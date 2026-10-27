@@ -4,7 +4,7 @@
 --- MODULE: Regression — ApiOllama readiness is reset on backend / model switch
 --- DESCRIPTION:
 --- Audit finding F-M8. ApiOllama._is_ready was only ever set true by a 200 warmup
---- and never reset. A backend round-trip (MLX kills `ollama serve`, then back to
+--- and never reset. A backend round-trip (MLX retires the owned `ollama serve`, then back to
 --- Ollama) or a model switch left it stale-true, so the warmup retry chain
 --- self-terminated ("backend already ready") and perform_check dispatched to a
 --- cold/dead server with no automatic recovery. Unlike ApiMlx (reset_endpoints)
@@ -128,7 +128,7 @@ helpers.describe("ApiOllama — a stale warmup 200 must not resurrect readiness"
 		ApiOllama.warmup("model-a")
 
 		-- The user switches backend to MLX and back: core_llm.set_backend calls
-		-- reset_ready() on both transitions, and the MLX detour kills `ollama serve`
+		-- reset_ready() on both transitions, and the MLX detour retires the owned `ollama serve`
 		ApiOllama.reset_ready()
 
 		-- Only now does model-a's POST resolve — against a server that was killed

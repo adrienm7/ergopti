@@ -16,6 +16,19 @@ helpers.describe("Remote provider error envelopes (macOS)", function()
 	helpers.it("executes every independent Lua response vector", function()
 		helpers.assert_eq(#contract.vectors, 23)
 	end)
+	helpers.it("keeps the full error-envelope matrix for every completion format", function()
+		helpers.assert_eq(table.concat(contract.shape_gaps(contract.vectors), ", "), "")
+		-- Mutation control: dropping one vector or reusing a healthy body as an
+		-- error case leaves a named gap.
+		local without_null, relabelled = {}, {}
+		for _, vector in ipairs(contract.vectors) do
+			if vector.name ~= "openai top-level null error" then without_null[#without_null + 1] = vector end
+			relabelled[#relabelled + 1] = vector.name == "gemini healthy retry"
+				and { name = vector.name, format = vector.format, body = vector.body } or vector
+		end
+		helpers.assert_eq(table.concat(contract.shape_gaps(without_null), ", "), "openai error:null")
+		helpers.assert_eq(table.concat(contract.shape_gaps(relabelled), ", "), "gemini healthy")
+	end)
 	for _, vector in ipairs(contract.vectors) do
 		helpers.it("provider response: " .. vector.name, function()
 			helpers.assert_eq(Classifier.classify(vector.format, vector.body).text, vector.expected or "",

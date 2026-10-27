@@ -57,6 +57,27 @@ else
 	DRIVERS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
 fi
 
+# The sentences this script prints, in the user's language (install/messages.sh).
+# shellcheck source=install/messages.sh
+source "${SRC_DRIVER}/install/messages.sh"
+
+# Prints a section title between its bars.
+# @param $1 Message name, then its arguments.
+_section() {
+	local title
+	title="$(ergopti_text "$@")" || return 2
+	printf '=== %s ===\n' "$title"
+}
+
+# Prints one option line of --help: the option in its column, then its message.
+# @param $1 Option as typed.
+# @param $2 Message name.
+_help_option() {
+	local column
+	column="$(printf '  %-18s' "$1")"
+	ergopti_msg_with "$column" "$2"
+}
+
 ERGOPTI_VERSION="$(
 	node -p "require('$(cd "${SCRIPT_DIR}/../../.." && pwd -P)/package.json').version" 2>/dev/null \
 	|| echo "dev"
@@ -88,20 +109,18 @@ while [[ $# -gt 0 ]]; do
 			shift 2
 			;;
 		--help|-h)
-			cat << 'HELP'
-Utilisation : bash install.sh [OPTIONS]
-
-Options :
-  --no-service      Ne crée pas le service systemd utilisateur
-  --no-deps         N'installe aucune dépendance (à votre charge)
-  --setup-perms     Configure uniquement les permissions (udev, groupes, module)
-  --prefix <dir>    Répertoire de base (défaut : ~/.local)
-  --help            Affiche ce message d'aide
-HELP
+			ergopti_msg install.help_usage
+			echo ""
+			ergopti_msg install.help_options
+			_help_option --no-service install.help_no_service
+			_help_option --no-deps install.help_no_deps
+			_help_option --setup-perms install.help_setup_perms
+			_help_option "--prefix <dir>" install.help_prefix
+			_help_option --help install.help_help
 			exit 0
 			;;
 		*)
-			echo "Option inconnue : $1" >&2
+			ergopti_msg install.unknown_option "$1" >&2
 			exit 1
 			;;
 	esac
@@ -185,13 +204,10 @@ _detect_pkg_manager() {
 
 _setup_permissions() {
 	echo ""
-	echo "=== Permissions d'entrée (nécessite sudo) ==="
+	_section install.section_permissions
 	echo ""
-	echo "  ⚠  AVERTISSEMENT DE SÉCURITÉ"
-	echo "     Appartenir au groupe « input » permet de lire TOUTES les frappes"
-	echo "     clavier de la session, y compris les mots de passe saisis dans"
-	echo "     n'importe quelle application. C'est ce qu'exige un moteur de"
-	echo "     hotstrings, et c'est ce que font keyd et xremap."
+	ergopti_msg_with "  ⚠  " install.security_warning_title
+	ergopti_msg_with "     " install.security_warning_body
 	echo ""
 
 	local target_uid
@@ -204,9 +220,7 @@ _setup_permissions() {
 		pkexec /bin/bash "${SRC_DRIVER}/install/setup_permissions.sh" --user "$target_uid"
 	fi
 	echo ""
-	echo "  ⚠  Déconnectez-vous et reconnectez-vous pour que les groupes"
-	echo "     prennent effet — l'appartenance à un groupe n'est lue qu'à"
-	echo "     l'ouverture de session."
+	ergopti_msg_with "  ⚠  " install.relogin_notice
 }
 
 if $SETUP_PERMS_ONLY; then
@@ -414,7 +428,7 @@ _check_or_install() {
 	local cmd="$1"
 
 	if command -v "$cmd" >/dev/null 2>&1; then
-		echo "  ✔  ${cmd} — déjà installé"
+		ergopti_msg_with "  ✔  " install.already_installed "${cmd}"
 		return 0
 	fi
 
@@ -422,46 +436,46 @@ _check_or_install() {
 	local package_name
 	pkg_mgr="$(_detect_pkg_manager)"
 	if ! package_name="$(_required_dependency_package "${pkg_mgr}" "${cmd}")"; then
-		echo "  ✗  Aucun paquet ${pkg_mgr} déclaré pour la dépendance '${cmd}'." >&2
-		echo "     Installez-la manuellement, puis relancez avec --no-deps." >&2
+		ergopti_msg_with "  ✗  " install.no_package_for_command "${pkg_mgr}" "${cmd}" >&2
+		ergopti_msg_with "     " install.install_manually_hint >&2
 		return 1
 	fi
 
-	echo "  →  ${cmd} manquant — installation de ${package_name}…"
+	ergopti_msg_with "  →  " install.installing_missing "${cmd}" "${package_name}"
 	_install_required_package "${pkg_mgr}" "${package_name}"
 	if ! command -v "$cmd" >/dev/null 2>&1; then
-		echo "  ✗  ${package_name} a été installé, mais '${cmd}' reste introuvable." >&2
+		ergopti_msg_with "  ✗  " install.command_still_missing "${package_name}" "${cmd}" >&2
 		return 1
 	fi
-	echo "  ✔  ${cmd} — capacité vérifiée"
+	ergopti_msg_with "  ✔  " install.capability_verified "${cmd}"
 }
 
 _check_or_install_library() {
 	local soname="$1"
 	if luajit -e "local ffi=require('ffi'); ffi.load('${soname}')" >/dev/null 2>&1; then
-		echo "  ✔  ${soname} — déjà installé"
+		ergopti_msg_with "  ✔  " install.already_installed "${soname}"
 		return 0
 	fi
 	local pkg_mgr
 	local package_name
 	pkg_mgr="$(_detect_pkg_manager)"
 	if ! package_name="$(_required_dependency_package "${pkg_mgr}" "${soname}")"; then
-		echo "  ✗  Aucun paquet ${pkg_mgr} déclaré pour la bibliothèque '${soname}'." >&2
+		ergopti_msg_with "  ✗  " install.no_package_for_library "${pkg_mgr}" "${soname}" >&2
 		return 1
 	fi
-	echo "  →  ${soname} manquant — installation de ${package_name}…"
+	ergopti_msg_with "  →  " install.installing_missing "${soname}" "${package_name}"
 	_install_required_package "${pkg_mgr}" "${package_name}"
 	if ! luajit -e "local ffi=require('ffi'); ffi.load('${soname}')" >/dev/null 2>&1; then
-		echo "  ✗  ${package_name} a été installé, mais '${soname}' reste indisponible." >&2
+		ergopti_msg_with "  ✗  " install.library_still_missing "${package_name}" "${soname}" >&2
 		return 1
 	fi
-	echo "  ✔  ${soname} — capacité vérifiée"
+	ergopti_msg_with "  ✔  " install.capability_verified "${soname}"
 }
 
 _native_output_ordinary_directory() {
 	local directory="$1"
 	if [ -L "$directory" ] || { [ -e "$directory" ] && [ ! -d "$directory" ]; }; then
-		echo "Native archive bin parent unavailable" >&2
+		ergopti_msg install.native_bin_parent_unavailable >&2
 		return 1
 	fi
 }
@@ -470,7 +484,7 @@ _native_output_bin_parents() {
 	# This namespace belongs to installed source-build output, never an ad hoc
 	# checkout artifact or an unreviewed release input.
 	if [ -e "${SRC_DRIVER}/native_modules" ] || [ -L "${SRC_DRIVER}/native_modules" ]; then
-		echo "Unreviewed source native module directory" >&2
+		ergopti_msg install.unreviewed_native_modules >&2
 		return 1
 	fi
 	_native_output_ordinary_directory "${SRC_DRIVER}/bin" \
@@ -533,7 +547,7 @@ _prepare_source_network_runtime() {
 	NATIVE_LUV_STAGE="$(mktemp -d)"
 	if ! bash "$builder" "$NATIVE_LUV_STAGE" "$NATIVE_LUV_SOURCE_URL" \
 		"$NATIVE_LUV_SOURCE_REVISION" "${NATIVE_LUV_CMAKE_OPTIONS[@]}"; then
-		echo "Source network build refused; stage retained: $NATIVE_LUV_STAGE" >&2
+		ergopti_msg install.network_build_refused "$NATIVE_LUV_STAGE" >&2
 		return 1
 	fi
 	[ -f "$NATIVE_LUV_STAGE/luv.so" ] && [ ! -L "$NATIVE_LUV_STAGE/luv.so" ] || return 1
@@ -553,7 +567,7 @@ _ensure_network_runtime() {
 	local packages
 	manager="$(_detect_pkg_manager)"
 	if ! packages="$(_network_runtime_packages "${manager}")"; then
-		echo "proxy-backend-unavailable: no verified ${manager} runtime provider; install the documented prerequisites." >&2
+		ergopti_msg_with "proxy-backend-unavailable: " install.proxy_no_provider "${manager}" >&2
 		return 1
 	fi
 	local package_name
@@ -561,17 +575,17 @@ _ensure_network_runtime() {
 		if ! _install_required_package "${manager}" "${package_name}"; then return 1; fi
 	done
 	if ! _network_runtime_available; then
-		echo "proxy-backend-unavailable: installed packages did not provide the required native runtime." >&2
+		ergopti_msg_with "proxy-backend-unavailable: " install.proxy_runtime_missing >&2
 		return 1
 	fi
 }
 
 if $SKIP_DEPS; then
 	echo ""
-	echo "=== Dépendances ignorées (--no-deps) ==="
+	_section install.section_deps_skipped
 else
 echo ""
-echo "=== Ergopti ${ERGOPTI_VERSION} — vérification des dépendances ==="
+_section install.section_dependency_check "${ERGOPTI_VERSION}"
 # ydotool is deliberately absent from this list. The daemon writes to
 # /dev/uinput itself; ydotool assumed a US layout, needed a root daemon, and
 # forked once per event, which is what made the keyboard grab unaffordable.
@@ -609,22 +623,22 @@ _ensure_desktop_backend() {
 	local label="$2"
 	local probe="$3"
 	if luajit -e "${probe}" >/dev/null 2>&1; then
-		echo "  ✔  ${label} — déjà installé"
+		ergopti_msg_with "  ✔  " install.already_installed "${label}"
 		return 0
 	fi
 	local pkg_mgr
 	local package_name
 	pkg_mgr="$(_detect_pkg_manager)"
 	if ! package_name="$(_required_dependency_package "${pkg_mgr}" "${capability}")"; then
-		echo "  ⚠  ${label} : aucun paquet ${pkg_mgr} connu — à installer manuellement." >&2
+		ergopti_msg_with "  ⚠  " install.no_known_package "${label}" "${pkg_mgr}" >&2
 		return 0
 	fi
-	echo "  →  ${label} manquant — installation de ${package_name}…"
+	ergopti_msg_with "  →  " install.installing_missing "${label}" "${package_name}"
 	_install_required_package "${pkg_mgr}" "${package_name}" || true
 	if luajit -e "${probe}" >/dev/null 2>&1; then
-		echo "  ✔  ${label} — capacité vérifiée"
+		ergopti_msg_with "  ✔  " install.capability_verified "${label}"
 	else
-		echo "  ⚠  ${label} indisponible après installation de ${package_name}." >&2
+		ergopti_msg_with "  ⚠  " install.unavailable_after_install "${label}" "${package_name}" >&2
 	fi
 }
 
@@ -640,11 +654,11 @@ _ensure_gnome_tray_host() {
 		*) return 0 ;;
 	esac
 	if ! command -v gnome-extensions >/dev/null 2>&1; then
-		echo "  ⚠  GNOME sans gnome-extensions — activez une extension AppIndicator pour voir l'icône." >&2
+		ergopti_msg_with "  ⚠  " install.gnome_without_extensions >&2
 		return 0
 	fi
 	if gnome-extensions list --enabled 2>/dev/null | grep -qi "appindicator"; then
-		echo "  ✔  extension GNOME AppIndicator — déjà active"
+		ergopti_msg_with "  ✔  " install.gnome_extension_active
 		return 0
 	fi
 	local pkg_mgr
@@ -652,11 +666,11 @@ _ensure_gnome_tray_host() {
 	pkg_mgr="$(_detect_pkg_manager)"
 	if ! gnome-extensions list 2>/dev/null | grep -qx "${GNOME_TRAY_EXTENSION}" \
 		&& package_name="$(_required_dependency_package "${pkg_mgr}" gnome-tray)"; then
-		echo "  →  extension GNOME AppIndicator manquante — installation de ${package_name}…"
+		ergopti_msg_with "  →  " install.gnome_extension_missing "${package_name}"
 		_install_required_package "${pkg_mgr}" "${package_name}" || true
 	fi
 	if gnome-extensions enable "${GNOME_TRAY_EXTENSION}" 2>/dev/null; then
-		echo "  ✔  extension GNOME AppIndicator activée"
+		ergopti_msg_with "  ✔  " install.gnome_extension_enabled
 		return 0
 	fi
 	# A package installed during this session is unknown to the running shell,
@@ -671,23 +685,23 @@ _ensure_gnome_tray_host() {
 			*) enabled="${enabled%]}, '${GNOME_TRAY_EXTENSION}']" ;;
 		esac
 		if gsettings set org.gnome.shell enabled-extensions "${enabled}" 2>/dev/null; then
-			echo "  ✔  extension GNOME AppIndicator activée (effective à la prochaine connexion)"
+			ergopti_msg_with "  ✔  " install.gnome_extension_next_login
 			return 0
 		fi
 	fi
-	echo "  ⚠  Impossible d'activer l'extension AppIndicator — sans elle, GNOME n'affiche pas l'icône." >&2
+	ergopti_msg_with "  ⚠  " install.gnome_extension_failed >&2
 }
 
 echo ""
-echo "=== Icône de la barre système et fenêtres ==="
+_section install.section_tray
 _ensure_gnome_tray_host
-_ensure_desktop_backend tray "icône de la barre système (libayatana-appindicator)" \
+_ensure_desktop_backend tray "$(ergopti_text install.label_tray)" \
 	"local ffi=require('ffi'); for _, n in ipairs({'libayatana-appindicator3.so.1','libappindicator3.so.1'}) do if pcall(ffi.load, n) then os.exit(0) end end; os.exit(1)"
 
 # Networking requires LuaJIT luv and a supported GIO proxy resolver. The other
 # Lua modules below remain optional for webviews, filesystem and signal features.
 echo ""
-echo "=== Dépendances Lua optionnelles (event loop, timers, webviews, signaux) ==="
+_section install.section_lua_deps
 
 # Each module must be loadable by LUAJIT, which speaks the Lua 5.1 ABI. The
 # generic names this list used (lua-lgi, lua-posix…) are Lua 5.4 builds on
@@ -737,45 +751,45 @@ _install_lua_module() {
 	local mod="$1"
 	local label="$2"
 	if _lua_module_installed "${mod}"; then
-		echo "  ✔  ${mod} (${label}) — déjà installé"
+		ergopti_msg_with "  ✔  " install.lua_module_installed "${mod}" "${label}"
 		return 0
 	fi
 	local pkg_mgr
 	local candidates
 	pkg_mgr="$(_detect_pkg_manager)"
 	if ! candidates="$(_lua_module_candidates "${pkg_mgr}" "${mod}")"; then
-		echo "  ⚠  ${mod} (${label}) : aucun paquet ${pkg_mgr} connu pour LuaJIT." >&2
+		ergopti_msg_with "  ⚠  " install.lua_module_no_package "${mod}" "${label}" "${pkg_mgr}" >&2
 		return 0
 	fi
 	local package_name
 	for package_name in ${candidates}; do
-		echo "  →  ${mod} manquant — essai du paquet ${package_name}…"
+		ergopti_msg_with "  →  " install.lua_module_trying "${mod}" "${package_name}"
 		_install_required_package "${pkg_mgr}" "${package_name}" >/dev/null 2>&1 || true
 		if _lua_module_installed "${mod}"; then
-			echo "  ✔  ${mod} (${label}) — capacité vérifiée"
+			ergopti_msg_with "  ✔  " install.lua_module_verified "${mod}" "${label}"
 			return 0
 		fi
 	done
-	echo "  ⚠  ${mod} (${label}) indisponible pour LuaJIT — fonction dégradée." >&2
+	ergopti_msg_with "  ⚠  " install.lua_module_degraded "${mod}" "${label}" >&2
 }
 
 # Networking owns luv as a required native ABI, after any repair attempt.
 _prepare_source_network_runtime
 _ensure_network_runtime
 if ! _ensure_archive_digest_runtime; then
-	echo "archive-digest-unavailable: retained-FD updates require an actual OpenSSL3 runtime; capability remains unavailable." >&2
+	ergopti_msg_with "archive-digest-unavailable: " install.archive_digest_unavailable >&2
 fi
-_install_lua_module lfs   "système de fichiers"
-_install_lua_module posix "signaux SIGTERM/SIGHUP"
-_install_lua_module lgi   "fenêtres WebKit, compteur de vitesse"
+_install_lua_module lfs   "$(ergopti_text install.label_lfs)"
+_install_lua_module posix "$(ergopti_text install.label_posix)"
+_install_lua_module lgi   "$(ergopti_text install.label_lgi)"
 
-echo "  → Les dépendances Lua optionnelles sont installées si disponibles."
+ergopti_msg_with "  → " install.lua_deps_done
 
 # After lgi, which is how the windows reach WebKit: the typelib is useless to a
 # luajit that cannot load lgi, and the probe needs both. lgi.core loads the
 # typelib WITHOUT initialising GTK: `lgi.WebKit2` would call gtk_init, which
 # fails with no display — i.e. during every install over SSH or from a TTY.
-_ensure_desktop_backend webkit "fenêtres de configuration (WebKit2GTK)" \
+_ensure_desktop_backend webkit "$(ergopti_text install.label_webkit)" \
 	"local core=require('lgi.core'); os.exit(core.gi.require('WebKit2') and 0 or 1)"
 fi
 
@@ -787,7 +801,7 @@ fi
 # =================================
 
 echo ""
-echo "=== Installation des fichiers ==="
+_section install.section_files
 
 # The layout registry travels below the installed driver. Resolved before the
 # first copy: a source without it must stop here, not after replacing an
@@ -831,27 +845,27 @@ _ensure_native_output_toolchain() {
 	if native_source_compile_probe "$source"; then return 0; fi
 	manager="$(_detect_pkg_manager)"
 	if ! packages="$(_native_output_build_packages "$manager")"; then
-		echo "Native archive build prerequisites unavailable; install a C compiler and libc headers, then use --no-deps" >&2
+		ergopti_msg install.native_build_prereqs_unavailable >&2
 		return 1
 	fi
 	for package_name in $packages; do
 		_install_required_package "$manager" "$package_name" || return 1
 	done
 	if ! native_source_compile_probe "$source"; then
-		echo "source-build-toolchain-unavailable" >&2
+		ergopti_msg_with "source-build-toolchain-unavailable: " install.source_toolchain_unavailable >&2
 		return 1
 	fi
 }
 
 _native_output_bin_parents || exit 1
-command -v tar >/dev/null || { echo "Native payload copy requires tar" >&2; exit 1; }
+command -v tar >/dev/null || { ergopti_msg install.tar_required >&2; exit 1; }
 NATIVE_OUTPUT_STAGE=""
 NATIVE_OUTPUT_SOURCE="${SRC_DRIVER}/bin/libergopti_archive_publication.so"
 NATIVE_OUTPUT_REPO="$(cd "${SRC_DRIVER}/../../.." && pwd -P)"
 if [ "$SRC_DRIVER" = "${NATIVE_OUTPUT_REPO}/static/ergopti_plus/linux" ]; then
 	NATIVE_OUTPUT_BUILD="${NATIVE_OUTPUT_REPO}/tools/build/build-linux-native-output.sh"
 	[ -f "$NATIVE_OUTPUT_BUILD" ] && [ ! -L "$NATIVE_OUTPUT_BUILD" ] || {
-		echo "Canonical native archive build helper unavailable" >&2
+		ergopti_msg install.native_helper_unavailable >&2
 		exit 1
 	}
 	_ensure_native_output_toolchain || exit 1
@@ -860,13 +874,13 @@ if [ "$SRC_DRIVER" = "${NATIVE_OUTPUT_REPO}/static/ergopti_plus/linux" ]; then
 	# no recursive trap can erase an unobserved compiler descendant's resources.
 	if ! bash "$NATIVE_OUTPUT_BUILD" --source-directory "${SRC_DRIVER}/native/archive_output" \
 		--output-directory "$NATIVE_OUTPUT_STAGE"; then
-		echo "Native archive build refused; stage retained: $NATIVE_OUTPUT_STAGE" >&2
+		ergopti_msg install.native_build_refused "$NATIVE_OUTPUT_STAGE" >&2
 		exit 1
 	fi
 	NATIVE_OUTPUT_SOURCE="${NATIVE_OUTPUT_STAGE}/libergopti_archive_publication.so"
 fi
 [ -f "$NATIVE_OUTPUT_SOURCE" ] && [ ! -L "$NATIVE_OUTPUT_SOURCE" ] || {
-	echo "Target native archive backend unavailable" >&2
+	ergopti_msg install.native_backend_unavailable >&2
 	exit 1
 }
 
@@ -962,7 +976,7 @@ fi
 if [ -n "$NATIVE_LUV_STAGE" ]; then
 	# Keep the authenticated source/build evidence; no recursive cleanup assumes
 	# retirement of compiler descendants solely from the installer's own exit.
-	echo "Source network build evidence retained: $NATIVE_LUV_STAGE"
+	ergopti_msg install.network_build_evidence "$NATIVE_LUV_STAGE"
 fi
 
 # Create the wrapper script in ~/.local/bin/ that points to the installed libs.
@@ -974,7 +988,7 @@ INSTALL_ROOT=$(printf '%q' "${LIB_DIR}")
 exec bash "\${INSTALL_ROOT}/bin/ergopti-hotstrings" "\$@"
 WRAPPER
 chmod +x "${BIN_DIR}/ergopti-hotstrings"
-echo "  ✔  lanceur : ${BIN_DIR}/ergopti-hotstrings"
+ergopti_msg_with "  ✔  " install.launcher_installed "${BIN_DIR}/ergopti-hotstrings"
 
 
 # The permissions the daemon cannot start without. Run as part of a normal
@@ -991,7 +1005,7 @@ _setup_permissions
 
 if $INSTALL_SERVICE; then
 	echo ""
-	echo "=== Création des services systemd utilisateur ==="
+	_section install.section_services
 	AUTOSTART_DIR="${CONFIG_ROOT}/autostart"
 	AUTOSTART_FILE="${AUTOSTART_DIR}/ergopti-hotstrings.desktop"
 	STARTUP_OWNER="xdg"
@@ -1033,7 +1047,7 @@ if $INSTALL_SERVICE; then
 		case "$STARTUP_CHOICE" in
 			enabled) bash "$LIB_DIR/linux/install/start_at_login.sh" enable ;;
 			disabled) bash "$LIB_DIR/linux/install/start_at_login.sh" disable ;;
-			*) echo 'The startup choice could not be read.' >&2; exit 1 ;;
+			*) ergopti_msg install.startup_choice_unreadable >&2; exit 1 ;;
 		esac
 		STARTUP_OWNER="user-choice"
 	elif command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
@@ -1046,20 +1060,20 @@ if $INSTALL_SERVICE; then
 		systemctl --user enable  ergopti-hotstrings.service
 		systemctl --user restart ergopti-hotstrings.service
 		STARTUP_OWNER="systemd"
-		echo "  ✔  service ergopti-hotstrings activé et démarré"
+		ergopti_msg_with "  ✔  " install.service_started
 
 	elif command -v systemctl >/dev/null 2>&1; then
-		echo "  ⚠  systemd présent mais aucun bus utilisateur joignable (session absente)."
+		ergopti_msg_with "  ⚠  " install.systemd_without_bus
 		if systemctl --user is-enabled ergopti-hotstrings.service >/dev/null 2>&1; then
 			# Preserve an already-enabled owner and retire an older fallback.
 			rm -f -- "${AUTOSTART_FILE}"
 			STARTUP_OWNER="systemd"
-			echo "     L'unité déjà activée reste l'unique propriétaire du démarrage."
+			ergopti_msg_with "     " install.unit_keeps_startup
 		else
-			echo "     L'unité est installée ; XDG assurera le démarrage à la prochaine session."
+			ergopti_msg_with "     " install.unit_installed_xdg_next
 		fi
 	else
-		echo "  ⚠  systemd absent — utilisation du démarrage automatique XDG."
+		ergopti_msg_with "  ⚠  " install.systemd_absent
 	fi
 
 	# XDG is the sole owner only on hosts where systemd is absent.
@@ -1074,7 +1088,7 @@ $(ergopti_desktop_exec "${BIN_DIR}/ergopti-hotstrings")
 Terminal=false
 X-GNOME-Autostart-enabled=true
 AUTOSTART
-		echo "  ✔  démarrage automatique XDG : ${AUTOSTART_FILE}"
+		ergopti_msg_with "  ✔  " install.xdg_autostart "${AUTOSTART_FILE}"
 	fi
 fi
 
@@ -1101,24 +1115,24 @@ for kind in wrapper unit autostart; do
 done
 
 echo ""
-echo "=== Installation terminée ==="
+_section install.section_done
 echo ""
-echo "  Lanceur  : ${BIN_DIR}/ergopti-hotstrings"
-echo "  Config   : ${CONFIG_DIR}/"
+ergopti_msg_with "  " install.summary_launcher "${BIN_DIR}/ergopti-hotstrings"
+ergopti_msg_with "  " install.summary_config "${CONFIG_DIR}/"
 echo ""
 
 # Warn if ~/.local/bin is not on PATH — a common pitfall on fresh systems.
 if [[ ":${PATH}:" != *":${BIN_DIR}:"* ]]; then
-	echo "Attention : ${BIN_DIR} n'est pas dans votre PATH."
-	echo "  Ajoutez cette ligne à ~/.bashrc ou ~/.zshrc :"
+	ergopti_msg install.path_warning "${BIN_DIR}"
+	ergopti_msg_with "  " install.path_hint
 	echo "    export PATH=\"\$HOME/.local/bin:\$PATH\""
 	echo ""
 fi
 
 if $INSTALL_SERVICE; then
-	echo "Le daemon tourne en arrière-plan. Pour vérifier son état :"
+	ergopti_msg install.daemon_running
 	echo "  systemctl --user status ergopti-hotstrings"
 else
-	echo "Pour démarrer le daemon manuellement :"
+	ergopti_msg install.daemon_manual
 	echo "  ergopti-hotstrings"
 fi

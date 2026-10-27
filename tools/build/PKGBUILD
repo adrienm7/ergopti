@@ -29,6 +29,10 @@ sha256sums=('SKIP')
 package() {
   cd "$srcdir/ergopti"
 
+  # Where the driver bundle is built. makepkg leaves this unset and gets build/linux; a caller that
+  # builds several packages at once names its own absolute directory.
+  local bundle="${ERGOPTI_LINUX_BUILD_DIR:-build/linux}"
+
   # Build the driver bundle
   bash tools/build/build-linux-driver.sh --skip-smoke
 
@@ -40,14 +44,14 @@ package() {
   # containing the shared Lua tree, a wrapper with no LUA_PATH, a .desktop and a
   # unit, and no driver at all. Verified empty on disk before this was fixed.
   install -d "$pkgdir/usr/lib/ergopti"
-  cp -r build/linux/linux/. "$pkgdir/usr/lib/ergopti/"
+  cp -r "$bundle/linux/." "$pkgdir/usr/lib/ergopti/"
 
   # The shared tree is a SIBLING of the driver at runtime, and the daemon
   # resolves it that way. _shared/data and _shared/modules are not optional
   # extras: the keycode tables, the hotstring packs, the locales and the
   # defaults the resolver fails fast on all live there.
   install -d "$pkgdir/usr/lib/ergopti/_shared"
-  cp -r build/linux/_shared/. "$pkgdir/usr/lib/ergopti/_shared/"
+  cp -r "$bundle/_shared/." "$pkgdir/usr/lib/ergopti/_shared/"
 
   # An installed package has no .git: without the stamp the driver builder
   # wrote, every diagnostic reports the commit as "unknown".
@@ -82,13 +86,13 @@ DESKTOP
 
   # Permission files belong to the package manager; lifecycle hooks apply them
   # and enroll graphical users through the existing privileged owner.
-  install -Dm644 build/linux/linux/install/99-ergopti-uinput.rules \
+  install -Dm644 "$bundle/linux/install/99-ergopti-uinput.rules" \
     "$pkgdir/etc/udev/rules.d/99-ergopti-uinput.rules"
-  install -Dm644 build/linux/linux/install/ergopti-uinput.conf \
+  install -Dm644 "$bundle/linux/install/ergopti-uinput.conf" \
     "$pkgdir/etc/modules-load.d/ergopti-uinput.conf"
 
   # The desktop uses the same packaged logo as the tray, at its real size.
-  install -Dm644 build/linux/_shared/assets/ergopti_tray.png \
+  install -Dm644 "$bundle/_shared/assets/ergopti_tray.png" \
     "$pkgdir/usr/share/icons/hicolor/512x512/apps/ergopti.png"
 
   # Default config
@@ -109,7 +113,7 @@ CONFIG
   # The canonical unit prevents a refused setup from looping the prompt.
   install -d "$pkgdir/usr/lib/systemd/user"
   sed 's|^ExecStart=.*|ExecStart=/usr/bin/ergopti --service --tray|' \
-    build/linux/linux/ergopti-hotstrings.service \
+    "$bundle/linux/ergopti-hotstrings.service" \
     > "$pkgdir/usr/lib/systemd/user/ergopti-hotstrings.service"
 
   # Post-install message

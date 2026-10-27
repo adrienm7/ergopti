@@ -2258,10 +2258,6 @@
 			"reason": "brand-or-feature-name",
 			"locales": ["da", "de", "fr", "he", "hi", "no", "sv"]
 		},
-		"ui_apps.h2_top_trio": {
-			"reason": "loanword-or-cognate",
-			"locales": ["nl", "pt"]
-		},
 		"ui_apps.kpi_bursts_count": {
 			"reason": "loanword-or-cognate",
 			"locales": ["da", "nl", "no"]
@@ -2309,6 +2305,14 @@
 		"ui_apps.tile_focus": {
 			"reason": "loanword-or-cognate",
 			"locales": ["fr", "it", "nl"]
+		},
+		"ui_apps.value_ms": {
+			"reason": "unit-or-abbreviation",
+			"locales": ["cs", "da", "de", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "tr"]
+		},
+		"ui_typing.apps_some": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "es", "fr", "nl", "pt"]
 		},
 		"ui_typing.calendar_month_0": {
 			"reason": "loanword-or-cognate",

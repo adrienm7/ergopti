@@ -4,7 +4,9 @@
 # Source, compiler and Git stages remain retained on refusal or interruption.
 
 set -euo pipefail
-[ "$#" -ge 4 ] || { echo "Native luv source recipe required" >&2; exit 2; }
+# The sentences this script prints, in the user's language (install/messages.sh).
+source "$(dirname -- "${BASH_SOURCE[0]}")/messages.sh"
+[ "$#" -ge 4 ] || { ergopti_msg build_luv.recipe_required >&2; exit 2; }
 STAGE="$1"
 SOURCE_URL="$2"
 SOURCE_REVISION="$3"
@@ -45,4 +47,4 @@ assert(uv.fs_stat(".").type == "directory")
 assert(uv.loop_alive() == false)
 LUA
 install -m 755 "$BUILD/luv.so" "$DESTINATION"
-echo "Native source LuaJIT networking module generated"
+ergopti_msg build_luv.module_generated

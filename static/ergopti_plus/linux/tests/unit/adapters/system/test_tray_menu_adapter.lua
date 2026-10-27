@@ -17,6 +17,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+-- Every case installs its own indicator double; the module end puts the real
+-- entries back so no later module meets the double.
+local restore_loaded = helpers.keep_loaded({ "platform.tray.appindicator", "adapters.tray_menu" })
 
 --- Installs a stand-in indicator and loads the adapter over it.
 --- @param available boolean Whether the machine can host a tray.
@@ -250,3 +253,5 @@ helpers.describe("tray_menu: the icon is the Ergopti logo", function()
 	end)
 
 end)
+
+restore_loaded()

@@ -9,6 +9,8 @@ const { spawnSync } = require('node:child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 const generator = require('../codegen/codegen-linux-native-runtime.cjs');
 const root = path.resolve(__dirname, '../..');
+// The installer's functions print through its message reader.
+const MESSAGES_READER = require('./lib/shell-messages-fixture.cjs').readerSource();
 const read = (name) => fs.readFileSync(path.join(root, name), 'utf8');
 const data = JSON.parse(read(generator.SOURCE));
 let checks = 0;
@@ -75,6 +77,7 @@ for (const manager of ['apt', 'dnf', 'zypper', 'pacman', 'xbps', 'apk']) {
 			() => {
 				const script = [
 					'set -eu',
+					MESSAGES_READER,
 					shellFunction(installer, '_required_dependency_package'),
 					shellFunction(installer, '_check_or_install'),
 					`available=${state === 'present' ? '1' : '0'}`,
@@ -153,6 +156,7 @@ function run(options) {
 			: 'false';
 	const script =
 		'set -u\n' +
+		MESSAGES_READER +
 		functions +
 		'\n' +
 		'ARCHIVE_DIGEST_SONAME=libcrypto.so.3\nprobes=0\n_detect_pkg_manager() { echo apt; }\n' +

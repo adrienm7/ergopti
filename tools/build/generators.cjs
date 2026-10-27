@@ -261,6 +261,32 @@ const GENERATORS = [
 		]
 	},
 	{
+		script: 'codegen/codegen-linux-shell-messages.cjs',
+		outputs: [
+			'static/ergopti_plus/linux/_generated/shell_messages/ar.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/cs.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/da.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/de.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/en.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/es.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/fr.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/he.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/hi.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/it.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/ja.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/ko.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/nl.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/no.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/pl.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/pt.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/ru.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/sv.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/tr.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/uk.msg',
+			'static/ergopti_plus/linux/_generated/shell_messages/zh.msg'
+		]
+	},
+	{
 		script: 'codegen/codegen-gesture-emit-actions.cjs',
 		outputs: ['static/ergopti_plus/windows/_generated/gesture_emit_actions.ahk']
 	},
