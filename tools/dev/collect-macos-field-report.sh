@@ -354,6 +354,35 @@ step native_runtime sh -c '
 	log show --last 30m --style compact --predicate "(process == \"kernel\" OR sender == \"AppleMobileFileIntegrity\") AND (eventMessage CONTAINS[c] \"code sign\" OR eventMessage CONTAINS[c] \"killed\" OR eventMessage CONTAINS[c] \"cs_invalid\" OR eventMessage CONTAINS[c] \"memorystatus\")" 2>&1 | tail -60
 ' native_runtime "${native_root}"
 
+# The native PTY guardian runs its installer as /bin/bash /dev/fd/3 over an
+# unlinked copy. On the 2026-10-27 runs that bash was killed by SIGKILL about
+# 10 s after it started, before any output, and nothing in Ergopti sent it.
+# The same shape from this shell, beside a plain script path, shows whether
+# an endpoint-security agent kills fileless script execution on this Mac.
+step security_agents sh -c '
+	systemextensionsctl list 2>&1 | grep -v -i "com.apple" || true
+	pgrep -lf -i "falcon|crowdstrike|sentinel|wdav|defender|jamf|cylance|carbonblack|cbagent|tanium|sophos|trend|zscaler|netskope|forcepoint|elastic|santa|kandji|mosyle|cortex|traps" || true
+'
+step fileless_bash_probe bash -c '
+	[ "$(uname -s)" = Darwin ] || { printf "skipped: not a Mac\n"; exit 0; }
+	dir="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-bash-probe.XXXXXX")" || exit 1
+	printf "%s\n" "printf \"started\\n\"; sleep 12; printf \"survived\\n\"" > "$dir/probe.sh"
+	cp "$dir/probe.sh" "$dir/unlinked.sh"
+	# Both shapes run at once: the kill came about 10 s in, so 12 s covers it.
+	start=$(date +%s)
+	( /bin/bash "$dir/probe.sh" > "$dir/path.out" 2>&1; printf "%s" "$?" > "$dir/path.status" ) &
+	exec 3< "$dir/unlinked.sh"
+	rm -f "$dir/unlinked.sh"
+	( /bin/bash /dev/fd/3 > "$dir/fd.out" 2>&1; printf "%s" "$?" > "$dir/fd.status" ) &
+	exec 3<&-
+	wait
+	elapsed=$(( $(date +%s) - start ))
+	printf "path script: exit=%s output=%s\n" "$(cat "$dir/path.status")" "$(tr "\n" " " < "$dir/path.out")"
+	printf "unlinked /dev/fd/3 script: exit=%s output=%s\n" "$(cat "$dir/fd.status")" "$(tr "\n" " " < "$dir/fd.out")"
+	printf "both finished after %ss\n" "$elapsed"
+	rm -rf "$dir"
+'
+
 # Checklist items that need no person: which privacy pane URL form this macOS
 # opens (ledger L29) and the system bash 3.2 (tools/dev/macos-field-shell-checks.sh)
 step privacy_pane_urls field_privacy_pane_urls "${REPO_ROOT}"
