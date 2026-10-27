@@ -1393,10 +1393,7 @@ function M.current_view(prefs_file, tolerate_outdated)
 		local flat
 		local outdated = ConfigOutdated.collect_reports(function() flat = flatten_from_disk(decoded, nil, shapes) end)
 		if next(outdated) ~= nil and tolerate_outdated ~= true then
-			local paths = {}
-			for outdated_path in pairs(outdated) do paths[#paths + 1] = outdated_path end
-			table.sort(paths)
-			return nil, nil, "outdated_keys", paths[1]
+			return nil, nil, "outdated_keys", require("table_util").sorted_keys(outdated)[1]
 		end
 		return flat, current
 	end)
