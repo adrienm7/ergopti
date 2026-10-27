@@ -57,7 +57,13 @@ for (const vector of corpus.url_vectors || []) {
 	let got;
 	let error = null;
 	try {
-		got = IssueLink.buildIssueUrl(templates, corpus.repository, vector.template, vector.values);
+		got = IssueLink.buildIssueUrl(
+			templates,
+			corpus.repository,
+			vector.template,
+			vector.values,
+			vector.notes
+		);
 	} catch (caught) {
 		error = caught;
 	}
