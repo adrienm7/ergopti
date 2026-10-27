@@ -245,6 +245,22 @@ dev.
   output never reaches the driver (a separate stream defect); a "stage X ended with exit 137
   (signal SIGKILL)" line names the killed child (check native_runtime.txt for an invalid
   signature on uv or Python); no stage line means bash itself was killed.
+  The 23:33 run (with eeedd5ab3d) read `exit=137 (signal SIGKILL, path=native_runtime_pty)`, zero
+  bytes on every stream and no stage line, and native-bootstrap/bin was still empty. Before uv is
+  in place no command of the installer can pass a 137 on (every failure there returns 1 or 78),
+  and the guardian reports its own cancellation as 130 and its deadline as 124, so bash itself was
+  killed by a SIGKILL Ergopti did not send, about 10 s after it started (10.2, 10.5 and 10.6 s
+  over three runs). Leading hypothesis, unproven: the company Mac's endpoint-security agent kills
+  `/bin/bash /dev/fd/3` over an unlinked file (fileless script execution); the Python PTY path
+  (`/bin/bash <path>`) works on the same Mac. Next diagnostics, not a fix: the native PTY worker
+  now writes "[PTY-WORKER] The installer was killed by signal N, not sent by Ergopti, M ms after
+  it started, having written B byte(s) to its terminal." on its stderr (Swift, compiled only by
+  macOS CI), and the collector adds `security_agents.txt` and `fileless_bash_probe.txt` (the same
+  12 s script run from a path and as an unlinked /dev/fd/3, from Terminal). Mac confirms: if the
+  /dev/fd/3 probe dies near 10 s while the path one survives, the agent is the cause, and the
+  guardian must run a private linked snapshot instead (a design change to the unlinked-source pin
+  that `ManagedPTYWorkerTests` asserts); B > 0 with nothing in the driver log would point at the
+  hs.task stream instead.
 - **L50** Fixed c98dceabce. 01_field_lease `guardian_state=fail:unknown` on the 22:32 developer
   run: the check ran 1.5 s after the driver started registering the guardian; the registration
   removed a stale record and answered 'ready' 5 s later. "unknown" is "not yet observed in this
