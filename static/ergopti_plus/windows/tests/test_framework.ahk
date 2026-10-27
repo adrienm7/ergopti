@@ -658,17 +658,25 @@ global TEST_MODULE_GROUPS := [
 	["meta", "^meta/"],
 	; Local LLM server panel (view preparation, discovery, panel actions).
 	["llm-server-panel", "^unit/modules/llm/servers/test_local_server_panel"],
+	; Local server publication rollback and join (about half of the server tests' time).
+	["llm-servers-join", "^unit/modules/llm/servers/test_local_server_(publication_rollback|join)\.ahk$"],
 	; Every other local and managed LLM server test: sharing, publication, Ollama.
 	["llm-servers", "^unit/modules/llm/servers/"],
 	; LLM terminal navigation owner.
 	["llm-terminal", "^unit/modules/llm/nav_event_owner/"],
+	; Adding an API entry through the production menu path.
+	["llm-api-add", "^unit/modules/llm/api/test_llm_api_add_production\.ahk$"],
 	; The rest of the LLM module: prediction, menus, API clients.
 	["llm", "^unit/modules/llm/"],
 	; Configuration version transitions.
 	["config-transition", "^unit/infra/config/transition/"],
-	; Whole-configuration scope: global scope, recommended restore, scope manifest, menus.
-	["config-scope-global", "^unit/infra/config/scope/test_(global_config_scope|restore_recommended_no_confirm|config_scope_menus|config_scope_shortcuts)\.ahk$|^unit/test_config_scope_manifest\.ahk$"],
-	; Per-feature configuration scope: hotstrings, tap-hold, personal files.
+	; Whole-configuration scope: global scope, its menus and shortcuts.
+	["config-scope-global", "^unit/infra/config/scope/test_(global_config_scope|config_scope_menus|config_scope_shortcuts)\.ahk$"],
+	; Whole-configuration recommended restore and the scope manifest.
+	["config-scope-restore", "^unit/infra/config/scope/test_restore_recommended_no_confirm\.ahk$|^unit/test_config_scope_manifest\.ahk$"],
+	; Hotstrings configuration scope.
+	["config-scope-hotstrings", "^unit/infra/config/scope/test_hotstrings_scope\.ahk$"],
+	; Per-feature configuration scope: hotstring categories, tap-hold, personal files.
 	["config-scope-features", "^unit/infra/config/scope/"],
 	; Configuration storage, TOML and the updater.
 	["config-updater", "^unit/infra/(config|toml)/|^unit/modules/updater/|^unit/updater/|^unit/test_updater\.ahk$"],
