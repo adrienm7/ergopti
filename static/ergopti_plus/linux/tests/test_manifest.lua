@@ -427,6 +427,7 @@ return {
 	"tests.unit.modules.llm.prediction.test_llm_thinking_filter",
 	"tests.unit.infra.i18n.test_locale_reader",
 	"tests.meta.architecture.test_logger_shim_only",
+	"tests.unit.infra.logger.test_account_name",
 	"tests.unit.infra.logger.test_logger_sink",
 	"tests.unit.infra.logger.test_logger_sink_retention",
 	"tests.unit.ui.menu.structure.test_menu_builder_group_calls",

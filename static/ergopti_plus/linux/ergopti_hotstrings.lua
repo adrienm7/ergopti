@@ -68,6 +68,33 @@ package.path = SCRIPT_DIR .. "/?.lua;" ..
                SHARED_LUA_DIR .. "/?/init.lua;" ..
                package.path
 
+--- Prints the CLI usage. Deliberately ENGLISH, not translated.
+---
+--- This runs before the session lock, the logger and i18n.init() — which cannot move
+--- earlier, because the config directory it reads the persisted locale from is
+--- itself settable with --config. So at this point the user's chosen language is
+--- genuinely unknown, and routing the text through i18n would render it in the
+--- default locale rather than theirs. Every other pre-i18n surface in this file
+--- (the two startup error prints) is English for the same reason.
+local function print_usage()
+	print("Usage: luajit ergopti_hotstrings.lua [OPTIONS]")
+	print("")
+	print("  --config <path>     TOML file or directory of definitions.")
+	print("                      Default: ~/.config/ergopti/hotstrings/")
+	print("  --device <path>     evdev device (e.g. /dev/input/event3).")
+	print("                      Default: auto-detected.")
+	print("  --layout <name>     Keyboard layout: qwerty | azerty.")
+	print("                      Default: $XKBLAYOUT, else qwerty.")
+	print("  --tray              Enable the system tray icon.")
+	print("  --no-grab           Do NOT take an exclusive grab on the device.")
+	print("                      Physical keys then reach the application while an")
+	print("                      expansion is being typed, which can scramble it.")
+	print("                      Use only if the grab misbehaves on your hardware.")
+	print("  --dry-run           Log matches without injecting.")
+	print("  --verbose           Log at debug level for this run.")
+	print("  --help              Show this message.")
+end
+
 -- Retain the launcher's lock here, while preventing any later external process
 -- from holding it after this daemon stops or crashes.
 -- The fatal outcomes that precede the logger sink leave one closed-vocabulary
@@ -78,6 +105,18 @@ if not lock_protected then
 	io.stderr:write("[session_lock] " .. lock_error .. "\n")
 	BootstrapLog.append("session_lock_refused")
 	os.exit(78)
+end
+
+-- `--help` asks nothing of the session: no logger, no privacy identity. It stays
+-- behind the launcher's lock check above, which refuses a corrupt lock marker
+-- whatever the arguments are (tests/hardware/test_session_lock.py).
+-- It used to run after all three, so a start without $USER (a container, `env -i`)
+-- refused to even print its usage.
+for _, argument in ipairs(arg or {}) do
+	if argument == "--help" or argument == "-h" then
+		print_usage()
+		os.exit(0)
+	end
 end
 
 
@@ -103,9 +142,13 @@ local RuntimeGuard = require("infra.runtime_guard")
 local LoggerSink = require("infra.logger_sink")
 -- A privacy admission failure must not let Lua print the unredacted exception.
 -- A false durability result remains a successfully admitted stdout-only sink.
-local privacy_admitted, _, privacy_refusal = pcall(function() return LoggerSink.install(Logger) end)
+local privacy_admitted, privacy_failure, privacy_refusal = pcall(function() return LoggerSink.install(Logger) end)
 if not privacy_admitted or privacy_refusal then
-	io.stderr:write("[logger_sink] Privacy initialization refused; daemon not started.\n")
+	-- Only the sink's own closed wording is repeated ("logger_sink: <letters>"); any
+	-- other exception text may carry a path or a name and stays unprinted.
+	local cause = tostring(privacy_admitted and privacy_refusal or privacy_failure):match("logger_sink: ([%a%s,:]+)$")
+	io.stderr:write("[logger_sink] Privacy initialization refused" .. (cause and (" (" .. cause .. ")") or "")
+		.. "; daemon not started.\n")
 	BootstrapLog.append("privacy_admission_refused")
 	os.exit(1)
 end
@@ -530,7 +573,6 @@ local function parse_args()
 		layout  = default_layout,
 		dry_run = false,
 		verbose = false,
-		help    = false,
 		tray    = false,
 		-- Grab the device by default. Observe mode lets every physical keystroke
 		-- reach the application while the daemon is mid-expansion, which is the
@@ -542,8 +584,7 @@ local function parse_args()
 	local i = 1
 	while i <= #arg do
 		local a = arg[i]
-		if     a == "--help"    or a == "-h"  then opts.help    = true
-		elseif a == "--dry-run"               then opts.dry_run = true
+		if     a == "--dry-run"               then opts.dry_run = true
 		elseif a == "--verbose" or a == "-v"  then opts.verbose = true
 		elseif a == "--tray"                  then opts.tray    = true
 		elseif a == "--no-grab"               then opts.grab    = false
@@ -558,34 +599,6 @@ local function parse_args()
 	end
 	return opts
 end
-
---- Prints the CLI usage. Deliberately ENGLISH, not translated.
----
---- This runs from parse_args, long before i18n.init() — which cannot move
---- earlier, because the config directory it reads the persisted locale from is
---- itself settable with --config. So at this point the user's chosen language is
---- genuinely unknown, and routing the text through i18n would render it in the
---- default locale rather than theirs. Every other pre-i18n surface in this file
---- (the two startup error prints) is English for the same reason.
-local function print_usage()
-	print("Usage: luajit ergopti_hotstrings.lua [OPTIONS]")
-	print("")
-	print("  --config <path>     TOML file or directory of definitions.")
-	print("                      Default: ~/.config/ergopti/hotstrings/")
-	print("  --device <path>     evdev device (e.g. /dev/input/event3).")
-	print("                      Default: auto-detected.")
-	print("  --layout <name>     Keyboard layout: qwerty | azerty.")
-	print("                      Default: $XKBLAYOUT, else qwerty.")
-	print("  --tray              Enable the system tray icon.")
-	print("  --no-grab           Do NOT take an exclusive grab on the device.")
-	print("                      Physical keys then reach the application while an")
-	print("                      expansion is being typed, which can scramble it.")
-	print("                      Use only if the grab misbehaves on your hardware.")
-	print("  --dry-run           Log matches without injecting.")
-	print("  --verbose           Log at debug level for this run.")
-	print("  --help              Show this message.")
-end
-
 
 -- =========================================
 -- =========================================
@@ -787,11 +800,6 @@ local function main()
 	-- it could. A main() local, not a file-scope one, for the upvalue budget.
 	local PREVIEW_MAX_CANDIDATES = 8
 	local opts = parse_args()
-
-	if opts.help then
-		print_usage()
-		os.exit(0)
-	end
 
 	-- A start outside launch.sh (AppRun, Nix wrapper, manual luajit) holds no lock
 	-- yet; a second keyboard grab next to a running daemon is refused here.
