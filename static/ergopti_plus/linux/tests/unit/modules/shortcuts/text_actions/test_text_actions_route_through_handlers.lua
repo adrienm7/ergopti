@@ -88,7 +88,7 @@ helpers.describe("Linux text actions route through the daemon handlers", functio
 	helpers.it("select_word selects the whole word, select_line the line", function()
 		local Gestures, log = routed_gestures()
 		local ok, err = pcall(with_destination, log, function()
-			Gestures.execute_action("select_word", "keyboard__ctrl_j")
+			Gestures.execute_action("select_word", "keyboard__primary_j")
 			helpers.assert_eq(table.concat(log.presses, " / "), "ctrl+Right / ctrl+shift+Left",
 				"select_word must move to the end of the word, then select back to its start")
 			log.presses = {}
@@ -102,7 +102,7 @@ helpers.describe("Linux text actions route through the daemon handlers", functio
 	helpers.it("paste_plain types the clipboard's plain text", function()
 		local Gestures, log = routed_gestures()
 		local ok, err = pcall(with_destination, log, function()
-			Gestures.execute_action("paste_plain", "keyboard__ctrl_shift_v")
+			Gestures.execute_action("paste_plain", "keyboard__primary_shift_v")
 			helpers.assert_eq(#log.injected, 1, "paste_plain must inject exactly once")
 			helpers.assert_eq(log.injected[1], "plain clipboard")
 		end)
