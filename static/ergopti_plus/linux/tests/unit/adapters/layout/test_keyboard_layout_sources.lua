@@ -87,7 +87,7 @@ end
 
 helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 
-	helpers.it("xkb-data-prerequisite: requires actual default paths and Compose tables", function()
+	helpers.it("xkb-data-prerequisite: requires actual include files and Compose tables", function()
 		local shell = require("adapters.shell_runner")
 		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"),
 			"native XKB data admission requires Python and the actual LuaJIT FFI runtime")

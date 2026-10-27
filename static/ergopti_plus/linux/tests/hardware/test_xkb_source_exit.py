@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import shlex
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -32,8 +33,8 @@ capture.clear()
 """
 
 
-def native_keymap():
-    """Serialize a real libxkbcommon map without consulting a display server."""
+def native_library():
+    """Admit the genuine native library used by the isolated capture fixtures."""
     lib = ctypes.CDLL("libxkbcommon.so.0")
     lib.xkb_context_new.argtypes = [ctypes.c_int]
     lib.xkb_context_new.restype = ctypes.c_void_p
@@ -48,6 +49,38 @@ def native_keymap():
     lib.xkb_keymap_get_as_string.restype = ctypes.c_void_p
     lib.xkb_keymap_unref.argtypes = [ctypes.c_void_p]
     lib.xkb_context_unref.argtypes = [ctypes.c_void_p]
+    lib.xkb_context_num_include_paths.argtypes = [ctypes.c_void_p]
+    lib.xkb_context_num_include_paths.restype = ctypes.c_uint
+    lib.xkb_context_include_path_get.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+    lib.xkb_context_include_path_get.restype = ctypes.c_char_p
+    return lib
+
+
+def native_keycodes():
+    """Read real evdev data from the native context's admitted search paths."""
+    lib = native_library()
+    context = lib.xkb_context_new(0)
+    assert context, "native data admission needs a genuine XKB context"
+    try:
+        for index in range(lib.xkb_context_num_include_paths(context)):
+            base = Path(os.fsdecode(lib.xkb_context_include_path_get(context, index)))
+            path = base / "keycodes" / "evdev"
+            try:
+                observed = path.stat()
+            except FileNotFoundError:
+                continue
+            assert stat.S_ISREG(observed.st_mode), "native evdev keycodes must be a regular file"
+            data = path.read_bytes()
+            assert data, "native evdev keycodes must not be empty"
+            return data
+        raise AssertionError("native XKB include paths contain no evdev keycodes data")
+    finally:
+        lib.xkb_context_unref(context)
+
+
+def native_keymap():
+    """Serialize a real libxkbcommon map without consulting a display server."""
+    lib = native_library()
     libc = ctypes.CDLL(None)
     libc.free.argtypes = [ctypes.c_void_p]
     context = lib.xkb_context_new(0)
@@ -55,8 +88,8 @@ def native_keymap():
     keymap = None
     serialized = None
     try:
-        # Self-contained symbols avoid host layout includes. The real native context
-        # still needs its default include directory and separate Compose data.
+        # Self-contained symbols avoid host layout includes. The data-admission
+        # fixture separately exercises include-dependent input and Compose data.
         # These are fixture coordinates, never a product layout or typing fallback.
         letters = dict(
             zip(
