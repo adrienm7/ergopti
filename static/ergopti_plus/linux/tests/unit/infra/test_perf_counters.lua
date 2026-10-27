@@ -66,11 +66,26 @@ helpers.describe("perf counters: spans are always timed", function()
 		helpers.assert_throws(function() perf.span("input.dispatch", nil) end)
 	end)
 
-	helpers.it("a counted and timed hot call allocates nothing", function()
-		local perf = fixture(20)
+	--- Counts the Lua heap growth of 10000 counted and timed hot calls. The
+	--- clock is stepped by clock_step_ms per read, not read from the machine: a
+	--- CI container preempted for more than the 5 ms slow threshold during one
+	--- iteration made that span slow, and its HotPath WARNING (about 1.5 KB of
+	--- report tables and log text) failed the Arch row with 1.64 KB. A fast span
+	--- is the code under test; the slow path allocates its warning by design.
+	--- @param perf table Loaded perf counters.
+	--- @param clock_step_ms number Milliseconds the clock advances per read.
+	--- @return number grown_kb
+	local function hot_call_growth(perf, clock_step_ms)
 		-- The first closed span builds the slow-threshold table once; that
 		-- lazy setup is not the hot call, so it happens before the count.
 		perf.span("input.dispatch", perf.clock())
+		local Monotonic = require("infra.monotonic")
+		local machine_clock = Monotonic.now_ms
+		local stepped = machine_clock()
+		Monotonic.now_ms = function()
+			stepped = stepped + clock_step_ms
+			return stepped
+		end
 		-- LuaJIT's trace compiler allocates its IR on the Lua heap whenever it
 		-- happens to record this loop, which made the count flaky (4 to 5 KB on
 		-- the distribution rows). Only the interpreter's own allocations are
@@ -88,9 +103,58 @@ helpers.describe("perf counters: spans are always timed", function()
 		local grown = collectgarbage("count") - before
 		collectgarbage("restart")
 		if compiler then compiler.on() end
+		Monotonic.now_ms = machine_clock
 		if not counted then error(failure, 0) end
+		return grown
+	end
+
+	helpers.it("a counted and timed hot call allocates nothing", function()
+		local perf, lines = fixture(20)
+		local grown = hot_call_growth(perf, 0.001)
 		-- Counted allocation, not wall clock: a fast span builds no string.
 		helpers.assert_true(grown < 1, "hot-path timing allocated " .. grown .. " KB")
+		helpers.assert_eq(#lines, 0, "no span of the counted window may be slow")
+	end)
+
+	helpers.it("a preempted machine clock cannot make the hot-call count allocate", function()
+		local perf, lines = fixture(20)
+		local Monotonic = require("infra.monotonic")
+		local machine_clock = Monotonic.now_ms
+		local reads = 0
+		-- Every 1000th read jumps 7 ms, as a descheduled CI container does.
+		Monotonic.now_ms = function()
+			reads = reads + 1
+			return machine_clock() + math.floor(reads / 1000) * 7
+		end
+		local measured, result = pcall(hot_call_growth, perf, 0.001)
+		Monotonic.now_ms = machine_clock
+		if not measured then error(result, 0) end
+		helpers.assert_true(result < 1, "a preempted span allocated " .. result .. " KB")
+		helpers.assert_eq(#lines, 0, "the stepped clock must hide machine preemption")
+	end)
+
+	helpers.it("the hot-call count sees the slow-span warning allocation", function()
+		-- Sensitivity check: the measurement is able to fail. Every span over
+		-- the threshold builds and logs its report.
+		local perf = fixture(20)
+		local grown = hot_call_growth(perf, 6)
+		helpers.assert_true(grown >= 1, "slow spans allocated only " .. grown .. " KB")
+	end)
+
+	helpers.it("reading the machine clock allocates nothing", function()
+		local Monotonic = require("infra.monotonic")
+		local compiler = rawget(_G, "jit")
+		if compiler then compiler.off() end
+		local before = collectgarbage("count")
+		collectgarbage("stop")
+		local read, failure = pcall(function()
+			for _ = 1, 10000 do Monotonic.now_ms() end
+		end)
+		local grown = collectgarbage("count") - before
+		collectgarbage("restart")
+		if compiler then compiler.on() end
+		if not read then error(failure, 0) end
+		helpers.assert_true(grown < 1, "the monotonic clock allocated " .. grown .. " KB")
 	end)
 end)
 
