@@ -48,6 +48,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from desktop_activation import (  # noqa: E402
     CleanupStatus,
     activate_layout,
+    apply_x11_user_tree,
     compile_rmlvo,
     deactivate_layouts,
     keymap_has_type,
@@ -368,9 +369,15 @@ def install(
     root: Path,
     home: Path,
     environ: Optional[Dict[str, str]] = None,
+    allow_xorg: bool = False,
 ) -> dict:
-    """Installs one converted layout into the user tree."""
-    refuse_xorg_session(environ)
+    """Installs one converted layout into the user tree.
+
+    A pure Xorg session is refused unless the caller loads the layout itself
+    with ``apply_x11`` (``allow_xorg``): the desktop settings cannot select a
+    layout from the user tree there."""
+    if not allow_xorg:
+        refuse_xorg_session(environ)
     symbols = (source_dir / (layout_id + ".xkb")).read_text(encoding="utf-8")
     types = (source_dir / "xkb_types.txt").read_text(encoding="utf-8")
     compose_source = source_dir / (layout_id + ".XCompose")
@@ -473,6 +480,21 @@ def activate(layout_id: str, root: Path, environ: Optional[Dict[str, str]] = Non
     }
 
 
+def apply_x11(layout_id: str, root: Path, environ: Optional[Dict[str, str]] = None) -> dict:
+    """Loads one installed layout into the running Xorg server, live."""
+    if layout_id not in read_manifest(root):
+        raise InstallError(EXIT_VALIDATION, "the layout %s is not installed" % layout_id)
+    applied, code = apply_x11_user_tree(LayoutSpec(layout_id), root, environ)
+    report = {
+        "ok": applied,
+        "verified": applied,
+        "detail": "loaded into the running X server" if applied else "not loaded: " + code,
+    }
+    if not applied:
+        report["code"] = code
+    return report
+
+
 def parse_arguments(argv: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Install registry layouts in the user XKB tree.")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -481,7 +503,10 @@ def parse_arguments(argv: List[str]) -> argparse.Namespace:
     install_parser.add_argument("--display-name", required=True)
     install_parser.add_argument("--source-dir", required=True, type=Path)
     install_parser.add_argument("--language", action="append", default=[])
-    for name in ("uninstall", "activate"):
+    install_parser.add_argument(
+        "--allow-xorg", action="store_true", help="install in a pure Xorg session (see apply-x11)"
+    )
+    for name in ("uninstall", "activate", "apply-x11"):
         command = commands.add_parser(name)
         command.add_argument("--layout-id", required=True)
     return parser.parse_args(argv)
@@ -496,10 +521,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     try:
         if args.command == "install":
             report = install(
-                args.layout_id, args.display_name, args.source_dir, args.language, root, home
+                args.layout_id,
+                args.display_name,
+                args.source_dir,
+                args.language,
+                root,
+                home,
+                allow_xorg=args.allow_xorg,
             )
         elif args.command == "uninstall":
             report = uninstall(args.layout_id, root, home)
+        elif args.command == "apply-x11":
+            report = apply_x11(args.layout_id, root)
         else:
             report = activate(args.layout_id, root)
     except InstallError as error:
