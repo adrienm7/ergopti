@@ -1,0 +1,204 @@
+{
+	"_comment": "Leaf-row planning and writing vectors, replayed by _shared/lua/test/toml_leaf_rows_vectors_contract.lua on macOS and Linux. entry point: the leaf-row planner turns (source bytes, operations) into batch rows, then the batch writer prepares the candidate bytes from the source (a null source is an absent file). An operation is {path: [segments], value} or {path, delete: true}; a path has at least two segments and no empty one. expect.ok is acceptance of the whole chain (a refusal may come from either step); decoded lists paths of the decoded candidate whose value must equal value, or must be absent when absent is true; contains are substrings of the candidate bytes. Converted from toml_leaf_rows_contract.lua.",
+	"entry_point": "leaf-row planner prepare(source, operations) -> rows, then the batch writer's prepare step on (source, rows)",
+	"drivers": {
+		"macos": "Replays every vector.",
+		"linux": "Replays every vector.",
+		"windows": "Not ported: one AHK consumer must call the Windows leaf-row planner and batch writer in that order and decode the candidate for the decoded checks."
+	},
+	"vectors": [
+		{
+			"id": "bare-leaves-written-as-ordinary-table-rows-in-an-absent-file",
+			"source": null,
+			"operations": [
+				{
+					"path": ["hotstrings", "groups", "rolls"],
+					"value": true
+				},
+				{
+					"path": ["hotstrings", "modules", "rolls", "hc"],
+					"value": false
+				}
+			],
+			"expect": {
+				"ok": true,
+				"decoded": [
+					{
+						"path": ["hotstrings", "groups", "rolls"],
+						"value": true
+					},
+					{
+						"path": ["hotstrings", "modules", "rolls", "hc"],
+						"value": false
+					}
+				]
+			}
+		},
+		{
+			"id": "runtime-identity-and-bare-siblings-in-one-quoted-inline-table",
+			"source": "[hotstrings]\nkeep = 1\n",
+			"operations": [
+				{
+					"path": ["hotstrings", "groups", "rolls"],
+					"value": true
+				},
+				{
+					"path": ["hotstrings", "groups", "ext:demo:rolls"],
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"decoded": [
+					{
+						"path": ["hotstrings", "groups"],
+						"value": {
+							"rolls": true,
+							"ext:demo:rolls": true
+						}
+					},
+					{
+						"path": ["hotstrings", "keep"],
+						"value": 1
+					}
+				],
+				"contains": ["\"ext:demo:rolls\""]
+			}
+		},
+		{
+			"id": "inline-table-rewritten-whole-keeping-unknown-entries",
+			"source": "[hotstrings]\ngroups = { rolls = false, \"ext:x:y\" = true, other = true }\n",
+			"operations": [
+				{
+					"path": ["hotstrings", "groups", "rolls"],
+					"value": true
+				},
+				{
+					"path": ["hotstrings", "groups", "ext:x:y"],
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"decoded": [
+					{
+						"path": ["hotstrings", "groups"],
+						"value": {
+							"rolls": true,
+							"other": true
+						}
+					}
+				]
+			}
+		},
+		{
+			"id": "inline-table-left-empty-by-deletions-is-removed",
+			"source": "[hotstrings]\ngroups = { rolls = true }\nkeep = true\n",
+			"operations": [
+				{
+					"path": ["hotstrings", "groups", "rolls"],
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"decoded": [
+					{
+						"path": ["hotstrings", "groups"],
+						"absent": true
+					},
+					{
+						"path": ["hotstrings", "keep"],
+						"value": true
+					}
+				]
+			}
+		},
+		{
+			"id": "sections-below-a-quoted-table-header-addressed",
+			"source": "[hotstrings.modules.\"ext:demo:rolls\"]\nkeep = true\nold = true\n",
+			"operations": [
+				{
+					"path": ["hotstrings", "modules", "ext:demo:rolls", "old"],
+					"delete": true
+				},
+				{
+					"path": ["hotstrings", "modules", "ext:demo:rolls", "new"],
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"decoded": [
+					{
+						"path": ["hotstrings", "modules", "ext:demo:rolls"],
+						"value": {
+							"keep": true,
+							"new": true
+						}
+					}
+				]
+			}
+		},
+		{
+			"id": "malformed-operation-1-refused",
+			"source": "",
+			"operations": [
+				{
+					"path": ["a"],
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "malformed-operation-2-refused",
+			"source": "",
+			"operations": [
+				{
+					"path": ["a", ""],
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "malformed-operation-3-refused",
+			"source": "",
+			"operations": [
+				{
+					"path": ["a", "b"]
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "malformed-operation-4-refused",
+			"source": "",
+			"operations": [
+				{
+					"path": ["a", "b"],
+					"value": true,
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "malformed-source-refused",
+			"source": "[a\n",
+			"operations": [],
+			"expect": {
+				"ok": false
+			}
+		}
+	]
+}

@@ -69,7 +69,9 @@ return function(helpers, corpus, expected_count)
 					local decoded = Codec.decode(content)
 					for _, check in ipairs(expect.decoded) do
 						local node = decoded
-						for _, key in ipairs(check.path) do node = type(node) == "table" and node[key] or nil end
+						for _, key in ipairs(check.path) do
+						if type(node) == "table" then node = node[key] else node = nil end
+					end
 						helpers.assert_eq(node, revive(check.value), table.concat(check.path, "."))
 					end
 				end

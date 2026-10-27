@@ -326,6 +326,12 @@ do
 	require("test.toml_batch_write_vectors_contract")(helpers, corpus, 49)
 end
 require("test.toml_leaf_rows_contract")(helpers)
+do
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/toml/leaf_rows_vectors.json"), "rb"))
+	local corpus = assert(require("json").decode_lossless(file:read("*a")))
+	file:close()
+	require("test.toml_leaf_rows_vectors_contract")(helpers, corpus, 10)
+end
 
 local noop_vectors_file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/config_noop/vectors.json", "rb"))
 local noop_vectors = assert(require("json").decode(noop_vectors_file:read("*a")))
