@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "Ordine nativo",
 	"menu.layout.number_row_digits": "Numeri prima",
 	"menu.layout.number_row_symbols": "Simboli prima",
-	"platform_reason.number_row_override_unsupported": "Non ancora su questo sistema: il layout installato nel sistema digita la riga dei numeri. Ergopti prevede di riscriverne qui i tasti; oggi solo Windows, che emula il layout, mette prima le cifre o i simboli.",
+	"platform_reason.number_row_override_unsupported": "Su questo sistema il layout installato nel sistema digita la riga dei numeri; solo Windows, che emula il layout, mette prima le cifre o i simboli.",
 	"platform_reason.number_row_live_session": "Non disponibile: Solo una sessione X11 lo applica subito. Questa sessione mantiene la disposizione attuale; la tua scelta è salvata.",
 	"platform_reason.number_row_live_no_layout": "Non disponibile: Installa prima una disposizione ErgoptiPlus: questa scelta modifica la disposizione che usi.",
 	"layouts.linux_rows_not_applied": "La scelta della riga dei numeri è salvata, ma non è stato possibile aggiornare la disposizione di tastiera in uso.",

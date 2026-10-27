@@ -3666,7 +3666,7 @@
 	"menu.layout.number_row_native": "सिस्टम का क्रम",
 	"menu.layout.number_row_digits": "अंक पहले",
 	"menu.layout.number_row_symbols": "चिह्न पहले",
-	"platform_reason.number_row_override_unsupported": "इस सिस्टम पर अभी नहीं: अंकों की पंक्ति सिस्टम में इंस्टॉल किया गया लेआउट टाइप करता है। Ergopti यहाँ उसकी कुंजियाँ दोबारा टाइप करने की योजना बना रहा है; आज केवल Windows, जो लेआउट का अनुकरण करता है, अंक या चिह्न पहले रखता है।",
+	"platform_reason.number_row_override_unsupported": "इस सिस्टम पर अंकों की पंक्ति सिस्टम में इंस्टॉल किया गया लेआउट टाइप करता है; केवल Windows, जो लेआउट का अनुकरण करता है, अंक या चिह्न पहले रखता है।",
 	"platform_reason.number_row_live_session": "अनुपलब्ध: केवल X11 सत्र इसे तुरंत लागू करता है। यह सत्र अपना मौजूदा लेआउट रखता है; आपकी पसंद सहेज ली गई है।",
 	"platform_reason.number_row_live_no_layout": "अनुपलब्ध: पहले ErgoptiPlus कीबोर्ड लेआउट इंस्टॉल करें; यह विकल्प आपके उपयोग के लेआउट को बदलता है।",
 	"layouts.linux_rows_not_applied": "संख्या पंक्ति की पसंद सहेज ली गई है, लेकिन चालू कीबोर्ड लेआउट अपडेट नहीं हो सका।",
