@@ -41,15 +41,55 @@ function Write-Outcome($outcome) {
 	$outcome | ConvertTo-Json -Compress
 }
 
+# Keep the original JSON root kind before PowerShell unwraps single-item arrays.
+function Read-DriverControlObject([string]$Path, [string]$Kind) {
+	$text = Get-Content -Raw -Encoding UTF8 -LiteralPath $Path
+	if ($null -eq $text -or -not $text.TrimStart().StartsWith('{', [StringComparison]::Ordinal)) {
+		throw "The driver $Kind is malformed."
+	}
+	try { $record = ConvertFrom-Json -InputObject $text }
+	catch { throw [IO.InvalidDataException]::new("The driver $Kind is malformed.", $_.Exception) }
+	if ($record -isnot [pscustomobject]) { throw "The driver $Kind is malformed." }
+	return $record
+}
+
+function Test-DriverControlMembers($Record, [string[]]$Required) {
+	$names = @($Record.PSObject.Properties | ForEach-Object { $_.Name })
+	foreach ($name in $Required) {
+		if ($names -cnotcontains $name) { return $false }
+	}
+	return $true
+}
+
+# Preserve integral JSON floating spellings without coercing strings or Booleans.
+function Test-DriverControlInteger($Value) {
+	if (-not ($Value -is [int] -or $Value -is [long] -or $Value -is [double] -or $Value -is [decimal])) {
+		return $false
+	}
+	try { $integer = [long]$Value } catch { return $false }
+	# The parsed value stays on the left: integer-first equality would round it.
+	return $Value -eq $integer
+}
+
+function Assert-DriverControlSession($Session, $Spec) {
+	if (-not (Test-DriverControlMembers $Session @('schema', 'driver', 'pid', 'token'))) {
+		throw 'The driver session is malformed.'
+	}
+	if (-not (Test-DriverControlInteger $Session.schema) -or $Session.schema -ne $Spec.schema -or
+		$Session.driver -isnot [string] -or $Session.driver -cne 'windows' -or
+		$Session.token -isnot [string] -or $Session.token -cnotmatch ('^[0-9a-f]{' + $Spec.token_hex_length + '}\z') -or
+		-not (Test-DriverControlInteger $Session.pid) -or $Session.pid -le 0 -or $Session.pid -gt [int]::MaxValue) {
+		throw 'The driver session is malformed.'
+	}
+}
+
 $sessionPath = Join-Path $folder $spec.files.session
 if (-not (Test-Path -LiteralPath $sessionPath -PathType Leaf)) {
 	Write-Outcome ([ordered]@{ state = 'unreachable'; detail = 'no driver session is published' })
 	exit 3
 }
-$session = Get-Content -Raw -Encoding UTF8 -LiteralPath $sessionPath | ConvertFrom-Json
-if ($session.schema -ne $spec.schema -or $session.driver -ne 'windows' -or $session.token -notmatch '^[0-9a-f]{64}$') {
-	throw 'The driver session is malformed.'
-}
+$session = Read-DriverControlObject $sessionPath 'session'
+Assert-DriverControlSession $session $spec
 
 Add-Type -TypeDefinition @'
 using System;
