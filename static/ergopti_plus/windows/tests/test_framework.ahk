@@ -1051,12 +1051,12 @@ RunTests(PlanModuleOf := 0) {
 		_TestPrint("# --reverse - the selected tests run in reverse registry order.")
 	if (_AHK_DRY_RUN) {
 		_TestPrint("# dry-run - skipping execution.")
-		_CopyTestResultsForCi()
+		_TestResultsPublishOrExit()
 		ExitApp(0)
 	}
 	if (ActiveTests.Length == 0) {
 		_TestPrint("# no test matched --only " . _AHK_ONLY_FILTER . ".")
-		_CopyTestResultsForCi()
+		_TestResultsPublishOrExit()
 		ExitApp(1)
 	}
 	Index := 0
@@ -1122,7 +1122,7 @@ RunTests(PlanModuleOf := 0) {
 	}
 	_TestPrint("# " . TEST_PASS_COUNT . " passed, " . TEST_FAIL_COUNT . " failed"
 		. (TEST_NOT_EXECUTED_COUNT ? ", " . TEST_NOT_EXECUTED_COUNT . " not executed" : "") . ".")
-	_CopyTestResultsForCi()
+	_TestResultsPublishOrExit()
 	ExitApp(TEST_FAIL_COUNT > 0 ? 1 : 0)
 }
 
@@ -1146,9 +1146,29 @@ _CopyTestResultsForCi() {
 	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
 	if (TEST_RESULTS_FILE = TEST_RESULTS_CANONICAL)
 		return
+	FileCopy(TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL, true)
+}
+
+; A canonical publication refusal must terminate standalone runners headlessly.
+_TestResultsPublishOrExit(ErrorOutputFn := unset, ExitFn := unset) {
 	try {
-		if FileExist(TEST_RESULTS_FILE)
-			FileCopy(TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL, true)
+		_CopyTestResultsForCi()
+		return true
+	} catch as Failure {
+		Message := "not ok 0 - FATAL TAP PUBLICATION ERROR: " . Type(Failure)
+			. "|" . Failure.Extra . ": " . Failure.Message . "`r`n"
+		try {
+			if IsSet(ErrorOutputFn)
+				ErrorOutputFn.Call(Message)
+			else
+				FileAppend(Message, "**")
+		} finally {
+			if IsSet(ExitFn)
+				ExitFn.Call(1)
+			else
+				ExitApp(1)
+		}
+		return false
 	}
 }
 
