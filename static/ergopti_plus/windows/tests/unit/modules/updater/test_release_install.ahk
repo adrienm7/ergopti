@@ -681,3 +681,43 @@ _R7BS_ManifestSchema(Token, Accepted) {
 for _R7BS_Case in [["1", true], ["1.0", true], ["1e0", true], ["true", false], ['"1"', false], ["false", false], ["0", false]]
 	Test("Config backup schema kind: " . _R7BS_Case[1] . " retains only numeric version authority (backup-schema-json-kind)",
 		_R7BS_ManifestSchema.Bind(_R7BS_Case[1], _R7BS_Case[2]))
+
+
+; A fixed stage basename is not authority over an existing private sidecar.
+_R7RS_RestorePreservesForeignStage() {
+	Root := A_Temp . "\ergopti_r7_restore_stage_" . PLC_CurrentProcessId() . "_" . A_TickCount
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "generation = 1`n")
+		Rules := ConfigBackup_Rules()
+		Clock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		Later := () => Map("stamp", "20260930-111500", "iso", "2026-09-30T11:15:00Z")
+		Original := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, Clock)
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 2`n"))
+		Control := ConfigBackup_Restore(Cfg, Original["id"], Rules, Later)
+		AssertTrue(Control["ok"], "the actual restore must first succeed on the same native paths")
+		AssertEqual("generation = 1`n", FSReadUtf8Exact(Cfg . "\config.toml"))
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 3`n"))
+		Foreign := Cfg . "\config.toml.ergopti-restore.tmp"
+		Sentinel := "foreign pending editor bytes`n"
+		AssertTrue(FSWriteCreateDurable(Foreign, Sentinel), "the colliding sidecar has its own exact preexisting bytes")
+		Result := ConfigBackup_Restore(Cfg, Original["id"], Rules, Later)
+		AssertTrue(FileExist(Foreign), "restore must never consume a stage pathname it did not create")
+		AssertEqual(Sentinel, FSReadUtf8Exact(Foreign), "unrelated sidecar bytes must survive unchanged")
+		if Result["ok"] {
+			AssertEqual("generation = 1`n", FSReadUtf8Exact(Cfg . "\config.toml"))
+		} else {
+			AssertEqual("write", Result["reason"], "an occupied stage may explicitly refuse publication")
+			AssertEqual("generation = 3`n", FSReadUtf8Exact(Cfg . "\config.toml"), "refusal keeps the live destination intact")
+		}
+		if Result["pre"] is Map
+			AssertEqual("generation = 3`n", FSReadUtf8Exact(Result["pre"]["path"] . "\config\config.toml"))
+		else
+			AssertFalse(Result["ok"], "only an explicit pre-write refusal may omit the recovery snapshot")
+	} finally {
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("Config restore: preexisting sidecar bytes retain their own stage identity (restore-foreign-stage)",
+	_R7RS_RestorePreservesForeignStage)
