@@ -1803,7 +1803,9 @@ function render_table() {
 			?.classList.contains('active');
 		const match_positions = new Map();
 		if (app_state.search_query) {
-			const q = app_state.search_query;
+			const q = case_sensitive_search
+				? app_state.search_query
+				: app_state.search_query.toLowerCase();
 			arr = arr.filter((i) => {
 				const haystack = build_searchable_key(i.key, case_sensitive_search);
 				const idx = haystack.indexOf(q);

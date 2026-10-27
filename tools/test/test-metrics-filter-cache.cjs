@@ -2893,4 +2893,62 @@ assert.equal(
 	'all Unicode expansion, context and unchanged-offset controls must execute'
 );
 
+const typingHeaderSearchCases = [
+	{ query: 'A', sensitive: false, key: 'a', count: 12 },
+	{ query: 'a', sensitive: false, key: 'a', count: 12 },
+	{ query: 'É', sensitive: false, key: 'é', count: 6 },
+	{ query: 'é', sensitive: false, key: 'é', count: 6 },
+	{ query: 'A', sensitive: true, key: 'A', count: 5 },
+	{ query: 'a', sensitive: true, key: 'a', count: 7 },
+	{ query: 'Z', sensitive: false, key: null },
+	{ query: 'É', sensitive: true, key: null }
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of typingHeaderSearchCases) {
+		test(`${host} table search honors case mode for ${vector.query}/${vector.sensitive}`, () => {
+			const page = loadMetricsTypingPage(host);
+			freezePageClock(page, '2026-10-27T12:00:00Z');
+			const manifest = { '2026-10-26': { 'Editor.exe': { chars: 18, time: 1800 } } };
+			publishTypingPage(page, host, manifest);
+			deliverTypingManifest(page, host, manifest, {
+				range: {
+					historical: { c: { a: { c: 7, t: 700 }, A: { c: 5, t: 500 }, é: { c: 6, t: 600 } } },
+					today: {}
+				}
+			});
+			// The browser toggle changes the projected rows before searching them.
+			if (vector.sensitive) page.elements.get('btn_case_sensitive').classList.add('active');
+			else page.elements.get('btn_case_sensitive').classList.remove('active');
+			page.context.apply_local_filters();
+			assert.ok(vm.runInContext('app_state.rendered_list.length', page.context) >= 2);
+			page.elements.get('search_input').value = vector.query;
+			page.context.handle_search();
+			page.timers.at(-1)();
+			const html = page.elements.get('metrics_table_body').innerHTML;
+			assert.equal(
+				vm.runInContext('app_state.search_query', page.context),
+				vector.query,
+				'the input and retained query preserve the user text'
+			);
+			if (vector.key === null) {
+				assert.ok(html.includes(page.context._t('ui_typing.no_data')));
+				assert.equal(page.elements.get('total_rows').innerHTML, '');
+			} else {
+				assert.ok(
+					html.includes(`<span class="mono-space">${vector.key}</span>`),
+					'the actual table must render the matching native character'
+				);
+				assert.ok(html.includes(`<td>${vector.count}</td>`));
+				assert.equal(page.elements.get('total_rows').innerHTML, '1 ligne');
+			}
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false
+			);
+		});
+	}
+}
+assert.equal(typingHeaderSearchCases.length, 8);
+assert.equal(passed, 531, 'all case-mode, Unicode and absent-query table controls must execute');
+
 console.log(`${passed} passed, 0 failed.`);
