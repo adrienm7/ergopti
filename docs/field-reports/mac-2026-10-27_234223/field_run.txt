@@ -1,0 +1,494 @@
+[field-report] Building and opening the developer app (static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedPTYWorkerTests.swift is newer than the build; a few minutes)...
+[macos-dev-app] Stopping the running ErgoptiPlus (pids: 15217 15223 51072 51091 51473)...
+[macos-dev-app] No ErgoptiPlus process is left.
+[macos-build] Single-architecture launcher (arm64 only): this local app runs on arm64 Macs and is never released.
+[macos-build] Wiping ~/perso/ergopti/build/macos
+[macos-build] Using cached Hammerspoon 1.1.1: ~/perso/ergopti/build/cache/hammerspoon/Hammerspoon-1.1.1.zip
+[macos-build] Extracting Hammerspoon into ~/perso/ergopti/build/macos
+[macos-build] Building Swift launcher (release, arm64)
+Building for production...
+[0/3] Write sources
+[1/3] Write swift-version--1AB21518FC5DEDBE.txt
+[3/4] Compiling ErgoptiPlus AppDirs.generated.swift
+[3/5] Write Objects.LinkFileList
+[4/5] Linking ErgoptiPlus
+Build of product 'ErgoptiPlus' complete! (20.62s)
+[macos-build] Launcher binary: ~/perso/ergopti/static/ergopti_plus/macos/launcher/.build/arm64-apple-macosx/release/ErgoptiPlus (archs: arm64 )
+[macos-build] launcher_bin resolved: '~/perso/ergopti/static/ergopti_plus/macos/launcher/.build/arm64-apple-macosx/release/ErgoptiPlus'
+[macos-build] Assembling ~/perso/ergopti/build/macos/ErgoptiPlus.app
+[macos-build] Bundling Sparkle.framework (source: ~/perso/ergopti/static/ergopti_plus/macos/launcher/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework)
+[macos-bundle-payload] staged 1166 files into ~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Resources/static
+[build-stamp] commit=814becdd1417c0bc7b8ca21247427ea45a0f4432 (git HEAD of ~/perso/ergopti) -> ~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/_shared/build_stamp.txt
+[build-stamp] no version entry: ERGOPTI_BUILD_VERSION is unset (not a release build)
+[macos-build] Bundling keyboard layout Ergopti_v2.2.2.bundle
+[macos-build] Bundling the keyboard-layout registry
+~/perso/ergopti/build/macos/luasocket-build/lua.tar.gz: OK
+~/perso/ergopti/build/macos/luasocket-build/luasocket.tar.gz: OK
+~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos/socket/core.so: replacing existing signature
+[macos-build] Generating ErgoptiPlus.icns from logo_simple_square.png
+[macos-build] Generating ~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Info.plist
+[macos-build] Developer source mode: the launcher runs the Lua of ~/perso/ergopti
+[macos-build] WARNING: ================================================================
+[macos-build] WARNING: No MACOS_SIGNING_CERTIFICATE_BASE64 / _PASSWORD: signing AD HOC.
+[macos-build] WARNING: An ad hoc signature is a new code identity on every build: macOS
+[macos-build] WARNING: will NOT carry the Accessibility, Screen Recording, Automation and
+[macos-build] WARNING: Login Items grants over to this build; users re-grant each one.
+[macos-build] WARNING: Create a stable identity once with
+[macos-build] WARNING: tools/build/create_macos_signing_identity.sh and set both variables.
+[macos-build] WARNING: ================================================================
+[macos-build] Codesigning ErgoptiPlus.app (ad hoc, identifier: com.ergoptiplus.app)
+~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos/socket/core.so: replacing existing signature
+~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app: replacing existing signature
+~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Sparkle.framework: replacing existing signature
+~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiAutomationQuery: replacing existing signature
+~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/SystemSwitcherState: replacing existing signature
+~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus: replacing existing signature
+~/perso/ergopti/build/macos/ErgoptiPlus.app: replacing existing signature
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/SystemSwitcherState
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/SystemSwitcherState
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiAutomationQuery
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiAutomationQuery
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Sparkle.framework/Versions/Current/.
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Autoupdate
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Autoupdate
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Updater.app
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Updater.app
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices/Installer.xpc
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices/Downloader.xpc
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices/Installer.xpc
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices/Downloader.xpc
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Sparkle.framework/Versions/Current/.
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libtimer.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libtimer.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libuielement.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libuielement.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libimage.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libimage.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libusb.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libusb.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhotkey.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdialog.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspotlight.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsocketudp.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhotkey.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdialog.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsocketudp.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsocket.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspotlight.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libeventtapevent.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhttpserver.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsocket.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libeventtapevent.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libconsole.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhttpserver.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libconsole.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/.
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libscreenwatcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libscreenwatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnetworkhost.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnetworkhost.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnotify.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhost_locale.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnotify.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhost_locale.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmouse.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmouse.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhid.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmath.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebsocket.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhid.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmath.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebsocket.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcamera.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmidi.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsharing.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcamera.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhash.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmidi.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbrightness.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsharing.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhash.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbrightness.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libshortcuts.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libshortcuts.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhints.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhints.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebviewdatastore.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libusbwatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbase64.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdockicon.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebviewdatastore.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libusbwatcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbase64.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdockicon.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmenubar.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmenubar.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdistributednotifications.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebviewtoolbar.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/liblsqlite3.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libkeycodes.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdistributednotifications.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebviewtoolbar.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/liblsqlite3.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libkeycodes.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libjson.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnoises.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnoises.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libjson.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwindow.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwindow.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libuielementwatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcaffeinatewatcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libuielementwatcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcaffeinatewatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libapplicationwatcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libapplicationwatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcanvas.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcanvas.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbatterywatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libapplication.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspeechlistener.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbatterywatcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libapplication.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspeechlistener.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libaudiodevicewatcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libaudiodevicewatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspaces_watcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libscreen.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspaces_watcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnetworkconfiguration.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libscreen.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/liblocation.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnetworkconfiguration.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/liblocation.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libfsvolume.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libpasteboardwatcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libfsvolume.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libstyledtext.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libpasteboardwatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/hs
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libstyledtext.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/hs
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbonjour.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libstreamdeck.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libpasteboard.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbonjour.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libstreamdeck.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libpasteboard.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libfsxattr.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspaces.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libfsxattr.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspaces.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libplist.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcaffeinate.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libplist.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcaffeinate.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libeventtap.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebviewusercontent.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libeventtap.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebviewusercontent.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Autoupdate
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Autoupdate
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Updater.app
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libaudiodevice.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libaudiodevice.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsound.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices/Downloader.xpc
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsound.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbonjourservice.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbonjourservice.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libchooser.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices/Installer.xpc
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libchooser.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnetworkreachability.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libfs.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhttp.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspeech.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libfs.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnetworkreachability.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhttp.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspeech.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices/Downloader.xpc
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Updater.app
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices/Installer.xpc
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/.
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libserial.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libserial.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libpathwatcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libpathwatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libaxuielement.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libaxuielement.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhost.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsettings.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmilight.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcanvasmatrix.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhost.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbattery.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsettings.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmilight.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbattery.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcanvasmatrix.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmarkdown.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmarkdown.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdoc.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdoc.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdrawing_color.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdrawing_color.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnetworkping.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcrash.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnetworkping.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/librazer.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcrash.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebview.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/librazer.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebview.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwifiwatcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwifiwatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwifi.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwifi.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libipc.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libtask.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/liburlevent.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libosascript.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libipc.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libtask.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/liburlevent.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libosascript.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/LuaSkin.framework/Versions/Current/.
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/LuaSkin.framework/Versions/Current/.
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app
+~/perso/ergopti/build/macos/ErgoptiPlus.app: valid on disk
+~/perso/ergopti/build/macos/ErgoptiPlus.app: satisfies its Designated Requirement
+[macos-build] Designated requirement of ~/perso/ergopti/build/macos/ErgoptiPlus.app:
+[macos-build]   Executable=~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus
+[macos-build]   # designated => cdhash H"52d604a5e0b7020adbce663ceaf8ead558eaf612"
+[macos-build] WARNING: ad hoc requirement (cdhash): the next build will not match it.
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsocketudp.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsocketudp.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsocket.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsocket.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libimage.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libuielement.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libtimer.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libimage.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libuielement.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libtimer.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libeventtapevent.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libusb.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libeventtapevent.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhttpserver.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhotkey.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libusb.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspotlight.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdialog.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhttpserver.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhotkey.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspotlight.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libconsole.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdialog.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libconsole.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnotify.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnotify.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/.
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcamera.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcamera.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebsocket.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libscreenwatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhost_locale.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbrightness.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnetworkhost.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebsocket.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libscreenwatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhid.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhost_locale.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmath.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbrightness.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhid.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnetworkhost.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmath.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmidi.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libusbwatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhash.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmidi.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libusbwatcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhash.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsharing.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsharing.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmouse.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmouse.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libshortcuts.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libshortcuts.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdockicon.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdockicon.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmenubar.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbase64.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdistributednotifications.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbase64.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmenubar.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdistributednotifications.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhints.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebviewdatastore.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebviewtoolbar.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhints.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebviewtoolbar.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebviewdatastore.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libkeycodes.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libjson.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/liblsqlite3.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libkeycodes.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libjson.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/liblsqlite3.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcaffeinatewatcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcaffeinatewatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libapplicationwatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcanvas.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libapplicationwatcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcanvas.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwindow.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbatterywatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libapplication.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libuielementwatcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwindow.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnoises.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbatterywatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/liblocation.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libapplication.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libuielementwatcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnoises.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/liblocation.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspeechlistener.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspeechlistener.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libscreen.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libscreen.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnetworkconfiguration.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspaces_watcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnetworkconfiguration.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspaces_watcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libpasteboardwatcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libpasteboardwatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libaudiodevicewatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libfsvolume.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libfsvolume.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libaudiodevicewatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspaces.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspaces.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbonjour.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libstyledtext.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbonjour.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libstreamdeck.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libstyledtext.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libstreamdeck.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libfsxattr.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libfsxattr.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Autoupdate
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebviewusercontent.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Autoupdate
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebviewusercontent.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libplist.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/hs
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libpasteboard.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libeventtap.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcaffeinate.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libplist.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/hs
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libpasteboard.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libeventtap.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcaffeinate.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Updater.app
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices/Downloader.xpc
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices/Installer.xpc
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libchooser.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libchooser.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libaudiodevice.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsound.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/Updater.app
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libaudiodevice.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsound.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnetworkreachability.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspeech.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnetworkreachability.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices/Downloader.xpc
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libspeech.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices/Installer.xpc
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/Sparkle.framework/Versions/Current/.
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libfs.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libfs.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libserial.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libserial.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhost.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhost.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbonjourservice.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbonjourservice.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libaxuielement.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libaxuielement.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhttp.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libhttp.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcanvasmatrix.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsettings.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmilight.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcanvasmatrix.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libsettings.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmilight.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmarkdown.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libmarkdown.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libpathwatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbattery.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libpathwatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/librazer.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libbattery.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/librazer.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdrawing_color.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdrawing_color.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdoc.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcrash.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libdoc.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libcrash.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnetworkping.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libnetworkping.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwifi.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwifi.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwifiwatcher.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwifiwatcher.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libosascript.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/liburlevent.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libosascript.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/liburlevent.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebview.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libipc.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libtask.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libwebview.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libipc.dylib
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/hs/libtask.dylib
+--prepared:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/LuaSkin.framework/Versions/Current/.
+--validated:~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/Frameworks/LuaSkin.framework/Versions/Current/.
+~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app: valid on disk
+~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app: satisfies its Designated Requirement
+[macos-build] Designated requirement of ~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app:
+[macos-build]   Executable=~/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon
+[macos-build]   # designated => cdhash H"9a6c82b36721dc7528f1ed9514b0b066d344a6a6" or cdhash H"c3132bf49dd3f70c785449fff687de3bb4f6553c"
+[macos-build] WARNING: ad hoc requirement (cdhash): the next build will not match it.
+[macos-build] Developer source app ready (no release archive): ~/perso/ergopti/build/macos/ErgoptiPlus.app
+[macos-build]   Lua source : ~/perso/ergopti/static/ergopti_plus/macos
+[macos-dev-app] Opened ~/perso/ergopti/build/macos/ErgoptiPlus.app; its Lua runs from ~/perso/ergopti/static/ergopti_plus/macos.
+[macos-dev-app] A saved .lua edit reloads the driver; the menu's Reload does it on demand.
+[macos-dev-app] Launcher trail: ~/Library/Logs/ergopti_plus/launcher.log (look for 'developer source mode').
+[field-report] Waiting for the developer app to publish its readiness...
+[field-report] Developer app ready (pid 17740); requesting every step within 4800 s.
+[field-report]   field run 01_field_lease: pass
+[field-report]   field run 02_field_owned_runtime: pass
+[field-report]   field run 03_field_network: pass
+[field-report]   field run 04_field_toolchain: pass
+[field-report]   field run 05_field_login_items: pass
+[field-report]   field run 06_field_composer: fail
+[field-report]   field run 07_key_accounting: needs_typing
+[field-report]   field run 08_diagnostics: pass
+[field-report]   field run 09_ollama_runtime: fail
+[field-report]   field run 10_ollama_model: skip
+[field-report]   field run 11_mlx_runtime: pass
+[field-report]   field run still running, 60 s since the request...
+[field-report]   field run still running, 121 s since the request...
+[field-report]   field run still running, 183 s since the request...
+[field-report]   field run 12_mlx_model: pass
+[field-report]   field run 13_config_guard: fail
+[field-report] Field run done: {"counts":{"fail":3,"needs_typing":1,"pass":8,"skip":1},"elapsed_ms":190879,"finished_at":"2026-10-27T22:46:20Z","interrupted":false,"order":["field_lease","field_owned_runtime","field_network","field_toolchain","field_login_items","field_composer","key_accounting","diagnostics","ollama_runtime","ollama_model","mlx_runtime","mlx_model","config_guard"],"pid":17740,"request_id":"mac-2026-10-27_234223","schema":1,"started_at":"2026-10-27T22:43:09Z","verdicts":{"config_guard":"fail","diagnostics":"pass","field_composer":"fail","field_lease":"pass","field_login_items":"pass","field_network":"pass","field_owned_runtime":"pass","field_toolchain":"pass","key_accounting":"needs_typing","mlx_model":"pass","mlx_runtime":"pass","ollama_model":"skip","ollama_runtime":"fail"}}
