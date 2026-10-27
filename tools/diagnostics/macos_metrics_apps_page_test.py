@@ -216,20 +216,9 @@ class MetricsAppsPageControls(unittest.TestCase):
         repo = self.root / "repo"
         page = repo / probe.PAGE
         page.parent.mkdir(parents=True)
-        scripts = [
-            "../vendor/chart.umd.js",
-            "../host_bridge.js",
-            "../dom_utils.js",
-            "../i18n.js",
-            "../metrics_rebuild_banner.js",
-            "../metrics_freshness.js",
-            "../_generated/metrics_general_category_aliases.js",
-            "helpers.js",
-            "state.js",
-            "main.js",
-            "charts.js",
-            "modal.js",
-        ]
+        # The probe's ordered census is the one admission contract; the actual
+        # page test below proves it still matches the shipped HTML.
+        scripts = list(probe.PAGE_SCRIPTS)
         page.write_text(
             "".join(f'<script src="{name}"></script>' for name in scripts)
             + '<link rel="stylesheet" href="style.css">'
