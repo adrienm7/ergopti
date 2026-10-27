@@ -320,6 +320,7 @@ function checkChoiceProjection() {
 				(code) => `static/ergopti_plus/_shared/data/locales/${code}.json`
 			),
 			'tools/lib/paths.cjs',
+			'tools/lib/_generated/config_keys.cjs',
 			'tools/lib/menu-row-availability.cjs',
 			'static/ergopti_plus/_shared/data/locales/en.json',
 			'static/ergopti_plus/_shared/modules/updater/channels.json',
@@ -9898,6 +9899,7 @@ console.log(
 			'static/ergopti_plus/_shared/modules/updater/defaults.json',
 			'static/ergopti_plus/_shared/ui/update_channels.js',
 			'tools/lib/paths.cjs',
+			'tools/lib/_generated/config_keys.cjs',
 			'static/ergopti_plus/_shared/modules/updater/schedule.js',
 			'static/ergopti_plus/_shared/data/locales/en.json'
 		]) {

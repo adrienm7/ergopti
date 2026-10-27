@@ -132,6 +132,7 @@ const GENERATORS = [
 		outputs: [
 			'static/ergopti_plus/_shared/lua/config_keys.lua',
 			'static/ergopti_plus/_shared/ui/_generated/config_keys.js',
+			'tools/lib/_generated/config_keys.cjs',
 			'static/ergopti_plus/windows/_generated/config_keys.ahk'
 		]
 	},

@@ -312,8 +312,8 @@ for idx, v in ipairs(VECTORS) do
 	table.insert(obj, '\t\t\t"full_text": ' .. jstr(v.full_text) .. ',')
 	table.insert(obj, '\t\t\t"tail_text": ' .. jstr(v.tail_text) .. ',')
 	table.insert(obj, '\t\t\t"block": ' .. jstr(v.block) .. ',')
-	table.insert(obj, '\t\t\t"min_words": ' .. tostring(v.min_words) .. ',')
-	table.insert(obj, '\t\t\t"max_words": ' .. tostring(v.max_words) .. ',')
+	table.insert(obj, '\t\t\t"min_words": ' .. tostring(v.min_words) .. ',') -- config-key-literal-ok: a corpus field name
+	table.insert(obj, '\t\t\t"max_words": ' .. tostring(v.max_words) .. ',') -- config-key-literal-ok: a corpus field name
 	table.insert(obj, '\t\t\t"expected": ' .. serialize_expected(pred))
 	table.insert(obj, '\t\t}' .. (idx < #VECTORS and "," or ""))
 	table.insert(lines, table.concat(obj, "\n"))

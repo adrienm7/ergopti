@@ -6,6 +6,7 @@ local M = {}
 local GLOBAL_KEY = "__ergopti_native_script_scope_probe"
 
 local function same_views(left, right)
+	-- config-key-literal-ok: the field names of the participant's view table
 	for _, key in ipairs({ "locale", "locale_backend", "log_level", "error_dialog" }) do
 		if left[key] ~= right[key] then return false end
 	end
