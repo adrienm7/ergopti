@@ -55,6 +55,17 @@ do
 			end
 		end)
 	end
+
+	-- A developer app (infra/dev_source.lua) runs this clone, which holds no
+	-- LuaSocket: the build stages it into the app payload only. A root that does
+	-- not name this driver is left to the instance admission below, which
+	-- refuses the process.
+	local dev_ok, dev_root = pcall(function() return require("infra.dev_source").root() end)
+	if dev_ok and dev_root and searchers then
+		local DevSource = require("infra.dev_source")
+		local payload = DevSource.payload_driver_dir(hs.processInfo and hs.processInfo.bundlePath)
+		table.insert(searchers, 2, DevSource.payload_searcher(payload, loadfile, package.loadlib))
+	end
 end
 
 
@@ -2254,6 +2265,8 @@ local file_watchers_committed = require("infra.file_watchers").start({
 	ignored_dirs            = { TOML_CACHE_DIR },
 	-- The personal hotstrings tree is usually a SEPARATE git repository from the
 	-- driver, so a pull there must be gated by its own .git, not the driver's.
+	-- A developer app also reloads on shared Lua edits; a packaged tree never changes.
+	shared_source_dir       = require("infra.dev_source").is_active() and (logger_shared_root .. "/lua") or nil,
 	git_roots               = {
 		base_dir,
 		require("native_path").without_trailing_separators(config_paths.get("HotstringsDirPath") or ""),

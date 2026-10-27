@@ -135,7 +135,9 @@ end
 --- init.lua's shutdown callback stops on quit).
 --- @param ctx table { hotstrings_dir: string, base_dir: string,
 ---   personal_hotstrings_dir: string, personal_info_path: string,
----   self_written_files: string[] } — absolute paths resolved by the boot script.
+---   self_written_files: string[], shared_source_dir: string|nil } — absolute
+---   paths resolved by the boot script; shared_source_dir is the clone's
+---   _shared/lua tree of a developer app, nil otherwise.
 --- @return boolean committed True only when both required watchers, plus the
 ---   personal watcher when available, are started and their owner is published.
 function M.start(ctx)
@@ -640,6 +642,11 @@ function M.start(ctx)
 		end
 	end
 	if not acquire_watcher(base_dir, project_changed, "Project source watcher", false) then
+		return rollback_startup()
+	end
+	-- Only a developer app passes its clone's shared Lua tree (infra/dev_source.lua).
+	if ctx.shared_source_dir ~= nil
+		and not acquire_watcher(ctx.shared_source_dir, project_changed, "Shared source watcher", false) then
 		return rollback_startup()
 	end
 
