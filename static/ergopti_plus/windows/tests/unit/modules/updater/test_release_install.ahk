@@ -631,3 +631,53 @@ for _RIT_CaseKind in ["file", "directory"] {
 		Test("Config backup: case-variant " . _RIT_CaseKind . " at " . _RIT_CasePosition . " preserves foreign ownership (config-backup-case-collision)",
 			_RIT_BackupAllocationPreservesCaseVariant.Bind(_RIT_CaseKind, _RIT_CasePosition))
 }
+
+
+; The manifest schema version is numeric; AHK's Boolean/string coercion cannot
+; grant a malformed backup the current schema's restore authority.
+
+_R7BS_ManifestSchema(Token, Accepted) {
+	global CONFIG_BACKUP_SCHEMA_VERSION
+	static Sequence := 0
+	Sequence += 1
+	Root := A_Temp . "\ergopti_r7_backup_schema_" . PLC_CurrentProcessId() . "_" . A_TickCount . "_" . Sequence
+	Cfg := Root . "\cfg"
+	try {
+		_RIT_WriteFile(Cfg . "\config.toml", "generation = 1`n")
+		Rules := ConfigBackup_Rules()
+		FirstClock := () => Map("stamp", "20260930-101500", "iso", "2026-09-30T10:15:00Z")
+		LaterClock := () => Map("stamp", "20260930-111500", "iso", "2026-09-30T11:15:00Z")
+		Valid := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, FirstClock)
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 2`n"))
+		Candidate := ConfigBackup_Create(Cfg, "pre_install", "", "", Rules, LaterClock)
+		ManifestPath := Candidate["path"] . "\" . Rules["manifest"]
+		Original := FSReadUtf8Exact(ManifestPath)
+		Member := '"schema_version":' . CONFIG_BACKUP_SCHEMA_VERSION
+		Changed := StrReplace(Original, Member, '"schema_version":' . Token, , &ChangedCount)
+		AssertEqual(1, ChangedCount, "the actual completed manifest must own exactly one schema-version token")
+		AssertTrue(FSWriteDurable(ManifestPath, Changed))
+		AssertTrue(FSWriteDurable(Cfg . "\config.toml", "generation = 3`n"))
+		Loaded := _ConfigBackup_Load(Cfg, Candidate["id"], Rules)
+		Latest := ConfigBackup_Latest(Cfg, "pre_install", Rules)
+		if Accepted {
+			AssertTrue(Loaded is Map, "supported numeric schema versions retain their genuine restore authority")
+			AssertEqual(Candidate["id"], Latest["id"])
+			Result := ConfigBackup_Restore(Cfg, Candidate["id"], Rules, LaterClock)
+			AssertTrue(Result["ok"])
+			AssertEqual("generation = 2`n", FSReadUtf8Exact(Cfg . "\config.toml"))
+		} else {
+			AssertEqual(0, Loaded, "a Boolean or string cannot impersonate the numeric backup schema")
+			AssertEqual(Valid["id"], Latest["id"], "a malformed schema cannot hide an earlier supported backup")
+			Result := ConfigBackup_Restore(Cfg, Candidate["id"], Rules, LaterClock)
+			AssertFalse(Result["ok"])
+			AssertEqual("missing", Result["reason"])
+			AssertEqual("generation = 3`n", FSReadUtf8Exact(Cfg . "\config.toml"), "rejected metadata cannot replace live configuration")
+		}
+	} finally {
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+for _R7BS_Case in [["1", true], ["1.0", true], ["1e0", true], ["true", false], ['"1"', false], ["false", false], ["0", false]]
+	Test("Config backup schema kind: " . _R7BS_Case[1] . " retains only numeric version authority (backup-schema-json-kind)",
+		_R7BS_ManifestSchema.Bind(_R7BS_Case[1], _R7BS_Case[2]))
