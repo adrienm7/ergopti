@@ -2307,7 +2307,7 @@ function M.new(deps, presets, ram_getter)
 			if not bin then
 				pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
 					string.format(i18n.get("ollama.delete_error"), model_name,
-						"Ollama executable unavailable"), "error")
+						i18n.get("ollama.delete_reason_executable")), "error")
 				operation.finish(nil, "Ollama deletion executable refusal")
 				return false
 			end
@@ -2397,7 +2397,7 @@ function M.new(deps, presets, ram_getter)
 					operation.finish(nil, "Ollama model deletion start refusal")
 					pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
 						string.format(i18n.get("ollama.delete_error"), model_name,
-							"task start failed"), "error")
+							i18n.get("ollama.delete_reason_start")), "error")
 					return false
 				end
 				owner.start_committed = true
@@ -2420,7 +2420,7 @@ function M.new(deps, presets, ram_getter)
 			operation.finish(nil, "Ollama model deletion construction refusal")
 			pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
 				string.format(i18n.get("ollama.delete_error"), model_name,
-					"task creation failed"), "error")
+					i18n.get("ollama.delete_reason_creation")), "error")
 			return false
 		end, function(reason)
 			local authorized = operation.is_authorized() == true
@@ -2428,7 +2428,7 @@ function M.new(deps, presets, ram_getter)
 			if authorized then
 				pcall(notifications.notify, i18n.get("ollama.delete_fail_title"),
 					string.format(i18n.get("ollama.delete_error"), model_name,
-						tostring(reason or "readiness failed")), "error")
+						tostring(reason or i18n.get("ollama.delete_reason_readiness"))), "error")
 			end
 			return true
 		end, {
