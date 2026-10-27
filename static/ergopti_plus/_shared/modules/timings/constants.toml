@@ -284,29 +284,33 @@ finger_confirm_ms = 50
 # HS: gestures/engine.lua FINGER_DROP_CONFIRM_MS.
 finger_drop_confirm_ms = 200
 
-# Consecutive touch frames a higher finger count must hold before a gesture is
-# recognised at it, so a palm or thumb grazing the pad for a frame is not a
-# third finger. HS: gestures/engine.lua FINGER_CONFIRM_FRAMES (same value, a
-# local copy the engine's timing stubs predate).
+# Consecutive touch frames a higher finger count must hold before the Linux
+# decoder recognises a gesture at it, so a palm grazing the pad for one frame
+# is not a third finger. Two frames keep a deliberate staggered landing.
 # LX: gestures/mt_decoder.lua stable_frames.
-finger_confirm_frames = 4
+finger_join_frames = 2
 
 # Window to wait for staggered multi-finger contact to stabilise.
 # HS: gestures/engine.lua FINGER_COUNT_STABLE_MS.
 finger_count_stable_ms = 60
 
+# How long a third finger joining a pair must stay down before the gesture is
+# recognised at three, while the pair has not scrolled yet (about two frames).
+# HS: gestures/engine.lua PAIR_JOIN_CONFIRM_SEC.
+pair_join_confirm_ms = 20
+
 # Window after a two-finger touch-down in which more fingers may still land and
-# make it a three-or-more-finger gesture. A contact joining a two-finger set
-# later belongs to its scroll (a resting thumb, a grazing palm).
+# make it a three-or-more-finger gesture, as long as the pair has not scrolled.
 # HS: gestures/engine.lua MULTI_FINGER_LANDING_SEC.
 # LX: gestures/mt_decoder.lua landing_sec.
-multi_finger_landing_ms = 150
+multi_finger_landing_ms = 300
 
-# After a two-finger scroll ends, or while its momentum still scrolls, no
-# three-or-more-finger gesture may fire for this long.
+# After a real scroll ends (a native momentum phase, or a locked two-finger
+# scroll lifting), no three-or-more-finger gesture may fire for this long. A
+# mere two-finger touch arms nothing.
 # HS: gestures/engine.lua SCROLL_MOMENTUM_GUARD_SEC.
 # LX: gestures/mt_decoder.lua scroll_guard_sec.
-scroll_momentum_guard_ms = 300
+scroll_momentum_guard_ms = 200
 
 # Post-gesture click cooldown to prevent double-fires.
 # HS: gestures/actions.lua CLICK_COOLDOWN_SEC.
