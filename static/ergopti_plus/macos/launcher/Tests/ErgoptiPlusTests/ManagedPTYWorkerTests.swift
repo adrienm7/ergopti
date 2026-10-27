@@ -81,6 +81,12 @@ private final class ManagedPTYTestSession {
 			environment["ERGOPTI_BOOTSTRAP_TIMEOUT_MS"] = "999999999"
 			process.environment = environment
 		}
+		// The guardian keeps its installer snapshot under HOME: the fixture owns it.
+		var isolated = process.environment ?? ProcessInfo.processInfo.environment
+		isolated["HOME"] = root.path
+		process.environment = isolated
+		try manager.createDirectory(at: root.appendingPathComponent("Library/Application Support"),
+			withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
 		process.standardInput = input
 		process.standardOutput = output
 		process.standardError = error
@@ -152,6 +158,8 @@ private final class ManagedPTYTestSession {
 		XCTAssertNotEqual(CFGetTypeID(payloadStatus), CFBooleanGetTypeID())
 		XCTAssertNotEqual(CFGetTypeID(workerStatus), CFBooleanGetTypeID())
 		XCTAssertTrue((0...255).contains(payloadStatus.intValue))
+		let snapshots = (try? FileManager.default.contentsOfDirectory(atPath: ManagedPTYSource.root(home: root.path))) ?? []
+		XCTAssertTrue(snapshots.isEmpty, "The guardian removes its installer snapshot: \(snapshots)")
 		XCTAssertEqual(workerStatus.int32Value, worker)
 		if let exit { XCTAssertEqual(payloadStatus.intValue, exit) }
 		guard process.terminationReason == .exit, process.terminationStatus == worker,
@@ -200,30 +208,96 @@ private final class ManagedPTYTestSession {
 }
 
 final class ManagedPTYWorkerTests: XCTestCase {
-	func testRetainedSourceSnapshotCannotFollowLaterPathReplacement() throws {
-		let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-		try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+	// Field report 2026-10-27 23:55: endpoint security killed /bin/bash /dev/fd/3
+	// over an unlinked copy, so the snapshot is now a private linked file whose
+	// identity and digest are proved through the retained descriptor.
+	func testLinkedSnapshotIsPrivateVerifiedAndIndependentOfTheSource() throws {
+		let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).resolvingSymlinksInPath()
+		let home = root.appendingPathComponent("home")
+		try FileManager.default.createDirectory(at: home.appendingPathComponent("Library/Application Support"),
+			withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+		defer { try? FileManager.default.removeItem(at: root) }
+		let source = root.appendingPathComponent("source.sh")
+		try Data("abc".utf8).write(to: source)
+		let digest = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+		let request = ManagedPTYRequest(sourcePath: source.path, sourceSHA256: digest,
+			environment: [], timeoutMilliseconds: 1000, receiptPath: root.appendingPathComponent("receipt").path,
+			nonce: "independent-snapshot")
+		let snapshotRoot = ManagedPTYSource.root(home: home.path)
+		let snapshot = try XCTUnwrap(ManagedPTYSource.snapshot(request, root: snapshotRoot, interrupted: { false }))
+		defer { XCTAssertEqual(Darwin.close(snapshot.descriptor), 0) }
+		XCTAssertTrue(snapshot.path.hasPrefix(snapshotRoot + "/op.\(getpid())."))
+		XCTAssertEqual(URL(fileURLWithPath: snapshot.path).lastPathComponent, "source.sh")
+		var held = stat()
+		var named = stat()
+		var folder = stat()
+		var rootInfo = stat()
+		XCTAssertEqual(fstat(snapshot.descriptor, &held), 0)
+		XCTAssertEqual(lstat(snapshot.path, &named), 0)
+		XCTAssertEqual(lstat(snapshot.directory, &folder), 0)
+		XCTAssertEqual(lstat(snapshotRoot, &rootInfo), 0)
+		XCTAssertEqual(held.st_nlink, 1, "bash receives a regular linked path, never /dev/fd")
+		XCTAssertEqual(held.st_ino, named.st_ino)
+		XCTAssertEqual(held.st_mode & 0o7777, 0o400)
+		XCTAssertEqual(folder.st_mode & 0o7777, 0o700)
+		XCTAssertEqual(rootInfo.st_mode & 0o7777, 0o700)
+		XCTAssertEqual(fcntl(snapshot.descriptor, F_GETFD) & FD_CLOEXEC, FD_CLOEXEC)
+		XCTAssertEqual(fcntl(snapshot.descriptor, F_GETFL) & O_ACCMODE, O_RDONLY)
+		XCTAssertTrue(snapshot.verified(sha256: digest))
+		// The original source may change; the admitted copy does not follow it.
+		try FileManager.default.removeItem(at: source)
+		try Data("foreign".utf8).write(to: source)
+		XCTAssertTrue(snapshot.verified(sha256: digest))
+		XCTAssertNil(ManagedPTYSource.snapshot(request, root: snapshotRoot, interrupted: { false }),
+			"The changed source no longer matches the independent pin")
+		// A changed copy (mode, then content) is refused before exec.
+		XCTAssertEqual(chmod(snapshot.path, 0o600), 0)
+		XCTAssertFalse(snapshot.verified(sha256: digest))
+		// In place, on the same inode: only the digest can tell.
+		let writer = try FileHandle(forWritingTo: URL(fileURLWithPath: snapshot.path))
+		try writer.write(contentsOf: Data("abd".utf8))
+		try writer.close()
+		XCTAssertFalse(snapshot.verified(sha256: digest))
+		XCTAssertTrue(snapshot.remove())
+		XCTAssertNotEqual(access(snapshot.directory, F_OK), 0, "The private folder goes with its copy")
+	}
+
+	func testLinkedSnapshotRefusesAForeignWritableRootAndSweepsOnlyDeadGuardians() throws {
+		let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).resolvingSymlinksInPath()
+		let home = root.appendingPathComponent("home")
+		try FileManager.default.createDirectory(at: home.appendingPathComponent("Library/Application Support"),
+			withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
 		defer { try? FileManager.default.removeItem(at: root) }
 		let source = root.appendingPathComponent("source.sh")
 		try Data("abc".utf8).write(to: source)
 		let request = ManagedPTYRequest(sourcePath: source.path,
 			sourceSHA256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
 			environment: [], timeoutMilliseconds: 1000, receiptPath: root.appendingPathComponent("receipt").path,
-			nonce: "independent-snapshot")
-		let descriptor = try XCTUnwrap(ManagedPTYSource.snapshot(request, interrupted: { false }))
-		defer { XCTAssertEqual(Darwin.close(descriptor), 0) }
-		var info = stat()
-		XCTAssertEqual(fstat(descriptor, &info), 0)
-		XCTAssertEqual(info.st_nlink, 0, "No later pathname lookup can replace the admitted source")
-		XCTAssertEqual(fcntl(descriptor, F_GETFD) & FD_CLOEXEC, FD_CLOEXEC)
-		XCTAssertEqual(fcntl(descriptor, F_GETFL) & O_ACCMODE, O_RDONLY)
-		try FileManager.default.removeItem(at: source)
-		try Data("foreign".utf8).write(to: source)
-		var bytes = [UInt8](repeating: 0, count: 16)
-		let count = Darwin.read(descriptor, &bytes, bytes.count)
-		XCTAssertEqual(count, 3)
-		XCTAssertEqual(Data(bytes.prefix(max(0, count))), Data("abc".utf8))
-		XCTAssertNil(ManagedPTYSource.snapshot(request, interrupted: { false }), "The changed source no longer matches the independent pin")
+			nonce: "private-root")
+		let snapshotRoot = ManagedPTYSource.root(home: home.path)
+		try FileManager.default.createDirectory(atPath: snapshotRoot, withIntermediateDirectories: true,
+			attributes: [.posixPermissions: 0o777])
+		XCTAssertEqual(chmod(snapshotRoot, 0o777), 0)
+		XCTAssertNil(ManagedPTYSource.snapshot(request, root: snapshotRoot, interrupted: { false }),
+			"A root others may write is refused")
+		XCTAssertEqual(chmod(snapshotRoot, 0o700), 0)
+		try FileManager.default.removeItem(atPath: snapshotRoot)
+		try FileManager.default.createSymbolicLink(atPath: snapshotRoot, withDestinationPath: root.path)
+		XCTAssertNil(ManagedPTYSource.snapshot(request, root: snapshotRoot, interrupted: { false }),
+			"A symbolic link in place of the root is refused")
+		try FileManager.default.removeItem(atPath: snapshotRoot)
+		XCTAssertEqual(Darwin.mkdir(snapshotRoot, 0o700), 0)
+		// A dead guardian's folder is swept; a live one's is kept.
+		let dead = snapshotRoot + "/op.999999.AbCdEf"
+		let live = snapshotRoot + "/op.\(getppid()).GhIjKl"
+		for folder in [dead, live] {
+			XCTAssertEqual(Darwin.mkdir(folder, 0o700), 0)
+			XCTAssertTrue(FileManager.default.createFile(atPath: folder + "/ensure-mlx-deps.sh", contents: Data("x".utf8),
+				attributes: [.posixPermissions: 0o400]))
+		}
+		ManagedPTYSource.sweepStale(root: snapshotRoot)
+		XCTAssertNotEqual(access(dead, F_OK), 0)
+		XCTAssertEqual(access(live + "/ensure-mlx-deps.sh", F_OK), 0)
 	}
 
 	func testPrivateAdmissionRejectsBooleanBudgetCommandsAndEnvironmentOverrides() throws {
@@ -338,7 +412,8 @@ final class ManagedPTYWorkerTests: XCTestCase {
 	func testSecondPinnedInstallerUsesActualTTYRetainedSourceAndOriginalBudget() throws {
 		let session = try ManagedPTYTestSession(script: """
 		#!/bin/bash
-		test "$0" = /dev/fd/3 || exit 91
+		test "$0" = "$ERGOPTI_BOOTSTRAP_SNAPSHOT" && test -f "$0" && test ! -w "$0" || exit 91
+		case "$0" in "$HOME/Library/Application Support/ErgoptiPlus/pty-sources/op."*/ensure-ollama-native-deps.sh) ;; *) exit 96;; esac
 		test -t 0 && test -t 1 && test -t 2 || exit 92
 		test "$ERGOPTI_BOOTSTRAP_SCRIPT_DIR" = "${PROJECT_ROOT}/Fixture.app/Contents/Resources/static/ergopti_plus/macos/modules/llm" || exit 93
 		case "$ERGOPTI_BOOTSTRAP_TIMEOUT_MS" in ''|*[!0-9]*) exit 94;; esac
@@ -371,7 +446,7 @@ final class ManagedPTYWorkerTests: XCTestCase {
 	func testOfficialThirdPinnedInstallerReceivesOnlyItsPrivateEnvironmentContract() throws {
 		let session = try ManagedPTYTestSession(script: """
 		#!/bin/bash
-		test "$0" = /dev/fd/3 && test -t 0 && test -t 1 && test -t 2 || exit 91
+		test "$0" = "$ERGOPTI_BOOTSTRAP_SNAPSHOT" && test -t 0 && test -t 1 && test -t 2 || exit 91
 		test -z "$ERGOPTI_BOOTSTRAP_OLLAMA_RESOLVED_BIN" && test -z "$ERGOPTI_BOOTSTRAP_PYTHON" || exit 92
 		test "$ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR" = "$HOME/Library/Application Support/Ergopti/ollama" || exit 93
 		test "$ERGOPTI_BOOTSTRAP_TIMEOUT_MS" -gt 0 && test "$ERGOPTI_BOOTSTRAP_TIMEOUT_MS" -le 5000 || exit 94

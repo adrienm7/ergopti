@@ -17,7 +17,10 @@
 set -eu
 set -o pipefail 2>/dev/null || true
 
-if [ "$0" = "/dev/fd/3" ] && [ -n "${ERGOPTI_BOOTSTRAP_SCRIPT_DIR:-}" ]; then
+# The native PTY guardian runs a private snapshot of this file; its sources
+# stay in the folder the guardian names. Any other path is its own folder.
+if [ -n "${ERGOPTI_BOOTSTRAP_SNAPSHOT:-}" ] && [ "$0" = "$ERGOPTI_BOOTSTRAP_SNAPSHOT" ] \
+	&& [ -n "${ERGOPTI_BOOTSTRAP_SCRIPT_DIR:-}" ]; then
 	SCRIPT_DIR="$ERGOPTI_BOOTSTRAP_SCRIPT_DIR"
 else
 	SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
