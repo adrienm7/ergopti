@@ -662,10 +662,14 @@ function validateRaw(files) {
 		assert.equal(macJobs[id].steps.indexOf(admissions[0]), 2, `${id} admits before products`);
 	}
 	const originalSilence = YAML.parse('job:\n' + LEASE_SILENCE_NATIVE_BODY).job;
-	const expectedSilenceSteps = originalSilence.steps.map((step) => ({
-		...macRole.metadata(step, 'lease-silence-native'),
-		if: macRole.condition('lease-silence-native', step.if ?? null)
-	}));
+	// The E2E stage job checks out once before admission, so a role no longer
+	// checks out the same commit again: the original body's checkout is dropped.
+	const expectedSilenceSteps = originalSilence.steps
+		.filter((step) => step.uses !== 'actions/checkout@v4')
+		.map((step) => ({
+			...macRole.metadata(step, 'lease-silence-native'),
+			if: macRole.condition('lease-silence-native', step.if ?? null)
+		}));
 	const silenceSteps = YAML.parse(macRole.body(macText, 'lease-silence-native')).steps;
 	assert.deepEqual(
 		silenceSteps,

@@ -339,7 +339,8 @@ check('every scoped full body remains owned; all other product scripts remain ex
 				(job) =>
 					job.file === MAC &&
 					job.id === 'e2e-hs' &&
-					macRole.selected(job.body, 'lease-silence-native').length === 5
+					// Four steps: the role no longer checks out again after admission.
+					macRole.selected(job.body, 'lease-silence-native').length === 4
 			).length,
 		1
 	);
