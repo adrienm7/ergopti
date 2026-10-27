@@ -169,7 +169,8 @@ function render_app_list() {
 		if (!app.toLowerCase().includes(query)) return;
 
 		const checked = app_state.selected_apps.has(app) ? 'checked' : '';
-		const icon_src = window.app_icons?.[app];
+		const icon_src =
+			window.app_icons && Object.hasOwn(window.app_icons, app) ? window.app_icons[app] : null;
 		const icon_html = icon_src
 			? `<img src="${icon_src}" class="app-icon-img" alt="${escape_html(app)}" />`
 			: `<div class="app-icon-div" style="background-color:${get_app_color(app)}">${app.charAt(0).toUpperCase()}</div>`;
