@@ -311,6 +311,7 @@ local function with_prediction_preflight(source, body)
 			end
 			local prediction = require("modules.llm.prediction_engine")
 			prediction.init({ scheduler = require("tests.fakes").timer_scheduler(), overlay = {
+				show = function() return true end,
 				move = function() return true end,
 				hide = function() return true end,
 				is_showing = function() error("configured preflight must not query an offer or UI") end,

@@ -28,12 +28,17 @@
 
 local M = {}
 
+-- The HttpClient port of the request plan: the client that sends and cancels inference
+-- requests. The engine hands it in at init; every other request keeps the adapter.
+local InferenceClient = nil
+
 local Logger = require("logger.shim")
 local ErrorDescription = require("error_description")
 local Json = require("json")
 local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local HttpClient = require("adapters.http_client")
+local Ports = require("llm.request_plan.ports")
 local PromptBuilder = require("llm.prompt_builder")
 local TextUtils = require("text_utils")
 local LlmBridge = require("infra.llm_bridge")
@@ -511,7 +516,7 @@ local function cancel_exchange(scope, expected_epoch)
 	-- An earlier cancellation may have synchronously admitted another scope's
 	-- successor. Its new epoch does not belong to the original cancel-all call.
 	if scope.epoch ~= expected_epoch then return true, false end
-	if HttpClient.cancel(scope.owner) ~= true then return false, false end
+	if (InferenceClient or HttpClient).cancel(scope.owner) ~= true then return false, false end
 	if scope.epoch ~= expected_epoch then return true, false end
 	scope.epoch, scope.active = expected_epoch + 1, nil
 	return true, true
@@ -614,7 +619,7 @@ local function post_json(scope, epoch, url, headers, payload, fail, on_answer, a
 		fail("request could not be encoded")
 		return
 	end
-	local dispatched = HttpClient.post(url, headers, body, function(result)
+	local dispatched = (InferenceClient or HttpClient).post(url, headers, body, function(result)
 		if epoch ~= scope.epoch then return end
 		if authorized and not authorized() then return end
 		if type(result) ~= "table" or result.ok ~= true then
@@ -756,7 +761,7 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 	local request, reason = M.build_request(entry, messages, opts)
 	if not request then return refuse(reason) end
 	Logger.debug(LOG, "chat() → %s (model=%s)", M.redact_url(request.url), request.model)
-	local dispatched = HttpClient.post(request.url, request.headers, request.body, function(result)
+	local dispatched = (InferenceClient or HttpClient).post(request.url, request.headers, request.body, function(result)
 		if epoch ~= scope.epoch then return end
 		if authorized and not authorized() then return end
 		if type(result) ~= "table" or result.ok ~= true then
@@ -960,6 +965,13 @@ function M._reset_for_test()
 		scope.epoch, scope.active, scope.used = scope.epoch + 1, nil, nil
 	end
 	_assistants = {}
+end
+
+--- Hands in the HttpClient that sends and cancels inference requests (engine init).
+--- nil restores the adapter.
+--- @param client table|nil Offers post and cancel (llm.request_plan.ports).
+function M.set_inference_client(client)
+	InferenceClient = client ~= nil and Ports.check("HttpClient", client) or nil
 end
 
 return M
