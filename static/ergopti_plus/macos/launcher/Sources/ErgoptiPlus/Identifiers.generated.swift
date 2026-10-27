@@ -16,6 +16,7 @@ enum Identifiers {
 	}
 	enum ServiceLabels {
 		static let macosCore = "com.ergoptiplus.runtime.core"
+		static let macosRemapGuardian = "com.ergoptiplus.remap-guardian"
 		static let macosVirtualHid = "com.ergoptiplus.runtime.vhid"
 	}
 	enum Hosts {

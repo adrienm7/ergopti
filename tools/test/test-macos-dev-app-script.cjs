@@ -5,10 +5,12 @@
  * MODULE: macOS Developer App Runner Tests
  * DESCRIPTION:
  * Runs the real tools/dev/run-macos-dev-app.sh from a fixture clone whose
- * build script, uname, pgrep, plutil and open are recording shims. Proves it
- * builds in developer source mode, opens only a developer app recorded for this
- * clone, refuses beside a running ErgoptiPlus or off macOS, and names a retired
- * ~/.hammerspoon bootstrap without deleting user configuration.
+ * build script, uname, pgrep, plutil, open, osascript, launchctl, ps and sleep
+ * are recording shims. Proves it builds in developer source mode, opens only a
+ * developer app recorded for this clone, stops a running ErgoptiPlus first
+ * (quit, then the guardian launchd keeps alive booted out), fails naming the
+ * survivors when a process outlives SIGKILL, refuses off macOS, and names a
+ * retired ~/.hammerspoon bootstrap without deleting user configuration.
  * ==============================================================================
  */
 
@@ -62,10 +64,26 @@ printf '%s' "$(cd "$(dirname "$0")/../.." && pwd)" > "$app/Contents/Info.plist"\
 	fs.mkdirSync(home, { recursive: true });
 	fs.mkdirSync(bin);
 	shim(bin, 'uname', 'echo "${FIXTURE_UNAME:-Darwin}"');
-	shim(bin, 'pgrep', '[ "${FIXTURE_RUNNING:-0}" = 1 ]');
+	// A pid that never exists, so the runner's real kill cannot reach a process.
+	const pids = path.join(scratch, name, 'pids');
+	// Only the bundle-path query answers: a runner that asks by process name
+	// finds nothing, as it missed the guardian on the maintainer's Mac.
+	shim(
+		bin,
+		'pgrep',
+		`[ "$1 $2" = "-f /ErgoptiPlus.app/Contents/" ] && [ -s "${pids}" ] && cat "${pids}"\nexit 0`
+	);
+	shim(
+		bin,
+		'osascript',
+		`echo "osascript $*" >> "${log}"\n[ "\${FIXTURE_SURVIVES:-0}" = 1 ] || : > "${pids}"`
+	);
+	shim(bin, 'launchctl', `echo "launchctl $*" >> "${log}"`);
+	shim(bin, 'ps', 'exit 0');
+	shim(bin, 'sleep', 'exit 0');
 	shim(bin, 'plutil', '[ "$1" = -extract ] && [ "$3" = raw ] || exit 9\ncat "$6"');
 	shim(bin, 'open', `echo "open $*" >> "${log}"`);
-	return { clone, home, bin, log };
+	return { clone, home, bin, log, pids };
 }
 
 /** Runs the real runner inside a fixture. */
@@ -128,11 +146,30 @@ try {
 		assert.equal(calls(paths), '', 'a foreign developer app must not be opened');
 	});
 
-	check('refuses beside a running ErgoptiPlus and off macOS, before building', () => {
+	check('quits a running ErgoptiPlus and boots its guardian out before building', () => {
+		const paths = fixture('running');
+		fs.writeFileSync(paths.pids, '999999991\n999999992\n');
+		const result = run(paths);
+		assert.equal(result.status, 0, result.stderr);
+		const log = calls(paths);
+		assert.match(log, /^osascript -e tell application id "com\.ergoptiplus\.app" to quit$/m);
+		assert.match(log, /^launchctl bootout gui\/\d+\/com\.ergoptiplus\.remap-guardian$/m);
+		assert(log.indexOf('launchctl bootout') < log.indexOf('build '), 'stop before building');
+		assert.match(result.stdout, /No ErgoptiPlus process is left/);
+	});
+
+	check('fails naming the survivors when a process outlives quit, SIGTERM and SIGKILL', () => {
+		const paths = fixture('survivor');
+		fs.writeFileSync(paths.pids, '999999993\n');
+		const result = run(paths, [], { FIXTURE_SURVIVES: '1' });
+		assert.equal(result.status, 1);
+		assert.match(result.stderr, /survived a quit, SIGTERM and SIGKILL/);
+		assert.match(result.stderr, /Login Items & Extensions/);
+		assert.doesNotMatch(calls(paths), /^(build|open) /m);
+	});
+
+	check('refuses off macOS and an unknown argument, before building', () => {
 		const paths = fixture('refusals');
-		const running = run(paths, [], { FIXTURE_RUNNING: '1' });
-		assert.equal(running.status, 1);
-		assert.match(running.stderr, /Quit the running ErgoptiPlus first/);
 		const linux = run(paths, [], { FIXTURE_UNAME: 'Linux' });
 		assert.equal(linux.status, 1);
 		assert.match(linux.stderr, /macOS only/);
