@@ -553,6 +553,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-contract-vector-ledger.cjs"],
 			"repro": "npm run test:contract-vector-ledger"
+		},
+		{
+			"id": "js-menu-row-order-single-source",
+			"ordinal": 509,
+			"name": "Menu row order single source (no driver spells a display order of row_order.json)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-menu-row-order-single-source.cjs"],
+			"repro": "npm run test:menu-row-order-single-source"
 		}
 	]
 }

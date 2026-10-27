@@ -71,15 +71,7 @@ local FALLBACK_HEALTH_DOT = {
 }
 
 --- Built-in fallback row ORDER — the order the two tables above cannot express.
-local FALLBACK_ROW_ORDER = {
-	"llm_backend",
-	"llm_model",
-	"llm_profile",
-	"llm_trigger",
-	"llm_generation_settings",
-	"llm_display",
-	"llm_navigation",
-}
+local FALLBACK_ROW_ORDER = require("menu.row_order").list("llm_menu_rows")
 
 -- Map of row id -> disabled_when_off (bool). nil until first load.
 local _policy = nil

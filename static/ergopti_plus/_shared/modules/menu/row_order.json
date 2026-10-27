@@ -1,0 +1,40 @@
+{
+	"_comment": "The display-order rules of the menus, in one place. Each rule is an ordered list; a name outside a list sorts after every listed name. Read by the Lua drivers through menu.row_order (generated into _shared/lua/menu/row_order_data.lua by tools/codegen/codegen-menu-row-order.cjs). tools/test/test-menu-row-order-single-source.cjs refuses a hard-coded copy of any of these orders in a driver.",
+	"rules": {
+		"hotstring_group_classes": {
+			"description": "Order of the hotstring group classes in a menu: the classes of menu_manifest.json hotstring_groups, listed by the order of their members.",
+			"order": ["standard", "ergopti", "dynamic"]
+		},
+		"hotstring_config_categories": {
+			"description": "Display order of the built-in categories in the hotstrings configuration window; it matches the menu and the AHK driver.",
+			"order": [
+				"magickey",
+				"autocorrection",
+				"rolls",
+				"sfbsreduction",
+				"distancesreduction",
+				"personal"
+			]
+		},
+		"llm_menu_rows": {
+			"description": "Order of the AI submenu rows a native menu registers handlers for when menu_manifest.json llm_menu cannot be read. The gate pins it to the manifest rows of the macOS driver.",
+			"order": [
+				"llm_backend",
+				"llm_model",
+				"llm_profile",
+				"llm_trigger",
+				"llm_generation_settings",
+				"llm_display",
+				"llm_navigation"
+			]
+		},
+		"model_tag_emoji": {
+			"description": "Order of the capability emoji after a model name in the model list.",
+			"order": ["🏆", "⚡", "🧠💭", "🧠", "💻", "🌐", "🖼️", "⭐"]
+		},
+		"menu_chord_modifiers": {
+			"description": "Order of the modifiers in the shortcut titles of the macOS menus (shortcut_utils); the bindings' own labels use the canonical chord order.",
+			"order": ["shift", "cmd", "alt", "ctrl"]
+		}
+	}
+}

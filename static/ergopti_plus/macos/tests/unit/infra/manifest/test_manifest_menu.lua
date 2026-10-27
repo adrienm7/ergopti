@@ -621,6 +621,7 @@ require("test.menu_native_composition").register(helpers, "hs")
 require("test.menu_layout_caption_values_contract").register(helpers, "macos")
 
 require("test.menu_numbered_caption_contract").register(helpers, "macos")
+require("test.menu_row_order_contract").register(helpers, 9)
 
 require("test.menu_fixed_feature_parent_contract").register(helpers, "macos")
 
