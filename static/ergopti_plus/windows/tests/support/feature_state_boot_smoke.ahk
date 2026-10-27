@@ -62,6 +62,11 @@ TapKeyAssignments["feature_state_include_once_probe"] := "none"
 #Include ..\..\modules\gestures\config.ahk
 ; LoggerInit admits the real shared privacy policy through this native codec.
 #Include ..\..\infra\json.ahk
+; Canonical classification also consults the real language/category ownership
+; registry, even when the authored file contains only script preferences.
+#Include ..\..\infra\toml\toml_loader.ahk
+#Include ..\..\infra\master_gates.ahk
+#Include ..\..\infra\hotstrings\hotstrings_cache.ahk
 
 try {
     if (A_Args.Length != 1 && !(A_Args.Length == 3 && A_Args[1] == "distance_gate")
@@ -119,6 +124,14 @@ try {
 			_FeatureStateSmokeInvalidValue("hotstrings", "repeat_key_enabled", "false")
 		case "invalid_kana":
 			_FeatureStateSmokeInvalidValue("script", "alt_gr_is_kana_remap", "sometimes")
+		case "kana_authored_outdated_enum", "kana_authored_outdated_quoted_boolean",
+				"kana_authored_outdated_number", "kana_authored_outdated_array",
+				"kana_authored_outdated_zero", "kana_authored_outdated_one",
+				"kana_authored_outdated_signed_zero", "kana_authored_outdated_missing_marker",
+				"kana_authored_valid_auto",
+				"kana_authored_valid_true", "kana_authored_valid_false",
+				"kana_authored_valid_comment":
+			_FeatureStateSmokeAuthoredKana(A_Args[1])
 		case "kana_auto_lower", "kana_auto_upper", "kana_auto_mixed":
 			_FeatureStateSmokeKanaAutomatic(A_Args[1])
 		case "logger_dotted", "logger_inline", "logger_quoted":
@@ -595,5 +608,72 @@ _FeatureStateSmokeLoggerSemantic(Fixture) {
 			_LoggerRepeatDisable()
 		}
 		DirDelete(Root, true)
+	}
+}
+
+
+; Each caller runs this full production reader in a fresh child process. Native
+; boot-owned hotstring globals therefore cannot leak into another test case.
+_FeatureStateSmokeAuthoredKana(Fixture) {
+	global ConfigurationFile, ScriptInformation
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries, _ConfigBootReadFailed
+	Cases := Map(
+		"kana_authored_outdated_enum", ['"sometimes"', true],
+		"kana_authored_outdated_quoted_boolean", ['"false"', true],
+		"kana_authored_outdated_number", ["42", true],
+		"kana_authored_outdated_array", ["[]", true],
+		"kana_authored_outdated_zero", ["0", true],
+		"kana_authored_outdated_one", ["1", true],
+		"kana_authored_outdated_signed_zero", ["-0", true],
+		"kana_authored_outdated_missing_marker", ['"_"', true],
+		"kana_authored_valid_auto", ['"auto"', false],
+		"kana_authored_valid_true", ["true", false],
+		"kana_authored_valid_false", ["false", false],
+		"kana_authored_valid_comment", ["true # explicit layout choice", false])
+	FixtureCase := Cases[Fixture]
+	Path := A_Temp . "\ergopti_kana_authored_" . DllCall("GetCurrentProcessId") . ".toml"
+	SavedScript := ScriptInformation.Clone()
+	FileWasSet := IsSet(ConfigurationFile)
+	SavedFile := FileWasSet ? ConfigurationFile : ""
+	try {
+		ConfigurationFile := Path
+		Source := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion()
+			. "`n[script]`nalt_gr_is_kana_remap = " . FixtureCase[1] . "`n"
+		if !FSWrite(Path, Source)
+			throw Error("The authored Kana fixture could not write its real native source.")
+		Before := FSReadUtf8Exact(Path)
+		Journal := ConfigMigrateBoot(Path)
+		if !(Journal is Map) || Journal.Get("status", "missing") != "current"
+			throw Error("The authored Kana source must complete the genuine current-schema boot constructor.")
+		Cache := ParseConfigTomlFile(Path)
+		if !Cache.Has(ConfigKey.SCRIPT) || !Cache[ConfigKey.SCRIPT].Has(ConfigLeaf.ALT_GR_IS_KANA_REMAP)
+			throw Error("The actual native bootstrap must expose the authored Kana setting.")
+		Snapshot := ConfigTomlReadSnapshot(Path)
+		if Snapshot.Cache != Cache || StrCompare(Snapshot.Source, Source, true) != 0
+			throw Error("The early reader fixture must retain the exact native bootstrap generation.")
+		Tree := ManifestBuildFeaturesMap()
+		Applied := ApplyConfigToml(Tree, Path, &Rejected, , &Outdated)
+		if Applied < 0 || Rejected != 0 || Outdated.Count != (FixtureCase[2] ? 1 : 0)
+			throw Error("The actual canonical loader must classify this declared Kana value before the early-reader assertion.")
+		Expected := Tree[ConfigKey.SCRIPT][ConfigLeaf.ALT_GR_IS_KANA_REMAP]
+		; Keep the actual cold-boot initialization so source admission is checked
+		; from the same live state as the driver's sole startup reader call.
+		Initial := ManifestDefaultFor(ConfigKey.SCRIPT_ALT_GR_IS_KANA_REMAP)
+		if Type(ScriptInformation["AltGrIsKanaRemap"]) != Type(Initial)
+				|| ScriptInformation["AltGrIsKanaRemap"] !== Initial
+			throw Error("The authored Kana fixture must start from its real manifest initialization.")
+		ReadScriptConfig(Cache)
+		Actual := ScriptInformation["AltGrIsKanaRemap"]
+		if Type(Actual) != Type(Expected) || Actual !== Expected
+			throw Error("The actual early script reader must keep canonical Kana admission; expected "
+				. String(Expected) . " (" . Type(Expected) . "), actual " . String(Actual) . " (" . Type(Actual) . ").")
+		if !FSUtf8ExactMatches(Path, Before) || StrCompare(Snapshot.Source, Source, true) != 0
+			throw Error("Ignoring an outdated authored Kana setting must preserve its physical and admitted source.")
+	} finally {
+		for Key, Value in SavedScript
+			ScriptInformation[Key] := Value
+		ConfigurationFile := FileWasSet ? SavedFile : unset
+		_TOML_InvalidateParseCache(Path)
+		FSDelete(Path)
 	}
 }
