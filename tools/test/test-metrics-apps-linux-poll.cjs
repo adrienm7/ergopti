@@ -94,6 +94,7 @@ const actual = vm.createContext({
 });
 actual.window = actual;
 installHostCapabilities(actual);
+require('./support/theme-tokens.cjs').installThemeTokens(actual);
 actual.__ergopti_host_capabilities = { document_bridge: true };
 actual.webkit = { messageHandlers: { metrics_apps_bridge: { postMessage() {} } } };
 vm.runInContext(

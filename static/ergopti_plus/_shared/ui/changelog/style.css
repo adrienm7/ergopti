@@ -130,7 +130,7 @@ body {
 }
 
 .release-item-date {
-	color: #666;
+	color: var(--theme-grey-666);
 	font-size: 11px;
 	margin-top: 2px;
 }
@@ -162,12 +162,12 @@ body {
 .badge-installed {
 	background: rgba(255, 214, 10, 0.12);
 	border: 1px solid rgba(255, 214, 10, 0.4);
-	color: #ffd60a;
+	color: var(--theme-yellow-dark);
 	margin-left: 4px;
 }
 
 .release-item.installed .release-item-tag {
-	color: #ffd60a;
+	color: var(--theme-yellow-dark);
 }
 
 /* ============================================= */
@@ -249,7 +249,7 @@ body {
 }
 
 #release-meta {
-	color: #666;
+	color: var(--theme-grey-666);
 	font-size: 12px;
 }
 
@@ -552,12 +552,12 @@ body {
 }
 
 #release-body .release-footer {
-	color: #666;
+	color: var(--theme-grey-666);
 	font-size: 12px;
 }
 
 #release-body .release-footer p {
-	color: #666;
+	color: var(--theme-grey-666);
 	font-size: 12px;
 }
 
@@ -618,7 +618,7 @@ body {
 }
 
 #loading-text {
-	color: #666;
+	color: var(--theme-grey-666);
 	font-size: 13px;
 }
 
