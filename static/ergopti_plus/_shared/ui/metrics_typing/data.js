@@ -127,15 +127,21 @@ function merge_dict(
 
 		if (real_count <= 0) return;
 
-		if (!target[display_k]) {
-			target[display_k] = {
-				count: 0,
-				time: 0,
-				errors: 0,
-				synth_hs: 0,
-				synth_llm: 0,
-				synth_other: 0
-			};
+		if (!Object.hasOwn(target, display_k)) {
+			// Native text is data even when it names an inherited member or setter.
+			Object.defineProperty(target, display_k, {
+				value: {
+					count: 0,
+					time: 0,
+					errors: 0,
+					synth_hs: 0,
+					synth_llm: 0,
+					synth_other: 0
+				},
+				enumerable: true,
+				writable: true,
+				configurable: true
+			});
 		}
 
 		target[display_k].count += real_count;

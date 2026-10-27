@@ -2951,4 +2951,97 @@ for (const host of ['windows', 'macos', 'linux']) {
 assert.equal(typingHeaderSearchCases.length, 8);
 assert.equal(passed, 531, 'all case-mode, Unicode and absent-query table controls must execute');
 
+const nativeWordTokens = ['ordinary', 'constructor', 'toString', '__proto__', 'hasOwnProperty'];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const source of ['historical', 'today']) {
+		for (const sensitive of [true, false]) {
+			for (const token of nativeWordTokens) {
+				test(`${host} ${source} words retain literal ${token}/${sensitive}`, () => {
+					const page = loadMetricsTypingPage(host);
+					freezePageClock(page, '2026-10-27T12:00:00Z');
+					const manifest = {
+						[source === 'historical' ? '2026-10-26' : '2026-10-27']: {
+							'Editor.exe': { chars: token.length * 7, time: 7000 }
+						}
+					};
+					publishTypingPage(page, host, manifest);
+					if (sensitive) page.elements.get('btn_case_sensitive').classList.add('active');
+					else page.elements.get('btn_case_sensitive').classList.remove('active');
+					const prototypeShape = () =>
+						vm.runInContext(
+							`JSON.stringify(
+						Object.getOwnPropertyNames(Object.prototype).map(key => [key,
+							typeof Object.prototype[key] === 'function'
+								? Object.getOwnPropertyNames(Object.prototype[key]) : []]))`,
+							page.context
+						);
+					const beforePrototype = prototypeShape();
+					const words = { w: Object.fromEntries([[token, { c: 7, t: 0 }]]) };
+					deliverTypingManifest(page, host, manifest, {
+						range:
+							source === 'historical'
+								? { historical: words, today: {} }
+								: { historical: {}, today: { 'Editor.exe': words } }
+					});
+					const key = sensitive ? token : token.toLowerCase();
+					assert.deepEqual(
+						Array.from(vm.runInContext('Object.keys(app_state.data.w)', page.context)),
+						[key],
+						'every native word remains an own dictionary entry'
+					);
+					assert.equal(
+						vm.runInContext(`app_state.data.w[${JSON.stringify(key)}].count`, page.context),
+						7
+					);
+					assert.equal(
+						prototypeShape(),
+						beforePrototype,
+						'native text must never mutate prototypes or inherited built-in functions'
+					);
+					const projection = vm.runInContext('app_state.data', page.context);
+					page.context.apply_local_filters();
+					assert.strictEqual(
+						vm.runInContext('app_state.data', page.context),
+						projection,
+						'the retained projection keeps valid token keys on cache hits'
+					);
+					vm.runInContext("app_state.current_tab = 'w';", page.context);
+					page.context.render_current_tab();
+					page.timers.at(-1)();
+					const html = page.elements.get('metrics_table_body').innerHTML;
+					assert.ok(html.includes(`<span class="mono-space">${key}</span>`));
+					assert.ok(html.includes('<td>7</td>'));
+					assert.ok(
+						page.context.build_searchable_key('[BS]', false).includes('backspace'),
+						'declared control markers retain their actual search aliases'
+					);
+					assert.equal(
+						page.context.build_searchable_key(token, sensitive),
+						key,
+						'ordinary word text cannot acquire inherited control-key aliases'
+					);
+					page.elements.get('search_input').value = token;
+					page.context.handle_search();
+					page.timers.at(-1)();
+					assert.ok(
+						page.elements
+							.get('metrics_table_body')
+							.innerHTML.includes(`<span class="mono-space">${key}</span>`)
+					);
+					assert.equal(
+						page.diagnostics.some((entry) => entry.level === 'error'),
+						false
+					);
+				});
+			}
+		}
+	}
+}
+assert.equal(nativeWordTokens.length, 5);
+assert.equal(
+	passed,
+	591,
+	'all historical/live native token identity and prototype controls must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);
