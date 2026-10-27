@@ -2132,6 +2132,8 @@
 	"ollama.download_title": "Downloading Ollama model",
 	"ollama.error_network": "Ollama could not be downloaded. Check your internet connection, then select the Ollama backend again.",
 	"ollama.error_checksum": "The downloaded Ollama archive failed its SHA-256 check and was discarded. Nothing was installed.",
+	"ollama.error_installer_refused": "Ergopti's Ollama installer refused its own request, so nothing was installed. Restart Ergopti and select the Ollama backend again; if this persists, send the diagnostics report.",
+	"ollama.error_runtime_refused": "Ergopti could not verify its pinned Ollama runtime (release catalogue or integrity check), so nothing was installed. Send the diagnostics report.",
 	"ollama.external_manual_start_body": "This Ollama installation is managed outside Ergopti. Start or stop its service yourself, or install Ergopti’s managed runtime from the Ollama setup offer.",
 	"ollama.native_install_declined_body": "The current Ollama installation and models stay unchanged. The managed runtime was not installed.",
 	"ollama.native_migration_body": "Install Ergopti’s managed runtime alongside your current Ollama installation. Existing models stay in their current location. Ergopti will not stop the current service; stop it yourself if it uses the same port. Native checks must pass before the managed runtime can run.",
