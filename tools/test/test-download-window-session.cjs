@@ -50,6 +50,7 @@ const context = vm.createContext({
 		}
 	}
 });
+require('./support/theme-tokens.cjs').installThemeTokens(context);
 vm.runInContext(hostBridge, context);
 vm.runInContext(source, context);
 assert.deepEqual(messages.splice(0), ['ready']);
