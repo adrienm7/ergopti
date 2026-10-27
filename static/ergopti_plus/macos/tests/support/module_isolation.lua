@@ -63,6 +63,21 @@ function M.purge(driver_root, shared_lua)
 	hs_stub.__reset()
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
+	-- A production module can require("hs.task") instead of reading the global.
+	-- Those entries resolve to no file, so the sweep above never reaches them: a
+	-- double one test file put there was the next file's hs.task. Point each at
+	-- the fresh stub's own member, or drop it when the stub has none.
+	local hs_keys = {}
+	for key in pairs(package.loaded) do
+		if type(key) == "string" and key:match("^hs%.") then hs_keys[#hs_keys + 1] = key end
+	end
+	for _, key in ipairs(hs_keys) do
+		local member = hs_stub
+		for part in key:sub(4):gmatch("[^.]+") do
+			member = type(member) == "table" and member[part] or nil
+		end
+		package.loaded[key] = member
+	end
 
 	local ok_core, core = pcall(require, "logger")
 	if ok_core and type(core) == "table" then
