@@ -36,11 +36,18 @@ One slot, one action, one neutral id, on every driver:
 - Personal shortcuts stay a separate surface (a script on Windows and macOS, a
   set of slots on Linux, see the reason text of `edit_shortcuts`).
 
-## Why no migration
+## Why saved bindings are migrated (supersedes "no migration")
 
-The repository has no users (memory note `project-no-users-no-backcompat`).
-Old keys are not read, not converted and not aliased. A leftover key is
-reported by the unused-key scan and offered for removal.
+The first draft of this note said the repository has no users, so old keys
+would be neither read nor converted. That is superseded (maintainer's
+decision, 2026-10-27): a setting a user chose is kept. The retired slot ids and
+the redundant booleans of macOS and Linux are converted into the neutral slot
+ids by one step of the shared config migration registry
+(`_shared/core/config_schema/migrations.toml`, the same closed op set the
+Windows engine already runs: `rename`, `copy_if_absent`, `map_value`,
+`delete`, `set_if_absent`). No new op kind and no runtime alias exist: after the
+step, only neutral ids are read. A leftover key that no slot owns is reported
+through `ConfigOutdated` and offered by the cleanup, on macOS and Linux.
 
 ## Steps
 
@@ -94,17 +101,39 @@ reported by the unused-key scan and offered for removal.
   (`quote`, `capslock`, `star`, `sc029`) that `modifier_chords.json` lacks; add
   them in step 3 before those chords become slots.
 
-## Blocker for steps 5 and 6 (found while preparing them)
+## Status after the macOS and Linux adoption
 
-Renaming a macOS or Linux slot id drops the saved binding without a word. The
-macOS owner (`keyboard_shortcuts.lua`, `walk_assignments`) consumes only slots
-it owns and reports only malformed `physical_` ids; any other key under
-`[shortcuts.keyboard]` is skipped, and `shortcuts.keyboard` is a declared
-dynamic namespace, so the unused-key scan never offers it for removal. A probe
-with a stored `secondary_space = "llm_generate_prediction"` left
-`hs_ctrl_space` at `none` and bound nothing, with no warning. The same holds for
-removing the 21 `shortcuts.keys.ctrl_*` booleans: a saved `true` is ignored
-and the chord stops working. "No migration" therefore needs one explicit
-decision before step 5 or 6: either every retired key is reported and listed
-by the cleanup (a reader that names it, not a conversion), or a one-off
-conversion is accepted. Nothing was renamed.
+- Step 3 done for macOS and Linux: the 18 macOS Ctrl-letter switches
+  (`ctrl_a` ... `ctrl_quote`, `cmd_shift_v`) are declared as
+  `shortcuts.keyboard` slots (`secondary_a` ... `secondary_quote`,
+  `primary_shift_v`) with their catalogue action as the recommendation; the
+  shipped slots are `secondary_space` (macOS), `primary_g` and `meta_space`
+  (Linux). Windows keeps its ids until step 4.
+- Steps 5 and 6 done: macOS and Linux build their slot prefixes from
+  `shortcuts.slot_roles` (families in menu order, longest prefix matched
+  first). macOS also accepts Caps Lock and the apostrophe in slots
+  (`extra_keys`), which `modifier_chords.json` does not carry because it also
+  feeds every driver's chord actions.
+- Step 8 done for macOS and Linux: the 18 hotkey factories and their menu rows
+  are deleted. `ctrl_g` (open ChatGPT with `shortcuts.chatgpt_url`), `cmd_star`
+  and `wrap_text_if_selected` stay as fixed switches: ChatGPT needs a per-binding
+  URL parameter and a shared `chatgpt_url` retirement, the other two are not
+  catalogue actions.
+- Migration: schema v15 (`migrations.toml`, `v14_to_v15`). Every retired slot
+  id is renamed, each switch becomes its slot and action (`false` becomes
+  `none`), and a slot the user set wins over the switch of the same chord. Only
+  the closed op set is used. Not converted: the per-slot action parameters
+  (`gestures.action_parameters` keys `keyboard__<slot>__<action>`), because a
+  rename op names one key and there are about 3,000 slot-and-action pairs per
+  driver; a parameter of a renamed slot stays under its old name, is reported as
+  outdated and offered by the cleanup, and the user re-enters it.
+- Known edge: a user who cleared a slot to `none` and kept the switch of the
+  same chord on had the switch win in the old runtime; after the step the
+  cleared slot wins. This is the "existing target keeps its value" rule of
+  `copy_if_absent`.
+- A key under `[shortcuts.keyboard]` that no slot owns is reported through
+  `ConfigOutdated` at boot on macOS and Linux. (The cleanup already listed it;
+  only the boot warning was missing.)
+- Chord action ids (`cmd_a`, `hs_ctrl_a`, `ctrl_a` ... the modifier chords of
+  `modifier_chords.json`) are actions, not slots, and keep their names; the
+  macOS `shortcut_groups` prefixes of that file build them.

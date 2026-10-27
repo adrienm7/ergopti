@@ -80,6 +80,7 @@ return {
 	"tests.unit.modules.shortcuts.physical.test_physical_slots",
 	"tests.unit.modules.shortcuts.keyboard.test_slot_roles",
 	"tests.unit.modules.shortcuts.keyboard.test_unknown_slot_report",
+	"tests.unit.modules.shortcuts.keyboard.test_migrated_config_keeps_bindings",
 	"tests.unit.infra.config.test_keyboard_slot_migration",
 	"tests.unit.ui.editors.test_physical_editor",
 	"tests.unit.ui.editors.test_physical_editor_host",
