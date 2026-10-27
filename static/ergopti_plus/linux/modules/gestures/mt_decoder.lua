@@ -27,15 +27,23 @@
 --- amount of hardware testing would reveal quickly, and the part a fixture can
 --- pin exactly.
 ---
---- THE TWO RULES THAT ARE EASY TO GET WRONG:
+--- THE THREE RULES THAT ARE EASY TO GET WRONG:
 --- 1. The finger count must be LATCHED AT ITS PEAK across the whole touch, never
 ---    read at the moment of lift. Fingers land and leave one at a time, so the
 ---    count walks up a ladder and back down: a three-finger swipe passes through
 ---    one and two on the way in and on the way out. Reading the instantaneous
 ---    value classifies most three-finger gestures as one-finger ones.
+---    The peak must be HELD, though: a count only becomes the peak after
+---    stable_frames consecutive frames, and a pair takes no further finger once
+---    it has travelled or outlived its landing. Otherwise a palm grazing the pad
+---    for one frame during a two-finger scroll made it a three-finger swipe.
 --- 2. With six or more fingers down, EVERY BTN_TOOL_* bit is 0 while BTN_TOUCH
 ---    stays 1. That is "unknown count", not "no fingers", and treating it as the
 ---    latter ends the gesture in the middle of it.
+--- 3. Travel is what the peak contacts covered TOGETHER: motion while fewer
+---    fingers are down (the scroll before a late finger, the pair left after
+---    one lifts) is not the swipe, and a three-finger gesture starting right
+---    after a two-finger scroll is the user stopping it, not a swipe.
 --- ==============================================================================
 
 local M = {}
@@ -114,6 +122,13 @@ if not M.TAP_MAX_SEC then
 	Logger.error(LOG, "[gestures].tap_max_ms is unreadable — taps cannot be time-bounded.")
 end
 
+-- How a finger count becomes the gesture's, from the shared timings registry:
+-- the frames it must hold, the landing window in which a pair may still take
+-- more fingers, and how long after a two-finger scroll no larger gesture fires.
+M.STABLE_FRAMES = ok_timings and Timings.count("gestures", "finger_confirm_frames") or nil
+M.LANDING_SEC = ok_timings and Timings.sec("gestures", "multi_finger_landing_ms") or nil
+M.SCROLL_GUARD_SEC = ok_timings and Timings.sec("gestures", "scroll_momentum_guard_ms") or nil
+
 
 
 
@@ -141,6 +156,16 @@ function M.new(opts)
 		now_sec = ok_mono and Monotonic.now_sec or os.time
 	end
 	local tap_max_sec = tonumber(opts.tap_max_sec) or M.TAP_MAX_SEC
+	local stable_frames = tonumber(opts.stable_frames) or M.STABLE_FRAMES
+	local landing_sec = tonumber(opts.landing_sec) or M.LANDING_SEC
+	local scroll_guard_sec = tonumber(opts.scroll_guard_sec) or M.SCROLL_GUARD_SEC
+	assert(type(stable_frames) == "number" and stable_frames >= 1,
+		"[gestures].finger_confirm_frames must be a positive frame count")
+	assert(type(landing_sec) == "number" and landing_sec >= 0,
+		"[gestures].multi_finger_landing_ms must be a duration")
+	assert(type(scroll_guard_sec) == "number" and scroll_guard_sec >= 0,
+		"[gestures].scroll_momentum_guard_ms must be a duration")
+	local landing_travel = threshold * Direction.LANDING_TRAVEL_FACTOR
 
 	local decoder = {}
 
@@ -152,6 +177,23 @@ function M.new(opts)
 	-- first one landed. The peak is the gesture's identity; see rule 1 above.
 	local _touching = false
 	local _peak_fingers = 0
+	local _peak_since = nil
+
+	-- The count the kernel reports now, and the run of frames it has held.
+	local _count = 0
+	local _run_count, _run_frames = 0, 0
+	local _run_x, _run_y = nil, nil
+
+	-- Travel the peak contacts covered together, and their previous centroid.
+	local _travel_x, _travel_y = 0, 0
+	local _prev_x, _prev_y = nil, nil
+	local _late_join_refused = false
+	-- A pair left travelling after the peak dropped: the gesture is a scroll.
+	local _drop_x, _drop_y = nil, nil
+	local _aborted = false
+
+	-- When the last two-finger scroll ended; survives reset() on purpose.
+	local _last_scroll_end_at = nil
 
 	-- Where the gesture started, averaged across the contacts present at the time.
 	local _origin_x, _origin_y = nil, nil
@@ -167,6 +209,15 @@ function M.new(opts)
 		_current_slot = 0
 		_touching = false
 		_peak_fingers = 0
+		_peak_since = nil
+		_count = 0
+		_run_count, _run_frames = 0, 0
+		_run_x, _run_y = nil, nil
+		_travel_x, _travel_y = 0, 0
+		_prev_x, _prev_y = nil, nil
+		_late_join_refused = false
+		_drop_x, _drop_y = nil, nil
+		_aborted = false
 		_origin_x, _origin_y = nil, nil
 		_last_x, _last_y = nil, nil
 		_started_at = nil
@@ -245,8 +296,10 @@ function M.new(opts)
 		if etype == EV_KEY then
 			local reported = FINGER_COUNT_CODES[code]
 			if reported and value == 1 then
-				-- Rule 1: the peak, never the instantaneous value.
-				if reported > _peak_fingers then _peak_fingers = reported end
+				-- Rule 1: the count is judged per frame, at SYN_REPORT.
+				_count = reported
+			elseif reported and value == 0 then
+				if _count == reported then _count = 0 end
 			elseif code == BTN_TOUCH then
 				if value == 1 then
 					_touching = true
@@ -265,11 +318,57 @@ function M.new(opts)
 
 		if _touching then
 			if cx and cy then
+				local now = now_sec()
 				if not _origin_x then
 					_origin_x, _origin_y = cx, cy
-					_started_at = now_sec()
+					_started_at = now
 				end
 				_last_x, _last_y = cx, cy
+
+				if _count ~= _run_count then
+					_run_count, _run_frames = _count, 0
+					_run_x, _run_y = cx, cy
+				end
+				_run_frames = _run_frames + 1
+
+				if _count > _peak_fingers and _run_frames >= stable_frames then
+					-- Rule 1: a pair that moved or outlived its landing is a scroll,
+					-- and a finger joining it is a resting thumb or a palm.
+					local late = _peak_fingers >= 2 and (
+						now - (_peak_since or now) > landing_sec
+						or math.abs(_travel_x) + math.abs(_travel_y) >= landing_travel)
+					if late then
+						if not _late_join_refused then
+							Logger.debug(LOG, "Late finger ignored for a moving pair: %d -> %d.",
+								_peak_fingers, _count)
+							_late_join_refused = true
+						end
+					else
+						_peak_fingers, _peak_since = _count, now
+						_travel_x, _travel_y = cx - _run_x, cy - _run_y
+						_prev_x, _prev_y = cx, cy
+					end
+				elseif _count == _peak_fingers and _peak_fingers > 0 then
+					-- Rule 3: only frames where every peak contact is down travel.
+					if _prev_x then
+						_travel_x = _travel_x + (cx - _prev_x)
+						_travel_y = _travel_y + (cy - _prev_y)
+					end
+					_prev_x, _prev_y = cx, cy
+				else
+					_prev_x, _prev_y = nil, nil
+				end
+
+				-- Fingers lifting one by one leave the rest still; a pair that
+				-- travels on after the peak dropped is scrolling.
+				if _peak_fingers >= 3 and _count == 2 then
+					if not _drop_x then _drop_x, _drop_y = cx, cy end
+					if math.abs(cx - _drop_x) + math.abs(cy - _drop_y) >= landing_travel then
+						_aborted = true
+					end
+				else
+					_drop_x, _drop_y = nil, nil
+				end
 			end
 			return nil
 		end
@@ -283,12 +382,28 @@ function M.new(opts)
 		end
 
 		local fingers = _peak_fingers
-		local dx = (_last_x and _origin_x) and (_last_x - _origin_x) or 0
-		local dy = (_last_y and _origin_y) and (_last_y - _origin_y) or 0
+		local dx, dy = _travel_x, _travel_y
 		local direction = direction_of(dx, dy)
-		local elapsed = (_started_at and now_sec() - _started_at) or 0
+		local now = now_sec()
+		local elapsed = (_started_at and now - _started_at) or 0
+		local started_at = _started_at
+		local aborted = _aborted
 
 		reset()
+
+		if aborted then
+			Logger.debug(LOG, "%d-finger gesture continued as a scrolling pair; ignored.", fingers)
+			_last_scroll_end_at = now
+			return nil
+		elseif fingers == 2 and direction then
+			_last_scroll_end_at = now
+		elseif fingers >= 3 and _last_scroll_end_at
+			and started_at - _last_scroll_end_at < scroll_guard_sec then
+			-- Rule 3: fingers landing to stop a scroll's momentum.
+			Logger.debug(LOG, "%d-finger gesture %.0f ms after a two-finger scroll ignored.",
+				fingers, (started_at - _last_scroll_end_at) * 1000)
+			return nil
+		end
 
 		if direction then
 			-- A swipe is a swipe however long it took: someone dragging slowly
@@ -325,6 +440,13 @@ function M.new(opts)
 	--- @return integer
 	function decoder:peak_fingers()
 		return _peak_fingers
+	end
+
+	--- Test seam: the finger count the kernel reports right now. Unlike the
+	--- peak, it needs no stable run of frames.
+	--- @return integer
+	function decoder:fingers_down()
+		return _count
 	end
 
 	return decoder
