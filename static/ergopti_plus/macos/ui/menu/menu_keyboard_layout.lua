@@ -533,7 +533,7 @@ function M.build(ctx)
 	if #records == 0 then
 		local ManifestMenu = require("infra.manifest_menu")
 		return ManifestMenu.template_rows("layout_active_source_empty_commands", {
-			["layout_open_preferences"] = function() pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'") end,
+			[require("config_keys").COMMAND.LAYOUT_OPEN_PREFERENCES] = function() pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'") end,
 		}, {}, {}) or {}
 	else
 		for _, r in ipairs(records) do
@@ -763,7 +763,7 @@ function M.build(ctx)
 		["layout_bundle"] = function() return declared_bundle_rows end,
 		["layout_switching"] = function() return switching_rows end,
 		-- The physical magic key, chosen by pressing it or from the candidates.
-		["magic_key_source"] = function()
+		[require("config_keys").LEAF.MAGIC_KEY_SOURCE] = function()
 			return MagicKeySourceMenu.rows({
 				state = state, save_prefs = save_prefs, keymap = ctx and ctx.keymap,
 				update_menu = update_menu, paused = ctx and ctx.paused,

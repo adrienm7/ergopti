@@ -16,6 +16,7 @@ local M = {}
 
 local llm_mod = require("modules.llm")
 local ManifestMenu = require("infra.manifest_menu")
+local ConfigKeys = require("config_keys")
 
 
 
@@ -40,8 +41,8 @@ function M.build(ctx, out)
 
 	-- The declaration owns label, order and reset presence; native callbacks are unchanged.
 	local rows = ManifestMenu.template_rows("llm_generation_temperature_controls", {
-		["llm_generation_temperature"] = settings_mgr.set_temperature,
-		["llm_generation_temperature_reset"] = settings_mgr.reset_temperature,
+		[ConfigKeys.COMMAND.LLM_GENERATION_TEMPERATURE] = settings_mgr.set_temperature,
+		[ConfigKeys.COMMAND.LLM_GENERATION_TEMPERATURE_RESET] = settings_mgr.reset_temperature,
 	}, {
 		llm_generation_ready = function() return not is_disabled end,
 		llm_generation_temperature_caption = function() return tostring(state.llm_temperature) end,
@@ -59,7 +60,7 @@ function M.build(ctx, out)
 	end
 	return {
 		commands = {
-			["llm_auto_raise_temperature"] = function()
+			[ConfigKeys.COMMAND.LLM_AUTO_RAISE_TEMPERATURE] = function()
 				if not ready() then return false end
 				return settings_mgr.apply_setting_transaction({
 					key = "llm_auto_raise_temp",

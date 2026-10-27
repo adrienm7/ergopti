@@ -1235,10 +1235,10 @@ local function create_menu(deps)
 								-- above it are ModelsSelector's, these three are this file's,
 								-- and the renderer materialises this file's.
 								local port_rows = ManifestMenu.template_rows("llm_mlx_port_frame", {
-									["llm_mlx_port"] = function()
+									[require("config_keys").COMMAND.LLM_MLX_PORT] = function()
 										return settings_mgr.set_mlx_port(restart_mlx_for_current_port)
 									end,
-									["llm_mlx_port_reset"] = function()
+									[require("config_keys").COMMAND.LLM_MLX_PORT_RESET] = function()
 										return settings_mgr.reset_mlx_port(restart_mlx_for_current_port)
 									end,
 								}, {
@@ -1346,7 +1346,7 @@ local function create_menu(deps)
 				for _, row in ipairs(count_rows) do generation_rows[#generation_rows + 1] = row end
 				if state.llm_num_predictions ~= llm_mod.DEFAULT_STATE.llm_num_predictions then
 					local reset_rows = ManifestMenu.template_rows("llm_generation_count_reset_control", {
-						["llm_generation_count_reset"] = function()
+						[require("config_keys").COMMAND.LLM_GENERATION_COUNT_RESET] = function()
 										return settings_mgr.apply_setting_transaction({
 												key = "llm_num_predictions",
 												value = llm_mod.DEFAULT_STATE.llm_num_predictions,
@@ -1372,15 +1372,15 @@ local function create_menu(deps)
 				local default_max_display = (llm_mod.DEFAULT_STATE.llm_max_words and llm_mod.DEFAULT_STATE.llm_max_words > 0)
 					and tostring(llm_mod.DEFAULT_STATE.llm_max_words) or i18n.get("menu.llm.unlimited")
 				local native_generation_rows = ManifestMenu.template_rows("llm_generation_native_controls", {
-					["llm_generation_context"] = settings_mgr.set_context_length,
-					["llm_generation_context_reset"] = settings_mgr.reset_context_length,
-					["llm_generation_min_words"] = settings_mgr.set_min_words,
-					["llm_generation_min_words_reset"] = settings_mgr.reset_min_words,
-					["llm_generation_max_words"] = settings_mgr.set_max_words,
-					["llm_generation_max_words_reset"] = settings_mgr.reset_max_words,
-					["llm_reset_on_nav"] = function()
+					[require("config_keys").COMMAND.LLM_GENERATION_CONTEXT] = settings_mgr.set_context_length,
+					[require("config_keys").COMMAND.LLM_GENERATION_CONTEXT_RESET] = settings_mgr.reset_context_length,
+					[require("config_keys").COMMAND.LLM_GENERATION_MIN_WORDS] = settings_mgr.set_min_words,
+					[require("config_keys").COMMAND.LLM_GENERATION_MIN_WORDS_RESET] = settings_mgr.reset_min_words,
+					[require("config_keys").COMMAND.LLM_GENERATION_MAX_WORDS] = settings_mgr.set_max_words,
+					[require("config_keys").COMMAND.LLM_GENERATION_MAX_WORDS_RESET] = settings_mgr.reset_max_words,
+					[require("config_keys").COMMAND.LLM_RESET_ON_NAV] = function()
 						return settings_mgr.apply_setting_transaction({
-							key = "llm_reset_on_nav",
+							key = require("config_keys").COMMAND.LLM_RESET_ON_NAV,
 							value = not state.llm_reset_on_nav,
 							runtime_fn = "set_llm_reset_on_nav",
 							publish_setting = false,
@@ -2019,7 +2019,7 @@ local function create_menu(deps)
 								local render_ctx = {
 										commands      = {
 											llm_toggle = toggle_action,
-											["scope_restore"] = function()
+											[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
 												-- A retained row rechecks what greyed it when it was built.
 												if paused or not configuration_writable() then
 													Logger.warn(LOG, "AI settings restore refused: %s.", paused and "the script is paused"
@@ -2132,7 +2132,7 @@ local function create_menu(deps)
 					return true
 				end
 				local rows = template_owner("llm_download_shortcut_frame", {
-					["llm_download_shortcut"] = function()
+					[require("config_keys").COMMAND.LLM_DOWNLOAD_SHORTCUT] = function()
 								if _dw and type(_dw.focus) == "function" then
 										pcall(_dw.focus)
 								elseif _dw and type(_dw.is_active) == "function" and not _dw.is_active() then

@@ -13,7 +13,7 @@ local ConfigKeys = require("config_keys")
 local function aliases()
 	return {
 		[ConfigKeys.KEY.SCRIPT_LOCALE] = { alias = "i18n_locale", native = require("infra.i18n") },
-		[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = { alias = "log_level", native = require("infra.logger") },
+		[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = { alias = ConfigKeys.LEAF.LOG_LEVEL, native = require("infra.logger") },
 		[ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG] = { alias = ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG, native = require("ui.error_dialog") },
 	}
 end
