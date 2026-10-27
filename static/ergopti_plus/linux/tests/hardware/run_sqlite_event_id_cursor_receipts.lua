@@ -20,6 +20,7 @@ local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
 local Keystats = require("modules.keystats.keystats")
 local Writer = require("modules.keystats.sqlite_writer")
+local Monotonic = require("infra.monotonic")
 local checks, failures = 0, 0
 local serial = 0
 local function check(name, test)
@@ -30,14 +31,9 @@ local function check(name, test)
 		io.stderr:write("FAIL " .. name .. ": " .. tostring(err) .. "\n")
 	end
 end
-local function fresh(cursor)
-	Writer.close_db()
-	serial = serial + 1
-	Keystats.init({ sqlite_path = root .. "/metrics-" .. serial .. ".sqlite", log_dir = root .. "/logs" })
-	assert(Keystats.is_enabled())
-	-- A session reset is acknowledged only after its native SQLite COMMIT; the
-	-- cursor must not be written while that asynchronous reset still owns the
-	-- writer (a slower runner reached set_meta first and it was refused).
+--- Resets the typing session and waits for its native SQLite COMMIT.
+--- @param purpose string What the acknowledged reset must precede.
+local function await_session_reset(purpose)
 	local deadline, reset = uv.hrtime() + 10 * 1e9, Keystats.reset_session()
 	while not reset and uv.hrtime() < deadline do
 		uv.run("nowait")
@@ -45,7 +41,21 @@ local function fresh(cursor)
 		reset = Keystats.reset_session()
 		if not reset then uv.sleep(1) end
 	end
-	assert(reset, "the session reset must be acknowledged before the cursor is set")
+	assert(reset, "the session reset must be acknowledged before " .. purpose)
+end
+local function fresh(cursor)
+	-- The previous case's typing session is still open: close it into its own
+	-- database. Left open, the next reset wrote its session_end into the new
+	-- database before the cursor existed, and the case saw a foreign low ID.
+	if serial > 0 then await_session_reset("the database changes") end
+	Writer.close_db()
+	serial = serial + 1
+	Keystats.init({ sqlite_path = root .. "/metrics-" .. serial .. ".sqlite", log_dir = root .. "/logs" })
+	assert(Keystats.is_enabled())
+	-- A session reset is acknowledged only after its native SQLite COMMIT; the
+	-- cursor must not be written while that asynchronous reset still owns the
+	-- writer (a slower runner reached set_meta first and it was refused).
+	await_session_reset("the cursor is set")
 	assert(Writer.set_meta("linux_next_event_id", cursor))
 end
 local function number(sql)
@@ -65,7 +75,10 @@ local invalid = {
 }
 for _, item in ipairs(invalid) do
 	fresh(item[2])
-	Keystats.on_keydown("a", 1000, "owned-cursor-app")
+	-- The session tracker measures silence on the monotonic clock the driver
+	-- passes here. A fixed 1000 ms made the flush end the session only on a host
+	-- up for more than the session timeout, so a freshly booted runner differed.
+	Keystats.on_keydown("a", math.floor(Monotonic.now_ms()), "owned-cursor-app")
 	require("tests.support.sqlite_flush_native").flush(Keystats)
 	require("tests.support.sqlite_flush_native").flush(Keystats)
 	check("native " .. item[1] .. " cursor refuses without mutation", function()
