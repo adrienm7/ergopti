@@ -169,7 +169,10 @@ final class NativeAppClonerReadOnlyBundleTests: XCTestCase {
 		let helperName = "clone 'helper'.sh"
 		let deniedName = "not executable.sh"
 		let program = "#!/bin/sh\nprintf 'readonly-cloner-helper\\n'\n"
-		for (name, permissions) in [(helperName, 0o755), (deniedName, 0o644)] {
+		// The helper is executable for its owner only. Darwin's chmod(1) skips a
+		// mode it would not change, so on a 0755 helper the old `chmod +x` was a
+		// successful no-op and the negative control below could never fail.
+		for (name, permissions) in [(helperName, 0o744), (deniedName, 0o644)] {
 			let helper = source.appendingPathComponent(name)
 			try program.write(to: helper, atomically: true, encoding: .utf8)
 			try FileManager.default.setAttributes([.posixPermissions: permissions], ofItemAtPath: helper.path)
