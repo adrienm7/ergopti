@@ -51,9 +51,7 @@ function M.available(deps)
 	if not live then return false, "session_unsupported" end
 	local resolved = resolve(deps)
 	local snapshot = resolved.registry.snapshot(resolved.registry_deps)
-	local count = 0
-	for _ in pairs(snapshot.installed or {}) do count = count + 1 end
-	if count == 0 then return false, "no_source_layout" end
+	if require("table_util").count(snapshot.installed or {}) == 0 then return false, "no_source_layout" end
 	return true, nil
 end
 
