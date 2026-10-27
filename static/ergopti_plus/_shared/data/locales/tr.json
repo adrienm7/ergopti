@@ -1697,7 +1697,7 @@
 	"menu.llm.min_words_label": "Öneri başına min. kelime: %s",
 	"menu.llm.min_words_prompt": "Öneri başına minimum kelime sayısı:",
 	"menu.llm.mlx_model_hint": "MLX modeli için HuggingFace tanımlayıcısı, ör.: mlx-community/Qwen2.5-3B-Instruct-4bit",
-	"menu.llm.mlx_port_label": "MLX sunucu bağlantı noktası: %s",
+	"menu.llm.server_port_label": "%s sunucu bağlantı noktası: %s",
 	"menu.llm.server_port_title": "%s sunucu bağlantı noktası",
 	"menu.llm.server_port_prompt": "Yerel %s sunucusunun bağlantı noktası (1024-65535). Varsayılan: %s.",
 	"menu.llm.model_backend": "Arka uç: %s",

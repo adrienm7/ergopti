@@ -1697,7 +1697,7 @@
 	"menu.llm.min_words_label": "제안당 최소 단어 수: %s",
 	"menu.llm.min_words_prompt": "제안당 최소 단어 수:",
 	"menu.llm.mlx_model_hint": "MLX 모델의 HuggingFace 식별자, 예: mlx-community/Qwen2.5-3B-Instruct-4bit",
-	"menu.llm.mlx_port_label": "MLX 서버 포트: %s",
+	"menu.llm.server_port_label": "%s 서버 포트: %s",
 	"menu.llm.server_port_title": "%s 서버 포트",
 	"menu.llm.server_port_prompt": "로컬 %s 서버의 포트 (1024-65535). 기본값: %s.",
 	"menu.llm.model_backend": "백엔드: %s",

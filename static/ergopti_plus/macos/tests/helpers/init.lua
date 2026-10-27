@@ -17,6 +17,12 @@
 --- ==============================================================================
 
 local M = {}
+
+--- English formats of the keys a caption with several getters (caption_getters) reads.
+--- Such a caption refuses a format without its placeholders, so a stub that echoes
+--- the key (the usual one) would drop the whole row; a stub that replaces the
+--- baseline starts from these.
+M.I18N_PLACEHOLDER_FORMATS = { ["menu.llm.server_port_label"] = "%s server port: %s" }
 local CommandLines = require("tests.support.command_lines")
 local SourceFile = require("tests.support.source_file")
 
@@ -439,8 +445,11 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- ui.menu.menu_utils.build_section_header) wrap disabled headers in the
 	-- canonical "— … —" decoration, so the stub must expose them or any builder
 	-- that renders a section header crashes with a nil-field call.
+	-- A caption that takes several getters (caption_getters) refuses a format without its
+	-- placeholders, so the keys the AI menu builds that way carry their English format.
+	local PLACEHOLDER_FORMATS = M.I18N_PLACEHOLDER_FORMATS
 	loaded["infra.i18n"] = {
-		get             = function(key) return key end,
+		get             = function(key) return PLACEHOLDER_FORMATS[key] or key end,
 		get_locale      = function() return "fr" end,
 		set_locale      = function() end,
 		decorate_section = function(text) return "— " .. text .. " —" end,

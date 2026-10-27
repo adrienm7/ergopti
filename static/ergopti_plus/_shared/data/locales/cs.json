@@ -1697,7 +1697,7 @@
 	"menu.llm.min_words_label": "Min. slov na návrh: %s",
 	"menu.llm.min_words_prompt": "Minimální počet slov na návrh:",
 	"menu.llm.mlx_model_hint": "Identifikátor HuggingFace pro model MLX, např.: mlx-community/Qwen2.5-3B-Instruct-4bit",
-	"menu.llm.mlx_port_label": "Port serveru MLX: %s",
+	"menu.llm.server_port_label": "Port serveru %s: %s",
 	"menu.llm.server_port_title": "Port serveru %s",
 	"menu.llm.server_port_prompt": "Port místního serveru %s (1024-65535). Výchozí: %s.",
 	"menu.llm.model_backend": "Backend: %s",

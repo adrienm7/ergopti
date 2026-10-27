@@ -1697,7 +1697,7 @@
 	"menu.llm.min_words_label": "Min. woorden per suggestie: %s",
 	"menu.llm.min_words_prompt": "Minimaal aantal woorden per suggestie:",
 	"menu.llm.mlx_model_hint": "HuggingFace-identificator voor het MLX-model, bijv.: mlx-community/Qwen2.5-3B-Instruct-4bit",
-	"menu.llm.mlx_port_label": "MLX-serverpoort: %s",
+	"menu.llm.server_port_label": "%s-serverpoort: %s",
 	"menu.llm.server_port_title": "%s-serverpoort",
 	"menu.llm.server_port_prompt": "Poort van de lokale %s-server (1024-65535). Standaard: %s.",
 	"menu.llm.model_backend": "Backend: %s",

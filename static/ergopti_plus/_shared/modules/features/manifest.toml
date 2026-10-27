@@ -8877,8 +8877,9 @@ section = "llm_generation_word_controls"
 [[menu.llm_mlx_port_control]]
 type = "command"
 id = "llm_mlx_port"
-i18n = "menu.llm.mlx_port_label"
-caption_getter = "llm_mlx_port_caption"
+i18n = "menu.llm.server_port_label"
+# The shared label names the provider, then the port: the two getters feed its two %s.
+caption_getters = ["llm_mlx_port_provider", "llm_mlx_port_caption"]
 disabled_when = ["llm_mlx_port_ready"]
 platforms = ["hs"]
 unavailable = "hide"

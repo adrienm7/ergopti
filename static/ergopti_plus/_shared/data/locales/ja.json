@@ -1697,7 +1697,7 @@
 	"menu.llm.min_words_label": "提案あたりの最小単語数: %s",
 	"menu.llm.min_words_prompt": "提案あたりの最小単語数:",
 	"menu.llm.mlx_model_hint": "MLXモデルのHuggingFace識別子、例: mlx-community/Qwen2.5-3B-Instruct-4bit",
-	"menu.llm.mlx_port_label": "MLX サーバーポート: %s",
+	"menu.llm.server_port_label": "%s サーバーポート: %s",
 	"menu.llm.server_port_title": "%s サーバーポート",
 	"menu.llm.server_port_prompt": "ローカル %s サーバーのポート（1024-65535）。デフォルト: %s。",
 	"menu.llm.model_backend": "バックエンド: %s",

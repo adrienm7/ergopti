@@ -1697,7 +1697,7 @@
 	"menu.llm.min_words_label": "每条建议最少单词: %s",
 	"menu.llm.min_words_prompt": "每条建议生成的最少单词数：",
 	"menu.llm.mlx_model_hint": "MLX模型HuggingFace标识，例：mlx-community/Qwen2.5-3B-Instruct-4bit",
-	"menu.llm.mlx_port_label": "MLX 服务器端口：%s",
+	"menu.llm.server_port_label": "%s 服务器端口：%s",
 	"menu.llm.server_port_title": "%s 服务器端口",
 	"menu.llm.server_port_prompt": "本地 %s 服务器的端口（1024-65535）。默认：%s。",
 	"menu.llm.model_backend": "后端: %s",

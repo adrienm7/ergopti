@@ -493,6 +493,8 @@ function M.new(deps)
 		local display_val = current_val < 0 and i18n.get("menu.settings.never") or math.floor(current_val * 1000)
 		local display_def = math.floor(llm_mod.DEFAULT_STATE.llm_debounce * 1000)
 
+		-- Not menu.llm.debounce_prompt: this dialog accepts a blank (reset to the default) and
+		-- "Never"/-1 on top of milliseconds, the Windows one a plain integer of milliseconds.
 		local full_msg = string.format(i18n.get("menu.settings.delay_prompt"), display_def)
 
 		local ok_p, btn, raw = pcall(dialog.text_prompt, i18n.get("menu.settings.delay_title"), full_msg, tostring(display_val), i18n.get("button.ok"), i18n.get("common.cancel"))

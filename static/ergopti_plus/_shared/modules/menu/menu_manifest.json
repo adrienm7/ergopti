@@ -5392,8 +5392,11 @@
 		{
 			"type": "command",
 			"id": "llm_mlx_port",
-			"i18n": "menu.llm.mlx_port_label",
-			"caption_getter": "llm_mlx_port_caption",
+			"i18n": "menu.llm.server_port_label",
+			"caption_getters": [
+				"llm_mlx_port_provider",
+				"llm_mlx_port_caption"
+			],
 			"disabled_when": [
 				"llm_mlx_port_ready"
 			],

@@ -85,7 +85,7 @@ local function build_fixture(callback, options)
 		assert(locale_file:close())
 		package.loaded["infra.i18n"] = { get = function(key)
 			if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
-			return key
+			return helpers.I18N_PLACEHOLDER_FORMATS[key] or key
 		end }
 		package.loaded["ui.menu.shortcut_utils"] = {}
 		package.loaded["modules.llm"] = {
@@ -547,7 +547,7 @@ helpers.describe("LLM health probe ownership", function()
 			fixture.set_stop_mode("deferred")
 			local item = fixture.handler.build_item()
 			local port_action = find_nested_action(
-				item, "menu.llm.model_label", "menu.llm.mlx_port_label")
+				item, "menu.llm.model_label", "MLX server port")
 			local backend_action = find_nested_action(
 				item, "MLX 🚀", "API 🌐")
 			helpers.assert_eq(type(port_action), "function")
@@ -574,7 +574,7 @@ helpers.describe("LLM health probe ownership", function()
 			fixture.set_stop_mode("deferred")
 			local item = fixture.handler.build_item()
 			local port_action = find_nested_action(
-				item, "menu.llm.model_label", "menu.llm.mlx_port_label")
+				item, "menu.llm.model_label", "MLX server port")
 			local backend_action = find_nested_action(
 				item, "MLX 🚀", "API 🌐")
 

@@ -1697,7 +1697,7 @@
 	"menu.llm.min_words_label": "الحد الأدنى من الكلمات لكل اقتراح: %s",
 	"menu.llm.min_words_prompt": "الحد الأدنى لعدد الكلمات في كل اقتراح:",
 	"menu.llm.mlx_model_hint": "معرّف HuggingFace لنموذج MLX، مثال: mlx-community/Qwen2.5-3B-Instruct-4bit",
-	"menu.llm.mlx_port_label": "منفذ خادم MLX: %s",
+	"menu.llm.server_port_label": "منفذ خادم %s: %s",
 	"menu.llm.server_port_title": "منفذ خادم %s",
 	"menu.llm.server_port_prompt": "منفذ خادم %s المحلي (1024-65535). الافتراضي: %s.",
 	"menu.llm.model_backend": "الخادم الخلفي: %s",
