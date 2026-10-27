@@ -276,6 +276,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.field_run_ports",
+		contract = { "new" },
+		-- Built by infra/field_run.lua, which starts only in developer source mode.
+		wired    = true,
+	},
+	{
 		id       = "adapters.runtime_owner_ports",
 		contract = { "new", "unpinned_count" },
 		-- Required only by the remap bridge after the hidden `runtime = "owned"` opt-in.
