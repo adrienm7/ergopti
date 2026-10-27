@@ -1575,4 +1575,82 @@ for (const host of ['windows', 'macos', 'linux']) {
 }
 assert.equal(typingGridDates.length, 3);
 assert.equal(passed, 288, 'all weekday-boundary calendar grid controls must execute');
+const typingWindowCases = [
+	{ name: 'older archive', extra: '2020-01-01' },
+	{ name: 'future day', extra: '2026-10-29' },
+	{ name: 'leading week padding', extra: '2025-10-28' },
+	{ name: 'first included day', extra: '2025-10-29', included: true },
+	{ name: 'local today', extra: '2026-10-28', included: true },
+	{ name: 'invalid recorded key', extra: 'not-a-recorded-date' },
+	{
+		name: 'local tomorrow before UTC midnight',
+		zone: 'America/Los_Angeles',
+		now: '2026-01-01T00:30:00Z',
+		recent: '2025-12-30',
+		extra: '2026-01-01'
+	},
+	{
+		name: 'Apia archived date identity',
+		zone: 'Pacific/Apia',
+		now: '2011-12-31T00:00:00Z',
+		recent: '2011-12-30',
+		extra: '2010-01-01'
+	}
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of typingWindowCases) {
+		test(`${host} typing annual normalization scopes ${vector.name}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = vector.zone || 'UTC';
+			try {
+				const paint = (extra) => {
+					const page = loadMetricsTypingPage(host);
+					freezePageClock(page, vector.now || '2026-10-28T12:00:00Z');
+					publishTypingPage(page, host, {
+						[vector.recent || '2026-10-20']: { Editor: { chars: 20, time: 10000 } },
+						...extra
+					});
+					assert.equal(
+						page.diagnostics.some((entry) => entry.level === 'error'),
+						false
+					);
+					const html = page.elements.get('activity_calendar_container').innerHTML;
+					const cells = Array.from(
+						html.matchAll(/<rect[^>]*fill="([^"]+)"[^>]*><title>([^<]+)<\/title>/g)
+					);
+					const recentColour = cells.find((match) => match[2].includes(' — 20 '))?.[1];
+					assert.ok(recentColour, 'the baseline recorded day has a real rendered cell');
+					return { page, html, recentColour };
+				};
+				const baseline = paint({});
+				const withOutlier = paint({ [vector.extra]: { Editor: { chars: 100000, time: 10000 } } });
+				if (vector.included) {
+					assert.notEqual(withOutlier.recentColour, baseline.recentColour);
+					assert.ok(
+						withOutlier.html.includes(
+							`2 ${withOutlier.page.context._t('ui_typing.calendar_active_days')} · ${withOutlier.page.context.format_number(100020)} ${withOutlier.page.context._t('ui_typing.calendar_chars')}`
+						),
+						'included boundaries contribute to the actual annual summary'
+					);
+				} else {
+					assert.equal(
+						withOutlier.recentColour,
+						baseline.recentColour,
+						'out-of-window rows cannot flatten visible calendar intensity'
+					);
+					assert.equal(
+						withOutlier.html,
+						baseline.html,
+						'out-of-window rows cannot change the annual summary or padding cells'
+					);
+				}
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+}
+assert.equal(typingWindowCases.length, 8);
+assert.equal(passed, 312, 'all annual summary, normalization and date-edge controls must execute');
 console.log(`${passed} passed, 0 failed.`);
