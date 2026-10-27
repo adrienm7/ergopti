@@ -259,7 +259,7 @@ local NATIVE_REASON_MAX_BYTES = 240
 --- @param body any Native response body of a failed request.
 --- @return string reason
 local function native_failure_reason(body)
-	local reason = type(body) == "string" and body:gsub("[%c]+", " "):match("^%s*(.-)%s*$") or ""
+	local reason = type(body) == "string" and TextUtils.trim((body:gsub("[%c]+", " "))) or ""
 	if reason == "" then return "Network request failed" end
 	if #reason > NATIVE_REASON_MAX_BYTES then reason = reason:sub(1, NATIVE_REASON_MAX_BYTES) .. "…" end
 	return "Network request failed: " .. reason
