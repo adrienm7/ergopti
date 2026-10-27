@@ -1,0 +1,23 @@
+# _shared/tests/corpus/config_migrations/shipped_keyboard_slot_parameters_on_linux/expected.toml
+
+[_meta]
+schema_version = 15
+
+[shortcuts.keyboard]
+primary_g = "open_url"
+primary_shift_k = "send_text"
+meta_r = "run_program"
+meta_shift_t = "send_text"
+alt_x = "open_url"
+
+[gesture_parameters]
+keyboard__primary_g__open_url = "https://example.org/g"
+keyboard__primary_shift_k__send_text = "Best regards"
+keyboard__meta_r__run_program = "xdg-open ~/Notes"
+keyboard__meta_shift_t__send_text = "TODO: "
+keyboard__alt_x__open_url = "https://example.org/x"
+keyboard__physical_none_KeyJ__open_url = "https://example.org/j"
+
+[linux.action_parameters]
+keyboard__primary_o__open_url = "https://example.org/legacy"
+keyboard__meta_e__send_text = "legacy"

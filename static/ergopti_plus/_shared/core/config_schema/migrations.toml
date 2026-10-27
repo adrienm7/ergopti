@@ -30,6 +30,12 @@
 #       At least one target field is required; copying to the same path is a no-op.
 #       An explicit ancestor value or descendant table also occupies a target:
 #       copying there is a no-op and leaves both namespaces untouched.
+#   { op = "rename_prefix", section, prefix, to_prefix }
+#       Renames every key of one section that starts with prefix to to_prefix
+#       followed by the same remainder; other keys and sub-sections stay. A
+#       target already held by a key or a table refuses the migration
+#       ("invalid", the file is never written). Neither prefix may extend the
+#       other, so a replay finds nothing left to rename.
 #   { op = "move_chord_action", section, key, to_section, action,
 #     conditional_key, disabled_action, platform = "macos" }
 #       Handoffs only exact legacy mods/key values represented by the injected
@@ -347,10 +353,20 @@ reason = "Keyboard slots are named by modifier role (primary_g, secondary_a, met
 # the user turned off becomes "none", and the switch itself is deleted. The
 # ChatGPT switch (ctrl_g, with the shortcuts.chatgpt_url setting) and the
 # Cmd+* and wrap-selection switches stay: they are not catalogue actions yet.
-# The per-slot action parameters of the retired ids (gestures.action_parameters
-# keys "keyboard__<slot>__<action>") are not renamed: each would need one op per
-# slot and parameterized action, thousands of rows every driver parses at boot.
+# The per-slot action parameters ("keyboard__<slot>__<action>" keys) follow
+# their slot with one rename_prefix per retired slot family, in the section
+# each driver keeps them in: macOS [gestures.action_parameters], Linux
+# [gesture_parameters] and its pre-2026-08 [linux.action_parameters], which the
+# Linux reader still reads. hs_ctrl_ and hs_option_ do not extend each other, so
+# the order of the families is free.
 ops = [
+	{ op = "rename_prefix", section = "gestures.action_parameters", prefix = "keyboard__cmd_", to_prefix = "keyboard__primary_" },
+	{ op = "rename_prefix", section = "gestures.action_parameters", prefix = "keyboard__hs_ctrl_", to_prefix = "keyboard__secondary_" },
+	{ op = "rename_prefix", section = "gestures.action_parameters", prefix = "keyboard__hs_option_", to_prefix = "keyboard__alt_" },
+	{ op = "rename_prefix", section = "gesture_parameters", prefix = "keyboard__ctrl_", to_prefix = "keyboard__primary_" },
+	{ op = "rename_prefix", section = "gesture_parameters", prefix = "keyboard__super_", to_prefix = "keyboard__meta_" },
+	{ op = "rename_prefix", section = "linux.action_parameters", prefix = "keyboard__ctrl_", to_prefix = "keyboard__primary_" },
+	{ op = "rename_prefix", section = "linux.action_parameters", prefix = "keyboard__super_", to_prefix = "keyboard__meta_" },
 	{ op = "rename", section = "shortcuts.keyboard", key = "cmd_a", to_key = "primary_a" },
 	{ op = "rename", section = "shortcuts.keyboard", key = "cmd_b", to_key = "primary_b" },
 	{ op = "rename", section = "shortcuts.keyboard", key = "cmd_c", to_key = "primary_c" },

@@ -15,6 +15,8 @@
 ---    "none", and an action the user chose for the slot wins over the switch.
 --- 3. Replaying the step on its own output changes nothing; a file at the new
 ---    version is untouched and a newer file is refused.
+--- 4. Every per-slot action parameter ("keyboard__<slot>__<action>") follows its
+---    slot in each section the driver keeps parameters in, so none is orphaned.
 --- ==============================================================================
 
 local Engine = require("config_migrate")
@@ -32,6 +34,15 @@ local PREFIXES = {
 		{ "super_", "meta_" }, { "super_shift_", "meta_shift_" },
 	},
 }
+
+-- Sections each driver reads "keyboard__<slot>__<action>" parameters from.
+local PARAMETER_SECTIONS = {
+	hs = { "gestures.action_parameters" },
+	linux = { "gesture_parameters", "linux.action_parameters" },
+}
+
+-- Parameterized actions a slot can carry; the suffix after the slot id.
+local PARAMETER_ACTIONS = { "open_url", "send_text", "run_program" }
 
 -- Retired macOS switch -> role-named slot and the catalogue action it ran.
 local SWITCHES = {
@@ -94,6 +105,47 @@ function M.register(h, opts)
 			h.assert_eq(Engine.plain(Engine.model_from_source(plan.candidate))["shortcuts.keyboard"], expected)
 			local replay = Engine.apply_steps(Engine.model_from_source(plan.candidate), registry, driver, 14, context)
 			h.assert_eq(Engine.plain(replay)["shortcuts.keyboard"], expected, "a replay must change nothing")
+		end)
+
+		h.it("(slot-migration) every retired slot's action parameters follow it to the role-named id", function()
+			local lines, expected, count = {}, {}, 0
+			for _, section in ipairs(PARAMETER_SECTIONS[driver]) do
+				lines[#lines + 1] = "[" .. section .. "]"
+				expected[section] = { keyboard__physical_none_KeyJ__open_url = "kept" }
+				lines[#lines + 1] = 'keyboard__physical_none_KeyJ__open_url = "kept"'
+				for _, pair in ipairs(PREFIXES[driver]) do
+					for _, key in ipairs(keys) do
+						for _, action in ipairs(PARAMETER_ACTIONS) do
+							local value = section .. ":" .. pair[1] .. key .. ":" .. action
+							lines[#lines + 1] = "keyboard__" .. pair[1] .. key .. "__" .. action .. ' = "' .. value .. '"'
+							expected[section]["keyboard__" .. pair[2] .. key .. "__" .. action] = value
+							count = count + 1
+						end
+					end
+				end
+			end
+			h.assert_true(count >= 480, "the replay must cover every legacy prefix times every key and action")
+			local plan = migrate(table.concat(lines, "\n") .. "\n")
+			h.assert_eq(plan.outcome, "migrated", tostring(plan.detail))
+			local model = Engine.plain(Engine.model_from_source(plan.candidate))
+			for _, section in ipairs(PARAMETER_SECTIONS[driver]) do
+				h.assert_eq(model[section], expected[section], "no parameter of [" .. section .. "] is orphaned")
+			end
+			local replay = Engine.plain(Engine.apply_steps(Engine.model_from_source(plan.candidate), registry, driver, 14, context))
+			for _, section in ipairs(PARAMETER_SECTIONS[driver]) do
+				h.assert_eq(replay[section], expected[section], "a replay must change nothing")
+			end
+		end)
+
+		h.it("(slot-migration) a parameter whose role-named key is already taken refuses the migration", function()
+			local pair = PREFIXES[driver][1]
+			local section = PARAMETER_SECTIONS[driver][1]
+			local source = "[" .. section .. "]\nkeyboard__" .. pair[1] .. 'a__open_url = "old"\nkeyboard__'
+				.. pair[2] .. 'a__open_url = "new"\n'
+			local plan = migrate(source)
+			h.assert_eq(plan.outcome, "invalid")
+			h.assert_nil(plan.candidate, "neither value may be dropped")
+			h.assert_true(tostring(plan.detail):find("Prefix rename refused:", 1, true) == 1, tostring(plan.detail))
 		end)
 
 		h.it("(slot-migration) an already role-named slot and a physical slot stay", function()
