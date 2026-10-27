@@ -9,8 +9,9 @@
 # (company) Mac: the system relay of `scutil --proxy` as HTTPS_PROXY,
 # HTTP_PROXY and NO_PROXY (loopback always excluded), and the system trust
 # store, where a company installs its inspection certificate. No CA file is
-# ever handed to a child: uv loads the keychain's roots (UV_SYSTEM_CERTS),
-# Apple's curl and Python's truststore read it already. Callers provide
+# ever handed to a child, and an inherited SSL_CERT_FILE or SSL_CERT_DIR is
+# dropped: uv loads the keychain's roots (UV_SYSTEM_CERTS), Apple's curl and
+# Python's truststore read it already. Callers provide
 # log_info() and log_error() before invoking retry_network() or
 # apply_system_network().
 # ============================================================================
@@ -374,9 +375,29 @@ managed_bootstrap_download() {
 # sends the local Ollama and MLX servers to the company's.
 LOOPBACK_NO_PROXY="localhost,127.0.0.1,::1"
 
+# Names of the CA-file variables a download child never inherits: they override
+# uv's and Python's system trust, and the signed native worker ignores them.
+INHERITED_TRUST_VARIABLES="SSL_CERT_FILE SSL_CERT_DIR"
+
+# Drops an inherited CA file or folder so every child uses the system and
+# keychain trust only, where the policy puts a company root. Ergopti never sets
+# either; the field run of 2026-10-27 19:47 inherited one the worker could not
+# read, and every download stopped. One INFO line per dropped name: once unset,
+# a later activation in the same child has nothing left to report.
+drop_inherited_trust_variables() {
+	local name
+	for name in $INHERITED_TRUST_VARIABLES; do
+		if [ -n "${!name:-}" ]; then
+			log_info "Inherited $name ignored: downloads use the system and keychain trust."
+		fi
+		unset "$name"
+	done
+}
+
 # Repeated admission checks keep the same child environment. Never append a CA
 # file: uv's native trust selection is the same Boolean activation every time.
 apply_client_network_environment() {
+	drop_inherited_trust_variables
 	local exclusions="${NO_PROXY:-${no_proxy:-}}" host
 	local IFS=,
 	for host in $LOOPBACK_NO_PROXY; do

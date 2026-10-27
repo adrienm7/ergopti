@@ -1315,10 +1315,12 @@ if ManagedPTYWorker.handles(arguments: CommandLine.arguments) {
 }
 
 if ManagedBootstrapDownload.handles(arguments: CommandLine.arguments) {
+	guard ManagedCertificateAuthorities.dropInheritedTrustVariables() else { Darwin.exit(78) }
 	Darwin.exit(ManagedBootstrapDownload.run(arguments: CommandLine.arguments))
 }
 
 if ManagedHTTPWorker.handles(arguments: CommandLine.arguments) {
+	guard ManagedCertificateAuthorities.dropInheritedTrustVariables() else { Darwin.exit(78) }
 	Darwin.exit(ManagedHTTPWorker.run(arguments: CommandLine.arguments))
 }
 
