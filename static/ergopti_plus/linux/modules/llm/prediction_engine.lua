@@ -628,7 +628,16 @@ function M.init(opts)
 	M.drop_agent_triage("engine initialised")
 	_agent_triaged = {}
 	_agent_last_app = nil
-	_scheduler = type(options.scheduler) == "table" and options.scheduler or TimerScheduler
+	-- The three ports are checked once, here, so a missing method fails at wiring and
+	-- not inside a timer or a network callback (llm.request_plan.ports).
+	local Ports = require("llm.request_plan.ports")
+	_scheduler = Ports.check("TimerScheduler", options.scheduler or TimerScheduler)
+	-- Without one, the remote client keeps the adapter (and an injected client stays: init runs
+	-- once per process; tests reload the module).
+	if options.http_client ~= nil then
+		require("modules.llm.api_remote").set_inference_client(Ports.check("HttpClient", options.http_client))
+	end
+	if _overlay ~= nil then Ports.check("TooltipRenderer", _overlay) end
 	-- The pacing clock must be the scheduler's: a test's virtual timers would
 	-- otherwise be measured against real time.
 	_clock_ms = type(options.clock_ms) == "function" and options.clock_ms or Monotonic.now_ms
