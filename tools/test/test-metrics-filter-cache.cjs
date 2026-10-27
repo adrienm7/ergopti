@@ -1751,4 +1751,82 @@ for (const host of ['windows', 'macos', 'linux']) {
 }
 assert.equal(typingMonthCases.length, 8);
 assert.equal(passed, 336, 'all quick-range month boundary controls must execute');
+const quickRangeTag = read('metrics_typing/index.html').match(
+	/<select\b[^>]*\bid="quick_range"[^>]*>([\s\S]*?)<\/select>/
+)[0];
+const quickPresets = Array.from(
+	quickRangeTag.matchAll(/<option\b[^>]*\bvalue="([^"]*)"/g),
+	(match) => match[1]
+).filter(Boolean);
+function runTypingControlChange(page, id) {
+	const tag = page.html.match(new RegExp('<(?:select|input)\\b[^>]*\\bid="' + id + '"[^>]*>'))?.[0];
+	assert.ok(tag, `the real page declares control ${id}`);
+	const handler = tag.match(/\bonchange="([^"]+)"/)?.[1];
+	assert.ok(handler, `the real HTML owns control ${id}'s change handler`);
+	vm.runInContext(handler, page.context);
+}
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const preset of quickPresets) {
+		test(`${host} quick preset ${preset} releases its action selection`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = 'UTC';
+			try {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, '2026-10-28T12:00:00Z');
+				publishTypingPage(page, host, { '2020-01-01': { Editor: { chars: 10, time: 10000 } } });
+				const quick = page.elements.get('quick_range');
+				quick.value = preset;
+				runTypingControlChange(page, 'quick_range');
+				const start = page.elements.get('date_start').value;
+				const cutoff = vm.runInContext('app_state.hour_cutoff', page.context);
+				assert.equal(
+					quick.value,
+					'',
+					'a completed quick action returns to the actual placeholder option'
+				);
+				page.elements.get('date_start').value = '2026-10-01';
+				runTypingControlChange(page, 'date_start');
+				assert.equal(quick.value, '', 'manual date edits cannot retain a false preset label');
+				quick.value = preset;
+				runTypingControlChange(page, 'quick_range');
+				assert.equal(quick.value, '');
+				assert.equal(
+					page.elements.get('date_start').value,
+					start,
+					'the same action remains selectable after a manual date edit'
+				);
+				assert.equal(page.elements.get('date_end').value, '2026-10-28');
+				assert.equal(vm.runInContext('app_state.hour_cutoff', page.context), cutoff);
+				assert.deepEqual(
+					JSON.parse(vm.runInContext('app_state.range_request_selection', page.context)),
+					[start, '2026-10-28', ['Editor']]
+				);
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+	test(`${host} empty quick placeholder does not issue a query`, () => {
+		const page = loadMetricsTypingPage(host);
+		freezePageClock(page, '2026-10-28T12:00:00Z');
+		publishTypingPage(page, host, { '2020-01-01': { Editor: { chars: 10, time: 10000 } } });
+		const before = vm.runInContext('app_state.range_request_sequence', page.context);
+		const start = page.elements.get('date_start').value;
+		page.elements.get('quick_range').value = '';
+		runTypingControlChange(page, 'quick_range');
+		assert.equal(vm.runInContext('app_state.range_request_sequence', page.context), before);
+		assert.equal(page.elements.get('date_start').value, start);
+		assert.equal(
+			page.diagnostics.some((entry) => entry.level === 'error'),
+			false
+		);
+	});
+}
+assert.equal(quickPresets.length, 8, 'all actual quick actions must participate');
+assert.equal(passed, 363, 'all quick-action, manual-edit and placeholder controls must execute');
 console.log(`${passed} passed, 0 failed.`);
