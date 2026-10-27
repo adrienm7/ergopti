@@ -1482,10 +1482,12 @@ HealthCheck_StartWindowControl()
 try DriverControl_Start()
 catch as _DriverControlErr
 	LoggerError("ErgoptiPlus", "Local reload control unavailable: {1}.", _DriverControlErr.Message)
-; A developer run (tools/dev/run-windows-dev.ps1) reloads on a saved .ahk.
+; A developer run (tools/dev/run-windows-dev.ps1, or this script double-clicked
+; in a clone) reloads on a saved .ahk.
 try {
 	if (DevSource_Root() != "") {
-		LoggerInfo("ErgoptiPlus", "Developer source mode; the driver runs from {1}.", _DriverDir)
+		LoggerInfo("ErgoptiPlus", "Developer source mode; the driver runs from {1} (clone root from {2}).",
+			_DriverDir, DevSource_Resolution()["origin"])
 		DevSourceWatcher_Start(_DriverDir, ReloadPreservingSuspend)
 	}
 } catch as _DevSourceErr

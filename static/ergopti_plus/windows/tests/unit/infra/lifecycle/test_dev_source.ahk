@@ -3,11 +3,12 @@
 ; ==============================================================================
 ; MODULE: Developer Source Mode Tests (Windows)
 ; DESCRIPTION:
-; A developer run (tools/dev/run-windows-dev.ps1) names the clone root and
-; reloads the driver once a saved .ahk settles. These tests pin the exact-root
-; resolution, that a compiled build ignores the variable, that test and
-; generated files never reload, and that a change reloads once, after a quiet
-; poll.
+; A developer run (tools/dev/run-windows-dev.ps1) names the clone root, a
+; double-clicked ErgoptiPlus.ahk in a clone derives it, and either reloads the
+; driver once a saved .ahk settles. These tests pin the exact-root resolution,
+; the derived root of a Git checkout only, that the variable wins, that a
+; compiled build ignores both, that test and generated files never reload, and
+; that a change reloads once, after a quiet poll.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -58,6 +59,86 @@ _DST_ExactRoot() {
 	AssertThrows(() => DevSource_ResolveRoot("C:\other", _DST_Driver, 1), "another clone")
 }
 Test("dev source: accepts only the clone the script runs from (windows-dev-mode)", _DST_ExactRoot)
+
+; A scratch clone layout: the shared identifiers, the driver folder and, unless
+; told otherwise, a .git folder ("file" makes it a linked worktree's .git file).
+_DST_Clone(GitKind := "dir") {
+	Root := A_Temp . "\ergopti_dev_clone_" . A_TickCount . "_" . Random(1, 1000000)
+	DirCreate(Root . "\static\ergopti_plus\_shared\data")
+	DirCreate(Root . "\static\ergopti_plus\windows")
+	FileAppend("{}", Root . "\static\ergopti_plus\_shared\data\identifiers.json", "UTF-8")
+	if (GitKind == "dir")
+		DirCreate(Root . "\.git")
+	else if (GitKind == "file")
+		FileAppend("gitdir: C:\elsewhere`n", Root . "\.git", "UTF-8")
+	return Root
+}
+
+_DST_DerivedRoot() {
+	Root := _DST_Clone()
+	Worktree := _DST_Clone("file")
+	try {
+		Driver := Root . "\static\ergopti_plus\windows"
+		AssertEqual(Root, DevSource_ResolveRoot("", Driver, 1), "a double-click in a clone")
+		AssertEqual(Root, DevSource_ResolveRoot("", StrReplace(Driver, "\", "/"), 1), "forward slashes")
+		AssertEqual(Worktree, DevSource_ResolveRoot("", Worktree . "\static\ergopti_plus\windows", 1),
+			"a linked worktree's .git file")
+		AssertEqual("the script location", DevSource_RootOrigin(Root, ""))
+		AssertEqual("the developer variable", DevSource_RootOrigin(Root, Root))
+		AssertEqual("", DevSource_RootOrigin("", ""))
+	} finally {
+		DirDelete(Root, true)
+		DirDelete(Worktree, true)
+	}
+}
+Test("dev source: a source run in a Git clone derives the root (windows-dev-mode)", _DST_DerivedRoot)
+
+_DST_DerivedRefused() {
+	NoGit := _DST_Clone("none")
+	NoTree := _DST_Clone()
+	try {
+		AssertEqual("", DevSource_ResolveRoot("", NoGit . "\static\ergopti_plus\windows", 1),
+			"a source tree without .git is a plain source run")
+		FileDelete(NoTree . "\static\ergopti_plus\_shared\data\identifiers.json")
+		AssertEqual("", DevSource_ResolveRoot("", NoTree . "\static\ergopti_plus\windows", 1),
+			"a checkout without this repository's tree")
+		AssertEqual("", DevSource_ResolveRoot("", NoTree . "\static\ergopti_plus", 1),
+			"a folder that is not the Windows driver")
+	} finally {
+		DirDelete(NoGit, true)
+		DirDelete(NoTree, true)
+	}
+}
+Test("dev source: no derived root outside a Git clone of this repository (windows-dev-mode)",
+	_DST_DerivedRefused)
+
+_DST_VariableWins() {
+	Clone := _DST_Clone()
+	NoGit := _DST_Clone("none")
+	try {
+		AssertThrows(() => DevSource_ResolveRoot("C:\other", Clone . "\static\ergopti_plus\windows", 1),
+			"a variable naming another clone still raises inside a clone")
+		AssertEqual(NoGit, DevSource_ResolveRoot(NoGit, NoGit . "\static\ergopti_plus\windows", 1),
+			"the launcher's variable needs no .git")
+	} finally {
+		DirDelete(Clone, true)
+		DirDelete(NoGit, true)
+	}
+}
+Test("dev source: the developer variable wins over the derived root (windows-dev-mode)", _DST_VariableWins)
+
+_DST_DerivedCompiled() {
+	Clone := _DST_Clone()
+	try AssertEqual("", DevSource_ResolveRoot("", Clone . "\static\ergopti_plus\windows", 0),
+		"a compiled build never derives a root")
+	finally DirDelete(Clone, true)
+	Body := _DriverFuncBody("DevSource_Resolution")
+	AssertContains(Body, "Updater_IsLocalSource()", "the source-run owner decides")
+	AssertFalse(InStr(Body, "A_IsCompiled"), "no second source-run owner")
+	AssertContains(_DriverSourceConcat(), 'DevSource_Resolution()["origin"]',
+		"the startup line names where the root came from")
+}
+Test("dev source: a compiled build derives no root (windows-dev-mode)", _DST_DerivedCompiled)
 
 _DST_SnapshotScope() {
 	Root := _DST_Tree()
