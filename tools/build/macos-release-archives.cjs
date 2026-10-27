@@ -445,22 +445,25 @@ function installCIArchive(input, output, options = {}) {
 }
 
 if (require.main === module) {
+	// A developer source build (ERGOPTI_DEV_SOURCE=1) runs one clone's Lua: it
+	// is never receipted, archived or installed, whichever entry is used.
+	const { refuseDeveloperSource } = require('./macos-dev-source-guard.cjs');
 	const args = process.argv.slice(2);
 	if (args[0] === '--ci-receipt' && args.length === 3) {
+		refuseDeveloperSource(path.resolve(args[1]));
 		createCIReceipt(path.resolve(args[1]), path.resolve(args[2]));
 	} else if (args[0] === '--ci-install' && (args.length === 3 || args.length === 4)) {
-		process.stdout.write(
-			JSON.stringify(
-				installCIArchive(
-					path.resolve(args[1]),
-					path.resolve(args[2]),
-					args.length === 4 ? { quarantine: args[3] } : {}
-				)
-			) + '\n'
+		const installed = installCIArchive(
+			path.resolve(args[1]),
+			path.resolve(args[2]),
+			args.length === 4 ? { quarantine: args[3] } : {}
 		);
+		refuseDeveloperSource(path.join(path.resolve(args[2]), ciBindings({}).basename));
+		process.stdout.write(JSON.stringify(installed) + '\n');
 	} else {
 		if (process.argv.length !== 4)
 			throw new Error('Expected the signed application and output directory.');
+		refuseDeveloperSource(path.resolve(process.argv[2]));
 		for (const archive of createArchives(process.argv[2], process.argv[3]))
 			process.stdout.write(`Created ${archive.name}\n`);
 	}
