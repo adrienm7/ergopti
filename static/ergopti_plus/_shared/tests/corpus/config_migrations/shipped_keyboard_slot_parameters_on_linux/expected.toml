@@ -1,7 +1,7 @@
 # _shared/tests/corpus/config_migrations/shipped_keyboard_slot_parameters_on_linux/expected.toml
 
 [_meta]
-schema_version = 15
+schema_version = 16
 
 [shortcuts.keyboard]
 primary_g = "open_url"

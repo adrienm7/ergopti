@@ -45,6 +45,8 @@ rejected = [
 	"rename_prefix_not_bare",
 	"rename_prefix_extends_prefix",
 	"rename_prefix_shortens_prefix",
+	"wrap_value_missing_to_key",
+	"wrap_value_to_key_not_bare",
 	"copy_without_target",
 	"copy_missing_source_key",
 	"copy_unknown_field",
