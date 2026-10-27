@@ -11,6 +11,13 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shar
 	.. root .. "/../_shared/lua/?/init.lua;" .. package.path
 package.cpath = ""
 assert(package.loaded.luv == nil and not pcall(require, "luv"), "the native luv provider must actually be unavailable")
+--- Runs a shell command and reports success under either os.execute ABI:
+--- Lua 5.1 LuaJIT returns 0, a 5.2-compatible LuaJIT build (Fedora, Alpine)
+--- and stock Lua 5.2+ return true.
+local function succeeded(command)
+	local status = os.execute(command)
+	return status == true or status == 0
+end
 local database = os.tmpname()
 local ok, failure = xpcall(function()
 	local writer = require("modules.keystats.sqlite_writer")
@@ -23,20 +30,20 @@ local ok, failure = xpcall(function()
 		assert(writer.query_rows("SELECT value FROM private_no_luv_fixture;")[1] == "retained")
 		assert(writer.flush_transport_available() == false, "synchronous admission cannot fabricate an async transport")
 		local quote = require("text_utils").shell_quote
-		assert(os.execute("chmod 644 -- " .. quote(database)) == 0)
+		assert(succeeded("chmod 644 -- " .. quote(database)))
 		assert(require("infra.private_sqlite_file").admit(database))
 		local pipe = assert(io.popen("stat -c %a -- " .. quote(database), "r"))
 		assert(pipe:read("*a") == "600\n" and pipe:close())
 		assert(writer.query_rows("SELECT value FROM private_no_luv_fixture;")[1] == "retained")
 		writer.close_db()
 		local alias = database .. ".alias"
-		assert(os.execute("ln -s -- " .. quote(database) .. " " .. quote(alias)) == 0)
+		assert(succeeded("ln -s -- " .. quote(database) .. " " .. quote(alias)))
 		assert(writer.open_db(alias) and writer.query_rows("SELECT value FROM private_no_luv_fixture;")[1] == "retained")
 		writer.close_db()
 		assert(os.remove(alias))
-		assert(os.execute("chmod 400 -- " .. quote(database)) == 0)
+		assert(succeeded("chmod 400 -- " .. quote(database)))
 		assert(require("infra.private_sqlite_file").admit(database) == false, "FFI cannot silently grant write access to a read-only owner")
-		assert(os.execute("chmod 600 -- " .. quote(database)) == 0)
+		assert(succeeded("chmod 600 -- " .. quote(database)))
 	else
 		assert(admitted == false and not writer.is_available(), "stock Lua without a descriptor API must not admit plaintext storage")
 	end
