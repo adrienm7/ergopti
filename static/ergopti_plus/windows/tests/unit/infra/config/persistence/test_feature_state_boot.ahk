@@ -209,3 +209,15 @@ _FeatureStateBootNativeInclude(DriverSource, Position) {
 for Fixture in ["kana_auto_lower", "kana_auto_upper", "kana_auto_mixed"]
 	Test("feature-state startup: admitted " . Fixture . " stays automatic (kana-auto-case-runtime)",
 		_FeatureStateBootRun.Bind(Fixture))
+
+
+for Fixture in [
+	"kana_authored_outdated_enum", "kana_authored_outdated_quoted_boolean",
+	"kana_authored_outdated_number", "kana_authored_outdated_array",
+	"kana_authored_outdated_zero", "kana_authored_outdated_one",
+	"kana_authored_outdated_signed_zero", "kana_authored_outdated_missing_marker",
+	"kana_authored_valid_auto",
+	"kana_authored_valid_true", "kana_authored_valid_false", "kana_authored_valid_comment"
+]
+	Test("feature-state authored Kana admission: " . Fixture . " (script-authored-kana-admission)",
+		_FeatureStateBootRun.Bind(Fixture))
