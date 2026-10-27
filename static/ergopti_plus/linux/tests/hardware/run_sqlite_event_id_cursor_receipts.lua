@@ -35,7 +35,17 @@ local function fresh(cursor)
 	serial = serial + 1
 	Keystats.init({ sqlite_path = root .. "/metrics-" .. serial .. ".sqlite", log_dir = root .. "/logs" })
 	assert(Keystats.is_enabled())
-	Keystats.reset_session()
+	-- A session reset is acknowledged only after its native SQLite COMMIT; the
+	-- cursor must not be written while that asynchronous reset still owns the
+	-- writer (a slower runner reached set_meta first and it was refused).
+	local deadline, reset = uv.hrtime() + 10 * 1e9, Keystats.reset_session()
+	while not reset and uv.hrtime() < deadline do
+		uv.run("nowait")
+		Keystats.pump_flush()
+		reset = Keystats.reset_session()
+		if not reset then uv.sleep(1) end
+	end
+	assert(reset, "the session reset must be acknowledged before the cursor is set")
 	assert(Writer.set_meta("linux_next_event_id", cursor))
 end
 local function number(sql)
