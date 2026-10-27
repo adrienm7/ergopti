@@ -1,0 +1,45 @@
+(
+        {
+        "Bundle ID" = "com.apple.CharacterPaletteIM";
+        InputSourceKind = "Non Keyboard Input Method";
+    },
+        {
+        InputSourceKind = "Keyboard Layout";
+        "KeyboardLayout ID" = 1;
+        "KeyboardLayout Name" = French;
+    },
+        {
+        "Bundle ID" = "com.apple.PressAndHold";
+        InputSourceKind = "Non Keyboard Input Method";
+    },
+        {
+        "Bundle ID" = "com.apple.inputmethod.ironwood";
+        InputSourceKind = "Non Keyboard Input Method";
+    },
+        {
+        InputSourceKind = "Keyboard Layout";
+        "KeyboardLayout ID" = "-2605093";
+        "KeyboardLayout Name" = "Ergopti_v2_2_2_plus";
+    },
+        {
+        InputSourceKind = "Keyboard Layout";
+        "KeyboardLayout ID" = "-2605091";
+        "KeyboardLayout Name" = "Ergopti_v2_2_2";
+    },
+        {
+        InputSourceKind = "Keyboard Layout";
+        "KeyboardLayout ID" = "-2791611";
+        "KeyboardLayout Name" = "Composer Check";
+    }
+)
+(
+        {
+        "Bundle ID" = "com.apple.PressAndHold";
+        InputSourceKind = "Non Keyboard Input Method";
+    },
+        {
+        InputSourceKind = "Keyboard Layout";
+        "KeyboardLayout ID" = "-2605093";
+        "KeyboardLayout Name" = "Ergopti_v2_2_2_plus";
+    }
+)

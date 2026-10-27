@@ -1,0 +1,1 @@
+{"codes":["synthetic_input_unsafe"],"deadline_ms":0,"elapsed_ms":0,"finished_at":"2026-10-27T18:48:49Z","index":7,"kind":"field_check","log_window":{"lines":[],"truncated":false},"report":{},"request_id":"mac-2026-10-27_194738","schema":1,"started_at":"2026-10-27T18:48:49Z","step":"key_accounting","verdict":"needs_typing"}
