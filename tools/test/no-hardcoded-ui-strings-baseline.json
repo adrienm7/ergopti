@@ -1,47 +1,5 @@
 [
 	{
-		"file": "linux/bin/ergopti-hotstrings",
-		"sink": "echo",
-		"text": "  Lancez : ergopti-hotstrings --install-deps",
-		"count": 1
-	},
-	{
-		"file": "linux/bin/ergopti-hotstrings",
-		"sink": "echo",
-		"text": "  Ou installez manuellement : apt-get install ${missing[*]}",
-		"count": 1
-	},
-	{
-		"file": "linux/bin/ergopti-hotstrings",
-		"sink": "echo",
-		"text": "Dépendances installées avec succès.",
-		"count": 1
-	},
-	{
-		"file": "linux/bin/ergopti-hotstrings",
-		"sink": "echo",
-		"text": "Erreur : dépendances manquantes — ${missing[*]}",
-		"count": 1
-	},
-	{
-		"file": "linux/bin/ergopti-hotstrings",
-		"sink": "echo",
-		"text": "Erreur : gestionnaire de paquets introuvable (apt, dnf ou pacman requis).",
-		"count": 1
-	},
-	{
-		"file": "linux/bin/ergopti-hotstrings",
-		"sink": "echo",
-		"text": "Erreur : répertoire du driver Linux introuvable : ${DRIVER_ROOT}",
-		"count": 1
-	},
-	{
-		"file": "linux/bin/ergopti-hotstrings",
-		"sink": "echo",
-		"text": "Installation des dépendances requises…",
-		"count": 1
-	},
-	{
 		"file": "linux/install.sh",
 		"sink": "echo",
 		"text": "     Appartenir au groupe « input » permet de lire TOUTES les frappes",
