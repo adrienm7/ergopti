@@ -103,7 +103,7 @@ vm.runInContext(
 	),
 	actual
 );
-for (const file of ['helpers.js', 'state.js', 'main.js']) {
+for (const file of ['../metrics_calendar.js', 'helpers.js', 'state.js', 'main.js']) {
 	vm.runInContext(fs.readFileSync(path.join(path.dirname(PAGE), file), 'utf8'), actual, {
 		filename: file
 	});

@@ -25,7 +25,12 @@ let appIcons = window.AppIcons || {};
 let currentSelectedDate = null;
 let currentPeriod = 'day';
 // One calendar-length owner for period queries and their previous-period comparison.
-const METRICS_PERIOD_DAYS = Object.freeze({ day: 1, week: 7, month: 30, year: 365 });
+const METRICS_PERIOD_DAYS = Object.freeze({
+	day: 1,
+	week: 7,
+	month: 30,
+	year: METRICS_CALENDAR_YEAR_DAYS
+});
 // #53 — null means "all categories enabled"; otherwise a Set of allowed cats.
 let currentCategoryFilter = null;
 // #54 — null means "all weekdays enabled"; otherwise a Set of allowed dows (0=Mon..6=Sun).
@@ -332,47 +337,6 @@ function formatDuration(ms) {
 function formatDurationDecimal(ms) {
 	if (!ms) return 0;
 	return Number((ms / 3600000).toFixed(2));
-}
-
-// Recorded dates are Gregorian day identities, not instants in the viewer's timezone.
-function metricsDayOrdinal(year, month, day) {
-	const date = new Date(0);
-	date.setUTCFullYear(year, month, day);
-	return date.getTime();
-}
-
-function metricsLocalDayOrdinal(date) {
-	return metricsDayOrdinal(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function shiftMetricsDay(ordinal, days) {
-	const date = new Date(ordinal);
-	date.setUTCDate(date.getUTCDate() + days);
-	return date.getTime();
-}
-
-function formatMetricsDateKey(ordinal) {
-	const date = new Date(ordinal);
-	return `${String(date.getUTCFullYear()).padStart(4, '0')}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
-}
-
-function parseDateKey(dateStr) {
-	if (!dateStr || (typeof dateStr !== 'string' && typeof dateStr !== 'number')) return NaN;
-	if (/^\d+$/.test(String(dateStr))) {
-		const n = Number(dateStr);
-		return metricsLocalDayOrdinal(new Date(String(dateStr).length <= 10 ? n * 1000 : n));
-	}
-	const s = String(dateStr);
-	const isoMatch = s.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})/);
-	if (isoMatch)
-		return metricsDayOrdinal(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
-
-	const frMatch = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-	if (frMatch)
-		return metricsDayOrdinal(Number(frMatch[3]), Number(frMatch[2]) - 1, Number(frMatch[1]));
-
-	const t = Date.parse(s);
-	return isNaN(t) ? NaN : metricsLocalDayOrdinal(new Date(t));
 }
 
 function formatDisplayDate(dateStr) {
