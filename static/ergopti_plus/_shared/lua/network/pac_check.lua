@@ -83,6 +83,15 @@ function M.judge(status, body, transport_error)
 	return "ok", string.format("HTTP 200, %d bytes, %s, FindProxyForURL found", bytes, utf16 and "UTF-16" or "UTF-8")
 end
 
+--- Appends to a PAC failure detail what a driver whose downloads fall back to
+--- a direct connection (proxy_policy.json "pac_unavailable_fallback") does next,
+--- so the diagnostics do not read as "every download is refused".
+--- @param detail string The detail judge() returned.
+--- @return string
+function M.with_direct_fallback(detail)
+	return tostring(detail) .. "; downloads then try a direct connection"
+end
+
 --- Extracts the PAC URL from `scutil --proxy` text (macOS).
 --- @param text string
 --- @return string|nil

@@ -2172,6 +2172,7 @@
 	"network.failure.proxy": "Nie można użyć systemowej konfiguracji proxy albo proxy odmówiło połączenia lub zażądało uwierzytelnienia. Sprawdź systemowe ustawienia proxy.",
 	"network.failure.host_blocked": "Sieć blokuje dostęp do tego serwera (filtrowanie firmowe lub zapora sieciowa).",
 	"network.failure.offline": "Sieć lub trasa sieciowa jest niedostępna. Sprawdź połączenie i systemowe ustawienia sieci.",
+	"network.failure.pac_unreachable_direct_failed": "Automatyczna konfiguracja proxy (PAC) jest nieosiągalna lub nieczytelna, a próba połączenia bezpośredniego również się nie powiodła. Sprawdź połączenie sieciowe i ustawienia proxy systemu albo zwróć się do działu IT.",
 	"network.failure.disk": "Nie można kontynuować pobierania z powodu braku miejsca na dysku lub przekroczenia limitu. Zwolnij miejsce i spróbuj ponownie.",
 	"network.failure.permission": "System odmówił wykonania wymaganej operacji na pliku. Sprawdź uprawnienia lokalizacji docelowej i czy nie jest ona tylko do odczytu.",
 	"network.failure.unknown": "Operacja nie powiodła się, ale dostępne dane diagnostyczne nie pozwalają ustalić przyczyny.",

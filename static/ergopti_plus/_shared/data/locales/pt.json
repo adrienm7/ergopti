@@ -2172,6 +2172,7 @@
 	"network.failure.proxy": "Não foi possível usar a configuração de proxy do sistema, ou o proxy recusou a ligação ou pediu autenticação. Verifique as definições de proxy do sistema.",
 	"network.failure.host_blocked": "A rede bloqueia o acesso a este servidor (filtragem da empresa ou firewall).",
 	"network.failure.offline": "A rede ou a rota de rede está indisponível. Verifique a ligação e as definições de rede do sistema.",
+	"network.failure.pac_unreachable_direct_failed": "Não foi possível acessar ou ler a configuração automática do proxy (PAC), e a conexão direta tentada em seu lugar também falhou. Verifique a conexão de rede e as configurações de proxy do sistema, ou consulte o seu departamento de TI.",
 	"network.failure.disk": "Não foi possível continuar a transferência porque o espaço em disco é insuficiente ou a quota foi excedida. Liberte espaço e tente novamente.",
 	"network.failure.permission": "O sistema recusou uma operação necessária num ficheiro. Verifique as permissões do destino e se está em modo só de leitura.",
 	"network.failure.unknown": "A operação falhou, mas os dados de diagnóstico disponíveis não permitem determinar a causa.",

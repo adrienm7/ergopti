@@ -2172,6 +2172,7 @@
 	"network.failure.proxy": "Die Proxykonfiguration des Systems konnte nicht verwendet werden, oder der Proxy hat die Verbindung abgelehnt oder eine Authentifizierung angefordert. Prüfen Sie die Proxy-Einstellungen des Systems.",
 	"network.failure.host_blocked": "Das Netzwerk sperrt den Zugriff auf diesen Server (Firmenfilter oder Firewall).",
 	"network.failure.offline": "Das Netzwerk oder die Netzwerkroute ist nicht verfügbar. Prüfen Sie Ihre Verbindung und die Netzwerkeinstellungen des Systems.",
+	"network.failure.pac_unreachable_direct_failed": "Die automatische Proxy-Konfiguration (PAC) war nicht erreichbar oder nicht lesbar, und die stattdessen versuchte direkte Verbindung ist ebenfalls fehlgeschlagen. Prüfen Sie die Netzwerkverbindung und die Proxy-Einstellungen des Systems oder wenden Sie sich an Ihre IT-Abteilung.",
 	"network.failure.disk": "Der Download konnte wegen unzureichenden Speicherplatzes oder eines überschrittenen Kontingents nicht fortgesetzt werden. Geben Sie Speicherplatz frei und versuchen Sie es erneut.",
 	"network.failure.permission": "Das System hat einen erforderlichen Dateivorgang abgelehnt. Prüfen Sie die Berechtigungen des Zielorts und ob er schreibgeschützt ist.",
 	"network.failure.unknown": "Der Vorgang ist fehlgeschlagen, aber die verfügbaren Diagnosedaten lassen keine Ursache erkennen.",
