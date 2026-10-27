@@ -322,7 +322,12 @@ in <ms> ms` (the forks of the write phase). Not reproduced here: the save writes
   than 100 rows for the device is now deleted in committed batches of 100 with a pace point
   between batches, and the rest keeps the single transaction. Still open [CODE]: the 170 ms sort
   goes over the 8 ms budget; an index on events_typing(device_id, ts, id) added through
-  schema.sql with a cache migration would remove it. Mac confirms: no hold over 1 s from
+  schema.sql with a cache migration would remove it. Residue fixed on `tmp/wip-mac-holds`: schema.sql declares
+  `idx_events_typing_device_ts_id` and the macOS sqlite_writer creates it on an existing cache
+  from that statement (`test_sqlite_writer.lua`, fails without the migration). Measured with the
+  sqlite3 3.45 CLI on 180,000 synthetic typing rows: first replay row 78 ms with a temporary
+  B-tree, under 1 ms with the index; building it once took 153 ms. Linux has no (ts, id) replay
+  query, so a fresh Linux cache only gains the index. Mac confirms: no hold over 1 s from
   log_manager.lua after a "Typing ids restart".
 - **L20** Fixed ef3b8ddfd5. "config.toml
   cannot be read, so the virtual keyboard choice is unknown" (init.lua:2168 on 228f79f2, new.txt
