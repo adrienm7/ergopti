@@ -81,6 +81,9 @@ function update_app_btn_text() {
 	}
 }
 
+// Locale application rewrites declared labels before this dynamic caption is restored.
+document.addEventListener('i18n:applied', update_app_btn_text);
+
 // ======================================
 // ======================================
 // ======= 3/ Modal Open / Close =======
