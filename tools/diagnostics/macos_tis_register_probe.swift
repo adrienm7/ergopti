@@ -37,7 +37,7 @@
  *   P1  the capabilities of a freshly registered loose .keylayout before selecting
  *   P2  select at once (the v1 result: -50)
  *   P3  select after a run-loop turn, then after re-reading the source list
- *   P4  the same layout installed as a .bundle (Info.plist + Resources/*.keylayout)
+ *   P4  the same layout installed as a .bundle (Info.plist + Resources/<name>.keylayout)
  *   P5  select once the source is enabled through the user's preferences (--write-prefs)
  *   P6  sources named EPProbe still listed after the cleanup (a ghost until logout is
  *       expected); with the argument after-logout, whether any survived the logout
