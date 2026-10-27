@@ -497,7 +497,7 @@ LoggerInit() {
 						; Normal boot and menu updates retain the canonical source
 						; generation, including its original native presence.
 						Cache := ConfigTomlReadSnapshot(ConfigurationFile).Cache
-						Value := IniCacheGet(Cache, "script", "log_level", LOGGER_DEFAULT_LEVEL)
+						Value := IniCacheGet(Cache, ConfigKey.SCRIPT, ConfigLeaf.LOG_LEVEL, LOGGER_DEFAULT_LEVEL)
 				} else if FileExist(ConfigurationFile) {
 						; Fatal startup recovery can initialize logging before the
 						; configuration constructor admits a source; no cache exists yet.
