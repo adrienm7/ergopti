@@ -10,7 +10,11 @@
 --- 2. a missing Homebrew or Shortcuts tool skips what depends on it and a
 ---    cask that is simply not installed is information, not a failure;
 --- 3. every command is read-only and bounded, the missing shortcut name is the
----    fixed absent one, and no step value can carry a shortcut name or a path.
+---    fixed absent one, and no step value can carry a shortcut name or a path;
+--- 4. a broken strict signature names codesign's first known cause and logs
+---    its bounded diagnostic, and Gatekeeper's own assessment is its own step,
+---    so a report shows whether the app is refused or only fails --strict
+---    (field report of 2026-10-27 22:32, karabiner_signature fail:exit_1).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -20,6 +24,8 @@ local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks
 local SHORTCUTS = "/usr/bin/shortcuts"
 local BREW = "/opt/homebrew/bin/brew"
 local APP = "/Applications/Karabiner-Elements.app"
+local CODESIGN = "/usr/bin/codesign --verify --deep --strict --verbose=4 " .. APP
+local SPCTL = "/usr/sbin/spctl --assess -vv " .. APP
 
 --- Builds scripted ports; `world` records every command.
 --- @param overrides table|nil Fields replacing the defaults.
@@ -32,7 +38,7 @@ local function make_ports(overrides)
 			world.commands[#world.commands + 1] = { executable = executable, args = args, timeout = timeout_s }
 			local scripted = world.outputs[executable .. " " .. table.concat(args, " ")]
 				or world.outputs[executable] or { 0, "" }
-			callback(scripted[1], scripted[2])
+			callback(scripted[1], scripted[2], scripted[3])
 		end,
 		timer_probe = function(_, callback) callback(world.late_ms) end,
 	}
@@ -50,7 +56,9 @@ local function healthy(world)
 	world.outputs[SHORTCUTS .. " run ergopti-field-check-absent-shortcut"] = { 1, "" }
 	world.outputs[BREW .. " --version"] = { 0, "Homebrew 4.6.3\n" }
 	world.outputs[BREW .. " list --cask --versions karabiner-elements"] = { 0, "karabiner-elements 15.4.0\n" }
-	world.outputs["/usr/bin/codesign --verify --deep --strict " .. APP] = { 0, "" }
+	world.outputs[CODESIGN] = { 0, "", APP .. ": valid on disk\n" .. APP .. ": satisfies its Designated Requirement\n" }
+	world.outputs[SPCTL] = { 0, "", APP .. ": accepted\nsource=Notarized Developer ID\n"
+		.. "origin=Developer ID Application: Fumihiko Takayama (G43BCU2T37)\n" }
 end
 
 --- Runs the toolchain check and returns its steps keyed by id.
@@ -82,6 +90,7 @@ helpers.describe("toolchain check", function()
 		helpers.assert_eq(steps.brew_version.value, "4.6.3")
 		helpers.assert_eq(steps.karabiner_cask.value, "installed")
 		helpers.assert_eq(steps.karabiner_signature.value, "valid")
+		helpers.assert_eq(steps.karabiner_gatekeeper.value, "accepted:notarized_developer_id")
 	end)
 
 	helpers.it("fails only the timer step when the timer fires late", function()
@@ -160,12 +169,12 @@ helpers.describe("toolchain check", function()
 		healthy(world)
 		world.outputs[BREW .. " --version"] = { nil, "" }
 		world.outputs[BREW .. " list --cask --versions karabiner-elements"] = { nil, "" }
-		world.outputs["/usr/bin/codesign --verify --deep --strict " .. APP] = { 1, "" }
+		world.outputs[CODESIGN] = { 1, "", "" }
 		local steps, result = run(ports)
 		helpers.assert_true(not result.passed)
 		helpers.assert_eq(steps.brew_version.value, "timeout")
 		helpers.assert_eq(steps.karabiner_cask.state, "fail")
-		helpers.assert_eq(steps.karabiner_signature.value, "exit_1")
+		helpers.assert_eq(steps.karabiner_signature.value, "exit_1:unclassified")
 	end)
 
 	helpers.it("skips the signature of an app that is not installed", function()
@@ -182,9 +191,9 @@ helpers.describe("toolchain check", function()
 		local ports, world = make_ports()
 		healthy(world)
 		run(ports)
-		-- shortcuts list and run, brew --version and list, codesign: the timer step
-		-- is a port of its own, not a command.
-		helpers.assert_eq(#world.commands, 5, "the healthy check runs each of its five commands")
+		-- shortcuts list and run, brew --version and list, codesign, spctl: the
+		-- timer step is a port of its own, not a command.
+		helpers.assert_eq(#world.commands, 6, "the healthy check runs each of its six commands")
 		local forbidden = { install = true, uninstall = true, upgrade = true, update = true, ["-f"] = true, edit = true }
 		for _, command in ipairs(world.commands) do
 			helpers.assert_true(type(command.timeout) == "number" and command.timeout > 0 and command.timeout <= 20,
@@ -196,5 +205,68 @@ helpers.describe("toolchain check", function()
 				helpers.assert_eq(command.args[2], "ergopti-field-check-absent-shortcut")
 			end
 		end
+	end)
+
+	helpers.it("names the strict signature's cause and logs codesign's diagnostic", function()
+		local ports, world = make_ports()
+		healthy(world)
+		world.outputs[CODESIGN] = { 1, "", APP .. ": a sealed resource is missing or invalid\n"
+			.. "file modified: " .. APP .. "/Contents/Resources/en.lproj/Localizable.strings\n" }
+		local logged = {}
+		local steps, result
+		helpers.with_stub_scope({ "infra.logger" }, function()
+			local logger = helpers.make_logger_stub()
+			logger.evidence = function(_, format, ...) logged[#logged + 1] = string.format(format, ...) end
+			package.loaded["infra.logger"] = logger
+			package.loaded["infra.field_check_checks"] = nil
+			package.loaded["infra.field_check"] = nil
+			local Engine = require("infra.field_check")
+			assert(Engine.run("toolchain", ports, function(done) result = done end), "check did not start")
+			package.loaded["infra.field_check_checks"] = nil
+			package.loaded["infra.field_check"] = nil
+		end)
+		steps = {}
+		for _, step in ipairs(result.steps) do steps[step.id] = step end
+		helpers.assert_true(not result.passed)
+		helpers.assert_eq(steps.karabiner_signature.state, "fail")
+		helpers.assert_eq(steps.karabiner_signature.value, "exit_1:sealed_resource_invalid")
+		helpers.assert_eq(steps.karabiner_gatekeeper.state, "pass", "Gatekeeper's answer is reported on its own")
+		local verification
+		for _, line in ipairs(logged) do
+			if line:find("strict signature verification", 1, true) then verification = line end
+		end
+		helpers.assert_eq(verification, "Karabiner-Elements strict signature verification: exit=1, "
+			.. "<app>: a sealed resource is missing or invalid | "
+			.. "file modified: <app>/Contents/Resources/en.lproj/Localizable.strings")
+	end)
+
+	helpers.it("fails a Gatekeeper rejection with its cause", function()
+		local ports, world = make_ports()
+		healthy(world)
+		world.outputs[SPCTL] = { 3, "", APP .. ": rejected\nsource=Unnotarized Developer ID\n" }
+		local steps, result = run(ports)
+		helpers.assert_true(not result.passed)
+		helpers.assert_eq(steps.karabiner_gatekeeper.state, "fail")
+		helpers.assert_eq(steps.karabiner_gatekeeper.value, "rejected:unnotarized_developer_id")
+		world.outputs[SPCTL] = { 3, "", APP .. ": code or signature have been modified\n" }
+		helpers.assert_eq(run(ports).karabiner_gatekeeper.value, "rejected:signature_modified")
+		world.outputs[SPCTL] = { nil, "", "" }
+		helpers.assert_eq(run(ports).karabiner_gatekeeper.value, "timeout")
+	end)
+
+	helpers.it("bounds a long diagnostic in the log", function()
+		local Checks
+		helpers.with_stub_scope(MODULES, function()
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["infra.field_check_checks"] = nil
+			Checks = require("infra.field_check_checks")
+		end)
+		local many = {}
+		for index = 1, 40 do many[#many + 1] = "file added: " .. APP .. "/x" .. index .. string.rep("y", 300) end
+		local excerpt = Checks.diagnostic_excerpt(table.concat(many, "\n"), APP)
+		local _, separators = excerpt:gsub(" | ", "")
+		helpers.assert_eq(separators, Checks.DIAGNOSTIC_MAX_LINES, "the lines past the bound become one ellipsis")
+		helpers.assert_true(#excerpt < (Checks.DIAGNOSTIC_MAX_LINE_CHARS + 8) * (Checks.DIAGNOSTIC_MAX_LINES + 1))
+		helpers.assert_eq(excerpt:find(APP, 1, true), nil, "the app path is shortened")
 	end)
 end)

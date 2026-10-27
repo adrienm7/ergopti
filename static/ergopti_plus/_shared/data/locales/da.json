@@ -257,6 +257,7 @@
 	"field_check.step.brew_version": "Homebrew-version",
 	"field_check.step.karabiner_cask": "Karabiner-Elements installeret via Homebrew",
 	"field_check.step.karabiner_signature": "Kodesignatur for Karabiner-Elements",
+	"field_check.step.karabiner_gatekeeper": "Gatekeeper-vurdering af Karabiner-Elements",
 	"field_check.step.this_copy_known": "Placeringen af denne kopi kendt",
 	"field_check.step.main_app_login_item": "Ergoptis loginemne (systemstatus)",
 	"field_check.step.btm_state": "Systemliste over baggrundsemner",

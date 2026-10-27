@@ -257,6 +257,7 @@
 	"field_check.step.brew_version": "Homebrew 版本",
 	"field_check.step.karabiner_cask": "Karabiner-Elements 已通过 Homebrew 安装",
 	"field_check.step.karabiner_signature": "Karabiner-Elements 的代码签名",
+	"field_check.step.karabiner_gatekeeper": "Gatekeeper 对 Karabiner-Elements 的评估",
 	"field_check.step.this_copy_known": "已知此副本的位置",
 	"field_check.step.main_app_login_item": "Ergopti 登录项 (系统状态)",
 	"field_check.step.btm_state": "后台项目的系统列表",
