@@ -134,7 +134,7 @@ function M.log_if_slow(label, start_ns)
 	local now_ns = Timer.now_ns()
 	local phase = _phase_names[label]
 	if phase == nil then
-		phase = "hotpath." .. tostring(label)
+		phase = Segments.phase(label)
 		_phase_names[label] = phase
 	end
 	PhaseStats.add(phase, now_ns - start_ns)

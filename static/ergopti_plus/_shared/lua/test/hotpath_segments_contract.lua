@@ -173,6 +173,15 @@ function M.register(helpers, options)
 			helpers.assert_eq(options.default_slow_ms, 5, "the registry's [logger] hotpath_slow_ms")
 		end)
 
+		helpers.it("names the phase of a declared segment and refuses an undeclared one", function()
+			for name in pairs(declared) do
+				helpers.assert_eq(Inventory.phase(name), "hotpath." .. name)
+			end
+			local ok, err = pcall(Inventory.phase, "not.a.segment")
+			helpers.assert_eq(ok, false)
+			helpers.assert_true(tostring(err):find("undeclared hot-path segment", 1, true) ~= nil, tostring(err))
+		end)
+
 		helpers.it("rate-limits the slow-segment line per segment, first occurrence always admitted", function()
 			local window = Inventory.LOG_WINDOW_MS
 			helpers.assert_true(window > 0, "the log window needs a positive length")
