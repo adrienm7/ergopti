@@ -51,12 +51,6 @@ M.AXIS_MAX_DEGREES = 25
 -- multiple of its swipe minimum.
 M.DIAGONAL_MINIMUM_FACTOR = 1.5
 
--- How far a two-finger contact set may travel, as a share of its swipe
--- minimum, while more fingers may still land and make it a three-or-more-finger
--- gesture. Past it the pair is a native two-finger scroll, and a contact that
--- joins it (a resting thumb, a grazing palm) never turns it into a tab swipe.
-M.LANDING_TRAVEL_FACTOR = 0.5
-
 
 
 

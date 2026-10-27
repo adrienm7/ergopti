@@ -633,6 +633,27 @@ helpers.describe("mt decoder: a two-finger scroll is never a three-finger swipe 
 			"fingers landing to stop a scroll are not a three-finger swipe")
 	end)
 
+	helpers.it("fingers landing over 200 ms still report three fingers", function()
+		local p = scroll_player()
+		p.frame({ { 0, 1000, 900 } })
+		for _ = 1, 25 do p.frame(pair_at(900)) end
+		for i = 0, 20 do p.frame(hand_at(900 - i * 20)) end
+		p.lift()
+		helpers.assert_true(p.result ~= nil and p.result.fingers == 3 and p.result.direction == "up",
+			"a still pair joined 200 ms later is a three-finger swipe; got "
+				.. tostring(p.result and p.result.fingers))
+	end)
+
+	helpers.it("a fast short three-finger flick reports three fingers", function()
+		local p = scroll_player()
+		p.frame(pair_at(900))
+		for i = 0, 4 do p.frame(hand_at(900 - i * 60)) end
+		p.lift()
+		helpers.assert_true(p.result ~= nil and p.result.fingers == 3 and p.result.direction == "up",
+			"two frames confirm the third finger before a flick lifts; got "
+				.. tostring(p.result and p.result.fingers))
+	end)
+
 	helpers.it("a deliberate three-finger swipe still reports three fingers up", function()
 		local p = scroll_player()
 		p.frame(pair_at(900))
