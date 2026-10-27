@@ -2263,6 +2263,7 @@
 	"ollama.error_checksum": "El archivo de Ollama descargado no superó la verificación SHA-256 y se descartó. No se instaló nada.",
 	"ollama.error_installer_refused": "El instalador de Ollama de Ergopti rechazó su propia solicitud, así que no se instaló nada. Reinicie Ergopti y vuelva a elegir el motor Ollama; si persiste, envíe el informe de diagnóstico.",
 	"ollama.error_runtime_refused": "Ergopti no pudo verificar su versión fijada de Ollama (catálogo de versiones o comprobación de integridad), así que no se instaló nada. Envíe el informe de diagnóstico.",
+	"ollama.error_killed": "El sistema detuvo la instalación de Ollama ({1}) antes de terminar, así que no se instaló nada. Inténtelo de nuevo; si vuelve a ocurrir, envíe el informe de diagnóstico.",
 	"ollama.external_manual_start_body": "Esta instalación de Ollama se gestiona fuera de Ergopti. Inicie o detenga su servicio usted mismo, o instale el entorno gestionado por Ergopti desde la propuesta de configuración de Ollama.",
 	"ollama.native_offer_body": "Instalar el Ollama propio de Ergopti %s, la versión que Ergopti fija y verifica. Funciona en su propio puerto junto a cualquier Ollama que usted haya instalado, que Ergopti nunca usa, detiene ni modifica. Sus modelos se quedan donde están.",
 	"ollama.native_offer_install": "Instalar el entorno gestionado",

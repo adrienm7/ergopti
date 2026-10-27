@@ -264,7 +264,11 @@ local function command(text)
 	return bytes:gsub("\n?__STATUS__:%d+%s*$", ""), status
 end
 
-local function shell_receiving(body, refused)
+--- Runs the real native installer over a recording interpreter.
+--- @param body function fn(root, output, status).
+--- @param refused boolean The delegated Python bootstrap refuses (78).
+--- @param python_source string|nil Replaces the recording interpreter's script.
+local function shell_receiving(body, refused, python_source)
 	local output, created = command("mktemp -d " .. quote(helpers.temp_dir() .. "/ergopti-native-choice.XXXXXX"))
 	helpers.assert_eq(created, 0)
 	local root = assert(output:match("^(/[^\r\n]+)\n?$"))
@@ -275,7 +279,7 @@ local function shell_receiving(body, refused)
 		write(root .. "/source/ensure-ollama-native-deps.sh", read(driver .. "modules/llm/ensure-ollama-native-deps.sh"))
 		write(root .. "/source/network-retry.sh", read(driver .. "modules/llm/network-retry.sh"))
 		write(root .. "/foreign-python", "#!/bin/bash\nprintf inherited > \"$FIXTURE_ROOT/foreign-called\"\nexit 0\n")
-		write(root .. "/recording-python", [[#!/bin/bash
+		write(root .. "/recording-python", python_source or [[#!/bin/bash
 set -eu
 [ "$1" = "$FIXTURE_ROOT/source/managed_ollama_runtime.py" ]
 [ "$2" = install ]
@@ -375,7 +379,19 @@ helpers.describe("native installer source and fixed environment receiving", func
 			helpers.assert_eq(output:find("OLLAMA_INSTALLED", 1, true), nil)
 			helpers.assert_eq(read(root .. "/home/models-sentinel"), "existing models remain at their original location")
 			helpers.assert_eq(read(root .. "/home/service-sentinel"), "existing foreign service remains untouched")
+			helpers.assert_true(output:find("[OLLAMA-DEPS] ERROR: stage python_bootstrap ended with exit 78.", 1, true) ~= nil, output)
 		end, true)
+	end)
+	-- Field run 2026-10-27 22:32: exit 137 with no output line. A child killed
+	-- by a signal ends the installer through set -e; the installer now names
+	-- the stage and the signal (ollama-bootstrap-exit-signal).
+	helpers.it("names the stage and the signal of a child killed by SIGKILL", function()
+		shell_receiving(function(_, output, status)
+			helpers.assert_eq(status, 137)
+			helpers.assert_true(output:find("[OLLAMA-DEPS] stage: runtime_install", 1, true) ~= nil, output)
+			helpers.assert_true(output:find(
+				"[OLLAMA-DEPS] ERROR: stage runtime_install ended with exit 137 (signal SIGKILL).", 1, true) ~= nil, output)
+		end, false, "#!/bin/bash\nkill -KILL $$\n")
 	end)
 end)
 

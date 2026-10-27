@@ -244,6 +244,24 @@ function replaceExactly(source, before, after) {
 	return source.slice(0, first) + after + source.slice(first + before.length);
 }
 
+// A signalled leader exits 128 + N, the shell's and the native PTY guardian's
+// convention. Popen's -9 used to leave the wrapper as 247, which no checker
+// could name (field run 2026-10-27 22:32 saw a signalled installer).
+function signalledLeaderStatus(python, wrapperSource) {
+	const directory = fs.mkdtempSync(path.join(require('os').tmpdir(), 'ergopti-pty-signal-'));
+	const wrapperPath = path.join(directory, 'wrapper.py');
+	try {
+		fs.writeFileSync(wrapperPath, wrapperSource);
+		const run = spawnSync(python, ['-u', wrapperPath, '/bin/sh', '-c', 'kill -KILL $$'], {
+			encoding: 'utf8',
+			timeout: 20000
+		});
+		return run.status;
+	} finally {
+		fs.rmSync(directory, { recursive: true, force: true });
+	}
+}
+
 function report() {
 	console.log('TAP version 14');
 	console.log(`1..${results.length}`);
@@ -459,6 +477,22 @@ test(
 test(
 	'mutation guard keeps the existing deadline for unconfirmed post-KILL retirement',
 	!boundedDrainContract(runWrapper(python, noHardDeadline, 'post-kill-persistent'))
+);
+
+const signalled = signalledLeaderStatus(python, wrapper);
+test(
+	'a leader killed by SIGKILL makes the wrapper exit 137',
+	signalled === 137,
+	`status=${signalled}`
+);
+const negativeStatus = replaceExactly(
+	wrapper,
+	'    if returncode < 0:\n        returncode = 128 - returncode\n',
+	''
+);
+test(
+	'mutation guard rejects the raw negative Popen status',
+	signalledLeaderStatus(python, negativeStatus) !== 137
 );
 
 report();

@@ -333,6 +333,25 @@ field_run_status=${PIPESTATUS[0]}
 printf '%-28s exit=%s\n' "field_run" "${field_run_status}" >> "${steps}"
 [ "${field_run_status}" -eq 0 ] || log "step 'field_run' exited ${field_run_status} (kept in ${out}/field_run.txt)"
 
+# The owned Ollama install of the 22:32 run of 2026-10-27 ended with exit 137
+# (SIGKILL) and no output. These show which binaries it left, whether macOS
+# accepts their signatures, and any kernel or code-signing kill around the run.
+native_root="${HOME}/Library/Application Support/Ergopti"
+step native_runtime sh -c '
+	root="$1"
+	for dir in "$root/native-bootstrap/bin" "$root/native-bootstrap/python-bin" "$root/ollama-native-http"; do
+		printf "== %s\n" "$dir"; ls -la "$dir" 2>&1
+	done
+	for bin in "$root/native-bootstrap/bin/uv" "$root/ollama-native-http/ollama" "$root"/native-bootstrap/python-bin/python3*; do
+		[ -e "$bin" ] || continue
+		printf "== codesign %s\n" "$bin"; codesign --verify --strict --verbose=2 "$bin" 2>&1; codesign -dv "$bin" 2>&1 | head -8
+	done
+	printf "== diagnostic reports of the last hour\n"
+	find "$HOME/Library/Logs/DiagnosticReports" -mmin -60 -type f 2>/dev/null | grep -iE "python|uv|ollama|bash|ErgoptiPlus" || true
+	printf "== kernel and code-signing kills of the last 30 minutes\n"
+	log show --last 30m --style compact --predicate "(process == \"kernel\" OR sender == \"AppleMobileFileIntegrity\") AND (eventMessage CONTAINS[c] \"code sign\" OR eventMessage CONTAINS[c] \"killed\" OR eventMessage CONTAINS[c] \"cs_invalid\" OR eventMessage CONTAINS[c] \"memorystatus\")" 2>&1 | tail -60
+' native_runtime "${native_root}"
+
 # ===========================================
 # ======= 4/ Input-source probe =============
 # ===========================================
