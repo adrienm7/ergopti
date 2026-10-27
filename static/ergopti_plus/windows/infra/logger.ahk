@@ -508,8 +508,16 @@ LoggerInit() {
 						}
 				}
 		}
-		if LOGGER_SEVERITY.Has(Value)
-				LOGGER_MIN_LEVEL := Value
+		; Enum admission accepts case variants; native severity keys are exact.
+		; Resolve with the same comparison and publish the owning native name.
+		if Value is String {
+				for Level in LOGGER_SEVERITY {
+						if Level = Value {
+								LOGGER_MIN_LEVEL := Level
+								break
+						}
+				}
+		}
 		_LoggerRefreshFastFlags()
 		; Now that the user's level is finally known, apply it retroactively to
 		; everything the permissive pre-init defaults let through. This is the half

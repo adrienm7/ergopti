@@ -136,6 +136,16 @@ try {
 			_FeatureStateSmokeKanaAutomatic(A_Args[1])
 		case "logger_dotted", "logger_inline", "logger_quoted":
 			_FeatureStateSmokeLoggerSemantic(A_Args[1])
+		case "logger_case_debug_lower", "logger_case_debug_mixed", "logger_case_debug_upper",
+				"logger_case_trace_lower", "logger_case_trace_mixed", "logger_case_trace_upper",
+				"logger_case_done_lower", "logger_case_done_mixed", "logger_case_done_upper",
+				"logger_case_info_lower", "logger_case_info_mixed", "logger_case_info_upper":
+			_FeatureStateSmokeLoggerCase(A_Args[1])
+		case "logger_case_start_lower", "logger_case_start_mixed", "logger_case_start_upper",
+				"logger_case_success_lower", "logger_case_success_mixed", "logger_case_success_upper",
+				"logger_case_warning_lower", "logger_case_warning_mixed", "logger_case_warning_upper",
+				"logger_case_error_lower", "logger_case_error_mixed", "logger_case_error_upper":
+			_FeatureStateSmokeLoggerCase(A_Args[1])
 		case "logger_generation_deleted_error", "logger_generation_created_error":
 			_FeatureStateSmokeLoggerPresence(A_Args[1])
 		case "logger_generation_replaced_debug", "logger_generation_replaced_error",
@@ -825,6 +835,87 @@ _FeatureStateSmokeLoggerPresence(Fixture) {
 		try {
 			if _LOGGER_FLUSH_TIMER_STARTED && !LoggerPrepareShutdown()
 				throw Error("The logger presence fixture could not settle its native writes.")
+		} finally {
+			if _LOGGER_FLUSH_TIMER_STARTED {
+				SetTimer(_LoggerFlush, 0)
+				OnExit(_LoggerOnExitFlush, 0)
+				_LoggerRepeatDisable()
+			}
+			_TOML_InvalidateParseCache(ConfigurationFile)
+			DirDelete(Root, true)
+		}
+	}
+}
+
+
+; Every valid enum spelling must select the same real native severity and
+; queued-log visibility as the canonical name, with a real file as receiver.
+_FeatureStateSmokeLoggerCase(Fixture) {
+	global ConfigurationFile, _LogsDir, LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL, LOGGER_LOG_PATH
+	global _LOGGER_FLUSH_TIMER_STARTED, _LOGGER_PENDING, LOGGER_SEVERITY
+	if !RegExMatch(Fixture, "^logger_case_([a-z]+)_(lower|mixed|upper)$", &Parts)
+		throw Error("The logger enum fixture requires a valid threshold spelling.")
+	Expected := StrUpper(Parts[1])
+	if !LOGGER_SEVERITY.Has(Expected)
+		throw Error("The logger enum fixture must name a genuine native severity.")
+	Spelling := Parts[2] == "upper" ? Expected : Parts[1]
+	if Parts[2] == "mixed"
+		Spelling := SubStr(Parts[1], 1, 1) . StrUpper(SubStr(Parts[1], 2))
+	Root := A_Temp . "\ergopti_logger_case_" . DllCall("GetCurrentProcessId") . "_" . A_TickCount
+	if DirExist(Root)
+		throw Error("The logger enum fixture requires a fresh private native root.")
+	DirCreate(Root)
+	InitialDefault := LOGGER_DEFAULT_LEVEL
+	try {
+		ConfigurationFile := Root . "\config.toml"
+		_LogsDir := Root . "\logs\"
+		Source := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion()
+			. "`n[script]`nlog_level = " . TOML_RenderString(Spelling) . "`n"
+		if !FSWriteCreateDurable(ConfigurationFile, Source)
+			throw Error("The private logger enum source could not be created.")
+		if !(ConfigMigrateBoot(ConfigurationFile) is Map)
+			throw Error("The genuine boot constructor must admit the private logger source.")
+		Cache := ParseConfigTomlFile(ConfigurationFile)
+		Primary := ConfigTomlReadSnapshot(ConfigurationFile)
+		Tree := ManifestBuildFeaturesMap()
+		if ApplyConfigToml(Tree, ConfigurationFile, &Rejected, , &Outdated) < 0
+				|| Rejected != 0 || Outdated.Count != 0
+			throw Error("The authored logger enum must be fully accepted by the canonical loader.")
+		if Cache != Primary.Cache || StrCompare(Tree[ConfigKey.SCRIPT][ConfigLeaf.LOG_LEVEL], Spelling, true) != 0
+			throw Error("The actual canonical source must retain the authored accepted case.")
+		LoggerDebug("LoggerCaseFixture", "CASE_DEBUG_NATIVE_CANARY")
+		LoggerInfo("LoggerCaseFixture", "CASE_INFO_NATIVE_CANARY")
+		LoggerError("LoggerCaseFixture", "CASE_ERROR_NATIVE_CANARY")
+		QueuedDebug := false, QueuedInfo := false, QueuedError := false
+		for Line in _LOGGER_PENDING {
+			QueuedDebug := QueuedDebug || !!InStr(Line, "CASE_DEBUG_NATIVE_CANARY", true)
+			QueuedInfo := QueuedInfo || !!InStr(Line, "CASE_INFO_NATIVE_CANARY", true)
+			QueuedError := QueuedError || !!InStr(Line, "CASE_ERROR_NATIVE_CANARY", true)
+		}
+		if !QueuedDebug || !QueuedInfo || !QueuedError
+			throw Error("Every actual pre-init canary must be queued before threshold selection.")
+		LoggerInit()
+		Content := FileRead(LOGGER_LOG_PATH, "UTF-8")
+		ActualDebug := !!InStr(Content, "CASE_DEBUG_NATIVE_CANARY", true)
+		ActualInfo := !!InStr(Content, "CASE_INFO_NATIVE_CANARY", true)
+		ExpectedDebug := LOGGER_SEVERITY[Expected] <= LOGGER_SEVERITY["DEBUG"]
+		ExpectedInfo := LOGGER_SEVERITY[Expected] <= LOGGER_SEVERITY["INFO"]
+		if !InStr(Content, "CASE_ERROR_NATIVE_CANARY", true)
+			throw Error("The actual native file must receive the admitted ERROR control.")
+		FileAppend("logger enum: authored=" . Spelling . ", active=" . LOGGER_MIN_LEVEL
+			. ", debug=" . ActualDebug . ", info=" . ActualInfo . "`n", "*")
+		if ActualDebug != ExpectedDebug || ActualInfo != ExpectedInfo
+			throw Error("The native log visibility must follow the accepted enum spelling " . Spelling . ".")
+		if StrCompare(LOGGER_MIN_LEVEL, Expected, true) != 0
+			throw Error("The actual logger must publish the canonical accepted native threshold name.")
+		if StrCompare(LOGGER_DEFAULT_LEVEL, InitialDefault, true) != 0
+			throw Error("An authored case variant cannot alter the logger default.")
+		if ConfigTomlReadSnapshot(ConfigurationFile) != Primary || !FSUtf8ExactMatches(ConfigurationFile, Source)
+			throw Error("Logger enum admission cannot rewrite the authored source or retained generation.")
+	} finally {
+		try {
+			if _LOGGER_FLUSH_TIMER_STARTED && !LoggerPrepareShutdown()
+				throw Error("The logger enum fixture could not settle native writes.")
 		} finally {
 			if _LOGGER_FLUSH_TIMER_STARTED {
 				SetTimer(_LoggerFlush, 0)

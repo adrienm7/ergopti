@@ -184,3 +184,11 @@ for Fixture in [
 ]
 	Test("logger startup: " . Fixture . " retains native source ownership (logger-retained-generation)",
 		_LPIL_SemanticThreshold.Bind(Fixture))
+
+
+for Level in LOGGER_SEVERITY
+	for Form in ["lower", "mixed", "upper"] {
+		Fixture := "logger_case_" . StrLower(Level) . "_" . Form
+		Test("logger startup: " . Fixture . " selects actual native visibility (logger-enum-spelling)",
+			_LPIL_SemanticThreshold.Bind(Fixture))
+	}
