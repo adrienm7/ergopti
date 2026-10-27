@@ -59,29 +59,26 @@ function apply_default_date_range() {
 /**
  * Applies a quick date range preset and triggers a full data refresh.
  * Resets the dropdown to the placeholder after applying to avoid stale state.
- * Sets app_state.hour_cutoff so the chart layer knows which granularity to use:
- *   null → daily (multi-day); 0 → today all-day (hourly); N → last hour (hours ≥ N).
+ * Captures app_state.hour_window for the detailed last-hour view. Other presets
+ * retain ordinary hourly (one selected day) or daily (multiple days) rendering.
  */
 function apply_quick_date_range() {
 	const sel = document.getElementById('quick_range');
 	const val = sel ? sel.value : '';
 	if (!val) return;
 
-	const today = get_local_date_string();
 	const now = new Date();
+	const today = formatMetricsDateKey(metricsLocalDayOrdinal(now));
 	let start = today;
+	app_state.hour_window = null;
 
 	if (val === 'last_hour') {
-		// Show the current hour and the previous one — max 2 hourly data points
-		start = today;
-		app_state.hour_cutoff = Math.max(0, now.getHours() - 1);
+		// The two coarse hours can belong to different local dates.
+		app_state.hour_window = createMetricsHourWindow(now);
+		start = app_state.hour_window.start_date;
 	} else if (val === 'today') {
 		start = today;
-		app_state.hour_cutoff = 0;
 	} else {
-		// All multi-day presets switch back to daily granularity
-		app_state.hour_cutoff = null;
-
 		if (val === 'week') {
 			// ISO week: starts on Monday
 			const d = new Date(now);
@@ -221,7 +218,7 @@ function reset_filters(clear_cache = true) {
 	if (quick_sel) quick_sel.value = '';
 
 	// Revert to daily chart granularity
-	app_state.hour_cutoff = null;
+	app_state.hour_window = null;
 
 	// Re-select all available apps
 	app_state.selected_apps.clear();

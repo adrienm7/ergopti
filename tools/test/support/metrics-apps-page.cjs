@@ -187,7 +187,7 @@ function loadMetricsAppsPage(host = 'macos', afterScript) {
 /** Loads the real typing page; node values and classes come from its HTML. */
 function loadMetricsTypingPage(host = 'macos') {
 	const page = loadMetricsPage('metrics_typing', host);
-	for (const match of page.html.matchAll(/<([a-z]+)\b([^>]*\bid="([^"]+)"[^>]*)>/gi)) {
+	for (const match of page.html.matchAll(/<([a-z][a-z0-9]*)\b([^>]*\bid="([^"]+)"[^>]*)>/gi)) {
 		// Chart drawing remains an optional browser boundary. The SVG calendar
 		// and all text controls are actual production renderers, not replacements.
 		if (match[1] === 'canvas') continue;
