@@ -113,7 +113,7 @@ DriverControl_Folder(Spec, Base) {
 ; ===========================
 
 DriverControl_IsToken(Spec, Text) {
-	return (Text is String) && StrLen(Text) == Spec["token_hex_length"] && RegExMatch(Text, "^[0-9a-f]+$")
+	return (Text is String) && StrLen(Text) == Spec["token_hex_length"] && RegExMatch(Text, "\A[0-9a-f]+\z")
 }
 
 ; Compares every character, so the time taken does not tell how many match.
@@ -127,7 +127,7 @@ DriverControl_SameToken(First, Second) {
 }
 
 DriverControl_IsRequestId(Value) {
-	return (Value is String) && RegExMatch(Value, "^[A-Za-z0-9_-]{1,64}$")
+	return (Value is String) && RegExMatch(Value, "\A[A-Za-z0-9_-]{1,64}\z")
 }
 
 /**

@@ -606,3 +606,79 @@ for _TDC_DeadlinePhase in ["pending", "claimed"]
 		Test("driver-control: " . _TDC_DeadlinePhase . " " . _TDC_DeadlineCase[1] . " preserves deadline kind (driver-control-deadline-kind)",
 			_TDC_DeadlineKind.Bind(_TDC_DeadlinePhase, _TDC_DeadlineCase[2],
 				_TDC_DeadlineCase[_TDC_DeadlinePhase == "pending" ? 3 : 4]))
+
+_TDC_RequestIdCharacters(Value, Expected, Length) {
+	if Value is String
+		AssertEqual(Length, StrLen(Value), "the real identifier fixture must preserve every supplied code unit")
+	else
+		AssertEqual(0, Length)
+	if Expected
+		AssertTrue(DriverControl_IsRequestId(Value))
+	else
+		AssertFalse(DriverControl_IsRequestId(Value), "a control identifier cannot contain a final newline or exceed its complete character limit")
+}
+_TDC_TokenCharacters(Value, Expected, Length) {
+	Spec := _TDC_Spec()
+	AssertTrue(Value is String)
+	AssertEqual(Length, StrLen(Value), "the token fixture must preserve the actual final newline and complete length")
+	if Expected
+		AssertTrue(DriverControl_IsToken(Spec, Value))
+	else
+		AssertFalse(DriverControl_IsToken(Spec, Value), "every token code unit must be a lowercase hexadecimal digit")
+}
+_TDC_MaxIdentifier := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+for _TDC_IdRow in [
+	["allowed alphabet", "aZ_09-", true, 6], ["empty", "", false, 0],
+	["maximum length", _TDC_MaxIdentifier, true, 64], ["oversize", _TDC_MaxIdentifier . "a", false, 65],
+	["LF suffix", "ok`n", false, 3], ["CRLF suffix", "ok`r`n", false, 4], ["CR suffix", "ok`r", false, 3],
+	["maximum LF suffix", _TDC_MaxIdentifier . "`n", false, 65],
+	["maximum CRLF suffix", _TDC_MaxIdentifier . "`r`n", false, 66],
+	["interior LF", "a`nb", false, 3], ["space suffix", "ok ", false, 3], ["number", 23, false, 0]
+]
+	Test("driver-control: request id " . _TDC_IdRow[1] . " validates every code unit (driver-control-character-boundaries)",
+		_TDC_RequestIdCharacters.Bind(_TDC_IdRow[2], _TDC_IdRow[3], _TDC_IdRow[4]))
+for _TDC_TokenRow in [
+	["valid hexadecimal", _TDC_MaxIdentifier, true, 64],
+	["LF suffix", SubStr(_TDC_MaxIdentifier, 1, 63) . "`n", false, 64],
+	["CRLF suffix", SubStr(_TDC_MaxIdentifier, 1, 62) . "`r`n", false, 64],
+	["uppercase", StrUpper(_TDC_MaxIdentifier), false, 64],
+	["short", SubStr(_TDC_MaxIdentifier, 1, 63), false, 63],
+	["long", _TDC_MaxIdentifier . "a", false, 65],
+	["CR suffix", SubStr(_TDC_MaxIdentifier, 1, 63) . "`r", false, 64],
+	["LF prefix", "`n" . SubStr(_TDC_MaxIdentifier, 1, 63), false, 64],
+	["interior LF", SubStr(_TDC_MaxIdentifier, 1, 31) . "`n" . SubStr(_TDC_MaxIdentifier, 33), false, 64]
+]
+	Test("driver-control: token " . _TDC_TokenRow[1] . " validates every code unit (driver-control-character-boundaries)",
+		_TDC_TokenCharacters.Bind(_TDC_TokenRow[2], _TDC_TokenRow[3], _TDC_TokenRow[4]))
+
+_TDC_RequestIdSessionBoundary(Id, Expected) {
+	_TDC_World(Body)
+	Body(World) {
+		World.Session.Start()
+		Text := '{"schema":1,"token":"' . World.Token . '","request_id":' . JsonStringLiteral(Id) . "}"
+		Decoded := JsonParse(Text)
+		AssertEqual(StrLen(Id), StrLen(Decoded["request_id"]))
+		AssertEqual(0, StrCompare(Id, Decoded["request_id"], true), "the real JSON file must preserve the complete identifier")
+		RequestPath := World.Session.Path("request")
+		AssertTrue(FSWriteDurable(RequestPath, Text))
+		Acknowledged := World.Endpoint.Call()
+		if Expected {
+			AssertEqual(1, World.Calls.Length)
+			AssertTrue(Acknowledged)
+			Result := JsonParse(_TDC_Read(World, "result"))
+			AssertEqual("requested", Result["state"])
+			AssertEqual(Id, Result["request_id"])
+		} else {
+			AssertEqual(0, World.Calls.Length, "an invalid complete identifier must never reach the actual reload boundary")
+			AssertFalse(Acknowledged)
+			Result := JsonParse(_TDC_Read(World, "result"))
+			AssertEqual("refused", Result["state"])
+			AssertEqual("malformed", Result["reason"])
+			AssertTrue(Result["request_id"] == JSON_NULL)
+		}
+		AssertFalse(FileExist(RequestPath), "the real private request file is consumed exactly once")
+	}
+}
+for _TDC_IdSessionRow in [["valid", "line-id", true], ["LF suffix", "line-id`n", false], ["CRLF suffix", "line-id`r`n", false]]
+	Test("driver-control: real request file " . _TDC_IdSessionRow[1] . " respects complete identifier validation (driver-control-character-boundaries)",
+		_TDC_RequestIdSessionBoundary.Bind(_TDC_IdSessionRow[2], _TDC_IdSessionRow[3]))
