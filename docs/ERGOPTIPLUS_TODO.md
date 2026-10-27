@@ -31,25 +31,28 @@ a sealed Windows updater source, reseal with
 
 ## Handover of 2026-10-26 (read first if the session was lost)
 
-- **State.** dev 34ff85e515 is linear and pushed; every push of dev had its CI cancelled (a dev push builds a
-  release). Latest stable release: v1.0.6. A full CI on 34ff85e515 was dispatched on `tmp/preflight-dev` at
-  00:12 UTC on 27 October: read it first. It carries the fixes for every red of the previous full run
-  40402212463 (pointer-dismiss stand-in for 14 Windows lots, the metrics-pause meta check, the Apps page fixture
-  assets, the Linux allocation and find-fallback tests, the macOS 26 App Cloner XCTest, the tooltip page census).
-  Expected reds: none outside the Windows unit lots `config-scope-features`, `meta`, `keymap-gestures` if they
-  still fail (PC work below).
-- **Integrated from the ChatGPT fix branches** (fix/linux, fix/macos, fix/windows, up to 26 Oct 23:00 UTC).
-  Their per-branch seal refresh commits are never integrated: reseal once on dev instead.
+- **State.** dev 376b28db82 is linear and pushed; every push of dev had its CI cancelled (a dev push builds a
+  release). Latest stable release: v1.0.6. A full CI on 376b28db82 was dispatched on `tmp/preflight-dev` at
+  03:23 UTC on 27 October: read it first. The previous full run (40424851292 on 34ff85e515) was green except
+  Windows `hotstrings-shortcuts`, macOS E2E Managed Ollama (Intel, likely flaky: rerun) and Launcher XCTest
+  (macOS 26), and the Linux integration rows, all addressed in this batch (CI-only confirmation).
+- **Integrated from the ChatGPT fix branches** up to 27 Oct 01:30 UTC. Per-branch seal refresh commits are never
+  integrated: reseal once on dev instead.
 - **Agent work in flight (Linux/macOS only)**, each backed up on a remote `tmp/wip-*` branch; if lost, redo
   from the spec:
-  - `tmp/wip-todo-af`: PAR-65 phase 3 (both engines replay `request_plan_engine_transcripts.json` through
-    recording ports, macOS prediction tooltip adapter), then init-time port injection on macOS and
-    `Ports.check` at engine init.
-  - `tmp/wip-todo-ae`: PAR-76 (a) separator rule shared; then (b) macOS hotstring injection converges on the
-    shared engine (maintainer decisions: Windows end-character behaviour, cascade typed once) and (c) a shared
-    `.keylayout` parser on a canonical JSON schema consumed by the Linux converter.
-  - `tmp/wip-todo-ag`: PAR-48 done (95 keys translated in 19 locales, shrink-only equal-to-English gate);
-    then the drift-guard symlink fix and PAR-41 (one shortcut model) without AHK edits.
+  - `tmp/wip-todo-ae`: the Linux daemon account-name fix (refused to start without USER/LOGNAME; now reads the
+    passwd entry, `--help` needs no session) and the `layouts.linux_needs_python` text, not in dev yet; then the
+    PAR-74 Lua burn-down remainder.
+  - `tmp/wip-todo-af`: PAR-58 JSON vectors (toml batch writer, leaf rows, menu numbered captions, scope plan,
+    ledger gate) and the Debug > Test network `route_plan` step, not in dev yet; then PAR-43, PAR-12 and the
+    remaining PAR-58 cases.
+  - `tmp/wip-todo-ag`: PAR-41 config migration of retired slot ids and Ctrl-letter switches, unknown slot ids
+    reported as outdated, then steps 3, 5, 6 and the macOS/Linux part of 8.
+- **Scripts used by the coordinator** live in the session scratchpad (lost with the container): `fullsweep.sh`
+  (gen:check, every `node` suite check with `xargs -P6`, Linux suite with `USER=root LOGNAME=root` and a
+  private `XDG_RUNTIME_DIR`, macOS suite per `--module` group), `pick.sh` (cherry-pick a list until a conflict)
+  and `renumber.py` (contiguous suite ordinals, increasing within each file). The commit hook needs Ruff 0.15.8
+  first on PATH (`python3 -m venv` plus `pip install ruff==0.15.8`).
 - **Integration procedure** (each batch): fetch `origin/fix/{linux,macos,windows}`; list commits whose subject
   is not on dev; cherry-pick them on a local `integ/*` branch from dev (skip seal refresh commits; on a
   conflict prefer dev when it already fixed the same thing, otherwise merge both by hand); renumber
