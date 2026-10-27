@@ -18,6 +18,28 @@ P-256 and not the Sparkle Ed25519 key: the Windows CNG provider only gained
 Ed25519 recently and the driver supports Windows 10; CNG and OpenSSL both verify
 P-256. Windows 10 and later, and OpenSSL 3, are the verifiers; no extra binary.
 
+## How the Linux updater applies it
+
+`linux/modules/updater/signature_gate.lua` is the only caller of
+`linux/infra/asset_signature.lua`. The transfer fetches `ergopti-plus-linux.tar.gz.sig`
+next to the checksum, on the checksum phase deadline, and asks the gate once the
+archive is adopted, with the sealed size and the verified SHA-256. A refusal retires
+the adopted archive through the normal failure path, so nothing is installed.
+
+| `enforcement` | good signature            | bad, missing or undownloadable signature     |
+| ------------- | ------------------------- | -------------------------------------------- |
+| `"off"`       | installs, logs `verified` | installs, logs the reason in words (warning) |
+| `"required"`  | installs, logs `verified` | refused with the reason in words (error)     |
+
+There is no separate `"warn"` value: with `"off"` and a key provisioned a bad
+signature is already reported without blocking, and a new value would not be
+admitted by the Windows verifier, which reads the same policy file. A policy that
+cannot be read or admitted refuses the update instead of skipping the check.
+
+macOS needs nothing more: Sparkle verifies the EdDSA signature of the appcast
+download, and the in-app release installer checks the GitHub API digest and the
+code-signature requirement of the staged app.
+
 ## Code in the repository
 
 | Part                          | File                                                                 |
@@ -26,6 +48,7 @@ P-256. Windows 10 and later, and OpenSSL 3, are the verifiers; no extra binary.
 | Signer and reference verifier | `tools/build/update-asset-signature.cjs`                             |
 | Shared vectors                | `_shared/tests/corpus/updater/asset_signature_vectors.json`          |
 | Linux verifier                | `linux/infra/asset_signature.lua` (OpenSSL)                          |
+| Linux updater gate            | `linux/modules/updater/signature_gate.lua`                           |
 | Windows verifier              | `windows/modules/updater/asset_signature.ahk` (CNG)                  |
 | CI signing                    | `Sign the update asset` steps in `ci-windows.yml` and `ci-linux.yml` |
 | CI presence gate              | `ci-release.yml`, "Refuse to publish an incomplete..."               |
