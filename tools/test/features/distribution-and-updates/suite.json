@@ -488,7 +488,7 @@
 		},
 		{
 			"id": "js-0504",
-			"ordinal": 513,
+			"ordinal": 514,
 			"name": "one .keylayout reader in the Lua drivers and tooling",
 			"cmd": "node",
 			"args": ["tools/test/test-keylayout-single-parser.cjs"],
