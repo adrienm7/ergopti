@@ -430,7 +430,7 @@ closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swift
   package. The network check, which starts the worker without the shell, still read
   `tls fail:ssl_cert_env` because its launcher was the stale one; it should clear after the
   rebuild.
-- **L42** [CODE][PHYS-M] 03_field_network on the 19:47 run: `pac_download fail:failed` and
+- **L42** [CODE][PHYS-M] 03*field_network on the 19:47 run: `pac_download fail:failed` and
   `pac_script fail:invalid` because the PAC host (http, company intranet name) does not resolve
   off the company network; environmental, the fallback goes direct. Two defects behind the other
   values are fixed on tmp/wip-field-1947b: `route_plan fail:lookup_failed` lost the real stage
@@ -441,7 +441,17 @@ closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swift
   passes: report `pac_download`/`pac_script` as info when the fallback covers their failure, as
   L26 asks. The 21:06 run confirms the route fix
   (`route_plan info:direct_fallback:native_pac_download`) and a URL-free warning; `pac_download`/`pac_script` still fail off the company network, which is
-  the open follow-up above, not a defect of the fixes.
+  the open follow-up above, not a defect of the fixes. The 22:31 run is the same; fixed on
+  tmp/wip-field-run-hygiene (ec15345d22): where the driver's PAC fallback covers the stage, the
+  check reports `pac_download info:unreachable_direct` (or `http*<n>\_direct`), `pac_script
+  skip:not_fetched`(or`info:invalid_direct`), and `transfer` proves the direct path. Only macOS
+has that port: Windows strict admission (`ergopti_network_routes.ps1` `pac_failed`) and the
+Linux Ollama lookup still refuse an unusable PAC, so their check keeps failing, which matches
+what they do; their fallback is the deferred item "PAC unusable: direct fallback". Open on macOS:
+`route_lookup pass:selected`in the 22:31 run carried no fallback marker although the route role
+saw`native_pac_download`; confirm on the Mac whether the HEAD worker's CFNetwork lookup went
+  direct by itself. Mac confirms: off the company network, 03_field_network passes with those
+  info values.
 - **L43** [PHYS-M] 04_field_toolchain `karabiner_signature fail:exit_1` (19:47 run). Not a
   wrong check: `karabiner_cask info:absent` only means Homebrew did not install it; Karabiner
   16.0.0 is installed from the pqrs package (its services run, karabiner.txt), so the app exists
@@ -450,7 +460,25 @@ closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swift
   `spctl -a -vv` on it. Next
   [CODE]: carry codesign's first stderr cause as a closed token in the step value, so the report
   says why without a manual run. The 21:06 run is unchanged (`exit_1`); not Swift, so the rebuild
-  will not clear it.
+  will not clear it. Fixed on tmp/wip-field-run-hygiene (cc172a504d, 58fd867081): the step runs
+  `--verbose=4`, logs codesign's bounded diagnostic and carries its first cause, and a new
+  `karabiner_gatekeeper` step runs `spctl --assess -vv`. The 22:55 Mac shows the cause: a
+  `com.apple.FinderInfo` xattr on the bundle root ("detritus not allowed") while Gatekeeper accepts
+  it as Notarized Developer ID from team G43BCU2T37; that case is now `info
+strict_only:finder_detritus`, any other cause, team or a rejection still fails. Mac confirms:
+  04_field_toolchain passes with those values. The collector's karabiner.txt lines are the
+  coordinator's change on dev.
+- **L51** Fixed 7c61334393. 13_config_guard
+  `restored_MlxActiveModelPath` (22:31 run): the 12_mlx_model download ends by serving the model
+  and the server launcher writes its `--model` argument into `mlx_active_model.txt`. The step now
+  snapshots that file and puts it back after the server stops (codes `active_model_restored` or
+  `active_model_restore_failed`, the latter failing the step); the guard is unchanged. Mac
+  confirms: config_guard passes on the next run.
+- **L52** Open. 06_field_composer `composer_ready fail:not_enabled` with "Failed to enable 'Composer
+  Check' — reason=process_failed" (22:31 run) is the macOS 26 limitation of L25, but neither the
+  verdict nor the log names it yet: they read the generic `process_failed`. Next [CODE]: have the
+  enable path report the observed TIS state (register 0, enable 0, still disabled) as its own
+  reason and map it to a `not_enabled:macos_refused` value.
 - **L44** Fixed 6593474037. Wake at 19:46:39 (driver booted 16:54): "Cannot refresh Karabiner
   lease liveness — no live generation exists" and "Wake refresh could not renew the exact
   Karabiner lease liveness", twice each, then the layout refresh retries of L20; nothing
