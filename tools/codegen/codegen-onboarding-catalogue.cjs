@@ -119,7 +119,9 @@ const CONTROL_FIELDS = new Set([
 	'choice_label_prefix',
 	'choices',
 	'platforms',
-	'reason_key'
+	'reason_key',
+	'capability',
+	'capability_platforms'
 ]);
 
 // What the page draws between an item's trigger and the action it imports. No
@@ -1363,6 +1365,24 @@ function controlsFor(id, page, platform, features, projection, labels) {
 			choices: []
 		};
 		if (!available) control.reason_key = declared.reason_key;
+		// A control the host may still refuse at run time (a session that cannot apply it):
+		// the page asks the host's capability of that name, and draws the control greyed
+		// with the reason the host gives, or this one, when it does not hold it.
+		if (declared.capability !== undefined) {
+			if (typeof declared.capability !== 'string' || !/^[a-z][a-z0-9_]*$/.test(declared.capability))
+				throw new Error(`${where} capability must be a lower-case name`);
+			const gated = declared.capability_platforms;
+			if (!Array.isArray(gated) || gated.length === 0 || gated.some((p) => !platforms.includes(p)))
+				throw new Error(`${where} capability_platforms must list platforms of the control`);
+			if (typeof declared.reason_key !== 'string')
+				throw new Error(`${where} needs the reason_key shown when the host lacks the capability`);
+			if (available && gated.includes(platform)) {
+				control.capability = declared.capability;
+				control.reason_key = declared.reason_key;
+			}
+		} else if (declared.capability_platforms !== undefined) {
+			throw new Error(`${where} capability_platforms needs a capability`);
+		}
 		for (const choice of choices) {
 			if (kind === 'choice') labels.requireKey(choice.label_key, `${where} choice ${choice.value}`);
 			if (Object.keys(choice.writes).sort().join() !== paths.join())
