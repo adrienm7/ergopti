@@ -11,7 +11,7 @@
 
 #Requires AutoHotkey v2.0
 
-_OllamaHttp_NativeRecovery(BodyKind, ExpectedOffer) {
+_OllamaHttp_NativeRecovery(BodyKind, ExpectedOffer, RetirementWitness := 0) {
 	global _LLM_Ollama_Async, _LLM_Ollama_Pending, _LLM_Ollama_PreflightPort
 	global _LLM_AuxGeneration, _LLM_AuxOwners, _LLM_AuxCleanupDebt
 	global _LLM_ManagedBootstrap, LLM_OLLAMA_BASE_URL
@@ -52,10 +52,12 @@ _OllamaHttp_NativeRecovery(BodyKind, ExpectedOffer) {
 		LLM_OLLAMA_BASE_URL := "http://127.0.0.1:" . Port
 		_LLM_Ollama_PreflightPort := 0
 		Payload := '{"model":"FiXtUrE-MoDeL","messages":[{"role":"user","content":"synthetic private context"}],"stream":false}'
-		Id := LLM_OllamaChat_Async(Payload, (*) => State["successes"] += 1,
-			(Failure := "") => State["failures"].Push(Failure))
+		Id := LLM_OllamaChat_Async(Payload, _OllamaHttp_ObserveSuccess.Bind(State),
+			_OllamaHttp_ObserveFailure.Bind(State))
 		AssertTrue(_LLM_Ollama_Async.Has(Id), "the real public chat must reserve its actual asynchronous slot")
 		Entry := _LLM_Ollama_Async[Id]
+		if IsObject(RetirementWitness)
+			Entry["test_retirement_witness"] := RetirementWitness
 		Started := A_TickCount
 		while State["successes"] + State["failures"].Length == 0 && TickElapsed(Started) < 10000
 			Sleep(10)
@@ -93,7 +95,7 @@ _OllamaHttp_NativeRecovery(BodyKind, ExpectedOffer) {
 		AssertTrue(Failure is Map, "the real terminal classifier preserves a typed failure")
 		AssertEqual(ExpectedOffer, LLM_LocalModelIsMissing(Failure),
 			"only a response for the captured admitted model retains typed missing-model recovery")
-		_LLM_LocalModelOfferPort := Map("confirm", Confirm, "install", Install)
+		_LLM_LocalModelOfferPort := Map("confirm", _OllamaHttp_ObserveConfirm.Bind(State), "install", _OllamaHttp_ObserveInstall.Bind(State))
 		LLM_LocalModelOffer(Failure)
 		AssertEqual(ExpectedOffer, State["offers"].Length, "foreign or private provider echoes cannot acquire consent")
 		AssertEqual(ExpectedOffer, State["installs"].Length, "only captured matching identity may reach download admission")
@@ -144,16 +146,89 @@ _OllamaHttp_NativeRecovery(BodyKind, ExpectedOffer) {
 			Critical(PreviousCritical)
 		}
 	}
-	Confirm(Title, Text) {
-		State["offers"].Push(Text)
-		return true
-	}
-	Install(Origin, Model) {
-		State["installs"].Push(Map("origin", Origin, "model", Model))
-		return false
-	}
 }
 
 for _OllamaRecoveryVector in [["matching", 1], ["foreign", 0], ["private", 0]]
 	Test("Ollama native HTTP404: " . _OllamaRecoveryVector[1] . " preserves admitted model recovery (ollama-native-http-model-recovery)",
 		_OllamaStream_WithBootTimings.Bind(_OllamaHttp_NativeRecovery.Bind(_OllamaRecoveryVector[1], _OllamaRecoveryVector[2])))
+
+_OllamaHttp_NativeRequestRetirement(BodyKind, ExpectedOffer) {
+	Counter := Map("deleted", 0)
+	_LLM_TestReleaseIndependentWitness(Counter)
+	AssertEqual(1, Counter["deleted"], "a released independent witness must prove actual object destruction")
+	Counter["deleted"] := 0
+	_OllamaHttp_NativeRecovery(BodyKind, ExpectedOffer, _LLM_TestRetirementWitness(Counter))
+	AssertEqual(1, Counter["deleted"], "the actual completed native chat must release its private entry and callback closure")
+}
+
+for _OllamaRetirementVector in [["matching", 1], ["foreign", 0], ["private", 0]]
+	Test("Ollama native request: " . _OllamaRetirementVector[1] . " releases its private request closure (ollama-native-request-retirement)",
+		_OllamaStream_WithBootTimings.Bind(_OllamaHttp_NativeRequestRetirement.Bind(_OllamaRetirementVector[1], _OllamaRetirementVector[2])))
+
+; Bound observers retain only their explicit state, never the native fixture frame.
+_OllamaHttp_ObserveSuccess(State, *) {
+	State["successes"] += 1
+}
+
+_OllamaHttp_ObserveFailure(State, Failure := "") {
+	State["failures"].Push(Failure)
+}
+
+_OllamaHttp_ObserveConfirm(State, Title, Text) {
+	State["offers"].Push(Text)
+	return true
+}
+
+_OllamaHttp_ObserveInstall(State, Origin, Model) {
+	State["installs"].Push(Map("origin", Origin, "model", Model))
+	return false
+}
+
+
+_OllamaHttp_RetryRetirement(State) {
+	State["attempts"] += 1
+	if State["refuse"]
+		throw Error("Injected retirement acknowledgement refusal.")
+}
+
+_OllamaHttp_RetirementRetry() {
+	global _LLM_AuxOwners, _LLM_AuxCleanupDebt
+	SavedOwners := _LLM_AuxOwners, SavedDebt := _LLM_AuxCleanupDebt
+	Owner := 0, State := Map("attempts", 0, "refuse", true)
+	Path := A_Temp . "\ergopti_tag_retirement_" . A_TickCount . "_" . Random(1, 1000000) . ".json"
+	try {
+		_LLM_AuxOwners := Map(), _LLM_AuxCleanupDebt := Map()
+		AssertTrue(FSWriteCreateDurable(Path, "synthetic retired tags"), "the finalizer must own an actual private artifact")
+		AssertEqual("synthetic retired tags", FileRead(Path, "UTF-8-RAW"))
+		Owner := LLM_AuxBegin("test_tags_retirement_retry")
+		Owner["on_retired"] := _OllamaHttp_RetryRetirement.Bind(State)
+		AssertTrue(LLM_AuxBindResources(Owner,
+			Map("finalizer", _LLM_Ollama_TagsFinalize.Bind([Path], Owner))))
+		AssertTrue(LLM_AuxFinish(Owner), "the original owner must transfer its resource cleanup")
+		AssertEqual(1, State["attempts"], "the actual cleanup owner must attempt the original retirement callback")
+		AssertFalse(FileExist(Path), "the real private artifact retires before callback acknowledgement")
+		AssertEqual(1, _LLM_AuxCleanupDebt.Count, "a thrown callback retains its exact acknowledged-cleanup debt")
+		AssertTrue(HasMethod(Owner["on_retired"], "Call"), "a refused acknowledgement cannot lose its retry capability")
+		State["refuse"] := false
+		AssertTrue(LLM_AuxRetryCleanupDebt(), "retry must deliver the retained retirement acknowledgement")
+		AssertEqual(2, State["attempts"], "exactly one failed and one successful callback run")
+		AssertEqual(0, _LLM_AuxCleanupDebt.Count, "successful acknowledgement settles the original cleanup debt")
+		AssertEqual(0, Owner["on_retired"], "successful retirement releases the reverse callback capture")
+		_LLM_Ollama_TagsFinalize([Path], Owner)
+		AssertEqual(2, State["attempts"], "an acknowledged finalizer cannot deliver retirement twice")
+	} finally {
+		try {
+			State["refuse"] := false
+			if Owner is Map && LLM_AuxIsCurrent(Owner)
+				_LLM_AuxRetireOwner(Owner, true)
+			AssertTrue(LLM_AuxRetryCleanupDebt(), "the fixture cannot abandon actual finalizer cleanup debt")
+			if FileExist(Path)
+				FSDelete(Path)
+		} finally {
+			_LLM_AuxOwners := SavedOwners, _LLM_AuxCleanupDebt := SavedDebt
+		}
+	}
+}
+
+Test("Ollama tags retirement: acknowledgement retries and then releases once (ollama-native-request-retirement)",
+	_OllamaHttp_RetirementRetry)

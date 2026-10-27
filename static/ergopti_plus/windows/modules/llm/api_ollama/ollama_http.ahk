@@ -952,8 +952,14 @@ _LLM_OllamaTagsOrigin(Owner, Strict) {
 
 _LLM_Ollama_TagsFinalize(Paths, Owner) {
 	_LLM_OllamaAuxDeletePaths(Paths)
-	if HasMethod(Owner.Get("on_retired", 0), "Call")
-		Owner["on_retired"].Call()
+	OnRetired := Owner.Get("on_retired", 0)
+	if HasMethod(OnRetired, "Call") {
+		OnRetired.Call()
+		; The request retains its auxiliary owner. Release the reverse bound
+		; callback only after acknowledgement so failed finalizers remain retryable.
+		if Owner.Get("on_retired", 0) == OnRetired
+			Owner["on_retired"] := 0
+	}
 }
 
 /**
