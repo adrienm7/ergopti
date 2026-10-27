@@ -55,6 +55,35 @@ def route_step(fallback):
         emit("route_lookup", "info", "direct_" + fallback.removeprefix("native_"))
 
 
+# The worker refuses the request before any route lookup or connection when the
+# CA file or folder named by SSL_CERT_FILE or SSL_CERT_DIR cannot be read as
+# certificates (ManagedCertificateAuthorities). That is not a TLS verdict.
+CERTIFICATE_LOAD_STAGE = "native_certificate_load"
+
+
+def failure_steps(failure):
+    """The route, TLS and transfer lines of a request that raised.
+
+    The field run of 2026-10-27 19:47 read "route_lookup pass selected" and
+    "tls fail certificate" for a request the worker refused while loading the
+    inherited trust variables: no lookup and no handshake had taken place.
+    """
+    reason = getattr(failure, "reason", "unavailable")
+    native = getattr(failure, "native_diagnostic", None)
+    if type(native) is dict and native.get("stage") == CERTIFICATE_LOAD_STAGE:
+        emit("route_lookup", "skip", "not_reached")
+        emit("tls", "fail", "ssl_cert_env")
+        emit("transfer", "fail", reason)
+        return
+    route_step(getattr(failure, "native_route_fallback", None))
+    emit(
+        "tls",
+        "fail" if reason == "certificate" else "skip",
+        "certificate" if reason == "certificate" else "not_reached",
+    )
+    emit("transfer", "fail", reason)
+
+
 def main():
     bootstrap = load_bootstrap()
     url = json.loads(RELEASE.read_text(encoding="utf-8"))["source"]["url"]
@@ -75,14 +104,7 @@ def main():
                 "http_" + str(response.status),
             )
     except Exception as failure:
-        reason = getattr(failure, "reason", "unavailable")
-        route_step(getattr(failure, "native_route_fallback", None))
-        emit(
-            "tls",
-            "fail" if reason == "certificate" else "skip",
-            "certificate" if reason == "certificate" else "not_reached",
-        )
-        emit("transfer", "fail", reason)
+        failure_steps(failure)
     emit("digest", "skip", "head_only")
 
 
