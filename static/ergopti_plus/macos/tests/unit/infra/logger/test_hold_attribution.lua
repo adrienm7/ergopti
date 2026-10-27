@@ -26,9 +26,11 @@ local function with_capture(body)
 	local saved = {
 		doAfter = hs.timer.doAfter, doEvery = hs.timer.doEvery, new = hs.timer.new,
 		delayed_new = hs.timer.delayed and hs.timer.delayed.new or nil,
-		absoluteTime = hs.timer.absoluteTime, print = _G.print,
+		absoluteTime = hs.timer.absoluteTime, print = _G.print, execute = hs.execute,
 	}
 	local clock = { now = 0 }
+	-- A scripted shell: each command costs 45 ms of the scripted clock.
+	hs.execute = function() clock.now = clock.now + 45 * NS_PER_MS; return "", true, "exit", 0 end
 	hs.timer.absoluteTime = function() return clock.now end
 	hs.timer.doAfter = function(_delay, fn) if type(fn) == "function" then fn() end end
 	local captured = {}
@@ -39,6 +41,7 @@ local function with_capture(body)
 	Fresh.set_sink(nil)
 	hs.timer.doAfter, hs.timer.doEvery, hs.timer.new = saved.doAfter, saved.doEvery, saved.new
 	hs.timer.absoluteTime = saved.absoluteTime
+	hs.execute = saved.execute
 	if hs.timer.delayed then hs.timer.delayed.new = saved.delayed_new end
 	_G.print = saved.print
 	PhaseStats.reset()
@@ -72,6 +75,25 @@ helpers.describe("slow-callback report: phase attribution", function()
 			end
 			helpers.assert_eq(PhaseStats.counter("runtime.timer_hold_over_250ms"), 1)
 			helpers.assert_eq(PhaseStats.counter("runtime.timer_hold_over_1000ms"), 0)
+		end)
+	end)
+	helpers.it("names the synchronous shell forks inside a hold by program only", function()
+		with_capture(function(_, clock, captured)
+			hs.timer.doAfter(0, function()
+				hs.execute("mkdir -p '/Users/someone/private dir'")
+				hs.execute("LC_ALL=C /bin/ls -led '/Users/someone/file'")
+				hs.execute("'/Users/someone/my script.sh' --flag")
+				clock.now = clock.now + 1100 * NS_PER_MS
+			end)
+			local report
+			for _, line in ipairs(captured) do
+				if line:find("held the main thread", 1, true) then report = line end
+			end
+			helpers.assert_true(report ~= nil, "a 1.2 s hold is reported")
+			for _, phase in ipairs({ "shell.mkdir=45.0 ms", "shell.ls=45.0 ms", "shell.other=45.0 ms" }) do
+				helpers.assert_true(report:find(phase, 1, true) ~= nil, "the report names " .. phase .. ": " .. report)
+			end
+			helpers.assert_true(report:find("someone", 1, true) == nil, "no path reaches the report")
 		end)
 	end)
 end)
