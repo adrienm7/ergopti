@@ -317,7 +317,7 @@ enum ManagedPTYWorker {
 				if !decoder.append(Data(buffer.prefix(count))) { disconnected = true; break }
 				while let line = decoder.pop() {
 					let parts = String(decoding: line, as: UTF8.self).split(separator: " ").map(String.init)
-					if parts.count == 4 && parts[0] == "RETIRED" { terminal = parts }
+					if parts.count == 6 && parts[0] == "RETIRED" { terminal = parts }
 					else { disconnected = true }
 				}
 			} else if count == 0 || (count < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) { disconnected = true }
@@ -331,14 +331,37 @@ enum ManagedPTYWorker {
 		guard waited == guardian, nativeStatus == 0, let terminal,
 			let exit = Int32(terminal[1]), let worker = Int32(terminal[2]),
 			(0...255).contains(exit), (0...255).contains(worker),
-			["0", "1"].contains(terminal[3]), worker != 0 || terminal[3] == "1" else { return 74 }
+			["0", "1"].contains(terminal[3]), worker != 0 || terminal[3] == "1",
+			let ptyBytes = Int(terminal[4]), ptyBytes >= 0,
+			let leaderMilliseconds = Int(terminal[5]), leaderMilliseconds >= -1 else { return 74 }
 		guard Darwin.close(control) == 0 else { return 74 }
 		controlClosed = true
 		let result: Int32 = deadline ? 124 : (latch.cancelled ? 130 : worker)
 		guard receipt.publish(["version": 1, "nonce": request.nonce, "state": "retired", "group_retired": true,
 			"guardian_reaped": true, "pty_eof": true, "handles_closed": true, "status_valid": true,
 			"exit_status": exit, "worker_status": result, "source_admitted": terminal[3] == "1"]) else { return 74 }
+		reportUnexplainedEnd(exit: exit, result: result, ptyBytes: ptyBytes, leaderMilliseconds: leaderMilliseconds)
 		return result
+	}
+
+	/// Names, on the worker's stderr, an installer that ran and failed without
+	/// a cause of its own: killed by a signal Ergopti did not send, or silent.
+	/// The 2026-10-27 field runs ended with 137 and no output at all, and
+	/// nothing said whether bash had run, what it printed or how long it
+	/// lived. Cancellation (130), the deadline (124) and refusals before
+	/// activation already have their own closed status and stay quiet.
+	/// - Parameters:
+	///   - exit: The leader's exit status, 128 + N for signal N.
+	///   - result: The worker's status for the caller.
+	///   - ptyBytes: Bytes the leader wrote to the PTY.
+	///   - leaderMilliseconds: Time from activation to retirement, -1 when never activated.
+	private static func reportUnexplainedEnd(exit: Int32, result: Int32, ptyBytes: Int, leaderMilliseconds: Int) {
+		guard leaderMilliseconds >= 0, result != 0, result != 124, result != 130,
+			exit > 128 || ptyBytes == 0 else { return }
+		let cause = exit > 128 ? "was killed by signal \(exit - 128), not sent by Ergopti" : "exited \(exit)"
+		let line = "[PTY-WORKER] The installer \(cause) \(leaderMilliseconds) ms after it started, "
+			+ "having written \(ptyBytes) byte(s) to its terminal.\n"
+		_ = write(Data(line.utf8), to: STDERR_FILENO)
 	}
 
 	private static func guardian(milliseconds: Int) -> Int32 {
@@ -371,17 +394,17 @@ enum ManagedPTYWorker {
 		}
 		guard admitted.contains(expected),
 			let source = ManagedPTYSource.snapshot(request, interrupted: { consumeControl(); return cancelled }) else {
-			return write(Data("RETIRED 64 64 0\n".utf8), to: controlDescriptor) ? 0 : 74
+			return write(Data("RETIRED 64 64 0 0 -1\n".utf8), to: controlDescriptor) ? 0 : 74
 		}
 		var master: Int32 = -1
 		var slave: Int32 = -1
 		guard openpty(&master, &slave, nil, nil, nil) == 0 else {
 			guard Darwin.close(source) == 0 else { return 74 }
-			return write(Data("RETIRED 74 74 1\n".utf8), to: controlDescriptor) ? 0 : 74
+			return write(Data("RETIRED 74 74 1 0 -1\n".utf8), to: controlDescriptor) ? 0 : 74
 		}
 		guard nonblocking(master) else {
 			let closed = [source, master, slave].map { Darwin.close($0) == 0 }.allSatisfy { $0 }
-			return closed && write(Data("RETIRED 74 74 1\n".utf8), to: controlDescriptor) ? 0 : 74
+			return closed && write(Data("RETIRED 74 74 1 0 -1\n".utf8), to: controlDescriptor) ? 0 : 74
 		}
 		var environment = ProcessInfo.processInfo.environment
 		// Noninteractive bash must not run an inherited startup file or exported
@@ -397,7 +420,7 @@ enum ManagedPTYWorker {
 		guard let argv = duplicateCStringVector(["/bin/bash", "/dev/fd/3"]),
 			let envp = duplicateCStringVector(environment.keys.sorted().map { $0 + "=" + environment[$0]! }) else {
 			let closed = [source, master, slave].map { Darwin.close($0) == 0 }.allSatisfy { $0 }
-			return closed && write(Data("RETIRED 74 74 1\n".utf8), to: controlDescriptor) ? 0 : 74
+			return closed && write(Data("RETIRED 74 74 1 0 -1\n".utf8), to: controlDescriptor) ? 0 : 74
 		}
 		defer { for case let pointer? in argv { free(pointer) }; for case let pointer? in envp { free(pointer) } }
 		var mutableArguments = argv
@@ -413,15 +436,19 @@ enum ManagedPTYWorker {
 		let borrowedClosed = sourceClosed && slaveClosed
 		guard let prepared = owner else {
 			let masterClosed = Darwin.close(master) == 0
-			return borrowedClosed && masterClosed && write(Data("RETIRED 74 74 1\n".utf8), to: controlDescriptor) ? 0 : 74
+			return borrowedClosed && masterClosed && write(Data("RETIRED 74 74 1 0 -1\n".utf8), to: controlDescriptor) ? 0 : 74
 		}
 		if error != 0 || !borrowedClosed { cancelled = true }
 		consumeControl()
+		var activatedAt: TimeInterval?
 		if !cancelled {
 			let activation = ergopti_owned_program_activate(prepared)
 			if !activation.active || activation.cancelled { cancelled = true }
+			else { activatedAt = ProcessInfo.processInfo.systemUptime }
 		}
 		var retired: ergopti_owned_program_receipt?
+		var retiredAt: TimeInterval?
+		var ptyBytes = 0
 		var eof = false
 		var output = Data()
 		var delivered = true
@@ -434,11 +461,17 @@ enum ManagedPTYWorker {
 				delivered = false; output.removeAll()
 			}
 			let observation = ergopti_owned_program_poll(prepared)
-			if observation.retired { retired = observation }
+			if observation.retired {
+				retired = observation
+				if retiredAt == nil { retiredAt = ProcessInfo.processInfo.systemUptime }
+			}
 			if !eof && output.count < 65_536 {
 				var bytes = [UInt8](repeating: 0, count: min(4096, 65_536 - output.count))
 				let count = Darwin.read(master, &bytes, bytes.count)
-				if count > 0 { if delivered { output.append(contentsOf: bytes.prefix(count)) } }
+				if count > 0 {
+					ptyBytes += count
+					if delivered { output.append(contentsOf: bytes.prefix(count)) }
+				}
 				// Darwin PTYs report EIO when the final slave closes. This may
 				// precede leader exit; the native owner still gates retirement.
 				else if count == 0 || (count < 0 && errno == EIO) { eof = true }
@@ -459,6 +492,10 @@ enum ManagedPTYWorker {
 		guard let retired, retired.status_valid, retired.error_code == 0,
 			ergopti_owned_program_destroy(&owner), Darwin.close(master) == 0, borrowedClosed else { return 74 }
 		let status: Int32 = deadline ? 124 : (cancelled ? 130 : retired.exit_status)
-		return write(Data("RETIRED \(retired.exit_status) \(status) 1\n".utf8), to: controlDescriptor) ? 0 : 74
+		// -1: the leader was never activated, so it cannot have run.
+		let leaderMilliseconds = activatedAt.flatMap { start in
+			retiredAt.map { max(0, Int(($0 - start) * 1000)) } } ?? -1
+		return write(Data("RETIRED \(retired.exit_status) \(status) 1 \(ptyBytes) \(leaderMilliseconds)\n".utf8),
+			to: controlDescriptor) ? 0 : 74
 	}
 }
