@@ -168,14 +168,19 @@ run_field_run() {
 	local started_at now pid
 	started_at="$(date +%s)"
 
-	if ! pgrep -x "${ERGOPTI_APP_NAME}" >/dev/null 2>&1; then
-		if [ -d "${REPO_ROOT}/build/macos/${ERGOPTI_APP_BUNDLE}" ]; then
+	# A ready developer app of this clone is reused. Anything else (an installed
+	# ErgoptiPlus, a guardian launchd keeps alive, a stale build) is stopped by
+	# the runner, which then opens the developer app, rebuilt when the launcher,
+	# a native helper or the build recipe is newer than the built binary.
+	if ! ready_pid >/dev/null; then
+		local app_binary="${REPO_ROOT}/build/macos/${ERGOPTI_APP_BUNDLE}/Contents/MacOS/${ERGOPTI_APP_NAME}"
+		if [ -x "${app_binary}" ] && [ -z "$(find "${REPO_ROOT}/static/ergopti_plus/macos/launcher" \
+			"${REPO_ROOT}/tools/build" -type f -newer "${app_binary}" -print -quit 2>/dev/null)" ]; then
 			log "Opening the developer app..."
 			bash "${REPO_ROOT}/tools/dev/run-macos-dev-app.sh" --open-only \
-				|| bash "${REPO_ROOT}/tools/dev/run-macos-dev-app.sh" \
 				|| { log "The developer app could not be opened."; return 1; }
 		else
-			log "Building and opening the developer app (first run, a few minutes)..."
+			log "Building and opening the developer app (the launcher changed; a few minutes)..."
 			bash "${REPO_ROOT}/tools/dev/run-macos-dev-app.sh" || { log "The developer app could not be built."; return 1; }
 		fi
 	fi
