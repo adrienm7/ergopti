@@ -38,7 +38,7 @@ const OUTPUT_SWIFT = path.join(
 	'macos/launcher/Sources/ErgoptiPlus/Identifiers.generated.swift'
 );
 
-const GROUPS = ['app', 'bundle_ids', 'service_labels', 'hosts'];
+const GROUPS = ['app', 'bundle_ids', 'service_labels', 'hosts', 'dev_source'];
 const VALUE_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 /** Stops generation with one exact reason. */
@@ -98,7 +98,8 @@ const SHELL_PREFIX = {
 	app: 'ERGOPTI_APP',
 	bundle_ids: 'ERGOPTI_BUNDLE_ID',
 	service_labels: 'ERGOPTI_SERVICE_LABEL',
-	hosts: 'ERGOPTI_HOST'
+	hosts: 'ERGOPTI_HOST',
+	dev_source: 'ERGOPTI_DEV_SOURCE'
 };
 
 const shell = `#!/bin/sh
@@ -144,7 +145,8 @@ const SWIFT_ENUM = {
 	app: 'App',
 	bundle_ids: 'BundleIds',
 	service_labels: 'ServiceLabels',
-	hosts: 'Hosts'
+	hosts: 'Hosts',
+	dev_source: 'DevSource'
 };
 const camel = (key) => key.replace(/_([a-z0-9])/g, (_m, c) => c.toUpperCase());
 const swift = `${BANNER('//')}

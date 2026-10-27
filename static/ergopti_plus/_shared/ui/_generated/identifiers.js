@@ -25,5 +25,9 @@ const ERGOPTI_IDENTIFIERS = Object.freeze({
 		huggingface: 'huggingface.co',
 		ollama: 'ollama.com',
 		ollama_registry: 'registry.ollama.ai'
+	}),
+	dev_source: Object.freeze({
+		plist_key: 'ErgoptiDevSourceRoot',
+		environment: 'ERGOPTI_DEV_SOURCE_ROOT'
 	})
 });
