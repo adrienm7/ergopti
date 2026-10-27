@@ -1392,7 +1392,9 @@ end
 -- cleanup, LLM bootstrap, TOML loading and the keymap engine startup have all
 -- completed (F-MED-19).
 local function finish_boot_after_onboarding()
-Boot.stage("Accessibility permission")
+-- stage_once: when the wait below grants trust, this function runs again from
+-- inside this very stage, which must resume rather than open twice.
+Boot.stage_once("Accessibility permission")
 -- Every input owner below is an eventtap, and an untrusted process gets taps
 -- that never enable. The packaged runtime is its own app identity, so a user
 -- whose onboarding was skipped (config.toml already present) may never have
