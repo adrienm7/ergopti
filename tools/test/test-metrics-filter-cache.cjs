@@ -3325,4 +3325,79 @@ assert.equal(
 	'all native empty/replaced app-scope and later discovery controls must execute'
 );
 
+const typingEmptySelectionStarts = ['empty', 'application', 'system-only'];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const initial of typingEmptySelectionStarts) {
+		test(`${host} app-filter caption follows explicit selection after ${initial}`, () => {
+			const page = loadMetricsTypingPage(host);
+			freezePageClock(page, '2026-10-27T12:00:00Z');
+			page.elements.get('app_search').focus = () => {};
+			const manifest =
+				initial === 'empty'
+					? {}
+					: {
+							'2026-10-27':
+								initial === 'application'
+									? { 'Editor.exe': { chars: 5, time: 500 } }
+									: { _system: { awake_ms: 1000 } }
+						};
+			publishTypingPage(page, host, manifest);
+			const button = page.elements.get('app_filter_btn');
+			const choose = (all) => {
+				page.context.open_app_modal();
+				if (all) page.context.select_all_apps();
+				else page.context.deselect_all_apps();
+				page.context.close_app_modal();
+			};
+			const assertCaption = (all) => {
+				assert.equal(
+					button.innerText,
+					page.context._t(all ? 'ui_typing.apps_all' : 'ui_typing.apps_none'),
+					'the native filter caption distinguishes explicit NONE from ALL at zero apps'
+				);
+				assert.equal(button.classList.contains('active'), all);
+				assert.equal(
+					vm.runInContext('app_state.app_selection_mode', page.context),
+					all ? 'all' : 'none'
+				);
+			};
+			assertCaption(true);
+			choose(false);
+			assertCaption(false);
+			assert.deepEqual(Array.from(page.context.get_app_selection_request_apps()), []);
+			choose(true);
+			assertCaption(true);
+			deliverTypingManifest(page, host, {
+				'2026-10-27': {
+					'Fresh.exe': { chars: 8, time: 800 },
+					'Other.exe': { chars: 9, time: 900 }
+				}
+			});
+			assertCaption(true);
+			page.context.open_app_modal();
+			page.context.toggle_app_selection({ value: 'Other.exe', checked: false });
+			page.context.close_app_modal();
+			assert.ok(button.innerText.includes('(1/2)'), 'nonempty subset captions retain their count');
+			assert.equal(button.classList.contains('active'), false);
+			choose(false);
+			assertCaption(false);
+			deliverTypingManifest(page, host, {}, { revision: 3 });
+			assert.deepEqual(Array.from(vm.runInContext('app_state.available_apps', page.context)), []);
+			assertCaption(false);
+			choose(true);
+			assertCaption(true);
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false
+			);
+		});
+	}
+}
+assert.equal(typingEmptySelectionStarts.length, 3);
+assert.equal(
+	passed,
+	756,
+	'all explicit empty NONE/ALL, subset and native-clear caption controls must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);
