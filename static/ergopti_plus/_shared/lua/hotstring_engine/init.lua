@@ -56,6 +56,7 @@ local text_utils = require("text_utils")
 local TableUtil = require("table_util")
 local PersonalFiles = require("hotstrings.personal_files")
 local Cascade = require("hotstring_engine.cascade")
+local InjectionPlan = require("hotstring_engine.injection_plan")
 
 local LOG = "shared.hotstring_engine"
 
@@ -897,8 +898,11 @@ function M.new()
 			end
 			-- A terminator the chain still carries is the end character of an end
 			-- step and the last codepoint of an auto step's trigger.
-			local step_bc = tlen + (via_end_char and 1 or 0)
-				+ ((via_end_char and nbsp_stripped) and 1 or 0)
+			local step_bc = InjectionPlan.erase_count({
+				path = via_end_char and InjectionPlan.PATH_TERMINATOR or InjectionPlan.PATH_AUTO,
+				trigger_len = tlen, event_len = 1, event_on_screen = true,
+				nbsp_stripped = nbsp_stripped == true,
+			})
 			local step = {
 				key             = spec_key(mapping),
 				backspace_count = step_bc,
@@ -1012,8 +1016,11 @@ function M.new()
 		-- +1 for the terminator, +1 more for a stripped no-break space: both sit
 		-- between the trigger and the caret, so both are replaced. Mirrors
 		-- hotstring_dispatch.ahk (Spec.Length + endchar + HSE_TypoNbspStripped).
-		local bc = tlen + (erase_terminator and 1 or 0)
-			+ ((via_end_char and nbsp_stripped) and 1 or 0)
+		local bc = InjectionPlan.erase_count({
+			path = erase_terminator and InjectionPlan.PATH_TERMINATOR or InjectionPlan.PATH_AUTO,
+			trigger_len = tlen, event_len = 1, event_on_screen = true,
+			nbsp_stripped = nbsp_stripped == true,
+		})
 		-- Length, never the trigger: it is text the user typed, and the shared
 		-- logger's default level makes a debug line an always-on one.
 		Logger.debug(LOG, "Match: trigger of %d char(s), backspaces=%d end_char=%s.",
@@ -1053,8 +1060,13 @@ function M.new()
 		local max_arrows = options.cascade_max_arrows
 		-- One arrow is the first expansion alone: nothing to chain.
 		if max_arrows ~= nil and max_arrows ~= M.CASCADE_MIN_ARROWS then
-			return cascade(result, mapping, max_arrows, options)
+			result = cascade(result, mapping, max_arrows, options)
 		end
+		-- The terminator typed back after the replacement: the injection plan's
+		-- rule, applied to the final (possibly cascaded) result.
+		result.replay_terminator = InjectionPlan.tail(
+			result.end_char and InjectionPlan.PATH_TERMINATOR or InjectionPlan.PATH_AUTO,
+			result.consume_terminator, result.terminator)
 		return result
 	end
 
