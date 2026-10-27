@@ -119,3 +119,24 @@ _WRT_FailuresOnALiveWindowSurface() {
 }
 Test("WPM region: failures on a live window still surface (wpm-region-target)",
 	_WRT_FailuresOnALiveWindowSurface)
+
+; The ownership check lives in the window adapter (the OS-purity ratchet keeps
+; raw DllCall out of ui/); its three outcomes are what the region relies on.
+_WRT_OwnershipCheckIsTheAdapters() {
+	Surface := Gui("-Caption +ToolWindow")
+	Hwnd := Surface.Hwnd
+	PriorHidden := A_DetectHiddenWindows
+	try {
+		DetectHiddenWindows(false)
+		AssertTrue(WMHandleOwnedByThisProcess(Hwnd), "a hidden window this process created is its own")
+	} finally {
+		DetectHiddenWindows(PriorHidden)
+		Surface.Destroy()
+	}
+	AssertFalse(WMHandleOwnedByThisProcess(Hwnd), "a destroyed window is no longer owned")
+	Desktop := DllCall("User32\GetDesktopWindow", "Ptr")
+	AssertTrue(DllCall("User32\IsWindow", "Ptr", Desktop, "Int") != 0, "the desktop window must exist")
+	AssertFalse(WMHandleOwnedByThisProcess(Desktop), "a live window of another process is not owned")
+}
+Test("WPM region: window ownership goes through the window adapter (wpm-region-target)",
+	_WRT_OwnershipCheckIsTheAdapters)
