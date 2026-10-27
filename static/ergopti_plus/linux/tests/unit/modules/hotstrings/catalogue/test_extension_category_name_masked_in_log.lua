@@ -16,7 +16,10 @@ local helpers, user_folder, write, one_entry_pack, load_with_user_folder =
 
 helpers.describe("Config manager: a category name is masked in the log", function()
 	helpers.it("(category-name-log-mask) never prints the overridden category's name", function()
-		local Logger = require("logger")
+		-- The loader logs through logger.shim, which binds the logger instance
+		-- that was current when it loaded; another test can leave package.loaded.logger
+		-- pointing at a newer one, so the sink goes on the shim's own instance.
+		local Logger = require("logger.shim")
 		local lines = {}
 		local previous_level = Logger.get_level()
 		Logger.set_level("debug")
