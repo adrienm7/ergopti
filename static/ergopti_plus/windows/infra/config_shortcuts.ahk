@@ -216,20 +216,6 @@ _CS_RequireString(Value, Key) {
 		return Value
 }
 
-_CS_RequireDisabledApps(Value) {
-		if !(Value is Array)
-				throw TypeError("metrics.disabled_apps must be a TOML array")
-		Result := Map()
-		for AppName in Value {
-				if !(AppName is String)
-						throw TypeError("metrics.disabled_apps items must be TOML strings")
-				Normalized := Trim(AppName)
-				if (Normalized != "")
-						Result[StrLower(Normalized)] := true
-		}
-		return Result
-}
-
 _CS_ValidateMetricsSection(Section) {
 		Validated := Map()
 		for Key in ["enabled",
@@ -240,7 +226,7 @@ _CS_ValidateMetricsSection(Section) {
 		}
 		if Section.Has("disabled_apps")
 				Validated["disabled_apps"] :=
-						_CS_RequireDisabledApps(Section["disabled_apps"])
+						TomlConfigMetricsDisabledApps(Section["disabled_apps"])
 		return Validated
 }
 
