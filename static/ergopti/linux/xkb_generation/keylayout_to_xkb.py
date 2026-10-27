@@ -253,6 +253,114 @@ class Keylayout:
             return self._key_entry(base[0], base[1], code, depth + 1)
         return None
 
+    # -- canonical form ----------------------------------------------------
+
+    CANONICAL_SCHEMA = 1
+
+    def to_canonical(self) -> dict:
+        """The schema-1 canonical form shared with the Lua parser.
+
+        The form is documented in _shared/lua/layouts/keylayout.lua; absent
+        fields are omitted, never null.
+        """
+        selects = []
+        for index, modifiers in self.selects:
+            selects.append(
+                {
+                    "index": index,
+                    "modifiers": [
+                        {"required": sorted(required), "optional": sorted(optional)}
+                        for required, optional in modifiers
+                    ],
+                }
+            )
+        key_map_sets = []
+        for set_id, maps in self.key_map_sets.items():
+            key_maps = []
+            for index, entries in maps.items():
+                key_map: dict = {"index": index}
+                base = self.key_map_bases.get(set_id, {}).get(index)
+                if base is not None:
+                    key_map["base"] = {"set": base[0], "index": base[1]}
+                key_map["keys"] = [
+                    {"code": code, kind: value} for code, (kind, value) in entries.items()
+                ]
+                key_maps.append(key_map)
+            key_map_sets.append({"id": set_id, "key_maps": key_maps})
+        actions = []
+        for action in self.actions.values():
+            whens = []
+            for state, (output, next_state) in action.whens.items():
+                when: dict = {"state": state}
+                if output is not None:
+                    when["output"] = output
+                if next_state is not None:
+                    when["next"] = next_state
+                whens.append(when)
+            actions.append({"id": action.id, "whens": whens})
+        return {
+            "schema": self.CANONICAL_SCHEMA,
+            "name": self.name,
+            "map_set": self.map_set_id,
+            "default_index": self.default_index,
+            "selects": selects,
+            "key_map_sets": key_map_sets,
+            "actions": actions,
+            "terminators": [
+                {"state": state, "output": output} for state, output in self.terminators.items()
+            ],
+        }
+
+    @classmethod
+    def from_canonical(cls, data: dict) -> "Keylayout":
+        """Build a Keylayout from the schema-1 canonical form.
+
+        Raises:
+            KeylayoutError: when the form is not schema 1 or lacks a part every
+                conversion needs.
+        """
+        if not isinstance(data, dict) or data.get("schema") != cls.CANONICAL_SCHEMA:
+            raise KeylayoutError("canonical keylayout must be schema %d" % cls.CANONICAL_SCHEMA)
+        try:
+            layout = cls()
+            layout.name = data["name"]
+            layout.map_set_id = data["map_set"]
+            layout.default_index = int(data["default_index"])
+            for select in data["selects"]:
+                layout.selects.append(
+                    (
+                        int(select["index"]),
+                        [
+                            (frozenset(item["required"]), frozenset(item["optional"]))
+                            for item in select["modifiers"]
+                        ],
+                    )
+                )
+            for key_map_set in data["key_map_sets"]:
+                maps = layout.key_map_sets.setdefault(key_map_set["id"], {})
+                for key_map in key_map_set["key_maps"]:
+                    entries = maps.setdefault(int(key_map["index"]), {})
+                    base = key_map.get("base")
+                    if base is not None:
+                        layout.key_map_bases.setdefault(key_map_set["id"], {})[
+                            int(key_map["index"])
+                        ] = (base["set"], int(base["index"]))
+                    for key in key_map["keys"]:
+                        kind = "output" if "output" in key else "action"
+                        entries[int(key["code"])] = (kind, key[kind])
+            for item in data["actions"]:
+                action = Action(item["id"])
+                for when in item["whens"]:
+                    action.whens[when["state"]] = (when.get("output"), when.get("next"))
+                layout.actions[action.id] = action
+            for item in data["terminators"]:
+                layout.terminators[item["state"]] = item["output"]
+        except (KeyError, TypeError, ValueError) as error:
+            raise KeylayoutError("malformed canonical keylayout: %s" % error)
+        if layout.map_set_id not in layout.key_map_sets:
+            raise KeylayoutError("keyMapSet %r is not defined" % layout.map_set_id)
+        return layout
+
 
 def _parse_modifier_keys(keys: str) -> Tuple[frozenset, frozenset]:
     required, optional = set(), set()
@@ -752,9 +860,19 @@ def convert(
         display_name: Name shown by desktop layout pickers.
         hints: Per-layout choices from the registry index (XkbHints).
     """
+    return convert_layout(parse_keylayout(keylayout_text), keycodes, layout_id, display_name, hints)
+
+
+def convert_layout(
+    layout: Keylayout,
+    keycodes: Sequence[Tuple[str, int]],
+    layout_id: str,
+    display_name: str,
+    hints: Optional[XkbHints] = None,
+) -> Conversion:
+    """Convert a parsed Keylayout (from parse_keylayout or from_canonical)."""
     if not re.fullmatch(r"[A-Za-z0-9_]+", layout_id):
         raise KeylayoutError("layout id %r must be letters, digits and _" % layout_id)
-    layout = parse_keylayout(keylayout_text)
     converter = _Converter(layout, keycodes, hints or XkbHints())
     template = (DATA_DIR / "xkb_symbols.txt").read_text(encoding="utf-8")
     # Dead triggers first, in state order, so borrowed keysyms do not depend
@@ -800,7 +918,13 @@ def hints_from_index(index_path: Path, layout_id: str) -> XkbHints:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Convert a macOS .keylayout to XKB files.")
-    parser.add_argument("--keylayout", required=True, type=Path)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--keylayout", type=Path)
+    source.add_argument(
+        "--canonical",
+        type=Path,
+        help="schema-1 canonical keylayout JSON, as the shared Lua parser writes it",
+    )
     parser.add_argument("--keycodes", required=True, type=Path, help="shared mac_keycodes.json")
     parser.add_argument("--convention", required=True, choices=("iso", "ansi"))
     parser.add_argument("--layout-id", required=True)
@@ -816,9 +940,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         registry_id = args.registry_id or args.layout_id
         hints = hints_from_index(args.index, registry_id) if args.index else XkbHints()
-        text = args.keylayout.read_text(encoding="utf-8")
-        result = convert(
-            text,
+        if args.canonical is not None:
+            layout = Keylayout.from_canonical(
+                json.loads(args.canonical.read_text(encoding="utf-8"))
+            )
+        else:
+            layout = parse_keylayout(args.keylayout.read_text(encoding="utf-8"))
+        result = convert_layout(
+            layout,
             load_keycodes(args.keycodes, args.convention),
             args.layout_id,
             args.display_name,
