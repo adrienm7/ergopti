@@ -23,6 +23,7 @@ local BackendLabels = require("ui.menu.menu_llm.backend_labels")
 local ManifestMenu = require("infra.manifest_menu")
 local TextUtils = require("text_utils")
 local TableUtil = require("table_util")
+local NativeTheme = require("native_theme_data")
 
 local LOG = "models_selector"
 
@@ -342,20 +343,27 @@ function M.build(ctx)
 			return (s:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub('"', "&quot;"))
 		end
 
+		-- The palette colours come from the web theme (_shared/ui/theme.css), through
+		-- the generated table; the blue accent and the dark label are this dialog's own.
+		local palette_rows = {}
+		for _, name in ipairs({ "page-background", "white", "gray5", "gray4" }) do
+			palette_rows[#palette_rows + 1] = "--theme-" .. name .. ":" .. assert(NativeTheme.web_palette[name]) .. ";"
+		end
 		local css = table.concat({
+			":root{" .. table.concat(palette_rows) .. "}",
 			"*{box-sizing:border-box;margin:0;padding:0;}",
 			"body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;",
-			"background:#f5f5f7;display:flex;flex-direction:column;justify-content:center;",
+			"background:var(--theme-page-background);display:flex;flex-direction:column;justify-content:center;",
 			"height:100vh;padding:18px 20px;gap:10px;}",
 			"label{font-weight:600;color:#1a1a1a;font-size:13px;}",
 			"input{width:100%;padding:7px 10px;font-size:13px;border:1px solid #c6c6c8;",
-			"border-radius:6px;outline:none;background:#fff;}",
+			"border-radius:6px;outline:none;background:var(--theme-white);}",
 			"input:focus{border-color:#0078d4;box-shadow:0 0 0 2px rgba(0,120,212,.2);}",
 			".row{display:flex;gap:8px;justify-content:flex-end;}",
 			"button{padding:6px 18px;font-size:13px;border-radius:6px;border:none;cursor:pointer;}",
-			".btn-cancel{background:#e5e5ea;color:#1a1a1a;}",
-			".btn-cancel:hover{background:#d1d1d6;}",
-			".btn-add{background:#0078d4;color:#fff;}",
+			".btn-cancel{background:var(--theme-gray5);color:#1a1a1a;}",
+			".btn-cancel:hover{background:var(--theme-gray4);}",
+			".btn-add{background:#0078d4;color:var(--theme-white);}",
 			".btn-add:hover{background:#106ebe;}",
 		}, "")
 
