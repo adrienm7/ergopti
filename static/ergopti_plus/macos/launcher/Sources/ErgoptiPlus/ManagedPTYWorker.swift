@@ -165,6 +165,22 @@ enum ManagedPTYWorker {
 	private static let guardianFlag = "--managed-pty-guardian"
 	private static let controlDescriptor: Int32 = 3
 	private static let pollMilliseconds: Int32 = 20
+	/// The only installers the guardian runs, relative to the driver folder.
+	static let admittedSourceNames = ["ensure-mlx-deps.sh", "ensure-ollama-native-deps.sh", "ensure-ollama-deps.sh"]
+
+	/// Absolute installer paths the guardian admits for one Lua source. They live
+	/// in the folder the embedded runtime reads its Lua from: the signed payload
+	/// of a packaged app, or the clone a developer build records. The driver
+	/// builds the request from its own folder, so a developer build that admitted
+	/// only the payload refused its clone's installer with exit 64 (field run
+	/// 2026-10-27 19:47). A refused selection admits nothing.
+	/// - Parameter selection: The launcher's Lua source selection.
+	/// - Returns: The standardized admitted paths; empty for a refusal.
+	static func admittedSources(for selection: LuaSourceSelection) -> Set<String> {
+		guard let configDir = selection.configDir else { return [] }
+		let directory = URL(fileURLWithPath: configDir).appendingPathComponent("modules/llm")
+		return Set(admittedSourceNames.map { directory.appendingPathComponent($0).standardizedFileURL.path })
+	}
 
 	static func handles(arguments: [String]) -> Bool {
 		return arguments.count > 1 && [flag, guardianFlag].contains(arguments[1])
@@ -335,10 +351,10 @@ enum ManagedPTYWorker {
 			let clock = readLine(controlDescriptor, milliseconds: milliseconds, started: received),
 			let started = Double(String(decoding: clock, as: UTF8.self)), started.isFinite,
 			started > 0, started <= ProcessInfo.processInfo.systemUptime else { return 74 }
-		let scriptDirectory = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/static/ergopti_plus/macos/modules/llm")
-		let admittedSources = Set(["ensure-mlx-deps.sh", "ensure-ollama-native-deps.sh", "ensure-ollama-deps.sh"].map {
-			scriptDirectory.appendingPathComponent($0).standardizedFileURL.path
-		})
+		let admitted = admittedSources(for: LuaSourceSelection.resolve(
+			infoDictionary: Bundle.main.infoDictionary,
+			bundlePath: Bundle.main.bundlePath,
+			fileExists: { FileManager.default.fileExists(atPath: $0) }))
 		let expected = URL(fileURLWithPath: request.sourcePath).standardizedFileURL.path
 		var cancelled = false
 		var deadline = false
@@ -353,7 +369,7 @@ enum ManagedPTYWorker {
 			deadline = ProcessInfo.processInfo.systemUptime - started >= Double(milliseconds) / 1000
 			if deadline || getppid() != parent { cancelled = true }
 		}
-		guard admittedSources.contains(expected),
+		guard admitted.contains(expected),
 			let source = ManagedPTYSource.snapshot(request, interrupted: { consumeControl(); return cancelled }) else {
 			return write(Data("RETIRED 64 64 0\n".utf8), to: controlDescriptor) ? 0 : 74
 		}
