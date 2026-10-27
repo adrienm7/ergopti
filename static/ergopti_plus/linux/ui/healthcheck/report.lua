@@ -33,6 +33,7 @@ local IssueLink   = require("diagnostics.issue_link")
 local Redact      = require("diagnostics.redact")
 local Share       = require("healthcheck.share")
 local ReportRunner = require("healthcheck.report")
+local ConfigKeys = require("config_keys")
 
 local LOG = "healthcheck.report"
 
@@ -184,7 +185,7 @@ end
 --- @param complete function|nil Receives true once the form opened.
 --- @return table|nil cancellable request
 function M.report_bug(overrides, complete)
-	return menu_request("report_bug", overrides, complete, function(owner)
+	return menu_request(ConfigKeys.COMMAND.REPORT_BUG, overrides, complete, function(owner)
 		local snapshot, documents = menu_snapshot(true)
 		assert(type(snapshot) == "table" and type(snapshot.sections) == "table"
 			and type(snapshot.sections.paths) == "table", "the diagnostics snapshot has no paths section")
@@ -200,12 +201,12 @@ end
 --- @param complete function|nil Receives true once the form opened.
 --- @return table|nil cancellable request; completion receives the child outcome.
 function M.suggest_feature(overrides, complete)
-	return menu_request("suggest_feature", overrides, complete, function(owner)
+	return menu_request(ConfigKeys.COMMAND.SUGGEST_FEATURE, overrides, complete, function(owner)
 		local snapshot, documents = menu_snapshot()
 		local document = Share.document(snapshot, documents.schema,
 			require("infra.i18n").get(documents.schema.share_policy.notice_key))
 		local url = IssueLink.build_url(documents.templates, documents.repository, "feature", document.fields)
-		return M.perform({ action = "suggest_feature", url = url }, {}, documents, {}, overrides, nil, owner)
+		return M.perform({ action = ConfigKeys.COMMAND.SUGGEST_FEATURE, url = url }, {}, documents, {}, overrides, nil, owner)
 	end)
 end
 

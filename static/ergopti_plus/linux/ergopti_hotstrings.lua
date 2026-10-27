@@ -1352,7 +1352,7 @@ local function main()
 					trigger         = MagicKey.get(),
 					replacement     = repeated.replacement,
 					backspace_count = repeated.backspace_count,
-					group           = "repeat_key",
+					group           = require("config_keys").COMMAND.REPEAT_KEY,
 					final_result    = true,
 				}
 			end
@@ -2438,7 +2438,7 @@ local function main()
 					-- "hotstrings_config": that name has a bridge in BRIDGE_MODULES but
 					-- no page on disk, so the window opened and rendered
 					-- "Error: app 'hotstrings_config' not found".
-					webview_manager.show("hotstrings_config_window")
+					webview_manager.show(require("config_keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW)
 				else
 					Logger.warn(LOG, "No settings window available — a custom delimiter cannot be added.")
 				end

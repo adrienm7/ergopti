@@ -16,6 +16,7 @@ local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
 local ManifestMenu = require("infra.manifest_menu")
 local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 local LOG = "gesture_conflicts"
 local boot_notified = false
 
@@ -114,7 +115,7 @@ function M.rows(gestures)
 	local open_settings = M.open_settings
 	for _, group in ipairs(M.groups(gestures)) do
 		local rows = ManifestMenu.template_rows("gesture_system_slot_linux_frame", {
-			["gesture_system_open_unknown_slot"] = function(...) return open_settings(...) end,
+			[ConfigKeys.COMMAND.GESTURE_SYSTEM_OPEN_UNKNOWN_SLOT] = function(...) return open_settings(...) end,
 		}, {
 			["gesture_system_slot_caption"] = function() return I18n.get("gesture.slots." .. group.slot) end,
 		}, {})
