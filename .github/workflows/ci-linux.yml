@@ -857,6 +857,7 @@ jobs:
           elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_filesystem_paths.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_filesystem_paths.lua
+          ERGOPTI_SQLITE_ADMISSION_TEST_LUA=lua5.4 python3 tests/hardware/test_sqlite_file_admission.py
           else
               exit 1
           fi
