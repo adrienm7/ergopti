@@ -486,7 +486,7 @@ function M.mark_load_failed(model_name, notify)
 		-- Reuse the fully-translated "incompatible — choose another model" message:
 		-- it is the correct, actionable advice for any model that never becomes ready,
 		-- whether the cause is an unsupported architecture or a hung load.
-		pcall(Notifications.notify, "MLX incompatible",
+		pcall(Notifications.notify, i18n.get("mlx.model_incompatible_title"),
 			string.format(i18n.get("mlx.model_incompatible"), tostring(model_name)), "error")
 	end
 end
