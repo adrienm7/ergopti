@@ -507,9 +507,9 @@ Not started:
       JOINS it (Linux and macOS; Windows in the standing-checks agent's work, see PAR entries); Linux
       reports a refused `load_all` truthfully; the ordered-pair test runs in 8 s.
 - [ ] **AppImage self-contained.** [CODE] `.zsync` and update information are done (10c016e51f,
-      6fb83014e3). Left: validate on hosted CI; bundle the C library and loader (or build on an older
-      base) and prove it on the distro matrix (musl cannot run glibc binaries: say so), keeping the
-      tray closure.
+      6fb83014e3). Built on ubuntu:22.04 (glibc 2.35 floor, no bundled libc or loader, musl refused in words,
+      tray closure kept); the build refuses a foreign loader or a staged C library (dce846a0bd). Left: hosted
+      CI evidence of the Build and `install-linux` AppImage rows on the distro matrix.
 - [x] **Linux `copy_selected_path` in a file manager.** Done (8edb31edba, d2a7bc9c5b, 3027faffd3: the
       AT-SPI active frame names the application under Wayland). Left: confirm the AT-SPI query on a
       real GNOME or KDE Wayland desktop. Unicode IDNs and a zoned IPv6 are searched, not opened.
