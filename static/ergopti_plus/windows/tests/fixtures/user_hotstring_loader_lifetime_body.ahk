@@ -223,7 +223,13 @@ _UHLC_Main() {
 	try {
 		_UHLC_Require(_UHLC.Mode == "retained" || _UHLC.Mode == "released", "Unknown loader lifetime mode.")
 		_UHLC_Require(!FileExist(ConfigurationFile), "The actual private logger config must be absent before initialization.")
+		_UHLC_Require(ConfigKey.SCRIPT is String && ConfigLeaf.LOG_LEVEL is String,
+			"The actual generated logger key owners must be available in this component.")
+		_UHLC_Require(!ConfigMigrateBoot(ConfigurationFile, "known"),
+			"The real logger dependency graph must not admit the absent private configuration.")
 		LoggerInit(), LoggerSetTestSink(_UHLC_Log)
+		_UHLC_Require(!FileExist(ConfigurationFile) && !ConfigMigrateBoot(ConfigurationFile, "known"),
+			"Actual logger initialization must retain the absent pre-journal fixture role.")
 		Features := ManifestBuildFeaturesMap()
 		_UHLC_Require(!Features["hotstrings"]["dynamic"]["user_code"]["enabled"]
 			&& !IsObject(_UserHotstringsOwner) && !IsObject(_UserHotstringsLoader) && _UserHotstringsJobs.Count == 0,
