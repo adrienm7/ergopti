@@ -16,14 +16,13 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const sourcePath = path.join(ROOT, 'static/ergopti_plus/linux/install/setup_permissions.sh');
 assert.ok(fs.existsSync(sourcePath), 'native packages need an automatic permission setup owner');
 const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-package-setup-'));
-const bashPath = (value) =>
-	value.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`);
+const shellQuote = (value) => "'" + value.replaceAll("'", "'\\''") + "'";
 try {
 	const stubs = path.join(sandbox, 'stubs');
 	const callLog = path.join(sandbox, 'calls');
@@ -59,7 +58,7 @@ show-session) case "$2" in
 		script,
 		fs
 			.readFileSync(sourcePath, 'utf8')
-			.replaceAll('/etc/', `${bashPath(sandbox)}/etc/`)
+			.replaceAll('/etc/', `${shellQuote(bashPath(sandbox))}/etc/`)
 			.replace('[ -S /run/udev/control ]', 'true')
 			.replace('set -euo pipefail', 'set -euo pipefail\nexport PATH="$TEST_STUBS:/usr/bin:/bin"')
 	);
@@ -240,7 +239,7 @@ else echo "users input uinput"; fi`
 		stopScript,
 		fs
 			.readFileSync(path.join(ROOT, 'static/ergopti_plus/linux/install/stop_sessions.sh'), 'utf8')
-			.replaceAll('/run/user/', `${bashPath(runtimeRoot)}/`)
+			.replaceAll('/run/user/', `${shellQuote(bashPath(runtimeRoot))}/`)
 			.replaceAll('[ -S ', '[ -f ')
 			.replace('set -euo pipefail', 'set -euo pipefail\nexport PATH="$TEST_STUBS:/usr/bin:/bin"')
 	);

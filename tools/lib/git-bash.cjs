@@ -85,6 +85,19 @@ function bashExecutable() {
 }
 
 /**
+ * Spells a native path for the selected Bash without rewriting POSIX filename bytes.
+ * @param {string} value Native path, already resolved when the caller requires it.
+ * @returns {string} Git Bash drive spelling on Windows, unchanged bytes elsewhere.
+ */
+function bashPath(value) {
+	if (typeof value !== 'string') throw new TypeError('A Bash path must be a string.');
+	if (process.platform !== 'win32') return value;
+	return value
+		.replaceAll('\\', '/')
+		.replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`);
+}
+
+/**
  * Runs a bash script with bashExecutable(), inheriting stdio.
  * @param {string[]} argv The script path, then its arguments.
  * @returns {number} Process exit code: the script's, or 1 when it could not
@@ -110,4 +123,4 @@ function runScript(argv) {
 
 if (require.main === module) process.exitCode = runScript(process.argv.slice(2));
 
-module.exports = { SYSTEM_BASH, bashExecutable, gitForWindowsRoot, runScript };
+module.exports = { SYSTEM_BASH, bashExecutable, bashPath, gitForWindowsRoot, runScript };
