@@ -98,7 +98,7 @@ end
 function M.restart_context(root)
 	root = root or M.root()
 	if not root then return nil end
-	return { kind = "standalone", wrapper = root .. M.LAUNCHER_SUBPATH, reason = "developer source run" }
+	return { kind = "standalone", wrapper = root .. M.LAUNCHER_SUBPATH }
 end
 
 --- The source trees whose saved .lua edits restart a developer run.
