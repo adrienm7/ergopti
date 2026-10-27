@@ -53,24 +53,56 @@ helpers.describe("current view refusal reasons", function()
 		end)
 	end)
 
-	helpers.it("names a section stored as a scalar", function()
+	helpers.it("names a section stored as a scalar in the strict view", function()
 		with_source("layout = 3\n", function(preferences, path)
-			local view, _, reason = preferences.current_view(path, true)
+			local view, _, reason, key_path = preferences.current_view(path)
 			helpers.assert_nil(view)
-			helpers.assert_eq(reason, "section_shape")
+			helpers.assert_eq(reason, "outdated_keys")
+			helpers.assert_eq(key_path, "layout")
+			helpers.assert_type(preferences.current_view(path, true), "table",
+				"a read-only consumer sees past it, as load does")
 		end)
 	end)
 
-	helpers.it("names a value of the wrong type", function()
+	helpers.it("names a value of the wrong type in the strict view", function()
 		with_source("[layout]\npause_switch_enabled = \"yes\"\n", function(preferences, path)
-			local view, _, reason, key_path = preferences.current_view(path, true)
+			local view, _, reason, key_path = preferences.current_view(path)
 			helpers.assert_nil(view)
-			helpers.assert_true(reason == "value_type" or reason == "value_out_of_range",
-				"a wrong value type must be named, got " .. tostring(reason))
+			helpers.assert_eq(reason, "outdated_keys")
 			-- Field run 2026-10-27 19:47: value_type on every regeneration, no key named.
 			helpers.assert_eq(key_path, "layout.pause_switch_enabled")
 		end)
 	end)
+
+	-- Field ledger L20 (2026-10-27 21:06): load accepted `date = true` while the view
+	-- refused it with "value_type at hotstrings.dynamic.date", so every Karabiner
+	-- regeneration and wake refresh failed. Both now apply one admission rule.
+	for _, source in ipairs({
+		"[hotstrings.dynamic]\ndate = true\n",
+		"[hotstrings.dynamic]\ndate = false\n",
+		"[layout]\npause_switch_enabled = \"yes\"\nvirtual_keyboard = \"iso\"\n",
+	}) do
+		helpers.it("accepts in the read-only view exactly what load accepts (view-equals-load-2026-10-27): "
+			.. source:gsub("\n", " "), function()
+			with_source(source, function(preferences, path)
+				local view, _, reason, key_path = preferences.current_view(path, true)
+				helpers.assert_type(view, "table", "the read-only view refused what load accepts: "
+					.. tostring(reason) .. " at " .. tostring(key_path))
+				local loaded, status = preferences.load(path)
+				helpers.assert_eq(status, "ok")
+				for key, value in pairs(loaded) do
+					if type(value) ~= "table" then
+						helpers.assert_eq(view[key], value, "view and load disagree on " .. key)
+					end
+				end
+				for key, value in pairs(view) do
+					if type(value) ~= "table" then
+						helpers.assert_eq(loaded[key], value, "view and load disagree on " .. key)
+					end
+				end
+			end)
+		end)
+	end
 
 	helpers.it("names an invalid path", function()
 		with_source(nil, function(preferences)
