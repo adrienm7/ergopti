@@ -562,7 +562,7 @@ reason_key = "platform_reason.tap_hold_word_reset_not_on_macos"
 # `facebook` and `facebook` giving `Facebook`, typing `fb` and a space ends on
 # `Facebook` from 2 arrows. It applies to every hotstring, the shipped ones and
 # the personal ones. The whole chain is resolved before anything is typed and
-# goes out as ONE edit (one SendInput burst on Windows, one transaction on
+# goes out as ONE edit (one input burst on Windows, one transaction on
 # macOS, one injection on Linux), so the application never shows the
 # intermediate text and an Undo (Linux) restores what was typed, not a half-way
 # text. Guards: a hotstring never fires twice in the same chain (the 124
