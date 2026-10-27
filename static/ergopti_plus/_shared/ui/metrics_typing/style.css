@@ -28,7 +28,7 @@
 	--th-bg: var(--theme-metrics-th-bg);
 	--th-hover: var(--theme-metrics-th-hover);
 	--td-hover: var(--theme-metrics-td-hover);
-	--tooltip-bg: #333333;
+	--tooltip-bg: var(--theme-grey-333);
 	--modal-overlay: rgba(0, 0, 0, 0.3);
 
 	/* Button Tints Light Mode */
@@ -86,7 +86,7 @@
 		--text-color-rgb: 240, 240, 240; /* matches --text-color for use in rgba() */
 		--mono-bg: #111111;
 		--mono-color: #9cdcfe;
-		--tooltip-bg: #555555;
+		--tooltip-bg: var(--theme-grey-555);
 		--modal-overlay: rgba(0, 0, 0, 0.6);
 
 		/* Button Tints Dark Mode */
@@ -269,7 +269,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 .filter-btn.active {
 	background: var(--accent);
 	border-color: var(--accent);
-	color: #fff;
+	color: var(--theme-white);
 }
 
 .filter-reset {
@@ -408,7 +408,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 .trend-svg.up,
 .trend-svg.down,
 .trend-svg.stable {
-	color: #ffffff;
+	color: var(--theme-white);
 	opacity: 0.9;
 }
 
@@ -805,7 +805,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 .tab-btn.active {
 	background: var(--accent);
 	border-color: var(--accent);
-	color: #fff;
+	color: var(--theme-white);
 }
 
 /* =================================== */
@@ -1133,7 +1133,7 @@ td.col-rep {
 	border-radius: 6px;
 	bottom: 150%;
 	box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
-	color: #fff;
+	color: var(--theme-white);
 	font-size: 12px;
 	font-weight: normal;
 	left: 0;
@@ -1187,7 +1187,7 @@ th .tooltip .tooltiptext {
 	background: var(--tooltip-bg);
 	border-radius: 4px;
 	bottom: calc(100% + 4px);
-	color: #fff;
+	color: var(--theme-white);
 	content: attr(title);
 	display: none;
 	font-size: 11px;
@@ -1322,7 +1322,7 @@ th .tooltip .tooltiptext {
 	align-items: center;
 	border-radius: 6px;
 	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
-	color: #fff;
+	color: var(--theme-white);
 	display: flex;
 	font-size: 14px;
 	font-weight: bold;
