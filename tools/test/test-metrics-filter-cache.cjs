@@ -2300,4 +2300,84 @@ assert.equal(
 	'all fresh-manifest chart, metadata and native-query ownership controls must execute'
 );
 
+const typingHeatmapCases = [
+	{ name: 'ALL selection', action: 'all', monday: 23 },
+	{ name: 'editor subset and Unknown policy', action: 'editor', monday: 12 },
+	{ name: 'browser subset and Unknown policy', action: 'browser', monday: 16 },
+	{ name: 'explicit NONE selection', action: 'none', monday: 0 },
+	{ name: 'ALL restored after NONE', action: 'restore', monday: 23 },
+	{ name: 'date and app selection together', action: 'date-editor', monday: 12 }
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of typingHeatmapCases) {
+		test(`${host} hour-weekday heatmap retains ${vector.name}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = 'UTC';
+			try {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, '2026-01-06T12:00:00Z');
+				const app = (chars) => ({ chars, time: 60000, hourly: { '09': { c: chars } } });
+				const manifest = { '2026-01-05': { Editor: app(7), Browser: app(11), Unknown: app(5) } };
+				if (vector.action === 'date-editor')
+					manifest['2026-01-06'] = { Editor: app(13), Browser: app(17), Unknown: app(19) };
+				publishTypingPage(page, host, manifest);
+				if (['editor', 'browser', 'date-editor'].includes(vector.action)) {
+					const checkbox = page.context.document.createElement('input');
+					checkbox.value = vector.action === 'browser' ? 'Editor' : 'Browser';
+					checkbox.checked = false;
+					page.context.toggle_app_selection(checkbox);
+				} else if (vector.action === 'none') page.context.deselect_all_apps();
+				else if (vector.action === 'restore') {
+					page.context.deselect_all_apps();
+					page.context.select_all_apps();
+				}
+				if (vector.action === 'date-editor') {
+					page.elements.get('date_start').value = '2026-01-05';
+					page.elements.get('date_end').value = '2026-01-05';
+					runTypingControlChange(page, 'date_start');
+				}
+				page.context.close_app_modal();
+				const heatmap = page.elements.get('hour_weekday_heatmap_container').innerHTML;
+				assert.equal(
+					(heatmap.match(/<title>/g) || []).length,
+					7 * 24,
+					'the production heatmap renders its complete real grid'
+				);
+				const mondayCount = vector.monday
+					? `${vector.monday} ${page.context._t('ui_typing.heatmap_hour_chars_abbrev')}`
+					: page.context._t('ui_typing.heatmap_hour_no_keystrokes');
+				assert.ok(
+					heatmap.includes(
+						`<title>${page.context._t('ui_typing.heatmap_day_mon')} 09h — ${mondayCount}</title>`
+					),
+					'selected-scope cells follow the canonical app selection policy'
+				);
+				assert.ok(
+					heatmap.includes(
+						`<title>${page.context._t('ui_typing.heatmap_day_tue')} 09h — ${page.context._t('ui_typing.heatmap_hour_no_keystrokes')}</title>`
+					),
+					'a different or excluded date cannot populate the selected cell'
+				);
+				assert.ok(
+					heatmap.includes(`${vector.monday} ${page.context._t('ui_typing.heatmap_hour_total')}`)
+				);
+				assert.ok(
+					page.elements.get('global_details').innerHTML.includes(`>${vector.monday}</strong>`),
+					'the raw-character KPI and heatmap agree on the selected apps/dates'
+				);
+				assert.equal(page.elements.get('app_modal').style.display, 'none');
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+}
+assert.equal(typingHeatmapCases.length, 6);
+assert.equal(passed, 435, 'all app-modal, Unknown-policy and scoped heatmap controls must execute');
+
 console.log(`${passed} passed, 0 failed.`);

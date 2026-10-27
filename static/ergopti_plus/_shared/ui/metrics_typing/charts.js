@@ -1141,8 +1141,8 @@ function _render_hour_weekday_heatmap() {
 	const accumulate_day = (date_str, app_data_map) => {
 		const d = new Date(parseDateKey(date_str));
 		const dow = (d.getUTCDay() + 6) % 7; // 0 = Mon, 6 = Sun
-		Object.values(app_data_map || {}).forEach((app) => {
-			if (!app || !app.hourly) return;
+		Object.entries(app_data_map || {}).forEach(([app_name, app]) => {
+			if (!matches_typing_app_selection(app_name) || !app || !app.hourly) return;
 			Object.entries(app.hourly).forEach(([h_str, hd]) => {
 				const h = parseInt(h_str, 10);
 				if (isNaN(h)) return;
