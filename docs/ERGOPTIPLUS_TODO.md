@@ -2,8 +2,8 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-27 evening (read "Handover of 2026-10-27 evening" first). Latest stable: [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6)
-(tag 950979d19c, 2026-10-23). **Next step: issue #101 follow-ups on the Mac (Backlog).** Open work only: a finished item is removed, its lessons go to
+Updated: 2026-10-27 evening (read "Handover of 2026-10-27 evening" first). Latest stable: v1.0.7 (released 2026-10-27 from dev; previous [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6),
+tag 950979d19c). **Next step: issue #101 follow-ups on the Mac (Backlog).** Open work only: a finished item is removed, its lessons go to
 [docs/memory](memory/README.md), and the history stays in Git
 (`git log -p -- docs/ERGOPTIPLUS_TODO.md`). Item numbers are stable and never reused. Open
 questions are in [questions-for-maintainer.md](questions-for-maintainer.md); per-work handoff files
