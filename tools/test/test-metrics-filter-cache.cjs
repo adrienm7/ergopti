@@ -1653,4 +1653,102 @@ for (const host of ['windows', 'macos', 'linux']) {
 }
 assert.equal(typingWindowCases.length, 8);
 assert.equal(passed, 312, 'all annual summary, normalization and date-edge controls must execute');
+const typingMonthCases = [
+	{
+		name: 'three months into ordinary February',
+		now: '2026-05-31T12:00:00Z',
+		preset: '3m',
+		start: '2026-02-28',
+		end: '2026-05-31'
+	},
+	{
+		name: 'six months into ordinary February',
+		now: '2026-08-31T12:00:00Z',
+		preset: '6m',
+		start: '2026-02-28',
+		end: '2026-08-31'
+	},
+	{
+		name: 'three months into leap February',
+		now: '2024-05-31T12:00:00Z',
+		preset: '3m',
+		start: '2024-02-29',
+		end: '2024-05-31'
+	},
+	{
+		name: 'six months across the year boundary',
+		now: '2026-03-31T12:00:00Z',
+		preset: '6m',
+		start: '2025-09-30',
+		end: '2026-03-31'
+	},
+	{
+		name: 'three months into a thirty-day month',
+		now: '2026-07-31T12:00:00Z',
+		preset: '3m',
+		start: '2026-04-30',
+		end: '2026-07-31'
+	},
+	{
+		name: 'valid day retained across months',
+		now: '2026-03-30T12:00:00Z',
+		preset: '3m',
+		start: '2025-12-30',
+		end: '2026-03-30'
+	},
+	{
+		name: 'local month end after UTC midnight',
+		zone: 'America/Los_Angeles',
+		now: '2026-06-01T00:30:00Z',
+		preset: '3m',
+		start: '2026-02-28',
+		end: '2026-05-31'
+	},
+	{
+		name: 'local month end before UTC midnight',
+		zone: 'Pacific/Kiritimati',
+		now: '2026-05-30T13:00:00Z',
+		preset: '3m',
+		start: '2026-02-28',
+		end: '2026-05-31'
+	}
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of typingMonthCases) {
+		test(`${host} quick date range retains ${vector.name}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = vector.zone || 'UTC';
+			try {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, vector.now);
+				publishTypingPage(page, host, { '2020-01-01': { Editor: { chars: 10, time: 10000 } } });
+				page.elements.get('quick_range').value = vector.preset;
+				const tag = page.html.match(/<select\b[^>]*\bid="quick_range"[^>]*>/)[0];
+				const handler = tag.match(/\bonchange="([^"]+)"/)[1];
+				assert.ok(handler, 'the real HTML owns the quick-range change handler');
+				vm.runInContext(handler, page.context);
+				assert.equal(page.elements.get('date_start').value, vector.start);
+				assert.equal(page.elements.get('date_end').value, vector.end);
+				const selection = JSON.parse(
+					vm.runInContext('app_state.range_request_selection', page.context)
+				);
+				assert.deepEqual(
+					selection,
+					[vector.start, vector.end, ['Editor']],
+					'the actual native query owns the clamped local date interval'
+				);
+				assert.equal(vm.runInContext('app_state.hour_cutoff', page.context), null);
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+}
+assert.equal(typingMonthCases.length, 8);
+assert.equal(passed, 336, 'all quick-range month boundary controls must execute');
 console.log(`${passed} passed, 0 failed.`);
