@@ -1892,7 +1892,7 @@ local function report_slow_timer_callback(fn, kind, started, modal_before)
 		PhaseStats.count(held_ms >= SLOW_TIMER_CALLBACK_REPORT_MS and "runtime.timer_hold_over_1000ms"
 			or "runtime.timer_hold_over_250ms")
 	end
-	if held_ms < SLOW_TIMER_CALLBACK_REPORT_MS then return end
+	if held_ms < SLOW_TIMER_CALLBACK_COUNT_MS then return end
 	local ok_site, site = pcall(describe_callback_site, fn)
 	site = ok_site and site or "?"
 	local previous = _slow_callback_reported_at[site]
@@ -1900,6 +1900,15 @@ local function report_slow_timer_callback(fn, kind, started, modal_before)
 	if previous and now_sec - previous < SLOW_TIMER_CALLBACK_REPEAT_SEC then return end
 	_slow_callback_reported_at[site] = now_sec
 	local phases = PhaseStats.recent_since(started)
+	if held_ms < SLOW_TIMER_CALLBACK_REPORT_MS then
+		-- The Mac counted 7 to 18 such holds per 5 minutes with no site: key
+		-- events arrive late from 250 ms on, so each one is named once a minute.
+		-- Evidence, not info: one template for every site would be collapsed.
+		M.evidence("runtime", "Main-thread hold of %d ms in an hs.timer.%s callback (%s).%s",
+			math.floor(held_ms), kind, site,
+			phases and (" Phases inside the hold: " .. phases .. ".") or "")
+		return
+	end
 	M.warn("runtime",
 		"An hs.timer.%s callback (%s) held the main thread for %d ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.%s",
 		kind, site, math.floor(held_ms),
