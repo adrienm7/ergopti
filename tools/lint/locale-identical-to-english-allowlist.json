@@ -2258,10 +2258,6 @@
 			"reason": "brand-or-feature-name",
 			"locales": ["da", "de", "fr", "he", "hi", "no", "sv"]
 		},
-		"ui_apps.h2_top_trio": {
-			"reason": "loanword-or-cognate",
-			"locales": ["nl", "pt"]
-		},
 		"ui_apps.kpi_bursts_count": {
 			"reason": "loanword-or-cognate",
 			"locales": ["da", "nl", "no"]
