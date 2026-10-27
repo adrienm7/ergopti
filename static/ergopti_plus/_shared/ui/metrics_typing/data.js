@@ -234,37 +234,35 @@ function update_manifest_scope() {
 	const start_input = document.getElementById('date_start');
 	const end_input = document.getElementById('date_end');
 	app_state.manifest_dates_sorted = Object.keys(window.metrics_manifest).sort();
-	if (app_state.manifest_dates_sorted.length > 0) {
-		const app_set = new Set();
-		app_state.manifest_dates_sorted.forEach((date) => {
-			Object.keys(window.metrics_manifest[date]).forEach((app_name) => {
-				if (app_name !== 'Unknown' && app_name !== '_sys' && app_name !== '_system') {
-					app_set.add(app_name);
-				}
-			});
+	const app_set = new Set();
+	app_state.manifest_dates_sorted.forEach((date) => {
+		Object.keys(window.metrics_manifest[date]).forEach((app_name) => {
+			if (app_name !== 'Unknown' && app_name !== '_sys' && app_name !== '_system') {
+				app_set.add(app_name);
+			}
 		});
+	});
 
-		const previous_selection = new Set(app_state.selected_apps);
-		const previous_mode = app_state.app_selection_mode || APP_SELECTION_MODE.UNINITIALIZED;
+	const previous_selection = new Set(app_state.selected_apps);
+	const previous_mode = app_state.app_selection_mode || APP_SELECTION_MODE.UNINITIALIZED;
 
-		app_state.available_apps = Array.from(app_set).sort((a, b) => a.localeCompare(b));
+	app_state.available_apps = Array.from(app_set).sort((a, b) => a.localeCompare(b));
 
-		if (
-			previous_mode === APP_SELECTION_MODE.UNINITIALIZED ||
-			previous_mode === APP_SELECTION_MODE.ALL
-		) {
-			app_state.selected_apps = new Set(app_state.available_apps);
-			app_state.app_selection_mode = APP_SELECTION_MODE.ALL;
-		} else if (previous_mode === APP_SELECTION_MODE.NONE) {
-			app_state.selected_apps = new Set();
-		} else {
-			const next_sel = new Set();
-			app_state.available_apps.forEach((app) => {
-				if (previous_selection.has(app)) next_sel.add(app);
-			});
-			app_state.selected_apps = next_sel;
-			if (next_sel.size === 0) app_state.app_selection_mode = APP_SELECTION_MODE.NONE;
-		}
+	if (
+		previous_mode === APP_SELECTION_MODE.UNINITIALIZED ||
+		previous_mode === APP_SELECTION_MODE.ALL
+	) {
+		app_state.selected_apps = new Set(app_state.available_apps);
+		app_state.app_selection_mode = APP_SELECTION_MODE.ALL;
+	} else if (previous_mode === APP_SELECTION_MODE.NONE) {
+		app_state.selected_apps = new Set();
+	} else {
+		const next_sel = new Set();
+		app_state.available_apps.forEach((app) => {
+			if (previous_selection.has(app)) next_sel.add(app);
+		});
+		app_state.selected_apps = next_sel;
+		if (next_sel.size === 0) app_state.app_selection_mode = APP_SELECTION_MODE.NONE;
 	}
 
 	if (start_input && end_input && (!start_input.value || !end_input.value)) {

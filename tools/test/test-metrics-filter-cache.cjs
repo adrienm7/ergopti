@@ -3230,4 +3230,99 @@ assert.equal(
 	'all literal-word versus physical-control display and search controls must execute'
 );
 
+const typingReplacementAppScopes = [
+	{ name: 'empty history', apps: null, names: [] },
+	{ name: 'system-only day', apps: { _system: { awake_ms: 1000 } }, names: [] },
+	{
+		name: 'retained selected app',
+		apps: { 'Editor.exe': { chars: 9, time: 900 } },
+		names: ['Editor.exe']
+	},
+	{ name: 'new app only', apps: { 'Fresh.exe': { chars: 9, time: 900 } }, names: ['Fresh.exe'] }
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const mode of ['all', 'none', 'subset']) {
+		for (const vector of typingReplacementAppScopes) {
+			test(`${host} ${mode} app scope reconciles ${vector.name}`, () => {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, '2026-10-27T12:00:00Z');
+				page.elements.get('app_search').focus = () => {};
+				publishTypingPage(page, host, {
+					'2026-10-27': {
+						'Editor.exe': { chars: 5, time: 500 },
+						'Browser.exe': { chars: 6, time: 600 }
+					}
+				});
+				if (mode !== 'all') {
+					page.context.open_app_modal();
+					page.context.deselect_all_apps();
+					if (mode === 'subset')
+						page.context.toggle_app_selection({ checked: true, value: 'Editor.exe' });
+					page.context.close_app_modal();
+				}
+				assert.equal(vm.runInContext('app_state.app_selection_mode', page.context), mode);
+				const replacement = vector.apps === null ? {} : { '2026-10-27': vector.apps };
+				deliverTypingManifest(page, host, replacement);
+				const selected =
+					mode === 'all'
+						? vector.names
+						: mode === 'subset' && vector.names.includes('Editor.exe')
+							? ['Editor.exe']
+							: [];
+				const expectedMode = mode === 'subset' && selected.length === 0 ? 'none' : mode;
+				assert.deepEqual(
+					Array.from(vm.runInContext('app_state.available_apps', page.context)),
+					vector.names,
+					'a full native replacement retires every unavailable app identity'
+				);
+				assert.deepEqual(
+					Array.from(vm.runInContext('[...app_state.selected_apps]', page.context)),
+					selected
+				);
+				assert.equal(vm.runInContext('app_state.app_selection_mode', page.context), expectedMode);
+				assert.deepEqual(
+					Array.from(page.context.get_app_selection_request_apps()),
+					selected,
+					'future native queries use only the reconciled application scope'
+				);
+				page.context.open_app_modal();
+				const list = page.elements.get('app_list').innerHTML;
+				for (const retired of [
+					'Browser.exe',
+					...(!vector.names.includes('Editor.exe') ? ['Editor.exe'] : [])
+				])
+					assert.equal(list.includes(`value="${retired}"`), false);
+				for (const available of vector.names) assert.ok(list.includes(`value="${available}"`));
+				page.context.close_app_modal();
+				deliverTypingManifest(
+					page,
+					host,
+					{
+						'2026-10-27': { 'Future.exe': { chars: 10, time: 1000 } }
+					},
+					{ revision: 3 }
+				);
+				assert.deepEqual(Array.from(vm.runInContext('app_state.available_apps', page.context)), [
+					'Future.exe'
+				]);
+				assert.deepEqual(
+					Array.from(page.context.get_app_selection_request_apps()),
+					mode === 'all' ? ['Future.exe'] : [],
+					'ALL follows new apps while explicit NONE and subset intent remain restrictive'
+				);
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			});
+		}
+	}
+}
+assert.equal(typingReplacementAppScopes.length, 4);
+assert.equal(
+	passed,
+	747,
+	'all native empty/replaced app-scope and later discovery controls must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);
