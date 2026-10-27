@@ -108,6 +108,11 @@ M.FAILURE_FOREIGN_FILE = "foreign_file"
 M.FAILURE_XORG_SESSION = "xorg_session"
 M.FAILURE_SELECT = "select_failed"
 M.FAILURE_INVALID = "invalid"
+-- Live number-row options (apply_rows): no layout to apply them to, a session that
+-- cannot load a user layout live, or the live load that the X server did not keep.
+M.FAILURE_NO_SOURCE = "no_source_layout"
+M.FAILURE_SESSION = "session_unsupported"
+M.FAILURE_LIVE = "live_apply_failed"
 
 
 
@@ -453,8 +458,9 @@ end
 --- @param deps table
 --- @param entry table
 --- @param layout_path string
---- @param on_done function on_done(ok, code, detail)
-local function convert(deps, entry, layout_path, on_done)
+--- @param on_done function on_done(ok, code, detail, rows_report)
+--- @param rows table|nil Number-row options { order, edges } applied while converting.
+local function convert(deps, entry, layout_path, on_done, rows)
 	local data_dir = deps.converter_data
 	if not data_dir then
 		on_done(false, M.FAILURE_CONVERSION, "the XKB conversion data is not shipped with this driver")
@@ -495,6 +501,7 @@ local function convert(deps, entry, layout_path, on_done)
 		layout_id = entry.id,
 		display_name = entry.name,
 		hints = entry.xkb,
+		rows = rows,
 	})
 	if not result then on_done(false, M.FAILURE_CONVERSION, convert_err) return end
 	local out_dir = deps.local_dir .. entry.id .. "/"
@@ -506,7 +513,7 @@ local function convert(deps, entry, layout_path, on_done)
 		local written, write_err = write_file(deps, out_dir .. file[1], file[2])
 		if not written then on_done(false, M.FAILURE_WRITE, write_err) return end
 	end
-	on_done(true, nil, nil)
+	on_done(true, nil, nil, result.rows)
 end
 
 --- Runs one command of the user XKB installer and reads its report.
@@ -530,7 +537,7 @@ local function run_installer(deps, args, on_done)
 			-- A pure Xorg session never reads the user XKB tree: nothing was written,
 			-- and the user is told what to do instead of seeing a layout that types nothing.
 			if report and report.code == "xorg_session" then code = M.FAILURE_XORG_SESSION end
-			on_done(false, code, tostring(reason))
+			on_done(false, code, tostring(reason), report and report.code or nil)
 			return
 		end
 		on_done(true, report, nil)
@@ -861,6 +868,123 @@ function M.select(id, on_done, deps)
 	end)
 	return true
 end
+
+
+
+
+
+-- ======================================
+-- ======================================
+-- ======= 7b/ Number-row options =======
+-- ======================================
+-- ======================================
+
+--- The session type the desktop declares, lower case ("" when it declares none).
+--- @return string
+local function session_type()
+	return (os.getenv("XDG_SESSION_TYPE") or ""):lower()
+end
+
+--- The layout the options apply to: the one named, else the one this session made
+--- the input source, else the only installed one.
+--- @param id string|nil
+--- @param record table
+--- @return string|nil
+local function rows_base(id, record)
+	if id ~= nil then return id end
+	if _active ~= "" and record.layouts[_active] then return _active end
+	local only
+	for installed_id in pairs(record.layouts) do
+		if only ~= nil then return nil end
+		only = installed_id
+	end
+	return only
+end
+
+--- Applies the number-row options to an installed layout and loads it into the
+--- running session: the layout is converted again with the options, installed in the
+--- user XKB tree and, on X11, compiled into the running server (apply-x11). Nothing is
+--- written where the session cannot load a user layout live (Wayland, until a
+--- compositor is known to compile one); the stored choice is kept by the caller.
+--- on_done(true, { id, rows }) or on_done(false, failure_code, detail, user_message,
+--- live_code) runs once unless terminal shutdown cancels its delivery. live_code is the
+--- closed code of apply-x11 (not_loaded, compile_failed, ...) when that step failed.
+--- @param id string|nil Installed layout id; nil takes the active or the only one.
+--- @param rows table { order = "native"|"digits"|"symbols", edges = boolean }
+--- @param on_done function
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.apply_rows(id, rows, on_done, deps)
+	if _stopping then return false end
+	local epoch, receive = _epoch, on_done
+	on_done = function(...) if current(epoch) and receive then return receive(...) end end
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then
+		on_done(false, M.FAILURE_WRITE, deps_err, nil)
+		return false
+	end
+	deps = resolved
+	local session = (deps.session_type or session_type)()
+	if session ~= "x11" then
+		Logger.warn(LOG, "The number-row options were not applied: a '%s' session cannot load a user layout live.",
+			session == "" and "unknown" or session)
+		on_done(false, M.FAILURE_SESSION, session, nil)
+		return false
+	end
+	local record, record_problem = read_installed(deps)
+	if not record then
+		on_done(false, M.FAILURE_RECORD, record_problem, nil)
+		return false
+	end
+	local base = rows_base(id, record)
+	local entry = base ~= nil and record.layouts[base] or nil
+	if entry == nil then
+		on_done(false, base == nil and M.FAILURE_NO_SOURCE or M.FAILURE_NOT_INSTALLED,
+			base == nil and "no ErgoptiPlus layout is installed or selected" or ("the layout '" .. base .. "' is not installed"), nil)
+		return false
+	end
+	if not acquire_slot(base, "apply_rows", on_done) then return false end
+	local function finish(ok, code_or_detail, detail, live_code)
+		if not current(epoch) then return end
+		_busy = nil
+		if ok then
+			Logger.success(LOG, "Applied the number-row options to the '%s' layout (%s).", base, tostring(code_or_detail.rows.order))
+			on_done(true, code_or_detail)
+			return
+		end
+		Logger.error(LOG, "The number-row options were not applied to '%s' (%s): %s.", base, tostring(code_or_detail),
+			tostring(detail))
+		on_done(false, code_or_detail, detail, user_message(deps, code_or_detail), live_code)
+	end
+	Logger.start(LOG, "Applying the number-row options to the '%s' layout…", base)
+	convert(deps, entry, deps.local_dir .. base .. ".keylayout", function(converted, code, convert_err, report)
+		if not current(epoch) then return end
+		if not converted then
+			finish(false, code, convert_err)
+			return
+		end
+		run_installer(deps, { "install", "--layout-id", base, "--display-name", entry.name,
+			"--source-dir", deps.local_dir .. base, "--allow-xorg" }, function(installed, installed_report, install_err)
+			if not current(epoch) then return end
+			if not installed then
+				finish(false, installed_report, install_err)
+				return
+			end
+			run_installer(deps, { "apply-x11", "--layout-id", base }, function(applied, _, apply_err, live_code)
+				if not current(epoch) then return end
+				if not applied then
+					finish(false, M.FAILURE_LIVE, apply_err, live_code)
+					return
+				end
+				_active = base
+				finish(true, { id = base, rows = report })
+			end)
+		end)
+	end, rows)
+	return true
+end
+
+
 
 
 
