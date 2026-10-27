@@ -85,6 +85,17 @@ a sealed Windows updater source, reseal with
   - the registry op that re-encodes a value in `config_migrate.ahk`, then delete the macOS
     `[llm.profiles] user_profiles` reader import.
 
+## Release blocker (before the next release)
+
+- [ ] **Shortcut parameters lost by the schema v15 slot renames.** [CODE] PAR-41's `v14_to_v15` step renames
+      the macOS and Linux slot ids (`cmd_*`→`primary_*`, `hs_ctrl_*`→`secondary_*`, `ctrl_*`→`primary_*`,
+      `super_*`→`meta_*`), but the per-slot action parameters (`gestures.action_parameters` keys
+      `keyboard__<slot>__<action>`) cannot follow with the existing op kinds, so they would be orphaned (reported
+      as outdated, re-entered by hand). Fix: a `rename_prefix` op, taught first to Windows
+      `config_migrate.ahk` (it refuses an unknown op at boot) together with the re-encode op of the older macOS
+      LLM profiles, then to the Lua engines and the JS reference, then the parameter ops in `v14_to_v15`. Do
+      not release with v15 before this lands (only after PAR-41 reaches dev).
+
 ## Windows side to do on the PC (from October 25)
 
 Work done on Linux and macOS only; the AHK side is built and run live on the Windows PC.
