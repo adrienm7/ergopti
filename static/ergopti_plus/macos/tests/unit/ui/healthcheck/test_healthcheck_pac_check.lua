@@ -49,6 +49,17 @@ helpers.describe("PAC check", function()
 		helpers.assert_true(big:find("limit", 1, true) ~= nil)
 	end)
 
+	helpers.it("tells that the downloads go direct after a PAC failure", function()
+		local _, failed = PacCheck.judge(0, "", "timed out")
+		helpers.assert_eq(PacCheck.with_direct_fallback(failed),
+			"PAC download failed: timed out; downloads then try a direct connection")
+		local probes = assert(io.open("ui/healthcheck/probes.lua", "rb"))
+		local source = probes:read("*a")
+		probes:close()
+		helpers.assert_true(source:find('detail = PacCheck.with_direct_fallback(text)', 1, true) ~= nil,
+			"the macOS proxy_pac probe names the direct fallback")
+	end)
+
 	helpers.it("reads the PAC URL only when the system PAC is enabled", function()
 		local on = "<dictionary> {\n  ProxyAutoConfigEnable : 1\n  ProxyAutoConfigURLString : http://pac.example.invalid/a.pac\n}"
 		helpers.assert_eq(PacCheck.url_from_scutil(on), "http://pac.example.invalid/a.pac")
