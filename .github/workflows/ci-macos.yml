@@ -683,7 +683,7 @@ jobs:
           grep -Fq "Test Suite 'ManagedOllamaAPIWorkerTests' passed" "$transcript"
           grep -Fq 'Executed 12 tests, with 0 failures' "$transcript"
           grep -Fq "Test Suite 'ManagedPTYWorkerTests' passed" "$transcript"
-          grep -Fq 'Executed 11 tests, with 0 failures' "$transcript"
+          grep -Fq 'Executed 13 tests, with 0 failures' "$transcript"
           grep -Fq "Test Suite 'ManagedImageAliasTests' passed" "$transcript"
           grep -Fq 'Executed 4 tests, with 0 failures' "$transcript"
           grep -Fq "Test Suite 'OwnedSuspendedImageTests' passed" "$transcript"
@@ -691,9 +691,9 @@ jobs:
           grep -Fq "Test Suite 'ManagedListenerPathIdentityTests' passed" "$transcript"
           grep -Fq 'Executed 2 tests, with 0 failures' "$transcript"
           grep -Fq "Test Suite 'ManagedNetworkBootstrapTests' passed" "$transcript"
-          test "$(grep -Fc 'Executed 6 tests, with 0 failures' "$transcript")" -eq 1
-          grep -Fq 'Executed 49 tests, with 0 failures' "$transcript"
-          # Independent logging cohort; historical49 above supplies no seven-case credit.
+          test "$(grep -Fc 'Executed 7 tests, with 0 failures' "$transcript")" -eq 1
+          grep -Fq 'Executed 52 tests, with 0 failures' "$transcript"
+          # Independent logging cohort; historical52 above supplies no seven-case credit.
           log_transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-xctest.log"
           log_source="$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-source.json"
           node tools/diagnostics/native_daemon_log_xctest_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$log_source"
@@ -705,7 +705,7 @@ jobs:
           set -e
           test "${#log_statuses[@]}" -eq 2
           node tools/diagnostics/native_daemon_log_xctest_evidence.cjs judge "$log_transcript" "${log_statuses[0]}" "${log_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$log_source" "$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-verdict.json"
-          # Unchanged original logger29+directory13; neither SDK49 nor daily-log7 supplies this credit.
+          # Unchanged original logger29+directory13; neither SDK52 nor daily-log7 supplies this credit.
           logger_transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-xctest.log"
           logger_source="$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-source.json"
           node tools/diagnostics/native_logger_regression_xctest_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$logger_source"
