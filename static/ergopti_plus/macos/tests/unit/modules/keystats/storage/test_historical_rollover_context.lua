@@ -224,6 +224,63 @@ helpers.describe("historical rebuild ownership", function()
 		end)
 	end)
 
+	-- The 22 s startup freeze of issue #104: the recovery ran inside the deferred
+	-- keystats start and held every event tap until it returned.
+	helpers.it("recovers in budgeted slices while ingest waits (issue104-cooperative-recovery)", function()
+		with_rebuild(function(_, rebuild, _, db, state, _, manager)
+			local start = value(value(manager.init, "_init"), "_start_aggregate_recovery")
+			local slice = value(start, "_run_recovery_slice")
+			value(value(start, "_recover_aggregate_cache"), "_sync_foreign_data_sql", function() return {} end)
+			local clock = 0
+			-- Every clock read spends a whole slice budget, so each pace point yields.
+			value(slice, "timer", { absoluteTime = function() clock = clock + 8 * 1000 * 1000; return clock end })
+			local pending, cancelled = {}, 0
+			value(slice, "TimerScheduler", {
+				after = function(_, fn)
+					local handle = { timer = {}, fn = fn }
+					pending[#pending + 1] = handle
+					return handle, true
+				end,
+				cancel = function(handle) handle.timer = nil; cancelled = cancelled + 1; return true end,
+			})
+			local walked = 0
+			value(rebuild, "Aggregator", { get_ngram_ctx = function() return {} end,
+				set_ngram_ctx = function() end, reset_ngram_ctx = function() end,
+				set_device_id = function() end, reset_batch = function() end, flush = function() return true end,
+				walk_typing = function() walked = walked + 1 end })
+			local ids, sql = {}, {}
+			for id = 1, 300 do ids[#ids + 1] = id; sql[#sql + 1] = insert(id) end
+			state.raw.device = ids
+			state.ledgers["owned/device/data.sql"] = batch(table.concat(sql)) .. marker
+
+			start(db)
+			helpers.assert_eq(manager.is_recovering(), true, "a large recovery must yield before init returns")
+			helpers.assert_true(walked < 300, "the first slice must not walk the whole cache")
+			helpers.assert_eq(manager.ingest_once(), false, "ingest waits while the recovery owns the aggregator")
+			local slices = 1
+			while manager.is_recovering() do
+				local handle = table.remove(pending, 1)
+				assert(handle, "a yielded recovery must own its next slice timer")
+				handle.timer = nil
+				handle.fn()
+				slices = slices + 1
+				assert(slices < 10000, "recovery never ended")
+			end
+			helpers.assert_eq(walked, 300, "every raw row is replayed across the slices")
+			helpers.assert_true(slices > 2, "the recovery ran in several slices")
+			helpers.assert_true(db.statements[#db.statements] == "COMMIT;", "the revision mark committed")
+
+			-- A stop in the middle abandons the walk and its exact timer.
+			walked = 0
+			start(db)
+			helpers.assert_eq(manager.is_recovering(), true)
+			local cancel = value(value(manager.init, "_rollback_failed_init"), "_release_failed_init_resources")
+			helpers.assert_eq(value(cancel, "_cancel_aggregate_recovery")(), true)
+			helpers.assert_eq(manager.is_recovering(), false)
+			helpers.assert_eq(cancelled, 1, "the pending slice timer is cancelled")
+		end)
+	end)
+
 	helpers.it("accepts a first pending outbox only when every retained id is covered (historical-rollover-context)", function()
 		with_rebuild(function(cutoffs, _, _, db, state)
 			state.outbox = batch(insert(1) .. insert(3))

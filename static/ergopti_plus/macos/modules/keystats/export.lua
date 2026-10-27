@@ -302,6 +302,9 @@ local function _typing_tuple_id(chunk, opening, device_sql)
 	return id
 end
 
+--- Ledger bytes scanned between two calls of an optional pace callback.
+local LEDGER_SCAN_PACE_BYTES = 16384
+
 --- One lexical owner for complete SQL boundaries and optional rollover facts.
 --- Unknown producer forms cannot authorize resets; markerless continuity remains.
 --- A typing id at or below the last marker's bound is a known legacy producer
@@ -310,8 +313,9 @@ end
 --- generation already owns. Id cutoffs cannot separate those generations, so the
 --- restart withdraws every reset (markerless continuity) instead of refusing a
 --- ledger that is append-only and would therefore be refused forever.
-local function _scan_ledger(chunk, device_sql, collect_ids, is_rollover)
+local function _scan_ledger(chunk, device_sql, collect_ids, is_rollover, pace)
 	chunk = chunk or ""
+	local paced = 0
 	local last_commit, i, n, line_start = 0, 1, #chunk, 1
 	local in_string, in_comment, in_batch = false, false, false
 	local in_block = false
@@ -323,6 +327,12 @@ local function _scan_ledger(chunk, device_sql, collect_ids, is_rollover)
 		if invalid_at == nil then invalid_at, invalid_reason = at, reason end
 	end
 	while i <= n do
+		-- A months-old ledger is tens of MB scanned byte by byte: let the caller
+		-- yield to the event taps between bounded runs of bytes.
+		if pace then
+			paced = paced + 1
+			if paced >= LEDGER_SCAN_PACE_BYTES then paced = 0; pace() end
+		end
 		local ch = chunk:sub(i, i)
 		local blocked = in_block
 		if device_sql and not in_string and not in_comment then
@@ -425,11 +435,13 @@ end
 ---@param device_sql string SQL-escaped device literal from the canonical writer.
 ---@param collect_ids boolean|nil Collect ids only for the bounded local outbox.
 ---@param is_rollover function Strict canonical suffix predicate owned by LogManager.
+---@param pace function|nil Called between bounded runs of scanned bytes; may yield.
 ---@return table|nil facts
 ---@return string|nil error_message
-function M._typing_rollover_boundaries(chunk, device_sql, collect_ids, is_rollover)
+function M._typing_rollover_boundaries(chunk, device_sql, collect_ids, is_rollover, pace)
 	assert(type(is_rollover) == "function", "canonical rollover predicate required")
-	local _, facts = _scan_ledger(chunk, device_sql, collect_ids, is_rollover)
+	assert(pace == nil or type(pace) == "function", "pace must be a function")
+	local _, facts = _scan_ledger(chunk, device_sql, collect_ids, is_rollover, pace)
 	if facts.has_markers and facts.unreadable then
 		-- Name the exact shape and byte: the ledger lives on the user's machine,
 		-- so the log line is the only evidence a maintainer will ever see.

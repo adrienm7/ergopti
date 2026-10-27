@@ -80,6 +80,19 @@ local WPM_MAX_EVENT_DELAY_MS = Timings.ms("keystats", "max_keystroke_delay_ms")
 --- Refused journal bytes rotation re-verifies per deferred retry turn.
 local JOURNAL_RECOVERY_TURN_BYTES = Timings.count("limits", "journal_recovery_turn_bytes")
 
+--- Main-thread budget of one aggregate-recovery slice. A full recovery scans
+--- every ledger and replays every raw row (22 s on a months-old Mac ledger), so
+--- it yields to the event taps whenever a slice has run this long.
+local RECOVERY_SLICE_NS = 8 * 1000 * 1000
+
+--- Pause between two recovery slices: long enough for queued key events and
+--- timers to run, short enough that a recovery finishes close to its CPU cost.
+local RECOVERY_RESUME_SEC = 0.01
+
+--- Raw rows replayed between two budget checks; a clock read per row would cost
+--- more than the walk itself.
+local RECOVERY_PACE_ROWS = 64
+
 --- Maximum drain iterations during day_rollover. At 5000 lines/batch this
 --- covers 100 000 lines before giving up and preserving the file.
 local MAX_ROLLOVER_DRAIN_ITERS = 20
@@ -129,6 +142,10 @@ local _foreign_sync_error_key = nil
 
 --- Retry rollover before any producer queue drain or journal EOF check.
 local _pending_rollover = false
+
+--- The one running cooperative aggregate recovery, or nil. It owns the shared
+--- Aggregator state while it runs, so ingest waits for it (today.log buffers).
+local _recovery = nil
 
 --- Registered post-ingest listeners — called after every successful ingest cycle.
 --- Each entry is a function(); failures are logged and contained so one broken
@@ -1127,6 +1144,16 @@ local function _get_local_outbox(db)
 	return ""
 end
 
+--- Yields the running aggregate recovery once its slice has spent its budget.
+--- A no-op outside that coroutine, so the ingest partition rebuild and tests that
+--- call the rebuild directly keep running it to completion. Callers yield only
+--- between SQLite transactions, never inside one.
+local function _recovery_pace()
+	local job = _recovery
+	if job == nil or coroutine.running() ~= job.co then return end
+	if timer.absoluteTime() - job.slice_start_ns >= RECOVERY_SLICE_NS then coroutine.yield() end
+end
+
 --- Validate a missing/lagging canonical prefix against the committed local outbox.
 --- Membership, not min/max, matters because global event ids may be sparse.
 local function _outbox_covers_typing(db, device_id, after_id)
@@ -1165,7 +1192,8 @@ local function _typing_replay_cutoffs(db, device_id)
 	if type(ledger) ~= "string" or #ledger ~= attrs.size then
 		return nil, "canonical typing ledger could not be read completely"
 	end
-	local facts, detail = Export._typing_rollover_boundaries(ledger, _sq(device_id), false, _has_trailing_rollover)
+	local facts, detail = Export._typing_rollover_boundaries(ledger, _sq(device_id), false,
+		_has_trailing_rollover, _recovery_pace)
 	if not facts then return nil, detail end
 	if facts.regression then
 		Logger.warn(LOG, "Typing ids restart at ledger byte %d (id %d after rollover bound %d): "
@@ -1259,7 +1287,10 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 		end
 		local function walked()
 			processed = processed + 1
-			return flush_if_needed(false)
+			if not flush_if_needed(false) then return false end
+			-- After the flush: a yield never leaves a recovery transaction open.
+			if processed % RECOVERY_PACE_ROWS == 0 then _recovery_pace() end
+			return true
 		end
 		local quoted_device = _sq(replay_device_id)
 		local ok, replay_err = pcall(function()
@@ -1483,9 +1514,131 @@ local function _sync_foreign_data_sql(on_applied)
 	return {}
 end
 
+--- Hands the shared Aggregator back to live ingest after a recovery ended.
+--- meta holds the rebuilt context after a success and the live one otherwise,
+--- because a failed or interrupted recovery never marks the cache rebuilt.
+--- @param db userdata The recovery's SQLite handle.
+local function _restore_live_aggregator(db)
+	Aggregator.set_device_id(_device_id)
+	Aggregator.reset_batch()
+	local restored = false
+	local read_ok, read_err = pcall(function()
+		for row in db:nrows("SELECT value FROM meta WHERE key='ngram_ctx_json'") do
+			local ok, decoded = pcall(json.decode, row.value or "{}")
+			if ok and type(decoded) == "table" then
+				Aggregator.set_ngram_ctx(decoded)
+				restored = true
+			end
+		end
+	end)
+	if not restored then
+		if not read_ok then
+			Logger.error(LOG, "Cannot restore the live typing context after recovery: %s.", tostring(read_err))
+		end
+		Aggregator.reset_ngram_ctx()
+	end
+end
+
+--- Full aggregate recovery: foreign raw import, rollover facts, deterministic
+--- walk and the revision mark. Runs inside the recovery coroutine.
+--- @param db userdata SQLite handle.
+local function _recover_aggregate_cache(db)
+	-- Foreign ledgers also carry raw rows only. Import them before the
+	-- deterministic aggregate walk so cross-device totals survive a normal
+	-- TMPDIR purge and older caches gain the missing foreign aggregates.
+	_sync_foreign_data_sql()
+	if not _rebuild_aggregates_from_raw(db) then
+		Logger.error(LOG, "Aggregate cache recovery failed; raw events remain durable for retry.")
+	elseif _mark_aggregate_cache_rebuilt(db) then
+		Logger.success(LOG, "Rebuilt aggregate cache from durable raw ledgers.")
+	else
+		Logger.error(LOG, "Aggregate cache rebuild completed but could not be marked for reuse.")
+	end
+end
+
+--- Runs one budgeted slice of the recovery and schedules the next one.
+--- @param job table The exact recovery owned by `_recovery`.
+local function _run_recovery_slice(job)
+	if _recovery ~= job then return end
+	job.slice_start_ns = timer.absoluteTime()
+	job.slices = job.slices + 1
+	local resumed, resume_err = coroutine.resume(job.co)
+	if not resumed then
+		Logger.error(LOG, "Aggregate cache recovery raised: %s.", tostring(resume_err))
+	end
+	if coroutine.status(job.co) == "dead" then
+		_recovery = nil
+		_restore_live_aggregator(job.db)
+		if job.slices > 1 then
+			Logger.done(LOG, "Aggregate cache recovery ended after %d slice(s) over %.0f ms.",
+				job.slices, (timer.absoluteTime() - job.started_ns) / 1e6)
+		end
+		return
+	end
+	if job.slices == 1 then
+		Logger.info(LOG, "Aggregate cache recovery continues in %.0f ms slices; ingest waits for it.",
+			RECOVERY_SLICE_NS / 1e6)
+	end
+	-- Forward-declared: the callback compares against this exact handle.
+	local handle
+	local committed
+	handle, committed = TimerScheduler.after(RECOVERY_RESUME_SEC, function()
+		if job.handle == handle then job.handle = nil end
+		_run_recovery_slice(job)
+	end)
+	if handle and handle.timer ~= nil then job.handle = handle end
+	if committed ~= true then
+		-- Nothing is marked rebuilt, so the next start retries the whole recovery.
+		Logger.error(LOG, "Aggregate cache recovery could not schedule its next slice; it retries at the next start.")
+		_recovery = nil
+		_restore_live_aggregator(job.db)
+	end
+end
+
+--- Starts the aggregate recovery as a coroutine fed by timer slices. The first
+--- slice runs now, so a small cache recovers before init returns.
+--- @param db userdata SQLite handle.
+local function _start_aggregate_recovery(db)
+	assert(_recovery == nil, "one aggregate recovery at a time")
+	local job = { db = db, slices = 0, started_ns = timer.absoluteTime(), handle = nil }
+	job.co = coroutine.create(function() _recover_aggregate_cache(db) end)
+	_recovery = job
+	_run_recovery_slice(job)
+end
+
+--- Abandons a running recovery before teardown. Its derived rows stay unmarked,
+--- so the next start repeats it; no SQLite transaction is open between slices.
+--- @return boolean settled False while its timer cleanup remains pending.
+local function _cancel_aggregate_recovery()
+	local job = _recovery
+	if job == nil then return true end
+	_recovery = nil
+	local settled = true
+	if job.handle ~= nil then
+		local ok, cancelled = xpcall(function() return TimerScheduler.cancel(job.handle) end, debug.traceback)
+		settled = ok and cancelled == true
+		if not settled then
+			pcall(Logger.error, LOG, "Aggregate recovery timer cleanup remains pending: %s.", tostring(cancelled))
+		end
+	end
+	pcall(Logger.warn, LOG, "Aggregate cache recovery interrupted after %d slice(s); it restarts at the next start.",
+		job.slices)
+	pcall(_restore_live_aggregator, job.db)
+	return settled
+end
+
+--- Reports whether the cooperative aggregate recovery is still running.
+--- @return boolean
+function M.is_recovering()
+	return _recovery ~= nil
+end
+
 --- Run one ingest cycle: pull new today.log entries, append SQL batch to
 --- data.sql, apply it to db.sqlite, update aggregate tables.
 function M.ingest_once()
+	-- The recovery owns the shared Aggregator until it ends; today.log keeps
+	-- every event meanwhile and the next tick ingests it.
+	if _recovery ~= nil then return false end
 	if not _resume_pending_rollover() then return false end
 
 	local trace = IngestTrace.begin(function() return timer.absoluteTime() end, function(line)
@@ -1844,7 +1997,7 @@ end
 --- be retried without constructing a sibling owner.
 --- @return boolean complete True only when no initialization cleanup debt remains.
 local function _release_failed_init_resources()
-	local complete = true
+	local complete = _cancel_aggregate_recovery()
 	local readers_ok, readers_closed = pcall(Export.cleanup)
 	if not readers_ok or readers_closed ~= true then
 		complete = false
@@ -2032,22 +2185,8 @@ local function _init(core_state)
 				Logger.error(LOG, "Skipped aggregate recovery because local ledger replay failed.")
 			end
 		end
-		if db and recovery_ready
-			and (cache_was_fresh or _aggregate_cache_revision(db) ~= AGGREGATE_CACHE_REVISION) then
-			-- Foreign ledgers also carry raw rows only. Import them before the
-			-- deterministic aggregate walk so cross-device totals survive a normal
-			-- TMPDIR purge and older caches gain the missing foreign aggregates.
-			_sync_foreign_data_sql()
-			if _rebuild_aggregates_from_raw(db) then
-				if _mark_aggregate_cache_rebuilt(db) then
-					Logger.success(LOG, "Rebuilt aggregate cache from durable raw ledgers.")
-				else
-					Logger.error(LOG, "Aggregate cache rebuild completed but could not be marked for reuse.")
-				end
-			else
-				Logger.error(LOG, "Aggregate cache recovery failed; raw events remain durable for retry.")
-			end
-		end
+		local recovery_due = db and recovery_ready
+			and (cache_was_fresh or _aggregate_cache_revision(db) ~= AGGREGATE_CACHE_REVISION)
 		-- Restore persisted counters and n-gram context from meta.
 		if db then
 			local offset_val = 0
@@ -2067,6 +2206,9 @@ local function _init(core_state)
 				end
 			end
 		end
+		-- Last: the live context above must not land in the middle of its walk.
+		-- It ran synchronously here and held the event taps for 22 s (issue #104).
+		if recovery_due then _start_aggregate_recovery(db) end
 	end
 
 	-- Rotation is normally initialised inside the SQLite branch above, which is
@@ -2179,7 +2321,7 @@ function M.stop(opts)
 	_physical_sink_active = false
 	_physical_sink_generation = _physical_sink_generation + 1
 	local process_exit = type(opts) == "table" and opts.process_exit == true
-	local complete = true
+	local complete = _cancel_aggregate_recovery()
 	local ingest_timer = _ingest_timer
 	if ingest_timer then
 		if not _stop_ingest_timer(ingest_timer, "Ingest timer") then
