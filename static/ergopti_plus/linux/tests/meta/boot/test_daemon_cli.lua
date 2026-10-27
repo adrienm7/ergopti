@@ -200,6 +200,17 @@ helpers.describe("ergopti_hotstrings CLI", function()
         "daemon handles nonexistent config dir")
     end)
 
+    helpers.it("--help needs no session: no USER, no HOME, no XDG_RUNTIME_DIR", function()
+      -- It used to run after the logger's privacy admission, which refused a start
+      -- without $USER and $LOGNAME, so even the usage could not be printed.
+      local cmd = string.format("env -i PATH=%q %s %s --help 2>&1", os.getenv("PATH") or "/usr/bin:/bin", lua_bin(), daemon_path())
+      local pipe = assert(io.popen(cmd, "r"))
+      local out = pipe:read("*a")
+      pipe:close()
+      helpers.assert_contains(out, "Usage: luajit ergopti_hotstrings.lua")
+      helpers.assert_true(not out:find("Privacy initialization", 1, true), "no privacy refusal for --help")
+    end)
+
     helpers.it("--config is parsed correctly in help output", function()
       local out, _ = run_daemon("--help 2>&1")
       helpers.assert_true(out:find("%-%-config") or out:find("Utilisation") or out:find("Usage"),

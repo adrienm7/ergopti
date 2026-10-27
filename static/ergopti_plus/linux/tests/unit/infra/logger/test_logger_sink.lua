@@ -425,22 +425,28 @@ helpers.describe("logger sink — production wiring", function()
 		local block = entry and entry:match("(local privacy_admitted[^\n]*= pcall%b()%s*if not privacy_admitted.-\nend)")
 		helpers.assert_not_nil(block, "The actual bootstrap privacy admission block must be present")
 		local run = assert(load("return function(LoggerSink, Logger, io, os, BootstrapLog)\n" .. block .. "\nend"))()
-		for _, result in ipairs({ "true", "false", "throw", "refusal" }) do
+		for _, result in ipairs({ "true", "false", "throw", "refusal", "cause" }) do
 			local calls, exits, output, records = 0, {}, {}, {}
 			run({ install = function()
 				calls = calls + 1
 				if result == "throw" then error("PRIVATE_BOOT_CANARY /home/PrivateUser", 0) end
 				if result == "refusal" then return false, "PRIVATE_REFUSAL_CANARY /home/PrivateUser" end
+				if result == "cause" then
+					error("/home/PrivateUser/linux/infra/logger_sink.lua:158: logger_sink: privacy identity unavailable: no account name", 0)
+				end
 				return result == "true"
 			end }, {}, { stderr = { write = function(_, text) output[#output + 1] = text end } },
 				{ exit = function(code) exits[#exits + 1] = code end },
 				{ append = function(code) records[#records + 1] = code end })
 			helpers.assert_eq(calls, 1)
-			local refused = result == "throw" or result == "refusal"
+			local refused = result == "throw" or result == "refusal" or result == "cause"
 			helpers.assert_eq(exits, refused and { 1 } or {})
 			helpers.assert_eq(records, refused and { "privacy_admission_refused" } or {}, "a refusal leaves its pre-sink record")
-			helpers.assert_eq(output, refused
-				and { "[logger_sink] Privacy initialization refused; daemon not started.\n" } or {})
+			local message = result == "cause"
+				and "[logger_sink] Privacy initialization refused (privacy identity unavailable: no account name); daemon not started.\n"
+				or "[logger_sink] Privacy initialization refused; daemon not started.\n"
+			helpers.assert_eq(output, refused and { message } or {},
+				"the sink's own cause is named, any other exception text stays unprinted")
 		end
 	end)
 
