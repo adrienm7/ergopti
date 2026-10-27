@@ -447,6 +447,10 @@ const RULES = [
 			f.startsWith('tools/diagnostics/macos_layout_manager_pool') ||
 			f.startsWith('tools/diagnostics/macos_permission_dialog_pool') ||
 			f.startsWith('tools/diagnostics/macos_metrics_apps_page') ||
+			// macos_metrics_apps_page.py pins this page's ordered script census and
+			// its caller's readiness query; a new script tag must re-run its controls.
+			f === 'static/ergopti_plus/_shared/ui/metrics_apps/index.html' ||
+			f === 'static/ergopti_plus/macos/ui/metrics_apps/init.lua' ||
 			f.startsWith('tools/diagnostics/macos_webview_raw_delete') ||
 			f === 'tools/diagnostics/macos_owned_process.py' ||
 			f === 'tools/test/run-macos-tooltip-canvas-tests.cjs'

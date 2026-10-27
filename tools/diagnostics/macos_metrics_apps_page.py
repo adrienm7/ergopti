@@ -38,6 +38,7 @@ PAGE_SCRIPTS = (
     "../vendor/chart.umd.js",
     "../host_bridge.js",
     "../dom_utils.js",
+    "../theme_tokens.js",
     "../i18n.js",
     "../metrics_rebuild_banner.js",
     "../metrics_freshness.js",
