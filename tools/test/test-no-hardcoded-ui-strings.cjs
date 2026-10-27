@@ -81,6 +81,12 @@ const ALLOWED = [
 		reason: 'the fatal boot handler can fire before i18n is loaded (audit I10)'
 	},
 	{
+		file: 'linux/install/messages.sh',
+		sink: 'printf',
+		reason:
+			'the catalogue reader reports a missing catalogue or key, which no catalogue can translate'
+	},
+	{
 		file: 'linux/install/desktop_entry.sh',
 		sink: 'printf',
 		reason: 'these lines are the Exec keys of the desktop entry and unit files it writes'
