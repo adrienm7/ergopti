@@ -6329,7 +6329,12 @@ function M.regenerate(
 		-- is the same shell-quoting rule the generator applies 150 lines away, and the
 		-- generator's own regression test covers only that file. Memoised because this
 		-- runs on every regenerate: the directory does not stop existing.
-		pcall(hs.execute, "mkdir -p " .. require("text_utils").shell_quote(kc_parent))
+		-- An existing folder needs no shell fork (about 40 ms on the Mac, inside
+		-- the boot regeneration).
+		local ok_mode, mode = pcall(hs.fs.attributes, kc_parent, "mode")
+		if not (ok_mode and mode == "directory") then
+			pcall(hs.execute, "mkdir -p " .. require("text_utils").shell_quote(kc_parent))
+		end
 		_kc_parent_ensured = true
 	end
 
