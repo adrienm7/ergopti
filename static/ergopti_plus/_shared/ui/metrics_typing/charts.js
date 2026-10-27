@@ -992,12 +992,16 @@ function _render_activity_calendar() {
 	const PAD_LEFT = 28; // space for weekday labels
 	const ROWS = 7; // Mon..Sun
 	const DAYS = METRICS_CALENDAR_YEAR_DAYS; // 52*7 + 1 — covers a full year
+	const today = new Date(metricsLocalDayOrdinal(new Date()));
+	const first_day = shiftMetricsDay(today.getTime(), 1 - DAYS);
 
 	// Build the full date map from the manifest so the calendar shows historical
 	// days even when they're not currently in the filter selection.
 	const date_chars = {};
 	if (window.metrics_manifest) {
 		Object.keys(window.metrics_manifest).forEach((date_str) => {
+			const ordinal = parseDateKey(date_str);
+			if (!(ordinal >= first_day && ordinal <= today.getTime())) return;
 			let total = 0;
 			Object.values(window.metrics_manifest[date_str] || {}).forEach((app) => {
 				total += app.chars || 0;
@@ -1014,8 +1018,7 @@ function _render_activity_calendar() {
 		date_chars[today] = (date_chars[today] || 0) + total;
 	}
 
-	const today = new Date(metricsLocalDayOrdinal(new Date()));
-	const start = new Date(shiftMetricsDay(today.getTime(), 1 - DAYS));
+	const start = new Date(first_day);
 	// Start the grid on the Monday of `start`'s week so columns align to weeks.
 	const start_dow = (start.getUTCDay() + 6) % 7; // 0 = Mon, 6 = Sun
 	start.setUTCDate(start.getUTCDate() - start_dow);
