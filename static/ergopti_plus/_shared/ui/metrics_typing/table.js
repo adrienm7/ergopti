@@ -1767,9 +1767,10 @@ function build_searchable_key(raw_key, case_sensitive) {
 	}
 	// Add the text label for the exact key (lowercased for case-insensitive search)
 	// so that typing "backspace", "left", "space", etc. finds the matching entries.
-	const exact_sym = Object.hasOwn(CONTROL_KEY_SYMBOLS, raw_key.toLowerCase())
-		? CONTROL_KEY_SYMBOLS[raw_key.toLowerCase()]
-		: null;
+	const exact_sym =
+		app_state.current_tab !== 'w' && Object.hasOwn(CONTROL_KEY_SYMBOLS, raw_key.toLowerCase())
+			? CONTROL_KEY_SYMBOLS[raw_key.toLowerCase()]
+			: null;
 	if (exact_sym) {
 		const candidate = case_sensitive ? exact_sym : exact_sym.toLowerCase();
 		if (!s.includes(candidate)) s += ' ' + candidate;
@@ -1880,6 +1881,7 @@ function render_table() {
 				// Regular space (code 32) is printable but must still render as a "Space" chip so
 				// the cell is not blank. CONTROL_KEY_LABELS includes " " for this reason.
 				const is_ctrl_display =
+					app_state.current_tab !== 'w' &&
 					!is_shortcut_tab &&
 					!is_kc_tab &&
 					(CONTROL_KEY_LABELS.has(raw_lower) || CONTROL_KEY_LABELS.has(item.key) || is_nonprint);
