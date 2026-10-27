@@ -39,9 +39,10 @@ const macRole = require('./fixtures/macos-stage-source.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const Cask = require(path.join(ROOT, 'tools', 'build', 'homebrew-cask.cjs'));
 
-const BUILD_SCRIPT = fs.readFileSync(
-	path.join(ROOT, 'tools', 'build', 'build_macos_app.sh'),
-	'utf8'
+const BUILD_SCRIPT = require(
+	path.join(ROOT, 'tools', 'lib', 'shell-identifiers.cjs')
+).expandIdentifiers(
+	fs.readFileSync(path.join(ROOT, 'tools', 'build', 'build_macos_app.sh'), 'utf8')
 );
 // Release (tag, feed, cask and notes) runs in ci-release.yml.
 const WORKFLOW = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'ci-release.yml'), 'utf8');

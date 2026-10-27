@@ -48,7 +48,11 @@ sys.path.insert(
         / "data"
     ),
 )
+_bytecode_default = sys.dont_write_bytecode
+sys.dont_write_bytecode = True  # a cache beside the shared data would ship in the bundles
 from identifiers import APP  # noqa: E402
+
+sys.dont_write_bytecode = _bytecode_default
 
 # Repository root: tools/build/ is two levels below it.
 DEFAULT_REPO_ROOT = Path(__file__).resolve().parent.parent.parent

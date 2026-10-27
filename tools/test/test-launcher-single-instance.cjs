@@ -29,7 +29,9 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
-const build = read('tools/build/build_macos_app.sh');
+const build = require('../lib/shell-identifiers.cjs').expandIdentifiers(
+	read('tools/build/build_macos_app.sh')
+);
 const constants = read(
 	'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LauncherConstants.swift'
 );

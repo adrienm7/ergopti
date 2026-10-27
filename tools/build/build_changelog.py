@@ -37,7 +37,11 @@ from pathlib import Path
 sys.path.insert(
     0, str(Path(__file__).resolve().parents[2] / "static" / "ergopti_plus" / "_shared" / "data")
 )
+_bytecode_default = sys.dont_write_bytecode
+sys.dont_write_bytecode = True  # a cache beside the shared data would ship in the bundles
 from identifiers import HOSTS  # noqa: E402
+
+sys.dont_write_bytecode = _bytecode_default
 
 
 # ============================================

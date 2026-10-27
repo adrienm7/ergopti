@@ -220,7 +220,7 @@ const IDENTIFIER_SOURCE = /\.(lua|js|cjs|mjs|ahk|swift|sh|py|ps1|go|mm|hpp|cpp)$
 // Tests, vendored code, generated copies and the maintainer's diagnostics may
 // spell identifiers; so may the example extension users copy as one file.
 const IDENTIFIER_EXEMPT =
-	/(^|\/)(tests?|vendor|node_modules|_generated|diagnostics)\/|^static\/ergopti_plus\/(extensions|_shared\/lua\/identifiers\.lua)|^tools\/test\/|_test\.(py|go)$|\.generated\.swift$/;
+	/(^|\/)(tests?|vendor|node_modules|_generated|diagnostics)\/|^static\/ergopti_plus\/(extensions|_shared\/lua\/identifiers\.lua|_shared\/data\/identifiers\.(py|sh))|^tools\/test\/|_test\.(py|go)$|\.generated\.swift$/;
 const COMMENT_LINE = /^\s*(--|;|\/\/|#|\*|\/\*)/;
 
 const KIND_PATTERNS = {
