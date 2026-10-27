@@ -498,3 +498,37 @@ for _TDC_ResultPhase in ["completion", "resolution"]
 	]
 		Test("driver-control: " . _TDC_ResultPhase . " " . _TDC_ResultCase[1] . " preserves schema kind (driver-control-result-schema-kind)",
 			_TDC_ResultSchemaToken.Bind(_TDC_ResultPhase, _TDC_ResultCase[2], _TDC_ResultCase[3]))
+
+_TDC_PendingSuccessorToken(Fields, HasDeadline, ExpectedKind) {
+	Spec := _TDC_Spec()
+	Text := '{"schema":1,"request_id":"pending-key","state":"requested","driver_pid":100'
+		. (Fields == "" ? "" : "," . Fields)
+		. (HasDeadline ? ',"deadline":1700000120}' : "}")
+	Decoded := JsonParse(Text)
+	AssertTrue(Decoded is Map)
+	AssertEqual("pending-key", Decoded["request_id"])
+	AssertEqual("requested", Decoded["state"])
+	Result := DriverControl_Resolve(Spec, Text, 200, 1700000000, &Kind)
+	AssertEqual(ExpectedKind, Kind, "the authoritative decoded successor member owns pending admission")
+	if ExpectedKind == "claimed"
+		AssertEqual('{"schema":1,"request_id":"pending-key","state":"claimed","driver_pid":200,"successor_pid":200,"deadline":1700000120}`n', Result)
+	else if ExpectedKind == "completed"
+		AssertEqual('{"schema":1,"request_id":"pending-key","state":"completed","driver_pid":200,"successor_pid":200}`n', Result)
+	else
+		AssertEqual("", Result, "a missing or non-null unassigned successor cannot claim the pending record")
+}
+for _TDC_PendingCase in [
+	["canonical null", '"successor_pid":null', true, "claimed"],
+	["escaped null", '"successor_\u0070id":null', true, "claimed"],
+	["last escaped null", '"successor_pid":200,"successor_\u0070id":null', true, "claimed"],
+	["last literal null", '"successor_\u0070id":200,"successor_pid":null', true, "claimed"],
+	["missing successor", "", true, ""],
+	["string null", '"successor_pid":"null"', true, ""],
+	["boolean successor", '"successor_pid":false', true, ""],
+	["last assigned successor", '"successor_pid":null,"successor_pid":200', false, "completed"],
+	["assigned successor", '"successor_pid":200', false, "completed"],
+	["escaped assigned successor", '"successor_\u0070id":200', false, "completed"],
+	["string assigned successor", '"successor_pid":"200"', false, ""]
+]
+	Test("driver-control: " . _TDC_PendingCase[1] . " preserves successor source identity (driver-control-pending-successor-source)",
+		_TDC_PendingSuccessorToken.Bind(_TDC_PendingCase[2], _TDC_PendingCase[3], _TDC_PendingCase[4]))
