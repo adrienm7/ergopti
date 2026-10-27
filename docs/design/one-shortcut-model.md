@@ -45,8 +45,9 @@ the redundant booleans of macOS and Linux are converted into the neutral slot
 ids by one step of the shared config migration registry
 (`_shared/core/config_schema/migrations.toml`, the same closed op set the
 Windows engine already runs: `rename`, `copy_if_absent`, `map_value`,
-`delete`, `set_if_absent`). No new op kind and no runtime alias exist: after the
-step, only neutral ids are read. A leftover key that no slot owns is reported
+`delete`, `set_if_absent`, plus `rename_prefix`, which carries the per-slot
+action parameters `keyboard__<slot>__<action>` to the new slot ids). No runtime
+alias exists: after the step, only neutral ids are read. A leftover key that no slot owns is reported
 through `ConfigOutdated` and offered by the cleanup, on macOS and Linux.
 
 ## Steps
