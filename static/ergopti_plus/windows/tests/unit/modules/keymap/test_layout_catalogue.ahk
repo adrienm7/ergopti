@@ -891,3 +891,38 @@ Test("layout catalogue: raw preservation compares exact JSON string identities (
 	_LCT_RecordValueStringIdentity)
 
 #Include test_layout_catalogue_refresh_owner.ahk
+
+
+#Include ../../../support/layout_schema_kind_fixtures.ahk
+
+; Real native installed metadata must not publish an incompatible source kind
+; as a valid empty catalogue. The read leaves its exact private file untouched.
+_LCT_SchemaSourceKind(Fixture) {
+	Dir := _LCT_TempDir()
+	Path := Dir . LayoutRegistry_Settings()["installed_file"]
+	Source := "{" . Fixture.Members . ',"layouts":{},"future":true}'
+	AssertTrue(JsonParse(Source) is Map, "the metadata control must be actual valid JSON")
+	try {
+		_LCT_WriteRaw(Path, Source)
+		Rejected := false
+		try Installed := LayoutCatalogue_ReadInstalled(Dir)
+		catch as Err {
+			Rejected := true
+			AssertEqual("The installed-layouts record has an unknown schema version: " . Path, Err.Message,
+				"metadata refusal must come from the actual schema gate")
+		}
+		AssertEqual(Fixture.Refused, Rejected,
+			"native installed metadata must preserve its declared schema source kind: " . Fixture.Label)
+		if !Fixture.Refused {
+			AssertTrue(Installed is Map)
+			AssertEqual(0, Installed.Count)
+			AssertTrue(Installed.HasOwnProp("_LayoutCatalogueRecordSource"))
+			AssertEqual(Source, Installed._LayoutCatalogueRecordSource.text)
+		}
+		AssertEqual(Source, FSReadUtf8Exact(Path), "reading schema metadata cannot rewrite the private source")
+	} finally DirDelete(Dir, true)
+}
+
+for Fixture in _LayoutSchemaKindFixtures(LAYOUT_CATALOGUE_INSTALLED_SCHEMA)
+	Test("layout schema: installed " . Fixture.Label . " retains native kind (layout-schema-kind)",
+		_LCT_SchemaSourceKind.Bind(Fixture))

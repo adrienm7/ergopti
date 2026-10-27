@@ -203,6 +203,9 @@ LayoutComposer_Check(DeclarationText, Keylayout) {
 	catch
 		Refuse("The composition is not valid JSON.")
 	if !(Declaration is Map) || !Declaration.Has("schema_version")
+		Refuse("The composition has an unknown schema version.")
+	Members := JsonObjectMemberSpans(DeclarationText)
+	if Members["schema_version"]["kind"] != "number"
 			|| Declaration["schema_version"] != LAYOUT_COMPOSER_SCHEMA_VERSION
 		Refuse("The composition has an unknown schema version.")
 	Name := Declaration.Get("name", "")

@@ -291,3 +291,39 @@ _LCH_BootCase() {
 			"install", (*) => Log.Push("install")))))
 	AssertEqual("register", _KLT_Join(Log), "registered, never installed from the registry")
 }
+
+
+#Include ../../../support/layout_schema_kind_fixtures.ahk
+
+; Keep the shipped composition and real compiled keylayout as positive peers;
+; only the schema member token changes, including decoded duplicate identity.
+_LCH_SchemaSourceKind(Fixture) {
+	Declaration := _LCH_Declaration()
+	Keylayout := _LCH_Text()
+	Members := JsonObjectMemberSpans(Declaration)
+	AssertTrue(Members.Has("schema_version"), "the genuine composer fixture declares its schema")
+	Span := Members["schema_version"]
+	Candidate := SubStr(Declaration, 1, Span["member_start"] - 1) . Fixture.Members
+		. SubStr(Declaration, Span["member_start"] + Span["member_length"])
+	AssertTrue(JsonParse(Candidate) is Map, "the altered composition must remain valid actual JSON")
+	Rejected := false
+	try Checked := LayoutComposer_Check(Candidate, Keylayout)
+	catch as Err {
+		Rejected := true
+		AssertEqual(LAYOUT_COMPOSER_FAILURE_INVALID, Err.Extra)
+		AssertEqual("The composition has an unknown schema version.", Err.Message,
+			"composition refusal must belong to the actual schema gate")
+	}
+	AssertEqual(Fixture.Refused, Rejected,
+		"native composition admission must preserve schema source kind: " . Fixture.Label)
+	if !Fixture.Refused {
+		AssertTrue(Checked is Map)
+		AssertEqual("composed", Checked["entry"]["id"])
+		AssertEqual("Composer Corpus", Checked["entry"]["name"])
+		AssertEqual(CryptoSha256(Keylayout), Checked["entry"]["sha256"])
+	}
+}
+
+for Fixture in _LayoutSchemaKindFixtures(LAYOUT_COMPOSER_SCHEMA_VERSION)
+	Test("layout schema: composition " . Fixture.Label . " retains native kind (layout-schema-kind)",
+		_LCH_SchemaSourceKind.Bind(Fixture))
