@@ -14,4 +14,23 @@ local World = require("tests.support.modules.llm.engine_transcript_world")
 
 Transcript.run(helpers, helpers.shared("tests/corpus/llm/request_plan_engine_transcripts.json"), World.with_world)
 
+local CONFIG = { debounce_ms = 400, count = 1, profile = "basic", watch_timers_ms = { 400 } }
+
+helpers.describe("the engine checks its ports at init", function()
+	helpers.it("refuses an incomplete scheduler or HTTP client, naming the missing method", function()
+		World.with_world(CONFIG, function()
+			for ports, expected in pairs({
+				[{ TimerScheduler = { after = function() end } }] = "TimerScheduler lacks: cancel",
+				[{ HttpClient = { post = function() end } }] = "HttpClient lacks: cancel",
+			}) do
+				package.loaded["modules.llm.prediction_engine"] = nil
+				local fresh = require("modules.llm.prediction_engine")
+				local ok, err = pcall(fresh.init, { buffer = "", mappings = {} }, ports)
+				helpers.assert_eq(ok, false, "init must raise for " .. expected)
+				helpers.assert_contains(tostring(err), expected)
+			end
+		end)
+	end)
+end)
+
 return true

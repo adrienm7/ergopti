@@ -150,36 +150,38 @@ function M.with_world(config, body)
 	local _, ready_index = get_upvalue(api.is_ready, "_is_ready")
 	assert(ready_index, "the remote readiness flag must be reachable")
 	debug.setupvalue(api.is_ready, ready_index, true)
-	-- The HttpClient port: the remote backend's inference client.
-	local inference = get_upvalue(api.cancel_streaming, "_infer_client")
-	assert(type(inference) == "table", "the remote HTTP owner must be reachable")
-	inference.post = function(_, _, request_body, callback)
-		local decoded = json.decode(request_body)
-		posts[#posts + 1] = { callback = callback }
-		log[#log + 1] = { port = "http", call = "post", max_tokens = decoded.max_tokens }
-		return true
-	end
-
 	local engine = require("modules.llm.prediction_engine")
-	-- The TimerScheduler port: the adapter the engine arms its debounce on.
-	local scheduler = require("adapters.timer_scheduler")
-	local real_after = scheduler.after
+	-- The TimerScheduler port: the real adapter, recording the delays the engine arms.
+	local real_scheduler = require("adapters.timer_scheduler")
+	local scheduler = {}
+	for key, value in pairs(real_scheduler) do scheduler[key] = value end
 	scheduler.after = function(delay_sec, fn)
 		local delay_ms = math.floor(delay_sec * 1000 + 0.5)
 		if watched[delay_ms] then log[#log + 1] = { port = "timer", call = "after", delay_ms = delay_ms } end
-		return real_after(delay_sec, fn)
+		return real_scheduler.after(delay_sec, fn)
 	end
-	local scheduler_hs = get_upvalue(real_after, "hs")
+	-- The HttpClient port: records the inference requests the backend sends.
+	local http_client = {
+		post = function(_, _, request_body, callback)
+			local decoded = json.decode(request_body)
+			posts[#posts + 1] = { callback = callback }
+			log[#log + 1] = { port = "http", call = "post", max_tokens = decoded.max_tokens }
+			return true
+		end,
+		cancel = function() return true end,
+	}
+	local scheduler_hs = get_upvalue(real_scheduler.after, "hs")
 	assert(type(scheduler_hs) == "table" and type(scheduler_hs.timer.__timers) == "table",
 		"the timer scheduler's native stub must be reachable")
 	local timers = scheduler_hs.timer.__timers
 
+	world.engine = engine
 	local state = {
 		buffer = "", llm_buffer = "", mappings = {}, DELAYS = { llm_prediction = 1 },
 		ignored_window_titles = {}, ignored_window_patterns = {},
 		suppress_rescan_keep_buffer = function() return true end,
 	}
-	engine.init(state)
+	assert(engine.init(state, { TimerScheduler = scheduler, HttpClient = http_client }), "the engine must init")
 	engine.set_llm_enabled(true)
 	engine.set_llm_num_predictions(config.count)
 	engine.set_llm_sequential_mode(false)
