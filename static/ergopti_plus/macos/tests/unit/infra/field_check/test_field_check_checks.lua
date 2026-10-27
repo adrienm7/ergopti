@@ -124,7 +124,7 @@ helpers.describe("owned runtime check", function()
 	helpers.it("passes while dormant and reports the install state as information", function()
 		local ports, world = make_ports()
 		world.outputs["/bin/launchctl print system/com.ergoptiplus.runtime.core"] = { 113, "" }
-		world.outputs["/usr/sbin/systemextensionsctl list"] = { 0, "*\t*\tG43BCU2T37\torg.pqrs.Karabiner-DriverKit-VirtualHIDDevice (1.8.0/1.8.0)\tdriver\t[activated enabled]\n" }
+		world.outputs["/usr/bin/systemextensionsctl list"] = { 0, "*\t*\tG43BCU2T37\torg.pqrs.Karabiner-DriverKit-VirtualHIDDevice (1.8.0/1.8.0)\tdriver\t[activated enabled]\n" }
 		world.outputs["/usr/bin/pgrep -f org.pqrs/Karabiner"] = { 0, "101\n102\n" }
 		world.outputs["/usr/bin/pgrep -f ErgoptiPlus/Runtime"] = { 1, "" }
 		local steps, result = run("owned_runtime", ports)
@@ -241,7 +241,7 @@ helpers.describe("field check commands are read-only", function()
 		local allowed = {
 			[CLI .. " --version"] = true,
 			["/bin/launchctl print system/com.ergoptiplus.runtime.core"] = true,
-			["/usr/sbin/systemextensionsctl list"] = true,
+			["/usr/bin/systemextensionsctl list"] = true,
 			["/usr/bin/pgrep -f org.pqrs/Karabiner"] = true,
 			["/usr/bin/pgrep -f ErgoptiPlus/Runtime"] = true,
 		}
