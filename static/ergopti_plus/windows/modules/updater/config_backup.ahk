@@ -272,10 +272,17 @@ _ConfigBackup_Load(ConfigDir, Id, Rules) {
 	ManifestPath := BackupPath . "\" . Rules["manifest"]
 	if !FSExists(ManifestPath)
 		return 0
-	try Record := JsonParse(FSReadStrict(ManifestPath))
-	catch
+	try {
+		Source := FSReadStrict(ManifestPath)
+		Record := JsonParse(Source)
+	} catch
 		return 0
-	if !(Record is Map) || !Record.Has("schema_version") || Record["schema_version"] != CONFIG_BACKUP_SCHEMA_VERSION
+	if !(Record is Map) || !Record.Has("schema_version")
+		return 0
+	; The same validated source owns the decoded member and its exact kind.
+	; Native true and numeric strings cannot acquire numeric schema authority.
+	SchemaKind := JsonObjectMemberSpans(Source)["schema_version"]["kind"]
+	if SchemaKind != "number" || Record["schema_version"] != CONFIG_BACKUP_SCHEMA_VERSION
 			|| !Record.Has("id") || Record["id"] != Id || !Record.Has("kind") || !Rules["kinds"].Has(Record["kind"])
 			|| !Record.Has("files") || !(Record["files"] is Array)
 		return 0
