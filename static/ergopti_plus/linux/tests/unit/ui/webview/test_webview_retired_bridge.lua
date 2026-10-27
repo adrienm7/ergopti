@@ -7,6 +7,8 @@
 --- Legacy epochless calls remain available to existing bridge consumers.
 --- ==============================================================================
 
+-- The cases replace these entries; the module end puts them back.
+local restore_loaded = require("tests.helpers").keep_loaded({ "ui.webview_manager" })
 local helpers = require("tests.helpers")
 
 --- Supplies an owned bridge and the existing native-creator seam.
@@ -221,3 +223,5 @@ helpers.describe("download progress native page closure", function()
 		end)
 	end)
 end)
+
+restore_loaded()
