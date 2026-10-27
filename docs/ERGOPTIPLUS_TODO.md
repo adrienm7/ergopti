@@ -38,8 +38,11 @@ a sealed Windows updater source, reseal with
   falls back to the legacy XKB root: 03f842b66e), Windows unit core (UIA constructor race, fixed by
   131131e339) and macOS Launcher XCTest (read-only bundle helper mode, App Cloner Cancel label): all
   addressed in this batch, CI-only confirmation.
-- **Integrated from the ChatGPT fix branches** up to 27 Oct 04:00 UTC (fix/windows 07d2514ef0). Per-branch seal refresh commits are never
-  integrated: reseal once on dev instead.
+- **The ChatGPT fix branches are finished and fully integrated** (27 Oct, 08:00 UTC): every commit of
+  fix/linux fe2413797f, fix/macos e8ea64ff1e and fix/windows d6b075687e is on dev by subject or content
+  (the last two Windows test commits in the eighth batch; the per-branch reseal was replaced by one reseal on
+  dev). The branches can be deleted; the proxy refuses remote deletion from this container, so the
+  maintainer deletes them (`git push origin --delete fix/linux fix/macos fix/windows`).
 - **Sixth integration batch (27 Oct morning)** brought into dev: fix/windows up to 07d2514ef0 (seal commits
   skipped, resealed once), the Linux daemon account-name fix, the PAR-74 Lua burn-down (567 to 0), the PAR-58
   vectors and ledger, the network-check `route_plan` step, PAR-43, and PAR-41 on macOS/Linux (schema v15).
@@ -54,8 +57,8 @@ a sealed Windows updater source, reseal with
   private `XDG_RUNTIME_DIR`, macOS suite per `--module` group), `pick.sh` (cherry-pick a list until a conflict)
   and `renumber.py` (contiguous suite ordinals, increasing within each file). The commit hook needs Ruff 0.15.8
   first on PATH (`python3 -m venv` plus `pip install ruff==0.15.8`).
-- **Integration procedure** (each batch): fetch `origin/fix/{linux,macos,windows}`; list commits whose subject
-  is not on dev; cherry-pick them on a local `integ/*` branch from dev (skip seal refresh commits; on a
+- **Integration procedure** (each batch): list the agent branch commits whose subject is not on dev;
+  cherry-pick them on a local `integ/*` branch from dev (skip seal refresh commits; on a
   conflict prefer dev when it already fixed the same thing, otherwise merge both by hand); renumber
   `tools/test/features/*/suite.json` ordinals on collision (`test-js-feature-inventory.cjs`); reseal if
   `test-windows-updater-original-source.cjs` fails; run gen:check, the complete JS sweep (every `node` check
