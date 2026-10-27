@@ -178,18 +178,19 @@ dev.
 - **L18** [CODE] keystats start still holds the main thread 1.1 to 1.3 s from the deferred timer
   at menu_state.lua:531 (new.txt 16:28:06, 16:48:13, on 228f79f2). Next: move the SQLite open and
   offset replay of `kl.start` into slices like the recovery.
-- **L19** [CODE][PHYS-M] log_manager.lua:1585 held the main thread 5288 ms right after "Typing
-  ids restart at ledger byte ... rebuilding without day-boundary context resets" (new.txt
-  16:49:17 to 16:49:22). Line 1585 is the recovery slice timer: one slice overran its 8 ms
-  budget. Read from code, three operations in `_rebuild_aggregates_from_raw` cannot yield: (1)
-  `_typing_replay_cutoffs` reads the whole data.sql (68 MB) with `FileSystem.read` for each
-  device before any work; (2) `_clear_derived_device_rows` deletes every derived row of a device
-  in one transaction; (3) the replay query `WHERE device_id=... AND id range ORDER BY ts, id` has
-  no index on (device_id, ts, id) (schema.sql only has (device_id, date) and (date, app)), so
-  SQLite sorts the whole partition before the first row reaches the pace check. The warning is
-  logged after (1), so (2) or (3) is the hold. Next: time (2) and (3) on a copy of the field
-  cache; if (3), add the shared index through schema.sql with a cache version bump; if (2),
-  delete in bounded batches between yields.
+- **L19** Fixed (derived delete batches commit) for the measured cause; one smaller residue stays
+  open. log_manager.lua:1585 (the recovery slice timer) held the main thread 5288 ms right after
+  "Typing ids restart ..." (new.txt 16:49:17 to 16:49:22). Measured on a synthetic cache built
+  from schema.sql with the sqlite3 3.45 CLI and Python's sqlite3 (180,000 typing rows, 61 MB of
+  typing text, 3 million n-gram rows): deleting the device's derived rows in one transaction took
+  9.5 s; 500 rows per committed batch took 30 ms (synchronous=FULL), 5000 rows 225 ms. The
+  replay query `ORDER BY ts, id` uses a temporary B-tree for the sort and returned its first row
+  after 165 to 183 ms (9 ms with `ORDER BY id`). Fix: inside the recovery, a table holding more
+  than 100 rows for the device is now deleted in committed batches of 100 with a pace point
+  between batches, and the rest keeps the single transaction. Still open [CODE]: the 170 ms sort
+  goes over the 8 ms budget; an index on events_typing(device_id, ts, id) added through
+  schema.sql with a cache migration would remove it. Mac confirms: no hold over 1 s from
+  log_manager.lua after a "Typing ids restart".
 - **L20** Fixed ef3b8ddfd5. "config.toml
   cannot be read, so the virtual keyboard choice is unknown" (init.lua:2168 on 228f79f2, new.txt
   16:28:07, 16:48:12, 16:54:32, developer mode). `Preferences.current_view` now returns a closed
@@ -242,7 +243,7 @@ dev.
   Next, on the Mac: run `open "<that URL>"` in Terminal; if it fails on macOS 26, switch to the
   `com.apple.settings.PrivacySecurity.extension?Privacy_ScreenCapture` form, else trace the
   `hs.urlevent.openURL` call made from the notification click.
-- **L30** Fixed (lease guard commit). karabiner.lease "'status' called before M.init()" (new.txt
+- **L30** Fixed 0e7bff98d2. karabiner.lease "'status' called before M.init()" (new.txt
   15:32:19, right after the config migration refusal stopped that boot early). The guard at
   platform/remap/lease_controller.lua now logs its caller's traceback. The evident caller is the
   diagnostics collector (`H.collect_input`, ui/healthcheck/helpers.lua), which reads the remapping
