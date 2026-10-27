@@ -2018,11 +2018,15 @@ local function _init(core_state)
 			_paths.today_log_path, _reset_rollover_cache) then
 			error("pending canonical ledger recovery was refused", 0)
 		end
-		local recovery_cursor = nil
 		local recovery_ready = true
 		if cache_was_fresh and db then
 			local replay_ok, cursor = _replay_local_data_sql(db)
-			if replay_ok then recovery_cursor = cursor
+			-- The replayed raw ids and today.log cursor are owned by the ledger, not
+			-- by the derived rebuild. Publishing them only after a successful rebuild
+			-- left a failed one with next_event_id=1 and offset 0: every new event
+			-- then collided with a replayed id (INSERT OR IGNORE dropped it from the
+			-- cache) and data.sql gained the id restart that refuses later rebuilds.
+			if replay_ok then _persist_recovery_state(db, cursor)
 			else
 				recovery_ready = false
 				Logger.error(LOG, "Skipped aggregate recovery because local ledger replay failed.")
@@ -2035,9 +2039,6 @@ local function _init(core_state)
 			-- TMPDIR purge and older caches gain the missing foreign aggregates.
 			_sync_foreign_data_sql()
 			if _rebuild_aggregates_from_raw(db) then
-				if recovery_cursor then
-					_persist_recovery_state(db, recovery_cursor)
-				end
 				if _mark_aggregate_cache_rebuilt(db) then
 					Logger.success(LOG, "Rebuilt aggregate cache from durable raw ledgers.")
 				else
