@@ -116,6 +116,7 @@ while (_riArgIndex <= A_Args.Length) {
 ; Test framework first — Assert / Test / RunTests must exist before any
 ; subsequent file registers its cases or invokes assertions inside lambdas.
 #Include test_framework.ahk
+#Include support/native_cli_diagnostics.ahk
 ; Acquire the selected receipt before any bootstrap observation or test include.
 _TestResultsBeginRun()
 
