@@ -3667,7 +3667,7 @@
 	"menu.layout.number_row_native": "Native order",
 	"menu.layout.number_row_digits": "Digits first",
 	"menu.layout.number_row_symbols": "Symbols first",
-	"platform_reason.number_row_override_unsupported": "On this system the installed system layout types the number row; only Windows, which emulates the layout, puts digits or symbols first.",
+	"platform_reason.number_row_override_unsupported": "Windows only: on this system the installed system layout types the number row; only Windows, which emulates the layout, puts digits or symbols first.",
 	"platform_reason.number_row_live_session": "Unavailable: Only an X11 session applies this live. This session keeps its current layout; your choice is saved.",
 	"platform_reason.number_row_live_no_layout": "Unavailable: Install an ErgoptiPlus keyboard layout first; this choice changes the layout you use.",
 	"layouts.linux_rows_not_applied": "The number-row choice is saved, but the running keyboard layout could not be updated.",
