@@ -389,6 +389,15 @@ _OllamaStream_CompletedNativeOwner() {
 	}
 }
 
+; Pure JSONL tests still pass through the real HTTP admission owner. Acquire
+; a new on-disk header image instead of mocking a successful status result.
+_OllamaStream_FixtureHttpResponse(Handle) {
+	Path := Handle.TmpStdout . ".headers"
+	AssertTrue(FSWriteCreateDurable(Path, "HTTP/1.1 200 OK`r`nContent-Type: application/x-ndjson`r`n`r`n"),
+		"the stream fixture must exclusively acquire its real HTTP header image")
+	Handle.TmpHeaders := Path
+}
+
 ; The live poll must fence the same real-reader return boundary as final flush.
 ; Only cancellation is injected: production reads/parses every JSONL byte.
 _OllamaLivePoll_ReaderCancellation(CancelAtRead, Boundary := "read", FinalOnly := false) {
@@ -402,7 +411,7 @@ _OllamaLivePoll_ReaderCancellation(CancelAtRead, Boundary := "read", FinalOnly :
 	State := Map("read_calls", 0, "partials", 0, "successes", 0, "failures", 0, "text", "")
 	Path := A_Temp . "\ergopti_live_poll_cancel_" . A_TickCount . "_" . Random(1, 1000000)
 	Handle := { Pid: 0, ProcessOwner: 0, Cancelled: false,
-		TmpPayload: Path . ".json", TmpStdout: Path . ".out" }
+		TmpPayload: Path . ".json", TmpStdout: Path . ".out", TmpHeaders: "" }
 	try {
 		AssertFalse(HadReadCall, "the production reader starts with its genuine Call boundary")
 		_LLM_ManagedBootstrap := 0
@@ -413,6 +422,7 @@ _OllamaLivePoll_ReaderCancellation(CancelAtRead, Boundary := "read", FinalOnly :
 		FileAppend('{"message":{"content":"live answer"},"done":true}' . (FinalOnly ? "" : "`n"),
 			Handle.TmpStdout, "UTF-8-RAW")
 		ObservedFn.DefineProp("Call", {Call: ObserveRead})
+		_OllamaStream_FixtureHttpResponse(Handle)
 		_LLM_Ollama_StreamPoll(Handle, Map("acc", "", "last_pos", 0),
 			(Text) => (State["partials"] += 1, State["text"] := Text),
 			(*) => State["successes"] += 1, (*) => State["failures"] += 1)
@@ -423,6 +433,7 @@ _OllamaLivePoll_ReaderCancellation(CancelAtRead, Boundary := "read", FinalOnly :
 		if !CancelAtRead
 			AssertEqual("live answer", State["text"], "the control parses production JSONL")
 		AssertFalse(FileExist(Handle.TmpStdout), "the settled poll removes its private response")
+		AssertFalse(FileExist(Handle.TmpHeaders), "the settled stream retires its actual HTTP header image")
 		AssertEqual(0, _LLM_Ollama_ActiveStreams.Length, "the poll relinquishes its exact stream handle")
 	} finally {
 		_LLM_CurlReleaseProcess(Handle.ProcessOwner, true)
@@ -432,6 +443,8 @@ _OllamaLivePoll_ReaderCancellation(CancelAtRead, Boundary := "read", FinalOnly :
 			ObservedFn.DefineProp("Call", SavedReadCall)
 		if FileExist(Handle.TmpStdout)
 			FileDelete(Handle.TmpStdout)
+		if FileExist(Handle.TmpHeaders)
+			FileDelete(Handle.TmpHeaders)
 		_LLM_Ollama_ActiveStreams := SavedStreams
 		_LLM_Ollama_IsReady := SavedReady
 		_LLM_ManagedBootstrap := SavedBootstrap
@@ -458,9 +471,9 @@ _OllamaLivePoll_PartialCancellationKeepsSuccessor() {
 	SavedBootstrap := _LLM_ManagedBootstrap
 	Path := A_Temp . "\ergopti_live_partial_cancel_" . A_TickCount . "_" . Random(1, 1000000)
 	Handle := { Pid: 0, ProcessOwner: 0, Cancelled: false,
-		TmpPayload: Path . ".json", TmpStdout: Path . ".out" }
+		TmpPayload: Path . ".json", TmpStdout: Path . ".out", TmpHeaders: "" }
 	Successor := { Pid: 0, ProcessOwner: 0, Cancelled: false,
-		TmpPayload: Path . "_next.json", TmpStdout: Path . "_next.out" }
+		TmpPayload: Path . "_next.json", TmpStdout: Path . "_next.out", TmpHeaders: "" }
 	State := Map("partials", 0, "successes", 0, "failures", 0)
 	try {
 		_LLM_ManagedBootstrap := 0
@@ -472,12 +485,14 @@ _OllamaLivePoll_PartialCancellationKeepsSuccessor() {
 			. '{"message":{"content":" stale final"},"done":true}', Handle.TmpStdout, "UTF-8-RAW")
 		FileAppend("owned next payload", Successor.TmpPayload, "UTF-8-RAW")
 		FileAppend("owned next response", Successor.TmpStdout, "UTF-8-RAW")
+		_OllamaStream_FixtureHttpResponse(Handle)
 		_LLM_Ollama_StreamPoll(Handle, Map("acc", "", "last_pos", 0), Partial,
 			(*) => State["successes"] += 1, (*) => State["failures"] += 1)
 		AssertEqual(1, State["partials"], "the admitted first partial cannot be followed by stale final text")
 		AssertEqual(0, State["successes"], "a partial cancellation cannot settle as successful")
 		AssertEqual(1, State["failures"], "the canceled original is settled once")
 		AssertFalse(FileExist(Handle.TmpStdout), "the old response is removed")
+		AssertFalse(FileExist(Handle.TmpHeaders), "the settled stream retires its actual HTTP header image")
 		AssertEqual(1, _LLM_Ollama_ActiveStreams.Length, "the successor keeps its registration")
 		AssertTrue(_LLM_Ollama_ActiveStreams[1] == Successor, "cleanup retires the exact original handle")
 		AssertEqual("owned next payload", FileRead(Successor.TmpPayload, "UTF-8-RAW"))
@@ -485,7 +500,7 @@ _OllamaLivePoll_PartialCancellationKeepsSuccessor() {
 		AssertFalse(Successor.Cancelled, "the new request retains its own cancellation intent")
 	} finally {
 		_LLM_CurlReleaseProcess(Handle.ProcessOwner, true)
-		for FilePath in [Handle.TmpPayload, Handle.TmpStdout, Successor.TmpPayload, Successor.TmpStdout]
+		for FilePath in [Handle.TmpPayload, Handle.TmpStdout, Handle.TmpHeaders, Successor.TmpPayload, Successor.TmpStdout]
 			if FileExist(FilePath)
 				FileDelete(FilePath)
 		_LLM_Ollama_ActiveStreams := SavedStreams
@@ -585,7 +600,7 @@ _OllamaStreaming_PreparationFailureRetiresReservation() {
 	SavedStreams := _LLM_Ollama_ActiveStreams
 	SavedReady := _LLM_Ollama_IsReady
 	SavedBootstrap := _LLM_ManagedBootstrap
-	Other := { Pid: 0, ProcessOwner: 0, Cancelled: false, TmpPayload: "", TmpStdout: "" }
+	Other := { Pid: 0, ProcessOwner: 0, Cancelled: false, TmpPayload: "", TmpStdout: "", TmpHeaders: "" }
 	Failure := 0
 	Callbacks := 0
 	try {
@@ -660,10 +675,11 @@ _OllamaStream_NativeExitStatus(ExitCode, Queryable := true) {
 			AssertTrue(QueryDiagnostic != "", "the failed query retains its native diagnostic")
 		}
 		Handle := {Pid: Pid, ProcessOwner: Owner, Cancelled: false,
-			TmpPayload: Directory . "\payload.json", TmpStdout: Output}
+			TmpPayload: Directory . "\payload.json", TmpStdout: Output, TmpHeaders: ""}
 		_LLM_ManagedBootstrap := 0
 		_LLM_Ollama_IsReady := true
 		_LLM_Ollama_ActiveStreams := [Handle]
+		_OllamaStream_FixtureHttpResponse(Handle)
 		_LLM_Ollama_StreamPoll(Handle, Map("acc", "", "last_pos", 0),
 			(Text) => (State["partials"] += 1, State["text"] := Text),
 			(Text) => (State["successes"] += 1, State["text"] := Text), (*) => State["failures"] += 1)
@@ -676,6 +692,7 @@ _OllamaStream_NativeExitStatus(ExitCode, Queryable := true) {
 		AssertTrue(Owner.Get("released", false), "the terminal child handle is acknowledged and released")
 		AssertEqual(0, Owner.Get("handle", 0), "no native handle remains after terminal delivery")
 		AssertFalse(FileExist(Output), "the terminal response is removed")
+		AssertFalse(FileExist(Handle.TmpHeaders), "the terminal transport retires its actual HTTP header image")
 		AssertEqual(0, _LLM_Ollama_ActiveStreams.Length, "the exact stream registration is retired")
 	} finally {
 		if Owner is Map
@@ -790,3 +807,324 @@ _OllamaStream_CompletedNativeOwnerControl() {
 }
 Test("Ollama live fixture: completed native owner starts from exit zero (ollama-live-native-owner)",
 	_OllamaStream_CompletedNativeOwnerControl)
+
+; Real public streaming admission is independent from the provider HTTP status.
+; The peer and curl are actual native processes; only launch observation is added.
+_OllamaStream_HttpStatus(Status, ExpectedSuccess) {
+	global _LLM_Ollama_ActiveStreams, _LLM_Ollama_IsReady, _LLM_ManagedBootstrap, LLM_OLLAMA_BASE_URL
+	Saved := Map("streams", _LLM_Ollama_ActiveStreams, "ready", _LLM_Ollama_IsReady,
+		"bootstrap", _LLM_ManagedBootstrap, "origin", LLM_OLLAMA_BASE_URL)
+	PreviousCritical := Critical("Off")
+	Directory := A_Temp . "\ergopti_stream_http_" . A_TickCount . "_" . Random(1, 1000000)
+	PortPath := Directory . "\port.txt"
+	RecordPath := Directory . "\receipt.txt"
+	PeerOwner := 0, Handle := 0
+	State := Map("runs", 0, "partials", 0, "successes", 0, "failures", 0, "text", "", "query_handle", 0, "owner", 0)
+	try {
+		DirCreate(Directory)
+		SplitPath(A_LineFile, , &TestDirectory)
+		Peer := TestDirectory . "\..\..\..\..\fixtures\ollama_stream_http_peer.ahk"
+		AssertTrue(FileExist(Peer), "the actual loopback peer fixture must exist")
+		Command := _SR_BuildDirectCommandLine(A_AhkPath,
+			["/ErrorStdOut", Peer, PortPath, RecordPath, String(Status), "done"])
+		PeerPid := 0
+		_LLM_CurlArtifactRun(Command, Directory, "Hide", &PeerPid, &PeerOwner)
+		Started := A_TickCount
+		while !FileExist(PortPath) && !_LLM_CurlProcessExited(PeerOwner) && TickElapsed(Started) < 5000
+			Sleep(10)
+		AssertTrue(FileExist(PortPath), "the actual peer must publish its bound loopback port")
+		ReadyBytes := FileRead(PortPath, "RAW")
+		ReadyHex := ""
+		loop ReadyBytes.Size
+			ReadyHex .= Format("{:02X}", NumGet(ReadyBytes, A_Index - 1, "UChar"))
+		FileAppend(Format("RECEIPT stream-http ready_bytes={1} ready_hex={2}`n", ReadyBytes.Size, ReadyHex), "*")
+		ReadyRecord := FileRead(PortPath, "UTF-8-RAW")
+		AssertTrue(RegExMatch(ReadyRecord, "^[0-9]{1,5}`n\z"),
+			"the native peer publishes exactly its decimal port followed by LF")
+		Port := Integer(SubStr(ReadyRecord, 1, -1))
+		AssertTrue(Port > 0 && Port <= 65535, "the operating system supplies the ephemeral TCP port")
+		_LLM_ManagedBootstrap := 0
+		_LLM_Ollama_IsReady := true
+		_LLM_Ollama_ActiveStreams := []
+		LLM_OLLAMA_BASE_URL := "http://127.0.0.1:" . Port
+		Handle := LLM_OllamaGenerate_Streaming("fixture-model", "system", "synthetic input", 0.1,
+			(*) => State["partials"] += 1, (Text) => (State["successes"] += 1, State["text"] := Text),
+			(*) => State["failures"] += 1, "", "", false, "", Map("run", NativeRun))
+		Started := A_TickCount
+		while State["successes"] + State["failures"] == 0 && TickElapsed(Started) < 10000
+			Sleep(10)
+		AssertEqual(1, State["runs"], "the public driver must launch the real curl transport exactly once")
+		AssertEqual(1, State["successes"] + State["failures"], "the real transport settles exactly once")
+		Owner := State["owner"]
+		AssertTrue(Owner is Map, "the actual curl native owner was retained by the observer")
+		if State["query_handle"] {
+			AssertEqual(0, DllCall("Kernel32\WaitForSingleObject", "Ptr", State["query_handle"], "UInt", 0, "UInt"),
+				"the exact curl process has acknowledged native exit")
+			ExitCode := 0, Diagnostic := ""
+			AssertTrue(_SR_TreeReadExitCode(State["query_handle"], &ExitCode, &Diagnostic),
+				"the exact native curl exit receipt remains observable after production release")
+		} else {
+			AssertTrue(Owner.Has("tree") && Owner.Get("terminal", 0) is Map,
+				"a wrapped curl launch must retain its canonical native completion receipt")
+			ExitCode := Owner["terminal"]["exit"]
+		}
+		AssertEqual(0, ExitCode, "the actual transport exit is successful independently of the HTTP status")
+		Started := A_TickCount
+		while !_LLM_CurlProcessExited(PeerOwner) && TickElapsed(Started) < 5000
+			Sleep(10)
+		AssertTrue(_LLM_CurlProcessExited(PeerOwner), "the actual peer finishes after sending its response")
+		PeerExit := 0, PeerDiagnostic := ""
+		AssertTrue(_SR_TreeReadExitCode(PeerOwner["handle"], &PeerExit, &PeerDiagnostic))
+		AssertEqual(0, PeerExit, "the native peer completed the declared HTTP response")
+		AssertTrue(FileExist(RecordPath), "the peer records the actual completed response")
+		Receipt := FileRead(RecordPath, "UTF-8-RAW")
+		ChatResponses := 0
+		for Line in StrSplit(Receipt, "`n", "`r") {
+			if Line == ""
+				continue
+			Record := JsonParse(Line)
+			AssertTrue(Record is Map, "the actual response transcript is a typed JSON object")
+			if Record["method"] == "POST" && Record["path"] == "/api/chat" {
+				ChatResponses += 1
+				AssertEqual(Status, Record["status"], "the peer completed the requested HTTP status")
+			}
+		}
+		AssertEqual(1, ChatResponses, "the actual public request reaches the expected endpoint exactly once")
+		AssertTrue(Owner.Get("released", false), "the public stream retires its actual process owner")
+		AssertEqual(0, _LLM_Ollama_ActiveStreams.Length, "the settled public stream retires its registration")
+		AssertFalse(FileExist(Handle.TmpHeaders), "every HTTP verdict retires its actual response header image")
+		FileAppend(Format("RECEIPT stream-http status={1} native_exit={2} partials={3} successes={4} failures={5}`n",
+			Status, ExitCode, State["partials"], State["successes"], State["failures"]), "*")
+		AssertEqual(ExpectedSuccess ? 1 : 0, State["partials"],
+			"HTTP refusal must withhold provider bytes from every partial callback")
+		AssertEqual(ExpectedSuccess ? 1 : 0, State["successes"],
+			"a done frame cannot authorize streaming success after an HTTP failure")
+		AssertEqual(ExpectedSuccess ? 0 : 1, State["failures"],
+			"an unsuccessful HTTP response must settle the failure callback exactly once")
+		if ExpectedSuccess
+			AssertEqual("native HTTP answer", State["text"], "the successful HTTP control delivers the actual provider bytes")
+	} finally {
+		if IsObject(Handle)
+			LLM_OllamaCancelStream(Handle)
+		if State["owner"] is Map
+			_LLM_CurlReleaseProcess(State["owner"], true)
+		if State["query_handle"]
+			DllCall("Kernel32\CloseHandle", "Ptr", State["query_handle"])
+		if PeerOwner is Map
+			_LLM_CurlReleaseProcess(PeerOwner, true)
+		_LLM_Ollama_ActiveStreams := Saved["streams"]
+		_LLM_Ollama_IsReady := Saved["ready"]
+		_LLM_ManagedBootstrap := Saved["bootstrap"]
+		LLM_OLLAMA_BASE_URL := Saved["origin"]
+		if DirExist(Directory)
+			DirDelete(Directory, true)
+		Critical(PreviousCritical)
+	}
+	NativeRun(Command, WorkingDir, Options, &Pid, &Owner) {
+		State["runs"] += 1
+		_LLM_CurlArtifactRun(Command, WorkingDir, Options, &Pid, &Owner)
+		State["owner"] := Owner
+		if Owner.Get("handle", 0) {
+			Observer := 0
+			CurrentProcess := DllCall("Kernel32\GetCurrentProcess", "Ptr")
+			AssertTrue(DllCall("Kernel32\DuplicateHandle", "Ptr", CurrentProcess,
+				"Ptr", Owner["handle"], "Ptr", CurrentProcess, "Ptr*", &Observer,
+				"UInt", 0, "Int", false, "UInt", 2, "Int"),
+				"the transparent observer duplicates the actual curl object without reopening its PID")
+			State["query_handle"] := Observer
+		}
+		; Receive a complete native response before testing its semantic admission.
+		; This observes the real exit and leaves the actual curl command unchanged.
+		AssertTrue(State["query_handle"] != 0, "the completed-response control requires its exact native handle")
+		AssertEqual(0, DllCall("Kernel32\WaitForSingleObject", "Ptr", State["query_handle"], "UInt", 5000, "UInt"),
+			"the genuine curl transport completes before its response is admitted")
+	}
+}
+; Filtered runs do not execute the suite's timing-loader test. Admit the actual
+; boot values and restore every global written by their canonical loader.
+_OllamaStream_WithBootTimings(Callback) {
+	global LLM_OLLAMA_POLL_MS, LLM_OLLAMA_DELETE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_POLL_MS
+	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
+	Previous := [IsSet(LLM_OLLAMA_POLL_MS) ? LLM_OLLAMA_POLL_MS : unset,
+		IsSet(LLM_OLLAMA_DELETE_TIMEOUT_MS) ? LLM_OLLAMA_DELETE_TIMEOUT_MS : unset,
+		IsSet(LLM_REMOTE_TIMEOUT_MS) ? LLM_REMOTE_TIMEOUT_MS : unset,
+		IsSet(LLM_REMOTE_POLL_MS) ? LLM_REMOTE_POLL_MS : unset,
+		IsSet(LLM_INSTALLED_CACHE_TTL_MS) ? LLM_INSTALLED_CACHE_TTL_MS : unset,
+		IsSet(LLM_DEPS_POLL_TIMEOUT_MS) ? LLM_DEPS_POLL_TIMEOUT_MS : unset,
+		IsSet(LLM_REMOTE_READY_PING_DEADLINE_MS) ? LLM_REMOTE_READY_PING_DEADLINE_MS : unset]
+	try {
+		LLMApiLoadTimings()
+		AssertEqual(TimingsGet("llm", "poll_interval_ms"), LLM_OLLAMA_POLL_MS,
+			"the real poll cadence must be admitted before launching an asynchronous stream")
+		AssertTrue(LLM_OLLAMA_POLL_MS > 0, "a real one-shot poll cannot use the uninitialized zero sentinel")
+		return Callback.Call()
+	} finally {
+		LLM_OLLAMA_POLL_MS := Previous.Has(1) ? Previous[1] : unset
+		LLM_OLLAMA_DELETE_TIMEOUT_MS := Previous.Has(2) ? Previous[2] : unset
+		LLM_REMOTE_TIMEOUT_MS := Previous.Has(3) ? Previous[3] : unset
+		LLM_REMOTE_POLL_MS := Previous.Has(4) ? Previous[4] : unset
+		LLM_INSTALLED_CACHE_TTL_MS := Previous.Has(5) ? Previous[5] : unset
+		LLM_DEPS_POLL_TIMEOUT_MS := Previous.Has(6) ? Previous[6] : unset
+		LLM_REMOTE_READY_PING_DEADLINE_MS := Previous.Has(7) ? Previous[7] : unset
+	}
+}
+for _OllamaHttpVector in [[200, true], [201, true], [299, true], [302, false], [400, false],
+	[401, false], [404, false], [429, false], [500, false], [503, false]]
+	Test("Ollama public stream: HTTP" . _OllamaHttpVector[1] . " complete response admission (ollama-stream-http-admission)",
+		_OllamaStream_WithBootTimings.Bind(
+			_OllamaStream_HttpStatus.Bind(_OllamaHttpVector[1], _OllamaHttpVector[2])))
+
+; Partial/interim headers are not a final response; invalid I/O stays distinct
+; from a file that curl has not created. Every image lives in a private folder.
+_OllamaStream_HttpHeaderReceipt(Mode, Expected) {
+	global HTTP_CURL_MAX_HEADER_BYTES
+	Directory := A_Temp . "\ergopti_stream_headers_" . A_TickCount . "_" . Random(1, 1000000)
+	Path := Directory . "\response.headers", Lock := 0
+	State := Map()
+	try {
+		DirCreate(Directory)
+		if Mode == "invalid-path"
+			Path := Directory . "\absent\response.headers"
+		else if Mode != "missing" {
+			Image := ""
+			if Mode == "partial-status"
+				Image := "HTTP/1.1 200"
+			else if Mode == "partial-fields"
+				Image := "HTTP/1.1 200 OK`r`nContent-Type:"
+			else if Mode == "interim"
+				Image := "HTTP/1.1 100 Continue`r`n`r`n"
+			else if Mode == "interim-partial-final"
+				Image := "HTTP/1.1 100 Continue`r`n`r`nHTTP/1.1 200 OK`r`n"
+			else if Mode == "interim-final"
+				Image := "HTTP/1.1 100 Continue`r`n`r`nHTTP/1.1 200 OK`r`n`r`n"
+			else if Mode == "malformed"
+				Image := "Not an HTTP response`r`n`r`n"
+			else if Mode != "empty" && Mode != "oversize" && Mode != "raw-nul"
+				Image := "HTTP/1.1 " . (Mode == "locked" ? 200 : Mode) . " Fixture Response`r`n`r`n"
+			FileAppend(Image, Path, "UTF-8-RAW")
+			if Mode == "oversize" {
+				Bytes := Buffer(HTTP_CURL_MAX_HEADER_BYTES + 1, 0x41)
+				Writer := FileOpen(Path, "w", "UTF-8-RAW")
+				try AssertEqual(Bytes.Size, Writer.RawWrite(Bytes), "the oversized native fixture writes its complete byte image")
+				finally Writer.Close()
+				AssertEqual(Bytes.Size, FileGetSize(Path), "the actual header artifact exceeds the canonical byte ceiling")
+			} else if Mode == "raw-nul" {
+				FileAppend("HTTP/1.1 200 OK`r`nX-Fixture: ", Path, "UTF-8-RAW")
+				_TLAO_AppendRawBytes(Path, [0])
+				FileAppend("suffix`r`n`r`n", Path, "UTF-8-RAW")
+				Raw := FileRead(Path, "RAW")
+				AssertEqual(0, NumGet(Raw, StrPut("HTTP/1.1 200 OK`r`nX-Fixture: ", "UTF-8") - 1, "UChar"),
+					"the malformed native header actually contains the raw NUL")
+			} else if Mode == "locked" {
+				Lock := DllCall("Kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000,
+					"UInt", 0, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+				AssertTrue(Lock != -1 && Lock != 0, "the header fixture exclusively owns the real sharing refusal")
+			}
+		}
+		Observed := -1, Diagnostic := "", NativeError := 0
+		try Observed := _LLM_Ollama_ReadStreamHttpStatus({TmpHeaders: Path}, State)
+		catch OSError as Err {
+			NativeError := Err.Number
+			Diagnostic := Err.Message
+		} catch as Err
+			Diagnostic := Err.Message
+		if Expected is String {
+			if Mode == "locked" || Mode == "invalid-path"
+				AssertEqual(Mode == "locked" ? 32 : 3, NativeError, "native header I/O refusal must propagate unchanged")
+			else
+				AssertContains(Diagnostic, Expected, "the header refusal must identify its actual protocol boundary")
+			AssertFalse(State.Has("http_status"), "a refused header never caches a successful status")
+		} else {
+			AssertEqual("", Diagnostic, "pending or valid header images have no hidden failure")
+			AssertEqual(Expected, Observed, "only a complete final successful HTTP status is admitted")
+			AssertEqual(Expected != 0, State.Has("http_status"), "only successful final admission is retained")
+		}
+	} finally {
+		if Lock && Lock != -1
+			DllCall("Kernel32\CloseHandle", "Ptr", Lock)
+		if DirExist(Directory)
+			DirDelete(Directory, true)
+	}
+}
+for _OllamaHeaderVector in [["missing", 0], ["empty", 0], ["partial-status", 0], ["partial-fields", 0],
+	["interim", 0], ["interim-partial-final", 0], ["interim-final", 200], ["200", 200], ["299", 299],
+	["302", "refused"], ["401", "refused"], ["500", "refused"], ["101", "upgrade"],
+	["malformed", "refused"], ["oversize", "ceiling"], ["raw-nul", "NUL"], ["locked", "native"], ["invalid-path", "native"]]
+	Test("Ollama HTTP header receipt: " . _OllamaHeaderVector[1] . " (ollama-stream-http-headers)",
+		_OllamaStream_HttpHeaderReceipt.Bind(_OllamaHeaderVector[1], _OllamaHeaderVector[2]))
+
+; Header reads can pump cancellation too. Observe the real reader return and
+; prove that a revoked request cannot start a subsequent body read or delivery.
+_OllamaStream_HttpHeaderCancellation(Final, Cancel) {
+	global _LLM_Ollama_ActiveStreams, _LLM_Ollama_IsReady, _LLM_ManagedBootstrap
+	Saved := [_LLM_Ollama_ActiveStreams, _LLM_Ollama_IsReady, _LLM_ManagedBootstrap]
+	Path := A_Temp . "\ergopti_header_cancel_" . A_TickCount . "_" . Random(1, 1000000)
+	Handle := {Pid: 0, ProcessOwner: 0, Cancelled: false,
+		TmpPayload: Path . ".json", TmpStdout: Path . ".out", TmpHeaders: ""}
+	State := Map("headers", 0, "body_reads", 0, "partials", 0, "successes", 0, "failures", 0)
+	HeaderFn := _LLM_Ollama_ReadStreamHttpStatus, BodyFn := _LLM_Ollama_ReadStreamText
+	HadHeaderCall := HeaderFn.HasOwnProp("Call"), HadBodyCall := BodyFn.HasOwnProp("Call")
+	SavedHeaderCall := HadHeaderCall ? HeaderFn.GetOwnPropDesc("Call") : 0
+	SavedBodyCall := HadBodyCall ? BodyFn.GetOwnPropDesc("Call") : 0
+	try {
+		AssertFalse(HadHeaderCall || HadBodyCall, "both diagnostic boundaries must start from their genuine native readers")
+		_LLM_ManagedBootstrap := 0, _LLM_Ollama_IsReady := true
+		Handle.ProcessOwner := _OllamaStream_CompletedNativeOwner()
+		Handle.Pid := Handle.ProcessOwner["pid"]
+		_LLM_Ollama_ActiveStreams := [Handle]
+		AssertTrue(FSWriteCreateDurable(Handle.TmpStdout,
+			'{"message":{"content":"actual header control"},"done":true}' . "`n"),
+			"the fixture must exclusively acquire its real provider response")
+		_OllamaStream_FixtureHttpResponse(Handle)
+		if Final
+			AssertTrue(_LLM_CurlReleaseProcess(Handle.ProcessOwner), "a direct final flush follows actual native owner release")
+		HeaderFn.DefineProp("Call", {Call: ObserveHeader})
+		BodyFn.DefineProp("Call", {Call: ObserveBody})
+		RunFn := Final ? _LLM_Ollama_StreamFinalFlush : _LLM_Ollama_StreamPoll
+		RunFn.Call(Handle, Map("acc", "", "last_pos", 0),
+			(*) => State["partials"] += 1, (*) => State["successes"] += 1, (*) => State["failures"] += 1)
+		AssertEqual(1, State["headers"], "the genuine header return must actually cross the observed boundary")
+		AssertEqual(Cancel ? 0 : 1, State["body_reads"], "header cancellation fences the subsequent body read")
+		AssertEqual(Cancel ? 0 : 1, State["partials"], "header cancellation fences partial delivery")
+		AssertEqual(Cancel ? 0 : 1, State["successes"], "header cancellation fences successful completion")
+		AssertEqual(Cancel ? 1 : 0, State["failures"], "the current stream settles exactly once")
+		AssertTrue(Handle.ProcessOwner.Get("released", false), "the actual completed native child handle must retire")
+		AssertEqual(0, _LLM_Ollama_ActiveStreams.Length, "the original stream registration must retire")
+		AssertFalse(FileExist(Handle.TmpStdout), "the actual provider response must retire")
+		AssertFalse(FileExist(Handle.TmpHeaders), "the actual HTTP header response must retire")
+	} finally {
+		if HeaderFn.HasOwnProp("Call")
+			HeaderFn.DeleteProp("Call")
+		if BodyFn.HasOwnProp("Call")
+			BodyFn.DeleteProp("Call")
+		if HadHeaderCall
+			HeaderFn.DefineProp("Call", SavedHeaderCall)
+		if HadBodyCall
+			BodyFn.DefineProp("Call", SavedBodyCall)
+		_LLM_CurlReleaseProcess(Handle.ProcessOwner, true)
+		for FilePath in [Handle.TmpPayload, Handle.TmpStdout, Handle.TmpHeaders]
+			if FilePath != "" && FileExist(FilePath)
+				FileDelete(FilePath)
+		_LLM_Ollama_ActiveStreams := Saved[1], _LLM_Ollama_IsReady := Saved[2], _LLM_ManagedBootstrap := Saved[3]
+	}
+	ObserveHeader(Self, Args*) {
+		HeaderFn.DeleteProp("Call")
+		Status := HeaderFn.Call(Args*)
+		AssertEqual(200, Status, "the actual on-disk HTTP status is successful before cancellation")
+		State["headers"] += 1
+		if Cancel
+			LLM_OllamaCancelStream(Handle)
+		return Status
+	}
+	ObserveBody(Self, Args*) {
+		BodyFn.DeleteProp("Call")
+		State["body_reads"] += 1
+		return BodyFn.Call(Args*)
+	}
+}
+for _OllamaHeaderBoundary in [[false, false], [false, true], [true, false], [true, true]]
+	Test("Ollama HTTP header return: final=" . _OllamaHeaderBoundary[1] . " cancel=" . _OllamaHeaderBoundary[2]
+		. " (ollama-stream-http-header-cancellation)",
+		_OllamaStream_HttpHeaderCancellation.Bind(_OllamaHeaderBoundary[1], _OllamaHeaderBoundary[2]))
+
+#Include %A_LineFile%/../test_llm_api_ollama_http_recovery.ahk
