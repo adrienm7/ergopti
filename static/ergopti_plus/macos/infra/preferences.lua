@@ -700,6 +700,32 @@ local function scalar_value_fits(flat_key, value)
 	return ConfigOutdated.manifest_value_fits(entry, value, "hs")
 end
 
+--- Lua type a stored value has for the manifest entry types whose name is not
+--- a Lua type: a feature row and an array both persist as TOML tables.
+local VALUE_LUA_TYPE = { array = "table", feature = "table" }
+
+--- Whether a persisted scalar has the type and value its manifest entry
+--- declares. load() and current_view() both admit values through this one
+--- rule: the view kept a second, stricter copy and refused a `date = true`
+--- load took (field ledger L20, "value_type at hotstrings.dynamic.date").
+--- A codec value was checked against its stored form by persisted_units_fit.
+--- @param flat_key string Flat state key.
+--- @param value any Persisted value.
+--- @return boolean fits
+--- @return string|nil detail Why the value is outdated.
+local function manifest_type_fits(flat_key, value)
+	local spec = KEY_MAP[flat_key]
+	if not spec or spec.codec then return true end
+	local path = spec.sec .. "." .. (spec.path and (spec.path .. ".") or "") .. (spec.key or flat_key)
+	local entry = Manifest.find_entry_by_path(path)
+	if not entry then return true end
+	local expected = VALUE_LUA_TYPE[entry.type] or entry.type
+	if entry.type ~= "enum" and type(value) ~= expected then
+		return false, "a " .. tostring(entry.type) .. " is expected here, not a " .. type(value)
+	end
+	return ConfigOutdated.manifest_value_fits(entry, value, "hs", SCALAR_VALUE_RULES[flat_key])
+end
+
 --- Resolves canonical defaults/operations into the units used by their native owner.
 --- @param path string Canonical configuration path.
 --- @param value any Value expressed in persisted units.
@@ -865,6 +891,24 @@ local function flatten_from_disk(grouped, mark, shapes)
 	local function take(...)
 		if mark then mark(...) end
 	end
+	-- A scalar where an owned value's table belongs (`layout = 3`, the bare
+	-- `hotstrings.dynamic.date = true` of field ledger L20) is outdated on its
+	-- own. The read-only view refused it with a second rule load never applied.
+	for _, spec in pairs(KEY_MAP) do
+		local node, segments = grouped[spec.sec], { spec.sec }
+		if node ~= nil and type(node) ~= "table" then
+			ConfigOutdated.report(segments, "a table of settings is expected here")
+		else
+			for segment in (spec.path or ""):gmatch("[^.]+") do
+				node = node and node[segment]
+				segments[#segments + 1] = segment
+				if node ~= nil and type(node) ~= "table" then
+					ConfigOutdated.report(segments, "a table of settings is expected here")
+					break
+				end
+			end
+		end
+	end
 	--- Takes one owned value, unless it cannot cross its unit boundary: such a
 	--- leaf (`debounce_ms = "fast"`) is outdated on its own, and used to make
 	--- the whole file load as corrupt.
@@ -891,6 +935,7 @@ local function flatten_from_disk(grouped, mark, shapes)
 				Manifest.find_entry_by_path(table.concat({ ... }, ".")), value, "hs")
 		end
 		if fits then fits, detail = scalar_value_fits(flat_key, value) end
+		if fits then fits, detail = manifest_type_fits(flat_key, value) end
 		if fits and flat_key == "llm_active_profile" then
 			-- A deleted or renamed profile silently ran "basic" at every prediction.
 			local ids, legacy = document_profile_ids()
@@ -1318,10 +1363,6 @@ function M.load(prefs_file)
 	return values, "ok"
 end
 
---- Lua type a stored value has for the manifest entry types whose name is not
---- a Lua type: a feature row and an array both persist as TOML tables.
-local VALUE_LUA_TYPE = { array = "table", feature = "table" }
-
 --- Reads current canonical preferences without adopting overwrite authority.
 --- This view is admission evidence only; load/save alone own source snapshots.
 --- @param prefs_file string Canonical configuration path.
@@ -1332,10 +1373,10 @@ local VALUE_LUA_TYPE = { array = "table", feature = "table" }
 --- @return table|nil source Exact classified bytes read for this view.
 --- @return string|nil reason Closed refusal cause when flat is nil: invalid_path,
 ---   publication_in_flight, schema_owner_unavailable, schema_refused, unreadable,
----   undecodable, section_shape, outdated_keys, value_type, value_out_of_range or raised.
---- @return string|nil key The config.toml path of the refused value ("layout.pause_switch_enabled")
----   for value_type and value_out_of_range: the 2026-10-27 19:47 field run named value_type
----   on every regeneration and nothing said which key held it. Never the value itself.
+---   undecodable, outdated_keys or raised.
+--- @return string|nil key For outdated_keys, the first config.toml path load() leaves out
+---   ("layout.pause_switch_enabled"): the 2026-10-27 19:47 field run refused the view on
+---   every regeneration and nothing said which key held it. Never the value itself.
 function M.current_view(prefs_file, tolerate_outdated)
 	if type(prefs_file) ~= "string" or prefs_file == "" then return nil, nil, "invalid_path" end
 	if _owned_publications[prefs_file] then return nil, nil, "publication_in_flight" end
@@ -1345,30 +1386,15 @@ function M.current_view(prefs_file, tolerate_outdated)
 		if current.status == "absent" then return {}, current end
 		local decoded, shapes = require("toml_codec.leaf_rows").decode_source(current.content)
 		if type(decoded) ~= "table" then return nil, nil, "undecodable" end
-		for _, spec in pairs(KEY_MAP) do
-			local node = decoded[spec.sec]
-			if node ~= nil and type(node) ~= "table" then return nil, nil, "section_shape" end
-			for segment in (spec.path or ""):gmatch("[^.]+") do
-				node = node and node[segment]
-				if node ~= nil and type(node) ~= "table" then return nil, nil, "section_shape" end
-			end
-		end
+		-- The very walk and admission load() applies: a value load leaves out as
+		-- outdated is left out here too, never refused by a second rule.
 		local flat
 		local outdated = ConfigOutdated.collect_reports(function() flat = flatten_from_disk(decoded, nil, shapes) end)
-		if next(outdated) ~= nil and tolerate_outdated ~= true then return nil, nil, "outdated_keys" end
-		for key, value in pairs(flat) do
-			local spec = KEY_MAP[key]
-			-- A codec value was checked against its stored form while it was read.
-			if spec and not spec.codec then
-				local path = spec.sec .. "." .. (spec.path and (spec.path .. ".") or "") .. (spec.key or key)
-				local entry = Manifest.find_entry_by_path(path)
-				if entry and entry.type ~= "enum" and type(value) ~= (VALUE_LUA_TYPE[entry.type] or entry.type) then
-					return nil, nil, "value_type", path
-				end
-				if entry and not ConfigOutdated.manifest_value_fits(entry, value, "hs", SCALAR_VALUE_RULES[key]) then
-					return nil, nil, "value_out_of_range", path
-				end
-			end
+		if next(outdated) ~= nil and tolerate_outdated ~= true then
+			local paths = {}
+			for outdated_path in pairs(outdated) do paths[#paths + 1] = outdated_path end
+			table.sort(paths)
+			return nil, nil, "outdated_keys", paths[1]
 		end
 		return flat, current
 	end)
