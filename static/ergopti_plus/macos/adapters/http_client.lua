@@ -249,6 +249,22 @@ local function request_refusal(url, headers, body)
 	return nil
 end
 
+--- Longest native failure reason kept in a result; the system text is one sentence.
+local NATIVE_REASON_MAX_BYTES = 240
+
+--- Names a transport failure with the system's reason. hs.http answers one with
+--- status -1 and the reason as its body; dropping it left a failed PAC download
+--- or model fetch with no cause in any log (issue #104). Control bytes are
+--- folded so the reason stays one log line.
+--- @param body any Native response body of a failed request.
+--- @return string reason
+local function native_failure_reason(body)
+	local reason = type(body) == "string" and body:gsub("[%c]+", " "):match("^%s*(.-)%s*$") or ""
+	if reason == "" then return "Network request failed" end
+	if #reason > NATIVE_REASON_MAX_BYTES then reason = reason:sub(1, NATIVE_REASON_MAX_BYTES) .. "…" end
+	return "Network request failed: " .. reason
+end
+
 --- Returns whether an admitted URL is HTTPS, whatever the scheme's case.
 --- @param url string Admitted absolute URL.
 --- @return boolean
@@ -639,7 +655,7 @@ local function new(options)
 			local is_ok  = public_status >= 200 and public_status < 300
 			local err_msg = nil
 			if not is_ok then
-				err_msg = native_status < 0 and "Network request failed"
+				err_msg = native_status < 0 and native_failure_reason(response_body)
 					or string.format("HTTP %s", tostring(public_status))
 			end
 			invoke_callback(callback, {
