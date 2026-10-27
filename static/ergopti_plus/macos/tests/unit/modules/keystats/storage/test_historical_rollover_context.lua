@@ -162,10 +162,31 @@ helpers.describe("historical rollover facts", function()
 		end)
 	end)
 
-	helpers.it("refuses ids that cross a true boundary backwards (historical-rollover-context)", function()
+	-- An id at or below the last marker's bound is the legacy id-counter restart
+	-- (issue #104). It used to be refused, and an append-only ledger never stops
+	-- containing it, so every boot re-scanned the whole ledger only to fail again.
+	-- The invariant kept: a restart can never authorize a reset; it withdraws them.
+	helpers.it("withdraws every reset when ids restart across a true boundary (issue104-id-restart)", function()
 		with_owner(function(facts)
-			helpers.assert_eq(facts(batch(insert(9)) .. marker .. batch(insert(3))), nil)
+			local ledger = batch(insert(4) .. insert(9)) .. marker .. batch(insert(3)) .. marker .. batch(insert(12))
+			local result = assert(facts(ledger))
+			helpers.assert_eq(result.cutoffs, {}, "id cutoffs cannot separate generations that share ids")
+			helpers.assert_eq(result.has_markers, true)
+			helpers.assert_eq(result.regression.id, 3)
+			helpers.assert_eq(result.regression.bound, 9)
+			helpers.assert_eq(ledger:sub(result.regression.at, result.regression.at + 9), "('device',")
 			helpers.assert_eq(assert(facts(batch(insert(9) .. insert(3)))).cutoffs, {})
+		end)
+	end)
+
+	helpers.it("names the refused shape and its byte in the refusal (issue104-id-restart)", function()
+		with_owner(function(facts)
+			local multiple = insert(1):gsub("%);\n$", "),('device',9,'2026-10-21','y');\n")
+			local ledger = batch(multiple) .. marker
+			local _, detail = facts(ledger)
+			local at = tonumber(detail:match("multi%-row typing INSERT at byte (%d+)%)$"))
+			helpers.assert_true(at ~= nil, detail)
+			helpers.assert_eq(ledger:sub(at, at + 9), "('device',")
 		end)
 	end)
 end)
@@ -182,6 +203,24 @@ helpers.describe("historical rebuild ownership", function()
 			helpers.assert_eq(cutoffs(db, "device"), nil)
 			helpers.assert_eq(rebuild(db), false)
 			helpers.assert_eq(db.deletes, 0)
+		end)
+	end)
+
+	helpers.it("rebuilds a ledger whose id counter restarted after a rollover (issue104-id-restart)", function()
+		with_rebuild(function(cutoffs, rebuild, _, db, state)
+			-- The restarted generation's duplicate ids were dropped by INSERT OR IGNORE.
+			local ledger = batch(insert(1) .. insert(5)) .. marker .. batch(insert(1) .. insert(2) .. insert(7))
+			state.ledgers["owned/device/data.sql"] = ledger
+			state.raw.device = { 1, 2, 5, 7 }
+			local walked = 0
+			value(rebuild, "Aggregator", { get_ngram_ctx = function() return {} end,
+				set_ngram_ctx = function() end, reset_ngram_ctx = function() end,
+				set_device_id = function() end, reset_batch = function() end, flush = function() return true end,
+				walk_typing = function() walked = walked + 1 end })
+			helpers.assert_eq(assert(cutoffs(db, "device")), {})
+			helpers.assert_eq(rebuild(db), true, "a legacy restart must not refuse the rebuild forever")
+			helpers.assert_true(db.deletes > 0, "the partition was rebuilt")
+			helpers.assert_eq(walked, 4, "every retained typing row is replayed")
 		end)
 	end)
 
