@@ -662,7 +662,14 @@ function _endLoad() {
  * @param {number} token - Load that owns this request.
  */
 function _clientFetch(channel, token) {
-	var url = 'https://api.github.com/repos/' + _ghOwner + '/' + _ghRepo + '/releases?per_page=20';
+	var url =
+		'https://' +
+		ERGOPTI_IDENTIFIERS.hosts.github_api +
+		'/repos/' +
+		_ghOwner +
+		'/' +
+		_ghRepo +
+		'/releases?per_page=20';
 	if (typeof fetch !== 'function') {
 		injectError(_t('changelog_window.error_network'));
 		return;
@@ -932,7 +939,8 @@ function openOnGitHub() {
 	var url = _currentReleaseUrl;
 	if (!_isAllowedRepositoryUrl(url)) {
 		// Fall back to the releases index.
-		url = 'https://github.com/' + _ghOwner + '/' + _ghRepo + '/releases';
+		url =
+			'https://' + ERGOPTI_IDENTIFIERS.hosts.github + '/' + _ghOwner + '/' + _ghRepo + '/releases';
 	}
 	_postChangelogMessage({ action: 'open_url', url: url });
 }
@@ -941,7 +949,8 @@ function openOnGitHub() {
 function openReleasesPage() {
 	_postChangelogMessage({
 		action: 'open_url',
-		url: 'https://github.com/' + _ghOwner + '/' + _ghRepo + '/releases'
+		url:
+			'https://' + ERGOPTI_IDENTIFIERS.hosts.github + '/' + _ghOwner + '/' + _ghRepo + '/releases'
 	});
 }
 

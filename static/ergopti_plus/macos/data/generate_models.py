@@ -17,10 +17,16 @@ FEATURES & RATIONALE:
 import json
 import os
 import re
+import sys
+from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 import requests
 from bs4 import BeautifulSoup
+
+# The hosts are declared once in _shared/data/identifiers.json.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_shared" / "data"))
+from identifiers import HOSTS  # noqa: E402
 
 REQUEST_TIMEOUT = 10
 
@@ -43,9 +49,9 @@ def extract_repo_id(url: Optional[str]) -> Optional[str]:
     """
     if not url:
         return None
-    if "huggingface.co/" not in url:
+    if f"{HOSTS['huggingface']}/" not in url:
         return url
-    return url.split("huggingface.co/")[-1].strip("/")
+    return url.split(f"{HOSTS['huggingface']}/")[-1].strip("/")
 
 
 # =========================================
@@ -75,7 +81,7 @@ def get_hf_metadata(repo_url: Optional[str]) -> Dict[str, Any]:
     if not repo_id:
         return default_meta
 
-    api_url = f"https://huggingface.co/api/models/{repo_id}"
+    api_url = f"https://{HOSTS['huggingface']}/api/models/{repo_id}"
     try:
         response = requests.get(api_url, timeout=REQUEST_TIMEOUT)
         if response.status_code != 200:
@@ -125,7 +131,7 @@ def get_hf_metadata(repo_url: Optional[str]) -> Dict[str, Any]:
     readme = ""
     try:
         readme_req = requests.get(
-            f"https://huggingface.co/{repo_id}/raw/main/README.md",
+            f"https://{HOSTS['huggingface']}/{repo_id}/raw/main/README.md",
             timeout=REQUEST_TIMEOUT,
         )
         if readme_req.status_code == 200:
@@ -161,7 +167,7 @@ def get_hf_repo_size_gb(repo_url: Optional[str]) -> Optional[float]:
     if not repo_id:
         return None
 
-    api_url = f"https://huggingface.co/api/models/{repo_id}/tree/main"
+    api_url = f"https://{HOSTS['huggingface']}/api/models/{repo_id}/tree/main"
     try:
         response = requests.get(api_url, timeout=REQUEST_TIMEOUT)
         if response.status_code != 200:
@@ -182,7 +188,7 @@ def get_ollama_size_gb(ollama_url: Optional[str]) -> Optional[float]:
     Returns:
             The extracted size in GB, or None if parsing fails.
     """
-    if not ollama_url or "ollama.com" not in ollama_url:
+    if not ollama_url or HOSTS["ollama"] not in ollama_url:
         return None
 
     try:

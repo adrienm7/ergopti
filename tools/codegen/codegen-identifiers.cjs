@@ -4,7 +4,8 @@
  * ==============================================================================
  * MODULE: Identifiers and Hosts Codegen
  * DESCRIPTION:
- * Emits _shared/lua/identifiers.lua from _shared/data/identifiers.json: the
+ * Emits _shared/lua/identifiers.lua, the shell, Python, Swift and browser
+ * counterparts from _shared/data/identifiers.json: the
  * ErgoptiPlus file and bundle names, the bundle ids, the service labels and the
  * external hosts (GitHub, Ollama, Hugging Face) that the macOS and Linux Lua
  * drivers used to spell in dozens of files.
@@ -29,6 +30,13 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const SOURCE = path.join(SP, '_shared/data/identifiers.json');
 const OUTPUT = path.join(SP, '_shared/lua/identifiers.lua');
+const OUTPUT_JS = path.join(SP, '_shared/ui/_generated/identifiers.js');
+const OUTPUT_SH = path.join(SP, '_shared/data/identifiers.sh');
+const OUTPUT_PY = path.join(SP, '_shared/data/identifiers.py');
+const OUTPUT_SWIFT = path.join(
+	SP,
+	'macos/launcher/Sources/ErgoptiPlus/Identifiers.generated.swift'
+);
 
 const GROUPS = ['app', 'bundle_ids', 'service_labels', 'hosts'];
 const VALUE_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -81,7 +89,87 @@ ${GROUPS.map(emitGroup).join('\n')}
 }
 `;
 
-fs.mkdirSync(path.dirname(OUTPUT), { recursive: true });
-fs.writeFileSync(OUTPUT, lua, 'utf8');
-console.log(`  wrote ${path.relative(ROOT, OUTPUT).split(path.sep).join('/')}`);
+const BANNER = (comment) =>
+	`${comment} AUTO-GENERATED from _shared/data/identifiers.json.\n` +
+	`${comment} DO NOT EDIT BY HAND — run \`npm run codegen:identifiers\` to refresh.`;
+
+/** The upper-case shell prefix of a group. */
+const SHELL_PREFIX = {
+	app: 'ERGOPTI_APP',
+	bundle_ids: 'ERGOPTI_BUNDLE_ID',
+	service_labels: 'ERGOPTI_SERVICE_LABEL',
+	hosts: 'ERGOPTI_HOST'
+};
+
+const shell = `#!/bin/sh
+${BANNER('#')}
+
+# Application names, bundle ids, service labels and external hosts, for the shell
+# tools and installers that source this file. Hosts are bare names: build a URL as
+# "https://\${ERGOPTI_HOST_GITHUB}/...".
+${GROUPS.flatMap((group) =>
+	Object.entries(source[group]).map(
+		([key, value]) => `${SHELL_PREFIX[group]}_${key.toUpperCase()}="${value}"`
+	)
+).join('\n')}
+`;
+
+const python = `${BANNER('#')}
+"""Application names, bundle ids, service labels and external hosts.
+
+Hosts are bare names: build a URL as f"https://{HOSTS['github']}/...".
+"""
+
+${GROUPS.map((group) => {
+	const rows = Object.entries(source[group]).map(([key, value]) => `    "${key}": "${value}",`);
+	return `${group.toUpperCase()} = {\n${rows.join('\n')}\n}`;
+}).join('\n\n')}
+`;
+
+const js = `${BANNER('//')}
+
+// Application names, bundle ids, service labels and external hosts for the
+// classic-script pages. Hosts are bare names: build a URL as
+// 'https://' + ERGOPTI_IDENTIFIERS.hosts.github + '/...'.
+const ERGOPTI_IDENTIFIERS = Object.freeze({
+${GROUPS.map((group) => {
+	const rows = Object.entries(source[group]).map(([key, value]) => `\t\t${key}: '${value}'`);
+	return `\t${group}: Object.freeze({\n${rows.join(',\n')}\n\t})`;
+}).join(',\n')}
+});
+`;
+
+/** Swift enum name of a group. */
+const SWIFT_ENUM = {
+	app: 'App',
+	bundle_ids: 'BundleIds',
+	service_labels: 'ServiceLabels',
+	hosts: 'Hosts'
+};
+const camel = (key) => key.replace(/_([a-z0-9])/g, (_m, c) => c.toUpperCase());
+const swift = `${BANNER('//')}
+
+/// Application names, bundle ids, service labels and external hosts. Hosts are
+/// bare names: build a URL as "https://\\(Identifiers.Hosts.github)/...".
+enum Identifiers {
+${GROUPS.map((group) => {
+	const rows = Object.entries(source[group]).map(
+		([key, value]) => `\t\tstatic let ${camel(key)} = "${value}"`
+	);
+	return `\tenum ${SWIFT_ENUM[group]} {\n${rows.join('\n')}\n\t}`;
+}).join('\n')}
+}
+`;
+
+for (const [file, text] of [
+	[OUTPUT, lua],
+	[OUTPUT_JS, js],
+	[OUTPUT_SH, shell],
+	[OUTPUT_PY, python],
+	[OUTPUT_SWIFT, swift]
+]) {
+	fs.mkdirSync(path.dirname(file), { recursive: true });
+	fs.writeFileSync(file, text, 'utf8');
+	console.log(`  wrote ${path.relative(ROOT, file).split(path.sep).join('/')}`);
+}
 console.log(`[OK] identifiers generated: ${seen.size} value(s) in ${GROUPS.length} group(s).`);
