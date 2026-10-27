@@ -781,6 +781,8 @@ M.eventtap = {
 			keyboardEventAutorepeat = 6,
 			keyboardEventKeyboardType = 8,
 			scrollWheelEventDeltaAxis2 = 7,
+			scrollWheelEventScrollPhase = 9,
+			scrollWheelEventMomentumPhase = 10,
 		},
 		-- Every type the driver actually names. It used to carry five, and the
 		-- gap was invisible in the worst way: keep-awake builds its watch list as
