@@ -480,7 +480,7 @@ local function live_override()
 	-- Loaded when live mode started, which refuses without it: never nil here.
 	local config = live_config()
 	local decision = require("llm.request_plan.live").decide(
-		config, _live, ProfileSettings.get("num_predictions") or 1, binding_profile(_live))
+		config, _live, ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS) or 1, binding_profile(_live))
 	if decision.action == "stop" then
 		Logger.warn(LOG, "Live mode stopped: the prompt '%s' no longer exists.", _live.profile_id)
 		M.stop_live(decision.cause, false)

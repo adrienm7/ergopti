@@ -36,6 +36,7 @@ local Codec = require("toml_codec")
 local Logger = require("logger.shim")
 local LayerPreset = require("keymap.layer_preset")
 local NativePath = require("native_path")
+local ConfigKeys = require("config_keys")
 local LOG = "infra.tap_hold_scope"
 local _owner, _sequence = nil, 0
 require("infra.scope_registry").register("tap_hold_scope", function() return _owner ~= nil and _owner.pending() == true end)
@@ -121,7 +122,7 @@ function M.new(options)
 		assert(type(document) == "table", "tap-hold scope configuration is malformed")
 		local paths
 		paths, legacy = parameters.parameter_configuration_inventory(document, is_tap_hold_binding)
-		return Manifest.scope_inventory("tap_holds", { parameters = function() return paths end }, validators)
+		return Manifest.scope_inventory(ConfigKeys.KEY.TAP_HOLDS, { parameters = function() return paths end }, validators)
 	end
 	local function acquire()
 		if held then return true end
@@ -144,7 +145,7 @@ function M.new(options)
 		path = options.path, backup_path = options.backup_path, files = files, manifest = Manifest,
 		owned_paths = inventory, owners = validators,
 		presets = { tap_hold = {
-			path = options.tap_hold_path, backup_path = options.tap_hold_backup_path, prefixes = { "tap_holds" },
+			path = options.tap_hold_path, backup_path = options.tap_hold_backup_path, prefixes = { ConfigKeys.KEY.TAP_HOLDS },
 			render = function(mode, document, rows, shapes) return writer.render_scope(mode, document, rows, preset, shapes) end,
 		} },
 		prepare_batch = function(path, updates, adapter)
@@ -196,7 +197,7 @@ function M.new(options)
 			end
 			layer = import
 		end
-		local committed, detail = transaction.apply("tap_holds", mode)
+		local committed, detail = transaction.apply(ConfigKeys.KEY.TAP_HOLDS, mode)
 		if committed ~= true then
 			layer_debt = layer ~= nil
 			if settle_inverse() ~= true then return false, "tap-hold rollback remains pending" end

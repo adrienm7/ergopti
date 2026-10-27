@@ -452,8 +452,8 @@ local OPEN_PATH = {
 --- a missing errors file is announced there and here alike.
 local OPEN_LOG = {
 	["open_logs_folder"] = "open_logs_folder",
-	["open_today_log"]   = "open_today_log",
-	["open_error_log"]   = "open_today_errors",
+	[ConfigKeys.COMMAND.OPEN_TODAY_LOG]   = ConfigKeys.COMMAND.OPEN_TODAY_LOG,
+	[ConfigKeys.COMMAND.OPEN_ERROR_LOG]   = "open_today_errors",
 }
 
 --- The screenshot command for each capture action, one shell cascade per id.
@@ -1379,7 +1379,7 @@ local function binding_action(binding)
 	end
 	local descriptors = {
 		{ "keyboard__", "modules.shortcuts.keyboard_shortcuts", "keyboard" },
-		{ "script__", "modules.shortcuts.script_chords", "script_control" },
+		{ "script__", "modules.shortcuts.script_chords", ConfigKeys.LEAF.SCRIPT_CONTROL },
 		{ "tap_key__", "modules.shortcuts.tap_keys", "tap_keys" },
 		{ "combination__", "modules.shortcuts.key_combinations", "key_combination_taps" },
 	}
