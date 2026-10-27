@@ -304,14 +304,24 @@ end
 
 --- One lexical owner for complete SQL boundaries and optional rollover facts.
 --- Unknown producer forms cannot authorize resets; markerless continuity remains.
+--- A typing id at or below the last marker's bound is a known legacy producer
+--- shape, not an unknown one: until the fresh-cache replay existed, a lost TMPDIR
+--- cache restarted the macOS id counter at 1, so later days reuse ids an earlier
+--- generation already owns. Id cutoffs cannot separate those generations, so the
+--- restart withdraws every reset (markerless continuity) instead of refusing a
+--- ledger that is append-only and would therefore be refused forever.
 local function _scan_ledger(chunk, device_sql, collect_ids, is_rollover)
 	chunk = chunk or ""
 	local last_commit, i, n, line_start = 0, 1, #chunk, 1
 	local in_string, in_comment, in_batch = false, false, false
 	local in_block = false
 	local max_id, committed_max, invalid_at, lower_id = nil, nil, nil, nil
+	local invalid_reason, regression = nil, nil
 	local values_at, depth, tuple_seen = nil, 0, false
 	local markers, ids = {}, {}
+	local function refuse(at, reason)
+		if invalid_at == nil then invalid_at, invalid_reason = at, reason end
+	end
 	while i <= n do
 		local ch = chunk:sub(i, i)
 		local blocked = in_block
@@ -320,7 +330,8 @@ local function _scan_ledger(chunk, device_sql, collect_ids, is_rollover)
 				if ch == "*" and chunk:sub(i + 1, i + 1) == "/" then in_block = false; i = i + 1 end
 			elseif ch == "/" and chunk:sub(i + 1, i + 1) == "*" then
 				-- Unsupported block contents cannot hide a later real producer marker.
-				in_block, blocked, invalid_at = true, true, invalid_at or i
+				in_block, blocked = true, true
+				refuse(i, "block comment")
 			end
 		end
 		if not blocked and device_sql and not in_string and not in_comment then
@@ -333,14 +344,18 @@ local function _scan_ledger(chunk, device_sql, collect_ids, is_rollover)
 					lower_id = max_id
 				end
 				local opening, unknown = _typing_values_start(line)
-				if unknown then invalid_at = invalid_at or i end
+				if unknown then refuse(i, "unrecognised INSERT header") end
 				if opening then values_at, depth, tuple_seen = i + opening - 1, 0, false end
 			end
 			if values_at and i >= values_at then
 				if ch == "(" then
 					if depth == 0 then
 						local id = not tuple_seen and _typing_tuple_id(chunk, i, device_sql) or nil
-						if id == nil or (lower_id and id <= lower_id) then invalid_at = invalid_at or i
+						if id == nil then
+							refuse(i, tuple_seen and "multi-row typing INSERT" or "unreadable typing device or id")
+						elseif lower_id and id <= lower_id then
+							regression = regression or { at = i, id = id, bound = lower_id }
+							if collect_ids then ids[#ids + 1] = { at = i, id = id } end
 						else
 							max_id = math.max(max_id or id, id)
 							if collect_ids then ids[#ids + 1] = { at = i, id = id } end
@@ -377,7 +392,9 @@ local function _scan_ledger(chunk, device_sql, collect_ids, is_rollover)
 	if not device_sql then return last_commit end
 	local trailing = is_rollover(chunk:sub(last_commit + 1))
 	local facts = { cutoffs = {}, ids = {}, max_id = committed_max, has_markers = false,
-		unreadable = invalid_at ~= nil and invalid_at <= last_commit }
+		unreadable = invalid_at ~= nil and invalid_at <= last_commit,
+		invalid_at = invalid_at, invalid_reason = invalid_reason,
+		regression = regression ~= nil and regression.at <= last_commit and regression or nil }
 	for _, marker in ipairs(markers) do
 		if marker.at <= last_commit or trailing then
 			facts.has_markers = true
@@ -389,6 +406,7 @@ local function _scan_ledger(chunk, device_sql, collect_ids, is_rollover)
 	for _, item in ipairs(ids) do
 		if item.at <= last_commit then facts.ids[item.id] = true end
 	end
+	if facts.regression then facts.cutoffs = {} end
 	return last_commit, facts
 end
 
@@ -401,7 +419,8 @@ function M._last_complete_batch_offset(chunk)
 end
 
 --- Read authoritative per-device typing cutoffs from uncompacted producer SQL.
---- Multi-tuple/unknown INSERT forms are refused when marker facts are required.
+--- Multi-tuple/unknown INSERT forms are refused when marker facts are required;
+--- an id restart returns no cutoffs plus its `regression` position instead.
 ---@param chunk string
 ---@param device_sql string SQL-escaped device literal from the canonical writer.
 ---@param collect_ids boolean|nil Collect ids only for the bounded local outbox.
@@ -412,7 +431,10 @@ function M._typing_rollover_boundaries(chunk, device_sql, collect_ids, is_rollov
 	assert(type(is_rollover) == "function", "canonical rollover predicate required")
 	local _, facts = _scan_ledger(chunk, device_sql, collect_ids, is_rollover)
 	if facts.has_markers and facts.unreadable then
-		return nil, "unsupported or ambiguous typing SQL at a rollover boundary"
+		-- Name the exact shape and byte: the ledger lives on the user's machine,
+		-- so the log line is the only evidence a maintainer will ever see.
+		return nil, string.format("unsupported or ambiguous typing SQL at a rollover boundary (%s at byte %d)",
+			tostring(facts.invalid_reason), facts.invalid_at)
 	end
 	return facts
 end
