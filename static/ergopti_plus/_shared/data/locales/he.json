@@ -257,6 +257,7 @@
 	"field_check.step.brew_version": "גרסת Homebrew",
 	"field_check.step.karabiner_cask": "Karabiner-Elements הותקן באמצעות Homebrew",
 	"field_check.step.karabiner_signature": "חתימת הקוד של Karabiner-Elements",
+	"field_check.step.karabiner_gatekeeper": "הערכת Gatekeeper של Karabiner-Elements",
 	"field_check.step.this_copy_known": "מיקום העותק הזה ידוע",
 	"field_check.step.main_app_login_item": "פריט הכניסה של Ergopti (מצב המערכת)",
 	"field_check.step.btm_state": "רשימת המערכת של פריטי רקע",

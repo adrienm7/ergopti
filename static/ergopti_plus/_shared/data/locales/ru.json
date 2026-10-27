@@ -257,6 +257,7 @@
 	"field_check.step.brew_version": "Версия Homebrew",
 	"field_check.step.karabiner_cask": "Karabiner-Elements установлен через Homebrew",
 	"field_check.step.karabiner_signature": "Подпись кода Karabiner-Elements",
+	"field_check.step.karabiner_gatekeeper": "Проверка Karabiner-Elements в Gatekeeper",
 	"field_check.step.this_copy_known": "Расположение этой копии известно",
 	"field_check.step.main_app_login_item": "Объект входа Ergopti (состояние системы)",
 	"field_check.step.btm_state": "Системный список фоновых объектов",

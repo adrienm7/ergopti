@@ -257,6 +257,7 @@
 	"field_check.step.brew_version": "Homebrew संस्करण",
 	"field_check.step.karabiner_cask": "Karabiner-Elements Homebrew से स्थापित है",
 	"field_check.step.karabiner_signature": "Karabiner-Elements का कोड हस्ताक्षर",
+	"field_check.step.karabiner_gatekeeper": "Karabiner-Elements का Gatekeeper आकलन",
 	"field_check.step.this_copy_known": "इस प्रति का स्थान ज्ञात है",
 	"field_check.step.main_app_login_item": "Ergopti का लॉगिन आइटम (सिस्टम स्थिति)",
 	"field_check.step.btm_state": "बैकग्राउंड आइटम की सिस्टम सूची",
