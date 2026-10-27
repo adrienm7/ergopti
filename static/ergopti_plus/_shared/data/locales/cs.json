@@ -1248,6 +1248,7 @@
 	"layout_composer.problem_unknown_source": "Vrstva používá rozložení, které zde není k dispozici.",
 	"layout_composer.problem_spec_invalid": "Záznam vrstvy je chybně utvořen.",
 	"layout_composer.problem_shortcuts_invalid": "Zkratky jsou chybně utvořeny.",
+	"layout_composer.problem_rows_invalid": "Volby řady číslic jsou chybně utvořeny.",
 	"layout_composer.problem_unknown_shortcut": "Neznámý modifikátor zkratky.",
 	"layout_composer.problem_overrides_invalid": "Změny kláves jsou chybně utvořeny.",
 	"layout_composer.problem_unknown_target": "Změna klávesy uvádí neznámou vrstvu.",

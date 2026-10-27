@@ -1248,6 +1248,7 @@
 	"layout_composer.problem_unknown_source": "Een laag gebruikt een layout dat hier niet beschikbaar is.",
 	"layout_composer.problem_spec_invalid": "Een laagvermelding is misvormd.",
 	"layout_composer.problem_shortcuts_invalid": "De sneltoetsen zijn misvormd.",
+	"layout_composer.problem_rows_invalid": "De opties van de cijferrij zijn misvormd.",
 	"layout_composer.problem_unknown_shortcut": "Een sneltoetsmodifier is onbekend.",
 	"layout_composer.problem_overrides_invalid": "De toetswijzigingen zijn misvormd.",
 	"layout_composer.problem_unknown_target": "Een toetswijziging noemt een onbekende laag.",

@@ -1243,6 +1243,7 @@
 	"layout_composer.problem_unknown_source": "A layer uses a layout that is not available here.",
 	"layout_composer.problem_spec_invalid": "A layer entry is malformed.",
 	"layout_composer.problem_shortcuts_invalid": "The shortcuts are malformed.",
+	"layout_composer.problem_rows_invalid": "The number-row options are malformed.",
 	"layout_composer.problem_unknown_shortcut": "A shortcut modifier is not known.",
 	"layout_composer.problem_overrides_invalid": "The key changes are malformed.",
 	"layout_composer.problem_unknown_target": "A key change names an unknown layer.",

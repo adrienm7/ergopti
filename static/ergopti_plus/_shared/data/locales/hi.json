@@ -1248,6 +1248,7 @@
 	"layout_composer.problem_unknown_source": "एक परत ऐसे लेआउट का उपयोग करती है जो यहाँ उपलब्ध नहीं है।",
 	"layout_composer.problem_spec_invalid": "परत की एक प्रविष्टि गलत रूप में है।",
 	"layout_composer.problem_shortcuts_invalid": "शॉर्टकट गलत रूप में हैं।",
+	"layout_composer.problem_rows_invalid": "अंकों की पंक्ति के विकल्प गलत रूप में हैं।",
 	"layout_composer.problem_unknown_shortcut": "शॉर्टकट संशोधक अज्ञात है।",
 	"layout_composer.problem_overrides_invalid": "कुंजी परिवर्तन गलत रूप में हैं।",
 	"layout_composer.problem_unknown_target": "एक कुंजी परिवर्तन अज्ञात परत का नाम देता है।",

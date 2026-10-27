@@ -1248,6 +1248,7 @@
 	"layout_composer.problem_unknown_source": "تستخدم طبقة تخطيطًا غير متاح هنا.",
 	"layout_composer.problem_spec_invalid": "إدخال طبقة غير صالح.",
 	"layout_composer.problem_shortcuts_invalid": "الاختصارات غير صالحة.",
+	"layout_composer.problem_rows_invalid": "خيارات صف الأرقام غير صالحة.",
 	"layout_composer.problem_unknown_shortcut": "معدّل اختصار غير معروف.",
 	"layout_composer.problem_overrides_invalid": "تغييرات المفاتيح غير صالحة.",
 	"layout_composer.problem_unknown_target": "تغيير مفتاح يسمّي طبقة غير معروفة.",

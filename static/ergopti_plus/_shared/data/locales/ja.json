@@ -1248,6 +1248,7 @@
 	"layout_composer.problem_unknown_source": "レイヤーがここで利用できないレイアウトを使っています。",
 	"layout_composer.problem_spec_invalid": "レイヤーの項目の形式が正しくありません。",
 	"layout_composer.problem_shortcuts_invalid": "ショートカットの形式が正しくありません。",
+	"layout_composer.problem_rows_invalid": "数字の列のオプションの形式が正しくありません。",
 	"layout_composer.problem_unknown_shortcut": "不明なショートカットの修飾キーがあります。",
 	"layout_composer.problem_overrides_invalid": "キーの変更の形式が正しくありません。",
 	"layout_composer.problem_unknown_target": "キーの変更が不明なレイヤーを指しています。",
