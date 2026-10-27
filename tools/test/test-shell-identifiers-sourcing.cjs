@@ -22,6 +22,7 @@ const os = require('os');
 const path = require('path');
 const assert = require('node:assert/strict');
 const { execFileSync, spawnSync } = require('child_process');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SOURCE_LINE =
@@ -67,7 +68,7 @@ for (const file of scripts) {
 			path.join(ROOT, 'static/ergopti_plus/_shared/data/identifiers.sh'),
 			path.join(present, 'identifiers.sh')
 		);
-		const control = spawnSync('bash', [probe], {
+		const control = spawnSync(bashExecutable(), [probe], {
 			cwd: scratch,
 			env: { PATH: process.env.PATH },
 			encoding: 'utf8'
@@ -77,7 +78,7 @@ for (const file of scripts) {
 			`${file}: the source line does not work even with the file: ${control.stderr}`
 		);
 		fs.rmSync(path.join(scratch, 'static'), { recursive: true, force: true });
-		const result = spawnSync('bash', [probe], {
+		const result = spawnSync(bashExecutable(), [probe], {
 			cwd: scratch,
 			env: { PATH: process.env.PATH },
 			encoding: 'utf8'
