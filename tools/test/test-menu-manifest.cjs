@@ -2485,7 +2485,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		[
 			'linux',
 			'ui/menu/menu_builder.lua',
-			'NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands)'
+			// Linux passes its live owner: the rows apply where the session can.
+			'NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands, {'
 		]
 	]) {
 		const source = readFileSync(
