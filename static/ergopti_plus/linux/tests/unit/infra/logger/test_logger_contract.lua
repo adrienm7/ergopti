@@ -158,3 +158,5 @@ describe("Logger contract: shared cross-driver vectors", function()
 		end
 	end
 end)
+
+require("test.adapter_errors_contract").register(helpers)

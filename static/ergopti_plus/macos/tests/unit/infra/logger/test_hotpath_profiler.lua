@@ -163,3 +163,5 @@ end)
 hs.timer.absoluteTime = orig_abs
 package.loaded["infra.logger"] = _real_logger
 package.loaded["adapters.timer_scheduler"] = nil
+
+require("test.adapter_errors_contract").register(helpers)

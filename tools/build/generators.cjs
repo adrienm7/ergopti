@@ -191,6 +191,10 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/_shared/lua/brightness_actions_data.lua']
 	},
 	{
+		script: 'codegen/codegen-adapter-errors.cjs',
+		outputs: ['static/ergopti_plus/_shared/lua/adapter_errors.lua']
+	},
+	{
 		script: 'codegen/codegen-menu-row-order.cjs',
 		outputs: ['static/ergopti_plus/_shared/lua/menu/row_order_data.lua']
 	},
