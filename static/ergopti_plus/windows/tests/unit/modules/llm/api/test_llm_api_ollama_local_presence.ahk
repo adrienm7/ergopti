@@ -541,7 +541,7 @@ for _G4O_PresenceMode in ["installed", "missing", "replacement"]
 ; All substituted ports are OS/UI boundaries; no classifier or offer is replaced.
 
 _RWMO_AdmittedTerminal(ProviderModel, ExpectedOffer, State) {
-	global _LLM_LocalModelOfferPort
+	global _LLM_LocalModelOfferPort, _SharedDir
 	State["callback"].Call(LLM_LocalModelListReceipt(Map("ok", true, "status", 200,
 		"body", '{"models":[{"name":"qwen2.5:latest"}]}')))
 	Entry := State["entry"]
@@ -556,6 +556,15 @@ _RWMO_AdmittedTerminal(ProviderModel, ExpectedOffer, State) {
 	_LLM_Ollama_PollCurl(State["id"])
 	AssertEqual(1, State["failures"].Length, "the actual terminal must settle exactly one failure")
 	Failure := State["failures"][1]
+	AssertTrue(Failure is Map && Failure.Has("reason") && Failure["reason"] is String && Failure["reason"] != "",
+		"the actual typed recovery refusal must carry a nonempty reason code")
+	ReasonCodes := JsonParse(FileRead(_SharedDir . "\core\ports\contracts.json", "UTF-8"))["enums"]["reason"]
+	AssertTrue(ReasonCodes is Array && ReasonCodes.Length > 0, "the actual generated reason vocabulary must be present")
+	DeclaredReason := false
+	for ReasonCode in ReasonCodes
+		if ReasonCode == Failure["reason"]
+			DeclaredReason := true
+	AssertTrue(DeclaredReason, "the actual typed recovery failure must use the canonical closed reason vocabulary")
 	Offers := [], Installs := []
 	Confirm(Title, Text) {
 		Offers.Push(Text)
