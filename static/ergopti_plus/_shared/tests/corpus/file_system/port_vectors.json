@@ -1,0 +1,68 @@
+{
+	"_comment": "Vectors of file_system.ports (the lease and atomic write spec of the FileSystem owner). `owner` lists the method names an owner offers (each a function) and `non_functions` the names it offers as something else. `expect.error` is a text the refusal must contain; `expect.offered` is the capability list a complete owner reports. `drivers` gives, per driver, the capabilities its real owner must report: the shared contract replays them against the owner of the driver it runs on.",
+	"drivers": {
+		"macos": ["ConditionalRemoval", "PublicationReceipts", "WriteLease"],
+		"linux": []
+	},
+	"required": [
+		"read",
+		"write",
+		"append",
+		"exists",
+		"delete",
+		"read_with_status",
+		"write_if_unchanged",
+		"write_if_unchanged_admitted",
+		"configuration_ports"
+	],
+	"capabilities": {
+		"ConditionalRemoval": ["remove_if_unchanged", "remove_if_unchanged_admitted", "remove_exact"],
+		"WriteLease": ["acquire_write_locks", "release_write_locks"],
+		"PublicationReceipts": ["publication_receipt_view", "publication_receipt_chain_restore"]
+	},
+	"vectors": [
+		{
+			"id": "complete-minimal-owner-offers-no-capability",
+			"expect": { "offered": [] }
+		},
+		{
+			"id": "every-capability-is-reported-sorted",
+			"with_capabilities": ["WriteLease", "ConditionalRemoval", "PublicationReceipts"],
+			"expect": { "offered": ["ConditionalRemoval", "PublicationReceipts", "WriteLease"] }
+		},
+		{
+			"id": "missing-publication-is-refused-by-name",
+			"without": ["write_if_unchanged_admitted"],
+			"expect": { "error": "FileSystem lacks: write_if_unchanged_admitted" }
+		},
+		{
+			"id": "all-missing-methods-are-listed-sorted",
+			"without": ["read_with_status", "append"],
+			"expect": { "error": "FileSystem lacks: append, read_with_status" }
+		},
+		{
+			"id": "a-non-function-method-counts-as-missing",
+			"non_functions": ["configuration_ports"],
+			"expect": { "error": "FileSystem lacks: configuration_ports" }
+		},
+		{
+			"id": "half-a-lease-is-refused",
+			"extra": ["acquire_write_locks"],
+			"expect": { "error": "WriteLease is offered by halves, it lacks: release_write_locks" }
+		},
+		{
+			"id": "half-the-conditional-removal-is-refused",
+			"extra": ["remove_exact"],
+			"expect": {
+				"error": "ConditionalRemoval is offered by halves, it lacks: remove_if_unchanged, remove_if_unchanged_admitted"
+			}
+		},
+		{
+			"id": "a-receipt-view-without-its-restore-is-refused",
+			"extra": ["publication_receipt_view"],
+			"expect": {
+				"error": "PublicationReceipts is offered by halves, it lacks: publication_receipt_chain_restore"
+			}
+		}
+	]
+}

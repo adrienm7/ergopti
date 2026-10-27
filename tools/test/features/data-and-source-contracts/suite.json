@@ -561,6 +561,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-menu-row-order-single-source.cjs"],
 			"repro": "npm run test:menu-row-order-single-source"
+		},
+		{
+			"id": "js-file-system-port-wired",
+			"ordinal": 510,
+			"name": "FileSystem port spec wiring (both Lua owners check the lease and atomic write spec at load)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-file-system-port-wired.cjs"],
+			"repro": "npm run test:file-system-port-wired"
 		}
 	]
 }

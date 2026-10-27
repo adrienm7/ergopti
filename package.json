@@ -583,6 +583,7 @@
 		"test:go-route-plan-gate": "node ./tools/test/test-go-route-plan-gate.cjs",
 		"test:proxy-policy-single-source": "node ./tools/test/test-proxy-policy-single-source.cjs",
 		"test:contract-vector-ledger": "node ./tools/test/test-contract-vector-ledger.cjs",
+		"test:file-system-port-wired": "node ./tools/test/test-file-system-port-wired.cjs",
 		"test:menu-row-order-single-source": "node ./tools/test/test-menu-row-order-single-source.cjs",
 		"test:linux-elf-needed-closure": "node ./tools/test/test-linux-elf-needed-closure.cjs",
 		"test:codegen-proxy-precedence": "node ./tools/test/test-codegen-proxy-precedence.cjs",
