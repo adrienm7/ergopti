@@ -1576,6 +1576,12 @@ class AcceptedSocketStopControls(unittest.TestCase):
             # The real request line has already been read. This additive witness
             # prevents a partial-header mutant from passing on an earlier EOF.
             headers.set()
+            if native_signal and partial:
+                # A signal that lands between the interpreter's last check and the
+                # blocking read is only noticed when that read times out, so a peer
+                # thread cannot time it reliably. Raising it on this thread, right
+                # before the read, makes the real signal's handler run first.
+                signal.pthread_kill(threading.get_ident(), signal.SIGTERM)
             return original_parse(handler)
 
         def publish_attribute(server, name, value):
@@ -1611,7 +1617,12 @@ class AcceptedSocketStopControls(unittest.TestCase):
                     if partial and not headers.wait(2):
                         raise AssertionError("actual request line did not reach header parsing")
                     if native_signal:
-                        os.kill(os.getpid(), signal.SIGTERM)
+                        # Aimed at the serving thread: a process-directed kill may be
+                        # taken by this peer thread, which cannot interrupt the server's
+                        # blocking read, and the stop would then never run. The partial
+                        # case is signalled by the serving thread itself in parse().
+                        if not partial:
+                            signal.pthread_kill(serving_thread, signal.SIGTERM)
                     else:
                         # Explicit Windows/portable signal port: invoke the actual
                         # installed stop callback, never pretend native SIGTERM.
@@ -1624,6 +1635,7 @@ class AcceptedSocketStopControls(unittest.TestCase):
             except BaseException as error:
                 failures.append(error)
 
+        serving_thread = threading.get_ident()
         worker = threading.Thread(target=peer)
         raised = None
         filesystem_root = Path.cwd().resolve()
