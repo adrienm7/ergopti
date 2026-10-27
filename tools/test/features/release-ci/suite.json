@@ -282,6 +282,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-managed-ollama-handoff.cjs"],
 			"repro": "npm run test:managed-ollama-handoff"
+		},
+		{
+			"id": "js-macos-swiftpm-cache-scope",
+			"ordinal": 521,
+			"name": "macOS SwiftPM build cache scope (only the Intel XCTest cell restores a build tree, by an exact key)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-swiftpm-cache-scope.cjs"],
+			"repro": "npm run test:macos-swiftpm-cache-scope"
 		}
 	]
 }
