@@ -4,30 +4,43 @@
  * ==============================================================================
  * MODULE: macOS TIS Register Probe
  * DESCRIPTION:
- * A one-file probe that answers the macOS questions M1 to M6 of
- * docs/design/layout-option-emulation.md on a real Mac: whether a keyboard
- * layout file written while the system runs can be registered, enabled,
- * selected, replaced by a newer build and retired without a logout.
+ * A one-file probe for the macOS questions of docs/design/layout-option-emulation.md:
+ * can a keyboard layout written while the system runs be registered, enabled and
+ * SELECTED without a logout, and what makes TISSelectInputSource refuse it.
+ * The first run (probe v1) showed that registering works at once, that an in-place
+ * rewrite stays cached, that a removed file leaves a ghost entry until logout, and
+ * that selecting a freshly registered loose .keylayout answers -50 (paramErr).
+ * This version tries the ways around that refusal, one line each.
  *
  * Run (Terminal, macOS 13 or later, no Xcode project needed):
  *   swiftc -O -o /tmp/ep_tis_probe tools/diagnostics/macos_tis_register_probe.swift && /tmp/ep_tis_probe
+ * Optional: add --write-prefs to also try the last resort (P5), which edits the
+ * user's AppleEnabledInputSources in com.apple.HIToolbox and puts it back.
+ * After a logout and login: /tmp/ep_tis_probe after-logout
  *
  * FEATURES & RATIONALE:
- * 1. It changes only two throw-away layouts named "EPProbe<pid>v1" and
- *    "EPProbe<pid>v2" in ~/Library/Keyboard Layouts, and puts the user back on
- *    the input source they started with. Both files are removed at the end,
- *    also when a step fails.
- * 2. One verdict line per question, then a closing line:
- *      M<n> PASS|FAIL|INFO <what was observed>
- *    Send all printed lines back. Nothing else is read or written.
- * 3. No event is posted: what a source types is read from its own layout data
- *    with UCKeyTranslate (key code 12, the Q key, no modifier).
- * 4. The only wait is a single two-second pause in M1, to tell « listed at
- *    once » from « listed later ».
+ * 1. Throw-away layouts only, named EPProbe<pid>..., with numeric ids drawn from a range
+ *    no installed layout uses (the ids found in the layout folders are listed first and
+ *    avoided). The user is put back on the input source they started on and every file
+ *    is removed at the end, also when a step fails.
+ * 2. One verdict line per question:
+ *      P<n> PASS|FAIL|INFO <what was observed>
+ *    Send all printed lines back. Nothing else is read or written; P5 writes the user's
+ *    preferences only with --write-prefs, and restores them.
+ * 3. No event is posted: what a source types is read from its own layout data with
+ *    UCKeyTranslate (key code 12, the Q key, no modifier).
+ * 4. The only waits are run-loop turns of 0.3 s (P3, P4, P5), to tell « needs time » from
+ *    « refused for good ».
  *
- * After the run, log out and in once and run the probe again with the argument
- * "after-logout": it only reports whether any EPProbe source is still listed
- * (the second half of M5).
+ * Questions:
+ *   P0  how many numeric ids are already taken, and where this run's ids start
+ *   P1  the capabilities of a freshly registered loose .keylayout before selecting
+ *   P2  select at once (the v1 result: -50)
+ *   P3  select after a run-loop turn, then after re-reading the source list
+ *   P4  the same layout installed as a .bundle (Info.plist + Resources/*.keylayout)
+ *   P5  select once the source is enabled through the user's preferences (--write-prefs)
+ *   P6  sources named EPProbe still listed after the cleanup (a ghost until logout is
+ *       expected); with the argument after-logout, whether any survived the logout
  * ==============================================================================
  */
 
@@ -37,8 +50,9 @@ import Foundation
 let layoutsDirectory = NSString(string: "~/Library/Keyboard Layouts").expandingTildeInPath
 let keyCodeQ: UInt16 = 12
 let pidTag = "EPProbe\(getpid())"
-let nameV1 = pidTag + "v1"
-let nameV2 = pidTag + "v2"
+let writePrefs = CommandLine.arguments.contains("--write-prefs")
+var createdPaths: [String] = []
+var createdNames: [String] = []
 
 // MARK: - Layout files
 
@@ -54,12 +68,66 @@ func keylayoutText(name: String, id: Int, output: String) -> String {
 	"""
 }
 
-func filePath(_ name: String) -> String { return "\(layoutsDirectory)/\(name).keylayout" }
+/// The numeric ids already declared by the layout files of the user and the system folders.
+func takenIdentifiers() -> Set<Int> {
+	var taken = Set<Int>()
+	let folders = [layoutsDirectory, "/Library/Keyboard Layouts", "/System/Library/Keyboard Layouts"]
+	for folder in folders {
+		guard let enumerator = FileManager.default.enumerator(atPath: folder) else { continue }
+		for case let relative as String in enumerator where relative.hasSuffix(".keylayout") {
+			guard let data = FileManager.default.contents(atPath: folder + "/" + relative),
+				let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1),
+				let range = text.range(of: "<keyboard ") else { continue }
+			let head = text[range.upperBound...].prefix(400)
+			if let idRange = head.range(of: " id=\"") {
+				let digits = head[idRange.upperBound...].prefix { $0 == "-" || $0.isNumber }
+				if let value = Int(digits) { taken.insert(value) }
+			}
+		}
+	}
+	return taken
+}
 
-func writeLayout(name: String, id: Int, output: String) throws {
+var identifierTaken = takenIdentifiers()
+var nextIdentifier = -(700_000 + Int(getpid()) % 200_000)
+
+func freshIdentifier() -> Int {
+	while identifierTaken.contains(nextIdentifier) { nextIdentifier -= 1 }
+	let value = nextIdentifier
+	identifierTaken.insert(value)
+	nextIdentifier -= 1
+	return value
+}
+
+func writeLoose(name: String, output: String) throws -> URL {
 	try FileManager.default.createDirectory(atPath: layoutsDirectory, withIntermediateDirectories: true)
-	try keylayoutText(name: name, id: id, output: output)
-		.write(toFile: filePath(name), atomically: true, encoding: .utf8)
+	let path = "\(layoutsDirectory)/\(name).keylayout"
+	try keylayoutText(name: name, id: freshIdentifier(), output: output).write(toFile: path, atomically: true, encoding: .utf8)
+	createdPaths.append(path)
+	createdNames.append(name)
+	return URL(fileURLWithPath: path)
+}
+
+func writeBundle(name: String, output: String) throws -> URL {
+	let root = "\(layoutsDirectory)/\(name).bundle"
+	let resources = root + "/Contents/Resources"
+	try FileManager.default.createDirectory(atPath: resources, withIntermediateDirectories: true)
+	try keylayoutText(name: name, id: freshIdentifier(), output: output)
+		.write(toFile: "\(resources)/\(name).keylayout", atomically: true, encoding: .utf8)
+	let identifier = "org.epprobe.keylayout.\(name)"
+	let info: [String: Any] = [
+		"CFBundleIdentifier": identifier,
+		"CFBundleName": name,
+		"CFBundleVersion": "1",
+		"CFBundleShortVersionString": "1",
+		"CFBundlePackageType": "BNDL",
+		"KLInfo_\(name)": ["TISInputSourceID": identifier, "TISIntendedLanguage": "en-US"],
+	]
+	let data = try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+	try data.write(to: URL(fileURLWithPath: root + "/Contents/Info.plist"))
+	createdPaths.append(root)
+	createdNames.append(name)
+	return URL(fileURLWithPath: root)
 }
 
 // MARK: - Input-source reads
@@ -67,6 +135,11 @@ func writeLayout(name: String, id: Int, output: String) throws {
 func property(_ source: TISInputSource, _ key: CFString) -> String? {
 	guard let pointer = TISGetInputSourceProperty(source, key) else { return nil }
 	return Unmanaged<CFString>.fromOpaque(pointer).takeUnretainedValue() as String
+}
+
+func flag(_ source: TISInputSource, _ key: CFString) -> String {
+	guard let pointer = TISGetInputSourceProperty(source, key) else { return "nil" }
+	return CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque(pointer).takeUnretainedValue()) ? "true" : "false"
 }
 
 func inventory() -> [TISInputSource] {
@@ -88,11 +161,6 @@ func currentIdentifier() -> String {
 	return identifier(current.takeRetainedValue())
 }
 
-func isEnabled(_ source: TISInputSource) -> Bool {
-	guard let pointer = TISGetInputSourceProperty(source, kTISPropertyInputSourceIsEnabled) else { return false }
-	return CFBooleanGetValue(Unmanaged<CFBoolean>.fromOpaque(pointer).takeUnretainedValue())
-}
-
 /// What the Q key types on this source, from its own layout data.
 func typed(_ source: TISInputSource) -> String {
 	guard let pointer = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else { return "<no layout data>" }
@@ -107,16 +175,74 @@ func typed(_ source: TISInputSource) -> String {
 	return status == noErr ? String(utf16CodeUnits: characters, count: length) : "<UCKeyTranslate \(status)>"
 }
 
+func capabilities(_ source: TISInputSource) -> String {
+	return "selectCapable=\(flag(source, kTISPropertyInputSourceIsSelectCapable)) "
+		+ "enableCapable=\(flag(source, kTISPropertyInputSourceIsEnableCapable)) "
+		+ "enabled=\(flag(source, kTISPropertyInputSourceIsEnabled)) "
+		+ "selected=\(flag(source, kTISPropertyInputSourceIsSelected)) "
+		+ "category=\(property(source, kTISPropertyInputSourceCategory) ?? "nil") "
+		+ "type=\(property(source, kTISPropertyInputSourceType) ?? "nil") "
+		+ "id=\(identifier(source))"
+}
+
 func verdict(_ step: String, _ pass: Bool?, _ text: String) {
 	let word = pass == nil ? "INFO" : (pass! ? "PASS" : "FAIL")
 	print("\(step) \(word) \(text)")
+}
+
+func turn(_ seconds: Double) {
+	RunLoop.current.run(until: Date(timeIntervalSinceNow: seconds))
+}
+
+/// Enables, selects and reads back; the line says every status and what the Q key types.
+func trySelect(_ step: String, _ label: String, _ name: String) {
+	guard let source = find(name: name) else {
+		verdict(step, false, "\(label): \(name) is not listed")
+		return
+	}
+	let enable = TISEnableInputSource(source)
+	let select = TISSelectInputSource(source)
+	let now = currentIdentifier()
+	verdict(step, select == noErr && now == identifier(source),
+		"\(label): enable \(enable), select \(select), current \(now), Q types '\(typed(source))'")
+}
+
+// MARK: - User preferences (P5 only, with --write-prefs)
+
+func defaultsTool(_ arguments: [String], input: Data? = nil) -> (Int32, Data) {
+	let process = Process()
+	process.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
+	process.arguments = arguments
+	let output = Pipe()
+	process.standardOutput = output
+	if let input = input {
+		let pipe = Pipe()
+		process.standardInput = pipe
+		pipe.fileHandleForWriting.write(input)
+		pipe.fileHandleForWriting.closeFile()
+	}
+	do { try process.run() } catch { return (-1, Data()) }
+	let data = output.fileHandleForReading.readDataToEndOfFile()
+	process.waitUntilExit()
+	return (process.terminationStatus, data)
+}
+
+/// The domain as exported, so that it can be put back as it was.
+func exportDomain() -> Data? {
+	let (status, data) = defaultsTool(["export", "com.apple.HIToolbox", "-"])
+	return status == 0 ? data : nil
+}
+
+func enabledListContains(_ fragment: String) -> Bool {
+	let (_, data) = defaultsTool(["read", "com.apple.HIToolbox", "AppleEnabledInputSources"])
+	return String(data: data, encoding: .utf8)?.contains(fragment) ?? false
 }
 
 // MARK: - After-logout mode
 
 if CommandLine.arguments.dropFirst().first == "after-logout" {
 	let leftover = inventory().compactMap { property($0, kTISPropertyLocalizedName) }.filter { $0.hasPrefix("EPProbe") }
-	verdict("M5b", leftover.isEmpty, "after a logout, EPProbe sources still listed: \(leftover.isEmpty ? "none" : leftover.joined(separator: ", "))")
+	verdict("P6", leftover.isEmpty, "after a logout, EPProbe sources still listed: \(leftover.isEmpty ? "none" : leftover.joined(separator: ", "))")
 	exit(0)
 }
 
@@ -124,77 +250,78 @@ if CommandLine.arguments.dropFirst().first == "after-logout" {
 
 let originalSource = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue()
 print("start current source: \(currentIdentifier())")
+verdict("P0", nil, "\(identifierTaken.count) numeric layout ids already taken; this run draws from \(nextIdentifier) downward")
+
+let originalDomain = writePrefs ? exportDomain() : nil
+if writePrefs && originalDomain == nil {
+	print("P5 FAIL cannot export com.apple.HIToolbox, so --write-prefs is refused and nothing will be written")
+}
 
 func cleanUp() {
 	if let original = originalSource { _ = TISSelectInputSource(original) }
-	for name in [nameV1, nameV2] {
+	for name in createdNames {
 		if let source = find(name: name) { _ = TISDisableInputSource(source) }
-		try? FileManager.default.removeItem(atPath: filePath(name))
+	}
+	for path in createdPaths { try? FileManager.default.removeItem(atPath: path) }
+	if let saved = originalDomain {
+		let (status, _) = defaultsTool(["import", "com.apple.HIToolbox", "-"], input: saved)
+		verdict("P5", nil, "preferences put back from the export (defaults import status \(status))")
 	}
 }
 
 do {
-	// M1 and M2: register a file written just now; is it listed without a logout, and under which id?
-	try writeLayout(name: nameV1, id: -24101, output: "A")
-	let url1 = URL(fileURLWithPath: filePath(nameV1)) as CFURL
-	let registerStatus1 = TISRegisterInputSource(url1)
-	let listedAtOnce = find(name: nameV1)
-	verdict("M1", registerStatus1 == noErr && listedAtOnce != nil,
-		"TISRegisterInputSource status \(registerStatus1), listed immediately: \(listedAtOnce != nil)")
-	if listedAtOnce == nil {
-		sleep(2)
-		verdict("M1", nil, "listed two seconds later: \(find(name: nameV1) != nil)")
-	}
-	verdict("M2", nil, "source id of a bare user .keylayout: \(identifier(find(name: nameV1)))")
-
-	// M4: a new name (new id) types the new cells after enable and select, no logout.
-	if let first = find(name: nameV1) {
-		let enable1 = TISEnableInputSource(first)
-		let select1 = TISSelectInputSource(first)
-		verdict("M4a", enable1 == noErr && select1 == noErr && currentIdentifier() == identifier(first) && typed(first) == "A",
-			"build v1: enable \(enable1), select \(select1), current \(currentIdentifier()), Q types '\(typed(first))' (expected 'A')")
+	// P1 and P2: a loose file with a unique id; its capabilities, then an immediate select.
+	let loose = pidTag + "a"
+	let looseURL = try writeLoose(name: loose, output: "A")
+	let registered = TISRegisterInputSource(looseURL as CFURL)
+	if let source = find(name: loose) {
+		verdict("P1", nil, "loose file, register status \(registered), before selecting: \(capabilities(source))")
+		trySelect("P2", "loose file, select at once", loose)
 	} else {
-		verdict("M4a", false, "build v1 is not listed, so it cannot be enabled")
+		verdict("P1", false, "loose file, register status \(registered): not listed")
 	}
 
-	try writeLayout(name: nameV2, id: -24102, output: "B")
-	let registerStatus2 = TISRegisterInputSource(URL(fileURLWithPath: filePath(nameV2)) as CFURL)
-	if let second = find(name: nameV2) {
-		let enable2 = TISEnableInputSource(second)
-		let select2 = TISSelectInputSource(second)
-		verdict("M4b", registerStatus2 == noErr && enable2 == noErr && select2 == noErr && currentIdentifier() == identifier(second) && typed(second) == "B",
-			"build v2 (new name): register \(registerStatus2), enable \(enable2), select \(select2), current \(currentIdentifier()), Q types '\(typed(second))' (expected 'B')")
+	// P3: the same source after a run-loop turn, then after the list is read again.
+	turn(0.3)
+	trySelect("P3", "loose file, after a 0.3 s run-loop turn", loose)
+	turn(0.3)
+	_ = inventory()
+	if let source = find(name: loose) {
+		verdict("P3", nil, "loose file, after re-reading the list: \(capabilities(source))")
+	}
+	trySelect("P3", "loose file, after re-reading the list", loose)
+
+	// P4: the same layout as a bundle.
+	let bundle = pidTag + "b"
+	let bundleURL = try writeBundle(name: bundle, output: "B")
+	let bundleStatus = TISRegisterInputSource(bundleURL as CFURL)
+	if let source = find(name: bundle) {
+		verdict("P4", nil, "bundle, register status \(bundleStatus), before selecting: \(capabilities(source))")
+		trySelect("P4", "bundle, select at once", bundle)
+		turn(0.3)
+		trySelect("P4", "bundle, after a 0.3 s run-loop turn", bundle)
 	} else {
-		verdict("M4b", false, "build v2 is not listed after register status \(registerStatus2)")
+		verdict("P4", false, "bundle, register status \(bundleStatus): not listed")
 	}
 
-	// M3: rewrite build v1 in place, same name and id, without toggling anything.
-	try writeLayout(name: nameV1, id: -24101, output: "Z")
-	_ = TISRegisterInputSource(url1)
-	if let again = find(name: nameV1) {
-		let seen = typed(again)
-		verdict("M3", nil, "same name rewritten in place: Q types '\(seen)' (A means the old cells are cached, Z means the new ones are read)")
-	} else {
-		verdict("M3", nil, "build v1 disappeared after the in-place rewrite")
-	}
-
-	// M6 and M5: retire build v1 while build v2 is selected; the selection must survive.
-	let selectedBefore = currentIdentifier()
-	if let old = find(name: nameV1) {
-		let disable1 = TISDisableInputSource(old)
-		verdict("M6", currentIdentifier() == selectedBefore,
-			"disabled v1 (status \(disable1)); current source before \(selectedBefore), after \(currentIdentifier())")
-		try? FileManager.default.removeItem(atPath: filePath(nameV1))
-		let afterRemoval = find(name: nameV1)
-		let enabledLeft = afterRemoval.map(isEnabled) ?? false
-		verdict("M5a", afterRemoval == nil,
-			"v1 after disable and file removal: listed \(afterRemoval != nil), enabled \(enabledLeft) (still listed means a ghost entry)")
-	} else {
-		verdict("M6", false, "build v1 was not listed when retirement was due")
+	// P5: the last resort, only with --write-prefs and a verified export to put back.
+	if writePrefs && originalDomain != nil {
+		let name = pidTag + "c"
+		let url = try writeLoose(name: name, output: "C")
+		_ = TISRegisterInputSource(url as CFURL)
+		let entry = "<dict><key>InputSourceKind</key><string>Keyboard Layout</string><key>KeyboardLayout Name</key><string>\(name)</string></dict>"
+		let (status, _) = defaultsTool(["write", "com.apple.HIToolbox", "AppleEnabledInputSources", "-array-add", entry])
+		verdict("P5", nil, "added \(name) to AppleEnabledInputSources (defaults status \(status), listed there: \(enabledListContains(name)))")
+		turn(0.3)
+		trySelect("P5", "enabled through the preferences, select", name)
+	} else if !writePrefs {
+		verdict("P5", nil, "skipped: pass --write-prefs to try enabling through com.apple.HIToolbox")
 	}
 } catch {
 	print("probe error: \(error)")
 }
 
 cleanUp()
-verdict("END", nil, "restored to \(currentIdentifier()); started on \(identifier(originalSource)); run again with 'after-logout' after a logout for M5b")
+let ghosts = inventory().compactMap { property($0, kTISPropertyLocalizedName) }.filter { $0.hasPrefix(pidTag) }
+verdict("P6", ghosts.isEmpty, "after the cleanup, probe sources still listed: \(ghosts.isEmpty ? "none" : ghosts.joined(separator: ", ")) (a ghost until logout is expected)")
+verdict("END", nil, "restored to \(currentIdentifier()); started on \(identifier(originalSource)); run again with 'after-logout' after a logout for P6")
