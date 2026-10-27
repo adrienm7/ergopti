@@ -99,6 +99,161 @@ fix/windows`.
   - the registry op that re-encodes a value in `config_migrate.ahk`, then delete the macOS
     `[llm.profiles] user_profiles` reader import.
 
+## Mac field session 2026-10-27: problem ledger
+
+Every problem seen on the maintainer's Mac on 2026-10-27 (macOS 26.6.2, arm64), from issue
+[#104](https://github.com/adrienm7/ergopti/issues/104) (body; no comments), the field reports
+`mac-2026-10-27_150026`, `_151611`, `_152936`, `_164726` and `new.txt` (the day's WARNING/ERROR
+log) on the `field/mac-2026-10-27` branch, which never reaches dev. Builds seen: ba73f58 (15:00),
+92d4615 (15:16), b014076 (15:29), 228f79f2 (16:47 developer app). The 16:28 to 16:54 boots ran
+after every 14:00 to 15:38 fix below, so "not seen after 16:28" is the evidence for those fixes.
+Labels L1 to L39 are local to this ledger. Shas on `tmp/wip-audit-field` change when rebased onto
+dev.
+
+### Fixed on dev
+
+- **L1** Remap guardian status 'unavailable', regeneration fail-closed (new.txt 14:25:50 to
+  16:06:42, 7 boots). Fixed b3893e0480, 6f667b3380 (developer-build agent fallback, after
+  228f79f2). Not seen after 16:28. Mac confirms: no "guardian status 'unavailable'" at boot of the
+  developer app and of the installed app.
+- **L2** menu_state.lua:531 timer held the main thread 21 to 23 s, with "Cannot read typing
+  rollover facts" and "Aggregate cache recovery failed" (new.txt 14:25:49, 14:27:27, 15:26:02,
+  15:28:51, 16:06:41). Fixed d854d55c79, 18d71c8580, d3cb3e6765 (sliced recovery). At 16:28 the
+  recovery ran in slices ("interrupted after 267 slice(s)", expected). Residual hold: L18. Mac
+  confirms: no rollover ERROR, no hold over 2 s from menu_state.lua:531.
+- **L3** macOS disabled the keyDown, loopbackKeyUp and script-control taps, then "Typing context
+  invalidated" (new.txt 14:27:29). Consequence of the 23 s hold of L2; same fix. Mac confirms:
+  no tap re-enable warning.
+- **L4** AXValueChanged watcher cleanup/setup failed, context_tracker.lua:631 (new.txt 14:26 to
+  16:09, about 20 lines). Fixed 690d7877d8. Not seen after 16:28. Mac confirms: none after
+  switching between apps for a few minutes.
+- **L5** notifier.lua:79 "attempt to call a nil value (method 'release')" (new.txt 14:31:59,
+  14:32:09). Fixed 75c2f02956. Not seen after.
+- **L6** hs.task refused to launch /usr/sbin/systemextensionsctl (new.txt 14:31:37, 15:27:18).
+  Fixed f03227b916. Not seen after.
+- **L7** "Boot stage 'Accessibility permission' opened while ... still open" (new.txt 14:25:26,
+  15:34:07, 16:06:18). Fixed ed5a622eda (AK); verified: absent from the three boots on 228f79f2
+  (16:28, 16:48, 16:54). Mac confirms: absent after a cold start that waits for the permission.
+- **L8** AI activation chain at 15:27:35: MLX bootstrap exit 78 "native network receiver is
+  unavailable", Ollama bootstrap exit 64 "Erreur inconnue", eight MLX warmup settlement ERRORs,
+  "PGID pending timeout", four HTTP 1500 ms timeouts, two download_window error states, failed
+  switch_model. Fixed c0e3359a19 (receiver admitted in a developer app), 8fc33138ec (named exit
+  causes), 0e9fa0c149 (MLX warmup stop), bc09e4584c (owned pinned Ollama). Mac confirms: enabling
+  MLX then Ollama from the menu downloads or names a closed cause, with no settlement ERROR.
+- **L9** TIS probe did not compile, "missing argument label 'name:'" (`_151611`, `_152936`
+  probe_compile.txt), and a stale binary ran anyway. Fixed 678588c625, 1434adcc57.
+- **L10** PAC download failure aborted downloads; issue #104 `probes.proxy_pac.state: error`.
+  Fixed 8e267e23df, 7634296b28, cbaa14ad46, 7af4e65b10, d09303810d (PAC then direct). Field check
+  part: L26.
+- **L11** Field run step 10_ollama_model timed out while still downloading, then "answered after
+  it was settled" (`_164726`, new.txt 16:53:45). Fixed 2790b3239a.
+- **L12** "Field run ... was cut short by a reload" (new.txt 16:54:32). Fixed bde408f3a6.
+- **L13** `_164726` holds no logs: the collector was stopped. Fixed 259244ddb1.
+
+### Fixed on tmp/wip-audit-field (to land on dev)
+
+- **L14** "TOML mapping file '<name>' registered ZERO mappings" on every boot (new.txt 14:27:05 to
+  16:54:31, 7 boots). Cause: a pack whose only section is disabled by the user registers nothing
+  on purpose. Fixed 9481ba78ac: one INFO line names the disabled section count; an empty or
+  unreadable file still warns. `'<name>'` is the deliberate PrivateLabel mask
+  (`_shared/lua/diagnostics/private_label.lua`), not a logging bug. Mac confirms: no ZERO warning.
+- **L15** "Duplicate Ergopti Karabiner revocation completion ignored" on every reload (new.txt
+  14:26:53 to 16:28:13, 6 times). Cause: both revocation halves answer synchronously, the join
+  settles, and the trailing join in `M.revoke` (platform/remap/init.lua) settled again. Fixed
+  9f4dea89b2. Mac confirms: no such warning after a reload.
+
+### Open TODO
+
+- **L16** [CODE][PHYS-M] Slow ingest tick, `append` phase 466 to 563 ms, peaks 1531 and 1709 ms
+  (new.txt 14:25:50 to 16:53:38, 20 lines, still on 228f79f2). The 1.2 to 1.8 s ticks are the
+  log_manager.lua:1722 holds. `LedgerAppend.flush` (adapters/ledger_append.lua) takes the lock,
+  reads the journal, publishes it atomically, reads the tail, appends, clears the SQLite outbox
+  and publishes the journal again; `prepare_append` reads the whole data.sql (68 MB) only without
+  a journal, so the cost is not proven yet. Next: split the `append` trace mark into lock,
+  journal publish, tail, write, clear and terminal publish, then one Mac run names the slow one.
+- **L17** [CODE][PHYS-M] "Slow preferences save 1.9 to 2.1 s (prepare about 1.25 s, write about
+  0.8 s; operations=293)" (new.txt 15:27:35 to 16:48:20, 6 times, also on 228f79f2). It is the
+  2.06 s hold of startup_controller.lua:263 (15:28:57, 16:48:20). Next: profile `prepare` for 293
+  operations and why a one-key save carries 293.
+- **L18** [CODE] keystats start still holds the main thread 1.1 to 1.3 s from the deferred timer
+  at menu_state.lua:531 (new.txt 16:28:06, 16:48:13, on 228f79f2). Next: move the SQLite open and
+  offset replay of `kl.start` into slices like the recovery.
+- **L19** [CODE][PHYS-M] log_manager.lua:1585 held the main thread 5288 ms right after "Typing
+  ids restart at ledger byte ... rebuilding without day-boundary context resets" (new.txt
+  16:49:17 to 16:49:22). Line 1585 is the recovery slice timer: one slice overran its budget.
+  Next: find the unbounded statement in the restart rebuild path and bound it per slice; a test
+  replays a ledger with an id restart and asserts every slice stays under its budget.
+- **L20** [CODE] "config.toml cannot be read, so the virtual keyboard choice is unknown"
+  (init.lua:2168 on 228f79f2, new.txt 16:28:07, 16:48:12, 16:54:32, developer mode).
+  `Preferences.current_view` returns nil for six causes (a publication in flight, read failure,
+  decode, section shape, outdated keys, a value outside the manifest) and the error names none.
+  Earlier "Config migration ... refused (newer)" (15:32:19, 15:34:29) shows this config was
+  written by a newer schema than one build. Next: return a closed reason token from
+  `current_view`, log it in the karabiner error, and decide which causes must not refuse the
+  deploy.
+- **L21** [CODE] Ollama `stop_warmup() could not retire its HTTP owner: false` and settlement
+  'Ollama warmup stop' did not commit (new.txt 16:28:07, after "Disabling LLM ...
+  startup_model_download_declined"). Next: reproduce with the startup decline before any warmup
+  request exists and make retirement of an absent owner a success.
+- **L22** [CODE][PHYS-M] A granite model pull showed an error at 100% that no log recorded
+  (maintainer report during the field run; no line in any report). Next: log the last status line
+  and error of the Ollama pull stream whenever the pull ends, even at 100%.
+- **L23** [CODE] "Ignored-window prewarm incomplete; tracking remains fail-closed" (new.txt
+  15:28:28, 16:28:04) and 1 s holds from keymap/utils.lua:1426 and :1455 (14:26:05, 15:34:09).
+  Next: log which prewarm stage was incomplete and bound the 1 s probe.
+- **L24** [PHYS-M] key_event_health: key events 250 ms or more late (max 879 ms), 100 key-downs
+  without key-up, 81 key-ups without key-down, 62 keys stuck over 3 s, one key stuck 518 s
+  (new.txt 09:54 to 10:36, session totals); issue #104 shows 1 late key. Most late events follow
+  the main-thread holds of L16 to L19. Next: after those, re-read the totals; lost key-ups without
+  a hold point at the Karabiner virtual HID path (big item 2).
+- **L25** Known limitation, plus one open bug. "Failed to enable 'Composer Check' —
+  reason=process_failed" (new.txt 14:31:52, 16:48:44). The TIS probe (issue #104 and `_152936`)
+  shows macOS 26.6.2 refuses it: register 0 and enable 0, but the source stays disabled, select
+  returns -50, the HIToolbox preference route is refused too, and removed sources stay listed
+  until logout. Open [CODE]: the rollback disable right after is refused "busy" because the
+  failed enable is still settling; wait for the settlement or skip a disable of a source that
+  never became enabled. Mac confirms: after a logout, the probe's `after-logout` mode for M5b/P6.
+- **L26** [CODE][PHYS-M] field run 03_field_network: fail (`_164726`); the PAC host is unknown
+  off the company network (new.txt 16:48:20). Sub-steps were not captured (L13). Next: read the
+  sub-steps in the next report; a PAC that cannot be fetched while direct works must not fail the
+  check.
+- **L27** [PHYS-M] field run 04_field_toolchain: fail (`_164726`), sub-step unknown; candidates
+  are `timer_late_ms` (main-thread hold) and the Shortcuts or Homebrew steps. Next: read the
+  sub-steps in the next report.
+- **L28** [PHYS-M] field run 06_field_composer: fail, same cause as L25. 07_key_accounting:
+  needs_typing, not a failure: the maintainer types the prompted text on the next run.
+- **L29** [CODE] Screen Recording settings could not be opened, openURL returned false (new.txt
+  15:31:46). Next: check the settings URL on macOS 26 and fall back to the Privacy pane.
+- **L30** [CODE] karabiner.lease "'status' called before M.init()" (new.txt 15:32:19, right
+  after the config migration refusal). Next: find the caller that runs when init stopped early.
+- **L31** [CODE] "Accessibility observer setup failed ... for PID 31319" (new.txt 14:27:31): 31319
+  is the ErgoptiPlus runtime itself (issue #104 `runtime_pid`). Next: never observe the own
+  process.
+- **L32** [CODE] issue #104 diagnostics: Input Monitoring, Login Items and Screen Recording read
+  `unknown`; memory used 843 MB with 93 MB free. Next: read or label those permissions, and
+  measure the 843 MB resident size.
+- **L33** [CODE] Swift warnings in the launcher build (`_164726` field_run.txt):
+  OwnedVirtualHIDDaemonReportMainOperation.swift:112 compares a non-optional descriptor to nil
+  (always true, so `scriptReturned` only checks the error), main.swift:1290 "will never be
+  executed", OwnedSuspendedImageGuardian.swift:58-59 trailing closures, RemapLeaseWorker.swift:1297
+  `var`. Next: fix the comparison first, then the rest.
+- **L34** [CODE] HotPath over budget: preview.rebuild 5.3 to 13.3 ms, hotstring.match 6.4 ms,
+  keydown 5.8 ms (new.txt 14:26 to 16:18). Low priority; profile with perf-profiling.
+
+### Expected, no defect
+
+- **L35** "Ergopti driver not started in this Hammerspoon" (new.txt 11:19 to 11:21): the stock
+  Hammerspoon.app started next to a standalone ErgoptiPlus; the guard kept it inert.
+- **L36** "Config migration ... refused (newer)" (new.txt 15:32:19, 15:34:29): an older build met
+  a config written by a newer schema and left it untouched. Linked to L20.
+- **L37** Lease heartbeat answered after 1.06 s, under its 2.5 s deadline (new.txt 09:59:00): a
+  main-thread hold, covered by L16 to L19.
+- **L38** "Aggregate cache recovery interrupted after 267 slice(s)" (new.txt 16:28:13): the sliced
+  recovery resumes at the next start by design.
+- **L39** Ad hoc signing of the developer app loses the Accessibility and other grants on each
+  build (`_164726`): known; `tools/build/create_macos_signing_identity.sh` gives a stable
+  identity.
+
 ## Release blocker (before the next release)
 
 - [ ] **Shortcut parameters lost by the schema v15 slot renames.** [CODE] PAR-41's `v14_to_v15` step renames
