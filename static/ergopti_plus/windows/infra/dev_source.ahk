@@ -109,11 +109,13 @@ DevSource_ResolveRoot(EnvValue, ScriptDir, IsLocalSource) {
 ; @returns {Map} Path to "time|size".
 DevSource_Snapshot(DriverDir) {
 	Snapshot := Map()
+	; A_LoopFilePath keeps DriverDir exactly as given; A_LoopFileFullPath expands
+	; an 8.3 short folder (a runner's RUNNER~1 temp), which broke the prefix cut.
 	Loop Files DriverDir . "\*.ahk", "FR" {
-		Relative := SubStr(A_LoopFileFullPath, StrLen(DriverDir) + 2)
+		Relative := SubStr(A_LoopFilePath, StrLen(DriverDir) + 2)
 		if RegExMatch(Relative, "i)^(?:tests|_generated)\\")
 			continue
-		Snapshot[A_LoopFileFullPath] := A_LoopFileTimeModified . "|" . A_LoopFileSize
+		Snapshot[A_LoopFilePath] := A_LoopFileTimeModified . "|" . A_LoopFileSize
 	}
 	return Snapshot
 }
