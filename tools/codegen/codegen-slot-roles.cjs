@@ -48,6 +48,27 @@ const absent = order
 	.filter((name) => data.roles[name].absent_reason)
 	.map((name) => `\t\t${name} = ${quote(data.roles[name].absent_reason)},`);
 
+/** Role combinations of one driver, in the data's order, each with its prefix. */
+const families = DRIVERS.flatMap((driver) =>
+	(data.families[driver] || []).map((roles) => {
+		const ranks = roles.map((r) => order.indexOf(r));
+		if (ranks.some((r) => r < 0)) throw new Error(`${driver} family names an unknown role`);
+		if (ranks.some((r, i) => i > 0 && r <= ranks[i - 1]))
+			throw new Error(`${driver} family ${roles} is misordered`);
+		for (const role of roles) {
+			if (data.roles[role][driver] === null)
+				throw new Error(`${driver} family uses ${role}, absent there`);
+		}
+		return `\t\t{ driver = ${quote(driver)}, prefix = ${quote(roles.join('_') + '_')}, roles = { ${roles.map(quote).join(', ')} } },`;
+	})
+);
+const extraKeys = DRIVERS.flatMap((driver) =>
+	(data.extra_keys[driver] || []).map(
+		(key) =>
+			`\t\t{ driver = ${quote(driver)}, id = ${quote(key.id)}, label = ${quote(key.label)}, chord_key = ${quote(key.chord_key)} },`
+	)
+);
+
 const lua = [
 	'--- _shared/lua/shortcuts/slot_roles_data.lua',
 	'',
@@ -60,6 +81,12 @@ const lua = [
 	'\t},',
 	'\tabsent_reason = {',
 	...absent,
+	'\t},',
+	'\tfamilies = {',
+	...families,
+	'\t},',
+	'\textra_keys = {',
+	...extraKeys,
 	'\t},',
 	'}',
 	''
