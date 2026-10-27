@@ -2,6 +2,9 @@
 //
 // Executes the shipped AppleScript first-picker construction against AppKit.
 // A bounded owned timer observes the visible panel and cancels only that panel.
+// The Cancel title is not observed: NSOpenPanel exposes no KVC
+// cancelButtonTitle and no in-process accessibility Cancel button, so the
+// wizard keeps the system label and only the prompt and message are its own.
 
 import Foundation
 import XCTest
@@ -39,30 +42,20 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 		XCTAssertTrue(result.stderr.isEmpty, "The App Cloner observation must emit no errors: \(result.stderr)")
 		let actual = try XCTUnwrap(JSONSerialization.jsonObject(with: result.output) as? [String: String])
 		XCTAssertEqual(actual["visible"], "true", "Observe a genuinely visible native picker")
-		XCTAssertEqual(actual["cancel_role"], "AXButton", "Observe the public Cancel button itself")
-		print("APPCLONER_PICKER_PUBLIC locale=\(locale) setter=\(actual["setter_selector"] ?? "<missing>") getter=\(actual["getter_selector"] ?? "<missing>") setter_error=\(String(reflecting: actual["setter_error"] ?? "<missing>")) cancel=\(String(reflecting: actual["cancel"] ?? "<missing>"))")
 		return actual
 	}
 
 	private static let pickerObservationInterval: TimeInterval = 0.05
 	private static let pickerObservationDeadline: TimeInterval = 5
 
-	/// Keeps the real picker modal and setters, then inspects its public Cancel control.
+	/// Keeps the real picker modal and setters, then reads its public prompt and message.
 	private func observingActualPicker(_ production: String) throws -> String {
 		let modal = "set rc to panel's runModal()"
 		XCTAssertEqual(production.components(separatedBy: modal).count, 2, "Instrument the one actual picker modal")
 		guard production.components(separatedBy: modal).count == 2 else { throw CocoaError(.fileReadCorruptFile) }
-		let setter = "panel's setValue:(btn_cancel of u) forKey:\"cancelButtonTitle\""
-		XCTAssertEqual(production.components(separatedBy: setter).count, 2, "Retain the one actual Cancel setter")
-		guard production.components(separatedBy: setter).count == 2 else { throw CocoaError(.fileReadCorruptFile) }
-		// The original try already catches setter errors. Record that same outcome
-		// without changing the setter or deciding whether it has a readable getter.
-		let capturedSetter = setter + """
-
-		on error pickerSetterMessage number pickerSetterNumber
-			set my fixturePickerSetterError to (pickerSetterNumber as text) & ": " & pickerSetterMessage
-		"""
-		var source = production.replacingOccurrences(of: setter, with: capturedSetter)
+		// The removed setter always failed inside a try; it must not return.
+		XCTAssertFalse(production.contains("cancelButtonTitle"), "The wizard must not hide a Cancel title setter that cannot work")
+		var source = production
 		let modalObservation = """
 		if (my fixturePickerPanel) is not missing value or (my fixturePickerTimer) is not missing value then error "The native picker observer was already armed."
 		set my fixturePickerPanel to panel
@@ -83,9 +76,8 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 		-- object specifier instead of its current text value.
 		set pickerFailureSnapshot to (get my fixturePickerError) as text
 		set pickerReadinessSnapshot to (get my fixturePickerReadiness) as text
-		set pickerSetterSnapshot to (get my fixturePickerSetterError) as text
 		set pickerReceiptSnapshot to (get my fixturePickerReceipt) as text
-		if pickerFailureSnapshot is not "" then error (pickerFailureSnapshot & " [readiness=" & pickerReadinessSnapshot & "; setter_error=" & pickerSetterSnapshot & "]")
+		if pickerFailureSnapshot is not "" then error (pickerFailureSnapshot & " [readiness=" & pickerReadinessSnapshot & "]")
 		if rc is not (current application's NSModalResponseCancel) then error "The owned native picker was not cancelled."
 		if pickerReceiptSnapshot is "" then error "The native picker observer produced no receipt."
 		return pickerReceiptSnapshot
@@ -106,7 +98,6 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 		property fixturePickerDeadline : 0.0
 		property fixturePickerReceipt : ""
 		property fixturePickerError : ""
-		property fixturePickerSetterError : ""
 		property fixturePickerFinished : false
 		property fixturePickerReadiness : "panel visibility"
 
@@ -133,18 +124,9 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 				set pickerReadinessSnapshot to (get my fixturePickerReadiness) as text
 				if observerNow ≥ (my fixturePickerDeadline) then error ("The actual native picker did not expose " & pickerReadinessSnapshot & " before its deadline.")
 				if not ((ownedPicker's isVisible()) as boolean) then return
-				set my fixturePickerReadiness to "a public Cancel button"
-				set cancelControl to ownedPicker's accessibilityCancelButton()
-				if cancelControl is missing value then return
-				set cancelRole to (cancelControl's accessibilityRole()) as text
-				if cancelRole is not ((current application's NSAccessibilityButtonRole) as text) then error "The native Cancel control is not an accessibility button."
-				set my fixturePickerReadiness to "the public Cancel button visible title"
-				set cancelTitle to cancelControl's accessibilityTitle()
-				if cancelTitle is missing value then return
-				set cancelTitle to cancelTitle as text
-				if cancelTitle is "" then return
-				set pickerSetterSnapshot to (get my fixturePickerSetterError) as text
-				set observation to current application's NSDictionary's dictionaryWithObjects:{ownedPicker's prompt(), ownedPicker's message(), cancelTitle, cancelRole, (((ownedPicker's isVisible()) as boolean) as text), (((ownedPicker's respondsToSelector:"setCancelButtonTitle:") as boolean) as text), (((ownedPicker's respondsToSelector:"cancelButtonTitle") as boolean) as text), pickerSetterSnapshot} forKeys:{"prompt", "message", "cancel", "cancel_role", "visible", "setter_selector", "getter_selector", "setter_error"}
+				-- The visible panel is the readiness signal; its prompt and message
+				-- are public properties of that same panel. Cancel is not exposed.
+				set observation to current application's NSDictionary's dictionaryWithObjects:{ownedPicker's prompt(), ownedPicker's message(), (((ownedPicker's isVisible()) as boolean) as text)} forKeys:{"prompt", "message", "visible"}
 				set {observationData, observationError} to current application's NSJSONSerialization's dataWithJSONObject:observation options:0 |error|:(reference)
 				if observationData is missing value then error "The native picker observer could not encode its receipt."
 				set my fixturePickerReceipt to (current application's NSString's alloc()'s initWithData:observationData encoding:(current application's NSUTF8StringEncoding)) as text
@@ -194,11 +176,9 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 		use scripting additions
 		property fixturePickerError : ""
 		property fixturePickerReadiness : ""
-		property fixturePickerSetterError : ""
 		property fixturePickerReceipt : ""
 		on run argv
 			set my fixturePickerReadiness to "owned readiness marker"
-			set my fixturePickerSetterError to "owned setter marker"
 			if item 1 of argv is "failure" then
 				set my fixturePickerError to "owned callback failure"
 			else if item 1 of argv is "receipt" then
@@ -211,7 +191,7 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 		let failed = try execute(probe, arguments: ["failure"], locale: "en", root: root)
 		XCTAssertNotEqual(failed.status, 0)
 		XCTAssertTrue(failed.output.isEmpty)
-		for marker in ["owned callback failure", "owned readiness marker", "owned setter marker"] {
+		for marker in ["owned callback failure", "owned readiness marker"] {
 			XCTAssertTrue(failed.stderr.contains(marker), "The real observer error must expose stored callback values")
 		}
 		XCTAssertFalse(failed.stderr.contains("fixturePickerError of"), "A property specifier is not the callback error text")
@@ -277,7 +257,6 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 		let actual = try observePicker(locale: "en")
 		let expected = try catalogue("en")
 		XCTAssertEqual(actual["prompt"], expected["apps.cloner.btn_choose"])
-		XCTAssertEqual(actual["cancel"], expected["button.cancel"])
 		XCTAssertEqual(actual["message"], "Application to clone")
 	}
 
@@ -285,7 +264,6 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 		let actual = try observePicker(locale: "fr")
 		let expected = try catalogue("fr")
 		XCTAssertEqual(actual["prompt"], expected["apps.cloner.btn_choose"])
-		XCTAssertEqual(actual["cancel"], expected["button.cancel"])
 		XCTAssertEqual(actual["message"], "Application à cloner")
 	}
 
@@ -294,7 +272,6 @@ final class AppClonerWizardLocaleTests: XCTestCase {
 		let expected = try catalogue("en")
 		XCTAssertEqual(actual["prompt"], "Choisir", "The injected old prompt must execute in AppKit")
 		XCTAssertNotEqual(actual["prompt"], expected["apps.cloner.btn_choose"], "The real-panel oracle must reject the old French prompt")
-		XCTAssertEqual(actual["cancel"], expected["button.cancel"])
 		XCTAssertEqual(actual["message"], "Application to clone")
 	}
 

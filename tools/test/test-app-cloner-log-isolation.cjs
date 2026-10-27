@@ -316,7 +316,7 @@ def launch(file_path, override=None, locale="en"):
     first_picker = payload.split("if step = 1 then", 1)[1].split("set rc to panel's runModal()", 1)[0] if "if step = 1 then" in payload else ""
     return {"locales_dir": resolved, "locale": env["ERGOPTI_LOCALE"],
             "choose": catalog.get("apps.cloner.btn_choose"),
-            "cancel": catalog.get("button.cancel"), "first_picker": first_picker,
+            "first_picker": first_picker,
             "failure": failure, "fatal": fatal}
 
 try:
@@ -412,17 +412,14 @@ test(
 
 // The actual main chooses the physical catalogue and hands this exact payload
 // to osascript. Native XCTest independently executes its AppKit construction.
-for (const [locale, choose, cancel] of [
-	['en', 'Choose', 'Cancel'],
-	['fr', 'Choisir', 'Annuler']
+for (const [locale, choose] of [
+	['en', 'Choose'],
+	['fr', 'Choisir']
 ]) {
 	const observation = locale === 'en' ? localeEvents.source : localeEvents.french;
 	test(
 		`the actual ${locale} launch selects its shipped picker catalogue`,
-		localeRun.status === 0 &&
-			observation?.locale === locale &&
-			observation.choose === choose &&
-			observation.cancel === cancel,
+		localeRun.status === 0 && observation?.locale === locale && observation.choose === choose,
 		localeDetail
 	);
 	if (locale !== 'en') continue;
@@ -430,9 +427,9 @@ for (const [locale, choose, cancel] of [
 		`the ${locale} launch payload binds the first picker to the selected catalogue`,
 		localeRun.status === 0 &&
 			observation?.first_picker?.includes("panel's setPrompt:(btn_choose of u)") &&
-			observation.first_picker.includes(
-				'panel\'s setValue:(btn_cancel of u) forKey:"cancelButtonTitle"'
-			) &&
+			// NSOpenPanel exposes no KVC cancelButtonTitle; a guarded setter
+			// always failed silently, so the picker must not carry one.
+			!observation.first_picker.includes('cancelButtonTitle') &&
 			observation.first_picker.includes("panel's setMessage:(msg_choose_source of u)"),
 		localeDetail
 	);
