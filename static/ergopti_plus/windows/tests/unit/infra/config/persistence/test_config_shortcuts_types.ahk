@@ -462,3 +462,131 @@ for Key in [ConfigLeaf.ENABLED, ConfigLeaf.PRIVATE_FILTER_ENABLED] {
 	Test("metrics boot: unchanged source retains " . Key . " generation (metrics-retained-generation)",
 		_CSTT_RetainedBootGeneration.Bind(Key, false))
 }
+
+
+; The schema declares an application-identity string list. The primary native
+; admission and the later strict metrics domain must agree before live settings
+; are published, including arrays that have the right outer container shape.
+_CSTT_StringListDomain(Label, Raw, Outdated, ExpectedNames) {
+	static FixtureSequence := 0
+	FixtureSequence += 1
+	global _ConfigDir, _AhkSubDir, ConfigurationFile, _BootConfigSnapshot
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries, _ConfigBootReadFailed
+	SavedConfigDir := _ConfigDir, SavedAhkSubDir := _AhkSubDir
+	SavedFileSet := IsSet(ConfigurationFile)
+	SavedFile := SavedFileSet ? ConfigurationFile : ""
+	SavedSnapshotSet := IsSet(_BootConfigSnapshot)
+	SavedSnapshot := SavedSnapshotSet ? _BootConfigSnapshot : 0
+	SavedRejected := _ConfigBootRejectedOverrides
+	SavedOutdated := _ConfigBootOutdatedEntries
+	SavedReadFailure := _ConfigBootReadFailed
+	SavedRuntime := _CSTT_SaveRuntime()
+	TestDir := A_Temp . "\ergopti_cs_string_list_" . A_TickCount . "_" . A_ScriptHwnd
+		. "_" . FixtureSequence . "\"
+	DirCreate(TestDir)
+	Path := ""
+	try {
+		_ConfigDir := TestDir, _AhkSubDir := ""
+		ConfigurationFile := CS_GetTomlPath(), Path := ConfigurationFile
+		Source := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion()
+			. "`n[metrics]`nenabled = false`ndisabled_apps = " . Raw . "`n"
+		AssertTrue(FSWrite(Path, Source))
+		Before := FSReadUtf8Exact(Path)
+		_ConfigBootRejectedOverrides := 0
+		_ConfigBootOutdatedEntries := Map()
+		_ConfigBootReadFailed := false
+		Journal := ConfigMigrateBoot(Path)
+		AssertTrue(Journal is Map, "the actual current-schema journal must initialize this private native source")
+		AssertEqual("current", Journal.Get("status", "missing"))
+		Bootstrap := ParseConfigTomlFile(Path)
+		AssertTrue(Bootstrap.Has(ConfigKey.METRICS), "the actual native bootstrap must publish metrics")
+		Tree := ManifestBuildFeaturesMap()
+		AssertTrue(ApplyBootConfigToml(Tree, Path, &_BootConfigSnapshot) >= 0)
+		AssertEqual(0, _ConfigBootRejectedOverrides)
+		AssertFalse(_ConfigBootReadFailed)
+		AssertTrue(_BootConfigSnapshot.Cache == Bootstrap,
+			"primary application must retain the actual native bootstrap generation")
+		Physical := Bootstrap[ConfigKey.METRICS][ConfigLeaf.DISABLED_APPS]
+		AssertTrue(Physical is Array, "every domain fixture must be a real authored TOML array")
+		AdmittedNames := Tree[ConfigKey.METRICS][ConfigLeaf.DISABLED_APPS]
+		AssertTrue(AdmittedNames is Array)
+		ItemTypes := ""
+		for Item in AdmittedNames
+			ItemTypes .= (ItemTypes == "" ? "" : ",") . Type(Item)
+		FileAppend("# metrics string-list primary admission: fixture=" . Label
+			. ", outdated=" . _ConfigBootOutdatedEntries.Count
+			. ", admitted_item_types=" . ItemTypes . "`n", "*")
+		MetricsShortcuts.enabled := true
+		MetricsFilters.disabled_apps := Map("previous.exe", true)
+		CS_Load()
+		AssertEqual(Outdated ? 1 : 0, _ConfigBootOutdatedEntries.Count,
+			"the canonical owner must classify wrong item shapes for cleanup and full saves")
+		Expected := Outdated ? ManifestDefaultFor(ConfigKey.METRICS_DISABLED_APPS) : ExpectedNames
+		AssertEqual(Expected.Length, MetricsFilters.disabled_apps.Count)
+		for Name in Expected
+			AssertTrue(MetricsFilters.disabled_apps.Has(Name), "the complete admitted application list must reach runtime")
+		AssertFalse(MetricsFilters.disabled_apps.Has("previous.exe"), "no previous application list can survive this source read")
+		AssertFalse(MetricsShortcuts.enabled, "a valid sibling recording opt-out must remain applied")
+		AssertTrue(Bootstrap[ConfigKey.METRICS][ConfigLeaf.DISABLED_APPS] == Physical,
+			"the raw physical application list must remain available to canonical cleanup")
+		AssertTrue(ConfigTomlReadSnapshot(Path) == _BootConfigSnapshot,
+			"metrics publication must not mutate the admitted native snapshot")
+		AssertTrue(FSUtf8ExactMatches(Path, Before), "wrong item shapes must preserve every authored source byte")
+	} finally {
+		_CSTT_RestoreRuntime(SavedRuntime)
+		_ConfigDir := SavedConfigDir, _AhkSubDir := SavedAhkSubDir
+		ConfigurationFile := SavedFileSet ? SavedFile : unset
+		_BootConfigSnapshot := SavedSnapshotSet ? SavedSnapshot : unset
+		_ConfigBootRejectedOverrides := SavedRejected
+		_ConfigBootOutdatedEntries := SavedOutdated
+		_ConfigBootReadFailed := SavedReadFailure
+		if Path != ""
+			_TOML_InvalidateParseCache(Path)
+		if DirExist(TestDir)
+			DirDelete(TestDir, true)
+	}
+}
+
+for Fixture in [
+	["integer", "[123]"], ["boolean", "[true]"], ["float", "[1.5]"],
+	["record", "[{}]"], ["nested", "[[]]"], ["mixed", '["kept.exe", 123]']
+]
+	Test("metrics string-list: authored " . Fixture[1] . " item is outdated (metrics-string-list-domain)",
+		_CSTT_StringListDomain.Bind(Fixture[1], Fixture[2], true, []))
+
+for Fixture in [
+	["empty", "[]", []], ["single", '["chrome.exe"]', ["chrome.exe"]],
+	["trim-hash", '[" CHROME.EXE ", "Editor#1.exe"]', ["chrome.exe", "editor#1.exe"]],
+	["comments", '[`n "CHROME.EXE", # excluded browser`n "editor#1.exe",`n] # excluded apps',
+		["chrome.exe", "editor#1.exe"]],
+	["duplicates", '["CHROME.EXE", "chrome.exe", "", "  "]', ["chrome.exe"]]
+]
+	Test("metrics string-list: valid " . Fixture[1] . " list applies (metrics-string-list-domain)",
+		_CSTT_StringListDomain.Bind(Fixture[1], Fixture[2], false, Fixture[3]))
+
+
+_CSTT_StrictStringListCandidate(Value) {
+	SavedEnabled := MetricsShortcuts.enabled
+	SavedApps := MetricsFilters.disabled_apps
+	try {
+		MetricsShortcuts.enabled := true
+		Thrown := false
+		try _CS_ValidateMetricsSection(Map(ConfigLeaf.ENABLED, false,
+			ConfigLeaf.DISABLED_APPS, Value))
+		catch TypeError
+			Thrown := true
+		AssertTrue(Thrown, "malformed in-memory string-list candidates must retain their strict TypeError contract")
+		AssertTrue(MetricsShortcuts.enabled, "a rejected candidate cannot publish an earlier recording field")
+		AssertTrue(MetricsFilters.disabled_apps == SavedApps, "a rejected candidate cannot replace the live application map")
+	} finally {
+		MetricsShortcuts.enabled := SavedEnabled
+		MetricsFilters.disabled_apps := SavedApps
+	}
+}
+
+for Fixture in [
+	["integer", [123]], ["boolean", [true]], ["float", [1.5]],
+	["record", [Map()]], ["nested", [[]]], ["mixed", ["kept.exe", 123]]
+]
+	Test("metrics string-list: malformed " . Fixture[1] . " candidate stays strict (metrics-string-list-candidate)",
+		_CSTT_StrictStringListCandidate.Bind(Fixture[2]))
