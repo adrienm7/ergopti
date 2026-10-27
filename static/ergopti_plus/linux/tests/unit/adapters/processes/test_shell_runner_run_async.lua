@@ -13,6 +13,7 @@
 --- 4. a cancelled run stops the group and answers nothing.
 --- ==============================================================================
 
+local Errors = require("adapter_errors")
 local helpers = require("tests.helpers")
 
 --- A libuv double that records the child it starts.
@@ -318,7 +319,7 @@ helpers.describe("shell_runner.run_async (linux)", function()
 		helpers.assert_eq(state.kills[1], { pid = -4321, signal = "sigterm" },
 			"a reaped leader does not mean the process group is empty")
 		helpers.assert_eq(#answers, 1)
-		helpers.assert_eq(answers[1].error, "native process group outlived leader")
+		helpers.assert_eq(answers[1].error, Errors.PROCESS_GROUP_OUTLIVED_LEADER)
 		state.finish(0)
 		helpers.assert_eq(#answers, 1, "late EOF must not publish twice")
 	end)

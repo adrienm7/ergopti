@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local M = {}
+local Errors = require("adapter_errors")
 local Logger = require("logger.shim")
 local Exit = require("infra.libuv_exit")
 local Group = require("infra.libuv_process_group")
@@ -253,10 +254,10 @@ end
 local function maybe_complete(request)
 	if request.terminal or not request.exited or not request.stdout_eof or not request.stderr_eof then return end
 	if not stdin_settled(request) then return end
-	local reason = request.exit_code ~= 0 and "process exited unsuccessfully" or nil
+	local reason = request.exit_code ~= 0 and Errors.PROCESS_EXITED_UNSUCCESSFULLY or nil
 	if request.stdin_owner then
 		local called, result = pcall(request.stdin_owner.result, request.stdin_owner.source)
-		if not called or type(result) ~= "table" or result.ok ~= true then reason = "native stdin feed failed" end
+		if not called or type(result) ~= "table" or result.ok ~= true then reason = Errors.PROCESS_STDIN_FEED_FAILED end
 	end
 	finish(request, reason)
 end
@@ -268,7 +269,7 @@ local function observe_exit(request)
 	close_handle(request, request.process)
 	if request.terminal then retry_cleanup(request) return end
 	if not probe_group(request) then
-		finish(request, "native process group outlived leader")
+		finish(request, Errors.PROCESS_GROUP_OUTLIVED_LEADER)
 		return
 	end
 	maybe_complete(request)
@@ -363,7 +364,7 @@ function M.start(executable, args, options, callback)
 			if request.stdin_owner ~= input or not stdin_settled(request) then return end
 			local observed, result = pcall(input.result, input.source)
 			if not observed or type(result) ~= "table" or result.ok ~= true then
-				finish(request, "native stdin feed failed")
+				finish(request, Errors.PROCESS_STDIN_FEED_FAILED)
 			elseif not request.dispatching then
 				close_handle(request, request.stdin)
 				maybe_complete(request)
@@ -371,7 +372,7 @@ function M.start(executable, args, options, callback)
 			if request.terminal then retry_cleanup(request) end
 		end)
 		if not called or ack ~= true then return refuse("stdin settlement subscription refused") end
-		if request.terminal then return refuse("native stdin feed failed") end
+		if request.terminal then return refuse(Errors.PROCESS_STDIN_FEED_FAILED) end
 	end
 	if type(request.owner) ~= "string" or request.owner == "" then return refuse("a process owner is required") end
 	local refusal = Shell.validate_spawn_args(executable, args)
@@ -399,7 +400,7 @@ function M.start(executable, args, options, callback)
 		if type(native[name]) ~= "function" then return refuse("native process capability is unavailable") end
 	end
 	if owners[request.owner] then return refuse("previous process cleanup pending") end
-	if not authorized(request) then return refuse("process source admission refused") end
+	if not authorized(request) then return refuse(Errors.PROCESS_SOURCE_ADMISSION_REFUSED) end
 	-- Source admission can synchronously dispatch another exact operation.
 	if owners[request.owner] then return refuse("previous process cleanup pending") end
 	owners[request.owner] = operation
@@ -408,19 +409,19 @@ function M.start(executable, args, options, callback)
 			local allocator = native.new_timer
 			if kind == "stdout" or kind == "stderr" then allocator = native.new_pipe end
 			local ok, handle = pcall(allocator, false)
-			if not ok or not own_handle(request, handle, kind) then return refuse("native handle allocation failed") end
+			if not ok or not own_handle(request, handle, kind) then return refuse(Errors.PROCESS_HANDLE_ALLOCATION_FAILED) end
 		end
 	end
 	-- The source can change while a fallible allocator invokes another owner.
-	if not authorized(request) then return refuse("process source admission refused") end
+	if not authorized(request) then return refuse(Errors.PROCESS_SOURCE_ADMISSION_REFUSED) end
 	if request.timeout and not request.terminal then
 		request.handles[request.timeout].active = true
 		if not accepted(NativeTimer.start, native, request.timeout, options.timeout_ms, 0, function()
-			finish(request, "process deadline exceeded")
-		end) then return refuse("native process deadline refused") end
+			finish(request, Errors.PROCESS_DEADLINE_EXCEEDED)
+		end) then return refuse(Errors.PROCESS_DEADLINE_REFUSED) end
 	end
-	if request.terminal then return refuse("process deadline exceeded") end
-	if not authorized(request) then return refuse("process source admission refused") end
+	if request.terminal then return refuse(Errors.PROCESS_DEADLINE_EXCEEDED) end
+	if not authorized(request) then return refuse(Errors.PROCESS_SOURCE_ADMISSION_REFUSED) end
 	local spawned, process, pid, spawn_code = pcall(native.spawn, executable, {
 		args = args, stdio = { request.stdin, request.stdout, request.stderr },
 		detached = true, env = options.env, cwd = options.cwd,
@@ -435,7 +436,7 @@ function M.start(executable, args, options, callback)
 		if spawned and type(spawn_code) == "string" and spawn_code:match("^E[A-Z0-9_]+$") then
 			operation.spawn_error_code = spawn_code
 		end
-		return refuse("native process dispatch failed")
+		return refuse(Errors.PROCESS_DISPATCH_FAILED)
 	end
 	if not own_handle(request, process, "process") then return refuse("native process handle malformed") end
 	request.spawned, request.pid = true, pid
@@ -443,7 +444,7 @@ function M.start(executable, args, options, callback)
 	if type(pid) ~= "number" or pid < 1 or pid % 1 ~= 0 then return refuse("native process identity malformed") end
 	if not authorized(request) then
 		request.cancelled = true
-		return refuse("process source admission refused")
+		return refuse(Errors.PROCESS_SOURCE_ADMISSION_REFUSED)
 	end
 	for _, kind in ipairs({ "stdout", "stderr" }) do
 		if request.terminal then break end
@@ -451,7 +452,7 @@ function M.start(executable, args, options, callback)
 		request.handles[handle].active = true
 		local started = accepted(native.read_start, handle, function(err, chunk)
 			if request.terminal then return end
-			if not authorized(request) then request.cancelled = true finish(request, "process source admission refused") return end
+			if not authorized(request) then request.cancelled = true finish(request, Errors.PROCESS_SOURCE_ADMISSION_REFUSED) return end
 			if err ~= nil then finish(request, "native output read failed") return end
 			if chunk == nil then
 				request[kind .. "_eof"] = true
@@ -464,13 +465,13 @@ function M.start(executable, args, options, callback)
 			local count_key = kind .. "_bytes"
 			request[count_key] = request[count_key] + #chunk
 			if options.capture_output == false then
-				if request[count_key] > max_output then finish(request, "process output exceeds its bound") return end
+				if request[count_key] > max_output then finish(request, Errors.PROCESS_OUTPUT_EXCEEDS_BOUND) return end
 			elseif options.capture_tail == true then
 				-- Long-lived daemon logs keep bounded diagnostics without eventually
 				-- terminating a healthy service because of its total historical output.
 				request[key] = (request[key] .. chunk):sub(-max_output)
 			else
-				if #request[key] + #chunk > max_output then finish(request, "process output exceeds its bound") return end
+				if #request[key] + #chunk > max_output then finish(request, Errors.PROCESS_OUTPUT_EXCEEDS_BOUND) return end
 				request[key] = request[key] .. chunk
 			end
 			if options.on_output then
@@ -478,7 +479,7 @@ function M.start(executable, args, options, callback)
 				if not ok then finish(request, "process output callback failed") end
 			end
 		end)
-		if not started then return refuse("native output watch refused") end
+		if not started then return refuse(Errors.PROCESS_OUTPUT_WATCH_REFUSED) end
 	end
 	request.dispatching = false
 	if request.stdin_owner and stdin_settled(request) then close_handle(request, request.stdin) end

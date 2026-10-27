@@ -5,6 +5,7 @@ local driver_root = assert(self_path:match("^(.*)/tests/hardware/[^/]+$"),
 	"launch with an absolute script path")
 local shared_root = driver_root .. "/../_shared/lua"
 package.path = driver_root .. "/?.lua;" .. shared_root .. "/?.lua;" .. package.path
+local Errors = require("adapter_errors")
 
 local uv = require("luv")
 local Owner = require("adapters.owned_process")
@@ -78,7 +79,7 @@ test("deadline settles a real SIGTERM-resistant process", function()
 	assert(operation.started and await(function() return captured:find("ready\n", 1, true) ~= nil end),
 		"the actual child must install its SIGTERM-resistant handler before deadline qualification")
 	assert(await(function() return operation:is_settled() end))
-	assert(result and not result.ok and result.error == "process deadline exceeded")
+	assert(result and not result.ok and result.error == Errors.PROCESS_DEADLINE_EXCEEDED)
 end)
 
 test("a real signalled child does not report successful exit", function()
@@ -95,7 +96,7 @@ test("real ENOENT is a refusal with no surviving native handles", function()
 		callbacks, result = callbacks + 1, value
 	end)
 	assert(not operation.started and await(function() return operation:is_settled() end))
-	assert(callbacks == 1 and result and not result.ok and result.error == "native process dispatch failed")
+	assert(callbacks == 1 and result and not result.ok and result.error == Errors.PROCESS_DISPATCH_FAILED)
 end)
 
 test("real output overflow preserves admitted bounded bytes", function()
@@ -103,7 +104,7 @@ test("real output overflow preserves admitted bounded bytes", function()
 	local operation = Owner.start("python3", { "-c", "import os,time; os.write(1,b'overflow'); time.sleep(30)" },
 		{ owner = "overflow", timeout_ms = 1000, max_output_bytes = 4 }, function(value) result = value end)
 	assert(operation.started and await(function() return operation:is_settled() end))
-	assert(result and not result.ok and result.error == "process output exceeds its bound" and #result.stdout <= 4)
+	assert(result and not result.ok and result.error == Errors.PROCESS_OUTPUT_EXCEEDS_BOUND and #result.stdout <= 4)
 end)
 
 test("explicit rolling diagnostics do not kill ordinary real daemon output", function()
@@ -149,7 +150,7 @@ os._exit(0)
 			end,
 		}, function(value) result = value end)
 		assert(operation.started and await(function() return operation:is_settled() end))
-		assert(result and not result.ok and result.error == "native process group outlived leader")
+		assert(result and not result.ok and result.error == Errors.PROCESS_GROUP_OUTLIVED_LEADER)
 		assert(descendant, "the original leader did not provide its actual descendant identity")
 		local present, _, code = uv.kill(descendant, 0)
 		assert(present == nil and code == "ESRCH", "the descendant remains native-owned or unreaped")
