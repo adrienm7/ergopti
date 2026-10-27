@@ -206,6 +206,23 @@ create stage that reads "unknown". Run such a client with
 `OLLAMA_CREATE_REMOTE=1` (upload through the server API) and keep every
 receiver failure code in its closed list.
 
+### project-macos-installers-run-from-a-linked-private-snapshot
+
+Endpoint-security agents on managed Macs (Microsoft Defender, Santa, BeyondTrust,
+Symantec, Trellix on the maintainer's work Mac) kill fileless script execution:
+`/bin/bash /dev/fd/3` over an unlinked file died with SIGKILL about 10 s after it
+started, before any output, while the same script ran from a path (field report
+2026-10-27 23:55, `fileless_bash_probe.txt`). The native PTY guardian
+(`ManagedPTYWorker.swift`) therefore runs its installer from a linked copy:
+`~/Library/Application Support/ErgoptiPlus/pty-sources/op.<guardian pid>.XXXXXX/<name>`,
+folders 0700 and owned by the user, file created O_EXCL at 0400, its identity
+(inode, size, mode, mtime, ctime) and SHA-256 proved through the retained
+read-only descriptor after the copy and again right before bash is activated, and
+removed after the group retires; folders of dead guardians are swept at start.
+The installer recognises its own snapshot by `ERGOPTI_BOOTSTRAP_SNAPSHOT`. Never
+reintroduce `/dev/fd`, `bash -s` or stdin scripts for a child that must run on a
+managed Mac, and keep a field probe of the exact exec shape when changing it.
+
 ### project-macos-ai-runtimes-install-on-selection
 
 Neither AI runtime ships in the app or downloads at boot, on AI enable with
