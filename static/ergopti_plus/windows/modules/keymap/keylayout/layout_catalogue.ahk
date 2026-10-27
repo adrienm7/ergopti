@@ -241,11 +241,11 @@ LayoutCatalogue_IsErgopti(Entry) {
 ; ==============================
 ; ==============================
 
-; Replaces a file atomically: the text lands under a partial name first.
+; Acquire the stage exclusively: a pre-existing sidecar belongs to another owner.
 _LayoutCatalogueWriteText(Path, Text) {
 	global LAYOUT_REGISTRY_PARTIAL_SUFFIX
 	Partial := Path . LAYOUT_REGISTRY_PARTIAL_SUFFIX
-	if !FSWrite(Partial, Text)
+	if !FSWriteCreateDurable(Partial, Text)
 		throw Error("Cannot write " . Partial)
 	if !FSAtomicMoveReplace(Partial, Path)
 		throw Error("Cannot publish " . Path)
