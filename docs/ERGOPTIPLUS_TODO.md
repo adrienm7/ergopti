@@ -297,7 +297,7 @@ dev.
   `; append: lock= journal= prepare= publish= write= clear= settle= release= ms; metadata_commands=<n>
 in <ms> ms` (`adapters/metadata_command_stats.lua` counts every metadata fork). Mac confirms: the
   next `Slow ingest tick` line names the stage; if `publish` and `settle` carry it with
-  metadata_commands=8 near the total, the fix is to stop forking for the private journal.
+  metadata_commands=8 near the total, the fix is to stop forking for the private journal. The 23:33 run measured a fork: four `mkdir -p` of the keystats start took 161 ms, about 40 ms each, so eight journal forks match the 0.3 to 0.7 s append. Fixed on `tmp/wip-mac-holds-2` (016ef6adc5): the driver-owned journal is published by `FileSystem.write_private_if_unchanged` (same lock, route, staging and compare-before-write, no carried ACL or xattrs); a flush forks nothing (`test_append_retry.lua`: 4 forks before, 0 after). Mac confirms: no `Slow ingest tick` and no `Main-thread hold` line from log_manager.lua during typing.
 - **L17** [CODE][PHYS-M] "Slow preferences save 1.9 to 2.1 s (prepare about 1.25 s, write about
   0.8 s; operations=293)" (new.txt 15:27:35 to 16:48:20, 6 times, also on 228f79f2). It is the
   2.06 s hold of startup_controller.lua:263 (15:28:57, 16:48:20). Next: profile `prepare` for 293
@@ -306,14 +306,14 @@ in <ms> ms` (`adapters/metadata_command_stats.lua` counts every metadata fork). 
 sparse= wrap= rows= gestures= llm= shortcuts= hotstrings= ms; proposed=<rows>; metadata_commands=<n>
 in <ms> ms` (the forks of the write phase). Not reproduced here: the save writes the whole sparse
   snapshot by design (the 293 are every non-default row, not the changed key). Mac confirms: the
-  next slow-save line names the prepare stage and how much of `write` the forks take.
+  next slow-save line names the prepare stage and how much of `write` the forks take. Not reproduced: the same whole-snapshot save over `_generated/config_template.toml` costs 58 ms of Lua here against 1291 ms of prepare on the Mac, so the gap is not the save's CPU. The slow-save line now also gives `lua_heap=<before>-><after> MB` (380a8d4445) to tell a garbage collection apart. Mac confirms: the next slow save names its prepare stage and whether the heap dropped.
 - **L18** [CODE] keystats start still holds the main thread 1.1 to 1.3 s from the deferred timer
   at menu_state.lua:531 (new.txt 16:28:06, 16:48:13, on 228f79f2). Next: move the SQLite open and
   offset replay of `kl.start` into slices like the recovery. The 22:55 report splits it: 150 to
   270 ms before `sqlite_writer` initializes, then 917 to 1047 ms between `rotation Initialized` and
   `Aggregate cache recovery continues in 8 ms slices` on the two boots that started a recovery;
   boots without a recovery hold 264 to 874 ms (16:54 to 22:55). Not changed on `tmp/wip-mac-holds`
-  (time box); the slicing remains the fix.
+  (time box); the slicing remains the fix. Fixed on `tmp/wip-mac-holds-2` (58f82e9fdc) after the 23:33 run (1300 ms: 161 ms of four `mkdir -p` forks, 696 ms of the one-time L19 index build, 392 ms of the synchronous first `ingest_once`, 48 ms of watchers): existing folders are answered from their attributes and the first ingest runs on the first 5 s tick, which flushes the outbox first (`cold_rollover_context_process.lua` asserts no synchronous ingest and no fork; 4 forks before). The index build happens once per cache and is done on this Mac. Mac confirms: `Keystats engine start (deferred)` under 100 ms and no hold from menu_state.lua:531.
 - **L19** Fixed 3d6479306a for the measured cause; one smaller residue stays
   open. log_manager.lua:1585 (the recovery slice timer) held the main thread 5288 ms right after
   "Typing ids restart ..." (new.txt 16:49:17 to 16:49:22). Measured on a synthetic cache built
@@ -383,7 +383,7 @@ application|app_name|title|context_watchers|secure_field>, TTL refresh <armed|no
   without key-up, 81 key-ups without key-down, 62 keys stuck over 3 s, one key stuck 518 s
   (new.txt 09:54 to 10:36, session totals); issue #104 shows 1 late key. Most late events follow
   the main-thread holds of L16 to L19. Next: after those, re-read the totals; lost key-ups without
-  a hold point at the Karabiner virtual HID path (big item 2).
+  a hold point at the Karabiner virtual HID path (big item 2). `tmp/wip-mac-holds-2` names every timer hold from 250 ms on (82c220c089: one `Main-thread hold of N ms in an hs.timer.<kind> callback (<site>)` evidence line per site and minute, with the `shell.<program>` fork phases of d0993e39e4 and the Lua heap); the 23:33 log counted 7 to 18 such holds per 5 minutes without a site. The menu rebuilt twice at every boot (591 then 513 ms); the login item state is now asked before the prime build (fec27c153e) and each refresh logs its requester at DEBUG.
 - **L25** Known limitation, plus one open bug. "Failed to enable 'Composer Check' —
   reason=process_failed" (new.txt 14:31:52, 16:48:44). The TIS probe (issue #104 and `_152936`)
   shows macOS 26.6.2 refuses it: register 0 and enable 0, but the source stays disabled, select
@@ -445,7 +445,7 @@ main.swift:1290 "will never be executed", OwnedSuspendedImageGuardian.swift:58-5
 closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swiftc to compile
   them.
 - **L34** [CODE] HotPath over budget: preview.rebuild 5.3 to 13.3 ms, hotstring.match 6.4 ms,
-  keydown 5.8 ms (new.txt 14:26 to 16:18). Low priority; profile with perf-profiling.
+  keydown 5.8 ms (new.txt 14:26 to 16:18). Low priority; profile with perf-profiling. Not reproduced on the later runs: the 21:16 hot-path summary reads keydown max 4.6 ms, preview.rebuild max 2.6 ms, hotstring.match max 0.2 ms, all within budget; no change.
 - **L41** Fixed bc33bfbc73 [PHYS-M]. Every native download stopped at stage
   `native_certificate_load` (19:47 run: the MLX `uv sync` staging failed 6 of 6 attempts with
   native receipt reason `certificate`, 19:48:49 to 19:51:26; 03_field_network tls and transfer `certificate`). This is
