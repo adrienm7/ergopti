@@ -39,6 +39,17 @@ local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "file_watchers"
 
+--- Whether a reload or quit already owns the process. The menu watcher sees the
+--- same file burst; when its reload wins, this refusal is expected, not a fault.
+--- Required lazily: the coordinator is initialized after this module loads.
+--- @return boolean terminating
+local function reload_already_terminating()
+	local loaded, coordinator = pcall(require, "infra.termination_coordinator")
+	if not loaded or type(coordinator) ~= "table" then return false end
+	local checked, in_progress = pcall(coordinator.terminal_in_progress)
+	return checked and in_progress == true
+end
+
 -- Hard cap on how deep the recursive personal-hotstrings watcher scan descends.
 -- Same rationale as infra/personal_hotstrings.lua's SCAN_MAX_DEPTH: the scanned
 -- tree is a user-writable folder, so a self-referential symlink would make a
@@ -548,11 +559,15 @@ function M.start(ctx)
 					return hs.reload()
 				end, debug.traceback)
 				if not request_ok or accepted ~= true then
-					if not reload_refusal_logged then
+					if request_ok and reload_already_terminating() then
+						-- The menu watcher's reload of this same burst is under way
+						-- (field run 2026-10-27 19:47:04, ledger L45 sibling).
+						Logger.info(LOG, "Reload request deferred: a reload or quit is in progress.")
+					elseif not reload_refusal_logged then
 						reload_refusal_logged = true
 						Logger.warn(LOG,
-							"Reload request was refused; the source-file burst remains pending for retry: %s.",
-							tostring(request_ok and accepted or accepted))
+							"Reload request was refused (%s); the source-file burst stays pending and is retried.",
+							request_ok and ("result " .. tostring(accepted)) or tostring(accepted))
 					else
 						Logger.debug(LOG, "Reload request remains refused; retaining the source-file burst.")
 					end
@@ -568,8 +583,8 @@ function M.start(ctx)
 			if not reload_refusal_logged then
 				reload_refusal_logged = true
 				Logger.warn(LOG,
-					"Deferred reload owner refused the source-file burst; retaining it for retry: %s.",
-					tostring(defer_ok and deferred or deferred))
+					"Deferred reload owner refused the source-file burst (%s); it stays pending and is retried.",
+					defer_ok and ("result " .. tostring(deferred)) or tostring(deferred))
 			end
 			arm_timer(msg)
 		end
