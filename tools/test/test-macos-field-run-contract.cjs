@@ -8,7 +8,8 @@
  * developer app's field run (static/ergopti_plus/macos/infra/field_run.lua),
  * both of which read static/ergopti_plus/macos/data/field_run.json:
  * 1. the declaration: a step for every Debug field check, the person verdicts,
- *    and a request deadline that ends before the collector stops waiting;
+ *    progress-aware AI downloads, and a request deadline that covers every
+ *    step at its bound and ends before the collector stops waiting;
  * 2. the collector reads every name it uses from the declaration;
  * 3. the real collector, in a fixture clone with a recording driver, writes a
  *    request of the declared shape, waits for done, copies the results and
@@ -88,7 +89,8 @@ function fixture(name) {
 		fs.mkdirSync(path.dirname(path.join(clone, relative)), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, relative), path.join(clone, relative));
 	}
-	fs.writeFileSync(path.join(clone, '.gitignore'), '/build/\n');
+	// The logs are ignored in the real clone too: the collector adds them with -f
+	fs.writeFileSync(path.join(clone, '.gitignore'), '/build/\n*.log\n');
 	fs.mkdirSync(bin, { recursive: true });
 	fs.mkdirSync(home, { recursive: true });
 	const env = { ...process.env, ...GIT_IDENTITY, HOME: home };
@@ -144,7 +146,12 @@ const timer = setInterval(() => {
 	fs.rmSync(requestPath);
 	fs.writeFileSync(record, text);
 	const request = JSON.parse(text);
-	if (mode === 'refuse') {
+	if (mode === 'hang') {
+		const dir = path.join(folder, spec.files.results, request.request_id);
+		fs.mkdirSync(dir, { recursive: true });
+		fs.writeFileSync(path.join(dir, spec.files.accepted), JSON.stringify({ schema: 1, request_id: request.request_id }));
+		fs.writeFileSync(path.join(dir, '01_field_lease.json'), JSON.stringify({ schema: 1, step: 'field_lease', verdict: 'pass', codes: [] }));
+	} else if (mode === 'refuse') {
 		fs.writeFileSync(path.join(folder, spec.files.refused), JSON.stringify({ schema: 1, request_id: request.request_id, reason: 'busy' }));
 	} else {
 		const dir = path.join(folder, spec.files.results, request.request_id);
@@ -174,13 +181,19 @@ async function waitFor(file, ms = 10000) {
 	}
 }
 
-/** Runs the real collector, without pushing, inside a fixture. */
-function runCollector(paths) {
+/**
+ * Runs the real collector, without pushing, inside a fixture.
+ * @param {object} paths Fixture paths.
+ * @param {(child: object) => void} [onStart] Receives the child, in its own process group.
+ */
+function runCollector(paths, onStart) {
 	return new Promise((resolve) => {
 		const child = spawn(bashExecutable(), [path.join(paths.clone, SCRIPT), '--no-push'], {
 			cwd: paths.clone,
-			env: { ...paths.env, PATH: `${paths.bin}${path.delimiter}${process.env.PATH}` }
+			env: { ...paths.env, PATH: `${paths.bin}${path.delimiter}${process.env.PATH}` },
+			detached: Boolean(onStart)
 		});
+		if (onStart) onStart(child);
 		let stdout = '';
 		let stderr = '';
 		child.stdout.on('data', (chunk) => (stdout += chunk));
@@ -231,16 +244,40 @@ function reportFolder(paths) {
 				);
 		});
 
-		await check('the request deadline ends before the collector stops waiting', () => {
-			const global = Number(collector.match(/^FIELD_RUN_DEADLINE_SECONDS=(\d+)$/m)?.[1]);
-			assert(
-				global >= 840 && global <= 960,
-				`the collector waits ${global} s, about 15 minutes expected`
-			);
-			const { min, default: fallback, max } = spec.deadline_seconds;
-			assert(min <= fallback && fallback <= max, 'deadline_seconds needs min <= default <= max');
-			assert(max < global, 'the longest request deadline must end before the collector gives up');
-		});
+		await check(
+			'the request deadline covers every step and ends before the collector stops waiting',
+			() => {
+				const grace = Number(collector.match(/^FIELD_RUN_GRACE_SECONDS=(\d+)$/m)?.[1]);
+				assert(grace >= 60 && grace <= 300, `the collector grace is ${grace} s`);
+				assert.match(
+					collector,
+					/\$\(\(now - sent_at\)\) -ge \$\(\(deadline_seconds \+ FIELD_RUN_GRACE_SECONDS\)\)/,
+					'the collector must wait for the request deadline it sent plus its grace'
+				);
+				assert.doesNotMatch(
+					collector,
+					/FIELD_RUN_DEADLINE_SECONDS/,
+					'no second, fixed run deadline'
+				);
+				const { min, default: fallback, max } = spec.deadline_seconds;
+				assert(min <= fallback && fallback <= max, 'deadline_seconds needs min <= default <= max');
+				const bounds = spec.steps.reduce(
+					(sum, step) => sum + (step.progress_max_seconds ?? step.deadline_seconds),
+					0
+				);
+				assert(
+					fallback >= bounds,
+					`the default request (${fallback} s) is below the step bounds (${bounds} s)`
+				);
+				for (const id of ['ollama_runtime', 'ollama_model', 'mlx_runtime', 'mlx_model']) {
+					const step = spec.steps.find((item) => item.id === id);
+					assert(
+						step.progress_max_seconds >= step.deadline_seconds,
+						`${id} must be judged by its progress, with a bound`
+					);
+				}
+			}
+		);
 
 		await check('the collector reads every name it uses from the declaration', () => {
 			const used = [...collector.matchAll(/spec_value ([\w.]+)/g)].map((match) => match[1]);
