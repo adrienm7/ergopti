@@ -1,5 +1,5 @@
 {
-	"_comment": "TOML batch-writer vectors, replayed by _shared/lua/test/toml_batch_write_vectors_contract.lua on macOS and Linux. Each vector gives the file bytes (source; \"\" is an empty file), the batch rows and what the writer's prepare step must answer without publishing. The entry point is the batch writer's prepare step: given the source bytes and the rows, it answers accepted or refused, a detail, and the candidate bytes. expect.ok is acceptance; content is the exact candidate bytes; unchanged means the candidate equals the source; decoded lists TOML paths (array of keys) whose decoded value must equal value (a JSON null is not used); contains and not_contains are substrings of the candidate; detail_contains are substrings of the refusal detail; reads is the number of times the source may have been read (0: refused before reading). A row value {\"$number\": \"text\"} is the number the text spells (IEEE: \"-0.0\" is negative zero), which JSON cannot carry. Converted from toml_batch_existing_key_contract.lua and toml_quoted_headers_contract.lua; the ledger in contract_conversion_ledger.json records which cases moved.",
+	"_comment": "TOML batch-writer vectors, replayed by _shared/lua/test/toml_batch_write_vectors_contract.lua on macOS and Linux. Each vector gives the file bytes (source; \"\" is an empty file), the batch rows and what the writer's prepare step must answer without publishing. The entry point is the batch writer's prepare step: given the source bytes and the rows, it answers accepted or refused, a detail, and the candidate bytes. expect.ok is acceptance; content is the exact candidate bytes; unchanged means the candidate equals the source; decoded lists TOML paths (array of keys) whose decoded value must equal value (a JSON null is not used); contains and not_contains are substrings of the candidate; detail_contains are substrings of the refusal detail; reads is the number of times the source may have been read (0: refused before reading). A row value {\"$number\": \"text\"} is the number the text spells (IEEE: \"-0.0\" is negative zero), which JSON cannot carry. Converted from toml_batch_existing_key_contract.lua and toml_quoted_headers_contract.lua; the ledger in contract_conversion_ledger.json records which cases moved. expected_snapshot (optional) is the caller's earlier read {status, content}: when the source read now differs the writer refuses with \"source changed before preparing the batch\"; expect.detail_equals is the exact refusal detail.",
 	"entry_point": "batch writer prepare step: prepare_batch(path, rows, {read source}) -> accepted, detail, candidate bytes",
 	"drivers": {
 		"macos": "Replays every vector.",
@@ -925,6 +925,1698 @@
 			],
 			"expect": {
 				"ok": false
+			}
+		},
+		{
+			"id": "dotted-section-unchanged-value-keeps-every-byte",
+			"group": "toml-dotted-keys",
+			"source": "# retained\n[settings]\npersonal.future.enabled = false # untouched owner\npersonal.future.text = \"001\"\nowned = 1 # own comment\n[foreign]\nkeep = [1, 2]\n",
+			"rows": [
+				{
+					"section": "settings.personal.future",
+					"key": "enabled",
+					"value": false
+				}
+			],
+			"expect": {
+				"ok": true,
+				"unchanged": true
+			}
+		},
+		{
+			"id": "dotted-section-unrelated-owned-update-keeps-dotted-unknown-records",
+			"group": "toml-dotted-keys",
+			"source": "# retained\n[settings]\npersonal.future.enabled = false # untouched owner\npersonal.future.text = \"001\"\nowned = 1 # own comment\n[foreign]\nkeep = [1, 2]\n",
+			"rows": [
+				{
+					"section": "settings",
+					"key": "owned",
+					"value": 2
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# retained\n[settings]\npersonal.future.enabled = false # untouched owner\npersonal.future.text = \"001\"\nowned = 2\n[foreign]\nkeep = [1, 2]\n"
+			}
+		},
+		{
+			"id": "dotted-section-scalar-replaced-with-an-exact-owned-image",
+			"group": "toml-dotted-keys",
+			"source": "# retained\n[settings]\npersonal.future.enabled = false # untouched owner\npersonal.future.text = \"001\"\nowned = 1 # own comment\n[foreign]\nkeep = [1, 2]\n",
+			"rows": [
+				{
+					"section": "settings.personal.future",
+					"key": "enabled",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# retained\n[settings]\npersonal.future.enabled = true\npersonal.future.text = \"001\"\nowned = 1 # own comment\n[foreign]\nkeep = [1, 2]\n",
+				"decoded": [
+					{
+						"path": ["settings", "personal", "future", "enabled"],
+						"value": true
+					},
+					{
+						"path": ["settings", "personal", "future", "text"],
+						"value": "001"
+					},
+					{
+						"path": ["foreign", "keep"],
+						"value": [1, 2]
+					}
+				]
+			}
+		},
+		{
+			"id": "dotted-section-scalar-deleted-with-an-exact-owned-image",
+			"group": "toml-dotted-keys",
+			"source": "# retained\n[settings]\npersonal.future.enabled = false # untouched owner\npersonal.future.text = \"001\"\nowned = 1 # own comment\n[foreign]\nkeep = [1, 2]\n",
+			"rows": [
+				{
+					"section": "settings.personal.future",
+					"key": "enabled",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# retained\n[settings]\npersonal.future.text = \"001\"\nowned = 1 # own comment\n[foreign]\nkeep = [1, 2]\n",
+				"decoded": [
+					{
+						"path": ["settings", "personal", "future", "enabled"],
+						"absent": true
+					},
+					{
+						"path": ["settings", "personal", "future", "text"],
+						"value": "001"
+					},
+					{
+						"path": ["foreign", "keep"],
+						"value": [1, 2]
+					}
+				]
+			}
+		},
+		{
+			"id": "duplicate-semantic-dotted-source-refuses-an-unrelated-update",
+			"group": "toml-dotted-keys",
+			"source": "a.b=1\na.\"b\"=2\n[other]\nv=1\n",
+			"rows": [
+				{
+					"section": "other",
+					"key": "v",
+					"value": 2
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-dotted-bare-scalar-updated-alone",
+			"group": "toml-dotted-keys",
+			"source": "# exact before\nllm.agent_mode = \"auto\" # owned comment\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n",
+			"rows": [
+				{
+					"section": "llm",
+					"key": "agent_mode",
+					"value": "action"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# exact before\nllm.agent_mode = \"action\"\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n"
+			}
+		},
+		{
+			"id": "root-dotted-bare-scalar-removed-alone",
+			"group": "toml-dotted-keys",
+			"source": "# exact before\nllm.agent_mode = \"auto\" # owned comment\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n",
+			"rows": [
+				{
+					"section": "llm",
+					"key": "agent_mode",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# exact before\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n"
+			}
+		},
+		{
+			"id": "root-dotted-bare-scalar-unchanged-keeps-every-byte",
+			"group": "toml-dotted-keys",
+			"source": "# exact before\nllm.agent_mode = \"auto\" # owned comment\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n",
+			"rows": [
+				{
+					"section": "llm",
+					"key": "agent_mode",
+					"value": "auto"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"unchanged": true
+			}
+		},
+		{
+			"id": "root-dotted-quoted-leaf-scalar-updated-alone",
+			"group": "toml-dotted-keys",
+			"source": "# exact before\nllm.\"agent_mode\" = \"auto\" # owned comment\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n",
+			"rows": [
+				{
+					"section": "llm",
+					"key": "agent_mode",
+					"value": "action"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# exact before\nllm.\"agent_mode\" = \"action\"\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n"
+			}
+		},
+		{
+			"id": "root-dotted-quoted-leaf-scalar-removed-alone",
+			"group": "toml-dotted-keys",
+			"source": "# exact before\nllm.\"agent_mode\" = \"auto\" # owned comment\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n",
+			"rows": [
+				{
+					"section": "llm",
+					"key": "agent_mode",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# exact before\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n"
+			}
+		},
+		{
+			"id": "root-dotted-quoted-leaf-scalar-unchanged-keeps-every-byte",
+			"group": "toml-dotted-keys",
+			"source": "# exact before\nllm.\"agent_mode\" = \"auto\" # owned comment\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n",
+			"rows": [
+				{
+					"section": "llm",
+					"key": "agent_mode",
+					"value": "auto"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"unchanged": true
+			}
+		},
+		{
+			"id": "root-dotted-quoted-parent-scalar-updated-alone",
+			"group": "toml-dotted-keys",
+			"source": "# exact before\n\"team.name\".agent_mode = \"auto\" # owned comment\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n",
+			"rows": [
+				{
+					"section": "\"team.name\"",
+					"key": "agent_mode",
+					"value": "action"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# exact before\n\"team.name\".agent_mode = \"action\"\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n"
+			}
+		},
+		{
+			"id": "root-dotted-quoted-parent-scalar-removed-alone",
+			"group": "toml-dotted-keys",
+			"source": "# exact before\n\"team.name\".agent_mode = \"auto\" # owned comment\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n",
+			"rows": [
+				{
+					"section": "\"team.name\"",
+					"key": "agent_mode",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# exact before\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n"
+			}
+		},
+		{
+			"id": "root-dotted-quoted-parent-scalar-unchanged-keeps-every-byte",
+			"group": "toml-dotted-keys",
+			"source": "# exact before\n\"team.name\".agent_mode = \"auto\" # owned comment\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n",
+			"rows": [
+				{
+					"section": "\"team.name\"",
+					"key": "agent_mode",
+					"value": "auto"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"unchanged": true
+			}
+		},
+		{
+			"id": "root-dotted-literal-parent-scalar-updated-alone",
+			"group": "toml-dotted-keys",
+			"source": "# exact before\n'team=name'.agent_mode = \"auto\" # owned comment\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n",
+			"rows": [
+				{
+					"section": "\"team=name\"",
+					"key": "agent_mode",
+					"value": "action"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# exact before\n'team=name'.agent_mode = \"action\"\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n"
+			}
+		},
+		{
+			"id": "root-dotted-literal-parent-scalar-removed-alone",
+			"group": "toml-dotted-keys",
+			"source": "# exact before\n'team=name'.agent_mode = \"auto\" # owned comment\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n",
+			"rows": [
+				{
+					"section": "\"team=name\"",
+					"key": "agent_mode",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# exact before\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n"
+			}
+		},
+		{
+			"id": "root-dotted-literal-parent-scalar-unchanged-keeps-every-byte",
+			"group": "toml-dotted-keys",
+			"source": "# exact before\n'team=name'.agent_mode = \"auto\" # owned comment\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n",
+			"rows": [
+				{
+					"section": "\"team=name\"",
+					"key": "agent_mode",
+					"value": "auto"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"unchanged": true
+			}
+		},
+		{
+			"id": "root-dotted-unicode-escaped-parent-scalar-updated-alone",
+			"group": "toml-dotted-keys",
+			"source": "# exact before\n\"\\u00C9quipe\".agent_mode = \"auto\" # owned comment\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n",
+			"rows": [
+				{
+					"section": "\"Équipe\"",
+					"key": "agent_mode",
+					"value": "action"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# exact before\n\"\\u00C9quipe\".agent_mode = \"action\"\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n"
+			}
+		},
+		{
+			"id": "root-dotted-unicode-escaped-parent-scalar-removed-alone",
+			"group": "toml-dotted-keys",
+			"source": "# exact before\n\"\\u00C9quipe\".agent_mode = \"auto\" # owned comment\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n",
+			"rows": [
+				{
+					"section": "\"Équipe\"",
+					"key": "agent_mode",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# exact before\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n"
+			}
+		},
+		{
+			"id": "root-dotted-unicode-escaped-parent-scalar-unchanged-keeps-every-byte",
+			"group": "toml-dotted-keys",
+			"source": "# exact before\n\"\\u00C9quipe\".agent_mode = \"auto\" # owned comment\nfuture.precise = 0.1\nfuture.long = 1.234567890123456789\nfuture.integer = 9007199254740993\nfuture.empty = []\n# exact after\n",
+			"rows": [
+				{
+					"section": "\"Équipe\"",
+					"key": "agent_mode",
+					"value": "auto"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"unchanged": true
+			}
+		},
+		{
+			"id": "root-dotted-case-distinct-neighbours-kept-and-multiline-scalar-replaced-whole",
+			"group": "toml-dotted-keys",
+			"source": "a.text = \"\"\"before\n[looks.like.a.header]\nafter\"\"\"\nA.text = \"untouched\" # case owner\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "text",
+					"value": "changed"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a.text = \"changed\"\nA.text = \"untouched\" # case owner\n"
+			}
+		},
+		{
+			"id": "root-dotted-bom-kept-when-updating-a-first-leaf",
+			"group": "toml-dotted-keys",
+			"source": "﻿a.setting=false\nfuture.keep=0.1",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "﻿a.setting = true\nfuture.keep=0.1"
+			}
+		},
+		{
+			"id": "root-dotted-bom-kept-when-deleting-a-first-leaf",
+			"group": "toml-dotted-keys",
+			"source": "﻿a.setting=false\nfuture.keep=0.1",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "﻿future.keep=0.1"
+			}
+		},
+		{
+			"id": "root-dotted-final-newline-ownership-kept-when-updating-the-last-leaf",
+			"group": "toml-dotted-keys",
+			"source": "future.keep=0.1\na.setting=0.25",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": 0.75
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "future.keep=0.1\na.setting = 0.75"
+			}
+		},
+		{
+			"id": "root-inline-scalar-updated-without-claiming-its-parent",
+			"group": "toml-dotted-keys",
+			"source": "llm={agent_mode=\"auto\"}\n",
+			"rows": [
+				{
+					"section": "llm",
+					"key": "agent_mode",
+					"value": "action"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "llm={agent_mode=\"action\"}\n",
+				"decoded": [
+					{
+						"path": ["llm", "agent_mode"],
+						"value": "action"
+					}
+				]
+			}
+		},
+		{
+			"id": "root-container-mutation-or-subtree-collision-1-refused",
+			"group": "toml-dotted-keys",
+			"source": "llm=\"obsolete\"\n",
+			"rows": [
+				{
+					"section": "llm",
+					"key": "agent_mode",
+					"value": "action"
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-container-mutation-or-subtree-collision-2-refused",
+			"group": "toml-dotted-keys",
+			"source": "llm=[]\n",
+			"rows": [
+				{
+					"section": "llm",
+					"key": "agent_mode",
+					"value": "action"
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-container-mutation-or-subtree-collision-3-refused",
+			"group": "toml-dotted-keys",
+			"source": "[[llm]]\nagent_mode=\"auto\"\n",
+			"rows": [
+				{
+					"section": "llm",
+					"key": "agent_mode",
+					"value": "action"
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-container-mutation-or-subtree-collision-4-refused",
+			"group": "toml-dotted-keys",
+			"source": "llm.agent_mode=[\"auto\"]\n",
+			"rows": [
+				{
+					"section": "llm",
+					"key": "agent_mode",
+					"value": "action"
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-container-mutation-or-subtree-collision-5-refused",
+			"group": "toml-dotted-keys",
+			"source": "llm.agent_mode={value=\"auto\"}\n",
+			"rows": [
+				{
+					"section": "llm",
+					"key": "agent_mode",
+					"value": "action"
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-scalar-replaced-while-publishing-a-descendant-refused",
+			"group": "toml-dotted-keys",
+			"source": "a.setting=\"obsolete\"\nfuture.keep=0.1\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"delete": true
+				},
+				{
+					"section": "a.setting",
+					"key": "child",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false,
+				"detail_contains": ["a.setting"]
+			}
+		},
+		{
+			"id": "root-scalar-nonfinite-infinity-refused",
+			"group": "toml-dotted-keys",
+			"source": "a.setting=0.25\nfuture.keep=0.1\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": {
+						"$number": "inf"
+					}
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-scalar-nonfinite-negative-infinity-refused",
+			"group": "toml-dotted-keys",
+			"source": "a.setting=0.25\nfuture.keep=0.1\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": {
+						"$number": "-inf"
+					}
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-scalar-nonfinite-not-a-number-refused",
+			"group": "toml-dotted-keys",
+			"source": "a.setting=0.25\nfuture.keep=0.1\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": {
+						"$number": "nan"
+					}
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-duplicate-aliases-refused",
+			"group": "toml-dotted-keys",
+			"source": "llm.agent_mode=\"auto\"\nllm.\"agent_mode\"=\"other\"\n",
+			"rows": [
+				{
+					"section": "llm",
+					"key": "agent_mode",
+					"value": "action"
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-scalar-changed-into-a-dictionary-refused",
+			"group": "toml-dotted-keys",
+			"source": "llm.agent_mode=\"auto\"\n",
+			"rows": [
+				{
+					"section": "llm",
+					"key": "agent_mode",
+					"value": {
+						"child": true
+					}
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-dotted-precise-precise-decimal-published-exactly",
+			"group": "toml-dotted-keys",
+			"source": "a.setting=0.25\nfuture.precise=0.1\nfuture.integer=9007199254740993\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": {
+						"$number": "0.12345678901234567"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a.setting = 0.12345678901234566\nfuture.precise=0.1\nfuture.integer=9007199254740993\n",
+				"decoded": [
+					{
+						"path": ["a", "setting"],
+						"value": {
+							"$number": "0.12345678901234567"
+						}
+					}
+				]
+			}
+		},
+		{
+			"id": "root-dotted-precise-representable-large-integer-published-exactly",
+			"group": "toml-dotted-keys",
+			"source": "a.setting=0.25\nfuture.precise=0.1\nfuture.integer=9007199254740993\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": {
+						"$number": "9007199254740992"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a.setting = 9007199254740992\nfuture.precise=0.1\nfuture.integer=9007199254740993\n",
+				"decoded": [
+					{
+						"path": ["a", "setting"],
+						"value": {
+							"$number": "9007199254740992"
+						}
+					}
+				]
+			}
+		},
+		{
+			"id": "root-dotted-precise-negative-zero-published-exactly",
+			"group": "toml-dotted-keys",
+			"source": "a.setting=0.25\nfuture.precise=0.1\nfuture.integer=9007199254740993\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": {
+						"$number": "-0.0"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a.setting = -0.0\nfuture.precise=0.1\nfuture.integer=9007199254740993\n",
+				"decoded": [
+					{
+						"path": ["a", "setting"],
+						"value": {
+							"$number": "-0.0"
+						},
+						"negative_zero": true
+					}
+				]
+			}
+		},
+		{
+			"id": "header-scalar-precise-decimal-published-exactly",
+			"group": "toml-dotted-keys",
+			"source": "# before\n[a]\nsetting=0.25 # owned\nfuture=1.234567890123456789\ninteger=9223372036854775807\nempty=[]\n# after\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": {
+						"$number": "0.12345678901234567"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# before\n[a]\nsetting = 0.12345678901234566\nfuture=1.234567890123456789\ninteger=9223372036854775807\nempty=[]\n# after\n",
+				"decoded": [
+					{
+						"path": ["a", "setting"],
+						"value": {
+							"$number": "0.12345678901234567"
+						}
+					}
+				]
+			}
+		},
+		{
+			"id": "header-scalar-representable-large-integer-published-exactly",
+			"group": "toml-dotted-keys",
+			"source": "# before\n[a]\nsetting=0.25 # owned\nfuture=1.234567890123456789\ninteger=9223372036854775807\nempty=[]\n# after\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": {
+						"$number": "9007199254740992"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# before\n[a]\nsetting = 9007199254740992\nfuture=1.234567890123456789\ninteger=9223372036854775807\nempty=[]\n# after\n",
+				"decoded": [
+					{
+						"path": ["a", "setting"],
+						"value": {
+							"$number": "9007199254740992"
+						}
+					}
+				]
+			}
+		},
+		{
+			"id": "header-scalar-negative-zero-published-exactly",
+			"group": "toml-dotted-keys",
+			"source": "# before\n[a]\nsetting=0.25 # owned\nfuture=1.234567890123456789\ninteger=9223372036854775807\nempty=[]\n# after\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": {
+						"$number": "-0.0"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "# before\n[a]\nsetting = -0.0\nfuture=1.234567890123456789\ninteger=9223372036854775807\nempty=[]\n# after\n",
+				"decoded": [
+					{
+						"path": ["a", "setting"],
+						"value": {
+							"$number": "-0.0"
+						},
+						"negative_zero": true
+					}
+				]
+			}
+		},
+		{
+			"id": "header-scalar-new-key-gets-the-precise-numeric-literal",
+			"group": "toml-dotted-keys",
+			"source": "[a]\nfuture=0.1\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": {
+						"$number": "0.12345678901234567"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a]\nsetting = 0.12345678901234566\nfuture=0.1\n"
+			}
+		},
+		{
+			"id": "root-inline-nested-numeric",
+			"group": "toml-root-inline-scalar",
+			"source": "llm = { generation = { temperature=0.25, future=9007199254740993 }, private=\"untouched\" } # tail\n",
+			"rows": [
+				{
+					"section": "llm.generation",
+					"key": "temperature",
+					"value": {
+						"$number": "0.12345678901234567"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "llm = { generation = { temperature=0.12345678901234566, future=9007199254740993 }, private=\"untouched\" } # tail\n"
+			}
+		},
+		{
+			"id": "root-inline-first-removal",
+			"group": "toml-root-inline-scalar",
+			"source": "a = { first=false , second=\"keep\" , third=9007199254740993 } # tail\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "first",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a = { second=\"keep\" , third=9007199254740993 } # tail\n"
+			}
+		},
+		{
+			"id": "root-inline-middle-removal",
+			"group": "toml-root-inline-scalar",
+			"source": "a = { first=false , second=\"keep\" , third=9007199254740993 } # tail\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "second",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a = { first=false , third=9007199254740993 } # tail\n"
+			}
+		},
+		{
+			"id": "root-inline-last-removal",
+			"group": "toml-root-inline-scalar",
+			"source": "a = { first=false , second=\"keep\" , third=9007199254740993 } # tail\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "third",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a = { first=false , second=\"keep\" } # tail\n"
+			}
+		},
+		{
+			"id": "root-inline-only-removal",
+			"group": "toml-root-inline-scalar",
+			"source": "a={only=false} # retained\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "only",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a={} # retained\n"
+			}
+		},
+		{
+			"id": "root-inline-adjacent-removals",
+			"group": "toml-root-inline-scalar",
+			"source": "a={one=false, two=true, three=\"keep\"}\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "one",
+					"delete": true
+				},
+				{
+					"section": "a",
+					"key": "two",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a={ three=\"keep\"}\n"
+			}
+		},
+		{
+			"id": "root-inline-all-removals",
+			"group": "toml-root-inline-scalar",
+			"source": "a={one=false, two=true, three=\"keep\"}\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "one",
+					"delete": true
+				},
+				{
+					"section": "a",
+					"key": "two",
+					"delete": true
+				},
+				{
+					"section": "a",
+					"key": "three",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a={}\n"
+			}
+		},
+		{
+			"id": "root-inline-nested-empty-parent-retained",
+			"group": "toml-root-inline-scalar",
+			"source": "a={child={only=false}, foreign=[]}\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "only",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a={child={}, foreign=[]}\n"
+			}
+		},
+		{
+			"id": "root-inline-nested-dotted-inline-member",
+			"group": "toml-root-inline-scalar",
+			"source": "a={child.setting=false, child.future=0.1, \"literal.dot\"={v=[]}}\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a={child.setting=true, child.future=0.1, \"literal.dot\"={v=[]}}\n"
+			}
+		},
+		{
+			"id": "root-inline-disjoint-edits",
+			"group": "toml-root-inline-scalar",
+			"source": "a={one=false, child={setting=0.25, future=0.1}, last=\"keep\"}\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "one",
+					"delete": true
+				},
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": {
+						"$number": "-0.0"
+					}
+				},
+				{
+					"section": "a",
+					"key": "last",
+					"value": "changed"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a={ child={setting=-0.0, future=0.1}, last=\"changed\"}\n"
+			}
+		},
+		{
+			"id": "root-inline-opaque-escaped-delimiters",
+			"group": "toml-root-inline-scalar",
+			"source": "a = { setting=false, \"literal=key\"=\"comma, hash# braces{}\", text=\"escaped\\\"comma,\", arrays=[{v=0.1}, []], map={n=9223372036854775807} } # keep\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a = { setting=true, \"literal=key\"=\"comma, hash# braces{}\", text=\"escaped\\\"comma,\", arrays=[{v=0.1}, []], map={n=9223372036854775807} } # keep\n"
+			}
+		},
+		{
+			"id": "root-inline-quoted-root-owner",
+			"group": "toml-root-inline-scalar",
+			"source": "\"team=name\" = { setting=false, future=1_234.500e-2 }",
+			"rows": [
+				{
+					"section": "\"team=name\"",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "\"team=name\" = { setting=true, future=1_234.500e-2 }"
+			}
+		},
+		{
+			"id": "root-inline-exact-no-op-keeps-every-byte-and-signed-zero",
+			"group": "toml-root-inline-scalar",
+			"source": "a  =  { setting = -0.0 , future=9007199254740993 } # comment\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": {
+						"$number": "-0.0"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"unchanged": true
+			}
+		},
+		{
+			"id": "root-inline-signed-zero-changed-to-integer-zero",
+			"group": "toml-root-inline-scalar",
+			"source": "a  =  { setting = -0.0 , future=9007199254740993 } # comment\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": 0
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a  =  { setting = 0 , future=9007199254740993 } # comment\n"
+			}
+		},
+		{
+			"id": "root-inline-bom-and-trailing-newline-ownership-kept",
+			"group": "toml-root-inline-scalar",
+			"source": "﻿a={setting=false, future=[]}",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "﻿a={setting=true, future=[]}"
+			}
+		},
+		{
+			"id": "root-inline-refused-case-twin-member",
+			"group": "toml-root-inline-scalar",
+			"source": "a={setting=false, Setting=true}\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-inline-refused-case-twin-table",
+			"group": "toml-root-inline-scalar",
+			"source": "a={setting=false}\nA={setting=true}\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-inline-refused-duplicate-member",
+			"group": "toml-root-inline-scalar",
+			"source": "a={setting=false, setting=true}\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-inline-refused-table-header-beside-the-inline-table",
+			"group": "toml-root-inline-scalar",
+			"source": "a={setting=false}\n[a]\nother=1\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-inline-refused-closed-scalar-parent",
+			"group": "toml-root-inline-scalar",
+			"source": "a={child=\"obsolete\", setting=false}\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-inline-refused-closed-array-parent",
+			"group": "toml-root-inline-scalar",
+			"source": "a={child=[], setting=false}\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-inline-refused-literal-dot-key",
+			"group": "toml-root-inline-scalar",
+			"source": "a={\"literal.dot\"=false}\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "literal.dot",
+					"literal_key": true,
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-inline-refused-parent-and-child-in-one-batch",
+			"group": "toml-root-inline-scalar",
+			"source": "a={child={setting=false}}\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "child",
+					"value": {
+						"setting": false
+					}
+				},
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-inline-refused-changed-type",
+			"group": "toml-root-inline-scalar",
+			"source": "a={setting=false}\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": "changed type"
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "root-inline-new-member-appended",
+			"group": "toml-root-inline-scalar",
+			"source": "a={setting=false}\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "other",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a={setting=false,other = true}\n",
+				"decoded": [
+					{
+						"path": ["a", "setting"],
+						"value": false
+					},
+					{
+						"path": ["a", "other"],
+						"value": true
+					}
+				]
+			}
+		},
+		{
+			"id": "section-dotted-boolean-leaf",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild.setting=false # owned\nchild.future=9007199254740993 # foreign\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a]\nchild.setting = true\nchild.future=9007199254740993 # foreign\n"
+			}
+		},
+		{
+			"id": "section-dotted-string-leaf",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild.setting=\"001\"\nchild.future=[]\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": "002"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a]\nchild.setting = \"002\"\nchild.future=[]\n"
+			}
+		},
+		{
+			"id": "section-dotted-nested-header",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a.parent]\nchild.setting=false\nfuture={}\n",
+			"rows": [
+				{
+					"section": "a.parent.child",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a.parent]\nchild.setting = true\nfuture={}\n"
+			}
+		},
+		{
+			"id": "section-dotted-quoted-header",
+			"group": "toml-section-dotted-scalar",
+			"source": "[\"a\".\"parent\"] # header\nchild.setting=false\nfuture=\"unchanged\"\n",
+			"rows": [
+				{
+					"section": "a.parent.child",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[\"a\".\"parent\"] # header\nchild.setting = true\nfuture=\"unchanged\"\n"
+			}
+		},
+		{
+			"id": "section-dotted-quoted-literal-header-segment",
+			"group": "toml-section-dotted-scalar",
+			"source": "[\"literal.dot\"]\nchild.setting=false\nfuture=0.1\n",
+			"rows": [
+				{
+					"section": "\"literal.dot\".child",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[\"literal.dot\"]\nchild.setting = true\nfuture=0.1\n"
+			}
+		},
+		{
+			"id": "section-dotted-precise-finite-number",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild.setting=0.25\nchild.future=9007199254740993\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": {
+						"$number": "0.12345678901234567"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a]\nchild.setting = 0.12345678901234566\nchild.future=9007199254740993\n"
+			}
+		},
+		{
+			"id": "section-dotted-negative-zero",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild.setting=0.25\nchild.future=1.0\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": {
+						"$number": "-0.0"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a]\nchild.setting = -0.0\nchild.future=1.0\n"
+			}
+		},
+		{
+			"id": "section-dotted-explicit-leaf-deletion",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild.setting=false\nchild.future=0.1 # foreign\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a]\nchild.future=0.1 # foreign\n"
+			}
+		},
+		{
+			"id": "section-dotted-multiline-scalar-record",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild.setting=\"\"\"line one\nline two\"\"\"\nchild.future=[]\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": "replacement"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a]\nchild.setting = \"replacement\"\nchild.future=[]\n"
+			}
+		},
+		{
+			"id": "section-dotted-two-separate-scalar-owners",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild.first=false\nchild.second=\"001\"\nchild.future={}\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "first",
+					"value": true
+				},
+				{
+					"section": "a.child",
+					"key": "second",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a]\nchild.first = true\nchild.future={}\n"
+			}
+		},
+		{
+			"id": "section-dotted-original-no-op-image-kept",
+			"group": "toml-section-dotted-scalar",
+			"source": "[\"a\"] # exact header\n child.setting = -0.0 # exact scalar\nchild.future=9007199254740993\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": {
+						"$number": "-0.0"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"unchanged": true,
+				"decoded": [
+					{
+						"path": ["a", "child", "setting"],
+						"value": {
+							"$number": "-0.0"
+						},
+						"negative_zero": true
+					}
+				]
+			}
+		},
+		{
+			"id": "section-dotted-safety-refusal-1",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild.setting=false\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": "wrong type"
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "section-dotted-safety-refusal-2",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild.setting=[]\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": false
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "section-dotted-safety-refusal-3",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild.setting={}\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"delete": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "section-dotted-safety-refusal-4",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild=7\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "section-dotted-safety-refusal-5",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild.\"literal.dot\"=false\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "literal.dot",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "section-dotted-safety-refusal-6",
+			"group": "toml-section-dotted-scalar",
+			"source": "[[a]]\nchild.setting=false\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "section-dotted-safety-refusal-7",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nChild.setting=false\nchild.future=true\n",
+			"rows": [
+				{
+					"section": "a.Child",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "section-dotted-safety-refusal-8",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild.setting=false\n",
+			"rows": [
+				{
+					"section": "A.child",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "section-dotted-safety-refusal-9",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild.setting=0.25\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": {
+						"$number": "inf"
+					}
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "section-dotted-safety-refusal-10",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild.setting=0.25\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": {
+						"$number": "nan"
+					}
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "section-dotted-safety-refusal-11",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild.setting=false\nchild.setting=true\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "section-dotted-overlapping-scalar-and-ancestor-requests-refused",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild.setting=false\nchild.future=[]\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": true
+				},
+				{
+					"section": "a",
+					"key": "child",
+					"value": "replaced"
+				}
+			],
+			"expect": {
+				"ok": false
+			}
+		},
+		{
+			"id": "dotted-stale-snapshot-refused-without-publication",
+			"group": "toml-dotted-keys",
+			"source": "# retained\n[settings]\npersonal.future.enabled = false # untouched owner\npersonal.future.text = \"001\"\nowned = 1 # own comment\n[foreign]\nkeep = [1, 2]\n",
+			"rows": [
+				{
+					"section": "settings",
+					"key": "owned",
+					"value": 2
+				}
+			],
+			"expect": {
+				"ok": false,
+				"detail_equals": "source changed before preparing the batch"
+			},
+			"expected_snapshot": {
+				"status": "ok",
+				"content": "# retained\n[settings]\npersonal.future.enabled = false # untouched owner\npersonal.future.text = \"001\"\nowned = 1 # own comment\n[foreign]\nkeep = [1, 2]\n# changed\n"
+			}
+		},
+		{
+			"id": "root-changed-source-snapshot-refused",
+			"group": "toml-dotted-keys",
+			"source": "llm.agent_mode=\"auto\"\n",
+			"rows": [
+				{
+					"section": "llm",
+					"key": "agent_mode",
+					"value": "action"
+				}
+			],
+			"expect": {
+				"ok": false
+			},
+			"expected_snapshot": {
+				"status": "ok",
+				"content": "llm.agent_mode=\"foreign\"\n"
+			}
+		},
+		{
+			"id": "root-inline-stale-source-refused-before-any-edit",
+			"group": "toml-root-inline-scalar",
+			"source": "a={setting=false, future=0.1}\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false,
+				"detail_contains": ["source changed"]
+			},
+			"expected_snapshot": {
+				"status": "ok",
+				"content": "a={setting=false, future=0.1}\n# successor\n"
+			}
+		},
+		{
+			"id": "section-dotted-stale-source-refused-before-an-owned-scalar",
+			"group": "toml-section-dotted-scalar",
+			"source": "[a]\nchild.setting=false\nchild.future=[]\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "setting",
+					"value": true
+				}
+			],
+			"expect": {
+				"ok": false,
+				"detail_equals": "source changed before preparing the batch"
+			},
+			"expected_snapshot": {
+				"status": "ok",
+				"content": "[a]\nchild.setting=false\nchild.future=[]\n# successor\n"
 			}
 		}
 	]

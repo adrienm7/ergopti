@@ -1,0 +1,944 @@
+{
+	"_comment": "Inline scalar ownership vectors of the TOML batch writer, replayed by _shared/lua/test/toml_inline_scalar_vectors_contract.lua on macOS and Linux. Each vector gives the file bytes (source), the batch rows and what two entry points answer: the source hint step source_inline_scalar_parents(source, rows), which names the inline tables a direct scalar write may address (expect.hint_parents is that set; [] means none), and the writer's prepare step prepare_batch(path, rows, {read source}). expect.ok is acceptance of prepare; when false no bytes come back (a raised refusal counts). content is the exact candidate; decoded lists paths of the decoded candidate whose value must equal value (negative_zero also checks the IEEE sign); idempotent means preparing the same rows on the candidate answers the candidate again. A value {\"$number\": \"text\"} is the number the text spells, with inf, -inf and nan for the non-finite ones JSON cannot carry. Converted from toml_batch_existing_key_contract.lua.",
+	"entry_point": "source_inline_scalar_parents(source, rows) -> set of inline parent tables, then the writer's prepare step on (source, rows)",
+	"drivers": {
+		"macos": "Replays every vector.",
+		"linux": "Replays every vector.",
+		"windows": "Not ported: one AHK consumer must call the Windows writer's inline hint step and prepare step on (source, rows) and decode the candidate for the decoded checks."
+	},
+	"vectors": [
+		{
+			"id": "whole-group-withheld-wrong-scalar-type",
+			"group": "inline-scalar-hints-withheld",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "first",
+					"value": "wrong type"
+				}
+			],
+			"expect": {
+				"hint_parents": []
+			}
+		},
+		{
+			"id": "whole-group-withheld-delete-of-an-array-member",
+			"group": "inline-scalar-hints-withheld",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "empty",
+					"delete": true
+				}
+			],
+			"expect": {
+				"hint_parents": []
+			}
+		},
+		{
+			"id": "whole-group-withheld-delete-below-an-array-member",
+			"group": "inline-scalar-hints-withheld",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a.child.empty",
+					"key": "missing",
+					"delete": true
+				}
+			],
+			"expect": {
+				"hint_parents": []
+			}
+		},
+		{
+			"id": "whole-group-withheld-delete-below-a-scalar-member",
+			"group": "inline-scalar-hints-withheld",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a.child.first",
+					"key": "missing",
+					"delete": true
+				}
+			],
+			"expect": {
+				"hint_parents": []
+			}
+		},
+		{
+			"id": "whole-group-withheld-parent-replaced-by-a-scalar",
+			"group": "inline-scalar-hints-withheld",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "child",
+					"value": false
+				}
+			],
+			"expect": {
+				"hint_parents": []
+			}
+		},
+		{
+			"id": "whole-group-withheld-infinite-number",
+			"group": "inline-scalar-hints-withheld",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "last",
+					"value": {
+						"$number": "inf"
+					}
+				}
+			],
+			"expect": {
+				"hint_parents": []
+			}
+		},
+		{
+			"id": "whole-group-withheld-not-a-number",
+			"group": "inline-scalar-hints-withheld",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "last",
+					"value": {
+						"$number": "nan"
+					}
+				}
+			],
+			"expect": {
+				"hint_parents": []
+			}
+		},
+		{
+			"id": "whole-group-withheld-case-twin-of-the-parent",
+			"group": "inline-scalar-hints-withheld",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "A.child",
+					"key": "first",
+					"value": true
+				}
+			],
+			"expect": {
+				"hint_parents": []
+			}
+		},
+		{
+			"id": "whole-group-withheld-scalar-group-with-a-parent-replacement",
+			"group": "inline-scalar-hints-withheld",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "first",
+					"value": true
+				},
+				{
+					"section": "a",
+					"key": "child",
+					"value": {}
+				}
+			],
+			"expect": {
+				"hint_parents": []
+			}
+		},
+		{
+			"id": "whole-group-withheld-delete-group-with-an-overlapping-parent-delete",
+			"group": "inline-scalar-hints-withheld",
+			"source": "[a] # header\nchild = { first=false, middle=\"001\", last=0.25, future=9007199254740993, empty=[], map={} } # trailer\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "missing",
+					"delete": true
+				},
+				{
+					"section": "a.child.missing",
+					"key": "child",
+					"delete": true
+				}
+			],
+			"expect": {
+				"hint_parents": []
+			}
+		},
+		{
+			"id": "whole-group-withheld-overlapping-new-scalar-and-parent",
+			"group": "inline-scalar-hints-withheld",
+			"source": "[a]\nchild={future=[]}\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": 0.25
+				},
+				{
+					"section": "a",
+					"key": "child",
+					"value": {}
+				}
+			],
+			"expect": {
+				"hint_parents": [],
+				"ok": false
+			}
+		},
+		{
+			"id": "array-table-source-hint-withheld",
+			"group": "inline-scalar-hints-withheld",
+			"source": "[[a]]\nchild={first=false}\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "first",
+					"value": true
+				}
+			],
+			"expect": {
+				"hint_parents": []
+			}
+		},
+		{
+			"id": "literal-dot-key-source-hint-withheld",
+			"group": "inline-scalar-hints-withheld",
+			"source": "[a]\nchild={\"literal.dot\"=false}\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "literal.dot",
+					"value": true
+				}
+			],
+			"expect": {
+				"hint_parents": []
+			}
+		},
+		{
+			"id": "empty-literal-identity-stays-on-the-whole-parent-route",
+			"group": "inline-scalar-hints-withheld",
+			"source": "[a]\nchild={\"\"=false,setting=false}\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "",
+					"value": true
+				}
+			],
+			"expect": {
+				"hint_parents": [],
+				"ok": false
+			}
+		},
+		{
+			"id": "insertion-refused-through-scalar-parent",
+			"group": "inline-scalar-insertion-refused",
+			"source": "[a]\nchild=7\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": 0.25
+				}
+			],
+			"expect": {
+				"hint_parents": [],
+				"ok": false
+			}
+		},
+		{
+			"id": "insertion-refused-through-array-parent",
+			"group": "inline-scalar-insertion-refused",
+			"source": "[a]\nchild=[]\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": 0.25
+				}
+			],
+			"expect": {
+				"hint_parents": [],
+				"ok": false
+			}
+		},
+		{
+			"id": "insertion-refused-through-missing-intermediate-parent",
+			"group": "inline-scalar-insertion-refused",
+			"source": "[a]\nchild={future=[]}\n",
+			"rows": [
+				{
+					"section": "a.child.missing",
+					"key": "number",
+					"value": 0.25
+				}
+			],
+			"expect": {
+				"hint_parents": [],
+				"ok": false
+			}
+		},
+		{
+			"id": "insertion-refused-through-existing-scalar-intermediate",
+			"group": "inline-scalar-insertion-refused",
+			"source": "[a]\nchild={nested=7}\n",
+			"rows": [
+				{
+					"section": "a.child.nested",
+					"key": "number",
+					"value": 0.25
+				}
+			],
+			"expect": {
+				"hint_parents": [],
+				"ok": false
+			}
+		},
+		{
+			"id": "insertion-refused-through-array-intermediate",
+			"group": "inline-scalar-insertion-refused",
+			"source": "[a]\nchild={nested=[]}\n",
+			"rows": [
+				{
+					"section": "a.child.nested",
+					"key": "number",
+					"value": 0.25
+				}
+			],
+			"expect": {
+				"hint_parents": [],
+				"ok": false
+			}
+		},
+		{
+			"id": "insertion-refused-through-new-structured-value",
+			"group": "inline-scalar-insertion-refused",
+			"source": "[a]\nchild={future=[]}\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {}
+				}
+			],
+			"expect": {
+				"hint_parents": [],
+				"ok": false
+			}
+		},
+		{
+			"id": "insertion-refused-through-literal-dotted-key",
+			"group": "inline-scalar-insertion-refused",
+			"source": "[a]\nchild={future=[]}\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "new.dot",
+					"value": 0.25
+				}
+			],
+			"expect": {
+				"hint_parents": [],
+				"ok": false
+			}
+		},
+		{
+			"id": "insertion-refused-through-source-case-twin",
+			"group": "inline-scalar-insertion-refused",
+			"source": "[a]\nchild={Number=7}\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": 0.25
+				}
+			],
+			"expect": {
+				"hint_parents": [],
+				"ok": false
+			}
+		},
+		{
+			"id": "insertion-refused-through-dotted-implicit-parent",
+			"group": "inline-scalar-insertion-refused",
+			"source": "[a]\nchild={nested.old=7}\n",
+			"rows": [
+				{
+					"section": "a.child.nested",
+					"key": "number",
+					"value": 0.25
+				}
+			],
+			"expect": {
+				"hint_parents": [],
+				"ok": false
+			}
+		},
+		{
+			"id": "insertion-refused-through-nonfinite-scalar",
+			"group": "inline-scalar-insertion-refused",
+			"source": "[a]\nchild={}\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "inf"
+					}
+				}
+			],
+			"expect": {
+				"hint_parents": [],
+				"ok": false
+			}
+		},
+		{
+			"id": "insertion-root-nested-scalar",
+			"group": "inline-scalar-insertion",
+			"source": "a={child={foreign=9223372036854775807,empty=[]}} # keep\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": 0.25
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a={child={foreign=9223372036854775807,empty=[],number = 0.25}} # keep\n",
+				"idempotent": true,
+				"decoded": [
+					{
+						"path": ["a", "child", "number"],
+						"value": 0.25
+					}
+				]
+			}
+		},
+		{
+			"id": "insertion-relative-scalar",
+			"group": "inline-scalar-insertion",
+			"source": "[a] # keep\nchild={foreign=[],map={}} # tail\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": 0.25
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a] # keep\nchild={foreign=[],map={},number = 0.25} # tail\n",
+				"idempotent": true,
+				"decoded": [
+					{
+						"path": ["a", "child", "number"],
+						"value": 0.25
+					}
+				],
+				"hint_parents": ["a.child"]
+			}
+		},
+		{
+			"id": "insertion-empty-source-object",
+			"group": "inline-scalar-insertion",
+			"source": "[a]\nchild={ } # tail\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "flag",
+					"value": false
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a]\nchild={ flag = false} # tail\n",
+				"idempotent": true,
+				"decoded": [
+					{
+						"path": ["a", "child", "flag"],
+						"value": false
+					}
+				],
+				"hint_parents": ["a.child"]
+			}
+		},
+		{
+			"id": "insertion-precise-finite-number",
+			"group": "inline-scalar-insertion",
+			"source": "[a]\nchild={future=9007199254740993}\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "0.12345678901234567"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a]\nchild={future=9007199254740993,number = 0.12345678901234566}\n",
+				"idempotent": true,
+				"decoded": [
+					{
+						"path": ["a", "child", "number"],
+						"value": {
+							"$number": "0.12345678901234567"
+						}
+					}
+				],
+				"hint_parents": ["a.child"]
+			}
+		},
+		{
+			"id": "insertion-negative-zero",
+			"group": "inline-scalar-insertion",
+			"source": "[a]\nchild={future=[]}\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "-0.0"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a]\nchild={future=[],number = -0.0}\n",
+				"idempotent": true,
+				"decoded": [
+					{
+						"path": ["a", "child", "number"],
+						"value": {
+							"$number": "-0.0"
+						},
+						"negative_zero": true
+					}
+				],
+				"hint_parents": ["a.child"]
+			}
+		},
+		{
+			"id": "insertion-quoted-key-and-string",
+			"group": "inline-scalar-insertion",
+			"source": "[a]\nchild={future=\"001\"}\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "new key",
+					"value": "literal"
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a]\nchild={future=\"001\",\"new key\" = \"literal\"}\n",
+				"idempotent": true,
+				"decoded": [
+					{
+						"path": ["a", "child", "new key"],
+						"value": "literal"
+					}
+				],
+				"hint_parents": ["a.child"]
+			}
+		},
+		{
+			"id": "insertion-sorts-only-new-siblings-and-keeps-replacement-deletion-and-foreign-spans",
+			"group": "inline-scalar-insertion",
+			"source": "[a]\nchild={old=1,drop=false,future=[]} # keep\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "z",
+					"value": true
+				},
+				{
+					"section": "a.child",
+					"key": "old",
+					"value": 2
+				},
+				{
+					"section": "a.child",
+					"key": "drop",
+					"delete": true
+				},
+				{
+					"section": "a.child",
+					"key": "b",
+					"value": "new"
+				}
+			],
+			"expect": {
+				"hint_parents": ["a.child"],
+				"ok": true,
+				"content": "[a]\nchild={old=2,future=[],b = \"new\",z = true} # keep\n"
+			}
+		},
+		{
+			"id": "integer-above-double-precision-published-exactly-through-root-inline",
+			"group": "inline-scalar-exact-integers",
+			"source": "a={number=9007199254740993,foreign=[]} # exact\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "number",
+					"value": {
+						"$number": "9007199254740992"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a={number=9007199254740992,foreign=[]} # exact\n"
+			}
+		},
+		{
+			"id": "integer-above-double-precision-published-exactly-through-root-dotted",
+			"group": "inline-scalar-exact-integers",
+			"source": "a.number=9007199254740993 # owned\nfuture=[] # exact\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "number",
+					"value": {
+						"$number": "9007199254740992"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "a.number = 9007199254740992\nfuture=[] # exact\n"
+			}
+		},
+		{
+			"id": "integer-above-double-precision-published-exactly-through-section-dotted",
+			"group": "inline-scalar-exact-integers",
+			"source": "[a]\nchild.number=9007199254740993 # owned\nfuture=[] # exact\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "9007199254740992"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a]\nchild.number = 9007199254740992\nfuture=[] # exact\n"
+			}
+		},
+		{
+			"id": "integer-above-double-precision-published-exactly-through-header-leaf",
+			"group": "inline-scalar-exact-integers",
+			"source": "[a]\nnumber=9007199254740993 # owned\nfuture=[] # exact\n",
+			"rows": [
+				{
+					"section": "a",
+					"key": "number",
+					"value": {
+						"$number": "9007199254740992"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a]\nnumber = 9007199254740992\nfuture=[] # exact\n"
+			}
+		},
+		{
+			"id": "integer-above-double-precision-published-exactly-through-section-inline",
+			"group": "inline-scalar-exact-integers",
+			"source": "[a]\nchild={number=9007199254740993,foreign=[]} # exact\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "9007199254740992"
+					}
+				}
+			],
+			"expect": {
+				"ok": true,
+				"content": "[a]\nchild={number=9007199254740992,foreign=[]} # exact\n"
+			}
+		},
+		{
+			"id": "canonical-numeric-token-minus9007199254740993",
+			"group": "inline-scalar-exact-integers",
+			"source": "[a]\nchild={number=-9007199254740993,foreign=9223372036854775807,empty=[]} # exact\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "-9007199254740992"
+					}
+				}
+			],
+			"expect": {
+				"hint_parents": ["a.child"],
+				"ok": true,
+				"content": "[a]\nchild={number=-9007199254740992,foreign=9223372036854775807,empty=[]} # exact\n"
+			}
+		},
+		{
+			"id": "canonical-numeric-token-9_007_199_254_740_993",
+			"group": "inline-scalar-exact-integers",
+			"source": "[a]\nchild={number=9_007_199_254_740_993,foreign=9223372036854775807,empty=[]} # exact\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "9007199254740992"
+					}
+				}
+			],
+			"expect": {
+				"hint_parents": ["a.child"],
+				"ok": true,
+				"content": "[a]\nchild={number=9007199254740992,foreign=9223372036854775807,empty=[]} # exact\n"
+			}
+		},
+		{
+			"id": "canonical-numeric-token-0x20000000000001",
+			"group": "inline-scalar-exact-integers",
+			"source": "[a]\nchild={number=0x20000000000001,foreign=9223372036854775807,empty=[]} # exact\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "9007199254740992"
+					}
+				}
+			],
+			"expect": {
+				"hint_parents": ["a.child"],
+				"ok": true,
+				"content": "[a]\nchild={number=9007199254740992,foreign=9223372036854775807,empty=[]} # exact\n"
+			}
+		},
+		{
+			"id": "canonical-numeric-token-0o400000000000000001",
+			"group": "inline-scalar-exact-integers",
+			"source": "[a]\nchild={number=0o400000000000000001,foreign=9223372036854775807,empty=[]} # exact\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "9007199254740992"
+					}
+				}
+			],
+			"expect": {
+				"hint_parents": ["a.child"],
+				"ok": true,
+				"content": "[a]\nchild={number=9007199254740992,foreign=9223372036854775807,empty=[]} # exact\n"
+			}
+		},
+		{
+			"id": "canonical-numeric-token-0b100000000000000000000000000000000000000000000000000001",
+			"group": "inline-scalar-exact-integers",
+			"source": "[a]\nchild={number=0b100000000000000000000000000000000000000000000000000001,foreign=9223372036854775807,empty=[]} # exact\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "9007199254740992"
+					}
+				}
+			],
+			"expect": {
+				"hint_parents": ["a.child"],
+				"ok": true,
+				"content": "[a]\nchild={number=9007199254740992,foreign=9223372036854775807,empty=[]} # exact\n"
+			}
+		},
+		{
+			"id": "canonical-numeric-token-9007199254740991",
+			"group": "inline-scalar-exact-integers",
+			"source": "[a]\nchild={number=9007199254740991,foreign=9223372036854775807,empty=[]} # exact\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "9007199254740991"
+					}
+				}
+			],
+			"expect": {
+				"hint_parents": ["a.child"],
+				"ok": true,
+				"content": "[a]\nchild={number=9007199254740991,foreign=9223372036854775807,empty=[]} # exact\n"
+			}
+		},
+		{
+			"id": "canonical-numeric-token-plus9_007_199_254_740_992",
+			"group": "inline-scalar-exact-integers",
+			"source": "[a]\nchild={number=+9_007_199_254_740_992,foreign=9223372036854775807,empty=[]} # exact\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "9007199254740992"
+					}
+				}
+			],
+			"expect": {
+				"hint_parents": ["a.child"],
+				"ok": true,
+				"content": "[a]\nchild={number=+9_007_199_254_740_992,foreign=9223372036854775807,empty=[]} # exact\n"
+			}
+		},
+		{
+			"id": "canonical-numeric-token-9007199254740994",
+			"group": "inline-scalar-exact-integers",
+			"source": "[a]\nchild={number=9007199254740994,foreign=9223372036854775807,empty=[]} # exact\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "9007199254740994"
+					}
+				}
+			],
+			"expect": {
+				"hint_parents": ["a.child"],
+				"ok": true,
+				"content": "[a]\nchild={number=9007199254740994,foreign=9223372036854775807,empty=[]} # exact\n"
+			}
+		},
+		{
+			"id": "canonical-numeric-token-minus9007199254740991",
+			"group": "inline-scalar-exact-integers",
+			"source": "[a]\nchild={number=-9007199254740991,foreign=9223372036854775807,empty=[]} # exact\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "-9007199254740991"
+					}
+				}
+			],
+			"expect": {
+				"hint_parents": ["a.child"],
+				"ok": true,
+				"content": "[a]\nchild={number=-9007199254740991,foreign=9223372036854775807,empty=[]} # exact\n"
+			}
+		},
+		{
+			"id": "canonical-numeric-token-minus9_007_199_254_740_992",
+			"group": "inline-scalar-exact-integers",
+			"source": "[a]\nchild={number=-9_007_199_254_740_992,foreign=9223372036854775807,empty=[]} # exact\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "-9007199254740992"
+					}
+				}
+			],
+			"expect": {
+				"hint_parents": ["a.child"],
+				"ok": true,
+				"content": "[a]\nchild={number=-9_007_199_254_740_992,foreign=9223372036854775807,empty=[]} # exact\n"
+			}
+		},
+		{
+			"id": "canonical-numeric-token-minus9007199254740994",
+			"group": "inline-scalar-exact-integers",
+			"source": "[a]\nchild={number=-9007199254740994,foreign=9223372036854775807,empty=[]} # exact\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "-9007199254740994"
+					}
+				}
+			],
+			"expect": {
+				"hint_parents": ["a.child"],
+				"ok": true,
+				"content": "[a]\nchild={number=-9007199254740994,foreign=9223372036854775807,empty=[]} # exact\n"
+			}
+		},
+		{
+			"id": "canonical-numeric-token-1dot0000000000000001e16",
+			"group": "inline-scalar-exact-integers",
+			"source": "[a]\nchild={number=1.0000000000000001e16,foreign=9223372036854775807,empty=[]} # exact\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "10000000000000000"
+					}
+				}
+			],
+			"expect": {
+				"hint_parents": ["a.child"],
+				"ok": true,
+				"content": "[a]\nchild={number=1.0000000000000001e16,foreign=9223372036854775807,empty=[]} # exact\n"
+			}
+		},
+		{
+			"id": "canonical-numeric-token-0dot1",
+			"group": "inline-scalar-exact-integers",
+			"source": "[a]\nchild={number=0.1,foreign=9223372036854775807,empty=[]} # exact\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "0.1"
+					}
+				}
+			],
+			"expect": {
+				"hint_parents": ["a.child"],
+				"ok": true,
+				"content": "[a]\nchild={number=0.1,foreign=9223372036854775807,empty=[]} # exact\n"
+			}
+		},
+		{
+			"id": "canonical-numeric-token-minus0dot0",
+			"group": "inline-scalar-exact-integers",
+			"source": "[a]\nchild={number=-0.0,foreign=9223372036854775807,empty=[]} # exact\n",
+			"rows": [
+				{
+					"section": "a.child",
+					"key": "number",
+					"value": {
+						"$number": "-0.0"
+					}
+				}
+			],
+			"expect": {
+				"hint_parents": ["a.child"],
+				"ok": true,
+				"content": "[a]\nchild={number=-0.0,foreign=9223372036854775807,empty=[]} # exact\n"
+			}
+		}
+	]
+}

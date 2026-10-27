@@ -1,8 +1,9 @@
 {
-	"_comment": "Which cases of the shared Lua contracts moved into JSON vector corpora (PAR-58). Each moved entry names the removed case (an it title, or a loop's title prefix) and the vector ids that now hold it. tools/test/test-contract-vector-ledger.cjs fails when a vector is not listed here, when a listed vector is missing, when a removed case title is still registered in its contract, or when a vector breaks the schema.",
+	"_comment": "Which cases of the shared Lua contracts moved into JSON vector corpora (PAR-58). Each moved entry names the removed case (an it title, or a loop's title prefix) and the vector ids that now hold it. tools/test/test-contract-vector-ledger.cjs fails when a vector is not listed here, when a listed vector is missing, when a removed case title is still registered in its contract, or when a vector breaks the schema. contracts: for every remaining Lua contract of the families (config_scope_*, toml_*, menu_*), data_driven lists the registration sites fed by a JSON corpus and stays_in_lua lists each other registration site with the reason it stays Lua (reasons below); lua_sites is the number of registration sites (helpers.it( or test(\"), so a new Lua case without a ledger entry fails the gate. Reasons were assigned by reviewing the cases of the toml_* and config_scope_plan contracts and by rule (identity, metatables, patched functions, the family of the contract) for the rest.",
 	"field_semantics": {
 		"entry_point": "Descriptive: names the one function a port's consumer must call for the family's vectors; read by people, checked by tools/test/test-contract-vector-ledger.cjs only for presence of the family.",
-		"windows_consumer": "Descriptive: what the AutoHotkey consumer of the family does with each vector; no replay reads it."
+		"windows_consumer": "Descriptive: what the AutoHotkey consumer of the family does with each vector; no replay reads it.",
+		"row_corpus": "Descriptive: the corpus that already holds the menu rows a Lua contract's ordered-callback cases are about; read by people porting the assertions as code."
 	},
 	"families": [
 		{
@@ -147,9 +148,504 @@
 							]
 						}
 					]
+				},
+				{
+					"contract": "toml_dotted_keys_contract.lua",
+					"moved": [
+						{
+							"case": "unchanged dotted value keeps every original byte",
+							"vectors": ["dotted-section-unchanged-value-keeps-every-byte"]
+						},
+						{
+							"case": "unrelated owned update preserves dotted unknown records and comments",
+							"vectors": ["dotted-section-unrelated-owned-update-keeps-dotted-unknown-records"]
+						},
+						{
+							"case": "changed section dotted scalar has an exact owned image before publication",
+							"vectors": [
+								"dotted-section-scalar-replaced-with-an-exact-owned-image",
+								"dotted-section-scalar-deleted-with-an-exact-owned-image"
+							]
+						},
+						{
+							"case": "duplicate semantic source cannot publish an unrelated update",
+							"vectors": ["duplicate-semantic-dotted-source-refuses-an-unrelated-update"]
+						},
+						{
+							"case": "stale source remains refused without publication",
+							"vectors": ["dotted-stale-snapshot-refused-without-publication"]
+						},
+						{
+							"case": "updates only the authentic ",
+							"vectors": [
+								"root-dotted-bare-scalar-updated-alone",
+								"root-dotted-quoted-leaf-scalar-updated-alone",
+								"root-dotted-quoted-parent-scalar-updated-alone",
+								"root-dotted-literal-parent-scalar-updated-alone",
+								"root-dotted-unicode-escaped-parent-scalar-updated-alone"
+							]
+						},
+						{
+							"case": "removes only the authentic ",
+							"vectors": [
+								"root-dotted-bare-scalar-removed-alone",
+								"root-dotted-quoted-leaf-scalar-removed-alone",
+								"root-dotted-quoted-parent-scalar-removed-alone",
+								"root-dotted-literal-parent-scalar-removed-alone",
+								"root-dotted-unicode-escaped-parent-scalar-removed-alone"
+							]
+						},
+						{
+							"case": "retains every byte of an unchanged ",
+							"vectors": [
+								"root-dotted-bare-scalar-unchanged-keeps-every-byte",
+								"root-dotted-quoted-leaf-scalar-unchanged-keeps-every-byte",
+								"root-dotted-quoted-parent-scalar-unchanged-keeps-every-byte",
+								"root-dotted-literal-parent-scalar-unchanged-keeps-every-byte",
+								"root-dotted-unicode-escaped-parent-scalar-unchanged-keeps-every-byte"
+							]
+						},
+						{
+							"case": "retains case-distinct root neighbors and replaces a multiline scalar through its complete physical range",
+							"vectors": [
+								"root-dotted-case-distinct-neighbours-kept-and-multiline-scalar-replaced-whole"
+							]
+						},
+						{
+							"case": "preserves stream BOM and final newline ownership while updating or deleting a first root leaf",
+							"vectors": [
+								"root-dotted-bom-kept-when-updating-a-first-leaf",
+								"root-dotted-bom-kept-when-deleting-a-first-leaf",
+								"root-dotted-final-newline-ownership-kept-when-updating-the-last-leaf"
+							]
+						},
+						{
+							"case": "updates the newly supported root-inline scalar without claiming its parent",
+							"vectors": ["root-inline-scalar-updated-without-claiming-its-parent"]
+						},
+						{
+							"case": "refuses root container mutation and subtree collisions without manufacturing authority",
+							"vectors": [
+								"root-container-mutation-or-subtree-collision-1-refused",
+								"root-container-mutation-or-subtree-collision-2-refused",
+								"root-container-mutation-or-subtree-collision-3-refused",
+								"root-container-mutation-or-subtree-collision-4-refused",
+								"root-container-mutation-or-subtree-collision-5-refused"
+							]
+						},
+						{
+							"case": "refuses replacing a root scalar while publishing a descendant in the same batch",
+							"vectors": ["root-scalar-replaced-while-publishing-a-descendant-refused"]
+						},
+						{
+							"case": "retains root scalar refusal for nonfinite requested values",
+							"vectors": [
+								"root-scalar-nonfinite-infinity-refused",
+								"root-scalar-nonfinite-negative-infinity-refused",
+								"root-scalar-nonfinite-not-a-number-refused"
+							]
+						},
+						{
+							"case": "refuses duplicate aliases, stale source and a changed root scalar into a dictionary",
+							"vectors": [
+								"root-duplicate-aliases-refused",
+								"root-scalar-changed-into-a-dictionary-refused",
+								"root-changed-source-snapshot-refused"
+							]
+						},
+						{
+							"case": "preserves precise requested root numbers and signed zero through the optional scalar encoder",
+							"vectors": [
+								"root-dotted-precise-precise-decimal-published-exactly",
+								"root-dotted-precise-representable-large-integer-published-exactly",
+								"root-dotted-precise-negative-zero-published-exactly"
+							]
+						},
+						{
+							"case": "publishes exact ",
+							"vectors": [
+								"header-scalar-precise-decimal-published-exactly",
+								"header-scalar-representable-large-integer-published-exactly",
+								"header-scalar-negative-zero-published-exactly"
+							]
+						},
+						{
+							"case": "uses the same precise numeric capability for a new key under its existing header",
+							"vectors": ["header-scalar-new-key-gets-the-precise-numeric-literal"]
+						},
+						{
+							"case": "splices only the authentic ",
+							"vectors": [
+								"root-inline-nested-numeric",
+								"root-inline-first-removal",
+								"root-inline-middle-removal",
+								"root-inline-last-removal",
+								"root-inline-only-removal",
+								"root-inline-adjacent-removals",
+								"root-inline-all-removals",
+								"root-inline-nested-empty-parent-retained",
+								"root-inline-nested-dotted-inline-member",
+								"root-inline-disjoint-edits",
+								"root-inline-opaque-escaped-delimiters",
+								"root-inline-quoted-root-owner"
+							]
+						},
+						{
+							"case": "retains every byte and signed zero of an exact root-inline no-op",
+							"vectors": [
+								"root-inline-exact-no-op-keeps-every-byte-and-signed-zero",
+								"root-inline-signed-zero-changed-to-integer-zero"
+							]
+						},
+						{
+							"case": "preserves BOM and exact trailing newline ownership",
+							"vectors": ["root-inline-bom-and-trailing-newline-ownership-kept"]
+						},
+						{
+							"case": "keeps source collisions, closed parents and new-member additions refused",
+							"vectors": [
+								"root-inline-refused-case-twin-member",
+								"root-inline-refused-case-twin-table",
+								"root-inline-refused-duplicate-member",
+								"root-inline-refused-table-header-beside-the-inline-table",
+								"root-inline-refused-closed-scalar-parent",
+								"root-inline-refused-closed-array-parent",
+								"root-inline-refused-literal-dot-key",
+								"root-inline-refused-parent-and-child-in-one-batch",
+								"root-inline-refused-changed-type",
+								"root-inline-new-member-appended"
+							]
+						},
+						{
+							"case": "refuses stale source before any inline edit",
+							"vectors": ["root-inline-stale-source-refused-before-any-edit"]
+						},
+						{
+							"case": "publishes exact section scalar image: ",
+							"vectors": [
+								"section-dotted-boolean-leaf",
+								"section-dotted-string-leaf",
+								"section-dotted-nested-header",
+								"section-dotted-quoted-header",
+								"section-dotted-quoted-literal-header-segment",
+								"section-dotted-precise-finite-number",
+								"section-dotted-negative-zero",
+								"section-dotted-explicit-leaf-deletion",
+								"section-dotted-multiline-scalar-record",
+								"section-dotted-two-separate-scalar-owners"
+							]
+						},
+						{
+							"case": "retains the complete original section scalar no-op image",
+							"vectors": ["section-dotted-original-no-op-image-kept"]
+						},
+						{
+							"case": "retains scoped scalar safety refusal ",
+							"vectors": [
+								"section-dotted-safety-refusal-1",
+								"section-dotted-safety-refusal-2",
+								"section-dotted-safety-refusal-3",
+								"section-dotted-safety-refusal-4",
+								"section-dotted-safety-refusal-5",
+								"section-dotted-safety-refusal-6",
+								"section-dotted-safety-refusal-7",
+								"section-dotted-safety-refusal-8",
+								"section-dotted-safety-refusal-9",
+								"section-dotted-safety-refusal-10",
+								"section-dotted-safety-refusal-11"
+							]
+						},
+						{
+							"case": "refuses stale section source before preparing an owned scalar",
+							"vectors": ["section-dotted-stale-source-refused-before-an-owned-scalar"]
+						},
+						{
+							"case": "refuses overlapping section scalar and ancestor requests",
+							"vectors": ["section-dotted-overlapping-scalar-and-ancestor-requests-refused"]
+						}
+					]
 				}
 			],
 			"schema": "toml_batch_write"
+		},
+		{
+			"family": "toml_inline_scalar",
+			"schema": "toml_inline_scalar",
+			"corpus": "toml/inline_scalar_vectors.json",
+			"entry_point": "source_inline_scalar_parents(source, rows), then the writer's prepare step on (source, rows)",
+			"windows_consumer": "One AHK consumer calls the Windows writer's inline hint step and prepare step on (source, rows) and decodes the candidate for the decoded checks.",
+			"sources": [
+				{
+					"contract": "toml_batch_existing_key_contract.lua",
+					"moved": [
+						{
+							"case": "withholds the entire mixed inline group ",
+							"vectors": [
+								"whole-group-withheld-wrong-scalar-type",
+								"whole-group-withheld-delete-of-an-array-member",
+								"whole-group-withheld-delete-below-an-array-member",
+								"whole-group-withheld-delete-below-a-scalar-member",
+								"whole-group-withheld-parent-replaced-by-a-scalar",
+								"whole-group-withheld-infinite-number",
+								"whole-group-withheld-not-a-number",
+								"whole-group-withheld-case-twin-of-the-parent",
+								"whole-group-withheld-scalar-group-with-a-parent-replacement",
+								"whole-group-withheld-delete-group-with-an-overlapping-parent-delete"
+							]
+						},
+						{
+							"case": "withholds a whole group for overlapping new scalar and parent requests",
+							"vectors": ["whole-group-withheld-overlapping-new-scalar-and-parent"]
+						},
+						{
+							"case": "withholds array-table and literal-dot scalar source hints",
+							"vectors": [
+								"array-table-source-hint-withheld",
+								"literal-dot-key-source-hint-withheld"
+							]
+						},
+						{
+							"case": "keeps an empty literal identity on its existing native whole-parent route",
+							"vectors": ["empty-literal-identity-stays-on-the-whole-parent-route"]
+						},
+						{
+							"case": "inserts ",
+							"vectors": [
+								"insertion-root-nested-scalar",
+								"insertion-relative-scalar",
+								"insertion-empty-source-object",
+								"insertion-precise-finite-number",
+								"insertion-negative-zero",
+								"insertion-quoted-key-and-string"
+							]
+						},
+						{
+							"case": "sorts only new sibling members and retains mixed replacement deletion and foreign spans",
+							"vectors": [
+								"insertion-sorts-only-new-siblings-and-keeps-replacement-deletion-and-foreign-spans"
+							]
+						},
+						{
+							"case": "refuses insertion through ",
+							"vectors": [
+								"insertion-refused-through-scalar-parent",
+								"insertion-refused-through-array-parent",
+								"insertion-refused-through-missing-intermediate-parent",
+								"insertion-refused-through-existing-scalar-intermediate",
+								"insertion-refused-through-array-intermediate",
+								"insertion-refused-through-new-structured-value",
+								"insertion-refused-through-literal-dotted-key",
+								"insertion-refused-through-source-case-twin",
+								"insertion-refused-through-dotted-implicit-parent",
+								"insertion-refused-through-nonfinite-scalar"
+							]
+						},
+						{
+							"case": "publishes exact requested integer through ",
+							"vectors": [
+								"integer-above-double-precision-published-exactly-through-root-inline",
+								"integer-above-double-precision-published-exactly-through-root-dotted",
+								"integer-above-double-precision-published-exactly-through-section-dotted",
+								"integer-above-double-precision-published-exactly-through-header-leaf",
+								"integer-above-double-precision-published-exactly-through-section-inline"
+							]
+						},
+						{
+							"case": "retains exact numeric intent for canonical token ",
+							"vectors": [
+								"canonical-numeric-token-minus9007199254740993",
+								"canonical-numeric-token-9_007_199_254_740_993",
+								"canonical-numeric-token-0x20000000000001",
+								"canonical-numeric-token-0o400000000000000001",
+								"canonical-numeric-token-0b100000000000000000000000000000000000000000000000000001",
+								"canonical-numeric-token-9007199254740991",
+								"canonical-numeric-token-plus9_007_199_254_740_992",
+								"canonical-numeric-token-9007199254740994",
+								"canonical-numeric-token-minus9007199254740991",
+								"canonical-numeric-token-minus9_007_199_254_740_992",
+								"canonical-numeric-token-minus9007199254740994",
+								"canonical-numeric-token-1dot0000000000000001e16",
+								"canonical-numeric-token-0dot1",
+								"canonical-numeric-token-minus0dot0"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"family": "toml_leaf_rows",
+			"schema": "toml_leaf_rows",
+			"corpus": "toml/leaf_rows_vectors.json",
+			"entry_point": "leaf-row planner prepare(source, operations) then the batch writer's prepare step",
+			"windows_consumer": "One AHK consumer calls the Windows leaf-row planner and batch writer in that order and decodes the candidate for the decoded checks.",
+			"sources": [
+				{
+					"contract": "toml_leaf_rows_contract.lua",
+					"moved": [
+						{
+							"case": "writes bare leaves as ordinary table rows in an absent file",
+							"vectors": ["bare-leaves-written-as-ordinary-table-rows-in-an-absent-file"]
+						},
+						{
+							"case": "creates one quoted inline table for a runtime identity and its bare siblings",
+							"vectors": ["runtime-identity-and-bare-siblings-in-one-quoted-inline-table"]
+						},
+						{
+							"case": "rewrites an inline table whole and keeps its unknown entries",
+							"vectors": ["inline-table-rewritten-whole-keeping-unknown-entries"]
+						},
+						{
+							"case": "removes an inline table that its deletions leave empty",
+							"vectors": ["inline-table-left-empty-by-deletions-is-removed"]
+						},
+						{
+							"case": "addresses sections below a quoted table header",
+							"vectors": ["sections-below-a-quoted-table-header-addressed"]
+						},
+						{
+							"case": "refuses malformed operations",
+							"vectors": [
+								"malformed-operation-1-refused",
+								"malformed-operation-2-refused",
+								"malformed-operation-3-refused",
+								"malformed-operation-4-refused",
+								"malformed-source-refused"
+							]
+						}
+					]
+				},
+				{
+					"contract": "toml_batch_existing_key_contract.lua",
+					"moved": [
+						{
+							"case": "keeps genuine source-shaped scalar requests exact despite decoded integer aliasing",
+							"vectors": ["source-shaped-scalar-request-exact-despite-decoded-integer-aliasing"]
+						},
+						{
+							"case": "preserves authentic unrelated numeric tokens inside a source-shaped carried model",
+							"vectors": ["unrelated-numeric-tokens-kept-inside-a-source-shaped-carried-model"]
+						}
+					]
+				}
+			]
+		},
+		{
+			"family": "toml_hotstring_reader",
+			"schema": "toml_hotstring_reader",
+			"corpus": "toml/hotstring_reader_vectors.json",
+			"entry_point": "hotstring TOML reader parse_text(text) -> document, committed",
+			"windows_consumer": "One AHK consumer calls the Windows hotstring TOML reader on each text and compares the committed verdict, sections, first output, order, source entry count and metadata delays.",
+			"sources": [
+				{
+					"contract": "toml_quoted_headers_contract.lua",
+					"moved": [
+						{
+							"case": "(toml-hotstring-header) rejects an incomplete or malformed header ",
+							"vectors": [
+								"malformed-header-1-refused",
+								"malformed-header-2-refused",
+								"malformed-header-3-refused",
+								"malformed-header-4-refused",
+								"malformed-header-5-refused",
+								"malformed-header-6-refused",
+								"malformed-header-7-refused",
+								"malformed-header-8-refused",
+								"malformed-header-9-refused",
+								"malformed-header-10-refused"
+							]
+						},
+						{
+							"case": "(toml-hotstring-header) preserves a complete unfamiliar header ",
+							"vectors": [
+								"complete-unfamiliar-header-1-preserved",
+								"complete-unfamiliar-header-2-preserved",
+								"complete-unfamiliar-header-3-preserved",
+								"complete-unfamiliar-header-4-preserved",
+								"complete-unfamiliar-header-5-preserved"
+							]
+						},
+						{
+							"case": "(toml-hotstring-header) preserves the historical literal name ",
+							"vectors": [
+								"historical-literal-name-1-preserved",
+								"historical-literal-name-2-preserved",
+								"historical-literal-name-3-preserved",
+								"historical-literal-name-4-preserved",
+								"historical-literal-name-5-preserved",
+								"historical-literal-name-6-preserved",
+								"historical-literal-name-7-preserved",
+								"historical-literal-name-8-preserved",
+								"historical-literal-name-9-preserved",
+								"historical-literal-name-10-preserved",
+								"historical-literal-name-11-preserved",
+								"historical-literal-name-12-preserved"
+							]
+						},
+						{
+							"case": "(toml-raw-comment) reads the exact literal name ",
+							"vectors": [
+								"exact-literal-name-1-before-a-comment",
+								"exact-literal-name-2-before-a-comment",
+								"exact-literal-name-3-before-a-comment",
+								"exact-literal-name-4-before-a-comment",
+								"exact-literal-name-5-before-a-comment",
+								"exact-literal-name-6-before-a-comment",
+								"exact-literal-name-7-before-a-comment",
+								"exact-literal-name-8-before-a-comment",
+								"exact-literal-name-9-before-a-comment"
+							]
+						},
+						{
+							"case": "(toml-raw-comment) never reinterprets the accepted identity ",
+							"vectors": [
+								"accepted-identity-1-never-reinterpreted",
+								"accepted-identity-2-never-reinterpreted"
+							]
+						},
+						{
+							"case": "(toml-raw-comment) retains the existing refusal for ",
+							"vectors": [
+								"existing-refusal-1-retained",
+								"existing-refusal-2-retained",
+								"existing-refusal-3-retained",
+								"existing-refusal-4-retained"
+							]
+						},
+						{
+							"case": "(toml-hotstring-header) preserves header-looking value continuation ",
+							"vectors": [
+								"header-looking-value-continuation-1-preserved",
+								"header-looking-value-continuation-2-preserved",
+								"header-looking-value-continuation-3-preserved",
+								"header-looking-value-continuation-4-preserved"
+							]
+						},
+						{
+							"case": "(toml-hotstring-header) keeps quoted metadata paths distinct from literal rule names",
+							"vectors": ["quoted-metadata-path-distinct-from-the-literal-rule-name"]
+						},
+						{
+							"case": "(toml-hotstring-value-eof) refuses an unfinished logical value ",
+							"vectors": [
+								"unfinished-logical-value-1-refused",
+								"unfinished-logical-value-2-refused",
+								"unfinished-logical-value-3-refused",
+								"unfinished-logical-value-4-refused"
+							]
+						},
+						{
+							"case": "(toml-hotstring-value-eof) admits its completed logical-value neighbour ",
+							"vectors": [
+								"completed-logical-value-1-admitted",
+								"completed-logical-value-2-admitted",
+								"completed-logical-value-3-admitted",
+								"completed-logical-value-4-admitted"
+							]
+						}
+					]
+				}
+			]
 		},
 		{
 			"family": "menu_numbered_caption",
@@ -225,54 +721,1443 @@
 								"foreign-domain",
 								"foreign-section"
 							]
-						}
-					]
-				}
-			]
-		},
-		{
-			"family": "toml_leaf_rows",
-			"schema": "toml_leaf_rows",
-			"corpus": "toml/leaf_rows_vectors.json",
-			"entry_point": "leaf-row planner prepare(source, operations) then the batch writer's prepare step",
-			"windows_consumer": "One AHK consumer calls the Windows leaf-row planner and batch writer in that order and decodes the candidate for the decoded checks.",
-			"sources": [
-				{
-					"contract": "toml_leaf_rows_contract.lua",
-					"moved": [
-						{
-							"case": "writes bare leaves as ordinary table rows in an absent file",
-							"vectors": ["bare-leaves-written-as-ordinary-table-rows-in-an-absent-file"]
 						},
 						{
-							"case": "creates one quoted inline table for a runtime identity and its bare siblings",
-							"vectors": ["runtime-identity-and-bare-siblings-in-one-quoted-inline-table"]
-						},
-						{
-							"case": "rewrites an inline table whole and keeps its unknown entries",
-							"vectors": ["inline-table-rewritten-whole-keeping-unknown-entries"]
-						},
-						{
-							"case": "removes an inline table that its deletions leave empty",
-							"vectors": ["inline-table-left-empty-by-deletions-is-removed"]
-						},
-						{
-							"case": "addresses sections below a quoted table header",
-							"vectors": ["sections-below-a-quoted-table-header-addressed"]
-						},
-						{
-							"case": "refuses malformed operations",
+							"absent": [
+								"french_probe",
+								"own.clear_keep",
+								"hotstrings.groups..invalid",
+								"future.setting"
+							],
 							"vectors": [
-								"malformed-operation-1-refused",
-								"malformed-operation-2-refused",
-								"malformed-operation-3-refused",
-								"malformed-operation-4-refused",
-								"malformed-source-refused"
+								"direct-plan-keeps-only-its-own-declarations-on-restore",
+								"direct-plan-keeps-only-its-own-declarations-on-clear",
+								"unknown-scope",
+								"unknown-mode",
+								"unknown-parameter-path",
+								"foreign-cyclic-or-missing-included-declarations-are-not-traversed",
+								"runtime-owned-leaves-collected-once-without-static-or-unknown-siblings",
+								"unknown-group-below-a-module",
+								"setting-outside-the-scope",
+								"empty-path-segment",
+								"a-later-provider-raises",
+								"a-provider-that-is-not-a-function"
 							]
 						}
 					]
 				}
 			]
+		}
+	],
+	"reasons": {
+		"lua_identity": "Asserts the identity of a closure or table (rawequal) or mutates a returned table to prove it was a copy. A port asserts identity with its own references.",
+		"lua_hooks": "Proves user-controlled metatable hooks (__index, __len, __eq, __tostring, __pairs) are never run. Lua-only mechanism: the AutoHotkey equivalent (__Get, __Enum, __Call) needs its own test.",
+		"lua_table_shape": "Depends on Lua table shapes JSON cannot carry (a sparse array, a hole, a named key in an array).",
+		"fault_injection": "Replaces a production function (an encoder, a codec, a loaded module) to force a fault, then repairs it. A port injects faults its own way.",
+		"ordered_callbacks": "Asserts which injected getters, actions or participants ran and in which order, around menu rows that are already JSON where row_corpus names the corpus. The Windows side ports the assertions as code over the same rows.",
+		"transaction_sequence": "A multi-step apply, revert or retry with retained debt, reentrancy or settlement order across participants.",
+		"file_effects": "Backup, publication and restoration of real or virtual files and the exact bytes of several files.",
+		"in_memory_document": "Encodes against a decoded document and its shape receipt after the test mutated the Lua table in between.",
+		"internal_api": "Calls an internal module surface directly (scanner records, span evidence, planner row counts, script projection, sequences whose output feeds the next step) whose shape is the Lua module's own; data in principle once that surface is a named entry point.",
+		"global_state": "Depends on a process-wide writer registry (refuse_writes, sparse defaults).",
+		"generated_manifest": "Asserts over the generated manifest data itself, not over inputs; Windows shares the generated manifest and should gate it by its own check.",
+		"snapshot_argument": "Needs two different sources (the hint source and the source read afterwards) or a global fence; data in principle with a second source field."
+	},
+	"contracts": [
+		{
+			"contract": "config_scope_composition_contract.lua",
+			"lua_sites": 40,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "applies registered participants in manifest order and reports the missing ones",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "reverts committed participants newest first when a later one refuses",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "treats a raising participant as a refusal and rolls back",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "waits for an asynchronous terminal before the next participant",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "retains a refused rollback and settles it in the same order on retry",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses before any change while a participant retains its own debt",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses a participant registered outside the composite scope",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "reports a registry provider that raises instead of letting it escape",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses an incomplete participant and an unknown mode before any change",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "adapts a synchronous owner so the composition reverts the owner that committed",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "ignores a duplicate settlement instead of running the next participant twice",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "reverts the actual committed source and runtime after its provider is replaced",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "preserves a same-path successor and retains the original inverse until exact repair",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "releases only its committed inverse after a later owner replaced the provider",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "keeps the failed apply owner",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses reentrant application without replacing the in-flight real-file owner",
+					"reason": "file_effects"
+				},
+				{
+					"case": "retains a raising apply",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses a successful request whose retained owner is",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "admits no replacement while the latest provider retains pre-apply debt",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "keeps an unmodified refusal without an owner retryable",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "never forgets a committed transaction on its successful no-op retry",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "keeps its actual inverse on explicit release refusal while void success stays supported",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "owns",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "retains no primary mutation when",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "retains an inverse until its released claim can be reacquired",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "keeps all claims while runtime compensation refuses",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "settles an acknowledged inverse release without repeating runtime restoration",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses reentrant mutation while a native claim is being acquired",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "guards reentrant admission before the first native claim",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses sparse and named native claim lists instead of dropping an owner",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "retains original native port identities after its caller mutates the descriptor list",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "separates public pending from the exact private primary-compensation token",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses a malformed private native token before any acquisition",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "reclaims acknowledged tail admission gates while forward release debt remains",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "reclaims tail gates after an acknowledged explicit inverse without repeating that inverse",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "retains refused tail reacquisition even after the primary inverse acknowledged",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "reclaims only actually acquired gates during a partial acquisition cleanup refusal",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "retains exact two-file finalization on",
+					"reason": "file_effects"
+				},
+				{
+					"case": "refuses reentrant apply and retry while the exact finalization release runs",
+					"reason": "transaction_sequence"
+				}
+			]
+		},
+		{
+			"contract": "config_scope_file_contract.lua",
+			"lua_sites": 6,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "publishes after a verified backup and restores the exact bytes",
+					"reason": "file_effects"
+				},
+				{
+					"case": "refuses to publish over bytes another writer changed after preparation",
+					"reason": "file_effects"
+				},
+				{
+					"case": "keeps a refused restoration owed until the published bytes are back",
+					"reason": "file_effects"
+				},
+				{
+					"case": "creates an absent file and removes only its own candidate on restore",
+					"reason": "file_effects"
+				},
+				{
+					"case": "touches nothing when the plan leaves the bytes unchanged",
+					"reason": "file_effects"
+				},
+				{
+					"case": "retains cleanup after a refused publication effect=",
+					"reason": "transaction_sequence"
+				}
+			]
+		},
+		{
+			"contract": "config_scope_plan_contract.lua",
+			"lua_sites": 14,
+			"data_driven": [
+				{
+					"case": "removes only validated parameter domains for both clear and recommendation restore",
+					"corpus": "config_scope/plan_vectors.json"
+				},
+				{
+					"case": "requires exact host ownership and refuses malformed or non-parameter actions",
+					"corpus": "config_scope/plan_vectors.json"
+				},
+				{
+					"case": "(config-scope-plan)",
+					"corpus": "config_scope/plan_vectors.json"
+				},
+				{
+					"case": "(config-scope-plan) refuses incomplete inventory:",
+					"corpus": "config_scope/plan_vectors.json"
+				},
+				{
+					"case": "(config-scope-plan)",
+					"corpus": "config_scope/plan_vectors.json"
+				},
+				{
+					"case": "(config-scope-plan) refuses a direct plan:",
+					"corpus": "config_scope/plan_vectors.json"
+				},
+				{
+					"case": "(config-scope-plan)",
+					"corpus": "config_scope/plan_vectors.json"
+				}
+			],
+			"stays_in_lua": [
+				{
+					"case": "retains generated dynamic scalar types before a native runtime erases false versus zero",
+					"reason": "generated_manifest"
+				},
+				{
+					"case": "refuses a sparse or named path list instead of returning a partial successful plan",
+					"reason": "lua_table_shape"
+				},
+				{
+					"case": "(",
+					"reason": "generated_manifest"
+				},
+				{
+					"case": "plans global",
+					"reason": "generated_manifest"
+				},
+				{
+					"case": "does not resolve an included native backend for direct planning",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "hands out a detached plan on every call",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "routes separate-file presets for restore and clear without inventing config rows",
+					"reason": "generated_manifest"
+				}
+			]
+		},
+		{
+			"contract": "config_scope_script_contract.lua",
+			"lua_sites": 10,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "publishes only its declared",
+					"reason": "file_effects"
+				},
+				{
+					"case": "reconstructs actual native consumers from aliases after a sparse canonical clear",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "honors the actual boot schema refusal before any backup or native alias write",
+					"reason": "file_effects"
+				},
+				{
+					"case": "refuses paused and invalid requests before source or alias mutation",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses an existing wrong-kind script source:",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses a same-valued declaration owner replacement before file or aliases are written",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "refuses a same-valued declaration successor interposed by the real config read",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses changed declaration metadata before file or aliases are written",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "compensates a real partially applied translation backend that explicitly refuses",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "retains the real participant through composition finalization without replay",
+					"reason": "transaction_sequence"
+				}
+			]
+		},
+		{
+			"contract": "config_scope_script_field_contract.lua",
+			"lua_sites": 7,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "publishes its actual consumer and restores the opaque inverse after reacquisition",
+					"reason": "file_effects"
+				},
+				{
+					"case": "refuses wrong field kinds, foreign receipts and callback setter reentry",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "keeps exact live-parent admission through an equal-valued module replacement",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "refuses identity impostors whose equality metamethod claims the retained owner",
+					"reason": "lua_hooks"
+				},
+				{
+					"case": "refuses an actual already scheduled error without canceling its presentation",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses the existing locale reload instead of cancelling or replaying it",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "forgets only finalized native inverse data and acknowledges repeat cleanup",
+					"reason": "transaction_sequence"
+				}
+			]
+		},
+		{
+			"contract": "config_scope_script_runtime_contract.lua",
+			"lua_sites": 15,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "retains a real native inverse across release and composition reacquisition",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses forged receipts, wrong owners and noncanonical values without changing state",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses ordinary setter reentry throughout the actual field claim",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "preserves a foreign successor even when its value matches the prior publication",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses a replaced live module with the same scalar without touching either owner",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "restores an actual native setter that mutates before its terminal refusal",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "keeps the native gate through real setter callback reentry",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "fences a same-value live successor after the publication getter",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "refuses a same-value successor created during the actual final getter",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "refuses a live log backend successor before acquiring its native field",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "refuses a same-threshold live backend replacement without changing its retired receiver",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "refuses a same-threshold backend interposed by its actual",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "rejects equal-valued owner impostors by raw identity",
+					"reason": "lua_hooks"
+				},
+				{
+					"case": "forgets its inverse only after primary finalization and gate release",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "keeps the gate until literal primary compensation acknowledgement",
+					"reason": "transaction_sequence"
+				}
+			]
+		},
+		{
+			"contract": "config_scope_transaction_contract.lua",
+			"lua_sites": 30,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "makes ordinary registered configuration writes sparse without touching unrelated files",
+					"reason": "file_effects"
+				},
+				{
+					"case": "clears owned leaves while preserving unknown nested keys and unrelated consent",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "restores recommendations without acquiring absent AI or metrics consent",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses a failed backup before touching runtime or the destination",
+					"reason": "file_effects"
+				},
+				{
+					"case": "compensates a throwing native application without publishing the candidate",
+					"reason": "file_effects"
+				},
+				{
+					"case": "compensates a refused publication without losing unknown bytes",
+					"reason": "file_effects"
+				},
+				{
+					"case": "retains failed rollback debt and refuses another transaction until restored",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "preserves an external edit arriving during runtime application",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "never overwrites an existing backup",
+					"reason": "file_effects"
+				},
+				{
+					"case": "removes only runtime-owned ordinary leaves and backs up the exact unknown neighbors",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "clears a quoted extension leaf with exact backup and neighbor preservation",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "removes only validated binding parameters while preserving other domains and unknown neighbors",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "refuses a malformed inline macOS parameter table before backup or runtime publication",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "clears the original inline macOS parameter with exact bytes, backup and typed reload",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "refuses preset scopes before reading, backing up or touching runtime",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "publishes the preset file with a verified backup and leaves config.toml untouched",
+					"reason": "file_effects"
+				},
+				{
+					"case": "creates an absent preset file without creating config.toml",
+					"reason": "file_effects"
+				},
+				{
+					"case": "keeps an external preset edit made during runtime application",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "restores a published preset when the configuration publication is refused",
+					"reason": "file_effects"
+				},
+				{
+					"case": "reverts runtime and every published file, removing a file it created",
+					"reason": "file_effects"
+				},
+				{
+					"case": "puts the exact configuration bytes back after a committed single-file scope",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "retains a revert refused by a later edit until the edit is undone",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "release forgets the inverse so a composed commit cannot be reverted",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "retains",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "proves absence only after the retained removal lease releases",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "refuses cloned and altered prepared snapshots without issuing authority",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "refuses withdrawn preparation authority instead of trusting an accessor",
+					"reason": "lua_hooks"
+				},
+				{
+					"case": "retires an old preparation while a fresh explicit current intent can succeed",
+					"reason": "transaction_sequence"
+				},
+				{
+					"case": "rechecks preparation after runtime and compensates without primary publication",
+					"reason": "transaction_sequence"
+				}
+			]
+		},
+		{
+			"contract": "menu_caption_layout_contract.lua",
+			"lua_sites": 5,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "preserves exact literal prefixes, suffixes and values in",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "keeps omission and status getter-free",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "keeps newly introduced metadata physical on an unrelated include",
+					"reason": "lua_identity"
+				}
+			],
+			"row_corpus": "menus/inert_caption_layouts.json"
+		},
+		{
+			"contract": "menu_command_group_affix_contract.lua",
+			"lua_sites": 13,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "projects exact selected captions and finished child identity in",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "materializes template captions once with native callbacks withheld in",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "binds exact main-build captions before native group builders in",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "keeps empty native String details genuine and preserves selected checked false",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "retains the original current pause gate and native command return",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "keeps the existing disabled reason stand-in without a native callback",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "preserves missing and foreign command owners before data getters",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "keeps no-layout main commands and groups getter-free",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "keeps no-layout command readiness before its original translated caption read",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "keeps no-layout template child acquisition before its original translated caption read",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "retains original no-layout template caption evaluation",
+					"reason": "ordered_callbacks"
+				}
+			],
+			"row_corpus": "menus/command_group_caption_layouts.json"
+		},
+		{
+			"contract": "menu_command_literal_prefix_contract.lua",
+			"lua_sites": 7,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "keeps hand-authored selected and built images exact in",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "prefixes final template and legacy getter captions exactly once in",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "keeps prefixed disabled stand-ins inert in",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "keeps platform-grey command prefixes literal without exposing a callback",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses a literal prefix on",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses a withdrawn declaration and missing real command without effects",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses",
+					"reason": "ordered_callbacks"
+				}
+			],
+			"row_corpus": "menus/command_literal_prefixes.json"
+		},
+		{
+			"contract": "menu_disabled_reasons_contract.lua",
+			"lua_sites": 1,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "draws",
+					"reason": "ordered_callbacks"
+				}
+			],
+			"row_corpus": "menus/disabled_reasons.json"
+		},
+		{
+			"contract": "menu_dynamic_caption_contract.lua",
+			"lua_sites": 7,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "keeps literal values, disabled posture and header decoration in",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses behavior metadata",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses malformed caption metadata",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "does not admit dynamic captions as omittable presentation or inert status",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "distinguishes supported slots from literal escapes in hand case",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses decorator-manufactured slots for source",
+					"reason": "ordered_callbacks"
+				}
+			],
+			"row_corpus": "menus/inert_dynamic_captions.json"
+		},
+		{
+			"contract": "menu_fixed_feature_parent_contract.lua",
+			"lua_sites": 5,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "preserves all five original fixed captions in",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "uses the independent original 21-language oracle (fixed-feature-parent-contract)",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "retains the genuinely absent TapHold disabled leaf declaration (fixed-feature-parent-contract)",
+					"reason": "ordered_callbacks"
+				}
+			],
+			"row_corpus": "menus/fixed_feature_parents.json"
+		},
+		{
+			"contract": "menu_group_row_contract.lua",
+			"lua_sites": 17,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "preserves singleton",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "keeps the independently translated plain parent and genuine empty subtree in",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "retains the completed depth and every native callback without materializing items",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "refuses",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "keeps missing checked getters false and diagnostic, and propagates thrown getters",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "preserves Boolean compound short circuit and the existing public resolver",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "forwards the existing disabled predicate and its reason without touching the subtree",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "reads the authentic caption group once in",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "refuses a missing actual caption getter and admits its explicit repaired receipt",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "refuses the actual",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses nonstring identities without calling their tostring hooks",
+					"reason": "lua_hooks"
+				},
+				{
+					"case": "generic group preserves native child and translated readiness",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "generic reasoned group preserves the original builder disabled state",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "generic group final getter refuses",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "retains the existing physical updater choice with a nonempty genuine context",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses API ownership withdrawn through a final getter installed metatable",
+					"reason": "lua_identity"
+				}
+			]
+		},
+		{
+			"contract": "menu_layout_caption_values_contract.lua",
+			"lua_sites": 8,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "preserves independent original-format captions through selected, template and built rows in",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "hidden other-driver caption rows require no native data or mutation owners",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "disabled reason stand-ins retain the fully formatted native values",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "a genuine native record parent retains its completed subtree identity and literal caption",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "refuses",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "retained native callbacks refuse withdrawn declaration and preserve exact native results",
+					"reason": "ordered_callbacks"
+				}
+			],
+			"row_corpus": "menus/layout_caption_values.json"
+		},
+		{
+			"contract": "menu_magic_frame_contract.lua",
+			"lua_sites": 6,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "admits a plain frame of the expected size and sees it unchanged",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "honours a named frame and its own expected size",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses a frame that is missing, short, long or sparse",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses a frame carrying a function, a metatable or a nested table",
+					"reason": "lua_hooks"
+				},
+				{
+					"case": "withholds publication once a captured field or identity changed",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses a missing snapshot and a swapped root",
+					"reason": "ordered_callbacks"
+				}
+			]
+		},
+		{
+			"contract": "menu_native_child_rows.lua",
+			"lua_sites": 6,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "retains complete hierarchy, flags, image and exact callback identity",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "admits genuine empty child arrays and independent shared subtrees",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "refuses",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "uses only raw plain arrays and rows without invoking metamethods",
+					"reason": "lua_hooks"
+				},
+				{
+					"case": "refuses cycles and depth nine before returning any partial rows",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "admits or refuses without invoking IO, logger, translation or child functions",
+					"reason": "lua_identity"
+				}
+			]
+		},
+		{
+			"contract": "menu_native_composition.lua",
+			"lua_sites": 7,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "preserves actual row resource callback and target identities without construction effects",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "owns the download boundary from the actual completed receipt:",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "refuses all publication atomically:",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "a held composer rechecks its exact actual canonical owner:",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "policy is admitted before any native producer:",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses a prefix submenu that aliases the target before any write:",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "preserves shared row resource callback and non-target submenu identities",
+					"reason": "lua_identity"
+				}
+			]
+		},
+		{
+			"contract": "menu_numbered_caption_contract.lua",
+			"lua_sites": 5,
+			"data_driven": [
+				{
+					"case": "preserves literal and repeated original numbered value for",
+					"corpus": "menu/numbered_caption_vectors.json"
+				},
+				{
+					"case": "refuses unsupported original numbered grammar",
+					"corpus": "menu/numbered_caption_vectors.json"
+				},
+				{
+					"case": "refuses",
+					"corpus": "menu/numbered_caption_vectors.json"
+				}
+			],
+			"stays_in_lua": [
+				{
+					"case": "hands off the exact existing completed numbered parent (numbered-caption-contract)",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "retains the exact default percent formatter and literal default numbered text (numbered-caption-contract)",
+					"reason": "ordered_callbacks"
+				}
+			]
+		},
+		{
+			"contract": "menu_off_platform.lua",
+			"lua_sites": 0,
+			"note": "A helper module for the menu contracts: it registers no case of its own.",
+			"data_driven": [],
+			"stays_in_lua": []
+		},
+		{
+			"contract": "menu_parent_source_contract.lua",
+			"lua_sites": 9,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "admits a plain",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses a",
+					"reason": "lua_hooks"
+				},
+				{
+					"case": "admits a",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses a renderer that lacks get_root, build or group_row for",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "reports a change of the",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "lets get_root raise for Debug, Configuration and About but not for Metrics",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "requires a child and a plain label for About only",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "raises on an unknown section instead of guessing one",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "checks raw dense arrays without metamethods",
+					"reason": "lua_hooks"
+				}
+			]
+		},
+		{
+			"contract": "menu_personal_info_source_contract.lua",
+			"lua_sites": 5,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "admits the registered plain renderer and returns its own template owner",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses a renderer that is not the registered infra.manifest_menu",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "refuses a renderer with a metatable or a missing owner",
+					"reason": "lua_hooks"
+				},
+				{
+					"case": "refuses a declaration that is not the single plain editor command",
+					"reason": "lua_hooks"
+				},
+				{
+					"case": "reports false once the retained declaration or the facade changed",
+					"reason": "lua_hooks"
+				}
+			]
+		},
+		{
+			"contract": "menu_platform_lookup.lua",
+			"lua_sites": 8,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "retains caption readiness checked state and exact action acknowledgment:",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "rejects duplicate visible identities before any readiness or native action",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "ignores multiple hidden identities when exactly one native identity is visible",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "withdrawn visible declaration blocks its held action while retaining the hidden sibling",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "new visible ambiguity blocks a previously admitted retained action",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "checkbox provider reads the visible caption and visible predicates",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "inert status comes from the native owner and rejects ambiguity or withdrawal",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "single global inert status stays shared without granting native command ownership",
+					"reason": "ordered_callbacks"
+				}
+			]
+		},
+		{
+			"contract": "menu_row_dialect_contract.lua",
+			"lua_sites": 6,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "detaches mixed native and provider children without calling their actions",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "retains an actual valid empty child and exact matching aliases",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "normalizes the finished native submenu field by the same bounded tree grammar",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "refuses a whole malformed tree instead of publishing its surviving siblings",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "refuses cycles and excessive depth without executing callbacks",
+					"reason": "ordered_callbacks"
+				},
+				{
+					"case": "uses no user-controlled field, length, equality or iteration hooks",
+					"reason": "lua_hooks"
+				}
+			]
+		},
+		{
+			"contract": "menu_separators.lua",
+			"lua_sites": 0,
+			"note": "A helper module for the menu contracts: it registers no case of its own.",
+			"data_driven": [],
+			"stays_in_lua": []
+		},
+		{
+			"contract": "menu_top_level_separator_contract.lua",
+			"lua_sites": 5,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "keeps every original source position and platform owner (declared-top-level-separator)",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "retains the original normalization and callback contract (declared-top-level-separator)",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "projects Linux",
+					"reason": "lua_hooks"
+				},
+				{
+					"case": "held actual boundary receipt refuses",
+					"reason": "lua_hooks"
+				},
+				{
+					"case": "refuses malformed actual separator source before observer credit:",
+					"reason": "ordered_callbacks"
+				}
+			],
+			"row_corpus": "menus/top_level_separators_original.json"
+		},
+		{
+			"contract": "toml_batch_existing_key_contract.lua",
+			"lua_sites": 10,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "describes the complete eligible parent and retains fresh detached hints",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "admits a new inline member next to existing ones",
+					"reason": "internal_api"
+				},
+				{
+					"case": "rejects malformed source, sparse and duplicate descriptions",
+					"reason": "lua_table_shape"
+				},
+				{
+					"case": "withholds hints when the canonical decoder does not publish shape evidence",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "refuses a wrong scalar candidate even after a hint is forged",
+					"reason": "lua_identity"
+				},
+				{
+					"case": "checks the actual typed scalar candidate after an eligible encoder is interposed",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "retains the strict actual source precondition after hint creation",
+					"reason": "snapshot_argument"
+				},
+				{
+					"case": "refuses a malicious decoded-equal integer literal before a native publisher",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "refuses an authentic scalar row minted by a decoded-equal wrong encoder",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "refuses an inserted scalar emitted with the wrong exact native integer intent",
+					"reason": "fault_injection"
+				}
+			]
+		},
+		{
+			"contract": "toml_document_shapes_contract.lua",
+			"lua_sites": 12,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "keeps the default value model and encoder independent of source receipts",
+					"reason": "in_memory_document"
+				},
+				{
+					"case": "preserves an unchanged root numeric token:",
+					"reason": "in_memory_document"
+				},
+				{
+					"case": "threads exact identities through nested maps and array dictionary members",
+					"reason": "in_memory_document"
+				},
+				{
+					"case": "does not reuse numeric authority after mutation",
+					"reason": "in_memory_document"
+				},
+				{
+					"case": "retains signed-zero authority only for the same sign:",
+					"reason": "in_memory_document"
+				},
+				{
+					"case": "retains a fresh negative zero without changing default or integer encoding",
+					"reason": "in_memory_document"
+				},
+				{
+					"case": "keeps integer-zero ownership distinct from floating source receipts",
+					"reason": "in_memory_document"
+				},
+				{
+					"case": "refuses a document from a different read generation",
+					"reason": "in_memory_document"
+				},
+				{
+					"case": "refuses named and sparse slots in source arrays instead of discarding them",
+					"reason": "in_memory_document"
+				},
+				{
+					"case": "retains an unchanged existing temporal fallback token:",
+					"reason": "in_memory_document"
+				},
+				{
+					"case": "keeps quoted temporal strings distinct and does not reuse changed fallback tokens",
+					"reason": "in_memory_document"
+				},
+				{
+					"case": "threads temporal receipts through inline records and arrays with exact owners",
+					"reason": "in_memory_document"
+				}
+			]
+		},
+		{
+			"contract": "toml_dotted_keys_contract.lua",
+			"lua_sites": 10,
+			"data_driven": [
+				{
+					"case": "inline",
+					"corpus": "toml/dotted_keys.json"
+				}
+			],
+			"stays_in_lua": [
+				{
+					"case": "script projection keeps exact paths and ignores every other table",
+					"reason": "internal_api"
+				},
+				{
+					"case": "script tables and arrays stay non-scalar",
+					"reason": "internal_api"
+				},
+				{
+					"case": "refuses an encodable but wrong owned scalar before publication",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "refuses a valid wrong numeric literal, keeps source and permits an explicit repaired retry",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "refuses an optional numeric encoder exception before candidate admission",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "strict canonical span evidence refuses malformed and non-inline values",
+					"reason": "internal_api"
+				},
+				{
+					"case": "rejects an authenticated but wrong string literal before candidate ACK",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "refuses a wrong numeric token before publication and permits explicit repaired retry",
+					"reason": "fault_injection"
+				},
+				{
+					"case": "refuses an inexact section literal and permits an explicit repaired retry",
+					"reason": "fault_injection"
+				}
+			]
+		},
+		{
+			"contract": "toml_leaf_rows_contract.lua",
+			"lua_sites": 2,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "sets, updates and removes a quoted key under an existing table header",
+					"reason": "internal_api"
+				},
+				{
+					"case": "deletes nothing where the source holds a scalar instead of the leaf",
+					"reason": "internal_api"
+				}
+			]
+		},
+		{
+			"contract": "toml_noop_contract.lua",
+			"lua_sites": 3,
+			"data_driven": [
+				{
+					"case": "toml-noop-parity",
+					"corpus": "config_noop/vectors.json"
+				}
+			],
+			"stays_in_lua": [
+				{
+					"case": "toml-noop-parity revalidates an unchanged source before acknowledgement",
+					"reason": "snapshot_argument"
+				},
+				{
+					"case": "toml-noop-parity refuses an unchanged source after the session fence",
+					"reason": "global_state"
+				}
+			]
+		},
+		{
+			"contract": "toml_quoted_headers_contract.lua",
+			"lua_sites": 8,
+			"data_driven": [],
+			"stays_in_lua": [
+				{
+					"case": "updates deletes and inserts quoted literal dotted leaves without touching nested paths",
+					"reason": "internal_api"
+				},
+				{
+					"case": "preserves sparse defaults under equivalent quoted owner paths",
+					"reason": "global_state"
+				},
+				{
+					"case": "keeps cleanup conservative while the batch deletes a quoted assignment key",
+					"reason": "internal_api"
+				},
+				{
+					"case": "equals-boundary: authentic splitter keeps key and raw RHS",
+					"reason": "internal_api"
+				},
+				{
+					"case": "equals-boundary: an unclosed quoted key never invents a separator",
+					"reason": "internal_api"
+				},
+				{
+					"case": "equals-boundary: actual quoted leaf batch uses its original physical owner",
+					"reason": "internal_api"
+				},
+				{
+					"case": "equals-boundary: complete physical multiline span stays attached to the quoted owner",
+					"reason": "internal_api"
+				},
+				{
+					"case": "(toml-raw-comment) keeps rejected-header substring work linear as markers double",
+					"reason": "fault_injection"
+				}
+			]
+		},
+		{
+			"contract": "toml_source_preservation_contract.lua",
+			"lua_sites": 1,
+			"data_driven": [
+				{
+					"case": "toml-foreign-source",
+					"corpus": "config_source_preservation/vectors.json"
+				}
+			],
+			"stays_in_lua": []
 		}
 	]
 }

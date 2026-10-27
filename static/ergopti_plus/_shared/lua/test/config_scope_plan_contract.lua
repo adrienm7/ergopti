@@ -19,8 +19,10 @@ return function(helpers)
 	local file = assert(io.open(require("infra.paths").shared("tests/corpus/config_scope/plan_vectors.json"), "rb"))
 	local corpus = assert(require("json").decode(file:read("*a")))
 	file:close()
-	assert(#corpus.stored_paths == 5 and #corpus.inventories == 4 and #corpus.refusals == 6,
-		"plan_vectors.json must hold the 5 paths, 4 inventories and 6 refusals the contract replays")
+	assert(#corpus.stored_paths == 5 and #corpus.inventories == 4 and #corpus.refusals == 6
+		and #corpus.declaration_plans == 2 and #corpus.declaration_refusals == 3 and #corpus.declaration_cycles == 1
+		and #corpus.inventory_collections == 1 and #corpus.inventory_refusals == 5,
+		"plan_vectors.json must hold the vectors the contract replays")
 	helpers.describe("scoped configuration planning", function()
 		helpers.it("retains generated dynamic scalar types before a native runtime erases false versus zero", function()
 			local found = {}
@@ -73,49 +75,52 @@ return function(helpers)
 				action_parameter_domain = function() error("owner unavailable") end,
 			}), false)
 		end)
-		helpers.it("collects exact runtime-owned leaves once without claiming static or unknown siblings", function()
-			local calls = 0
-			helpers.assert_not_nil(Manifest.find_entry_by_path("gestures.enabled"))
-			local owned = Manifest.scope_inventory("hotstrings", {
-				language = function()
-					calls = calls + 1
-					return { "hotstrings.groups.french_probe", "hotstrings.modules.french_probe.accents",
-						"gestures.enabled" }
-				end,
-				extension = function()
-					calls = calls + 1
-					return { "hotstrings.modules.ext:ergopti:rolls.custom", "hotstrings.groups.french_probe",
-						"shortcuts.personal.other_scope" }
-				end,
-			})
-			helpers.assert_eq(calls, 2)
-			helpers.assert_eq(owned, { "hotstrings.groups.french_probe",
-				"hotstrings.modules.ext:ergopti:rolls.custom", "hotstrings.modules.french_probe.accents" })
-			local plan = Manifest.scope_plan("hotstrings", "clear", owned)
-			local indexed = {}
-			for _, row in ipairs(plan.operations) do
-				local segments = assert(require("toml_codec.key_path").parse(row.section))
-				indexed[table.concat(segments, ".") .. "." .. row.key] = row
+		--- Providers of a vector as the functions scope_inventory calls.
+		local function providers_of(vector)
+			local providers, calls = {}, { count = 0 }
+			for _, provider in ipairs(vector.providers) do
+				if provider.raises then
+					providers[provider.name] = function() error("runtime inventory unavailable") end
+				elseif provider.not_a_function then
+					providers[provider.name] = false
+				else
+					providers[provider.name] = function() calls.count = calls.count + 1; return provider.paths end
+				end
 			end
-			for _, path in ipairs(owned) do helpers.assert_eq(indexed[path].delete, true) end
-			helpers.assert_eq(indexed["hotstrings.modules.ext:ergopti:rolls.custom"].section,
-				'hotstrings.modules."ext:ergopti:rolls"', "the colon identity stays one valid TOML section segment")
-			helpers.assert_eq(indexed["hotstrings.modules.ext:ergopti:rolls.unknown"], nil)
-			helpers.assert_eq(indexed["shortcuts.personal.other_scope"], nil)
-		end)
-		helpers.it("refuses incomplete inventory instead of returning a partial successful plan", function()
+			return providers, calls
+		end
+		for _, vector in ipairs(corpus.inventory_collections) do
+			helpers.it("(config-scope-plan) " .. vector.id, function()
+				helpers.assert_not_nil(Manifest.find_entry_by_path("gestures.enabled"))
+				local providers, calls = providers_of(vector)
+				local owned = Manifest.scope_inventory(vector.scope, providers)
+				helpers.assert_eq(calls.count, vector.expect.calls)
+				helpers.assert_eq(owned, vector.expect.owned)
+				local plan = Manifest.scope_plan(vector.scope, "clear", owned)
+				local indexed = {}
+				for _, row in ipairs(plan.operations) do
+					local segments = assert(require("toml_codec.key_path").parse(row.section))
+					indexed[table.concat(segments, ".") .. "." .. row.key] = row
+				end
+				if vector.expect.clear_deletes_every_owned_path then
+					for _, path in ipairs(owned) do helpers.assert_eq(indexed[path].delete, true) end
+				end
+				for path, section in pairs(vector.expect.section_of) do helpers.assert_eq(indexed[path].section, section) end
+				for _, path in ipairs(vector.expect.no_row_for) do helpers.assert_eq(indexed[path], nil) end
+			end)
+		end
+		for _, vector in ipairs(corpus.inventory_refusals) do
+			helpers.it("(config-scope-plan) refuses incomplete inventory: " .. vector.id, function()
+				local providers = providers_of(vector)
+				helpers.assert_eq(pcall(Manifest.scope_inventory, vector.scope, providers), false)
+			end)
+		end
+		helpers.it("refuses a sparse or named path list instead of returning a partial successful plan", function()
 			helpers.assert_type(Manifest.scope_inventory, "function")
-			for _, paths in ipairs({ { "hotstrings.modules.group.section.expert" }, { "future.setting" },
-				{ [1] = "hotstrings.groups.valid", [3] = "hotstrings.groups.hole" },
-				{ named = "hotstrings.groups.valid" }, { "hotstrings.groups..invalid" } }) do
-				local ok = pcall(Manifest.scope_inventory, "hotstrings", { runtime = function() return paths end })
-				helpers.assert_eq(ok, false)
+			for _, paths in ipairs({ { [1] = "hotstrings.groups.valid", [3] = "hotstrings.groups.hole" },
+				{ named = "hotstrings.groups.valid" } }) do
+				helpers.assert_eq(pcall(Manifest.scope_inventory, "hotstrings", { runtime = function() return paths end }), false)
 			end
-			helpers.assert_eq(pcall(Manifest.scope_inventory, "hotstrings", {
-				first = function() return { "hotstrings.groups.valid" } end,
-				second = function() error("runtime inventory unavailable") end,
-			}), false)
-			helpers.assert_eq(pcall(Manifest.scope_inventory, "hotstrings", { invalid = false }), false)
 		end)
 		-- « Tout effacer » of the Tap-Holds menu, then of the Gestures menu,
 		-- switched the feature off, and the next key or gesture the user set did
@@ -185,54 +190,44 @@ return function(helpers)
 				if not ok then error(err) end
 			end)
 		end
-		helpers.it("retains only direct preset, exclusion, dynamic and parameter declarations", function()
-			local contract = require("config_defaults").new({
-				features = {
-					{ path = "own.keep", default = false, recommended = true },
-					{ path = "own.clear_keep", default = false, recommended = true },
-					{ path = "own.switch", default = true, recommended = true, cleared = false },
-					{ path = "child.value", default = false, recommended = true },
-				},
-				scopes = {
-					root = { prefixes = { "own" }, includes = { "child" }, preset = "own_file",
-						restore_exclude = { "own.keep" }, clear_exclude = { "own.clear_keep" },
-						dynamic_defaults = { { prefix = "own.dynamic", depth = 1, default = false, recommended = true } },
-						action_parameters = { restore = "remove", domains = { "script" } } },
-					child = { prefixes = { "child" }, preset = "child_file",
-						dynamic_defaults = { { prefix = "child.dynamic", depth = 1, default = false, recommended = true } },
-						action_parameters = { restore = "remove", domains = { "gesture" } } },
-				},
-			})
-			local paths = { "own.dynamic.actual", "child.dynamic.other", "action_parameters.script__reload__open_url",
-				"action_parameters.gesture__tap_4__open_url" }
-			for _, mode in ipairs({ "recommended", "clear" }) do
-				local plan = contract.direct_scope_plan("root", mode, paths, owners)
-				helpers.assert_eq(plan.presets, { { scope = "root", preset = "own_file", mode = mode } })
+		for _, vector in ipairs(corpus.declaration_plans) do
+			helpers.it("(config-scope-plan) " .. vector.id, function()
+				local contract = require("config_defaults").new(vector.declaration)
+				local plan = contract.direct_scope_plan(vector.scope, vector.mode, vector.paths, owners)
+				helpers.assert_eq(plan.presets, vector.expect.direct_presets)
 				local rows = {}
 				for _, operation in ipairs(plan.operations) do rows[operation.section .. "." .. operation.key] = operation end
-				helpers.assert_eq(rows["child.value"], nil)
-				helpers.assert_eq(rows["child.dynamic.other"], nil)
-				helpers.assert_eq(rows["action_parameters.gesture__tap_4__open_url"], nil)
-				helpers.assert_eq(rows["action_parameters.script__reload__open_url"].delete, true)
-				helpers.assert_eq(rows["own.dynamic.actual"].delete, mode == "clear" and true or nil)
-				helpers.assert_eq(rows[mode == "recommended" and "own.keep" or "own.clear_keep"], nil)
-				if mode == "clear" then helpers.assert_eq(rows["own.switch"].value, false)
-				else helpers.assert_eq(rows["own.switch"].delete, true) end
-				plan.presets[1].preset = "foreign"
-				helpers.assert_eq(contract.direct_scope_plan("root", mode, paths, owners).presets[1].preset, "own_file")
-				helpers.assert_eq(#contract.scope_plan("root", mode, paths, owners).presets, 2)
-			end
-			helpers.assert_eq(pcall(contract.direct_scope_plan, "missing", "clear"), false)
-			helpers.assert_eq(pcall(contract.direct_scope_plan, "root", "foreign"), false)
-			helpers.assert_eq(pcall(contract.direct_scope_plan, "root", "clear", { "own.unknown" }, owners), false)
+				for _, path in ipairs(vector.expect.absent) do helpers.assert_eq(rows[path], nil, path) end
+				for _, path in ipairs(vector.expect.deleted) do helpers.assert_eq(rows[path].delete, true, path) end
+				for _, path in ipairs(vector.expect.restored_not_deleted or {}) do
+					helpers.assert_eq(rows[path].delete, nil, path)
+				end
+				for path, value in pairs(vector.expect.set or {}) do helpers.assert_eq(rows[path].value, value, path) end
+				helpers.assert_eq(#contract.scope_plan(vector.scope, vector.mode, vector.paths, owners).presets,
+					vector.expect.scope_preset_count)
+			end)
+		end
+		for _, vector in ipairs(corpus.declaration_refusals) do
+			helpers.it("(config-scope-plan) refuses a direct plan: " .. vector.id, function()
+				local contract = require("config_defaults").new(vector.declaration)
+				helpers.assert_eq(pcall(contract.direct_scope_plan, vector.scope, vector.mode, vector.paths,
+					vector.with_owners and owners or nil), false)
+			end)
+		end
+		helpers.it("hands out a detached plan on every call", function()
+			local vector = corpus.declaration_plans[1]
+			local contract = require("config_defaults").new(vector.declaration)
+			local plan = contract.direct_scope_plan(vector.scope, vector.mode, vector.paths, owners)
+			plan.presets[1].preset = "foreign"
+			helpers.assert_eq(contract.direct_scope_plan(vector.scope, vector.mode, vector.paths, owners).presets[1].preset, "own_file")
 		end)
-		helpers.it("does not traverse foreign cyclic or missing included declarations", function()
-			local contract = require("config_defaults").new({ features = {
-				{ path = "own.value", default = false, recommended = true },
-			}, scopes = { root = { prefixes = { "own" }, includes = { "root", "missing" } } } })
-			helpers.assert_eq(#contract.direct_scope_plan("root", "recommended").operations, 1)
-			helpers.assert_eq(pcall(contract.scope_plan, "root", "recommended"), false)
-		end)
+		for _, vector in ipairs(corpus.declaration_cycles) do
+			helpers.it("(config-scope-plan) " .. vector.id, function()
+				local contract = require("config_defaults").new(vector.declaration)
+				helpers.assert_eq(#contract.direct_scope_plan(vector.scope, vector.mode).operations, vector.expect.direct_operations)
+				helpers.assert_eq(pcall(contract.scope_plan, vector.scope, vector.mode), not vector.expect.full_plan_refused)
+			end)
+		end
 		helpers.it("routes separate-file presets for restore and clear without inventing config rows", function()
 			for _, mode in ipairs({ "recommended", "clear" }) do
 				local plan = Manifest.scope_plan("global", mode, {})
