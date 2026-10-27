@@ -14,6 +14,7 @@ local helpers = require("tests.helpers")
 require("table_util")
 require("native_path")
 require("text_utils")
+require("file_system.ports") -- the file-system owner checks itself against it when it loads
 
 --- Collects actual scoped callbacks without publishing replacement registrations.
 --- @return table scenarios Registered names and callbacks.

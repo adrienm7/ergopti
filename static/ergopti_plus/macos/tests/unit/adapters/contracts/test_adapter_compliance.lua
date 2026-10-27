@@ -140,3 +140,6 @@ for _, adapter_name in ipairs(ADAPTERS_UNDER_TEST) do
 		end
 	end)
 end
+
+require("test.file_system_ports_contract").register(helpers, "macos", 8,
+	function() return helpers.load_with_stubs("adapters.file_system") end)

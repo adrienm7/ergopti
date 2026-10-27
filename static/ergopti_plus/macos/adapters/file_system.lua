@@ -2526,4 +2526,8 @@ function M.configuration_ports()
 		configuration_receipt_view, configuration_chain_restore
 end
 
+-- The owner is checked against the shared spec when it loads: a missing method
+-- or a half-offered capability would otherwise fail late, inside a publication.
+require("file_system.ports").check_owner(M)
+
 return M

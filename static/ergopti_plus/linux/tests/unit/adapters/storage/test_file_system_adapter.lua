@@ -1167,3 +1167,5 @@ helpers.describe("FileSystem initializer configuration identities", function()
 		end)
 	end)
 end)
+
+require("test.file_system_ports_contract").register(helpers, "linux", 8, function() return fs end)
