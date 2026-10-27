@@ -36,20 +36,10 @@ local VALID_MODS = {
 	shift = true,
 }
 
-local MOD_ORDER = {
-	shift = 1,
-	cmd = 2,
-	alt = 3,
-	ctrl = 4,
-}
+local MOD_BEFORE = require("menu.row_order").comparator("menu_chord_modifiers")
 
 local function sort_modifiers(mods)
-	table.sort(mods, function(a, b)
-		local oa = MOD_ORDER[a] or 99
-		local ob = MOD_ORDER[b] or 99
-		if oa == ob then return a < b end
-		return oa < ob
-	end)
+	table.sort(mods, MOD_BEFORE)
 end
 
 

@@ -170,11 +170,7 @@ local function get_model_info_logic(model_name, presets)
 
 	local tag_list = {}
 	for em, _ in pairs(seen_emojis) do table.insert(tag_list, em) end
-	local EMOJI_ORDER = { ["🏆"]=1, ["⚡"]=2, ["🧠💭"]=3, ["🧠"]=4, ["💻"]=5, ["🌐"]=6, ["🖼️"]=7, ["⭐"]=8 }
-	table.sort(tag_list, function(a, b)
-		local oa = EMOJI_ORDER[a] or 99; local ob = EMOJI_ORDER[b] or 99
-		if oa == ob then return a < b end; return oa < ob
-	end)
+	table.sort(tag_list, require("menu.row_order").comparator("model_tag_emoji"))
 
 	local tag_str = #tag_list > 0 and (" " .. table.concat(tag_list, "")) or ""
 	return {

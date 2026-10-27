@@ -1430,6 +1430,7 @@ end)
 require("test.menu_layout_caption_values_contract").register(helpers, "linux")
 
 require("test.menu_numbered_caption_contract").register(helpers, "linux")
+require("test.menu_row_order_contract").register(helpers, 9)
 
 -- Component coverage above uses the recorded declaration only during its build.
 -- Current public policy is checked separately with the genuine prediction owner.

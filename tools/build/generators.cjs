@@ -190,6 +190,10 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/_shared/lua/brightness_actions_data.lua']
 	},
 	{
+		script: 'codegen/codegen-menu-row-order.cjs',
+		outputs: ['static/ergopti_plus/_shared/lua/menu/row_order_data.lua']
+	},
+	{
 		script: 'codegen/codegen-layer-editor-data-js.cjs',
 		outputs: ['static/ergopti_plus/_shared/ui/layer_editor/_generated/layer_data.js']
 	},

@@ -1,0 +1,67 @@
+{
+	"_comment": "Vectors of menu.row_order (_shared/modules/menu/row_order.json). `sorts` run the rule's comparator over `input`; a name outside the rule follows the listed ones and ties compare by text. `lists` give the rule's order as the data file projects it. `refusals` name a rule that does not exist.",
+	"drivers": ["macos", "linux", "windows"],
+	"sorts": [
+		{
+			"id": "model-tags-follow-the-capability-order",
+			"rule": "model_tag_emoji",
+			"input": ["⭐", "🌐", "🏆", "🧠", "⚡", "🧠💭", "💻", "🖼️"],
+			"sorted": ["🏆", "⚡", "🧠💭", "🧠", "💻", "🌐", "🖼️", "⭐"]
+		},
+		{
+			"id": "unlisted-model-tag-follows-and-ties-compare-by-text",
+			"rule": "model_tag_emoji",
+			"input": ["🧪", "⭐", "🔧", "🏆"],
+			"sorted": ["🏆", "⭐", "🔧", "🧪"]
+		},
+		{
+			"id": "menu-modifiers-put-shift-first",
+			"rule": "menu_chord_modifiers",
+			"input": ["ctrl", "alt", "cmd", "shift"],
+			"sorted": ["shift", "cmd", "alt", "ctrl"]
+		},
+		{
+			"id": "unlisted-modifier-follows-the-listed-ones",
+			"rule": "menu_chord_modifiers",
+			"input": ["fn", "ctrl", "shift"],
+			"sorted": ["shift", "ctrl", "fn"]
+		},
+		{
+			"id": "hotstring-classes-put-ergopti-before-dynamic",
+			"rule": "hotstring_group_classes",
+			"input": ["dynamic", "ergopti", "standard"],
+			"sorted": ["standard", "ergopti", "dynamic"]
+		}
+	],
+	"lists": [
+		{
+			"id": "hotstring-config-categories",
+			"rule": "hotstring_config_categories",
+			"order": [
+				"magickey",
+				"autocorrection",
+				"rolls",
+				"sfbsreduction",
+				"distancesreduction",
+				"personal"
+			]
+		},
+		{
+			"id": "llm-menu-rows",
+			"rule": "llm_menu_rows",
+			"order": [
+				"llm_backend",
+				"llm_model",
+				"llm_profile",
+				"llm_trigger",
+				"llm_generation_settings",
+				"llm_display",
+				"llm_navigation"
+			]
+		}
+	],
+	"refusals": [
+		{ "id": "unknown-rule-is-refused", "rule": "no_such_rule" },
+		{ "id": "empty-rule-name-is-refused", "rule": "" }
+	]
+}
