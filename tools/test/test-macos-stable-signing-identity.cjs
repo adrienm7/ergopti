@@ -143,6 +143,7 @@ security() {
 REPO_ROOT="$T/repo"
 LAUNCHER_DIR="$T/launcher"
 BUNDLE_ID="com.ergoptiplus.app"
+ERGOPTI_APP_BUNDLE="ErgoptiPlus.app"
 ERGOPTI_VERSION=0.0.0-dev ERGOPTI_BUILD=1 ERGOPTI_CHANNEL=main
 HAMMERSPOON_VERSION=1.1.1
 BUILD_DIR="$T/build"
