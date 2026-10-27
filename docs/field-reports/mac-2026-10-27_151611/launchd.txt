@@ -1,0 +1,5 @@
+-	78	com.ergoptiplus.remap-guardian
+65321	0	org.pqrs.service.agent.karabiner_console_user_server
+2113	0	org.pqrs.service.agent.Karabiner-NotificationWindow
+65322	0	org.pqrs.service.agent.karabiner_session_monitor
+65323	0	org.pqrs.service.agent.Karabiner-Core-Service-rev2
