@@ -88,7 +88,7 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_in
 		}
 		package.loaded["ui.menu.shortcut_utils"] = {}
 		package.loaded["ui.menu.menu_keyboard_slots"] = {
-			provide_rows = function(_, _, fixed_by_prefix) return fixed_by_prefix.hs_ctrl_ end,
+			provide_rows = function(_, _, fixed_by_prefix) return fixed_by_prefix.secondary_ end,
 		}
 		package.loaded["infra.manifest_reader"] = { default_for = function() return "star" end }
 

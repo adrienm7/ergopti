@@ -220,10 +220,10 @@ local function with_menu_fixture(options, callback)
 		initial_gestures = nil,
 		script = clone(state.script_control_shortcuts),
 		initial_script = nil,
-		keyboard = { cmd_x = "copy_selection", alt_v = "paste_plain" },
+		keyboard = { primary_x = "copy_selection", alt_v = "paste_plain" },
 		initial_keyboard = nil,
 		settings = {
-			keyboard_shortcut_cmd_x = "copy_selection",
+			keyboard_shortcut_primary_x = "copy_selection",
 			keyboard_shortcut_alt_v = "paste_plain",
 			llm_api_entries = { { id = "old", endpoint = "https://old.invalid" } },
 			llm_api_entry_id = "old",

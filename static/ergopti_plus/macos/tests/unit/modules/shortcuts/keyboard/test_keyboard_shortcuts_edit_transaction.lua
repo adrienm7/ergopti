@@ -32,7 +32,7 @@ local function with_subject(initial_action, scenario)
 	for _, name in ipairs(MODULES) do prior[name] = package.loaded[name] end
 	local prior_hs = _G.hs
 
-	local key = "cmd_a"
+	local key = "primary_a"
 	local store = {[key] = initial_action}
 	local controls = {
 		bind_refuses = false,
@@ -152,7 +152,7 @@ helpers.describe("configurable shortcut edit transaction (HS-013)", function()
 		with_subject("copy_selection", function(subject, ctx)
 			local exact = ctx.handles[1]
 			local binds = ctx.counters.bind
-			helpers.assert_eq(subject.set_action("cmd_a", "paste_plain"), true)
+			helpers.assert_eq(subject.set_action("primary_a", "paste_plain"), true)
 			helpers.assert_eq(ctx.counters.bind, binds, "action edits must reuse the live chord")
 			helpers.assert_eq(ctx.counters.unbind, 0, "action edits must not release the chord")
 			helpers.assert_eq(ctx.counters.set_enabled, 0, "an active chord stays active")
@@ -166,8 +166,8 @@ helpers.describe("configurable shortcut edit transaction (HS-013)", function()
 		with_subject("copy_selection", function(subject, ctx)
 			local exact = ctx.handles[1]
 			ctx.controls.publication_throws_once = true
-			helpers.assert_eq(subject.set_action("cmd_a", "paste_plain"), false)
-			helpers.assert_eq(subject.get_action("cmd_a"), "copy_selection")
+			helpers.assert_eq(subject.set_action("primary_a", "paste_plain"), false)
+			helpers.assert_eq(subject.get_action("primary_a"), "copy_selection")
 			helpers.assert_eq(ctx.store[ctx.setting_key], "copy_selection",
 				"a refused conditional publication must preserve the exact prior assignment")
 			helpers.assert_eq(ctx.handles[1], exact)
@@ -182,14 +182,14 @@ helpers.describe("configurable shortcut edit transaction (HS-013)", function()
 		with_subject("copy_selection", function(subject, ctx)
 			local exact = ctx.handles[1]
 			ctx.controls.set_enabled_refuses_once = true
-			helpers.assert_eq(subject.set_action("cmd_a", "none"), false)
-			helpers.assert_eq(subject.get_action("cmd_a"), "copy_selection")
+			helpers.assert_eq(subject.set_action("primary_a", "none"), false)
+			helpers.assert_eq(subject.get_action("primary_a"), "copy_selection")
 			helpers.assert_eq(ctx.store[ctx.setting_key], "copy_selection")
 			helpers.assert_eq(ctx.counters.unbind, 0)
 			helpers.assert_eq(ctx.handles[1], exact)
 
-			helpers.assert_eq(subject.set_action("cmd_a", "none"), true)
-			helpers.assert_eq(subject.get_action("cmd_a"), "none")
+			helpers.assert_eq(subject.set_action("primary_a", "none"), true)
+			helpers.assert_eq(subject.get_action("primary_a"), "none")
 			helpers.assert_eq(ctx.handles[1], exact)
 			helpers.assert_eq(ctx.counters.bind, 1, "retry must not allocate a successor")
 			helpers.assert_eq(exact.enabled, false)
@@ -200,16 +200,16 @@ helpers.describe("configurable shortcut edit transaction (HS-013)", function()
 		with_subject("none", function(subject, ctx)
 			ctx.controls.publication_throws_once = true
 			ctx.controls.set_enabled_refuses_once = true
-			helpers.assert_eq(subject.set_action("cmd_a", "paste_plain"), false)
+			helpers.assert_eq(subject.set_action("primary_a", "paste_plain"), false)
 			local exact = ctx.handles[1]
 			helpers.assert_true(exact ~= nil, "the acquired handle must remain owned")
 			helpers.assert_eq(exact.enabled, false, "failed publication must fence delivery")
 			helpers.assert_eq(exact.native_settled, false,
 				"a refused compensation must remain explicit cleanup debt")
-			helpers.assert_eq(subject.get_action("cmd_a"), "none")
+			helpers.assert_eq(subject.get_action("primary_a"), "none")
 			helpers.assert_eq(ctx.store[ctx.setting_key], "none")
 
-			helpers.assert_eq(subject.set_action("cmd_a", "paste_plain"), true)
+			helpers.assert_eq(subject.set_action("primary_a", "paste_plain"), true)
 			helpers.assert_eq(ctx.handles[1], exact)
 			helpers.assert_eq(ctx.counters.bind, 1, "retry must re-enable the exact candidate")
 			helpers.assert_eq(exact.enabled, true)
@@ -221,8 +221,8 @@ helpers.describe("configurable shortcut edit transaction (HS-013)", function()
 	helpers.it("leaves a fresh assignment unchanged when native bind is refused", function()
 		with_subject("none", function(subject, ctx)
 			ctx.controls.bind_refuses = true
-			helpers.assert_eq(subject.set_action("cmd_a", "paste_plain"), false)
-			helpers.assert_eq(subject.get_action("cmd_a"), "none")
+			helpers.assert_eq(subject.set_action("primary_a", "paste_plain"), false)
+			helpers.assert_eq(subject.get_action("primary_a"), "none")
 			helpers.assert_eq(ctx.store[ctx.setting_key], "none")
 			helpers.assert_eq(#ctx.handles, 0)
 		end)
@@ -235,10 +235,10 @@ helpers.describe("configurable shortcut edit transaction (HS-013)", function()
 				ctx.controls.bind_hook = nil
 				nested_pause = subject.pause()
 			end
-			helpers.assert_eq(subject.set_action("cmd_a", "paste_plain"), false)
+			helpers.assert_eq(subject.set_action("primary_a", "paste_plain"), false)
 			helpers.assert_eq(nested_pause, false,
 				"PAUSE cannot certify settlement while Registrar.bind is in flight")
-			helpers.assert_eq(subject.get_action("cmd_a"), "none")
+			helpers.assert_eq(subject.get_action("primary_a"), "none")
 			helpers.assert_eq(ctx.store[ctx.setting_key], "none")
 			helpers.assert_eq(ctx.counters.unbind, 1)
 			helpers.assert_eq(ctx.handles[1].enabled, false)
@@ -252,20 +252,20 @@ helpers.describe("configurable shortcut edit transaction (HS-013)", function()
 		with_subject("none", function(subject, ctx)
 			ctx.controls.publication_throws_once = true
 			ctx.controls.set_enabled_refuses_once = true
-			helpers.assert_eq(subject.set_action("cmd_a", "paste_plain"), false)
+			helpers.assert_eq(subject.set_action("primary_a", "paste_plain"), false)
 			local exact = ctx.handles[1]
 			local nested_pause = nil
 			ctx.controls.set_enabled_hook = function()
 				ctx.controls.set_enabled_hook = nil
 				nested_pause = subject.pause()
 			end
-			helpers.assert_eq(subject.set_action("cmd_a", "paste_plain"), false)
+			helpers.assert_eq(subject.set_action("primary_a", "paste_plain"), false)
 			helpers.assert_eq(nested_pause, false)
 			helpers.assert_eq(ctx.unbound_handles[1] == exact, true)
 			helpers.assert_eq(ctx.unbound_handles[2] == exact, true,
 				"the superseded native re-enable must compensate the same handle")
 			helpers.assert_eq(exact.enabled, false)
-			helpers.assert_eq(subject.get_action("cmd_a"), "none")
+			helpers.assert_eq(subject.get_action("primary_a"), "none")
 			helpers.assert_eq(subject.pause(), true)
 		end)
 	end)

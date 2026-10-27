@@ -6,7 +6,7 @@ local Manifest = require("infra.manifest_reader")
 
 helpers.describe("dynamic keyboard scope contract", function()
 	helpers.it("makes an explicitly inventoried non-static keyboard assignment sparse", function()
-		local path = "shortcuts.keyboard.hs_option_z"
+		local path = "shortcuts.keyboard.alt_z"
 		helpers.assert_nil(Manifest.find_entry_by_path(path))
 		helpers.assert_eq(Manifest.default_for(path), "none")
 		helpers.assert_eq(Manifest.sparse_operation(path, "none").delete, true)
@@ -15,7 +15,7 @@ helpers.describe("dynamic keyboard scope contract", function()
 			local inventory = Manifest.scope_inventory("shortcuts", { keyboard = function() return { path } end })
 			local found = false
 			for _, row in ipairs(Manifest.scope_plan("shortcuts", mode, inventory).operations) do
-				if row.section == "shortcuts.keyboard" and row.key == "hs_option_z" then
+				if row.section == "shortcuts.keyboard" and row.key == "alt_z" then
 					found = true; helpers.assert_eq(row.delete, true)
 				end
 			end

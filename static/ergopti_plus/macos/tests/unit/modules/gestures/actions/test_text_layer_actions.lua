@@ -42,7 +42,7 @@ helpers.describe("gesture actions delegate to the text owner under their parent"
 			helpers.assert_eq(last.name, method, action_id .. " must run text." .. method)
 			helpers.assert_eq(last.parent, "gestures", action_id .. " runs under the gesture parent")
 
-			helpers.assert_eq(actions.execute_single(action_id, "keyboard__cmd_1"), true)
+			helpers.assert_eq(actions.execute_single(action_id, "keyboard__primary_1"), true)
 			last = calls.text_actions[#calls.text_actions]
 			helpers.assert_eq(last.name, method)
 			helpers.assert_eq(last.parent, "shortcut_bindings",
@@ -58,7 +58,7 @@ helpers.describe("gesture actions delegate to the text owner under their parent"
 		local before = #calls.text_actions
 		helpers.assert_eq(actions.execute_single("paste_plain"), false)
 		helpers.assert_eq(#calls.text_actions, before, "a fenced gesture must not paste")
-		helpers.assert_eq(actions.execute_single("paste_plain", "keyboard__cmd_1"), true)
+		helpers.assert_eq(actions.execute_single("paste_plain", "keyboard__primary_1"), true)
 		helpers.assert_eq(calls.text_actions[#calls.text_actions].parent, "shortcut_bindings")
 	end)
 end)

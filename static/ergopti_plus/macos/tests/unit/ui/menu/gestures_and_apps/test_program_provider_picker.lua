@@ -411,10 +411,10 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 		fixture(function(f)
 			local calls = 0
 			local function transaction(_, _, scalar) calls = calls + 1; helpers.assert_eq(scalar, SCALAR); return true end
-			helpers.assert_eq(f.utils.commit_action_parameter({}, "keyboard__cmd_1", "run_program", RESERVED, {}, transaction), false)
+			helpers.assert_eq(f.utils.commit_action_parameter({}, "keyboard__primary_1", "run_program", RESERVED, {}, transaction), false)
 			helpers.assert_eq(calls, 0)
 			helpers.assert_eq(f.warning, UNAVAILABLE)
-			helpers.assert_true(f.utils.commit_action_parameter({}, "keyboard__cmd_1", "run_program", SCALAR, {}, transaction))
+			helpers.assert_true(f.utils.commit_action_parameter({}, "keyboard__primary_1", "run_program", SCALAR, {}, transaction))
 			helpers.assert_eq(calls, 1)
 			helpers.assert_eq(f.native_tasks, 0)
 		end)
@@ -432,13 +432,13 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 				program_binding_supported = function() return true end,
 			}
 			local items = { { type = "action", id = "run_program" } }
-			f.utils.picker_parameter_fields(gestures, items, "keyboard__cmd_1")
+			f.utils.picker_parameter_fields(gestures, items, "keyboard__primary_1")
 			helpers.assert_eq(items[1].parameterValue, RESERVED)
 			helpers.assert_eq(items[1].hint, UNAVAILABLE)
 			helpers.assert_eq(items[1].disabled, nil)
 			scalar = SCALAR
 			local repaired = { { type = "action", id = "run_program" } }
-			f.utils.picker_parameter_fields(gestures, repaired, "keyboard__cmd_1")
+			f.utils.picker_parameter_fields(gestures, repaired, "keyboard__primary_1")
 			helpers.assert_eq(repaired[1].hint, nil)
 			helpers.assert_eq(repaired[1].parameterValue, SCALAR)
 			helpers.assert_eq(f.native_tasks, 0)

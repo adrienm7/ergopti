@@ -61,7 +61,7 @@ helpers.describe("HS-016 script-control callbacks are visible and truthful", fun
 				"a thrown gesture action cannot be reported as handled")
 			helpers.assert_true(stopped)
 			helpers.assert_eq(#failures, 1)
-			helpers.assert_contains(failures[1], "Configurable shortcut 'cmd_a'")
+			helpers.assert_contains(failures[1], "Configurable shortcut 'primary_a'")
 			helpers.assert_contains(failures[1], "gesture exploded")
 			helpers.assert_contains(failures[1], "stack traceback")
 		end)

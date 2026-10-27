@@ -108,7 +108,7 @@ local function load_keyboard()
 	package.loaded["modules.shortcuts.ai_actions"] = nil
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 	require("tests.support.keyboard_config_fixture").install(
-		{ cmd_a = "llm_generate_prediction", cmd_b = "script_pause_toggle" })
+		{ primary_a = "llm_generate_prediction", primary_b = "script_pause_toggle" })
 	local subject = require("modules.shortcuts.keyboard_shortcuts")
 	return subject, enabled, require("modules.shortcuts.ai_actions")
 end

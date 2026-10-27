@@ -24,7 +24,7 @@ helpers.describe("configured shortcut row labels", function()
 		helpers.it("shows the saved parameter in the real " .. surface .. " provider", function()
 			helpers.with_fresh_modules(names, function()
 				local parameters = {
-					[keyboard_binding("hs_ctrl_a")] = "https://keyboard.example/?q=[x]&p=50%",
+					[keyboard_binding("secondary_a")] = "https://keyboard.example/?q=[x]&p=50%",
 					[tap_binding("number_row_left")] = "https://tap.example",
 					[script_prefix .. "script_altgr_enter"] = "https://script.example",
 				}
@@ -40,8 +40,8 @@ helpers.describe("configured shortcut row labels", function()
 				}
 				local shortcuts = {
 					DEFAULT_STATE = { shortcuts = true },
-					get_keyboard_slot_groups = function() return { { prefix = "hs_ctrl_", group_key = "menu.shortcuts.ctrl_group", add_key = "menu.shortcuts.ctrl_add" } } end,
-					assigned_keyboard_slots = function() return { { id = "hs_ctrl_a", action = "open_url" } } end,
+					get_keyboard_slot_groups = function() return { { prefix = "secondary_", group_key = "menu.shortcuts.ctrl_group", add_key = "menu.shortcuts.ctrl_add" } } end,
+					assigned_keyboard_slots = function() return { { id = "secondary_a", action = "open_url" } } end,
 					get_keyboard_slot_label = function() return "Ctrl+A" end,
 					keyboard_binding_id = keyboard_binding,
 				}
@@ -88,7 +88,7 @@ helpers.describe("configured shortcut row labels", function()
 					-- The group opens with its restore, clear and separator; the
 					-- assigned slot is the first row after them.
 					label = require("ui.menu.menu_keyboard_slots").provide_rows(ctx)[1].items[4].label
-					expected = parameters[keyboard_binding("hs_ctrl_a")]
+					expected = parameters[keyboard_binding("secondary_a")]
 				elseif surface == "tap" then
 					label = require("ui.menu.menu_tap_keys").provide_rows(ctx)[1].label
 					expected = parameters[tap_binding("number_row_left")]

@@ -358,104 +358,13 @@ hotkey_defs.wrap_text_if_selected   = function()
 		get_live_wrap_pairs, delivery_admitted)
 end
 
--- Ctrl shortcuts — alphabetical by id (mirrors list_shortcuts() sort order)
-hotkey_labels.ctrl_a = i18n.get("shortcuts.label_ctrl_a")
-hotkey_defs.ctrl_a   = function()
-	return bind_log({"ctrl"}, "a", text_acts.select_line)
-end
-
-hotkey_labels.ctrl_d = i18n.get("shortcuts.label_ctrl_d")
-hotkey_defs.ctrl_d   = function()
-	return bind_log({"ctrl"}, "d", app_acts.open_downloads)
-end
-
-hotkey_labels.ctrl_e = i18n.get("shortcuts.label_ctrl_e")
-hotkey_defs.ctrl_e   = function()
-	return bind_log({"ctrl"}, "e", app_acts.open_finder)
-end
-
+-- Fixed shortcuts that are not catalogue actions. The other Ctrl-letter chords
+-- (and Cmd+Shift+V) are role-named keyboard slots now; see keyboard_shortcuts.lua.
 hotkey_labels.ctrl_g = i18n.get("shortcuts.label_ctrl_g")
 hotkey_defs.ctrl_g   = function()
 	return bind_log({"ctrl"}, "g", function()
 		app_acts.open_chatgpt(_chatgpt_url or M.DEFAULT_CHATGPT_URL)
 	end)
-end
-
-hotkey_labels.ctrl_h = i18n.get("shortcuts.label_ctrl_h")
-hotkey_defs.ctrl_h   = function()
-	return bind_log({"ctrl"}, "h", sys_acts.interactive_screenshot)
-end
-
-hotkey_labels.ctrl_i = i18n.get("shortcuts.label_ctrl_i")
-hotkey_defs.ctrl_i   = function()
-	return bind_log({"ctrl"}, "i", app_acts.open_settings)
-end
-
-hotkey_labels.ctrl_m = i18n.get("shortcuts.label_ctrl_m")
-hotkey_defs.ctrl_m   = function()
-	return bind_log({"ctrl"}, "m", sys_acts.toggle_awake)
-end
-
-hotkey_labels.ctrl_o = i18n.get("shortcuts.label_ctrl_o")
-hotkey_defs.ctrl_o   = function()
-	return bind_log({"ctrl"}, "o", text_acts.surround_with_parens)
-end
-
-hotkey_labels.ctrl_p = i18n.get("shortcuts.label_ctrl_p")
-hotkey_defs.ctrl_p   = function()
-	return bind_log({"ctrl"}, "p", sys_acts.toggle_display_mirror)
-end
-
-hotkey_labels.ctrl_s = i18n.get("shortcuts.label_ctrl_s")
-hotkey_defs.ctrl_s   = function()
-	return bind_log({"ctrl"}, "s", app_acts.copy_or_open_path)
-end
-
-hotkey_labels.ctrl_t = i18n.get("shortcuts.label_ctrl_t")
-hotkey_defs.ctrl_t   = function()
-	return bind_log({"ctrl"}, "t", sys_acts.teleport_mouse)
-end
-
-hotkey_labels.ctrl_u = i18n.get("shortcuts.label_ctrl_u")
-hotkey_defs.ctrl_u   = function()
-	return bind_log({"ctrl"}, "u", text_acts.toggle_uppercase)
-end
-
-hotkey_labels.ctrl_w = i18n.get("shortcuts.label_ctrl_w")
-hotkey_defs.ctrl_w   = function()
-	return bind_log({"ctrl"}, "w", text_acts.toggle_titlecase)
-end
-
-hotkey_labels.ctrl_x = i18n.get("shortcuts.label_ctrl_x")
-hotkey_defs.ctrl_x   = function()
-	return bind_log({"ctrl"}, "x", sys_acts.copy_pixel_color)
-end
-
-hotkey_labels.ctrl_capslock = i18n.get("shortcuts.label_ctrl_capslock")
-hotkey_defs.ctrl_capslock   = function()
-	return bind_log({"ctrl"}, "capslock", sys_acts.toggle_capslock)
-end
-
-hotkey_labels.ctrl_l = i18n.get("shortcuts.label_ctrl_l")
-hotkey_defs.ctrl_l   = function()
-	return bind_log({"ctrl"}, "l", sys_acts.lock_screen)
-end
-
--- Punctuation shortcuts — after all letter-based ctrl shortcuts
-hotkey_labels.ctrl_period = i18n.get("shortcuts.label_ctrl_period")
-hotkey_defs.ctrl_period   = function()
-	return bind_log({"ctrl"}, ".", sys_acts.open_emoji_picker)
-end
-
-hotkey_labels.ctrl_quote = i18n.get("shortcuts.label_ctrl_quote")
-hotkey_defs.ctrl_quote   = function()
-	return bind_log({"ctrl"}, "'", sys_acts.spotlight_mouse)
-end
-
--- Cmd shortcuts — alphabetical by id
-hotkey_labels.cmd_shift_v = i18n.get("shortcuts.label_cmd_shift_v")
-hotkey_defs.cmd_shift_v   = function()
-	return bind_log({"cmd", "shift"}, "v", text_acts.paste_as_plain_text)
 end
 
 hotkey_labels.cmd_star = i18n.get("shortcuts.label_cmd_star")
