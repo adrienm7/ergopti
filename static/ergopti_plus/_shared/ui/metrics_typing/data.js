@@ -106,7 +106,9 @@ function merge_dict(
 		if (!show_spaces && !is_word_ngram && display_k.includes(' ')) return;
 
 		const item = source[k];
-		const total_c = item.c || 0;
+		// Word storage separates clean and corrected completions; both are occurrences.
+		const error_c = item.e || 0;
+		const total_c = (item.c || 0) + (tab_name === 'w' || is_word_ngram ? error_c : 0);
 		const hs_c = item.hs || 0;
 		const llm_c = item.llm || 0;
 		const other_c = item.o || 0;
@@ -146,7 +148,7 @@ function merge_dict(
 
 		target[display_k].count += real_count;
 		target[display_k].time += item.t || 0;
-		target[display_k].errors += item.e || 0;
+		target[display_k].errors += error_c;
 		target[display_k].synth_hs += filtered_hs;
 		target[display_k].synth_llm += filtered_llm;
 		target[display_k].synth_other += other_c;
