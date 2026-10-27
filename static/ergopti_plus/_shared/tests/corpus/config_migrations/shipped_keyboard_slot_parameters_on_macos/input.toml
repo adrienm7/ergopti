@@ -1,0 +1,22 @@
+# _shared/tests/corpus/config_migrations/shipped_keyboard_slot_parameters_on_macos/input.toml
+
+[_meta]
+schema_version = 14
+
+[shortcuts.keyboard]
+cmd_a = "open_url"
+cmd_shift_k = "send_text"
+hs_ctrl_r = "run_program"
+hs_ctrl_shift_t = "send_text"
+hs_option_u = "open_url"
+physical_none_KeyJ = "open_url"
+
+[gestures.action_parameters]
+# Saved by the shortcut parameter dialogs.
+keyboard__cmd_a__open_url = "https://example.org/docs"
+keyboard__cmd_shift_k__send_text = "Best regards"
+keyboard__hs_ctrl_r__run_program = "/usr/bin/open -a Notes"
+keyboard__hs_ctrl_shift_t__send_text = "TODO: "
+keyboard__hs_option_u__open_url = "https://example.org/u"
+keyboard__physical_none_KeyJ__open_url = "https://example.org/j"
+tap_key__KeyJ__send_text = "tap"

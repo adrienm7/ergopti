@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_keyboard_slot_parameters_on_macos/case.toml
+
+[case]
+description = "Every action parameter of a retired macOS slot follows its slot to the role-named id (Cmd to primary, Ctrl to secondary, Option to alt); physical-slot and gesture parameters stay, so none is orphaned."
+drivers = ["hs"]
+outcome = "migrated"
+from_version = 14
+to_version = 15

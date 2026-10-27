@@ -1,0 +1,21 @@
+# _shared/tests/corpus/config_migrations/shipped_keyboard_slot_parameters_on_macos/expected.toml
+
+[_meta]
+schema_version = 15
+
+[shortcuts.keyboard]
+primary_a = "open_url"
+primary_shift_k = "send_text"
+secondary_r = "run_program"
+secondary_shift_t = "send_text"
+alt_u = "open_url"
+physical_none_KeyJ = "open_url"
+
+[gestures.action_parameters]
+keyboard__primary_a__open_url = "https://example.org/docs"
+keyboard__primary_shift_k__send_text = "Best regards"
+keyboard__secondary_r__run_program = "/usr/bin/open -a Notes"
+keyboard__secondary_shift_t__send_text = "TODO: "
+keyboard__alt_u__open_url = "https://example.org/u"
+keyboard__physical_none_KeyJ__open_url = "https://example.org/j"
+tap_key__KeyJ__send_text = "tap"
