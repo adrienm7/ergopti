@@ -15,13 +15,15 @@
 ---    catalogue.lua): conditional refresh with the cached ETag, cache and
 ---    shipped-index fallbacks with the exact error, the installed record, and
 ---    the offline installation of a layout shipped with the package.
---- 2. Python 3.8 or newer runs the converter and the installer: every Linux
----    layout installer of this project already requires it. The .keylayout is
----    read once, by the parser shared with macOS (_shared/lua/layouts/
----    keylayout.lua), and the converter takes that canonical form. A missing or older
----    python3 fails with a translated explanation.
+--- 2. The conversion is Lua: the .keylayout is read by the parser shared with
+---    macOS (_shared/lua/layouts/keylayout.lua) and written as XKB and XCompose
+---    by _shared/lua/layouts/xkb_converter.lua, byte for byte what the Python
+---    converter writes (tools/test/test-keylayout-canonical-parity.cjs). Python
+---    3.8 or newer is still required by the user XKB installer that follows,
+---    which edits the user tree and the desktop configuration; a missing or
+---    older python3 fails there with a translated explanation.
 --- 3. Every child runs asynchronously (adapters/process_runner): the daemon
----    owns the keyboard and never waits on a conversion or an installation.
+---    owns the keyboard and never waits on an installation.
 --- 4. The installed record is written last, so an interrupted installation
 ---    never claims a layout the session does not have. Every collaborator is
 ---    injectable, so tests replay operations without network, luv or python3.
@@ -38,6 +40,7 @@ local ShellRunner   = require("adapters.shell_runner")
 local ProcessRunner = require("adapters.process_runner")
 local Json          = require("json")
 local Keylayout     = require("layouts.keylayout")
+local XkbConverter  = require("layouts.xkb_converter")
 local ShutdownHelpers, HelpersSettled = ProcessRunner.shutdown, ProcessRunner.is_settled
 local CancelHttp, CancelDigest = HttpClient.cancel, FileDigest.cancel
 local Registry      = require("layouts.registry")
@@ -63,21 +66,20 @@ local REQUEST_OWNER = "layout_registry"
 -- ================================
 -- ================================
 
--- Interpreter of the converter and the installer, looked up in PATH like the
--- installers do.
+-- Interpreter of the user installer, looked up in PATH like the installers do.
 local PYTHON = "python3"
 
--- Oldest Python the converter supports (the installers' floor).
+-- Oldest Python the installer supports (the installers' floor).
 local MIN_PYTHON = { 3, 8 }
 
 -- Exit code of the version probe when the interpreter is too old.
 local PYTHON_TOO_OLD_EXIT = 3
 
--- The converter and the user installer, relative to the driver root: where the
--- package ships them, then where they live in a source checkout.
-local CONVERTER_CANDIDATES = {
-	"xkb_generation/keylayout_to_xkb.py",
-	"../../ergopti/linux/xkb_generation/keylayout_to_xkb.py",
+-- The conversion data and the user installer, relative to the driver root: where
+-- the package ships them, then where they live in a source checkout.
+local CONVERTER_DATA_CANDIDATES = {
+	"xkb_generation/data",
+	"../../ergopti/linux/xkb_generation/data",
 }
 local INSTALLER_CANDIDATES = {
 	"xkb_installation/user_layout_installer.py",
@@ -245,12 +247,13 @@ local function first_existing(driver_root, candidates, exists)
 	return nil
 end
 
---- The converter shipped with this driver.
+--- The folder of the conversion data (keysym table, symbols template, key types)
+--- shipped with this driver.
 --- @param driver_root string Driver root, without a trailing slash.
 --- @param exists function exists(path) -> boolean
 --- @return string|nil path
-function M.converter_path(driver_root, exists)
-	return first_existing(driver_root, CONVERTER_CANDIDATES, exists)
+function M.converter_data_path(driver_root, exists)
+	return first_existing(driver_root, CONVERTER_DATA_CANDIDATES, function(path) return exists(path .. "/key_sym.json") end)
 end
 
 --- The user XKB installer shipped with this driver.
@@ -358,7 +361,7 @@ local function default_deps(settings)
 		run = ProcessRunner.run,
 		local_dir = local_dir,
 		bundled_dir = M.bundled_dir(driver_root, settings, FileSystem.exists),
-		converter = M.converter_path(driver_root, FileSystem.exists),
+		converter_data = M.converter_data_path(driver_root, FileSystem.exists),
 		installer = M.installer_path(driver_root, FileSystem.exists),
 		keycodes = Paths.shared("modules/layouts/mac_keycodes.json"),
 		translate = I18n.get,
@@ -442,18 +445,21 @@ local function run_python(deps, args, on_done)
 end
 
 --- Converts a verified layout to XKB files in <local folder>/<id>/.
+---
+--- The whole conversion runs in Lua (layouts.keylayout parses the file,
+--- layouts.xkb_converter writes the XKB symbols and XCompose text): no child
+--- process, so a machine without python3 still converts, and only the user XKB
+--- installer that follows needs it.
 --- @param deps table
 --- @param entry table
 --- @param layout_path string
---- @param index_path string Index carrying the layout's XKB hints.
 --- @param on_done function on_done(ok, code, detail)
-local function convert(deps, entry, layout_path, index_path, on_done)
-	if not deps.converter then
-		on_done(false, M.FAILURE_CONVERSION, "the .keylayout converter is not shipped with this driver")
+local function convert(deps, entry, layout_path, on_done)
+	local data_dir = deps.converter_data
+	if not data_dir then
+		on_done(false, M.FAILURE_CONVERSION, "the XKB conversion data is not shipped with this driver")
 		return
 	end
-	-- The shared parser (layouts/keylayout.lua) reads the file; the converter
-	-- takes its canonical form, the one reading of a .keylayout every driver uses.
 	local text = deps.read(layout_path)
 	if type(text) ~= "string" then
 		on_done(false, M.FAILURE_CONVERSION, "the downloaded .keylayout cannot be read: " .. layout_path)
@@ -464,29 +470,43 @@ local function convert(deps, entry, layout_path, index_path, on_done)
 		on_done(false, M.FAILURE_CONVERSION, parse_err)
 		return
 	end
-	local canonical_path = deps.local_dir .. entry.id .. ".canonical.json"
-	local written, write_err = write_file(deps, canonical_path, deps.encode_json(canonical))
-	if not written then
-		on_done(false, M.FAILURE_WRITE, write_err)
+	local function decode_file(path)
+		local raw = deps.read(path)
+		local decoded = type(raw) == "string" and deps.decode_json(raw) or nil
+		if type(decoded) ~= "table" then return nil, "the conversion data " .. path .. " cannot be read" end
+		return decoded
+	end
+	local keycode_table, keycode_err = decode_file(deps.keycodes)
+	if not keycode_table then on_done(false, M.FAILURE_CONVERSION, keycode_err) return end
+	local keysym_table, keysym_err = decode_file(data_dir .. "/key_sym.json")
+	if not keysym_table then on_done(false, M.FAILURE_CONVERSION, keysym_err) return end
+	local template = deps.read(data_dir .. "/xkb_symbols.txt")
+	local types = deps.read(data_dir .. "/xkb_types.txt")
+	if type(template) ~= "string" or type(types) ~= "string" then
+		on_done(false, M.FAILURE_CONVERSION, "the XKB template or key types are not shipped with this driver")
 		return
 	end
-	run_python(deps, {
-		deps.converter,
-		"--canonical", canonical_path,
-		"--keycodes", deps.keycodes,
-		"--convention", entry.keycode_convention,
-		"--layout-id", entry.id,
-		"--display-name", entry.name,
-		"--index", index_path,
-		"--out", deps.local_dir .. entry.id,
-	}, function(started, result, detail)
-		if not started then on_done(false, result, detail) return end
-		if result.error then
-			on_done(false, M.FAILURE_CONVERSION, result.stderr ~= "" and result.stderr or result.error)
-			return
-		end
-		on_done(true, nil, nil)
-	end)
+	local keycodes, keycodes_err = XkbConverter.keycodes(keycode_table, entry.keycode_convention)
+	if not keycodes then on_done(false, M.FAILURE_CONVERSION, keycodes_err) return end
+	local result, convert_err = XkbConverter.convert(canonical, {
+		keycodes = keycodes,
+		keysyms = keysym_table.keysyms,
+		template = template,
+		layout_id = entry.id,
+		display_name = entry.name,
+		hints = entry.xkb,
+	})
+	if not result then on_done(false, M.FAILURE_CONVERSION, convert_err) return end
+	local out_dir = deps.local_dir .. entry.id .. "/"
+	for _, file in ipairs({
+		{ entry.id .. ".xkb", result.symbols_text },
+		{ entry.id .. ".XCompose", result.compose_text },
+		{ "xkb_types.txt", types },
+	}) do
+		local written, write_err = write_file(deps, out_dir .. file[1], file[2])
+		if not written then on_done(false, M.FAILURE_WRITE, write_err) return end
+	end
+	on_done(true, nil, nil)
 end
 
 --- Runs one command of the user XKB installer and reads its report.
@@ -707,12 +727,7 @@ function M.install(id, on_done, deps)
 				finish(false, M.FAILURE_WRITE, write_err)
 				return
 			end
-			-- The converter reads the entry's XKB hints from an index; the one
-			-- the entry came from is the cached copy, or the shipped one offline.
-			local index_path = outcome.source == Catalogue.SOURCE_BUNDLED
-				and deps.bundled_dir .. deps.settings.index_file
-				or deps.local_dir .. deps.settings.index_file
-			convert(deps, entry, layout_path, index_path, function(converted, code, convert_err)
+			convert(deps, entry, layout_path, function(converted, code, convert_err)
 				if not current(epoch) then return end
 				if not converted then
 					finish(false, code, convert_err)
@@ -786,7 +801,6 @@ function M.uninstall(id, on_done, deps)
 		end
 		for _, path in ipairs({
 			deps.local_dir .. id .. ".keylayout",
-			deps.local_dir .. id .. ".canonical.json",
 			deps.local_dir .. id .. "/" .. id .. ".xkb",
 			deps.local_dir .. id .. "/" .. id .. ".XCompose",
 			deps.local_dir .. id .. "/xkb_types.txt",
@@ -909,15 +923,12 @@ function M.install_local(entry, text, on_done, deps)
 			return
 		end
 		local layout_path = deps.local_dir .. id .. ".keylayout"
-		local index_path = deps.local_dir .. id .. ".index.json"
-		for _, step in ipairs({ { layout_path, text }, { index_path, deps.encode_json({ layouts = { entry } }) } }) do
-			local written, write_err = write_file(deps, step[1], step[2])
-			if not written then
-				finish(false, M.FAILURE_WRITE, write_err)
-				return
-			end
+		local written, write_err = write_file(deps, layout_path, text)
+		if not written then
+			finish(false, M.FAILURE_WRITE, write_err)
+			return
 		end
-		convert(deps, entry, layout_path, index_path, function(converted, code, convert_err)
+		convert(deps, entry, layout_path, function(converted, code, convert_err)
 			if not current(epoch) then return end
 			if not converted then
 				finish(false, code, convert_err)
