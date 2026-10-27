@@ -452,12 +452,12 @@
 			"repro": "npm run test:linux-portable-commands"
 		},
 		{
-			"id": "js-0479",
+			"id": "js-macos-dev-app-script",
 			"ordinal": 498,
-			"name": "macOS development installer emits executable Lua for literal paths and preserves original backups",
+			"name": "macOS developer app runner builds in source mode and opens only this clone's developer app",
 			"cmd": "$NODE_EXECUTABLE",
-			"args": ["tools/test/test-macos-dev-bootstrap.cjs"],
-			"repro": "node tools/test/test-macos-dev-bootstrap.cjs",
+			"args": ["tools/test/test-macos-dev-app-script.cjs"],
+			"repro": "npm run test:macos-dev-app-script",
 			"platforms": ["linux", "darwin"]
 		},
 		{
