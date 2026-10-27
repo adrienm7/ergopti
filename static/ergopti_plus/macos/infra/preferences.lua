@@ -86,6 +86,7 @@ local RecordList = require("toml_codec.record_list")
 local LOG       = "preferences"
 local OperationReporter = require("diagnostics.operation_reporter")
 local ConfigKeys = require("config_keys")
+local MetricsState = require("infra.metrics_state_keys")
 
 
 --- Top-level TOML section names in the order they appear on disk.
@@ -137,16 +138,16 @@ local KEY_MAP = {
 	custom_default_section               = { sec = "hotstrings", path = "editor", key = "default_section" },
 
 	-- ── Metrics (formerly Keystats) ───────────────────────────────────────
-	keystats_enabled                    = { sec = "metrics", key = "enabled"                       },
-	keystats_encrypt                    = { sec = "metrics", key = "encrypt"                       },
-	keystats_float_colors               = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_COLORS             },
-	keystats_float_graph                = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_GRAPH              },
-	keystats_float_wpm                  = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_VISIBLE            },
-	keystats_menubar_colors             = { sec = "metrics", key = ConfigKeys.LEAF.WPM_MENUBAR_COLORS            },
-	keystats_menubar_wpm                = { sec = "metrics", key = ConfigKeys.LEAF.WPM_MENUBAR_VISIBLE           },
-	keystats_private_filter_enabled     = { sec = "metrics", key = ConfigKeys.LEAF.PRIVATE_FILTER_ENABLED        },
-	keystats_secure_filter_enabled      = { sec = "metrics", key = ConfigKeys.LEAF.SECURE_FILTER_ENABLED         },
-	keystats_system_auth_filter_enabled = { sec = "metrics", key = ConfigKeys.LEAF.SYSTEM_AUTH_FILTER_ENABLED   },
+	[MetricsState.ENABLED]                    = { sec = "metrics", key = "enabled"                       },
+	[MetricsState.ENCRYPT]                    = { sec = "metrics", key = "encrypt"                       },
+	[MetricsState.FLOAT_COLORS]               = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_COLORS             },
+	[MetricsState.FLOAT_GRAPH]                = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_GRAPH              },
+	[MetricsState.FLOAT_WPM]                  = { sec = "metrics", key = ConfigKeys.LEAF.WPM_WIDGET_VISIBLE            },
+	[MetricsState.MENUBAR_COLORS]             = { sec = "metrics", key = ConfigKeys.LEAF.WPM_MENUBAR_COLORS            },
+	[MetricsState.MENUBAR_WPM]                = { sec = "metrics", key = ConfigKeys.LEAF.WPM_MENUBAR_VISIBLE           },
+	[MetricsState.PRIVATE_FILTER_ENABLED]     = { sec = "metrics", key = ConfigKeys.LEAF.PRIVATE_FILTER_ENABLED        },
+	[MetricsState.SECURE_FILTER_ENABLED]      = { sec = "metrics", key = ConfigKeys.LEAF.SECURE_FILTER_ENABLED         },
+	[MetricsState.SYSTEM_AUTH_FILTER_ENABLED] = { sec = "metrics", key = ConfigKeys.LEAF.SYSTEM_AUTH_FILTER_ENABLED   },
 
 	-- ── LLM ────────────────────────────────────────────────────────────────
 	llm_enabled                          = { sec = "llm", key = "enabled"                           },
@@ -238,7 +239,7 @@ local NESTED_KEY_MAP = {
 	custom_terminators       = { sec = "hotstrings", key = "terminators"                },
 	custom_delimiters        = { sec = "hotstrings", key = "delimiters"                 },
 	-- Metrics nested tables
-	keystats_disabled_apps  = { sec = "metrics",    key = ConfigKeys.LEAF.DISABLED_APPS              },
+	[MetricsState.DISABLED_APPS]  = { sec = "metrics",    key = ConfigKeys.LEAF.DISABLED_APPS              },
 	-- LLM nested tables
 	llm_disabled_apps        = { sec = "llm",        key = "trigger.disabled_apps"      },
 	llm_nav_modifiers        = { sec = "llm",        key = "navigation.nav_modifiers"   },
