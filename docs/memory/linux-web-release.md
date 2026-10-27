@@ -613,6 +613,10 @@ has no bash) sources `libc-preflight.sh`, rendered by
 `startup.linux_appimage_*` locale keys, which refuses in words with exit 69
 (`getconf GNU_LIBC_VERSION` answers only on glibc). Action: never put a bash
 construct before that `.` line.
+`check-elf-glibc-ceiling.cjs` also refuses an executable that requests a program loader other
+than `/lib64/ld-linux-x86-64.so.2` (a musl or Nix build) and any staged copy of libc, its
+loader or `libnss_*` (names from the glibc group of `linux_appimage_recipient_libraries.json`).
+musl hosts cannot run the image; only the CI install rows prove the distro matrix.
 `tools/build/appimage-distro-sweep.sh <AppImage>` replays the musl refusal,
 the old-glibc refusal and the desktop launch per distribution image. Action:
 run it on every change to AppRun, the stager or the build image.
