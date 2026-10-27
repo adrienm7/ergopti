@@ -572,6 +572,13 @@ end)
 
 require("test.toml_quoted_headers_contract")(helpers)
 require("test.toml_batch_existing_key_contract")(helpers)
+do
+	local Json = require("json")
+	local file = assert(io.open(require("infra.paths").shared("tests/corpus/toml/batch_write_vectors.json"), "rb"))
+	local corpus = assert(Json.decode_lossless(file:read("*a")))
+	file:close()
+	require("test.toml_batch_write_vectors_contract")(helpers, corpus, 49)
+end
 require("test.toml_leaf_rows_contract")(helpers)
 
 local noop_vectors_file = assert(io.open(helpers.shared("tests/corpus/config_noop/vectors.json"), "rb"))

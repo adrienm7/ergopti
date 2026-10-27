@@ -1,0 +1,150 @@
+{
+	"_comment": "Which cases of the shared Lua contracts moved into JSON vector corpora (PAR-58). Each moved entry names the removed case (an it title, or a loop's title prefix) and the vector ids that now hold it. tools/test/test-contract-vector-ledger.cjs fails when a vector is not listed here, when a listed vector is missing, when a removed case title is still registered in its contract, or when a vector breaks the schema.",
+	"families": [
+		{
+			"family": "toml_batch_write",
+			"corpus": "toml/batch_write_vectors.json",
+			"entry_point": "batch writer prepare step (source bytes + rows -> accepted, detail, candidate bytes)",
+			"windows_consumer": "One AHK consumer calls the Windows TOML batch writer's prepare step for each vector and compares accepted, detail and candidate bytes; decoded checks use the Windows TOML codec.",
+			"sources": [
+				{
+					"contract": "toml_batch_existing_key_contract.lua",
+					"moved": [
+						{
+							"case": "deletes a table declared by an empty header and keeps every comment",
+							"vectors": ["empty-header-table-deleted-comments-kept"]
+						},
+						{
+							"case": "replaces a header table, its descendants and interleaved blocks by one scalar",
+							"vectors": ["header-table-descendants-and-interleaved-blocks-replaced-by-scalar"]
+						},
+						{
+							"case": "removes a header table whose parent has no header of its own",
+							"vectors": [
+								"header-table-without-parent-header-deleted",
+								"header-table-without-parent-header-set-to-a-table"
+							]
+						},
+						{
+							"case": "leaves a value another spelling already holds byte-for-byte",
+							"vectors": [
+								"equal-array-of-tables-left-byte-for-byte",
+								"equal-empty-header-table-left-byte-for-byte",
+								"equal-inline-parent-value-left-byte-for-byte"
+							]
+						},
+						{
+							"case": "rewrites a changed array of tables as one inline list and keeps its comments",
+							"vectors": ["changed-array-of-tables-rewritten-as-one-inline-list"]
+						},
+						{
+							"case": "updates and deletes a quoted bare-compatible key in place",
+							"vectors": [
+								"quoted-bare-key-updated-in-place-double-quoted",
+								"quoted-bare-key-deleted-in-place-double-quoted",
+								"quoted-bare-key-updated-in-place-single-quoted",
+								"quoted-bare-key-deleted-in-place-single-quoted",
+								"quoted-bare-key-in-dotted-section-updated"
+							]
+						},
+						{
+							"case": "names the key an inline table holds when its value changes",
+							"vectors": ["inline-table-value-change-names-its-key"]
+						},
+						{
+							"case": "updates the existing section-inline string without owning its parent",
+							"vectors": ["section-inline-string-updated-without-owning-its-parent"]
+						},
+						{
+							"case": "refuses a batch that replaces a header table and writes inside it",
+							"vectors": ["batch-replacing-a-header-table-and-writing-inside-it-refused"]
+						},
+						{
+							"case": "publishes complete inline source:",
+							"vectors": [
+								"inline-source-existing-boolean",
+								"inline-source-existing-string",
+								"inline-source-precise-number",
+								"inline-source-negative-zero",
+								"inline-source-first-deletion",
+								"inline-source-middle-deletion",
+								"inline-source-existing-no-op",
+								"inline-source-authored-absent-deletion",
+								"inline-source-scalar-and-absent-sibling-deletion"
+							]
+						},
+						{
+							"case": "retains exact nested dotted and quoted member fragments under a quoted header",
+							"vectors": ["nested-dotted-and-quoted-member-fragments-kept-under-a-quoted-header"]
+						},
+						{
+							"case": "preserves the explicit empty inline parent after its last scalar deletion",
+							"vectors": ["explicit-empty-inline-parent-kept-after-last-scalar-deletion"]
+						}
+					]
+				},
+				{
+					"contract": "toml_quoted_headers_contract.lua",
+					"moved": [
+						{
+							"case": "deletes an owned extension leaf while preserving all neighboring bytes",
+							"vectors": ["owned-extension-leaf-deleted-neighbour-bytes-kept"]
+						},
+						{
+							"case": "inserts and updates through equivalent literal and escaped section spellings",
+							"vectors": [
+								"equivalent-section-spelling-literal-updated-and-extended",
+								"equivalent-section-spelling-basic-updated-and-extended",
+								"equivalent-section-spelling-escaped-updated-and-extended"
+							]
+						},
+						{
+							"case": "renders canonical colon segments as valid quoted TOML on first insertion",
+							"vectors": ["canonical-colon-segments-rendered-quoted-on-first-insertion"]
+						},
+						{
+							"case": "rejects equivalent batch rows before reading and preserves unrelated case variants",
+							"vectors": [
+								"duplicate-equivalent-rows-refused-before-reading",
+								"unrelated-case-variants-preserved-on-quoted-delete"
+							]
+						},
+						{
+							"case": "keeps quoted dots and bracket characters distinct from nested sections",
+							"vectors": ["quoted-dots-and-brackets-kept-distinct-from-nested-sections"]
+						},
+						{
+							"case": "rejects malformed table paths before acquiring a snapshot",
+							"vectors": [
+								"malformed-table-path-1-refused-before-reading",
+								"malformed-table-path-2-refused-before-reading",
+								"malformed-table-path-3-refused-before-reading",
+								"malformed-table-path-4-refused-before-reading",
+								"malformed-table-path-5-refused-before-reading",
+								"malformed-table-path-6-refused-before-reading",
+								"malformed-table-path-7-refused-before-reading",
+								"malformed-table-path-8-refused-before-reading"
+							]
+						},
+						{
+							"case": "refuses malformed source headers and equivalent duplicate tables",
+							"vectors": [
+								"malformed-source-or-duplicate-table-1-refused",
+								"malformed-source-or-duplicate-table-2-refused",
+								"malformed-source-or-duplicate-table-3-refused"
+							]
+						},
+						{
+							"case": "refuses ambiguous case-folded targets and array-of-table targets",
+							"vectors": [
+								"ambiguous-case-folded-or-array-target-1-refused",
+								"ambiguous-case-folded-or-array-target-2-refused",
+								"ambiguous-case-folded-or-array-target-3-refused"
+							]
+						}
+					]
+				}
+			]
+		}
+	]
+}
