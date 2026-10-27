@@ -8,7 +8,7 @@ local Preferences = require("infra.preferences")
 local Scope = require("infra.preferences_scope")
 local MOD_COMBOS = require("config_keys").KEY.MOD_COMBOS
 
-local STATE_FIELDS = { "shortcuts", "chatgpt_url", "shortcut_keys", "script_control_enabled", "script_control_shortcuts" }
+local STATE_FIELDS = { "shortcuts", require("config_keys").LEAF.CHATGPT_URL, "shortcut_keys", "script_control_enabled", "script_control_shortcuts" }
 
 -- [shortcuts.caps_word] and its pointer kinds belong to their settings owner,
 -- which names their state keys; the scope applies them through it.
@@ -211,7 +211,7 @@ function M.new(options)
 						if row.key == "chords_enabled" then desired.script_control_enabled = value
 						else desired.script_control_shortcuts[row.key] = value end
 					elseif row.section == "shortcuts" and row.key == "enabled" then native.master, desired.shortcuts = value, value
-					elseif row.section == "shortcuts" and row.key == "chatgpt_url" then native.url, desired.chatgpt_url = value, value
+					elseif row.section == "shortcuts" and row.key == require("config_keys").LEAF.CHATGPT_URL then native.url, desired.chatgpt_url = value, value
 					elseif row.section == "shortcuts.caps_word.pointer" then
 						desired[CapsWordAutoOff.POINTER_KEY][row.key] = value
 					elseif row.section == require("config_keys").KEY.SHORTCUTS_CAPS_WORD then

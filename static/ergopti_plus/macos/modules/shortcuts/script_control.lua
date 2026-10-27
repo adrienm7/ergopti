@@ -60,7 +60,7 @@ local LOG = "shortcuts.script_control"
 -- ====================================
 -- ====================================
 
-local SCRIPT_CONTROL_SHORTCUT_CLAIM = "script_control"
+local SCRIPT_CONTROL_SHORTCUT_CLAIM = ConfigKeys.LEAF.SCRIPT_CONTROL
 
 -- Sentinel keycode -> script chord slot, built at the first key event.
 -- Karabiner's script-control rules (platform/remap/script_chord_rules.lua)
@@ -1621,8 +1621,8 @@ M.PAUSE_OWNER_IDS = {
 	"warmup_controller",
 	"ollama_warmup",
 	"remote_warmup",
-	"wpm_menubar",
-	"wpm_widget",
+	ConfigKeys.COMMAND.WPM_MENUBAR,
+	ConfigKeys.COMMAND.WPM_WIDGET,
 	"remap_onboarding",
 	"predictions",
 	"tooltip",

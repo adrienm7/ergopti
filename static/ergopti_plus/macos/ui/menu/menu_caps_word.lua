@@ -42,7 +42,7 @@ function M.build(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
-		["caps_word_idle_timeout"] = function(seconds) return commit(CapsWordAutoOff.IDLE_KEY, seconds) end,
+		[require("config_keys").COMMAND.CAPS_WORD_IDLE_TIMEOUT] = function(seconds) return commit(CapsWordAutoOff.IDLE_KEY, seconds) end,
 	}
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end

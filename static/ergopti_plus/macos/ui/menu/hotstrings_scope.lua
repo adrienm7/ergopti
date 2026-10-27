@@ -49,20 +49,20 @@ local LOG = "menu.hotstrings_scope"
 --- is absent where the menu state is the only reader on this driver, and a
 --- getter is present where the native owner can read its value back.
 local OWNERS = {
-	{ key = "repeat_key_enabled", setter = "set_repeat_feature_enabled", getter = "is_repeat_feature_enabled" },
+	{ key = require("config_keys").LEAF.REPEAT_KEY_ENABLED, setter = "set_repeat_feature_enabled", getter = "is_repeat_feature_enabled" },
 	{ key = require("config_keys").LEAF.EXPANSION_DELAY, setter = "set_base_delay", getter = "get_base_delay" },
-	{ key = "idle_reset_seconds", setter = "set_idle_reset_seconds", getter = "get_idle_reset_seconds" },
+	{ key = require("config_keys").LEAF.IDLE_RESET_SECONDS, setter = "set_idle_reset_seconds", getter = "get_idle_reset_seconds" },
 	{ key = require("config_keys").LEAF.CASCADE_MAX_ARROWS, setter = "set_cascade_max_arrows", getter = "get_cascade_max_arrows" },
-	{ key = "click_resets_word", setter = "set_click_resets_word", getter = "is_click_resets_word_enabled" },
-	{ key = "arrow_resets_word", setter = "set_arrow_resets_word", getter = "is_arrow_resets_word_enabled" },
-	{ key = "shortcut_resets_word", setter = "set_shortcut_resets_word",
+	{ key = require("config_keys").LEAF.CLICK_RESETS_WORD, setter = "set_click_resets_word", getter = "is_click_resets_word_enabled" },
+	{ key = require("config_keys").LEAF.ARROW_RESETS_WORD, setter = "set_arrow_resets_word", getter = "is_arrow_resets_word_enabled" },
+	{ key = require("config_keys").LEAF.SHORTCUT_RESETS_WORD, setter = "set_shortcut_resets_word",
 		getter = "is_shortcut_resets_word_enabled" },
-	{ key = "trigger_char", setter = "set_trigger_char", getter = "get_trigger_char" },
-	{ key = "magic_key_source", setter = "set_magic_key_source", getter = "get_magic_key_source" },
-	{ key = "preview_star_enabled", setter = "set_preview_star_enabled" },
-	{ key = "preview_autocorrect_enabled", setter = "set_preview_autocorrect_enabled" },
-	{ key = "preview_colored_tooltips", setter = "set_preview_colored_tooltips" },
-	{ key = "preview_ai_enabled", setter = "set_preview_ai_enabled" },
+	{ key = require("config_keys").LEAF.TRIGGER_CHAR, setter = "set_trigger_char", getter = "get_trigger_char" },
+	{ key = require("config_keys").LEAF.MAGIC_KEY_SOURCE, setter = "set_magic_key_source", getter = "get_magic_key_source" },
+	{ key = require("config_keys").LEAF.PREVIEW_STAR_ENABLED, setter = "set_preview_star_enabled" },
+	{ key = require("config_keys").LEAF.PREVIEW_AUTOCORRECT_ENABLED, setter = "set_preview_autocorrect_enabled" },
+	{ key = require("config_keys").LEAF.PREVIEW_COLORED_TOOLTIPS, setter = "set_preview_colored_tooltips" },
+	{ key = require("config_keys").LEAF.PREVIEW_AI_ENABLED, setter = "set_preview_ai_enabled" },
 	{ key = "dynamichotstrings_enabled" },
 	{ key = "dynamichotstrings_user_code_time_activation_seconds", native = "dynamic",
 		setter = "set_user_code_time_activation", getter = "user_code_time_activation" },
@@ -286,7 +286,7 @@ function M.new(options)
 			local value = values[owner.key]
 			if value ~= nil and owner.native ~= "dynamic" and owner.setter and current(owner.key) ~= value then
 				if keymap[owner.setter](value) ~= true then return false end
-				if owner.key == "trigger_char" and options.editor then options.editor.set_trigger_char(value) end
+				if owner.key == require("config_keys").LEAF.TRIGGER_CHAR and options.editor then options.editor.set_trigger_char(value) end
 			end
 		end
 		if programmable then

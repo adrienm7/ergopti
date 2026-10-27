@@ -47,6 +47,7 @@ local i18n             = require("infra.i18n")
 local Keycodes         = require("infra.keycodes")
 local tooltip          = require("ui.tooltip")
 local keystats        = require("modules.keystats")
+local ConfigKeys = require("config_keys")
 
 local LOG    = "llm.prediction_engine"
 local _state = nil  -- Shared keymap core state; injected via M.init()
@@ -990,7 +991,7 @@ function M.get_llm_runtime_setting(key)
 	if key == "llm_pred_indent" then return true, prediction_indent end
 	if key == "llm_nav_modifiers" then return true, navigation_mods end
 	if key == "llm_val_modifiers" then return true, validation_mods end
-	if key == "llm_instant_on_word_end" then return true, instant_on_word_end end
+	if key == ConfigKeys.COMMAND.LLM_INSTANT_ON_WORD_END then return true, instant_on_word_end end
 	if key == "llm_url_bar_filter_enabled" then return true, url_bar_filter_enabled end
 	if key == "llm_secure_field_filter_enabled" then
 		return true, secure_field_filter_enabled

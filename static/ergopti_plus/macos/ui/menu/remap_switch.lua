@@ -22,6 +22,7 @@ local M = {}
 local Logger        = require("infra.logger")
 local i18n          = require("infra.i18n")
 local Notifications = require("infra.notifications")
+local ConfigKeys = require("config_keys")
 
 local LOG = "menu.remap_switch"
 
@@ -132,8 +133,8 @@ end
 --- @return table state_getters
 function M.rows(karabiner, update_menu)
 	return {
-		["karabiner_integration"] = function() return M.toggle(karabiner, update_menu) end,
-		["remove_from_karabiner"] = function() return M.remove(karabiner, update_menu) end,
+		[ConfigKeys.COMMAND.KARABINER_INTEGRATION] = function() return M.toggle(karabiner, update_menu) end,
+		[ConfigKeys.COMMAND.REMOVE_FROM_KARABINER] = function() return M.remove(karabiner, update_menu) end,
 	}, {
 		["karabiner_integration_enabled"] = function() return M.is_enabled(karabiner) end,
 	}

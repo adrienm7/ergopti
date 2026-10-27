@@ -257,7 +257,7 @@ end
 --- @return table Provider row.
 function M.all_sections_row(ctx, group_names, set_fn)
 	local all_on = M.all_sections_on(ctx, group_names)
-	local row = ManifestMenu.check_row("hotstring_scope_checkbox", "hotstring_scope_all_sections",
+	local row = ManifestMenu.check_row("hotstring_scope_checkbox", require("config_keys").COMMAND.HOTSTRING_SCOPE_ALL_SECTIONS,
 		{ hotstring_scope_all_sections = function() return false end },
 		{ hotstring_scope_all_on = function() return all_on end })
 	if not row then return nil end
@@ -485,8 +485,8 @@ function M.build_custom(ctx, counts)
 					lbl = ctx.applyTriggerChar(lbl)
 					local sname = sec.name
 					local selected = (state.custom_default_section == sname) or nil
-					local choice = ManifestMenu.check_row("hotstring_personal_default_choice", "personal_default_section", {
-						["personal_default_section"] = function()
+					local choice = ManifestMenu.check_row("hotstring_personal_default_choice", require("config_keys").COMMAND.PERSONAL_DEFAULT_SECTION, {
+						[require("config_keys").COMMAND.PERSONAL_DEFAULT_SECTION] = function()
 							state.custom_default_section = sname
 							if ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then
 								pcall(ctx.hotstring_editor.set_default_section, sname)
@@ -506,7 +506,7 @@ function M.build_custom(ctx, counts)
 	end
 
 	local cat_menu = ManifestMenu.template_rows("hotstring_personal_default_frame", {
-		["personal_default_none"] = none_action,
+		[require("config_keys").COMMAND.PERSONAL_DEFAULT_NONE] = none_action,
 	}, {
 		["personal_default_unset"] = function() return not state.custom_default_section end,
 		["personal_default_boundary"] = function() return #cat_choices > 0 end,
@@ -551,7 +551,7 @@ function M.build_custom(ctx, counts)
 				local caption = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl
 				-- The original factory only allocates this closure; native effects run on delivery.
 				local action = toggleSectionFn(ctx, group_name, sec.name, lbl, admission)
-				local row = ManifestMenu.check_row("hotstring_personal_section_choice", "personal_section_toggle", {
+				local row = ManifestMenu.check_row("hotstring_personal_section_choice", require("config_keys").COMMAND.PERSONAL_SECTION_TOGGLE, {
 					personal_section_toggle = action,
 				}, {
 					personal_section_label = function() return caption end,
@@ -612,8 +612,8 @@ function M.build_custom(ctx, counts)
 		{ personal_default_caption = function() return cat_menu end })
 	if type(default_parent) ~= "table" or #default_parent ~= 1 then return nil end
 	local controls = ManifestMenu.template_rows("hotstring_personal_controls_frame", {
-		["hotstring_file_open"] = function() open_toml_path(toml_path_for_group(ctx, "personal")) end,
-		["personal_close_on_add"] = close_action,
+		[require("config_keys").COMMAND.HOTSTRING_FILE_OPEN] = function() open_toml_path(toml_path_for_group(ctx, "personal")) end,
+		[require("config_keys").COMMAND.PERSONAL_CLOSE_ON_ADD] = close_action,
 	}, {
 		["hotstring_file_ready"] = function() return not paused end,
 		["personal_open_present"] = function() return true end,
@@ -621,7 +621,7 @@ function M.build_custom(ctx, counts)
 		["personal_controls_tail_boundary"] = function() return false end,
 		["personal_preferences_present"] = function() return true end,
 		["personal_controls_ready"] = function() return not paused end,
-		["personal_close_on_add"] = function() return state.custom_close_on_add == true end,
+		[require("config_keys").COMMAND.PERSONAL_CLOSE_ON_ADD] = function() return state.custom_close_on_add == true end,
 	}, {
 		["personal_editor"] = function() return editor_row and { editor_row } or {} end,
 		["personal_default_parent"] = function() return default_parent end,
@@ -640,8 +640,8 @@ function M.build_custom(ctx, counts)
 	local function scope_menu(names, file_rows, section_rows)
 		return ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil,
 			{ commands = {
-				["hotstring_category_enable_all"] = M.category_scope_fn(ctx, names, true),
-				["hotstring_category_disable_all"] = M.category_scope_fn(ctx, names, false),
+				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL] = M.category_scope_fn(ctx, names, true),
+				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL] = M.category_scope_fn(ctx, names, false),
 			} }, {
 				["hotstring_category_file"] = function() return file_rows end,
 				["hotstring_category_sections"] = function() return section_rows end,
@@ -650,7 +650,7 @@ function M.build_custom(ctx, counts)
 	local function file_menu_for_group(gname, rows, check, readonly)
 		local path = toml_path_for_group(ctx, gname)
 		local file_rows = ManifestMenu.template_rows("hotstring_personal_file_frame", {
-			["hotstring_file_open"] = function() open_toml_path(path) end,
+			[require("config_keys").COMMAND.HOTSTRING_FILE_OPEN] = function() open_toml_path(path) end,
 		}, {
 			["hotstring_file_ready"] = function() return true end,
 			["personal_file_open_present"] = function() return path ~= nil end,
@@ -663,8 +663,8 @@ function M.build_custom(ctx, counts)
 
 		local rendered = ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil,
 			{ commands = {
-				["hotstring_category_enable_all"] = M.category_scope_fn(ctx, { gname }, true, check),
-				["hotstring_category_disable_all"] = M.category_scope_fn(ctx, { gname }, false, check),
+				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL] = M.category_scope_fn(ctx, { gname }, true, check),
+				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL] = M.category_scope_fn(ctx, { gname }, false, check),
 			} }, {
 				["hotstring_category_file"] = function() return file_rows end,
 				["hotstring_category_sections"] = function() return rows end,

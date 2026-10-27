@@ -81,9 +81,9 @@ function M.build_management(ctx)
 
 	local bubble_sub = {}
 
-	local magic_row = ManifestMenu.check_row("preview_magic_control", "preview_star_enabled", {
-		["preview_star_enabled"] = function()
-			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview("preview_star_enabled") ~= true then
+	local magic_row = ManifestMenu.check_row("preview_magic_control", require("config_keys").LEAF.PREVIEW_STAR_ENABLED, {
+		[require("config_keys").LEAF.PREVIEW_STAR_ENABLED] = function()
+			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview(require("config_keys").LEAF.PREVIEW_STAR_ENABLED) ~= true then
 				return false
 			end
 			ctx.notify_feature(i18n.get("menu.hotstrings.notify_bubble_star"), state.preview_star_enabled)
@@ -120,9 +120,9 @@ function M.build_management(ctx)
 	local preview_presence_rows = bubble_sub
 	bubble_sub = {}
 
-	local colored_row = ManifestMenu.check_row("preview_colored_control", "preview_colored_tooltips", {
-		["preview_colored_tooltips"] = function()
-			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview("preview_colored_tooltips") ~= true then
+	local colored_row = ManifestMenu.check_row("preview_colored_control", require("config_keys").LEAF.PREVIEW_COLORED_TOOLTIPS, {
+		[require("config_keys").LEAF.PREVIEW_COLORED_TOOLTIPS] = function()
+			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview(require("config_keys").LEAF.PREVIEW_COLORED_TOOLTIPS) ~= true then
 				return false
 			end
 			ctx.notify_feature(i18n.get("menu.hotstrings.notify_bubble_colored"), state.preview_colored_tooltips)
@@ -273,7 +273,7 @@ function M.build_management(ctx)
 		local ct_lbl = ct.char .. " : " .. i18n.get("menu.hotstrings.custom_label") .. consume_sfx
 
 		local delete_row = ManifestMenu.command_row("word_expander_custom_menu", require("config_keys").COMMAND.WORD_EXPANDER_DELETE, {
-			["word_expander_delete"] = (function(k) return function()
+			[require("config_keys").COMMAND.WORD_EXPANDER_DELETE] = (function(k) return function()
 					local res = dialog.block_alert(
 						i18n.get("dialog.hotstrings.delete_title"),
 						i18n.get("dialog.hotstrings.delete_body"),
@@ -312,7 +312,7 @@ function M.build_management(ctx)
 	end
 
 	local add_row = ManifestMenu.command_row("word_expander_custom_menu", require("config_keys").COMMAND.WORD_EXPANDER_ADD, {
-		["word_expander_add"] = function()
+		[require("config_keys").COMMAND.WORD_EXPANDER_ADD] = function()
 			local existing_keys = {}
 			for _, d in ipairs(defs) do
 				if d.key then existing_keys[d.key] = true end
@@ -387,9 +387,9 @@ function M.build_management(ctx)
 
 	local exp_ctx = {
 		commands = {
-			["word_expanders_enable_all"] = function() return bulk_set_terminators(true) end,
-			["word_expanders_disable_all"] = function() return bulk_set_terminators(false) end,
-			["word_expanders_restore"] = reset_terminators,
+			[require("config_keys").COMMAND.WORD_EXPANDERS_ENABLE_ALL] = function() return bulk_set_terminators(true) end,
+			[require("config_keys").COMMAND.WORD_EXPANDERS_DISABLE_ALL] = function() return bulk_set_terminators(false) end,
+			[require("config_keys").COMMAND.WORD_EXPANDERS_RESTORE] = reset_terminators,
 		},
 		state_getters = { ["word_expanders_ready"] = word_expanders_ready },
 	}
@@ -648,7 +648,7 @@ function M.build_management(ctx)
 		return ctx.state.idle_reset_seconds
 	end
 	params_ctx.commands[require("config_keys").COMMAND.IDLE_RESET] = function(seconds)
-		return commit_word_reset("idle_reset_seconds", "set_idle_reset_seconds", seconds)
+		return commit_word_reset(require("config_keys").LEAF.IDLE_RESET_SECONDS, "set_idle_reset_seconds", seconds)
 	end
 	params_ctx.commands["idle_reset_custom"] = function()
 		local current = current_idle_reset()
@@ -667,7 +667,7 @@ function M.build_management(ctx)
 				i18n.get("menu.hotstrings.idle_reset_invalid"), ok_label)
 			return false
 		end
-		return commit_word_reset("idle_reset_seconds", "set_idle_reset_seconds", seconds)
+		return commit_word_reset(require("config_keys").LEAF.IDLE_RESET_SECONDS, "set_idle_reset_seconds", seconds)
 	end
 	-- The cascade's longest chain: a fixed choice, drawn by the renderer from its declaration.
 	local function current_cascade_max_arrows()
@@ -683,19 +683,19 @@ function M.build_management(ctx)
 	local click_enabled = ctx.keymap and type(ctx.keymap.is_click_resets_word_enabled) == "function"
 		and ctx.keymap.is_click_resets_word_enabled()
 	params_ctx.commands[require("config_keys").COMMAND.CLICK_RESETS_WORD] = function()
-		return commit_word_reset("click_resets_word", "set_click_resets_word", not click_enabled)
+		return commit_word_reset(require("config_keys").LEAF.CLICK_RESETS_WORD, "set_click_resets_word", not click_enabled)
 	end
 	-- The arrow and shortcut checkboxes (tap_hold_resets_word is greyed by the
 	-- manifest on macOS: Karabiner owns tap-hold, so it has no command here).
 	local arrow_enabled = ctx.keymap and type(ctx.keymap.is_arrow_resets_word_enabled) == "function"
 		and ctx.keymap.is_arrow_resets_word_enabled()
 	params_ctx.commands[require("config_keys").COMMAND.ARROW_RESETS_WORD] = function()
-		return commit_word_reset("arrow_resets_word", "set_arrow_resets_word", not arrow_enabled)
+		return commit_word_reset(require("config_keys").LEAF.ARROW_RESETS_WORD, "set_arrow_resets_word", not arrow_enabled)
 	end
 	local shortcut_enabled = ctx.keymap and type(ctx.keymap.is_shortcut_resets_word_enabled) == "function"
 		and ctx.keymap.is_shortcut_resets_word_enabled()
 	params_ctx.commands[require("config_keys").COMMAND.SHORTCUT_RESETS_WORD] = function()
-		return commit_word_reset("shortcut_resets_word", "set_shortcut_resets_word", not shortcut_enabled)
+		return commit_word_reset(require("config_keys").LEAF.SHORTCUT_RESETS_WORD, "set_shortcut_resets_word", not shortcut_enabled)
 	end
 	params_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do params_ctx.state_getters[key] = value end

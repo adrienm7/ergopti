@@ -316,10 +316,10 @@ function M.build(ctx)
 		local modeSubmenu
 		if slot:match("swipe") then
 			modeSubmenu = ManifestMenu.template_rows("gesture_slot_mode_commands", {
-				["gesture_mode_single"] = function()
+				[require("config_keys").COMMAND.GESTURE_MODE_SINGLE] = function()
 					return commit_gesture_row_value("get_mode", "set_mode", slot, "x1", "mode")
 				end,
-				["gesture_mode_incremental"] = function()
+				[require("config_keys").COMMAND.GESTURE_MODE_INCREMENTAL] = function()
 					return commit_gesture_row_value("get_mode", "set_mode", slot, "incremental", "mode")
 				end,
 			}, {
@@ -353,7 +353,7 @@ function M.build(ctx)
 			or  i18n.get("menu.gestures.mode_single")
 
 		local slot_commands = {
-			["gesture_slot_change_action"] = function()
+			[require("config_keys").COMMAND.GESTURE_SLOT_CHANGE_ACTION] = function()
 				DeferredWork.after(0.05,
 					function() open_action_chooser(slot, names, current) end,
 					"menu_gestures.action_chooser")
@@ -438,10 +438,10 @@ function M.build(ctx)
 			local pinch = gestures.system_pinch_enabled()
 			local open_settings = gestures.open_system_gestures
 			local children = ManifestMenu.template_rows("gesture_system_macos_children", {
-				["gesture_system_open_enabled_pinch"] = function(...) return open_settings(...) end,
-				["gesture_system_open_disabled_pinch"] = function(...) return open_settings(...) end,
-				["gesture_system_open_unknown_pinch"] = function(...) return open_settings(...) end,
-				["gesture_system_refresh"] = function()
+				[require("config_keys").COMMAND.GESTURE_SYSTEM_OPEN_ENABLED_PINCH] = function(...) return open_settings(...) end,
+				[require("config_keys").COMMAND.GESTURE_SYSTEM_OPEN_DISABLED_PINCH] = function(...) return open_settings(...) end,
+				[require("config_keys").COMMAND.GESTURE_SYSTEM_OPEN_UNKNOWN_PINCH] = function(...) return open_settings(...) end,
+				[require("config_keys").COMMAND.GESTURE_SYSTEM_REFRESH] = function()
 					return gestures.refresh_system_gestures(ctx.updateMenu)
 				end,
 			}, {

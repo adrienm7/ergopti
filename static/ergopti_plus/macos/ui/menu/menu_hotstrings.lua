@@ -425,7 +425,7 @@ function M.build_extension_bulk_actions(ctx, groups, bound)
 		end
 	end
 	local rows = ManifestMenu.template_rows("hotstring_extension_bulk_controls", {
-		["extension_all_sections"] = function()
+		[require("config_keys").COMMAND.EXTENSION_ALL_SECTIONS] = function()
 			return M.commit_extension_selection(ctx, groups, bound, not all_on)
 		end,
 	}, {
@@ -560,8 +560,8 @@ function M.build_groups(ctx, only, counts)
 			local render_ctx = { commands = {
 				-- The submenu's own sections: an extension's bound ones are drawn,
 				-- and switched, in that extension's submenu (2026-10-17).
-				["hotstring_category_enable_all"] = Custom.category_scope_fn(ctx, { name }, true, nil, bound_by_group),
-				["hotstring_category_disable_all"] = Custom.category_scope_fn(ctx, { name }, false, nil, bound_by_group),
+				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL] = Custom.category_scope_fn(ctx, { name }, true, nil, bound_by_group),
+				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL] = Custom.category_scope_fn(ctx, { name }, false, nil, bound_by_group),
 			} }
 			-- The renderer owns the head and separator order. A rendered child is
 			-- attached as `submenu` so its native commands are not rendered twice.

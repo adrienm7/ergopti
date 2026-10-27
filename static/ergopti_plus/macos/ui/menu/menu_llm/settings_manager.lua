@@ -18,6 +18,7 @@ local dialog  = require("infra.dialog_util")
 local Notifications = require("infra.notifications")
 local ManifestMenu = require("infra.manifest_menu")
 local TableUtil = require("table_util")
+local ConfigKeys = require("config_keys")
 
 local LOG = "menu_llm.settings"
 
@@ -770,8 +771,8 @@ function M.new(deps)
 			}
 		end
 		local rows = ManifestMenu.template_rows("llm_modifier_picker_frame", {
-			["llm_modifier_disabled"] = function() return apply_modifiers({"none"}) end,
-			["llm_modifier_none"] = function() return apply_modifiers({}) end,
+			[ConfigKeys.COMMAND.LLM_MODIFIER_DISABLED] = function() return apply_modifiers({"none"}) end,
+			[ConfigKeys.COMMAND.LLM_MODIFIER_NONE] = function() return apply_modifiers({}) end,
 		}, {
 			llm_modifier_disabled_checked = function() return current_str == "none" end,
 			llm_modifier_none_checked = function() return current_str == "" end,
