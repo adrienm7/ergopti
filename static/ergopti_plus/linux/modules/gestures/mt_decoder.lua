@@ -125,7 +125,7 @@ end
 -- How a finger count becomes the gesture's, from the shared timings registry:
 -- the frames it must hold, the landing window in which a pair may still take
 -- more fingers, and how long after a two-finger scroll no larger gesture fires.
-M.STABLE_FRAMES = ok_timings and Timings.count("gestures", "finger_confirm_frames") or nil
+M.STABLE_FRAMES = ok_timings and Timings.count("gestures", "finger_join_frames") or nil
 M.LANDING_SEC = ok_timings and Timings.sec("gestures", "multi_finger_landing_ms") or nil
 M.SCROLL_GUARD_SEC = ok_timings and Timings.sec("gestures", "scroll_momentum_guard_ms") or nil
 
@@ -160,12 +160,13 @@ function M.new(opts)
 	local landing_sec = tonumber(opts.landing_sec) or M.LANDING_SEC
 	local scroll_guard_sec = tonumber(opts.scroll_guard_sec) or M.SCROLL_GUARD_SEC
 	assert(type(stable_frames) == "number" and stable_frames >= 1,
-		"[gestures].finger_confirm_frames must be a positive frame count")
+		"[gestures].finger_join_frames must be a positive frame count")
 	assert(type(landing_sec) == "number" and landing_sec >= 0,
 		"[gestures].multi_finger_landing_ms must be a duration")
 	assert(type(scroll_guard_sec) == "number" and scroll_guard_sec >= 0,
 		"[gestures].scroll_momentum_guard_ms must be a duration")
-	local landing_travel = threshold * Direction.LANDING_TRAVEL_FACTOR
+	-- A pair that travelled a swipe's worth has scrolled.
+	local landing_travel = threshold
 
 	local decoder = {}
 
@@ -326,6 +327,10 @@ function M.new(opts)
 				_last_x, _last_y = cx, cy
 
 				if _count ~= _run_count then
+					if _peak_fingers >= 2 and _run_count > _peak_fingers and _run_frames < stable_frames then
+						Logger.debug(LOG, "Three-finger candidate rejected by frames held: %d -> %d held %d frame(s) < %d.",
+							_peak_fingers, _run_count, _run_frames, stable_frames)
+					end
 					_run_count, _run_frames = _count, 0
 					_run_x, _run_y = cx, cy
 				end
@@ -334,13 +339,17 @@ function M.new(opts)
 				if _count > _peak_fingers and _run_frames >= stable_frames then
 					-- Rule 1: a pair that moved or outlived its landing is a scroll,
 					-- and a finger joining it is a resting thumb or a palm.
-					local late = _peak_fingers >= 2 and (
-						now - (_peak_since or now) > landing_sec
-						or math.abs(_travel_x) + math.abs(_travel_y) >= landing_travel)
+					local since_landing = now - (_peak_since or now)
+					local pair_travel = math.abs(_travel_x) + math.abs(_travel_y)
+					local late = _peak_fingers >= 2
+						and (since_landing > landing_sec or pair_travel >= landing_travel)
 					if late then
 						if not _late_join_refused then
-							Logger.debug(LOG, "Late finger ignored for a moving pair: %d -> %d.",
-								_peak_fingers, _count)
+							Logger.debug(LOG,
+								"Three-finger candidate rejected by %s: %d -> %d, %.0f ms since landing (max %.0f), travel %.0f (max %.0f).",
+								pair_travel >= landing_travel and "pair scroll" or "landing window",
+								_peak_fingers, _count, since_landing * 1000, landing_sec * 1000,
+								pair_travel, landing_travel)
 							_late_join_refused = true
 						end
 					else
@@ -400,8 +409,8 @@ function M.new(opts)
 		elseif fingers >= 3 and _last_scroll_end_at
 			and started_at - _last_scroll_end_at < scroll_guard_sec then
 			-- Rule 3: fingers landing to stop a scroll's momentum.
-			Logger.debug(LOG, "%d-finger gesture %.0f ms after a two-finger scroll ignored.",
-				fingers, (started_at - _last_scroll_end_at) * 1000)
+			Logger.debug(LOG, "Three-finger candidate rejected by scroll guard: %d fingers %.0f ms after a two-finger scroll < %.0f ms.",
+				fingers, (started_at - _last_scroll_end_at) * 1000, scroll_guard_sec * 1000)
 			return nil
 		end
 

@@ -1121,13 +1121,18 @@ A pair of contacts is the native scroll. Until 2026-10 the engine promoted a
 third contact joining a pair on ONE frame, and a count drop shifted startPos
 without endPos, so a palm touching below two scrolling fingers committed a
 vertical three-finger swipe (tab switching). `modules/gestures/engine.lua` now
-confirms a join to a pair over FINGER_CONFIRM_FRAMES during the landing only
-(`multi_finger_landing_ms`, `Geometry.LANDING_TRAVEL_MAX`), checks that every
-contact travelled with the centroid (`Geometry.movedTogether`), aborts a
-three-finger gesture that continues as a moving pair, and holds three-or-more
-finger actions back for `scroll_momentum_guard_ms` after a scroll or a native
-momentum event seen by the scroll-blocker tap. The Linux `mt_decoder.lua`
-applies the same rules. Action: never give a pair a fast path, and move endPos
+lets a third finger join a pair only before the pair has scrolled (direction
+locked, `Geometry.SWIPE_MIN_2` travelled, a macOS scroll phase) and within
+`multi_finger_landing_ms`, once it held `pair_join_confirm_ms`; checks that every
+contact covered `Geometry.COHESION_MIN_SHARE` of the travel since the promotion;
+aborts a three-finger gesture that continues as a moving pair; and holds
+three-or-more finger actions back for `scroll_momentum_guard_ms` after a native
+momentum phase or a locked pair lifting. A first stricter tuning (4 frames plus
+50 ms, a 150 ms landing, half the lock distance, share 0.5, a guard after any
+scroll phase) missed deliberate swipes on the maintainer's Mac. Every refusal
+logs `Three-finger candidate rejected by <gate>: <value>` once per touch. The
+Linux `mt_decoder.lua` applies the same rules. Action: never give a pair a fast
+path, read a missed swipe from its `rejected by` line before retuning, and move endPos
 with startPos on every centroid compensation.
 
 ### project-hs-click-drag-is-not-a-gesture
