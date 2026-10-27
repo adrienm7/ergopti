@@ -136,6 +136,11 @@ try {
 			_FeatureStateSmokeKanaAutomatic(A_Args[1])
 		case "logger_dotted", "logger_inline", "logger_quoted":
 			_FeatureStateSmokeLoggerSemantic(A_Args[1])
+		case "logger_generation_deleted_error", "logger_generation_created_error":
+			_FeatureStateSmokeLoggerPresence(A_Args[1])
+		case "logger_generation_replaced_debug", "logger_generation_replaced_error",
+				"logger_generation_unchanged_debug", "logger_generation_unchanged_error":
+			_FeatureStateSmokeLoggerGeneration(A_Args[1])
 		case "outdated_source_key":
 			_FeatureStateSmokeOutdatedSourceKey()
 		case "retired_source_scan":
@@ -675,5 +680,159 @@ _FeatureStateSmokeAuthoredKana(Fixture) {
 		ConfigurationFile := FileWasSet ? SavedFile : unset
 		_TOML_InvalidateParseCache(Path)
 		FSDelete(Path)
+	}
+}
+
+
+; Logger initialization has a pre-journal recovery role and a later normal boot
+; role. This fixture reaches the latter with a genuine already published source
+; generation; its physical edit must not silently select unrelated settings.
+_FeatureStateSmokeLoggerGeneration(Fixture) {
+	global ConfigurationFile, _LogsDir, LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL
+	global _LOGGER_FLUSH_TIMER_STARTED
+	Cases := Map(
+		"logger_generation_replaced_debug", ["DEBUG", "ERROR", true],
+		"logger_generation_replaced_error", ["ERROR", "DEBUG", true],
+		"logger_generation_unchanged_debug", ["DEBUG", "ERROR", false],
+		"logger_generation_unchanged_error", ["ERROR", "DEBUG", false])
+	FixtureCase := Cases[Fixture]
+	Root := A_Temp . "\ergopti_logger_generation_" . DllCall("GetCurrentProcessId") . "_" . A_TickCount
+	if DirExist(Root)
+		throw Error("The logger generation fixture requires a fresh private native root.")
+	DirCreate(Root)
+	InitialDefault := LOGGER_DEFAULT_LEVEL
+	try {
+		ConfigurationFile := Root . "\config.toml"
+		_LogsDir := Root . "\logs\"
+		Header := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n[script]`n"
+		Initial := Header . "log_level = " . TOML_RenderString(FixtureCase[1])
+			. "`nshow_error_dialog = true`n"
+		Replacement := Header . "log_level = " . TOML_RenderString(FixtureCase[2])
+			. "`nshow_error_dialog = false`n"
+		if !FSWriteCreateDurable(ConfigurationFile, Initial)
+			throw Error("The actual native logger fixture source could not be created.")
+		Journal := ConfigMigrateBoot(ConfigurationFile)
+		if !(Journal is Map) || Journal.Get("status", "missing") != "current"
+			throw Error("The logger generation source must complete the genuine boot constructor.")
+		Cache := ParseConfigTomlFile(ConfigurationFile)
+		Primary := ConfigTomlReadSnapshot(ConfigurationFile)
+		if Cache != Primary.Cache || StrCompare(Primary.Source, Initial, true) != 0
+			throw Error("The logger generation fixture must retain the genuine native bootstrap cache.")
+		Tree := ManifestBuildFeaturesMap()
+		Applied := ApplyConfigToml(Tree, ConfigurationFile, &Rejected, , &Outdated)
+		if Applied < 0 || Rejected != 0 || Outdated.Count != 0
+			throw Error("The original logger source must be fully accepted by canonical configuration admission.")
+		Expected := Tree[ConfigKey.SCRIPT][ConfigLeaf.LOG_LEVEL]
+		if StrCompare(Expected, FixtureCase[1], true) != 0
+				|| Tree[ConfigKey.SCRIPT][ConfigLeaf.SHOW_ERROR_DIALOG] != true
+			throw Error("The primary settings generation must hold both original authored choices.")
+		if FixtureCase[3] && !FSWrite(ConfigurationFile, Replacement)
+			throw Error("The independent physical settings generation could not replace the native file.")
+		Physical := FixtureCase[3] ? Replacement : Initial
+		if !FSUtf8ExactMatches(ConfigurationFile, Physical)
+			throw Error("The physical source mutation must be real before logger initialization.")
+		Observed := ConfigTomlDecodeSnapshot(FSReadStrict(ConfigurationFile))
+		PhysicalLevel := Observed.Cache[ConfigKey.SCRIPT][ConfigLeaf.LOG_LEVEL]
+		PhysicalDialog := Observed.Cache[ConfigKey.SCRIPT][ConfigLeaf.SHOW_ERROR_DIALOG]
+		if StrCompare(PhysicalLevel, FixtureCase[FixtureCase[3] ? 2 : 1], true) != 0
+				|| PhysicalDialog != !FixtureCase[3]
+			throw Error("The physical file must decode into its independent complete settings generation.")
+		Retained := ConfigTomlReadSnapshot(ConfigurationFile)
+		if Retained != Primary || StrCompare(Retained.Source, Initial, true) != 0
+			throw Error("The genuine canonical producer must retain its original admitted generation.")
+		LoggerInit()
+		FileAppend("logger generation: admitted=" . Expected . ", physical=" . PhysicalLevel
+			. ", active=" . LOGGER_MIN_LEVEL . ", default=" . LOGGER_DEFAULT_LEVEL . "`n", "*")
+		if StrCompare(LOGGER_DEFAULT_LEVEL, InitialDefault, true) != 0
+			throw Error("Generation selection must never change the logger default.")
+		if StrCompare(LOGGER_MIN_LEVEL, Expected, true) != 0
+			throw Error("The actual initialized logger must retain the canonical boot generation; expected "
+				. Expected . ", actual " . LOGGER_MIN_LEVEL . ".")
+		if ConfigTomlReadSnapshot(ConfigurationFile) != Primary
+				|| !FSUtf8ExactMatches(ConfigurationFile, Physical)
+			throw Error("Logger initialization must preserve both the admitted snapshot and external source.")
+	} finally {
+		try {
+			if _LOGGER_FLUSH_TIMER_STARTED && !LoggerPrepareShutdown()
+				throw Error("The logger generation fixture could not settle its actual native writes.")
+		} finally {
+			if _LOGGER_FLUSH_TIMER_STARTED {
+				SetTimer(_LoggerFlush, 0)
+				OnExit(_LoggerOnExitFlush, 0)
+				_LoggerRepeatDisable()
+			}
+			_TOML_InvalidateParseCache(ConfigurationFile)
+			DirDelete(Root, true)
+		}
+	}
+}
+
+
+; An admitted source generation owns absence as well as present file bytes.
+; Native creation/deletion after admission must not change only the logger.
+_FeatureStateSmokeLoggerPresence(Fixture) {
+	global ConfigurationFile, _LogsDir, LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL
+	global _LOGGER_FLUSH_TIMER_STARTED
+	Deleted := Fixture == "logger_generation_deleted_error"
+	Root := A_Temp . "\ergopti_logger_presence_" . DllCall("GetCurrentProcessId") . "_" . A_TickCount
+	if DirExist(Root)
+		throw Error("The logger presence fixture requires a fresh private root.")
+	DirCreate(Root)
+	InitialDefault := LOGGER_DEFAULT_LEVEL
+	try {
+		ConfigurationFile := Root . "\config.toml"
+		_LogsDir := Root . "\logs\"
+		Authored := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion()
+			. '[script]`nlog_level = "ERROR"`n'
+		Authored := StrReplace(Authored, "[script]", "`n[script]")
+		if Deleted && !FSWriteCreateDurable(ConfigurationFile, Authored)
+			throw Error("The original private logger source could not be created.")
+		if !Deleted && FileExist(ConfigurationFile)
+			throw Error("The absent generation requires actual native source absence.")
+		Journal := ConfigMigrateBoot(ConfigurationFile)
+		if !(Journal is Map)
+			throw Error("The actual boot constructor must admit the logger presence source.")
+		Cache := ParseConfigTomlFile(ConfigurationFile)
+		Primary := ConfigTomlReadSnapshot(ConfigurationFile)
+		if Cache != Primary.Cache || Primary.Present != Deleted
+			throw Error("The canonical snapshot must retain the exact original source presence.")
+		Tree := ManifestBuildFeaturesMap()
+		if ApplyConfigToml(Tree, ConfigurationFile, &Rejected, , &Outdated) < 0
+				|| Rejected != 0 || Outdated.Count != 0
+			throw Error("The original logger presence generation must be canonically admitted.")
+		Expected := Tree[ConfigKey.SCRIPT][ConfigLeaf.LOG_LEVEL]
+		if StrCompare(Expected, Deleted ? "ERROR" : InitialDefault, true) != 0
+			throw Error("The canonical threshold must match the real initial generation.")
+		if Deleted {
+			if !FSDelete(ConfigurationFile) || FileExist(ConfigurationFile)
+				throw Error("The independent physical source must genuinely disappear.")
+		} else if !FSWriteCreateDurable(ConfigurationFile, Authored)
+			throw Error("The independent later physical source must genuinely appear.")
+		if !Deleted && !FSUtf8ExactMatches(ConfigurationFile, Authored)
+			throw Error("The new physical source must contain the independent ERROR threshold.")
+		if ConfigTomlReadSnapshot(ConfigurationFile) != Primary
+			throw Error("The canonical owner must retain its initial native source generation.")
+		LoggerInit()
+		FileAppend("logger source presence: initial=" . Deleted . ", physical=" . !!FileExist(ConfigurationFile)
+			. ", expected=" . Expected . ", active=" . LOGGER_MIN_LEVEL . "`n", "*")
+		if StrCompare(LOGGER_MIN_LEVEL, Expected, true) != 0
+			throw Error("Logger initialization selected a threshold from another native presence generation.")
+		if StrCompare(LOGGER_DEFAULT_LEVEL, InitialDefault, true) != 0
+			throw Error("Native presence selection cannot change the logger default.")
+		if ConfigTomlReadSnapshot(ConfigurationFile) != Primary
+			throw Error("Logger initialization cannot retire the admitted generation.")
+	} finally {
+		try {
+			if _LOGGER_FLUSH_TIMER_STARTED && !LoggerPrepareShutdown()
+				throw Error("The logger presence fixture could not settle its native writes.")
+		} finally {
+			if _LOGGER_FLUSH_TIMER_STARTED {
+				SetTimer(_LoggerFlush, 0)
+				OnExit(_LoggerOnExitFlush, 0)
+				_LoggerRepeatDisable()
+			}
+			_TOML_InvalidateParseCache(ConfigurationFile)
+			DirDelete(Root, true)
+		}
 	}
 }
