@@ -243,7 +243,7 @@ assert.deepStrictEqual(
 	'the real Typing consumer must produce non-empty hourly error buckets'
 );
 assert.deepStrictEqual(
-	plain(typingState.minute5_series['09:00'].e_buckets),
+	plain(typingState.minute5_series['2025-05-01T09:00'].e_buckets),
 	{ 250: 3, 500: 3 },
 	'the real Typing consumer must produce non-empty five-minute error buckets'
 );
