@@ -143,7 +143,11 @@ Every macOS download child now sources `apply_system_network` from
 `modules/llm/network-retry.sh` (the scripts directly, the Ollama service and
 the MLX model download through `modules/llm/network_env.lua`): relay from
 `scutil --proxy`, loopback always in NO_PROXY, `UV_SYSTEM_CERTS=1`, and never
-a CA file. uv comes from its pinned PyPI wheel (`uv-release.sh`), and a native
+a CA file: an inherited `SSL_CERT_FILE` or `SSL_CERT_DIR` is unset with one INFO
+line, the launcher's `--managed-http` and `--managed-bootstrap-download` roles
+unset both in `main.swift` before reading their environment, and the Go
+`native_http` package ignores them on darwin (`inheritedTrustIgnored`). Only the
+wire-test fixture, which has its own entry point, keeps that CA channel. uv comes from its pinned PyPI wheel (`uv-release.sh`), and a native
 Python 3.11–3.14 builds the venv without the managed interpreter download from
 GitHub. Failures use the shared classes (certificate, proxy, host_blocked,
 offline) and `network.failure.*` sentences with their actions. Never log the
