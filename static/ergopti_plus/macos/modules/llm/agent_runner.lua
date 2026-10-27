@@ -504,7 +504,8 @@ local function report_connector(action, ok, detail)
 		return
 	end
 	local reason = type(detail) == "table" and detail.reason or tostring(detail)
-	Logger.error(LOG, "Agent action '%s' failed: %s.", action.type, tostring(reason))
+	local extra = type(detail) == "table" and detail.detail ~= nil and (" (" .. tostring(detail.detail) .. ")") or ""
+	Logger.error(LOG, "Agent action '%s' failed: %s%s.", action.type, tostring(reason), extra)
 	if type(detail) == "table" and detail.permission then
 		show_notice("llm.agent.permission_needed", detail.permission)
 		local Connectors = require("modules.llm.agent_connectors")
