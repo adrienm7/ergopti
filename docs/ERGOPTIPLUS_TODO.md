@@ -45,6 +45,12 @@ a sealed Windows updater source, reseal with
   field-run request (`static/ergopti_plus/macos/data/field_run.json`), collects the logs and commits and pushes
   them, also on Ctrl-C. Read the newest `docs/field-reports/mac-*` folder with
   `git show origin/field/mac-2026-10-27:<path>`.
+- **Developer mode on the three OS** (run the clone's code with the installed app's features, auto-reload on a
+  saved source file; inventory in `docs/design/developer-mode.md`, open checks in the item "Developer mode on
+  the three OS"): macOS `bash tools/dev/run-macos-dev-app.sh` (`--open-only` without rebuilding), Linux
+  `bash tools/dev/run-linux-dev.sh` (`npm run dev:linux`), Windows
+  `powershell -ExecutionPolicy Bypass -File tools\dev\run-windows-dev.ps1` (`npm run dev:windows`). Each passes
+  the clone root in `ERGOPTI_DEV_SOURCE_ROOT` and the driver refuses a root that is not its own clone.
 - **Problem ledger of the Mac session:** see "Mac field session 2026-10-27: problem ledger" below; every
   problem of issue #104 and of the field reports is there as fixed (sha) or open with its next step.
 - **Coordinator scripts** are in `tools/dev/coordinator/`: `integration-sweep.sh <out-dir>` (gen:check,
