@@ -315,14 +315,16 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 			else
 				_LLM_Menu_LogInvalidPersistedOption("llm.user_profiles")
 		}
-		raw := IniCacheGet(Cache, "llm", "onboarding_seen")
+		if !ConfigTomlTryReadBootValue(Cache, "llm", "onboarding_seen", &raw)
+			raw := IniCacheGet(Cache, "llm", "onboarding_seen")
 		if !((raw is String) && raw == "_") {
 			if LLM_Option_TryParseConfigBoolean(raw, &OnboardingSeen)
 				opts["onboarding_seen"] := OnboardingSeen
 			else
 				_LLM_Menu_LogInvalidPersistedOption("llm.onboarding_seen")
 		}
-		raw := IniCacheGet(Cache, "llm.navigation", "val_modifiers")
+		if !ConfigTomlTryReadBootValue(Cache, "llm.navigation", "val_modifiers", &raw)
+			raw := IniCacheGet(Cache, "llm.navigation", "val_modifiers")
 		if !((raw is String) && raw == "_") {
 			arr := _LLM_Menu_CoerceIniArray(raw)
 			Value := (arr is Array) ? _LLM_Menu_ModifiersArrayToString(arr) : false
@@ -334,7 +336,8 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 				_LLM_Menu_LogInvalidPersistedOption("llm.navigation.val_modifiers")
 			}
 		}
-		raw := IniCacheGet(Cache, "llm.navigation", "nav_modifiers")
+		if !ConfigTomlTryReadBootValue(Cache, "llm.navigation", "nav_modifiers", &raw)
+			raw := IniCacheGet(Cache, "llm.navigation", "nav_modifiers")
 		if !((raw is String) && raw == "_") {
 			arr := _LLM_Menu_CoerceIniArray(raw)
 			Value := (arr is Array) ? _LLM_Menu_ModifiersArrayToString(arr) : false
@@ -343,7 +346,8 @@ LLM_Menu_BuildSavedOpts(Cache := unset) {
 			else
 				_LLM_Menu_LogInvalidPersistedOption("llm.navigation.nav_modifiers")
 		}
-		raw := IniCacheGet(Cache, "llm.trigger", "disabled_apps")
+		if !ConfigTomlTryReadBootValue(Cache, "llm.trigger", "disabled_apps", &raw)
+			raw := IniCacheGet(Cache, "llm.trigger", "disabled_apps")
 		if !((raw is String) && raw == "_") {
 			arr := _LLM_Menu_CoerceIniArray(raw)
 			arr := (arr is Array) ? LLM_Option_NormalizeStringArray(arr, true) : false
