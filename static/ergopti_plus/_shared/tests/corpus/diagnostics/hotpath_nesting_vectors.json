@@ -1,0 +1,135 @@
+{
+	"_comment": "Nesting attribution of the slow-segment WARNING (_shared/lua/hotpath_segments.lua new_nesting), replayed by the macOS and Linux suites. Steps: [\"open\", at_ms] or [\"close\", name, started_ms, at_ms]. A name absent from thresholds is a span that is not a declared segment. reports lists every slow segment in emission order; slow lists the verdict of each close.",
+	"thresholds": {
+		"input.dispatch": 5,
+		"input.char": 5,
+		"hotstring.match": 5,
+		"hotstring.expand": 5
+	},
+	"cases": [
+		{
+			"id": "top_level_slow_segment_has_no_parent",
+			"steps": [
+				["open", 0],
+				["close", "input.dispatch", 0, 7]
+			],
+			"slow": [true],
+			"reports": [{ "segment": "input.dispatch", "parent": "none", "total_ms": 7, "own_ms": 7 }]
+		},
+		{
+			"id": "fast_segment_reports_nothing",
+			"steps": [
+				["open", 0],
+				["close", "input.dispatch", 0, 3]
+			],
+			"slow": [false],
+			"reports": []
+		},
+		{
+			"id": "own_time_equal_to_the_threshold_is_not_slow",
+			"steps": [
+				["open", 0],
+				["close", "input.dispatch", 0, 5]
+			],
+			"slow": [false],
+			"reports": []
+		},
+		{
+			"id": "slow_child_is_reported_with_its_parent_and_the_parent_is_not_billed",
+			"steps": [
+				["open", 0],
+				["open", 1],
+				["close", "hotstring.expand", 1, 13],
+				["close", "input.dispatch", 0, 14]
+			],
+			"slow": [true, false],
+			"reports": [
+				{ "segment": "hotstring.expand", "parent": "input.dispatch", "total_ms": 12, "own_ms": 12 }
+			]
+		},
+		{
+			"id": "parent_slow_on_its_own_time_follows_its_child",
+			"steps": [
+				["open", 0],
+				["open", 1],
+				["close", "hotstring.expand", 1, 8],
+				["close", "input.dispatch", 0, 15]
+			],
+			"slow": [true, true],
+			"reports": [
+				{ "segment": "hotstring.expand", "parent": "input.dispatch", "total_ms": 7, "own_ms": 7 },
+				{ "segment": "input.dispatch", "parent": "none", "total_ms": 15, "own_ms": 8 }
+			]
+		},
+		{
+			"id": "grandchild_is_billed_once_to_its_direct_parent",
+			"steps": [
+				["open", 0],
+				["open", 1],
+				["open", 2],
+				["close", "hotstring.match", 2, 10],
+				["close", "input.char", 1, 12],
+				["close", "input.dispatch", 0, 13]
+			],
+			"slow": [true, false, false],
+			"reports": [
+				{ "segment": "hotstring.match", "parent": "input.char", "total_ms": 8, "own_ms": 8 }
+			]
+		},
+		{
+			"id": "siblings_both_count_against_the_parent",
+			"steps": [
+				["open", 0],
+				["open", 1],
+				["close", "hotstring.match", 1, 3],
+				["open", 4],
+				["close", "hotstring.expand", 4, 11],
+				["close", "input.dispatch", 0, 12]
+			],
+			"slow": [false, true, false],
+			"reports": [
+				{ "segment": "hotstring.expand", "parent": "input.dispatch", "total_ms": 7, "own_ms": 7 }
+			]
+		},
+		{
+			"id": "span_that_is_not_a_segment_is_transparent",
+			"steps": [
+				["open", 0],
+				["open", 1],
+				["open", 2],
+				["close", "hotstring.expand", 2, 9],
+				["close", "tray.build", 1, 10],
+				["close", "input.dispatch", 0, 11]
+			],
+			"slow": [true, false, false],
+			"reports": [
+				{ "segment": "hotstring.expand", "parent": "input.dispatch", "total_ms": 7, "own_ms": 7 }
+			]
+		},
+		{
+			"id": "segment_under_a_transparent_root_has_no_parent",
+			"steps": [
+				["open", 0],
+				["open", 1],
+				["close", "input.dispatch", 1, 9],
+				["close", "loop.idle", 0, 100]
+			],
+			"slow": [true, false],
+			"reports": [{ "segment": "input.dispatch", "parent": "none", "total_ms": 8, "own_ms": 8 }]
+		},
+		{
+			"id": "frame_abandoned_by_a_raise_closes_with_its_parent",
+			"steps": [
+				["open", 0],
+				["open", 1],
+				["open", 2],
+				["close", "hotstring.expand", 2, 9],
+				["close", "input.dispatch", 0, 12]
+			],
+			"slow": [true, false],
+			"reports": [
+				{ "segment": "hotstring.expand", "parent": "input.dispatch", "total_ms": 7, "own_ms": 7 }
+			]
+		}
+	]
+}

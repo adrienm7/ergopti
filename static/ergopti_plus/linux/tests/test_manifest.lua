@@ -331,6 +331,7 @@ return {
 	"tests.meta.corpus.test_corpus_logger_behaviour",
 	"tests.meta.corpus.test_corpus_updater_release_parser",
 	"tests.meta.corpus.test_corpus_updater_list_cache",
+	"tests.meta.corpus.test_corpus_hotpath_nesting",
 	"tests.meta.corpus.test_corpus_updater_check_only",
 	"tests.meta.corpus.test_corpus_tap_hold_decisions",
 	"tests.meta.corpus.test_corpus_llm_app_profile_overrides",

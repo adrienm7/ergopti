@@ -192,3 +192,50 @@ helpers.describe("perf counters: interval summary", function()
 		helpers.assert_eq(#lines, 3, "evidence records are exempt from the logger's suppression")
 	end)
 end)
+
+helpers.describe("perf counters: nesting attribution", function()
+	--- Loads fresh counters on a clock the case moves by hand.
+	local function clocked()
+		local clock = { now = 1000 }
+		package.loaded["logger"] = nil
+		package.loaded["logger.shim"] = nil
+		local logger = require("logger")
+		local lines = {}
+		logger.set_sink(function(line) lines[#lines + 1] = line end)
+		logger.set_level(30)
+		local perf = helpers.load_module_with_dependency("infra.perf_counters", "infra.monotonic",
+			{ now_ms = function() return clock.now end })
+		perf._reset_for_test()
+		return perf, lines, clock
+	end
+
+	helpers.it("reports a slow expansion with the dispatch around it and does not bill the dispatch", function()
+		local perf, lines, clock = clocked()
+		local dispatch = perf.clock()
+		clock.now = clock.now + 1
+		local expand = perf.clock()
+		clock.now = clock.now + 12
+		perf.span("hotstring.expand", expand)
+		helpers.assert_eq(#lines, 0, "the child waits for its parent to be named")
+		clock.now = clock.now + 1
+		helpers.assert_eq(perf.span("input.dispatch", dispatch), 14, "the span still returns its wall clock")
+		helpers.assert_eq(#lines, 1, "one line: the dispatch's own 2 ms is under the threshold")
+		helpers.assert_contains(lines[1], "Slow hotstring.expand: 12.00 ms own, 12.00 ms total, parent input.dispatch")
+		local spans = perf.snapshot().spans
+		helpers.assert_eq(spans["hotstring.expand"].slow, 1)
+		helpers.assert_eq(spans["input.dispatch"].slow, 0, "the dispatch is judged on its own time")
+		helpers.assert_eq(spans["input.dispatch"].max_ms, 14, "the summary keeps the wall clock")
+	end)
+
+	helpers.it("names no parent when only an idle wait encloses the segment", function()
+		local perf, lines, clock = clocked()
+		local idle = perf.clock()
+		local dispatch = perf.clock()
+		clock.now = clock.now + 8
+		perf.span("input.dispatch", dispatch)
+		clock.now = clock.now + 100
+		perf.span("loop.idle", idle)
+		helpers.assert_eq(#lines, 1)
+		helpers.assert_contains(lines[1], "Slow input.dispatch: 8.00 ms own, 8.00 ms total, parent none")
+	end)
+end)
