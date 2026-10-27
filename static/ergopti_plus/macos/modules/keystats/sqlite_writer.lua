@@ -165,6 +165,10 @@ local function _read_schema_file(path, label)
 	return body
 end
 
+--- Indexes schema.sql gained after caches already existed; the migration in
+--- _initialize_db creates them from the schema's own statement.
+local LATE_SCHEMA_INDEXES = { "idx_events_typing_device_ts_id" }
+
 --- Read the canonical schema.sql from disk.
 --- @return string|nil The full DDL text, or nil on IO error.
 local function _read_schema_sql()
@@ -275,6 +279,30 @@ local function _initialize_db(db, existed)
 			Logger.error(LOG, "Semantic media schema rollback failed: %s.", tostring(rollback_result))
 		end
 		return false
+	end
+
+	-- schema.sql applies only to fresh caches. An index it gained later is
+	-- created on an existing cache from the schema's own statement (L19).
+	local index_schema = nil
+	for _, name in ipairs(LATE_SCHEMA_INDEXES) do
+		local present = false
+		for _ in db:nrows("SELECT name FROM sqlite_master WHERE type='index' AND name='" .. name .. "'") do
+			present = true
+		end
+		if not present then
+			index_schema = index_schema or _read_schema_sql()
+			if not index_schema then return false end
+			local statement = index_schema:match("CREATE INDEX IF NOT EXISTS " .. name .. " ON [^;]+;")
+			if not statement then
+				Logger.error(LOG, "schema.sql has no statement for index %s.", name)
+				return false
+			end
+			if db:exec(statement) ~= sqlite3.OK then
+				Logger.error(LOG, "Cannot create index %s: %s.", name, db:errmsg())
+				return false
+			end
+			Logger.info(LOG, "Created cache index %s on an existing db.sqlite.", name)
+		end
 	end
 
 	-- schema.sql applies only to fresh caches. Keep older caches writable when
