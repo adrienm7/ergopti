@@ -1014,7 +1014,7 @@ tr:hover td {
 .shortcut-mod-fn {
 	background: rgba(255, 204, 0, 0.1);
 	border-color: rgba(255, 204, 0, 0.5) !important;
-	color: #ffcc00 !important;
+	color: var(--theme-yellow) !important;
 }
 
 /* Control/special keys (Backspace, Tab, Escape, arrows…) — same dark bg as regular

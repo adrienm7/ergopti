@@ -7,6 +7,7 @@
 		<script src="../host_bridge.js"></script>
 		<script src="../dom_utils.js"></script>
 		<link rel="stylesheet" href="../theme.css" />
+		<script src="../theme_tokens.js"></script>
 		<link rel="stylesheet" href="style.css" />
 	</head>
 	<body>
@@ -90,7 +91,10 @@
 						margin-bottom: 8px;
 					"
 				>
-					<strong style="color: #fff; font-size: 13px" data-i18n="ui_apps.compare_title"></strong>
+					<strong
+						style="color: var(--theme-white); font-size: 13px"
+						data-i18n="ui_apps.compare_title"
+					></strong>
 					<span id="compare-window">--</span>
 				</div>
 				<div
@@ -158,21 +162,21 @@
 							style="font-size: 0.85em; color: var(--text-muted)"
 							data-i18n="ui_apps.lbl_switches"
 						></span>
-						<strong id="kpi-switches" style="color: #fff">--</strong>
+						<strong id="kpi-switches" style="color: var(--theme-white)">--</strong>
 					</div>
 					<div style="display: flex; justify-content: space-between; margin-bottom: 8px">
 						<span
 							style="font-size: 0.85em; color: var(--text-muted)"
 							data-i18n="ui_apps.lbl_unlocks"
 						></span>
-						<strong id="kpi-unlocks" style="color: #fff">--</strong>
+						<strong id="kpi-unlocks" style="color: var(--theme-white)">--</strong>
 					</div>
 					<div style="display: flex; justify-content: space-between">
 						<span
 							style="font-size: 0.85em; color: var(--text-muted)"
 							data-i18n="ui_apps.lbl_top_wifi"
 						></span>
-						<strong id="kpi-wifi" style="color: #fff">--</strong>
+						<strong id="kpi-wifi" style="color: var(--theme-white)">--</strong>
 					</div>
 				</div>
 			</div>
@@ -291,7 +295,7 @@
 					"
 				>
 					<h3
-						style="margin: 0 0 10px 0; font-size: 14px; color: #fff"
+						style="margin: 0 0 10px 0; font-size: 14px; color: var(--theme-white)"
 						data-i18n="ui_apps.chart_top7"
 					></h3>
 					<div style="position: relative; height: 210px">
@@ -310,7 +314,7 @@
 					"
 				>
 					<h3
-						style="margin: 0 0 10px 0; font-size: 14px; color: #fff"
+						style="margin: 0 0 10px 0; font-size: 14px; color: var(--theme-white)"
 						data-i18n="ui_apps.chart_time_by_cat"
 					></h3>
 					<div style="position: relative; height: 210px">
@@ -333,7 +337,7 @@
 			>
 				<h3
 					id="timeline_chart_title"
-					style="margin: 0 0 10px 0; font-size: 14px; color: #fff"
+					style="margin: 0 0 10px 0; font-size: 14px; color: var(--theme-white)"
 					data-i18n="ui_apps.chart_timeline"
 				></h3>
 				<div style="position: relative; height: 210px">
@@ -407,7 +411,7 @@
 				"
 			>
 				<h3
-					style="margin: 0 0 10px 0; font-size: 14px; color: #fff"
+					style="margin: 0 0 10px 0; font-size: 14px; color: var(--theme-white)"
 					data-i18n="ui_apps.chart_speed_by_cat"
 				>
 					<span
@@ -568,7 +572,7 @@
 							style="
 								height: 100%;
 								width: 0%;
-								background: linear-gradient(90deg, #0a84ff, #30d158);
+								background: linear-gradient(90deg, var(--theme-blue-dark), var(--theme-green-dark));
 								transition: width 0.3s;
 							"
 						></div>
@@ -637,7 +641,7 @@
 				"
 			>
 				<h3
-					style="margin: 0 0 10px 0; font-size: 14px; color: #fff"
+					style="margin: 0 0 10px 0; font-size: 14px; color: var(--theme-white)"
 					data-i18n="ui_apps.chart_speed_by_hour"
 				>
 					<span
@@ -671,7 +675,7 @@
 					"
 				>
 					<h3
-						style="margin: 0; font-size: 14px; color: #fff"
+						style="margin: 0; font-size: 14px; color: var(--theme-white)"
 						data-i18n="ui_apps.chart_activity_cal"
 					></h3>
 					<div style="display: flex; gap: 6px">
@@ -713,7 +717,7 @@
 					"
 				>
 					<h3
-						style="margin: 0; font-size: 14px; color: #fff"
+						style="margin: 0; font-size: 14px; color: var(--theme-white)"
 						data-i18n="ui_apps.chart_hour_weekday"
 					></h3>
 					<div style="display: flex; gap: 6px">
@@ -747,7 +751,7 @@
 				"
 			>
 				<h3
-					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					style="margin: 0 0 12px 0; font-size: 14px; color: var(--theme-white)"
 					data-i18n="ui_apps.chart_annotated_strip"
 				>
 					<span
@@ -771,7 +775,7 @@
 				"
 			>
 				<h3
-					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					style="margin: 0 0 12px 0; font-size: 14px; color: var(--theme-white)"
 					data-i18n="ui_apps.chart_session_durations"
 				>
 					<span
@@ -785,7 +789,7 @@
 			<!-- Top fenêtres (#39) — titres de fenêtre les plus tapés. -->
 			<div class="table-container" data-tab="system" style="margin-bottom: 20px">
 				<h3
-					style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px"
+					style="margin: 0 0 12px 0; font-size: 14px; color: var(--theme-white); padding: 0 10px"
 					data-i18n="ui_apps.chart_top_windows"
 				>
 					<span
@@ -809,7 +813,7 @@
 			<!-- Top sessions (#37) — les plus longues sessions observées par app-jour. -->
 			<div class="table-container" data-tab="system" style="margin-bottom: 20px">
 				<h3
-					style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px"
+					style="margin: 0 0 12px 0; font-size: 14px; color: var(--theme-white); padding: 0 10px"
 					data-i18n="ui_apps.chart_top_sessions"
 				>
 					<span
@@ -833,7 +837,7 @@
 			<!-- Top journées (#38) — meilleures journées par caractères, temps focus, bascules. -->
 			<div class="table-container" data-tab="system" style="margin-bottom: 20px">
 				<h3
-					style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px"
+					style="margin: 0 0 12px 0; font-size: 14px; color: var(--theme-white); padding: 0 10px"
 					data-i18n="ui_apps.chart_top_days"
 				>
 					<span
@@ -858,7 +862,7 @@
 			<!-- Table des paires d’app (#36) — bascules A→B les plus fréquentes. -->
 			<div class="table-container" data-tab="apps" style="margin-bottom: 20px">
 				<h3
-					style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px"
+					style="margin: 0 0 12px 0; font-size: 14px; color: var(--theme-white); padding: 0 10px"
 					data-i18n="ui_apps.chart_top_switch_pairs"
 				>
 					<span
@@ -892,7 +896,7 @@
 				"
 			>
 				<h3
-					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					style="margin: 0 0 12px 0; font-size: 14px; color: var(--theme-white)"
 					data-i18n="ui_apps.chart_daily_evolution"
 				>
 					<span
@@ -915,7 +919,7 @@
 				"
 			>
 				<h3
-					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					style="margin: 0 0 12px 0; font-size: 14px; color: var(--theme-white)"
 					data-i18n="ui_apps.chart_active_ratio"
 				>
 					<span
@@ -940,7 +944,7 @@
 				"
 			>
 				<h3
-					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					style="margin: 0 0 12px 0; font-size: 14px; color: var(--theme-white)"
 					data-i18n="ui_apps.chart_cat_evolution"
 				>
 					<span
@@ -965,7 +969,7 @@
 				"
 			>
 				<h3
-					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					style="margin: 0 0 12px 0; font-size: 14px; color: var(--theme-white)"
 					data-i18n="ui_apps.chart_wake_sleep"
 				>
 					<span
@@ -991,7 +995,10 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_top8">
+				<h3
+					style="margin: 0 0 10px 0; font-size: 14px; color: var(--theme-white)"
+					data-i18n="ui_apps.chart_top8"
+				>
 					<span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>deux séries normalisées sur le top focus</span
@@ -1015,7 +1022,7 @@
 				"
 			>
 				<h3
-					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					style="margin: 0 0 12px 0; font-size: 14px; color: var(--theme-white)"
 					data-i18n="ui_apps.chart_burst_hist"
 				>
 					<span
@@ -1041,7 +1048,7 @@
 				"
 			>
 				<h3
-					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					style="margin: 0 0 12px 0; font-size: 14px; color: var(--theme-white)"
 					data-i18n="ui_apps.chart_app_switches"
 				>
 					<span
@@ -1065,7 +1072,7 @@
 				"
 			>
 				<h3
-					style="margin: 0 0 12px 0; font-size: 14px; color: #fff"
+					style="margin: 0 0 12px 0; font-size: 14px; color: var(--theme-white)"
 					data-i18n="ui_apps.chart_day_strip"
 				>
 					<span

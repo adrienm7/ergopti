@@ -149,6 +149,7 @@ vm.runInContext(
 	appsContext
 );
 vm.runInContext(read('static/ergopti_plus/_shared/ui/metrics_calendar.js'), appsContext);
+require('./support/theme-tokens.cjs').installThemeTokens(appsContext);
 vm.runInContext(read('static/ergopti_plus/_shared/ui/metrics_apps/helpers.js'), appsContext);
 vm.runInContext(appsSource, appsContext);
 vm.runInContext(
