@@ -501,6 +501,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-shell-identifiers-sourcing.cjs"],
 			"repro": "npm run test:shell-identifiers-sourcing"
+		},
+		{
+			"id": "js-macos-dev-source-build",
+			"ordinal": 517,
+			"name": "a developer source ErgoptiPlus.app is refused as a release and by every archive entry",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-dev-source-build.cjs"],
+			"repro": "npm run test:macos-dev-source-build"
 		}
 	]
 }

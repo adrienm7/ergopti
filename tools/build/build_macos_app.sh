@@ -28,6 +28,9 @@
 #  - All version-stamping (CFBundleVersion, BUNDLE_VERSION, Sparkle key) goes
 #    through env vars so the same script drives local dev builds and CI
 #    releases without branching.
+#  - ERGOPTI_DEV_SOURCE=1 builds a developer app whose launcher runs the Lua of
+#    this clone instead of its payload (see check_dev_source_configuration).
+#    Such an app is never archived and a release build refuses the switch.
 # ==============================================================================
 
 set -euo pipefail
@@ -73,6 +76,13 @@ LAUNCHER_LOCALIZATIONS="$(python3 "$REPO_ROOT/tools/build/launcher_localizations
 # Ollama backend offers to download the pinned official release into
 # Application Support (modules/llm/ensure-ollama-deps.sh). The 79.6 MB binary
 # this build used to copy under Resources/Tools/ weighed 29.4 MB of the zip.
+
+# Developer source mode: 1 records this clone's root in the launcher Info.plist
+# (key ERGOPTI_DEV_SOURCE_PLIST_KEY), so the launcher points the embedded
+# Hammerspoon at static/ergopti_plus/macos of the clone, Reload picks up edits,
+# and Sparkle and the driver's update checks stay off. Unset or 0 builds the
+# ordinary packaged app.
+ERGOPTI_DEV_SOURCE="${ERGOPTI_DEV_SOURCE:-0}"
 
 # Sparkle EdDSA public key (base64). Empty string means "Sparkle will refuse
 # to install updates"; CI must inject the real value from a secret.
@@ -167,6 +177,32 @@ disarm_bundle_sparkle() {
 		! plutil -extract "$key" xml1 -o - "$plist" >/dev/null 2>&1 \
 			|| fail "$plist still declares $key."
 	done
+}
+
+# Reject an unknown developer switch value and a developer build that would
+# ship: a release or a published archive must only ever carry the payload Lua.
+check_dev_source_configuration() {
+	case "$ERGOPTI_DEV_SOURCE" in
+		0) ;;
+		1)
+			[ "${ERGOPTI_RELEASE:-false}" != true ] \
+				|| fail "ERGOPTI_DEV_SOURCE=1 is refused for a release build (ERGOPTI_RELEASE=true)."
+			[ -f "$REPO_ROOT/static/ergopti_plus/macos/init.lua" ] \
+				|| fail "Developer source mode needs $REPO_ROOT/static/ergopti_plus/macos/init.lua."
+			;;
+		*) fail "ERGOPTI_DEV_SOURCE must be 0 or 1, not '$ERGOPTI_DEV_SOURCE'." ;;
+	esac
+}
+
+# Records the clone root in a developer build's launcher Info.plist, read back
+# exactly. It runs before codesign, so the key is covered by the signature.
+record_dev_source_root() {
+	local plist="$APP_PATH/Contents/Info.plist"
+	plutil -insert "$ERGOPTI_DEV_SOURCE_PLIST_KEY" -string "$REPO_ROOT" "$plist" \
+		|| fail "$plist refused the developer source key."
+	[ "$(plutil -extract "$ERGOPTI_DEV_SOURCE_PLIST_KEY" raw -o - "$plist")" = "$REPO_ROOT" ] \
+		|| fail "$plist did not keep the developer source root $REPO_ROOT."
+	log "Developer source mode: the launcher runs the Lua of $REPO_ROOT"
 }
 
 clean_build_dir() {
@@ -820,6 +856,7 @@ main() {
 		return
 	fi
 	[[ $# -eq 0 ]] || fail "Expected no arguments or --native-helper-only."
+	check_dev_source_configuration
 	for cmd in curl unzip zip ditto tar swift xcrun awk lipo codesign iconutil sips plutil shasum git node; do
 		require_cmd "$cmd"
 	done
@@ -836,10 +873,17 @@ main() {
 	bash "$REPO_ROOT/tools/build/bundle-macos-luasocket.sh" "$APP_PATH" "$BUILD_DIR/luasocket-build"
 	build_icon
 	generate_info_plist
+	[ "$ERGOPTI_DEV_SOURCE" != 1 ] || record_dev_source_root
 	setup_signing_identity
 	codesign_app
 	verify_app_signature "$APP_PATH"
 	verify_app_signature "$APP_PATH/Contents/Frameworks/Hammerspoon.app"
+	# The archive producer refuses a developer app; none is ever published.
+	if [ "$ERGOPTI_DEV_SOURCE" = 1 ]; then
+		log "Developer source app ready (no release archive): $APP_PATH"
+		log "  Lua source : $REPO_ROOT/static/ergopti_plus/macos"
+		return
+	fi
 	node "$REPO_ROOT/tools/build/macos-release-archives.cjs" "$APP_PATH" "$BUILD_DIR"
 
 	log "Done."

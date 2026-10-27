@@ -97,6 +97,8 @@ function shellFunction(source, name) {
 function replay(source, options) {
 	const signing = sliceBetween(source, '======= 8/ Codesign + zip', '======= 9/ Entrypoint');
 	const entry = shellFunction(source, options.entry === 'main' ? 'main' : 'build_native_helper');
+	// main() admits the developer source switch first; replay the real check.
+	const devSource = shellFunction(source, 'check_dev_source_configuration');
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-signing-'));
 	const posix = tmp.replaceAll('\\', '/');
 	const checksumNode =
@@ -157,6 +159,8 @@ MACOS_SIGNING_CERTIFICATE_BASE64="$2"
 MACOS_SIGNING_CERTIFICATE_PASSWORD="$3"
 DR="$4"
 FAIL_ON="$5"
+ERGOPTI_DEV_SOURCE=0
+${devSource}
 ${signing}
 ${entry}
 clean_build_dir() { :; }
