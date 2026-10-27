@@ -532,3 +532,41 @@ for _TDC_PendingCase in [
 ]
 	Test("driver-control: " . _TDC_PendingCase[1] . " preserves successor source identity (driver-control-pending-successor-source)",
 		_TDC_PendingSuccessorToken.Bind(_TDC_PendingCase[2], _TDC_PendingCase[3], _TDC_PendingCase[4]))
+
+_TDC_ClaimedDriverPidKind(TokenKind, Expected) {
+	Spec := _TDC_Spec(), Pid := ProcessExist()
+	AssertTrue(Pid is Integer && Pid > 1, "the claimed identity must be a genuine native driver process id")
+	switch TokenKind {
+		case "native": Fields := '"driver_pid":' . Pid
+		case "decimal": Fields := '"driver_pid":' . Pid . ".0"
+		case "exponent": Fields := '"driver_pid":' . Pid . "e0"
+		case "string": Fields := '"driver_pid":"' . Pid . '"'
+		case "duplicate-string": Fields := '"driver_pid":' . Pid . ',"driver_pid":"' . Pid . '"'
+		case "escaped": Fields := '"driver_\u0070id":' . Pid
+		case "boolean": Fields := '"driver_pid":true'
+		case "missing": Fields := ""
+		default: throw Error("Unknown claimed driver identity fixture")
+	}
+	Text := '{"schema":1,"request_id":"claimed-kind","state":"claimed","successor_pid":' . Pid
+		. ',"deadline":1700000120' . (Fields == "" ? "" : "," . Fields) . "}"
+	Decoded := JsonParse(Text)
+	AssertEqual("claimed", Decoded["state"])
+	AssertEqual(Pid, Decoded["successor_pid"])
+	AssertTrue(Decoded["successor_pid"] is Integer)
+	AssertEqual(1700000120, Decoded["deadline"])
+	Result := DriverControl_Resolve(Spec, Text, Pid, 1700000000, &Kind)
+	if Expected {
+		AssertEqual("completed", Kind)
+		AssertEqual('{"schema":1,"request_id":"claimed-kind","state":"completed","driver_pid":'
+			. Pid . ',"successor_pid":' . Pid . '}`n', Result)
+	} else {
+		AssertEqual("", Result, "a nonnumeric claimant cannot own the actual native process identity")
+		AssertEqual("", Kind)
+	}
+}
+for _TDC_ClaimedPidCase in [
+	["native", true], ["decimal", true], ["exponent", true], ["string", false],
+	["duplicate-string", false], ["escaped", true], ["boolean", false], ["missing", false]
+]
+	Test("driver-control: claimed " . _TDC_ClaimedPidCase[1] . " keeps numeric process identity (driver-control-claimed-pid-kind)",
+		_TDC_ClaimedDriverPidKind.Bind(_TDC_ClaimedPidCase[1], _TDC_ClaimedPidCase[2]))
