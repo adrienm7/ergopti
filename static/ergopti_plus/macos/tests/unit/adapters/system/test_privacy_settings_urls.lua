@@ -10,7 +10,6 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local SourceFile = require("tests.support.source_file")
 
 local LEGACY = "x-apple.systempreferences:com.apple.preference.security?"
 local EXTENSION = "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?"
@@ -48,11 +47,10 @@ helpers.describe("privacy settings URLs: one version-aware table", function()
 	end)
 
 	helpers.it("leaves no privacy pane URL spelled outside the table", function()
-		local root = helpers.driver_root()
-		for _, relative in ipairs({ "adapters/screen_capture.lua", "adapters/accessibility_permission.lua",
-			"platform/remap/onboarding.lua", "modules/llm/agent_connectors.lua" }) do
-			local src = assert(SourceFile.read(root .. "/" .. relative), relative)
-			helpers.assert_true(src:find("?Privacy_", 1, true) == nil, relative .. " spells a privacy pane URL")
-		end
+		-- Every production file, found by content rather than by path, so a
+		-- moved or new caller is covered and no read is pinned to a location.
+		helpers.assert_true(helpers.read_driver_source() ~= nil, "the production source scan must not be empty")
+		local spelled = helpers.read_driver_source("?Privacy_")
+		helpers.assert_true(spelled == nil, "a production file spells a privacy pane URL outside data/privacy_panes.json")
 	end)
 end)
