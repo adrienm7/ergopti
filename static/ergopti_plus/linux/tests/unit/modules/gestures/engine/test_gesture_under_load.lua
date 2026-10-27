@@ -202,7 +202,9 @@ helpers.describe("gesture load: SYN_DROPPED", function()
 		local partial = {}
 		for index = 1, 24 do partial[#partial + 1] = interrupted[index] end
 		feed(decoder, partial)
-		helpers.assert_true(decoder:peak_fingers() > 0, "the fixture really did put fingers down")
+		-- Fingers down, not the peak: a count joins the peak only after a stable
+		-- run of frames, and this fixture is cut in the middle of the landing.
+		helpers.assert_true(decoder:fingers_down() > 0, "the fixture really did put fingers down")
 
 		decoder:feed({ type = Decoder.EV_SYN, code = Decoder.SYN_DROPPED, value = 0 })
 		-- The first SYN_REPORT closes the invalid packet; a new contact belongs
