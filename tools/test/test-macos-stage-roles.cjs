@@ -122,21 +122,21 @@ check('push E2E includes every mandatory role and both managed architectures', (
 			.map((cell) => [cell.role, cell.runner, cell.scenario, cell.timeout_minutes]),
 		[
 			['e2e-hs', 'ubuntu-latest', '', 360],
-			['tooltip-canvas', 'macos-15', '', 10],
-			['managed-ollama-native', 'macos-15', '', 60],
-			// Intel runs its XCTest cohorts beside the runtime receiving.
-			['managed-ollama-native', 'macos-15-intel', 'runtime', 60],
-			['managed-ollama-native', 'macos-15-intel', 'xctest', 45],
-			['managed-ollama-build', 'macos-15', '', 60],
+			// The Intel chain takes the first runners: its build, its XCTest
+			// cohorts and the runtime receiving that waits for the build.
 			['managed-ollama-build', 'macos-15-intel', '', 60],
+			['managed-ollama-native', 'macos-15-intel', 'xctest', 45],
+			['managed-ollama-native', 'macos-15-intel', 'runtime', 60],
+			['managed-ollama-build', 'macos-15', '', 60],
+			['managed-ollama-native', 'macos-15', '', 60],
 			// The launcher XCTest and native probes of the build host, out of Build.
-			['launcher-native', 'macos-latest', '', 30]
+			['launcher-native', 'macos-latest', '', 30],
+			['tooltip-canvas', 'macos-15', '', 10]
 		]
 	);
-	assert.deepEqual(roles.displayPlan('e2e', context).matrix.lot.slice(2, 5), [
-		'Managed Ollama (macOS 15, Apple silicon)',
-		'Managed Ollama (macOS 15, Intel)',
-		'Native XCTest (macOS 15, Intel)'
+	assert.deepEqual(roles.displayPlan('e2e', context).matrix.lot.slice(2, 4), [
+		'Native XCTest (macOS 15, Intel)',
+		'Managed Ollama (macOS 15, Intel)'
 	]);
 	for (const [architecture, scenario] of [
 		['arm64', 'runtime'],
@@ -161,7 +161,8 @@ function checkManagedNativeSplit(workflow) {
 		.plan('e2e', context)
 		.filter((cell) => cell.role === 'managed-ollama-native')
 		.map((cell) => cell.scenario);
-	assert.deepEqual(scenarios, ['', 'runtime', 'xctest']);
+	// The plan order is owned by the runner-start order pinned above.
+	assert.deepEqual([...scenarios].sort(), ['', 'runtime', 'xctest']);
 	const xctest = steps.filter((step) =>
 		/\bswift test\b|run_logger_numeric_native\.sh/.test(step.run ?? '')
 	);
@@ -406,7 +407,12 @@ for (const stage of roles.STAGES) {
 }
 check('wrong native architecture refuses', () => {
 	const rows = completed.all.e2e.map((row) => structuredClone(row));
-	rows[2].host.architecture = 'x64';
+	// An Apple silicon cell that reports an Intel host.
+	const arm = rows.findIndex(
+		(row) => row.cell.architecture === 'arm64' && row.cell.role !== 'e2e-hs'
+	);
+	assert.ok(arm >= 0, 'an Apple silicon E2E cell exists');
+	rows[arm].host.architecture = 'x64';
 	assert.throws(() => roles.union('e2e', rows, 'success', context, 1), /Wrong architecture/);
 });
 check('successful earlier attempts survive a legitimate failed-jobs rerun', () => {
@@ -536,13 +542,13 @@ check('Unit lots are the module groups, each one complete stubbed cell', () => {
 check('E2E human lots retain native architectures and scoped manual roles', () => {
 	const push = [
 		'Virtual-keyboard replay (stubbed)',
-		'Tooltip canvas (macOS 15, Apple silicon)',
-		'Managed Ollama (macOS 15, Apple silicon)',
-		'Managed Ollama (macOS 15, Intel)',
-		'Native XCTest (macOS 15, Intel)',
-		'Managed Ollama build (macOS 15, Apple silicon)',
 		'Managed Ollama build (macOS 15, Intel)',
-		'Launcher XCTest and native probes (macOS 26)'
+		'Native XCTest (macOS 15, Intel)',
+		'Managed Ollama (macOS 15, Intel)',
+		'Managed Ollama build (macOS 15, Apple silicon)',
+		'Managed Ollama (macOS 15, Apple silicon)',
+		'Launcher XCTest and native probes (macOS 26)',
+		'Tooltip canvas (macOS 15, Apple silicon)'
 	];
 	assert.deepEqual(roles.displayPlan('e2e', context).matrix, { lot: push });
 	assert.deepEqual(
@@ -607,7 +613,9 @@ for (const [name, ctx] of [
 check(
 	'human-lot renderer refuses foreign roles, stages, native architectures and scenarios',
 	() => {
-		const selected = roles.plan('e2e', context)[2];
+		const selected = roles
+			.plan('e2e', context)
+			.find((cell) => cell.role === 'managed-ollama-native' && cell.architecture === 'arm64');
 		assert.throws(() => roles.humanLot('unit', selected), /Unknown human lot stage or role/);
 		assert.throws(
 			() => roles.humanLot('e2e', { ...selected, architecture: 'host' }),
