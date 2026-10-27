@@ -823,6 +823,15 @@ local function main()
 		tostring(opts.grab), tostring(opts.tray), tostring(opts.dry_run), tostring(opts.verbose),
 		opts.device and "pinned" or "auto", tostring(opts.layout),
 		opts.keymap and "override" or "server", opts.config and "custom" or "default")
+	-- Resolved here so a launcher root naming another clone stops the boot
+	-- (infra/dev_source.lua) before any watcher or restart relies on it.
+	do
+		local DevSource = require("infra.dev_source")
+		local dev_root = DevSource.root()
+		if dev_root then
+			Logger.info(LOG, "Developer source mode; Lua runs from %s%s.", dev_root, DevSource.DRIVER_SUBPATH)
+		end
+	end
 
 	if opts.dry_run then
 		Logger.info(LOG, "Dry-run mode: matches will be logged but not injected.")
@@ -2779,6 +2788,9 @@ local function main()
 	-- When luv is available, uses native inotify; otherwise falls back
 	-- to mtime polling driven by the event loop's onPeriodic callback.
 	if file_watchers then
+		-- A developer run (tools/dev/run-linux-dev.sh) also restarts on a saved
+		-- .lua of the clone, as the macOS developer app reloads on one.
+		local DevSource = require("infra.dev_source")
 		file_watchers.start({
 			hotstrings_dir = config_path,
 			base_dir       = SCRIPT_DIR,
@@ -2788,6 +2800,8 @@ local function main()
 				local reloaded = require("infra.reload_outcome").run(function() return hotstrings_config.reload() end)
 				if reloaded and privacy_owners.menu_rebuild then privacy_owners.menu_rebuild.note_reload() end
 			end,
+			source_dirs      = DevSource.source_dirs(),
+			on_source_change = DevSource.is_active() and function() perform_reload("a saved source file") end or nil,
 		})
 		Logger.info(LOG, "File watchers armed (%s).",
 			file_watchers.has_inotify() and "inotify" or "mtime poll")
