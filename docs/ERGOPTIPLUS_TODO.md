@@ -85,11 +85,12 @@ a sealed Windows updater source, reseal with
   `vendor/ergopti_updater_download.ps1` (`CreateFileW`, `GetFileInformationByHandle`, from bdfa026d16). Check
   whether a bundled type already declaring them could be reused, then lower it back. The same build log notes
   `key_state_polling` dropped to 59: lower its script ceiling from 62 once a Windows build confirms 59.
-- **Last full preflight:** read the newest `ci.yml` run on `tmp/preflight-dev` first. The run of 17e9011468
-  was 70 green and 5 red. All five are fixed on dev: the pinned-source-reads ratchet (948f79c7b8), shared
-  Lua helpers (89a106d4b2), Ollama/bootstrap test expectations (179afb41e2), the AppImage GLib closure
-  list (79c6e0978b), and the Windows antivirus ceilings (d7d98e133b). A new full run is dispatched on the
-  head.
+- **Last full preflight:** read the newest `ci.yml` run on `tmp/preflight-dev` first. Run 40550190562 on
+  6907f0bbd9 (27 Oct evening) was 87 green, 2 red, 2 Linux install rows still running when read: Windows
+  unit core (two windows-dev-mode tests, an 8.3 short temp path, fixed by the next commit after 6907f0bbd9)
+  and Common packaging and boot (`test-linux-install-sandbox` expected the former French degraded line,
+  fixed likewise). Dispatch a new `os_lanes=all` run on the head and confirm both, plus the two Linux
+  install rows (AppImage, Ubuntu 22.04 first installation).
 - **The ChatGPT fix branches** fix/linux, fix/macos and fix/windows are fully on dev. The container proxy
   refuses remote deletion, so the maintainer deletes them: `git push origin --delete fix/linux fix/macos
 fix/windows`.
