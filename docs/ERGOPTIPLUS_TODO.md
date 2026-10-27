@@ -208,7 +208,7 @@ dev.
 
 ### Open TODO
 
-- **L40** [CODE][PHYS-M] Two-finger scrolls switched tabs through the vertical three-finger swipe
+- **L46** [CODE][PHYS-M] Two-finger scrolls switched tabs through the vertical three-finger swipe
   (`swipe_3_up` tab_prev, `swipe_3_down` tab_next); the maintainer turned the option off. The
   day logs hold no live fire line (the swipe action was off and the log collapses repeats), but
   show the shape: `Finger join (fast-path): 2 → 3` immediately followed by `n 3 -> 2` (14:25:52).
@@ -1486,7 +1486,7 @@ Standing checks:
 
 ### Mac
 
-- [ ] **L40 three-finger swipe vs scroll** (`tmp/wip-three-finger-swipe`): re-enable
+- [ ] **L46 three-finger swipe vs scroll** (`tmp/wip-three-finger-swipe`): re-enable
       `swipe_3_up`/`swipe_3_down`, scroll with two fingers for a few minutes, no tab switch; a
       deliberate three-finger swipe still switches tabs.
 - [ ] **Issue #100 retest** (after v1.0.5: 2353a72eed, 25411ee080, e57f4cce77): with Ollama.app and
@@ -1523,7 +1523,7 @@ Standing checks:
 Wizard (7) on Wayland, physical input, installed-daemon restart; real kernel capture (93); magic
 key grab, injection and hotplug (30); tap delay row (zenity/kdialog), group restore/clear, open
 target, Backspace word start (GNOME Terminal Enter, `ab`, three Backspaces, `c★`; gedit
-Ctrl+Backspace; Firefox Ctrl+L). L40: a two-finger scroll with a thumb resting reports two
+Ctrl+Backspace; Firefox Ctrl+L). L46: a two-finger scroll with a thumb resting reports two
 fingers, a brisk three-finger tap still reports `tap_3` (the peak must hold four frames).
 
 ## CI final acceptance receipts
