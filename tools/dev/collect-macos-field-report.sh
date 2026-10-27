@@ -167,7 +167,7 @@ finalize() {
 		done
 		if [ "${#day_logs[@]}" -gt 0 ]; then
 			step digest_boot grep -hE "Boot complete|Boot CPU|Boot stage completed|held the main thread" "${day_logs[@]}"
-			step digest_slow grep -hE "\[HotPath\]|Slow " "${day_logs[@]}"
+			step digest_slow grep -hE "\[HotPath\]|Slow |Main-thread hold of" "${day_logs[@]}"
 			step digest_errors grep -hE "\[(ERROR|WARNING)\]" "${day_logs[@]}"
 			step digest_input grep -hE "key_event_health|karabiner.lease|guardian" "${day_logs[@]}"
 		fi
