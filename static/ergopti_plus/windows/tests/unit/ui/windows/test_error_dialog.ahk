@@ -338,3 +338,121 @@ _TED_RealSharingSink() {
 Test("error window: actual sharing caller retains snapshot and excludes private details", _TED_RealSharingSink)
 
 #Include ../webview/test_error_dialog_startup_owner.ahk
+
+
+; The actual boot owner starts without a policy or an enabled window. Recreate
+; only that module lifecycle state while the private file goes through genuine
+; native bootstrap admission; no window or scheduler port is replaced.
+_TED_AuthoredSetting(Label, Raw, Outdated) {
+	static FixtureSequence := 0
+	FixtureSequence += 1
+	global ConfigurationFile, _BootConfigSnapshot
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries, _ConfigBootReadFailed
+	global _ED_Policy, _ED_Decisions, _ED_Enabled, _ED_Busy, _ED_PendingRecord, _ED_TimerFn
+	SavedFileSet := IsSet(ConfigurationFile)
+	SavedFile := SavedFileSet ? ConfigurationFile : ""
+	SavedSnapshotSet := IsSet(_BootConfigSnapshot)
+	SavedSnapshot := SavedSnapshotSet ? _BootConfigSnapshot : 0
+	SavedRejected := _ConfigBootRejectedOverrides
+	SavedOutdated := _ConfigBootOutdatedEntries
+	SavedReadFailure := _ConfigBootReadFailed
+	SavedPolicy := _ED_Policy, SavedDecisions := _ED_Decisions, SavedEnabled := _ED_Enabled
+	SavedTimer := _ED_TimerFn
+	AssertFalse(_ED_Busy, "the fixture must not replace an active native error window")
+	AssertFalse(_ED_PendingRecord is Map, "the fixture must not replace a pending native error request")
+	Path := A_Temp . "\ergopti_error_setting_" . A_TickCount . "_" . A_ScriptHwnd
+		. "_" . FixtureSequence . ".toml"
+	try {
+		_ED_Policy := 0, _ED_Decisions := 0, _ED_Enabled := false
+		ConfigurationFile := Path
+		Source := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n[script]`n"
+		if Raw is String
+			Source .= "show_error_dialog = " . Raw . "`n"
+		AssertTrue(FSWrite(Path, Source))
+		Before := FSReadUtf8Exact(Path)
+		_ConfigBootRejectedOverrides := 0
+		_ConfigBootOutdatedEntries := Map()
+		_ConfigBootReadFailed := false
+		Journal := ConfigMigrateBoot(Path)
+		AssertTrue(Journal is Map, "the actual native journal must initialize the private current-schema source")
+		AssertEqual("current", Journal.Get("status", "missing"))
+		Bootstrap := ParseConfigTomlFile(Path)
+		Tree := ManifestBuildFeaturesMap()
+		AssertTrue(ApplyBootConfigToml(Tree, Path, &_BootConfigSnapshot) >= 0)
+		AssertEqual(0, _ConfigBootRejectedOverrides)
+		AssertFalse(_ConfigBootReadFailed)
+		AssertEqual(Outdated ? 1 : 0, _ConfigBootOutdatedEntries.Count)
+		AssertTrue(Bootstrap == _BootConfigSnapshot.Cache,
+			"the early diagnostic owner must receive the actual retained bootstrap cache")
+		Expected := Tree[ConfigKey.SCRIPT][ConfigLeaf.SHOW_ERROR_DIALOG]
+		AssertTrue(Expected is Integer)
+		Started := ErrorDialog_Init(Bootstrap)
+		FileAppend("# error-window source admission: fixture=" . Label
+			. ", outdated=" . _ConfigBootOutdatedEntries.Count . ", initialized=" . Started
+			. ", enabled=" . ErrorDialog_IsEnabled() . ", expected=" . Expected . "`n", "*")
+		AssertTrue(Started, "an outdated authored diagnostic switch must not prevent cold initialization")
+		AssertTrue(_ED_Policy is Map, "the genuine shipped error policy must be adopted")
+		AssertEqual(Expected, ErrorDialog_IsEnabled(),
+			"cold diagnostic publication must retain the canonical authored/default switch")
+		AssertFalse(_ED_Busy, "loading the switch must not open or schedule an error window")
+		AssertFalse(_ED_PendingRecord is Map)
+		AssertTrue(_ED_TimerFn == SavedTimer, "initialization must retain the native scheduling owner")
+		AssertTrue(ConfigTomlReadSnapshot(Path) == _BootConfigSnapshot,
+			"diagnostic initialization cannot mutate the admitted native source")
+		AssertTrue(FSUtf8ExactMatches(Path, Before), "outdated preferences must retain all physical source bytes")
+	} finally {
+		_ED_Policy := SavedPolicy, _ED_Decisions := SavedDecisions, _ED_Enabled := SavedEnabled
+		ConfigurationFile := SavedFileSet ? SavedFile : unset
+		_BootConfigSnapshot := SavedSnapshotSet ? SavedSnapshot : unset
+		_ConfigBootRejectedOverrides := SavedRejected
+		_ConfigBootOutdatedEntries := SavedOutdated
+		_ConfigBootReadFailed := SavedReadFailure
+		_TOML_InvalidateParseCache(Path)
+		FSDelete(Path)
+	}
+}
+
+for Fixture in [
+	["quoted-boolean", '"false"'], ["integer", "2"], ["float", "0.0"],
+	["array", "[]"], ["record", "{}"], ["signed-zero", "-0"], ["plus-zero", "+0"]
+]
+	Test("error window: outdated authored " . Fixture[1] . " keeps cold admission (error-window-authored-admission)",
+		_TED_AuthoredSetting.Bind(Fixture[1], Fixture[2], true))
+
+for Fixture in [
+	["true", "true", false], ["false", "false", false],
+	["legacy-zero", "0", false], ["legacy-one", "1", false],
+	["legacy-zero-comment", "0 # explicit opt-out", false],
+	["legacy-one-comment", "1 # explicit opt-in", false],
+	["boolean-comment", "true # explicit diagnostics", false],
+	["missing-marker", '"_"', true], ["absent", 0, false]
+]
+	Test("error window: authored " . Fixture[1] . " cold control applies (error-window-authored-admission)",
+		_TED_AuthoredSetting.Bind(Fixture[1], Fixture[2], Fixture[3]))
+
+; In-memory callers do not own a physical spelling: they keep the strict
+; contract instead of borrowing another file's outdated-value admission.
+_TED_DetachedSettingRejects(Value) {
+	Cache := Map("script", Map("show_error_dialog", Value))
+	Rejected := false
+	try _ErrorDialog_ReadSetting(Cache)
+	catch ValueError as Err {
+		Rejected := true
+		AssertEqual("script.show_error_dialog must be a boolean.", Err.Message)
+	}
+	AssertTrue(Rejected, "detached invalid candidates require the actual typed setting refusal")
+}
+
+for Fixture in [["quoted-boolean", "false"], ["number", 2], ["float", 0.0],
+	["array", []], ["record", Map()]]
+	Test("error window: detached " . Fixture[1] . " remains strict (error-window-setting-candidate)",
+		_TED_DetachedSettingRejects.Bind(Fixture[2]))
+
+_TED_DetachedSettingApplies(Value) {
+	Cache := Map("script", Map("show_error_dialog", Value))
+	AssertEqual(Value, _ErrorDialog_ReadSetting(Cache))
+}
+
+for Value in [0, 1]
+	Test("error window: detached boolean " . Value . " applies (error-window-setting-candidate)",
+		_TED_DetachedSettingApplies.Bind(Value))
