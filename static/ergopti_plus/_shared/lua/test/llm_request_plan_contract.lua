@@ -17,6 +17,7 @@ local Batching = require("llm.request_plan.batching")
 local TokenBudget = require("llm.request_plan.token_budget")
 local InfoBar = require("llm.request_plan.info_bar")
 local Live = require("llm.request_plan.live")
+local AgentPlan = require("llm.request_plan.agent")
 local Ports = require("llm.request_plan.ports")
 
 --- Reads and decodes one corpus file.
@@ -202,6 +203,31 @@ function M.run_live(helpers, corpus_path)
 						helpers.assert_eq(result.min_words, vector.expect.min_words)
 						helpers.assert_eq(result.profile, profile)
 					end
+				end
+			end)
+		end
+	end)
+end
+
+--- Replays the agent admission vectors through the shared plan.
+--- @param helpers table Driver assertions and case registration.
+--- @param corpus_path string Canonical shared agent corpus path.
+function M.run_agent(helpers, corpus_path)
+	local corpus = read_json(corpus_path)
+	helpers.describe("Shared request plan agent admission", function()
+		for _, vector in ipairs(corpus.vectors) do
+			helpers.it("vector '" .. vector.id .. "'", function()
+				if vector.kind == "admit" then
+					local decision = AgentPlan.admit(vector.facts)
+					helpers.assert_eq(decision.allowed, vector.expect.allowed)
+					helpers.assert_eq(decision.step, vector.expect.step)
+					helpers.assert_eq(decision.notice, vector.expect.notice)
+				elseif vector.kind == "auto_blocker" then
+					helpers.assert_eq(AgentPlan.auto_blocker(vector.facts), vector.expect.blocker)
+				elseif vector.kind == "triage_skip" then
+					helpers.assert_eq(AgentPlan.triage_skip(vector.facts), vector.expect.skip)
+				else
+					error("unknown agent vector kind: " .. tostring(vector.kind))
 				end
 			end)
 		end
