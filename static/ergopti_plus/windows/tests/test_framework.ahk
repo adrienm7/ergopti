@@ -734,11 +734,27 @@ _SelectListed(Tests, ListFile) {
 			Wanted[A_LoopField] := true
 	}
 	Selected := []
+	Matched := Map()
 	for Entry in Tests {
-		if Wanted.Has(Entry.name)
+		if Wanted.Has(Entry.name) {
 			Selected.Push(Entry)
+			Matched[Entry.name] := true
+		}
+	}
+	for Name in Wanted {
+		if !Matched.Has(Name)
+			throw ValueError("Unknown test listed for replay: " . Name)
 	}
 	return Selected
+}
+
+; Admit every replay name against the full registry before applying optional
+; intersections. Known tests outside a requested module or filter remain valid.
+_SelectRunTests(Registry, Filter, Module, ListFile, AllowInteractive, Reverse, &Excluded, &UnmodularCount) {
+	Listed := _SelectListed(Registry, ListFile)
+	Selected := _SelectTests(Listed, Filter, AllowInteractive, &Excluded)
+	UnmodularCount := Selected.Length
+	return _SelectReversed(_SelectModule(Selected, Module), Reverse)
 }
 
 _SelectTests(Registry, Filter, AllowInteractive, &Excluded) {
@@ -999,10 +1015,8 @@ RunTests(PlanModuleOf := 0) {
 	; Apply the optional --only <substr> filter. The plan line (1..N) and the run
 	; loop both operate on the selected subset so a filtered run is a valid, fast
 	; replay of a single failing test.
-	ActiveTests := _SelectTests(TEST_REGISTRY, _AHK_ONLY_FILTER, _AHK_INTERACTIVE, &Excluded)
-	UnmodularCount := ActiveTests.Length
-	ActiveTests := _SelectReversed(_SelectListed(_SelectModule(ActiveTests, _AHK_MODULE), _AHK_LIST_FILE),
-		_AHK_REVERSE)
+	ActiveTests := _SelectRunTests(TEST_REGISTRY, _AHK_ONLY_FILTER, _AHK_MODULE, _AHK_LIST_FILE,
+		_AHK_INTERACTIVE, _AHK_REVERSE, &Excluded, &UnmodularCount)
 	if _AHK_DUMP_PLAN != "" {
 		Plan := _TestBuildPlan(ActiveTests, PlanClassifier)
 		FileAppend(Plan, _AHK_DUMP_PLAN, "UTF-8")
