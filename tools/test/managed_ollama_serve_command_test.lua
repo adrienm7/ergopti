@@ -104,9 +104,15 @@ case(function()
 end)
 case(function()
 	files[receipt_path] = Json.encode(copy(receipt)); files[receipt_path] = files[receipt_path]:gsub(rd, string.rep("f", 64))
+	-- A foreign receipt never falls back to the user's own Ollama (issue #104):
+	-- the app is only named for a log, and the stock composition is reached
+	-- through an explicit non-native source.
 	local path, err, source = Binary.resolve()
-	check(path, "/Applications/Ollama.app/Contents/Resources/ollama"); check(err, nil); check(source, Binary.SOURCE_APP)
-	local command = assert(Builder.build(path, "/private/logs/ErgoptiPlus_2099-01-01.log", 45678))
+	check(path, nil); check(err, "Ergopti's own Ollama runtime is not installed"); check(source, nil)
+	local user_path, user_source = Binary.find_user_installation()
+	check(user_path, "/Applications/Ollama.app/Contents/Resources/ollama"); check(user_source, Binary.SOURCE_APP)
+	local command = assert(ActualBuilder.build(user_path, "/private/logs/ErgoptiPlus_2099-01-01.log", 45678,
+		Binary.SOURCE_APP))
 	check(command:find("STATIC-PRELUDE", 1, true) ~= nil, true)
 	check(command:find("while IFS= read -r LINE", 1, true) ~= nil, true)
 	check(command:find("%Y-%m-%d", 1, true) ~= nil, true)
@@ -131,7 +137,8 @@ end)
 case(function()
 	binary_present = false
 	check(Binary.native_candidate(), nil)
-	check(Binary.resolve(), "/Applications/Ollama.app/Contents/Resources/ollama")
+	local absent_path, absent_err = Binary.resolve()
+	check(absent_path, nil); check(absent_err, "Ergopti's own Ollama runtime is not installed")
 	binary_present = true
 	files[receipt_path] = string.rep("x", 1048577)
 	check(Binary.native_candidate(), nil); seed()
