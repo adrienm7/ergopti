@@ -1,0 +1,58 @@
+2026-10-27 16:27:53:341 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 14 key-down(s), 14 key-up(s), 0 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 1 key-down(s) and 2 key-up(s) seen 250 ms or more late (max 488 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 16:28:02:628 [DEBUG] [karabiner] ↑ "Karabiner regeneration remains fail-closed pending guardian readiness (next check in %.1f s; %s)." repeated 25 more times between 2026-10-27 16:26:48:075 and 2026-10-27 16:28:01:956 (last: Karabiner regeneration remains fail-closed pending guardian readiness (next check in 3.0 s; unavailable).).
+2026-10-27 16:28:02:628 [DEBUG] [karabiner] ↑ "Karabiner regeneration remains fail-closed after guardian status '%s' (%s)." repeated 23 more times between 2026-10-27 16:26:54:227 and 2026-10-27 16:28:01:956 (last: Karabiner regeneration remains fail-closed after guardian status 'unavailable' (guardian-status-poll).).
+2026-10-27 16:28:04:347 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-10-27 16:28:04:348 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-10-27 16:28:04:392 [INFO] [init] ↑ "%s" repeated 2 more times between 2026-10-27 16:28:03:956 and 2026-10-27 16:28:04:299 (last: Remap guardian status reported by the launcher: not_requested.).
+2026-10-27 16:28:04:690 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-10-27 16:28:04:690 [INFO] [karabiner.lease] Registering the remap guardian for this Ergopti lifecycle.
+2026-10-27 16:28:07:880 [INFO] [karabiner.lease] Remap guardian registration answered 'ready'.
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2040: in upvalue 'replay_guardian_regenerations'
+2026-10-27 16:48:11:663 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-10-27 16:48:11:664 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-10-27 16:48:11:717 [INFO] [init] ↑ "%s" repeated 2 more times between 2026-10-27 16:48:11:226 and 2026-10-27 16:48:11:616 (last: Remap guardian status reported by the launcher: not_requested.).
+2026-10-27 16:48:11:975 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-10-27 16:48:11:975 [INFO] [karabiner.lease] Registering the remap guardian for this Ergopti lifecycle.
+2026-10-27 16:48:12:037 [INFO] [karabiner.lease] Remap guardian registration answered 'ready'.
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2040: in upvalue 'replay_guardian_regenerations'
+2026-10-27 16:48:15:571 [INFO] [field_check] Field check result: check=lease verdict=pass steps=8 cli_present=pass:yes integration_enabled=info:yes lease_phase=pass:idle guardian_state=pass:ready config_present=info:yes lease_failures=pass:0 key_losses=pass:0 cli_version=pass:16.0.0
+2026-10-27 16:54:31:575 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-10-27 16:54:31:577 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-10-27 16:54:31:626 [INFO] [init] ↑ "%s" repeated 2 more times between 2026-10-27 16:54:31:198 and 2026-10-27 16:54:31:526 (last: Remap guardian status reported by the launcher: not_requested.).
+2026-10-27 16:54:32:164 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-10-27 16:54:32:164 [INFO] [karabiner.lease] Registering the remap guardian for this Ergopti lifecycle.
+2026-10-27 16:54:32:479 [INFO] [karabiner.lease] Remap guardian registration answered 'ready'.
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2040: in upvalue 'replay_guardian_regenerations'
+2026-10-27 16:55:18:527 [WARNING] [key_event_health] Key events reached the keymap taps 250 ms or more late: the main thread held them (2 times); session totals: 35 key-down(s), 35 key-up(s), 2 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 1 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 367 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 16:55:18:527 [WARNING] [key_event_health] A key-up reached the keymap taps with no key-down before it: that key-down was lost or consumed upstream (2 times); session totals: 35 key-down(s), 35 key-up(s), 2 key-up(s) without key-down, 0 key-down(s) without key-up, 0 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 1 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 367 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 19:46:39:112 [WARNING] [karabiner.lease] Cannot refresh Karabiner lease liveness — no live generation exists.
+2026-10-27 19:46:46:863 [WARNING] [key_event_health] A character key stayed down 589.8 s with no further event: its key-up was lost before the keymap taps (2 times); session totals: 38 key-down(s), 38 key-up(s), 2 key-up(s) without key-down, 0 key-down(s) without key-up, 2 key(s) stuck over 3.0 s, 0 character key(s) held 500 ms or more (0 across a rule switch), 1 key-down(s) and 1 key-up(s) seen 250 ms or more late (max 367 ms), 0 late key event(s) passed untouched, 0 Karabiner lease failure(s).
+2026-10-27 19:47:04:868 [INFO] [file_watchers] Source change reload requested (72 file(s): api_ollama.lua, field_run.lua, field_run_ports.lua, file_watchers.lua, guardian_notice.lua, +67 more).
+2026-10-27 19:47:04:940 [WARNING] [karabiner.lease] ↑ "Cannot refresh Karabiner lease liveness — no live generation exists." repeated 1 more time between 2026-10-27 19:46:40:099 and 2026-10-27 19:46:40:099.
+2026-10-27 19:47:06:525 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-10-27 19:47:06:526 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-10-27 19:47:06:568 [INFO] [init] ↑ "%s" repeated 2 more times between 2026-10-27 19:47:06:145 and 2026-10-27 19:47:06:476 (last: Remap guardian status reported by the launcher: not_requested.).
+2026-10-27 19:47:06:812 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-10-27 19:47:06:812 [INFO] [karabiner.lease] Registering the remap guardian for this Ergopti lifecycle.
+2026-10-27 19:47:06:862 [INFO] [karabiner.lease] Remap guardian registration answered 'ready'.
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2040: in upvalue 'replay_guardian_regenerations'
+2026-10-27 19:48:23:165 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-10-27 19:48:23:166 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-10-27 19:48:23:216 [INFO] [init] ↑ "%s" repeated 2 more times between 2026-10-27 19:48:22:768 and 2026-10-27 19:48:23:116 (last: Remap guardian status reported by the launcher: not_requested.).
+2026-10-27 19:48:23:462 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-10-27 19:48:23:462 [INFO] [karabiner.lease] Registering the remap guardian for this Ergopti lifecycle.
+2026-10-27 19:48:23:529 [INFO] [karabiner.lease] Remap guardian registration answered 'ready'.
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2040: in upvalue 'replay_guardian_regenerations'
+2026-10-27 19:48:26:168 [INFO] [field_check] Field check result: check=lease verdict=pass steps=8 cli_present=pass:yes integration_enabled=info:yes lease_phase=pass:idle guardian_state=pass:ready config_present=info:yes lease_failures=pass:0 key_losses=pass:0 cli_version=pass:16.0.0
+2026-10-27 20:06:24:760 [WARNING] [karabiner.lease] Cannot refresh Karabiner lease liveness — no live generation exists.
+2026-10-27 20:16:24:832 [WARNING] [karabiner.lease] ↑ "Cannot refresh Karabiner lease liveness — no live generation exists." repeated 3 more times between 2026-10-27 20:06:25:212 and 2026-10-27 20:16:02:425.
+2026-10-27 21:06:41:427 [WARNING] [karabiner.lease] Cannot refresh Karabiner lease liveness — no live generation exists.
+2026-10-27 21:06:55:214 [WARNING] [karabiner.lease] ↑ "Cannot refresh Karabiner lease liveness — no live generation exists." repeated 1 more time between 2026-10-27 21:06:43:239 and 2026-10-27 21:06:43:239.
+2026-10-27 21:06:56:863 [START] [karabiner.lease] Initializing Karabiner lease controller…
+2026-10-27 21:06:56:864 [SUCCESS] [karabiner.lease] Karabiner lease controller initialized.
+2026-10-27 21:06:56:905 [INFO] [init] ↑ "%s" repeated 2 more times between 2026-10-27 21:06:56:511 and 2026-10-27 21:06:56:820 (last: Remap guardian status reported by the launcher: not_requested.).
+2026-10-27 21:06:57:222 [DEBUG] [karabiner] Retaining public Karabiner regeneration behind a fresh native guardian proof.
+2026-10-27 21:06:57:222 [INFO] [karabiner.lease] Registering the remap guardian for this Ergopti lifecycle.
+2026-10-27 21:06:57:281 [INFO] [karabiner.lease] Remap guardian registration answered 'ready'.
+	...rgopti/static/ergopti_plus/macos/platform/remap/init.lua:2040: in upvalue 'replay_guardian_regenerations'
+2026-10-27 21:06:59:951 [INFO] [field_check] Field check result: check=lease verdict=pass steps=8 cli_present=pass:yes integration_enabled=info:yes lease_phase=pass:idle guardian_state=pass:ready config_present=info:yes lease_failures=pass:0 key_losses=pass:0 cli_version=pass:16.0.0

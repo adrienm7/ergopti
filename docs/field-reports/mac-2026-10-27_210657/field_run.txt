@@ -1,0 +1,17 @@
+[field-report] Waiting for the developer app to publish its readiness...
+[field-report] Developer app ready (pid 76752); requesting every step within 4800 s.
+[field-report]   field run 01_field_lease: pass
+[field-report]   field run 02_field_owned_runtime: pass
+[field-report]   field run 03_field_network: fail
+[field-report]   field run 04_field_toolchain: fail
+[field-report]   field run 05_field_login_items: pass
+[field-report]   field run 06_field_composer: fail
+[field-report]   field run 07_key_accounting: needs_typing
+[field-report]   field run 08_diagnostics: pass
+[field-report]   field run 09_ollama_runtime: fail
+[field-report]   field run 10_ollama_model: skip
+[field-report]   field run still running, 61 s since the request...
+[field-report]   field run 11_mlx_runtime: fail
+[field-report]   field run 12_mlx_model: fail
+[field-report]   field run 13_config_guard: pass
+[field-report] Field run done: {"counts":{"fail":6,"needs_typing":1,"pass":5,"skip":1},"elapsed_ms":101258,"finished_at":"2026-10-27T20:08:40Z","interrupted":false,"order":["field_lease","field_owned_runtime","field_network","field_toolchain","field_login_items","field_composer","key_accounting","diagnostics","ollama_runtime","ollama_model","mlx_runtime","mlx_model","config_guard"],"pid":76752,"request_id":"mac-2026-10-27_210657","schema":1,"started_at":"2026-10-27T20:06:59Z","verdicts":{"config_guard":"pass","diagnostics":"pass","field_composer":"fail","field_lease":"pass","field_login_items":"pass","field_network":"fail","field_owned_runtime":"pass","field_toolchain":"fail","key_accounting":"needs_typing","mlx_model":"fail","mlx_runtime":"fail","ollama_model":"skip","ollama_runtime":"fail"}}

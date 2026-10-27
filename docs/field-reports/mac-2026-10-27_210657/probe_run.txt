@@ -1,0 +1,59 @@
+Keyboard Layouts: duplicate keyboard layout identifier -2605092.
+Keyboard Layouts: keyboard layout identifier -2605092 has been replaced with -28676.
+Keyboard Layouts: duplicate keyboard layout identifier -2605093.
+Keyboard Layouts: keyboard layout identifier -2605093 has been replaced with -28677.
+Keyboard Layouts: duplicate keyboard layout identifier -2605094.
+Keyboard Layouts: keyboard layout identifier -2605094 has been replaced with -28678.
+Keyboard Layouts: duplicate keyboard layout identifier -2605091.
+Keyboard Layouts: keyboard layout identifier -2605091 has been replaced with -28679.
+Keyboard Layouts: duplicate keyboard layout identifier -2605092.
+Keyboard Layouts: keyboard layout identifier -2605092 has been replaced with -28676.
+Keyboard Layouts: duplicate keyboard layout identifier -2605093.
+Keyboard Layouts: keyboard layout identifier -2605093 has been replaced with -28677.
+Keyboard Layouts: duplicate keyboard layout identifier -2605094.
+Keyboard Layouts: keyboard layout identifier -2605094 has been replaced with -28678.
+Keyboard Layouts: duplicate keyboard layout identifier -2605091.
+Keyboard Layouts: keyboard layout identifier -2605091 has been replaced with -28679.
+Keyboard Layouts: duplicate keyboard layout identifier -2605092.
+Keyboard Layouts: keyboard layout identifier -2605092 has been replaced with -28676.
+Keyboard Layouts: duplicate keyboard layout identifier -2605093.
+Keyboard Layouts: keyboard layout identifier -2605093 has been replaced with -28677.
+Keyboard Layouts: duplicate keyboard layout identifier -2605094.
+Keyboard Layouts: keyboard layout identifier -2605094 has been replaced with -28678.
+Keyboard Layouts: duplicate keyboard layout identifier -2605091.
+Keyboard Layouts: keyboard layout identifier -2605091 has been replaced with -28679.
+Keyboard Layouts: duplicate keyboard layout identifier -2605092.
+Keyboard Layouts: keyboard layout identifier -2605092 has been replaced with -28676.
+Keyboard Layouts: duplicate keyboard layout identifier -2605093.
+Keyboard Layouts: keyboard layout identifier -2605093 has been replaced with -28677.
+Keyboard Layouts: duplicate keyboard layout identifier -2605094.
+Keyboard Layouts: keyboard layout identifier -2605094 has been replaced with -28678.
+Keyboard Layouts: duplicate keyboard layout identifier -2605091.
+Keyboard Layouts: keyboard layout identifier -2605091 has been replaced with -28679.
+Keyboard Layouts: duplicate keyboard layout identifier -2605092.
+Keyboard Layouts: keyboard layout identifier -2605092 has been replaced with -28676.
+Keyboard Layouts: duplicate keyboard layout identifier -2605093.
+Keyboard Layouts: keyboard layout identifier -2605093 has been replaced with -28677.
+Keyboard Layouts: duplicate keyboard layout identifier -2605094.
+Keyboard Layouts: keyboard layout identifier -2605094 has been replaced with -28678.
+Keyboard Layouts: duplicate keyboard layout identifier -2605091.
+Keyboard Layouts: keyboard layout identifier -2605091 has been replaced with -28679.
+uchr XML compiler: XML parse error (10) Encountered unexpected character 0x24 ('$') at top-level on line 3, character 125
+probe v4 flags: write-prefs=false replace-ergopti=false
+start current source: com.apple.keyboardlayout.ergopti.plus
+P0 INFO probe v4; 4 numeric layout ids already taken; this run draws from -741169 downward
+P1 INFO loose file, register status 0, before selecting: selectCapable=true enableCapable=true enabled=false selected=false category=TISCategoryKeyboardInputSource type=TISTypeKeyboardLayout name='EPProbe41169a' id=org.unknown.keylayout.EPProbe41169a
+P2 FAIL loose file, select at once: enable 0, select -50, current com.apple.keyboardlayout.ergopti.plus, enabled afterwards=false, Q types 'A' because select answered paramErr (the call refuses this source in its present state) and the source is still not enabled
+P3 FAIL loose file, after a 0.3 s run-loop turn: enable 0, select -50, current com.apple.keyboardlayout.ergopti.plus, enabled afterwards=false, Q types 'A' because select answered paramErr (the call refuses this source in its present state) and the source is still not enabled
+P3 FAIL loose file, after re-reading the list: enable 0, select -50, current com.apple.keyboardlayout.ergopti.plus, enabled afterwards=false, Q types 'A' because select answered paramErr (the call refuses this source in its present state) and the source is still not enabled
+P4 INFO a. shaped like the Ergopti bundle: register status 0, listed after 0.00 s: selectCapable=true enableCapable=true enabled=false selected=false category=TISCategoryKeyboardInputSource type=TISTypeKeyboardLayout name='EPProbe41169b' id=com.apple.keyboardlayout.epprobe41169b
+P4 FAIL a. shaped like the Ergopti bundle, select at once: enable 0, select -50, current com.apple.keyboardlayout.ergopti.plus, enabled afterwards=false, Q types 'B' because select answered paramErr (the call refuses this source in its present state) and the source is still not enabled
+P4 INFO b. the same with an icon copied from the installed bundle: register status 0, listed after 0.00 s: selectCapable=true enableCapable=true enabled=false selected=false category=TISCategoryKeyboardInputSource type=TISTypeKeyboardLayout name='EPProbe41169f' id=com.apple.keyboardlayout.epprobe41169f
+P4 FAIL b. the same with an icon copied from the installed bundle, select at once: enable 0, select -50, current com.apple.keyboardlayout.ergopti.plus, enabled afterwards=false, Q types 'F' because select answered paramErr (the call refuses this source in its present state) and the source is still not enabled
+P4 INFO c. the inner .keylayout registered alone: register status 0, listed after 0.00 s: selectCapable=true enableCapable=true enabled=false selected=false category=TISCategoryKeyboardInputSource type=TISTypeKeyboardLayout name='EPProbe41169g' id=com.apple.keyboardlayout.epprobe41169g
+P4 FAIL c. the inner .keylayout registered alone, select at once: enable 0, select -50, current com.apple.keyboardlayout.ergopti.plus, enabled afterwards=false, Q types 'G' because select answered paramErr (the call refuses this source in its present state) and the source is still not enabled
+P4 FAIL d. clone of the installed bundle, only name and ids changed: register status 0 ended with the layout unlisted after 3 s because no listed source has 'EPProbe41169e' in its name or id (330 sources searched)
+P5 INFO skipped because --write-prefs was not given; it edits and restores com.apple.HIToolbox
+P7 INFO skipped because --replace-ergopti was not given; it adds a layout inside the installed bundle that holds the current source (backed up and restored)
+P6 FAIL after the cleanup, probe sources still listed: EPProbe41169a, EPProbe41169b, EPProbe41169f, EPProbe41169g (a ghost until logout is expected)
+END INFO probe v4 restored to com.apple.keyboardlayout.ergopti.plus; started on com.apple.keyboardlayout.ergopti.plus; run again with 'after-logout' after a logout for P6
