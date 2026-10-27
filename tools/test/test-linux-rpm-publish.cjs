@@ -18,7 +18,13 @@ const { bashExecutable } = require('../lib/git-bash.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-rpm-publish-'));
 const expected = { name: 'ergopti', version: '1.0.3', arch: 'x86_64' };
-const env = { ...process.env, ERGOPTI_BUILD_VERSION: expected.version };
+// The test owns its build directory: packaging tests that run at the same time never share one folder.
+const BUILD = path.join(scratch, 'build');
+const env = {
+	...process.env,
+	ERGOPTI_BUILD_VERSION: expected.version,
+	ERGOPTI_LINUX_BUILD_DIR: BUILD
+};
 function bash(filename, args = [], childEnv = env) {
 	return spawnSync(bashExecutable(), [filename, ...args], {
 		cwd: ROOT,
@@ -97,13 +103,13 @@ if (path.basename(process.argv[1]) === 'rpm') {
 		/native metadata diagnostic/,
 		'successful native metadata diagnostics must remain visible'
 	);
-	const published = path.join(ROOT, 'build/linux/rpm/RPMS');
+	const published = path.join(BUILD, 'rpm/RPMS');
 	assert.deepEqual(
 		findPackages(published),
 		[selected],
 		'the release consumer must see exactly one admitted main'
 	);
-	const nativeRoot = path.join(ROOT, 'build/linux/rpm/native-rpms');
+	const nativeRoot = path.join(BUILD, 'rpm/native-rpms');
 	assert.equal(
 		findPackages(nativeRoot).length,
 		2,
@@ -112,7 +118,7 @@ if (path.basename(process.argv[1]) === 'rpm') {
 	const mainBytes = fs.readFileSync(selected);
 	const staged = success(bash(producer, ['--skip-rpm'], modelEnv));
 	assert.deepEqual(
-		fs.readFileSync(path.join(ROOT, 'build/linux/rpm/publish-linux-rpm.cjs')),
+		fs.readFileSync(path.join(BUILD, 'rpm/publish-linux-rpm.cjs')),
 		fs.readFileSync(path.join(ROOT, 'tools/build/publish-linux-rpm.cjs')),
 		'prepared manual builds must carry the canonical publisher bytes'
 	);
