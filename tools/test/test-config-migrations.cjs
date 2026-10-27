@@ -50,6 +50,7 @@ const BARE = /^[A-Za-z0-9_-]+$/;
 // Required and optional fields of each op of the closed set.
 const OPS = {
 	rename: { required: ['section', 'key'], optional: ['to_section', 'to_key'] },
+	rename_prefix: { required: ['section', 'prefix', 'to_prefix'], optional: [] },
 	copy_if_absent: { required: ['section', 'key'], optional: ['to_section', 'to_key'] },
 	move_ergopti_variant: {
 		required: [
@@ -178,6 +179,16 @@ function validateOp(op, where) {
 		if ((op.to_section ?? op.section) === op.section && (op.to_key ?? op.key) === op.key) {
 			fail(where, 'rename must change the section or the key');
 		}
+	}
+	if (op.op === 'rename_prefix') {
+		const bare = (value) => typeof value === 'string' && BARE.test(value);
+		if (!bare(op.prefix) || !bare(op.to_prefix))
+			fail(where, "'prefix' and 'to_prefix' must be bare key text");
+		else if (op.prefix.startsWith(op.to_prefix) || op.to_prefix.startsWith(op.prefix))
+			fail(
+				where,
+				'rename_prefix prefixes must not extend each other, or a replay would rename again'
+			);
 	}
 	if (op.op === 'copy_if_absent' && op.to_section === undefined && op.to_key === undefined)
 		fail(where, 'copy_if_absent needs to_section or to_key');
@@ -493,12 +504,39 @@ function moveChordAction(model, op, context) {
 	}
 }
 
-class VariantMigrationRefusal extends Error {}
+// A typed refusal: the plan reports "invalid" and the file is never written.
+class MigrationRefusal extends Error {}
+
+/**
+ * Renames every key of one section that starts with a prefix, keeping the
+ * remainder. A target that is already occupied refuses the whole migration
+ * before any key moves.
+ * @param {Map<string, Map<string, *>>} model
+ * @param {object} op
+ */
+function renamePrefix(model, op) {
+	const values = model.get(op.section);
+	if (!values) return;
+	const moves = [];
+	for (const key of [...values.keys()].sort()) {
+		if (!key.startsWith(op.prefix)) continue;
+		const target = op.to_prefix + key.slice(op.prefix.length);
+		if (!copyDestinationAbsent(model, op.section, target))
+			throw new MigrationRefusal(
+				`Prefix rename refused: [${op.section}] ${key} would land on the occupied ${target}`
+			);
+		moves.push([key, target]);
+	}
+	for (const [key, target] of moves) {
+		values.set(target, values.get(key));
+		values.delete(key);
+	}
+}
 
 function moveErgoptiVariant(model, op) {
 	const source = model.get(op.section) || new Map();
 	const refuse = (detail) => {
-		throw new VariantMigrationRefusal('Ergopti variant migration refused: ' + detail);
+		throw new MigrationRefusal('Ergopti variant migration refused: ' + detail);
 	};
 	for (const field of ['key', 'to_key', 'base_key', 'alt_gr_key', 'source_key']) {
 		const view = new Map([...model].map(([section, values]) => [section, new Map(values)]));
@@ -537,6 +575,10 @@ function applyOp(model, op, context) {
 	switch (op.op) {
 		case 'move_ergopti_variant': {
 			moveErgoptiVariant(model, op);
+			break;
+		}
+		case 'rename_prefix': {
+			renamePrefix(model, op);
 			break;
 		}
 		case 'rename': {
@@ -627,7 +669,7 @@ function migrate(model, registry, driver, context) {
 			if (step.drivers.includes(driver)) for (const op of step.ops) applyOp(out, op, context);
 		}
 	} catch (error) {
-		if (error instanceof VariantMigrationRefusal) return { outcome: 'invalid' };
+		if (error instanceof MigrationRefusal) return { outcome: 'invalid' };
 		throw error;
 	}
 	if (!out.has('_meta')) out.set('_meta', new Map());

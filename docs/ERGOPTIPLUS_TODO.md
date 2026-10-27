@@ -2,8 +2,8 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-27 evening (read "Handover of 2026-10-27 evening" first). Latest stable: [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6)
-(tag 950979d19c, 2026-10-23). **Next step: issue #101 follow-ups on the Mac (Backlog).** Open work only: a finished item is removed, its lessons go to
+Updated: 2026-10-27 evening (read "Handover of 2026-10-27 evening" first). Latest stable: v1.0.7 (released 2026-10-27 from dev; previous [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6),
+tag 950979d19c). **Next step: issue #101 follow-ups on the Mac (Backlog).** Open work only: a finished item is removed, its lessons go to
 [docs/memory](memory/README.md), and the history stays in Git
 (`git log -p -- docs/ERGOPTIPLUS_TODO.md`). Item numbers are stable and never reused. Open
 questions are in [questions-for-maintainer.md](questions-for-maintainer.md); per-work handoff files
@@ -304,17 +304,6 @@ closures and RemapLeaseWorker.swift:1297 `var`; the Linux container has no swift
 - **L39** Ad hoc signing of the developer app loses the Accessibility and other grants on each
   build (`_164726`): known; `tools/build/create_macos_signing_identity.sh` gives a stable
   identity.
-
-## Release blocker (before the next release)
-
-- [ ] **Shortcut parameters lost by the schema v15 slot renames.** [CODE] PAR-41's `v14_to_v15` step renames
-      the macOS and Linux slot ids (`cmd_*`→`primary_*`, `hs_ctrl_*`→`secondary_*`, `ctrl_*`→`primary_*`,
-      `super_*`→`meta_*`), but the per-slot action parameters (`gestures.action_parameters` keys
-      `keyboard__<slot>__<action>`) cannot follow with the existing op kinds, so they would be orphaned (reported
-      as outdated, re-entered by hand). Fix: a `rename_prefix` op, taught first to Windows
-      `config_migrate.ahk` (it refuses an unknown op at boot) together with the re-encode op of the older macOS
-      LLM profiles, then to the Lua engines and the JS reference, then the parameter ops in `v14_to_v15`. Do
-      not release with v15 before this lands (only after PAR-41 reaches dev).
 
 ## Windows side to do on the PC (from October 25)
 
@@ -837,8 +826,8 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       (`docs/design/one-shortcut-model.md`, 4ca41ed2e9): one action slot per chord with neutral role-based ids.
       Done on macOS and Linux (sixth integration batch): schema v15 `v14_to_v15` migration of the slots and
       Ctrl-letter switches, role table with per-driver families, manifest slots, both drivers adopt the role
-      names, migrated-config binding proof, AHK fixtures pinned to v15. Left: the release blocker above
-      (`rename_prefix` for parameters, PC first), the Windows adoption, macOS `ctrl_g` to `open_url` later.
+      names, migrated-config binding proof, AHK fixtures pinned to v15, per-slot parameters carried by
+      `rename_prefix`. Left: the Windows adoption, macOS `ctrl_g` to `open_url` later.
 - [x] **PAR-43. Duplicated per-OS prompt strings.** [CODE] Done: `max_words`, `temperature` and the port
       dialogs (fb1aa4d934); one shared `menu.llm.server_port_label` row caption through `caption_getters`
       (`mlx_port_label` retired, `ollama_port_label` kept for AHK); `delay_prompt` and `debounce_prompt` stay two
@@ -1041,7 +1030,7 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       comment change: within about 2 s the driver reloads once and keeps a Pause; the tray's Reload still works;
       AI menus (Ollama), the metrics window (WebView2, sqlite3.dll) and Alt+Tab navigation (ergopti_nav_owner.dll)
       work; Start at login in this mode registers the interpreter and the clone's script, and that login start
-      derives the root, so it is a developer run too: report whether that is wanted. (2) [PHYS-W] check that
+      derives the root, so it is a developer run too (wanted, maintainer decision of 27 October): confirm it. (2) [PHYS-W] check that
       `npm run dev:windows` works from Git Bash and from cmd (it calls Windows PowerShell 5.1). (2b) [PHYS-W]
       double-click works: quit the exe from its tray, double-click `static\ergopti_plus\windows\ErgoptiPlus.ahk`
       in Explorer: the same Debug lines appear, the "Developer source mode" one ending "(clone root from the
@@ -1246,10 +1235,9 @@ PONG/READY), `Lease-bound input startup failed`, `Layout poll detected change`, 
 
 #### 3. Configuration migration and menus
 
-- [ ] Schema v15 (PAR-41, release blocker): with a copy of an old `config.toml` that has keyboard
-      shortcut slots with parameters (for example a shortcut that opens a URL or types text), start the new
-      build: every slot keeps its action under its role-named id, and report any parameter that is lost
-      (this is the known release blocker; the log names each migrated key).
+- [ ] Schema v15 (PAR-41): with a copy of an old `config.toml` that has keyboard shortcut slots with
+      parameters (for example a shortcut that opens a URL or types text), start the new build: every slot
+      keeps its action and its parameter under its role-named id.
 - [ ] Old `[llm.profiles] user_profiles`: a config that has them still shows the profiles in the AI menu
       (PAR-40), and the next save writes the new `llm.user_profiles` only.
 - [ ] Clear and Restore per category and global, then restart: unknown keys kept, personal hotstrings kept

@@ -32,9 +32,9 @@ and of the steps between them; every driver reads it at runtime (Windows with
 `windows/infra/config_migrate.ahk`, macOS and Linux with
 `_shared/lua/config_migrate.lua`). A step is `[steps.v<N>_to_v<N+1>]` with the
 drivers whose files it changes and an ordered list of ops drawn from a closed,
-data-only set: `rename`, `move_section`, `merge_into`, `map_value`, `delete`,
-`set_if_absent`. There is no code in a step, so the three interpreters cannot
-disagree about what a step means without the shared corpus
+data-only set: `rename`, `rename_prefix`, `move_section`, `merge_into`,
+`map_value`, `delete`, `set_if_absent`. There is no code in a step, so the
+three interpreters cannot disagree about what a step means without the shared corpus
 (`_shared/tests/corpus/config_migrations/`, replayed by all three suites and by
 `tools/test/test-config-migrations.cjs`) failing. Nor can they disagree about
 which registry is valid: `_shared/tests/corpus/config_migration_registries/`
