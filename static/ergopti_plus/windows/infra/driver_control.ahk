@@ -326,9 +326,9 @@ DriverControl_Resolve(Spec, Text, OwnPid, Now, &Kind) {
 	Deadline := Result.Get("deadline", "")
 	State := Result.Get("state", "")
 	Successor := Result.Get("successor_pid", "")
-	if State == "requested" && (Successor == JSON_NULL || !Result.Has("successor_pid")) {
-		; The raw text must say null: an absent field is a malformed record.
-		if !RegExMatch(Text, '"successor_pid"\s*:\s*null') || !(Deadline is Integer) || Deadline <= 0
+	if State == "requested" && Successor == JSON_NULL {
+		; Only an explicit JSON null decodes to this unique sentinel object.
+		if !(Deadline is Integer) || Deadline <= 0
 			return ""
 		if Now > Deadline {
 			Kind := "timeout"
