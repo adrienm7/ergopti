@@ -958,6 +958,10 @@ local function new(options)
 	--- Native task cancellation remains opportunistic for an implementation that
 	--- does return a cancellable handle. False reports pending physical settlement;
 	--- logical cancellation still fences the result synchronously.
+	--- @return boolean settled Whether no request, task or timer capability remains.
+	--- @return string|nil pending "pending" when every task and timer settled and
+	---   only taskless native completions are outstanding: the revocation has
+	---   committed and only their self-discarding delivery remains. Nil otherwise.
 	function inst.cancel()
 		_lifecycle_depth = _lifecycle_depth + 1
 		_cancelled  = true
@@ -973,9 +977,11 @@ local function new(options)
 		-- physical receipt for the revoked set before invoking that continuation;
 		-- isSettled() still reports any newly acquired request as pending.
 		local receipt_settled = task_settled and timers_settled and next(_native_requests) == nil
+		local pending = not receipt_settled and task_settled and timers_settled
+			and not _has_pending_tasks() and "pending" or nil
 		_lifecycle_depth = _lifecycle_depth - 1
 		_notify_settlement_observers()
-		return receipt_settled
+		return receipt_settled, pending
 	end
 
 	--- Registers a continuation for exact native settlement of this instance.

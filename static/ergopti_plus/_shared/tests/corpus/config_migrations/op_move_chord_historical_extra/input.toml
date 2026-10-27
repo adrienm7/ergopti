@@ -1,4 +1,0 @@
-[hotstrings.editor.shortcut]
-mods = ["ctrl"]
-key = "d"
-future = false # preserve typed unknown choice

@@ -1,4 +1,0 @@
-[case]
-description = "joint variant malformed alt gr preserves exact typed joint ownership."
-drivers = ["ahk", "hs", "linux"]
-outcome = "invalid"

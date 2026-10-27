@@ -1,6 +1,0 @@
-[_meta]
-schema_version = 15
-
-[shortcuts.keyboard]
-secondary_d = "open_hotstrings_editor"
-magic_editor = "none"

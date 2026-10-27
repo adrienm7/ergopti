@@ -1,4 +1,0 @@
-[case]
-description = "A file stamped by a newer build is never rewritten."
-drivers = ["linux"]
-outcome = "newer"

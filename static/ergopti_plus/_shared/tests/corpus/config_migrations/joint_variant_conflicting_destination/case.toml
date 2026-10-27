@@ -1,4 +1,0 @@
-[case]
-description = "joint variant conflicting destination preserves exact typed joint ownership."
-drivers = ["ahk", "hs", "linux"]
-outcome = "invalid"

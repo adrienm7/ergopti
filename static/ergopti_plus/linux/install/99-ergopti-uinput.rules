@@ -1,3 +1,0 @@
-# static/ergopti_plus/linux/install/99-ergopti-uinput.rules
-# Explicit group access; raw keyboard access is never granted through uaccess.
-KERNEL=="uinput", MODE="0660", GROUP="uinput", OPTIONS+="static_node=uinput"

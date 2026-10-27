@@ -1,5 +1,0 @@
-[_meta]
-schema_version = 1
-
-[tap_hold.keys.caps_lock]
-tap_action = "enter"

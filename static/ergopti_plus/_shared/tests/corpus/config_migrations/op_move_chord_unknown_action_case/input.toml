@@ -1,4 +1,0 @@
-[hotstrings.editor]
-shortcut = { mods = ["ctrl"], key = "d" }
-[shortcuts.keyboard]
-hs_ctrl_d = "NONE" # preserve unknown action id

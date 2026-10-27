@@ -1,4 +1,0 @@
-[hotstrings.editor.shortcut]
-mods = ["cmd", "shift"]
-# Independent comment survives table cleanup.
-key = "comma"

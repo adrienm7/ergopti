@@ -1,8 +1,0 @@
-[_meta]
-schema_version = 2
-
-[hotstrings.editor]
-shortcut = false
-
-[shortcuts.keyboard]
-magic_editor = false

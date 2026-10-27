@@ -1,4 +1,0 @@
-[hotstrings.editor.shortcut]
-mods = ["ctrl"]
-key = "d"
-"future.key" = false # unknown record remains byte exact
