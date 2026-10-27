@@ -1,0 +1,7 @@
+tools/diagnostics/macos_tis_register_probe.swift:295:37: error: missing argument label 'name:' in call
+293 | /// The route the driver uses, then the checks: enabled? select?
+294 | func tryThroughPreferences(_ step: String, _ label: String, _ name: String) {
+295 | 	let did = enableThroughPreferences(name)
+    |                                     `- error: missing argument label 'name:' in call
+296 | 	turn(1.5)
+297 | 	guard let source = find(name: name) else {
