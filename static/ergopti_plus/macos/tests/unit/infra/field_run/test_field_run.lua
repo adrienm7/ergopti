@@ -599,9 +599,10 @@ end)
 helpers.describe("field run ports: configuration guard", function()
 	helpers.it("puts back a changed file, removes a created one and restores a preference", function()
 		local stubbed = { "infra.logger", "adapters.field_run_ports", "adapters.file_system", "adapters.storage",
-			"infra.config_paths", "adapters.shell_runner", "adapters.timer_scheduler" }
+			"infra.config_paths", "adapters.shell_runner", "adapters.timer_scheduler", "platform.remap.lease_controller" }
 		helpers.with_stub_scope(stubbed, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["platform.remap.lease_controller"] = { RUNTIME_SETTING_KEYS = {} }
 			local files = { ["/cfg/config.toml"] = "a = 1\n" }
 			local settings = { llm_backend = "ollama", keep = true }
 			package.loaded["infra.config_paths"] = { get = function(key)
@@ -645,6 +646,45 @@ helpers.describe("field run ports: configuration guard", function()
 			helpers.assert_eq(table.concat(outcome.restored, ","),
 				"ConfigTomlPath,KarabinerConfigPath,setting_added,setting_llm_backend")
 			helpers.assert_eq(#outcome.failed, 0)
+		end)
+	end)
+end)
+
+helpers.describe("field run ports: configuration guard and runtime state", function()
+	helpers.it("never rewinds the Karabiner lease's used-token ledger", function()
+		local stubbed = { "infra.logger", "adapters.field_run_ports", "adapters.file_system", "adapters.storage",
+			"infra.config_paths", "adapters.shell_runner", "adapters.timer_scheduler", "platform.remap.lease_controller" }
+		helpers.with_stub_scope(stubbed, function()
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["infra.config_paths"] = { get = function(key) return "/cfg/" .. key end }
+			package.loaded["adapters.file_system"] = {
+				read_with_status = function() return nil, "absent" end,
+				write = function() return true end,
+				delete = function() return true end,
+			}
+			local settings = { ["karabiner.used_tokens.v1"] = { "t1" }, llm_backend = "ollama" }
+			package.loaded["adapters.storage"] = {
+				keys = function()
+					local keys = {}
+					for key in pairs(settings) do keys[#keys + 1] = key end
+					table.sort(keys)
+					return keys
+				end,
+				get = function(key) return settings[key] end,
+				set = function(key, value) settings[key] = value; return true end,
+				delete = function(key) settings[key] = nil; return true end,
+			}
+			package.loaded["platform.remap.lease_controller"] = { RUNTIME_SETTING_KEYS = { "karabiner.used_tokens.v1" } }
+			package.loaded["adapters.shell_runner"] = { exec = function() return "" end }
+			package.loaded["adapters.timer_scheduler"] = { after = function() end, cancel = function() end }
+			package.loaded["adapters.field_run_ports"] = nil
+			local ports = require("adapters.field_run_ports").new("/repo")
+			local snapshot = ports.config_snapshot()
+			-- The lease spends a token during the run, as the 23:42 Mac run of 2026-10-27 showed.
+			settings["karabiner.used_tokens.v1"] = { "t1", "t2" }
+			local outcome = ports.config_restore(snapshot)
+			helpers.assert_eq(#outcome.restored, 0, "runtime state is not reported as a changed setting")
+			helpers.assert_eq(#settings["karabiner.used_tokens.v1"], 2, "the spent token stays recorded")
 		end)
 	end)
 end)
