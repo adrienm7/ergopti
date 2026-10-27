@@ -21,12 +21,12 @@ _CMJ_CapturedTransitionRejectsCallerNulSuffix(Side) {
 	HadPath := IsSet(ConfigurationFile)
 	PreviousPath := HadPath ? ConfigurationFile : ""
 	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
-	Source := '[_meta]`nschema_version = 14`n[layout]`nergopti_base = true`n# genuine original image`n'
-	Candidate := '[_meta]`nschema_version = 14`n[layout]`nergopti_base = false`n# genuine candidate image`n'
+	Source := '[_meta]`nschema_version = 15`n[layout]`nergopti_base = true`n# genuine original image`n'
+	Candidate := '[_meta]`nschema_version = 15`n[layout]`nergopti_base = false`n# genuine candidate image`n'
 	Bundle := false
 	PrimaryError := false, CleanupErrors := [], OriginalBytesValid := false
 	try {
-		AssertEqual(14, ConfigMigrateCurrentVersion(), "the handwritten images require the actual v14 registry")
+		AssertEqual(15, ConfigMigrateCurrentVersion(), "the handwritten images require the actual v15 registry")
 		ConfigurationFile := Path
 		AssertTrue(FSWriteDurable(Path, Source))
 		BeforeBytes := FileRead(Path, "RAW")
@@ -134,12 +134,12 @@ _CMJ_CapturedImageRejectsCallerNulSuffix(Request, Side, WithBom := false) {
 	HadPath := IsSet(ConfigurationFile)
 	PreviousPath := HadPath ? ConfigurationFile : ""
 	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
-	Source := '[_meta]`nschema_version = 14`n[layout]`nergopti_base = true`n# genuine captured image`n'
-	Candidate := '[_meta]`nschema_version = 14`n[layout]`nergopti_base = false`n# genuine captured candidate`n'
+	Source := '[_meta]`nschema_version = 15`n[layout]`nergopti_base = true`n# genuine captured image`n'
+	Candidate := '[_meta]`nschema_version = 15`n[layout]`nergopti_base = false`n# genuine captured candidate`n'
 	PhysicalSource := WithBom ? Chr(0xFEFF) . Source : Source
 	Bundle := false, PrimaryError := false, CleanupErrors := [], OriginalBytesValid := false
 	try {
-		AssertEqual(14, ConfigMigrateCurrentVersion(), "the handwritten images require the actual v14 registry")
+		AssertEqual(15, ConfigMigrateCurrentVersion(), "the handwritten images require the actual v15 registry")
 		ConfigurationFile := Path
 		AssertTrue(!WithBom || Request == "capture_read", "the BOM subject belongs only to logical captured read")
 		AssertTrue(FSWriteDurable(Path, PhysicalSource))
@@ -306,10 +306,10 @@ Test("config journal: captured ordinary write rejects caller-only FinalCandidate
 ; Physical source bytes remain ASCII; no transition or native publication occurs.
 _CMJ_UpstreamExactCallerNul(Kind) {
 	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
-	Source := '[_meta]`nschema_version = 14`n[layout]`nergopti_base = true`n'
+	Source := '[_meta]`nschema_version = 15`n[layout]`nergopti_base = true`n'
 	PrimaryError := false, CleanupErrors := [], OriginalBytesValid := false
 	try {
-		AssertEqual(14, ConfigMigrateCurrentVersion(), "the independent current image requires the actual v14 registry")
+		AssertEqual(15, ConfigMigrateCurrentVersion(), "the independent current image requires the actual v15 registry")
 		AssertTrue(FSWriteDurable(Path, Source))
 		BeforeBytes := FileRead(Path, "RAW")
 		AssertEqual(StrLen(Source), BeforeBytes.Size)
