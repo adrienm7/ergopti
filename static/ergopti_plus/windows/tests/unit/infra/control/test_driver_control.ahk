@@ -459,3 +459,42 @@ for _TDC_SchemaCase in [
 ]
 	Test("driver-control: " . _TDC_SchemaCase[1] . " follows the decoded schema member (driver-control-schema-token-identity)",
 		_TDC_RequestSchemaToken.Bind(_TDC_SchemaCase[2], _TDC_SchemaCase[3]))
+
+_TDC_ResultSchemaToken(Phase, Fields, Expected) {
+	Spec := _TDC_Spec()
+	Text := '{' . Fields . ',"request_id":"result-kind","state":"requested","driver_pid":100,"successor_pid":200}'
+	Decoded := JsonParse(Text)
+	AssertTrue(Decoded is Map)
+	AssertTrue(DriverControl_IsRequestId(Decoded["request_id"]))
+	AssertEqual("requested", Decoded["state"])
+	AssertTrue(Decoded["successor_pid"] is Integer)
+	AssertEqual(200, Decoded["successor_pid"])
+	Kind := ""
+	if Phase == "completion"
+		Result := DriverControl_Completion(Spec, Text, 200)
+	else
+		Result := DriverControl_Resolve(Spec, Text, 200, 1700000000, &Kind)
+	if Expected {
+		AssertEqual('{"schema":1,"request_id":"result-kind","state":"completed","driver_pid":200,"successor_pid":200}`n', Result,
+			"a genuine numeric schema keeps the named successor completion contract")
+		if Phase == "resolution"
+			AssertEqual("completed", Kind)
+	} else {
+		AssertEqual("", Result, "only a JSON number schema may authorize a completion")
+		AssertEqual("", Kind, "a nonnumeric schema cannot claim a pending result")
+	}
+}
+for _TDC_ResultPhase in ["completion", "resolution"]
+	for _TDC_ResultCase in [
+		["integer", '"schema":1', true],
+		["decimal number", '"schema":1.0', true],
+		["exponent number", '"schema":1e0', true],
+		["escaped key", '"sc\u0068ema":1', true],
+		["boolean", '"schema":true', false],
+		["numeric string", '"schema":"1"', false],
+		["last boolean", '"schema":1,"schema":true', false],
+		["last numeric string", '"schema":1,"schema":"1"', false],
+		["last decimal number", '"schema":true,"sc\u0068ema":1.0', true]
+	]
+		Test("driver-control: " . _TDC_ResultPhase . " " . _TDC_ResultCase[1] . " preserves schema kind (driver-control-result-schema-kind)",
+			_TDC_ResultSchemaToken.Bind(_TDC_ResultPhase, _TDC_ResultCase[2], _TDC_ResultCase[3]))
