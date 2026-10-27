@@ -1248,6 +1248,7 @@
 	"layout_composer.problem_unknown_source": "Warstwa używa układu, który nie jest tu dostępny.",
 	"layout_composer.problem_spec_invalid": "Wpis warstwy jest nieprawidłowy.",
 	"layout_composer.problem_shortcuts_invalid": "Skróty są nieprawidłowe.",
+	"layout_composer.problem_rows_invalid": "Opcje rzędu cyfr są nieprawidłowe.",
 	"layout_composer.problem_unknown_shortcut": "Nieznany modyfikator skrótu.",
 	"layout_composer.problem_overrides_invalid": "Zmiany klawiszy są nieprawidłowe.",
 	"layout_composer.problem_unknown_target": "Zmiana klawisza wskazuje nieznaną warstwę.",

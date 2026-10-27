@@ -1248,6 +1248,7 @@
 	"layout_composer.problem_unknown_source": "Una capa usa una distribución que no está disponible aquí.",
 	"layout_composer.problem_spec_invalid": "Una entrada de capa está mal formada.",
 	"layout_composer.problem_shortcuts_invalid": "Los atajos están mal formados.",
+	"layout_composer.problem_rows_invalid": "Las opciones de la fila de números están mal formadas.",
 	"layout_composer.problem_unknown_shortcut": "Un modificador de atajo es desconocido.",
 	"layout_composer.problem_overrides_invalid": "Los cambios de teclas están mal formados.",
 	"layout_composer.problem_unknown_target": "Un cambio de tecla nombra una capa desconocida.",

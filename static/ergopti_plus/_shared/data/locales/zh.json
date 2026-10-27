@@ -1248,6 +1248,7 @@
 	"layout_composer.problem_unknown_source": "某一层使用了此处不可用的布局。",
 	"layout_composer.problem_spec_invalid": "某个层条目格式有误。",
 	"layout_composer.problem_shortcuts_invalid": "快捷键格式有误。",
+	"layout_composer.problem_rows_invalid": "数字行选项格式有误。",
 	"layout_composer.problem_unknown_shortcut": "存在未知的快捷键修饰键。",
 	"layout_composer.problem_overrides_invalid": "按键更改格式有误。",
 	"layout_composer.problem_unknown_target": "按键更改指向了未知的层。",

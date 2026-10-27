@@ -1248,6 +1248,7 @@
 	"layout_composer.problem_unknown_source": "Uma camada usa um layout que não está disponível aqui.",
 	"layout_composer.problem_spec_invalid": "Uma entrada de camada está malformada.",
 	"layout_composer.problem_shortcuts_invalid": "Os atalhos estão malformados.",
+	"layout_composer.problem_rows_invalid": "As opções da linha de números estão malformadas.",
 	"layout_composer.problem_unknown_shortcut": "Um modificador de atalho é desconhecido.",
 	"layout_composer.problem_overrides_invalid": "As alterações de teclas estão malformadas.",
 	"layout_composer.problem_unknown_target": "Uma alteração de tecla refere uma camada desconhecida.",

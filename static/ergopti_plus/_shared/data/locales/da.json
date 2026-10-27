@@ -1248,6 +1248,7 @@
 	"layout_composer.problem_unknown_source": "Et lag bruger et layout, der ikke er tilgængeligt her.",
 	"layout_composer.problem_spec_invalid": "En lagpost er forkert udformet.",
 	"layout_composer.problem_shortcuts_invalid": "Genvejene er forkert udformet.",
+	"layout_composer.problem_rows_invalid": "Talrækkens indstillinger er forkert udformet.",
 	"layout_composer.problem_unknown_shortcut": "En genvejsmodifikator er ukendt.",
 	"layout_composer.problem_overrides_invalid": "Tastændringerne er forkert udformet.",
 	"layout_composer.problem_unknown_target": "En tastændring nævner et ukendt lag.",

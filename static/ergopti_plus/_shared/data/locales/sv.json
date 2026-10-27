@@ -1248,6 +1248,7 @@
 	"layout_composer.problem_unknown_source": "Ett lager använder en layout som inte finns här.",
 	"layout_composer.problem_spec_invalid": "En lagerpost är felformad.",
 	"layout_composer.problem_shortcuts_invalid": "Genvägarna är felformade.",
+	"layout_composer.problem_rows_invalid": "Sifferradens alternativ är felformade.",
 	"layout_composer.problem_unknown_shortcut": "En genvägsmodifierare är okänd.",
 	"layout_composer.problem_overrides_invalid": "Tangentändringarna är felformade.",
 	"layout_composer.problem_unknown_target": "En tangentändring nämner ett okänt lager.",

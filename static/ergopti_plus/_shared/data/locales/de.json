@@ -1248,6 +1248,7 @@
 	"layout_composer.problem_unknown_source": "Eine Ebene nutzt ein Layout, das hier nicht verfügbar ist.",
 	"layout_composer.problem_spec_invalid": "Ein Ebeneneintrag ist fehlerhaft.",
 	"layout_composer.problem_shortcuts_invalid": "Die Tastenkürzel sind fehlerhaft.",
+	"layout_composer.problem_rows_invalid": "Die Optionen der Zahlenreihe sind fehlerhaft.",
 	"layout_composer.problem_unknown_shortcut": "Ein Kürzel-Modifikator ist unbekannt.",
 	"layout_composer.problem_overrides_invalid": "Die Tastenänderungen sind fehlerhaft.",
 	"layout_composer.problem_unknown_target": "Eine Tastenänderung nennt eine unbekannte Ebene.",
