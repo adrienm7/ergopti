@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-27 morning (read "Handover of 2026-10-26" first). Latest stable: [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6)
+Updated: 2026-10-27 evening (read "Handover of 2026-10-27 evening" first). Latest stable: [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6)
 (tag 950979d19c, 2026-10-23). **Next step: issue #101 follow-ups on the Mac (Backlog).** Open work only: a finished item is removed, its lessons go to
 [docs/memory](memory/README.md), and the history stays in Git
 (`git log -p -- docs/ERGOPTIPLUS_TODO.md`). Item numbers are stable and never reused. Open
@@ -29,46 +29,37 @@ a sealed Windows updater source, reseal with
 `node tools/ci/seal-windows-updater-original-source.cjs --ref <commit> --write`. Procedures:
 [COORDINATOR-MEMORY](todo-agents/COORDINATOR-MEMORY.md).
 
-## Handover of 2026-10-26 (read first if the session was lost)
+## Handover of 2026-10-27 evening (read first)
 
-- **Mac hardware session.** The maintainer has a Mac: the checklist is "Mac hardware session" under
-  Maintainer checks; their logs land in `docs/field-reports/mac-2026-10-27/` on their branch.
-- **State.** dev is linear and pushed at the head of the eighth integration batch (27 Oct, about 09:30 UTC);
-  every push of dev had its CI cancelled (a dev push builds a release). Latest stable release: v1.0.6. A full
-  CI of that head is dispatched on `tmp/preflight-dev` with `os_lanes=all`: read it first. The previous full
-  run (40467200993 on 8eae6e8b63) was 69 green; its reds (Windows unit core, macOS tooltip canvas, four Linux
-  E2E rows) are fixed in this batch by the CI agent (stale fixtures after recent dev changes), CI-only
-  confirmation. Batch 8 holds PAR-80, PAR-53, PAR-83, item 139, item 5 (config-only Linux participant),
-  PAR-65 agent decisions, PAR-84, PAR-79 and the Mac hardware checklist.
-- **Disk.** The container allowance fills up with `/tmp/ergopti-*` test leftovers; the sandbox refused a
-  sweep of them from the coordinator, so ask the maintainer to remove the ones older than an hour.
-- **The ChatGPT fix branches are finished and fully integrated** (27 Oct, 08:00 UTC): every commit of
-  fix/linux fe2413797f, fix/macos e8ea64ff1e and fix/windows d6b075687e is on dev by subject or content
-  (the last two Windows test commits in the eighth batch; the per-branch reseal was replaced by one reseal on
-  dev). The branches can be deleted; the proxy refuses remote deletion from this container, so the
-  maintainer deletes them (`git push origin --delete fix/linux fix/macos fix/windows`).
-- **Sixth integration batch (27 Oct morning)** brought into dev: fix/windows up to 07d2514ef0 (seal commits
-  skipped, resealed once), the Linux daemon account-name fix, the PAR-74 Lua burn-down (567 to 0), the PAR-58
-  vectors and ledger, the network-check `route_plan` step, PAR-43, and PAR-41 on macOS/Linux (schema v15).
-- **Agent work in flight (Linux/macOS only)**, each backed up on a remote `tmp/wip-*` branch; if lost, redo
-  from the spec:
-  - `tmp/wip-todo-ae-sweep`: a sweep of the small Linux/macOS TODO items (anything not owned below).
-  - `tmp/wip-todo-af`: check the prediction floor decisions are all covered, then PAR-66 section readers, then
-    the Lua 5.4 `io.popen` child that still sees the real HOME in tests.
-  - `tmp/wip-todo-ag`: Linux Quit refusals as macOS (Quit wins over reload, a pending scope write blocks).
-- **Scripts used by the coordinator** live in the session scratchpad (lost with the container): `fullsweep.sh`
-  (gen:check, every `node` suite check with `xargs -P6`, Linux suite with `USER=root LOGNAME=root` and a
-  private `XDG_RUNTIME_DIR`, macOS suite per `--module` group), `pick.sh` (cherry-pick a list until a conflict)
-  and `renumber.py` (contiguous suite ordinals, increasing within each file). The commit hook needs Ruff 0.15.8
-  first on PATH (`python3 -m venv` plus `pip install ruff==0.15.8`).
+- **Focus decided by the maintainer (27 Oct afternoon):** fix every macOS problem while their Mac is
+  available. The general TODO and cross-OS parity work are paused until then (they resume afterwards).
+- **State.** dev is linear and pushed; every dev push had its CI cancelled at once (a dev push builds a
+  release; the maintainer allows pushing dev as long as that CI is cancelled). Latest stable: v1.0.6. A full
+  CI of the head is dispatched on `tmp/preflight-dev` with `os_lanes=all`: read it first and fix its reds.
+- **The maintainer's Mac field branch** is `field/mac-2026-10-27` (macOS 26.6.2, arm64, Swift Command Line
+  Tools only, behind a company PAC proxy at work). It carries their logs under `docs/field-reports/` and must
+  never be merged into dev: only dev is merged into it (`git merge` is fine there), then pushed. Their whole
+  procedure is `git pull` then `bash tools/dev/collect-macos-field-report.sh`: it stops any running
+  ErgoptiPlus and its kept-alive guardian, builds the developer app when the launcher changed
+  (`tools/dev/run-macos-dev-app.sh`), runs every Debug check and the Ollama/MLX download flows through the
+  field-run request (`static/ergopti_plus/macos/data/field_run.json`), collects the logs and commits and pushes
+  them, also on Ctrl-C. Read the newest `docs/field-reports/mac-*` folder with
+  `git show origin/field/mac-2026-10-27:<path>`.
+- **Problem ledger of the Mac session:** see "Mac field session 2026-10-27: problem ledger" below; every
+  problem of issue #104 and of the field reports is there as fixed (sha) or open with its next step.
+- **Coordinator scripts** are in `tools/dev/coordinator/`: `integration-sweep.sh <out-dir>` (gen:check,
+  format, every single-file node suite check in parallel with a lone re-run of each red, the Linux suite, the
+  macOS suite per group), `cherry-pick-list.sh <list> [resume-sha]` and `renumber-suite-ordinals.cjs`. The
+  commit hook needs Ruff 0.15.8 first on PATH (`python3 -m venv` plus `pip install ruff==0.15.8`) and Node 22.
 - **Integration procedure** (each batch): list the agent branch commits whose subject is not on dev;
-  cherry-pick them on a local `integ/*` branch from dev (skip seal refresh commits; on a
-  conflict prefer dev when it already fixed the same thing, otherwise merge both by hand); renumber
-  `tools/test/features/*/suite.json` ordinals on collision (`test-js-feature-inventory.cjs`); reseal if
-  `test-windows-updater-original-source.cjs` fails; run gen:check, the complete JS sweep (every `node` check
-  of the suite.json files, `xargs -P6`), the Linux suite and the macOS suite per `--module` group; then
-  fast-forward dev, push, cancel the push CI, and dispatch `ci.yml` on `tmp/preflight-dev` with
-  `os_lanes=all`.
+  cherry-pick them onto dev or a local `integ/*` branch (skip seal refresh commits; on a conflict prefer dev
+  when it already fixed the same thing, otherwise merge both by hand); renumber suite ordinals on a collision;
+  reseal if `test-windows-updater-original-source.cjs` fails
+  (`node tools/ci/seal-windows-updater-original-source.cjs --ref <commit> --write`); run the integration
+  sweep; push dev and cancel its push CI in the same step; dispatch `ci.yml` on `tmp/preflight-dev`.
+- **The ChatGPT fix branches** fix/linux, fix/macos and fix/windows are fully on dev. The container proxy
+  refuses remote deletion, so the maintainer deletes them: `git push origin --delete fix/linux fix/macos
+fix/windows`.
 - **Host-only reds on the Linux container** (not bugs): JS `test-ahk-tap-follower`, `test-linux-install-sandbox`,
   `test-linux-runtime-native-registration`, `test-macos-managed-bootstrap-http`, `test-managed-ollama-protocol`,
   `test-managed-remote-retirement` (no pwsh), `test-linux-deb-package-owner` (refuses root),
