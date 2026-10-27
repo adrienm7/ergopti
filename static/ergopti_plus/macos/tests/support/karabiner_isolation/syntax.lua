@@ -364,6 +364,49 @@ local function has_folded_stock_target(statement, constants)
 	return false
 end
 
+--- Reads the generated Swift identifier enum into reference-to-value pairs.
+--- The launcher names its owned service labels through this enum, so the guard
+--- judges the label value the enum holds, not the spelling of the member name
+--- (`macosVirtualHid` names the owned vhid daemon, not the stock VirtualHID).
+--- @param source string Content of Identifiers.generated.swift.
+--- @return table values Map from `Identifiers.Group.member` to its string value.
+local function generated_swift_identifiers(source)
+	assert(type(source) == "string" and source:find("enum Identifiers", 1, true),
+		"the generated Swift identifier enum is required")
+	local values, group, count = {}, nil, 0
+	for line in (source .. "\n"):gmatch("([^\n]*)\n") do
+		local name = line:match("^%s*enum%s+([%a_][%w_]*)%s*{")
+		if name and name ~= "Identifiers" then group = name end
+		local member, value = line:match('^%s*static%s+let%s+([%a_][%w_]*)%s*=%s*"([^"\\]*)"%s*$')
+		if member then
+			assert(group ~= nil, "generated identifier outside a group: " .. member)
+			values["Identifiers." .. group .. "." .. member] = value
+			count = count + 1
+		end
+	end
+	assert(count > 0, "the generated Swift identifier enum declares no value")
+	return values
+end
+
+--- Replaces each generated identifier reference with the value it holds.
+--- An interpolated reference becomes the bare value inside its string; a bare
+--- reference becomes a quoted literal. An unknown reference fails loudly.
+--- @param text string Swift source.
+--- @param values table Map built by generated_swift_identifiers.
+--- @return string folded Source with every reference replaced.
+local function fold_generated_identifiers(text, values)
+	local function resolve(reference)
+		local value = values[reference]
+		assert(value ~= nil, "unknown generated identifier: " .. reference)
+		return value
+	end
+	local folded = text:gsub("\\%(%s*(Identifiers%.[%a_][%w_]*%.[%a_][%w_]*)%s*%)", resolve)
+	folded = folded:gsub("Identifiers%.[%a_][%w_]*%.[%a_][%w_]*", function(reference)
+		return '"' .. resolve(reference) .. '"'
+	end)
+	return folded
+end
+
 --- Propagates only statically foldable string assignments to a fixed point.
 --- @param statements table Comment-free source statements.
 --- @return table constants Lowercase identifier-to-string map.
@@ -409,4 +452,6 @@ return {
 	folded_constant_values = folded_constant_values,
 	has_folded_stock_target = has_folded_stock_target,
 	collect_constant_strings = collect_constant_strings,
+	generated_swift_identifiers = generated_swift_identifiers,
+	fold_generated_identifiers = fold_generated_identifiers,
 }
