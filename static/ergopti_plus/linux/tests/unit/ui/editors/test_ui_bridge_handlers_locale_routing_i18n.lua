@@ -6,6 +6,8 @@
 --- Pure Lua — no GTK/WebKit2GTK required.
 --- ==============================================================================
 
+-- The cases replace these entries; the module end puts them back.
+local restore_loaded = require("tests.helpers").keep_loaded({ "ui.changelog.bridge" })
 package.loaded["tests.support.ui.editors.ui_bridge_handlers_fixture"] = nil
 local Fixture = require("tests.support.ui.editors.ui_bridge_handlers_fixture")
 local helpers, build_mock_state, make_spies, with_opened_spies =
@@ -636,3 +638,4 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 end)
 
+restore_loaded()
