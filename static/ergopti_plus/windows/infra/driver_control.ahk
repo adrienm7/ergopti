@@ -324,6 +324,8 @@ DriverControl_Resolve(Spec, Text, OwnPid, Now, &Kind) {
 	if Result.Get("schema", "") != Spec["schema"] || !DriverControl_IsRequestId(Id)
 		return ""
 	Deadline := Result.Get("deadline", "")
+	if Members.Has("deadline") && Members["deadline"]["kind"] != "number"
+		return ""
 	State := Result.Get("state", "")
 	Successor := Result.Get("successor_pid", "")
 	if State == "requested" && Successor == JSON_NULL {

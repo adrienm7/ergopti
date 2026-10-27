@@ -570,3 +570,39 @@ for _TDC_ClaimedPidCase in [
 ]
 	Test("driver-control: claimed " . _TDC_ClaimedPidCase[1] . " keeps numeric process identity (driver-control-claimed-pid-kind)",
 		_TDC_ClaimedDriverPidKind.Bind(_TDC_ClaimedPidCase[1], _TDC_ClaimedPidCase[2]))
+
+_TDC_DeadlineKind(Phase, Token, ExpectedKind) {
+	Spec := _TDC_Spec(), Pid := ProcessExist()
+	AssertTrue(Pid is Integer && Pid > 1)
+	Text := '{"schema":1,"request_id":"deadline-kind","state":"'
+		. (Phase == "pending" ? "requested" : "claimed") . '","driver_pid":' . Pid
+		. ',"successor_pid":' . (Phase == "pending" ? "null" : String(Pid)) . ',"deadline":' . Token . "}"
+	Decoded := JsonParse(Text)
+	AssertEqual("deadline-kind", Decoded["request_id"])
+	AssertEqual(Pid, Decoded["driver_pid"])
+	Result := DriverControl_Resolve(Spec, Text, Pid, 1700000000, &Kind)
+	AssertEqual(ExpectedKind, Kind, "only an actual JSON number deadline may resolve a pending reload")
+	Prefix := '{"schema":1,"request_id":"deadline-kind","state":"'
+	if ExpectedKind == "claimed"
+		AssertEqual(Prefix . 'claimed","driver_pid":' . Pid . ',"successor_pid":' . Pid . ',"deadline":1700000120}`n', Result)
+	else if ExpectedKind == "completed"
+		AssertEqual(Prefix . 'completed","driver_pid":' . Pid . ',"successor_pid":' . Pid . '}`n', Result)
+	else if ExpectedKind == "timeout"
+		AssertEqual(Prefix . 'timeout","driver_pid":' . Pid . ',"reason":"deadline"}`n', Result)
+	else if ExpectedKind == ""
+		AssertEqual("", Result)
+	else
+		throw Error("Unknown control deadline fixture outcome")
+}
+for _TDC_DeadlinePhase in ["pending", "claimed"]
+	for _TDC_DeadlineCase in [
+		["future integer", "1700000120", "claimed", "completed"],
+		["expired integer", "1", "timeout", "timeout"],
+		["boolean true", "true", "", ""],
+		["boolean false", "false", "", ""],
+		["numeric string", '"1700000120"', "", ""],
+		["null", "null", "", ""]
+	]
+		Test("driver-control: " . _TDC_DeadlinePhase . " " . _TDC_DeadlineCase[1] . " preserves deadline kind (driver-control-deadline-kind)",
+			_TDC_DeadlineKind.Bind(_TDC_DeadlinePhase, _TDC_DeadlineCase[2],
+				_TDC_DeadlineCase[_TDC_DeadlinePhase == "pending" ? 3 : 4]))
