@@ -491,6 +491,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.metadata_command_stats",
+		contract = { "clock", "record", "snapshot" },
+		-- Slow ingest and slow preferences save reports count the metadata forks.
+		wired    = true,
+	},
+	{
 		id       = "adapters.graphics_renderer",
 		contract = { "createWindow", "destroyWindow", "drawBitmap", "show", "hide" },
 		wired    = true,

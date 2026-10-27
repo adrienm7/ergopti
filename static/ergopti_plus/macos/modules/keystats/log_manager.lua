@@ -48,6 +48,7 @@ local Literal = require("sqlite.literal")
 local Queries = require("keystats.queries")
 local i18n    = require("infra.i18n")  -- kept for MAC_CATEGORIES_FR still used by export
 local FileSystem = require("adapters.file_system")
+local MetadataCommandStats = require("adapters.metadata_command_stats")
 local LedgerAppend = require("adapters.ledger_append")
 local TimerScheduler = require("adapters.timer_scheduler")
 local LOG     = "keystats.log_manager"
@@ -1510,11 +1511,12 @@ end
 --- Flush a committed local batch before allocating any new event id.
 --- The adjacent durable intent also survives loss of the disposable SQLite cache.
 --- @return boolean True when the exact batch and its publication journal settled.
-local function _flush_local_data_sql_outbox(db)
+--- @param stage function|nil Receives each LedgerAppend.FLUSH_STAGES name (ingest trace).
+local function _flush_local_data_sql_outbox(db, stage)
 	local batch_text = _get_local_outbox(db)
 	return LedgerAppend.flush(_paths.data_sql_path, batch_text, function()
 		return _clear_local_outbox(db)
-	end, _ledger_origin_is_complete)
+	end, _ledger_origin_is_complete, stage)
 end
 
 --- Commits the idempotent rollover cursor reset before its durable intent settles.
@@ -1857,7 +1859,14 @@ function M.ingest_once()
 	-- source-of-truth SQL log). Writing here rather than before the COMMIT
 	-- ensures data.sql never contains statements that were not persisted.
 	Rotation.set_offset(new_offset, Rotation.get_date())
-	if not _flush_local_data_sql_outbox(db) then
+	-- L16: the append phase alone held 0.5 to 1.7 s on the Mac; its sub-stages
+	-- and the synchronous metadata forks of the journal publications name why.
+	local commands_before, command_ms_before = MetadataCommandStats.snapshot()
+	local appended = _flush_local_data_sql_outbox(db, trace.stages("append", LedgerAppend.FLUSH_STAGES))
+	local commands_after, command_ms_after = MetadataCommandStats.snapshot()
+	trace.count("metadata_commands", commands_after - commands_before)
+	trace.count("metadata_command_ms", math.floor(command_ms_after - command_ms_before))
+	if not appended then
 		trace.mark("append")
 		-- The in-memory cursor must still advance: the committed outbox owns this
 		-- exact batch, while replaying today.log here would allocate new ids and
