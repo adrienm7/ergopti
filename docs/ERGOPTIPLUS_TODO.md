@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-26 evening (read "Handover of 2026-10-26" first). Latest stable: [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6)
+Updated: 2026-10-27 morning (read "Handover of 2026-10-26" first). Latest stable: [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6)
 (tag 950979d19c, 2026-10-23). **Next step: issue #101 follow-ups on the Mac (Backlog).** Open work only: a finished item is removed, its lessons go to
 [docs/memory](memory/README.md), and the history stays in Git
 (`git log -p -- docs/ERGOPTIPLUS_TODO.md`). Item numbers are stable and never reused. Open
@@ -38,16 +38,15 @@ a sealed Windows updater source, reseal with
   (macOS 26), and the Linux integration rows, all addressed in this batch (CI-only confirmation).
 - **Integrated from the ChatGPT fix branches** up to 27 Oct 01:30 UTC. Per-branch seal refresh commits are never
   integrated: reseal once on dev instead.
+- **Sixth integration batch (27 Oct morning)** brought into dev: fix/windows up to 07d2514ef0 (seal commits
+  skipped, resealed once), the Linux daemon account-name fix, the PAR-74 Lua burn-down (567 to 0), the PAR-58
+  vectors and ledger, the network-check `route_plan` step, PAR-43, and PAR-41 on macOS/Linux (schema v15).
 - **Agent work in flight (Linux/macOS only)**, each backed up on a remote `tmp/wip-*` branch; if lost, redo
   from the spec:
-  - `tmp/wip-todo-ae`: the Linux daemon account-name fix (refused to start without USER/LOGNAME; now reads the
-    passwd entry, `--help` needs no session) and the `layouts.linux_needs_python` text, not in dev yet; then the
-    PAR-74 Lua burn-down remainder.
-  - `tmp/wip-todo-af`: PAR-58 JSON vectors (toml batch writer, leaf rows, menu numbered captions, scope plan,
-    ledger gate) and the Debug > Test network `route_plan` step, not in dev yet; then PAR-43, PAR-12 and the
-    remaining PAR-58 cases.
-  - `tmp/wip-todo-ag`: PAR-41 config migration of retired slot ids and Ctrl-letter switches, unknown slot ids
-    reported as outdated, then steps 3, 5, 6 and the macOS/Linux part of 8.
+  - `tmp/wip-todo-ae-sweep`: a sweep of the small Linux/macOS TODO items (anything not owned below).
+  - `tmp/wip-todo-af`: check the prediction floor decisions are all covered, then PAR-66 section readers, then
+    the Lua 5.4 `io.popen` child that still sees the real HOME in tests.
+  - `tmp/wip-todo-ag`: Linux Quit refusals as macOS (Quit wins over reload, a pending scope write blocks).
 - **Scripts used by the coordinator** live in the session scratchpad (lost with the container): `fullsweep.sh`
   (gen:check, every `node` suite check with `xargs -P6`, Linux suite with `USER=root LOGNAME=root` and a
   private `XDG_RUNTIME_DIR`, macOS suite per `--module` group), `pick.sh` (cherry-pick a list until a conflict)
@@ -153,8 +152,8 @@ Work done on Linux and macOS only; the AHK side is built and run live on the Win
 - [ ] **Prediction request floor.** [CODE] Explicit requests never wait for the floor; one global floor
       settable from the menu on the three OS; "never" debounce on the three OS; live mode instant at a word end;
       the variants of one request never wait; default 300 ms, 0 accepted; a mashed explicit shortcut supersedes
-      its in-flight request. macOS and Linux: first part on `work/todo-af` (not yet in dev), the rest in
-      progress. Windows on the PC.
+      its in-flight request. macOS and Linux: in dev (88b27a94c1 to 5c36a116cd); agent AF checks every decided
+      part is covered and finishes any gap. Windows on the PC.
 - [ ] **PAR-66 section readers.** [CODE] Re-point the source-pin gates to the shared module, then extract
       `personal_info_editor_source` and the metrics/configuration/debug/about readers.
 
@@ -545,9 +544,8 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       through the live config writer and moves the old override strings at boot (2d734b6). Left: run the
       rewritten AHK tests on the PC (never executed); no menu toggle for built-in consumption on any
       driver; macOS and Linux still ignore user delimiters when deciding a repeat.
-- [ ] **PAR-12. Token streaming reason.** [CODE] Reason text rewritten in 21 locales (the display exists on
-      Windows but is not validated there). Left: rename the key `token_streaming_transport_missing` (it is
-      misleading) in manifest and locales, or enable the row on Windows after a live Ollama check.
+- [ ] **PAR-12. Token streaming reason.** [CODE] Done: reason text rewritten in 21 locales and the key renamed
+      `token_streaming_unvalidated_on_windows`. Left [PC]: enable the row on Windows after a live Ollama check.
 - [ ] **PAR-14. Check-only fallback when the GitHub API is blocked: Windows.** [CODE] Linux and shared
       pieces done (28bdd5a5d9, vectors `check_only_vectors.json` and `list_cache_vectors.json`). Windows
       needs the Atom fallback in `core.ahk` plus an AHK feed parser, then a reseal of the sealed updater
@@ -592,12 +590,15 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       array is imported on load and deleted by the next save (0146a938c5). Left: check on a real Mac that an
       old config keeps its profiles in the menu.
 - [ ] **PAR-41. One shortcut data model.** [CODE] Design note written
-      (`docs/design/one-shortcut-model.md`, 4ca41ed2e9): one action slot per chord with neutral role-based ids,
-      no migration, eight steps; step 1 is the inventory of the Windows legacy boolean list. Large.
-- [ ] **PAR-43. Duplicated per-OS prompt strings.** [CODE] Done for `max_words`, `temperature` and the port
-      dialogs (fb1aa4d934). Left: the two row captions (`ollama_port_label`, `mlx_port_label`: the caption
-      machinery takes one argument) and `menu.settings.delay_prompt` against `menu.llm.debounce_prompt`
-      (different accepted input).
+      (`docs/design/one-shortcut-model.md`, 4ca41ed2e9): one action slot per chord with neutral role-based ids.
+      Done on macOS and Linux (sixth integration batch): schema v15 `v14_to_v15` migration of the slots and
+      Ctrl-letter switches, role table with per-driver families, manifest slots, both drivers adopt the role
+      names, migrated-config binding proof, AHK fixtures pinned to v15. Left: the release blocker above
+      (`rename_prefix` for parameters, PC first), the Windows adoption, macOS `ctrl_g` to `open_url` later.
+- [x] **PAR-43. Duplicated per-OS prompt strings.** [CODE] Done: `max_words`, `temperature` and the port
+      dialogs (fb1aa4d934); one shared `menu.llm.server_port_label` row caption through `caption_getters`
+      (`mlx_port_label` retired, `ollama_port_label` kept for AHK); `delay_prompt` and `debounce_prompt` stay two
+      keys on purpose (different accepted input), reason documented (3f885f03d1).
 - [x] **PAR-44. Reset error texts on macOS and Linux.** [CODE] Done: shared `config_reset_failure.lua`
       composes `dialog.reset_defaults.reason.*` for the macOS (`ui/menu/init.lua`) and Linux
       (`ui/menu/menu_builder.lua`) restore and clear rows; `reload_refused` has no entry there because they
@@ -636,7 +637,9 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
 - [ ] **PAR-58. Windows consumer for the shared Lua contracts.** [CODE] 105 contracts (about 940 cases)
       run on macOS and Linux, none on Windows. Convert the highest-value ones (`config_scope_*`,
       `toml_*`, `menu_*`) to JSON vectors and replay from one AHK consumer per family. Audit test
-      item 11, section 14.
+      item 11, section 14. Lua side done: 302 JSON vectors replayed by both drivers; the ledger
+      (`tools/test/test-contract-vector-ledger.cjs`) classifies 288 Lua sites, 13 data-driven and 275 kept in
+      Lua with a reason code. Left [PC]: the AHK consumers per family.
 - [ ] **PAR-59. Corpus replay gaps.** [CODE] Done on macOS and Linux (file warnings, route plan, GET
       redirects, document lease; the download-document contract is Linux-only by design). Left: Windows
       consumers of `http/get_redirect_vectors.json`, `native_presentations/original_captions.json`,
@@ -691,7 +694,8 @@ audit come from grep counts: confirm them before starting. Done and verified: ab
       `_shared/lua/features/manifest_data.lua`, eae6f45708). Left: `config_template.toml` (decision pending).
 - [ ] **PAR-74. Config-key and command-id constants by codegen.** [CODE] Generate constants from
       `config.schema.json` and `menu_manifest.json` for AHK, Lua and JS; lint raw literals such as
-      `private_filter_enabled`. Audit R10.
+      `private_filter_enabled`. Audit R10. Lua and shared Lua done (567 sites to 0). Left: 1243 AHK and JS
+      literals in the shrink-only `config-key-literal-baseline.json`.
 - [x] **PAR-75. Shared Lua helper modules and a redefinition lint.** [CODE] Done: every inline site burned
       down (baseline `{}`), basename detector added; the allowed exceptions are listed in the gate's `ALLOWED`
       list (two URL segments, the Linux worker `arg[0]` check, boot-time dirname splits).
