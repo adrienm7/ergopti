@@ -84,6 +84,8 @@ cases = [
 	"op_set_if_absent",
 	"op_wrap_value",
 	"op_wrap_value_replay",
+	"shipped_dynamic_switch_scalar_becomes_row",
+	"shipped_dynamic_switch_row_replay_unchanged",
 	"shipped_editor_shortcut_handoff_on_macos",
 	"shipped_keyboard_slots_neutral_on_macos",
 	"shipped_keyboard_slot_parameters_on_macos",
