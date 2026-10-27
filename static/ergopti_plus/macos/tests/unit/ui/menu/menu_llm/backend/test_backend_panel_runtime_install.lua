@@ -59,6 +59,11 @@ local function new_checker(installed, refuses_while_completing)
 		end
 		return settle_or_queue(on_complete)
 	end
+	-- Ergopti's own Ollama is installed through the issued owned choice (issue #104).
+	checker.install_native_for_selection = function(_, _, _, _, _, on_complete)
+		return checker.install_for_selection(on_complete)
+	end
+	checker.provisioning_idle = function() return not checker.running end
 	checker.runtime_available = function() return checker.installed end
 	checker.runtime_installed = function() return checker.installed end
 	checker.is_task_running = function() return checker.running end
@@ -118,7 +123,7 @@ local function with_rows(opts, scenario)
 		package.loaded["infra.dialog_util"] = {
 			block_alert = function()
 				record.dialogs = record.dialogs + 1
-				return opts.dialog_choice or "ollama.offer_download"
+				return opts.dialog_choice or "ollama.native_offer_install"
 			end,
 		}
 		package.loaded["modules.llm.mlx_deps_checker"] = record.mlx

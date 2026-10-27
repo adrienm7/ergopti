@@ -137,7 +137,7 @@ helpers.describe("llm-backend-ollama-start-gate", function()
 			-- Past the ten-second cache of a previous detection
 			hs.timer.secondsSinceEpoch = function() return 100 end
 			local mlx_url = require("modules.llm.api_mlx").get_base_url() .. "/v1/models"
-			hs.http.__set_response("http://127.0.0.1:11434/api/version", 200, '{"version":"fixture"}')
+			hs.http.__set_response("http://127.0.0.1:11435/api/version", 200, '{"version":"fixture"}')
 			hs.http.__set_response(mlx_url, 404, "")
 			local detected = nil
 			core.auto_detect_backend(function(backend) detected = backend end)
@@ -152,7 +152,7 @@ helpers.describe("llm-backend-ollama-start-gate", function()
 			-- Past the ten-second cache of a previous detection
 			hs.timer.secondsSinceEpoch = function() return 100 end
 			local mlx_url = require("modules.llm.api_mlx").get_base_url() .. "/v1/models"
-			hs.http.__set_response("http://127.0.0.1:11434/api/version", 200, '{"version":"fixture"}')
+			hs.http.__set_response("http://127.0.0.1:11435/api/version", 200, '{"version":"fixture"}')
 			hs.http.__set_response(mlx_url, 404, "")
 			core.auto_detect_backend(function() end)
 			helpers.assert_eq(core.get_backend(), "ollama")
