@@ -24,7 +24,7 @@ local locale_mod = require("infra.locale")
 local Logger     = require("logger.shim")
 -- The shared section-header decoration, the same one macOS and AutoHotkey draw.
 local Labels     = require("menu.labels")
-local TextUtils = require("text_utils")
+local NativeDirectory = require("infra.native_directory")
 local LOG        = "i18n"
 
 local _locale    = "fr"   -- active locale code
@@ -103,35 +103,35 @@ end
 local function _scan_locales()
 	local codes = {}
 
-	-- Through the shared resolver, not a per-file ".." count. This line used to
-	-- walk "../../" from the driver root — one level too high — so `ls` found
-	-- nothing, the scan collected zero codes, and the {"en","fr"} fallback below
-	-- took over: the language menu offered 2 locales out of the 21 that ship.
-	-- Nothing failed loudly; the menu simply had two rows.
 	local Paths = require("infra.paths")
 	local locales_dir = Paths.shared("data/locales")
-	if not locales_dir then
-		return { "en", "fr" }
+	assert(locales_dir, "i18n: shared locale directory is unavailable")
+	-- Availability is established only by a complete native enumeration. Shell
+	-- lines can invent names from legal LF bytes or publish failed partial output.
+	local entries, err = NativeDirectory.entries(locales_dir)
+	if not entries then
+		local reason = string.format("Locale directory '%s' could not be enumerated: %s", locales_dir, tostring(err))
+		Logger.error(LOG, "%s.", reason)
+		error(reason, 0)
 	end
-
-	local pipe = io.popen(string.format("ls %s 2>/dev/null", TextUtils.shell_quote(locales_dir)), "r")
-	if not pipe then
-		-- Fallback: try common codes.
-		return { "en", "fr" }
-	end
-
-	for line in pipe:lines() do
-		local code = line:match("^([%w_%-]+)%.json$")
-		if code then
-			-- Exclude non-language files (flags, readme, etc.)
-			if not code:match("^_") and not code:match("^flags$") then
-				codes[#codes + 1] = code
+	for _, entry in ipairs(entries) do
+		local code = entry.name:match("^([%w_%-]+)%.json$")
+		if code and not code:match("^_") and not code:match("^flags$") then
+			local kind = entry.kind
+			if kind == "link" then
+				local path = NativeDirectory.join(locales_dir, entry.name)
+				local detail, refusal
+				kind, detail, refusal = NativeDirectory.target_kind(path)
+				if kind == nil and refusal ~= "ENOENT" then
+					local reason = string.format("Locale path '%s' could not be inspected: %s", path, tostring(detail))
+					Logger.error(LOG, "%s.", reason)
+					error(reason, 0)
+				end
 			end
+			if kind == "file" then codes[#codes + 1] = code end
 		end
 	end
-	pipe:close()
-
-	if #codes == 0 then codes = { "en", "fr" } end
+	assert(#codes > 0, "i18n: no locale files are available in " .. locales_dir)
 
 	-- Order by the canonical shared list; codes absent from it fall to the end
 	-- alphabetically, so a newly added locale still appears before it is listed.

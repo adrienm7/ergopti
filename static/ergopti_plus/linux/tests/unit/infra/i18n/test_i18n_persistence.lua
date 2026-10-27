@@ -35,6 +35,20 @@ helpers.describe("i18n persistence", function()
   -- ==========================================================================
 
   helpers.describe("locale discovery", function()
+    helpers.it("native-locale-catalog: only actual locale files establish availability", function()
+      local shell = require("adapters.shell_runner")
+      helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"),
+        "native locale catalog receipts require Python and LuaJIT")
+      local quote = require("text_utils").shell_quote
+      local runtime = assert(shell.exec_line("command -v luajit"))
+      local root = helpers.driver_root()
+      local fixture = root .. "/tests/hardware/test_i18n_catalog.py"
+      local status = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime)
+        .. " --driver " .. quote(root))
+      helpers.assert_true(status == true or status == 0,
+        "complete native catalogs must preserve availability, refusal, cache and retry contracts")
+    end)
+
     helpers.it("list_locales returns at least fr and en", function()
       local i18n = helpers.load_module("infra.i18n")
       i18n.init()
