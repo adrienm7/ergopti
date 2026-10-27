@@ -727,3 +727,49 @@ for _OllamaDoneVector in [
 	["escaped last quoted", ',"done":true,"d\u006fne":"1"', false]]
 	Test("Ollama done marker: " . _OllamaDoneVector[1] . " keeps JSON type (ollama-stream-done-kind)",
 		_OllamaStream_DoneLiteral.Bind(_OllamaDoneVector[2], _OllamaDoneVector[3]))
+
+; curl creates its stdout file after CreateProcessW returns; absence is pending,
+; whereas a sharing refusal remains a genuine I/O failure.
+_OllamaStream_InitialOutput(Mode) {
+	Directory := A_Temp . "\ergopti_stream_start_" . A_TickCount . "_" . Random(1, 1000000)
+	Path := Directory . (Mode == "missing-parent" ? "\absent\response.jsonl" : "\response.jsonl")
+	Lock := 0
+	try {
+		DirCreate(Directory)
+		if Mode == "empty" || Mode == "locked"
+			FileAppend("", Path, "UTF-8-RAW")
+		if Mode == "locked" {
+			Lock := DllCall("Kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000,
+				"UInt", 0, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+			AssertTrue(Lock != -1 && Lock != 0, "the real exclusive fixture handle must be owned")
+		}
+		NativeError := 0
+		try {
+			NativeFile := FileOpen(Path, "r")
+			NativeFile.Close()
+		} catch OSError as Err
+			NativeError := Err.Number
+		AssertEqual(Mode == "missing" ? 2 : Mode == "missing-parent" ? 3 : Mode == "locked" ? 32 : 0, NativeError,
+			"the genuine Windows open must establish the requested file-state prerequisite")
+		State := Map("last_pos", 0, "stream_bytes_pending", true)
+		ReadError := 0, Chunk := "unexpected"
+		try Chunk := _LLM_Ollama_ReadStreamText(Path, State)
+		catch OSError as Err
+			ReadError := Err.Number
+		AssertEqual(Mode == "locked" ? 32 : Mode == "missing-parent" ? 3 : 0, ReadError,
+			"a not-yet-created curl output remains pending while a sharing refusal stays visible")
+		if Mode == "missing" || Mode == "empty" {
+			AssertEqual("", Chunk, "pending and empty output deliver zero provider bytes")
+			AssertEqual(0, State["last_pos"], "pending output never advances the stream cursor")
+			AssertFalse(State["stream_bytes_pending"], "the next tick receives no stale drain claim")
+		}
+	} finally {
+		if Lock && Lock != -1
+			DllCall("Kernel32\CloseHandle", "Ptr", Lock)
+		if DirExist(Directory)
+			DirDelete(Directory, true)
+	}
+}
+for _OllamaStartMode in ["missing", "empty", "locked", "missing-parent"]
+	Test("Ollama initial output: " . _OllamaStartMode . " preserves file state (ollama-stream-initial-output)",
+		_OllamaStream_InitialOutput.Bind(_OllamaStartMode))
