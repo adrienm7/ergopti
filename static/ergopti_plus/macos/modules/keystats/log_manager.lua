@@ -1167,6 +1167,11 @@ local function _typing_replay_cutoffs(db, device_id)
 	end
 	local facts, detail = Export._typing_rollover_boundaries(ledger, _sq(device_id), false, _has_trailing_rollover)
 	if not facts then return nil, detail end
+	if facts.regression then
+		Logger.warn(LOG, "Typing ids restart at ledger byte %d (id %d after rollover bound %d): "
+			.. "rebuilding without day-boundary context resets.",
+			facts.regression.at, facts.regression.id, facts.regression.bound)
+	end
 	if facts.has_markers and raw_max > (facts.max_id or -1)
 		and not _outbox_covers_typing(db, device_id, facts.max_id or -1) then
 		return nil, "typing ahead of canonical rollover facts is not owned by the local outbox"
