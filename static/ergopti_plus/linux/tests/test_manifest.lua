@@ -590,6 +590,7 @@ return {
 	"tests.unit.modules.keystats.privacy.test_resident_text_identity",
 	"tests.unit.modules.keystats.aggregation.test_aggregate_walker_ngram_nine_families",
 	"tests.unit.modules.keystats.aggregation.test_aggregate_walker_streaks_layout_exists",
+	"tests.unit.modules.keystats.aggregation.test_aggregate_walker_correction_erased",
 	"tests.unit.modules.keystats.aggregation.test_unicode_character_classes",
 	"tests.unit.modules.keystats.aggregation.test_app_switch_aggregate",
 	"tests.unit.modules.keystats.core.test_configuration_scope",
