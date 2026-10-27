@@ -1,0 +1,356 @@
+{
+	"_comment": "The agent's admission decisions replayed through _shared/lua/llm/request_plan/agent.lua by the macOS and Linux runners (_shared/lua/test/llm_request_plan_contract.lua). admit: the refusal a manual action meets first (paused, AI off, agent mode off, System 2 unusable, focus refused); auto_blocker: what stops the automatic mode's triage, in order; triage_skip: whether a sentence is worth triaging. An absent blocker or skip means the plan answers nil: nothing blocks and nothing is skipped.",
+	"drivers": {
+		"macos": "Replays every vector.",
+		"linux": "Replays every vector.",
+		"windows": "Not ported yet: the AutoHotkey agent must replay every vector."
+	},
+	"vectors": [
+		{
+			"id": "admit-open",
+			"kind": "admit",
+			"description": "Nothing refuses a manual action",
+			"facts": {
+				"paused": false,
+				"ai_enabled": true,
+				"mode": "action"
+			},
+			"expect": {
+				"allowed": true
+			}
+		},
+		{
+			"id": "admit-paused-first",
+			"kind": "admit",
+			"description": "A pause refuses before everything",
+			"facts": {
+				"paused": true,
+				"ai_enabled": false,
+				"mode": "off",
+				"system2_usable": false,
+				"focus_blocked": true
+			},
+			"expect": {
+				"allowed": false,
+				"step": "paused",
+				"notice": "paused"
+			}
+		},
+		{
+			"id": "admit-ai-off-before-mode",
+			"kind": "admit",
+			"description": "The AI switch refuses before the agent's own mode",
+			"facts": {
+				"paused": false,
+				"ai_enabled": false,
+				"mode": "off"
+			},
+			"expect": {
+				"allowed": false,
+				"step": "ai_off",
+				"notice": "disabled"
+			}
+		},
+		{
+			"id": "admit-mode-off",
+			"kind": "admit",
+			"description": "A mode of off refuses with the agent's notice",
+			"facts": {
+				"paused": false,
+				"ai_enabled": true,
+				"mode": "off",
+				"system2_usable": false
+			},
+			"expect": {
+				"allowed": false,
+				"step": "mode_off",
+				"notice": "agent_off"
+			}
+		},
+		{
+			"id": "admit-no-system2",
+			"kind": "admit",
+			"description": "An unusable System 2 refuses before the focus is looked at",
+			"facts": {
+				"paused": false,
+				"ai_enabled": true,
+				"mode": "auto",
+				"system2_usable": false,
+				"focus_blocked": true
+			},
+			"expect": {
+				"allowed": false,
+				"step": "no_system2",
+				"notice": "no_system2"
+			}
+		},
+		{
+			"id": "admit-focus-blocked-silent",
+			"kind": "admit",
+			"description": "A refused field or window refuses without a notice",
+			"facts": {
+				"paused": false,
+				"ai_enabled": true,
+				"mode": "action",
+				"system2_usable": true,
+				"focus_blocked": true
+			},
+			"expect": {
+				"allowed": false,
+				"step": "focus_blocked"
+			}
+		},
+		{
+			"id": "admit-system2-not-asked-yet",
+			"kind": "admit",
+			"description": "A driver that has not resolved System 2 is not refused for it",
+			"facts": {
+				"paused": false,
+				"ai_enabled": true,
+				"mode": "auto"
+			},
+			"expect": {
+				"allowed": true
+			}
+		},
+		{
+			"id": "auto-open",
+			"kind": "auto_blocker",
+			"description": "Nothing blocks the triage",
+			"facts": {
+				"mode": "auto",
+				"paused": false,
+				"ai_enabled": true,
+				"live": false,
+				"ai_busy": false,
+				"vision": false,
+				"hotstring_preview": false,
+				"focus_blocked": false
+			},
+			"expect": {}
+		},
+		{
+			"id": "auto-mode-first",
+			"kind": "auto_blocker",
+			"description": "A mode other than auto blocks before everything",
+			"facts": {
+				"mode": "action",
+				"paused": true,
+				"ai_enabled": false,
+				"live": true,
+				"ai_busy": true,
+				"vision": true,
+				"hotstring_preview": true,
+				"focus_blocked": true
+			},
+			"expect": {
+				"blocker": "mode"
+			}
+		},
+		{
+			"id": "auto-mode-off",
+			"kind": "auto_blocker",
+			"description": "The off mode blocks as any mode but auto",
+			"facts": {
+				"mode": "off",
+				"paused": false,
+				"ai_enabled": true,
+				"live": false,
+				"ai_busy": false,
+				"vision": false,
+				"hotstring_preview": false,
+				"focus_blocked": false
+			},
+			"expect": {
+				"blocker": "mode"
+			}
+		},
+		{
+			"id": "auto-paused",
+			"kind": "auto_blocker",
+			"description": "A pause blocks",
+			"facts": {
+				"mode": "auto",
+				"paused": true,
+				"ai_enabled": false,
+				"live": false,
+				"ai_busy": false,
+				"vision": false,
+				"hotstring_preview": false,
+				"focus_blocked": false
+			},
+			"expect": {
+				"blocker": "paused"
+			}
+		},
+		{
+			"id": "auto-ai-off",
+			"kind": "auto_blocker",
+			"description": "The AI switched off disarms the automatic mode",
+			"facts": {
+				"mode": "auto",
+				"paused": false,
+				"ai_enabled": false,
+				"live": true,
+				"ai_busy": false,
+				"vision": false,
+				"hotstring_preview": false,
+				"focus_blocked": false
+			},
+			"expect": {
+				"blocker": "ai_off"
+			}
+		},
+		{
+			"id": "auto-live",
+			"kind": "auto_blocker",
+			"description": "Live mode blocks",
+			"facts": {
+				"mode": "auto",
+				"paused": false,
+				"ai_enabled": true,
+				"live": true,
+				"ai_busy": true,
+				"vision": false,
+				"hotstring_preview": false,
+				"focus_blocked": false
+			},
+			"expect": {
+				"blocker": "live"
+			}
+		},
+		{
+			"id": "auto-ai-busy",
+			"kind": "auto_blocker",
+			"description": "An explicit AI action in flight or shown blocks",
+			"facts": {
+				"mode": "auto",
+				"paused": false,
+				"ai_enabled": true,
+				"live": false,
+				"ai_busy": true,
+				"vision": true,
+				"hotstring_preview": false,
+				"focus_blocked": false
+			},
+			"expect": {
+				"blocker": "ai_busy"
+			}
+		},
+		{
+			"id": "auto-vision",
+			"kind": "auto_blocker",
+			"description": "A vision flow blocks",
+			"facts": {
+				"mode": "auto",
+				"paused": false,
+				"ai_enabled": true,
+				"live": false,
+				"ai_busy": false,
+				"vision": true,
+				"hotstring_preview": true,
+				"focus_blocked": false
+			},
+			"expect": {
+				"blocker": "vision"
+			}
+		},
+		{
+			"id": "auto-hotstring-preview",
+			"kind": "auto_blocker",
+			"description": "A hotstring preview on screen blocks",
+			"facts": {
+				"mode": "auto",
+				"paused": false,
+				"ai_enabled": true,
+				"live": false,
+				"ai_busy": false,
+				"vision": false,
+				"hotstring_preview": true,
+				"focus_blocked": true
+			},
+			"expect": {
+				"blocker": "hotstring_preview"
+			}
+		},
+		{
+			"id": "auto-focus",
+			"kind": "auto_blocker",
+			"description": "An excluded field or application blocks last",
+			"facts": {
+				"mode": "auto",
+				"paused": false,
+				"ai_enabled": true,
+				"live": false,
+				"ai_busy": false,
+				"vision": false,
+				"hotstring_preview": false,
+				"focus_blocked": true
+			},
+			"expect": {
+				"blocker": "focus_blocked"
+			}
+		},
+		{
+			"id": "triage-ok",
+			"kind": "triage_skip",
+			"description": "A long enough new sentence is triaged",
+			"facts": {
+				"chars": 40,
+				"min_chars": 20,
+				"already_triaged": false
+			},
+			"expect": {}
+		},
+		{
+			"id": "triage-exact-minimum",
+			"kind": "triage_skip",
+			"description": "A sentence of exactly the minimum is triaged",
+			"facts": {
+				"chars": 20,
+				"min_chars": 20,
+				"already_triaged": false
+			},
+			"expect": {}
+		},
+		{
+			"id": "triage-too-short",
+			"kind": "triage_skip",
+			"description": "A short sentence is not triaged",
+			"facts": {
+				"chars": 19,
+				"min_chars": 20,
+				"already_triaged": false
+			},
+			"expect": {
+				"skip": "too_short"
+			}
+		},
+		{
+			"id": "triage-short-before-repeat",
+			"kind": "triage_skip",
+			"description": "Too short is answered before already triaged",
+			"facts": {
+				"chars": 5,
+				"min_chars": 20,
+				"already_triaged": true
+			},
+			"expect": {
+				"skip": "too_short"
+			}
+		},
+		{
+			"id": "triage-already",
+			"kind": "triage_skip",
+			"description": "A sentence triaged before is not triaged again",
+			"facts": {
+				"chars": 40,
+				"min_chars": 20,
+				"already_triaged": true
+			},
+			"expect": {
+				"skip": "already_triaged"
+			}
+		}
+	]
+}
