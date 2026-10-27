@@ -46,16 +46,16 @@ _DST_SharedVariable() {
 Test("dev source: the developer variable is the shared one (windows-dev-mode)", _DST_SharedVariable)
 
 _DST_Inactive() {
-	AssertEqual("", DevSource_ResolveRoot("", _DST_Driver, 0))
-	AssertEqual("", DevSource_ResolveRoot("C:\clone", _DST_Driver, 1), "a compiled build ignores the root")
+	AssertEqual("", DevSource_ResolveRoot("", _DST_Driver, 1))
+	AssertEqual("", DevSource_ResolveRoot("C:\clone", _DST_Driver, 0), "an installed build ignores the root")
 }
-Test("dev source: inactive without a root or in a compiled build (windows-dev-mode)", _DST_Inactive)
+Test("dev source: inactive without a root or in an installed build (windows-dev-mode)", _DST_Inactive)
 
 _DST_ExactRoot() {
-	AssertEqual("C:\clone", DevSource_ResolveRoot("C:/clone", "c:\CLONE\static\ergopti_plus\windows", 0))
-	AssertThrows(() => DevSource_ResolveRoot("clone", _DST_Driver, 0), "a relative root")
-	AssertThrows(() => DevSource_ResolveRoot("C:\clone\", _DST_Driver, 0), "a trailing separator")
-	AssertThrows(() => DevSource_ResolveRoot("C:\other", _DST_Driver, 0), "another clone")
+	AssertEqual("C:\clone", DevSource_ResolveRoot("C:/clone", "c:\CLONE\static\ergopti_plus\windows", 1))
+	AssertThrows(() => DevSource_ResolveRoot("clone", _DST_Driver, 1), "a relative root")
+	AssertThrows(() => DevSource_ResolveRoot("C:\clone\", _DST_Driver, 1), "a trailing separator")
+	AssertThrows(() => DevSource_ResolveRoot("C:\other", _DST_Driver, 1), "another clone")
 }
 Test("dev source: accepts only the clone the script runs from (windows-dev-mode)", _DST_ExactRoot)
 
@@ -103,17 +103,15 @@ _DST_ReloadsOnce() {
 Test("dev source: a saved .ahk reloads once, after a quiet poll (windows-dev-mode)", _DST_ReloadsOnce)
 
 _DST_SharedPaths() {
-	Source := FileRead(A_ScriptDir . "\..\infra\boot.ahk", "UTF-8")
-	Start := InStr(Source, "global _PathsFile :=")
-	Assert(Start > 0, "boot.ahk declares _PathsFile")
-	Declaration := SubStr(Source, Start, 300)
-	AssertContains(Declaration, '(A_IsCompiled || DevSource_Root() != "")',
-		"a developer run reads the installed build's paths.toml")
-	Entry := FileRead(A_ScriptDir . "\..\ErgoptiPlus.ahk", "UTF-8")
-	Assert(InStr(Entry, "#Include infra/dev_source.ahk") < InStr(Entry, "#Include infra/boot.ahk"),
-		"dev_source.ahk is included before boot.ahk reads it")
-	Assert(InStr(Entry, "DevSourceWatcher_Start(_DriverDir, ReloadPreservingSuspend)") > 0,
+	; This runner is a source run without the developer variable: the clone's copy.
+	AssertEqual("", DevSource_Root())
+	AssertFalse(DevSource_UsesInstalledPaths(), "a plain source run keeps the clone's paths.toml")
+	Body := _DriverFuncBody("DevSource_UsesInstalledPaths")
+	AssertContains(Body, 'DevSource_Root() != ""', "a developer run reads the installed build's paths.toml")
+	Source := _DriverSourceConcat()
+	AssertContains(Source, "DevSourceWatcher_Start(_DriverDir, ReloadPreservingSuspend)",
 		"the driver arms the watcher on the tray's Reload path")
+	AssertContains(Source, ": (DevSource_UsesInstalledPaths()", "boot.ahk asks the paths owner")
 }
 Test("dev source: a developer run uses the installed paths.toml and the Reload path (windows-dev-mode)",
 	_DST_SharedPaths)

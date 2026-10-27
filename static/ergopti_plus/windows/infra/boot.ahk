@@ -49,7 +49,7 @@ global OneShotShiftEnabled := False
 ; folder; a plain source run keeps using A_ScriptDir\_generated\paths.toml.
 global _PathsFile := (_DriverStartupSmokeDir != "")
 		? (_DriverStartupSmokeDir . "\paths.toml")
-		: ((A_IsCompiled || DevSource_Root() != "")
+		: (DevSource_UsesInstalledPaths()
 				? (A_AppData . "\Ergopti\paths.toml")
 				: (A_ScriptDir . "\_generated\paths.toml"))
 ; The OS-default logs folder, %LOCALAPPDATA%\ergopti_plus\logs\. Named before
