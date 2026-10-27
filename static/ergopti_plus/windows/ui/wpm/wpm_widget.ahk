@@ -95,7 +95,7 @@ WPMWidget_BuildCompact() {
 _WPMWidget_ApplyRoundedRegion(Hwnd, W, H, Diameter, RegionFn := 0) {
 		if !(Hwnd is Integer) || Hwnd <= 0
 				throw TypeError("The WPM region target must be a positive HWND, got " . Type(Hwnd) . ".")
-		if !_WPMWidget_IsOwnLiveWindow(Hwnd) {
+		if !WMHandleOwnedByThisProcess(Hwnd) {
 				LoggerDebug("WPMWidget", "Rounded region skipped: window {1} no longer exists.", Hwnd)
 				return false
 		}
@@ -106,23 +106,12 @@ _WPMWidget_ApplyRoundedRegion(Hwnd, W, H, Diameter, RegionFn := 0) {
 				else
 						WinSetRegion(Options, Hwnd)
 		} catch TargetError as Err {
-				if _WPMWidget_IsOwnLiveWindow(Hwnd)
+				if WMHandleOwnedByThisProcess(Hwnd)
 						throw Err
 				LoggerDebug("WPMWidget", "Rounded region skipped: window {1} closed while the region was applied.", Hwnd)
 				return false
 		}
 		return true
-}
-
-
-; True when Hwnd names an existing window created by this process. A handle
-; Windows recycled for another process after our window closed is not ours.
-_WPMWidget_IsOwnLiveWindow(Hwnd) {
-		if !DllCall("User32\IsWindow", "Ptr", Hwnd, "Int")
-				return false
-		OwnerPid := 0
-		DllCall("User32\GetWindowThreadProcessId", "Ptr", Hwnd, "UInt*", &OwnerPid, "UInt")
-		return OwnerPid == ProcessExist()
 }
 
 
