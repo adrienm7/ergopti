@@ -556,7 +556,7 @@
 		},
 		{
 			"id": "js-menu-row-order-single-source",
-			"ordinal": 509,
+			"ordinal": 513,
 			"name": "Menu row order single source (no driver spells a display order of row_order.json)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-menu-row-order-single-source.cjs"],
@@ -564,7 +564,7 @@
 		},
 		{
 			"id": "js-file-system-port-wired",
-			"ordinal": 510,
+			"ordinal": 514,
 			"name": "FileSystem port spec wiring (both Lua owners check the lease and atomic write spec at load)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-file-system-port-wired.cjs"],
