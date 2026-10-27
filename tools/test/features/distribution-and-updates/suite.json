@@ -493,6 +493,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-keylayout-single-parser.cjs"],
 			"repro": "npm run test:keylayout-single-parser"
+		},
+		{
+			"id": "js-0505",
+			"ordinal": 514,
+			"name": "build scripts source identifiers.sh fail-fast and the AppImage containers mount the checkout",
+			"cmd": "node",
+			"args": ["tools/test/test-shell-identifiers-sourcing.cjs"],
+			"repro": "npm run test:shell-identifiers-sourcing"
 		}
 	]
 }
