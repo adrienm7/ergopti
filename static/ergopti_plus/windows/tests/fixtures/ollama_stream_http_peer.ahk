@@ -88,9 +88,9 @@ _R7HS_Main() {
 		throw Error("The private service requires ready path, transcript path, status and body kind.")
 	ReadyPath := A_Args[1], Transcript := A_Args[2], ChatStatus := Integer(A_Args[3])
 	BodyKind := A_Args[4]
-	if BodyKind != "done" && BodyKind != "matching" && BodyKind != "foreign" && BodyKind != "private" && BodyKind != "after-done"
+	if BodyKind != "done" && BodyKind != "matching" && BodyKind != "foreign" && BodyKind != "private" && BodyKind != "after-done" && BodyKind != "ping"
 		throw Error("The private service refused an unknown response body kind.")
-	if BodyKind != "done" && BodyKind != "after-done" && ChatStatus != 404
+	if BodyKind != "done" && BodyKind != "after-done" && BodyKind != "ping" && ChatStatus != 404
 		throw Error("Missing-model response controls require HTTP404.")
 	if BodyKind == "after-done" && ChatStatus != 200
 		throw Error("The terminal-closure control requires HTTP200.")
@@ -152,9 +152,11 @@ _R7HS_Main() {
 				Requests += 1
 				if Requests > 2
 					throw Error("The private service received more than tags and one chat.")
-				if Request["method"] == "GET" && Request["path"] == "/api/tags" {
+				if BodyKind == "ping" && Request["method"] == "GET" && Request["path"] == "/api/version" {
+					Status := ChatStatus, Body := '{"version":"1.2.3"}'
+				} else if BodyKind != "ping" && Request["method"] == "GET" && Request["path"] == "/api/tags" {
 					Status := 200, Body := '{"models":[{"name":"fixture-model:latest"}]}'
-				} else if Request["method"] == "POST" && Request["path"] == "/api/chat" {
+				} else if BodyKind != "ping" && Request["method"] == "POST" && Request["path"] == "/api/chat" {
 					Status := ChatStatus
 					Body := '{"message":{"content":"native HTTP answer"},"done":true}' . "`n"
 					if BodyKind == "after-done"
@@ -169,7 +171,7 @@ _R7HS_Main() {
 				_R7HS_Reply(Peer, Status, Body)
 				Record := '{"method":"' . Request["method"] . '","path":"' . Request["path"] . '","status":' . Status . '}'
 				FileAppend(Record . "`n", Transcript, "UTF-8-RAW")
-				if Request["method"] == "POST"
+				if Request["method"] == "POST" || BodyKind == "ping"
 					return 0
 			} finally {
 				DllCall("Ws2_32\closesocket", "Ptr", Peer)

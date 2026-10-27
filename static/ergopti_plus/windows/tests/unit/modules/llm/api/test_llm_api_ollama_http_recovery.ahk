@@ -232,3 +232,5 @@ _OllamaHttp_RetirementRetry() {
 
 Test("Ollama tags retirement: acknowledgement retries and then releases once (ollama-native-request-retirement)",
 	_OllamaHttp_RetirementRetry)
+
+#Include %A_LineFile%/../test_llm_api_ollama_native_enable_retirement.ahk
