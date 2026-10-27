@@ -199,6 +199,11 @@ end)
 
 helpers.describe("changelog_bridge: native fetch push", function()
 	local Bridge = helpers.load_module("ui.changelog.bridge")
+	-- The manager reads the timing registry when it loads, and a document
+	-- fixture replaces that registry with its own acknowledgement deadline.
+	-- Load the real manager here, outside every fixture, so the doubles below
+	-- wrap it and restore it instead of reloading it under a fixture.
+	local RealManager = require("modules.updater.manager")
 
 	--- Decodes padded RFC 4648 Base64 (the codec under test only encodes).
 	--- @param text string
@@ -245,10 +250,9 @@ helpers.describe("changelog_bridge: native fetch push", function()
 	--- Runs `body` with the updater following `channel`.
 	local function following(channel, body)
 		local previous = package.loaded["modules.updater.manager"]
-		local real = require("modules.updater.manager")
 		package.loaded["modules.updater.manager"] = setmetatable({
 			get_channel = function() return channel end,
-		}, { __index = real })
+		}, { __index = RealManager })
 		local ok, err = pcall(body)
 		-- The caller may release transport callbacks after this configuration scope.
 		-- Keep its actual document lease until the next install() or group teardown.
@@ -289,12 +293,11 @@ helpers.describe("changelog_bridge: native fetch push", function()
 	for _, subscribed in ipairs({ "dev", "main" }) do
 		helpers.it("opens on the subscribed channel (" .. subscribed .. ")", function()
 			local calls, pushed = install()
-			local real = require("modules.updater.manager")
 			local previous = package.loaded["modules.updater.manager"]
 			package.loaded["modules.updater.manager"] = setmetatable({
 				get_channel = function() return subscribed end,
 				get_cached_release = function() return nil end,
-			}, { __index = real })
+			}, { __index = RealManager })
 			local ok, err = pcall(function()
 				local initial = Bridge.on_message("ready", {})
 				helpers.assert_eq(initial.channel, subscribed, "the first view is the subscribed channel")
