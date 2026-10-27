@@ -574,12 +574,29 @@ function Session:run_step(index, step, continue)
 	local ring_before = ports.log_ring()
 	local started_ms, started_at = ports.now_ms(), ports.iso_now()
 	local settled, timer = false, nil
+	-- The timeout settles the step without stopping its runner, so the runner's
+	-- own answer still arrives later; only a second answer to a step the runner
+	-- itself settled is a defect.
+	local settled_by_timeout = false
 	local last_mark = progress_aware and ports.progress_mark() or nil
 	run.current_step = step.id
 	Logger.info(LOG, "Field run step %d/%d '%s' started.", index, #run.request.steps, step.id)
 	local function settle(verdict, codes, report)
 		if settled then
-			Logger.warn(LOG, "Field run step '%s' answered after it was settled; answer dropped.", step.id)
+			local late_codes = {}
+			for _, code in ipairs(type(codes) == "table" and codes or {}) do
+				late_codes[#late_codes + 1] = safe_code(code) or "empty"
+			end
+			local late = table.concat(late_codes, ",")
+			if settled_by_timeout then
+				-- Expected after a timeout (field run 2026-10-27 16:53:45): the late
+				-- verdict is the news the timeout could not carry, so it is logged.
+				Logger.info(LOG, "Field run step '%s' answered %s (%s) after its timeout; the timeout stands.",
+					step.id, tostring(verdict), late ~= "" and late or "no code")
+			else
+				Logger.warn(LOG, "Field run step '%s' answered twice; second answer %s (%s) dropped.",
+					step.id, tostring(verdict), late ~= "" and late or "no code")
+			end
 			return
 		end
 		settled = true
@@ -604,16 +621,20 @@ function Session:run_step(index, step, continue)
 			if timer then run.timers[timer] = nil end
 			timer = nil
 			if settled then return end
+			local function settle_timeout(code)
+				settled_by_timeout = true
+				return settle("timeout", { code })
+			end
 			local elapsed_ms = ports.now_ms() - started_ms
 			if not progress_aware then
-				return settle("timeout", { "deadline_" .. math.floor(deadline_ms / 1000) .. "s" })
+				return settle_timeout("deadline_" .. math.floor(deadline_ms / 1000) .. "s")
 			end
 			if elapsed_ms >= deadline_ms then
-				return settle("timeout", { "bound_" .. math.floor(deadline_ms / 1000) .. "s" })
+				return settle_timeout("bound_" .. math.floor(deadline_ms / 1000) .. "s")
 			end
 			local mark = ports.progress_mark()
 			if mark == nil or mark == last_mark then
-				return settle("timeout", { "stalled_" .. math.floor(stall_ms / 1000) .. "s" })
+				return settle_timeout("stalled_" .. math.floor(stall_ms / 1000) .. "s")
 			end
 			last_mark = mark
 			Logger.debug(LOG, "Field run step '%s' still progressing after %d s; deadline extended.",
