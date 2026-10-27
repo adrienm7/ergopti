@@ -17,12 +17,14 @@ const zlib = require('node:zlib');
 const {
 	parsePe,
 	readZip,
+	checkSection,
 	countSection,
 	breakdownFiles,
 	readSourceFiles,
 	validatePolicy,
 	scanExecutable,
-	POLICY_PATH
+	POLICY_PATH,
+	TEXT_MEMBER
 } = require('../ci/windows-exe-av-surface.cjs');
 
 const root = path.resolve(__dirname, '../..');
@@ -395,6 +397,35 @@ const keep = workflow.indexOf('- name: Keep the ErgoptiPlus.exe antivirus surfac
 assert.ok(
 	keep > gate && keep < sign && workflow.slice(keep, sign).includes('actions/upload-artifact@'),
 	'the record is uploaded with the build, before signing'
+);
+
+// 12. The tracked bundle holds its ceilings before any Windows build: the
+// bundle members are the builder's selection copied verbatim, so a script or a
+// locale that adds a P/Invoke declaration or a SendInput mention fails here
+// instead of on the compiled exe (the 17e9011468 Windows build exceeded both).
+const bundlePython = [
+	['python3', []],
+	['py', ['-3']],
+	['python', []]
+].find(
+	([command, prefix]) =>
+		childProcess.spawnSync(command, [...prefix, '--version'], { encoding: 'utf8' }).status === 0
+);
+assert.ok(bundlePython, 'a Python interpreter must list the bundle selection');
+const listing = childProcess.spawnSync(
+	bundlePython[0],
+	[...bundlePython[1], path.join(root, 'tools/build/build_static_bundle.py'), '--list'],
+	{ cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
+);
+assert.equal(listing.status, 0, listing.stderr);
+const trackedMembers = JSON.parse(listing.stdout)
+	.files.filter((file) => TEXT_MEMBER.test(file.arcname))
+	.map((file) => fs.readFileSync(path.join(root, file.source), 'utf8'));
+assert.ok(trackedMembers.length > 0, 'the bundle selection lists text members');
+assert.deepEqual(
+	checkSection('bundle', trackedMembers.join('\n'), policy.bundle).errors,
+	[],
+	'the tracked bundle selection stays under every bundle ceiling'
 );
 
 console.log(
