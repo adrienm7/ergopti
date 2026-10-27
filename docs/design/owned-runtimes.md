@@ -57,7 +57,8 @@ rows (risks 1 to 3, and the Windows server acceptance).
    The VirtualHIDDevice DriverKit extension and its daemon are one system-wide
    instance. ADR 011 decision 3 (`docs/adr/011-owned-karabiner-runtime.md:49`, under `static/ergopti_plus/`) makes the owned runtime quit
    any other running Karabiner, which the new rule forbids (it says never stop
-   the user's copy). The two cannot both hold. Options in section 6.1.
+   the user's copy). Decided on 2026-10-27 (section 6.1): Tap-Hold on quits
+   theirs, Tap-Hold off never activates ours.
 2. **The macOS Ollama path still prefers the user's copy.** The resolver tries
    `/Applications/Ollama.app`, `~/Applications`, Homebrew and `PATH` before the
    copy Ergopti manages (`macos/modules/llm/ollama_binary.lua:121-129`), and
@@ -213,10 +214,13 @@ runtime (pinned with Ahk2Exe 1.1.37.02a2 and SHA-256 in
   use" otherwise, which is what the option does when unticked; (c) stop using
   Karabiner and implement the remapping on the app's own Quartz event tap plus
   a self-owned virtual device, which is a different project.
-- Recommendation: (b) as the default behaviour, (a) only as an explicit
-  consent the user gives each time they enable Tap-Hold, and a rewrite of
-  decision 3's wording. This is the single point where the rule and an existing
-  decision disagree.
+- **Decided by the maintainer (2026-10-27):** when Ergopti's Tap-Hold is on,
+  Ergopti quits the user's Karabiner and runs its own pinned runtime; when
+  Tap-Hold is off and the user has their own Karabiner, Ergopti never
+  activates its runtime and leaves theirs untouched. This is ADR 011 decision 3
+  as written (Tap-Hold on means the runtime runs and quits the other
+  instance), so the ADR stands; it is the one declared exception to "never
+  stop the user's copy".
 
 ### 6.2 Ollama (all three OS)
 
@@ -249,7 +253,8 @@ not fit.
 
 ## 7. Proposed order of work (for decision, not started)
 
-1. Decide section 6.1 (Karabiner) in writing; amend ADR 011.
+1. Karabiner: decided (section 6.1), ADR 011 decision 3 stands; finish the
+   owned runtime as the default (TODO item 31).
 2. Ollama on all three OS: dedicated port, remove stock candidates (macOS
    `ollama_binary.lua:121-129`, the shell installers, the Windows winget path),
    delete the `foreign` source machinery.
@@ -257,7 +262,8 @@ not fit.
    AppImage the only supported format; replace `openssl` and `sqlite3` CLI uses
    by bundled copies or FFI.
 4. macOS App Cloner: run its helpers on the managed Python.
-5. Windows: decide Fixed Version WebView2 and a pinned `curl.exe`; keep
+5. Windows: WebView2 stays the system Evergreen runtime (decided 2026-10-27),
+   with a minimum-version check and a clear refusal; decide a pinned `curl.exe`; keep
    PowerShell 5.1 as a checked system dependency.
 6. Add one machine-readable registry (`_shared/data/owned_runtimes.json`: name,
    OS, version, URL, SHA-256, size, licence, proposal) and a test that every
