@@ -2791,4 +2791,106 @@ assert.equal(
 	'all missing-search, stale-DOM and navigation recovery controls must execute'
 );
 
+const typingFindUnicodeCases = [
+	{
+		name: 'one expanded prefix',
+		app: 'İTarget.exe',
+		query: 'Target',
+		matches: ['Target']
+	},
+	{
+		name: 'two expanded prefixes',
+		app: 'İİTarget.exe',
+		query: 'target',
+		matches: ['Target']
+	},
+	{
+		name: 'expansion after match',
+		app: 'Targetİ.exe',
+		query: 'TARGET',
+		matches: ['Target']
+	},
+	{
+		name: 'multiple later matches',
+		app: 'İTargetTarget.exe',
+		query: 'target',
+		matches: ['Target', 'Target']
+	},
+	{
+		name: 'full expanded fold query',
+		app: 'İTarget.exe',
+		query: 'i̇',
+		matches: ['İ']
+	},
+	{
+		name: 'partial expanded fold query',
+		app: 'İTarget.exe',
+		query: 'i',
+		matches: ['İ']
+	},
+	{
+		name: 'contextual Greek lowercasing',
+		app: 'İΟΣ-Target.exe',
+		query: 'ος',
+		matches: ['ΟΣ']
+	},
+	{
+		name: 'surrogate pair prefix control',
+		app: '🧪Target.exe',
+		query: 'Target',
+		matches: ['Target']
+	}
+];
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of typingFindUnicodeCases) {
+		test(`${host} find preserves source offsets for ${vector.name}`, () => {
+			const page = typingFindPage(host);
+			publishTypingPage(page, host, { '2026-10-27': { [vector.app]: liveTypingApp(30) } });
+			assert.equal(
+				page.admitTableText(),
+				vector.app,
+				'the actual native table retains the valid Unicode process name'
+			);
+			page.elements.get('find_input').value = vector.query;
+			page.context.find_in_page(true);
+			assert.deepEqual(
+				page.highlights(),
+				vector.matches,
+				'case-folded match positions must map back to original text spans'
+			);
+			assert.equal(
+				page.elements.get('find_status').textContent,
+				`1\u202f/\u202f${vector.matches.length}`
+			);
+			assert.equal(
+				page.context.document.body.children.map((node) => node.textContent).join(''),
+				vector.app,
+				'highlighting preserves every original character'
+			);
+			page.context.find_in_page(true);
+			assert.equal(
+				page.elements.get('find_status').textContent,
+				`${vector.matches.length === 1 ? 1 : 2}\u202f/\u202f${vector.matches.length}`
+			);
+			assert.deepEqual(page.highlights(), vector.matches);
+			page.context.close_find_bar();
+			assert.deepEqual(page.highlights(), []);
+			assert.equal(
+				page.context.document.body.children.map((node) => node.textContent).join(''),
+				vector.app
+			);
+			assert.equal(
+				page.diagnostics.some((entry) => entry.level === 'error'),
+				false
+			);
+		});
+	}
+}
+assert.equal(typingFindUnicodeCases.length, 8);
+assert.equal(
+	passed,
+	507,
+	'all Unicode expansion, context and unchanged-offset controls must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);
