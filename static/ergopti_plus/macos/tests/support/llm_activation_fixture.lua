@@ -182,7 +182,7 @@ local function build_fixture(backend, save_results, options)
 	package.loaded["infra.dialog_util"] = {
 		block_alert = function()
 			calls.offers = calls.offers + 1
-			return options.ollama_offer_choice or "ollama.offer_website"
+			return options.ollama_offer_choice or "ollama.native_offer_keep"
 		end,
 		choose = function(title, message, choices, cancel_label, ok_label)
 			local dialog = {
