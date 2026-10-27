@@ -1,0 +1,6 @@
+25709 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus
+25713 /Users/b519hs/perso/ergopti/build/macos/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon
+65321 /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_console_user_server
+65322 /Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_session_monitor
+70132 /Applications/Ollama.app/Contents/Resources/ollama serve
+77996 omlx-server ptr_munge= main_stack= executable_file=0x1a01000011,0x41d62a9 dyld_file=0x1a01000011,0xfffffff000a9547 executable_cdhash=3af32e98331491c46756a22efea3fabda03bb2f9 executable_boothash=e6b167276deed627ca09a870a78ecdcee6d200a6 th_port=
