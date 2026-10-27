@@ -50,6 +50,7 @@ const path = require('path');
 const TOML = require('smol-toml');
 const { REPO_ROOT, shared, sharedRel } = require('../lib/paths.cjs');
 const { candidateKeys } = require('../lib/manifest-label-keys.cjs');
+const { KEY } = require('../lib/_generated/config_keys.cjs');
 
 const MANIFEST_PATH = shared('modules', 'features', 'manifest.toml');
 const HOTSTRINGS_DIR = shared('modules', 'hotstrings');
@@ -84,7 +85,9 @@ const MANIFEST_PLATFORMS = Object.values(DRIVERS);
 // change so a stale host refuses the data instead of misreading it.
 const SCHEMA_VERSION = 1;
 
-const CHECKLIST_KINDS = ['recommended', 'hotstrings', 'tap_holds', 'none'];
+// config-key-literal-ok: the tap_holds onboarding page and checklist kind, not a configuration leaf
+const TAP_HOLDS_CHECKLIST = 'tap_holds';
+const CHECKLIST_KINDS = ['recommended', 'hotstrings', TAP_HOLDS_CHECKLIST, 'none'];
 const PAGE_FIELDS = new Set([
 	'title_key',
 	'question_key',
@@ -99,7 +102,7 @@ const PAGE_FIELDS = new Set([
 	'file_path',
 	'section_path',
 	'neutral_label_key',
-	'magic_key',
+	'magic_key', // config-key-literal-ok: an onboarding page field, not a configuration key
 	'sub_switch',
 	'state',
 	'triggers',
@@ -481,17 +484,17 @@ const CHORD_KEY_NAMES = { space: 'common.key_space', enter: 'common.key_enter' }
 const CHORD_KEY_GLYPHS = { period: '.', comma: ',', quote: "'", sc029: '²', capslock: 'CapsLock' };
 // The key the macOS Cmd + star shortcut names: the hotstring trigger character.
 const CHORD_TRIGGER_KEY = 'star';
-const TRIGGER_CHARACTER_PATH = 'hotstrings.trigger_char';
+const TRIGGER_CHARACTER_PATH = KEY.HOTSTRINGS_TRIGGER_CHAR;
 
 // The manifest sections whose ids spell a chord: the keyboard slots, whose
 // value is the action they run, and the macOS built-in shortcuts, whose label
 // is the action their chord runs.
-const SLOT_SECTION = 'shortcuts.keyboard';
+const SLOT_SECTION = KEY.SHORTCUTS_KEYBOARD;
 // A key-combination slot is named by its two keys, the one held first then the
 // one struck under it, as the Shortcuts menu lists the pair.
 const COMBINATION_SECTION = 'shortcuts.key_combination_taps';
 const COMBINATION_SEPARATOR = '_then_';
-const BUILT_IN_SHORTCUT_SECTION = 'shortcuts.keys';
+const BUILT_IN_SHORTCUT_SECTION = KEY.SHORTCUTS_KEYS;
 
 /**
  * Label segments of a key-combination slot: its two tap-hold keys, each under
@@ -643,7 +646,7 @@ function validatePage(id, page, manifest, labels) {
 	if (page.consent && page.checklist !== 'none') {
 		throw new Error(`[onboarding.pages.${id}] a consent page imports nothing else`);
 	}
-	if (page.checklist === 'tap_holds' && id !== 'tap_holds') {
+	if (page.checklist === TAP_HOLDS_CHECKLIST && id !== TAP_HOLDS_CHECKLIST) {
 		throw new Error(`[onboarding.pages.${id}] only the tap_holds page lists tap-hold keys`);
 	}
 	if (page.settings !== undefined) {
@@ -1418,7 +1421,7 @@ function buildPage(id, page, platform, manifest, features, projection, labels, u
 		);
 	} else if (page.checklist === 'hotstrings') {
 		groups = hotstringGroups(id, page, platform, manifest, features, projection, labels);
-	} else if (page.checklist === 'tap_holds') {
+	} else if (page.checklist === TAP_HOLDS_CHECKLIST) {
 		groups = tapHoldGroups(id, platform, labels);
 	}
 	groups = groups.concat(settingsGroups(id, page, platform, features, projection));
