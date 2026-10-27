@@ -1460,6 +1460,39 @@ Record the commit, OS build, scale, layout and emulation state; report pass, fai
 per line. Use a disposable profile (`paths.toml` pointing at a scratch folder) for anything that
 writes configuration. Reload the driver from the working tree for dev-only fixes.
 
+### Web-view window toggle actions (`tmp/wip-webview-toggle-actions`)
+
+Maintainer decision of 2026-10-27: every Ergopti web-view page has a shortcut action in the shared
+catalogue (`_shared/modules/actions/actions.toml`, group "UI") that toggles it. Closed or hidden:
+open and focus; open behind another window: bring to front, never close; open and frontmost: close
+through the page's own close. Ten actions, all three OS: `open_metrics_typing`,
+`open_metrics_apps`, `open_hotstrings_editor`, `open_paths_editor` (existing ids, now toggles on
+macOS and Linux too), and new `open_hotstrings_settings`, `open_layout_manager`,
+`open_layer_editor`, `open_model_browser`, `open_changelog`, `open_healthcheck`. Not toggles, on
+purpose: onboarding (a shortcut would abandon a half-finished setup), the download window (a
+progress view owned by a running download), the release notes (a pane, not a window) and the
+contextual dialogs. Owners: macOS `ui/window_toggle.lua`, Linux `ui/webview_manager.lua`
+`toggle()`, Windows `GestureToggleOrFocusUI` (`modules/gestures/actions.ahk`). Pending
+coordination: the model selector rework (`tmp/wip-model-selector-page`) must keep
+`ui/model_browser` `window()`/`close()` (macOS) and the macOS `set_opener("model_browser", …)`
+line of `menu_llm/models_selector.lua`.
+
+For each OS, bind each of the ten actions to a keyboard shortcut (Shortcuts menu, keyboard slot or
+tap-hold picker) and press it three times: from closed it opens and has the focus; click another
+app's window so the page is covered, press again: it comes to the front and stays open; press once
+more while it is frontmost: it closes. Also minimize it, press: it comes back.
+
+- [ ] **Windows**: the ten actions above, including the WebView2-less fallbacks (native hotstring
+      editor, native hotstrings settings, native ListView model browser) when WebView2 is absent;
+      the close must run the page's own Close handler (no orphan WebView2 process in Task Manager).
+- [ ] **Mac**: the ten actions. The model browser's opener is registered when the AI menu is
+      built (the menu prime, a few seconds after a reload): press `open_model_browser` right
+      after a reload and with the AI off, and note any `window_toggle` ERROR naming a page with
+      no registered opener. A covered window must be presented, not closed (focus is read
+      through Accessibility).
+- [ ] **Linux** (no machine): GNOME Wayland and X11, the ten actions; GTK's is-active flag decides
+      "frontmost", so check that a page covered by another app is raised, not closed.
+
 ### Mac hardware session (prepared 27 October, run from a branch of dev)
 
 Clone only the current dev state and branch from it:
