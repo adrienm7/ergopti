@@ -9,7 +9,9 @@ import XCTest
 @testable import ErgoptiPlus
 
 final class NativeAppClonerReadOnlyBundleTests: XCTestCase {
-	private static let operationDeadline: DispatchTimeInterval = .seconds(15)
+	// Bounds a hung child, not its speed: on a loaded macOS 26 runner one cold
+	// disk image or AppleScript child passed the former 15 s.
+	private static let operationDeadline: DispatchTimeInterval = .seconds(60)
 	private static let retirementDeadline: DispatchTimeInterval = .seconds(5)
 	private var fixtureCanRetire = true
 
@@ -58,6 +60,7 @@ final class NativeAppClonerReadOnlyBundleTests: XCTestCase {
 			// A timed-out image operation can leave service-side ownership unknown
 			// even after its CLI exits. Preserve the fixture instead of deleting it.
 			fixtureCanRetire = false
+			XCTFail("\(executable) \(arguments.first ?? "") did not finish within its deadline")
 			if process.isRunning { process.terminate() }
 			if completed.wait(timeout: .now() + Self.retirementDeadline) != .success {
 				XCTFail("The exact read-only bundle fixture child did not retire")
