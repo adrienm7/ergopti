@@ -32,6 +32,10 @@
 ;    as before — only the user file is parsed.
 ; ==============================================================================
 
+; The loader reads the generated config leaf names (ConfigLeaf); include their
+; owner here so a runner that loads this file alone still resolves them.
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 ; The global default tap-hold delay (TAPHOLD_DEFAULT_ACTIVATION_SECONDS) is the
 ; timing registry's tap_hold.default_activation_ms, loaded at boot by
 ; TapHoldsLoadTimings() (platform/remap/constants.ahk) like every other tap-hold
