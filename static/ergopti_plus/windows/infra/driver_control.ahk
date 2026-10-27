@@ -283,7 +283,7 @@ DriverControl_Completion(Spec, Text, OwnPid) {
 	for Key in Result
 		if !(Key ~= "^(schema|request_id|state|driver_pid|successor_pid|reason)$")
 			return ""
-	if Result.Get("schema", "") != Spec["schema"] || Result.Get("state", "") != "requested"
+	if Result.Get("schema", "") != Spec["schema"] || Result.Get("state", "") !== "requested"
 			|| !DriverControl_IsRequestId(Result.Get("request_id", ""))
 			|| !(Result.Get("successor_pid", "") is Integer) || Result["successor_pid"] != OwnPid
 		return ""

@@ -682,3 +682,82 @@ _TDC_RequestIdSessionBoundary(Id, Expected) {
 for _TDC_IdSessionRow in [["valid", "line-id", true], ["LF suffix", "line-id`n", false], ["CRLF suffix", "line-id`r`n", false]]
 	Test("driver-control: real request file " . _TDC_IdSessionRow[1] . " respects complete identifier validation (driver-control-character-boundaries)",
 		_TDC_RequestIdSessionBoundary.Bind(_TDC_IdSessionRow[2], _TDC_IdSessionRow[3]))
+
+_TDC_ResultStateEnum(Phase, Fields, Expected) {
+	Spec := _TDC_Spec(), Canonical := 0
+	for Declared in Spec["states"] {
+		if StrCompare(Declared, "requested", true) == 0
+			Canonical += 1
+		AssertTrue(StrCompare(Declared, "REQUESTED", true) != 0,
+			"the canonical declaration does not name an uppercase requested state")
+	}
+	AssertEqual(1, Canonical, "the canonical declaration names the exact lowercase requested state")
+	Text := '{"schema":1,"request_id":"state-enum","driver_pid":100,"successor_pid":200,' . Fields . "}"
+	Decoded := JsonParse(Text)
+	AssertTrue(Decoded is Map)
+	AssertEqual("state-enum", Decoded["request_id"])
+	AssertTrue(Decoded["successor_pid"] is Integer)
+	AssertEqual(200, Decoded["successor_pid"])
+	Kind := ""
+	if Phase == "completion"
+		Result := DriverControl_Completion(Spec, Text, 200)
+	else
+		Result := DriverControl_Resolve(Spec, Text, 200, 1700000000, &Kind)
+	if Expected {
+		AssertEqual('{"schema":1,"request_id":"state-enum","state":"completed","driver_pid":200,"successor_pid":200}`n', Result)
+		if Phase == "resolution"
+			AssertEqual("completed", Kind)
+	} else {
+		AssertEqual("", Result, "only the canonical declared requested enum can complete a named successor")
+		AssertEqual("", Kind)
+	}
+}
+for _TDC_StatePhase in ["completion", "resolution"]
+	for _TDC_StateRow in [
+		["canonical", '"state":"requested"', true],
+		["escaped canonical", '"state":"\u0072equested"', true],
+		["uppercase", '"state":"REQUESTED"', false],
+		["title case", '"state":"Requested"', false],
+		["mixed case", '"state":"rEqUeStEd"', false],
+		["other declared state", '"state":"claimed"', false],
+		["boolean", '"state":true', false],
+		["integer", '"state":1', false],
+		["array", '"state":[]', false],
+		["object", '"state":{}', false],
+		["null", '"state":null', false],
+		["last uppercase", '"state":"requested","state":"REQUESTED"', false],
+		["last canonical", '"state":"REQUESTED","state":"requested"', true]
+	]
+		Test("driver-control: " . _TDC_StatePhase . " " . _TDC_StateRow[1] . " follows the canonical state enum (driver-control-state-enum)",
+			_TDC_ResultStateEnum.Bind(_TDC_StatePhase, _TDC_StateRow[2], _TDC_StateRow[3]))
+
+_TDC_BootStateEnum(StateName, Expected) {
+	_TDC_World(Body)
+	Body(World) {
+		Pid := World.Session.Pid
+		Text := '{"schema":1,"request_id":"boot-state-enum","state":' . JsonStringLiteral(StateName)
+			. ',"driver_pid":500,"successor_pid":' . Pid . "}"
+		Decoded := JsonParse(Text)
+		AssertEqual(0, StrCompare(StateName, Decoded["state"], true))
+		AssertTrue(Decoded["successor_pid"] is Integer)
+		AssertEqual(Pid, Decoded["successor_pid"])
+		FSEnsureDirectoryStrict(World.Folder)
+		AssertTrue(FSWriteDurable(World.Session.Path("result"), Text))
+		World.Session.Start()
+		AssertTrue(World.Session.Active)
+		AssertEqual(1, World.Started, "the real session must reach its endpoint after reading the private result file")
+		Output := _TDC_Read(World, "result")
+		if Expected {
+			Result := JsonParse(Output)
+			AssertEqual("completed", Result["state"])
+			AssertEqual("boot-state-enum", Result["request_id"])
+			AssertEqual(Pid, Result["driver_pid"])
+			AssertEqual(Pid, Result["successor_pid"])
+		} else
+			AssertEqual(0, StrCompare(Text, Output, true),
+				"startup cannot complete or replace a private pending file whose state is not the declared enum")
+	}
+}
+for _TDC_BootStateRow in [["canonical", "requested", true], ["uppercase", "REQUESTED", false], ["title case", "Requested", false]]
+	Test("driver-control: boot private result " . _TDC_BootStateRow[1] . " preserves canonical state admission (driver-control-state-enum)",
+		_TDC_BootStateEnum.Bind(_TDC_BootStateRow[2], _TDC_BootStateRow[3]))
