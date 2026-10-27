@@ -2848,18 +2848,23 @@ function render_records_kpi() {
 	let streak_max = 0,
 		streak_cur = 0,
 		prev = null;
-	const ymd = (s) => new Date(s + 'T12:00:00').getTime();
 	sorted_dates.forEach((d) => {
-		if (prev && ymd(d) - prev === 86400_000) streak_cur += 1;
+		const ordinal = parseDateKey(d);
+		if (prev !== null && shiftMetricsDay(prev, 1) === ordinal) streak_cur += 1;
 		else streak_cur = 1;
 		if (streak_cur > streak_max) streak_max = streak_cur;
-		prev = ymd(d);
+		prev = ordinal;
 	});
 
 	const fr_short = (date_str) => {
 		if (!date_str) return '—';
-		const d = new Date(date_str + 'T12:00:00');
-		return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' });
+		const d = new Date(parseDateKey(date_str));
+		return d.toLocaleDateString('fr-FR', {
+			day: 'numeric',
+			month: 'short',
+			year: '2-digit',
+			timeZone: 'UTC'
+		});
 	};
 
 	const set = (id, html) => {

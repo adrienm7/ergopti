@@ -38,6 +38,7 @@ function appsFixture() {
 	const index = read('metrics_apps/index.html');
 	vm.runInContext(read('host_bridge.js'), context);
 	vm.runInContext(read('_generated/metrics_general_category_aliases.js'), context);
+	vm.runInContext(read('metrics_calendar.js'), context);
 	for (const name of ['helpers.js', 'state.js', 'main.js']) {
 		assert.ok(index.includes(`src="${name}"`), `${name} must be loaded by the actual page`);
 		vm.runInContext(read(`metrics_apps/${name}`), context);
@@ -450,6 +451,7 @@ assert.equal(passed, 12, 'all original seven and five selection regressions must
 		vm.runInContext(read('host_bridge.js'), context);
 		vm.runInContext(read('dom_utils.js'), context);
 		vm.runInContext(read('_generated/metrics_general_category_aliases.js'), context);
+		vm.runInContext(read('metrics_calendar.js'), context);
 		for (const name of ['helpers.js', 'state.js', 'main.js', 'charts.js', 'modal.js']) {
 			assert.ok(read('metrics_apps/index.html').includes(`src="${name}"`));
 			vm.runInContext(read(`metrics_apps/${name}`), context);
@@ -1375,4 +1377,152 @@ for (const host of ['windows', 'macos', 'linux']) {
 }
 assert.equal(windowTitleCases.length, 4);
 assert.equal(passed, 228, 'all native title dictionary and rendering controls must execute');
+const { loadMetricsTypingPage } = require('./support/metrics-apps-page.cjs');
+function publishTypingPage(page, host, manifest) {
+	assert.equal(
+		page.scripts.filter((name) => name === '../metrics_calendar.js').length,
+		1,
+		'both pages load one canonical calendar owner'
+	);
+	assert.ok(
+		page.scripts.indexOf('../metrics_calendar.js') < page.scripts.indexOf('format.js'),
+		'the shared calendar owner loads before typing consumers'
+	);
+	const initial = { historical: {}, today: {} };
+	if (host === 'macos') {
+		page.context.publishTypingMetricsData(
+			{ manifest, initial_data: initial, app_icons: {}, kc_layout: {} },
+			{ manifest_revision: 1, assets_revision: 1 }
+		);
+	} else {
+		const blob = {
+			metrics_manifest: manifest,
+			_prefetch_data: initial,
+			app_icons: {},
+			keycode_layout: {},
+			driver_meta: { os: host, heatmap_id: 'sc' }
+		};
+		if (host === 'windows')
+			page.messageListeners
+				.filter((entry) => entry.name === 'message')
+				.at(-1)
+				.callback({ data: { type: 'prefetch', blob } });
+		else
+			page.context.__hostBridgeResponse(
+				'metrics_typing_bridge',
+				false,
+				encodeURIComponent(JSON.stringify(blob))
+			);
+	}
+}
+function freezePageClock(page, timestamp) {
+	const fixedNow = Date.parse(timestamp);
+	page.context.Date = class ClockPort extends Date {
+		constructor(...args) {
+			super(...(args.length ? args : [fixedNow]));
+		}
+		static now() {
+			return fixedNow;
+		}
+	};
+}
+for (const host of ['windows', 'macos', 'linux']) {
+	for (const vector of streakCases) {
+		test(`${host} loaded typing streak retains ${vector.name}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = vector.zone;
+			try {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, vector.dates.slice().sort().at(-1) + 'T12:00:00Z');
+				const manifest = Object.fromEntries(
+					vector.dates.map((date) => [
+						date,
+						{
+							Editor: {
+								chars: vector.empty || vector.ineligible === date ? 0 : 10,
+								time: 10000,
+								wpm_chars: 10
+							}
+						}
+					])
+				);
+				publishTypingPage(page, host, manifest);
+				assert.equal(
+					page.elements.get('records_streak').innerHTML,
+					vector.expected ? `${vector.expected} jour${vector.expected > 1 ? 's' : ''}` : '—'
+				);
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false,
+					'real declared scripts and native-handler ingress must finish without fixture errors'
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+	for (const vector of annualCases) {
+		test(`${host} loaded typing calendar preserves civil days in ${vector.zone}`, () => {
+			const previousTimezone = process.env.TZ;
+			process.env.TZ = vector.zone;
+			try {
+				const page = loadMetricsTypingPage(host);
+				freezePageClock(page, vector.now);
+				publishTypingPage(page, host, {
+					'2011-12-30': { Editor: { chars: 20, time: 10000, hourly: { '09': { c: 20 } } } }
+				});
+				const svg = page.elements.get('activity_calendar_container').innerHTML;
+				const label = (key) => {
+					const [day, month, year] = key.split('/').map(Number);
+					const date = new Date(0);
+					date.setUTCFullYear(year, month - 1, day);
+					return date.toLocaleDateString('fr-FR', {
+						weekday: 'long',
+						day: 'numeric',
+						month: 'long',
+						year: 'numeric',
+						timeZone: 'UTC'
+					});
+				};
+				assert.ok(
+					svg.includes(`<title>${label(vector.today)} — `),
+					'the real local today remains visible'
+				);
+				assert.ok(
+					!svg.includes(`<title>${label(vector.future)} — `),
+					'UTC conversion must not insert local tomorrow'
+				);
+				if (vector.archived) {
+					assert.ok(
+						svg.includes(`<title>${label(vector.archived)} — 20 `),
+						'archived skipped dates remain distinct cells'
+					);
+					assert.ok(page.elements.get('records_best_day').innerHTML.includes('30 déc. 11'));
+					assert.ok(
+						page.elements
+							.get('hour_weekday_heatmap_container')
+							.innerHTML.includes(
+								`<title>${page.context._t('ui_typing.heatmap_day_fri')} 09h — 20 `
+							),
+						'archived dates retain their recorded Gregorian weekday'
+					);
+				}
+				assert.equal(
+					page.diagnostics.some((entry) => entry.level === 'error'),
+					false
+				);
+			} finally {
+				if (previousTimezone === undefined) delete process.env.TZ;
+				else process.env.TZ = previousTimezone;
+			}
+		});
+	}
+}
+assert.equal(
+	passed,
+	279,
+	'all apps controls and full loaded typing-page calendar controls must execute'
+);
+
 console.log(`${passed} passed, 0 failed.`);

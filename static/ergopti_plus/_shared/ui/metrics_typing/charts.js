@@ -991,7 +991,7 @@ function _render_activity_calendar() {
 	const PAD_TOP = 18; // space for month labels
 	const PAD_LEFT = 28; // space for weekday labels
 	const ROWS = 7; // Mon..Sun
-	const DAYS = 365; // 52*7 + 1 — covers a full year
+	const DAYS = METRICS_CALENDAR_YEAR_DAYS; // 52*7 + 1 — covers a full year
 
 	// Build the full date map from the manifest so the calendar shows historical
 	// days even when they're not currently in the filter selection.
@@ -1014,12 +1014,11 @@ function _render_activity_calendar() {
 		date_chars[today] = (date_chars[today] || 0) + total;
 	}
 
-	const today = new Date();
-	today.setHours(12, 0, 0, 0);
-	const start = new Date(today.getTime() - (DAYS - 1) * 86400_000);
+	const today = new Date(metricsLocalDayOrdinal(new Date()));
+	const start = new Date(shiftMetricsDay(today.getTime(), 1 - DAYS));
 	// Start the grid on the Monday of `start`'s week so columns align to weeks.
-	const start_dow = (start.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
-	start.setDate(start.getDate() - start_dow);
+	const start_dow = (start.getUTCDay() + 6) % 7; // 0 = Mon, 6 = Sun
+	start.setUTCDate(start.getUTCDate() - start_dow);
 
 	// Find the day max for color scale (gamma-compressed so big outliers don't
 	// flatten everything else).
@@ -1041,10 +1040,9 @@ function _render_activity_calendar() {
 			weekday: 'long',
 			day: 'numeric',
 			month: 'long',
-			year: 'numeric'
+			year: 'numeric',
+			timeZone: 'UTC'
 		});
-	const iso_date = (d) =>
-		`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 	let cells = '';
 	let month_labels = '';
@@ -1052,19 +1050,19 @@ function _render_activity_calendar() {
 	const cursor = new Date(start);
 	let col = 0;
 	while (cursor <= today) {
-		const dow = (cursor.getDay() + 6) % 7; // 0 = Mon
+		const dow = (cursor.getUTCDay() + 6) % 7; // 0 = Mon
 		if (dow === 0 && col > 0) col++; // new column at start of each week
 		// Actually the simplest: increment column when we hit Monday OR the very first iteration
 		const x = PAD_LEFT + col * (CELL + GAP);
 		const y = PAD_TOP + dow * (CELL + GAP);
-		const date_str = iso_date(cursor);
+		const date_str = formatMetricsDateKey(cursor.getTime());
 		const n = date_chars[date_str] || 0;
 		const fill = heat_color(n);
 		const tip = `${fr_date(cursor)} — ${n === 0 ? _t('ui_typing.calendar_no_keystrokes') : format_number(n) + ' ' + _t('ui_typing.calendar_chars')}`;
 		cells += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${fill}"><title>${tip}</title></rect>`;
 
 		// Month label appears once at the start of each new month
-		if (cursor.getMonth() !== last_month && dow === 0) {
+		if (cursor.getUTCMonth() !== last_month && dow === 0) {
 			const month_short = [
 				_t('ui_typing.calendar_month_0'),
 				_t('ui_typing.calendar_month_1'),
@@ -1078,13 +1076,13 @@ function _render_activity_calendar() {
 				_t('ui_typing.calendar_month_9'),
 				_t('ui_typing.calendar_month_10'),
 				_t('ui_typing.calendar_month_11')
-			][cursor.getMonth()];
+			][cursor.getUTCMonth()];
 			month_labels += `<text x="${x}" y="${PAD_TOP - 6}" font-size="10" fill="var(--text-muted, #888)">${month_short}</text>`;
-			last_month = cursor.getMonth();
+			last_month = cursor.getUTCMonth();
 		}
 
-		cursor.setDate(cursor.getDate() + 1);
-		if ((cursor.getDay() + 6) % 7 === 0) col++;
+		cursor.setUTCDate(cursor.getUTCDate() + 1);
+		if ((cursor.getUTCDay() + 6) % 7 === 0) col++;
 	}
 
 	const weekday_labels = [
@@ -1151,8 +1149,8 @@ function _render_hour_weekday_heatmap() {
 	let max_cell = 0;
 
 	const accumulate_day = (date_str, app_data_map) => {
-		const d = new Date(date_str + 'T12:00:00');
-		const dow = (d.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
+		const d = new Date(parseDateKey(date_str));
+		const dow = (d.getUTCDay() + 6) % 7; // 0 = Mon, 6 = Sun
 		Object.values(app_data_map || {}).forEach((app) => {
 			if (!app || !app.hourly) return;
 			Object.entries(app.hourly).forEach(([h_str, hd]) => {

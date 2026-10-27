@@ -148,6 +148,7 @@ vm.runInContext(
 	read('static/ergopti_plus/_shared/ui/_generated/metrics_general_category_aliases.js'),
 	appsContext
 );
+vm.runInContext(read('static/ergopti_plus/_shared/ui/metrics_calendar.js'), appsContext);
 vm.runInContext(read('static/ergopti_plus/_shared/ui/metrics_apps/helpers.js'), appsContext);
 vm.runInContext(appsSource, appsContext);
 vm.runInContext(
