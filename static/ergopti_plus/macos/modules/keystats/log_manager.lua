@@ -93,6 +93,13 @@ local RECOVERY_RESUME_SEC = 0.01
 --- more than the walk itself.
 local RECOVERY_PACE_ROWS = 64
 
+--- Derived rows one recovery transaction deletes. A single-transaction delete
+--- of a large partition (3 million n-gram rows) took 9.5 s on a synthetic cache
+--- and held the main thread 5.3 s in the 2026-10-27 field session; 500 rows per
+--- committed batch measured 30 ms with synchronous=FULL, so 100 stays near the
+--- 8 ms slice budget.
+local RECOVERY_DELETE_BATCH_ROWS = 100
+
 --- Maximum drain iterations during day_rollover. At 5000 lines/batch this
 --- covers 100 000 lines before giving up and preserving the file.
 local MAX_ROLLOVER_DRAIN_ITERS = 20
@@ -1111,11 +1118,11 @@ local function _flush_recovery_batch(db)
 	return true
 end
 
---- Remove a single device partition before deterministic re-aggregation.
+--- Remove a single device partition in one transaction (outside the recovery).
 ---@param db userdata
 ---@param device_id string
 ---@return boolean
-local function _clear_derived_device_rows(db, device_id)
+local function _clear_derived_device_rows_at_once(db, device_id)
 	local begin_rc = db:exec("BEGIN TRANSACTION;")
 	if begin_rc ~= sqlite3.OK then return false end
 	local ok, err = pcall(function()
@@ -1134,6 +1141,58 @@ local function _clear_derived_device_rows(db, device_id)
 	return true
 end
 
+local _recovery_pace
+
+--- Remove a single device partition before deterministic re-aggregation.
+--- Inside the cooperative recovery it deletes in committed batches with a pace
+--- point between them, so one slice never holds a whole partition delete; the
+--- partition is not marked rebuilt until the recovery ends, so a stop between
+--- batches repeats it at the next start.
+---@param db userdata
+---@param device_id string
+---@return boolean
+local function _clear_derived_device_rows(db, device_id)
+	local job = _recovery
+	if job == nil or coroutine.running() ~= job.co then
+		return _clear_derived_device_rows_at_once(db, device_id)
+	end
+	-- Small partitions keep the single-transaction delete; only a table holding
+	-- more than one batch for this device is deleted in paced batches.
+	local partition = " WHERE device_id=" .. _sq(device_id)
+	local large = {}
+	for _, table_name in ipairs(DERIVED_DEVICE_TABLES) do
+		for _ in db:nrows("SELECT 1 AS left_over FROM " .. table_name .. partition
+			.. " LIMIT 1 OFFSET " .. RECOVERY_DELETE_BATCH_ROWS .. ";") do
+			large[#large + 1] = table_name
+		end
+	end
+	for _, table_name in ipairs(large) do
+		local statement = "DELETE FROM " .. table_name .. " WHERE rowid IN (SELECT rowid FROM " .. table_name
+			.. partition .. " LIMIT " .. RECOVERY_DELETE_BATCH_ROWS .. ");"
+		local probe = "SELECT 1 AS left_over FROM " .. table_name .. partition .. " LIMIT 1 OFFSET "
+			.. RECOVERY_DELETE_BATCH_ROWS .. ";"
+		local remaining = true
+		while remaining do
+			local ok, err = pcall(function()
+				if db:exec("BEGIN TRANSACTION;") ~= sqlite3.OK then error(db:errmsg() or "cannot begin derived cleanup") end
+				if db:exec(statement) ~= sqlite3.OK then error(db:errmsg() or ("cannot clear " .. table_name)) end
+				if db:exec("COMMIT;") ~= sqlite3.OK then error(db:errmsg() or "cannot commit derived cleanup") end
+				remaining = false
+				for _ in db:nrows(probe) do remaining = true end
+			end)
+			if not ok then
+				_rollback_sqlite(db, "Derived row cleanup")
+				Logger.error(LOG, "Cannot clear derived device rows: %s.", tostring(err))
+				return false
+			end
+			-- Between two committed batches: a yield never leaves a transaction open.
+			_recovery_pace()
+		end
+	end
+	-- What is left is at most one batch per table: one transaction, as before.
+	return _clear_derived_device_rows_at_once(db, device_id)
+end
+
 --- Return the local-only ledger batch waiting to reach data.sql.
 --- This value must never be appended to data.sql itself: it is a cursor-local
 --- recovery record, not data to replay into a different device cache.
@@ -1148,7 +1207,7 @@ end
 --- A no-op outside that coroutine, so the ingest partition rebuild and tests that
 --- call the rebuild directly keep running it to completion. Callers yield only
 --- between SQLite transactions, never inside one.
-local function _recovery_pace()
+_recovery_pace = function()
 	local job = _recovery
 	if job == nil or coroutine.running() ~= job.co then return end
 	if timer.absoluteTime() - job.slice_start_ns >= RECOVERY_SLICE_NS then coroutine.yield() end
