@@ -973,5 +973,111 @@ class PrivateOwnerPortControls(unittest.TestCase):
                             owner.require_owned(replacement.lstat(), "private-keyring")
 
 
+class ArchiveCacheControls(unittest.TestCase):
+    """The cross-run archive cache admits only bytes the signed index names."""
+
+    GOOD = b"signed archive bytes"
+    STALE = b"same-size poisoned!!"
+
+    def plan_line(self, name, raw):
+        return "'http://azure.archive.ubuntu.com/ubuntu/pool/%s' %s %d MD5Sum:%s" % (
+            name,
+            name,
+            len(raw),
+            hashlib.md5(raw).hexdigest(),
+        )
+
+    def index(self, names):
+        """The signed-index stanzas apt-cache shows: the genuine bytes' SHA256."""
+        return "\n\n".join(
+            "Package: %s\nFilename: pool/main/%s\nSize: %d\nSHA256: %s"
+            % (name.split("_")[0], name, len(self.GOOD), hashlib.sha256(self.GOOD).hexdigest())
+            for name in names
+        )
+
+    def run_cached(self, restored_files, listing, downloaded):
+        """Drive one acquisition; the fake install writes what APT would download."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as folder:
+            cache = Path(folder)
+            for half in ("restored", "used"):
+                (cache / half).mkdir()
+            for name, raw in restored_files.items():
+                target = cache / "restored" / name
+                if isinstance(raw, Path):
+                    target.symlink_to(raw)
+                else:
+                    target.write_bytes(raw)
+            seen = {}
+
+            def execute(argv, *, check):
+                if "install" in argv:
+                    archives = (
+                        Path(next(v.split("=", 1)[1] for v in argv if v.startswith("Dir::Cache=")))
+                        / "archives"
+                    )
+                    seen["before"] = sorted(p.name for p in archives.glob("*.deb"))
+                    for name in downloaded:
+                        if not (archives / name).exists():
+                            (archives / name).write_bytes(self.GOOD)
+
+            def capture(argv, **kwargs):
+                if argv[0] == "/usr/bin/apt-cache":
+                    selectors = argv[argv.index("show") + 1 :]
+                    seen["selectors"] = selectors
+                    return SimpleNamespace(stdout=self.index(downloaded))
+                self.assertIn("--print-uris", argv)
+                return SimpleNamespace(stdout=listing)
+
+            acquire_as_root(
+                VALID,
+                ["-y", "xdotool"],
+                execute,
+                keyring=CANONICAL,
+                deb_cache=str(cache),
+                capture=capture,
+            )
+            seen["used"] = {p.name: p.read_bytes() for p in (cache / "used").glob("*.deb")}
+            return seen
+
+    def test_hash_matching_archives_are_reused_and_every_used_one_is_kept(self):
+        listing = "\n".join(
+            [
+                self.plan_line("xdotool_1%3a3.2_amd64.deb", self.GOOD),
+                self.plan_line("libxdo3_1%3a3.2_amd64.deb", self.GOOD),
+            ]
+        )
+        seen = self.run_cached(
+            {"xdotool_1%3a3.2_amd64.deb": self.GOOD},
+            listing,
+            ["xdotool_1%3a3.2_amd64.deb", "libxdo3_1%3a3.2_amd64.deb"],
+        )
+        self.assertEqual(seen["before"], ["xdotool_1%3a3.2_amd64.deb"])
+        self.assertEqual(seen["selectors"], ["xdotool=1:3.2", "libxdo3=1:3.2"])
+        self.assertEqual(
+            seen["used"],
+            {"xdotool_1%3a3.2_amd64.deb": self.GOOD, "libxdo3_1%3a3.2_amd64.deb": self.GOOD},
+        )
+
+    def test_same_size_foreign_bytes_and_links_are_never_seeded(self):
+        name = "xdotool_1%3a3.2_amd64.deb"
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as outside:
+            real = Path(outside) / "real.deb"
+            real.write_bytes(self.GOOD)
+            for cached in (self.STALE, real):
+                seen = self.run_cached({name: cached}, self.plan_line(name, self.GOOD), [name])
+                self.assertEqual(seen["before"], [])
+                self.assertEqual(seen["used"], {name: self.GOOD})
+
+    def test_an_unknown_download_plan_line_refuses_before_install(self):
+        with self.assertRaises(ValueError):
+            self.run_cached({}, "Inst xdotool (1:3.2 Ubuntu:24.04)", [])
+        with self.assertRaises(ValueError):
+            owner.planned_archives("'http://x/a/../b.deb' ../b.deb 3 MD5Sum:00")
+
+
 if __name__ == "__main__":
     unittest.main()

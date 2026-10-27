@@ -607,6 +607,14 @@ const STEP_CONDITIONS = [
 		'Save the Flatpak runtimes',
 		"steps.flatpak-cache.outputs.cache-hit != 'true'"
 	],
+	// Each E2E row saves the Ubuntu archives it used only when the set changed.
+	[LINUX_BOX, 'e2e-linux', 'Name the used Ubuntu archive set', '${{ !cancelled() }}'],
+	[
+		LINUX_BOX,
+		'e2e-linux',
+		'Save the Ubuntu archive cache',
+		"${{ !cancelled() && steps.ubuntu-apt-used.outputs.count != '0' && steps.ubuntu-apt-used.outputs.key != steps.ubuntu-apt-cache.outputs.cache-matched-key }}"
+	],
 	[
 		LINUX_BOX,
 		'test-linux',
@@ -3736,8 +3744,8 @@ for (const [what, from, to] of [
 	],
 	[
 		'Linux E2E forwards an integration predicate for a diagnostic build',
-		'      ci_attempt: ${{ github.run_attempt }}\n\n    steps:\n      - uses: actions/checkout@v4\n\n      - name: Install LuaJIT\n        # Bound',
-		'      ci_attempt: ${{ github.run_attempt }}\n      ci_integration_result: ${{ needs.integration-linux.result }}\n\n    steps:\n      - uses: actions/checkout@v4\n\n      - name: Install LuaJIT\n        # Bound'
+		'      ci_attempt: ${{ github.run_attempt }}\n\n    steps:\n      - uses: actions/checkout@v4\n\n      # The rows spent',
+		'      ci_attempt: ${{ github.run_attempt }}\n      ci_integration_result: ${{ needs.integration-linux.result }}\n\n    steps:\n      - uses: actions/checkout@v4\n\n      # The rows spent'
 	]
 ]) {
 	mustCatch(what, LINUX_BOX, from, to, graphProblems);

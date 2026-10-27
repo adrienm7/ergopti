@@ -269,6 +269,23 @@ for (const [file, floor] of scopes) {
 	}
 }
 
+// The archive cache directory has one owner, ubuntu_apt.py's DEB_CACHE: every
+// workflow path naming it must be that directory or one of its two halves.
+const cacheOwner = fs.readFileSync(path.join(root, 'tools/ci/ubuntu_apt.py'), 'utf8');
+const debCache = (cacheOwner.match(/^DEB_CACHE = Path\("([^"]+)"\)$/m) || [])[1];
+assert.ok(debCache, 'ubuntu_apt.py declares DEB_CACHE');
+const linuxWorkflow = fs.readFileSync(path.join(root, '.github/workflows/ci-linux.yml'), 'utf8');
+const cacheMentions = linuxWorkflow.match(/\/var\/cache\/ergopti-ubuntu-apt-debs[^\s"']*/g) || [];
+assert.ok(
+	cacheMentions.length >= 5,
+	'the E2E rows create, restore, prepare, name and save the cache'
+);
+for (const mention of cacheMentions)
+	assert.ok(
+		[debCache, debCache + '/used'].includes(mention),
+		'foreign archive cache path ' + mention
+	);
+
 const result = spawnSync(
 	process.platform === 'win32' ? 'python' : 'python3',
 	['tools/ci/ubuntu_apt_test.py'],
@@ -277,5 +294,5 @@ const result = spawnSync(
 assert.ifError(result.error);
 assert.equal(result.signal, null);
 assert.equal(result.status, 0, result.stdout + result.stderr);
-assert.match(result.stderr, /Ran 31 tests in /);
+assert.match(result.stderr, /Ran 34 tests in /);
 console.log('PASS: signed Ubuntu host acquisition, failure controls and workflow mutations');

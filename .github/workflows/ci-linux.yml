@@ -535,6 +535,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The rows spent most of their time downloading Ubuntu archives: 469 to 658 s
+      # for one install step on run 40498535042, where the Azure mirror is slow.
+      # Each row keeps the archives it installed. ubuntu_apt.py uses the cache only
+      # when its directory (DEB_CACHE there) exists, and reuses a cached file only
+      # when its bytes match the SHA256 of the signed index it has just fetched;
+      # it downloads every other archive as before.
+      - name: Create the Ubuntu archive cache directory
+        run: sudo install -d -o "$(id -u)" -g "$(id -g)" -m 0755 /var/cache/ergopti-ubuntu-apt-debs
+
+      - name: Restore the Ubuntu archive cache
+        id: ubuntu-apt-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /var/cache/ergopti-ubuntu-apt-debs/used
+          key: ubuntu-apt-debs-${{ matrix.shard }}-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}
+          restore-keys: ubuntu-apt-debs-${{ matrix.shard }}-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Prepare the Ubuntu archive cache
+        run: |
+          set -euo pipefail
+          cache=/var/cache/ergopti-ubuntu-apt-debs
+          mkdir -p "$cache/used"
+          mv "$cache/used" "$cache/restored"
+          mkdir "$cache/used"
+          echo "restored archives: $(find "$cache/restored" -maxdepth 1 -name '*.deb' | wc -l)"
+
       - name: Install LuaJIT
         # Bound extension sections require actual no-follow source identity.
         # Test discovery alone does not prove their filesystem admission.
@@ -4189,6 +4215,26 @@ jobs:
           retention-days: 7
           path: ${{ runner.temp }}/linux-ci-evidence/e2e-linux-${{ matrix.shard }}.json
           if-no-files-found: error
+
+      # A new entry is saved only when this row used a different archive set;
+      # the name carries a digest of the file list, so an unchanged set is a hit.
+      - name: Name the used Ubuntu archive set
+        id: ubuntu-apt-used
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          used=/var/cache/ergopti-ubuntu-apt-debs/used
+          count="$(find "$used" -maxdepth 1 -name '*.deb' | wc -l)"
+          digest="$(find "$used" -maxdepth 1 -name '*.deb' -printf '%f %s\n' | sort | sha256sum | cut -c1-16)"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "key=ubuntu-apt-debs-${{ matrix.shard }}-${{ runner.os }}-${{ runner.arch }}-$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Save the Ubuntu archive cache
+        if: ${{ !cancelled() && steps.ubuntu-apt-used.outputs.count != '0' && steps.ubuntu-apt-used.outputs.key != steps.ubuntu-apt-cache.outputs.cache-matched-key }}
+        uses: actions/cache/save@v4
+        with:
+          path: /var/cache/ergopti-ubuntu-apt-debs/used
+          key: ${{ steps.ubuntu-apt-used.outputs.key }}
 
       # ─────────────────────────────────────────────────
       # 3) Assemble the driver once, build every package, smoke two of them
