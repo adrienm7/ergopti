@@ -800,6 +800,7 @@ return {
 	"tests.unit.ui.metrics.test_metrics_flush_bridge",
 	"tests.unit.ui.metrics.test_wpm_readouts",
 	"tests.unit.ui.webview.test_windows_focused_not_topmost",
+	"tests.unit.ui.webview.test_webview_toggle",
 	"tests.meta.corpus.test_corpus_llm_parser",
 	"tests.meta.corpus.test_corpus_prompt_builder",
 	"tests.meta.corpus.test_corpus_tone",

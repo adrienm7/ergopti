@@ -628,6 +628,13 @@ function M.is_open()
 	return _webview ~= nil and owner_is_current(_owner)
 end
 
+--- The open window, for ui/window_toggle (nil when closed).
+--- @return userdata|nil view
+function M.window()
+	if _webview ~= nil and owner_is_current(_owner) then return _webview end
+	return nil
+end
+
 --- Closes the Hotstring Editor window and cleans up resources.
 --- @return boolean committed
 function M.close()
