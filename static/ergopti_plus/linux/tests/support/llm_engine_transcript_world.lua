@@ -31,7 +31,7 @@ local RELOADED = {
 	"modules.llm.api_remote",
 }
 local FAKED = {
-	"adapters.secure_field_detector", "adapters.http_client", "modules.llm.api_entries",
+	"adapters.secure_field_detector", "modules.llm.api_entries",
 	"modules.llm.profiles", "modules.llm.api_ollama",
 }
 
@@ -60,14 +60,9 @@ function M.with_world(config, body)
 		for _, name in ipairs(RELOADED) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		for _, name in ipairs(FAKED) do previous[name] = package.loaded[name] end
 		local log, posts = {}, {}
-		local world = { model_label = "qwen-3.8-27b" }
-		package.loaded["adapters.secure_field_detector"] = {
-			isSecureField = function() return false end,
-			isSecureApp = function() return false end,
-			isUrlBar = function() return false end,
-		}
-		package.loaded["adapters.http_client"] = {
-			post = function(url, _, request_body, callback)
+		-- The HttpClient port, handed to the engine at init.
+		local http_client = {
+			post = function(_, _, request_body, callback)
 				local decoded = Json.decode(request_body)
 				posts[#posts + 1] = { callback = callback }
 				log[#log + 1] = { port = "http", call = "post", max_tokens = decoded.max_tokens }
@@ -75,7 +70,12 @@ function M.with_world(config, body)
 			end,
 			cancel = function() return true end,
 		}
-		require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"])
+		local world = { model_label = "qwen-3.8-27b" }
+		package.loaded["adapters.secure_field_detector"] = {
+			isSecureField = function() return false end,
+			isSecureApp = function() return false end,
+			isUrlBar = function() return false end,
+		}
 		package.loaded["modules.llm.api_entries"] = { active = function() return ENTRY end }
 		local profiles = ProfilesFixture.without_inventory({
 			init = function() return true end,
@@ -100,6 +100,7 @@ function M.with_world(config, body)
 		local engine = require("modules.llm.prediction_engine")
 		engine.init({ focus_id = function() return "owned-prediction-window" end,
 			scheduler = scheduler,
+			http_client = http_client,
 			clock_ms = function() return scheduler.now * 1000 end,
 			engine = { reset = function() buffer = "" end },
 			context = { text = function() return buffer end, replaced = function() end },
@@ -118,6 +119,7 @@ function M.with_world(config, body)
 			},
 			apply_prediction = function() return true end,
 		})
+		world.engine = engine
 		local handlers = engine.action_handlers()
 
 		function world.keystroke(text)
