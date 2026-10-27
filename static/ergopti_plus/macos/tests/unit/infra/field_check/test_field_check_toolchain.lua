@@ -14,7 +14,10 @@
 --- 4. a broken strict signature names codesign's first known cause and logs
 ---    its bounded diagnostic, and Gatekeeper's own assessment is its own step,
 ---    so a report shows whether the app is refused or only fails --strict
----    (field report of 2026-10-27 22:32, karabiner_signature fail:exit_1).
+---    (field report of 2026-10-27 22:32, karabiner_signature fail:exit_1);
+--- 5. Gatekeeper decides: a strict failure whose only cause is the Finder
+---    attribute of the 22:55 Mac is information when Gatekeeper accepts the
+---    app from the pqrs team, and a failure otherwise.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -268,5 +271,41 @@ helpers.describe("toolchain check", function()
 		helpers.assert_eq(separators, Checks.DIAGNOSTIC_MAX_LINES, "the lines past the bound become one ellipsis")
 		helpers.assert_true(#excerpt < (Checks.DIAGNOSTIC_MAX_LINE_CHARS + 8) * (Checks.DIAGNOSTIC_MAX_LINES + 1))
 		helpers.assert_eq(excerpt:find(APP, 1, true), nil, "the app path is shortened")
+	end)
+
+	-- codesign and spctl output of the Mac of 2026-10-27 22:55
+	-- (docs/field-reports/mac-2026-10-27_225536, karabiner_signature.txt).
+	local DETRITUS = APP .. ": resource fork, Finder information, or similar detritus not allowed\n"
+		.. "file with invalid attached data: Disallowed xattr com.apple.FinderInfo found on " .. APP .. "\n"
+	local NOTARIZED = APP .. ": accepted\nsource=Notarized Developer ID\n"
+		.. "origin=Developer ID Application: Fumihiko Takayama (G43BCU2T37)\n"
+
+	helpers.it("reports Finder detritus Gatekeeper accepts from the pqrs team as information", function()
+		local ports, world = make_ports()
+		healthy(world)
+		world.outputs[CODESIGN] = { 1, "", DETRITUS }
+		world.outputs[SPCTL] = { 0, "", NOTARIZED }
+		local steps, result = run(ports)
+		helpers.assert_true(result.passed, "a notarized app with a Finder attribute is not broken")
+		helpers.assert_eq(steps.karabiner_signature.state, "info")
+		helpers.assert_eq(steps.karabiner_signature.value, "strict_only:finder_detritus")
+		helpers.assert_eq(steps.karabiner_gatekeeper.state, "pass")
+		helpers.assert_eq(steps.karabiner_gatekeeper.value, "accepted:notarized_developer_id")
+	end)
+
+	helpers.it("keeps Finder detritus a failure without the pqrs team or with another cause", function()
+		local ports, world = make_ports()
+		healthy(world)
+		world.outputs[CODESIGN] = { 1, "", DETRITUS }
+		world.outputs[SPCTL] = { 0, "", (NOTARIZED:gsub("G43BCU2T37", "ABCDE12345")) }
+		local steps, result = run(ports)
+		helpers.assert_true(not result.passed)
+		helpers.assert_eq(steps.karabiner_signature.value, "exit_1:finder_detritus")
+		helpers.assert_eq(steps.karabiner_gatekeeper.value, "accepted:other_team")
+		world.outputs[CODESIGN] = { 1, "", DETRITUS .. APP .. ": a sealed resource is missing or invalid\n" }
+		world.outputs[SPCTL] = { 0, "", NOTARIZED }
+		steps, result = run(ports)
+		helpers.assert_true(not result.passed, "a second cause is not explained by the attribute")
+		helpers.assert_eq(steps.karabiner_signature.state, "fail")
 	end)
 end)
