@@ -23,6 +23,11 @@ dev = [
 line-length = 100
 target-version = "py313"
 extend-exclude = ["**/vendor/**", "**/_generated/**", ".claude/**"]
+# The plain-layout Linux package runs on the user's own interpreter, down to
+# install.sh's MIN_PYTHON_MINOR (Ubuntu 20.04's 3.8). Formatting it for py313
+# rewrote long `with` statements into the 3.9+ parenthesized form, which broke
+# the 3.8 floor and the ubuntu-20.04/22.04 real installs.
+per-file-target-version = { "static/ergopti/linux/**/*.py" = "py38" }
 
 [tool.ruff.lint.per-file-ignores]
 # Puts its sibling packages on sys.path before importing them.
