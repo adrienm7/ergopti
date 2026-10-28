@@ -1426,11 +1426,7 @@ function checkIsolatedLlmSuites(body) {
 	assert.match(block[0], /^foreach /, 'the suite loop must execute outside conditional wrappers');
 	const names = [...block[0].matchAll(/"(run_[a-z_]+\.ahk)"/g)].map((match) => match[1]);
 	assert.equal(new Set(names).size, names.length, 'each isolated suite runs once');
-	for (const name of [
-		'run_llm_model_browser.ahk',
-		'run_llm_model_menu_disabled.ahk',
-		'run_llm_pointer_dismiss.ahk'
-	])
+	for (const name of ['run_llm_model_browser.ahk', 'run_llm_pointer_dismiss.ahk'])
 		assert.ok(names.includes(name), name + ' must be a mandatory native suite');
 	const nativeBody = block.filter((line) => !line.trimStart().startsWith('#')).join('\n');
 	assert.doesNotMatch(

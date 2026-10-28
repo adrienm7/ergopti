@@ -66,11 +66,15 @@ return function(callback, options)
 		for _, name in ipairs({ "temperature_panel", "streaming_panel", "trigger_panel" }) do
 			package.loaded["ui.menu.menu_llm." .. name] = { build = function() return {} end }
 		end
+		-- The menu itself must build neither panel: the model selector page
+		-- collects them only when it opens (maintainer, 2026-10-27).
+		calls.panel_builds = 0
+		local function counted_build() calls.panel_builds = calls.panel_builds + 1; return nil, nil end
 		package.loaded["ui.menu.menu_llm.backend_panel"] = {
-			is_apple_silicon = function() return false end, build = function() return "backend", {} end }
+			is_apple_silicon = function() return false end, build = counted_build }
 		package.loaded["ui.menu.menu_llm.api_panel"] = {
-			build = function() return nil, nil end, build_model_picker = function() return {} end }
-		package.loaded["ui.menu.menu_llm.models_selector"] = { build = function() return {} end }
+			build = counted_build,
+			active_entry_caption_text = function() return nil end }
 		package.loaded["ui.menu.menu_llm.model_switcher"] = { new = function()
 			return { switch_model = unobserved_command, disable_model = unobserved_command,
 				get_display_model_name = function(name) return name end,
@@ -104,15 +108,17 @@ return function(callback, options)
 			return manager
 		end
 		if options.real_model_selector then
-			package.loaded["ui.menu.menu_llm.models_selector"] = nil
-			local selector = require("ui.menu.menu_llm.models_selector")
-			local genuine_build = selector.build
-			selector.build = function(...)
-				local rows = genuine_build(...)
-				calls.real_model_selector_rows = rows
-				return rows
+			package.loaded["ui.menu.menu_llm.model_selector_page"] = nil
+			local page = require("ui.menu.menu_llm.model_selector_page")
+			local genuine_open = page.open
+			calls.page_opens = 0
+			page.open = function(...)
+				calls.page_opens = calls.page_opens + 1
+				calls.page_open_result = genuine_open(...)
+				return calls.page_open_result
 			end
 		end
+		if options.window_toggle then package.loaded["ui.window_toggle"] = options.window_toggle end
 		local menu = require("ui.menu.menu_llm").create({ state = state,
 			keymap = { set_llm_model = accept }, script_control = options.script_control,
 			save_prefs = accept, update_menu = accept, active_tasks = {} })

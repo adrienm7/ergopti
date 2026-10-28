@@ -105,14 +105,19 @@ helpers.describe("model browser inventory document", function()
 			end
 			helpers.assert_not_nil(installed); helpers.assert_not_nil(available)
 			helpers.assert_true(installed.installed)
-			local selected = f.send({ action = "select_model", name = installed.name })
+			local selected = f.send({ action = "select_model", backend = "ollama", name = installed.name })
 			helpers.assert_eq(seen.selected, { installed.runtime_name })
 			helpers.assert_eq(f.manager.is_visible("model_browser"), false)
 			-- Native close consumes the old response's document authority.
 			helpers.assert_eq(selected, nil)
 			helpers.assert_true(f.manager.show("model_browser"))
 			f.handshake()
-			f.send({ action = "select_model", name = available.name })
+			-- model-selector-page: a model not downloaded offers its download,
+			-- never its activation.
+			f.send({ action = "select_model", backend = "ollama", name = available.name })
+			helpers.assert_eq(seen.selected, { installed.runtime_name }, "selecting a missing model selects nothing")
+			helpers.assert_eq(seen.downloads, {}, "selecting a missing model downloads nothing")
+			f.send({ action = "download_model", backend = "ollama", name = available.name })
 			helpers.assert_eq(seen.downloads, { { available.runtime_name, available.name } })
 		end)
 	end)

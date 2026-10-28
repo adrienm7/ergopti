@@ -107,7 +107,7 @@ _CMJ_NewerSchemaPersistenceRows(Path, Source, Getters) {
 	_CMJ_NewerSchemaParents(Path, Source)
 }
 
-; The dynamic AI parents (servers, API entries, profiles) are native rows: they
+; The dynamic AI parent (profiles) is a native row: it
 ; name the same cause, and a click kept from before a reload rechecks it
 ; (ai-submenus-newer-config-2026-10-23).
 _CMJ_NewerSchemaParents(Path, Source) {
@@ -135,11 +135,12 @@ _CMJ_NewerSchemaParents(Path, Source) {
 		Child.Delete()
 		MenuDispatcher_PruneMenu(Child)
 	}
-	; Only the parents of the three writing submenus take the cause.
-	Model := _LLM_Menu_GreyConfigParents("llm_backend", [Map("label", "Servers", "submenu", Menu())], false)
-	AssertTrue(Model[1].Get("disabled", false), "the backend parent names the cause")
+	; Only the profile parent takes the cause: the model selector button opens
+	; the page, which greys every backend with that cause itself.
+	Model := _LLM_Menu_GreyConfigParents("llm_model", [Map("label", "Servers", "submenu", Menu())], false)
+	AssertFalse(Model[1].Has("disabled_reason_key"), "the model selector row is left to the page")
 	Unrelated := _LLM_Menu_GreyConfigParents("llm_trigger", [Map("label", "Other", "submenu", Menu())], false)
-	AssertFalse(Unrelated[1].Has("disabled_reason_key"), "a row outside the three writing submenus is left alone")
+	AssertFalse(Unrelated[1].Has("disabled_reason_key"), "a row outside the writing submenu is left alone")
 	Ran := 0
 	Guarded := _LLM_Menu_GuardConfigRows([Map("label", "leaf", "action", (*) => ++Ran,
 		"items", [Map("label", "inner", "action", (*) => ++Ran)])])

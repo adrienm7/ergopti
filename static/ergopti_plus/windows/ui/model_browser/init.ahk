@@ -503,66 +503,236 @@ _LLM_MBW_SessionCall(SessionEpoch, Callback, Params*) {
 }
 
 /**
- * Builds the normalised catalogue (name/family/params/RAM/speed/type/installed/url,
- * MoE-aware) from the shared model index and injects it via injectModels(). The
- * Windows backend is always Ollama, so the install flag reads the Ollama tag list.
+ * Builds the selector payload and injects it via injectModels(). The rows come
+ * from the shared model index (projected field by field as
+ * _shared/lua/llm/model_catalogue.lua projects them on macOS and Linux, pinned
+ * by tools/test/test-model-selector-page.cjs), the installed-tag cache, the API
+ * entries and the local servers' rows. Each row's actions are the tray's own
+ * closures, held in _LLM_MBW_Rows for the session; the page names a row, never
+ * a command.
  *
- * The catalogue is STATIC (_shared/modules/llm/models.json), so it is ALWAYS injected in
- * full — whether or not the AI feature is enabled. Only the green "installed" dot
- * needs Ollama, so its tag scan is skipped unless the daemon is confirmed ready.
- * This is critical here: InjectCatalogue runs inside the WebView2 WebMessageReceived
- * (STA COM) callback, and a synchronous /api/tags WinHttp probe against a down
- * daemon (the usual state when the feature is OFF) stalls that callback so the
- * injectModels() ExecuteScript never fires — leaving the user with an empty table.
+ * The catalogue is STATIC (_shared/modules/llm/models.json), so it is ALWAYS
+ * injected in full. The installed state reads the asynchronously maintained tag
+ * cache: InjectCatalogue runs inside the WebView2 WebMessageReceived (STA COM)
+ * callback, and a synchronous /api/tags WinHttp probe against a down daemon
+ * stalls that callback so the injectModels() ExecuteScript never fires.
  */
 _LLM_MBW_InjectCatalogue(ExpectedEpoch := unset) {
-	global _LLM_Menu
-	index := LLM_GetModelIndex()
-	installed := Map()
-	if (IsSet(LLM_Deps_IsReady) and LLM_Deps_IsReady()) {
-		for tag in _LLM_ModelBrowser_GetInstalledTags()
-			installed[StrLower(tag)] := true
-	}
-	active := _LLM_Menu.Has("model") ? _LLM_Menu["model"] : ""
-
-	models := "", count := 0
-	for name, info in index {
-		params   := (info is Map and info.Has("params_b"))    ? info["params_b"]    : 0
-		active_b := (info is Map and info.Has("active_b"))     ? info["active_b"]    : 0
-		if (active_b <= 0)
-			active_b := params
-		is_moe   := (active_b > 0 and active_b < params)
-		ram      := (info is Map and info.Has("ram_gb"))       ? info["ram_gb"]      : 0
-		speed    := (info is Map and info.Has("speed_tok_s"))  ? info["speed_tok_s"] : 0
-		mtype    := (info is Map and info.Has("type"))         ? info["type"]        : "chat"
-		ollama   := (info is Map and info.Has("ollama"))       ? info["ollama"]      : ""
-		inst     := installed.Has(StrLower(ollama))
-		family   := _LLM_ModelBrowser_GuessFamily(name)
-		url      := (ollama != "") ? ("https://ollama.com/library/" . ollama) : ""
-
-		obj := "{name:" . _LLM_MBW_JsStr(name)
-			. ",family:" . _LLM_MBW_JsStr(family)
-			. ",provider:" . _LLM_MBW_JsStr("")
-			. ",params_b:" . _LLM_MBW_Num(params)
-			. ",active_b:" . _LLM_MBW_Num(active_b)
-			. ",is_moe:" . (is_moe ? "true" : "false")
-			. ",ram_gb:" . _LLM_MBW_Num(ram)
-			. ",speed_tok_s:" . _LLM_MBW_Num(speed)
-			. ",type:" . _LLM_MBW_JsStr(mtype)
-			. ",installed:" . (inst ? "true" : "false")
-			. ",url:" . _LLM_MBW_JsStr(url)
-			. "}"
-		models .= (count > 0 ? "," : "") . obj
-		count += 1
-	}
-
-	js := "injectModels({backend:" . _LLM_MBW_JsStr("ollama")
-		. ",active:" . _LLM_MBW_JsStr(active)
-		. ",models:[" . models . "]})"
+	js := "injectModels(" . _LLM_MBW_BuildPayload() . ")"
 	if IsSet(ExpectedEpoch)
 		_LLM_MBW_Eval(js, ExpectedEpoch)
 	else
 		_LLM_MBW_Eval(js)
+}
+
+/** Re-sends the payload to an open page after a menu rebuild changed its state. */
+LLM_ModelBrowser_Refresh() {
+	global _LLM_MBW_Gui, _LLM_MBW_SessionEpoch, _LLM_MBW_Ready
+	if !IsSet(_LLM_MBW_Gui) || !_LLM_MBW_Ready
+		return false
+	_LLM_MBW_InjectCatalogue(_LLM_MBW_SessionEpoch)
+	return true
+}
+
+; The rows of the payload last injected, by "<backend>`n<name>", with their actions.
+global _LLM_MBW_Rows := Map()
+; The group tools of that payload, by "<backend>`n<id>".
+global _LLM_MBW_Tools := Map()
+
+/**
+ * The selector payload as a JSON object literal. Ollama is the local backend,
+ * MLX is listed greyed with its reason (it needs Apple silicon), and the API
+ * group holds the saved entries and the local servers that answer.
+ * @returns {String}
+ */
+_LLM_MBW_BuildPayload() {
+	global _LLM_Menu, _LLM_MBW_Rows, _LLM_MBW_Tools
+	Rows := Map(), Tools := Map(), Models := []
+	Backend := _LLM_Menu.Get("backend", "ollama")
+	Active := _LLM_Menu_ModelDisplayText()
+
+	; ===== Ollama =====
+	OllamaFailed := IsSet(LLM_Deps_HasFailed) && LLM_Deps_HasFailed()
+	Installed := Map()
+	for Tag in _LLM_ModelBrowser_GetInstalledTags()
+		Installed[StrLower(Tag)] := Tag
+	OllamaTools := []
+	if OllamaFailed
+		OllamaTools.Push(_LLM_MBW_Tool(Tools, "ollama", "install",
+			StrReplace(t("model_browser.install_runtime"), "%s", "Ollama"), (*) => _LLM_MBW_InstallOllama()))
+	PortDisplay := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_port")
+	OllamaTools.Push(_LLM_MBW_Tool(Tools, "ollama", "ollama_port",
+		StrReplace(t("menu.llm.ollama_port_label"), "%s", "" . PortDisplay), (*) => LLM_Menu_PromptOllamaPort()))
+	DefaultPort := _LLM_DefaultFor("llm_ollama_port")
+	if !(PortDisplay = DefaultPort)
+		OllamaTools.Push(_LLM_MBW_Tool(Tools, "ollama", "ollama_port_reset",
+			Trim(StrReplace(t("menu.llm.reset_label"), "%s", "" . DefaultPort)),
+			(*) => LLM_Menu_ResetOllamaPort(DefaultPort)))
+	DefaultModel := _LLM_DefaultFor("llm_model", "")
+	Seen := Map()
+	for Name, Info in LLM_GetModelIndex() {
+		Tag := (Info is Map && Info.Has("ollama")) ? Info["ollama"] : ""
+		if (Tag == "")
+			continue
+		IsInstalled := Installed.Has(StrLower(Tag))
+		if IsInstalled
+			Seen[StrLower(Tag)] := true
+		Row := _LLM_MBW_LocalRow(Name, Tag, Info, IsInstalled, Name == DefaultModel, false, Backend == "ollama")
+		Models.Push(Row["json"])
+		Rows["ollama`n" . Name] := Row
+	}
+	; Installed tags outside the catalogue are the user's own models.
+	for Lower, Tag in Installed {
+		if Seen.Has(Lower)
+			continue
+		Row := _LLM_MBW_LocalRow(Tag, Tag, Map(), true, false, true, Backend == "ollama")
+		Models.Push(Row["json"])
+		Rows["ollama`n" . Tag] := Row
+	}
+
+	; ===== API =====
+	ApiTools := [_LLM_MBW_Tool(Tools, "api", "add_api", t("menu.llm.api_add_entry"), (*) => _LLM_Menu_PromptApiEntry(""))]
+	_LLM_Menu_ApiEntryPageRows(Rows, Models)
+	_LLM_MBW_LocalServerRows(Rows, Tools, Models, ApiTools)
+
+	; A config.toml that refuses writes greys every backend with that cause.
+	Blocked := _LLM_Menu_ConfigBlockReason()
+	OllamaReason := Blocked != "" ? Blocked : (OllamaFailed ? "model_browser.reason_ollama_missing" : "")
+	Backends := _LLM_MBW_BackendJson("ollama", OllamaReason == "", OllamaReason, OllamaTools, OllamaReason == "")
+		. "," . _LLM_MBW_BackendJson("mlx", false, "model_browser.reason_mlx_unsupported_os", [], false)
+		. "," . _LLM_MBW_BackendJson("api", Blocked == "", Blocked, ApiTools, false)
+	ModelsJson := ""
+	for Json in Models
+		ModelsJson .= (ModelsJson == "" ? "" : ",") . Json
+	_LLM_MBW_Rows := Rows
+	_LLM_MBW_Tools := Tools
+	return "{backend:" . JsonStringLiteral(Backend) . ",active:" . JsonStringLiteral(Active)
+		. ",capabilities:{disable:true},backends:[" . Backends . "],models:[" . ModelsJson . "]}"
+}
+
+/**
+ * One local (Ollama) row: the catalogue fields the page's columns read. The
+ * tray's delete runs only on the Ollama backend, so the page offers it there.
+ */
+_LLM_MBW_LocalRow(Name, Tag, Info, IsInstalled, IsDefault, Custom, Deletable) {
+	Params := Info.Has("params_b") ? Info["params_b"] : 0
+	ActiveB := Info.Has("active_b") ? Info["active_b"] : 0
+	if (ActiveB <= 0)
+		ActiveB := Params
+	Url := Custom ? "" : "https://ollama.com/library/" . Tag
+	Json := "{backend:" . JsonStringLiteral("ollama")
+		. ",name:" . JsonStringLiteral(Name)
+		. ",runtime_name:" . JsonStringLiteral(Tag)
+		. ",family:" . JsonStringLiteral(Custom ? "" : _LLM_ModelBrowser_GuessFamily(Name))
+		. ",params_b:" . _LLM_MBW_Num(Params)
+		. ",active_b:" . _LLM_MBW_Num(ActiveB)
+		. ",is_moe:" . ((ActiveB > 0 && ActiveB < Params) ? "true" : "false")
+		. ",ram_gb:" . _LLM_MBW_Num(Info.Has("ram_gb") ? Info["ram_gb"] : 0)
+		. ",disk_gb:" . _LLM_MBW_Num(Info.Has("disk_gb") ? Info["disk_gb"] : 0)
+		. ",type:" . JsonStringLiteral(Info.Has("type") ? Info["type"] : "chat")
+		. ",installed:" . (IsInstalled ? "true" : "false")
+		. ",is_default:" . (IsDefault ? "true" : "false")
+		. ",custom:" . (Custom ? "true" : "false")
+		. ",deletable:" . (Deletable ? "true" : "false")
+		. ",url:" . JsonStringLiteral(Url) . "}"
+	return Map("backend", "ollama", "name", Name, "tag", Tag, "installed", IsInstalled, "custom", Custom,
+		"url", Url, "json", Json, "row_actions", Map())
+}
+
+/** Registers one group tool and returns its JSON. */
+_LLM_MBW_Tool(Tools, Backend, Id, Text, Action) {
+	Tools[Backend . "`n" . Id] := Action
+	return "{id:" . JsonStringLiteral(Id) . ",text:" . JsonStringLiteral(Text) . "}"
+}
+
+/** One backend entry of the payload, brand and emoji from backends.json. */
+_LLM_MBW_BackendJson(Id, Available, ReasonKey, Tools, AddModel) {
+	Brands := LLM_GetBackendBrands()
+	ToolsJson := ""
+	for Json in Tools
+		ToolsJson .= (ToolsJson == "" ? "" : ",") . Json
+	return "{id:" . JsonStringLiteral(Id) . ",brand:" . JsonStringLiteral(Brands[Id]["brand"])
+		. ",emoji:" . JsonStringLiteral(Brands[Id]["emoji"]) . ",kind:" . JsonStringLiteral(Brands[Id]["kind"])
+		. ",available:" . (Available ? "true" : "false")
+		. (ReasonKey != "" ? ",reason_key:" . JsonStringLiteral(ReasonKey) : "")
+		. (AddModel ? ",add_model:true" : "")
+		. ",actions:[" . ToolsJson . "]}"
+}
+
+/**
+ * The local servers that answer, as API rows: one per model they serve, the
+ * server's key and address as row actions, the sweep and the other addresses
+ * as group tools. The closures are the local-server panel's own.
+ */
+_LLM_MBW_LocalServerRows(Rows, Tools, Models, ApiTools) {
+	KeyLabel := t("menu.llm.local_servers.api_key")
+	RescanLabel := t("menu.llm.local_servers.rescan")
+	OtherLabel := t("menu.llm.local_servers.other_address")
+	for Top in LLM_Menu_LocalServersRows() {
+		if !(Top is Map) || Top.Get("separator", false)
+			continue
+		Label := Top.Get("label", "")
+		if (Label == RescanLabel && Top.Has("action")) {
+			ApiTools.Push(_LLM_MBW_Tool(Tools, "api", "rescan", Label, Top["action"]))
+			continue
+		}
+		if !Top.Has("items") || !(Top["items"] is Array)
+			continue
+		if (Label == OtherLabel) {
+			for Index, Child in Top["items"]
+				if Child is Map && Child.Has("action")
+					ApiTools.Push(_LLM_MBW_Tool(Tools, "api", "address_" . Index,
+						OtherLabel . " — " . Child.Get("label", ""), Child["action"]))
+			continue
+		}
+		Server := Trim(StrSplit(Label, " 🖥️")[1])
+		RowActions := Map(), ActionsJson := "", ModelRows := [], AfterSeparator := false
+		for Child in Top["items"] {
+			if !(Child is Map)
+				continue
+			if Child.Get("separator", false) {
+				AfterSeparator := true
+				continue
+			}
+			if !Child.Has("action")
+				continue
+			ChildLabel := Child.Get("label", "")
+			if (ChildLabel == KeyLabel || AfterSeparator) {
+				ActionId := ChildLabel == KeyLabel ? "set_key" : "address"
+				RowActions[ActionId] := Child["action"]
+				ActionsJson .= (ActionsJson == "" ? "" : ",") . "{id:" . JsonStringLiteral(ActionId) . ",text:" . JsonStringLiteral(ChildLabel) . "}"
+				continue
+			}
+			ModelRows.Push(Child)
+		}
+		if ModelRows.Length == 0 {
+			Name := Server
+			Row := Map("backend", "api", "name", Name, "installed", true, "row_actions", RowActions)
+			Row["json"] := "{backend:" . JsonStringLiteral("api") . ",name:" . JsonStringLiteral(Name)
+				. ",provider:" . JsonStringLiteral(Server) . ",installed:true,available:false"
+				. ",hint_key:" . JsonStringLiteral("model_browser.hint_api_no_key") . ",actions:[" . ActionsJson . "]}"
+			Models.Push(Row["json"])
+			Rows["api`n" . Name] := Row
+			continue
+		}
+		for Child in ModelRows {
+			Name := Server . "/" . Child.Get("label", "")
+			Row := Map("backend", "api", "name", Name, "installed", true, "select", Child["action"], "row_actions", RowActions)
+			Row["json"] := "{backend:" . JsonStringLiteral("api") . ",name:" . JsonStringLiteral(Name)
+				. ",runtime_name:" . JsonStringLiteral(Child.Get("label", "")) . ",provider:" . JsonStringLiteral(Server)
+				. ",installed:true,actions:[" . ActionsJson . "]}"
+			Models.Push(Row["json"])
+			Rows["api`n" . Name] := Row
+		}
+	}
+}
+
+/** The Ollama install the backend selection runs, from the page's Ollama group. */
+_LLM_MBW_InstallOllama() {
+	global _LLM_Menu
+	if (_LLM_Menu.Get("backend", "") != "ollama")
+		return LLM_Menu_SetBackend("ollama")
+	return LLM_Deps_CheckAndInstall(_LLM_Menu.Get("model", ""))
 }
 
 /**
@@ -659,9 +829,13 @@ _LLM_MBW_OnPageReady(ExpectedEpoch) {
 
 /**
  * Receives messages from the page. Expected payloads:
- *   "ready"                                  — page bootstrap complete
- *   {"action":"select_model","name":"…"}     — activate a model
- *   {"action":"open_url","url":"…"}          — open the model page in the browser
+ *   "ready"                                            — page bootstrap complete
+ *   {"action":"select_model","backend":"…","name":"…"} — activate a model
+ *   {"action":"download_model"|"delete_model"|"remove_custom_model", …}
+ *   {"action":"add_model","backend":"ollama","name":"…"} — pull a named model
+ *   {"action":"group_action"|"row_action","id":"…", …}  — a tool of the payload
+ *   {"action":"disable_model"}                         — no model
+ *   {"action":"open_url","url":"…"}                    — open the model page
  */
 _LLM_MBW_OnWebMessage(ExpectedEpoch, Handler, Args) {
 	global _LLM_MBW_SessionEpoch
@@ -693,25 +867,114 @@ _LLM_MBW_OnWebMessage(ExpectedEpoch, Handler, Args) {
 	Action := Payload.Has("action") ? Payload["action"] : ""
 	if !(Action is String)
 		return
-	if (Action == "select_model") {
-		Name := Payload.Has("name") ? Payload["name"] : ""
-		if _LLM_MBW_IsCatalogueModelName(Name) {
-			; Defer the teardown out of this COM callback. _LLM_MBW_OnClose ->
-			; _LLM_MBW_Reset releases the WebMessageReceived subscription that is
-			; CURRENTLY DISPATCHING, then closes the controller and destroys the
-			; host Gui — all synchronously on the callback stack. That is the
-			; access-violation class ui/onboarding/webview.ahk documents and
-			; already solves with SetTimer(-1); it was never applied here, and this
-			; path runs on every successful use of the browser (double-click, Enter
-			; or the Use button). An SEH fault of this kind is uncatchable and
-			; surfaces as a random crash with no link to the click.
-			SetTimer(_LLM_MBW_ApplyModel.Bind(Name, ExpectedEpoch), -1)
+	; Every page action writes config.toml, as the tray rows it replaces did.
+	if (Action != "open_url") {
+		BlockReason := _LLM_Menu_ConfigBlockReason()
+		if (BlockReason != "") {
+			try LoggerWarn("LLM.browser", "Model selector action '{1}' refused: {2}.", Action, BlockReason)
+			return
 		}
-	} else if (Action == "open_url") {
+	}
+	if (Action == "open_url") {
 		Url := Payload.Has("url") ? Payload["url"] : ""
 		if (_LLM_MBW_IsCatalogueSourceUrl(Url)
 				&& ExpectedEpoch == _LLM_MBW_SessionEpoch)
 			ExternalUrl_OpenHttp(Url)
+		return
+	}
+	; Defer every action out of this COM callback. _LLM_MBW_OnClose ->
+	; _LLM_MBW_Reset releases the WebMessageReceived subscription that is
+	; CURRENTLY DISPATCHING, then closes the controller and destroys the host
+	; Gui — all synchronously on the callback stack. That is the
+	; access-violation class ui/onboarding/webview.ahk documents and solves
+	; with SetTimer(-1); an SEH fault of this kind is uncatchable.
+	if (Action == "select_model" && !Payload.Has("backend")) {
+		Name := Payload.Has("name") ? Payload["name"] : ""
+		if _LLM_MBW_IsCatalogueModelName(Name)
+			SetTimer(_LLM_MBW_ApplyModel.Bind(Name, ExpectedEpoch), -1)
+		return
+	}
+	SetTimer(_LLM_MBW_RunAction.Bind(Payload, ExpectedEpoch), -1)
+}
+
+/**
+ * Runs one page action through the tray's own code path, on a fresh call
+ * stack. The page names a row or a tool of the payload last injected; anything
+ * else is refused, so the bridge never becomes a second, unvalidated model or
+ * process-launch input channel.
+ * @param {Map} Payload The page message.
+ * @param {Integer} ExpectedEpoch The browser session that sent it.
+ */
+_LLM_MBW_RunAction(Payload, ExpectedEpoch) {
+	global _LLM_MBW_SessionEpoch, _LLM_MBW_Rows, _LLM_MBW_Tools, _LLM_Menu
+	if A_IsSuspended || (ExpectedEpoch != _LLM_MBW_SessionEpoch)
+		return
+	Action := Payload["action"]
+	Backend := Payload.Has("backend") && Payload["backend"] is String ? Payload["backend"] : ""
+	Name := Payload.Has("name") && Payload["name"] is String ? Payload["name"] : ""
+	try {
+		if (Action == "disable_model") {
+			if (LLM_Menu_SetModel("") == 1 && ExpectedEpoch == _LLM_MBW_SessionEpoch)
+				_LLM_MBW_OnClose()
+			return
+		}
+		if (Action == "group_action") {
+			Id := Payload.Has("id") && Payload["id"] is String ? Payload["id"] : ""
+			if _LLM_MBW_Tools.Has(Backend . "`n" . Id)
+				_LLM_MBW_Tools[Backend . "`n" . Id].Call()
+			return
+		}
+		if (Action == "add_model") {
+			if (Backend != "ollama" || !LLM_ValidModelIdentifier("ollama", Name)) {
+				try LoggerWarn("LLM.browser", "Refused adding '{1}': not a valid Ollama name.", Name)
+				return
+			}
+			if (IsSet(LLM_Deps_HasFailed) && LLM_Deps_HasFailed())
+				return
+			try LoggerInfo("LLM.browser", "Model added via the selector page: {1}.", Name)
+			_LLM_Menu_PullModel(Name, true)
+			return
+		}
+		Key := Backend . "`n" . Name
+		if !_LLM_MBW_Rows.Has(Key) {
+			try LoggerWarn("LLM.browser", "Refused model selector action '{1}' for an unknown row.", Action)
+			return
+		}
+		Row := _LLM_MBW_Rows[Key]
+		OllamaReady := !(IsSet(LLM_Deps_HasFailed) && LLM_Deps_HasFailed())
+		if (Action == "row_action") {
+			Id := Payload.Has("id") && Payload["id"] is String ? Payload["id"] : ""
+			if Row["row_actions"].Has(Id)
+				Row["row_actions"][Id].Call()
+			return
+		}
+		if (Backend == "ollama") {
+			if !OllamaReady
+				return
+			if (Action == "select_model") {
+				if !Row["installed"]
+					return
+				Applied := LLM_Menu_SetModel(Row["custom"] ? Row["tag"] : Row["name"])
+				if (Applied == 1 && _LLM_Menu.Get("backend", "") != "ollama")
+					Applied := LLM_Menu_SetBackend("ollama")
+				if (Applied == 1 && ExpectedEpoch == _LLM_MBW_SessionEpoch)
+					_LLM_MBW_OnClose()
+			} else if (Action == "download_model") {
+				if !Row["installed"]
+					_LLM_Menu_PullModel(Row["custom"] ? Row["tag"] : Row["name"], Row["custom"])
+			} else if (Action == "delete_model" || Action == "remove_custom_model") {
+				if Row["installed"]
+					_LLM_Menu_PromptDeleteCachedModel(Row["custom"] ? Row["tag"] : Row["name"])
+			}
+			return
+		}
+		if (Backend == "api" && Action == "select_model" && Row.Has("select")) {
+			Applied := Row["select"].Call()
+			if (Applied == 1 && ExpectedEpoch == _LLM_MBW_SessionEpoch)
+				_LLM_MBW_OnClose()
+		}
+	} catch as Err {
+		LoggerError("LLM.browser", "Model selector action '{1}' failed: {2}.", Action, Err.Message)
 	}
 }
 
@@ -800,7 +1063,7 @@ _LLM_MBW_I18nApplyScript() {
 }
 
 /** Escapes a string for safe injection into a JS double-quoted literal. */
-_LLM_MBW_JsStr(s) {
+JsonStringLiteral(s) {
 	return JsonStringLiteral(s)
 }
 

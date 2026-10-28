@@ -19,7 +19,6 @@
 		"llm_menu_rows": {
 			"description": "Order of the AI submenu rows a native menu registers handlers for when menu_manifest.json llm_menu cannot be read. The gate pins it to the manifest rows of the macOS driver.",
 			"order": [
-				"llm_backend",
 				"llm_model",
 				"llm_profile",
 				"llm_trigger",

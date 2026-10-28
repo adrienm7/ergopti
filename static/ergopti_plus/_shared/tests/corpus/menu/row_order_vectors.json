@@ -50,7 +50,6 @@
 			"id": "llm-menu-rows",
 			"rule": "llm_menu_rows",
 			"order": [
-				"llm_backend",
 				"llm_model",
 				"llm_profile",
 				"llm_trigger",
