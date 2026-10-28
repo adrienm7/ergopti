@@ -323,13 +323,14 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 		local script = Installer.SWAP_SCRIPT:gsub("/usr/bin/open", open)
 		script = require("tests.support.release_swap_ports").observe(script, dir)
 		if opts.publication_refused then
-			local move = fake(dir, "move", '[ "$2" = ' .. quote(staged) .. ' ] && exit 45\nexec /bin/mv "$@"')
-			script = script:gsub("/bin/mv", function() return move end)
+			local move = fake(dir, "move", '[ "$2" = ' .. quote(staged) .. ' ] && exit 45\nexec ' .. require("tests.support.release_swap_ports").command() .. ' --release-rename move "$2" "$3"')
+			script = script:gsub('%"%$launcher%" %"%$rename_flag%" move', function() return move .. " --" end)
 		end
 		local pid = opts.pid or "999999999"
 		local acknowledgement = dir .. "/arming-receipt"
-		local status, output = sh("sh -c " .. quote(script) .. " swap " .. pid .. " " .. quote(app) .. " "
-			.. quote(staged) .. " " .. quote(previous) .. " 3>" .. quote(acknowledgement))
+		local status, output = sh(require("tests.support.release_swap_ports").command() .. " --release-rename lock " .. quote(app)
+			.. " " .. quote(script) .. " " .. pid .. " " .. quote(staged) .. " " .. quote(previous)
+			.. " 3>" .. quote(acknowledgement))
 		helpers.assert_eq(read(acknowledgement), "ARMED\n", "the actual worker acknowledges before the same swap checks")
 		local result = {
 			status = status, output = output,
@@ -494,11 +495,35 @@ helpers.describe("release_installer: filesystem publication admission", function
 			local status, output = sh("python3 -B " .. quote(probe) .. " controls " .. quote(source) .. " " .. quote(dir .. "/controls"))
 			helpers.assert_eq(status, 0, output)
 			local receipt = assert(require("json").decode(output))
-			helpers.assert_eq(#receipt.parser_refusals, 14, "the literal parser must refuse every malformed authority")
+			helpers.assert_eq(#receipt.parser_refusals, 25, "the literal parser must refuse every malformed authority")
 			helpers.assert_eq(#receipt.cases, 8, "all independent physical refusals and healthy controls execute")
 			local emitted, program = sh("python3 -B " .. quote(probe) .. " emit " .. quote(source))
 			helpers.assert_eq(emitted, 0, program)
 			helpers.assert_eq(program, fresh_installer().SWAP_SCRIPT, "the shared extractor must equal actual production Lua bytes")
+		end, debug.traceback)
+		assert(sh("rm -rf " .. quote(dir)) == 0)
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
+helpers.describe("release_installer: concurrent filesystem publication", function()
+	helpers.it("refuses racing destinations and serializes detached installers before arming (release-exclusive-publication)", function()
+		local dir = scratch()
+		local ok, err = xpcall(function()
+			local probe = helpers.driver_root() .. "tests/support/release_swap_concurrent_probe.py"
+			local status, output = sh("python3 -B " .. quote(probe) .. " " .. quote(helpers.driver_root()) .. " " .. quote(dir))
+			helpers.assert_eq(status, 0, output)
+			local receipt = assert(require("json").decode(output))
+			helpers.assert_eq(#receipt.cases, 4, "all three native boundaries and the two-installer transaction execute")
+			local names = {}
+			for _, case in ipairs(receipt.cases) do names[#names + 1] = case.name end
+			helpers.assert_eq(names, { "backup", "publish", "rollback", "two-installers-before-arming" })
+			for index = 1, 3 do
+				helpers.assert_eq(receipt.cases[index].foreign_identity_preserved, true)
+				helpers.assert_eq(receipt.cases[index].nested_source, false)
+			end
+			helpers.assert_eq(receipt.cases[4].original_restored, true)
 		end, debug.traceback)
 		assert(sh("rm -rf " .. quote(dir)) == 0)
 		if not ok then error(err, 0) end
@@ -535,6 +560,24 @@ helpers.describe("release_installer: complete literal extraction", function()
 					helpers.assert_true(status ~= 0, "the extractor must refuse the complete changed expression: " .. output)
 				end
 			end
+			local suffix_literal = assert(source:match('\nlocal EXECUTABLE_SUFFIX = ("[^"\n]+")'))
+			local suffix = assert(load("return " .. suffix_literal))()
+			local changed_suffix = suffix .. ".fixture"
+			local changed_source, changed_count = source:gsub('\nlocal EXECUTABLE_SUFFIX = "[^"\n]+"', function()
+				return "\nlocal EXECUTABLE_SUFFIX = " .. string.format("%q", changed_suffix)
+			end)
+			helpers.assert_eq(changed_count, 1, "the executable has one declared authority")
+			local path = dir .. "/changed-executable-suffix.lua"
+			write(path, changed_source)
+			local evaluated = assert(loadfile(path))()
+			local suffix_pattern = suffix:gsub("([^%w])", "%%%1")
+			local expected, replacements = original:gsub(suffix_pattern, function() return changed_suffix end)
+			helpers.assert_eq(replacements, 2, "both worker launch paths consume the executable authority")
+			helpers.assert_eq(evaluated.SWAP_SCRIPT, expected)
+			local status, output = sh("python3 -B " .. quote(helpers.driver_root() .. "tests/support/release_swap_physical_probe.py")
+				.. " emit " .. quote(path))
+			helpers.assert_eq(status, 0, output)
+			helpers.assert_eq(output, evaluated.SWAP_SCRIPT, "the extractor must read a changed declared suffix rather than a fallback")
 		end, debug.traceback)
 		assert(sh("rm -rf " .. quote(dir)) == 0)
 		if not ok then error(err, 0) end

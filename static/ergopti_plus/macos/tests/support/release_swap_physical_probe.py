@@ -83,6 +83,18 @@ def extract_program(source):
         raise ValueError("The release swap source needs one receipt and one script binding")
     receipt, end = literal(source, constants[0].end())
     standalone_boundary(source, end)
+    rename_constants = list(re.finditer(r"(?m)^local RENAME_FLAG\s*=\s*", source))
+    rename_assignments = list(re.finditer(r"(?m)^(?:local[ \t]+)?RENAME_FLAG\s*=", source))
+    if len(rename_constants) != 1 or len(rename_assignments) != 1:
+        raise ValueError("The release rename ABI needs one named flag")
+    rename_flag, rename_end = literal(source, rename_constants[0].end())
+    standalone_boundary(source, rename_end)
+    suffix_constants = list(re.finditer(r"(?m)^local EXECUTABLE_SUFFIX\s*=\s*", source))
+    suffix_assignments = list(re.finditer(r"(?m)^(?:local[ \t]+)?EXECUTABLE_SUFFIX\s*=", source))
+    if len(suffix_constants) != 1 or len(suffix_assignments) != 1:
+        raise ValueError("The release executable suffix needs one named authority")
+    executable_suffix, suffix_end = literal(source, suffix_constants[0].end())
+    standalone_boundary(source, suffix_end)
     offset = bindings[0].end()
 
     def whitespace():
@@ -93,9 +105,15 @@ def extract_program(source):
     def term():
         nonlocal offset
         whitespace()
+        if source.startswith("RENAME_FLAG", offset):
+            offset += len("RENAME_FLAG")
+            return rename_flag
         if source.startswith("ARMING_RECEIPT", offset):
             offset += len("ARMING_RECEIPT")
             return receipt
+        if source.startswith("EXECUTABLE_SUFFIX", offset):
+            offset += len("EXECUTABLE_SUFFIX")
+            return executable_suffix
         value, offset = literal(source, offset)
         return value
 
@@ -132,6 +150,16 @@ def extract_program(source):
 
 def copy_mutant(program):
     """Remove only the new admissions, preserving the historical unsafe worker."""
+    program = program.replace('"$launcher" "$rename_flag" move', "/bin/mv --")
+    probe_lines = [
+        line
+        for line in program.splitlines()
+        if line.startswith("receipt=$(") or line.startswith('[ "$receipt" =')
+    ]
+    if len(probe_lines) != 2:
+        raise ValueError("The historical copy mutant requires both native receipt admissions")
+    for line in probe_lines:
+        program = program.replace(line + "\n", "", 1)
     first = "# Stage/destination filesystem admission begins\n"
     last = "# Stage/destination filesystem admission ends\n"
     if program.count(first) != 1 or program.count(last) != 1:
@@ -161,6 +189,25 @@ def native_stat_port(arguments):
     print(os.stat(arguments[2], follow_symlinks=follow).st_dev)
 
 
+def launcher_command(native_executable=None):
+    """Use the real built launcher only in the native receiving fixture."""
+    if native_executable is not None:
+        return [str(native_executable)]
+    return [sys.executable, "-B", str(Path(__file__).with_name("release_rename_physical_port.py"))]
+
+
+def install_launcher(app, native_executable=None):
+    """The original app owns the helper; older candidates deliberately lack its ABI."""
+    executable = app / "Contents/MacOS/ErgoptiPlus"
+    executable.parent.mkdir(parents=True)
+    executable.write_text(
+        "#!/bin/sh\nexec " + shlex.join(launcher_command(native_executable)) + ' "$@"\n',
+        encoding="utf-8",
+    )
+    executable.chmod(0o700)
+    return executable
+
+
 def execute_case(
     program,
     name,
@@ -172,6 +219,7 @@ def execute_case(
     temporary_root=None,
     stat_fault=None,
     candidate_fault=None,
+    native_executable=None,
 ):
     """Keep all app trees owned and execute real moves except the named refusal."""
     import resource
@@ -182,12 +230,17 @@ def execute_case(
     previous = base / "ErgoptiPlus.app.previous"
     app.mkdir()
     (app / "marker").write_text("installed", encoding="utf-8")
+    install_launcher(app, native_executable)
     original_identity = (app.stat().st_dev, app.stat().st_ino)
     stage = Path(tempfile.mkdtemp(prefix="ergopti-release-probe-", dir=stage_base))
     staged = stage / "app" / "ErgoptiPlus.app"
     staged.mkdir(parents=True)
     (staged / "marker").write_text("chosen", encoding="utf-8")
     (staged / "large").write_bytes(b"x" * 8192)
+    old_executable = staged / "Contents/MacOS/ErgoptiPlus"
+    old_executable.parent.mkdir(parents=True)
+    old_executable.write_text("#!/bin/sh\nexit 99\n", encoding="utf-8")
+    old_executable.chmod(0o700)
     if candidate_fault == "missing":
         import shutil
 
@@ -231,11 +284,14 @@ def execute_case(
         )
     if move_fault:
         mover = base / "move"
+        delegate = (
+            shlex.join(launcher_command(native_executable)) + ' --release-rename move "$2" "$3"'
+        )
         lines = ["#!/bin/sh"]
         if move_fault == "occupied":
             lines += [
                 'if [ "$2" = ' + shlex.quote(str(app)) + " ]; then",
-                ' /bin/mv "$@" || exit $?',
+                " " + delegate + " || exit $?",
                 " /bin/mkdir " + shlex.quote(str(app)) + " || exit $?",
                 " printf 'foreign' > " + shlex.quote(str(app / "marker")),
                 " exit 0",
@@ -253,10 +309,10 @@ def execute_case(
             lines += ['[ "$2" = ' + shlex.quote(str(staged)) + " ] && exit 45"]
         else:
             raise ValueError("Unknown owned move refusal")
-        lines += ['exec /bin/mv "$@"']
+        lines += ["exec " + delegate]
         mover.write_text("\n".join(lines) + "\n", encoding="utf-8")
         mover.chmod(0o700)
-        actual = actual.replace("/bin/mv", shlex.quote(str(mover)))
+        actual = actual.replace('"$launcher" "$rename_flag" move', shlex.quote(str(mover)) + " --")
 
     def policy():
         if limit is not None:
@@ -273,10 +329,14 @@ def execute_case(
             [
                 "/bin/sh",
                 "-c",
-                "exec 3>&1\n" + actual,
-                "swap",
-                "999999999",
+                'exec 3>&1\nexec "$@"',
+                "start",
+                *launcher_command(native_executable),
+                "--release-rename",
+                "lock",
                 str(app),
+                actual,
+                "999999999",
                 str(staged),
                 str(previous),
             ],
@@ -323,14 +383,18 @@ def execute_case(
             shutil.rmtree(stage)
 
 
-def probe(root, source, external, native):
+def probe(root, source, external, native, native_executable=None):
     """Exercise same-parent publication and a historical real cross-volume fault."""
     root.mkdir(parents=True, exist_ok=True)
     if root.stat().st_dev == external.stat().st_dev:
         raise ValueError("The physical worker probe requires a distinct external volume")
     program = extract_program(source.read_text(encoding="utf-8"))
+
+    def execute(*args, **kwargs):
+        return execute_case(*args, native_executable=native_executable, **kwargs)
+
     cases = [
-        execute_case(
+        execute(
             copy_mutant(program),
             "old-cross-device-copy-failure",
             root,
@@ -338,7 +402,7 @@ def probe(root, source, external, native):
             native,
             256,
         ),
-        execute_case(
+        execute(
             program,
             "parent-stage-external-tmp",
             root,
@@ -347,8 +411,8 @@ def probe(root, source, external, native):
             256,
             temporary_root=external,
         ),
-        execute_case(program, "foreign-device-before-arming", root, external, native),
-        execute_case(
+        execute(program, "foreign-device-before-arming", root, external, native),
+        execute(
             program,
             "occupied-publication-target",
             root,
@@ -356,7 +420,7 @@ def probe(root, source, external, native):
             native,
             move_fault="occupied",
         ),
-        execute_case(
+        execute(
             program,
             "publication-refusal-restores-original",
             root,
@@ -364,7 +428,7 @@ def probe(root, source, external, native):
             native,
             move_fault="publication",
         ),
-        execute_case(
+        execute(
             program,
             "partial-publication-target",
             root,
@@ -372,7 +436,7 @@ def probe(root, source, external, native):
             native,
             move_fault="partial-publication",
         ),
-        execute_case(
+        execute(
             program,
             "device-observation-refused",
             root,
@@ -380,7 +444,7 @@ def probe(root, source, external, native):
             native,
             stat_fault="refused",
         ),
-        execute_case(
+        execute(
             program,
             "device-observation-invalid",
             root,
@@ -388,8 +452,8 @@ def probe(root, source, external, native):
             native,
             stat_fault="invalid",
         ),
-        execute_case(program, "missing-candidate", root, root, native, candidate_fault="missing"),
-        execute_case(program, "symlink-candidate", root, root, native, candidate_fault="symlink"),
+        execute(program, "missing-candidate", root, root, native, candidate_fault="missing"),
+        execute(program, "symlink-candidate", root, root, native, candidate_fault="symlink"),
     ]
     qualify(cases)
     return {
@@ -403,7 +467,42 @@ def probe(root, source, external, native):
 
 def parser_controls(source):
     """Prove unknown syntax and duplicate authorities cannot select stale bytes."""
+    suffix = re.search(r"(?m)^local EXECUTABLE_SUFFIX[^\n]*$", source)
+    if suffix is None:
+        raise ValueError("The parser controls require the actual executable suffix declaration")
+    suffix_declaration = suffix.group()
+    script_start = source.index("M.SWAP_SCRIPT = table.concat({")
+    before_script, script = source[:script_start], source[script_start:]
     variants = {
+        "executable-suffix-missing": source.replace(suffix_declaration, "", 1),
+        "executable-suffix-duplicate": source + "\n" + suffix_declaration + "\n",
+        "executable-suffix-reassigned": source.replace(
+            "M.SWAP_SCRIPT = ", 'EXECUTABLE_SUFFIX = "foreign"\nM.SWAP_SCRIPT = ', 1
+        ),
+        "executable-suffix-dynamic": source.replace(
+            suffix_declaration, 'local EXECUTABLE_SUFFIX = os.getenv("UNSUPPORTED_EXECUTABLE")', 1
+        ),
+        "executable-suffix-expression": source.replace(
+            suffix_declaration, suffix_declaration + ' .. "foreign"', 1
+        ),
+        "executable-suffix-unknown-reference": before_script
+        + script.replace("EXECUTABLE_SUFFIX", "UNKNOWN_EXECUTABLE_SUFFIX", 1),
+        "executable-suffix-prefixed-reference": before_script
+        + script.replace("EXECUTABLE_SUFFIX", "EXECUTABLE_SUFFIX_FOREIGN", 1),
+        "rename-flag-suffix": source.replace(
+            'local RENAME_FLAG = "--release-rename"',
+            'local RENAME_FLAG = "--release-rename" .. "foreign"',
+            1,
+        ),
+        "rename-flag-continued-suffix": source.replace(
+            'local RENAME_FLAG = "--release-rename"',
+            'local RENAME_FLAG = "--release-rename"\n .. "foreign"',
+            1,
+        ),
+        "rename-flag-duplicate": source + '\nlocal RENAME_FLAG = "foreign"\n',
+        "rename-flag-reassigned": source.replace(
+            "M.SWAP_SCRIPT = ", 'RENAME_FLAG = "foreign"\nM.SWAP_SCRIPT = ', 1
+        ),
         "receipt-suffix": source.replace(
             'local ARMING_RECEIPT = "ARMED"', 'local ARMING_RECEIPT = "ARMED" .. "X"', 1
         ),
@@ -596,10 +695,17 @@ def main():
         source, root = map(Path, args.arguments)
         print(json.dumps(controls(root, source)))
     else:
-        source, root, external = map(Path, args.arguments)
+        if args.mode == "native":
+            if len(args.arguments) != 4:
+                raise ValueError("Native receiving requires the actual built launcher")
+            native_executable = Path(args.arguments[3]).resolve(strict=True)
+            source, root, external = map(Path, args.arguments[:3])
+        else:
+            native_executable = None
+            source, root, external = map(Path, args.arguments)
         if args.mode == "native" and sys.platform != "darwin":
             raise ValueError("Native release swap receiving requires Darwin")
-        print(json.dumps(probe(root, source, external, args.mode == "native")))
+        print(json.dumps(probe(root, source, external, args.mode == "native", native_executable)))
 
 
 if __name__ == "__main__":

@@ -41,6 +41,7 @@ local Archives    = require("updater.release_assets")
 
 local LOG = "updater.release_installer"
 local ARMING_RECEIPT = "ARMED"
+local RENAME_FLAG = "--release-rename"
 
 -- The executable inside the app bundle the launcher runs from.
 local EXECUTABLE_SUFFIX = "/Contents/MacOS/ErgoptiPlus"
@@ -86,6 +87,10 @@ M.SWAP_SCRIPT = table.concat({
 	'done',
 	'[ "$staged_device" = "$parent_device" ] || { echo "The verified app is not on the installation filesystem: nothing was replaced."; exit 1; }',
 	'# Stage/destination filesystem admission ends',
+	'rename_flag=' .. RENAME_FLAG,
+	'launcher="$app' .. EXECUTABLE_SUFFIX .. '"',
+	'receipt=$("$launcher" "$rename_flag" probe && printf .) || { echo "The native release rename role is unavailable."; exit 1; }',
+	"[ \"$receipt\" = \"$(printf '%s\\n.' \"$rename_flag\")\" ] || { echo \"The native release rename receipt is invalid.\"; exit 1; }",
 	"printf '" .. ARMING_RECEIPT .. "\\n' >&3 || exit 1",
 	"exec 3>&- || exit 1",
 	"waited=0",
@@ -95,7 +100,8 @@ M.SWAP_SCRIPT = table.concat({
 	"	/bin/sleep 0.1",
 	"done",
 	'/bin/rm -rf -- "$previous" || { echo "The previous backup app could not be removed."; /usr/bin/open -- "$app"; exit 4; }',
-	'/bin/mv -- "$app" "$previous" || { echo "The installed app could not be moved aside."; /usr/bin/open -- "$app"; exit 5; }',
+	'"$launcher" "$rename_flag" move "$app" "$previous" || { echo "The installed app could not be moved aside."; /usr/bin/open -- "$app"; exit 5; }',
+	'launcher="$previous' .. EXECUTABLE_SUFFIX .. '"',
 	'# Occupied destinations are retained rather than overwritten or nested into',
 	'replacement_path_clear() {',
 	'	if [ -e "$app" ] || [ -L "$app" ]; then',
@@ -106,13 +112,13 @@ M.SWAP_SCRIPT = table.concat({
 	'}',
 	'# Occupied destination admission ends',
 	'replacement_path_clear || exit 8',
-	'if /bin/mv -- "$staged" "$app"; then',
+	'if "$launcher" "$rename_flag" move "$staged" "$app"; then',
 	'	echo "Installed."',
 	'	/usr/bin/open -- "$app" || { echo "The installed app could not be opened."; exit 7; }',
 	"	exit 0",
 	"fi",
 	'replacement_path_clear || exit 8',
-	'if ! /bin/mv -- "$previous" "$app"; then',
+	'if ! "$launcher" "$rename_flag" move "$previous" "$app"; then',
 	'	echo "The previous app could not be restored: it remains at $previous."',
 	"	exit 8",
 	"fi",
@@ -127,7 +133,7 @@ local DETACH_SCRIPT = table.concat({
 	"{",
 	"\texec 3>&1",
 	'\texec >>"$6" 2>&1 || exit 1',
-	'\t/usr/bin/nohup /bin/sh -c "$1" swap "$2" "$3" "$4" "$5" </dev/null &',
+	'\t/usr/bin/nohup "$3' .. EXECUTABLE_SUFFIX .. '" ' .. RENAME_FLAG .. ' lock "$3" "$1" "$2" "$4" "$5" </dev/null &',
 	"} | {",
 	"\tIFS= read -r receipt || exit 1",
 	'\t[ "$receipt" = ' .. ARMING_RECEIPT .. ' ] || exit 1',
