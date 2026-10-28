@@ -295,11 +295,11 @@ _ConfigBackup_Load(ConfigDir, Id, Rules) {
 			return 0
 	}
 	Files := []
-	for _, File in Record["files"] {
-		if !(File is Map) || !File.Has("root") || File["root"] != "config" || !File.Has("path")
-				|| !ConfigBackup_IsContained(File["path"])
+	for _, BackupFile in Record["files"] {
+		if !(BackupFile is Map) || !BackupFile.Has("root") || BackupFile["root"] != "config" || !BackupFile.Has("path")
+				|| !ConfigBackup_IsContained(BackupFile["path"])
 			return 0
-		Files.Push(File["path"])
+		Files.Push(BackupFile["path"])
 	}
 	return Map("id", Id, "path", BackupPath, "kind", Record["kind"],
 		"created_at", Record["created_at"],

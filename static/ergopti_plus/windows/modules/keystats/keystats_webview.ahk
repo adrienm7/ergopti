@@ -1157,8 +1157,8 @@ KLWV_PageMessage(Entry, Json) {
 KLWV_MonitorFromPoint(x, y) {
 		loop MonitorGetCount() {
 				try {
-						MonitorGet(A_Index, &L, &T, &R, &B)
-						if (x >= L && x < R && y >= T && y < B)
+						MonitorGet(A_Index, &L, &MonTop, &R, &B)
+						if (x >= L && x < R && y >= MonTop && y < B)
 								return A_Index
 				}
 		}

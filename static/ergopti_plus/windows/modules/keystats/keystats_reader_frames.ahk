@@ -102,10 +102,10 @@ _KLR_RebuildIndex(State, Ledger) {
 _KLR_RebuildFrameScan(Text, Start, End, Index) {
 	Pattern := "m)^(\Q" . SubStr(KLRRebuildConst.BATCH_MARKER, 2) . "\E[^\n]*(?:\n|$)|COMMIT;[ \t]*(?:\n|$))"
 	Position := 1
-	Search := 1
+	ScanFrom := 1
 	ByteCursor := Start
 	First := -1
-	while RegExMatch(Text, Pattern, &Match, Search) {
+	while RegExMatch(Text, Pattern, &Match, ScanFrom) {
 		Segment := SubStr(Text, Position, Match.Pos - Position)
 		ByteCursor += _KLR_RebuildFrameState(Segment, Index)
 		if Index["lexical"] = 1 {
@@ -118,7 +118,7 @@ _KLR_RebuildFrameScan(Text, Start, End, Index) {
 		; Keep the candidate in the next lexical segment: quoted fake header
 		; lines must still affect SQLite's lexer exactly once.
 		Position := Match.Pos
-		Search := Match.Pos + Match.Len
+		ScanFrom := Match.Pos + Match.Len
 	}
 	Rest := SubStr(Text, Position)
 	_KLR_RebuildFrameState(Rest . (SubStr(Rest, -1) = "`n" ? "" : "`n"), Index)
