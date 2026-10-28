@@ -21,6 +21,9 @@
 ---    was tried and why.
 --- ==============================================================================
 
+local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
+
 local M = {}
 
 M.SOURCE_CLI       = "cli"
@@ -46,9 +49,7 @@ local OS_NAMES = { macos = true, linux = true, windows = true }
 --- @return boolean
 local function string_list(value)
 	if type(value) ~= "table" then return false end
-	local count = 0
-	for _ in pairs(value) do count = count + 1 end
-	for index = 1, count do
+	for index = 1, TableUtil.count(value) do
 		if type(value[index]) ~= "string" or value[index] == "" then return false end
 	end
 	return true
@@ -255,7 +256,7 @@ local function port_from_config(config, context)
 	if config.dir_file then
 		-- A pointer file holding the data folder the user moved the server to
 		local pointer = context.read_file(expand(config.dir_file, context.home))
-		local moved = type(pointer) == "string" and pointer:match("^%s*(.-)%s*$") or ""
+		local moved = type(pointer) == "string" and TextUtils.trim(pointer) or ""
 		if moved ~= "" then dir = expand(moved, context.home) end
 	end
 	local path = dir:gsub("/+$", "") .. "/" .. config.file

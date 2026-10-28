@@ -1979,7 +1979,7 @@ local function shell_program_label(command)
 	end
 	-- A quoted or escaped first word is a caller-built path: never name it.
 	if not first or not first:match("^[%w_%-%./]+$") then return "other" end
-	local base = first:match("([^/]+)$")
+	local base = NativePath.basename(first)
 	if base and #base <= 24 and base:match("^[%w_%-%.]+$") then return base end
 	return "other"
 end

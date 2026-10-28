@@ -55,8 +55,8 @@ request_timeout_ms = 30000
 local_server_probe_timeout_ms = 1500
 
 # Deadline of each process-list or listening-socket command of a local
-# server sweep (ps, lsof, ss; on Windows one PowerShell process and socket
-# query, whose cold start takes about two seconds): the sweep then probes
+# server sweep (ps, lsof, ss; on Windows one shell query of the processes and
+# sockets, whose cold start takes about two seconds): the sweep then probes
 # without that reading.
 # AHK: local_server_port_scan.ahk. HS: local_server_ports.lua run_bounded.
 # LX: local_server_ports.lua.

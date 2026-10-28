@@ -16,6 +16,7 @@ local Json = require("json")
 local Logger = require("logger.shim")
 local Timings = require("infra.timings")
 local ProcessRunner = require("adapters.process_runner")
+local ConfigPaths = require("infra.config_paths")
 local Policy = require("llm.local_server_ports")
 
 local LOG = "llm.local_server_ports"
@@ -56,7 +57,9 @@ M._read_file = function(path)
 	file:close()
 	return raw
 end
-M._home = function() return os.getenv("HOME") end
+-- The account home only: a server's settings file is never looked for in the
+-- temporary folder home() falls back to when HOME is unset.
+M._home = function() return ConfigPaths.account_home() end
 
 --- Finds where each catalogue server listens, asynchronously.
 --- @param entries table Array of { id, descriptor, base_url } (catalogue order).

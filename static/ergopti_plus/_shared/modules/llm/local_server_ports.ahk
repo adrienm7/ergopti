@@ -37,24 +37,24 @@ _LocalServerPortsStringList(Value) {
  * Validates the discovery object of one catalogue server.
  * @param {String} Id Server id.
  * @param {Any} Raw The server's "discovery" object of local_servers.json.
- * @returns {Map} Map("descriptor", Map|0, "reason", String).
+ * @returns {Map} Map("descriptor", Map|0, "problem", String).
  */
 LocalServerPortsDescriptor(Id, Raw) {
 	if !(Raw is Map)
-		return Map("descriptor", 0, "reason", "server '" Id "' has no discovery object")
+		return Map("descriptor", 0, "problem", "server '" Id "' has no discovery object")
 	Lists := Map()
 	for Key in ["process_names", "command_lines", "port_flags", "address_flags"] {
 		Value := Raw.Get(Key, [])
 		if !_LocalServerPortsStringList(Value)
-			return Map("descriptor", 0, "reason", "server '" Id "' discovery." Key " is not a list of strings")
+			return Map("descriptor", 0, "problem", "server '" Id "' discovery." Key " is not a list of strings")
 		Lists[Key] := Value
 	}
 	if Lists["process_names"].Length + Lists["command_lines"].Length == 0
-		return Map("descriptor", 0, "reason", "server '" Id "' declares no process name nor command line")
+		return Map("descriptor", 0, "problem", "server '" Id "' declares no process name nor command line")
 	Configs := []
 	RawConfigs := Raw.Get("config_files", [])
 	if !(RawConfigs is Array)
-		return Map("descriptor", 0, "reason", "server '" Id "' discovery.config_files is not a list")
+		return Map("descriptor", 0, "problem", "server '" Id "' discovery.config_files is not a list")
 	for Index, Config in RawConfigs {
 		Valid := (Config is Map) && _LocalServerPortsStringList(Config.Get("os", 0)) && Config["os"].Length > 0
 			&& (Config.Get("dir", 0) is String) && Config["dir"] != ""
@@ -66,11 +66,11 @@ LocalServerPortsDescriptor(Id, Raw) {
 				if !(OsName == "macos" || OsName == "linux" || OsName == "windows")
 					Valid := false
 		if !Valid
-			return Map("descriptor", 0, "reason", "server '" Id "' discovery.config_files[" Index "] is malformed")
+			return Map("descriptor", 0, "problem", "server '" Id "' discovery.config_files[" Index "] is malformed")
 		Configs.Push(Config)
 	}
 	Lists["config_files"] := Configs
-	return Map("descriptor", Lists, "reason", "")
+	return Map("descriptor", Lists, "problem", "")
 }
 
 
