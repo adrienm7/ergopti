@@ -695,6 +695,10 @@ input_source_confirm_window_ms = 8000
 # Linux: adapters/input_source_switch.lua (each gsettings or setxkbmap child).
 input_source_operation_timeout_ms = 10000
 
+# Settle after each selection edge of the macOS fresh-process TIS refresh.
+# Independent of the menu debounce and the whole-operation deadline.
+input_source_refresh_settle_ms = 300
+
 # Karabiner ready notification debounce delay.
 # HS: platform/remap/ke_lifecycle.lua KARABINER_READY_NOTIFY_DELAY_SEC.
 karabiner_ready_notify_delay_ms = 2500
