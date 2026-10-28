@@ -182,7 +182,7 @@ _MBPT_StageAssets(Directory) {
 	; canonical presentation/privacy policies for diagnostics. The component
 	; does not claim every reserved policy is read on its successful cold path.
 	for Relative in ["modules\llm\defaults.json", "modules\llm\models.json", "modules\hotstrings\_index.toml", "data\locales\fr.json", "data\locales\en.json",
-		"modules\menu\menu_manifest.json", "modules\diagnostics\redaction.json", "data\keycodes\physical_keys.json",
+		"modules\llm\backends.json", "modules\menu\menu_manifest.json", "modules\diagnostics\redaction.json", "data\keycodes\physical_keys.json",
 		"core\config_schema\migrations.toml", "core\config_schema\config.schema.json",
 		"core\config_schema\tap_hold.schema.json", "core\config_schema\SCHEMA.md",
 		"core\config_schema\examples\hs_tap_hold.example.toml", "core\config_schema\examples\personal_info.example.toml",

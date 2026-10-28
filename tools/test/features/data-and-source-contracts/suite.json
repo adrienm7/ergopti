@@ -585,6 +585,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-ahk-local-same-as-global.cjs"],
 			"repro": "npm run test:ahk-local-same-as-global"
+		},
+		{
+			"id": "js-lua-undefined-globals",
+			"ordinal": 529,
+			"name": "Lua undefined global reads (no production Lua of macOS, Linux or _shared reads a global nothing defines)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-lua-undefined-globals.cjs"],
+			"repro": "npm run test:lua-undefined-globals"
 		}
 	]
 }

@@ -119,6 +119,58 @@ helpers.describe("model browser inventory document", function()
 		end)
 	end)
 
+	-- model-selector-install-button: the Ollama group's install button follows
+	-- the runtime, MLX cannot run here, and the click runs the AI enable that
+	-- offers Ergopti's own Ollama download.
+	helpers.it("(model-selector-install-button) Install Ollama follows the runtime and runs the AI enable", function()
+		-- The API rows are another owner's (test_model_selector_api_listing);
+		-- the real one would load the HTTP stack this fixture does not provide.
+		local saved_rows = package.loaded["ui.menu.llm_backend_rows"]
+		package.loaded["ui.menu.llm_backend_rows"] = {
+			api_page = function() return { rows = {}, providers = {}, tools = {} } end,
+		}
+		local ok, failure = pcall(with_browser, function(f, bridge)
+			local phase, ollama_ok, installs = "idle", false, {}
+			bridge.bind({
+				dialogs = {}, delete_model = function() return true end, on_changed = function() end,
+				ollama_state = function()
+					if ollama_ok then return true end
+					return false, "model_browser.reason_ollama_missing"
+				end,
+				ollama_install_phase = function() return phase end,
+				install_ollama = function(_, on_changed) installs[#installs + 1] = on_changed; return true end,
+			})
+			local function backends()
+				local _, data = bridge.reproject_current()
+				local out = {}
+				for _, b in ipairs(data.backends) do out[b.id] = b end
+				return out
+			end
+			f.handshake()
+			local b = backends()
+			helpers.assert_eq(b.ollama.available, false, "a missing Ollama greys its rows")
+			helpers.assert_eq(b.ollama.install, { state = "available" })
+			helpers.assert_eq(b.mlx.install, { state = "unsupported", reason_key = "model_browser.reason_mlx_unsupported_os" })
+			helpers.assert_nil(b.api.install, "the API installs nothing")
+			f.send({ action = "group_action", backend = "ollama", id = "install" })
+			helpers.assert_eq(#installs, 1, "the click runs the AI enable")
+			phase = "running"
+			helpers.assert_eq(backends().ollama.install, { state = "running" })
+			f.send({ action = "group_action", backend = "ollama", id = "install" })
+			helpers.assert_eq(#installs, 1, "a running install is not started twice")
+			phase, ollama_ok = "ai_on", true
+			b = backends()
+			helpers.assert_eq(b.ollama.install, { state = "installed" })
+			helpers.assert_eq(b.ollama.available, true, "the installed runtime unlocks its rows")
+			ollama_ok = false
+			helpers.assert_eq(backends().ollama.install,
+				{ state = "unsupported", reason_key = "model_browser.reason_install_ai_on" })
+			bridge._reset()
+		end)
+		package.loaded["ui.menu.llm_backend_rows"] = saved_rows
+		assert(ok, failure)
+	end)
+
 	helpers.it("(linux-model-browser-owner) installed selection and available download retain their own page", function()
 		with_browser(function(f, _, seen)
 			local ready = f.handshake()

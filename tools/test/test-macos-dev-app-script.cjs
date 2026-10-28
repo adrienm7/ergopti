@@ -61,6 +61,11 @@ app="$(cd "$(dirname "$0")/../.." && pwd)/build/macos/ErgoptiPlus.app"
 mkdir -p "$app/Contents"
 printf '%s' "$(cd "$(dirname "$0")/../.." && pwd)" > "$app/Contents/Info.plist"\n`
 	);
+	// The catalogue stager records its call and answers the fixture's exit code.
+	fs.writeFileSync(
+		path.join(clone, 'tools/dev/stage-macos-dev-ollama-catalogue.py'),
+		`import os, sys\nopen(${JSON.stringify(log)}, "a").write("catalogue\\n")\nsys.exit(int(os.environ.get("FIXTURE_CATALOGUE_EXIT", "0")))\n`
+	);
 	fs.mkdirSync(home, { recursive: true });
 	fs.mkdirSync(bin);
 	shim(bin, 'uname', 'echo "${FIXTURE_UNAME:-Darwin}"');
@@ -116,9 +121,30 @@ try {
 		const app = path.join(paths.clone, 'build/macos/ErgoptiPlus.app');
 		assert.equal(
 			calls(paths),
-			`build ERGOPTI_DEV_SOURCE=1 ERGOPTI_LAUNCHER_ARCHS=native\nopen ${app}\n`
+			`build ERGOPTI_DEV_SOURCE=1 ERGOPTI_LAUNCHER_ARCHS=native\ncatalogue\nopen ${app}\n`
 		);
 		assert.match(result.stdout, /Lua runs from .*clone with space\/static\/ergopti_plus\/macos/);
+	});
+
+	// The developer app reads the clone's shared data, where no managed Ollama
+	// catalogue is committed: without the stager its owned Ollama install
+	// refused with OLLAMA_MANAGED_CATALOGUE_MISSING on the maintainer's Mac.
+	check('stages the managed Ollama catalogue before opening, and names a missing one', () => {
+		const paths = fixture('catalogue');
+		const staged = run(paths, []);
+		assert.equal(staged.status, 0, staged.stderr);
+		assert.match(calls(paths), /^catalogue\nopen /m);
+		assert.doesNotMatch(staged.stdout, /WARNING: .*managed Ollama/);
+		for (const [code, reason] of [
+			['3', /no published managed Ollama catalogue binds this clone/],
+			['1', /managed Ollama catalogue was not staged \(exit 1/]
+		]) {
+			fs.rmSync(paths.log);
+			const result = run(paths, ['--open-only'], { FIXTURE_CATALOGUE_EXIT: code });
+			assert.equal(result.status, 0, result.stderr);
+			assert.match(calls(paths), /^catalogue\nopen /m);
+			assert.match(result.stdout, reason);
+		}
 	});
 
 	check('--open-only opens a recorded developer app without building', () => {
@@ -128,7 +154,7 @@ try {
 		const result = run(paths, ['--open-only']);
 		assert.equal(result.status, 0, result.stderr);
 		assert.doesNotMatch(calls(paths), /^build /m);
-		assert.match(calls(paths), /^open /);
+		assert.match(calls(paths), /^catalogue\nopen /);
 	});
 
 	check('refuses an app recorded for another clone, or none at all', () => {

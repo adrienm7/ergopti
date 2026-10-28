@@ -31,7 +31,12 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { analyse, hitsAmong, localSameAsGlobal } = require('./lib/ahk-local-same-as-global.cjs');
+const {
+	BUILTINS,
+	analyse,
+	hitsAmong,
+	localSameAsGlobal
+} = require('./lib/ahk-local-same-as-global.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BASE = path.join(ROOT, 'static', 'ergopti_plus');
@@ -113,7 +118,13 @@ const flagged = [
 	],
 	['hotkey body', [['a', '^a:: {\n\tFile := 1\n}\n']], ['hotkey:File']],
 	['multi-line parameter list', [['a', 'F(A,\n\t\tB) {\n\tMenu := A\n}\n']], ['F:Menu']],
-	['catch variable', [['a', 'F() {\n\ttry X()\n\tcatch as Format\n\t\treturn\n}\n']], ['F:Format']]
+	['catch variable', [['a', 'F() {\n\ttry X()\n\tcatch as Format\n\t\treturn\n}\n']], ['F:Format']],
+	// Edit() opens the script: the v1.0.7 CI11 red was this loop variable.
+	[
+		'built-in Edit as a loop variable',
+		[['a', 'F(E) {\n\tfor text, edit in E\n\t\treturn text\n}\n']],
+		['F:edit']
+	]
 ];
 for (const [label, files, expected] of flagged)
 	check(
@@ -147,6 +158,20 @@ for (const [label, source] of silent)
 		names([['a', source]]).length === 0,
 		`self-test must not flag ${label}: ${names([['a', source]])}`
 	);
+
+// Built-ins that read like ordinary words; Edit was missing once.
+for (const name of [
+	'Edit',
+	'ListLines',
+	'KeyHistory',
+	'Reload',
+	'Pause',
+	'Suspend',
+	'Any',
+	'IsAlnum'
+])
+	check(BUILTINS.has(name), `the built-in set must name ${name}`);
+check(!BUILTINS.has('Promise'), 'the vendored Promise class is a script class, not a built-in');
 
 // ── 2. Production library ───────────────────────────────────────────────────
 

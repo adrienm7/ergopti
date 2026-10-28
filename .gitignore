@@ -89,6 +89,10 @@ static/ergopti_plus/windows/_generated/personal_shortcuts.ahk
 static/ergopti_plus/windows/_generated/prefetch_*.json
 static/ergopti_plus/_shared/ui/metrics_typing/prefetch.json
 static/ergopti_plus/_shared/ui/metrics_apps/prefetch.json
+# The managed Ollama catalogue a built app seals in its bundle. The macOS
+# developer runner (tools/dev/stage-macos-dev-ollama-catalogue.py) stages the
+# verified published one here for the developer app; it is never committed.
+static/ergopti_plus/_shared/modules/llm/managed_ollama_release.json
 
 # Self-healing locale fast-parse cache. The .json beside each is the single
 # tracked source of truth; the Windows driver writes/refreshes the .tsv on demand

@@ -82,10 +82,11 @@ local function note_progress(signature)
 end
 
 --- Tells the percentage observer a new whole percentage of the current
---- model download (never a repeated one), with its kind and session.
---- @param percent integer Whole percentage in [0, 99] while downloading.
+--- model download or runtime install (never a repeated one), with its kind
+--- and session.
+--- @param percent integer Whole percentage in [0, 99] while it runs.
 local function tell_percent(percent)
-	if type(_percent_listener) ~= "function" or _mode ~= "download" then return end
+	if type(_percent_listener) ~= "function" then return end
 	local signature = tostring(_session) .. "|" .. tostring(percent)
 	if signature == _told_percent then return end
 	_told_percent = signature
@@ -468,9 +469,10 @@ function M.session_id()
 	return _session
 end
 
---- Sets the one observer of model download percentages: it receives
---- (kind, percent, session) at each new whole percentage of an
---- ollama_model or mlx_model download. nil removes it.
+--- Sets the one observer of progress percentages: it receives
+--- (kind, percent, session) at each new whole percentage of an ollama_model
+--- or mlx_model download and of an ollama_install or mlx_install runtime
+--- install. nil removes it.
 --- @param listener function|nil
 function M.set_percent_listener(listener)
 	if listener ~= nil and type(listener) ~= "function" then
@@ -879,6 +881,8 @@ function M.set_progress(pct)
     if not require_active_operation() then return false end
     if pct ~= nil and type(pct) ~= "number" then return end
     note_progress("p|" .. tostring(pct))
+    -- The model selector page shows a runtime install's progress in its group.
+    if pct ~= nil and pct < 100 then tell_percent(math.floor(pct)) end
     eval(string.format("setProgress(%s)", pct == nil and "null" or tostring(pct)), "setProgress")
 end
 

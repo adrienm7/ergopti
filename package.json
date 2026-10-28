@@ -372,6 +372,7 @@
 		"test:source-encoding": "node ./tools/test/test-source-encoding.cjs",
 		"test:ahk-v2-syntax-antipatterns": "node ./tools/test/test-ahk-v2-syntax-antipatterns.cjs",
 		"test:ahk-local-same-as-global": "node ./tools/test/test-ahk-local-same-as-global.cjs",
+		"test:lua-undefined-globals": "node ./tools/test/test-lua-undefined-globals.cjs",
 		"test:report": "node ./tools/test/test-report.cjs",
 		"test:locale-resolution-single-source": "node ./tools/test/test-locale-resolution-single-source.cjs",
 		"test:menu-category-coverage": "node ./tools/test/test-menu-category-coverage.cjs",
