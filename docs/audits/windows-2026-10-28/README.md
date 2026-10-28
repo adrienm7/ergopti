@@ -2,6 +2,14 @@
 
 # Windows audit handover, 28 October 2026
 
+Post-validation update: the first hosted run exposed two fixture failures and
+review of the same shutdown flow proved one production compensation defect.
+See [POST_VALIDATION.md](POST_VALIDATION.md) for the three saved corrections, the unresolved 21 keymap failures, urgent-stop
+recovery instructions and exact before/after evidence. The original
+160-commit index and binary archives remain historical and unchanged; the
+corrected batch remains unqualified: work stopped before new full shared or
+native Windows CI runs at the explicit urgent stop request.
+
 The audit stopped at the maintainer's request. This handover preserves the
 implemented fixes, their before/after evidence, and the unfinished findings so
 that deleting the execution container does not discard the investigation.
