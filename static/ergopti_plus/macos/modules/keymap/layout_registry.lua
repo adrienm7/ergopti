@@ -176,7 +176,7 @@ local function default_deps(settings)
 		disable_source = InputSources.disable_keylayout_source_async,
 		select_source = InputSources.set_input_source_async,
 		active_sources = InputSources.list_active_keyboard_layouts,
-		live_enabled = InputSources.is_live_enabled,
+		confirm_source = InputSources.confirm_source_async,
 		pending = require("modules.keymap.pending_layout_activation"),
 		bundle_names = Install.bundle_keylayout_names,
 	}
@@ -388,37 +388,52 @@ local function acquire_slot(id, action, on_done)
 	return true
 end
 
---- What an installed layout's enable came to. The enabled-sources preference
---- can list a layout macOS turns on only at the next login, so the live list
---- decides: on now (enabled), listed but off (pending_activation, recorded for
---- the next boot), or the enable failed.
+--- What an installed layout's enable came to, read from a fresh process. The
+--- macOS 26 field probe (v5, P5 and P9) showed that writing the enabled-sources
+--- preference turns a layout on at once, but only a process started after the
+--- write sees it: Hammerspoon's own list stays stale. A layout the fresh process
+--- does not see on is the fallback: pending until the next login (P10). An
+--- update re-registers the rewritten file and, when it is selected, selects
+--- another layout and back, so the new content applies (P8 a).
 --- @param deps table
 --- @param id string Layout id.
 --- @param entry table Record entry (keyboard_name).
+--- @param path string Installed .keylayout path.
 --- @param listed boolean Whether the enable wrote the preference.
 --- @param reason string|nil The enable's failure reason.
---- @return table state { enabled, pending_activation, reason }
-local function settle_enable(deps, id, entry, listed, reason)
+--- @param update boolean Whether this replaced an installed copy.
+--- @param callback function fn(state): { enabled, pending_activation, consent, reason }.
+local function settle_enable(deps, id, entry, path, listed, reason, update, callback)
 	if not listed then
 		-- The layout is installed; only the enabled list could not be updated.
 		-- System Settings can still add it by hand.
 		Logger.warn(LOG, "The '%s' layout is installed but not enabled: %s.", id, tostring(reason))
-		return { enabled = false, pending_activation = false, reason = reason }
+		callback({ enabled = false, pending_activation = false, consent = false, reason = reason })
+		return
 	end
-	local live, live_err = deps.live_enabled(entry.keyboard_name)
-	if live == true then
-		deps.pending.forget(id)
-		return { enabled = true, pending_activation = false }
+	local dispatched = deps.confirm_source(entry.keyboard_name, { register_path = path, refresh = update },
+		function(read, state, read_reason)
+			if not read then
+				Logger.error(LOG, "The '%s' layout is listed in the enabled sources, but whether macOS turned it on cannot be read: %s.",
+					id, tostring(read_reason))
+				callback({ enabled = false, pending_activation = false, consent = false, reason = read_reason })
+				return
+			end
+			if state.enabled == true then
+				deps.pending.forget(id)
+				Logger.info(LOG, "macOS turned the '%s' layout on (%s).", id, tostring(state.id))
+				-- macOS asks the user to allow a keyboard it has not seen before.
+				callback({ enabled = true, pending_activation = false, consent = not update })
+				return
+			end
+			Logger.warn(LOG, "The '%s' layout is installed and listed in the enabled sources, but a fresh process does not see it on (listed=%s); macOS turns it on at the next login (reason=not_enabled:%s).",
+				id, tostring(state.listed), M.REASON_REQUIRES_LOGOUT)
+			deps.pending.record(id, entry.keyboard_name)
+			callback({ enabled = false, pending_activation = true, consent = false, reason = M.REASON_REQUIRES_LOGOUT })
+		end)
+	if dispatched ~= true then
+		Logger.warn(LOG, "The state of the '%s' layout was not read: the fresh-process read did not start.", id)
 	end
-	if live == nil then
-		Logger.error(LOG, "The '%s' layout is listed in the enabled sources, but whether macOS turned it on cannot be read: %s.",
-			id, tostring(live_err))
-		return { enabled = false, pending_activation = false, reason = live_err }
-	end
-	Logger.warn(LOG, "The '%s' layout is installed and listed in the enabled sources, but macOS turns it on only at the next login (reason=not_enabled:%s).",
-		id, M.REASON_REQUIRES_LOGOUT)
-	deps.pending.record(id, entry.keyboard_name)
-	return { enabled = false, pending_activation = true, reason = M.REASON_REQUIRES_LOGOUT }
 end
 
 --- Publishes a verified layout: the local copy, the installed file, the record.
@@ -445,7 +460,7 @@ local function publish(deps, entry, text)
 end
 
 --- Installs (or updates) one registry layout and adds it to the input sources.
---- on_done(true, { entry, path, source, enabled, pending_activation }) or
+--- on_done(true, { entry, path, source, enabled, pending_activation, consent }) or
 --- on_done(false, failure_code, detail) is called exactly once.
 --- @param id string Registry id.
 --- @param on_done function
@@ -534,9 +549,10 @@ function M.install(id, on_done, deps)
 				return
 			end
 			deps.enable_source(path, entry.name, function(listed, _output, reason)
-				local state = settle_enable(deps, id, entry, listed == true, reason)
-				finish(true, { entry = entry, path = path, source = detail.source, enabled = state.enabled,
-					pending_activation = state.pending_activation })
+				settle_enable(deps, id, entry, path, listed == true, reason, record.layouts[id] ~= nil, function(state)
+					finish(true, { entry = entry, path = path, source = detail.source, enabled = state.enabled,
+						pending_activation = state.pending_activation, consent = state.consent })
+				end)
 			end)
 		end)
 	end, deps)
@@ -645,7 +661,7 @@ end
 --- Installs the layout the user composed (docs/layout-composer.md): no catalogue
 --- and no download, the caller built the entry from the compiled file. The copy
 --- is published and enabled exactly like a registry layout's.
---- on_done(true, { entry, path, source, enabled, pending_activation }) or
+--- on_done(true, { entry, path, source, enabled, pending_activation, consent }) or
 --- on_done(false, failure_code, detail) is called exactly once.
 --- @param entry table Record entry of the composition.
 --- @param text string The compiled .keylayout.
@@ -702,9 +718,10 @@ function M.install_local(entry, text, on_done, deps)
 			return
 		end
 		deps.enable_source(path, entry.name, function(listed, _output, enable_reason)
-			local state = settle_enable(deps, id, entry, listed == true, enable_reason)
-			finish(true, { entry = entry, path = path, source = "composer", enabled = state.enabled,
-				pending_activation = state.pending_activation })
+			settle_enable(deps, id, entry, path, listed == true, enable_reason, record.layouts[id] ~= nil, function(state)
+				finish(true, { entry = entry, path = path, source = "composer", enabled = state.enabled,
+					pending_activation = state.pending_activation, consent = state.consent })
+			end)
 		end)
 	end)
 	return true
