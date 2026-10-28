@@ -60,8 +60,8 @@ class LocalServerPortScan {
 		try LoggerTrace("LLM.local_server_ports", "Scanning {1} local server process(es)…", Entries.Length)
 		State := Map("settled", false, "handle", 0, "timer", 0)
 		Finish := ObjBindMethod(this, "_Finish", Entries, OnDone, State)
-		Executable := A_WinDir "\System32\WindowsPowerShell\v1.0\powershell.exe"
-		Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", LLM_LOCAL_SERVER_SCAN_SCRIPT]
+		Executable := ShellRunner_WinPsPath()
+		Args := ShellRunner_WinPsArgs("-Command", LLM_LOCAL_SERVER_SCAN_SCRIPT)
 		Spawn := this.Options.Get("spawn", ShellRunner_Spawn)
 		try {
 			State["handle"] := Spawn.Call(Executable, Args, (ExitCode, Stdout, *) => Finish.Call(ExitCode == 0 ? Stdout : 0))
