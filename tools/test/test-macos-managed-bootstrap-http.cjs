@@ -173,7 +173,7 @@ assert.equal(
 	0,
 	officialColdReceipt.stderr || officialColdReceipt.stdout
 );
-assert.match(officialColdReceipt.stderr, /Ran 35 tests in/);
+assert.match(officialColdReceipt.stderr, /Ran 36 tests in/);
 assert.match(officialColdReceipt.stderr, /\bOK\b/);
 assert.doesNotMatch(officialColdReceipt.stderr, /skipped=/);
 process.stdout.write(officialColdReceipt.stdout);
