@@ -264,6 +264,58 @@ try {
 		'utf8'
 	);
 
+	const confirm = source.match(/^local CONFIRM_SOURCE_SCRIPT = \[\[([\s\S]*?)\n\]\]$/m);
+	if (!confirm) throw new Error('input-source confirmation program not found');
+	const refreshDelayProbe = spawnSync(
+		python,
+		[
+			'-c',
+			`
+import ast, json, sys, types
+program = ast.parse(sys.stdin.read())
+sleeps = [node for node in ast.walk(program) if isinstance(node, ast.Call)
+    and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name)
+    and node.func.value.id == "time" and node.func.attr == "sleep"]
+assert len(sleeps) == 2, "Both actual selection legs must settle"
+observed = []
+namespace = {"time": types.SimpleNamespace(sleep=observed.append),
+    "sys": types.SimpleNamespace(argv=["confirm", "layout", "", "refresh", "0.417"]), "float": float}
+assignments = {}
+for node in program.body:
+    if isinstance(node, ast.Assign):
+        for target in node.targets:
+            if isinstance(target, ast.Name): assignments.setdefault(target.id, []).append(node)
+loading = set()
+def execute(node):
+    for child in ast.walk(node):
+        if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Load) and child.id not in namespace:
+            assert child.id not in loading, "Cyclic delay dependency"
+            declarations = assignments.get(child.id, [])
+            assert len(declarations) == 1, "The delay must have one admitted definition"
+            loading.add(child.id)
+            execute(declarations[0])
+            loading.remove(child.id)
+    unit = ast.Module(body=[node], type_ignores=[])
+    exec(compile(ast.fix_missing_locations(unit), "actual-refresh-delay", "exec"), namespace)
+for call in sleeps: execute(ast.Expr(value=call))
+print(json.dumps(observed))
+`
+		],
+		{ input: confirm[1], encoding: 'utf8' }
+	);
+	test(
+		'both actual confirmation sleeps consume the admitted delay',
+		!refreshDelayProbe.error &&
+			refreshDelayProbe.status === 0 &&
+			JSON.stringify(JSON.parse(refreshDelayProbe.stdout || 'null')) ===
+				JSON.stringify([0.417, 0.417]),
+		JSON.stringify({
+			status: refreshDelayProbe.status,
+			stdout: refreshDelayProbe.stdout,
+			stderr: refreshDelayProbe.stderr
+		})
+	);
+
 	const budget = runMode(python, supervisor, fixtureDir, 'budget');
 	test(
 		'all nested children consume the one decreasing monotonic budget',
