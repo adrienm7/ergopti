@@ -112,8 +112,8 @@ KL_ReadNewTodayLog(Token := 0) {
 	    ; actually holds, so this has to be a real flush (see KL_FlushTodayFh).
 	    if Keystats.HasOwnProp("_today_fh") && !KL_FlushTodayFh(Keystats._today_fh)
 	        return Map("ok", false, "offset", Keystats.today_log_offset, "entries", [], "eof", false)
-		return _KL_JournalReadLines(Keystats.today_log_path,
-			Keystats.today_log_offset, KeystatsConst.INGEST_BATCH_LINES, KL_JsonDecode)
+		return _KL_ReadJournalEvents(Keystats.today_log_path,
+			Keystats.today_log_offset, KeystatsConst.INGEST_BATCH_LINES)
 	} finally {
 		_KL_JournalLeave(Scope)
 	}
