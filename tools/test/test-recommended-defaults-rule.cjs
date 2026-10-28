@@ -13,7 +13,9 @@
  * WHAT THIS PINS:
  *   1. Linux recommends "none" for every three- and four-finger swipe: the
  *      touchpad is read without being grabbed, so the desktop also acts.
- *   2. macOS recommends "none" for the three-finger tap (system Look up).
+ *   2. The three-finger tap recommends left_click_toggle on every driver,
+ *      macOS included although the system uses it for Look up (maintainer's
+ *      choice, 2026-10-28).
  *   3. The Gestures menu declares the shared note and both platform reasons,
  *      and the English locale carries their text. Each row Windows shows fits
  *      AutoHotkey's 260-unit menu item name in every locale.
@@ -62,8 +64,14 @@ for (const finger of [3, 4]) {
 	}
 }
 
-// 2. macOS: the three-finger tap is the system's Look up.
-assert.equal(recommended('gestures', 'tap_3', 'hs'), 'none', 'macOS tap_3 is Look up');
+// 2. macOS: the three-finger tap is the system's Look up, yet it stays
+// recommended like on Windows and Linux by the maintainer's choice (2026-10-28).
+for (const platform of ['ahk', 'hs', 'linux'])
+	assert.equal(
+		recommended('gestures', 'tap_3', platform),
+		'left_click_toggle',
+		`tap_3 recommends left_click_toggle on ${platform}`
+	);
 
 // 3. The menu says why and how to avoid the double action.
 const en = JSON.parse(read('_shared/data/locales/en.json'));

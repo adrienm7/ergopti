@@ -1453,7 +1453,7 @@
 	"menu.gestures.enabled": "️ إيماءات",
 	"menu.gestures.recommended_note": "تتجنّب الإيماءات الموصى بها ما يفعله نظامك أصلًا. يمكن إعادة تعيين أي إيماءة: أزل أولًا تعيين النظام نفسه، وإلا نُفّذ الإجراءان معًا.",
 	"menu.gestures.recommended_reason_linux": "في لينكس لا يُوصى بالسحب بثلاثة وأربعة أصابع: تُقرأ لوحة اللمس ولا يُستحوذ عليها، لذا يستجيب سطح المكتب (GNOME وKDE وHyprland وCOSMIC) لها أيضًا.",
-	"menu.gestures.recommended_reason_macos": "في macOS لا يُوصى بالنقر بثلاثة أصابع: يستخدمه النظام للبحث عن كلمة.",
+	"menu.gestures.recommended_reason_macos": "في macOS يستخدم النظام النقر بثلاثة أصابع أيضًا للبحث عن كلمة: أوقف البحث عن كلمة في إعدادات لوحة التتبع قبل استخدامه، وإلا فسيُنفَّذ الإجراءان معًا.",
 	"menu.gestures.recommended_reason_windows": "في Windows لا يمكن استخدام إيماءة إلا إذا كانت إعدادات لوحة اللمس ترسلها إلى Ergopti. يضبط Ergopti ذلك بنفسه (الإعداد التلقائي)، وتظهر الإيماءة غير المُسنَدة باهتة. يستبدل Ergopti إجراء النظام الخاص، فلا يحدث إجراء مزدوج.",
 	"menu.gestures.manual_tutorial": "📋 دليل الإعداد اليدوي",
 	"menu.gestures.mode_incremental": "إرسال تدريجي (مسافة)",
