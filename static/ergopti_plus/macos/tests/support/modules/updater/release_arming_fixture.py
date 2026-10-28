@@ -73,10 +73,18 @@ def hostile_interpreter_control(driver, temporary):
         )
         executable.chmod(0o700)
         environment = dict(
-            os.environ, LUA=configured, PATH=str(root) + os.pathsep + os.environ.get("PATH", "")
+            os.environ,
+            LUA=configured,
+            PATH=str(root) + os.pathsep + os.environ.get("PATH", ""),
         )
         result = subprocess.run(
-            [sys.executable, "-B", str(Path(__file__).resolve()), str(driver), str(temporary)],
+            [
+                sys.executable,
+                "-B",
+                str(Path(__file__).resolve()),
+                str(driver),
+                str(temporary),
+            ],
             env=environment,
             text=True,
             capture_output=True,
@@ -169,13 +177,32 @@ def run_case(driver, temporary, mode, lua):
             command["args"][3] = command["args"][3].replace(
                 "/usr/bin/open", shlex.quote(str(native_open))
             )
+            if sys.platform != "darwin":
+                observer = root / "device-observer"
+                observer.write_text(
+                    "#!/bin/sh\nexec "
+                    + shlex.quote(sys.executable)
+                    + " -B "
+                    + shlex.quote(str(driver / "tests/support/release_swap_physical_probe.py"))
+                    + ' stat "$@"\n'
+                )
+                observer.chmod(0o700)
+                command["args"][3] = command["args"][3].replace(
+                    "/usr/bin/stat", shlex.quote(str(observer))
+                )
             if mode == "log_refused":
                 stage.chmod(0o500)
                 if os.access(stage, os.W_OK):
                     raise RuntimeError("The controlled log refusal is not physically active")
             arguments = [command["executable"], *command["args"]]
             supervisor = subprocess.Popen(
-                [sys.executable, "-c", SUPERVISOR, json.dumps(arguments), str(write_fd)],
+                [
+                    sys.executable,
+                    "-c",
+                    SUPERVISOR,
+                    json.dumps(arguments),
+                    str(write_fd),
+                ],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
