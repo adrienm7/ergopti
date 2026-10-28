@@ -676,6 +676,11 @@ post_install_refresh_ms = 1500
 # HS: menu_keyboard_layout.lua TIS_CALL_DELAY.
 tis_call_delay_ms = 100
 
+# Delay after boot before the layouts macOS turns on only at the next login are
+# checked again (and selected when the user asked to use one).
+# HS: init.lua, modules/keymap/pending_layout_activation.lua resume().
+pending_layout_activation_delay_ms = 5000
+
 # Hard deadline for a native keyboard input-source mutation subprocess.
 # HS: keymap/input_sources.lua INPUT_SOURCE_OPERATION_TIMEOUT_SEC.
 # Linux: adapters/input_source_switch.lua (each gsettings or setxkbmap child).
