@@ -619,3 +619,5 @@ _LMOC_Case(Mode) {
 
 for _LMOC_Mode in ["cold-success", "cold-refusal", "close-refusal", "close-reopen-refusal", "close-success", "close-reopen-success"]
 	Test("Layout opening generation: " . _LMOC_Mode . " preserves the current window (layout-open-generation)", _LMOC_Case.Bind(_LMOC_Mode))
+
+#Include test_layout_manager_early_show.ahk
