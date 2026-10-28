@@ -20,7 +20,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { isDeepStrictEqual } = require('node:util');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 const { sharedRel } = require('../lib/paths.cjs');
 const releaseGenerator = require('../codegen/codegen-ollama-release.cjs');
 const { GENERATORS, allOutputs } = require('../build/generators.cjs');
@@ -55,14 +55,6 @@ function report() {
 	});
 	console.log(`# passed: ${passed}/${results.length}`);
 	if (failed > 0) process.exit(1);
-}
-
-function toBashPath(filePath) {
-	const normalized = path.resolve(filePath).replace(/\\/g, '/');
-	if (process.platform !== 'win32') return normalized;
-	const match = normalized.match(/^([A-Za-z]):(\/.*)$/);
-	if (!match) throw new Error(`cannot convert path for Git Bash: ${filePath}`);
-	return `/${match[1].toLowerCase()}${match[2]}`;
 }
 
 function writeExecutable(filePath, source) {
@@ -220,27 +212,31 @@ exit 0
 }
 
 function runFixture(bash, fixture, args = ['', fixture.installDir]) {
-	const bashArgs = args.map((arg) => (arg === '' ? '' : toBashPath(arg)));
-	const fixturePath = `${toBashPath(fixture.fakeBin)}:/usr/bin:/bin`;
+	const bashArgs = args.map((arg) => (arg === '' ? '' : bashPath(path.resolve(arg))));
+	const fixturePath = `${bashPath(path.resolve(fixture.fakeBin))}:/usr/bin:/bin`;
 	// Git's bin/bash wrapper prepends real system tools to inherited PATH.
 	// Set the private transport path after that wrapper has finished startup.
-	return spawnSync(bash, ['-s', '--', fixturePath, toBashPath(fixture.scriptPath), ...bashArgs], {
-		input:
-			'export PATH="$1"; shift\n' +
-			'expected="${PATH%%:*}/curl"\n' +
-			'if [ "$(command -v curl)" != "$expected" ]; then echo "Private curl transport is missing." >&2; exit 78; fi\n' +
-			'exec bash "$@"\n',
-		cwd: fixture.fixtureRoot,
-		encoding: 'utf8',
-		timeout: 30000,
-		maxBuffer: 16 * 1024 * 1024,
-		env: {
-			...process.env,
-			HOME: toBashPath(fixture.homeDir),
-			PATH: `${toBashPath(fixture.fakeBin)}:/usr/bin:/bin`,
-			ERGOPTI_FIXTURE_ROOT: toBashPath(fixture.fixtureRoot)
+	return spawnSync(
+		bash,
+		['-s', '--', fixturePath, bashPath(path.resolve(fixture.scriptPath)), ...bashArgs],
+		{
+			input:
+				'export PATH="$1"; shift\n' +
+				'expected="${PATH%%:*}/curl"\n' +
+				'if [ "$(command -v curl)" != "$expected" ]; then echo "Private curl transport is missing." >&2; exit 78; fi\n' +
+				'exec bash "$@"\n',
+			cwd: fixture.fixtureRoot,
+			encoding: 'utf8',
+			timeout: 30000,
+			maxBuffer: 16 * 1024 * 1024,
+			env: {
+				...process.env,
+				HOME: bashPath(path.resolve(fixture.homeDir)),
+				PATH: `${bashPath(path.resolve(fixture.fakeBin))}:/usr/bin:/bin`,
+				ERGOPTI_FIXTURE_ROOT: bashPath(path.resolve(fixture.fixtureRoot))
+			}
 		}
-	});
+	);
 }
 
 function cleanupFixture(fixture) {
@@ -420,7 +416,7 @@ test(
 		'refused(){ calls=$((calls+1)); return 78; }; transient(){ calls=$((calls+1)); return 74; }; ' +
 		'retry_network refused; first=$?; refused_calls=$calls; calls=0; ' +
 		'retry_network transient; echo "$first $refused_calls $calls"';
-	const run = spawnSync(bash, ['-c', probe, 'probe', toBashPath(SOURCE_NETWORK)], {
+	const run = spawnSync(bash, ['-c', probe, 'probe', bashPath(path.resolve(SOURCE_NETWORK))], {
 		encoding: 'utf8'
 	});
 	test(

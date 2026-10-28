@@ -37,7 +37,7 @@ const path = require('path');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { selectGates } = require('./verify-change.cjs');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 const {
 	commandPlan: swiftLauncherCommandPlan,
 	run: runSwiftLauncherGate
@@ -688,7 +688,7 @@ ${launcherBody}
 build_launcher
 `,
 			'fixture',
-			temporaryBuild.replaceAll('\\', '/')
+			bashPath(temporaryBuild)
 		],
 		{ encoding: 'utf8', timeout: 10000 }
 	);

@@ -27,7 +27,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { spawnSync } = require('child_process');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 const { scriptTokens } = require('../lib/script-source.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -499,14 +499,10 @@ check('the packaged macOS app ships the registry folder the layout manager reads
 			fn[0],
 			'bundle_layout_registry "$1"'
 		].join('\n');
-		const result = spawnSync(
-			bashExecutable(),
-			['-c', bash, 'fixture', staticRoot.replace(/\\/g, '/')],
-			{
-				encoding: 'utf8',
-				env: { ...process.env, REPO_ROOT: path.join(fixture, 'repo').replace(/\\/g, '/') }
-			}
-		);
+		const result = spawnSync(bashExecutable(), ['-c', bash, 'fixture', bashPath(staticRoot)], {
+			encoding: 'utf8',
+			env: { ...process.env, REPO_ROOT: bashPath(path.join(fixture, 'repo')) }
+		});
 		const packaged = path.join(staticRoot, ...registry.folder.slice('static/'.length).split('/'));
 		const outcome = {
 			status: result.status,

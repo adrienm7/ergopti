@@ -17,7 +17,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { bashExecutable } = require('../lib/git-bash.cjs');
+const { bashExecutable, bashPath } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SOURCE_SCRIPT = path.join(
@@ -47,14 +47,6 @@ function report() {
 	});
 	console.log(`# passed: ${results.filter((result) => result.ok).length}/${results.length}`);
 	if (results.some((result) => !result.ok)) process.exitCode = 1;
-}
-
-function toBashPath(filePath) {
-	const normalized = path.resolve(filePath).replace(/\\/g, '/');
-	if (process.platform !== 'win32') return normalized;
-	const match = normalized.match(/^([A-Za-z]):(\/.*)$/);
-	if (!match) throw new Error(`cannot convert path for Git Bash: ${filePath}`);
-	return `/${match[1].toLowerCase()}${match[2]}`;
 }
 
 function writeExecutable(filePath, source) {
@@ -113,7 +105,7 @@ printf 'icns' > "$out"
 	const run = spawnSync(
 		bash,
 		[
-			toBashPath(SOURCE_SCRIPT),
+			bashPath(SOURCE_SCRIPT),
 			'Shortcut',
 			'/tmp/project',
 			'/Applications/Visual Studio Code.app',
@@ -126,8 +118,8 @@ printf 'icns' > "$out"
 			maxBuffer: 4 * 1024 * 1024,
 			env: {
 				...process.env,
-				HOME: toBashPath(fixtureRoot),
-				PATH: `${toBashPath(fakeBin)}:${process.env.PATH || ''}`
+				HOME: bashPath(fixtureRoot),
+				PATH: `${bashPath(fakeBin)}:${process.env.PATH || ''}`
 			}
 		}
 	);
