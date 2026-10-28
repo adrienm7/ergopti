@@ -161,7 +161,7 @@ shell.run(function(capture, observed, native)
 	local log=helpers.make_logger_stub()
 	log.error=function(_,msg,...) logs[#logs+1]=string.format(msg,...) end
 	package.loaded["infra.logger"]=log
-	package.loaded["infra.config_paths"]={metrics_dir=function() return metrics end,get_config_dir=function() return temporary end}
+	package.loaded["infra.config_paths"]={metrics_dir=function() return metrics end,metrics_cache_dir=function() return temporary.."/ergopti_metrics" end,get_config_dir=function() return temporary end}
 	package.loaded["adapters.file_system"]=file_system
 	package.loaded["modules.keystats.text_cipher"]={is_enabled=function() return false end}
 	package.loaded["modules.keystats.export"]=nil
@@ -506,7 +506,7 @@ shell.run(function(capture, observed, native)
 	local log=helpers.make_logger_stub()
 	log.error=function(_,msg,...) logs[#logs+1]=string.format(msg,...) end
 	package.loaded["infra.logger"]=log
-	package.loaded["infra.config_paths"]={metrics_dir=function() return metrics end,get_config_dir=function() return temporary end}
+	package.loaded["infra.config_paths"]={metrics_dir=function() return metrics end,metrics_cache_dir=function() return temporary.."/ergopti_metrics" end,get_config_dir=function() return temporary end}
 	package.loaded["adapters.file_system"]=file_system
 	package.loaded["modules.keystats.text_cipher"]={is_enabled=function() return false end}
 	package.loaded["modules.keystats.export"]=nil

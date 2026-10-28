@@ -226,7 +226,7 @@ local function main()
 				assert(file:write("# Fixture-owned user exclusion\n"))
 				assert(file:close())
 			end
-			assert(manager.init({LOG_DIR = temporary .. "/metrics"}), table.concat(errors, " | "))
+			assert(manager.init({LOG_DIR = temporary .. "/metrics", CACHE_DIR = temporary .. "/ergopti_metrics"}), table.concat(errors, " | "))
 			assert(writer.get_db() ~= nil, "actual SQLite handle was not admitted")
 			if phase ~= "seed" then
 				-- L18: the deferred keystats start held the main thread 1.3 s on the

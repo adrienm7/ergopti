@@ -179,7 +179,7 @@ require("tests.support.file_system_transaction_fixture").with_fixture(function(n
 		end
 		return proxy
 	end
-	local state = { LOG_DIR = temporary, buffer_events = {}, rich_chunks = {}, today_idx = {}, manifest = {} }
+	local state = { LOG_DIR = temporary, CACHE_DIR = temporary .. "/ergopti_metrics", buffer_events = {}, rich_chunks = {}, today_idx = {}, manifest = {} }
 	assert(Manager.init(state) == false, "an incomplete first header must reject public initialization")
 	assert(refused and failed_close.native_closed, "the physical failure must execute on the original FILE")
 	assert(Writer.get_db() == nil, "header failure must precede SQLite admission")
