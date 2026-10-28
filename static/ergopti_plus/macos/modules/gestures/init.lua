@@ -458,7 +458,7 @@ local function create_watcher(deviceID)
 	local candidate
 	local token = { committed = false }
 	local callback_ok, callback_result = xpcall(function()
-		candidate = dev:frameCallback(function(_, touches, _, _)
+		candidate = dev:frameCallback(function(_, touches, frame_stamp, _)
 			if touch_watchers[deviceID] ~= candidate
 				or touch_watcher_tokens[deviceID] ~= token
 				or token.committed ~= true
@@ -486,7 +486,18 @@ local function create_watcher(deviceID)
 				Logger.debug(LOG, "Touch session started on device=%s (frame %d, touches=%d).",
 					tostring(deviceID), fc, finger_count)
 			end
-			if not Logger.pcall(LOG, Engine.process_frame, touches) then
+			-- The engine times frames on this capture stamp: frames queued behind a
+			-- busy main thread arrive in one burst. A device that reports none is a
+			-- broken contract; its frames are then timed at delivery, said once.
+			if type(frame_stamp) ~= "number" or frame_stamp ~= frame_stamp then
+				if not token.stamp_reported then
+					token.stamp_reported = true
+					Logger.error(LOG, "Touch frame from device=%s has no capture timestamp (%s); gesture timing uses delivery time.",
+						tostring(deviceID), tostring(frame_stamp))
+				end
+				frame_stamp = nil
+			end
+			if not Logger.pcall(LOG, Engine.process_frame, touches, frame_stamp) then
 				-- A failed frame may leave the native scroll blocker engaged
 				pcall(Engine.emergency_reset)
 			end
