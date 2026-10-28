@@ -103,10 +103,11 @@ end
 local function ollama_install(frame, blocked, ollama_ok)
 	if not _bound then return nil end
 	if blocked ~= nil then return { state = "unsupported", reason_key = blocked } end
-	local phase = _bound.ollama_install_phase(frame.llm)
-	if phase == "running" then return { state = "running" } end
+	-- Named for the install, not "phase": a log phase belongs to the closed logger vocabulary.
+	local install_step = _bound.ollama_install_phase(frame.llm)
+	if install_step == "running" then return { state = "running" } end
 	if ollama_ok then return { state = "installed" } end
-	if phase == "ai_on" then return { state = "unsupported", reason_key = "model_browser.reason_install_ai_on" } end
+	if install_step == "ai_on" then return { state = "unsupported", reason_key = "model_browser.reason_install_ai_on" } end
 	return { state = "available" }
 end
 
