@@ -40,6 +40,8 @@ local function with_subject(assignments, scenario)
 			bind = function() observed.binds = observed.binds + 1; return "ordinary-handle" end,
 			unbind = function() return true end,
 			setEnabled = function() return true end,
+			-- Every key resolves in this double's layout.
+			layout_key_refusal = function() return nil end,
 			replace_physical_claims = function(_, rows) observed.claims = rows; return true end,
 		}
 		package.loaded["modules.shortcuts.magic_editor"] = {

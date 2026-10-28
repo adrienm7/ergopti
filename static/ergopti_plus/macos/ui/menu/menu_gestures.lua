@@ -333,7 +333,7 @@ function M.build(ctx)
 			sensSubmenu = ManifestMenu.template_rows("gesture_sensitivity_head")
 			if not sensSubmenu then return nil end
 		end
-		local sensitivities = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0 }
+		local sensitivities = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0, 40.0, 50.0, 60.0 }
 		for _, s in ipairs(sensitivities) do
 			local label = string.format("%.1f", s)
 			if s == 3.5 then label = label .. " " .. i18n.get("menu.gestures.default_sensitivity") end

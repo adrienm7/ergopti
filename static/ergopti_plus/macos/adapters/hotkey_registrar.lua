@@ -361,12 +361,40 @@ function M.physical_claims()
 	return claims
 end
 
+--- Reports why one key name cannot be resolved in the active keyboard layout.
+--- A single character is layout-dependent: when the active keymap lacks it,
+--- Hammerspoon silently resolves it through its US-ANSI fallback table, which
+--- can land on a physical key that another live hotkey of the old layout still
+--- holds (the 2026-10-28 field run: 'g' fell back to keycode 5, where the
+--- Ergopti '.' of Ctrl+. was still registered). Named keys (space, f17…) do not
+--- depend on the layout. rawget skips the fallback metatable on purpose.
+--- @param key string Native key name.
+--- @return string|nil refusal Nil when the key resolves in the active layout.
+function M.layout_key_refusal(key)
+	if type(key) ~= "string" or utf8.len(key) ~= 1 then return nil end
+	local name = key:lower()
+	if rawget(hs.keycodes.map, name) ~= nil then return nil end
+	return string.format("key '%s' is not in the active keyboard layout", name)
+end
+
 --- Registers an ordinary named chord through the common native owner.
 --- @param chord string Canonical chord.
 --- @param callback function Delivery callback.
+--- @param ... table|nil Driver-only options beyond the two-parameter port
+---   contract: `{require_layout_key = true}` refuses a key the active layout
+---   cannot resolve instead of binding its US-ANSI fallback.
 --- @return string|nil handle
-function M.bind(chord, callback)
-	return bind_native(chord, callback)
+--- @return string|nil refusal Why no handle was returned, when known.
+function M.bind(chord, callback, ...)
+	local options = ...
+	if type(options) == "table" and options.require_layout_key == true then
+		local parsed = Chord.parse(chord)
+		local refusal = parsed and M.layout_key_refusal(parsed.key)
+		if refusal then return nil, refusal end
+	end
+	local handle = bind_native(chord, callback)
+	if handle == nil then return nil, "the registrar or macOS refused the registration" end
+	return handle
 end
 
 --- Registers a modified Caps Lock chord (e.g. "Ctrl+Capslock") through the

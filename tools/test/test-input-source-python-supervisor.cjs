@@ -185,9 +185,12 @@ function replaceExactly(source, before, after) {
 	return source.slice(0, first) + after + source.slice(first + before.length);
 }
 
+// The editor runs exactly two children, `defaults export` then `defaults import`:
+// since 0682a6cb4f it ends on its own write and restarts no agent (launchctl
+// answered 113 on every successful write), so the budget is spent twice.
 function budgetContract(payload) {
 	const timeouts = eventsOf(payload, 'communicate').map((event) => event[2]);
-	return payload.exit === 0 && JSON.stringify(timeouts) === JSON.stringify([8, 5, 1]);
+	return payload.exit === 0 && JSON.stringify(timeouts) === JSON.stringify([8, 5]);
 }
 
 function timeoutKillContract(payload) {
@@ -242,7 +245,7 @@ try {
 	);
 	test(
 		'every nested child starts in its own process group',
-		eventsOf(budget, 'spawn').length === 3 &&
+		eventsOf(budget, 'spawn').length === 2 &&
 			eventsOf(budget, 'spawn').every((event) => event[2] === true),
 		JSON.stringify(budget)
 	);
