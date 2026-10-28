@@ -8,7 +8,8 @@
  * counterparts from _shared/data/identifiers.json: the
  * ErgoptiPlus file and bundle names, the bundle ids, the service labels and the
  * external hosts (GitHub, Ollama, Hugging Face) that the macOS and Linux Lua
- * drivers used to spell in dozens of files.
+ * drivers used to spell in dozens of files, and the field report names the
+ * macOS, Linux and Windows collectors share (tools/dev/collect-*-field-report).
  *
  * WHY THIS EXISTS:
  * The parity audit (K4, K9) counted the `ErgoptiPlus.app` name 459 times, the
@@ -38,8 +39,12 @@ const OUTPUT_SWIFT = path.join(
 	'macos/launcher/Sources/ErgoptiPlus/Identifiers.generated.swift'
 );
 
-const GROUPS = ['app', 'bundle_ids', 'service_labels', 'hosts', 'dev_source'];
+const GROUPS = ['app', 'bundle_ids', 'service_labels', 'hosts', 'dev_source', 'field_report'];
 const VALUE_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+// The field report names are repository paths and a branch prefix: slash-
+// separated plain segments, with an optional final slash for a prefix.
+const PATH_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9._-]+)*\/?$/;
+const GROUP_SHAPE = { field_report: PATH_SHAPE };
 
 /** Stops generation with one exact reason. */
 function fail(message) {
@@ -55,8 +60,8 @@ for (const group of GROUPS) {
 		fail(`"${group}" must be a non-empty object.`);
 	for (const [key, value] of Object.entries(table)) {
 		if (!/^[a-z][a-z0-9_]*$/.test(key)) fail(`${group}.${key}: key must be snake_case.`);
-		if (typeof value !== 'string' || !VALUE_SHAPE.test(value))
-			fail(`${group}.${key}: ${JSON.stringify(value)} is not a plain identifier or host.`);
+		if (typeof value !== 'string' || !(GROUP_SHAPE[group] ?? VALUE_SHAPE).test(value))
+			fail(`${group}.${key}: ${JSON.stringify(value)} is not a plain identifier, host or path.`);
 		// Two keys with one value are two names for one thing: keep one.
 		if (group !== 'app' && seen.has(value))
 			fail(`${group}.${key} repeats ${seen.get(value)} (${value}).`);
@@ -99,15 +104,16 @@ const SHELL_PREFIX = {
 	bundle_ids: 'ERGOPTI_BUNDLE_ID',
 	service_labels: 'ERGOPTI_SERVICE_LABEL',
 	hosts: 'ERGOPTI_HOST',
-	dev_source: 'ERGOPTI_DEV_SOURCE'
+	dev_source: 'ERGOPTI_DEV_SOURCE',
+	field_report: 'ERGOPTI_FIELD_REPORT'
 };
 
 const shell = `#!/bin/sh
 ${BANNER('#')}
 
-# Application names, bundle ids, service labels and external hosts, for the shell
-# tools and installers that source this file. Hosts are bare names: build a URL as
-# "https://\${ERGOPTI_HOST_GITHUB}/...".
+# Application names, bundle ids, service labels, external hosts and the field
+# report names, for the shell tools and installers that source this file. Hosts
+# are bare names: build a URL as "https://\${ERGOPTI_HOST_GITHUB}/...".
 ${GROUPS.flatMap((group) =>
 	Object.entries(source[group]).map(
 		([key, value]) => `${SHELL_PREFIX[group]}_${key.toUpperCase()}="${value}"`
@@ -146,7 +152,8 @@ const SWIFT_ENUM = {
 	bundle_ids: 'BundleIds',
 	service_labels: 'ServiceLabels',
 	hosts: 'Hosts',
-	dev_source: 'DevSource'
+	dev_source: 'DevSource',
+	field_report: 'FieldReport'
 };
 const camel = (key) => key.replace(/_([a-z0-9])/g, (_m, c) => c.toUpperCase());
 const swift = `${BANNER('//')}
