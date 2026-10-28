@@ -2,6 +2,8 @@
 
 # Atomic Windows audit commits
 
+The original 160-commit index is historical. The post-validation Windows fixes and their integrated source head are documented in the appendix.
+
 Integration head: `fe3d8b010779a2666ef9307305c68f1bc9d92428`. Base: `18d69a24c06586186a221c1afb5ce703732ac4a1`.
 
 The proof paths below resolve after extracting `evidence.tar.gz`. The machine-readable index is `report.json`.
@@ -3694,3 +3696,63 @@ These normal merges import dev under the final synchronization instruction.
 - `8e636fc9fde012e37a1a15a30d03d62a67ed8fa8` chore(windows): merge current release qualification from dev
 - `3c88b1db2320067e2b49b9c4037d50ada5c14c38` chore(windows): merge current release source contracts
 - `fe3d8b010779a2666ef9307305c68f1bc9d92428` chore(windows): merge current release history
+
+## Post-validation Windows corrections
+
+### a2fc97973e fix(test): include registry shutdown in the program envelope
+
+Full SHA: `a2fc97973e4f2d9a67e384a7b2b3e92006401cb3`; original: `5ce0e246954ef3d150d9eb19a720fa9b2b0f4e6d`.
+The extracted production handler now asks the registry download owner
+before program retirement. Its native fixture omitted that dependency,
+so an unset call became an earlier shutdown refusal and failed the
+actual Windows lane before reaching program ownership.
+Export the faithful ready owner and require exactly one registry call
+on every shutdown attempt. This isolated AHK child is Windows-only;
+macOS and Linux do not execute this handler or fixture.
+
+Regression files:
+
+- `static/ergopti_plus/windows/tests/support/run_program_shutdown_envelope.ahk`
+
+Integration proof: `post-validation-evidence/evidence/windows-post-ci-integration/receipts.json` in `post-validation-evidence.tar.gz`.
+
+### 2ad1daa540 fix(windows): resume native admission after registry refusal
+
+Full SHA: `2ad1daa5405a2ab9dada5cef2a1212933e6a3f5d`; original: `c8e977a8fb138082967a02a2531bf771fcbc6326`.
+Registry cleanup could refuse after navigation admission was fenced but
+before the compensating finally block began. A cancelled shutdown then
+returned to the live driver with native admission still fenced.
+Run that refusal gate inside both reversible ownership scopes, after
+held modifiers release and before user programs retire. Genuine handler
+children cover ready, false, Error and empty Error results, exact bundle
+return, one native cancellation and preserved pause/generation state.
+
+macOS and Linux do not execute this AHK OnExit/native-owner contract.
+
+Regression files:
+
+- `static/ergopti_plus/windows/tests/support/run_program_shutdown_envelope.ahk`
+- `static/ergopti_plus/windows/tests/unit/modules/shortcuts/test_run_program_actions.ahk`
+
+Integration proof: `post-validation-evidence/evidence/windows-post-ci-integration/receipts.json` in `post-validation-evidence.tar.gz`.
+
+### 0d524fa308 fix(test): serialize absent interpreter choices as null
+
+Full SHA: `0d524fa308358dc54fcca497686ce90411ef2d21`; original: `7348172a5698c0ab5251a1958b9d1e1448676fb4`.
+The Windows PowerShell 5.1 native fixture correctly refused missing
+explicit interpreters, but serializing the empty pipeline value retained
+an object wrapper. Its strict consumer therefore rejected a correct
+refusal. Build one canonical receipt with a literal null field and publish
+only nonnull selections.
+Keep strict null assertions and all eight complete native entry controls.
+Exercise literal null, actual pipeline exhaustion, AutomationNull and a
+nonnull path through the same producer on every host. The original
+Windows CI failure supplies the native before proof; PowerShell 7 host
+controls cannot qualify Windows PowerShell 5.1.
+
+Regression files:
+
+- `tools/test/fixtures/windows_dev_interpreter_controls.ps1`
+- `tools/test/test-windows-dev-script.cjs`
+
+Integration proof: `post-validation-evidence/evidence/windows-post-ci-integration/receipts.json` in `post-validation-evidence.tar.gz`.
