@@ -45,6 +45,7 @@ local OWNED = {
 	"keymap.control_signals",
 	"keymap.utils",
 	"lfs",
+	"llm.api_model_listing",
 	"llm.enable_admission",
 	"llm.local_model_policy",
 	"llm.local_server_auth",

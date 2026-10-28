@@ -69,6 +69,7 @@ local LocalServerPorts = require("modules.llm.local_server_ports")
 local AuthPolicy     = require("llm.local_server_auth")
 local ProviderConfig = require("llm.provider_config_policy")
 local Json           = require("json")
+local ApiModelListing = require("llm.api_model_listing")
 local LOG            = "llm.api_remote"
 -- One probe client per local server, created at its first sweep with the
 -- registry's local_server_probe_timeout_ms and pinned for the life of the
@@ -1940,37 +1941,25 @@ function M.check_availability(_model_name, on_available, on_missing, on_cancelle
 end
 
 
--- The model ids each entry's provider listed, by entry id: the model selector
--- page shows one row per listed model, and the configured one when absent.
-local _listed_models = {}
-
---- Extracts the model ids of a provider-shaped models response.
---- @param format string Provider wire format.
---- @param body string Response body already validated by models_response_is_valid.
---- @return table ids Sorted, unique.
-local function model_ids_from_body(format, body)
-	local decoded = JsonCodec.decode(body)
-	local list = decoded[format == "gemini" and "models" or "data"]
-	local ids, seen = {}, {}
-	for _, item in ipairs(type(list) == "table" and list or {}) do
-		local id = type(item) == "table" and (item.id or item.name) or nil
-		if type(id) == "string" then
-			if format == "gemini" and id:sub(1, 7) == "models/" then id = id:sub(8) end
-			if id ~= "" and not seen[id] then
-				seen[id] = true
-				ids[#ids + 1] = id
-			end
-		end
-	end
-	table.sort(ids)
-	return ids
-end
+-- The listing state of each entry's provider, by entry id: the model selector
+-- page shows one row per listed model, or the provider's known models and a
+-- typed-id row while it is pending, refused or unavailable
+-- (_shared/lua/llm/api_model_listing.lua).
+local _listing_state = {}
 
 --- The ids the active entry's provider listed at its last successful listing.
 --- @param entry_id string Entry identifier.
 --- @return table|nil ids Nil before a listing succeeded for this entry.
 function M.listed_models(entry_id)
-	return _listed_models[entry_id]
+	local state = _listing_state[entry_id]
+	return type(state) == "table" and state.state == "listed" and state.ids or nil
+end
+
+--- The listing state of one entry, as api_model_listing.plan reads it.
+--- @param entry_id string Entry identifier.
+--- @return table|nil state Nil when this entry was never listed.
+function M.listing_state(entry_id)
+	return _listing_state[entry_id]
 end
 
 --- Lists the models the active entry's provider serves, through the same
@@ -1989,35 +1978,43 @@ function M.list_active_models(on_done)
 		end
 		local provider = M.PROVIDERS[entry.provider]
 		local base = provider and resolve_base_url(entry, provider) or nil
-		if not provider or not base or key_missing(entry) or provider.format == "backboard"
-				or provider.format == "decisions" then
+		if not provider or not base or key_missing(entry) or not ApiModelListing.supported(provider.format) then
+			_listing_state[entry.id] = { state = "failed", reason = "unsupported" }
 			Logger.callback(LOG, "Remote model listing", on_done, false, "listing_unsupported")
 			return
 		end
 		local format = provider.format
+		_listing_state[entry.id] = { state = "pending" }
 		local dispatched = dispatch_probe(_check_client, base, format, entry.token, function(r)
 			if my_identity ~= _identity_generation then
+				-- The entry changed under the listing: it is no longer pending.
+				local held = _listing_state[entry.id]
+				if type(held) == "table" and held.state == "pending" then _listing_state[entry.id] = nil end
 				Logger.callback(LOG, "Remote model listing", on_done, false, "stale_identity")
 				return
 			end
 			local valid, reason = models_response_is_valid(format, r)
 			if not valid then
+				local status = type(r) == "table" and tonumber(r.status) or 0
+				_listing_state[entry.id] = { state = "failed", reason = (status or 0) > 0 and "refused" or "unavailable" }
 				Logger.info(LOG, "Remote model listing unavailable (provider=%s, status=%s, reason=%s).",
 					tostring(entry.provider), tostring(type(r) == "table" and r.status or nil), tostring(reason))
 				Logger.callback(LOG, "Remote model listing", on_done, false, "listing_refused")
 				return
 			end
-			local ok, ids = pcall(model_ids_from_body, format, r.body)
-			if not ok then
-				Logger.warn(LOG, "Remote model listing could not be read: %s.", tostring(ids))
+			local ok, ids = pcall(function() return ApiModelListing.model_ids(format, JsonCodec.decode(r.body)) end)
+			if not ok or type(ids) ~= "table" then
+				_listing_state[entry.id] = { state = "failed", reason = "unreadable" }
+				Logger.warn(LOG, "Remote model listing could not be read: %s.", tostring(ok and "no model list" or ids))
 				Logger.callback(LOG, "Remote model listing", on_done, false, "listing_unreadable")
 				return
 			end
-			_listed_models[entry.id] = ids
+			_listing_state[entry.id] = { state = "listed", ids = ids }
 			Logger.info(LOG, "Remote model listing: %d model(s) for provider %s.", #ids, tostring(entry.provider))
 			Logger.callback(LOG, "Remote model listing", on_done, true, ids)
 		end)
 		if dispatched ~= true then
+			_listing_state[entry.id] = { state = "failed", reason = "unavailable" }
 			Logger.callback(LOG, "Remote model listing", on_done, false, "dispatch_refused")
 		end
 	end)

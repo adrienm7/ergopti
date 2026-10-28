@@ -13,6 +13,12 @@
 #Include ollama_runtime_owner.ahk
 
 global _LLM_ManagedBootstrap := 0
+; The one observer of a menu pull's percentage (the model selector page):
+; called with (Tag, Percent) at each new whole percentage, then (Tag, "") once
+; the pull ended. 0 when no page observes it.
+global LLM_PULL_PERCENT_LISTENER := 0
+; The end of a pull's capture read for its percentage: a few progress frames.
+global LLM_PULL_PERCENT_TAIL_BYTES := 4096
 
 /** Dispatches explicit installation without an administrator/system fallback. */
 LLM_Deps_RunManagedInstaller(Model, Epoch, OnReady?, OnFailed?) {
@@ -172,6 +178,24 @@ LLM_ManagedModelTag(Model) {
 	if !(Tag is String) || (Tag != "" && !RegExMatch(Tag, "^[A-Za-z0-9_][A-Za-z0-9_./:-]*$"))
 		throw ValueError("Managed model admission requires a canonical literal Ollama tag.")
 	return Tag
+}
+
+/**
+ * The last whole percentage an Ollama pull printed ("pulling 6a07…:  45% ▕██
+ * ▏ 2.1 GB/4.7 GB"), as the macOS download window reads the same output.
+ * @param {String} Text The tail of the pull's output.
+ * @returns {Integer|String} 0-100, or "" when the text holds none.
+ */
+LLM_OllamaPullPercent(Text) {
+	if !(Text is String) || Text == ""
+		return ""
+	Percent := "", Pos := 1
+	while (Pos := RegExMatch(Text, "(?<![\d.])(\d{1,3})%", &Match, Pos)) {
+		if (Integer(Match[1]) <= 100)
+			Percent := Integer(Match[1])
+		Pos += Match.Len
+	}
+	return Percent
 }
 
 /** One source-bound managed bootstrap, retaining physical debt independently. */
@@ -613,11 +637,44 @@ class OllamaManagedBootstrap {
 				? this.Port["pull"].Call(this.Target.Clone(), Tag, Done) : this._NativePull(Tag, Done)
 			if !this._True(Accepted) && this.MenuPull == Operation
 				return this._MenuPullFail(Operation)
+			if this._True(Accepted) && !(this.Port is Map) && this.PullTask is Map
+				this._PollMenuPullPercent(Operation, this.PullTask, "")
 			return this._True(Accepted)
 		} catch as Err {
 			this._MenuPullFail(Operation)
 			throw Err
 		}
+	}
+
+	/**
+	 * Reads the running menu pull's percentage from its capture and tells the
+	 * page each new whole one, then "" once the pull ended.
+	 * @param {Map} Operation The menu pull.
+	 * @param {Map} PullOwner Its native task owner.
+	 * @param {Integer|String} Told The percentage last told.
+	 */
+	_PollMenuPullPercent(Operation, PullOwner, Told) {
+		global LLM_PULL_PERCENT_LISTENER, LLM_PULL_PERCENT_TAIL_BYTES
+		Listener := LLM_PULL_PERCENT_LISTENER
+		if (this.MenuPull != Operation || this.PullTask != PullOwner || !IsObject(PullOwner.Get("task", 0))) {
+			if HasMethod(Listener, "Call")
+				try Listener.Call(Operation["tag"], "")
+				catch as Err
+					LoggerWarn("LLM.managed", "Pull percentage observer raised: {1}.", Err.Message)
+			return false
+		}
+		Percent := ""
+		try Percent := LLM_OllamaPullPercent(PullOwner["task"].outputTail(LLM_PULL_PERCENT_TAIL_BYTES))
+		; Paused, the page is told nothing; the pull itself keeps running.
+		if (!A_IsSuspended && Percent != "" && Percent != Told && HasMethod(Listener, "Call")) {
+			Told := Percent
+			try Listener.Call(Operation["tag"], Percent)
+			catch as Err
+				LoggerWarn("LLM.managed", "Pull percentage observer raised: {1}.", Err.Message)
+		}
+		SetTimer(ObjBindMethod(this, "_PollMenuPullPercent", Operation, PullOwner, Told),
+			-TimingsGet("llm", "pull_progress_poll_ms"))
+		return true
 	}
 
 	/** A menu operation cannot borrow another request or reset its deadline. */

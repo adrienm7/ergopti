@@ -351,16 +351,27 @@ From the whole-day log of the report `mac-2026-10-27_233356`. Boots and their bu
   cannot work right now is greyed with its reason: MLX on Windows, Linux or an Intel Mac or
   with its runtime absent or broken, Ollama with its install failed, an API entry without the
   key its endpoint requires, a read-only config.toml. A model that is not downloaded offers the
-  download, never the activation. Known gaps: progress is a "downloading" status, not a
-  percentage; Windows and Linux list only the configured model of an API entry (macOS lists
-  the provider's /v1/models); Linux has no Ollama install state, so its Ollama group is never
-  greyed. Mac confirms: the AI menu shows one button with the emoji and the model; the page
+  download, never the activation. Parity pass (2026-10-28): each API entry lists one row per
+  model its provider's listing returns, or, while that listing is pending, refused or
+  unreachable, the provider's known models (configured, default, model_extras) and a typed-id
+  row whose hint is the reason (`_shared/lua/llm/api_model_listing.lua`, its AHK port and
+  `api_model_listing_vectors.json`); Windows and Linux ask every chat entry once per page
+  open, one at a time, at most 16, macOS still only the active one (its keys resolve through
+  the Keychain). Linux greys Ollama with its reason when its runtime is absent or its last
+  owned repair failed (`modules/llm/ollama_install_state.lua`). A download shows its
+  percentage: macOS from the download window (Ollama and MLX), Linux from the /api/pull
+  NDJSON, Windows from the managed pull's own output (the unmanaged cmd-window pull shows none).
+  Mac confirms: the AI menu shows one button with the emoji and the model; the page
   opens from it and from the toggle shortcut before the AI menu was ever opened; choosing an
   MLX model while Ollama is active switches the backend; a model not downloaded offers only
   the download; an API entry without a key is greyed and offers its key; the menu rebuild
   feels faster. PC confirms: the same button; the page lists the Ollama catalogue and the
   installed tags, greys MLX with its reason, adds an Ollama model by name and pulls it with
-  the usual progress window; an API entry without a key is greyed with Edit offered.
+  the usual progress window; an API entry without a key is greyed with Edit offered; an API
+  entry lists its provider's models (a wrong key shows the refused hint and the typed-id row);
+  a managed Ollama pull started from the page shows its percentage on its row. Linux confirms:
+  with no Ollama installed the Ollama group is greyed with its reason; an API entry lists its
+  provider's models; a pull from the page shows its percentage.
 
 ### Open TODO
 

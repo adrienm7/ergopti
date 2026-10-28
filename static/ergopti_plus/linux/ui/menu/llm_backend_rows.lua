@@ -31,6 +31,7 @@ local TextUtils = require("text_utils")
 
 local Logger = require("logger.shim")
 local EntryNames = require("llm.api_entry_names")
+local ApiModelListing = require("llm.api_model_listing")
 local BackendBrands = require("modules.llm.backend_brands")
 
 local LOG = "ui.menu.llm_backend_rows"
@@ -251,7 +252,40 @@ function M.bind_page(llm, options)
 	require("ui.model_browser.bridge").bind({
 		llm = llm, dialogs = options.dialogs, on_changed = options.on_changed,
 		delete_model = options.delete_model, context = options.context,
+		-- Ollama's install state greys its group (modules/llm/ollama_install_state.lua).
+		ollama_state = function(engine) return require("modules.llm.ollama_install_state").capture(engine) end,
+		listing = {
+			targets = M.listing_targets,
+			list = function(entry, on_done) return require("modules.llm.api_remote").list_models(entry, on_done) end,
+		},
 	})
+	-- A pull's percentage reaches the page's row of that model.
+	require("modules.llm.model_download").set_progress_listener(function(tag, percent)
+		return require("ui.model_browser.bridge").on_download_progress(tag, percent)
+	end)
+end
+
+--- The API entries the page asks for their provider's models: chat entries
+--- whose provider lists models and whose key its endpoint accepts, at most
+--- api_model_listing.MAX_ENTRIES of them.
+--- @return table entries
+function M.listing_targets()
+	local ok_remote, remote = pcall(require, "modules.llm.api_remote")
+	local ok_entries, entries = pcall(require, "modules.llm.api_entries")
+	local targets = {}
+	if not ok_remote or not ok_entries then
+		Logger.error(LOG, "Remote API modules unavailable — the page lists no provider model.")
+		return targets
+	end
+	for _, entry in ipairs(entries.list()) do
+		if #targets >= ApiModelListing.MAX_ENTRIES then break end
+		local provider = remote.provider(entry.provider)
+		if provider and ApiModelListing.supported(provider.format) and remote.serves(entry.provider, "chat")
+			and remote.token_allowed(entry.provider, entry.token, entry.base_url) then
+			targets[#targets + 1] = entry
+		end
+	end
+	return targets
 end
 
 --- The API group of the model selector page: one row per saved entry, the
@@ -262,8 +296,9 @@ end
 --- @param dialogs table { prompt, error, info, confirm }
 --- @param on_changed function|nil Called after a change (menu and page refresh).
 --- @param context table|nil { paused, is_paused } for the local servers.
+--- @param listings table|nil Provider listing state by entry id (llm.api_model_listing); nil when never asked.
 --- @return table api { rows, providers, tools }
-function M.api_page(llm, dialogs, on_changed, context)
+function M.api_page(llm, dialogs, on_changed, context, listings)
 	local function changed() if type(on_changed) == "function" then on_changed() end end
 	local ok_remote, remote = pcall(require, "modules.llm.api_remote")
 	local ok_entries, entries = pcall(require, "modules.llm.api_entries")
@@ -285,6 +320,18 @@ function M.api_page(llm, dialogs, on_changed, context)
 	local function active_commands_ready()
 		local current = entries.active()
 		return active ~= nil and current ~= nil and current.id == active.id
+	end
+	-- Two entries of one provider and host can share a model name: each
+	-- entry's own model wins, then the first entry keeps a shared known model
+	-- or typed-id row (the bridge keys rows by name).
+	local named, later = {}, {}
+	local function push(row)
+		if named[row.name] then return end
+		named[row.name] = true
+		api.rows[#api.rows + 1] = row
+	end
+	local function queue(row)
+		if row.alternative or row.typed then later[#later + 1] = row else push(row) end
 	end
 	for _, entry in ipairs(list) do
 		local label = names[entry.id]
@@ -320,23 +367,59 @@ function M.api_page(llm, dialogs, on_changed, context)
 				return true
 			end }
 		end
-		api.rows[#api.rows + 1] = {
-			name = label, runtime_name = entry.model, provider = entry.provider, installed = true,
-			-- A provider that is no chat model never answers predictions.
-			available = chat or false, current = is_active, actions = actions,
-			-- Selecting goes through set_backend("api") even under the API
-			-- backend: it retires the running request of the previous entry.
-			run = chat and function()
-				if llm.set_backend("api") ~= true then return false end
-				if entries.set_active(entry.id) ~= true then
-					dialogs.error(tr("dialog.bulk_toggle.save_failed"), tr("common.error_title"))
-					return false
-				end
-				changed()
-				return true
-			end or nil,
-		}
+		local provider = remote.provider(entry.provider) or {}
+		local configured = entry.model ~= "" and entry.model or (provider.default_model or "")
+		local extras = {}
+		for id in pairs(type(provider.model_extras) == "table" and provider.model_extras or {}) do extras[#extras + 1] = id end
+		-- One row per model the provider listed, or its known models and a
+		-- typed-id row while that listing is pending, refused or unavailable.
+		local plan = ApiModelListing.plan({ model = configured, default_model = provider.default_model or "",
+			extras = extras, format = provider.format }, type(listings) == "table" and listings[entry.id] or nil)
+		local base, suffix = ApiModelListing.name_parts(label, configured)
+		for _, item in ipairs(plan.models) do
+			local model = item.model
+			local own = model == configured
+			queue({
+				name = own and label or (base .. "/" .. model .. suffix), runtime_name = model,
+				provider = entry.provider, installed = true, alternative = not own or nil,
+				-- A provider that is no chat model never answers predictions.
+				available = chat or false, current = is_active and own, actions = own and actions or {},
+				-- Selecting goes through set_backend("api") even under the API
+				-- backend: it retires the running request of the previous entry.
+				run = chat and function()
+					if llm.set_backend("api") ~= true then return false end
+					local saved
+					if own then saved = entries.set_active(entry.id) else saved = entries.set_model(entry.id, model) end
+					if saved ~= true then
+						dialogs.error(tr("dialog.bulk_toggle.save_failed"), tr("common.error_title"))
+						return false
+					end
+					changed()
+					return true
+				end or nil,
+			})
+		end
+		if plan.typed and chat then
+			-- Not a model: the place to type one the provider serves, with the
+			-- reason its list is missing; named by the provider and host.
+			queue({
+				name = base .. suffix, runtime_name = configured, provider = entry.provider, installed = true,
+				available = false, typed = true, hint_key = plan.typed.hint_key,
+				actions = { { id = "other_model", text = tr("model_browser.api_other_model"), run = function()
+					local typed = dialogs.prompt(label, tr("menu.llm.api_prompt_model"), configured)
+					typed = type(typed) == "string" and TextUtils.trim(typed) or ""
+					if typed == "" then return false end
+					if llm.set_backend("api") ~= true or entries.set_model(entry.id, typed) ~= true then
+						dialogs.error(tr("dialog.bulk_toggle.save_failed"), tr("common.error_title"))
+						return false
+					end
+					changed()
+					return true
+				end } },
+			})
+		end
 	end
+	for _, row in ipairs(later) do push(row) end
 	for _, provider in ipairs(remote.providers()) do
 		local function add() return add_entry(llm, remote, entries, dialogs, provider, on_changed) end
 		api.providers[#api.providers + 1] = { id = provider.id, label = provider.label, run = function()

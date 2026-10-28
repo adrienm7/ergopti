@@ -1365,17 +1365,47 @@ _SR_NewTreeOwnedTask(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdoptFn?,
 	_SR_TreeOwnedDetach(*) {
 		return _SR_TreeHandleDetach(state)
 	}
+	_SR_TreeOwnedOutputTail(Self, MaxBytes) {
+		return _SR_TreeHandleOutputTail(state, MaxBytes)
+	}
 
 	handle.start := _SR_TreeOwnedStart
 	handle.terminate := _SR_TreeOwnedTerminate
 	handle.processId := _SR_TreeOwnedProcessId
 	handle.detach := _SR_TreeOwnedDetach
 	handle.requestTerminate := _SR_TreeOwnedRequestTerminate
+	handle.outputTail := _SR_TreeOwnedOutputTail
 	; A tree-owned termination cannot honestly be fire-and-forget: its defining
 	; contract is that no descendant exists on return. Keep the optional method
 	; for handle-shape compatibility, but route it through the same hard fence.
 	handle.terminateAsync := _SR_TreeOwnedTerminate
 	return handle
+}
+
+/**
+ * Reads the last bytes a running tree-owned child wrote to its capture, for a
+ * progress display (an Ollama pull's percentage). The capture is opened
+ * read-only and shared, as the child's own handle shares it; nothing is read
+ * once the task stopped capturing, and a refused read is no progress, not an
+ * error.
+ * @param {Map} State The task.
+ * @param {Integer} MaxBytes Most bytes read from the end.
+ * @returns {String} The tail, "" when unavailable.
+ */
+_SR_TreeHandleOutputTail(State, MaxBytes) {
+	if !(MaxBytes is Integer) || MaxBytes <= 0 || !State["CaptureOutput"] || !State["Started"]
+			|| State["TreeQuiesced"] || !(State["TmpFile"] is String) || State["TmpFile"] == ""
+		return ""
+	try {
+		Capture := FileOpen(State["TmpFile"], "r", "UTF-8-RAW")
+		Capture.Pos := Max(0, Capture.Length - MaxBytes)
+		Tail := Capture.Read()
+		Capture.Close()
+		return Tail
+	} catch as Err {
+		_SR_LogAt("Debug", "tree-owned capture tail unavailable for '{1}': {2}", State["Executable"], Err.Message)
+		return ""
+	}
 }
 
 _SR_TreeLogError(Owner, Message, Arguments*) {

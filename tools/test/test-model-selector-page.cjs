@@ -426,6 +426,29 @@ const pulling = drawnRows(page.byId).Pulling;
 assert.ok(pulling.innerHTML.includes(en['model_browser.status_downloading']));
 assert.ok(!pulling.innerHTML.includes('data-act='), 'a running download offers no other action');
 
+// model-selector-progress: a driver's download percentage reaches the row; a
+// payload row may carry it too; an unknown row or a foreign backend is ignored.
+page.context.injectProgress({ backend: 'ollama', name: 'Pulling', percent: 42.8 });
+const percentText = en['model_browser.status_downloading_percent'].replace('{n}', '42');
+assert.ok(
+	drawnRows(page.byId).Pulling.innerHTML.includes(percentText),
+	'the whole percentage is shown'
+);
+page.context.injectProgress({ backend: 'mlx', name: 'Pulling', percent: 90 });
+assert.ok(
+	drawnRows(page.byId).Pulling.innerHTML.includes(percentText),
+	'another backend changes nothing'
+);
+page.context.injectProgress({ backend: 'ollama', name: 'Ghost', percent: 10 });
+assert.ok(!('Ghost' in drawnRows(page.byId)), 'an unknown row is not invented');
+page.context.injectProgress({ backend: 'ollama', name: 'Pulling', percent: 150 });
+const bounded = drawnRows(page.byId).Pulling;
+assert.ok(
+	bounded.innerHTML.includes(en['model_browser.status_downloading_percent'].replace('{n}', '100')),
+	'a percentage is bounded'
+);
+assert.ok(!bounded.innerHTML.includes('data-act='), 'a downloading row offers no other action');
+
 // The page and the shared Lua rule accept and refuse the same identifiers.
 const corpus = JSON.parse(
 	fs.readFileSync(path.join(SP, '_shared/tests/corpus/llm/model_identifiers.json'), 'utf8')
@@ -513,6 +536,18 @@ assert.equal(projected.backend, 'ollama', 'each row names its backend');
 const ahk = fs.readFileSync(path.join(SP, 'windows/ui/model_browser/init.ahk'), 'utf8');
 for (const field of [...fields, 'backend', 'installed']) {
 	assert.ok(ahk.includes(`${field}:`) || ahk.includes(`"${field}"`), `Windows projects ${field}`);
+}
+
+// model-selector-api-listing: every driver replays the shared listing corpus.
+for (const replay of [
+	'macos/tests/unit/modules/llm/vectors/test_api_model_listing_vectors.lua',
+	'linux/tests/meta/corpus/test_corpus_api_model_listing.lua',
+	'windows/tests/unit/modules/llm/menu/test_llm_menu_backend_model_labels.ahk'
+]) {
+	assert.ok(
+		fs.readFileSync(path.join(SP, replay), 'utf8').includes('api_model_listing_vectors.json'),
+		`${replay} replays the API listing corpus`
+	);
 }
 
 console.log(
