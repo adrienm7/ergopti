@@ -99,8 +99,11 @@ a sealed Windows updater source, reseal with
   that shadows a global across the 495 production files and the 94 `#Warn All` children, with the new
   static gate `test-ahk-local-same-as-global`; c887b89fc5 stops the model selector from building its
   catalogue for a page that is not ready yet; 389f589bf9 fixes the UIA selection snapshot that was never
-  invalidated (a missing `global`). The sixth v1.0.7 release commit sits on top and a new full run
-  qualifies it before `main`. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
+  invalidated (a missing `global`). Run 40652046694 on 1279af1d7a (sixth) left two Windows reds: the
+  gate's built-in set lacked `Edit` (714e08bfbf), the page called the tray's local-server status rows in a
+  child without the menu renderer (576439e0f0), and the sweep's rename broke a backtick escape in a
+  `Trim` set (b4e925ce1e). ed95abafa1 fixes the selector page crash the Mac showed (missing
+  `text_utils` require). The seventh v1.0.7 release commit sits on top and a new full run qualifies it. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
   `CFMessagePortSendRequest FAILED(-1)` (the runner's TSM UI server), rerun that job once.
 - **Decide after v1.0.7 [CI]:** since bc09e4584c no product path calls the stock
   `ollama_deps_checker.install_for_selection()` (selection goes through `install_native_for_selection`,
