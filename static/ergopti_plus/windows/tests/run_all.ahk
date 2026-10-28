@@ -2074,6 +2074,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include ../ui/error_dialog/init.ahk
 #Include unit/ui/windows/test_error_dialog.ahk
 #Include unit/ui/webview/test_onboarding_open_generation.ahk
+#Include unit/ui/webview/test_changelog_open_generation.ahk
 #Include unit/ui/windows/test_window_title_captions.ahk
 #Include ../ui/update_check/init.ahk
 #Include unit/modules/updater/test_updater_result_dialog_states.ahk
