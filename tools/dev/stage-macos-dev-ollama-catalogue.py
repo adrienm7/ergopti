@@ -1,24 +1,38 @@
 #!/usr/bin/env python3
 # tools/dev/stage-macos-dev-ollama-catalogue.py
-"""Give the macOS developer app the published, verified managed Ollama catalogue.
+"""Build the macOS developer app's managed Ollama from this clone's pinned sources.
 
 A built app carries ``managed_ollama_release.json`` inside its sealed bundle:
-the release pipeline generates it from the native producer and never commits
-it. The developer app runs the Python and the shared data of this clone, so its
+the release pipeline builds the native Ollama asset with
+tools/build/build-macos-managed-ollama.py, generates the catalogue with
+tools/build/stage-macos-managed-ollama-catalogue.py and never commits either.
+The developer app runs the Python and the shared data of this clone, so its
 owned Ollama install found no catalogue and refused with
-OLLAMA_MANAGED_CATALOGUE_MISSING. This tool copies the catalogue of the newest
-immutable GitHub release that binds this clone's runtime contract into the
-clone, where the developer app reads it (the path is ignored by Git).
+OLLAMA_MANAGED_CATALOGUE_MISSING. Copying the catalogue of a published release
+only worked once the clone's version was published, so an upcoming version
+(its contract edited since the last release) had no owned Ollama at all.
 
-The catalogue is admitted only when every link of the chain holds: the release
-is published and immutable; the catalogue bytes match the SHA-256 GitHub
-recorded for that asset; the runtime policy accepts it for both macOS hosts
-against this clone's contract; its publication names that tag and the canonical
-repository; and each native asset it pins is an asset of the same release with
-the same digest, size and download URL. When no release binds the contract (a
-contract edited since the last release), the stale catalogue is removed and the
-tool exits 3, so the app keeps refusing with its closed missing-catalogue
-result instead of running a binary built for another contract.
+This tool runs the same two release tools on this Mac instead, from the
+repository's own pins, and depends on no published Ergopti release:
+
+- the official Ollama archive is downloaded and admitted only when its SHA-256
+  and size equal the ones ollama_release.json pins (the build tools check them
+  again);
+- the upstream source is fetched at the exact source_commit of
+  managed_ollama_runtime.json, and the producer checks every reviewed
+  upstream preimage and go.sum before it patches anything;
+- the Go toolchain must report the contract's go_version: the local `go` when
+  it is that version, otherwise the exact toolchain Go downloads itself, which
+  it verifies against the Go checksum database (refused when that database is
+  disabled or bypassed).
+
+The catalogue is generated in unpublished mode: CI alone attaches a release
+URL, so it names none, and the archive stays in the clone under
+build/macos-dev-ollama, where the runtime installer admits it against the
+catalogue's SHA-256 and size. A staged build is reused while it binds the
+clone's contract and every fingerprinted source; anything else is removed
+before rebuilding, so the app refuses with its closed missing-catalogue result
+instead of running a binary built for other sources.
 """
 
 import argparse
@@ -27,27 +41,46 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import platform
+import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 SHARED = "static/ergopti_plus/_shared"
 CONTRACT = SHARED + "/modules/llm/managed_ollama_runtime.json"
-OUTPUT = SHARED + "/modules/llm/managed_ollama_release.json"
-DEFAULTS = SHARED + "/modules/updater/defaults.json"
+OFFICIAL_RELEASE = SHARED + "/modules/llm/ollama_release.json"
+CHANNELS = SHARED + "/modules/updater/channels.json"
 IDENTIFIERS = SHARED + "/data/identifiers.json"
 POLICY_SOURCE = SHARED + "/python/managed_ollama_runtime.py"
+OUTPUT = SHARED + "/modules/llm/managed_ollama_release.json"
+PRODUCER = "tools/build/build-macos-managed-ollama.py"
+GENERATOR = "tools/build/stage-macos-managed-ollama-catalogue.py"
 CATALOGUE = "managed_ollama_release.json"
-HOSTS = ("macos-arm64", "macos-amd64")
-# Releases read per listing; the binding release is one of the newest ones.
-RELEASES_PER_PAGE = 30
-FETCH_TIMEOUT_SECONDS = 60
-NO_BINDING_RELEASE = 3
+HOSTS = {"arm64": "macos-arm64", "x86_64": "macos-amd64"}
+# The Go settings that would let a toolchain or module download skip the Go
+# checksum database; any of them refuses the toolchain instead of trusting HTTPS.
+CHECKSUM_BYPASS = ("GONOSUMDB", "GOINSECURE", "GOPRIVATE")
+CHECKSUM_DATABASE = "sum.golang.org"
+DOWNLOAD_TIMEOUT_SECONDS = 1800
 
 
-class CatalogueRefusal(Exception):
-    """A published catalogue or release that fails one admission link."""
+class StageRefusal(Exception):
+    """One pinned input or produced output that fails its admission."""
+
+
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def read_json(path):
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def load_policy(root):
@@ -59,119 +92,12 @@ def load_policy(root):
     return module
 
 
-def curl_fetch(url, accept):
-    """Read one HTTPS resource through curl, which honours the system proxy settings."""
-    result = subprocess.run(
-        [
-            "/usr/bin/curl",
-            "--fail",
-            "--silent",
-            "--show-error",
-            "--location",
-            "--proto",
-            "=https",
-            "--proto-redir",
-            "=https",
-            "--max-time",
-            str(FETCH_TIMEOUT_SECONDS),
-            "--header",
-            "Accept: " + accept,
-            url,
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
-    if result.returncode != 0:
-        raise OSError(
-            "curl exited %d for %s: %s"
-            % (result.returncode, url, result.stderr.decode("utf-8", "replace").strip())
-        )
-    return result.stdout
+def fingerprint(root, contract):
+    return {name: sha256_file(root / name) for name in contract["source_fingerprint_paths"]}
 
 
-def asset_digest(asset):
-    digest = asset.get("digest")
-    if not isinstance(digest, str) or not digest.startswith("sha256:"):
-        raise CatalogueRefusal("asset %s has no SHA-256 digest" % asset.get("name"))
-    return digest[len("sha256:") :]
-
-
-def admit(policy, contract_bytes, repository, github_host, release, catalogue_bytes):
-    """Return the catalogue bytes when every admission link holds, else raise."""
-    tag = release.get("tag_name")
-    if release.get("draft") is not False or release.get("immutable") is not True:
-        raise CatalogueRefusal("release %s is not published and immutable" % tag)
-    assets = {asset.get("name"): asset for asset in release.get("assets", [])}
-    if hashlib.sha256(catalogue_bytes).hexdigest() != asset_digest(assets[CATALOGUE]):
-        raise CatalogueRefusal("catalogue of %s differs from its recorded digest" % tag)
-    publication = policy.metadata_bytes(catalogue_bytes)["publication"]
-    if (
-        publication.get("mode") != "planned-release"
-        or publication.get("tag") != tag
-        or publication.get("repository") != repository
-    ):
-        raise CatalogueRefusal("catalogue of %s names another publication" % tag)
-    for host in HOSTS:
-        try:
-            _, pinned = policy.select_asset(contract_bytes, catalogue_bytes, host)
-        except policy.RuntimeRefusal as error:
-            raise CatalogueRefusal(
-                "catalogue of %s refused for %s: %s" % (tag, host, error)
-            ) from error
-        native = assets.get(pinned["filename"])
-        expected_url = "https://%s/%s/releases/download/%s/%s" % (
-            github_host,
-            repository,
-            tag,
-            pinned["filename"],
-        )
-        if (
-            native is None
-            or asset_digest(native) != pinned["sha256"]
-            or native.get("size") != pinned["bytes"]
-            or pinned["url"] != expected_url
-            or native.get("browser_download_url") != expected_url
-        ):
-            raise CatalogueRefusal("native %s asset of %s differs from its catalogue" % (host, tag))
-    return catalogue_bytes
-
-
-def binding_catalogue(root, fetch, policy):
-    """Return (tag, bytes) of the newest release binding this clone's contract, or None."""
-    contract_bytes = (root / CONTRACT).read_bytes()
-    contract_sha256 = hashlib.sha256(contract_bytes).hexdigest()
-    github = json.loads((root / DEFAULTS).read_text(encoding="utf-8"))["github"]
-    repository = github["owner"] + "/" + github["repo"]
-    hosts = json.loads((root / IDENTIFIERS).read_text(encoding="utf-8"))["hosts"]
-    listing = json.loads(
-        fetch(
-            "https://%s/repos/%s/releases?per_page=%d"
-            % (hosts["github_api"], repository, RELEASES_PER_PAGE),
-            "application/vnd.github+json",
-        )
-    )
-    for release in listing:
-        assets = {asset.get("name"): asset for asset in release.get("assets", [])}
-        if CATALOGUE not in assets or release.get("draft") is not False:
-            continue
-        catalogue_bytes = fetch(
-            assets[CATALOGUE]["browser_download_url"], "application/octet-stream"
-        )
-        try:
-            bound = policy.metadata_bytes(catalogue_bytes).get("runtime_contract_sha256")
-        except policy.RuntimeRefusal as error:
-            raise CatalogueRefusal(
-                "catalogue of %s is not metadata" % release.get("tag_name")
-            ) from error
-        if bound != contract_sha256:
-            continue
-        # The newest binding release decides; a refusal there is an error, never
-        # a reason to fall back to an older catalogue.
-        return release["tag_name"], admit(
-            policy, contract_bytes, repository, hosts["github"], release, catalogue_bytes
-        )
-    return None
+def regular_file(path):
+    return path.is_file() and not path.is_symlink()
 
 
 def write_atomically(path, data):
@@ -189,35 +115,309 @@ def write_atomically(path, data):
         raise
 
 
-def stage(root, fetch):
-    """Stage the binding catalogue; return the process exit code."""
-    output = root / OUTPUT
-    found = binding_catalogue(root, fetch, load_policy(root))
-    if found is None:
-        if output.exists():
-            output.unlink()
-        print(
-            "[dev-ollama-catalogue] WARNING: no published release binds this clone's managed"
-            " Ollama contract (%s changed since the last release); the developer app's owned"
-            " Ollama install will refuse with OLLAMA_MANAGED_CATALOGUE_MISSING until a release"
-            " publishes it." % CONTRACT,
-            file=sys.stderr,
+class Pins:
+    """The clone's pinned identities, read once from their single sources."""
+
+    def __init__(self, root, policy, machine):
+        if machine not in HOSTS:
+            raise StageRefusal("this Mac's architecture %s has no managed Ollama" % machine)
+        self.root = root
+        self.policy = policy
+        self.host = HOSTS[machine]
+        self.contract_bytes = (root / CONTRACT).read_bytes()
+        self.contract = json.loads(self.contract_bytes)
+        official = read_json(root / OFFICIAL_RELEASE)
+        if official["version"] != self.contract["version"]:
+            raise StageRefusal("ollama_release.json and the managed contract pin other versions")
+        self.official = official["assets"][self.contract["official_asset_key"]]
+        github = read_json(root / IDENTIFIERS)["hosts"]["github"]
+        self.official_url = "https://%s/ollama/ollama/releases/download/v%s/%s" % (
+            github,
+            official["version"],
+            self.official["filename"],
         )
-        return NO_BINDING_RELEASE
-    tag, data = found
-    if output.exists() and output.read_bytes() == data:
-        print("[dev-ollama-catalogue] Catalogue of %s already staged." % tag)
+        self.source_url = "https://%s/ollama/ollama.git" % github
+        self.channel = read_json(root / CHANNELS)["unreleased_build_channel"]
+        self.filename = self.contract["assets"][self.host]["filename"]
+        self.state = root / policy.DEVELOPER_ASSET_DIRECTORY
+        self.archive = self.state / self.filename
+        self.output = root / OUTPUT
+
+    def admit(self, catalogue_bytes, archive):
+        """Raise unless the catalogue pins this clone and the archive is its asset."""
+        try:
+            _, asset = self.policy.select_asset(self.contract_bytes, catalogue_bytes, self.host)
+        except self.policy.RuntimeRefusal as error:
+            raise StageRefusal("the runtime policy refuses the catalogue: %s" % error) from error
+        catalogue = self.policy.metadata_bytes(catalogue_bytes)
+        if catalogue["publication"].get("mode") != "unpublished-ci" or asset["url"]:
+            raise StageRefusal("the catalogue is not an unpublished build of this clone")
+        if catalogue["repository_source_sha256"] != fingerprint(self.root, self.contract):
+            raise StageRefusal("the catalogue was built from other fingerprinted sources")
+        if (
+            not regular_file(archive)
+            or archive.stat().st_size != asset["bytes"]
+            or sha256_file(archive) != asset["sha256"]
+        ):
+            raise StageRefusal("the native archive differs from the catalogue's pin")
+
+    def staged_build_holds(self):
+        if not regular_file(self.output):
+            return False
+        try:
+            self.admit(self.output.read_bytes(), self.archive)
+        except StageRefusal:
+            return False
+        return True
+
+
+def run(arguments, **options):
+    subprocess.run(arguments, check=True, **options)
+
+
+def output_of(arguments, environment=None):
+    return subprocess.run(
+        arguments, check=True, text=True, stdout=subprocess.PIPE, env=environment
+    ).stdout.strip()
+
+
+class HostPorts:
+    """The real downloads, toolchain and release tools; tests inject their own."""
+
+    def __init__(self, go=None):
+        self.go = go
+
+    def machine(self):
+        return platform.machine()
+
+    def download(self, url, destination):
+        run(
+            [
+                "/usr/bin/curl",
+                "--fail",
+                "--show-error",
+                "--location",
+                "--proto",
+                "=https",
+                "--proto-redir",
+                "=https",
+                "--retry",
+                "3",
+                "--max-time",
+                str(DOWNLOAD_TIMEOUT_SECONDS),
+                "--output",
+                str(destination),
+                url,
+            ]
+        )
+
+    def source_head(self, source):
+        """Return the checkout's HEAD when it is clean, else None."""
+        try:
+            head = output_of(["git", "-C", str(source), "rev-parse", "HEAD"])
+            dirty = output_of(
+                ["git", "-C", str(source), "status", "--porcelain", "--untracked-files=all"]
+            )
+        except (OSError, subprocess.CalledProcessError):
+            return None
+        return None if dirty else head
+
+    def fetch_source(self, source, url, commit):
+        run(["git", "init", "--quiet", str(source)])
+        run(["git", "-C", str(source), "remote", "add", "origin", url])
+        run(["git", "-C", str(source), "fetch", "--depth=1", "--no-tags", "origin", commit])
+        run(["git", "-C", str(source), "checkout", "--quiet", "--detach", "FETCH_HEAD"])
+
+    def pinned_go(self, version):
+        """Return a go executable that reports `version`, checksum-verified when downloaded."""
+        go = self.go or shutil.which("go")
+        if go is None:
+            raise StageRefusal(
+                "no Go toolchain: install Go (https://go.dev/dl or `brew install go`); this"
+                " tool then uses the pinned %s it verifies itself" % version
+            )
+        local = dict(os.environ, GOTOOLCHAIN="local")
+        if output_of([go, "env", "GOVERSION"], local) == version:
+            return Path(go).resolve()
+        settings = json.loads(output_of([go, "env", "-json", "GOSUMDB", *CHECKSUM_BYPASS], local))
+        bypass = [name for name in CHECKSUM_BYPASS if settings.get(name)]
+        if settings.get("GOSUMDB") != CHECKSUM_DATABASE or bypass:
+            raise StageRefusal(
+                "Go would download %s without the %s checksum database (GOSUMDB=%s%s);"
+                " restore the default or install %s yourself"
+                % (
+                    version,
+                    CHECKSUM_DATABASE,
+                    settings.get("GOSUMDB"),
+                    "".join(", %s is set" % name for name in bypass),
+                    version,
+                )
+            )
+        pinned = dict(os.environ, GOTOOLCHAIN=version)
+        for name in CHECKSUM_BYPASS:
+            pinned.pop(name, None)
+        goroot = Path(output_of([go, "env", "GOROOT"], pinned))
+        executable = goroot / "bin/go"
+        if output_of([str(executable), "env", "GOVERSION"], local) != version:
+            raise StageRefusal("the downloaded Go toolchain does not report %s" % version)
+        return executable
+
+    def produce(self, root, source, official, go, output):
+        run(
+            [
+                sys.executable,
+                str(root / PRODUCER),
+                "--repository",
+                str(root),
+                "--source",
+                str(source),
+                "--official-archive",
+                str(official),
+                "--go",
+                str(go),
+                "--output",
+                str(output),
+            ]
+        )
+
+    def generate(self, root, source, official, go, receipt, archive, channel, output):
+        run(
+            [
+                sys.executable,
+                str(root / GENERATOR),
+                "--repository",
+                str(root),
+                "--source",
+                str(source),
+                "--official-archive",
+                str(official),
+                "--producer-receipt",
+                str(receipt),
+                "--archive",
+                str(archive),
+                "--go",
+                str(go),
+                "--release",
+                "false",
+                "--release-channel",
+                channel,
+                "--output",
+                str(output),
+            ]
+        )
+
+
+def official_archive(pins, ports):
+    """Return the official archive, downloaded once and admitted by its pinned identity."""
+    path = pins.state / "official" / pins.official["filename"]
+
+    def pinned(candidate):
+        return (
+            regular_file(candidate)
+            and candidate.stat().st_size == pins.official["bytes"]
+            and sha256_file(candidate) == pins.official["sha256"]
+        )
+
+    if pinned(path):
+        return path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    partial = path.with_name("." + path.name + ".partial")
+    for stale in (path, partial):
+        if stale.exists() or stale.is_symlink():
+            stale.unlink()
+    print(
+        "[dev-ollama-catalogue] Downloading the official Ollama %s archive..."
+        % (pins.contract["version"])
+    )
+    ports.download(pins.official_url, partial)
+    if not pinned(partial):
+        if partial.exists():
+            partial.unlink()
+        raise StageRefusal(
+            "the downloaded %s differs from the SHA-256 and size %s pins"
+            % (pins.official["filename"], OFFICIAL_RELEASE)
+        )
+    os.replace(partial, path)
+    return path
+
+
+def upstream_source(pins, ports):
+    """Return a clean checkout of the contract's exact upstream commit."""
+    source = pins.state / "source"
+    commit = pins.contract["source_commit"]
+    if source.exists() or source.is_symlink():
+        if ports.source_head(source) == commit:
+            return source
+        shutil.rmtree(source)
+    print("[dev-ollama-catalogue] Fetching the upstream Ollama source at %s..." % commit)
+    ports.fetch_source(source, pins.source_url, commit)
+    if ports.source_head(source) != commit:
+        raise StageRefusal("the fetched upstream source is not the clean commit %s" % commit)
+    return source
+
+
+def build(pins, ports):
+    """Produce the asset and its catalogue with the release tools."""
+    # The release tools extract with tarfile's data filter and zip strictly:
+    # the Xcode /usr/bin/python3 (3.9) has neither, and would fail mid-build.
+    if sys.version_info < (3, 10) or not hasattr(tarfile, "data_filter"):
+        raise StageRefusal(
+            "the release tools need Python 3.11.4 or newer, not %s at %s; run this with one"
+            " (for example `brew install python`)" % (platform.python_version(), sys.executable)
+        )
+    official = official_archive(pins, ports)
+    source = upstream_source(pins, ports)
+    go = ports.pinned_go(pins.contract["go_version"])
+    work = Path(tempfile.mkdtemp(prefix="build-", dir=pins.state))
+    try:
+        assets = work / "assets"
+        assets.mkdir()
+        print(
+            "[dev-ollama-catalogue] Building the managed Ollama %s for %s (several minutes)..."
+            % (pins.contract["version"], pins.host)
+        )
+        ports.produce(pins.root, source, official, go, assets)
+        archive = assets / pins.filename
+        receipt = assets / (pins.filename + ".provenance.json")
+        generated = work / "catalogue" / CATALOGUE
+        ports.generate(pins.root, source, official, go, receipt, archive, pins.channel, generated)
+        data = generated.read_bytes()
+        pins.admit(data, archive)
+        os.replace(archive, pins.archive)
+        pins.admit(data, pins.archive)
+        write_atomically(pins.output, data)
+    finally:
+        shutil.rmtree(work)
+
+
+def stage(root, ports):
+    """Stage a catalogue and archive built from this clone's pins; return the exit code."""
+    pins = Pins(root, load_policy(root), ports.machine())
+    pins.state.mkdir(parents=True, exist_ok=True)
+    if pins.staged_build_holds():
+        print("[dev-ollama-catalogue] The managed Ollama built from this clone is staged.")
         return 0
-    write_atomically(output, data)
-    print("[dev-ollama-catalogue] Staged the verified catalogue of %s." % tag)
+    if pins.output.exists() or pins.output.is_symlink():
+        # A catalogue of other sources must not outlive a failed rebuild.
+        pins.output.unlink()
+    build(pins, ports)
+    print(
+        "[dev-ollama-catalogue] Staged the managed Ollama %s built from this clone's pinned"
+        " sources." % pins.contract["version"]
+    )
     return 0
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.parse_args()
+    parser.add_argument("--go", help="Go executable to start from (default: go on PATH)")
+    arguments = parser.parse_args()
     try:
-        sys.exit(stage(ROOT, curl_fetch))
-    except (CatalogueRefusal, OSError, ValueError, KeyError) as error:
-        print("[dev-ollama-catalogue] ERROR: %s" % error, file=sys.stderr)
+        sys.exit(stage(ROOT, HostPorts(arguments.go)))
+    except (StageRefusal, OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
+        print(
+            "[dev-ollama-catalogue] ERROR: %s; the developer app's owned Ollama install"
+            " refuses with OLLAMA_MANAGED_CATALOGUE_MISSING until this succeeds." % error,
+            file=sys.stderr,
+        )
         sys.exit(1)

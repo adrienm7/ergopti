@@ -113,7 +113,11 @@ a sealed Windows updater source, reseal with
   a7e59fb0d1, 2e398c5c93). The ninth v1.0.7 release commit adds L66 (one refused shortcut fails alone),
   the three-finger step of 25 (L46), the bounded composer re-read (L52), the reboot-proof keystats cache
   (L64), the fixes for issues #99 to #101 and #103, and the Dependabot and npm audit bumps (PRs 98 and
-  102); a new full run qualifies it. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
+  102). Run 40694886399 on 4d70b5dc47 (ninth) left Common reds fixed by CI15 (9e36b4af0b, d6a08b1e12,
+  fe34691cb1, 37cebbf4be) and a runner-side checkout stall on the macOS tooltip canvas job. The tenth
+  v1.0.7 release commit adds SvelteKit 3, the model selector's collapsed groups, the pgrep-based local
+  server discovery (oMLX on its configured port) and the developer app's locally built managed Ollama; a
+  new full run qualifies it. If macOS 15 Intel `NumberRowSourceProbeTests` fails with
   `CFMessagePortSendRequest FAILED(-1)` (the runner's TSM UI server), rerun that job once.
 - **Decide after v1.0.7 [CI]:** since bc09e4584c no product path calls the stock
   `ollama_deps_checker.install_for_selection()` (selection goes through `install_native_for_selection`,

@@ -1257,9 +1257,7 @@ function M.bind_pending(final)
 	if not _started or _lifecycle_paused == true or _start_attempt ~= nil then
 		return next(_pending_slots) == nil
 	end
-	local slots = {}
-	for slot in pairs(_pending_slots) do slots[#slots + 1] = slot end
-	table.sort(slots)
+	local slots = TableUtil.sorted_keys(_pending_slots)
 	local epoch = _lifecycle_epoch
 	_layout_fallback_admitted = final == true
 	for _, slot in ipairs(slots) do

@@ -1,10 +1,10 @@
 <script>
-	import Ergopti from '$lib/components/Ergopti.svelte';
-	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
-	import SFB from '$lib/components/SFB.svelte';
+	import Ergopti from '#lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
+	import SFB from '#lib/components/SFB.svelte';
 
-	import KeyboardBasis from '$lib/keyboard/KeyboardBasis.svelte';
-	import { Keyboard } from '$lib/keyboard/Keyboard.js';
+	import KeyboardBasis from '#lib/keyboard/KeyboardBasis.svelte';
+	import { Keyboard } from '#lib/keyboard/Keyboard.js';
 	const keyboard = new Keyboard('roulements');
 
 	let texte;

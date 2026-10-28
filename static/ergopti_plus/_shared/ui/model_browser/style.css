@@ -289,10 +289,60 @@ tbody tr.active .name-cell::after {
 tbody tr.group th {
 	background: var(--bg-head);
 	color: var(--text);
-	cursor: default;
 	font-size: 12px;
 	padding: 8px 10px;
 	text-align: left;
+}
+
+/* The whole header opens and closes its group; its tools keep their own cursor. */
+tbody tr.group th,
+tbody tr.group .group-toggle {
+	cursor: pointer;
+}
+
+tbody tr.group .group-tools {
+	cursor: default;
+}
+
+tbody tr.group .group-toggle {
+	border-radius: 4px;
+	display: inline-block;
+	font-weight: 600;
+	padding: 2px 4px;
+}
+
+tbody tr.group .group-toggle:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 0;
+}
+
+tbody tr.group .chevron {
+	display: inline-block;
+	transition: transform 0.12s ease;
+	width: 1em;
+}
+
+tbody tr.group.expanded .chevron {
+	transform: rotate(90deg);
+}
+
+tbody tr.group .group-count,
+tbody tr.group .group-active {
+	color: var(--text-dim);
+	font-weight: 400;
+	margin-left: 8px;
+}
+
+tbody tr.group .group-active {
+	color: var(--accent);
+}
+
+/* The thin line between the local backends and the remote API. */
+tbody.group-separator td {
+	border-bottom: 0;
+	border-top: 1px solid var(--border);
+	height: 0;
+	padding: 0;
 }
 
 tbody tr.group.unavailable th,

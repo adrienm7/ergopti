@@ -389,12 +389,12 @@ local function acquire_slot(id, action, on_done)
 end
 
 --- What an installed layout's enable came to, read from a fresh process. The
---- macOS 26 field probe (v5, P5 and P9) showed that writing the enabled-sources
+--- macOS 26 field probe (v5) showed that writing the enabled-sources
 --- preference turns a layout on at once, but only a process started after the
 --- write sees it: Hammerspoon's own list stays stale. A layout the fresh process
---- does not see on is the fallback: pending until the next login (P10). An
+--- does not see on is the fallback: pending until the next login. An
 --- update re-registers the rewritten file and, when it is selected, selects
---- another layout and back, so the new content applies (P8 a).
+--- another layout and back, so the new content applies.
 --- @param deps table
 --- @param id string Layout id.
 --- @param entry table Record entry (keyboard_name).

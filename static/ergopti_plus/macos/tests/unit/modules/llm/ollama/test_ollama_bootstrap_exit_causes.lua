@@ -50,6 +50,46 @@ helpers.describe("Ollama bootstrap exit causes (ollama-bootstrap-exit-causes)", 
 	end)
 end)
 
+--- Runs one bootstrap that ends with the managed runtime's missing-catalogue
+--- line and exit 78, in a developer app or a built one.
+--- @param developer boolean Whether infra.dev_source reports a developer app.
+--- @return string message The published failure message.
+--- @return string developer_words The developer missing-catalogue words.
+--- @return string refused_words The refused pinned runtime words.
+local function missing_catalogue_failure(developer)
+	local message, developer_words, refused_words
+	helpers.with_stub_scope({ "infra.dev_source" }, function()
+		package.loaded["infra.dev_source"] = { is_active = function() return developer end }
+		Fixture.scoped(function()
+			local state = Fixture.new_state()
+			local checker = Fixture.load_ollama_checker(state)
+			helpers.assert_true(checker.install_for_selection(function() end))
+			state.tasks[1].done(78, "", "[OLLAMA-DEPS] stage: runtime_install\nOLLAMA_MANAGED_CATALOGUE_MISSING\n"
+				.. "[OLLAMA-DEPS] ERROR: stage runtime_install ended with exit 78.\n")
+			message = checker.get_failure_message()
+			developer_words = require("infra.i18n").get("ollama.error_dev_catalogue_missing")
+			refused_words = require("infra.i18n").get("ollama.error_runtime_refused")
+		end)()
+	end)
+	return message, developer_words, refused_words
+end
+
+-- Field run 2026-10-28 14:17: the developer app said it could not verify its
+-- pinned Ollama (release catalogue or integrity check), while the real cause
+-- was that no catalogue had been built from the clone.
+helpers.describe("Ollama missing catalogue cause (ollama-dev-catalogue-missing)", function()
+	helpers.it("names the clone build a developer app has not completed", function()
+		local message, developer_words, refused_words = missing_catalogue_failure(true)
+		helpers.assert_eq(message, developer_words)
+		helpers.assert_true(message ~= refused_words)
+	end)
+
+	helpers.it("keeps the refused pinned runtime in a built app", function()
+		local message, _, refused_words = missing_catalogue_failure(false)
+		helpers.assert_eq(message, refused_words)
+	end)
+end)
+
 --- Runs one bootstrap that streams `streamed` on stderr and exits with `code`,
 --- capturing every ERROR line the checker logs.
 --- @param code integer Exit code.

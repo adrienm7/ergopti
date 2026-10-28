@@ -7,7 +7,8 @@
 ; current declared order and refuses an effect-bearing boundary. Each slot row
 ; is greyed out, with its reason in the label, unless the Windows touchpad
 ; settings send Ergopti's shortcut for it (assigned / not assigned / key
-; missing / unreadable). The retired status submenu stays absent.
+; missing / unreadable). The retired status submenu stays absent, and the
+; « Infos… » row opens the Windows reason in a native message box.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -315,11 +316,37 @@ _GSS_StatusSubmenuAbsent() {
 		AssertEqual("", _DriverFuncBodyOrEmpty(Name), Name . " is retired with the status submenu")
 	Builder := _DriverFuncBody("BuildGesturesMenu")
 	AssertFalse(InStr(Builder, "system_gesture_status"), "the Windows menu registers no status provider")
-	Notes := _MR_FindItemById("gesture_recommended_notes", "gesture_recommended_reason_windows")
-	Assert(Notes is Map, "the Windows note explains the greying")
-	AssertEqual("ahk", Notes["platforms"][1])
+	Info := _MR_FindItemById("gestures_menu", "gesture_recommended_info")
+	Assert(Info is Map, "the Infos row explains the greying")
+	AssertEqual("command", Info["type"])
 }
 Test("Gestures availability: the status submenu is absent from the Windows menu", _GSS_StatusSubmenuAbsent)
+
+; The explanation was a menu row: a paragraph in the tray, and a French row
+; AutoHotkey dropped (Menu.Add refuses more than 260 UTF-16 units). The menu now
+; shows « Infos… » and the native message box carries the Windows reason.
+_GSS_InfoOpensTheWindowsReason() {
+	for Item in _MR_GetMenuDef("gestures_menu")
+		if _MR_IsForAhk(Item)
+			AssertTrue(Item.Get("type", "") != "label", "the Gestures menu shows no explanation row")
+	AssertContains(_DriverFuncBody("BuildGesturesMenu"),
+		'"gesture_recommended_info", (*) => GestureShowRecommendedInfo()',
+		"the Infos row opens the explanation dialog")
+	InfoShown := []
+	try {
+		TestMsgBoxResponder((Text, Title, Options) => (InfoShown.Push(Map("text", Text, "title", Title, "options", Options)), "OK"))
+		GestureShowRecommendedInfo()
+	} finally {
+		TestMsgBoxResponder("")
+	}
+	AssertEqual(1, InfoShown.Length, "one native message box opens")
+	AssertEqual(t("menu.gestures.recommended_reason_windows"), InfoShown[1]["text"])
+	AssertTrue(InStr(InfoShown[1]["title"], t("menu.gestures.notify_title")), "the dialog is titled Gestures")
+	AssertTrue(InStr(InfoShown[1]["options"], "Iconi"), "it is an information dialog")
+	AssertFalse(InStr(InfoShown[1]["text"], t("menu.gestures.recommended_note")),
+		"Windows takes the system assignment over itself: no remove-it-first advice")
+}
+Test("Gestures menu: Infos opens the Windows reason in a message box", _GSS_InfoOpensTheWindowsReason)
 
 ; Whoever rewrites the registry asks for a re-read, so the greying follows it.
 _GSS_RegistryWritersRequestRefresh() {

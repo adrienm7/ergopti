@@ -2,11 +2,11 @@
 	import Ergopti from '../components/Ergopti.svelte';
 	import ErgoptiPlus from '../components/ErgoptiPlus.svelte';
 
-	import { page } from '$app/stores';
-	import { base } from '$app/paths';
+	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 
-	import { getKeyboardData } from '$lib/keyboard/data/getKeyboardData.js';
-	import { version, layoutData, versionsList, discordLink } from '$lib/stores_infos.js';
+	import { getKeyboardData } from '#lib/keyboard/data/getKeyboardData.js';
+	import { version, layoutData, versionsList, discordLink } from '#lib/stores_infos.js';
 
 	function closeMenu() {
 		document.getElementById('menu-btn').checked = false;
@@ -48,7 +48,7 @@
 	});
 
 	function isCurrent(path) {
-		return $page.url && ($page.url.pathname === path || $page.url.pathname === base + path);
+		return page.url.pathname === path || page.url.pathname === resolve(path);
 	}
 
 	$effect(() => {

@@ -54,13 +54,23 @@ request_timeout_ms = 30000
 # HS: api_remote.lua detect_local_servers (each probe client).
 local_server_probe_timeout_ms = 1500
 
-# Deadline of each process-list or listening-socket command of a local
-# server sweep (ps, lsof, ss; on Windows one shell query of the processes and
-# sockets, whose cold start takes about two seconds): the sweep then probes
+# Deadline of each listening-socket or per-pid command of a local server sweep
+# (lsof, ss, ps -p; on Windows the one shell query of the processes and
+# sockets, whose cold start takes about two seconds): the sweep then goes on
 # without that reading.
 # AHK: local_server_port_scan.ahk. HS: local_server_ports.lua run_bounded.
 # LX: local_server_ports.lua.
 local_server_port_scan_timeout_ms = 6000
+
+# Deadline of the process lookup of a local server sweep (pgrep of the
+# catalogue's process names only). It prints a few rows and returned in 16 ms
+# over 98 processes on Linux; two seconds leave room for the endpoint-security
+# agents of a managed Mac authorizing its exec. A full ps listing (-ww, every
+# argument of every process) is not used: past the pipe buffer (64 KiB) that
+# hs.task reads only once the child exits, ps blocks on its write until its
+# deadline (field report 2026-10-28), and the Linux runner refuses it.
+# HS, LX: local_server_ports.lua list_processes.
+local_server_process_lookup_timeout_ms = 2000
 
 # Age after which the AI menu sweeps the local servers again when it is built.
 # The menu's Search again row sweeps at any time.
@@ -689,6 +699,11 @@ input_source_confirm_retry_base_ms = 500
 # Longest total wait for those reads before the install falls back to pending.
 # HS: keymap/input_sources.lua CONFIRM_WINDOW_SEC.
 input_source_confirm_window_ms = 8000
+
+# Pause after each selection of the layout refresh (another layout, then the
+# rewritten one again), so the text-input system loads the new copy.
+# HS: keymap/input_sources.lua CONFIRM_SOURCE_SCRIPT (passed as its fourth argument).
+input_source_reselect_settle_ms = 300
 
 # Hard deadline for a native keyboard input-source mutation subprocess.
 # HS: keymap/input_sources.lua INPUT_SOURCE_OPERATION_TIMEOUT_SEC.
