@@ -280,6 +280,7 @@ local function load_log_manager_fixture(sink_failures, initialize)
 	local state = {
 		is_enabled = true,
 		LOG_DIR = "/tmp/ergopti_append_transaction",
+		CACHE_DIR = "/tmp/ergopti_append_transaction/cache",
 		buffer_events = { { "old", 20, {} } },
 		buffer_text = "old",
 		rich_chunks = { { type = "text", text = "old" } },

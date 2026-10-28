@@ -73,6 +73,7 @@ local function load_keystats(options)
 	package.loaded["infra.config_paths"] = {
 		get_config_dir = function() return "/tmp/ergopti-test" end,
 		metrics_dir = function() return "/tmp/ergopti-test/metrics" end,
+		metrics_cache_dir = function() return "/tmp/ergopti-test/cache" end,
 	}
 	package.loaded["infra.dialog_util"] = { alert = function() end }
 
