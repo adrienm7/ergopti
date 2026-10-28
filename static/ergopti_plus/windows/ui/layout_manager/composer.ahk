@@ -389,8 +389,14 @@ _LayoutComposer_OnInstalled(Deps, Use, Ok, CodeOrDetail := "", Detail := "") {
 	}
 	if Selected {
 		; The layout in use changed: reload so the emulation reads the new file.
-		Reloaded(Accepted) {
-			_LayoutComposer_Report(Deps, Action, Accepted, Accepted ? "" : LAYOUT_COMPOSER_FAILURE_USE, "", Accepted)
+		; Prelaunch refusal completes the callback and returns false; both signals
+		; must settle this save through the same terminal owner.
+		Completed := false
+		Reloaded(Accepted, FailureDetail := "") {
+			if Completed
+				return
+			Completed := true
+			_LayoutComposer_Report(Deps, Action, Accepted, Accepted ? "" : LAYOUT_COMPOSER_FAILURE_USE, FailureDetail, Accepted)
 		}
 		try Started := Deps["after"].Call(Id, "install", Reloaded)
 		catch as Err {
@@ -398,7 +404,7 @@ _LayoutComposer_OnInstalled(Deps, Use, Ok, CodeOrDetail := "", Detail := "") {
 			Started := false
 		}
 		if !(Started is Integer) || Started != 1
-			_LayoutComposer_Report(Deps, Action, false, LAYOUT_COMPOSER_FAILURE_USE, "the driver could not reload")
+			Reloaded(false, "the driver could not reload")
 		return
 	}
 	_LayoutComposer_Report(Deps, Action, true)
