@@ -194,11 +194,9 @@ class PrivilegeDropTests(unittest.TestCase):
             calls.append(command)
             return SimpleNamespace(returncode=0, stdout="@a(ss) []")
 
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(activation, "running_as_root", return_value=True),
-            mock.patch.object(activation.subprocess, "run", side_effect=fake_run),
-        ):
+        with mock.patch("builtins.print"), mock.patch.object(
+            activation, "running_as_root", return_value=True
+        ), mock.patch.object(activation.subprocess, "run", side_effect=fake_run):
             applied = activation.activate_layout([ERGOPTI])
 
         self.assertFalse(applied)
@@ -206,9 +204,8 @@ class PrivilegeDropTests(unittest.TestCase):
 
     def test_session_bus_is_rebuilt_from_the_target_uid(self):
         fake_pwd = SimpleNamespace(getpwnam=lambda name: SimpleNamespace(pw_uid=1000))
-        with (
-            mock.patch.dict(sys.modules, {"pwd": fake_pwd}),
-            mock.patch.object(activation.Path, "is_dir", return_value=True),
+        with mock.patch.dict(sys.modules, {"pwd": fake_pwd}), mock.patch.object(
+            activation.Path, "is_dir", return_value=True
         ):
             env = activation.session_bus_env("someone")
         self.assertEqual(env["XDG_RUNTIME_DIR"], "/run/user/1000")
@@ -216,9 +213,8 @@ class PrivilegeDropTests(unittest.TestCase):
 
     def test_missing_runtime_directory_yields_no_bus_override(self):
         fake_pwd = SimpleNamespace(getpwnam=lambda name: SimpleNamespace(pw_uid=1000))
-        with (
-            mock.patch.dict(sys.modules, {"pwd": fake_pwd}),
-            mock.patch.object(activation.Path, "is_dir", return_value=False),
+        with mock.patch.dict(sys.modules, {"pwd": fake_pwd}), mock.patch.object(
+            activation.Path, "is_dir", return_value=False
         ):
             self.assertEqual(activation.session_bus_env("someone"), {})
 
@@ -260,12 +256,10 @@ class PrivilegeDropTests(unittest.TestCase):
 class GnomeApplyTests(unittest.TestCase):
     def run_apply(self, initial, accept=True, specs=(ERGOPTI,)):
         writes: list[list[str]] = []
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(activation.time, "sleep"),
-            mock.patch.object(
-                activation.subprocess, "run", side_effect=gsettings_session(initial, writes, accept)
-            ),
+        with mock.patch("builtins.print"), mock.patch.object(
+            activation.time, "sleep"
+        ), mock.patch.object(
+            activation.subprocess, "run", side_effect=gsettings_session(initial, writes, accept)
         ):
             applied = activation.apply_gnome(list(specs), {"gnome"})
         return applied, writes
@@ -318,9 +312,8 @@ class GnomeApplyTests(unittest.TestCase):
             writes.append(command)
             return SimpleNamespace(returncode=0, stdout="")
 
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(activation.subprocess, "run", side_effect=fake_run),
+        with mock.patch("builtins.print"), mock.patch.object(
+            activation.subprocess, "run", side_effect=fake_run
         ):
             self.assertFalse(activation.apply_gnome([ERGOPTI], {"gnome"}))
         self.assertEqual(writes, [])
@@ -347,12 +340,10 @@ class KdeApplyTests(unittest.TestCase):
                 return SimpleNamespace(returncode=0, stdout="")
             raise FileNotFoundError(command[0])
 
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(activation.subprocess, "run", side_effect=fake_run),
-            mock.patch.object(
-                activation.shutil, "which", side_effect=lambda name: name if name in which else None
-            ),
+        with mock.patch("builtins.print"), mock.patch.object(
+            activation.subprocess, "run", side_effect=fake_run
+        ), mock.patch.object(
+            activation.shutil, "which", side_effect=lambda name: name if name in which else None
         ):
             applied = activation.apply_kde(list(specs), {"kde"})
         by_key = {write[write.index("--key") + 1]: write[-1] for write in writes}
@@ -408,19 +399,15 @@ class OwningDesktopTests(unittest.TestCase):
     def run_activation(self, environ, accept=True, spec=ERGOPTI):
         writes: list[list[str]] = []
         printed: list[str] = []
-        with (
-            mock.patch(
-                "builtins.print",
-                side_effect=lambda *a, **k: printed.append(" ".join(str(part) for part in a)),
-            ),
-            mock.patch.object(activation.time, "sleep"),
-            mock.patch.object(
-                activation,
-                "subprocess",
-                fake_subprocess(gsettings_session({"sources": "[('xkb', 'us')]"}, writes, accept)),
-            ),
-            mock.patch.object(activation.shutil, "which", return_value=None),
-            mock.patch.object(activation, "running_as_root", return_value=False),
+        with mock.patch(
+            "builtins.print",
+            side_effect=lambda *a, **k: printed.append(" ".join(str(part) for part in a)),
+        ), mock.patch.object(activation.time, "sleep"), mock.patch.object(
+            activation,
+            "subprocess",
+            fake_subprocess(gsettings_session({"sources": "[('xkb', 'us')]"}, writes, accept)),
+        ), mock.patch.object(activation.shutil, "which", return_value=None), mock.patch.object(
+            activation, "running_as_root", return_value=False
         ):
             applied = activation.activate_layout([spec], environ)
         return applied, "\n".join(printed), writes
@@ -473,21 +460,16 @@ class OwningDesktopTests(unittest.TestCase):
 
     def test_x11_without_a_layout_manager_is_told_how_to_persist(self):
         printed: list[str] = []
-        with (
-            mock.patch(
-                "builtins.print",
-                side_effect=lambda *a, **k: printed.append(" ".join(str(part) for part in a)),
-            ),
-            mock.patch.object(
-                activation.subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout="")
-            ),
-            mock.patch.object(
-                activation.shutil,
-                "which",
-                side_effect=lambda name: name if name in ("setxkbmap", "localectl") else None,
-            ),
-            mock.patch.object(activation, "running_as_root", return_value=False),
-        ):
+        with mock.patch(
+            "builtins.print",
+            side_effect=lambda *a, **k: printed.append(" ".join(str(part) for part in a)),
+        ), mock.patch.object(
+            activation.subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout="")
+        ), mock.patch.object(
+            activation.shutil,
+            "which",
+            side_effect=lambda name: name if name in ("setxkbmap", "localectl") else None,
+        ), mock.patch.object(activation, "running_as_root", return_value=False):
             applied = activation.activate_layout(
                 [LEGACY], {"XDG_CURRENT_DESKTOP": "XFCE", "XDG_SESSION_TYPE": "x11"}
             )
@@ -590,18 +572,14 @@ class KeymapVerificationTests(unittest.TestCase):
                 )
             return activation.CompileResult(command, keymap, "", dict(environment or {}))
 
-        with (
-            mock.patch(
-                "builtins.print",
-                side_effect=lambda *a, **k: printed.append(" ".join(str(part) for part in a)),
-            ),
-            mock.patch.object(
-                activation.shutil,
-                "which",
-                side_effect=lambda name: f"/usr/bin/{name}" if name in tools else None,
-            ),
-            mock.patch.object(activation, "run_compiler", side_effect=fake_compiler),
-        ):
+        with mock.patch(
+            "builtins.print",
+            side_effect=lambda *a, **k: printed.append(" ".join(str(part) for part in a)),
+        ), mock.patch.object(
+            activation.shutil,
+            "which",
+            side_effect=lambda name: f"/usr/bin/{name}" if name in tools else None,
+        ), mock.patch.object(activation, "run_compiler", side_effect=fake_compiler):
             verdict = activation.verify_keymap(spec, TYPE, xkbcomp_probe=xkbcomp_probe)
         return verdict, seen, "\n".join(printed)
 
@@ -679,15 +657,11 @@ class KeymapVerificationTests(unittest.TestCase):
                 )
             return activation.CompileResult(command, keymap, "", dict(environment or {}))
 
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(
-                activation.shutil,
-                "which",
-                side_effect=lambda name: "/usr/bin/xkbcli" if name == "xkbcli" else None,
-            ),
-            mock.patch.object(activation, "run_compiler", side_effect=fake_compiler),
-        ):
+        with mock.patch("builtins.print"), mock.patch.object(
+            activation.shutil,
+            "which",
+            side_effect=lambda name: "/usr/bin/xkbcli" if name == "xkbcli" else None,
+        ), mock.patch.object(activation, "run_compiler", side_effect=fake_compiler):
             self.assertTrue(
                 activation.verify_keymap(LEGACY, TYPE, include_roots=[Path("/sandbox")])
             )
@@ -714,15 +688,11 @@ class KeymapVerificationTests(unittest.TestCase):
                 dict(environment or {}),
             )
 
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(
-                activation.shutil,
-                "which",
-                side_effect=lambda name: "/usr/bin/xkbcli" if name == "xkbcli" else None,
-            ),
-            mock.patch.object(activation, "run_compiler", side_effect=fake_compiler),
-        ):
+        with mock.patch("builtins.print"), mock.patch.object(
+            activation.shutil,
+            "which",
+            side_effect=lambda name: "/usr/bin/xkbcli" if name == "xkbcli" else None,
+        ), mock.patch.object(activation, "run_compiler", side_effect=fake_compiler):
             activation.verify_keymap(ERGOPTI, TYPE, extensions_root=Path("/staging"))
         environment = captured[0]
         self.assertEqual(environment["XKB_LOG_LEVEL"], "warning")
@@ -834,12 +804,10 @@ class DeactivationTests(unittest.TestCase):
                 return SimpleNamespace(returncode=0, stdout="")
             raise FileNotFoundError(command[0])
 
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(activation.subprocess, "run", side_effect=fake_run),
-            mock.patch.object(
-                activation.shutil, "which", side_effect=lambda name: name if name in which else None
-            ),
+        with mock.patch("builtins.print"), mock.patch.object(
+            activation.subprocess, "run", side_effect=fake_run
+        ), mock.patch.object(
+            activation.shutil, "which", side_effect=lambda name: name if name in which else None
         ):
             status = activation.deactivate_layouts()
         return status, calls
@@ -888,16 +856,13 @@ class DeactivationTests(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("gsettings"), "requires the real gsettings executable")
     def test_real_gsettings_with_no_installed_schemas_is_absent(self):
-        with (
-            tempfile.TemporaryDirectory() as temporary,
-            mock.patch.dict(
-                os.environ,
-                {
-                    "GSETTINGS_SCHEMA_DIR": temporary,
-                    "XDG_DATA_DIRS": temporary,
-                    "LC_ALL": "C",
-                },
-            ),
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.dict(
+            os.environ,
+            {
+                "GSETTINGS_SCHEMA_DIR": temporary,
+                "XDG_DATA_DIRS": temporary,
+                "LC_ALL": "C",
+            },
         ):
             probe = subprocess.run(
                 ["gsettings", "list-schemas"],
@@ -924,14 +889,11 @@ class DeactivationTests(unittest.TestCase):
             ),
             (2, "", "No schemas installed\n", activation.CommandCaptureStatus.FAILED),
         ):
-            with (
-                self.subTest(code=code, output=output, error=error),
-                mock.patch.object(
-                    activation.subprocess,
-                    "run",
-                    return_value=SimpleNamespace(returncode=code, stdout=output, stderr=error),
-                ) as run,
-            ):
+            with self.subTest(code=code, output=output, error=error), mock.patch.object(
+                activation.subprocess,
+                "run",
+                return_value=SimpleNamespace(returncode=code, stdout=output, stderr=error),
+            ) as run:
                 self.assertIs(activation._gnome_schema_status(), expected)
                 self.assertEqual(run.call_args.kwargs["env"]["LC_ALL"], "C")
                 self.assertEqual(run.call_args.args[0], ["gsettings", "list-schemas"])
@@ -942,9 +904,8 @@ class DeactivationTests(unittest.TestCase):
             (PermissionError("gsettings"), activation.CommandCaptureStatus.FAILED),
             (subprocess.TimeoutExpired(["gsettings"], 15), activation.CommandCaptureStatus.FAILED),
         ):
-            with (
-                self.subTest(error=type(error)),
-                mock.patch.object(activation.subprocess, "run", side_effect=error),
+            with self.subTest(error=type(error)), mock.patch.object(
+                activation.subprocess, "run", side_effect=error
             ):
                 self.assertIs(activation._gnome_schema_status(), expected)
 
@@ -991,20 +952,16 @@ class DeactivationTests(unittest.TestCase):
 
 class InstallerWiringTests(unittest.TestCase):
     def test_clean_activate_only_refuses_to_run_as_root_without_a_user(self):
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(clean_installer, "running_as_root", return_value=True),
-            mock.patch.object(clean_installer, "rerun_unprivileged", return_value=None),
-        ):
+        with mock.patch("builtins.print"), mock.patch.object(
+            clean_installer, "running_as_root", return_value=True
+        ), mock.patch.object(clean_installer, "rerun_unprivileged", return_value=None):
             code = clean_installer.main(["--activate-only", "--variant", "ergopti"])
         self.assertNotEqual(code, clean_installer.EXIT_OK)
 
     def test_clean_activate_only_reruns_unprivileged_when_root(self):
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(clean_installer, "running_as_root", return_value=True),
-            mock.patch.object(clean_installer, "rerun_unprivileged", return_value=0) as rerun,
-        ):
+        with mock.patch("builtins.print"), mock.patch.object(
+            clean_installer, "running_as_root", return_value=True
+        ), mock.patch.object(clean_installer, "rerun_unprivileged", return_value=0) as rerun:
             code = clean_installer.main(["--activate-only", "--variant", "ergopti"])
         self.assertEqual(code, clean_installer.EXIT_OK)
         argv = rerun.call_args[0][0]
@@ -1018,15 +975,14 @@ class InstallerWiringTests(unittest.TestCase):
             order.append("verify")
             return True
 
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(clean_installer, "running_as_root", return_value=False),
-            mock.patch.object(clean_installer, "verify_keymap", side_effect=verify),
-            mock.patch.object(
-                clean_installer,
-                "activate_layout",
-                side_effect=lambda *a, **k: order.append("activate"),
-            ),
+        with mock.patch("builtins.print"), mock.patch.object(
+            clean_installer, "running_as_root", return_value=False
+        ), mock.patch.object(
+            clean_installer, "verify_keymap", side_effect=verify
+        ), mock.patch.object(
+            clean_installer,
+            "activate_layout",
+            side_effect=lambda *a, **k: order.append("activate"),
         ):
             code = clean_installer.main(["--activate-only", "--variant", "ergopti"])
         self.assertEqual(code, clean_installer.EXIT_OK)
@@ -1036,15 +992,14 @@ class InstallerWiringTests(unittest.TestCase):
         """Activating a package whose layers are dead is issue #84 with a
         success message on top; the failure must reach the exit code."""
         printed: list[str] = []
-        with (
-            mock.patch(
-                "builtins.print",
-                side_effect=lambda *a, **k: printed.append(" ".join(str(p) for p in a)),
-            ),
-            mock.patch.object(clean_installer, "running_as_root", return_value=False),
-            mock.patch.object(clean_installer, "verify_keymap", return_value=False),
-            mock.patch.object(clean_installer, "activate_layout") as activate,
-        ):
+        with mock.patch(
+            "builtins.print",
+            side_effect=lambda *a, **k: printed.append(" ".join(str(p) for p in a)),
+        ), mock.patch.object(
+            clean_installer, "running_as_root", return_value=False
+        ), mock.patch.object(
+            clean_installer, "verify_keymap", return_value=False
+        ), mock.patch.object(clean_installer, "activate_layout") as activate:
             code = clean_installer.main(["--activate-only", "--variant", "ergopti"])
         self.assertEqual(code, clean_installer.EXIT_INSTALL_ABORTED)
         activate.assert_not_called()
@@ -1052,15 +1007,14 @@ class InstallerWiringTests(unittest.TestCase):
 
     def test_clean_activation_without_a_compiler_warns_and_continues(self):
         printed: list[str] = []
-        with (
-            mock.patch(
-                "builtins.print",
-                side_effect=lambda *a, **k: printed.append(" ".join(str(p) for p in a)),
-            ),
-            mock.patch.object(clean_installer, "running_as_root", return_value=False),
-            mock.patch.object(clean_installer, "verify_keymap", return_value=None),
-            mock.patch.object(clean_installer, "activate_layout") as activate,
-        ):
+        with mock.patch(
+            "builtins.print",
+            side_effect=lambda *a, **k: printed.append(" ".join(str(p) for p in a)),
+        ), mock.patch.object(
+            clean_installer, "running_as_root", return_value=False
+        ), mock.patch.object(
+            clean_installer, "verify_keymap", return_value=None
+        ), mock.patch.object(clean_installer, "activate_layout") as activate:
             code = clean_installer.main(["--activate-only", "--variant", "ergopti"])
         self.assertEqual(code, clean_installer.EXIT_OK)
         activate.assert_called_once()
@@ -1068,14 +1022,11 @@ class InstallerWiringTests(unittest.TestCase):
 
     def test_clean_activation_gives_xorg_a_probe_into_the_package(self):
         seen = {}
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(clean_installer, "running_as_root", return_value=False),
-            mock.patch.object(
-                clean_installer, "verify_keymap", side_effect=lambda *a, **k: seen.update(k) or True
-            ),
-            mock.patch.object(clean_installer, "activate_layout"),
-        ):
+        with mock.patch("builtins.print"), mock.patch.object(
+            clean_installer, "running_as_root", return_value=False
+        ), mock.patch.object(
+            clean_installer, "verify_keymap", side_effect=lambda *a, **k: seen.update(k) or True
+        ), mock.patch.object(clean_installer, "activate_layout"):
             clean_installer.main(["--activate-only", "--variant", "ergopti"])
         probe = seen["xkbcomp_probe"]
         self.assertEqual(probe.symbols, "pc+ergopti+inet(evdev)")
@@ -1085,12 +1036,9 @@ class InstallerWiringTests(unittest.TestCase):
     def test_a_message_raised_as_system_exit_is_printed_not_swallowed(self):
         """``read_text`` raises SystemExit with the message: the CLI used to
         return code 4 without ever printing it."""
-        with (
-            mock.patch("sys.stderr") as stderr,
-            mock.patch.dict(
-                clean_installer.os.environ,
-                {"ERGOPTI_XKB_EXTENSIONS_ROOT": "/tmp/sandbox-extensions"},
-            ),
+        with mock.patch("sys.stderr") as stderr, mock.patch.dict(
+            clean_installer.os.environ,
+            {"ERGOPTI_XKB_EXTENSIONS_ROOT": "/tmp/sandbox-extensions"},
         ):
             code = clean_installer.main(
                 [
@@ -1110,38 +1058,30 @@ class InstallerWiringTests(unittest.TestCase):
         """Overriding the search path would prove the files exist, not that the
         session can find them: only a sandboxed run may pass an explicit root."""
         seen = {}
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(clean_installer, "running_as_root", return_value=False),
-            mock.patch.object(
-                clean_installer, "verify_keymap", side_effect=lambda *a, **k: seen.update(k)
-            ),
-            mock.patch.object(clean_installer, "activate_layout"),
-            mock.patch.dict(
-                clean_installer.os.environ,
-                {
-                    "ERGOPTI_XKB_EXTENSIONS_ROOT": "",
-                    "ERGOPTI_XKB_SYSTEM_ROOT": "",
-                    "ERGOPTI_XKB_CACHE_DIR": "",
-                },
-            ),
+        with mock.patch("builtins.print"), mock.patch.object(
+            clean_installer, "running_as_root", return_value=False
+        ), mock.patch.object(
+            clean_installer, "verify_keymap", side_effect=lambda *a, **k: seen.update(k)
+        ), mock.patch.object(clean_installer, "activate_layout"), mock.patch.dict(
+            clean_installer.os.environ,
+            {
+                "ERGOPTI_XKB_EXTENSIONS_ROOT": "",
+                "ERGOPTI_XKB_SYSTEM_ROOT": "",
+                "ERGOPTI_XKB_CACHE_DIR": "",
+            },
         ):
             clean_installer.main(["--activate-only", "--variant", "ergopti"])
         self.assertIsNone(seen["extensions_root"])
 
     def test_a_sandboxed_run_verifies_against_its_own_root(self):
         seen = {}
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(clean_installer, "running_as_root", return_value=False),
-            mock.patch.object(
-                clean_installer, "verify_keymap", side_effect=lambda *a, **k: seen.update(k)
-            ),
-            mock.patch.object(clean_installer, "activate_layout"),
-            mock.patch.dict(
-                clean_installer.os.environ,
-                {"ERGOPTI_XKB_EXTENSIONS_ROOT": "/tmp/sandbox-extensions"},
-            ),
+        with mock.patch("builtins.print"), mock.patch.object(
+            clean_installer, "running_as_root", return_value=False
+        ), mock.patch.object(
+            clean_installer, "verify_keymap", side_effect=lambda *a, **k: seen.update(k)
+        ), mock.patch.object(clean_installer, "activate_layout"), mock.patch.dict(
+            clean_installer.os.environ,
+            {"ERGOPTI_XKB_EXTENSIONS_ROOT": "/tmp/sandbox-extensions"},
         ):
             clean_installer.main(["--activate-only", "--variant", "ergopti"])
         self.assertEqual(str(seen["extensions_root"]).replace("\\", "/"), "/tmp/sandbox-extensions")
@@ -1176,12 +1116,11 @@ class InstallerWiringTests(unittest.TestCase):
 
     def test_legacy_activation_uses_the_shared_module_with_the_split_spec(self):
         roots = legacy_installer.resolve_roots()
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(legacy_installer, "running_as_root", return_value=False),
-            mock.patch.object(legacy_installer, "compile_check", return_value=True),
-            mock.patch.object(legacy_installer, "activate_layout") as activate,
-        ):
+        with mock.patch("builtins.print"), mock.patch.object(
+            legacy_installer, "running_as_root", return_value=False
+        ), mock.patch.object(
+            legacy_installer, "compile_check", return_value=True
+        ), mock.patch.object(legacy_installer, "activate_layout") as activate:
             self.assertEqual(
                 legacy_installer.run_activation_phase("Ergopti_v2_2_1", roots),
                 legacy_installer.EXIT_OK,
@@ -1190,12 +1129,11 @@ class InstallerWiringTests(unittest.TestCase):
 
     def test_legacy_activation_aborts_when_the_tree_is_unusable(self):
         roots = legacy_installer.resolve_roots()
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(legacy_installer, "running_as_root", return_value=False),
-            mock.patch.object(legacy_installer, "compile_check", return_value=False),
-            mock.patch.object(legacy_installer, "activate_layout") as activate,
-        ):
+        with mock.patch("builtins.print"), mock.patch.object(
+            legacy_installer, "running_as_root", return_value=False
+        ), mock.patch.object(
+            legacy_installer, "compile_check", return_value=False
+        ), mock.patch.object(legacy_installer, "activate_layout") as activate:
             self.assertEqual(
                 legacy_installer.run_activation_phase("Ergopti_v2_2_1", roots),
                 legacy_installer.EXIT_INSTALL_ABORTED,
@@ -1217,11 +1155,9 @@ class InstallerWiringTests(unittest.TestCase):
 
     def test_legacy_activation_reruns_unprivileged_when_root(self):
         roots = legacy_installer.resolve_roots()
-        with (
-            mock.patch("builtins.print"),
-            mock.patch.object(legacy_installer, "running_as_root", return_value=True),
-            mock.patch.object(legacy_installer, "rerun_unprivileged", return_value=0) as rerun,
-        ):
+        with mock.patch("builtins.print"), mock.patch.object(
+            legacy_installer, "running_as_root", return_value=True
+        ), mock.patch.object(legacy_installer, "rerun_unprivileged", return_value=0) as rerun:
             self.assertEqual(
                 legacy_installer.run_activation_phase("Ergopti_v2_2_1", roots),
                 legacy_installer.EXIT_OK,

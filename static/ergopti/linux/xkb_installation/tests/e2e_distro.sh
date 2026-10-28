@@ -200,9 +200,13 @@ snapshot() {
 # ---------------------------------------------------------------------------
 # The suites simulate a desktop user; run as root they would exercise the
 # privilege-drop paths instead of the ones a user reaches.
+#
+# -u keeps the log chronological: block-buffered stdout from the tests would
+# otherwise land after unittest's stderr summary, and the tail printed on
+# failure would show stray paths instead of the failing test.
 
 step "Installer test suites with $PYTHON_BIN"
-run_as_user -- "$PYTHON_BIN" "$SCRIPT_DIR/run_all_tests.py" > "$WORK/unit.log" 2>&1 || { tail -40 "$WORK/unit.log"; die "unit suite failed"; }
+run_as_user -- "$PYTHON_BIN" -u "$SCRIPT_DIR/run_all_tests.py" > "$WORK/unit.log" 2>&1 || { tail -40 "$WORK/unit.log"; die "unit suite failed"; }
 tail -3 "$WORK/unit.log"
 run_as_user -- bash "$SCRIPT_DIR/test_install_entrypoint.sh" > "$WORK/entrypoint.log" 2>&1 || { tail -40 "$WORK/entrypoint.log"; die "entrypoint suite failed"; }
 tail -1 "$WORK/entrypoint.log"
