@@ -295,7 +295,7 @@ _MET_CohortRefusals() {
 
 _MET_CohortRefusal(Refuse) {
 	Native := Map(), Personal := Map("personal-vk", true, "personal-sc", true)
-	Events := [], Handles := Map(), Debt := ""
+	Events := [], Handles := Map(), Debt := "", ContractThrew := false
 	Reserve(Scan) {
 		Events.Push("reserve " . Scan)
 		if Refuse == "reserve" && Scan == "SC028"
@@ -328,10 +328,11 @@ _MET_CohortRefusal(Refuse) {
 		["personal-vk", "personal-sc"], Handles,
 		Map("reserve", Reserve, "activate", Activate, "retire", Retire, "set_enabled", SetEnabled))
 	catch as Err {
+		ContractThrew := true
 		Debt := Err.Message
 	}
 	if Refuse == "" {
-		AssertEqual("", Debt)
+		AssertFalse(ContractThrew, "The complete native cohort must not throw: " . Debt)
 		AssertEqual(2, Handles.Count)
 		AssertTrue(Native["SC027"] && Native["SC028"], "the complete native cohort is acknowledged")
 		AssertFalse(Personal["personal-vk"] || Personal["personal-sc"], "both aliases yield to the sole broker")
