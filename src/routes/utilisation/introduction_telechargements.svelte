@@ -1,11 +1,11 @@
 <script>
-	import Ergopti from '$lib/components/Ergopti.svelte';
-	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
-	import SFB from '$lib/components/SFB.svelte';
+	import Ergopti from '#lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
+	import SFB from '#lib/components/SFB.svelte';
 
-	import KeyboardEmulation from '$lib/keyboard/KeyboardEmulation.svelte';
+	import KeyboardEmulation from '#lib/keyboard/KeyboardEmulation.svelte';
 	import { base } from '$app/paths';
-	import { getMagicKeyUrls, getFrenchMagicKeyUrl } from '$lib/js/hotstringDataUrls.js';
+	import { getMagicKeyUrls, getFrenchMagicKeyUrl } from '#lib/js/hotstringDataUrls.js';
 
 	import magicSampleToml from './magic_sample.toml?raw';
 	let remplacements = {};

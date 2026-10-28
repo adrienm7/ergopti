@@ -1,9 +1,9 @@
 <script>
-	import Ergopti from '$lib/components/Ergopti.svelte';
-	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
-	import SFB from '$lib/components/SFB.svelte';
+	import Ergopti from '#lib/components/Ergopti.svelte';
+	import ErgoptiPlus from '#lib/components/ErgoptiPlus.svelte';
+	import SFB from '#lib/components/SFB.svelte';
 
-	import { version } from '$lib/stores_infos.js';
+	import { version } from '#lib/stores_infos.js';
 	import { base } from '$app/paths';
 	import IntroductionBenchmarks from './introduction_benchmarks.svelte';
 	import AnalyseErgoptiPlus from './analyse_ergopti_plus.svelte';
@@ -63,7 +63,7 @@
 	let ergol = 'en_fr';
 	let version_1dfh = '_1dk';
 
-	const images = import.meta.glob('$lib/images/benchmarks/**/*.jpg', {
+	const images = import.meta.glob('/src/lib/images/benchmarks/**/*.jpg', {
 		eager: true,
 		query: {
 			enhanced: true

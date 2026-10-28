@@ -21,7 +21,7 @@ FEATURES & RATIONALE:
 
 <script>
 	import { base } from '$app/paths';
-	import { driverWindowSrc, hostDriverWindow } from '$lib/js/driverWindowHost.js';
+	import { driverWindowSrc, hostDriverWindow } from '#lib/js/driverWindowHost.js';
 	import WindowChrome from './WindowChrome.svelte';
 	import { reveal } from './reveal.js';
 	import { ui } from './state.svelte.js';

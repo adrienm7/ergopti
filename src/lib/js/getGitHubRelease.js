@@ -6,7 +6,7 @@
 // All release assets (keyboard layout installers, ErgoptiPlus binaries,
 // installation scripts) are fetched from here rather than served from static/.
 
-import { branchForInstall } from '$lib/js/isDev.js';
+import { branchForInstall } from '#lib/js/isDev.js';
 
 const REPO = 'adrienm7/ergopti';
 const API_BASE = `https://api.github.com/repos/${REPO}`;

@@ -618,6 +618,9 @@
 		"test:linux-distro-native-prerequisites": "node ./tools/test/test-linux-distro-native-prerequisites.cjs"
 	},
 	"type": "module",
+	"imports": {
+		"#lib/*": "./src/lib/*"
+	},
 	"dependencies": {
 		"aos": "^3.0.0-beta.6",
 		"modern-normalize": "^3.0.1",
