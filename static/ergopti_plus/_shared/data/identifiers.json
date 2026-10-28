@@ -1,5 +1,5 @@
 {
-	"_comment": "The one declaration of the application's file and bundle names, its service labels, the external hosts the drivers talk to and the developer source-mode names (the launcher Info.plist key a source build carries and the environment variable the launcher hands its runtime). tools/codegen/codegen-identifiers.cjs emits _shared/lua/identifiers.lua from it; Node tools read this file directly. tools/test/test-repo-url-single-source.cjs holds every other driver source to a shrinking baseline of typed copies. The GitHub owner and repository stay in _shared/modules/updater/defaults.json.",
+	"_comment": "The one declaration of the application's file and bundle names, its service labels, the external hosts the drivers talk to the developer source-mode names (the launcher Info.plist key a source build carries and the environment variable the launcher hands its runtime) and the field report names the three collectors share (tools/dev/collect-*-field-report.*: the field branch prefix, the report folder and the git config key that remembers the base of a field branch). tools/codegen/codegen-identifiers.cjs emits _shared/lua/identifiers.lua from it; Node tools read this file directly. tools/test/test-repo-url-single-source.cjs holds every other driver source to a shrinking baseline of typed copies. The GitHub owner and repository stay in _shared/modules/updater/defaults.json.",
 	"app": {
 		"name": "ErgoptiPlus",
 		"ahk": "ErgoptiPlus.ahk",
@@ -25,5 +25,10 @@
 	"dev_source": {
 		"plist_key": "ErgoptiDevSourceRoot",
 		"environment": "ERGOPTI_DEV_SOURCE_ROOT"
+	},
+	"field_report": {
+		"branch_prefix": "field/",
+		"folder": "docs/field-reports",
+		"base_config_key": "ergoptiFieldBase"
 	}
 }

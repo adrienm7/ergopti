@@ -2,9 +2,9 @@
 # AUTO-GENERATED from _shared/data/identifiers.json.
 # DO NOT EDIT BY HAND — run `npm run codegen:identifiers` to refresh.
 
-# Application names, bundle ids, service labels and external hosts, for the shell
-# tools and installers that source this file. Hosts are bare names: build a URL as
-# "https://${ERGOPTI_HOST_GITHUB}/...".
+# Application names, bundle ids, service labels, external hosts and the field
+# report names, for the shell tools and installers that source this file. Hosts
+# are bare names: build a URL as "https://${ERGOPTI_HOST_GITHUB}/...".
 ERGOPTI_APP_NAME="ErgoptiPlus"
 ERGOPTI_APP_AHK="ErgoptiPlus.ahk"
 ERGOPTI_APP_EXE="ErgoptiPlus.exe"
@@ -21,3 +21,6 @@ ERGOPTI_HOST_OLLAMA="ollama.com"
 ERGOPTI_HOST_OLLAMA_REGISTRY="registry.ollama.ai"
 ERGOPTI_DEV_SOURCE_PLIST_KEY="ErgoptiDevSourceRoot"
 ERGOPTI_DEV_SOURCE_ENVIRONMENT="ERGOPTI_DEV_SOURCE_ROOT"
+ERGOPTI_FIELD_REPORT_BRANCH_PREFIX="field/"
+ERGOPTI_FIELD_REPORT_FOLDER="docs/field-reports"
+ERGOPTI_FIELD_REPORT_BASE_CONFIG_KEY="ergoptiFieldBase"

@@ -30,4 +30,9 @@ enum Identifiers {
 		static let plistKey = "ErgoptiDevSourceRoot"
 		static let environment = "ERGOPTI_DEV_SOURCE_ROOT"
 	}
+	enum FieldReport {
+		static let branchPrefix = "field/"
+		static let folder = "docs/field-reports"
+		static let baseConfigKey = "ergoptiFieldBase"
+	}
 }
