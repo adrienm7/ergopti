@@ -232,6 +232,10 @@ clipboard_restore_ms = 150
 # HS: karabiner/init.lua LAYOUT_TIS_SETTLE_SEC.
 layout_tis_settle_ms = 500
 
+# Wait after each away/back selection in the fresh-process input-source refresh.
+# HS: keymap/input_sources.lua confirm_source_async().
+input_source_refresh_settle_ms = 300
+
 # Inter-key pause for deletion prefixes sent to terminal/TUI prompt controls.
 # Their render loop may otherwise evaluate every Backspace against one stale
 # state snapshot before the replacement text arrives.

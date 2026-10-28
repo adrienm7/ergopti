@@ -928,13 +928,16 @@ end
 -- Carbon is called through ctypes: the AppleScript ObjC bridge crashes on these
 -- calls (see ENABLED_LIST_SCRIPT), the C API does not.
 local CONFIRM_SOURCE_SCRIPT = [[
-import ctypes, json, sys, time
+import ctypes, json, math, sys, time
 
 TARGET = sys.argv[1]
 REGISTER_PATH = sys.argv[2]
 FLAGS = sys.argv[3].split(",")
 REFRESH = "refresh" in FLAGS
 ENABLE = "enable" in FLAGS
+REFRESH_SETTLE_SEC = float(sys.argv[4])
+if not math.isfinite(REFRESH_SETTLE_SEC) or REFRESH_SETTLE_SEC <= 0:
+    raise ValueError("Input-source refresh duration must be finite and positive")
 UTF8 = 0x08000100
 
 cf = ctypes.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
@@ -1022,9 +1025,9 @@ if target is not None and REFRESH and flag(target, K_SELECTED):
         and flag(source, K_ENABLED) and flag(source, K_SELECT_CAPABLE)), None)
     if other is not None:
         away = tis.TISSelectInputSource(other)
-        time.sleep(0.3)
+        time.sleep(REFRESH_SETTLE_SEC)
         back = tis.TISSelectInputSource(target)
-        time.sleep(0.3)
+        time.sleep(REFRESH_SETTLE_SEC)
         refreshed = {"away": away, "back": back}
     else:
         refreshed = {"away": None, "back": None}
@@ -1059,11 +1062,13 @@ local function confirm_source_async(keyboard_name, options, on_done)
 		return false
 	end
 	local register_path = type(options.register_path) == "string" and options.register_path or ""
+	local refresh_settle_sec = Timings.sec("debounce", "input_source_refresh_settle_ms")
 	local flags = {}
 	if options.refresh == true then flags[#flags + 1] = "refresh" end
 	if options.enable == true then flags[#flags + 1] = "enable" end
 	return run_bounded_process("Confirm keyboard input source", python_bin,
-		{ "-c", CONFIRM_SOURCE_SCRIPT, keyboard_name, register_path, table.concat(flags, ",") },
+		{ "-c", CONFIRM_SOURCE_SCRIPT, keyboard_name, register_path, table.concat(flags, ","),
+			tostring(refresh_settle_sec) },
 		function(process_ok, out, reason)
 			local decoded_ok, state = pcall(require("json").decode, tostring(out or ""))
 			if process_ok ~= true or not decoded_ok or type(state) ~= "table" or type(state.listed) ~= "boolean" then
