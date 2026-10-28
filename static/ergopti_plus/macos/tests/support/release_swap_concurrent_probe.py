@@ -60,27 +60,132 @@ def load(name, path):
     return module
 
 
-def emitted(driver, root):
-    """Compare the strict literal parser with real production Lua evaluation."""
+def command_from(driver, physical, arming, app, staged, pid, emission_source):
+    """Keep native script-only observation distinct from executing real arm_swap Lua."""
+    if emission_source == "actual-lua":
+        result = subprocess.run(
+            [
+                arming.resolve_lua(),
+                "-",
+                str(driver),
+                str(driver.parent / "_shared"),
+                str(app),
+                str(staged),
+                str(pid),
+                "",
+            ],
+            input=arming.CAPTURE,
+            text=True,
+            capture_output=True,
+            timeout=CONTROL_TIMEOUT,
+            check=True,
+        )
+        return json.loads(result.stdout)
+    if emission_source != "strict-source":
+        raise ValueError("An explicit supported release emission source is required")
+    source = (driver / "modules/updater/release_installer.lua").read_text(encoding="utf-8")
+    # This fixture supplies positional script inputs. It does not run arm_swap:
+    # the common Lua gate compares this entire vector with the actual Lua call.
+    return {
+        "executable": "/bin/sh",
+        "args": [
+            "-c",
+            physical.extract_program(source, "DETACH_SCRIPT"),
+            "detach",
+            physical.extract_program(source),
+            str(pid),
+            str(app),
+            str(staged),
+            str(app) + ".previous",
+            str(staged.parent.parent / "swap.log"),
+        ],
+    }
+
+
+def command_digest(command):
+    """Bind the executable and every raw argv byte, before or after explicit ports."""
+    values = [command["executable"], *command["args"]]
+    if any("\0" in value for value in values):
+        raise ValueError("A release command cannot contain native NUL bytes")
+    return hashlib.sha256("\0".join(values).encode()).hexdigest()
+
+
+def emitted(driver, root, emission_source):
+    """Bind one explicit script source; never discover a substitute interpreter."""
     arming = load(
         "concurrent_arming", driver / "tests/support/modules/updater/release_arming_fixture.py"
     )
     physical = load("concurrent_physical", driver / "tests/support/release_swap_physical_probe.py")
-    capture = (
-        arming.CAPTURE.split("installer._getenv=", 1)[0] + "\nio.write(installer.SWAP_SCRIPT)\n"
+    command = command_from(
+        driver,
+        physical,
+        arming,
+        root / "ErgoptiPlus.app",
+        root / "stage/app/ErgoptiPlus.app",
+        os.getpid(),
+        emission_source,
     )
-    result = subprocess.run(
-        [arming.resolve_lua(), "-", str(driver), str(driver.parent / "_shared"), "", "", "", ""],
-        input=capture,
-        text=True,
-        capture_output=True,
-        timeout=CONTROL_TIMEOUT,
-        check=True,
-    )
-    source = driver / "modules/updater/release_installer.lua"
-    if result.stdout != physical.extract_program(source.read_text(encoding="utf-8")):
-        raise RuntimeError("The physical concurrent probe does not match actual Lua bytes")
-    return result.stdout, physical, arming
+    source = (driver / "modules/updater/release_installer.lua").read_text(encoding="utf-8")
+    if command["args"][3] != physical.extract_program(source):
+        raise RuntimeError("The physical concurrent probe does not match actual swap bytes")
+    if command["args"][1] != physical.extract_program(source, "DETACH_SCRIPT"):
+        raise RuntimeError("The physical concurrent probe does not match actual detach bytes")
+    return command["args"][3], command["args"][1], physical, arming
+
+
+def emission_controls(driver, root):
+    """Compare real Lua calls and reject malformed detached literal authorities."""
+    _, _, physical, arming = emitted(driver, root, "actual-lua")
+    commands = []
+    for name in ["ordinary", "quote ' and slash\\", "native\ntrailing\n"]:
+        app = root / name / "Installed.app"
+        staged = root / name / "stage/app/ErgoptiPlus.app"
+        actual = command_from(driver, physical, arming, app, staged, os.getpid(), "actual-lua")
+        parsed = command_from(driver, physical, arming, app, staged, os.getpid(), "strict-source")
+        assert actual["interpreter_version"] == "Lua 5.4"
+        assert actual["executable"] == parsed["executable"] and actual["args"] == parsed["args"]
+        commands.append(
+            {
+                "name": name,
+                "interpreter_version": actual["interpreter_version"],
+                "argv_equal": True,
+                "swap_equal": True,
+                "detach_equal": True,
+                "argv_sha256": command_digest(actual),
+            }
+        )
+    source = (driver / "modules/updater/release_installer.lua").read_text(encoding="utf-8")
+    marker = "local DETACH_SCRIPT = table.concat({"
+    assert source.count(marker) == 1
+    head, tail = source.split(marker)
+    variants = {
+        "missing": source.replace(marker, "local OTHER_SCRIPT = table.concat({"),
+        "duplicate": source + "\n" + marker,
+        "reassigned": source + '\nDETACH_SCRIPT = "foreign"\n',
+        "unknown-term": head + marker + tail.replace('"set -u"', "UNKNOWN_CONSTANT", 1),
+        "dynamic-term": head + marker + tail.replace('"set -u"', 'os.getenv("SHELL")', 1),
+        "unterminated-entry": head + marker + tail.replace('"set -u",', '"set -u"', 1),
+        "same-line-suffix": head + marker + tail.replace('}, "\\n")', '}, "\\n") .. "foreign"', 1),
+        "continued-suffix": head
+        + marker
+        + tail.replace('}, "\\n")', '}, "\\n")\n .. "foreign"', 1),
+        "missing-separator": head + marker + tail.replace('}, "\\n")', "})", 1),
+        "missing-constant": source.replace(
+            "local EXECUTABLE_SUFFIX = ", "local OTHER_SUFFIX = ", 1
+        ),
+    }
+    for name, changed in variants.items():
+        assert changed != source, name
+        try:
+            physical.extract_program(changed, "DETACH_SCRIPT")
+        except ValueError:
+            continue
+        raise AssertionError("The detach literal extractor accepted " + name)
+    return {
+        "emission_source": "actual-lua-compared-with-strict-source",
+        "commands": commands,
+        "parser_refusals": list(variants),
+    }
 
 
 MOVER = r"""
@@ -239,7 +344,7 @@ def rename_case(program, physical, root, phase, native, mutant):
             reap_owned_group(process.pid)
 
 
-def lease_case(driver, physical, arming, root, native, mutant):
+def lease_case(driver, physical, arming, root, native, mutant, emission_source):
     """A second real detached installer must refuse before acknowledging ARMED."""
     base = root / "two-installers"
     base.mkdir()
@@ -267,25 +372,13 @@ def lease_case(driver, physical, arming, root, native, mutant):
     owned = []
     try:
         receipts = []
+        commands = []
         for staged in staged_apps:
-            capture = subprocess.run(
-                [
-                    arming.resolve_lua(),
-                    "-",
-                    str(driver),
-                    str(driver.parent / "_shared"),
-                    str(app),
-                    str(staged),
-                    str(parent.pid),
-                    "",
-                ],
-                input=arming.CAPTURE,
-                text=True,
-                capture_output=True,
-                timeout=CONTROL_TIMEOUT,
-                check=True,
+            command = command_from(
+                driver, physical, arming, app, staged, parent.pid, emission_source
             )
-            command = json.loads(capture.stdout)
+            raw_digest = command_digest(command)
+            unported_args = list(command["args"])
             command["args"][3] = command["args"][3].replace(
                 "/usr/bin/open", shlex.quote(str(opener))
             )
@@ -301,6 +394,15 @@ def lease_case(driver, physical, arming, root, native, mutant):
                         "The lease mutant requires the exact detached production owner"
                     )
                 command["args"][1] = command["args"][1].replace(expected, replacement)
+            commands.append(
+                {
+                    "executable": command["executable"],
+                    "args": command["args"],
+                    "unported_argv_sha256": raw_digest,
+                    "unported_args": unported_args,
+                    "argv_sha256": command_digest(command),
+                }
+            )
             read_fd, write_fd = os.pipe()
             supervisor = subprocess.Popen(
                 [
@@ -354,6 +456,7 @@ def lease_case(driver, physical, arming, root, native, mutant):
             )
         return {
             "name": "two-installers-before-arming",
+            "commands": commands,
             "receipts": receipts,
             "original_restored": original_restored,
             "second_candidate_preserved": staged_apps[1].exists(),
@@ -378,21 +481,32 @@ def lease_case(driver, physical, arming, root, native, mutant):
 
 def main():
     """Keep one exact fixture tree until all controlled descendants have retired."""
+    if not __debug__:
+        raise RuntimeError("Concurrent release regressions require Python assertions to be enabled")
     parser = argparse.ArgumentParser()
     parser.add_argument("driver", type=Path)
     parser.add_argument("root", type=Path)
     parser.add_argument("--native-launcher", type=Path)
+    parser.add_argument(
+        "--emission-source", choices=["actual-lua", "strict-source"], default="actual-lua"
+    )
+    parser.add_argument("--emission-controls", action="store_true")
     parser.add_argument("--mutant", choices=["none", "mv", "no-lease"], default="none")
     parser.add_argument("--phase", choices=["backup", "publish", "rollback", "lease"])
     args = parser.parse_args()
     if os.name != "posix" or os.geteuid() == 0:
         raise RuntimeError("Concurrent release controls require an unprivileged POSIX host")
+    if args.emission_controls:
+        print(json.dumps(emission_controls(args.driver.resolve(strict=True), args.root)))
+        return
     own_detached_descendants()
     args.root.mkdir(parents=True, exist_ok=True)
     root = Path(tempfile.mkdtemp(prefix="concurrent-release-", dir=args.root))
     complete = False
     try:
-        program, physical, arming = emitted(args.driver.resolve(strict=True), root)
+        program, detach, physical, arming = emitted(
+            args.driver.resolve(strict=True), root, args.emission_source
+        )
         phases = [args.phase] if args.phase else ["backup", "publish", "rollback", "lease"]
         records = [
             lease_case(
@@ -402,6 +516,7 @@ def main():
                 root,
                 args.native_launcher,
                 args.mutant,
+                args.emission_source,
             )
             if phase == "lease"
             else rename_case(program, physical, root, phase, args.native_launcher, args.mutant)
@@ -416,6 +531,11 @@ def main():
             json.dumps(
                 {
                     "program_sha256": hashlib.sha256(program.encode()).hexdigest(),
+                    "detach_sha256": hashlib.sha256(detach.encode()).hexdigest(),
+                    "emission_source": args.emission_source,
+                    "execution_scope": "script-only/source-parser"
+                    if args.emission_source == "strict-source"
+                    else "actual-arm-swap-lua",
                     "source_sha256": hashlib.sha256(
                         (args.driver / "modules/updater/release_installer.lua").read_bytes()
                     ).hexdigest(),

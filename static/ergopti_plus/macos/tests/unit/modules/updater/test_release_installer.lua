@@ -583,3 +583,48 @@ helpers.describe("release_installer: complete literal extraction", function()
 		if not ok then error(err, 0) end
 	end)
 end)
+
+
+helpers.describe("release_installer: explicit native script observation", function()
+	helpers.it("executes only the explicit script observer without discovering Lua (release-native-script-scope)", function()
+		local dir = scratch()
+		local ok, err = xpcall(function()
+			local probe = helpers.driver_root() .. "tests/support/release_swap_concurrent_probe.py"
+			local command = "LUA=" .. quote(dir .. "/missing-lua") .. " python3 -B " .. quote(probe)
+				.. " " .. quote(helpers.driver_root()) .. " " .. quote(dir)
+			local status, output = sh(command .. " --emission-source strict-source")
+			helpers.assert_eq(status, 0, output)
+			local receipt = assert(require("json").decode(output))
+			helpers.assert_eq(receipt.emission_source, "strict-source")
+			helpers.assert_eq(receipt.execution_scope, "script-only/source-parser")
+			helpers.assert_eq(#receipt.cases, 4, "the explicit observer must still execute every physical boundary")
+			local rejected, detail = sh(command)
+			helpers.assert_true(rejected ~= 0, "the default mode must fail without its required Lua")
+			helpers.assert_true(detail:find("Lua 5.4 is required", 1, true) ~= nil)
+		end, debug.traceback)
+		assert(sh("rm -rf " .. quote(dir)) == 0)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("binds both extracted scripts and complete argv to actual Lua emission (release-native-script-scope)", function()
+		local dir = scratch()
+		local ok, err = xpcall(function()
+			local probe = helpers.driver_root() .. "tests/support/release_swap_concurrent_probe.py"
+			local status, output = sh("python3 -B " .. quote(probe) .. " " .. quote(helpers.driver_root())
+				.. " " .. quote(dir) .. " --emission-controls")
+			helpers.assert_eq(status, 0, output)
+			local receipt = assert(require("json").decode(output))
+			helpers.assert_eq(receipt.emission_source, "actual-lua-compared-with-strict-source")
+			helpers.assert_eq(#receipt.commands, 3, "each complete argv and both scripts must match real Lua")
+			helpers.assert_eq(#receipt.parser_refusals, 10, "every malformed detach authority must refuse")
+			for _, command in ipairs(receipt.commands) do
+				helpers.assert_eq(command.interpreter_version, "Lua 5.4")
+				helpers.assert_eq(command.argv_equal, true)
+				helpers.assert_eq(command.swap_equal, true)
+				helpers.assert_eq(command.detach_equal, true)
+			end
+		end, debug.traceback)
+		assert(sh("rm -rf " .. quote(dir)) == 0)
+		if not ok then error(err, 0) end
+	end)
+end)

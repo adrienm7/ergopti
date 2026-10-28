@@ -68,12 +68,20 @@ def standalone_boundary(source, offset):
         raise ValueError("The release literal must be a standalone assignment")
 
 
-def extract_program(source):
+def extract_program(source, binding="M.SWAP_SCRIPT"):
     """Extract one complete, fail-closed literal table; Common compares Lua bytes."""
+    declarations = {
+        "M.SWAP_SCRIPT": r"M\.SWAP_SCRIPT",
+        "DETACH_SCRIPT": r"local[ \t]+DETACH_SCRIPT",
+    }
+    if binding not in declarations:
+        raise ValueError("The release parser only admits the swap and detach script authorities")
+    declaration = declarations[binding]
+    assignment = r"(?:local[ \t]+)?DETACH_SCRIPT" if binding == "DETACH_SCRIPT" else declaration
     constants = list(re.finditer(r"(?m)^local ARMING_RECEIPT\s*=\s*", source))
-    bindings = list(re.finditer(r"(?m)^M\.SWAP_SCRIPT\s*=\s*table\.concat\s*\(\s*\{", source))
+    bindings = list(re.finditer(r"(?m)^" + declaration + r"\s*=\s*table\.concat\s*\(\s*\{", source))
     receipt_assignments = list(re.finditer(r"(?m)^(?:local[ \t]+)?ARMING_RECEIPT\s*=", source))
-    assignments = list(re.finditer(r"(?m)^M\.SWAP_SCRIPT\s*=", source))
+    assignments = list(re.finditer(r"(?m)^" + assignment + r"\s*=", source))
     if (
         len(constants) != 1
         or len(bindings) != 1

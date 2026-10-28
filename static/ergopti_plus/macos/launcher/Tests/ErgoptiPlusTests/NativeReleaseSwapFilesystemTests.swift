@@ -170,12 +170,19 @@ final class NativeReleaseSwapFilesystemTests: XCTestCase {
 		let probe = driver.appendingPathComponent("tests/support/release_swap_concurrent_probe.py")
 		let executable = try nativeExecutable()
 		let result = try run("/usr/bin/env", arguments: ["python3", "-B", probe.path,
-			driver.path, root.appendingPathComponent("controls").path, "--native-launcher", executable.path], root: root)
+			driver.path, root.appendingPathComponent("controls").path, "--native-launcher", executable.path,
+			"--emission-source", "strict-source"], root: root)
 		XCTAssertEqual(result.status, 0, "Every native concurrent publication contract must pass: \(String(decoding: result.output, as: UTF8.self)); \(result.stderr)")
 		guard result.status == 0 else { throw CocoaError(.executableRuntimeMismatch) }
 		observerRetired = true
 		let report = try XCTUnwrap(JSONSerialization.jsonObject(with: result.output) as? [String: Any])
 		XCTAssertEqual(report["native_launcher"] as? String, executable.path)
+		XCTAssertEqual(report["emission_source"] as? String, "strict-source")
+		XCTAssertEqual(report["execution_scope"] as? String, "script-only/source-parser")
+		let source = driver.appendingPathComponent("modules/updater/release_installer.lua")
+		let sourceDigest = SHA256.hash(data: try Data(contentsOf: source)).map { String(format: "%02x", $0) }.joined()
+		XCTAssertEqual(report["source_sha256"] as? String, sourceDigest)
+
 		let cases = try XCTUnwrap(report["cases"] as? [[String: Any]])
 		XCTAssertEqual(cases.compactMap { $0["name"] as? String },
 			["backup", "publish", "rollback", "two-installers-before-arming"])
@@ -186,6 +193,27 @@ final class NativeReleaseSwapFilesystemTests: XCTestCase {
 		let transaction = try XCTUnwrap(cases.last)
 		XCTAssertEqual(transaction["original_restored"] as? Bool, true)
 		XCTAssertEqual(transaction["second_candidate_preserved"] as? Bool, true)
+		let commands = try XCTUnwrap(transaction["commands"] as? [[String: Any]])
+		XCTAssertEqual(commands.count, 2, "Both actual detached script invocations must be bound")
+		for command in commands {
+			let executable = try XCTUnwrap(command["executable"] as? String)
+			XCTAssertEqual(executable, "/bin/sh")
+			let args = try XCTUnwrap(command["args"] as? [String])
+			let unported = try XCTUnwrap(command["unported_args"] as? [String])
+			XCTAssertEqual(args.count, 9)
+			XCTAssertEqual(unported.count, 9)
+			guard args.count == 9, unported.count == 9 else { throw CocoaError(.fileReadCorruptFile) }
+			for (field, values) in [("argv_sha256", args), ("unported_argv_sha256", unported)] {
+				let digest = SHA256.hash(data: Data(([executable] + values).joined(separator: "\0").utf8))
+					.map { String(format: "%02x", $0) }.joined()
+				XCTAssertEqual(command[field] as? String, digest)
+			}
+			let swap = SHA256.hash(data: Data(unported[3].utf8)).map { String(format: "%02x", $0) }.joined()
+			let detach = SHA256.hash(data: Data(unported[1].utf8)).map { String(format: "%02x", $0) }.joined()
+			XCTAssertEqual(report["program_sha256"] as? String, swap)
+			XCTAssertEqual(report["detach_sha256"] as? String, detach)
+		}
+
 	}
 
 	func testActualReleaseSwapKeepsSameFilesystemPublicationAndSafeRollback() throws {
