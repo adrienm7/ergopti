@@ -330,7 +330,7 @@ From the whole-day log of the report `mac-2026-10-27_233356`. Boots and their bu
 - **L59** Fixed 8b08121e0f for the sleep; the orphan key-ups stay open. "A character key stayed
   down 589.8 s ... its key-up was lost" (19:46:46, 2 times): keys pressed around 16:55 before a
   three-hour sleep behind the lock screen; the awake clock advanced 590 s. A sleep is now detected
-  between two key events (wall clock SLEEP_GAP_MS ahead of the awake clock), held keys are retired
+  between two key events (wall clock SLEEP_CLOCK_DRIFT_MS ahead of the awake clock), held keys are retired
   at INFO and their key-ups right after are counted apart. Open [PHYS-M]: "A key-up reached the
   keymap taps with no key-down before it (2 times)" at 16:55:18, 44 s after the 16:54:34 boot,
   with 2 late events, no sleep and no tap outage; candidates are a secure text field (16:54:47
